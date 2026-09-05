@@ -101,7 +101,7 @@ import {
   fecharSeletorPortais,
   useSeletorPortaisAberto,
 } from "@/components/portal-launcher";
-import { BannerNaoAtribuidas } from "@/components/nina/BannerNaoAtribuidas";
+import { CentralAtencao } from "@/components/nina/CentralAtencao";
 
 import logoSaoFranciscoCdn from "@/assets/logo-policlinica-sao-francisco-de-paula.png.asset.json";
 import logoMeninoJesus from "@/assets/logo-menino-jesus.png";
@@ -1243,7 +1243,9 @@ function AppShellInner() {
                 {subsystemLabel ?? "Portais"}
               </span>
             </button>
-            <BannerNaoAtribuidas />
+            {/* Central de Atenção: posição fixa imediatamente à direita do
+                botão de portal ("Clínica Médica"). */}
+            <CentralAtencao />
           </div>
 
           <div className="flex flex-1 items-center justify-end gap-3 min-w-0 sm:flex-none sm:justify-center">
@@ -1262,7 +1264,10 @@ function AppShellInner() {
                   else setClinicaAtual(v);
                 }}
               >
-                <SelectTrigger className="max-w-[180px] sm:max-w-sm w-auto min-w-0 h-9 px-2.5 text-xs font-semibold truncate shrink rounded-lg border-0 bg-slate-100 text-slate-800 shadow-none focus:ring-0 focus-visible:ring-0 hover:bg-slate-200 [&>svg]:w-4 [&>svg]:h-4 [&>svg]:shrink-0 [&>svg]:ml-1.5 [&>span]:truncate [&>span]:min-w-0">
+                <SelectTrigger
+                  title={clinicaAtual?.clinica.nome}
+                  style={{ width: "clamp(120px, 18vw, 300px)" }}
+                  className="max-w-[180px] sm:max-w-[300px] min-w-0 h-9 px-2.5 text-xs font-semibold truncate shrink rounded-lg border-0 bg-slate-100 text-slate-800 shadow-none focus:ring-0 focus-visible:ring-0 hover:bg-slate-200 [&>svg]:w-4 [&>svg]:h-4 [&>svg]:shrink-0 [&>svg]:ml-1.5 [&>span]:truncate [&>span]:min-w-0">
                   <SelectValue placeholder="Selecione a clínica" />
                 </SelectTrigger>
                 <SelectContent>
