@@ -97,8 +97,6 @@ import {
 } from "@/components/nina/AtendimentoTabs";
 import {
   AtendInbox,
-  AtendSupervisor,
-  AtendRelatorios,
   AtendRoteamento,
 } from "@/components/nina/AtendimentoExtraTabs";
 
@@ -239,8 +237,6 @@ function NinaPage() {
     "atend-kb",
     "atend-pausas",
     "atend-inbox",
-    "atend-supervisor",
-    "atend-relatorios",
     "atend-roteamento",
     "aprendizado",
     "base-conhecimento",
@@ -464,12 +460,6 @@ function NinaPage() {
         </TabsContent>
         <TabsContent value="atend-inbox" className="mt-0 h-full">
           <AtendInbox />
-        </TabsContent>
-        <TabsContent value="atend-supervisor">
-          <AtendSupervisor />
-        </TabsContent>
-        <TabsContent value="atend-relatorios">
-          <AtendRelatorios />
         </TabsContent>
         <TabsContent value="atend-roteamento">
           <AtendRoteamento />
