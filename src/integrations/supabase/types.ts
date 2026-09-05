@@ -748,6 +748,7 @@ export type Database = {
           assigned_at: string | null
           atribuicao_origem: string | null
           atribuida_user_id: string | null
+          awaiting_patient_since: string | null
           canal: string
           clinica_id: string
           closed_at: string | null
@@ -768,6 +769,7 @@ export type Database = {
           janela_24h_em: string | null
           nina_fluxo_estado: Json | null
           owner_type: string
+          patient_response_deadline: string | null
           primeiro_resp_em: string | null
           prioridade: number
           protocol_number: string | null
@@ -788,6 +790,7 @@ export type Database = {
           assigned_at?: string | null
           atribuicao_origem?: string | null
           atribuida_user_id?: string | null
+          awaiting_patient_since?: string | null
           canal?: string
           clinica_id: string
           closed_at?: string | null
@@ -808,6 +811,7 @@ export type Database = {
           janela_24h_em?: string | null
           nina_fluxo_estado?: Json | null
           owner_type?: string
+          patient_response_deadline?: string | null
           primeiro_resp_em?: string | null
           prioridade?: number
           protocol_number?: string | null
@@ -828,6 +832,7 @@ export type Database = {
           assigned_at?: string | null
           atribuicao_origem?: string | null
           atribuida_user_id?: string | null
+          awaiting_patient_since?: string | null
           canal?: string
           clinica_id?: string
           closed_at?: string | null
@@ -848,6 +853,7 @@ export type Database = {
           janela_24h_em?: string | null
           nina_fluxo_estado?: Json | null
           owner_type?: string
+          patient_response_deadline?: string | null
           primeiro_resp_em?: string | null
           prioridade?: number
           protocol_number?: string | null
