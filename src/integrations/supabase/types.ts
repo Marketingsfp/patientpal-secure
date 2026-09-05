@@ -7667,14 +7667,19 @@ export type Database = {
           clinica_id: string
           conversa_id: string | null
           correcao: string
+          correcao_original: string | null
           created_at: string
           id: string
           mensagem_id: string | null
           mensagem_texto: string | null
+          motivo_rejeicao: string | null
           observacao: string | null
           pergunta_texto: string | null
           reportado_por: string
+          revisado_em: string | null
+          revisado_por: string | null
           status: string
+          unidade_id: string | null
           updated_at: string
         }
         Insert: {
@@ -7682,14 +7687,19 @@ export type Database = {
           clinica_id: string
           conversa_id?: string | null
           correcao: string
+          correcao_original?: string | null
           created_at?: string
           id?: string
           mensagem_id?: string | null
           mensagem_texto?: string | null
+          motivo_rejeicao?: string | null
           observacao?: string | null
           pergunta_texto?: string | null
           reportado_por: string
+          revisado_em?: string | null
+          revisado_por?: string | null
           status?: string
+          unidade_id?: string | null
           updated_at?: string
         }
         Update: {
@@ -7697,14 +7707,19 @@ export type Database = {
           clinica_id?: string
           conversa_id?: string | null
           correcao?: string
+          correcao_original?: string | null
           created_at?: string
           id?: string
           mensagem_id?: string | null
           mensagem_texto?: string | null
+          motivo_rejeicao?: string | null
           observacao?: string | null
           pergunta_texto?: string | null
           reportado_por?: string
+          revisado_em?: string | null
+          revisado_por?: string | null
           status?: string
+          unidade_id?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -11636,6 +11651,10 @@ export type Database = {
           teleconsulta: boolean
           token_publico: string
         }[]
+      }
+      nina_fb_pode_revisar: {
+        Args: { _clinica_id: string; _user_id: string }
+        Returns: boolean
       }
       nina_kb_buscar_semantico: {
         Args: { p_base_id: string; p_embedding: string; p_limite?: number }
