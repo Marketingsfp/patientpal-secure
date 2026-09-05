@@ -231,6 +231,7 @@ export function AtendInbox() {
       setFilaAberta(s.filaAberta);
       setPausaAtiva(p);
       setPauseReasons(rs);
+      setStatusCarregado(true);
     } catch {
       // Estado auxiliar da fila: se falhar, a aba segue com os valores atuais.
     }
