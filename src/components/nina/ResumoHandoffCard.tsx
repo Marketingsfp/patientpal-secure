@@ -26,14 +26,19 @@ export function ResumoHandoffCard({
   const obter = useServerFn(obterResumoHandoff);
   const [linha, setLinha] = useState<Linha>(null);
   const [carregando, setCarregando] = useState(false);
-  const [aberto, setAberto] = useState(true);
+  // Regra: cada conversa começa com o resumo RECOLHIDO.
+  const [aberto, setAberto] = useState(false);
+  const [atualizado, setAtualizado] = useState(false);
 
   const carregar = useCallback(
     async (forcar = false) => {
       setCarregando(true);
       try {
         const r = (await obter({ data: { clinicaId, conversaId, forcar } })) as Linha;
-        setLinha(r);
+        setLinha((anterior) => {
+          if (anterior && r && anterior.versao !== r.versao) setAtualizado(true);
+          return r;
+        });
       } catch {
         setLinha({ status: "erro", payload: null, erro: "Não foi possível gerar o resumo.", versao: 0 });
       } finally {
@@ -51,7 +56,8 @@ export function ResumoHandoffCard({
 
   const r = linha.payload;
   return (
-    <div className="rounded-lg border border-purple-300/70 bg-purple-50 text-purple-950 dark:border-purple-400/30 dark:bg-purple-950/30 dark:text-purple-100">
+    <div className="sticky top-0 z-20 rounded-lg border border-purple-300/70 bg-purple-50 text-purple-950 shadow-sm dark:border-purple-400/30 dark:bg-purple-950/95 dark:text-purple-100">
+
       <div className="flex items-center gap-2 px-3 py-2">
         <button
           type="button"
