@@ -449,21 +449,42 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
                         });
                       }
 
+                      // Envio confirmado: agora sim a conversa é resolvida pelo
+                      // MESMO mecanismo do botão "Resolver". Falha de envio nunca
+                      // chega aqui (a exceção sobe), então não existe conversa
+                      // resolvida sem mensagem final entregue.
+                      if (encerrarConversaId) {
+                        try {
+                          const { resolverConversaPelaNina } = await import(
+                            "@/lib/nina/encerramento-automatico.server"
+                          );
+                          await resolverConversaPelaNina({
+                            clinicaId: params.clinicaId,
+                            conversaId: encerrarConversaId,
+                          });
+                        } catch (e) {
+                          console.error("[nina] falha ao resolver conversa automaticamente", e);
+                        }
+                      }
+
                       // Espera do paciente: só abre prazo quando a Nina fez
                       // uma pergunta necessária para continuar. Informação
                       // simples ou despedida não liga relógio nenhum.
-                      try {
-                        const { registrarEsperaPorTelefone } = await import(
-                          "@/lib/nina/espera-paciente.server"
-                        );
-                        await registrarEsperaPorTelefone({
-                          clinicaId: params.clinicaId,
-                          telefone: from,
-                          resposta: reply,
-                        });
-                      } catch (e) {
-                        console.error("nina espera paciente error", e);
+                      if (!encerrarConversaId) {
+                        try {
+                          const { registrarEsperaPorTelefone } = await import(
+                            "@/lib/nina/espera-paciente.server"
+                          );
+                          await registrarEsperaPorTelefone({
+                            clinicaId: params.clinicaId,
+                            telefone: from,
+                            resposta: reply,
+                          });
+                        } catch (e) {
+                          console.error("nina espera paciente error", e);
+                        }
                       }
+
 
 
 
