@@ -23,7 +23,7 @@ export type OpcoesChamada = {
   messages: ChatMensagem[];
   tools?: readonly unknown[];
   maxTokens?: number;
-  /** Reservado para a Fase 2 (LOW/MEDIUM/HIGH). Não usado nesta fase. */
+  /** Fase 2: esforço de raciocínio decidido pelo Reasoning Router. */
   reasoning?: "none" | "low" | "medium" | "high";
   stream?: boolean;
 };
@@ -63,6 +63,10 @@ export async function chamarModeloGemini(opcoes: OpcoesChamada): Promise<Respost
     headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
     body: JSON.stringify({
       model: opcoes.modelo,
+      // Fase 2: nível LOW/MEDIUM/HIGH escolhido pelo Reasoning Router.
+      ...(opcoes.reasoning && opcoes.reasoning !== "none"
+        ? { reasoning_effort: opcoes.reasoning }
+        : {}),
       ...(opcoes.tools ? { tools: opcoes.tools } : {}),
       ...(opcoes.maxTokens ? { max_tokens: opcoes.maxTokens } : {}),
       messages: opcoes.messages,
@@ -115,6 +119,9 @@ export async function chamarModeloGeminiStream(
     body: JSON.stringify({
       model: opcoes.modelo,
       stream: true,
+      ...(opcoes.reasoning && opcoes.reasoning !== "none"
+        ? { reasoning_effort: opcoes.reasoning }
+        : {}),
       ...(opcoes.tools ? { tools: opcoes.tools } : {}),
       ...(opcoes.maxTokens ? { max_tokens: opcoes.maxTokens } : {}),
       messages: opcoes.messages,
