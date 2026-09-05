@@ -43,6 +43,13 @@ export type AcaoScroll =
  */
 export function decidirScroll(args: {
   primeiraCarga: boolean;
+  /**
+   * Janela de abertura: a conversa acabou de ser aberta e a atendente ainda não
+   * navegou por conta própria. Enquanto isso, qualquer conteúdo que chegue
+   * depois (resumo da Nina, eventos internos, revalidação do cache) mantém a
+   * tela colada no fim, em vez de virar "↓ novas mensagens".
+   */
+  emAbertura?: boolean;
   totalAnterior: number;
   totalAtual: number;
   ultimoIdAnterior: string | null;
@@ -57,12 +64,15 @@ export function decidirScroll(args: {
     args.ultimoIdAtual !== args.ultimoIdAnterior && args.totalAtual > args.totalAnterior;
   if (!chegouItemNovo) return { tipo: "manter", novas: args.novasAtuais };
 
+  if (args.emAbertura) return { tipo: "ir_ao_fim", suave: false, zerarNovas: true };
+
   const quantidade = args.totalAtual - args.totalAnterior;
   if (pertoDoFim(args.posicao, args.limiar)) {
     return { tipo: "ir_ao_fim", suave: false, zerarNovas: true };
   }
   return { tipo: "manter", novas: args.novasAtuais + quantidade };
 }
+
 
 export function rotuloNovasMensagens(n: number): string {
   return n === 1 ? "1 nova mensagem" : `${n} novas mensagens`;
