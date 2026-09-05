@@ -342,9 +342,6 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
                     // Revalida o dono ANTES de enviar: um atendente pode ter
                     // assumido enquanto o modelo pensava. Nesse caso, a resposta
                     // é descartada para o paciente não receber IA e humano juntos.
-                    // Revalida o dono ANTES de enviar: um atendente pode ter
-                    // assumido enquanto o modelo pensava. Nesse caso, a resposta
-                    // é descartada para o paciente não receber IA e humano juntos.
                     if (reply && from) {
                       const agora = await estadoConversaPorTelefone(params.clinicaId, from);
                       if (!ninaPodeResponder(agora)) reply = "";
