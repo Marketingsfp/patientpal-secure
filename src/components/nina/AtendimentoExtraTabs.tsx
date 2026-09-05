@@ -579,6 +579,93 @@ export function AtendInbox() {
   const [assumindo, setAssumindo] = useState(false);
   const [assumirOpen, setAssumirOpen] = useState(false);
 
+  /* ---------- Mensagens rápidas (comandos "/") ---------- */
+  const respostasRapidas = useRespostasRapidas(clinicaId);
+  const registrarUsoFn = useServerFn(registrarUsoResposta);
+  const composerRef = useRef<HTMLTextAreaElement | null>(null);
+  const [slash, setSlash] = useState<ComandoDigitado | null>(null);
+  const [slashIdx, setSlashIdx] = useState(0);
+  // Prioriza (sem esconder) respostas ligadas ao que já está no atendimento.
+  const contextoResp = useMemo<string[]>(() => {
+    const ags: any[] = contato?.agendamentos ?? [];
+    return ags
+      .map((a) => String(a?.procedimento ?? "").trim())
+      .filter((s) => s.length > 3)
+      .slice(0, 3);
+  }, [contato]);
+  const itensResp = useRespostasFiltradas(respostasRapidas, slash?.termo ?? "", contextoResp);
+  useEffect(() => setSlashIdx(0), [slash?.termo]);
+
+  /**
+   * Variáveis: apenas dados reais. Só usa agendamento CONFIRMADO e futuro —
+   * uma intenção de agendar nunca vira confirmação.
+   */
+  const ctxVariaveis = useMemo<ContextoVariaveis>(() => {
+    const p = contato?.paciente ?? null;
+    const ags: any[] = contato?.agendamentos ?? [];
+    const agora = Date.now();
+    const ag = ags
+      .filter(
+        (a) =>
+          String(a?.status ?? "") === "confirmado" &&
+          a?.inicio &&
+          new Date(a.inicio).getTime() >= agora,
+      )
+      .sort((a, b) => new Date(a.inicio).getTime() - new Date(b.inicio).getTime())[0];
+    const dt = ag?.inicio ? new Date(ag.inicio) : null;
+    return {
+      "patient.name": p?.nome ?? "",
+      "patient.first_name": primeiroNome(p?.nome),
+      "patient.phone": p?.telefone ?? "",
+      "doctor.name": ag?.medico_nome ?? "",
+      "appointment.date": dt ? dt.toLocaleDateString("pt-BR") : "",
+      "appointment.time": dt
+        ? dt.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })
+        : "",
+      "unit.name": (clinicaAtual as any)?.clinica?.nome ?? "",
+      "procedure.name": ag?.procedimento ?? "",
+      "attendant.name": nomeUsuario(meuId) ?? "",
+    };
+  }, [contato, clinicaAtual, nomeUsuario, meuId]);
+
+  /**
+   * Insere o texto no composer (nunca envia) substituindo apenas o comando
+   * digitado, ou na posição do cursor quando veio do botão ⚡.
+   */
+  const inserirRespostaRapida = useCallback(
+    (r: RespostaRapida) => {
+      const { texto: conteudo, faltantes } = aplicarVariaveis(r.conteudo, ctxVariaveis);
+      const el = composerRef.current;
+      const pos = slash ?? {
+        inicio: el?.selectionStart ?? draft.length,
+        fim: el?.selectionEnd ?? draft.length,
+        termo: "",
+      };
+      const { texto, cursor } = substituirTrecho(draft, pos.inicio, pos.fim, conteudo);
+      setDraft(texto);
+      setSlash(null);
+      if (faltantes.length > 0)
+        toast.warning(`Não foi possível preencher “${faltantes.join("”, “")}”. Complete antes de enviar.`);
+      requestAnimationFrame(() => {
+        el?.focus();
+        try {
+          el?.setSelectionRange(cursor, cursor);
+        } catch {
+          /* navegador sem suporte: o texto já foi inserido */
+        }
+      });
+      if (clinicaId)
+        void registrarUsoFn({
+          data: { clinicaId, respostaId: r.id, conversaId: sel?.id ?? null },
+        }).catch(() => {
+          /* log de uso é best-effort e nunca bloqueia o atendimento */
+        });
+    },
+    [ctxVariaveis, slash, draft, clinicaId, registrarUsoFn, sel],
+  );
+
+
+
   const motivoBloqueio = !sel
     ? null
     : conversaEncerrada
