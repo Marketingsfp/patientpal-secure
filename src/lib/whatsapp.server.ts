@@ -976,11 +976,34 @@ ${procs || "(nenhum)"}`;
     }
   })();
 
+  // FASE 3: só entra em coleta de dados quando o paciente confirma que quer
+  // agendar. Marca BOOKING_INTENT_CONFIRMED no estado da conversa.
+  const blocoFase3 = await (async () => {
+    try {
+      const { flagFluxoFase3Ativa } = await import("@/lib/nina/atendimento-fase3.server");
+      if (!(await flagFluxoFase3Ativa(clinicaId))) return "";
+      const { avaliarIntencaoAgendar, blocoPromptFase3 } = await import(
+        "@/lib/nina/atendimento-fase3"
+      );
+      const { confirmado } = avaliarIntencaoAgendar(mensagemPaciente, fluxoEstado);
+      if (confirmado) {
+        fluxoEstado.appointment = { ...fluxoEstado.appointment, intent_confirmed: true };
+        if (fluxoEstado.flow.stage === "IDLE") {
+          fluxoEstado.flow = { stage: "BOOKING_INTENT_CONFIRMED" };
+        }
+      }
+      return blocoPromptFase3({ mensagem: mensagemPaciente, estado: fluxoEstado });
+    } catch {
+      return "";
+    }
+  })();
+
   const systemPromptFinal = [
     systemPrompt,
     blocoPromptDisponibilidade(),
     blocoKb,
     blocoFase2,
+    blocoFase3,
     podeAgendar ? blocoPromptAgenda() : "",
     blocoAprendizado,
     blocoPromptEstado(fluxoEstado),
