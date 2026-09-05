@@ -679,6 +679,8 @@ export function AtendInbox() {
   // é revalidado em segundo plano — nunca o conteúdo da conversa anterior.
   useEffect(() => {
     const id = sel?.id;
+    janelaRef.current = JANELA_INICIAL;
+    setTemMaisAntigas(false);
     const emCache = id ? cacheConversas.current.obter(id) : undefined;
     if (id && emCache) {
       setMsgs(emCache.msgs);
@@ -1454,6 +1456,18 @@ export function AtendInbox() {
                 className="h-full overflow-auto p-4 space-y-2 bg-atd-bg"
               >
 
+                {conteudoDaConversa && temMaisAntigas && (
+                  <div className="flex justify-center pb-1">
+                    <button
+                      type="button"
+                      onClick={() => void carregarAntigas()}
+                      disabled={carregandoAntigas}
+                      className="rounded-full border border-atd-border bg-atd-surface px-3 py-1 text-xs text-atd-ink-soft hover:bg-atd-blue-hover disabled:opacity-60"
+                    >
+                      {carregandoAntigas ? "Carregando…" : "Carregar mensagens anteriores"}
+                    </button>
+                  </div>
+                )}
                 {clinicaId && conteudoDaConversa && (
                   <ResumoHandoffCard key={sel.id} clinicaId={clinicaId} conversaId={sel.id} />
                 )}
