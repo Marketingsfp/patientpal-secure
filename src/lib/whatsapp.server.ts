@@ -769,10 +769,21 @@ export async function gerarRespostaNina(
       ? `IDENTIDADE: você JÁ perguntou a identidade nesta conversa e não houve confirmação clara. NÃO pergunte de novo — siga o atendimento normalmente. Só pergunte mais uma vez (a última) se for indispensável para a ação pedida (ex.: confirmar um agendamento existente dessa pessoa).`
       : `IDENTIDADE: ainda não perguntada. Você pode confirmar o nome UMA ÚNICA VEZ nesta conversa, e apenas se for necessário. Nunca abra a resposta com a confirmação: responda primeiro o que foi perguntado e, se ainda precisar, peça a confirmação no fim, em uma linha.`;
 
-  // No atendimento real o histórico NÃO é descartado ao encerrar a conversa:
-  // a Nina deve continuar entendendo o contexto das mensagens anteriores.
-  // O reset de memória vale apenas para o console de testes.
-  const msgsMemoria = ((histR as any)?.data ?? []) as any[];
+  // SESSÃO DA NINA (memória transitória com TTL deslizante, padrão 4h).
+  // Encerrar a conversa NÃO apaga histórico, CRM, agendamentos nem Base: o que
+  // vence é a MEMÓRIA de sessão. Dentro da janela, a Nina continua entendendo o
+  // contexto; fora dela, começa uma sessão nova sem arrastar assunto antigo.
+  const { resolverSessao, persistirEstadoSessao } = await import("@/lib/nina/sessao.server");
+  const { ttlSessaoMinutos } = await import("@/lib/nina/sessao");
+  const sessaoNina = resolverSessao(estadoId.fluxoEstadoBruto, estadoId.memoriaDesde);
+  if (sessaoNina.expirou) {
+    await persistirEstadoSessao(clinicaId, estadoId.conversaId, sessaoNina.estado);
+  }
+  const corteMemoria = Date.now() - ttlSessaoMinutos() * 60_000;
+  const msgsMemoria = (((histR as any)?.data ?? []) as any[]).filter((m: any) => {
+    const t = Date.parse(String(m?.created_at ?? ""));
+    return !Number.isFinite(t) || t >= corteMemoria;
+  });
 
   const historico = msgsMemoria
 
@@ -783,6 +794,7 @@ export async function gerarRespostaNina(
       content: String(m.body ?? "").slice(0, 1500),
     }))
     .filter((m: any) => m.content);
+
 
   // Nome curto para a apresentação (o cadastro costuma trazer a unidade após um travessão).
   const nomeCurtoUnidade =
@@ -917,12 +929,14 @@ ${procs || "(nenhum)"}`;
   // ------------------------------------------- estado estruturado do fluxo
   // Recarregado da própria conversa. É isto que faz o paciente já
   // identificado continuar identificado na mensagem seguinte.
+  const { blocoPromptSessao: blocoPromptSessaoNina } = await import("@/lib/nina/sessao");
   const {
     normalizarEstado,
     blocoPromptEstado,
     salvarFluxoEstado,
   } = await import("@/lib/nina/fluxo-estado.server");
-  const fluxoEstado = normalizarEstado(estadoId.fluxoEstadoBruto);
+  // Estado já passado pelo TTL de sessão (ver `sessaoNina` acima).
+  const fluxoEstado = sessaoNina.estado ?? normalizarEstado(estadoId.fluxoEstadoBruto);
   // Fallbacks de reidratação, em ordem de confiança: estado do fluxo →
   // paciente já vinculado à conversa → casamento pelo telefone do remetente.
   let pacienteIdEfetivo =
@@ -1072,6 +1086,7 @@ ${procs || "(nenhum)"}`;
 
     blocoAprendizado,
     blocoPromptEstado(fluxoEstado),
+    blocoPromptSessaoNina(sessaoNina),
   ]
     .filter(Boolean)
     .join("\n\n");

@@ -383,3 +383,84 @@ export async function devolverParaIA(args: {
     motivo: args.motivo ?? null,
   });
 }
+
+/** Status considerados "conversa encerrada" na arquitetura atual. */
+export const STATUS_ENCERRADOS = ["closed", "finished", "resolved"];
+
+/**
+ * Reabre automaticamente uma conversa encerrada quando chega uma nova mensagem
+ * real do paciente.
+ *
+ * - Persiste o novo status (não é efeito visual do frontend).
+ * - Zera a responsabilidade humana anterior: resolver encerra aquela
+ *   responsabilidade operacional; a distribuição recomeça pelas regras atuais.
+ * - Encerra estados transacionais da sessão da Nina, preservando o contexto
+ *   recente (nada de histórico, CRM, agendamento ou Base é apagado).
+ * - Idempotente: o UPDATE só acerta linhas ainda encerradas, então webhook
+ *   duplicado, retry ou duas instâncias não geram duas reaberturas.
+ */
+export async function reabrirConversaPorMensagemPaciente(args: {
+  clinicaId: string;
+  telefone: string;
+}): Promise<Array<{ id: string }>> {
+  const digits = normalizarTelefone(args.telefone);
+  if (!digits) return [];
+
+  const { data: alvos } = await supabaseAdmin
+    .from("atend_conversas")
+    .select("id, nina_fluxo_estado")
+    .eq("clinica_id", args.clinicaId)
+    .in("contato_telefone", [digits, `+${digits}`])
+    .in("status", STATUS_ENCERRADOS);
+  if (!alvos || alvos.length === 0) return [];
+
+  const { ninaDesativadaNaClinica } = await import("@/lib/nina-desligada.server");
+  const ninaOff = await ninaDesativadaNaClinica(args.clinicaId).catch(() => false);
+  const { normalizarEstado } = await import("@/lib/nina/fluxo-estado.server");
+  const { encerrarEstadosTransacionais } = await import("@/lib/nina/sessao");
+
+  const agora = new Date().toISOString();
+  const reabertas: Array<{ id: string }> = [];
+
+  for (const alvo of alvos as Array<{ id: string; nina_fluxo_estado: unknown }>) {
+    const estado = encerrarEstadosTransacionais(normalizarEstado(alvo.nina_fluxo_estado));
+    const { data: ok } = await supabaseAdmin
+      .from("atend_conversas")
+      .update({
+        status: ninaOff ? "waiting" : "bot_attending",
+        owner_type: ninaOff ? "NONE" : "AI",
+        ai_enabled: !ninaOff,
+        atribuida_user_id: null,
+        assigned_at: null,
+        aguardando_desde: ninaOff ? agora : null,
+        resolved_at: null,
+        closed_at: null,
+        ultima_msg_em: agora,
+        updated_at: agora,
+        nina_fluxo_estado: { ...estado, updated_at: agora } as never,
+      })
+      .eq("id", alvo.id)
+      .eq("clinica_id", args.clinicaId)
+      // Trava de idempotência: se outra instância já reabriu, 0 linhas.
+      .in("status", STATUS_ENCERRADOS)
+      .select("id");
+    if (!ok || ok.length === 0) continue;
+
+    reabertas.push({ id: alvo.id });
+    await registrarEvento({
+      clinicaId: args.clinicaId,
+      conversaId: alvo.id,
+      evento: "REABERTA",
+      motivo: "Conversa reaberta automaticamente após nova mensagem do paciente",
+    });
+    if (!ninaOff) {
+      await registrarEvento({
+        clinicaId: args.clinicaId,
+        conversaId: alvo.id,
+        evento: "ATRIBUIDA_IA",
+        motivo: "Reabertura: novo atendimento volta para a Nina",
+      });
+    }
+  }
+  return reabertas;
+}
