@@ -287,6 +287,13 @@ export function AtendInbox() {
     },
     [navigate],
   );
+  // Leitura do endereço dentro de callbacks, sem recriá-los a cada navegação.
+  const conversaIdUrlRef = useRef<string | null>(conversaIdUrl);
+  useEffect(() => {
+    conversaIdUrlRef.current = conversaIdUrl;
+  }, [conversaIdUrl]);
+  // Conversas já buscadas por link direto (evita repetir a busca em loop).
+  const deepLinkTentado = useRef<Set<string>>(new Set());
 
   // Filtro "somente espera crítica" — acionado pela Central de Atenção.
   const [soCriticas, setSoCriticas] = useState(false);
@@ -762,8 +769,44 @@ export function AtendInbox() {
     }
     if (selIdRef.current === conversaIdUrl) return;
     const c = convs.find((x: any) => x.id === conversaIdUrl);
-    if (c) setSel(c);
-  }, [conversaIdUrl, convs]);
+    if (c) {
+      setSel(c);
+      return;
+    }
+    // FASE 2 — F5 / link colado / Voltar-Avançar: a conversa do endereço pode
+    // não estar na lista do filtro atual. Buscamos ela pelo id e, se o usuário
+    // puder vê-la, o filtro acompanha. Sem permissão, volta para /app/nina.
+    if (!clinicaId || !meuId) return;
+    if (deepLinkTentado.current.has(conversaIdUrl)) return;
+    deepLinkTentado.current.add(conversaIdUrl);
+    const idPedido = conversaIdUrl;
+    void (async () => {
+      try {
+        const row: any = await obterConversaFn({ data: { clinicaId, conversaId: idPedido } });
+        if (conversaIdUrlRef.current !== idPedido) return;
+        if (!row) {
+          toast.error("Conversa não encontrada.");
+          abrirPelaUrl(null, true);
+          return;
+        }
+        const destino = escopoParaConversa(row, { escopoAtual: escopo, userId: meuId, gestor: souGestor });
+        if (!destino) {
+          toast.error("Você não tem acesso a esta conversa.");
+          abrirPelaUrl(null, true);
+          return;
+        }
+        setSel(row);
+        setConvs((prev: any[]) =>
+          prev.some((x: any) => x.id === row.id) ? prev : [row, ...prev],
+        );
+        if (destino !== escopo) setEscopo(destino);
+      } catch (e: any) {
+        if (conversaIdUrlRef.current !== idPedido) return;
+        mostrarErro(e);
+        abrirPelaUrl(null, true);
+      }
+    })();
+  }, [conversaIdUrl, convs, clinicaId, meuId, escopo, souGestor, obterConversaFn, abrirPelaUrl]);
 
   // Abrir uma conversa a partir da Central de Atenção, sem trocar de página
   // e sem mexer em filtros/rascunho de quem já estava atendendo.
