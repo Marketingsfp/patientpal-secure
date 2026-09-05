@@ -40,7 +40,11 @@ export function ResumoHandoffCard({
     async (forcar = false) => {
       setCarregando(true);
       try {
-        const r = (await obter({ data: { clinicaId, conversaId, forcar } })) as Linha;
+        const r = (await medirRequest(
+          "obterResumoHandoff",
+          obter({ data: { clinicaId, conversaId, forcar } }),
+        )) as Linha;
+        marcarTroca("T7_resumo");
         setLinha((anterior) => {
           if (anterior && r && anterior.versao !== r.versao) setAtualizado(true);
           return r;
