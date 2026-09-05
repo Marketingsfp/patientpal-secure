@@ -22,6 +22,9 @@ import {
   type OpcoesChamada,
 } from "./adapters/gemini-adapter.server";
 import { modeloNinaParaClinica, type ResolucaoModelo } from "./modelo-flag.server";
+import { classificarErro, decidirRetry, mensagemCategoria, type CategoriaErro } from "./erros";
+import { motivoOperacional, rotuloHomologacao } from "./telemetria";
+import type { KnowledgeStatus } from "./knowledge-contract";
 import {
   selectThinkingLevel,
   nivelNaoRegride,
@@ -50,6 +53,14 @@ export type PedidoNina = {
   raciocinio?: ContextoRaciocinio;
   /** Força o nível (uso interno de teste). Ignora o router. */
   nivelForcado?: NivelRaciocinio;
+  /** Fase 5 — observabilidade. Id da conversa (WhatsApp, painel ou console de teste). */
+  conversaId?: string | null;
+  /** Situação da Base de Conhecimentos nesta etapa, quando já consultada. */
+  knowledgeStatus?: KnowledgeStatus | null;
+  /** Ferramentas já executadas neste turno (só os nomes). */
+  ferramentasUsadas?: readonly string[];
+  /** A etapa terminou em transferência para humano. */
+  handoff?: boolean;
 };
 
 export type RespostaNina = RespostaChat & {
@@ -59,6 +70,10 @@ export type RespostaNina = RespostaChat & {
   nivel: NivelRaciocinio;
   /** Etiqueta interna de homologação. NUNCA enviar ao paciente. */
   debug: string;
+  /** Fase 5 — tempo total, tentativas e categoria de erro (quando houver). */
+  latenciaMs: number;
+  tentativas: number;
+  categoriaErro: CategoriaErro | null;
 };
 
 /**
@@ -86,10 +101,67 @@ export async function ninaAIGateway(pedido: PedidoNina): Promise<RespostaNina> {
     reasoning: nivel,
   };
 
-  const debug = rotuloDebug(resolucao.modelo, nivel);
-  // Visível só no log do servidor (homologação/produção interna).
-  console.info("[nina-ai-gateway]", debug, "|", decisao.motivo);
+  const debug = rotuloHomologacao({
+    model: resolucao.modelo,
+    thinking_level: nivel,
+    knowledge_status: pedido.knowledgeStatus ?? null,
+    tool_calls: pedido.ferramentasUsadas ?? [],
+  });
+  const routeReason = motivoOperacional(decisao.motivo, nivel);
+  // Só motivo operacional curto no log — nunca raciocínio do modelo.
+  console.info("[nina-ai-gateway]", debug, "| route_reason:", routeReason);
 
-  const resposta = await chamarModeloGemini(opcoes);
-  return { ...resposta, modelo: resolucao.modelo, resolucao, nivel, debug };
+  // ---- Chamada com política única de timeout/retry (Fase 5).
+  const inicio = Date.now();
+  let tentativa = 0;
+  let resposta = await chamarModeloGemini(opcoes);
+  let categoria: CategoriaErro | null = null;
+  tentativa = 1;
+
+  while (!resposta.ok) {
+    categoria = classificarErro({ status: resposta.status ?? null, erro: resposta.erro, origem: "modelo" });
+    const decisaoRetry = decidirRetry(categoria, tentativa);
+    console.warn("[nina-ai-gateway] falha", categoria, "|", decisaoRetry.motivo);
+    if (!decisaoRetry.repetir) break;
+    await new Promise((r) => setTimeout(r, decisaoRetry.esperaMs));
+    resposta = await chamarModeloGemini(opcoes);
+    tentativa += 1;
+    if (resposta.ok) categoria = null;
+  }
+
+  const latenciaMs = Date.now() - inicio;
+  const retries = Math.max(0, tentativa - 1);
+
+  void (async () => {
+    const { registrarExecucao } = await import("./telemetria.server");
+    await registrarExecucao({
+      clinica_id: pedido.clinicaId,
+      conversation_id: pedido.conversaId ?? null,
+      perfil: pedido.perfil,
+      model: resolucao.modelo,
+      thinking_level: nivel,
+      route_reason: routeReason,
+      latency_ms: latenciaMs,
+      knowledge_status: pedido.knowledgeStatus ?? null,
+      tool_calls: [...(pedido.ferramentasUsadas ?? [])],
+      success: resposta.ok,
+      error_category: categoria,
+      handoff: Boolean(pedido.handoff),
+      input_tokens: resposta.uso?.entrada ?? null,
+      output_tokens: resposta.uso?.saida ?? null,
+      retries,
+    });
+  })();
+
+  return {
+    ...resposta,
+    ...(resposta.ok ? {} : { erro: categoria ? mensagemCategoria(categoria) : resposta.erro }),
+    modelo: resolucao.modelo,
+    resolucao,
+    nivel,
+    debug,
+    latenciaMs,
+    tentativas: tentativa,
+    categoriaErro: categoria,
+  };
 }
