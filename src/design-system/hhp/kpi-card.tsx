@@ -106,7 +106,18 @@ export function HhpKpiCard({
   );
 }
 
-/** Grade responsiva de KPIs com scroll horizontal no mobile e grid ≥ md. */
+/**
+ * Grade responsiva de KPIs.
+ *
+ * No celular em pé (≤ 439px, que cobre praticamente todo aparelho comum) os
+ * cards ficam em COLUNA ÚNICA: com duas colunas, um valor em dinheiro como
+ * "R$ 123.456,78" não cabe na metade da largura e era cortado. A partir de
+ * 440px volta a duas colunas, e o desktop segue igual ao que sempre foi.
+ *
+ * Exceção: `compact` (faixa fina de contadores em cima de uma lista, como na
+ * Agenda). Ali os valores são números pequenos, cabem em duas colunas, e
+ * empilhá-los empurraria a lista para fora da tela do celular.
+ */
 export function HhpKpiRow({
   children,
   compact = false,
@@ -119,8 +130,10 @@ export function HhpKpiRow({
   return (
     <div
       className={cn(
-        "grid w-full gap-4 grid-cols-2 sm:grid-cols-3",
-        compact ? "lg:grid-cols-6" : "lg:grid-cols-5",
+        "grid w-full gap-3 sm:gap-4 sm:grid-cols-3",
+        compact
+          ? "grid-cols-2 lg:grid-cols-6"
+          : "grid-cols-1 min-[440px]:grid-cols-2 lg:grid-cols-5",
         className,
       )}
     >

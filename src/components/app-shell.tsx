@@ -223,9 +223,12 @@ export function itemDeMenuAtivo(pathname: string, to: string): boolean {
   return p === to || p.startsWith(`${to}/`);
 }
 
-// Bottom nav mobile — piloto São Francisco de Paula (flag ux_melhorias).
-// Os 4 atalhos mais usados; o resto do menu continua acessível via "Mais".
-const BOTTOM_NAV_ITENS: ReadonlyArray<{ to: string; label: string; Icon: typeof CalendarDays }> = [
+// Barra inferior do celular (`md:hidden`), em todas as clínicas: os 4 atalhos
+// mais usados. O resto do menu continua acessível pelo botão "Mais", que abre
+// a mesma gaveta lateral do hambúrguer.
+type BottomNavItem = { to: string; label: string; Icon: typeof CalendarDays };
+
+const BOTTOM_NAV_ITENS: ReadonlyArray<BottomNavItem> = [
   { to: "/app/painel", label: "Início", Icon: LayoutDashboard },
   { to: "/app/agenda", label: "Agenda", Icon: CalendarDays },
   { to: "/app/checkin", label: "Fila", Icon: ConciergeBell },
@@ -237,11 +240,14 @@ function LiquidBottomNav({
   onNavigate,
   onMais,
   cor,
+  itens,
 }: {
   pathname: string;
   onNavigate: (to: string) => void;
   onMais: () => void;
   cor: string;
+  /** Já filtrado pelas permissões do perfil — ver `bottomNavItens`. */
+  itens: ReadonlyArray<BottomNavItem>;
 }) {
   const navRef = useRef<HTMLElement | null>(null);
   const [navW, setNavW] = useState(0);
@@ -256,9 +262,7 @@ function LiquidBottomNav({
     return () => ro.disconnect();
   }, []);
 
-  const rotaIdx = BOTTOM_NAV_ITENS.findIndex(
-    (i) => pathname === i.to || pathname.startsWith(`${i.to}/`),
-  );
+  const rotaIdx = itens.findIndex((i) => pathname === i.to || pathname.startsWith(`${i.to}/`));
   // Índice "otimista": move o indicador no toque, sem esperar a rota montar.
   const [idxOtimista, setIdxOtimista] = useState<number | null>(null);
   const [, startNav] = useTransition();
@@ -266,7 +270,7 @@ function LiquidBottomNav({
     setIdxOtimista(null);
   }, [rotaIdx]);
   const activeIdx = idxOtimista ?? rotaIdx;
-  const slots = BOTTOM_NAV_ITENS.length + 1;
+  const slots = itens.length + 1;
   const cell = navW / slots;
   const cx = activeIdx >= 0 ? (activeIdx + 0.5) * cell : -999;
   const R = 30;
@@ -301,7 +305,7 @@ function LiquidBottomNav({
             : ({ backgroundColor: cor } as React.CSSProperties)
         }
       >
-        {BOTTOM_NAV_ITENS.map(({ to, label, Icon }, idx) => {
+        {itens.map(({ to, label, Icon }, idx) => {
           const active = idx === activeIdx;
           return (
             <a
@@ -346,7 +350,7 @@ function LiquidBottomNav({
           }}
         >
           {(() => {
-            const Ativo = BOTTOM_NAV_ITENS[activeIdx].Icon;
+            const Ativo = itens[activeIdx].Icon;
             return <Ativo className="h-5 w-5" />;
           })()}
         </div>
@@ -1001,6 +1005,14 @@ function AppShellInner() {
     });
   }, [flagFilteredRows, menuOrdem, uxMelhorias]);
 
+  // Barra inferior do celular: só entram as telas que o perfil realmente pode
+  // abrir. Sem esse filtro uma recepcionista veria "Início" e "Caixa" fixos no
+  // rodapé e tocaria neles para cair em "Acesso negado".
+  const bottomNavItens = useMemo(
+    () => BOTTOM_NAV_ITENS.filter((i) => leafAllowed(i.to, allowedModules)),
+    [allowedModules],
+  );
+
   // Resultado da busca do menu lateral (sem acento, case-insensitive).
   const termoMenu = buscaMenu.trim();
   const buscandoMenu = termoMenu.length > 0;
@@ -1220,7 +1232,10 @@ function AppShellInner() {
     <div
       className={cn(
         "flex flex-col bg-background overflow-hidden",
-        uxMelhorias ? "h-[100dvh]" : "h-screen",
+        // `dvh` acompanha a barra de endereço do navegador do celular, que
+        // aparece e some ao rolar. Com `100vh` o rodapé da tela ficava
+        // escondido atrás dela. No desktop os dois valores são iguais.
+        "h-dvh",
       )}
     >
       {/* Cabeçalho branco: ocupa 100% da largura no topo e é o único lugar do
@@ -1239,7 +1254,14 @@ function AppShellInner() {
             >
               <MenuIcon className="h-5 w-5" />
             </button>
-            <Link to="/app" className="flex items-center gap-2 min-w-0 shrink-0" title="ClinicaOS">
+            {/* No celular o atalho para a home sai do cabeçalho: ele repete o
+                "Início" da barra inferior e o espaço faz falta para o seletor
+                de clínica. */}
+            <Link
+              to="/app"
+              className="hidden sm:flex items-center gap-2 min-w-0 shrink-0"
+              title="ClinicaOS"
+            >
               <Activity className="h-5 w-5 shrink-0 text-slate-800" />
             </Link>
             <button
@@ -1277,7 +1299,8 @@ function AppShellInner() {
                 <SelectTrigger
                   title={clinicaAtual?.clinica.nome}
                   style={{ width: "clamp(120px, 18vw, 300px)" }}
-                  className="max-w-[180px] sm:max-w-[300px] min-w-0 h-9 px-2.5 text-xs font-semibold truncate shrink rounded-lg border-0 bg-slate-100 text-slate-800 shadow-none focus:ring-0 focus-visible:ring-0 hover:bg-slate-200 [&>svg]:w-4 [&>svg]:h-4 [&>svg]:shrink-0 [&>svg]:ml-1.5 [&>span]:truncate [&>span]:min-w-0">
+                  className="max-w-[180px] sm:max-w-[300px] min-w-0 h-9 px-2.5 text-xs font-semibold truncate shrink rounded-lg border-0 bg-slate-100 text-slate-800 shadow-none focus:ring-0 focus-visible:ring-0 hover:bg-slate-200 [&>svg]:w-4 [&>svg]:h-4 [&>svg]:shrink-0 [&>svg]:ml-1.5 [&>span]:truncate [&>span]:min-w-0"
+                >
                   <SelectValue placeholder="Selecione a clínica" />
                 </SelectTrigger>
                 <SelectContent>
@@ -1310,8 +1333,13 @@ function AppShellInner() {
               <UniversalSearchBar />
             </div>
             {/* Consulta de preços — fica no cabeçalho para a atendente
-                responder "quanto custa?" sem sair da Agenda ou da Recepção. */}
-            <BotaoTabelaValores />
+                responder "quanto custa?" sem sair da Agenda ou da Recepção.
+                No celular sai da barra (a tela continua no menu, em "Tabela de
+                valores"): é ferramenta de balcão e o cabeçalho não comporta
+                todos os ícones numa largura de telefone. */}
+            <span className="hidden sm:contents">
+              <BotaoTabelaValores />
+            </span>
             <Button
               variant="ghost"
               size="sm"
@@ -1326,7 +1354,11 @@ function AppShellInner() {
             <BotaoAcessibilidade />
             <div className="flex items-center gap-1.5 [&_button]:text-slate-700 [&_button:hover]:bg-slate-100 [&_button:hover]:text-slate-900">
               <EstornosBell />
-              <TTSToggle />
+              {/* Leitura em voz alta: recurso de mesa, escondido no celular
+                  pelo mesmo motivo da tabela de valores. */}
+              <span className="hidden sm:contents">
+                <TTSToggle />
+              </span>
             </div>
           </div>
         </header>
@@ -1643,8 +1675,9 @@ function AppShellInner() {
                 ? "p-0 w-full"
                 : cn(
                     "px-3 pt-1 sm:px-4 sm:pt-1.5 lg:px-6 lg:pt-2",
-                    // Espaço extra embaixo no mobile para não ficar atrás da bottom nav.
-                    uxMelhorias ? "pb-28 sm:pb-28 md:pb-4 lg:pb-6" : "pb-3 sm:pb-4 lg:pb-6",
+                    // Espaço extra embaixo no mobile para o conteúdo não ficar
+                    // atrás da barra inferior (que só existe abaixo de `md`).
+                    "pb-28 md:pb-4 lg:pb-6",
                   ),
               uxMelhorias && "animate-in fade-in duration-200 motion-reduce:animate-none",
             )}
@@ -1660,14 +1693,18 @@ function AppShellInner() {
         </Suspense>
       )}
       <KeyboardShortcuts />
-      {/* A barra inferior do celular some enquanto a gaveta está aberta: ela
-          é fixa no rodapé e cobriria o menu do usuário dentro da gaveta. */}
-      {!isChooser && uxMelhorias && !sidebarAberta && (
+      {/* A barra inferior é `md:hidden` — existe só no celular, em qualquer
+          clínica. Antes dependia da flag `ux_melhorias` (desligada na São
+          Francisco), e no celular sobrava apenas o hambúrguer para navegar.
+          Ela some enquanto a gaveta está aberta: é fixa no rodapé e cobriria o
+          menu do usuário dentro da gaveta. */}
+      {!isChooser && !sidebarAberta && bottomNavItens.length > 0 && (
         <LiquidBottomNav
           pathname={location.pathname}
           onNavigate={irPara}
           cor={corSidebar}
           onMais={() => setSidebarAberta(true)}
+          itens={bottomNavItens}
         />
       )}
       {seletorPortaisAberto && !isChooser && (

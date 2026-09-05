@@ -1121,6 +1121,64 @@ function Page() {
     }
   }
 
+  /**
+   * Botão de estorno de um movimento. Existe como componente próprio porque a
+   * mesma ação aparece em dois lugares: na última coluna da tabela (desktop) e
+   * dentro do card do celular. Só recebimento e sangria podem ser estornados.
+   */
+  function AcaoEstornoMov({ m }: { m: Mov }) {
+    if (!podeEscrever) return null;
+    if (m.tipo !== "recebimento" && m.tipo !== "sangria") return null;
+    const sangria = m.tipo === "sangria";
+    const st = sangria
+      ? estornosPorMov.get(m.id)
+      : m.lancamento_id
+        ? estornosPorLanc.get(m.lancamento_id)
+        : undefined;
+    if (st === "pendente") {
+      return (
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          disabled
+          className="h-7 text-xs text-amber-800 border-amber-300 bg-amber-50 cursor-not-allowed"
+          title="Solicitação de estorno enviada — aguardando decisão do financeiro"
+        >
+          <Undo2 className="h-3 w-3 mr-1" /> Aguardando aprovação
+        </Button>
+      );
+    }
+    if (st === "aprovado") {
+      return (
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          disabled
+          className="h-7 text-xs text-slate-600 border-slate-300 bg-slate-100 cursor-not-allowed"
+          title={sangria ? "Esta sangria já foi estornada" : "Este lançamento já foi estornado"}
+        >
+          <Undo2 className="h-3 w-3 mr-1" /> {sangria ? "Estornada" : "Estornado"}
+        </Button>
+      );
+    }
+    return (
+      <Button
+        type="button"
+        size="sm"
+        variant="outline"
+        className="h-7 text-xs text-rose-700 border-rose-200 hover:bg-rose-50"
+        title={
+          sangria ? "Solicitar estorno da sangria ao financeiro" : "Solicitar estorno ao financeiro"
+        }
+        onClick={() => setEstornoFor(m)}
+      >
+        <Undo2 className="h-3 w-3 mr-1" /> Solicitar estorno
+      </Button>
+    );
+  }
+
   function FormaCellEditavel({ m }: { m: Mov }) {
     const bucket = normalizarForma(m.forma_pagamento);
     const editavel = podeEscrever && bucket !== "misto" && TIPOS_FORMA_EDITAVEL.has(m.tipo);
@@ -3955,22 +4013,27 @@ function Page() {
 
           {!loading && (
             <Tabs defaultValue="saldo" className="w-full">
-              <TabsList className="bg-transparent p-0 h-auto gap-4 border-b border-slate-200/80 rounded-none w-full justify-start">
-                {[
-                  { v: "saldo", l: "Saldo" },
-                  { v: "movimentos", l: "Movimentos" },
-                  { v: "historico", l: "Histórico" },
-                  { v: "aguardando", l: "Aguardando" },
-                ].map((t) => (
-                  <TabsTrigger
-                    key={t.v}
-                    value={t.v}
-                    className="rounded-none border-b-2 border-transparent bg-transparent px-0 pb-2 pt-0 text-sm font-semibold text-slate-500 shadow-none data-[state=active]:border-indigo-600 data-[state=active]:bg-transparent data-[state=active]:text-indigo-700 data-[state=active]:shadow-none"
-                  >
-                    {t.l}
-                  </TabsTrigger>
-                ))}
-              </TabsList>
+              {/* Faixa de abas rolável de lado: numa tela de celular as quatro
+                  abas não cabem lado a lado, e sem isso a página inteira é que
+                  ganhava rolagem horizontal. */}
+              <div className="w-full overflow-x-auto">
+                <TabsList className="bg-transparent p-0 h-auto gap-4 border-b border-slate-200/80 rounded-none w-max min-w-full justify-start">
+                  {[
+                    { v: "saldo", l: "Saldo" },
+                    { v: "movimentos", l: "Movimentos" },
+                    { v: "historico", l: "Histórico" },
+                    { v: "aguardando", l: "Aguardando" },
+                  ].map((t) => (
+                    <TabsTrigger
+                      key={t.v}
+                      value={t.v}
+                      className="shrink-0 rounded-none border-b-2 border-transparent bg-transparent px-0 pb-2 pt-0 text-sm font-semibold text-slate-500 shadow-none data-[state=active]:border-indigo-600 data-[state=active]:bg-transparent data-[state=active]:text-indigo-700 data-[state=active]:shadow-none"
+                    >
+                      {t.l}
+                    </TabsTrigger>
+                  ))}
+                </TabsList>
+              </div>
 
               {/* ---------- Saldo ---------- */}
               <TabsContent value="saldo" className="space-y-4 pt-4">
@@ -4049,7 +4112,7 @@ function Page() {
                       </button>
                     </div>
 
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    <div className="grid grid-cols-1 min-[440px]:grid-cols-2 md:grid-cols-4 gap-3">
                       {[
                         {
                           key: "saldo",
@@ -4397,7 +4460,92 @@ function Page() {
                       )}
                     </div>
                   </CardHeader>
-                  <CardContent className="overflow-x-auto">
+
+                  {/* ---------- Celular: um card por movimento ----------
+                      A tabela tem 12 colunas e não cabe na largura de um
+                      telefone: rolando de lado, o operador perdia justamente
+                      a ponta da linha (forma e valor). No celular a mesma
+                      lista sai empilhada, com valor e ação sempre visíveis.
+                      A tabela completa continua a partir de `md`. */}
+                  <CardContent className="space-y-2 md:hidden">
+                    {minhasMovsFiltrados.length === 0 ? (
+                      <p className="py-6 text-center text-sm text-muted-foreground">
+                        {filtrosAtivos
+                          ? "Nenhum movimento corresponde aos filtros"
+                          : "Sem movimentos no período"}
+                        <span className="mt-1 block text-xs">
+                          Esta lista mostra apenas o seu caixa.
+                          {isManager
+                            ? ' O que outro operador recebeu aparece na aba "Todos (Financeiro)".'
+                            : ""}
+                        </span>
+                      </p>
+                    ) : (
+                      minhasMovsFiltrados.map((m) => {
+                        const enr = m.lancamento_id
+                          ? enrichPorLanc.get(m.lancamento_id)
+                          : undefined;
+                        const servico = enr?.servico ?? servicoFromDescricao(m.descricao);
+                        const medico = enr?.medico ?? null;
+                        const ficha = enr?.ficha ?? null;
+                        const paciente = enr?.paciente ?? pacienteFromDescricao(m.descricao);
+                        const sinal = TIPO_SINAL[m.tipo];
+                        return (
+                          <div key={m.id} className="rounded-xl border bg-card p-3 shadow-sm">
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+                                <Badge variant="outline" className={TIPO_CLASS[m.tipo]}>
+                                  {TIPO_LABEL[m.tipo]}
+                                </Badge>
+                                <span className="text-xs tabular-nums text-muted-foreground">
+                                  {new Date(m.created_at).toLocaleDateString("pt-BR")} ·{" "}
+                                  {new Date(m.created_at).toLocaleTimeString("pt-BR", {
+                                    hour: "2-digit",
+                                    minute: "2-digit",
+                                  })}
+                                </span>
+                              </div>
+                              <span
+                                className={`shrink-0 text-base font-bold tabular-nums ${
+                                  sinal < 0 ? "text-rose-600" : sinal > 0 ? "text-emerald-600" : ""
+                                }`}
+                              >
+                                {sinal < 0 ? "-" : ""}
+                                {fmt(m.valor)}
+                              </span>
+                            </div>
+                            {paciente && (
+                              <p className="mt-1.5 text-sm font-medium uppercase leading-tight">
+                                {paciente}
+                              </p>
+                            )}
+                            <p className="mt-0.5 text-xs leading-snug text-muted-foreground">
+                              {m.descricao || "—"}
+                            </p>
+                            {(servico || medico || ficha) && (
+                              <p className="mt-0.5 text-xs leading-snug text-muted-foreground">
+                                {[
+                                  servico,
+                                  medico,
+                                  ficha ? `Ficha ${formatFichaCaixa(ficha)}` : null,
+                                ]
+                                  .filter(Boolean)
+                                  .join(" · ")}
+                              </p>
+                            )}
+                            <div className="mt-2 flex flex-wrap items-center justify-between gap-2 border-t pt-2">
+                              <span className="text-xs text-muted-foreground">
+                                {formatarFormaPagamento(m, mistoObs)} · {usuarioNomeFor(m)}
+                              </span>
+                              <AcaoEstornoMov m={m} />
+                            </div>
+                          </div>
+                        );
+                      })
+                    )}
+                  </CardContent>
+
+                  <CardContent className="hidden overflow-x-auto md:block">
                     <Table>
                       <TableHeader>
                         <TableRow>
@@ -4566,98 +4714,7 @@ function Page() {
                                   {fmt(m.valor)}
                                 </TableCell>
                                 <TableCell className="text-right sticky right-0 z-10 bg-card border-l">
-                                  {m.tipo === "recebimento" &&
-                                    podeEscrever &&
-                                    (() => {
-                                      const st = m.lancamento_id
-                                        ? estornosPorLanc.get(m.lancamento_id)
-                                        : undefined;
-                                      if (st === "pendente") {
-                                        return (
-                                          <Button
-                                            type="button"
-                                            size="sm"
-                                            variant="outline"
-                                            disabled
-                                            className="h-7 text-xs text-amber-800 border-amber-300 bg-amber-50 cursor-not-allowed"
-                                            title="Solicitação de estorno enviada — aguardando decisão do financeiro"
-                                          >
-                                            <Undo2 className="h-3 w-3 mr-1" /> Aguardando aprovação
-                                          </Button>
-                                        );
-                                      }
-                                      if (st === "aprovado") {
-                                        return (
-                                          <Button
-                                            type="button"
-                                            size="sm"
-                                            variant="outline"
-                                            disabled
-                                            className="h-7 text-xs text-slate-600 border-slate-300 bg-slate-100 cursor-not-allowed"
-                                            title="Este lançamento já foi estornado"
-                                          >
-                                            <Undo2 className="h-3 w-3 mr-1" /> Estornado
-                                          </Button>
-                                        );
-                                      }
-                                      return (
-                                        <Button
-                                          type="button"
-                                          size="sm"
-                                          variant="outline"
-                                          className="h-7 text-xs text-rose-700 border-rose-200 hover:bg-rose-50"
-                                          title="Solicitar estorno ao financeiro"
-                                          onClick={() => setEstornoFor(m)}
-                                        >
-                                          <Undo2 className="h-3 w-3 mr-1" /> Solicitar estorno
-                                        </Button>
-                                      );
-                                    })()}
-                                  {m.tipo === "sangria" &&
-                                    podeEscrever &&
-                                    (() => {
-                                      const st = estornosPorMov.get(m.id);
-                                      if (st === "pendente") {
-                                        return (
-                                          <Button
-                                            type="button"
-                                            size="sm"
-                                            variant="outline"
-                                            disabled
-                                            className="h-7 text-xs text-amber-800 border-amber-300 bg-amber-50 cursor-not-allowed"
-                                            title="Solicitação de estorno enviada — aguardando decisão do financeiro"
-                                          >
-                                            <Undo2 className="h-3 w-3 mr-1" /> Aguardando aprovação
-                                          </Button>
-                                        );
-                                      }
-                                      if (st === "aprovado") {
-                                        return (
-                                          <Button
-                                            type="button"
-                                            size="sm"
-                                            variant="outline"
-                                            disabled
-                                            className="h-7 text-xs text-slate-600 border-slate-300 bg-slate-100 cursor-not-allowed"
-                                            title="Esta sangria já foi estornada"
-                                          >
-                                            <Undo2 className="h-3 w-3 mr-1" /> Estornada
-                                          </Button>
-                                        );
-                                      }
-                                      return (
-                                        <Button
-                                          type="button"
-                                          size="sm"
-                                          variant="outline"
-                                          className="h-7 text-xs text-rose-700 border-rose-200 hover:bg-rose-50"
-                                          title="Solicitar estorno da sangria ao financeiro"
-                                          onClick={() => setEstornoFor(m)}
-                                        >
-                                          <Undo2 className="h-3 w-3 mr-1" /> Solicitar estorno
-                                        </Button>
-                                      );
-                                    })()}
+                                  <AcaoEstornoMov m={m} />
                                 </TableCell>
                               </TableRow>,
                             ];
@@ -6279,7 +6336,7 @@ function Page() {
                 ];
                 return (
                   <>
-                    <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3">
+                    <div className="grid grid-cols-1 min-[440px]:grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3">
                       {cards.map((c) => (
                         <div
                           key={c.key}

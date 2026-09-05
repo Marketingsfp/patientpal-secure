@@ -666,13 +666,18 @@ function PainelExecutivoPage() {
       </TooltipProvider>
 
       <Tabs defaultValue="producao" className="space-y-4">
-        <TabsList>
-          <TabsTrigger value="producao">Produção</TabsTrigger>
-          <TabsTrigger value="grs">GRs</TabsTrigger>
-          {podeFin && <TabsTrigger value="financeiro">Financeiro</TabsTrigger>}
-          <TabsTrigger value="comercial">Comercial</TabsTrigger>
-          <TabsTrigger value="qualidade">Qualidade</TabsTrigger>
-        </TabsList>
+        {/* As cinco abas somam mais que a largura de um celular. O invólucro
+            rolável deixa deslizar de lado só a faixa de abas, em vez de a
+            página inteira sair do lugar. */}
+        <div className="-mx-1 overflow-x-auto px-1 pb-1">
+          <TabsList className="w-max">
+            <TabsTrigger value="producao">Produção</TabsTrigger>
+            <TabsTrigger value="grs">GRs</TabsTrigger>
+            {podeFin && <TabsTrigger value="financeiro">Financeiro</TabsTrigger>}
+            <TabsTrigger value="comercial">Comercial</TabsTrigger>
+            <TabsTrigger value="qualidade">Qualidade</TabsTrigger>
+          </TabsList>
+        </div>
 
         {/* Produção */}
         <TabsContent value="producao" className="space-y-6">
