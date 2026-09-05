@@ -159,10 +159,11 @@ import {
 import { ResumoHandoffCard } from "@/components/nina/ResumoHandoffCard";
 import { ReportarErroNinaBotao } from "@/components/nina/ReportarErroNinaDialog";
 import { BadgeEspera, RelogioEsperaProvider } from "@/components/nina/BadgeEspera";
+import { formatarDataHoraMensagem } from "@/lib/atendimento/data-hora";
 
 function fmtHora(s?: string | null) {
   if (!s) return "";
-  return new Date(s).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+  return formatarDataHoraMensagem(s);
 }
 function fmtData(s?: string | null) {
   if (!s) return "—";
@@ -1752,7 +1753,7 @@ export function AtendInbox() {
                         <div
                           className={`text-[11px] mt-1 flex items-center justify-between gap-2 ${out ? "text-atd-on-strong/80" : "text-atd-ink-soft"}`}
                         >
-                          <span>
+                          <span className="whitespace-nowrap">
                             {fmtHora(m.recebida_em)} {m.enviada_por === "nina" && "· Nina"}
                           </span>
                           {daNina && clinicaId && (
