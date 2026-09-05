@@ -252,6 +252,11 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
                     clinicaId: params.clinicaId,
                     telefone: fromDigits,
                   });
+                  // O paciente respondeu: qualquer prazo de espera cai.
+                  const { limparEsperaPorTelefone } = await import(
+                    "@/lib/nina/espera-paciente.server"
+                  );
+                  await limparEsperaPorTelefone(params.clinicaId, fromDigits);
                 }
 
 
@@ -404,6 +409,24 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
                           enviada_por: "nina",
                         });
                       }
+
+                      // Espera do paciente: só abre prazo quando a Nina fez
+                      // uma pergunta necessária para continuar. Informação
+                      // simples ou despedida não liga relógio nenhum.
+                      try {
+                        const { registrarEsperaPorTelefone } = await import(
+                          "@/lib/nina/espera-paciente.server"
+                        );
+                        await registrarEsperaPorTelefone({
+                          clinicaId: params.clinicaId,
+                          telefone: from,
+                          resposta: reply,
+                        });
+                      } catch (e) {
+                        console.error("nina espera paciente error", e);
+                      }
+
+
 
                       if (webhookPhoneNumberId && webhookPhoneNumberId !== cfg.phone_number_id) {
                         await supabaseAdmin
