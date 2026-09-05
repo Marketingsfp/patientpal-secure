@@ -274,81 +274,16 @@ export const fecharConversa = createServerFn({ method: "POST" })
       .maybeSingle();
     if (dono?.atribuida_user_id && dono.atribuida_user_id !== context.userId)
       throw new Error("Esta conversa está com outro atendente. Assuma antes de encerrar.");
-    const { data: prot } = await context.supabase.rpc("atend_gerar_protocolo", {
-      _clinica_id: data.clinicaId,
-    });
-    // Resolver a conversa encerra a OPERAÇÃO pendente (vaga escolhida,
-    // confirmação, criação de agendamento), mas mantém o contexto recente:
-    // se o paciente voltar dentro do TTL da sessão, a Nina ainda entende do
-    // que se falava. Histórico, CRM, agendamentos e Base não são tocados.
-    // Conversa resolvida cancela qualquer prazo de espera pendente.
-    const { limparEsperaPaciente } = await import("@/lib/nina/espera-paciente.server");
-    await limparEsperaPaciente(data.clinicaId, data.conversaId);
-    const { encerrarEstadosTransacionais } = await import("@/lib/nina/sessao");
-    const { normalizarEstado } = await import("@/lib/nina/fluxo-estado-normalizar");
-    const estadoEncerrado = encerrarEstadosTransacionais(
-      normalizarEstado((dono as { nina_fluxo_estado?: unknown } | null)?.nina_fluxo_estado ?? null),
-    );
-    const agoraISO = new Date().toISOString();
-    // Histórico: guarda quem atendeu por último, mas SEM manter essa pessoa
-    // como responsável ativo da próxima sessão (atribuida_user_id = null).
-    const ultimoAtendente =
-      (dono as { atribuida_user_id?: string | null; last_assigned_user_id?: string | null } | null)
-        ?.atribuida_user_id ??
-      (dono as { last_assigned_user_id?: string | null } | null)?.last_assigned_user_id ??
-      context.userId;
-    const { error } = await context.supabase
-      .from("atend_conversas")
-      .update({
-        status: "closed",
-        owner_type: "AI",
-        ai_enabled: true,
-        atribuida_user_id: null,
-        last_assigned_user_id: ultimoAtendente,
-        resolved_by: context.userId,
-        resolved_at: agoraISO,
-        closed_at: agoraISO,
-        protocol_number: prot as string,
-        nina_fluxo_estado: {
-          ...estadoEncerrado,
-          updated_at: agoraISO,
-        } as never,
-        handoff_resumo: null,
-        handoff_motivo: null,
-      } as never)
-      .eq("id", data.conversaId)
-      .eq("clinica_id", data.clinicaId);
-    if (error) throw new Error(error.message);
-    await registrarEventoConversa(context.supabase, {
+    // Mecanismo ÚNICO de resolução (o mesmo usado pela Nina no encerramento
+    // automático): status, prazos, estados transacionais, evento e resumo.
+    const { resolverConversaCore } = await import("@/lib/atendimento/resolver-conversa.server");
+    const r = await resolverConversaCore(context.supabase as never, {
       clinicaId: data.clinicaId,
       conversaId: data.conversaId,
-      evento: "FINALIZADA",
       userId: context.userId,
-      detalhes: {
-        protocolo: prot as string,
-        resolvido_por: context.userId,
-        resolvido_em: agoraISO,
-        ultimo_atendente: ultimoAtendente,
-      },
     });
+    return { ok: true, protocol: r.protocol as string };
 
-    // Desfecho relevante: o resumo interno é regerado para refletir o estado
-    // FINAL do atendimento. O resumo anterior fica como histórico (superado).
-    try {
-      const { registrarDesfechoResumo } = await import(
-        "@/lib/atendimento/handoff-resumo.server"
-      );
-      await registrarDesfechoResumo({
-        clinicaId: data.clinicaId,
-        conversaId: data.conversaId,
-        desfecho: "conversa_resolvida",
-        resolvidoPor: context.userId,
-      });
-    } catch (e) {
-      console.error("[fecharConversa] falha ao atualizar resumo", e);
-    }
-
-    return { ok: true, protocol: prot as string };
 
   });
 
