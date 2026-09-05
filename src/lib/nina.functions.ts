@@ -200,6 +200,8 @@ export const chatNina = createServerFn({ method: "POST" })
       const resposta = await ninaAIGateway({
         clinicaId: data.clinicaId,
         perfil: data.modoVoz ? "voz" : "texto",
+        conversaId: (data as { conversaId?: string | null }).conversaId ?? null,
+        ferramentasUsadas: nomesFerramentas,
         messages: historico as any,
         tools: FERRAMENTAS_NINA,
         ...(data.modoVoz ? { maxTokens: 220 } : {}),

@@ -7541,6 +7541,66 @@ export type Database = {
           },
         ]
       }
+      nina_execucoes: {
+        Row: {
+          clinica_id: string | null
+          conversation_id: string | null
+          created_at: string
+          error_category: string | null
+          handoff: boolean
+          id: string
+          input_tokens: number | null
+          knowledge_status: string | null
+          latency_ms: number
+          model: string
+          output_tokens: number | null
+          perfil: string
+          retries: number
+          route_reason: string
+          success: boolean
+          thinking_level: string
+          tool_calls: string[]
+        }
+        Insert: {
+          clinica_id?: string | null
+          conversation_id?: string | null
+          created_at?: string
+          error_category?: string | null
+          handoff?: boolean
+          id?: string
+          input_tokens?: number | null
+          knowledge_status?: string | null
+          latency_ms?: number
+          model: string
+          output_tokens?: number | null
+          perfil: string
+          retries?: number
+          route_reason: string
+          success?: boolean
+          thinking_level: string
+          tool_calls?: string[]
+        }
+        Update: {
+          clinica_id?: string | null
+          conversation_id?: string | null
+          created_at?: string
+          error_category?: string | null
+          handoff?: boolean
+          id?: string
+          input_tokens?: number | null
+          knowledge_status?: string | null
+          latency_ms?: number
+          model?: string
+          output_tokens?: number | null
+          perfil?: string
+          retries?: number
+          route_reason?: string
+          success?: boolean
+          thinking_level?: string
+          tool_calls?: string[]
+        }
+        Relationships: []
+      }
       nina_feedback: {
         Row: {
           aprendizado_id: string | null
