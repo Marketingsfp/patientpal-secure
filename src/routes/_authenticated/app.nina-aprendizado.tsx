@@ -153,6 +153,7 @@ const ABAS = [
   { valor: "approved", rotulo: "Aprovados" },
   { valor: "rejected", rotulo: "Rejeitados" },
   { valor: "applied", rotulo: "Aplicados" },
+  { valor: "reverted", rotulo: "Revertidos" },
 ] as const;
 
 type Preparo = {
