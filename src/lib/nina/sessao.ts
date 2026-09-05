@@ -118,6 +118,8 @@ export function novaSessao(anterior: EstadoFluxoNina, agoraISO?: string): Estado
     },
     flow: { stage: "GREETING" },
     updated_at: null,
+    // Sessão nova = apresentação obrigatória de novo.
+    greeting_completed: false,
   };
 }
 
@@ -140,6 +142,8 @@ export function reabrirSessao(anterior: EstadoFluxoNina, agoraISO?: string): Est
     session_id: novoSessionId(),
     session_started_at: inicio,
     updated_at: inicio,
+    // Reabertura após resolução = nova sessão operacional: apresentar de novo.
+    greeting_completed: false,
   };
 }
 

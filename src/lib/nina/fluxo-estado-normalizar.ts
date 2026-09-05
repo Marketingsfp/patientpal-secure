@@ -68,6 +68,12 @@ export type EstadoFluxoNina = {
   session_id?: string | null;
   /** Início da sessão operacional atual. */
   session_started_at?: string | null;
+  /**
+   * A apresentação obrigatória (saudação + Nina + assistente virtual +
+   * unidade + abertura) já foi entregue NESTA sessão. Toda sessão nova
+   * começa em `false`.
+   */
+  greeting_completed?: boolean;
 };
 
 export function estadoVazio(): EstadoFluxoNina {
@@ -96,6 +102,7 @@ export function estadoVazio(): EstadoFluxoNina {
     updated_at: null,
     session_id: null,
     session_started_at: null,
+    greeting_completed: false,
   };
 }
 
@@ -117,6 +124,7 @@ export function normalizarEstado(bruto: unknown): EstadoFluxoNina {
     updated_at: o["updated_at"] ?? null,
     session_id: o["session_id"] ?? null,
     session_started_at: o["session_started_at"] ?? null,
+    greeting_completed: o["greeting_completed"] === true,
   };
 }
 
