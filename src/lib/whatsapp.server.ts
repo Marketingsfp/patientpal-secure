@@ -1219,7 +1219,9 @@ ATENDIMENTO HUMANO — REGRA OBRIGATÓRIA:
   // appointment_id verificado no banco — ou quando a conversa JÁ tem um
   // agendamento gravado (senão a Nina não conseguiria nem falar sobre a
   // consulta já marcada nos turnos seguintes).
-  let agendamentoConfirmado = Boolean(fluxoEstado.appointment.appointment_id);
+  const jaTinhaAgendamento = Boolean(fluxoEstado.appointment.appointment_id);
+  let agendamentoConfirmado = jaTinhaAgendamento;
+
   let correcaoFalsoSucessoUsada = false;
   // Frases que afirmam/prometem agendamento. Se aparecerem sem gravação
   // confirmada, a resposta é falso sucesso e não pode ir ao paciente.
