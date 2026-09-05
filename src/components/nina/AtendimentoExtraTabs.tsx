@@ -192,6 +192,9 @@ export function AtendInbox() {
   const selIdRef = useRef<string | null>(null);
   selIdRef.current = sel?.id ?? null;
   const conteudoDaConversa = !!sel?.id && conversaCarregadaId === sel.id;
+  // Enquanto a conversa selecionada não terminou de carregar, todas as ações
+  // dependentes do conversation_id ficam bloqueadas.
+  const carregandoConversa = !!sel?.id && !conteudoDaConversa;
   const [deptos, setDeptos] = useState<any[]>([]);
   const [usuarios, setUsuarios] = useState<any[]>([]);
   const [busca, setBusca] = useState("");
