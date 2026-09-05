@@ -625,7 +625,7 @@ export function AtendInbox() {
 
   // Trocar de escopo (ou de usuário/clínica) recomeça a lista: cada filtro tem
   // a sua própria caixa de dados, nada de sobras de outro filtro na tela.
-  const chaveAtual = chaveInbox({ clinicaId, userId: meuId, escopo });
+  const chaveAtual = chaveInbox({ clinicaId: clinicaId ?? null, userId: meuId, escopo });
   useEffect(() => {
     seqConvs.current++;
     setConvs([]);
