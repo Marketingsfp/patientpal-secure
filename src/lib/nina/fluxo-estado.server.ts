@@ -29,7 +29,7 @@ export type {
 export { estadoVazio, normalizarEstado } from "./fluxo-estado-normalizar";
 
 import type { EstadoFluxoNina } from "./fluxo-estado-normalizar";
-import { normalizarEstado } from "./fluxo-estado-normalizar";
+import { normalizarEstado, estadoVazio } from "./fluxo-estado-normalizar";
 
 type Db = SupabaseClient<any, any, any>;
 

@@ -3,7 +3,7 @@
  * conversa persistida. Nada aqui apaga histórico, CRM, agendamentos ou Base.
  */
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
-import { normalizarEstado, type EstadoFluxoNina } from "./fluxo-estado.server";
+import { normalizarEstado, type EstadoFluxoNina } from "./fluxo-estado-normalizar";
 import { aplicarTtlSessao, ttlSessaoMinutos, type ResultadoSessao } from "./sessao";
 
 /** Aplica o TTL deslizante ao estado bruto vindo de `atend_conversas`. */

@@ -12,7 +12,7 @@
  *   conversa é resolvida — contexto pode sobreviver, operação pendente não.
  */
 
-import type { EstadoFluxoNina, EtapaFluxoNina } from "./fluxo-estado.server";
+import type { EstadoFluxoNina, EtapaFluxoNina } from "./fluxo-estado-normalizar";
 
 /** Valor inicial pedido pela clínica; configurável por ambiente. */
 export const TTL_SESSAO_PADRAO_MINUTOS = 240;
