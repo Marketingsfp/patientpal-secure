@@ -1,4 +1,19 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  ListaRespostasRapidas,
+  useRespostasFiltradas,
+  useRespostasRapidas,
+} from "@/components/nina/RespostasRapidas";
+import { registrarUsoResposta } from "@/lib/atendimento/respostas-rapidas.functions";
+import {
+  aplicarVariaveis,
+  detectarComandoNoTexto,
+  primeiroNome,
+  substituirTrecho,
+  type ComandoDigitado,
+  type ContextoVariaveis,
+  type RespostaRapida,
+} from "@/lib/atendimento/respostas-rapidas";
 import { confirmDialog } from "@/lib/confirm";
 import { normalizarNomeBusca } from "@/lib/busca-texto";
 import { useServerFn } from "@tanstack/react-start";
