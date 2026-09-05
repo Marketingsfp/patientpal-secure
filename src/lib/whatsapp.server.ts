@@ -1330,6 +1330,25 @@ ATENDIMENTO HUMANO — REGRA OBRIGATÓRIA:
   // vale para as próximas mensagens da MESMA conversa.
   await salvarFluxoEstado(supabaseAdmin as never, clinicaId, estadoId.conversaId, fluxoEstado);
 
+  // DESFECHO: agendamento concluído agora. O resumo interno é regerado para
+  // refletir o sucesso; o resumo anterior (tentativa/falha) vira histórico.
+  if (agendamentoConfirmado && !jaTinhaAgendamento) {
+    try {
+      const { registrarDesfechoResumo } = await import(
+        "@/lib/atendimento/handoff-resumo.server"
+      );
+      await registrarDesfechoResumo({
+        clinicaId,
+        conversaId: estadoId.conversaId,
+        desfecho: "agendamento_concluido",
+      });
+    } catch (e) {
+      console.error("[nina] falha ao atualizar resumo pós-agendamento", e);
+    }
+  }
+
+
+
 
   if (!resposta && houveHandoff) {
     resposta =
