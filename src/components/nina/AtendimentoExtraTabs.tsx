@@ -322,7 +322,7 @@ export function AtendInbox() {
       clearInterval(t);
       window.removeEventListener("pagehide", sair);
     };
-  }, [clinicaId, online, manualOffline, presencaFn]);
+  }, [clinicaId, statusCarregado, online, manualOffline, presencaFn]);
 
 
   const alternarFila = async (abrir: boolean) => {
