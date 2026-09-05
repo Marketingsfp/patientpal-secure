@@ -1227,11 +1227,72 @@ export function AtendInbox() {
                     <span>{motivoBloqueio}</span>
                   </div>
                 )}
-                <div className="flex gap-2">
+                <div className="relative flex gap-2">
+                  {slash && (
+                    <ListaRespostasRapidas
+                      itens={itensResp}
+                      indice={slashIdx}
+                      termo={slash.termo}
+                      favoritos={respostasRapidas.favoritos}
+                      onSelecionar={inserirRespostaRapida}
+                      onIndice={setSlashIdx}
+                      onFavoritar={respostasRapidas.favoritar}
+                    />
+                  )}
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    title="Respostas rápidas"
+                    aria-label="Respostas rápidas"
+                    aria-expanded={!!slash}
+                    className="h-9 w-9 shrink-0 p-0 text-atd-ink-soft"
+                    disabled={enviando || !!motivoBloqueio}
+                    onClick={() => {
+                      const el = composerRef.current;
+                      const pos = el?.selectionStart ?? draft.length;
+                      setSlash((s) => (s ? null : { inicio: pos, fim: pos, termo: "" }));
+                      el?.focus();
+                    }}
+                  >
+                    <Zap className="h-4 w-4" />
+                  </Button>
                   <Textarea
+                    ref={composerRef}
                     value={draft}
-                    onChange={(e) => setDraft(e.target.value)}
+                    onChange={(e) => {
+                      setDraft(e.target.value);
+                      setSlash(
+                        detectarComandoNoTexto(e.target.value, e.target.selectionStart ?? 0),
+                      );
+                    }}
+                    onBlur={() => setSlash(null)}
                     onKeyDown={(e) => {
+                      // Com a lista aberta, o teclado navega nela — Enter insere
+                      // a resposta no campo e NUNCA envia a mensagem.
+                      if (slash && itensResp.length > 0) {
+                        if (e.key === "ArrowDown") {
+                          e.preventDefault();
+                          setSlashIdx((i) => (i + 1) % itensResp.length);
+                          return;
+                        }
+                        if (e.key === "ArrowUp") {
+                          e.preventDefault();
+                          setSlashIdx((i) => (i - 1 + itensResp.length) % itensResp.length);
+                          return;
+                        }
+                        if (e.key === "Enter" || e.key === "Tab") {
+                          e.preventDefault();
+                          const escolhida = itensResp[slashIdx];
+                          if (escolhida) inserirRespostaRapida(escolhida);
+                          return;
+                        }
+                      }
+                      if (slash && e.key === "Escape") {
+                        e.preventDefault();
+                        setSlash(null);
+                        return;
+                      }
                       if (e.key === "Enter" && !e.shiftKey) {
                         e.preventDefault();
                         enviar();
@@ -1240,12 +1301,13 @@ export function AtendInbox() {
                     placeholder={
                       motivoBloqueio
                         ? "Envio bloqueado"
-                        : "Mensagem… (Enter envia, Shift+Enter quebra linha)"
+                        : "Mensagem… (digite / para respostas rápidas)"
                     }
                     rows={1}
                     className="min-h-9 resize-none border-atd-border bg-atd-surface focus-visible:border-atd-blue focus-visible:ring-2 focus-visible:ring-atd-blue/30"
                     disabled={enviando || !!motivoBloqueio}
                   />
+
                   <Button
                     onClick={enviar}
                     disabled={enviando || !draft.trim() || !!motivoBloqueio}
