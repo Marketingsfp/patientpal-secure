@@ -978,6 +978,16 @@ ${procs || "(nenhum)"}`;
     pacienteNomeEfetivo = (pRow as any)?.nome ?? null;
     if (!pacienteNomeEfetivo) pacienteIdEfetivo = null; // cadastro sumiu/outra clínica
   }
+  // Fase 2: assim que o contato é identificado, o vínculo vira a referência
+  // principal da conversa — evita repetir o lookup por telefone.
+  if (pacienteIdEfetivo && estadoId.conversaId && !estadoId.pacienteIdConversa) {
+    const { vincularPacienteConversa } = await import("@/lib/atendimento/vinculo-contato.server");
+    await vincularPacienteConversa(supabaseAdmin as never, {
+      clinicaId,
+      conversaId: estadoId.conversaId,
+      pacienteId: pacienteIdEfetivo,
+    });
+  }
   if (pacienteIdEfetivo && !fluxoEstado.patient.identified) {
     fluxoEstado.patient = {
       ...fluxoEstado.patient,
