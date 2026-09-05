@@ -90,6 +90,7 @@ import {
   esperaConversas,
 } from "@/lib/atendimento.functions";
 import { FilaHumana } from "@/components/nina/FilaHumana";
+import { AgendaConversaDrawer } from "@/components/nina/AgendaConversaDrawer";
 import { ResumoHandoffCard } from "@/components/nina/ResumoHandoffCard";
 import { BadgeEspera, RelogioEsperaProvider } from "@/components/nina/BadgeEspera";
 
@@ -181,6 +182,7 @@ export function AtendInbox() {
   const [enviando, setEnviando] = useState(false);
   const [novaNota, setNovaNota] = useState("");
   const [transferOpen, setTransferOpen] = useState(false);
+  const [agendaOpen, setAgendaOpen] = useState(false);
   const [buscaAgente, setBuscaAgente] = useState("");
   const [fecharOpen, setFecharOpen] = useState(false);
   // Começa fechada: só entra em "online" depois de ler o status real gravado,
