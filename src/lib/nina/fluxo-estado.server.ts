@@ -24,6 +24,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 export type EtapaFluxoNina =
   | "IDLE"
+  | "BOOKING_INTENT_CONFIRMED"
   | "IDENTIFYING_PATIENT"
   | "CHOOSING_SLOT"
   | "AWAITING_SLOT_CONFIRMATION"
