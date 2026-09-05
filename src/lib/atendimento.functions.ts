@@ -158,6 +158,29 @@ export const listarConversas = createServerFn({ method: "POST" })
     return rows ?? [];
   });
 
+/**
+ * FASE 2 — Deep link / F5: carrega UMA conversa pelo id do endereço, mesmo
+ * que ela não esteja na lista do filtro atual. O isolamento continua valendo:
+ * exige ser membro da clínica e que a conversa pertença a ela (além do RLS).
+ */
+export const obterConversa = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) =>
+    z.object({ clinicaId: z.string().uuid(), conversaId: z.string().uuid() }).parse(i),
+  )
+  .handler(async ({ data, context }) => {
+    await assertMember(context.supabase, context.userId, data.clinicaId);
+    const { data: row, error } = await context.supabase
+      .from("atend_conversas")
+      .select("*")
+      .eq("id", data.conversaId)
+      .eq("clinica_id", data.clinicaId)
+      .eq("is_teste", false)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    return row ?? null;
+  });
+
 
 /**
  * Contagem independente de cada filtro da Inbox. Cada número é calculado com
