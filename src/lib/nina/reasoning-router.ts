@@ -84,6 +84,20 @@ export function selectThinkingLevel(ctx: ContextoRaciocinio): DecisaoRaciocinio 
   const alternativas = contar(texto, PADRAO_ALTERNATIVAS);
   const restricoes = contar(texto, PADRAO_RESTRICAO);
   const ehAgenda = PADRAO_MEDIUM.test(texto);
+  // "Quanto custa Cardiologia?" cita especialidade, mas é pergunta de tabela:
+  // intenção administrativa forte vence a menção a agenda, desde que não haja
+  // verbo de marcação nem data/período.
+  const lowForte =
+    /\b(quanto custa|valor|valores|pre[çc]o|tabela|endere[çc]o|onde fica|documento|pagamento|pix|boleto|conv[êe]nio|hor[áa]rio de (funcionamento|atendimento))/i.test(
+      texto,
+    );
+  const agendaForte =
+    /\b(?:agend|marcar|remarc|reagend|cancel|desmarc|disponibilidade|dispon[íi]ve|vaga|encaixe|amanh[ãa]|s[áa]bado|domingo|segunda-?feira|ter[çc]a|quarta|quinta|sexta|semana que vem|pr[óo]xima semana|de manh[ãa]|[àa] tarde|[àa] noite)/i.test(
+      texto,
+    );
+  if (lowForte && !agendaForte) {
+    return { nivel: "low", motivo: "pergunta administrativa/factual direta" };
+  }
 
   // ---- MEDIUM: agenda, disponibilidade, tools, múltiplas restrições.
   if (ehAgenda) {
