@@ -1460,6 +1460,10 @@ export const obterDadosContato = createServerFn({ method: "POST" })
           .eq("id", conv.atribuida_user_id)
           .maybeSingle()
       : { data: null };
+    marcar("responsavel");
+    console.info(
+      `[perf-contato] total=${Date.now() - t0}ms ${JSON.stringify(marcas)}`,
+    );
 
     return {
       conversa: conv,
