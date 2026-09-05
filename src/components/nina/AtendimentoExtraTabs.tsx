@@ -146,9 +146,19 @@ export function AtendInbox() {
   >("all");
   // Filtro "somente sem atendente" — acionado pelo alerta do cabeçalho.
   const [soNaoAtribuidas, setSoNaoAtribuidas] = useState(false);
-  const convsVisiveis: any[] = soNaoAtribuidas
-    ? convs.filter((c: any) => !c.atribuida_user_id)
-    : convs;
+  // Ordenação da lista: recentes (padrão) ou quem espera há mais tempo.
+  const [ordem, setOrdem] = useState<"recentes" | "espera">("recentes");
+  // conversaId -> instante da 1ª mensagem do paciente ainda sem resposta.
+  const [espera, setEspera] = useState<Record<string, string>>({});
+  const convsVisiveis: any[] = (() => {
+    const base = soNaoAtribuidas ? convs.filter((c: any) => !c.atribuida_user_id) : convs;
+    if (ordem !== "espera") return base;
+    return [...base].sort((a: any, b: any) => {
+      const ta = espera[a.id] ? new Date(espera[a.id]).getTime() : Infinity;
+      const tb = espera[b.id] ? new Date(espera[b.id]).getTime() : Infinity;
+      return ta - tb;
+    });
+  })();
   useEffect(() => {
     const ativar = () => setSoNaoAtribuidas(true);
     try {
