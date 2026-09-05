@@ -10,6 +10,7 @@
  * `clinica_id` — nunca só pelo id da conversa.
  */
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { ninaResponde } from "./ciclo-responsabilidade";
 
 export type OwnerType = "AI" | "HUMAN" | "NONE";
 
