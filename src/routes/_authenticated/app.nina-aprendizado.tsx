@@ -797,6 +797,169 @@ function Pagina() {
         </ul>
       )}
 
+      {/* Ações técnicas em aberto */}
+      {podeRevisar && acoesAbertas.length > 0 && (
+        <Card>
+          <CardContent className="space-y-3 p-4">
+            <h2 className="text-sm font-semibold">
+              Ações de correção em aberto ({acoesAbertas.length})
+            </h2>
+            <ul className="space-y-2">
+              {acoesAbertas.map((a) => (
+                <li
+                  key={a.id}
+                  className="flex flex-wrap items-start justify-between gap-2 rounded-md border border-border p-3"
+                >
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Badge variant="outline">
+                        {ROTULO_CAMADA[a.camada as keyof typeof ROTULO_CAMADA] ?? a.camada}
+                      </Badge>
+                      <Badge variant="secondary">
+                        {ROTULO_ACAO[a.tipo as keyof typeof ROTULO_ACAO] ?? a.tipo}
+                      </Badge>
+                      <span className="text-xs text-muted-foreground">{fmtData(a.created_at)}</span>
+                    </div>
+                    <p className="mt-1 text-sm font-medium">{a.titulo}</p>
+                    <p className="text-xs text-muted-foreground">{a.instrucao}</p>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      disabled={salvando}
+                      onClick={() => void finalizarAcao(a.id, "done")}
+                    >
+                      Concluir
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={salvando}
+                      onClick={() => void finalizarAcao(a.id, "canceled")}
+                    >
+                      Cancelar
+                    </Button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Aplicar correção */}
+      <Dialog open={!!aplicando} onOpenChange={(o) => !o && setAplicando(null)}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Aplicar a correção aprovada</DialogTitle>
+            <DialogDescription>
+              A correção é direcionada para a camada responsável pelo erro. Confira{" "}
+              <strong>Atual</strong> e <strong>Novo</strong> antes de confirmar.
+            </DialogDescription>
+          </DialogHeader>
+
+          {preparando || !preparo ? (
+            <div className="flex items-center gap-2 py-6 text-sm text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> Consultando a Base…
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge variant="outline">{ROTULO_CAMADA[preparo.plano.camada]}</Badge>
+                <Badge variant="secondary">{ROTULO_ACAO[preparo.plano.tipo]}</Badge>
+                {preparo.base_version ? (
+                  <Badge variant="outline">Base versão {preparo.base_version}</Badge>
+                ) : null}
+              </div>
+
+              <div>
+                <p className="text-sm font-medium">{preparo.plano.titulo}</p>
+                <p className="text-xs text-muted-foreground">{preparo.plano.instrucao}</p>
+              </div>
+
+              <div className="grid gap-3 md:grid-cols-2">
+                <div>
+                  <Label className="text-xs text-muted-foreground">Atual (na Base hoje)</Label>
+                  <div className="mt-1 max-h-40 overflow-auto whitespace-pre-wrap rounded-md border border-border bg-muted/40 p-2 text-xs">
+                    {preparo.atual ?? "Nada encontrado na Base para esta pergunta."}
+                  </div>
+                </div>
+                <div>
+                  <Label className="text-xs text-muted-foreground">Novo (correção aprovada)</Label>
+                  <div className="mt-1 max-h-40 overflow-auto whitespace-pre-wrap rounded-md border border-primary/40 bg-primary/5 p-2 text-xs">
+                    {preparo.novo}
+                  </div>
+                </div>
+              </div>
+
+              <ul className="space-y-1 rounded-md border border-amber-500/40 bg-amber-500/5 p-3 text-xs">
+                {preparo.plano.avisos.map((av) => (
+                  <li key={av} className="flex gap-2">
+                    <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" aria-hidden="true" />
+                    <span>{av}</span>
+                  </li>
+                ))}
+                {preparo.plano.exigeReenvioPlanilha && !preparo.ja_na_base && (
+                  <li className="flex gap-2">
+                    <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" aria-hidden="true" />
+                    <span>
+                      A versão ativa ainda não contém esta informação. Ao confirmar, fica registrada
+                      a pendência de corrigir o arquivo oficial e reenviar pela Base de
+                      Conhecimentos — o registro só será marcado como aplicado depois disso.
+                    </span>
+                  </li>
+                )}
+              </ul>
+
+              {preparo.plano.permiteReindexar && (
+                <label className="flex items-center gap-2 text-xs">
+                  <input
+                    type="checkbox"
+                    checked={reindexar}
+                    onChange={(e) => setReindexar(e.target.checked)}
+                  />
+                  Reprocessar a versão ativa (chunks, embeddings, índices e cache) a partir do
+                  arquivo oficial.
+                </label>
+              )}
+
+              <div>
+                <Label htmlFor="obs-aplicacao">Observação interna (opcional)</Label>
+                <Textarea
+                  id="obs-aplicacao"
+                  className="mt-1"
+                  rows={2}
+                  value={obsAplicacao}
+                  onChange={(e) => setObsAplicacao(e.target.value)}
+                />
+              </div>
+
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={confirmado}
+                  onChange={(e) => setConfirmado(e.target.checked)}
+                />
+                Confirmo a mudança de <strong>Atual</strong> para <strong>Novo</strong> na camada
+                indicada.
+              </label>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAplicando(null)}>
+              Cancelar
+            </Button>
+            <Button
+              disabled={salvando || preparando || !preparo || !confirmado}
+              onClick={() => void confirmarAplicacao()}
+            >
+              Confirmar aplicação
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Diagnosticar causa */}
       <Dialog open={!!diagnosticando} onOpenChange={(o) => !o && setDiagnosticando(null)}>
         <DialogContent className="max-w-2xl">
