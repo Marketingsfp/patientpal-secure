@@ -24,6 +24,7 @@ export type CacheConversas = {
   invalidar: (conversaId: string) => void;
   limpar: () => void;
   tamanho: () => number;
+  chaves: () => string[];
 };
 
 /** Cache LRU simples, limitado para não crescer sem controle. */
@@ -57,6 +58,9 @@ export function criarCacheConversas(limite = 10): CacheConversas {
     },
     tamanho() {
       return mapa.size;
+    },
+    chaves() {
+      return [...mapa.keys()];
     },
   };
 }
