@@ -99,7 +99,9 @@ export function estadoVazio(): EstadoFluxoNina {
       slot_fim: null,
       slot_confirmed_by_patient: false,
       intent_confirmed: false,
+      price: null,
       appointment_id: null,
+
     },
     flow: { stage: "IDLE" },
     updated_at: null,
