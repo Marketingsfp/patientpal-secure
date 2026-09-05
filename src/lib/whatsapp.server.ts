@@ -1134,6 +1134,11 @@ ATENDIMENTO HUMANO — REGRA OBRIGATÓRIA:
           error_code: r?.ok ? null : (resultado as { erro?: string })?.erro ?? null,
         });
       }
+      nomesFerramentasTurno.push(nome);
+      if (resultado && typeof resultado === "object") {
+        const r = resultado as { ok?: boolean; erro?: string };
+        if (r.erro || r.ok === false) conflitoFerramenta = true;
+      }
       mensagens.push({
         role: "tool",
         tool_call_id: c.id,
