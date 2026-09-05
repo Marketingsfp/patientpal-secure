@@ -81,6 +81,16 @@ export const listarConversas = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     await assertMember(context.supabase, context.userId, data.clinicaId);
+
+    // Varredura barata e limitada dos prazos já vencidos desta clínica, para
+    // que a transferência automática aconteça mesmo sem mensagem nova.
+    try {
+      const { processarTimeoutsEsperaPaciente } = await import("@/lib/nina/espera-timeout.server");
+      await processarTimeoutsEsperaPaciente({ clinicaId: data.clinicaId, limite: 10 });
+    } catch (e) {
+      console.error("[nina-timeout] varredura na listagem falhou", e);
+    }
+
     let q = context.supabase
       .from("atend_conversas")
       .select("*")

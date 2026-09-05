@@ -241,6 +241,20 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
                   console.error("whatsapp mensagem insert error", insErr.message);
                 }
 
+                // Antes de qualquer coisa, vence quem já passou do prazo —
+                // assim uma conversa parada não fica presa na Nina.
+                try {
+                  const { processarTimeoutsEsperaPaciente } = await import(
+                    "@/lib/nina/espera-timeout.server"
+                  );
+                  await processarTimeoutsEsperaPaciente({
+                    clinicaId: params.clinicaId,
+                    limite: 10,
+                  });
+                } catch (e) {
+                  console.error("[nina-timeout] varredura no webhook falhou", e);
+                }
+
                 // Mensagem nova do paciente reabre automaticamente a conversa
                 // encerrada e devolve o atendimento ao fluxo inicial da Nina.
                 const fromDigits = String(from ?? "").replace(/\D/g, "");
