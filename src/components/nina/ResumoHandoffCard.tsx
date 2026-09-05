@@ -15,7 +15,10 @@ type Linha = {
   payload: ResumoHandoff | null;
   erro: string | null;
   versao: number;
+  situacao?: string | null;
+  desfecho?: string | null;
 } | null;
+
 
 export function ResumoHandoffCard({
   clinicaId,
