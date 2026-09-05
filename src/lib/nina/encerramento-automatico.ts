@@ -47,9 +47,10 @@ const PADROES_NOVA_SOLICITACAO: RegExp[] = [
 export function pediuEncerramento(mensagem: string): boolean {
   const t = normalizar(mensagem);
   if (!t) return false;
-  // Todos os padrões de fim são ancorados (^...$): a mensagem inteira precisa
-  // ser a confirmação de que não há mais nada. Se vier qualquer coisa junto
-  // ("obrigado, mas queria..."), nenhum padrão casa e a conversa continua.
+  if (PADROES_NOVA_SOLICITACAO.some((r) => r.test(t))) return false;
+  // Padrões ancorados (^...$): a mensagem inteira precisa ser a confirmação
+  // de que não há mais nada.
+
   return PADROES_FIM.some((r) => r.test(t));
 }
 
