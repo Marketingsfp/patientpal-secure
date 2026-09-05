@@ -23,9 +23,13 @@ function autor(ev: ConversaEvento): string {
 
 export function textoEvento(ev: ConversaEvento): string {
   const por = autor(ev);
+  const automatico = Boolean((ev.detalhes as { automatico?: boolean } | null)?.automatico);
   switch (ev.evento) {
     case "FINALIZADA":
-      return `Conversa encerrada e resolvida por ${por}`;
+      return automatico
+        ? "Conversa resolvida automaticamente pela Nina após conclusão do atendimento"
+        : `Conversa encerrada e resolvida por ${por}`;
+
 
     case "REABERTA":
       return "Conversa reaberta por nova mensagem do paciente";
