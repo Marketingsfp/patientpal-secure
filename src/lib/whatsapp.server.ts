@@ -1068,7 +1068,7 @@ ATENDIMENTO HUMANO — REGRA OBRIGATÓRIA:
     const respostaIA = await ninaAIGateway({
       clinicaId,
       perfil: "whatsapp",
-      conversaId: conversaId ?? null,
+      conversaId: estadoId.conversaId ?? null,
       ferramentasUsadas: nomesFerramentasTurno,
       messages: mensagens as never,
       ...(ferramentas ? { tools: ferramentas as readonly unknown[] } : {}),
