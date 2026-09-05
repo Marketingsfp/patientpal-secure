@@ -244,7 +244,6 @@ function NinaPage() {
     "atend-roteamento",
     "aprendizado",
     "base-conhecimento",
-
   ].includes(hashAba)
     ? hashAba === "chat"
       ? "atend-inbox"
@@ -486,14 +485,11 @@ function NinaPage() {
           <BaseConhecimento />
         </TabsContent>
       </Tabs>
-
     </div>
   );
 }
 
-
 type NinaMsg = { role: "user" | "assistant"; content: string };
-
 
 /* ===================== FEEDBACK DA RESPOSTA (aprendizado) ===================== */
 
@@ -581,12 +577,7 @@ function FeedbackResposta({ pergunta, resposta }: { pergunta: string; resposta: 
             <Button size="sm" disabled={salvando} onClick={() => registrar(-1, correcao)}>
               Enviar correção
             </Button>
-            <Button
-              size="sm"
-              variant="ghost"
-              disabled={salvando}
-              onClick={() => registrar(-1)}
-            >
+            <Button size="sm" variant="ghost" disabled={salvando} onClick={() => registrar(-1)}>
               Só marcar como ruim
             </Button>
           </div>
@@ -595,7 +586,6 @@ function FeedbackResposta({ pergunta, resposta }: { pergunta: string; resposta: 
     </div>
   );
 }
-
 
 /* ============================ WHATSAPP CONFIG ============================ */
 
