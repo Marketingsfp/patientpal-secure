@@ -21,8 +21,8 @@ export type RegistroConhecimento = {
   medico?: string | null;
   dia?: string | null;
   horario?: string | null;
-  preco_dinheiro?: number | null;
-  preco_cartao?: number | null;
+  preco_dinheiro?: number | string | null;
+  preco_cartao?: number | string | null;
   observacoes?: string | null;
   preparo?: string | null;
   linha_origem?: number | null;
@@ -68,9 +68,25 @@ export function normalizar(v: unknown): string {
     .trim();
 }
 
-function moeda(v: number | null | undefined): string | null {
-  if (v === null || v === undefined || Number.isNaN(Number(v))) return null;
-  return `R$ ${Number(v).toFixed(2).replace(".", ",")}`;
+/**
+ * Normaliza preço para comparação e exibição.
+ * Aceita número e também texto ("250,00", "R$ 1.250,00"): a planilha e o banco
+ * podem devolver `numeric` como texto, e nesse caso o valor não pode virar
+ * `null` em silêncio — se virasse, a detecção de conflito deixaria passar dois
+ * preços diferentes para o mesmo item.
+ */
+function moeda(v: number | string | null | undefined): string | null {
+  if (v === null || v === undefined) return null;
+  let n: number;
+  if (typeof v === "number") {
+    n = v;
+  } else {
+    const limpo = v.replace(/[^\d,.-]/g, "").replace(/\.(?=\d{3}\b)/g, "").replace(",", ".");
+    if (limpo.trim() === "") return null;
+    n = Number(limpo);
+  }
+  if (Number.isNaN(n)) return null;
+  return `R$ ${n.toFixed(2).replace(".", ",")}`;
 }
 
 function unico(lista: Array<string | null | undefined>): string[] {

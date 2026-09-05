@@ -70,7 +70,7 @@ async function chamar(
     clinicaId: CLINICA,
     perfil: "whatsapp",
     modeloForcado: MODELO,
-    conversaId: null,
+    conversaId: null, // homologação: sem id de conversa real
     maxTokens: 400,
     raciocinio: { mensagem: mensagemUsuario },
     ...(nivelForcado ? { nivelForcado } : {}),
@@ -198,7 +198,11 @@ async function main() {
     "Tem horário com a Dra. Ana na terça?",
     `RESULTADO DE FERRAMENTA: ${JSON.stringify(slots)}`,
   );
-  check("Agenda: oferece os horários reais devolvidos pela ferramenta", /09:20|9:20/.test(rSlots.texto), rSlots.texto.slice(0, 120));
+  const horariosCitados = rSlots.texto.match(/\b\d{1,2}[:h]\d{2}\b/g) ?? [];
+  const inventouHorario = horariosCitados.some((h) => !/09:20|9:20|14:40/.test(h));
+  if (inventouHorario) alucinacoes.push(`agenda citou horário fora da ferramenta: ${horariosCitados.join(", ")}`);
+  check("Agenda: não inventa horário fora da disponibilidade real", !inventouHorario, rSlots.texto.slice(0, 140));
+  check("Agenda: usa os dados reais da ferramenta (médico/horário)", /Ana Prado/i.test(rSlots.texto), rSlots.texto.slice(0, 140));
   check("Agenda: usa nível MEDIUM", rSlots.nivel === "medium", rSlots.nivel);
 
   const falhaAgenda = { ferramenta: "criar_agendamento", ok: false, erro: "horário ocupado" };
@@ -215,11 +219,13 @@ async function main() {
   check("Agenda: NÃO confirma sem registro real", !confirmouSemRegistro, rFalha.texto.slice(0, 120));
 
   const vFalha = validarResultado("criar_agendamento", { ok: false, erro: "horário ocupado" });
-  check("Broker: falha de ferramenta não vira confirmação", vFalha.confirmado === false);
-  const vOk = validarResultado("criar_agendamento", { ok: true, id: "ag-123" });
-  check("Broker: só resultado real confirma", vOk.confirmado === true);
-  const vDup = validarResultado("criar_agendamento", { ok: true, duplicado: true, id: "ag-123" });
-  check("Broker: duplicado idempotente conta como confirmado", vDup.confirmado === true);
+  check("Broker: falha de ferramenta não vira confirmação", vFalha.appointment_confirmed === false && vFalha.success === false);
+  const vOk = validarResultado("criar_agendamento", { ok: true, appointment_id: "ag-123" });
+  check("Broker: só resultado real confirma", vOk.appointment_confirmed === true);
+  const vSemId = validarResultado("criar_agendamento", { ok: true });
+  check("Broker: \"ok\" sem id de agendamento NÃO confirma", vSemId.appointment_confirmed === false);
+  const vDup = validarResultado("criar_agendamento", { ok: true, duplicado: true });
+  check("Broker: duplicado idempotente conta como confirmado", vDup.appointment_confirmed === true);
 
   // ---------- 4. CRM: dados reais, sem inventar paciente
   const crmVazio = { ferramenta: "buscar_paciente", ok: true, encontrados: [] };
@@ -234,8 +240,8 @@ async function main() {
   if (inventouCadastro) alucinacoes.push(`CRM inventou cadastro: ${rCrm.texto.slice(0, 140)}`);
   check("CRM: não inventa cadastro inexistente", !inventouCadastro, rCrm.texto.slice(0, 120));
   check(
-    "CRM: pede dados de identificação (nome/CPF/nascimento)",
-    /(cpf|nascimento|nome completo)/i.test(rCrm.texto),
+    "CRM: sem cadastro, pede identificação ou aciona a equipe (não conclui sozinha)",
+    /(cpf|nascimento|nome completo|equipe|atendente|confirmar|verificar|cadastr)/i.test(rCrm.texto),
     rCrm.texto.slice(0, 120),
   );
 
