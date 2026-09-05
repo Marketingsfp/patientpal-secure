@@ -1000,13 +1000,19 @@ ${procs || "(nenhum)"}`;
 
 
   // Handoff humano: disponível SEMPRE, mesmo sem a flag de agenda.
-  const {
-    FERRAMENTA_HANDOFF,
-    ehFerramentaHandoff,
-    executarHandoffTool,
-  } = await import("@/lib/nina/handoff-tool.server");
+  const { FERRAMENTA_HANDOFF } = await import("@/lib/nina/handoff-tool.server");
+  const { respostaParaModelo } = await import("@/lib/nina/tool-broker");
   ferramentas = [...(ferramentas ?? []), FERRAMENTA_HANDOFF];
   const ctxHandoff = { clinicaId, conversaId: estadoId.conversaId ?? null };
+  // FASE 4 — Tool Broker: ponto único de execução das ferramentas reais.
+  const { criarToolBroker } = await import("@/lib/nina/tool-broker.server");
+  const broker = criarToolBroker({
+    ctxPaciente: ctxFerramentas,
+    ctxHandoff,
+    executarPaciente: executar
+      ? (ctx, nome, args) => executar!(ctx, nome, args as never)
+      : null,
+  });
   const systemPromptComHandoff = `${systemPromptFinal}
 
 ATENDIMENTO HUMANO — REGRA OBRIGATÓRIA:
@@ -1021,11 +1027,23 @@ ATENDIMENTO HUMANO — REGRA OBRIGATÓRIA:
     tool_calls?: Array<{ id: string; function?: { name?: string; arguments?: string } }>;
     tool_call_id?: string;
   };
-  const mensagens: MsgIA[] = [
-    { role: "system", content: systemPromptComHandoff },
-    ...(historico as MsgIA[]),
-    { role: "user", content: mensagemPaciente },
-  ];
+  // FASE 4 — Context Builder: só o necessário vai ao modelo (instruções,
+  // janela recente de mensagens, campos mínimos do paciente). Planilha,
+  // histórico completo, CRM e Agenda inteiros nunca são enviados.
+  const { montarContexto } = await import("@/lib/nina/context-builder");
+  const contexto = montarContexto({
+    systemBlocos: [systemPromptComHandoff],
+    historico: historico as MsgIA[],
+    mensagemAtual: mensagemPaciente,
+    paciente: pacienteIdEfetivo
+      ? {
+          primeiro_nome: pacienteNomeEfetivo ? pacienteNomeEfetivo.split(" ")[0]! : null,
+          identificado: true,
+          validado: true,
+        }
+      : null,
+  });
+  const mensagens: MsgIA[] = contexto.messages as MsgIA[];
 
   let resposta = "";
   let houveHandoff = false;
@@ -1107,46 +1125,33 @@ ATENDIMENTO HUMANO — REGRA OBRIGATÓRIA:
     mensagens.push({ role: "assistant", content: msg?.content ?? null, tool_calls: chamadas });
     for (const c of chamadas) {
       const nome = String(c.function?.name ?? "");
-      let resultado: unknown;
-      try {
-        if (ehFerramentaHandoff(nome)) {
-          resultado = await executarHandoffTool(ctxHandoff, c.function?.arguments);
-          houveHandoff = true;
-        } else if (executar && ctxFerramentas) {
-          resultado = await executar(ctxFerramentas, nome, c.function?.arguments);
-        } else {
-          resultado = { ok: false, erro: "FERRAMENTA_INDISPONIVEL" };
-        }
-      } catch (e) {
-        console.error("[Nina] ferramenta falhou", nome, e);
-        resultado = { ok: false, erro: "INTERNAL_ERROR", mensagem: "Falha ao consultar o sistema." };
-      }
-      // Fonte única da verdade sobre "agendou de fato": appointment_id
-      // devolvido pela ferramenta depois da verificação no banco.
-      if (nome === "agendar") {
-        const r = resultado as { ok?: boolean; appointment_id?: string; duplicado?: boolean };
-        if (r?.ok && (r.appointment_id || r.duplicado)) agendamentoConfirmado = true;
+      // Toda execução passa pelo broker: ele valida o retorno, aplica
+      // idempotência de turno e nunca transforma erro em sucesso.
+      const r = await broker.executar(nome, c.function?.arguments);
+      const resultado = respostaParaModelo(r);
+      if (r.capacidade === "requestHumanHandoff" && r.success) houveHandoff = true;
+      if (r.appointment_confirmed) agendamentoConfirmado = true;
+      if (r.capacidade === "createAppointment") {
         console.info("[NINA_APPOINTMENT]", {
           conversation_id: estadoId.conversaId,
           create_appointment_called: true,
-          appointment_id: r?.appointment_id ?? null,
-          final_result: r?.ok ? "SUCCESS" : "FAILED",
-          error_code: r?.ok ? null : (resultado as { erro?: string })?.erro ?? null,
+          appointment_id:
+            (r.dados as { appointment_id?: string } | null)?.appointment_id ?? null,
+          final_result: r.success ? "SUCCESS" : "FAILED",
+          error_code: r.erro ?? null,
+          reused: r.reused,
         });
       }
       nomesFerramentasTurno.push(nome);
-      if (resultado && typeof resultado === "object") {
-        const r = resultado as { ok?: boolean; erro?: string };
-        if (r.erro || r.ok === false) conflitoFerramenta = true;
-      }
+      if (!r.success || r.erro) conflitoFerramenta = true;
       mensagens.push({
         role: "tool",
         tool_call_id: c.id,
         content: JSON.stringify(resultado).slice(0, 8000),
       });
-
     }
   }
+
 
   // Persiste o estado estruturado: o que as ferramentas descobriram nesta
   // rodada (paciente identificado, horário oferecido, agendamento criado)
