@@ -60,7 +60,10 @@ export type EstadoFluxoNina = {
     slot_confirmed_by_patient: boolean;
     /** Paciente disse "sim/isso/pode marcar" para a vaga oferecida. */
     intent_confirmed: boolean;
+    /** Valor oficial da consulta vindo da planilha (nunca estimado). */
+    price?: string | null;
     appointment_id: string | null;
+
   };
   flow: { stage: EtapaFluxoNina };
   updated_at: string | null;
