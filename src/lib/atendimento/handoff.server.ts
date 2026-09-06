@@ -241,7 +241,12 @@ export async function encaminharParaHumano(args: {
     evento: "HANDOFF_SOLICITADO",
     departamentoId: depto?.id ?? null,
     motivo: args.motivo,
-    detalhes: { urgencia: args.urgencia ?? "normal", resumo: args.resumo ?? null },
+    detalhes: {
+      urgencia: args.urgencia ?? "normal",
+      resumo: args.resumo ?? null,
+      // Métricas: distingue transferência pedida pela Nina de tomada manual.
+      solicitado_por: args.solicitadoPor ?? "IA",
+    },
   });
   await registrarEvento({
     clinicaId: args.clinicaId,
