@@ -39,8 +39,13 @@ const PRIORIDADES = ["critico", "alto", "normal"] as const;
 const filtros = z.object({
   clinicaId: z.string().uuid(),
   granularidade: z.enum(["dia", "semana", "mes"]).default("dia"),
+  // Recorte operacional (FASE 2): datas + faixa de horário no fuso da clínica.
   de: z.string().nullish(),
   ate: z.string().nullish(),
+  diaInteiro: z.boolean().default(true),
+  horaInicio: z.string().nullish(),
+  horaFim: z.string().nullish(),
+  fuso: z.string().nullish(),
   status: z.enum(STATUS).nullish(),
   categoria: z.enum(VALORES_CATEGORIA_FEEDBACK).nullish(),
   rootCause: z.enum(CAUSAS).nullish(),
@@ -62,23 +67,6 @@ type Linha = {
   created_at: string;
 };
 
-/** Rótulo do balde temporal (ISO curto) conforme a granularidade escolhida. */
-function balde(iso: string, granularidade: "dia" | "semana" | "mes") {
-  const d = new Date(iso);
-  if (granularidade === "mes") {
-    return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
-  }
-  if (granularidade === "semana") {
-    const base = new Date(
-      Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()),
-    );
-    // Segunda-feira como início da semana.
-    const diaSemana = (base.getUTCDay() + 6) % 7;
-    base.setUTCDate(base.getUTCDate() - diaSemana);
-    return base.toISOString().slice(0, 10);
-  }
-  return iso.slice(0, 10);
-}
 
 function contar<T extends string>(valores: readonly T[], linhas: string[]) {
   const mapa = Object.fromEntries(valores.map((v) => [v, 0])) as Record<T, number>;
