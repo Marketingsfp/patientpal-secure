@@ -2262,6 +2262,8 @@ export function AtendInbox() {
 
               <button
                 key={c.id}
+                data-testid="item-conversa"
+                data-conversa-id={c.id}
                 onClick={() => {
                   iniciarTroca(c.id, "clique");
                   medidor.current = criarMedidorConversa(`conversa ${c.id}`);
@@ -2378,6 +2380,8 @@ export function AtendInbox() {
                     <CardTitle
                       className="text-base flex items-center gap-2 truncate"
                       title={tituloConversa(sel)}
+                      data-testid="titulo-conversa"
+                      data-conversa-id={sel.id}
                     >
                       <span className="truncate">{tituloConversa(sel)}</span>
                       {statusBadge(sel.status)}

@@ -63,3 +63,4 @@ package-lock.json
 *.njsproj
 *.sln
 *.sw?
+evidencias/
