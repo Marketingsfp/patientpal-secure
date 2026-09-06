@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import {
@@ -67,54 +67,54 @@ describe("Fase 5 — leitura não é resposta", () => {
 
 describe("Fase 5 — cenários obrigatórios", () => {
   const base = {
-    conversaSelecionadaId: "c1",
+    conversaId: "c1",
     conversaCarregadaId: "c1",
-    carregando: false,
-    temMensagens: true,
     abaVisivel: true,
-    usuarioId: "maria",
-    atribuidaUserId: "maria",
-    souGestor: false,
-    aberturaPorMensagemAntiga: false,
+    userId: "maria",
+    atribuidaUserId: "maria" as string | null,
+    ehGestor: false,
+    aberturaPorAlvo: false,
+    ultimaMensagemId: "m10",
+    ultimaRegistradaId: null as string | null,
   };
 
   it("atendente abre e visualiza → registra leitura", () => {
-    expect(deveRegistrarLeituraAoAbrir(base).registrar).toBe(true);
+    expect(deveRegistrarLeituraAoAbrir(base).toBe(true);
   });
 
   it("administrador abre (e chega ao fim) → não registra leitura", () => {
     expect(
-      deveRegistrarLeituraAoAbrir({ ...base, usuarioId: "admin", souGestor: true }).registrar,
+      deveRegistrarLeituraAoAbrir({ ...base, userId: "admin", ehGestor: true },
     ).toBe(false);
     expect(
       deveRegistrarLeituraDeNovas({
         ...base,
-        usuarioId: "admin",
-        souGestor: true,
+        userId: "admin",
+        ehGestor: true,
         seguindoFim: true,
-      }).registrar,
+      },
     ).toBe(false);
   });
 
   it("abertura pela auditoria/revisão (mensagem antiga) não marca as novas", () => {
     expect(
-      deveRegistrarLeituraAoAbrir({ ...base, aberturaPorMensagemAntiga: true }).registrar,
+      deveRegistrarLeituraAoAbrir({ ...base, aberturaPorAlvo: true },
     ).toBe(false);
   });
 
   it("lendo histórico antigo → novas continuam sinalizadas", () => {
-    expect(deveRegistrarLeituraDeNovas({ ...base, seguindoFim: false }).registrar).toBe(false);
+    expect(deveRegistrarLeituraDeNovas({ ...base, seguindoFim: false }).toBe(false);
   });
 
   it("conversa transferida: nova responsável não herda a leitura da anterior", () => {
     // Maria era responsável; após transferir para Jean, o contexto é de Jean,
     // que ainda não tem marcador — a leitura só é registrada quando ele abre.
     expect(
-      deveRegistrarLeituraAoAbrir({ ...base, usuarioId: "jean", atribuidaUserId: "maria" })
+      deveRegistrarLeituraAoAbrir({ ...base, userId: "jean", atribuidaUserId: "maria" })
         .registrar,
     ).toBe(false);
     expect(
-      deveRegistrarLeituraAoAbrir({ ...base, usuarioId: "jean", atribuidaUserId: "jean" })
+      deveRegistrarLeituraAoAbrir({ ...base, userId: "jean", atribuidaUserId: "jean" })
         .registrar,
     ).toBe(true);
   });
