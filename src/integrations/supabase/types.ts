@@ -7625,6 +7625,187 @@ export type Database = {
           },
         ]
       }
+      nina_cat_profissionais: {
+        Row: {
+          atende_consultorio: boolean | null
+          aviso_dia: string | null
+          aviso_valido_ate: string | null
+          aviso_valido_de: string | null
+          clinica_id: string
+          convenios: Json
+          created_at: string
+          criado_por: string | null
+          especialidades: Json
+          formas_pagamento: Json
+          horarios: Json
+          id: string
+          medico_id: string | null
+          nome: string
+          nota_interna: string | null
+          observacao_publica: string | null
+          publicado_em: string | null
+          publicado_por: string | null
+          rascunho: Json | null
+          status: string
+          tipo_atendimento: string | null
+          unidade_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          atende_consultorio?: boolean | null
+          aviso_dia?: string | null
+          aviso_valido_ate?: string | null
+          aviso_valido_de?: string | null
+          clinica_id: string
+          convenios?: Json
+          created_at?: string
+          criado_por?: string | null
+          especialidades?: Json
+          formas_pagamento?: Json
+          horarios?: Json
+          id?: string
+          medico_id?: string | null
+          nome: string
+          nota_interna?: string | null
+          observacao_publica?: string | null
+          publicado_em?: string | null
+          publicado_por?: string | null
+          rascunho?: Json | null
+          status?: string
+          tipo_atendimento?: string | null
+          unidade_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          atende_consultorio?: boolean | null
+          aviso_dia?: string | null
+          aviso_valido_ate?: string | null
+          aviso_valido_de?: string | null
+          clinica_id?: string
+          convenios?: Json
+          created_at?: string
+          criado_por?: string | null
+          especialidades?: Json
+          formas_pagamento?: Json
+          horarios?: Json
+          id?: string
+          medico_id?: string | null
+          nome?: string
+          nota_interna?: string | null
+          observacao_publica?: string | null
+          publicado_em?: string | null
+          publicado_por?: string | null
+          rascunho?: Json | null
+          status?: string
+          tipo_atendimento?: string | null
+          unidade_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nina_cat_profissionais_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nina_cat_profissionais_medico_id_fkey"
+            columns: ["medico_id"]
+            isOneToOne: false
+            referencedRelation: "medicos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nina_cat_profissionais_unidade_id_fkey"
+            columns: ["unidade_id"]
+            isOneToOne: false
+            referencedRelation: "unidades"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      nina_cat_servicos: {
+        Row: {
+          clinica_id: string
+          created_at: string
+          criado_por: string | null
+          descricao_publica: string | null
+          executantes: Json
+          formas_pagamento: Json
+          id: string
+          nome: string
+          nota_interna: string | null
+          preparo: string | null
+          procedimento_id: string | null
+          publicado_em: string | null
+          publicado_por: string | null
+          rascunho: Json | null
+          restricoes: string | null
+          status: string
+          updated_at: string
+          valor: number | null
+          valor_observacao: string | null
+        }
+        Insert: {
+          clinica_id: string
+          created_at?: string
+          criado_por?: string | null
+          descricao_publica?: string | null
+          executantes?: Json
+          formas_pagamento?: Json
+          id?: string
+          nome: string
+          nota_interna?: string | null
+          preparo?: string | null
+          procedimento_id?: string | null
+          publicado_em?: string | null
+          publicado_por?: string | null
+          rascunho?: Json | null
+          restricoes?: string | null
+          status?: string
+          updated_at?: string
+          valor?: number | null
+          valor_observacao?: string | null
+        }
+        Update: {
+          clinica_id?: string
+          created_at?: string
+          criado_por?: string | null
+          descricao_publica?: string | null
+          executantes?: Json
+          formas_pagamento?: Json
+          id?: string
+          nome?: string
+          nota_interna?: string | null
+          preparo?: string | null
+          procedimento_id?: string | null
+          publicado_em?: string | null
+          publicado_por?: string | null
+          rascunho?: Json | null
+          restricoes?: string | null
+          status?: string
+          updated_at?: string
+          valor?: number | null
+          valor_observacao?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nina_cat_servicos_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nina_cat_servicos_procedimento_id_fkey"
+            columns: ["procedimento_id"]
+            isOneToOne: false
+            referencedRelation: "procedimentos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       nina_execucoes: {
         Row: {
           clinica_id: string | null
