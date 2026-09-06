@@ -1155,7 +1155,7 @@ export function AtendInbox() {
     cacheContatos.current.invalidar(anterior);
     (async () => {
       try {
-        const c = await obterContato({ data: { conversa_id: id } });
+        const c = await obterContato({ data: { clinicaId, conversaId: id } });
         if (selIdRef.current !== id) return;
         cacheContatos.current.guardar((c as any)?.paciente?.id, c);
         setContato(c as any);
