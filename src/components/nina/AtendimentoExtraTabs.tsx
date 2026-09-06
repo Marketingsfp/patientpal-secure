@@ -830,7 +830,54 @@ export function AtendInbox() {
     } catch (e: any) {
       mostrarErro(e);
     }
-  }, [clinicaId, filtroStatus, buscaTexto, escopo, listarConvs, carregarContadores, meuId, souGestor, abrirPelaUrl]);
+  }, [clinicaId, filtroStatus, buscaTexto, buscaInterp.exigeNumero, escopo, listarConvs, carregarContadores, meuId, souGestor, abrirPelaUrl]);
+
+  // FASE 2 — busca pelo número permanente (#1342). Consulta exata no backend,
+  // fora do filtro atual e sem baixar a lista inteira. Só leitura: encontrar
+  // uma conversa não muda responsável, fila nem status.
+  useEffect(() => {
+    const numero = buscaInterp.numero;
+    if (!clinicaId || numero === null) {
+      setResultadoNumero(null);
+      return;
+    }
+    let valido = true;
+    setResultadoNumero({ estado: "carregando" });
+    const t = window.setTimeout(() => {
+      void (async () => {
+        try {
+          const row: any = await buscarPorNumeroFn({ data: { clinicaId, numero } });
+          if (!valido) return;
+          setResultadoNumero(row ? { estado: "ok", conversa: row } : { estado: "vazio" });
+        } catch {
+          // Resposta neutra também em caso de falha: nada é revelado.
+          if (valido) setResultadoNumero({ estado: "vazio" });
+        }
+      })();
+    }, 250);
+    return () => {
+      valido = false;
+      window.clearTimeout(t);
+    };
+  }, [clinicaId, buscaInterp.numero, buscarPorNumeroFn]);
+
+  /**
+   * Abre um resultado da busca por número usando o MESMO caminho de abertura
+   * da Inbox (nada de endpoint paralelo pelo número visível). A conversa entra
+   * na lista para não ser fechada por uma resposta do filtro antigo.
+   */
+  const abrirResultadoNumero = useCallback(
+    (row: any) => {
+      if (!row?.id) return;
+      setConvs((prev: any[]) => (prev.some((x: any) => x.id === row.id) ? prev : [row, ...prev]));
+      deepLinkPendente.current = row.id;
+      iniciarTroca(row.id, "clique");
+      abrirPelaUrl(row.id);
+    },
+    [abrirPelaUrl],
+  );
+
+
 
   // FASE 1 — a conversa aberta é sempre a do endereço. Quando o
   // conversationId da URL muda (clique, voltar/avançar do navegador, link
