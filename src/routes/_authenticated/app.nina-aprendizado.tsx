@@ -1166,11 +1166,12 @@ function Pagina() {
                                 {AVISO_ANALISE_NAO_APROVA}
                               </p>
                               {analiseUsouOutroConjunto(
-                                (analises[it.id] as { evidencias_resumo?: unknown })
-                                  .evidencias_resumo,
-                                (versoesAnalise[it.id]?.[1] as
-                                  | { evidencias_resumo?: unknown }
-                                  | undefined)?.evidencias_resumo ?? null,
+                                (analises[it.id] as unknown as {
+                                  evidencias_resumo?: { entradas?: number; etapas?: number } | null;
+                                }).evidencias_resumo ?? null,
+                                ((versoesAnalise[it.id]?.[1] as unknown as
+                                  | { evidencias_resumo?: { entradas: number; etapas: number } }
+                                  | undefined)?.evidencias_resumo ?? null),
                               ) && (
                                 <p className="rounded-md border border-border bg-muted/40 p-2 text-xs">
                                   Esta análise usou um conjunto de evidências diferente da versão
