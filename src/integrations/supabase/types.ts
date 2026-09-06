@@ -776,6 +776,9 @@ export type Database = {
           primeiro_resp_em: string | null
           prioridade: number
           protocol_number: string | null
+          protocolo_atendimento: string | null
+          protocolo_em: string | null
+          protocolo_sessao_id: string | null
           resolved_at: string | null
           resolved_by: string | null
           sentimento: string | null
@@ -822,6 +825,9 @@ export type Database = {
           primeiro_resp_em?: string | null
           prioridade?: number
           protocol_number?: string | null
+          protocolo_atendimento?: string | null
+          protocolo_em?: string | null
+          protocolo_sessao_id?: string | null
           resolved_at?: string | null
           resolved_by?: string | null
           sentimento?: string | null
@@ -868,6 +874,9 @@ export type Database = {
           primeiro_resp_em?: string | null
           prioridade?: number
           protocol_number?: string | null
+          protocolo_atendimento?: string | null
+          protocolo_em?: string | null
+          protocolo_sessao_id?: string | null
           resolved_at?: string | null
           resolved_by?: string | null
           sentimento?: string | null
@@ -1370,6 +1379,41 @@ export type Database = {
             foreignKeyName: "atend_pause_reasons_clinica_id_fkey"
             columns: ["clinica_id"]
             isOneToOne: false
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      atend_protocolo_atendimento_config: {
+        Row: {
+          ativo: boolean
+          clinica_id: string
+          created_at: string
+          prefixo: string
+          proximo_seq: number
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          clinica_id: string
+          created_at?: string
+          prefixo?: string
+          proximo_seq?: number
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          clinica_id?: string
+          created_at?: string
+          prefixo?: string
+          proximo_seq?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "atend_protocolo_atendimento_config_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: true
             referencedRelation: "clinicas"
             referencedColumns: ["id"]
           },
@@ -11181,6 +11225,17 @@ export type Database = {
         }[]
       }
       atend_gerar_protocolo: { Args: { _clinica_id: string }; Returns: string }
+      atend_gerar_protocolo_atendimento: {
+        Args: {
+          _clinica_id: string
+          _conversa_id: string
+          _session_id?: string
+        }
+        Returns: {
+          novo: boolean
+          protocolo: string
+        }[]
+      }
       atend_usuario_e_admin: {
         Args: { _clinica_id: string; _user_id: string }
         Returns: boolean
