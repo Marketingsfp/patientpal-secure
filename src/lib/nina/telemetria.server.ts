@@ -12,13 +12,27 @@ import {
   type RegistroExecucao,
 } from "./telemetria";
 
-export async function registrarExecucao(registro: RegistroExecucao): Promise<void> {
+/**
+ * Grava a execução e devolve o identificador do registro técnico, para que a
+ * mensagem enviada ao paciente possa apontar para a execução que a produziu.
+ * Continua best-effort: falha aqui nunca derruba o atendimento (retorna null).
+ */
+export async function registrarExecucao(registro: RegistroExecucao): Promise<string | null> {
   try {
     const linha = sanitizarRegistro(registro as unknown as Record<string, unknown>);
-    const { error } = await supabaseAdmin.from("nina_execucoes").insert(linha as never);
-    if (error) console.warn("[nina-telemetria] falha ao gravar execução:", error.message);
+    const { data, error } = await supabaseAdmin
+      .from("nina_execucoes")
+      .insert(linha as never)
+      .select("id")
+      .single();
+    if (error) {
+      console.warn("[nina-telemetria] falha ao gravar execução:", error.message);
+      return null;
+    }
+    return (data as { id: string } | null)?.id ?? null;
   } catch (e) {
     console.warn("[nina-telemetria] erro inesperado:", e instanceof Error ? e.message : e);
+    return null;
   }
 }
 

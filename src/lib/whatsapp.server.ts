@@ -499,8 +499,13 @@ export async function gerarRespostaNina(
   clinicaId: string,
   mensagemPaciente: string,
   telefoneRemetente?: string | null,
-  /** Console de Homologação: mesma IA, mas tudo que grava nasce como teste. */
-  opcoes?: { teste?: boolean },
+  /**
+   * Console de Homologação: mesma IA, mas tudo que grava nasce como teste.
+   * `auditoria` é um objeto do chamador preenchido com o id da execução que
+   * produziu a resposta final — usado para vincular a mensagem enviada ao
+   * registro técnico. Não altera o comportamento da Nina.
+   */
+  opcoes?: { teste?: boolean; auditoria?: { execucaoId?: string | null } },
 ): Promise<string> {
   const apiKey = process.env.LOVABLE_API_KEY;
   if (!apiKey) throw new Error("LOVABLE_API_KEY ausente");
@@ -1280,6 +1285,10 @@ ATENDIMENTO HUMANO — REGRA OBRIGATÓRIA:
       },
     });
     nivelAnteriorTurno = respostaIA.nivel;
+    // Guarda a execução mais recente: é a que produz o texto devolvido.
+    if (opcoes?.auditoria && respostaIA.execucaoId) {
+      opcoes.auditoria.execucaoId = respostaIA.execucaoId;
+    }
 
     if (!respostaIA.ok) {
       throw new Error(respostaIA.erro ?? "Falha IA");

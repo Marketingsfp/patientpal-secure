@@ -380,12 +380,15 @@ export const enviarMensagemTeste = createServerFn({ method: "POST" })
 
     let reply = "";
     let falhaTecnica = false;
+    // Auditoria: id da execução que produziu esta resposta.
+    const auditoriaNina: { execucaoId?: string | null } = {};
     try {
       if (textoPaciente) {
         const { gerarRespostaNina } = await import("@/lib/whatsapp.server");
         diag.model_called = true;
         reply = await gerarRespostaNina(data.clinicaId, textoPaciente, lead.telefone_sessao, {
           teste: true,
+          auditoria: auditoriaNina,
         });
       } else if (audioFalhou) {
         reply = RESPOSTA_AUDIO_FALHOU;
@@ -465,6 +468,7 @@ export const enviarMensagemTeste = createServerFn({ method: "POST" })
               media_mime: sintetizado.mime,
               status: "sent",
               enviada_por: "nina",
+              execucao_id: auditoriaNina.execucaoId ?? null,
               is_teste: true,
             });
           }
@@ -487,6 +491,7 @@ export const enviarMensagemTeste = createServerFn({ method: "POST" })
         tipo: "text",
         status: "sent",
         enviada_por: "nina",
+        execucao_id: auditoriaNina.execucaoId ?? null,
         is_teste: true,
       });
     }

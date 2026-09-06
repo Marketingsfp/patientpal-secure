@@ -331,8 +331,12 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
                     const { RESPOSTA_AUDIO_FALHOU, respostaMidiaNaoSuportada } =
                       await import("@/lib/whatsapp-midia.server");
                     let reply = "";
+                    // Auditoria: id da execução que produziu esta resposta.
+                    const auditoriaNina: { execucaoId?: string | null } = {};
                     if (textoPaciente) {
-                      reply = await gerarRespostaNina(params.clinicaId, textoPaciente, from);
+                      reply = await gerarRespostaNina(params.clinicaId, textoPaciente, from, {
+                        auditoria: auditoriaNina,
+                      });
                     } else if (audioFalhou) {
                       reply = RESPOSTA_AUDIO_FALHOU;
                     } else {
@@ -419,6 +423,7 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
                                 media_mime: audio.mime,
                                 status: "sent",
                                 enviada_por: "nina",
+                                execucao_id: auditoriaNina.execucaoId ?? null,
                               });
                               audioEnviado = true;
                               precisaTextoCompleto = longa;
@@ -446,6 +451,7 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
                           tipo: "text",
                           status: "sent",
                           enviada_por: "nina",
+                          execucao_id: auditoriaNina.execucaoId ?? null,
                         });
                       }
 

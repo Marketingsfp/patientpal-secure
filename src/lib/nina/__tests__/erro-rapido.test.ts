@@ -11,6 +11,7 @@ import {
   TEXTO_REPORTE_DUPLICADO,
   TEXTO_REPORTE_FALHA,
   TEXTO_REPORTE_SUCESSO,
+  estadoAuditoria,
 } from "@/lib/nina/erro-rapido";
 
 const CONVERSA = "11111111-1111-4111-8111-111111111111";
@@ -123,5 +124,75 @@ describe("botão de reporte rápido no chat", () => {
     expect(avisoReporte(null).texto).toBe(TEXTO_REPORTE_SUCESSO);
     expect(TEXTO_REPORTE_FALHA).toBe("Não foi possível registrar o erro. Tente novamente.");
     expect(ROTULO_REPORTE).toBe("Reportar erro da Nina");
+  });
+});
+
+describe("estado da auditoria técnica do reporte", () => {
+  const agora = Date.parse("2026-01-10T12:00:00Z");
+
+  it("mensagem antiga sem execução vinculada fica Indisponível", () => {
+    expect(
+      estadoAuditoria({
+        execucaoId: null,
+        mensagemCriadaEmMs: agora - 60 * 60 * 1000,
+        agoraMs: agora,
+      }),
+    ).toBe("unavailable");
+  });
+
+  it("mensagem recém-enviada sem vínculo ainda aparece Em processamento", () => {
+    expect(
+      estadoAuditoria({ execucaoId: null, mensagemCriadaEmMs: agora - 5_000, agoraMs: agora }),
+    ).toBe("processing");
+  });
+
+  it("execução vinculada mas ainda não encontrada fica Em processamento", () => {
+    expect(estadoAuditoria({ execucaoId: "exec-1", execucao: null, agoraMs: agora })).toBe(
+      "processing",
+    );
+  });
+
+  it("execução incompleta fica Parcial e execução completa fica Disponível", () => {
+    expect(
+      estadoAuditoria({
+        execucaoId: "exec-1",
+        execucao: { model: "gemini", latency_ms: null, created_at: "2026-01-10T11:59:00Z" },
+      }),
+    ).toBe("partial");
+    expect(
+      estadoAuditoria({
+        execucaoId: "exec-1",
+        execucao: { model: "gemini", latency_ms: 800, created_at: "2026-01-10T11:59:00Z" },
+      }),
+    ).toBe("available");
+  });
+
+  it("o registro guarda a execução da mensagem clicada, não a última da conversa", () => {
+    const r = montarRegistroErroRapido({
+      clinicaId: "c1",
+      conversaId: "cv1",
+      mensagemId: "m-antiga",
+      snapshot: "texto",
+      reporterUserId: "u1",
+      execucaoId: "exec-da-mensagem",
+      auditoriaStatus: "available",
+    });
+    expect(r.execucao_id).toBe("exec-da-mensagem");
+    expect(r.auditoria_status).toBe("available");
+    expect(r.mensagem_id).toBe("m-antiga");
+    expect(r.status).toBe("pending");
+    expect(r.correcao).toBeNull();
+  });
+
+  it("sem execução o reporte continua válido, apenas sem auditoria", () => {
+    const r = montarRegistroErroRapido({
+      clinicaId: "c1",
+      conversaId: "cv1",
+      mensagemId: "m1",
+      snapshot: "texto",
+      reporterUserId: "u1",
+    });
+    expect(r.execucao_id).toBeNull();
+    expect(r.auditoria_status).toBe("unavailable");
   });
 });

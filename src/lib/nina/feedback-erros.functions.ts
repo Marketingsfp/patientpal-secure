@@ -99,8 +99,13 @@ export const reportarErroRapidoMensagemNina = createServerFn({ method: "POST" })
       .parse(i),
   )
   .handler(async ({ data, context }) => {
-    const { validarMensagemNina, montarRegistroErroRapido, ehConflitoDuplicidade, ORIGEM_ERRO_RAPIDO } =
-      await import("@/lib/nina/erro-rapido");
+    const {
+      validarMensagemNina,
+      montarRegistroErroRapido,
+      ehConflitoDuplicidade,
+      estadoAuditoria,
+      ORIGEM_ERRO_RAPIDO,
+    } = await import("@/lib/nina/erro-rapido");
 
     const { data: membro, error: erroMembro } = await context.supabase.rpc("is_member", {
       _user_id: context.userId,
@@ -122,7 +127,9 @@ export const reportarErroRapidoMensagemNina = createServerFn({ method: "POST" })
 
     const { data: mensagem, error: erroMensagem } = await context.supabase
       .from("whatsapp_mensagens")
-      .select("id, conversa_id, clinica_id, direction, enviada_por, body, transcricao")
+      .select(
+        "id, conversa_id, clinica_id, direction, enviada_por, body, transcricao, execucao_id, created_at",
+      )
       .eq("id", data.mensagemId)
       .eq("clinica_id", data.clinicaId)
       .maybeSingle();
@@ -131,7 +138,31 @@ export const reportarErroRapidoMensagemNina = createServerFn({ method: "POST" })
     const validacao = validarMensagemNina(mensagem as never, data.conversaId);
     if (!validacao.ok) throw new Error(validacao.mensagem);
 
-    const colunas = "id, status, categoria, origem, created_at, mensagem_id, conversa_id";
+    // Auditoria: SEMPRE pela execução gravada NESTA mensagem — nunca a última
+    // execução da conversa. Sem execução, o reporte continua válido.
+    const msg = mensagem as unknown as {
+      execucao_id: string | null;
+      created_at: string | null;
+    };
+    const execucaoId = msg.execucao_id ?? null;
+    let execucao: { model: string | null; latency_ms: number | null; created_at: string | null } | null =
+      null;
+    if (execucaoId) {
+      const { data: exec } = await context.supabase
+        .from("nina_execucoes")
+        .select("id, model, latency_ms, created_at")
+        .eq("id", execucaoId)
+        .maybeSingle();
+      execucao = (exec as typeof execucao) ?? null;
+    }
+    const auditoriaStatus = estadoAuditoria({
+      execucaoId,
+      execucao,
+      mensagemCriadaEmMs: msg.created_at ? Date.parse(msg.created_at) : null,
+    });
+
+    const colunas =
+      "id, status, categoria, origem, created_at, mensagem_id, conversa_id, execucao_id, auditoria_status";
 
     // 1ª barreira: já existe reporte rápido pendente para esta mensagem.
     const { data: existente } = await context.supabase
@@ -153,6 +184,8 @@ export const reportarErroRapidoMensagemNina = createServerFn({ method: "POST" })
           mensagemId: data.mensagemId,
           snapshot: validacao.snapshot,
           reporterUserId: context.userId,
+          execucaoId,
+          auditoriaStatus,
         }) as never,
       )
       .select(colunas)

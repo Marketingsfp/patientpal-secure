@@ -20,7 +20,47 @@ export type MensagemParaReporte = {
   enviada_por: string | null;
   body: string | null;
   transcricao?: string | null;
+  /** Execução da Nina que produziu ESTA mensagem (não a última da conversa). */
+  execucao_id?: string | null;
 };
+
+/** Estado real dos registros técnicos ligados ao erro reportado. */
+export type EstadoAuditoria = "processing" | "available" | "partial" | "unavailable";
+
+export const ROTULO_AUDITORIA: Record<EstadoAuditoria, string> = {
+  processing: "Em processamento",
+  available: "Disponível",
+  partial: "Parcial",
+  unavailable: "Indisponível",
+};
+
+/**
+ * Decide o estado da auditoria sem nunca bloquear o reporte:
+ * - sem vínculo com execução → Indisponível;
+ * - vínculo existe mas o registro ainda não apareceu → Em processamento;
+ * - registro existe mas incompleto (sem modelo/latência) → Parcial;
+ * - registro completo → Disponível.
+ */
+export function estadoAuditoria(entrada: {
+  execucaoId?: string | null;
+  execucao?: { model?: string | null; latency_ms?: number | null; created_at?: string | null } | null;
+  mensagemCriadaEmMs?: number | null;
+  agoraMs?: number;
+}): EstadoAuditoria {
+  if (!entrada.execucaoId) {
+    const criada = entrada.mensagemCriadaEmMs ?? null;
+    const agora = entrada.agoraMs ?? Date.now();
+    // Mensagem recém-criada ainda pode receber o vínculo técnico.
+    if (criada != null && agora - criada < 2 * 60 * 1000) return "processing";
+    return "unavailable";
+  }
+  if (!entrada.execucao) return "processing";
+  const completo =
+    Boolean(entrada.execucao.model) &&
+    entrada.execucao.latency_ms != null &&
+    Boolean(entrada.execucao.created_at);
+  return completo ? "available" : "partial";
+}
 
 export type ResultadoValidacao =
   | { ok: true; snapshot: string }
@@ -71,12 +111,16 @@ export function montarRegistroErroRapido(params: {
   mensagemId: string;
   snapshot: string;
   reporterUserId: string;
+  execucaoId?: string | null;
+  auditoriaStatus?: EstadoAuditoria;
 }) {
   return {
     clinica_id: params.clinicaId,
     conversa_id: params.conversaId,
     mensagem_id: params.mensagemId,
     mensagem_texto: params.snapshot,
+    execucao_id: params.execucaoId ?? null,
+    auditoria_status: params.auditoriaStatus ?? "unavailable",
     categoria: CATEGORIA_A_CLASSIFICAR,
     correcao: null,
     observacao: null,

@@ -25,7 +25,7 @@ const STATUS = [
 export type StatusFeedbackNina = (typeof STATUS)[number];
 
 const COLUNAS =
-  "id, clinica_id, conversa_id, mensagem_id, mensagem_texto, pergunta_texto, categoria, origem, correcao, correcao_original, observacao, motivo_rejeicao, status, reportado_por, revisado_por, revisado_em, unidade_id, created_at, updated_at, root_cause, prioridade, knowledge_status, knowledge_snapshot, knowledge_consultado_em, grupo_chave, grupo_titulo, diagnosticado_por, diagnosticado_em";
+  "id, clinica_id, conversa_id, mensagem_id, mensagem_texto, pergunta_texto, categoria, origem, correcao, correcao_original, observacao, motivo_rejeicao, status, reportado_por, revisado_por, revisado_em, unidade_id, created_at, updated_at, root_cause, prioridade, knowledge_status, knowledge_snapshot, knowledge_consultado_em, grupo_chave, grupo_titulo, diagnosticado_por, diagnosticado_em, execucao_id, auditoria_status";
 
 type ClienteSupabase = {
   rpc: (
@@ -150,7 +150,38 @@ export const listarRevisaoFeedbackNina = createServerFn({ method: "POST" })
       if (k) ocorrencias[k] = (ocorrencias[k] ?? 0) + 1;
     }
 
-    return { itens, pessoas, contagens, ocorrencias, conversas };
+    // Auditoria técnica: só o PONTEIRO para o registro existente (nada é
+    // copiado para outro armazenamento). O estado é recalculado na leitura,
+    // então "Em processamento" vira "Disponível" assim que o registro chega,
+    // e vira "Indisponível" quando a retenção já expurgou a evidência.
+    const { estadoAuditoria } = await import("@/lib/nina/erro-rapido");
+    const execucoes: Record<
+      string,
+      { id: string; model: string | null; latency_ms: number | null; created_at: string | null; success: boolean | null; knowledge_status: string | null; thinking_level: string | null; route_reason: string | null; tool_calls: string[] | null }
+    > = {};
+    const idsExec = Array.from(
+      new Set(itens.map((l) => (l as { execucao_id?: string | null }).execucao_id).filter(Boolean) as string[]),
+    );
+    if (idsExec.length) {
+      const { data: execs } = await context.supabase
+        .from("nina_execucoes")
+        .select(
+          "id, model, latency_ms, created_at, success, knowledge_status, thinking_level, route_reason, tool_calls",
+        )
+        .in("id", idsExec);
+      for (const e of execs ?? []) execucoes[e.id] = e as (typeof execucoes)[string];
+    }
+    const auditoria: Record<string, string> = {};
+    for (const l of itens) {
+      const execId = (l as { execucao_id?: string | null }).execucao_id ?? null;
+      auditoria[l.id] = estadoAuditoria({
+        execucaoId: execId,
+        execucao: execId ? (execucoes[execId] ?? null) : null,
+        mensagemCriadaEmMs: l.created_at ? Date.parse(l.created_at) : null,
+      });
+    }
+
+    return { itens, pessoas, contagens, ocorrencias, conversas, execucoes, auditoria };
   });
 
 /** Lista quem já reportou erros na clínica — alimenta o filtro por atendente. */
