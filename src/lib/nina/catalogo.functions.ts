@@ -290,3 +290,29 @@ export const excluirItemCatalogo = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     return { ok: true };
   });
+
+/* ------------------------------------------------------------------ */
+/* Fase 3 — "Criar com IA": organiza texto livre nos campos do formulário */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Chama o modelo apenas para ORGANIZAR o texto colado nos campos do
+ * formulário. Nada é gravado aqui: o retorno é um rascunho para revisão.
+ * O texto original não é armazenado nem vira fonte de conhecimento da Nina.
+ */
+export const organizarTextoCatalogoIA = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) =>
+    z
+      .object({
+        clinicaId: z.string().uuid(),
+        tipo: z.enum(["servico", "profissional"]),
+        texto: z.string().trim().min(10, "Escreva ou cole as informações a organizar.").max(20000),
+      })
+      .parse(i),
+  )
+  .handler(async ({ data, context }) => {
+    await exigirAdmin(context.supabase, context.userId, data.clinicaId);
+    const { organizarTextoComIA } = await import("./catalogo-ia.server");
+    return await organizarTextoComIA(data.tipo, data.texto);
+  });
