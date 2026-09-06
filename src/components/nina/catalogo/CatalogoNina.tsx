@@ -292,11 +292,64 @@ export function CatalogoNina({
           </p>
         </div>
         {podeEditar && (
-          <Button onClick={abrirNovo} size="sm">
-            <Plus className="mr-2 h-4 w-4" /> Novo
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              onClick={() => {
+                setIaAberta(true);
+              }}
+              size="sm"
+              variant="outline"
+            >
+              <Sparkles className="mr-2 h-4 w-4" /> Criar com IA
+            </Button>
+            <Button onClick={abrirNovo} size="sm">
+              <Plus className="mr-2 h-4 w-4" /> Novo
+            </Button>
+          </div>
         )}
       </div>
+
+      <Dialog open={iaAberta} onOpenChange={(v) => !iaProcessando && setIaAberta(v)}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Criar com IA — {titulo.toLowerCase()}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              Escreva ou cole as informações do jeito que você tem. A IA organiza nos campos do
+              formulário e você revisa antes de salvar. Nada é salvo nem publicado
+              automaticamente.
+            </p>
+            <Textarea
+              value={iaTexto}
+              onChange={(e) => setIaTexto(e.target.value)}
+              rows={10}
+              placeholder={
+                tipo === "servico"
+                  ? "Ex.: Ultrassom de tireoide 130 no pix, 150 no cartão em 3x. Precisa de pedido médico..."
+                  : "Ex.: Dra. Ana Paula, cardiologista, atende quinzenal às quintas das 14h às 18h..."
+              }
+            />
+            <p className="text-xs text-muted-foreground">
+              Modelo utilizado: {MODELO_CATALOGO_IA}. O texto é usado apenas para preencher este
+              formulário.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setIaAberta(false)} disabled={iaProcessando}>
+              Cancelar
+            </Button>
+            <Button onClick={() => void organizarComIA()} disabled={iaProcessando}>
+              {iaProcessando ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Sparkles className="mr-2 h-4 w-4" />
+              )}
+              Organizar e preencher campos com IA
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {carregando ? (
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
