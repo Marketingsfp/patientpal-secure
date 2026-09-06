@@ -362,6 +362,19 @@ export async function atribuirAtendenteOnline(args: {
       texto: `👤 Atribuída automaticamente a ${nome} (online).`,
     });
 
+  // Transferência da Nina EFETIVADA: só aqui o protocolo é gerado e informado
+  // ao paciente. Falha nessa etapa não desfaz a atribuição.
+  try {
+    const { protocoloAoAtribuirHumano } = await import("./protocolo-atendimento.server");
+    await protocoloAoAtribuirHumano({
+      clinicaId: args.clinicaId,
+      conversaId: args.conversaId,
+      userId,
+    });
+  } catch (e) {
+    console.error("[handoff] falha no protocolo de atendimento", e);
+  }
+
   return { userId, nome };
 }
 
