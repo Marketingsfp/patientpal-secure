@@ -2405,7 +2405,10 @@ export function AtendInbox() {
                     <Button
                       size="sm"
                       variant="outline"
-                      disabled={(!!responsavelId && !souResponsavel) || carregandoConversa}
+                      disabled={
+                        (!!responsavelId && !souResponsavel && !souAdmin) || carregandoConversa
+                      }
+
                       className="border-atd-border text-atd-blue-ink hover:bg-atd-blue-tint hover:text-atd-blue-ink"
                       onClick={() => setTransferOpen(true)}
                     >
