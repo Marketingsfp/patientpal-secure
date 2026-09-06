@@ -41,8 +41,8 @@ export type TraceConhecimento = {
 export type ResultadoConhecimento = {
   found: boolean;
   knowledge_status: KnowledgeStatus;
-  source: "nina_knowledge_base";
-  source_type: "spreadsheet";
+  source: "nina_knowledge_base" | "nina_catalogo";
+  source_type: "spreadsheet" | "catalog";
   base_version: number | null;
   base_file: string | null;
   procedure: string | null;
