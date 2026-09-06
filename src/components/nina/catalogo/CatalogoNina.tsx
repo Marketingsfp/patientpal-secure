@@ -139,13 +139,80 @@ export function CatalogoNina({
   function abrirNovo() {
     setServico(servicoVazio());
     setProfissional(profissionalVazio());
+    setFila([]);
+    setPosicao(0);
+    setAvisos([]);
     setAberto(true);
   }
 
   function abrirEdicao(registro: any) {
     if (tipo === "servico") setServico(servicoDoRegistro(registro));
     else setProfissional(profissionalDoRegistro(registro));
+    setFila([]);
+    setPosicao(0);
+    setAvisos([]);
     setAberto(true);
+  }
+
+  /** Carrega no formulário o registro `i` gerado pela IA. */
+  function carregarDaFila(lista: any[], i: number, avisosBase: string[]) {
+    const item = lista[i];
+    if (!item) return;
+    if (tipo === "servico") {
+      setServico(paraEstadoServico(item) as EstadoServico);
+      setAvisos(avisosBase);
+    } else {
+      const { estado, ambiguidades } = paraEstadoProfissional(item, {
+        medicos: opcoes.medicos,
+        especialidades: opcoes.especialidades,
+        convenios: opcoes.convenios,
+      });
+      setProfissional(estado as unknown as EstadoProfissional);
+      setAvisos([...avisosBase, ...ambiguidades]);
+    }
+  }
+
+  /** Só roda no clique. Nada é salvo nem publicado automaticamente. */
+  async function organizarComIA() {
+    if (!clinicaId || iaTexto.trim().length < 10) {
+      toast.error("Escreva ou cole as informações a organizar.");
+      return;
+    }
+    const meu = ++pedidoRef.current;
+    setIaProcessando(true);
+    try {
+      const r = (await iaFn({ data: { clinicaId, tipo, texto: iaTexto.trim() } })) as any;
+      if (meu !== pedidoRef.current) return; // resposta atrasada: descartar
+      const lista: any[] = tipo === "servico" ? r.servicos : r.profissionais;
+      if (!lista?.length) {
+        toast.error("A IA não encontrou registros neste texto. Revise e tente novamente.");
+        return;
+      }
+      const base = [...(r.pendencias ?? []), ...(r.ambiguidades ?? [])];
+      setFila(lista);
+      setPosicao(0);
+      carregarDaFila(lista, 0, base);
+      setIaAberta(false);
+      setAberto(true);
+      toast.success(
+        lista.length > 1
+          ? `${lista.length} registros organizados. Revise um a um antes de salvar.`
+          : "Campos preenchidos. Revise antes de salvar.",
+      );
+    } catch (e: any) {
+      if (meu !== pedidoRef.current) return;
+      // O texto digitado é preservado: a janela continua aberta.
+      toast.error(e?.message ?? "A IA não respondeu agora. Seu texto foi preservado.");
+    } finally {
+      if (meu === pedidoRef.current) setIaProcessando(false);
+    }
+  }
+
+  function proximoDaFila() {
+    const prox = posicao + 1;
+    if (prox >= fila.length) return;
+    setPosicao(prox);
+    carregarDaFila(fila, prox, []);
   }
 
   async function salvar(publicar: boolean) {
