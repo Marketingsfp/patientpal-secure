@@ -53,4 +53,4 @@
 - [x] Fase 7 — camada de dados analítica (calendário + consultas combináveis, reconciliada com o painel)
 - [x] Fase 8 — analista GPT-5.6 Sol no backend (ferramentas restritas + validação de valores)
 - [x] Fase 9 — interface "Análise com IA" no painel (histórico, limites, custo)
-- [ ] Fase 10 — validação final ponta a ponta
+- [x] Fase 10 — validação com dados sintéticos + teste real com gpt-5.6-sol (pendências: E2E com dois usuários na tela, medição de desempenho em volume alto, publicação)
