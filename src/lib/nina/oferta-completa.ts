@@ -228,7 +228,7 @@ export function blocoPromptOfertaCompleta({
   }
 
   linhas.push(
-    "- REGRA DO VALOR: sempre que estiver mostrando consulta ou disponibilidade e existir valor cadastrado na base, o valor faz parte da resposta. Nunca entregue médico + horário sem o valor quando ele existir. Se não existir, apenas não fale de preço — jamais estime.",
+    "- REGRA DO VALOR: sempre que estiver mostrando consulta ou disponibilidade e existir valor cadastrado na base, o valor faz parte da resposta, com a forma de pagamento e a condição correspondentes (nunca só o menor valor). Nunca entregue médico + horário sem o valor quando ele existir. Se não existir, apenas não fale de preço — jamais estime.",
     "- Apresentar médico, data e horário NÃO cria agendamento. Depois da escolha, mostre o resumo (paciente, consulta, valor quando houver, médico, data, horário, unidade) e pergunte \"Posso confirmar esse agendamento?\". Só execute a ferramenta após a confirmação.",
     `- Unidade de referência desta conversa: ${nomeUnidade}.`,
   );
