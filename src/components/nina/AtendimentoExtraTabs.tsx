@@ -311,7 +311,16 @@ export function AtendInbox() {
   const conversaIdUrlRef = useRef<string | null>(conversaIdUrl);
   useEffect(() => {
     conversaIdUrlRef.current = conversaIdUrl;
+    // FASE 4 — instante em que o endereço passou a apontar para o lead pedido.
+    if (conversaIdUrl) marcarTroca("T1b_url", conversaIdUrl);
   }, [conversaIdUrl]);
+
+  // Montagens/desmontagens da Inbox: a Fase 1 precisa continuar em zero por
+  // troca de conversa. Contadas aqui e expostas para a medição.
+  useEffect(() => {
+    contarCicloInbox("montagem");
+    return () => contarCicloInbox("desmontagem");
+  }, []);
   // Conversas já buscadas por link direto (evita repetir a busca em loop).
   const deepLinkTentado = useRef<Set<string>>(new Set());
   // Conversa aberta por link enquanto o filtro correspondente ainda carrega:
