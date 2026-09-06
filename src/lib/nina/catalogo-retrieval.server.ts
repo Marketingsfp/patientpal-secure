@@ -51,6 +51,25 @@ function termosBusca(query: string): string[] {
 
 const PALAVRAS_CONSULTA = /(consulta|medic|doutor|dra|dr\b|especialista|atende)/i;
 
+function semAcento(v: unknown): string {
+  return String(v ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+}
+
+/** Casa o termo com nome, especialidade ou modalidade — só campos públicos. */
+function casaProfissional(p: ProfissionalPublicado, termos: string[]): boolean {
+  if (!termos.length) return false;
+  const especialidades = Array.isArray(p.especialidades)
+    ? (p.especialidades as Array<Record<string, unknown>>)
+        .map((e) => semAcento(e?.["nome"]))
+        .join(" ")
+    : "";
+  const alvo = `${semAcento(p.nome)} ${especialidades} ${semAcento(p.tipo_atendimento)}`;
+  return termos.some((t) => alvo.includes(t));
+}
+
 /**
  * Busca só o necessário: filtra por nome/termos e limita o retorno. Nunca
  * devolve o catálogo inteiro.
