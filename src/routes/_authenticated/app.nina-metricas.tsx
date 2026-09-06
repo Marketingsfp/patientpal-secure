@@ -6,7 +6,7 @@
  * feedbacks. Os números não expõem texto ou dados pessoais do paciente.
  */
 import { createFileRoute } from "@tanstack/react-router";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { BarChart3, Loader2, RefreshCw, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -41,6 +41,10 @@ import {
   rotuloCausaRaiz,
   rotuloPrioridade,
 } from "@/lib/nina/feedback-diagnostico";
+import {
+  FUSO_OPERACAO_PADRAO,
+  validarRecorte,
+} from "@/lib/nina/metricas-filtros";
 import {
   metricasAprendizadoNina,
   trilhaAuditoriaAprendizadoNina,
@@ -117,6 +121,9 @@ function Pagina() {
   const [granularidade, setGranularidade] = useState<"dia" | "semana" | "mes">("dia");
   const [de, setDe] = useState(dataISO(30));
   const [ate, setAte] = useState(dataISO(0));
+  const [diaInteiro, setDiaInteiro] = useState(true);
+  const [horaInicio, setHoraInicio] = useState("07:00");
+  const [horaFim, setHoraFim] = useState("12:00");
   const [status, setStatus] = useState(TODOS);
   const [categoria, setCategoria] = useState(TODOS);
   const [rootCause, setRootCause] = useState(TODOS);
@@ -127,6 +134,14 @@ function Pagina() {
   const [trilhaId, setTrilhaId] = useState("");
   const [trilha, setTrilha] = useState<Trilha | null>(null);
   const [carregandoTrilha, setCarregandoTrilha] = useState(false);
+
+  // Evita que uma consulta antiga sobrescreva uma seleção mais recente.
+  const consultaRef = useRef(0);
+
+  const erroFiltro = useMemo(
+    () => validarRecorte({ de, ate, diaInteiro, horaInicio, horaFim }),
+    [de, ate, diaInteiro, horaInicio, horaFim],
+  );
 
   useEffect(() => {
     if (!clinicaId) return;
@@ -145,15 +160,20 @@ function Pagina() {
   }, [clinicaId]);
 
   const carregar = useCallback(async () => {
-    if (!clinicaId) return;
+    if (!clinicaId || erroFiltro) return;
+    const meu = ++consultaRef.current;
     setCarregando(true);
     try {
       const res = await buscarMetricas({
         data: {
           clinicaId,
           granularidade,
-          de: de ? `${de}T00:00:00.000Z` : null,
-          ate: ate ? `${ate}T23:59:59.999Z` : null,
+          de,
+          ate,
+          diaInteiro,
+          horaInicio: diaInteiro ? null : horaInicio,
+          horaFim: diaInteiro ? null : horaFim,
+          fuso: FUSO_OPERACAO_PADRAO,
           status: status === TODOS ? null : (status as never),
           categoria: categoria === TODOS ? null : (categoria as never),
           rootCause: rootCause === TODOS ? null : (rootCause as never),
@@ -162,18 +182,22 @@ function Pagina() {
           assunto: assunto.trim() || null,
         },
       });
-      setDados(res);
+      if (meu === consultaRef.current) setDados(res);
     } catch (e) {
-      mostrarErro(e);
+      if (meu === consultaRef.current) mostrarErro(e);
     } finally {
-      setCarregando(false);
+      if (meu === consultaRef.current) setCarregando(false);
     }
   }, [
     buscarMetricas,
     clinicaId,
+    erroFiltro,
     granularidade,
     de,
     ate,
+    diaInteiro,
+    horaInicio,
+    horaFim,
     status,
     categoria,
     rootCause,
@@ -198,6 +222,7 @@ function Pagina() {
     }
   };
 
+
   const maxSerie = useMemo(
     () => Math.max(1, ...(dados?.evolucao ?? []).map((p) => p.reportados)),
     [dados],
@@ -217,7 +242,11 @@ function Pagina() {
             Painel somente leitura. Sem dados pessoais do paciente e sem alterar nada da Nina.
           </p>
         </div>
-        <Button variant="outline" onClick={() => void carregar()} disabled={carregando}>
+        <Button
+          variant="outline"
+          onClick={() => void carregar()}
+          disabled={carregando || Boolean(erroFiltro)}
+        >
           {carregando ? (
             <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden />
           ) : (
@@ -237,6 +266,47 @@ function Pagina() {
             <Label htmlFor="ate">Até</Label>
             <Input id="ate" type="date" value={ate} onChange={(e) => setAte(e.target.value)} />
           </div>
+          <div className="space-y-1">
+            <Label htmlFor="hora-inicio">Horário inicial</Label>
+            <Input
+              id="hora-inicio"
+              type="time"
+              value={horaInicio}
+              disabled={diaInteiro}
+              onChange={(e) => setHoraInicio(e.target.value)}
+            />
+          </div>
+          <div className="space-y-1">
+            <Label htmlFor="hora-fim">Horário final</Label>
+            <Input
+              id="hora-fim"
+              type="time"
+              value={horaFim}
+              disabled={diaInteiro}
+              onChange={(e) => setHoraFim(e.target.value)}
+            />
+          </div>
+          <div className="flex items-center gap-2 md:col-span-4">
+            <input
+              id="dia-inteiro"
+              type="checkbox"
+              className="h-4 w-4 accent-primary"
+              checked={diaInteiro}
+              onChange={(e) => setDiaInteiro(e.target.checked)}
+            />
+            <Label htmlFor="dia-inteiro" className="cursor-pointer">
+              Dia inteiro
+            </Label>
+            <span className="text-xs text-muted-foreground">
+              A faixa de horário vale em cada dia do período (10 a 12/09 das 07:00 às 12:00 conta só
+              essas manhãs). O horário inicial entra e o final não entra: 07:00 sim, 12:00 não.
+              Horários no fuso da operação ({FUSO_OPERACAO_PADRAO}), não no do seu computador.
+            </span>
+          </div>
+          {erroFiltro ? (
+            <p className="text-sm font-medium text-destructive md:col-span-4">{erroFiltro}</p>
+          ) : null}
+
           <div className="space-y-1">
             <Label>Período do gráfico</Label>
             <Select value={granularidade} onValueChange={(v) => setGranularidade(v as never)}>
@@ -316,9 +386,22 @@ function Pagina() {
               value={assunto}
               onChange={(e) => setAssunto(e.target.value)}
             />
+            <p className="text-xs text-muted-foreground">
+              Alcance: filtra apenas os erros reportados que têm assunto registrado. Não é aplicado
+              a indicadores sem vínculo confiável com esse assunto.
+            </p>
           </div>
+          {dados?.recorte ? (
+            <p className="text-xs text-muted-foreground md:col-span-4">
+              Recorte em uso: {dados.recorte.descricao}
+              {dados.recorte.filtrosErroAtivos
+                ? " A taxa mostra os erros filtrados sobre o total do recorte operacional, que não é reduzido por esses filtros."
+                : ""}
+            </p>
+          ) : null}
         </CardContent>
       </Card>
+
 
       {ind ? (
         <>
