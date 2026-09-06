@@ -7,7 +7,7 @@
  * decisão. A aplicação real virá em fase posterior.
  */
 import { EvidenciasExecucao } from "@/components/nina/EvidenciasExecucao";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
@@ -75,7 +75,10 @@ import {
   podeRevisarFeedbackNina,
   revisarFeedbackErroNina,
 } from "@/lib/nina/feedback-revisao.functions";
-import { lerConversaFeedbackNina } from "@/lib/nina/feedback-conversa.functions";
+import { TZ_CLINICA } from "@/lib/date-utils";
+import { pedirAbrirConversa } from "@/lib/atendimento/central-atencao";
+import { ROTA_ATENDIMENTO } from "@/lib/atendimento/abrir-conversa";
+
 import {
   AVISO_ANALISE_NAO_APROVA,
   EXPLICACAO_APROVAR,
@@ -260,8 +263,22 @@ type VersaoAprendizado = {
 };
 
 function fmtData(iso: string) {
-  return new Date(iso).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" });
+  return new Date(iso).toLocaleString("pt-BR", {
+    dateStyle: "short",
+    timeStyle: "short",
+    timeZone: TZ_CLINICA,
+  });
 }
+
+/** Data/hora da mensagem com segundos — precisão que existe na fonte. */
+function fmtDataSegundos(iso: string) {
+  return new Date(iso).toLocaleString("pt-BR", {
+    dateStyle: "short",
+    timeStyle: "medium",
+    timeZone: TZ_CLINICA,
+  });
+}
+
 
 function Pagina() {
   const { clinicaAtual } = useClinica();
@@ -278,6 +295,8 @@ function Pagina() {
   const [pessoas, setPessoas] = useState<Record<string, string>>({});
   const [contagens, setContagens] = useState<Record<string, number>>({});
   const [conversas, setConversas] = useState<Record<string, number>>({});
+  // Data/hora REAL de cada mensagem reportada (vem em lote junto da lista).
+  const [mensagens, setMensagens] = useState<Record<string, { enviada_em: string | null }>>({});
   // Estado da auditoria técnica por item (ponteiro, sem copiar a evidência).
   const [auditoria, setAuditoria] = useState<Record<string, string>>({});
   // FASE 4 — análise assistida: só roda por clique explícito.
@@ -293,7 +312,7 @@ function Pagina() {
   const [motivo, setMotivo] = useState("");
   const [editando, setEditando] = useState<Item | null>(null);
   const [textoEdicao, setTextoEdicao] = useState("");
-  const [conversa, setConversa] = useState<{ item: Item; msgs: any[] } | null>(null);
+  const navigate = useNavigate();
   const [salvando, setSalvando] = useState(false);
   const [ocorrencias, setOcorrencias] = useState<Record<string, number>>({});
   const [fPrioridade, setFPrioridade] = useState("todas");
@@ -332,7 +351,6 @@ function Pagina() {
   const checarPermissao = useServerFn(podeRevisarFeedbackNina);
   const revisar = useServerFn(revisarFeedbackErroNina);
   const editar = useServerFn(editarSugestaoFeedbackNina);
-  const lerConversa = useServerFn(lerConversaFeedbackNina);
   const consultarBase = useServerFn(consultarBaseFeedbackNina);
   const salvarDiagnostico = useServerFn(salvarDiagnosticoFeedbackNina);
   const analisarIA = useServerFn(analisarErroNinaComIA);
@@ -365,6 +383,9 @@ function Pagina() {
       setPessoas(r.pessoas ?? {});
       setContagens(r.contagens ?? {});
       setConversas((r as { conversas?: Record<string, number> }).conversas ?? {});
+      setMensagens(
+        (r as { mensagens?: Record<string, { enviada_em: string | null }> }).mensagens ?? {},
+      );
       setAuditoria((r as { auditoria?: Record<string, string> }).auditoria ?? {});
       setExecucoes((r as { execucoes?: Record<string, { model: string | null }> }).execucoes ?? {});
       setOcorrencias((r as { ocorrencias?: Record<string, number> }).ocorrencias ?? {});
@@ -619,20 +640,20 @@ function Pagina() {
     }
   };
 
-  const abrirConversa = async (item: Item) => {
-    if (!item.conversa_id || !clinicaId) {
+  /**
+   * Abre o atendimento (Inbox) na conversa de origem e pede que o histórico
+   * fique posicionado exatamente na mensagem reportada (pelo id, nunca pelo
+   * texto ou horário). Só visualização: não assume nem transfere o lead.
+   */
+  const abrirConversa = (item: Item) => {
+    if (!item.conversa_id) {
       toast.error("Este registro não tem conversa vinculada.");
       return;
     }
-    try {
-      const msgs = await lerConversa({
-        data: { clinicaId, conversaId: item.conversa_id },
-      });
-      setConversa({ item, msgs });
-    } catch (e) {
-      mostrarErro(e);
-    }
+    pedirAbrirConversa({ conversaId: item.conversa_id, mensagemId: item.mensagem_id ?? null });
+    void navigate({ to: ROTA_ATENDIMENTO });
   };
+
 
   const abrirDiagnostico = async (item: Item) => {
     if (!clinicaId) return;
@@ -1000,15 +1021,25 @@ function Pagina() {
                         {it.grupo_titulo ?? "Problema"} — {ocorrencias[it.grupo_chave]} ocorrências
                       </Badge>
                     )}
-                    <span className="ml-auto text-[11px] text-muted-foreground">
-                      {fmtData(it.created_at)} · {pessoas[it.reportado_por] ?? "—"}
-                    </span>
                   </div>
 
                   <p className="line-clamp-2 text-xs text-muted-foreground">
                     “{(it.mensagem_texto?.trim() || "—").slice(0, 220)}
                     {(it.mensagem_texto?.trim().length ?? 0) > 220 ? "…" : ""}”
                   </p>
+
+                  {/* Duas datas distintas: quando a Nina respondeu e quando a
+                      atendente reportou. A primeira vem da própria mensagem. */}
+                  <p className="text-[11px] text-muted-foreground">
+                    Mensagem da Nina:{" "}
+                    {it.mensagem_id && mensagens[it.mensagem_id]?.enviada_em
+                      ? fmtDataSegundos(mensagens[it.mensagem_id]!.enviada_em!)
+                      : "Data/hora da mensagem indisponível"}
+                  </p>
+                  <p className="text-[11px] text-muted-foreground">
+                    Reportado em: {fmtData(it.created_at)} · {pessoas[it.reportado_por] ?? "—"}
+                  </p>
+
 
                   <p className="text-xs text-muted-foreground">
                     Auditoria:{" "}
@@ -1053,7 +1084,7 @@ function Pagina() {
                     <Button
                       size="sm"
                       variant="ghost"
-                      onClick={() => void abrirConversa(it)}
+                      onClick={() => abrirConversa(it)}
                       disabled={!it.conversa_id}
                     >
                       <Eye className="mr-1 h-4 w-4" aria-hidden="true" /> Ver conversa
@@ -1842,48 +1873,9 @@ function Pagina() {
         </DialogContent>
       </Dialog>
 
-      {/* Ver conversa */}
-      <Dialog open={!!conversa} onOpenChange={(o) => !o && setConversa(null)}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>Conversa de origem</DialogTitle>
-            <DialogDescription>Somente leitura.</DialogDescription>
-          </DialogHeader>
-          <div className="max-h-[60vh] space-y-2 overflow-auto pr-1">
-            {(conversa?.msgs ?? []).map((m: any) => (
-              <div
-                key={m.id}
-                className={`flex ${m.direction === "out" ? "justify-end" : "justify-start"}`}
-              >
-                <div
-                  className={`max-w-[75%] rounded-lg px-3 py-2 text-xs ${
-                    m.id === conversa?.item.mensagem_id
-                      ? "border-2 border-destructive bg-muted"
-                      : m.direction === "out"
-                        ? "bg-primary/10"
-                        : "bg-muted"
-                  }`}
-                >
-                  <div className="whitespace-pre-wrap">
-                    {m.body || m.transcricao || `[${m.tipo}]`}
-                  </div>
-                  <div className="mt-1 text-[10px] text-muted-foreground">
-                    {fmtData(m.recebida_em)} {m.enviada_por === "nina" ? "· Nina" : ""}
-                  </div>
-                </div>
-              </div>
-            ))}
-            {conversa && conversa.msgs.length === 0 && (
-              <p className="text-sm text-muted-foreground">Sem mensagens vinculadas.</p>
-            )}
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setConversa(null)}>
-              Fechar
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {/* "Ver conversa" abre o atendimento (Inbox) posicionado na mensagem
+          reportada — não existe mais cópia da conversa nesta tela. */}
+
     </div>
   );
 }

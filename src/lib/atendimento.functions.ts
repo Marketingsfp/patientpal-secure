@@ -1615,6 +1615,75 @@ export const listarMensagensConversa = createServerFn({ method: "POST" })
     return (rows ?? []).slice().reverse();
   });
 
+/**
+ * Janela de contexto em volta de UMA mensagem específica (id interno).
+ *
+ * Usada por "Ver conversa" na Revisão de aprendizados: em vez de percorrer o
+ * histórico página por página até achar a mensagem reportada, busca a própria
+ * mensagem pelo id e um bloco limitado de mensagens antes e depois.
+ * Somente leitura: não assume, transfere, resolve nem reabre o atendimento.
+ */
+export const carregarJanelaMensagem = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) =>
+    z
+      .object({
+        clinicaId: z.string().uuid(),
+        conversaId: z.string().uuid(),
+        mensagemId: z.string().uuid(),
+        antes: z.number().int().min(1).max(200).default(30),
+        depois: z.number().int().min(0).max(200).default(30),
+      })
+      .parse(i),
+  )
+  .handler(async ({ data, context }) => {
+    await assertMember(context.supabase, context.userId, data.clinicaId);
+    {
+      const { assertAcessoConversa } = await import("./atendimento/acesso-conversa.server");
+      await assertAcessoConversa(context.supabase, context.userId, data.clinicaId, data.conversaId);
+    }
+    const COLUNAS =
+      "id, direction, from_number, to_number, body, tipo, enviada_por, recebida_em, media_url, media_mime, status";
+    const { data: alvo, error: eAlvo } = await context.supabase
+      .from("whatsapp_mensagens")
+      .select(COLUNAS)
+      .eq("clinica_id", data.clinicaId)
+      .eq("conversa_id", data.conversaId)
+      .eq("id", data.mensagemId)
+      .maybeSingle();
+    if (eAlvo) throw new Error(eAlvo.message);
+    // Mensagem removida ou fora desta conversa: quem chamou avisa a pessoa em
+    // vez de destacar outra mensagem parecida.
+    if (!alvo) return { encontrada: false as const, mensagens: [] as any[] };
+
+    const [ant, dep] = await Promise.all([
+      context.supabase
+        .from("whatsapp_mensagens")
+        .select(COLUNAS)
+        .eq("clinica_id", data.clinicaId)
+        .eq("conversa_id", data.conversaId)
+        .lt("recebida_em", alvo.recebida_em)
+        .order("recebida_em", { ascending: false })
+        .limit(data.antes),
+      context.supabase
+        .from("whatsapp_mensagens")
+        .select(COLUNAS)
+        .eq("clinica_id", data.clinicaId)
+        .eq("conversa_id", data.conversaId)
+        .gt("recebida_em", alvo.recebida_em)
+        .order("recebida_em", { ascending: true })
+        .limit(data.depois),
+    ]);
+    if (ant.error) throw new Error(ant.error.message);
+    if (dep.error) throw new Error(dep.error.message);
+    return {
+      encontrada: true as const,
+      mensagens: [...(ant.data ?? []).slice().reverse(), alvo, ...(dep.data ?? [])],
+    };
+  });
+
+
+
 
 export const enviarMensagemConversa = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])

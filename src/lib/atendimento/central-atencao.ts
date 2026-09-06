@@ -13,6 +13,35 @@ export const EVENTO_FILTRAR_ESPERA_CRITICA = "nina:filtrar-espera-critica";
 export const FILTRO_ESPERA_CRITICA_KEY = "nina.inbox.filtrar-espera-critica";
 export const EVENTO_ABRIR_CONVERSA = "nina:abrir-conversa";
 export const ABRIR_CONVERSA_KEY = "nina.inbox.abrir-conversa";
+/**
+ * Mensagem específica que deve ficar visível ao abrir a conversa (id interno
+ * da mensagem). Usada pelo "Ver conversa" de um erro reportado: só nesse caso
+ * a Inbox posiciona o histórico na mensagem em vez de abrir no fim.
+ */
+export const ABRIR_MENSAGEM_KEY = "nina.inbox.abrir-mensagem";
+
+/**
+ * Pede à Inbox que abra uma conversa (e, opcionalmente, posicione o histórico
+ * numa mensagem). Funciona vindo de outra página (guarda o pedido) e com a
+ * Inbox já aberta (evento imediato). Não altera responsável, fila nem status.
+ */
+export function pedirAbrirConversa(pedido: { conversaId: string; mensagemId?: string | null }) {
+  if (typeof window === "undefined") return;
+  const { conversaId, mensagemId } = pedido;
+  try {
+    window.sessionStorage.setItem(ABRIR_CONVERSA_KEY, conversaId);
+    if (mensagemId) window.sessionStorage.setItem(ABRIR_MENSAGEM_KEY, mensagemId);
+    else window.sessionStorage.removeItem(ABRIR_MENSAGEM_KEY);
+  } catch {
+    /* sem armazenamento: o evento abaixo ainda atende a Inbox já montada */
+  }
+  window.dispatchEvent(
+    new CustomEvent(EVENTO_ABRIR_CONVERSA, {
+      detail: { id: conversaId, mensagemId: mensagemId ?? null },
+    }),
+  );
+}
+
 
 export type CategoriaAtencao = "nao_atribuida" | "critica" | "aguardando";
 

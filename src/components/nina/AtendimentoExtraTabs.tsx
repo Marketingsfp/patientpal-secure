@@ -31,6 +31,8 @@ import {
 } from "@/components/nina/BannerNaoAtribuidas";
 import {
   ABRIR_CONVERSA_KEY,
+  ABRIR_MENSAGEM_KEY,
+
   EVENTO_ABRIR_CONVERSA,
   EVENTO_FILTRAR_ESPERA_CRITICA,
   FILTRO_ESPERA_CRITICA_KEY,
@@ -102,6 +104,7 @@ import {
   souGestorAtendimento,
   contarConversasInbox,
   listarMensagensConversa,
+  carregarJanelaMensagem,
   enviarMensagemConversa,
   obterDadosContato,
   listarEventosConversa,
@@ -230,6 +233,7 @@ export function AtendInbox() {
   const souGestorFn = useServerFn(souGestorAtendimento);
   const contarInboxFn = useServerFn(contarConversasInbox);
   const listarMsgs = useServerFn(listarMensagensConversa);
+  const carregarJanela = useServerFn(carregarJanelaMensagem);
   const enviarMsg = useServerFn(enviarMensagemConversa);
   const obterContato = useServerFn(obterDadosContato);
   const transferirFn = useServerFn(transferirConversa);
@@ -391,6 +395,16 @@ export function AtendInbox() {
   const syncEmVooRef = useRef<{ conversaId: string; promise: Promise<void> } | null>(null);
 
   const [carregandoAntigas, setCarregandoAntigas] = useState(false);
+  // Mensagem específica a localizar ao abrir (vem da Revisão de aprendizados).
+  const seqAlvo = useRef(0);
+  const [alvoMensagem, setAlvoMensagem] = useState<{
+    conversaId: string;
+    mensagemId: string;
+    pedido: number;
+  } | null>(null);
+  const [buscandoAlvo, setBuscandoAlvo] = useState(false);
+  const [alvoIndisponivel, setAlvoIndisponivel] = useState(false);
+  const [msgDestacada, setMsgDestacada] = useState<string | null>(null);
   const seqEspera = useRef(0);
   const convsVisiveis: any[] = (() => {
     let base = convs;
@@ -960,20 +974,31 @@ export function AtendInbox() {
     })();
   }, [selecaoId, convs, clinicaId, meuId, escopo, souGestor, obterConversaFn, abrirConversa]);
 
-  // Abrir uma conversa a partir da Central de Atenção, sem trocar de página
-  // e sem mexer em filtros/rascunho de quem já estava atendendo.
+  // Abrir uma conversa a partir da Central de Atenção ou da Revisão de
+  // aprendizados, sem trocar de página e sem mexer em filtros/rascunho de quem
+  // já estava atendendo. Quando vem um id de mensagem junto (erro reportado),
+  // o histórico é posicionado nela em vez de abrir no fim.
   useEffect(() => {
-    const abrir = (id: string | null) => {
+    const abrir = (id: string | null, mensagemId?: string | null) => {
       if (!id) return;
+      setAlvoIndisponivel(false);
+      setMsgDestacada(null);
+      if (mensagemId) setAlvoMensagem({ conversaId: id, mensagemId, pedido: ++seqAlvo.current });
+      else setAlvoMensagem(null);
       abrirConversa(id);
     };
 
-    const handler = (e: Event) => abrir((e as CustomEvent).detail?.id ?? null);
+    const handler = (e: Event) => {
+      const d = (e as CustomEvent).detail ?? {};
+      abrir(d.id ?? null, d.mensagemId ?? null);
+    };
     try {
       const pendente = window.sessionStorage.getItem(ABRIR_CONVERSA_KEY);
+      const alvoPendente = window.sessionStorage.getItem(ABRIR_MENSAGEM_KEY);
       if (pendente) {
         window.sessionStorage.removeItem(ABRIR_CONVERSA_KEY);
-        abrir(pendente);
+        window.sessionStorage.removeItem(ABRIR_MENSAGEM_KEY);
+        abrir(pendente, alvoPendente);
       }
     } catch {
       /* sem armazenamento: só o evento abaixo abre a conversa */
@@ -981,6 +1006,7 @@ export function AtendInbox() {
     window.addEventListener(EVENTO_ABRIR_CONVERSA, handler);
     return () => window.removeEventListener(EVENTO_ABRIR_CONVERSA, handler);
   }, [abrirConversa]);
+
 
 
 
@@ -1707,6 +1733,83 @@ export function AtendInbox() {
     }
   }, [clinicaId, sel?.id, msgs, carregandoAntigas, listarMsgs, chat]);
 
+
+  // Posicionamento na mensagem reportada (exceção à abertura no fim): só
+  // acontece quando a conversa foi aberta pelo "Ver conversa" de um erro.
+  // A mensagem é localizada pelo id — nunca por texto ou horário.
+  useEffect(() => {
+    const alvo = alvoMensagem;
+    if (!alvo || !clinicaId) return;
+    if (!conteudoDaConversa || conversaCarregadaId !== alvo.conversaId) return;
+    let cancelado = false;
+
+    const posicionar = () => {
+      const cont = chat.containerRef.current;
+      const el = cont?.querySelector(
+        `[data-msg-id="${alvo.mensagemId}"]`,
+      ) as HTMLElement | null;
+      if (!el) return false;
+      // A partir daqui a posição é do alvo, não da abertura no fim.
+      chat.encerrarAbertura();
+      el.scrollIntoView({ block: "center" });
+      setMsgDestacada(alvo.mensagemId);
+      window.setTimeout(
+        () => setMsgDestacada((d) => (d === alvo.mensagemId ? null : d)),
+        4000,
+      );
+      setAlvoMensagem(null);
+      setBuscandoAlvo(false);
+      return true;
+    };
+
+    if (msgs.some((m: any) => m.id === alvo.mensagemId)) {
+      const t = window.setTimeout(() => {
+        if (!cancelado) requestAnimationFrame(() => !cancelado && posicionar());
+      }, 150);
+      return () => {
+        cancelado = true;
+        window.clearTimeout(t);
+      };
+    }
+
+    // Fora da janela carregada: busca só um trecho ao redor da mensagem.
+    setBuscandoAlvo(true);
+    void (async () => {
+      try {
+        const r = (await carregarJanela({
+          data: { clinicaId, conversaId: alvo.conversaId, mensagemId: alvo.mensagemId },
+        })) as { encontrada: boolean; mensagens: any[] };
+        // Troca rápida entre reportes: resposta antiga não mexe na tela.
+        if (cancelado || seqAlvo.current !== alvo.pedido || selIdRef.current !== alvo.conversaId)
+          return;
+        if (!r.encontrada) {
+          setAlvoIndisponivel(true);
+          setAlvoMensagem(null);
+          return;
+        }
+        janelaRef.current += r.mensagens.length;
+        setMsgs((prev) => mesclarAnteriores(prev, r.mensagens));
+      } catch {
+        if (!cancelado) {
+          setAlvoIndisponivel(true);
+          setAlvoMensagem(null);
+        }
+      } finally {
+        if (!cancelado) setBuscandoAlvo(false);
+      }
+    })();
+    return () => {
+      cancelado = true;
+    };
+  }, [
+    alvoMensagem,
+    conteudoDaConversa,
+    conversaCarregadaId,
+    msgs,
+    clinicaId,
+    chat,
+    carregarJanela,
+  ]);
 
   const janela24hExpirada = (() => {
     if (!sel || sel.canal !== "whatsapp") return false;
@@ -2521,6 +2624,26 @@ export function AtendInbox() {
                 ref={chat.containerRef}
                 className="h-full overflow-auto p-4 space-y-2 bg-atd-bg"
               >
+                {buscandoAlvo && (
+                  <div className="sticky top-0 z-10 mb-2 rounded-md border border-atd-border bg-atd-surface px-3 py-1.5 text-xs text-atd-ink-soft">
+                    Localizando mensagem reportada…
+                  </div>
+                )}
+                {alvoIndisponivel && (
+                  <div className="sticky top-0 z-10 mb-2 flex items-center justify-between gap-2 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-1.5 text-xs">
+                    <span>
+                      Não foi possível localizar a mensagem original. O conteúdo reportado continua
+                      disponível na revisão.
+                    </span>
+                    <button
+                      type="button"
+                      className="underline"
+                      onClick={() => setAlvoIndisponivel(false)}
+                    >
+                      Fechar
+                    </button>
+                  </div>
+                )}
 
                 {conteudoDaConversa && temMaisAntigas && (
                   <div className="flex justify-center pb-1">
@@ -2570,11 +2693,22 @@ export function AtendInbox() {
                   }
                   // Autoria pelo campo do sistema, nunca pelo texto da mensagem.
                   const daNina = out && m.enviada_por === "nina";
+                  const destacada = msgDestacada === m.id;
                   return (
                     <div
                       key={m.id}
-                      className={`flex items-start gap-2 ${out ? "justify-end" : "justify-start"}`}
+                      data-msg-id={m.id}
+                      className={`flex items-start gap-2 ${out ? "justify-end" : "justify-start"} ${
+                        destacada
+                          ? "motion-safe:transition-colors rounded-xl ring-2 ring-destructive bg-destructive/10 px-1 py-1 scroll-my-24"
+                          : ""
+                      }`}
                     >
+                      {destacada && (
+                        <span className="self-center rounded bg-destructive px-1.5 py-0.5 text-[10px] font-medium text-destructive-foreground">
+                          Mensagem reportada
+                        </span>
+                      )}
                       {/* Botão de reporte rápido: fora do balão, sempre visível. */}
                       {daNina && clinicaId && (
                         <ReportarErroNinaBotao
