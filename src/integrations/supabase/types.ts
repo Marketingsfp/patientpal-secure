@@ -12465,6 +12465,23 @@ export type Database = {
           tipo: string
         }[]
       }
+      nina_metricas_operacionais: {
+        Args: {
+          p_assunto?: string
+          p_categoria?: string
+          p_clinica: string
+          p_fins: string[]
+          p_fuso?: string
+          p_granularidade?: string
+          p_incluir_teste?: boolean
+          p_inicios: string[]
+          p_prioridade?: string
+          p_root_cause?: string
+          p_status?: string
+          p_unidade?: string
+        }
+        Returns: Json
+      }
       normalizar_telefone: { Args: { _tel: string }; Returns: string }
       normalizar_termo_busca: { Args: { _termo: string }; Returns: string }
       paciente_cartao_inadimplente: {

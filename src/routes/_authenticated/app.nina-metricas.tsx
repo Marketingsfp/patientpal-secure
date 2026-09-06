@@ -229,6 +229,7 @@ function Pagina() {
   );
 
   const ind = dados?.indicadores;
+  const op = dados?.operacionais;
 
   return (
     <div className="space-y-6 p-4 md:p-6">
@@ -403,6 +404,71 @@ function Pagina() {
       </Card>
 
 
+      {op ? (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">Indicadores operacionais do período</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              <Indicador
+                titulo="Mensagens totais do sistema"
+                valor={String(op.mensagensTotais)}
+                detalhe={`${op.msgsPaciente} de pacientes · ${op.msgsNina} da Nina · ${op.msgsHumano} de atendentes · ${op.msgsAutomaticas} automáticas`}
+              />
+              <Indicador
+                titulo="Mensagens com participação da Nina"
+                valor={String(op.ninaParticipacao)}
+                detalhe={`${op.ninaEntrada} recebidas processadas + ${op.ninaSaida} respostas enviadas`}
+              />
+              <Indicador
+                titulo="Erros reportados da Nina"
+                valor={String(op.errosReportados)}
+                detalhe={
+                  op.errosSemVinculo
+                    ? `${op.errosSemVinculo} reporte(s) sem vínculo com a mensagem original — não entram na taxa`
+                    : "Pela data e hora da mensagem original"
+                }
+              />
+              <Indicador
+                titulo="Agendamentos concluídos pela Nina"
+                valor={String(op.agendamentosNina)}
+                detalhe="Pelo momento da conclusão, não pela data da consulta"
+              />
+              <Indicador
+                titulo="Encaminhamentos para atendentes"
+                valor={String(op.encaminhamentos)}
+                detalhe="Inclui a entrada em “Não atribuídas”"
+              />
+              <Indicador
+                titulo="Taxa de erro"
+                valor={op.taxaErroSistema === null ? "—" : pct(op.taxaErroSistema)}
+                detalhe={
+                  op.mensagensTotais === 0
+                    ? "Sem mensagens no período"
+                    : `${op.errosReportados} erros reportados / ${op.mensagensTotais} mensagens totais`
+                }
+              />
+            </section>
+            <p className="text-xs text-muted-foreground">
+              A taxa é baseada em reportes, inclusive os ainda não confirmados. Não é uma medida
+              definitiva de acurácia da Nina. Ambiente:{" "}
+              {op.ambiente === "producao" ? "produção" : "produção + testes"}.
+            </p>
+            {op.ninaEntrada === 0 ? (
+              <p className="text-xs text-muted-foreground">
+                Mensagens recebidas processadas pela Nina só passaram a ser registradas a partir
+                desta versão
+                {op.entradaMedidaDesde
+                  ? ` (medição confiável desde ${new Date(op.entradaMedidaDesde).toLocaleString("pt-BR")})`
+                  : " (ainda sem nenhum registro)"}
+                . Períodos anteriores não são estimados.
+              </p>
+            ) : null}
+          </CardContent>
+        </Card>
+      ) : null}
+
       {ind ? (
         <>
           <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -420,9 +486,9 @@ function Pagina() {
             />
             <Indicador titulo="Correções revertidas" valor={String(ind.revertidos)} />
             <Indicador
-              titulo="Taxa de erro"
+              titulo="Reportes por resposta da Nina (referência)"
               valor={pct(ind.taxaErro)}
-              detalhe={`${ind.execucoes} respostas da Nina no período`}
+              detalhe={`${ind.execucoes} respostas da Nina no período · a taxa oficial usa as mensagens totais do sistema`}
             />
             <Indicador titulo="Alucinações" valor={String(ind.porCausa.hallucination)} />
             <Indicador
