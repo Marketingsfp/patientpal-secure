@@ -2262,6 +2262,8 @@ export function AtendInbox() {
 
               <button
                 key={c.id}
+                data-testid="item-conversa"
+                data-conversa-id={c.id}
                 onClick={() => {
                   iniciarTroca(c.id, "clique");
                   medidor.current = criarMedidorConversa(`conversa ${c.id}`);
