@@ -46,7 +46,11 @@ async function registrarConsulta(entrada: {
   clinicaId: string;
   canal: string;
   pergunta: string;
-  encontrados: Array<{ id: string; procedimento?: string | null; medico?: string | null }>;
+  encontrados: Array<{
+    id?: string | null;
+    procedimento?: string | null;
+    medico?: string | null;
+  }>;
   resposta: string;
 }) {
   try {
@@ -58,7 +62,7 @@ async function registrarConsulta(entrada: {
       pergunta: entrada.pergunta.slice(0, 2000),
       termos: termosAuditoria(entrada.pergunta),
       encontrados: entrada.encontrados.slice(0, 10).map((e) => ({
-        id: e.id,
+        id: e.id ?? null,
         procedimento: e.procedimento ?? null,
         medico: e.medico ?? null,
         origem: "catalogo",
