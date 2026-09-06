@@ -124,7 +124,10 @@ import {
   definirPresenca,
   esperaConversas,
   assumirConversa,
+  marcarLida,
 } from "@/lib/atendimento.functions";
+import { podeMarcarLidaAutomaticamente } from "@/lib/atendimento/leitura-inbox";
+
 import { FilaHumana } from "@/components/nina/FilaHumana";
 import { idConversaValido } from "@/lib/atendimento/abrir-conversa";
 import { assinarSelecaoConversa } from "@/lib/webmcp/selecao-conversa";
@@ -1336,6 +1339,43 @@ export function AtendInbox() {
     }
   }, [clinicaId, listarMsgs, listarEventosFn, carregarConversa]);
 
+  /* ---- Leitura individual (Fase 2) ------------------------------------
+   * Quando a conversa aberta é da própria atendente, registra até QUAL
+   * mensagem ela viu (a última carregada), não "agora". Supervisão apenas
+   * acompanha: nada é registrado e o aviso de quem atende continua igual.
+   * O marcador só avança — o banco cuida disso. */
+  const marcarLidaFn = useServerFn(marcarLida);
+  const ultimaLidaRef = useRef<Map<string, string>>(new Map());
+  useEffect(() => {
+    const conversa = sel;
+    const alvo = conversa?.id as string | undefined;
+    if (!clinicaId || !alvo || conversaCarregadaId !== alvo) return;
+    if (
+      !podeMarcarLidaAutomaticamente({
+        userId: meuId ?? "",
+        atribuidaUserId: conversa?.atribuida_user_id ?? null,
+        ehGestor: souGestor,
+      })
+    )
+      return;
+    const ultima = msgs.length ? (msgs[msgs.length - 1] as any) : null;
+    const mensagemId = ultima?.id as string | undefined;
+    if (!mensagemId) return;
+    if (ultimaLidaRef.current.get(alvo) === mensagemId) return;
+    ultimaLidaRef.current.set(alvo, mensagemId);
+    void marcarLidaFn({ data: { clinicaId, conversaId: alvo, mensagemId } })
+      .then(() => {
+        setConvs((prev) =>
+          prev.map((c: any) => (c.id === alvo ? { ...c, nao_lidas: 0 } : c)),
+        );
+      })
+      .catch(() => {
+        // Falha de rede não trava o atendimento: a próxima abertura registra.
+        ultimaLidaRef.current.delete(alvo);
+      });
+  }, [clinicaId, sel, conversaCarregadaId, msgs, meuId, souGestor, marcarLidaFn]);
+
+
   // Apoio da conversa aberta (notas internas e eventos): antes uma nota nova
   // recarregava a conversa inteira. Agora só o painel de apoio é atualizado.
   const carregarApoio = useCallback(async () => {
@@ -2392,9 +2432,10 @@ export function AtendInbox() {
                   >
                     {tituloConversa(c)}
                   </span>
-                  {c.unread_count > 0 && (
+                  {Number(c.nao_lidas ?? 0) > 0 && (
                     <Badge className="bg-atd-blue text-atd-on-strong text-xs px-1.5 py-0">
-                      {c.unread_count}
+                      {Number(c.nao_lidas ?? 0)}
+
                     </Badge>
                   )}
                 </div>
