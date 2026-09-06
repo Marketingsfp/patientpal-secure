@@ -14,6 +14,8 @@ import { loadWhatsAppConfig, metaSendText } from "./whatsapp.server";
 import {
   MSG_ADMIN_NAO_ATENDE,
   apenasDestinatariosValidos,
+  statusPresenca,
+
 } from "@/lib/atendimento/perfil-atendimento";
 
 /* =========================================================
