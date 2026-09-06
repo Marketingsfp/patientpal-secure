@@ -392,6 +392,13 @@ export function AtendInbox() {
     },
     [],
   );
+  /**
+   * Limpa o rascunho de UMA conversa específica (a de origem da ação), mesmo
+   * que a atendente já tenha aberto outra enquanto o envio terminava.
+   */
+  const limparRascunhoDe = useCallback((id: string) => {
+    setRascunhos((prev) => limparRascunho(prev, id));
+  }, []);
   const [enviando, setEnviando] = useState(false);
   const [novaNota, setNovaNota] = useState("");
   const [transferOpen, setTransferOpen] = useState(false);
