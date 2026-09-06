@@ -1049,7 +1049,7 @@ function Pagina() {
                           (analises[it.id] ? (
                             <AnaliseErroIAResultado
                               analise={analises[it.id]!}
-                              solicitante={pessoas[analises[it.id]!.id] ?? null}
+                              solicitante={pessoas[analises[it.id]!.solicitado_por] ?? null}
                             />
                           ) : (
                             <p className="text-xs text-muted-foreground">

@@ -24,6 +24,7 @@ export type AnaliseSalva = {
   output_tokens: number | null;
   duracao_ms: number | null;
   erro: string | null;
+  solicitado_por: string;
   created_at: string;
   concluida_em: string | null;
 };
