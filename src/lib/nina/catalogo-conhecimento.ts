@@ -209,6 +209,7 @@ export function profissionalParaRegistro(
     extras: {
       catalogo_tipo: "profissional",
       especialidades,
+      unidade: unidadeDoProfissional(p),
       convenios,
       horarios,
       atende_consultorio: p.atende_consultorio,
