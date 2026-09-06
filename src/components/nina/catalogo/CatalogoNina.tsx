@@ -413,8 +413,25 @@ export function CatalogoNina({
       <Dialog open={aberto} onOpenChange={setAberto}>
         <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>{titulo}</DialogTitle>
+            <DialogTitle>
+              {titulo}
+              {fila.length > 1 && (
+                <span className="ml-2 text-sm font-normal text-muted-foreground">
+                  Registro {posicao + 1} de {fila.length}
+                </span>
+              )}
+            </DialogTitle>
           </DialogHeader>
+          {avisos.length > 0 && (
+            <div className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm">
+              <p className="font-medium">Confira antes de salvar</p>
+              <ul className="mt-1 list-disc space-y-1 pl-5 text-muted-foreground">
+                {avisos.map((a, i) => (
+                  <li key={i}>{a}</li>
+                ))}
+              </ul>
+            </div>
+          )}
           {tipo === "servico" ? (
             <FormServico
               estado={servico}
