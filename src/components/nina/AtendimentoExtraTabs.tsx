@@ -763,7 +763,7 @@ export function AtendInbox() {
       const removeu = selecaoDeveSair({
         selecionada: (selRef.current as any) ?? null,
         linhas: rows as any,
-        buscando: !!busca,
+        buscando: !!buscaTexto || buscaInterp.exigeNumero,
         ctx: ctxEscopo,
       });
       if (deepLinkPendente.current && rows.some((r: any) => r.id === deepLinkPendente.current))
