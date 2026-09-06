@@ -3,7 +3,7 @@
  *
  * Garantias desta camada:
  *  - a correção é direcionada para a camada responsável pelo erro;
- *  - nenhuma escrita direta em `nina_kb_registros` (fonte oficial derivada da
+ *  - nenhuma escrita direta na fonte oficial (o catálogo é editado e publicado
  *    planilha enviada) — não existe base paralela;
  *  - correção de planilha só marca `applied` depois que a versão ativa da Base
  *    realmente passa a conter a informação corrigida (verificação por consulta);
@@ -116,8 +116,8 @@ const aplicarSchema = z.object({
 
 /**
  * Aplica a correção aprovada na camada correta.
- *  - planilha: verifica a versão ativa; se a correção ainda não estiver lá,
- *    registra a pendência de reenviar a planilha e NÃO marca como aplicado;
+ *  - catálogo: verifica o conteúdo publicado; se a correção ainda não estiver
+ *    lá, registra a pendência de editar/publicar e NÃO marca como aplicado;
  *  - demais camadas: registra a ação técnica; a conclusão marca `applied`.
  */
 export const aplicarFeedbackNina = createServerFn({ method: "POST" })
@@ -143,23 +143,9 @@ export const aplicarFeedbackNina = createServerFn({ method: "POST" })
     const jaNaBase = baseJaContem(resumo, fb.correcao);
     const agora = new Date().toISOString();
 
-    // Reindexação: refaz chunks/embeddings/índices a partir do arquivo oficial
-    // da versão ATIVA. Nunca inventa conteúdo nem grava registro à mão.
-    let reindexado: { ok: boolean; detalhe: string } | null = null;
-    if (data.reindexar && plano.permiteReindexar) {
-      const { baseAtiva, processarBase, invalidarCache } = await import("@/lib/nina/kb.server");
-      const base = await baseAtiva(data.clinicaId);
-      if (!base) {
-        reindexado = { ok: false, detalhe: "Nenhuma versão ativa da Base para reprocessar." };
-      } else {
-        const r = await processarBase(base.id);
-        invalidarCache(data.clinicaId);
-        reindexado = {
-          ok: Boolean((r as { ok?: boolean }).ok ?? true),
-          detalhe: `Versão ${base.versao} reprocessada (chunks, embeddings e índices).`,
-        };
-      }
-    }
+    // FASE 7: não existe base externa para reprocessar. A correção de conteúdo
+    // oficial é a edição e publicação do registro no catálogo.
+    const reindexado: { ok: boolean; detalhe: string } | null = null;
 
     const evidencia = {
       knowledge_status: kb.knowledge_status,
@@ -172,7 +158,7 @@ export const aplicarFeedbackNina = createServerFn({ method: "POST" })
       verificado_em: agora,
     };
 
-    const aplicaAgora = plano.camada === "planilha" ? jaNaBase : false;
+    const aplicaAgora = plano.camada === "catalogo" ? jaNaBase : false;
 
     // Ação rastreável (aberta quando ainda depende de trabalho humano/técnico).
     const { data: acao, error: erroAcao } = await context.supabase
@@ -199,16 +185,6 @@ export const aplicarFeedbackNina = createServerFn({ method: "POST" })
     if (erroAcao) throw new Error(erroAcao.message);
 
     // FASE 5 — versionamento: valor anterior, valor novo, motivo e autoria.
-    const { data: bases } = await context.supabase
-      .from("nina_kb_bases")
-      .select("id, versao, status")
-      .eq("clinica_id", data.clinicaId)
-      .order("versao", { ascending: false })
-      .limit(5);
-    const listaBases = bases ?? [];
-    const baseAtual = listaBases.find((b) => b.status === "ATIVA") ?? listaBases[0] ?? null;
-    const baseAnterior = listaBases.find((b) => b.id !== baseAtual?.id) ?? null;
-
     const { count: versoesAnteriores } = await context.supabase
       .from("nina_feedback_versoes")
       .select("id", { count: "exact", head: true })
@@ -231,9 +207,6 @@ export const aplicarFeedbackNina = createServerFn({ method: "POST" })
         reportado_por: (fb as { reportado_por?: string | null }).reportado_por ?? null,
         aprovado_por: (fb as { revisado_por?: string | null }).revisado_por ?? null,
         aplicado_por: context.userId,
-        kb_base_id_anterior: baseAnterior?.id ?? null,
-        kb_versao_anterior: baseAnterior?.versao ?? null,
-        kb_versao_nova: baseAtual?.versao ?? null,
         evidencia,
         teste_status: "pendente",
       })
