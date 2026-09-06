@@ -1807,6 +1807,13 @@ export function AtendInbox() {
     ultimoId: ultimoItemId,
   });
 
+  // Só quem está no fim da conversa (sem indicador de novas pendentes) tem a
+  // leitura avançada automaticamente quando chega mensagem.
+  useEffect(() => {
+    setSeguindoFim(chat.novas === 0);
+  }, [chat.novas]);
+
+
   // Medição temporária de desempenho (ligue com localStorage "nina:perf"=1):
   // marca quando a conversa terminou de desenhar e quando o scroll ficou no fim.
   useEffect(() => {
