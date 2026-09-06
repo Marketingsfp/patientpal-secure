@@ -36,7 +36,7 @@ describe("decisões humanas", () => {
     expect(valores).toContain("aprovado");
     // Aplicar continua fora desta lista: é o fluxo autorizado já existente.
     expect(valores).not.toContain("aplicado");
-    expect(EXPLICACAO_APROVAR).toContain("não altera o catálogo".toLowerCase().slice(0, 5));
+    expect(EXPLICACAO_APROVAR).toMatch(/não altera o catálogo/i);
   });
 
   test("a análise por IA nunca aprova sozinha", () => {
@@ -60,9 +60,9 @@ describe("decisões humanas", () => {
   });
 
   test("causa técnica não sugere alterar o catálogo", () => {
-    expect(camadaDaCausa("knowledge_error").catalogo).toBe(true);
-    expect(camadaDaCausa("tool_error").catalogo).toBe(false);
-    expect(camadaDaCausa(null).catalogo).toBe(false);
+    expect(camadaDaCausa("knowledge_error").alvo).toBe("catalogo");
+    expect(camadaDaCausa("tool_error").alvo).toBe("tecnico");
+    expect(camadaDaCausa(null).alvo).toBe("indefinido");
   });
 
   test("registro de decisão falha fechada quando a auditoria não grava", async () => {
