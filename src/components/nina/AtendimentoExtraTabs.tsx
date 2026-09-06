@@ -1414,37 +1414,79 @@ export function AtendInbox() {
     return () => clearInterval(t);
   }, [carregarEspera]);
 
-  // Uma rajada de mensagens novas gerava várias recargas seguidas da lista,
-  // que disputavam espaço com a abertura da conversa. Agora as atualizações
-  // próximas são agrupadas em uma única recarga.
-  const recargaListaRef = useRef<number | null>(null);
-  const recarregarListaAgrupado = useCallback(() => {
-    if (recargaListaRef.current !== null) window.clearTimeout(recargaListaRef.current);
-    recargaListaRef.current = window.setTimeout(() => {
-      recargaListaRef.current = null;
-      void carregarConvs();
-    }, 500);
-  }, [carregarConvs]);
+  // FASE 3 — uma rajada de mensagens não pode virar uma recarga por evento,
+  // nem ficar adiada para sempre: os eventos próximos são agrupados e saem no
+  // máximo dentro do teto, mesmo com tráfego contínuo.
+  const carregarConvsAgrup = useRef(carregarConvs);
+  carregarConvsAgrup.current = carregarConvs;
+  const carregarEsperaRef = useRef(carregarEspera);
+  carregarEsperaRef.current = carregarEspera;
+
+  const agrupadores = useRef<{
+    lista: Agrupador;
+    conversa: Agrupador;
+    apoio: Agrupador;
+    espera: Agrupador;
+  } | null>(null);
+  if (agrupadores.current === null) {
+    agrupadores.current = {
+      lista: criarAgrupador({
+        executar: () => void carregarConvsAgrup.current(),
+        atrasoMs: 400,
+        tetoMs: 1500,
+      }),
+      conversa: criarAgrupador({
+        executar: () => void sincronizarConversaRef.current?.(),
+        atrasoMs: 250,
+        tetoMs: 1000,
+      }),
+      apoio: criarAgrupador({
+        executar: () => void carregarApoioRef.current?.(),
+        atrasoMs: 400,
+        tetoMs: 2000,
+      }),
+      espera: criarAgrupador({
+        executar: () => void carregarEsperaRef.current(),
+        atrasoMs: 1000,
+        tetoMs: 5000,
+      }),
+    };
+  }
   useEffect(
     () => () => {
-      if (recargaListaRef.current !== null) window.clearTimeout(recargaListaRef.current);
+      const g = agrupadores.current;
+      if (!g) return;
+      g.lista.cancelar();
+      g.conversa.cancelar();
+      g.apoio.cancelar();
+      g.espera.cancelar();
     },
     [],
   );
 
-  useRealtimeRefresh(
-    ["atend_conversas", "whatsapp_mensagens"],
-    recarregarListaAgrupado,
-    !!clinicaId,
-  );
-  useRealtimeRefresh(["whatsapp_mensagens"], carregarEspera, !!clinicaId);
-  useRealtimeRefresh(
-    ["whatsapp_mensagens", "atend_conversa_eventos"],
-    () => void sincronizarConversa(),
-    !!clinicaId && !!sel?.id,
-  );
-  // Notas internas são raras: aí sim vale recarregar o painel de apoio.
-  useRealtimeRefresh(["atend_notas_internas"], carregarConversa, !!clinicaId && !!sel?.id);
+  useRealtimeAtendimento({
+    clinicaId: clinicaId ?? null,
+    conversaAberta: sel?.id ?? null,
+    enabled: !!clinicaId,
+    onAlvos: (alvos) => {
+      const g = agrupadores.current;
+      if (!g) return;
+      for (const alvo of alvos) g[alvo].agendar();
+    },
+    // Reconexão: pode ter passado mensagem, transferência ou encerramento sem
+    // aviso. A tela reconcilia sozinha — ninguém precisa dar F5.
+    onReconectar: () => {
+      const g = agrupadores.current;
+      if (!g) return;
+      g.lista.agendar();
+      g.espera.agendar();
+      if (selIdRef.current) {
+        g.conversa.agendar();
+        g.apoio.agendar();
+      }
+    },
+  });
+
 
   // Mensagens e eventos de estado na mesma linha do tempo, em ordem cronológica.
   const timeline = useMemo(() => {
