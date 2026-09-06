@@ -410,46 +410,69 @@ export const perguntarAnalistaMetricas = createServerFn({ method: "POST" })
       erroFerramenta = e instanceof Error ? e.message : "Falha na análise.";
     }
 
-    const base = {
-      versao: VERSAO_ANALISTA,
-      modelo: MODELO_ANALISTA,
-      geradoEm: new Date().toISOString(),
-      duracaoMs: Date.now() - inicio,
-      inputTokens,
-      outputTokens,
-      consultas: consultas.map((c) => ({ id: c.id, filtros: c.dados?.periodos?.map((p: any) => p.filtros) })),
-    };
+    const custo = calcularCusto(limites, inputTokens, outputTokens);
+    const duracaoMs = Date.now() - inicio;
 
-    if (erroFerramenta) {
-      return { ...base, status: "falha" as const, erro: erroFerramenta, resposta: null, problemas: [] };
+    let resposta: RespostaAnalista | null = null;
+    let status: "ok" | "invalida" | "falha" = "falha";
+    let erro: string | null = erroFerramenta;
+    let problemas: any[] = [];
+
+    if (!erroFerramenta) {
+      let bruto: unknown = null;
+      try {
+        bruto = JSON.parse(saida?.texto ?? "");
+      } catch {
+        bruto = null;
+      }
+      if (!bruto || typeof bruto !== "object") {
+        erro = "O analista não devolveu um resultado interpretável.";
+      } else {
+        resposta = bruto as RespostaAnalista;
+        const v = validarResposta(resposta, valoresPermitidos(consultas));
+        problemas = v.problemas;
+        // Resposta com número incompatível NÃO é apresentada como válida.
+        status = v.valida ? "ok" : "invalida";
+        erro = v.valida ? null : "Os valores citados não conferem com as consultas executadas.";
+      }
     }
 
-    let bruto: unknown = null;
-    try {
-      bruto = JSON.parse(saida?.texto ?? "");
-    } catch {
-      bruto = null;
-    }
-    if (!bruto || typeof bruto !== "object") {
-      return {
-        ...base,
-        status: "falha" as const,
-        erro: "O analista não devolveu um resultado interpretável.",
-        resposta: null,
-        problemas: [],
-      };
-    }
-
-    const resposta = bruto as RespostaAnalista;
-    const { valida, problemas } = validarResposta(resposta, valoresPermitidos(consultas));
-
-    return {
-      ...base,
-      // Resposta com número incompatível NÃO é apresentada como válida.
-      status: valida ? ("ok" as const) : ("invalida" as const),
-      erro: valida ? null : "Os valores citados não conferem com as consultas executadas.",
+    const registro = {
+      clinica_id: data.clinicaId,
+      pergunta: perguntaSegura,
+      status,
+      erro,
       resposta,
       problemas,
-      resultadosConsultados: consultas,
+      // Dados estruturados que sustentam a resposta: a tela monta tabelas com
+      // eles, nunca com números escritos pelo modelo.
+      resultados: consultas,
+      filtros_painel: data.painel,
+      recorte_utilizado: resposta?.recorte_utilizado ?? null,
+      modelo: MODELO_ANALISTA,
+      versao_regras: VERSAO_ANALISTA,
+      input_tokens: inputTokens,
+      output_tokens: outputTokens,
+      custo_estimado: custo?.valor ?? null,
+      custo_moeda: custo?.moeda ?? null,
+      custo_preco_vigencia: custo?.vigencia ?? null,
+      duracao_ms: duracaoMs,
+      dados_atualizados_em: new Date().toISOString(),
+      origem: data.origem,
+      criado_por: ctx.userId,
+    };
+
+    // Falha ao gravar o histórico não pode derrubar a resposta já produzida.
+    const { data: salvo } = await ctx.supabase
+      .from("nina_analista_analises")
+      .insert(registro)
+      .select("id, created_at")
+      .maybeSingle();
+
+    return {
+      ...registro,
+      id: salvo?.id ?? null,
+      created_at: salvo?.created_at ?? new Date().toISOString(),
+      limites,
     };
   });
