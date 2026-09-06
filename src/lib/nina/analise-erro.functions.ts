@@ -33,7 +33,7 @@ type Analise = {
   criterios_versao: string;
   conclusao: string | null;
   resultado: ResultadoAnalise | null;
-  evidencias_resumo: Record<string, unknown> | null;
+  evidencias_resumo: unknown;
   input_tokens: number | null;
   output_tokens: number | null;
   duracao_ms: number | null;
