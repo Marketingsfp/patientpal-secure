@@ -391,6 +391,16 @@ export function AtendInbox() {
   const syncEmVooRef = useRef<{ conversaId: string; promise: Promise<void> } | null>(null);
 
   const [carregandoAntigas, setCarregandoAntigas] = useState(false);
+  // Mensagem específica a localizar ao abrir (vem da Revisão de aprendizados).
+  const seqAlvo = useRef(0);
+  const [alvoMensagem, setAlvoMensagem] = useState<{
+    conversaId: string;
+    mensagemId: string;
+    pedido: number;
+  } | null>(null);
+  const [buscandoAlvo, setBuscandoAlvo] = useState(false);
+  const [alvoIndisponivel, setAlvoIndisponivel] = useState(false);
+  const [msgDestacada, setMsgDestacada] = useState<string | null>(null);
   const seqEspera = useRef(0);
   const convsVisiveis: any[] = (() => {
     let base = convs;
