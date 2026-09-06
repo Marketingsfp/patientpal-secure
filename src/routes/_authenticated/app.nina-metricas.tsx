@@ -182,11 +182,20 @@ function Pagina() {
           prioridade: prioridade === TODOS ? null : (prioridade as never),
           unidadeId: unidadeId === TODOS ? null : unidadeId,
           assunto: assunto.trim() || null,
+          ambiente,
         },
       });
-      if (meu === consultaRef.current) setDados(res);
+      if (meu === consultaRef.current) {
+        setDados(res);
+        setErroConsulta(null);
+      }
     } catch (e) {
-      if (meu === consultaRef.current) mostrarErro(e);
+      // Falha nunca vira zero na tela: os cartões saem de cena e entra o aviso.
+      if (meu === consultaRef.current) {
+        setDados(null);
+        setErroConsulta(e instanceof Error ? e.message : "Não foi possível carregar os números.");
+        mostrarErro(e);
+      }
     } finally {
       if (meu === consultaRef.current) setCarregando(false);
     }
