@@ -2,7 +2,7 @@
  * FASE 5 — regras de exibição do desempenho dentro/fora do horário.
  * Dados sintéticos; nada é publicado nem gravado.
  */
-import { describe, it, expect } from "bun:test";
+import { describe, it, expect } from "vitest";
 import {
   FILTROS_PERIODO,
   contagem,
