@@ -18,57 +18,18 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
   Plus,
   Pencil,
   Trash2,
-  Loader2,
-  Play,
-  Pause as PauseIcon,
-  Users,
-  BookOpen,
   Zap,
-  Coffee,
-  BarChart3,
 } from "lucide-react";
 import { useClinica } from "@/hooks/use-clinica";
 import {
-  listarDepartamentos,
-  salvarDepartamento,
-  excluirDepartamento,
   listarMacros,
   salvarMacro,
   excluirMacro,
-  listarKb,
-  salvarKb,
-  excluirKb,
-  listarPauseReasons,
-  salvarPauseReason,
-  excluirPauseReason,
-  iniciarPausa,
-  finalizarPausa,
-  pausaAtual,
-  dashboardAtendimento,
-  listarMembros,
-  travarMinhaFila,
 } from "@/lib/atendimento.functions";
-import { supabase } from "@/integrations/supabase/client";
 import { useRealtimeRefresh } from "@/hooks/use-realtime-refresh";
-
-function Metric({ label, value, tone }: { label: string; value: any; tone?: string }) {
-  return (
-    <div className="rounded-lg border bg-card p-3">
-      <div className="text-xs text-muted-foreground">{label}</div>
-      <div className={`text-2xl font-semibold ${tone ?? ""}`}>{value}</div>
-    </div>
-  );
-}
 
 
 /* ============================================================

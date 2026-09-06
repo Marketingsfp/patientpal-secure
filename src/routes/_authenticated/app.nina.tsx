@@ -4,7 +4,6 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import {
   MessageCircle,
   Send,
-  Phone,
   FileText,
   Loader2,
   Copy,
@@ -15,7 +14,6 @@ import {
   Plus,
   Pencil,
   X,
-  User,
   RefreshCw,
   ThumbsUp,
   ThumbsDown,
@@ -153,8 +151,6 @@ function NinaPage() {
     </div>
   );
 }
-
-type NinaMsg = { role: "user" | "assistant"; content: string };
 
 /* ===================== FEEDBACK DA RESPOSTA (aprendizado) ===================== */
 

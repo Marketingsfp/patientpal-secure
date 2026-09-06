@@ -15,18 +15,16 @@ import {
   type ContextoVariaveis,
   type RespostaRapida,
 } from "@/lib/atendimento/respostas-rapidas";
-import { confirmDialog } from "@/lib/confirm";
 import { normalizarNomeBusca } from "@/lib/busca-texto";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Switch } from "@/components/ui/switch";
 import {
   EVENTO_FILTRAR_NAO_ATRIBUIDAS,
   FILTRO_NAO_ATRIBUIDAS_KEY,
@@ -59,23 +57,15 @@ import {
   Search,
   Loader2,
   UserCheck,
-  Eye,
   ArrowRightLeft,
   CheckCircle2,
   Plus,
-  Pencil,
-  Trash2,
-  Clock,
-  AlertTriangle,
   Users,
-  FileText,
   Phone,
   MessageSquare,
   Circle,
   Coffee,
   PowerOff,
-  Lock,
-  Unlock,
   CalendarPlus,
   Pin,
   PinOff,
@@ -85,7 +75,6 @@ import {
 import { useClinica } from "@/hooks/use-clinica";
 import { useAuth } from "@/hooks/use-auth";
 import { usePodeEscrever } from "@/hooks/use-permissoes";
-import { useRealtimeRefresh } from "@/hooks/use-realtime-refresh";
 import { useRealtimeAtendimento } from "@/hooks/use-realtime-atendimento";
 import { criarAgrupador, type Agrupador } from "@/lib/atendimento/realtime-roteador";
 import {
@@ -106,7 +95,6 @@ import {
   ConversationSystemEvent,
   type ConversaEvento,
 } from "@/components/nina/ConversationSystemEvent";
-import { DateInputBR } from "@/components/ui/date-input-br";
 import {
   listarConversas,
   obterConversa,
@@ -123,11 +111,6 @@ import {
   criarNota,
   listarDepartamentos,
   listarUsuariosClinica,
-  supervisaoLive,
-  relatorioAtendimento,
-  listarRoutingRules,
-  salvarRoutingRule,
-  excluirRoutingRule,
   travarMinhaFila,
   iniciarPausa,
   finalizarPausa,
@@ -140,7 +123,7 @@ import {
   assumirConversa,
 } from "@/lib/atendimento.functions";
 import { FilaHumana } from "@/components/nina/FilaHumana";
-import { destinoInbox, idConversaValido } from "@/lib/atendimento/abrir-conversa";
+import { idConversaValido } from "@/lib/atendimento/abrir-conversa";
 import { AgendaConversaDrawer } from "@/components/nina/AgendaConversaDrawer";
 import { ConversaSkeleton, ContatoSkeleton } from "@/components/nina/ConversaSkeleton";
 import {
@@ -3022,29 +3005,4 @@ export function AtendInbox() {
   );
 }
 
-function Stat({
-  label,
-  value,
-  tone,
-  icon: Icon,
-}: {
-  label: string;
-  value: any;
-  tone?: string;
-  icon: any;
-}) {
-  return (
-    <div className="rounded-lg border bg-card p-3 flex items-center gap-3">
-      <div
-        className={`h-10 w-10 rounded-lg bg-muted flex items-center justify-center ${tone ?? ""}`}
-      >
-        <Icon className="h-5 w-5" />
-      </div>
-      <div>
-        <div className="text-xs text-muted-foreground">{label}</div>
-        <div className={`text-2xl font-semibold ${tone ?? ""}`}>{value}</div>
-      </div>
-    </div>
-  );
-}
 
