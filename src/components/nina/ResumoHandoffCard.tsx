@@ -73,7 +73,17 @@ export function ResumoHandoffCard({
   // Só o próprio resumo dispara recarga. Antes, qualquer alteração em
   // "atend_conversas" (toda mensagem nova atualiza a conversa) pedia o resumo
   // de novo — era uma requisição repetida a cada mensagem.
-  useRealtimeRefresh(["atend_handoff_resumos"], () => void carregar(false));
+  // FASE 3 — além de assinar só a tabela do resumo, o canal é filtrado pela
+  // clínica e o evento de outra conversa é descartado sem nenhuma requisição.
+  useRealtimeRefresh(
+    ["atend_handoff_resumos"],
+    () => void carregar(false),
+    !!clinicaId && !!conversaId,
+    {
+      filtro: clinicaId ? `clinica_id=eq.${clinicaId}` : undefined,
+      interessa: (linha) => linha.conversa_id === conversaId,
+    },
+  );
 
   if (!linha) return null;
 

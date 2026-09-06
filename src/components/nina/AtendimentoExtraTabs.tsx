@@ -85,6 +85,8 @@ import { useClinica } from "@/hooks/use-clinica";
 import { useAuth } from "@/hooks/use-auth";
 import { usePodeEscrever } from "@/hooks/use-permissoes";
 import { useRealtimeRefresh } from "@/hooks/use-realtime-refresh";
+import { useRealtimeAtendimento } from "@/hooks/use-realtime-atendimento";
+import { criarAgrupador, type Agrupador } from "@/lib/atendimento/realtime-roteador";
 import {
   cursorMaisRecente,
   mesclarNovas,
@@ -344,6 +346,11 @@ export function AtendInbox() {
   const [erroMsgs, setErroMsgs] = useState(false);
   const [temMaisAntigas, setTemMaisAntigas] = useState(false);
   const temMaisAntigasRef = useRef(false);
+  // FASE 3 — coordenação entre abertura, sincronização e tempo real.
+  const aberturaEmAndamentoRef = useRef<{ conversaId: string; pedido: number } | null>(null);
+  const syncPendenteRef = useRef(false);
+  const apoioPendenteRef = useRef(false);
+  const syncEmVooRef = useRef<{ conversaId: string; promise: Promise<void> } | null>(null);
 
   const [carregandoAntigas, setCarregandoAntigas] = useState(false);
   const seqEspera = useRef(0);
@@ -962,6 +969,9 @@ export function AtendInbox() {
     const alvo: string = sel.id;
     const pedido = ++seqConversa.current;
     const janela = janelaRef.current;
+    // FASE 3 — enquanto a abertura roda, eventos de tempo real não reiniciam
+    // a carga: eles só marcam que há sincronização pendente.
+    aberturaEmAndamentoRef.current = { conversaId: alvo, pedido };
     medidor.current?.marcar("request");
     marcarTroca("T2_requests");
     // Todas as buscas saem juntas (sem fila). A diferença é o que cada uma
@@ -1111,6 +1121,21 @@ export function AtendInbox() {
     })();
 
     await Promise.all([critico, secundarios]);
+
+    // Abertura concluída. Se chegou mensagem/evento durante o caminho, uma
+    // única sincronização incremental busca o que faltou — nada se perde.
+    const emAndamento = aberturaEmAndamentoRef.current;
+    if (emAndamento?.conversaId === alvo && emAndamento.pedido === pedido) {
+      aberturaEmAndamentoRef.current = null;
+      if (syncPendenteRef.current) {
+        syncPendenteRef.current = false;
+        if (selIdRef.current === alvo) void sincronizarConversaRef.current?.();
+      }
+      if (apoioPendenteRef.current) {
+        apoioPendenteRef.current = false;
+        if (selIdRef.current === alvo) void carregarApoioRef.current?.();
+      }
+    }
   }, [clinicaId, sel?.id, listarMsgs, obterContato, listarNotasFn, listarEventosFn]);
 
 
@@ -1120,6 +1145,17 @@ export function AtendInbox() {
   const sincronizarConversa = useCallback(async () => {
     const alvo = selIdRef.current;
     if (!clinicaId || !alvo) return;
+    // Abertura em andamento: não começa outra carga por cima. A abertura
+    // dispara esta sincronização assim que terminar.
+    if (aberturaEmAndamentoRef.current) {
+      syncPendenteRef.current = true;
+      return;
+    }
+    // Já existe uma sincronização desta conversa em voo: reaproveita.
+    if (syncEmVooRef.current?.conversaId === alvo) {
+      await syncEmVooRef.current.promise;
+      return;
+    }
     const cursor = cursorMaisRecente(msgsRef.current);
     if (
       !podeAtualizarIncremental({
@@ -1131,6 +1167,7 @@ export function AtendInbox() {
       await carregarConversa();
       return;
     }
+    const execucao = (async () => {
     try {
       const [novas, ev] = await Promise.all([
         listarMsgs({
@@ -1157,7 +1194,48 @@ export function AtendInbox() {
       // Falha na sincronização não derruba o atendimento: a próxima tentativa
       // (Realtime ou rede de segurança) resolve.
     }
+    })();
+    syncEmVooRef.current = { conversaId: alvo, promise: execucao };
+    try {
+      await execucao;
+    } finally {
+      if (syncEmVooRef.current?.promise === execucao) syncEmVooRef.current = null;
+    }
   }, [clinicaId, listarMsgs, listarEventosFn, carregarConversa]);
+
+  // Apoio da conversa aberta (notas internas e eventos): antes uma nota nova
+  // recarregava a conversa inteira. Agora só o painel de apoio é atualizado.
+  const carregarApoio = useCallback(async () => {
+    const alvo = selIdRef.current;
+    if (!clinicaId || !alvo) return;
+    if (aberturaEmAndamentoRef.current) {
+      apoioPendenteRef.current = true;
+      return;
+    }
+    try {
+      const [n, ev] = await Promise.all([
+        listarNotasFn({ data: { clinicaId, conversaId: alvo } }).catch(() => null as any),
+        listarEventosFn({ data: { clinicaId, conversaId: alvo } }).catch(
+          () => null as ConversaEvento[] | null,
+        ),
+      ]);
+      if (selIdRef.current !== alvo) return;
+      if (conversaIdUrlRef.current && conversaIdUrlRef.current !== alvo) return;
+      if (n) {
+        setNotas(n as any[]);
+        const guardado = cacheConversas.current.obter(alvo);
+        if (guardado) cacheConversas.current.guardar(alvo, { ...guardado, notas: n as any[] });
+      }
+      if (ev) setEventos((prev) => mesclarEventos(prev, ev as ConversaEvento[]));
+    } catch {
+      /* apoio é auxiliar: falha não derruba o atendimento */
+    }
+  }, [clinicaId, listarNotasFn, listarEventosFn]);
+
+  const sincronizarConversaRef = useRef(sincronizarConversa);
+  sincronizarConversaRef.current = sincronizarConversa;
+  const carregarApoioRef = useRef(carregarApoio);
+  carregarApoioRef.current = carregarApoio;
 
   useEffect(() => {
     msgsRef.current = msgs;
@@ -1336,37 +1414,79 @@ export function AtendInbox() {
     return () => clearInterval(t);
   }, [carregarEspera]);
 
-  // Uma rajada de mensagens novas gerava várias recargas seguidas da lista,
-  // que disputavam espaço com a abertura da conversa. Agora as atualizações
-  // próximas são agrupadas em uma única recarga.
-  const recargaListaRef = useRef<number | null>(null);
-  const recarregarListaAgrupado = useCallback(() => {
-    if (recargaListaRef.current !== null) window.clearTimeout(recargaListaRef.current);
-    recargaListaRef.current = window.setTimeout(() => {
-      recargaListaRef.current = null;
-      void carregarConvs();
-    }, 500);
-  }, [carregarConvs]);
+  // FASE 3 — uma rajada de mensagens não pode virar uma recarga por evento,
+  // nem ficar adiada para sempre: os eventos próximos são agrupados e saem no
+  // máximo dentro do teto, mesmo com tráfego contínuo.
+  const carregarConvsAgrup = useRef(carregarConvs);
+  carregarConvsAgrup.current = carregarConvs;
+  const carregarEsperaRef = useRef(carregarEspera);
+  carregarEsperaRef.current = carregarEspera;
+
+  const agrupadores = useRef<{
+    lista: Agrupador;
+    conversa: Agrupador;
+    apoio: Agrupador;
+    espera: Agrupador;
+  } | null>(null);
+  if (agrupadores.current === null) {
+    agrupadores.current = {
+      lista: criarAgrupador({
+        executar: () => void carregarConvsAgrup.current(),
+        atrasoMs: 400,
+        tetoMs: 1500,
+      }),
+      conversa: criarAgrupador({
+        executar: () => void sincronizarConversaRef.current?.(),
+        atrasoMs: 250,
+        tetoMs: 1000,
+      }),
+      apoio: criarAgrupador({
+        executar: () => void carregarApoioRef.current?.(),
+        atrasoMs: 400,
+        tetoMs: 2000,
+      }),
+      espera: criarAgrupador({
+        executar: () => void carregarEsperaRef.current(),
+        atrasoMs: 1000,
+        tetoMs: 5000,
+      }),
+    };
+  }
   useEffect(
     () => () => {
-      if (recargaListaRef.current !== null) window.clearTimeout(recargaListaRef.current);
+      const g = agrupadores.current;
+      if (!g) return;
+      g.lista.cancelar();
+      g.conversa.cancelar();
+      g.apoio.cancelar();
+      g.espera.cancelar();
     },
     [],
   );
 
-  useRealtimeRefresh(
-    ["atend_conversas", "whatsapp_mensagens"],
-    recarregarListaAgrupado,
-    !!clinicaId,
-  );
-  useRealtimeRefresh(["whatsapp_mensagens"], carregarEspera, !!clinicaId);
-  useRealtimeRefresh(
-    ["whatsapp_mensagens", "atend_conversa_eventos"],
-    () => void sincronizarConversa(),
-    !!clinicaId && !!sel?.id,
-  );
-  // Notas internas são raras: aí sim vale recarregar o painel de apoio.
-  useRealtimeRefresh(["atend_notas_internas"], carregarConversa, !!clinicaId && !!sel?.id);
+  useRealtimeAtendimento({
+    clinicaId: clinicaId ?? null,
+    conversaAberta: sel?.id ?? null,
+    enabled: !!clinicaId,
+    onAlvos: (alvos) => {
+      const g = agrupadores.current;
+      if (!g) return;
+      for (const alvo of alvos) g[alvo].agendar();
+    },
+    // Reconexão: pode ter passado mensagem, transferência ou encerramento sem
+    // aviso. A tela reconcilia sozinha — ninguém precisa dar F5.
+    onReconectar: () => {
+      const g = agrupadores.current;
+      if (!g) return;
+      g.lista.agendar();
+      g.espera.agendar();
+      if (selIdRef.current) {
+        g.conversa.agendar();
+        g.apoio.agendar();
+      }
+    },
+  });
+
 
   // Mensagens e eventos de estado na mesma linha do tempo, em ordem cronológica.
   const timeline = useMemo(() => {
