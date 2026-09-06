@@ -305,6 +305,20 @@ export const perguntarAnalistaMetricas = createServerFn({ method: "POST" })
     const agora = new Date();
     const inicio = Date.now();
 
+    const limites = await carregarLimites(ctx, data.clinicaId);
+    const inicioDoDia = new Date(agora);
+    inicioDoDia.setUTCHours(0, 0, 0, 0);
+    const { count } = await ctx.supabase
+      .from("nina_analista_analises")
+      .select("id", { count: "exact", head: true })
+      .eq("clinica_id", data.clinicaId)
+      .gte("created_at", inicioDoDia.toISOString());
+    if ((count ?? 0) >= limites.max_analises_por_dia) {
+      throw new Error(
+        `Limite de ${limites.max_analises_por_dia} análises por dia atingido nesta clínica.`,
+      );
+    }
+
     // A pergunta é conteúdo, não instrução, e vai mascarada para o provedor.
     const perguntaSegura = mascararPergunta(data.pergunta);
     const configuracao = await ferramentaConfiguracao(ctx, data.clinicaId);
@@ -342,8 +356,13 @@ export const perguntarAnalistaMetricas = createServerFn({ method: "POST" })
     let erroFerramenta: string | null = null;
 
     try {
-      for (let rodada = 0; rodada < MAX_RODADAS_FERRAMENTA; rodada += 1) {
-        saida = await chamarModelo(input);
+      for (let rodada = 0; rodada < limites.max_rodadas; rodada += 1) {
+        // Orçamento de tempo: não interrompe uma chamada em andamento (o que
+        // desperdiçaria a geração já cobrada); apenas não inicia outra rodada.
+        if (rodada > 0 && Date.now() - inicio > limites.timeout_ms) {
+          throw new Error("Tempo limite da análise atingido antes de concluir as consultas.");
+        }
+        saida = await chamarModelo(input, limites.max_tokens_saida);
         inputTokens += saida.inputTokens ?? 0;
         outputTokens += saida.outputTokens ?? 0;
         if (saida.chamadas.length === 0) break;
@@ -354,8 +373,10 @@ export const perguntarAnalistaMetricas = createServerFn({ method: "POST" })
           try {
             const args = JSON.parse(chamada.arguments || "{}");
             if (chamada.name === "consultar_metricas") {
-              if (consultas.length >= MAX_CONSULTAS) {
-                resultado = { erro: `Limite de ${MAX_CONSULTAS} consultas por pergunta atingido.` };
+              if (consultas.length >= limites.max_consultas_por_pergunta) {
+                resultado = {
+                  erro: `Limite de ${limites.max_consultas_por_pergunta} consultas por pergunta atingido.`,
+                };
               } else {
                 // Permissões revalidadas a cada consulta, inclusive em perguntas seguintes.
                 await exigirPermissao(ctx, data.clinicaId);
