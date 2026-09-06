@@ -5,6 +5,12 @@ import {
   ehConflitoDuplicidade,
   montarRegistroErroRapido,
   validarMensagemNina,
+  deveMostrarBotaoReporte,
+  avisoReporte,
+  ROTULO_REPORTE,
+  TEXTO_REPORTE_DUPLICADO,
+  TEXTO_REPORTE_FALHA,
+  TEXTO_REPORTE_SUCESSO,
 } from "@/lib/nina/erro-rapido";
 
 const CONVERSA = "11111111-1111-4111-8111-111111111111";
@@ -88,5 +94,34 @@ describe("reporte rápido de erro da Nina", () => {
     expect(ehConflitoDuplicidade({ code: "23505" })).toBe(true);
     expect(ehConflitoDuplicidade({ code: "23503" })).toBe(false);
     expect(ehConflitoDuplicidade(null)).toBe(false);
+  });
+});
+
+describe("botão de reporte rápido no chat", () => {
+  it("aparece só em mensagens com autoria da Nina no sistema", () => {
+    expect(deveMostrarBotaoReporte({ direction: "out", enviada_por: "nina" })).toBe(true);
+    expect(deveMostrarBotaoReporte({ direction: "out", enviada_por: "humano" })).toBe(false);
+    expect(deveMostrarBotaoReporte({ direction: "in", enviada_por: "paciente" })).toBe(false);
+    expect(deveMostrarBotaoReporte({ direction: "out", enviada_por: "sistema" })).toBe(false);
+  });
+
+  it("não usa a palavra 'Nina' no texto para decidir a autoria", () => {
+    expect(
+      deveMostrarBotaoReporte({ direction: "in", enviada_por: "paciente" } as never),
+    ).toBe(false);
+  });
+
+  it("mostra o aviso certo para sucesso e para reporte já pendente", () => {
+    expect(avisoReporte({ duplicado: false })).toEqual({
+      tipo: "sucesso",
+      texto: TEXTO_REPORTE_SUCESSO,
+    });
+    expect(avisoReporte({ duplicado: true })).toEqual({
+      tipo: "duplicado",
+      texto: TEXTO_REPORTE_DUPLICADO,
+    });
+    expect(avisoReporte(null).texto).toBe(TEXTO_REPORTE_SUCESSO);
+    expect(TEXTO_REPORTE_FALHA).toBe("Não foi possível registrar o erro. Tente novamente.");
+    expect(ROTULO_REPORTE).toBe("Reportar erro da Nina");
   });
 });

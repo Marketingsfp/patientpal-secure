@@ -2550,7 +2550,7 @@ export function AtendInbox() {
                   <p className="text-sm text-muted-foreground text-center">Sem mensagens.</p>
                 )}
 
-                {(conteudoDaConversa ? timeline : []).map((item, idxTimeline) => {
+                {(conteudoDaConversa ? timeline : []).map((item) => {
                   if (item.kind === "evento") {
                     return <ConversationSystemEvent key={`ev-${item.ev.id}`} evento={item.ev} />;
                   }
@@ -2568,21 +2568,21 @@ export function AtendInbox() {
                       </div>
                     );
                   }
+                  // Autoria pelo campo do sistema, nunca pelo texto da mensagem.
                   const daNina = out && m.enviada_por === "nina";
-                  // Pergunta do paciente = última mensagem recebida antes desta.
-                  let perguntaPaciente: string | null = null;
-                  if (daNina) {
-                    for (let i = idxTimeline - 1; i >= 0; i--) {
-                      const ant = timeline[i];
-                      if (ant.kind !== "msg") continue;
-                      if (ant.msg.direction === "in") {
-                        perguntaPaciente = ant.msg.body ?? ant.msg.transcricao ?? null;
-                        break;
-                      }
-                    }
-                  }
                   return (
-                    <div key={m.id} className={`flex ${out ? "justify-end" : "justify-start"}`}>
+                    <div
+                      key={m.id}
+                      className={`flex items-start gap-2 ${out ? "justify-end" : "justify-start"}`}
+                    >
+                      {/* Botão de reporte rápido: fora do balão, sempre visível. */}
+                      {daNina && clinicaId && (
+                        <ReportarErroNinaBotao
+                          clinicaId={clinicaId}
+                          conversaId={m.conversa_id ?? sel.id}
+                          mensagemId={m.id}
+                        />
+                      )}
                       <div
                         className={`max-w-[68%] rounded-2xl px-3 py-2 text-sm shadow-sm break-words ${
                           out
@@ -2597,19 +2597,11 @@ export function AtendInbox() {
                           <span className="whitespace-nowrap">
                             {fmtHora(m.recebida_em)} {m.enviada_por === "nina" && "· Nina"}
                           </span>
-                          {daNina && clinicaId && (
-                            <ReportarErroNinaBotao
-                              clinicaId={clinicaId}
-                              conversaId={sel.id}
-                              mensagemId={m.id}
-                              respostaNina={m.body ?? ""}
-                              perguntaPaciente={perguntaPaciente}
-                            />
-                          )}
                         </div>
                       </div>
                     </div>
                   );
+
                 })}
                 {/* Âncora do fim da conversa: é para cá que a tela vai ao abrir. */}
                 <div ref={chat.ancoraRef} />
