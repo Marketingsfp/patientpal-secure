@@ -55,9 +55,13 @@ export async function carregarCalendariosPublicados(
 
   return (versoes ?? []).map((v: any) => {
     const linhas = (dias.data ?? []).filter((d: any) => d.versao_id === v.id && d.ativo !== false);
-    const porDia = new Map<number, { dia_semana: number; fechado: boolean; faixas: any[] }>();
+    const porDia = new Map<number, { dia_semana: number; fechado: boolean; faixas: Array<{ hora_inicio: string; hora_fim: string }> }>();
     for (const l of linhas) {
-      const atual = porDia.get(l.dia_semana) ?? { dia_semana: l.dia_semana, fechado: false, faixas: [] };
+      const atual = porDia.get(l.dia_semana) ?? {
+        dia_semana: l.dia_semana as number,
+        fechado: false,
+        faixas: [] as Array<{ hora_inicio: string; hora_fim: string }>,
+      };
       if (l.fechado) atual.fechado = true;
       else if (l.hora_inicio && l.hora_fim)
         atual.faixas.push({ hora_inicio: String(l.hora_inicio).slice(0, 5), hora_fim: String(l.hora_fim).slice(0, 5) });
