@@ -770,6 +770,7 @@ export type Database = {
           janela_24h_em: string | null
           last_assigned_user_id: string | null
           nina_fluxo_estado: Json | null
+          numero_conversa: number
           owner_type: string
           patient_response_deadline: string | null
           primeiro_resp_em: string | null
@@ -815,6 +816,7 @@ export type Database = {
           janela_24h_em?: string | null
           last_assigned_user_id?: string | null
           nina_fluxo_estado?: Json | null
+          numero_conversa?: number
           owner_type?: string
           patient_response_deadline?: string | null
           primeiro_resp_em?: string | null
@@ -860,6 +862,7 @@ export type Database = {
           janela_24h_em?: string | null
           last_assigned_user_id?: string | null
           nina_fluxo_estado?: Json | null
+          numero_conversa?: number
           owner_type?: string
           patient_response_deadline?: string | null
           primeiro_resp_em?: string | null
