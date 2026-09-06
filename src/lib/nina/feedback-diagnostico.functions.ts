@@ -145,7 +145,7 @@ export const salvarDiagnosticoFeedbackNina = createServerFn({ method: "POST" })
 
     const { data: atual, error: e1 } = await context.supabase
       .from("nina_feedback_erros")
-      .select("categoria")
+      .select("categoria, root_cause")
       .eq("id", data.id)
       .eq("clinica_id", data.clinicaId)
       .single();
@@ -184,6 +184,17 @@ export const salvarDiagnosticoFeedbackNina = createServerFn({ method: "POST" })
       .eq("id", data.id)
       .eq("clinica_id", data.clinicaId);
     if (error) throw new Error(error.message);
+
+    const { registrarDecisao } = await import("@/lib/nina/decisoes.functions");
+    await registrarDecisao(context.supabase, {
+      clinicaId: data.clinicaId,
+      feedbackId: data.id,
+      tipo: "classificacao_ajustada",
+      autor: context.userId,
+      causaAntes: (atual as { root_cause?: string | null }).root_cause ?? null,
+      causaDepois: data.rootCause,
+      observacao: `Assunto: ${data.assunto}`,
+    });
 
     // Quantas ocorrências do mesmo problema já existem (registros preservados).
     const { count } = await context.supabase
