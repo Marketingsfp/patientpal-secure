@@ -41,3 +41,26 @@ export function destinoConversa(
   if (!id) return { to: ROTA_ATENDIMENTO, replace };
   return { to: ROTA_CONVERSA, params: { conversationId: id }, replace };
 }
+
+const RE_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * Lê o id da conversa direto do endereço (`/app/nina/<uuid>`).
+ *
+ * A Inbox é renderizada pela rota-mãe `/app/nina`; nesse ponto os parâmetros
+ * da rota-filha não chegam ao componente, então a leitura do endereço é feita
+ * pelo caminho. Só aceita id no formato interno — nada de nome, telefone,
+ * protocolo ou número visível da conversa.
+ */
+export function idConversaDaUrl(pathname: string | null | undefined): string | null {
+  if (!pathname) return null;
+  const m = /^\/app\/nina\/([^/?#]+)/.exec(pathname.trim());
+  if (!m?.[1]) return null;
+  let id = m[1];
+  try {
+    id = decodeURIComponent(id);
+  } catch {
+    /* endereço malformado: usa o texto cru */
+  }
+  return RE_UUID.test(id) ? id : null;
+}
