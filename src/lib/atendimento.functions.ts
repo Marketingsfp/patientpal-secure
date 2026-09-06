@@ -92,7 +92,28 @@ export const listarConversas = createServerFn({ method: "POST" })
       .parse(i),
   )
   .handler(async ({ data, context }) => {
-    await assertMember(context.supabase, context.userId, data.clinicaId);
+    // FASE 3 — medição por etapa. Sem dado de paciente no log: só tempos.
+    const t0 = Date.now();
+    const marcos: Record<string, number> = {};
+    let ultimo = t0;
+    const marcar = (etapa: string) => {
+      const agora = Date.now();
+      marcos[etapa] = agora - ultimo;
+      ultimo = agora;
+    };
+
+    // Autorização e permissão de gestão não dependem uma da outra: saem juntas.
+    const [, podeGerirRes] = await Promise.all([
+      assertMember(context.supabase, context.userId, data.clinicaId),
+      context.supabase
+        .rpc("can_manage_clinica", {
+          _user_id: context.userId,
+          _clinica_id: data.clinicaId,
+        })
+        .then((r: any) => r?.data)
+        .catch(() => false),
+    ]);
+    marcar("autorizacao");
 
     // Varredura barata e limitada dos prazos já vencidos desta clínica, para
     // que a transferência automática aconteça mesmo sem mensagem nova.
@@ -102,18 +123,10 @@ export const listarConversas = createServerFn({ method: "POST" })
     } catch (e) {
       console.error("[nina-timeout] varredura na listagem falhou", e);
     }
+    marcar("timeouts");
 
     // Gestor/admin da clínica pode escolher ver tudo; atendente comum, não.
-    let gestor = false;
-    try {
-      const { data: podeGerir } = await context.supabase.rpc("can_manage_clinica", {
-        _user_id: context.userId,
-        _clinica_id: data.clinicaId,
-      });
-      gestor = !!podeGerir;
-    } catch {
-      gestor = false;
-    }
+    const gestor = !!podeGerirRes;
     const filtroEscopo = filtroEscopoInbox({
       escopo: data.escopo,
       userId: context.userId,
@@ -154,7 +167,17 @@ export const listarConversas = createServerFn({ method: "POST" })
       }
     }
     const { data: rows, error } = await q;
+    marcar("consulta");
     if (error) throw new Error(error.message);
+    const total = Date.now() - t0;
+    // Só registra quando realmente demorou, para não poluir o log.
+    if (total > 400) {
+      console.warn("[atendimento] listarConversas lenta", {
+        totalMs: total,
+        linhas: rows?.length ?? 0,
+        etapas: marcos,
+      });
+    }
     return rows ?? [];
   });
 
