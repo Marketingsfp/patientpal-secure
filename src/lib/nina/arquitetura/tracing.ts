@@ -183,9 +183,10 @@ export function criarRastro(opcoes: OpcoesRastro): Rastro {
     tipo: TipoEvento,
     status: StatusEvento,
     metadata?: Record<string, unknown>,
+    instante?: number,
   ): EventoTrace {
     const inicioMs = abertos.get(chaveAberta(nodeId));
-    const fimMs = agora();
+    const fimMs = instante ?? agora();
     const encerra = tipo !== "started";
     return {
       ...ids,
@@ -217,8 +218,9 @@ export function criarRastro(opcoes: OpcoesRastro): Rastro {
     },
     iniciar(nodeId, metadata) {
       seguro(() => {
-        abertos.set(chaveAberta(nodeId), agora());
-        empurrar(base(nodeId, "started", "running", metadata));
+        const instante = agora();
+        abertos.set(chaveAberta(nodeId), instante);
+        empurrar(base(nodeId, "started", "running", metadata, instante));
       });
     },
     concluir(nodeId, metadata) {
@@ -241,8 +243,9 @@ export function criarRastro(opcoes: OpcoesRastro): Rastro {
     },
     repetir(nodeId, tentativa, motivo) {
       seguro(() => {
-        empurrar(base(nodeId, "retry", "running", { tentativa, motivo: motivo ?? null }));
-        abertos.set(chaveAberta(nodeId), agora());
+        const instante = agora();
+        empurrar(base(nodeId, "retry", "running", { tentativa, motivo: motivo ?? null }, instante));
+        abertos.set(chaveAberta(nodeId), instante);
       });
     },
     cancelar(nodeId, motivo) {
