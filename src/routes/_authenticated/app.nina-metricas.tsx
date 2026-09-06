@@ -425,18 +425,6 @@ function Pagina() {
               </SelectContent>
             </Select>
           </div>
-          <div className="space-y-1">
-            <Label>Unidade</Label>
-            <Select value={unidadeId} onValueChange={setUnidadeId}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value={TODOS}>Todas</SelectItem>
-                {unidades.map((u) => (
-                  <SelectItem key={u.id} value={u.id}>{u.nome}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
           <div className="space-y-1 md:col-span-2">
             <Label htmlFor="assunto">Assunto / procedimento</Label>
             <Input
