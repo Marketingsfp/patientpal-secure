@@ -11456,6 +11456,7 @@ export type Database = {
         }
       }
       checkin_agendamento: { Args: { _token: string }; Returns: Json }
+      clinicas_do_usuario: { Args: never; Returns: string[] }
       clinicas_publicas: {
         Args: never
         Returns: {
