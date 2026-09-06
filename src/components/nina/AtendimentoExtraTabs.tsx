@@ -960,20 +960,29 @@ export function AtendInbox() {
     })();
   }, [selecaoId, convs, clinicaId, meuId, escopo, souGestor, obterConversaFn, abrirConversa]);
 
-  // Abrir uma conversa a partir da Central de Atenção, sem trocar de página
-  // e sem mexer em filtros/rascunho de quem já estava atendendo.
+  // Abrir uma conversa a partir da Central de Atenção ou da Revisão de
+  // aprendizados, sem trocar de página e sem mexer em filtros/rascunho de quem
+  // já estava atendendo. Quando vem um id de mensagem junto (erro reportado),
+  // o histórico é posicionado nela em vez de abrir no fim.
   useEffect(() => {
-    const abrir = (id: string | null) => {
+    const abrir = (id: string | null, mensagemId?: string | null) => {
       if (!id) return;
+      if (mensagemId) setAlvoMensagem({ conversaId: id, mensagemId, pedido: ++seqAlvo.current });
+      else setAlvoMensagem(null);
       abrirConversa(id);
     };
 
-    const handler = (e: Event) => abrir((e as CustomEvent).detail?.id ?? null);
+    const handler = (e: Event) => {
+      const d = (e as CustomEvent).detail ?? {};
+      abrir(d.id ?? null, d.mensagemId ?? null);
+    };
     try {
       const pendente = window.sessionStorage.getItem(ABRIR_CONVERSA_KEY);
+      const alvoPendente = window.sessionStorage.getItem(ABRIR_MENSAGEM_KEY);
       if (pendente) {
         window.sessionStorage.removeItem(ABRIR_CONVERSA_KEY);
-        abrir(pendente);
+        window.sessionStorage.removeItem(ABRIR_MENSAGEM_KEY);
+        abrir(pendente, alvoPendente);
       }
     } catch {
       /* sem armazenamento: só o evento abaixo abre a conversa */
@@ -981,6 +990,7 @@ export function AtendInbox() {
     window.addEventListener(EVENTO_ABRIR_CONVERSA, handler);
     return () => window.removeEventListener(EVENTO_ABRIR_CONVERSA, handler);
   }, [abrirConversa]);
+
 
 
 
