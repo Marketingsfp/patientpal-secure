@@ -601,8 +601,8 @@ const ROTAS_HOME_PORTAL: ReadonlySet<string> = new Set(
 
 /**
  * Famílias de rotas em que a tela é a MESMA instância mesmo quando o endereço
- * muda (ex.: a Inbox da Nina, onde /app/nina/<conversa> só troca a conversa
- * aberta). Trocar a `key` da área principal nesses casos remontaria a tela
+ * muda (ex.: links antigos /app/nina/<conversa>, que apenas voltam para a
+ * Inbox). Trocar a `key` da área principal nesses casos remontaria a tela
  * inteira — lista, filtros, cache, prefetch e rascunhos — a cada clique.
  *
  * A comparação é por segmento exato, então /app/nina-metricas e

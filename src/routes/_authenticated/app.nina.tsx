@@ -64,9 +64,9 @@ import { AtendInbox } from "@/components/nina/AtendimentoExtraTabs";
 
 
 export const Route = createFileRoute("/_authenticated/app/nina")({
-  // A rota filha /app/nina/<id> só existe para dar endereço próprio a cada
-  // conversa; sem o <Outlet /> o roteador não encontra a rota e mostra
-  // "Not Found" ao abrir o link direto.
+  // A tela de atendimento tem sempre o mesmo endereço (/app/nina): a conversa
+  // aberta é uma seleção interna da Inbox. O <Outlet /> permanece só para que
+  // links antigos (/app/nina/<id>) sejam redirecionados para cá.
   component: () => (
     <>
       <NinaPage />

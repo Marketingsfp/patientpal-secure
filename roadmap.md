@@ -30,3 +30,10 @@
 - [x] Testes do parser (`bun test`)
 - [ ] Calibrar com a planilha TAP real (pendente do envio pelo colaborador)
 
+
+## Atendimento — endereço das conversas (decisão atual)
+- [x] As conversas são abertas por seleção interna na Inbox, mantendo o mesmo
+      endereço (`/app/nina`). A identificação e localização operacional usam o
+      número único e permanente, como #1342.
+- [x] URLs individuais por conversa foram descontinuadas: links antigos
+      (`/app/nina/<id>`) apenas redirecionam para a Inbox, sem abrir a conversa.
