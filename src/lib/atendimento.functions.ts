@@ -206,6 +206,25 @@ export const listarConversas = createServerFn({ method: "POST" })
     const { data: rows, error } = await q;
     marcar("consulta");
     if (error) throw new Error(error.message);
+
+    // Não lidas DESTE usuário: mensagens recebidas do paciente depois do
+    // marcador de leitura dele. O contador antigo da conversa continua na
+    // linha, apenas como referência histórica.
+    let naoLidas = new Map<string, number>();
+    const ids = (rows ?? []).map((r: any) => r.id);
+    if (ids.length) {
+      try {
+        const { data: cont } = await context.supabase.rpc("atend_nao_lidas", {
+          _clinica_id: data.clinicaId,
+          _conversa_ids: ids,
+        });
+        naoLidas = new Map((cont ?? []).map((c: any) => [c.conversa_id, Number(c.nao_lidas) || 0]));
+      } catch (e) {
+        console.error("[atendimento] contagem de nao lidas falhou", e);
+      }
+      marcar("nao_lidas");
+    }
+
     const total = Date.now() - t0;
     // Só registra quando realmente demorou, para não poluir o log.
     if (total > 400) {
@@ -215,8 +234,9 @@ export const listarConversas = createServerFn({ method: "POST" })
         etapas: marcos,
       });
     }
-    return rows ?? [];
+    return (rows ?? []).map((r: any) => ({ ...r, nao_lidas: naoLidas.get(r.id) ?? 0 }));
   });
+
 
 /**
  * FASE 2 — Deep link / F5: carrega UMA conversa pelo id do endereço, mesmo
