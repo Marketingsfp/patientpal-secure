@@ -2132,10 +2132,19 @@ export function AtendInbox() {
                 {clinicaId && conteudoDaConversa && (
                   <ResumoHandoffCard key={sel.id} clinicaId={clinicaId} conversaId={sel.id} />
                 )}
-                {!conteudoDaConversa && <ConversaSkeleton />}
-                {conteudoDaConversa && msgs.length === 0 && (
+                {!conteudoDaConversa && !erroMsgs && <ConversaSkeleton />}
+                {erroMsgs && (
+                  <div className="text-center text-sm text-muted-foreground">
+                    <p>Não foi possível carregar as mensagens desta conversa.</p>
+                    <Button size="sm" variant="outline" className="mt-2" onClick={() => void carregarConversa()}>
+                      Tentar novamente
+                    </Button>
+                  </div>
+                )}
+                {conteudoDaConversa && !erroMsgs && msgs.length === 0 && (
                   <p className="text-sm text-muted-foreground text-center">Sem mensagens.</p>
                 )}
+
                 {(conteudoDaConversa ? timeline : []).map((item, idxTimeline) => {
                   if (item.kind === "evento") {
                     return <ConversationSystemEvent key={`ev-${item.ev.id}`} evento={item.ev} />;
