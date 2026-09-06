@@ -18,9 +18,9 @@ import type { ResultadoConhecimento } from "./knowledge-contract";
 
 /** Colunas públicas — `nota_interna` e `rascunho` ficam de fora de propósito. */
 const COLUNAS_SERVICO =
-  "id, nome, valor, valor_observacao, descricao_publica, preparo, restricoes, executantes, formas_pagamento";
+  "id, nome, valor, valor_observacao, descricao_publica, preparo, restricoes, executantes, formas_pagamento, status, updated_at";
 const COLUNAS_PROFISSIONAL =
-  "id, nome, especialidades, atende_consultorio, formas_pagamento, convenios, horarios, tipo_atendimento, observacao_publica, aviso_dia, aviso_valido_de, aviso_valido_ate, unidades(nome)";
+  "id, nome, especialidades, atende_consultorio, formas_pagamento, convenios, horarios, tipo_atendimento, observacao_publica, aviso_dia, aviso_valido_de, aviso_valido_ate, unidades(nome), status, updated_at";
 
 /** Tetos de leitura por clínica — nunca o catálogo inteiro sem limite. */
 const TETO_PROFISSIONAIS = 60;
@@ -187,12 +187,88 @@ export async function buscarNoCatalogo(pedido: {
   const empatados = pontuados.filter((x) => x.score === melhor).length;
   const ambiguo = servicosDistintos.size > 1 && empatados > 1;
 
-  return montarResultadoCatalogo({
+  const resultado = montarResultadoCatalogo({
     servicos: listaServicos,
     profissionais: listaProfissionais,
     hojeISO,
     ambiguo,
     priorizar: perguntaSobreConsulta && listaProfissionais.length ? "profissional" : "servico",
   });
+
+  // Evidência preservada da consulta: seção, filtros, registros encontrados
+  // (com versão e estado de publicação NA OCASIÃO) e o que foi selecionado.
+  // Snapshot histórico — uma alteração posterior no catálogo não o reescreve.
+  try {
+    const { registrarEtapa } = await import("./evidencias.server");
+    const snapshot = (
+      lista: readonly Record<string, unknown>[],
+      campos: readonly string[],
+    ) =>
+      lista.map((r) => ({
+        id: String(r["id"] ?? ""),
+        nome: String(r["nome"] ?? ""),
+        versao: (r["updated_at"] as string | null) ?? null,
+        publicacao: (r["status"] as string | null) ?? null,
+        camposEncontrados: campos.filter(
+          (c) => r[c] !== null && r[c] !== undefined && r[c] !== "",
+        ),
+      }));
+    const camposServico = COLUNAS_SERVICO.split(", ");
+    const camposProf = COLUNAS_PROFISSIONAL.replace("unidades(nome)", "unidades").split(", ");
+    const codigo = {
+      arquivo: "src/lib/nina/catalogo-retrieval.server.ts",
+      funcao: "buscarNoCatalogo",
+      regra: "somente registros PUBLICADOS da própria clínica; colunas públicas",
+    } as const;
+    registrarEtapa({
+      tipo: "consulta",
+      fonte: "catalogo",
+      titulo: "Exames e procedimentos",
+      dados: {
+        secao: "Exames e procedimentos",
+        filtros: {
+          clinica_id: pedido.clinicaId,
+          status: "PUBLICADO",
+          termos,
+          termos_expandidos: expandidos,
+          teto: TETO_SERVICOS,
+          limite,
+        },
+        cache: false,
+        encontrados: snapshot(brutosServicos as never, camposServico),
+        selecionados: listaServicos.map((s) => String(s.id ?? "")),
+        camposEnviados: camposServico.filter((c) => c !== "id"),
+        knowledgeStatus: resultado.knowledge_status,
+      },
+      codigo,
+    });
+    registrarEtapa({
+      tipo: "consulta",
+      fonte: "catalogo",
+      titulo: "Consultas e profissionais",
+      dados: {
+        secao: "Consultas e profissionais",
+        filtros: {
+          clinica_id: pedido.clinicaId,
+          status: "PUBLICADO",
+          medico: pedido.medico ?? null,
+          dia: pedido.dia ?? null,
+          termos,
+          teto: TETO_PROFISSIONAIS,
+          limite,
+        },
+        cache: false,
+        encontrados: snapshot(brutosProfissionais as never, camposProf),
+        selecionados: listaProfissionais.map((p) => String(p.id ?? "")),
+        camposEnviados: camposProf.filter((c) => c !== "id"),
+        knowledgeStatus: resultado.knowledge_status,
+      },
+      codigo,
+    });
+  } catch {
+    /* auditoria nunca interrompe o atendimento */
+  }
+
+  return resultado;
 }
 
