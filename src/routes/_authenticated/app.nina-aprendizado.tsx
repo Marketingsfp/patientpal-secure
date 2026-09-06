@@ -321,6 +321,8 @@ function Pagina() {
   const [versoesAnalise, setVersoesAnalise] = useState<Record<string, AnaliseSalva[]>>({});
   const [decisoes, setDecisoes] = useState<Record<string, Decisao[]>>({});
   const [decidindo, setDecidindo] = useState(false);
+  // Chave de ativação da análise por IA (não afeta reporte nem auditoria).
+  const [analiseIAAtiva, setAnaliseIAAtiva] = useState(true);
 
   const decidirProblema = useServerFn(decidirProblemaFeedbackNina);
   const listarDecisoes = useServerFn(listarDecisoesFeedbackNina);
@@ -501,6 +503,7 @@ function Pagina() {
       if (!clinicaId || analises[feedbackId] !== undefined) return;
       try {
         const r = await listarAnalises({ data: { clinicaId, feedbackId } });
+        setAnaliseIAAtiva((r as { ativa?: boolean }).ativa !== false);
         const todas = (r.analises ?? []) as AnaliseSalva[];
         setAnalises((a) => ({ ...a, [feedbackId]: todas[0] ?? null }));
         setVersoesAnalise((v) => ({ ...v, [feedbackId]: todas }));
@@ -1030,11 +1033,13 @@ function Pagina() {
                     <Button
                       size="sm"
                       variant="outline"
-                      disabled={!podeRevisar || Boolean(analisando[it.id])}
+                      disabled={!podeRevisar || !analiseIAAtiva || Boolean(analisando[it.id])}
                       title={
-                        podeRevisar
-                          ? "Executa uma análise assistida deste erro (ação paga)."
-                          : "Restrito a quem revisa aprendizados."
+                        !podeRevisar
+                          ? "Restrito a quem revisa aprendizados."
+                          : !analiseIAAtiva
+                            ? "Análise com IA desativada nesta clínica. Reporte e auditoria continuam funcionando."
+                            : "Executa uma análise assistida deste erro (ação paga)."
                       }
                       onClick={() =>
                         void executarAnalise(it.id, analises[it.id]?.status === "done")
