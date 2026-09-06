@@ -97,23 +97,35 @@ export function respostaAindaVale(params: {
  * lista (realtime). Comparamos o instante da última mensagem: se mudou, o
  * conteúdo guardado daquela conversa não vale mais.
  *
+ * O campo é o que a listagem realmente devolve (`ultima_msg_em`). Quando ele
+ * não vem — na linha nova ou na anterior — não temos como provar que o cache
+ * continua válido, então a conversa é tratada como desatualizada.
+ *
  * Cada conversa é avaliada isoladamente pelo seu próprio id — o cache de uma
  * nunca é usado nem invalidado pelo movimento de outra.
  */
+export type LinhaListaConversa = { id: string; ultima_msg_em?: string | null };
+
 export function conversasDesatualizadas(params: {
-  anteriores: { id: string; ultima_mensagem_em?: string | null }[];
-  atuais: { id: string; ultima_mensagem_em?: string | null }[];
+  anteriores: LinhaListaConversa[];
+  atuais: LinhaListaConversa[];
   emCache: string[];
 }): string[] {
-  const antes = new Map(params.anteriores.map((c) => [c.id, c.ultima_mensagem_em ?? null]));
+  const antes = new Map(params.anteriores.map((c) => [c.id, c.ultima_msg_em]));
   const cacheados = new Set(params.emCache);
   const fora: string[] = [];
   for (const c of params.atuais) {
     if (!cacheados.has(c.id)) continue;
-    const anterior = antes.get(c.id);
-    const agora = c.ultima_mensagem_em ?? null;
-    if (anterior === undefined) continue;
-    if (anterior !== agora) fora.push(c.id);
+    if (!antes.has(c.id)) {
+      // Conversa em cache que não estava na lista anterior: sem base de
+      // comparação, revalida por segurança.
+      fora.push(c.id);
+      continue;
+    }
+    const anterior = antes.get(c.id) ?? null;
+    const agora = c.ultima_msg_em ?? null;
+    if (agora === null || anterior === null || anterior !== agora) fora.push(c.id);
   }
   return fora;
 }
+

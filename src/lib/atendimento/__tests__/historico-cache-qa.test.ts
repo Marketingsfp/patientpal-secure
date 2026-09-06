@@ -114,12 +114,12 @@ describe("cache por conversa", () => {
 
     const vencidas = conversasDesatualizadas({
       anteriores: [
-        { id: "A", ultima_mensagem_em: "2026-01-01T10:00:00Z" },
-        { id: "B", ultima_mensagem_em: "2026-01-01T09:00:00Z" },
+        { id: "A", ultima_msg_em: "2026-01-01T10:00:00Z" },
+        { id: "B", ultima_msg_em: "2026-01-01T09:00:00Z" },
       ],
       atuais: [
-        { id: "A", ultima_mensagem_em: "2026-01-01T11:30:00Z" },
-        { id: "B", ultima_mensagem_em: "2026-01-01T09:00:00Z" },
+        { id: "A", ultima_msg_em: "2026-01-01T11:30:00Z" },
+        { id: "B", ultima_msg_em: "2026-01-01T09:00:00Z" },
       ],
       emCache: cache.chaves(),
     });
@@ -133,19 +133,39 @@ describe("cache por conversa", () => {
 
   it("conversa fora do cache não gera invalidação", () => {
     const vencidas = conversasDesatualizadas({
-      anteriores: [{ id: "C", ultima_mensagem_em: "2026-01-01T10:00:00Z" }],
-      atuais: [{ id: "C", ultima_mensagem_em: "2026-01-01T12:00:00Z" }],
+      anteriores: [{ id: "C", ultima_msg_em: "2026-01-01T10:00:00Z" }],
+      atuais: [{ id: "C", ultima_msg_em: "2026-01-01T12:00:00Z" }],
       emCache: ["A"],
     });
     expect(vencidas).toEqual([]);
   });
 
-  it("conversa nova na lista não invalida nada", () => {
+  it("conversa em cache que não estava na lista anterior é revalidada", () => {
     const vencidas = conversasDesatualizadas({
       anteriores: [],
-      atuais: [{ id: "A", ultima_mensagem_em: "2026-01-01T12:00:00Z" }],
+      atuais: [{ id: "A", ultima_msg_em: "2026-01-01T12:00:00Z" }],
       emCache: ["A"],
     });
-    expect(vencidas).toEqual([]);
+    expect(vencidas).toEqual(["A"]);
+  });
+
+  it("lista sem mudanças não invalida cache nenhum", () => {
+    const lista = [
+      { id: "A", ultima_msg_em: "2026-01-01T10:00:00Z" },
+      { id: "B", ultima_msg_em: "2026-01-01T09:00:00Z" },
+    ];
+    expect(
+      conversasDesatualizadas({ anteriores: lista, atuais: lista, emCache: ["A", "B"] }),
+    ).toEqual([]);
+  });
+
+  it("sem data de última mensagem, o cache não é considerado atualizado", () => {
+    expect(
+      conversasDesatualizadas({
+        anteriores: [{ id: "A", ultima_msg_em: "2026-01-01T10:00:00Z" }],
+        atuais: [{ id: "A" }],
+        emCache: ["A"],
+      }),
+    ).toEqual(["A"]);
   });
 });

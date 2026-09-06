@@ -144,6 +144,8 @@ import {
   criarCacheConversas,
   respostaAindaVale,
 } from "@/lib/atendimento/conversa-cache";
+import { criarPrefetchStore, chavePrefetch } from "@/lib/atendimento/prefetch-cache";
+
 import { CacheContatos, planoAberturaContato } from "@/lib/atendimento/contato-cache";
 import {
   JANELA_INICIAL,
@@ -327,16 +329,21 @@ export function AtendInbox() {
   // Janela de mensagens carregadas da conversa aberta (cresce ao pedir o
   // histórico antigo) + prefetch em andamento + medição de desempenho.
   const janelaRef = useRef(JANELA_INICIAL);
-  const prefetchEmCurso = useRef<Set<string>>(new Set());
-  // Buscas de prefetch em andamento (reaproveitadas quando o lead é clicado
-  // antes de o prefetch terminar) e temporizadores de intenção de abertura.
-  const prefetchMsgs = useRef<Map<string, Promise<any[]>>>(new Map());
+  // FASE 2 — buscas de pré-carregamento em andamento. Elas são reaproveitadas
+  // quando o lead é clicado antes de o pré-carregamento terminar e param de
+  // valer quando a conversa muda ou a clínica/usuário troca.
+  const prefetchMsgs = useRef(criarPrefetchStore<any[]>());
   const prefetchTimers = useRef<Map<string, number>>(new Map());
+
   // Espelho do que está na tela, usado pela atualização incremental.
   const msgsRef = useRef<any[]>([]);
   const conversaCarregadaRef = useRef<string | null>(null);
   const medidor = useRef<MedidorConversa | null>(null);
+  // Falha ao carregar as mensagens: a tela mostra o aviso em vez de fingir
+  // que a conversa está vazia (e o cache não guarda lista vazia).
+  const [erroMsgs, setErroMsgs] = useState(false);
   const [temMaisAntigas, setTemMaisAntigas] = useState(false);
+
   const [carregandoAntigas, setCarregandoAntigas] = useState(false);
   const seqEspera = useRef(0);
   const convsVisiveis: any[] = (() => {
@@ -724,6 +731,7 @@ export function AtendInbox() {
       } else if (removeu) {
         const idFora = selIdRef.current!;
         cacheConversas.current.invalidar(idFora);
+        prefetchMsgs.current.invalidar(idFora);
         setSel(null);
         setConversaCarregadaId(null);
         setSecundariosCarregadosId(null);
@@ -747,10 +755,12 @@ export function AtendInbox() {
         for (const id of vencidas) {
           if (id === selIdRef.current) continue;
           cacheConversas.current.invalidar(id);
+          prefetchMsgs.current.invalidar(id);
         }
         // Quem saiu deste filtro não pode continuar guardado em cache.
         for (const id of idsQueSairam(prev as any, rows as any)) {
           cacheConversas.current.invalidar(id);
+          prefetchMsgs.current.invalidar(id);
         }
         return ordenarPorRecentes(mesclarListaConversas(prev as any, rows as any)) as any[];
       });
@@ -878,15 +888,22 @@ export function AtendInbox() {
     (id: string) => {
       if (!clinicaId || !id) return;
       if (id === selIdRef.current) return;
-      if (cacheConversas.current.obter(id) || prefetchEmCurso.current.has(id)) return;
-      prefetchEmCurso.current.add(id);
+      const chave = chavePrefetch(clinicaId, meuId);
+      if (cacheConversas.current.obter(id) || prefetchMsgs.current.obter(id, chave)) return;
       // Só as mensagens recentes: o suficiente para o chat abrir na hora.
       // Nada de histórico completo nem dados de apoio no prefetch.
-      const p = listarMsgs({ data: { clinicaId, conversaId: id, limit: JANELA_INICIAL } });
-      prefetchMsgs.current.set(id, p as Promise<any[]>);
+      const p = listarMsgs({
+        data: { clinicaId, conversaId: id, limit: JANELA_INICIAL },
+      }) as Promise<any[]>;
+      const entrada = prefetchMsgs.current.registrar(id, chave, p);
       void (async () => {
         try {
-          const m = (await p) as any[];
+          const m = await p;
+          // Se a conversa foi invalidada (mensagem nova, transferência) ou a
+          // clínica/usuário mudou enquanto a busca vinha, o resultado é
+          // descartado — nunca repovoa o cache com conteúdo velho.
+          if (!prefetchMsgs.current.resultadoValido(id, entrada, chavePrefetch(clinicaId, meuId)))
+            return;
           if (!cacheConversas.current.obter(id)) {
             cacheConversas.current.guardar(id, {
               msgs: m,
@@ -897,14 +914,16 @@ export function AtendInbox() {
             });
           }
         } catch {
-          /* prefetch é oportunista: falha não afeta o atendimento */
+          /* prefetch é oportunista: falha não afeta o atendimento e a busca
+             sai do controle no finally, permitindo nova tentativa */
         } finally {
-          prefetchEmCurso.current.delete(id);
+          prefetchMsgs.current.concluir(id, entrada);
         }
       })();
     },
-    [clinicaId, listarMsgs],
+    [clinicaId, meuId, listarMsgs],
   );
+
 
   // Intenção de abrir: o prefetch só dispara depois de ~150ms com o mouse (ou
   // o foco) parado no lead — evita disparar dezenas de buscas ao passar o
@@ -955,17 +974,19 @@ export function AtendInbox() {
         conversaIdUrl: conversaIdUrlRef.current,
       });
 
-    // Se o prefetch desta conversa já está em andamento (hover → clique),
-    // reaproveitamos a mesma busca em vez de pedir as mensagens duas vezes.
+    // Se o pré-carregamento desta conversa já está em andamento (mouse parado
+    // no lead → clique), reaproveitamos a mesma busca em vez de pedir as
+    // mensagens duas vezes. A busca só é reaproveitada se ainda valer para
+    // esta clínica/usuário e para a versão atual da conversa.
+    const chavePf = chavePrefetch(clinicaId, meuId);
     const emVoo =
-      janela === JANELA_INICIAL ? prefetchMsgs.current.get(alvo) : undefined;
+      janela === JANELA_INICIAL ? prefetchMsgs.current.obter(alvo, chavePf)?.promise : undefined;
     const pMensagens = emVoo
       ? emVoo
       : medirRequest(
           "listarMensagensConversa",
           listarMsgs({ data: { clinicaId, conversaId: alvo, limit: janela } }),
         );
-    prefetchMsgs.current.delete(alvo);
     const pContato = medirRequest(
       "obterDadosContato",
       obterContato({ data: { clinicaId, conversaId: alvo } }),
@@ -979,20 +1000,40 @@ export function AtendInbox() {
       listarEventosFn({ data: { clinicaId, conversaId: alvo } }),
     ).catch(() => [] as ConversaEvento[]);
 
+    // Guarda o que as mensagens devolveram: `null` significa que a busca
+    // falhou. Falha nunca é gravada no cache como conversa vazia.
+    let msgsCarregadas: any[] | null = null;
+
     // 1) Caminho crítico — mensagens recentes abrem o chat e o campo de envio.
     const critico = (async () => {
       try {
-        const m = await pMensagens;
+        const m = (await pMensagens) as any[];
+        msgsCarregadas = m;
         marcarTroca("T4_mensagens");
         if (!aindaVale()) return;
         medidor.current?.marcar("dados");
+        setErroMsgs(false);
         setMsgs(m);
         setTemMaisAntigas(podeCarregarMais(m.length, janela));
         setConversaCarregadaId(alvo);
+        // O chat já pode ser reaberto na hora: guarda parcial agora, sem
+        // esperar contato/notas/eventos. Se o conteúdo completo já estiver
+        // guardado, ele é preservado.
+        if (janela === JANELA_INICIAL && !cacheConversas.current.obter(alvo)) {
+          cacheConversas.current.guardar(alvo, {
+            msgs: m,
+            contato: null,
+            notas: [],
+            eventos: [],
+            parcial: true,
+          });
+        }
       } catch (e: any) {
+        if (aindaVale()) setErroMsgs(true);
         mostrarErro(e);
       }
     })();
+
 
     // 2) Segundo plano — contato, notas e eventos entram quando chegarem.
     const secundarios = (async () => {
@@ -1004,6 +1045,7 @@ export function AtendInbox() {
         if (!c) {
           // Conversa não existe mais nesta clínica: limpa a seleção sem quebrar.
           cacheConversas.current.invalidar(alvo);
+          prefetchMsgs.current.invalidar(alvo);
           setSel(null);
           setConversaCarregadaId(null);
           setSecundariosCarregadosId(null);
@@ -1014,17 +1056,23 @@ export function AtendInbox() {
           return;
         }
         const eventosLista = (ev ?? []) as ConversaEvento[];
-        const msgsCache = await pMensagens.catch(() => [] as any[]);
+        await critico;
         // Nova espera → nova checagem. Entre o `await` acima e a publicação a
         // atendente pode ter trocado de conversa; nesse caso nada é gravado
         // no cache nem na tela.
         if (!aindaVale()) return;
-        cacheConversas.current.guardar(alvo, {
-          msgs: msgsCache,
-          contato: c,
-          notas: n,
-          eventos: eventosLista,
-        });
+        // Mensagens que falharam não viram conversa vazia no cache: guardamos
+        // apenas os dados de apoio e o conteúdo continua marcado como parcial.
+        const msgsCache = msgsCarregadas as any[] | null;
+        if (msgsCache) {
+          cacheConversas.current.guardar(alvo, {
+            msgs: msgsCache,
+            contato: c,
+            notas: n,
+            eventos: eventosLista,
+          });
+        }
+
         // FASE 4 — guarda o contato pelo vínculo direto, para reaproveitar em
         // outras conversas do mesmo paciente.
         cacheContatos.current.guardar((c as any)?.paciente?.id, c);
@@ -1175,6 +1223,7 @@ export function AtendInbox() {
     if (!pid || anterior === pid || conversaCarregadaId !== id) return;
     // Vínculo mudou com a conversa já aberta: o cache antigo não vale mais.
     cacheConversas.current.invalidar(id);
+    prefetchMsgs.current.invalidar(id);
     cacheContatos.current.invalidar(anterior);
     (async () => {
       try {
@@ -1189,9 +1238,19 @@ export function AtendInbox() {
     })();
   }, [clinicaId, sel?.id, (sel as any)?.contato_paciente_id, conversaCarregadaId, obterContato]);
 
+  // Troca de clínica ou de usuário: nada guardado ou em voo do contexto
+  // anterior pode reaparecer.
+  useEffect(() => {
+    cacheConversas.current.limpar?.();
+    cacheContatos.current.limpar?.();
+    prefetchMsgs.current.limpar();
+    setErroMsgs(false);
+  }, [clinicaId, meuId]);
+
   // Trocou de conversa: formulários abertos sobre a conversa anterior fecham.
   // Um formulário iniciado em A jamais é reaproveitado em B.
   useEffect(() => {
+    setErroMsgs(false);
     setTransferOpen(false);
     setFecharOpen(false);
     setAgendaOpen(false);
@@ -1550,6 +1609,7 @@ export function AtendInbox() {
       await enviarMsg({ data: { clinicaId, conversaId: origem, text: t } });
       limparRascunhoDe(origem);
       cacheConversas.current.invalidar(origem);
+      prefetchMsgs.current.invalidar(origem);
       if (selIdRef.current === origem) await carregarConversa();
     } catch (e: any) {
       mostrarErro(e);
@@ -1565,6 +1625,7 @@ export function AtendInbox() {
     try {
       await criarNotaFn({ data: { clinicaId, conversaId: origem, conteudo: t } });
       cacheConversas.current.invalidar(origem);
+      prefetchMsgs.current.invalidar(origem);
       if (selIdRef.current !== origem) return;
       setNovaNota("");
       await carregarConversa();
@@ -1598,6 +1659,7 @@ export function AtendInbox() {
         data: { clinicaId, conversaId: origem, userId: userId || null, departamentoId, motivo },
       });
       cacheConversas.current.invalidar(origem);
+      prefetchMsgs.current.invalidar(origem);
       setTransferOpen(false);
       await carregarConvs();
       if (selIdRef.current === origem) await carregarConversa();
@@ -1632,6 +1694,7 @@ export function AtendInbox() {
         },
       });
       cacheConversas.current.invalidar(origem);
+      prefetchMsgs.current.invalidar(origem);
       setFecharOpen(false);
       await carregarConvs();
       if (selIdRef.current === origem) await carregarConversa();
@@ -2088,10 +2151,19 @@ export function AtendInbox() {
                 {clinicaId && conteudoDaConversa && (
                   <ResumoHandoffCard key={sel.id} clinicaId={clinicaId} conversaId={sel.id} />
                 )}
-                {!conteudoDaConversa && <ConversaSkeleton />}
-                {conteudoDaConversa && msgs.length === 0 && (
+                {!conteudoDaConversa && !erroMsgs && <ConversaSkeleton />}
+                {erroMsgs && (
+                  <div className="text-center text-sm text-muted-foreground">
+                    <p>Não foi possível carregar as mensagens desta conversa.</p>
+                    <Button size="sm" variant="outline" className="mt-2" onClick={() => void carregarConversa()}>
+                      Tentar novamente
+                    </Button>
+                  </div>
+                )}
+                {conteudoDaConversa && !erroMsgs && msgs.length === 0 && (
                   <p className="text-sm text-muted-foreground text-center">Sem mensagens.</p>
                 )}
+
                 {(conteudoDaConversa ? timeline : []).map((item, idxTimeline) => {
                   if (item.kind === "evento") {
                     return <ConversationSystemEvent key={`ev-${item.ev.id}`} evento={item.ev} />;
