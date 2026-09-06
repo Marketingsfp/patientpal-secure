@@ -377,85 +377,6 @@ function Pagina() {
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base">Filtros específicos dos erros reportados</CardTitle>
-        </CardHeader>
-        <CardContent className="grid gap-3 p-4 pt-0 md:grid-cols-4">
-          <p className="text-xs text-muted-foreground md:col-span-4">
-            Estes filtros afetam apenas os erros reportados e a seção de aprendizado. Eles não
-            reduzem as mensagens totais do sistema nem os demais números operacionais acima.
-          </p>
-          <div className="space-y-1">
-            <Label>Situação</Label>
-            <Select value={status} onValueChange={setStatus}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value={TODOS}>Todas</SelectItem>
-                {Object.entries(STATUS_ROTULO).map(([v, r]) => (
-                  <SelectItem key={v} value={v}>{r}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-1">
-            <Label>Tipo de erro</Label>
-            <Select value={categoria} onValueChange={setCategoria}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value={TODOS}>Todos</SelectItem>
-                {CATEGORIAS_FEEDBACK_NINA.map((c) => (
-                  <SelectItem key={c.valor} value={c.valor}>{c.rotulo}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-1">
-            <Label>Causa</Label>
-            <Select value={rootCause} onValueChange={setRootCause}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value={TODOS}>Todas</SelectItem>
-                {CAUSAS_RAIZ_NINA.map((c) => (
-                  <SelectItem key={c.valor} value={c.valor}>{c.rotulo}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-1">
-            <Label>Prioridade</Label>
-            <Select value={prioridade} onValueChange={setPrioridade}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value={TODOS}>Todas</SelectItem>
-                {PRIORIDADES_NINA.map((p) => (
-                  <SelectItem key={p.valor} value={p.valor}>{p.rotulo}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-1 md:col-span-2">
-            <Label htmlFor="assunto">Assunto / procedimento</Label>
-            <Input
-              id="assunto"
-              placeholder="Ex.: Cardiologia"
-              value={assunto}
-              onChange={(e) => setAssunto(e.target.value)}
-            />
-            <p className="text-xs text-muted-foreground">
-              Alcance: filtra apenas os erros reportados que têm assunto registrado. Não é aplicado
-              a indicadores sem vínculo confiável com esse assunto.
-            </p>
-          </div>
-          {dados?.recorte?.filtrosErroAtivos ? (
-            <p className="text-xs text-muted-foreground md:col-span-4">
-              Com filtros de erro ativos, a taxa mostra os erros filtrados sobre o total do recorte
-              operacional, que não é reduzido por esses filtros.
-            </p>
-          ) : null}
-        </CardContent>
-      </Card>
-
       {erroConsulta ? (
         <Card className="border-destructive">
           <CardContent className="space-y-2 p-4">
@@ -605,6 +526,85 @@ function Pagina() {
           if (r.horaFim) setHoraFim(r.horaFim);
         }}
       />
+
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base">Filtros específicos dos erros reportados</CardTitle>
+        </CardHeader>
+        <CardContent className="grid gap-3 p-4 pt-0 md:grid-cols-4">
+          <p className="text-xs text-muted-foreground md:col-span-4">
+            Estes filtros afetam apenas os erros reportados e a seção de aprendizado. Eles não
+            reduzem as mensagens totais do sistema nem os demais números operacionais acima.
+          </p>
+          <div className="space-y-1">
+            <Label>Situação</Label>
+            <Select value={status} onValueChange={setStatus}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value={TODOS}>Todas</SelectItem>
+                {Object.entries(STATUS_ROTULO).map(([v, r]) => (
+                  <SelectItem key={v} value={v}>{r}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1">
+            <Label>Tipo de erro</Label>
+            <Select value={categoria} onValueChange={setCategoria}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value={TODOS}>Todos</SelectItem>
+                {CATEGORIAS_FEEDBACK_NINA.map((c) => (
+                  <SelectItem key={c.valor} value={c.valor}>{c.rotulo}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1">
+            <Label>Causa</Label>
+            <Select value={rootCause} onValueChange={setRootCause}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value={TODOS}>Todas</SelectItem>
+                {CAUSAS_RAIZ_NINA.map((c) => (
+                  <SelectItem key={c.valor} value={c.valor}>{c.rotulo}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1">
+            <Label>Prioridade</Label>
+            <Select value={prioridade} onValueChange={setPrioridade}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value={TODOS}>Todas</SelectItem>
+                {PRIORIDADES_NINA.map((p) => (
+                  <SelectItem key={p.valor} value={p.valor}>{p.rotulo}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1 md:col-span-2">
+            <Label htmlFor="assunto">Assunto / procedimento</Label>
+            <Input
+              id="assunto"
+              placeholder="Ex.: Cardiologia"
+              value={assunto}
+              onChange={(e) => setAssunto(e.target.value)}
+            />
+            <p className="text-xs text-muted-foreground">
+              Alcance: filtra apenas os erros reportados que têm assunto registrado. Não é aplicado
+              a indicadores sem vínculo confiável com esse assunto.
+            </p>
+          </div>
+          {dados?.recorte?.filtrosErroAtivos ? (
+            <p className="text-xs text-muted-foreground md:col-span-4">
+              Com filtros de erro ativos, a taxa mostra os erros filtrados sobre o total do recorte
+              operacional, que não é reduzido por esses filtros.
+            </p>
+          ) : null}
+        </CardContent>
+      </Card>
 
       {ind ? (
         <>
