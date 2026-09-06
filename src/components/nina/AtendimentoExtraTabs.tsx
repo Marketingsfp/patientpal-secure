@@ -327,11 +327,12 @@ export function AtendInbox() {
   // Janela de mensagens carregadas da conversa aberta (cresce ao pedir o
   // histórico antigo) + prefetch em andamento + medição de desempenho.
   const janelaRef = useRef(JANELA_INICIAL);
-  const prefetchEmCurso = useRef<Set<string>>(new Set());
-  // Buscas de prefetch em andamento (reaproveitadas quando o lead é clicado
-  // antes de o prefetch terminar) e temporizadores de intenção de abertura.
-  const prefetchMsgs = useRef<Map<string, Promise<any[]>>>(new Map());
+  // FASE 2 — buscas de pré-carregamento em andamento. Elas são reaproveitadas
+  // quando o lead é clicado antes de o pré-carregamento terminar e param de
+  // valer quando a conversa muda ou a clínica/usuário troca.
+  const prefetchMsgs = useRef(criarPrefetchStore<any[]>());
   const prefetchTimers = useRef<Map<string, number>>(new Map());
+
   // Espelho do que está na tela, usado pela atualização incremental.
   const msgsRef = useRef<any[]>([]);
   const conversaCarregadaRef = useRef<string | null>(null);
