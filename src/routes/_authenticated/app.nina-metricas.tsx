@@ -540,8 +540,9 @@ function Pagina() {
               />
             </section>
             <p className="text-xs text-muted-foreground">
-              A taxa é baseada em reportes, inclusive os ainda não confirmados. Não é uma medida
-              definitiva de acurácia da Nina. Ambiente:{" "}
+              A base desta taxa inclui todas as mensagens do sistema de atendimento no período
+              selecionado, não apenas as respostas da Nina. Ela é baseada em reportes, inclusive os
+              ainda não confirmados, e não é uma medida definitiva de acurácia. Ambiente:{" "}
               {op.ambiente === "producao" ? "produção" : "produção + testes"}.
             </p>
             {op.ninaEntrada === 0 ? (
