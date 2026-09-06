@@ -83,41 +83,36 @@ describe("Fase 5 — cenários obrigatórios", () => {
   });
 
   it("administrador abre (e chega ao fim) → não registra leitura", () => {
-    expect(
-      deveRegistrarLeituraAoAbrir({ ...base, userId: "admin", ehGestor: true },
-    ).toBe(false);
+    expect(deveRegistrarLeituraAoAbrir({ ...base, userId: "admin", ehGestor: true })).toBe(false);
     expect(
       deveRegistrarLeituraDeNovas({
         ...base,
         userId: "admin",
         ehGestor: true,
         seguindoFim: true,
-      },
+      }),
     ).toBe(false);
   });
 
   it("abertura pela auditoria/revisão (mensagem antiga) não marca as novas", () => {
-    expect(
-      deveRegistrarLeituraAoAbrir({ ...base, aberturaPorAlvo: true },
-    ).toBe(false);
+    expect(deveRegistrarLeituraAoAbrir({ ...base, aberturaPorAlvo: true })).toBe(false);
   });
 
   it("lendo histórico antigo → novas continuam sinalizadas", () => {
-    expect(deveRegistrarLeituraDeNovas({ ...base, seguindoFim: false }).toBe(false);
+    expect(deveRegistrarLeituraDeNovas({ ...base, seguindoFim: false })).toBe(false);
   });
 
   it("conversa transferida: nova responsável não herda a leitura da anterior", () => {
     // Maria era responsável; após transferir para Jean, o contexto é de Jean,
     // que ainda não tem marcador — a leitura só é registrada quando ele abre.
     expect(
-      deveRegistrarLeituraAoAbrir({ ...base, userId: "jean", atribuidaUserId: "maria" })
-        .registrar,
+      deveRegistrarLeituraAoAbrir({ ...base, userId: "jean", atribuidaUserId: "maria" }),
     ).toBe(false);
     expect(
-      deveRegistrarLeituraAoAbrir({ ...base, userId: "jean", atribuidaUserId: "jean" })
-        .registrar,
+      deveRegistrarLeituraAoAbrir({ ...base, userId: "jean", atribuidaUserId: "jean" }),
     ).toBe(true);
   });
+
 
   it("mensagem que chega durante a gravação não é zerada por resposta antiga", () => {
     const r = aplicarReconciliacao({
