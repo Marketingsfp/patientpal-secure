@@ -29,6 +29,7 @@ import {
   type ConversaEvento,
 } from "@/components/nina/ConversationSystemEvent";
 import { definirSelecaoTeste } from "@/lib/webmcp/selecao-teste";
+import { assinarAtualizacao } from "@/lib/webmcp/atualizacao";
 
 type Lead = {
   id: string;
