@@ -58,7 +58,26 @@ const filtros = z.object({
   prioridade: z.enum(PRIORIDADES).nullish(),
   unidadeId: z.string().uuid().nullish(),
   assunto: z.string().trim().max(120).nullish(),
+  // Produção é o padrão. "todos" inclui homologação/testes, sem misturar em silêncio.
+  ambiente: z.enum(["producao", "todos"]).default("producao"),
 });
+
+/** Retorno da função de banco nina_metricas_operacionais (agregado no servidor). */
+type Operacionais = {
+  mensagensTotais: number;
+  msgsPaciente: number;
+  msgsNina: number;
+  msgsHumano: number;
+  msgsAutomaticas: number;
+  ninaEntrada: number;
+  ninaSaida: number;
+  errosReportados: number;
+  errosSemVinculo: number;
+  agendamentosNina: number;
+  encaminhamentos: number;
+  entradaMedidaDesde: string | null;
+  serie: { periodo: string; mensagens: number; erros: number }[];
+};
 
 type Linha = {
   id: string;
@@ -137,6 +156,54 @@ export const metricasAprendizadoNina = createServerFn({ method: "POST" })
       dentroDoRecorte(e.created_at, recorte),
     );
 
+    // FASE 3 — indicadores operacionais. A soma é feita no banco (função
+    // nina_metricas_operacionais, somente leitura, RLS do usuário), sem trazer
+    // o histórico de mensagens para o navegador nem para este processo.
+    const { data: opBruto, error: erroOp } = await context.supabase.rpc(
+      "nina_metricas_operacionais",
+      {
+        p_clinica: data.clinicaId,
+        p_inicios: recorte.janelas.map((j) => j.inicio),
+        p_fins: recorte.janelas.map((j) => j.fim),
+        p_fuso: recorte.fuso,
+        p_granularidade: data.granularidade,
+        p_incluir_teste: data.ambiente === "todos",
+        p_status: data.status ?? null,
+        p_categoria: data.categoria ?? null,
+        p_root_cause: data.rootCause ?? null,
+        p_prioridade: data.prioridade ?? null,
+        p_unidade: data.unidadeId ?? null,
+        p_assunto: data.assunto ?? null,
+      } as never,
+    );
+    if (erroOp) throw new Error(erroOp.message);
+    const op = (opBruto ?? null) as Operacionais | null;
+    const mensagensTotais = op?.mensagensTotais ?? 0;
+    const errosSistema = op?.errosReportados ?? 0;
+    const operacionais = {
+      mensagensTotais,
+      msgsPaciente: op?.msgsPaciente ?? 0,
+      msgsNina: op?.msgsNina ?? 0,
+      msgsHumano: op?.msgsHumano ?? 0,
+      msgsAutomaticas: op?.msgsAutomaticas ?? 0,
+      // Participação da Nina = recebidas processadas + respostas enviadas.
+      ninaEntrada: op?.ninaEntrada ?? 0,
+      ninaSaida: op?.ninaSaida ?? 0,
+      ninaParticipacao: (op?.ninaEntrada ?? 0) + (op?.ninaSaida ?? 0),
+      // Sem registro de vínculo, a quantidade de recebidas processadas não é
+      // estimada: fica indisponível e a tela mostra a limitação.
+      entradaMedidaDesde: op?.entradaMedidaDesde ?? null,
+      errosReportados: errosSistema,
+      errosSemVinculo: op?.errosSemVinculo ?? 0,
+      agendamentosNina: op?.agendamentosNina ?? 0,
+      encaminhamentos: op?.encaminhamentos ?? 0,
+      taxaErroSistema: mensagensTotais ? (errosSistema / mensagensTotais) * 100 : null,
+      ambiente: data.ambiente,
+    };
+    const serieOperacional = new Map(
+      (op?.serie ?? []).map((p) => [p.periodo, p] as const),
+    );
+
     const porStatus = contar(STATUS, itens.map((i) => i.status));
     const porCausa = contar(
       CAUSAS,
@@ -188,12 +255,22 @@ export const metricasAprendizadoNina = createServerFn({ method: "POST" })
       garantir(baldeLocal(e.created_at, data.granularidade, recorte.fuso)).execucoes += 1;
 
 
+    for (const p of serieOperacional.values()) garantir(p.periodo);
+
     const evolucao = [...serie.values()]
       .sort((a, b) => a.periodo.localeCompare(b.periodo))
-      .map((p) => ({
-        ...p,
-        taxaErro: p.execucoes ? (p.reportados / p.execucoes) * 100 : null,
-      }));
+      .map((p) => {
+        const o = serieOperacional.get(p.periodo);
+        const mensagens = o?.mensagens ?? 0;
+        const erros = o?.erros ?? 0;
+        return {
+          ...p,
+          mensagens,
+          errosSistema: erros,
+          // Taxa oficial: erros pela data da mensagem original ÷ mensagens totais.
+          taxaErro: mensagens ? (erros / mensagens) * 100 : null,
+        };
+      });
 
     // Problemas recorrentes: assunto + tipo de erro.
     const grupos = new Map<
