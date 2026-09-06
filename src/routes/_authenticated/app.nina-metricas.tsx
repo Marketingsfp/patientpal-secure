@@ -229,6 +229,7 @@ function Pagina() {
   );
 
   const ind = dados?.indicadores;
+  const op = dados?.operacionais;
 
   return (
     <div className="space-y-6 p-4 md:p-6">
