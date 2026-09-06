@@ -1,4 +1,4 @@
-import { createFileRoute, useLocation, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Outlet, useLocation, useNavigate } from "@tanstack/react-router";
 import { confirmDialog } from "@/lib/confirm";
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import {
@@ -94,7 +94,15 @@ import {
 } from "@/components/nina/AtendimentoExtraTabs";
 
 export const Route = createFileRoute("/_authenticated/app/nina")({
-  component: NinaPage,
+  // A rota filha /app/nina/<id> só existe para dar endereço próprio a cada
+  // conversa; sem o <Outlet /> o roteador não encontra a rota e mostra
+  // "Not Found" ao abrir o link direto.
+  component: () => (
+    <>
+      <NinaPage />
+      <Outlet />
+    </>
+  ),
   head: () => ({ meta: [{ title: "Nina — WhatsApp — ClinicaOS" }] }),
 });
 

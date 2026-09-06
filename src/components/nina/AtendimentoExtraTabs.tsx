@@ -252,6 +252,10 @@ export function AtendInbox() {
   const [secundariosCarregadosId, setSecundariosCarregadosId] = useState<string | null>(null);
   const selIdRef = useRef<string | null>(null);
   selIdRef.current = sel?.id ?? null;
+  // A conversa aberta é lida por referência dentro da recarga da lista: assim
+  // abrir uma conversa não recria a função e não dispara recargas em cadeia.
+  const selRef = useRef<any>(null);
+  selRef.current = sel;
   const conteudoDaConversa = !!sel?.id && conversaCarregadaId === sel.id;
   const dadosSecundariosProntos = !!sel?.id && secundariosCarregadosId === sel.id;
   // Enquanto a conversa selecionada não terminou de carregar, todas as ações
@@ -698,7 +702,7 @@ export function AtendInbox() {
       if (deepLinkPendente.current && selIdRef.current !== deepLinkPendente.current)
         deepLinkPendente.current = null;
       const removeu = selecaoDeveSair({
-        selecionada: (sel as any) ?? null,
+        selecionada: (selRef.current as any) ?? null,
         linhas: rows as any,
         buscando: !!busca,
         ctx: ctxEscopo,
@@ -747,10 +751,10 @@ export function AtendInbox() {
       if (
         devoAutoSelecionarComUrl({
           conversaIdUrl: conversaIdUrlRef.current,
-          temSelecao: !!sel,
+          temSelecao: !!selRef.current,
           removeuAgora: removeu,
           temPrimeiraLinha: devoAutoSelecionar({
-            temSelecao: !!sel,
+            temSelecao: !!selRef.current,
             removeuAgora: removeu,
             primeiraLinha: rows[0] as LinhaInbox,
           }),
@@ -764,7 +768,7 @@ export function AtendInbox() {
     } catch (e: any) {
       mostrarErro(e);
     }
-  }, [clinicaId, filtroStatus, busca, escopo, listarConvs, sel, carregarContadores, meuId, souGestor, abrirPelaUrl]);
+  }, [clinicaId, filtroStatus, busca, escopo, listarConvs, carregarContadores, meuId, souGestor, abrirPelaUrl]);
 
   // FASE 1 — a conversa aberta é sempre a do endereço. Quando o
   // conversationId da URL muda (clique, voltar/avançar do navegador, link
@@ -1075,9 +1079,13 @@ export function AtendInbox() {
     conversaCarregadaRef.current = conversaCarregadaId;
   }, [conversaCarregadaId]);
 
+  // A lista só é recarregada quando algo dela muda de verdade (clínica,
+  // filtro, busca, usuário). Abrir uma conversa não recarrega a lista.
+  const carregarConvsRef = useRef(carregarConvs);
+  carregarConvsRef.current = carregarConvs;
   useEffect(() => {
-    carregarConvs();
-  }, [carregarConvs]);
+    void carregarConvsRef.current();
+  }, [clinicaId, filtroStatus, busca, escopo, meuId, souGestor]);
   // O responsável pode mudar a qualquer momento (transferência, distribuição
   // automática, tomada por outra pessoa). A lista chega por Realtime, então a
   // conversa aberta sempre acompanha o que está gravado no banco.
@@ -1135,6 +1143,37 @@ export function AtendInbox() {
     setNotas([]);
   }, [sel?.id]);
 
+
+  // FASE 5 — o vínculo da conversa com o paciente pode nascer depois (cadastro
+  // rápido, vínculo manual, identificação pela Nina). Quando o Realtime traz
+  // esse vínculo novo, o painel de contato se atualiza sozinho, sem recarregar.
+  const vinculoRef = useRef<string | null>(null);
+  useEffect(() => {
+    const id = sel?.id;
+    const pid = ((sel as any)?.contato_paciente_id ?? null) as string | null;
+    if (!id) {
+      vinculoRef.current = null;
+      return;
+    }
+    const anterior = vinculoRef.current;
+    vinculoRef.current = pid;
+    if (!pid || anterior === pid || conversaCarregadaId !== id) return;
+    // Vínculo mudou com a conversa já aberta: o cache antigo não vale mais.
+    cacheConversas.current.invalidar(id);
+    cacheContatos.current.invalidar(anterior);
+    (async () => {
+      try {
+        const c = await obterContato({ data: { clinicaId, conversaId: id } });
+        if (selIdRef.current !== id) return;
+        cacheContatos.current.guardar((c as any)?.paciente?.id, c);
+        setContato(c as any);
+        setSecundariosCarregadosId(id);
+      } catch (e: any) {
+        console.warn("[atendimento] revalidar contato:", e?.message ?? e);
+      }
+    })();
+  }, [clinicaId, sel?.id, (sel as any)?.contato_paciente_id, conversaCarregadaId, obterContato]);
+
   useEffect(() => {
     carregarConversa();
   }, [carregarConversa]);
@@ -1187,7 +1226,29 @@ export function AtendInbox() {
     return () => clearInterval(t);
   }, [carregarEspera]);
 
-  useRealtimeRefresh(["atend_conversas", "whatsapp_mensagens"], carregarConvs, !!clinicaId);
+  // Uma rajada de mensagens novas gerava várias recargas seguidas da lista,
+  // que disputavam espaço com a abertura da conversa. Agora as atualizações
+  // próximas são agrupadas em uma única recarga.
+  const recargaListaRef = useRef<number | null>(null);
+  const recarregarListaAgrupado = useCallback(() => {
+    if (recargaListaRef.current !== null) window.clearTimeout(recargaListaRef.current);
+    recargaListaRef.current = window.setTimeout(() => {
+      recargaListaRef.current = null;
+      void carregarConvs();
+    }, 500);
+  }, [carregarConvs]);
+  useEffect(
+    () => () => {
+      if (recargaListaRef.current !== null) window.clearTimeout(recargaListaRef.current);
+    },
+    [],
+  );
+
+  useRealtimeRefresh(
+    ["atend_conversas", "whatsapp_mensagens"],
+    recarregarListaAgrupado,
+    !!clinicaId,
+  );
   useRealtimeRefresh(["whatsapp_mensagens"], carregarEspera, !!clinicaId);
   useRealtimeRefresh(
     ["whatsapp_mensagens", "atend_conversa_eventos"],
