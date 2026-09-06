@@ -1585,6 +1585,8 @@ async function executarFerramentaInterna(
           // `appointment_id`.
           success: true,
           appointment_id: r.id,
+          // Gerado no banco só depois da gravação conferida.
+          protocolo: await protocoloDoAgendamento(ctx),
           patient_id: (conferido as { paciente_id: string | null }).paciente_id,
           doctor_id: (conferido as { medico_id: string | null }).medico_id,
           unit_id: (conferido as { clinica_id: string }).clinica_id,
