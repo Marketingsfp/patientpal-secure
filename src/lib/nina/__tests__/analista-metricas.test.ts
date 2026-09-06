@@ -172,10 +172,45 @@ describe("validação da resposta", () => {
     expect(r.valida).toBe(false);
   });
 
-  it("rejeita resposta sem nenhuma consulta executada", () => {
-    const r = validarResposta(respostaBase(), new Map());
+  it("rejeita resposta que cita números sem nenhuma consulta executada", () => {
+    const r = validarResposta(
+      respostaBase({
+        indicadores: [
+          { chave: "mensagensTotais", rotulo: "Mensagens", valor: 10, consulta_id: "x", periodo: "p" },
+        ] as any,
+      }),
+      new Map(),
+    );
     expect(r.valida).toBe(false);
     expect(r.problemas[0].campo).toBe("consultas");
+  });
+
+  it("aceita recusa sem consulta e sem números (pedido fora do escopo autorizado)", () => {
+    expect(validarResposta(respostaBase(), new Map()).valida).toBe(true);
+  });
+
+  it("aceita o id técnico do período como apelido da consulta", () => {
+    const permitidosAlias = valoresPermitidos([
+      {
+        id: "consulta_1",
+        dados: { ...dadosConsulta, periodos: [{ ...dadosConsulta.periodos[0], consultaId: "rpc_42" }] },
+      },
+    ]);
+    const r = validarResposta(
+      respostaBase({
+        indicadores: [
+          {
+            chave: "mensagensTotais",
+            rotulo: "Mensagens",
+            valor: 200,
+            consulta_id: "rpc_42",
+            periodo: "p",
+          },
+        ] as any,
+      }),
+      permitidosAlias,
+    );
+    expect(r.valida).toBe(true);
   });
 
   it("aceita pedido de esclarecimento sem consulta, desde que a pergunta exista", () => {
