@@ -140,7 +140,7 @@ import {
   assumirConversa,
 } from "@/lib/atendimento.functions";
 import { FilaHumana } from "@/components/nina/FilaHumana";
-import { destinoConversa } from "@/lib/atendimento/abrir-conversa";
+import { destinoConversa, idConversaDaUrl } from "@/lib/atendimento/abrir-conversa";
 import { AgendaConversaDrawer } from "@/components/nina/AgendaConversaDrawer";
 import { ConversaSkeleton, ContatoSkeleton } from "@/components/nina/ConversaSkeleton";
 import {
@@ -166,7 +166,7 @@ import {
   marcarTroca,
   medirRequest,
 } from "@/lib/atendimento/perf-troca";
-import { useNavigate, useParams } from "@tanstack/react-router";
+import { useLocation, useNavigate, useParams } from "@tanstack/react-router";
 import {
   acaoPermitida,
   gravarRascunho,
@@ -327,7 +327,11 @@ export function AtendInbox() {
   // está aberta. O clique só navega; a seleção vem sempre do endereço.
   const navigate = useNavigate();
   const rotaParams = useParams({ strict: false }) as { conversationId?: string };
-  const conversaIdUrl = rotaParams?.conversationId ?? null;
+  // A Inbox fica na rota-mãe /app/nina, que não recebe o parâmetro da rota
+  // filha; por isso o endereço é lido também pelo caminho da página.
+  const caminhoAtual = useLocation({ select: (l: any) => l.pathname as string });
+  const conversaIdUrl = rotaParams?.conversationId ?? idConversaDaUrl(caminhoAtual);
+
   const abrirPelaUrl = useCallback(
     (id: string | null, replace = false) => {
       // Função central (Fase 5): todo módulo abre conversa por este caminho.
@@ -2121,7 +2125,10 @@ export function AtendInbox() {
                 placeholder="Buscar nome, telefone ou # da conversa…"
               />
             </div>
-            {resultadoNumero && (
+            {/* Sem "#" (ex.: telefone), só aparece quando REALMENTE achou o
+                número: nada de avisar "não encontrei" em busca de texto. */}
+            {resultadoNumero &&
+              (buscaInterp.exigeNumero || resultadoNumero.estado === "ok") && (
               <div className="rounded-md border border-atd-border bg-atd-blue-tint/40 p-2 text-xs">
                 {resultadoNumero.estado === "carregando" && (
                   <span className="text-muted-foreground">Procurando pelo número…</span>
