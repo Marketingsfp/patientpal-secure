@@ -21,6 +21,7 @@ import {
 import { useServerFn } from "@tanstack/react-start";
 import { useClinica } from "@/hooks/use-clinica";
 import { usePodeEscrever } from "@/hooks/use-permissoes";
+import { useWebmcpContexto } from "@/hooks/use-webmcp-contexto";
 import { registrarFeedbackNina } from "@/lib/nina/aprendizado.functions";
 import { BaseConhecimento } from "@/components/nina/BaseConhecimento";
 
