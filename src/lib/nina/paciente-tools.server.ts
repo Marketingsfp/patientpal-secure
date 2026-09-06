@@ -1396,6 +1396,8 @@ async function executarFerramentaInterna(
           return {
             ok: true,
             duplicado: true,
+            // Mesmo atendimento: reaproveita o protocolo já gerado.
+            protocolo: await protocoloDoAgendamento(ctx),
             agendamento: {
               data: formatarData(p.inicio),
               hora: formatarHora(p.inicio),
