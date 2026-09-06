@@ -1385,19 +1385,39 @@ export const listarUsuariosClinica = createServerFn({ method: "POST" })
       .eq("ativo", true);
     if (error) throw new Error(error.message);
     const userIds = (rows ?? []).map((r: any) => r.user_id);
-    const { data: profs } = userIds.length
-      ? await context.supabase.from("profiles").select("id, nome").in("id", userIds)
-      : { data: [] as any[] };
+    const [{ data: profs }, { data: pres }, { data: pausas }] = await Promise.all([
+      userIds.length
+        ? context.supabase.from("profiles").select("id, nome").in("id", userIds)
+        : Promise.resolve({ data: [] as any[] }),
+      context.supabase
+        .from("atend_agente_presenca")
+        .select("user_id, status, visto_em")
+        .eq("clinica_id", data.clinicaId),
+      context.supabase
+        .from("atend_pausas_log")
+        .select("user_id")
+        .eq("clinica_id", data.clinicaId)
+        .is("finalizada_em", null),
+    ]);
     const nomeMap = new Map((profs ?? []).map((p: any) => [p.id, p.nome]));
+    const presMap = new Map((pres ?? []).map((p: any) => [p.user_id, p]));
+    const emPausa = new Set((pausas ?? []).map((p: any) => p.user_id));
     // Administrador não aparece como destinatário de atendimento.
     return apenasDestinatariosValidos(
       (rows ?? []).map((r: any) => ({
         user_id: r.user_id,
         role: r.role as string | null,
         nome: nomeMap.get(r.user_id) ?? r.user_id,
+        // Presença vem da fonte já existente (atend_agente_presenca + pausas).
+        presenca: statusPresenca({
+          status: presMap.get(r.user_id)?.status ?? null,
+          vistoEm: presMap.get(r.user_id)?.visto_em ?? null,
+          emPausa: emPausa.has(r.user_id),
+        }),
       })),
     );
   });
+
 
 /* =========================================================
  *  PAINEL — métricas do dia
