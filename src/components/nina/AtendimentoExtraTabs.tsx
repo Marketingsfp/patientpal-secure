@@ -346,6 +346,11 @@ export function AtendInbox() {
   const [erroMsgs, setErroMsgs] = useState(false);
   const [temMaisAntigas, setTemMaisAntigas] = useState(false);
   const temMaisAntigasRef = useRef(false);
+  // FASE 3 — coordenação entre abertura, sincronização e tempo real.
+  const aberturaEmAndamentoRef = useRef<{ conversaId: string; pedido: number } | null>(null);
+  const syncPendenteRef = useRef(false);
+  const apoioPendenteRef = useRef(false);
+  const syncEmVooRef = useRef<{ conversaId: string; promise: Promise<void> } | null>(null);
 
   const [carregandoAntigas, setCarregandoAntigas] = useState(false);
   const seqEspera = useRef(0);
@@ -1162,6 +1167,7 @@ export function AtendInbox() {
       await carregarConversa();
       return;
     }
+    const execucao = (async () => {
     try {
       const [novas, ev] = await Promise.all([
         listarMsgs({
@@ -1188,7 +1194,48 @@ export function AtendInbox() {
       // Falha na sincronização não derruba o atendimento: a próxima tentativa
       // (Realtime ou rede de segurança) resolve.
     }
+    })();
+    syncEmVooRef.current = { conversaId: alvo, promise: execucao };
+    try {
+      await execucao;
+    } finally {
+      if (syncEmVooRef.current?.promise === execucao) syncEmVooRef.current = null;
+    }
   }, [clinicaId, listarMsgs, listarEventosFn, carregarConversa]);
+
+  // Apoio da conversa aberta (notas internas e eventos): antes uma nota nova
+  // recarregava a conversa inteira. Agora só o painel de apoio é atualizado.
+  const carregarApoio = useCallback(async () => {
+    const alvo = selIdRef.current;
+    if (!clinicaId || !alvo) return;
+    if (aberturaEmAndamentoRef.current) {
+      apoioPendenteRef.current = true;
+      return;
+    }
+    try {
+      const [n, ev] = await Promise.all([
+        listarNotasFn({ data: { clinicaId, conversaId: alvo } }).catch(() => null as any),
+        listarEventosFn({ data: { clinicaId, conversaId: alvo } }).catch(
+          () => null as ConversaEvento[] | null,
+        ),
+      ]);
+      if (selIdRef.current !== alvo) return;
+      if (conversaIdUrlRef.current && conversaIdUrlRef.current !== alvo) return;
+      if (n) {
+        setNotas(n as any[]);
+        const guardado = cacheConversas.current.obter(alvo);
+        if (guardado) cacheConversas.current.guardar(alvo, { ...guardado, notas: n as any[] });
+      }
+      if (ev) setEventos((prev) => mesclarEventos(prev, ev as ConversaEvento[]));
+    } catch {
+      /* apoio é auxiliar: falha não derruba o atendimento */
+    }
+  }, [clinicaId, listarNotasFn, listarEventosFn]);
+
+  const sincronizarConversaRef = useRef(sincronizarConversa);
+  sincronizarConversaRef.current = sincronizarConversa;
+  const carregarApoioRef = useRef(carregarApoio);
+  carregarApoioRef.current = carregarApoio;
 
   useEffect(() => {
     msgsRef.current = msgs;
