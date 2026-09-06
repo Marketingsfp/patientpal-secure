@@ -28,6 +28,7 @@ import {
   ConversationSystemEvent,
   type ConversaEvento,
 } from "@/components/nina/ConversationSystemEvent";
+import { definirSelecaoTeste } from "@/lib/webmcp/selecao-teste";
 
 type Lead = {
   id: string;
@@ -109,6 +110,16 @@ export function ConsoleTesteNina() {
   // Estado estruturado do fluxo (homologação): mostra por que a Nina
   // perguntou — ou deixou de perguntar — algo.
   const [debugEstado, setDebugEstado] = useState<Record<string, unknown> | null>(null);
+
+  // Informa à ferramenta WebMCP de leitura qual lead de homologação está
+  // aberto. Guarda só identificadores e o nome fictício do lead.
+  useEffect(() => {
+    const lead = leads.find((l) => l.id === leadId) ?? null;
+    definirSelecaoTeste(
+      lead ? { leadId: lead.id, leadNome: lead.nome, conversaId } : null,
+    );
+    return () => definirSelecaoTeste(null);
+  }, [leadId, conversaId, leads]);
 
   const carregarLeads = useCallback(async () => {
     if (!clinicaId) return;
