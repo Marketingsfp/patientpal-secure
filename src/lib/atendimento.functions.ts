@@ -2377,6 +2377,19 @@ export const assumirConversa = createServerFn({ method: "POST" })
       evento: "ASSUMIDA",
       userId: context.userId,
     });
+    // Encaminhamento da Nina concluído por quem assumiu na fila.
+    try {
+      const { protocoloAoAtribuirHumano } = await import(
+        "@/lib/atendimento/protocolo-atendimento.server"
+      );
+      await protocoloAoAtribuirHumano({
+        clinicaId: data.clinicaId,
+        conversaId: data.conversaId,
+        userId: context.userId,
+      });
+    } catch (e) {
+      console.error("[atendimento] protocolo ao assumir", e);
+    }
     return {
       ok: true as const,
       motivo: null,
