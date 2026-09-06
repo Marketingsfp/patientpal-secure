@@ -126,7 +126,11 @@ import {
   assumirConversa,
   marcarLida,
 } from "@/lib/atendimento.functions";
-import { deveRegistrarLeituraAoAbrir } from "@/lib/atendimento/leitura-inbox";
+import {
+  aplicarReconciliacao,
+  deveRegistrarLeituraAoAbrir,
+  deveRegistrarLeituraDeNovas,
+} from "@/lib/atendimento/leitura-inbox";
 
 import { FilaHumana } from "@/components/nina/FilaHumana";
 import { idConversaValido } from "@/lib/atendimento/abrir-conversa";
