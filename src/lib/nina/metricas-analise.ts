@@ -166,3 +166,68 @@ export const DEFINICOES_INDICADORES: Record<string, string> = {
   agendamentosNina: "Agendamentos concluídos pela Nina, pela data da conclusão.",
   encaminhamentos: "Encaminhamentos para atendimento humano iniciados pela Nina.",
 };
+
+export type ComparacaoIndicador = {
+  chave: string;
+  a: number;
+  b: number;
+  diferencaAbsoluta: number;
+  /** Variação percentual de A para B. Null quando A é zero (sem base). */
+  variacaoPercentual: number | null;
+};
+
+/**
+ * Compara indicadores de dois períodos de forma determinística.
+ * O modelo não faz aritmética: ele apenas cita estes valores.
+ */
+export function compararIndicadores(
+  a: Record<string, unknown>,
+  b: Record<string, unknown>,
+): ComparacaoIndicador[] {
+  const chaves = new Set([...Object.keys(a), ...Object.keys(b)]);
+  const saida: ComparacaoIndicador[] = [];
+  for (const chave of chaves) {
+    const va = Number(a[chave]);
+    const vb = Number(b[chave]);
+    if (!Number.isFinite(va) || !Number.isFinite(vb)) continue;
+    saida.push({
+      chave,
+      a: va,
+      b: vb,
+      diferencaAbsoluta: vb - va,
+      variacaoPercentual: va === 0 ? null : ((vb - va) / va) * 100,
+    });
+  }
+  return saida.sort((x, y) => x.chave.localeCompare(y.chave));
+}
+
+/**
+ * Compara duas taxas de erro. Diferença de taxas é em PONTOS PERCENTUAIS;
+ * a variação relativa é percentual. Os dois campos vêm separados de propósito.
+ */
+export function compararTaxas(
+  a: { valor?: number | null; numerador?: number; denominador?: number } | null,
+  b: { valor?: number | null; numerador?: number; denominador?: number } | null,
+): {
+  taxaA: number | null;
+  taxaB: number | null;
+  diferencaPontosPercentuais: number | null;
+  variacaoPercentual: number | null;
+} {
+  const ta = a?.valor ?? null;
+  const tb = b?.valor ?? null;
+  if (ta === null || tb === null) {
+    return {
+      taxaA: ta,
+      taxaB: tb,
+      diferencaPontosPercentuais: null,
+      variacaoPercentual: null,
+    };
+  }
+  return {
+    taxaA: ta,
+    taxaB: tb,
+    diferencaPontosPercentuais: tb - ta,
+    variacaoPercentual: ta === 0 ? null : ((tb - ta) / ta) * 100,
+  };
+}

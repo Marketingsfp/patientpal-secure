@@ -16,6 +16,8 @@ import { resolverRecorte, descricaoRecorte } from "@/lib/nina/metricas-filtros";
 import {
   DEFINICOES_INDICADORES,
   VERSAO_REGRAS_ANALISE,
+  compararIndicadores,
+  compararTaxas,
   consolidarTaxaErro,
   mediaPorDia,
   mediaPorHora,
@@ -146,51 +148,67 @@ async function consultarPeriodo(
 }
 
 /**
+ * Núcleo da consulta analítica (um ou dois períodos). Usado tanto pela função
+ * pública abaixo quanto pela ferramenta autorizada do analista, para que os
+ * dois caminhos usem exatamente a mesma fonte de verdade.
+ *
+ * Todas as comparações são calculadas AQUI, de forma determinística: o modelo
+ * nunca precisa fazer aritmética.
+ */
+export async function executarConsultaMetricas(context: any, data: Entrada) {
+  const agora = new Date();
+  const periodos = [];
+  for (const p of data.periodos) {
+    periodos.push(await consultarPeriodo(context, data, p, agora));
+  }
+
+  // Consolidação: soma numeradores e denominadores antes de dividir.
+  const consolidado = consolidarTaxaErro(
+    periodos.map((p) => ({
+      numerador: p.taxaErro?.numerador ?? 0,
+      denominador: p.taxaErro?.denominador ?? 0,
+    })),
+  );
+
+  return {
+    versaoRegras: VERSAO_REGRAS_ANALISE,
+    geradoEm: agora.toISOString(),
+    definicoes: DEFINICOES_INDICADORES,
+    periodos,
+    consolidado,
+    comparacao:
+      periodos.length === 2
+        ? {
+            // Duração diferente é normal: os totais vêm acompanhados das
+            // médias por dia e por hora efetivamente incluídos.
+            a: periodos[0].rotulo,
+            b: periodos[1].rotulo,
+            diasA: periodos[0].cobertura.dias,
+            diasB: periodos[1].cobertura.dias,
+            horasA: periodos[0].cobertura.horas,
+            horasB: periodos[1].cobertura.horas,
+            duracoesIguais:
+              periodos[0].cobertura.dias === periodos[1].cobertura.dias &&
+              periodos[0].cobertura.horas === periodos[1].cobertura.horas,
+            indicadores: compararIndicadores(
+              periodos[0].indicadores ?? {},
+              periodos[1].indicadores ?? {},
+            ),
+            taxaErro: compararTaxas(periodos[0].taxaErro, periodos[1].taxaErro),
+          }
+        : null,
+  };
+}
+
+/**
  * Consulta analítica: um período, ou dois quando a pergunta é comparativa.
  * Reaproveita exatamente a mesma fonte de verdade dos cards do painel.
  */
 export const consultarMetricasNina = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) => entrada.parse(i))
-  .handler(async ({ data, context }) => {
-    const agora = new Date();
-    const periodos = [];
-    for (const p of data.periodos) {
-      periodos.push(await consultarPeriodo(context, data, p, agora));
-    }
+  .handler(async ({ data, context }) => executarConsultaMetricas(context, data));
 
-    // Consolidação: soma numeradores e denominadores antes de dividir.
-    const consolidado = consolidarTaxaErro(
-      periodos.map((p) => ({
-        numerador: p.taxaErro?.numerador ?? 0,
-        denominador: p.taxaErro?.denominador ?? 0,
-      })),
-    );
-
-    return {
-      versaoRegras: VERSAO_REGRAS_ANALISE,
-      geradoEm: agora.toISOString(),
-      definicoes: DEFINICOES_INDICADORES,
-      periodos,
-      consolidado,
-      comparacao:
-        periodos.length === 2
-          ? {
-              // Duração diferente é normal: os totais vêm acompanhados das
-              // médias por dia e por hora efetivamente incluídos.
-              a: periodos[0].rotulo,
-              b: periodos[1].rotulo,
-              diasA: periodos[0].cobertura.dias,
-              diasB: periodos[1].cobertura.dias,
-              horasA: periodos[0].cobertura.horas,
-              horasB: periodos[1].cobertura.horas,
-              duracoesIguais:
-                periodos[0].cobertura.dias === periodos[1].cobertura.dias &&
-                periodos[0].cobertura.horas === periodos[1].cobertura.horas,
-            }
-          : null,
-    };
-  });
 
 /**
  * Configuração de calendário e faixas usada pela análise. Sem configuração,
