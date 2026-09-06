@@ -104,6 +104,22 @@ export const listarRevisaoFeedbackNina = createServerFn({ method: "POST" })
       pessoas = Object.fromEntries((perfis ?? []).map((p) => [p.id, p.nome ?? "—"]));
     }
 
+    // Código amigável (#numero) das conversas citadas, para exibir junto ao ID.
+    const conversas: Record<string, number> = {};
+    const idsConversa = Array.from(
+      new Set(itens.map((l) => l.conversa_id).filter(Boolean) as string[]),
+    );
+    if (idsConversa.length) {
+      const { data: convs } = await context.supabase
+        .from("atend_conversas")
+        .select("id, numero_conversa")
+        .in("id", idsConversa);
+      for (const c of convs ?? []) {
+        if (c.numero_conversa != null) conversas[c.id] = Number(c.numero_conversa);
+      }
+    }
+
+
     // Contagem por situação (para as abas), respeitando os demais filtros.
     const contagens: Record<string, number> = {};
     for (const s of STATUS) contagens[s] = 0;
@@ -134,7 +150,7 @@ export const listarRevisaoFeedbackNina = createServerFn({ method: "POST" })
       if (k) ocorrencias[k] = (ocorrencias[k] ?? 0) + 1;
     }
 
-    return { itens, pessoas, contagens, ocorrencias };
+    return { itens, pessoas, contagens, ocorrencias, conversas };
   });
 
 /** Lista quem já reportou erros na clínica — alimenta o filtro por atendente. */

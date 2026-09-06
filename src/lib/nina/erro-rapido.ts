@@ -115,3 +115,35 @@ export function avisoReporte(
     ? { tipo: "duplicado", texto: TEXTO_REPORTE_DUPLICADO }
     : { tipo: "sucesso", texto: TEXTO_REPORTE_SUCESSO };
 }
+
+/** Item vindo do reporte de um clique (X vermelho). */
+export function ehReporteRapido(origem: string | null | undefined): boolean {
+  return origem === ORIGEM_ERRO_RAPIDO;
+}
+
+/** Identificador da conversa exibido na revisão: código amigável + ID do sistema. */
+export function rotuloConversaReporte(
+  conversaId: string | null | undefined,
+  numero?: number | null,
+): string {
+  if (!conversaId) return "—";
+  return numero ? `#${numero} · ${conversaId}` : conversaId;
+}
+
+/**
+ * Insere/atualiza um item na lista sem duplicar quando a resposta da
+ * requisição e o evento em tempo real chegam para o mesmo registro.
+ */
+export function mesclarReporte<T extends { id: string; created_at?: string }>(
+  itens: T[],
+  novo: T,
+): T[] {
+  const i = itens.findIndex((x) => x.id === novo.id);
+  if (i >= 0) {
+    const copia = itens.slice();
+    copia[i] = { ...itens[i], ...novo };
+    return copia;
+  }
+  return [novo, ...itens];
+}
+
