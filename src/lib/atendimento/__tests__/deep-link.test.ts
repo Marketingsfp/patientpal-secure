@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { devoAutoSelecionarComUrl, escopoParaConversa } from "../deep-link";
+import { devoAutoSelecionarComSelecao, escopoParaConversa } from "../deep-link";
 
 const JEAN = "11111111-1111-1111-1111-111111111111";
 const MARIA = "22222222-2222-2222-2222-222222222222";
@@ -7,8 +7,8 @@ const MARIA = "22222222-2222-2222-2222-222222222222";
 describe("deep link da conversa", () => {
   it("não escolhe outra conversa quando o endereço já aponta uma (F5/link colado)", () => {
     expect(
-      devoAutoSelecionarComUrl({
-        conversaIdUrl: "abc",
+      devoAutoSelecionarComSelecao({
+        selecaoAtual: "abc",
         temSelecao: false,
         removeuAgora: false,
         temPrimeiraLinha: true,
@@ -18,16 +18,16 @@ describe("deep link da conversa", () => {
 
   it("sem conversa no endereço, mantém a seleção automática antiga", () => {
     expect(
-      devoAutoSelecionarComUrl({
-        conversaIdUrl: null,
+      devoAutoSelecionarComSelecao({
+        selecaoAtual: null,
         temSelecao: false,
         removeuAgora: false,
         temPrimeiraLinha: true,
       }),
     ).toBe(true);
     expect(
-      devoAutoSelecionarComUrl({
-        conversaIdUrl: null,
+      devoAutoSelecionarComSelecao({
+        selecaoAtual: null,
         temSelecao: true,
         removeuAgora: false,
         temPrimeiraLinha: true,

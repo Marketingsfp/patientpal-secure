@@ -182,7 +182,7 @@ import {
   formatarNumeroConversa,
   interpretarBuscaConversa,
 } from "@/lib/atendimento/numero-conversa";
-import { devoAutoSelecionarComUrl, escopoParaConversa } from "@/lib/atendimento/deep-link";
+import { devoAutoSelecionarComSelecao, escopoParaConversa } from "@/lib/atendimento/deep-link";
 import {
   avisoSaidaEscopo,
   devoAutoSelecionar,
@@ -824,8 +824,8 @@ export function AtendInbox() {
       // Com uma conversa já escolhida (ou pedida por outro módulo), a tela
       // nunca troca sozinha para outra.
       if (
-        devoAutoSelecionarComUrl({
-          conversaIdUrl: selecaoIdRef.current,
+        devoAutoSelecionarComSelecao({
+          selecaoAtual: selecaoIdRef.current,
           temSelecao: !!selRef.current,
           removeuAgora: removeu,
           temPrimeiraLinha: devoAutoSelecionar({
@@ -1075,7 +1075,7 @@ export function AtendInbox() {
         selecionadaAgora: selIdRef.current,
         pedido,
         pedidoAtual: seqConversa.current,
-        conversaIdUrl: selecaoIdRef.current,
+        selecaoAtual: selecaoIdRef.current,
       });
 
     // Se o pré-carregamento desta conversa já está em andamento (mouse parado
@@ -1848,7 +1848,7 @@ export function AtendInbox() {
     const t = draft.trim();
     if (!t || !sel || !clinicaId || enviando) return;
     // A ação só vale para a conversa que está de fato aberta e carregada.
-    if (!acaoPermitida({ alvo: sel.id, selecionadaAgora: selIdRef.current, carregando: carregandoConversa, conversaIdUrl: selecaoIdRef.current })) {
+    if (!acaoPermitida({ alvo: sel.id, selecionadaAgora: selIdRef.current, carregando: carregandoConversa, selecaoAtual: selecaoIdRef.current })) {
       toast.error("Carregando a conversa. Tente novamente em instantes.");
       return;
     }
@@ -1897,7 +1897,7 @@ export function AtendInbox() {
         alvo: sel.id,
         selecionadaAgora: selIdRef.current,
         carregando: carregandoConversa,
-        conversaIdUrl: selecaoIdRef.current,
+        selecaoAtual: selecaoIdRef.current,
       })
     ) {
       toast.error("Carregando a conversa. Tente novamente em instantes.");
@@ -1931,7 +1931,7 @@ export function AtendInbox() {
         alvo: sel.id,
         selecionadaAgora: selIdRef.current,
         carregando: carregandoConversa,
-        conversaIdUrl: selecaoIdRef.current,
+        selecaoAtual: selecaoIdRef.current,
       })
     ) {
       toast.error("Carregando a conversa. Tente novamente em instantes.");

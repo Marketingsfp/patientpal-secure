@@ -82,12 +82,12 @@ export function respostaAindaVale(params: {
   pedido: number;
   pedidoAtual: number;
   /** Conversa indicada pelo endereço aberto agora (quando houver). */
-  conversaIdUrl?: string | null;
+  selecaoAtual?: string | null;
 }): boolean {
-  const { alvo, selecionadaAgora, pedido, pedidoAtual, conversaIdUrl } = params;
+  const { alvo, selecionadaAgora, pedido, pedidoAtual, selecaoAtual } = params;
   if (!alvo) return false;
   if (alvo !== selecionadaAgora) return false;
-  if (conversaIdUrl && alvo !== conversaIdUrl) return false;
+  if (selecaoAtual && alvo !== selecaoAtual) return false;
   return pedido === pedidoAtual;
 }
 

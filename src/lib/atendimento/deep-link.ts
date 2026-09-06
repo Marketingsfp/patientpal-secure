@@ -1,9 +1,9 @@
 /**
- * FASE 2 — Deep link, refresh (F5) e Voltar/Avançar do navegador.
+ * Seleção interna da conversa na Inbox (sem endereço individual).
  *
- * A URL representa a CONVERSA (nunca a sessão da Nina). Estas funções são
- * puras: decidem em qual filtro a conversa apontada pelo endereço deve ser
- * mostrada e impedem que a tela troque sozinha a conversa pedida no link.
+ * Estas funções são puras: decidem em qual filtro a conversa escolhida deve
+ * ser mostrada e impedem que a tela troque sozinha a conversa pedida por
+ * outro ponto do sistema (busca por número, alerta, Central de Atenção).
  */
 import {
   conversaVisivelNoEscopo,
@@ -12,16 +12,16 @@ import {
 } from "./escopo-inbox";
 
 /**
- * Quando o endereço já indica uma conversa, a Inbox NÃO pode escolher outra
- * automaticamente — senão um link colado ou um F5 abriria a conversa errada.
+ * Quando já existe uma conversa escolhida, a Inbox NÃO pode trocar por outra
+ * automaticamente — senão a lista abriria a conversa errada.
  */
-export function devoAutoSelecionarComUrl(args: {
-  conversaIdUrl: string | null | undefined;
+export function devoAutoSelecionarComSelecao(args: {
+  selecaoAtual: string | null | undefined;
   temSelecao: boolean;
   removeuAgora: boolean;
   temPrimeiraLinha: boolean;
 }): boolean {
-  if (args.conversaIdUrl) return false;
+  if (args.selecaoAtual) return false;
   if (args.temSelecao || args.removeuAgora) return false;
   return args.temPrimeiraLinha;
 }

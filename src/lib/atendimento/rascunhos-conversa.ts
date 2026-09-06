@@ -43,12 +43,12 @@ export function acaoPermitida(params: {
   selecionadaAgora: string | null | undefined;
   carregando: boolean;
   /** Conversa indicada pelo endereço aberto agora (quando houver). */
-  conversaIdUrl?: string | null;
+  selecaoAtual?: string | null;
 }): boolean {
-  const { alvo, selecionadaAgora, carregando, conversaIdUrl } = params;
+  const { alvo, selecionadaAgora, carregando, selecaoAtual } = params;
   if (!alvo || !selecionadaAgora) return false;
   if (carregando) return false;
-  if (conversaIdUrl && alvo !== conversaIdUrl) return false;
+  if (selecaoAtual && alvo !== selecaoAtual) return false;
   return alvo === selecionadaAgora;
 }
 
