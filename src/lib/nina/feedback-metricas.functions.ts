@@ -303,6 +303,7 @@ export const metricasAprendizadoNina = createServerFn({ method: "POST" })
 
     return {
       indicadores,
+      operacionais,
       evolucao,
       recorrentes,
       recorte: {
