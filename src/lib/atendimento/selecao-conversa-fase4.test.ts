@@ -7,16 +7,16 @@ const base = { pedido: 1, pedidoAtual: 1 };
 describe("Fase 4 — carregamento seguro a partir da URL", () => {
   it("A → B: resposta de A é descartada quando a URL já é B", () => {
     expect(
-      respostaAindaVale({ ...base, alvo: "A", selecionadaAgora: "A", conversaIdUrl: "B" }),
+      respostaAindaVale({ ...base, alvo: "A", selecionadaAgora: "A", selecaoAtual: "B" }),
     ).toBe(false);
   });
 
   it("A → B → C rapidamente: só a conversa da URL atual renderiza", () => {
     expect(
-      respostaAindaVale({ ...base, alvo: "B", selecionadaAgora: "C", conversaIdUrl: "C" }),
+      respostaAindaVale({ ...base, alvo: "B", selecionadaAgora: "C", selecaoAtual: "C" }),
     ).toBe(false);
     expect(
-      respostaAindaVale({ ...base, alvo: "C", selecionadaAgora: "C", conversaIdUrl: "C" }),
+      respostaAindaVale({ ...base, alvo: "C", selecionadaAgora: "C", selecaoAtual: "C" }),
     ).toBe(true);
   });
 
@@ -25,7 +25,7 @@ describe("Fase 4 — carregamento seguro a partir da URL", () => {
       respostaAindaVale({
         alvo: "A",
         selecionadaAgora: "A",
-        conversaIdUrl: "A",
+        selecaoAtual: "A",
         pedido: 1,
         pedidoAtual: 2,
       }),
@@ -50,11 +50,11 @@ describe("Fase 4 — carregamento seguro a partir da URL", () => {
         alvo: "A",
         selecionadaAgora: "A",
         carregando: false,
-        conversaIdUrl: "B",
+        selecaoAtual: "B",
       }),
     ).toBe(false);
     expect(
-      acaoPermitida({ alvo: "B", selecionadaAgora: "B", carregando: false, conversaIdUrl: "B" }),
+      acaoPermitida({ alvo: "B", selecionadaAgora: "B", carregando: false, selecaoAtual: "B" }),
     ).toBe(true);
   });
 
@@ -69,7 +69,7 @@ describe("Fase 4 — carregamento seguro a partir da URL", () => {
   it("resumo e contato atrasados de outra conversa não são aplicados", () => {
     for (const alvo of ["A", "outro"]) {
       expect(
-        respostaAindaVale({ ...base, alvo, selecionadaAgora: "B", conversaIdUrl: "B" }),
+        respostaAindaVale({ ...base, alvo, selecionadaAgora: "B", selecaoAtual: "B" }),
       ).toBe(false);
     }
   });

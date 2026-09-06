@@ -140,7 +140,7 @@ import {
   assumirConversa,
 } from "@/lib/atendimento.functions";
 import { FilaHumana } from "@/components/nina/FilaHumana";
-import { destinoConversa, idConversaDaUrl } from "@/lib/atendimento/abrir-conversa";
+import { destinoInbox, idConversaValido } from "@/lib/atendimento/abrir-conversa";
 import { AgendaConversaDrawer } from "@/components/nina/AgendaConversaDrawer";
 import { ConversaSkeleton, ContatoSkeleton } from "@/components/nina/ConversaSkeleton";
 import {
@@ -166,7 +166,6 @@ import {
   marcarTroca,
   medirRequest,
 } from "@/lib/atendimento/perf-troca";
-import { useLocation, useNavigate, useParams } from "@tanstack/react-router";
 import {
   acaoPermitida,
   gravarRascunho,
@@ -183,7 +182,7 @@ import {
   formatarNumeroConversa,
   interpretarBuscaConversa,
 } from "@/lib/atendimento/numero-conversa";
-import { devoAutoSelecionarComUrl, escopoParaConversa } from "@/lib/atendimento/deep-link";
+import { devoAutoSelecionarComSelecao, escopoParaConversa } from "@/lib/atendimento/deep-link";
 import {
   avisoSaidaEscopo,
   devoAutoSelecionar,
@@ -323,30 +322,25 @@ export function AtendInbox() {
   });
   const soNaoAtribuidas = escopo === "nao_atribuidas";
   const setSoNaoAtribuidas = (v: boolean) => setEscopo(v ? "nao_atribuidas" : ESCOPO_INBOX_PADRAO);
-  // FASE 1 — a URL manda: /app/nina/<conversation_id> define qual conversa
-  // está aberta. O clique só navega; a seleção vem sempre do endereço.
-  const navigate = useNavigate();
-  const rotaParams = useParams({ strict: false }) as { conversationId?: string };
-  // A Inbox fica na rota-mãe /app/nina, que não recebe o parâmetro da rota
-  // filha; por isso o endereço é lido também pelo caminho da página.
-  const caminhoAtual = useLocation({ select: (l: any) => l.pathname as string });
-  const conversaIdUrl = rotaParams?.conversationId ?? idConversaDaUrl(caminhoAtual);
+  // DECISÃO ATUAL — a conversa aberta é uma SELEÇÃO INTERNA da Inbox, pelo id
+  // interno da conversa. O endereço da tela é sempre /app/nina: abrir um lead
+  // não cria, altera nem lê endereço individual.
+  const [selecaoId, setSelecaoId] = useState<string | null>(null);
 
-  const abrirPelaUrl = useCallback(
-    (id: string | null, replace = false) => {
-      // Função central (Fase 5): todo módulo abre conversa por este caminho.
-      void navigate(destinoConversa(id, { replace }) as any);
-    },
-    [navigate],
-  );
+  const abrirConversa = useCallback((id: string | null) => {
+    // Caminho único de abertura: lista, busca por número, Central de Atenção,
+    // fila, alertas e atalhos passam todos por aqui.
+    setSelecaoId(id ? (idConversaValido(id) ?? null) : null);
+  }, []);
 
-  // Leitura do endereço dentro de callbacks, sem recriá-los a cada navegação.
-  const conversaIdUrlRef = useRef<string | null>(conversaIdUrl);
+  // Leitura da seleção dentro de callbacks, sem recriá-los a cada troca.
+  const selecaoIdRef = useRef<string | null>(selecaoId);
   useEffect(() => {
-    conversaIdUrlRef.current = conversaIdUrl;
-    // FASE 4 — instante em que o endereço passou a apontar para o lead pedido.
-    if (conversaIdUrl) marcarTroca("T1b_url", conversaIdUrl);
-  }, [conversaIdUrl]);
+    selecaoIdRef.current = selecaoId;
+    // FASE 4 — instante em que a seleção passou a apontar para o lead pedido.
+    if (selecaoId) marcarTroca("T1b_url", selecaoId);
+  }, [selecaoId]);
+
 
   // Montagens/desmontagens da Inbox: a Fase 1 precisa continuar em zero por
   // troca de conversa. Contadas aqui e expostas para a medição.
@@ -801,8 +795,8 @@ export function AtendInbox() {
         setNotas([]);
         setEventos([]);
         toast.info(avisoSaidaEscopo(escopo));
-        // O endereço acompanha: sem conversa aberta, volta para /app/nina.
-        abrirPelaUrl(null, true);
+        // Sem conversa aberta: a tela volta a "Selecione uma conversa".
+        abrirConversa(null);
       }
       setConvs((prev: any[]) => {
         // Chegou mensagem nova numa conversa guardada em cache (mesmo sem estar
@@ -827,11 +821,11 @@ export function AtendInbox() {
       });
       // O número do filtro atual muda na hora; o servidor confirma em seguida.
       setContadores((c) => ajustarContadorAtual(c as ContadoresInbox, escopo, rows.length));
-      // Com uma conversa no endereço (F5, link colado, Voltar/Avançar), a
-      // tela nunca escolhe outra sozinha.
+      // Com uma conversa já escolhida (ou pedida por outro módulo), a tela
+      // nunca troca sozinha para outra.
       if (
-        devoAutoSelecionarComUrl({
-          conversaIdUrl: conversaIdUrlRef.current,
+        devoAutoSelecionarComSelecao({
+          selecaoAtual: selecaoIdRef.current,
           temSelecao: !!selRef.current,
           removeuAgora: removeu,
           temPrimeiraLinha: devoAutoSelecionar({
@@ -841,15 +835,14 @@ export function AtendInbox() {
           }),
         })
       )
-        // A seleção automática também passa pela URL, para não existirem dois
-        // estados divergentes (endereço x conversa aberta).
-        abrirPelaUrl((rows[0] as any)?.id ?? null, true);
+        // A seleção automática usa o mesmo caminho central de abertura.
+        abrirConversa((rows[0] as any)?.id ?? null);
       // Os números de cada filtro acompanham a movimentação em tempo real.
       void carregarContadores();
     } catch (e: any) {
       mostrarErro(e);
     }
-  }, [clinicaId, filtroStatus, buscaTexto, buscaInterp.exigeNumero, escopo, listarConvs, carregarContadores, meuId, souGestor, abrirPelaUrl]);
+  }, [clinicaId, filtroStatus, buscaTexto, buscaInterp.exigeNumero, escopo, listarConvs, carregarContadores, meuId, souGestor, abrirConversa]);
 
   // FASE 2 — busca pelo número permanente (#1342). Consulta exata no backend,
   // fora do filtro atual e sem baixar a lista inteira. Só leitura: encontrar
@@ -891,18 +884,18 @@ export function AtendInbox() {
       setConvs((prev: any[]) => (prev.some((x: any) => x.id === row.id) ? prev : [row, ...prev]));
       deepLinkPendente.current = row.id;
       iniciarTroca(row.id, "clique");
-      abrirPelaUrl(row.id);
+      abrirConversa(row.id);
     },
-    [abrirPelaUrl],
+    [abrirConversa],
   );
 
 
 
-  // FASE 1 — a conversa aberta é sempre a do endereço. Quando o
-  // conversationId da URL muda (clique, voltar/avançar do navegador, link
-  // colado), a seleção acompanha; sem id na URL, nada fica aberto.
+  // A conversa aberta é sempre a da seleção interna. Quando ela muda (clique
+  // na lista, busca por número, Central de Atenção, alerta), o conteúdo
+  // acompanha; sem seleção, nada fica aberto.
   useEffect(() => {
-    if (!conversaIdUrl) {
+    if (!selecaoId) {
       if (selIdRef.current) {
         setSel(null);
         setConversaCarregadaId(null);
@@ -914,33 +907,33 @@ export function AtendInbox() {
       }
       return;
     }
-    if (selIdRef.current === conversaIdUrl) return;
+    if (selIdRef.current === selecaoId) return;
     setErroAcesso(null);
-    const c = convs.find((x: any) => x.id === conversaIdUrl);
+    const c = convs.find((x: any) => x.id === selecaoId);
     if (c) {
       setSel(c);
       return;
     }
-    // FASE 2 — F5 / link colado / Voltar-Avançar: a conversa do endereço pode
-    // não estar na lista do filtro atual. Buscamos ela pelo id e, se o usuário
-    // puder vê-la, o filtro acompanha. Sem permissão, volta para /app/nina.
+    // A conversa pedida pode não estar na lista do filtro atual (busca por
+    // número, alerta, Central de Atenção). Buscamos pelo id e, se o usuário
+    // puder vê-la, o filtro acompanha. Sem permissão, nada é aberto.
     if (!clinicaId || !meuId) return;
-    if (deepLinkTentado.current.has(conversaIdUrl)) return;
-    deepLinkTentado.current.add(conversaIdUrl);
-    const idPedido = conversaIdUrl;
+    if (deepLinkTentado.current.has(selecaoId)) return;
+    deepLinkTentado.current.add(selecaoId);
+    const idPedido = selecaoId;
     void (async () => {
       try {
         const row: any = await obterConversaFn({ data: { clinicaId, conversaId: idPedido } });
-        if (conversaIdUrlRef.current !== idPedido) return;
+        if (selecaoIdRef.current !== idPedido) return;
         if (!row) {
           setErroAcesso("Conversa não encontrada.");
-          abrirPelaUrl(null, true);
+          abrirConversa(null);
           return;
         }
         const destino = escopoParaConversa(row, { escopoAtual: escopo, userId: meuId, gestor: souGestor });
         if (!destino) {
           setErroAcesso("Você não possui permissão para visualizar esta conversa.");
-          abrirPelaUrl(null, true);
+          abrirConversa(null);
           return;
         }
         deepLinkTentado.current.delete(idPedido);
@@ -951,7 +944,7 @@ export function AtendInbox() {
         );
         if (destino !== escopo) setEscopo(destino);
       } catch (e: any) {
-        if (conversaIdUrlRef.current !== idPedido) return;
+        if (selecaoIdRef.current !== idPedido) return;
         const msg = String(e?.message ?? "");
         setErroAcesso(
           msg.includes("não encontrada")
@@ -960,17 +953,17 @@ export function AtendInbox() {
               ? "Você não possui permissão para visualizar esta conversa."
               : msg || "Não foi possível abrir esta conversa.",
         );
-        abrirPelaUrl(null, true);
+        abrirConversa(null);
       }
     })();
-  }, [conversaIdUrl, convs, clinicaId, meuId, escopo, souGestor, obterConversaFn, abrirPelaUrl]);
+  }, [selecaoId, convs, clinicaId, meuId, escopo, souGestor, obterConversaFn, abrirConversa]);
 
   // Abrir uma conversa a partir da Central de Atenção, sem trocar de página
   // e sem mexer em filtros/rascunho de quem já estava atendendo.
   useEffect(() => {
     const abrir = (id: string | null) => {
       if (!id) return;
-      abrirPelaUrl(id);
+      abrirConversa(id);
     };
 
     const handler = (e: Event) => abrir((e as CustomEvent).detail?.id ?? null);
@@ -985,7 +978,7 @@ export function AtendInbox() {
     }
     window.addEventListener(EVENTO_ABRIR_CONVERSA, handler);
     return () => window.removeEventListener(EVENTO_ABRIR_CONVERSA, handler);
-  }, [abrirPelaUrl]);
+  }, [abrirConversa]);
 
 
 
@@ -1082,7 +1075,7 @@ export function AtendInbox() {
         selecionadaAgora: selIdRef.current,
         pedido,
         pedidoAtual: seqConversa.current,
-        conversaIdUrl: conversaIdUrlRef.current,
+        selecaoAtual: selecaoIdRef.current,
       });
 
     // Se o pré-carregamento desta conversa já está em andamento (mouse parado
@@ -1290,7 +1283,7 @@ export function AtendInbox() {
         ),
       ]);
       if (selIdRef.current !== alvo) return;
-      if (conversaIdUrlRef.current && conversaIdUrlRef.current !== alvo) return;
+      if (selecaoIdRef.current && selecaoIdRef.current !== alvo) return;
       if ((novas as any[])?.length) {
         setMsgs((prev) => {
           const juntas = mesclarNovas(prev, novas as any[]);
@@ -1332,7 +1325,7 @@ export function AtendInbox() {
         ),
       ]);
       if (selIdRef.current !== alvo) return;
-      if (conversaIdUrlRef.current && conversaIdUrlRef.current !== alvo) return;
+      if (selecaoIdRef.current && selecaoIdRef.current !== alvo) return;
       if (n) {
         setNotas(n as any[]);
         const guardado = cacheConversas.current.obter(alvo);
@@ -1389,7 +1382,7 @@ export function AtendInbox() {
     marcarTroca("T1_selecao", id ?? undefined);
     // O cabeçalho lê `sel`: no momento em que a seleção passa a ser a conversa
     // pedida na URL, o cabeçalho já é o do lead certo.
-    if (id && conversaIdUrlRef.current === id) marcarTroca("T1c_cabecalho", id);
+    if (id && selecaoIdRef.current === id) marcarTroca("T1c_cabecalho", id);
     janelaRef.current = JANELA_INICIAL;
     setTemMaisAntigas(false);
     // FASE 4 — conversa já vinculada a um paciente conhecido: o painel de
@@ -1855,7 +1848,7 @@ export function AtendInbox() {
     const t = draft.trim();
     if (!t || !sel || !clinicaId || enviando) return;
     // A ação só vale para a conversa que está de fato aberta e carregada.
-    if (!acaoPermitida({ alvo: sel.id, selecionadaAgora: selIdRef.current, carregando: carregandoConversa, conversaIdUrl: conversaIdUrlRef.current })) {
+    if (!acaoPermitida({ alvo: sel.id, selecionadaAgora: selIdRef.current, carregando: carregandoConversa, selecaoAtual: selecaoIdRef.current })) {
       toast.error("Carregando a conversa. Tente novamente em instantes.");
       return;
     }
@@ -1904,7 +1897,7 @@ export function AtendInbox() {
         alvo: sel.id,
         selecionadaAgora: selIdRef.current,
         carregando: carregandoConversa,
-        conversaIdUrl: conversaIdUrlRef.current,
+        selecaoAtual: selecaoIdRef.current,
       })
     ) {
       toast.error("Carregando a conversa. Tente novamente em instantes.");
@@ -1938,7 +1931,7 @@ export function AtendInbox() {
         alvo: sel.id,
         selecionadaAgora: selIdRef.current,
         carregando: carregandoConversa,
-        conversaIdUrl: conversaIdUrlRef.current,
+        selecaoAtual: selecaoIdRef.current,
       })
     ) {
       toast.error("Carregando a conversa. Tente novamente em instantes.");
@@ -2103,7 +2096,7 @@ export function AtendInbox() {
               onAssumida={(id) => {
                 const c = convs.find((x: any) => x.id === id);
                 if (c) setSel({ ...c, owner_type: "HUMAN", status: "active" });
-                abrirPelaUrl(id);
+                abrirConversa(id);
                 void carregarConvs();
               }}
             />
@@ -2239,8 +2232,8 @@ export function AtendInbox() {
                   iniciarTroca(c.id, "clique");
                   medidor.current = criarMedidorConversa(`conversa ${c.id}`);
                   medidor.current.marcar("click");
-                  // Só muda o endereço: a conversa aberta vem da URL.
-                  abrirPelaUrl(c.id);
+                  // Seleção interna: a conversa aberta é escolhida aqui mesmo.
+                  abrirConversa(c.id);
                 }}
                 onMouseEnter={() => agendarPrefetch(c.id)}
                 onMouseLeave={() => cancelarPrefetch(c.id)}

@@ -1,15 +1,17 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 
 /**
- * FASE 1 — URL individual por conversa.
+ * Endereço individual por conversa — DESCONTINUADO.
  *
- * A tela de atendimento continua sendo renderizada pela rota pai
- * (/app/nina). Esta rota existe apenas para que cada conversa tenha um
- * endereço próprio e imutável: /app/nina/<id interno da conversa>.
- * O identificador usado é o id interno da conversa (conversation_id),
- * nunca nome, telefone, posição na lista, status ou contador.
+ * A conversa aberta passou a ser uma seleção interna da Inbox, sempre no
+ * mesmo endereço (/app/nina). Esta rota existe só para que links antigos não
+ * quebrem: o identificador do endereço é descartado, nenhuma conversa é
+ * buscada por causa dele e nada muda no atendimento (responsável, fila,
+ * status ou mensagens).
  */
 export const Route = createFileRoute("/_authenticated/app/nina/$conversationId")({
+  beforeLoad: () => {
+    throw redirect({ to: "/app/nina", hash: "atend-inbox", replace: true });
+  },
   component: () => null,
-  head: () => ({ meta: [{ title: "Atendimento — Nina — ClinicaOS" }] }),
 });
