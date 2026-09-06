@@ -171,6 +171,7 @@ import {
   formatarNumeroConversa,
   interpretarBuscaConversa,
 } from "@/lib/atendimento/numero-conversa";
+import { SEM_NOME, nomeConversa, tituloConversa } from "@/lib/atendimento/rotulo-conversa";
 import { devoAutoSelecionarComSelecao, escopoParaConversa } from "@/lib/atendimento/deep-link";
 import {
   avisoSaidaEscopo,
@@ -2159,12 +2160,16 @@ export function AtendInbox() {
                 {resultadoNumero.estado === "ok" && (
                   <div className="flex items-center gap-2">
                     <div className="min-w-0 flex-1">
-                      <p className="truncate font-medium">
-                        {resultadoNumero.conversa.contato_nome ||
-                          resultadoNumero.conversa.contato_telefone ||
-                          "—"}
+                      <p
+                        className="truncate font-medium"
+                        title={tituloConversa(resultadoNumero.conversa)}
+                      >
+                        {tituloConversa(resultadoNumero.conversa)}
                       </p>
                       <p className="text-[11px] text-muted-foreground">
+                        {resultadoNumero.conversa.contato_telefone
+                          ? `${resultadoNumero.conversa.contato_telefone} · `
+                          : ""}
                         Encontrada pelo número{" "}
                         {formatarNumeroConversa(resultadoNumero.conversa.numero_conversa)}
                         {!convsVisiveis.some(
@@ -2272,8 +2277,11 @@ export function AtendInbox() {
               >
 
                 <div className="flex items-center gap-2">
-                  <span className="font-medium text-sm truncate flex-1">
-                    {c.contato_nome || c.contato_telefone || "—"}
+                  <span
+                    className="font-medium text-sm truncate flex-1"
+                    title={tituloConversa(c)}
+                  >
+                    {tituloConversa(c)}
                   </span>
                   {c.unread_count > 0 && (
                     <Badge className="bg-atd-blue text-atd-on-strong text-xs px-1.5 py-0">
@@ -2363,8 +2371,11 @@ export function AtendInbox() {
               <CardHeader className="py-2 border-b">
                 <div className="flex items-center justify-between gap-2">
                   <div className="min-w-0">
-                    <CardTitle className="text-base flex items-center gap-2 truncate">
-                      {sel.contato_nome || sel.contato_telefone}
+                    <CardTitle
+                      className="text-base flex items-center gap-2 truncate"
+                      title={tituloConversa(sel)}
+                    >
+                      <span className="truncate">{tituloConversa(sel)}</span>
                       {statusBadge(sel.status)}
                     </CardTitle>
                     <p className="text-xs text-muted-foreground flex flex-wrap items-center gap-x-2 gap-y-1">
@@ -2740,9 +2751,8 @@ export function AtendInbox() {
                 <section>
                   <div className="font-medium">
                     {contatoAtual.paciente?.nome ||
-                      contatoAtual.conversa?.contato_nome ||
-                      contatoAtual.conversa?.contato_telefone ||
-                      "Sem nome"}
+                      nomeConversa(contatoAtual.conversa) ||
+                      SEM_NOME}
                   </div>
                   <div className="text-xs text-muted-foreground space-y-0.5 mt-1">
                     {(contatoAtual.conversa?.contato_telefone || contatoAtual.paciente?.telefone) && (

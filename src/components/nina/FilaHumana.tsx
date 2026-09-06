@@ -14,6 +14,7 @@ type ConversaFila = {
   id: string;
   contato_nome: string | null;
   contato_telefone: string | null;
+  pacientes?: { nome?: string | null } | null;
   prioridade: number | null;
   aguardando_desde: string | null;
   handoff_motivo: string | null;
@@ -126,6 +127,11 @@ export function FilaHumana(_props: { onAssumida?: (conversaId: string) => void }
                         </Badge>
                       )}
                     </div>
+                    {c.contato_telefone && (
+                      <p className="text-[11px] text-muted-foreground mt-0.5">
+                        {c.contato_telefone}
+                      </p>
+                    )}
                     {c.handoff_motivo && (
                       <p className="text-xs text-muted-foreground mt-1">
                         <span className="font-medium">Motivo:</span> {c.handoff_motivo}
