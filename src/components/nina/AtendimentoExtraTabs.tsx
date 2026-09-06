@@ -258,6 +258,9 @@ export function AtendInbox() {
   selRef.current = sel;
   const conteudoDaConversa = !!sel?.id && conversaCarregadaId === sel.id;
   const dadosSecundariosProntos = !!sel?.id && secundariosCarregadosId === sel.id;
+  // Contato exibido: só o da conversa aberta agora. Ter `contato` preenchido
+  // não basta — ele pode ser o do paciente anterior enquanto o novo carrega.
+  const contatoAtual = dadosSecundariosProntos ? contato : null;
   // Enquanto a conversa selecionada não terminou de carregar, todas as ações
   // dependentes do conversation_id ficam bloqueadas.
   const carregandoConversa = !!sel?.id && !conteudoDaConversa;
@@ -392,6 +395,13 @@ export function AtendInbox() {
     },
     [],
   );
+  /**
+   * Limpa o rascunho de UMA conversa específica (a de origem da ação), mesmo
+   * que a atendente já tenha aberto outra enquanto o envio terminava.
+   */
+  const limparRascunhoDe = useCallback((id: string) => {
+    setRascunhos((prev) => limparRascunho(prev, id));
+  }, []);
   const [enviando, setEnviando] = useState(false);
   const [novaNota, setNovaNota] = useState("");
   const [transferOpen, setTransferOpen] = useState(false);
@@ -1004,8 +1014,13 @@ export function AtendInbox() {
           return;
         }
         const eventosLista = (ev ?? []) as ConversaEvento[];
+        const msgsCache = await pMensagens.catch(() => [] as any[]);
+        // Nova espera → nova checagem. Entre o `await` acima e a publicação a
+        // atendente pode ter trocado de conversa; nesse caso nada é gravado
+        // no cache nem na tela.
+        if (!aindaVale()) return;
         cacheConversas.current.guardar(alvo, {
-          msgs: await pMensagens.catch(() => [] as any[]),
+          msgs: msgsCache,
           contato: c,
           notas: n,
           eventos: eventosLista,
@@ -1173,6 +1188,15 @@ export function AtendInbox() {
       }
     })();
   }, [clinicaId, sel?.id, (sel as any)?.contato_paciente_id, conversaCarregadaId, obterContato]);
+
+  // Trocou de conversa: formulários abertos sobre a conversa anterior fecham.
+  // Um formulário iniciado em A jamais é reaproveitado em B.
+  useEffect(() => {
+    setTransferOpen(false);
+    setFecharOpen(false);
+    setAgendaOpen(false);
+    setNovaNota("");
+  }, [sel?.id]);
 
   useEffect(() => {
     carregarConversa();
@@ -1518,11 +1542,15 @@ export function AtendInbox() {
       toast.error(motivoBloqueio);
       return;
     }
+    // Conversa de origem: o envio pertence a ela, não à que estiver aberta
+    // quando a resposta chegar.
+    const origem = sel.id;
     setEnviando(true);
     try {
-      await enviarMsg({ data: { clinicaId, conversaId: sel.id, text: t } });
-      setDraft("");
-      await carregarConversa();
+      await enviarMsg({ data: { clinicaId, conversaId: origem, text: t } });
+      limparRascunhoDe(origem);
+      cacheConversas.current.invalidar(origem);
+      if (selIdRef.current === origem) await carregarConversa();
     } catch (e: any) {
       mostrarErro(e);
     } finally {
@@ -1533,8 +1561,11 @@ export function AtendInbox() {
   const adicionarNota = async () => {
     const t = novaNota.trim();
     if (!t || !sel || !clinicaId) return;
+    const origem = sel.id;
     try {
-      await criarNotaFn({ data: { clinicaId, conversaId: sel.id, conteudo: t } });
+      await criarNotaFn({ data: { clinicaId, conversaId: origem, conteudo: t } });
+      cacheConversas.current.invalidar(origem);
+      if (selIdRef.current !== origem) return;
       setNovaNota("");
       await carregarConversa();
     } catch (e: any) {
@@ -1560,13 +1591,16 @@ export function AtendInbox() {
     const userId = String(fd.get("userId") || "");
     const departamentoId = String(fd.get("departamentoId") || "") || undefined;
     const motivo = String(fd.get("motivo") || "") || undefined;
+    // O formulário foi aberto sobre esta conversa: a transferência é dela.
+    const origem = sel.id;
     try {
       await transferirFn({
-        data: { clinicaId, conversaId: sel.id, userId: userId || null, departamentoId, motivo },
+        data: { clinicaId, conversaId: origem, userId: userId || null, departamentoId, motivo },
       });
+      cacheConversas.current.invalidar(origem);
       setTransferOpen(false);
       await carregarConvs();
-      await carregarConversa();
+      if (selIdRef.current === origem) await carregarConversa();
     } catch (e: any) {
       mostrarErro(e);
     }
@@ -1587,18 +1621,20 @@ export function AtendInbox() {
       return;
     }
     const fd = new FormData(e.currentTarget);
+    const origem = sel.id;
     try {
       await fecharFn({
         data: {
           clinicaId,
-          conversaId: sel.id,
+          conversaId: origem,
           motivo: String(fd.get("motivo") || "") || undefined,
           resumo: String(fd.get("resumo") || "") || undefined,
         },
       });
+      cacheConversas.current.invalidar(origem);
       setFecharOpen(false);
       await carregarConvs();
-      await carregarConversa();
+      if (selIdRef.current === origem) await carregarConversa();
     } catch (e: any) {
       mostrarErro(e);
     }
@@ -2272,7 +2308,7 @@ export function AtendInbox() {
           </CardHeader>
 
           <div className="flex-1 overflow-auto p-3 space-y-4 text-sm">
-            {!contato ? (
+            {!contatoAtual ? (
               // O esqueleto é só deste painel: o chat nunca espera pelo contato.
               !dadosSecundariosProntos ? (
                 <ContatoSkeleton />
@@ -2283,37 +2319,37 @@ export function AtendInbox() {
               <>
                 <section>
                   <div className="font-medium">
-                    {contato.paciente?.nome ||
-                      contato.conversa?.contato_nome ||
-                      contato.conversa?.contato_telefone ||
+                    {contatoAtual.paciente?.nome ||
+                      contatoAtual.conversa?.contato_nome ||
+                      contatoAtual.conversa?.contato_telefone ||
                       "Sem nome"}
                   </div>
                   <div className="text-xs text-muted-foreground space-y-0.5 mt-1">
-                    {(contato.conversa?.contato_telefone || contato.paciente?.telefone) && (
+                    {(contatoAtual.conversa?.contato_telefone || contatoAtual.paciente?.telefone) && (
                       <div>
-                        📱 {contato.conversa?.contato_telefone || contato.paciente?.telefone}
+                        📱 {contatoAtual.conversa?.contato_telefone || contatoAtual.paciente?.telefone}
                       </div>
                     )}
-                    {contato.paciente?.email && <div>✉️ {contato.paciente.email}</div>}
-                    {contato.paciente?.cpf && <div>CPF: {contato.paciente.cpf}</div>}
-                    {contato.paciente?.cidade && (
+                    {contatoAtual.paciente?.email && <div>✉️ {contatoAtual.paciente.email}</div>}
+                    {contatoAtual.paciente?.cpf && <div>CPF: {contatoAtual.paciente.cpf}</div>}
+                    {contatoAtual.paciente?.cidade && (
                       <div>
-                        📍 {contato.paciente.cidade}/{contato.paciente.estado}
+                        📍 {contatoAtual.paciente.cidade}/{contatoAtual.paciente.estado}
                       </div>
                     )}
-                    {contato.conversa?.protocolo && (
-                      <div>Protocolo: {contato.conversa.protocolo}</div>
+                    {contatoAtual.conversa?.protocolo && (
+                      <div>Protocolo: {contatoAtual.conversa.protocolo}</div>
                     )}
-                    {contato.conversa?.canal && <div>Canal: {contato.conversa.canal}</div>}
-                    {contato.conversa?.status && <div>Status: {contato.conversa.status}</div>}
-                    {contato.conversa?.atend_departamentos?.nome && (
-                      <div>Depto: {contato.conversa.atend_departamentos.nome}</div>
+                    {contatoAtual.conversa?.canal && <div>Canal: {contatoAtual.conversa.canal}</div>}
+                    {contatoAtual.conversa?.status && <div>Status: {contatoAtual.conversa.status}</div>}
+                    {contatoAtual.conversa?.atend_departamentos?.nome && (
+                      <div>Depto: {contatoAtual.conversa.atend_departamentos.nome}</div>
                     )}
-                    {contato.conversa?.ultima_mensagem_em && (
-                      <div>Última mensagem: {fmtData(contato.conversa.ultima_mensagem_em)}</div>
+                    {contatoAtual.conversa?.ultima_mensagem_em && (
+                      <div>Última mensagem: {fmtData(contatoAtual.conversa.ultima_mensagem_em)}</div>
                     )}
                   </div>
-                  {!contato.paciente && (
+                  {!contatoAtual.paciente && (
                     <div className="text-xs text-muted-foreground mt-2">
                       Não vinculado a paciente cadastrado.
                     </div>
@@ -2321,12 +2357,12 @@ export function AtendInbox() {
                 </section>
 
 
-                {contato.agendamentos?.length > 0 && (
+                {contatoAtual.agendamentos?.length > 0 && (
                   <section>
                     <div className="text-xs font-semibold text-muted-foreground uppercase mb-1">
                       Agendamentos
                     </div>
-                    {contato.agendamentos.map((a: any) => (
+                    {contatoAtual.agendamentos.map((a: any) => (
                       <div key={a.id} className="text-xs border rounded p-2 mb-1 space-y-0.5">
                         <div className="font-medium">
                           {a.procedimento || a.tipo_atendimento || "Consulta"}
@@ -2342,12 +2378,12 @@ export function AtendInbox() {
                   </section>
                 )}
 
-                {contato.contratos?.length > 0 && (
+                {contatoAtual.contratos?.length > 0 && (
                   <section>
                     <div className="text-xs font-semibold text-muted-foreground uppercase mb-1">
                       Contratos
                     </div>
-                    {contato.contratos.map((c: any) => (
+                    {contatoAtual.contratos.map((c: any) => (
                       <div key={c.id} className="text-xs border rounded p-2 mb-1">
                         <div className="font-medium">#{c.numero}</div>
                         <div className="text-muted-foreground">
@@ -2397,10 +2433,10 @@ export function AtendInbox() {
                   </div>
                 </section>
 
-                {contato.atribuido_nome && (
+                {contatoAtual.atribuido_nome && (
                   <section className="text-xs text-muted-foreground">
                     Atribuída a{" "}
-                    <span className="font-medium text-foreground">{contato.atribuido_nome}</span>
+                    <span className="font-medium text-foreground">{contatoAtual.atribuido_nome}</span>
                   </section>
                 )}
               </>
@@ -2418,7 +2454,7 @@ export function AtendInbox() {
             conversaId={sel.id}
             contatoNome={sel.contato_nome ?? null}
             contatoTelefone={sel.contato_telefone ?? null}
-            pacienteIdVinculado={contato?.paciente?.id ?? null}
+            pacienteIdVinculado={contatoAtual?.paciente?.id ?? null}
             onMensagemPronta={(t) => setDraft((d) => (d ? `${d}\n${t}` : t))}
           />
         )}
