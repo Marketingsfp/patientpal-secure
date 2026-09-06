@@ -85,13 +85,8 @@ describe("evidências da execução da Nina", () => {
     registro.nome = "Raio-X do tórax";
     registro.versao = "v2";
     const guardado = (c.pacote().etapas[0]!.dados as Record<string, any>)["encontrados"][0];
-    // O snapshot foi serializado no momento do registro? Não: guardamos a
-    // referência. Por isso a gravação persiste JSON — o teste garante que a
-    // evidência lida do banco é a do momento, não a atual.
-    const persistido = JSON.parse(JSON.stringify(c.pacote())) as { etapas: Etapa[] };
-    registro.nome = "outro nome ainda";
-    expect(persistido.etapas[0]!.dados["encontrados"][0].nome).toBe(guardado.nome);
-    expect(persistido.etapas[0]!.dados["encontrados"][0].nome).not.toBe("outro nome ainda");
+    expect(guardado.nome).toBe("Raio-X");
+    expect(guardado.versao).toBe("v1");
   });
 
   it("conteúdo muito longo enviado ao modelo é truncado com aviso, sem perder a etapa", () => {

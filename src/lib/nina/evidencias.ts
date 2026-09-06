@@ -81,6 +81,15 @@ function corta(v: unknown, max = LIMITE_TEXTO): string {
   return s.length > max ? `${s.slice(0, max)}…[truncado]` : s;
 }
 
+function clonar<T>(v: T): T {
+  if (v === null || typeof v !== "object") return v;
+  try {
+    return JSON.parse(JSON.stringify(v)) as T;
+  } catch {
+    return v;
+  }
+}
+
 export type Coletor = {
   etapa: (e: Omit<Etapa, "em"> & { em?: string }) => void;
   mensagensEntrada: (ids: string[]) => void;
@@ -102,16 +111,15 @@ export function criarColetor(agora: () => string = () => new Date().toISOString(
   let entrada: string[] = [];
   return {
     etapa(e) {
-      etapas.push({
-        ...e,
-        em: e.em ?? agora(),
-        dados: Object.fromEntries(
-          Object.entries(e.dados).map(([k, v]) => [
-            k,
-            typeof v === "string" ? corta(v) : v,
-          ]),
-        ),
-      });
+      // Cópia profunda no ato: a evidência é um snapshot do momento. Uma
+      // alteração posterior no objeto de origem não pode reescrevê-la.
+      const dados = Object.fromEntries(
+        Object.entries(e.dados).map(([k, v]) => [
+          k,
+          typeof v === "string" ? corta(v) : clonar(v),
+        ]),
+      );
+      etapas.push({ ...e, em: e.em ?? agora(), dados });
     },
     mensagensEntrada(ids) {
       entrada = [...new Set(ids.filter(Boolean))];
