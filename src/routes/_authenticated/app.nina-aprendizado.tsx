@@ -59,6 +59,14 @@ import {
   estadoAnalise,
 } from "@/lib/nina/erro-rapido";
 import { supabase } from "@/integrations/supabase/client";
+import {
+  AnaliseErroIAResultado,
+  type AnaliseSalva,
+} from "@/components/nina/AnaliseErroIAResultado";
+import {
+  analisarErroNinaComIA,
+  listarAnalisesErroNina,
+} from "@/lib/nina/analise-erro.functions";
 
 import {
   editarSugestaoFeedbackNina,
@@ -257,6 +265,9 @@ function Pagina() {
   const [conversas, setConversas] = useState<Record<string, number>>({});
   // Estado da auditoria técnica por item (ponteiro, sem copiar a evidência).
   const [auditoria, setAuditoria] = useState<Record<string, string>>({});
+  // FASE 4 — análise assistida: só roda por clique explícito.
+  const [analises, setAnalises] = useState<Record<string, AnaliseSalva | null>>({});
+  const [analisando, setAnalisando] = useState<Record<string, boolean>>({});
   const [execucoes, setExecucoes] = useState<Record<string, { model: string | null }>>({});
 
   const [autores, setAutores] = useState<{ id: string; nome: string }[]>([]);
@@ -300,6 +311,8 @@ function Pagina() {
   const lerConversa = useServerFn(lerConversaFeedbackNina);
   const consultarBase = useServerFn(consultarBaseFeedbackNina);
   const salvarDiagnostico = useServerFn(salvarDiagnosticoFeedbackNina);
+  const analisarIA = useServerFn(analisarErroNinaComIA);
+  const listarAnalises = useServerFn(listarAnalisesErroNina);
   const prepararAplicacao = useServerFn(prepararAplicacaoFeedbackNina);
   const aplicarCorrecao = useServerFn(aplicarFeedbackNina);
   const concluirAcao = useServerFn(concluirAcaoFeedbackNina);
@@ -449,6 +462,45 @@ function Pagina() {
       setSalvando(false);
     }
   };
+
+  /** Carrega a análise já existente (não chama o modelo). */
+  const carregarAnalise = useCallback(
+    async (feedbackId: string) => {
+      if (!clinicaId || analises[feedbackId] !== undefined) return;
+      try {
+        const r = await listarAnalises({ data: { clinicaId, feedbackId } });
+        setAnalises((a) => ({ ...a, [feedbackId]: (r.analises[0] as AnaliseSalva) ?? null }));
+      } catch {
+        setAnalises((a) => ({ ...a, [feedbackId]: null }));
+      }
+    },
+    [analises, clinicaId, listarAnalises],
+  );
+
+  /** Ação explícita e paga. Duplo clique não dispara duas análises. */
+  const executarAnalise = useCallback(
+    async (feedbackId: string, reanalisar: boolean) => {
+      if (!clinicaId || analisando[feedbackId]) return;
+      setAnalisando((a) => ({ ...a, [feedbackId]: true }));
+      try {
+        const r = await analisarIA({ data: { clinicaId, feedbackId, reanalisar } });
+        setAnalises((a) => ({ ...a, [feedbackId]: (r.analise as AnaliseSalva) ?? null }));
+        if ((r as { erro?: string }).erro) {
+          toast.error(`Análise não concluída: ${(r as { erro?: string }).erro}`);
+        } else if (r.jaExistia) {
+          toast.info("Análise já existente exibida. Use “Reanalisar” para gerar outra versão.");
+        } else {
+          toast.success("Análise concluída.");
+        }
+        setAbertos((ab) => ({ ...ab, [feedbackId]: true }));
+      } catch (e) {
+        mostrarErro(e, "Não foi possível analisar este erro.");
+      } finally {
+        setAnalisando((a) => ({ ...a, [feedbackId]: false }));
+      }
+    },
+    [analisando, analisarIA, clinicaId],
+  );
 
   const abrirConversa = async (item: Item) => {
     if (!item.conversa_id || !clinicaId) {
@@ -854,19 +906,30 @@ function Pagina() {
                       size="sm"
                       variant="outline"
                       aria-expanded={Boolean(abertos[it.id])}
-                      onClick={() =>
-                        setAbertos((a) => ({ ...a, [it.id]: !a[it.id] }))
-                      }
+                      onClick={() => {
+                        setAbertos((a) => ({ ...a, [it.id]: !a[it.id] }));
+                        if (!abertos[it.id] && podeRevisar) void carregarAnalise(it.id);
+                      }}
                     >
                       {abertos[it.id] ? "Ocultar detalhes" : "Ver detalhes"}
                     </Button>
                     <Button
                       size="sm"
                       variant="outline"
-                      disabled
-                      title="Conexão da análise automática será concluída na próxima fase."
+                      disabled={!podeRevisar || Boolean(analisando[it.id])}
+                      title={
+                        podeRevisar
+                          ? "Executa uma análise assistida deste erro (ação paga)."
+                          : "Restrito a quem revisa aprendizados."
+                      }
+                      onClick={() =>
+                        void executarAnalise(it.id, analises[it.id]?.status === "done")
+                      }
                     >
-                      Analisar com IA
+                      {analisando[it.id] ? (
+                        <Loader2 className="mr-1 h-4 w-4 animate-spin" aria-hidden="true" />
+                      ) : null}
+                      {analises[it.id]?.status === "done" ? "Reanalisar" : "Analisar com IA"}
                     </Button>
                     <Button
                       size="sm"
@@ -971,11 +1034,28 @@ function Pagina() {
                           )}
                         </div>
                         <p className="text-xs text-muted-foreground">
-                          Análise com IA: {ROTULO_ANALISE[estadoAnalise(it)]}
-                          {estadoAnalise(it) === "done"
-                            ? " (diagnóstico registrado — não confirma o erro)"
-                            : ""}
+                          Análise com IA:{" "}
+                          {ROTULO_ANALISE[
+                            analises[it.id]
+                              ? (analises[it.id]!.status === "done"
+                                  ? "done"
+                                  : analises[it.id]!.status === "failed"
+                                    ? "failed"
+                                    : "processing")
+                              : estadoAnalise(it)
+                          ]}
                         </p>
+                        {podeRevisar &&
+                          (analises[it.id] ? (
+                            <AnaliseErroIAResultado
+                              analise={analises[it.id]!}
+                              solicitante={pessoas[analises[it.id]!.solicitado_por] ?? null}
+                            />
+                          ) : (
+                            <p className="text-xs text-muted-foreground">
+                              Nenhuma análise assistida registrada. Use “Analisar com IA”.
+                            </p>
+                          ))}
                         <div>
                           <Label className="text-xs text-muted-foreground">Correção sugerida</Label>
                           <div className="mt-1 whitespace-pre-wrap rounded-md border border-border p-2 text-xs">
