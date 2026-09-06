@@ -161,7 +161,12 @@ import { ReportarErroNinaBotao } from "@/components/nina/ReportarErroNinaDialog"
 import { BadgeEspera, RelogioEsperaProvider } from "@/components/nina/BadgeEspera";
 import { formatarDataHoraMensagem } from "@/lib/atendimento/data-hora";
 import { ESCOPO_INBOX_PADRAO, type EscopoInbox } from "@/lib/atendimento/escopo-inbox";
-import { MSG_ADMIN_NAO_ATENDE } from "@/lib/atendimento/perfil-atendimento";
+import {
+  MSG_ADMIN_NAO_ATENDE,
+  ROTULO_PRESENCA,
+  type PresencaAtendente,
+} from "@/lib/atendimento/perfil-atendimento";
+
 import {
   formatarNumeroConversa,
   interpretarBuscaConversa,
@@ -1490,6 +1495,26 @@ export function AtendInbox() {
     })();
   }, [clinicaId, listarDeptosFn, listarUsuariosFn]);
 
+  // Ao abrir a janela de transferência, só a lista de atendentes é relida
+  // (para o status ficar atual). Não recarrega a conversa nem transfere nada.
+  useEffect(() => {
+    if (!transferOpen || !clinicaId) return;
+    let vale = true;
+    (async () => {
+      try {
+        const u = await listarUsuariosFn({ data: { clinicaId } });
+        if (vale) setUsuarios(u);
+      } catch {
+        // Mantém a lista anterior se a releitura falhar.
+      }
+    })();
+    return () => {
+      vale = false;
+    };
+  }, [transferOpen, clinicaId, listarUsuariosFn]);
+
+
+
   // Tempo de espera: uma única consulta para toda a lista. O relógio da tela
   // atualiza o texto sozinho; o banco só é consultado quando algo muda
   // (realtime) ou a cada 60s como rede de segurança.
@@ -2400,7 +2425,10 @@ export function AtendInbox() {
                     <Button
                       size="sm"
                       variant="outline"
-                      disabled={(!!responsavelId && !souResponsavel) || carregandoConversa}
+                      disabled={
+                        (!!responsavelId && !souResponsavel && !souAdmin) || carregandoConversa
+                      }
+
                       className="border-atd-border text-atd-blue-ink hover:bg-atd-blue-tint hover:text-atd-blue-ink"
                       onClick={() => setTransferOpen(true)}
                     >
@@ -2920,11 +2948,30 @@ export function AtendInbox() {
                             Nenhum agente encontrado.
                           </p>
                         );
-                      return lista.map((u: any) => (
-                        <SelectItem key={u.user_id} value={u.user_id}>
-                          {u.nome ?? u.email ?? u.user_id}
-                        </SelectItem>
-                      ));
+                      return lista.map((u: any) => {
+                        const st: PresencaAtendente = u.presenca ?? "OFFLINE";
+                        const cor =
+                          st === "ONLINE"
+                            ? "bg-emerald-500"
+                            : st === "PAUSA"
+                              ? "bg-amber-500"
+                              : "bg-muted-foreground";
+                        return (
+                          <SelectItem key={u.user_id} value={u.user_id}>
+                            <span className="flex items-center gap-2">
+                              <span
+                                aria-hidden="true"
+                                className={`h-2 w-2 rounded-full ${cor}`}
+                              />
+                              <span>{u.nome ?? u.email ?? u.user_id}</span>
+                              <span className="text-xs text-muted-foreground">
+                                — {ROTULO_PRESENCA[st]}
+                              </span>
+                            </span>
+                          </SelectItem>
+                        );
+                      });
+
                     })()}
                   </SelectContent>
                 </Select>
