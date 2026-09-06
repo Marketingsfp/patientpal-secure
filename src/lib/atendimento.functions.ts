@@ -628,18 +628,30 @@ export const fecharConversa = createServerFn({ method: "POST" })
   });
 
 /**
- * Zera o contador de não lidas da conversa.
+ * Registra a leitura DESTE usuário até uma mensagem real da timeline.
  *
- * O contador é único por conversa, então supervisão NÃO pode apagá-lo: a
- * decisão é tomada aqui, pelo usuário autenticado e pelo papel lido do banco,
- * e não pelo que a tela enviar. Quando não pode, a chamada não falha — apenas
- * não altera nada (`marcada: false`), para que acompanhar uma conversa nunca
- * quebre a tela de quem supervisiona.
+ * A leitura é individual (`atend_leituras`): o que Maria leu não interfere no
+ * que Jean leu. O usuário vem da autenticação — a tela não pode informar outra
+ * pessoa. Fase 1 preservada: quem tem perfil administrativo/gestor apenas
+ * acompanha e não registra leitura automática ao abrir.
+ *
+ * O contador antigo da conversa (`unread_count`) NÃO é zerado: fica como
+ * referência histórica.
  */
 export const marcarLida = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) =>
-    z.object({ clinicaId: z.string().uuid(), conversaId: z.string().uuid() }).parse(i),
+    z
+      .object({
+        clinicaId: z.string().uuid(),
+        conversaId: z.string().uuid(),
+        // Última mensagem realmente vista. Sem ela, usa a última existente no
+        // momento da chamada (nunca "agora", para não engolir o que chegar).
+        mensagemId: z.string().uuid().optional().nullable(),
+        // Leitura por abertura da conversa (padrão) x ação explícita.
+        automatico: z.boolean().default(true),
+      })
+      .parse(i),
   )
   .handler(async ({ data, context }) => {
     await assertMember(context.supabase, context.userId, data.clinicaId);
@@ -660,16 +672,17 @@ export const marcarLida = createServerFn({ method: "POST" })
       atribuidaUserId: conv.atribuida_user_id ?? null,
       ehGestor: ehGestor || admin,
     });
-    if (!pode) return { ok: true, marcada: false, motivo };
+    if (data.automatico && !pode) return { ok: true, marcada: false, motivo, lidaAte: null };
 
-    await context.supabase
-      .from("atend_conversas")
-      .update({ unread_count: 0 })
-      .eq("id", data.conversaId)
-      .eq("clinica_id", data.clinicaId)
-      // Trava também no banco: a linha só é atualizada se ainda for dele.
-      .eq("atribuida_user_id", context.userId);
-    return { ok: true, marcada: true, motivo };
+    // O avanço monotônico e o vínculo mensagem/conversa são garantidos no banco.
+    const { data: lidaAte, error } = await context.supabase.rpc("atend_registrar_leitura", {
+      _clinica_id: data.clinicaId,
+      _conversa_id: data.conversaId,
+      _mensagem_id: data.mensagemId ?? null,
+    });
+    if (error) throw new Error(error.message);
+    return { ok: true, marcada: true, motivo, lidaAte: (lidaAte as string | null) ?? null };
+
   });
 
 
