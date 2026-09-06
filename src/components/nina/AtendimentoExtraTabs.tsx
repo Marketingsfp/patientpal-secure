@@ -1079,9 +1079,13 @@ export function AtendInbox() {
     conversaCarregadaRef.current = conversaCarregadaId;
   }, [conversaCarregadaId]);
 
+  // A lista só é recarregada quando algo dela muda de verdade (clínica,
+  // filtro, busca, usuário). Abrir uma conversa não recarrega a lista.
+  const carregarConvsRef = useRef(carregarConvs);
+  carregarConvsRef.current = carregarConvs;
   useEffect(() => {
-    carregarConvs();
-  }, [carregarConvs]);
+    void carregarConvsRef.current();
+  }, [clinicaId, filtroStatus, busca, escopo, meuId, souGestor]);
   // O responsável pode mudar a qualquer momento (transferência, distribuição
   // automática, tomada por outra pessoa). A lista chega por Realtime, então a
   // conversa aberta sempre acompanha o que está gravado no banco.
