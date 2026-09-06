@@ -11,6 +11,10 @@ import {
   filtroEscopoInbox,
 } from "@/lib/atendimento/escopo-inbox";
 import { loadWhatsAppConfig, metaSendText } from "./whatsapp.server";
+import {
+  MSG_ADMIN_NAO_ATENDE,
+  apenasDestinatariosValidos,
+} from "@/lib/atendimento/perfil-atendimento";
 
 /* =========================================================
  *  Helpers
@@ -26,6 +30,22 @@ async function assertMember(
   });
   if (error) throw new Error(error.message);
   if (!data) throw new Error("Sem acesso a esta clínica");
+}
+/**
+ * Administrador não atende paciente: esta checagem é a barreira do
+ * aplicativo (o banco tem a sua própria, para chamadas diretas).
+ */
+async function ehAdminClinica(
+  supabase: SupabaseClient<Database>,
+  userId: string,
+  clinicaId: string,
+): Promise<boolean> {
+  const { data, error } = await supabase.rpc("atend_usuario_e_admin", {
+    _user_id: userId,
+    _clinica_id: clinicaId,
+  });
+  if (error) throw new Error(error.message);
+  return !!data;
 }
 async function assertManager(
   supabase: SupabaseClient<Database>,
@@ -319,7 +339,10 @@ export const souGestorAtendimento = createServerFn({ method: "POST" })
       _user_id: context.userId,
       _clinica_id: data.clinicaId,
     });
-    return { gestor: !!podeGerir };
+    // `admin` = supervisão total, sem atender: a Inbox usa isto para abrir na
+    // visão da equipe e esconder as ações de atendimento.
+    const admin = await ehAdminClinica(context.supabase, context.userId, data.clinicaId);
+    return { gestor: !!podeGerir, admin };
   });
 
 /**
@@ -414,6 +437,8 @@ export const transferirConversa = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     await assertMember(context.supabase, context.userId, data.clinicaId);
+    if (data.paraUserId && (await ehAdminClinica(context.supabase, data.paraUserId, data.clinicaId)))
+      throw new Error(MSG_ADMIN_NAO_ATENDE);
     const { data: conv, error: e1 } = await context.supabase
       .from("atend_conversas")
       .select("atribuida_user_id, departamento_id")
@@ -1364,11 +1389,14 @@ export const listarUsuariosClinica = createServerFn({ method: "POST" })
       ? await context.supabase.from("profiles").select("id, nome").in("id", userIds)
       : { data: [] as any[] };
     const nomeMap = new Map((profs ?? []).map((p: any) => [p.id, p.nome]));
-    return (rows ?? []).map((r: any) => ({
-      user_id: r.user_id,
-      role: r.role,
-      nome: nomeMap.get(r.user_id) ?? r.user_id,
-    }));
+    // Administrador não aparece como destinatário de atendimento.
+    return apenasDestinatariosValidos(
+      (rows ?? []).map((r: any) => ({
+        user_id: r.user_id,
+        role: r.role as string | null,
+        nome: nomeMap.get(r.user_id) ?? r.user_id,
+      })),
+    );
   });
 
 /* =========================================================
@@ -1495,6 +1523,8 @@ export const enviarMensagemConversa = createServerFn({ method: "POST" })
       const { assertAcessoConversa } = await import("./atendimento/acesso-conversa.server");
       await assertAcessoConversa(context.supabase, context.userId, data.clinicaId, data.conversaId);
     }
+    if (await ehAdminClinica(context.supabase, context.userId, data.clinicaId))
+      throw new Error(MSG_ADMIN_NAO_ATENDE);
     const cfg = await loadWhatsAppConfig(data.clinicaId);
     if (!cfg?.phone_number_id || !cfg?.access_token) throw new Error("WhatsApp não configurado.");
     const { data: conv, error: cErr } = await context.supabase
@@ -2136,6 +2166,8 @@ export const assumirConversa = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     await assertMember(context.supabase, context.userId, data.clinicaId);
+    if (await ehAdminClinica(context.supabase, context.userId, data.clinicaId))
+      return { ok: false as const, motivo: "ADMIN_NAO_ATENDE" as const };
     await assertConversaDaClinica(context.supabase, data.conversaId, data.clinicaId);
     const { data: conv, error: eConv } = await context.supabase
       .from("atend_conversas")

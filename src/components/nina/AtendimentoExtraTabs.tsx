@@ -161,6 +161,7 @@ import { ReportarErroNinaBotao } from "@/components/nina/ReportarErroNinaDialog"
 import { BadgeEspera, RelogioEsperaProvider } from "@/components/nina/BadgeEspera";
 import { formatarDataHoraMensagem } from "@/lib/atendimento/data-hora";
 import { ESCOPO_INBOX_PADRAO, type EscopoInbox } from "@/lib/atendimento/escopo-inbox";
+import { MSG_ADMIN_NAO_ATENDE } from "@/lib/atendimento/perfil-atendimento";
 import {
   formatarNumeroConversa,
   interpretarBuscaConversa,
@@ -295,6 +296,8 @@ export function AtendInbox() {
   // atendente logado). O filtro é aplicado no backend.
   const [escopo, setEscopo] = useState<EscopoInbox>(ESCOPO_INBOX_PADRAO);
   const [souGestor, setSouGestor] = useState(false);
+  // Administrador acompanha tudo, mas não atende: só supervisão.
+  const [souAdmin, setSouAdmin] = useState(false);
   // Contagem própria de cada filtro (nunca reaproveita o número de outro).
   const [contadores, setContadores] = useState<Record<string, number>>({
     minhas: 0,
@@ -688,10 +691,16 @@ export function AtendInbox() {
     if (!clinicaId) return;
     souGestorFn({ data: { clinicaId } })
       .then((r: any) => {
-        if (vivo) setSouGestor(!!r?.gestor);
+        if (!vivo) return;
+        setSouGestor(!!r?.gestor);
+        setSouAdmin(!!r?.admin);
+        // Administrador não tem conversas próprias: abre já na visão da equipe.
+        if (r?.admin) setEscopo((e) => (e === ESCOPO_INBOX_PADRAO ? "equipe" : e));
       })
       .catch(() => {
-        if (vivo) setSouGestor(false);
+        if (!vivo) return;
+        setSouGestor(false);
+        setSouAdmin(false);
       });
     return () => {
       vivo = false;
@@ -1778,6 +1787,8 @@ export function AtendInbox() {
 
   const motivoBloqueio = !sel
     ? null
+    : souAdmin
+      ? MSG_ADMIN_NAO_ATENDE
     : carregandoConversa
       ? "Carregando conversa…"
     : conversaEncerrada
@@ -2358,7 +2369,7 @@ export function AtendInbox() {
                     )}
                   </div>
                   <div className="flex gap-1 shrink-0">
-                    {!conversaEncerrada && !souResponsavel && podeAtender && (
+                    {!conversaEncerrada && !souResponsavel && podeAtender && !souAdmin && (
                       <Button
                         size="sm"
                         variant="default"

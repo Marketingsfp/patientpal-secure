@@ -11000,6 +11000,10 @@ export type Database = {
         }[]
       }
       atend_gerar_protocolo: { Args: { _clinica_id: string }; Returns: string }
+      atend_usuario_e_admin: {
+        Args: { _clinica_id: string; _user_id: string }
+        Returns: boolean
+      }
       buscar_contratos: {
         Args: {
           _clinica_id: string
