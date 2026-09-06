@@ -77,20 +77,17 @@ export async function buscarNoCatalogo(pedido: {
     qServicos = qServicos.or(termos.map((t) => `nome.ilike.%${t}%`).join(","));
   }
 
+  // Profissionais: a especialidade fica em JSONB, onde o filtro exato do
+  // PostgREST não casa com o termo digitado (acento/caixa). Lemos apenas os
+  // publicados da clínica, com teto, e casamos nome/especialidade aqui.
   let qProfissionais = supabaseAdmin
     .from("nina_cat_profissionais")
     .select(COLUNAS_PROFISSIONAL)
     .eq("clinica_id", pedido.clinicaId)
     .eq("status", "PUBLICADO")
-    .limit(limite);
+    .limit(TETO_PROFISSIONAIS);
   if (pedido.medico) {
     qProfissionais = qProfissionais.ilike("nome", `%${pedido.medico}%`);
-  } else if (termos.length) {
-    qProfissionais = qProfissionais.or(
-      termos
-        .map((t) => `nome.ilike.%${t}%,especialidades.cs.[{"nome":"${t}"}]`)
-        .join(","),
-    );
   }
 
   const [servicos, profissionais] = await Promise.all([
@@ -102,7 +99,12 @@ export async function buscarNoCatalogo(pedido: {
   if (profissionais.error) throw new Error(profissionais.error.message);
 
   const listaServicos = (servicos.data ?? []) as unknown as ServicoPublicado[];
-  const listaProfissionais = (profissionais.data ?? []) as unknown as ProfissionalPublicado[];
+  const brutosProfissionais = (profissionais.data ?? []) as unknown as ProfissionalPublicado[];
+  const listaProfissionais = (
+    pedido.medico
+      ? brutosProfissionais
+      : brutosProfissionais.filter((p) => casaProfissional(p, termos))
+  ).slice(0, limite);
 
   // Ambiguidade: mais de um item distinto compatível com a pergunta.
   const itensDistintos = new Set(
