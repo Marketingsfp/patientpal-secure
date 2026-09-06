@@ -1004,8 +1004,13 @@ export function AtendInbox() {
           return;
         }
         const eventosLista = (ev ?? []) as ConversaEvento[];
+        const msgsCache = await pMensagens.catch(() => [] as any[]);
+        // Nova espera → nova checagem. Entre o `await` acima e a publicação a
+        // atendente pode ter trocado de conversa; nesse caso nada é gravado
+        // no cache nem na tela.
+        if (!aindaVale()) return;
         cacheConversas.current.guardar(alvo, {
-          msgs: await pMensagens.catch(() => [] as any[]),
+          msgs: msgsCache,
           contato: c,
           notas: n,
           eventos: eventosLista,
