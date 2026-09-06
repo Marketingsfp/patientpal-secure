@@ -19,6 +19,14 @@ export const lerEvidenciasExecucaoNina = createServerFn({ method: "POST" })
     z.object({ clinicaId: z.string().uuid(), execucaoId: z.string().uuid() }).parse(i),
   )
   .handler(async ({ data, context }) => {
+    // Conteúdo técnico sensível: exige permissão de revisão também no backend.
+    const { data: pode, error: ePerm } = await (context.supabase as any).rpc(
+      "nina_fb_pode_revisar",
+      { _user_id: context.userId, _clinica_id: data.clinicaId },
+    );
+    if (ePerm) throw new Error(ePerm.message);
+    if (!pode) throw new Error("Sem permissão para ver a auditoria técnica.");
+
     const supabase = context.supabase as never as {
       from: (t: string) => any;
     };

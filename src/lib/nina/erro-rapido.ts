@@ -62,6 +62,32 @@ export function estadoAuditoria(entrada: {
   return completo ? "available" : "partial";
 }
 
+/**
+ * Estado da análise assistida do erro. Reaproveita o mecanismo já existente de
+ * "Diagnosticar causa" — não existe uma segunda análise concorrente.
+ * A execução automática ("Analisar com IA") será conectada na próxima fase.
+ */
+export type EstadoAnalise = "not_requested" | "processing" | "done" | "failed";
+
+export const ROTULO_ANALISE: Record<EstadoAnalise, string> = {
+  not_requested: "Não solicitada",
+  processing: "Processando",
+  done: "Concluída",
+  failed: "Falhou",
+};
+
+/** Análise concluída = diagnóstico registrado. Não significa erro confirmado. */
+export function estadoAnalise(item: {
+  root_cause?: string | null;
+  analise_status?: string | null;
+}): EstadoAnalise {
+  const s = item.analise_status ?? null;
+  if (s === "processing" || s === "failed" || s === "done" || s === "not_requested") {
+    return s as EstadoAnalise;
+  }
+  return item.root_cause ? "done" : "not_requested";
+}
+
 export type ResultadoValidacao =
   | { ok: true; snapshot: string }
   | { ok: false; motivo: "mensagem_inexistente" | "conversa_divergente" | "autor_invalido" | "sem_conteudo"; mensagem: string };

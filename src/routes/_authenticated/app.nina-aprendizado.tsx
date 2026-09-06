@@ -51,7 +51,13 @@ import {
   CATEGORIAS_FEEDBACK_NINA,
   rotuloCategoriaFeedback,
 } from "@/lib/nina/feedback-erros";
-import { ehReporteRapido, rotuloConversaReporte, ROTULO_AUDITORIA } from "@/lib/nina/erro-rapido";
+import {
+  ehReporteRapido,
+  rotuloConversaReporte,
+  ROTULO_AUDITORIA,
+  ROTULO_ANALISE,
+  estadoAnalise,
+} from "@/lib/nina/erro-rapido";
 import { supabase } from "@/integrations/supabase/client";
 
 import {
@@ -147,6 +153,16 @@ type Comparacao = {
   snapshot: Record<string, unknown>;
 };
 
+/** Estado da revisão humana — independente da auditoria e da análise. */
+const ROTULO_REVISAO: Record<string, string> = {
+  pending: "Pendente de revisão",
+  under_review: "Em revisão",
+  approved: "Aprovado",
+  rejected: "Rejeitado",
+  applied: "Aplicado",
+  reverted: "Revertido",
+};
+
 const ROTULO_KB: Record<string, string> = {
   found: "Encontrada no catálogo",
   not_found: "Não encontrada no catálogo",
@@ -234,6 +250,8 @@ function Pagina() {
   const [de, setDe] = useState("");
   const [ate, setAte] = useState("");
   const [itens, setItens] = useState<Item[]>([]);
+  // Itens expandidos: os detalhes (e a auditoria) só carregam ao abrir.
+  const [abertos, setAbertos] = useState<Record<string, boolean>>({});
   const [pessoas, setPessoas] = useState<Record<string, string>>({});
   const [contagens, setContagens] = useState<Record<string, number>>({});
   const [conversas, setConversas] = useState<Record<string, number>>({});
@@ -798,208 +816,262 @@ function Pagina() {
             <li key={it.id}>
               <Card>
                 <CardContent className="space-y-3 p-4 text-sm">
+                  {/* Estado inicial compacto: só o essencial para triagem. */}
                   <div className="flex flex-wrap items-center gap-2">
                     <Badge variant="destructive" className="gap-1">
                       <AlertTriangle className="h-3 w-3" aria-hidden="true" />
-                      {rotuloCategoriaFeedback(it.categoria)}
+                      ERRO REPORTADO
                     </Badge>
-                    {it.prioridade && (
-                      <Badge
-                        variant={it.prioridade === "critico" ? "destructive" : "secondary"}
-                        className={it.prioridade === "alto" ? "border-amber-500 text-amber-700 dark:text-amber-400" : ""}
-                      >
-                        Prioridade: {rotuloPrioridade(it.prioridade)}
-                      </Badge>
-                    )}
-                    {it.root_cause && (
-                      <Badge variant="outline">Causa: {rotuloCausaRaiz(it.root_cause)}</Badge>
-                    )}
-                    {it.knowledge_status && (
-                      <Badge variant="outline">
-                        Base: {ROTULO_KB[it.knowledge_status] ?? it.knowledge_status}
-                      </Badge>
-                    )}
+                    <span className="text-xs font-medium">
+                      {rotuloConversaReporte(it.conversa_id, conversas[it.conversa_id ?? ""])}
+                    </span>
+                    <Badge variant="outline">{ROTULO_REVISAO[it.status] ?? it.status}</Badge>
                     {it.grupo_chave && (ocorrencias[it.grupo_chave] ?? 1) > 1 && (
                       <Badge variant="secondary">
                         {it.grupo_titulo ?? "Problema"} — {ocorrencias[it.grupo_chave]} ocorrências
                       </Badge>
                     )}
-                    <span className="text-xs text-muted-foreground">
-                      {fmtData(it.created_at)} · reportado por{" "}
-                      {pessoas[it.reportado_por] ?? "—"}
-                      {it.revisado_por
-                        ? ` · revisado por ${pessoas[it.revisado_por] ?? "—"}`
-                        : ""}
+                    <span className="ml-auto text-[11px] text-muted-foreground">
+                      {fmtData(it.created_at)} · {pessoas[it.reportado_por] ?? "—"}
                     </span>
                   </div>
 
-                  {ehReporteRapido(it.origem) && (
-                    <div className="space-y-1 rounded-md border border-destructive/40 bg-destructive/5 p-3">
-                      <p className="text-xs font-semibold uppercase tracking-wide text-destructive">
-                        Erro reportado da Nina
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        Conversa: {rotuloConversaReporte(it.conversa_id, conversas[it.conversa_id ?? ""])}
-                      </p>
-                      <div>
-                        <Label className="text-xs text-muted-foreground">Mensagem reportada</Label>
-                        <div className="mt-1 max-h-40 overflow-auto whitespace-pre-wrap rounded-md border border-border bg-background p-2 text-xs">
-                          {it.mensagem_texto ?? "—"}
-                        </div>
-                      </div>
-                      <p className="text-xs text-muted-foreground">
-                        Reportado por: {pessoas[it.reportado_por] ?? "—"} · Data do reporte:{" "}
-                        {fmtData(it.created_at)}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        Status: {it.status === "pending" ? "Pendente de revisão" : it.status}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        Auditoria técnica:{" "}
-                        {ROTULO_AUDITORIA[
-                          (auditoria[it.id] as keyof typeof ROTULO_AUDITORIA) ?? "unavailable"
-                        ]}
-                        {execucoes[(it as { execucao_id?: string | null }).execucao_id ?? ""]
-                          ? ` · ${execucoes[(it as { execucao_id?: string | null }).execucao_id ?? ""]?.model ?? "—"}`
-                          : ""}
-                      </p>
-                      <details className="rounded-md border border-border p-2">
-                        <summary className="cursor-pointer text-xs font-medium">
-                          Evidências da execução (somente leitura)
-                        </summary>
-                        <div className="mt-2">
-                          <EvidenciasExecucao
-                            clinicaId={clinicaId ?? ""}
-                            execucaoId={
-                              (it as { execucao_id?: string | null }).execucao_id ?? null
-                            }
-                          />
-                        </div>
-                      </details>
-                    </div>
+                  <p className="line-clamp-2 text-xs text-muted-foreground">
+                    “{(it.mensagem_texto?.trim() || "—").slice(0, 220)}
+                    {(it.mensagem_texto?.trim().length ?? 0) > 220 ? "…" : ""}”
+                  </p>
 
-                  )}
+                  <p className="text-xs text-muted-foreground">
+                    Auditoria:{" "}
+                    {ROTULO_AUDITORIA[
+                      (auditoria[it.id] as keyof typeof ROTULO_AUDITORIA) ?? "unavailable"
+                    ]}{" "}
+                    · Análise com IA: {ROTULO_ANALISE[estadoAnalise(it)]}
+                  </p>
 
-                  <div className="grid gap-3 md:grid-cols-2">
-                    <div>
-                      <Label className="text-xs text-muted-foreground">
-                        Pergunta do paciente
-                      </Label>
-                      <div className="mt-1 max-h-28 overflow-auto whitespace-pre-wrap rounded-md border border-border bg-muted/40 p-2 text-xs">
-                        {it.pergunta_texto?.trim() || "—"}
-                      </div>
-                    </div>
-                    <div>
-                      <Label className="text-xs text-muted-foreground">Resposta da Nina</Label>
-                      <div className="mt-1 max-h-28 overflow-auto whitespace-pre-wrap rounded-md border border-border bg-muted/40 p-2 text-xs">
-                        {it.mensagem_texto?.trim() || "—"}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div>
-                    <Label className="text-xs text-muted-foreground">Correção sugerida</Label>
-                    <div className="mt-1 whitespace-pre-wrap rounded-md border border-border p-2 text-xs">
-                      {it.correcao?.trim() || "— (a preencher na revisão)"}
-                    </div>
-                  </div>
-
-                  {it.observacao && (
-                    <p className="text-xs text-muted-foreground">
-                      Observação interna: {it.observacao}
-                    </p>
-                  )}
-                  {it.motivo_rejeicao && (
-                    <p className="text-xs text-muted-foreground">
-                      Motivo da rejeição: {it.motivo_rejeicao}
-                    </p>
-                  )}
-
-                  <div className="flex flex-wrap gap-2 pt-1">
+                  <div className="flex flex-wrap gap-2">
                     <Button
                       size="sm"
                       variant="outline"
+                      aria-expanded={Boolean(abertos[it.id])}
+                      onClick={() =>
+                        setAbertos((a) => ({ ...a, [it.id]: !a[it.id] }))
+                      }
+                    >
+                      {abertos[it.id] ? "Ocultar detalhes" : "Ver detalhes"}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled
+                      title="Conexão da análise automática será concluída na próxima fase."
+                    >
+                      Analisar com IA
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
                       onClick={() => void abrirConversa(it)}
                       disabled={!it.conversa_id}
                     >
                       <Eye className="mr-1 h-4 w-4" aria-hidden="true" /> Ver conversa
                     </Button>
-                    {podeRevisar && (
-                      <>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => void abrirDiagnostico(it)}
-                        >
-                          <Stethoscope className="mr-1 h-4 w-4" aria-hidden="true" />{" "}
-                          {it.root_cause ? "Rever diagnóstico" : "Diagnosticar causa"}
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => {
-                            setEditando(it);
-                            setTextoEdicao(it.correcao ?? "");
-                          }}
-                        >
-                          <Pencil className="mr-1 h-4 w-4" aria-hidden="true" /> Editar sugestão
-                        </Button>
-                        {it.status !== "under_review" && it.status !== "approved" && (
-                          <Button
-                            size="sm"
-                            variant="secondary"
-                            disabled={salvando}
-                            onClick={() => void acao(it, "under_review")}
-                          >
-                            Colocar em revisão
-                          </Button>
-                        )}
-                        <Button
-                          size="sm"
-                          disabled={salvando || it.status === "approved"}
-                          onClick={() => void acao(it, "approved")}
-                        >
-                          <Check className="mr-1 h-4 w-4" aria-hidden="true" /> Aprovar
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="destructive"
-                          disabled={salvando || it.status === "rejected"}
-                          onClick={() => {
-                            setRejeitando(it);
-                            setMotivo("");
-                          }}
-                        >
-                          <X className="mr-1 h-4 w-4" aria-hidden="true" /> Rejeitar
-                        </Button>
-                        {it.status === "approved" && (
-                          <Button
-                            size="sm"
-                            variant="secondary"
-                            disabled={salvando || !it.root_cause}
-                            title={
-                              it.root_cause
-                                ? "Aplicar na camada responsável"
-                                : "Diagnostique a causa antes de aplicar"
-                            }
-                            onClick={() => void abrirAplicacao(it)}
-                          >
-                            <Wrench className="mr-1 h-4 w-4" aria-hidden="true" /> Aplicar correção
-                          </Button>
-                        )}
-                        {(it.status === "applied" || it.status === "reverted") && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            disabled={salvando}
-                            onClick={() => void abrirHistorico(it)}
-                          >
-                            Histórico e reversão
-                          </Button>
-                        )}
-                      </>
-                    )}
                   </div>
+
+                  {abertos[it.id] && (
+                    <div className="space-y-3 border-t border-border pt-3">
+                      {/* 1) Mensagem e contexto */}
+                      <section className="space-y-2">
+                        <h3 className="text-xs font-semibold uppercase tracking-wide">
+                          Mensagem e contexto
+                        </h3>
+                        <div>
+                          <Label className="text-xs text-muted-foreground">
+                            Mensagem reportada (resposta da Nina)
+                          </Label>
+                          <div className="mt-1 max-h-40 overflow-auto whitespace-pre-wrap rounded-md border border-border bg-muted/40 p-2 text-xs">
+                            {it.mensagem_texto?.trim() || "—"}
+                          </div>
+                        </div>
+                        <div>
+                          <Label className="text-xs text-muted-foreground">
+                            Entradas que originaram a resposta
+                          </Label>
+                          <div className="mt-1 max-h-28 overflow-auto whitespace-pre-wrap rounded-md border border-border bg-muted/40 p-2 text-xs">
+                            {it.pergunta_texto?.trim() || "— (sem vínculo confiável)"}
+                          </div>
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          Conversa:{" "}
+                          {rotuloConversaReporte(it.conversa_id, conversas[it.conversa_id ?? ""])}
+                          {it.knowledge_status
+                            ? ` · Base: ${ROTULO_KB[it.knowledge_status] ?? it.knowledge_status}`
+                            : ""}
+                          {ehReporteRapido(it.origem) ? " · Reporte de um clique" : ""}
+                        </p>
+                      </section>
+
+                      {/* 2) Auditoria técnica — carregada só ao expandir */}
+                      <section className="space-y-2">
+                        <h3 className="text-xs font-semibold uppercase tracking-wide">
+                          Auditoria técnica
+                        </h3>
+                        {podeRevisar ? (
+                          <details className="rounded-md border border-border p-2">
+                            <summary className="cursor-pointer text-xs font-medium">
+                              Caminho executado, fontes, registros e ferramentas
+                            </summary>
+                            <div className="mt-2">
+                              <EvidenciasExecucao
+                                clinicaId={clinicaId ?? ""}
+                                execucaoId={
+                                  (it as { execucao_id?: string | null }).execucao_id ?? null
+                                }
+                              />
+                            </div>
+                          </details>
+                        ) : (
+                          <p className="text-xs text-muted-foreground">
+                            Conteúdo técnico restrito a quem revisa aprendizados.
+                          </p>
+                        )}
+                        <p className="text-[11px] text-muted-foreground">
+                          Auditoria disponível não significa que a resposta está correta.
+                        </p>
+                      </section>
+
+                      {/* 3) Análise e revisão */}
+                      <section className="space-y-2">
+                        <h3 className="text-xs font-semibold uppercase tracking-wide">
+                          Análise e revisão
+                        </h3>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Badge variant="outline">
+                            Classificação: {rotuloCategoriaFeedback(it.categoria)}
+                          </Badge>
+                          {it.prioridade && (
+                            <Badge
+                              variant={it.prioridade === "critico" ? "destructive" : "secondary"}
+                              className={
+                                it.prioridade === "alto"
+                                  ? "border-amber-500 text-amber-700 dark:text-amber-400"
+                                  : ""
+                              }
+                            >
+                              Prioridade: {rotuloPrioridade(it.prioridade)}
+                            </Badge>
+                          )}
+                          {it.root_cause && (
+                            <Badge variant="outline">Causa: {rotuloCausaRaiz(it.root_cause)}</Badge>
+                          )}
+                          {it.revisado_por && (
+                            <span className="text-xs text-muted-foreground">
+                              revisado por {pessoas[it.revisado_por] ?? "—"}
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          Análise com IA: {ROTULO_ANALISE[estadoAnalise(it)]}
+                          {estadoAnalise(it) === "done"
+                            ? " (diagnóstico registrado — não confirma o erro)"
+                            : ""}
+                        </p>
+                        <div>
+                          <Label className="text-xs text-muted-foreground">Correção sugerida</Label>
+                          <div className="mt-1 whitespace-pre-wrap rounded-md border border-border p-2 text-xs">
+                            {it.correcao?.trim() || "— (a preencher na revisão)"}
+                          </div>
+                        </div>
+                        {it.observacao && (
+                          <p className="text-xs text-muted-foreground">
+                            Observação interna: {it.observacao}
+                          </p>
+                        )}
+                        {it.motivo_rejeicao && (
+                          <p className="text-xs text-muted-foreground">
+                            Motivo da rejeição: {it.motivo_rejeicao}
+                          </p>
+                        )}
+
+                        {podeRevisar && (
+                          <div className="flex flex-wrap gap-2 pt-1">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => void abrirDiagnostico(it)}
+                            >
+                              <Stethoscope className="mr-1 h-4 w-4" aria-hidden="true" />{" "}
+                              {it.root_cause ? "Rever diagnóstico" : "Diagnosticar causa"}
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => {
+                                setEditando(it);
+                                setTextoEdicao(it.correcao ?? "");
+                              }}
+                            >
+                              <Pencil className="mr-1 h-4 w-4" aria-hidden="true" /> Editar sugestão
+                            </Button>
+                            {it.status !== "under_review" && it.status !== "approved" && (
+                              <Button
+                                size="sm"
+                                variant="secondary"
+                                disabled={salvando}
+                                onClick={() => void acao(it, "under_review")}
+                              >
+                                Colocar em revisão
+                              </Button>
+                            )}
+                            <Button
+                              size="sm"
+                              disabled={salvando || it.status === "approved"}
+                              onClick={() => void acao(it, "approved")}
+                            >
+                              <Check className="mr-1 h-4 w-4" aria-hidden="true" /> Aprovar
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="destructive"
+                              disabled={salvando || it.status === "rejected"}
+                              onClick={() => {
+                                setRejeitando(it);
+                                setMotivo("");
+                              }}
+                            >
+                              <X className="mr-1 h-4 w-4" aria-hidden="true" /> Rejeitar
+                            </Button>
+                            {it.status === "approved" && (
+                              <Button
+                                size="sm"
+                                variant="secondary"
+                                disabled={salvando || !it.root_cause}
+                                title={
+                                  it.root_cause
+                                    ? "Aplicar na camada responsável"
+                                    : "Diagnostique a causa antes de aplicar"
+                                }
+                                onClick={() => void abrirAplicacao(it)}
+                              >
+                                <Wrench className="mr-1 h-4 w-4" aria-hidden="true" /> Aplicar
+                                correção
+                              </Button>
+                            )}
+                            {(it.status === "applied" || it.status === "reverted") && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                disabled={salvando}
+                                onClick={() => void abrirHistorico(it)}
+                              >
+                                Histórico e reversão
+                              </Button>
+                            )}
+                          </div>
+                        )}
+                      </section>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             </li>
