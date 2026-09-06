@@ -600,6 +600,24 @@ const ROTAS_HOME_PORTAL: ReadonlySet<string> = new Set(
 );
 
 /**
+ * Famílias de rotas em que a tela é a MESMA instância mesmo quando o endereço
+ * muda (ex.: a Inbox da Nina, onde /app/nina/<conversa> só troca a conversa
+ * aberta). Trocar a `key` da área principal nesses casos remontaria a tela
+ * inteira — lista, filtros, cache, prefetch e rascunhos — a cada clique.
+ *
+ * A comparação é por segmento exato, então /app/nina-metricas e
+ * /app/nina-aprendizado continuam sendo telas independentes.
+ */
+const FAMILIAS_ROTA_ESTAVEL: readonly string[] = ["/app/nina"];
+
+export function chaveAreaPrincipal(pathname: string): string {
+  for (const base of FAMILIAS_ROTA_ESTAVEL) {
+    if (pathname === base || pathname.startsWith(`${base}/`)) return base;
+  }
+  return pathname;
+}
+
+/**
  * Primeira tela que o usuário realmente pode abrir, na ordem em que ela
  * aparece no menu lateral já filtrado (portal + permissões + feature flags +
  * ordem personalizada). Grupos expansíveis (ex.: Nina) entram pelo primeiro
