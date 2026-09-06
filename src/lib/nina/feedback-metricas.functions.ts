@@ -220,7 +220,25 @@ export const metricasAprendizadoNina = createServerFn({ method: "POST" })
       .sort((a, b) => b.ocorrencias - a.ocorrencias)
       .slice(0, 20);
 
-    return { indicadores, evolucao, recorrentes };
+    const filtrosErroAtivos = Boolean(
+      data.status || data.categoria || data.rootCause || data.prioridade,
+    );
+
+    return {
+      indicadores,
+      evolucao,
+      recorrentes,
+      recorte: {
+        inicio: recorte.inicio,
+        fim: recorte.fim,
+        fuso: recorte.fuso,
+        dias: recorte.janelas.length,
+        diaInteiro: recorte.diaInteiro,
+        descricao: descricaoRecorte(recorte),
+        filtrosErroAtivos,
+      },
+    };
+
   });
 
 /**
