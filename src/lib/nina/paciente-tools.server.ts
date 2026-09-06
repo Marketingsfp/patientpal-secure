@@ -554,6 +554,23 @@ export const FERRAMENTAS_NINA_CONSULTA = [
   {
     type: "function",
     function: {
+      name: "horario_funcionamento",
+      description:
+        "Horário de funcionamento OFICIAL publicado na Base de Conhecimentos (abertura e fechamento da clínica). NÃO é horário de profissional nem vaga disponível — para vaga use consultar_disponibilidade. Se devolver encontrado=false, diga que não tem a informação confirmada; NUNCA afirme que a clínica está fechada.",
+      parameters: {
+        type: "object",
+        properties: {
+          data: {
+            type: "string",
+            description: "AAAA-MM-DD quando o paciente perguntou de um dia específico (aplica exceções e vigência).",
+          },
+        },
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
       name: "consultar_disponibilidade",
       description:
         "Horários REALMENTE livres na agenda. É a ÚNICA fonte de horário — nunca ofereça um horário que não veio daqui.",
@@ -971,6 +988,41 @@ async function executarFerramentaInterna(
           },
         };
       }
+
+      case "horario_funcionamento": {
+        // Fonte única: calendário publicado na Base de Conhecimentos (Fases 1-3).
+        const { carregarCalendariosPublicados } = await import("./classificador-periodo.functions");
+        const { horarioOficialDoDia, semanaOficial, nomeDia } = await import("./horario-oficial");
+        const calendarios = await carregarCalendariosPublicados(supabaseAdmin, ctx.clinicaId);
+        const hoje = new Intl.DateTimeFormat("en-CA", { timeZone: HORA_LOCAL }).format(new Date());
+        const alvo = typeof (args as any)?.data === "string" && (args as any).data ? String((args as any).data) : hoje;
+        // Unidade histórica não é inferida: sem unidade no contexto, só calendário geral.
+        const escopo = { clinica_id: ctx.clinicaId, unidade_id: null };
+        const dia = horarioOficialDoDia({ data: alvo, escopo, calendarios });
+        const semana = semanaOficial({ referencia: alvo, escopo, calendarios });
+        return {
+          ok: true,
+          data: alvo,
+          fuso: dia.fuso,
+          dia: {
+            encontrado: dia.encontrado,
+            fechado: dia.fechado,
+            faixas: dia.faixas,
+            excecao: dia.excecao,
+            motivo: dia.motivo,
+          },
+          semana: semana.encontrado
+            ? semana.dias.map((d) => ({
+                dia: nomeDia(d.dia_semana),
+                fechado: d.fechado,
+                faixas: d.faixas,
+              }))
+            : [],
+          versao_calendario: dia.versao,
+          instrucao: dia.instrucao,
+        };
+      }
+
 
       case "consultar_disponibilidade": {
         const p = zDisponibilidade.parse(args);
