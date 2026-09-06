@@ -2121,7 +2121,10 @@ export function AtendInbox() {
                 placeholder="Buscar nome, telefone ou # da conversa…"
               />
             </div>
-            {resultadoNumero && (
+            {/* Sem "#" (ex.: telefone), só aparece quando REALMENTE achou o
+                número: nada de avisar "não encontrei" em busca de texto. */}
+            {resultadoNumero &&
+              (buscaInterp.exigeNumero || resultadoNumero.estado === "ok") && (
               <div className="rounded-md border border-atd-border bg-atd-blue-tint/40 p-2 text-xs">
                 {resultadoNumero.estado === "carregando" && (
                   <span className="text-muted-foreground">Procurando pelo número…</span>
