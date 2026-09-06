@@ -13,6 +13,8 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { MSG_CONFLITO } from "@/lib/nina/decisoes";
+import { registrarDecisao } from "@/lib/nina/decisoes.functions";
 
 const STATUS = [
   "pending",
@@ -232,7 +234,7 @@ export const revisarFeedbackErroNina = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     await assertRevisor(context.supabase, context.userId, data.clinicaId);
 
-    const { data: atual, error: eAtual } = await (context.supabase as never as ClienteSupabase)
+    const { data: atual, error: eAtual } = await (context.supabase as any)
       .from("nina_feedback_erros")
       .select("id, status, root_cause, updated_at")
       .eq("id", data.id)
