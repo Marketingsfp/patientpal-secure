@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "bun:test";
 import { criarPrefetchStore, chavePrefetch } from "../prefetch-cache";
 
 const CH = chavePrefetch("clinica-1", "user-1");
