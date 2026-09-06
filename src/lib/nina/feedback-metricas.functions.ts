@@ -78,17 +78,30 @@ export const metricasAprendizadoNina = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) => filtros.parse(i))
   .handler(async ({ data, context }) => {
+    // Recorte comum (data + faixa de horário + fuso da clínica). Uma única
+    // consulta cobre do primeiro ao último instante e o filtro por faixa de
+    // horário é aplicado dia a dia, sem incluir tardes/noites intermediárias.
+    const hoje = new Date().toISOString().slice(0, 10);
+    const recorte = resolverRecorte({
+      de: (data.de ?? hoje).slice(0, 10),
+      ate: (data.ate ?? hoje).slice(0, 10),
+      diaInteiro: data.diaInteiro,
+      horaInicio: data.horaInicio ?? null,
+      horaFim: data.horaFim ?? null,
+      fuso: data.fuso ?? null,
+    });
+
     let q = context.supabase
       .from("nina_feedback_erros")
       .select(
         "id, status, categoria, root_cause, prioridade, unidade_id, grupo_titulo, grupo_chave, validacao_status, created_at",
       )
       .eq("clinica_id", data.clinicaId)
+      .gte("created_at", recorte.inicio)
+      .lt("created_at", recorte.fim)
       .order("created_at", { ascending: true })
       .limit(5000);
 
-    if (data.de) q = q.gte("created_at", data.de);
-    if (data.ate) q = q.lte("created_at", data.ate);
     if (data.status) q = q.eq("status", data.status);
     if (data.categoria) q = q.eq("categoria", data.categoria);
     if (data.rootCause) q = q.eq("root_cause", data.rootCause);
@@ -98,20 +111,25 @@ export const metricasAprendizadoNina = createServerFn({ method: "POST" })
 
     const { data: linhas, error } = await q;
     if (error) throw new Error(error.message);
-    const itens = (linhas ?? []) as Linha[];
+    const itens = ((linhas ?? []) as Linha[]).filter((l) =>
+      dentroDoRecorte(l.created_at, recorte),
+    );
 
-    // Volume de respostas da Nina no mesmo período, para a taxa de erro.
-    let qe = context.supabase
+    // Volume de respostas da Nina no mesmo recorte, para a taxa de erro.
+    // Filtros específicos de erro NÃO reduzem este denominador.
+    const qe = context.supabase
       .from("nina_execucoes")
       .select("created_at")
       .eq("clinica_id", data.clinicaId)
+      .gte("created_at", recorte.inicio)
+      .lt("created_at", recorte.fim)
       .order("created_at", { ascending: true })
       .limit(20000);
-    if (data.de) qe = qe.gte("created_at", data.de);
-    if (data.ate) qe = qe.lte("created_at", data.ate);
     const { data: execs, error: erroExec } = await qe;
     if (erroExec) throw new Error(erroExec.message);
-    const execucoes = (execs ?? []) as { created_at: string }[];
+    const execucoes = ((execs ?? []) as { created_at: string }[]).filter((e) =>
+      dentroDoRecorte(e.created_at, recorte),
+    );
 
     const porStatus = contar(STATUS, itens.map((i) => i.status));
     const porCausa = contar(
@@ -141,6 +159,8 @@ export const metricasAprendizadoNina = createServerFn({ method: "POST" })
     };
 
     // Série temporal: reportados, aplicados, revertidos e taxa de erro.
+    // O agrupamento é independente do filtro de horário: "por dia" continua
+    // considerando apenas a faixa selecionada em cada dia.
     const serie = new Map<
       string,
       { periodo: string; reportados: number; aplicados: number; revertidos: number; execucoes: number }
@@ -153,12 +173,14 @@ export const metricasAprendizadoNina = createServerFn({ method: "POST" })
       return novo;
     };
     for (const i of itens) {
-      const b = garantir(balde(i.created_at, data.granularidade));
+      const b = garantir(baldeLocal(i.created_at, data.granularidade, recorte.fuso));
       b.reportados += 1;
       if (i.status === "applied") b.aplicados += 1;
       if (i.status === "reverted") b.revertidos += 1;
     }
-    for (const e of execucoes) garantir(balde(e.created_at, data.granularidade)).execucoes += 1;
+    for (const e of execucoes)
+      garantir(baldeLocal(e.created_at, data.granularidade, recorte.fuso)).execucoes += 1;
+
 
     const evolucao = [...serie.values()]
       .sort((a, b) => a.periodo.localeCompare(b.periodo))
