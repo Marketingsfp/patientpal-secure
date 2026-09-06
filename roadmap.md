@@ -50,6 +50,6 @@
 
 ## Nina — Analista de métricas
 - [x] Fase 6 — diagnóstico e plano
-- [ ] Fase 7 — camada de dados analítica (calendário + consultas combináveis)
+- [x] Fase 7 — camada de dados analítica (calendário + consultas combináveis, reconciliada com o painel)
 - [ ] Fase 8 — analista GPT-5.6 Sol na tela de métricas
 - [ ] Fase 9 — validação final
