@@ -188,7 +188,18 @@ export function calendarioAplicavel(
   const daUnidade = candidatos.filter((c) => c.unidade_id && c.unidade_id === escopo.unidade_id);
   const efetivos = daUnidade.length > 0 ? daUnidade : candidatos;
 
-  if (efetivos.length > 1) return { calendario: null, conflito: true };
+  // Dentro do mesmo escopo, a versão publicada prevalece sobre versões já substituídas
+  // (a substituída permanece apenas como registro histórico do período anterior).
+  const publicadosVigentes = efetivos.filter((c) => c.status === "publicado");
+  if (publicadosVigentes.length > 1) return { calendario: null, conflito: true };
+  if (publicadosVigentes.length === 1) return { calendario: publicadosVigentes[0] ?? null, conflito: false };
+
+  if (efetivos.length > 1) {
+    // Somente versões substituídas: usa a mais recente aplicável àquela data.
+    const ordenados = [...efetivos].sort((a, b) => (b.versao ?? 0) - (a.versao ?? 0));
+    if ((ordenados[0]?.versao ?? 0) === (ordenados[1]?.versao ?? 0)) return { calendario: null, conflito: true };
+    return { calendario: ordenados[0] ?? null, conflito: false };
+  }
   return { calendario: efetivos[0] ?? null, conflito: false };
 }
 
