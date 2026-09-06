@@ -36,3 +36,32 @@ export function apenasDestinatariosValidos<T extends { role?: string | null }>(
 ): T[] {
   return pessoas.filter((p) => podeReceberConversa(p.role));
 }
+
+/* ---------------------------------------------------------------
+ * Presença exibida ao lado do nome na transferência.
+ * Fonte já existente: `atend_agente_presenca` + `atend_pausas_log`.
+ * ------------------------------------------------------------- */
+
+export type PresencaAtendente = "ONLINE" | "PAUSA" | "OFFLINE";
+
+/** Janela em que o heartbeat de presença ainda vale (igual à distribuição). */
+const PRESENCA_VALIDA_MS = 5 * 60 * 1000;
+
+export function statusPresenca(p: {
+  status: string | null | undefined;
+  vistoEm: string | null | undefined;
+  emPausa: boolean;
+}): PresencaAtendente {
+  if (p.emPausa) return "PAUSA";
+  const visto = p.vistoEm ? Date.parse(p.vistoEm) : NaN;
+  const recente = Number.isFinite(visto) && Date.now() - visto < PRESENCA_VALIDA_MS;
+  if ((p.status ?? "").toUpperCase() === "ONLINE" && recente) return "ONLINE";
+  return "OFFLINE";
+}
+
+/** Texto do status (a cor nunca é a única informação). */
+export const ROTULO_PRESENCA: Record<PresencaAtendente, string> = {
+  ONLINE: "Online",
+  PAUSA: "Em pausa",
+  OFFLINE: "Offline",
+};
