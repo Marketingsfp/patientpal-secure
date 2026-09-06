@@ -451,6 +451,11 @@ export function CatalogoNina({
             <Button variant="outline" onClick={() => setAberto(false)} disabled={salvando}>
               Cancelar
             </Button>
+            {posicao + 1 < fila.length && (
+              <Button variant="ghost" onClick={proximoDaFila} disabled={salvando}>
+                Pular para o próximo
+              </Button>
+            )}
             {podeEditar && (
               <>
                 <Button variant="secondary" onClick={() => salvar(false)} disabled={salvando}>
