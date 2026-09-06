@@ -981,6 +981,8 @@ export function AtendInbox() {
   useEffect(() => {
     const abrir = (id: string | null, mensagemId?: string | null) => {
       if (!id) return;
+      setAlvoIndisponivel(false);
+      setMsgDestacada(null);
       if (mensagemId) setAlvoMensagem({ conversaId: id, mensagemId, pedido: ++seqAlvo.current });
       else setAlvoMensagem(null);
       abrirConversa(id);
