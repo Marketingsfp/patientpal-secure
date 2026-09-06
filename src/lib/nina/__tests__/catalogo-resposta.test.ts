@@ -50,7 +50,7 @@ describe("FASE 4 — contexto sem obstáculo", () => {
   });
 
   it("dúvida administrativa simples não exige CPF", () => {
-    expect(bloco).toMatch(/Dúvida administrativa simples.*não exige nome completo, CPF/s);
+    expect(bloco).toMatch(/Dúvida administrativa simples.*NÃO exige nome completo, CPF/s);
   });
 });
 
