@@ -406,6 +406,10 @@ export function AtendInbox() {
     pedido: number;
   } | null>(null);
   const [buscandoAlvo, setBuscandoAlvo] = useState(false);
+  // Conversas abertas apontando para uma mensagem antiga: nelas a leitura
+  // automática fica suspensa até a atendente abrir a conversa normalmente.
+  const aberturaPorAlvoRef = useRef<Set<string>>(new Set());
+
   const [alvoIndisponivel, setAlvoIndisponivel] = useState(false);
   const [msgDestacada, setMsgDestacada] = useState<string | null>(null);
   const seqEspera = useRef(0);
