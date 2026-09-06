@@ -1369,25 +1369,24 @@ export function AtendInbox() {
   useEffect(() => {
     const conversa = sel;
     const alvo = conversa?.id as string | undefined;
-    // Skeleton, conversa trocada ou aba em segundo plano: ninguém leu nada.
-    if (!clinicaId || !alvo || !abaVisivel) return;
-    if (conversaCarregadaId !== alvo || carregandoConversa) return;
-    // Abertura posicionada num trecho antigo: só depois que a localização
-    // termina e o usuário volta a abrir a conversa normalmente.
-    if (aberturaPorAlvoRef.current.has(alvo) || buscandoAlvo || alvoMensagem) return;
-    if (
-      !podeMarcarLidaAutomaticamente({
-        userId: meuId ?? "",
-        atribuidaUserId: conversa?.atribuida_user_id ?? null,
-        ehGestor: souGestor,
-      })
-    )
-      return;
+    if (!clinicaId || !alvo || carregandoConversa) return;
     const ultima = msgs.length ? (msgs[msgs.length - 1] as any) : null;
-    const mensagemId = ultima?.id as string | undefined;
-    if (!mensagemId) return;
-    if (ultimaLidaRef.current.get(alvo) === mensagemId) return;
+    const mensagemId = (ultima?.id as string | undefined) ?? null;
+    const liberado = deveRegistrarLeituraAoAbrir({
+      userId: meuId ?? "",
+      atribuidaUserId: conversa?.atribuida_user_id ?? null,
+      ehGestor: souGestor,
+      conversaId: alvo,
+      conversaCarregadaId,
+      abaVisivel,
+      aberturaPorAlvo:
+        aberturaPorAlvoRef.current.has(alvo) || buscandoAlvo || !!alvoMensagem,
+      ultimaMensagemId: mensagemId,
+      ultimaRegistradaId: ultimaLidaRef.current.get(alvo) ?? null,
+    });
+    if (!liberado || !mensagemId) return;
     ultimaLidaRef.current.set(alvo, mensagemId);
+
     // Otimista: a bolinha some na hora, mas o número anterior é guardado para
     // voltar caso a gravação falhe — nada de esconder o problema.
     let anterior = 0;
