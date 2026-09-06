@@ -45,8 +45,9 @@ export function ResumoHandoffCard({
         const r = (await medirRequest(
           "obterResumoHandoff",
           obter({ data: { clinicaId, conversaId, forcar } }),
+          conversaId,
         )) as Linha;
-        marcarTroca("T7_resumo");
+        marcarTroca("T7_resumo", conversaId);
         setLinha((anterior) => {
           if (anterior && r && anterior.versao !== r.versao) setAtualizado(true);
           return r;

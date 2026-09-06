@@ -157,7 +157,13 @@ import {
   cursorMaisAntigo,
 } from "@/lib/atendimento/mensagens-janela";
 import { criarMedidorConversa, type MedidorConversa } from "@/lib/atendimento/perf-conversa";
-import { iniciarTroca, marcarTroca, medirRequest } from "@/lib/atendimento/perf-troca";
+import {
+  contarCicloInbox,
+  iniciarTroca,
+  marcarCache,
+  marcarTroca,
+  medirRequest,
+} from "@/lib/atendimento/perf-troca";
 import { useNavigate, useParams } from "@tanstack/react-router";
 import {
   acaoPermitida,
@@ -305,7 +311,16 @@ export function AtendInbox() {
   const conversaIdUrlRef = useRef<string | null>(conversaIdUrl);
   useEffect(() => {
     conversaIdUrlRef.current = conversaIdUrl;
+    // FASE 4 — instante em que o endereço passou a apontar para o lead pedido.
+    if (conversaIdUrl) marcarTroca("T1b_url", conversaIdUrl);
   }, [conversaIdUrl]);
+
+  // Montagens/desmontagens da Inbox: a Fase 1 precisa continuar em zero por
+  // troca de conversa. Contadas aqui e expostas para a medição.
+  useEffect(() => {
+    contarCicloInbox("montagem");
+    return () => contarCicloInbox("desmontagem");
+  }, []);
   // Conversas já buscadas por link direto (evita repetir a busca em loop).
   const deepLinkTentado = useRef<Set<string>>(new Set());
   // Conversa aberta por link enquanto o filtro correspondente ainda carrega:
@@ -973,7 +988,7 @@ export function AtendInbox() {
     // a carga: eles só marcam que há sincronização pendente.
     aberturaEmAndamentoRef.current = { conversaId: alvo, pedido };
     medidor.current?.marcar("request");
-    marcarTroca("T2_requests");
+    marcarTroca("T2_requests", alvo);
     // Todas as buscas saem juntas (sem fila). A diferença é o que cada uma
     // libera na tela: só as mensagens abrem o chat.
     const aindaVale = () =>
@@ -992,11 +1007,14 @@ export function AtendInbox() {
     const chavePf = chavePrefetch(clinicaId, meuId);
     const entradaEmVoo =
       janela === JANELA_INICIAL ? prefetchMsgs.current.obter(alvo, chavePf) : undefined;
+    marcarCache("mensagens_prefetch", !!entradaEmVoo, alvo);
+    marcarCache("mensagens_cache", !!cacheConversas.current.obter(alvo), alvo);
     const pMensagens = entradaEmVoo
       ? entradaEmVoo.promise
       : medirRequest(
           "listarMensagensConversa",
           listarMsgs({ data: { clinicaId, conversaId: alvo, limit: janela } }),
+          alvo,
         );
     // A busca fica registrada com a versão atual da conversa. Se a conversa for
     // invalidada (mensagem nova, transferência) ou a clínica/usuário mudarem
@@ -1008,14 +1026,17 @@ export function AtendInbox() {
     const pContato = medirRequest(
       "obterDadosContato",
       obterContato({ data: { clinicaId, conversaId: alvo } }),
+      alvo,
     );
     const pNotas = medirRequest(
       "listarNotas",
       listarNotasFn({ data: { clinicaId, conversaId: alvo } }),
+      alvo,
     ).catch(() => [] as any[]);
     const pEventos = medirRequest(
       "listarEventosConversa",
       listarEventosFn({ data: { clinicaId, conversaId: alvo } }),
+      alvo,
     ).catch(() => [] as ConversaEvento[]);
 
     // Guarda o que as mensagens devolveram: `null` significa que a busca
@@ -1027,7 +1048,7 @@ export function AtendInbox() {
       try {
         const m = (await pMensagens) as any[];
         msgsCarregadas = m;
-        marcarTroca("T4_mensagens");
+        marcarTroca("T4_mensagens", alvo);
         if (!aindaVale()) return;
         medidor.current?.marcar("dados");
         setErroMsgs(false);
@@ -1042,6 +1063,10 @@ export function AtendInbox() {
           anteriores.length > m.length ? temMaisAntigasRef.current : podeCarregarMais(m.length, janela),
         );
         setConversaCarregadaId(alvo);
+        // "Mensagens certas visíveis": o estado já é o desta conversa, não
+        // um skeleton nem o histórico do lead anterior.
+        marcarTroca("T4b_mensagens_corretas", alvo);
+        marcarTroca("T5b_acoes", alvo);
         // O chat já pode ser reaberto na hora: guarda parcial agora, sem
         // esperar contato/notas/eventos. Se o conteúdo completo já estiver
         // guardado, ele é preservado.
@@ -1068,8 +1093,10 @@ export function AtendInbox() {
     const secundarios = (async () => {
       try {
         const [c, n, ev] = await Promise.all([pContato, pNotas, pEventos]);
-        marcarTroca("T3_conversa");
-        marcarTroca("T8_contato");
+        marcarTroca("T3_conversa", alvo);
+        marcarTroca("T8_contato", alvo);
+        marcarTroca("T9_notas", alvo);
+        marcarTroca("T9b_eventos", alvo);
         if (!aindaVale()) return;
         if (!c) {
           // Conversa não existe mais nesta clínica: limpa a seleção sem quebrar.
@@ -1274,7 +1301,10 @@ export function AtendInbox() {
   // é revalidado em segundo plano — nunca o conteúdo da conversa anterior.
   useEffect(() => {
     const id = sel?.id;
-    marcarTroca("T1_selecao");
+    marcarTroca("T1_selecao", id ?? undefined);
+    // O cabeçalho lê `sel`: no momento em que a seleção passa a ser a conversa
+    // pedida na URL, o cabeçalho já é o do lead certo.
+    if (id && conversaIdUrlRef.current === id) marcarTroca("T1c_cabecalho", id);
     janelaRef.current = JANELA_INICIAL;
     setTemMaisAntigas(false);
     // FASE 4 — conversa já vinculada a um paciente conhecido: o painel de
@@ -1527,11 +1557,11 @@ export function AtendInbox() {
   useEffect(() => {
     if (!conteudoDaConversa) return;
     medidor.current?.marcar("render");
-    marcarTroca("T5_render");
+    marcarTroca("T5_render", conversaCarregadaId ?? undefined);
     const id = requestAnimationFrame(() => {
       requestAnimationFrame(() => {
         medidor.current?.marcar("scroll");
-        marcarTroca("T6_scroll");
+        marcarTroca("T6_scroll", conversaCarregadaId ?? undefined);
         medidor.current = null;
       });
     });
@@ -2080,7 +2110,7 @@ export function AtendInbox() {
               <button
                 key={c.id}
                 onClick={() => {
-                  iniciarTroca(c.id);
+                  iniciarTroca(c.id, "clique");
                   medidor.current = criarMedidorConversa(`conversa ${c.id}`);
                   medidor.current.marcar("click");
                   // Só muda o endereço: a conversa aberta vem da URL.
