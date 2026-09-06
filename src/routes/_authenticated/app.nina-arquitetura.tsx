@@ -36,7 +36,7 @@ export const Route = createFileRoute("/_authenticated/app/nina-arquitetura")({
 });
 
 function Pagina() {
-  const { clinicaId } = useClinica();
+  const { clinicaAtual } = useClinica();
   const [modo, setModo] = useState<"arquitetura" | "execucao">("arquitetura");
 
   return (

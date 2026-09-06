@@ -68,6 +68,7 @@ export const ROUTE_TO_MODULE: Record<string, string | null> = {
   // gestor/supervisor — justamente quem revisa e aprova os erros reportados.
   "/app/nina-aprendizado": "nina",
   "/app/nina-metricas": "nina",
+  "/app/nina-arquitetura": "nina",
   "/app/configuracoes/respostas-rapidas": "nina",
   "/app/odontologia": "odontologia",
   "/app/odontologia/orcamentos": "odontologia",
