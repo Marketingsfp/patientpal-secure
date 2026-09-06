@@ -462,8 +462,9 @@ export const perguntarAnalistaMetricas = createServerFn({ method: "POST" })
       criado_por: ctx.userId,
     };
 
-    // Falha ao gravar o histórico não pode derrubar a resposta já produzida.
-    const { data: salvo } = await ctx.supabase
+    // Falha ao gravar o histórico não pode derrubar a resposta já produzida,
+    // mas precisa ser informada: a tela avisa que a análise não ficou salva.
+    const { data: salvo, error: erroHistorico } = await ctx.supabase
       .from("nina_analista_analises")
       .insert(registro)
       .select("id, created_at")
@@ -473,6 +474,8 @@ export const perguntarAnalistaMetricas = createServerFn({ method: "POST" })
       ...registro,
       id: salvo?.id ?? null,
       created_at: salvo?.created_at ?? new Date().toISOString(),
+      historico_salvo: Boolean(salvo?.id),
+      historico_erro: erroHistorico?.message ?? null,
       limites,
     };
   });

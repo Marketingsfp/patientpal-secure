@@ -181,6 +181,15 @@ function Resposta({
 
   return (
     <div className="space-y-4">
+      {resultado.historico_salvo === false ? (
+        <div className="rounded-md border border-amber-500/40 bg-amber-500/5 p-3 text-sm">
+          <p className="font-medium">Análise não salva no histórico</p>
+          <p className="text-muted-foreground">
+            O resultado abaixo foi gerado normalmente, mas não ficou registrado no histórico desta
+            clínica.
+          </p>
+        </div>
+      ) : null}
       {resultado.status === "invalida" ? (
         <div className="flex gap-2 rounded-md border border-destructive/40 bg-destructive/5 p-3 text-sm">
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" aria-hidden />

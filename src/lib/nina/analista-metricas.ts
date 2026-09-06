@@ -380,7 +380,15 @@ export function valoresPermitidos(resultados: { id: string; dados: any }[]): Map
         if (typeof c[k] === "number") comparacoes.push(c[k]);
       }
     }
-    mapa.set(id, { indicadores, comparacoes });
+    const valores = { indicadores, comparacoes };
+    mapa.set(id, valores);
+    // O resultado de cada período também traz o id técnico devolvido pelo
+    // banco. Quando o modelo cita esse id em vez do id da consulta, o número
+    // continua sendo o mesmo — aceitamos os dois como apelido da consulta.
+    for (const p of dados?.periodos ?? []) {
+      const alias = p?.consultaId;
+      if (typeof alias === "string" && alias && !mapa.has(alias)) mapa.set(alias, valores);
+    }
   }
   return mapa;
 }
@@ -408,6 +416,13 @@ export function validarResposta(
   }
 
   if (permitidos.size === 0) {
+    const semNumeros =
+      (resposta.indicadores?.length ?? 0) === 0 &&
+      (resposta.comparacoes?.length ?? 0) === 0 &&
+      (resposta.evidencias?.length ?? 0) === 0;
+    // Recusa legítima (pedido fora do escopo autorizado) não cita números e
+    // não pode ser tratada como análise inválida.
+    if (semNumeros) return { valida: true, problemas: [] };
     problemas.push({
       campo: "consultas",
       detalhe: "Nenhuma consulta autorizada foi executada; a resposta não tem base em dados.",
