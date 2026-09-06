@@ -21,6 +21,7 @@ import {
 import { useServerFn } from "@tanstack/react-start";
 import { useClinica } from "@/hooks/use-clinica";
 import { usePodeEscrever } from "@/hooks/use-permissoes";
+import { useWebmcpContexto } from "@/hooks/use-webmcp-contexto";
 import { registrarFeedbackNina } from "@/lib/nina/aprendizado.functions";
 import { BaseConhecimento } from "@/components/nina/BaseConhecimento";
 
@@ -76,6 +77,9 @@ export const Route = createFileRoute("/_authenticated/app/nina")({
 
 function NinaPage() {
   const { clinicaAtual } = useClinica();
+  // WebMCP (Fase 2): registra a única ferramenta de leitura de contexto.
+  // Sem suporte no navegador, nada acontece e a tela segue igual.
+  useWebmcpContexto();
   const clinicaId = clinicaAtual?.clinica_id;
   const location = useLocation();
   const navigate = useNavigate();
