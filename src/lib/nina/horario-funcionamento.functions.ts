@@ -145,7 +145,9 @@ export const salvarDiaHorario = createServerFn({ method: "POST" })
       ativo: true,
     };
 
-    const linhas = data.fechado
+    const linhas: Array<
+      typeof base & { fechado: boolean; hora_inicio: string | null; hora_fim: string | null }
+    > = data.fechado
       ? [{ ...base, fechado: true, hora_inicio: null, hora_fim: null }]
       : data.faixas.map((f) => ({
           ...base,
