@@ -7491,6 +7491,139 @@ export type Database = {
           },
         ]
       }
+      nina_analista_analises: {
+        Row: {
+          clinica_id: string
+          created_at: string
+          criado_por: string
+          custo_estimado: number | null
+          custo_moeda: string | null
+          custo_preco_vigencia: string | null
+          dados_atualizados_em: string
+          duracao_ms: number | null
+          erro: string | null
+          filtros_painel: Json
+          id: string
+          input_tokens: number
+          modelo: string
+          origem: string
+          output_tokens: number
+          pergunta: string
+          problemas: Json
+          recorte_utilizado: string | null
+          resposta: Json | null
+          resultados: Json
+          status: string
+          versao_regras: string
+        }
+        Insert: {
+          clinica_id: string
+          created_at?: string
+          criado_por: string
+          custo_estimado?: number | null
+          custo_moeda?: string | null
+          custo_preco_vigencia?: string | null
+          dados_atualizados_em?: string
+          duracao_ms?: number | null
+          erro?: string | null
+          filtros_painel?: Json
+          id?: string
+          input_tokens?: number
+          modelo: string
+          origem?: string
+          output_tokens?: number
+          pergunta: string
+          problemas?: Json
+          recorte_utilizado?: string | null
+          resposta?: Json | null
+          resultados?: Json
+          status: string
+          versao_regras: string
+        }
+        Update: {
+          clinica_id?: string
+          created_at?: string
+          criado_por?: string
+          custo_estimado?: number | null
+          custo_moeda?: string | null
+          custo_preco_vigencia?: string | null
+          dados_atualizados_em?: string
+          duracao_ms?: number | null
+          erro?: string | null
+          filtros_painel?: Json
+          id?: string
+          input_tokens?: number
+          modelo?: string
+          origem?: string
+          output_tokens?: number
+          pergunta?: string
+          problemas?: Json
+          recorte_utilizado?: string | null
+          resposta?: Json | null
+          resultados?: Json
+          status?: string
+          versao_regras?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nina_analista_analises_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      nina_analista_config: {
+        Row: {
+          clinica_id: string
+          max_analises_por_dia: number
+          max_consultas_por_pergunta: number
+          max_rodadas: number
+          max_tokens_saida: number
+          preco_input_por_milhao: number | null
+          preco_moeda: string
+          preco_output_por_milhao: number | null
+          preco_vigencia_inicio: string | null
+          timeout_ms: number
+          updated_at: string
+        }
+        Insert: {
+          clinica_id: string
+          max_analises_por_dia?: number
+          max_consultas_por_pergunta?: number
+          max_rodadas?: number
+          max_tokens_saida?: number
+          preco_input_por_milhao?: number | null
+          preco_moeda?: string
+          preco_output_por_milhao?: number | null
+          preco_vigencia_inicio?: string | null
+          timeout_ms?: number
+          updated_at?: string
+        }
+        Update: {
+          clinica_id?: string
+          max_analises_por_dia?: number
+          max_consultas_por_pergunta?: number
+          max_rodadas?: number
+          max_tokens_saida?: number
+          preco_input_por_milhao?: number | null
+          preco_moeda?: string
+          preco_output_por_milhao?: number | null
+          preco_vigencia_inicio?: string | null
+          timeout_ms?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nina_analista_config_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: true
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       nina_aprendizado_versoes: {
         Row: {
           alterado_por: string | null

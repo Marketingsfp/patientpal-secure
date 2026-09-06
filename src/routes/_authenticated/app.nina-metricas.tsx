@@ -45,6 +45,7 @@ import {
   FUSO_OPERACAO_PADRAO,
   validarRecorte,
 } from "@/lib/nina/metricas-filtros";
+import { AnalistaMetricasIA } from "@/components/nina/AnalistaMetricasIA";
 import {
   metricasAprendizadoNina,
   trilhaAuditoriaAprendizadoNina,
@@ -242,6 +243,13 @@ function Pagina() {
 
   const ind = dados?.indicadores;
   const op = dados?.operacionais;
+
+  const filtrosErroAtivos =
+    status !== TODOS ||
+    categoria !== TODOS ||
+    rootCause !== TODOS ||
+    prioridade !== TODOS ||
+    assunto.trim() !== "";
 
   // Resumo do recorte ativo, sempre visível (mesmo antes da primeira resposta).
   const resumoRecorte = useMemo(() => {
@@ -556,6 +564,31 @@ function Pagina() {
           </CardContent>
         </Card>
       ) : null}
+
+      {/* Seção da Fase 9: isolada dos cards acima — falha ou lentidão aqui não
+          afeta os indicadores, a Nina nem o atendimento. */}
+      <AnalistaMetricasIA
+        clinicaId={clinicaId}
+        resumoRecorte={resumoRecorte}
+        filtrosErroAtivos={filtrosErroAtivos}
+        filtros={{
+          de,
+          ate,
+          diaInteiro,
+          horaInicio: diaInteiro ? null : horaInicio,
+          horaFim: diaInteiro ? null : horaFim,
+          ambiente,
+          unidadeId: unidadeId === TODOS ? null : unidadeId,
+        }}
+        onAplicarRecorte={(r) => {
+          // Ação explícita: os filtros do painel só mudam se a pessoa clicar.
+          setDe(r.de);
+          setAte(r.ate);
+          setDiaInteiro(r.diaInteiro);
+          if (r.horaInicio) setHoraInicio(r.horaInicio);
+          if (r.horaFim) setHoraFim(r.horaFim);
+        }}
+      />
 
       {ind ? (
         <>

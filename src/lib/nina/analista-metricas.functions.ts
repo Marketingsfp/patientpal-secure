@@ -50,6 +50,7 @@ const entrada = z.object({
   painel: contextoPainel,
   /** Continuidade: últimas rodadas desta mesma análise. */
   historico: z.array(turnoAnterior).max(6).default([]),
+  origem: z.enum(["pergunta", "filtros_atuais", "atualizacao"]).default("pergunta"),
 });
 
 type Contexto = { supabase: any; userId: string };
@@ -72,7 +73,7 @@ type SaidaModelo = {
 };
 
 /** Chamada ao provedor via Responses API, com streaming consumido no servidor. */
-async function chamarModelo(input: any[]): Promise<SaidaModelo> {
+async function chamarModelo(input: any[], maxTokensSaida: number): Promise<SaidaModelo> {
   const apiKey = process.env["LOVABLE_API_KEY"];
   if (!apiKey) throw new Error("Análise indisponível: chave do provedor de IA não configurada.");
 
@@ -91,6 +92,7 @@ async function chamarModelo(input: any[]): Promise<SaidaModelo> {
       store: false,
       tools: FERRAMENTAS_ANALISTA,
       tool_choice: "auto",
+      max_output_tokens: maxTokensSaida,
       text: {
         format: {
           type: "json_schema",
@@ -226,6 +228,67 @@ async function ferramentaConfiguracao(context: Contexto, clinicaId: string) {
   };
 }
 
+const LIMITES_PADRAO = {
+  max_consultas_por_pergunta: MAX_CONSULTAS,
+  max_rodadas: MAX_RODADAS_FERRAMENTA,
+  max_tokens_saida: 6000,
+  timeout_ms: 300000,
+  max_analises_por_dia: 60,
+  preco_input_por_milhao: null as number | null,
+  preco_output_por_milhao: null as number | null,
+  preco_moeda: "USD",
+  preco_vigencia_inicio: null as string | null,
+};
+
+/** Limites configuráveis por clínica; sem configuração, valem os padrões. */
+async function carregarLimites(context: Contexto, clinicaId: string) {
+  const { data } = await context.supabase
+    .from("nina_analista_config")
+    .select("*")
+    .eq("clinica_id", clinicaId)
+    .maybeSingle();
+  return { ...LIMITES_PADRAO, ...(data ?? {}) };
+}
+
+/** Custo só é calculado quando há preço cadastrado, com a data de vigência. */
+function calcularCusto(limites: any, inputTokens: number, outputTokens: number) {
+  const pi = Number(limites.preco_input_por_milhao);
+  const po = Number(limites.preco_output_por_milhao);
+  if (!Number.isFinite(pi) && !Number.isFinite(po)) return null;
+  const valor =
+    ((Number.isFinite(pi) ? pi : 0) * inputTokens + (Number.isFinite(po) ? po : 0) * outputTokens) /
+    1_000_000;
+  return {
+    valor: Number(valor.toFixed(6)),
+    moeda: limites.preco_moeda ?? "USD",
+    vigencia: limites.preco_vigencia_inicio ?? null,
+  };
+}
+
+/** Lista o histórico de análises. Respeita a permissão atual, não a de quando foi criada. */
+export const listarAnalisesMetricasNina = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => z.object({ clinicaId: z.string().uuid() }).parse(i))
+  .handler(async ({ data, context }) => {
+    const ctx = context as unknown as Contexto;
+    await exigirPermissao(ctx, data.clinicaId);
+    const { analiseIAAtivaNaClinica } = await import("./analise-flag.server");
+    const [{ data: linhas, error }, limites, ativa] = await Promise.all([
+      ctx.supabase
+        .from("nina_analista_analises")
+        .select(
+          "id, pergunta, status, erro, resposta, problemas, resultados, filtros_painel, recorte_utilizado, modelo, versao_regras, input_tokens, output_tokens, custo_estimado, custo_moeda, custo_preco_vigencia, duracao_ms, dados_atualizados_em, origem, created_at",
+        )
+        .eq("clinica_id", data.clinicaId)
+        .order("created_at", { ascending: false })
+        .limit(30),
+      carregarLimites(ctx, data.clinicaId),
+      analiseIAAtivaNaClinica(data.clinicaId),
+    ]);
+    if (error) throw new Error(error.message);
+    return { analises: linhas ?? [], limites, ativa, modelo: MODELO_ANALISTA };
+  });
+
 export const perguntarAnalistaMetricas = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) => entrada.parse(i))
@@ -241,6 +304,20 @@ export const perguntarAnalistaMetricas = createServerFn({ method: "POST" })
     const fuso = data.fuso?.trim() || FUSO_OPERACAO_PADRAO;
     const agora = new Date();
     const inicio = Date.now();
+
+    const limites = await carregarLimites(ctx, data.clinicaId);
+    const inicioDoDia = new Date(agora);
+    inicioDoDia.setUTCHours(0, 0, 0, 0);
+    const { count } = await ctx.supabase
+      .from("nina_analista_analises")
+      .select("id", { count: "exact", head: true })
+      .eq("clinica_id", data.clinicaId)
+      .gte("created_at", inicioDoDia.toISOString());
+    if ((count ?? 0) >= limites.max_analises_por_dia) {
+      throw new Error(
+        `Limite de ${limites.max_analises_por_dia} análises por dia atingido nesta clínica.`,
+      );
+    }
 
     // A pergunta é conteúdo, não instrução, e vai mascarada para o provedor.
     const perguntaSegura = mascararPergunta(data.pergunta);
@@ -279,8 +356,13 @@ export const perguntarAnalistaMetricas = createServerFn({ method: "POST" })
     let erroFerramenta: string | null = null;
 
     try {
-      for (let rodada = 0; rodada < MAX_RODADAS_FERRAMENTA; rodada += 1) {
-        saida = await chamarModelo(input);
+      for (let rodada = 0; rodada < limites.max_rodadas; rodada += 1) {
+        // Orçamento de tempo: não interrompe uma chamada em andamento (o que
+        // desperdiçaria a geração já cobrada); apenas não inicia outra rodada.
+        if (rodada > 0 && Date.now() - inicio > limites.timeout_ms) {
+          throw new Error("Tempo limite da análise atingido antes de concluir as consultas.");
+        }
+        saida = await chamarModelo(input, limites.max_tokens_saida);
         inputTokens += saida.inputTokens ?? 0;
         outputTokens += saida.outputTokens ?? 0;
         if (saida.chamadas.length === 0) break;
@@ -291,8 +373,10 @@ export const perguntarAnalistaMetricas = createServerFn({ method: "POST" })
           try {
             const args = JSON.parse(chamada.arguments || "{}");
             if (chamada.name === "consultar_metricas") {
-              if (consultas.length >= MAX_CONSULTAS) {
-                resultado = { erro: `Limite de ${MAX_CONSULTAS} consultas por pergunta atingido.` };
+              if (consultas.length >= limites.max_consultas_por_pergunta) {
+                resultado = {
+                  erro: `Limite de ${limites.max_consultas_por_pergunta} consultas por pergunta atingido.`,
+                };
               } else {
                 // Permissões revalidadas a cada consulta, inclusive em perguntas seguintes.
                 await exigirPermissao(ctx, data.clinicaId);
@@ -326,46 +410,69 @@ export const perguntarAnalistaMetricas = createServerFn({ method: "POST" })
       erroFerramenta = e instanceof Error ? e.message : "Falha na análise.";
     }
 
-    const base = {
-      versao: VERSAO_ANALISTA,
-      modelo: MODELO_ANALISTA,
-      geradoEm: new Date().toISOString(),
-      duracaoMs: Date.now() - inicio,
-      inputTokens,
-      outputTokens,
-      consultas: consultas.map((c) => ({ id: c.id, filtros: c.dados?.periodos?.map((p: any) => p.filtros) })),
-    };
+    const custo = calcularCusto(limites, inputTokens, outputTokens);
+    const duracaoMs = Date.now() - inicio;
 
-    if (erroFerramenta) {
-      return { ...base, status: "falha" as const, erro: erroFerramenta, resposta: null, problemas: [] };
+    let resposta: RespostaAnalista | null = null;
+    let status: "ok" | "invalida" | "falha" = "falha";
+    let erro: string | null = erroFerramenta;
+    let problemas: any[] = [];
+
+    if (!erroFerramenta) {
+      let bruto: unknown = null;
+      try {
+        bruto = JSON.parse(saida?.texto ?? "");
+      } catch {
+        bruto = null;
+      }
+      if (!bruto || typeof bruto !== "object") {
+        erro = "O analista não devolveu um resultado interpretável.";
+      } else {
+        resposta = bruto as RespostaAnalista;
+        const v = validarResposta(resposta, valoresPermitidos(consultas));
+        problemas = v.problemas;
+        // Resposta com número incompatível NÃO é apresentada como válida.
+        status = v.valida ? "ok" : "invalida";
+        erro = v.valida ? null : "Os valores citados não conferem com as consultas executadas.";
+      }
     }
 
-    let bruto: unknown = null;
-    try {
-      bruto = JSON.parse(saida?.texto ?? "");
-    } catch {
-      bruto = null;
-    }
-    if (!bruto || typeof bruto !== "object") {
-      return {
-        ...base,
-        status: "falha" as const,
-        erro: "O analista não devolveu um resultado interpretável.",
-        resposta: null,
-        problemas: [],
-      };
-    }
-
-    const resposta = bruto as RespostaAnalista;
-    const { valida, problemas } = validarResposta(resposta, valoresPermitidos(consultas));
-
-    return {
-      ...base,
-      // Resposta com número incompatível NÃO é apresentada como válida.
-      status: valida ? ("ok" as const) : ("invalida" as const),
-      erro: valida ? null : "Os valores citados não conferem com as consultas executadas.",
+    const registro = {
+      clinica_id: data.clinicaId,
+      pergunta: perguntaSegura,
+      status,
+      erro,
       resposta,
       problemas,
-      resultadosConsultados: consultas,
+      // Dados estruturados que sustentam a resposta: a tela monta tabelas com
+      // eles, nunca com números escritos pelo modelo.
+      resultados: consultas,
+      filtros_painel: data.painel,
+      recorte_utilizado: resposta?.recorte_utilizado ?? null,
+      modelo: MODELO_ANALISTA,
+      versao_regras: VERSAO_ANALISTA,
+      input_tokens: inputTokens,
+      output_tokens: outputTokens,
+      custo_estimado: custo?.valor ?? null,
+      custo_moeda: custo?.moeda ?? null,
+      custo_preco_vigencia: custo?.vigencia ?? null,
+      duracao_ms: duracaoMs,
+      dados_atualizados_em: new Date().toISOString(),
+      origem: data.origem,
+      criado_por: ctx.userId,
+    };
+
+    // Falha ao gravar o histórico não pode derrubar a resposta já produzida.
+    const { data: salvo } = await ctx.supabase
+      .from("nina_analista_analises")
+      .insert(registro)
+      .select("id, created_at")
+      .maybeSingle();
+
+    return {
+      ...registro,
+      id: salvo?.id ?? null,
+      created_at: salvo?.created_at ?? new Date().toISOString(),
+      limites,
     };
   });
