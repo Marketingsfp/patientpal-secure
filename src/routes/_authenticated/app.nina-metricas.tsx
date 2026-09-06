@@ -486,9 +486,9 @@ function Pagina() {
             />
             <Indicador titulo="Correções revertidas" valor={String(ind.revertidos)} />
             <Indicador
-              titulo="Taxa de erro"
+              titulo="Reportes por resposta da Nina (referência)"
               valor={pct(ind.taxaErro)}
-              detalhe={`${ind.execucoes} respostas da Nina no período`}
+              detalhe={`${ind.execucoes} respostas da Nina no período · a taxa oficial usa as mensagens totais do sistema`}
             />
             <Indicador titulo="Alucinações" valor={String(ind.porCausa.hallucination)} />
             <Indicador
