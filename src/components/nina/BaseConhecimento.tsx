@@ -64,7 +64,7 @@ function corStatus(s: string) {
  * Envio da planilha oficial (TAP), processamento, versões e homologação.
  * As permissões são conferidas no servidor: aqui a UI apenas reflete.
  */
-export function BaseConhecimento() {
+function BaseConhecimentoPlanilha() {
   const { clinicaAtual } = useClinica();
   const clinicaId = clinicaAtual?.clinica_id;
   const ehAdmin = ["admin", "gestor"].includes(String(clinicaAtual?.role ?? ""));
