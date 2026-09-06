@@ -117,6 +117,9 @@ function Pagina() {
   const [granularidade, setGranularidade] = useState<"dia" | "semana" | "mes">("dia");
   const [de, setDe] = useState(dataISO(30));
   const [ate, setAte] = useState(dataISO(0));
+  const [diaInteiro, setDiaInteiro] = useState(true);
+  const [horaInicio, setHoraInicio] = useState("07:00");
+  const [horaFim, setHoraFim] = useState("12:00");
   const [status, setStatus] = useState(TODOS);
   const [categoria, setCategoria] = useState(TODOS);
   const [rootCause, setRootCause] = useState(TODOS);
@@ -127,6 +130,14 @@ function Pagina() {
   const [trilhaId, setTrilhaId] = useState("");
   const [trilha, setTrilha] = useState<Trilha | null>(null);
   const [carregandoTrilha, setCarregandoTrilha] = useState(false);
+
+  // Evita que uma consulta antiga sobrescreva uma seleção mais recente.
+  const consultaRef = useRef(0);
+
+  const erroFiltro = useMemo(
+    () => validarRecorte({ de, ate, diaInteiro, horaInicio, horaFim }),
+    [de, ate, diaInteiro, horaInicio, horaFim],
+  );
 
   useEffect(() => {
     if (!clinicaId) return;
@@ -145,15 +156,20 @@ function Pagina() {
   }, [clinicaId]);
 
   const carregar = useCallback(async () => {
-    if (!clinicaId) return;
+    if (!clinicaId || erroFiltro) return;
+    const meu = ++consultaRef.current;
     setCarregando(true);
     try {
       const res = await buscarMetricas({
         data: {
           clinicaId,
           granularidade,
-          de: de ? `${de}T00:00:00.000Z` : null,
-          ate: ate ? `${ate}T23:59:59.999Z` : null,
+          de,
+          ate,
+          diaInteiro,
+          horaInicio: diaInteiro ? null : horaInicio,
+          horaFim: diaInteiro ? null : horaFim,
+          fuso: FUSO_OPERACAO_PADRAO,
           status: status === TODOS ? null : (status as never),
           categoria: categoria === TODOS ? null : (categoria as never),
           rootCause: rootCause === TODOS ? null : (rootCause as never),
@@ -162,18 +178,22 @@ function Pagina() {
           assunto: assunto.trim() || null,
         },
       });
-      setDados(res);
+      if (meu === consultaRef.current) setDados(res);
     } catch (e) {
-      mostrarErro(e);
+      if (meu === consultaRef.current) mostrarErro(e);
     } finally {
-      setCarregando(false);
+      if (meu === consultaRef.current) setCarregando(false);
     }
   }, [
     buscarMetricas,
     clinicaId,
+    erroFiltro,
     granularidade,
     de,
     ate,
+    diaInteiro,
+    horaInicio,
+    horaFim,
     status,
     categoria,
     rootCause,
@@ -197,6 +217,7 @@ function Pagina() {
       setCarregandoTrilha(false);
     }
   };
+
 
   const maxSerie = useMemo(
     () => Math.max(1, ...(dados?.evolucao ?? []).map((p) => p.reportados)),
