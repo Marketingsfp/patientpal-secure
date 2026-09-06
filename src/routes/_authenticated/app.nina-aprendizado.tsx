@@ -77,6 +77,19 @@ import {
 } from "@/lib/nina/feedback-revisao.functions";
 import { lerConversaFeedbackNina } from "@/lib/nina/feedback-conversa.functions";
 import {
+  AVISO_ANALISE_NAO_APROVA,
+  EXPLICACAO_APROVAR,
+  analiseUsouOutroConjunto,
+  camadaDaCausa,
+  rotuloDecisao,
+} from "@/lib/nina/decisoes";
+import {
+  decidirProblemaFeedbackNina,
+  listarDecisoesFeedbackNina,
+  registrarUsoRascunhoIA,
+  type Decisao,
+} from "@/lib/nina/decisoes.functions";
+import {
   CAUSAS_RAIZ_NINA,
   PRIORIDADES_NINA,
   rotuloCausaRaiz,
@@ -143,6 +156,8 @@ type Item = {
   revisado_por: string | null;
   revisado_em: string | null;
   created_at: string;
+  updated_at: string;
+  decisao_humana: string | null;
   root_cause: string | null;
   prioridade: string | null;
   knowledge_status: string | null;
@@ -303,6 +318,13 @@ function Pagina() {
   const [revertendo, setRevertendo] = useState<VersaoAprendizado | null>(null);
   const [motivoReversao, setMotivoReversao] = useState("");
 
+  const [versoesAnalise, setVersoesAnalise] = useState<Record<string, AnaliseSalva[]>>({});
+  const [decisoes, setDecisoes] = useState<Record<string, Decisao[]>>({});
+  const [decidindo, setDecidindo] = useState(false);
+
+  const decidirProblema = useServerFn(decidirProblemaFeedbackNina);
+  const listarDecisoes = useServerFn(listarDecisoesFeedbackNina);
+  const registrarRascunhoIA = useServerFn(registrarUsoRascunhoIA);
   const listar = useServerFn(listarRevisaoFeedbackNina);
   const listarAutores = useServerFn(listarAutoresFeedbackNina);
   const checarPermissao = useServerFn(podeRevisarFeedbackNina);
@@ -400,7 +422,15 @@ function Pagina() {
   const acao = async (item: Item, novo: "under_review" | "approved" | "pending") => {
     setSalvando(true);
     try {
-      await revisar({ data: { id: item.id, clinicaId: clinicaId!, acao: novo, motivo: null } });
+      await revisar({
+        data: {
+          id: item.id,
+          clinicaId: clinicaId!,
+          acao: novo,
+          motivo: null,
+          esperadoUpdatedAt: item.updated_at ?? null,
+        },
+      });
       toast.success(
         novo === "approved"
           ? "Correção validada. Nada foi alterado na Base ainda."
@@ -469,12 +499,20 @@ function Pagina() {
       if (!clinicaId || analises[feedbackId] !== undefined) return;
       try {
         const r = await listarAnalises({ data: { clinicaId, feedbackId } });
-        setAnalises((a) => ({ ...a, [feedbackId]: (r.analises[0] as AnaliseSalva) ?? null }));
+        const todas = (r.analises ?? []) as AnaliseSalva[];
+        setAnalises((a) => ({ ...a, [feedbackId]: todas[0] ?? null }));
+        setVersoesAnalise((v) => ({ ...v, [feedbackId]: todas }));
       } catch {
         setAnalises((a) => ({ ...a, [feedbackId]: null }));
       }
+      try {
+        const d = await listarDecisoes({ data: { clinicaId, feedbackId } });
+        setDecisoes((x) => ({ ...x, [feedbackId]: d as Decisao[] }));
+      } catch {
+        /* histórico é complementar */
+      }
     },
-    [analises, clinicaId, listarAnalises],
+    [analises, clinicaId, listarAnalises, listarDecisoes],
   );
 
   /** Ação explícita e paga. Duplo clique não dispara duas análises. */

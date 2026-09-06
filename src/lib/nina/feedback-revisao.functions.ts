@@ -27,7 +27,7 @@ const STATUS = [
 export type StatusFeedbackNina = (typeof STATUS)[number];
 
 const COLUNAS =
-  "id, clinica_id, conversa_id, mensagem_id, mensagem_texto, pergunta_texto, categoria, origem, correcao, correcao_original, observacao, motivo_rejeicao, status, reportado_por, revisado_por, revisado_em, unidade_id, created_at, updated_at, root_cause, prioridade, knowledge_status, knowledge_snapshot, knowledge_consultado_em, grupo_chave, grupo_titulo, diagnosticado_por, diagnosticado_em, execucao_id, auditoria_status";
+  "id, clinica_id, conversa_id, mensagem_id, mensagem_texto, pergunta_texto, categoria, origem, correcao, correcao_original, observacao, motivo_rejeicao, status, reportado_por, revisado_por, revisado_em, unidade_id, created_at, updated_at, root_cause, prioridade, knowledge_status, knowledge_snapshot, knowledge_consultado_em, grupo_chave, grupo_titulo, diagnosticado_por, diagnosticado_em, execucao_id, auditoria_status, decisao_humana, decidido_por, decidido_em";
 
 type ClienteSupabase = {
   rpc: (
