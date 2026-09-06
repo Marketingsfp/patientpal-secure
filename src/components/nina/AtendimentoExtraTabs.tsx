@@ -1218,7 +1218,29 @@ export function AtendInbox() {
     return () => clearInterval(t);
   }, [carregarEspera]);
 
-  useRealtimeRefresh(["atend_conversas", "whatsapp_mensagens"], carregarConvs, !!clinicaId);
+  // Uma rajada de mensagens novas gerava várias recargas seguidas da lista,
+  // que disputavam espaço com a abertura da conversa. Agora as atualizações
+  // próximas são agrupadas em uma única recarga.
+  const recargaListaRef = useRef<number | null>(null);
+  const recarregarListaAgrupado = useCallback(() => {
+    if (recargaListaRef.current !== null) window.clearTimeout(recargaListaRef.current);
+    recargaListaRef.current = window.setTimeout(() => {
+      recargaListaRef.current = null;
+      void carregarConvs();
+    }, 500);
+  }, [carregarConvs]);
+  useEffect(
+    () => () => {
+      if (recargaListaRef.current !== null) window.clearTimeout(recargaListaRef.current);
+    },
+    [],
+  );
+
+  useRealtimeRefresh(
+    ["atend_conversas", "whatsapp_mensagens"],
+    recarregarListaAgrupado,
+    !!clinicaId,
+  );
   useRealtimeRefresh(["whatsapp_mensagens"], carregarEspera, !!clinicaId);
   useRealtimeRefresh(
     ["whatsapp_mensagens", "atend_conversa_eventos"],
