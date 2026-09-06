@@ -133,7 +133,7 @@ type Item = {
 type Comparacao = {
   knowledge_status: "found" | "not_found" | "conflict";
   base_version: number | null;
-  planilha_atual: string | null;
+  catalogo_atual: string | null;
   correcao_sugerida: string | null;
   causa_sugerida: string;
   prioridade_sugerida: string;
@@ -1251,7 +1251,7 @@ function Pagina() {
                     {comparacao?.base_version ? ` (versão ${comparacao.base_version})` : ""}
                   </Label>
                   <div className="mt-1 max-h-40 overflow-auto whitespace-pre-wrap rounded-md border border-border bg-muted/40 p-2 text-xs">
-                    {comparacao?.planilha_atual ?? "Nada encontrado na planilha para esta pergunta."}
+                    {comparacao?.catalogo_atual ?? "Nada encontrado no catálogo para esta pergunta."}
                   </div>
                 </div>
                 <div>
@@ -1269,7 +1269,7 @@ function Pagina() {
               )}
 
               <p className="rounded-md border border-amber-500/40 bg-amber-500/10 p-2 text-xs">
-                Erro da Nina não é sinônimo de planilha errada. Se a planilha já traz a informação
+                Erro da Nina não é sinônimo de catálogo errado. Se o catálogo já traz a informação
                 correta, a causa está na busca, na interpretação, na ferramenta ou no fluxo.
               </p>
 

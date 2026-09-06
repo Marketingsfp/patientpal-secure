@@ -2,11 +2,11 @@
  * FASE 3 — Diagnóstico da causa real dos erros da Nina (servidor).
  *
  * O que estas funções fazem:
- *   1. consultam a Base de Conhecimentos (planilha oficial) para comparar
- *      "o que a planilha diz hoje" com "a correção sugerida";
+ *   1. consultam a Base de Conhecimentos (catálogo oficial) para comparar
+ *      "o que o catálogo diz hoje" com "a correção sugerida";
  *   2. gravam a causa raiz, a prioridade e o agrupamento no próprio feedback.
  *
- * O que elas NÃO fazem (garantia da fase): não alteram planilha, Base de
+ * O que elas NÃO fazem (garantia da fase): não alteram o catálogo, a Base de
  * Conhecimentos, embeddings, prompt, modelo, regras nem ferramentas. A consulta
  * é somente leitura.
  *
@@ -49,7 +49,7 @@ function contem(alvo: string | null | undefined, trecho: string | null | undefin
 }
 
 /**
- * Compara a planilha oficial com a correção sugerida. Somente leitura.
+ * Compara o catálogo oficial com a correção sugerida. Somente leitura.
  */
 export const consultarBaseFeedbackNina = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -75,7 +75,7 @@ export const consultarBaseFeedbackNina = createServerFn({ method: "POST" })
       canal: "revisao-aprendizado",
     });
 
-    const planilhaResumo = [
+    const catalogoResumo = [
       kb.procedure ? `Item: ${kb.procedure}` : null,
       kb.price ? `Valor: ${kb.price}` : null,
       kb.doctors.length ? `Médicos: ${kb.doctors.join(", ")}` : null,
@@ -92,8 +92,8 @@ export const consultarBaseFeedbackNina = createServerFn({ method: "POST" })
       causaSugerida = "knowledge_missing";
     } else if (kb.knowledge_status === "conflict") {
       causaSugerida = "knowledge_error";
-    } else if (contem(planilhaResumo, fb.correcao)) {
-      // A planilha já traz a informação correta → a falha foi da Nina.
+    } else if (contem(catalogoResumo, fb.correcao)) {
+      // O catálogo já traz a informação correta → a falha foi da Nina.
       causaSugerida = "retrieval_error";
     } else {
       causaSugerida = "knowledge_error";
@@ -106,7 +106,7 @@ export const consultarBaseFeedbackNina = createServerFn({ method: "POST" })
       base_version: kb.base_version,
       base_file: kb.base_file,
       termo,
-      planilha_atual: planilhaResumo || null,
+      catalogo_atual: catalogoResumo || null,
       correcao_sugerida: fb.correcao ?? null,
       trace: kb.trace.slice(0, 5),
       causa_sugerida: causaSugerida,
@@ -117,7 +117,7 @@ export const consultarBaseFeedbackNina = createServerFn({ method: "POST" })
         base_version: kb.base_version,
         base_file: kb.base_file,
         termo,
-        resumo: planilhaResumo || null,
+        resumo: catalogoResumo || null,
         trace: kb.trace.slice(0, 5),
         consultado_em: new Date().toISOString(),
       },
