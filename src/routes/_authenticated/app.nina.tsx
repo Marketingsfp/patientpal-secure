@@ -1,4 +1,5 @@
 import { createFileRoute, Outlet, useLocation, useNavigate } from "@tanstack/react-router";
+import { confirmDialog } from "@/lib/confirm";
 import { useState, useEffect, useCallback, useMemo } from "react";
 import {
   MessageCircle,
