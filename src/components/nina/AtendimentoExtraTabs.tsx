@@ -2296,7 +2296,7 @@ export function AtendInbox() {
           </CardHeader>
 
           <div className="flex-1 overflow-auto p-3 space-y-4 text-sm">
-            {!contato ? (
+            {!contatoAtual ? (
               // O esqueleto é só deste painel: o chat nunca espera pelo contato.
               !dadosSecundariosProntos ? (
                 <ContatoSkeleton />
