@@ -70,8 +70,8 @@ function BadgeStatus({ status, emRevisao }: { status: string; emRevisao?: boolea
 
 /**
  * Catálogo estruturado da Nina: exames/procedimentos e consultas/profissionais.
- * Nesta fase o catálogo é apenas cadastrado — a fonte usada no atendimento
- * continua sendo a planilha ativa.
+ * FASE 7: é a única base de conhecimento administrativo da Nina. Só os
+ * registros PUBLICADOS são usados no atendimento.
  */
 export function CatalogoNina({
   clinicaId,
@@ -287,8 +287,8 @@ export function CatalogoNina({
         <div>
           <h3 className="text-base font-semibold">{titulo}</h3>
           <p className="text-sm text-muted-foreground">
-            Cadastro estruturado do catálogo. Nesta fase, a Nina continua respondendo pela
-            planilha ativa.
+            Cadastro manual ou com IA. A Nina responde aos pacientes usando apenas os
+            registros publicados.
           </p>
         </div>
         {podeEditar && (
