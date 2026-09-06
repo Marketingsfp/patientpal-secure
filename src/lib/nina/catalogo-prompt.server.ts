@@ -46,14 +46,15 @@ function hojeLocal(agora: Date = new Date()): string {
  * (valor + forma + condição, horário + recorrência + aviso, preparo,
  * observação pública, consulta/convênio). Não repetir essas regras em outros
  * blocos de prompt — regra duplicada vira regra contraditória.
+ *
+ * Exportada como função pura para que a homologação use EXATAMENTE o mesmo
+ * texto do atendimento, sem depender de leitura de banco.
  */
-export async function blocoPromptCatalogo(clinicaId: string): Promise<string> {
-  const { servicos, profissionais } = await contarCatalogoPublicado(clinicaId);
-  if (servicos + profissionais === 0) return "";
-
+export function regrasCatalogo(servicos: number, profissionais: number): string {
   return `BASE DE CONHECIMENTOS OFICIAL DA CLÍNICA (catálogo estruturado — fonte de verdade administrativa)
 Registros publicados: ${servicos} exames/procedimentos e ${profissionais} profissionais.
 Hoje é ${hojeLocal()} (fuso ${FUSO}). Use SEMPRE esta data para "hoje", "amanhã", "essa semana", "próximo sábado". Nunca presuma outra data.
+
 
 A. FONTE E LIMITES
 - Antes de responder qualquer coisa sobre especialidades, exames, procedimentos, médicos, dias, horários, preços, preparos, convênios, observações ou regras administrativas, CHAME "consultar_base_conhecimento".
@@ -125,6 +126,13 @@ K. INFORMAR NÃO É EXECUTAR
 - NUNCA confirme vaga com base no horário habitual do catálogo.
 - NUNCA diga "agendado", "marcado", "transferido" ou "protocolo gerado" antes de a operação retornar confirmada. Antes disso, fale em intenção: "vou verificar", "posso reservar".
 - Havendo intenção de agendar, siga o fluxo já definido de coleta e validação dos dados; não pule etapas nem crie um fluxo próprio.`;
-
 }
+
+/** Bloco anexado ao prompt do atendimento — vazio se a clínica não tem catálogo publicado. */
+export async function blocoPromptCatalogo(clinicaId: string): Promise<string> {
+  const { servicos, profissionais } = await contarCatalogoPublicado(clinicaId);
+  if (servicos + profissionais === 0) return "";
+  return regrasCatalogo(servicos, profissionais);
+}
+
 
