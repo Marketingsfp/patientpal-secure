@@ -235,6 +235,8 @@ function Pagina() {
   const [itens, setItens] = useState<Item[]>([]);
   const [pessoas, setPessoas] = useState<Record<string, string>>({});
   const [contagens, setContagens] = useState<Record<string, number>>({});
+  const [conversas, setConversas] = useState<Record<string, number>>({});
+
   const [autores, setAutores] = useState<{ id: string; nome: string }[]>([]);
   const [carregando, setCarregando] = useState(false);
   const [podeRevisar, setPodeRevisar] = useState(false);
