@@ -86,12 +86,8 @@ import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { NinaMessage, TypingDots } from "@/components/nina/NinaMessage";
 import { formatWhatsappText } from "@/components/nina/formatWhatsappText";
 import { HomologacaoWhatsapp } from "@/components/nina/HomologacaoWhatsapp";
-import {
-  AtendMacros,
-} from "@/components/nina/AtendimentoTabs";
-import {
-  AtendInbox,
-} from "@/components/nina/AtendimentoExtraTabs";
+import { AtendMacros } from "@/components/nina/AtendimentoTabs";
+import { AtendInbox } from "@/components/nina/AtendimentoExtraTabs";
 
 export const Route = createFileRoute("/_authenticated/app/nina")({
   // A rota filha /app/nina/<id> só existe para dar endereço próprio a cada
