@@ -22,7 +22,10 @@ export const FLAG_NINA_CATALOGO_FONTE = "nina_catalogo_fonte_enabled";
 const COLUNAS_SERVICO =
   "id, nome, valor, valor_observacao, descricao_publica, preparo, restricoes, executantes, formas_pagamento";
 const COLUNAS_PROFISSIONAL =
-  "id, nome, especialidades, atende_consultorio, formas_pagamento, convenios, horarios, tipo_atendimento, observacao_publica, aviso_dia, aviso_valido_de, aviso_valido_ate";
+  "id, nome, especialidades, atende_consultorio, formas_pagamento, convenios, horarios, tipo_atendimento, observacao_publica, aviso_dia, aviso_valido_de, aviso_valido_ate, unidades(nome)";
+
+/** Teto de leitura por clínica — nunca o catálogo inteiro sem limite. */
+const TETO_PROFISSIONAIS = 60;
 
 export async function flagCatalogoFonteAtiva(clinicaId: string | null): Promise<boolean> {
   if (!clinicaId) return false;
@@ -47,6 +50,25 @@ function termosBusca(query: string): string[] {
 }
 
 const PALAVRAS_CONSULTA = /(consulta|medic|doutor|dra|dr\b|especialista|atende)/i;
+
+function semAcento(v: unknown): string {
+  return String(v ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+}
+
+/** Casa o termo com nome, especialidade ou modalidade — só campos públicos. */
+function casaProfissional(p: ProfissionalPublicado, termos: string[]): boolean {
+  if (!termos.length) return false;
+  const especialidades = Array.isArray(p.especialidades)
+    ? (p.especialidades as Array<Record<string, unknown>>)
+        .map((e) => semAcento(e?.["nome"]))
+        .join(" ")
+    : "";
+  const alvo = `${semAcento(p.nome)} ${especialidades} ${semAcento(p.tipo_atendimento)}`;
+  return termos.some((t) => alvo.includes(t));
+}
 
 /**
  * Busca só o necessário: filtra por nome/termos e limita o retorno. Nunca
@@ -74,20 +96,17 @@ export async function buscarNoCatalogo(pedido: {
     qServicos = qServicos.or(termos.map((t) => `nome.ilike.%${t}%`).join(","));
   }
 
+  // Profissionais: a especialidade fica em JSONB, onde o filtro exato do
+  // PostgREST não casa com o termo digitado (acento/caixa). Lemos apenas os
+  // publicados da clínica, com teto, e casamos nome/especialidade aqui.
   let qProfissionais = supabaseAdmin
     .from("nina_cat_profissionais")
     .select(COLUNAS_PROFISSIONAL)
     .eq("clinica_id", pedido.clinicaId)
     .eq("status", "PUBLICADO")
-    .limit(limite);
+    .limit(TETO_PROFISSIONAIS);
   if (pedido.medico) {
     qProfissionais = qProfissionais.ilike("nome", `%${pedido.medico}%`);
-  } else if (termos.length) {
-    qProfissionais = qProfissionais.or(
-      termos
-        .map((t) => `nome.ilike.%${t}%,especialidades.cs.[{"nome":"${t}"}]`)
-        .join(","),
-    );
   }
 
   const [servicos, profissionais] = await Promise.all([
@@ -99,7 +118,12 @@ export async function buscarNoCatalogo(pedido: {
   if (profissionais.error) throw new Error(profissionais.error.message);
 
   const listaServicos = (servicos.data ?? []) as unknown as ServicoPublicado[];
-  const listaProfissionais = (profissionais.data ?? []) as unknown as ProfissionalPublicado[];
+  const brutosProfissionais = (profissionais.data ?? []) as unknown as ProfissionalPublicado[];
+  const listaProfissionais = (
+    pedido.medico
+      ? brutosProfissionais
+      : brutosProfissionais.filter((p) => casaProfissional(p, termos))
+  ).slice(0, limite);
 
   // Ambiguidade: mais de um item distinto compatível com a pergunta.
   const itensDistintos = new Set(

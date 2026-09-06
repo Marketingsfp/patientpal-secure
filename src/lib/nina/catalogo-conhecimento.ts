@@ -47,7 +47,15 @@ export type ProfissionalPublicado = {
   aviso_dia: string | null;
   aviso_valido_de: string | null;
   aviso_valido_ate: string | null;
+  /** Unidade vinculada (nome público), quando cadastrada. */
+  unidades?: { nome?: string | null } | null;
 };
+
+/** Nome da unidade do profissional, quando houver. */
+export function unidadeDoProfissional(p: ProfissionalPublicado): string | null {
+  const nome = String(p.unidades?.nome ?? "").trim();
+  return nome ? nome : null;
+}
 
 function lista(v: unknown): Array<Record<string, unknown>> {
   return Array.isArray(v) ? (v.filter((i) => i && typeof i === "object") as Array<Record<string, unknown>>) : [];
@@ -188,6 +196,7 @@ export function profissionalParaRegistro(
             ? "Atende no consultório."
             : "Não atende no consultório.",
         convenios.length ? `Convênios: ${convenios.join(", ")}` : null,
+        unidadeDoProfissional(p) ? `Unidade: ${unidadeDoProfissional(p)}` : null,
         texto(p.observacao_publica),
         aviso ? `Aviso vigente: ${aviso}` : null,
         descricaoPagamentos(p.formas_pagamento),
@@ -200,6 +209,7 @@ export function profissionalParaRegistro(
     extras: {
       catalogo_tipo: "profissional",
       especialidades,
+      unidade: unidadeDoProfissional(p),
       convenios,
       horarios,
       atende_consultorio: p.atende_consultorio,
@@ -279,7 +289,13 @@ export function montarResultadoCatalogo(entrada: {
           .filter(Boolean),
       ),
     ],
-    units: [] as string[],
+    units: [
+      ...new Set(
+        entrada.profissionais
+          .map(unidadeDoProfissional)
+          .filter((u): u is string => Boolean(u)),
+      ),
+    ],
     days: [...new Set(registros.map((r) => String(r.dia ?? "").trim()).filter(Boolean))],
     notes: [
       ...new Set(
