@@ -1151,6 +1151,50 @@ export type Database = {
           },
         ]
       }
+      atend_leituras: {
+        Row: {
+          clinica_id: string
+          conversa_id: string
+          created_at: string
+          id: string
+          read_at: string
+          ultima_msg_lida_em: string
+          ultima_msg_lida_id: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          clinica_id: string
+          conversa_id: string
+          created_at?: string
+          id?: string
+          read_at?: string
+          ultima_msg_lida_em: string
+          ultima_msg_lida_id?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          clinica_id?: string
+          conversa_id?: string
+          created_at?: string
+          id?: string
+          read_at?: string
+          ultima_msg_lida_em?: string
+          ultima_msg_lida_id?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "atend_leituras_conversa_id_fkey"
+            columns: ["conversa_id"]
+            isOneToOne: false
+            referencedRelation: "atend_conversas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       atend_macros: {
         Row: {
           atalho: string
@@ -11732,6 +11776,21 @@ export type Database = {
           novo: boolean
           protocolo: string
         }[]
+      }
+      atend_nao_lidas: {
+        Args: { _clinica_id: string; _conversa_ids: string[] }
+        Returns: {
+          conversa_id: string
+          nao_lidas: number
+        }[]
+      }
+      atend_registrar_leitura: {
+        Args: {
+          _clinica_id: string
+          _conversa_id: string
+          _mensagem_id?: string
+        }
+        Returns: string
       }
       atend_usuario_e_admin: {
         Args: { _clinica_id: string; _user_id: string }
