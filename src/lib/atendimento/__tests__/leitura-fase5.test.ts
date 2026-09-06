@@ -79,7 +79,7 @@ describe("Fase 5 — cenários obrigatórios", () => {
   };
 
   it("atendente abre e visualiza → registra leitura", () => {
-    expect(deveRegistrarLeituraAoAbrir(base).toBe(true);
+    expect(deveRegistrarLeituraAoAbrir(base)).toBe(true);
   });
 
   it("administrador abre (e chega ao fim) → não registra leitura", () => {
