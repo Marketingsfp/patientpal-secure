@@ -77,6 +77,19 @@ import {
 } from "@/lib/nina/feedback-revisao.functions";
 import { lerConversaFeedbackNina } from "@/lib/nina/feedback-conversa.functions";
 import {
+  AVISO_ANALISE_NAO_APROVA,
+  EXPLICACAO_APROVAR,
+  analiseUsouOutroConjunto,
+  camadaDaCausa,
+  rotuloDecisao,
+} from "@/lib/nina/decisoes";
+import {
+  decidirProblemaFeedbackNina,
+  listarDecisoesFeedbackNina,
+  registrarUsoRascunhoIA,
+  type Decisao,
+} from "@/lib/nina/decisoes.functions";
+import {
   CAUSAS_RAIZ_NINA,
   PRIORIDADES_NINA,
   rotuloCausaRaiz,
@@ -143,6 +156,8 @@ type Item = {
   revisado_por: string | null;
   revisado_em: string | null;
   created_at: string;
+  updated_at: string;
+  decisao_humana: string | null;
   root_cause: string | null;
   prioridade: string | null;
   knowledge_status: string | null;
@@ -303,6 +318,13 @@ function Pagina() {
   const [revertendo, setRevertendo] = useState<VersaoAprendizado | null>(null);
   const [motivoReversao, setMotivoReversao] = useState("");
 
+  const [versoesAnalise, setVersoesAnalise] = useState<Record<string, AnaliseSalva[]>>({});
+  const [decisoes, setDecisoes] = useState<Record<string, Decisao[]>>({});
+  const [decidindo, setDecidindo] = useState(false);
+
+  const decidirProblema = useServerFn(decidirProblemaFeedbackNina);
+  const listarDecisoes = useServerFn(listarDecisoesFeedbackNina);
+  const registrarRascunhoIA = useServerFn(registrarUsoRascunhoIA);
   const listar = useServerFn(listarRevisaoFeedbackNina);
   const listarAutores = useServerFn(listarAutoresFeedbackNina);
   const checarPermissao = useServerFn(podeRevisarFeedbackNina);
@@ -400,7 +422,15 @@ function Pagina() {
   const acao = async (item: Item, novo: "under_review" | "approved" | "pending") => {
     setSalvando(true);
     try {
-      await revisar({ data: { id: item.id, clinicaId: clinicaId!, acao: novo, motivo: null } });
+      await revisar({
+        data: {
+          id: item.id,
+          clinicaId: clinicaId!,
+          acao: novo,
+          motivo: null,
+          esperadoUpdatedAt: item.updated_at ?? null,
+        },
+      });
       toast.success(
         novo === "approved"
           ? "Correção validada. Nada foi alterado na Base ainda."
@@ -424,6 +454,7 @@ function Pagina() {
           clinicaId: clinicaId!,
           acao: "rejected",
           motivo: motivo.trim() || null,
+          esperadoUpdatedAt: rejeitando.updated_at ?? null,
         },
       });
       toast.success("Registro rejeitado. Nada foi alterado na Base.");
@@ -447,6 +478,7 @@ function Pagina() {
     try {
       await editar({
         data: {
+          esperadoUpdatedAt: editando.updated_at ?? null,
           id: editando.id,
           clinicaId: clinicaId!,
           correcao: textoEdicao.trim(),
@@ -469,12 +501,20 @@ function Pagina() {
       if (!clinicaId || analises[feedbackId] !== undefined) return;
       try {
         const r = await listarAnalises({ data: { clinicaId, feedbackId } });
-        setAnalises((a) => ({ ...a, [feedbackId]: (r.analises[0] as AnaliseSalva) ?? null }));
+        const todas = (r.analises ?? []) as AnaliseSalva[];
+        setAnalises((a) => ({ ...a, [feedbackId]: todas[0] ?? null }));
+        setVersoesAnalise((v) => ({ ...v, [feedbackId]: todas }));
       } catch {
         setAnalises((a) => ({ ...a, [feedbackId]: null }));
       }
+      try {
+        const d = await listarDecisoes({ data: { clinicaId, feedbackId } });
+        setDecisoes((x) => ({ ...x, [feedbackId]: d as Decisao[] }));
+      } catch {
+        /* histórico é complementar */
+      }
     },
-    [analises, clinicaId, listarAnalises],
+    [analises, clinicaId, listarAnalises, listarDecisoes],
   );
 
   /** Ação explícita e paga. Duplo clique não dispara duas análises. */
@@ -501,6 +541,80 @@ function Pagina() {
     },
     [analisando, analisarIA, clinicaId],
   );
+
+  /** Decisão humana de diagnóstico: confirma o erro ou marca falso positivo. */
+  const decidir = async (item: Item, decisao: "problema_confirmado" | "falso_positivo") => {
+    if (!clinicaId || decidindo) return;
+    setDecidindo(true);
+    try {
+      await decidirProblema({
+        data: {
+          clinicaId,
+          id: item.id,
+          decisao,
+          esperadoUpdatedAt: item.updated_at ?? null,
+        },
+      });
+      toast.success(
+        decisao === "falso_positivo"
+          ? "Marcado como falso positivo. Nada foi alterado no catálogo."
+          : "Problema confirmado. Isso não aprova nem aplica correção.",
+      );
+      await carregar();
+      setDecisoes((d) => {
+        const c = { ...d };
+        delete c[item.id];
+        return c;
+      });
+      setAnalises((a) => ({ ...a }));
+      void carregarDecisoes(item.id);
+    } catch (e) {
+      mostrarErro(e);
+    } finally {
+      setDecidindo(false);
+    }
+  };
+
+  const carregarDecisoes = useCallback(
+    async (feedbackId: string) => {
+      if (!clinicaId) return;
+      try {
+        const d = await listarDecisoes({ data: { clinicaId, feedbackId } });
+        setDecisoes((x) => ({ ...x, [feedbackId]: d as Decisao[] }));
+      } catch {
+        /* histórico é complementar */
+      }
+    },
+    [clinicaId, listarDecisoes],
+  );
+
+  /** Só preenche o rascunho de correção. Não aprova, não publica, não aplica. */
+  const usarSugestaoIA = async (item: Item) => {
+    const a = analises[item.id];
+    const r = a?.resultado;
+    if (!r) return;
+    const texto = [
+      r.problema ? `Problema: ${r.problema}` : null,
+      r.causaProvavel
+        ? `Causa provável${r.causaEhHipotese ? " (hipótese)" : ""}: ${r.causaProvavel}`
+        : null,
+      r.proximaVerificacao ? `Próxima verificação: ${r.proximaVerificacao}` : null,
+    ]
+      .filter(Boolean)
+      .join("\n");
+    setEditando(item);
+    setTextoEdicao(item.correcao?.trim() ? item.correcao : texto);
+    toast.info("Rascunho preenchido a partir da análise. Revise antes de salvar.");
+    if (clinicaId) {
+      try {
+        await registrarRascunhoIA({
+          data: { clinicaId, id: item.id, analiseId: a!.id, analiseVersao: a!.versao },
+        });
+      } catch {
+        /* registro complementar */
+      }
+    }
+  };
 
   const abrirConversa = async (item: Item) => {
     if (!item.conversa_id || !clinicaId) {
@@ -1047,15 +1161,81 @@ function Pagina() {
                         </p>
                         {podeRevisar &&
                           (analises[it.id] ? (
-                            <AnaliseErroIAResultado
-                              analise={analises[it.id]!}
-                              solicitante={pessoas[analises[it.id]!.solicitado_por] ?? null}
-                            />
+                            <div className="space-y-2">
+                              <p className="text-xs text-muted-foreground">
+                                {AVISO_ANALISE_NAO_APROVA}
+                              </p>
+                              {analiseUsouOutroConjunto(
+                                (analises[it.id] as unknown as {
+                                  evidencias_resumo?: { entradas?: number; etapas?: number } | null;
+                                }).evidencias_resumo ?? null,
+                                ((versoesAnalise[it.id]?.[1] as unknown as
+                                  | { evidencias_resumo?: { entradas: number; etapas: number } }
+                                  | undefined)?.evidencias_resumo ?? null),
+                              ) && (
+                                <p className="rounded-md border border-border bg-muted/40 p-2 text-xs">
+                                  Esta análise usou um conjunto de evidências diferente da versão
+                                  anterior. Nenhuma nova análise é disparada automaticamente.
+                                </p>
+                              )}
+                              <AnaliseErroIAResultado
+                                analise={analises[it.id]!}
+                                solicitante={pessoas[analises[it.id]!.solicitado_por] ?? null}
+                              />
+                              {(versoesAnalise[it.id]?.length ?? 0) > 1 && (
+                                <details className="text-xs">
+                                  <summary className="cursor-pointer text-muted-foreground">
+                                    Versões anteriores da análise (
+                                    {(versoesAnalise[it.id]?.length ?? 1) - 1})
+                                  </summary>
+                                  <ul className="mt-1 space-y-1">
+                                    {versoesAnalise[it.id]!.slice(1).map((v) => (
+                                      <li key={v.id} className="rounded-md border border-border p-2">
+                                        <span className="font-medium">v{v.versao}</span> ·{" "}
+                                        {new Date(v.created_at).toLocaleString("pt-BR")} ·{" "}
+                                        {v.modelo} · critérios {v.criterios_versao}
+                                        <p className="mt-1 whitespace-pre-wrap">
+                                          {v.conclusao ?? v.erro ?? "—"}
+                                        </p>
+                                      </li>
+                                    ))}
+                                  </ul>
+                                </details>
+                              )}
+                              {analises[it.id]!.status === "done" && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => void usarSugestaoIA(it)}
+                                >
+                                  Usar sugestão da IA no rascunho
+                                </Button>
+                              )}
+                            </div>
                           ) : (
                             <p className="text-xs text-muted-foreground">
                               Nenhuma análise assistida registrada. Use “Analisar com IA”.
                             </p>
                           ))}
+
+                        {podeRevisar && (decisoes[it.id]?.length ?? 0) > 0 && (
+                          <details className="text-xs">
+                            <summary className="cursor-pointer text-muted-foreground">
+                              Histórico de decisões ({decisoes[it.id]!.length})
+                            </summary>
+                            <ul className="mt-1 space-y-1">
+                              {decisoes[it.id]!.map((d) => (
+                                <li key={d.id} className="rounded-md border border-border p-2">
+                                  {rotuloDecisao(d.tipo)} · {pessoas[d.autor] ?? "—"} ·{" "}
+                                  {new Date(d.created_at).toLocaleString("pt-BR")}
+                                  {d.observacao ? (
+                                    <p className="mt-1 whitespace-pre-wrap">{d.observacao}</p>
+                                  ) : null}
+                                </li>
+                              ))}
+                            </ul>
+                          </details>
+                        )}
                         <div>
                           <Label className="text-xs text-muted-foreground">Correção sugerida</Label>
                           <div className="mt-1 whitespace-pre-wrap rounded-md border border-border p-2 text-xs">
@@ -1073,6 +1253,14 @@ function Pagina() {
                           </p>
                         )}
 
+                        {podeRevisar && (
+                          <p className="text-xs text-muted-foreground">
+                            {EXPLICACAO_APROVAR} {camadaDaCausa(it.root_cause).texto}
+                            {it.decisao_humana
+                              ? ` Decisão humana: ${rotuloDecisao(it.decisao_humana)}.`
+                              : ""}
+                          </p>
+                        )}
                         {podeRevisar && (
                           <div className="flex flex-wrap gap-2 pt-1">
                             <Button
@@ -1105,7 +1293,26 @@ function Pagina() {
                             )}
                             <Button
                               size="sm"
+                              variant="outline"
+                              disabled={decidindo || it.decisao_humana === "problema_confirmado"}
+                              title="Confirma que a resposta estava errada. Não aprova e não aplica nada."
+                              onClick={() => void decidir(it, "problema_confirmado")}
+                            >
+                              Confirmar problema
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              disabled={decidindo || it.decisao_humana === "falso_positivo"}
+                              title="O reporte não procede: a resposta da Nina estava adequada."
+                              onClick={() => void decidir(it, "falso_positivo")}
+                            >
+                              Falso positivo
+                            </Button>
+                            <Button
+                              size="sm"
                               disabled={salvando || it.status === "approved"}
+                              title={EXPLICACAO_APROVAR}
                               onClick={() => void acao(it, "approved")}
                             >
                               <Check className="mr-1 h-4 w-4" aria-hidden="true" /> Aprovar
