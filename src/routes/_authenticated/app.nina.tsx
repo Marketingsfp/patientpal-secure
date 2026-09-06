@@ -77,6 +77,9 @@ export const Route = createFileRoute("/_authenticated/app/nina")({
 
 function NinaPage() {
   const { clinicaAtual } = useClinica();
+  // WebMCP (Fase 2): registra a única ferramenta de leitura de contexto.
+  // Sem suporte no navegador, nada acontece e a tela segue igual.
+  useWebmcpContexto();
   const clinicaId = clinicaAtual?.clinica_id;
   const location = useLocation();
   const navigate = useNavigate();
