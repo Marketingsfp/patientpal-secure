@@ -1668,6 +1668,18 @@ export const enviarMensagemConversa = createServerFn({ method: "POST" })
         evento: "ASSUMIDA",
         userId: context.userId,
       });
+      try {
+        const { protocoloAoAtribuirHumano } = await import(
+          "@/lib/atendimento/protocolo-atendimento.server"
+        );
+        await protocoloAoAtribuirHumano({
+          clinicaId: data.clinicaId,
+          conversaId: data.conversaId,
+          userId: context.userId,
+        });
+      } catch (e) {
+        console.error("[atendimento] protocolo ao responder direto", e);
+      }
     }
 
 
