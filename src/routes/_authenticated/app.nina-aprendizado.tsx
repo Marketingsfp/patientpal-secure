@@ -1166,19 +1166,15 @@ function Pagina() {
                                 {AVISO_ANALISE_NAO_APROVA}
                               </p>
                               {analiseUsouOutroConjunto(
-                                analises[it.id]!.evidencias_resumo as never,
-                                auditoria[it.id]
-                                  ? {
-                                      entradas: auditoria[it.id]!.entradas?.length ?? 0,
-                                      etapas: auditoria[it.id]!.etapas?.length ?? 0,
-                                    }
-                                  : null,
+                                (analises[it.id] as { evidencias_resumo?: unknown })
+                                  .evidencias_resumo,
+                                (versoesAnalise[it.id]?.[1] as
+                                  | { evidencias_resumo?: unknown }
+                                  | undefined)?.evidencias_resumo ?? null,
                               ) && (
                                 <p className="rounded-md border border-border bg-muted/40 p-2 text-xs">
-                                  Chegaram evidências desta execução depois da análise. A análise
-                                  exibida usou um conjunto diferente. Nenhuma nova análise foi
-                                  disparada automaticamente — use “Reanalisar” se quiser outra
-                                  versão.
+                                  Esta análise usou um conjunto de evidências diferente da versão
+                                  anterior. Nenhuma nova análise é disparada automaticamente.
                                 </p>
                               )}
                               <AnaliseErroIAResultado
