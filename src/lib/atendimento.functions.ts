@@ -2444,8 +2444,10 @@ export const listarEventosConversa = createServerFn({ method: "POST" })
     const ids = Array.from(
       new Set(
         lista.flatMap((r) => {
-          const det = (r.detalhes ?? null) as { para_user_id?: string | null } | null;
-          return [r.user_id, det?.para_user_id ?? null];
+          const det = (r.detalhes ?? null) as
+            | { para_user_id?: string | null; de_user_id?: string | null }
+            | null;
+          return [r.user_id, det?.para_user_id ?? null, det?.de_user_id ?? null];
         }).filter((v): v is string => typeof v === "string" && v.length > 0),
       ),
     );
@@ -2460,12 +2462,16 @@ export const listarEventosConversa = createServerFn({ method: "POST" })
       });
     }
     return lista.map((r) => {
-      const det = (r.detalhes ?? null) as { para_user_id?: string | null } | null;
+      const det = (r.detalhes ?? null) as
+        | { para_user_id?: string | null; de_user_id?: string | null }
+        | null;
       const paraId = det?.para_user_id ?? null;
+      const deId = det?.de_user_id ?? null;
       return {
         ...r,
         user_nome: r.user_id ? (nomes.get(r.user_id) ?? null) : null,
         para_nome: paraId ? (nomes.get(paraId) ?? null) : null,
+        de_nome: deId ? (nomes.get(deId) ?? null) : null,
       };
     });
   });
