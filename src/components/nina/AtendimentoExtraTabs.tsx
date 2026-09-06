@@ -343,6 +343,7 @@ export function AtendInbox() {
   // que a conversa está vazia (e o cache não guarda lista vazia).
   const [erroMsgs, setErroMsgs] = useState(false);
   const [temMaisAntigas, setTemMaisAntigas] = useState(false);
+  const temMaisAntigasRef = useRef(false);
 
   const [carregandoAntigas, setCarregandoAntigas] = useState(false);
   const seqEspera = useRef(0);
@@ -1161,6 +1162,9 @@ export function AtendInbox() {
   useEffect(() => {
     msgsRef.current = msgs;
   }, [msgs]);
+  useEffect(() => {
+    temMaisAntigasRef.current = temMaisAntigas;
+  }, [temMaisAntigas]);
   useEffect(() => {
     conversaCarregadaRef.current = conversaCarregadaId;
   }, [conversaCarregadaId]);
