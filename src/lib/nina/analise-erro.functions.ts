@@ -20,7 +20,16 @@ import {
   normalizarResultado,
   type PacoteEvidencias,
   type ResultadoAnalise,
+  type Verificacao,
 } from "./analise-erro";
+
+type ResumoEvidencias = {
+  entradas: number;
+  etapas: number;
+  lacunas: string[];
+  verificacoes: Verificacao[];
+  modelo_da_execucao: string | null;
+};
 
 const GATEWAY = "https://ai.gateway.lovable.dev/v1/responses";
 
@@ -33,7 +42,7 @@ type Analise = {
   criterios_versao: string;
   conclusao: string | null;
   resultado: ResultadoAnalise | null;
-  evidencias_resumo: unknown;
+  evidencias_resumo: ResumoEvidencias | null;
   input_tokens: number | null;
   output_tokens: number | null;
   duracao_ms: number | null;
@@ -141,7 +150,7 @@ async function chamarAvaliador(
   return { texto, inputTokens, outputTokens };
 }
 
-function resumoEvidencias(p: PacoteEvidencias) {
+function resumoEvidencias(p: PacoteEvidencias): ResumoEvidencias {
   return {
     entradas: p.entradas.length,
     etapas: p.etapas.length,
