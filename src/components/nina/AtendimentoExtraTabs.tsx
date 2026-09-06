@@ -252,6 +252,10 @@ export function AtendInbox() {
   const [secundariosCarregadosId, setSecundariosCarregadosId] = useState<string | null>(null);
   const selIdRef = useRef<string | null>(null);
   selIdRef.current = sel?.id ?? null;
+  // A conversa aberta é lida por referência dentro da recarga da lista: assim
+  // abrir uma conversa não recria a função e não dispara recargas em cadeia.
+  const selRef = useRef<any>(null);
+  selRef.current = sel;
   const conteudoDaConversa = !!sel?.id && conversaCarregadaId === sel.id;
   const dadosSecundariosProntos = !!sel?.id && secundariosCarregadosId === sel.id;
   // Enquanto a conversa selecionada não terminou de carregar, todas as ações
