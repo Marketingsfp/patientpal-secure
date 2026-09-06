@@ -979,14 +979,21 @@ export function AtendInbox() {
     // mensagens duas vezes. A busca só é reaproveitada se ainda valer para
     // esta clínica/usuário e para a versão atual da conversa.
     const chavePf = chavePrefetch(clinicaId, meuId);
-    const emVoo =
-      janela === JANELA_INICIAL ? prefetchMsgs.current.obter(alvo, chavePf)?.promise : undefined;
-    const pMensagens = emVoo
-      ? emVoo
+    const entradaEmVoo =
+      janela === JANELA_INICIAL ? prefetchMsgs.current.obter(alvo, chavePf) : undefined;
+    const pMensagens = entradaEmVoo
+      ? entradaEmVoo.promise
       : medirRequest(
           "listarMensagensConversa",
           listarMsgs({ data: { clinicaId, conversaId: alvo, limit: janela } }),
         );
+    // A busca fica registrada com a versão atual da conversa. Se a conversa for
+    // invalidada (mensagem nova, transferência) ou a clínica/usuário mudarem
+    // enquanto a resposta vem, ela não pode mais gravar no cache.
+    const entradaMsgs =
+      entradaEmVoo ?? prefetchMsgs.current.registrar(alvo, chavePf, pMensagens as Promise<any[]>);
+    const podeGravarCache = () =>
+      prefetchMsgs.current.resultadoValido(alvo, entradaMsgs, chavePrefetch(clinicaId, meuId));
     const pContato = medirRequest(
       "obterDadosContato",
       obterContato({ data: { clinicaId, conversaId: alvo } }),
@@ -1013,13 +1020,21 @@ export function AtendInbox() {
         if (!aindaVale()) return;
         medidor.current?.marcar("dados");
         setErroMsgs(false);
-        setMsgs(m);
-        setTemMaisAntigas(podeCarregarMais(m.length, janela));
+        // Revalidação com histórico já aberto: mescla em vez de trocar tudo
+        // pela janela inicial (as páginas antigas continuam na tela).
+        const guardadoAgora = cacheConversas.current.obter(alvo);
+        const anteriores =
+          conversaCarregadaRef.current === alvo ? msgsRef.current : (guardadoAgora?.msgs ?? []);
+        const visiveis = anteriores.length > m.length ? mesclarNovas(anteriores, m) : m;
+        setMsgs(visiveis);
+        setTemMaisAntigas(
+          anteriores.length > m.length ? temMaisAntigasRef.current : podeCarregarMais(m.length, janela),
+        );
         setConversaCarregadaId(alvo);
         // O chat já pode ser reaberto na hora: guarda parcial agora, sem
         // esperar contato/notas/eventos. Se o conteúdo completo já estiver
         // guardado, ele é preservado.
-        if (janela === JANELA_INICIAL && !cacheConversas.current.obter(alvo)) {
+        if (janela === JANELA_INICIAL && !cacheConversas.current.obter(alvo) && podeGravarCache()) {
           cacheConversas.current.guardar(alvo, {
             msgs: m,
             contato: null,
@@ -1031,6 +1046,9 @@ export function AtendInbox() {
       } catch (e: any) {
         if (aindaVale()) setErroMsgs(true);
         mostrarErro(e);
+      } finally {
+        // Remove só a referência desta busca; uma mais nova continua valendo.
+        prefetchMsgs.current.concluir(alvo, entradaMsgs);
       }
     })();
 
@@ -1064,9 +1082,14 @@ export function AtendInbox() {
         // Mensagens que falharam não viram conversa vazia no cache: guardamos
         // apenas os dados de apoio e o conteúdo continua marcado como parcial.
         const msgsCache = msgsCarregadas as any[] | null;
-        if (msgsCache) {
+        if (msgsCache && podeGravarCache()) {
+          // O que já está guardado pode ser mais completo (páginas antigas já
+          // carregadas) ou mais novo (mensagem que chegou durante a abertura).
+          const guardado = cacheConversas.current.obter(alvo);
+          const base = guardado?.msgs ?? [];
+          const msgsFinais = base.length ? mesclarNovas(base, msgsCache) : msgsCache;
           cacheConversas.current.guardar(alvo, {
-            msgs: msgsCache,
+            msgs: msgsFinais,
             contato: c,
             notas: n,
             eventos: eventosLista,
