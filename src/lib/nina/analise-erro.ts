@@ -347,7 +347,10 @@ export const SCHEMA_ANALISE = {
     "limitacoes",
   ],
   properties: {
-    veredito: { enum: ["erro_comprovado", "suspeita", "sem_erro", "inconclusivo"] },
+    veredito: {
+      type: "string",
+      enum: ["erro_comprovado", "suspeita", "sem_erro", "inconclusivo"],
+    },
     conclusao: { type: "string" },
     problema: { type: ["string", "null"] },
     evidencias: {
