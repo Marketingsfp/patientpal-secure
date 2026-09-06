@@ -1495,6 +1495,26 @@ export function AtendInbox() {
     })();
   }, [clinicaId, listarDeptosFn, listarUsuariosFn]);
 
+  // Ao abrir a janela de transferência, só a lista de atendentes é relida
+  // (para o status ficar atual). Não recarrega a conversa nem transfere nada.
+  useEffect(() => {
+    if (!transferOpen || !clinicaId) return;
+    let vale = true;
+    (async () => {
+      try {
+        const u = await listarUsuariosFn({ data: { clinicaId } });
+        if (vale) setUsuarios(u);
+      } catch {
+        // Mantém a lista anterior se a releitura falhar.
+      }
+    })();
+    return () => {
+      vale = false;
+    };
+  }, [transferOpen, clinicaId, listarUsuariosFn]);
+
+
+
   // Tempo de espera: uma única consulta para toda a lista. O relógio da tela
   // atualiza o texto sozinho; o banco só é consultado quando algo muda
   // (realtime) ou a cada 60s como rede de segurança.
