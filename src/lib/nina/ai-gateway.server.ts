@@ -133,6 +133,64 @@ export async function ninaAIGateway(pedido: PedidoNina): Promise<RespostaNina> {
   const latenciaMs = Date.now() - inicio;
   const retries = Math.max(0, tentativa - 1);
 
+  // Evidência: exatamente o que foi enviado ao modelo, com quais parâmetros,
+  // e o texto que ele devolveu ANTES de qualquer ajuste posterior.
+  try {
+    const { registrarEtapa } = await import("./evidencias.server");
+    const codigo = {
+      arquivo: "src/lib/nina/ai-gateway.server.ts",
+      funcao: "ninaAIGateway",
+    } as const;
+    registrarEtapa({
+      tipo: "contexto_modelo",
+      fonte: "modelo",
+      titulo: "Conteúdo efetivamente enviado ao modelo",
+      dados: {
+        mensagens: (pedido.messages as readonly { role?: string; content?: unknown }[]).map(
+          (m) => ({ role: m.role ?? null, content: typeof m.content === "string" ? m.content : JSON.stringify(m.content ?? null) }),
+        ),
+        ferramentas_disponiveis: (pedido.tools as readonly { function?: { name?: string } }[] | undefined)?.map(
+          (t) => t?.function?.name ?? null,
+        ) ?? [],
+      },
+      codigo,
+    });
+    registrarEtapa({
+      tipo: "modelo_parametros",
+      fonte: "modelo",
+      titulo: "Modelo e parâmetros utilizados",
+      dados: {
+        model: resolucao.modelo,
+        thinking_level: nivel,
+        route_reason: routeReason,
+        max_tokens: pedido.maxTokens ?? null,
+        tentativas: tentativa,
+        retries,
+        latency_ms: latenciaMs,
+        knowledge_status: pedido.knowledgeStatus ?? null,
+        sucesso: resposta.ok,
+        categoria_erro: categoria,
+        tokens: { entrada: resposta.uso?.entrada ?? null, saida: resposta.uso?.saida ?? null },
+      },
+      codigo,
+    });
+    registrarEtapa({
+      tipo: "resposta_original",
+      fonte: "modelo",
+      titulo: "Resposta original do modelo",
+      dados: {
+        texto: resposta.ok ? (resposta.conteudo ?? "") : null,
+        erro: resposta.ok ? null : (resposta.erro ?? null),
+        tool_calls: (resposta.toolCalls as readonly { function?: { name?: string; arguments?: unknown } }[] | undefined)?.map(
+          (t) => ({ nome: t?.function?.name ?? null, argumentos: t?.function?.arguments ?? null }),
+        ) ?? [],
+      },
+      codigo,
+    });
+  } catch {
+    /* auditoria nunca interrompe o atendimento */
+  }
+
   // O id da execução é aguardado porque a mensagem enviada precisa apontar
   // para o registro técnico que a produziu (auditoria do reporte de erro).
   const execucaoId = await (async () => {
