@@ -6,7 +6,7 @@
  * feedbacks. Os números não expõem texto ou dados pessoais do paciente.
  */
 import { createFileRoute } from "@tanstack/react-router";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { BarChart3, Loader2, RefreshCw, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
