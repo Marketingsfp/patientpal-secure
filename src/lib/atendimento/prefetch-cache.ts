@@ -61,8 +61,8 @@ export function criarPrefetchStore<T>(): PrefetchStore<T> {
       mapa.delete(id);
     },
     limpar() {
+      for (const id of [...mapa.keys(), ...epocas.keys()]) epocas.set(id, epocaDe(id) + 1);
       mapa.clear();
-      for (const id of epocas.keys()) epocas.set(id, epocaDe(id) + 1);
     },
     emVoo() {
       return mapa.size;
