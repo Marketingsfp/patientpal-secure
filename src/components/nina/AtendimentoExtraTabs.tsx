@@ -2307,37 +2307,37 @@ export function AtendInbox() {
               <>
                 <section>
                   <div className="font-medium">
-                    {contato.paciente?.nome ||
-                      contato.conversa?.contato_nome ||
-                      contato.conversa?.contato_telefone ||
+                    {contatoAtual.paciente?.nome ||
+                      contatoAtual.conversa?.contato_nome ||
+                      contatoAtual.conversa?.contato_telefone ||
                       "Sem nome"}
                   </div>
                   <div className="text-xs text-muted-foreground space-y-0.5 mt-1">
-                    {(contato.conversa?.contato_telefone || contato.paciente?.telefone) && (
+                    {(contatoAtual.conversa?.contato_telefone || contatoAtual.paciente?.telefone) && (
                       <div>
-                        📱 {contato.conversa?.contato_telefone || contato.paciente?.telefone}
+                        📱 {contatoAtual.conversa?.contato_telefone || contatoAtual.paciente?.telefone}
                       </div>
                     )}
-                    {contato.paciente?.email && <div>✉️ {contato.paciente.email}</div>}
-                    {contato.paciente?.cpf && <div>CPF: {contato.paciente.cpf}</div>}
-                    {contato.paciente?.cidade && (
+                    {contatoAtual.paciente?.email && <div>✉️ {contatoAtual.paciente.email}</div>}
+                    {contatoAtual.paciente?.cpf && <div>CPF: {contatoAtual.paciente.cpf}</div>}
+                    {contatoAtual.paciente?.cidade && (
                       <div>
-                        📍 {contato.paciente.cidade}/{contato.paciente.estado}
+                        📍 {contatoAtual.paciente.cidade}/{contatoAtual.paciente.estado}
                       </div>
                     )}
-                    {contato.conversa?.protocolo && (
-                      <div>Protocolo: {contato.conversa.protocolo}</div>
+                    {contatoAtual.conversa?.protocolo && (
+                      <div>Protocolo: {contatoAtual.conversa.protocolo}</div>
                     )}
-                    {contato.conversa?.canal && <div>Canal: {contato.conversa.canal}</div>}
-                    {contato.conversa?.status && <div>Status: {contato.conversa.status}</div>}
-                    {contato.conversa?.atend_departamentos?.nome && (
-                      <div>Depto: {contato.conversa.atend_departamentos.nome}</div>
+                    {contatoAtual.conversa?.canal && <div>Canal: {contatoAtual.conversa.canal}</div>}
+                    {contatoAtual.conversa?.status && <div>Status: {contatoAtual.conversa.status}</div>}
+                    {contatoAtual.conversa?.atend_departamentos?.nome && (
+                      <div>Depto: {contatoAtual.conversa.atend_departamentos.nome}</div>
                     )}
-                    {contato.conversa?.ultima_mensagem_em && (
-                      <div>Última mensagem: {fmtData(contato.conversa.ultima_mensagem_em)}</div>
+                    {contatoAtual.conversa?.ultima_mensagem_em && (
+                      <div>Última mensagem: {fmtData(contatoAtual.conversa.ultima_mensagem_em)}</div>
                     )}
                   </div>
-                  {!contato.paciente && (
+                  {!contatoAtual.paciente && (
                     <div className="text-xs text-muted-foreground mt-2">
                       Não vinculado a paciente cadastrado.
                     </div>
@@ -2345,12 +2345,12 @@ export function AtendInbox() {
                 </section>
 
 
-                {contato.agendamentos?.length > 0 && (
+                {contatoAtual.agendamentos?.length > 0 && (
                   <section>
                     <div className="text-xs font-semibold text-muted-foreground uppercase mb-1">
                       Agendamentos
                     </div>
-                    {contato.agendamentos.map((a: any) => (
+                    {contatoAtual.agendamentos.map((a: any) => (
                       <div key={a.id} className="text-xs border rounded p-2 mb-1 space-y-0.5">
                         <div className="font-medium">
                           {a.procedimento || a.tipo_atendimento || "Consulta"}
@@ -2366,12 +2366,12 @@ export function AtendInbox() {
                   </section>
                 )}
 
-                {contato.contratos?.length > 0 && (
+                {contatoAtual.contratos?.length > 0 && (
                   <section>
                     <div className="text-xs font-semibold text-muted-foreground uppercase mb-1">
                       Contratos
                     </div>
-                    {contato.contratos.map((c: any) => (
+                    {contatoAtual.contratos.map((c: any) => (
                       <div key={c.id} className="text-xs border rounded p-2 mb-1">
                         <div className="font-medium">#{c.numero}</div>
                         <div className="text-muted-foreground">
@@ -2421,10 +2421,10 @@ export function AtendInbox() {
                   </div>
                 </section>
 
-                {contato.atribuido_nome && (
+                {contatoAtual.atribuido_nome && (
                   <section className="text-xs text-muted-foreground">
                     Atribuída a{" "}
-                    <span className="font-medium text-foreground">{contato.atribuido_nome}</span>
+                    <span className="font-medium text-foreground">{contatoAtual.atribuido_nome}</span>
                   </section>
                 )}
               </>
@@ -2442,7 +2442,7 @@ export function AtendInbox() {
             conversaId={sel.id}
             contatoNome={sel.contato_nome ?? null}
             contatoTelefone={sel.contato_telefone ?? null}
-            pacienteIdVinculado={contato?.paciente?.id ?? null}
+            pacienteIdVinculado={contatoAtual?.paciente?.id ?? null}
             onMensagemPronta={(t) => setDraft((d) => (d ? `${d}\n${t}` : t))}
           />
         )}
