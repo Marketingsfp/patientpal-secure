@@ -20,7 +20,13 @@ import {
   salvarProfissionalCatalogo,
   alterarStatusCatalogo,
   excluirItemCatalogo,
+  organizarTextoCatalogoIA,
 } from "@/lib/nina/catalogo.functions";
+import {
+  MODELO_CATALOGO_IA,
+  paraEstadoProfissional,
+  paraEstadoServico,
+} from "@/lib/nina/catalogo-ia";
 import {
   ROTULO_STATUS,
   formatarBRL,
