@@ -1079,7 +1079,7 @@ async function executarFerramentaInterna(
           // Estes são os ÚNICOS horários realmente livres. A escala da planilha
           // (ex.: 09h-18h) não é vaga.
           instrucao:
-            "Ao apresentar estes horários, inclua também o valor oficial da consulta vindo de consultar_base_conhecimento (se ainda não consultou, consulte antes de responder). Se não houver valor cadastrado, não estime nem cite preço. Mostre de 3 a 5 opções, agrupadas por médico, com data, horário e unidade.",
+            "Ao apresentar estes horários, inclua também o valor oficial da consulta vindo de consultar_base_conhecimento, com a forma de pagamento e a condição correspondentes (se ainda não consultou, consulte antes de responder). Se não houver valor cadastrado, não estime nem cite preço. Mostre de 3 a 5 opções, agrupadas por médico, com data, horário e unidade.",
         };
 
       }
