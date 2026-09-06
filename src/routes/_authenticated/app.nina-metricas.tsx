@@ -243,6 +243,15 @@ function Pagina() {
   const ind = dados?.indicadores;
   const op = dados?.operacionais;
 
+  // Resumo do recorte ativo, sempre visível (mesmo antes da primeira resposta).
+  const resumoRecorte = useMemo(() => {
+    const nomeUnidade =
+      unidadeId === TODOS ? "todas as unidades" : (unidades.find((u) => u.id === unidadeId)?.nome ?? "unidade selecionada");
+    const faixa = diaInteiro ? "dia inteiro" : `das ${horaInicio} às ${horaFim} em cada dia`;
+    const amb = ambiente === "producao" ? "somente produção" : "produção + testes";
+    return `${de} a ${ate} · ${faixa} · ${nomeUnidade} · ${amb} · fuso ${FUSO_OPERACAO_PADRAO}`;
+  }, [de, ate, diaInteiro, horaInicio, horaFim, unidadeId, unidades, ambiente]);
+
   return (
     <div className="space-y-6 p-4 md:p-6">
       <header className="flex flex-wrap items-center justify-between gap-3">
