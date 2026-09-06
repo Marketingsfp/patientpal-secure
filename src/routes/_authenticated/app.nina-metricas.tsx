@@ -46,6 +46,7 @@ import {
   validarRecorte,
 } from "@/lib/nina/metricas-filtros";
 import { AnalistaMetricasIA } from "@/components/nina/AnalistaMetricasIA";
+import { DesempenhoPorPeriodo } from "@/components/nina/DesempenhoPorPeriodo";
 import {
   metricasAprendizadoNina,
   trilhaAuditoriaAprendizadoNina,
@@ -564,6 +565,21 @@ function Pagina() {
           </CardContent>
         </Card>
       ) : null}
+
+      {/* FASE 5 — mesma tela, mesmo recorte: desempenho dentro e fora do
+          horário oficial publicado. Aqui não se edita horário. */}
+      <DesempenhoPorPeriodo
+        clinicaId={clinicaId}
+        de={de}
+        ate={ate}
+        diaInteiro={diaInteiro}
+        horaInicio={diaInteiro ? null : horaInicio}
+        horaFim={diaInteiro ? null : horaFim}
+        fuso={FUSO_OPERACAO_PADRAO}
+        ambiente={ambiente}
+        podeConfigurar={["admin", "gestor"].includes(String(clinicaAtual?.role ?? ""))}
+      />
+
 
       {/* Seção da Fase 9: isolada dos cards acima — falha ou lentidão aqui não
           afeta os indicadores, a Nina nem o atendimento. */}
