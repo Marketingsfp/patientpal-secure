@@ -1579,13 +1579,16 @@ export function AtendInbox() {
     const userId = String(fd.get("userId") || "");
     const departamentoId = String(fd.get("departamentoId") || "") || undefined;
     const motivo = String(fd.get("motivo") || "") || undefined;
+    // O formulário foi aberto sobre esta conversa: a transferência é dela.
+    const origem = sel.id;
     try {
       await transferirFn({
-        data: { clinicaId, conversaId: sel.id, userId: userId || null, departamentoId, motivo },
+        data: { clinicaId, conversaId: origem, userId: userId || null, departamentoId, motivo },
       });
+      cacheConversas.current.invalidar(origem);
       setTransferOpen(false);
       await carregarConvs();
-      await carregarConversa();
+      if (selIdRef.current === origem) await carregarConversa();
     } catch (e: any) {
       mostrarErro(e);
     }
