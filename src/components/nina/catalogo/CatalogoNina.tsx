@@ -88,6 +88,7 @@ export function CatalogoNina({
   const salvarProfFn = useServerFn(salvarProfissionalCatalogo);
   const statusFn = useServerFn(alterarStatusCatalogo);
   const excluirFn = useServerFn(excluirItemCatalogo);
+  const iaFn = useServerFn(organizarTextoCatalogoIA);
 
   const [carregando, setCarregando] = useState(false);
   const [salvando, setSalvando] = useState(false);
@@ -96,6 +97,16 @@ export function CatalogoNina({
   const [aberto, setAberto] = useState(false);
   const [servico, setServico] = useState<EstadoServico>(servicoVazio);
   const [profissional, setProfissional] = useState<EstadoProfissional>(profissionalVazio);
+
+  // "Criar com IA": texto livre → rascunho de formulário para revisão humana.
+  const [iaAberta, setIaAberta] = useState(false);
+  const [iaTexto, setIaTexto] = useState("");
+  const [iaProcessando, setIaProcessando] = useState(false);
+  const [avisos, setAvisos] = useState<string[]>([]);
+  const [fila, setFila] = useState<any[]>([]);
+  const [posicao, setPosicao] = useState(0);
+  // Resposta atrasada não pode sobrescrever uma edição posterior do usuário.
+  const pedidoRef = useRef(0);
 
   const carregar = useCallback(async () => {
     if (!clinicaId) return;
