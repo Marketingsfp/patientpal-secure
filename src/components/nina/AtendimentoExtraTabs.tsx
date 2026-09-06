@@ -140,7 +140,7 @@ import {
   assumirConversa,
 } from "@/lib/atendimento.functions";
 import { FilaHumana } from "@/components/nina/FilaHumana";
-import { destinoConversa } from "@/lib/atendimento/abrir-conversa";
+import { destinoConversa, idConversaDaUrl } from "@/lib/atendimento/abrir-conversa";
 import { AgendaConversaDrawer } from "@/components/nina/AgendaConversaDrawer";
 import { ConversaSkeleton, ContatoSkeleton } from "@/components/nina/ConversaSkeleton";
 import {
@@ -166,7 +166,7 @@ import {
   marcarTroca,
   medirRequest,
 } from "@/lib/atendimento/perf-troca";
-import { useNavigate, useParams } from "@tanstack/react-router";
+import { useLocation, useNavigate, useParams } from "@tanstack/react-router";
 import {
   acaoPermitida,
   gravarRascunho,

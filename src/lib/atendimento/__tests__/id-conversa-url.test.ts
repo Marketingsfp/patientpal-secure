@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect } from "bun:test";
 import { idConversaDaUrl, urlConversa } from "../abrir-conversa";
 
 const ID = "51170f58-39c9-4169-ac05-027827f39fee";
