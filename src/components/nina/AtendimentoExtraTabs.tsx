@@ -325,6 +325,9 @@ export function AtendInbox() {
     setSelecaoId(id ? (idConversaValido(id) ?? null) : null);
   }, []);
 
+  // A automação (WebMCP) pede abertura pelo MESMO caminho, sempre por id.
+  useEffect(() => assinarSelecaoConversa((id) => abrirConversa(id)), [abrirConversa]);
+
   // Leitura da seleção dentro de callbacks, sem recriá-los a cada troca.
   const selecaoIdRef = useRef<string | null>(selecaoId);
   useEffect(() => {
