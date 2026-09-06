@@ -98,10 +98,13 @@ describe("FASE 6 — estados da auditoria", () => {
 describe("FASE 6 — contexto histórico preservado", () => {
   test("a pergunta vem das entradas da execução, na ordem, não da última mensagem", () => {
     const p = perguntaDaExecucao([
-      { em: "2026-09-01T10:00:02Z", texto: "quanto custa?" },
-      { em: "2026-09-01T10:00:00Z", texto: "bom dia" },
-    ] as never);
-    expect(p).toBe("bom dia\nquanto custa?");
+      { id: "b", em: "2026-09-01T10:00:02Z", texto: "quanto custa?" },
+      { id: "a", em: "2026-09-01T10:00:00Z", texto: "bom dia" },
+    ]);
+    expect(p?.texto).toBe("bom dia\nquanto custa?");
+    expect(p?.fragmentos.map((f) => f.id)).toEqual(["a", "b"]);
+    // Sem vínculo: limitação declarada, nunca a última mensagem da conversa.
+    expect(perguntaDaExecucao([])).toBeNull();
   });
 });
 
