@@ -29,20 +29,18 @@ describe("Fase 5 — leitura não é resposta", () => {
   });
 
   it("marcarLida não altera atribuição, status, espera ou pendências", () => {
-    for (const campo of [
-      "atribuida_user_id",
-      "aguardando_desde",
-      "primeiro_resp_em",
-      "closed_at",
-      "nina_fluxo_estado",
-    ]) {
+    // Nenhuma escrita: a função só lê a conversa e grava o marcador individual.
+    expect(marcarLida.includes(".update(")).toBe(false);
+    expect(marcarLida.includes(".insert(")).toBe(false);
+    for (const campo of ["aguardando_desde", "primeiro_resp_em", "closed_at", "nina_fluxo_estado"]) {
       expect(marcarLida.includes(campo)).toBe(false);
     }
   });
 
   it("marcarLida só usa as rotinas de leitura individual", () => {
     expect(marcarLida).toMatch(/atend_registrar_leitura/);
-    expect(marcarLida).toMatch(/atend_nao_lidas/);
+    expect(marcarLida).toMatch(/contarNaoLidasConversa/);
+    expect(fns).toMatch(/atend_nao_lidas/);
   });
 
   it("transferência não copia nem apaga marcadores de leitura", () => {

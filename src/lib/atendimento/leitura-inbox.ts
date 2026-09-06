@@ -124,6 +124,9 @@ export function aplicarReconciliacao(args: {
   naoLidasAnterior: number;
 }): { aplicar: boolean; valor: number } {
   if (args.sequenciaResposta !== args.sequenciaAtual) return { aplicar: false, valor: args.naoLidasAnterior };
+  if (args.naoLidasBackend === null || args.naoLidasBackend === undefined) {
+    return { aplicar: true, valor: args.naoLidasAnterior };
+  }
   const v = Number(args.naoLidasBackend);
   if (!Number.isFinite(v) || v < 0) return { aplicar: true, valor: args.naoLidasAnterior };
   return { aplicar: true, valor: v };
