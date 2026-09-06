@@ -14,7 +14,7 @@ const cal = (o: Partial<CalendarioPublicado> = {}): CalendarioPublicado => ({
   versao_id: o.versao_id ?? "v1",
   versao: o.versao ?? 1,
   status: o.status ?? "publicado",
-  publicado_em: o.publicado_em ?? "2026-01-01T12:00:00Z",
+  publicado_em: "publicado_em" in o ? (o.publicado_em ?? null) : "2026-01-01T12:00:00Z",
   vigencia_inicio: o.vigencia_inicio ?? "2026-01-01",
   vigencia_fim: o.vigencia_fim ?? null,
   fuso: o.fuso ?? "America/Sao_Paulo",
@@ -211,6 +211,7 @@ describe("Classificador de período — não altera atendimento nem usa IA", () 
 
   it("não escreve nada nem mexe em conversa, handoff ou timeout", () => {
     expect(/\.update\(|\.insert\(|\.delete\(|\.upsert\(/.test(src + srcFn)).toBe(false);
-    expect(/handoff|resolver_conversa|timeout|responsavel_id/i.test(src)).toBe(false);
+    const codigo = src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+    expect(/handoff|resolver_conversa|timeout|responsavel_id/i.test(codigo)).toBe(false);
   });
 });
