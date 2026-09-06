@@ -307,7 +307,7 @@ export const enviarMensagemTeste = createServerFn({ method: "POST" })
     if (jaExiste) return { duplicada: true, reply: null as string | null, erro: null, audio: null };
 
     const agora = new Date().toISOString();
-    await supabaseAdmin.from("whatsapp_mensagens").insert({
+    const { data: msgEntrada } = await supabaseAdmin.from("whatsapp_mensagens").insert({
       clinica_id: data.clinicaId,
       conversa_id: conversaId,
       canal: CANAL_TESTE,
@@ -321,7 +321,7 @@ export const enviarMensagemTeste = createServerFn({ method: "POST" })
       status: "received",
       enviada_por: "paciente",
       is_teste: true,
-    });
+    }).select("id").maybeSingle();
     await supabaseAdmin
       .from("atend_conversas")
       .update({ ultima_msg_em: agora, ultima_msg_preview: body.slice(0, 160) })
@@ -389,6 +389,9 @@ export const enviarMensagemTeste = createServerFn({ method: "POST" })
         reply = await gerarRespostaNina(data.clinicaId, textoPaciente, lead.telefone_sessao, {
           teste: true,
           auditoria: auditoriaNina,
+          mensagensEntrada: (msgEntrada as { id?: string } | null)?.id
+            ? [(msgEntrada as { id: string }).id]
+            : [],
         });
       } else if (audioFalhou) {
         reply = RESPOSTA_AUDIO_FALHOU;

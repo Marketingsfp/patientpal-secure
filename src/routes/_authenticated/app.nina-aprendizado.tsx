@@ -6,6 +6,7 @@
  * embeddings, prompt, modelo, regras ou ferramentas — apenas registra a
  * decisão. A aplicação real virá em fase posterior.
  */
+import { EvidenciasExecucao } from "@/components/nina/EvidenciasExecucao";
 import { createFileRoute } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
@@ -862,7 +863,21 @@ function Pagina() {
                           ? ` · ${execucoes[(it as { execucao_id?: string | null }).execucao_id ?? ""]?.model ?? "—"}`
                           : ""}
                       </p>
+                      <details className="rounded-md border border-border p-2">
+                        <summary className="cursor-pointer text-xs font-medium">
+                          Evidências da execução (somente leitura)
+                        </summary>
+                        <div className="mt-2">
+                          <EvidenciasExecucao
+                            clinicaId={clinicaId ?? ""}
+                            execucaoId={
+                              (it as { execucao_id?: string | null }).execucao_id ?? null
+                            }
+                          />
+                        </div>
+                      </details>
                     </div>
+
                   )}
 
                   <div className="grid gap-3 md:grid-cols-2">

@@ -214,7 +214,7 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
                 // mesmo evento (retry/duplicidade), o insert falha aqui e a
                 // mensagem NÃO é processada de novo — nada de resposta dupla
                 // nem de reabertura repetida.
-                const { error: insErr } = await supabaseAdmin
+                const { data: msgInserida, error: insErr } = await supabaseAdmin
                   .from("whatsapp_mensagens")
                   .insert({
                     clinica_id: params.clinicaId,
@@ -229,7 +229,9 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
                     status: "received",
                     enviada_por: "paciente",
                     raw: msg,
-                  });
+                  })
+                  .select("id")
+                  .maybeSingle();
                 if (insErr) {
                   const duplicada =
                     (insErr as { code?: string }).code === "23505" ||
@@ -333,9 +335,43 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
                     let reply = "";
                     // Auditoria: id da execução que produziu esta resposta.
                     const auditoriaNina: { execucaoId?: string | null } = {};
+                    // Mensagens de entrada reais desta resposta. O paciente pode
+                    // ter escrito em partes: pegamos as mensagens dele ainda sem
+                    // resposta, na ordem em que chegaram.
+                    const entradasNina = await (async () => {
+                      const atual = (msgInserida as { id?: string } | null)?.id ?? null;
+                      try {
+                        const ultimaSaida = await supabaseAdmin
+                          .from("whatsapp_mensagens")
+                          .select("created_at")
+                          .eq("clinica_id", params.clinicaId)
+                          .eq("to_number", from)
+                          .eq("direction", "out")
+                          .order("created_at", { ascending: false })
+                          .limit(1)
+                          .maybeSingle();
+                        let q = supabaseAdmin
+                          .from("whatsapp_mensagens")
+                          .select("id, created_at")
+                          .eq("clinica_id", params.clinicaId)
+                          .eq("from_number", from)
+                          .eq("direction", "in")
+                          .order("created_at", { ascending: true })
+                          .limit(10);
+                        const corte = (ultimaSaida.data as { created_at?: string } | null)
+                          ?.created_at;
+                        if (corte) q = q.gt("created_at", corte);
+                        const { data } = await q;
+                        const ids = (data ?? []).map((m: { id: string }) => m.id);
+                        return ids.length ? ids : atual ? [atual] : [];
+                      } catch {
+                        return atual ? [atual] : [];
+                      }
+                    })();
                     if (textoPaciente) {
                       reply = await gerarRespostaNina(params.clinicaId, textoPaciente, from, {
                         auditoria: auditoriaNina,
+                        mensagensEntrada: entradasNina,
                       });
                     } else if (audioFalhou) {
                       reply = RESPOSTA_AUDIO_FALHOU;

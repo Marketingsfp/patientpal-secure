@@ -326,6 +326,51 @@ export async function executarFerramentaNina(
     typeof argsRaw === "string" ? parseJson(argsRaw, "arguments") : (argsRaw ?? {})
   ) as any;
 
+  // Evidência da ferramenta: nome, argumentos e resultado/erro reais.
+  // A fonte muda conforme a ferramenta (agenda, catálogo, cadastro, atendimento).
+  const fonteFerramenta =
+    nome.includes("disponibilidade") || nome.includes("agend")
+      ? "agenda"
+      : nome.includes("base_conhecimento")
+        ? "catalogo"
+        : nome.includes("paciente") || nome.includes("dados")
+          ? "crm"
+          : "atendimento";
+  const registrar = async (dados: Record<string, unknown>) => {
+    try {
+      const { registrarEtapa } = await import("@/lib/nina/evidencias.server");
+      registrarEtapa({
+        tipo: "ferramenta",
+        fonte: fonteFerramenta as never,
+        titulo: nome,
+        dados,
+        codigo: {
+          arquivo: "src/lib/nina-ferramentas.server.ts",
+          funcao: "executarFerramentaNina",
+        },
+      });
+    } catch {
+      /* auditoria nunca interrompe o atendimento */
+    }
+  };
+
+  try {
+    const resultado = await executarFerramentaNinaInterno(supabase, userId, clinicaId, nome, args);
+    await registrar({ argumentos: args, resultado });
+    return resultado;
+  } catch (e) {
+    await registrar({ argumentos: args, erro: e instanceof Error ? e.message : String(e) });
+    throw e;
+  }
+}
+
+async function executarFerramentaNinaInterno(
+  supabase: any,
+  userId: string,
+  clinicaId: string,
+  nome: string,
+  args: any,
+): Promise<unknown> {
   switch (nome) {
     case "consultar_base_conhecimento": {
       // FASE 3: única porta de acesso à planilha oficial.
