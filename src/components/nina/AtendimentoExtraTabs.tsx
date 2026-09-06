@@ -144,6 +144,8 @@ import {
   criarCacheConversas,
   respostaAindaVale,
 } from "@/lib/atendimento/conversa-cache";
+import { criarPrefetchStore, chavePrefetch } from "@/lib/atendimento/prefetch-cache";
+
 import { CacheContatos, planoAberturaContato } from "@/lib/atendimento/contato-cache";
 import {
   JANELA_INICIAL,
