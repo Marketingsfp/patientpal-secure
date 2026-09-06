@@ -289,7 +289,13 @@ export function montarResultadoCatalogo(entrada: {
           .filter(Boolean),
       ),
     ],
-    units: [] as string[],
+    units: [
+      ...new Set(
+        entrada.profissionais
+          .map(unidadeDoProfissional)
+          .filter((u): u is string => Boolean(u)),
+      ),
+    ],
     days: [...new Set(registros.map((r) => String(r.dia ?? "").trim()).filter(Boolean))],
     notes: [
       ...new Set(
