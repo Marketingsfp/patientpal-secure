@@ -102,6 +102,7 @@ import {
   souGestorAtendimento,
   contarConversasInbox,
   listarMensagensConversa,
+  carregarJanelaMensagem,
   enviarMensagemConversa,
   obterDadosContato,
   listarEventosConversa,
@@ -230,6 +231,7 @@ export function AtendInbox() {
   const souGestorFn = useServerFn(souGestorAtendimento);
   const contarInboxFn = useServerFn(contarConversasInbox);
   const listarMsgs = useServerFn(listarMensagensConversa);
+  const carregarJanela = useServerFn(carregarJanelaMensagem);
   const enviarMsg = useServerFn(enviarMensagemConversa);
   const obterContato = useServerFn(obterDadosContato);
   const transferirFn = useServerFn(transferirConversa);
@@ -1727,6 +1729,83 @@ export function AtendInbox() {
     }
   }, [clinicaId, sel?.id, msgs, carregandoAntigas, listarMsgs, chat]);
 
+
+  // Posicionamento na mensagem reportada (exceção à abertura no fim): só
+  // acontece quando a conversa foi aberta pelo "Ver conversa" de um erro.
+  // A mensagem é localizada pelo id — nunca por texto ou horário.
+  useEffect(() => {
+    const alvo = alvoMensagem;
+    if (!alvo || !clinicaId) return;
+    if (!conteudoDaConversa || conversaCarregadaId !== alvo.conversaId) return;
+    let cancelado = false;
+
+    const posicionar = () => {
+      const cont = chat.containerRef.current;
+      const el = cont?.querySelector(
+        `[data-msg-id="${alvo.mensagemId}"]`,
+      ) as HTMLElement | null;
+      if (!el) return false;
+      // A partir daqui a posição é do alvo, não da abertura no fim.
+      chat.encerrarAbertura();
+      el.scrollIntoView({ block: "center" });
+      setMsgDestacada(alvo.mensagemId);
+      window.setTimeout(
+        () => setMsgDestacada((d) => (d === alvo.mensagemId ? null : d)),
+        4000,
+      );
+      setAlvoMensagem(null);
+      setBuscandoAlvo(false);
+      return true;
+    };
+
+    if (msgs.some((m: any) => m.id === alvo.mensagemId)) {
+      const t = window.setTimeout(() => {
+        if (!cancelado) requestAnimationFrame(() => !cancelado && posicionar());
+      }, 150);
+      return () => {
+        cancelado = true;
+        window.clearTimeout(t);
+      };
+    }
+
+    // Fora da janela carregada: busca só um trecho ao redor da mensagem.
+    setBuscandoAlvo(true);
+    void (async () => {
+      try {
+        const r = (await carregarJanela({
+          data: { clinicaId, conversaId: alvo.conversaId, mensagemId: alvo.mensagemId },
+        })) as { encontrada: boolean; mensagens: any[] };
+        // Troca rápida entre reportes: resposta antiga não mexe na tela.
+        if (cancelado || seqAlvo.current !== alvo.pedido || selIdRef.current !== alvo.conversaId)
+          return;
+        if (!r.encontrada) {
+          setAlvoIndisponivel(true);
+          setAlvoMensagem(null);
+          return;
+        }
+        janelaRef.current += r.mensagens.length;
+        setMsgs((prev) => mesclarAnteriores(prev, r.mensagens));
+      } catch {
+        if (!cancelado) {
+          setAlvoIndisponivel(true);
+          setAlvoMensagem(null);
+        }
+      } finally {
+        if (!cancelado) setBuscandoAlvo(false);
+      }
+    })();
+    return () => {
+      cancelado = true;
+    };
+  }, [
+    alvoMensagem,
+    conteudoDaConversa,
+    conversaCarregadaId,
+    msgs,
+    clinicaId,
+    chat,
+    carregarJanela,
+  ]);
 
   const janela24hExpirada = (() => {
     if (!sel || sel.canal !== "whatsapp") return false;
