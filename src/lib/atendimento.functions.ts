@@ -607,6 +607,15 @@ export const fecharConversa = createServerFn({ method: "POST" })
 
   });
 
+/**
+ * Zera o contador de não lidas da conversa.
+ *
+ * O contador é único por conversa, então supervisão NÃO pode apagá-lo: a
+ * decisão é tomada aqui, pelo usuário autenticado e pelo papel lido do banco,
+ * e não pelo que a tela enviar. Quando não pode, a chamada não falha — apenas
+ * não altera nada (`marcada: false`), para que acompanhar uma conversa nunca
+ * quebre a tela de quem supervisiona.
+ */
 export const marcarLida = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) =>
@@ -614,13 +623,35 @@ export const marcarLida = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     await assertMember(context.supabase, context.userId, data.clinicaId);
+    const { assertAcessoConversa, usuarioEhGestor } = await import(
+      "./atendimento/acesso-conversa.server"
+    );
+    const { avaliarLeituraAutomatica } = await import("./atendimento/leitura-inbox");
+    const conv = await assertAcessoConversa(
+      context.supabase,
+      context.userId,
+      data.clinicaId,
+      data.conversaId,
+    );
+    const ehGestor = await usuarioEhGestor(context.supabase, context.userId, data.clinicaId);
+    const admin = await ehAdminClinica(context.supabase, context.userId, data.clinicaId);
+    const { pode, motivo } = avaliarLeituraAutomatica({
+      userId: context.userId,
+      atribuidaUserId: conv.atribuida_user_id ?? null,
+      ehGestor: ehGestor || admin,
+    });
+    if (!pode) return { ok: true, marcada: false, motivo };
+
     await context.supabase
       .from("atend_conversas")
       .update({ unread_count: 0 })
       .eq("id", data.conversaId)
-      .eq("clinica_id", data.clinicaId);
-    return { ok: true };
+      .eq("clinica_id", data.clinicaId)
+      // Trava também no banco: a linha só é atualizada se ainda for dele.
+      .eq("atribuida_user_id", context.userId);
+    return { ok: true, marcada: true, motivo };
   });
+
 
 /* =========================================================
  *  NOTAS INTERNAS
