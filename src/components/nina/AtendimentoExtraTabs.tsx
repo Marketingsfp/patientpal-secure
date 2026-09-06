@@ -2232,7 +2232,7 @@ export function AtendInbox() {
                   iniciarTroca(c.id, "clique");
                   medidor.current = criarMedidorConversa(`conversa ${c.id}`);
                   medidor.current.marcar("click");
-                  // Só muda o endereço: a conversa aberta vem da URL.
+                  // Seleção interna: a conversa aberta é escolhida aqui mesmo.
                   abrirConversa(c.id);
                 }}
                 onMouseEnter={() => agendarPrefetch(c.id)}
