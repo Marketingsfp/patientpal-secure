@@ -627,7 +627,22 @@ export const fecharConversa = createServerFn({ method: "POST" })
 
   });
 
+/** Contagem individual real (marcador de leitura deste usuário) de uma conversa. */
+async function contarNaoLidasConversa(
+  supabase: any,
+  clinicaId: string,
+  conversaId: string,
+): Promise<number> {
+  const { data } = await supabase.rpc("atend_nao_lidas", {
+    _clinica_id: clinicaId,
+    _conversa_ids: [conversaId],
+  });
+  const linha = (data ?? [])[0];
+  return Number(linha?.nao_lidas ?? 0) || 0;
+}
+
 /**
+
  * Registra a leitura DESTE usuário até uma mensagem real da timeline.
  *
  * A leitura é individual (`atend_leituras`): o que Maria leu não interfere no
