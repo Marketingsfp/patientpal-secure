@@ -2225,7 +2225,7 @@ export function AtendInbox() {
                 <SelectItem value="all">Todas</SelectItem>
                 <SelectItem value="waiting">Em espera</SelectItem>
                 <SelectItem value="active">Ativas</SelectItem>
-                <SelectItem value="bot_attending">Bot</SelectItem>
+                
                 <SelectItem value="closed">Fechadas</SelectItem>
               </SelectContent>
             </Select>
