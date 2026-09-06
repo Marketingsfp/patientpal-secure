@@ -702,7 +702,7 @@ export function AtendInbox() {
       if (deepLinkPendente.current && selIdRef.current !== deepLinkPendente.current)
         deepLinkPendente.current = null;
       const removeu = selecaoDeveSair({
-        selecionada: (sel as any) ?? null,
+        selecionada: (selRef.current as any) ?? null,
         linhas: rows as any,
         buscando: !!busca,
         ctx: ctxEscopo,
@@ -751,10 +751,10 @@ export function AtendInbox() {
       if (
         devoAutoSelecionarComUrl({
           conversaIdUrl: conversaIdUrlRef.current,
-          temSelecao: !!sel,
+          temSelecao: !!selRef.current,
           removeuAgora: removeu,
           temPrimeiraLinha: devoAutoSelecionar({
-            temSelecao: !!sel,
+            temSelecao: !!selRef.current,
             removeuAgora: removeu,
             primeiraLinha: rows[0] as LinhaInbox,
           }),
@@ -768,7 +768,7 @@ export function AtendInbox() {
     } catch (e: any) {
       mostrarErro(e);
     }
-  }, [clinicaId, filtroStatus, busca, escopo, listarConvs, sel, carregarContadores, meuId, souGestor, abrirPelaUrl]);
+  }, [clinicaId, filtroStatus, busca, escopo, listarConvs, carregarContadores, meuId, souGestor, abrirPelaUrl]);
 
   // FASE 1 — a conversa aberta é sempre a do endereço. Quando o
   // conversationId da URL muda (clique, voltar/avançar do navegador, link
