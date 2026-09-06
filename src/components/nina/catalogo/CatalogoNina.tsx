@@ -125,6 +125,9 @@ export function CatalogoNina({
     void carregar();
   }, [carregar]);
 
+  // Recarga incremental após uma operação feita pela automação (WebMCP).
+  useEffect(() => assinarAtualizacao("catalogo", () => void carregar()), [carregar]);
+
   useEffect(() => {
     if (!clinicaId) return;
     void (async () => {
