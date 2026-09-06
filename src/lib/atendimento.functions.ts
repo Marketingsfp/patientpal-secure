@@ -1619,7 +1619,6 @@ export const obterDadosContato = createServerFn({ method: "POST" })
     let paciente: any = null;
     let agendamentos: any[] = [];
     let contratos: any[] = [];
-    const pendencias: any = null;
     // FASE 4 — como o contato foi obtido nesta abertura ("id" = vínculo direto).
     let contatoVia: "id" | "telefone" | "sem_contato" = "sem_contato";
 
@@ -1961,7 +1960,7 @@ export const relatorioAtendimento = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     await assertMember(context.supabase, context.userId, data.clinicaId);
-    const [{ data: convs }, { data: avals }, { data: pausasLog }] = await Promise.all([
+    const [{ data: convs }, { data: avals }] = await Promise.all([
       context.supabase
         .from("atend_conversas")
         .select(
@@ -1976,15 +1975,6 @@ export const relatorioAtendimento = createServerFn({ method: "POST" })
         .eq("clinica_id", data.clinicaId)
         .gte("created_at", data.de)
         .lte("created_at", data.ate),
-      // Log de pausas: as colunas reais são `iniciada_em`, `finalizada_em` e
-      // `reason_id` (migration 20260527111301). O nome do motivo mora em
-      // `atend_pause_reasons.nome` — não existe coluna `motivo` aqui.
-      context.supabase
-        .from("atend_pausas_log")
-        .select("user_id, reason_id, iniciada_em, finalizada_em")
-        .eq("clinica_id", data.clinicaId)
-        .gte("iniciada_em", data.de)
-        .lte("iniciada_em", data.ate),
     ]);
 
     const userIds = Array.from(
