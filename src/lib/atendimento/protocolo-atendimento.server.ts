@@ -64,7 +64,7 @@ export async function garantirProtocoloAtendimento(args: {
   const { data, error } = await supabaseAdmin.rpc("atend_gerar_protocolo_atendimento", {
     _clinica_id: args.clinicaId,
     _conversa_id: args.conversaId,
-    _session_id: sessionIdDoEstado(conv.nina_fluxo_estado),
+    _session_id: sessionIdDoEstado(conv.nina_fluxo_estado) ?? undefined,
   });
   if (error) {
     console.error("[protocolo] falha ao gerar", error.message);
