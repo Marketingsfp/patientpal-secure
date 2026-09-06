@@ -339,7 +339,11 @@ export function AtendInbox() {
   const msgsRef = useRef<any[]>([]);
   const conversaCarregadaRef = useRef<string | null>(null);
   const medidor = useRef<MedidorConversa | null>(null);
+  // Falha ao carregar as mensagens: a tela mostra o aviso em vez de fingir
+  // que a conversa está vazia (e o cache não guarda lista vazia).
+  const [erroMsgs, setErroMsgs] = useState(false);
   const [temMaisAntigas, setTemMaisAntigas] = useState(false);
+
   const [carregandoAntigas, setCarregandoAntigas] = useState(false);
   const seqEspera = useRef(0);
   const convsVisiveis: any[] = (() => {
