@@ -8061,7 +8061,7 @@ export type Database = {
           categoria: string
           clinica_id: string
           conversa_id: string | null
-          correcao: string
+          correcao: string | null
           correcao_original: string | null
           created_at: string
           diagnosticado_em: string | null
@@ -8077,6 +8077,7 @@ export type Database = {
           motivo_rejeicao: string | null
           motivo_reversao: string | null
           observacao: string | null
+          origem: string
           pergunta_texto: string | null
           prioridade: string | null
           reportado_por: string
@@ -8101,7 +8102,7 @@ export type Database = {
           categoria: string
           clinica_id: string
           conversa_id?: string | null
-          correcao: string
+          correcao?: string | null
           correcao_original?: string | null
           created_at?: string
           diagnosticado_em?: string | null
@@ -8117,6 +8118,7 @@ export type Database = {
           motivo_rejeicao?: string | null
           motivo_reversao?: string | null
           observacao?: string | null
+          origem?: string
           pergunta_texto?: string | null
           prioridade?: string | null
           reportado_por: string
@@ -8141,7 +8143,7 @@ export type Database = {
           categoria?: string
           clinica_id?: string
           conversa_id?: string | null
-          correcao?: string
+          correcao?: string | null
           correcao_original?: string | null
           created_at?: string
           diagnosticado_em?: string | null
@@ -8157,6 +8159,7 @@ export type Database = {
           motivo_rejeicao?: string | null
           motivo_reversao?: string | null
           observacao?: string | null
+          origem?: string
           pergunta_texto?: string | null
           prioridade?: string | null
           reportado_por?: string

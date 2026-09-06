@@ -28,6 +28,15 @@ export const VALORES_CATEGORIA_FEEDBACK = CATEGORIAS_FEEDBACK_NINA.map(
   (c) => c.valor,
 ) as unknown as [CategoriaFeedbackNina, ...CategoriaFeedbackNina[]];
 
+/**
+ * Classificação neutra usada pelo reporte rápido (um clique). Fica fora das
+ * opções do formulário — ninguém escolhe "a classificar" manualmente —, mas
+ * precisa de rótulo na Revisão de aprendizados.
+ */
+export const CATEGORIA_A_CLASSIFICAR = "nao_classificado";
+export const ROTULO_CATEGORIA_A_CLASSIFICAR = "Erro reportado — a classificar";
+
 export function rotuloCategoriaFeedback(valor: string): string {
+  if (valor === CATEGORIA_A_CLASSIFICAR) return ROTULO_CATEGORIA_A_CLASSIFICAR;
   return CATEGORIAS_FEEDBACK_NINA.find((c) => c.valor === valor)?.rotulo ?? valor;
 }
