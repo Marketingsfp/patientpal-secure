@@ -244,7 +244,8 @@ export function CatalogoNina({
               : "Rascunho salvo.",
         );
       }
-      setAberto(false);
+      if (posicao + 1 < fila.length) proximoDaFila();
+      else setAberto(false);
       await carregar();
     } catch (e: any) {
       const msg =
