@@ -65,7 +65,7 @@ function Pagina() {
             </CardHeader>
             <CardContent>
               <ArquiteturaCanvas
-                chavePosicoes={`nina-arquitetura-posicoes:${clinicaId ?? "sem-clinica"}`}
+                chavePosicoes={`nina-arquitetura-posicoes:${clinicaAtual?.id ?? "sem-clinica"}`}
               />
             </CardContent>
           </Card>
