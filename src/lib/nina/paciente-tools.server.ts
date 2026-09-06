@@ -991,9 +991,9 @@ async function executarFerramentaInterna(
 
       case "horario_funcionamento": {
         // Fonte única: calendário publicado na Base de Conhecimentos (Fases 1-3).
-        const { carregarCalendariosPublicados } = await import("./classificador-periodo.functions");
+        const { carregarCalendariosPublicadosCache } = await import("./classificador-periodo.functions");
         const { horarioOficialDoDia, semanaOficial, nomeDia } = await import("./horario-oficial");
-        const calendarios = await carregarCalendariosPublicados(supabaseAdmin, ctx.clinicaId);
+        const calendarios = await carregarCalendariosPublicadosCache(supabaseAdmin, ctx.clinicaId);
         const hoje = new Intl.DateTimeFormat("en-CA", { timeZone: HORA_LOCAL }).format(new Date());
         const alvo = typeof (args as any)?.data === "string" && (args as any).data ? String((args as any).data) : hoje;
         // Unidade histórica não é inferida: sem unidade no contexto, só calendário geral.

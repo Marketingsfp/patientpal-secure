@@ -90,6 +90,53 @@ export async function carregarCalendariosPublicados(
   });
 }
 
+/**
+ * Cache do calendário por escopo (clínica) para o caminho quente do
+ * atendimento: sem ele, cada mensagem do paciente relia versões, dias e
+ * exceções (3 consultas). O cache guarda a assinatura da última publicação
+ * (quantidade de versões + publicado_em mais recente) e é descartado assim que
+ * uma nova publicação aparece — nunca serve horário desatualizado.
+ */
+type EntradaCache = { assinatura: string; em: number; calendarios: CalendarioPublicado[] };
+const cacheCalendarios = new Map<string, EntradaCache>();
+/** Janela curta: mesmo sem nova publicação, o cache se renova sozinho. */
+const TTL_MS = 5 * 60 * 1000;
+
+async function assinaturaPublicacao(supabase: any, clinicaId: string): Promise<string> {
+  const { data, count, error } = await supabase
+    .from("nina_calendario_versoes")
+    .select("publicado_em", { count: "exact" })
+    .eq("clinica_id", clinicaId)
+    .in("status", ["publicado", "substituido"])
+    .not("publicado_em", "is", null)
+    .order("publicado_em", { ascending: false })
+    .limit(1);
+  if (error) throw new Error(error.message);
+  return `${count ?? 0}:${data?.[0]?.publicado_em ?? "-"}`;
+}
+
+/** Igual a carregarCalendariosPublicados, com reuso por escopo e versão. */
+export async function carregarCalendariosPublicadosCache(
+  supabase: any,
+  clinicaId: string,
+): Promise<CalendarioPublicado[]> {
+  const assinatura = await assinaturaPublicacao(supabase, clinicaId);
+  const atual = cacheCalendarios.get(clinicaId);
+  if (atual && atual.assinatura === assinatura && Date.now() - atual.em < TTL_MS) {
+    return atual.calendarios;
+  }
+  const calendarios = await carregarCalendariosPublicados(supabase, clinicaId);
+  cacheCalendarios.set(clinicaId, { assinatura, em: Date.now(), calendarios });
+  return calendarios;
+}
+
+/** Só para testes: zera o cache em memória. */
+export function limparCacheCalendarios() {
+  cacheCalendarios.clear();
+}
+
+
+
 /** Classifica um ou vários instantes de uma mesma clínica. */
 export const classificarPeriodoEventos = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
