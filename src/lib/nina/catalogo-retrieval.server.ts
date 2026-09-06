@@ -146,12 +146,27 @@ export async function buscarNoCatalogo(pedido: {
   if (servicos.error) throw new Error(servicos.error.message);
   if (profissionais.error) throw new Error(profissionais.error.message);
 
-  const brutosServicos = (servicos.data ?? []) as unknown as ServicoPublicado[];
+  let brutosServicos = (servicos.data ?? []) as unknown as ServicoPublicado[];
+  // O `ilike` do banco é sensível a acento: "ressonancia" não casa com
+  // "Ressonância". Quando o filtro não trouxe nada, relemos os publicados da
+  // clínica (com teto) e comparamos sem acento aqui. Uma consulta extra só no
+  // caso de erro de escrita — nunca por mensagem.
+  if (termos.length && !brutosServicos.length) {
+    const semFiltro = await supabaseAdmin
+      .from("nina_cat_servicos")
+      .select(COLUNAS_SERVICO)
+      .eq("clinica_id", pedido.clinicaId)
+      .eq("status", "PUBLICADO")
+      .limit(TETO_SERVICOS);
+    if (semFiltro.error) throw new Error(semFiltro.error.message);
+    brutosServicos = (semFiltro.data ?? []) as unknown as ServicoPublicado[];
+  }
   const pontuados = brutosServicos
     .map((s) => ({ s, score: pontuar(s.nome, String(s.descricao_publica ?? ""), termos) }))
     .filter((x) => (termos.length ? x.score > 0 : true))
     .sort((a, b) => b.score - a.score);
   const listaServicos = pontuados.slice(0, limite).map((x) => x.s);
+
 
   const brutosProfissionais = (profissionais.data ?? []) as unknown as ProfissionalPublicado[];
   const listaProfissionais = (
