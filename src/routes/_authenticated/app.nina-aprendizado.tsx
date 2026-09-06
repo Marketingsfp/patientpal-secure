@@ -50,6 +50,9 @@ import {
   CATEGORIAS_FEEDBACK_NINA,
   rotuloCategoriaFeedback,
 } from "@/lib/nina/feedback-erros";
+import { ehReporteRapido, rotuloConversaReporte } from "@/lib/nina/erro-rapido";
+import { supabase } from "@/integrations/supabase/client";
+
 import {
   editarSugestaoFeedbackNina,
   listarAutoresFeedbackNina,
@@ -114,7 +117,9 @@ type Item = {
   mensagem_texto: string | null;
   pergunta_texto: string | null;
   categoria: string;
-  correcao: string;
+  origem: string | null;
+  correcao: string | null;
+
   correcao_original: string | null;
   observacao: string | null;
   motivo_rejeicao: string | null;
@@ -230,6 +235,8 @@ function Pagina() {
   const [itens, setItens] = useState<Item[]>([]);
   const [pessoas, setPessoas] = useState<Record<string, string>>({});
   const [contagens, setContagens] = useState<Record<string, number>>({});
+  const [conversas, setConversas] = useState<Record<string, number>>({});
+
   const [autores, setAutores] = useState<{ id: string; nome: string }[]>([]);
   const [carregando, setCarregando] = useState(false);
   const [podeRevisar, setPodeRevisar] = useState(false);
@@ -298,6 +305,7 @@ function Pagina() {
       setItens((r.itens ?? []) as Item[]);
       setPessoas(r.pessoas ?? {});
       setContagens(r.contagens ?? {});
+      setConversas((r as { conversas?: Record<string, number> }).conversas ?? {});
       setOcorrencias((r as { ocorrencias?: Record<string, number> }).ocorrencias ?? {});
     } catch (e) {
       mostrarErro(e);
@@ -309,6 +317,32 @@ function Pagina() {
   useEffect(() => {
     void carregar();
   }, [carregar]);
+
+  // Tempo real: novos reportes (inclusive o do X vermelho) entram na lista e
+  // atualizam os contadores sem recarregar a página. A recarga usa a mesma
+  // consulta, então o item nunca aparece duplicado.
+  useEffect(() => {
+    if (!clinicaId) return;
+    const canal = supabase
+      .channel(`nina-feedback-erros-${clinicaId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "nina_feedback_erros",
+          filter: `clinica_id=eq.${clinicaId}`,
+        },
+        () => {
+          void carregar();
+        },
+      )
+      .subscribe();
+    return () => {
+      void supabase.removeChannel(canal);
+    };
+  }, [clinicaId, carregar]);
+
 
   useEffect(() => {
     if (!clinicaId) return;
@@ -793,6 +827,30 @@ function Pagina() {
                     </span>
                   </div>
 
+                  {ehReporteRapido(it.origem) && (
+                    <div className="space-y-1 rounded-md border border-destructive/40 bg-destructive/5 p-3">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-destructive">
+                        Erro reportado da Nina
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        Conversa: {rotuloConversaReporte(it.conversa_id, conversas[it.conversa_id ?? ""])}
+                      </p>
+                      <div>
+                        <Label className="text-xs text-muted-foreground">Mensagem reportada</Label>
+                        <div className="mt-1 max-h-40 overflow-auto whitespace-pre-wrap rounded-md border border-border bg-background p-2 text-xs">
+                          {it.mensagem_texto ?? "—"}
+                        </div>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Reportado por: {pessoas[it.reportado_por] ?? "—"} · Data do reporte:{" "}
+                        {fmtData(it.created_at)}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        Status: {it.status === "pending" ? "Pendente de revisão" : it.status}
+                      </p>
+                    </div>
+                  )}
+
                   <div className="grid gap-3 md:grid-cols-2">
                     <div>
                       <Label className="text-xs text-muted-foreground">
@@ -813,9 +871,10 @@ function Pagina() {
                   <div>
                     <Label className="text-xs text-muted-foreground">Correção sugerida</Label>
                     <div className="mt-1 whitespace-pre-wrap rounded-md border border-border p-2 text-xs">
-                      {it.correcao}
+                      {it.correcao?.trim() || "— (a preencher na revisão)"}
                     </div>
                   </div>
+
                   {it.observacao && (
                     <p className="text-xs text-muted-foreground">
                       Observação interna: {it.observacao}
@@ -851,7 +910,7 @@ function Pagina() {
                           variant="outline"
                           onClick={() => {
                             setEditando(it);
-                            setTextoEdicao(it.correcao);
+                            setTextoEdicao(it.correcao ?? "");
                           }}
                         >
                           <Pencil className="mr-1 h-4 w-4" aria-hidden="true" /> Editar sugestão
