@@ -416,7 +416,10 @@ export function normalizarResultado(
   }
 
   const causa = o["causa_provavel"] == null ? null : String(o["causa_provavel"]).slice(0, 600);
-  const causaEhHipotese = causa ? (o["causa_eh_hipotese"] === false ? evidencias.length > 0 : true) : false;
+  // Sem evidência citada, a causa NUNCA deixa de ser hipótese.
+  const causaEhHipotese = causa
+    ? !(o["causa_eh_hipotese"] === false && evidencias.length > 0)
+    : false;
 
   return {
     veredito: vFinal,
