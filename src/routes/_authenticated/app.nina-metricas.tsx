@@ -42,6 +42,10 @@ import {
   rotuloPrioridade,
 } from "@/lib/nina/feedback-diagnostico";
 import {
+  FUSO_OPERACAO_PADRAO,
+  validarRecorte,
+} from "@/lib/nina/metricas-filtros";
+import {
   metricasAprendizadoNina,
   trilhaAuditoriaAprendizadoNina,
 } from "@/lib/nina/feedback-metricas.functions";
