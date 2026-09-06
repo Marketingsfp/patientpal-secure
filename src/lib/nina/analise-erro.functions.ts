@@ -168,6 +168,8 @@ export const listarAnalisesErroNina = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     await exigirPermissao(context, data.clinicaId);
+    const { analiseIAAtivaNaClinica } = await import("./analise-flag.server");
+    const ativa = await analiseIAAtivaNaClinica(data.clinicaId);
     const { data: linhas, error } = await (context.supabase as any)
       .from("nina_feedback_analises")
       .select(COLUNAS)
@@ -175,7 +177,7 @@ export const listarAnalisesErroNina = createServerFn({ method: "POST" })
       .eq("feedback_id", data.feedbackId)
       .order("versao", { ascending: false });
     if (error) throw new Error(error.message);
-    return { analises: (linhas ?? []) as Analise[] };
+    return { analises: (linhas ?? []) as Analise[], ativa };
   });
 
 export const analisarErroNinaComIA = createServerFn({ method: "POST" })
@@ -191,6 +193,12 @@ export const analisarErroNinaComIA = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     await exigirPermissao(context, data.clinicaId);
+    const { analiseIAAtivaNaClinica, MSG_ANALISE_DESATIVADA } = await import(
+      "./analise-flag.server"
+    );
+    if (!(await analiseIAAtivaNaClinica(data.clinicaId))) {
+      throw new Error(MSG_ANALISE_DESATIVADA);
+    }
     const supabase = context.supabase as any;
 
     const { data: existentes, error: eLista } = await supabase
