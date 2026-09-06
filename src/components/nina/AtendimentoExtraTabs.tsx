@@ -1339,17 +1339,31 @@ export function AtendInbox() {
     }
   }, [clinicaId, listarMsgs, listarEventosFn, carregarConversa]);
 
-  /* ---- Leitura individual (Fase 2) ------------------------------------
-   * Quando a conversa aberta é da própria atendente, registra até QUAL
-   * mensagem ela viu (a última carregada), não "agora". Supervisão apenas
-   * acompanha: nada é registrado e o aviso de quem atende continua igual.
-   * O marcador só avança — o banco cuida disso. */
+  /* ---- Leitura individual (Fases 2 e 3) --------------------------------
+   * Registra a leitura da própria atendente até a ÚLTIMA mensagem realmente
+   * exibida na tela — nunca "agora" e nunca por prefetch, cache, hover ou
+   * carregamento em segundo plano. Só conta quando a conversa certa está
+   * aberta, as mensagens já apareceram e a aba está visível.
+   * Supervisão (admin/gestor) continua de fora, mesmo chegando ao fim.
+   * Quem chega por "Ver conversa" de um erro antigo não zera os novos. */
   const marcarLidaFn = useServerFn(marcarLida);
   const ultimaLidaRef = useRef<Map<string, string>>(new Map());
+  const [abaVisivel, setAbaVisivel] = useState(true);
+  useEffect(() => {
+    const ler = () => setAbaVisivel(document.visibilityState === "visible");
+    ler();
+    document.addEventListener("visibilitychange", ler);
+    return () => document.removeEventListener("visibilitychange", ler);
+  }, []);
   useEffect(() => {
     const conversa = sel;
     const alvo = conversa?.id as string | undefined;
-    if (!clinicaId || !alvo || conversaCarregadaId !== alvo) return;
+    // Skeleton, conversa trocada ou aba em segundo plano: ninguém leu nada.
+    if (!clinicaId || !alvo || !abaVisivel) return;
+    if (conversaCarregadaId !== alvo || carregandoConversa) return;
+    // Abertura posicionada num trecho antigo: só depois que a localização
+    // termina e o usuário volta a abrir a conversa normalmente.
+    if (aberturaPorAlvoRef.current.has(alvo) || buscandoAlvo || alvoMensagem) return;
     if (
       !podeMarcarLidaAutomaticamente({
         userId: meuId ?? "",
@@ -1363,17 +1377,47 @@ export function AtendInbox() {
     if (!mensagemId) return;
     if (ultimaLidaRef.current.get(alvo) === mensagemId) return;
     ultimaLidaRef.current.set(alvo, mensagemId);
+    // Otimista: a bolinha some na hora, mas o número anterior é guardado para
+    // voltar caso a gravação falhe — nada de esconder o problema.
+    let anterior = 0;
+    setConvs((prev) =>
+      prev.map((c: any) => {
+        if (c.id !== alvo) return c;
+        anterior = Number(c.nao_lidas ?? 0);
+        return { ...c, nao_lidas: 0 };
+      }),
+    );
     void marcarLidaFn({ data: { clinicaId, conversaId: alvo, mensagemId } })
-      .then(() => {
-        setConvs((prev) =>
-          prev.map((c: any) => (c.id === alvo ? { ...c, nao_lidas: 0 } : c)),
-        );
+      .then((r: any) => {
+        if (r?.marcada === false) {
+          setConvs((prev) =>
+            prev.map((c: any) => (c.id === alvo ? { ...c, nao_lidas: anterior } : c)),
+          );
+          ultimaLidaRef.current.delete(alvo);
+        }
       })
       .catch(() => {
-        // Falha de rede não trava o atendimento: a próxima abertura registra.
+        // Falhou a gravação: devolve o número verdadeiro e libera nova
+        // tentativa na próxima abertura/atualização.
+        setConvs((prev) =>
+          prev.map((c: any) => (c.id === alvo ? { ...c, nao_lidas: anterior } : c)),
+        );
         ultimaLidaRef.current.delete(alvo);
       });
-  }, [clinicaId, sel, conversaCarregadaId, msgs, meuId, souGestor, marcarLidaFn]);
+  }, [
+    clinicaId,
+    sel,
+    conversaCarregadaId,
+    carregandoConversa,
+    msgs,
+    meuId,
+    souGestor,
+    abaVisivel,
+    buscandoAlvo,
+    alvoMensagem,
+    marcarLidaFn,
+  ]);
+
 
 
   // Apoio da conversa aberta (notas internas e eventos): antes uma nota nova
