@@ -37,3 +37,13 @@
       número único e permanente, como #1342.
 - [x] URLs individuais por conversa foram descontinuadas: links antigos
       (`/app/nina/<id>`) apenas redirecionam para a Inbox, sem abrir a conversa.
+
+## Nina — Catálogo estruturado (Fases 1–7)
+- [x] Fases 1–5: tabelas, formulários, IA, migração e integração
+- [x] Fase 6: homologação em clínica fictícia isolada (aprovada)
+- [x] Fase 7: modo planilha removido (global; dados antigos isolados; versão não publicada)
+
+## Atendimento — identificação da conversa pelo nome (06/09/2026)
+- [ ] Nome do paciente/contato como título no cabeçalho, lista, busca e filas
+- [ ] Telefone e #número como informação secundária; "Paciente não identificado" sem nome
+- [ ] Sem consulta por item da lista; sem mistura de dados ao trocar de conversa

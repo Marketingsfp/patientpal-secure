@@ -1,11 +1,11 @@
 /**
  * FASE 3 — Diagnóstico da causa real dos erros da Nina (catálogo puro).
  *
- * Este módulo NÃO altera planilha, Base de Conhecimentos, embeddings, prompt,
+ * Este módulo NÃO altera o catálogo, a Base de Conhecimentos, embeddings, prompt,
  * modelo, regras ou ferramentas. Ele apenas classifica o erro já reportado.
  *
- * Regra crítica: erro da Nina != planilha errada. Só `knowledge_error` e
- * `knowledge_missing` apontam para a planilha; as demais causas apontam para
+ * Regra crítica: erro da Nina != catálogo errado. Só `knowledge_error` e
+ * `knowledge_missing` apontam para o catálogo; as demais causas apontam para
  * busca (retrieval), interpretação, ferramenta ou fluxo.
  */
 
@@ -13,14 +13,14 @@ export const CAUSAS_RAIZ_NINA = [
   {
     valor: "knowledge_error",
     rotulo: "Planilha errada",
-    descricao: "A informação oficial da planilha está errada ou desatualizada.",
-    alvo: "planilha",
+    descricao: "A informação oficial do catálogo está errada ou desatualizada.",
+    alvo: "catalogo",
   },
   {
     valor: "knowledge_missing",
-    rotulo: "Falta na planilha",
+    rotulo: "Falta no catálogo",
     descricao: "A informação deveria existir na Base, mas não está lá.",
-    alvo: "planilha",
+    alvo: "catalogo",
   },
   {
     valor: "retrieval_error",
@@ -135,7 +135,7 @@ export function chaveAgrupamento(categoria: string, assunto: string): string {
   return `${normalizar(categoria).replace(/\s/g, "-")}:${a || "geral"}`;
 }
 
-/** Assunto sugerido a partir do que a planilha devolveu e da pergunta. */
+/** Assunto sugerido a partir do que o catálogo devolveu e da pergunta. */
 export function assuntoSugerido(
   itemPlanilha: string | null | undefined,
   pergunta: string | null | undefined,

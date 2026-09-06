@@ -997,8 +997,8 @@ ${procs || "(nenhum)"}`;
   }
 
   const blocoKb = await (async () => {
-    const { blocoPromptBaseConhecimento } = await import("@/lib/nina/kb.server");
-    return await blocoPromptBaseConhecimento(clinicaId).catch(() => "");
+    const { blocoPromptCatalogo } = await import("@/lib/nina/catalogo-prompt.server");
+    return await blocoPromptCatalogo(clinicaId).catch(() => "");
   })();
 
   // FASE 2 do novo fluxo: respostas factuais fundamentadas na planilha.

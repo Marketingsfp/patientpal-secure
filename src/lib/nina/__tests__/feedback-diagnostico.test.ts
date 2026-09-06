@@ -19,7 +19,7 @@ describe("prioridade sugerida", () => {
     expect(prioridadeSugerida("retrieval_error", "medico_incorreto")).toBe("critico");
     expect(prioridadeSugerida("knowledge_error", "unidade_incorreta")).toBe("critico");
   });
-  it("busca, planilha e fluxo ficam em alto", () => {
+  it("busca, catálogo e fluxo ficam em alto", () => {
     expect(prioridadeSugerida("retrieval_error", "informacao_nao_encontrada")).toBe("alto");
     expect(prioridadeSugerida("workflow_error", "handoff_deveria_ocorrer")).toBe("alto");
     expect(prioridadeSugerida("knowledge_missing", "informacao_inexistente")).toBe("alto");
@@ -40,7 +40,7 @@ describe("agrupamento", () => {
       chaveAgrupamento("valor_incorreto", "Dermatologia"),
     );
   });
-  it("usa o item da planilha quando existe", () => {
+  it("usa o item do catálogo quando existe", () => {
     expect(assuntoSugerido("Consulta Cardiologia", "quanto custa?")).toBe("Consulta Cardiologia");
     expect(assuntoSugerido(null, "quanto custa a consulta de cardiologia mesmo")).toBe(
       "quanto custa a consulta de cardiologia",

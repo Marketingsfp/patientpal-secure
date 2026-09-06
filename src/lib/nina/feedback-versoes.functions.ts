@@ -202,30 +202,11 @@ export const reverterVersaoAprendizadoNina = createServerFn({ method: "POST" })
     const agora = new Date().toISOString();
     let detalheBase: string | null = null;
 
-    if (versao.camada === "planilha" && versao.kb_base_id_anterior) {
-      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-      const { data: anterior, error: erroAnt } = await supabaseAdmin
-        .from("nina_kb_bases")
-        .select("id, versao, clinica_id")
-        .eq("id", versao.kb_base_id_anterior)
-        .eq("clinica_id", data.clinicaId)
-        .single();
-      if (erroAnt || !anterior)
-        throw new Error("Versão anterior da planilha não foi encontrada para restaurar.");
-
-      await supabaseAdmin
-        .from("nina_kb_bases")
-        .update({ status: "INATIVA" })
-        .eq("clinica_id", data.clinicaId)
-        .eq("status", "ATIVA");
-
-      const { processarBase, invalidarCache } = await import("@/lib/nina/kb.server");
-      await processarBase(anterior.id);
-      invalidarCache(data.clinicaId);
-      detalheBase = `Planilha restaurada para a versão ${anterior.versao} (chunks, embeddings, índices e cache atualizados).`;
-    } else if (versao.camada === "planilha") {
+    if (versao.camada === "planilha" || versao.camada === "catalogo") {
+      // FASE 7: não há arquivo externo para restaurar. O conteúdo oficial volta
+      // ao estado anterior editando e publicando o registro no catálogo.
       detalheBase =
-        "Não havia versão anterior da planilha registrada: reverta enviando novamente o arquivo oficial correto pela Base de Conhecimentos.";
+        "Reversão de conteúdo oficial: edite o registro na Base de Conhecimentos da Nina e publique a versão correta.";
     }
 
     const { error: erroVer } = await context.supabase

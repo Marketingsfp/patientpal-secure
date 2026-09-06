@@ -2,7 +2,7 @@
  * Nina → Revisão de Aprendizados (FASE 2).
  *
  * Central administrativa para revisar os erros reportados pelas atendentes.
- * Aprovar/rejeitar aqui NÃO altera planilha, Base de Conhecimentos,
+ * Aprovar/rejeitar aqui NÃO altera o catálogo, a Base de Conhecimentos,
  * embeddings, prompt, modelo, regras ou ferramentas — apenas registra a
  * decisão. A aplicação real virá em fase posterior.
  */
@@ -133,7 +133,7 @@ type Item = {
 type Comparacao = {
   knowledge_status: "found" | "not_found" | "conflict";
   base_version: number | null;
-  planilha_atual: string | null;
+  catalogo_atual: string | null;
   correcao_sugerida: string | null;
   causa_sugerida: string;
   prioridade_sugerida: string;
@@ -142,9 +142,9 @@ type Comparacao = {
 };
 
 const ROTULO_KB: Record<string, string> = {
-  found: "Encontrada na planilha",
-  not_found: "Não encontrada na planilha",
-  conflict: "Conflito na planilha",
+  found: "Encontrada no catálogo",
+  not_found: "Não encontrada no catálogo",
+  conflict: "Conflito no catálogo",
 };
 
 const ABAS = [
@@ -454,7 +454,7 @@ function Pagina() {
         },
       });
       toast.success(
-        `Diagnóstico salvo (${r.ocorrencias} ocorrência${r.ocorrencias > 1 ? "s" : ""}). Nada foi alterado na planilha.`,
+        `Diagnóstico salvo (${r.ocorrencias} ocorrência${r.ocorrencias > 1 ? "s" : ""}). Nada foi alterado no catálogo.`,
       );
       setDiagnosticando(null);
       await carregar();
@@ -946,7 +946,7 @@ function Pagina() {
                     <p className="text-xs text-muted-foreground">{a.instrucao}</p>
                   </div>
                   <div className="flex flex-wrap gap-2">
-                    {a.camada !== "planilha" && !a.homologado && (
+                    {a.camada !== "catalogo" && !a.homologado && (
                       <Button
                         size="sm"
                         variant="secondary"
@@ -956,16 +956,16 @@ function Pagina() {
                         Homologar
                       </Button>
                     )}
-                    {a.camada !== "planilha" && a.homologado && (
+                    {a.camada !== "catalogo" && a.homologado && (
                       <Badge variant="secondary" className="self-center">
                         Homologada
                       </Badge>
                     )}
                     <Button
                       size="sm"
-                      disabled={salvando || (a.camada !== "planilha" && !a.homologado)}
+                      disabled={salvando || (a.camada !== "catalogo" && !a.homologado)}
                       title={
-                        a.camada !== "planilha" && !a.homologado
+                        a.camada !== "catalogo" && !a.homologado
                           ? "Passe pela homologação antes de concluir"
                           : "Concluir a ação"
                       }
@@ -1042,7 +1042,7 @@ function Pagina() {
                     Aprovou: {pessoas[v.aprovado_por ?? ""] ?? "—"} · Aplicou:{" "}
                     {pessoas[v.aplicado_por] ?? "—"}
                     {v.kb_versao_anterior || v.kb_versao_nova
-                      ? ` · Planilha v${v.kb_versao_anterior ?? "?"} → v${v.kb_versao_nova ?? "?"}`
+                      ? ` · Catálogo (registro publicado)`
                       : ""}
                   </p>
                   {v.teste_resposta && (
@@ -1087,7 +1087,7 @@ function Pagina() {
           <DialogHeader>
             <DialogTitle>Reverter alteração</DialogTitle>
             <DialogDescription>
-              A versão anterior volta a valer. Quando a correção era da planilha, a versão anterior
+              A versão anterior volta a valer. Quando a correção era de conteúdo oficial, a versão anterior
               do arquivo oficial é reativada e a busca é atualizada (blocos, embeddings, índices e
               cache). O item volta para investigação.
             </DialogDescription>
@@ -1165,13 +1165,13 @@ function Pagina() {
                     <span>{av}</span>
                   </li>
                 ))}
-                {preparo.plano.exigeReenvioPlanilha && !preparo.ja_na_base && (
+                {preparo.plano.exigeEdicaoCatalogo && !preparo.ja_na_base && (
                   <li className="flex gap-2">
                     <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" aria-hidden="true" />
                     <span>
-                      A versão ativa ainda não contém esta informação. Ao confirmar, fica registrada
-                      a pendência de corrigir o arquivo oficial e reenviar pela Base de
-                      Conhecimentos — o registro só será marcado como aplicado depois disso.
+                      O catálogo publicado ainda não contém esta informação. Ao confirmar, fica
+                      registrada a pendência de corrigir e publicar o registro na Base de
+                      Conhecimentos — só depois disso a correção é marcada como aplicada.
                     </span>
                   </li>
                 )}
@@ -1232,26 +1232,26 @@ function Pagina() {
           <DialogHeader>
             <DialogTitle>Diagnosticar a causa do erro</DialogTitle>
             <DialogDescription>
-              Comparação somente leitura com a planilha oficial. Salvar o diagnóstico{" "}
-              <strong>não altera</strong> a planilha nem a Base de Conhecimentos.
+              Comparação somente leitura com o catálogo oficial. Salvar o diagnóstico{" "}
+              <strong>não altera</strong> o catálogo nem a Base de Conhecimentos.
             </DialogDescription>
           </DialogHeader>
 
           {consultandoBase ? (
             <div className="flex items-center gap-2 py-6 text-sm text-muted-foreground">
               <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> Consultando a
-              planilha…
+              catálogo…
             </div>
           ) : (
             <div className="space-y-4">
               <div className="grid gap-3 md:grid-cols-2">
                 <div>
                   <Label className="text-xs text-muted-foreground">
-                    Planilha atual
+                    Catálogo atual
                     {comparacao?.base_version ? ` (versão ${comparacao.base_version})` : ""}
                   </Label>
                   <div className="mt-1 max-h-40 overflow-auto whitespace-pre-wrap rounded-md border border-border bg-muted/40 p-2 text-xs">
-                    {comparacao?.planilha_atual ?? "Nada encontrado na planilha para esta pergunta."}
+                    {comparacao?.catalogo_atual ?? "Nada encontrado no catálogo para esta pergunta."}
                   </div>
                 </div>
                 <div>
@@ -1269,7 +1269,7 @@ function Pagina() {
               )}
 
               <p className="rounded-md border border-amber-500/40 bg-amber-500/10 p-2 text-xs">
-                Erro da Nina não é sinônimo de planilha errada. Se a planilha já traz a informação
+                Erro da Nina não é sinônimo de catálogo errado. Se o catálogo já traz a informação
                 correta, a causa está na busca, na interpretação, na ferramenta ou no fluxo.
               </p>
 

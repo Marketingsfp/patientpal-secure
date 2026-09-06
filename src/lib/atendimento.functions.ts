@@ -161,7 +161,9 @@ export const listarConversas = createServerFn({ method: "POST" })
 
     let q = context.supabase
       .from("atend_conversas")
-      .select("*")
+      // O nome do paciente vinculado vem embutido na MESMA consulta (sem
+      // consulta por item da lista). Sem vínculo, vem null.
+      .select("*, pacientes:contato_paciente_id(nome)")
       // Conversas do console de homologação nunca aparecem no atendimento real.
       .eq("is_teste", false)
       .eq("clinica_id", data.clinicaId)
@@ -187,9 +189,18 @@ export const listarConversas = createServerFn({ method: "POST" })
       // — remove operadores e separadores reservados.
       const safe = data.busca.replace(/[%_,.()'"\\:*]/g, "");
       if (safe.length > 0) {
-        q = q.or(
-          `contato_nome.ilike.%${safe}%,contato_telefone.ilike.%${safe}%,protocol_number.ilike.%${safe}%`,
-        );
+        // Busca por nome também alcança o cadastro do paciente vinculado.
+        // Uma única consulta em lote, com teto — nunca por item da lista.
+        let filtro = `contato_nome.ilike.%${safe}%,contato_telefone.ilike.%${safe}%,protocol_number.ilike.%${safe}%`;
+        const { data: pacs } = await context.supabase
+          .from("pacientes")
+          .select("id")
+          .eq("clinica_id", data.clinicaId)
+          .ilike("nome", `%${safe}%`)
+          .limit(50);
+        const ids = (pacs ?? []).map((p) => p.id);
+        if (ids.length) filtro += `,contato_paciente_id.in.(${ids.join(",")})`;
+        q = q.or(filtro);
       }
     }
     const { data: rows, error } = await q;
@@ -225,7 +236,7 @@ export const obterConversa = createServerFn({ method: "POST" })
     }
     const { data: row, error } = await context.supabase
       .from("atend_conversas")
-      .select("*")
+      .select("*, pacientes:contato_paciente_id(nome)")
       .eq("id", data.conversaId)
       .eq("clinica_id", data.clinicaId)
       .eq("is_teste", false)
@@ -262,7 +273,7 @@ export const buscarConversaPorNumero = createServerFn({ method: "POST" })
     await assertMember(context.supabase, context.userId, data.clinicaId);
     const { data: row, error } = await context.supabase
       .from("atend_conversas")
-      .select("*")
+      .select("*, pacientes:contato_paciente_id(nome)")
       .eq("clinica_id", data.clinicaId)
       .eq("numero_conversa", data.numero)
       .eq("is_teste", false)
@@ -2206,7 +2217,7 @@ export const listarFilaHumana = createServerFn({ method: "POST" })
     let q = context.supabase
       .from("atend_conversas")
       .select(
-        "id, contato_nome, contato_telefone, canal, status, departamento_id, prioridade, aguardando_desde, handoff_motivo, handoff_resumo, ultima_msg_preview, ultima_msg_em, unread_count",
+        "id, contato_nome, contato_telefone, canal, status, departamento_id, prioridade, aguardando_desde, handoff_motivo, handoff_resumo, ultima_msg_preview, ultima_msg_em, unread_count, pacientes:contato_paciente_id(nome)",
       )
       .eq("clinica_id", data.clinicaId)
       // Fila global "Não atribuídas": tudo que aguarda uma pessoa e ainda não

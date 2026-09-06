@@ -8,11 +8,13 @@ import { Inbox, RefreshCw, AlertTriangle } from "lucide-react";
 import { useClinica } from "@/hooks/use-clinica";
 import { useRealtimeRefresh } from "@/hooks/use-realtime-refresh";
 import { listarFilaHumana } from "@/lib/atendimento.functions";
+import { tituloConversa } from "@/lib/atendimento/rotulo-conversa";
 
 type ConversaFila = {
   id: string;
   contato_nome: string | null;
   contato_telefone: string | null;
+  pacientes?: { nome?: string | null } | null;
   prioridade: number | null;
   aguardando_desde: string | null;
   handoff_motivo: string | null;
@@ -110,8 +112,8 @@ export function FilaHumana(_props: { onAssumida?: (conversaId: string) => void }
                 >
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className="font-medium text-sm truncate">
-                        {c.contato_nome || c.contato_telefone || "—"}
+                      <span className="font-medium text-sm truncate" title={tituloConversa(c)}>
+                        {tituloConversa(c)}
                       </span>
                       <Badge variant="outline" className="text-[11px]">
                         #{c.posicao} na fila
@@ -125,6 +127,11 @@ export function FilaHumana(_props: { onAssumida?: (conversaId: string) => void }
                         </Badge>
                       )}
                     </div>
+                    {c.contato_telefone && (
+                      <p className="text-[11px] text-muted-foreground mt-0.5">
+                        {c.contato_telefone}
+                      </p>
+                    )}
                     {c.handoff_motivo && (
                       <p className="text-xs text-muted-foreground mt-1">
                         <span className="font-medium">Motivo:</span> {c.handoff_motivo}
