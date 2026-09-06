@@ -173,8 +173,8 @@ export const chatNina = createServerFn({ method: "POST" })
     if (blocoAprendizado) systemPrompt = `${systemPrompt}\n\n${blocoAprendizado}`;
 
     // Base de Conhecimentos (planilha oficial) — fonte de verdade administrativa.
-    const { blocoPromptBaseConhecimento } = await import("@/lib/nina/kb.server");
-    const blocoKb = await blocoPromptBaseConhecimento(data.clinicaId).catch(() => "");
+    const { blocoPromptCatalogo } = await import("@/lib/nina/catalogo-prompt.server");
+    const blocoKb = await blocoPromptCatalogo(data.clinicaId).catch(() => "");
     if (blocoKb) systemPrompt = `${systemPrompt}\n\n${blocoKb}`;
 
 

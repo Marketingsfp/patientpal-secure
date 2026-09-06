@@ -5,8 +5,8 @@
  * interna, rascunho, registro em RASCUNHO e registro ARQUIVADO nunca saem do
  * banco — não é o modelo que decide o que omitir.
  *
- * Ligado por clínica pela flag `nina_catalogo_fonte_enabled`. Sem linha em
- * `clinica_feature_flags` = desligado (a planilha continua sendo a fonte).
+ * FASE 7: fonte única. Não há flag de seleção de fonte nem fallback — o que
+ * não está PUBLICADO aqui é tratado como informação desconhecida.
  */
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import {
@@ -16,8 +16,6 @@ import {
 } from "./catalogo-conhecimento";
 import type { ResultadoConhecimento } from "./knowledge-contract";
 
-export const FLAG_NINA_CATALOGO_FONTE = "nina_catalogo_fonte_enabled";
-
 /** Colunas públicas — `nota_interna` e `rascunho` ficam de fora de propósito. */
 const COLUNAS_SERVICO =
   "id, nome, valor, valor_observacao, descricao_publica, preparo, restricoes, executantes, formas_pagamento";
@@ -26,18 +24,6 @@ const COLUNAS_PROFISSIONAL =
 
 /** Teto de leitura por clínica — nunca o catálogo inteiro sem limite. */
 const TETO_PROFISSIONAIS = 60;
-
-export async function flagCatalogoFonteAtiva(clinicaId: string | null): Promise<boolean> {
-  if (!clinicaId) return false;
-  const { data, error } = await supabaseAdmin
-    .from("clinica_feature_flags")
-    .select("ativo")
-    .eq("clinica_id", clinicaId)
-    .eq("flag_key", FLAG_NINA_CATALOGO_FONTE)
-    .maybeSingle();
-  if (error || !data) return false;
-  return Boolean((data as { ativo?: boolean }).ativo);
-}
 
 function termosBusca(query: string): string[] {
   return String(query ?? "")
