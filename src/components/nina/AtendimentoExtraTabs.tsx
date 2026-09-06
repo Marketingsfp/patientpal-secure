@@ -2110,7 +2110,7 @@ export function AtendInbox() {
               <button
                 key={c.id}
                 onClick={() => {
-                  iniciarTroca(c.id);
+                  iniciarTroca(c.id, "clique");
                   medidor.current = criarMedidorConversa(`conversa ${c.id}`);
                   medidor.current.marcar("click");
                   // Só muda o endereço: a conversa aberta vem da URL.
