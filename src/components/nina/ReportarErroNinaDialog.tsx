@@ -13,7 +13,7 @@ import { useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { X } from "lucide-react";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { reportarErroRapidoMensagemNina } from "@/lib/nina/feedback-erros.functions";
 
 export const TEXTO_REPORTE_SUCESSO = "Erro enviado para revisão.";
@@ -58,7 +58,8 @@ export function ReportarErroNinaBotao({ clinicaId, conversaId, mensagemId, class
   };
 
   return (
-    <Tooltip>
+    <TooltipProvider delayDuration={200}>
+      <Tooltip>
       <TooltipTrigger asChild>
         <button
           type="button"
@@ -77,6 +78,7 @@ export function ReportarErroNinaBotao({ clinicaId, conversaId, mensagemId, class
         </button>
       </TooltipTrigger>
       <TooltipContent side="left">{ROTULO_REPORTE}</TooltipContent>
-    </Tooltip>
+      </Tooltip>
+    </TooltipProvider>
   );
 }

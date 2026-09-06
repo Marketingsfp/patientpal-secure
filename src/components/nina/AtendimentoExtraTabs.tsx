@@ -2568,19 +2568,8 @@ export function AtendInbox() {
                       </div>
                     );
                   }
+                  // Autoria pelo campo do sistema, nunca pelo texto da mensagem.
                   const daNina = out && m.enviada_por === "nina";
-                  // Pergunta do paciente = última mensagem recebida antes desta.
-                  let perguntaPaciente: string | null = null;
-                  if (daNina) {
-                    for (let i = idxTimeline - 1; i >= 0; i--) {
-                      const ant = timeline[i];
-                      if (ant.kind !== "msg") continue;
-                      if (ant.msg.direction === "in") {
-                        perguntaPaciente = ant.msg.body ?? ant.msg.transcricao ?? null;
-                        break;
-                      }
-                    }
-                  }
                   return (
                     <div
                       key={m.id}
