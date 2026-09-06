@@ -2464,6 +2464,10 @@ export function AtendInbox() {
                 data-conversa-id={c.id}
                 onClick={() => {
                   iniciarTroca(c.id, "clique");
+                  // Abertura normal pela Inbox: volta a valer a leitura
+                  // automática, mesmo que antes tenha vindo de um erro.
+                  aberturaPorAlvoRef.current.delete(c.id);
+
                   medidor.current = criarMedidorConversa(`conversa ${c.id}`);
                   medidor.current.marcar("click");
                   // Seleção interna: a conversa aberta é escolhida aqui mesmo.
