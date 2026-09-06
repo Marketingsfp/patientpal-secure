@@ -254,7 +254,7 @@ export const NODES_ARQUITETURA: NodeArquitetura[] = [
     servico: "Lovable AI Gateway",
     entrada: "Mensagens e ferramentas disponíveis",
     saida: "Resposta de texto ou chamadas de ferramenta",
-    anteriores: ["prompt.compose", "tool.execute"],
+    anteriores: ["prompt.compose", "llm.model_flag", "tool.execute"],
     seguintes: ["tool.execute", "response.validate", "error.handle"],
     erros: ["limite de uso", "créditos insuficientes", "tempo esgotado", "resposta inválida"],
   },
