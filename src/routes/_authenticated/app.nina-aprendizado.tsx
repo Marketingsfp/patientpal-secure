@@ -50,7 +50,7 @@ import {
   CATEGORIAS_FEEDBACK_NINA,
   rotuloCategoriaFeedback,
 } from "@/lib/nina/feedback-erros";
-import { ehReporteRapido, rotuloConversaReporte } from "@/lib/nina/erro-rapido";
+import { ehReporteRapido, rotuloConversaReporte, ROTULO_AUDITORIA } from "@/lib/nina/erro-rapido";
 import { supabase } from "@/integrations/supabase/client";
 
 import {
@@ -236,6 +236,9 @@ function Pagina() {
   const [pessoas, setPessoas] = useState<Record<string, string>>({});
   const [contagens, setContagens] = useState<Record<string, number>>({});
   const [conversas, setConversas] = useState<Record<string, number>>({});
+  // Estado da auditoria técnica por item (ponteiro, sem copiar a evidência).
+  const [auditoria, setAuditoria] = useState<Record<string, string>>({});
+  const [execucoes, setExecucoes] = useState<Record<string, { model: string | null }>>({});
 
   const [autores, setAutores] = useState<{ id: string; nome: string }[]>([]);
   const [carregando, setCarregando] = useState(false);
@@ -306,6 +309,8 @@ function Pagina() {
       setPessoas(r.pessoas ?? {});
       setContagens(r.contagens ?? {});
       setConversas((r as { conversas?: Record<string, number> }).conversas ?? {});
+      setAuditoria((r as { auditoria?: Record<string, string> }).auditoria ?? {});
+      setExecucoes((r as { execucoes?: Record<string, { model: string | null }> }).execucoes ?? {});
       setOcorrencias((r as { ocorrencias?: Record<string, number> }).ocorrencias ?? {});
     } catch (e) {
       mostrarErro(e);
@@ -847,6 +852,15 @@ function Pagina() {
                       </p>
                       <p className="text-xs text-muted-foreground">
                         Status: {it.status === "pending" ? "Pendente de revisão" : it.status}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        Auditoria técnica:{" "}
+                        {ROTULO_AUDITORIA[
+                          (auditoria[it.id] as keyof typeof ROTULO_AUDITORIA) ?? "unavailable"
+                        ]}
+                        {execucoes[(it as { execucao_id?: string | null }).execucao_id ?? ""]
+                          ? ` · ${execucoes[(it as { execucao_id?: string | null }).execucao_id ?? ""]?.model ?? "—"}`
+                          : ""}
                       </p>
                     </div>
                   )}

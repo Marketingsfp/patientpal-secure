@@ -8058,6 +8058,7 @@ export type Database = {
           aplicacao_tipo: string | null
           aplicado_em: string | null
           aplicado_por: string | null
+          auditoria_status: string | null
           categoria: string
           clinica_id: string
           conversa_id: string | null
@@ -8066,6 +8067,7 @@ export type Database = {
           created_at: string
           diagnosticado_em: string | null
           diagnosticado_por: string | null
+          execucao_id: string | null
           grupo_chave: string | null
           grupo_titulo: string | null
           id: string
@@ -8099,6 +8101,7 @@ export type Database = {
           aplicacao_tipo?: string | null
           aplicado_em?: string | null
           aplicado_por?: string | null
+          auditoria_status?: string | null
           categoria: string
           clinica_id: string
           conversa_id?: string | null
@@ -8107,6 +8110,7 @@ export type Database = {
           created_at?: string
           diagnosticado_em?: string | null
           diagnosticado_por?: string | null
+          execucao_id?: string | null
           grupo_chave?: string | null
           grupo_titulo?: string | null
           id?: string
@@ -8140,6 +8144,7 @@ export type Database = {
           aplicacao_tipo?: string | null
           aplicado_em?: string | null
           aplicado_por?: string | null
+          auditoria_status?: string | null
           categoria?: string
           clinica_id?: string
           conversa_id?: string | null
@@ -8148,6 +8153,7 @@ export type Database = {
           created_at?: string
           diagnosticado_em?: string | null
           diagnosticado_por?: string | null
+          execucao_id?: string | null
           grupo_chave?: string | null
           grupo_titulo?: string | null
           id?: string
@@ -8181,6 +8187,13 @@ export type Database = {
             columns: ["clinica_id"]
             isOneToOne: false
             referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nina_feedback_erros_execucao_id_fkey"
+            columns: ["execucao_id"]
+            isOneToOne: false
+            referencedRelation: "nina_execucoes"
             referencedColumns: ["id"]
           },
         ]
@@ -10887,6 +10900,7 @@ export type Database = {
           created_at: string
           direction: string
           enviada_por: string | null
+          execucao_id: string | null
           from_number: string | null
           id: string
           is_teste: boolean
@@ -10910,6 +10924,7 @@ export type Database = {
           created_at?: string
           direction: string
           enviada_por?: string | null
+          execucao_id?: string | null
           from_number?: string | null
           id?: string
           is_teste?: boolean
@@ -10933,6 +10948,7 @@ export type Database = {
           created_at?: string
           direction?: string
           enviada_por?: string | null
+          execucao_id?: string | null
           from_number?: string | null
           id?: string
           is_teste?: boolean
@@ -10961,6 +10977,13 @@ export type Database = {
             columns: ["conversa_id"]
             isOneToOne: false
             referencedRelation: "atend_conversas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "whatsapp_mensagens_execucao_id_fkey"
+            columns: ["execucao_id"]
+            isOneToOne: false
+            referencedRelation: "nina_execucoes"
             referencedColumns: ["id"]
           },
         ]
@@ -12247,6 +12270,7 @@ export type Database = {
           token_publico: string
         }[]
       }
+      nina_execucoes_expurgo: { Args: { _dias?: number }; Returns: number }
       nina_fb_pode_revisar: {
         Args: { _clinica_id: string; _user_id: string }
         Returns: boolean

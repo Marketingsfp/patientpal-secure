@@ -73,6 +73,8 @@ export type RespostaNina = RespostaChat & {
   latenciaMs: number;
   tentativas: number;
   categoriaErro: CategoriaErro | null;
+  /** Id do registro técnico desta execução (auditoria). Null se não gravou. */
+  execucaoId: string | null;
 };
 
 /**
@@ -131,9 +133,11 @@ export async function ninaAIGateway(pedido: PedidoNina): Promise<RespostaNina> {
   const latenciaMs = Date.now() - inicio;
   const retries = Math.max(0, tentativa - 1);
 
-  void (async () => {
+  // O id da execução é aguardado porque a mensagem enviada precisa apontar
+  // para o registro técnico que a produziu (auditoria do reporte de erro).
+  const execucaoId = await (async () => {
     const { registrarExecucao } = await import("./telemetria.server");
-    await registrarExecucao({
+    return registrarExecucao({
       clinica_id: pedido.clinicaId,
       conversation_id: pedido.conversaId ?? null,
       perfil: pedido.perfil,
@@ -162,5 +166,6 @@ export async function ninaAIGateway(pedido: PedidoNina): Promise<RespostaNina> {
     latenciaMs,
     tentativas: tentativa,
     categoriaErro: categoria,
+    execucaoId,
   };
 }
