@@ -90,8 +90,11 @@ export async function searchKnowledgeBase(
     clinicaId: pedido.clinicaId,
     query,
     medico: pedido.medico ?? null,
+    // Dia pedido pelo paciente: até aqui ele era aceito e descartado.
+    dia: pedido.dia ?? null,
     ...(pedido.limite ? { limite: pedido.limite } : {}),
   });
+
 
   void registrarConsulta({
     clinicaId: pedido.clinicaId,

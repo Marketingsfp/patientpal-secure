@@ -182,8 +182,14 @@ export function profissionalParaRegistro(
       : "Consulta",
     medico: p.nome,
     dia: horarios.length
-      ? resumoHorarios(horarios as never)
+      ? [
+          resumoHorarios(horarios as never),
+          // Observação do horário (ex.: "somente encaixe", "1º e 3º sábado")
+          // muda a leitura do dia: precisa chegar junto, não só no resumo.
+          ...horarios.map((h) => texto(h["observacao"])).filter(Boolean),
+        ].join(" · ")
       : texto(p.observacao_publica),
+
     horario: null,
     preco_dinheiro: dinheiro,
     preco_cartao: cartao,
@@ -239,11 +245,22 @@ export function montarResultadoCatalogo(entrada: {
   profissionais: readonly ProfissionalPublicado[];
   hojeISO: string;
   ambiguo?: boolean;
+  /**
+   * Tipo perguntado. O primeiro registro é o que define `procedure` e `price`:
+   * se a pergunta é sobre consulta, o preço do exame NUNCA pode ficar em
+   * primeiro lugar (e vice-versa).
+   */
+  priorizar?: "servico" | "profissional";
 }): ResultadoConhecimento {
-  const registros: RegistroConhecimento[] = [
-    ...entrada.servicos.map(servicoParaRegistro),
-    ...entrada.profissionais.map((p) => profissionalParaRegistro(p, entrada.hojeISO)),
-  ];
+  const deServicos = entrada.servicos.map(servicoParaRegistro);
+  const deProfissionais = entrada.profissionais.map((p) =>
+    profissionalParaRegistro(p, entrada.hojeISO),
+  );
+  const registros: RegistroConhecimento[] =
+    entrada.priorizar === "profissional"
+      ? [...deProfissionais, ...deServicos]
+      : [...deServicos, ...deProfissionais];
+
 
   const traces = registros.map((r) => ({
     record_id: r.id ?? null,
