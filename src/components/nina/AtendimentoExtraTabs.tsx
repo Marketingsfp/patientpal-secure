@@ -990,8 +990,15 @@ export function AtendInbox() {
       if (!id) return;
       setAlvoIndisponivel(false);
       setMsgDestacada(null);
-      if (mensagemId) setAlvoMensagem({ conversaId: id, mensagemId, pedido: ++seqAlvo.current });
-      else setAlvoMensagem(null);
+      if (mensagemId) {
+        setAlvoMensagem({ conversaId: id, mensagemId, pedido: ++seqAlvo.current });
+        // Localizar um erro histórico não é ler as mensagens novas.
+        aberturaPorAlvoRef.current.add(id);
+      } else {
+        setAlvoMensagem(null);
+        aberturaPorAlvoRef.current.delete(id);
+      }
+
       abrirConversa(id);
     };
 
