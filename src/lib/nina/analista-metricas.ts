@@ -380,7 +380,15 @@ export function valoresPermitidos(resultados: { id: string; dados: any }[]): Map
         if (typeof c[k] === "number") comparacoes.push(c[k]);
       }
     }
-    mapa.set(id, { indicadores, comparacoes });
+    const valores = { indicadores, comparacoes };
+    mapa.set(id, valores);
+    // O resultado de cada período também traz o id técnico devolvido pelo
+    // banco. Quando o modelo cita esse id em vez do id da consulta, o número
+    // continua sendo o mesmo — aceitamos os dois como apelido da consulta.
+    for (const p of dados?.periodos ?? []) {
+      const alias = p?.consultaId;
+      if (typeof alias === "string" && alias && !mapa.has(alias)) mapa.set(alias, valores);
+    }
   }
   return mapa;
 }
