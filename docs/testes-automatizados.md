@@ -1,4 +1,9 @@
-# Fase 4 — testes funcionais reprodutíveis
+# Testes automatizados do atendimento e da Nina
+
+Documento único. Fase 4 define as camadas de teste; Fase 5 define a execução
+pelo Codex. Não criar outro arquivo de instruções.
+
+## Fase 4 — testes funcionais reprodutíveis
 
 Três camadas separadas. Uma não substitui a outra.
 
