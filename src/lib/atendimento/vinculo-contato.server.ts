@@ -1,5 +1,8 @@
 import { normalizarTelefone } from "./telefone";
 
+/** FASE 4 — métrica: quantas aberturas ainda precisaram do lookup por telefone. */
+export const metricasContato = { lookupsTelefone: 0, aberturasPorVinculo: 0 };
+
 type Cliente = {
   from: (t: string) => any;
 };
@@ -34,6 +37,7 @@ export async function resolverContatoConversa(
   const telefoneNorm = normalizarTelefone(params.contatoTelefone);
 
   if (params.contatoPacienteId) {
+    metricasContato.aberturasPorVinculo += 1;
     return {
       pacienteId: params.contatoPacienteId,
       viaVinculo: true,
@@ -46,15 +50,21 @@ export async function resolverContatoConversa(
     return { pacienteId: null, viaVinculo: false, vinculado: false, telefoneNorm };
   }
 
-  const { data } = await supabase
-    .from("pacientes")
-    .select("id")
-    .eq("clinica_id", params.clinicaId)
-    .or(`telefone_norm.eq.${telefoneNorm},telefone2_norm.eq.${telefoneNorm}`)
-    .limit(1)
-    .maybeSingle();
+  // FASE 4 — o `OR` impedia o uso dos índices (Seq Scan ~47ms). Duas
+  // igualdades separadas usam `idx_pacientes_tel_norm` / `tel2_norm` (~0,07ms).
+  metricasContato.lookupsTelefone += 1;
+  const porColuna = async (coluna: "telefone_norm" | "telefone2_norm") => {
+    const { data } = await supabase
+      .from("pacientes")
+      .select("id")
+      .eq("clinica_id", params.clinicaId)
+      .eq(coluna, telefoneNorm)
+      .limit(1)
+      .maybeSingle();
+    return (data as { id?: string } | null)?.id ?? null;
+  };
 
-  const pacienteId = (data as { id?: string } | null)?.id ?? null;
+  const pacienteId = (await porColuna("telefone_norm")) ?? (await porColuna("telefone2_norm"));
   if (!pacienteId) {
     return { pacienteId: null, viaVinculo: false, vinculado: false, telefoneNorm };
   }

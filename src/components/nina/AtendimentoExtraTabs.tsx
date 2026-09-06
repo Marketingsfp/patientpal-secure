@@ -144,6 +144,7 @@ import {
   criarCacheConversas,
   respostaAindaVale,
 } from "@/lib/atendimento/conversa-cache";
+import { CacheContatos, planoAberturaContato } from "@/lib/atendimento/contato-cache";
 import {
   JANELA_INICIAL,
   JANELA_ANTERIOR,
@@ -313,6 +314,9 @@ export function AtendInbox() {
   // descartadas. Cache por conversation_id evita tela vazia ao reabrir.
   const seqConversa = useRef(0);
   const cacheConversas = useRef(criarCacheConversas(10));
+  // FASE 4 — cache por ["contact", contactId]: o mesmo paciente aparece na
+  // hora em qualquer conversa vinculada, sem lookup por telefone.
+  const cacheContatos = useRef(new CacheContatos<any>());
   // Janela de mensagens carregadas da conversa aberta (cresce ao pedir o
   // histórico antigo) + prefetch em andamento + medição de desempenho.
   const janelaRef = useRef(JANELA_INICIAL);
@@ -1002,6 +1006,9 @@ export function AtendInbox() {
           notas: n,
           eventos: eventosLista,
         });
+        // FASE 4 — guarda o contato pelo vínculo direto, para reaproveitar em
+        // outras conversas do mesmo paciente.
+        cacheContatos.current.guardar((c as any)?.paciente?.id, c);
         setContato(c);
         setNotas(n);
         setEventos(eventosLista);
@@ -1094,13 +1101,21 @@ export function AtendInbox() {
     marcarTroca("T1_selecao");
     janelaRef.current = JANELA_INICIAL;
     setTemMaisAntigas(false);
+    // FASE 4 — conversa já vinculada a um paciente conhecido: o painel de
+    // contato usa o cache por ID enquanto o servidor revalida em segundo plano.
+    const plano = planoAberturaContato({
+      contactId: (sel as any)?.contato_paciente_id ?? null,
+      telefone: (sel as any)?.contato_telefone ?? null,
+    });
+    const contatoEmCache =
+      plano.via === "id" ? cacheContatos.current.obter(plano.contactId) : undefined;
     const emCache = id ? cacheConversas.current.obter(id) : undefined;
     if (id && emCache) {
       setMsgs(emCache.msgs);
       setConversaCarregadaId(id);
       if (emCache.parcial) {
         // Veio do prefetch: o chat já abre, os dados de apoio carregam agora.
-        setContato(null);
+        setContato(contatoEmCache ? { ...contatoEmCache, conversa: sel } : null);
         setNotas([]);
         setEventos([]);
         setSecundariosCarregadosId(null);
@@ -1116,7 +1131,7 @@ export function AtendInbox() {
     setSecundariosCarregadosId(null);
     setMsgs([]);
     setEventos([]);
-    setContato(null);
+    setContato(contatoEmCache ? { ...contatoEmCache, conversa: sel } : null);
     setNotas([]);
   }, [sel?.id]);
 
@@ -2196,10 +2211,13 @@ export function AtendInbox() {
           </CardHeader>
 
           <div className="flex-1 overflow-auto p-3 space-y-4 text-sm">
-            {!dadosSecundariosProntos ? (
-              <ContatoSkeleton />
-            ) : !contato ? (
-              <p className="text-muted-foreground">—</p>
+            {!contato ? (
+              // O esqueleto é só deste painel: o chat nunca espera pelo contato.
+              !dadosSecundariosProntos ? (
+                <ContatoSkeleton />
+              ) : (
+                <p className="text-muted-foreground">—</p>
+              )
             ) : (
               <>
                 <section>

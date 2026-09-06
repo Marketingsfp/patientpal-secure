@@ -1548,6 +1548,8 @@ export const obterDadosContato = createServerFn({ method: "POST" })
     let agendamentos: any[] = [];
     let contratos: any[] = [];
     const pendencias: any = null;
+    // FASE 4 — como o contato foi obtido nesta abertura ("id" = vínculo direto).
+    let contatoVia: "id" | "telefone" | "sem_contato" = "sem_contato";
 
     // Fase 2: o vínculo direto (`contato_paciente_id`) é a referência
     // principal. Só quando ele não existe é que buscamos pelo telefone
@@ -1567,6 +1569,7 @@ export const obterDadosContato = createServerFn({ method: "POST" })
           .eq("id", resolvido.pacienteId)
           .maybeSingle();
         paciente = p;
+        contatoVia = resolvido.viaVinculo ? "id" : "telefone";
         if (resolvido.vinculado) (conv as any).contato_paciente_id = resolvido.pacienteId;
       }
     }
@@ -1613,6 +1616,7 @@ export const obterDadosContato = createServerFn({ method: "POST" })
       agendamentos,
       contratos,
       atribuido_nome: atribuidoProfile?.nome ?? null,
+      contato_via: contatoVia,
     };
   });
 
