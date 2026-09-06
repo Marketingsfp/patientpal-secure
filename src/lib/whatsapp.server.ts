@@ -1001,7 +1001,7 @@ ${procs || "(nenhum)"}`;
     return await blocoPromptCatalogo(clinicaId).catch(() => "");
   })();
 
-  // FASE 2 do novo fluxo: respostas factuais fundamentadas na planilha.
+  // FASE 2 do novo fluxo: respostas factuais fundamentadas no catálogo publicado.
   // Só texto de prompt; a consulta continua na ferramenta já existente.
   const blocoFase2 = await (async () => {
     try {
@@ -1102,7 +1102,7 @@ ${procs || "(nenhum)"}`;
     }
   })();
 
-  // OFERTA COMPLETA: valor (planilha) + médicos + datas/horários reais
+  // OFERTA COMPLETA: valor (catálogo publicado) + médicos + datas/horários reais
   // (agenda) + unidade na mesma resposta, sem misturar as fontes.
   const blocoOferta = await (async () => {
     try {
