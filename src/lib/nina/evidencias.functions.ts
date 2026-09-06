@@ -77,4 +77,22 @@ export async function carregarEvidenciasExecucao(
       lacunas: (evid?.lacunas as string[] | undefined) ?? lacunas(etapas, ids),
       evidenciaEm: (evid?.created_at as string | undefined) ?? null,
     };
+  }
+}
+
+export const lerEvidenciasExecucaoNina = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) =>
+    z.object({ clinicaId: z.string().uuid(), execucaoId: z.string().uuid() }).parse(i),
+  )
+  .handler(async ({ data, context }) => {
+    // Conteúdo técnico sensível: exige permissão de revisão também no backend.
+    const { data: pode, error: ePerm } = await (context.supabase as any).rpc(
+      "nina_fb_pode_revisar",
+      { _user_id: context.userId, _clinica_id: data.clinicaId },
+    );
+    if (ePerm) throw new Error(ePerm.message);
+    if (!pode) throw new Error("Sem permissão para ver a auditoria técnica.");
+
+    return await carregarEvidenciasExecucao(context.supabase, data.clinicaId, data.execucaoId);
   });
