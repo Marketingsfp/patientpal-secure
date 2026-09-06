@@ -12912,6 +12912,15 @@ export type Database = {
         }
         Returns: string
       }
+      nina_classificar_atendimento_detalhe: {
+        Args: {
+          p_clinica: string
+          p_em: string
+          p_fuso?: string
+          p_unidade: string
+        }
+        Returns: Json
+      }
       nina_execucoes_expurgo: { Args: { _dias?: number }; Returns: number }
       nina_fb_pode_revisar: {
         Args: { _clinica_id: string; _user_id: string }
