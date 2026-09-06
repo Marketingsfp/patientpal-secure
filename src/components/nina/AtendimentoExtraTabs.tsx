@@ -694,6 +694,8 @@ export function AtendInbox() {
         if (!vivo) return;
         setSouGestor(!!r?.gestor);
         setSouAdmin(!!r?.admin);
+        // Administrador não tem conversas próprias: abre já na visão da equipe.
+        if (r?.admin) setEscopo((e) => (e === ESCOPO_INBOX_PADRAO ? "equipe" : e));
       })
       .catch(() => {
         if (!vivo) return;
