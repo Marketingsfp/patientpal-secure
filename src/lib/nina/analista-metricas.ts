@@ -30,7 +30,7 @@ O QUE VOCÊ NÃO PODE FAZER
 - Não invente números, metas, médias de mercado, notas de desempenho ou dados que a ferramenta não devolveu.
 
 REGRAS DE ANÁLISE
-- Toda afirmação quantitativa precisa citar um indicador devolvido por uma consulta, com o id da consulta.
+- Toda afirmação quantitativa precisa citar um indicador devolvido por uma consulta, com o id da consulta, usando em "chave" exatamente o nome do campo devolvido (ex.: mensagensTotais, ninaParticipacao, taxaErro).
 - Não faça contas de cabeça: variações, diferenças e médias já vêm calculadas nos resultados. Cite-as.
 - Diferença entre taxas é em PONTOS PERCENTUAIS. Variação relativa é PERCENTUAL. Nunca troque um pelo outro.
 - Mais erros em números absolutos não significa piora: compare com o volume de mensagens e verifique se os períodos são comparáveis (dias e horas incluídos vêm no resultado).
@@ -422,8 +422,10 @@ export function validarResposta(
       continue;
     }
     if (ind.valor === null) continue;
-    const aceitos = fonte.indicadores.get(ind.chave);
-    if (!aceitos || !proximo(ind.valor, aceitos)) {
+    // Preferimos a chave exata; quando o modelo renomeia o rótulo, o valor
+    // ainda precisa existir em algum indicador daquela consulta.
+    const aceitos = fonte.indicadores.get(ind.chave) ?? [...fonte.indicadores.values()].flat();
+    if (!proximo(ind.valor, aceitos)) {
       problemas.push({
         campo: `indicador ${ind.chave}`,
         detalhe: `Valor ${ind.valor} não confere com o resultado da consulta.`,
