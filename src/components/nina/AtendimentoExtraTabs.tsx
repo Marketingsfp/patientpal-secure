@@ -1048,17 +1048,23 @@ export function AtendInbox() {
           return;
         }
         const eventosLista = (ev ?? []) as ConversaEvento[];
-        const msgsCache = await pMensagens.catch(() => [] as any[]);
+        await critico;
         // Nova espera → nova checagem. Entre o `await` acima e a publicação a
         // atendente pode ter trocado de conversa; nesse caso nada é gravado
         // no cache nem na tela.
         if (!aindaVale()) return;
-        cacheConversas.current.guardar(alvo, {
-          msgs: msgsCache,
-          contato: c,
-          notas: n,
-          eventos: eventosLista,
-        });
+        // Mensagens que falharam não viram conversa vazia no cache: guardamos
+        // apenas os dados de apoio e o conteúdo continua marcado como parcial.
+        const msgsCache = msgsCarregadas as any[] | null;
+        if (msgsCache) {
+          cacheConversas.current.guardar(alvo, {
+            msgs: msgsCache,
+            contato: c,
+            notas: n,
+            eventos: eventosLista,
+          });
+        }
+
         // FASE 4 — guarda o contato pelo vínculo direto, para reaproveitar em
         // outras conversas do mesmo paciente.
         cacheContatos.current.guardar((c as any)?.paciente?.id, c);
