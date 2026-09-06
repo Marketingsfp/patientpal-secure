@@ -332,6 +332,43 @@ function Pagina() {
             </Select>
           </div>
           <div className="space-y-1">
+            <Label>Unidade</Label>
+            <Select value={unidadeId} onValueChange={setUnidadeId}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value={TODOS}>Todas</SelectItem>
+                {unidades.map((u) => (
+                  <SelectItem key={u.id} value={u.id}>{u.nome}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1">
+            <Label>Ambiente</Label>
+            <Select value={ambiente} onValueChange={(v) => setAmbiente(v as never)}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="producao">Somente produção</SelectItem>
+                <SelectItem value="todos">Produção + testes</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <p className="text-xs text-muted-foreground md:col-span-4">
+            Recorte em uso: {resumoRecorte}
+          </p>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base">Filtros específicos dos erros reportados</CardTitle>
+        </CardHeader>
+        <CardContent className="grid gap-3 p-4 pt-0 md:grid-cols-4">
+          <p className="text-xs text-muted-foreground md:col-span-4">
+            Estes filtros afetam apenas os erros reportados e a seção de aprendizado. Eles não
+            reduzem as mensagens totais do sistema nem os demais números operacionais acima.
+          </p>
+          <div className="space-y-1">
             <Label>Situação</Label>
             <Select value={status} onValueChange={setStatus}>
               <SelectTrigger><SelectValue /></SelectTrigger>
