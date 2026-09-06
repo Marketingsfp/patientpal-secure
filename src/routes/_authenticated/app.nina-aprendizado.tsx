@@ -1161,15 +1161,84 @@ function Pagina() {
                         </p>
                         {podeRevisar &&
                           (analises[it.id] ? (
-                            <AnaliseErroIAResultado
-                              analise={analises[it.id]!}
-                              solicitante={pessoas[analises[it.id]!.solicitado_por] ?? null}
-                            />
+                            <div className="space-y-2">
+                              <p className="text-xs text-muted-foreground">
+                                {AVISO_ANALISE_NAO_APROVA}
+                              </p>
+                              {analiseUsouOutroConjunto(
+                                analises[it.id]!.evidencias_resumo as never,
+                                auditoria[it.id]
+                                  ? {
+                                      entradas: auditoria[it.id]!.entradas?.length ?? 0,
+                                      etapas: auditoria[it.id]!.etapas?.length ?? 0,
+                                    }
+                                  : null,
+                              ) && (
+                                <p className="rounded-md border border-border bg-muted/40 p-2 text-xs">
+                                  Chegaram evidências desta execução depois da análise. A análise
+                                  exibida usou um conjunto diferente. Nenhuma nova análise foi
+                                  disparada automaticamente — use “Reanalisar” se quiser outra
+                                  versão.
+                                </p>
+                              )}
+                              <AnaliseErroIAResultado
+                                analise={analises[it.id]!}
+                                solicitante={pessoas[analises[it.id]!.solicitado_por] ?? null}
+                              />
+                              {(versoesAnalise[it.id]?.length ?? 0) > 1 && (
+                                <details className="text-xs">
+                                  <summary className="cursor-pointer text-muted-foreground">
+                                    Versões anteriores da análise (
+                                    {(versoesAnalise[it.id]?.length ?? 1) - 1})
+                                  </summary>
+                                  <ul className="mt-1 space-y-1">
+                                    {versoesAnalise[it.id]!.slice(1).map((v) => (
+                                      <li key={v.id} className="rounded-md border border-border p-2">
+                                        <span className="font-medium">v{v.versao}</span> ·{" "}
+                                        {new Date(v.created_at).toLocaleString("pt-BR")} ·{" "}
+                                        {v.modelo} · critérios {v.criterios_versao}
+                                        <p className="mt-1 whitespace-pre-wrap">
+                                          {v.conclusao ?? v.erro ?? "—"}
+                                        </p>
+                                      </li>
+                                    ))}
+                                  </ul>
+                                </details>
+                              )}
+                              {analises[it.id]!.status === "done" && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => void usarSugestaoIA(it)}
+                                >
+                                  Usar sugestão da IA no rascunho
+                                </Button>
+                              )}
+                            </div>
                           ) : (
                             <p className="text-xs text-muted-foreground">
                               Nenhuma análise assistida registrada. Use “Analisar com IA”.
                             </p>
                           ))}
+
+                        {podeRevisar && (decisoes[it.id]?.length ?? 0) > 0 && (
+                          <details className="text-xs">
+                            <summary className="cursor-pointer text-muted-foreground">
+                              Histórico de decisões ({decisoes[it.id]!.length})
+                            </summary>
+                            <ul className="mt-1 space-y-1">
+                              {decisoes[it.id]!.map((d) => (
+                                <li key={d.id} className="rounded-md border border-border p-2">
+                                  {rotuloDecisao(d.tipo)} · {pessoas[d.autor] ?? "—"} ·{" "}
+                                  {new Date(d.created_at).toLocaleString("pt-BR")}
+                                  {d.observacao ? (
+                                    <p className="mt-1 whitespace-pre-wrap">{d.observacao}</p>
+                                  ) : null}
+                                </li>
+                              ))}
+                            </ul>
+                          </details>
+                        )}
                         <div>
                           <Label className="text-xs text-muted-foreground">Correção sugerida</Label>
                           <div className="mt-1 whitespace-pre-wrap rounded-md border border-border p-2 text-xs">
@@ -1187,6 +1256,14 @@ function Pagina() {
                           </p>
                         )}
 
+                        {podeRevisar && (
+                          <p className="text-xs text-muted-foreground">
+                            {EXPLICACAO_APROVAR} {camadaDaCausa(it.root_cause).texto}
+                            {it.decisao_humana
+                              ? ` Decisão humana: ${rotuloDecisao(it.decisao_humana)}.`
+                              : ""}
+                          </p>
+                        )}
                         {podeRevisar && (
                           <div className="flex flex-wrap gap-2 pt-1">
                             <Button
@@ -1219,7 +1296,26 @@ function Pagina() {
                             )}
                             <Button
                               size="sm"
+                              variant="outline"
+                              disabled={decidindo || it.decisao_humana === "problema_confirmado"}
+                              title="Confirma que a resposta estava errada. Não aprova e não aplica nada."
+                              onClick={() => void decidir(it, "problema_confirmado")}
+                            >
+                              Confirmar problema
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              disabled={decidindo || it.decisao_humana === "falso_positivo"}
+                              title="O reporte não procede: a resposta da Nina estava adequada."
+                              onClick={() => void decidir(it, "falso_positivo")}
+                            >
+                              Falso positivo
+                            </Button>
+                            <Button
+                              size="sm"
                               disabled={salvando || it.status === "approved"}
+                              title={EXPLICACAO_APROVAR}
                               onClick={() => void acao(it, "approved")}
                             >
                               <Check className="mr-1 h-4 w-4" aria-hidden="true" /> Aprovar
