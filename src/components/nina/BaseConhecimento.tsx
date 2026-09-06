@@ -1,6 +1,7 @@
 import { useClinica } from "@/hooks/use-clinica";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CatalogoNina } from "@/components/nina/catalogo/CatalogoNina";
+import { HorarioFuncionamento } from "@/components/nina/catalogo/HorarioFuncionamento";
 
 /**
  * Aba "Base de conhecimentos da Nina".
@@ -20,12 +21,16 @@ export function BaseConhecimento() {
       <TabsList>
         <TabsTrigger value="servicos">Exames e procedimentos</TabsTrigger>
         <TabsTrigger value="profissionais">Consultas e profissionais</TabsTrigger>
+        <TabsTrigger value="clinica">Informações da clínica</TabsTrigger>
       </TabsList>
       <TabsContent value="servicos">
         <CatalogoNina clinicaId={clinicaId} podeEditar={podeEditar} tipo="servico" />
       </TabsContent>
       <TabsContent value="profissionais">
         <CatalogoNina clinicaId={clinicaId} podeEditar={podeEditar} tipo="profissional" />
+      </TabsContent>
+      <TabsContent value="clinica">
+        <HorarioFuncionamento clinicaId={clinicaId} podeEditar={podeEditar} />
       </TabsContent>
     </Tabs>
   );
