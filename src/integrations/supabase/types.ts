@@ -7860,6 +7860,7 @@ export type Database = {
           observacao: string | null
           unidade_id: string | null
           updated_at: string
+          versao_id: string | null
           vigencia_fim: string | null
           vigencia_inicio: string
         }
@@ -7876,6 +7877,7 @@ export type Database = {
           observacao?: string | null
           unidade_id?: string | null
           updated_at?: string
+          versao_id?: string | null
           vigencia_fim?: string | null
           vigencia_inicio?: string
         }
@@ -7892,6 +7894,7 @@ export type Database = {
           observacao?: string | null
           unidade_id?: string | null
           updated_at?: string
+          versao_id?: string | null
           vigencia_fim?: string | null
           vigencia_inicio?: string
         }
@@ -7910,6 +7913,13 @@ export type Database = {
             referencedRelation: "unidades"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "nina_calendario_atendimento_versao_id_fkey"
+            columns: ["versao_id"]
+            isOneToOne: false
+            referencedRelation: "nina_calendario_versoes"
+            referencedColumns: ["id"]
+          },
         ]
       }
       nina_calendario_excecoes: {
@@ -7925,6 +7935,7 @@ export type Database = {
           tipo: string
           unidade_id: string | null
           updated_at: string
+          versao_id: string | null
         }
         Insert: {
           clinica_id: string
@@ -7938,6 +7949,7 @@ export type Database = {
           tipo: string
           unidade_id?: string | null
           updated_at?: string
+          versao_id?: string | null
         }
         Update: {
           clinica_id?: string
@@ -7951,6 +7963,7 @@ export type Database = {
           tipo?: string
           unidade_id?: string | null
           updated_at?: string
+          versao_id?: string | null
         }
         Relationships: [
           {
@@ -7962,6 +7975,85 @@ export type Database = {
           },
           {
             foreignKeyName: "nina_calendario_excecoes_unidade_id_fkey"
+            columns: ["unidade_id"]
+            isOneToOne: false
+            referencedRelation: "unidades"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nina_calendario_excecoes_versao_id_fkey"
+            columns: ["versao_id"]
+            isOneToOne: false
+            referencedRelation: "nina_calendario_versoes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      nina_calendario_versoes: {
+        Row: {
+          clinica_id: string
+          created_at: string
+          created_by: string | null
+          fuso: string
+          id: string
+          motivo_retroativo: string | null
+          observacao: string | null
+          publicado_em: string | null
+          publicado_por: string | null
+          retroativa: boolean
+          status: string
+          unidade_id: string | null
+          updated_at: string
+          versao: number
+          vigencia_fim: string | null
+          vigencia_inicio: string
+        }
+        Insert: {
+          clinica_id: string
+          created_at?: string
+          created_by?: string | null
+          fuso?: string
+          id?: string
+          motivo_retroativo?: string | null
+          observacao?: string | null
+          publicado_em?: string | null
+          publicado_por?: string | null
+          retroativa?: boolean
+          status?: string
+          unidade_id?: string | null
+          updated_at?: string
+          versao: number
+          vigencia_fim?: string | null
+          vigencia_inicio: string
+        }
+        Update: {
+          clinica_id?: string
+          created_at?: string
+          created_by?: string | null
+          fuso?: string
+          id?: string
+          motivo_retroativo?: string | null
+          observacao?: string | null
+          publicado_em?: string | null
+          publicado_por?: string | null
+          retroativa?: boolean
+          status?: string
+          unidade_id?: string | null
+          updated_at?: string
+          versao?: number
+          vigencia_fim?: string | null
+          vigencia_inicio?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nina_calendario_versoes_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nina_calendario_versoes_unidade_id_fkey"
             columns: ["unidade_id"]
             isOneToOne: false
             referencedRelation: "unidades"
@@ -12802,6 +12894,14 @@ export type Database = {
           teleconsulta: boolean
           token_publico: string
         }[]
+      }
+      nina_calendario_publicar: {
+        Args: {
+          p_confirmar_conflito?: boolean
+          p_motivo_retroativo?: string
+          p_versao_id: string
+        }
+        Returns: Json
       }
       nina_classificar_atendimento: {
         Args: {

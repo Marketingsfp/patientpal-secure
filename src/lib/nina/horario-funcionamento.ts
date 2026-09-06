@@ -138,3 +138,76 @@ export function validarVigencia(inicio: string, fim?: string | null): string[] {
 export function podeEditarHorario(role: string | null | undefined): boolean {
   return ["admin", "gestor"].includes(String(role ?? ""));
 }
+
+/* ------------------------------------------------------------------ */
+/* FASE 2 — versões, publicação e histórico                            */
+/* ------------------------------------------------------------------ */
+
+export type StatusVersao = "rascunho" | "publicado" | "substituido";
+
+export type VersaoHorario = {
+  id: string;
+  versao: number;
+  status: StatusVersao;
+  vigencia_inicio: string;
+  vigencia_fim?: string | null;
+  publicado_em?: string | null;
+  publicado_por?: string | null;
+  retroativa?: boolean | null;
+  motivo_retroativo?: string | null;
+  fuso?: string | null;
+  unidade_id?: string | null;
+};
+
+/** Versão oficial que valia numa data (histórico). Rascunhos nunca contam. */
+export function versaoAplicavel(versoes: VersaoHorario[], data: string): VersaoHorario | null {
+  const candidatas = (versoes ?? [])
+    .filter((v) => v.status !== "rascunho" && !!v.publicado_em)
+    .filter((v) => v.vigencia_inicio <= data && (!v.vigencia_fim || v.vigencia_fim >= data))
+    .sort((a, b) =>
+      a.vigencia_inicio === b.vigencia_inicio ? b.versao - a.versao : a.vigencia_inicio < b.vigencia_inicio ? 1 : -1,
+    );
+  return candidatas[0] ?? null;
+}
+
+/** Versões oficiais cujo período se cruza com o da versão que se quer publicar. */
+export function conflitosDeVigencia(
+  nova: { id?: string; vigencia_inicio: string; vigencia_fim?: string | null },
+  publicadas: VersaoHorario[],
+): VersaoHorario[] {
+  const fimNova = nova.vigencia_fim ?? "9999-12-31";
+  return (publicadas ?? [])
+    .filter((v) => v.status === "publicado" && v.id !== nova.id)
+    .filter((v) => (v.vigencia_fim ?? "9999-12-31") >= nova.vigencia_inicio && v.vigencia_inicio <= fimNova);
+}
+
+/** Publicar valendo para data passada exige justificativa e perfil de administrador. */
+export function ehRetroativa(vigenciaInicio: string, hoje: string): boolean {
+  return vigenciaInicio < hoje;
+}
+
+export function podePublicarRetroativo(role: string | null | undefined): boolean {
+  return String(role ?? "") === "admin";
+}
+
+export function validarPublicacao(params: {
+  vigenciaInicio: string;
+  hoje: string;
+  role: string | null | undefined;
+  motivoRetroativo?: string | null;
+  temDiaConfigurado: boolean;
+}): string[] {
+  const erros: string[] = [];
+  if (!podeEditarHorario(params.role)) erros.push("Apenas administradores e gestores podem publicar o horário.");
+  if (!params.temDiaConfigurado) erros.push("Configure pelo menos um dia (aberto ou fechado) antes de publicar.");
+  erros.push(...validarVigencia(params.vigenciaInicio, null));
+  if (ehRetroativa(params.vigenciaInicio, params.hoje)) {
+    if (!podePublicarRetroativo(params.role)) {
+      erros.push("Publicação com validade em data passada é permitida apenas para administradores.");
+    }
+    if (String(params.motivoRetroativo ?? "").trim().length < 5) {
+      erros.push("Informe a justificativa da publicação retroativa (mínimo de 5 caracteres).");
+    }
+  }
+  return erros;
+}
