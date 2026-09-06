@@ -2550,7 +2550,7 @@ export function AtendInbox() {
                   <p className="text-sm text-muted-foreground text-center">Sem mensagens.</p>
                 )}
 
-                {(conteudoDaConversa ? timeline : []).map((item, idxTimeline) => {
+                {(conteudoDaConversa ? timeline : []).map((item) => {
                   if (item.kind === "evento") {
                     return <ConversationSystemEvent key={`ev-${item.ev.id}`} evento={item.ev} />;
                   }
