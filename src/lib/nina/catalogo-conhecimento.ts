@@ -245,11 +245,22 @@ export function montarResultadoCatalogo(entrada: {
   profissionais: readonly ProfissionalPublicado[];
   hojeISO: string;
   ambiguo?: boolean;
+  /**
+   * Tipo perguntado. O primeiro registro é o que define `procedure` e `price`:
+   * se a pergunta é sobre consulta, o preço do exame NUNCA pode ficar em
+   * primeiro lugar (e vice-versa).
+   */
+  priorizar?: "servico" | "profissional";
 }): ResultadoConhecimento {
-  const registros: RegistroConhecimento[] = [
-    ...entrada.servicos.map(servicoParaRegistro),
-    ...entrada.profissionais.map((p) => profissionalParaRegistro(p, entrada.hojeISO)),
-  ];
+  const deServicos = entrada.servicos.map(servicoParaRegistro);
+  const deProfissionais = entrada.profissionais.map((p) =>
+    profissionalParaRegistro(p, entrada.hojeISO),
+  );
+  const registros: RegistroConhecimento[] =
+    entrada.priorizar === "profissional"
+      ? [...deProfissionais, ...deServicos]
+      : [...deServicos, ...deProfissionais];
+
 
   const traces = registros.map((r) => ({
     record_id: r.id ?? null,
