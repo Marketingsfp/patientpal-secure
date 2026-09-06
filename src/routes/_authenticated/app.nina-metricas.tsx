@@ -124,6 +124,8 @@ function Pagina() {
   const [diaInteiro, setDiaInteiro] = useState(true);
   const [horaInicio, setHoraInicio] = useState("07:00");
   const [horaFim, setHoraFim] = useState("12:00");
+  const [ambiente, setAmbiente] = useState<"producao" | "todos">("producao");
+  const [erroConsulta, setErroConsulta] = useState<string | null>(null);
   const [status, setStatus] = useState(TODOS);
   const [categoria, setCategoria] = useState(TODOS);
   const [rootCause, setRootCause] = useState(TODOS);
@@ -180,11 +182,20 @@ function Pagina() {
           prioridade: prioridade === TODOS ? null : (prioridade as never),
           unidadeId: unidadeId === TODOS ? null : unidadeId,
           assunto: assunto.trim() || null,
+          ambiente,
         },
       });
-      if (meu === consultaRef.current) setDados(res);
+      if (meu === consultaRef.current) {
+        setDados(res);
+        setErroConsulta(null);
+      }
     } catch (e) {
-      if (meu === consultaRef.current) mostrarErro(e);
+      // Falha nunca vira zero na tela: os cartões saem de cena e entra o aviso.
+      if (meu === consultaRef.current) {
+        setDados(null);
+        setErroConsulta(e instanceof Error ? e.message : "Não foi possível carregar os números.");
+        mostrarErro(e);
+      }
     } finally {
       if (meu === consultaRef.current) setCarregando(false);
     }
@@ -204,6 +215,7 @@ function Pagina() {
     prioridade,
     unidadeId,
     assunto,
+    ambiente,
   ]);
 
   useEffect(() => {
@@ -230,6 +242,15 @@ function Pagina() {
 
   const ind = dados?.indicadores;
   const op = dados?.operacionais;
+
+  // Resumo do recorte ativo, sempre visível (mesmo antes da primeira resposta).
+  const resumoRecorte = useMemo(() => {
+    const nomeUnidade =
+      unidadeId === TODOS ? "todas as unidades" : (unidades.find((u) => u.id === unidadeId)?.nome ?? "unidade selecionada");
+    const faixa = diaInteiro ? "dia inteiro" : `das ${horaInicio} às ${horaFim} em cada dia`;
+    const amb = ambiente === "producao" ? "somente produção" : "produção + testes";
+    return `${de} a ${ate} · ${faixa} · ${nomeUnidade} · ${amb} · fuso ${FUSO_OPERACAO_PADRAO}`;
+  }, [de, ate, diaInteiro, horaInicio, horaFim, unidadeId, unidades, ambiente]);
 
   return (
     <div className="space-y-6 p-4 md:p-6">
@@ -320,6 +341,43 @@ function Pagina() {
             </Select>
           </div>
           <div className="space-y-1">
+            <Label>Unidade</Label>
+            <Select value={unidadeId} onValueChange={setUnidadeId}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value={TODOS}>Todas</SelectItem>
+                {unidades.map((u) => (
+                  <SelectItem key={u.id} value={u.id}>{u.nome}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1">
+            <Label>Ambiente</Label>
+            <Select value={ambiente} onValueChange={(v) => setAmbiente(v as never)}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="producao">Somente produção</SelectItem>
+                <SelectItem value="todos">Produção + testes</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <p className="text-xs text-muted-foreground md:col-span-4">
+            Recorte em uso: {resumoRecorte}
+          </p>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base">Filtros específicos dos erros reportados</CardTitle>
+        </CardHeader>
+        <CardContent className="grid gap-3 p-4 pt-0 md:grid-cols-4">
+          <p className="text-xs text-muted-foreground md:col-span-4">
+            Estes filtros afetam apenas os erros reportados e a seção de aprendizado. Eles não
+            reduzem as mensagens totais do sistema nem os demais números operacionais acima.
+          </p>
+          <div className="space-y-1">
             <Label>Situação</Label>
             <Select value={status} onValueChange={setStatus}>
               <SelectTrigger><SelectValue /></SelectTrigger>
@@ -367,18 +425,6 @@ function Pagina() {
               </SelectContent>
             </Select>
           </div>
-          <div className="space-y-1">
-            <Label>Unidade</Label>
-            <Select value={unidadeId} onValueChange={setUnidadeId}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value={TODOS}>Todas</SelectItem>
-                {unidades.map((u) => (
-                  <SelectItem key={u.id} value={u.id}>{u.nome}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
           <div className="space-y-1 md:col-span-2">
             <Label htmlFor="assunto">Assunto / procedimento</Label>
             <Input
@@ -392,24 +438,65 @@ function Pagina() {
               a indicadores sem vínculo confiável com esse assunto.
             </p>
           </div>
-          {dados?.recorte ? (
+          {dados?.recorte?.filtrosErroAtivos ? (
             <p className="text-xs text-muted-foreground md:col-span-4">
-              Recorte em uso: {dados.recorte.descricao}
-              {dados.recorte.filtrosErroAtivos
-                ? " A taxa mostra os erros filtrados sobre o total do recorte operacional, que não é reduzido por esses filtros."
-                : ""}
+              Com filtros de erro ativos, a taxa mostra os erros filtrados sobre o total do recorte
+              operacional, que não é reduzido por esses filtros.
             </p>
           ) : null}
         </CardContent>
       </Card>
 
+      {erroConsulta ? (
+        <Card className="border-destructive">
+          <CardContent className="space-y-2 p-4">
+            <p className="text-sm font-medium text-destructive">
+              Não foi possível carregar os números deste recorte.
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Os cartões ficam ocultos de propósito: uma falha de consulta não é o mesmo que
+              “nenhuma ocorrência”. Detalhe técnico: {erroConsulta}
+            </p>
+            <Button variant="outline" size="sm" onClick={() => void carregar()} disabled={carregando}>
+              Tentar de novo
+            </Button>
+          </CardContent>
+        </Card>
+      ) : null}
+
+      {carregando && !dados && !erroConsulta ? (
+        <section
+          className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3"
+          aria-busy="true"
+          aria-label="Carregando indicadores"
+        >
+          {Array.from({ length: 6 }).map((_, i) => (
+            <Card key={i}>
+              <CardContent className="space-y-2 p-4">
+                <span className="block h-3 w-32 animate-pulse rounded bg-muted" />
+                <span className="block h-7 w-20 animate-pulse rounded bg-muted" />
+                <span className="block h-3 w-44 animate-pulse rounded bg-muted" />
+              </CardContent>
+            </Card>
+          ))}
+        </section>
+      ) : null}
 
       {op ? (
-        <Card>
+        <Card className={carregando ? "opacity-60 transition-opacity" : undefined}>
           <CardHeader className="pb-2">
             <CardTitle className="text-base">Indicadores operacionais do período</CardTitle>
+            <p className="text-xs text-muted-foreground">
+              {carregando ? "Atualizando com o recorte novo…" : `Recorte: ${dados?.recorte?.descricao ?? resumoRecorte}`}
+            </p>
           </CardHeader>
           <CardContent className="space-y-3">
+            {op.mensagensTotais === 0 ? (
+              <p className="rounded-md border border-dashed px-3 py-2 text-sm text-muted-foreground">
+                Nenhuma mensagem de atendimento neste recorte. Os números abaixo são zero reais, não
+                falha de consulta.
+              </p>
+            ) : null}
             <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               <Indicador
                 titulo="Mensagens totais do sistema"
@@ -419,7 +506,7 @@ function Pagina() {
               <Indicador
                 titulo="Mensagens com participação da Nina"
                 valor={String(op.ninaParticipacao)}
-                detalhe={`${op.ninaEntrada} recebidas processadas + ${op.ninaSaida} respostas enviadas`}
+                detalhe={`${op.ninaEntrada} recebidas e processadas · ${op.ninaSaida} respostas enviadas`}
               />
               <Indicador
                 titulo="Erros reportados da Nina"
@@ -451,8 +538,9 @@ function Pagina() {
               />
             </section>
             <p className="text-xs text-muted-foreground">
-              A taxa é baseada em reportes, inclusive os ainda não confirmados. Não é uma medida
-              definitiva de acurácia da Nina. Ambiente:{" "}
+              A base desta taxa inclui todas as mensagens do sistema de atendimento no período
+              selecionado, não apenas as respostas da Nina. Ela é baseada em reportes, inclusive os
+              ainda não confirmados, e não é uma medida definitiva de acurácia. Ambiente:{" "}
               {op.ambiente === "producao" ? "produção" : "produção + testes"}.
             </p>
             {op.ninaEntrada === 0 ? (
@@ -471,6 +559,12 @@ function Pagina() {
 
       {ind ? (
         <>
+          <div className="space-y-1">
+            <h2 className="text-base font-semibold">Aprendizado e revisão dos erros</h2>
+            <p className="text-xs text-muted-foreground">
+              Seção complementar. Aqui valem também os filtros específicos de erros.
+            </p>
+          </div>
           <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <Indicador titulo="Erros reportados" valor={String(ind.reportados)} />
             <Indicador
