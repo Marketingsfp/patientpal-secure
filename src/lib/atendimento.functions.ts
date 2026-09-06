@@ -552,6 +552,23 @@ export const transferirConversa = createServerFn({ method: "POST" })
         sorteio: Boolean(sorteada),
       },
     });
+    // Se a conversa veio da Nina e agora tem responsável humano, o protocolo é
+    // gerado (ou reaproveitado, quando já existir neste atendimento).
+    const destinatario = data.paraUserId ?? sorteada ?? null;
+    if (destinatario) {
+      try {
+        const { protocoloAoAtribuirHumano } = await import(
+          "@/lib/atendimento/protocolo-atendimento.server"
+        );
+        await protocoloAoAtribuirHumano({
+          clinicaId: data.clinicaId,
+          conversaId: data.conversaId,
+          userId: destinatario,
+        });
+      } catch (e) {
+        console.error("[atendimento] protocolo ao transferir", e);
+      }
+    }
     return { ok: true };
   });
 
@@ -1668,6 +1685,18 @@ export const enviarMensagemConversa = createServerFn({ method: "POST" })
         evento: "ASSUMIDA",
         userId: context.userId,
       });
+      try {
+        const { protocoloAoAtribuirHumano } = await import(
+          "@/lib/atendimento/protocolo-atendimento.server"
+        );
+        await protocoloAoAtribuirHumano({
+          clinicaId: data.clinicaId,
+          conversaId: data.conversaId,
+          userId: context.userId,
+        });
+      } catch (e) {
+        console.error("[atendimento] protocolo ao responder direto", e);
+      }
     }
 
 
@@ -2365,6 +2394,19 @@ export const assumirConversa = createServerFn({ method: "POST" })
       evento: "ASSUMIDA",
       userId: context.userId,
     });
+    // Encaminhamento da Nina concluído por quem assumiu na fila.
+    try {
+      const { protocoloAoAtribuirHumano } = await import(
+        "@/lib/atendimento/protocolo-atendimento.server"
+      );
+      await protocoloAoAtribuirHumano({
+        clinicaId: data.clinicaId,
+        conversaId: data.conversaId,
+        userId: context.userId,
+      });
+    } catch (e) {
+      console.error("[atendimento] protocolo ao assumir", e);
+    }
     return {
       ok: true as const,
       motivo: null,

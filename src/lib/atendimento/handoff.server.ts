@@ -362,6 +362,19 @@ export async function atribuirAtendenteOnline(args: {
       texto: `👤 Atribuída automaticamente a ${nome} (online).`,
     });
 
+  // Transferência da Nina EFETIVADA: só aqui o protocolo é gerado e informado
+  // ao paciente. Falha nessa etapa não desfaz a atribuição.
+  try {
+    const { protocoloAoAtribuirHumano } = await import("./protocolo-atendimento.server");
+    await protocoloAoAtribuirHumano({
+      clinicaId: args.clinicaId,
+      conversaId: args.conversaId,
+      userId,
+    });
+  } catch (e) {
+    console.error("[handoff] falha no protocolo de atendimento", e);
+  }
+
   return { userId, nome };
 }
 
@@ -451,6 +464,11 @@ export async function reabrirConversaPorMensagemPaciente(args: {
         closed_at: null,
         // Sem responsável humano herdado e sem prazos/resumos da sessão anterior.
         handoff_resumo: null,
+        // Novo ciclo de atendimento: o protocolo anterior fica no histórico de
+        // eventos, mas não é apresentado como se fosse o atual.
+        protocolo_atendimento: null,
+        protocolo_sessao_id: null,
+        protocolo_em: null,
         handoff_motivo: null,
         handoff_em: null,
         awaiting_patient_since: null,

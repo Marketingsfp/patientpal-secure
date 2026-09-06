@@ -96,6 +96,29 @@ export type CtxNinaPaciente = {
 };
 
 
+/**
+ * Protocolo do atendimento após agendamento CONFIRMADO no banco.
+ * Devolve `null` quando a clínica não usa protocolo — a Nina só cita o número
+ * que vem do backend, nunca inventa.
+ */
+async function protocoloDoAgendamento(ctx: CtxNinaPaciente): Promise<string | null> {
+  if (!ctx.conversaId) return null;
+  try {
+    const { garantirProtocoloAtendimento } = await import(
+      "@/lib/atendimento/protocolo-atendimento.server"
+    );
+    const r = await garantirProtocoloAtendimento({
+      clinicaId: ctx.clinicaId,
+      conversaId: ctx.conversaId,
+      gatilho: "agendamento",
+    });
+    return r?.protocolo ?? null;
+  } catch (e) {
+    console.error("[nina-tools] protocolo do agendamento", e);
+    return null;
+  }
+}
+
 /** Marca gravada em `agendamentos.origem_integracao`. */
 export function origemAgendamentoNina(ctx: CtxNinaPaciente): string {
   if (ctx.teste || ctx.origem === "homologacao") return "nina_homologacao";
@@ -1396,6 +1419,8 @@ async function executarFerramentaInterna(
           return {
             ok: true,
             duplicado: true,
+            // Mesmo atendimento: reaproveita o protocolo já gerado.
+            protocolo: await protocoloDoAgendamento(ctx),
             agendamento: {
               data: formatarData(p.inicio),
               hora: formatarHora(p.inicio),
@@ -1560,6 +1585,8 @@ async function executarFerramentaInterna(
           // `appointment_id`.
           success: true,
           appointment_id: r.id,
+          // Gerado no banco só depois da gravação conferida.
+          protocolo: await protocoloDoAgendamento(ctx),
           patient_id: (conferido as { paciente_id: string | null }).paciente_id,
           doctor_id: (conferido as { medico_id: string | null }).medico_id,
           unit_id: (conferido as { clinica_id: string }).clinica_id,

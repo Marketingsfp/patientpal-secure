@@ -126,7 +126,13 @@ export function respostaParaModelo(r: ResultadoBroker): Record<string, unknown> 
       ? {
           appointment_confirmed: r.appointment_confirmed,
           ...(r.appointment_confirmed
-            ? {}
+            ? typeof dados["protocolo"] === "string" && dados["protocolo"]
+              ? {
+                  instrucao:
+                    `Informe ao paciente, na mesma mensagem de confirmação (com profissional, data, horário, modalidade e orientações), o protocolo de atendimento ${String(dados["protocolo"])}. ` +
+                    "Use exatamente esse número: nunca invente, calcule ou altere protocolo.",
+                }
+              : {}
             : {
                 instrucao:
                   "O agendamento NÃO foi gravado. É proibido dizer ao paciente que está agendado, marcado ou confirmado.",
