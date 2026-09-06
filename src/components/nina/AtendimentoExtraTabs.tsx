@@ -2432,9 +2432,10 @@ export function AtendInbox() {
                   >
                     {tituloConversa(c)}
                   </span>
-                  {c.unread_count > 0 && (
+                  {Number(c.nao_lidas ?? 0) > 0 && (
                     <Badge className="bg-atd-blue text-atd-on-strong text-xs px-1.5 py-0">
-                      {c.unread_count}
+                      {Number(c.nao_lidas ?? 0)}
+
                     </Badge>
                   )}
                 </div>
