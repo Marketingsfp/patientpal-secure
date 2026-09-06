@@ -2925,11 +2925,30 @@ export function AtendInbox() {
                             Nenhum agente encontrado.
                           </p>
                         );
-                      return lista.map((u: any) => (
-                        <SelectItem key={u.user_id} value={u.user_id}>
-                          {u.nome ?? u.email ?? u.user_id}
-                        </SelectItem>
-                      ));
+                      return lista.map((u: any) => {
+                        const st: PresencaAtendente = u.presenca ?? "OFFLINE";
+                        const cor =
+                          st === "ONLINE"
+                            ? "bg-emerald-500"
+                            : st === "PAUSA"
+                              ? "bg-amber-500"
+                              : "bg-muted-foreground";
+                        return (
+                          <SelectItem key={u.user_id} value={u.user_id}>
+                            <span className="flex items-center gap-2">
+                              <span
+                                aria-hidden="true"
+                                className={`h-2 w-2 rounded-full ${cor}`}
+                              />
+                              <span>{u.nome ?? u.email ?? u.user_id}</span>
+                              <span className="text-xs text-muted-foreground">
+                                — {ROTULO_PRESENCA[st]}
+                              </span>
+                            </span>
+                          </SelectItem>
+                        );
+                      });
+
                     })()}
                   </SelectContent>
                 </Select>
