@@ -485,11 +485,20 @@ function Pagina() {
       ) : null}
 
       {op ? (
-        <Card>
+        <Card className={carregando ? "opacity-60 transition-opacity" : undefined}>
           <CardHeader className="pb-2">
             <CardTitle className="text-base">Indicadores operacionais do período</CardTitle>
+            <p className="text-xs text-muted-foreground">
+              {carregando ? "Atualizando com o recorte novo…" : `Recorte: ${dados?.recorte?.descricao ?? resumoRecorte}`}
+            </p>
           </CardHeader>
           <CardContent className="space-y-3">
+            {op.mensagensTotais === 0 ? (
+              <p className="rounded-md border border-dashed px-3 py-2 text-sm text-muted-foreground">
+                Nenhuma mensagem de atendimento neste recorte. Os números abaixo são zero reais, não
+                falha de consulta.
+              </p>
+            ) : null}
             <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               <Indicador
                 titulo="Mensagens totais do sistema"
@@ -499,7 +508,7 @@ function Pagina() {
               <Indicador
                 titulo="Mensagens com participação da Nina"
                 valor={String(op.ninaParticipacao)}
-                detalhe={`${op.ninaEntrada} recebidas processadas + ${op.ninaSaida} respostas enviadas`}
+                detalhe={`${op.ninaEntrada} recebidas e processadas · ${op.ninaSaida} respostas enviadas`}
               />
               <Indicador
                 titulo="Erros reportados da Nina"
