@@ -22,7 +22,10 @@ export const FLAG_NINA_CATALOGO_FONTE = "nina_catalogo_fonte_enabled";
 const COLUNAS_SERVICO =
   "id, nome, valor, valor_observacao, descricao_publica, preparo, restricoes, executantes, formas_pagamento";
 const COLUNAS_PROFISSIONAL =
-  "id, nome, especialidades, atende_consultorio, formas_pagamento, convenios, horarios, tipo_atendimento, observacao_publica, aviso_dia, aviso_valido_de, aviso_valido_ate";
+  "id, nome, especialidades, atende_consultorio, formas_pagamento, convenios, horarios, tipo_atendimento, observacao_publica, aviso_dia, aviso_valido_de, aviso_valido_ate, unidades(nome)";
+
+/** Teto de leitura por clínica — nunca o catálogo inteiro sem limite. */
+const TETO_PROFISSIONAIS = 60;
 
 export async function flagCatalogoFonteAtiva(clinicaId: string | null): Promise<boolean> {
   if (!clinicaId) return false;
