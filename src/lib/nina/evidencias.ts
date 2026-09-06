@@ -45,7 +45,8 @@ export type Etapa = {
   fonte: FonteEvidencia;
   titulo: string;
   em: string;
-  dados: Record<string, unknown>;
+  // `any` proposital: o conteúdo varia por etapa e precisa trafegar como JSON.
+  dados: Record<string, any>;
   codigo?: ReferenciaCodigo;
 };
 

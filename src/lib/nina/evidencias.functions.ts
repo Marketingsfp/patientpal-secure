@@ -45,7 +45,7 @@ export const lerEvidenciasExecucaoNina = createServerFn({ method: "POST" })
       .eq("execucao_id", data.execucaoId)
       .maybeSingle();
 
-    const etapas = ordenarEtapas(((evid?.etapas ?? []) as Etapa[]) ?? []);
+    const etapas = ordenarEtapas((evid?.etapas ?? []) as Etapa[]);
 
     const ids: string[] = (execucao.mensagens_entrada ?? []) as string[];
     let entradas: { id: string; texto: string | null; em: string | null }[] = [];
