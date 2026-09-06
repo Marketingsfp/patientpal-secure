@@ -124,7 +124,10 @@ import {
   definirPresenca,
   esperaConversas,
   assumirConversa,
+  marcarLida,
 } from "@/lib/atendimento.functions";
+import { podeMarcarLidaAutomaticamente } from "@/lib/atendimento/leitura-inbox";
+
 import { FilaHumana } from "@/components/nina/FilaHumana";
 import { idConversaValido } from "@/lib/atendimento/abrir-conversa";
 import { assinarSelecaoConversa } from "@/lib/webmcp/selecao-conversa";
