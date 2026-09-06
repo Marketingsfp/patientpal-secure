@@ -187,16 +187,17 @@ export function blocoPromptOfertaCompleta({
 
   const linhas: string[] = [
     "RESPOSTA COMPLETA SOBRE CONSULTA / ESPECIALIDADE:",
-    "- Duas fontes, nunca misturadas: a PLANILHA da Base de Conhecimentos é a fonte oficial de VALOR, médicos, dias e horário de atendimento, unidade e regras; a AGENDA é a única fonte de DATA e HORÁRIO realmente disponíveis.",
-    "- Horário da planilha (ex.: 09h às 18h) é ESCALA DE ATENDIMENTO, não vaga. Só chame um horário de \"disponível\" se ele veio agora de \"consultar_disponibilidade\".",
+    "- Duas fontes, nunca misturadas: o CATÁLOGO publicado é a fonte oficial de valor, médicos, especialidades, escala, unidade e regras; a AGENDA é a única fonte de DATA e HORÁRIO realmente disponíveis. As regras de leitura do catálogo estão no bloco da base de conhecimentos — não as reinterprete aqui.",
+    "- Escala do catálogo (ex.: 09h às 18h) não é vaga. Só chame um horário de \"disponível\" se ele veio agora de \"consultar_disponibilidade\".",
     "- É proibido estimar valor, preço médio, médico, dia ou vaga. Sem o dado na fonte oficial, diga que vai confirmar com a equipe.",
   ];
 
   if (!baseAtiva) {
     linhas.push(
-      "- Esta clínica ainda não tem planilha ativa: não afirme valores nem escalas; use apenas o que as ferramentas devolverem e siga o fluxo humano quando faltar informação.",
+      "- Esta clínica ainda não tem catálogo publicado: não afirme valores nem escalas; use apenas o que as ferramentas devolverem e siga o fluxo humano quando faltar informação.",
     );
   }
+
 
   if (leitura.pedeInfoConsulta && !leitura.pedeDisponibilidade) {
     linhas.push(
