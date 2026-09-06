@@ -42,6 +42,7 @@ export const CATALOGO_FERRAMENTAS: Record<string, DescritorFerramenta> = {
   buscar_medicos: { capacidade: "listCatalog", fonte: "base_conhecimento", escrita: false },
   buscar_procedimentos: { capacidade: "listCatalog", fonte: "base_conhecimento", escrita: false },
   dados_da_clinica: { capacidade: "listCatalog", fonte: "base_conhecimento", escrita: false },
+  horario_funcionamento: { capacidade: "listCatalog", fonte: "base_conhecimento", escrita: false },
   consultar_disponibilidade: { capacidade: "checkAvailability", fonte: "agenda", escrita: false },
   verificar_horario: { capacidade: "checkAvailability", fonte: "agenda", escrita: false },
   proxima_vaga: { capacidade: "checkAvailability", fonte: "agenda", escrita: false },
