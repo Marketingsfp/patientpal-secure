@@ -323,30 +323,25 @@ export function AtendInbox() {
   });
   const soNaoAtribuidas = escopo === "nao_atribuidas";
   const setSoNaoAtribuidas = (v: boolean) => setEscopo(v ? "nao_atribuidas" : ESCOPO_INBOX_PADRAO);
-  // FASE 1 — a URL manda: /app/nina/<conversation_id> define qual conversa
-  // está aberta. O clique só navega; a seleção vem sempre do endereço.
-  const navigate = useNavigate();
-  const rotaParams = useParams({ strict: false }) as { conversationId?: string };
-  // A Inbox fica na rota-mãe /app/nina, que não recebe o parâmetro da rota
-  // filha; por isso o endereço é lido também pelo caminho da página.
-  const caminhoAtual = useLocation({ select: (l: any) => l.pathname as string });
-  const conversaIdUrl = rotaParams?.conversationId ?? idConversaDaUrl(caminhoAtual);
+  // DECISÃO ATUAL — a conversa aberta é uma SELEÇÃO INTERNA da Inbox, pelo id
+  // interno da conversa. O endereço da tela é sempre /app/nina: abrir um lead
+  // não cria, altera nem lê endereço individual.
+  const [selecaoId, setSelecaoId] = useState<string | null>(null);
 
-  const abrirPelaUrl = useCallback(
-    (id: string | null, replace = false) => {
-      // Função central (Fase 5): todo módulo abre conversa por este caminho.
-      void navigate(destinoConversa(id, { replace }) as any);
-    },
-    [navigate],
-  );
+  const abrirConversa = useCallback((id: string | null) => {
+    // Caminho único de abertura: lista, busca por número, Central de Atenção,
+    // fila, alertas e atalhos passam todos por aqui.
+    setSelecaoId(id ? (idConversaValido(id) ?? null) : null);
+  }, []);
 
-  // Leitura do endereço dentro de callbacks, sem recriá-los a cada navegação.
-  const conversaIdUrlRef = useRef<string | null>(conversaIdUrl);
+  // Leitura da seleção dentro de callbacks, sem recriá-los a cada troca.
+  const selecaoIdRef = useRef<string | null>(selecaoId);
   useEffect(() => {
-    conversaIdUrlRef.current = conversaIdUrl;
-    // FASE 4 — instante em que o endereço passou a apontar para o lead pedido.
-    if (conversaIdUrl) marcarTroca("T1b_url", conversaIdUrl);
-  }, [conversaIdUrl]);
+    selecaoIdRef.current = selecaoId;
+    // FASE 4 — instante em que a seleção passou a apontar para o lead pedido.
+    if (selecaoId) marcarTroca("T1b_url", selecaoId);
+  }, [selecaoId]);
+
 
   // Montagens/desmontagens da Inbox: a Fase 1 precisa continuar em zero por
   // troca de conversa. Contadas aqui e expostas para a medição.
