@@ -7850,6 +7850,38 @@ export type Database = {
           },
         ]
       }
+      nina_execucao_evidencias: {
+        Row: {
+          clinica_id: string | null
+          created_at: string
+          etapas: Json
+          execucao_id: string
+          lacunas: string[]
+        }
+        Insert: {
+          clinica_id?: string | null
+          created_at?: string
+          etapas?: Json
+          execucao_id: string
+          lacunas?: string[]
+        }
+        Update: {
+          clinica_id?: string | null
+          created_at?: string
+          etapas?: Json
+          execucao_id?: string
+          lacunas?: string[]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nina_execucao_evidencias_execucao_id_fkey"
+            columns: ["execucao_id"]
+            isOneToOne: true
+            referencedRelation: "nina_execucoes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       nina_execucoes: {
         Row: {
           clinica_id: string | null
@@ -7861,6 +7893,7 @@ export type Database = {
           input_tokens: number | null
           knowledge_status: string | null
           latency_ms: number
+          mensagens_entrada: string[]
           model: string
           output_tokens: number | null
           perfil: string
@@ -7880,6 +7913,7 @@ export type Database = {
           input_tokens?: number | null
           knowledge_status?: string | null
           latency_ms?: number
+          mensagens_entrada?: string[]
           model: string
           output_tokens?: number | null
           perfil: string
@@ -7899,6 +7933,7 @@ export type Database = {
           input_tokens?: number | null
           knowledge_status?: string | null
           latency_ms?: number
+          mensagens_entrada?: string[]
           model?: string
           output_tokens?: number | null
           perfil?: string
