@@ -212,6 +212,51 @@ export const obterConversa = createServerFn({ method: "POST" })
     return row ?? null;
   });
 
+/**
+ * FASE 2 — Localizar uma conversa pelo número permanente (#1342).
+ *
+ * Consulta exata e indexada: nada de varrer mensagens nem baixar a lista
+ * inteira no navegador. Encontra mesmo que a conversa seja antiga, esteja
+ * encerrada ou fora do filtro que a pessoa está vendo.
+ *
+ * Permissão continua valendo: só devolve conversas desta clínica e que este
+ * usuário pode ver. Conversa inexistente e conversa sem acesso recebem a MESMA
+ * resposta neutra (`null`), para não revelar a existência de nada restrito.
+ * Conversas de homologação (`is_teste`) ficam fora da busca operacional.
+ *
+ * Somente leitura: não muda responsável, fila nem status.
+ */
+export const buscarConversaPorNumero = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) =>
+    z
+      .object({
+        clinicaId: z.string().uuid(),
+        numero: z.number().int().positive().max(1_000_000_000_000),
+      })
+      .parse(i),
+  )
+  .handler(async ({ data, context }) => {
+    await assertMember(context.supabase, context.userId, data.clinicaId);
+    const { data: row, error } = await context.supabase
+      .from("atend_conversas")
+      .select("*")
+      .eq("clinica_id", data.clinicaId)
+      .eq("numero_conversa", data.numero)
+      .eq("is_teste", false)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!row) return null;
+    try {
+      const { assertAcessoConversa } = await import("./atendimento/acesso-conversa.server");
+      await assertAcessoConversa(context.supabase, context.userId, data.clinicaId, row.id);
+    } catch {
+      // Resposta neutra: sem acesso é indistinguível de não existir.
+      return null;
+    }
+    return row;
+  });
+
 
 /**
  * Contagem independente de cada filtro da Inbox. Cada número é calculado com
