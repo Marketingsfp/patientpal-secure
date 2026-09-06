@@ -1700,7 +1700,7 @@ function AppShellInner() {
 
         <div className="flex-1 flex flex-col min-w-0 min-h-0">
           <main
-            key={uxMelhorias ? chaveAreaPrincipal(location.pathname) : "static"}
+            key={uxMelhorias ? location.pathname : "static"}
             className={cn(
               "flex-1 min-h-0 overflow-y-auto overflow-x-hidden min-w-0",
               isChooser
