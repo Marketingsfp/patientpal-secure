@@ -1,19 +1,18 @@
 /**
- * FASE 3 — KNOWLEDGE RETRIEVAL DA NINA (camada única de consulta).
+ * KNOWLEDGE RETRIEVAL DA NINA (camada única de consulta).
  *
  * Fluxo oficial:
- *   Paciente → intenção → searchKnowledgeBase() → planilha (base ATIVA)
- *   → resultado estruturado → modelo → resposta.
+ *   Paciente → intenção → searchKnowledgeBase() → CATÁLOGO ESTRUTURADO
+ *   (registros PUBLICADOS) → resultado estruturado → modelo → resposta.
  *
- * Só o conteúdo RELEVANTE vai ao modelo (busca estruturada + semântica com
- * limite), nunca a planilha inteira a cada mensagem.
+ * FASE 7: o modo planilha deixou de existir. Não há segunda fonte, seleção de
+ * fonte nem fallback: o que não está publicado no catálogo é tratado como
+ * informação desconhecida.
  *
  * Server-only: usa o cliente administrativo e nunca entra no bundle do navegador.
  */
-import {
-  montarResultadoConhecimento,
-  type ResultadoConhecimento,
-} from "./knowledge-contract";
+import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import type { ResultadoConhecimento } from "./knowledge-contract";
 
 export type { ResultadoConhecimento };
 
@@ -28,99 +27,85 @@ export type PedidoConhecimento = {
   canal?: string;
 };
 
+/** Termos usados só para auditoria da consulta (rastreabilidade). */
+function termosAuditoria(texto: string): string[] {
+  return String(texto ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .split(/[^a-z0-9]+/)
+    .filter((t) => t.length >= 3)
+    .slice(0, 30);
+}
+
 /**
- * Ponto ÚNICO de consulta à Base de Conhecimentos. Toda ferramenta da Nina
- * chama esta função — nada de consultar a planilha por caminhos paralelos.
+ * Log de auditoria da consulta. É registro histórico: não é fonte de conteúdo
+ * e nunca é lido para responder ao paciente.
+ */
+async function registrarConsulta(entrada: {
+  clinicaId: string;
+  canal: string;
+  pergunta: string;
+  encontrados: Array<{ id: string; procedimento?: string | null; medico?: string | null }>;
+  resposta: string;
+}) {
+  try {
+    await supabaseAdmin.from("nina_kb_consultas").insert({
+      clinica_id: entrada.clinicaId,
+      base_id: null,
+      versao: null,
+      canal: entrada.canal,
+      pergunta: entrada.pergunta.slice(0, 2000),
+      termos: termosAuditoria(entrada.pergunta),
+      encontrados: entrada.encontrados.slice(0, 10).map((e) => ({
+        id: e.id,
+        procedimento: e.procedimento ?? null,
+        medico: e.medico ?? null,
+        origem: "catalogo",
+      })),
+      registro_usado: entrada.encontrados[0]?.id ?? null,
+      score: null,
+      resposta: entrada.resposta.slice(0, 4000),
+    });
+  } catch (e) {
+    console.error("[Nina catálogo] log de consulta falhou", (e as Error).message);
+  }
+}
+
+/**
+ * Ponto ÚNICO de consulta à Base de Conhecimentos da Nina (catálogo).
+ * Toda ferramenta da Nina chama esta função.
  */
 export async function searchKnowledgeBase(
   pedido: PedidoConhecimento,
 ): Promise<ResultadoConhecimento> {
-  const { consultarBase, registrarConsultaKb } = await import("./kb.server");
-  const { expandirTermos } = await import("./kb-parser");
-
   const query = String(pedido.query ?? "").trim().slice(0, 200);
 
-  // FASE 5 — catálogo publicado como fonte, por clínica (flag desligada = planilha).
-  // Sem fallback silencioso: com a flag ligada, o que não está publicado no
-  // catálogo é tratado como informação desconhecida.
-  const { flagCatalogoFonteAtiva, buscarNoCatalogo } = await import(
-    "./catalogo-retrieval.server"
-  );
-  if (await flagCatalogoFonteAtiva(pedido.clinicaId)) {
-    const doCatalogo = await buscarNoCatalogo({
-      clinicaId: pedido.clinicaId,
-      query,
-      medico: pedido.medico ?? null,
-      ...(pedido.limite ? { limite: pedido.limite } : {}),
-    });
-
-    void registrarConsultaKb({
-      clinicaId: pedido.clinicaId,
-      baseId: null,
-      versao: null,
-      canal: pedido.canal ?? "interno",
-      pergunta: query,
-      termos: expandirTermos(query),
-      encontrados: doCatalogo.records.map((r) => ({
-        id: r.id,
-        procedimento: r.procedimento,
-        medico: r.medico,
-        linha_origem: null,
-        score: null,
-        origem: "catalogo",
-      })) as never,
-      resposta: `fonte=catalogo knowledge_status=${doCatalogo.knowledge_status}`,
-    });
-
-    console.info("[nina-catalogo]", {
-      knowledge_status: doCatalogo.knowledge_status,
-      itens: doCatalogo.records.length,
-      trace: doCatalogo.trace.slice(0, 3),
-    });
-
-    return doCatalogo;
-  }
-
-  const achado = await consultarBase({
+  const { buscarNoCatalogo } = await import("./catalogo-retrieval.server");
+  const resultado = await buscarNoCatalogo({
     clinicaId: pedido.clinicaId,
-    termo: query,
+    query,
     medico: pedido.medico ?? null,
-    dia: pedido.dia ?? null,
     ...(pedido.limite ? { limite: pedido.limite } : {}),
   });
 
-  const resultado = montarResultadoConhecimento({
-    registros: achado.registros as never,
-    base: achado.base
-      ? { versao: achado.base.versao, arquivo: achado.base.arquivo }
-      : null,
-    ambiguo: achado.ambiguo,
-  });
-
-  // Rastreabilidade: item, aba, linha, registro e versão ficam registrados.
-  void registrarConsultaKb({
+  void registrarConsulta({
     clinicaId: pedido.clinicaId,
-    baseId: achado.base?.id ?? null,
-    versao: achado.base?.versao ?? null,
     canal: pedido.canal ?? "interno",
     pergunta: query,
-    termos: expandirTermos(query),
-    encontrados: achado.registros,
-    resposta: `knowledge_status=${resultado.knowledge_status}`,
+    encontrados: resultado.records.map((r) => ({
+      id: r.id,
+      procedimento: r.procedimento,
+      medico: r.medico,
+    })),
+    resposta: `fonte=catalogo knowledge_status=${resultado.knowledge_status}`,
   });
 
-  console.info("[nina-kb]", {
+  console.info("[nina-catalogo]", {
     knowledge_status: resultado.knowledge_status,
-    versao: resultado.base_version,
     itens: resultado.records.length,
     trace: resultado.trace.slice(0, 3),
   });
 
-  return {
-    ...resultado,
-    // Consolidação por profissional continua disponível para o modelo.
-    ...(achado.consolidado?.length
-      ? ({ consolidado_por_profissional: achado.consolidado } as never)
-      : {}),
-  };
+  return resultado;
 }
