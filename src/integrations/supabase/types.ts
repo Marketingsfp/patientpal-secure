@@ -7853,8 +7853,9 @@ export type Database = {
           created_at: string
           created_by: string | null
           dia_semana: number
-          hora_fim: string
-          hora_inicio: string
+          fechado: boolean
+          hora_fim: string | null
+          hora_inicio: string | null
           id: string
           observacao: string | null
           unidade_id: string | null
@@ -7868,8 +7869,9 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           dia_semana: number
-          hora_fim: string
-          hora_inicio: string
+          fechado?: boolean
+          hora_fim?: string | null
+          hora_inicio?: string | null
           id?: string
           observacao?: string | null
           unidade_id?: string | null
@@ -7883,8 +7885,9 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           dia_semana?: number
-          hora_fim?: string
-          hora_inicio?: string
+          fechado?: boolean
+          hora_fim?: string | null
+          hora_inicio?: string | null
           id?: string
           observacao?: string | null
           unidade_id?: string | null
