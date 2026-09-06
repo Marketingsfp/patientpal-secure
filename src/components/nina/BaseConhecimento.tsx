@@ -16,6 +16,8 @@ import {
   FlaskConical,
 } from "lucide-react";
 import { useClinica } from "@/hooks/use-clinica";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { CatalogoNina } from "@/components/nina/catalogo/CatalogoNina";
 import {
   listarBasesKb,
   enviarBaseKb,
@@ -64,7 +66,7 @@ function corStatus(s: string) {
  * Envio da planilha oficial (TAP), processamento, versões e homologação.
  * As permissões são conferidas no servidor: aqui a UI apenas reflete.
  */
-export function BaseConhecimento() {
+function BaseConhecimentoPlanilha() {
   const { clinicaAtual } = useClinica();
   const clinicaId = clinicaAtual?.clinica_id;
   const ehAdmin = ["admin", "gestor"].includes(String(clinicaAtual?.role ?? ""));
@@ -377,5 +379,34 @@ export function BaseConhecimento() {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+/**
+ * Aba "Base de conhecimentos da Nina": planilha atual + catálogo estruturado.
+ * O catálogo é cadastro; a fonte ativa do atendimento segue sendo a planilha.
+ */
+export function BaseConhecimento() {
+  const { clinicaAtual } = useClinica();
+  const clinicaId = clinicaAtual?.clinica_id;
+  const podeEditar = ["admin", "gestor"].includes(String(clinicaAtual?.role ?? ""));
+
+  return (
+    <Tabs defaultValue="planilha" className="space-y-4">
+      <TabsList>
+        <TabsTrigger value="planilha">Planilha</TabsTrigger>
+        <TabsTrigger value="servicos">Exames e procedimentos</TabsTrigger>
+        <TabsTrigger value="profissionais">Consultas e profissionais</TabsTrigger>
+      </TabsList>
+      <TabsContent value="planilha">
+        <BaseConhecimentoPlanilha />
+      </TabsContent>
+      <TabsContent value="servicos">
+        <CatalogoNina clinicaId={clinicaId} podeEditar={podeEditar} tipo="servico" />
+      </TabsContent>
+      <TabsContent value="profissionais">
+        <CatalogoNina clinicaId={clinicaId} podeEditar={podeEditar} tipo="profissional" />
+      </TabsContent>
+    </Tabs>
   );
 }
