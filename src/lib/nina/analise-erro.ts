@@ -366,7 +366,10 @@ export const SCHEMA_ANALISE = {
       },
     },
     etapa: { type: ["string", "null"] },
-    gravidade: { enum: ["baixa", "media", "alta", "critica", null] },
+    gravidade: {
+      type: ["string", "null"],
+      enum: ["baixa", "media", "alta", "critica", null],
+    },
     causa_provavel: { type: ["string", "null"] },
     causa_eh_hipotese: { type: "boolean" },
     proxima_verificacao: { type: ["string", "null"] },
