@@ -50,6 +50,7 @@ const entrada = z.object({
   painel: contextoPainel,
   /** Continuidade: últimas rodadas desta mesma análise. */
   historico: z.array(turnoAnterior).max(6).default([]),
+  origem: z.enum(["pergunta", "filtros_atuais", "atualizacao"]).default("pergunta"),
 });
 
 type Contexto = { supabase: any; userId: string };
@@ -72,7 +73,7 @@ type SaidaModelo = {
 };
 
 /** Chamada ao provedor via Responses API, com streaming consumido no servidor. */
-async function chamarModelo(input: any[]): Promise<SaidaModelo> {
+async function chamarModelo(input: any[], maxTokensSaida: number): Promise<SaidaModelo> {
   const apiKey = process.env["LOVABLE_API_KEY"];
   if (!apiKey) throw new Error("Análise indisponível: chave do provedor de IA não configurada.");
 
@@ -91,6 +92,7 @@ async function chamarModelo(input: any[]): Promise<SaidaModelo> {
       store: false,
       tools: FERRAMENTAS_ANALISTA,
       tool_choice: "auto",
+      max_output_tokens: maxTokensSaida,
       text: {
         format: {
           type: "json_schema",
@@ -225,6 +227,67 @@ async function ferramentaConfiguracao(context: Contexto, clinicaId: string) {
         : null,
   };
 }
+
+const LIMITES_PADRAO = {
+  max_consultas_por_pergunta: MAX_CONSULTAS,
+  max_rodadas: MAX_RODADAS_FERRAMENTA,
+  max_tokens_saida: 6000,
+  timeout_ms: 300000,
+  max_analises_por_dia: 60,
+  preco_input_por_milhao: null as number | null,
+  preco_output_por_milhao: null as number | null,
+  preco_moeda: "USD",
+  preco_vigencia_inicio: null as string | null,
+};
+
+/** Limites configuráveis por clínica; sem configuração, valem os padrões. */
+async function carregarLimites(context: Contexto, clinicaId: string) {
+  const { data } = await context.supabase
+    .from("nina_analista_config")
+    .select("*")
+    .eq("clinica_id", clinicaId)
+    .maybeSingle();
+  return { ...LIMITES_PADRAO, ...(data ?? {}) };
+}
+
+/** Custo só é calculado quando há preço cadastrado, com a data de vigência. */
+function calcularCusto(limites: any, inputTokens: number, outputTokens: number) {
+  const pi = Number(limites.preco_input_por_milhao);
+  const po = Number(limites.preco_output_por_milhao);
+  if (!Number.isFinite(pi) && !Number.isFinite(po)) return null;
+  const valor =
+    ((Number.isFinite(pi) ? pi : 0) * inputTokens + (Number.isFinite(po) ? po : 0) * outputTokens) /
+    1_000_000;
+  return {
+    valor: Number(valor.toFixed(6)),
+    moeda: limites.preco_moeda ?? "USD",
+    vigencia: limites.preco_vigencia_inicio ?? null,
+  };
+}
+
+/** Lista o histórico de análises. Respeita a permissão atual, não a de quando foi criada. */
+export const listarAnalisesMetricasNina = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => z.object({ clinicaId: z.string().uuid() }).parse(i))
+  .handler(async ({ data, context }) => {
+    const ctx = context as unknown as Contexto;
+    await exigirPermissao(ctx, data.clinicaId);
+    const { analiseIAAtivaNaClinica } = await import("./analise-flag.server");
+    const [{ data: linhas, error }, limites, ativa] = await Promise.all([
+      ctx.supabase
+        .from("nina_analista_analises")
+        .select(
+          "id, pergunta, status, erro, resposta, problemas, resultados, filtros_painel, recorte_utilizado, modelo, versao_regras, input_tokens, output_tokens, custo_estimado, custo_moeda, custo_preco_vigencia, duracao_ms, dados_atualizados_em, origem, created_at",
+        )
+        .eq("clinica_id", data.clinicaId)
+        .order("created_at", { ascending: false })
+        .limit(30),
+      carregarLimites(ctx, data.clinicaId),
+      analiseIAAtivaNaClinica(data.clinicaId),
+    ]);
+    if (error) throw new Error(error.message);
+    return { analises: linhas ?? [], limites, ativa, modelo: MODELO_ANALISTA };
+  });
 
 export const perguntarAnalistaMetricas = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
