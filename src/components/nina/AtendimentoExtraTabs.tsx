@@ -2622,6 +2622,26 @@ export function AtendInbox() {
                 ref={chat.containerRef}
                 className="h-full overflow-auto p-4 space-y-2 bg-atd-bg"
               >
+                {buscandoAlvo && (
+                  <div className="sticky top-0 z-10 mb-2 rounded-md border border-atd-border bg-atd-surface px-3 py-1.5 text-xs text-atd-ink-soft">
+                    Localizando mensagem reportada…
+                  </div>
+                )}
+                {alvoIndisponivel && (
+                  <div className="sticky top-0 z-10 mb-2 flex items-center justify-between gap-2 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-1.5 text-xs">
+                    <span>
+                      Não foi possível localizar a mensagem original. O conteúdo reportado continua
+                      disponível na revisão.
+                    </span>
+                    <button
+                      type="button"
+                      className="underline"
+                      onClick={() => setAlvoIndisponivel(false)}
+                    >
+                      Fechar
+                    </button>
+                  </div>
+                )}
 
                 {conteudoDaConversa && temMaisAntigas && (
                   <div className="flex justify-center pb-1">
@@ -2671,11 +2691,22 @@ export function AtendInbox() {
                   }
                   // Autoria pelo campo do sistema, nunca pelo texto da mensagem.
                   const daNina = out && m.enviada_por === "nina";
+                  const destacada = msgDestacada === m.id;
                   return (
                     <div
                       key={m.id}
-                      className={`flex items-start gap-2 ${out ? "justify-end" : "justify-start"}`}
+                      data-msg-id={m.id}
+                      className={`flex items-start gap-2 ${out ? "justify-end" : "justify-start"} ${
+                        destacada
+                          ? "motion-safe:transition-colors rounded-xl ring-2 ring-destructive bg-destructive/10 px-1 py-1 scroll-my-24"
+                          : ""
+                      }`}
                     >
+                      {destacada && (
+                        <span className="self-center rounded bg-destructive px-1.5 py-0.5 text-[10px] font-medium text-destructive-foreground">
+                          Mensagem reportada
+                        </span>
+                      )}
                       {/* Botão de reporte rápido: fora do balão, sempre visível. */}
                       {daNina && clinicaId && (
                         <ReportarErroNinaBotao
