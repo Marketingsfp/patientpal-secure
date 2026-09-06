@@ -1,41 +1,20 @@
 import { createFileRoute, Outlet, useLocation, useNavigate } from "@tanstack/react-router";
-import { confirmDialog } from "@/lib/confirm";
-import { useState, useRef, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import {
   MessageCircle,
   Send,
-  Mic,
-  Bot,
-  CheckCheck,
   Phone,
   FileText,
-  DollarSign,
-  Cake,
-  Calendar,
-  Sparkles,
-  Brain,
   Loader2,
   Copy,
   CheckCircle2,
   AlertCircle,
   Eye,
   EyeOff,
-  Smartphone,
-  Instagram,
-  Facebook,
-  Globe,
   Plus,
   Pencil,
   X,
-  Paperclip,
-  Smile,
-  Search,
-  PanelRightClose,
-  PanelRightOpen,
-  MoreVertical,
   User,
-  Tag,
-  ArrowLeft,
   RefreshCw,
   ThumbsUp,
   ThumbsDown,
@@ -43,7 +22,6 @@ import {
 import { useServerFn } from "@tanstack/react-start";
 import { useClinica } from "@/hooks/use-clinica";
 import { usePodeEscrever } from "@/hooks/use-permissoes";
-import { chatNina } from "@/lib/nina.functions";
 import { registrarFeedbackNina } from "@/lib/nina/aprendizado.functions";
 import { BaseConhecimento } from "@/components/nina/BaseConhecimento";
 
@@ -58,19 +36,16 @@ import {
   listarEventosWebhook,
 } from "@/lib/whatsapp.functions";
 import {
-  enviarMensagemWhatsapp,
   listarTemplatesWhatsapp,
   criarTemplateWhatsapp,
   excluirTemplateWhatsapp,
 } from "@/lib/whatsapp.functions";
-import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent } from "@/components/ui/tabs";
-import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
@@ -82,12 +57,10 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { Sheet, SheetContent } from "@/components/ui/sheet";
-import { NinaMessage, TypingDots } from "@/components/nina/NinaMessage";
-import { formatWhatsappText } from "@/components/nina/formatWhatsappText";
 import { HomologacaoWhatsapp } from "@/components/nina/HomologacaoWhatsapp";
 import { AtendMacros } from "@/components/nina/AtendimentoTabs";
 import { AtendInbox } from "@/components/nina/AtendimentoExtraTabs";
+
 
 export const Route = createFileRoute("/_authenticated/app/nina")({
   // A rota filha /app/nina/<id> só existe para dar endereço próprio a cada
