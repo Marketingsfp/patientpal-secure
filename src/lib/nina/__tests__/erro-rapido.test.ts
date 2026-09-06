@@ -2,6 +2,8 @@ import { describe, expect, it } from "bun:test";
 import {
   CATEGORIA_A_CLASSIFICAR,
   ORIGEM_ERRO_RAPIDO,
+  estadoAnalise,
+  ROTULO_ANALISE,
   ehConflitoDuplicidade,
   montarRegistroErroRapido,
   validarMensagemNina,
@@ -194,5 +196,19 @@ describe("estado da auditoria técnica do reporte", () => {
     });
     expect(r.execucao_id).toBeNull();
     expect(r.auditoria_status).toBe("unavailable");
+  });
+});
+
+describe("FASE 3 — estado da análise", () => {
+  it("sem diagnóstico é 'não solicitada'", () => {
+    expect(estadoAnalise({ root_cause: null })).toBe("not_requested");
+    expect(ROTULO_ANALISE[estadoAnalise({ root_cause: null })]).toBe("Não solicitada");
+  });
+  it("diagnóstico existente conta como concluída", () => {
+    expect(estadoAnalise({ root_cause: "catalogo_incompleto" })).toBe("done");
+  });
+  it("estado explícito tem prioridade", () => {
+    expect(estadoAnalise({ root_cause: "x", analise_status: "processing" })).toBe("processing");
+    expect(estadoAnalise({ analise_status: "failed" })).toBe("failed");
   });
 });
