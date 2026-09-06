@@ -1189,6 +1189,15 @@ export function AtendInbox() {
     })();
   }, [clinicaId, sel?.id, (sel as any)?.contato_paciente_id, conversaCarregadaId, obterContato]);
 
+  // Trocou de conversa: formulários abertos sobre a conversa anterior fecham.
+  // Um formulário iniciado em A jamais é reaproveitado em B.
+  useEffect(() => {
+    setTransferOpen(false);
+    setFecharOpen(false);
+    setAgendaOpen(false);
+    setNovaNota("");
+  }, [sel?.id]);
+
   useEffect(() => {
     carregarConversa();
   }, [carregarConversa]);
