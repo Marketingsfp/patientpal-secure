@@ -8157,6 +8157,62 @@ export type Database = {
           },
         ]
       }
+      nina_feedback_decisoes: {
+        Row: {
+          analise_id: string | null
+          analise_versao: number | null
+          autor: string
+          causa_antes: string | null
+          causa_depois: string | null
+          clinica_id: string
+          created_at: string
+          feedback_id: string
+          id: string
+          observacao: string | null
+          status_antes: string | null
+          status_depois: string | null
+          tipo: string
+        }
+        Insert: {
+          analise_id?: string | null
+          analise_versao?: number | null
+          autor: string
+          causa_antes?: string | null
+          causa_depois?: string | null
+          clinica_id: string
+          created_at?: string
+          feedback_id: string
+          id?: string
+          observacao?: string | null
+          status_antes?: string | null
+          status_depois?: string | null
+          tipo: string
+        }
+        Update: {
+          analise_id?: string | null
+          analise_versao?: number | null
+          autor?: string
+          causa_antes?: string | null
+          causa_depois?: string | null
+          clinica_id?: string
+          created_at?: string
+          feedback_id?: string
+          id?: string
+          observacao?: string | null
+          status_antes?: string | null
+          status_depois?: string | null
+          tipo?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nina_feedback_decisoes_feedback_id_fkey"
+            columns: ["feedback_id"]
+            isOneToOne: false
+            referencedRelation: "nina_feedback_erros"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       nina_feedback_erros: {
         Row: {
           aplicacao_evidencia: Json | null
@@ -8171,6 +8227,9 @@ export type Database = {
           correcao: string | null
           correcao_original: string | null
           created_at: string
+          decidido_em: string | null
+          decidido_por: string | null
+          decisao_humana: string | null
           diagnosticado_em: string | null
           diagnosticado_por: string | null
           execucao_id: string | null
@@ -8214,6 +8273,9 @@ export type Database = {
           correcao?: string | null
           correcao_original?: string | null
           created_at?: string
+          decidido_em?: string | null
+          decidido_por?: string | null
+          decisao_humana?: string | null
           diagnosticado_em?: string | null
           diagnosticado_por?: string | null
           execucao_id?: string | null
@@ -8257,6 +8319,9 @@ export type Database = {
           correcao?: string | null
           correcao_original?: string | null
           created_at?: string
+          decidido_em?: string | null
+          decidido_por?: string | null
+          decisao_humana?: string | null
           diagnosticado_em?: string | null
           diagnosticado_por?: string | null
           execucao_id?: string | null
