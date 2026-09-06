@@ -454,6 +454,7 @@ function Pagina() {
           clinicaId: clinicaId!,
           acao: "rejected",
           motivo: motivo.trim() || null,
+          esperadoUpdatedAt: rejeitando.updated_at ?? null,
         },
       });
       toast.success("Registro rejeitado. Nada foi alterado na Base.");
@@ -477,6 +478,7 @@ function Pagina() {
     try {
       await editar({
         data: {
+          esperadoUpdatedAt: editando.updated_at ?? null,
           id: editando.id,
           clinicaId: clinicaId!,
           correcao: textoEdicao.trim(),
@@ -539,6 +541,80 @@ function Pagina() {
     },
     [analisando, analisarIA, clinicaId],
   );
+
+  /** Decisão humana de diagnóstico: confirma o erro ou marca falso positivo. */
+  const decidir = async (item: Item, decisao: "problema_confirmado" | "falso_positivo") => {
+    if (!clinicaId || decidindo) return;
+    setDecidindo(true);
+    try {
+      await decidirProblema({
+        data: {
+          clinicaId,
+          id: item.id,
+          decisao,
+          esperadoUpdatedAt: item.updated_at ?? null,
+        },
+      });
+      toast.success(
+        decisao === "falso_positivo"
+          ? "Marcado como falso positivo. Nada foi alterado no catálogo."
+          : "Problema confirmado. Isso não aprova nem aplica correção.",
+      );
+      await carregar();
+      setDecisoes((d) => {
+        const c = { ...d };
+        delete c[item.id];
+        return c;
+      });
+      setAnalises((a) => ({ ...a }));
+      void carregarDecisoes(item.id);
+    } catch (e) {
+      mostrarErro(e);
+    } finally {
+      setDecidindo(false);
+    }
+  };
+
+  const carregarDecisoes = useCallback(
+    async (feedbackId: string) => {
+      if (!clinicaId) return;
+      try {
+        const d = await listarDecisoes({ data: { clinicaId, feedbackId } });
+        setDecisoes((x) => ({ ...x, [feedbackId]: d as Decisao[] }));
+      } catch {
+        /* histórico é complementar */
+      }
+    },
+    [clinicaId, listarDecisoes],
+  );
+
+  /** Só preenche o rascunho de correção. Não aprova, não publica, não aplica. */
+  const usarSugestaoIA = async (item: Item) => {
+    const a = analises[item.id];
+    const r = a?.resultado;
+    if (!r) return;
+    const texto = [
+      r.problema ? `Problema: ${r.problema}` : null,
+      r.causaProvavel
+        ? `Causa provável${r.causaEhHipotese ? " (hipótese)" : ""}: ${r.causaProvavel}`
+        : null,
+      r.proximaVerificacao ? `Próxima verificação: ${r.proximaVerificacao}` : null,
+    ]
+      .filter(Boolean)
+      .join("\n");
+    setEditando(item);
+    setTextoEdicao(item.correcao?.trim() ? item.correcao : texto);
+    toast.info("Rascunho preenchido a partir da análise. Revise antes de salvar.");
+    if (clinicaId) {
+      try {
+        await registrarRascunhoIA({
+          data: { clinicaId, id: item.id, analiseId: a!.id, analiseVersao: a!.versao },
+        });
+      } catch {
+        /* registro complementar */
+      }
+    }
+  };
 
   const abrirConversa = async (item: Item) => {
     if (!item.conversa_id || !clinicaId) {
