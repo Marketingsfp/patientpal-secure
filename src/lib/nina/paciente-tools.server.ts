@@ -96,6 +96,29 @@ export type CtxNinaPaciente = {
 };
 
 
+/**
+ * Protocolo do atendimento após agendamento CONFIRMADO no banco.
+ * Devolve `null` quando a clínica não usa protocolo — a Nina só cita o número
+ * que vem do backend, nunca inventa.
+ */
+async function protocoloDoAgendamento(ctx: CtxNinaPaciente): Promise<string | null> {
+  if (!ctx.conversaId) return null;
+  try {
+    const { garantirProtocoloAtendimento } = await import(
+      "@/lib/atendimento/protocolo-atendimento.server"
+    );
+    const r = await garantirProtocoloAtendimento({
+      clinicaId: ctx.clinicaId,
+      conversaId: ctx.conversaId,
+      gatilho: "agendamento",
+    });
+    return r?.protocolo ?? null;
+  } catch (e) {
+    console.error("[nina-tools] protocolo do agendamento", e);
+    return null;
+  }
+}
+
 /** Marca gravada em `agendamentos.origem_integracao`. */
 export function origemAgendamentoNina(ctx: CtxNinaPaciente): string {
   if (ctx.teste || ctx.origem === "homologacao") return "nina_homologacao";
