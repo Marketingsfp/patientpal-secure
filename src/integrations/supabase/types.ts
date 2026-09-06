@@ -9261,6 +9261,60 @@ export type Database = {
           },
         ]
       }
+      nina_trace_eventos: {
+        Row: {
+          clinica_id: string | null
+          conversation_id: string | null
+          created_at: string
+          cycle_id: number
+          duration_ms: number | null
+          event_type: string
+          execution_id: string
+          finished_at: string | null
+          id: string
+          message_id: string | null
+          metadata: Json
+          node_id: string
+          started_at: string
+          status: string
+          trace_id: string
+        }
+        Insert: {
+          clinica_id?: string | null
+          conversation_id?: string | null
+          created_at?: string
+          cycle_id?: number
+          duration_ms?: number | null
+          event_type: string
+          execution_id: string
+          finished_at?: string | null
+          id?: string
+          message_id?: string | null
+          metadata?: Json
+          node_id: string
+          started_at: string
+          status: string
+          trace_id: string
+        }
+        Update: {
+          clinica_id?: string | null
+          conversation_id?: string | null
+          created_at?: string
+          cycle_id?: number
+          duration_ms?: number | null
+          event_type?: string
+          execution_id?: string
+          finished_at?: string | null
+          id?: string
+          message_id?: string | null
+          metadata?: Json
+          node_id?: string
+          started_at?: string
+          status?: string
+          trace_id?: string
+        }
+        Relationships: []
+      }
       odonto_anamnese: {
         Row: {
           alergias: string | null
