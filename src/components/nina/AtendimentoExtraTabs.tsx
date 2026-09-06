@@ -166,7 +166,6 @@ import {
   marcarTroca,
   medirRequest,
 } from "@/lib/atendimento/perf-troca";
-import { useLocation, useNavigate, useParams } from "@tanstack/react-router";
 import {
   acaoPermitida,
   gravarRascunho,
@@ -796,7 +795,7 @@ export function AtendInbox() {
         setNotas([]);
         setEventos([]);
         toast.info(avisoSaidaEscopo(escopo));
-        // O endereço acompanha: sem conversa aberta, volta para /app/nina.
+        // Sem conversa aberta: a tela volta a "Selecione uma conversa".
         abrirConversa(null);
       }
       setConvs((prev: any[]) => {
@@ -822,8 +821,8 @@ export function AtendInbox() {
       });
       // O número do filtro atual muda na hora; o servidor confirma em seguida.
       setContadores((c) => ajustarContadorAtual(c as ContadoresInbox, escopo, rows.length));
-      // Com uma conversa no endereço (F5, link colado, Voltar/Avançar), a
-      // tela nunca escolhe outra sozinha.
+      // Com uma conversa já escolhida (ou pedida por outro módulo), a tela
+      // nunca troca sozinha para outra.
       if (
         devoAutoSelecionarComUrl({
           conversaIdUrl: selecaoIdRef.current,
@@ -836,9 +835,8 @@ export function AtendInbox() {
           }),
         })
       )
-        // A seleção automática também passa pela URL, para não existirem dois
-        // estados divergentes (endereço x conversa aberta).
-        abrirConversa((rows[0] as any)?.id ?? null, true);
+        // A seleção automática usa o mesmo caminho central de abertura.
+        abrirConversa((rows[0] as any)?.id ?? null);
       // Os números de cada filtro acompanham a movimentação em tempo real.
       void carregarContadores();
     } catch (e: any) {
@@ -893,9 +891,9 @@ export function AtendInbox() {
 
 
 
-  // FASE 1 — a conversa aberta é sempre a do endereço. Quando o
-  // conversationId da URL muda (clique, voltar/avançar do navegador, link
-  // colado), a seleção acompanha; sem id na URL, nada fica aberto.
+  // A conversa aberta é sempre a da seleção interna. Quando ela muda (clique
+  // na lista, busca por número, Central de Atenção, alerta), o conteúdo
+  // acompanha; sem seleção, nada fica aberto.
   useEffect(() => {
     if (!selecaoId) {
       if (selIdRef.current) {
@@ -916,9 +914,9 @@ export function AtendInbox() {
       setSel(c);
       return;
     }
-    // FASE 2 — F5 / link colado / Voltar-Avançar: a conversa do endereço pode
-    // não estar na lista do filtro atual. Buscamos ela pelo id e, se o usuário
-    // puder vê-la, o filtro acompanha. Sem permissão, volta para /app/nina.
+    // A conversa pedida pode não estar na lista do filtro atual (busca por
+    // número, alerta, Central de Atenção). Buscamos pelo id e, se o usuário
+    // puder vê-la, o filtro acompanha. Sem permissão, nada é aberto.
     if (!clinicaId || !meuId) return;
     if (deepLinkTentado.current.has(selecaoId)) return;
     deepLinkTentado.current.add(selecaoId);
