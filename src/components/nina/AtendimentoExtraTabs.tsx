@@ -2582,7 +2582,18 @@ export function AtendInbox() {
                     }
                   }
                   return (
-                    <div key={m.id} className={`flex ${out ? "justify-end" : "justify-start"}`}>
+                    <div
+                      key={m.id}
+                      className={`flex items-start gap-2 ${out ? "justify-end" : "justify-start"}`}
+                    >
+                      {/* Botão de reporte rápido: fora do balão, sempre visível. */}
+                      {daNina && clinicaId && (
+                        <ReportarErroNinaBotao
+                          clinicaId={clinicaId}
+                          conversaId={m.conversa_id ?? sel.id}
+                          mensagemId={m.id}
+                        />
+                      )}
                       <div
                         className={`max-w-[68%] rounded-2xl px-3 py-2 text-sm shadow-sm break-words ${
                           out
@@ -2597,19 +2608,11 @@ export function AtendInbox() {
                           <span className="whitespace-nowrap">
                             {fmtHora(m.recebida_em)} {m.enviada_por === "nina" && "· Nina"}
                           </span>
-                          {daNina && clinicaId && (
-                            <ReportarErroNinaBotao
-                              clinicaId={clinicaId}
-                              conversaId={sel.id}
-                              mensagemId={m.id}
-                              respostaNina={m.body ?? ""}
-                              perguntaPaciente={perguntaPaciente}
-                            />
-                          )}
                         </div>
                       </div>
                     </div>
                   );
+
                 })}
                 {/* Âncora do fim da conversa: é para cá que a tela vai ao abrir. */}
                 <div ref={chat.ancoraRef} />
