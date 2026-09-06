@@ -121,6 +121,24 @@ export const listarRevisaoFeedbackNina = createServerFn({ method: "POST" })
       }
     }
 
+    // Data/hora REAL da mensagem reportada, lida da própria mensagem pelo id
+    // (nunca o horário do reporte nem o horário atual). Consulta em lote: um
+    // único acesso para todos os cards da página.
+    const mensagens: Record<string, { enviada_em: string | null }> = {};
+    const idsMensagem = Array.from(
+      new Set(itens.map((l) => l.mensagem_id).filter(Boolean) as string[]),
+    );
+    if (idsMensagem.length) {
+      const { data: msgs } = await context.supabase
+        .from("whatsapp_mensagens")
+        .select("id, recebida_em")
+        .eq("clinica_id", data.clinicaId)
+        .in("id", idsMensagem);
+      for (const m of msgs ?? []) mensagens[m.id] = { enviada_em: m.recebida_em ?? null };
+    }
+
+
+
 
     // Contagem por situação (para as abas), respeitando os demais filtros.
     const contagens: Record<string, number> = {};
@@ -183,7 +201,7 @@ export const listarRevisaoFeedbackNina = createServerFn({ method: "POST" })
       });
     }
 
-    return { itens, pessoas, contagens, ocorrencias, conversas, execucoes, auditoria };
+    return { itens, pessoas, contagens, ocorrencias, conversas, execucoes, auditoria, mensagens };
   });
 
 /** Lista quem já reportou erros na clínica — alimenta o filtro por atendente. */
