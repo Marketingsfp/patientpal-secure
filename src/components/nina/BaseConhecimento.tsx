@@ -16,6 +16,8 @@ import {
   FlaskConical,
 } from "lucide-react";
 import { useClinica } from "@/hooks/use-clinica";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { CatalogoNina } from "@/components/nina/catalogo/CatalogoNina";
 import {
   listarBasesKb,
   enviarBaseKb,
