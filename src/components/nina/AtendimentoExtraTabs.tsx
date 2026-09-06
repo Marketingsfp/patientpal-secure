@@ -31,6 +31,8 @@ import {
 } from "@/components/nina/BannerNaoAtribuidas";
 import {
   ABRIR_CONVERSA_KEY,
+  ABRIR_MENSAGEM_KEY,
+
   EVENTO_ABRIR_CONVERSA,
   EVENTO_FILTRAR_ESPERA_CRITICA,
   FILTRO_ESPERA_CRITICA_KEY,
