@@ -114,7 +114,7 @@ describe("cenário 2 — administrador vê, transfere, mas nunca atende", () => 
   });
 
   test("administrador enxerga a operação inteira; atendente vê o que é dele", () => {
-    const conversaDeOutro = { id: CONVERSA_A, status: "active", owner_type: "HUMAN", assigned_to: ATENDENTE_ONLINE, departamento_id: null } as never;
+    const conversaDeOutro = { id: CONVERSA_A, status: "active", owner_type: "HUMAN", atribuida_user_id: ATENDENTE_ONLINE } as never;
     // Gestor no escopo de equipe: enxerga.
     expect(conversaVisivelNoEscopo(conversaDeOutro, { escopo: "equipe", gestor: true, userId: ADMIN })).toBe(true);
     // Atendente no escopo padrão "minhas": não é dele, não aparece.
@@ -158,7 +158,7 @@ describe("cenário 3 — presença e elegibilidade na transferência", () => {
     // Ninguém online: nada é distribuído, a conversa espera em "Não atribuídas".
     const semNinguem = apenasDestinatariosValidos(equipe).filter(() => false);
     expect(semNinguem).toHaveLength(0);
-    const aguardando = { id: CONVERSA_B, status: "active", owner_type: "HUMAN", assigned_to: null, departamento_id: "setor-1" } as never;
+    const aguardando = { id: CONVERSA_B, status: "active", owner_type: "HUMAN", atribuida_user_id: null } as never;
     expect(conversaVisivelNoEscopo(aguardando, { escopo: "nao_atribuidas", gestor: false, userId: ATENDENTE_ONLINE })).toBe(true);
   });
 });
@@ -176,7 +176,10 @@ describe("cenário 4 — catálogo publicado alimenta a Nina", () => {
   test("a origem é o catálogo — nunca a planilha", () => {
     expect(resultado.source).toBe("nina_catalogo");
     expect(resultado.source_type).toBe("catalog");
-    expect(JSON.stringify(resultado)).not.toMatch(/planilha|spreadsheet|\.xlsx/i);
+    // A base antiga não é mais citada como origem de nenhum registro.
+    expect(resultado.base_file).toBeNull();
+    expect(resultado.base_version).toBeNull();
+    for (const t of resultado.trace) expect(String(t.sheet)).toContain("Catálogo");
   });
 
   test("valores condicionais aparecem separados por forma de pagamento", () => {
@@ -205,7 +208,8 @@ describe("cenário 4 — catálogo publicado alimenta a Nina", () => {
     expect(vazio.found).toBe(false);
     expect(vazio.knowledge_status).toBe("not_found");
     expect(vazio.price).toBeNull();
-    expect(vazio.instrucao).toMatch(/não invente|nao invente|confirmar com a equipe/i);
+    expect(vazio.instrucao).toMatch(/NÃO tem essa informação/i);
+    expect(vazio.instrucao).toMatch(/proibido deduzir|verificar com a equipe/i);
   });
 
   test("nota interna nunca faz parte do contexto entregue à Nina", () => {
