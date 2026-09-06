@@ -327,7 +327,11 @@ export function AtendInbox() {
   // está aberta. O clique só navega; a seleção vem sempre do endereço.
   const navigate = useNavigate();
   const rotaParams = useParams({ strict: false }) as { conversationId?: string };
-  const conversaIdUrl = rotaParams?.conversationId ?? null;
+  // A Inbox fica na rota-mãe /app/nina, que não recebe o parâmetro da rota
+  // filha; por isso o endereço é lido também pelo caminho da página.
+  const caminhoAtual = useLocation({ select: (l: any) => l.pathname as string });
+  const conversaIdUrl = rotaParams?.conversationId ?? idConversaDaUrl(caminhoAtual);
+
   const abrirPelaUrl = useCallback(
     (id: string | null, replace = false) => {
       // Função central (Fase 5): todo módulo abre conversa por este caminho.
