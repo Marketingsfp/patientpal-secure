@@ -561,6 +561,12 @@ function Pagina() {
 
       {ind ? (
         <>
+          <div className="space-y-1">
+            <h2 className="text-base font-semibold">Aprendizado e revisão dos erros</h2>
+            <p className="text-xs text-muted-foreground">
+              Seção complementar. Aqui valem também os filtros específicos de erros.
+            </p>
+          </div>
           <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <Indicador titulo="Erros reportados" valor={String(ind.reportados)} />
             <Indicador
