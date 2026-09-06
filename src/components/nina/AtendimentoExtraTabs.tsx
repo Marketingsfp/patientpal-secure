@@ -161,7 +161,12 @@ import { ReportarErroNinaBotao } from "@/components/nina/ReportarErroNinaDialog"
 import { BadgeEspera, RelogioEsperaProvider } from "@/components/nina/BadgeEspera";
 import { formatarDataHoraMensagem } from "@/lib/atendimento/data-hora";
 import { ESCOPO_INBOX_PADRAO, type EscopoInbox } from "@/lib/atendimento/escopo-inbox";
-import { MSG_ADMIN_NAO_ATENDE } from "@/lib/atendimento/perfil-atendimento";
+import {
+  MSG_ADMIN_NAO_ATENDE,
+  ROTULO_PRESENCA,
+  type PresencaAtendente,
+} from "@/lib/atendimento/perfil-atendimento";
+
 import {
   formatarNumeroConversa,
   interpretarBuscaConversa,
