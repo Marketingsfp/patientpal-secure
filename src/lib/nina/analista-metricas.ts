@@ -416,6 +416,13 @@ export function validarResposta(
   }
 
   if (permitidos.size === 0) {
+    const semNumeros =
+      (resposta.indicadores?.length ?? 0) === 0 &&
+      (resposta.comparacoes?.length ?? 0) === 0 &&
+      (resposta.evidencias?.length ?? 0) === 0;
+    // Recusa legítima (pedido fora do escopo autorizado) não cita números e
+    // não pode ser tratada como análise inválida.
+    if (semNumeros) return { valida: true, problemas: [] };
     problemas.push({
       campo: "consultas",
       detalhe: "Nenhuma consulta autorizada foi executada; a resposta não tem base em dados.",
