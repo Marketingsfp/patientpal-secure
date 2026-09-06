@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog,
   DialogContent,
@@ -11,7 +12,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Plus, Loader2, Pencil, Trash2, Archive, Send } from "lucide-react";
+import { Plus, Loader2, Pencil, Trash2, Archive, Send, Sparkles } from "lucide-react";
 import {
   listarCatalogoNina,
   opcoesCatalogoNina,
@@ -19,7 +20,13 @@ import {
   salvarProfissionalCatalogo,
   alterarStatusCatalogo,
   excluirItemCatalogo,
+  organizarTextoCatalogoIA,
 } from "@/lib/nina/catalogo.functions";
+import {
+  MODELO_CATALOGO_IA,
+  paraEstadoProfissional,
+  paraEstadoServico,
+} from "@/lib/nina/catalogo-ia";
 import {
   ROTULO_STATUS,
   formatarBRL,
@@ -81,6 +88,7 @@ export function CatalogoNina({
   const salvarProfFn = useServerFn(salvarProfissionalCatalogo);
   const statusFn = useServerFn(alterarStatusCatalogo);
   const excluirFn = useServerFn(excluirItemCatalogo);
+  const iaFn = useServerFn(organizarTextoCatalogoIA);
 
   const [carregando, setCarregando] = useState(false);
   const [salvando, setSalvando] = useState(false);
@@ -89,6 +97,16 @@ export function CatalogoNina({
   const [aberto, setAberto] = useState(false);
   const [servico, setServico] = useState<EstadoServico>(servicoVazio);
   const [profissional, setProfissional] = useState<EstadoProfissional>(profissionalVazio);
+
+  // "Criar com IA": texto livre → rascunho de formulário para revisão humana.
+  const [iaAberta, setIaAberta] = useState(false);
+  const [iaTexto, setIaTexto] = useState("");
+  const [iaProcessando, setIaProcessando] = useState(false);
+  const [avisos, setAvisos] = useState<string[]>([]);
+  const [fila, setFila] = useState<any[]>([]);
+  const [posicao, setPosicao] = useState(0);
+  // Resposta atrasada não pode sobrescrever uma edição posterior do usuário.
+  const pedidoRef = useRef(0);
 
   const carregar = useCallback(async () => {
     if (!clinicaId) return;
@@ -121,13 +139,80 @@ export function CatalogoNina({
   function abrirNovo() {
     setServico(servicoVazio());
     setProfissional(profissionalVazio());
+    setFila([]);
+    setPosicao(0);
+    setAvisos([]);
     setAberto(true);
   }
 
   function abrirEdicao(registro: any) {
     if (tipo === "servico") setServico(servicoDoRegistro(registro));
     else setProfissional(profissionalDoRegistro(registro));
+    setFila([]);
+    setPosicao(0);
+    setAvisos([]);
     setAberto(true);
+  }
+
+  /** Carrega no formulário o registro `i` gerado pela IA. */
+  function carregarDaFila(lista: any[], i: number, avisosBase: string[]) {
+    const item = lista[i];
+    if (!item) return;
+    if (tipo === "servico") {
+      setServico(paraEstadoServico(item) as EstadoServico);
+      setAvisos(avisosBase);
+    } else {
+      const { estado, ambiguidades } = paraEstadoProfissional(item, {
+        medicos: opcoes.medicos,
+        especialidades: opcoes.especialidades,
+        convenios: opcoes.convenios,
+      });
+      setProfissional(estado as unknown as EstadoProfissional);
+      setAvisos([...avisosBase, ...ambiguidades]);
+    }
+  }
+
+  /** Só roda no clique. Nada é salvo nem publicado automaticamente. */
+  async function organizarComIA() {
+    if (!clinicaId || iaTexto.trim().length < 10) {
+      toast.error("Escreva ou cole as informações a organizar.");
+      return;
+    }
+    const meu = ++pedidoRef.current;
+    setIaProcessando(true);
+    try {
+      const r = (await iaFn({ data: { clinicaId, tipo, texto: iaTexto.trim() } })) as any;
+      if (meu !== pedidoRef.current) return; // resposta atrasada: descartar
+      const lista: any[] = tipo === "servico" ? r.servicos : r.profissionais;
+      if (!lista?.length) {
+        toast.error("A IA não encontrou registros neste texto. Revise e tente novamente.");
+        return;
+      }
+      const base = [...(r.pendencias ?? []), ...(r.ambiguidades ?? [])];
+      setFila(lista);
+      setPosicao(0);
+      carregarDaFila(lista, 0, base);
+      setIaAberta(false);
+      setAberto(true);
+      toast.success(
+        lista.length > 1
+          ? `${lista.length} registros organizados. Revise um a um antes de salvar.`
+          : "Campos preenchidos. Revise antes de salvar.",
+      );
+    } catch (e: any) {
+      if (meu !== pedidoRef.current) return;
+      // O texto digitado é preservado: a janela continua aberta.
+      toast.error(e?.message ?? "A IA não respondeu agora. Seu texto foi preservado.");
+    } finally {
+      if (meu === pedidoRef.current) setIaProcessando(false);
+    }
+  }
+
+  function proximoDaFila() {
+    const prox = posicao + 1;
+    if (prox >= fila.length) return;
+    setPosicao(prox);
+    carregarDaFila(fila, prox, []);
   }
 
   async function salvar(publicar: boolean) {
@@ -159,7 +244,8 @@ export function CatalogoNina({
               : "Rascunho salvo.",
         );
       }
-      setAberto(false);
+      if (posicao + 1 < fila.length) proximoDaFila();
+      else setAberto(false);
       await carregar();
     } catch (e: any) {
       const msg =
@@ -206,11 +292,64 @@ export function CatalogoNina({
           </p>
         </div>
         {podeEditar && (
-          <Button onClick={abrirNovo} size="sm">
-            <Plus className="mr-2 h-4 w-4" /> Novo
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              onClick={() => {
+                setIaAberta(true);
+              }}
+              size="sm"
+              variant="outline"
+            >
+              <Sparkles className="mr-2 h-4 w-4" /> Criar com IA
+            </Button>
+            <Button onClick={abrirNovo} size="sm">
+              <Plus className="mr-2 h-4 w-4" /> Novo
+            </Button>
+          </div>
         )}
       </div>
+
+      <Dialog open={iaAberta} onOpenChange={(v) => !iaProcessando && setIaAberta(v)}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Criar com IA — {titulo.toLowerCase()}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              Escreva ou cole as informações do jeito que você tem. A IA organiza nos campos do
+              formulário e você revisa antes de salvar. Nada é salvo nem publicado
+              automaticamente.
+            </p>
+            <Textarea
+              value={iaTexto}
+              onChange={(e) => setIaTexto(e.target.value)}
+              rows={10}
+              placeholder={
+                tipo === "servico"
+                  ? "Ex.: Ultrassom de tireoide 130 no pix, 150 no cartão em 3x. Precisa de pedido médico..."
+                  : "Ex.: Dra. Ana Paula, cardiologista, atende quinzenal às quintas das 14h às 18h..."
+              }
+            />
+            <p className="text-xs text-muted-foreground">
+              Modelo utilizado: {MODELO_CATALOGO_IA}. O texto é usado apenas para preencher este
+              formulário.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setIaAberta(false)} disabled={iaProcessando}>
+              Cancelar
+            </Button>
+            <Button onClick={() => void organizarComIA()} disabled={iaProcessando}>
+              {iaProcessando ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Sparkles className="mr-2 h-4 w-4" />
+              )}
+              Organizar e preencher campos com IA
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {carregando ? (
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -274,8 +413,25 @@ export function CatalogoNina({
       <Dialog open={aberto} onOpenChange={setAberto}>
         <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>{titulo}</DialogTitle>
+            <DialogTitle>
+              {titulo}
+              {fila.length > 1 && (
+                <span className="ml-2 text-sm font-normal text-muted-foreground">
+                  Registro {posicao + 1} de {fila.length}
+                </span>
+              )}
+            </DialogTitle>
           </DialogHeader>
+          {avisos.length > 0 && (
+            <div className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm">
+              <p className="font-medium">Confira antes de salvar</p>
+              <ul className="mt-1 list-disc space-y-1 pl-5 text-muted-foreground">
+                {avisos.map((a, i) => (
+                  <li key={i}>{a}</li>
+                ))}
+              </ul>
+            </div>
+          )}
           {tipo === "servico" ? (
             <FormServico
               estado={servico}
@@ -295,6 +451,11 @@ export function CatalogoNina({
             <Button variant="outline" onClick={() => setAberto(false)} disabled={salvando}>
               Cancelar
             </Button>
+            {posicao + 1 < fila.length && (
+              <Button variant="ghost" onClick={proximoDaFila} disabled={salvando}>
+                Pular para o próximo
+              </Button>
+            )}
             {podeEditar && (
               <>
                 <Button variant="secondary" onClick={() => salvar(false)} disabled={salvando}>
