@@ -296,9 +296,9 @@ export function AtendInbox() {
   const [resultadoNumero, setResultadoNumero] = useState<
     { estado: "carregando" } | { estado: "vazio" } | { estado: "ok"; conversa: any } | null
   >(null);
-  const [filtroStatus, setFiltroStatus] = useState<
-    "all" | "active" | "waiting" | "closed" | "bot_attending"
-  >("all");
+  // Opção "Bot" removida da lista de status a pedido da equipe: conversas sob
+  // a Nina continuam acessíveis pelo filtro de escopo "Nina".
+  const [filtroStatus, setFiltroStatus] = useState<"all" | "active" | "waiting" | "closed">("all");
   // Escopo da Inbox: por padrão "Minhas conversas" (somente as atribuídas ao
   // atendente logado). O filtro é aplicado no backend.
   const [escopo, setEscopo] = useState<EscopoInbox>(ESCOPO_INBOX_PADRAO);
@@ -2225,7 +2225,7 @@ export function AtendInbox() {
                 <SelectItem value="all">Todas</SelectItem>
                 <SelectItem value="waiting">Em espera</SelectItem>
                 <SelectItem value="active">Ativas</SelectItem>
-                <SelectItem value="bot_attending">Bot</SelectItem>
+                
                 <SelectItem value="closed">Fechadas</SelectItem>
               </SelectContent>
             </Select>
