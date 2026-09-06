@@ -464,6 +464,11 @@ export async function reabrirConversaPorMensagemPaciente(args: {
         closed_at: null,
         // Sem responsável humano herdado e sem prazos/resumos da sessão anterior.
         handoff_resumo: null,
+        // Novo ciclo de atendimento: o protocolo anterior fica no histórico de
+        // eventos, mas não é apresentado como se fosse o atual.
+        protocolo_atendimento: null,
+        protocolo_sessao_id: null,
+        protocolo_em: null,
         handoff_motivo: null,
         handoff_em: null,
         awaiting_patient_since: null,
