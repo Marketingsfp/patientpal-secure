@@ -678,7 +678,7 @@ export const marcarLida = createServerFn({ method: "POST" })
     const { data: lidaAte, error } = await context.supabase.rpc("atend_registrar_leitura", {
       _clinica_id: data.clinicaId,
       _conversa_id: data.conversaId,
-      _mensagem_id: data.mensagemId ?? null,
+      _mensagem_id: data.mensagemId ?? undefined,
     });
     if (error) throw new Error(error.message);
     return { ok: true, marcada: true, motivo, lidaAte: (lidaAte as string | null) ?? null };
