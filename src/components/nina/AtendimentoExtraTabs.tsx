@@ -2397,6 +2397,25 @@ export function AtendInbox() {
                         </span>
                       )}
                       {sel.is_teste && <span>· Teste (homologação)</span>}
+                      {sel.protocolo_atendimento && (
+                        <span className="inline-flex items-center gap-1">
+                          · <code>Protocolo {sel.protocolo_atendimento}</code>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              void navigator.clipboard
+                                .writeText(sel.protocolo_atendimento as string)
+                                .then(() => toast.success("Protocolo copiado"))
+                                .catch(() => toast.error("Não foi possível copiar"));
+                            }}
+                            title="Copiar protocolo de atendimento"
+                            aria-label="Copiar protocolo de atendimento"
+                            className="rounded p-0.5 hover:bg-atd-blue-hover"
+                          >
+                            <Copy className="h-3 w-3" />
+                          </button>
+                        </span>
+                      )}
                       {sel.protocol_number && <span>· Protocolo: {sel.protocol_number}</span>}
                       {sel.sla_first_response_seg != null && (
                         <> · 1ª resp: {fmtSeg(sel.sla_first_response_seg)}</>
