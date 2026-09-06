@@ -8086,6 +8086,77 @@ export type Database = {
           },
         ]
       }
+      nina_feedback_analises: {
+        Row: {
+          clinica_id: string
+          concluida_em: string | null
+          conclusao: string | null
+          created_at: string
+          criterios_versao: string
+          duracao_ms: number | null
+          erro: string | null
+          evidencias_resumo: Json | null
+          execucao_id: string | null
+          feedback_id: string
+          id: string
+          input_tokens: number | null
+          modelo: string
+          output_tokens: number | null
+          resultado: Json | null
+          solicitado_por: string
+          status: string
+          versao: number
+        }
+        Insert: {
+          clinica_id: string
+          concluida_em?: string | null
+          conclusao?: string | null
+          created_at?: string
+          criterios_versao: string
+          duracao_ms?: number | null
+          erro?: string | null
+          evidencias_resumo?: Json | null
+          execucao_id?: string | null
+          feedback_id: string
+          id?: string
+          input_tokens?: number | null
+          modelo: string
+          output_tokens?: number | null
+          resultado?: Json | null
+          solicitado_por: string
+          status?: string
+          versao?: number
+        }
+        Update: {
+          clinica_id?: string
+          concluida_em?: string | null
+          conclusao?: string | null
+          created_at?: string
+          criterios_versao?: string
+          duracao_ms?: number | null
+          erro?: string | null
+          evidencias_resumo?: Json | null
+          execucao_id?: string | null
+          feedback_id?: string
+          id?: string
+          input_tokens?: number | null
+          modelo?: string
+          output_tokens?: number | null
+          resultado?: Json | null
+          solicitado_por?: string
+          status?: string
+          versao?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nina_feedback_analises_feedback_id_fkey"
+            columns: ["feedback_id"]
+            isOneToOne: false
+            referencedRelation: "nina_feedback_erros"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       nina_feedback_erros: {
         Row: {
           aplicacao_evidencia: Json | null
