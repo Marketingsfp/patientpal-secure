@@ -29,6 +29,7 @@ import {
   type ConversaEvento,
 } from "@/components/nina/ConversationSystemEvent";
 import { definirSelecaoTeste } from "@/lib/webmcp/selecao-teste";
+import { assinarAtualizacao } from "@/lib/webmcp/atualizacao";
 
 type Lead = {
   id: string;
@@ -208,6 +209,16 @@ export function ConsoleTesteNina() {
     }
     setAudio(null);
   }, [leadId, carregarHistorico]);
+
+  // Recarga incremental após uma operação feita pela automação (WebMCP).
+  useEffect(
+    () =>
+      assinarAtualizacao("teste-nina", () => {
+        void carregarLeads();
+        if (leadId) void carregarHistorico(leadId);
+      }),
+    [carregarLeads, carregarHistorico, leadId],
+  );
 
   useEffect(() => {
     fimRef.current?.scrollIntoView({ block: "end" });

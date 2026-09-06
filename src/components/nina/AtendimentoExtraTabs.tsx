@@ -124,6 +124,7 @@ import {
 } from "@/lib/atendimento.functions";
 import { FilaHumana } from "@/components/nina/FilaHumana";
 import { idConversaValido } from "@/lib/atendimento/abrir-conversa";
+import { assinarSelecaoConversa } from "@/lib/webmcp/selecao-conversa";
 import { AgendaConversaDrawer } from "@/components/nina/AgendaConversaDrawer";
 import { ConversaSkeleton, ContatoSkeleton } from "@/components/nina/ConversaSkeleton";
 import {
@@ -324,6 +325,9 @@ export function AtendInbox() {
     // fila, alertas e atalhos passam todos por aqui.
     setSelecaoId(id ? (idConversaValido(id) ?? null) : null);
   }, []);
+
+  // A automação (WebMCP) pede abertura pelo MESMO caminho, sempre por id.
+  useEffect(() => assinarSelecaoConversa((id) => abrirConversa(id)), [abrirConversa]);
 
   // Leitura da seleção dentro de callbacks, sem recriá-los a cada troca.
   const selecaoIdRef = useRef<string | null>(selecaoId);
