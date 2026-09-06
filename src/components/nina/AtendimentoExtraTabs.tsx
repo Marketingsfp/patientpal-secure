@@ -879,15 +879,22 @@ export function AtendInbox() {
     (id: string) => {
       if (!clinicaId || !id) return;
       if (id === selIdRef.current) return;
-      if (cacheConversas.current.obter(id) || prefetchEmCurso.current.has(id)) return;
-      prefetchEmCurso.current.add(id);
+      const chave = chavePrefetch(clinicaId, meuId);
+      if (cacheConversas.current.obter(id) || prefetchMsgs.current.obter(id, chave)) return;
       // Só as mensagens recentes: o suficiente para o chat abrir na hora.
       // Nada de histórico completo nem dados de apoio no prefetch.
-      const p = listarMsgs({ data: { clinicaId, conversaId: id, limit: JANELA_INICIAL } });
-      prefetchMsgs.current.set(id, p as Promise<any[]>);
+      const p = listarMsgs({
+        data: { clinicaId, conversaId: id, limit: JANELA_INICIAL },
+      }) as Promise<any[]>;
+      const entrada = prefetchMsgs.current.registrar(id, chave, p);
       void (async () => {
         try {
-          const m = (await p) as any[];
+          const m = await p;
+          // Se a conversa foi invalidada (mensagem nova, transferência) ou a
+          // clínica/usuário mudou enquanto a busca vinha, o resultado é
+          // descartado — nunca repovoa o cache com conteúdo velho.
+          if (!prefetchMsgs.current.resultadoValido(id, entrada, chavePrefetch(clinicaId, meuId)))
+            return;
           if (!cacheConversas.current.obter(id)) {
             cacheConversas.current.guardar(id, {
               msgs: m,
@@ -898,14 +905,16 @@ export function AtendInbox() {
             });
           }
         } catch {
-          /* prefetch é oportunista: falha não afeta o atendimento */
+          /* prefetch é oportunista: falha não afeta o atendimento e a busca
+             sai do controle no finally, permitindo nova tentativa */
         } finally {
-          prefetchEmCurso.current.delete(id);
+          prefetchMsgs.current.concluir(id, entrada);
         }
       })();
     },
-    [clinicaId, listarMsgs],
+    [clinicaId, meuId, listarMsgs],
   );
+
 
   // Intenção de abrir: o prefetch só dispara depois de ~150ms com o mouse (ou
   // o foco) parado no lead — evita disparar dezenas de buscas ao passar o
