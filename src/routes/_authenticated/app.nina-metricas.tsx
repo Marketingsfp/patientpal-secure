@@ -449,6 +449,40 @@ function Pagina() {
         </CardContent>
       </Card>
 
+      {erroConsulta ? (
+        <Card className="border-destructive">
+          <CardContent className="space-y-2 p-4">
+            <p className="text-sm font-medium text-destructive">
+              Não foi possível carregar os números deste recorte.
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Os cartões ficam ocultos de propósito: uma falha de consulta não é o mesmo que
+              “nenhuma ocorrência”. Detalhe técnico: {erroConsulta}
+            </p>
+            <Button variant="outline" size="sm" onClick={() => void carregar()} disabled={carregando}>
+              Tentar de novo
+            </Button>
+          </CardContent>
+        </Card>
+      ) : null}
+
+      {carregando && !dados && !erroConsulta ? (
+        <section
+          className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3"
+          aria-busy="true"
+          aria-label="Carregando indicadores"
+        >
+          {Array.from({ length: 6 }).map((_, i) => (
+            <Card key={i}>
+              <CardContent className="space-y-2 p-4">
+                <span className="block h-3 w-32 animate-pulse rounded bg-muted" />
+                <span className="block h-7 w-20 animate-pulse rounded bg-muted" />
+                <span className="block h-3 w-44 animate-pulse rounded bg-muted" />
+              </CardContent>
+            </Card>
+          ))}
+        </section>
+      ) : null}
 
       {op ? (
         <Card>
