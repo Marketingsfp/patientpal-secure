@@ -47,7 +47,15 @@ export type ProfissionalPublicado = {
   aviso_dia: string | null;
   aviso_valido_de: string | null;
   aviso_valido_ate: string | null;
+  /** Unidade vinculada (nome público), quando cadastrada. */
+  unidades?: { nome?: string | null } | null;
 };
+
+/** Nome da unidade do profissional, quando houver. */
+export function unidadeDoProfissional(p: ProfissionalPublicado): string | null {
+  const nome = String(p.unidades?.nome ?? "").trim();
+  return nome ? nome : null;
+}
 
 function lista(v: unknown): Array<Record<string, unknown>> {
   return Array.isArray(v) ? (v.filter((i) => i && typeof i === "object") as Array<Record<string, unknown>>) : [];
