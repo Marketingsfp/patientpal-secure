@@ -85,6 +85,8 @@ import { useClinica } from "@/hooks/use-clinica";
 import { useAuth } from "@/hooks/use-auth";
 import { usePodeEscrever } from "@/hooks/use-permissoes";
 import { useRealtimeRefresh } from "@/hooks/use-realtime-refresh";
+import { useRealtimeAtendimento } from "@/hooks/use-realtime-atendimento";
+import { criarAgrupador, type Agrupador } from "@/lib/atendimento/realtime-roteador";
 import {
   cursorMaisRecente,
   mesclarNovas,
@@ -962,6 +964,9 @@ export function AtendInbox() {
     const alvo: string = sel.id;
     const pedido = ++seqConversa.current;
     const janela = janelaRef.current;
+    // FASE 3 — enquanto a abertura roda, eventos de tempo real não reiniciam
+    // a carga: eles só marcam que há sincronização pendente.
+    aberturaEmAndamentoRef.current = { conversaId: alvo, pedido };
     medidor.current?.marcar("request");
     marcarTroca("T2_requests");
     // Todas as buscas saem juntas (sem fila). A diferença é o que cada uma
@@ -1111,6 +1116,21 @@ export function AtendInbox() {
     })();
 
     await Promise.all([critico, secundarios]);
+
+    // Abertura concluída. Se chegou mensagem/evento durante o caminho, uma
+    // única sincronização incremental busca o que faltou — nada se perde.
+    const emAndamento = aberturaEmAndamentoRef.current;
+    if (emAndamento?.conversaId === alvo && emAndamento.pedido === pedido) {
+      aberturaEmAndamentoRef.current = null;
+      if (syncPendenteRef.current) {
+        syncPendenteRef.current = false;
+        if (selIdRef.current === alvo) void sincronizarConversaRef.current?.();
+      }
+      if (apoioPendenteRef.current) {
+        apoioPendenteRef.current = false;
+        if (selIdRef.current === alvo) void carregarApoioRef.current?.();
+      }
+    }
   }, [clinicaId, sel?.id, listarMsgs, obterContato, listarNotasFn, listarEventosFn]);
 
 
@@ -1120,6 +1140,17 @@ export function AtendInbox() {
   const sincronizarConversa = useCallback(async () => {
     const alvo = selIdRef.current;
     if (!clinicaId || !alvo) return;
+    // Abertura em andamento: não começa outra carga por cima. A abertura
+    // dispara esta sincronização assim que terminar.
+    if (aberturaEmAndamentoRef.current) {
+      syncPendenteRef.current = true;
+      return;
+    }
+    // Já existe uma sincronização desta conversa em voo: reaproveita.
+    if (syncEmVooRef.current?.conversaId === alvo) {
+      await syncEmVooRef.current.promise;
+      return;
+    }
     const cursor = cursorMaisRecente(msgsRef.current);
     if (
       !podeAtualizarIncremental({
