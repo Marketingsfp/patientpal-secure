@@ -236,7 +236,7 @@ export const obterConversa = createServerFn({ method: "POST" })
     }
     const { data: row, error } = await context.supabase
       .from("atend_conversas")
-      .select("*")
+      .select("*, pacientes:contato_paciente_id(nome)")
       .eq("id", data.conversaId)
       .eq("clinica_id", data.clinicaId)
       .eq("is_teste", false)
