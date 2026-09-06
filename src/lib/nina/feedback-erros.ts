@@ -1,7 +1,7 @@
 /**
  * Feedback de erros da Nina — catálogo compartilhado (UI + servidor).
  *
- * FASE 1: registrar o erro é APENAS registro. Nada aqui altera planilha,
+ * FASE 1: registrar o erro é APENAS registro. Nada aqui altera catálogo,
  * Base de Conhecimentos, embeddings, prompt, modelo, regras ou ferramentas.
  */
 

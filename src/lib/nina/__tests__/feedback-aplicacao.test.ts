@@ -2,25 +2,25 @@ import { describe, expect, test } from "bun:test";
 import { baseJaContem, planoParaCausa } from "@/lib/nina/feedback-aplicacao";
 
 describe("plano por causa", () => {
-  test("planilha errada aponta para a planilha e exige reenvio", () => {
+  test("informação oficial errada aponta para o catálogo e exige publicação", () => {
     const p = planoParaCausa("knowledge_error")!;
-    expect(p.camada).toBe("planilha");
-    expect(p.exigeReenvioPlanilha).toBe(true);
+    expect(p.camada).toBe("catalogo");
+    expect(p.exigeEdicaoCatalogo).toBe(true);
   });
 
-  test("falha de busca nunca altera a planilha", () => {
+  test("falha de busca nunca altera o catálogo", () => {
     const p = planoParaCausa("retrieval_error")!;
     expect(p.camada).toBe("busca");
-    expect(p.exigeReenvioPlanilha).toBe(false);
-    expect(p.permiteReindexar).toBe(true);
+    expect(p.exigeEdicaoCatalogo).toBe(false);
+    expect(p.permiteReindexar).toBe(false);
   });
 
   test("interpretação e invenção vão para prompt/grounding, sem mexer na Base", () => {
     expect(planoParaCausa("reasoning_error")!.camada).toBe("modelo");
-    expect(planoParaCausa("reasoning_error")!.exigeReenvioPlanilha).toBe(false);
+    expect(planoParaCausa("reasoning_error")!.exigeEdicaoCatalogo).toBe(false);
     const h = planoParaCausa("hallucination")!;
     expect(h.tipo).toBe("grounding_fix");
-    expect(h.exigeReenvioPlanilha).toBe(false);
+    expect(h.exigeEdicaoCatalogo).toBe(false);
   });
 
   test("ferramenta e fluxo têm plano próprio", () => {
