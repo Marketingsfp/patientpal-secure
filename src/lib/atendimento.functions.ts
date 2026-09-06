@@ -175,7 +175,7 @@ export const listarConversas = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     const total = Date.now() - t0;
     // Só registra quando realmente demorou, para não poluir o log.
-    if (total > 0) {
+    if (total > 400) {
       console.warn("[atendimento] listarConversas lenta", {
         totalMs: total,
         linhas: rows?.length ?? 0,
