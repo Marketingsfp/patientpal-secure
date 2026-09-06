@@ -623,7 +623,7 @@ export const FERRAMENTAS_NINA_CONSULTA = [
     function: {
       name: "consultar_base_conhecimento",
       description:
-        "FONTE DE VERDADE administrativa da clínica (planilha oficial). Consulte SEMPRE antes de falar sobre especialidades, exames, procedimentos, médicos, dias e horários de atendimento, preços em dinheiro/PIX e no cartão, preparos, observações e regras. Nunca responda esses assuntos sem chamar esta ferramenta. O horário retornado é a escala do profissional, não vaga disponível.",
+        "FONTE DE VERDADE administrativa da clínica (catálogo publicado). Consulte SEMPRE antes de falar sobre especialidades, exames, procedimentos, médicos, dias e horários de atendimento, valores e formas de pagamento, preparos, convênios, observações e regras. Nunca responda esses assuntos sem chamar esta ferramenta. Cada valor vem com sua forma de pagamento e condição: informe todas as que vierem, nunca só a mais barata. O horário retornado é a escala do profissional, não vaga disponível.",
       parameters: {
         type: "object",
         properties: {
@@ -1079,7 +1079,7 @@ async function executarFerramentaInterna(
           // Estes são os ÚNICOS horários realmente livres. A escala da planilha
           // (ex.: 09h-18h) não é vaga.
           instrucao:
-            "Ao apresentar estes horários, inclua também o valor oficial da consulta vindo de consultar_base_conhecimento (se ainda não consultou, consulte antes de responder). Se não houver valor cadastrado, não estime nem cite preço. Mostre de 3 a 5 opções, agrupadas por médico, com data, horário e unidade.",
+            "Ao apresentar estes horários, inclua também o valor oficial da consulta vindo de consultar_base_conhecimento, com a forma de pagamento e a condição correspondentes (se ainda não consultou, consulte antes de responder). Se não houver valor cadastrado, não estime nem cite preço. Mostre de 3 a 5 opções, agrupadas por médico, com data, horário e unidade.",
         };
 
       }

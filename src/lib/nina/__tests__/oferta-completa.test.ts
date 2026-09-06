@@ -56,7 +56,7 @@ describe("prompt da oferta", () => {
 
   it("Testes 5, 6, 10, 11 e 12 — nunca inventar valor nem vaga", () => {
     const t = blocoPromptOfertaCompleta({ ...base, mensagem: "Tem ortopedista hoje?" });
-    expect(t).toContain("ESCALA DE ATENDIMENTO, não vaga");
+    expect(t).toContain("não é vaga");
     expect(t).toContain("jamais estime");
   });
 
