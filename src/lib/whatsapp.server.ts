@@ -495,7 +495,38 @@ async function salvarEstadoIdentidade(
   await supabaseAdmin.from("atend_conversas").update(patch).eq("id", estado.conversaId);
 }
 
+/**
+ * FASE 2 — envelope de auditoria. A geração da resposta roda dentro de um
+ * coletor de evidências próprio da requisição; ao final, o que foi coletado é
+ * gravado e vinculado à execução que produziu a resposta. Nada aqui altera o
+ * comportamento da Nina: falha de auditoria não interrompe o atendimento.
+ */
 export async function gerarRespostaNina(
+  clinicaId: string,
+  mensagemPaciente: string,
+  telefoneRemetente?: string | null,
+  opcoes?: {
+    teste?: boolean;
+    auditoria?: { execucaoId?: string | null };
+    /** IDs reais das mensagens de entrada que originaram esta resposta. */
+    mensagensEntrada?: string[];
+  },
+): Promise<string> {
+  const { comColetor } = await import("@/lib/nina/evidencias.server");
+  const auditoria = opcoes?.auditoria ?? { execucaoId: null as string | null };
+  const { resultado, coletor } = await comColetor(async (c) => {
+    if (opcoes?.mensagensEntrada?.length) c.mensagensEntrada(opcoes.mensagensEntrada);
+    return await gerarRespostaNinaInterno(clinicaId, mensagemPaciente, telefoneRemetente, {
+      ...opcoes,
+      auditoria,
+    });
+  });
+  const { gravarEvidencias } = await import("@/lib/nina/evidencias.server");
+  await gravarEvidencias(auditoria.execucaoId ?? null, clinicaId, coletor);
+  return resultado;
+}
+
+async function gerarRespostaNinaInterno(
   clinicaId: string,
   mensagemPaciente: string,
   telefoneRemetente?: string | null,
@@ -505,8 +536,13 @@ export async function gerarRespostaNina(
    * produziu a resposta final — usado para vincular a mensagem enviada ao
    * registro técnico. Não altera o comportamento da Nina.
    */
-  opcoes?: { teste?: boolean; auditoria?: { execucaoId?: string | null } },
+  opcoes?: {
+    teste?: boolean;
+    auditoria?: { execucaoId?: string | null };
+    mensagensEntrada?: string[];
+  },
 ): Promise<string> {
+  const { registrarEtapa } = await import("@/lib/nina/evidencias.server");
   const apiKey = process.env.LOVABLE_API_KEY;
   if (!apiKey) throw new Error("LOVABLE_API_KEY ausente");
 
@@ -1361,6 +1397,9 @@ ATENDIMENTO HUMANO — REGRA OBRIGATÓRIA:
   }
 
 
+  // Texto tal como saiu do modelo, antes dos ajustes obrigatórios abaixo.
+  const respostaDoModelo = resposta;
+
   // Persiste o estado estruturado: o que as ferramentas descobriram nesta
   // rodada (paciente identificado, horário oferecido, agendamento criado)
   // vale para as próximas mensagens da MESMA conversa.
@@ -1436,6 +1475,59 @@ ATENDIMENTO HUMANO — REGRA OBRIGATÓRIA:
       identidade_tentativas: estadoId.tentativas + 1,
     });
   }
+  // Evidências finais: estado/sessão no momento da resposta, regras aplicáveis,
+  // alterações posteriores ao texto do modelo e a mensagem realmente enviada.
+  try {
+    const codigo = {
+      arquivo: "src/lib/whatsapp.server.ts",
+      funcao: "gerarRespostaNina",
+    } as const;
+    registrarEtapa({
+      tipo: "estado_sessao",
+      fonte: "atendimento",
+      titulo: "Estado e sessão no momento da resposta",
+      dados: {
+        conversa_id: estadoId.conversaId,
+        session_id: (fluxoEstado as { session_id?: string | null }).session_id ?? null,
+        greeting_completed: Boolean(fluxoEstado.greeting_completed),
+        identidade_confirmada: identidadeConfirmada,
+        handoff: houveHandoff,
+        agendamento_confirmado: agendamentoConfirmado,
+        teste: Boolean(opcoes?.teste),
+      },
+      codigo,
+    });
+    registrarEtapa({
+      tipo: "regras_instrucoes",
+      fonte: "sistema",
+      titulo: "Regras e versão das instruções aplicadas",
+      dados: {
+        ferramentas_do_turno: nomesFerramentasTurno,
+        saudacao_obrigatoria: saudacaoObrigatoria,
+        conflito_ferramenta: conflitoFerramenta,
+      },
+      codigo,
+    });
+    if (respostaDoModelo !== resposta) {
+      registrarEtapa({
+        tipo: "alteracao_posterior",
+        fonte: "sistema",
+        titulo: "Alterações aplicadas depois da resposta do modelo",
+        dados: { antes: respostaDoModelo, depois: resposta },
+        codigo,
+      });
+    }
+    registrarEtapa({
+      tipo: "mensagem_final",
+      fonte: "sistema",
+      titulo: "Mensagem final enviada",
+      dados: { texto: resposta },
+      codigo,
+    });
+  } catch {
+    /* auditoria nunca interrompe o atendimento */
+  }
+
   return resposta;
 }
 
