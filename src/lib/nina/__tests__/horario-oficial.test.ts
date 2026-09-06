@@ -1,11 +1,11 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect } from "bun:test";
 import {
   horarioOficialDoDia,
   semanaOficial,
   abertoNoInstante,
   diaDaSemanaISO,
-} from "./horario-oficial";
-import type { CalendarioPublicado } from "./classificador-periodo";
+} from "../horario-oficial";
+import type { CalendarioPublicado } from "../classificador-periodo";
 
 const CLINICA = "11111111-1111-1111-1111-111111111111";
 
