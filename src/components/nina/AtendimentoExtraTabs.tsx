@@ -126,7 +126,7 @@ import {
   assumirConversa,
   marcarLida,
 } from "@/lib/atendimento.functions";
-import { podeMarcarLidaAutomaticamente } from "@/lib/atendimento/leitura-inbox";
+import { deveRegistrarLeituraAoAbrir } from "@/lib/atendimento/leitura-inbox";
 
 import { FilaHumana } from "@/components/nina/FilaHumana";
 import { idConversaValido } from "@/lib/atendimento/abrir-conversa";
@@ -406,6 +406,10 @@ export function AtendInbox() {
     pedido: number;
   } | null>(null);
   const [buscandoAlvo, setBuscandoAlvo] = useState(false);
+  // Conversas abertas apontando para uma mensagem antiga: nelas a leitura
+  // automática fica suspensa até a atendente abrir a conversa normalmente.
+  const aberturaPorAlvoRef = useRef<Set<string>>(new Set());
+
   const [alvoIndisponivel, setAlvoIndisponivel] = useState(false);
   const [msgDestacada, setMsgDestacada] = useState<string | null>(null);
   const seqEspera = useRef(0);
@@ -986,8 +990,15 @@ export function AtendInbox() {
       if (!id) return;
       setAlvoIndisponivel(false);
       setMsgDestacada(null);
-      if (mensagemId) setAlvoMensagem({ conversaId: id, mensagemId, pedido: ++seqAlvo.current });
-      else setAlvoMensagem(null);
+      if (mensagemId) {
+        setAlvoMensagem({ conversaId: id, mensagemId, pedido: ++seqAlvo.current });
+        // Localizar um erro histórico não é ler as mensagens novas.
+        aberturaPorAlvoRef.current.add(id);
+      } else {
+        setAlvoMensagem(null);
+        aberturaPorAlvoRef.current.delete(id);
+      }
+
       abrirConversa(id);
     };
 
@@ -1339,41 +1350,84 @@ export function AtendInbox() {
     }
   }, [clinicaId, listarMsgs, listarEventosFn, carregarConversa]);
 
-  /* ---- Leitura individual (Fase 2) ------------------------------------
-   * Quando a conversa aberta é da própria atendente, registra até QUAL
-   * mensagem ela viu (a última carregada), não "agora". Supervisão apenas
-   * acompanha: nada é registrado e o aviso de quem atende continua igual.
-   * O marcador só avança — o banco cuida disso. */
+  /* ---- Leitura individual (Fases 2 e 3) --------------------------------
+   * Registra a leitura da própria atendente até a ÚLTIMA mensagem realmente
+   * exibida na tela — nunca "agora" e nunca por prefetch, cache, hover ou
+   * carregamento em segundo plano. Só conta quando a conversa certa está
+   * aberta, as mensagens já apareceram e a aba está visível.
+   * Supervisão (admin/gestor) continua de fora, mesmo chegando ao fim.
+   * Quem chega por "Ver conversa" de um erro antigo não zera os novos. */
   const marcarLidaFn = useServerFn(marcarLida);
   const ultimaLidaRef = useRef<Map<string, string>>(new Map());
+  const [abaVisivel, setAbaVisivel] = useState(true);
+  useEffect(() => {
+    const ler = () => setAbaVisivel(document.visibilityState === "visible");
+    ler();
+    document.addEventListener("visibilitychange", ler);
+    return () => document.removeEventListener("visibilitychange", ler);
+  }, []);
   useEffect(() => {
     const conversa = sel;
     const alvo = conversa?.id as string | undefined;
-    if (!clinicaId || !alvo || conversaCarregadaId !== alvo) return;
-    if (
-      !podeMarcarLidaAutomaticamente({
-        userId: meuId ?? "",
-        atribuidaUserId: conversa?.atribuida_user_id ?? null,
-        ehGestor: souGestor,
-      })
-    )
-      return;
+    if (!clinicaId || !alvo || carregandoConversa) return;
     const ultima = msgs.length ? (msgs[msgs.length - 1] as any) : null;
-    const mensagemId = ultima?.id as string | undefined;
-    if (!mensagemId) return;
-    if (ultimaLidaRef.current.get(alvo) === mensagemId) return;
+    const mensagemId = (ultima?.id as string | undefined) ?? null;
+    const liberado = deveRegistrarLeituraAoAbrir({
+      userId: meuId ?? "",
+      atribuidaUserId: conversa?.atribuida_user_id ?? null,
+      ehGestor: souGestor,
+      conversaId: alvo,
+      conversaCarregadaId,
+      abaVisivel,
+      aberturaPorAlvo:
+        aberturaPorAlvoRef.current.has(alvo) || buscandoAlvo || !!alvoMensagem,
+      ultimaMensagemId: mensagemId,
+      ultimaRegistradaId: ultimaLidaRef.current.get(alvo) ?? null,
+    });
+    if (!liberado || !mensagemId) return;
     ultimaLidaRef.current.set(alvo, mensagemId);
+
+    // Otimista: a bolinha some na hora, mas o número anterior é guardado para
+    // voltar caso a gravação falhe — nada de esconder o problema.
+    let anterior = 0;
+    setConvs((prev) =>
+      prev.map((c: any) => {
+        if (c.id !== alvo) return c;
+        anterior = Number(c.nao_lidas ?? 0);
+        return { ...c, nao_lidas: 0 };
+      }),
+    );
     void marcarLidaFn({ data: { clinicaId, conversaId: alvo, mensagemId } })
-      .then(() => {
-        setConvs((prev) =>
-          prev.map((c: any) => (c.id === alvo ? { ...c, nao_lidas: 0 } : c)),
-        );
+      .then((r: any) => {
+        if (r?.marcada === false) {
+          setConvs((prev) =>
+            prev.map((c: any) => (c.id === alvo ? { ...c, nao_lidas: anterior } : c)),
+          );
+          ultimaLidaRef.current.delete(alvo);
+        }
       })
       .catch(() => {
-        // Falha de rede não trava o atendimento: a próxima abertura registra.
+        // Falhou a gravação: devolve o número verdadeiro e libera nova
+        // tentativa na próxima abertura/atualização.
+        setConvs((prev) =>
+          prev.map((c: any) => (c.id === alvo ? { ...c, nao_lidas: anterior } : c)),
+        );
         ultimaLidaRef.current.delete(alvo);
       });
-  }, [clinicaId, sel, conversaCarregadaId, msgs, meuId, souGestor, marcarLidaFn]);
+  }, [
+    clinicaId,
+    sel,
+    conversaCarregadaId,
+    carregandoConversa,
+    msgs,
+    meuId,
+    souGestor,
+    abaVisivel,
+    buscandoAlvo,
+    alvoMensagem,
+    marcarLidaFn,
+  ]);
+
 
 
   // Apoio da conversa aberta (notas internas e eventos): antes uma nota nova
@@ -2409,6 +2463,10 @@ export function AtendInbox() {
                 data-conversa-id={c.id}
                 onClick={() => {
                   iniciarTroca(c.id, "clique");
+                  // Abertura normal pela Inbox: volta a valer a leitura
+                  // automática, mesmo que antes tenha vindo de um erro.
+                  aberturaPorAlvoRef.current.delete(c.id);
+
                   medidor.current = criarMedidorConversa(`conversa ${c.id}`);
                   medidor.current.marcar("click");
                   // Seleção interna: a conversa aberta é escolhida aqui mesmo.

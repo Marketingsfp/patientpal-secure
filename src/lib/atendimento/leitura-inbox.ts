@@ -49,3 +49,33 @@ export function avaliarLeituraAutomatica(ctx: ContextoLeitura): {
 export function podeMarcarLidaAutomaticamente(ctx: ContextoLeitura): boolean {
   return avaliarLeituraAutomatica(ctx).pode;
 }
+
+/* ============================================================
+ * FASE 3 — quando a ABERTURA da conversa conta como leitura.
+ * Prefetch, cache, hover, skeleton, aba em segundo plano e
+ * localização de mensagem antiga não são leitura.
+ * ========================================================== */
+
+export type ContextoAbertura = ContextoLeitura & {
+  /** Conversa selecionada agora. */
+  conversaId: string | null | undefined;
+  /** Conversa cujo conteúdo terminou de carregar na tela. */
+  conversaCarregadaId: string | null | undefined;
+  /** Aba/janela realmente visível. */
+  abaVisivel: boolean;
+  /** Aberta apontando para uma mensagem antiga ("Ver conversa" de um erro). */
+  aberturaPorAlvo: boolean;
+  /** Última mensagem exibida na tela (o limite da leitura). */
+  ultimaMensagemId: string | null | undefined;
+  /** Marcador já registrado nesta sessão para esta conversa. */
+  ultimaRegistradaId?: string | null;
+};
+
+export function deveRegistrarLeituraAoAbrir(ctx: ContextoAbertura): boolean {
+  if (!ctx.conversaId || !ctx.abaVisivel) return false;
+  if (ctx.conversaCarregadaId !== ctx.conversaId) return false; // skeleton/troca
+  if (ctx.aberturaPorAlvo) return false;
+  if (!ctx.ultimaMensagemId) return false;
+  if (ctx.ultimaRegistradaId === ctx.ultimaMensagemId) return false;
+  return podeMarcarLidaAutomaticamente(ctx);
+}
