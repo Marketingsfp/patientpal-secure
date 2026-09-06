@@ -199,6 +199,21 @@ import {
 } from "@/lib/atendimento/inbox-cache";
 
 
+/**
+ * Copia apenas o número visível da conversa (ex.: "#1342").
+ * Nunca copia id interno, endereço da página ou dado pessoal.
+ */
+async function copiarNumeroConversa(numero: number | null | undefined) {
+  const texto = formatarNumeroConversa(numero);
+  if (!texto) return;
+  try {
+    await navigator.clipboard.writeText(texto);
+    toast.success(`Número copiado: ${texto}`);
+  } catch {
+    toast.error("Não foi possível copiar o número.");
+  }
+}
+
 function fmtHora(s?: string | null) {
   if (!s) return "";
   return formatarDataHoraMensagem(s);
@@ -2103,9 +2118,47 @@ export function AtendInbox() {
                 value={busca}
                 onChange={(e) => setBusca(e.target.value)}
                 className="pl-7 h-8 text-sm"
-                placeholder="Buscar nome, telefone, protocolo…"
+                placeholder="Buscar nome, telefone ou # da conversa…"
               />
             </div>
+            {resultadoNumero && (
+              <div className="rounded-md border border-atd-border bg-atd-blue-tint/40 p-2 text-xs">
+                {resultadoNumero.estado === "carregando" && (
+                  <span className="text-muted-foreground">Procurando pelo número…</span>
+                )}
+                {resultadoNumero.estado === "vazio" && (
+                  <span className="text-muted-foreground">
+                    Nenhuma conversa disponível para este número.
+                  </span>
+                )}
+                {resultadoNumero.estado === "ok" && (
+                  <div className="flex items-center gap-2">
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate font-medium">
+                        {resultadoNumero.conversa.contato_nome ||
+                          resultadoNumero.conversa.contato_telefone ||
+                          "—"}
+                      </p>
+                      <p className="text-[11px] text-muted-foreground">
+                        Encontrada pelo número{" "}
+                        {formatarNumeroConversa(resultadoNumero.conversa.numero_conversa)}
+                        {!convsVisiveis.some(
+                          (c: any) => c.id === resultadoNumero.conversa.id,
+                        ) && " · fora do filtro atual"}
+                      </p>
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-7 text-[11px]"
+                      onClick={() => abrirResultadoNumero(resultadoNumero.conversa)}
+                    >
+                      Abrir conversa
+                    </Button>
+                  </div>
+                )}
+              </div>
+            )}
             <Select
               value={escopo}
               onValueChange={(v) => setEscopo(v as EscopoInbox)}
@@ -2233,8 +2286,20 @@ export function AtendInbox() {
                       {c.atribuida_user_id === meuId ? "Você" : nomeUsuario(c.atribuida_user_id)}
                     </Badge>
                   )}
+                  {formatarNumeroConversa(c.numero_conversa) && (
+                    <code className="text-[11px] text-muted-foreground">
+                      Conversa {formatarNumeroConversa(c.numero_conversa)}
+                    </code>
+                  )}
+                  {c.is_teste && (
+                    <Badge className="bg-atd-warn-bg text-atd-warn-ink text-[11px] border border-atd-warn">
+                      Teste
+                    </Badge>
+                  )}
                   {c.protocol_number && (
-                    <code className="text-[11px] text-muted-foreground">#{c.protocol_number}</code>
+                    <code className="text-[11px] text-muted-foreground">
+                      Protocolo: {c.protocol_number}
+                    </code>
                   )}
                   <BadgeEspera desde={espera[c.id]} className="ml-auto" />
                 </div>
@@ -2277,14 +2342,26 @@ export function AtendInbox() {
                       {sel.contato_nome || sel.contato_telefone}
                       {statusBadge(sel.status)}
                     </CardTitle>
-                    <p className="text-xs text-muted-foreground flex items-center gap-2">
-                      <Phone className="h-3 w-3" /> {sel.contato_telefone}
-                      {sel.protocol_number && (
-                        <>
-                          {" "}
-                          · <code>#{sel.protocol_number}</code>
-                        </>
+                    <p className="text-xs text-muted-foreground flex flex-wrap items-center gap-x-2 gap-y-1">
+                      <span className="inline-flex items-center gap-1">
+                        <Phone className="h-3 w-3" /> {sel.contato_telefone}
+                      </span>
+                      {formatarNumeroConversa(sel.numero_conversa) && (
+                        <span className="inline-flex items-center gap-1">
+                          · <code>Conversa {formatarNumeroConversa(sel.numero_conversa)}</code>
+                          <button
+                            type="button"
+                            onClick={() => void copiarNumeroConversa(sel.numero_conversa)}
+                            title="Copiar número da conversa"
+                            aria-label="Copiar número da conversa"
+                            className="rounded p-0.5 hover:bg-atd-blue-hover"
+                          >
+                            <Copy className="h-3 w-3" />
+                          </button>
+                        </span>
                       )}
+                      {sel.is_teste && <span>· Teste (homologação)</span>}
+                      {sel.protocol_number && <span>· Protocolo: {sel.protocol_number}</span>}
                       {sel.sla_first_response_seg != null && (
                         <> · 1ª resp: {fmtSeg(sel.sla_first_response_seg)}</>
                       )}
