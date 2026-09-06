@@ -79,3 +79,52 @@ export function deveRegistrarLeituraAoAbrir(ctx: ContextoAbertura): boolean {
   if (ctx.ultimaRegistradaId === ctx.ultimaMensagemId) return false;
   return podeMarcarLidaAutomaticamente(ctx);
 }
+
+/* ============================================================
+ * FASE 4 — leitura com mensagens CHEGANDO, cache e realtime.
+ *
+ * Regra: mensagem nova só conta como lida para quem está de fato
+ * acompanhando o fim da conversa, com a conversa certa aberta e a aba
+ * visível. Quem subiu para ler o histórico continua com o indicador de
+ * novas mensagens; ao voltar ao fim, a leitura avança.
+ * ========================================================== */
+
+export type ContextoNovasMensagens = ContextoLeitura & {
+  conversaId: string | null | undefined;
+  conversaCarregadaId: string | null | undefined;
+  abaVisivel: boolean;
+  /** Está no fim da timeline, sem indicador de novas mensagens pendentes. */
+  seguindoFim: boolean;
+  ultimaMensagemId: string | null | undefined;
+  ultimaRegistradaId?: string | null;
+};
+
+export function deveRegistrarLeituraDeNovas(ctx: ContextoNovasMensagens): boolean {
+  if (!ctx.conversaId || !ctx.abaVisivel) return false;
+  if (ctx.conversaCarregadaId !== ctx.conversaId) return false;
+  if (!ctx.seguindoFim) return false;
+  if (!ctx.ultimaMensagemId) return false;
+  // Marcador já está nesta mensagem: nada de repetir requisição por render.
+  if (ctx.ultimaRegistradaId === ctx.ultimaMensagemId) return false;
+  return podeMarcarLidaAutomaticamente(ctx);
+}
+
+/**
+ * Reconciliação de contador vinda do backend.
+ *
+ * Uma resposta atrasada não pode sobrescrever um estado mais novo: só vale a
+ * resposta da última requisição disparada para aquela conversa. E o número
+ * usado é sempre o que o backend devolveu (nunca "zero cego"), então uma
+ * mensagem que chegou durante a gravação continua contando.
+ */
+export function aplicarReconciliacao(args: {
+  sequenciaResposta: number;
+  sequenciaAtual: number;
+  naoLidasBackend: number | null | undefined;
+  naoLidasAnterior: number;
+}): { aplicar: boolean; valor: number } {
+  if (args.sequenciaResposta !== args.sequenciaAtual) return { aplicar: false, valor: args.naoLidasAnterior };
+  const v = Number(args.naoLidasBackend);
+  if (!Number.isFinite(v) || v < 0) return { aplicar: true, valor: args.naoLidasAnterior };
+  return { aplicar: true, valor: v };
+}

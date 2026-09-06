@@ -627,7 +627,22 @@ export const fecharConversa = createServerFn({ method: "POST" })
 
   });
 
+/** Contagem individual real (marcador de leitura deste usuário) de uma conversa. */
+async function contarNaoLidasConversa(
+  supabase: any,
+  clinicaId: string,
+  conversaId: string,
+): Promise<number> {
+  const { data } = await supabase.rpc("atend_nao_lidas", {
+    _clinica_id: clinicaId,
+    _conversa_ids: [conversaId],
+  });
+  const linha = (data ?? [])[0];
+  return Number(linha?.nao_lidas ?? 0) || 0;
+}
+
 /**
+
  * Registra a leitura DESTE usuário até uma mensagem real da timeline.
  *
  * A leitura é individual (`atend_leituras`): o que Maria leu não interfere no
@@ -672,7 +687,10 @@ export const marcarLida = createServerFn({ method: "POST" })
       atribuidaUserId: conv.atribuida_user_id ?? null,
       ehGestor: ehGestor || admin,
     });
-    if (data.automatico && !pode) return { ok: true, marcada: false, motivo, lidaAte: null };
+    if (data.automatico && !pode) {
+      const naoLidas = await contarNaoLidasConversa(context.supabase, data.clinicaId, data.conversaId);
+      return { ok: true, marcada: false, motivo, lidaAte: null, naoLidas };
+    }
 
     // O avanço monotônico e o vínculo mensagem/conversa são garantidos no banco.
     const { data: lidaAte, error } = await context.supabase.rpc("atend_registrar_leitura", {
@@ -681,7 +699,12 @@ export const marcarLida = createServerFn({ method: "POST" })
       _mensagem_id: data.mensagemId ?? undefined,
     });
     if (error) throw new Error(error.message);
-    return { ok: true, marcada: true, motivo, lidaAte: (lidaAte as string | null) ?? null };
+    // Reconciliação: devolve o número verdadeiro DEPOIS da gravação. Se uma
+    // mensagem nova chegou durante a operação, ela continua contando como não
+    // lida — a tela não fica com um zero falso.
+    const naoLidas = await contarNaoLidasConversa(context.supabase, data.clinicaId, data.conversaId);
+    return { ok: true, marcada: true, motivo, lidaAte: (lidaAte as string | null) ?? null, naoLidas };
+
 
   });
 

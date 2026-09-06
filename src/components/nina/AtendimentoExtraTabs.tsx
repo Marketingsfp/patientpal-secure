@@ -126,7 +126,11 @@ import {
   assumirConversa,
   marcarLida,
 } from "@/lib/atendimento.functions";
-import { deveRegistrarLeituraAoAbrir } from "@/lib/atendimento/leitura-inbox";
+import {
+  aplicarReconciliacao,
+  deveRegistrarLeituraAoAbrir,
+  deveRegistrarLeituraDeNovas,
+} from "@/lib/atendimento/leitura-inbox";
 
 import { FilaHumana } from "@/components/nina/FilaHumana";
 import { idConversaValido } from "@/lib/atendimento/abrir-conversa";
@@ -1359,7 +1363,11 @@ export function AtendInbox() {
    * Quem chega por "Ver conversa" de um erro antigo não zera os novos. */
   const marcarLidaFn = useServerFn(marcarLida);
   const ultimaLidaRef = useRef<Map<string, string>>(new Map());
+  const seqLeituraRef = useRef<Map<string, number>>(new Map());
+  const timerLeituraRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [abaVisivel, setAbaVisivel] = useState(true);
+  /** Acompanhando o fim da conversa (sem indicador de novas pendentes). */
+  const [seguindoFim, setSeguindoFim] = useState(true);
   useEffect(() => {
     const ler = () => setAbaVisivel(document.visibilityState === "visible");
     ler();
@@ -1372,48 +1380,73 @@ export function AtendInbox() {
     if (!clinicaId || !alvo || carregandoConversa) return;
     const ultima = msgs.length ? (msgs[msgs.length - 1] as any) : null;
     const mensagemId = (ultima?.id as string | undefined) ?? null;
-    const liberado = deveRegistrarLeituraAoAbrir({
+    const base = {
       userId: meuId ?? "",
       atribuidaUserId: conversa?.atribuida_user_id ?? null,
       ehGestor: souGestor,
       conversaId: alvo,
       conversaCarregadaId,
       abaVisivel,
-      aberturaPorAlvo:
-        aberturaPorAlvoRef.current.has(alvo) || buscandoAlvo || !!alvoMensagem,
       ultimaMensagemId: mensagemId,
       ultimaRegistradaId: ultimaLidaRef.current.get(alvo) ?? null,
-    });
+    };
+    const aberturaPorAlvo =
+      aberturaPorAlvoRef.current.has(alvo) || buscandoAlvo || !!alvoMensagem;
+    const liberado =
+      deveRegistrarLeituraAoAbrir({ ...base, aberturaPorAlvo }) ||
+      // Mensagem nova (ou volta ao fim depois de ler o histórico).
+      deveRegistrarLeituraDeNovas({ ...base, seguindoFim });
     if (!liberado || !mensagemId) return;
-    ultimaLidaRef.current.set(alvo, mensagemId);
 
-    // Otimista: a bolinha some na hora, mas o número anterior é guardado para
-    // voltar caso a gravação falhe — nada de esconder o problema.
-    let anterior = 0;
-    setConvs((prev) =>
-      prev.map((c: any) => {
-        if (c.id !== alvo) return c;
-        anterior = Number(c.nao_lidas ?? 0);
-        return { ...c, nao_lidas: 0 };
-      }),
-    );
-    void marcarLidaFn({ data: { clinicaId, conversaId: alvo, mensagemId } })
-      .then((r: any) => {
-        if (r?.marcada === false) {
-          setConvs((prev) =>
-            prev.map((c: any) => (c.id === alvo ? { ...c, nao_lidas: anterior } : c)),
-          );
-          ultimaLidaRef.current.delete(alvo);
-        }
-      })
-      .catch(() => {
-        // Falhou a gravação: devolve o número verdadeiro e libera nova
-        // tentativa na próxima abertura/atualização.
+    // Agrupa rajadas (várias mensagens seguidas, re-renders): uma requisição só.
+    if (timerLeituraRef.current) clearTimeout(timerLeituraRef.current);
+    timerLeituraRef.current = setTimeout(() => {
+      timerLeituraRef.current = null;
+      if (ultimaLidaRef.current.get(alvo) === mensagemId) return;
+      ultimaLidaRef.current.set(alvo, mensagemId);
+      const seq = (seqLeituraRef.current.get(alvo) ?? 0) + 1;
+      seqLeituraRef.current.set(alvo, seq);
+
+      // Otimista: a bolinha some na hora; o número anterior fica guardado e o
+      // valor verdadeiro vem da resposta do backend (reconciliação).
+      let anterior = 0;
+      setConvs((prev) =>
+        prev.map((c: any) => {
+          if (c.id !== alvo) return c;
+          anterior = Number(c.nao_lidas ?? 0);
+          return { ...c, nao_lidas: 0 };
+        }),
+      );
+      const reconciliar = (naoLidasBackend: number | null | undefined) => {
+        const r = aplicarReconciliacao({
+          sequenciaResposta: seq,
+          sequenciaAtual: seqLeituraRef.current.get(alvo) ?? seq,
+          naoLidasBackend,
+          naoLidasAnterior: anterior,
+        });
+        if (!r.aplicar) return; // resposta atrasada: não sobrescreve estado novo
         setConvs((prev) =>
-          prev.map((c: any) => (c.id === alvo ? { ...c, nao_lidas: anterior } : c)),
+          prev.map((c: any) => (c.id === alvo ? { ...c, nao_lidas: r.valor } : c)),
         );
-        ultimaLidaRef.current.delete(alvo);
-      });
+      };
+      void marcarLidaFn({ data: { clinicaId, conversaId: alvo, mensagemId } })
+        .then((r: any) => {
+          if (r?.marcada === false) ultimaLidaRef.current.delete(alvo);
+          reconciliar(r?.naoLidas);
+        })
+        .catch(() => {
+          // Falhou a gravação: devolve o número verdadeiro conhecido e libera
+          // nova tentativa — nada de esconder a bolinha só no visual.
+          reconciliar(anterior);
+          ultimaLidaRef.current.delete(alvo);
+        });
+    }, 350);
+    return () => {
+      if (timerLeituraRef.current) {
+        clearTimeout(timerLeituraRef.current);
+        timerLeituraRef.current = null;
+      }
+    };
   }, [
     clinicaId,
     sel,
@@ -1423,10 +1456,12 @@ export function AtendInbox() {
     meuId,
     souGestor,
     abaVisivel,
+    seguindoFim,
     buscandoAlvo,
     alvoMensagem,
     marcarLidaFn,
   ]);
+
 
 
 
@@ -1771,6 +1806,13 @@ export function AtendInbox() {
     total: timeline.length,
     ultimoId: ultimoItemId,
   });
+
+  // Só quem está no fim da conversa (sem indicador de novas pendentes) tem a
+  // leitura avançada automaticamente quando chega mensagem.
+  useEffect(() => {
+    setSeguindoFim(chat.novas === 0);
+  }, [chat.novas]);
+
 
   // Medição temporária de desempenho (ligue com localStorage "nina:perf"=1):
   // marca quando a conversa terminou de desenhar e quando o scroll ficou no fim.
