@@ -105,13 +105,17 @@ export const listarConversas = createServerFn({ method: "POST" })
     // Autorização e permissão de gestão não dependem uma da outra: saem juntas.
     const [, podeGerirRes] = await Promise.all([
       assertMember(context.supabase, context.userId, data.clinicaId),
-      context.supabase
-        .rpc("can_manage_clinica", {
-          _user_id: context.userId,
-          _clinica_id: data.clinicaId,
-        })
-        .then((r: any) => r?.data)
-        .catch(() => false),
+      (async () => {
+        try {
+          const { data: podeGerir } = await context.supabase.rpc("can_manage_clinica", {
+            _user_id: context.userId,
+            _clinica_id: data.clinicaId,
+          });
+          return !!podeGerir;
+        } catch {
+          return false;
+        }
+      })(),
     ]);
     marcar("autorizacao");
 
