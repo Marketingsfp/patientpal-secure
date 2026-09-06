@@ -215,6 +215,7 @@ function Pagina() {
     prioridade,
     unidadeId,
     assunto,
+    ambiente,
   ]);
 
   useEffect(() => {
