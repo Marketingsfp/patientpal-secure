@@ -373,6 +373,20 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
                         auditoria: auditoriaNina,
                         mensagensEntrada: entradasNina,
                       });
+                      // Instrumentação mínima para métricas: marca quais
+                      // mensagens recebidas foram realmente processadas por
+                      // esta execução. Não altera decisão, resposta ou fluxo.
+                      if (auditoriaNina.execucaoId && entradasNina.length) {
+                        try {
+                          await supabaseAdmin
+                            .from("whatsapp_mensagens")
+                            .update({ execucao_id: auditoriaNina.execucaoId })
+                            .in("id", entradasNina)
+                            .is("execucao_id", null);
+                        } catch (e) {
+                          console.error("[nina] marcação de execução na entrada falhou", e);
+                        }
+                      }
                     } else if (audioFalhou) {
                       reply = RESPOSTA_AUDIO_FALHOU;
                     } else {
