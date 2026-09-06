@@ -2217,7 +2217,7 @@ export const listarFilaHumana = createServerFn({ method: "POST" })
     let q = context.supabase
       .from("atend_conversas")
       .select(
-        "id, contato_nome, contato_telefone, canal, status, departamento_id, prioridade, aguardando_desde, handoff_motivo, handoff_resumo, ultima_msg_preview, ultima_msg_em, unread_count",
+        "id, contato_nome, contato_telefone, canal, status, departamento_id, prioridade, aguardando_desde, handoff_motivo, handoff_resumo, ultima_msg_preview, ultima_msg_em, unread_count, pacientes:contato_paciente_id(nome)",
       )
       .eq("clinica_id", data.clinicaId)
       // Fila global "Não atribuídas": tudo que aguarda uma pessoa e ainda não

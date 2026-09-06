@@ -8,6 +8,7 @@ import { Inbox, RefreshCw, AlertTriangle } from "lucide-react";
 import { useClinica } from "@/hooks/use-clinica";
 import { useRealtimeRefresh } from "@/hooks/use-realtime-refresh";
 import { listarFilaHumana } from "@/lib/atendimento.functions";
+import { tituloConversa } from "@/lib/atendimento/rotulo-conversa";
 
 type ConversaFila = {
   id: string;
@@ -110,8 +111,8 @@ export function FilaHumana(_props: { onAssumida?: (conversaId: string) => void }
                 >
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className="font-medium text-sm truncate">
-                        {c.contato_nome || c.contato_telefone || "—"}
+                      <span className="font-medium text-sm truncate" title={tituloConversa(c)}>
+                        {tituloConversa(c)}
                       </span>
                       <Badge variant="outline" className="text-[11px]">
                         #{c.posicao} na fila
