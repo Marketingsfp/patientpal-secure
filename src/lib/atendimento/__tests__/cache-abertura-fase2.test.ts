@@ -70,6 +70,7 @@ describe("Fase 2 — cache de abertura da conversa", () => {
         { id: "A", ultima_msg_em: "2026-01-01T11:00:00Z" },
         { id: "B", ultima_msg_em: "2026-01-01T09:00:00Z" },
       ],
+      emCache: ["A", "B"],
     });
     expect(desatualizadas).toEqual(["A"]);
   });
