@@ -1164,7 +1164,7 @@ export function AtendInbox() {
         console.warn("[atendimento] revalidar contato:", e?.message ?? e);
       }
     })();
-  }, [sel?.id, (sel as any)?.contato_paciente_id, conversaCarregadaId, obterContato]);
+  }, [clinicaId, sel?.id, (sel as any)?.contato_paciente_id, conversaCarregadaId, obterContato]);
 
   useEffect(() => {
     carregarConversa();
