@@ -1238,9 +1238,19 @@ export function AtendInbox() {
     })();
   }, [clinicaId, sel?.id, (sel as any)?.contato_paciente_id, conversaCarregadaId, obterContato]);
 
+  // Troca de clínica ou de usuário: nada guardado ou em voo do contexto
+  // anterior pode reaparecer.
+  useEffect(() => {
+    cacheConversas.current.limpar?.();
+    cacheContatos.current.limpar?.();
+    prefetchMsgs.current.limpar();
+    setErroMsgs(false);
+  }, [clinicaId, meuId]);
+
   // Trocou de conversa: formulários abertos sobre a conversa anterior fecham.
   // Um formulário iniciado em A jamais é reaproveitado em B.
   useEffect(() => {
+    setErroMsgs(false);
     setTransferOpen(false);
     setFecharOpen(false);
     setAgendaOpen(false);
