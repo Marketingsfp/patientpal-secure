@@ -80,6 +80,7 @@ import {
   Pin,
   PinOff,
   Zap,
+  Copy,
 } from "lucide-react";
 import { useClinica } from "@/hooks/use-clinica";
 import { useAuth } from "@/hooks/use-auth";
@@ -109,6 +110,7 @@ import { DateInputBR } from "@/components/ui/date-input-br";
 import {
   listarConversas,
   obterConversa,
+  buscarConversaPorNumero,
   souGestorAtendimento,
   contarConversasInbox,
   listarMensagensConversa,
@@ -177,6 +179,10 @@ import { ReportarErroNinaBotao } from "@/components/nina/ReportarErroNinaDialog"
 import { BadgeEspera, RelogioEsperaProvider } from "@/components/nina/BadgeEspera";
 import { formatarDataHoraMensagem } from "@/lib/atendimento/data-hora";
 import { ESCOPO_INBOX_PADRAO, type EscopoInbox } from "@/lib/atendimento/escopo-inbox";
+import {
+  formatarNumeroConversa,
+  interpretarBuscaConversa,
+} from "@/lib/atendimento/numero-conversa";
 import { devoAutoSelecionarComUrl, escopoParaConversa } from "@/lib/atendimento/deep-link";
 import {
   avisoSaidaEscopo,
@@ -192,6 +198,21 @@ import {
   type ContadoresInbox,
 } from "@/lib/atendimento/inbox-cache";
 
+
+/**
+ * Copia apenas o número visível da conversa (ex.: "#1342").
+ * Nunca copia id interno, endereço da página ou dado pessoal.
+ */
+async function copiarNumeroConversa(numero: number | null | undefined) {
+  const texto = formatarNumeroConversa(numero);
+  if (!texto) return;
+  try {
+    await navigator.clipboard.writeText(texto);
+    toast.success(`Número copiado: ${texto}`);
+  } catch {
+    toast.error("Não foi possível copiar o número.");
+  }
+}
 
 function fmtHora(s?: string | null) {
   if (!s) return "";
@@ -239,6 +260,7 @@ export function AtendInbox() {
   const esperaFn = useServerFn(esperaConversas);
   const assumirFn = useServerFn(assumirConversa);
   const obterConversaFn = useServerFn(obterConversa);
+  const buscarPorNumeroFn = useServerFn(buscarConversaPorNumero);
   const { user } = useAuth();
   const meuId = user?.id ?? null;
   const podeAtender = usePodeEscrever("nina");
@@ -277,6 +299,13 @@ export function AtendInbox() {
   const [deptos, setDeptos] = useState<any[]>([]);
   const [usuarios, setUsuarios] = useState<any[]>([]);
   const [busca, setBusca] = useState("");
+  // FASE 2 — o que foi digitado: texto (nome/telefone/protocolo) e/ou número
+  // permanente da conversa. Uma coisa nunca é confundida com a outra.
+  const buscaInterp = useMemo(() => interpretarBuscaConversa(busca), [busca]);
+  const buscaTexto = buscaInterp.texto;
+  const [resultadoNumero, setResultadoNumero] = useState<
+    { estado: "carregando" } | { estado: "vazio" } | { estado: "ok"; conversa: any } | null
+  >(null);
   const [filtroStatus, setFiltroStatus] = useState<
     "all" | "active" | "waiting" | "closed" | "bot_attending"
   >("all");
@@ -371,6 +400,11 @@ export function AtendInbox() {
   const seqEspera = useRef(0);
   const convsVisiveis: any[] = (() => {
     let base = convs;
+    // "#1342" é busca exata: a lista mostra só essa conversa (o resultado
+    // do backend aparece destacado logo acima).
+    if (buscaInterp.exigeNumero) {
+      base = base.filter((c: any) => Number(c.numero_conversa) === buscaInterp.numero);
+    }
     if (soCriticas) {
       base = base.filter(
         (c: any) => faixaEsperaAtd(minutosDesde(espera[c.id])) === "critico",
@@ -720,7 +754,7 @@ export function AtendInbox() {
         data: {
           clinicaId,
           status: filtroStatus,
-          busca: busca || undefined,
+          busca: buscaTexto || undefined,
           canal: "todos",
           escopo,
           limit: 200,
@@ -744,7 +778,7 @@ export function AtendInbox() {
       const removeu = selecaoDeveSair({
         selecionada: (selRef.current as any) ?? null,
         linhas: rows as any,
-        buscando: !!busca,
+        buscando: !!buscaTexto || buscaInterp.exigeNumero,
         ctx: ctxEscopo,
       });
       if (deepLinkPendente.current && rows.some((r: any) => r.id === deepLinkPendente.current))
@@ -811,7 +845,54 @@ export function AtendInbox() {
     } catch (e: any) {
       mostrarErro(e);
     }
-  }, [clinicaId, filtroStatus, busca, escopo, listarConvs, carregarContadores, meuId, souGestor, abrirPelaUrl]);
+  }, [clinicaId, filtroStatus, buscaTexto, buscaInterp.exigeNumero, escopo, listarConvs, carregarContadores, meuId, souGestor, abrirPelaUrl]);
+
+  // FASE 2 — busca pelo número permanente (#1342). Consulta exata no backend,
+  // fora do filtro atual e sem baixar a lista inteira. Só leitura: encontrar
+  // uma conversa não muda responsável, fila nem status.
+  useEffect(() => {
+    const numero = buscaInterp.numero;
+    if (!clinicaId || numero === null) {
+      setResultadoNumero(null);
+      return;
+    }
+    let valido = true;
+    setResultadoNumero({ estado: "carregando" });
+    const t = window.setTimeout(() => {
+      void (async () => {
+        try {
+          const row: any = await buscarPorNumeroFn({ data: { clinicaId, numero } });
+          if (!valido) return;
+          setResultadoNumero(row ? { estado: "ok", conversa: row } : { estado: "vazio" });
+        } catch {
+          // Resposta neutra também em caso de falha: nada é revelado.
+          if (valido) setResultadoNumero({ estado: "vazio" });
+        }
+      })();
+    }, 250);
+    return () => {
+      valido = false;
+      window.clearTimeout(t);
+    };
+  }, [clinicaId, buscaInterp.numero, buscarPorNumeroFn]);
+
+  /**
+   * Abre um resultado da busca por número usando o MESMO caminho de abertura
+   * da Inbox (nada de endpoint paralelo pelo número visível). A conversa entra
+   * na lista para não ser fechada por uma resposta do filtro antigo.
+   */
+  const abrirResultadoNumero = useCallback(
+    (row: any) => {
+      if (!row?.id) return;
+      setConvs((prev: any[]) => (prev.some((x: any) => x.id === row.id) ? prev : [row, ...prev]));
+      deepLinkPendente.current = row.id;
+      iniciarTroca(row.id, "clique");
+      abrirPelaUrl(row.id);
+    },
+    [abrirPelaUrl],
+  );
+
+
 
   // FASE 1 — a conversa aberta é sempre a do endereço. Quando o
   // conversationId da URL muda (clique, voltar/avançar do navegador, link
@@ -1280,7 +1361,7 @@ export function AtendInbox() {
   carregarConvsRef.current = carregarConvs;
   useEffect(() => {
     void carregarConvsRef.current();
-  }, [clinicaId, filtroStatus, busca, escopo, meuId, souGestor]);
+  }, [clinicaId, filtroStatus, buscaTexto, escopo, meuId, souGestor]);
   // O responsável pode mudar a qualquer momento (transferência, distribuição
   // automática, tomada por outra pessoa). A lista chega por Realtime, então a
   // conversa aberta sempre acompanha o que está gravado no banco.
@@ -2037,9 +2118,47 @@ export function AtendInbox() {
                 value={busca}
                 onChange={(e) => setBusca(e.target.value)}
                 className="pl-7 h-8 text-sm"
-                placeholder="Buscar nome, telefone, protocolo…"
+                placeholder="Buscar nome, telefone ou # da conversa…"
               />
             </div>
+            {resultadoNumero && (
+              <div className="rounded-md border border-atd-border bg-atd-blue-tint/40 p-2 text-xs">
+                {resultadoNumero.estado === "carregando" && (
+                  <span className="text-muted-foreground">Procurando pelo número…</span>
+                )}
+                {resultadoNumero.estado === "vazio" && (
+                  <span className="text-muted-foreground">
+                    Nenhuma conversa disponível para este número.
+                  </span>
+                )}
+                {resultadoNumero.estado === "ok" && (
+                  <div className="flex items-center gap-2">
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate font-medium">
+                        {resultadoNumero.conversa.contato_nome ||
+                          resultadoNumero.conversa.contato_telefone ||
+                          "—"}
+                      </p>
+                      <p className="text-[11px] text-muted-foreground">
+                        Encontrada pelo número{" "}
+                        {formatarNumeroConversa(resultadoNumero.conversa.numero_conversa)}
+                        {!convsVisiveis.some(
+                          (c: any) => c.id === resultadoNumero.conversa.id,
+                        ) && " · fora do filtro atual"}
+                      </p>
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-7 text-[11px]"
+                      onClick={() => abrirResultadoNumero(resultadoNumero.conversa)}
+                    >
+                      Abrir conversa
+                    </Button>
+                  </div>
+                )}
+              </div>
+            )}
             <Select
               value={escopo}
               onValueChange={(v) => setEscopo(v as EscopoInbox)}
@@ -2167,8 +2286,20 @@ export function AtendInbox() {
                       {c.atribuida_user_id === meuId ? "Você" : nomeUsuario(c.atribuida_user_id)}
                     </Badge>
                   )}
+                  {formatarNumeroConversa(c.numero_conversa) && (
+                    <code className="text-[11px] text-muted-foreground">
+                      Conversa {formatarNumeroConversa(c.numero_conversa)}
+                    </code>
+                  )}
+                  {c.is_teste && (
+                    <Badge className="bg-atd-warn-bg text-atd-warn-ink text-[11px] border border-atd-warn">
+                      Teste
+                    </Badge>
+                  )}
                   {c.protocol_number && (
-                    <code className="text-[11px] text-muted-foreground">#{c.protocol_number}</code>
+                    <code className="text-[11px] text-muted-foreground">
+                      Protocolo: {c.protocol_number}
+                    </code>
                   )}
                   <BadgeEspera desde={espera[c.id]} className="ml-auto" />
                 </div>
@@ -2211,14 +2342,26 @@ export function AtendInbox() {
                       {sel.contato_nome || sel.contato_telefone}
                       {statusBadge(sel.status)}
                     </CardTitle>
-                    <p className="text-xs text-muted-foreground flex items-center gap-2">
-                      <Phone className="h-3 w-3" /> {sel.contato_telefone}
-                      {sel.protocol_number && (
-                        <>
-                          {" "}
-                          · <code>#{sel.protocol_number}</code>
-                        </>
+                    <p className="text-xs text-muted-foreground flex flex-wrap items-center gap-x-2 gap-y-1">
+                      <span className="inline-flex items-center gap-1">
+                        <Phone className="h-3 w-3" /> {sel.contato_telefone}
+                      </span>
+                      {formatarNumeroConversa(sel.numero_conversa) && (
+                        <span className="inline-flex items-center gap-1">
+                          · <code>Conversa {formatarNumeroConversa(sel.numero_conversa)}</code>
+                          <button
+                            type="button"
+                            onClick={() => void copiarNumeroConversa(sel.numero_conversa)}
+                            title="Copiar número da conversa"
+                            aria-label="Copiar número da conversa"
+                            className="rounded p-0.5 hover:bg-atd-blue-hover"
+                          >
+                            <Copy className="h-3 w-3" />
+                          </button>
+                        </span>
                       )}
+                      {sel.is_teste && <span>· Teste (homologação)</span>}
+                      {sel.protocol_number && <span>· Protocolo: {sel.protocol_number}</span>}
                       {sel.sla_first_response_seg != null && (
                         <> · 1ª resp: {fmtSeg(sel.sla_first_response_seg)}</>
                       )}
