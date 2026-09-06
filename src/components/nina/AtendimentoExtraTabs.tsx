@@ -1930,7 +1930,13 @@ export function AtendInbox() {
     const origem = sel.id;
     try {
       await transferirFn({
-        data: { clinicaId, conversaId: origem, userId: userId || null, departamentoId, motivo },
+        data: {
+          clinicaId,
+          conversaId: origem,
+          paraUserId: userId || null,
+          paraDepartamentoId: departamentoId ?? null,
+          motivo,
+        },
       });
       cacheConversas.current.invalidar(origem);
       prefetchMsgs.current.invalidar(origem);

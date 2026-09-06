@@ -12,6 +12,7 @@ export interface ConversaEvento {
   user_id: string | null;
   user_nome?: string | null;
   para_nome?: string | null;
+  de_nome?: string | null;
   motivo: string | null;
   detalhes: unknown;
   created_at: string;
@@ -38,15 +39,35 @@ export function textoEvento(ev: ConversaEvento): string {
     case "ATRIBUIDA_IA":
     case "DEVOLVIDA_PARA_IA":
       return "Conversa atribuída à Nina (IA)";
-    case "ASSUMIDA":
+    case "ASSUMIDA": {
+      const det = (ev.detalhes ?? null) as { manual?: boolean } | null;
+      const para = (ev.para_nome ?? "").trim();
+      const de = (ev.de_nome ?? "").trim();
+      // Atribuição feita por outra pessoa: o registro diz quem agiu e o destino.
+      if (det?.manual && para) {
+        if (de && de !== para) return `${por} transferiu esta conversa de ${de} para ${para}.`;
+        return `${por} atribuiu esta conversa a ${para}.`;
+      }
       return `Conversa atribuída a ${por}`;
+    }
     case "DESATRIBUIDA":
       return "Conversa ficou sem responsável";
     case "TRANSFERIDA": {
+      const det = (ev.detalhes ?? null) as
+        | { setor_nome?: string | null; sorteio?: boolean }
+        | null;
       const para = (ev.para_nome ?? "").trim();
-      return para
-        ? `Conversa transferida por ${por} para ${para}`
-        : `Conversa transferida por ${por}`;
+      const de = (ev.de_nome ?? "").trim();
+      const setor = (det?.setor_nome ?? "").trim();
+      if (setor) {
+        // Um único registro para a operação: setor escolhido + resultado real.
+        return det?.sorteio && para
+          ? `${por} encaminhou esta conversa para o setor ${setor}. Atribuída a ${para} por distribuição aleatória.`
+          : `${por} encaminhou esta conversa para o setor ${setor}. Aguardando uma atendente disponível na fila de Não atribuídas.`;
+      }
+      if (para && de) return `${por} transferiu esta conversa de ${de} para ${para}.`;
+      if (para) return `${por} atribuiu esta conversa a ${para}.`;
+      return `Conversa transferida por ${por}`;
     }
     case "IA_MEMORIA_RESETADA":
       return "Memória da Nina foi resetada";

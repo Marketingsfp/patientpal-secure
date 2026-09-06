@@ -391,6 +391,16 @@ export const atribuirConversa = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     await assertMember(context.supabase, context.userId, data.clinicaId);
+    // Responsável antes da ação: define se o registro é "atribuiu" ou
+    // "transferiu de X para Y" e evita evento quando nada muda.
+    const { data: antes } = await context.supabase
+      .from("atend_conversas")
+      .select("atribuida_user_id")
+      .eq("id", data.conversaId)
+      .eq("clinica_id", data.clinicaId)
+      .maybeSingle();
+    const anterior = (antes as { atribuida_user_id: string | null } | null)?.atribuida_user_id ?? null;
+    const semMudanca = anterior === (data.userId ?? null) && data.departamentoId === undefined;
     const patch: {
       atribuida_user_id: string | null;
       status: "active" | "waiting";
@@ -413,12 +423,21 @@ export const atribuirConversa = createServerFn({ method: "POST" })
       .eq("id", data.conversaId)
       .eq("clinica_id", data.clinicaId);
     if (error) throw new Error(error.message);
+    // Escolher de novo a mesma responsável não é acontecimento: sem registro.
+    if (semMudanca) return { ok: true, semAlteracao: true };
     await registrarEventoConversa(context.supabase, {
       clinicaId: data.clinicaId,
       conversaId: data.conversaId,
       evento: data.userId ? "ASSUMIDA" : "DESATRIBUIDA",
-      userId: data.userId ?? context.userId,
+      // Autor = quem executou a ação (vem da sessão autenticada), nunca o
+      // destinatário informado pela tela.
+      userId: context.userId,
       departamentoId: data.departamentoId ?? null,
+      detalhes: {
+        manual: true,
+        para_user_id: data.userId ?? null,
+        de_user_id: anterior,
+      },
     });
     return { ok: true };
   });
@@ -451,6 +470,13 @@ export const transferirConversa = createServerFn({ method: "POST" })
     // A conversa pode ter sido encerrada/removida enquanto estava selecionada
     // no inbox. Nesse caso devolvemos `null` em vez de derrubar a tela.
     if (!conv) return null;
+    // Repetir a responsável atual, sem setor novo, não é transferência.
+    if (
+      data.paraUserId &&
+      data.paraUserId === conv.atribuida_user_id &&
+      (!data.paraDepartamentoId || data.paraDepartamentoId === conv.departamento_id)
+    )
+      return { ok: true, semAlteracao: true };
     await context.supabase.from("atend_transferencias").insert({
       clinica_id: data.clinicaId,
       conversa_id: data.conversaId,
@@ -473,17 +499,51 @@ export const transferirConversa = createServerFn({ method: "POST" })
       .eq("id", data.conversaId)
       .eq("clinica_id", data.clinicaId);
     if (e2) throw new Error(e2.message);
+
+    // Encaminhamento para setor: usa a distribuição já existente (mesma regra
+    // de presença, capacidade e carga). Se ninguém estiver disponível, a
+    // conversa fica em "Não atribuídas" e o texto do registro diz isso.
+    let sorteada: string | null = null;
+    let setorNome: string | null = null;
+    if (!data.paraUserId && data.paraDepartamentoId) {
+      const { data: dep } = await context.supabase
+        .from("atend_departamentos")
+        .select("nome")
+        .eq("id", data.paraDepartamentoId)
+        .eq("clinica_id", data.clinicaId)
+        .maybeSingle();
+      setorNome = (dep as { nome?: string | null } | null)?.nome ?? null;
+      const { atribuirAtendenteOnline } = await import("@/lib/atendimento/handoff.server");
+      const escolhido = await atribuirAtendenteOnline({
+        clinicaId: data.clinicaId,
+        conversaId: data.conversaId,
+        departamentoId: data.paraDepartamentoId,
+        origem: "queue_distribution",
+        semMarcador: true,
+      });
+      sorteada = escolhido?.userId ?? null;
+    }
+
     await registrarEventoConversa(context.supabase, {
       clinicaId: data.clinicaId,
       conversaId: data.conversaId,
       evento: "TRANSFERIDA",
+      // Autor sempre da sessão autenticada (pode ser administrador).
       userId: context.userId,
       departamentoId: data.paraDepartamentoId ?? conv.departamento_id,
       motivo: data.motivo ?? null,
-      detalhes: { para_user_id: data.paraUserId ?? null },
+      detalhes: {
+        manual: true,
+        de_user_id: conv.atribuida_user_id,
+        para_user_id: data.paraUserId ?? sorteada,
+        setor_nome: setorNome,
+        setor: Boolean(setorNome),
+        sorteio: Boolean(sorteada),
+      },
     });
     return { ok: true };
   });
+
 
 export const fecharConversa = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -2384,8 +2444,10 @@ export const listarEventosConversa = createServerFn({ method: "POST" })
     const ids = Array.from(
       new Set(
         lista.flatMap((r) => {
-          const det = (r.detalhes ?? null) as { para_user_id?: string | null } | null;
-          return [r.user_id, det?.para_user_id ?? null];
+          const det = (r.detalhes ?? null) as
+            | { para_user_id?: string | null; de_user_id?: string | null }
+            | null;
+          return [r.user_id, det?.para_user_id ?? null, det?.de_user_id ?? null];
         }).filter((v): v is string => typeof v === "string" && v.length > 0),
       ),
     );
@@ -2400,12 +2462,16 @@ export const listarEventosConversa = createServerFn({ method: "POST" })
       });
     }
     return lista.map((r) => {
-      const det = (r.detalhes ?? null) as { para_user_id?: string | null } | null;
+      const det = (r.detalhes ?? null) as
+        | { para_user_id?: string | null; de_user_id?: string | null }
+        | null;
       const paraId = det?.para_user_id ?? null;
+      const deId = det?.de_user_id ?? null;
       return {
         ...r,
         user_nome: r.user_id ? (nomes.get(r.user_id) ?? null) : null,
         para_nome: paraId ? (nomes.get(paraId) ?? null) : null,
+        de_nome: deId ? (nomes.get(deId) ?? null) : null,
       };
     });
   });

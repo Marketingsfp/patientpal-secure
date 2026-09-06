@@ -332,6 +332,8 @@ export async function atribuirAtendenteOnline(args: {
   conversaId: string;
   departamentoId?: string | null;
   origem?: "auto_assignment" | "queue_distribution";
+  /** Não grava o banner de sistema (quem chama já registra o próprio evento). */
+  semMarcador?: boolean;
 }): Promise<{ userId: string; nome: string } | null> {
   const { data: escolhido, error } = await supabaseAdmin.rpc("atend_auto_assign_conversa", {
     _conversa_id: args.conversaId,
@@ -353,11 +355,12 @@ export async function atribuirAtendenteOnline(args: {
     .maybeSingle();
   const nome = ((prof as { nome?: string | null } | null)?.nome ?? "Atendente").trim();
 
-  await registrarMarcadorSistema({
-    clinicaId: args.clinicaId,
-    conversaId: args.conversaId,
-    texto: `👤 Atribuída automaticamente a ${nome} (online).`,
-  });
+  if (!args.semMarcador)
+    await registrarMarcadorSistema({
+      clinicaId: args.clinicaId,
+      conversaId: args.conversaId,
+      texto: `👤 Atribuída automaticamente a ${nome} (online).`,
+    });
 
   return { userId, nome };
 }
