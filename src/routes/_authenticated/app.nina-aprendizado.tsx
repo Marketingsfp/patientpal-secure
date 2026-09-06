@@ -59,6 +59,14 @@ import {
   estadoAnalise,
 } from "@/lib/nina/erro-rapido";
 import { supabase } from "@/integrations/supabase/client";
+import {
+  AnaliseErroIAResultado,
+  type AnaliseSalva,
+} from "@/components/nina/AnaliseErroIAResultado";
+import {
+  analisarErroNinaComIA,
+  listarAnalisesErroNina,
+} from "@/lib/nina/analise-erro.functions";
 
 import {
   editarSugestaoFeedbackNina,
@@ -257,6 +265,9 @@ function Pagina() {
   const [conversas, setConversas] = useState<Record<string, number>>({});
   // Estado da auditoria técnica por item (ponteiro, sem copiar a evidência).
   const [auditoria, setAuditoria] = useState<Record<string, string>>({});
+  // FASE 4 — análise assistida: só roda por clique explícito.
+  const [analises, setAnalises] = useState<Record<string, AnaliseSalva | null>>({});
+  const [analisando, setAnalisando] = useState<Record<string, boolean>>({});
   const [execucoes, setExecucoes] = useState<Record<string, { model: string | null }>>({});
 
   const [autores, setAutores] = useState<{ id: string; nome: string }[]>([]);
