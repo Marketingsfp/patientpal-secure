@@ -7669,6 +7669,126 @@ export type Database = {
           },
         ]
       }
+      nina_calendario_atendimento: {
+        Row: {
+          ativo: boolean
+          clinica_id: string
+          created_at: string
+          created_by: string | null
+          dia_semana: number
+          hora_fim: string
+          hora_inicio: string
+          id: string
+          observacao: string | null
+          unidade_id: string | null
+          updated_at: string
+          vigencia_fim: string | null
+          vigencia_inicio: string
+        }
+        Insert: {
+          ativo?: boolean
+          clinica_id: string
+          created_at?: string
+          created_by?: string | null
+          dia_semana: number
+          hora_fim: string
+          hora_inicio: string
+          id?: string
+          observacao?: string | null
+          unidade_id?: string | null
+          updated_at?: string
+          vigencia_fim?: string | null
+          vigencia_inicio?: string
+        }
+        Update: {
+          ativo?: boolean
+          clinica_id?: string
+          created_at?: string
+          created_by?: string | null
+          dia_semana?: number
+          hora_fim?: string
+          hora_inicio?: string
+          id?: string
+          observacao?: string | null
+          unidade_id?: string | null
+          updated_at?: string
+          vigencia_fim?: string | null
+          vigencia_inicio?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nina_calendario_atendimento_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nina_calendario_atendimento_unidade_id_fkey"
+            columns: ["unidade_id"]
+            isOneToOne: false
+            referencedRelation: "unidades"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      nina_calendario_excecoes: {
+        Row: {
+          clinica_id: string
+          created_at: string
+          created_by: string | null
+          data: string
+          descricao: string | null
+          hora_fim: string | null
+          hora_inicio: string | null
+          id: string
+          tipo: string
+          unidade_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          clinica_id: string
+          created_at?: string
+          created_by?: string | null
+          data: string
+          descricao?: string | null
+          hora_fim?: string | null
+          hora_inicio?: string | null
+          id?: string
+          tipo: string
+          unidade_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          clinica_id?: string
+          created_at?: string
+          created_by?: string | null
+          data?: string
+          descricao?: string | null
+          hora_fim?: string | null
+          hora_inicio?: string | null
+          id?: string
+          tipo?: string
+          unidade_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nina_calendario_excecoes_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nina_calendario_excecoes_unidade_id_fkey"
+            columns: ["unidade_id"]
+            isOneToOne: false
+            referencedRelation: "unidades"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       nina_cat_profissionais: {
         Row: {
           atende_consultorio: boolean | null
@@ -7944,6 +8064,53 @@ export type Database = {
           tool_calls?: string[]
         }
         Relationships: []
+      }
+      nina_faixas_horarias: {
+        Row: {
+          chave: string
+          clinica_id: string
+          created_at: string
+          created_by: string | null
+          hora_fim: string
+          hora_inicio: string
+          id: string
+          nome: string
+          ordem: number
+          updated_at: string
+        }
+        Insert: {
+          chave: string
+          clinica_id: string
+          created_at?: string
+          created_by?: string | null
+          hora_fim: string
+          hora_inicio: string
+          id?: string
+          nome: string
+          ordem?: number
+          updated_at?: string
+        }
+        Update: {
+          chave?: string
+          clinica_id?: string
+          created_at?: string
+          created_by?: string | null
+          hora_fim?: string
+          hora_inicio?: string
+          id?: string
+          nome?: string
+          ordem?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nina_faixas_horarias_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       nina_feedback: {
         Row: {
@@ -12441,6 +12608,15 @@ export type Database = {
           token_publico: string
         }[]
       }
+      nina_classificar_atendimento: {
+        Args: {
+          p_clinica: string
+          p_em: string
+          p_fuso?: string
+          p_unidade: string
+        }
+        Returns: string
+      }
       nina_execucoes_expurgo: { Args: { _dias?: number }; Returns: number }
       nina_fb_pode_revisar: {
         Args: { _clinica_id: string; _user_id: string }
@@ -12464,6 +12640,25 @@ export type Database = {
           similaridade: number
           tipo: string
         }[]
+      }
+      nina_metricas_analise: {
+        Args: {
+          p_assunto?: string
+          p_calendario?: string
+          p_categoria?: string
+          p_clinica: string
+          p_dias_semana?: number[]
+          p_fins: string[]
+          p_fuso?: string
+          p_granularidade?: string
+          p_incluir_teste?: boolean
+          p_inicios: string[]
+          p_prioridade?: string
+          p_root_cause?: string
+          p_status?: string
+          p_unidade?: string
+        }
+        Returns: Json
       }
       nina_metricas_operacionais: {
         Args: {
