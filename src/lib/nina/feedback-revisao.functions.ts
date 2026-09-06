@@ -13,7 +13,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { VALORES_CATEGORIA_FEEDBACK } from "@/lib/nina/feedback-erros";
 
 const STATUS = [
   "pending",
