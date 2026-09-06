@@ -258,6 +258,9 @@ export function AtendInbox() {
   selRef.current = sel;
   const conteudoDaConversa = !!sel?.id && conversaCarregadaId === sel.id;
   const dadosSecundariosProntos = !!sel?.id && secundariosCarregadosId === sel.id;
+  // Contato exibido: só o da conversa aberta agora. Ter `contato` preenchido
+  // não basta — ele pode ser o do paciente anterior enquanto o novo carrega.
+  const contatoAtual = dadosSecundariosProntos ? contato : null;
   // Enquanto a conversa selecionada não terminou de carregar, todas as ações
   // dependentes do conversation_id ficam bloqueadas.
   const carregandoConversa = !!sel?.id && !conteudoDaConversa;
