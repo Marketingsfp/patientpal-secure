@@ -731,6 +731,7 @@ export function AtendInbox() {
       } else if (removeu) {
         const idFora = selIdRef.current!;
         cacheConversas.current.invalidar(idFora);
+        prefetchMsgs.current.invalidar(idFora);
         setSel(null);
         setConversaCarregadaId(null);
         setSecundariosCarregadosId(null);
@@ -754,10 +755,12 @@ export function AtendInbox() {
         for (const id of vencidas) {
           if (id === selIdRef.current) continue;
           cacheConversas.current.invalidar(id);
+          prefetchMsgs.current.invalidar(id);
         }
         // Quem saiu deste filtro não pode continuar guardado em cache.
         for (const id of idsQueSairam(prev as any, rows as any)) {
           cacheConversas.current.invalidar(id);
+          prefetchMsgs.current.invalidar(id);
         }
         return ordenarPorRecentes(mesclarListaConversas(prev as any, rows as any)) as any[];
       });
@@ -1042,6 +1045,7 @@ export function AtendInbox() {
         if (!c) {
           // Conversa não existe mais nesta clínica: limpa a seleção sem quebrar.
           cacheConversas.current.invalidar(alvo);
+          prefetchMsgs.current.invalidar(alvo);
           setSel(null);
           setConversaCarregadaId(null);
           setSecundariosCarregadosId(null);
@@ -1219,6 +1223,7 @@ export function AtendInbox() {
     if (!pid || anterior === pid || conversaCarregadaId !== id) return;
     // Vínculo mudou com a conversa já aberta: o cache antigo não vale mais.
     cacheConversas.current.invalidar(id);
+    prefetchMsgs.current.invalidar(id);
     cacheContatos.current.invalidar(anterior);
     (async () => {
       try {
@@ -1594,6 +1599,7 @@ export function AtendInbox() {
       await enviarMsg({ data: { clinicaId, conversaId: origem, text: t } });
       limparRascunhoDe(origem);
       cacheConversas.current.invalidar(origem);
+      prefetchMsgs.current.invalidar(origem);
       if (selIdRef.current === origem) await carregarConversa();
     } catch (e: any) {
       mostrarErro(e);
@@ -1609,6 +1615,7 @@ export function AtendInbox() {
     try {
       await criarNotaFn({ data: { clinicaId, conversaId: origem, conteudo: t } });
       cacheConversas.current.invalidar(origem);
+      prefetchMsgs.current.invalidar(origem);
       if (selIdRef.current !== origem) return;
       setNovaNota("");
       await carregarConversa();
@@ -1642,6 +1649,7 @@ export function AtendInbox() {
         data: { clinicaId, conversaId: origem, userId: userId || null, departamentoId, motivo },
       });
       cacheConversas.current.invalidar(origem);
+      prefetchMsgs.current.invalidar(origem);
       setTransferOpen(false);
       await carregarConvs();
       if (selIdRef.current === origem) await carregarConversa();
@@ -1676,6 +1684,7 @@ export function AtendInbox() {
         },
       });
       cacheConversas.current.invalidar(origem);
+      prefetchMsgs.current.invalidar(origem);
       setFecharOpen(false);
       await carregarConvs();
       if (selIdRef.current === origem) await carregarConversa();
