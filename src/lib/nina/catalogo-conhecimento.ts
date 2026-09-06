@@ -182,8 +182,14 @@ export function profissionalParaRegistro(
       : "Consulta",
     medico: p.nome,
     dia: horarios.length
-      ? resumoHorarios(horarios as never)
+      ? [
+          resumoHorarios(horarios as never),
+          // Observação do horário (ex.: "somente encaixe", "1º e 3º sábado")
+          // muda a leitura do dia: precisa chegar junto, não só no resumo.
+          ...horarios.map((h) => texto(h["observacao"])).filter(Boolean),
+        ].join(" · ")
       : texto(p.observacao_publica),
+
     horario: null,
     preco_dinheiro: dinheiro,
     preco_cartao: cartao,
