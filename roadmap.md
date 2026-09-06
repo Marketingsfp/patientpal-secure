@@ -47,3 +47,9 @@
 - [ ] Nome do paciente/contato como título no cabeçalho, lista, busca e filas
 - [ ] Telefone e #número como informação secundária; "Paciente não identificado" sem nome
 - [ ] Sem consulta por item da lista; sem mistura de dados ao trocar de conversa
+
+## Nina — Analista de métricas
+- [x] Fase 6 — diagnóstico e plano
+- [ ] Fase 7 — camada de dados analítica (calendário + consultas combináveis)
+- [ ] Fase 8 — analista GPT-5.6 Sol na tela de métricas
+- [ ] Fase 9 — validação final
