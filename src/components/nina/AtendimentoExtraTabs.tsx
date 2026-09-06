@@ -967,17 +967,19 @@ export function AtendInbox() {
         conversaIdUrl: conversaIdUrlRef.current,
       });
 
-    // Se o prefetch desta conversa já está em andamento (hover → clique),
-    // reaproveitamos a mesma busca em vez de pedir as mensagens duas vezes.
+    // Se o pré-carregamento desta conversa já está em andamento (mouse parado
+    // no lead → clique), reaproveitamos a mesma busca em vez de pedir as
+    // mensagens duas vezes. A busca só é reaproveitada se ainda valer para
+    // esta clínica/usuário e para a versão atual da conversa.
+    const chavePf = chavePrefetch(clinicaId, meuId);
     const emVoo =
-      janela === JANELA_INICIAL ? prefetchMsgs.current.get(alvo) : undefined;
+      janela === JANELA_INICIAL ? prefetchMsgs.current.obter(alvo, chavePf)?.promise : undefined;
     const pMensagens = emVoo
       ? emVoo
       : medirRequest(
           "listarMensagensConversa",
           listarMsgs({ data: { clinicaId, conversaId: alvo, limit: janela } }),
         );
-    prefetchMsgs.current.delete(alvo);
     const pContato = medirRequest(
       "obterDadosContato",
       obterContato({ data: { clinicaId, conversaId: alvo } }),
@@ -991,20 +993,40 @@ export function AtendInbox() {
       listarEventosFn({ data: { clinicaId, conversaId: alvo } }),
     ).catch(() => [] as ConversaEvento[]);
 
+    // Guarda o que as mensagens devolveram: `null` significa que a busca
+    // falhou. Falha nunca é gravada no cache como conversa vazia.
+    let msgsCarregadas: any[] | null = null;
+
     // 1) Caminho crítico — mensagens recentes abrem o chat e o campo de envio.
     const critico = (async () => {
       try {
-        const m = await pMensagens;
+        const m = (await pMensagens) as any[];
+        msgsCarregadas = m;
         marcarTroca("T4_mensagens");
         if (!aindaVale()) return;
         medidor.current?.marcar("dados");
+        setErroMsgs(false);
         setMsgs(m);
         setTemMaisAntigas(podeCarregarMais(m.length, janela));
         setConversaCarregadaId(alvo);
+        // O chat já pode ser reaberto na hora: guarda parcial agora, sem
+        // esperar contato/notas/eventos. Se o conteúdo completo já estiver
+        // guardado, ele é preservado.
+        if (janela === JANELA_INICIAL && !cacheConversas.current.obter(alvo)) {
+          cacheConversas.current.guardar(alvo, {
+            msgs: m,
+            contato: null,
+            notas: [],
+            eventos: [],
+            parcial: true,
+          });
+        }
       } catch (e: any) {
+        if (aindaVale()) setErroMsgs(true);
         mostrarErro(e);
       }
     })();
+
 
     // 2) Segundo plano — contato, notas e eventos entram quando chegarem.
     const secundarios = (async () => {
