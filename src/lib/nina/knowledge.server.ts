@@ -39,6 +39,48 @@ export async function searchKnowledgeBase(
   const { expandirTermos } = await import("./kb-parser");
 
   const query = String(pedido.query ?? "").trim().slice(0, 200);
+
+  // FASE 5 — catálogo publicado como fonte, por clínica (flag desligada = planilha).
+  // Sem fallback silencioso: com a flag ligada, o que não está publicado no
+  // catálogo é tratado como informação desconhecida.
+  const { flagCatalogoFonteAtiva, buscarNoCatalogo } = await import(
+    "./catalogo-retrieval.server"
+  );
+  if (await flagCatalogoFonteAtiva(pedido.clinicaId)) {
+    const doCatalogo = await buscarNoCatalogo({
+      clinicaId: pedido.clinicaId,
+      query,
+      medico: pedido.medico ?? null,
+      ...(pedido.limite ? { limite: pedido.limite } : {}),
+    });
+
+    void registrarConsultaKb({
+      clinicaId: pedido.clinicaId,
+      baseId: null,
+      versao: null,
+      canal: pedido.canal ?? "interno",
+      pergunta: query,
+      termos: expandirTermos(query),
+      encontrados: doCatalogo.records.map((r) => ({
+        id: r.id,
+        procedimento: r.procedimento,
+        medico: r.medico,
+        linha_origem: null,
+        score: null,
+        origem: "catalogo",
+      })) as never,
+      resposta: `fonte=catalogo knowledge_status=${doCatalogo.knowledge_status}`,
+    });
+
+    console.info("[nina-catalogo]", {
+      knowledge_status: doCatalogo.knowledge_status,
+      itens: doCatalogo.records.length,
+      trace: doCatalogo.trace.slice(0, 3),
+    });
+
+    return doCatalogo;
+  }
+
   const achado = await consultarBase({
     clinicaId: pedido.clinicaId,
     termo: query,
