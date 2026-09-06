@@ -386,9 +386,22 @@ function Pagina() {
               value={assunto}
               onChange={(e) => setAssunto(e.target.value)}
             />
+            <p className="text-xs text-muted-foreground">
+              Alcance: filtra apenas os erros reportados que têm assunto registrado. Não é aplicado
+              a indicadores sem vínculo confiável com esse assunto.
+            </p>
           </div>
+          {dados?.recorte ? (
+            <p className="text-xs text-muted-foreground md:col-span-4">
+              Recorte em uso: {dados.recorte.descricao}
+              {dados.recorte.filtrosErroAtivos
+                ? " A taxa mostra os erros filtrados sobre o total do recorte operacional, que não é reduzido por esses filtros."
+                : ""}
+            </p>
+          ) : null}
         </CardContent>
       </Card>
+
 
       {ind ? (
         <>
