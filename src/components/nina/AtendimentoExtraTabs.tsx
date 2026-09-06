@@ -1609,18 +1609,20 @@ export function AtendInbox() {
       return;
     }
     const fd = new FormData(e.currentTarget);
+    const origem = sel.id;
     try {
       await fecharFn({
         data: {
           clinicaId,
-          conversaId: sel.id,
+          conversaId: origem,
           motivo: String(fd.get("motivo") || "") || undefined,
           resumo: String(fd.get("resumo") || "") || undefined,
         },
       });
+      cacheConversas.current.invalidar(origem);
       setFecharOpen(false);
       await carregarConvs();
-      await carregarConversa();
+      if (selIdRef.current === origem) await carregarConversa();
     } catch (e: any) {
       mostrarErro(e);
     }
