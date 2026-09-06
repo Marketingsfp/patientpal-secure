@@ -196,6 +196,7 @@ export function profissionalParaRegistro(
             ? "Atende no consultório."
             : "Não atende no consultório.",
         convenios.length ? `Convênios: ${convenios.join(", ")}` : null,
+        unidadeDoProfissional(p) ? `Unidade: ${unidadeDoProfissional(p)}` : null,
         texto(p.observacao_publica),
         aviso ? `Aviso vigente: ${aviso}` : null,
         descricaoPagamentos(p.formas_pagamento),
