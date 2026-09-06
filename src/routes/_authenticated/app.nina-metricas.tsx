@@ -242,7 +242,11 @@ function Pagina() {
             Painel somente leitura. Sem dados pessoais do paciente e sem alterar nada da Nina.
           </p>
         </div>
-        <Button variant="outline" onClick={() => void carregar()} disabled={carregando}>
+        <Button
+          variant="outline"
+          onClick={() => void carregar()}
+          disabled={carregando || Boolean(erroFiltro)}
+        >
           {carregando ? (
             <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden />
           ) : (
@@ -262,6 +266,47 @@ function Pagina() {
             <Label htmlFor="ate">Até</Label>
             <Input id="ate" type="date" value={ate} onChange={(e) => setAte(e.target.value)} />
           </div>
+          <div className="space-y-1">
+            <Label htmlFor="hora-inicio">Horário inicial</Label>
+            <Input
+              id="hora-inicio"
+              type="time"
+              value={horaInicio}
+              disabled={diaInteiro}
+              onChange={(e) => setHoraInicio(e.target.value)}
+            />
+          </div>
+          <div className="space-y-1">
+            <Label htmlFor="hora-fim">Horário final</Label>
+            <Input
+              id="hora-fim"
+              type="time"
+              value={horaFim}
+              disabled={diaInteiro}
+              onChange={(e) => setHoraFim(e.target.value)}
+            />
+          </div>
+          <div className="flex items-center gap-2 md:col-span-4">
+            <input
+              id="dia-inteiro"
+              type="checkbox"
+              className="h-4 w-4 accent-primary"
+              checked={diaInteiro}
+              onChange={(e) => setDiaInteiro(e.target.checked)}
+            />
+            <Label htmlFor="dia-inteiro" className="cursor-pointer">
+              Dia inteiro
+            </Label>
+            <span className="text-xs text-muted-foreground">
+              A faixa de horário vale em cada dia do período (10 a 12/09 das 07:00 às 12:00 conta só
+              essas manhãs). O horário inicial entra e o final não entra: 07:00 sim, 12:00 não.
+              Horários no fuso da operação ({FUSO_OPERACAO_PADRAO}), não no do seu computador.
+            </span>
+          </div>
+          {erroFiltro ? (
+            <p className="text-sm font-medium text-destructive md:col-span-4">{erroFiltro}</p>
+          ) : null}
+
           <div className="space-y-1">
             <Label>Período do gráfico</Label>
             <Select value={granularidade} onValueChange={(v) => setGranularidade(v as never)}>
