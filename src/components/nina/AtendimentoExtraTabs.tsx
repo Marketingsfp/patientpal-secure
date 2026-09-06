@@ -1530,11 +1530,15 @@ export function AtendInbox() {
       toast.error(motivoBloqueio);
       return;
     }
+    // Conversa de origem: o envio pertence a ela, não à que estiver aberta
+    // quando a resposta chegar.
+    const origem = sel.id;
     setEnviando(true);
     try {
-      await enviarMsg({ data: { clinicaId, conversaId: sel.id, text: t } });
-      setDraft("");
-      await carregarConversa();
+      await enviarMsg({ data: { clinicaId, conversaId: origem, text: t } });
+      limparRascunhoDe(origem);
+      cacheConversas.current.invalidar(origem);
+      if (selIdRef.current === origem) await carregarConversa();
     } catch (e: any) {
       mostrarErro(e);
     } finally {
@@ -1545,8 +1549,11 @@ export function AtendInbox() {
   const adicionarNota = async () => {
     const t = novaNota.trim();
     if (!t || !sel || !clinicaId) return;
+    const origem = sel.id;
     try {
-      await criarNotaFn({ data: { clinicaId, conversaId: sel.id, conteudo: t } });
+      await criarNotaFn({ data: { clinicaId, conversaId: origem, conteudo: t } });
+      cacheConversas.current.invalidar(origem);
+      if (selIdRef.current !== origem) return;
       setNovaNota("");
       await carregarConversa();
     } catch (e: any) {
