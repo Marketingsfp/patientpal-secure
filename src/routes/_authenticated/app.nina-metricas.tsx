@@ -124,6 +124,8 @@ function Pagina() {
   const [diaInteiro, setDiaInteiro] = useState(true);
   const [horaInicio, setHoraInicio] = useState("07:00");
   const [horaFim, setHoraFim] = useState("12:00");
+  const [ambiente, setAmbiente] = useState<"producao" | "todos">("producao");
+  const [erroConsulta, setErroConsulta] = useState<string | null>(null);
   const [status, setStatus] = useState(TODOS);
   const [categoria, setCategoria] = useState(TODOS);
   const [rootCause, setRootCause] = useState(TODOS);
