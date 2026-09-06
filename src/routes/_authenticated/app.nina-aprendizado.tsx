@@ -305,6 +305,7 @@ function Pagina() {
       setItens((r.itens ?? []) as Item[]);
       setPessoas(r.pessoas ?? {});
       setContagens(r.contagens ?? {});
+      setConversas((r as { conversas?: Record<string, number> }).conversas ?? {});
       setOcorrencias((r as { ocorrencias?: Record<string, number> }).ocorrencias ?? {});
     } catch (e) {
       mostrarErro(e);
@@ -316,6 +317,32 @@ function Pagina() {
   useEffect(() => {
     void carregar();
   }, [carregar]);
+
+  // Tempo real: novos reportes (inclusive o do X vermelho) entram na lista e
+  // atualizam os contadores sem recarregar a página. A recarga usa a mesma
+  // consulta, então o item nunca aparece duplicado.
+  useEffect(() => {
+    if (!clinicaId) return;
+    const canal = supabase
+      .channel(`nina-feedback-erros-${clinicaId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "nina_feedback_erros",
+          filter: `clinica_id=eq.${clinicaId}`,
+        },
+        () => {
+          void carregar();
+        },
+      )
+      .subscribe();
+    return () => {
+      void supabase.removeChannel(canal);
+    };
+  }, [clinicaId, carregar]);
+
 
   useEffect(() => {
     if (!clinicaId) return;
