@@ -1292,7 +1292,10 @@ export function AtendInbox() {
   // é revalidado em segundo plano — nunca o conteúdo da conversa anterior.
   useEffect(() => {
     const id = sel?.id;
-    marcarTroca("T1_selecao");
+    marcarTroca("T1_selecao", id ?? undefined);
+    // O cabeçalho lê `sel`: no momento em que a seleção passa a ser a conversa
+    // pedida na URL, o cabeçalho já é o do lead certo.
+    if (id && conversaIdUrlRef.current === id) marcarTroca("T1c_cabecalho", id);
     janelaRef.current = JANELA_INICIAL;
     setTemMaisAntigas(false);
     // FASE 4 — conversa já vinculada a um paciente conhecido: o painel de
@@ -1545,11 +1548,11 @@ export function AtendInbox() {
   useEffect(() => {
     if (!conteudoDaConversa) return;
     medidor.current?.marcar("render");
-    marcarTroca("T5_render");
+    marcarTroca("T5_render", conversaCarregadaId ?? undefined);
     const id = requestAnimationFrame(() => {
       requestAnimationFrame(() => {
         medidor.current?.marcar("scroll");
-        marcarTroca("T6_scroll");
+        marcarTroca("T6_scroll", conversaCarregadaId ?? undefined);
         medidor.current = null;
       });
     });
