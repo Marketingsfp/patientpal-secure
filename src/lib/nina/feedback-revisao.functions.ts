@@ -210,17 +210,39 @@ const acaoSchema = z.object({
   acao: z.enum(["under_review", "approved", "rejected", "pending"]),
   motivo: z.string().trim().max(2000).nullish(),
   correcao: z.string().trim().min(3).max(4000).nullish(),
+  /** Versão que a pessoa estava vendo — protege contra duas revisões simultâneas. */
+  esperadoUpdatedAt: z.string().nullish(),
 });
+
+const TIPO_POR_ACAO = {
+  under_review: "em_revisao",
+  approved: "aprovado",
+  rejected: "rejeitado",
+  pending: "reaberto",
+} as const;
 
 /**
  * Revisa um feedback. Só muda a situação do registro — nada é aplicado na
- * Base de Conhecimentos nesta fase.
+ * Base de Conhecimentos nesta fase. "approved" apenas autoriza a correção a
+ * seguir para o processo de aplicação existente.
  */
 export const revisarFeedbackErroNina = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) => acaoSchema.parse(i))
   .handler(async ({ data, context }) => {
     await assertRevisor(context.supabase, context.userId, data.clinicaId);
+
+    const { data: atual, error: eAtual } = await (context.supabase as never as ClienteSupabase)
+      .from("nina_feedback_erros")
+      .select("id, status, root_cause, updated_at")
+      .eq("id", data.id)
+      .eq("clinica_id", data.clinicaId)
+      .maybeSingle();
+    if (eAtual) throw new Error(eAtual.message);
+    if (!atual) throw new Error("Erro reportado não encontrado nesta clínica.");
+    if (data.esperadoUpdatedAt && atual.updated_at !== data.esperadoUpdatedAt) {
+      throw new Error(MSG_CONFLITO);
+    }
 
     const patch: {
       status: string;
@@ -238,14 +260,29 @@ export const revisarFeedbackErroNina = createServerFn({ method: "POST" })
     }
     if (data.correcao) patch.correcao = data.correcao;
 
-    const { data: linha, error } = await context.supabase
+    let q = context.supabase
       .from("nina_feedback_erros")
       .update(patch)
       .eq("id", data.id)
-      .eq("clinica_id", data.clinicaId)
-      .select(COLUNAS)
-      .single();
+      .eq("clinica_id", data.clinicaId);
+    if (data.esperadoUpdatedAt) q = q.eq("updated_at", data.esperadoUpdatedAt);
+
+    const { data: linha, error } = await q.select(COLUNAS).maybeSingle();
     if (error) throw new Error(error.message);
+    if (!linha) throw new Error(MSG_CONFLITO);
+
+    await registrarDecisao(context.supabase, {
+      clinicaId: data.clinicaId,
+      feedbackId: data.id,
+      tipo: TIPO_POR_ACAO[data.acao],
+      autor: context.userId,
+      statusAntes: (atual as { status: string }).status,
+      statusDepois: data.acao,
+      causaAntes: (atual as { root_cause: string | null }).root_cause ?? null,
+      causaDepois: (atual as { root_cause: string | null }).root_cause ?? null,
+      observacao: data.motivo ?? null,
+    });
+
     return linha;
   });
 
@@ -259,21 +296,34 @@ export const editarSugestaoFeedbackNina = createServerFn({ method: "POST" })
         clinicaId: z.string().uuid(),
         correcao: z.string().trim().min(3).max(4000),
         observacao: z.string().trim().max(4000).nullish(),
+        esperadoUpdatedAt: z.string().nullish(),
       })
       .parse(i),
   )
   .handler(async ({ data, context }) => {
     await assertRevisor(context.supabase, context.userId, data.clinicaId);
-    const { data: linha, error } = await context.supabase
+    let q = context.supabase
       .from("nina_feedback_erros")
       .update({
         correcao: data.correcao,
         observacao: data.observacao?.trim() ? data.observacao.trim() : null,
       })
       .eq("id", data.id)
-      .eq("clinica_id", data.clinicaId)
-      .select(COLUNAS)
-      .single();
+      .eq("clinica_id", data.clinicaId);
+    if (data.esperadoUpdatedAt) q = q.eq("updated_at", data.esperadoUpdatedAt);
+
+    const { data: linha, error } = await q.select(COLUNAS).maybeSingle();
     if (error) throw new Error(error.message);
+    if (!linha) throw new Error(MSG_CONFLITO);
+
+    await registrarDecisao(context.supabase, {
+      clinicaId: data.clinicaId,
+      feedbackId: data.id,
+      tipo: "sugestao_editada",
+      autor: context.userId,
+      observacao: "Correção sugerida editada por uma pessoa.",
+    });
+
     return linha;
   });
+
