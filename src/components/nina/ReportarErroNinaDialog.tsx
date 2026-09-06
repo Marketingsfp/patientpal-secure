@@ -15,11 +15,7 @@ import { toast } from "sonner";
 import { X } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { reportarErroRapidoMensagemNina } from "@/lib/nina/feedback-erros.functions";
-
-export const TEXTO_REPORTE_SUCESSO = "Erro enviado para revisão.";
-export const TEXTO_REPORTE_DUPLICADO = "Esta mensagem já foi enviada para revisão.";
-export const TEXTO_REPORTE_FALHA = "Não foi possível registrar o erro. Tente novamente.";
-export const ROTULO_REPORTE = "Reportar erro da Nina";
+import { ROTULO_REPORTE, TEXTO_REPORTE_FALHA, avisoReporte } from "@/lib/nina/erro-rapido";
 
 type Props = {
   clinicaId: string;
@@ -47,8 +43,9 @@ export function ReportarErroNinaBotao({ clinicaId, conversaId, mensagemId, class
     try {
       const r = await reportar({ data: alvo });
       setReportado(true);
-      if (r && (r as { duplicado?: boolean }).duplicado) toast.info(TEXTO_REPORTE_DUPLICADO);
-      else toast.success(TEXTO_REPORTE_SUCESSO);
+      const aviso = avisoReporte(r as { duplicado?: boolean } | null);
+      if (aviso.tipo === "duplicado") toast.info(aviso.texto);
+      else toast.success(aviso.texto);
     } catch {
       toast.error(TEXTO_REPORTE_FALHA);
     } finally {

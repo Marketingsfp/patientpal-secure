@@ -90,3 +90,28 @@ export function montarRegistroErroRapido(params: {
 export function ehConflitoDuplicidade(erro: { code?: string | null } | null | undefined): boolean {
   return erro?.code === "23505";
 }
+
+/** Textos exibidos à atendente após o clique. */
+export const TEXTO_REPORTE_SUCESSO = "Erro enviado para revisão.";
+export const TEXTO_REPORTE_DUPLICADO = "Esta mensagem já foi enviada para revisão.";
+export const TEXTO_REPORTE_FALHA = "Não foi possível registrar o erro. Tente novamente.";
+export const ROTULO_REPORTE = "Reportar erro da Nina";
+
+/**
+ * O botão aparece só em mensagens cuja autoria é da Nina segundo o sistema
+ * (`direction`/`enviada_por`) — nunca por conter a palavra "Nina" no texto.
+ */
+export function deveMostrarBotaoReporte(
+  mensagem: Pick<MensagemParaReporte, "direction" | "enviada_por">,
+): boolean {
+  return mensagem.direction === "out" && mensagem.enviada_por === "nina";
+}
+
+/** Resultado do backend → aviso discreto correspondente. */
+export function avisoReporte(
+  resultado: { duplicado?: boolean } | null,
+): { tipo: "sucesso" | "duplicado"; texto: string } {
+  return resultado?.duplicado
+    ? { tipo: "duplicado", texto: TEXTO_REPORTE_DUPLICADO }
+    : { tipo: "sucesso", texto: TEXTO_REPORTE_SUCESSO };
+}
