@@ -80,6 +80,7 @@ import {
   Pin,
   PinOff,
   Zap,
+  Copy,
 } from "lucide-react";
 import { useClinica } from "@/hooks/use-clinica";
 import { useAuth } from "@/hooks/use-auth";
@@ -109,6 +110,7 @@ import { DateInputBR } from "@/components/ui/date-input-br";
 import {
   listarConversas,
   obterConversa,
+  buscarConversaPorNumero,
   souGestorAtendimento,
   contarConversasInbox,
   listarMensagensConversa,
@@ -177,6 +179,10 @@ import { ReportarErroNinaBotao } from "@/components/nina/ReportarErroNinaDialog"
 import { BadgeEspera, RelogioEsperaProvider } from "@/components/nina/BadgeEspera";
 import { formatarDataHoraMensagem } from "@/lib/atendimento/data-hora";
 import { ESCOPO_INBOX_PADRAO, type EscopoInbox } from "@/lib/atendimento/escopo-inbox";
+import {
+  formatarNumeroConversa,
+  interpretarBuscaConversa,
+} from "@/lib/atendimento/numero-conversa";
 import { devoAutoSelecionarComUrl, escopoParaConversa } from "@/lib/atendimento/deep-link";
 import {
   avisoSaidaEscopo,
@@ -239,6 +245,7 @@ export function AtendInbox() {
   const esperaFn = useServerFn(esperaConversas);
   const assumirFn = useServerFn(assumirConversa);
   const obterConversaFn = useServerFn(obterConversa);
+  const buscarPorNumeroFn = useServerFn(buscarConversaPorNumero);
   const { user } = useAuth();
   const meuId = user?.id ?? null;
   const podeAtender = usePodeEscrever("nina");
@@ -277,6 +284,13 @@ export function AtendInbox() {
   const [deptos, setDeptos] = useState<any[]>([]);
   const [usuarios, setUsuarios] = useState<any[]>([]);
   const [busca, setBusca] = useState("");
+  // FASE 2 — o que foi digitado: texto (nome/telefone/protocolo) e/ou número
+  // permanente da conversa. Uma coisa nunca é confundida com a outra.
+  const buscaInterp = useMemo(() => interpretarBuscaConversa(busca), [busca]);
+  const buscaTexto = buscaInterp.texto;
+  const [resultadoNumero, setResultadoNumero] = useState<
+    { estado: "carregando" } | { estado: "vazio" } | { estado: "ok"; conversa: any } | null
+  >(null);
   const [filtroStatus, setFiltroStatus] = useState<
     "all" | "active" | "waiting" | "closed" | "bot_attending"
   >("all");
@@ -371,6 +385,11 @@ export function AtendInbox() {
   const seqEspera = useRef(0);
   const convsVisiveis: any[] = (() => {
     let base = convs;
+    // "#1342" é busca exata: a lista mostra só essa conversa (o resultado
+    // do backend aparece destacado logo acima).
+    if (buscaInterp.exigeNumero) {
+      base = base.filter((c: any) => Number(c.numero_conversa) === buscaInterp.numero);
+    }
     if (soCriticas) {
       base = base.filter(
         (c: any) => faixaEsperaAtd(minutosDesde(espera[c.id])) === "critico",
@@ -720,7 +739,7 @@ export function AtendInbox() {
         data: {
           clinicaId,
           status: filtroStatus,
-          busca: busca || undefined,
+          busca: buscaTexto || undefined,
           canal: "todos",
           escopo,
           limit: 200,
@@ -811,7 +830,7 @@ export function AtendInbox() {
     } catch (e: any) {
       mostrarErro(e);
     }
-  }, [clinicaId, filtroStatus, busca, escopo, listarConvs, carregarContadores, meuId, souGestor, abrirPelaUrl]);
+  }, [clinicaId, filtroStatus, buscaTexto, escopo, listarConvs, carregarContadores, meuId, souGestor, abrirPelaUrl]);
 
   // FASE 1 — a conversa aberta é sempre a do endereço. Quando o
   // conversationId da URL muda (clique, voltar/avançar do navegador, link
@@ -1280,7 +1299,7 @@ export function AtendInbox() {
   carregarConvsRef.current = carregarConvs;
   useEffect(() => {
     void carregarConvsRef.current();
-  }, [clinicaId, filtroStatus, busca, escopo, meuId, souGestor]);
+  }, [clinicaId, filtroStatus, buscaTexto, escopo, meuId, souGestor]);
   // O responsável pode mudar a qualquer momento (transferência, distribuição
   // automática, tomada por outra pessoa). A lista chega por Realtime, então a
   // conversa aberta sempre acompanha o que está gravado no banco.
