@@ -45,7 +45,7 @@ export type Decisao = {
 const COLUNAS =
   "id, feedback_id, tipo, status_antes, status_depois, causa_antes, causa_depois, observacao, analise_versao, autor, created_at";
 
-/** Grava a decisão no histórico. Best-effort: nunca derruba a ação principal. */
+/** Grava a decisão no histórico de auditoria. Falha fechada: erro aqui é erro da ação. */
 export async function registrarDecisao(
   supabase: unknown,
   entrada: {
@@ -62,25 +62,22 @@ export async function registrarDecisao(
     analiseVersao?: number | null;
   },
 ) {
-  try {
-    await (supabase as { from: (t: string) => any })
-      .from("nina_feedback_decisoes")
-      .insert({
-        clinica_id: entrada.clinicaId,
-        feedback_id: entrada.feedbackId,
-        tipo: entrada.tipo,
-        status_antes: entrada.statusAntes ?? null,
-        status_depois: entrada.statusDepois ?? null,
-        causa_antes: entrada.causaAntes ?? null,
-        causa_depois: entrada.causaDepois ?? null,
-        observacao: entrada.observacao?.slice(0, 2000) ?? null,
-        analise_id: entrada.analiseId ?? null,
-        analise_versao: entrada.analiseVersao ?? null,
-        autor: entrada.autor,
-      });
-  } catch {
-    // histórico é complementar; a decisão em si já foi gravada no reporte
-  }
+  const { error } = await (supabase as { from: (t: string) => any })
+    .from("nina_feedback_decisoes")
+    .insert({
+      clinica_id: entrada.clinicaId,
+      feedback_id: entrada.feedbackId,
+      tipo: entrada.tipo,
+      status_antes: entrada.statusAntes ?? null,
+      status_depois: entrada.statusDepois ?? null,
+      causa_antes: entrada.causaAntes ?? null,
+      causa_depois: entrada.causaDepois ?? null,
+      observacao: entrada.observacao?.slice(0, 2000) ?? null,
+      analise_id: entrada.analiseId ?? null,
+      analise_versao: entrada.analiseVersao ?? null,
+      autor: entrada.autor,
+    });
+  if (error) throw new Error(`Decisão não registrada na auditoria: ${error.message}`);
 }
 
 export const listarDecisoesFeedbackNina = createServerFn({ method: "POST" })
