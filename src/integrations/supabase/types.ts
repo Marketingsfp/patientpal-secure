@@ -12981,6 +12981,16 @@ export type Database = {
         }
         Returns: Json
       }
+      nina_metricas_periodo: {
+        Args: {
+          p_clinica: string
+          p_fins: string[]
+          p_fuso?: string
+          p_incluir_teste?: boolean
+          p_inicios: string[]
+        }
+        Returns: Json
+      }
       normalizar_telefone: { Args: { _tel: string }; Returns: string }
       normalizar_termo_busca: { Args: { _termo: string }; Returns: string }
       paciente_cartao_inadimplente: {
