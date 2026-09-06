@@ -129,7 +129,7 @@ export function pedeInformacaoDeCatalogo(entradas: { texto: string }[]): boolean
  */
 export function verificacoesDeterministicas(entrada: {
   mensagemReportada: string;
-  entradas: { texto: string }[];
+  entradas: { em?: string | null; texto: string }[];
   etapas: EtapaEvidencia[];
   execucao: PacoteEvidencias["execucao"];
   lacunas: string[];
