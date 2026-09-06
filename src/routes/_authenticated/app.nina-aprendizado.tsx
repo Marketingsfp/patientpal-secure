@@ -117,7 +117,9 @@ type Item = {
   mensagem_texto: string | null;
   pergunta_texto: string | null;
   categoria: string;
-  correcao: string;
+  origem: string | null;
+  correcao: string | null;
+
   correcao_original: string | null;
   observacao: string | null;
   motivo_rejeicao: string | null;
