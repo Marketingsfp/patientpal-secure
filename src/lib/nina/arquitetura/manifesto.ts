@@ -196,7 +196,7 @@ export const NODES_ARQUITETURA: NodeArquitetura[] = [
     entrada: "Clínica e conversa",
     saida: "Texto de contexto",
     anteriores: ["session.resolve"],
-    seguintes: ["prompt.compose"],
+    seguintes: ["instructions.catalog", "instructions.learnings", "prompt.compose"],
     tabelas: ["clinicas", "unidades", "whatsapp_mensagens"],
     erros: ["clínica sem dados cadastrados"],
   },
@@ -238,7 +238,7 @@ export const NODES_ARQUITETURA: NodeArquitetura[] = [
     entrada: "Contexto e blocos de instrução",
     saida: "Prompt do sistema",
     anteriores: ["context.load", "instructions.catalog", "instructions.learnings"],
-    seguintes: ["llm.generate"],
+    seguintes: ["llm.model_flag", "llm.generate"],
     erros: ["prompt acima do limite do modelo"],
   },
 
