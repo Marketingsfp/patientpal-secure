@@ -1135,6 +1135,37 @@ export function AtendInbox() {
     setNotas([]);
   }, [sel?.id]);
 
+
+  // FASE 5 — o vínculo da conversa com o paciente pode nascer depois (cadastro
+  // rápido, vínculo manual, identificação pela Nina). Quando o Realtime traz
+  // esse vínculo novo, o painel de contato se atualiza sozinho, sem recarregar.
+  const vinculoRef = useRef<string | null>(null);
+  useEffect(() => {
+    const id = sel?.id;
+    const pid = ((sel as any)?.contato_paciente_id ?? null) as string | null;
+    if (!id) {
+      vinculoRef.current = null;
+      return;
+    }
+    const anterior = vinculoRef.current;
+    vinculoRef.current = pid;
+    if (!pid || anterior === pid || conversaCarregadaId !== id) return;
+    // Vínculo mudou com a conversa já aberta: o cache antigo não vale mais.
+    cacheConversas.current.invalidar(id);
+    cacheContatos.current.invalidar(anterior);
+    (async () => {
+      try {
+        const c = await obterContato({ data: { conversa_id: id } });
+        if (selIdRef.current !== id) return;
+        cacheContatos.current.guardar((c as any)?.paciente?.id, c);
+        setContato(c as any);
+        setSecundariosCarregadosId(id);
+      } catch (e: any) {
+        console.warn("[atendimento] revalidar contato:", e?.message ?? e);
+      }
+    })();
+  }, [sel?.id, (sel as any)?.contato_paciente_id, conversaCarregadaId, obterContato]);
+
   useEffect(() => {
     carregarConversa();
   }, [carregarConversa]);
