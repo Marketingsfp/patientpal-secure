@@ -265,6 +265,26 @@ export function ArquiteturaCanvas({
     }));
   }, [layout]);
 
+  /** Move a visão até um componente encontrado na busca (só navegação). */
+  const centralizarEm = useCallback(
+    (id: string) => {
+      const area = areaRef.current;
+      const alvo = mapaPosicionado.get(id);
+      if (!area || !alvo) return;
+      setView((atual) => ({
+        escala: atual.escala,
+        ...centralizarNoNode(
+          { x: alvo.x, y: alvo.y },
+          { largura: area.clientWidth, altura: area.clientHeight },
+          atual.escala,
+        ),
+      }));
+    },
+    [mapaPosicionado],
+  );
+
+
+
   const aplicarZoom = useCallback((fator: number, centro?: { x: number; y: number }) => {
     const area = areaRef.current;
     if (!area) return;
