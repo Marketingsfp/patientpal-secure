@@ -36,6 +36,7 @@ import {
   enviarMensagemTeste,
   resolverConversaTeste,
   ferramentasUsadasTeste,
+  marcarLeadTesteLido,
   detalheExecucaoTeste,
 } from "@/lib/nina/teste-console.functions";
 import {
@@ -149,6 +150,7 @@ export function HomologacaoInbox() {
   const enviar = useServerFn(enviarMensagemTeste);
   const resolver = useServerFn(resolverConversaTeste);
   const ferramentasFn = useServerFn(ferramentasUsadasTeste);
+  const marcarLido = useServerFn(marcarLeadTesteLido);
 
   const [leads, setLeads] = useState<Lead[]>([]);
   const [leadId, setLeadId] = useState<string | null>(null);
