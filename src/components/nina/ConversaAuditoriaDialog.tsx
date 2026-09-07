@@ -75,16 +75,28 @@ function autorDe(m: Mensagem, atendenteNome: string | null) {
   return m.direction === "out" ? "Nina" : "Paciente";
 }
 
+/** Código curto e legível para IDs longos (erro, conversa, mensagem). */
+function curto(id: string | null | undefined) {
+  if (!id) return null;
+  return id.slice(0, 8).toUpperCase();
+}
+
 export function ConversaAuditoriaDialog({
   clinicaId,
   conversaId,
   mensagemId,
+  erroId,
+  reportadoEm,
   aberto,
   onOpenChange,
 }: {
   clinicaId: string | null;
   conversaId: string | null;
   mensagemId: string | null;
+  /** Id do reporte, exibido no cabeçalho da auditoria. */
+  erroId?: string | null;
+  /** Quando o erro foi reportado (≠ data da mensagem da Nina). */
+  reportadoEm?: string | null;
   aberto: boolean;
   onOpenChange: (v: boolean) => void;
 }) {
