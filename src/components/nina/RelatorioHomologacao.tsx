@@ -151,6 +151,7 @@ export function RelatorioHomologacao() {
         data: { clinicaId, tipo: item.tipo, execucaoId: item.id },
       })) as Detalhe;
       setDetalhe(r);
+      void carregarEnviados((r.avaliacoes ?? []).map((a) => a.id));
     } catch (e) {
       mostrarErro(e);
     } finally {
