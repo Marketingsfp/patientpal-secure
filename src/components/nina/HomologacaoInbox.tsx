@@ -44,6 +44,8 @@ import {
   controlarSimulacaoTerra,
   simulacaoAtualTerra,
 } from "@/lib/nina/simulador-terra.functions";
+import { AvaliacaoSol } from "@/components/nina/AvaliacaoSol";
+
 import {
   CENARIOS_SUGERIDOS,
   DETALHES,
@@ -770,6 +772,12 @@ export function HomologacaoInbox() {
                   >
                     <Wrench className="mr-1 h-3.5 w-3.5" /> Diagnóstico
                   </Button>
+                  <AvaliacaoSol
+                    clinicaId={clinicaId}
+                    leadId={leadId}
+                    podeAvaliar={podeEscrever}
+                  />
+
                   <Button
                     size="sm"
                     variant="outline"
