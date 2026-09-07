@@ -55,19 +55,28 @@ export function useConfiancaMensagens(
   return mapa;
 }
 
-const ESTILO: Record<string, { classe: string; rotulo: string; Icone: typeof ShieldCheck }> = {
+const ESTILO: Record<
+  string,
+  { classe: string; ponto: string; curto: string; rotulo: string; Icone: typeof ShieldCheck }
+> = {
   HIGH: {
-    classe: "border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
+    classe: "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
+    ponto: "bg-emerald-500",
+    curto: "Alta",
     rotulo: "Confiança alta",
     Icone: ShieldCheck,
   },
   MEDIUM: {
-    classe: "border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-300",
+    classe: "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300",
+    ponto: "bg-amber-500",
+    curto: "Média",
     rotulo: "Confiança intermediária",
     Icone: ShieldQuestion,
   },
   LOW: {
-    classe: "border-destructive/40 bg-destructive/10 text-destructive",
+    classe: "border-destructive/30 bg-destructive/10 text-destructive",
+    ponto: "bg-destructive",
+    curto: "Baixa",
     rotulo: "Confiança baixa",
     Icone: ShieldAlert,
   },
@@ -105,15 +114,17 @@ export function ConfiancaMensagemBadge({
         <button
           type="button"
           aria-label={`${estilo.rotulo}: ${confianca.score}%. Ver detalhes.`}
-          className={`inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px] font-medium ${estilo.classe}`}
+          title={`${estilo.rotulo} — ${confianca.score}% (visível apenas para a equipe)`}
+          className={`inline-flex h-[18px] shrink-0 items-center gap-1 rounded-full border px-1.5 text-[10px] font-medium leading-none ${estilo.classe}`}
         >
-          <Icone className="h-3 w-3" />
-          {confianca.score}%
+          <span aria-hidden className={`h-1.5 w-1.5 rounded-full ${estilo.ponto}`} />
+          {confianca.score}% {estilo.curto}
         </button>
       </PopoverTrigger>
       <PopoverContent align="end" className="w-80 space-y-2 text-xs">
         <div>
           <p className="text-sm font-medium">
+            <Icone className="mr-1 inline h-3.5 w-3.5" aria-hidden />
             {estilo.rotulo} — {confianca.score}%
           </p>
           <p className="text-muted-foreground">
@@ -163,9 +174,10 @@ export function ConfiancaMensagemBadge({
 export function ConfiancaNaoAvaliadaBadge() {
   return (
     <span
-      title="Esta resposta é anterior ao registro de confiança ou não teve avaliação gravada."
-      className="inline-flex items-center rounded-full border border-border/60 px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground"
+      title="Esta resposta é anterior ao registro de confiança ou não teve avaliação gravada (visível apenas para a equipe)."
+      className="inline-flex h-[18px] shrink-0 items-center gap-1 rounded-full border border-border/60 px-1.5 text-[10px] font-medium leading-none text-muted-foreground"
     >
+      <span aria-hidden className="h-1.5 w-1.5 rounded-full border border-muted-foreground/60" />
       Não avaliada
     </span>
   );
