@@ -74,6 +74,8 @@ type Props = {
   nivelAcesso?: NivelAcesso;
   /** Paciente da execução, usado para nunca exibir fonte de outro paciente. */
   pacienteExecucaoId?: string | null;
+  /** FASE 6 — marcas de mudança por node (adicionado/alterado/removido). */
+  marcasAlteracao?: Record<string, MarcaAlteracao>;
 };
 
 const ESCALA_MIN = 0.2;
