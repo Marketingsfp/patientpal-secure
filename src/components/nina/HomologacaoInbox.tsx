@@ -332,15 +332,23 @@ export function HomologacaoInbox() {
     void carregarLeads();
   }, [carregarLeads]);
 
+  /**
+   * FASE 4 — troca rápida entre Teste 01 → 02 → 03: guardamos qual lead está
+   * aberto e descartamos qualquer resposta atrasada de um lead anterior, para
+   * que nenhum card receba mensagens, horário ou contador de outro.
+   */
+  const leadSelecionadoRef = useRef<string | null>(null);
   const carregarHistorico = useCallback(
     async (id: string) => {
       if (!clinicaId) return;
+      leadSelecionadoRef.current = id;
       try {
         const r = (await historico({ data: { clinicaId, leadId: id } })) as {
           mensagens: Msg[];
           eventos?: ConversaEvento[];
           conversaId: string | null;
         };
+        if (leadSelecionadoRef.current !== id) return; // resposta atrasada
         setMsgs(r.mensagens);
         setEventosConversa(r.eventos ?? []);
         setConversaId(r.conversaId);
@@ -348,6 +356,7 @@ export function HomologacaoInbox() {
           const f = (await ferramentasFn({
             data: { clinicaId, conversaId: r.conversaId },
           })) as { eventos: EventoFerramenta[]; debug?: Record<string, unknown> };
+          if (leadSelecionadoRef.current !== id) return; // resposta atrasada
           setFerramentas(f.eventos);
           setDebugEstado(f.debug ?? null);
         } else {
@@ -444,6 +453,7 @@ export function HomologacaoInbox() {
     setCarregandoConversa(true);
     setAudio(null);
     setErro(null);
+    marcadoRef.current = "";
     void carregarHistorico(leadId).finally(() => setCarregandoConversa(false));
   }, [leadId, carregarHistorico]);
 
@@ -677,6 +687,11 @@ export function HomologacaoInbox() {
       setErro(null);
       setAudio(null);
       setFerramentas([]);
+      // Nova sessão: leitura e idempotência recomeçam; o histórico anterior
+      // continua disponível no console.
+      marcadoRef.current = "";
+      aplicadasRef.current.clear();
+      setLeads((ls) => ls.map((l) => (l.id === leadId ? { ...l, naoLidas: 0 } : l)));
       await carregarHistorico(leadId);
       await carregarLeads();
     } catch (e: any) {
