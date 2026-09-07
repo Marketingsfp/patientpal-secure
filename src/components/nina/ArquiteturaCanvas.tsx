@@ -206,6 +206,30 @@ export function ArquiteturaCanvas({
   );
   const temRealce = realce.nodes.size > 0;
 
+  const categoriasVisiveis = useMemo(
+    () =>
+      new Set(
+        CATEGORIAS_ARQUITETURA.filter(
+          (categoria: CategoriaArquitetura) => !categoriasOcultas.has(categoria),
+        ),
+      ),
+    [categoriasOcultas],
+  );
+
+  const visiveis = useMemo(
+    () => nodesVisiveis(nodes, categoriasVisiveis),
+    [nodes, categoriasVisiveis],
+  );
+
+  const resultadosBusca = useMemo(() => new Set(buscarNodes(nodes, termoBusca)), [nodes, termoBusca]);
+
+  const minimapa = useMemo(
+    () => calcularMinimapa(layout, { largura: 180, altura: 120 }),
+    [layout],
+  );
+
+
+
 
   const ajustarTela = useCallback(() => {
     const area = areaRef.current;
