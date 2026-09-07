@@ -15,7 +15,6 @@ import {
   ZoomOut,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import {
   CATEGORIAS_ARQUITETURA,
   NODES_ARQUITETURA,
@@ -30,6 +29,7 @@ import {
   calcularLayout,
   type Posicao,
 } from "@/lib/nina/arquitetura/layout";
+import { NodeDetalhePainel } from "./NodeDetalhePainel";
 
 export type StatusNodeCanvas = {
   /** Estado mostrado no node (modo EXECUÇÃO preenche isto na fase seguinte). */
@@ -38,6 +38,10 @@ export type StatusNodeCanvas = {
   horario?: string | null;
   tentativas?: number | null;
   erro?: string | null;
+  /** Resumo já mascarado do que entrou neste node naquela passagem. */
+  entrada?: string | null;
+  /** Resumo já mascarado do que o node devolveu naquela passagem. */
+  resultado?: string | null;
 };
 
 type Props = {
@@ -48,6 +52,8 @@ type Props = {
   /** Quando true, nodes sem status ficam apagados. */
   modoExecucao?: boolean;
   nodes?: NodeArquitetura[];
+  /** Clínica usada para autorizar a visualização de código no painel. */
+  clinicaId?: string | null;
 };
 
 const ESCALA_MIN = 0.2;
@@ -77,6 +83,7 @@ export function ArquiteturaCanvas({
   execucao,
   modoExecucao = false,
   nodes = NODES_ARQUITETURA,
+  clinicaId,
 }: Props) {
   const areaRef = useRef<HTMLDivElement | null>(null);
   const [posicoes, setPosicoes] = useState<Record<string, Posicao>>({});
@@ -381,55 +388,20 @@ export function ArquiteturaCanvas({
         ))}
       </div>
 
-      {detalhe ? (
-        <div className="rounded-lg border bg-card p-4 text-sm">
-          <div className="flex flex-wrap items-center gap-2">
-            <strong className="text-foreground">{detalhe.nome}</strong>
-            <Badge variant="outline">{detalhe.categoria}</Badge>
-            {detalhe.servico ? <Badge variant="secondary">{detalhe.servico}</Badge> : null}
-          </div>
-          <p className="mt-2 text-muted-foreground">{detalhe.descricao}</p>
-          <dl className="mt-3 grid gap-2 sm:grid-cols-2">
-            {detalhe.arquivo ? (
-              <div>
-                <dt className="text-xs text-muted-foreground">Arquivo</dt>
-                <dd className="break-all font-mono text-xs">{detalhe.arquivo}</dd>
-              </div>
-            ) : null}
-            {detalhe.funcao ? (
-              <div>
-                <dt className="text-xs text-muted-foreground">Função</dt>
-                <dd className="break-all font-mono text-xs">{detalhe.funcao}</dd>
-              </div>
-            ) : null}
-            <div>
-              <dt className="text-xs text-muted-foreground">Entrada</dt>
-              <dd>{detalhe.entrada}</dd>
-            </div>
-            <div>
-              <dt className="text-xs text-muted-foreground">Saída</dt>
-              <dd>{detalhe.saida}</dd>
-            </div>
-            {detalhe.tabelas?.length ? (
-              <div className="sm:col-span-2">
-                <dt className="text-xs text-muted-foreground">Tabelas</dt>
-                <dd className="font-mono text-xs">{detalhe.tabelas.join(", ")}</dd>
-              </div>
-            ) : null}
-            {detalhe.erros.length ? (
-              <div className="sm:col-span-2">
-                <dt className="text-xs text-muted-foreground">Possíveis erros</dt>
-                <dd>{detalhe.erros.join(" · ")}</dd>
-              </div>
-            ) : null}
-          </dl>
-        </div>
-      ) : (
-        <p className="text-xs text-muted-foreground">
-          Clique em um componente para ver arquivo, função, entradas, saídas e erros possíveis.
-          Arraste para reposicionar — isso muda apenas o desenho, nunca o funcionamento da Nina.
-        </p>
-      )}
+      <p className="text-xs text-muted-foreground">
+        Clique em um componente para abrir o painel com arquivo, função, entradas, saídas, erros
+        possíveis e documentação. Arraste para reposicionar — isso muda apenas o desenho, nunca o
+        funcionamento da Nina.
+      </p>
+
+      <NodeDetalhePainel
+        node={detalhe}
+        aberto={Boolean(detalhe)}
+        onFechar={() => setSelecionado(null)}
+        clinicaId={clinicaId}
+        execucao={detalhe ? execucao?.[detalhe.id] ?? null : null}
+        modoExecucao={modoExecucao}
+      />
     </div>
   );
 }
