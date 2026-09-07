@@ -51,8 +51,8 @@ describe("layout incremental", () => {
       descricao: "Ferramenta hipotética usada apenas neste teste.",
       anteriores: [agenda.id],
       seguintes: [],
-      entrada: [],
-      saida: [],
+      entrada: "teste",
+      saida: "teste",
       erros: [],
     };
     nodes.find((n) => n.id === agenda.id)!.seguintes.push(novo.id);
@@ -140,8 +140,8 @@ describe("layout incremental", () => {
       descricao: "somente teste",
       anteriores,
       seguintes,
-      entrada: [],
-      saida: [],
+      entrada: "teste",
+      saida: "teste",
       erros: [],
     });
     // Cadeia longa: assim a mudança é pequena e o recálculo é local.
@@ -215,8 +215,8 @@ describe("layout incremental", () => {
       descricao: "somente teste",
       anteriores: [alvo.id],
       seguintes: [],
-      entrada: [],
-      saida: [],
+      entrada: "teste",
+      saida: "teste",
       erros: [],
     };
     alvo.seguintes.push(novo.id);
