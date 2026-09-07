@@ -151,6 +151,13 @@ export function ArquiteturaCanvas({
   const [selecionado, setSelecionado] = useState<string | null>(null);
   const [caminhoCompleto, setCaminhoCompleto] = useState(false);
   const [mostrarAlteracoes, setMostrarAlteracoes] = useState(false);
+  // FASE 7 — filtro e busca são apenas visuais: escondem/realçam na tela e
+  // nunca mudam o manifesto, as conexões ou o funcionamento da Nina.
+  const [categoriasOcultas, setCategoriasOcultas] = useState<Set<CategoriaArquitetura>>(
+    () => new Set(),
+  );
+  const [termoBusca, setTermoBusca] = useState("");
+
   const arrasto = useRef<
     | { tipo: "canvas"; startX: number; startY: number; origemX: number; origemY: number }
     | { tipo: "node"; id: string; startX: number; startY: number; origemX: number; origemY: number }
