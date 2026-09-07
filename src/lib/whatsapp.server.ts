@@ -1448,25 +1448,28 @@ ATENDIMENTO HUMANO — REGRA OBRIGATÓRIA:
         entities: dadosColetados,
       };
       const decisao = decidirNoTurno(estadoTurno);
-      // FASE 7 — SHADOW MODE: por padrão o motor só observa e registra. A
-      // decisão só passa a valer quando a clínica ligar a flag
-      // `nina_confidence_enforce`.
-      const [{ modoConfianca }, { aplicarModo }] = await Promise.all([
-        import("@/lib/nina/confidence/shadow-flag.server"),
-        import("@/lib/nina/confidence/shadow"),
+      // FASE 8 — ATIVAÇÃO PROGRESSIVA: etapa A só observa; B aplica handoff e
+      // bloqueio; C acrescenta esclarecimento; D endurece o agendamento.
+      const [{ etapaConfianca, modoDaEtapa }, { aplicarEtapa }] = await Promise.all([
+        import("@/lib/nina/confidence/etapas-flag.server"),
+        import("@/lib/nina/confidence/etapas"),
       ]);
-      const modo = await modoConfianca(clinicaId);
-      const aplicado = aplicarModo(decisao, modo);
+      const etapa = await etapaConfianca(clinicaId);
+      const modo = modoDaEtapa(etapa);
+      const aplicado = aplicarEtapa(decisao, etapa);
       rastro?.concluir("confidence.decision", {
         score: decisao.score,
         nivel: decisao.level,
         acao: decisao.decision,
         modo,
+        etapa,
         decisao_efetiva: aplicado.decisaoEfetiva,
         teria_permitido: aplicado.teriaPermitido,
+        motivo_etapa: aplicado.motivoEtapa ?? null,
         bloqueios: decisao.hardBlockers ?? [],
         categorias: decisao.evidence.categorias,
       });
+
       {
         const { registrarDecisaoConfianca } = await import(
           "@/lib/nina/confidence-engine.server"
