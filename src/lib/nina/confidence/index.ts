@@ -6,3 +6,20 @@
  */
 export * from "./types";
 export { decidirConfianca, executarValidadores, LIMITE_HIGH, LIMITE_MEDIUM } from "./engine";
+export {
+  ActionRiskValidator,
+  BusinessRulesValidator,
+  ConflictValidator,
+  CONFIG_PADRAO_VALIDADORES,
+  EntityResolutionValidator,
+  executarValidadoresDeConfianca,
+  IntentClarityValidator,
+  MINIMO_POR_RISCO,
+  OfficialSourceValidator,
+  RequiredDataValidator,
+  riscoDaAcao,
+  SourceFreshnessValidator,
+  ToolIntegrityValidator,
+  type ConfigValidador,
+  type ConfigValidadores,
+} from "./validators";
