@@ -30,6 +30,7 @@ import {
   type Posicao,
 } from "@/lib/nina/arquitetura/layout";
 import { NodeDetalhePainel } from "./NodeDetalhePainel";
+import type { NivelAcesso } from "@/lib/nina/arquitetura/detalhes-ia";
 
 export type StatusNodeCanvas = {
   /** Estado mostrado no node (modo EXECUÇÃO preenche isto na fase seguinte). */
@@ -42,6 +43,8 @@ export type StatusNodeCanvas = {
   entrada?: string | null;
   /** Resumo já mascarado do que o node devolveu naquela passagem. */
   resultado?: string | null;
+  /** Metadata do trace daquela passagem (prompt, RAG, IA, tools). */
+  metadata?: Record<string, unknown> | null;
 };
 
 type Props = {
@@ -54,6 +57,10 @@ type Props = {
   nodes?: NodeArquitetura[];
   /** Clínica usada para autorizar a visualização de código no painel. */
   clinicaId?: string | null;
+  /** Perfil de quem está olhando: define o que pode ser exibido. */
+  nivelAcesso?: NivelAcesso;
+  /** Paciente da execução, usado para nunca exibir fonte de outro paciente. */
+  pacienteExecucaoId?: string | null;
 };
 
 const ESCALA_MIN = 0.2;
@@ -84,6 +91,8 @@ export function ArquiteturaCanvas({
   modoExecucao = false,
   nodes = NODES_ARQUITETURA,
   clinicaId,
+  nivelAcesso = "operacional",
+  pacienteExecucaoId = null,
 }: Props) {
   const areaRef = useRef<HTMLDivElement | null>(null);
   const [posicoes, setPosicoes] = useState<Record<string, Posicao>>({});
@@ -399,6 +408,8 @@ export function ArquiteturaCanvas({
         aberto={Boolean(detalhe)}
         onFechar={() => setSelecionado(null)}
         clinicaId={clinicaId}
+        nivelAcesso={nivelAcesso}
+        pacienteExecucaoId={pacienteExecucaoId}
         execucao={detalhe ? execucao?.[detalhe.id] ?? null : null}
         modoExecucao={modoExecucao}
       />

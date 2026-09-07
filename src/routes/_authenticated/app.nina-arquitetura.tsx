@@ -67,6 +67,7 @@ function Pagina() {
               <ArquiteturaCanvas
                 chavePosicoes={`nina-arquitetura-posicoes:${clinicaAtual?.clinica_id ?? "sem-clinica"}`}
                 clinicaId={clinicaAtual?.clinica_id ?? null}
+                nivelAcesso={clinicaAtual?.role === "admin" ? "admin" : "operacional"}
               />
             </CardContent>
           </Card>

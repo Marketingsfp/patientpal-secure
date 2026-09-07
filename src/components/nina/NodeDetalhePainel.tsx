@@ -18,6 +18,12 @@ import { NODES_ARQUITETURA, type NodeArquitetura } from "@/lib/nina/arquitetura/
 import { CORES_CATEGORIA } from "@/lib/nina/arquitetura/layout";
 import { verTrechoCodigo, type RespostaCodigo } from "@/lib/nina/arquitetura/codigo.functions";
 import type { StatusNodeCanvas } from "./ArquiteturaCanvas";
+import {
+  RESTRITO,
+  lerDetalheEspecifico,
+  type DetalheEspecifico,
+  type NivelAcesso,
+} from "@/lib/nina/arquitetura/detalhes-ia";
 
 type Props = {
   node: NodeArquitetura | null;
@@ -26,7 +32,157 @@ type Props = {
   clinicaId?: string | null;
   execucao?: StatusNodeCanvas | null;
   modoExecucao?: boolean;
+  nivelAcesso?: NivelAcesso;
+  pacienteExecucaoId?: string | null;
 };
+
+/** FASE 6 — leitura específica de prompt, conhecimento/RAG, IA e ferramentas. */
+function DetalheIAeTools({ detalhe }: { detalhe: DetalheEspecifico }) {
+  if (!detalhe) return null;
+
+  if (detalhe.tipo === "prompt") {
+    return (
+      <div className="space-y-4 rounded-md border p-3">
+        <p className="text-xs font-medium uppercase tracking-wide">Instruções da Nina</p>
+        <Campo rotulo="Versão do prompt principal">{detalhe.versao ?? "—"}</Campo>
+        <Campo rotulo="Publicado em">{detalhe.publicadoEm ?? "—"}</Campo>
+        <Campo rotulo="Situação">{detalhe.status ?? "—"}</Campo>
+        <Campo rotulo="Módulos adicionais carregados">
+          {detalhe.modulos.length ? (
+            <ul className="list-disc pl-4">
+              {detalhe.modulos.map((m) => (
+                <li key={m}>{m}</li>
+              ))}
+            </ul>
+          ) : (
+            "Nenhum módulo adicional"
+          )}
+        </Campo>
+        <Campo rotulo="Instruções utilizadas">
+          <span className="whitespace-pre-wrap break-words text-xs">
+            {detalhe.instrucoes ?? "—"}
+          </span>
+        </Campo>
+      </div>
+    );
+  }
+
+  if (detalhe.tipo === "conhecimento") {
+    return (
+      <div className="space-y-4 rounded-md border p-3">
+        <p className="text-xs font-medium uppercase tracking-wide">Conhecimento consultado</p>
+        <Campo rotulo="Consulta realizada">{detalhe.consulta ?? "—"}</Campo>
+        <Campo rotulo="Tipo de recuperação">{detalhe.recuperacao}</Campo>
+        <Campo rotulo="Fontes encontradas">
+          {detalhe.semResultados ? (
+            "Nenhuma fonte encontrada para esta consulta."
+          ) : (
+            <ul className="space-y-1">
+              {detalhe.fontes.map((f, i) => (
+                <li key={f.id ?? i} className="flex flex-wrap items-center gap-2">
+                  <span>{f.titulo}</span>
+                  {f.versao ? <Badge variant="outline">versão {f.versao}</Badge> : null}
+                  {f.score != null ? <Badge variant="secondary">{f.score}</Badge> : null}
+                  {f.selecionada ? <Badge>usada na resposta</Badge> : null}
+                </li>
+              ))}
+            </ul>
+          )}
+        </Campo>
+        <Campo rotulo="Conteúdo utilizado">
+          <span className="whitespace-pre-wrap break-words text-xs">
+            {detalhe.conteudoUtilizado ?? "—"}
+          </span>
+        </Campo>
+        {detalhe.fontesDeOutroPaciente > 0 ? (
+          <p className="text-xs text-muted-foreground">
+            {detalhe.fontesDeOutroPaciente} fonte(s) de outro paciente não são exibidas.
+          </p>
+        ) : null}
+      </div>
+    );
+  }
+
+  if (detalhe.tipo === "ia") {
+    return (
+      <div className="space-y-4 rounded-md border p-3">
+        <p className="text-xs font-medium uppercase tracking-wide">Modelo de IA</p>
+        <div className="grid grid-cols-2 gap-3">
+          <Campo rotulo="Provedor">{detalhe.provedor ?? "—"}</Campo>
+          <Campo rotulo="Modelo">{detalhe.modelo ?? "—"}</Campo>
+          <Campo rotulo="Horário">{detalhe.horario ?? "—"}</Campo>
+          <Campo rotulo="Latência">
+            {detalhe.latenciaMs != null ? `${detalhe.latenciaMs} ms` : "—"}
+          </Campo>
+          <Campo rotulo="Tokens de entrada">{detalhe.tokensEntrada ?? "—"}</Campo>
+          <Campo rotulo="Tokens de saída">{detalhe.tokensSaida ?? "—"}</Campo>
+          <Campo rotulo="Tokens totais">{detalhe.tokensTotais ?? "—"}</Campo>
+          <Campo rotulo="Custo estimado">{detalhe.custoEstimado ?? "não informado"}</Campo>
+          <Campo rotulo="Chamadas ao modelo">{detalhe.chamadas ?? "—"}</Campo>
+          <Campo rotulo="Situação">{detalhe.status ?? "—"}</Campo>
+        </div>
+        <Campo rotulo="Instruções utilizadas">
+          <span className="whitespace-pre-wrap break-words text-xs">
+            {detalhe.instrucoes ?? "—"}
+          </span>
+        </Campo>
+        <Campo rotulo="Contexto enviado">
+          <span className="whitespace-pre-wrap break-words text-xs">
+            {detalhe.contextoEnviado ?? "—"}
+          </span>
+        </Campo>
+        <Campo rotulo="Conhecimento recuperado">
+          <span className="whitespace-pre-wrap break-words text-xs">
+            {detalhe.conhecimentoRecuperado ?? "—"}
+          </span>
+        </Campo>
+        <Campo rotulo="Ferramentas solicitadas">
+          {detalhe.toolCalls.length ? detalhe.toolCalls.join(" · ") : "Nenhuma"}
+        </Campo>
+        <Campo rotulo="Resultado estruturado">
+          <span className="whitespace-pre-wrap break-words text-xs">
+            {detalhe.resultadoEstruturado ?? "—"}
+          </span>
+        </Campo>
+        <p className="text-xs text-muted-foreground">
+          O raciocínio interno do modelo nunca é registrado nem exibido.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4 rounded-md border p-3">
+      <p className="text-xs font-medium uppercase tracking-wide">Ferramenta</p>
+      <Campo rotulo="Ferramenta">{detalhe.ferramenta ?? "—"}</Campo>
+      <Campo rotulo="Argumentos">
+        {detalhe.argumentos ? (
+          <pre className="overflow-auto rounded bg-muted/40 p-2 text-[11px]">
+            <code>{JSON.stringify(detalhe.argumentos, null, 2)}</code>
+          </pre>
+        ) : (
+          "—"
+        )}
+      </Campo>
+      <Campo rotulo="Resultado">{detalhe.resultado ?? "—"}</Campo>
+      <Campo rotulo="Validações">
+        {detalhe.validacoes.length ? detalhe.validacoes.join(" · ") : "—"}
+      </Campo>
+      <div className="grid grid-cols-2 gap-3">
+        <Campo rotulo="Situação">{detalhe.status ?? "—"}</Campo>
+        <Campo rotulo="Latência">
+          {detalhe.latenciaMs != null ? `${detalhe.latenciaMs} ms` : "—"}
+        </Campo>
+        <Campo rotulo="Identificador da operação">{detalhe.operacaoId ?? "—"}</Campo>
+      </div>
+      {detalhe.erro ? (
+        <Campo rotulo="Erro">
+          <span className="text-destructive">{detalhe.erro}</span>
+        </Campo>
+      ) : null}
+    </div>
+  );
+}
 
 function nomeDe(id: string): string {
   return NODES_ARQUITETURA.find((n) => n.id === id)?.nome ?? id;
@@ -48,6 +204,8 @@ export function NodeDetalhePainel({
   clinicaId,
   execucao,
   modoExecucao = false,
+  nivelAcesso = "operacional",
+  pacienteExecucaoId = null,
 }: Props) {
   const buscarCodigo = useServerFn(verTrechoCodigo);
   const [codigo, setCodigo] = useState<RespostaCodigo | null>(null);
@@ -150,6 +308,20 @@ export function NodeDetalhePainel({
                         <Campo rotulo="Tentativas">{execucao.tentativas ?? 1}</Campo>
                         <Campo rotulo="Entrada desta passagem">{execucao.entrada ?? "—"}</Campo>
                         <Campo rotulo="Resultado">{execucao.resultado ?? "—"}</Campo>
+                        <DetalheIAeTools
+                          detalhe={lerDetalheEspecifico(
+                            node.id,
+                            execucao.metadata,
+                            nivelAcesso,
+                            pacienteExecucaoId,
+                          )}
+                        />
+                        {nivelAcesso !== "admin" ? (
+                          <p className="text-xs text-muted-foreground">
+                            Conteúdos marcados como {RESTRITO} são visíveis apenas para
+                            administradores desta clínica.
+                          </p>
+                        ) : null}
                         {execucao.erro ? (
                           <Campo rotulo="Erro">
                             <span className="text-destructive">{execucao.erro}</span>
