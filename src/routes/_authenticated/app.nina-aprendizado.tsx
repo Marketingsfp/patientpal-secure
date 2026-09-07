@@ -314,8 +314,10 @@ function Pagina() {
   const [textoEdicao, setTextoEdicao] = useState("");
   const navigate = useNavigate();
   const [conversaAuditoria, setConversaAuditoria] = useState<{
-    conversaId: string;
+    conversaId: string | null;
     mensagemId: string | null;
+    erroId: string;
+    reportadoEm: string;
   } | null>(null);
 
   const [salvando, setSalvando] = useState(false);
