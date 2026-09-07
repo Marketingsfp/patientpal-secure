@@ -120,9 +120,19 @@ export function CentralAtencao() {
   );
 
   const resumo = useMemo(
-    () => (clinicaId ? calcularAtencao({ naoAtribuidas: fila, espera, nomes, agora }) : VAZIO),
+    () =>
+      clinicaId
+        ? calcularAtencao({ naoAtribuidas: fila, espera, nomes, agora, limiteItens: 200 })
+        : VAZIO,
     [clinicaId, fila, espera, nomes, agora],
   );
+
+  // Lista mostrada: prioridades gerais (8 primeiras) ou a categoria escolhida.
+  const lista = useMemo(() => {
+    const base = itensDaCategoria(resumo.itens, categoria);
+    return categoria ? base : base.slice(0, 8);
+  }, [resumo.itens, categoria]);
+
 
   // Animação de entrada mais perceptível só quando SURGE algo crítico novo.
   const [novo, setNovo] = useState(false);
@@ -276,25 +286,40 @@ export function CentralAtencao() {
   );
 }
 
+function tituloCategoria(c: CategoriaAtencao) {
+  return c === "nao_atribuida"
+    ? "Não atribuídas"
+    : c === "critica"
+      ? "Espera crítica"
+      : "Aguardando resposta";
+}
+
 function LinhaCategoria({
   cor,
   icone,
   titulo,
   valor,
+  ativo,
   onClick,
 }: {
   cor: "vermelho" | "ambar";
   icone: React.ReactNode;
   titulo: string;
   valor: number;
+  ativo?: boolean;
   onClick: () => void;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs hover:bg-muted"
+      aria-pressed={Boolean(ativo)}
+      className={cn(
+        "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs hover:bg-muted",
+        ativo && "bg-muted",
+      )}
     >
+
       <span
         className={cn(
           "grid h-6 w-6 shrink-0 place-items-center rounded-md",
