@@ -57,7 +57,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { HomologacaoWhatsapp } from "@/components/nina/HomologacaoWhatsapp";
+import { HomologacaoInbox } from "@/components/nina/HomologacaoInbox";
 import { AtendMacros } from "@/components/nina/AtendimentoTabs";
 import { AtendInbox } from "@/components/nina/AtendimentoExtraTabs";
 
@@ -134,7 +134,7 @@ function NinaPage() {
 
         {/* ============ HOMOLOGAÇÃO ============ */}
         <TabsContent value="homologacao">
-          <HomologacaoWhatsapp />
+          <HomologacaoInbox />
         </TabsContent>
 
         {/* ============ ATENDIMENTO — Dashboard ============ */}

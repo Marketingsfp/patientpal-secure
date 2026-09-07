@@ -155,20 +155,11 @@ O agente deve preferir mudanças pequenas, rastreáveis e reversíveis. Quando a
 correção tiver risco de impacto operacional, deve propor validação antes de
 ampliar o escopo.
 
-### 1.10 Clínica-alvo obrigatória
+### 1.10 Alcance das alterações
 
-Este sistema atende múltiplas clínicas com feature flags e configurações
-independentes por `clinica_id`. Antes de qualquer alteração de sistema (código,
-UI, regra, banco, flag, permissão, dado ou teste operacional), o agente **deve
-perguntar ao colaborador em qual(is) clínica(s) a alteração deve ser aplicada**.
-
-- Não presumir "todas as clínicas" nem inferir a clínica pelo contexto atual.
-- Se a resposta for uma clínica específica, usar feature flag por `clinica_id`
-  conforme `mem/preferences/feature-flags-por-clinica.md`.
-- Se for global, confirmar explicitamente com o colaborador que a mudança
-  deve valer para todas as clínicas antes de executar.
-- Correções puramente técnicas (bug de código sem regra de negócio) podem ser
-  globais, mas o agente ainda deve confirmar antes de aplicar.
+Todas as alterações valem para **todas as clínicas**. Não é necessário
+perguntar qual clínica é o alvo nem criar feature flag por `clinica_id` para
+restringir o alcance de uma mudança.
 
 ---
 
