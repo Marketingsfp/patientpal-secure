@@ -9,6 +9,12 @@
  * (`../confidence-engine`) em vez de criar uma segunda gramática paralela.
  */
 import { detectarCategorias, type CategoriaConfianca } from "../confidence-engine";
+import {
+  executarValidadoresDeConfianca,
+  riscoDaAcao,
+  MINIMO_POR_RISCO,
+  type ConfigValidadores,
+} from "./validators";
 import type {
   Bloqueador,
   ContextoConfianca,
@@ -235,9 +241,34 @@ function nivel(score: number): NivelConfianca {
  * Ponto de entrada do serviço. Nunca lança: qualquer contexto estranho leva
  * ao caminho conservador (transferir para humano).
  */
-export function decidirConfianca(ctx: ContextoConfianca): ResultadoConfianca {
+export function decidirConfianca(
+  ctx: ContextoConfianca,
+  opcoes: { config?: ConfigValidadores; agora?: Date } = {},
+): ResultadoConfianca {
   const cats = categoriasDoContexto(ctx);
   const checks = executarValidadores(ctx);
+
+  // Validadores da Fase 2: independentes, auditáveis e configuráveis.
+  const validators = executarValidadoresDeConfianca({
+    ctx,
+    categorias: cats as string[],
+    ...(opcoes.config ? { config: opcoes.config } : {}),
+    ...(opcoes.agora ? { agora: opcoes.agora } : {}),
+  });
+  for (const v of validators) {
+    if (v.status === "PASS" || v.status === "NOT_APPLICABLE") continue;
+    checks.push(
+      check(
+        v.validator,
+        v.reasonCode,
+        false,
+        v.peso ?? 0,
+        v.blocker ?? null,
+        JSON.stringify(v.evidence),
+      ),
+    );
+  }
+
   const reprovados = checks.filter((c) => !c.aprovado);
   const blockers = [...new Set(reprovados.map((c) => c.bloqueador).filter(Boolean))] as Bloqueador[];
 
@@ -257,18 +288,21 @@ export function decidirConfianca(ctx: ContextoConfianca): ResultadoConfianca {
       decision: "ALLOW",
       blockers: [],
       checks,
+      validators,
       evidence: montarEvidencia(ctx, cats, ["handoff já solicitado pelo runtime"]),
     };
   }
+
+  const minimoRisco = MINIMO_POR_RISCO[riscoDaAcao(ctx)];
 
   let decision: DecisaoMotor;
   if (blockers.length > 0) {
     decision = ACOES_DE_ESCRITA.has(ctx.requestedAction) ? "BLOCK_ACTION" : "HANDOFF";
   } else {
     const nv = nivel(score);
-    if (nv === "HIGH") decision = "ALLOW";
-    else if (nv === "MEDIUM") decision = ctx.businessContext.esclarecimentoUsado ? "HANDOFF" : "CLARIFY";
-    else decision = "HANDOFF";
+    if (nv === "HIGH" && score >= minimoRisco) decision = "ALLOW";
+    else if (nv === "LOW") decision = "HANDOFF";
+    else decision = ctx.businessContext.esclarecimentoUsado ? "HANDOFF" : "CLARIFY";
   }
 
   if (motivos.length === 0) motivos.push("evidências suficientes no sistema");
@@ -279,6 +313,7 @@ export function decidirConfianca(ctx: ContextoConfianca): ResultadoConfianca {
     decision,
     blockers,
     checks,
+    validators,
     evidence: montarEvidencia(ctx, cats, motivos),
   };
 }

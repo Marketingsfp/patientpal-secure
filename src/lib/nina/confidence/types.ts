@@ -43,6 +43,14 @@ export type FonteRecuperada = {
   temConteudo: boolean;
   /** Publicado/vigente na origem. Rascunho e arquivado não valem. */
   publicado?: boolean;
+  /** Registro ativo na origem (false = desativado). */
+  ativo?: boolean;
+  /** Data de expiração/vigência, quando a origem controlar isso (ISO). */
+  expiraEm?: string | null;
+  /** Preenchido quando o registro foi substituído por outra versão. */
+  substituidoPor?: string | null;
+  /** Nota interna: jamais pode ser repassada ao paciente. */
+  interna?: boolean;
 };
 
 /** Resultado de uma ferramenta executada neste turno. */
@@ -85,6 +93,32 @@ export type ContextoConfianca = {
   businessContext: ContextoNegocio;
   /** Rascunho da resposta, quando o runtime já tem o texto. */
   draftText?: string | null;
+  /** O runtime detectou que o pedido do paciente está ambíguo. */
+  intentAmbiguo?: boolean;
+  /** Confiança do runtime na intenção detectada (0..1). */
+  intentConfidence?: number | null;
+  /** Candidatos encontrados por entidade — mais de um = ambiguidade. */
+  entityCandidates?: Record<string, string[]>;
+  /** Valores divergentes para o mesmo fato, vindos de origens diferentes. */
+  conflitos?: ConflitoDeFonte[];
+  /** Regras determinísticas da clínica aplicáveis a este turno. */
+  regrasNegocio?: RegraNegocio[];
+};
+
+/** O mesmo campo com valores diferentes em origens diferentes. */
+export type ConflitoDeFonte = {
+  campo: string;
+  valores: { origem: string; valor: string }[];
+};
+
+/** Regra determinística da clínica avaliada fora do modelo. */
+export type RegraNegocio = {
+  id: string;
+  descricao?: string | null;
+  /** A regra foi atendida pelo contexto atual. */
+  satisfeita: boolean;
+  /** A regra determina atendimento humano para este caso. */
+  exigeHumano?: boolean;
 };
 
 export type NivelConfianca = "HIGH" | "MEDIUM" | "LOW";
@@ -97,7 +131,31 @@ export type Bloqueador =
   | "AGENDA_SEM_CONFIRMACAO"
   | "FERRAMENTA_FALHOU"
   | "PREPARO_SEM_FONTE"
-  | "CAMPO_OBRIGATORIO_AUSENTE";
+  | "CAMPO_OBRIGATORIO_AUSENTE"
+  | "CONFLITO_DE_FONTE"
+  | "FONTE_NAO_VIGENTE"
+  | "NOTA_INTERNA_COMO_FONTE"
+  | "REGRA_EXIGE_HUMANO"
+  | "REGRA_DE_NEGOCIO_NAO_ATENDIDA";
+
+/** Status padronizado de um validador isolado. */
+export type StatusValidador = "PASS" | "WARNING" | "FAIL" | "BLOCK" | "NOT_APPLICABLE";
+
+export type NivelRiscoAcao = "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
+
+/** Saída padrão de cada validador da Fase 2. */
+export type ResultadoValidador = {
+  validator: string;
+  status: StatusValidador;
+  /** 0..100 — quanto este validador confia na própria dimensão. */
+  score: number;
+  reasonCode: string;
+  evidence: Record<string, unknown>;
+  /** Bloqueador absoluto associado, quando status = BLOCK. */
+  blocker?: Bloqueador | null;
+  /** Peso descontado do score final quando o status não é PASS. */
+  peso?: number;
+};
 
 /** Resultado de um validador individual (auditável). */
 export type Verificacao = {
@@ -127,5 +185,7 @@ export type ResultadoConfianca = {
   decision: DecisaoMotor;
   blockers: Bloqueador[];
   checks: Verificacao[];
+  /** Resultado bruto de cada validador da Fase 2 (auditoria e painel). */
+  validators?: ResultadoValidador[];
   evidence: EvidenciaConfianca;
 };
