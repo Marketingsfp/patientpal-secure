@@ -16,6 +16,13 @@ import {
   distribuirCenarios,
   type Criterio,
 } from "@/lib/nina/cenarios";
+import {
+  aplicarRegraHandoff,
+  desfechoDoItem,
+  handoffEsperado,
+  MOTIVO_CICLO_POR_DESFECHO,
+  type DesfechoCenario,
+} from "@/lib/nina/cenario-desfecho";
 import { MODELO_TERRA } from "@/lib/nina/simulador-terra";
 
 type Ctx = { supabase: any; userId: string };
@@ -79,6 +86,7 @@ const cenarioSchema = z.object({
   maxTurnos: z.number().int().min(1).max(20).default(6),
   tags: z.array(z.string().trim().max(30)).max(15).default([]),
   status: z.enum(["rascunho", "ativo", "arquivado"]).default("ativo"),
+  handoffEsperado: z.boolean().nullish(),
 });
 
 /** Lista os cenários da clínica. */
@@ -116,6 +124,7 @@ export const salvarCenario = createServerFn({ method: "POST" })
       max_turnos: data.maxTurnos,
       tags: data.tags,
       status: data.status,
+      handoff_esperado: data.handoffEsperado ?? null,
     };
 
     if (data.id) {
@@ -272,6 +281,7 @@ export const criarExecucaoCenarios = createServerFn({ method: "POST" })
       cenario_snapshot: d.cenario,
       lead_id: d.lead.id,
       lead_indice: (d.lead as any).indice,
+      handoff_esperado: handoffEsperado(d.cenario as any),
       ordem: d.ordem,
       status: "pendente",
       modelo_paciente: MODELO_TERRA,
@@ -427,6 +437,9 @@ export const finalizarItemExecucao = createServerFn({ method: "POST" })
         clinicaId: z.string().uuid(),
         itemId: z.string().uuid(),
         erroCliente: z.string().trim().max(300).nullish(),
+        handoffCliente: z.boolean().nullish(),
+        interrompido: z.boolean().nullish(),
+        turnosUsados: z.number().int().min(0).max(100).nullish(),
       })
       .parse(input),
   )
@@ -444,11 +457,31 @@ export const finalizarItemExecucao = createServerFn({ method: "POST" })
 
     const { data: lead } = await supabaseAdmin
       .from("nina_teste_leads")
-      .select("conversa_id, ciclo_id")
+      .select("id, indice, sessao_seq, conversa_id, ciclo_id")
       .eq("clinica_id", data.clinicaId)
       .eq("id", (item as any).lead_id)
       .maybeSingle();
-    const conversaId = (lead as any)?.conversa_id ?? null;
+
+    // O handoff (Fase 2) já pode ter encerrado o ciclo e limpado os ponteiros do
+    // lead. Nesse caso recuperamos a conversa pelo ciclo aberto para este item —
+    // nunca pela "primeira conversa do lead".
+    let conversaId = (lead as any)?.conversa_id ?? null;
+    let cicloId = (lead as any)?.ciclo_id ?? null;
+    if (!conversaId && (item as any).iniciado_em) {
+      const { data: ciclo } = await supabaseAdmin
+        .from("nina_teste_ciclos")
+        .select("id, conversa_id")
+        .eq("clinica_id", data.clinicaId)
+        .eq("lead_id", (item as any).lead_id)
+        .gte("started_at", (item as any).iniciado_em)
+        .order("started_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      conversaId = (ciclo as any)?.conversa_id ?? null;
+      cicloId = (ciclo as any)?.id ?? cicloId;
+    }
+
+
 
     let respostasNina: string[] = [];
     let mensagens = 0;
