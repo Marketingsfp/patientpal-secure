@@ -9713,13 +9713,17 @@ export type Database = {
           conversa_id: string | null
           created_at: string
           criado_por: string | null
+          end_reason: string | null
+          ended_at: string | null
           id: string
           indice: number
           lead_id: string
+          nina_session_id: string | null
           paciente_teste_id: string | null
           resolved_at: string | null
           resolvido_por: string | null
           sessao_seq: number
+          started_at: string
           status: string
           telefone_sessao: string
           updated_at: string
@@ -9729,13 +9733,17 @@ export type Database = {
           conversa_id?: string | null
           created_at?: string
           criado_por?: string | null
+          end_reason?: string | null
+          ended_at?: string | null
           id?: string
           indice: number
           lead_id: string
+          nina_session_id?: string | null
           paciente_teste_id?: string | null
           resolved_at?: string | null
           resolvido_por?: string | null
           sessao_seq: number
+          started_at?: string
           status?: string
           telefone_sessao: string
           updated_at?: string
@@ -9745,13 +9753,17 @@ export type Database = {
           conversa_id?: string | null
           created_at?: string
           criado_por?: string | null
+          end_reason?: string | null
+          ended_at?: string | null
           id?: string
           indice?: number
           lead_id?: string
+          nina_session_id?: string | null
           paciente_teste_id?: string | null
           resolved_at?: string | null
           resolvido_por?: string | null
           sessao_seq?: number
+          started_at?: string
           status?: string
           telefone_sessao?: string
           updated_at?: string

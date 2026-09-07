@@ -335,9 +335,13 @@ export const iniciarItemExecucao = createServerFn({ method: "POST" })
         .eq("id", (lead as any).conversa_id);
     }
     if ((lead as any).ciclo_id) {
+      const { patchEncerrarCiclo } = await import("@/lib/nina/ciclo-teste");
       await supabaseAdmin
         .from("nina_teste_ciclos")
-        .update({ status: "resolvido", resolved_at: agora, resolvido_por: context.userId })
+        .update({
+          ...patchEncerrarCiclo("cenario_concluido", agora),
+          resolvido_por: context.userId,
+        } as never)
         .eq("clinica_id", data.clinicaId)
         .eq("id", (lead as any).ciclo_id);
     }

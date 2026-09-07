@@ -85,6 +85,8 @@ async function garantirCiclo(
   if (lead.conversa_id && lead.ciclo_id)
     return { conversaId: lead.conversa_id, cicloId: lead.ciclo_id };
 
+  const { novoNinaSessionId } = await import("@/lib/nina/ciclo-teste");
+  const agoraISO = new Date().toISOString();
   const { data: ciclo, error: eCiclo } = await admin
     .from("nina_teste_ciclos")
     .insert({
@@ -94,6 +96,7 @@ async function garantirCiclo(
       sessao_seq: lead.sessao_seq,
       telefone_sessao: lead.telefone_sessao,
       status: "ativo",
+      started_at: agoraISO,
       criado_por: userId,
     })
     .select("id")
@@ -125,13 +128,16 @@ async function garantirCiclo(
     await admin.from("atend_conversas").update({ teste_ciclo_id: cicloId }).eq("id", conversaId);
   }
 
-  await admin.from("nina_teste_ciclos").update({ conversa_id: conversaId }).eq("id", cicloId);
+  await admin
+    .from("nina_teste_ciclos")
+    .update({ conversa_id: conversaId, nina_session_id: novoNinaSessionId(cicloId) })
+    .eq("id", cicloId);
   await admin
     .from("nina_teste_leads")
     .update({
       conversa_id: conversaId,
       ciclo_id: cicloId,
-      ciclo_iniciado_em: new Date().toISOString(),
+      ciclo_iniciado_em: agoraISO,
       status: "ativa",
     })
     .eq("id", lead.id);
