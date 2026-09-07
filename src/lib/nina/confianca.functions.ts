@@ -181,3 +181,133 @@ export const confiabilidadeDaExecucao = createServerFn({ method: "POST" })
       registradoEm: r.created_at,
     };
   });
+
+// ------------------------------------------------ FASE 6: métricas de confiabilidade
+
+import {
+  calcularMetricasConfiabilidade,
+  type ErroReportado,
+  type LinhaDecisaoMetrica,
+  type MetricasConfiabilidade,
+  type PeriodoOperacao,
+} from "./confidence/metricas";
+
+function lista(v: unknown): string[] {
+  return Array.isArray(v) ? v.map((i) => String(i)).filter(Boolean) : [];
+}
+
+export const metricasConfiabilidadeNina = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) =>
+    z
+      .object({
+        clinicaId: z.string().uuid(),
+        dias: z.number().int().min(1).max(180).default(30),
+        ambiente: z.enum(["todos", "producao", "homologacao"]).default("producao"),
+      })
+      .parse(i),
+  )
+  .handler(async ({ data, context }): Promise<MetricasConfiabilidade> => {
+    const desde = new Date(Date.now() - data.dias * 24 * 60 * 60 * 1000).toISOString();
+
+    let q = context.supabase
+      .from("nina_confianca_decisoes")
+      .select(
+        "id, created_at, ambiente, conversation_id, score, nivel, decisao, acao, intencao, categorias, bloqueadores, bloqueio, reason_codes, validadores, ferramentas",
+      )
+      .eq("clinica_id", data.clinicaId)
+      .gte("created_at", desde)
+      .order("created_at", { ascending: false })
+      .limit(5000);
+    if (data.ambiente !== "todos") q = q.eq("ambiente", data.ambiente);
+    const { data: rows, error } = await q;
+    if (error) throw new Error(error.message);
+
+    const { data: errosRows } = await context.supabase
+      .from("nina_feedback_erros")
+      .select("id, conversa_id, created_at, categoria")
+      .eq("clinica_id", data.clinicaId)
+      .gte("created_at", desde)
+      .limit(5000);
+
+    // Dentro/fora do horário: reutiliza o classificador central já publicado.
+    let calendarios: Awaited<
+      ReturnType<typeof import("./classificador-periodo.functions").carregarCalendariosPublicados>
+    > = [];
+    let classificar: typeof import("./classificador-periodo").classificarPeriodo | null = null;
+    try {
+      const [{ carregarCalendariosPublicadosCache }, mod] = await Promise.all([
+        import("./classificador-periodo.functions"),
+        import("./classificador-periodo"),
+      ]);
+      calendarios = await carregarCalendariosPublicadosCache(context.supabase, data.clinicaId);
+      classificar = mod.classificarPeriodo;
+    } catch {
+      calendarios = [];
+      classificar = null;
+    }
+
+    const linhas: LinhaDecisaoMetrica[] = (rows ?? []).map((raw) => {
+      const r = raw as Record<string, unknown>;
+      const created = String(r["created_at"] ?? "");
+      let periodo: PeriodoOperacao = "NAO_CLASSIFICAVEL";
+      let dataLocal: string | null = null;
+      if (classificar) {
+        const c = classificar({
+          em: created,
+          escopo: { clinica_id: data.clinicaId, unidade_id: null },
+          calendarios,
+        });
+        periodo = c.classificacao as PeriodoOperacao;
+        dataLocal = c.data_local ?? null;
+      }
+      if (!dataLocal && created) dataLocal = created.slice(0, 10);
+      const dow = dataLocal ? new Date(`${dataLocal}T12:00:00Z`).getUTCDay() : null;
+
+      const bloqueio = r["bloqueio"] ? [String(r["bloqueio"])] : [];
+      const bloqueadores = [...new Set([...lista(r["bloqueadores"]), ...bloqueio])];
+
+      return {
+        id: String(r["id"] ?? ""),
+        created_at: created,
+        ambiente: (r["ambiente"] as string) ?? null,
+        conversation_id: (r["conversation_id"] as string) ?? null,
+        score: Number(r["score"]) || 0,
+        nivel: (r["nivel"] as string) ?? null,
+        decisao: (r["decisao"] as string) ?? null,
+        acao: (r["acao"] as string) ?? null,
+        intencao: (r["intencao"] as string) ?? null,
+        categorias: lista(r["categorias"]),
+        bloqueadores,
+        reason_codes: lista(r["reason_codes"]),
+        validadores: Array.isArray(r["validadores"])
+          ? (r["validadores"] as Array<Record<string, unknown>>).map((v) => ({
+              validator: String(v["validator"] ?? ""),
+              status: String(v["status"] ?? ""),
+              reasonCode: v["reasonCode"] ? String(v["reasonCode"]) : null,
+            }))
+          : [],
+        ferramentas: Array.isArray(r["ferramentas"])
+          ? (r["ferramentas"] as Array<Record<string, unknown>>).map((f) => ({
+              nome: String(f["nome"] ?? ""),
+              sucesso: f["sucesso"] !== false,
+            }))
+          : [],
+        data_local: dataLocal,
+        dia_semana: dow,
+        periodo,
+      };
+    });
+
+    const erros: ErroReportado[] = (errosRows ?? []).map((raw) => {
+      const e = raw as Record<string, unknown>;
+      return {
+        id: String(e["id"] ?? ""),
+        conversa_id: (e["conversa_id"] as string) ?? null,
+        created_at: String(e["created_at"] ?? ""),
+        categoria: (e["categoria"] as string) ?? null,
+      };
+    });
+
+    return calcularMetricasConfiabilidade(linhas, erros);
+  });
