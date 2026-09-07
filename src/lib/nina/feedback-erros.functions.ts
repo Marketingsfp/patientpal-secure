@@ -118,12 +118,15 @@ export const reportarErroRapidoMensagemNina = createServerFn({ method: "POST" })
     // simplesmente não encontra a mensagem.
     const { data: conversa, error: erroConversa } = await context.supabase
       .from("atend_conversas")
-      .select("id")
+      .select(
+        "id, contato_paciente_id, contato_telefone, protocolo_atendimento, protocolo_sessao_id, teste_ciclo_id",
+      )
       .eq("id", data.conversaId)
       .eq("clinica_id", data.clinicaId)
       .maybeSingle();
     if (erroConversa) throw new Error(erroConversa.message);
     if (!conversa) throw new Error("Conversa não encontrada ou sem permissão de acesso.");
+
 
     const { data: mensagem, error: erroMensagem } = await context.supabase
       .from("whatsapp_mensagens")
