@@ -1267,7 +1267,19 @@ export const finalizarPausa = createServerFn({ method: "POST" })
       .eq("user_id", context.userId)
       .is("finalizada_em", null);
     if (error) throw new Error(error.message);
-    return { ok: true };
+
+    // Voltar da pausa é voltar a estar disponível: reavalia a fila "Não
+    // atribuídas" na hora, com o MESMO algoritmo de distribuição usado ao
+    // ficar Online (mais antiga primeiro, para quem tem menos conversas).
+    // Sem isso, a fila só seria reavaliada no próximo heartbeat (até 60s).
+    let distribuidas = 0;
+    const { data: n, error: e2 } = await context.supabase.rpc("atend_distribuir_fila", {
+      _clinica_id: data.clinicaId,
+      _max: 20,
+    } as never);
+    if (e2) console.error("[atendimento] falha ao distribuir fila após pausa:", e2.message);
+    else distribuidas = Number(n ?? 0);
+    return { ok: true, distribuidas };
   });
 
 export const pausaAtual = createServerFn({ method: "POST" })
