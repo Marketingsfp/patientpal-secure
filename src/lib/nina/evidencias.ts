@@ -117,6 +117,8 @@ export type PacoteEvidencias = {
   lacunas: string[];
   /** FASE 6 — versão das instruções usada nesta execução, quando registrada. */
   prompt: PromptDaExecucao | null;
+  /** FASE 6 — módulos complementares realmente utilizados. */
+  modulos: string[];
 };
 
 /**
@@ -154,7 +156,7 @@ export function criarColetor(agora: () => string = () => new Date().toISOString(
         lacunas: lacunas(etapas, entrada),
         prompt,
         modulos: modulosUtilizados(etapas),
-      } as PacoteEvidencias & { modulos: string[] };
+      };
     },
   };
 }
