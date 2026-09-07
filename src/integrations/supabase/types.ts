@@ -8347,6 +8347,72 @@ export type Database = {
           },
         ]
       }
+      nina_confianca_propostas: {
+        Row: {
+          alvo: string
+          aplicado_em: string | null
+          aplicado_por: string | null
+          clinica_id: string
+          created_at: string
+          decidido_em: string | null
+          decidido_por: string | null
+          evidencia: Json
+          id: string
+          justificativa: string
+          motivo_decisao: string | null
+          origem: string
+          periodo_fim: string | null
+          periodo_inicio: string | null
+          status: string
+          tipo: string
+          updated_at: string
+          valor_atual: string | null
+          valor_sugerido: string | null
+        }
+        Insert: {
+          alvo: string
+          aplicado_em?: string | null
+          aplicado_por?: string | null
+          clinica_id: string
+          created_at?: string
+          decidido_em?: string | null
+          decidido_por?: string | null
+          evidencia?: Json
+          id?: string
+          justificativa: string
+          motivo_decisao?: string | null
+          origem?: string
+          periodo_fim?: string | null
+          periodo_inicio?: string | null
+          status?: string
+          tipo: string
+          updated_at?: string
+          valor_atual?: string | null
+          valor_sugerido?: string | null
+        }
+        Update: {
+          alvo?: string
+          aplicado_em?: string | null
+          aplicado_por?: string | null
+          clinica_id?: string
+          created_at?: string
+          decidido_em?: string | null
+          decidido_por?: string | null
+          evidencia?: Json
+          id?: string
+          justificativa?: string
+          motivo_decisao?: string | null
+          origem?: string
+          periodo_fim?: string | null
+          periodo_inicio?: string | null
+          status?: string
+          tipo?: string
+          updated_at?: string
+          valor_atual?: string | null
+          valor_sugerido?: string | null
+        }
+        Relationships: []
+      }
       nina_execucao_evidencias: {
         Row: {
           clinica_id: string | null

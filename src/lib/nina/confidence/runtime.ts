@@ -99,10 +99,18 @@ export function montarContextoDoTurno(e: EstadoDoTurno): ContextoConfianca {
   };
 }
 
-/** Decide com o motor central a partir do estado real do turno. */
-export function decidirNoTurno(e: EstadoDoTurno): ResultadoConfianca {
-  return decidirConfianca(montarContextoDoTurno(e));
+/**
+ * Decide com o motor central a partir do estado real do turno.
+ * A política só é diferente da padrão quando um ajuste APROVADO por uma
+ * pessoa foi aplicado (FASE 9) — a Nina nunca muda a política sozinha.
+ */
+export function decidirNoTurno(
+  e: EstadoDoTurno,
+  politica?: import("./policy").PoliticaConfianca,
+): ResultadoConfianca {
+  return decidirConfianca(montarContextoDoTurno(e), politica ? { politica } : {});
 }
+
 
 const LEGADOS = new Set([
   "VALOR_SEM_CATALOGO",

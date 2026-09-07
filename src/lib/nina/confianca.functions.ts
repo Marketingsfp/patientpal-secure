@@ -311,3 +311,245 @@ export const metricasConfiabilidadeNina = createServerFn({ method: "POST" })
 
     return calcularMetricasConfiabilidade(linhas, erros);
   });
+
+// ------------------------------------------------ FASE 9: autoavaliação
+
+import {
+  calibrar,
+  type ErroCalibracao,
+  type LinhaCalibracao,
+  type RelatorioCalibracao,
+  type ResultadoConversa,
+} from "./confidence/calibracao";
+
+/**
+ * Cruza confiança × erro reportado × handoff × agendamento × resultado da
+ * conversa e devolve o relatório com PROPOSTAS de ajuste (nunca aplicadas).
+ */
+export const calibracaoConfiancaNina = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) =>
+    z
+      .object({
+        clinicaId: z.string().uuid(),
+        dias: z.number().int().min(7).max(180).default(30),
+        ambiente: z.enum(["todos", "producao", "homologacao"]).default("producao"),
+      })
+      .parse(i),
+  )
+  .handler(async ({ data, context }): Promise<RelatorioCalibracao> => {
+    const desde = new Date(Date.now() - data.dias * 24 * 60 * 60 * 1000).toISOString();
+
+    let q = context.supabase
+      .from("nina_confianca_decisoes")
+      .select(
+        "id, created_at, ambiente, conversation_id, message_id, execucao_id, score, nivel, decisao, acao, resultado_final, acao_solicitada, bloqueadores, bloqueio, reason_codes, categorias, validadores",
+      )
+      .eq("clinica_id", data.clinicaId)
+      .gte("created_at", desde)
+      .order("created_at", { ascending: false })
+      .limit(5000);
+    if (data.ambiente !== "todos") q = q.eq("ambiente", data.ambiente);
+    const { data: rows, error } = await q;
+    if (error) throw new Error(error.message);
+
+    const decisoes: LinhaCalibracao[] = (rows ?? []).map((raw) => {
+      const r = raw as Record<string, unknown>;
+      const bloqueio = r["bloqueio"] ? [String(r["bloqueio"])] : [];
+      return {
+        id: String(r["id"] ?? ""),
+        created_at: String(r["created_at"] ?? ""),
+        ambiente: (r["ambiente"] as string) ?? null,
+        conversation_id: (r["conversation_id"] as string) ?? null,
+        message_id: (r["message_id"] as string) ?? null,
+        execucao_id: (r["execucao_id"] as string) ?? null,
+        score: Number(r["score"]) || 0,
+        nivel: (r["nivel"] as string) ?? null,
+        decisao: ((r["decisao"] as string) ?? (r["acao"] as string)) ?? null,
+        resultado_final: (r["resultado_final"] as string) ?? null,
+        acao_solicitada: (r["acao_solicitada"] as string) ?? null,
+        bloqueadores: [...new Set([...lista(r["bloqueadores"]), ...bloqueio])],
+        reason_codes: lista(r["reason_codes"]),
+        categorias: lista(r["categorias"]),
+        validadores: Array.isArray(r["validadores"])
+          ? (r["validadores"] as Array<Record<string, unknown>>).map((v) => ({
+              validator: String(v["validator"] ?? ""),
+              status: String(v["status"] ?? ""),
+              reasonCode: v["reasonCode"] ? String(v["reasonCode"]) : null,
+            }))
+          : [],
+      };
+    });
+
+    const { data: errosRows } = await context.supabase
+      .from("nina_feedback_erros")
+      .select("id, conversa_id, mensagem_id, execucao_id, categoria, created_at")
+      .eq("clinica_id", data.clinicaId)
+      .gte("created_at", desde)
+      .limit(5000);
+
+    const erros: ErroCalibracao[] = (errosRows ?? []).map((raw) => {
+      const e = raw as Record<string, unknown>;
+      return {
+        id: String(e["id"] ?? ""),
+        conversa_id: (e["conversa_id"] as string) ?? null,
+        mensagem_id: (e["mensagem_id"] as string) ?? null,
+        execucao_id: (e["execucao_id"] as string) ?? null,
+        categoria: (e["categoria"] as string) ?? null,
+        created_at: String(e["created_at"] ?? ""),
+      };
+    });
+
+    // Resultado observado da conversa (status e transferência) — só das
+    // conversas que aparecem nas decisões do período.
+    const ids = [...new Set(decisoes.map((d) => d.conversation_id).filter(Boolean))] as string[];
+    let conversas: ResultadoConversa[] = [];
+    if (ids.length > 0) {
+      const { data: convRows } = await context.supabase
+        .from("atend_conversas")
+        .select("id, status, handoff_em")
+        .in("id", ids.slice(0, 1000));
+      // "Agendamento correto" = o motor só libera a confirmação depois do
+      // retorno real do backend; então a decisão liberada de uma ação de
+      // agendamento é a evidência de que ela aconteceu de verdade.
+      const tentouAgendar = new Map<string, boolean>();
+      for (const d of decisoes) {
+        if (!d.conversation_id) continue;
+        if (!(d.acao_solicitada ?? "").includes("agendamento")) continue;
+        const ok = d.resultado_final === "resposta_liberada" || d.decisao === "ALLOW";
+        tentouAgendar.set(d.conversation_id, (tentouAgendar.get(d.conversation_id) ?? false) || ok);
+      }
+      conversas = (convRows ?? []).map((raw) => {
+        const c = raw as { id: string; status: string | null; handoff_em: string | null };
+        return {
+          conversa_id: c.id,
+          status: c.status,
+          houveHandoff: Boolean(c.handoff_em),
+          agendamentoConfirmado: tentouAgendar.has(c.id) ? tentouAgendar.get(c.id)! : null,
+        };
+      });
+    }
+
+
+    return calibrar(decisoes, erros, conversas);
+  });
+
+export type PropostaConfiancaView = {
+  id: string;
+  tipo: string;
+  alvo: string;
+  valor_atual: string | null;
+  valor_sugerido: string | null;
+  justificativa: string;
+  evidencia: unknown;
+  status: string;
+  created_at: string;
+  decidido_em: string | null;
+  motivo_decisao: string | null;
+  aplicado_em: string | null;
+};
+
+export const listarPropostasConfianca = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => z.object({ clinicaId: z.string().uuid() }).parse(i))
+  .handler(async ({ data, context }): Promise<PropostaConfiancaView[]> => {
+    const { data: rows, error } = await context.supabase
+      .from("nina_confianca_propostas")
+      .select(
+        "id, tipo, alvo, valor_atual, valor_sugerido, justificativa, evidencia, status, created_at, decidido_em, motivo_decisao, aplicado_em",
+      )
+      .eq("clinica_id", data.clinicaId)
+      .order("created_at", { ascending: false })
+      .limit(100);
+    if (error) throw new Error(error.message);
+    return (rows ?? []) as PropostaConfiancaView[];
+  });
+
+/** Registra as sugestões do relatório como PENDENTES de revisão humana. */
+export const registrarPropostasConfianca = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) =>
+    z
+      .object({
+        clinicaId: z.string().uuid(),
+        propostas: z
+          .array(
+            z.object({
+              tipo: z.enum([
+                "AJUSTAR_PESO",
+                "AJUSTAR_LIMITE",
+                "REVISAR_VALIDADOR",
+                "NOVO_BLOQUEADOR",
+              ]),
+              alvo: z.string().min(1),
+              valorAtual: z.union([z.string(), z.number(), z.null()]),
+              valorSugerido: z.union([z.string(), z.number(), z.null()]),
+              justificativa: z.string().min(1),
+              evidencia: z.record(z.string(), z.unknown()).default({}),
+            }),
+          )
+          .min(1)
+          .max(50),
+      })
+      .parse(i),
+  )
+  .handler(async ({ data, context }): Promise<{ inseridas: number }> => {
+    const linhas = data.propostas.map((p) => ({
+      clinica_id: data.clinicaId,
+      tipo: p.tipo,
+      alvo: p.alvo,
+      valor_atual: p.valorAtual == null ? null : String(p.valorAtual),
+      valor_sugerido: p.valorSugerido == null ? null : String(p.valorSugerido),
+      justificativa: p.justificativa,
+      evidencia: p.evidencia as Record<string, unknown>,
+      origem: "calibracao_automatica",
+      status: "pendente",
+    }));
+    const { error, count } = await context.supabase
+      .from("nina_confianca_propostas")
+      .insert(linhas, { count: "exact" });
+    if (error) throw new Error(error.message);
+    return { inseridas: count ?? linhas.length };
+  });
+
+/**
+ * Aprovar, rejeitar ou aplicar uma proposta. Sempre com pessoa responsável:
+ * a Nina não pode chamar esta função (exige sessão autenticada).
+ */
+export const decidirPropostaConfianca = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) =>
+    z
+      .object({
+        clinicaId: z.string().uuid(),
+        propostaId: z.string().uuid(),
+        decisao: z.enum(["aprovada", "rejeitada", "aplicada"]),
+        motivo: z.string().max(500).optional(),
+      })
+      .parse(i),
+  )
+  .handler(async ({ data, context }): Promise<{ status: string }> => {
+    const agora = new Date().toISOString();
+    const patch: Record<string, unknown> =
+      data.decisao === "aplicada"
+        ? { status: "aplicada", aplicado_por: context.userId, aplicado_em: agora }
+        : {
+            status: data.decisao,
+            decidido_por: context.userId,
+            decidido_em: agora,
+            motivo_decisao: data.motivo ?? null,
+          };
+
+    const { error } = await context.supabase
+      .from("nina_confianca_propostas")
+      .update(patch)
+      .eq("id", data.propostaId)
+      .eq("clinica_id", data.clinicaId);
+    if (error) throw new Error(error.message);
+
+    if (data.decisao === "aplicada") {
+      const { limparCachePolitica } = await import("./confidence/politica-override.server");
+      limparCachePolitica(data.clinicaId);
+    }
+    return { status: data.decisao };
+  });
