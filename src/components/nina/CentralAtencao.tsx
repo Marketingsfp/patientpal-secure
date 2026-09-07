@@ -3,25 +3,21 @@ import { useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { AlertTriangle, CheckCircle2, Clock, UserX } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import {
-  EVENTO_FILTRAR_NAO_ATRIBUIDAS,
-  FILTRO_NAO_ATRIBUIDAS_KEY,
-} from "@/components/nina/BannerNaoAtribuidas";
 import { useClinica } from "@/hooks/use-clinica";
 import { useRealtimeRefresh } from "@/hooks/use-realtime-refresh";
 import { esperaConversas, listarConversas, listarFilaHumana } from "@/lib/atendimento.functions";
 import {
-  ABRIR_CONVERSA_KEY,
-  EVENTO_ABRIR_CONVERSA,
-  EVENTO_FILTRAR_ESPERA_CRITICA,
-  FILTRO_ESPERA_CRITICA_KEY,
   calcularAtencao,
+  itensDaCategoria,
+  pedirAbrirConversa,
   rotuloCentral,
+  type CategoriaAtencao,
   type ItemAtencao,
   type ResumoAtencao,
 } from "@/lib/atendimento/central-atencao";
 import { formatarEspera } from "@/lib/atendimento/espera";
 import { cn } from "@/lib/utils";
+
 
 const VAZIO: ResumoAtencao = {
   total: 0,
