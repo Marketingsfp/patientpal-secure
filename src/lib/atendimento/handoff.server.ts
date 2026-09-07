@@ -97,18 +97,27 @@ export async function registrarEvento(args: {
   departamentoId?: string | null;
   motivo?: string | null;
   detalhes?: Record<string, unknown> | null;
-}) {
-  const { error } = await supabaseAdmin.from("atend_conversa_eventos").insert({
-    clinica_id: args.clinicaId,
-    conversa_id: args.conversaId,
-    evento: args.evento,
-    user_id: args.userId ?? null,
-    departamento_id: args.departamentoId ?? null,
-    motivo: args.motivo ?? null,
-    detalhes: (args.detalhes ?? null) as never,
-  });
-  if (error) console.error("[handoff] falha ao registrar evento", args.evento, error.message);
+}): Promise<string | null> {
+  const { data, error } = await supabaseAdmin
+    .from("atend_conversa_eventos")
+    .insert({
+      clinica_id: args.clinicaId,
+      conversa_id: args.conversaId,
+      evento: args.evento,
+      user_id: args.userId ?? null,
+      departamento_id: args.departamentoId ?? null,
+      motivo: args.motivo ?? null,
+      detalhes: (args.detalhes ?? null) as never,
+    })
+    .select("id")
+    .maybeSingle();
+  if (error) {
+    console.error("[handoff] falha ao registrar evento", args.evento, error.message);
+    return null;
+  }
+  return ((data as { id?: string } | null)?.id as string | undefined) ?? null;
 }
+
 
 /** Escolhe o departamento (fila) pelo nome informado pela IA, com fallback. */
 async function resolverDepartamento(clinicaId: string, nome?: string | null) {
@@ -235,7 +244,7 @@ export async function encaminharParaHumano(args: {
     .is("atribuida_user_id", null)
     .lte("aguardando_desde", agora);
 
-  await registrarEvento({
+  const handoffEventoId = await registrarEvento({
     clinicaId: args.clinicaId,
     conversaId: args.conversaId,
     evento: "HANDOFF_SOLICITADO",
@@ -255,6 +264,21 @@ export async function encaminharParaHumano(args: {
     departamentoId: depto?.id ?? null,
     detalhes: { posicao: count ?? 1 },
   });
+
+  // FASE 1 — protocolo obrigatório no handoff: nasce aqui, vinculado ao evento
+  // de handoff, com a MESMA lógica em produção e homologação. Idempotente: o
+  // banco reaproveita o número quando o ciclo já tem um.
+  try {
+    const { protocoloAoIniciarHandoff } = await import("./protocolo-atendimento.server");
+    await protocoloAoIniciarHandoff({
+      clinicaId: args.clinicaId,
+      conversaId: args.conversaId,
+      handoffEventoId,
+    });
+  } catch (e) {
+    console.error("[handoff] falha ao gerar protocolo do handoff", e);
+  }
+
 
   // Reserva o resumo interno desta transferência (idempotente e barato).
   // O texto em si é produzido depois, quando alguém abre a conversa: falha de

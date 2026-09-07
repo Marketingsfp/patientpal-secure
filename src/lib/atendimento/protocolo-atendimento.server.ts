@@ -18,6 +18,8 @@
  */
 
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { ambienteDoHandoff, deveInformarProtocolo, vinculoProtocolo } from "./protocolo-handoff";
+
 
 export type ProtocoloGerado = { protocolo: string; novo: boolean } | null;
 
@@ -54,8 +56,9 @@ async function lerConversa(clinicaId: string, conversaId: string) {
 export async function garantirProtocoloAtendimento(args: {
   clinicaId: string;
   conversaId: string;
-  gatilho: "transferencia" | "agendamento";
+  gatilho: "transferencia" | "agendamento" | "handoff";
   userId?: string | null;
+  handoffEventoId?: string | null;
   detalhes?: Record<string, unknown> | null;
 }): Promise<ProtocoloGerado> {
   const conv = await lerConversa(args.clinicaId, args.conversaId);
@@ -76,17 +79,62 @@ export async function garantirProtocoloAtendimento(args: {
   if (linha.novo) {
     // Auditoria: o protocolo fica ligado ao evento que o justificou.
     const { registrarEvento } = await import("./handoff.server");
+    const evento =
+      args.gatilho === "agendamento"
+        ? "ATENDIMENTO_ENCERRADO"
+        : args.gatilho === "handoff"
+          ? "HANDOFF_SOLICITADO"
+          : "ASSUMIDA";
     await registrarEvento({
       clinicaId: args.clinicaId,
       conversaId: args.conversaId,
-      evento: args.gatilho === "transferencia" ? "ASSUMIDA" : "ATENDIMENTO_ENCERRADO",
+      evento,
       userId: args.userId ?? null,
       motivo: `Protocolo ${linha.protocolo} gerado (${args.gatilho})`,
-      detalhes: { protocolo: linha.protocolo, gatilho: args.gatilho, ...(args.detalhes ?? {}) },
+      detalhes: vinculoProtocolo({
+        conversaId: args.conversaId,
+        handoffEventoId: args.handoffEventoId ?? null,
+        protocolo: linha.protocolo,
+        ambiente: ambienteDoHandoff(conv.is_teste),
+      }) as unknown as Record<string, unknown>,
     });
   }
   return { protocolo: linha.protocolo, novo: linha.novo };
 }
+
+/**
+ * FASE 1 — o protocolo nasce no momento em que o handoff é EFETIVAMENTE
+ * iniciado (backend já validou e a conversa saiu da Nina), em qualquer
+ * ambiente. Não envia nada ao paciente: a mensagem é a próxima fase.
+ */
+export async function protocoloAoIniciarHandoff(args: {
+  clinicaId: string;
+  conversaId: string;
+  handoffEventoId?: string | null;
+}): Promise<ProtocoloGerado> {
+  return garantirProtocoloAtendimento({
+    clinicaId: args.clinicaId,
+    conversaId: args.conversaId,
+    gatilho: "handoff",
+    handoffEventoId: args.handoffEventoId ?? null,
+  });
+}
+
+/** O paciente já recebeu este número neste atendimento? */
+async function protocoloJaInformado(clinicaId: string, conversaId: string, protocolo: string) {
+  const { data } = await supabaseAdmin
+    .from("atend_conversa_eventos")
+    .select("id, detalhes")
+    .eq("clinica_id", clinicaId)
+    .eq("conversa_id", conversaId)
+    .order("created_at", { ascending: false })
+    .limit(50);
+  return ((data ?? []) as Array<{ detalhes: unknown }>).some((e) => {
+    const d = e.detalhes as { protocolo_informado?: unknown; protocol_number?: unknown } | null;
+    return Boolean(d?.protocolo_informado) && d?.protocol_number === protocolo;
+  });
+}
+
 
 /**
  * Mensagem transacional (sistema) para o paciente. Usada quando a Nina já foi
@@ -159,12 +207,27 @@ export async function protocoloAoAtribuirHumano(args: {
     gatilho: "transferencia",
     userId: args.userId ?? null,
   });
-  if (!r || !r.novo) return r;
+  if (!r) return r;
+
+  // O número já pode ter nascido no início do handoff (Fase 1). O anúncio ao
+  // paciente continua acontecendo uma única vez por atendimento.
+  const jaInformado = await protocoloJaInformado(args.clinicaId, args.conversaId, r.protocolo);
+  if (!deveInformarProtocolo({ protocolo: r.protocolo, jaInformado })) return r;
 
   await enviarTextoSistema(
     args.clinicaId,
     args.conversaId,
     `Seu atendimento foi encaminhado para nossa equipe. Seu protocolo de atendimento é ${r.protocolo}.`,
   );
+  const { registrarEvento } = await import("./handoff.server");
+  await registrarEvento({
+    clinicaId: args.clinicaId,
+    conversaId: args.conversaId,
+    evento: "ASSUMIDA",
+    userId: args.userId ?? null,
+    motivo: `Protocolo ${r.protocolo} informado ao paciente`,
+    detalhes: { protocol_number: r.protocolo, protocolo_informado: true },
+  });
   return r;
 }
+
