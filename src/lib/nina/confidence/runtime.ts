@@ -48,6 +48,13 @@ export type EstadoDoTurno = {
   messageId?: string | null;
   entities?: Record<string, unknown>;
   requiredFields?: string[];
+  /** Sinais opcionais repassados ao motor (usados pela matriz de homologação). */
+  intentAmbiguo?: boolean;
+  intentConfidence?: number;
+  entityCandidates?: Record<string, string[]>;
+  conflitos?: ContextoConfianca["conflitos"];
+  retrievedSources?: ContextoConfianca["retrievedSources"];
+  regrasNegocio?: ContextoConfianca["regrasNegocio"];
 };
 
 const CAP_CATALOGO = new Set(["searchKnowledgeBase", "listCatalog"]);
@@ -72,7 +79,12 @@ export function montarContextoDoTurno(e: EstadoDoTurno): ContextoConfianca {
     intent: e.intent ?? null,
     requestedAction: e.acao ?? "responder_informacao",
     entities: e.entities ?? {},
-    retrievedSources: [],
+    retrievedSources: e.retrievedSources ?? [],
+    ...(e.intentAmbiguo !== undefined ? { intentAmbiguo: e.intentAmbiguo } : {}),
+    ...(e.intentConfidence !== undefined ? { intentConfidence: e.intentConfidence } : {}),
+    ...(e.entityCandidates ? { entityCandidates: e.entityCandidates } : {}),
+    ...(e.conflitos ? { conflitos: e.conflitos } : {}),
+    ...(e.regrasNegocio ? { regrasNegocio: e.regrasNegocio } : {}),
     toolResults,
     ...(e.requiredFields ? { requiredFields: e.requiredFields } : {}),
     businessContext: {

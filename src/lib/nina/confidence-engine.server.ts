@@ -22,6 +22,10 @@ export async function registrarDecisaoConfianca(params: {
   decisao: DecisaoConfianca;
   /** Registro explicável da Fase 5 (opcional para chamadas antigas). */
   auditoria?: RegistroAuditoriaConfianca | null;
+  /** Fase 7: "shadow" (só observa) ou "enforce" (decide). */
+  modo?: "shadow" | "enforce";
+  /** Fase 7: o motor teria liberado a resposta/ação? */
+  teriaPermitido?: boolean;
 }): Promise<void> {
   try {
     const a = params.auditoria ?? null;
@@ -36,6 +40,8 @@ export async function registrarDecisaoConfianca(params: {
       bloqueio: params.decisao.bloqueio,
       categorias: params.decisao.categorias,
       motivos: params.decisao.motivos,
+      modo: params.modo ?? "shadow",
+      teria_permitido: params.teriaPermitido ?? null,
       ...(a
         ? {
             message_id: a.messageId,

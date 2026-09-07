@@ -150,6 +150,12 @@ export type EntradaPolitica = {
   acao: string;
   /** A rodada de esclarecimento já foi gasta neste turno. */
   esclarecimentoUsado: boolean;
+  /**
+   * As únicas reprovações são de ambiguidade (intenção/entidade), sem
+   * bloqueador, falha de ferramenta ou fonte ausente. Ambiguidade se resolve
+   * perguntando ao paciente — não transferindo.
+   */
+  ambiguidadeResolvivel?: boolean;
 };
 
 export type SaidaPolitica = {
@@ -184,7 +190,8 @@ export function aplicarPolitica(
   const minimo = politica.minimoPorRisco[e.risco];
   let decision: DecisaoMotor;
   if (level === "HIGH" && score >= minimo) decision = "ALLOW";
-  else if (level === "LOW") decision = "HANDOFF";
+  else if (level === "LOW")
+    decision = e.ambiguidadeResolvivel === true && !e.esclarecimentoUsado ? "CLARIFY" : "HANDOFF";
   else decision = e.esclarecimentoUsado ? "HANDOFF" : "CLARIFY";
 
   return { score, level, decision };

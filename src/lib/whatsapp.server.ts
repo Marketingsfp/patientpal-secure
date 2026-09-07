@@ -1448,10 +1448,22 @@ ATENDIMENTO HUMANO — REGRA OBRIGATÓRIA:
         entities: dadosColetados,
       };
       const decisao = decidirNoTurno(estadoTurno);
+      // FASE 7 — SHADOW MODE: por padrão o motor só observa e registra. A
+      // decisão só passa a valer quando a clínica ligar a flag
+      // `nina_confidence_enforce`.
+      const [{ modoConfianca }, { aplicarModo }] = await Promise.all([
+        import("@/lib/nina/confidence/shadow-flag.server"),
+        import("@/lib/nina/confidence/shadow"),
+      ]);
+      const modo = await modoConfianca(clinicaId);
+      const aplicado = aplicarModo(decisao, modo);
       rastro?.concluir("confidence.decision", {
         score: decisao.score,
         nivel: decisao.level,
         acao: decisao.decision,
+        modo,
+        decisao_efetiva: aplicado.decisaoEfetiva,
+        teria_permitido: aplicado.teriaPermitido,
         bloqueios: decisao.hardBlockers ?? [],
         categorias: decisao.evidence.categorias,
       });
@@ -1466,6 +1478,8 @@ ATENDIMENTO HUMANO — REGRA OBRIGATÓRIA:
           traceId: rastro?.ids.trace_id ?? null,
           teste: opcoes?.teste === true,
           decisao: paraDecisaoLegado(decisao),
+          modo,
+          teriaPermitido: aplicado.teriaPermitido,
           // Evidência observável apenas: validadores, motivos, fontes,
           // ferramentas e bloqueios. Nunca o rascunho ou o raciocínio interno.
           auditoria: montarRegistroAuditoria(decisao, {
@@ -1480,7 +1494,7 @@ ATENDIMENTO HUMANO — REGRA OBRIGATÓRIA:
 
       // Confiança intermediária: UMA pergunta objetiva ao paciente e depois o
       // motor roda inteiro de novo (nada de reaproveitar a pontuação).
-      if (decisao.decision === "CLARIFY" && rodada < MAX_RODADAS - 1) {
+      if (aplicado.decisaoEfetiva === "CLARIFY" && rodada < MAX_RODADAS - 1) {
         esclarecimentoConfiancaUsado = true;
         mensagens.push({ role: "assistant", content: texto });
         mensagens.push({ role: "user", content: instrucaoEsclarecimentoDirigida(decisao) });
@@ -1490,7 +1504,7 @@ ATENDIMENTO HUMANO — REGRA OBRIGATÓRIA:
       // Confiança baixa ou bloqueio absoluto: transfere pelo mesmo caminho já
       // existente (evento, fila, protocolo e aviso ao paciente), levando o
       // resumo estruturado para a atendente.
-      if (decisao.decision === "HANDOFF" || decisao.decision === "BLOCK_ACTION") {
+      if (aplicado.decisaoEfetiva === "HANDOFF" || aplicado.decisaoEfetiva === "BLOCK_ACTION") {
         const rh = await broker.executar(
           "solicitar_atendente_humano",
           JSON.stringify({

@@ -8270,11 +8270,13 @@ export type Database = {
           id: string
           intencao: string | null
           message_id: string | null
+          modo: string
           motivos: Json
           nivel: string | null
           reason_codes: string[]
           resultado_final: string | null
           score: number
+          teria_permitido: boolean | null
           trace_id: string | null
           updated_at: string
           validadores: Json
@@ -8296,11 +8298,13 @@ export type Database = {
           id?: string
           intencao?: string | null
           message_id?: string | null
+          modo?: string
           motivos?: Json
           nivel?: string | null
           reason_codes?: string[]
           resultado_final?: string | null
           score?: number
+          teria_permitido?: boolean | null
           trace_id?: string | null
           updated_at?: string
           validadores?: Json
@@ -8322,11 +8326,13 @@ export type Database = {
           id?: string
           intencao?: string | null
           message_id?: string | null
+          modo?: string
           motivos?: Json
           nivel?: string | null
           reason_codes?: string[]
           resultado_final?: string | null
           score?: number
+          teria_permitido?: boolean | null
           trace_id?: string | null
           updated_at?: string
           validadores?: Json
