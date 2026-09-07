@@ -668,7 +668,7 @@ export function HomologacaoInbox() {
     (tipo !== "text" && tipo !== "audio");
 
   return (
-    <div className="flex h-[calc(100vh-11rem)] min-h-[560px] gap-3">
+    <div id="homologacao-inbox" className="flex h-[calc(100vh-11rem)] min-h-[560px] gap-3">
       {/* COLUNA 1 — LEADS DE TESTE */}
       <Card className="flex w-[300px] shrink-0 flex-col overflow-hidden">
         <CardHeader className="gap-2 py-3">
