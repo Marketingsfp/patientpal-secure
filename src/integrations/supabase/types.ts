@@ -9252,6 +9252,185 @@ export type Database = {
           },
         ]
       }
+      nina_teste_carga: {
+        Row: {
+          cancelar: boolean
+          chamadas_modelo: number
+          clinica_id: string
+          config: Json
+          confirmado: boolean
+          conversas_finalizadas: number
+          created_at: string
+          criado_por: string | null
+          custo_estimado: number
+          enviadas: number
+          erros: number
+          ferramentas: number
+          finalizado_em: string | null
+          id: string
+          iniciado_em: string
+          input_tokens: number
+          modelo_gerador: string | null
+          nome: string
+          output_tokens: number
+          perfil: string
+          plano: Json
+          retries: number
+          status: string
+          sucesso: number
+          timeouts: number
+          total_planejado: number
+          updated_at: string
+          variacoes: Json
+        }
+        Insert: {
+          cancelar?: boolean
+          chamadas_modelo?: number
+          clinica_id: string
+          config?: Json
+          confirmado?: boolean
+          conversas_finalizadas?: number
+          created_at?: string
+          criado_por?: string | null
+          custo_estimado?: number
+          enviadas?: number
+          erros?: number
+          ferramentas?: number
+          finalizado_em?: string | null
+          id?: string
+          iniciado_em?: string
+          input_tokens?: number
+          modelo_gerador?: string | null
+          nome: string
+          output_tokens?: number
+          perfil?: string
+          plano?: Json
+          retries?: number
+          status?: string
+          sucesso?: number
+          timeouts?: number
+          total_planejado?: number
+          updated_at?: string
+          variacoes?: Json
+        }
+        Update: {
+          cancelar?: boolean
+          chamadas_modelo?: number
+          clinica_id?: string
+          config?: Json
+          confirmado?: boolean
+          conversas_finalizadas?: number
+          created_at?: string
+          criado_por?: string | null
+          custo_estimado?: number
+          enviadas?: number
+          erros?: number
+          ferramentas?: number
+          finalizado_em?: string | null
+          id?: string
+          iniciado_em?: string
+          input_tokens?: number
+          modelo_gerador?: string | null
+          nome?: string
+          output_tokens?: number
+          perfil?: string
+          plano?: Json
+          retries?: number
+          status?: string
+          sucesso?: number
+          timeouts?: number
+          total_planejado?: number
+          updated_at?: string
+          variacoes?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nina_teste_carga_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      nina_teste_carga_amostras: {
+        Row: {
+          carga_id: string
+          cenario: string | null
+          chamadas_modelo: number
+          clinica_id: string
+          conversa_id: string | null
+          created_at: string
+          erro: string | null
+          ferramentas: string[]
+          id: string
+          indice: number
+          input_tokens: number
+          latencia_ms: number | null
+          lead_id: string | null
+          lead_indice: number | null
+          mensagem: string | null
+          output_tokens: number
+          status: string
+          tentativa: number
+        }
+        Insert: {
+          carga_id: string
+          cenario?: string | null
+          chamadas_modelo?: number
+          clinica_id: string
+          conversa_id?: string | null
+          created_at?: string
+          erro?: string | null
+          ferramentas?: string[]
+          id?: string
+          indice?: number
+          input_tokens?: number
+          latencia_ms?: number | null
+          lead_id?: string | null
+          lead_indice?: number | null
+          mensagem?: string | null
+          output_tokens?: number
+          status?: string
+          tentativa?: number
+        }
+        Update: {
+          carga_id?: string
+          cenario?: string | null
+          chamadas_modelo?: number
+          clinica_id?: string
+          conversa_id?: string | null
+          created_at?: string
+          erro?: string | null
+          ferramentas?: string[]
+          id?: string
+          indice?: number
+          input_tokens?: number
+          latencia_ms?: number | null
+          lead_id?: string | null
+          lead_indice?: number | null
+          mensagem?: string | null
+          output_tokens?: number
+          status?: string
+          tentativa?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nina_teste_carga_amostras_carga_id_fkey"
+            columns: ["carga_id"]
+            isOneToOne: false
+            referencedRelation: "nina_teste_carga"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nina_teste_carga_amostras_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       nina_teste_cenarios: {
         Row: {
           categoria: string
