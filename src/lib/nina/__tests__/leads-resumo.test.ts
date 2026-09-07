@@ -3,8 +3,7 @@ import {
   ehConversacional,
   resumirLeads,
   previaTexto,
-  type MensagemResumoRow,
-} from "@/lib/nina/leads-resumo";
+  type MensagemResumoRow, aplicarMensagemRealtime, ordenarPorAtividade } from "@/lib/nina/leads-resumo";
 
 const msg = (p: Partial<MensagemResumoRow> & { id: string; created_at: string }): MensagemResumoRow => ({
   conversa_id: "c1",
@@ -154,5 +153,66 @@ describe("leads-resumo — não lidas (Fase 3)", () => {
     const usuarioB = resumirLeads({ L1: ["c1"] }, mensagens, {});
     expect(usuarioA["L1"]!.unreadCount).toBe(0);
     expect(usuarioB["L1"]!.unreadCount).toBe(1);
+  });
+});
+
+describe("FASE 4 — inbox de homologação", () => {
+  const base = { conversa_id: "c1", tipo: "text", read_at: null };
+  const card = () => ({
+    ultimaMensagemId: "m0" as string | null,
+    ultimaMensagemTexto: "oi" as string | null,
+    ultimaMensagemAutor: "paciente" as any,
+    ultimaMensagemEm: "2026-09-07T10:00:00Z" as string | null,
+    ultimaAtividadeEm: "2026-09-07T10:00:00Z" as string | null,
+    mensagens: 3,
+    naoLidas: 0,
+  });
+  const nova = {
+    ...base,
+    id: "m1",
+    direction: "out",
+    enviada_por: "nina",
+    body: "Temos horários amanhã",
+    created_at: "2026-09-07T11:00:00Z",
+  };
+
+  it("mensagem nova atualiza prévia, horário, total e contador", () => {
+    const r = aplicarMensagemRealtime(card(), nova, { jaAplicada: false, abertoAgora: false });
+    expect(r.ultimaMensagemId).toBe("m1");
+    expect(r.ultimaMensagemAutor).toBe("nina");
+    expect(r.ultimaMensagemEm).toBe("2026-09-07T11:00:00Z");
+    expect(r.mensagens).toBe(4);
+    expect(r.naoLidas).toBe(1);
+  });
+
+  it("mesma mensagem repetida no realtime não conta duas vezes", () => {
+    const r1 = aplicarMensagemRealtime(card(), nova, { jaAplicada: false, abertoAgora: false });
+    const r2 = aplicarMensagemRealtime(r1, nova, { jaAplicada: true, abertoAgora: false });
+    expect(r2.mensagens).toBe(4);
+    expect(r2.naoLidas).toBe(1);
+    expect(r2.ultimaMensagemId).toBe("m1");
+  });
+
+  it("lead aberto na tela não ganha bolinha azul", () => {
+    const r = aplicarMensagemRealtime(card(), nova, { jaAplicada: false, abertoAgora: true });
+    expect(r.naoLidas).toBe(0);
+    expect(r.ultimaMensagemId).toBe("m1");
+  });
+
+  it("evento técnico não vira prévia nem não lida", () => {
+    const ev = { ...nova, id: "m2", tipo: "sistema", body: "sessão reiniciada" };
+    const r = aplicarMensagemRealtime(card(), ev, { jaAplicada: false, abertoAgora: false });
+    expect(r.ultimaMensagemId).toBe("m0");
+    expect(r.naoLidas).toBe(0);
+  });
+
+  it("ordenação usa atividade de conversa e é estável no empate", () => {
+    const ordenado = ordenarPorAtividade([
+      { indice: 1, ultimaAtividadeEm: "2026-09-07T10:00:00Z" },
+      { indice: 2, ultimaAtividadeEm: "2026-09-07T12:00:00Z" },
+      { indice: 3, ultimaAtividadeEm: null },
+      { indice: 4, ultimaAtividadeEm: null },
+    ]);
+    expect(ordenado.map((l) => l.indice)).toEqual([2, 1, 3, 4]);
   });
 });
