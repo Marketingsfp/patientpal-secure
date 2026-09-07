@@ -785,6 +785,7 @@ export type Database = {
           sentimento_score: number | null
           sla_first_response_seg: number | null
           status: string
+          teste_ciclo_id: string | null
           ultima_msg_em: string
           ultima_msg_preview: string | null
           unread_count: number
@@ -834,6 +835,7 @@ export type Database = {
           sentimento_score?: number | null
           sla_first_response_seg?: number | null
           status?: string
+          teste_ciclo_id?: string | null
           ultima_msg_em?: string
           ultima_msg_preview?: string | null
           unread_count?: number
@@ -883,6 +885,7 @@ export type Database = {
           sentimento_score?: number | null
           sla_first_response_seg?: number | null
           status?: string
+          teste_ciclo_id?: string | null
           ultima_msg_em?: string
           ultima_msg_preview?: string | null
           unread_count?: number
@@ -908,6 +911,13 @@ export type Database = {
             columns: ["departamento_id"]
             isOneToOne: false
             referencedRelation: "atend_departamentos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "atend_conversas_teste_ciclo_id_fkey"
+            columns: ["teste_ciclo_id"]
+            isOneToOne: false
+            referencedRelation: "nina_teste_ciclos"
             referencedColumns: ["id"]
           },
         ]
@@ -9242,8 +9252,90 @@ export type Database = {
           },
         ]
       }
+      nina_teste_ciclos: {
+        Row: {
+          clinica_id: string
+          conversa_id: string | null
+          created_at: string
+          criado_por: string | null
+          id: string
+          indice: number
+          lead_id: string
+          paciente_teste_id: string | null
+          resolved_at: string | null
+          resolvido_por: string | null
+          sessao_seq: number
+          status: string
+          telefone_sessao: string
+          updated_at: string
+        }
+        Insert: {
+          clinica_id: string
+          conversa_id?: string | null
+          created_at?: string
+          criado_por?: string | null
+          id?: string
+          indice: number
+          lead_id: string
+          paciente_teste_id?: string | null
+          resolved_at?: string | null
+          resolvido_por?: string | null
+          sessao_seq: number
+          status?: string
+          telefone_sessao: string
+          updated_at?: string
+        }
+        Update: {
+          clinica_id?: string
+          conversa_id?: string | null
+          created_at?: string
+          criado_por?: string | null
+          id?: string
+          indice?: number
+          lead_id?: string
+          paciente_teste_id?: string | null
+          resolved_at?: string | null
+          resolvido_por?: string | null
+          sessao_seq?: number
+          status?: string
+          telefone_sessao?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nina_teste_ciclos_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nina_teste_ciclos_conversa_id_fkey"
+            columns: ["conversa_id"]
+            isOneToOne: false
+            referencedRelation: "atend_conversas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nina_teste_ciclos_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "nina_teste_leads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nina_teste_ciclos_paciente_teste_id_fkey"
+            columns: ["paciente_teste_id"]
+            isOneToOne: false
+            referencedRelation: "pacientes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       nina_teste_leads: {
         Row: {
+          ciclo_id: string | null
+          ciclo_iniciado_em: string | null
           clinica_id: string
           conversa_id: string | null
           created_at: string
@@ -9252,6 +9344,8 @@ export type Database = {
           indice: number
           is_test: boolean
           nome: string
+          paciente_teste_id: string | null
+          resolvido_em: string | null
           sessao_seq: number
           source_channel: string
           status: string
@@ -9260,6 +9354,8 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          ciclo_id?: string | null
+          ciclo_iniciado_em?: string | null
           clinica_id: string
           conversa_id?: string | null
           created_at?: string
@@ -9268,6 +9364,8 @@ export type Database = {
           indice: number
           is_test?: boolean
           nome: string
+          paciente_teste_id?: string | null
+          resolvido_em?: string | null
           sessao_seq?: number
           source_channel?: string
           status?: string
@@ -9276,6 +9374,8 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          ciclo_id?: string | null
+          ciclo_iniciado_em?: string | null
           clinica_id?: string
           conversa_id?: string | null
           created_at?: string
@@ -9284,6 +9384,8 @@ export type Database = {
           indice?: number
           is_test?: boolean
           nome?: string
+          paciente_teste_id?: string | null
+          resolvido_em?: string | null
           sessao_seq?: number
           source_channel?: string
           status?: string
@@ -9291,7 +9393,22 @@ export type Database = {
           telefone_sessao?: string
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "nina_teste_leads_ciclo_id_fkey"
+            columns: ["ciclo_id"]
+            isOneToOne: false
+            referencedRelation: "nina_teste_ciclos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nina_teste_leads_paciente_teste_id_fkey"
+            columns: ["paciente_teste_id"]
+            isOneToOne: false
+            referencedRelation: "pacientes"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       nina_testes_regressao: {
         Row: {

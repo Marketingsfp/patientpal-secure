@@ -42,6 +42,9 @@ type LeadRow = {
   telefone_sessao: string;
   sessao_seq: number;
   conversa_id: string | null;
+  ciclo_id: string | null;
+  ciclo_iniciado_em: string | null;
+  resolvido_em: string | null;
   status: string;
 };
 
@@ -66,7 +69,7 @@ async function garantirLeads(admin: any, clinicaId: string): Promise<LeadRow[]> 
 
   const { data, error: e2 } = await admin
     .from("nina_teste_leads")
-    .select("id, indice, nome, telefone_base, telefone_sessao, sessao_seq, conversa_id, status")
+    .select("id, indice, nome, telefone_base, telefone_sessao, sessao_seq, conversa_id, ciclo_id, ciclo_iniciado_em, resolvido_em, status")
     .eq("clinica_id", clinicaId)
     .order("indice");
   if (e2) throw new Error(e2.message);
@@ -76,7 +79,7 @@ async function garantirLeads(admin: any, clinicaId: string): Promise<LeadRow[]> 
 async function carregarLead(admin: any, clinicaId: string, leadId: string): Promise<LeadRow> {
   const { data, error } = await admin
     .from("nina_teste_leads")
-    .select("id, indice, nome, telefone_base, telefone_sessao, sessao_seq, conversa_id, status")
+    .select("id, indice, nome, telefone_base, telefone_sessao, sessao_seq, conversa_id, ciclo_id, ciclo_iniciado_em, resolvido_em, status")
     .eq("clinica_id", clinicaId)
     .eq("id", leadId)
     .maybeSingle();
@@ -85,31 +88,73 @@ async function carregarLead(admin: any, clinicaId: string, leadId: string): Prom
   return data as LeadRow;
 }
 
-/** Garante a conversa da sessão atual do lead (canal test-console, marcada como teste). */
-async function garantirConversa(admin: any, clinicaId: string, lead: LeadRow): Promise<string> {
-  if (lead.conversa_id) return lead.conversa_id;
-  const { data, error } = await admin
-    .from("atend_conversas")
+/**
+ * Garante o CICLO de teste atual do lead (test_cycle_id) e a conversa dele.
+ *
+ * Um ciclo = uma sessão isolada: telefone virtual próprio, conversa própria e
+ * registro próprio em `nina_teste_ciclos` (com início, encerramento e situação).
+ * Nada é compartilhado entre leads nem entre ciclos do mesmo lead.
+ */
+async function garantirCiclo(
+  admin: any,
+  clinicaId: string,
+  lead: LeadRow,
+  userId: string | null,
+): Promise<{ conversaId: string; cicloId: string }> {
+  if (lead.conversa_id && lead.ciclo_id)
+    return { conversaId: lead.conversa_id, cicloId: lead.ciclo_id };
+
+  const { data: ciclo, error: eCiclo } = await admin
+    .from("nina_teste_ciclos")
     .insert({
       clinica_id: clinicaId,
-      canal: CANAL_TESTE,
-      contato_telefone: lead.telefone_sessao,
-      contato_nome: lead.nome,
-      status: "bot_attending",
-      owner_type: "AI",
-      ai_enabled: true,
-      is_teste: true,
-      ultima_msg_em: new Date().toISOString(),
+      lead_id: lead.id,
+      indice: lead.indice,
+      sessao_seq: lead.sessao_seq,
+      telefone_sessao: lead.telefone_sessao,
+      status: "ativo",
+      criado_por: userId,
     })
     .select("id")
     .maybeSingle();
-  if (error) throw new Error(error.message);
-  const conversaId = (data as any)?.id as string;
+  if (eCiclo) throw new Error(eCiclo.message);
+  const cicloId = (ciclo as any)?.id as string;
+
+  let conversaId = lead.conversa_id;
+  if (!conversaId) {
+    const { data, error } = await admin
+      .from("atend_conversas")
+      .insert({
+        clinica_id: clinicaId,
+        canal: CANAL_TESTE,
+        contato_telefone: lead.telefone_sessao,
+        contato_nome: lead.nome,
+        status: "bot_attending",
+        owner_type: "AI",
+        ai_enabled: true,
+        is_teste: true,
+        teste_ciclo_id: cicloId,
+        ultima_msg_em: new Date().toISOString(),
+      })
+      .select("id")
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    conversaId = (data as any)?.id as string;
+  } else {
+    await admin.from("atend_conversas").update({ teste_ciclo_id: cicloId }).eq("id", conversaId);
+  }
+
+  await admin.from("nina_teste_ciclos").update({ conversa_id: conversaId }).eq("id", cicloId);
   await admin
     .from("nina_teste_leads")
-    .update({ conversa_id: conversaId, status: "ativa" })
+    .update({
+      conversa_id: conversaId,
+      ciclo_id: cicloId,
+      ciclo_iniciado_em: new Date().toISOString(),
+      status: "ativa",
+    })
     .eq("id", lead.id);
-  return conversaId;
+  return { conversaId: conversaId as string, cicloId };
 }
 
 /** Teto de mensagens guardadas por lead de teste (todas as sessões somadas). */
@@ -187,6 +232,9 @@ export const listarLeadsTeste = createServerFn({ method: "POST" })
         telefone: l.telefone_sessao,
         sessao: l.sessao_seq,
         conversaId: l.conversa_id,
+        cicloId: l.ciclo_id,
+        cicloIniciadoEm: l.ciclo_iniciado_em,
+        resolvidoEm: l.resolvido_em,
         status: l.status,
         mensagens: l.conversa_id ? (contagem.get(l.conversa_id) ?? 0) : 0,
       })),
@@ -278,7 +326,12 @@ export const enviarMensagemTeste = createServerFn({ method: "POST" })
     await assertMembership(context.supabase, context.userId, data.clinicaId);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const lead = await carregarLead(supabaseAdmin, data.clinicaId, data.leadId);
-    const conversaId = await garantirConversa(supabaseAdmin, data.clinicaId, lead);
+    const { conversaId, cicloId } = await garantirCiclo(
+      supabaseAdmin,
+      data.clinicaId,
+      lead,
+      context.userId,
+    );
 
     const ehAudio = data.tipo === "audio";
     const textoPaciente = data.tipo === "text" || ehAudio ? data.texto : "";
@@ -419,7 +472,9 @@ export const enviarMensagemTeste = createServerFn({ method: "POST" })
 
     // A conversa pode ter sido resolvida enquanto a Nina pensava: descarta.
     const atual = await carregarLead(supabaseAdmin, data.clinicaId, data.leadId);
-    if (atual.conversa_id !== conversaId) {
+    // Resposta atrasada: se o ciclo foi encerrado (ou já é outro) enquanto a
+    // Nina pensava, a resposta é descartada e nunca entra na conversa nova.
+    if (atual.conversa_id !== conversaId || atual.ciclo_id !== cicloId) {
       return {
         duplicada: false,
         reply: null,
@@ -660,6 +715,9 @@ export const resolverConversaTeste = createServerFn({ method: "POST" })
         identidade_perguntada_em: null,
         identidade_tentativas: 0,
         nina_fluxo_estado: null,
+        // Invalida qualquer tarefa pendente do ciclo (espera do paciente,
+        // encerramento automático, follow-up): nada dispara depois de resolver.
+        patient_response_deadline: null,
         handoff_resumo: null,
         handoff_motivo: null,
         closed_at: agora,
@@ -715,15 +773,34 @@ export const resolverConversaTeste = createServerFn({ method: "POST" })
     // arquivado (que fica só para auditoria).
     const proxima = lead.sessao_seq + 1;
 
+    // Encerra o ciclo atual (histórico preservado para auditoria) — a próxima
+    // mensagem cria um novo test_cycle_id, sem memória do ciclo anterior.
+    if (lead.ciclo_id) {
+      await supabaseAdmin
+        .from("nina_teste_ciclos")
+        .update({ status: "resolvido", resolved_at: agora, resolvido_por: context.userId })
+        .eq("id", lead.ciclo_id)
+        .eq("clinica_id", data.clinicaId);
+    }
+
     await supabaseAdmin
       .from("nina_teste_leads")
       .update({
         sessao_seq: proxima,
         telefone_sessao: telefoneSessao(lead.indice, proxima),
         conversa_id: null,
+        ciclo_id: null,
+        ciclo_iniciado_em: null,
+        resolvido_em: agora,
         status: "ativa",
       })
       .eq("id", lead.id);
 
-    return { ok: true, jaResolvida: false, sessao: proxima, agendamentosRemovidos };
+    return {
+      ok: true,
+      jaResolvida: false,
+      sessao: proxima,
+      cicloEncerrado: lead.ciclo_id,
+      agendamentosRemovidos,
+    };
   });

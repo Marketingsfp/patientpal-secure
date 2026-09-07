@@ -125,6 +125,87 @@ export function origemAgendamentoNina(ctx: CtxNinaPaciente): string {
   return ctx.origem === "whatsapp" ? "nina_whatsapp" : "nina_chat_interno";
 }
 
+/**
+ * Paciente SINTÉTICO do lead de homologação.
+ *
+ * Na homologação nenhum cadastro real é lido, criado ou vinculado: cada lead de
+ * teste tem um paciente próprio, marcado como dado de teste (`is_mock_data` e
+ * `teste`), reaproveitado a cada ciclo do mesmo lead. Isso garante que agenda,
+ * "meus agendamentos" e qualquer ferramenta que dependa do paciente enxerguem
+ * apenas registros de teste — e nunca os dados de um paciente real.
+ */
+async function pacienteSinteticoDoLead(
+  ctx: CtxNinaPaciente,
+  nomeInformado: string,
+): Promise<{ id: string; nome: string } | null> {
+  try {
+    const telefone = ctx.telefone ?? "";
+    const { data: lead } = await supabaseAdmin
+      .from("nina_teste_leads")
+      .select("id, indice, paciente_teste_id")
+      .eq("clinica_id", ctx.clinicaId)
+      .eq("telefone_sessao", telefone)
+      .maybeSingle();
+    const indice = (lead as { indice?: number } | null)?.indice ?? 0;
+    const nome = `[TESTE NINA] Paciente Teste ${String(indice || 0).padStart(2, "0")}`;
+
+    const existenteId = (lead as { paciente_teste_id?: string | null } | null)?.paciente_teste_id;
+    if (existenteId) {
+      const { data: pac } = await supabaseAdmin
+        .from("pacientes")
+        .select("id, nome, is_mock_data")
+        .eq("id", existenteId)
+        .eq("clinica_id", ctx.clinicaId)
+        .maybeSingle();
+      const p = pac as { id: string; nome: string; is_mock_data: boolean } | null;
+      if (p?.is_mock_data) return { id: p.id, nome: p.nome };
+    }
+
+    // Reaproveita o paciente de teste já criado para este telefone virtual.
+    const { data: achado } = await supabaseAdmin
+      .from("pacientes")
+      .select("id, nome")
+      .eq("clinica_id", ctx.clinicaId)
+      .eq("is_mock_data", true)
+      .eq("telefone", telefone)
+      .maybeSingle();
+    let pacienteId = (achado as { id: string } | null)?.id ?? null;
+    let pacienteNome = (achado as { nome: string } | null)?.nome ?? nome;
+
+    if (!pacienteId) {
+      const { data: criado, error } = await supabaseAdmin
+        .from("pacientes")
+        .insert({
+          clinica_id: ctx.clinicaId,
+          nome,
+          telefone,
+          is_mock_data: true,
+          teste: true,
+        } as never)
+
+        .select("id, nome")
+        .maybeSingle();
+      if (error) throw new Error(error.message);
+      pacienteId = (criado as { id: string } | null)?.id ?? null;
+      pacienteNome = (criado as { nome: string } | null)?.nome ?? nome;
+    }
+    if (!pacienteId) return null;
+
+    const leadId = (lead as { id?: string } | null)?.id;
+    if (leadId && existenteId !== pacienteId) {
+      await supabaseAdmin
+        .from("nina_teste_leads")
+        .update({ paciente_teste_id: pacienteId } as never)
+        .eq("id", leadId);
+    }
+    return { id: pacienteId, nome: pacienteNome };
+  } catch (e) {
+    console.error("[nina-tools] paciente sintético de homologação", e);
+    return null;
+  }
+}
+
+
 /* ------------------------------------------------------------------ auditoria */
 
 /**
@@ -1334,9 +1415,53 @@ async function executarFerramentaInterna(
         const p = zIdentificar.parse(args);
         const cpf = somenteDigitos(p.cpf);
         if (!isCPFValido(cpf)) return falha("VALIDATION_ERROR", "CPF inválido.");
+
+        // HOMOLOGAÇÃO: jamais tocar em cadastro real de paciente. A identificação
+        // é amarrada a um paciente SINTÉTICO exclusivo do lead de teste — nenhum
+        // CPF real é gravado, consultado ou vinculado.
+        if (ctx.teste || ctx.origem === "homologacao") {
+          const sintetico = await pacienteSinteticoDoLead(ctx, p.nome);
+          if (!sintetico) {
+            await auditar(ctx, "identificar_paciente", { cpf: "***", teste: true }, {
+              ok: false,
+              erro: "TEST_PATIENT_UNAVAILABLE",
+            });
+            return falha(
+              "INTERNAL_ERROR",
+              "Não consegui concluir a identificação no ambiente de homologação.",
+            );
+          }
+          ctx.pacienteId = sintetico.id;
+          ctx.pacienteNome = sintetico.nome;
+          mutarEstado(ctx, {
+            patient: {
+              id: sintetico.id,
+              first_name: sintetico.nome.split(" ")[0] ?? null,
+              identified: true,
+              validated: true,
+            },
+            stage: "CHOOSING_SLOT",
+          });
+          if (ctx.conversaId) {
+            await supabaseAdmin
+              .from("atend_conversas")
+              .update({ contato_paciente_id: sintetico.id, identidade_confirmada: true })
+              .eq("id", ctx.conversaId);
+          }
+          await auditar(ctx, "identificar_paciente", { cpf: "***", teste: true }, {
+            ok: true,
+            id: sintetico.id,
+          });
+          return {
+            ok: true,
+            paciente: { nome: sintetico.nome.split(" ")[0], cadastro: "teste" },
+          };
+        }
+
         const { data, error } = await supabaseAdmin.rpc("integracao_resolver_paciente", {
           _clinica_id: ctx.clinicaId,
           _cpf_digits: cpf,
+
           _nome: p.nome,
           _data_nascimento: p.data_nascimento,
           _telefone: ctx.telefone ?? "",
