@@ -581,29 +581,20 @@ async function gerarRespostaNinaInterno(
 
   const [medR, dispR, procR, cliR, pacienteInfo, medEspR, espR, estadoId, histR] =
     await Promise.all([
-      supabaseAdmin
-        .from("medicos")
-        .select("id, nome")
-        .eq("clinica_id", clinicaId)
-        .eq("ativo", true),
-      supabaseAdmin
-        .from("medico_disponibilidades")
-        .select("medico_id, agenda_id, dia_semana, hora_inicio, hora_fim, observacoes")
-        .eq("clinica_id", clinicaId)
-        .eq("ativo", true),
-      supabaseAdmin
-        .from("procedimentos")
-        .select("nome, grupo, valor_dinheiro_pix, valor_cartao, preparo")
-        .eq("clinica_id", clinicaId)
-        .eq("ativo", true),
+      // FONTE ÚNICA (catálogo publicado): médicos, escalas e procedimentos da
+      // tabela operacional NÃO entram mais no prompt. O que não estiver
+      // publicado no catálogo é desconhecido e vira encaminhamento humano.
+      Promise.resolve({ data: [] as any[] }),
+      Promise.resolve({ data: [] as any[] }),
+      Promise.resolve({ data: [] as any[] }),
       supabaseAdmin
         .from("clinicas")
         .select("nome, base_importada, endereco, cidade, estado, cep, telefone, email")
         .eq("id", clinicaId)
         .maybeSingle(),
       identificarPaciente(clinicaId, mensagemPaciente, telefoneNorm),
-      supabaseAdmin.from("medico_especialidades").select("medico_id, especialidade_id"),
-      supabaseAdmin.from("especialidades").select("id, nome").eq("ativo", true),
+      Promise.resolve({ data: [] as any[] }),
+      Promise.resolve({ data: [] as any[] }),
       carregarEstadoIdentidade(clinicaId, telefoneRemetente ? String(telefoneRemetente) : null),
       telefoneRemetente
         ? supabaseAdmin
@@ -735,88 +726,17 @@ async function gerarRespostaNinaInterno(
     };
   });
 
-  const medicos = medicosLista.map((m) => m.texto).join("\n");
+  // Nada de lista de médicos, especialidades ou tabela de preços no prompt: a
+  // única fonte factual é o catálogo publicado, consultado por ferramenta.
+  const SEM_FONTE_NO_PROMPT =
+    "(não disponível aqui — consulte SEMPRE a ferramenta consultar_base_conhecimento. Sem registro PUBLICADO, não responda por conhecimento próprio: encaminhe para atendimento humano com solicitar_atendente_humano.)";
+  const medicos = SEM_FONTE_NO_PROMPT;
+  const procs = SEM_FONTE_NO_PROMPT;
+  const espsCadastradasTexto = SEM_FONTE_NO_PROMPT;
+  void medicosLista;
 
-  const procs = (procR.data ?? [])
-    .map(
-      (p: any) =>
-        `- ${p.nome}${p.grupo ? ` [${p.grupo}]` : ""}: PIX R$ ${Number(p.valor_dinheiro_pix).toFixed(2)} / cartão R$ ${Number(p.valor_cartao).toFixed(2)}${p.preparo ? ` | PREPARO: ${String(p.preparo).replace(/\s+/g, " ").trim()}` : ""}`,
-    )
-    .join("\n");
-
-  /* ---------- Foco da pergunta: especialidade / procedimento / dia ---------- */
-  const espsCadastradas = [...new Set((espR.data ?? []).map((e: any) => String(e.nome)))];
-  const espsPedidas = detectarEspecialidades(mensagemPaciente, espsCadastradas);
-  const espCitadaSemCadastro =
-    espsPedidas.length === 0 ? pareceCitarEspecialidade(mensagemPaciente) : null;
-  const procsPedidos = detectarProcedimentos(
-    mensagemPaciente,
-    (procR.data ?? []).map((p: any) => String(p.nome)),
-  );
-
-  const agora = agoraNaClinica();
   const textoNorm = normalizar(mensagemPaciente);
-  let diaAlvo: number | null = null;
-  let rotuloDia = "";
-  if (/\bhoje\b/.test(textoNorm)) {
-    diaAlvo = agora.diaSemana;
-    rotuloDia = "hoje";
-  } else if (/\bamanha\b/.test(textoNorm)) {
-    diaAlvo = (agora.diaSemana + 1) % 7;
-    rotuloDia = "amanhã";
-  }
-
-  const temEsp = (m: (typeof medicosLista)[number], esp: string) =>
-    m.esps.some((e) => normalizar(e) === normalizar(esp));
-
-  let blocoFoco = "";
-  if (espCitadaSemCadastro) {
-    blocoFoco = `FOCO DA PERGUNTA: o paciente pediu "${espCitadaSemCadastro}", que NÃO existe no cadastro de especialidades desta clínica (${espsCadastradas.join(", ") || "nenhuma"}). Responda que a clínica não atende essa especialidade e ofereça listar as que atende. NÃO liste a agenda geral.`;
-  } else if (espsPedidas.length > 0) {
-    const partes: string[] = [];
-    for (const esp of espsPedidas) {
-      const daEsp = medicosLista.filter((m) => temEsp(m, esp));
-      const noDia = diaAlvo === null ? daEsp : daEsp.filter((m) => m.dias.has(diaAlvo!));
-      if (noDia.length > 0) {
-        const mostra = noDia.slice(0, 5);
-        const restantes = noDia.length - mostra.length;
-        partes.push(
-          `${esp}${rotuloDia ? ` — ${rotuloDia}` : ""}:\n${mostra.map((m) => m.texto).join("\n")}${
-            restantes > 0
-              ? `\n(mais ${restantes} profissional(is) de ${esp} — diga ao paciente quantos faltam e ofereça mostrar o restante)`
-              : ""
-          }`,
-        );
-      } else if (daEsp.length === 0) {
-        partes.push(
-          `${esp}: a clínica não tem profissional ativo cadastrado nesta especialidade. Informe isso e ofereça as especialidades atendidas.`,
-        );
-      } else {
-        // Procura o próximo dia com atendimento nessa especialidade
-        let proximo: { rotulo: string; lista: typeof daEsp } | null = null;
-        for (let i = 1; i <= 14 && !proximo; i++) {
-          const dia = (agora.diaSemana + i) % 7;
-          const lista = daEsp.filter((m) => m.dias.has(dia));
-          if (lista.length > 0) {
-            const iso = somarDiasIso(agora.iso, i);
-            const [aa, mm, dd] = iso.split("-");
-            proximo = { rotulo: `${DIAS[dia]} ${dd}/${mm}/${aa}`, lista };
-          }
-        }
-        partes.push(
-          proximo
-            ? `${esp}: NÃO há atendimento ${rotuloDia || "no dia pedido"}. Diga isso claramente e ofereça o próximo dia com ${esp}: ${proximo.rotulo} —\n${proximo.lista
-                .slice(0, 5)
-                .map((m) => m.texto)
-                .join("\n")}`
-            : `${esp}: sem dias de atendimento cadastrados. Informe isso e oriente a falar com a recepção.`,
-        );
-      }
-    }
-    blocoFoco = `FOCO DA PERGUNTA — RESPONDA SOMENTE SOBRE ISTO:\n${partes.join("\n\n")}\n\nNÃO liste profissionais de outras especialidades. Máximo 5 profissionais por resposta, com horários.`;
-  } else if (procsPedidos.length > 0) {
-    blocoFoco = `FOCO DA PERGUNTA: o paciente citou o(s) procedimento(s): ${procsPedidos.join(", ")}. Responda apenas sobre eles (valor e preparo), sem listar a tabela inteira.`;
-  }
+  const blocoFoco = "";
 
   /* ---------- Confirmação de identidade (uma vez por conversa) ---------- */
   const respondeuConfirmando =
