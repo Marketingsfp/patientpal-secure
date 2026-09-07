@@ -318,7 +318,16 @@ export function NodeDetalhePainel({
               <ScrollArea className="flex-1">
                 <div className="space-y-4 p-4">
                   <TabsContent value="visao" className="mt-0 space-y-4">
+                    {NODES_INSTRUCOES.includes(node.id) ? (
+                      <ConfiguracaoInstrucoes
+                        onVerInstrucoes={() => {
+                          onFechar();
+                          window.dispatchEvent(new CustomEvent("nina:ver-instrucoes"));
+                        }}
+                      />
+                    ) : null}
                     <Campo rotulo="Descrição">{node.descricao}</Campo>
+
                     <Campo rotulo="Entrada">{node.entrada}</Campo>
                     <Campo rotulo="Saída">{node.saida}</Campo>
                     <Campo rotulo="Serviço">{node.servico ?? "Interno do sistema"}</Campo>
