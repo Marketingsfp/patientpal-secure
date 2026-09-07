@@ -146,7 +146,7 @@ export const chatNina = createServerFn({ method: "POST" })
     if (await ninaDesativadaNaClinica(data.clinicaId)) {
       return { reply: "", error: "A Nina está desativada nesta clínica." };
     }
-    const { assertMembership, contextoClinicaTexto, systemPromptNina } = await import(
+    const { assertMembership, contextoClinicaTexto, systemPromptNinaRuntime } = await import(
       "@/lib/nina-contexto.server"
     );
     await assertMembership(supabase, userId, data.clinicaId);
@@ -156,7 +156,7 @@ export const chatNina = createServerFn({ method: "POST" })
     // deslocada em 3 horas.
     const janela = janelaDiaClinica(hojeBR());
     const contextoTexto = await contextoClinicaTexto(supabase, data.clinicaId, janela);
-    let systemPrompt = systemPromptNina(contextoTexto, data.modoVoz);
+    let systemPrompt = await systemPromptNinaRuntime(contextoTexto, data.modoVoz);
 
     // Aprendizados aprovados pela equipe (memória de longo prazo da clínica).
     const ultimaPergunta = [...data.messages].reverse().find((m) => m.role === "user")?.content ?? "";

@@ -4,7 +4,7 @@ import { requireSupabasePublicEnv } from "@/integrations/supabase/env";
 import {
   assertMembership,
   contextoClinicaTexto,
-  systemPromptNina,
+  systemPromptNinaRuntime,
 } from "@/lib/nina-contexto.server";
 import { hojeBR, janelaDiaClinica } from "@/lib/date-utils";
 import { z } from "zod";
@@ -101,7 +101,7 @@ export const Route = createFileRoute("/api/nina-fala")({
 
         const janela = janelaDiaClinica(hojeBR());
         const contexto = await contextoClinicaTexto(supabase, body.clinicaId, janela);
-        const systemPrompt = systemPromptNina(contexto, true);
+        const systemPrompt = await systemPromptNinaRuntime(contexto, true);
 
         const encoder = new TextEncoder();
         const stream = new ReadableStream<Uint8Array>({

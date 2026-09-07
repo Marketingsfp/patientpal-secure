@@ -185,5 +185,9 @@ export const publicarInstrucoesNina = createServerFn({ method: "POST" })
       p_comentario: data.comentario ?? null,
     });
     if (error) throw new Error(error.message);
+    // FASE 4 — a próxima execução da Nina já relê do banco nesta instância;
+    // nas demais, o TTL curto do cache fecha a janela.
+    const { invalidarCacheInstrucoes } = await import("@/lib/nina/instrucoes-runtime.server");
+    invalidarCacheInstrucoes(data.escopo as "whatsapp" | "painel_interno");
     return nova as VersaoInstrucoes;
   });
