@@ -21,6 +21,10 @@ import {
   RefreshCw,
   Send,
   Wrench,
+  Bot,
+  Pause,
+  Play,
+  Square,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useClinica } from "@/hooks/use-clinica";
@@ -34,6 +38,24 @@ import {
   ferramentasUsadasTeste,
   detalheExecucaoTeste,
 } from "@/lib/nina/teste-console.functions";
+import {
+  iniciarSimulacaoTerra,
+  proximaMensagemTerra,
+  controlarSimulacaoTerra,
+  simulacaoAtualTerra,
+} from "@/lib/nina/simulador-terra.functions";
+import {
+  CENARIOS_SUGERIDOS,
+  DETALHES,
+  ESTILOS,
+  LIMITES_PADRAO,
+  PERSONA_PADRAO,
+  ROTULO_MOTIVO,
+  type EstiloPersona,
+  type Limites,
+  type NivelDetalhe,
+  type Persona,
+} from "@/lib/nina/simulador-terra";
 import {
   Dialog,
   DialogContent,
@@ -160,6 +182,23 @@ export function HomologacaoInbox() {
   const [painelTecnico, setPainelTecnico] = useState(false);
   const composerRef = useRef<HTMLTextAreaElement | null>(null);
 
+  // FASE 4 — simulador automático de paciente (GPT Terra).
+  const iniciarSim = useServerFn(iniciarSimulacaoTerra);
+  const proximaSim = useServerFn(proximaMensagemTerra);
+  const controlarSim = useServerFn(controlarSimulacaoTerra);
+  const simAtual = useServerFn(simulacaoAtualTerra);
+  const [modo, setModo] = useState<"manual" | "terra">("manual");
+  const [cenario, setCenario] = useState<string>(CENARIOS_SUGERIDOS[0] ?? "");
+  const [persona, setPersona] = useState<Persona>(PERSONA_PADRAO);
+  const [limites, setLimites] = useState<Limites>(LIMITES_PADRAO);
+  const [sim, setSim] = useState<
+    { id: string; status: string; turnos: number; maxTurnos: number } | null
+  >(null);
+  const [simMotivo, setSimMotivo] = useState<string | null>(null);
+  const controleRef = useRef<{ parar: boolean; pausar: boolean }>({ parar: false, pausar: false });
+  const rodandoRef = useRef(false);
+
+
   // Mensagens e eventos na MESMA linha do tempo, ordenados por created_at.
   const timeline = useMemo<
     ({ id: string; em: string } & (
@@ -285,6 +324,42 @@ export function HomologacaoInbox() {
     void carregarHistorico(leadId).finally(() => setCarregandoConversa(false));
   }, [leadId, carregarHistorico]);
 
+  // Trocar de lead interrompe o loop automático do lead anterior e carrega a
+  // situação da última simulação daquele lead (cada lead é independente).
+  useEffect(() => {
+    controleRef.current.parar = true;
+    setSim(null);
+    setSimMotivo(null);
+    if (!clinicaId || !leadId) return;
+    let vivo = true;
+    void (async () => {
+      try {
+        const r = (await simAtual({ data: { clinicaId, leadId } })) as { simulacao: any };
+        if (!vivo || !r.simulacao) return;
+        setSim({
+          id: r.simulacao.id,
+          status: r.simulacao.status,
+          turnos: r.simulacao.turnos ?? 0,
+          maxTurnos: r.simulacao.max_turnos ?? LIMITES_PADRAO.maxTurnos,
+        });
+        if (r.simulacao.cenario) setCenario(r.simulacao.cenario);
+        if (r.simulacao.persona) setPersona({ ...PERSONA_PADRAO, ...r.simulacao.persona });
+        setSimMotivo(
+          r.simulacao.erro ??
+            (r.simulacao.motivo_fim
+              ? (ROTULO_MOTIVO[r.simulacao.motivo_fim as keyof typeof ROTULO_MOTIVO] ?? null)
+              : null),
+        );
+      } catch {
+        /* sem simulação anterior */
+      }
+    })();
+    return () => {
+      vivo = false;
+    };
+  }, [clinicaId, leadId, simAtual]);
+
+
   // Recarga incremental após uma operação feita pela automação (WebMCP).
   useEffect(
     () =>
@@ -295,20 +370,27 @@ export function HomologacaoInbox() {
     [carregarLeads, carregarHistorico, leadId],
   );
 
-  const dispararMensagem = async (conteudo: string) => {
-    if (!clinicaId || !leadId) return;
+  const dispararMensagem = async (
+    conteudo: string,
+    tipoForcado?: TipoMensagem,
+  ): Promise<{ ok: boolean; transferida: boolean; erro: string | null }> => {
+    if (!clinicaId || !leadId) return { ok: false, transferida: false, erro: null };
+    const tipoEnvio = tipoForcado ?? tipo;
     const corpo = conteudo.trim();
     // Só texto exige conteúdo: áudio sem transcrição e mídias simulam o webhook real.
-    if (tipo === "text" && !corpo) return;
+    if (tipoEnvio === "text" && !corpo) return { ok: false, transferida: false, erro: null };
     setProcessando(true);
     setErro(null);
     setUltimoTexto(corpo);
     try {
       const chave = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-      const r = (await enviar({ data: { clinicaId, leadId, tipo, texto: corpo, chave } })) as {
+      const r = (await enviar({
+        data: { clinicaId, leadId, tipo: tipoEnvio, texto: corpo, chave },
+      })) as {
         duplicada: boolean;
         reply: string | null;
         erro: string | null;
+        transferida?: boolean;
         audio: { base64: string; mime: string; texto: string } | null;
       };
       setTexto("");
@@ -317,13 +399,135 @@ export function HomologacaoInbox() {
       await carregarLeads();
       if (r.erro) setErro(r.erro);
       else if (!r.reply) setErro("A Nina não retornou resposta para esta mensagem.");
+      return { ok: !r.erro && !!r.reply, transferida: !!r.transferida, erro: r.erro ?? null };
     } catch (e: any) {
       const chegou = await aguardarResposta(leadId);
       setTexto("");
       await carregarLeads();
-      if (!chegou) setErro(String(e?.message ?? e));
+      const msg = String(e?.message ?? e);
+      if (!chegou) setErro(msg);
+      return { ok: chegou, transferida: false, erro: chegou ? null : msg };
     } finally {
       setProcessando(false);
+    }
+  };
+
+  /**
+   * Loop do teste automático: Terra escreve como paciente → a Nina real
+   * responde pelo mesmo pipeline → Terra lê a resposta e decide a próxima
+   * mensagem. Sempre limitado por turnos, duração, tokens e pelos botões do
+   * operador — nunca duas IAs conversando sem teto.
+   */
+  const rodarLoopTerra = async (simulacaoId: string) => {
+    if (!clinicaId || rodandoRef.current) return;
+    rodandoRef.current = true;
+    try {
+      while (!controleRef.current.parar && !controleRef.current.pausar) {
+        const r = (await proximaSim({ data: { clinicaId, simulacaoId } })) as {
+          encerrada: boolean;
+          pausada: boolean;
+          mensagem: string | null;
+          motivo: string | null;
+          turno: number;
+        };
+        if (r.pausada) {
+          setSim((s) => (s ? { ...s, status: "pausada" } : s));
+          break;
+        }
+        if (r.encerrada || !r.mensagem) {
+          setSimMotivo(r.motivo ?? ROTULO_MOTIVO.objetivo_concluido);
+          setSim((s) => (s ? { ...s, status: "concluida" } : s));
+          break;
+        }
+        setSim((s) => (s ? { ...s, turnos: r.turno } : s));
+
+        const env = await dispararMensagem(r.mensagem, "text");
+        if (controleRef.current.parar) break;
+        if (env.transferida) {
+          await controlarSim({
+            data: { clinicaId, simulacaoId, acao: "concluir", motivo: "transferencia" },
+          });
+          setSimMotivo(ROTULO_MOTIVO.transferencia);
+          setSim((s) => (s ? { ...s, status: "concluida" } : s));
+          break;
+        }
+        if (!env.ok) {
+          await controlarSim({
+            data: { clinicaId, simulacaoId, acao: "parar", motivo: "erro" },
+          });
+          setSimMotivo(env.erro ?? ROTULO_MOTIVO.erro);
+          setSim((s) => (s ? { ...s, status: "erro" } : s));
+          break;
+        }
+      }
+      if (controleRef.current.parar) setSim((s) => (s ? { ...s, status: "parada" } : s));
+    } catch (e) {
+      mostrarErro(e);
+      setSim((s) => (s ? { ...s, status: "erro" } : s));
+    } finally {
+      rodandoRef.current = false;
+    }
+  };
+
+  const iniciarTerra = async () => {
+    if (!clinicaId || !leadId) return;
+    if (!cenario.trim()) {
+      toast.error("Defina o cenário do teste antes de iniciar.");
+      return;
+    }
+    controleRef.current = { parar: false, pausar: false };
+    setSimMotivo(null);
+    try {
+      const r = (await iniciarSim({
+        data: { clinicaId, leadId, cenario: cenario.trim(), persona, limites },
+      })) as { simulacao: { id: string; status: string; turnos: number; max_turnos: number } };
+      const s = {
+        id: r.simulacao.id,
+        status: "executando",
+        turnos: r.simulacao.turnos ?? 0,
+        maxTurnos: r.simulacao.max_turnos ?? limites.maxTurnos,
+      };
+      setSim(s);
+      void rodarLoopTerra(s.id);
+    } catch (e) {
+      mostrarErro(e);
+    }
+  };
+
+  const pausarTerra = async () => {
+    if (!clinicaId || !sim) return;
+    controleRef.current.pausar = true;
+    try {
+      await controlarSim({ data: { clinicaId, simulacaoId: sim.id, acao: "pausar" } });
+      setSim((s) => (s ? { ...s, status: "pausada" } : s));
+    } catch (e) {
+      mostrarErro(e);
+    }
+  };
+
+  const retomarTerra = async () => {
+    if (!clinicaId || !sim) return;
+    controleRef.current = { parar: false, pausar: false };
+    try {
+      await controlarSim({ data: { clinicaId, simulacaoId: sim.id, acao: "retomar" } });
+      setSim((s) => (s ? { ...s, status: "executando" } : s));
+      void rodarLoopTerra(sim.id);
+    } catch (e) {
+      mostrarErro(e);
+    }
+  };
+
+  const pararTerra = async () => {
+    if (!clinicaId || !sim) return;
+    controleRef.current.parar = true;
+    try {
+      await controlarSim({
+        data: { clinicaId, simulacaoId: sim.id, acao: "parar", motivo: "operador" },
+      });
+      setSim((s) => (s ? { ...s, status: "parada" } : s));
+      setSimMotivo(ROTULO_MOTIVO.operador);
+    } catch (e) {
+      mostrarErro(e);
     }
   };
 
@@ -440,8 +644,13 @@ export function HomologacaoInbox() {
     }
   };
 
+  const terraRodando = modo === "terra" && sim?.status === "executando";
   const composerBloqueado =
-    !podeEscrever || !leadId || processando || (tipo !== "text" && tipo !== "audio");
+    !podeEscrever ||
+    !leadId ||
+    processando ||
+    terraRodando ||
+    (tipo !== "text" && tipo !== "audio");
 
   return (
     <div className="flex h-[calc(100vh-11rem)] min-h-[560px] gap-3">
@@ -746,6 +955,239 @@ export function HomologacaoInbox() {
                 <audio controls src={audio} className="w-full" />
               </div>
             )}
+
+            {/* FASE 4 — modo do lead: manual ou paciente simulado (Terra). */}
+            <div className="space-y-2 border-t bg-muted/20 p-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-xs font-medium text-muted-foreground">Modo do teste</span>
+                <Select
+                  value={modo}
+                  onValueChange={(v) => setModo(v as "manual" | "terra")}
+                  disabled={terraRodando}
+                >
+                  <SelectTrigger className="h-8 w-[220px] text-xs" aria-label="Modo do teste">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="z-50">
+                    <SelectItem value="manual">Manual</SelectItem>
+                    <SelectItem value="terra">Automático — Terra</SelectItem>
+                  </SelectContent>
+                </Select>
+                {sim && (
+                  <Badge variant={terraRodando ? "default" : "secondary"} className="text-[11px]">
+                    {sim.status} · turno {sim.turnos}/{sim.maxTurnos}
+                  </Badge>
+                )}
+                {simMotivo && (
+                  <span className="text-xs text-muted-foreground">{simMotivo}</span>
+                )}
+              </div>
+
+              {modo === "terra" && (
+                <div className="space-y-2 rounded-md border bg-atd-surface p-2">
+                  <p className="text-[11px] text-muted-foreground">
+                    O paciente é simulado por outra IA (Terra). Ela só vê o cenário, a persona
+                    sintética e as mensagens da conversa — nunca as instruções internas da Nina.
+                  </p>
+
+                  <div className="flex flex-wrap gap-2">
+                    <Select value={cenario} onValueChange={setCenario} disabled={terraRodando}>
+                      <SelectTrigger className="h-8 min-w-[280px] flex-1 text-xs" aria-label="Cenário">
+                        <SelectValue placeholder="Escolha um cenário" />
+                      </SelectTrigger>
+                      <SelectContent className="z-50">
+                        {CENARIOS_SUGERIDOS.map((c) => (
+                          <SelectItem key={c} value={c}>
+                            {c}
+                          </SelectItem>
+                        ))}
+                        {cenario && !CENARIOS_SUGERIDOS.includes(cenario) && (
+                          <SelectItem value={cenario}>{cenario}</SelectItem>
+                        )}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <Textarea
+                    rows={2}
+                    value={cenario}
+                    onChange={(e) => setCenario(e.target.value)}
+                    disabled={terraRodando}
+                    placeholder="Cenário do teste (ex.: Paciente quer marcar cardiologista.)"
+                    className="resize-none text-xs"
+                    aria-label="Cenário do teste"
+                  />
+
+                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                    <Select
+                      value={persona.estilo}
+                      onValueChange={(v) =>
+                        setPersona((p) => ({ ...p, estilo: v as EstiloPersona }))
+                      }
+                      disabled={terraRodando}
+                    >
+                      <SelectTrigger className="h-8 text-xs" aria-label="Comportamento">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="z-50">
+                        {ESTILOS.map((e) => (
+                          <SelectItem key={e.valor} value={e.valor}>
+                            {e.rotulo}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Select
+                      value={persona.detalhe}
+                      onValueChange={(v) =>
+                        setPersona((p) => ({ ...p, detalhe: v as NivelDetalhe }))
+                      }
+                      disabled={terraRodando}
+                    >
+                      <SelectTrigger className="h-8 text-xs" aria-label="Nível de detalhe">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="z-50">
+                        {DETALHES.map((d) => (
+                          <SelectItem key={d.valor} value={d.valor}>
+                            {d.rotulo}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <label className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                      <input
+                        type="checkbox"
+                        className="h-3.5 w-3.5 accent-current"
+                        checked={persona.errosDigitacao}
+                        disabled={terraRodando}
+                        onChange={(e) =>
+                          setPersona((p) => ({ ...p, errosDigitacao: e.target.checked }))
+                        }
+                      />
+                      Erros de digitação
+                    </label>
+                    <label className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                      <input
+                        type="checkbox"
+                        className="h-3.5 w-3.5 accent-current"
+                        checked={persona.respondeParcialmente}
+                        disabled={terraRodando}
+                        onChange={(e) =>
+                          setPersona((p) => ({ ...p, respondeParcialmente: e.target.checked }))
+                        }
+                      />
+                      Responde parcialmente
+                    </label>
+                    <label className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                      <input
+                        type="checkbox"
+                        className="h-3.5 w-3.5 accent-current"
+                        checked={persona.mudaDeAssunto}
+                        disabled={terraRodando}
+                        onChange={(e) =>
+                          setPersona((p) => ({ ...p, mudaDeAssunto: e.target.checked }))
+                        }
+                      />
+                      Muda de assunto
+                    </label>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
+                    <label className="flex items-center gap-1">
+                      Máx. turnos
+                      <input
+                        type="number"
+                        min={1}
+                        max={30}
+                        value={limites.maxTurnos}
+                        disabled={terraRodando}
+                        onChange={(e) =>
+                          setLimites((l) => ({ ...l, maxTurnos: Number(e.target.value) || 1 }))
+                        }
+                        className="h-7 w-16 rounded border border-atd-border bg-atd-surface px-1"
+                      />
+                    </label>
+                    <label className="flex items-center gap-1">
+                      Duração (s)
+                      <input
+                        type="number"
+                        min={30}
+                        max={1800}
+                        value={limites.maxDuracaoS}
+                        disabled={terraRodando}
+                        onChange={(e) =>
+                          setLimites((l) => ({ ...l, maxDuracaoS: Number(e.target.value) || 30 }))
+                        }
+                        className="h-7 w-20 rounded border border-atd-border bg-atd-surface px-1"
+                      />
+                    </label>
+                    <label className="flex items-center gap-1">
+                      Máx. tokens
+                      <input
+                        type="number"
+                        min={500}
+                        max={200000}
+                        step={500}
+                        value={limites.maxTokens}
+                        disabled={terraRodando}
+                        onChange={(e) =>
+                          setLimites((l) => ({ ...l, maxTokens: Number(e.target.value) || 500 }))
+                        }
+                        className="h-7 w-24 rounded border border-atd-border bg-atd-surface px-1"
+                      />
+                    </label>
+                    <label className="flex items-center gap-1">
+                      Timeout (s)
+                      <input
+                        type="number"
+                        min={10}
+                        max={180}
+                        value={limites.timeoutS}
+                        disabled={terraRodando}
+                        onChange={(e) =>
+                          setLimites((l) => ({ ...l, timeoutS: Number(e.target.value) || 10 }))
+                        }
+                        className="h-7 w-16 rounded border border-atd-border bg-atd-surface px-1"
+                      />
+                    </label>
+                  </div>
+
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      size="sm"
+                      disabled={!podeEscrever || terraRodando || !leadId}
+                      onClick={() => void iniciarTerra()}
+                    >
+                      <Bot className="mr-1 h-3.5 w-3.5" /> Iniciar teste
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={!terraRodando}
+                      onClick={() => void pausarTerra()}
+                    >
+                      <Pause className="mr-1 h-3.5 w-3.5" /> Pausar
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={sim?.status !== "pausada"}
+                      onClick={() => void retomarTerra()}
+                    >
+                      <Play className="mr-1 h-3.5 w-3.5" /> Retomar
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={!sim || (sim.status !== "executando" && sim.status !== "pausada")}
+                      onClick={() => void pararTerra()}
+                    >
+                      <Square className="mr-1 h-3.5 w-3.5" /> Parar
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
 
             <div className="space-y-2 border-t p-3">
               <div className="flex gap-2">
