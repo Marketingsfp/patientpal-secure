@@ -8,6 +8,7 @@
  * sensíveis. Não existe execução de código nesta tela.
  */
 import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -17,6 +18,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { NODES_ARQUITETURA, type NodeArquitetura } from "@/lib/nina/arquitetura/manifesto";
 import { CORES_CATEGORIA } from "@/lib/nina/arquitetura/layout";
 import { verTrechoCodigo, type RespostaCodigo } from "@/lib/nina/arquitetura/codigo.functions";
+import { carregarInstrucoesNina } from "@/lib/nina/instrucoes.functions";
 import type { StatusNodeCanvas } from "./ArquiteturaCanvas";
 import {
   RESTRITO,
@@ -24,6 +26,53 @@ import {
   type DetalheEspecifico,
   type NivelAcesso,
 } from "@/lib/nina/arquitetura/detalhes-ia";
+
+/** Nodes cuja configuração vem das Instruções da Nina publicadas. */
+const NODES_INSTRUCOES = ["prompt.compose", "instructions.published"];
+
+/**
+ * FASE 5 — versão publicada das Instruções da Nina usada pela montagem do
+ * prompt, com atalho para a seção editável abaixo do canvas.
+ */
+function ConfiguracaoInstrucoes({ onVerInstrucoes }: { onVerInstrucoes: () => void }) {
+  const carregar = useServerFn(carregarInstrucoesNina);
+  const { data, isLoading } = useQuery({
+    queryKey: ["nina-instrucoes"],
+    queryFn: () => carregar(),
+  });
+  const whatsapp = data?.find((d) => d.escopo === "whatsapp")?.publicada ?? null;
+
+  return (
+    <div className="space-y-3 rounded-md border p-3">
+      <p className="text-xs font-medium uppercase tracking-wide">Configuração publicada</p>
+      {isLoading ? (
+        <p className="text-sm text-muted-foreground">Carregando a versão publicada…</p>
+      ) : (
+        <div className="grid grid-cols-2 gap-3">
+          <Campo rotulo="Versão publicada">{whatsapp ? `v${whatsapp.versao}` : "—"}</Campo>
+          <Campo rotulo="Fonte">Instruções da Nina</Campo>
+          <Campo rotulo="Status">{whatsapp ? "Publicada" : "Nenhuma publicada (usa o texto do código)"}</Campo>
+          <Campo rotulo="Última publicação">
+            {whatsapp?.publicado_em
+              ? new Date(whatsapp.publicado_em).toLocaleString("pt-BR", {
+                  dateStyle: "short",
+                  timeStyle: "short",
+                })
+              : "—"}
+          </Campo>
+        </div>
+      )}
+      <Button size="sm" variant="outline" onClick={onVerInstrucoes}>
+        Ver instruções
+      </Button>
+      <p className="text-xs text-muted-foreground">
+        O texto publicado define só o jeito de conversar. Permissões, acesso a dados e confirmações
+        obrigatórias continuam valendo sempre.
+      </p>
+    </div>
+  );
+}
+
 
 type Props = {
   node: NodeArquitetura | null;
