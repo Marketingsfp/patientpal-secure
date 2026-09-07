@@ -9410,6 +9410,110 @@ export type Database = {
           },
         ]
       }
+      nina_teste_simulacoes: {
+        Row: {
+          cenario: string
+          ciclo_id: string | null
+          clinica_id: string
+          conversa_id: string | null
+          created_at: string
+          criado_por: string | null
+          erro: string | null
+          finalizado_em: string | null
+          id: string
+          input_tokens: number
+          lead_id: string
+          max_duracao_s: number
+          max_tokens: number
+          max_turnos: number
+          modelo: string
+          motivo_fim: string | null
+          output_tokens: number
+          persona: Json
+          status: string
+          timeout_s: number
+          turnos: number
+          updated_at: string
+        }
+        Insert: {
+          cenario: string
+          ciclo_id?: string | null
+          clinica_id: string
+          conversa_id?: string | null
+          created_at?: string
+          criado_por?: string | null
+          erro?: string | null
+          finalizado_em?: string | null
+          id?: string
+          input_tokens?: number
+          lead_id: string
+          max_duracao_s?: number
+          max_tokens?: number
+          max_turnos?: number
+          modelo: string
+          motivo_fim?: string | null
+          output_tokens?: number
+          persona?: Json
+          status?: string
+          timeout_s?: number
+          turnos?: number
+          updated_at?: string
+        }
+        Update: {
+          cenario?: string
+          ciclo_id?: string | null
+          clinica_id?: string
+          conversa_id?: string | null
+          created_at?: string
+          criado_por?: string | null
+          erro?: string | null
+          finalizado_em?: string | null
+          id?: string
+          input_tokens?: number
+          lead_id?: string
+          max_duracao_s?: number
+          max_tokens?: number
+          max_turnos?: number
+          modelo?: string
+          motivo_fim?: string | null
+          output_tokens?: number
+          persona?: Json
+          status?: string
+          timeout_s?: number
+          turnos?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nina_teste_simulacoes_ciclo_id_fkey"
+            columns: ["ciclo_id"]
+            isOneToOne: false
+            referencedRelation: "nina_teste_ciclos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nina_teste_simulacoes_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nina_teste_simulacoes_conversa_id_fkey"
+            columns: ["conversa_id"]
+            isOneToOne: false
+            referencedRelation: "atend_conversas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nina_teste_simulacoes_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "nina_teste_leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       nina_testes_regressao: {
         Row: {
           ativo: boolean
