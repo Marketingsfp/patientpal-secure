@@ -8696,6 +8696,8 @@ export type Database = {
           avaliacao_id: string | null
           categoria: string
           clinica_id: string
+          contato_paciente_id: string | null
+          contato_telefone: string | null
           conversa_id: string | null
           correcao: string | null
           correcao_original: string | null
@@ -8721,6 +8723,9 @@ export type Database = {
           pergunta_texto: string | null
           prioridade: string | null
           prompt_versao: number | null
+          prompt_versao_id: string | null
+          protocolo_atendimento: string | null
+          protocolo_sessao_id: string | null
           regressao_cenario_id: string | null
           reportado_por: string
           revertido_em: string | null
@@ -8730,10 +8735,12 @@ export type Database = {
           root_cause: string | null
           status: string
           teste_cenario_id: string | null
+          teste_ciclo_id: string | null
           teste_evidencia: Json | null
           teste_execucao_id: string | null
           teste_lead_indice: number | null
           teste_tipo: string | null
+          trace_id: string | null
           trace_ids: string[] | null
           unidade_id: string | null
           updated_at: string
@@ -8751,6 +8758,8 @@ export type Database = {
           avaliacao_id?: string | null
           categoria: string
           clinica_id: string
+          contato_paciente_id?: string | null
+          contato_telefone?: string | null
           conversa_id?: string | null
           correcao?: string | null
           correcao_original?: string | null
@@ -8776,6 +8785,9 @@ export type Database = {
           pergunta_texto?: string | null
           prioridade?: string | null
           prompt_versao?: number | null
+          prompt_versao_id?: string | null
+          protocolo_atendimento?: string | null
+          protocolo_sessao_id?: string | null
           regressao_cenario_id?: string | null
           reportado_por: string
           revertido_em?: string | null
@@ -8785,10 +8797,12 @@ export type Database = {
           root_cause?: string | null
           status?: string
           teste_cenario_id?: string | null
+          teste_ciclo_id?: string | null
           teste_evidencia?: Json | null
           teste_execucao_id?: string | null
           teste_lead_indice?: number | null
           teste_tipo?: string | null
+          trace_id?: string | null
           trace_ids?: string[] | null
           unidade_id?: string | null
           updated_at?: string
@@ -8806,6 +8820,8 @@ export type Database = {
           avaliacao_id?: string | null
           categoria?: string
           clinica_id?: string
+          contato_paciente_id?: string | null
+          contato_telefone?: string | null
           conversa_id?: string | null
           correcao?: string | null
           correcao_original?: string | null
@@ -8831,6 +8847,9 @@ export type Database = {
           pergunta_texto?: string | null
           prioridade?: string | null
           prompt_versao?: number | null
+          prompt_versao_id?: string | null
+          protocolo_atendimento?: string | null
+          protocolo_sessao_id?: string | null
           regressao_cenario_id?: string | null
           reportado_por?: string
           revertido_em?: string | null
@@ -8840,10 +8859,12 @@ export type Database = {
           root_cause?: string | null
           status?: string
           teste_cenario_id?: string | null
+          teste_ciclo_id?: string | null
           teste_evidencia?: Json | null
           teste_execucao_id?: string | null
           teste_lead_indice?: number | null
           teste_tipo?: string | null
+          trace_id?: string | null
           trace_ids?: string[] | null
           unidade_id?: string | null
           updated_at?: string
