@@ -61,6 +61,8 @@ import { HomologacaoInbox } from "@/components/nina/HomologacaoInbox";
 import { CenariosTeste } from "@/components/nina/CenariosTeste";
 import { CargaTeste } from "@/components/nina/CargaTeste";
 import { RelatorioHomologacao } from "@/components/nina/RelatorioHomologacao";
+import { DashboardHomologacao } from "@/components/nina/DashboardHomologacao";
+
 import { AtendMacros } from "@/components/nina/AtendimentoTabs";
 import { AtendInbox } from "@/components/nina/AtendimentoExtraTabs";
 
