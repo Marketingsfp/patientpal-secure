@@ -13,10 +13,12 @@ import {
   GitCompare,
   Route,
   RotateCcw,
+  Search,
   ZoomIn,
   ZoomOut,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   CATEGORIAS_ARQUITETURA,
   NODES_ARQUITETURA,
@@ -38,11 +40,18 @@ import {
 } from "@/lib/nina/arquitetura/layout-incremental";
 import { assinaturaAtual, calcularDiffArquitetura } from "@/lib/nina/arquitetura/sync";
 import {
+  buscarNodes,
+  calcularMinimapa,
+  centralizarNoNode,
+  nodesVisiveis,
+} from "@/lib/nina/arquitetura/navegacao";
+import {
   calcularRotas,
   descreverConexao,
   realceCaminhoCompleto,
   realceDireto,
 } from "@/lib/nina/arquitetura/rotas";
+
 import { NodeDetalhePainel } from "./NodeDetalhePainel";
 import type { NivelAcesso } from "@/lib/nina/arquitetura/detalhes-ia";
 import type { MarcaAlteracao } from "@/lib/nina/arquitetura/versoes";
@@ -142,6 +151,13 @@ export function ArquiteturaCanvas({
   const [selecionado, setSelecionado] = useState<string | null>(null);
   const [caminhoCompleto, setCaminhoCompleto] = useState(false);
   const [mostrarAlteracoes, setMostrarAlteracoes] = useState(false);
+  // FASE 7 — filtro e busca são apenas visuais: escondem/realçam na tela e
+  // nunca mudam o manifesto, as conexões ou o funcionamento da Nina.
+  const [categoriasOcultas, setCategoriasOcultas] = useState<Set<CategoriaArquitetura>>(
+    () => new Set(),
+  );
+  const [termoBusca, setTermoBusca] = useState("");
+
   const arrasto = useRef<
     | { tipo: "canvas"; startX: number; startY: number; origemX: number; origemY: number }
     | { tipo: "node"; id: string; startX: number; startY: number; origemX: number; origemY: number }
@@ -190,6 +206,30 @@ export function ArquiteturaCanvas({
   );
   const temRealce = realce.nodes.size > 0;
 
+  const categoriasVisiveis = useMemo(
+    () =>
+      new Set(
+        CATEGORIAS_ARQUITETURA.filter(
+          (categoria: CategoriaArquitetura) => !categoriasOcultas.has(categoria),
+        ),
+      ),
+    [categoriasOcultas],
+  );
+
+  const visiveis = useMemo(
+    () => nodesVisiveis(nodes, categoriasVisiveis),
+    [nodes, categoriasVisiveis],
+  );
+
+  const resultadosBusca = useMemo(() => new Set(buscarNodes(nodes, termoBusca)), [nodes, termoBusca]);
+
+  const minimapa = useMemo(
+    () => calcularMinimapa(layout, { largura: 180, altura: 120 }),
+    [layout],
+  );
+
+
+
 
   const ajustarTela = useCallback(() => {
     const area = areaRef.current;
@@ -224,6 +264,26 @@ export function ArquiteturaCanvas({
       y: (area.clientHeight - layout.altura * atual.escala) / 2,
     }));
   }, [layout]);
+
+  /** Move a visão até um componente encontrado na busca (só navegação). */
+  const centralizarEm = useCallback(
+    (id: string) => {
+      const area = areaRef.current;
+      const alvo = mapaPosicionado.get(id);
+      if (!area || !alvo) return;
+      setView((atual) => ({
+        escala: atual.escala,
+        ...centralizarNoNode(
+          { x: alvo.x, y: alvo.y },
+          { largura: area.clientWidth, altura: area.clientHeight },
+          atual.escala,
+        ),
+      }));
+    },
+    [mapaPosicionado],
+  );
+
+
 
   const aplicarZoom = useCallback((fator: number, centro?: { x: number; y: number }) => {
     const area = areaRef.current;
@@ -370,6 +430,87 @@ export function ArquiteturaCanvas({
         </span>
       </div>
 
+      {/* FASE 7 — busca e filtro por categoria: apenas visual. */}
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="relative">
+          <Search className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            value={termoBusca}
+            onChange={(evento) => setTermoBusca(evento.target.value)}
+            onKeyDown={(evento) => {
+              if (evento.key === "Enter") {
+                const primeiro = layout.nodes.find((n) => resultadosBusca.has(n.node.id));
+                if (primeiro) centralizarEm(primeiro.node.id);
+              }
+            }}
+            placeholder="Buscar node..."
+            aria-label="Buscar node"
+            className="h-8 w-56 pl-7 text-xs"
+          />
+        </div>
+        {termoBusca ? (
+          <>
+            <span className="text-xs text-muted-foreground">
+              {resultadosBusca.size} encontrado{resultadosBusca.size === 1 ? "" : "s"}
+            </span>
+            {[...resultadosBusca].slice(0, 6).map((id) => (
+              <Button
+                key={id}
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-7 text-xs"
+                onClick={() => centralizarEm(id)}
+              >
+                {mapaPosicionado.get(id)?.node.nome ?? id}
+              </Button>
+            ))}
+          </>
+        ) : null}
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2">
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="h-7 text-xs"
+          onClick={() => setCategoriasOcultas(new Set())}
+        >
+          Mostrar tudo
+        </Button>
+        {CATEGORIAS_ARQUITETURA.map((categoria: CategoriaArquitetura) => {
+          const marcada = !categoriasOcultas.has(categoria);
+          return (
+            <label
+              key={categoria}
+              className="inline-flex cursor-pointer items-center gap-1.5 rounded-full border px-2 py-0.5 text-[11px] text-muted-foreground"
+            >
+              <input
+                type="checkbox"
+                checked={marcada}
+                onChange={() =>
+                  setCategoriasOcultas((atual) => {
+                    const proximo = new Set(atual);
+                    if (proximo.has(categoria)) proximo.delete(categoria);
+                    else proximo.add(categoria);
+                    return proximo;
+                  })
+                }
+                className="h-3 w-3 accent-[var(--primary)]"
+              />
+              <span
+                className="h-2 w-2 rounded-full"
+                style={{ backgroundColor: CORES_CATEGORIA[categoria] }}
+              />
+              {categoria}
+            </label>
+          );
+        })}
+      </div>
+
+
+
       <div
         ref={areaRef}
         onWheel={onWheel}
@@ -444,8 +585,11 @@ export function ArquiteturaCanvas({
               </marker>
             </defs>
             {rotas.map((rota) => {
+              // Filtro é só visual: esconde a linha quando uma ponta está oculta.
+              if (!visiveis.has(rota.de) || !visiveis.has(rota.para)) return null;
               const ativa =
                 !modoExecucao || (Boolean(execucao?.[rota.de]) && Boolean(execucao?.[rota.para]));
+
               const destacada = realce.arestas.has(rota.id);
               const atenuada = temRealce && !destacada;
               const cor = !ativa
@@ -476,18 +620,23 @@ export function ArquiteturaCanvas({
 
 
           {layout.nodes.map(({ node, x, y, principal }) => {
+            if (!visiveis.has(node.id)) return null;
             const estado = execucao?.[node.id];
             const apagado = modoExecucao && !estado;
             const cor = CORES_CATEGORIA[node.categoria];
             const destacado = realce.nodes.has(node.id);
             const atenuado = temRealce && !destacado;
+            const encontrado = resultadosBusca.has(node.id);
             const marca = mostrarAlteracoes ? marcasAlteracao?.[node.id] : undefined;
             const corMarca =
               marca === "adicionado"
                 ? "var(--chart-2)"
                 : marca === "alterado"
                   ? "var(--chart-4)"
-                  : null;
+                  : encontrado
+                    ? "var(--primary)"
+                    : null;
+
             return (
               <button
                 type="button"
@@ -546,7 +695,59 @@ export function ArquiteturaCanvas({
             );
           })}
         </div>
+
+        {/* FASE 7 — minimapa discreto: só navegação, sem consultar o backend. */}
+        <div
+          className="absolute bottom-2 right-2 rounded-md border bg-card/90 p-1 shadow-sm"
+          style={{ width: minimapa.largura + 8, height: minimapa.altura + 8 }}
+          onPointerDown={(evento) => {
+            evento.stopPropagation();
+            const area = areaRef.current;
+            if (!area) return;
+            const caixa = evento.currentTarget.getBoundingClientRect();
+            const alvoX = (evento.clientX - caixa.left - 4) / minimapa.escala;
+            const alvoY = (evento.clientY - caixa.top - 4) / minimapa.escala;
+            setView((atual) => ({
+              escala: atual.escala,
+              x: area.clientWidth / 2 - alvoX * atual.escala,
+              y: area.clientHeight / 2 - alvoY * atual.escala,
+            }));
+          }}
+          aria-label="Minimapa da arquitetura"
+        >
+          <div className="relative h-full w-full">
+            {layout.nodes.map(({ node, x, y }) =>
+              visiveis.has(node.id) ? (
+                <span
+                  key={node.id}
+                  className="absolute rounded-[1px]"
+                  style={{
+                    left: x * minimapa.escala,
+                    top: y * minimapa.escala,
+                    width: Math.max(2, LARGURA_NODE * minimapa.escala),
+                    height: Math.max(2, ALTURA_NODE * minimapa.escala),
+                    backgroundColor: CORES_CATEGORIA[node.categoria],
+                    opacity: resultadosBusca.size > 0 && !resultadosBusca.has(node.id) ? 0.25 : 0.8,
+                  }}
+                />
+              ) : null,
+            )}
+            <span
+              className="pointer-events-none absolute border border-primary"
+              style={{
+                left: (-view.x / view.escala) * minimapa.escala,
+                top: (-view.y / view.escala) * minimapa.escala,
+                width:
+                  ((areaRef.current?.clientWidth ?? 0) / view.escala) * minimapa.escala,
+                height:
+                  ((areaRef.current?.clientHeight ?? 0) / view.escala) * minimapa.escala,
+              }}
+            />
+          </div>
+        </div>
       </div>
+
+
 
       <div className="flex flex-wrap items-center gap-2">
         <span className="inline-flex items-center gap-1.5 rounded-full border border-primary/50 px-2 py-0.5 text-[11px] text-foreground">
