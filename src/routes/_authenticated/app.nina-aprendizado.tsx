@@ -651,13 +651,13 @@ function Pagina() {
    * nunca localiza a conversa pelo lead. Somente leitura.
    */
   const abrirConversa = (item: Item) => {
-    if (!item.conversa_id) {
-      toast.error("Este registro não tem conversa vinculada.");
-      return;
-    }
+    // FASE 4 — sem conversa vinculada o modal abre avisando; nunca abrimos
+    // "a primeira conversa do lead" como aproximação.
     setConversaAuditoria({
-      conversaId: item.conversa_id,
+      conversaId: item.conversa_id ?? null,
       mensagemId: item.mensagem_id ?? null,
+      erroId: item.id,
+      reportadoEm: item.created_at,
     });
   };
 
