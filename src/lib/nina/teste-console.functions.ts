@@ -72,7 +72,38 @@ export const listarLeadsTeste = createServerFn({ method: "POST" })
     // Isolamento: cada lead só enxerga a própria conversa atual.
     const conversasPorLead: Record<string, string[]> = {};
     for (const l of leads) conversasPorLead[l.id] = l.conversa_id ? [l.conversa_id] : [];
-    const resumos = resumirLeads(conversasPorLead, linhas as MensagemResumoRow[]);
+
+    // FASE 3 — leitura INDIVIDUAL deste usuário (tabela `atend_leituras`,
+    // lida com a sessão do próprio usuário). O que um testador leu não zera o
+    // contador de outro, e nada aqui toca os contadores dos pacientes reais.
+    const lidoAte: Record<string, string | null> = {};
+    if (ids.length) {
+      const { data: leituras } = await context.supabase
+        .from("atend_leituras")
+        .select("conversa_id, ultima_msg_lida_em")
+        .eq("clinica_id", data.clinicaId)
+        .in("conversa_id", ids);
+      for (const l of (leituras ?? []) as any[])
+        lidoAte[l.conversa_id] = l.ultima_msg_lida_em ?? null;
+    }
+
+    const resumos = resumirLeads(conversasPorLead, linhas as MensagemResumoRow[], lidoAte);
+
+    // Contagem autoritativa no banco (a amostra acima é limitada).
+    const naoLidasBanco = new Map<string, number>();
+    if (ids.length) {
+      try {
+        const { data: cont } = await context.supabase.rpc("nina_teste_nao_lidas" as never, {
+          _clinica_id: data.clinicaId,
+          _conversa_ids: ids,
+        } as never);
+        for (const c of ((cont ?? []) as any[]))
+          naoLidasBanco.set(c.conversa_id, Number(c.nao_lidas) || 0);
+      } catch (e) {
+        console.error("[homologacao] contagem de nao lidas falhou", e);
+      }
+    }
+
 
     // Total real de mensagens da conversa atual (contagem no banco, sem trazer linhas).
     const totais = new Map<string, number>();
@@ -106,12 +137,51 @@ export const listarLeadsTeste = createServerFn({ method: "POST" })
           ultimaMensagemTexto: r.lastMessageText,
           ultimaMensagemAutor: r.lastMessageAuthor,
           ultimaMensagemEm: r.lastMessageAt,
-          naoLidas: r.unreadCount,
+          naoLidas: l.conversa_id
+            ? (naoLidasBanco.get(l.conversa_id) ?? r.unreadCount)
+            : r.unreadCount,
         };
       }),
     };
 
   });
+
+/**
+ * FASE 3 — registra a leitura INDIVIDUAL do usuário em um lead de teste.
+ *
+ * Só é chamada quando o testador realmente abre o lead e as mensagens são
+ * exibidas — nunca por prefetch, hover, cache ou carga em segundo plano.
+ * Usa a mesma tabela de leitura individual do atendimento (`atend_leituras`)
+ * pela sessão do próprio usuário, então a leitura de um testador não zera o
+ * contador de outro e os pacientes reais não são afetados.
+ */
+export const marcarLeadTesteLido = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) =>
+    z
+      .object({
+        clinicaId: z.string().uuid(),
+        conversaId: z.string().uuid(),
+        mensagemId: z.string().uuid().optional().nullable(),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    await assertMembership(context.supabase, context.userId, data.clinicaId);
+    const { error } = await context.supabase.rpc("atend_registrar_leitura", {
+      _clinica_id: data.clinicaId,
+      _conversa_id: data.conversaId,
+      _mensagem_id: data.mensagemId ?? undefined,
+    } as never);
+    if (error) throw new Error(error.message);
+    const { data: cont } = await context.supabase.rpc("nina_teste_nao_lidas" as never, {
+      _clinica_id: data.clinicaId,
+      _conversa_ids: [data.conversaId],
+    } as never);
+    const linha = ((cont ?? []) as any[])[0];
+    return { ok: true, naoLidas: Number(linha?.nao_lidas ?? 0) || 0 };
+  });
+
 
 export const historicoLeadTeste = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])

@@ -14058,6 +14058,13 @@ export type Database = {
         }
         Returns: Json
       }
+      nina_teste_nao_lidas: {
+        Args: { _clinica_id: string; _conversa_ids: string[] }
+        Returns: {
+          conversa_id: string
+          nao_lidas: number
+        }[]
+      }
       nina_trace_purgar: { Args: { _clinica_id?: string }; Returns: number }
       normalizar_telefone: { Args: { _tel: string }; Returns: string }
       normalizar_termo_busca: { Args: { _termo: string }; Returns: string }

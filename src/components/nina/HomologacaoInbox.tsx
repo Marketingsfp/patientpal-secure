@@ -36,6 +36,7 @@ import {
   enviarMensagemTeste,
   resolverConversaTeste,
   ferramentasUsadasTeste,
+  marcarLeadTesteLido,
   detalheExecucaoTeste,
 } from "@/lib/nina/teste-console.functions";
 import {
@@ -149,6 +150,7 @@ export function HomologacaoInbox() {
   const enviar = useServerFn(enviarMensagemTeste);
   const resolver = useServerFn(resolverConversaTeste);
   const ferramentasFn = useServerFn(ferramentasUsadasTeste);
+  const marcarLido = useServerFn(marcarLeadTesteLido);
 
   const [leads, setLeads] = useState<Lead[]>([]);
   const [leadId, setLeadId] = useState<string | null>(null);
@@ -323,6 +325,35 @@ export function HomologacaoInbox() {
     },
     [clinicaId, historico, ferramentasFn],
   );
+
+  /**
+   * FASE 3 — leitura individual dos leads de teste.
+   *
+   * Só marca como lido quando o testador abriu o lead E as mensagens estão
+   * realmente na tela (aba visível). Prefetch, cache, hover ou recarga em
+   * segundo plano não zeram o contador. A gravação é por usuário — a leitura
+   * de um testador não interfere na de outro nem nos pacientes reais.
+   */
+  const marcadoRef = useRef<string>("");
+  useEffect(() => {
+    if (!clinicaId || !leadId || !conversaId) return;
+    if (carregandoConversa) return;
+    if (typeof document !== "undefined" && document.visibilityState !== "visible") return;
+    const ultima = msgs[msgs.length - 1];
+    if (!ultima) return;
+    const chave = `${conversaId}:${ultima.id}`;
+    if (marcadoRef.current === chave) return;
+    marcadoRef.current = chave;
+    void (async () => {
+      try {
+        await marcarLido({ data: { clinicaId, conversaId, mensagemId: ultima.id } });
+        setLeads((ls) => ls.map((l) => (l.id === leadId ? { ...l, naoLidas: 0 } : l)));
+      } catch {
+        marcadoRef.current = ""; // falhou: tenta de novo na próxima visualização
+      }
+    })();
+  }, [clinicaId, leadId, conversaId, msgs, carregandoConversa, marcarLido]);
+
 
   /**
    * Rede de segurança: a resposta da Nina é gravada no banco pelo servidor,
@@ -765,6 +796,14 @@ export function HomologacaoInbox() {
             >
               <div className="flex items-center gap-2">
                 <span className="flex-1 truncate text-sm font-medium">{nomeLead(l)}</span>
+                {Number(l.naoLidas ?? 0) > 0 && (
+                  <Badge
+                    data-testid="nao-lidas-lead-teste"
+                    className="bg-atd-blue px-1.5 py-0 text-xs text-atd-on-strong"
+                  >
+                    {Number(l.naoLidas ?? 0)}
+                  </Badge>
+                )}
                 <Badge className="border border-atd-warn bg-atd-warn-bg text-[10px] text-atd-warn-ink">
                   TESTE
                 </Badge>
