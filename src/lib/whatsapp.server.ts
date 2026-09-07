@@ -1427,7 +1427,10 @@ ATENDIMENTO HUMANO — REGRA OBRIGATÓRIA:
         paraDecisaoLegado,
         resumoHandoffEstruturado,
       } = await import("@/lib/nina/confidence/runtime");
-      const { montarRegistroAuditoria } = await import("@/lib/nina/confidence/auditoria");
+      const [{ montarRegistroAuditoria }, { detectarIntencoes }] = await Promise.all([
+        import("@/lib/nina/confidence/auditoria"),
+        import("@/lib/nina/atendimento-fase1"),
+      ]);
       const estadoTurno = {
         texto,
         mensagemPaciente,
