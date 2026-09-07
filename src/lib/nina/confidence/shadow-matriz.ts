@@ -50,7 +50,7 @@ const catalogoOk = {
 };
 const agendaOk = {
   nome: "consultar_disponibilidade",
-  capacidade: "getAvailability",
+  capacidade: "checkAvailability",
   fonte: "agenda",
   success: true,
 };

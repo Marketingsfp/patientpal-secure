@@ -30,6 +30,7 @@ import type {
   FonteRecuperada,
   ResultadoConfianca,
   ResultadoFerramenta,
+  ResultadoValidador,
   Verificacao,
 } from "./types";
 
