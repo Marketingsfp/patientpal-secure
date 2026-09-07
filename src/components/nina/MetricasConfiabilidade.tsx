@@ -183,6 +183,60 @@ export function MetricasConfiabilidade({ clinicaId }: { clinicaId: string | null
               </Bloco>
             </div>
 
+            <div className="rounded-md border border-destructive/40 bg-destructive/5 p-3">
+              <p className="text-xs font-medium text-destructive">
+                Alta confiança + erro (HIGH_CONFIDENCE_ERROR)
+              </p>
+              <p className="text-2xl font-semibold tabular-nums text-destructive">
+                {formatarNumero(dados?.altaConfiancaComErro.casos ?? 0)}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                {dados?.altaConfiancaComErro.mensagensAlta
+                  ? `${formatarPercentual(dados.altaConfiancaComErro.taxa)} das ${formatarNumero(
+                      dados.altaConfiancaComErro.mensagensAlta,
+                    )} respostas de alta confiança · ${formatarPercentual(
+                      dados.altaConfiancaComErro.participacaoNosErros,
+                    )} de todos os erros vinculados`
+                  : "Sem respostas de alta confiança no período."}
+              </p>
+              {(dados?.altaConfiancaComErro.casos ?? 0) > 0 && (
+                <>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Confiança média nesses casos: {dados?.altaConfiancaComErro.scoreMedio}%. São os
+                    casos mais graves: o sistema não sinalizou incerteza. Investigar fonte,
+                    validador, regra, peso, identificação da entidade ou ferramenta.
+                  </p>
+                  <div className="mt-2 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                    <Bloco titulo="Tipos de atendimento">
+                      <ListaContagem
+                        itens={dados?.altaConfiancaComErro.fontesProvaveis.tiposAtendimento ?? []}
+                        vazio="Sem dados."
+                        rotulos={ROTULO_TIPO}
+                      />
+                    </Bloco>
+                    <Bloco titulo="Validadores envolvidos">
+                      <ListaContagem
+                        itens={dados?.altaConfiancaComErro.fontesProvaveis.validadores ?? []}
+                        vazio="Sem dados."
+                      />
+                    </Bloco>
+                    <Bloco titulo="Ferramentas usadas">
+                      <ListaContagem
+                        itens={dados?.altaConfiancaComErro.fontesProvaveis.ferramentas ?? []}
+                        vazio="Sem dados."
+                      />
+                    </Bloco>
+                    <Bloco titulo="Motivos registrados">
+                      <ListaContagem
+                        itens={dados?.altaConfiancaComErro.fontesProvaveis.motivos ?? []}
+                        vazio="Sem dados."
+                      />
+                    </Bloco>
+                  </div>
+                </>
+              )}
+            </div>
+
             <div className="rounded-md border p-3">
               <p className="mb-2 text-xs font-medium text-muted-foreground">
                 Calibração da confiança — confiança declarada × erro reportado

@@ -184,6 +184,7 @@ const FILTROS_CONFIANCA = [
   { valor: "MEDIUM", rotulo: "Média" },
   { valor: "LOW", rotulo: "Baixa" },
   { valor: "sem", rotulo: "Não avaliada" },
+  { valor: "alta_erro", rotulo: "Alta confiança + erro" },
   { valor: "90", rotulo: "90% ou mais" },
   { valor: "95", rotulo: "95% ou mais" },
 ];
@@ -907,6 +908,8 @@ function Pagina() {
         const c = i.execucao_id ? confianca[i.execucao_id] : undefined;
         if (fConfianca === "sem") return !c;
         if (!c) return false;
+        // HIGH_CONFIDENCE_ERROR: alta confiança declarada e erro reportado.
+        if (fConfianca === "alta_erro") return c.nivel === "HIGH" && Boolean(c.erro_reportado);
         if (fConfianca === "90") return c.score >= 90;
         if (fConfianca === "95") return c.score >= 95;
         return c.nivel === fConfianca;
@@ -1114,6 +1117,14 @@ function Pagina() {
                         ) : (
                           <span className="rounded-full border border-border px-1.5 py-0.5">
                             Não avaliada
+                          </span>
+                        )}
+                        {c?.alta_confianca_com_erro && (
+                          <span
+                            className="ml-1 rounded-full border border-destructive/40 bg-destructive/10 px-1.5 py-0.5 text-destructive"
+                            title="Resposta de alta confiança reportada como erro — prioridade de investigação"
+                          >
+                            Alta confiança + erro
                           </span>
                         )}
                       </p>

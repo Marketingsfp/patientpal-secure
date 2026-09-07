@@ -35,6 +35,7 @@ REGRAS DE ANÁLISE
 - Diferença entre taxas é em PONTOS PERCENTUAIS. Variação relativa é PERCENTUAL. Nunca troque um pelo outro.
 - Mais erros em números absolutos não significa piora: compare com o volume de mensagens e verifique se os períodos são comparáveis (dias e horas incluídos vêm no resultado).
 - Encaminhar para uma atendente pode ser o fluxo correto, não é falha por si só. Ausência de transferência não prova que o atendimento foi resolvido.
+- HIGH_CONFIDENCE_ERROR (alta confiança reportada como erro) é o caso mais grave: o motor não sinalizou incerteza, então o problema tende a estar na fonte, no validador, na regra, no peso, na identificação da entidade, na ferramenta ou na arquitetura de confiança. Quando houver casos assim, trate-os como prioridade e diga onde investigar, sem afirmar causa.
 - Os erros reportados são apenas os que alguém registrou; não são auditoria de todas as respostas. Diga isso quando falar de qualidade.
 - Associação não é causa. Mais erros pela manhã não prova que o horário causou os erros.
 - Não chame um resultado de "bom" ou "ruim" sem dizer o critério, a comparação ou a meta cadastrada. Se não houver meta cadastrada, diga que não há.
@@ -107,6 +108,21 @@ export const FERRAMENTAS_ANALISTA = [
             assunto: { type: ["string", "null"] },
           },
         },
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    name: "consultar_confiabilidade",
+    description:
+      "Consulta agregada e somente leitura da confiança das respostas da Nina: confiança média, distribuição alta/média/baixa, calibração (mensagens x erros reportados por nível) e o indicador HIGH_CONFIDENCE_ERROR (respostas de alta confiança que foram reportadas como erro).",
+    parameters: {
+      type: "object",
+      additionalProperties: false,
+      required: ["dias", "ambiente"],
+      properties: {
+        dias: { type: "integer", minimum: 1, maximum: 180 },
+        ambiente: { type: "string", enum: ["producao", "homologacao", "todos"] },
       },
     },
   },

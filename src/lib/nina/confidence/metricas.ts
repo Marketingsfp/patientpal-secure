@@ -65,6 +65,37 @@ export type FaixaCorrelacao = {
   taxaErro: number;
 };
 
+/**
+ * FASE 7 — HIGH_CONFIDENCE_ERROR.
+ *
+ * Resposta que o motor classificou como ALTA confiança e que, mesmo assim, foi
+ * reportada como erro pela equipe. É o caso mais grave: o sistema não sinalizou
+ * incerteza nenhuma, então o problema tende a estar na fonte, no validador, na
+ * regra, no peso, na identificação da entidade, na ferramenta ou na própria
+ * arquitetura de confiança.
+ */
+export const CLASSIFICACAO_ALTA_CONFIANCA_ERRO = "HIGH_CONFIDENCE_ERROR" as const;
+
+export type AltaConfiancaComErro = {
+  classificacao: typeof CLASSIFICACAO_ALTA_CONFIANCA_ERRO;
+  /** Respostas de alta confiança reportadas como erro. */
+  casos: number;
+  /** Total de respostas de alta confiança no recorte. */
+  mensagensAlta: number;
+  /** Percentual das respostas de alta confiança que viraram erro. */
+  taxa: number;
+  /** Participação desses casos no total de erros vinculados no recorte. */
+  participacaoNosErros: number;
+  scoreMedio: number;
+  /** Onde investigar primeiro — só nos casos HIGH_CONFIDENCE_ERROR. */
+  fontesProvaveis: {
+    validadores: Contagem[];
+    ferramentas: Contagem[];
+    tiposAtendimento: Contagem[];
+    motivos: Contagem[];
+  };
+};
+
 export type MetricasConfiabilidade = {
   total: number;
   scoreMedio: number;
@@ -84,6 +115,7 @@ export type MetricasConfiabilidade = {
   porPeriodoOperacao: MediaGrupo[];
   correlacaoErros: FaixaCorrelacao[];
   calibracaoPorNivel: CalibracaoNivel[];
+  altaConfiancaComErro: AltaConfiancaComErro;
 };
 
 const DIAS = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"];
@@ -210,14 +242,14 @@ const ROTULO_NIVEL: Record<CalibracaoNivel["nivel"], string> = {
  * a execução, cai para o vínculo por conversa dentro de 48h — o mesmo critério
  * já usado na correlação por faixa. Nenhum valor é estimado ou fixo.
  */
-export function calcularCalibracaoPorNivel(
-  linhas: LinhaDecisaoMetrica[],
-  erros: ErroReportado[] = [],
-): CalibracaoNivel[] {
-  const execucoesComErro = new Set<string>();
+type IndiceErros = { execucoes: Set<string>; porConversa: Map<string, number[]> };
+
+/** Índice de reportes: vínculo exato por execução e, na falta dele, por conversa. */
+export function indexarErros(erros: ErroReportado[]): IndiceErros {
+  const execucoes = new Set<string>();
   const porConversa = new Map<string, number[]>();
   for (const e of erros) {
-    if (e.execucao_id) execucoesComErro.add(e.execucao_id);
+    if (e.execucao_id) execucoes.add(e.execucao_id);
     else if (e.conversa_id) {
       const t = Date.parse(e.created_at);
       if (Number.isNaN(t)) continue;
@@ -226,6 +258,24 @@ export function calcularCalibracaoPorNivel(
       porConversa.set(e.conversa_id, arr);
     }
   }
+  return { execucoes, porConversa };
+}
+
+/** A resposta avaliada foi reportada como erro depois? */
+export function foiReportadaComoErro(l: LinhaDecisaoMetrica, idx: IndiceErros): boolean {
+  if (l.execucao_id && idx.execucoes.has(l.execucao_id)) return true;
+  if (!l.conversation_id) return false;
+  const marcas = idx.porConversa.get(l.conversation_id);
+  const t = Date.parse(l.created_at);
+  if (!marcas || Number.isNaN(t)) return false;
+  return marcas.some((m) => m >= t && m - t <= JANELA_ERRO_MS);
+}
+
+export function calcularCalibracaoPorNivel(
+  linhas: LinhaDecisaoMetrica[],
+  erros: ErroReportado[] = [],
+): CalibracaoNivel[] {
+  const idx = indexarErros(erros);
 
   const base: Record<CalibracaoNivel["nivel"], { mensagens: number; erros: number }> = {
     HIGH: { mensagens: 0, erros: 0 },
@@ -236,16 +286,7 @@ export function calcularCalibracaoPorNivel(
   for (const l of linhas) {
     const nivel = nivelDa({ nivel: l.nivel, score: Number.isFinite(l.score) ? l.score : 0 });
     base[nivel].mensagens += 1;
-
-    let reportada = Boolean(l.execucao_id && execucoesComErro.has(l.execucao_id));
-    if (!reportada && l.conversation_id) {
-      const marcas = porConversa.get(l.conversation_id);
-      const t = Date.parse(l.created_at);
-      if (marcas && !Number.isNaN(t)) {
-        reportada = marcas.some((m) => m >= t && m - t <= JANELA_ERRO_MS);
-      }
-    }
-    if (reportada) base[nivel].erros += 1;
+    if (foiReportadaComoErro(l, idx)) base[nivel].erros += 1;
   }
 
   return (["HIGH", "MEDIUM", "LOW"] as const).map((nivel) => {
@@ -258,6 +299,64 @@ export function calcularCalibracaoPorNivel(
       taxaErro: mensagens ? Math.round((qtd / mensagens) * 1000) / 10 : 0,
     };
   });
+}
+
+/**
+ * FASE 7 — recorte dedicado aos casos HIGH_CONFIDENCE_ERROR, com as pistas
+ * observáveis (validadores usados, ferramentas, tipo de atendimento e motivos
+ * registrados) para priorizar a melhoria do sistema. Nada é estimado.
+ */
+export function calcularAltaConfiancaComErro(
+  linhas: LinhaDecisaoMetrica[],
+  erros: ErroReportado[] = [],
+): AltaConfiancaComErro {
+  const idx = indexarErros(erros);
+  const validadores = new Map<string, number>();
+  const ferramentas = new Map<string, number>();
+  const tipos = new Map<string, number>();
+  const motivos = new Map<string, number>();
+
+  let mensagensAlta = 0;
+  let casos = 0;
+  let soma = 0;
+  let errosTotais = 0;
+
+  for (const l of linhas) {
+    const score = Number.isFinite(l.score) ? l.score : 0;
+    const nivel = nivelDa({ nivel: l.nivel, score });
+    const alta = nivel === "HIGH";
+    if (alta) mensagensAlta += 1;
+
+    if (!foiReportadaComoErro(l, idx)) continue;
+    errosTotais += 1;
+    if (!alta) continue;
+
+    casos += 1;
+    soma += score;
+    for (const v of l.validadores) somar(validadores, v.validator);
+    for (const f of l.ferramentas) somar(ferramentas, f.nome);
+    const cats = l.categorias.length > 0 ? l.categorias : [l.intencao || "nao_classificado"];
+    for (const c of cats) somar(tipos, c);
+    for (const c of l.reason_codes) somar(motivos, c);
+    for (const b of l.bloqueadores) somar(motivos, b);
+  }
+
+  const pct = (n: number, d: number) => (d ? Math.round((n / d) * 1000) / 10 : 0);
+
+  return {
+    classificacao: CLASSIFICACAO_ALTA_CONFIANCA_ERRO,
+    casos,
+    mensagensAlta,
+    taxa: pct(casos, mensagensAlta),
+    participacaoNosErros: pct(casos, errosTotais),
+    scoreMedio: casos ? Math.round((soma / casos) * 10) / 10 : 0,
+    fontesProvaveis: {
+      validadores: ordenar(validadores),
+      ferramentas: ordenar(ferramentas),
+      tiposAtendimento: ordenar(tipos),
+      motivos: ordenar(motivos),
+    },
+  };
 }
 
 export function calcularMetricasConfiabilidade(
@@ -342,5 +441,6 @@ export function calcularMetricasConfiabilidade(
     porPeriodoOperacao: medias(porPeriodo),
     correlacaoErros: correlacionar(linhas, erros),
     calibracaoPorNivel: calcularCalibracaoPorNivel(linhas, erros),
+    altaConfiancaComErro: calcularAltaConfiancaComErro(linhas, erros),
   };
 }

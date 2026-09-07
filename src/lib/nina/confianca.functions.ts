@@ -614,6 +614,11 @@ export type ConfiancaDaMensagem = {
   policy_version: string | null;
   /** Erro reportado depois pela equipe para a MESMA resposta (mesma execução). */
   erro_reportado: ErroReportadoVinculado | null;
+  /**
+   * FASE 7 — HIGH_CONFIDENCE_ERROR: alta confiança declarada que mesmo assim
+   * foi reportada como erro. Derivado do snapshot + reporte já gravados.
+   */
+  alta_confianca_com_erro: boolean;
 };
 
 /** Vínculo entre o snapshot de confiança e o reporte de erro da equipe. */
@@ -665,6 +670,7 @@ export const confiancaDasExecucoes = createServerFn({ method: "POST" })
         registrado_em: String(r["created_at"] ?? ""),
         policy_version: r["policy_version"] ? String(r["policy_version"]) : null,
         erro_reportado: null,
+        alta_confianca_com_erro: false,
       });
     }
 
@@ -689,6 +695,7 @@ export const confiancaDasExecucoes = createServerFn({ method: "POST" })
           categoria: e["categoria"] ? String(e["categoria"]) : null,
           created_at: String(e["created_at"] ?? ""),
         };
+        alvo.alta_confianca_com_erro = alvo.nivel === "HIGH";
       }
     }
     return [...porExecucao.values()];

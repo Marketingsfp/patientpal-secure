@@ -184,6 +184,16 @@ export function ConfiancaMensagemBadge({
             </ul>
           </div>
         )}
+        {confianca.alta_confianca_com_erro && (
+          <div className="rounded border border-destructive/40 bg-destructive/10 p-2 text-destructive">
+            <p className="font-medium">Alta confiança + erro (HIGH_CONFIDENCE_ERROR)</p>
+            <p>
+              A resposta foi dada com alta confiança e mesmo assim foi reportada como erro.
+              Caso prioritário de investigação de fonte, validador, regra, peso, identificação da
+              entidade ou ferramenta.
+            </p>
+          </div>
+        )}
         <Secao titulo="Erro posteriormente reportado">
           {confianca.erro_reportado ? (
             <p className="text-destructive">

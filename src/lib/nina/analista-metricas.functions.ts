@@ -199,6 +199,128 @@ async function ferramentaConsultarMetricas(
   } as any);
 }
 
+/**
+ * Ferramenta: confiabilidade das respostas (FASE 6/7).
+ *
+ * Leitura agregada dos snapshots de confiança já gravados, cruzada com os erros
+ * reportados. Não recalcula confiança e não expõe texto de paciente.
+ */
+async function ferramentaConfiabilidade(context: Contexto, clinicaId: string, args: any) {
+  const mod = await import("@/lib/nina/confidence/metricas");
+  const dias = Math.min(180, Math.max(1, Number(args?.dias) || 30));
+  const ambiente = ["producao", "homologacao", "todos"].includes(args?.ambiente)
+    ? args.ambiente
+    : "producao";
+  const desde = new Date(Date.now() - dias * 24 * 60 * 60 * 1000).toISOString();
+
+  let q = context.supabase
+    .from("nina_confianca_decisoes")
+    .select(
+      "id, created_at, ambiente, conversation_id, execucao_id, score, nivel, decisao, acao, intencao, categorias, bloqueadores, bloqueio, reason_codes, validadores, ferramentas",
+    )
+    .eq("clinica_id", clinicaId)
+    .gte("created_at", desde)
+    .order("created_at", { ascending: false })
+    .limit(5000);
+  if (ambiente !== "todos") q = q.eq("ambiente", ambiente);
+  const { data: rows, error } = await q;
+  if (error) throw new Error(error.message);
+
+  const { data: errosRows } = await context.supabase
+    .from("nina_feedback_erros")
+    .select("id, conversa_id, execucao_id, created_at, categoria")
+    .eq("clinica_id", clinicaId)
+    .gte("created_at", desde)
+    .limit(5000);
+
+  const texto = (v: unknown) => (v == null ? null : String(v));
+  const listaTexto = (v: unknown) => (Array.isArray(v) ? v.map((x) => String(x)) : []);
+
+  const linhas: import("@/lib/nina/confidence/metricas").LinhaDecisaoMetrica[] = (rows ?? []).map(
+    (raw: unknown) => {
+      const r = raw as Record<string, unknown>;
+      const created = String(r["created_at"] ?? "");
+      const bloqueio = r["bloqueio"] ? [String(r["bloqueio"])] : [];
+      return {
+        id: String(r["id"] ?? ""),
+        created_at: created,
+        ambiente: texto(r["ambiente"]),
+        conversation_id: texto(r["conversation_id"]),
+        execucao_id: texto(r["execucao_id"]),
+        score: Number(r["score"]) || 0,
+        nivel: texto(r["nivel"]),
+        decisao: texto(r["decisao"]),
+        acao: texto(r["acao"]),
+        intencao: texto(r["intencao"]),
+        categorias: listaTexto(r["categorias"]),
+        bloqueadores: [...new Set([...listaTexto(r["bloqueadores"]), ...bloqueio])],
+        reason_codes: listaTexto(r["reason_codes"]),
+        validadores: Array.isArray(r["validadores"])
+          ? (r["validadores"] as Array<Record<string, unknown>>).map((v) => ({
+              validator: String(v["validator"] ?? ""),
+              status: String(v["status"] ?? ""),
+            }))
+          : [],
+        ferramentas: Array.isArray(r["ferramentas"])
+          ? (r["ferramentas"] as Array<Record<string, unknown>>).map((f) => ({
+              nome: String(f["nome"] ?? ""),
+              sucesso: f["sucesso"] !== false,
+            }))
+          : [],
+        data_local: created ? created.slice(0, 10) : null,
+        dia_semana: null,
+        periodo: "NAO_CLASSIFICAVEL",
+      };
+    },
+  );
+
+  const erros: import("@/lib/nina/confidence/metricas").ErroReportado[] = (errosRows ?? []).map(
+    (raw: unknown) => {
+      const e = raw as Record<string, unknown>;
+      return {
+        id: String(e["id"] ?? ""),
+        conversa_id: texto(e["conversa_id"]),
+        execucao_id: texto(e["execucao_id"]),
+        created_at: String(e["created_at"] ?? ""),
+        categoria: texto(e["categoria"]),
+      };
+    },
+  );
+
+  const soma = linhas.reduce((a, l) => a + (Number.isFinite(l.score) ? l.score : 0), 0);
+  const calibracao = mod.calcularCalibracaoPorNivel(linhas, erros);
+  const alta = mod.calcularAltaConfiancaComErro(linhas, erros);
+
+  return {
+    dias,
+    ambiente,
+    respostasAvaliadas: linhas.length,
+    confiancaMedia: linhas.length ? Math.round((soma / linhas.length) * 10) / 10 : 0,
+    calibracaoPorNivel: calibracao.map((c) => ({
+      nivel: c.nivel,
+      mensagens: c.mensagens,
+      errosReportados: c.erros,
+      taxaErro: c.taxaErro,
+    })),
+    altaConfiancaComErro: {
+      classificacao: alta.classificacao,
+      casos: alta.casos,
+      mensagensAlta: alta.mensagensAlta,
+      taxa: alta.taxa,
+      participacaoNosErros: alta.participacaoNosErros,
+      scoreMedio: alta.scoreMedio,
+      tiposAtendimento: alta.fontesProvaveis.tiposAtendimento.slice(0, 5),
+      validadores: alta.fontesProvaveis.validadores.slice(0, 5),
+      ferramentas: alta.fontesProvaveis.ferramentas.slice(0, 5),
+      motivos: alta.fontesProvaveis.motivos.slice(0, 5),
+    },
+    aviso:
+      linhas.length === 0
+        ? "Não há decisões de confiabilidade registradas nesse recorte. Não estime valores."
+        : "Erros reportados são apenas os registrados pela equipe; não são auditoria de todas as respostas.",
+  };
+}
+
 /** Ferramenta 2: calendário e faixas configuradas (sem dados de paciente). */
 async function ferramentaConfiguracao(context: Contexto, clinicaId: string) {
   const [cal, faixas] = await Promise.all([
@@ -386,6 +508,18 @@ export const perguntarAnalistaMetricas = createServerFn({ method: "POST" })
                   fuso,
                   args,
                 );
+                const id = `consulta_${consultas.length + 1}`;
+                consultas.push({ id, dados });
+                resultado = { consulta_id: id, ...dados };
+              }
+            } else if (chamada.name === "consultar_confiabilidade") {
+              if (consultas.length >= limites.max_consultas_por_pergunta) {
+                resultado = {
+                  erro: `Limite de ${limites.max_consultas_por_pergunta} consultas por pergunta atingido.`,
+                };
+              } else {
+                await exigirPermissao(ctx, data.clinicaId);
+                const dados = await ferramentaConfiabilidade(ctx, data.clinicaId, args);
                 const id = `consulta_${consultas.length + 1}`;
                 consultas.push({ id, dados });
                 resultado = { consulta_id: id, ...dados };
