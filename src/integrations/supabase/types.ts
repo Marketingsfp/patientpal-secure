@@ -14065,6 +14065,19 @@ export type Database = {
           nao_lidas: number
         }[]
       }
+      nina_teste_resumo_leads: {
+        Args: { _clinica_id: string; _conversa_ids: string[] }
+        Returns: {
+          conversa_id: string
+          nao_lidas: number
+          total_mensagens: number
+          ultima_atividade_em: string
+          ultima_msg_autor: string
+          ultima_msg_body: string
+          ultima_msg_em: string
+          ultima_msg_id: string
+        }[]
+      }
       nina_trace_purgar: { Args: { _clinica_id?: string }; Returns: number }
       normalizar_telefone: { Args: { _tel: string }; Returns: string }
       normalizar_termo_busca: { Args: { _termo: string }; Returns: string }
