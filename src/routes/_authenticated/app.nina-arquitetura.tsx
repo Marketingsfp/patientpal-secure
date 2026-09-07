@@ -322,10 +322,13 @@ function PainelAlteracoes() {
         </CardContent>
       </Card>
 
+      <MudancasDoPrompt />
+
       <p className="text-xs text-muted-foreground">
         Mover ou reorganizar componentes no mapa muda apenas o desenho e não cria uma versão nova
         da arquitetura.
       </p>
+
     </div>
   );
 }
