@@ -490,19 +490,10 @@ function Pagina() {
         </Card>
       ) : null}
 
-      {/* FASE 5 — mesma tela, mesmo recorte: desempenho dentro e fora do
-          horário oficial publicado. Aqui não se edita horário. */}
-      <DesempenhoPorPeriodo
-        clinicaId={clinicaId}
-        de={de}
-        ate={ate}
-        diaInteiro={diaInteiro}
-        horaInicio={diaInteiro ? null : horaInicio}
-        horaFim={diaInteiro ? null : horaFim}
-        fuso={FUSO_OPERACAO_PADRAO}
-        ambiente={ambiente}
-        podeConfigurar={["admin", "gestor"].includes(String(clinicaAtual?.role ?? ""))}
-      />
+      {/* Container "Desempenho dentro e fora do horário" removido da tela a
+          pedido. O cálculo, o horário oficial e o uso pelo Analista de
+          Métricas continuam ativos no backend. Configuração do horário segue
+          na Base de Conhecimentos (/app/nina#base-conhecimento). */}
 
       {/* Confiabilidade das respostas: o que a Nina liberou, esclareceu ou
           transferiu, e o motivo determinístico de cada decisão. */}
