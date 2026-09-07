@@ -135,3 +135,25 @@ export function inconsistenciasCiclos(ciclos: CicloTeste[]): string[] {
 export function novoNinaSessionId(cicloId: string): string {
   return `nina_sess_${cicloId}`;
 }
+
+/* ---------------- FASE 3 — divisores visuais entre ciclos ----------------
+ * Marcadores só para a leitura humana do console de homologação. São gravados
+ * como mensagem de sistema e NUNCA entram no contexto enviado ao modelo.
+ */
+
+const ROTULO_FIM: Record<MotivoFimCiclo, string> = {
+  resolvido_manual: "Resolvido manualmente",
+  reiniciado: "Reiniciado",
+  handoff_humano: "Handoff para humano",
+  cenario_concluido: "Cenário concluído",
+  cancelado_usuario: "Cancelado",
+  falha_tecnica: "Falha técnica",
+};
+
+export function divisorFimCiclo(sessaoSeq: number | null | undefined, motivo: MotivoFimCiclo) {
+  return `───── Fim do ciclo ${sessaoSeq ?? "?"} — ${ROTULO_FIM[motivo]} ─────`;
+}
+
+export function divisorInicioCiclo(sessaoSeq: number | null | undefined) {
+  return `───── Início do ciclo ${sessaoSeq ?? "?"} ─────`;
+}
