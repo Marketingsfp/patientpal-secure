@@ -144,20 +144,39 @@ describe("layout incremental", () => {
       saida: [],
       erros: [],
     });
-    const antesNodes = [criar("a", [], ["b"]), criar("b", ["a"], ["c"]), criar("c", ["b"], [])];
+    // Cadeia longa: assim a mudança é pequena e o recálculo é local.
+    const total = 20;
+    const cadeia = (extra: boolean): NodeArquitetura[] =>
+      Array.from({ length: total }, (_, i) => {
+        const seguintes = i < total - 1 ? [`n${i + 1}`] : [];
+        if (extra && i === 5) seguintes.push("n8");
+        return criar(
+          `n${i}`,
+          i > 0 ? [`n${i - 1}`] : [],
+          seguintes,
+        );
+      }).map((node, i, lista) => {
+        if (extra && node.id === "n8" && !node.anteriores.includes("n5")) {
+          return { ...node, anteriores: [...node.anteriores, "n5"] };
+        }
+        void lista;
+        void i;
+        return node;
+      });
+
+    const antesNodes = cadeia(false);
     const inicial = aplicarDiffIncremental(antesNodes, ESTADO_LAYOUT_VAZIO);
     const estado: EstadoLayout = {
       assinatura: assinaturaAtual(antesNodes),
       canonical: inicial.canonical,
       // Movimentação manual colocada exatamente em cima de outro componente.
-      overrides: { b: { ...inicial.canonical["c"]! } },
+      overrides: { n5: { ...inicial.canonical["n12"]! } },
     };
 
-    // Conexões de "b" mudam: ele entra na região recalculada.
-    const depois = [criar("a", [], ["b", "c"]), criar("b", ["a"], []), criar("c", ["a"], [])];
-    const resultado = aplicarDiffIncremental(depois, estado);
-    expect(resultado.overridesDescartados).toContain("b");
-    expect(resultado.overrides["b"]).toBeUndefined();
+    const resultado = aplicarDiffIncremental(cadeia(true), estado);
+    expect(resultado.global).toBe(false);
+    expect(resultado.overridesDescartados).toContain("n5");
+    expect(resultado.overrides["n5"]).toBeUndefined();
   });
 
   test("override de componente removido não sobrevive", () => {
