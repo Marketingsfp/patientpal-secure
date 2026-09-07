@@ -10,6 +10,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Crosshair,
   Maximize2,
+  GitCompare,
   Route,
   RotateCcw,
   ZoomIn,
@@ -44,6 +45,7 @@ import {
 } from "@/lib/nina/arquitetura/rotas";
 import { NodeDetalhePainel } from "./NodeDetalhePainel";
 import type { NivelAcesso } from "@/lib/nina/arquitetura/detalhes-ia";
+import type { MarcaAlteracao } from "@/lib/nina/arquitetura/versoes";
 
 export type StatusNodeCanvas = {
   /** Estado mostrado no node (modo EXECUÇÃO preenche isto na fase seguinte). */
@@ -131,6 +133,7 @@ export function ArquiteturaCanvas({
   clinicaId,
   nivelAcesso = "operacional",
   pacienteExecucaoId = null,
+  marcasAlteracao,
 }: Props) {
   const areaRef = useRef<HTMLDivElement | null>(null);
   const [estado, setEstado] = useState<EstadoLayout>(ESTADO_LAYOUT_VAZIO);
@@ -138,6 +141,7 @@ export function ArquiteturaCanvas({
   const [view, setView] = useState({ escala: 0.7, x: 0, y: 0 });
   const [selecionado, setSelecionado] = useState<string | null>(null);
   const [caminhoCompleto, setCaminhoCompleto] = useState(false);
+  const [mostrarAlteracoes, setMostrarAlteracoes] = useState(false);
   const arrasto = useRef<
     | { tipo: "canvas"; startX: number; startY: number; origemX: number; origemY: number }
     | { tipo: "node"; id: string; startX: number; startY: number; origemX: number; origemY: number }
@@ -346,6 +350,17 @@ export function ArquiteturaCanvas({
         >
           <Route className="mr-2 h-4 w-4" /> Destacar caminho
         </Button>
+        {marcasAlteracao && Object.keys(marcasAlteracao).length > 0 ? (
+          <Button
+            type="button"
+            variant={mostrarAlteracoes ? "default" : "outline"}
+            size="sm"
+            aria-pressed={mostrarAlteracoes}
+            onClick={() => setMostrarAlteracoes((v) => !v)}
+          >
+            <GitCompare className="mr-2 h-4 w-4" /> Mostrar alterações
+          </Button>
+        ) : null}
         <Button type="button" variant="ghost" size="sm" onClick={organizarAutomaticamente}>
           <RotateCcw className="mr-2 h-4 w-4" /> Organizar automaticamente
         </Button>
@@ -466,6 +481,13 @@ export function ArquiteturaCanvas({
             const cor = CORES_CATEGORIA[node.categoria];
             const destacado = realce.nodes.has(node.id);
             const atenuado = temRealce && !destacado;
+            const marca = mostrarAlteracoes ? marcasAlteracao?.[node.id] : undefined;
+            const corMarca =
+              marca === "adicionado"
+                ? "var(--chart-2)"
+                : marca === "alterado"
+                  ? "var(--chart-4)"
+                  : null;
             return (
               <button
                 type="button"
@@ -495,6 +517,11 @@ export function ArquiteturaCanvas({
                   width: LARGURA_NODE,
                   height: ALTURA_NODE,
                   borderLeft: `4px solid ${cor}`,
+                  outline: corMarca ? `2px solid ${corMarca}` : undefined,
+                  outlineOffset: corMarca ? "2px" : undefined,
+                  backgroundColor: corMarca
+                    ? `color-mix(in oklch, ${corMarca} 12%, var(--card))`
+                    : undefined,
                   borderTopColor: principal ? cor : undefined,
                   borderTopWidth: principal ? 2 : undefined,
                 }}
@@ -504,6 +531,7 @@ export function ArquiteturaCanvas({
                 </span>
                 <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
                   {node.categoria}
+                  {marca ? (marca === "adicionado" ? " · novo" : " · alterado") : ""}
                 </span>
                 <span className="text-[10px] text-muted-foreground">
                   {estado
