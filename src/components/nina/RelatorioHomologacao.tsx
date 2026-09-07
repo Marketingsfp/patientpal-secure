@@ -519,8 +519,8 @@ export function RelatorioHomologacao() {
               Enviar
             </Button>
           </DialogFooter>
-        </DialogFooter>
         </DialogContent>
+
       </Dialog>
     </Card>
   );
