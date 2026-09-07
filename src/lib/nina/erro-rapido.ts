@@ -130,6 +130,23 @@ export function validarMensagemNina(
   return { ok: true, snapshot };
 }
 
+/**
+ * Contexto complementar do vínculo exato (FASE 1). Nunca substitui
+ * `conversa_id`/`mensagem_id`: só acrescenta referências já conhecidas no
+ * momento do reporte (lead, execução, trace, versão do prompt, ciclo de teste
+ * e protocolo). Campos ausentes ficam nulos — não são deduzidos depois.
+ */
+export type VinculoComplementar = {
+  contatoPacienteId?: string | null;
+  contatoTelefone?: string | null;
+  protocoloAtendimento?: string | null;
+  protocoloSessaoId?: string | null;
+  promptVersaoId?: string | null;
+  promptVersao?: number | null;
+  testeCicloId?: string | null;
+  traceId?: string | null;
+};
+
 /** Payload de inserção do reporte rápido (sem motivo, categoria detalhada ou correção). */
 export function montarRegistroErroRapido(params: {
   clinicaId: string;
@@ -139,7 +156,9 @@ export function montarRegistroErroRapido(params: {
   reporterUserId: string;
   execucaoId?: string | null;
   auditoriaStatus?: EstadoAuditoria;
+  vinculo?: VinculoComplementar;
 }) {
+  const v = params.vinculo ?? {};
   return {
     clinica_id: params.clinicaId,
     conversa_id: params.conversaId,
@@ -147,6 +166,15 @@ export function montarRegistroErroRapido(params: {
     mensagem_texto: params.snapshot,
     execucao_id: params.execucaoId ?? null,
     auditoria_status: params.auditoriaStatus ?? "unavailable",
+    contato_paciente_id: v.contatoPacienteId ?? null,
+    contato_telefone: v.contatoTelefone ?? null,
+    protocolo_atendimento: v.protocoloAtendimento ?? null,
+    protocolo_sessao_id: v.protocoloSessaoId ?? null,
+    prompt_versao_id: v.promptVersaoId ?? null,
+    prompt_versao: v.promptVersao ?? null,
+    teste_ciclo_id: v.testeCicloId ?? null,
+    trace_id: v.traceId ?? null,
+
     categoria: CATEGORIA_A_CLASSIFICAR,
     correcao: null,
     observacao: null,

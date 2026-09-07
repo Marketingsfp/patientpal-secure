@@ -212,3 +212,56 @@ describe("FASE 3 — estado da análise", () => {
     expect(estadoAnalise({ analise_status: "failed" })).toBe("failed");
   });
 });
+
+describe("FASE 1 — vínculo exato do erro", () => {
+  it("guarda conversa e mensagem exatas e preserva o contexto complementar", () => {
+    const r = montarRegistroErroRapido({
+      clinicaId: "c1",
+      conversaId: "conversa-B",
+      mensagemId: "msg-B2",
+      snapshot: "texto",
+      reporterUserId: "u1",
+      execucaoId: "exec-1",
+      vinculo: {
+        contatoPacienteId: "pac-1",
+        contatoTelefone: "5511999",
+        protocoloAtendimento: "2026-0001",
+        protocoloSessaoId: "sess-1",
+        promptVersaoId: "pv-1",
+        promptVersao: 3,
+        testeCicloId: "ciclo-1",
+        traceId: "trace-1",
+      },
+    });
+    expect(r.conversa_id).toBe("conversa-B");
+    expect(r.mensagem_id).toBe("msg-B2");
+    expect(r.execucao_id).toBe("exec-1");
+    expect(r.contato_paciente_id).toBe("pac-1");
+    expect(r.protocolo_atendimento).toBe("2026-0001");
+    expect(r.prompt_versao_id).toBe("pv-1");
+    expect(r.prompt_versao).toBe(3);
+    expect(r.teste_ciclo_id).toBe("ciclo-1");
+    expect(r.trace_id).toBe("trace-1");
+  });
+
+  it("sem contexto complementar os campos ficam nulos (nada é deduzido depois)", () => {
+    const r = montarRegistroErroRapido({
+      clinicaId: "c1",
+      conversaId: "conversa-A",
+      mensagemId: "msg-A1",
+      snapshot: "texto",
+      reporterUserId: "u1",
+    });
+    expect(r.trace_id).toBeNull();
+    expect(r.prompt_versao_id).toBeNull();
+    expect(r.contato_paciente_id).toBeNull();
+  });
+
+  it("bloqueia mensagem que pertence a outra conversa", () => {
+    const v = validarMensagemNina(
+      { id: "msg-B2", conversa_id: "conversa-B", direction: "out", enviada_por: "nina", body: "oi" },
+      "conversa-C",
+    );
+    expect(v.ok).toBe(false);
+  });
+});
