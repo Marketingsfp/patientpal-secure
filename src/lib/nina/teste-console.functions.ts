@@ -263,7 +263,7 @@ export const historicoLeadTeste = createServerFn({ method: "POST" })
     // mensagens novas enviadas depois do reset.
     const { data: msgsDesc, error } = await supabaseAdmin
       .from("whatsapp_mensagens")
-      .select("id, direction, body, enviada_por, created_at")
+      .select("id, direction, body, enviada_por, created_at, execucao_id")
       .eq("clinica_id", data.clinicaId)
       .in("conversa_id", ids)
       .order("created_at", { ascending: false })
@@ -802,5 +802,53 @@ export const resolverConversaTeste = createServerFn({ method: "POST" })
       sessao: proxima,
       cicloEncerrado: lead.ciclo_id,
       agendamentosRemovidos,
+    };
+  });
+
+
+/**
+ * FASE 3 — detalhe técnico de UMA mensagem da Nina na homologação.
+ * Mostra prompt/versão, conhecimento, ferramentas, modelo, erros e resposta,
+ * exatamente como registrado pelo mesmo núcleo usado no WhatsApp real.
+ */
+export const detalheExecucaoTeste = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) =>
+    z.object({ clinicaId: z.string().uuid(), execucaoId: z.string().uuid() }).parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    await assertMembership(context.supabase, context.userId, data.clinicaId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const { data: exec } = await supabaseAdmin
+      .from("nina_execucoes")
+      .select(
+        "id, created_at, model, thinking_level, latency_ms, knowledge_status, tool_calls, success, error_category, handoff, input_tokens, output_tokens, retries, prompt_versao, prompt_origem, prompt_publicado_em, prompt_modulos",
+      )
+      .eq("id", data.execucaoId)
+      .eq("clinica_id", data.clinicaId)
+      .maybeSingle();
+    if (!exec) return { execucao: null, etapas: [], traceId: null as string | null, eventos: [] };
+
+    const { data: evid } = await supabaseAdmin
+      .from("nina_execucao_evidencias")
+      .select("etapas")
+      .eq("execucao_id", data.execucaoId)
+      .maybeSingle();
+
+    const { data: eventos } = await supabaseAdmin
+      .from("nina_trace_eventos")
+      .select("trace_id, node_id, status, duracao_ms, detalhes, created_at")
+      .eq("clinica_id", data.clinicaId)
+      .eq("execution_id", data.execucaoId)
+      .order("created_at", { ascending: true })
+      .limit(200);
+
+    const lista = (eventos ?? []) as any[];
+    return {
+      execucao: exec as any,
+      etapas: ((evid as any)?.etapas ?? []) as any[],
+      traceId: (lista[0]?.trace_id as string | undefined) ?? null,
+      eventos: lista,
     };
   });
