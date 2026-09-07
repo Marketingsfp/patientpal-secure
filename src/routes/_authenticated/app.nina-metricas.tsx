@@ -510,7 +510,7 @@ function Pagina() {
 
       <MetricasConfiabilidade clinicaId={clinicaId} />
 
-      <CalibracaoConfianca clinicaId={clinicaId} />
+      {clinicaId ? <CalibracaoConfianca clinicaId={clinicaId} /> : null}
 
 
       {/* Seção da Fase 9: isolada dos cards acima — falha ou lentidão aqui não
