@@ -28,6 +28,8 @@ type LinhaConversa = {
   protocolo_sessao_id: string | null;
   handoff_em: string | null;
   contato_telefone: string | null;
+  contato_nome: string | null;
+  departamento_id: string | null;
   is_teste: boolean | null;
   nina_fluxo_estado: unknown;
 };
