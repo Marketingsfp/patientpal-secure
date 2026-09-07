@@ -202,10 +202,13 @@ export function lerDetalheIA(
   nivel: NivelAcesso,
 ): DetalheIA {
   const m = metadataSegura(metadata);
-  const entrada = numero(m["tokens_entrada"] ?? m["prompt_tokens"]);
-  const saida = numero(m["tokens_saida"] ?? m["completion_tokens"]);
+  // Contadores de tokens são números puros: lidos do original porque a
+  // sanitização remove qualquer chave que contenha "token".
+  const bruto = metadata ?? {};
+  const entrada = numero(bruto["tokens_entrada"] ?? bruto["prompt_tokens"]);
+  const saida = numero(bruto["tokens_saida"] ?? bruto["completion_tokens"]);
   const totais =
-    numero(m["tokens_totais"] ?? m["total_tokens"]) ??
+    numero(bruto["tokens_totais"] ?? bruto["total_tokens"]) ??
     (entrada !== null && saida !== null ? entrada + saida : null);
 
   return {
