@@ -9252,6 +9252,74 @@ export type Database = {
           },
         ]
       }
+      nina_teste_cenarios: {
+        Row: {
+          categoria: string
+          clinica_id: string
+          created_at: string
+          criado_por: string | null
+          criterios: Json
+          dados_sinteticos: Json
+          descricao: string | null
+          id: string
+          max_turnos: number
+          nome: string
+          objetivo: string
+          persona: Json
+          precondicoes: string | null
+          status: string
+          tags: string[]
+          updated_at: string
+          versao: number
+        }
+        Insert: {
+          categoria?: string
+          clinica_id: string
+          created_at?: string
+          criado_por?: string | null
+          criterios?: Json
+          dados_sinteticos?: Json
+          descricao?: string | null
+          id?: string
+          max_turnos?: number
+          nome: string
+          objetivo: string
+          persona?: Json
+          precondicoes?: string | null
+          status?: string
+          tags?: string[]
+          updated_at?: string
+          versao?: number
+        }
+        Update: {
+          categoria?: string
+          clinica_id?: string
+          created_at?: string
+          criado_por?: string | null
+          criterios?: Json
+          dados_sinteticos?: Json
+          descricao?: string | null
+          id?: string
+          max_turnos?: number
+          nome?: string
+          objetivo?: string
+          persona?: Json
+          precondicoes?: string | null
+          status?: string
+          tags?: string[]
+          updated_at?: string
+          versao?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nina_teste_cenarios_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       nina_teste_ciclos: {
         Row: {
           clinica_id: string
@@ -9328,6 +9396,193 @@ export type Database = {
             columns: ["paciente_teste_id"]
             isOneToOne: false
             referencedRelation: "pacientes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      nina_teste_execucao_itens: {
+        Row: {
+          cenario_id: string | null
+          cenario_snapshot: Json
+          ciclo_id: string | null
+          clinica_id: string
+          conversa_id: string | null
+          created_at: string
+          criterios_resultado: Json
+          custo_estimado: number
+          erro: string | null
+          execucao_id: string
+          ferramentas: string[]
+          finalizado_em: string | null
+          id: string
+          iniciado_em: string | null
+          input_tokens: number
+          lead_id: string | null
+          lead_indice: number | null
+          mensagens: number
+          modelo_nina: string | null
+          modelo_paciente: string | null
+          ordem: number
+          output_tokens: number
+          prompt_versao: number | null
+          prompt_versao_id: string | null
+          resultado: string
+          simulacao_id: string | null
+          status: string
+          transferida: boolean
+          turnos: number
+          updated_at: string
+        }
+        Insert: {
+          cenario_id?: string | null
+          cenario_snapshot?: Json
+          ciclo_id?: string | null
+          clinica_id: string
+          conversa_id?: string | null
+          created_at?: string
+          criterios_resultado?: Json
+          custo_estimado?: number
+          erro?: string | null
+          execucao_id: string
+          ferramentas?: string[]
+          finalizado_em?: string | null
+          id?: string
+          iniciado_em?: string | null
+          input_tokens?: number
+          lead_id?: string | null
+          lead_indice?: number | null
+          mensagens?: number
+          modelo_nina?: string | null
+          modelo_paciente?: string | null
+          ordem?: number
+          output_tokens?: number
+          prompt_versao?: number | null
+          prompt_versao_id?: string | null
+          resultado?: string
+          simulacao_id?: string | null
+          status?: string
+          transferida?: boolean
+          turnos?: number
+          updated_at?: string
+        }
+        Update: {
+          cenario_id?: string | null
+          cenario_snapshot?: Json
+          ciclo_id?: string | null
+          clinica_id?: string
+          conversa_id?: string | null
+          created_at?: string
+          criterios_resultado?: Json
+          custo_estimado?: number
+          erro?: string | null
+          execucao_id?: string
+          ferramentas?: string[]
+          finalizado_em?: string | null
+          id?: string
+          iniciado_em?: string | null
+          input_tokens?: number
+          lead_id?: string | null
+          lead_indice?: number | null
+          mensagens?: number
+          modelo_nina?: string | null
+          modelo_paciente?: string | null
+          ordem?: number
+          output_tokens?: number
+          prompt_versao?: number | null
+          prompt_versao_id?: string | null
+          resultado?: string
+          simulacao_id?: string | null
+          status?: string
+          transferida?: boolean
+          turnos?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nina_teste_execucao_itens_cenario_id_fkey"
+            columns: ["cenario_id"]
+            isOneToOne: false
+            referencedRelation: "nina_teste_cenarios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nina_teste_execucao_itens_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nina_teste_execucao_itens_execucao_id_fkey"
+            columns: ["execucao_id"]
+            isOneToOne: false
+            referencedRelation: "nina_teste_execucoes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nina_teste_execucao_itens_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "nina_teste_leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      nina_teste_execucoes: {
+        Row: {
+          aprovados: number
+          clinica_id: string
+          config: Json
+          created_at: string
+          criado_por: string | null
+          finalizado_em: string | null
+          id: string
+          inconclusivos: number
+          iniciado_em: string
+          nome: string
+          reprovados: number
+          status: string
+          total: number
+          updated_at: string
+        }
+        Insert: {
+          aprovados?: number
+          clinica_id: string
+          config?: Json
+          created_at?: string
+          criado_por?: string | null
+          finalizado_em?: string | null
+          id?: string
+          inconclusivos?: number
+          iniciado_em?: string
+          nome: string
+          reprovados?: number
+          status?: string
+          total?: number
+          updated_at?: string
+        }
+        Update: {
+          aprovados?: number
+          clinica_id?: string
+          config?: Json
+          created_at?: string
+          criado_por?: string | null
+          finalizado_em?: string | null
+          id?: string
+          inconclusivos?: number
+          iniciado_em?: string
+          nome?: string
+          reprovados?: number
+          status?: string
+          total?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nina_teste_execucoes_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
             referencedColumns: ["id"]
           },
         ]
