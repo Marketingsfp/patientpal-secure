@@ -507,6 +507,8 @@ function Pagina() {
           transferiu, e o motivo determinístico de cada decisão. */}
       <ConfiancaRespostas clinicaId={clinicaId} />
 
+      <MetricasConfiabilidade clinicaId={clinicaId} />
+
 
       {/* Seção da Fase 9: isolada dos cards acima — falha ou lentidão aqui não
           afeta os indicadores, a Nina nem o atendimento. */}
