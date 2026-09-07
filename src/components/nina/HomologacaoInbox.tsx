@@ -87,7 +87,11 @@ import { useChatScroll } from "@/hooks/use-chat-scroll";
 import { formatarDataHoraMensagem } from "@/lib/atendimento/data-hora";
 import { definirSelecaoTeste } from "@/lib/webmcp/selecao-teste";
 import { assinarAtualizacao } from "@/lib/webmcp/atualizacao";
-import { rotuloAutorResumo } from "@/lib/nina/leads-resumo";
+import {
+  rotuloAutorResumo,
+  aplicarMensagemRealtime,
+  type MensagemResumoRow,
+} from "@/lib/nina/leads-resumo";
 import { supabase } from "@/integrations/supabase/client";
 
 
@@ -102,7 +106,10 @@ type Lead = {
   status: string;
   mensagens: number;
   /** FASE 2 — resumo da última mensagem conversacional (paciente ou Nina). */
+  ultimaMensagemId?: string | null;
   ultimaMensagemTexto?: string | null;
+  /** FASE 4 — fonte estável de "atividade recente" (só conversa). */
+  ultimaAtividadeEm?: string | null;
   ultimaMensagemAutor?: "paciente" | "nina" | "atendente" | null;
   ultimaMensagemEm?: string | null;
   naoLidas?: number;
@@ -264,9 +271,17 @@ export function HomologacaoInbox() {
   );
 
   /**
-   * FASE 2 — a prévia do card acompanha as mensagens de teste em tempo real,
-   * sem recarregar a página. Só escuta mensagens desta clínica.
+   * FASE 4 — inbox em tempo real.
+   *
+   * Cada mensagem nova é aplicada NA HORA no card certo (prévia, horário,
+   * total e bolinha azul), usando o identificador da mensagem para não contar
+   * duas vezes. Logo depois, uma recarga silenciosa reconcilia os números com
+   * o banco. Só escuta mensagens desta clínica e nunca toca no atendimento
+   * real.
    */
+  const aplicadasRef = useRef<Set<string>>(new Set());
+  const leadAbertoRef = useRef<string | null>(null);
+  leadAbertoRef.current = conversaId;
   useEffect(() => {
     if (!clinicaId) return;
     let pendente: ReturnType<typeof setTimeout> | null = null;
@@ -280,9 +295,28 @@ export function HomologacaoInbox() {
           table: "whatsapp_mensagens",
           filter: `clinica_id=eq.${clinicaId}`,
         },
-        () => {
+        (payload) => {
+          const nova = (payload as any).new as MensagemResumoRow | null;
+          if (nova?.id && nova.conversa_id && !aplicadasRef.current.has(nova.id)) {
+            const jaAplicada = false;
+            const abertoAgora =
+              leadAbertoRef.current === nova.conversa_id &&
+              (typeof document === "undefined" || document.visibilityState === "visible");
+            aplicadasRef.current.add(nova.id);
+            if (aplicadasRef.current.size > 500) aplicadasRef.current.clear();
+            setLeads((ls) =>
+              ls.map((l) =>
+                l.conversaId === nova.conversa_id
+                  ? ({
+                      ...l,
+                      ...aplicarMensagemRealtime(l, nova, { jaAplicada, abertoAgora }),
+                    } as Lead)
+                  : l,
+              ),
+            );
+          }
           if (pendente) clearTimeout(pendente);
-          pendente = setTimeout(() => void carregarLeads(true), 600);
+          pendente = setTimeout(() => void carregarLeads(true), 800);
         },
       )
       .subscribe();
@@ -293,19 +327,28 @@ export function HomologacaoInbox() {
   }, [clinicaId, carregarLeads]);
 
 
+
   useEffect(() => {
     void carregarLeads();
   }, [carregarLeads]);
 
+  /**
+   * FASE 4 — troca rápida entre Teste 01 → 02 → 03: guardamos qual lead está
+   * aberto e descartamos qualquer resposta atrasada de um lead anterior, para
+   * que nenhum card receba mensagens, horário ou contador de outro.
+   */
+  const leadSelecionadoRef = useRef<string | null>(null);
   const carregarHistorico = useCallback(
     async (id: string) => {
       if (!clinicaId) return;
+      leadSelecionadoRef.current = id;
       try {
         const r = (await historico({ data: { clinicaId, leadId: id } })) as {
           mensagens: Msg[];
           eventos?: ConversaEvento[];
           conversaId: string | null;
         };
+        if (leadSelecionadoRef.current !== id) return; // resposta atrasada
         setMsgs(r.mensagens);
         setEventosConversa(r.eventos ?? []);
         setConversaId(r.conversaId);
@@ -313,6 +356,7 @@ export function HomologacaoInbox() {
           const f = (await ferramentasFn({
             data: { clinicaId, conversaId: r.conversaId },
           })) as { eventos: EventoFerramenta[]; debug?: Record<string, unknown> };
+          if (leadSelecionadoRef.current !== id) return; // resposta atrasada
           setFerramentas(f.eventos);
           setDebugEstado(f.debug ?? null);
         } else {
@@ -409,6 +453,7 @@ export function HomologacaoInbox() {
     setCarregandoConversa(true);
     setAudio(null);
     setErro(null);
+    marcadoRef.current = "";
     void carregarHistorico(leadId).finally(() => setCarregandoConversa(false));
   }, [leadId, carregarHistorico]);
 
@@ -642,6 +687,11 @@ export function HomologacaoInbox() {
       setErro(null);
       setAudio(null);
       setFerramentas([]);
+      // Nova sessão: leitura e idempotência recomeçam; o histórico anterior
+      // continua disponível no console.
+      marcadoRef.current = "";
+      aplicadasRef.current.clear();
+      setLeads((ls) => ls.map((l) => (l.id === leadId ? { ...l, naoLidas: 0 } : l)));
       await carregarHistorico(leadId);
       await carregarLeads();
     } catch (e: any) {

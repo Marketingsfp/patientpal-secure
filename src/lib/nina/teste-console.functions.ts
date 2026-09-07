@@ -27,7 +27,7 @@ import {
   processarMensagemTeste,
   type LeadRow,
 } from "@/lib/nina/teste-console.server";
-import { resumirLeads, type MensagemResumoRow } from "@/lib/nina/leads-resumo";
+import { resumirLeads, previaTexto, type MensagemResumoRow } from "@/lib/nina/leads-resumo";
 
 
 async function assertMembership(supabase: any, userId: string, clinicaId: string) {
@@ -53,31 +53,54 @@ export const listarLeadsTeste = createServerFn({ method: "POST" })
 
     const ids = leads.map((l) => l.conversa_id).filter(Boolean) as string[];
 
-    // Uma única consulta agrupada, limitada às mensagens mais recentes das
-    // conversas ATUAIS dos leads — nunca o histórico completo de cada lead.
-    const AMOSTRA_POR_LEAD = 20;
-    let linhas: any[] = [];
+    /**
+     * FASE 4 — resumo da inbox de homologação em UMA consulta agrupada.
+     *
+     * A função `nina_teste_resumo_leads` devolve, para todas as conversas de
+     * teste de uma vez: total de mensagens, não lidas DESTE usuário e a última
+     * mensagem conversacional (eventos técnicos ficam de fora). Nada de uma
+     * consulta por card.
+     */
+    type ResumoRpc = {
+      total_mensagens: number | null;
+      nao_lidas: number | null;
+      ultima_msg_id: string | null;
+      ultima_msg_body: string | null;
+      ultima_msg_autor: "paciente" | "nina" | "atendente" | null;
+      ultima_msg_em: string | null;
+      ultima_atividade_em: string | null;
+    };
+    const porConversa = new Map<string, ResumoRpc>();
+    let rpcOk = false;
     if (ids.length) {
-      const { data: msgs, error: eMsgs } = await supabaseAdmin
+      try {
+        const { data: rows, error } = await context.supabase.rpc(
+          "nina_teste_resumo_leads" as never,
+          { _clinica_id: data.clinicaId, _conversa_ids: ids } as never,
+        );
+        if (error) throw new Error(error.message);
+        for (const r of ((rows ?? []) as any[])) porConversa.set(r.conversa_id, r as ResumoRpc);
+        rpcOk = porConversa.size > 0;
+      } catch (e) {
+        console.error("[homologacao] resumo agrupado falhou, usando amostra", e);
+      }
+    }
+
+    // Plano B (só se o resumo agrupado falhar): amostra recente das conversas
+    // atuais — nunca o histórico completo de cada lead.
+    const conversasPorLead: Record<string, string[]> = {};
+    for (const l of leads) conversasPorLead[l.id] = l.conversa_id ? [l.conversa_id] : [];
+    let resumos = resumirLeads(conversasPorLead, [], {});
+    if (!rpcOk && ids.length) {
+      const AMOSTRA_POR_LEAD = 20;
+      const { data: msgs } = await supabaseAdmin
         .from("whatsapp_mensagens")
         .select("id, conversa_id, direction, body, tipo, enviada_por, created_at, read_at")
         .eq("clinica_id", data.clinicaId)
         .in("conversa_id", ids)
         .order("created_at", { ascending: false })
         .limit(ids.length * AMOSTRA_POR_LEAD);
-      if (eMsgs) throw new Error(eMsgs.message);
-      linhas = (msgs ?? []) as any[];
-    }
-
-    // Isolamento: cada lead só enxerga a própria conversa atual.
-    const conversasPorLead: Record<string, string[]> = {};
-    for (const l of leads) conversasPorLead[l.id] = l.conversa_id ? [l.conversa_id] : [];
-
-    // FASE 3 — leitura INDIVIDUAL deste usuário (tabela `atend_leituras`,
-    // lida com a sessão do próprio usuário). O que um testador leu não zera o
-    // contador de outro, e nada aqui toca os contadores dos pacientes reais.
-    const lidoAte: Record<string, string | null> = {};
-    if (ids.length) {
+      const lidoAte: Record<string, string | null> = {};
       const { data: leituras } = await context.supabase
         .from("atend_leituras")
         .select("conversa_id, ultima_msg_lida_em")
@@ -85,42 +108,14 @@ export const listarLeadsTeste = createServerFn({ method: "POST" })
         .in("conversa_id", ids);
       for (const l of (leituras ?? []) as any[])
         lidoAte[l.conversa_id] = l.ultima_msg_lida_em ?? null;
+      resumos = resumirLeads(conversasPorLead, (msgs ?? []) as MensagemResumoRow[], lidoAte);
     }
-
-    const resumos = resumirLeads(conversasPorLead, linhas as MensagemResumoRow[], lidoAte);
-
-    // Contagem autoritativa no banco (a amostra acima é limitada).
-    const naoLidasBanco = new Map<string, number>();
-    if (ids.length) {
-      try {
-        const { data: cont } = await context.supabase.rpc("nina_teste_nao_lidas" as never, {
-          _clinica_id: data.clinicaId,
-          _conversa_ids: ids,
-        } as never);
-        for (const c of ((cont ?? []) as any[]))
-          naoLidasBanco.set(c.conversa_id, Number(c.nao_lidas) || 0);
-      } catch (e) {
-        console.error("[homologacao] contagem de nao lidas falhou", e);
-      }
-    }
-
-
-    // Total real de mensagens da conversa atual (contagem no banco, sem trazer linhas).
-    const totais = new Map<string, number>();
-    await Promise.all(
-      ids.map(async (cid) => {
-        const { count } = await supabaseAdmin
-          .from("whatsapp_mensagens")
-          .select("id", { count: "exact", head: true })
-          .eq("clinica_id", data.clinicaId)
-          .eq("conversa_id", cid);
-        totais.set(cid, count ?? 0);
-      }),
-    );
 
     return {
       leads: leads.map((l) => {
         const r = resumos[l.id]!;
+        const g = l.conversa_id ? porConversa.get(l.conversa_id) : undefined;
+        const ultimaEm = g ? g.ultima_msg_em : r.lastMessageAt;
         return {
           id: l.id,
           indice: l.indice,
@@ -132,17 +127,21 @@ export const listarLeadsTeste = createServerFn({ method: "POST" })
           cicloIniciadoEm: l.ciclo_iniciado_em,
           resolvidoEm: l.resolvido_em,
           status: l.status,
-          mensagens: l.conversa_id ? (totais.get(l.conversa_id) ?? 0) : 0,
-          ultimaMensagemId: r.lastMessageId,
-          ultimaMensagemTexto: r.lastMessageText,
-          ultimaMensagemAutor: r.lastMessageAuthor,
-          ultimaMensagemEm: r.lastMessageAt,
-          naoLidas: l.conversa_id
-            ? (naoLidasBanco.get(l.conversa_id) ?? r.unreadCount)
-            : r.unreadCount,
+          mensagens: g ? Number(g.total_mensagens ?? 0) : r.totalMensagens,
+          ultimaMensagemId: g ? g.ultima_msg_id : r.lastMessageId,
+          ultimaMensagemTexto: g
+            ? (g.ultima_msg_body ? previaTexto(g.ultima_msg_body) : null)
+            : r.lastMessageText,
+          ultimaMensagemAutor: g ? g.ultima_msg_autor : r.lastMessageAuthor,
+          ultimaMensagemEm: ultimaEm,
+          // Fonte estável de ordenação por atividade recente: só conversa,
+          // evento técnico não reposiciona o card.
+          ultimaAtividadeEm: g ? (g.ultima_atividade_em ?? ultimaEm) : ultimaEm,
+          naoLidas: g ? Number(g.nao_lidas ?? 0) : r.unreadCount,
         };
       }),
     };
+
 
   });
 
