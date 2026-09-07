@@ -46,7 +46,6 @@ import {
   validarRecorte,
 } from "@/lib/nina/metricas-filtros";
 import { AnalistaMetricasIA } from "@/components/nina/AnalistaMetricasIA";
-import { DesempenhoPorPeriodo } from "@/components/nina/DesempenhoPorPeriodo";
 import { ConfiancaRespostas } from "@/components/nina/ConfiancaRespostas";
 import { MetricasConfiabilidade } from "@/components/nina/MetricasConfiabilidade";
 import { CalibracaoConfianca } from "@/components/nina/CalibracaoConfianca";
