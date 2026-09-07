@@ -80,6 +80,7 @@ describe("bloqueios absolutos", () => {
         ferramentas: [tool({ capacidade: "createAppointment" })],
         agendamentoConfirmado: true,
         pacienteIdentificado: true,
+      },
     });
     expect(d.bloqueio).toBeNull();
     expect(d.acao).toBe("responder");
