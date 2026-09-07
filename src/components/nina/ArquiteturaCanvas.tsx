@@ -585,8 +585,11 @@ export function ArquiteturaCanvas({
               </marker>
             </defs>
             {rotas.map((rota) => {
+              // Filtro é só visual: esconde a linha quando uma ponta está oculta.
+              if (!visiveis.has(rota.de) || !visiveis.has(rota.para)) return null;
               const ativa =
                 !modoExecucao || (Boolean(execucao?.[rota.de]) && Boolean(execucao?.[rota.para]));
+
               const destacada = realce.arestas.has(rota.id);
               const atenuada = temRealce && !destacada;
               const cor = !ativa
