@@ -12,6 +12,8 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { ArquiteturaCanvas } from "@/components/nina/ArquiteturaCanvas";
+import { ExecucaoDiagnostico } from "@/components/nina/ExecucaoDiagnostico";
+
 import { useClinica } from "@/hooks/use-clinica";
 
 export const Route = createFileRoute("/_authenticated/app/nina-arquitetura")({
