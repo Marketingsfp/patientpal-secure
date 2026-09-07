@@ -148,12 +148,17 @@ export const reportarErroRapidoMensagemNina = createServerFn({ method: "POST" })
       created_at: string | null;
     };
     const execucaoId = msg.execucao_id ?? null;
-    let execucao: { model: string | null; latency_ms: number | null; created_at: string | null } | null =
-      null;
+    let execucao: {
+      model: string | null;
+      latency_ms: number | null;
+      created_at: string | null;
+      prompt_versao_id?: string | null;
+      prompt_versao?: number | null;
+    } | null = null;
     if (execucaoId) {
       const { data: exec } = await context.supabase
         .from("nina_execucoes")
-        .select("id, model, latency_ms, created_at")
+        .select("id, model, latency_ms, created_at, prompt_versao_id, prompt_versao")
         .eq("id", execucaoId)
         .maybeSingle();
       execucao = (exec as typeof execucao) ?? null;
@@ -164,8 +169,29 @@ export const reportarErroRapidoMensagemNina = createServerFn({ method: "POST" })
       mensagemCriadaEmMs: msg.created_at ? Date.parse(msg.created_at) : null,
     });
 
+    // Trace da PRÓPRIA mensagem (nunca por texto/horário aproximado).
+    let traceId: string | null = null;
+    {
+      const { data: evento } = await context.supabase
+        .from("nina_trace_eventos")
+        .select("trace_id")
+        .eq("clinica_id", data.clinicaId)
+        .eq("message_id", data.mensagemId)
+        .limit(1)
+        .maybeSingle();
+      traceId = (evento as { trace_id: string | null } | null)?.trace_id ?? null;
+    }
+
+    const conv = conversa as unknown as {
+      contato_paciente_id: string | null;
+      contato_telefone: string | null;
+      protocolo_atendimento: string | null;
+      protocolo_sessao_id: string | null;
+      teste_ciclo_id: string | null;
+    };
+
     const colunas =
-      "id, status, categoria, origem, created_at, mensagem_id, conversa_id, execucao_id, auditoria_status";
+      "id, status, categoria, origem, created_at, mensagem_id, conversa_id, execucao_id, auditoria_status, contato_paciente_id, contato_telefone, protocolo_atendimento, protocolo_sessao_id, prompt_versao_id, prompt_versao, teste_ciclo_id, trace_id";
 
     // 1ª barreira: já existe reporte rápido pendente para esta mensagem.
     const { data: existente } = await context.supabase
@@ -189,10 +215,21 @@ export const reportarErroRapidoMensagemNina = createServerFn({ method: "POST" })
           reporterUserId: context.userId,
           execucaoId,
           auditoriaStatus,
+          vinculo: {
+            contatoPacienteId: conv.contato_paciente_id,
+            contatoTelefone: conv.contato_telefone,
+            protocoloAtendimento: conv.protocolo_atendimento,
+            protocoloSessaoId: conv.protocolo_sessao_id,
+            testeCicloId: conv.teste_ciclo_id,
+            promptVersaoId: execucao?.prompt_versao_id ?? null,
+            promptVersao: execucao?.prompt_versao ?? null,
+            traceId,
+          },
         }) as never,
       )
       .select(colunas)
       .single();
+
 
     if (error) {
       // 2ª barreira (concorrência / duplo clique): índice único parcial no banco.
