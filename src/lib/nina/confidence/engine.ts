@@ -310,6 +310,7 @@ export function decidirConfianca(
       risco,
       acao: ctx.requestedAction,
       esclarecimentoUsado: ctx.businessContext.esclarecimentoUsado,
+      ambiguidadeResolvivel: apenasAmbiguidade(validators, blockers, hardBlockers),
     },
     politica,
   );
@@ -326,6 +327,19 @@ export function decidirConfianca(
     validators,
     evidence: montarEvidencia(ctx, cats, motivos),
   };
+}
+
+/** Só há ambiguidade de intenção/entidade a resolver com o paciente. */
+function apenasAmbiguidade(
+  validators: ResultadoValidador[],
+  blockers: Bloqueador[],
+  hardBlockers: HardBlocker[],
+): boolean {
+  if (blockers.length > 0 || hardBlockers.length > 0) return false;
+  const reprovados = validators.filter((v) => v.status !== "PASS" && v.status !== "NOT_APPLICABLE");
+  if (reprovados.length === 0) return false;
+  const AMBIGUIDADE = new Set(["IntentClarityValidator", "EntityResolutionValidator"]);
+  return reprovados.every((v) => AMBIGUIDADE.has(v.validator));
 }
 
 function montarEvidencia(ctx: ContextoConfianca, cats: CategoriaConfianca[], motivos: string[]) {

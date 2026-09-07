@@ -202,7 +202,9 @@ export function OfficialSourceValidator(
         ferramentaOk(f),
     ) || ctx.retrievedSources.some((s) => s.tipo === "agenda" && fonteUtil(s));
 
-  const precisaAgenda = oficiais.some((c) => c === "horario" || c === "disponibilidade" || c === "profissional");
+  const precisaAgenda = oficiais.some(
+    (c) => c === "horario" || c === "disponibilidade" || c === "profissional" || c === "agendamento",
+  );
   const atendido = precisaAgenda ? catalogoOk || agendaOk : catalogoOk;
 
   if (atendido) {
