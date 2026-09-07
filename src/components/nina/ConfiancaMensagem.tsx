@@ -135,9 +135,12 @@ export function ConfiancaMensagemBadge({
             <p className="text-muted-foreground">Resultado: {detalhe.resultado}</p>
             <ul className="space-y-1">
               {detalhe.linhas.map((l, i) => (
-                <li key={`${l.texto}-${i}`} className="flex items-start gap-1">
+                <li key={`${l.rotulo}-${i}`} className="flex items-start gap-1">
                   <span aria-hidden>{l.ok ? "✓" : "✕"}</span>
-                  <span className={l.ok ? "" : "text-destructive"}>{l.texto}</span>
+                  <span className={l.ok ? "" : "text-destructive"}>
+                    {l.rotulo}
+                    {l.detalhe ? ` — ${l.detalhe}` : ""}
+                  </span>
                 </li>
               ))}
             </ul>
