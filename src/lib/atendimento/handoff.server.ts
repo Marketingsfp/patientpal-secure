@@ -87,7 +87,9 @@ export type EventoConversa =
   | "IA_SILENCIADA"
   | "IA_MEMORIA_RESETADA"
   | "ATENDIMENTO_ENCERRADO"
+  | "HANDOFF_AUDITORIA"
   | "TIMEOUT_NINA";
+
 
 export async function registrarEvento(args: {
   clinicaId: string;
@@ -266,6 +268,15 @@ export async function encaminharParaHumano(args: {
   });
 
   let protocoloHandoff: string | null = null;
+  // FASE 6 — vínculo mensagem <-> protocolo para a auditoria consolidada.
+  let anuncioHandoff: {
+    mensagemId: string | null;
+    mensagemTexto: string | null;
+    origem: "modelo" | "contingencia" | null;
+    status: import("./handoff-auditoria").StatusEnvioHandoff;
+    transporte: import("./handoff-auditoria").TransporteHandoff;
+    retry: boolean;
+  } | null = null;
   // FASE 1 — protocolo obrigatório no handoff: nasce aqui, vinculado ao evento
   // de handoff, com a MESMA lógica em produção e homologação. Idempotente: o
   // banco reaproveita o número quando o ciclo já tem um.
@@ -279,6 +290,16 @@ export async function encaminharParaHumano(args: {
       handoffEventoId,
     });
     protocoloHandoff = p?.protocolo ?? null;
+    anuncioHandoff = p?.anuncio
+      ? {
+          mensagemId: p.anuncio.mensagemId,
+          mensagemTexto: p.anuncio.mensagemTexto,
+          origem: p.anuncio.origem,
+          status: p.anuncio.status,
+          transporte: p.anuncio.transporte,
+          retry: p.anuncio.retry,
+        }
+      : null;
     if (p?.protocolo)
       await registrarMarcadorSistema({
         clinicaId: args.clinicaId,
@@ -290,6 +311,7 @@ export async function encaminharParaHumano(args: {
   } catch (e) {
     console.error("[handoff] falha ao gerar protocolo do handoff", e);
   }
+
 
 
   // Reserva o resumo interno desta transferência (idempotente e barato).
@@ -333,6 +355,8 @@ export async function encaminharParaHumano(args: {
   if ((convRow as any)?.is_teste) {
     // FASE 2 — handoff é evento terminal do ciclo de teste: encerra o ciclo e
     // zera a memória ativa da Nina (histórico e resumo permanecem).
+    let cicloId: string | null = null;
+    let ninaSessionId: string | null = null;
     try {
       const { encerrarCicloTestePorHandoff } = await import("@/lib/nina/handoff-ciclo.server");
       const r = await encerrarCicloTestePorHandoff({
@@ -341,6 +365,8 @@ export async function encaminharParaHumano(args: {
         agoraISO: agora,
       });
       if (r.encerrado) {
+        cicloId = r.cicloId ?? null;
+        ninaSessionId = r.ninaSessionId ?? null;
         await registrarEvento({
           clinicaId: args.clinicaId,
           conversaId: args.conversaId,
@@ -360,6 +386,21 @@ export async function encaminharParaHumano(args: {
     } catch (e) {
       console.error("[handoff] falha ao encerrar ciclo de teste", e);
     }
+    // FASE 6 — registro consolidado (teste): nenhum atendente real é atribuído.
+    await auditarHandoff({
+      clinicaId: args.clinicaId,
+      conversaId: args.conversaId,
+      cicloId,
+      ninaSessionId,
+      handoffEventoId,
+      protocolo: protocoloHandoff,
+      motivo: args.motivo,
+      destino: depto?.nome ?? null,
+      atribuidaPara: null,
+      anuncio: anuncioHandoff,
+      criadoEm: agora,
+      ambiente: "homologacao",
+    });
     return {
       ok: true,
       posicao_fila: count ?? 1,
@@ -377,6 +418,23 @@ export async function encaminharParaHumano(args: {
     departamentoId: depto?.id ?? null,
   });
 
+  // FASE 6 — registro consolidado (produção). Mesma regra, mesmo conteúdo;
+  // muda só o transporte real e a atribuição a uma pessoa.
+  await auditarHandoff({
+    clinicaId: args.clinicaId,
+    conversaId: args.conversaId,
+    cicloId: null,
+    ninaSessionId: null,
+    handoffEventoId,
+    protocolo: protocoloHandoff,
+    motivo: args.motivo,
+    destino: depto?.nome ?? null,
+    atribuidaPara: atribuida?.nome ?? null,
+    anuncio: anuncioHandoff,
+    criadoEm: agora,
+    ambiente: "producao",
+  });
+
   return {
     ok: true,
     posicao_fila: atribuida ? 0 : (count ?? 1),
@@ -386,6 +444,7 @@ export async function encaminharParaHumano(args: {
       ? `Conversa encaminhada e atribuída a ${atribuida.nome}. A IA parou de responder.`
       : "Conversa encaminhada para a equipe. A IA parou de responder.",
   };
+
 }
 
 /**
@@ -581,4 +640,58 @@ export async function reabrirConversaPorMensagemPaciente(args: {
     }
   }
   return reabertas;
+}
+
+/**
+ * FASE 6 — grava o registro consolidado do handoff (uma única inserção).
+ * Só é chamada QUANDO existe handoff: não pesa no caminho normal das mensagens.
+ * Nunca lança: auditoria não pode derrubar a transferência.
+ */
+async function auditarHandoff(args: {
+  clinicaId: string;
+  conversaId: string;
+  cicloId: string | null;
+  ninaSessionId: string | null;
+  handoffEventoId: string | null;
+  protocolo: string | null;
+  motivo: string;
+  destino: string | null;
+  atribuidaPara: string | null;
+  criadoEm: string;
+  ambiente: "producao" | "homologacao";
+  anuncio: {
+    mensagemId: string | null;
+    mensagemTexto: string | null;
+    origem: "modelo" | "contingencia" | null;
+    status: import("./handoff-auditoria").StatusEnvioHandoff;
+    transporte: import("./handoff-auditoria").TransporteHandoff;
+    retry: boolean;
+  } | null;
+}) {
+  try {
+    const { registrarAuditoriaHandoff } = await import("./handoff-auditoria.server");
+    await registrarAuditoriaHandoff({
+      clinicaId: args.clinicaId,
+      entrada: {
+        conversaId: args.conversaId,
+        cicloId: args.cicloId,
+        ninaSessionId: args.ninaSessionId,
+        handoffEventoId: args.handoffEventoId,
+        protocolo: args.protocolo,
+        criadoEm: args.criadoEm,
+        motivo: args.motivo,
+        destino: args.destino,
+        atribuidaPara: args.atribuidaPara,
+        mensagemId: args.anuncio?.mensagemId ?? null,
+        mensagemTexto: args.anuncio?.mensagemTexto ?? null,
+        mensagemOrigem: args.anuncio?.origem ?? null,
+        statusEnvio: args.anuncio?.status ?? "nao_enviado",
+        transporte: args.anuncio?.transporte ?? "nenhum",
+        retry: args.anuncio?.retry ?? false,
+        ambiente: args.ambiente,
+      },
+    });
+  } catch (e) {
+    console.error("[handoff] falha ao auditar handoff", e);
+  }
 }
