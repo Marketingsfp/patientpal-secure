@@ -31,6 +31,7 @@ import {
   ClipboardList,
   ClipboardCheck,
   MessageCircle,
+  Network,
   Target,
   Clock,
   BookOpen,
