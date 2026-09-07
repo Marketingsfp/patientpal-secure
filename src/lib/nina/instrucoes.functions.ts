@@ -123,3 +123,67 @@ export const salvarRascunhoInstrucoes = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     return criado as VersaoInstrucoes;
   });
+
+export type VersaoHistorico = VersaoInstrucoes & { autor: string | null };
+
+/** Histórico completo do escopo — nenhuma versão é omitida. */
+export const historicoInstrucoesNina = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => z.object({ escopo: z.enum(ESCOPOS) }).parse(input))
+  .handler(async ({ data, context }): Promise<VersaoHistorico[]> => {
+    const { supabase } = context as { supabase: any };
+    const { data: linhas, error } = await supabase
+      .from(TAB)
+      .select(`${COLUNAS}, criado_por, publicado_por`)
+      .is("clinica_id", null)
+      .eq("escopo", data.escopo)
+      .order("versao", { ascending: false });
+    if (error) throw new Error(error.message);
+
+    const versoes = (linhas ?? []) as Array<
+      VersaoInstrucoes & { criado_por: string | null; publicado_por: string | null }
+    >;
+    const ids = Array.from(
+      new Set(versoes.flatMap((v) => [v.publicado_por, v.criado_por]).filter(Boolean) as string[]),
+    );
+
+    let nomes = new Map<string, string | null>();
+    if (ids.length) {
+      const { data: autores } = await supabase.rpc("nina_instrucoes_autores", { p_ids: ids });
+      nomes = new Map(
+        ((autores ?? []) as Array<{ id: string; nome: string | null }>).map((a) => [a.id, a.nome]),
+      );
+    }
+
+    return versoes.map((v) => {
+      const responsavel = v.publicado_por ?? v.criado_por;
+      return { ...v, autor: responsavel ? (nomes.get(responsavel) ?? null) : null };
+    });
+  });
+
+/**
+ * Publica o conteúdo como uma NOVA versão. A versão publicada anterior é
+ * arquivada (nunca apagada). Restaurar uma versão antiga usa esta mesma
+ * função, enviando o conteúdo dela.
+ */
+export const publicarInstrucoesNina = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) =>
+    z
+      .object({
+        escopo: z.enum(ESCOPOS),
+        conteudo: z.string().min(1).max(60000),
+        comentario: z.string().trim().max(500).optional(),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data, context }): Promise<VersaoInstrucoes> => {
+    const { supabase } = context as { supabase: any };
+    const { data: nova, error } = await supabase.rpc("nina_instrucoes_publicar", {
+      p_escopo: data.escopo,
+      p_conteudo: data.conteudo,
+      p_comentario: data.comentario ?? null,
+    });
+    if (error) throw new Error(error.message);
+    return nova as VersaoInstrucoes;
+  });
