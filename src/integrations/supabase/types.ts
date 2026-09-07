@@ -13064,6 +13064,37 @@ export type Database = {
         Args: { _clinica_id: string; _user_id: string }
         Returns: boolean
       }
+      nina_instrucoes_autores: {
+        Args: { p_ids: string[] }
+        Returns: {
+          id: string
+          nome: string
+        }[]
+      }
+      nina_instrucoes_publicar: {
+        Args: { p_comentario?: string; p_conteudo: string; p_escopo: string }
+        Returns: {
+          clinica_id: string | null
+          comentario: string | null
+          conteudo: string
+          created_at: string
+          criado_por: string | null
+          escopo: string
+          id: string
+          publicado_em: string | null
+          publicado_por: string | null
+          status: string
+          updated_at: string
+          versao: number
+          versao_anterior_id: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "nina_instrucoes_versoes"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       nina_kb_buscar_semantico: {
         Args: { p_base_id: string; p_embedding: string; p_limite?: number }
         Returns: {
