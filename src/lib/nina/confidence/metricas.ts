@@ -210,14 +210,14 @@ const ROTULO_NIVEL: Record<CalibracaoNivel["nivel"], string> = {
  * a execução, cai para o vínculo por conversa dentro de 48h — o mesmo critério
  * já usado na correlação por faixa. Nenhum valor é estimado ou fixo.
  */
-export function calcularCalibracaoPorNivel(
-  linhas: LinhaDecisaoMetrica[],
-  erros: ErroReportado[] = [],
-): CalibracaoNivel[] {
-  const execucoesComErro = new Set<string>();
+type IndiceErros = { execucoes: Set<string>; porConversa: Map<string, number[]> };
+
+/** Índice de reportes: vínculo exato por execução e, na falta dele, por conversa. */
+export function indexarErros(erros: ErroReportado[]): IndiceErros {
+  const execucoes = new Set<string>();
   const porConversa = new Map<string, number[]>();
   for (const e of erros) {
-    if (e.execucao_id) execucoesComErro.add(e.execucao_id);
+    if (e.execucao_id) execucoes.add(e.execucao_id);
     else if (e.conversa_id) {
       const t = Date.parse(e.created_at);
       if (Number.isNaN(t)) continue;
@@ -226,6 +226,24 @@ export function calcularCalibracaoPorNivel(
       porConversa.set(e.conversa_id, arr);
     }
   }
+  return { execucoes, porConversa };
+}
+
+/** A resposta avaliada foi reportada como erro depois? */
+export function foiReportadaComoErro(l: LinhaDecisaoMetrica, idx: IndiceErros): boolean {
+  if (l.execucao_id && idx.execucoes.has(l.execucao_id)) return true;
+  if (!l.conversation_id) return false;
+  const marcas = idx.porConversa.get(l.conversation_id);
+  const t = Date.parse(l.created_at);
+  if (!marcas || Number.isNaN(t)) return false;
+  return marcas.some((m) => m >= t && m - t <= JANELA_ERRO_MS);
+}
+
+export function calcularCalibracaoPorNivel(
+  linhas: LinhaDecisaoMetrica[],
+  erros: ErroReportado[] = [],
+): CalibracaoNivel[] {
+  const idx = indexarErros(erros);
 
   const base: Record<CalibracaoNivel["nivel"], { mensagens: number; erros: number }> = {
     HIGH: { mensagens: 0, erros: 0 },
@@ -236,16 +254,7 @@ export function calcularCalibracaoPorNivel(
   for (const l of linhas) {
     const nivel = nivelDa({ nivel: l.nivel, score: Number.isFinite(l.score) ? l.score : 0 });
     base[nivel].mensagens += 1;
-
-    let reportada = Boolean(l.execucao_id && execucoesComErro.has(l.execucao_id));
-    if (!reportada && l.conversation_id) {
-      const marcas = porConversa.get(l.conversation_id);
-      const t = Date.parse(l.created_at);
-      if (marcas && !Number.isNaN(t)) {
-        reportada = marcas.some((m) => m >= t && m - t <= JANELA_ERRO_MS);
-      }
-    }
-    if (reportada) base[nivel].erros += 1;
+    if (foiReportadaComoErro(l, idx)) base[nivel].erros += 1;
   }
 
   return (["HIGH", "MEDIUM", "LOW"] as const).map((nivel) => {
