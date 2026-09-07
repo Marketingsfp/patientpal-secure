@@ -99,6 +99,7 @@ export function ArquiteturaCanvas({
   const [carregou, setCarregou] = useState(false);
   const [view, setView] = useState({ escala: 0.7, x: 0, y: 0 });
   const [selecionado, setSelecionado] = useState<string | null>(null);
+  const [caminhoCompleto, setCaminhoCompleto] = useState(false);
   const arrasto = useRef<
     | { tipo: "canvas"; startX: number; startY: number; origemX: number; origemY: number }
     | { tipo: "node"; id: string; startX: number; startY: number; origemX: number; origemY: number }
@@ -116,6 +117,20 @@ export function ArquiteturaCanvas({
     () => new Map(layout.nodes.map((n) => [n.node.id, n])),
     [layout],
   );
+
+  const rotas = useMemo(() => calcularRotas(layout), [layout]);
+
+  // Realce: só o vizinho imediato por padrão; "Destacar caminho" mostra tudo
+  // que leva até o componente e tudo que decorre dele.
+  const realce = useMemo(
+    () =>
+      caminhoCompleto
+        ? realceCaminhoCompleto(nodes, selecionado)
+        : realceDireto(nodes, selecionado),
+    [nodes, selecionado, caminhoCompleto],
+  );
+  const temRealce = realce.nodes.size > 0;
+
 
   const ajustarTela = useCallback(() => {
     const area = areaRef.current;
