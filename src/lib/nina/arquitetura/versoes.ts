@@ -51,6 +51,25 @@ const contarTools = (snapshot: AssinaturaNode[]) =>
 const SNAPSHOT_ATUAL = assinaturaAtual();
 
 /**
+ * Foto estrutural da versão 2 (antes de a montagem do prompt passar a ler as
+ * Instruções da Nina publicadas). Derivada da atual, removendo apenas o que a
+ * versão 3 acrescentou.
+ */
+const SNAPSHOT_V2: AssinaturaNode[] = SNAPSHOT_ATUAL.filter(
+  (n) => n.id !== "instructions.published",
+).map((n) =>
+  n.id === "prompt.compose"
+    ? {
+        ...n,
+        funcao: "systemPromptNina",
+        anteriores: n.anteriores.filter((a) => a !== "instructions.published"),
+      }
+    : n.id === "context.load"
+      ? { ...n, seguintes: n.seguintes.filter((s) => s !== "instructions.published") }
+      : n,
+);
+
+/**
  * Versões já registradas, da mais antiga para a mais recente.
  * Só entra aqui versão com mudança estrutural real do manifesto.
  */
@@ -68,22 +87,39 @@ export const HISTORICO_ARQUITETURA: VersaoArquitetura[] = [
     snapshot: SNAPSHOT_ANTERIOR,
   },
   {
-    versao: MANIFESTO_ARQUITETURA.versao,
+    versao: 2,
     data: "2026-09-07",
     deploy: null,
     commit: null,
     versaoPrompt: null,
     modelo: "google/gemini-2.5-flash",
-    quantidadeNodes: SNAPSHOT_ATUAL.length,
-    quantidadeTools: contarTools(SNAPSHOT_ATUAL),
+    quantidadeNodes: SNAPSHOT_V2.length,
+    quantidadeTools: contarTools(SNAPSHOT_V2),
     alteracoes: [
       "Ferramentas e componentes que existiam no código mas não apareciam no mapa foram incluídos.",
       "Ligações imprecisas de catálogo, conhecimento e métricas foram corrigidas.",
       "Sincronização registrada em docs/nina/arquitetura-diff-2026-09-07.md.",
     ],
+    snapshot: SNAPSHOT_V2,
+  },
+  {
+    versao: MANIFESTO_ARQUITETURA.versao,
+    data: "2026-09-07",
+    deploy: null,
+    commit: null,
+    versaoPrompt: "Instruções da Nina (versão publicada)",
+    modelo: "google/gemini-2.5-flash",
+    quantidadeNodes: SNAPSHOT_ATUAL.length,
+    quantidadeTools: contarTools(SNAPSHOT_ATUAL),
+    alteracoes: [
+      "Novo componente: Instruções da Nina (versão publicada), lido pelo backend antes da montagem do prompt.",
+      "A montagem do prompt passou a apontar para a função real do atendimento por WhatsApp.",
+      "Publicar novas instruções muda só a configuração do componente, sem reorganizar o mapa.",
+    ],
     snapshot: SNAPSHOT_ATUAL,
   },
 ];
+
 
 export function versaoPorNumero(versao: number): VersaoArquitetura | undefined {
   return HISTORICO_ARQUITETURA.find((v) => v.versao === versao);
