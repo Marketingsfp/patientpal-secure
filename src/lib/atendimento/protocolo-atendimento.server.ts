@@ -207,12 +207,27 @@ export async function protocoloAoAtribuirHumano(args: {
     gatilho: "transferencia",
     userId: args.userId ?? null,
   });
-  if (!r || !r.novo) return r;
+  if (!r) return r;
+
+  // O número já pode ter nascido no início do handoff (Fase 1). O anúncio ao
+  // paciente continua acontecendo uma única vez por atendimento.
+  const jaInformado = await protocoloJaInformado(args.clinicaId, args.conversaId, r.protocolo);
+  if (!deveInformarProtocolo({ protocolo: r.protocolo, jaInformado })) return r;
 
   await enviarTextoSistema(
     args.clinicaId,
     args.conversaId,
     `Seu atendimento foi encaminhado para nossa equipe. Seu protocolo de atendimento é ${r.protocolo}.`,
   );
+  const { registrarEvento } = await import("./handoff.server");
+  await registrarEvento({
+    clinicaId: args.clinicaId,
+    conversaId: args.conversaId,
+    evento: "ASSUMIDA",
+    userId: args.userId ?? null,
+    motivo: `Protocolo ${r.protocolo} informado ao paciente`,
+    detalhes: { protocol_number: r.protocolo, protocolo_informado: true },
+  });
   return r;
 }
+
