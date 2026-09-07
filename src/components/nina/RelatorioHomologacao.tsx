@@ -432,20 +432,56 @@ export function RelatorioHomologacao() {
                         ) : null}
                         {a.achados.length > 0 ? (
                           <ul className="space-y-1">
-                            {a.achados.map((f: any, i: number) => (
-                              <li key={i} className="rounded bg-background p-2">
-                                <p className="font-medium">{f.observado}</p>
-                                <p className="text-muted-foreground">Esperado: {f.esperado}</p>
-                                <p className="text-muted-foreground">Evidência: {f.fonte}</p>
-                                {f.componente ? (
-                                  <p className="text-muted-foreground">
-                                    Componente: {f.componente} · confiança {f.confianca ?? "—"}
-                                  </p>
-                                ) : null}
-                              </li>
-                            ))}
+                            {a.achados.map((f: any, i: number) => {
+                              const enviado = enviados[`${a.id}:${i}`] ?? null;
+                              return (
+                                <li key={i} className="space-y-1 rounded bg-background p-2">
+                                  <p className="font-medium">{f.observado}</p>
+                                  <p className="text-muted-foreground">Esperado: {f.esperado}</p>
+                                  <p className="text-muted-foreground">Evidência: {f.fonte}</p>
+                                  {f.componente ? (
+                                    <p className="text-muted-foreground">
+                                      Componente: {f.componente} · confiança {f.confianca ?? "—"}
+                                    </p>
+                                  ) : null}
+                                  <div className="flex flex-wrap items-center gap-2 pt-1">
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      disabled={!podeEscrever || ocupado === `${a.id}:${i}`}
+                                      onClick={() => void enviarAchado(a.id, i, item)}
+                                    >
+                                      {ocupado === `${a.id}:${i}` ? (
+                                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                      ) : (
+                                        <Flag className="mr-2 h-4 w-4" />
+                                      )}
+                                      {enviado ? "Já enviado para Revisão" : "Enviar para Revisão de Aprendizados"}
+                                    </Button>
+                                    {enviado ? (
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        disabled={!podeEscrever || ocupado === `reg:${enviado.id}`}
+                                        onClick={() => void criarRegressao(enviado.id)}
+                                      >
+                                        {ocupado === `reg:${enviado.id}` ? (
+                                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                        ) : (
+                                          <RotateCcw className="mr-2 h-4 w-4" />
+                                        )}
+                                        {enviado.cenarioRegressaoId
+                                          ? "Teste de regressão criado"
+                                          : "Transformar em teste de regressão"}
+                                      </Button>
+                                    ) : null}
+                                  </div>
+                                </li>
+                              );
+                            })}
                           </ul>
                         ) : null}
+
                         {a.erro ? <p className="text-destructive">{a.erro}</p> : null}
                       </div>
                     ))}
