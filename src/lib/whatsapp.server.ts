@@ -514,16 +514,44 @@ export async function gerarRespostaNina(
 ): Promise<string> {
   const { comColetor } = await import("@/lib/nina/evidencias.server");
   const auditoria = opcoes?.auditoria ?? { execucaoId: null as string | null };
-  const { resultado, coletor } = await comColetor(async (c) => {
-    if (opcoes?.mensagensEntrada?.length) c.mensagensEntrada(opcoes.mensagensEntrada);
-    return await gerarRespostaNinaInterno(clinicaId, mensagemPaciente, telefoneRemetente, {
-      ...opcoes,
-      auditoria,
-    });
+
+  // TRACE — mesmo núcleo, mesma instrumentação: WhatsApp real e homologação
+  // produzem o mesmo rastro (Nina → Arquitetura → Execução).
+  const { criarRastro } = await import("@/lib/nina/arquitetura/tracing");
+  const traceId = crypto.randomUUID();
+  const rastro = criarRastro({
+    trace_id: traceId,
+    execution_id: traceId,
+    conversation_id: null,
+    message_id: opcoes?.mensagensEntrada?.[0] ?? null,
   });
-  const { gravarEvidencias } = await import("@/lib/nina/evidencias.server");
-  await gravarEvidencias(auditoria.execucaoId ?? null, clinicaId, coletor);
-  return resultado;
+  if (opcoes?.auditoria) (opcoes.auditoria as { traceId?: string }).traceId = traceId;
+  rastro.iniciar("message.inbound", {
+    origem: opcoes?.teste ? "homologacao" : "whatsapp",
+    tamanho_mensagem: mensagemPaciente.length,
+  });
+
+  try {
+    const { resultado, coletor } = await comColetor(async (c) => {
+      if (opcoes?.mensagensEntrada?.length) c.mensagensEntrada(opcoes.mensagensEntrada);
+      return await gerarRespostaNinaInterno(clinicaId, mensagemPaciente, telefoneRemetente, {
+        ...opcoes,
+        auditoria,
+        rastro,
+      });
+    });
+    rastro.concluir("message.inbound", { resposta_tamanho: resultado.length });
+    const { gravarEvidencias } = await import("@/lib/nina/evidencias.server");
+    await gravarEvidencias(auditoria.execucaoId ?? null, clinicaId, coletor);
+    return resultado;
+  } catch (e) {
+    rastro.falhar("error.handle", e);
+    rastro.falhar("message.inbound", e);
+    throw e;
+  } finally {
+    const { descarregarRastro } = await import("@/lib/nina/arquitetura/tracing.server");
+    descarregarRastro(clinicaId, rastro);
+  }
 }
 
 async function gerarRespostaNinaInterno(
@@ -540,9 +568,11 @@ async function gerarRespostaNinaInterno(
     teste?: boolean;
     auditoria?: { execucaoId?: string | null };
     mensagensEntrada?: string[];
+    rastro?: import("@/lib/nina/arquitetura/tracing").Rastro;
   },
 ): Promise<string> {
   const { registrarEtapa } = await import("@/lib/nina/evidencias.server");
+  const rastro = opcoes?.rastro ?? null;
   const apiKey = process.env.LOVABLE_API_KEY;
   if (!apiKey) throw new Error("LOVABLE_API_KEY ausente");
 
@@ -991,6 +1021,11 @@ ${procs || "(nenhum)"}`;
     systemPromptCodigo,
   );
   const systemPrompt = instrucoesNina.texto;
+  rastro?.concluir("instructions.published", {
+    versao: instrucoesNina.versao ?? null,
+    origem: instrucoesNina.origem ?? null,
+    publicado_em: instrucoesNina.publicadoEm ?? null,
+  });
 
   // FASE 6 — rastreabilidade: guarda a REFERÊNCIA da versão usada nesta
   // execução (não o texto). Mensagens antigas continuam mostrando a versão
@@ -1080,6 +1115,10 @@ ${procs || "(nenhum)"}`;
     const { blocoPromptCatalogo } = await import("@/lib/nina/catalogo-prompt.server");
     return await blocoPromptCatalogo(clinicaId).catch(() => "");
   })();
+  rastro?.concluir("tool.knowledge.lookup", {
+    base_ativa: Boolean(blocoKb),
+    tamanho: blocoKb.length,
+  });
 
   // FASE 2 do novo fluxo: respostas factuais fundamentadas no catálogo publicado.
   // Só texto de prompt; a consulta continua na ferramenta já existente.
@@ -1319,6 +1358,15 @@ ATENDIMENTO HUMANO — REGRA OBRIGATÓRIA:
       : null,
   });
   const mensagens: MsgIA[] = contexto.messages as MsgIA[];
+  rastro?.concluir("context.load", {
+    mensagens_contexto: mensagens.length,
+    paciente_identificado: Boolean(pacienteIdEfetivo),
+  });
+  rastro?.concluir("prompt.compose", {
+    tamanho_prompt: systemPromptComHandoff.length,
+    ferramentas: Array.isArray(ferramentas) ? ferramentas.length : 0,
+    pode_agendar: podeAgendar,
+  });
 
   let resposta = "";
   let houveHandoff = false;
@@ -1342,6 +1390,8 @@ ATENDIMENTO HUMANO — REGRA OBRIGATÓRIA:
   for (let rodada = 0; rodada < MAX_RODADAS; rodada++) {
     // Toda chamada de modelo da Nina passa pelo Nina AI Gateway.
     const { ninaAIGateway } = await import("@/lib/nina/ai-gateway.server");
+    if (rastro && rodada > 0) rastro.novoCiclo();
+    rastro?.iniciar("llm.generate", { rodada });
     const respostaIA = await ninaAIGateway({
       clinicaId,
       perfil: "whatsapp",
@@ -1364,10 +1414,20 @@ ATENDIMENTO HUMANO — REGRA OBRIGATÓRIA:
     if (opcoes?.auditoria && respostaIA.execucaoId) {
       opcoes.auditoria.execucaoId = respostaIA.execucaoId;
     }
+    // O trace passa a apontar para a execução real registrada pelo gateway.
+    if (rastro && respostaIA.execucaoId) rastro.ids.execution_id = respostaIA.execucaoId;
 
     if (!respostaIA.ok) {
+      rastro?.falhar("llm.generate", respostaIA.erro ?? "Falha IA", {
+        modelo: respostaIA.modelo ?? null,
+      });
       throw new Error(respostaIA.erro ?? "Falha IA");
     }
+    rastro?.concluir("llm.generate", {
+      modelo: respostaIA.modelo ?? null,
+      nivel: respostaIA.nivel ?? null,
+      ferramentas_pedidas: (respostaIA.toolCalls ?? []).length,
+    });
     const msg = { content: respostaIA.conteudo, tool_calls: respostaIA.toolCalls };
     const chamadas = msg.tool_calls ?? [];
 
@@ -1410,7 +1470,10 @@ ATENDIMENTO HUMANO — REGRA OBRIGATÓRIA:
       const nome = String(c.function?.name ?? "");
       // Toda execução passa pelo broker: ele valida o retorno, aplica
       // idempotência de turno e nunca transforma erro em sucesso.
+      rastro?.iniciar("tool.execute", { ferramenta: nome });
       const r = await broker.executar(nome, c.function?.arguments);
+      if (r.success && !r.erro) rastro?.concluir("tool.execute", { ferramenta: nome });
+      else rastro?.falhar("tool.execute", r.erro ?? "falha na ferramenta", { ferramenta: nome });
       const resultado = respostaParaModelo(r);
       if (r.capacidade === "requestHumanHandoff" && r.success) houveHandoff = true;
       if (r.appointment_confirmed) agendamentoConfirmado = true;
