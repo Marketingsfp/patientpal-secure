@@ -577,6 +577,7 @@ export type ConfiancaDaMensagem = {
   resultado: string;
   bloqueadores: string[];
   registrado_em: string;
+  policy_version: string | null;
 };
 
 /**
@@ -597,7 +598,7 @@ export const confiancaDasExecucoes = createServerFn({ method: "POST" })
   .handler(async ({ data, context }): Promise<ConfiancaDaMensagem[]> => {
     const { data: rows, error } = await context.supabase
       .from("nina_confianca_decisoes")
-      .select("execucao_id, score, nivel, resultado_final, acao, bloqueadores, bloqueio, created_at")
+      .select("execucao_id, score, nivel, resultado_final, acao, bloqueadores, bloqueio, created_at, policy_version")
       .eq("clinica_id", data.clinicaId)
       .in("execucao_id", data.execucaoIds)
       .order("created_at", { ascending: true });
@@ -618,6 +619,7 @@ export const confiancaDasExecucoes = createServerFn({ method: "POST" })
         resultado: (r["resultado_final"] as string) ?? (r["acao"] as string) ?? "",
         bloqueadores: [...new Set([...lista(r["bloqueadores"]), ...bloqueio])],
         registrado_em: String(r["created_at"] ?? ""),
+        policy_version: r["policy_version"] ? String(r["policy_version"]) : null,
       });
     }
     return [...porExecucao.values()];
