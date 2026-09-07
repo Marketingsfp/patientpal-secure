@@ -30,7 +30,7 @@ const ROTULO_CATEGORIA: Record<string, string> = {
   clinico_administrativo: "Dados do paciente",
 };
 
-export function ConfiancaRespostas({ clinicaId }: { clinicaId: string | undefined }) {
+export function ConfiancaRespostas({ clinicaId }: { clinicaId: string | null | undefined }) {
   const buscar = useServerFn(resumoConfiancaNina);
   const [dados, setDados] = useState<ResumoConfianca | null>(null);
   const [carregando, setCarregando] = useState(false);
