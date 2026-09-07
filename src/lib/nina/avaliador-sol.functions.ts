@@ -23,7 +23,7 @@ import {
   type FerramentaDossie,
   type TurnoDossie,
 } from "@/lib/nina/avaliador-sol";
-import { ROTULO_CRITERIO } from "@/lib/nina/cenarios";
+import { TIPOS_CRITERIO } from "@/lib/nina/cenarios";
 
 const GATEWAY = "https://ai.gateway.lovable.dev/v1/responses";
 
@@ -266,7 +266,7 @@ async function montarDossie(
 }
 
 function descreverCriterio(c: any): string {
-  const rotulo = ROTULO_CRITERIO[c?.tipo as keyof typeof ROTULO_CRITERIO] ?? String(c?.tipo ?? "");
+  const rotulo = TIPOS_CRITERIO.find((t) => t.valor === c?.tipo)?.rotulo ?? String(c?.tipo ?? "");
   return c?.valor ? `${rotulo}: ${c.valor}` : rotulo;
 }
 
