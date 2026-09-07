@@ -185,5 +185,7 @@ export type ResultadoConfianca = {
   decision: DecisaoMotor;
   blockers: Bloqueador[];
   checks: Verificacao[];
+  /** Resultado bruto de cada validador da Fase 2 (auditoria e painel). */
+  validators?: ResultadoValidador[];
   evidence: EvidenciaConfianca;
 };
