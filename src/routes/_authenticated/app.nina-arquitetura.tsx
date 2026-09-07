@@ -19,6 +19,8 @@ import { RastrearExecucao } from "@/components/nina/RastrearExecucao";
 import { useClinica } from "@/hooks/use-clinica";
 import { capacidadesArquitetura } from "@/lib/nina/arquitetura/permissoes.functions";
 import { nivelAcessoDe, podeArquitetura } from "@/lib/nina/arquitetura/permissoes";
+import { NODES_ARQUITETURA } from "@/lib/nina/arquitetura/manifesto";
+import { statusArquitetura } from "@/lib/nina/arquitetura/layout-incremental";
 
 export const Route = createFileRoute("/_authenticated/app/nina-arquitetura")({
   head: () => ({
@@ -58,6 +60,9 @@ function Pagina() {
   const podeExecucao = podeArquitetura(capacidades, "arquitetura.execucao");
   const nivelAcesso = nivelAcessoDe(capacidades);
   const chavePosicoes = `nina-arquitetura-posicoes:${clinicaId ?? "sem-clinica"}`;
+  const status = statusArquitetura(NODES_ARQUITETURA);
+  const sinal =
+    status.cor === "verde" ? "🟢" : status.cor === "amarelo" ? "🟡" : "🔴";
 
   if (permissao && !podeVer) {
     return (
@@ -86,6 +91,25 @@ function Pagina() {
           </p>
         </div>
       </header>
+
+      <div
+        role="status"
+        className="flex flex-wrap items-start gap-2 rounded-lg border p-3 text-sm"
+        style={{
+          borderColor:
+            status.cor === "verde"
+              ? "color-mix(in oklch, var(--primary) 40%, transparent)"
+              : status.cor === "amarelo"
+                ? "color-mix(in oklch, var(--chart-4) 55%, transparent)"
+                : "color-mix(in oklch, var(--destructive) 55%, transparent)",
+        }}
+      >
+        <span aria-hidden="true">{sinal}</span>
+        <div>
+          <p className="font-medium">{status.titulo}</p>
+          <p className="text-muted-foreground">{status.detalhe}</p>
+        </div>
+      </div>
 
       <Tabs value={modo} onValueChange={(v) => setModo(v as typeof modo)}>
         <TabsList>

@@ -31,6 +31,12 @@ import {
   type Posicao,
 } from "@/lib/nina/arquitetura/layout";
 import {
+  ESTADO_LAYOUT_VAZIO,
+  aplicarDiffIncremental,
+  type EstadoLayout,
+} from "@/lib/nina/arquitetura/layout-incremental";
+import { assinaturaAtual, calcularDiffArquitetura } from "@/lib/nina/arquitetura/sync";
+import {
   calcularRotas,
   descreverConexao,
   realceCaminhoCompleto,
@@ -83,10 +89,33 @@ function lerPosicoes(chave: string): Record<string, Posicao> {
   }
 }
 
-function gravarPosicoes(chave: string, posicoes: Record<string, Posicao>) {
+/**
+ * Layout guardado: separa o desenho calculado (canonical) das movimentações
+ * manuais (overrides). Chave antiga continua sendo lida como override, para
+ * não perder o que já foi personalizado.
+ */
+function lerEstado(chave: string): EstadoLayout {
+  if (typeof window === "undefined") return ESTADO_LAYOUT_VAZIO;
+  try {
+    const bruto = window.localStorage.getItem(`${chave}:layout`);
+    if (bruto) {
+      const lido = JSON.parse(bruto) as Partial<EstadoLayout>;
+      return {
+        assinatura: lido.assinatura ?? [],
+        canonical: lido.canonical ?? {},
+        overrides: lido.overrides ?? {},
+      };
+    }
+  } catch {
+    /* desenho guardado é acessório */
+  }
+  return { ...ESTADO_LAYOUT_VAZIO, overrides: lerPosicoes(chave) };
+}
+
+function gravarEstado(chave: string, estado: EstadoLayout) {
   if (typeof window === "undefined") return;
   try {
-    window.localStorage.setItem(chave, JSON.stringify(posicoes));
+    window.localStorage.setItem(`${chave}:layout`, JSON.stringify(estado));
   } catch {
     /* posição visual é acessório: falha aqui não pode quebrar a tela */
   }
@@ -102,7 +131,7 @@ export function ArquiteturaCanvas({
   pacienteExecucaoId = null,
 }: Props) {
   const areaRef = useRef<HTMLDivElement | null>(null);
-  const [posicoes, setPosicoes] = useState<Record<string, Posicao>>({});
+  const [estado, setEstado] = useState<EstadoLayout>(ESTADO_LAYOUT_VAZIO);
   const [carregou, setCarregou] = useState(false);
   const [view, setView] = useState({ escala: 0.7, x: 0, y: 0 });
   const [selecionado, setSelecionado] = useState<string | null>(null);
@@ -113,10 +142,27 @@ export function ArquiteturaCanvas({
     | null
   >(null);
 
+  // Atualização incremental: ao abrir, compara o manifesto atual com o que
+  // gerou o desenho guardado e recalcula apenas a região afetada.
   useEffect(() => {
-    setPosicoes(lerPosicoes(chavePosicoes));
+    const guardado = lerEstado(chavePosicoes);
+    const atual = assinaturaAtual(nodes);
+    const diff = calcularDiffArquitetura(guardado.assinatura, atual);
+    const resultado = aplicarDiffIncremental(nodes, guardado, diff);
+    const novo: EstadoLayout = {
+      assinatura: atual,
+      canonical: resultado.canonical,
+      overrides: resultado.overrides,
+    };
+    setEstado(novo);
+    gravarEstado(chavePosicoes, novo);
     setCarregou(true);
-  }, [chavePosicoes]);
+  }, [chavePosicoes, nodes]);
+
+  const posicoes = useMemo(
+    () => ({ ...estado.canonical, ...estado.overrides }),
+    [estado],
+  );
 
   const layout = useMemo(() => calcularLayout(nodes, posicoes), [nodes, posicoes]);
 
@@ -208,11 +254,14 @@ export function ArquiteturaCanvas({
       return;
     }
     setView((v) => {
-      setPosicoes((mapa) => ({
-        ...mapa,
-        [atual.id]: {
-          x: Math.round(atual.origemX + dx / v.escala),
-          y: Math.round(atual.origemY + dy / v.escala),
+      setEstado((anterior) => ({
+        ...anterior,
+        overrides: {
+          ...anterior.overrides,
+          [atual.id]: {
+            x: Math.round(atual.origemX + dx / v.escala),
+            y: Math.round(atual.origemY + dy / v.escala),
+          },
         },
       }));
       return v;
@@ -223,20 +272,33 @@ export function ArquiteturaCanvas({
     const atual = arrasto.current;
     arrasto.current = null;
     if (atual?.tipo === "node") {
-      setPosicoes((mapa) => {
-        gravarPosicoes(chavePosicoes, mapa);
-        return mapa;
+      setEstado((anterior) => {
+        gravarEstado(chavePosicoes, anterior);
+        return anterior;
       });
     }
   }, [chavePosicoes]);
 
   const [pedidoAjuste, setPedidoAjuste] = useState(0);
 
+  // Reorganização global: descarta o canônico antigo e as movimentações
+  // manuais, recalculando o desenho inteiro a partir do manifesto.
   const organizarAutomaticamente = useCallback(() => {
-    setPosicoes({});
-    gravarPosicoes(chavePosicoes, {});
+    const atual = assinaturaAtual(nodes);
+    const resultado = aplicarDiffIncremental(nodes, {
+      assinatura: [],
+      canonical: {},
+      overrides: {},
+    });
+    const novo: EstadoLayout = {
+      assinatura: atual,
+      canonical: resultado.canonical,
+      overrides: {},
+    };
+    setEstado(novo);
+    gravarEstado(chavePosicoes, novo);
     setPedidoAjuste((n) => n + 1);
-  }, [chavePosicoes]);
+  }, [chavePosicoes, nodes]);
 
   // Após recalcular as posições, centralizar e ajustar à tela.
   useEffect(() => {
