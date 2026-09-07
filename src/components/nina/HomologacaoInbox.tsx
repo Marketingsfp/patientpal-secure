@@ -244,19 +244,52 @@ export function HomologacaoInbox() {
     return () => definirSelecaoTeste(null);
   }, [leadId, conversaId, leads]);
 
-  const carregarLeads = useCallback(async () => {
+  const carregarLeads = useCallback(
+    async (silencioso = false) => {
+      if (!clinicaId) return;
+      if (!silencioso) setCarregando(true);
+      try {
+        const r = (await listar({ data: { clinicaId } })) as { leads: Lead[] };
+        setLeads(r.leads);
+        setLeadId((atual) => atual ?? r.leads[0]?.id ?? null);
+      } catch (e: any) {
+        if (!silencioso) mostrarErro(e);
+      } finally {
+        if (!silencioso) setCarregando(false);
+      }
+    },
+    [clinicaId, listar],
+  );
+
+  /**
+   * FASE 2 — a prévia do card acompanha as mensagens de teste em tempo real,
+   * sem recarregar a página. Só escuta mensagens desta clínica.
+   */
+  useEffect(() => {
     if (!clinicaId) return;
-    setCarregando(true);
-    try {
-      const r = (await listar({ data: { clinicaId } })) as { leads: Lead[] };
-      setLeads(r.leads);
-      setLeadId((atual) => atual ?? r.leads[0]?.id ?? null);
-    } catch (e: any) {
-      mostrarErro(e);
-    } finally {
-      setCarregando(false);
-    }
-  }, [clinicaId, listar]);
+    let pendente: ReturnType<typeof setTimeout> | null = null;
+    const canal = supabase
+      .channel(`homologacao-leads-${clinicaId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "whatsapp_mensagens",
+          filter: `clinica_id=eq.${clinicaId}`,
+        },
+        () => {
+          if (pendente) clearTimeout(pendente);
+          pendente = setTimeout(() => void carregarLeads(true), 600);
+        },
+      )
+      .subscribe();
+    return () => {
+      if (pendente) clearTimeout(pendente);
+      void supabase.removeChannel(canal);
+    };
+  }, [clinicaId, carregarLeads]);
+
 
   useEffect(() => {
     void carregarLeads();
