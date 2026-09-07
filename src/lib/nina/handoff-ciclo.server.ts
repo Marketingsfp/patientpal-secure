@@ -15,7 +15,8 @@
  * Conversas reais de produção não são tocadas por este módulo.
  */
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
-import { patchEncerrarCiclo } from "./ciclo-teste";
+import { divisorFimCiclo, patchEncerrarCiclo } from "./ciclo-teste";
+
 import { telefoneSessao } from "./teste-console.server";
 
 export type ResultadoHandoffCiclo = {
