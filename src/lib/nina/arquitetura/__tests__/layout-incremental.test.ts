@@ -133,21 +133,31 @@ describe("layout incremental", () => {
   });
 
   test("override que passa a sobrepor outro componente é descartado", () => {
-    const base = estadoInicial();
-    const alvo = NODES_ARQUITETURA.find((n) => n.seguintes.length > 0)!;
-    const vizinho = alvo.seguintes[0]!;
-    const antes: EstadoLayout = {
-      ...base,
-      overrides: { [alvo.id]: { ...base.canonical[vizinho]! } },
+    const criar = (id: string, anteriores: string[], seguintes: string[]): NodeArquitetura => ({
+      id,
+      nome: id,
+      categoria: "TOOLS",
+      descricao: "somente teste",
+      anteriores,
+      seguintes,
+      entrada: [],
+      saida: [],
+      erros: [],
+    });
+    const antesNodes = [criar("a", [], ["b"]), criar("b", ["a"], ["c"]), criar("c", ["b"], [])];
+    const inicial = aplicarDiffIncremental(antesNodes, ESTADO_LAYOUT_VAZIO);
+    const estado: EstadoLayout = {
+      assinatura: assinaturaAtual(antesNodes),
+      canonical: inicial.canonical,
+      // Movimentação manual colocada exatamente em cima de outro componente.
+      overrides: { b: { ...inicial.canonical["c"]! } },
     };
-    const nodes = clonar(NODES_ARQUITETURA);
-    nodes.find((n) => n.id === alvo.id)!.seguintes = [];
-    nodes.find((n) => n.id === vizinho)!.anteriores = nodes
-      .find((n) => n.id === vizinho)!
-      .anteriores.filter((id) => id !== alvo.id);
 
-    const resultado = aplicarDiffIncremental(nodes, antes);
-    expect(resultado.overridesDescartados).toContain(alvo.id);
+    // Conexões de "b" mudam: ele entra na região recalculada.
+    const depois = [criar("a", [], ["b", "c"]), criar("b", ["a"], []), criar("c", ["a"], [])];
+    const resultado = aplicarDiffIncremental(depois, estado);
+    expect(resultado.overridesDescartados).toContain("b");
+    expect(resultado.overrides["b"]).toBeUndefined();
   });
 
   test("override de componente removido não sobrevive", () => {
