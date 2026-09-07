@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { calcularAtencao, nivelAtencao, rotuloCentral } from "./central-atencao";
+import { calcularAtencao, itensDaCategoria, nivelAtencao, rotuloCentral } from "./central-atencao";
 
 const AGORA = Date.parse("2026-09-05T12:00:00Z");
 const haMin = (m: number) => new Date(AGORA - m * 60000).toISOString();
