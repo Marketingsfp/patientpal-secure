@@ -71,8 +71,8 @@ describe("novo ciclo após handoff", () => {
 
   it("divisores identificam fim e início de ciclo", () => {
     expect(divisorFimCiclo(19, "handoff_humano")).toBe(
-      "───── Fim do ciclo 19 — Handoff para humano ─────",
+      "───── Ciclo 19 encerrado — handoff para atendimento humano ─────",
     );
-    expect(divisorInicioCiclo(20)).toBe("───── Início do ciclo 20 ─────");
+    expect(divisorInicioCiclo(20)).toBe("───── Ciclo 20 iniciado — nova sessão da Nina ─────");
   });
 });

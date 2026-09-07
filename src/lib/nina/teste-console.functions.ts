@@ -561,3 +561,46 @@ export const detalheExecucaoTeste = createServerFn({ method: "POST" })
       eventos: lista,
     };
   });
+
+/**
+ * FASE 5 — DIAGNÓSTICO DOS CICLOS DE UM LEAD DE TESTE.
+ *
+ * Leitura de auditoria (QA): lista os ciclos do lead com `cycle_id`,
+ * `nina_session_id`, situação, motivo de encerramento, início, fim e o
+ * instante em que a memória ativa foi invalidada. Não altera nada e não
+ * apaga histórico — só prova que o reset aconteceu.
+ */
+export const diagnosticoCiclosLead = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) =>
+    z
+      .object({
+        clinicaId: z.string().uuid(),
+        leadId: z.string().uuid(),
+        limite: z.number().int().min(1).max(100).optional(),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    await assertMembership(context.supabase, context.userId, data.clinicaId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { diagnosticoCiclos, ciclosSemProvaDeReset } = await import("@/lib/nina/ciclo-teste");
+
+    const { data: linhas, error } = await supabaseAdmin
+      .from("nina_teste_ciclos")
+      .select(
+        "id, lead_id, status, sessao_seq, conversa_id, nina_session_id, started_at, ended_at, end_reason, memory_reset_at, created_at",
+      )
+      .eq("clinica_id", data.clinicaId)
+      .eq("lead_id", data.leadId)
+      .order("started_at", { ascending: false })
+      .limit(data.limite ?? 30);
+    if (error) throw new Error(error.message);
+
+    const ciclos = diagnosticoCiclos((linhas ?? []) as any[]);
+    return {
+      ciclos: ciclos.slice().reverse(),
+      totalCiclos: ciclos.length,
+      semProvaDeReset: ciclosSemProvaDeReset(ciclos).length,
+    };
+  });

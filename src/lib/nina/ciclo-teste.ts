@@ -99,6 +99,9 @@ export function patchEncerrarCiclo(motivo: MotivoFimCiclo, agoraISO?: string) {
     status: statusPorMotivo(motivo),
     end_reason: motivo,
     ended_at: agora,
+    // Encerrar o ciclo É invalidar a memória ativa: o mesmo instante serve de
+    // prova, no diagnóstico, de que o reset aconteceu.
+    memory_reset_at: agora,
     resolved_at: agora,
   } as const;
 }
@@ -144,16 +147,68 @@ export function novoNinaSessionId(cicloId: string): string {
 const ROTULO_FIM: Record<MotivoFimCiclo, string> = {
   resolvido_manual: "Resolvido manualmente",
   reiniciado: "Reiniciado",
-  handoff_humano: "Handoff para humano",
+  handoff_humano: "handoff para atendimento humano",
   cenario_concluido: "Cenário concluído",
   cancelado_usuario: "Cancelado",
   falha_tecnica: "Falha técnica",
 };
 
 export function divisorFimCiclo(sessaoSeq: number | null | undefined, motivo: MotivoFimCiclo) {
-  return `───── Fim do ciclo ${sessaoSeq ?? "?"} — ${ROTULO_FIM[motivo]} ─────`;
+  return `───── Ciclo ${sessaoSeq ?? "?"} encerrado — ${ROTULO_FIM[motivo]} ─────`;
 }
 
 export function divisorInicioCiclo(sessaoSeq: number | null | undefined) {
-  return `───── Início do ciclo ${sessaoSeq ?? "?"} ─────`;
+  return `───── Ciclo ${sessaoSeq ?? "?"} iniciado — nova sessão da Nina ─────`;
+}
+
+/* ---------------- FASE 5 — diagnóstico dos ciclos (QA) -------------------
+ * Leitura de auditoria: prova que o ciclo foi encerrado e que a memória ativa
+ * foi invalidada, sem apagar nada. Puro: recebe as linhas já lidas do banco.
+ */
+
+export type LinhaDiagnosticoCiclo = {
+  ciclo_seq: number;
+  cycle_id: string;
+  nina_session_id: string | null;
+  cycle_status: EstadoCicloTeste;
+  end_reason: string | null;
+  started_at: string | null;
+  ended_at: string | null;
+  memory_reset_at: string | null;
+  conversa_id: string | null;
+  sessao: number | null;
+  memoria_resetada: boolean;
+};
+
+export type CicloDiagnosticoRow = CicloTeste & {
+  memory_reset_at?: string | null;
+  sessao_seq?: number | null;
+  created_at?: string | null;
+};
+
+/** Ordena do ciclo mais antigo para o mais novo e numera (ciclo 1, 2, 3…). */
+export function diagnosticoCiclos(ciclos: CicloDiagnosticoRow[]): LinhaDiagnosticoCiclo[] {
+  const ordenados = [...ciclos].sort((a, b) =>
+    String(a.started_at ?? a.created_at ?? "").localeCompare(
+      String(b.started_at ?? b.created_at ?? ""),
+    ),
+  );
+  return ordenados.map((c, i) => ({
+    ciclo_seq: i + 1,
+    cycle_id: c.id,
+    nina_session_id: c.nina_session_id ?? null,
+    cycle_status: estadoCiclo(c.status),
+    end_reason: c.end_reason ?? null,
+    started_at: c.started_at ?? c.created_at ?? null,
+    ended_at: c.ended_at ?? null,
+    memory_reset_at: c.memory_reset_at ?? null,
+    conversa_id: c.conversa_id ?? null,
+    sessao: c.sessao_seq ?? null,
+    memoria_resetada: !cicloAtivo(c.status) && Boolean(c.memory_reset_at),
+  }));
+}
+
+/** Ciclos encerrados sem prova de reset — usado nas checagens de QA. */
+export function ciclosSemProvaDeReset(linhas: LinhaDiagnosticoCiclo[]): LinhaDiagnosticoCiclo[] {
+  return linhas.filter((l) => l.cycle_status !== "active" && !l.memoria_resetada);
 }
