@@ -358,7 +358,10 @@ export function HomologacaoInbox() {
           maxTurnos: r.simulacao.max_turnos ?? LIMITES_PADRAO.maxTurnos,
         });
         if (r.simulacao.cenario) setCenario(r.simulacao.cenario);
-        if (r.simulacao.persona) setPersona({ ...PERSONA_PADRAO, ...r.simulacao.persona });
+        // O objetivo do paciente simulado vem sempre do cenário atual; restaurar
+        // o objetivo de uma execução anterior faria o Terra falar de outro assunto.
+        if (r.simulacao.persona)
+          setPersona({ ...PERSONA_PADRAO, ...r.simulacao.persona, objetivo: null });
         setSimMotivo(
           r.simulacao.erro ??
             (r.simulacao.motivo_fim
@@ -413,7 +416,10 @@ export function HomologacaoInbox() {
       await carregarHistorico(leadId);
       await carregarLeads();
       if (r.erro) setErro(r.erro);
-      else if (!r.reply) setErro("A Nina não retornou resposta para esta mensagem.");
+      else if (!r.reply)
+        setErro(
+          "A Nina não respondeu. Se a conversa foi transferida para atendimento humano, use “Resolver / Reiniciar teste” antes de começar um novo teste.",
+        );
       return { ok: !r.erro && !!r.reply, transferida: !!r.transferida, erro: r.erro ?? null };
     } catch (e: any) {
       const chegou = await aguardarResposta(leadId);
@@ -494,7 +500,13 @@ export function HomologacaoInbox() {
     setSimMotivo(null);
     try {
       const r = (await iniciarSim({
-        data: { clinicaId, leadId, cenario: cenario.trim(), persona, limites },
+        data: {
+          clinicaId,
+          leadId,
+          cenario: cenario.trim(),
+          persona: { ...persona, objetivo: cenario.trim() },
+          limites,
+        },
       })) as { simulacao: { id: string; status: string; turnos: number; max_turnos: number } };
       const s = {
         id: r.simulacao.id,
@@ -1171,7 +1183,62 @@ export function HomologacaoInbox() {
                         className="h-7 w-16 rounded border border-atd-border bg-atd-surface px-1"
                       />
                     </label>
+                    <label className="flex items-center gap-1">
+                      Máx. mensagens
+                      <input
+                        type="number"
+                        min={2}
+                        max={200}
+                        value={limites.maxMensagens}
+                        disabled={terraRodando}
+                        onChange={(e) =>
+                          setLimites((l) => ({ ...l, maxMensagens: Number(e.target.value) || 2 }))
+                        }
+                        className="h-7 w-20 rounded border border-atd-border bg-atd-surface px-1"
+                      />
+                    </label>
+                    <label className="flex items-center gap-1">
+                      Créditos / mil tokens
+                      <input
+                        type="number"
+                        min={0}
+                        max={100}
+                        step={0.1}
+                        value={limites.creditosPorMilTokens}
+                        disabled={terraRodando}
+                        onChange={(e) =>
+                          setLimites((l) => ({
+                            ...l,
+                            creditosPorMilTokens: Number(e.target.value) || 0,
+                          }))
+                        }
+                        className="h-7 w-20 rounded border border-atd-border bg-atd-surface px-1"
+                      />
+                    </label>
+                    <label className="flex items-center gap-1">
+                      Máx. custo (créditos)
+                      <input
+                        type="number"
+                        min={0}
+                        max={1000}
+                        step={0.5}
+                        value={limites.maxCustoCreditos}
+                        disabled={terraRodando}
+                        onChange={(e) =>
+                          setLimites((l) => ({
+                            ...l,
+                            maxCustoCreditos: Number(e.target.value) || 0,
+                          }))
+                        }
+                        className="h-7 w-20 rounded border border-atd-border bg-atd-surface px-1"
+                      />
+                    </label>
+                    <span className="w-full text-[10px] text-muted-foreground">
+                      O custo é estimado a partir dos tokens e da taxa informada acima — o provedor
+                      não devolve preço por chamada. Deixe 0 para não limitar por custo.
+                    </span>
                   </div>
+
 
                   <div className="flex flex-wrap gap-2">
                     <Button

@@ -63,22 +63,38 @@ export const PERSONA_PADRAO: Persona = {
 
 export type Limites = {
   maxTurnos: number;
+  /** Total de mensagens da conversa (paciente + Nina) permitido no teste. */
+  maxMensagens: number;
   maxDuracaoS: number;
   maxTokens: number;
+  /**
+   * Teto de custo estimado, em créditos. Só vale quando o operador informa
+   * `creditosPorMilTokens`; o provedor não devolve preço por chamada, então
+   * este valor é uma estimativa declarada, nunca um custo medido.
+   * 0 = sem limite de custo.
+   */
+  maxCustoCreditos: number;
+  creditosPorMilTokens: number;
   timeoutS: number;
 };
 
 export const LIMITES_PADRAO: Limites = {
   maxTurnos: 8,
+  maxMensagens: 40,
   maxDuracaoS: 300,
   maxTokens: 20000,
+  maxCustoCreditos: 0,
+  creditosPorMilTokens: 0,
   timeoutS: 60,
 };
 
 export const LIMITES_MAXIMOS: Limites = {
   maxTurnos: 30,
+  maxMensagens: 200,
   maxDuracaoS: 1800,
   maxTokens: 200000,
+  maxCustoCreditos: 1000,
+  creditosPorMilTokens: 100,
   timeoutS: 180,
 };
 
@@ -87,13 +103,29 @@ export function normalizarLimites(entrada: Partial<Limites> | null | undefined):
   const l = { ...LIMITES_PADRAO, ...(entrada ?? {}) };
   const corta = (v: number, min: number, max: number) =>
     Math.max(min, Math.min(max, Math.floor(Number.isFinite(v) ? v : min)));
+  const cortaDecimal = (v: number, min: number, max: number) =>
+    Math.max(min, Math.min(max, Number.isFinite(v) ? Number(v) : min));
   return {
     maxTurnos: corta(l.maxTurnos, 1, LIMITES_MAXIMOS.maxTurnos),
+    maxMensagens: corta(l.maxMensagens, 2, LIMITES_MAXIMOS.maxMensagens),
     maxDuracaoS: corta(l.maxDuracaoS, 30, LIMITES_MAXIMOS.maxDuracaoS),
     maxTokens: corta(l.maxTokens, 500, LIMITES_MAXIMOS.maxTokens),
+    maxCustoCreditos: cortaDecimal(l.maxCustoCreditos, 0, LIMITES_MAXIMOS.maxCustoCreditos),
+    creditosPorMilTokens: cortaDecimal(
+      l.creditosPorMilTokens,
+      0,
+      LIMITES_MAXIMOS.creditosPorMilTokens,
+    ),
     timeoutS: corta(l.timeoutS, 10, LIMITES_MAXIMOS.timeoutS),
   };
 }
+
+/** Custo estimado (créditos) a partir dos tokens já gastos. 0 quando não declarado. */
+export function custoEstimado(tokens: number, creditosPorMilTokens: number): number {
+  if (!creditosPorMilTokens || creditosPorMilTokens <= 0) return 0;
+  return (Math.max(0, tokens) / 1000) * creditosPorMilTokens;
+}
+
 
 export type TurnoConversa = { autor: "paciente" | "nina"; texto: string };
 
@@ -173,6 +205,8 @@ export function pediuFim(texto: string): boolean {
 export type EstadoSimulacao = {
   status: string;
   turnos: number;
+  /** Mensagens já trocadas na conversa (paciente + Nina). */
+  mensagens?: number;
   inputTokens: number;
   outputTokens: number;
   iniciadaEm: number;
@@ -182,8 +216,10 @@ export type EstadoSimulacao = {
 export type MotivoFim =
   | "objetivo_concluido"
   | "limite_turnos"
+  | "limite_mensagens"
   | "limite_duracao"
   | "limite_tokens"
+  | "limite_custo"
   | "transferencia"
   | "erro"
   | "timeout"
@@ -197,20 +233,28 @@ export function podeContinuar(
   if (estado.status === "parada" || estado.status === "concluida")
     return { ok: false, motivo: "operador" };
   if (estado.turnos >= estado.limites.maxTurnos) return { ok: false, motivo: "limite_turnos" };
+  if ((estado.mensagens ?? 0) >= estado.limites.maxMensagens)
+    return { ok: false, motivo: "limite_mensagens" };
   if ((agora - estado.iniciadaEm) / 1000 >= estado.limites.maxDuracaoS)
     return { ok: false, motivo: "limite_duracao" };
-  if (estado.inputTokens + estado.outputTokens >= estado.limites.maxTokens)
-    return { ok: false, motivo: "limite_tokens" };
+  const tokens = estado.inputTokens + estado.outputTokens;
+  if (tokens >= estado.limites.maxTokens) return { ok: false, motivo: "limite_tokens" };
+  const teto = estado.limites.maxCustoCreditos;
+  if (teto > 0 && custoEstimado(tokens, estado.limites.creditosPorMilTokens) >= teto)
+    return { ok: false, motivo: "limite_custo" };
   return { ok: true };
 }
 
 export const ROTULO_MOTIVO: Record<MotivoFim, string> = {
   objetivo_concluido: "Paciente simulado encerrou: objetivo concluído.",
   limite_turnos: "Limite de turnos atingido.",
+  limite_mensagens: "Limite de mensagens da conversa atingido.",
   limite_duracao: "Limite de duração atingido.",
   limite_tokens: "Limite de tokens atingido.",
+  limite_custo: "Limite de custo estimado atingido.",
   transferencia: "A Nina transferiu para atendimento humano.",
   erro: "Erro durante a simulação.",
   timeout: "Tempo de espera excedido.",
   operador: "Interrompido pelo operador.",
 };
+

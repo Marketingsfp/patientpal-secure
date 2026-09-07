@@ -9439,6 +9439,7 @@ export type Database = {
           output_tokens: number
           perfil: string
           plano: Json
+          provedor_gerador: string | null
           retries: number
           status: string
           sucesso: number
@@ -9469,6 +9470,7 @@ export type Database = {
           output_tokens?: number
           perfil?: string
           plano?: Json
+          provedor_gerador?: string | null
           retries?: number
           status?: string
           sucesso?: number
@@ -9499,6 +9501,7 @@ export type Database = {
           output_tokens?: number
           perfil?: string
           plano?: Json
+          provedor_gerador?: string | null
           retries?: number
           status?: string
           sucesso?: number
@@ -10035,19 +10038,23 @@ export type Database = {
           clinica_id: string
           conversa_id: string | null
           created_at: string
+          creditos_por_mil_tokens: number
           criado_por: string | null
           erro: string | null
           finalizado_em: string | null
           id: string
           input_tokens: number
           lead_id: string
+          max_custo_creditos: number
           max_duracao_s: number
+          max_mensagens: number
           max_tokens: number
           max_turnos: number
           modelo: string
           motivo_fim: string | null
           output_tokens: number
           persona: Json
+          provedor: string | null
           status: string
           timeout_s: number
           turnos: number
@@ -10059,19 +10066,23 @@ export type Database = {
           clinica_id: string
           conversa_id?: string | null
           created_at?: string
+          creditos_por_mil_tokens?: number
           criado_por?: string | null
           erro?: string | null
           finalizado_em?: string | null
           id?: string
           input_tokens?: number
           lead_id: string
+          max_custo_creditos?: number
           max_duracao_s?: number
+          max_mensagens?: number
           max_tokens?: number
           max_turnos?: number
           modelo: string
           motivo_fim?: string | null
           output_tokens?: number
           persona?: Json
+          provedor?: string | null
           status?: string
           timeout_s?: number
           turnos?: number
@@ -10083,19 +10094,23 @@ export type Database = {
           clinica_id?: string
           conversa_id?: string | null
           created_at?: string
+          creditos_por_mil_tokens?: number
           criado_por?: string | null
           erro?: string | null
           finalizado_em?: string | null
           id?: string
           input_tokens?: number
           lead_id?: string
+          max_custo_creditos?: number
           max_duracao_s?: number
+          max_mensagens?: number
           max_tokens?: number
           max_turnos?: number
           modelo?: string
           motivo_fim?: string | null
           output_tokens?: number
           persona?: Json
+          provedor?: string | null
           status?: string
           timeout_s?: number
           turnos?: number
