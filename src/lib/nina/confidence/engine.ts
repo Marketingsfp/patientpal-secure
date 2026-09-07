@@ -12,9 +12,17 @@ import { detectarCategorias, type CategoriaConfianca } from "../confidence-engin
 import {
   executarValidadoresDeConfianca,
   riscoDaAcao,
-  MINIMO_POR_RISCO,
   type ConfigValidadores,
 } from "./validators";
+import {
+  aplicarPolitica,
+  detectarHardBlockers,
+  nivelDaPontuacao,
+  pontuarValidadores,
+  POLITICA_PADRAO,
+  type HardBlocker,
+  type PoliticaConfianca,
+} from "./policy";
 import type {
   Bloqueador,
   ContextoConfianca,
@@ -26,11 +34,9 @@ import type {
   Verificacao,
 } from "./types";
 
-export const LIMITE_HIGH = 80;
-export const LIMITE_MEDIUM = 50;
-
-/** Ações que gravam algo de verdade — bloqueio nelas é BLOCK_ACTION. */
-const ACOES_DE_ESCRITA = new Set(["criar_agendamento", "cancelar_agendamento"]);
+/** Faixas da política central (mantidas exportadas por compatibilidade). */
+export const LIMITE_HIGH = POLITICA_PADRAO.limites.HIGH;
+export const LIMITE_MEDIUM = POLITICA_PADRAO.limites.MEDIUM;
 
 const CAP_CATALOGO = new Set(["searchKnowledgeBase", "listCatalog"]);
 const CAP_AGENDA = new Set(["checkAvailability", "createAppointment"]);
@@ -200,7 +206,7 @@ export function executarValidadores(ctx: ContextoConfianca): Verificacao[] {
       "consulta_realizada",
       "Houve consulta ao sistema para embasar a afirmação",
       cats.length === 0 || ctx.toolResults.length > 0 || ctx.retrievedSources.some(fonteUtil),
-      45,
+      POLITICA_PADRAO.penalidades["consulta_realizada"] ?? 0,
     ),
   );
 
@@ -210,7 +216,7 @@ export function executarValidadores(ctx: ContextoConfianca): Verificacao[] {
         "paciente_identificado",
         "Dado do paciente citado com identificação confirmada",
         ctx.businessContext.pacienteIdentificado,
-        30,
+        POLITICA_PADRAO.penalidades["paciente_identificado"] ?? 0,
       ),
     );
   }
@@ -220,21 +226,19 @@ export function executarValidadores(ctx: ContextoConfianca): Verificacao[] {
       "foco_da_resposta",
       "Resposta não acumula afirmações sensíveis demais",
       cats.length < 3,
-      15,
+      POLITICA_PADRAO.penalidades["foco_da_resposta"] ?? 0,
     ),
   );
 
   if (ctx.draftText !== undefined && ctx.draftText !== null) {
-    checks.push(check("resposta_nao_vazia", "A resposta tem conteúdo", ctx.draftText.trim().length > 0, 60));
+    checks.push(check("resposta_nao_vazia", "A resposta tem conteúdo", ctx.draftText.trim().length > 0, POLITICA_PADRAO.penalidades["resposta_nao_vazia"] ?? 0));
   }
 
   return checks;
 }
 
-function nivel(score: number): NivelConfianca {
-  if (score >= LIMITE_HIGH) return "HIGH";
-  if (score >= LIMITE_MEDIUM) return "MEDIUM";
-  return "LOW";
+function nivel(score: number, politica: PoliticaConfianca = POLITICA_PADRAO): NivelConfianca {
+  return nivelDaPontuacao(score, politica);
 }
 
 /**
@@ -243,7 +247,7 @@ function nivel(score: number): NivelConfianca {
  */
 export function decidirConfianca(
   ctx: ContextoConfianca,
-  opcoes: { config?: ConfigValidadores; agora?: Date } = {},
+  opcoes: { config?: ConfigValidadores; agora?: Date; politica?: PoliticaConfianca } = {},
 ): ResultadoConfianca {
   const cats = categoriasDoContexto(ctx);
   const checks = executarValidadores(ctx);
@@ -269,49 +273,60 @@ export function decidirConfianca(
     );
   }
 
+  const politica = opcoes.politica ?? POLITICA_PADRAO;
   const reprovados = checks.filter((c) => !c.aprovado);
   const blockers = [...new Set(reprovados.map((c) => c.bloqueador).filter(Boolean))] as Bloqueador[];
-
-  const desconto = reprovados
-    .filter((c) => !c.bloqueador)
-    .reduce((soma, c) => soma + c.peso, 0);
-  let score = blockers.length > 0 ? 0 : Math.max(0, Math.min(100, 100 - desconto));
 
   const motivos = reprovados.map((c) => (c.detalhe ? `${c.descricao} — ${c.detalhe}` : c.descricao));
 
   // Handoff já pedido pelo modelo: o pipeline de transferência assume o turno.
   if (ctx.businessContext.handoffSolicitado) {
-    score = 100;
     return {
-      score,
+      score: 100,
       level: "HIGH",
       decision: "ALLOW",
       blockers: [],
+      hardBlockers: [],
       checks,
       validators,
       evidence: montarEvidencia(ctx, cats, ["handoff já solicitado pelo runtime"]),
     };
   }
 
-  const minimoRisco = MINIMO_POR_RISCO[riscoDaAcao(ctx)];
+  const risco = riscoDaAcao(ctx);
+  const hardBlockers: HardBlocker[] = detectarHardBlockers(
+    { bloqueadores: blockers, validators, risco },
+    politica,
+  );
 
-  let decision: DecisaoMotor;
-  if (blockers.length > 0) {
-    decision = ACOES_DE_ESCRITA.has(ctx.requestedAction) ? "BLOCK_ACTION" : "HANDOFF";
-  } else {
-    const nv = nivel(score);
-    if (nv === "HIGH" && score >= minimoRisco) decision = "ALLOW";
-    else if (nv === "LOW") decision = "HANDOFF";
-    else decision = ctx.businessContext.esclarecimentoUsado ? "HANDOFF" : "CLARIFY";
-  }
+  // Pontuação: validadores ponderados pela política, menos as penalidades
+  // graduais (verificações que descontam sem bloquear).
+  const scoreValidadores = pontuarValidadores(validators, politica);
+  const penalidade = reprovados
+    .filter((c) => !c.bloqueador)
+    .reduce((soma, c) => soma + c.peso, 0);
+
+  const { score, level, decision } = aplicarPolitica(
+    {
+      scoreValidadores,
+      penalidade,
+      bloqueadores: blockers,
+      hardBlockers,
+      risco,
+      acao: ctx.requestedAction,
+      esclarecimentoUsado: ctx.businessContext.esclarecimentoUsado,
+    },
+    politica,
+  );
 
   if (motivos.length === 0) motivos.push("evidências suficientes no sistema");
 
   return {
     score,
-    level: nivel(score),
+    level,
     decision,
     blockers,
+    hardBlockers,
     checks,
     validators,
     evidence: montarEvidencia(ctx, cats, motivos),
