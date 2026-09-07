@@ -161,7 +161,14 @@ function Pagina() {
           </Card>
 
           <div id="instrucoes-nina" className="scroll-mt-24">
-            <InstrucoesNina />
+            {clinicaId && podeArquitetura(capacidades, "nina.instrucoes.ver") ? (
+              <InstrucoesNina
+                clinicaId={clinicaId}
+                podeEditar={podeArquitetura(capacidades, "nina.instrucoes.editar")}
+                podePublicar={podeArquitetura(capacidades, "nina.instrucoes.publicar")}
+                podeHistorico={podeArquitetura(capacidades, "nina.instrucoes.historico")}
+              />
+            ) : null}
           </div>
 
         </TabsContent>
@@ -347,7 +354,8 @@ function MudancasDoPrompt() {
   const buscar = useServerFn(historicoInstrucoesNina);
   const { data, isLoading } = useQuery({
     queryKey: ["nina-instrucoes-historico", "whatsapp"],
-    queryFn: () => buscar({ data: { escopo: "whatsapp" as const } }),
+    queryFn: () => buscar({ data: { clinicaId: clinicaId!, escopo: "whatsapp" as const } }),
+    enabled: !!clinicaId,
   });
 
   const publicadas = (data ?? [])

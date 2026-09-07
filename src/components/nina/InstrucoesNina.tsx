@@ -377,7 +377,7 @@ function HistoricoVersoes({
                     <Button
                       size="sm"
                       variant="secondary"
-                      disabled={restaurando}
+                      disabled={restaurando || !podeRestaurar}
                       onClick={() => setConfirmarRestauro(v)}
                     >
                       Restaurar como nova versão
