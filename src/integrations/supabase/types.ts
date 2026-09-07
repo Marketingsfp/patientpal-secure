@@ -8693,6 +8693,7 @@ export type Database = {
           aplicado_em: string | null
           aplicado_por: string | null
           auditoria_status: string | null
+          avaliacao_id: string | null
           categoria: string
           clinica_id: string
           conversa_id: string | null
@@ -8719,6 +8720,8 @@ export type Database = {
           origem: string
           pergunta_texto: string | null
           prioridade: string | null
+          prompt_versao: number | null
+          regressao_cenario_id: string | null
           reportado_por: string
           revertido_em: string | null
           revertido_por: string | null
@@ -8726,6 +8729,12 @@ export type Database = {
           revisado_por: string | null
           root_cause: string | null
           status: string
+          teste_cenario_id: string | null
+          teste_evidencia: Json | null
+          teste_execucao_id: string | null
+          teste_lead_indice: number | null
+          teste_tipo: string | null
+          trace_ids: string[] | null
           unidade_id: string | null
           updated_at: string
           validacao_em: string | null
@@ -8739,6 +8748,7 @@ export type Database = {
           aplicado_em?: string | null
           aplicado_por?: string | null
           auditoria_status?: string | null
+          avaliacao_id?: string | null
           categoria: string
           clinica_id: string
           conversa_id?: string | null
@@ -8765,6 +8775,8 @@ export type Database = {
           origem?: string
           pergunta_texto?: string | null
           prioridade?: string | null
+          prompt_versao?: number | null
+          regressao_cenario_id?: string | null
           reportado_por: string
           revertido_em?: string | null
           revertido_por?: string | null
@@ -8772,6 +8784,12 @@ export type Database = {
           revisado_por?: string | null
           root_cause?: string | null
           status?: string
+          teste_cenario_id?: string | null
+          teste_evidencia?: Json | null
+          teste_execucao_id?: string | null
+          teste_lead_indice?: number | null
+          teste_tipo?: string | null
+          trace_ids?: string[] | null
           unidade_id?: string | null
           updated_at?: string
           validacao_em?: string | null
@@ -8785,6 +8803,7 @@ export type Database = {
           aplicado_em?: string | null
           aplicado_por?: string | null
           auditoria_status?: string | null
+          avaliacao_id?: string | null
           categoria?: string
           clinica_id?: string
           conversa_id?: string | null
@@ -8811,6 +8830,8 @@ export type Database = {
           origem?: string
           pergunta_texto?: string | null
           prioridade?: string | null
+          prompt_versao?: number | null
+          regressao_cenario_id?: string | null
           reportado_por?: string
           revertido_em?: string | null
           revertido_por?: string | null
@@ -8818,6 +8839,12 @@ export type Database = {
           revisado_por?: string | null
           root_cause?: string | null
           status?: string
+          teste_cenario_id?: string | null
+          teste_evidencia?: Json | null
+          teste_execucao_id?: string | null
+          teste_lead_indice?: number | null
+          teste_tipo?: string | null
+          trace_ids?: string[] | null
           unidade_id?: string | null
           updated_at?: string
           validacao_em?: string | null
@@ -8825,6 +8852,20 @@ export type Database = {
           validacao_status?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "nina_fb_avaliacao_fk"
+            columns: ["avaliacao_id"]
+            isOneToOne: false
+            referencedRelation: "nina_teste_avaliacoes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nina_fb_regressao_cenario_fk"
+            columns: ["regressao_cenario_id"]
+            isOneToOne: false
+            referencedRelation: "nina_teste_cenarios"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "nina_feedback_erros_clinica_id_fkey"
             columns: ["clinica_id"]
@@ -9567,6 +9608,8 @@ export type Database = {
           max_turnos: number
           nome: string
           objetivo: string
+          origem_avaliacao_id: string | null
+          origem_feedback_id: string | null
           persona: Json
           precondicoes: string | null
           status: string
@@ -9586,6 +9629,8 @@ export type Database = {
           max_turnos?: number
           nome: string
           objetivo: string
+          origem_avaliacao_id?: string | null
+          origem_feedback_id?: string | null
           persona?: Json
           precondicoes?: string | null
           status?: string
@@ -9605,6 +9650,8 @@ export type Database = {
           max_turnos?: number
           nome?: string
           objetivo?: string
+          origem_avaliacao_id?: string | null
+          origem_feedback_id?: string | null
           persona?: Json
           precondicoes?: string | null
           status?: string
@@ -9618,6 +9665,20 @@ export type Database = {
             columns: ["clinica_id"]
             isOneToOne: false
             referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nina_teste_cenarios_origem_avaliacao_fk"
+            columns: ["origem_avaliacao_id"]
+            isOneToOne: false
+            referencedRelation: "nina_teste_avaliacoes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nina_teste_cenarios_origem_feedback_fk"
+            columns: ["origem_feedback_id"]
+            isOneToOne: false
+            referencedRelation: "nina_feedback_erros"
             referencedColumns: ["id"]
           },
         ]
