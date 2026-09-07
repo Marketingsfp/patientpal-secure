@@ -221,8 +221,11 @@ export const reportarErroRapidoMensagemNina = createServerFn({ method: "POST" })
             protocoloAtendimento: conv.protocolo_atendimento,
             protocoloSessaoId: conv.protocolo_sessao_id,
             testeCicloId: conv.teste_ciclo_id,
-            promptVersaoId: execucao?.prompt_versao_id ?? null,
-            promptVersao: execucao?.prompt_versao ?? null,
+            promptVersaoId:
+              (execucao as { prompt_versao_id?: string | null } | null)?.prompt_versao_id ?? null,
+            promptVersao:
+              (execucao as { prompt_versao?: number | null } | null)?.prompt_versao ?? null,
+
             traceId,
           },
         }) as never,
