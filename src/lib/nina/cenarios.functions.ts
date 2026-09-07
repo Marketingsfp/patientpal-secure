@@ -534,14 +534,30 @@ export const finalizarItemExecucao = createServerFn({ method: "POST" })
       .eq("id", (item as any).simulacao_id ?? "00000000-0000-0000-0000-000000000000")
       .maybeSingle();
 
+    if (data.handoffCliente) transferida = true;
+
     const criterios = ((item as any).cenario_snapshot?.criterios ?? []) as Criterio[];
-    const { resultado, avaliados } = avaliarCenario(criterios, {
+    const base = avaliarCenario(criterios, {
       respostasNina,
       ferramentas,
       transferida,
       houveErro,
       turnos: (sim as any)?.turnos ?? 0,
     });
+
+    // Handoff é o fim do ciclo automatizado. PASS/FAIL depende do esperado.
+    const esperado =
+      typeof (item as any).handoff_esperado === "boolean"
+        ? ((item as any).handoff_esperado as boolean)
+        : handoffEsperado((item as any).cenario_snapshot ?? {});
+    const desfecho: DesfechoCenario = desfechoDoItem({
+      transferida,
+      erro: data.erroCliente ?? null,
+      interrompido: !!data.interrompido,
+      turnosUsados: data.turnosUsados ?? (sim as any)?.turnos ?? 0,
+      maxTurnos: Number((item as any).cenario_snapshot?.max_turnos ?? 0),
+    });
+    const { resultado, avaliados } = aplicarRegraHandoff(base, { desfecho, esperado });
 
     const agora = new Date().toISOString();
     await supabaseAdmin
@@ -550,6 +566,8 @@ export const finalizarItemExecucao = createServerFn({ method: "POST" })
         status: data.erroCliente ? "erro" : "concluido",
         resultado,
         criterios_resultado: avaliados,
+        desfecho,
+        handoff_esperado: esperado,
         mensagens,
         turnos: (sim as any)?.turnos ?? 0,
         input_tokens: inputTokens + ((sim as any)?.input_tokens ?? 0),
@@ -560,11 +578,66 @@ export const finalizarItemExecucao = createServerFn({ method: "POST" })
         ferramentas,
         transferida,
         conversa_id: conversaId,
-        ciclo_id: (lead as any)?.ciclo_id ?? null,
+        ciclo_id: cicloId,
         erro: data.erroCliente ?? null,
         finalizado_em: agora,
       })
       .eq("id", (item as any).id);
+
+    // Cleanup do ciclo deste lead: encerra (histórico preservado) e libera o
+    // lead para o próximo cenário, sem tocar em nenhum outro lead.
+    if (lead) {
+      const { patchEncerrarCiclo } = await import("@/lib/nina/ciclo-teste");
+      if ((lead as any).conversa_id) {
+        await supabaseAdmin
+          .from("atend_conversas")
+          .update({
+            status: "finished",
+            owner_type: "NONE",
+            ai_enabled: false,
+            nina_fluxo_estado: null,
+            patient_response_deadline: null,
+            closed_at: agora,
+            resolved_at: agora,
+          })
+          .eq("clinica_id", data.clinicaId)
+          .eq("id", (lead as any).conversa_id);
+      }
+      if (cicloId) {
+        await supabaseAdmin
+          .from("nina_teste_ciclos")
+          .update({
+            ...patchEncerrarCiclo(MOTIVO_CICLO_POR_DESFECHO[desfecho], agora),
+            resolvido_por: context.userId,
+          } as never)
+          .eq("clinica_id", data.clinicaId)
+          .eq("id", cicloId)
+          .eq("status", "ativo");
+      }
+      const proxima = ((lead as any).sessao_seq ?? 1) + 1;
+      await supabaseAdmin
+        .from("nina_teste_leads")
+        .update({
+          sessao_seq: proxima,
+          telefone_sessao: telefoneSessao((lead as any).indice, proxima),
+          conversa_id: null,
+          ciclo_id: null,
+          ciclo_iniciado_em: null,
+          resolvido_em: agora,
+          status: "ativa",
+        })
+        .eq("clinica_id", data.clinicaId)
+        .eq("id", (lead as any).id);
+
+      // Nenhuma simulação de paciente pode continuar viva após o cenário.
+      await supabaseAdmin
+        .from("nina_teste_simulacoes")
+        .update({ status: "parada", finalizado_em: agora, motivo_fim: desfecho })
+        .eq("clinica_id", data.clinicaId)
+        .eq("lead_id", (lead as any).id)
+        .in("status", ["executando", "pausada"]);
+    }
+
 
     // Atualiza os totais da execução e fecha quando não sobra item pendente.
     const { data: irmaos } = await supabaseAdmin
