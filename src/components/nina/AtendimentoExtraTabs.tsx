@@ -132,7 +132,7 @@ import {
   deveRegistrarLeituraDeNovas,
 } from "@/lib/atendimento/leitura-inbox";
 
-import { FilaHumana } from "@/components/nina/FilaHumana";
+
 import { idConversaValido } from "@/lib/atendimento/abrir-conversa";
 import { assinarSelecaoConversa } from "@/lib/webmcp/selecao-conversa";
 import { AgendaConversaDrawer } from "@/components/nina/AgendaConversaDrawer";
@@ -2361,14 +2361,10 @@ export function AtendInbox() {
                 </Button>
               </div>
             )}
-            <FilaHumana
-              onAssumida={(id) => {
-                const c = convs.find((x: any) => x.id === id);
-                if (c) setSel({ ...c, owner_type: "HUMAN", status: "active" });
-                abrirConversa(id);
-                void carregarConvs();
-              }}
-            />
+            {/* FASE 2 — bloco visual de "Não atribuídas" removido da sidebar
+                para liberar espaço vertical. A fila continua existindo no
+                backend e é acompanhada pela Central de Atenção. */}
+
           </div>
           <CardHeader className="py-2 space-y-2">
             <div className="flex items-center gap-2">
@@ -2438,14 +2434,16 @@ export function AtendInbox() {
               onOpenChange={setPainelMenuAberto}
             >
               <SelectTrigger className="h-8 text-xs" aria-label="Escopo das conversas">
-                <SelectValue />
+                <SelectValue placeholder="Não atribuídas" />
+
               </SelectTrigger>
               <SelectContent className="z-50 min-w-[--radix-select-trigger-width]">
                 <SelectItem value="minhas">Minhas conversas ({contadores.minhas})</SelectItem>
                 <SelectItem value="nina">Nina ({contadores.nina})</SelectItem>
-                <SelectItem value="nao_atribuidas">
-                  Não atribuídas ({contadores.nao_atribuidas})
-                </SelectItem>
+                {/* FASE 2 — "Não atribuídas" saiu da interface comum da Inbox:
+                    a fila é consultada pela Central de Atenção no cabeçalho.
+                    O escopo continua existindo e é ativado por ela. */}
+
                 <SelectItem value="fechadas">Fechadas ({contadores.fechadas})</SelectItem>
                 {souGestor && (
                   <SelectItem value="equipe">Equipe ({contadores.equipe})</SelectItem>
