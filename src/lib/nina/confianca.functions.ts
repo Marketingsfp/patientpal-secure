@@ -314,6 +314,7 @@ export const metricasConfiabilidadeNina = createServerFn({ method: "POST" })
 
 // ------------------------------------------------ FASE 9: autoavaliação
 
+import type { Json } from "@/integrations/supabase/types";
 import {
   calibrar,
   type ErroCalibracao,
@@ -441,7 +442,7 @@ export type PropostaConfiancaView = {
   valor_atual: string | null;
   valor_sugerido: string | null;
   justificativa: string;
-  evidencia: unknown;
+  evidencia: { amostra?: number; comErro?: number; taxaErro?: number };
   status: string;
   created_at: string;
   decidido_em: string | null;
@@ -462,7 +463,13 @@ export const listarPropostasConfianca = createServerFn({ method: "POST" })
       .order("created_at", { ascending: false })
       .limit(100);
     if (error) throw new Error(error.message);
-    return (rows ?? []) as PropostaConfiancaView[];
+    return (rows ?? []).map((r) => {
+      const row = r as Record<string, unknown>;
+      return {
+        ...(row as unknown as Omit<PropostaConfiancaView, "evidencia">),
+        evidencia: (row["evidencia"] ?? {}) as PropostaConfiancaView["evidencia"],
+      };
+    });
   });
 
 /** Registra as sugestões do relatório como PENDENTES de revisão humana. */
@@ -501,7 +508,7 @@ export const registrarPropostasConfianca = createServerFn({ method: "POST" })
       valor_atual: p.valorAtual == null ? null : String(p.valorAtual),
       valor_sugerido: p.valorSugerido == null ? null : String(p.valorSugerido),
       justificativa: p.justificativa,
-      evidencia: p.evidencia as Record<string, unknown>,
+      evidencia: p.evidencia as unknown as Json,
       origem: "calibracao_automatica",
       status: "pendente",
     }));
@@ -530,7 +537,14 @@ export const decidirPropostaConfianca = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }): Promise<{ status: string }> => {
     const agora = new Date().toISOString();
-    const patch: Record<string, unknown> =
+    const patch: Partial<{
+      status: string;
+      decidido_por: string;
+      decidido_em: string;
+      motivo_decisao: string | null;
+      aplicado_por: string;
+      aplicado_em: string;
+    }> =
       data.decisao === "aplicada"
         ? { status: "aplicada", aplicado_por: context.userId, aplicado_em: agora }
         : {
