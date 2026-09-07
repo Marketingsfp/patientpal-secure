@@ -89,3 +89,13 @@ describe("leads-resumo", () => {
     expect(previaTexto("a".repeat(300)).length).toBe(120);
   });
 });
+
+describe("rótulo do autor na prévia", () => {
+  it("mostra Paciente, Nina e Atendente", async () => {
+    const { rotuloAutorResumo } = await import("@/lib/nina/leads-resumo");
+    expect(rotuloAutorResumo("paciente")).toBe("Paciente");
+    expect(rotuloAutorResumo("nina")).toBe("Nina");
+    expect(rotuloAutorResumo("atendente")).toBe("Atendente");
+    expect(rotuloAutorResumo(null)).toBe("");
+  });
+});

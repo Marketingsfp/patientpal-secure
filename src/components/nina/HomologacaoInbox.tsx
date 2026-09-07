@@ -86,6 +86,9 @@ import { useChatScroll } from "@/hooks/use-chat-scroll";
 import { formatarDataHoraMensagem } from "@/lib/atendimento/data-hora";
 import { definirSelecaoTeste } from "@/lib/webmcp/selecao-teste";
 import { assinarAtualizacao } from "@/lib/webmcp/atualizacao";
+import { rotuloAutorResumo } from "@/lib/nina/leads-resumo";
+import { supabase } from "@/integrations/supabase/client";
+
 
 type Lead = {
   id: string;
@@ -97,7 +100,13 @@ type Lead = {
   cicloId?: string | null;
   status: string;
   mensagens: number;
+  /** FASE 2 — resumo da última mensagem conversacional (paciente ou Nina). */
+  ultimaMensagemTexto?: string | null;
+  ultimaMensagemAutor?: "paciente" | "nina" | "atendente" | null;
+  ultimaMensagemEm?: string | null;
+  naoLidas?: number;
 };
+
 
 type Msg = {
   id: string;
@@ -235,19 +244,52 @@ export function HomologacaoInbox() {
     return () => definirSelecaoTeste(null);
   }, [leadId, conversaId, leads]);
 
-  const carregarLeads = useCallback(async () => {
+  const carregarLeads = useCallback(
+    async (silencioso = false) => {
+      if (!clinicaId) return;
+      if (!silencioso) setCarregando(true);
+      try {
+        const r = (await listar({ data: { clinicaId } })) as { leads: Lead[] };
+        setLeads(r.leads);
+        setLeadId((atual) => atual ?? r.leads[0]?.id ?? null);
+      } catch (e: any) {
+        if (!silencioso) mostrarErro(e);
+      } finally {
+        if (!silencioso) setCarregando(false);
+      }
+    },
+    [clinicaId, listar],
+  );
+
+  /**
+   * FASE 2 — a prévia do card acompanha as mensagens de teste em tempo real,
+   * sem recarregar a página. Só escuta mensagens desta clínica.
+   */
+  useEffect(() => {
     if (!clinicaId) return;
-    setCarregando(true);
-    try {
-      const r = (await listar({ data: { clinicaId } })) as { leads: Lead[] };
-      setLeads(r.leads);
-      setLeadId((atual) => atual ?? r.leads[0]?.id ?? null);
-    } catch (e: any) {
-      mostrarErro(e);
-    } finally {
-      setCarregando(false);
-    }
-  }, [clinicaId, listar]);
+    let pendente: ReturnType<typeof setTimeout> | null = null;
+    const canal = supabase
+      .channel(`homologacao-leads-${clinicaId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "whatsapp_mensagens",
+          filter: `clinica_id=eq.${clinicaId}`,
+        },
+        () => {
+          if (pendente) clearTimeout(pendente);
+          pendente = setTimeout(() => void carregarLeads(true), 600);
+        },
+      )
+      .subscribe();
+    return () => {
+      if (pendente) clearTimeout(pendente);
+      void supabase.removeChannel(canal);
+    };
+  }, [clinicaId, carregarLeads]);
+
 
   useEffect(() => {
     void carregarLeads();
@@ -735,9 +777,25 @@ export function HomologacaoInbox() {
                   {l.conversaId ? "conversa ativa" : "nova"}
                 </Badge>
               </div>
+              {l.ultimaMensagemTexto ? (
+                <div className="mt-1.5" data-testid="previa-lead-teste">
+                  <p className="line-clamp-2 text-xs leading-snug text-foreground/80">
+                    <span className="font-medium text-foreground">
+                      {rotuloAutorResumo(l.ultimaMensagemAutor ?? null)}:
+                    </span>{" "}
+                    {l.ultimaMensagemTexto}
+                  </p>
+                  <p className="mt-0.5 text-[11px] text-muted-foreground">
+                    {formatarDataHoraMensagem(l.ultimaMensagemEm)}
+                  </p>
+                </div>
+              ) : (
+                <p className="mt-1.5 text-xs italic text-muted-foreground">Sem mensagens ainda</p>
+              )}
               <div className="mt-1 min-h-[16px] truncate text-xs text-muted-foreground">
                 sessão {l.sessao} · {l.mensagens} mensagens
               </div>
+
               <div className="mt-0.5 min-h-[14px] font-mono text-[11px] text-muted-foreground">
                 {l.telefone} (virtual)
               </div>

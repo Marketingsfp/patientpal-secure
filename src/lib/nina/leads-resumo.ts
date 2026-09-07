@@ -136,3 +136,11 @@ export function resumirLeads(
 
   return resumo;
 }
+
+/** Rótulo curto do autor exibido na prévia do card. */
+export function rotuloAutorResumo(autor: AutorResumo | null): string {
+  if (autor === "paciente") return "Paciente";
+  if (autor === "nina") return "Nina";
+  if (autor === "atendente") return "Atendente";
+  return "";
+}
