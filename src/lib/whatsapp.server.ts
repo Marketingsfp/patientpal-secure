@@ -992,6 +992,21 @@ ${procs || "(nenhum)"}`;
   );
   const systemPrompt = instrucoesNina.texto;
 
+  // FASE 6 — rastreabilidade: guarda a REFERÊNCIA da versão usada nesta
+  // execução (não o texto). Mensagens antigas continuam mostrando a versão
+  // que valia na época, mesmo depois de novas publicações.
+  {
+    const { registrarPromptDaExecucao } = await import("@/lib/nina/evidencias.server");
+    registrarPromptDaExecucao({
+      escopo: "whatsapp",
+      versaoId: instrucoesNina.versaoId,
+      versao: instrucoesNina.versao,
+      publicadoEm: instrucoesNina.publicadoEm,
+      origem: instrucoesNina.origem,
+      conversaId: estadoId.conversaId ?? null,
+    });
+  }
+
   // ---------------------------------------------------------------- agendar
   // Quando a flag está ligada nesta clínica, a Nina deixa de ser somente
   // leitura: ela consulta a agenda REAL e marca, usando o mesmo núcleo de
