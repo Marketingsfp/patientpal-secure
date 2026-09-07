@@ -430,6 +430,87 @@ export function ArquiteturaCanvas({
         </span>
       </div>
 
+      {/* FASE 7 — busca e filtro por categoria: apenas visual. */}
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="relative">
+          <Search className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            value={termoBusca}
+            onChange={(evento) => setTermoBusca(evento.target.value)}
+            onKeyDown={(evento) => {
+              if (evento.key === "Enter") {
+                const primeiro = layout.nodes.find((n) => resultadosBusca.has(n.node.id));
+                if (primeiro) centralizarEm(primeiro.node.id);
+              }
+            }}
+            placeholder="Buscar node..."
+            aria-label="Buscar node"
+            className="h-8 w-56 pl-7 text-xs"
+          />
+        </div>
+        {termoBusca ? (
+          <>
+            <span className="text-xs text-muted-foreground">
+              {resultadosBusca.size} encontrado{resultadosBusca.size === 1 ? "" : "s"}
+            </span>
+            {[...resultadosBusca].slice(0, 6).map((id) => (
+              <Button
+                key={id}
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-7 text-xs"
+                onClick={() => centralizarEm(id)}
+              >
+                {mapaPosicionado.get(id)?.node.nome ?? id}
+              </Button>
+            ))}
+          </>
+        ) : null}
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2">
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="h-7 text-xs"
+          onClick={() => setCategoriasOcultas(new Set())}
+        >
+          Mostrar tudo
+        </Button>
+        {CATEGORIAS_ARQUITETURA.map((categoria: CategoriaArquitetura) => {
+          const marcada = !categoriasOcultas.has(categoria);
+          return (
+            <label
+              key={categoria}
+              className="inline-flex cursor-pointer items-center gap-1.5 rounded-full border px-2 py-0.5 text-[11px] text-muted-foreground"
+            >
+              <input
+                type="checkbox"
+                checked={marcada}
+                onChange={() =>
+                  setCategoriasOcultas((atual) => {
+                    const proximo = new Set(atual);
+                    if (proximo.has(categoria)) proximo.delete(categoria);
+                    else proximo.add(categoria);
+                    return proximo;
+                  })
+                }
+                className="h-3 w-3 accent-[var(--primary)]"
+              />
+              <span
+                className="h-2 w-2 rounded-full"
+                style={{ backgroundColor: CORES_CATEGORIA[categoria] }}
+              />
+              {categoria}
+            </label>
+          );
+        })}
+      </div>
+
+
+
       <div
         ref={areaRef}
         onWheel={onWheel}
