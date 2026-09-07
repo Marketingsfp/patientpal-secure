@@ -10,18 +10,6 @@
 const CANAL_TESTE = "test-console";
 const TOTAL_LEADS = 10;
 
-async function assertMembership(supabase: any, userId: string, clinicaId: string) {
-  const { data, error } = await supabase
-    .from("clinica_memberships")
-    .select("id")
-    .eq("user_id", userId)
-    .eq("clinica_id", clinicaId)
-    .eq("ativo", true)
-    .maybeSingle();
-  if (error) throw new Error(error.message);
-  if (!data) throw new Error("Sem acesso a esta clínica");
-}
-
 /** DDD "00" nunca existe no Brasil: o telefone virtual não colide com paciente real. */
 function telefoneSessao(indice: number, sessao: number) {
   return `5500${String(indice).padStart(2, "0")}${String(sessao).padStart(5, "0")}`;
