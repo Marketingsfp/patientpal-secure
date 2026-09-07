@@ -7,7 +7,7 @@
  * a ordem de execução, prompts, ferramentas ou dados de atendimento.
  */
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { Network } from "lucide-react";
@@ -28,6 +28,9 @@ import {
   comparacaoRecente,
   destaquesDaComparacao,
 } from "@/lib/nina/arquitetura/versoes";
+import { mudancaConfiguracaoPrompt } from "@/lib/nina/arquitetura/sync";
+import { historicoInstrucoesNina } from "@/lib/nina/instrucoes.functions";
+
 
 export const Route = createFileRoute("/_authenticated/app/nina-arquitetura")({
   head: () => ({
@@ -54,6 +57,20 @@ function Pagina() {
   const { clinicaAtual } = useClinica();
   const clinicaId = clinicaAtual?.clinica_id ?? null;
   const [modo, setModo] = useState<"arquitetura" | "execucao" | "alteracoes">("arquitetura");
+
+  // FASE 5 — ação "Ver instruções" do node Montagem do prompt: volta para o
+  // mapa e rola até a seção editável abaixo do canvas.
+  useEffect(() => {
+    function irParaInstrucoes() {
+      setModo("arquitetura");
+      requestAnimationFrame(() => {
+        document.getElementById("instrucoes-nina")?.scrollIntoView({ behavior: "smooth" });
+      });
+    }
+    window.addEventListener("nina:ver-instrucoes", irParaInstrucoes);
+    return () => window.removeEventListener("nina:ver-instrucoes", irParaInstrucoes);
+  }, []);
+
 
   const buscarCapacidades = useServerFn(capacidadesArquitetura);
   const { data: permissao } = useQuery({
@@ -143,7 +160,10 @@ function Pagina() {
             </CardContent>
           </Card>
 
-          <InstrucoesNina />
+          <div id="instrucoes-nina" className="scroll-mt-24">
+            <InstrucoesNina />
+          </div>
+
         </TabsContent>
 
 
@@ -305,10 +325,66 @@ function PainelAlteracoes() {
         </CardContent>
       </Card>
 
+      <MudancasDoPrompt />
+
       <p className="text-xs text-muted-foreground">
         Mover ou reorganizar componentes no mapa muda apenas o desenho e não cria uma versão nova
         da arquitetura.
       </p>
+
     </div>
+  );
+}
+
+/**
+ * FASE 5 — Architecture Sync das Instruções da Nina.
+ *
+ * Publicar novas instruções é mudança de configuração: atualiza os metadados
+ * do componente "Montagem do prompt" e registra a troca de versão, sem
+ * reorganizar o mapa nem criar versão nova da arquitetura.
+ */
+function MudancasDoPrompt() {
+  const buscar = useServerFn(historicoInstrucoesNina);
+  const { data, isLoading } = useQuery({
+    queryKey: ["nina-instrucoes-historico", "whatsapp"],
+    queryFn: () => buscar({ data: { escopo: "whatsapp" as const } }),
+  });
+
+  const publicadas = (data ?? [])
+    .filter((v) => v.status === "publicada" || v.status === "arquivada")
+    .sort((a, b) => a.versao - b.versao);
+
+  const trocas = publicadas.map((v, i) =>
+    mudancaConfiguracaoPrompt(i > 0 ? publicadas[i - 1]!.versao : null, v.versao),
+  );
+
+  return (
+    <Card>
+      <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2">
+        <CardTitle className="text-base">Mudanças das Instruções da Nina</CardTitle>
+        <Badge variant="outline">Configuração, não estrutura</Badge>
+      </CardHeader>
+      <CardContent className="space-y-2 text-sm">
+        {isLoading ? (
+          <p className="text-muted-foreground">Carregando as publicações…</p>
+        ) : trocas.length === 0 ? (
+          <p className="text-muted-foreground">Nenhuma versão publicada até agora.</p>
+        ) : (
+          <ul className="space-y-1">
+            {[...trocas].reverse().map((t) => (
+              <li key={t.para} className="flex flex-wrap items-center gap-2">
+                <span>{t.resumo}</span>
+                <span className="text-xs text-muted-foreground">
+                  Montagem do prompt — metadados atualizados
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+        <p className="text-xs text-muted-foreground">
+          Trocar o conteúdo das instruções não reorganiza o desenho do mapa.
+        </p>
+      </CardContent>
+    </Card>
   );
 }

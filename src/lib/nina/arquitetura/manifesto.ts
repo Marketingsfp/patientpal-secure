@@ -197,12 +197,14 @@ export const NODES_ARQUITETURA: NodeArquitetura[] = [
     saida: "Texto de contexto",
     anteriores: ["session.resolve", "flow.state"],
     seguintes: [
+      "instructions.published",
       "instructions.catalog",
       "instructions.learnings",
       "instructions.phases",
       "identity.gate",
       "prompt.compose",
     ],
+
     tabelas: ["clinicas", "unidades", "whatsapp_mensagens"],
     erros: ["clínica sem dados cadastrados"],
   },
@@ -234,17 +236,37 @@ export const NODES_ARQUITETURA: NodeArquitetura[] = [
     erros: ["nenhum aprendizado aprovado"],
   },
   {
+    id: "instructions.published",
+    nome: "Instruções da Nina (versão publicada)",
+    categoria: "INSTRUCOES",
+    descricao:
+      "Carrega no backend a versão publicada das Instruções da Nina, com cache curto, snapshot por execução e retorno à última versão válida em caso de falha. O conteúdo editável define só o comportamento da conversa — nunca permissões, acesso a dados ou confirmações obrigatórias.",
+    arquivo: "src/lib/nina/instrucoes-runtime.server.ts",
+    funcao: "promptInstrucoes",
+    entrada: "Escopo do atendimento e valores dinâmicos da conversa",
+    saida: "Texto base do Prompt Principal e a versão utilizada",
+    anteriores: ["context.load"],
+    seguintes: ["prompt.compose"],
+    tabelas: ["nina_instrucoes_versoes"],
+    erros: [
+      "nenhuma versão publicada (usa o texto do código)",
+      "marcador dinâmico não resolvido",
+      "falha de leitura (usa a última versão válida)",
+    ],
+  },
+  {
     id: "prompt.compose",
     nome: "Montagem do prompt",
     categoria: "INSTRUCOES",
     descricao:
-      "Compõe as instruções finais: identidade, fase do atendimento, contexto, catálogo e aprendizados.",
-    arquivo: "src/lib/nina-contexto.server.ts",
-    funcao: "systemPromptNina",
-    entrada: "Contexto e blocos de instrução",
+      "Compõe as instruções finais a partir da versão publicada das Instruções da Nina, somando identidade, fase do atendimento, contexto, catálogo e aprendizados.",
+    arquivo: "src/lib/whatsapp.server.ts",
+    funcao: "gerarRespostaNinaInterno",
+    entrada: "Instruções publicadas e blocos de contexto",
     saida: "Prompt do sistema",
     anteriores: [
       "context.load",
+      "instructions.published",
       "instructions.catalog",
       "instructions.learnings",
       "instructions.greeting",
@@ -254,6 +276,7 @@ export const NODES_ARQUITETURA: NodeArquitetura[] = [
     seguintes: ["llm.model_flag", "llm.generate"],
     erros: ["prompt acima do limite do modelo"],
   },
+
 
   // ───────────────────────── IA ─────────────────────────
   {
@@ -842,7 +865,7 @@ export const NODES_ARQUITETURA: NodeArquitetura[] = [
 ];
 
 export const MANIFESTO_ARQUITETURA = {
-  versao: 2,
+  versao: 3,
   descricao:
     "Descrição estruturada da arquitetura real da Nina. Não executa nada e não substitui o código.",
   categorias: CATEGORIAS_ARQUITETURA,

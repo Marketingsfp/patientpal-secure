@@ -588,12 +588,40 @@ export function diffEmTexto(diff: DiffArquitetura = calcularDiffArquitetura()): 
 }
 
 /**
- * FASE 5 — Versão do manifesto cuja sincronização já foi registrada no
+ * Versão do manifesto cuja sincronização já foi registrada no
  * Architecture Diff (`docs/nina/arquitetura-diff-2026-09-07.md`). Quando o
  * manifesto avançar de versão sem novo registro, o status da página deixa de
  * ficar verde e passa a indicar alterações pendentes.
  */
-export const VERSAO_SINCRONIZADA = 2;
+export const VERSAO_SINCRONIZADA = 3;
+
+/**
+ * FASE 5 — Publicar uma nova versão das Instruções da Nina é mudança de
+ * CONFIGURAÇÃO, não de estrutura: o Architecture Sync apenas atualiza os
+ * metadados do node "Montagem do prompt" e registra a troca de versão.
+ * O canvas não é reorganizado e nenhuma versão da arquitetura é criada.
+ */
+export type MudancaConfiguracaoPrompt = {
+  nodeId: "prompt.compose";
+  estrutural: false;
+  de: number | null;
+  para: number;
+  resumo: string;
+};
+
+export function mudancaConfiguracaoPrompt(
+  de: number | null,
+  para: number,
+): MudancaConfiguracaoPrompt {
+  return {
+    nodeId: "prompt.compose",
+    estrutural: false,
+    de,
+    para,
+    resumo: `Prompt principal: ${de ? `v${de} → ` : ""}v${para}`,
+  };
+}
+
 
 const DIFF_VAZIO: DiffArquitetura = {
   adicionados: [],
