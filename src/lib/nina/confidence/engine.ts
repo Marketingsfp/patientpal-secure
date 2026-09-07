@@ -9,6 +9,12 @@
  * (`../confidence-engine`) em vez de criar uma segunda gramática paralela.
  */
 import { detectarCategorias, type CategoriaConfianca } from "../confidence-engine";
+import {
+  executarValidadoresDeConfianca,
+  riscoDaAcao,
+  MINIMO_POR_RISCO,
+  type ConfigValidadores,
+} from "./validators";
 import type {
   Bloqueador,
   ContextoConfianca,
