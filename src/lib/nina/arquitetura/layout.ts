@@ -32,8 +32,11 @@ export type LayoutArquitetura = {
 
 export const LARGURA_NODE = 216;
 export const ALTURA_NODE = 88;
-const ESPACO_COLUNA = 300;
-const ESPACO_LINHA = 116;
+/** Vão entre níveis (~110px) e entre irmãos (~44px), somados ao tamanho do node. */
+export const VAO_COLUNA = 110;
+export const VAO_LINHA = 44;
+const ESPACO_COLUNA = LARGURA_NODE + VAO_COLUNA;
+const ESPACO_LINHA = ALTURA_NODE + VAO_LINHA;
 const MARGEM = 60;
 
 /**
