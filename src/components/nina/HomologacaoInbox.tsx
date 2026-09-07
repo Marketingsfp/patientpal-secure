@@ -44,6 +44,8 @@ import {
   controlarSimulacaoTerra,
   simulacaoAtualTerra,
 } from "@/lib/nina/simulador-terra.functions";
+import { AvaliacaoSol } from "@/components/nina/AvaliacaoSol";
+
 import {
   CENARIOS_SUGERIDOS,
   DETALHES,
