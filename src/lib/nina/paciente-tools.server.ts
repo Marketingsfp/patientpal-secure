@@ -1377,8 +1377,10 @@ async function executarFerramentaInterna(
           };
         }
 
-
+        const { data, error } = await supabaseAdmin.rpc("integracao_resolver_paciente", {
+          _clinica_id: ctx.clinicaId,
           _cpf_digits: cpf,
+
           _nome: p.nome,
           _data_nascimento: p.data_nascimento,
           _telefone: ctx.telefone ?? "",
