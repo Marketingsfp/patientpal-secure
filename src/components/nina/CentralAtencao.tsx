@@ -44,11 +44,21 @@ export function CentralAtencao() {
   const convsFn = useServerFn(listarConversas);
   const navigate = useNavigate();
 
-  const [fila, setFila] = useState<Array<{ id: string; contato_nome?: string | null }>>([]);
+  const [fila, setFila] = useState<
+    Array<{
+      id: string;
+      contato_nome?: string | null;
+      handoff_motivo?: string | null;
+      handoff_resumo?: string | null;
+    }>
+  >([]);
   const [espera, setEspera] = useState<Record<string, string>>({});
   const [nomes, setNomes] = useState<Record<string, string | null>>({});
   const [agora, setAgora] = useState(() => Date.now());
   const [aberto, setAberto] = useState(false);
+  /** Categoria em foco dentro da própria Central (não filtra a Inbox). */
+  const [categoria, setCategoria] = useState<CategoriaAtencao | null>(null);
+
 
   const carregar = useCallback(async () => {
     if (!clinicaId) {
@@ -211,33 +221,48 @@ export function CentralAtencao() {
             icone={<UserX className="h-3.5 w-3.5" aria-hidden />}
             titulo="Não atribuídas"
             valor={resumo.naoAtribuidas}
-            onClick={abrirNaoAtribuidas}
+            ativo={categoria === "nao_atribuida"}
+            onClick={() => alternarCategoria("nao_atribuida")}
           />
           <LinhaCategoria
             cor="vermelho"
             icone={<AlertTriangle className="h-3.5 w-3.5" aria-hidden />}
             titulo="Espera crítica"
             valor={resumo.criticas}
-            onClick={abrirCriticas}
+            ativo={categoria === "critica"}
+            onClick={() => alternarCategoria("critica")}
           />
           <LinhaCategoria
             cor="ambar"
             icone={<Clock className="h-3.5 w-3.5" aria-hidden />}
             titulo="Aguardando resposta"
             valor={resumo.aguardando}
-            onClick={abrirCriticas}
+            ativo={categoria === "aguardando"}
+            onClick={() => alternarCategoria("aguardando")}
           />
         </div>
 
+
         <div className="border-t border-border px-3 py-2">
-          <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-            Prioridades agora
-          </p>
-          {resumo.itens.length === 0 ? (
+          <div className="mb-1 flex items-center gap-2">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+              {categoria ? tituloCategoria(categoria) : "Prioridades agora"}
+            </p>
+            {categoria && (
+              <button
+                type="button"
+                onClick={() => setCategoria(null)}
+                className="ml-auto rounded px-1.5 py-0.5 text-[11px] text-muted-foreground hover:bg-muted"
+              >
+                Ver tudo ✕
+              </button>
+            )}
+          </div>
+          {lista.length === 0 ? (
             <p className="py-2 text-xs text-muted-foreground">Nenhuma pendência.</p>
           ) : (
             <ul className="max-h-64 space-y-0.5 overflow-y-auto">
-              {resumo.itens.map((i) => (
+              {lista.map((i) => (
                 <li key={i.id}>
                   <ItemLinha item={i} onClick={() => abrirConversa(i.id)} />
                 </li>
@@ -245,6 +270,7 @@ export function CentralAtencao() {
             </ul>
           )}
         </div>
+
       </PopoverContent>
     </Popover>
   );
