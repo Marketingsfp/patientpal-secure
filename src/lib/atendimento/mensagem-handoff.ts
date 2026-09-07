@@ -23,7 +23,6 @@ export const SETORES_MENCIONAVEIS = [
   "agendamentos",
   "faturamento",
   "exames",
-  "atendimento",
   "comercial",
   "suporte",
 ] as const;
