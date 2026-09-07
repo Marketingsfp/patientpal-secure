@@ -1331,6 +1331,10 @@ ATENDIMENTO HUMANO — REGRA OBRIGATÓRIA:
   }> = [];
   let catalogoEncontrou = false;
   let esclarecimentoConfiancaUsado = false;
+  // Disponibilidade confirmada em tempo real nesta conversa (pré-commit).
+  let disponibilidadeConfirmada = false;
+  // Dados já coletados no turno — entram no resumo estruturado do handoff.
+  const dadosColetados: Record<string, unknown> = {};
   // Frases que afirmam/prometem agendamento. Se aparecerem sem gravação
   // confirmada, a resposta é falso sucesso e não pode ir ao paciente.
   const AFIRMA_AGENDAMENTO =
@@ -1414,25 +1418,38 @@ ATENDIMENTO HUMANO — REGRA OBRIGATÓRIA:
         break;
       }
       // --------- CONFIDENCE DECISION ENGINE: antes de a resposta sair ---------
-      const { avaliarConfianca, instrucaoEsclarecimento, motivoHandoffConfianca } = await import(
-        "@/lib/nina/confidence-engine"
-      );
-      const decisao = avaliarConfianca({
+      // Mesmo motor central da Fase 1-3 (validadores + política de pesos e
+      // bloqueadores). Vale igual para atendimento real e homologação.
+      const {
+        decidirNoTurno,
+        instrucaoEsclarecimentoDirigida,
+        motivoHandoff,
+        paraDecisaoLegado,
+        resumoHandoffEstruturado,
+      } = await import("@/lib/nina/confidence/runtime");
+      const estadoTurno = {
         texto,
-        evidencias: {
-          ferramentas: evidenciasFerramentas,
-          catalogoEncontrou,
-          agendamentoConfirmado,
-          pacienteIdentificado: Boolean(pacienteIdEfetivo),
-          esclarecimentoUsado: esclarecimentoConfiancaUsado,
-          handoffSolicitado: houveHandoff,
-        },
-      });
+        mensagemPaciente,
+        ferramentas: evidenciasFerramentas,
+        catalogoEncontrou,
+        agendamentoConfirmado,
+        pacienteIdentificado: Boolean(pacienteIdEfetivo),
+        esclarecimentoUsado: esclarecimentoConfiancaUsado,
+        handoffSolicitado: houveHandoff,
+        ambiente: (opcoes?.teste === true ? "homologacao" : "producao") as
+          | "producao"
+          | "homologacao",
+        clinicaId,
+        conversaId: estadoId.conversaId ?? null,
+        entities: dadosColetados,
+      };
+      const decisao = decidirNoTurno(estadoTurno);
       rastro?.concluir("confidence.decision", {
         score: decisao.score,
-        acao: decisao.acao,
-        bloqueio: decisao.bloqueio,
-        categorias: decisao.categorias,
+        nivel: decisao.level,
+        acao: decisao.decision,
+        bloqueios: decisao.hardBlockers ?? [],
+        categorias: decisao.evidence.categorias,
       });
       {
         const { registrarDecisaoConfianca } = await import(
@@ -1444,30 +1461,28 @@ ATENDIMENTO HUMANO — REGRA OBRIGATÓRIA:
           execucaoId: respostaIA.execucaoId ?? null,
           traceId: rastro?.ids.trace_id ?? null,
           teste: opcoes?.teste === true,
-          decisao,
+          decisao: paraDecisaoLegado(decisao),
         });
       }
 
-      // Confiança intermediária: UMA rodada de esclarecimento com o paciente.
-      if (decisao.acao === "esclarecer" && rodada < MAX_RODADAS - 1) {
+      // Confiança intermediária: UMA pergunta objetiva ao paciente e depois o
+      // motor roda inteiro de novo (nada de reaproveitar a pontuação).
+      if (decisao.decision === "CLARIFY" && rodada < MAX_RODADAS - 1) {
         esclarecimentoConfiancaUsado = true;
         mensagens.push({ role: "assistant", content: texto });
-        mensagens.push({ role: "user", content: instrucaoEsclarecimento(decisao) });
+        mensagens.push({ role: "user", content: instrucaoEsclarecimentoDirigida(decisao) });
         continue;
       }
 
-      // Confiança baixa ou bloqueio absoluto: transfere pelo mesmo caminho
-      // já existente (evento, fila, protocolo e aviso fixo ao paciente).
-      if (decisao.acao === "transferir") {
+      // Confiança baixa ou bloqueio absoluto: transfere pelo mesmo caminho já
+      // existente (evento, fila, protocolo e aviso ao paciente), levando o
+      // resumo estruturado para a atendente.
+      if (decisao.decision === "HANDOFF" || decisao.decision === "BLOCK_ACTION") {
         const rh = await broker.executar(
           "solicitar_atendente_humano",
           JSON.stringify({
-            motivo: motivoHandoffConfianca(decisao),
-            resumo:
-              `Nina não teve dado confirmado para responder com segurança. ${decisao.motivos.join("; ")}`.slice(
-                0,
-                2000,
-              ),
+            motivo: motivoHandoff(decisao),
+            resumo: resumoHandoffEstruturado(estadoTurno, decisao),
             urgencia: "normal",
           }),
         );
@@ -1488,6 +1503,47 @@ ATENDIMENTO HUMANO — REGRA OBRIGATÓRIA:
       const nome = String(c.function?.name ?? "");
       // Toda execução passa pelo broker: ele valida o retorno, aplica
       // idempotência de turno e nunca transforma erro em sucesso.
+      // ---- validação final imediatamente antes de gravar o agendamento ----
+      let argsObj: Record<string, unknown> = {};
+      try {
+        const parsed = JSON.parse(String(c.function?.arguments ?? "{}"));
+        if (parsed && typeof parsed === "object") argsObj = parsed as Record<string, unknown>;
+      } catch {
+        argsObj = {};
+      }
+      for (const [k, v] of Object.entries(argsObj)) {
+        if (v !== null && v !== undefined && String(v).trim() !== "") dadosColetados[k] = v;
+      }
+      if (nome === "agendar") {
+        const { validarAgendamentoAntesDoCommit } = await import(
+          "@/lib/nina/confidence/runtime"
+        );
+        const gate = validarAgendamentoAntesDoCommit({
+          args: argsObj,
+          ferramentas: evidenciasFerramentas,
+          pacienteIdentificado: Boolean(pacienteIdEfetivo),
+          disponibilidadeConfirmada,
+        });
+        if (!gate.liberado) {
+          console.warn("[NINA_APPOINTMENT] commit bloqueado pelo Confidence Engine", {
+            conversa_id: estadoId.conversaId,
+            faltas: gate.faltas,
+          });
+          rastro?.falhar("tool.execute", gate.motivo, { ferramenta: nome });
+          mensagens.push({
+            role: "tool",
+            tool_call_id: c.id,
+            content: JSON.stringify({
+              ok: false,
+              erro: "PRECOMMIT_VALIDATION_FAILED",
+              detalhe: gate.motivo,
+              instrucao:
+                "NÃO diga que agendou nem que está agendando. Resolva o que falta (confirmar horário disponível, dados do paciente ou o procedimento) antes de chamar 'agendar' novamente.",
+            }),
+          });
+          continue;
+        }
+      }
       rastro?.iniciar("tool.execute", { ferramenta: nome });
       const r = await broker.executar(nome, c.function?.arguments);
       if (r.success && !r.erro) rastro?.concluir("tool.execute", { ferramenta: nome });
@@ -1495,6 +1551,9 @@ ATENDIMENTO HUMANO — REGRA OBRIGATÓRIA:
       const resultado = respostaParaModelo(r);
       if (r.capacidade === "requestHumanHandoff" && r.success) houveHandoff = true;
       if (r.appointment_confirmed) agendamentoConfirmado = true;
+      if (r.capacidade === "checkAvailability" && r.success && !r.erro) {
+        disponibilidadeConfirmada = true;
+      }
       if (r.capacidade === "createAppointment") {
         console.info("[NINA_APPOINTMENT]", {
           conversation_id: estadoId.conversaId,
