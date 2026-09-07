@@ -208,11 +208,19 @@ export function ArquiteturaCanvas({
     }
   }, [chavePosicoes]);
 
-  const restaurarPosicoes = useCallback(() => {
+  const [pedidoAjuste, setPedidoAjuste] = useState(0);
+
+  const organizarAutomaticamente = useCallback(() => {
     setPosicoes({});
     gravarPosicoes(chavePosicoes, {});
-    window.setTimeout(ajustarTela, 0);
-  }, [ajustarTela, chavePosicoes]);
+    setPedidoAjuste((n) => n + 1);
+  }, [chavePosicoes]);
+
+  // Após recalcular as posições, centralizar e ajustar à tela.
+  useEffect(() => {
+    if (pedidoAjuste === 0) return;
+    ajustarTela();
+  }, [pedidoAjuste, ajustarTela]);
 
   const detalhe = selecionado ? mapaPosicionado.get(selecionado)?.node ?? null : null;
 
