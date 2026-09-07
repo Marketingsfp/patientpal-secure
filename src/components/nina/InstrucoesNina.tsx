@@ -1,11 +1,12 @@
 /**
  * Seção "Instruções da Nina" (abaixo do canvas da Arquitetura).
  *
- * FASE 2: só leitura da fonte persistente + gravação de RASCUNHO.
- * Nada aqui altera o comportamento da Nina: o atendimento continua usando o
- * texto do código. O conteúdo NUNCA é duplicado no frontend — vem do banco.
+ * FASE 3: rascunho + publicação versionada + histórico + comparação + restauração.
+ * Publicar cria SEMPRE uma versão nova; a anterior é arquivada, nunca apagada.
+ * O carregamento do prompt em tempo de execução ainda NÃO usa esta fonte —
+ * isso é a próxima fase.
  */
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
@@ -13,19 +14,52 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import {
   ESCOPOS,
   ROTULO_ESCOPO,
   carregarInstrucoesNina,
+  historicoInstrucoesNina,
+  publicarInstrucoesNina,
   salvarRascunhoInstrucoes,
   type EscopoInstrucoes,
   type InstrucoesEscopo,
+  type VersaoHistorico,
 } from "@/lib/nina/instrucoes.functions";
+import { apenasMudancas, compararTextos, resumoDiff } from "@/lib/nina/instrucoes-diff";
+
+const ROTULO_STATUS: Record<string, string> = {
+  publicada: "Atual",
+  rascunho: "Rascunho",
+  arquivada: "Versão anterior",
+};
+
+function dataBr(iso: string | null) {
+  if (!iso) return "—";
+  return new Date(iso).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" });
+}
 
 export function InstrucoesNina() {
   const carregar = useServerFn(carregarInstrucoesNina);
-  const queryClient = useQueryClient();
   const { data, isLoading, error } = useQuery({
     queryKey: ["nina-instrucoes"],
     queryFn: () => carregar(),
@@ -36,7 +70,7 @@ export function InstrucoesNina() {
     <Card>
       <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2">
         <CardTitle className="text-base">Instruções da Nina</CardTitle>
-        <Badge variant="outline">Rascunho não muda o atendimento</Badge>
+        <Badge variant="outline">Publicar cria uma versão nova</Badge>
       </CardHeader>
       <CardContent className="space-y-4">
         {isLoading ? (
@@ -56,10 +90,7 @@ export function InstrucoesNina() {
             </TabsList>
             {(data ?? []).map((bloco) => (
               <TabsContent key={bloco.escopo} value={bloco.escopo} className="mt-4">
-                <Editor
-                  bloco={bloco}
-                  onSalvo={() => queryClient.invalidateQueries({ queryKey: ["nina-instrucoes"] })}
-                />
+                <Editor bloco={bloco} />
               </TabsContent>
             ))}
           </Tabs>
@@ -69,39 +100,67 @@ export function InstrucoesNina() {
   );
 }
 
-function Editor({ bloco, onSalvo }: { bloco: InstrucoesEscopo; onSalvo: () => void }) {
+function Editor({ bloco }: { bloco: InstrucoesEscopo }) {
+  const queryClient = useQueryClient();
   const base = bloco.rascunho ?? bloco.publicada;
   const [texto, setTexto] = useState(base?.conteudo ?? "");
+  const [comentario, setComentario] = useState("");
+  const [confirmando, setConfirmando] = useState(false);
+  const [historicoAberto, setHistoricoAberto] = useState(false);
 
-  // Recarrega o campo quando a fonte persistente muda (troca de aba/refetch).
   useEffect(() => {
     setTexto(base?.conteudo ?? "");
   }, [base?.id, base?.conteudo]);
 
+  const atualizar = () => {
+    queryClient.invalidateQueries({ queryKey: ["nina-instrucoes"] });
+    queryClient.invalidateQueries({ queryKey: ["nina-instrucoes-historico", bloco.escopo] });
+  };
+
   const salvarFn = useServerFn(salvarRascunhoInstrucoes);
   const salvar = useMutation({
-    mutationFn: () => salvarFn({ data: { escopo: bloco.escopo, conteudo: texto } }),
+    mutationFn: () =>
+      salvarFn({ data: { escopo: bloco.escopo, conteudo: texto, comentario: comentario || undefined } }),
     onSuccess: () => {
       toast.success("Rascunho salvo. A Nina continua respondendo como antes.");
-      onSalvo();
+      atualizar();
     },
     onError: (e: unknown) =>
       toast.error(e instanceof Error ? e.message : "Não foi possível salvar o rascunho."),
   });
 
+  const publicarFn = useServerFn(publicarInstrucoesNina);
+  const publicar = useMutation({
+    mutationFn: (entrada: { conteudo: string; comentario?: string }) =>
+      publicarFn({
+        data: { escopo: bloco.escopo, conteudo: entrada.conteudo, comentario: entrada.comentario },
+      }),
+    onSuccess: (nova) => {
+      toast.success(`Versão v${nova.versao} publicada. A versão anterior foi guardada.`);
+      setComentario("");
+      atualizar();
+    },
+    onError: (e: unknown) =>
+      toast.error(e instanceof Error ? e.message : "Não foi possível publicar as instruções."),
+  });
+
   const alterado = texto !== (base?.conteudo ?? "");
+  const vazio = texto.trim().length === 0;
 
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-2 text-sm">
-        <span className="text-muted-foreground">Versão publicada:</span>
+        <span className="text-muted-foreground">Versão em uso:</span>
         <Badge variant="secondary">
-          {bloco.publicada ? `v${bloco.publicada.versao}` : "nenhuma"}
+          {bloco.publicada ? `v${bloco.publicada.versao} — atual` : "nenhuma publicada"}
         </Badge>
-        <span className="text-muted-foreground">Status:</span>
-        <Badge variant="outline">{bloco.publicada ? "Ativa" : "Sem versão ativa"}</Badge>
         {bloco.rascunho ? (
           <Badge variant="outline">Rascunho v{bloco.rascunho.versao} em edição</Badge>
+        ) : null}
+        {bloco.publicada ? (
+          <span className="text-xs text-muted-foreground">
+            publicada em {dataBr(bloco.publicada.publicado_em)}
+          </span>
         ) : null}
       </div>
 
@@ -116,17 +175,276 @@ function Editor({ bloco, onSalvo }: { bloco: InstrucoesEscopo; onSalvo: () => vo
         className="min-h-[520px] resize-y overflow-auto whitespace-pre font-mono text-xs leading-relaxed"
       />
 
-      <div className="flex flex-wrap items-center gap-3">
+      <Input
+        value={comentario}
+        onChange={(e) => setComentario(e.target.value)}
+        maxLength={500}
+        placeholder="Comentário desta alteração (opcional) — aparece no histórico"
+      />
+
+      <div className="flex flex-wrap items-center gap-2">
         <Button
+          variant="secondary"
           onClick={() => salvar.mutate()}
-          disabled={salvar.isPending || !alterado || texto.trim().length === 0}
+          disabled={salvar.isPending || !alterado || vazio}
         >
           {salvar.isPending ? "Salvando…" : "Salvar rascunho"}
         </Button>
-        <p className="text-xs text-muted-foreground">
-          Salvar guarda apenas um rascunho. A publicação ainda não está disponível — o atendimento
-          segue usando a versão que está no sistema hoje.
-        </p>
+        <Button onClick={() => setConfirmando(true)} disabled={publicar.isPending || vazio}>
+          {publicar.isPending ? "Publicando…" : "Publicar instruções"}
+        </Button>
+        <Button variant="outline" onClick={() => setHistoricoAberto(true)}>
+          Histórico de versões
+        </Button>
+      </div>
+
+      <p className="text-xs text-muted-foreground">
+        Digitar e salvar rascunho não muda o atendimento. Publicar guarda a versão anterior e cria
+        uma nova — nenhuma versão é apagada.
+      </p>
+
+      <AlertDialog open={confirmando} onOpenChange={setConfirmando}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Publicar esta nova versão das instruções da Nina?</AlertDialogTitle>
+            <AlertDialogDescription>
+              As próximas execuções da Nina passarão a utilizar essas instruções.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => publicar.mutate({ conteudo: texto, comentario: comentario || undefined })}
+            >
+              Publicar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <HistoricoVersoes
+        escopo={bloco.escopo}
+        aberto={historicoAberto}
+        onOpenChange={setHistoricoAberto}
+        atualTexto={bloco.publicada?.conteudo ?? ""}
+        restaurando={publicar.isPending}
+        onRestaurar={(versao) =>
+          publicar.mutate({
+            conteudo: versao.conteudo,
+            comentario: `Restauração do conteúdo da v${versao.versao}.`,
+          })
+        }
+      />
+    </div>
+  );
+}
+
+function HistoricoVersoes({
+  escopo,
+  aberto,
+  onOpenChange,
+  atualTexto,
+  restaurando,
+  onRestaurar,
+}: {
+  escopo: EscopoInstrucoes;
+  aberto: boolean;
+  onOpenChange: (v: boolean) => void;
+  atualTexto: string;
+  restaurando: boolean;
+  onRestaurar: (versao: VersaoHistorico) => void;
+}) {
+  const buscar = useServerFn(historicoInstrucoesNina);
+  const { data: versoes, isLoading } = useQuery({
+    queryKey: ["nina-instrucoes-historico", escopo],
+    queryFn: () => buscar({ data: { escopo } }),
+    enabled: aberto,
+  });
+
+  const [selecionada, setSelecionada] = useState<VersaoHistorico | null>(null);
+  const [comparandoCom, setComparandoCom] = useState<VersaoHistorico | null>(null);
+  const [confirmarRestauro, setConfirmarRestauro] = useState<VersaoHistorico | null>(null);
+
+  const lista = versoes ?? [];
+  const atual = lista.find((v) => v.status === "publicada") ?? null;
+
+  return (
+    <Dialog open={aberto} onOpenChange={onOpenChange}>
+      <DialogContent className="max-h-[85vh] max-w-4xl overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Histórico de versões — {ROTULO_ESCOPO[escopo]}</DialogTitle>
+          <DialogDescription>
+            Todas as versões ficam guardadas. Restaurar uma versão antiga cria uma versão nova, sem
+            apagar as demais.
+          </DialogDescription>
+        </DialogHeader>
+
+        {isLoading ? (
+          <p className="text-sm text-muted-foreground">Carregando o histórico…</p>
+        ) : lista.length === 0 ? (
+          <p className="text-sm text-muted-foreground">Nenhuma versão registrada ainda.</p>
+        ) : (
+          <ul className="space-y-2">
+            {lista.map((v) => (
+              <li key={v.id} className="rounded-lg border p-3 text-sm">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="font-medium">v{v.versao}</span>
+                  <Badge variant={v.status === "publicada" ? "secondary" : "outline"}>
+                    {ROTULO_STATUS[v.status] ?? v.status}
+                  </Badge>
+                  <span className="text-xs text-muted-foreground">
+                    {dataBr(v.publicado_em ?? v.created_at)} · {v.autor ?? "responsável não registrado"}
+                  </span>
+                </div>
+                {v.comentario ? <p className="mt-1 text-muted-foreground">{v.comentario}</p> : null}
+                <div className="mt-2 flex flex-wrap gap-2">
+                  <Button size="sm" variant="outline" onClick={() => setSelecionada(v)}>
+                    Ver conteúdo
+                  </Button>
+                  {atual && v.id !== atual.id ? (
+                    <Button size="sm" variant="outline" onClick={() => setComparandoCom(v)}>
+                      Comparar com v{atual.versao}
+                    </Button>
+                  ) : null}
+                  {v.status !== "publicada" ? (
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      disabled={restaurando}
+                      onClick={() => setConfirmarRestauro(v)}
+                    >
+                      Restaurar como nova versão
+                    </Button>
+                  ) : null}
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+
+        {/* Leitura de uma versão antiga */}
+        <Dialog open={!!selecionada} onOpenChange={(o) => !o && setSelecionada(null)}>
+          <DialogContent className="max-h-[85vh] max-w-3xl overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Versão v{selecionada?.versao} — somente leitura</DialogTitle>
+              <DialogDescription>
+                {dataBr(selecionada?.publicado_em ?? selecionada?.created_at ?? null)} ·{" "}
+                {selecionada?.autor ?? "responsável não registrado"}
+              </DialogDescription>
+            </DialogHeader>
+            <pre className="max-h-[55vh] overflow-auto rounded-md border bg-muted/40 p-3 font-mono text-xs whitespace-pre-wrap">
+              {selecionada?.conteudo}
+            </pre>
+          </DialogContent>
+        </Dialog>
+
+        {/* Comparação */}
+        <Dialog open={!!comparandoCom} onOpenChange={(o) => !o && setComparandoCom(null)}>
+          <DialogContent className="max-h-[85vh] max-w-4xl overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>
+                Comparação: v{comparandoCom?.versao} ↔ v{atual?.versao} (atual)
+              </DialogTitle>
+              <DialogDescription>
+                Em verde o que foi acrescentado, em vermelho o que saiu, em amarelo o que mudou.
+              </DialogDescription>
+            </DialogHeader>
+            {comparandoCom ? (
+              <Comparacao antes={comparandoCom.conteudo} depois={atualTexto} />
+            ) : null}
+          </DialogContent>
+        </Dialog>
+
+        <AlertDialog
+          open={!!confirmarRestauro}
+          onOpenChange={(o) => !o && setConfirmarRestauro(null)}
+        >
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>
+                Restaurar o conteúdo da v{confirmarRestauro?.versao} como nova versão?
+              </AlertDialogTitle>
+              <AlertDialogDescription>
+                Uma versão nova será criada com esse conteúdo e passará a ser a atual. As versões
+                anteriores continuam guardadas no histórico.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() => {
+                  if (confirmarRestauro) onRestaurar(confirmarRestauro);
+                  setConfirmarRestauro(null);
+                }}
+              >
+                Restaurar
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            Fechar
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function Comparacao({ antes, depois }: { antes: string; depois: string }) {
+  const linhas = useMemo(() => compararTextos(antes, depois), [antes, depois]);
+  const resumo = useMemo(() => resumoDiff(linhas), [linhas]);
+  const visiveis = useMemo(() => apenasMudancas(linhas), [linhas]);
+
+  if (resumo.adicionadas + resumo.removidas + resumo.alteradas === 0) {
+    return <p className="text-sm text-muted-foreground">As duas versões têm o mesmo conteúdo.</p>;
+  }
+
+  return (
+    <div className="space-y-3">
+      <div className="flex flex-wrap gap-2 text-xs">
+        <Badge variant="outline">{resumo.adicionadas} linha(s) acrescentada(s)</Badge>
+        <Badge variant="outline">{resumo.removidas} linha(s) removida(s)</Badge>
+        <Badge variant="outline">{resumo.alteradas} linha(s) alterada(s)</Badge>
+      </div>
+      <div className="max-h-[55vh] overflow-auto rounded-md border font-mono text-xs">
+        {visiveis.map((l, i) => {
+          if (l.tipo === "igual") {
+            return (
+              <div key={i} className="px-3 py-0.5 text-muted-foreground whitespace-pre-wrap">
+                {l.antes}
+              </div>
+            );
+          }
+          if (l.tipo === "alterada") {
+            return (
+              <div key={i} className="border-l-2 border-l-[var(--chart-4)] bg-[color-mix(in_oklch,var(--chart-4)_14%,transparent)] px-3 py-0.5">
+                <div className="whitespace-pre-wrap line-through opacity-70">{l.antes}</div>
+                <div className="whitespace-pre-wrap">{l.depois}</div>
+              </div>
+            );
+          }
+          if (l.tipo === "removida") {
+            return (
+              <div
+                key={i}
+                className="border-l-2 border-l-destructive bg-[color-mix(in_oklch,var(--destructive)_12%,transparent)] px-3 py-0.5 whitespace-pre-wrap line-through opacity-80"
+              >
+                {l.antes}
+              </div>
+            );
+          }
+          return (
+            <div
+              key={i}
+              className="border-l-2 border-l-primary bg-[color-mix(in_oklch,var(--primary)_12%,transparent)] px-3 py-0.5 whitespace-pre-wrap"
+            >
+              {l.depois}
+            </div>
+          );
+        })}
       </div>
     </div>
   );
