@@ -99,3 +99,60 @@ describe("rótulo do autor na prévia", () => {
     expect(rotuloAutorResumo(null)).toBe("");
   });
 });
+
+/** FASE 3 — contador de não lidas por leitura individual do usuário. */
+describe("leads-resumo — não lidas (Fase 3)", () => {
+  const nina = (id: string, at: string) =>
+    msg({ id, created_at: at, direction: "out", enviada_por: "nina", body: "resposta" });
+
+  it("mensagem nova em lead fechado conta 1", () => {
+    const r = resumirLeads({ L1: ["c1"] }, [nina("n1", "2026-09-07T10:10:00Z")], {
+      c1: "2026-09-07T10:00:00Z",
+    });
+    expect(r["L1"]!.unreadCount).toBe(1);
+  });
+
+  it("duas mensagens novas contam 2", () => {
+    const r = resumirLeads(
+      { L1: ["c1"] },
+      [nina("n1", "2026-09-07T10:10:00Z"), nina("n2", "2026-09-07T10:11:00Z")],
+      { c1: "2026-09-07T10:00:00Z" },
+    );
+    expect(r["L1"]!.unreadCount).toBe(2);
+  });
+
+  it("após abrir (marcador na última mensagem) fica zero", () => {
+    const r = resumirLeads(
+      { L1: ["c1"] },
+      [nina("n1", "2026-09-07T10:10:00Z"), nina("n2", "2026-09-07T10:11:00Z")],
+      { c1: "2026-09-07T10:11:00Z" },
+    );
+    expect(r["L1"]!.unreadCount).toBe(0);
+  });
+
+  it("evento técnico não aumenta o contador", () => {
+    const r = resumirLeads(
+      { L1: ["c1"] },
+      [
+        msg({
+          id: "ev",
+          created_at: "2026-09-07T10:20:00Z",
+          direction: "out",
+          enviada_por: "sistema",
+          tipo: "evento",
+          body: "sessão trocada",
+        }),
+      ],
+      { c1: "2026-09-07T10:00:00Z" },
+    );
+    expect(r["L1"]!.unreadCount).toBe(0);
+  });
+
+  it("leitura de um usuário não se mistura com a de outro", () => {
+    const mensagens = [nina("n1", "2026-09-07T10:10:00Z")];
+    const usuarioA = resumirLeads({ L1: ["c1"] }, mensagens, { c1: "2026-09-07T10:10:00Z" });
+    const usuarioB = resumirLeads({ L1: ["c1"] }, mensagens, {});
+    expect(usuarioA["L1"]!.unreadCount).toBe(0);
+    expect(usuarioB["L1"]!.unreadCount).toBe(1);
+  });
+});
