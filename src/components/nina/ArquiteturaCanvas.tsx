@@ -15,7 +15,6 @@ import {
   ZoomOut,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import {
   CATEGORIAS_ARQUITETURA,
   NODES_ARQUITETURA,
