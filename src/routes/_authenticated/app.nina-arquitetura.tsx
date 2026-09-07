@@ -332,3 +332,56 @@ function PainelAlteracoes() {
     </div>
   );
 }
+
+/**
+ * FASE 5 — Architecture Sync das Instruções da Nina.
+ *
+ * Publicar novas instruções é mudança de configuração: atualiza os metadados
+ * do componente "Montagem do prompt" e registra a troca de versão, sem
+ * reorganizar o mapa nem criar versão nova da arquitetura.
+ */
+function MudancasDoPrompt() {
+  const buscar = useServerFn(historicoInstrucoesNina);
+  const { data, isLoading } = useQuery({
+    queryKey: ["nina-instrucoes-historico", "whatsapp"],
+    queryFn: () => buscar({ data: { escopo: "whatsapp" as const } }),
+  });
+
+  const publicadas = (data ?? [])
+    .filter((v) => v.status === "publicada" || v.status === "arquivada")
+    .sort((a, b) => a.versao - b.versao);
+
+  const trocas = publicadas.map((v, i) =>
+    mudancaConfiguracaoPrompt(i > 0 ? publicadas[i - 1]!.versao : null, v.versao),
+  );
+
+  return (
+    <Card>
+      <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2">
+        <CardTitle className="text-base">Mudanças das Instruções da Nina</CardTitle>
+        <Badge variant="outline">Configuração, não estrutura</Badge>
+      </CardHeader>
+      <CardContent className="space-y-2 text-sm">
+        {isLoading ? (
+          <p className="text-muted-foreground">Carregando as publicações…</p>
+        ) : trocas.length === 0 ? (
+          <p className="text-muted-foreground">Nenhuma versão publicada até agora.</p>
+        ) : (
+          <ul className="space-y-1">
+            {[...trocas].reverse().map((t) => (
+              <li key={t.para} className="flex flex-wrap items-center gap-2">
+                <span>{t.resumo}</span>
+                <span className="text-xs text-muted-foreground">
+                  Montagem do prompt — metadados atualizados
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+        <p className="text-xs text-muted-foreground">
+          Trocar o conteúdo das instruções não reorganiza o desenho do mapa.
+        </p>
+      </CardContent>
+    </Card>
+  );
+}
