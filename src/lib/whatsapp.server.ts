@@ -1427,6 +1427,7 @@ ATENDIMENTO HUMANO — REGRA OBRIGATÓRIA:
         paraDecisaoLegado,
         resumoHandoffEstruturado,
       } = await import("@/lib/nina/confidence/runtime");
+      const { montarRegistroAuditoria } = await import("@/lib/nina/confidence/auditoria");
       const estadoTurno = {
         texto,
         mensagemPaciente,
@@ -1462,6 +1463,15 @@ ATENDIMENTO HUMANO — REGRA OBRIGATÓRIA:
           traceId: rastro?.ids.trace_id ?? null,
           teste: opcoes?.teste === true,
           decisao: paraDecisaoLegado(decisao),
+          // Evidência observável apenas: validadores, motivos, fontes,
+          // ferramentas e bloqueios. Nunca o rascunho ou o raciocínio interno.
+          auditoria: montarRegistroAuditoria(decisao, {
+            conversationId: estadoId.conversaId ?? null,
+            messageId: opcoes?.mensagensEntrada?.[0] ?? null,
+            intencao: detectarIntencoes(mensagemPaciente).join(", ") || null,
+            acaoSolicitada: podeAgendar ? "criar_agendamento" : "responder_informacao",
+            ferramentas: evidenciasFerramentas,
+          }),
         });
       }
 

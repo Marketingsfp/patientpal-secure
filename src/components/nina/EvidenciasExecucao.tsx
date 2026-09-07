@@ -6,6 +6,7 @@
  */
 import { useEffect, useState } from "react";
 import { lerEvidenciasExecucaoNina } from "@/lib/nina/evidencias.functions";
+import { ConfiabilidadeDecisao } from "@/components/nina/ConfiabilidadeDecisao";
 import {
   ROTULO_ETAPA,
   ROTULO_FONTE,
@@ -60,6 +61,7 @@ export function EvidenciasExecucao({
 
   return (
     <div className="space-y-4 text-sm">
+      <ConfiabilidadeDecisao clinicaId={clinicaId} execucaoId={execucaoId} />
       <section className="space-y-1">
         <h4 className="font-medium">Pergunta do paciente (mensagens vinculadas)</h4>
         {dados.pergunta ? (
