@@ -632,7 +632,7 @@ export const finalizarItemExecucao = createServerFn({ method: "POST" })
       // Nenhuma simulação de paciente pode continuar viva após o cenário.
       await supabaseAdmin
         .from("nina_teste_simulacoes")
-        .update({ status: "parada", finalizado_em: agora, motivo_fim: desfecho })
+        .update({ status: "parada", finalizado_em: agora, motivo_fim: desfecho === "handoff" ? "transferencia" : "operador" })
         .eq("clinica_id", data.clinicaId)
         .eq("lead_id", (lead as any).id)
         .in("status", ["executando", "pausada"]);

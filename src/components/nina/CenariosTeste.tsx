@@ -230,7 +230,7 @@ export function CenariosTeste() {
               clinicaId: clinicaId!,
               simulacaoId: inicio.simulacaoId,
               acao: "concluir",
-              motivo: houveHandoff ? "handoff" : "limite_turnos",
+              motivo: houveHandoff ? "transferencia" : "limite_turnos",
             },
           }).catch(() => {});
         } catch (e: any) {
