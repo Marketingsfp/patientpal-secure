@@ -117,6 +117,9 @@ export type ConfiabilidadeDecisaoView = {
   ambiente: string;
   bloqueadores: string[];
   linhas: LinhaConfiabilidade[];
+  reasonCodes: string[];
+  acaoSolicitada: string | null;
+  policyVersion: string | null;
   registradoEm: string;
 };
 
@@ -133,7 +136,7 @@ export const confiabilidadeDaExecucao = createServerFn({ method: "POST" })
     const { data: row, error } = await context.supabase
       .from("nina_confianca_decisoes")
       .select(
-        "created_at, ambiente, score, nivel, intencao, resultado_final, bloqueadores, validadores, ferramentas, fontes",
+        "created_at, ambiente, score, nivel, intencao, resultado_final, bloqueadores, validadores, ferramentas, fontes, reason_codes, acao_solicitada, policy_version",
       )
       .eq("clinica_id", data.clinicaId)
       .eq("execucao_id", data.execucaoId)
@@ -178,6 +181,13 @@ export const confiabilidadeDaExecucao = createServerFn({ method: "POST" })
       ambiente: r.ambiente,
       bloqueadores: r.bloqueadores ?? [],
       linhas: linhasConfiabilidade(registro),
+      reasonCodes: lista((r as unknown as Record<string, unknown>)["reason_codes"]),
+      acaoSolicitada: (r as unknown as Record<string, unknown>)["acao_solicitada"]
+        ? String((r as unknown as Record<string, unknown>)["acao_solicitada"])
+        : null,
+      policyVersion: (r as unknown as Record<string, unknown>)["policy_version"]
+        ? String((r as unknown as Record<string, unknown>)["policy_version"])
+        : null,
       registradoEm: r.created_at,
     };
   });
