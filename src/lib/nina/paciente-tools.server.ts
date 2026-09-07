@@ -181,8 +181,8 @@ async function pacienteSinteticoDoLead(
           telefone,
           is_mock_data: true,
           teste: true,
-          } as never)
         } as never)
+
         .select("id, nome")
         .maybeSingle();
       if (error) throw new Error(error.message);
