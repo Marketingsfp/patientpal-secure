@@ -30,6 +30,7 @@ import {
   calcularLayout,
   type Posicao,
 } from "@/lib/nina/arquitetura/layout";
+import { NodeDetalhePainel } from "./NodeDetalhePainel";
 
 export type StatusNodeCanvas = {
   /** Estado mostrado no node (modo EXECUÇÃO preenche isto na fase seguinte). */
@@ -52,6 +53,8 @@ type Props = {
   /** Quando true, nodes sem status ficam apagados. */
   modoExecucao?: boolean;
   nodes?: NodeArquitetura[];
+  /** Clínica usada para autorizar a visualização de código no painel. */
+  clinicaId?: string | null;
 };
 
 const ESCALA_MIN = 0.2;
@@ -81,6 +84,7 @@ export function ArquiteturaCanvas({
   execucao,
   modoExecucao = false,
   nodes = NODES_ARQUITETURA,
+  clinicaId,
 }: Props) {
   const areaRef = useRef<HTMLDivElement | null>(null);
   const [posicoes, setPosicoes] = useState<Record<string, Posicao>>({});
