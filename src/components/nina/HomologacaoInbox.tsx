@@ -32,7 +32,15 @@ import {
   enviarMensagemTeste,
   resolverConversaTeste,
   ferramentasUsadasTeste,
+  detalheExecucaoTeste,
 } from "@/lib/nina/teste-console.functions";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -73,6 +81,7 @@ type Msg = {
   body: string | null;
   enviada_por: string | null;
   created_at: string;
+  execucao_id?: string | null;
 };
 
 /** Rastro técnico de uma chamada de ferramenta feita pela Nina no teste. */
@@ -120,6 +129,30 @@ export function HomologacaoInbox() {
   const [erro, setErro] = useState<string | null>(null);
   const [ultimoTexto, setUltimoTexto] = useState("");
   const [tipo, setTipo] = useState<TipoMensagem>("text");
+  // FASE 3 — detalhe técnico de uma execução da Nina (prompt, versão,
+  // conhecimento, ferramentas, modelo, erros e resposta).
+  const carregarDetalhe = useServerFn(detalheExecucaoTeste);
+  const [detalhe, setDetalhe] = useState<any | null>(null);
+  const [detalheAberto, setDetalheAberto] = useState(false);
+  const [detalheCarregando, setDetalheCarregando] = useState(false);
+  const abrirDetalhe = useCallback(
+    async (execucaoId: string) => {
+      if (!clinicaId) return;
+      setDetalheAberto(true);
+      setDetalheCarregando(true);
+      setDetalhe(null);
+      try {
+        const r = await carregarDetalhe({ data: { clinicaId, execucaoId } });
+        setDetalhe(r);
+      } catch (e) {
+        mostrarErro(e);
+        setDetalheAberto(false);
+      } finally {
+        setDetalheCarregando(false);
+      }
+    },
+    [carregarDetalhe, clinicaId],
+  );
   const [audio, setAudio] = useState<string | null>(null);
   const [limparAgenda, setLimparAgenda] = useState(true);
   const [ferramentas, setFerramentas] = useState<EventoFerramenta[]>([]);
@@ -655,6 +688,15 @@ export function HomologacaoInbox() {
                         >
                           {formatarDataHoraMensagem(m.created_at)}{" "}
                           {daNina ? "· Nina" : "· Paciente (teste)"}
+                          {daNina && m.execucao_id && (
+                            <button
+                              type="button"
+                              className="ml-2 underline underline-offset-2 hover:opacity-80"
+                              onClick={() => void abrirDetalhe(m.execucao_id as string)}
+                            >
+                              Detalhes técnicos
+                            </button>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -752,6 +794,7 @@ export function HomologacaoInbox() {
                   ) : (
                     <Send className="h-4 w-4" />
                   )}
+                  <span className="ml-2 hidden sm:inline">Enviar como paciente</span>
                 </Button>
               </div>
               {!podeEscrever && (
@@ -763,6 +806,87 @@ export function HomologacaoInbox() {
           </>
         )}
       </Card>
+
+      <Dialog open={detalheAberto} onOpenChange={setDetalheAberto}>
+        <DialogContent className="max-h-[85vh] max-w-2xl overflow-auto">
+          <DialogHeader>
+            <DialogTitle>Detalhes técnicos da resposta</DialogTitle>
+            <DialogDescription>
+              Mesma execução registrada pelo atendimento real da Nina.
+            </DialogDescription>
+          </DialogHeader>
+          {detalheCarregando && <p className="text-sm text-muted-foreground">Carregando…</p>}
+          {!detalheCarregando && detalhe?.execucao && (
+            <div className="space-y-3 text-xs">
+              <div className="grid grid-cols-1 gap-x-4 gap-y-1 sm:grid-cols-2">
+                {[
+                  ["Modelo", detalhe.execucao.model],
+                  ["Raciocínio", detalhe.execucao.thinking_level],
+                  ["Instruções (versão)", detalhe.execucao.prompt_versao],
+                  ["Origem das instruções", detalhe.execucao.prompt_origem],
+                  ["Publicada em", detalhe.execucao.prompt_publicado_em],
+                  ["Conhecimento", detalhe.execucao.knowledge_status],
+                  ["Ferramentas", detalhe.execucao.tool_calls],
+                  ["Transferência", detalhe.execucao.handoff ? "sim" : "não"],
+                  ["Sucesso", detalhe.execucao.success ? "sim" : "não"],
+                  ["Erro", detalhe.execucao.error_category],
+                  ["Tempo (ms)", detalhe.execucao.latency_ms],
+                  ["Trace", detalhe.traceId],
+                ].map(([k, v]) => (
+                  <div key={String(k)}>
+                    <span className="text-muted-foreground">{k}:</span>{" "}
+                    <span className="font-mono">
+                      {v === null || v === undefined || v === "" ? "—" : String(v)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+
+              {detalhe.eventos?.length > 0 && (
+                <div>
+                  <p className="mb-1 font-medium text-muted-foreground">Etapas do fluxo</p>
+                  <div className="space-y-0.5 font-mono text-[11px]">
+                    {detalhe.eventos.map((ev: any, i: number) => (
+                      <div key={i}>
+                        <span
+                          className={
+                            ev.status === "erro" ? "text-destructive" : "text-emerald-600"
+                          }
+                        >
+                          {ev.status === "erro" ? "✖" : "✔"}
+                        </span>{" "}
+                        {ev.node_id}
+                        {ev.duration_ms != null ? ` (${ev.duration_ms}ms)` : ""}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {detalhe.etapas?.length > 0 && (
+                <div>
+                  <p className="mb-1 font-medium text-muted-foreground">Evidências registradas</p>
+                  <div className="space-y-1">
+                    {detalhe.etapas.map((et: any, i: number) => (
+                      <details key={i} className="rounded border bg-muted/30 p-1.5">
+                        <summary className="cursor-pointer">{et.titulo ?? et.tipo}</summary>
+                        <pre className="mt-1 max-h-48 overflow-auto whitespace-pre-wrap break-words text-[10px]">
+                          {JSON.stringify(et.dados ?? et, null, 2)}
+                        </pre>
+                      </details>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+          {!detalheCarregando && detalhe && !detalhe.execucao && (
+            <p className="text-sm text-muted-foreground">
+              Sem registro técnico para esta mensagem.
+            </p>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
