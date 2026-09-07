@@ -55,6 +55,20 @@ function Pagina() {
   const clinicaId = clinicaAtual?.clinica_id ?? null;
   const [modo, setModo] = useState<"arquitetura" | "execucao" | "alteracoes">("arquitetura");
 
+  // FASE 5 — ação "Ver instruções" do node Montagem do prompt: volta para o
+  // mapa e rola até a seção editável abaixo do canvas.
+  useEffect(() => {
+    function irParaInstrucoes() {
+      setModo("arquitetura");
+      requestAnimationFrame(() => {
+        document.getElementById("instrucoes-nina")?.scrollIntoView({ behavior: "smooth" });
+      });
+    }
+    window.addEventListener("nina:ver-instrucoes", irParaInstrucoes);
+    return () => window.removeEventListener("nina:ver-instrucoes", irParaInstrucoes);
+  }, []);
+
+
   const buscarCapacidades = useServerFn(capacidadesArquitetura);
   const { data: permissao } = useQuery({
     queryKey: ["arquitetura-capacidades", clinicaId],
