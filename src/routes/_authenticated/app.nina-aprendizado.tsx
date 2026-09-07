@@ -886,14 +886,31 @@ function Pagina() {
     }
   };
 
+  // Confiança REAL registrada quando a resposta foi produzida. Nada é
+  // recalculado aqui: leitura em lote do snapshot, casado pela execução.
+  const idsExecucao = useMemo(
+    () =>
+      Array.from(
+        new Set(itens.map((i) => i.execucao_id).filter((v): v is string => Boolean(v))),
+      ).slice(0, 300),
+    [itens],
+  );
+  const confianca = useConfiancaMensagens(clinicaId, idsExecucao);
+
   const itensFiltrados = useMemo(
     () =>
-      itens.filter(
-        (i) =>
-          (fPrioridade === "todas" || i.prioridade === fPrioridade) &&
-          (fCausa === "todas" || i.root_cause === fCausa),
-      ),
-    [itens, fPrioridade, fCausa],
+      itens.filter((i) => {
+        if (fPrioridade !== "todas" && i.prioridade !== fPrioridade) return false;
+        if (fCausa !== "todas" && i.root_cause !== fCausa) return false;
+        if (fConfianca === "todas") return true;
+        const c = i.execucao_id ? confianca[i.execucao_id] : undefined;
+        if (fConfianca === "sem") return !c;
+        if (!c) return false;
+        if (fConfianca === "90") return c.score >= 90;
+        if (fConfianca === "95") return c.score >= 95;
+        return c.nivel === fConfianca;
+      }),
+    [itens, fPrioridade, fCausa, fConfianca, confianca],
   );
 
   const cabecalho = useMemo(
