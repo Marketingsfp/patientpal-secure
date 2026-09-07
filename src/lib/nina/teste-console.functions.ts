@@ -16,6 +16,7 @@ import { z } from "zod";
 
 import {
   CANAL_TESTE,
+  LIMITE_MENSAGENS_LEAD,
   TOTAL_LEADS,
   telefoneSessao,
   garantirLeads,

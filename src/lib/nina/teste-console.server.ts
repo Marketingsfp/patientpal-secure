@@ -195,7 +195,6 @@ export type EntradaMensagemTeste = {
 
 /** Processa uma mensagem de paciente de teste pelo pipeline real da Nina. */
 export async function processarMensagemTeste(data: EntradaMensagemTeste, userId: string | null) {
-    await assertMembership(context.supabase, userId, data.clinicaId);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const lead = await carregarLead(supabaseAdmin, data.clinicaId, data.leadId);
     const { conversaId, cicloId } = await garantirCiclo(
@@ -449,5 +448,5 @@ export async function processarMensagemTeste(data: EntradaMensagemTeste, userId:
     };
 }
 
-export { CANAL_TESTE, TOTAL_LEADS, telefoneSessao, garantirLeads, carregarLead, garantirCiclo, conversasDoLead, podarMensagensLead };
+export { LIMITE_MENSAGENS_LEAD, CANAL_TESTE, TOTAL_LEADS, telefoneSessao, garantirLeads, carregarLead, garantirCiclo, conversasDoLead, podarMensagensLead };
 export type { LeadRow };
