@@ -161,14 +161,21 @@ function Pagina() {
           </Card>
 
           <div id="instrucoes-nina" className="scroll-mt-24">
-            <InstrucoesNina />
+            {clinicaId && podeArquitetura(capacidades, "nina.instrucoes.ver") ? (
+              <InstrucoesNina
+                clinicaId={clinicaId}
+                podeEditar={podeArquitetura(capacidades, "nina.instrucoes.editar")}
+                podePublicar={podeArquitetura(capacidades, "nina.instrucoes.publicar")}
+                podeHistorico={podeArquitetura(capacidades, "nina.instrucoes.historico")}
+              />
+            ) : null}
           </div>
 
         </TabsContent>
 
 
         <TabsContent value="alteracoes" className="mt-4">
-          <PainelAlteracoes />
+          <PainelAlteracoes clinicaId={clinicaId ?? null} podeHistorico={podeArquitetura(capacidades, "nina.instrucoes.historico")} />
         </TabsContent>
 
         <TabsContent value="execucao" className="mt-4">
@@ -196,7 +203,13 @@ function Pagina() {
   );
 }
 
-function PainelAlteracoes() {
+function PainelAlteracoes({
+  clinicaId,
+  podeHistorico,
+}: {
+  clinicaId: string | null;
+  podeHistorico: boolean;
+}) {
   const comparacao = comparacaoRecente();
 
   if (!comparacao) {
@@ -325,7 +338,7 @@ function PainelAlteracoes() {
         </CardContent>
       </Card>
 
-      <MudancasDoPrompt />
+      {clinicaId && podeHistorico ? <MudancasDoPrompt clinicaId={clinicaId} /> : null}
 
       <p className="text-xs text-muted-foreground">
         Mover ou reorganizar componentes no mapa muda apenas o desenho e não cria uma versão nova
@@ -343,11 +356,11 @@ function PainelAlteracoes() {
  * do componente "Montagem do prompt" e registra a troca de versão, sem
  * reorganizar o mapa nem criar versão nova da arquitetura.
  */
-function MudancasDoPrompt() {
+function MudancasDoPrompt({ clinicaId }: { clinicaId: string }) {
   const buscar = useServerFn(historicoInstrucoesNina);
   const { data, isLoading } = useQuery({
-    queryKey: ["nina-instrucoes-historico", "whatsapp"],
-    queryFn: () => buscar({ data: { escopo: "whatsapp" as const } }),
+    queryKey: ["nina-instrucoes-historico", "whatsapp", clinicaId],
+    queryFn: () => buscar({ data: { clinicaId, escopo: "whatsapp" as const } }),
   });
 
   const publicadas = (data ?? [])

@@ -18,6 +18,16 @@ export const CAPACIDADES_ARQUITETURA = [
   "arquitetura.instrucoes",
   /** Ver detalhes adicionais (contexto enviado, conteúdo recuperado, argumentos). */
   "arquitetura.detalhes",
+  // FASE 7 — Instruções da Nina. Edição e publicação são SEPARADAS de
+  // propósito: dá para deixar alguém escrever rascunho sem poder publicar.
+  /** Ver o conteúdo das Instruções da Nina. */
+  "nina.instrucoes.ver",
+  /** Escrever/salvar rascunho (não altera o atendimento). */
+  "nina.instrucoes.editar",
+  /** Publicar uma versão — passa a valer para as próximas execuções. */
+  "nina.instrucoes.publicar",
+  /** Ver o histórico de versões, comparar e abrir versões antigas. */
+  "nina.instrucoes.historico",
 ] as const;
 
 export type CapacidadeArquitetura = (typeof CAPACIDADES_ARQUITETURA)[number];
@@ -28,6 +38,10 @@ export const ROTULOS_CAPACIDADE: Record<CapacidadeArquitetura, string> = {
   "arquitetura.codigo": "Visualizar referências e trechos de código",
   "arquitetura.instrucoes": "Visualizar instruções da Nina",
   "arquitetura.detalhes": "Visualizar detalhes adicionais autorizados",
+  "nina.instrucoes.ver": "Ver as Instruções da Nina",
+  "nina.instrucoes.editar": "Editar e salvar rascunho das Instruções da Nina",
+  "nina.instrucoes.publicar": "Publicar uma nova versão das Instruções da Nina",
+  "nina.instrucoes.historico": "Ver histórico e comparar versões das Instruções",
 };
 
 /**
@@ -36,8 +50,21 @@ export const ROTULOS_CAPACIDADE: Record<CapacidadeArquitetura, string> = {
  */
 const POR_PAPEL: Record<string, CapacidadeArquitetura[]> = {
   admin: [...CAPACIDADES_ARQUITETURA],
-  gestor: ["arquitetura.visualizar", "arquitetura.execucao"],
-  supervisor: ["arquitetura.visualizar", "arquitetura.execucao"],
+  // Gestor escreve rascunho, mas NÃO publica: publicar muda o comportamento
+  // real da Nina no atendimento.
+  gestor: [
+    "arquitetura.visualizar",
+    "arquitetura.execucao",
+    "nina.instrucoes.ver",
+    "nina.instrucoes.editar",
+    "nina.instrucoes.historico",
+  ],
+  supervisor: [
+    "arquitetura.visualizar",
+    "arquitetura.execucao",
+    "nina.instrucoes.ver",
+    "nina.instrucoes.historico",
+  ],
 };
 
 export function capacidadesDoPapel(papel: string | null | undefined): CapacidadeArquitetura[] {

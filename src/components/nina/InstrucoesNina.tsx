@@ -58,11 +58,24 @@ function dataBr(iso: string | null) {
   return new Date(iso).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" });
 }
 
-export function InstrucoesNina() {
+export function InstrucoesNina({
+  clinicaId,
+  podeEditar,
+  podePublicar,
+  podeHistorico,
+}: {
+  clinicaId: string;
+  /** FASE 7 — quem só visualiza não pode salvar rascunho. */
+  podeEditar: boolean;
+  /** FASE 7 — publicar é separado de editar. */
+  podePublicar: boolean;
+  podeHistorico: boolean;
+}) {
   const carregar = useServerFn(carregarInstrucoesNina);
   const { data, isLoading, error } = useQuery({
-    queryKey: ["nina-instrucoes"],
-    queryFn: () => carregar(),
+    queryKey: ["nina-instrucoes", clinicaId],
+    queryFn: () => carregar({ data: { clinicaId } }),
+    enabled: !!clinicaId,
   });
   const [escopo, setEscopo] = useState<EscopoInstrucoes>("whatsapp");
 
@@ -90,7 +103,13 @@ export function InstrucoesNina() {
             </TabsList>
             {(data ?? []).map((bloco) => (
               <TabsContent key={bloco.escopo} value={bloco.escopo} className="mt-4">
-                <Editor bloco={bloco} />
+                <Editor
+                  bloco={bloco}
+                  clinicaId={clinicaId}
+                  podeEditar={podeEditar}
+                  podePublicar={podePublicar}
+                  podeHistorico={podeHistorico}
+                />
               </TabsContent>
             ))}
           </Tabs>
@@ -100,7 +119,19 @@ export function InstrucoesNina() {
   );
 }
 
-function Editor({ bloco }: { bloco: InstrucoesEscopo }) {
+function Editor({
+  bloco,
+  clinicaId,
+  podeEditar,
+  podePublicar,
+  podeHistorico,
+}: {
+  bloco: InstrucoesEscopo;
+  clinicaId: string;
+  podeEditar: boolean;
+  podePublicar: boolean;
+  podeHistorico: boolean;
+}) {
   const queryClient = useQueryClient();
   const base = bloco.rascunho ?? bloco.publicada;
   const [texto, setTexto] = useState(base?.conteudo ?? "");
@@ -113,14 +144,21 @@ function Editor({ bloco }: { bloco: InstrucoesEscopo }) {
   }, [base?.id, base?.conteudo]);
 
   const atualizar = () => {
-    queryClient.invalidateQueries({ queryKey: ["nina-instrucoes"] });
+    queryClient.invalidateQueries({ queryKey: ["nina-instrucoes", clinicaId] });
     queryClient.invalidateQueries({ queryKey: ["nina-instrucoes-historico", bloco.escopo] });
   };
 
   const salvarFn = useServerFn(salvarRascunhoInstrucoes);
   const salvar = useMutation({
     mutationFn: () =>
-      salvarFn({ data: { escopo: bloco.escopo, conteudo: texto, comentario: comentario || undefined } }),
+      salvarFn({
+        data: {
+          clinicaId,
+          escopo: bloco.escopo,
+          conteudo: texto,
+          comentario: comentario || undefined,
+        },
+      }),
     onSuccess: () => {
       toast.success("Rascunho salvo. A Nina continua respondendo como antes.");
       atualizar();
@@ -131,9 +169,15 @@ function Editor({ bloco }: { bloco: InstrucoesEscopo }) {
 
   const publicarFn = useServerFn(publicarInstrucoesNina);
   const publicar = useMutation({
-    mutationFn: (entrada: { conteudo: string; comentario?: string }) =>
+    mutationFn: (entrada: { conteudo: string; comentario?: string; restauradaDe?: number }) =>
       publicarFn({
-        data: { escopo: bloco.escopo, conteudo: entrada.conteudo, comentario: entrada.comentario },
+        data: {
+          clinicaId,
+          escopo: bloco.escopo,
+          conteudo: entrada.conteudo,
+          comentario: entrada.comentario,
+          restauradaDe: entrada.restauradaDe ?? null,
+        },
       }),
     onSuccess: (nova) => {
       toast.success(`Versão v${nova.versao} publicada. A versão anterior foi guardada.`);
@@ -171,6 +215,7 @@ function Editor({ bloco }: { bloco: InstrucoesEscopo }) {
         id={`instrucoes-${bloco.escopo}`}
         value={texto}
         onChange={(e) => setTexto(e.target.value)}
+        readOnly={!podeEditar}
         spellCheck={false}
         className="min-h-[520px] resize-y overflow-auto whitespace-pre font-mono text-xs leading-relaxed"
       />
@@ -186,17 +231,32 @@ function Editor({ bloco }: { bloco: InstrucoesEscopo }) {
         <Button
           variant="secondary"
           onClick={() => salvar.mutate()}
-          disabled={salvar.isPending || !alterado || vazio}
+          disabled={!podeEditar || salvar.isPending || !alterado || vazio}
         >
           {salvar.isPending ? "Salvando…" : "Salvar rascunho"}
         </Button>
-        <Button onClick={() => setConfirmando(true)} disabled={publicar.isPending || vazio}>
+        <Button
+          onClick={() => setConfirmando(true)}
+          disabled={!podePublicar || publicar.isPending || vazio}
+        >
           {publicar.isPending ? "Publicando…" : "Publicar instruções"}
         </Button>
-        <Button variant="outline" onClick={() => setHistoricoAberto(true)}>
+        <Button
+          variant="outline"
+          onClick={() => setHistoricoAberto(true)}
+          disabled={!podeHistorico}
+        >
           Histórico de versões
         </Button>
       </div>
+
+      {!podePublicar ? (
+        <p className="text-xs text-muted-foreground">
+          {podeEditar
+            ? "Seu acesso permite salvar rascunho, mas não publicar. A publicação é feita por um administrador."
+            : "Seu acesso é somente de leitura nas Instruções da Nina."}
+        </p>
+      ) : null}
 
       <p className="text-xs text-muted-foreground">
         Digitar e salvar rascunho não muda o atendimento. Publicar guarda a versão anterior e cria
@@ -223,6 +283,8 @@ function Editor({ bloco }: { bloco: InstrucoesEscopo }) {
       </AlertDialog>
 
       <HistoricoVersoes
+        clinicaId={clinicaId}
+        podeRestaurar={podePublicar}
         escopo={bloco.escopo}
         aberto={historicoAberto}
         onOpenChange={setHistoricoAberto}
@@ -232,6 +294,7 @@ function Editor({ bloco }: { bloco: InstrucoesEscopo }) {
           publicar.mutate({
             conteudo: versao.conteudo,
             comentario: `Restauração do conteúdo da v${versao.versao}.`,
+            restauradaDe: versao.versao,
           })
         }
       />
@@ -240,6 +303,8 @@ function Editor({ bloco }: { bloco: InstrucoesEscopo }) {
 }
 
 function HistoricoVersoes({
+  clinicaId,
+  podeRestaurar,
   escopo,
   aberto,
   onOpenChange,
@@ -247,6 +312,8 @@ function HistoricoVersoes({
   restaurando,
   onRestaurar,
 }: {
+  clinicaId: string;
+  podeRestaurar: boolean;
   escopo: EscopoInstrucoes;
   aberto: boolean;
   onOpenChange: (v: boolean) => void;
@@ -257,7 +324,7 @@ function HistoricoVersoes({
   const buscar = useServerFn(historicoInstrucoesNina);
   const { data: versoes, isLoading } = useQuery({
     queryKey: ["nina-instrucoes-historico", escopo],
-    queryFn: () => buscar({ data: { escopo } }),
+    queryFn: () => buscar({ data: { clinicaId, escopo } }),
     enabled: aberto,
   });
 
@@ -310,7 +377,7 @@ function HistoricoVersoes({
                     <Button
                       size="sm"
                       variant="secondary"
-                      disabled={restaurando}
+                      disabled={restaurando || !podeRestaurar}
                       onClick={() => setConfirmarRestauro(v)}
                     >
                       Restaurar como nova versão
