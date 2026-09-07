@@ -537,6 +537,11 @@ const navRows: ReadonlyArray<{ label: string; items: ReadonlyArray<NavItem> }> =
             label: "Métricas de Aprendizado",
             icon: BarChart3,
           },
+          {
+            to: "/app/nina-arquitetura",
+            label: "Arquitetura",
+            icon: Network,
+          },
         ],
       },
       {
