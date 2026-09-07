@@ -14,8 +14,18 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
 
-const CANAL_TESTE = "test-console";
-const TOTAL_LEADS = 10;
+import {
+  CANAL_TESTE,
+  TOTAL_LEADS,
+  telefoneSessao,
+  garantirLeads,
+  carregarLead,
+  garantirCiclo,
+  conversasDoLead,
+  podarMensagensLead,
+  processarMensagemTeste,
+  type LeadRow,
+} from "@/lib/nina/teste-console.server";
 
 async function assertMembership(supabase: any, userId: string, clinicaId: string) {
   const { data, error } = await supabase
@@ -28,180 +38,6 @@ async function assertMembership(supabase: any, userId: string, clinicaId: string
   if (error) throw new Error(error.message);
   if (!data) throw new Error("Sem acesso a esta clínica");
 }
-
-/** DDD "00" nunca existe no Brasil: o telefone virtual não colide com paciente real. */
-function telefoneSessao(indice: number, sessao: number) {
-  return `5500${String(indice).padStart(2, "0")}${String(sessao).padStart(5, "0")}`;
-}
-
-type LeadRow = {
-  id: string;
-  indice: number;
-  nome: string;
-  telefone_base: string;
-  telefone_sessao: string;
-  sessao_seq: number;
-  conversa_id: string | null;
-  ciclo_id: string | null;
-  ciclo_iniciado_em: string | null;
-  resolvido_em: string | null;
-  status: string;
-};
-
-/** Cria os 10 leads da clínica se ainda não existirem (idempotente). */
-async function garantirLeads(admin: any, clinicaId: string): Promise<LeadRow[]> {
-  const linhas = Array.from({ length: TOTAL_LEADS }, (_, i) => {
-    const indice = i + 1;
-    return {
-      clinica_id: clinicaId,
-      indice,
-      nome: `Lead Teste ${String(indice).padStart(2, "0")}`,
-      telefone_base: telefoneSessao(indice, 0),
-      telefone_sessao: telefoneSessao(indice, 1),
-      sessao_seq: 1,
-      status: "ativa",
-    };
-  });
-  const { error } = await admin
-    .from("nina_teste_leads")
-    .upsert(linhas, { onConflict: "clinica_id,indice", ignoreDuplicates: true });
-  if (error) throw new Error(error.message);
-
-  const { data, error: e2 } = await admin
-    .from("nina_teste_leads")
-    .select("id, indice, nome, telefone_base, telefone_sessao, sessao_seq, conversa_id, ciclo_id, ciclo_iniciado_em, resolvido_em, status")
-    .eq("clinica_id", clinicaId)
-    .order("indice");
-  if (e2) throw new Error(e2.message);
-  return (data ?? []) as LeadRow[];
-}
-
-async function carregarLead(admin: any, clinicaId: string, leadId: string): Promise<LeadRow> {
-  const { data, error } = await admin
-    .from("nina_teste_leads")
-    .select("id, indice, nome, telefone_base, telefone_sessao, sessao_seq, conversa_id, ciclo_id, ciclo_iniciado_em, resolvido_em, status")
-    .eq("clinica_id", clinicaId)
-    .eq("id", leadId)
-    .maybeSingle();
-  if (error) throw new Error(error.message);
-  if (!data) throw new Error("Lead de teste não encontrado nesta clínica");
-  return data as LeadRow;
-}
-
-/**
- * Garante o CICLO de teste atual do lead (test_cycle_id) e a conversa dele.
- *
- * Um ciclo = uma sessão isolada: telefone virtual próprio, conversa própria e
- * registro próprio em `nina_teste_ciclos` (com início, encerramento e situação).
- * Nada é compartilhado entre leads nem entre ciclos do mesmo lead.
- */
-async function garantirCiclo(
-  admin: any,
-  clinicaId: string,
-  lead: LeadRow,
-  userId: string | null,
-): Promise<{ conversaId: string; cicloId: string }> {
-  if (lead.conversa_id && lead.ciclo_id)
-    return { conversaId: lead.conversa_id, cicloId: lead.ciclo_id };
-
-  const { data: ciclo, error: eCiclo } = await admin
-    .from("nina_teste_ciclos")
-    .insert({
-      clinica_id: clinicaId,
-      lead_id: lead.id,
-      indice: lead.indice,
-      sessao_seq: lead.sessao_seq,
-      telefone_sessao: lead.telefone_sessao,
-      status: "ativo",
-      criado_por: userId,
-    })
-    .select("id")
-    .maybeSingle();
-  if (eCiclo) throw new Error(eCiclo.message);
-  const cicloId = (ciclo as any)?.id as string;
-
-  let conversaId = lead.conversa_id;
-  if (!conversaId) {
-    const { data, error } = await admin
-      .from("atend_conversas")
-      .insert({
-        clinica_id: clinicaId,
-        canal: CANAL_TESTE,
-        contato_telefone: lead.telefone_sessao,
-        contato_nome: lead.nome,
-        status: "bot_attending",
-        owner_type: "AI",
-        ai_enabled: true,
-        is_teste: true,
-        teste_ciclo_id: cicloId,
-        ultima_msg_em: new Date().toISOString(),
-      })
-      .select("id")
-      .maybeSingle();
-    if (error) throw new Error(error.message);
-    conversaId = (data as any)?.id as string;
-  } else {
-    await admin.from("atend_conversas").update({ teste_ciclo_id: cicloId }).eq("id", conversaId);
-  }
-
-  await admin.from("nina_teste_ciclos").update({ conversa_id: conversaId }).eq("id", cicloId);
-  await admin
-    .from("nina_teste_leads")
-    .update({
-      conversa_id: conversaId,
-      ciclo_id: cicloId,
-      ciclo_iniciado_em: new Date().toISOString(),
-      status: "ativa",
-    })
-    .eq("id", lead.id);
-  return { conversaId: conversaId as string, cicloId };
-}
-
-/** Teto de mensagens guardadas por lead de teste (todas as sessões somadas). */
-const LIMITE_MENSAGENS_LEAD = 400;
-
-/** IDs de todas as conversas de teste do lead (sessões atuais e anteriores). */
-async function conversasDoLead(admin: any, clinicaId: string, lead: LeadRow): Promise<string[]> {
-  const { data: convs } = await admin
-    .from("atend_conversas")
-    .select("id")
-    .eq("clinica_id", clinicaId)
-    .eq("is_teste", true)
-    .like("contato_telefone", `5500${String(lead.indice).padStart(2, "0")}%`);
-  const ids = ((convs ?? []) as any[]).map((c) => c.id as string);
-  if (lead.conversa_id && !ids.includes(lead.conversa_id)) ids.push(lead.conversa_id);
-  return ids;
-}
-
-/**
- * Mantém no máximo LIMITE_MENSAGENS_LEAD mensagens por lead de teste: ao bater
- * o teto, as mais antigas são apagadas para dar lugar às novas.
- */
-async function podarMensagensLead(admin: any, clinicaId: string, lead: LeadRow) {
-  try {
-    const ids = await conversasDoLead(admin, clinicaId, lead);
-    if (ids.length === 0) return;
-    const { count } = await admin
-      .from("whatsapp_mensagens")
-      .select("id", { count: "exact", head: true })
-      .eq("clinica_id", clinicaId)
-      .in("conversa_id", ids);
-    const excedente = (count ?? 0) - LIMITE_MENSAGENS_LEAD;
-    if (excedente <= 0) return;
-    const { data: antigas } = await admin
-      .from("whatsapp_mensagens")
-      .select("id")
-      .eq("clinica_id", clinicaId)
-      .in("conversa_id", ids)
-      .order("created_at", { ascending: true })
-      .limit(excedente);
-    const alvo = ((antigas ?? []) as any[]).map((m) => m.id as string);
-    if (alvo.length) await admin.from("whatsapp_mensagens").delete().in("id", alvo);
-  } catch (e) {
-    console.error("[NINA_TESTE] falha ao podar mensagens antigas", e);
-  }
-}
-
 
 
 export const listarLeadsTeste = createServerFn({ method: "POST" })
