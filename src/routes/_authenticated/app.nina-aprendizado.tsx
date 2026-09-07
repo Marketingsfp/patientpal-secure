@@ -77,6 +77,7 @@ import {
 } from "@/lib/nina/feedback-revisao.functions";
 import { TZ_CLINICA } from "@/lib/date-utils";
 import { ConversaAuditoriaDialog } from "@/components/nina/ConversaAuditoriaDialog";
+import { useConfiancaMensagens } from "@/components/nina/ConfiancaMensagem";
 
 
 import {
@@ -166,7 +167,26 @@ type Item = {
   knowledge_status: string | null;
   grupo_chave: string | null;
   grupo_titulo: string | null;
+  /** Execução da Nina que produziu a resposta — chave do snapshot de confiança. */
+  execucao_id?: string | null;
 };
+
+/** Rótulo/estilo do nível de confiança registrado no momento da resposta. */
+const CONFIANCA_UI: Record<string, { curto: string; classe: string }> = {
+  HIGH: { curto: "Alta", classe: "border-emerald-500/30 text-emerald-700 dark:text-emerald-300" },
+  MEDIUM: { curto: "Média", classe: "border-amber-500/30 text-amber-700 dark:text-amber-400" },
+  LOW: { curto: "Baixa", classe: "border-destructive/30 text-destructive" },
+};
+
+const FILTROS_CONFIANCA = [
+  { valor: "todas", rotulo: "Todas" },
+  { valor: "HIGH", rotulo: "Alta" },
+  { valor: "MEDIUM", rotulo: "Média" },
+  { valor: "LOW", rotulo: "Baixa" },
+  { valor: "sem", rotulo: "Não avaliada" },
+  { valor: "90", rotulo: "90% ou mais" },
+  { valor: "95", rotulo: "95% ou mais" },
+];
 
 type Comparacao = {
   knowledge_status: "found" | "not_found" | "conflict";
@@ -324,6 +344,7 @@ function Pagina() {
   const [ocorrencias, setOcorrencias] = useState<Record<string, number>>({});
   const [fPrioridade, setFPrioridade] = useState("todas");
   const [fCausa, setFCausa] = useState("todas");
+  const [fConfianca, setFConfianca] = useState("todas");
   const [diagnosticando, setDiagnosticando] = useState<Item | null>(null);
   const [comparacao, setComparacao] = useState<Comparacao | null>(null);
   const [consultandoBase, setConsultandoBase] = useState(false);
@@ -866,14 +887,31 @@ function Pagina() {
     }
   };
 
+  // Confiança REAL registrada quando a resposta foi produzida. Nada é
+  // recalculado aqui: leitura em lote do snapshot, casado pela execução.
+  const idsExecucao = useMemo(
+    () =>
+      Array.from(
+        new Set(itens.map((i) => i.execucao_id).filter((v): v is string => Boolean(v))),
+      ).slice(0, 300),
+    [itens],
+  );
+  const confianca = useConfiancaMensagens(clinicaId, idsExecucao);
+
   const itensFiltrados = useMemo(
     () =>
-      itens.filter(
-        (i) =>
-          (fPrioridade === "todas" || i.prioridade === fPrioridade) &&
-          (fCausa === "todas" || i.root_cause === fCausa),
-      ),
-    [itens, fPrioridade, fCausa],
+      itens.filter((i) => {
+        if (fPrioridade !== "todas" && i.prioridade !== fPrioridade) return false;
+        if (fCausa !== "todas" && i.root_cause !== fCausa) return false;
+        if (fConfianca === "todas") return true;
+        const c = i.execucao_id ? confianca[i.execucao_id] : undefined;
+        if (fConfianca === "sem") return !c;
+        if (!c) return false;
+        if (fConfianca === "90") return c.score >= 90;
+        if (fConfianca === "95") return c.score >= 95;
+        return c.nivel === fConfianca;
+      }),
+    [itens, fPrioridade, fCausa, fConfianca, confianca],
   );
 
   const cabecalho = useMemo(
@@ -972,6 +1010,21 @@ function Pagina() {
             </Select>
           </div>
           <div>
+            <Label htmlFor="f-conf">Confiança</Label>
+            <Select value={fConfianca} onValueChange={setFConfianca}>
+              <SelectTrigger id="f-conf" className="mt-1">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {FILTROS_CONFIANCA.map((c) => (
+                  <SelectItem key={c.valor} value={c.valor}>
+                    {c.rotulo}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
             <Label htmlFor="f-de">De</Label>
             <Input
               id="f-de"
@@ -1046,9 +1099,30 @@ function Pagina() {
                       ? fmtDataSegundos(mensagens[it.mensagem_id]!.enviada_em!)
                       : "Data/hora da mensagem indisponível"}
                   </p>
+                  {/* Confiança do momento da resposta — snapshot gravado pelo
+                      motor, nunca recalculado nem estimado nesta tela. */}
+                  {(() => {
+                    const c = it.execucao_id ? confianca[it.execucao_id] : undefined;
+                    const ui = c ? CONFIANCA_UI[c.nivel] : undefined;
+                    return (
+                      <p className="text-[11px] text-muted-foreground">
+                        Confiança no momento da resposta:{" "}
+                        {c && ui ? (
+                          <span className={`rounded-full border px-1.5 py-0.5 ${ui.classe}`}>
+                            {c.score}% — {ui.curto}
+                          </span>
+                        ) : (
+                          <span className="rounded-full border border-border px-1.5 py-0.5">
+                            Não avaliada
+                          </span>
+                        )}
+                      </p>
+                    );
+                  })()}
                   <p className="text-[11px] text-muted-foreground">
-                    Reportado em: {fmtData(it.created_at)} · {pessoas[it.reportado_por] ?? "—"}
+                    Erro reportado: {fmtData(it.created_at)} · {pessoas[it.reportado_por] ?? "—"}
                   </p>
+
 
 
                   <p className="text-xs text-muted-foreground">
