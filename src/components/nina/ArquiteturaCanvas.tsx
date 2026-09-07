@@ -424,6 +424,10 @@ export function ArquiteturaCanvas({
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
+        <span className="inline-flex items-center gap-1.5 rounded-full border border-primary/50 px-2 py-0.5 text-[11px] text-foreground">
+          <span className="h-0.5 w-4 rounded bg-primary" />
+          Caminho principal (mensagem → processamento → IA → ação → resposta)
+        </span>
         {CATEGORIAS_ARQUITETURA.map((categoria: CategoriaArquitetura) => (
           <span
             key={categoria}
