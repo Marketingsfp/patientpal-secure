@@ -244,7 +244,7 @@ export async function encaminharParaHumano(args: {
     .is("atribuida_user_id", null)
     .lte("aguardando_desde", agora);
 
-  await registrarEvento({
+  const handoffEventoId = await registrarEvento({
     clinicaId: args.clinicaId,
     conversaId: args.conversaId,
     evento: "HANDOFF_SOLICITADO",
@@ -264,6 +264,21 @@ export async function encaminharParaHumano(args: {
     departamentoId: depto?.id ?? null,
     detalhes: { posicao: count ?? 1 },
   });
+
+  // FASE 1 — protocolo obrigatório no handoff: nasce aqui, vinculado ao evento
+  // de handoff, com a MESMA lógica em produção e homologação. Idempotente: o
+  // banco reaproveita o número quando o ciclo já tem um.
+  try {
+    const { protocoloAoIniciarHandoff } = await import("./protocolo-atendimento.server");
+    await protocoloAoIniciarHandoff({
+      clinicaId: args.clinicaId,
+      conversaId: args.conversaId,
+      handoffEventoId,
+    });
+  } catch (e) {
+    console.error("[handoff] falha ao gerar protocolo do handoff", e);
+  }
+
 
   // Reserva o resumo interno desta transferência (idempotente e barato).
   // O texto em si é produzido depois, quando alguém abre a conversa: falha de
