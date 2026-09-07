@@ -159,10 +159,10 @@ export function classificarFalha(
   if (status === "cancelled") return "cancelamento";
   const texto = (mensagem ?? "").toLowerCase();
   if (/timeout|tempo esgotado|timed out|deadline/.test(texto)) return "timeout";
+  if (NODES_IA.has(nodeId) || /modelo|gateway|llm|token/.test(texto)) return "modelo";
   if (/indispon[ií]vel|conflito|regra|n[aã]o permitido|sem vaga|fora do hor[aá]rio/.test(texto)) {
     return "negocio";
   }
-  if (NODES_IA.has(nodeId) || /modelo|gateway|llm|token/.test(texto)) return "modelo";
   if (
     nodeId === "message.outbound" ||
     /meta|whatsapp|http|api|rede|network|fetch|502|503|504/.test(texto)

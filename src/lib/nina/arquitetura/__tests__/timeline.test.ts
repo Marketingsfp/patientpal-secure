@@ -48,6 +48,7 @@ describe("entrada e saída", () => {
       evento({ node_id: "context.load" }),
       evento({ node_id: "llm.generate" }),
       evento({ node_id: "tool.schedule.availability" }),
+      evento({ node_id: "message.persist" }),
       evento({ node_id: "message.outbound", metadata: { resposta: "Tenho 3 horários" } }),
     ]);
     expect(es.mensagemOriginal).toBe("Quero marcar limpeza");
