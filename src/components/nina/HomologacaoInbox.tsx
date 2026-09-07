@@ -87,7 +87,12 @@ import { useChatScroll } from "@/hooks/use-chat-scroll";
 import { formatarDataHoraMensagem } from "@/lib/atendimento/data-hora";
 import { definirSelecaoTeste } from "@/lib/webmcp/selecao-teste";
 import { assinarAtualizacao } from "@/lib/webmcp/atualizacao";
-import { rotuloAutorResumo } from "@/lib/nina/leads-resumo";
+import {
+  rotuloAutorResumo,
+  aplicarMensagemRealtime,
+  ordenarPorAtividade,
+  type MensagemResumoRow,
+} from "@/lib/nina/leads-resumo";
 import { supabase } from "@/integrations/supabase/client";
 
 
