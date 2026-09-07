@@ -128,13 +128,16 @@ async function garantirCiclo(
     await admin.from("atend_conversas").update({ teste_ciclo_id: cicloId }).eq("id", conversaId);
   }
 
-  await admin.from("nina_teste_ciclos").update({ conversa_id: conversaId }).eq("id", cicloId);
+  await admin
+    .from("nina_teste_ciclos")
+    .update({ conversa_id: conversaId, nina_session_id: novoNinaSessionId(cicloId) })
+    .eq("id", cicloId);
   await admin
     .from("nina_teste_leads")
     .update({
       conversa_id: conversaId,
       ciclo_id: cicloId,
-      ciclo_iniciado_em: new Date().toISOString(),
+      ciclo_iniciado_em: agoraISO,
       status: "ativa",
     })
     .eq("id", lead.id);
