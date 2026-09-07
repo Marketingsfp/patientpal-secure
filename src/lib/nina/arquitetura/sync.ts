@@ -138,9 +138,7 @@ export const SNAPSHOT_ANTERIOR: AssinaturaNode[] = [
       "routing.decide"
     ],
     "seguintes": [
-      "context.load",
-      "flow.state",
-      "instructions.greeting"
+      "context.load"
     ]
   },
   {
@@ -149,14 +147,11 @@ export const SNAPSHOT_ANTERIOR: AssinaturaNode[] = [
     "arquivo": "src/lib/nina-contexto.server.ts",
     "funcao": "contextoClinicaTexto",
     "anteriores": [
-      "flow.state",
       "session.resolve"
     ],
     "seguintes": [
-      "identity.gate",
       "instructions.catalog",
       "instructions.learnings",
-      "instructions.phases",
       "prompt.compose"
     ]
   },
@@ -191,11 +186,8 @@ export const SNAPSHOT_ANTERIOR: AssinaturaNode[] = [
     "funcao": "systemPromptNina",
     "anteriores": [
       "context.load",
-      "identity.gate",
       "instructions.catalog",
-      "instructions.greeting",
-      "instructions.learnings",
-      "instructions.phases"
+      "instructions.learnings"
     ],
     "seguintes": [
       "llm.generate",
@@ -209,23 +201,17 @@ export const SNAPSHOT_ANTERIOR: AssinaturaNode[] = [
     "funcao": "ninaAIGateway",
     "anteriores": [
       "llm.model_flag",
-      "offer.complete",
-      "patient.link",
       "prompt.compose",
       "tool.business_hours",
-      "tool.catalog.list",
       "tool.catalog.lookup",
-      "tool.doctor_schedule",
       "tool.execute",
       "tool.knowledge.lookup",
-      "tool.my_appointments",
+      "tool.patient.lookup",
       "tool.schedule.availability",
-      "tool.schedule.book",
-      "voice.reasoning"
+      "tool.schedule.book"
     ],
     "seguintes": [
       "error.handle",
-      "metrics.record",
       "response.validate",
       "tool.execute"
     ]
@@ -253,12 +239,9 @@ export const SNAPSHOT_ANTERIOR: AssinaturaNode[] = [
     "seguintes": [
       "llm.generate",
       "tool.business_hours",
-      "tool.catalog.list",
       "tool.catalog.lookup",
-      "tool.doctor_schedule",
       "tool.handoff",
       "tool.knowledge.lookup",
-      "tool.my_appointments",
       "tool.patient.lookup",
       "tool.schedule.availability",
       "tool.schedule.book"
@@ -270,8 +253,7 @@ export const SNAPSHOT_ANTERIOR: AssinaturaNode[] = [
     "arquivo": "src/lib/nina/catalogo-retrieval.server.ts",
     "funcao": "buscarNoCatalogo",
     "anteriores": [
-      "tool.execute",
-      "tool.knowledge.lookup"
+      "tool.execute"
     ],
     "seguintes": [
       "llm.generate"
@@ -286,8 +268,7 @@ export const SNAPSHOT_ANTERIOR: AssinaturaNode[] = [
       "tool.execute"
     ],
     "seguintes": [
-      "llm.generate",
-      "tool.catalog.lookup"
+      "llm.generate"
     ]
   },
   {
@@ -311,8 +292,7 @@ export const SNAPSHOT_ANTERIOR: AssinaturaNode[] = [
       "tool.execute"
     ],
     "seguintes": [
-      "llm.generate",
-      "offer.complete"
+      "llm.generate"
     ]
   },
   {
@@ -336,7 +316,7 @@ export const SNAPSHOT_ANTERIOR: AssinaturaNode[] = [
       "tool.execute"
     ],
     "seguintes": [
-      "patient.link"
+      "llm.generate"
     ]
   },
   {
@@ -459,7 +439,7 @@ export const SNAPSHOT_ANTERIOR: AssinaturaNode[] = [
       "message.persist"
     ],
     "seguintes": [
-      "wait.timeout_job"
+      "wait.timeout"
     ]
   },
   {
@@ -468,7 +448,7 @@ export const SNAPSHOT_ANTERIOR: AssinaturaNode[] = [
     "arquivo": "src/lib/nina/espera-timeout.server.ts",
     "funcao": "processarTimeoutsEsperaPaciente",
     "anteriores": [
-      "wait.timeout_job"
+      "wait.start"
     ],
     "seguintes": [
       "conversation.close",
@@ -495,7 +475,6 @@ export const SNAPSHOT_ANTERIOR: AssinaturaNode[] = [
     "funcao": "registrarExecucao",
     "anteriores": [
       "conversation.close",
-      "llm.generate",
       "message.persist"
     ],
     "seguintes": [
@@ -511,8 +490,7 @@ export const SNAPSHOT_ANTERIOR: AssinaturaNode[] = [
       "metrics.record"
     ],
     "seguintes": [
-      "metrics.period",
-      "trace.record"
+      "metrics.period"
     ]
   },
   {
