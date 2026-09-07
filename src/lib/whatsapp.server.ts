@@ -1298,6 +1298,19 @@ ATENDIMENTO HUMANO — REGRA OBRIGATÓRIA:
   let agendamentoConfirmado = jaTinhaAgendamento;
 
   let correcaoFalsoSucessoUsada = false;
+  // ------------------- CONFIDENCE DECISION ENGINE -------------------
+  // Evidências reais do turno: o que rodou, se deu certo e se o catálogo
+  // publicado devolveu registro. É isso — e não o "achismo" do modelo —
+  // que autoriza afirmar valor, horário, profissional, preparo ou regra.
+  const evidenciasFerramentas: Array<{
+    nome: string;
+    capacidade: string | null;
+    fonte: string | null;
+    success: boolean;
+    erro?: string | undefined;
+  }> = [];
+  let catalogoEncontrou = false;
+  let esclarecimentoConfiancaUsado = false;
   // Frases que afirmam/prometem agendamento. Se aparecerem sem gravação
   // confirmada, a resposta é falso sucesso e não pode ir ao paciente.
   const AFIRMA_AGENDAMENTO =
