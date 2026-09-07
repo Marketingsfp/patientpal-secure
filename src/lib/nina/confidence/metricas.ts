@@ -83,6 +83,7 @@ export type MetricasConfiabilidade = {
   porDiaSemana: MediaGrupo[];
   porPeriodoOperacao: MediaGrupo[];
   correlacaoErros: FaixaCorrelacao[];
+  calibracaoPorNivel: CalibracaoNivel[];
 };
 
 const DIAS = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"];
@@ -340,5 +341,6 @@ export function calcularMetricasConfiabilidade(
     porDiaSemana: medias(porDow),
     porPeriodoOperacao: medias(porPeriodo),
     correlacaoErros: correlacionar(linhas, erros),
+    calibracaoPorNivel: calcularCalibracaoPorNivel(linhas, erros),
   };
 }
