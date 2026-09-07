@@ -1095,7 +1095,6 @@ function Pagina() {
                       size="sm"
                       variant="ghost"
                       onClick={() => abrirConversa(it)}
-                      disabled={!it.conversa_id}
                     >
                       <Eye className="mr-1 h-4 w-4" aria-hidden="true" /> Ver conversa
                     </Button>
