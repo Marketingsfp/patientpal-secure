@@ -1,12 +1,7 @@
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { normalizarTelefone } from "@/lib/atendimento/telefone";
-import { agoraNaClinica, blocoDataHoraAgora, somarDiasIso } from "@/lib/nina-agora";
-import {
-  detectarEspecialidades,
-  detectarProcedimentos,
-  normalizar,
-  pareceCitarEspecialidade,
-} from "@/lib/nina-especialidade";
+import { blocoDataHoraAgora } from "@/lib/nina-agora";
+import { normalizar } from "@/lib/nina-especialidade";
 
 const META_VERSION = "v22.0";
 /** Mídia (upload/envio de áudio) usa a versão atual da Graph API. */
