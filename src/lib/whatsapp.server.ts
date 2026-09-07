@@ -1393,6 +1393,71 @@ ATENDIMENTO HUMANO — REGRA OBRIGATÓRIA:
         resposta = "Não consegui concluir seu agendamento neste momento. Vou verificar novamente.";
         break;
       }
+      // --------- CONFIDENCE DECISION ENGINE: antes de a resposta sair ---------
+      const { avaliarConfianca, instrucaoEsclarecimento, motivoHandoffConfianca } = await import(
+        "@/lib/nina/confidence-engine"
+      );
+      const decisao = avaliarConfianca({
+        texto,
+        evidencias: {
+          ferramentas: evidenciasFerramentas,
+          catalogoEncontrou,
+          agendamentoConfirmado,
+          pacienteIdentificado: Boolean(pacienteIdEfetivo),
+          esclarecimentoUsado: esclarecimentoConfiancaUsado,
+          handoffSolicitado: houveHandoff,
+        },
+      });
+      rastro?.concluir("confidence.decision", {
+        score: decisao.score,
+        acao: decisao.acao,
+        bloqueio: decisao.bloqueio,
+        categorias: decisao.categorias,
+      });
+      {
+        const { registrarDecisaoConfianca } = await import(
+          "@/lib/nina/confidence-engine.server"
+        );
+        void registrarDecisaoConfianca({
+          clinicaId,
+          conversaId: estadoId.conversaId ?? null,
+          execucaoId: respostaIA.execucaoId ?? null,
+          traceId: rastro?.ids.trace_id ?? null,
+          teste: opcoes?.teste === true,
+          decisao,
+        });
+      }
+
+      // Confiança intermediária: UMA rodada de esclarecimento com o paciente.
+      if (decisao.acao === "esclarecer" && rodada < MAX_RODADAS - 1) {
+        esclarecimentoConfiancaUsado = true;
+        mensagens.push({ role: "assistant", content: texto });
+        mensagens.push({ role: "user", content: instrucaoEsclarecimento(decisao) });
+        continue;
+      }
+
+      // Confiança baixa ou bloqueio absoluto: transfere pelo mesmo caminho
+      // já existente (evento, fila, protocolo e aviso fixo ao paciente).
+      if (decisao.acao === "transferir") {
+        const rh = await broker.executar(
+          "solicitar_atendente_humano",
+          JSON.stringify({
+            motivo: motivoHandoffConfianca(decisao),
+            resumo:
+              `Nina não teve dado confirmado para responder com segurança. ${decisao.motivos.join("; ")}`.slice(
+                0,
+                2000,
+              ),
+            urgencia: "normal",
+          }),
+        );
+        if (rh.success) houveHandoff = true;
+        resposta = rh.success
+          ? "Para não te passar uma informação errada, vou chamar uma atendente da nossa equipe para confirmar isso com você."
+          : texto;
+        break;
+      }
+
       resposta = texto;
       break;
     }
