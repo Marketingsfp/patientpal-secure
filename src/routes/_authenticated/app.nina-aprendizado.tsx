@@ -343,6 +343,7 @@ function Pagina() {
   const [ocorrencias, setOcorrencias] = useState<Record<string, number>>({});
   const [fPrioridade, setFPrioridade] = useState("todas");
   const [fCausa, setFCausa] = useState("todas");
+  const [fConfianca, setFConfianca] = useState("todas");
   const [diagnosticando, setDiagnosticando] = useState<Item | null>(null);
   const [comparacao, setComparacao] = useState<Comparacao | null>(null);
   const [consultandoBase, setConsultandoBase] = useState(false);
