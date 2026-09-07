@@ -944,108 +944,73 @@ async function executarFerramentaInterna(
       }
 
       case "listar_especialidades": {
-        const lista = await listarEspecialidades(ctx.clinicaId);
-        return { ok: true, especialidades: lista.map((e) => e.nome) };
+        // FONTE ÚNICA: catálogo publicado. Sem publicação = desconhecido.
+        const { especialidadesPublicadas, SEM_CATALOGO_INSTRUCAO } = await import(
+          "./catalogo-fonte.server"
+        );
+        const nomes = await especialidadesPublicadas(ctx.clinicaId);
+        if (nomes.length === 0)
+          return falha("PROCEDURE_NOT_FOUND", SEM_CATALOGO_INSTRUCAO, {
+            fonte: "catalogo_publicado",
+            encaminhar_para_humano: true,
+          });
+        return { ok: true, fonte: "catalogo_publicado", especialidades: nomes };
       }
-
 
       case "buscar_medicos": {
         const p = zBuscarMedicos.parse(args);
-        const lista = await listarEspecialidades(ctx.clinicaId);
-        const esp = p.especialidade ? acharEspecialidade(p.especialidade, lista) : null;
-        if (p.especialidade && !esp)
-          return falha(
-            "DOCTOR_NOT_FOUND",
-            `A clínica não tem "${p.especialidade}" cadastrada. Especialidades: ${lista
-              .map((e) => e.nome)
-              .join(", ")}`,
-          );
-
-        let medicoIds: string[] | null = null;
-        if (esp) {
-          const daClinica = await medicosDaClinica(ctx.clinicaId);
-          const { data: vinc } = await supabaseAdmin
-            .from("medico_especialidades")
-            .select("medico_id")
-            .eq("especialidade_id", esp.id)
-            .in("medico_id", daClinica.length > 0 ? daClinica : ["00000000-0000-0000-0000-000000000000"]);
-          medicoIds = ((vinc ?? []) as Array<{ medico_id: string }>).map((v) => v.medico_id);
-          if (medicoIds.length === 0)
-            return falha("DOCTOR_NOT_FOUND", `Nenhum profissional de ${esp.nome} no momento.`);
-        }
-
-        let q = supabaseAdmin
-          .from("medicos")
-          .select("id, nome")
-          .eq("clinica_id", ctx.clinicaId)
-          .eq("ativo", true)
-          .order("nome")
-          .limit(30);
-        if (medicoIds) q = q.in("id", medicoIds);
-        if (p.nome) q = q.ilike("nome", `%${p.nome}%`);
-        const { data: meds } = await q;
-        const linhas = (meds ?? []) as Array<{ id: string; nome: string }>;
-        if (linhas.length === 0) return falha("DOCTOR_NOT_FOUND", "Nenhum profissional encontrado.");
-
-        const { data: disp } = await supabaseAdmin
-          .from("medico_disponibilidades")
-          .select("medico_id, dia_semana, hora_inicio, hora_fim")
-          .eq("clinica_id", ctx.clinicaId)
-          .eq("ativo", true)
-          .in(
-            "medico_id",
-            linhas.map((m) => m.id),
-          );
-        const DIAS = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
-        const porMedico = new Map<string, string[]>();
-        for (const d of (disp ?? []) as Array<{
-          medico_id: string;
-          dia_semana: number;
-          hora_inicio: string;
-          hora_fim: string;
-        }>) {
-          const arr = porMedico.get(d.medico_id) ?? [];
-          arr.push(
-            `${DIAS[d.dia_semana] ?? "?"} ${String(d.hora_inicio).slice(0, 5)}-${String(d.hora_fim).slice(0, 5)}`,
-          );
-          porMedico.set(d.medico_id, arr);
-        }
-
+        const { searchKnowledgeBase } = await import("./knowledge.server");
+        const { SEM_CATALOGO_INSTRUCAO } = await import("./catalogo-fonte.server");
+        const r = await searchKnowledgeBase({
+          clinicaId: ctx.clinicaId,
+          query: [p.especialidade, p.nome].filter(Boolean).join(" ") || "consulta profissional",
+          medico: p.nome ?? null,
+          canal: ctx.origem,
+        });
+        if (!r.found || r.records.length === 0)
+          return falha("DOCTOR_NOT_FOUND", SEM_CATALOGO_INSTRUCAO, {
+            fonte: "catalogo_publicado",
+            knowledge_status: r.knowledge_status,
+            encaminhar_para_humano: true,
+          });
         return {
           ok: true,
-          medicos: linhas.slice(0, 8).map((m) => ({
-            medico_id: m.id,
-            nome: m.nome,
-            especialidade: esp?.nome ?? null,
-            horarios: (porMedico.get(m.id) ?? []).slice(0, 6),
-          })),
-          total: linhas.length,
+          fonte: "catalogo_publicado",
+          knowledge_status: r.knowledge_status,
+          profissionais: r.doctors,
+          dias: r.days,
+          observacoes: r.notes,
+          registros: r.records,
+          trace: r.trace,
+          instrucao: r.instrucao,
         };
       }
 
       case "buscar_procedimentos": {
         const p = zProcedimentos.parse(args);
-        const { data } = await supabaseAdmin
-          .from("procedimentos")
-          .select("nome, grupo, valor_dinheiro_pix, valor_cartao, valor_padrao, preparo")
-          .eq("clinica_id", ctx.clinicaId)
-          .eq("ativo", true)
-          .ilike("nome", `%${p.termo}%`)
-          .order("nome")
-          .limit(12);
-        const linhas = (data ?? []) as Array<Record<string, unknown>>;
-        if (linhas.length === 0)
-          return falha("PROCEDURE_NOT_FOUND", `Nada cadastrado com "${p.termo}".`);
+        const { searchKnowledgeBase } = await import("./knowledge.server");
+        const { SEM_CATALOGO_INSTRUCAO } = await import("./catalogo-fonte.server");
+        const r = await searchKnowledgeBase({
+          clinicaId: ctx.clinicaId,
+          query: p.termo,
+          canal: ctx.origem,
+        });
+        if (!r.found || r.records.length === 0)
+          return falha("PROCEDURE_NOT_FOUND", SEM_CATALOGO_INSTRUCAO, {
+            fonte: "catalogo_publicado",
+            knowledge_status: r.knowledge_status,
+            encaminhar_para_humano: true,
+          });
         return {
           ok: true,
-          procedimentos: linhas.map((r) => ({
-            nome: r["nome"],
-            grupo: r["grupo"] ?? null,
-            valor_dinheiro_pix:
-              Number(r["valor_dinheiro_pix"] ?? 0) || Number(r["valor_padrao"] ?? 0) || null,
-            valor_cartao: Number(r["valor_cartao"] ?? 0) || Number(r["valor_padrao"] ?? 0) || null,
-            preparo: r["preparo"] ?? null,
-          })),
+          fonte: "catalogo_publicado",
+          knowledge_status: r.knowledge_status,
+          procedimento: r.procedure,
+          preco: r.price,
+          observacoes: r.notes,
+          registros: r.records,
+          trace: r.trace,
+          instrucao: r.instrucao,
         };
       }
 
