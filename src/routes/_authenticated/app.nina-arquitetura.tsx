@@ -125,7 +125,7 @@ function Pagina() {
           <TabsTrigger value="alteracoes">Alterações</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="arquitetura" className="mt-4">
+        <TabsContent value="arquitetura" className="mt-4 space-y-4">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between gap-2">
               <CardTitle className="text-base">O que a Nina pode fazer</CardTitle>
@@ -140,7 +140,10 @@ function Pagina() {
               />
             </CardContent>
           </Card>
+
+          <InstrucoesNina />
         </TabsContent>
+
 
         <TabsContent value="alteracoes" className="mt-4">
           <PainelAlteracoes />
