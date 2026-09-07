@@ -28,6 +28,9 @@ import {
   comparacaoRecente,
   destaquesDaComparacao,
 } from "@/lib/nina/arquitetura/versoes";
+import { mudancaConfiguracaoPrompt } from "@/lib/nina/arquitetura/sync";
+import { historicoInstrucoesNina } from "@/lib/nina/instrucoes.functions";
+
 
 export const Route = createFileRoute("/_authenticated/app/nina-arquitetura")({
   head: () => ({
