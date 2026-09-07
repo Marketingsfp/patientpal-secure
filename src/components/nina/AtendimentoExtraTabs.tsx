@@ -183,6 +183,10 @@ import {
   interpretarBuscaConversa,
 } from "@/lib/atendimento/numero-conversa";
 import { SEM_NOME, nomeConversa, tituloConversa } from "@/lib/atendimento/rotulo-conversa";
+import {
+  ConfiancaMensagemBadge,
+  useConfiancaMensagens,
+} from "@/components/nina/ConfiancaMensagem";
 import { devoAutoSelecionarComSelecao, escopoParaConversa } from "@/lib/atendimento/deep-link";
 import {
   avisoSaidaEscopo,
@@ -1773,6 +1777,20 @@ export function AtendInbox() {
   });
 
 
+  // Confiança REAL registrada pelo motor para cada resposta da Nina desta
+  // conversa. Leitura em lote; nada é calculado na tela.
+  const execucoesDaNina = useMemo(
+    () => [
+      ...new Set(
+        (msgs as Array<{ direction?: string; enviada_por?: string | null; execucao_id?: string | null }>)
+          .filter((m) => m.direction === "out" && m.enviada_por === "nina" && m.execucao_id)
+          .map((m) => String(m.execucao_id)),
+      ),
+    ],
+    [msgs],
+  );
+  const confiancaPorExecucao = useConfiancaMensagens(clinicaId, execucoesDaNina);
+
   // Mensagens e eventos de estado na mesma linha do tempo, em ordem cronológica.
   const timeline = useMemo(() => {
     const itens: (
@@ -2870,6 +2888,13 @@ export function AtendInbox() {
                           <span className="whitespace-nowrap">
                             {fmtHora(m.recebida_em)} {m.enviada_por === "nina" && "· Nina"}
                           </span>
+                          {daNina && clinicaId && m.execucao_id &&
+                            confiancaPorExecucao[String(m.execucao_id)] && (
+                              <ConfiancaMensagemBadge
+                                clinicaId={clinicaId}
+                                confianca={confiancaPorExecucao[String(m.execucao_id)]!}
+                              />
+                            )}
                         </div>
                       </div>
                     </div>
