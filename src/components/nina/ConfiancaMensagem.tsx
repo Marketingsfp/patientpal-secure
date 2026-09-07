@@ -6,7 +6,7 @@
  * produzida, casado pela execução que gerou a mensagem. Sem registro, o
  * indicador simplesmente não aparece — nunca estimamos um valor.
  */
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { ShieldAlert, ShieldCheck, ShieldQuestion } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -17,6 +17,12 @@ import {
   type ConfiabilidadeDecisaoView,
 } from "@/lib/nina/confianca.functions";
 import { rotuloConfianca } from "@/lib/nina/confianca-badge";
+import {
+  gravarLote,
+  idsParaBuscar,
+  mapaDoCache,
+  type CacheConfianca,
+} from "@/lib/nina/confianca-cache";
 
 export type MapaConfianca = Record<string, ConfiancaDaMensagem>;
 
