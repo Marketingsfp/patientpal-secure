@@ -292,6 +292,30 @@ export function ArquiteturaCanvas({
             height: layout.altura,
           }}
         >
+          {/* Molduras discretas por domínio funcional (apenas leitura visual). */}
+          {layout.grupos.map((grupo) => (
+            <div
+              key={grupo.id}
+              aria-hidden="true"
+              className="pointer-events-none absolute rounded-lg border border-dashed"
+              style={{
+                left: grupo.x,
+                top: grupo.y,
+                width: grupo.largura,
+                height: grupo.altura,
+                borderColor: `color-mix(in oklch, ${CORES_CATEGORIA[grupo.categoria]} 45%, transparent)`,
+                backgroundColor: `color-mix(in oklch, ${CORES_CATEGORIA[grupo.categoria]} 7%, transparent)`,
+              }}
+            >
+              <span
+                className="absolute left-2 top-1 text-[10px] font-semibold uppercase tracking-wide"
+                style={{ color: CORES_CATEGORIA[grupo.categoria] }}
+              >
+                {grupo.categoria}
+              </span>
+            </div>
+          ))}
+
           <svg
             width={layout.largura}
             height={layout.altura}
@@ -321,23 +345,28 @@ export function ArquiteturaCanvas({
               const meio = (x1 + x2) / 2;
               const ativa =
                 !modoExecucao || (Boolean(execucao?.[aresta.de]) && Boolean(execucao?.[aresta.para]));
+              const noCaminho = Boolean(de.principal && para.principal);
               return (
                 <path
                   key={aresta.id}
                   d={`M ${x1} ${y1} C ${meio} ${y1}, ${meio} ${y2}, ${x2} ${y2}`}
                   fill="none"
                   stroke="currentColor"
-                  strokeWidth={ativa ? 1.6 : 1}
+                  strokeWidth={!ativa ? 1 : noCaminho ? 2.6 : 1.4}
                   markerEnd="url(#seta-arquitetura)"
                   className={
-                    ativa ? "text-muted-foreground" : "text-muted-foreground/30"
+                    !ativa
+                      ? "text-muted-foreground/30"
+                      : noCaminho
+                        ? "text-primary"
+                        : "text-muted-foreground/60"
                   }
                 />
               );
             })}
           </svg>
 
-          {layout.nodes.map(({ node, x, y }) => {
+          {layout.nodes.map(({ node, x, y, principal }) => {
             const estado = execucao?.[node.id];
             const apagado = modoExecucao && !estado;
             const cor = CORES_CATEGORIA[node.categoria];
@@ -358,15 +387,19 @@ export function ArquiteturaCanvas({
                 }}
                 onClick={() => setSelecionado(node.id)}
                 title={node.descricao}
-                className={`absolute flex flex-col justify-center gap-1 rounded-md border bg-card px-3 py-2 text-left shadow-sm transition-opacity focus:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
-                  apagado ? "opacity-30" : "opacity-100"
-                } ${selecionado === node.id ? "ring-2 ring-primary" : ""}`}
+                className={`absolute flex flex-col justify-center gap-1 rounded-md border bg-card px-3 py-2 text-left transition-opacity focus:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                  apagado ? "opacity-30" : principal ? "opacity-100" : "opacity-80"
+                } ${principal ? "shadow-md" : "shadow-sm"} ${
+                  selecionado === node.id ? "ring-2 ring-primary" : ""
+                }`}
                 style={{
                   left: x,
                   top: y,
                   width: LARGURA_NODE,
                   height: ALTURA_NODE,
                   borderLeft: `4px solid ${cor}`,
+                  borderTopColor: principal ? cor : undefined,
+                  borderTopWidth: principal ? 2 : undefined,
                 }}
               >
                 <span className="line-clamp-2 text-xs font-medium leading-tight text-foreground">
@@ -391,6 +424,10 @@ export function ArquiteturaCanvas({
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
+        <span className="inline-flex items-center gap-1.5 rounded-full border border-primary/50 px-2 py-0.5 text-[11px] text-foreground">
+          <span className="h-0.5 w-4 rounded bg-primary" />
+          Caminho principal (mensagem → processamento → IA → ação → resposta)
+        </span>
         {CATEGORIAS_ARQUITETURA.map((categoria: CategoriaArquitetura) => (
           <span
             key={categoria}
