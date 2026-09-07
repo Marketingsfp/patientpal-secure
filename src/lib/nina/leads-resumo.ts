@@ -104,6 +104,12 @@ const vazio = (leadId: string): ResumoLead => ({
 export function resumirLeads(
   conversasPorLead: Record<string, string[]>,
   mensagens: MensagemResumoRow[],
+  /**
+   * FASE 3 — marcador de leitura DESTE usuário por conversa (data/hora da
+   * última mensagem que ele realmente visualizou). Sem marcador, tudo que a
+   * Nina respondeu ainda conta como não lido.
+   */
+  lidoAtePorConversa: Record<string, string | null> = {},
 ): Record<string, ResumoLead> {
   const leadPorConversa = new Map<string, string>();
   for (const [leadId, ids] of Object.entries(conversasPorLead))
@@ -120,8 +126,10 @@ export function resumirLeads(
     atual.totalMensagens += 1;
 
     const autor = autorDaMensagem(m)!;
-    // Não lidas = respostas da Nina ainda não marcadas como lidas.
-    if (autor === "nina" && !m.read_at) atual.unreadCount += 1;
+    // Não lidas = respostas da Nina posteriores à leitura individual do usuário.
+    if (autor === "nina" && naoLida(m, lidoAtePorConversa[m.conversa_id!] ?? null))
+      atual.unreadCount += 1;
+
 
     const maisNova =
       !atual.lastMessageAt ||
