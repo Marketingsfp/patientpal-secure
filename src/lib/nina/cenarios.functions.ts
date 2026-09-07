@@ -16,6 +16,13 @@ import {
   distribuirCenarios,
   type Criterio,
 } from "@/lib/nina/cenarios";
+import {
+  aplicarRegraHandoff,
+  desfechoDoItem,
+  handoffEsperado,
+  MOTIVO_CICLO_POR_DESFECHO,
+  type DesfechoCenario,
+} from "@/lib/nina/cenario-desfecho";
 import { MODELO_TERRA } from "@/lib/nina/simulador-terra";
 
 type Ctx = { supabase: any; userId: string };
@@ -79,6 +86,7 @@ const cenarioSchema = z.object({
   maxTurnos: z.number().int().min(1).max(20).default(6),
   tags: z.array(z.string().trim().max(30)).max(15).default([]),
   status: z.enum(["rascunho", "ativo", "arquivado"]).default("ativo"),
+  handoffEsperado: z.boolean().nullish(),
 });
 
 /** Lista os cenários da clínica. */
@@ -116,6 +124,7 @@ export const salvarCenario = createServerFn({ method: "POST" })
       max_turnos: data.maxTurnos,
       tags: data.tags,
       status: data.status,
+      handoff_esperado: data.handoffEsperado ?? null,
     };
 
     if (data.id) {
@@ -272,6 +281,7 @@ export const criarExecucaoCenarios = createServerFn({ method: "POST" })
       cenario_snapshot: d.cenario,
       lead_id: d.lead.id,
       lead_indice: (d.lead as any).indice,
+      handoff_esperado: handoffEsperado(d.cenario as any),
       ordem: d.ordem,
       status: "pendente",
       modelo_paciente: MODELO_TERRA,
@@ -427,6 +437,9 @@ export const finalizarItemExecucao = createServerFn({ method: "POST" })
         clinicaId: z.string().uuid(),
         itemId: z.string().uuid(),
         erroCliente: z.string().trim().max(300).nullish(),
+        handoffCliente: z.boolean().nullish(),
+        interrompido: z.boolean().nullish(),
+        turnosUsados: z.number().int().min(0).max(100).nullish(),
       })
       .parse(input),
   )
@@ -444,11 +457,31 @@ export const finalizarItemExecucao = createServerFn({ method: "POST" })
 
     const { data: lead } = await supabaseAdmin
       .from("nina_teste_leads")
-      .select("conversa_id, ciclo_id")
+      .select("id, indice, sessao_seq, conversa_id, ciclo_id")
       .eq("clinica_id", data.clinicaId)
       .eq("id", (item as any).lead_id)
       .maybeSingle();
-    const conversaId = (lead as any)?.conversa_id ?? null;
+
+    // O handoff (Fase 2) já pode ter encerrado o ciclo e limpado os ponteiros do
+    // lead. Nesse caso recuperamos a conversa pelo ciclo aberto para este item —
+    // nunca pela "primeira conversa do lead".
+    let conversaId = (lead as any)?.conversa_id ?? null;
+    let cicloId = (lead as any)?.ciclo_id ?? null;
+    if (!conversaId && (item as any).iniciado_em) {
+      const { data: ciclo } = await supabaseAdmin
+        .from("nina_teste_ciclos")
+        .select("id, conversa_id")
+        .eq("clinica_id", data.clinicaId)
+        .eq("lead_id", (item as any).lead_id)
+        .gte("started_at", (item as any).iniciado_em)
+        .order("started_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      conversaId = (ciclo as any)?.conversa_id ?? null;
+      cicloId = (ciclo as any)?.id ?? cicloId;
+    }
+
+
 
     let respostasNina: string[] = [];
     let mensagens = 0;
@@ -501,14 +534,30 @@ export const finalizarItemExecucao = createServerFn({ method: "POST" })
       .eq("id", (item as any).simulacao_id ?? "00000000-0000-0000-0000-000000000000")
       .maybeSingle();
 
+    if (data.handoffCliente) transferida = true;
+
     const criterios = ((item as any).cenario_snapshot?.criterios ?? []) as Criterio[];
-    const { resultado, avaliados } = avaliarCenario(criterios, {
+    const base = avaliarCenario(criterios, {
       respostasNina,
       ferramentas,
       transferida,
       houveErro,
       turnos: (sim as any)?.turnos ?? 0,
     });
+
+    // Handoff é o fim do ciclo automatizado. PASS/FAIL depende do esperado.
+    const esperado =
+      typeof (item as any).handoff_esperado === "boolean"
+        ? ((item as any).handoff_esperado as boolean)
+        : handoffEsperado((item as any).cenario_snapshot ?? {});
+    const desfecho: DesfechoCenario = desfechoDoItem({
+      transferida,
+      erro: data.erroCliente ?? null,
+      interrompido: !!data.interrompido,
+      turnosUsados: data.turnosUsados ?? (sim as any)?.turnos ?? 0,
+      maxTurnos: Number((item as any).cenario_snapshot?.max_turnos ?? 0),
+    });
+    const { resultado, avaliados } = aplicarRegraHandoff(base, { desfecho, esperado });
 
     const agora = new Date().toISOString();
     await supabaseAdmin
@@ -517,6 +566,8 @@ export const finalizarItemExecucao = createServerFn({ method: "POST" })
         status: data.erroCliente ? "erro" : "concluido",
         resultado,
         criterios_resultado: avaliados,
+        desfecho,
+        handoff_esperado: esperado,
         mensagens,
         turnos: (sim as any)?.turnos ?? 0,
         input_tokens: inputTokens + ((sim as any)?.input_tokens ?? 0),
@@ -527,11 +578,66 @@ export const finalizarItemExecucao = createServerFn({ method: "POST" })
         ferramentas,
         transferida,
         conversa_id: conversaId,
-        ciclo_id: (lead as any)?.ciclo_id ?? null,
+        ciclo_id: cicloId,
         erro: data.erroCliente ?? null,
         finalizado_em: agora,
       })
       .eq("id", (item as any).id);
+
+    // Cleanup do ciclo deste lead: encerra (histórico preservado) e libera o
+    // lead para o próximo cenário, sem tocar em nenhum outro lead.
+    if (lead) {
+      const { patchEncerrarCiclo } = await import("@/lib/nina/ciclo-teste");
+      if ((lead as any).conversa_id) {
+        await supabaseAdmin
+          .from("atend_conversas")
+          .update({
+            status: "finished",
+            owner_type: "NONE",
+            ai_enabled: false,
+            nina_fluxo_estado: null,
+            patient_response_deadline: null,
+            closed_at: agora,
+            resolved_at: agora,
+          })
+          .eq("clinica_id", data.clinicaId)
+          .eq("id", (lead as any).conversa_id);
+      }
+      if (cicloId) {
+        await supabaseAdmin
+          .from("nina_teste_ciclos")
+          .update({
+            ...patchEncerrarCiclo(MOTIVO_CICLO_POR_DESFECHO[desfecho], agora),
+            resolvido_por: context.userId,
+          } as never)
+          .eq("clinica_id", data.clinicaId)
+          .eq("id", cicloId)
+          .eq("status", "ativo");
+      }
+      const proxima = ((lead as any).sessao_seq ?? 1) + 1;
+      await supabaseAdmin
+        .from("nina_teste_leads")
+        .update({
+          sessao_seq: proxima,
+          telefone_sessao: telefoneSessao((lead as any).indice, proxima),
+          conversa_id: null,
+          ciclo_id: null,
+          ciclo_iniciado_em: null,
+          resolvido_em: agora,
+          status: "ativa",
+        })
+        .eq("clinica_id", data.clinicaId)
+        .eq("id", (lead as any).id);
+
+      // Nenhuma simulação de paciente pode continuar viva após o cenário.
+      await supabaseAdmin
+        .from("nina_teste_simulacoes")
+        .update({ status: "parada", finalizado_em: agora, motivo_fim: desfecho === "handoff" ? "transferencia" : "operador" })
+        .eq("clinica_id", data.clinicaId)
+        .eq("lead_id", (lead as any).id)
+        .in("status", ["executando", "pausada"]);
+    }
+
 
     // Atualiza os totais da execução e fecha quando não sobra item pendente.
     const { data: irmaos } = await supabaseAdmin

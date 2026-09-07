@@ -58,6 +58,7 @@ import {
   controlarSimulacaoTerra,
 } from "@/lib/nina/simulador-terra.functions";
 import { enviarMensagemTeste } from "@/lib/nina/teste-console.functions";
+import { ROTULO_DESFECHO, type DesfechoCenario } from "@/lib/nina/cenario-desfecho";
 
 type CenarioRow = {
   id: string;
@@ -71,6 +72,7 @@ type CenarioRow = {
   tags: string[];
   status: string;
   versao: number;
+  handoff_esperado?: boolean | null;
 };
 
 const VAZIO = {
@@ -82,6 +84,7 @@ const VAZIO = {
   precondicoes: "",
   maxTurnos: 6,
   criterios: [] as Criterio[],
+  handoffEsperado: null as boolean | null,
 };
 
 function corResultado(resultado: string) {
@@ -155,6 +158,7 @@ export function CenariosTeste() {
       precondicoes: c.precondicoes ?? "",
       maxTurnos: c.max_turnos,
       criterios: c.criterios ?? [],
+      handoffEsperado: c.handoff_esperado ?? null,
     });
     setEditorAberto(true);
   };
@@ -175,6 +179,7 @@ export function CenariosTeste() {
           persona: {},
           criterios: form.criterios,
           maxTurnos: form.maxTurnos,
+          handoffEsperado: form.handoffEsperado,
           tags: [],
           status: "ativo",
         },
@@ -193,6 +198,8 @@ export function CenariosTeste() {
       for (const item of fila) {
         if (pararRef.current) return;
         let erro: string | null = null;
+        let houveHandoff = false;
+        let turnosUsados = 0;
         try {
           const inicio: any = await iniciarItem({ data: { clinicaId: clinicaId!, itemId: item.id } });
           const maxTurnos = inicio.maxTurnos ?? 6;
@@ -202,7 +209,7 @@ export function CenariosTeste() {
               data: { clinicaId: clinicaId!, simulacaoId: inicio.simulacaoId },
             });
             if (passo.encerrada || !passo.mensagem) break;
-            await enviar({
+            const envio: any = await enviar({
               data: {
                 clinicaId: clinicaId!,
                 leadId: inicio.leadId,
@@ -211,13 +218,19 @@ export function CenariosTeste() {
                 chave: `run-${item.id}-${turno}-${Date.now()}`,
               },
             });
+            turnosUsados = turno + 1;
+            // Handoff encerra o cenário automatizado: não esperamos atendente humana.
+            if (envio?.transferida) {
+              houveHandoff = true;
+              break;
+            }
           }
           await controlarSim({
             data: {
               clinicaId: clinicaId!,
               simulacaoId: inicio.simulacaoId,
               acao: "concluir",
-              motivo: "limite_turnos",
+              motivo: houveHandoff ? "transferencia" : "limite_turnos",
             },
           }).catch(() => {});
         } catch (e: any) {
@@ -225,7 +238,14 @@ export function CenariosTeste() {
         }
         try {
           await finalizarItem({
-            data: { clinicaId: clinicaId!, itemId: item.id, erroCliente: erro },
+            data: {
+              clinicaId: clinicaId!,
+              itemId: item.id,
+              erroCliente: erro,
+              handoffCliente: houveHandoff,
+              interrompido: pararRef.current,
+              turnosUsados,
+            },
           });
         } catch (e) {
           mostrarErro(e);
@@ -399,6 +419,11 @@ export function CenariosTeste() {
                   {i.ferramentas?.length > 0 && (
                     <span className="text-muted-foreground">{i.ferramentas.join(", ")}</span>
                   )}
+                  {i.desfecho && (
+                    <span className="rounded bg-muted px-2 py-0.5 text-muted-foreground">
+                      {ROTULO_DESFECHO[i.desfecho as DesfechoCenario] ?? i.desfecho}
+                    </span>
+                  )}
                   <span className={`rounded px-2 py-0.5 ${corResultado(i.resultado)}`}>
                     {i.status === "executando" ? "executando" : i.resultado}
                   </span>
@@ -471,7 +496,31 @@ export function CenariosTeste() {
                   onChange={(e) => setForm({ ...form, maxTurnos: Number(e.target.value) })}
                 />
               </div>
+              <div>
+                <Label>Transferência para humano</Label>
+                <Select
+                  value={
+                    form.handoffEsperado === null ? "indiferente" : form.handoffEsperado ? "sim" : "nao"
+                  }
+                  onValueChange={(v) =>
+                    setForm({
+                      ...form,
+                      handoffEsperado: v === "indiferente" ? null : v === "sim",
+                    })
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="indiferente">Tanto faz</SelectItem>
+                    <SelectItem value="sim">Esperada (fim do cenário)</SelectItem>
+                    <SelectItem value="nao">Não pode acontecer</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
+
             <div>
               <Label>Objetivo do paciente</Label>
               <Textarea

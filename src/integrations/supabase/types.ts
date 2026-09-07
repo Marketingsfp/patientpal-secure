@@ -9628,6 +9628,7 @@ export type Database = {
           criterios: Json
           dados_sinteticos: Json
           descricao: string | null
+          handoff_esperado: boolean | null
           id: string
           max_turnos: number
           nome: string
@@ -9649,6 +9650,7 @@ export type Database = {
           criterios?: Json
           dados_sinteticos?: Json
           descricao?: string | null
+          handoff_esperado?: boolean | null
           id?: string
           max_turnos?: number
           nome: string
@@ -9670,6 +9672,7 @@ export type Database = {
           criterios?: Json
           dados_sinteticos?: Json
           descricao?: string | null
+          handoff_esperado?: boolean | null
           id?: string
           max_turnos?: number
           nome?: string
@@ -9809,10 +9812,12 @@ export type Database = {
           created_at: string
           criterios_resultado: Json
           custo_estimado: number
+          desfecho: string | null
           erro: string | null
           execucao_id: string
           ferramentas: string[]
           finalizado_em: string | null
+          handoff_esperado: boolean | null
           id: string
           iniciado_em: string | null
           input_tokens: number
@@ -9841,10 +9846,12 @@ export type Database = {
           created_at?: string
           criterios_resultado?: Json
           custo_estimado?: number
+          desfecho?: string | null
           erro?: string | null
           execucao_id: string
           ferramentas?: string[]
           finalizado_em?: string | null
+          handoff_esperado?: boolean | null
           id?: string
           iniciado_em?: string | null
           input_tokens?: number
@@ -9873,10 +9880,12 @@ export type Database = {
           created_at?: string
           criterios_resultado?: Json
           custo_estimado?: number
+          desfecho?: string | null
           erro?: string | null
           execucao_id?: string
           ferramentas?: string[]
           finalizado_em?: string | null
+          handoff_esperado?: boolean | null
           id?: string
           iniciado_em?: string | null
           input_tokens?: number
