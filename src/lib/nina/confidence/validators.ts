@@ -31,8 +31,10 @@ export type ConfigValidador = {
 export type ConfigValidadores = Record<string, ConfigValidador>;
 
 export const CONFIG_PADRAO_VALIDADORES: ConfigValidadores = {
-  IntentClarityValidator: { ativo: true, peso: 40 },
-  EntityResolutionValidator: { ativo: true, peso: 40 },
+  // Peso 0: a pontuação dos validadores é ponderada pela política central
+  // (policy.ts). Aqui só fica ligado/desligado por validador.
+  IntentClarityValidator: { ativo: true, peso: 0 },
+  EntityResolutionValidator: { ativo: true, peso: 0 },
   RequiredDataValidator: { ativo: true, peso: 0 },
   OfficialSourceValidator: { ativo: true, peso: 0 },
   SourceFreshnessValidator: { ativo: true, peso: 0 },
