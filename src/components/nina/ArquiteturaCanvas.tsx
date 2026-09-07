@@ -272,6 +272,15 @@ export function ArquiteturaCanvas({
         >
           <ZoomOut className="h-4 w-4" />
         </Button>
+        <Button
+          type="button"
+          variant={caminhoCompleto ? "default" : "outline"}
+          size="sm"
+          aria-pressed={caminhoCompleto}
+          onClick={() => setCaminhoCompleto((v) => !v)}
+        >
+          <Route className="mr-2 h-4 w-4" /> Destacar caminho
+        </Button>
         <Button type="button" variant="ghost" size="sm" onClick={organizarAutomaticamente}>
           <RotateCcw className="mr-2 h-4 w-4" /> Organizar automaticamente
         </Button>
