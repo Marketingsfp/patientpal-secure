@@ -96,7 +96,14 @@ describe("auditoria e handoff", () => {
   });
 
   it("instrução de esclarecimento pede UMA pergunta apenas", () => {
-    const r = decidirNoTurno(turno({ texto: "Seu cadastro está atualizado" }));
+    const r = decidirNoTurno(
+      turno({
+        texto: "Seu cadastro está atualizado",
+        ferramentas: [
+          { nome: "identificar_paciente", capacidade: "getPatient", fonte: "crm", success: true },
+        ],
+      }),
+    );
     const instrucao = instrucaoEsclarecimentoDirigida(r);
     expect(r.decision).toBe("CLARIFY");
     expect(instrucao).toContain("UMA única pergunta");
