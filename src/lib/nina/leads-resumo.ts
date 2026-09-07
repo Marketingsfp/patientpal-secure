@@ -96,6 +96,18 @@ const vazio = (leadId: string): ResumoLead => ({
 });
 
 /**
+ * FASE 3 — a mensagem da Nina só conta como não lida quando é posterior ao
+ * marcador de leitura individual do usuário. Sem marcador, conta.
+ */
+export function naoLida(m: MensagemResumoRow, lidoAte: string | null): boolean {
+  if (!lidoAte) return true;
+  return new Date(m.created_at).getTime() > new Date(lidoAte).getTime();
+}
+const _fim = (
+
+});
+
+/**
  * Monta o resumo de cada lead.
  *
  * @param conversasPorLead lead → conversas daquele lead (isolamento por card).
