@@ -14,7 +14,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
-import { Loader2, RefreshCw, MessageSquare, Network, Route as RouteIcon, FileText, Flag } from "lucide-react";
+import { Loader2, RefreshCw, MessageSquare, Network, Route as RouteIcon, FileText, Flag, RotateCcw } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -37,6 +37,11 @@ import {
   type ResumoRelatorio,
 } from "@/lib/nina/relatorio-teste.functions";
 import { registrarFeedbackErroNina } from "@/lib/nina/feedback-erros.functions";
+import {
+  enviarAchadoParaRevisao,
+  listarAchadosEnviados,
+  criarTesteRegressaoDeAchado,
+} from "@/lib/nina/revisao-teste.functions";
 import {
   formatarDuracao,
   rotuloCategoriaErroRelatorio,
@@ -100,6 +105,9 @@ export function RelatorioHomologacao() {
   const listar = useServerFn(listarRelatoriosTeste);
   const detalhar = useServerFn(detalheRelatorioTeste);
   const reportar = useServerFn(registrarFeedbackErroNina);
+  const enviarAchadoFn = useServerFn(enviarAchadoParaRevisao);
+  const listarEnviadosFn = useServerFn(listarAchadosEnviados);
+  const criarRegressaoFn = useServerFn(criarTesteRegressaoDeAchado);
 
   const [execucoes, setExecucoes] = useState<ResumoRelatorio[]>([]);
   const [carregandoLista, setCarregandoLista] = useState(false);
@@ -109,6 +117,11 @@ export function RelatorioHomologacao() {
   const [reporteItem, setReporteItem] = useState<ItemRelatorio | null>(null);
   const [reporteTexto, setReporteTexto] = useState("");
   const [enviandoReporte, setEnviandoReporte] = useState(false);
+  /** Achados já enviados para a Revisão, indexados por "avaliacaoId:indice". */
+  const [enviados, setEnviados] = useState<
+    Record<string, { id: string; cenarioRegressaoId: string | null }>
+  >({});
+  const [ocupado, setOcupado] = useState<string | null>(null);
 
   const carregarLista = async () => {
     if (!clinicaId) return;
@@ -193,6 +206,88 @@ export function RelatorioHomologacao() {
       mostrarErro(e);
     } finally {
       setEnviandoReporte(false);
+    }
+  };
+
+
+  const carregarEnviados = async (avaliacaoIds: string[]) => {
+    if (!clinicaId || avaliacaoIds.length === 0) return;
+    const mapa: Record<string, { id: string; cenarioRegressaoId: string | null }> = {};
+    for (const avaliacaoId of avaliacaoIds) {
+      try {
+        const r = (await listarEnviadosFn({ data: { clinicaId, avaliacaoId } })) as {
+          itens: Array<{ id: string; achadoIndice: number | null; cenarioRegressaoId: string | null }>;
+        };
+        for (const it of r.itens ?? []) {
+          if (it.achadoIndice === null) continue;
+          mapa[`${avaliacaoId}:${it.achadoIndice}`] = {
+            id: it.id,
+            cenarioRegressaoId: it.cenarioRegressaoId,
+          };
+        }
+      } catch {
+        /* leitura de apoio: não bloqueia o relatório */
+      }
+    }
+    setEnviados((atual) => ({ ...atual, ...mapa }));
+  };
+
+  const enviarAchado = async (avaliacaoId: string, indice: number, item: ItemRelatorio) => {
+    if (!clinicaId) return;
+    const chave = `${avaliacaoId}:${indice}`;
+    setOcupado(chave);
+    try {
+      const r = (await enviarAchadoFn({
+        data: {
+          clinicaId,
+          avaliacaoId,
+          achadoIndice: indice,
+          testeTipo:
+            item.tipo === "terra" || item.tipo === "cenarios" || item.tipo === "carga"
+              ? item.tipo
+              : "manual",
+        },
+      })) as { item: { id: string }; duplicado: boolean };
+      setEnviados((atual) => ({
+        ...atual,
+        [chave]: { id: r.item.id, cenarioRegressaoId: null },
+      }));
+      toast.success(
+        r.duplicado
+          ? "Este achado já estava na Revisão de aprendizados."
+          : "Achado enviado para a Revisão de aprendizados.",
+      );
+    } catch (e) {
+      mostrarErro(e);
+    } finally {
+      setOcupado(null);
+    }
+  };
+
+  const criarRegressao = async (feedbackId: string) => {
+    if (!clinicaId) return;
+    setOcupado(`reg:${feedbackId}`);
+    try {
+      const r = (await criarRegressaoFn({ data: { clinicaId, feedbackId } })) as {
+        cenarioId: string;
+        jaExistia: boolean;
+      };
+      setEnviados((atual) => {
+        const copia = { ...atual };
+        for (const [k, v] of Object.entries(copia)) {
+          if (v.id === feedbackId) copia[k] = { ...v, cenarioRegressaoId: r.cenarioId };
+        }
+        return copia;
+      });
+      toast.success(
+        r.jaExistia
+          ? "Este erro já tinha um teste de regressão."
+          : "Teste de regressão criado na biblioteca de cenários.",
+      );
+    } catch (e) {
+      mostrarErro(e);
+    } finally {
+      setOcupado(null);
     }
   };
 
