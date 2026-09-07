@@ -34,6 +34,10 @@ const ROTULO_TIPO: Record<string, string> = {
   nao_classificado: "Não classificado",
 };
 
+const formatarNumero = (n: number) => n.toLocaleString("pt-BR");
+const formatarPercentual = (n: number) =>
+  `${n.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`;
+
 function Bloco({ titulo, children }: { titulo: string; children: React.ReactNode }) {
   return (
     <div className="rounded-md border p-3">
@@ -177,6 +181,33 @@ export function MetricasConfiabilidade({ clinicaId }: { clinicaId: string | null
                 <p className="text-2xl font-semibold tabular-nums">{dados?.bloqueadores}</p>
                 <p className="text-xs text-muted-foreground">{dados?.acoesBloqueadas} ações bloqueadas</p>
               </Bloco>
+            </div>
+
+            <div className="rounded-md border p-3">
+              <p className="mb-2 text-xs font-medium text-muted-foreground">
+                Calibração da confiança — confiança declarada × erro reportado
+              </p>
+              <div className="grid gap-3 sm:grid-cols-3">
+                {(dados?.calibracaoPorNivel ?? []).map((c) => (
+                  <div key={c.nivel} className="rounded-md bg-muted/40 p-3">
+                    <p className="text-xs font-medium uppercase text-muted-foreground">{c.rotulo}</p>
+                    <p className="text-2xl font-semibold tabular-nums">{formatarNumero(c.mensagens)}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {c.mensagens === 1 ? "mensagem" : "mensagens"}
+                    </p>
+                    <p className="mt-1 text-sm tabular-nums">
+                      {formatarNumero(c.erros)} {c.erros === 1 ? "erro" : "erros"}
+                    </p>
+                    <p className="text-sm tabular-nums text-muted-foreground">
+                      {c.mensagens === 0 ? "sem base para cálculo" : `${formatarPercentual(c.taxaErro)} de erro`}
+                    </p>
+                  </div>
+                ))}
+              </div>
+              <p className="mt-2 text-xs text-muted-foreground">
+                Erro reportado é vinculado à própria resposta avaliada; quando o reporte não guardou esse
+                vínculo, considera-se o reporte da mesma conversa em até 48h.
+              </p>
             </div>
 
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">

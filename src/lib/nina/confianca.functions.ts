@@ -245,7 +245,7 @@ export const metricasConfiabilidadeNina = createServerFn({ method: "POST" })
     let q = context.supabase
       .from("nina_confianca_decisoes")
       .select(
-        "id, created_at, ambiente, conversation_id, score, nivel, decisao, acao, intencao, categorias, bloqueadores, bloqueio, reason_codes, validadores, ferramentas",
+        "id, created_at, ambiente, conversation_id, execucao_id, score, nivel, decisao, acao, intencao, categorias, bloqueadores, bloqueio, reason_codes, validadores, ferramentas",
       )
       .eq("clinica_id", data.clinicaId)
       .gte("created_at", desde)
@@ -257,7 +257,7 @@ export const metricasConfiabilidadeNina = createServerFn({ method: "POST" })
 
     const { data: errosRows } = await context.supabase
       .from("nina_feedback_erros")
-      .select("id, conversa_id, created_at, categoria")
+      .select("id, conversa_id, execucao_id, created_at, categoria")
       .eq("clinica_id", data.clinicaId)
       .gte("created_at", desde)
       .limit(5000);
@@ -304,6 +304,7 @@ export const metricasConfiabilidadeNina = createServerFn({ method: "POST" })
         created_at: created,
         ambiente: (r["ambiente"] as string) ?? null,
         conversation_id: (r["conversation_id"] as string) ?? null,
+        execucao_id: (r["execucao_id"] as string) ?? null,
         score: Number(r["score"]) || 0,
         nivel: (r["nivel"] as string) ?? null,
         decisao: (r["decisao"] as string) ?? null,
@@ -336,6 +337,7 @@ export const metricasConfiabilidadeNina = createServerFn({ method: "POST" })
       return {
         id: String(e["id"] ?? ""),
         conversa_id: (e["conversa_id"] as string) ?? null,
+        execucao_id: (e["execucao_id"] as string) ?? null,
         created_at: String(e["created_at"] ?? ""),
         categoria: (e["categoria"] as string) ?? null,
       };
