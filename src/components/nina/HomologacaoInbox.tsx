@@ -90,7 +90,6 @@ import { assinarAtualizacao } from "@/lib/webmcp/atualizacao";
 import {
   rotuloAutorResumo,
   aplicarMensagemRealtime,
-  ordenarPorAtividade,
   type MensagemResumoRow,
 } from "@/lib/nina/leads-resumo";
 import { supabase } from "@/integrations/supabase/client";
@@ -107,7 +106,10 @@ type Lead = {
   status: string;
   mensagens: number;
   /** FASE 2 — resumo da última mensagem conversacional (paciente ou Nina). */
+  ultimaMensagemId?: string | null;
   ultimaMensagemTexto?: string | null;
+  /** FASE 4 — fonte estável de "atividade recente" (só conversa). */
+  ultimaAtividadeEm?: string | null;
   ultimaMensagemAutor?: "paciente" | "nina" | "atendente" | null;
   ultimaMensagemEm?: string | null;
   naoLidas?: number;
