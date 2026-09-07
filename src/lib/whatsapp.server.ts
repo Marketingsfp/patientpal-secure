@@ -1630,6 +1630,16 @@ ATENDIMENTO HUMANO — REGRA OBRIGATÓRIA:
     /* auditoria nunca interrompe o atendimento */
   }
 
+  if (rastro) {
+    rastro.ids.conversation_id = estadoId.conversaId ?? null;
+    rastro.concluir("response.validate", {
+      alterada_apos_modelo: respostaDoModelo !== resposta,
+      handoff: houveHandoff,
+      agendamento_confirmado: agendamentoConfirmado,
+    });
+    rastro.concluir("message.outbound", { tamanho: resposta.length });
+  }
+
   return resposta;
 }
 
