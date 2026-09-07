@@ -118,6 +118,7 @@ export type ConfiabilidadeDecisaoView = {
   bloqueadores: string[];
   linhas: LinhaConfiabilidade[];
   reasonCodes: string[];
+  erroReportado: ErroReportadoVinculado | null;
   acaoSolicitada: string | null;
   policyVersion: string | null;
   registradoEm: string;
@@ -145,6 +146,26 @@ export const confiabilidadeDaExecucao = createServerFn({ method: "POST" })
       .maybeSingle();
     if (error) throw new Error(error.message);
     if (!row) return null;
+
+    // Erro reportado depois pela equipe para esta MESMA resposta.
+    const { data: erroRow } = await context.supabase
+      .from("nina_feedback_erros")
+      .select("id, status, categoria, created_at")
+      .eq("clinica_id", data.clinicaId)
+      .eq("execucao_id", data.execucaoId)
+      .order("created_at", { ascending: true })
+      .limit(1)
+      .maybeSingle();
+    const erroVinculado = erroRow
+      ? {
+          id: String((erroRow as Record<string, unknown>)["id"]),
+          status: String((erroRow as Record<string, unknown>)["status"] ?? ""),
+          categoria: (erroRow as Record<string, unknown>)["categoria"]
+            ? String((erroRow as Record<string, unknown>)["categoria"])
+            : null,
+          created_at: String((erroRow as Record<string, unknown>)["created_at"] ?? ""),
+        }
+      : null;
 
     const r = row as unknown as {
       created_at: string;
@@ -182,6 +203,7 @@ export const confiabilidadeDaExecucao = createServerFn({ method: "POST" })
       bloqueadores: r.bloqueadores ?? [],
       linhas: linhasConfiabilidade(registro),
       reasonCodes: lista((r as unknown as Record<string, unknown>)["reason_codes"]),
+      erroReportado: erroVinculado,
       acaoSolicitada: (r as unknown as Record<string, unknown>)["acao_solicitada"]
         ? String((r as unknown as Record<string, unknown>)["acao_solicitada"])
         : null,
@@ -588,6 +610,16 @@ export type ConfiancaDaMensagem = {
   bloqueadores: string[];
   registrado_em: string;
   policy_version: string | null;
+  /** Erro reportado depois pela equipe para a MESMA resposta (mesma execução). */
+  erro_reportado: ErroReportadoVinculado | null;
+};
+
+/** Vínculo entre o snapshot de confiança e o reporte de erro da equipe. */
+export type ErroReportadoVinculado = {
+  id: string;
+  status: string;
+  categoria: string | null;
+  created_at: string;
 };
 
 /**
@@ -630,7 +662,32 @@ export const confiancaDasExecucoes = createServerFn({ method: "POST" })
         bloqueadores: [...new Set([...lista(r["bloqueadores"]), ...bloqueio])],
         registrado_em: String(r["created_at"] ?? ""),
         policy_version: r["policy_version"] ? String(r["policy_version"]) : null,
+        erro_reportado: null,
       });
+    }
+
+    // Vínculo mensagem → confiança → erro reportado: o reporte já guarda a
+    // MESMA execução da resposta, então nada é inferido por texto ou horário.
+    const ids = [...porExecucao.keys()];
+    if (ids.length > 0) {
+      const { data: erros } = await context.supabase
+        .from("nina_feedback_erros")
+        .select("id, execucao_id, status, categoria, created_at")
+        .eq("clinica_id", data.clinicaId)
+        .in("execucao_id", ids)
+        .order("created_at", { ascending: true });
+      for (const raw of erros ?? []) {
+        const e = raw as Record<string, unknown>;
+        const id = e["execucao_id"] ? String(e["execucao_id"]) : "";
+        const alvo = porExecucao.get(id);
+        if (!alvo) continue;
+        alvo.erro_reportado = {
+          id: String(e["id"]),
+          status: String(e["status"] ?? ""),
+          categoria: e["categoria"] ? String(e["categoria"]) : null,
+          created_at: String(e["created_at"] ?? ""),
+        };
+      }
     }
     return [...porExecucao.values()];
   });

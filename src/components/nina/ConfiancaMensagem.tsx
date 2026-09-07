@@ -149,12 +149,19 @@ export function ConfiancaMensagemBadge({
       <PopoverTrigger asChild>
         <button
           type="button"
-          aria-label={`${estilo.rotulo}: ${confianca.score}%. Ver detalhes.`}
+          aria-label={`${estilo.rotulo}: ${confianca.score}%.${
+            confianca.erro_reportado ? " Erro reportado por atendente." : ""
+          } Ver detalhes.`}
           title={`${estilo.rotulo} — ${confianca.score}% (visível apenas para a equipe)`}
           className={`inline-flex h-[18px] shrink-0 items-center gap-1 rounded-full border px-1.5 text-[10px] font-medium leading-none ${estilo.classe}`}
         >
           <span aria-hidden className={`h-1.5 w-1.5 rounded-full ${estilo.ponto}`} />
           {confianca.score}% {estilo.curto}
+          {confianca.erro_reportado && (
+            <span className="font-semibold text-destructive" aria-hidden>
+              !
+            </span>
+          )}
         </button>
       </PopoverTrigger>
       <PopoverContent align="end" className="max-h-96 w-80 space-y-2 overflow-y-auto text-xs">
@@ -177,6 +184,21 @@ export function ConfiancaMensagemBadge({
             </ul>
           </div>
         )}
+        <Secao titulo="Erro posteriormente reportado">
+          {confianca.erro_reportado ? (
+            <p className="text-destructive">
+              SIM — registrado em{" "}
+              {new Date(confianca.erro_reportado.created_at).toLocaleString("pt-BR")} (situação:{" "}
+              {confianca.erro_reportado.status}
+              {confianca.erro_reportado.categoria
+                ? `, ${confianca.erro_reportado.categoria}`
+                : ""}
+              )
+            </p>
+          ) : (
+            <p className="text-muted-foreground">NÃO</p>
+          )}
+        </Secao>
         {detalhe ? (
           <>
             <Secao titulo="Decisão">
