@@ -264,9 +264,17 @@ export function HomologacaoInbox() {
   );
 
   /**
-   * FASE 2 — a prévia do card acompanha as mensagens de teste em tempo real,
-   * sem recarregar a página. Só escuta mensagens desta clínica.
+   * FASE 4 — inbox em tempo real.
+   *
+   * Cada mensagem nova é aplicada NA HORA no card certo (prévia, horário,
+   * total e bolinha azul), usando o identificador da mensagem para não contar
+   * duas vezes. Logo depois, uma recarga silenciosa reconcilia os números com
+   * o banco. Só escuta mensagens desta clínica e nunca toca no atendimento
+   * real.
    */
+  const aplicadasRef = useRef<Set<string>>(new Set());
+  const leadAbertoRef = useRef<string | null>(null);
+  leadAbertoRef.current = conversaId;
   useEffect(() => {
     if (!clinicaId) return;
     let pendente: ReturnType<typeof setTimeout> | null = null;
@@ -280,9 +288,28 @@ export function HomologacaoInbox() {
           table: "whatsapp_mensagens",
           filter: `clinica_id=eq.${clinicaId}`,
         },
-        () => {
+        (payload) => {
+          const nova = (payload as any).new as MensagemResumoRow | null;
+          if (nova?.id && nova.conversa_id && !aplicadasRef.current.has(nova.id)) {
+            const jaAplicada = false;
+            const abertoAgora =
+              leadAbertoRef.current === nova.conversa_id &&
+              (typeof document === "undefined" || document.visibilityState === "visible");
+            aplicadasRef.current.add(nova.id);
+            if (aplicadasRef.current.size > 500) aplicadasRef.current.clear();
+            setLeads((ls) =>
+              ls.map((l) =>
+                l.conversaId === nova.conversa_id
+                  ? ({
+                      ...l,
+                      ...aplicarMensagemRealtime(l, nova, { jaAplicada, abertoAgora }),
+                    } as Lead)
+                  : l,
+              ),
+            );
+          }
           if (pendente) clearTimeout(pendente);
-          pendente = setTimeout(() => void carregarLeads(true), 600);
+          pendente = setTimeout(() => void carregarLeads(true), 800);
         },
       )
       .subscribe();
@@ -291,6 +318,7 @@ export function HomologacaoInbox() {
       void supabase.removeChannel(canal);
     };
   }, [clinicaId, carregarLeads]);
+
 
 
   useEffect(() => {
