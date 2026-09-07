@@ -144,6 +144,8 @@ export const lerConversaAuditoria = createServerFn({ method: "POST" })
         status: (c["status"] as string | null) ?? null,
         is_teste: Boolean(c["is_teste"]),
         protocolo: (c["protocolo"] as string | null) ?? null,
+        // Nome usado para rotular as mensagens enviadas por atendente humana.
+        atendente_nome: responsavelId ? (nomes.get(responsavelId) ?? null) : null,
       },
       mensagens: lista,
       // A mensagem reportada pode ter sido apagada ou ficar fora do limite:
