@@ -106,7 +106,8 @@ export const CENARIOS_SHADOW: CenarioShadow[] = [
       texto: "Temos os dois exames.",
       catalogoEncontrou: true,
       ferramentas: [catalogoOk],
-      entities: { procedimento_ambiguo: true },
+      intentAmbiguo: true,
+      entityCandidates: { procedimento: ["ultrassom de mama", "ultrassom de axila"] },
     },
   },
   {
@@ -117,9 +118,17 @@ export const CENARIOS_SHADOW: CenarioShadow[] = [
     estado: {
       ...base,
       intent: "agenda",
-      texto: "Tenho 15h e também não tenho 15h.",
+      texto: "Temos vaga na quinta às 15:00.",
       ferramentas: [agendaOk, { ...agendaOk, fonte: "cache_agenda" }],
-      entities: { conflito_fontes: true },
+      conflitos: [
+        {
+          campo: "horario",
+          valores: [
+            { origem: "agenda", valor: "15:00 livre" },
+            { origem: "cache_agenda", valor: "15:00 ocupado" },
+          ],
+        },
+      ],
     },
   },
   {
@@ -142,7 +151,7 @@ export const CENARIOS_SHADOW: CenarioShadow[] = [
     estado: {
       ...base,
       intent: "informacao",
-      texto: "Fazemos sim.",
+      texto: "Fazemos cintilografia, o valor é R$ 400,00.",
       catalogoEncontrou: false,
       ferramentas: [catalogoOk],
     },
@@ -150,8 +159,8 @@ export const CENARIOS_SHADOW: CenarioShadow[] = [
   {
     id: "dados-incompletos",
     mensagem: "Quero marcar com o doutor.",
-    respostaEsperada: "Pede o dado que falta.",
-    decisaoEsperada: "CLARIFY",
+    respostaEsperada: "Não executa a ação e cobra o dado que falta.",
+    decisaoEsperada: "BLOCK_ACTION",
     estado: {
       ...base,
       intent: "agendamento",
@@ -230,7 +239,7 @@ export const CENARIOS_SHADOW: CenarioShadow[] = [
     estado: {
       ...base,
       intent: "preparo",
-      texto: "Dieta líquida na véspera.",
+      texto: "É necessário jejum de 8 horas antes da colonoscopia.",
       catalogoEncontrou: false,
       ferramentas: [],
     },
@@ -243,10 +252,18 @@ export const CENARIOS_SHADOW: CenarioShadow[] = [
     estado: {
       ...base,
       intent: "preco",
-      texto: "Custa R$ 60,00 e também R$ 90,00.",
+      texto: "O raio-x custa R$ 60,00.",
       catalogoEncontrou: true,
       ferramentas: [catalogoOk, { ...catalogoOk, fonte: "tabela_legada" }],
-      entities: { conflito_fontes: true },
+      conflitos: [
+        {
+          campo: "valor",
+          valores: [
+            { origem: "catalogo_publicado", valor: "60" },
+            { origem: "tabela_legada", valor: "90" },
+          ],
+        },
+      ],
     },
   },
   {
@@ -260,6 +277,7 @@ export const CENARIOS_SHADOW: CenarioShadow[] = [
       texto: "Depende do exame.",
       catalogoEncontrou: true,
       ferramentas: [catalogoOk],
+      intentAmbiguo: true,
     },
   },
   {
@@ -270,7 +288,7 @@ export const CENARIOS_SHADOW: CenarioShadow[] = [
     estado: {
       ...base,
       intent: "informacao",
-      texto: "Fazemos, sim, com o plano X.",
+      texto: "Fazemos, sim: o convênio X cobre e o valor é R$ 0,00.",
       catalogoEncontrou: false,
       ferramentas: [],
     },
