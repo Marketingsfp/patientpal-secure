@@ -865,7 +865,7 @@ export const NODES_ARQUITETURA: NodeArquitetura[] = [
 ];
 
 export const MANIFESTO_ARQUITETURA = {
-  versao: 2,
+  versao: 3,
   descricao:
     "Descrição estruturada da arquitetura real da Nina. Não executa nada e não substitui o código.",
   categorias: CATEGORIAS_ARQUITETURA,
