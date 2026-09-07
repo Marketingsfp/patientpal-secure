@@ -41,23 +41,38 @@ type Dados = {
     status: string | null;
     is_teste: boolean;
     protocolo: string | null;
+    atendente_nome: string | null;
   };
   mensagens: Mensagem[];
   mensagemEncontrada: boolean | null;
   eventos: ConversaEvento[];
 };
 
+/** Timestamp real persistido, sempre DD/MM/AAAA HH:mm:ss. */
 function fmtHora(iso: string) {
   try {
     return new Date(iso).toLocaleString("pt-BR", {
       day: "2-digit",
       month: "2-digit",
+      year: "numeric",
       hour: "2-digit",
       minute: "2-digit",
+      second: "2-digit",
     });
   } catch {
     return "";
   }
+}
+
+/** Autoria explícita: não depender só do lado do balão. */
+function autorDe(m: Mensagem, atendenteNome: string | null) {
+  const por = (m.enviada_por ?? "").toLowerCase();
+  if (por === "sistema") return "Sistema";
+  if (por === "nina" || por === "ia" || por === "bot") return "Nina";
+  if (por === "humano" || por === "atendente")
+    return atendenteNome ? `Atendente — ${atendenteNome}` : "Atendente";
+  if (por === "paciente") return "Paciente";
+  return m.direction === "out" ? "Nina" : "Paciente";
 }
 
 export function ConversaAuditoriaDialog({
