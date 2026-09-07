@@ -844,11 +844,24 @@ export const detalheExecucaoTeste = createServerFn({ method: "POST" })
       .order("started_at", { ascending: true })
       .limit(200);
 
-    const lista = (eventos ?? []) as any[];
+    let lista = (eventos ?? []) as any[];
+    // O trace cobre a mensagem inteira (várias rodadas de modelo). Buscando
+    // pelo trace_id trazemos TODAS as etapas, não só as da última rodada.
+    const traceId = (lista[0]?.trace_id as string | undefined) ?? null;
+    if (traceId) {
+      const { data: todos } = await supabaseAdmin
+        .from("nina_trace_eventos")
+        .select("trace_id, node_id, event_type, status, duration_ms, started_at, metadata")
+        .eq("clinica_id", data.clinicaId)
+        .eq("trace_id", traceId)
+        .order("started_at", { ascending: true })
+        .limit(300);
+      if (todos?.length) lista = todos as any[];
+    }
     return {
       execucao: exec as any,
       etapas: ((evid as any)?.etapas ?? []) as any[],
-      traceId: (lista[0]?.trace_id as string | undefined) ?? null,
+      traceId,
       eventos: lista,
     };
   });
