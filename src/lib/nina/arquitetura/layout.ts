@@ -247,6 +247,34 @@ export function calcularLayout(
     lista.forEach((node, indice) => ordem.set(node.id, indice));
   }
 
+  // Refino final: dentro de cada domínio, reordena por baricentro para voltar
+  // a reduzir cruzamentos sem quebrar o agrupamento.
+  for (let passo = 0; passo < 2; passo += 1) {
+    const lado = passo % 2 === 0 ? "antes" : "depois";
+    for (const chave of chaves) {
+      const lista = colunas.get(chave)!;
+      const bloco = new Map<string, number>();
+      let indiceBloco = -1;
+      let categoriaAtual: CategoriaArquitetura | null = null;
+      for (const node of lista) {
+        if (node.categoria !== categoriaAtual) {
+          categoriaAtual = node.categoria;
+          indiceBloco += 1;
+        }
+        bloco.set(node.id, indiceBloco);
+      }
+      const pontuacao = new Map(lista.map((n) => [n.id, baricentro(n.id, lado)]));
+      lista.sort((a, b) => {
+        const diffBloco = (bloco.get(a.id) ?? 0) - (bloco.get(b.id) ?? 0);
+        if (diffBloco !== 0) return diffBloco;
+        const diff = (pontuacao.get(a.id) ?? 0) - (pontuacao.get(b.id) ?? 0);
+        if (Math.abs(diff) > 1e-9) return diff;
+        return (ordem.get(a.id) ?? 0) - (ordem.get(b.id) ?? 0);
+      });
+      lista.forEach((node, indice) => ordem.set(node.id, indice));
+    }
+  }
+
   // Linha de cada node dentro da coluna, deslocada para alinhar o caminho
   // principal em uma faixa central comum a todas as colunas.
   const linhas = new Map<string, number>();
