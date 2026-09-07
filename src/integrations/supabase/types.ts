@@ -9315,6 +9315,27 @@ export type Database = {
         }
         Relationships: []
       }
+      nina_trace_retencao: {
+        Row: {
+          atualizado_em: string
+          atualizado_por: string | null
+          clinica_id: string
+          dias: number
+        }
+        Insert: {
+          atualizado_em?: string
+          atualizado_por?: string | null
+          clinica_id: string
+          dias?: number
+        }
+        Update: {
+          atualizado_em?: string
+          atualizado_por?: string | null
+          clinica_id?: string
+          dias?: number
+        }
+        Relationships: []
+      }
       odonto_anamnese: {
         Row: {
           alergias: string | null
@@ -13045,6 +13066,7 @@ export type Database = {
         }
         Returns: Json
       }
+      nina_trace_purgar: { Args: { _clinica_id?: string }; Returns: number }
       normalizar_telefone: { Args: { _tel: string }; Returns: string }
       normalizar_termo_busca: { Args: { _termo: string }; Returns: string }
       paciente_cartao_inadimplente: {
