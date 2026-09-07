@@ -770,15 +770,34 @@ export const resolverConversaTeste = createServerFn({ method: "POST" })
     // arquivado (que fica só para auditoria).
     const proxima = lead.sessao_seq + 1;
 
+    // Encerra o ciclo atual (histórico preservado para auditoria) — a próxima
+    // mensagem cria um novo test_cycle_id, sem memória do ciclo anterior.
+    if (lead.ciclo_id) {
+      await supabaseAdmin
+        .from("nina_teste_ciclos")
+        .update({ status: "resolvido", resolved_at: agora, resolvido_por: context.userId })
+        .eq("id", lead.ciclo_id)
+        .eq("clinica_id", data.clinicaId);
+    }
+
     await supabaseAdmin
       .from("nina_teste_leads")
       .update({
         sessao_seq: proxima,
         telefone_sessao: telefoneSessao(lead.indice, proxima),
         conversa_id: null,
+        ciclo_id: null,
+        ciclo_iniciado_em: null,
+        resolvido_em: agora,
         status: "ativa",
       })
       .eq("id", lead.id);
 
-    return { ok: true, jaResolvida: false, sessao: proxima, agendamentosRemovidos };
+    return {
+      ok: true,
+      jaResolvida: false,
+      sessao: proxima,
+      cicloEncerrado: lead.ciclo_id,
+      agendamentosRemovidos,
+    };
   });
