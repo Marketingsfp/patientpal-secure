@@ -1888,6 +1888,8 @@ function Pagina() {
         clinicaId={clinicaId ?? null}
         conversaId={conversaAuditoria?.conversaId ?? null}
         mensagemId={conversaAuditoria?.mensagemId ?? null}
+        erroId={conversaAuditoria?.erroId ?? null}
+        reportadoEm={conversaAuditoria?.reportadoEm ?? null}
         aberto={Boolean(conversaAuditoria)}
         onOpenChange={(v) => {
           if (!v) setConversaAuditoria(null);
