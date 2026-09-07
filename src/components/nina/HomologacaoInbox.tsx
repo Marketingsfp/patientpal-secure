@@ -770,6 +770,12 @@ export function HomologacaoInbox() {
                   >
                     <Wrench className="mr-1 h-3.5 w-3.5" /> Diagnóstico
                   </Button>
+                  <AvaliacaoSol
+                    clinicaId={clinicaId}
+                    leadId={leadId}
+                    podeAvaliar={podeEscrever}
+                  />
+
                   <Button
                     size="sm"
                     variant="outline"
