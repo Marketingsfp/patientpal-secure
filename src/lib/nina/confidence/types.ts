@@ -43,6 +43,14 @@ export type FonteRecuperada = {
   temConteudo: boolean;
   /** Publicado/vigente na origem. Rascunho e arquivado não valem. */
   publicado?: boolean;
+  /** Registro ativo na origem (false = desativado). */
+  ativo?: boolean;
+  /** Data de expiração/vigência, quando a origem controlar isso (ISO). */
+  expiraEm?: string | null;
+  /** Preenchido quando o registro foi substituído por outra versão. */
+  substituidoPor?: string | null;
+  /** Nota interna: jamais pode ser repassada ao paciente. */
+  interna?: boolean;
 };
 
 /** Resultado de uma ferramenta executada neste turno. */
