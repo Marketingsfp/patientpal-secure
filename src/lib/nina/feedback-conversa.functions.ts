@@ -100,16 +100,21 @@ export const lerConversaAuditoria = createServerFn({ method: "POST" })
     const eventos = evs.data ?? [];
 
     // Nomes de quem agiu nos eventos (banner da timeline).
+    const responsavelId =
+      ((conversa as unknown as Record<string, unknown>)["atribuida_user_id"] as
+        | string
+        | null) ?? null;
     const ids = Array.from(
       new Set(
-        eventos
-          .flatMap((r) => {
+        [
+          responsavelId,
+          ...eventos.flatMap((r) => {
             const det = (r.detalhes ?? null) as
               | { para_user_id?: string | null; de_user_id?: string | null }
               | null;
             return [r.user_id, det?.para_user_id ?? null, det?.de_user_id ?? null];
-          })
-          .filter((v): v is string => typeof v === "string" && v.length > 0),
+          }),
+        ].filter((v): v is string => typeof v === "string" && v.length > 0),
       ),
     );
     const nomes = new Map<string, string>();
