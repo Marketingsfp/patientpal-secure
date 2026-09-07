@@ -221,6 +221,10 @@ export type LinhaConfiabilidade = {
   ok: boolean;
   rotulo: string;
   detalhe: string | null;
+  /** Seção em que a linha é mostrada no painel de detalhes. */
+  grupo: "validador" | "ferramenta" | "fonte";
+  /** Código estruturado do motivo (só evidência observável). */
+  reasonCode: string | null;
 };
 
 /** Linhas ✓/✕ mostradas na seção "Confiabilidade" da auditoria. */
@@ -241,6 +245,8 @@ export function linhasConfiabilidade(
         ok: v.status === "PASS",
         rotulo: ROTULO_VALIDADOR[v.validator] ?? v.validator,
         detalhe: detalhe || null,
+        grupo: "validador" as const,
+        reasonCode: v.reasonCode ? String(v.reasonCode) : null,
       };
     });
 
@@ -249,6 +255,8 @@ export function linhasConfiabilidade(
       ok: f.sucesso,
       rotulo: `Consulta: ${f.nome}`,
       detalhe: f.sucesso ? (f.fonte ?? f.capacidade) : (f.erro ?? "sem resposta"),
+      grupo: "ferramenta",
+      reasonCode: null,
     });
   }
   for (const f of registro.fontes) {
@@ -256,6 +264,8 @@ export function linhasConfiabilidade(
       ok: f.temConteudo,
       rotulo: `Fonte: ${f.tipo}${f.referencia ? ` #${f.referencia}` : ""}`,
       detalhe: f.publicado === null ? null : `Registro publicado: ${f.publicado ? "sim" : "não"}`,
+      grupo: "fonte",
+      reasonCode: null,
     });
   }
   return linhas;
