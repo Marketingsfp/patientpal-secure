@@ -65,6 +65,37 @@ export type FaixaCorrelacao = {
   taxaErro: number;
 };
 
+/**
+ * FASE 7 — HIGH_CONFIDENCE_ERROR.
+ *
+ * Resposta que o motor classificou como ALTA confiança e que, mesmo assim, foi
+ * reportada como erro pela equipe. É o caso mais grave: o sistema não sinalizou
+ * incerteza nenhuma, então o problema tende a estar na fonte, no validador, na
+ * regra, no peso, na identificação da entidade, na ferramenta ou na própria
+ * arquitetura de confiança.
+ */
+export const CLASSIFICACAO_ALTA_CONFIANCA_ERRO = "HIGH_CONFIDENCE_ERROR" as const;
+
+export type AltaConfiancaComErro = {
+  classificacao: typeof CLASSIFICACAO_ALTA_CONFIANCA_ERRO;
+  /** Respostas de alta confiança reportadas como erro. */
+  casos: number;
+  /** Total de respostas de alta confiança no recorte. */
+  mensagensAlta: number;
+  /** Percentual das respostas de alta confiança que viraram erro. */
+  taxa: number;
+  /** Participação desses casos no total de erros vinculados no recorte. */
+  participacaoNosErros: number;
+  scoreMedio: number;
+  /** Onde investigar primeiro — só nos casos HIGH_CONFIDENCE_ERROR. */
+  fontesProvaveis: {
+    validadores: Contagem[];
+    ferramentas: Contagem[];
+    tiposAtendimento: Contagem[];
+    motivos: Contagem[];
+  };
+};
+
 export type MetricasConfiabilidade = {
   total: number;
   scoreMedio: number;
@@ -84,6 +115,7 @@ export type MetricasConfiabilidade = {
   porPeriodoOperacao: MediaGrupo[];
   correlacaoErros: FaixaCorrelacao[];
   calibracaoPorNivel: CalibracaoNivel[];
+  altaConfiancaComErro: AltaConfiancaComErro;
 };
 
 const DIAS = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"];
@@ -269,6 +301,64 @@ export function calcularCalibracaoPorNivel(
   });
 }
 
+/**
+ * FASE 7 — recorte dedicado aos casos HIGH_CONFIDENCE_ERROR, com as pistas
+ * observáveis (validadores usados, ferramentas, tipo de atendimento e motivos
+ * registrados) para priorizar a melhoria do sistema. Nada é estimado.
+ */
+export function calcularAltaConfiancaComErro(
+  linhas: LinhaDecisaoMetrica[],
+  erros: ErroReportado[] = [],
+): AltaConfiancaComErro {
+  const idx = indexarErros(erros);
+  const validadores = new Map<string, number>();
+  const ferramentas = new Map<string, number>();
+  const tipos = new Map<string, number>();
+  const motivos = new Map<string, number>();
+
+  let mensagensAlta = 0;
+  let casos = 0;
+  let soma = 0;
+  let errosTotais = 0;
+
+  for (const l of linhas) {
+    const score = Number.isFinite(l.score) ? l.score : 0;
+    const nivel = nivelDa({ nivel: l.nivel, score });
+    const alta = nivel === "HIGH";
+    if (alta) mensagensAlta += 1;
+
+    if (!foiReportadaComoErro(l, idx)) continue;
+    errosTotais += 1;
+    if (!alta) continue;
+
+    casos += 1;
+    soma += score;
+    for (const v of l.validadores) somar(validadores, v.validator);
+    for (const f of l.ferramentas) somar(ferramentas, f.nome);
+    const cats = l.categorias.length > 0 ? l.categorias : [l.intencao || "nao_classificado"];
+    for (const c of cats) somar(tipos, c);
+    for (const c of l.reason_codes) somar(motivos, c);
+    for (const b of l.bloqueadores) somar(motivos, b);
+  }
+
+  const pct = (n: number, d: number) => (d ? Math.round((n / d) * 1000) / 10 : 0);
+
+  return {
+    classificacao: CLASSIFICACAO_ALTA_CONFIANCA_ERRO,
+    casos,
+    mensagensAlta,
+    taxa: pct(casos, mensagensAlta),
+    participacaoNosErros: pct(casos, errosTotais),
+    scoreMedio: casos ? Math.round((soma / casos) * 10) / 10 : 0,
+    fontesProvaveis: {
+      validadores: ordenar(validadores),
+      ferramentas: ordenar(ferramentas),
+      tiposAtendimento: ordenar(tipos),
+      motivos: ordenar(motivos),
+    },
+  };
+}
+
 export function calcularMetricasConfiabilidade(
   linhas: LinhaDecisaoMetrica[],
   erros: ErroReportado[] = [],
@@ -351,5 +441,6 @@ export function calcularMetricasConfiabilidade(
     porPeriodoOperacao: medias(porPeriodo),
     correlacaoErros: correlacionar(linhas, erros),
     calibracaoPorNivel: calcularCalibracaoPorNivel(linhas, erros),
+    altaConfiancaComErro: calcularAltaConfiancaComErro(linhas, erros),
   };
 }
