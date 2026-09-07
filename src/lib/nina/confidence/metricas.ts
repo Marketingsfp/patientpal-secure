@@ -195,6 +195,70 @@ function correlacionar(
   });
 }
 
+const ROTULO_NIVEL: Record<CalibracaoNivel["nivel"], string> = {
+  HIGH: "Alta",
+  MEDIUM: "Média",
+  LOW: "Baixa",
+};
+
+/**
+ * Calibração por nível de confiança: quantas mensagens a Nina produziu em cada
+ * nível e quantas dessas foram reportadas como erro.
+ *
+ * O vínculo preferencial é exato (mesma execução). Quando o reporte não guardou
+ * a execução, cai para o vínculo por conversa dentro de 48h — o mesmo critério
+ * já usado na correlação por faixa. Nenhum valor é estimado ou fixo.
+ */
+export function calcularCalibracaoPorNivel(
+  linhas: LinhaDecisaoMetrica[],
+  erros: ErroReportado[] = [],
+): CalibracaoNivel[] {
+  const execucoesComErro = new Set<string>();
+  const porConversa = new Map<string, number[]>();
+  for (const e of erros) {
+    if (e.execucao_id) execucoesComErro.add(e.execucao_id);
+    else if (e.conversa_id) {
+      const t = Date.parse(e.created_at);
+      if (Number.isNaN(t)) continue;
+      const arr = porConversa.get(e.conversa_id) ?? [];
+      arr.push(t);
+      porConversa.set(e.conversa_id, arr);
+    }
+  }
+
+  const base: Record<CalibracaoNivel["nivel"], { mensagens: number; erros: number }> = {
+    HIGH: { mensagens: 0, erros: 0 },
+    MEDIUM: { mensagens: 0, erros: 0 },
+    LOW: { mensagens: 0, erros: 0 },
+  };
+
+  for (const l of linhas) {
+    const nivel = nivelDa({ nivel: l.nivel, score: Number.isFinite(l.score) ? l.score : 0 });
+    base[nivel].mensagens += 1;
+
+    let reportada = Boolean(l.execucao_id && execucoesComErro.has(l.execucao_id));
+    if (!reportada && l.conversation_id) {
+      const marcas = porConversa.get(l.conversation_id);
+      const t = Date.parse(l.created_at);
+      if (marcas && !Number.isNaN(t)) {
+        reportada = marcas.some((m) => m >= t && m - t <= JANELA_ERRO_MS);
+      }
+    }
+    if (reportada) base[nivel].erros += 1;
+  }
+
+  return (["HIGH", "MEDIUM", "LOW"] as const).map((nivel) => {
+    const { mensagens, erros: qtd } = base[nivel];
+    return {
+      nivel,
+      rotulo: ROTULO_NIVEL[nivel],
+      mensagens,
+      erros: qtd,
+      taxaErro: mensagens ? Math.round((qtd / mensagens) * 1000) / 10 : 0,
+    };
+  });
+}
+
 export function calcularMetricasConfiabilidade(
   linhas: LinhaDecisaoMetrica[],
   erros: ErroReportado[] = [],
