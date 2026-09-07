@@ -77,6 +77,7 @@ import {
 } from "@/lib/nina/feedback-revisao.functions";
 import { TZ_CLINICA } from "@/lib/date-utils";
 import { ConversaAuditoriaDialog } from "@/components/nina/ConversaAuditoriaDialog";
+import { useConfiancaMensagens } from "@/components/nina/ConfiancaMensagem";
 
 
 import {
