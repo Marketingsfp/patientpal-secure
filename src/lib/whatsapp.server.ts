@@ -1422,6 +1422,22 @@ ATENDIMENTO HUMANO — REGRA OBRIGATÓRIA:
         });
       }
       nomesFerramentasTurno.push(nome);
+      // Evidência para o Confidence Engine (não altera o que o modelo vê).
+      evidenciasFerramentas.push({
+        nome,
+        capacidade: r.capacidade,
+        fonte: r.fonte,
+        success: r.success,
+        erro: r.erro,
+      });
+      if (
+        r.success &&
+        !r.erro &&
+        (r.capacidade === "searchKnowledgeBase" || r.capacidade === "listCatalog") &&
+        temConteudoUtil(r.dados)
+      ) {
+        catalogoEncontrou = true;
+      }
       if (!r.success || r.erro) conflitoFerramenta = true;
       mensagens.push({
         role: "tool",
