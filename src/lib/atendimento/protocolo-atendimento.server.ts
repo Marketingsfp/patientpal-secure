@@ -19,6 +19,7 @@
 
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { ambienteDoHandoff, deveInformarProtocolo, vinculoProtocolo } from "./protocolo-handoff";
+import { classificarMotivoHandoff, type MotivoHandoff } from "./mensagem-handoff";
 
 
 export type ProtocoloGerado = { protocolo: string; novo: boolean } | null;
@@ -28,6 +29,8 @@ type LinhaConversa = {
   protocolo_sessao_id: string | null;
   handoff_em: string | null;
   contato_telefone: string | null;
+  contato_nome: string | null;
+  departamento_id: string | null;
   is_teste: boolean | null;
   nina_fluxo_estado: unknown;
 };
@@ -41,7 +44,7 @@ async function lerConversa(clinicaId: string, conversaId: string) {
   const { data } = await supabaseAdmin
     .from("atend_conversas")
     .select(
-      "protocolo_atendimento, protocolo_sessao_id, handoff_em, contato_telefone, is_teste, nina_fluxo_estado",
+      "protocolo_atendimento, protocolo_sessao_id, handoff_em, contato_telefone, contato_nome, departamento_id, is_teste, nina_fluxo_estado",
     )
     .eq("id", conversaId)
     .eq("clinica_id", clinicaId)
@@ -214,11 +217,17 @@ export async function protocoloAoAtribuirHumano(args: {
   const jaInformado = await protocoloJaInformado(args.clinicaId, args.conversaId, r.protocolo);
   if (!deveInformarProtocolo({ protocolo: r.protocolo, jaInformado })) return r;
 
-  await enviarTextoSistema(
-    args.clinicaId,
-    args.conversaId,
-    `Seu atendimento foi encaminhado para nossa equipe. Seu protocolo de atendimento é ${r.protocolo}.`,
-  );
+  // FASE 2 — a comunicação é contextual (nome, motivo, setor estruturado),
+  // nunca uma frase única fixa, e sempre carrega o protocolo real.
+  const { gerarMensagemHandoff } = await import("./mensagem-handoff.server");
+  const { texto, origem } = await gerarMensagemHandoff({
+    protocolo: r.protocolo,
+    nome: conv.contato_nome,
+    setor: await nomeDepartamento(args.clinicaId, conv.departamento_id),
+    motivo: await motivoDoHandoff(args.clinicaId, args.conversaId),
+  });
+
+  await enviarTextoSistema(args.clinicaId, args.conversaId, texto);
   const { registrarEvento } = await import("./handoff.server");
   await registrarEvento({
     clinicaId: args.clinicaId,
@@ -226,8 +235,41 @@ export async function protocoloAoAtribuirHumano(args: {
     evento: "ASSUMIDA",
     userId: args.userId ?? null,
     motivo: `Protocolo ${r.protocolo} informado ao paciente`,
-    detalhes: { protocol_number: r.protocolo, protocolo_informado: true },
+    detalhes: {
+      protocol_number: r.protocolo,
+      protocolo_informado: true,
+      mensagem_origem: origem,
+    },
   });
   return r;
+}
+
+/** Nome do departamento cadastrado (setor estruturado) — nunca inventado. */
+async function nomeDepartamento(clinicaId: string, departamentoId: string | null) {
+  if (!departamentoId) return null;
+  const { data } = await supabaseAdmin
+    .from("atend_departamentos")
+    .select("nome")
+    .eq("id", departamentoId)
+    .eq("clinica_id", clinicaId)
+    .maybeSingle();
+  return ((data as { nome?: string | null } | null)?.nome ?? null) as string | null;
+}
+
+/** Traduz o motivo registrado no handoff para o motivo funcional da mensagem. */
+async function motivoDoHandoff(
+  clinicaId: string,
+  conversaId: string,
+): Promise<MotivoHandoff> {
+  const { data } = await supabaseAdmin
+    .from("atend_conversa_eventos")
+    .select("evento, motivo")
+    .eq("clinica_id", clinicaId)
+    .eq("conversa_id", conversaId)
+    .eq("evento", "HANDOFF_SOLICITADO")
+    .order("created_at", { ascending: false })
+    .limit(1);
+  const bruto = ((data as Array<{ motivo?: string | null }> | null)?.[0]?.motivo ?? "").toLowerCase();
+  return classificarMotivoHandoff(bruto);
 }
 
