@@ -339,6 +339,26 @@ export function dentroHorarioAtendimento(cfg: WhatsAppConfigRow, now: Date = new
  * Extrai possíveis identificadores (CPF, telefone, nome) do texto do paciente.
  * Usado para tentar reconhecê-lo antes de pedir dados.
  */
+/**
+ * O retorno de uma consulta ao catálogo/base traz conteúdo aproveitável?
+ * Usado só pelo Confidence Engine: "consultei" não é o mesmo que "achei".
+ */
+function temConteudoUtil(dados: unknown): boolean {
+  if (dados === null || dados === undefined) return false;
+  if (Array.isArray(dados)) return dados.length > 0;
+  if (typeof dados !== "object") return String(dados).trim().length > 0;
+  const o = dados as Record<string, unknown>;
+  for (const [k, v] of Object.entries(o)) {
+    if (k === "ok" || k === "erro" || k === "success" || k === "source" || k === "instrucao") continue;
+    if (Array.isArray(v)) {
+      if (v.length > 0) return true;
+      continue;
+    }
+    if (v !== null && v !== undefined && String(v).trim() !== "") return true;
+  }
+  return false;
+}
+
 function extrairIdentificadores(mensagem: string): {
   cpf: string | null;
   telefone: string | null;
@@ -1298,6 +1318,19 @@ ATENDIMENTO HUMANO — REGRA OBRIGATÓRIA:
   let agendamentoConfirmado = jaTinhaAgendamento;
 
   let correcaoFalsoSucessoUsada = false;
+  // ------------------- CONFIDENCE DECISION ENGINE -------------------
+  // Evidências reais do turno: o que rodou, se deu certo e se o catálogo
+  // publicado devolveu registro. É isso — e não o "achismo" do modelo —
+  // que autoriza afirmar valor, horário, profissional, preparo ou regra.
+  const evidenciasFerramentas: Array<{
+    nome: string;
+    capacidade: string | null;
+    fonte: string | null;
+    success: boolean;
+    erro?: string | undefined;
+  }> = [];
+  let catalogoEncontrou = false;
+  let esclarecimentoConfiancaUsado = false;
   // Frases que afirmam/prometem agendamento. Se aparecerem sem gravação
   // confirmada, a resposta é falso sucesso e não pode ir ao paciente.
   const AFIRMA_AGENDAMENTO =
@@ -1380,6 +1413,71 @@ ATENDIMENTO HUMANO — REGRA OBRIGATÓRIA:
         resposta = "Não consegui concluir seu agendamento neste momento. Vou verificar novamente.";
         break;
       }
+      // --------- CONFIDENCE DECISION ENGINE: antes de a resposta sair ---------
+      const { avaliarConfianca, instrucaoEsclarecimento, motivoHandoffConfianca } = await import(
+        "@/lib/nina/confidence-engine"
+      );
+      const decisao = avaliarConfianca({
+        texto,
+        evidencias: {
+          ferramentas: evidenciasFerramentas,
+          catalogoEncontrou,
+          agendamentoConfirmado,
+          pacienteIdentificado: Boolean(pacienteIdEfetivo),
+          esclarecimentoUsado: esclarecimentoConfiancaUsado,
+          handoffSolicitado: houveHandoff,
+        },
+      });
+      rastro?.concluir("confidence.decision", {
+        score: decisao.score,
+        acao: decisao.acao,
+        bloqueio: decisao.bloqueio,
+        categorias: decisao.categorias,
+      });
+      {
+        const { registrarDecisaoConfianca } = await import(
+          "@/lib/nina/confidence-engine.server"
+        );
+        void registrarDecisaoConfianca({
+          clinicaId,
+          conversaId: estadoId.conversaId ?? null,
+          execucaoId: respostaIA.execucaoId ?? null,
+          traceId: rastro?.ids.trace_id ?? null,
+          teste: opcoes?.teste === true,
+          decisao,
+        });
+      }
+
+      // Confiança intermediária: UMA rodada de esclarecimento com o paciente.
+      if (decisao.acao === "esclarecer" && rodada < MAX_RODADAS - 1) {
+        esclarecimentoConfiancaUsado = true;
+        mensagens.push({ role: "assistant", content: texto });
+        mensagens.push({ role: "user", content: instrucaoEsclarecimento(decisao) });
+        continue;
+      }
+
+      // Confiança baixa ou bloqueio absoluto: transfere pelo mesmo caminho
+      // já existente (evento, fila, protocolo e aviso fixo ao paciente).
+      if (decisao.acao === "transferir") {
+        const rh = await broker.executar(
+          "solicitar_atendente_humano",
+          JSON.stringify({
+            motivo: motivoHandoffConfianca(decisao),
+            resumo:
+              `Nina não teve dado confirmado para responder com segurança. ${decisao.motivos.join("; ")}`.slice(
+                0,
+                2000,
+              ),
+            urgencia: "normal",
+          }),
+        );
+        if (rh.success) houveHandoff = true;
+        resposta = rh.success
+          ? "Para não te passar uma informação errada, vou chamar uma atendente da nossa equipe para confirmar isso com você."
+          : texto;
+        break;
+      }
+
       resposta = texto;
       break;
     }
@@ -1409,6 +1507,22 @@ ATENDIMENTO HUMANO — REGRA OBRIGATÓRIA:
         });
       }
       nomesFerramentasTurno.push(nome);
+      // Evidência para o Confidence Engine (não altera o que o modelo vê).
+      evidenciasFerramentas.push({
+        nome,
+        capacidade: r.capacidade,
+        fonte: r.fonte,
+        success: r.success,
+        erro: r.erro,
+      });
+      if (
+        r.success &&
+        !r.erro &&
+        (r.capacidade === "searchKnowledgeBase" || r.capacidade === "listCatalog") &&
+        temConteudoUtil(r.dados)
+      ) {
+        catalogoEncontrou = true;
+      }
       if (!r.success || r.erro) conflitoFerramenta = true;
       mensagens.push({
         role: "tool",

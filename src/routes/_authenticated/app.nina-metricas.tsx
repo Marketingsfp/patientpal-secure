@@ -47,6 +47,7 @@ import {
 } from "@/lib/nina/metricas-filtros";
 import { AnalistaMetricasIA } from "@/components/nina/AnalistaMetricasIA";
 import { DesempenhoPorPeriodo } from "@/components/nina/DesempenhoPorPeriodo";
+import { ConfiancaRespostas } from "@/components/nina/ConfiancaRespostas";
 import {
   metricasAprendizadoNina,
   trilhaAuditoriaAprendizadoNina,
@@ -500,6 +501,10 @@ function Pagina() {
         ambiente={ambiente}
         podeConfigurar={["admin", "gestor"].includes(String(clinicaAtual?.role ?? ""))}
       />
+
+      {/* Confiabilidade das respostas: o que a Nina liberou, esclareceu ou
+          transferiu, e o motivo determinístico de cada decisão. */}
+      <ConfiancaRespostas clinicaId={clinicaId} />
 
 
       {/* Seção da Fase 9: isolada dos cards acima — falha ou lentidão aqui não

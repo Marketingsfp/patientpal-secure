@@ -8252,6 +8252,62 @@ export type Database = {
           },
         ]
       }
+      nina_confianca_decisoes: {
+        Row: {
+          acao: string
+          ambiente: string
+          bloqueio: string | null
+          categorias: Json
+          clinica_id: string
+          conversation_id: string | null
+          created_at: string
+          execucao_id: string | null
+          id: string
+          motivos: Json
+          score: number
+          trace_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          acao: string
+          ambiente?: string
+          bloqueio?: string | null
+          categorias?: Json
+          clinica_id: string
+          conversation_id?: string | null
+          created_at?: string
+          execucao_id?: string | null
+          id?: string
+          motivos?: Json
+          score?: number
+          trace_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          acao?: string
+          ambiente?: string
+          bloqueio?: string | null
+          categorias?: Json
+          clinica_id?: string
+          conversation_id?: string | null
+          created_at?: string
+          execucao_id?: string | null
+          id?: string
+          motivos?: Json
+          score?: number
+          trace_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nina_confianca_decisoes_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       nina_execucao_evidencias: {
         Row: {
           clinica_id: string | null
