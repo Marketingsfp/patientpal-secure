@@ -8926,6 +8926,69 @@ export type Database = {
           },
         ]
       }
+      nina_instrucoes_versoes: {
+        Row: {
+          clinica_id: string | null
+          comentario: string | null
+          conteudo: string
+          created_at: string
+          criado_por: string | null
+          escopo: string
+          id: string
+          publicado_em: string | null
+          publicado_por: string | null
+          status: string
+          updated_at: string
+          versao: number
+          versao_anterior_id: string | null
+        }
+        Insert: {
+          clinica_id?: string | null
+          comentario?: string | null
+          conteudo: string
+          created_at?: string
+          criado_por?: string | null
+          escopo: string
+          id?: string
+          publicado_em?: string | null
+          publicado_por?: string | null
+          status?: string
+          updated_at?: string
+          versao: number
+          versao_anterior_id?: string | null
+        }
+        Update: {
+          clinica_id?: string | null
+          comentario?: string | null
+          conteudo?: string
+          created_at?: string
+          criado_por?: string | null
+          escopo?: string
+          id?: string
+          publicado_em?: string | null
+          publicado_por?: string | null
+          status?: string
+          updated_at?: string
+          versao?: number
+          versao_anterior_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nina_instrucoes_versoes_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nina_instrucoes_versoes_versao_anterior_id_fkey"
+            columns: ["versao_anterior_id"]
+            isOneToOne: false
+            referencedRelation: "nina_instrucoes_versoes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       nina_kb_bases: {
         Row: {
           arquivo_hash: string | null
