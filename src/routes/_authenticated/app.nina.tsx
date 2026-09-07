@@ -137,11 +137,13 @@ function NinaPage() {
 
         {/* ============ HOMOLOGAÇÃO ============ */}
         <TabsContent value="homologacao">
+          <DashboardHomologacao />
           <HomologacaoInbox />
           <CenariosTeste />
           <CargaTeste />
           <RelatorioHomologacao />
         </TabsContent>
+
 
         {/* ============ ATENDIMENTO — Dashboard ============ */}
         <TabsContent value="atend-macros">
