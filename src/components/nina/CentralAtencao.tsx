@@ -135,38 +135,17 @@ export function CentralAtencao() {
     void navigate({ to: "/app/nina", hash: "atend-inbox" });
   }, [navigate]);
 
-  const abrirNaoAtribuidas = () => {
-    try {
-      window.sessionStorage.setItem(FILTRO_NAO_ATRIBUIDAS_KEY, "1");
-    } catch {
-      /* o evento abaixo já resolve na mesma tela */
-    }
-    window.dispatchEvent(new CustomEvent(EVENTO_FILTRAR_NAO_ATRIBUIDAS));
-    setAberto(false);
-    irParaInbox();
-  };
-
-  const abrirCriticas = () => {
-    try {
-      window.sessionStorage.setItem(FILTRO_ESPERA_CRITICA_KEY, "1");
-    } catch {
-      /* idem */
-    }
-    window.dispatchEvent(new CustomEvent(EVENTO_FILTRAR_ESPERA_CRITICA));
-    setAberto(false);
-    irParaInbox();
-  };
+  // FASE 3 — as categorias filtram DENTRO da própria Central. A sidebar não é
+  // mais usada para alertas operacionais.
+  const alternarCategoria = (c: CategoriaAtencao) =>
+    setCategoria((atual) => (atual === c ? null : c));
 
   const abrirConversa = (id: string) => {
-    try {
-      window.sessionStorage.setItem(ABRIR_CONVERSA_KEY, id);
-    } catch {
-      /* idem */
-    }
-    window.dispatchEvent(new CustomEvent(EVENTO_ABRIR_CONVERSA, { detail: { id } }));
+    pedirAbrirConversa({ conversaId: id });
     setAberto(false);
     irParaInbox();
   };
+
 
   if (!clinicaId) return null;
 
