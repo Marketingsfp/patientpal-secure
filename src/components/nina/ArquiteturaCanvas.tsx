@@ -477,9 +477,13 @@ export function ArquiteturaCanvas({
 
       <p className="text-xs text-muted-foreground">
         Clique em um componente para abrir o painel com arquivo, função, entradas, saídas, erros
-        possíveis e documentação. Arraste para reposicionar — isso muda apenas o desenho, nunca o
-        funcionamento da Nina.
+        possíveis e documentação — ao clicar, ele e suas conexões diretas ficam em destaque e os
+        demais são atenuados. Use “Destacar caminho” para ver tudo que leva até o componente e tudo
+        que decorre dele. Passe o ponteiro sobre uma linha para ver origem → destino; linhas
+        tracejadas são retornos do fluxo. Arraste para reposicionar — isso muda apenas o desenho,
+        nunca o funcionamento da Nina.
       </p>
+
 
       <NodeDetalhePainel
         node={detalhe}
