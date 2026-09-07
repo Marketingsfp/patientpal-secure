@@ -593,7 +593,7 @@ export function diffEmTexto(diff: DiffArquitetura = calcularDiffArquitetura()): 
  * manifesto avançar de versão sem novo registro, o status da página deixa de
  * ficar verde e passa a indicar alterações pendentes.
  */
-export const VERSAO_SINCRONIZADA = 3;
+export const VERSAO_SINCRONIZADA = 4;
 
 /**
  * FASE 5 — Publicar uma nova versão das Instruções da Nina é mudança de

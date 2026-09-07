@@ -413,4 +413,5 @@ export const CORES_CATEGORIA: Record<CategoriaArquitetura, string> = {
   SAIDA: "var(--chart-1)",
   OBSERVABILIDADE: "var(--muted-foreground)",
   ERRO_FALLBACK: "var(--destructive)",
+  HOMOLOGACAO: "var(--chart-5)",
 };

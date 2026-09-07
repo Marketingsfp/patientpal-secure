@@ -50,12 +50,34 @@ const contarTools = (snapshot: AssinaturaNode[]) =>
 
 const SNAPSHOT_ATUAL = assinaturaAtual();
 
+/** IDs acrescentados na versão 4 (infraestrutura de homologação). */
+const IDS_HOMOLOGACAO = new Set([
+  "test.cycle",
+  "test.inbound",
+  "test.patient.terra",
+  "test.scenario.run",
+  "test.load.luna",
+  "test.evaluate.sol",
+  "test.report",
+  "test.review",
+  "test.regression",
+]);
+
+/** Foto estrutural da versão 3 (antes de a homologação entrar no mapa). */
+const SNAPSHOT_V3: AssinaturaNode[] = SNAPSHOT_ATUAL.filter(
+  (n) => !IDS_HOMOLOGACAO.has(n.id),
+).map((n) => ({
+  ...n,
+  anteriores: n.anteriores.filter((a) => !IDS_HOMOLOGACAO.has(a)),
+  seguintes: n.seguintes.filter((s) => !IDS_HOMOLOGACAO.has(s)),
+}));
+
 /**
  * Foto estrutural da versão 2 (antes de a montagem do prompt passar a ler as
  * Instruções da Nina publicadas). Derivada da atual, removendo apenas o que a
  * versão 3 acrescentou.
  */
-const SNAPSHOT_V2: AssinaturaNode[] = SNAPSHOT_ATUAL.filter(
+const SNAPSHOT_V2: AssinaturaNode[] = SNAPSHOT_V3.filter(
   (n) => n.id !== "instructions.published",
 ).map((n) =>
   n.id === "prompt.compose"
@@ -68,6 +90,7 @@ const SNAPSHOT_V2: AssinaturaNode[] = SNAPSHOT_ATUAL.filter(
       ? { ...n, seguintes: n.seguintes.filter((s) => s !== "instructions.published") }
       : n,
 );
+
 
 /**
  * Versões já registradas, da mais antiga para a mais recente.
@@ -103,8 +126,24 @@ export const HISTORICO_ARQUITETURA: VersaoArquitetura[] = [
     snapshot: SNAPSHOT_V2,
   },
   {
-    versao: MANIFESTO_ARQUITETURA.versao,
+    versao: 3,
     data: "2026-09-07",
+    deploy: null,
+    commit: null,
+    versaoPrompt: "Instruções da Nina (versão publicada)",
+    modelo: "google/gemini-2.5-flash",
+    quantidadeNodes: SNAPSHOT_V3.length,
+    quantidadeTools: contarTools(SNAPSHOT_V3),
+    alteracoes: [
+      "Novo componente: Instruções da Nina (versão publicada), lido pelo backend antes da montagem do prompt.",
+      "A montagem do prompt passou a apontar para a função real do atendimento por WhatsApp.",
+      "Publicar novas instruções muda só a configuração do componente, sem reorganizar o mapa.",
+    ],
+    snapshot: SNAPSHOT_V3,
+  },
+  {
+    versao: MANIFESTO_ARQUITETURA.versao,
+    data: "2026-09-08",
     deploy: null,
     commit: null,
     versaoPrompt: "Instruções da Nina (versão publicada)",
@@ -112,9 +151,9 @@ export const HISTORICO_ARQUITETURA: VersaoArquitetura[] = [
     quantidadeNodes: SNAPSHOT_ATUAL.length,
     quantidadeTools: contarTools(SNAPSHOT_ATUAL),
     alteracoes: [
-      "Novo componente: Instruções da Nina (versão publicada), lido pelo backend antes da montagem do prompt.",
-      "A montagem do prompt passou a apontar para a função real do atendimento por WhatsApp.",
-      "Publicar novas instruções muda só a configuração do componente, sem reorganizar o mapa.",
+      "A homologação entrou no mapa: entrada de teste, ciclo dos leads, paciente simulado (Terra), cenários e teste de carga (Luna).",
+      "A avaliação do Sol aparece como etapa posterior à resposta, fora do caminho de geração.",
+      "Relatório, envio para Revisão de Aprendizados e teste de regressão passaram a ser componentes visíveis.",
     ],
     snapshot: SNAPSHOT_ATUAL,
   },

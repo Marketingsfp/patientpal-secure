@@ -23,6 +23,9 @@ import { estadosPorNode } from "@/lib/nina/arquitetura/timeline";
 import type { EventoTrace } from "@/lib/nina/arquitetura/tracing";
 import { ArquiteturaCanvas } from "./ArquiteturaCanvas";
 import { ExecucaoDiagnostico } from "./ExecucaoDiagnostico";
+import { PipelineHomologacao } from "./PipelineHomologacao";
+import { CargaAgregada } from "./CargaAgregada";
+import { ehExecucaoHomologacao } from "@/lib/nina/arquitetura/homologacao";
 import type { NivelAcesso } from "@/lib/nina/arquitetura/detalhes-ia";
 
 type Props = {
@@ -207,6 +210,7 @@ export function RastrearExecucao({ clinicaId, nivelAcesso, chavePosicoes }: Prop
 
       {eventos.length > 0 && (
         <div className="space-y-5">
+          {ehExecucaoHomologacao(eventos) && <PipelineHomologacao eventos={eventos} />}
           <ArquiteturaCanvas
             chavePosicoes={chavePosicoes}
             execucao={estados}
@@ -217,6 +221,8 @@ export function RastrearExecucao({ clinicaId, nivelAcesso, chavePosicoes }: Prop
           <ExecucaoDiagnostico eventos={eventos} />
         </div>
       )}
+
+      <CargaAgregada clinicaId={clinicaId} />
 
       {!busca.isPending && !semPermissao && itens.length === 0 && (
         <p className="text-sm text-muted-foreground">
