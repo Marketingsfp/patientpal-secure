@@ -85,6 +85,8 @@ async function garantirCiclo(
   if (lead.conversa_id && lead.ciclo_id)
     return { conversaId: lead.conversa_id, cicloId: lead.ciclo_id };
 
+  const { novoNinaSessionId } = await import("@/lib/nina/ciclo-teste");
+  const agoraISO = new Date().toISOString();
   const { data: ciclo, error: eCiclo } = await admin
     .from("nina_teste_ciclos")
     .insert({
@@ -94,6 +96,7 @@ async function garantirCiclo(
       sessao_seq: lead.sessao_seq,
       telefone_sessao: lead.telefone_sessao,
       status: "ativo",
+      started_at: agoraISO,
       criado_por: userId,
     })
     .select("id")

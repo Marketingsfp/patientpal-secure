@@ -468,9 +468,13 @@ export const resolverConversaTeste = createServerFn({ method: "POST" })
     // Encerra o ciclo atual (histórico preservado para auditoria) — a próxima
     // mensagem cria um novo test_cycle_id, sem memória do ciclo anterior.
     if (lead.ciclo_id) {
+      const { patchEncerrarCiclo } = await import("@/lib/nina/ciclo-teste");
       await supabaseAdmin
         .from("nina_teste_ciclos")
-        .update({ status: "resolvido", resolved_at: agora, resolvido_por: context.userId })
+        .update({
+          ...patchEncerrarCiclo("resolvido_manual", agora),
+          resolvido_por: context.userId,
+        } as never)
         .eq("id", lead.ciclo_id)
         .eq("clinica_id", data.clinicaId);
     }
