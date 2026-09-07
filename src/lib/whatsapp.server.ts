@@ -914,7 +914,9 @@ ${
       ? `IDENTIFICAÇÃO: Não localizei este contato/CPF/nome na base de ${nomeUnidade}. Trate como paciente novo. NÃO peça dados completos agora — pergunte primeiro se a pessoa deseja agendar/se cadastrar. Só peça dados (nome completo, CPF, nascimento, telefone) quando houver intenção CLARA de agendamento, cadastro ou atualização.`
       : `IDENTIFICAÇÃO: A base de pacientes da unidade "${nomeUnidade}" AINDA NÃO FOI IMPORTADA no sistema. Se a pessoa quiser confirmar cadastro, agendamento ou histórico, responda com educação: "Os dados desta unidade ainda não estão disponíveis no meu sistema — vou te encaminhar para uma atendente humana." NÃO peça CPF, nome completo ou dados cadastrais. Você pode responder normalmente sobre horários de médicos, preços de tabela e informações públicas.`;
 
-  const systemPrompt = `Você é a Nina, assistente virtual da ${nomeUnidade}, respondendo a PACIENTES via WhatsApp. Responda em português do Brasil, de forma direta, cordial e acolhedora com TODOS. Seja breve quando a pergunta for simples (2 a 4 frases) e mais completa quando houver condições, restrições ou várias perguntas — nunca omita uma condição importante só para encurtar.
+  // FASE 4 — este texto é o FALLBACK de código. O Prompt Principal real vem
+  // da versão PUBLICADA em "Instruções da Nina" (carregada logo abaixo).
+  const systemPromptCodigo = `Você é a Nina, assistente virtual da ${nomeUnidade}, respondendo a PACIENTES via WhatsApp. Responda em português do Brasil, de forma direta, cordial e acolhedora com TODOS. Seja breve quando a pergunta for simples (2 a 4 frases) e mais completa quando houver condições, restrições ou várias perguntas — nunca omita uma condição importante só para encurtar.
 
 ${blocoClinica}
 
@@ -967,6 +969,28 @@ ${medicos || "(nenhum)"}
 
 PROCEDIMENTOS:
 ${procs || "(nenhum)"}`;
+
+  // FASE 4 — Prompt Principal a partir da versão publicada das Instruções da
+  // Nina. Snapshot único por execução: se a v(n+1) for publicada durante esta
+  // mensagem, esta execução termina com a versão que carregou aqui.
+  const { promptInstrucoes } = await import("@/lib/nina/instrucoes-runtime.server");
+  const instrucoesNina = await promptInstrucoes(
+    "whatsapp",
+    {
+      "${nomeUnidade}": nomeUnidade,
+      "${blocoClinica}": blocoClinica,
+      "${blocoDataHoraAgora()}": blocoDataHoraAgora(),
+      "${contextoRemetente}": contextoRemetente,
+      "${blocoIdentidade}": blocoIdentidade,
+      "${blocoFoco}": blocoFoco,
+      '${espsCadastradas.join(", ") || "(nenhuma cadastrada)"}':
+        espsCadastradas.join(", ") || "(nenhuma cadastrada)",
+      '${medicos || "(nenhum)"}': medicos || "(nenhum)",
+      '${procs || "(nenhum)"}': procs || "(nenhum)",
+    },
+    systemPromptCodigo,
+  );
+  const systemPrompt = instrucoesNina.texto;
 
   // ---------------------------------------------------------------- agendar
   // Quando a flag está ligada nesta clínica, a Nina deixa de ser somente
