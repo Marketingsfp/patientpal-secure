@@ -295,6 +295,27 @@ export async function encaminharParaHumano(args: {
     .eq("id", args.conversaId)
     .maybeSingle();
   if ((convRow as any)?.is_teste) {
+    // FASE 2 — handoff é evento terminal do ciclo de teste: encerra o ciclo e
+    // zera a memória ativa da Nina (histórico e resumo permanecem).
+    try {
+      const { encerrarCicloTestePorHandoff } = await import("@/lib/nina/handoff-ciclo.server");
+      const r = await encerrarCicloTestePorHandoff({
+        clinicaId: args.clinicaId,
+        conversaId: args.conversaId,
+        agoraISO: agora,
+      });
+      if (r.encerrado) {
+        await registrarEvento({
+          clinicaId: args.clinicaId,
+          conversaId: args.conversaId,
+          evento: "IA_MEMORIA_RESETADA",
+          motivo: "handoff_humano",
+          detalhes: { ciclo_id: r.cicloId, origem: "handoff_teste" },
+        });
+      }
+    } catch (e) {
+      console.error("[handoff] falha ao encerrar ciclo de teste", e);
+    }
     return {
       ok: true,
       posicao_fila: count ?? 1,
@@ -303,6 +324,7 @@ export async function encaminharParaHumano(args: {
       mensagem: "Conversa encaminhada para a equipe. A IA parou de responder.",
     };
   }
+
 
   // Se houver atendente online, a conversa já sai da fila atribuída a ele.
   const atribuida = await atribuirAtendenteOnline({
