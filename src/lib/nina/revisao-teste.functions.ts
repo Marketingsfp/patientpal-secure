@@ -114,14 +114,24 @@ export const enviarAchadoParaRevisao = createServerFn({ method: "POST" })
 
     const { data: execs } = await supabaseAdmin
       .from("nina_execucoes")
-      .select("id, trace_id, prompt_versao, prompt_versao_id, created_at")
+      .select("id, prompt_versao, prompt_versao_id, created_at")
       .eq("clinica_id", data.clinicaId)
       .eq("conversation_id", conversaId)
       .order("created_at", { ascending: true })
       .limit(60);
+
+    // O trace_id fica nos eventos de trace, não na execução.
+    const { data: traces } = await supabaseAdmin
+      .from("nina_trace_eventos")
+      .select("trace_id")
+      .eq("clinica_id", data.clinicaId)
+      .eq("conversation_id", conversaId)
+      .order("started_at", { ascending: false })
+      .limit(200);
     const traceIds = Array.from(
-      new Set(((execs ?? []) as any[]).map((e) => e.trace_id).filter(Boolean).map(String)),
-    ).slice(-10);
+      new Set(((traces ?? []) as any[]).map((t) => t.trace_id).filter(Boolean).map(String)),
+    ).slice(0, 10);
+
 
     const { data: linhasTool } = await supabaseAdmin
       .from("audit_log")
