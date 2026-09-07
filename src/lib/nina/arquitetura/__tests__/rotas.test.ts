@@ -113,7 +113,7 @@ describe("roteamento das conexões (FASE 4)", () => {
 });
 
 describe("realce de caminho (FASE 4)", () => {
-  const alvo = "ai.model_call";
+  const alvo = "llm.generate";
 
   it("realce direto traz apenas o node e seus vizinhos imediatos", () => {
     const realce = realceDireto(NODES_ARQUITETURA, alvo);
