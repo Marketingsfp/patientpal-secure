@@ -507,21 +507,13 @@ const navRows: ReadonlyArray<{ label: string; items: ReadonlyArray<NavItem> }> =
         icon: MessageCircle,
         children: [
           { to: "/app/nina", hash: "atend-inbox", label: "Conversas WhatsApp", icon: Inbox },
-          { to: "/app/nina", hash: "atend-macros", label: "Atendimento — Macros", icon: Zap },
-          {
-            to: "/app/nina",
-            hash: "templates",
-            label: "Templates aprovados (Meta)",
-            icon: FileText,
-          },
-          { to: "/app/nina", hash: "config", label: "Configuração", icon: KeyRound },
+          { to: "/app/nina", hash: "atend-macros", label: "/ Mensagens prontas", icon: Zap },
           {
             to: "/app/nina",
             hash: "base-conhecimento",
             label: "Base de conhecimentos",
             icon: BookOpen,
           },
-
           {
             to: "/app/nina",
             hash: "homologacao",
@@ -537,6 +529,13 @@ const navRows: ReadonlyArray<{ label: string; items: ReadonlyArray<NavItem> }> =
             to: "/app/nina-metricas",
             label: "Métricas de Aprendizado",
             icon: BarChart3,
+          },
+          { to: "/app/nina", hash: "config", label: "Configuração", icon: KeyRound },
+          {
+            to: "/app/nina",
+            hash: "templates",
+            label: "Templates aprovados (Meta)",
+            icon: FileText,
           },
           {
             to: "/app/nina-arquitetura",
