@@ -45,6 +45,24 @@ export function pedirAbrirConversa(pedido: { conversaId: string; mensagemId?: st
 
 export type CategoriaAtencao = "nao_atribuida" | "critica" | "aguardando";
 
+/** Linha da fila, como vem de `listarFilaHumana`. */
+export interface LinhaFila {
+  id: string;
+  contato_nome?: string | null;
+  handoff_motivo?: string | null;
+  handoff_resumo?: string | null;
+}
+
+/**
+ * "Não atribuída" tem definição própria: a Nina precisou de atendimento humano
+ * e não havia atendente elegível online. Conversa sem responsável que NÃO veio
+ * desse fluxo (ex.: aberta manualmente e ainda não assumida) não entra.
+ * A marca do fluxo é o registro do handoff na própria conversa.
+ */
+export function veioDoHandoff(c: LinhaFila): boolean {
+  return Boolean((c.handoff_motivo ?? "").trim() || (c.handoff_resumo ?? "").trim());
+}
+
 export interface ItemAtencao {
   id: string;
   nome: string;
@@ -52,6 +70,10 @@ export interface ItemAtencao {
   /** Minutos de espera do paciente (0 quando só falta responsável). */
   minutos: number;
   naoAtribuida: boolean;
+  /** Espera do paciente já na faixa crítica (mesma fonte do Tempo de Espera). */
+  critica: boolean;
+  /** Paciente falou por último e a clínica ainda não respondeu. */
+  aguardandoResposta: boolean;
 }
 
 export interface ResumoAtencao {
@@ -74,7 +96,7 @@ export function nivelAtencao(total: number): 0 | 1 | 2 | 3 {
 
 export function calcularAtencao(args: {
   /** Conversas sem responsável (fonte única: listarFilaHumana). */
-  naoAtribuidas: Array<{ id: string; contato_nome?: string | null }>;
+  naoAtribuidas: LinhaFila[];
   /** conversaId -> instante da 1ª mensagem do paciente ainda sem resposta. */
   espera: Record<string, string>;
   /** Nomes conhecidos das conversas (Inbox). */
@@ -84,9 +106,10 @@ export function calcularAtencao(args: {
 }): ResumoAtencao {
   const agora = args.agora ?? Date.now();
   const nomes = { ...(args.nomes ?? {}) };
-  for (const c of args.naoAtribuidas) if (c.contato_nome) nomes[c.id] = c.contato_nome;
+  const fila = args.naoAtribuidas.filter(veioDoHandoff);
+  for (const c of fila) if (c.contato_nome) nomes[c.id] = c.contato_nome;
 
-  const idsNaoAtribuidas = new Set(args.naoAtribuidas.map((c) => c.id));
+  const idsNaoAtribuidas = new Set(fila.map((c) => c.id));
   const idsCriticas = new Set<string>();
   let aguardando = 0;
 
@@ -105,12 +128,21 @@ export function calcularAtencao(args: {
     const desde = args.espera[id];
     const minutos = desde ? minutosDesde(desde, agora) : 0;
     const naoAtribuida = idsNaoAtribuidas.has(id);
+    const critica = idsCriticas.has(id);
     const categoria: CategoriaAtencao = naoAtribuida
       ? "nao_atribuida"
-      : idsCriticas.has(id)
+      : critica
         ? "critica"
         : "aguardando";
-    itens.push({ id, nome: nomes[id] || "Sem nome", categoria, minutos, naoAtribuida });
+    itens.push({
+      id,
+      nome: nomes[id] || "Sem nome",
+      categoria,
+      minutos,
+      naoAtribuida,
+      critica,
+      aguardandoResposta: Boolean(desde),
+    });
   }
 
   const peso: Record<CategoriaAtencao, number> = { nao_atribuida: 0, critica: 1, aguardando: 2 };
@@ -125,6 +157,18 @@ export function calcularAtencao(args: {
     nivel: nivelAtencao(unicas.size),
   };
 }
+
+/**
+ * Lista de uma categoria dentro da própria Central (não filtra a Inbox).
+ * A ordem já vem por gravidade e tempo de espera.
+ */
+export function itensDaCategoria(itens: ItemAtencao[], categoria: CategoriaAtencao | null) {
+  if (!categoria) return itens;
+  if (categoria === "nao_atribuida") return itens.filter((i) => i.naoAtribuida);
+  if (categoria === "critica") return itens.filter((i) => i.critica);
+  return itens.filter((i) => i.aguardandoResposta);
+}
+
 
 /** Texto lido por leitores de tela no indicador do cabeçalho. */
 export function rotuloCentral(r: ResumoAtencao): string {

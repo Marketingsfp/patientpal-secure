@@ -3,25 +3,21 @@ import { useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { AlertTriangle, CheckCircle2, Clock, UserX } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import {
-  EVENTO_FILTRAR_NAO_ATRIBUIDAS,
-  FILTRO_NAO_ATRIBUIDAS_KEY,
-} from "@/components/nina/BannerNaoAtribuidas";
 import { useClinica } from "@/hooks/use-clinica";
 import { useRealtimeRefresh } from "@/hooks/use-realtime-refresh";
 import { esperaConversas, listarConversas, listarFilaHumana } from "@/lib/atendimento.functions";
 import {
-  ABRIR_CONVERSA_KEY,
-  EVENTO_ABRIR_CONVERSA,
-  EVENTO_FILTRAR_ESPERA_CRITICA,
-  FILTRO_ESPERA_CRITICA_KEY,
   calcularAtencao,
+  itensDaCategoria,
+  pedirAbrirConversa,
   rotuloCentral,
+  type CategoriaAtencao,
   type ItemAtencao,
   type ResumoAtencao,
 } from "@/lib/atendimento/central-atencao";
 import { formatarEspera } from "@/lib/atendimento/espera";
 import { cn } from "@/lib/utils";
+
 
 const VAZIO: ResumoAtencao = {
   total: 0,
@@ -48,11 +44,21 @@ export function CentralAtencao() {
   const convsFn = useServerFn(listarConversas);
   const navigate = useNavigate();
 
-  const [fila, setFila] = useState<Array<{ id: string; contato_nome?: string | null }>>([]);
+  const [fila, setFila] = useState<
+    Array<{
+      id: string;
+      contato_nome?: string | null;
+      handoff_motivo?: string | null;
+      handoff_resumo?: string | null;
+    }>
+  >([]);
   const [espera, setEspera] = useState<Record<string, string>>({});
   const [nomes, setNomes] = useState<Record<string, string | null>>({});
   const [agora, setAgora] = useState(() => Date.now());
   const [aberto, setAberto] = useState(false);
+  /** Categoria em foco dentro da própria Central (não filtra a Inbox). */
+  const [categoria, setCategoria] = useState<CategoriaAtencao | null>(null);
+
 
   const carregar = useCallback(async () => {
     if (!clinicaId) {
@@ -114,9 +120,19 @@ export function CentralAtencao() {
   );
 
   const resumo = useMemo(
-    () => (clinicaId ? calcularAtencao({ naoAtribuidas: fila, espera, nomes, agora }) : VAZIO),
+    () =>
+      clinicaId
+        ? calcularAtencao({ naoAtribuidas: fila, espera, nomes, agora, limiteItens: 200 })
+        : VAZIO,
     [clinicaId, fila, espera, nomes, agora],
   );
+
+  // Lista mostrada: prioridades gerais (8 primeiras) ou a categoria escolhida.
+  const lista = useMemo(() => {
+    const base = itensDaCategoria(resumo.itens, categoria);
+    return categoria ? base : base.slice(0, 8);
+  }, [resumo.itens, categoria]);
+
 
   // Animação de entrada mais perceptível só quando SURGE algo crítico novo.
   const [novo, setNovo] = useState(false);
@@ -135,38 +151,17 @@ export function CentralAtencao() {
     void navigate({ to: "/app/nina", hash: "atend-inbox" });
   }, [navigate]);
 
-  const abrirNaoAtribuidas = () => {
-    try {
-      window.sessionStorage.setItem(FILTRO_NAO_ATRIBUIDAS_KEY, "1");
-    } catch {
-      /* o evento abaixo já resolve na mesma tela */
-    }
-    window.dispatchEvent(new CustomEvent(EVENTO_FILTRAR_NAO_ATRIBUIDAS));
-    setAberto(false);
-    irParaInbox();
-  };
-
-  const abrirCriticas = () => {
-    try {
-      window.sessionStorage.setItem(FILTRO_ESPERA_CRITICA_KEY, "1");
-    } catch {
-      /* idem */
-    }
-    window.dispatchEvent(new CustomEvent(EVENTO_FILTRAR_ESPERA_CRITICA));
-    setAberto(false);
-    irParaInbox();
-  };
+  // FASE 3 — as categorias filtram DENTRO da própria Central. A sidebar não é
+  // mais usada para alertas operacionais.
+  const alternarCategoria = (c: CategoriaAtencao) =>
+    setCategoria((atual) => (atual === c ? null : c));
 
   const abrirConversa = (id: string) => {
-    try {
-      window.sessionStorage.setItem(ABRIR_CONVERSA_KEY, id);
-    } catch {
-      /* idem */
-    }
-    window.dispatchEvent(new CustomEvent(EVENTO_ABRIR_CONVERSA, { detail: { id } }));
+    pedirAbrirConversa({ conversaId: id });
     setAberto(false);
     irParaInbox();
   };
+
 
   if (!clinicaId) return null;
 
@@ -236,33 +231,48 @@ export function CentralAtencao() {
             icone={<UserX className="h-3.5 w-3.5" aria-hidden />}
             titulo="Não atribuídas"
             valor={resumo.naoAtribuidas}
-            onClick={abrirNaoAtribuidas}
+            ativo={categoria === "nao_atribuida"}
+            onClick={() => alternarCategoria("nao_atribuida")}
           />
           <LinhaCategoria
             cor="vermelho"
             icone={<AlertTriangle className="h-3.5 w-3.5" aria-hidden />}
             titulo="Espera crítica"
             valor={resumo.criticas}
-            onClick={abrirCriticas}
+            ativo={categoria === "critica"}
+            onClick={() => alternarCategoria("critica")}
           />
           <LinhaCategoria
             cor="ambar"
             icone={<Clock className="h-3.5 w-3.5" aria-hidden />}
             titulo="Aguardando resposta"
             valor={resumo.aguardando}
-            onClick={abrirCriticas}
+            ativo={categoria === "aguardando"}
+            onClick={() => alternarCategoria("aguardando")}
           />
         </div>
 
+
         <div className="border-t border-border px-3 py-2">
-          <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-            Prioridades agora
-          </p>
-          {resumo.itens.length === 0 ? (
+          <div className="mb-1 flex items-center gap-2">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+              {categoria ? tituloCategoria(categoria) : "Prioridades agora"}
+            </p>
+            {categoria && (
+              <button
+                type="button"
+                onClick={() => setCategoria(null)}
+                className="ml-auto rounded px-1.5 py-0.5 text-[11px] text-muted-foreground hover:bg-muted"
+              >
+                Ver tudo ✕
+              </button>
+            )}
+          </div>
+          {lista.length === 0 ? (
             <p className="py-2 text-xs text-muted-foreground">Nenhuma pendência.</p>
           ) : (
             <ul className="max-h-64 space-y-0.5 overflow-y-auto">
-              {resumo.itens.map((i) => (
+              {lista.map((i) => (
                 <li key={i.id}>
                   <ItemLinha item={i} onClick={() => abrirConversa(i.id)} />
                 </li>
@@ -270,9 +280,18 @@ export function CentralAtencao() {
             </ul>
           )}
         </div>
+
       </PopoverContent>
     </Popover>
   );
+}
+
+function tituloCategoria(c: CategoriaAtencao) {
+  return c === "nao_atribuida"
+    ? "Não atribuídas"
+    : c === "critica"
+      ? "Espera crítica"
+      : "Aguardando resposta";
 }
 
 function LinhaCategoria({
@@ -280,20 +299,27 @@ function LinhaCategoria({
   icone,
   titulo,
   valor,
+  ativo,
   onClick,
 }: {
   cor: "vermelho" | "ambar";
   icone: React.ReactNode;
   titulo: string;
   valor: number;
+  ativo?: boolean;
   onClick: () => void;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs hover:bg-muted"
+      aria-pressed={Boolean(ativo)}
+      className={cn(
+        "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs hover:bg-muted",
+        ativo && "bg-muted",
+      )}
     >
+
       <span
         className={cn(
           "grid h-6 w-6 shrink-0 place-items-center rounded-md",
