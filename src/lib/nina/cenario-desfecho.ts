@@ -7,6 +7,7 @@
  */
 
 import type { Criterio, CriterioAvaliado, ResultadoItem } from "./cenarios";
+import type { MotivoFimCiclo } from "./ciclo-teste";
 
 export type DesfechoCenario =
   | "handoff"
@@ -24,12 +25,12 @@ export const ROTULO_DESFECHO: Record<DesfechoCenario, string> = {
 };
 
 /** Motivo de encerramento do ciclo de teste correspondente ao desfecho. */
-export const MOTIVO_CICLO_POR_DESFECHO: Record<DesfechoCenario, string> = {
+export const MOTIVO_CICLO_POR_DESFECHO: Record<DesfechoCenario, MotivoFimCiclo> = {
   handoff: "handoff_humano",
   concluido: "cenario_concluido",
   limite_turnos: "cenario_concluido",
-  erro: "cenario_falhou",
-  interrompido: "cenario_cancelado",
+  erro: "falha_tecnica",
+  interrompido: "cancelado_usuario",
 };
 
 /**
