@@ -15,6 +15,8 @@ export type NodePosicionado = {
   y: number;
   coluna: number;
   linha: number;
+  /** Node pertence ao caminho principal (mensagem → IA → resposta). */
+  principal?: boolean;
 };
 
 export type ArestaArquitetura = {
@@ -23,11 +25,23 @@ export type ArestaArquitetura = {
   para: string;
 };
 
+/** Moldura discreta que reúne nodes vizinhos do mesmo domínio funcional. */
+export type GrupoVisual = {
+  id: string;
+  categoria: CategoriaArquitetura;
+  x: number;
+  y: number;
+  largura: number;
+  altura: number;
+  nodes: string[];
+};
+
 export type LayoutArquitetura = {
   nodes: NodePosicionado[];
   arestas: ArestaArquitetura[];
   largura: number;
   altura: number;
+  grupos: GrupoVisual[];
 };
 
 export const LARGURA_NODE = 216;
