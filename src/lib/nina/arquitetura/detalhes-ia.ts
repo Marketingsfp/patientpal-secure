@@ -280,6 +280,8 @@ export type DetalheEspecifico =
 
 const NODES_PROMPT = new Set([
   "prompt.compose",
+  // FASE 6 — versão publicada das Instruções da Nina usada naquela execução.
+  "instructions.published",
   "instructions.catalog",
   "instructions.learnings",
 ]);
