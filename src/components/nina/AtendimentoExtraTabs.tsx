@@ -2434,7 +2434,8 @@ export function AtendInbox() {
               onOpenChange={setPainelMenuAberto}
             >
               <SelectTrigger className="h-8 text-xs" aria-label="Escopo das conversas">
-                <SelectValue />
+                <SelectValue placeholder="Não atribuídas" />
+
               </SelectTrigger>
               <SelectContent className="z-50 min-w-[--radix-select-trigger-width]">
                 <SelectItem value="minhas">Minhas conversas ({contadores.minhas})</SelectItem>
