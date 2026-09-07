@@ -181,7 +181,7 @@ async function pacienteSinteticoDoLead(
           telefone,
           is_mock_data: true,
           teste: true,
-          observacoes: `Paciente sintético da homologação da Nina (lead ${indice}). Nome informado no teste: ${nomeInformado.slice(0, 60)}`,
+          } as never)
         } as never)
         .select("id, nome")
         .maybeSingle();
