@@ -314,8 +314,10 @@ function Pagina() {
   const [textoEdicao, setTextoEdicao] = useState("");
   const navigate = useNavigate();
   const [conversaAuditoria, setConversaAuditoria] = useState<{
-    conversaId: string;
+    conversaId: string | null;
     mensagemId: string | null;
+    erroId: string;
+    reportadoEm: string;
   } | null>(null);
 
   const [salvando, setSalvando] = useState(false);
@@ -651,13 +653,13 @@ function Pagina() {
    * nunca localiza a conversa pelo lead. Somente leitura.
    */
   const abrirConversa = (item: Item) => {
-    if (!item.conversa_id) {
-      toast.error("Este registro não tem conversa vinculada.");
-      return;
-    }
+    // FASE 4 — sem conversa vinculada o modal abre avisando; nunca abrimos
+    // "a primeira conversa do lead" como aproximação.
     setConversaAuditoria({
-      conversaId: item.conversa_id,
+      conversaId: item.conversa_id ?? null,
       mensagemId: item.mensagem_id ?? null,
+      erroId: item.id,
+      reportadoEm: item.created_at,
     });
   };
 
@@ -1093,7 +1095,6 @@ function Pagina() {
                       size="sm"
                       variant="ghost"
                       onClick={() => abrirConversa(it)}
-                      disabled={!it.conversa_id}
                     >
                       <Eye className="mr-1 h-4 w-4" aria-hidden="true" /> Ver conversa
                     </Button>
@@ -1886,6 +1887,8 @@ function Pagina() {
         clinicaId={clinicaId ?? null}
         conversaId={conversaAuditoria?.conversaId ?? null}
         mensagemId={conversaAuditoria?.mensagemId ?? null}
+        erroId={conversaAuditoria?.erroId ?? null}
+        reportadoEm={conversaAuditoria?.reportadoEm ?? null}
         aberto={Boolean(conversaAuditoria)}
         onOpenChange={(v) => {
           if (!v) setConversaAuditoria(null);
