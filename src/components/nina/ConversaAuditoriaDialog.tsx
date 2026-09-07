@@ -9,7 +9,7 @@
  * responsável, não marca leitura e não mexe em contadores de não lidos.
  */
 import { useEffect, useRef, useState } from "react";
-import { Loader2 } from "lucide-react";
+import { AlertTriangle, Loader2 } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -41,23 +41,38 @@ type Dados = {
     status: string | null;
     is_teste: boolean;
     protocolo: string | null;
+    atendente_nome: string | null;
   };
   mensagens: Mensagem[];
   mensagemEncontrada: boolean | null;
   eventos: ConversaEvento[];
 };
 
+/** Timestamp real persistido, sempre DD/MM/AAAA HH:mm:ss. */
 function fmtHora(iso: string) {
   try {
     return new Date(iso).toLocaleString("pt-BR", {
       day: "2-digit",
       month: "2-digit",
+      year: "numeric",
       hour: "2-digit",
       minute: "2-digit",
+      second: "2-digit",
     });
   } catch {
     return "";
   }
+}
+
+/** Autoria explícita: não depender só do lado do balão. */
+function autorDe(m: Mensagem, atendenteNome: string | null) {
+  const por = (m.enviada_por ?? "").toLowerCase();
+  if (por === "sistema") return "Sistema";
+  if (por === "nina" || por === "ia" || por === "bot") return "Nina";
+  if (por === "humano" || por === "atendente")
+    return atendenteNome ? `Atendente — ${atendenteNome}` : "Atendente";
+  if (por === "paciente") return "Paciente";
+  return m.direction === "out" ? "Nina" : "Paciente";
 }
 
 export function ConversaAuditoriaDialog({
@@ -158,31 +173,42 @@ export function ConversaAuditoriaDialog({
                 }
                 const m = item.msg;
                 const out = m.direction === "out";
+                const destacada = mensagemId === m.id;
+                const autor = autorDe(m, dados.conversa.atendente_nome);
                 if (m.enviada_por === "sistema") {
                   return (
-                    <div key={m.id} className="flex justify-center">
+                    <div
+                      key={m.id}
+                      ref={destacada ? alvoRef : undefined}
+                      data-msg-id={m.id}
+                      className={`flex justify-center ${
+                        destacada ? "rounded-xl bg-destructive/10 px-1 py-1 ring-2 ring-destructive" : ""
+                      }`}
+                    >
                       <div className="max-w-[85%] whitespace-pre-wrap rounded-lg border border-atd-blue/20 bg-atd-blue-tint px-3 py-2 text-center text-xs text-atd-blue-ink">
+                        <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide opacity-80">
+                          Sistema
+                        </div>
                         {m.body}
                         <div className="mt-1 text-[10px] opacity-70">{fmtHora(m.recebida_em)}</div>
                       </div>
                     </div>
                   );
                 }
-                const destacada = mensagemId === m.id;
                 return (
                   <div
                     key={m.id}
                     ref={destacada ? alvoRef : undefined}
                     data-msg-id={m.id}
-                    className={`flex items-start gap-2 ${out ? "justify-end" : "justify-start"} ${
+                    className={`flex flex-col gap-1 ${out ? "items-end" : "items-start"} ${
                       destacada
                         ? "rounded-xl bg-destructive/10 px-1 py-1 ring-2 ring-destructive"
                         : ""
                     }`}
                   >
                     {destacada && (
-                      <span className="self-center rounded bg-destructive px-1.5 py-0.5 text-[10px] font-medium text-destructive-foreground">
-                        Mensagem reportada
+                      <span className="inline-flex items-center gap-1 rounded bg-destructive px-1.5 py-0.5 text-[10px] font-medium text-destructive-foreground">
+                        <AlertTriangle className="h-3 w-3" aria-hidden="true" /> MENSAGEM REPORTADA
                       </span>
                     )}
                     <div
@@ -192,6 +218,11 @@ export function ConversaAuditoriaDialog({
                           : "rounded-bl-sm border border-atd-border bg-atd-surface text-atd-ink"
                       }`}
                     >
+                      <div
+                        className={`mb-1 text-[11px] font-semibold ${out ? "text-atd-on-strong/90" : "text-atd-ink-soft"}`}
+                      >
+                        {autor}
+                      </div>
                       {m.media_url && (
                         <a
                           href={m.media_url}
@@ -206,7 +237,7 @@ export function ConversaAuditoriaDialog({
                       <div
                         className={`mt-1 text-[11px] ${out ? "text-atd-on-strong/80" : "text-atd-ink-soft"}`}
                       >
-                        {fmtHora(m.recebida_em)} {m.enviada_por === "nina" && "· Nina"}
+                        {fmtHora(m.recebida_em)}
                       </div>
                     </div>
                   </div>
