@@ -16,6 +16,7 @@ import {
   type ConfiancaDaMensagem,
   type ConfiabilidadeDecisaoView,
 } from "@/lib/nina/confianca.functions";
+import { rotuloConfianca } from "@/lib/nina/confianca-badge";
 
 export type MapaConfianca = Record<string, ConfiancaDaMensagem>;
 
@@ -142,6 +143,7 @@ export function ConfiancaMensagemBadge({
   }, [aberto, carregar, detalhe]);
 
   const estilo = ESTILO[confianca.nivel] ?? ESTILO["LOW"]!;
+  const rotulo = rotuloConfianca(confianca);
   const { Icone } = estilo;
 
   return (
@@ -156,7 +158,7 @@ export function ConfiancaMensagemBadge({
           className={`inline-flex h-[18px] shrink-0 items-center gap-1 rounded-full border px-1.5 text-[10px] font-medium leading-none ${estilo.classe}`}
         >
           <span aria-hidden className={`h-1.5 w-1.5 rounded-full ${estilo.ponto}`} />
-          {confianca.score}% {estilo.curto}
+          {rotulo.texto}
           {confianca.erro_reportado && (
             <span className="font-semibold text-destructive" aria-hidden>
               !

@@ -78,6 +78,7 @@ import {
 import { TZ_CLINICA } from "@/lib/date-utils";
 import { ConversaAuditoriaDialog } from "@/components/nina/ConversaAuditoriaDialog";
 import { useConfiancaMensagens } from "@/components/nina/ConfiancaMensagem";
+import { combinaFiltroConfianca } from "@/lib/nina/confianca-badge";
 
 
 import {
@@ -904,15 +905,9 @@ function Pagina() {
       itens.filter((i) => {
         if (fPrioridade !== "todas" && i.prioridade !== fPrioridade) return false;
         if (fCausa !== "todas" && i.root_cause !== fCausa) return false;
-        if (fConfianca === "todas") return true;
         const c = i.execucao_id ? confianca[i.execucao_id] : undefined;
-        if (fConfianca === "sem") return !c;
-        if (!c) return false;
-        // HIGH_CONFIDENCE_ERROR: alta confiança declarada e erro reportado.
-        if (fConfianca === "alta_erro") return c.nivel === "HIGH" && Boolean(c.erro_reportado);
-        if (fConfianca === "90") return c.score >= 90;
-        if (fConfianca === "95") return c.score >= 95;
-        return c.nivel === fConfianca;
+        // Regra pura compartilhada com o selo da Inbox (FASE 10).
+        return combinaFiltroConfianca(fConfianca, c);
       }),
     [itens, fPrioridade, fCausa, fConfianca, confianca],
   );
