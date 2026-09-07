@@ -265,6 +265,7 @@ export async function encaminharParaHumano(args: {
     detalhes: { posicao: count ?? 1 },
   });
 
+  let protocoloHandoff: string | null = null;
   // FASE 1 — protocolo obrigatório no handoff: nasce aqui, vinculado ao evento
   // de handoff, com a MESMA lógica em produção e homologação. Idempotente: o
   // banco reaproveita o número quando o ciclo já tem um.
@@ -277,6 +278,7 @@ export async function encaminharParaHumano(args: {
       conversaId: args.conversaId,
       handoffEventoId,
     });
+    protocoloHandoff = p?.protocolo ?? null;
     if (p?.protocolo)
       await registrarMarcadorSistema({
         clinicaId: args.clinicaId,
@@ -344,7 +346,15 @@ export async function encaminharParaHumano(args: {
           conversaId: args.conversaId,
           evento: "IA_MEMORIA_RESETADA",
           motivo: "handoff_humano",
-          detalhes: { ciclo_id: r.cicloId, origem: "handoff_teste" },
+          // FASE 4 — auditoria do ciclo encerrado: protocolo, motivo, ciclo e
+          // sessão da Nina ficam juntos para avaliação posterior.
+          detalhes: {
+            ciclo_id: r.cicloId,
+            nina_session_id: r.ninaSessionId ?? null,
+            protocol_number: protocoloHandoff,
+            handoff_reason: args.motivo,
+            origem: "handoff_teste",
+          },
         });
       }
     } catch (e) {

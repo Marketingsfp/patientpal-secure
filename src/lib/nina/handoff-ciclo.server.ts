@@ -23,6 +23,8 @@ export type ResultadoHandoffCiclo = {
   /** Encerrou o ciclo agora (false = não é teste, sem ciclo, ou já encerrado). */
   encerrado: boolean;
   cicloId: string | null;
+  /** Sessão da Nina do ciclo encerrado (auditoria). */
+  ninaSessionId?: string | null;
   motivo?: "nao_e_teste" | "sem_ciclo" | "ja_encerrado";
 };
 
@@ -57,10 +59,16 @@ export async function encerrarCicloTestePorHandoff(args: {
     .eq("id", cicloId)
     .eq("clinica_id", args.clinicaId)
     .eq("status", "ativo")
-    .select("id, lead_id, indice, sessao_seq");
+    .select("id, lead_id, indice, sessao_seq, nina_session_id");
 
   const ciclo = (encerrados ?? [])[0] as
-    | { id: string; lead_id: string; indice: number; sessao_seq: number }
+    | {
+        id: string;
+        lead_id: string;
+        indice: number;
+        sessao_seq: number;
+        nina_session_id: string | null;
+      }
     | undefined;
   if (!ciclo) return { encerrado: false, cicloId, motivo: "ja_encerrado" };
 
@@ -109,6 +117,6 @@ export async function encerrarCicloTestePorHandoff(args: {
     console.error("[handoff-ciclo] falha ao registrar divisor", e);
   }
 
-  return { encerrado: true, cicloId };
+  return { encerrado: true, cicloId, ninaSessionId: ciclo.nina_session_id ?? null };
 
 }
