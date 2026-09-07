@@ -62,6 +62,7 @@ type Lead = {
   telefone: string;
   sessao: number;
   conversaId: string | null;
+  cicloId?: string | null;
   status: string;
   mensagens: number;
 };
@@ -503,6 +504,11 @@ export function HomologacaoInbox() {
                     <span className="font-mono">{leadAtual.telefone}</span>
                     <span>· número virtual (não existe no WhatsApp)</span>
                     <span>· sessão {leadAtual.sessao}</span>
+                    {leadAtual.cicloId ? (
+                      <span className="font-mono">
+                        · ciclo {leadAtual.cicloId.slice(0, 8)}
+                      </span>
+                    ) : null}
                   </p>
                 </div>
                 <div className="flex shrink-0 gap-1">
@@ -529,7 +535,7 @@ export function HomologacaoInbox() {
                     disabled={!conversaId || processando}
                     onClick={() => void resolverConversa()}
                   >
-                    <CheckCheck className="mr-1 h-3.5 w-3.5" /> Resolver
+                    <CheckCheck className="mr-1 h-3.5 w-3.5" /> Resolver / Reiniciar teste
                   </Button>
                 </div>
               </div>
