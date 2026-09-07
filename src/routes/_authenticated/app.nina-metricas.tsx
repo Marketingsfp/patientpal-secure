@@ -49,6 +49,7 @@ import { AnalistaMetricasIA } from "@/components/nina/AnalistaMetricasIA";
 import { DesempenhoPorPeriodo } from "@/components/nina/DesempenhoPorPeriodo";
 import { ConfiancaRespostas } from "@/components/nina/ConfiancaRespostas";
 import { MetricasConfiabilidade } from "@/components/nina/MetricasConfiabilidade";
+import { CalibracaoConfianca } from "@/components/nina/CalibracaoConfianca";
 import {
   metricasAprendizadoNina,
   trilhaAuditoriaAprendizadoNina,
@@ -508,6 +509,8 @@ function Pagina() {
       <ConfiancaRespostas clinicaId={clinicaId} />
 
       <MetricasConfiabilidade clinicaId={clinicaId} />
+
+      <CalibracaoConfianca clinicaId={clinicaId} />
 
 
       {/* Seção da Fase 9: isolada dos cards acima — falha ou lentidão aqui não
