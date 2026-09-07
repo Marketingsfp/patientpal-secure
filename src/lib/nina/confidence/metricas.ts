@@ -54,6 +54,31 @@ export type CalibracaoNivel = {
   taxaErro: number;
 };
 
+/** FASE 8 — calibração empírica por faixa de score. */
+export type FaixaScore = {
+  id: string;
+  rotulo: string;
+  min: number;
+  max: number;
+  mensagens: number;
+  erros: number;
+  /** Percentual com uma casa decimal (0 quando não há mensagens). */
+  taxaErro: number;
+};
+
+export type CalibracaoPorFaixaScore = {
+  faixas: FaixaScore[];
+  /** Faixas com pelo menos uma mensagem, da menor confiança para a maior. */
+  faixasComDados: number;
+  /**
+   * A taxa de erro cai (ou empata) conforme a confiança sobe, considerando
+   * apenas faixas com dados. `null` quando há menos de duas faixas com dados.
+   */
+  monotonica: boolean | null;
+  /** Faixas onde a taxa de erro subiu em relação à faixa de confiança menor. */
+  inversoes: { de: string; para: string; taxaDe: number; taxaPara: number }[];
+};
+
 export type Contagem = { chave: string; total: number };
 export type MediaGrupo = { chave: string; total: number; scoreMedio: number; baixa: number };
 
@@ -115,6 +140,7 @@ export type MetricasConfiabilidade = {
   porPeriodoOperacao: MediaGrupo[];
   correlacaoErros: FaixaCorrelacao[];
   calibracaoPorNivel: CalibracaoNivel[];
+  calibracaoPorFaixaScore: CalibracaoPorFaixaScore;
   altaConfiancaComErro: AltaConfiancaComErro;
 };
 
@@ -301,6 +327,63 @@ export function calcularCalibracaoPorNivel(
   });
 }
 
+const FAIXAS_SCORE: { id: string; rotulo: string; min: number; max: number }[] = [
+  { id: "0-59", rotulo: "0–59%", min: 0, max: 59 },
+  { id: "60-69", rotulo: "60–69%", min: 60, max: 69 },
+  { id: "70-79", rotulo: "70–79%", min: 70, max: 79 },
+  { id: "80-89", rotulo: "80–89%", min: 80, max: 89 },
+  { id: "90-94", rotulo: "90–94%", min: 90, max: 94 },
+  { id: "95-100", rotulo: "95–100%", min: 95, max: 100 },
+];
+
+/**
+ * FASE 8 — calibração real: agrupa as respostas por faixa de confiança e mede a
+ * taxa de erro efetivamente reportada em cada faixa. Serve para verificar
+ * empiricamente se quanto maior a confiança, menor a taxa de erro. Nenhum valor
+ * é fixo ou estimado: tudo vem dos registros do recorte.
+ */
+export function calcularCalibracaoPorFaixaScore(
+  linhas: LinhaDecisaoMetrica[],
+  erros: ErroReportado[] = [],
+): CalibracaoPorFaixaScore {
+  const idx = indexarErros(erros);
+  const base = FAIXAS_SCORE.map((f) => ({ ...f, mensagens: 0, erros: 0, taxaErro: 0 }));
+
+  for (const l of linhas) {
+    const score = Number.isFinite(l.score) ? Math.max(0, Math.min(100, Math.round(l.score))) : 0;
+    const faixa = base.find((f) => score >= f.min && score <= f.max);
+    if (!faixa) continue;
+    faixa.mensagens += 1;
+    if (foiReportadaComoErro(l, idx)) faixa.erros += 1;
+  }
+
+  for (const f of base) {
+    f.taxaErro = f.mensagens ? Math.round((f.erros / f.mensagens) * 1000) / 10 : 0;
+  }
+
+  const comDados = base.filter((f) => f.mensagens > 0);
+  const inversoes: CalibracaoPorFaixaScore["inversoes"] = [];
+  for (let i = 1; i < comDados.length; i += 1) {
+    const anterior = comDados[i - 1]!;
+    const atual = comDados[i]!;
+    if (atual.taxaErro > anterior.taxaErro) {
+      inversoes.push({
+        de: anterior.rotulo,
+        para: atual.rotulo,
+        taxaDe: anterior.taxaErro,
+        taxaPara: atual.taxaErro,
+      });
+    }
+  }
+
+  return {
+    faixas: base,
+    faixasComDados: comDados.length,
+    monotonica: comDados.length < 2 ? null : inversoes.length === 0,
+    inversoes,
+  };
+}
+
 /**
  * FASE 7 — recorte dedicado aos casos HIGH_CONFIDENCE_ERROR, com as pistas
  * observáveis (validadores usados, ferramentas, tipo de atendimento e motivos
@@ -441,6 +524,7 @@ export function calcularMetricasConfiabilidade(
     porPeriodoOperacao: medias(porPeriodo),
     correlacaoErros: correlacionar(linhas, erros),
     calibracaoPorNivel: calcularCalibracaoPorNivel(linhas, erros),
+    calibracaoPorFaixaScore: calcularCalibracaoPorFaixaScore(linhas, erros),
     altaConfiancaComErro: calcularAltaConfiancaComErro(linhas, erros),
   };
 }

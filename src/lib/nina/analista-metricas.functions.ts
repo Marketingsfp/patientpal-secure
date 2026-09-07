@@ -290,6 +290,7 @@ async function ferramentaConfiabilidade(context: Contexto, clinicaId: string, ar
   const soma = linhas.reduce((a, l) => a + (Number.isFinite(l.score) ? l.score : 0), 0);
   const calibracao = mod.calcularCalibracaoPorNivel(linhas, erros);
   const alta = mod.calcularAltaConfiancaComErro(linhas, erros);
+  const faixas = mod.calcularCalibracaoPorFaixaScore(linhas, erros);
 
   return {
     dias,
@@ -302,6 +303,16 @@ async function ferramentaConfiabilidade(context: Contexto, clinicaId: string, ar
       errosReportados: c.erros,
       taxaErro: c.taxaErro,
     })),
+    calibracaoPorFaixaScore: {
+      faixas: faixas.faixas.map((f) => ({
+        faixa: f.rotulo,
+        mensagens: f.mensagens,
+        errosReportados: f.erros,
+        taxaErro: f.taxaErro,
+      })),
+      taxaCaiConformeConfiancaSobe: faixas.monotonica,
+      inversoes: faixas.inversoes,
+    },
     altaConfiancaComErro: {
       classificacao: alta.classificacao,
       casos: alta.casos,

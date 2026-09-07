@@ -264,6 +264,48 @@ export function MetricasConfiabilidade({ clinicaId }: { clinicaId: string | null
               </p>
             </div>
 
+            <div className="rounded-md border p-3">
+              <p className="mb-1 text-xs font-medium text-muted-foreground">
+                Calibração por faixa de confiança — a taxa de erro cai conforme a confiança sobe?
+              </p>
+              <div className="grid gap-2 sm:grid-cols-3 lg:grid-cols-6">
+                {(dados?.calibracaoPorFaixaScore?.faixas ?? []).map((f) => (
+                  <div key={f.id} className="rounded-md bg-muted/40 p-3">
+                    <p className="text-xs font-medium text-muted-foreground">{f.rotulo}</p>
+                    <p className="text-xl font-semibold tabular-nums">{formatarNumero(f.mensagens)}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {f.mensagens === 1 ? "mensagem" : "mensagens"}
+                    </p>
+                    <p className="mt-1 text-sm tabular-nums">
+                      {formatarNumero(f.erros)} {f.erros === 1 ? "erro" : "erros"}
+                    </p>
+                    <p className="text-sm tabular-nums text-muted-foreground">
+                      {f.mensagens === 0 ? "sem base" : `${formatarPercentual(f.taxaErro)} de erro`}
+                    </p>
+                  </div>
+                ))}
+              </div>
+              {dados?.calibracaoPorFaixaScore?.monotonica === null ? (
+                <p className="mt-2 text-xs text-muted-foreground">
+                  Ainda não há faixas suficientes com dados para avaliar a calibração.
+                </p>
+              ) : dados?.calibracaoPorFaixaScore?.monotonica ? (
+                <p className="mt-2 text-xs text-muted-foreground">
+                  No recorte atual, a taxa de erro não sobe conforme a confiança aumenta — comportamento
+                  esperado de um motor calibrado.
+                </p>
+              ) : (
+                <p className="mt-2 text-xs text-amber-600 dark:text-amber-400">
+                  Há faixas de confiança maior com taxa de erro maior — possível excesso de confiança em:{" "}
+                  {(dados?.calibracaoPorFaixaScore?.inversoes ?? [])
+                    .map((i) => `${i.para} (${formatarPercentual(i.taxaPara)}) acima de ${i.de} (${formatarPercentual(i.taxaDe)})`)
+                    .join("; ")}
+                  .
+                </p>
+              )}
+            </div>
+
+
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               <Bloco titulo="Principais motivos de baixa confiança">
                 <ListaContagem itens={dados?.motivosBaixaConfianca ?? []} vazio="Nenhum motivo registrado." />
