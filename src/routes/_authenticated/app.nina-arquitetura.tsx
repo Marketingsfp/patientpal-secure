@@ -16,6 +16,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { ArquiteturaCanvas } from "@/components/nina/ArquiteturaCanvas";
 import { RastrearExecucao } from "@/components/nina/RastrearExecucao";
+import { InstrucoesNina } from "@/components/nina/InstrucoesNina";
+
 import { useClinica } from "@/hooks/use-clinica";
 import { capacidadesArquitetura } from "@/lib/nina/arquitetura/permissoes.functions";
 import { nivelAcessoDe, podeArquitetura } from "@/lib/nina/arquitetura/permissoes";
