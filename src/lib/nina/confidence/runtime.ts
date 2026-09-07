@@ -170,7 +170,7 @@ export function resumoHandoffEstruturado(e: EstadoDoTurno, r: ResultadoConfianca
   );
 
   const linhas = [
-    `Intenção detectada: ${e.intent ?? r.evidence.categorias.join(", ") || "não identificada"}`,
+    `Intenção detectada: ${e.intent ?? (r.evidence.categorias.join(", ") || "não identificada")}`,
     `Pedido do paciente: ${(e.mensagemPaciente ?? "").trim() || "não registrado neste turno"}`,
     `Informações já coletadas: ${coletadas.length ? coletadas.join("; ") : "nenhuma"}`,
     `Paciente identificado: ${e.pacienteIdentificado ? "sim" : "não"}`,
