@@ -496,7 +496,31 @@ export function CenariosTeste() {
                   onChange={(e) => setForm({ ...form, maxTurnos: Number(e.target.value) })}
                 />
               </div>
+              <div>
+                <Label>Transferência para humano</Label>
+                <Select
+                  value={
+                    form.handoffEsperado === null ? "indiferente" : form.handoffEsperado ? "sim" : "nao"
+                  }
+                  onValueChange={(v) =>
+                    setForm({
+                      ...form,
+                      handoffEsperado: v === "indiferente" ? null : v === "sim",
+                    })
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="indiferente">Tanto faz</SelectItem>
+                    <SelectItem value="sim">Esperada (fim do cenário)</SelectItem>
+                    <SelectItem value="nao">Não pode acontecer</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
+
             <div>
               <Label>Objetivo do paciente</Label>
               <Textarea
