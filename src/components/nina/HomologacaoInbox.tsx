@@ -312,6 +312,19 @@ export function HomologacaoInbox() {
     [clinicaId, historico],
   );
 
+  // FASE 8 — "Ver conversa" no Relatório da homologação seleciona o lead aqui.
+  useEffect(() => {
+    function abrir(ev: Event) {
+      const d = (ev as CustomEvent).detail as { leadIndice?: number | null; conversaId?: string | null };
+      const alvo =
+        leads.find((l) => l.conversaId && l.conversaId === d?.conversaId) ??
+        (typeof d?.leadIndice === "number" ? leads.find((l) => l.indice === d.leadIndice) : null);
+      if (alvo) setLeadId(alvo.id);
+    }
+    window.addEventListener("nina:abrir-lead-teste", abrir);
+    return () => window.removeEventListener("nina:abrir-lead-teste", abrir);
+  }, [leads]);
+
   useEffect(() => {
     if (!leadId) {
       setMsgs([]);
@@ -655,7 +668,7 @@ export function HomologacaoInbox() {
     (tipo !== "text" && tipo !== "audio");
 
   return (
-    <div className="flex h-[calc(100vh-11rem)] min-h-[560px] gap-3">
+    <div id="homologacao-inbox" className="flex h-[calc(100vh-11rem)] min-h-[560px] gap-3">
       {/* COLUNA 1 — LEADS DE TESTE */}
       <Card className="flex w-[300px] shrink-0 flex-col overflow-hidden">
         <CardHeader className="gap-2 py-3">
