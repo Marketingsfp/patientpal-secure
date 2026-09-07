@@ -1010,6 +1010,21 @@ function Pagina() {
             </Select>
           </div>
           <div>
+            <Label htmlFor="f-conf">Confiança</Label>
+            <Select value={fConfianca} onValueChange={setFConfianca}>
+              <SelectTrigger id="f-conf" className="mt-1">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {FILTROS_CONFIANCA.map((c) => (
+                  <SelectItem key={c.valor} value={c.valor}>
+                    {c.rotulo}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
             <Label htmlFor="f-de">De</Label>
             <Input
               id="f-de"
