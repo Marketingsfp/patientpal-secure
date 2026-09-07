@@ -39,7 +39,6 @@ function evento(p: Partial<EventoTrace> & { node_id: string }): EventoTrace {
     conversation_id: "c",
     message_id: "m",
     cycle_id: 1,
-    node_id: p.node_id,
     event_type: "completed",
     started_at: "2026-09-06T19:00:00.000Z",
     finished_at: "2026-09-06T19:00:00.100Z",
