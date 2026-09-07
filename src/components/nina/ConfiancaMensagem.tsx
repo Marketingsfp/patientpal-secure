@@ -82,6 +82,42 @@ const ESTILO: Record<
   },
 };
 
+function Secao({ titulo, children }: { titulo: string; children: React.ReactNode }) {
+  return (
+    <div className="space-y-0.5">
+      <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+        {titulo}
+      </p>
+      {children}
+    </div>
+  );
+}
+
+function Grupo({
+  titulo,
+  linhas,
+}: {
+  titulo: string;
+  linhas: { ok: boolean; rotulo: string; detalhe: string | null }[];
+}) {
+  if (linhas.length === 0) return null;
+  return (
+    <Secao titulo={titulo}>
+      <ul className="space-y-0.5">
+        {linhas.map((l, i) => (
+          <li key={`${l.rotulo}-${i}`} className="flex items-start gap-1">
+            <span aria-hidden>{l.ok ? "✓" : "✕"}</span>
+            <span className={l.ok ? "" : "text-destructive"}>
+              {l.rotulo}
+              {l.detalhe ? ` — ${l.detalhe}` : ""}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </Secao>
+  );
+}
+
 export function ConfiancaMensagemBadge({
   clinicaId,
   confianca,
@@ -121,7 +157,7 @@ export function ConfiancaMensagemBadge({
           {confianca.score}% {estilo.curto}
         </button>
       </PopoverTrigger>
-      <PopoverContent align="end" className="w-80 space-y-2 text-xs">
+      <PopoverContent align="end" className="max-h-96 w-80 space-y-2 overflow-y-auto text-xs">
         <div>
           <p className="text-sm font-medium">
             <Icone className="mr-1 inline h-3.5 w-3.5" aria-hidden />
@@ -129,9 +165,6 @@ export function ConfiancaMensagemBadge({
           </p>
           <p className="text-muted-foreground">
             Registrado quando a resposta foi produzida. Não é recalculado.
-          </p>
-          <p className="text-muted-foreground">
-            Política de confiança: {confianca.policy_version ?? "desconhecida"}
           </p>
         </div>
         {confianca.bloqueadores.length > 0 && (
@@ -146,18 +179,27 @@ export function ConfiancaMensagemBadge({
         )}
         {detalhe ? (
           <>
-            <p className="text-muted-foreground">Resultado: {detalhe.resultado}</p>
-            <ul className="space-y-1">
-              {detalhe.linhas.map((l, i) => (
-                <li key={`${l.rotulo}-${i}`} className="flex items-start gap-1">
-                  <span aria-hidden>{l.ok ? "✓" : "✕"}</span>
-                  <span className={l.ok ? "" : "text-destructive"}>
-                    {l.rotulo}
-                    {l.detalhe ? ` — ${l.detalhe}` : ""}
-                  </span>
-                </li>
-              ))}
-            </ul>
+            <Secao titulo="Decisão">
+              <p>{detalhe.resultado}</p>
+              {detalhe.acaoSolicitada && (
+                <p className="text-muted-foreground">Ação avaliada: {detalhe.acaoSolicitada}</p>
+              )}
+              {detalhe.intencao && (
+                <p className="text-muted-foreground">Intenção: {detalhe.intencao}</p>
+              )}
+            </Secao>
+            <Grupo titulo="Validações" linhas={detalhe.linhas.filter((l) => l.grupo === "validador")} />
+            <Grupo titulo="Ferramentas" linhas={detalhe.linhas.filter((l) => l.grupo === "ferramenta")} />
+            <Grupo titulo="Fontes" linhas={detalhe.linhas.filter((l) => l.grupo === "fonte")} />
+            {detalhe.reasonCodes.length > 0 && (
+              <Secao titulo="Motivos registrados">
+                <p className="text-muted-foreground">{detalhe.reasonCodes.join(", ")}</p>
+              </Secao>
+            )}
+            <p className="text-[10px] text-muted-foreground">
+              Política: {detalhe.policyVersion ?? confianca.policy_version ?? "desconhecida"} ·
+              Ambiente: {detalhe.ambiente}
+            </p>
           </>
         ) : (
           <p className="text-muted-foreground">Carregando detalhes…</p>
