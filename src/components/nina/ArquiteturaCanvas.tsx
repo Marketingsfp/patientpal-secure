@@ -251,8 +251,8 @@ export function ArquiteturaCanvas({
         >
           <ZoomOut className="h-4 w-4" />
         </Button>
-        <Button type="button" variant="ghost" size="sm" onClick={restaurarPosicoes}>
-          <RotateCcw className="mr-2 h-4 w-4" /> Reorganizar
+        <Button type="button" variant="ghost" size="sm" onClick={organizarAutomaticamente}>
+          <RotateCcw className="mr-2 h-4 w-4" /> Organizar automaticamente
         </Button>
         <span className="text-xs text-muted-foreground">
           {layout.nodes.length} componentes · {layout.arestas.length} conexões ·{" "}
