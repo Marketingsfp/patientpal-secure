@@ -212,6 +212,12 @@ export function ConversaAuditoriaDialog({
                 Nenhuma outra mensagem é destacada por aproximação.
               </div>
             )}
+            {!mensagemId && (
+              <div className="rounded-md border border-atd-warn bg-atd-warn-bg px-3 py-2 text-xs text-atd-warn-ink">
+                Vínculo histórico exato indisponível: este reporte não guardou a mensagem
+                específica. A conversa é exibida sem destaque.
+              </div>
+            )}
             <div className="max-h-[60vh] space-y-2 overflow-y-auto rounded-md bg-atd-bg p-3">
               {timeline.length === 0 && (
                 <p className="text-center text-sm text-muted-foreground">Sem mensagens.</p>
