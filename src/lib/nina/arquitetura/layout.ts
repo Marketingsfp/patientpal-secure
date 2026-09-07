@@ -32,8 +32,11 @@ export type LayoutArquitetura = {
 
 export const LARGURA_NODE = 216;
 export const ALTURA_NODE = 88;
-const ESPACO_COLUNA = 300;
-const ESPACO_LINHA = 116;
+/** Vão entre níveis (~110px) e entre irmãos (~44px), somados ao tamanho do node. */
+export const VAO_COLUNA = 110;
+export const VAO_LINHA = 44;
+const ESPACO_COLUNA = LARGURA_NODE + VAO_COLUNA;
+const ESPACO_LINHA = ALTURA_NODE + VAO_LINHA;
 const MARGEM = 60;
 
 /**
@@ -115,14 +118,58 @@ export function extrairArestas(nodes: NodeArquitetura[]): ArestaArquitetura[] {
   return arestas;
 }
 
+/**
+ * Caminho principal: maior cadeia a partir de uma entrada, seguindo sempre o
+ * seguinte mais conectado. Serve para manter o fluxo feliz na linha central.
+ */
+function caminhoPrincipal(
+  nodes: NodeArquitetura[],
+  arestas: ArestaArquitetura[],
+  profundidade: Map<string, number>,
+): Set<string> {
+  const grau = new Map<string, number>();
+  const saidas = new Map<string, string[]>();
+  for (const aresta of arestas) {
+    grau.set(aresta.de, (grau.get(aresta.de) ?? 0) + 1);
+    grau.set(aresta.para, (grau.get(aresta.para) ?? 0) + 1);
+    const lista = saidas.get(aresta.de) ?? [];
+    lista.push(aresta.para);
+    saidas.set(aresta.de, lista);
+  }
+
+  const entrada =
+    nodes.find((n) => (profundidade.get(n.id) ?? 0) === 0)?.id ?? nodes[0]?.id ?? null;
+  const caminho = new Set<string>();
+  let atual = entrada;
+  while (atual && !caminho.has(atual)) {
+    caminho.add(atual);
+    const nivel = profundidade.get(atual) ?? 0;
+    const candidatos = (saidas.get(atual) ?? []).filter(
+      (id) => !caminho.has(id) && (profundidade.get(id) ?? 0) > nivel,
+    );
+    candidatos.sort((a, b) => (grau.get(b) ?? 0) - (grau.get(a) ?? 0));
+    atual = candidatos[0] ?? null;
+  }
+  return caminho;
+}
+
 /** Layout automático em camadas, da esquerda para a direita. */
 export function calcularLayout(
   nodes: NodeArquitetura[],
   posicoesSalvas: Record<string, Posicao> = {},
 ): LayoutArquitetura {
   const profundidade = calcularProfundidades(nodes);
-  const colunas = new Map<number, NodeArquitetura[]>();
+  const arestas = extrairArestas(nodes);
+  const principal = caminhoPrincipal(nodes, arestas, profundidade);
 
+  const vizinhos = new Map<string, { antes: string[]; depois: string[] }>();
+  for (const node of nodes) vizinhos.set(node.id, { antes: [], depois: [] });
+  for (const aresta of arestas) {
+    vizinhos.get(aresta.de)?.depois.push(aresta.para);
+    vizinhos.get(aresta.para)?.antes.push(aresta.de);
+  }
+
+  const colunas = new Map<number, NodeArquitetura[]>();
   for (const node of nodes) {
     const coluna = profundidade.get(node.id) ?? 0;
     const lista = colunas.get(coluna) ?? [];
@@ -130,19 +177,67 @@ export function calcularLayout(
     colunas.set(coluna, lista);
   }
 
+  const chaves = [...colunas.keys()].sort((a, b) => a - b);
+  const ordem = new Map<string, number>();
+  for (const chave of chaves) {
+    const lista = colunas.get(chave)!;
+    // Ordem inicial estável: caminho principal primeiro, depois por nome.
+    lista.sort((a, b) => {
+      const pa = principal.has(a.id) ? 0 : 1;
+      const pb = principal.has(b.id) ? 0 : 1;
+      if (pa !== pb) return pa - pb;
+      return a.nome.localeCompare(b.nome, "pt-BR");
+    });
+    lista.forEach((node, indice) => ordem.set(node.id, indice));
+  }
+
+  // Sweeps de baricentro para reduzir cruzamentos entre colunas vizinhas.
+  const baricentro = (id: string, lado: "antes" | "depois") => {
+    const ligacoes = vizinhos.get(id)?.[lado] ?? [];
+    const valores = ligacoes.map((outro) => ordem.get(outro)).filter((v): v is number => v != null);
+    if (valores.length === 0) return ordem.get(id) ?? 0;
+    return valores.reduce((soma, v) => soma + v, 0) / valores.length;
+  };
+
+  for (let passo = 0; passo < 4; passo += 1) {
+    const sequencia = passo % 2 === 0 ? chaves : [...chaves].reverse();
+    const lado = passo % 2 === 0 ? "antes" : "depois";
+    for (const chave of sequencia) {
+      const lista = colunas.get(chave)!;
+      const pontuacao = new Map(lista.map((n) => [n.id, baricentro(n.id, lado)]));
+      lista.sort((a, b) => {
+        const diff = (pontuacao.get(a.id) ?? 0) - (pontuacao.get(b.id) ?? 0);
+        if (Math.abs(diff) > 1e-9) return diff;
+        return (ordem.get(a.id) ?? 0) - (ordem.get(b.id) ?? 0);
+      });
+      lista.forEach((node, indice) => ordem.set(node.id, indice));
+    }
+  }
+
+  // Linha de cada node dentro da coluna, deslocada para alinhar o caminho
+  // principal em uma faixa central comum a todas as colunas.
+  const linhas = new Map<string, number>();
+  for (const chave of chaves) {
+    const lista = colunas.get(chave)!;
+    const indicePrincipal = lista.findIndex((n) => principal.has(n.id));
+    const ancora = indicePrincipal >= 0 ? indicePrincipal : (lista.length - 1) / 2;
+    lista.forEach((node, indice) => linhas.set(node.id, indice - ancora));
+  }
+  const menorLinha = Math.min(0, ...linhas.values());
+
   const posicionados: NodePosicionado[] = [];
-  for (const [coluna, lista] of [...colunas.entries()].sort((a, b) => a[0] - b[0])) {
-    lista.sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
-    lista.forEach((node, linha) => {
+  for (const chave of chaves) {
+    for (const node of colunas.get(chave)!) {
       const salva = posicoesSalvas[node.id];
+      const linha = (linhas.get(node.id) ?? 0) - menorLinha;
       posicionados.push({
         node,
-        coluna,
-        linha,
-        x: salva ? salva.x : MARGEM + coluna * ESPACO_COLUNA,
+        coluna: chave,
+        linha: Math.round(linha),
+        x: salva ? salva.x : MARGEM + chave * ESPACO_COLUNA,
         y: salva ? salva.y : MARGEM + linha * ESPACO_LINHA,
       });
-    });
+    }
   }
 
   const largura = Math.max(
@@ -151,7 +246,7 @@ export function calcularLayout(
   ) + MARGEM;
   const altura = Math.max(...posicionados.map((p) => p.y + ALTURA_NODE), ALTURA_NODE) + MARGEM;
 
-  return { nodes: posicionados, arestas: extrairArestas(nodes), largura, altura };
+  return { nodes: posicionados, arestas, largura, altura };
 }
 
 /** Escala e deslocamento para caber todo o desenho na área visível. */

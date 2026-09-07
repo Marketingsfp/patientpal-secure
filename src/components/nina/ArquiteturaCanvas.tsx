@@ -208,11 +208,19 @@ export function ArquiteturaCanvas({
     }
   }, [chavePosicoes]);
 
-  const restaurarPosicoes = useCallback(() => {
+  const [pedidoAjuste, setPedidoAjuste] = useState(0);
+
+  const organizarAutomaticamente = useCallback(() => {
     setPosicoes({});
     gravarPosicoes(chavePosicoes, {});
-    window.setTimeout(ajustarTela, 0);
-  }, [ajustarTela, chavePosicoes]);
+    setPedidoAjuste((n) => n + 1);
+  }, [chavePosicoes]);
+
+  // Após recalcular as posições, centralizar e ajustar à tela.
+  useEffect(() => {
+    if (pedidoAjuste === 0) return;
+    ajustarTela();
+  }, [pedidoAjuste, ajustarTela]);
 
   const detalhe = selecionado ? mapaPosicionado.get(selecionado)?.node ?? null : null;
 
@@ -243,8 +251,8 @@ export function ArquiteturaCanvas({
         >
           <ZoomOut className="h-4 w-4" />
         </Button>
-        <Button type="button" variant="ghost" size="sm" onClick={restaurarPosicoes}>
-          <RotateCcw className="mr-2 h-4 w-4" /> Reorganizar
+        <Button type="button" variant="ghost" size="sm" onClick={organizarAutomaticamente}>
+          <RotateCcw className="mr-2 h-4 w-4" /> Organizar automaticamente
         </Button>
         <span className="text-xs text-muted-foreground">
           {layout.nodes.length} componentes · {layout.arestas.length} conexões ·{" "}
