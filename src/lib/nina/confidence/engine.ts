@@ -28,7 +28,6 @@ import type {
   ContextoConfianca,
   DecisaoMotor,
   FonteRecuperada,
-  NivelConfianca,
   ResultadoConfianca,
   ResultadoFerramenta,
   Verificacao,
@@ -235,10 +234,6 @@ export function executarValidadores(ctx: ContextoConfianca): Verificacao[] {
   }
 
   return checks;
-}
-
-function nivel(score: number, politica: PoliticaConfianca = POLITICA_PADRAO): NivelConfianca {
-  return nivelDaPontuacao(score, politica);
 }
 
 /**

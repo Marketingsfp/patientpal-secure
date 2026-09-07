@@ -5,6 +5,15 @@
  * implementação possa evoluir sem quebrar quem chama.
  */
 export * from "./types";
+export {
+  aplicarPolitica,
+  detectarHardBlockers,
+  nivelDaPontuacao,
+  POLITICA_PADRAO,
+  pontuarValidadores,
+  type HardBlocker,
+  type PoliticaConfianca,
+} from "./policy";
 export { decidirConfianca, executarValidadores, LIMITE_HIGH, LIMITE_MEDIUM } from "./engine";
 export {
   ActionRiskValidator,

@@ -184,6 +184,8 @@ export type ResultadoConfianca = {
   level: NivelConfianca;
   decision: DecisaoMotor;
   blockers: Bloqueador[];
+  /** Bloqueadores absolutos em código canônico (policy.ts). */
+  hardBlockers?: string[];
   checks: Verificacao[];
   /** Resultado bruto de cada validador da Fase 2 (auditoria e painel). */
   validators?: ResultadoValidador[];
