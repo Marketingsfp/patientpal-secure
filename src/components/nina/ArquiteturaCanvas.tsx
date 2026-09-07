@@ -390,6 +390,8 @@ export function ArquiteturaCanvas({
             const estado = execucao?.[node.id];
             const apagado = modoExecucao && !estado;
             const cor = CORES_CATEGORIA[node.categoria];
+            const destacado = realce.nodes.has(node.id);
+            const atenuado = temRealce && !destacado;
             return (
               <button
                 type="button"
@@ -408,10 +410,11 @@ export function ArquiteturaCanvas({
                 onClick={() => setSelecionado(node.id)}
                 title={node.descricao}
                 className={`absolute flex flex-col justify-center gap-1 rounded-md border bg-card px-3 py-2 text-left transition-opacity focus:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
-                  apagado ? "opacity-30" : principal ? "opacity-100" : "opacity-80"
+                  apagado || atenuado ? "opacity-25" : principal ? "opacity-100" : "opacity-80"
                 } ${principal ? "shadow-md" : "shadow-sm"} ${
                   selecionado === node.id ? "ring-2 ring-primary" : ""
                 }`}
+
                 style={{
                   left: x,
                   top: y,
