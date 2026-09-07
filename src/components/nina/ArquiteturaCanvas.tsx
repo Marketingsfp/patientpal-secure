@@ -620,18 +620,23 @@ export function ArquiteturaCanvas({
 
 
           {layout.nodes.map(({ node, x, y, principal }) => {
+            if (!visiveis.has(node.id)) return null;
             const estado = execucao?.[node.id];
             const apagado = modoExecucao && !estado;
             const cor = CORES_CATEGORIA[node.categoria];
             const destacado = realce.nodes.has(node.id);
             const atenuado = temRealce && !destacado;
+            const encontrado = resultadosBusca.has(node.id);
             const marca = mostrarAlteracoes ? marcasAlteracao?.[node.id] : undefined;
             const corMarca =
               marca === "adicionado"
                 ? "var(--chart-2)"
                 : marca === "alterado"
                   ? "var(--chart-4)"
-                  : null;
+                  : encontrado
+                    ? "var(--primary)"
+                    : null;
+
             return (
               <button
                 type="button"
