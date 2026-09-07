@@ -76,8 +76,8 @@ import {
   revisarFeedbackErroNina,
 } from "@/lib/nina/feedback-revisao.functions";
 import { TZ_CLINICA } from "@/lib/date-utils";
-import { pedirAbrirConversa } from "@/lib/atendimento/central-atencao";
-import { ROTA_ATENDIMENTO } from "@/lib/atendimento/abrir-conversa";
+import { ConversaAuditoriaDialog } from "@/components/nina/ConversaAuditoriaDialog";
+
 
 import {
   AVISO_ANALISE_NAO_APROVA,
@@ -313,6 +313,11 @@ function Pagina() {
   const [editando, setEditando] = useState<Item | null>(null);
   const [textoEdicao, setTextoEdicao] = useState("");
   const navigate = useNavigate();
+  const [conversaAuditoria, setConversaAuditoria] = useState<{
+    conversaId: string;
+    mensagemId: string | null;
+  } | null>(null);
+
   const [salvando, setSalvando] = useState(false);
   const [ocorrencias, setOcorrencias] = useState<Record<string, number>>({});
   const [fPrioridade, setFPrioridade] = useState("todas");
@@ -641,18 +646,21 @@ function Pagina() {
   };
 
   /**
-   * Abre o atendimento (Inbox) na conversa de origem e pede que o histórico
-   * fique posicionado exatamente na mensagem reportada (pelo id, nunca pelo
-   * texto ou horário). Só visualização: não assume nem transfere o lead.
+   * FASE 2 — abre a conversa exata do reporte em um modal de auditoria sobre
+   * esta mesma página. Não troca de rota, não vai para Conversas WhatsApp e
+   * nunca localiza a conversa pelo lead. Somente leitura.
    */
   const abrirConversa = (item: Item) => {
     if (!item.conversa_id) {
       toast.error("Este registro não tem conversa vinculada.");
       return;
     }
-    pedirAbrirConversa({ conversaId: item.conversa_id, mensagemId: item.mensagem_id ?? null });
-    void navigate({ to: ROTA_ATENDIMENTO });
+    setConversaAuditoria({
+      conversaId: item.conversa_id,
+      mensagemId: item.mensagem_id ?? null,
+    });
   };
+
 
 
   const abrirDiagnostico = async (item: Item) => {
@@ -1873,8 +1881,17 @@ function Pagina() {
         </DialogContent>
       </Dialog>
 
-      {/* "Ver conversa" abre o atendimento (Inbox) posicionado na mensagem
-          reportada — não existe mais cópia da conversa nesta tela. */}
+      {/* "Ver conversa" abre a conversa exata em modo auditoria, aqui mesmo. */}
+      <ConversaAuditoriaDialog
+        clinicaId={clinicaId ?? null}
+        conversaId={conversaAuditoria?.conversaId ?? null}
+        mensagemId={conversaAuditoria?.mensagemId ?? null}
+        aberto={Boolean(conversaAuditoria)}
+        onOpenChange={(v) => {
+          if (!v) setConversaAuditoria(null);
+        }}
+      />
+
 
     </div>
   );
