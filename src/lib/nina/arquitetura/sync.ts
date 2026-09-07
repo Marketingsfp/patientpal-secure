@@ -5,7 +5,7 @@
  * calcula o diff estrutural contra a versão atual. Não executa nada do fluxo
  * da Nina, não lê banco e não é importado pelo atendimento.
  */
-import { NODES_ARQUITETURA, type NodeArquitetura } from "./manifesto";
+import { MANIFESTO_ARQUITETURA, NODES_ARQUITETURA, type NodeArquitetura } from "./manifesto";
 
 export type AssinaturaNode = {
   id: string;
@@ -585,4 +585,31 @@ export function diffEmTexto(diff: DiffArquitetura = calcularDiffArquitetura()): 
   for (const m of diff.alterados) linhas.push(`~ ${m.id} (${m.campos.join(", ")})`);
   for (const id of diff.removidos) linhas.push(`- ${id}`);
   return linhas.length > 0 ? linhas.join("\n") : diff.resumo;
+}
+
+/**
+ * FASE 5 — Versão do manifesto cuja sincronização já foi registrada no
+ * Architecture Diff (`docs/nina/arquitetura-diff-2026-09-07.md`). Quando o
+ * manifesto avançar de versão sem novo registro, o status da página deixa de
+ * ficar verde e passa a indicar alterações pendentes.
+ */
+export const VERSAO_SINCRONIZADA = 2;
+
+const DIFF_VAZIO: DiffArquitetura = {
+  adicionados: [],
+  alterados: [],
+  removidos: [],
+  inalterados: [],
+  resumo: "Arquitetura sincronizada — nenhuma alteração estrutural detectada.",
+};
+
+/** Diff ainda não registrado: vazio quando a versão atual já foi sincronizada. */
+export function diffPendente(
+  versao: number = MANIFESTO_ARQUITETURA.versao,
+  nodes: NodeArquitetura[] = NODES_ARQUITETURA,
+): DiffArquitetura {
+  if (versao === VERSAO_SINCRONIZADA) {
+    return { ...DIFF_VAZIO, inalterados: nodes.map((n) => n.id) };
+  }
+  return calcularDiffArquitetura(SNAPSHOT_ANTERIOR, assinaturaAtual(nodes));
 }
