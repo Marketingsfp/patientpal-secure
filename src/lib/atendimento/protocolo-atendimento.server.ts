@@ -19,6 +19,7 @@
 
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { ambienteDoHandoff, deveInformarProtocolo, vinculoProtocolo } from "./protocolo-handoff";
+import { classificarMotivoHandoff, type MotivoHandoff } from "./mensagem-handoff";
 
 
 export type ProtocoloGerado = { protocolo: string; novo: boolean } | null;

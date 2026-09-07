@@ -198,3 +198,18 @@ export function promptMensagemHandoff(ctx: ContextoMensagemHandoff): string {
     `Motivo do encaminhamento (uso interno): ${ctx.motivo ?? "indefinido"}`,
   ].join("\n");
 }
+
+/**
+ * Traduz o motivo técnico/interno registrado no handoff para o motivo
+ * funcional usado na comunicação com o paciente.
+ */
+export function classificarMotivoHandoff(motivoBruto?: string | null): MotivoHandoff {
+  const m = (motivoBruto ?? "").toLowerCase();
+  if (!m) return "indefinido";
+  if (/(agenda|marca|remarca|consulta|exame|horário|horario)/.test(m)) return "agendamento";
+  if (/(financ|pagam|boleto|valor|preço|preco|cobran|convênio|convenio)/.test(m)) return "financeiro";
+  if (/(human|atendente|pessoa|falar com)/.test(m)) return "pedido_do_paciente";
+  if (/(sem informa|não encontr|nao encontr|indisponí|indisponi|catálogo|catalogo|erro|falha|tool)/.test(m))
+    return "informacao_indisponivel";
+  return "indefinido";
+}
