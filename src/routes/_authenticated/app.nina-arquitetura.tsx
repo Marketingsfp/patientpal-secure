@@ -78,12 +78,17 @@ function Pagina() {
             <CardHeader>
               <CardTitle className="text-base">O que aconteceu em uma mensagem</CardTitle>
             </CardHeader>
-            <CardContent className="text-sm text-muted-foreground">
-              O rastreamento de uma mensagem real entra na próxima etapa. Aqui os componentes
-              executados ficarão destacados e os não utilizados, apagados.
+            <CardContent className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                A busca por uma mensagem real entra na próxima etapa. Assim que uma execução for
+                selecionada, aparecem aqui a linha do tempo, o caminho do paciente até a resposta e
+                as falhas encontradas.
+              </p>
+              <ExecucaoDiagnostico eventos={[]} />
             </CardContent>
           </Card>
         </TabsContent>
+
       </Tabs>
     </div>
   );
