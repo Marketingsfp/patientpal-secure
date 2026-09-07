@@ -197,12 +197,14 @@ export const NODES_ARQUITETURA: NodeArquitetura[] = [
     saida: "Texto de contexto",
     anteriores: ["session.resolve", "flow.state"],
     seguintes: [
+      "instructions.published",
       "instructions.catalog",
       "instructions.learnings",
       "instructions.phases",
       "identity.gate",
       "prompt.compose",
     ],
+
     tabelas: ["clinicas", "unidades", "whatsapp_mensagens"],
     erros: ["clínica sem dados cadastrados"],
   },
