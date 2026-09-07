@@ -216,8 +216,35 @@ export const CENARIOS_MODELO: {
     nome: "Falar com atendente",
     categoria: "transferencia",
     objetivo: "Paciente insiste em falar com um atendente humano.",
-    descricao: "Verifica se a Nina transfere quando solicitado.",
-    criterios: [{ tipo: "sem_erro" }],
+    descricao:
+      "Verifica transferência, protocolo e mensagem de encaminhamento ao paciente.",
+    criterios: [{ tipo: "sem_erro" }, { tipo: "transferiu" }],
+    maxTurnos: 4,
+  },
+  {
+    nome: "Informação fora do catálogo publicado",
+    categoria: "fallback",
+    objetivo:
+      "Paciente pergunta algo que não existe no catálogo publicado da clínica.",
+    descricao:
+      "A Nina deve reconhecer a ausência, encaminhar para a equipe e informar o protocolo.",
+    criterios: [{ tipo: "sem_erro" }, { tipo: "transferiu" }],
+    maxTurnos: 4,
+  },
+  {
+    nome: "Transferência com setor conhecido",
+    categoria: "transferencia",
+    objetivo: "Paciente trata de um assunto com setor estruturado de destino.",
+    descricao: "A mensagem pode citar o setor correto, com protocolo.",
+    criterios: [{ tipo: "sem_erro" }, { tipo: "transferiu" }],
+    maxTurnos: 5,
+  },
+  {
+    nome: "Transferência sem setor definido",
+    categoria: "transferencia",
+    objetivo: "Handoff sem destino estruturado.",
+    descricao: 'A mensagem não pode inventar setor: deve falar em "nossa equipe".',
+    criterios: [{ tipo: "sem_erro" }, { tipo: "transferiu" }],
     maxTurnos: 4,
   },
 ];
