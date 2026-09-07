@@ -339,6 +339,26 @@ export function dentroHorarioAtendimento(cfg: WhatsAppConfigRow, now: Date = new
  * Extrai possíveis identificadores (CPF, telefone, nome) do texto do paciente.
  * Usado para tentar reconhecê-lo antes de pedir dados.
  */
+/**
+ * O retorno de uma consulta ao catálogo/base traz conteúdo aproveitável?
+ * Usado só pelo Confidence Engine: "consultei" não é o mesmo que "achei".
+ */
+function temConteudoUtil(dados: unknown): boolean {
+  if (dados === null || dados === undefined) return false;
+  if (Array.isArray(dados)) return dados.length > 0;
+  if (typeof dados !== "object") return String(dados).trim().length > 0;
+  const o = dados as Record<string, unknown>;
+  for (const [k, v] of Object.entries(o)) {
+    if (k === "ok" || k === "erro" || k === "success" || k === "source" || k === "instrucao") continue;
+    if (Array.isArray(v)) {
+      if (v.length > 0) return true;
+      continue;
+    }
+    if (v !== null && v !== undefined && String(v).trim() !== "") return true;
+  }
+  return false;
+}
+
 function extrairIdentificadores(mensagem: string): {
   cpf: string | null;
   telefone: string | null;
