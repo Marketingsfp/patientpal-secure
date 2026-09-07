@@ -283,3 +283,53 @@ export function diagnosticarExecucao(eventos: EventoTrace[]): DiagnosticoExecuca
     duracaoTotalMs: duracao,
   };
 }
+
+// ─────────────────────── Estados para o canvas ───────────────────────
+
+export type EstadoNodeExecucao = {
+  status: "executado" | "falhou" | "ignorado" | "cancelado" | "retry";
+  duracaoMs?: number | null;
+  horario?: string | null;
+  tentativas?: number | null;
+  erro?: string | null;
+  entrada?: string | null;
+  resultado?: string | null;
+  metadata?: Record<string, unknown> | null;
+};
+
+/** Converte os eventos em estado por node, para destacar o caminho no canvas. */
+export function estadosPorNode(eventos: EventoTrace[]): Record<string, EstadoNodeExecucao> {
+  const mapa: Record<string, EstadoNodeExecucao> = {};
+  const tentativas: Record<string, number> = {};
+
+  for (const evento of [...eventos].sort((a, b) => a.started_at.localeCompare(b.started_at))) {
+    const m = metadataSegura(evento.metadata);
+    const anterior = mapa[evento.node_id];
+    if (evento.status === "error" || evento.event_type === "retry") {
+      tentativas[evento.node_id] = (tentativas[evento.node_id] ?? 0) + 1;
+    }
+
+    const status: EstadoNodeExecucao["status"] =
+      evento.status === "error"
+        ? "falhou"
+        : evento.status === "cancelled"
+          ? "cancelado"
+          : evento.status === "skipped"
+            ? "ignorado"
+            : anterior && anterior.status === "falhou"
+              ? "retry"
+              : "executado";
+
+    mapa[evento.node_id] = {
+      status,
+      duracaoMs: evento.duration_ms ?? anterior?.duracaoMs ?? null,
+      horario: evento.started_at,
+      tentativas: tentativas[evento.node_id] ?? null,
+      erro: typeof m["erro"] === "string" ? m["erro"] : (anterior?.erro ?? null),
+      entrada: typeof m["entrada"] === "string" ? m["entrada"] : (anterior?.entrada ?? null),
+      resultado: typeof m["resultado"] === "string" ? m["resultado"] : (anterior?.resultado ?? null),
+      metadata: { ...(anterior?.metadata ?? {}), ...m },
+    };
+  }
+  return mapa;
+}

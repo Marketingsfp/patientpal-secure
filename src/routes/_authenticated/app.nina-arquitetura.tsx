@@ -1,20 +1,24 @@
 /**
- * Nina → Arquitetura (FASE 3).
+ * Nina → Arquitetura.
  *
  * Tela somente leitura. Ela desenha o Architecture Manifest já existente
- * (`src/lib/nina/arquitetura/manifesto.ts`). Nada aqui altera o backend, a
- * ordem de execução, prompts, ferramentas ou dados de atendimento.
+ * (`src/lib/nina/arquitetura/manifesto.ts`) e, no modo Execução, mostra o
+ * caminho real de uma mensagem a partir do tracing. Nada aqui altera o backend,
+ * a ordem de execução, prompts, ferramentas ou dados de atendimento.
  */
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import { Network } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { ArquiteturaCanvas } from "@/components/nina/ArquiteturaCanvas";
-import { ExecucaoDiagnostico } from "@/components/nina/ExecucaoDiagnostico";
-
+import { RastrearExecucao } from "@/components/nina/RastrearExecucao";
 import { useClinica } from "@/hooks/use-clinica";
+import { capacidadesArquitetura } from "@/lib/nina/arquitetura/permissoes.functions";
+import { nivelAcessoDe, podeArquitetura } from "@/lib/nina/arquitetura/permissoes";
 
 export const Route = createFileRoute("/_authenticated/app/nina-arquitetura")({
   head: () => ({
@@ -39,7 +43,37 @@ export const Route = createFileRoute("/_authenticated/app/nina-arquitetura")({
 
 function Pagina() {
   const { clinicaAtual } = useClinica();
+  const clinicaId = clinicaAtual?.clinica_id ?? null;
   const [modo, setModo] = useState<"arquitetura" | "execucao">("arquitetura");
+
+  const buscarCapacidades = useServerFn(capacidadesArquitetura);
+  const { data: permissao } = useQuery({
+    queryKey: ["arquitetura-capacidades", clinicaId],
+    enabled: !!clinicaId,
+    queryFn: () => buscarCapacidades({ data: { clinicaId: clinicaId! } }),
+  });
+
+  const capacidades = permissao?.capacidades ?? [];
+  const podeVer = podeArquitetura(capacidades, "arquitetura.visualizar");
+  const podeExecucao = podeArquitetura(capacidades, "arquitetura.execucao");
+  const nivelAcesso = nivelAcessoDe(capacidades);
+  const chavePosicoes = `nina-arquitetura-posicoes:${clinicaId ?? "sem-clinica"}`;
+
+  if (permissao && !podeVer) {
+    return (
+      <div className="p-6">
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Acesso não liberado</CardTitle>
+          </CardHeader>
+          <CardContent className="text-sm text-muted-foreground">
+            Seu perfil não tem permissão para ver a arquitetura da Nina. Fale com a administração da
+            clínica.
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4 p-4 md:p-6">
@@ -67,9 +101,9 @@ function Pagina() {
             </CardHeader>
             <CardContent>
               <ArquiteturaCanvas
-                chavePosicoes={`nina-arquitetura-posicoes:${clinicaAtual?.clinica_id ?? "sem-clinica"}`}
-                clinicaId={clinicaAtual?.clinica_id ?? null}
-                nivelAcesso={clinicaAtual?.role === "admin" ? "admin" : "operacional"}
+                chavePosicoes={chavePosicoes}
+                clinicaId={clinicaId}
+                nivelAcesso={nivelAcesso}
               />
             </CardContent>
           </Card>
@@ -80,17 +114,21 @@ function Pagina() {
             <CardHeader>
               <CardTitle className="text-base">O que aconteceu em uma mensagem</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <p className="text-sm text-muted-foreground">
-                A busca por uma mensagem real entra na próxima etapa. Assim que uma execução for
-                selecionada, aparecem aqui a linha do tempo, o caminho do paciente até a resposta e
-                as falhas encontradas.
-              </p>
-              <ExecucaoDiagnostico eventos={[]} />
+            <CardContent>
+              {podeExecucao ? (
+                <RastrearExecucao
+                  clinicaId={clinicaId}
+                  nivelAcesso={nivelAcesso}
+                  chavePosicoes={`${chavePosicoes}:execucao`}
+                />
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  Seu perfil não tem permissão para rastrear mensagens.
+                </p>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
-
       </Tabs>
     </div>
   );
