@@ -9252,6 +9252,129 @@ export type Database = {
           },
         ]
       }
+      nina_teste_avaliacoes: {
+        Row: {
+          achados: Json
+          cenario_id: string | null
+          ciclo_id: string | null
+          clinica_id: string
+          conversa_id: string | null
+          created_at: string
+          criado_por: string | null
+          dimensoes: Json
+          erro: string | null
+          evidencias: Json
+          id: string
+          input_tokens: number
+          latency_ms: number | null
+          lead_id: string | null
+          mensagens_avaliadas: number
+          modelo: string
+          output_tokens: number
+          prompt_versao: number | null
+          prompt_versao_id: string | null
+          resultado: string | null
+          resumo: string | null
+          score: number | null
+          simulacao_id: string | null
+          status: string
+          updated_at: string
+          versao_rubrica: string
+        }
+        Insert: {
+          achados?: Json
+          cenario_id?: string | null
+          ciclo_id?: string | null
+          clinica_id: string
+          conversa_id?: string | null
+          created_at?: string
+          criado_por?: string | null
+          dimensoes?: Json
+          erro?: string | null
+          evidencias?: Json
+          id?: string
+          input_tokens?: number
+          latency_ms?: number | null
+          lead_id?: string | null
+          mensagens_avaliadas?: number
+          modelo: string
+          output_tokens?: number
+          prompt_versao?: number | null
+          prompt_versao_id?: string | null
+          resultado?: string | null
+          resumo?: string | null
+          score?: number | null
+          simulacao_id?: string | null
+          status?: string
+          updated_at?: string
+          versao_rubrica?: string
+        }
+        Update: {
+          achados?: Json
+          cenario_id?: string | null
+          ciclo_id?: string | null
+          clinica_id?: string
+          conversa_id?: string | null
+          created_at?: string
+          criado_por?: string | null
+          dimensoes?: Json
+          erro?: string | null
+          evidencias?: Json
+          id?: string
+          input_tokens?: number
+          latency_ms?: number | null
+          lead_id?: string | null
+          mensagens_avaliadas?: number
+          modelo?: string
+          output_tokens?: number
+          prompt_versao?: number | null
+          prompt_versao_id?: string | null
+          resultado?: string | null
+          resumo?: string | null
+          score?: number | null
+          simulacao_id?: string | null
+          status?: string
+          updated_at?: string
+          versao_rubrica?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nina_teste_avaliacoes_cenario_id_fkey"
+            columns: ["cenario_id"]
+            isOneToOne: false
+            referencedRelation: "nina_teste_cenarios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nina_teste_avaliacoes_ciclo_id_fkey"
+            columns: ["ciclo_id"]
+            isOneToOne: false
+            referencedRelation: "nina_teste_ciclos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nina_teste_avaliacoes_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nina_teste_avaliacoes_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "nina_teste_leads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nina_teste_avaliacoes_simulacao_id_fkey"
+            columns: ["simulacao_id"]
+            isOneToOne: false
+            referencedRelation: "nina_teste_simulacoes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       nina_teste_carga: {
         Row: {
           cancelar: boolean
