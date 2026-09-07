@@ -78,12 +78,12 @@ describe("fase 3 — comunicação única e retry", () => {
 
 describe("fase 3 — resumo entregue ao humano", () => {
   it("reutiliza o protocolo do handoff como primeiro bloco", async () => {
-    const { normalizarResumo, l } = await import("../handoff-resumo");
+    const { normalizarResumo, blocosVisiveis } = await import("../handoff-resumo");
     const r = normalizarResumo(
       { intencao: "agendamento", motivo_contato: "Quer marcar ultrassom" },
       { protocolo: "MJ-14712" },
     );
     expect(r.protocolo).toBe("MJ-14712");
-    expect(l(r)[0]).toEqual({ titulo: "Protocolo", itens: ["MJ-14712"] });
+    expect(blocosVisiveis(r)[0]).toEqual({ titulo: "Protocolo", itens: ["MJ-14712"] });
   });
 });
