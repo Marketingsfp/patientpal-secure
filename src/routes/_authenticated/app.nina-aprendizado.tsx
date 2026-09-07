@@ -78,6 +78,7 @@ import {
 import { TZ_CLINICA } from "@/lib/date-utils";
 import { ConversaAuditoriaDialog } from "@/components/nina/ConversaAuditoriaDialog";
 import { useConfiancaMensagens } from "@/components/nina/ConfiancaMensagem";
+import { combinaFiltroConfianca } from "@/lib/nina/confianca-badge";
 
 
 import {
