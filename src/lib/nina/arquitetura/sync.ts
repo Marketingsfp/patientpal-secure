@@ -589,7 +589,7 @@ export function diffEmTexto(diff: DiffArquitetura = calcularDiffArquitetura()): 
 
 /**
  * Versão do manifesto cuja sincronização já foi registrada no
- * Architecture Diff (`docs/nina/arquitetura-diff-2026-09-07.md`). Quando o
+ * Architecture Diff (`docs/nina/arquitetura-diff-2026-09-08.md`). Quando o
  * manifesto avançar de versão sem novo registro, o status da página deixa de
  * ficar verde e passa a indicar alterações pendentes.
  */
