@@ -21,17 +21,15 @@ import { Badge } from "@/components/ui/badge";
 import { useServerFn } from "@tanstack/react-start";
 import { lerConversaAuditoria } from "@/lib/nina/feedback-conversa.functions";
 import { ConversationSystemEvent, type ConversaEvento } from "./ConversationSystemEvent";
+import {
+  autorDe,
+  curto,
+  fmtHora,
+  localizarMensagem,
+  montarTimeline,
+  type MensagemAuditoria as Mensagem,
+} from "@/lib/nina/conversa-auditoria";
 
-type Mensagem = {
-  id: string;
-  direction: string | null;
-  body: string | null;
-  tipo: string | null;
-  enviada_por: string | null;
-  recebida_em: string;
-  media_url: string | null;
-  media_mime: string | null;
-};
 
 type Dados = {
   conversa: {
@@ -48,38 +46,6 @@ type Dados = {
   eventos: ConversaEvento[];
 };
 
-/** Timestamp real persistido, sempre DD/MM/AAAA HH:mm:ss. */
-function fmtHora(iso: string) {
-  try {
-    return new Date(iso).toLocaleString("pt-BR", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-      second: "2-digit",
-    });
-  } catch {
-    return "";
-  }
-}
-
-/** Autoria explícita: não depender só do lado do balão. */
-function autorDe(m: Mensagem, atendenteNome: string | null) {
-  const por = (m.enviada_por ?? "").toLowerCase();
-  if (por === "sistema") return "Sistema";
-  if (por === "nina" || por === "ia" || por === "bot") return "Nina";
-  if (por === "humano" || por === "atendente")
-    return atendenteNome ? `Atendente — ${atendenteNome}` : "Atendente";
-  if (por === "paciente") return "Paciente";
-  return m.direction === "out" ? "Nina" : "Paciente";
-}
-
-/** Código curto e legível para IDs longos (erro, conversa, mensagem). */
-function curto(id: string | null | undefined) {
-  if (!id) return null;
-  return id.slice(0, 8).toUpperCase();
-}
 
 export function ConversaAuditoriaDialog({
   clinicaId,
@@ -138,18 +104,13 @@ export function ConversaAuditoriaDialog({
   }, [dados]);
 
   // Mensagens e eventos em uma única linha do tempo, por horário.
-  const timeline = dados
-    ? [
-        ...dados.mensagens.map((m) => ({ t: m.recebida_em, kind: "msg" as const, msg: m })),
-        ...dados.eventos.map((ev) => ({ t: ev.created_at, kind: "evento" as const, ev })),
-      ].sort((a, b) => (a.t < b.t ? -1 : a.t > b.t ? 1 : 0))
-    : [];
+  const timeline = dados ? montarTimeline(dados.mensagens, dados.eventos) : [];
 
   // Data real da mensagem reportada (≠ data em que o erro foi reportado).
-  const dataMensagem =
-    dados && mensagemId
-      ? (dados.mensagens.find((m) => m.id === mensagemId)?.recebida_em ?? null)
-      : null;
+  // Localização sempre por id — nunca por texto.
+  const dataMensagem = dados
+    ? (localizarMensagem(dados.mensagens, mensagemId)?.recebida_em ?? null)
+    : null;
 
   // CASO 1 — sem conversa vinculada: nunca cair na "primeira conversa do lead".
   const semVinculo = !conversaId;
