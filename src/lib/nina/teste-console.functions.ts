@@ -27,6 +27,8 @@ import {
   processarMensagemTeste,
   type LeadRow,
 } from "@/lib/nina/teste-console.server";
+import { resumirLeads, type MensagemResumoRow } from "@/lib/nina/leads-resumo";
+
 
 async function assertMembership(supabase: any, userId: string, clinicaId: string) {
   const { data, error } = await supabase
