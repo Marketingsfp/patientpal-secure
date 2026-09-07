@@ -13,10 +13,12 @@ import {
   GitCompare,
   Route,
   RotateCcw,
+  Search,
   ZoomIn,
   ZoomOut,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   CATEGORIAS_ARQUITETURA,
   NODES_ARQUITETURA,
@@ -38,11 +40,18 @@ import {
 } from "@/lib/nina/arquitetura/layout-incremental";
 import { assinaturaAtual, calcularDiffArquitetura } from "@/lib/nina/arquitetura/sync";
 import {
+  buscarNodes,
+  calcularMinimapa,
+  centralizarNoNode,
+  nodesVisiveis,
+} from "@/lib/nina/arquitetura/navegacao";
+import {
   calcularRotas,
   descreverConexao,
   realceCaminhoCompleto,
   realceDireto,
 } from "@/lib/nina/arquitetura/rotas";
+
 import { NodeDetalhePainel } from "./NodeDetalhePainel";
 import type { NivelAcesso } from "@/lib/nina/arquitetura/detalhes-ia";
 import type { MarcaAlteracao } from "@/lib/nina/arquitetura/versoes";
