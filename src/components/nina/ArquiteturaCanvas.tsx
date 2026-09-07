@@ -292,6 +292,30 @@ export function ArquiteturaCanvas({
             height: layout.altura,
           }}
         >
+          {/* Molduras discretas por domínio funcional (apenas leitura visual). */}
+          {layout.grupos.map((grupo) => (
+            <div
+              key={grupo.id}
+              aria-hidden="true"
+              className="pointer-events-none absolute rounded-lg border border-dashed"
+              style={{
+                left: grupo.x,
+                top: grupo.y,
+                width: grupo.largura,
+                height: grupo.altura,
+                borderColor: `color-mix(in oklch, ${CORES_CATEGORIA[grupo.categoria]} 45%, transparent)`,
+                backgroundColor: `color-mix(in oklch, ${CORES_CATEGORIA[grupo.categoria]} 7%, transparent)`,
+              }}
+            >
+              <span
+                className="absolute left-2 top-1 text-[10px] font-semibold uppercase tracking-wide"
+                style={{ color: CORES_CATEGORIA[grupo.categoria] }}
+              >
+                {grupo.categoria}
+              </span>
+            </div>
+          ))}
+
           <svg
             width={layout.largura}
             height={layout.altura}
