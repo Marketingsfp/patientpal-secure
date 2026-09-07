@@ -8273,6 +8273,7 @@ export type Database = {
           modo: string
           motivos: Json
           nivel: string | null
+          policy_version: string | null
           reason_codes: string[]
           resultado_final: string | null
           score: number
@@ -8301,6 +8302,7 @@ export type Database = {
           modo?: string
           motivos?: Json
           nivel?: string | null
+          policy_version?: string | null
           reason_codes?: string[]
           resultado_final?: string | null
           score?: number
@@ -8329,6 +8331,7 @@ export type Database = {
           modo?: string
           motivos?: Json
           nivel?: string | null
+          policy_version?: string | null
           reason_codes?: string[]
           resultado_final?: string | null
           score?: number

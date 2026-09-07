@@ -49,6 +49,14 @@ export type PoliticaConfianca = {
   acoesDeEscrita: string[];
 };
 
+/**
+ * Versão da política de confiança. Sobe sempre que pesos, faixas, penalidades,
+ * mínimos por risco ou bloqueadores absolutos mudarem. Fica gravada junto de
+ * cada decisão, para que uma avaliação antiga continue lida com a régua da
+ * época — nunca com a régua de hoje.
+ */
+export const VERSAO_POLITICA = "v1";
+
 export const POLITICA_PADRAO: PoliticaConfianca = {
   pesos: {
     IntentClarityValidator: 15,

@@ -12,6 +12,7 @@
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import type { DecisaoConfianca } from "./confidence-engine";
 import type { RegistroAuditoriaConfianca } from "./confidence/auditoria";
+import { VERSAO_POLITICA } from "./confidence/policy";
 
 export async function registrarDecisaoConfianca(params: {
   clinicaId: string;
@@ -26,6 +27,8 @@ export async function registrarDecisaoConfianca(params: {
   modo?: "shadow" | "enforce";
   /** Fase 7: o motor teria liberado a resposta/ação? */
   teriaPermitido?: boolean;
+  /** Versão da política usada nesta avaliação (imutável no histórico). */
+  policyVersion?: string;
 }): Promise<void> {
   try {
     const a = params.auditoria ?? null;
@@ -42,6 +45,7 @@ export async function registrarDecisaoConfianca(params: {
       motivos: params.decisao.motivos,
       modo: params.modo ?? "shadow",
       teria_permitido: params.teriaPermitido ?? null,
+      policy_version: params.policyVersion ?? VERSAO_POLITICA,
       ...(a
         ? {
             message_id: a.messageId,

@@ -119,6 +119,9 @@ export function ConfiancaMensagemBadge({
           <p className="text-muted-foreground">
             Registrado quando a resposta foi produzida. Não é recalculado.
           </p>
+          <p className="text-muted-foreground">
+            Política de confiança: {confianca.policy_version ?? "desconhecida"}
+          </p>
         </div>
         {confianca.bloqueadores.length > 0 && (
           <div className="rounded border border-destructive/40 bg-destructive/10 p-2 text-destructive">
@@ -150,5 +153,20 @@ export function ConfiancaMensagemBadge({
         )}
       </PopoverContent>
     </Popover>
+  );
+}
+
+/**
+ * Mensagem da Nina anterior ao registro de confiança (ou sem avaliação
+ * gravada). Nunca inventamos pontuação: dizemos que não foi avaliada.
+ */
+export function ConfiancaNaoAvaliadaBadge() {
+  return (
+    <span
+      title="Esta resposta é anterior ao registro de confiança ou não teve avaliação gravada."
+      className="inline-flex items-center rounded-full border border-border/60 px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground"
+    >
+      Não avaliada
+    </span>
   );
 }

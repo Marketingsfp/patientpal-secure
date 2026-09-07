@@ -185,6 +185,7 @@ import {
 import { SEM_NOME, nomeConversa, tituloConversa } from "@/lib/atendimento/rotulo-conversa";
 import {
   ConfiancaMensagemBadge,
+  ConfiancaNaoAvaliadaBadge,
   useConfiancaMensagens,
 } from "@/components/nina/ConfiancaMensagem";
 import { devoAutoSelecionarComSelecao, escopoParaConversa } from "@/lib/atendimento/deep-link";
@@ -2888,13 +2889,15 @@ export function AtendInbox() {
                           <span className="whitespace-nowrap">
                             {fmtHora(m.recebida_em)} {m.enviada_por === "nina" && "· Nina"}
                           </span>
-                          {daNina && clinicaId && m.execucao_id &&
-                            confiancaPorExecucao[String(m.execucao_id)] && (
+                          {daNina &&
+                            (clinicaId && m.execucao_id && confiancaPorExecucao[String(m.execucao_id)] ? (
                               <ConfiancaMensagemBadge
                                 clinicaId={clinicaId}
                                 confianca={confiancaPorExecucao[String(m.execucao_id)]!}
                               />
-                            )}
+                            ) : (
+                              <ConfiancaNaoAvaliadaBadge />
+                            ))}
                         </div>
                       </div>
                     </div>
