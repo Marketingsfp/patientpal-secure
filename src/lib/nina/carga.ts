@@ -18,6 +18,9 @@ export const LIMITE_ABSOLUTO = {
   duracaoMaxS: 1800,
   timeoutS: 120,
   retriesMax: 3,
+  maxTokens: 2000000,
+  maxCustoCreditos: 5000,
+  creditosPorMilTokens: 100,
 } as const;
 
 /** Acima deste volume, o operador precisa confirmar explicitamente. */
@@ -35,6 +38,15 @@ export type ConfigCarga = {
   intervaloMs: number;
   timeoutS: number;
   retriesMax: number;
+  /** Teto de tokens somados (entrada + saída) de todo o teste. */
+  maxTokens: number;
+  /**
+   * Teto de custo estimado em créditos. Só vale quando o operador informa
+   * `creditosPorMilTokens`; o provedor não devolve preço por chamada.
+   * 0 = sem limite de custo.
+   */
+  maxCustoCreditos: number;
+  creditosPorMilTokens: number;
   /** Cenários e o peso de cada um na distribuição das mensagens. */
   distribuicao: { cenario: string; peso: number }[];
 };
@@ -50,6 +62,9 @@ export const PERFIS: Record<Exclude<Perfil, "customizado">, ConfigCarga> = {
     intervaloMs: 1000,
     timeoutS: 60,
     retriesMax: 1,
+    maxTokens: 200000,
+    maxCustoCreditos: 0,
+    creditosPorMilTokens: 0,
     distribuicao: [],
   },
   medio: {
@@ -62,6 +77,9 @@ export const PERFIS: Record<Exclude<Perfil, "customizado">, ConfigCarga> = {
     intervaloMs: 500,
     timeoutS: 60,
     retriesMax: 2,
+    maxTokens: 600000,
+    maxCustoCreditos: 0,
+    creditosPorMilTokens: 0,
     distribuicao: [],
   },
   alto: {
@@ -74,6 +92,9 @@ export const PERFIS: Record<Exclude<Perfil, "customizado">, ConfigCarga> = {
     intervaloMs: 250,
     timeoutS: 90,
     retriesMax: 2,
+    maxTokens: 2000000,
+    maxCustoCreditos: 0,
+    creditosPorMilTokens: 0,
     distribuicao: [],
   },
 };
@@ -108,6 +129,15 @@ export function normalizarConfig(entrada: Partial<ConfigCarga>): ConfigCarga {
     intervaloMs: limitar(bruto.intervaloMs, 0, 60000),
     timeoutS: limitar(bruto.timeoutS, 10, LIMITE_ABSOLUTO.timeoutS),
     retriesMax: limitar(bruto.retriesMax, 0, LIMITE_ABSOLUTO.retriesMax),
+    maxTokens: limitar(bruto.maxTokens ?? LIMITE_ABSOLUTO.maxTokens, 1000, LIMITE_ABSOLUTO.maxTokens),
+    maxCustoCreditos: Math.min(
+      Math.max(Number(bruto.maxCustoCreditos ?? 0) || 0, 0),
+      LIMITE_ABSOLUTO.maxCustoCreditos,
+    ),
+    creditosPorMilTokens: Math.min(
+      Math.max(Number(bruto.creditosPorMilTokens ?? 0) || 0, 0),
+      LIMITE_ABSOLUTO.creditosPorMilTokens,
+    ),
     distribuicao: (bruto.distribuicao ?? []).filter((d) => d.cenario?.trim() && d.peso > 0),
   };
 }
@@ -233,4 +263,24 @@ export function extrairVariacoes(texto: string, maximo = 12): string[] {
         .filter((l) => l.length >= 3 && l.length <= 140),
     ),
   ].slice(0, maximo);
+}
+
+/** Custo estimado (créditos) do teste de carga. 0 quando a taxa não foi declarada. */
+export function custoEstimadoCarga(tokens: number, creditosPorMilTokens: number): number {
+  if (!creditosPorMilTokens || creditosPorMilTokens <= 0) return 0;
+  return (Math.max(0, tokens) / 1000) * creditosPorMilTokens;
+}
+
+/** Diz se o teste estourou o orçamento de tokens ou de custo estimado. */
+export function estourouOrcamento(
+  config: ConfigCarga,
+  tokens: number,
+): { estourou: boolean; motivo?: "limite_tokens" | "limite_custo" } {
+  if (tokens >= config.maxTokens) return { estourou: true, motivo: "limite_tokens" };
+  if (
+    config.maxCustoCreditos > 0 &&
+    custoEstimadoCarga(tokens, config.creditosPorMilTokens) >= config.maxCustoCreditos
+  )
+    return { estourou: true, motivo: "limite_custo" };
+  return { estourou: false };
 }

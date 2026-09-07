@@ -23,8 +23,10 @@ import {
   planoDeMensagens,
   validarDisparo,
   variacoesFallback,
+  estourouOrcamento,
   type ConfigCarga,
 } from "@/lib/nina/carga";
+import { garantirPapel, PROVEDOR_IA } from "@/lib/nina/papeis-modelos";
 
 const GATEWAY = "https://ai.gateway.lovable.dev/v1/responses";
 /** Orçamento de tempo de cada chamada de lote (o restante segue no próximo). */
@@ -64,6 +66,9 @@ const configSchema = z.object({
   intervaloMs: z.number().int().min(0).max(60_000).default(1000),
   timeoutS: z.number().int().min(10).max(LIMITE_ABSOLUTO.timeoutS).default(60),
   retriesMax: z.number().int().min(0).max(LIMITE_ABSOLUTO.retriesMax).default(1),
+  maxTokens: z.number().int().min(1000).max(LIMITE_ABSOLUTO.maxTokens).default(200_000),
+  maxCustoCreditos: z.number().min(0).max(LIMITE_ABSOLUTO.maxCustoCreditos).default(0),
+  creditosPorMilTokens: z.number().min(0).max(LIMITE_ABSOLUTO.creditosPorMilTokens).default(0),
   distribuicao: z
     .array(z.object({ cenario: z.string().trim().min(3).max(300), peso: z.number().min(0.1).max(10) }))
     .max(10)
@@ -83,7 +88,7 @@ async function gerarVariacoesLuna(cenario: string, quantidade: number): Promise<
         "X-Lovable-AIG-SDK": "fetch",
       },
       body: JSON.stringify({
-        model: MODELO_LUNA,
+        model: garantirPapel("carga", MODELO_LUNA),
         instructions: INSTRUCOES_LUNA,
         input: [
           {
@@ -176,7 +181,8 @@ export const criarTesteCarga = createServerFn({ method: "POST" })
         plano: planoFinal,
         confirmado: data.confirmado,
         total_planejado: planoFinal.length,
-        modelo_gerador: data.usarLuna ? MODELO_LUNA : null,
+        modelo_gerador: data.usarLuna ? garantirPapel("carga", MODELO_LUNA) : null,
+        provedor_gerador: data.usarLuna ? PROVEDOR_IA : null,
         criado_por: context.userId,
       })
       .select("id, status, total_planejado")
@@ -241,6 +247,16 @@ export const executarLoteCarga = createServerFn({ method: "POST" })
       if (Date.now() - inicioLote > ORCAMENTO_LOTE_MS) break;
       if ((Date.now() - inicioTeste) / 1000 > config.duracaoMaxS) {
         terminou = "concluido";
+        break;
+      }
+      // Orçamento de tokens/custo estimado do teste inteiro.
+      const tokensAteAgora =
+        Number(carga.input_tokens) +
+        Number(carga.output_tokens) +
+        acumulado.inputTokens +
+        acumulado.outputTokens;
+      if (estourouOrcamento(config, tokensAteAgora).estourou) {
+        terminou = "parado";
         break;
       }
       // Cancelamento: relido do banco a cada rodada.

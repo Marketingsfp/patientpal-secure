@@ -313,7 +313,53 @@ export function CargaTeste() {
               />
             </div>
           </div>
+          <div className="space-y-1.5">
+            <Label>Máx. tokens do teste</Label>
+            <Input
+              type="number"
+              min={1000}
+              max={2000000}
+              step={1000}
+              value={config.maxTokens}
+              onChange={(e) => {
+                setPerfil("customizado");
+                setConfig((c) => ({ ...c, maxTokens: Number(e.target.value) }));
+              }}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label>Créditos / mil tokens e teto de custo</Label>
+            <div className="flex gap-2">
+              <Input
+                type="number"
+                min={0}
+                max={100}
+                step={0.1}
+                value={config.creditosPorMilTokens}
+                onChange={(e) => {
+                  setPerfil("customizado");
+                  setConfig((c) => ({ ...c, creditosPorMilTokens: Number(e.target.value) }));
+                }}
+              />
+              <Input
+                type="number"
+                min={0}
+                max={5000}
+                step={1}
+                value={config.maxCustoCreditos}
+                onChange={(e) => {
+                  setPerfil("customizado");
+                  setConfig((c) => ({ ...c, maxCustoCreditos: Number(e.target.value) }));
+                }}
+              />
+            </div>
+            <p className="text-[11px] text-muted-foreground">
+              Custo estimado a partir dos tokens e da taxa informada — o provedor não devolve preço
+              por chamada. 0 = sem limite de custo.
+            </p>
+          </div>
         </div>
+
 
         <div className="space-y-1.5">
           <Label>Cenários (um por linha)</Label>

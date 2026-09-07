@@ -25,6 +25,7 @@ import {
   type Persona,
   type TurnoConversa,
 } from "@/lib/nina/simulador-terra";
+import { garantirPapel, PROVEDOR_IA } from "@/lib/nina/papeis-modelos";
 
 const GATEWAY = "https://ai.gateway.lovable.dev/v1/responses";
 
@@ -39,10 +40,14 @@ const personaSchema = z.object({
 
 const limitesSchema = z.object({
   maxTurnos: z.number().int().min(1).max(LIMITES_MAXIMOS.maxTurnos).default(8),
+  maxMensagens: z.number().int().min(2).max(LIMITES_MAXIMOS.maxMensagens).default(40),
   maxDuracaoS: z.number().int().min(30).max(LIMITES_MAXIMOS.maxDuracaoS).default(300),
   maxTokens: z.number().int().min(500).max(LIMITES_MAXIMOS.maxTokens).default(20000),
+  maxCustoCreditos: z.number().min(0).max(LIMITES_MAXIMOS.maxCustoCreditos).default(0),
+  creditosPorMilTokens: z.number().min(0).max(LIMITES_MAXIMOS.creditosPorMilTokens).default(0),
   timeoutS: z.number().int().min(10).max(LIMITES_MAXIMOS.timeoutS).default(60),
 });
+
 
 type Ctx = { supabase: any; userId: string };
 
@@ -62,7 +67,7 @@ async function carregarSimulacao(admin: any, clinicaId: string, id: string) {
   const { data, error } = await admin
     .from("nina_teste_simulacoes")
     .select(
-      "id, clinica_id, lead_id, ciclo_id, conversa_id, cenario, persona, status, turnos, input_tokens, output_tokens, max_turnos, max_duracao_s, max_tokens, timeout_s, created_at",
+      "id, clinica_id, lead_id, ciclo_id, conversa_id, cenario, persona, status, turnos, input_tokens, output_tokens, max_turnos, max_mensagens, max_duracao_s, max_tokens, max_custo_creditos, creditos_por_mil_tokens, timeout_s, created_at",
     )
     .eq("clinica_id", clinicaId)
     .eq("id", id)
@@ -100,7 +105,7 @@ async function chamarTerra(
       "X-Lovable-AIG-SDK": "fetch",
     },
     body: JSON.stringify({
-      model: MODELO_TERRA,
+      model: garantirPapel("paciente", MODELO_TERRA),
       instructions: instrucoes,
       input,
       stream: true,
@@ -203,12 +208,16 @@ export const iniciarSimulacaoTerra = createServerFn({ method: "POST" })
         lead_id: data.leadId,
         ciclo_id: (lead as any).ciclo_id ?? null,
         conversa_id: (lead as any).conversa_id ?? null,
-        modelo: MODELO_TERRA,
+        modelo: garantirPapel("paciente", MODELO_TERRA),
+        provedor: PROVEDOR_IA,
         cenario: data.cenario,
         persona: data.persona,
         max_turnos: limites.maxTurnos,
+        max_mensagens: limites.maxMensagens,
         max_duracao_s: limites.maxDuracaoS,
         max_tokens: limites.maxTokens,
+        max_custo_creditos: limites.maxCustoCreditos,
+        creditos_por_mil_tokens: limites.creditosPorMilTokens,
         timeout_s: limites.timeoutS,
         status: "executando",
         criado_por: context.userId,
@@ -233,8 +242,10 @@ export const controlarSimulacaoTerra = createServerFn({ method: "POST" })
           .enum([
             "objetivo_concluido",
             "limite_turnos",
+            "limite_mensagens",
             "limite_duracao",
             "limite_tokens",
+            "limite_custo",
             "transferencia",
             "erro",
             "timeout",
@@ -288,14 +299,29 @@ export const proximaMensagemTerra = createServerFn({ method: "POST" })
 
     const limites = normalizarLimites({
       maxTurnos: sim.max_turnos,
+      maxMensagens: sim.max_mensagens,
       maxDuracaoS: sim.max_duracao_s,
       maxTokens: sim.max_tokens,
+      maxCustoCreditos: Number(sim.max_custo_creditos ?? 0),
+      creditosPorMilTokens: Number(sim.creditos_por_mil_tokens ?? 0),
       timeoutS: sim.timeout_s,
     });
+
+    // Mensagens já trocadas na conversa do lead (paciente + Nina).
+    let mensagensConversa = 0;
+    if (sim.conversa_id) {
+      const { count } = await supabaseAdmin
+        .from("whatsapp_mensagens")
+        .select("id", { count: "exact", head: true })
+        .eq("clinica_id", data.clinicaId)
+        .eq("conversa_id", sim.conversa_id);
+      mensagensConversa = count ?? 0;
+    }
     const guarda = podeContinuar(
       {
         status: sim.status,
         turnos: sim.turnos,
+        mensagens: mensagensConversa,
         inputTokens: sim.input_tokens,
         outputTokens: sim.output_tokens,
         iniciadaEm: new Date(sim.created_at).getTime(),
@@ -415,7 +441,7 @@ export const simulacaoAtualTerra = createServerFn({ method: "POST" })
     const { data: linha } = await supabaseAdmin
       .from("nina_teste_simulacoes")
       .select(
-        "id, status, cenario, persona, turnos, max_turnos, max_duracao_s, max_tokens, timeout_s, input_tokens, output_tokens, motivo_fim, erro, modelo, created_at, finalizado_em",
+        "id, status, cenario, persona, turnos, max_turnos, max_mensagens, max_duracao_s, max_tokens, max_custo_creditos, creditos_por_mil_tokens, timeout_s, input_tokens, output_tokens, motivo_fim, erro, modelo, created_at, finalizado_em",
       )
       .eq("clinica_id", data.clinicaId)
       .eq("lead_id", data.leadId)

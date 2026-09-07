@@ -13,6 +13,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { garantirPapel } from "@/lib/nina/papeis-modelos";
 import {
   MODELO_SOL,
   VERSAO_RUBRICA,
@@ -57,7 +58,7 @@ async function chamarSol(
       "X-Lovable-AIG-SDK": "fetch",
     },
     body: JSON.stringify({
-      model: MODELO_SOL,
+      model: garantirPapel("avaliador", MODELO_SOL),
       instructions: instrucoes,
       input,
       stream: true,
