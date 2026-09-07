@@ -1099,9 +1099,30 @@ function Pagina() {
                       ? fmtDataSegundos(mensagens[it.mensagem_id]!.enviada_em!)
                       : "Data/hora da mensagem indisponível"}
                   </p>
+                  {/* Confiança do momento da resposta — snapshot gravado pelo
+                      motor, nunca recalculado nem estimado nesta tela. */}
+                  {(() => {
+                    const c = it.execucao_id ? confianca[it.execucao_id] : undefined;
+                    const ui = c ? CONFIANCA_UI[c.nivel] : undefined;
+                    return (
+                      <p className="text-[11px] text-muted-foreground">
+                        Confiança no momento da resposta:{" "}
+                        {c && ui ? (
+                          <span className={`rounded-full border px-1.5 py-0.5 ${ui.classe}`}>
+                            {c.score}% — {ui.curto}
+                          </span>
+                        ) : (
+                          <span className="rounded-full border border-border px-1.5 py-0.5">
+                            Não avaliada
+                          </span>
+                        )}
+                      </p>
+                    );
+                  })()}
                   <p className="text-[11px] text-muted-foreground">
-                    Reportado em: {fmtData(it.created_at)} · {pessoas[it.reportado_por] ?? "—"}
+                    Erro reportado: {fmtData(it.created_at)} · {pessoas[it.reportado_por] ?? "—"}
                   </p>
+
 
 
                   <p className="text-xs text-muted-foreground">
