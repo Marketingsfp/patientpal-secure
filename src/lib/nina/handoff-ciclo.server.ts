@@ -15,7 +15,8 @@
  * Conversas reais de produção não são tocadas por este módulo.
  */
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
-import { patchEncerrarCiclo } from "./ciclo-teste";
+import { divisorFimCiclo, patchEncerrarCiclo } from "./ciclo-teste";
+
 import { telefoneSessao } from "./teste-console.server";
 
 export type ResultadoHandoffCiclo = {
@@ -96,5 +97,18 @@ export async function encerrarCicloTestePorHandoff(args: {
     .eq("clinica_id", args.clinicaId)
     .eq("ciclo_id", cicloId);
 
+  // Divisor visual no histórico (só para leitura humana; não vai ao modelo).
+  try {
+    const { registrarMarcadorSistema } = await import("@/lib/atendimento/handoff.server");
+    await registrarMarcadorSistema({
+      clinicaId: args.clinicaId,
+      conversaId: args.conversaId,
+      texto: divisorFimCiclo(ciclo.sessao_seq, "handoff_humano"),
+    });
+  } catch (e) {
+    console.error("[handoff-ciclo] falha ao registrar divisor", e);
+  }
+
   return { encerrado: true, cicloId };
+
 }

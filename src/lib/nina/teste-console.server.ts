@@ -141,7 +141,21 @@ async function garantirCiclo(
       status: "ativa",
     })
     .eq("id", lead.id);
+
+  // Divisor visual de início de ciclo (só leitura humana; não vai ao modelo).
+  try {
+    const { divisorInicioCiclo } = await import("@/lib/nina/ciclo-teste");
+    const { registrarMarcadorSistema } = await import("@/lib/atendimento/handoff.server");
+    await registrarMarcadorSistema({
+      clinicaId,
+      conversaId: conversaId as string,
+      texto: divisorInicioCiclo(lead.sessao_seq),
+    });
+  } catch (e) {
+    console.error("[NINA_TESTE] falha ao registrar divisor de início", e);
+  }
   return { conversaId: conversaId as string, cicloId };
+
 }
 
 /** Teto de mensagens guardadas por lead de teste (todas as sessões somadas). */
