@@ -161,3 +161,58 @@ export function rotuloAutorResumo(autor: AutorResumo | null): string {
   if (autor === "atendente") return "Atendente";
   return "";
 }
+
+/**
+ * FASE 4 — ordenação estável por atividade recente.
+ *
+ * Usa exclusivamente `ultimaAtividadeEm` (última mensagem de CONVERSA). Evento
+ * técnico não reposiciona card. Empate/sem atividade cai no índice do lead,
+ * então a ordem nunca "dança" entre atualizações.
+ */
+export function ordenarPorAtividade<T extends { indice: number; ultimaAtividadeEm?: string | null }>(
+  leads: T[],
+): T[] {
+  return leads.slice().sort((a, b) => {
+    const ta = a.ultimaAtividadeEm ? new Date(a.ultimaAtividadeEm).getTime() : 0;
+    const tb = b.ultimaAtividadeEm ? new Date(b.ultimaAtividadeEm).getTime() : 0;
+    if (ta !== tb) return tb - ta;
+    return a.indice - b.indice;
+  });
+}
+
+/**
+ * FASE 4 — aplica UMA mensagem nova (realtime) ao resumo de um card, de forma
+ * idempotente: reprocessar a mesma `id` não conta duas vezes nem duplica a
+ * prévia. `souODono` indica se a conversa aberta é essa (aí não vira não lida).
+ */
+export function aplicarMensagemRealtime(
+  atual: {
+    ultimaMensagemId?: string | null;
+    ultimaMensagemTexto?: string | null;
+    ultimaMensagemAutor?: AutorResumo | null;
+    ultimaMensagemEm?: string | null;
+    ultimaAtividadeEm?: string | null;
+    mensagens?: number;
+    naoLidas?: number;
+  },
+  m: MensagemResumoRow,
+  opcoes: { jaAplicada: boolean; abertoAgora: boolean },
+) {
+  if (opcoes.jaAplicada) return atual;
+  const proximo = { ...atual, mensagens: Number(atual.mensagens ?? 0) + 1 };
+  if (!ehConversacional(m)) return proximo; // evento técnico: só entra no total
+  const autor = autorDaMensagem(m)!;
+  const maisNova =
+    !atual.ultimaMensagemEm ||
+    new Date(m.created_at).getTime() >= new Date(atual.ultimaMensagemEm).getTime();
+  if (maisNova) {
+    proximo.ultimaMensagemId = m.id;
+    proximo.ultimaMensagemTexto = previaTexto(m.body ?? "");
+    proximo.ultimaMensagemAutor = autor;
+    proximo.ultimaMensagemEm = m.created_at;
+    proximo.ultimaAtividadeEm = m.created_at;
+  }
+  if (autor !== "paciente" && !opcoes.abertoAgora)
+    proximo.naoLidas = Number(atual.naoLidas ?? 0) + 1;
+  return proximo;
+}
