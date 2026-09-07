@@ -212,6 +212,25 @@ export async function contextoClinicaTexto(
 }
 
 /** Instruções da Nina + base de dados da clínica. */
+/**
+ * FASE 4 — versão de runtime: usa a versão PUBLICADA das "Instruções da Nina"
+ * (escopo painel_interno). Snapshot por execução; cai para o texto do código
+ * se a versão publicada não puder ser carregada (nunca prompt vazio).
+ */
+export async function systemPromptNinaRuntime(contextoTexto: string, modoVoz?: boolean) {
+  const { promptInstrucoes } = await import("@/lib/nina/instrucoes-runtime.server");
+  const fallback = systemPromptNina(contextoTexto, false);
+  const snap = await promptInstrucoes(
+    "painel_interno",
+    { "${contextoTexto}": contextoTexto },
+    fallback,
+  );
+  const voz = modoVoz
+    ? `\n\n=== MODO CONVERSA POR VOZ ===\nA resposta será lida em voz alta. Comece a responder imediatamente pela informação principal, em no máximo 2 frases curtas, em texto corrido, sem listas, sem tabelas, sem markdown e sem repetir a pergunta.`
+    : "";
+  return snap.texto + voz;
+}
+
 export function systemPromptNina(contextoTexto: string, modoVoz?: boolean) {
   const base = `Você é a Nina, assistente virtual interna da clínica, falando com a EQUIPE autenticada (gestão/recepção/médicos). Responda SEMPRE em português do Brasil, de forma curta, direta e amigável.
 
