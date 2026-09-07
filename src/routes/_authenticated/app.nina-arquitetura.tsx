@@ -21,6 +21,11 @@ import { capacidadesArquitetura } from "@/lib/nina/arquitetura/permissoes.functi
 import { nivelAcessoDe, podeArquitetura } from "@/lib/nina/arquitetura/permissoes";
 import { NODES_ARQUITETURA } from "@/lib/nina/arquitetura/manifesto";
 import { statusArquitetura } from "@/lib/nina/arquitetura/layout-incremental";
+import {
+  HISTORICO_ARQUITETURA,
+  comparacaoRecente,
+  destaquesDaComparacao,
+} from "@/lib/nina/arquitetura/versoes";
 
 export const Route = createFileRoute("/_authenticated/app/nina-arquitetura")({
   head: () => ({
@@ -46,7 +51,7 @@ export const Route = createFileRoute("/_authenticated/app/nina-arquitetura")({
 function Pagina() {
   const { clinicaAtual } = useClinica();
   const clinicaId = clinicaAtual?.clinica_id ?? null;
-  const [modo, setModo] = useState<"arquitetura" | "execucao">("arquitetura");
+  const [modo, setModo] = useState<"arquitetura" | "execucao" | "alteracoes">("arquitetura");
 
   const buscarCapacidades = useServerFn(capacidadesArquitetura);
   const { data: permissao } = useQuery({
@@ -61,6 +66,8 @@ function Pagina() {
   const nivelAcesso = nivelAcessoDe(capacidades);
   const chavePosicoes = `nina-arquitetura-posicoes:${clinicaId ?? "sem-clinica"}`;
   const status = statusArquitetura(NODES_ARQUITETURA);
+  const comparacao = comparacaoRecente();
+  const marcasAlteracao = destaquesDaComparacao(comparacao);
   const sinal =
     status.cor === "verde" ? "🟢" : status.cor === "amarelo" ? "🟡" : "🔴";
 
@@ -115,6 +122,7 @@ function Pagina() {
         <TabsList>
           <TabsTrigger value="arquitetura">Arquitetura</TabsTrigger>
           <TabsTrigger value="execucao">Execução</TabsTrigger>
+          <TabsTrigger value="alteracoes">Alterações</TabsTrigger>
         </TabsList>
 
         <TabsContent value="arquitetura" className="mt-4">
@@ -128,9 +136,14 @@ function Pagina() {
                 chavePosicoes={chavePosicoes}
                 clinicaId={clinicaId}
                 nivelAcesso={nivelAcesso}
+                marcasAlteracao={marcasAlteracao}
               />
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="alteracoes" className="mt-4">
+          <PainelAlteracoes />
         </TabsContent>
 
         <TabsContent value="execucao" className="mt-4">
@@ -154,6 +167,143 @@ function Pagina() {
           </Card>
         </TabsContent>
       </Tabs>
+    </div>
+  );
+}
+
+function PainelAlteracoes() {
+  const comparacao = comparacaoRecente();
+
+  if (!comparacao) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Alterações da arquitetura</CardTitle>
+        </CardHeader>
+        <CardContent className="text-sm text-muted-foreground">
+          Existe apenas uma versão registrada — ainda não há comparação disponível.
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const { de, para, nodes, conexoes, nomes } = comparacao;
+  const nome = (id: string) => nomes[id] ?? id;
+
+  return (
+    <div className="space-y-4">
+      <Card>
+        <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2">
+          <CardTitle className="text-base">
+            Arquitetura v{de.versao} → Arquitetura v{para.versao}
+          </CardTitle>
+          <Badge variant="outline">{comparacao.resumo}</Badge>
+        </CardHeader>
+        <CardContent className="space-y-4 text-sm">
+          <section>
+            <h3 className="mb-1 font-medium">Adicionado</h3>
+            {nodes.adicionados.length === 0 ? (
+              <p className="text-muted-foreground">Nada adicionado.</p>
+            ) : (
+              <ul className="space-y-0.5">
+                {nodes.adicionados.map((id) => (
+                  <li key={id} className="text-foreground">
+                    <span className="font-mono text-xs text-muted-foreground">+</span> {nome(id)}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+
+          <section>
+            <h3 className="mb-1 font-medium">Alterado</h3>
+            {nodes.alterados.length === 0 ? (
+              <p className="text-muted-foreground">Nada alterado.</p>
+            ) : (
+              <ul className="space-y-0.5">
+                {nodes.alterados.map((m) => (
+                  <li key={m.id} className="text-foreground">
+                    <span className="font-mono text-xs text-muted-foreground">~</span> {nome(m.id)}{" "}
+                    <span className="text-xs text-muted-foreground">({m.campos.join(", ")})</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+
+          <section>
+            <h3 className="mb-1 font-medium">Removido</h3>
+            {nodes.removidos.length === 0 ? (
+              <p className="text-muted-foreground">Nada removido.</p>
+            ) : (
+              <ul className="space-y-0.5">
+                {nodes.removidos.map((id) => (
+                  <li key={id} className="text-foreground">
+                    <span className="font-mono text-xs text-muted-foreground">-</span> {nome(id)}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+
+          <section>
+            <h3 className="mb-1 font-medium">Conexões</h3>
+            {conexoes.adicionadas.length === 0 && conexoes.removidas.length === 0 ? (
+              <p className="text-muted-foreground">Nenhuma ligação mudou.</p>
+            ) : (
+              <ul className="space-y-0.5">
+                {conexoes.adicionadas.map((c) => (
+                  <li key={`a-${c.de}-${c.para}`}>
+                    <span className="font-mono text-xs text-muted-foreground">+</span> {nome(c.de)}{" "}
+                    → {nome(c.para)}
+                  </li>
+                ))}
+                {conexoes.removidas.map((c) => (
+                  <li key={`r-${c.de}-${c.para}`}>
+                    <span className="font-mono text-xs text-muted-foreground">-</span> {nome(c.de)}{" "}
+                    → {nome(c.para)}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Versões registradas</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3 text-sm">
+          {[...HISTORICO_ARQUITETURA].reverse().map((v) => (
+            <div key={v.versao} className="rounded-lg border p-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="font-medium">Arquitetura v{v.versao}</span>
+                <Badge variant="outline">{v.data}</Badge>
+                <span className="text-xs text-muted-foreground">
+                  {v.quantidadeNodes} componentes · {v.quantidadeTools} ferramentas
+                </span>
+              </div>
+              <ul className="mt-2 space-y-0.5 text-xs text-muted-foreground">
+                <li>Publicação: {v.deploy ?? "não publicada"}</li>
+                <li>Commit: {v.commit ?? "não registrado"}</li>
+                <li>Versão do prompt: {v.versaoPrompt ?? "não registrada"}</li>
+                <li>Modelo: {v.modelo ?? "não registrado"}</li>
+              </ul>
+              <ul className="mt-2 list-disc space-y-0.5 pl-4 text-sm">
+                {v.alteracoes.map((linha) => (
+                  <li key={linha}>{linha}</li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </CardContent>
+      </Card>
+
+      <p className="text-xs text-muted-foreground">
+        Mover ou reorganizar componentes no mapa muda apenas o desenho e não cria uma versão nova
+        da arquitetura.
+      </p>
     </div>
   );
 }
