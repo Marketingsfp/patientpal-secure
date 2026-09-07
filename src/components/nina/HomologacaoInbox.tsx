@@ -325,6 +325,35 @@ export function HomologacaoInbox() {
   );
 
   /**
+   * FASE 3 — leitura individual dos leads de teste.
+   *
+   * Só marca como lido quando o testador abriu o lead E as mensagens estão
+   * realmente na tela (aba visível). Prefetch, cache, hover ou recarga em
+   * segundo plano não zeram o contador. A gravação é por usuário — a leitura
+   * de um testador não interfere na de outro nem nos pacientes reais.
+   */
+  const marcadoRef = useRef<string>("");
+  useEffect(() => {
+    if (!clinicaId || !leadId || !conversaId) return;
+    if (carregandoConversa) return;
+    if (typeof document !== "undefined" && document.visibilityState !== "visible") return;
+    const ultima = msgs[msgs.length - 1];
+    if (!ultima) return;
+    const chave = `${conversaId}:${ultima.id}`;
+    if (marcadoRef.current === chave) return;
+    marcadoRef.current = chave;
+    void (async () => {
+      try {
+        await marcarLido({ data: { clinicaId, conversaId, mensagemId: ultima.id } });
+        setLeads((ls) => ls.map((l) => (l.id === leadId ? { ...l, naoLidas: 0 } : l)));
+      } catch {
+        marcadoRef.current = ""; // falhou: tenta de novo na próxima visualização
+      }
+    })();
+  }, [clinicaId, leadId, conversaId, msgs, carregandoConversa, marcarLido]);
+
+
+  /**
    * Rede de segurança: a resposta da Nina é gravada no banco pelo servidor,
    * mesmo que a chamada do navegador caia. Buscamos o histórico algumas vezes
    * até a resposta aparecer — assim nenhuma mensagem "some" da tela.
