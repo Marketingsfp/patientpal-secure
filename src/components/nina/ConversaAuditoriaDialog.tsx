@@ -21,17 +21,15 @@ import { Badge } from "@/components/ui/badge";
 import { useServerFn } from "@tanstack/react-start";
 import { lerConversaAuditoria } from "@/lib/nina/feedback-conversa.functions";
 import { ConversationSystemEvent, type ConversaEvento } from "./ConversationSystemEvent";
+import {
+  autorDe,
+  curto,
+  fmtHora,
+  localizarMensagem,
+  montarTimeline,
+  type MensagemAuditoria as Mensagem,
+} from "@/lib/nina/conversa-auditoria";
 
-type Mensagem = {
-  id: string;
-  direction: string | null;
-  body: string | null;
-  tipo: string | null;
-  enviada_por: string | null;
-  recebida_em: string;
-  media_url: string | null;
-  media_mime: string | null;
-};
 
 type Dados = {
   conversa: {
