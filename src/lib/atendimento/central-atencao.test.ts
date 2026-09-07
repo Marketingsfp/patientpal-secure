@@ -13,7 +13,7 @@ describe("Central de Atenção", () => {
 
   it("Caso 2 — conversa não atribuída ativa o alerta", () => {
     const r = calcularAtencao({
-      naoAtribuidas: [{ id: "a", contato_nome: "João Silva" }],
+      naoAtribuidas: [{ id: "a", contato_nome: "João Silva", handoff_motivo: "sem atendente online" }],
       espera: {},
       agora: AGORA,
     });
@@ -43,7 +43,7 @@ describe("Central de Atenção", () => {
 
   it("Caso 6 — não atribuída + crítica conta uma vez só", () => {
     const r = calcularAtencao({
-      naoAtribuidas: [{ id: "x", contato_nome: "Maria" }],
+      naoAtribuidas: [{ id: "x", contato_nome: "Maria", handoff_motivo: "sem atendente online" }],
       espera: { x: haMin(17) },
       agora: AGORA,
     });
@@ -70,7 +70,7 @@ describe("Central de Atenção", () => {
 
   it("prioriza não atribuídas e maiores esperas na lista", () => {
     const r = calcularAtencao({
-      naoAtribuidas: [{ id: "n", contato_nome: "Sem dono" }],
+      naoAtribuidas: [{ id: "n", contato_nome: "Sem dono", handoff_motivo: "sem atendente online" }],
       espera: { k: haMin(20), j: haMin(6) },
       agora: AGORA,
     });
@@ -79,7 +79,11 @@ describe("Central de Atenção", () => {
 
   it("rótulo acessível descreve as categorias", () => {
     const r = calcularAtencao({
-      naoAtribuidas: [{ id: "a" }, { id: "b" }, { id: "c" }],
+      naoAtribuidas: [
+        { id: "a", handoff_motivo: "handoff" },
+        { id: "b", handoff_motivo: "handoff" },
+        { id: "c", handoff_motivo: "handoff" },
+      ],
       espera: { d: haMin(30), e: haMin(40), f: haMin(50), g: haMin(60) },
       agora: AGORA,
     });
@@ -87,5 +91,28 @@ describe("Central de Atenção", () => {
     expect(rotuloCentral(r)).toBe(
       "Central de Atenção. 7 conversas precisam de atenção. 3 não atribuídas e 4 com tempo de espera crítico.",
     );
+  });
+
+  it("FASE 3 — sem handoff registrado não é 'Não atribuída'", () => {
+    const r = calcularAtencao({
+      naoAtribuidas: [{ id: "z", contato_nome: "Aberta manualmente" }],
+      espera: {},
+      agora: AGORA,
+    });
+    expect(r.naoAtribuidas).toBe(0);
+    expect(r.total).toBe(0);
+  });
+
+  it("FASE 3 — lista por categoria dentro da própria Central", () => {
+    const r = calcularAtencao({
+      naoAtribuidas: [{ id: "n", contato_nome: "Sem dono", handoff_motivo: "handoff" }],
+      espera: { k: haMin(20), j: haMin(6) },
+      agora: AGORA,
+      limiteItens: 200,
+    });
+    expect(itensDaCategoria(r.itens, "nao_atribuida").map((i) => i.id)).toEqual(["n"]);
+    expect(itensDaCategoria(r.itens, "critica").map((i) => i.id)).toEqual(["k"]);
+    expect(itensDaCategoria(r.itens, "aguardando").map((i) => i.id)).toEqual(["k", "j"]);
+    expect(itensDaCategoria(r.itens, null).length).toBe(3);
   });
 });
