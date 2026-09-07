@@ -237,7 +237,7 @@ async function ferramentaConfiabilidade(context: Contexto, clinicaId: string, ar
   const listaTexto = (v: unknown) => (Array.isArray(v) ? v.map((x) => String(x)) : []);
 
   const linhas: import("@/lib/nina/confidence/metricas").LinhaDecisaoMetrica[] = (rows ?? []).map(
-    (raw) => {
+    (raw: unknown) => {
       const r = raw as Record<string, unknown>;
       const created = String(r["created_at"] ?? "");
       const bloqueio = r["bloqueio"] ? [String(r["bloqueio"])] : [];
@@ -275,7 +275,7 @@ async function ferramentaConfiabilidade(context: Contexto, clinicaId: string, ar
   );
 
   const erros: import("@/lib/nina/confidence/metricas").ErroReportado[] = (errosRows ?? []).map(
-    (raw) => {
+    (raw: unknown) => {
       const e = raw as Record<string, unknown>;
       return {
         id: String(e["id"] ?? ""),
