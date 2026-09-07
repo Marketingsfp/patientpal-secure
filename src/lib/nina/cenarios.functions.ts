@@ -16,6 +16,7 @@ import {
   distribuirCenarios,
   type Criterio,
 } from "@/lib/nina/cenarios";
+import { criteriosDeHandoff, verificarHandoff } from "./handoff-assertions";
 import {
   aplicarRegraHandoff,
   desfechoDoItem,
@@ -557,7 +558,61 @@ export const finalizarItemExecucao = createServerFn({ method: "POST" })
       turnosUsados: data.turnosUsados ?? (sim as any)?.turnos ?? 0,
       maxTurnos: Number((item as any).cenario_snapshot?.max_turnos ?? 0),
     });
-    const { resultado, avaliados } = aplicarRegraHandoff(base, { desfecho, esperado });
+    let { resultado, avaliados } = aplicarRegraHandoff(base, { desfecho, esperado });
+
+    // FASE 5 — assertions determinísticas de handoff (verificadas pelo sistema,
+    // nunca pelo avaliador de IA). Só se aplicam quando o cenário espera handoff.
+    let verificacaoHandoff: ReturnType<typeof verificarHandoff> | null = null;
+    if (esperado === true && conversaId) {
+      const { data: convFim } = await supabaseAdmin
+        .from("atend_conversas")
+        .select("protocolo_atendimento, departamento_id")
+        .eq("clinica_id", data.clinicaId)
+        .eq("id", conversaId)
+        .maybeSingle();
+      const protocolo = (convFim as any)?.protocolo_atendimento ?? null;
+
+      const { data: eventos } = await supabaseAdmin
+        .from("atend_conversa_eventos")
+        .select("detalhes")
+        .eq("clinica_id", data.clinicaId)
+        .eq("conversa_id", conversaId);
+      const numeros = new Set<string>();
+      for (const e of (eventos ?? []) as any[]) {
+        const n = e?.detalhes?.protocol_number;
+        if (typeof n === "string" && n.trim()) numeros.add(n.trim());
+      }
+      if (protocolo) numeros.add(String(protocolo).trim());
+
+      let cicloStatus: string | null = null;
+      let cicloEndReason: string | null = null;
+      let memoryResetAt: string | null = null;
+      if (cicloId) {
+        const { data: c } = await supabaseAdmin
+          .from("nina_teste_ciclos")
+          .select("status, end_reason, memory_reset_at")
+          .eq("clinica_id", data.clinicaId)
+          .eq("id", cicloId)
+          .maybeSingle();
+        cicloStatus = (c as any)?.status ?? null;
+        cicloEndReason = (c as any)?.end_reason ?? null;
+        memoryResetAt = (c as any)?.memory_reset_at ?? null;
+      }
+
+      verificacaoHandoff = verificarHandoff({
+        transferida,
+        protocolo,
+        protocolosDistintos: numeros.size,
+        mensagensSaida: respostasNina,
+        cicloStatus,
+        cicloEndReason,
+        memoryResetAt,
+      });
+      avaliados = [...avaliados, ...criteriosDeHandoff(verificacaoHandoff)];
+      if (resultado !== "inconclusivo") {
+        resultado = avaliados.every((a) => a.ok) ? "aprovado" : "reprovado";
+      }
+    }
 
     const agora = new Date().toISOString();
     await supabaseAdmin
