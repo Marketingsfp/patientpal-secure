@@ -173,31 +173,42 @@ export function ConversaAuditoriaDialog({
                 }
                 const m = item.msg;
                 const out = m.direction === "out";
+                const destacada = mensagemId === m.id;
+                const autor = autorDe(m, dados.conversa.atendente_nome);
                 if (m.enviada_por === "sistema") {
                   return (
-                    <div key={m.id} className="flex justify-center">
+                    <div
+                      key={m.id}
+                      ref={destacada ? alvoRef : undefined}
+                      data-msg-id={m.id}
+                      className={`flex justify-center ${
+                        destacada ? "rounded-xl bg-destructive/10 px-1 py-1 ring-2 ring-destructive" : ""
+                      }`}
+                    >
                       <div className="max-w-[85%] whitespace-pre-wrap rounded-lg border border-atd-blue/20 bg-atd-blue-tint px-3 py-2 text-center text-xs text-atd-blue-ink">
+                        <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide opacity-80">
+                          Sistema
+                        </div>
                         {m.body}
                         <div className="mt-1 text-[10px] opacity-70">{fmtHora(m.recebida_em)}</div>
                       </div>
                     </div>
                   );
                 }
-                const destacada = mensagemId === m.id;
                 return (
                   <div
                     key={m.id}
                     ref={destacada ? alvoRef : undefined}
                     data-msg-id={m.id}
-                    className={`flex items-start gap-2 ${out ? "justify-end" : "justify-start"} ${
+                    className={`flex flex-col gap-1 ${out ? "items-end" : "items-start"} ${
                       destacada
                         ? "rounded-xl bg-destructive/10 px-1 py-1 ring-2 ring-destructive"
                         : ""
                     }`}
                   >
                     {destacada && (
-                      <span className="self-center rounded bg-destructive px-1.5 py-0.5 text-[10px] font-medium text-destructive-foreground">
-                        Mensagem reportada
+                      <span className="inline-flex items-center gap-1 rounded bg-destructive px-1.5 py-0.5 text-[10px] font-medium text-destructive-foreground">
+                        <AlertTriangle className="h-3 w-3" aria-hidden="true" /> MENSAGEM REPORTADA
                       </span>
                     )}
                     <div
@@ -207,6 +218,11 @@ export function ConversaAuditoriaDialog({
                           : "rounded-bl-sm border border-atd-border bg-atd-surface text-atd-ink"
                       }`}
                     >
+                      <div
+                        className={`mb-1 text-[11px] font-semibold ${out ? "text-atd-on-strong/90" : "text-atd-ink-soft"}`}
+                      >
+                        {autor}
+                      </div>
                       {m.media_url && (
                         <a
                           href={m.media_url}
@@ -221,7 +237,7 @@ export function ConversaAuditoriaDialog({
                       <div
                         className={`mt-1 text-[11px] ${out ? "text-atd-on-strong/80" : "text-atd-ink-soft"}`}
                       >
-                        {fmtHora(m.recebida_em)} {m.enviada_por === "nina" && "· Nina"}
+                        {fmtHora(m.recebida_em)}
                       </div>
                     </div>
                   </div>
