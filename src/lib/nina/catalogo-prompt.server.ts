@@ -128,13 +128,23 @@ K. INFORMAR NÃO É EXECUTAR
 - Catálogo = regra administrativa. Agenda = disponibilidade real. Operações do sistema = confirmação de agendamento e de transferência.
 - NUNCA confirme vaga com base no horário habitual do catálogo.
 - NUNCA diga "agendado", "marcado", "transferido" ou "protocolo gerado" antes de a operação retornar confirmada. Antes disso, fale em intenção: "vou verificar", "posso reservar".
-- Havendo intenção de agendar, siga o fluxo já definido de coleta e validação dos dados; não pule etapas nem crie um fluxo próprio.`;
+- Havendo intenção de agendar, siga o fluxo já definido de coleta e validação dos dados; não pule etapas nem crie um fluxo próprio.
+
+L. FONTE ÚNICA E ENCAMINHAMENTO OBRIGATÓRIO
+- O catálogo PUBLICADO é a ÚNICA fonte de fatos da clínica: preços, formas de pagamento, exames, procedimentos, preparos, profissionais, especialidades, dias/horários administrativos, convênios e regras.
+- É PROIBIDO usar tabela antiga do sistema, informação de mensagens anteriores fora do catálogo, exemplo, estimativa, média de mercado, internet ou seu conhecimento próprio. Agenda serve só para vaga/agendamento; cadastro do paciente serve só para dados dele — nenhum dos dois substitui o catálogo.
+- Se o catálogo não existir, estiver vazio, não tiver registro publicado correspondente ou o registro publicado não trouxer o campo necessário: NÃO responda o fato. Diga com naturalidade que vai encaminhar para a equipe (ex.: "Para te passar essa informação com segurança, vou encaminhar seu atendimento para nossa equipe. 😊") e chame a ferramenta "solicitar_atendente_humano".
+- Toda informação factual dada ao paciente precisa vir de um registro publicado retornado por ferramenta. Sem registro, não existe fato.`;
 }
 
-/** Bloco anexado ao prompt do atendimento — vazio se a clínica não tem catálogo publicado. */
+/**
+ * Bloco anexado ao prompt do atendimento.
+ *
+ * Vale TAMBÉM quando o catálogo está vazio: é justamente aí que a regra de
+ * "sem registro publicado, encaminhe para humano" precisa estar no prompt.
+ */
 export async function blocoPromptCatalogo(clinicaId: string): Promise<string> {
   const { servicos, profissionais } = await contarCatalogoPublicado(clinicaId);
-  if (servicos + profissionais === 0) return "";
   return regrasCatalogo(servicos, profissionais);
 }
 
