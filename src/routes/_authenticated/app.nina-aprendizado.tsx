@@ -166,7 +166,26 @@ type Item = {
   knowledge_status: string | null;
   grupo_chave: string | null;
   grupo_titulo: string | null;
+  /** Execução da Nina que produziu a resposta — chave do snapshot de confiança. */
+  execucao_id?: string | null;
 };
+
+/** Rótulo/estilo do nível de confiança registrado no momento da resposta. */
+const CONFIANCA_UI: Record<string, { curto: string; classe: string }> = {
+  HIGH: { curto: "Alta", classe: "border-emerald-500/30 text-emerald-700 dark:text-emerald-300" },
+  MEDIUM: { curto: "Média", classe: "border-amber-500/30 text-amber-700 dark:text-amber-400" },
+  LOW: { curto: "Baixa", classe: "border-destructive/30 text-destructive" },
+};
+
+const FILTROS_CONFIANCA = [
+  { valor: "todas", rotulo: "Todas" },
+  { valor: "HIGH", rotulo: "Alta" },
+  { valor: "MEDIUM", rotulo: "Média" },
+  { valor: "LOW", rotulo: "Baixa" },
+  { valor: "sem", rotulo: "Não avaliada" },
+  { valor: "90", rotulo: "90% ou mais" },
+  { valor: "95", rotulo: "95% ou mais" },
+];
 
 type Comparacao = {
   knowledge_status: "found" | "not_found" | "conflict";
