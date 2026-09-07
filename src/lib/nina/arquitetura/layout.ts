@@ -214,6 +214,25 @@ export function calcularLayout(
     }
   }
 
+  // Mantém nodes do mesmo domínio funcional vizinhos dentro da coluna, sem
+  // desfazer a ordem por baricentro (usa a média do grupo como critério).
+  for (const chave of chaves) {
+    const lista = colunas.get(chave)!;
+    const grupos = new Map<CategoriaArquitetura, NodeArquitetura[]>();
+    for (const node of lista) {
+      const atual = grupos.get(node.categoria) ?? [];
+      atual.push(node);
+      grupos.set(node.categoria, atual);
+    }
+    const media = (itens: NodeArquitetura[]) =>
+      itens.reduce((soma, n) => soma + (ordem.get(n.id) ?? 0), 0) / Math.max(itens.length, 1);
+    const ordenados = [...grupos.values()]
+      .sort((a, b) => media(a) - media(b))
+      .flat();
+    lista.splice(0, lista.length, ...ordenados);
+    lista.forEach((node, indice) => ordem.set(node.id, indice));
+  }
+
   // Linha de cada node dentro da coluna, deslocada para alinhar o caminho
   // principal em uma faixa central comum a todas as colunas.
   const linhas = new Map<string, number>();
@@ -234,6 +253,7 @@ export function calcularLayout(
         node,
         coluna: chave,
         linha: Math.round(linha),
+        principal: principal.has(node.id),
         x: salva ? salva.x : MARGEM + chave * ESPACO_COLUNA,
         y: salva ? salva.y : MARGEM + linha * ESPACO_LINHA,
       });
@@ -246,7 +266,71 @@ export function calcularLayout(
   ) + MARGEM;
   const altura = Math.max(...posicionados.map((p) => p.y + ALTURA_NODE), ALTURA_NODE) + MARGEM;
 
-  return { nodes: posicionados, arestas, largura, altura };
+  return {
+    nodes: posicionados,
+    arestas,
+    largura,
+    altura,
+    grupos: calcularGrupos(posicionados),
+  };
+}
+
+/**
+ * Agrupamentos visuais discretos: reúne nodes da mesma categoria que já
+ * ficaram próximos no desenho. É apenas moldura de leitura — não altera
+ * conexões, ordem de execução nem nada do backend.
+ */
+export function calcularGrupos(posicionados: NodePosicionado[]): GrupoVisual[] {
+  const PADDING = 16;
+  const grupos: GrupoVisual[] = [];
+
+  const porCategoria = new Map<CategoriaArquitetura, NodePosicionado[]>();
+  for (const item of posicionados) {
+    const lista = porCategoria.get(item.node.categoria) ?? [];
+    lista.push(item);
+    porCategoria.set(item.node.categoria, lista);
+  }
+
+  for (const [categoria, itens] of porCategoria) {
+    // Clusteriza por proximidade (mesma coluna ou coluna vizinha e linhas próximas).
+    const restantes = [...itens];
+    while (restantes.length > 0) {
+      const cluster = [restantes.shift()!];
+      let cresceu = true;
+      while (cresceu) {
+        cresceu = false;
+        for (let i = restantes.length - 1; i >= 0; i -= 1) {
+          const candidato = restantes[i]!;
+          const perto = cluster.some(
+            (membro) =>
+              Math.abs(membro.x - candidato.x) <= ESPACO_COLUNA + 1 &&
+              Math.abs(membro.y - candidato.y) <= ESPACO_LINHA * 1.5,
+          );
+          if (perto) {
+            cluster.push(candidato);
+            restantes.splice(i, 1);
+            cresceu = true;
+          }
+        }
+      }
+      if (cluster.length < 2) continue;
+      const x = Math.min(...cluster.map((c) => c.x)) - PADDING;
+      const y = Math.min(...cluster.map((c) => c.y)) - PADDING - 18;
+      const x2 = Math.max(...cluster.map((c) => c.x + LARGURA_NODE)) + PADDING;
+      const y2 = Math.max(...cluster.map((c) => c.y + ALTURA_NODE)) + PADDING;
+      grupos.push({
+        id: `${categoria}-${cluster.map((c) => c.node.id).sort()[0]}`,
+        categoria,
+        x,
+        y,
+        largura: x2 - x,
+        altura: y2 - y,
+        nodes: cluster.map((c) => c.node.id),
+      });
+    }
+  }
+
+  return grupos.sort((a, b) => b.largura * b.altura - a.largura * a.altura);
 }
 
 /** Escala e deslocamento para caber todo o desenho na área visível. */
