@@ -150,11 +150,13 @@ async function montarDossie(
     .select("created_at, dados_depois")
     .eq("clinica_id", clinicaId)
     .eq("action", "NINA_TOOL")
+    // Filtra pela conversa no próprio banco: com muitos testes, buscar as
+    // últimas linhas e filtrar em memória perdia chamadas reais.
+    .eq("dados_depois->>conversa_id", conversaId)
     .order("created_at", { ascending: false })
-    .limit(300);
+    .limit(120);
 
   const ferramentas: FerramentaDossie[] = ((linhasTool ?? []) as any[])
-    .filter((l) => l?.dados_depois?.conversa_id === conversaId)
     .map((l) => {
       const d = l.dados_depois ?? {};
       const entrada = d.entrada ?? {};
