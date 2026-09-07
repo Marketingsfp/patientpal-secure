@@ -125,6 +125,87 @@ export function origemAgendamentoNina(ctx: CtxNinaPaciente): string {
   return ctx.origem === "whatsapp" ? "nina_whatsapp" : "nina_chat_interno";
 }
 
+/**
+ * Paciente SINTÉTICO do lead de homologação.
+ *
+ * Na homologação nenhum cadastro real é lido, criado ou vinculado: cada lead de
+ * teste tem um paciente próprio, marcado como dado de teste (`is_mock_data` e
+ * `teste`), reaproveitado a cada ciclo do mesmo lead. Isso garante que agenda,
+ * "meus agendamentos" e qualquer ferramenta que dependa do paciente enxerguem
+ * apenas registros de teste — e nunca os dados de um paciente real.
+ */
+async function pacienteSinteticoDoLead(
+  ctx: CtxNinaPaciente,
+  nomeInformado: string,
+): Promise<{ id: string; nome: string } | null> {
+  try {
+    const telefone = ctx.telefone ?? "";
+    const { data: lead } = await supabaseAdmin
+      .from("nina_teste_leads")
+      .select("id, indice, paciente_teste_id")
+      .eq("clinica_id", ctx.clinicaId)
+      .eq("telefone_sessao", telefone)
+      .maybeSingle();
+    const indice = (lead as { indice?: number } | null)?.indice ?? 0;
+    const nome = `[TESTE NINA] Paciente Teste ${String(indice || 0).padStart(2, "0")}`;
+
+    const existenteId = (lead as { paciente_teste_id?: string | null } | null)?.paciente_teste_id;
+    if (existenteId) {
+      const { data: pac } = await supabaseAdmin
+        .from("pacientes")
+        .select("id, nome, is_mock_data")
+        .eq("id", existenteId)
+        .eq("clinica_id", ctx.clinicaId)
+        .maybeSingle();
+      const p = pac as { id: string; nome: string; is_mock_data: boolean } | null;
+      if (p?.is_mock_data) return { id: p.id, nome: p.nome };
+    }
+
+    // Reaproveita o paciente de teste já criado para este telefone virtual.
+    const { data: achado } = await supabaseAdmin
+      .from("pacientes")
+      .select("id, nome")
+      .eq("clinica_id", ctx.clinicaId)
+      .eq("is_mock_data", true)
+      .eq("telefone", telefone)
+      .maybeSingle();
+    let pacienteId = (achado as { id: string } | null)?.id ?? null;
+    let pacienteNome = (achado as { nome: string } | null)?.nome ?? nome;
+
+    if (!pacienteId) {
+      const { data: criado, error } = await supabaseAdmin
+        .from("pacientes")
+        .insert({
+          clinica_id: ctx.clinicaId,
+          nome,
+          telefone,
+          is_mock_data: true,
+          teste: true,
+          observacoes: `Paciente sintético da homologação da Nina (lead ${indice}). Nome informado no teste: ${nomeInformado.slice(0, 60)}`,
+        } as never)
+        .select("id, nome")
+        .maybeSingle();
+      if (error) throw new Error(error.message);
+      pacienteId = (criado as { id: string } | null)?.id ?? null;
+      pacienteNome = (criado as { nome: string } | null)?.nome ?? nome;
+    }
+    if (!pacienteId) return null;
+
+    const leadId = (lead as { id?: string } | null)?.id;
+    if (leadId && existenteId !== pacienteId) {
+      await supabaseAdmin
+        .from("nina_teste_leads")
+        .update({ paciente_teste_id: pacienteId } as never)
+        .eq("id", leadId);
+    }
+    return { id: pacienteId, nome: pacienteNome };
+  } catch (e) {
+    console.error("[nina-tools] paciente sintético de homologação", e);
+    return null;
+  }
+}
+
+
 /* ------------------------------------------------------------------ auditoria */
 
 /**
