@@ -43,7 +43,7 @@ async function lerConversa(clinicaId: string, conversaId: string) {
   const { data } = await supabaseAdmin
     .from("atend_conversas")
     .select(
-      "protocolo_atendimento, protocolo_sessao_id, handoff_em, contato_telefone, is_teste, nina_fluxo_estado",
+      "protocolo_atendimento, protocolo_sessao_id, handoff_em, contato_telefone, contato_nome, departamento_id, is_teste, nina_fluxo_estado",
     )
     .eq("id", conversaId)
     .eq("clinica_id", clinicaId)
