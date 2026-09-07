@@ -97,3 +97,87 @@ export const resumoConfiancaNina = createServerFn({ method: "POST" })
       })),
     };
   });
+
+// ------------------------------------------------ FASE 5: explicabilidade
+
+import {
+  ROTULO_NIVEL,
+  ROTULO_RESULTADO,
+  linhasConfiabilidade,
+  type LinhaConfiabilidade,
+  type ResultadoFinalAuditoria,
+} from "./confidence/auditoria";
+import type { NivelConfianca } from "./confidence/types";
+
+export type ConfiabilidadeDecisaoView = {
+  score: number;
+  nivel: string;
+  resultado: string;
+  intencao: string | null;
+  ambiente: string;
+  bloqueadores: string[];
+  linhas: LinhaConfiabilidade[];
+  registradoEm: string;
+};
+
+/**
+ * Confiabilidade registrada para a resposta (execução) auditada.
+ * Só evidência observável — nunca rascunho ou raciocínio do modelo.
+ */
+export const confiabilidadeDaExecucao = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) =>
+    z.object({ clinicaId: z.string().uuid(), execucaoId: z.string().uuid() }).parse(i),
+  )
+  .handler(async ({ data, context }): Promise<ConfiabilidadeDecisaoView | null> => {
+    const { data: row, error } = await context.supabase
+      .from("nina_confianca_decisoes")
+      .select(
+        "created_at, ambiente, score, nivel, intencao, resultado_final, bloqueadores, validadores, ferramentas, fontes",
+      )
+      .eq("clinica_id", data.clinicaId)
+      .eq("execucao_id", data.execucaoId)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!row) return null;
+
+    const r = row as unknown as {
+      created_at: string;
+      ambiente: string;
+      score: number | string;
+      nivel: string | null;
+      intencao: string | null;
+      resultado_final: string | null;
+      bloqueadores: string[] | null;
+      validadores: unknown;
+      ferramentas: unknown;
+      fontes: unknown;
+    };
+
+    const registro = {
+      validadores: Array.isArray(r.validadores)
+        ? (r.validadores as Parameters<typeof linhasConfiabilidade>[0]["validadores"])
+        : [],
+      ferramentas: Array.isArray(r.ferramentas)
+        ? (r.ferramentas as Parameters<typeof linhasConfiabilidade>[0]["ferramentas"])
+        : [],
+      fontes: Array.isArray(r.fontes)
+        ? (r.fontes as Parameters<typeof linhasConfiabilidade>[0]["fontes"])
+        : [],
+    };
+
+    return {
+      score: Math.round(Number(r.score) || 0),
+      nivel: ROTULO_NIVEL[(r.nivel ?? "LOW") as NivelConfianca] ?? "—",
+      resultado:
+        ROTULO_RESULTADO[(r.resultado_final ?? "transferido_para_humano") as ResultadoFinalAuditoria] ??
+        "—",
+      intencao: r.intencao,
+      ambiente: r.ambiente,
+      bloqueadores: r.bloqueadores ?? [],
+      linhas: linhasConfiabilidade(registro),
+      registradoEm: r.created_at,
+    };
+  });
