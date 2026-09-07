@@ -1111,6 +1111,8 @@ ${procs || "(nenhum)"}`;
 
   }
 
+  if (rastro && estadoId?.conversaId) rastro.ids.conversation_id = estadoId.conversaId;
+
   const blocoKb = await (async () => {
     const { blocoPromptCatalogo } = await import("@/lib/nina/catalogo-prompt.server");
     return await blocoPromptCatalogo(clinicaId).catch(() => "");
@@ -1631,7 +1633,6 @@ ATENDIMENTO HUMANO — REGRA OBRIGATÓRIA:
   }
 
   if (rastro) {
-    rastro.ids.conversation_id = estadoId.conversaId ?? null;
     rastro.concluir("response.validate", {
       alterada_apos_modelo: respostaDoModelo !== resposta,
       handoff: houveHandoff,
