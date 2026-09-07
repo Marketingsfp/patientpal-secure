@@ -29,6 +29,12 @@ import {
   calcularLayout,
   type Posicao,
 } from "@/lib/nina/arquitetura/layout";
+import {
+  calcularRotas,
+  descreverConexao,
+  realceCaminhoCompleto,
+  realceDireto,
+} from "@/lib/nina/arquitetura/rotas";
 import { NodeDetalhePainel } from "./NodeDetalhePainel";
 import type { NivelAcesso } from "@/lib/nina/arquitetura/detalhes-ia";
 
