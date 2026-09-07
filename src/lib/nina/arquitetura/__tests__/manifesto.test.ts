@@ -76,7 +76,14 @@ describe("manifesto da arquitetura da Nina", () => {
   it("tem um ponto de entrada e pelo menos um ponto final", () => {
     const entradas = NODES_ARQUITETURA.filter((n) => n.anteriores.length === 0);
     const finais = NODES_ARQUITETURA.filter((n) => n.seguintes.length === 0);
-    expect(entradas.map((n) => n.id)).toEqual(["message.inbound", "voice.inbound"]);
+    expect(entradas.map((n) => n.id)).toEqual([
+      "message.inbound",
+      "voice.inbound",
+      // Homologação: cada disparador de teste é um ponto de entrada próprio.
+      "test.cycle",
+      "test.patient.terra",
+      "test.load.luna",
+    ]);
     expect(finais.length).toBeGreaterThan(0);
   });
 
