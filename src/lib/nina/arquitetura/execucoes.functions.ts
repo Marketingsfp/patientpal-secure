@@ -127,9 +127,15 @@ export const listarExecucoes = createServerFn({ method: "POST" })
     };
   });
 
+/** Mesma forma do EventoTrace, com metadata livre para trafegar em JSON. */
+export type EventoTraceSerializado = Omit<EventoTrace, "metadata"> & {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  metadata: Record<string, any>;
+};
+
 export type RespostaTrace =
   | { permitido: false }
-  | { permitido: true; eventos: EventoTrace[] };
+  | { permitido: true; eventos: EventoTraceSerializado[] };
 
 export const lerExecucao = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -152,5 +158,5 @@ export const lerExecucao = createServerFn({ method: "POST" })
       .limit(500);
 
     if (error) return { permitido: true, eventos: [] };
-    return { permitido: true, eventos: (linhas ?? []) as unknown as EventoTrace[] };
+    return { permitido: true, eventos: (linhas ?? []) as unknown as EventoTraceSerializado[] };
   });
