@@ -856,7 +856,7 @@ export function HomologacaoInbox() {
                           {ev.status === "erro" ? "✖" : "✔"}
                         </span>{" "}
                         {ev.node_id}
-                        {ev.duracao_ms != null ? ` (${ev.duracao_ms}ms)` : ""}
+                        {ev.duration_ms != null ? ` (${ev.duration_ms}ms)` : ""}
                       </div>
                     ))}
                   </div>

@@ -838,10 +838,10 @@ export const detalheExecucaoTeste = createServerFn({ method: "POST" })
 
     const { data: eventos } = await supabaseAdmin
       .from("nina_trace_eventos")
-      .select("trace_id, node_id, status, duracao_ms, detalhes, created_at")
+      .select("trace_id, node_id, event_type, status, duration_ms, started_at, metadata")
       .eq("clinica_id", data.clinicaId)
       .eq("execution_id", data.execucaoId)
-      .order("created_at", { ascending: true })
+      .order("started_at", { ascending: true })
       .limit(200);
 
     const lista = (eventos ?? []) as any[];
