@@ -5,7 +5,7 @@
  * carregado; a lista traz só o resumo; o detalhe de uma execução é lido apenas
  * quando alguém escolhe a execução.
  */
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { Loader2, Search } from "lucide-react";
@@ -48,6 +48,11 @@ export function RastrearExecucao({ clinicaId, nivelAcesso, chavePosicoes }: Prop
   const [selecionada, setSelecionada] = useState<string | null>(null);
   const [eventos, setEventos] = useState<EventoTrace[]>([]);
 
+  // Valor efetivo do termo no momento da busca (evita ler estado defasado
+  // quando a busca é disparada logo após preencher o campo).
+  const termoRef = useRef(termo);
+  termoRef.current = termo;
+
   const busca = useMutation({
     mutationFn: async (p: number) => {
       if (!clinicaId) return null;
@@ -56,7 +61,7 @@ export function RastrearExecucao({ clinicaId, nivelAcesso, chavePosicoes }: Prop
           clinicaId,
           pagina: p,
           tamanho: TAMANHO,
-          ...(termo.trim() ? { termo: termo.trim() } : {}),
+          ...(termoRef.current.trim() ? { termo: termoRef.current.trim() } : {}),
           ...(de ? { de: new Date(de).toISOString() } : {}),
           ...(ate ? { ate: new Date(ate).toISOString() } : {}),
           ...(somenteErros ? { somenteErros: true } : {}),
@@ -88,6 +93,20 @@ export function RastrearExecucao({ clinicaId, nivelAcesso, chavePosicoes }: Prop
       setEventos(r.eventos as unknown as EventoTrace[]);
     },
   });
+
+  // FASE 8 — o Relatório da homologação deixa o código a rastrear aqui.
+  const jaAutoBuscou = useRef(false);
+  useEffect(() => {
+    if (jaAutoBuscou.current || !clinicaId || typeof window === "undefined") return;
+    const guardado = window.sessionStorage.getItem("nina:rastrear:termo");
+    if (!guardado) return;
+    window.sessionStorage.removeItem("nina:rastrear:termo");
+    jaAutoBuscou.current = true;
+    setTermo(guardado);
+    termoRef.current = guardado;
+    busca.mutate(0);
+    // A busca usa o termo do estado; por isso disparamos no próximo ciclo.
+  }, [clinicaId, busca]);
 
   const estados = eventos.length ? estadosPorNode(eventos) : {};
 

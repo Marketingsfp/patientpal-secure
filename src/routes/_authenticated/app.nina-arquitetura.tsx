@@ -71,6 +71,18 @@ function Pagina() {
     return () => window.removeEventListener("nina:ver-instrucoes", irParaInstrucoes);
   }, []);
 
+  // FASE 8 — quem chega pelo Relatório da homologação com #execucao já cai na
+  // aba de rastreio; o código a procurar vem no sessionStorage (lido lá).
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (window.location.hash === "#execucao") setModo("execucao");
+    else if (window.location.hash === "#instrucoes-nina") {
+      requestAnimationFrame(() => {
+        document.getElementById("instrucoes-nina")?.scrollIntoView({ behavior: "smooth" });
+      });
+    }
+  }, []);
+
 
   const buscarCapacidades = useServerFn(capacidadesArquitetura);
   const { data: permissao } = useQuery({
