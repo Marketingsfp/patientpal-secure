@@ -9721,6 +9721,7 @@ export type Database = {
           id: string
           indice: number
           lead_id: string
+          memory_reset_at: string | null
           nina_session_id: string | null
           paciente_teste_id: string | null
           resolved_at: string | null
@@ -9741,6 +9742,7 @@ export type Database = {
           id?: string
           indice: number
           lead_id: string
+          memory_reset_at?: string | null
           nina_session_id?: string | null
           paciente_teste_id?: string | null
           resolved_at?: string | null
@@ -9761,6 +9763,7 @@ export type Database = {
           id?: string
           indice?: number
           lead_id?: string
+          memory_reset_at?: string | null
           nina_session_id?: string | null
           paciente_teste_id?: string | null
           resolved_at?: string | null

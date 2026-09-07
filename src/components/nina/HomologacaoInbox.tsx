@@ -38,6 +38,7 @@ import {
   ferramentasUsadasTeste,
   marcarLeadTesteLido,
   detalheExecucaoTeste,
+  diagnosticoCiclosLead,
 } from "@/lib/nina/teste-console.functions";
 import {
   iniciarSimulacaoTerra,
@@ -200,6 +201,10 @@ export function HomologacaoInbox() {
   const [ferramentas, setFerramentas] = useState<EventoFerramenta[]>([]);
   const [debugEstado, setDebugEstado] = useState<Record<string, unknown> | null>(null);
   const [painelTecnico, setPainelTecnico] = useState(false);
+
+  // FASE 5 — diagnóstico dos ciclos (prova de que a memória foi zerada).
+  const diagnosticoCiclos = useServerFn(diagnosticoCiclosLead);
+  const [ciclos, setCiclos] = useState<any[]>([]);
   const composerRef = useRef<HTMLTextAreaElement | null>(null);
 
   // FASE 4 — simulador automático de paciente (GPT Terra).
@@ -245,6 +250,22 @@ export function HomologacaoInbox() {
   });
 
   const leadAtual = leads.find((l) => l.id === leadId) ?? null;
+
+  // Carrega o diagnóstico só quando o painel técnico está aberto (leitura leve).
+  useEffect(() => {
+    if (!painelTecnico || !clinicaId || !leadId) return;
+    let vivo = true;
+    void diagnosticoCiclos({ data: { clinicaId, leadId } })
+      .then((r: any) => {
+        if (vivo) setCiclos(r?.ciclos ?? []);
+      })
+      .catch(() => {
+        if (vivo) setCiclos([]);
+      });
+    return () => {
+      vivo = false;
+    };
+  }, [painelTecnico, clinicaId, leadId, diagnosticoCiclos, msgs.length]);
 
   // Informa à ferramenta WebMCP de leitura qual lead está aberto.
   useEffect(() => {
@@ -922,7 +943,7 @@ export function HomologacaoInbox() {
                     <span>· sessão {leadAtual.sessao}</span>
                     {leadAtual.cicloId ? (
                       <span className="font-mono">
-                        · ciclo {leadAtual.cicloId.slice(0, 8)}
+                        · ciclo {ciclos.length > 0 ? ciclos[ciclos.length - 1]?.ciclo_seq : leadAtual.cicloId.slice(0, 8)}
                       </span>
                     ) : null}
                   </p>
@@ -985,6 +1006,48 @@ export function HomologacaoInbox() {
                   />
                   Remover agendamentos deste teste ao finalizar
                 </label>
+                {ciclos.length > 0 && (
+                  <div data-testid="diagnostico-ciclos">
+                    <p className="mb-1 text-xs font-medium text-muted-foreground">
+                      Ciclos deste lead (memória da Nina)
+                    </p>
+                    <div className="space-y-1">
+                      {ciclos
+                        .slice()
+                        .reverse()
+                        .map((c: any) => (
+                          <details
+                            key={c.cycle_id}
+                            className="rounded border bg-background/60 p-1.5 text-[11px]"
+                          >
+                            <summary className="cursor-pointer">
+                              Ciclo {c.ciclo_seq} · sessão {c.sessao ?? "—"} ·{" "}
+                              {c.cycle_status === "active" ? "em andamento" : "encerrado"}
+                              {c.end_reason ? ` (${c.end_reason})` : ""}
+                              {c.memoria_resetada ? " · memória zerada" : ""}
+                            </summary>
+                            <div className="mt-1 grid grid-cols-1 gap-x-4 font-mono leading-tight sm:grid-cols-2">
+                              {[
+                                ["cycle_id", c.cycle_id],
+                                ["nina_session_id", c.nina_session_id],
+                                ["cycle_status", c.cycle_status],
+                                ["end_reason", c.end_reason],
+                                ["started_at", c.started_at],
+                                ["ended_at", c.ended_at],
+                                ["memory_reset_at", c.memory_reset_at],
+                                ["conversation_id", c.conversa_id],
+                              ].map(([k, v]) => (
+                                <div key={String(k)}>
+                                  <span className="text-muted-foreground">{k}:</span>{" "}
+                                  <span>{v === null || v === undefined || v === "" ? "—" : String(v)}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </details>
+                        ))}
+                    </div>
+                  </div>
+                )}
                 {debugEstado && (
                   <div>
                     <p className="mb-1 text-xs font-medium text-muted-foreground">
