@@ -51,7 +51,10 @@ describe("layout incremental", () => {
       descricao: "Ferramenta hipotética usada apenas neste teste.",
       anteriores: [agenda.id],
       seguintes: [],
-    } as NodeArquitetura;
+      entrada: [],
+      saida: [],
+      erros: [],
+    };
     nodes.find((n) => n.id === agenda.id)!.seguintes.push(novo.id);
     nodes.push(novo);
 
@@ -176,14 +179,17 @@ describe("layout incremental", () => {
     const antes = estadoInicial();
     const nodes = clonar(NODES_ARQUITETURA);
     const alvo = nodes.find((n) => n.categoria === "TOOLS")!;
-    const novo = {
+    const novo: NodeArquitetura = {
       id: "tool.teste.novo",
       nome: "Ferramenta de teste",
       categoria: "TOOLS",
       descricao: "somente teste",
       anteriores: [alvo.id],
       seguintes: [],
-    } as NodeArquitetura;
+      entrada: [],
+      saida: [],
+      erros: [],
+    };
     alvo.seguintes.push(novo.id);
     nodes.push(novo);
     const posicoes = Object.values(aplicarDiffIncremental(nodes, antes).canonical);
