@@ -163,9 +163,31 @@ async function enviarTextoSistema(
   const conv = await lerConversa(clinicaId, conversaId);
   const { registrarMarcadorSistema } = await import("./handoff.server");
   // Conversa de homologação nunca dispara mensagem real.
-  if (!conv || conv.is_teste || !conv.contato_telefone) {
-    // Homologação: a comunicação é registrada na conversa (mesma lógica,
-    // transporte diferente) e conta como entregue.
+  if (conv?.is_teste) {
+    // FASE 4 — paridade: em Homologação a mensagem é a MESMA (mesmo protocolo,
+    // mesmo texto contextual) e aparece no chat de teste como fala da Nina.
+    // Só o transporte muda: nada sai para o WhatsApp real.
+    const { error } = await supabaseAdmin.from("whatsapp_mensagens").insert({
+      clinica_id: clinicaId,
+      conversa_id: conversaId,
+      canal: "test-console",
+      wa_message_id: `handoff-${conversaId}-${Date.now()}`,
+      direction: "out",
+      from_number: "test-console",
+      to_number: conv.contato_telefone,
+      body: texto,
+      tipo: "text",
+      status: "sent",
+      enviada_por: "nina",
+      is_teste: true,
+    });
+    if (error) {
+      console.error("[protocolo] falha ao registrar mensagem de teste", error.message);
+      return false;
+    }
+    return true;
+  }
+  if (!conv || !conv.contato_telefone) {
     await registrarMarcadorSistema({ clinicaId, conversaId, texto });
     return true;
   }
