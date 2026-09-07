@@ -10,6 +10,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Crosshair,
   Maximize2,
+  Route,
   RotateCcw,
   ZoomIn,
   ZoomOut,
@@ -29,6 +30,12 @@ import {
   calcularLayout,
   type Posicao,
 } from "@/lib/nina/arquitetura/layout";
+import {
+  calcularRotas,
+  descreverConexao,
+  realceCaminhoCompleto,
+  realceDireto,
+} from "@/lib/nina/arquitetura/rotas";
 import { NodeDetalhePainel } from "./NodeDetalhePainel";
 import type { NivelAcesso } from "@/lib/nina/arquitetura/detalhes-ia";
 
@@ -99,6 +106,7 @@ export function ArquiteturaCanvas({
   const [carregou, setCarregou] = useState(false);
   const [view, setView] = useState({ escala: 0.7, x: 0, y: 0 });
   const [selecionado, setSelecionado] = useState<string | null>(null);
+  const [caminhoCompleto, setCaminhoCompleto] = useState(false);
   const arrasto = useRef<
     | { tipo: "canvas"; startX: number; startY: number; origemX: number; origemY: number }
     | { tipo: "node"; id: string; startX: number; startY: number; origemX: number; origemY: number }
@@ -116,6 +124,20 @@ export function ArquiteturaCanvas({
     () => new Map(layout.nodes.map((n) => [n.node.id, n])),
     [layout],
   );
+
+  const rotas = useMemo(() => calcularRotas(layout), [layout]);
+
+  // Realce: só o vizinho imediato por padrão; "Destacar caminho" mostra tudo
+  // que leva até o componente e tudo que decorre dele.
+  const realce = useMemo(
+    () =>
+      caminhoCompleto
+        ? realceCaminhoCompleto(nodes, selecionado)
+        : realceDireto(nodes, selecionado),
+    [nodes, selecionado, caminhoCompleto],
+  );
+  const temRealce = realce.nodes.size > 0;
+
 
   const ajustarTela = useCallback(() => {
     const area = areaRef.current;
@@ -251,6 +273,15 @@ export function ArquiteturaCanvas({
         >
           <ZoomOut className="h-4 w-4" />
         </Button>
+        <Button
+          type="button"
+          variant={caminhoCompleto ? "default" : "outline"}
+          size="sm"
+          aria-pressed={caminhoCompleto}
+          onClick={() => setCaminhoCompleto((v) => !v)}
+        >
+          <Route className="mr-2 h-4 w-4" /> Destacar caminho
+        </Button>
         <Button type="button" variant="ghost" size="sm" onClick={organizarAutomaticamente}>
           <RotateCcw className="mr-2 h-4 w-4" /> Organizar automaticamente
         </Button>
@@ -320,7 +351,6 @@ export function ArquiteturaCanvas({
             width={layout.largura}
             height={layout.altura}
             className="pointer-events-none absolute left-0 top-0"
-            aria-hidden="true"
           >
             <defs>
               <marker
@@ -334,42 +364,44 @@ export function ArquiteturaCanvas({
                 <path d="M0,0 L8,4 L0,8 z" fill="currentColor" />
               </marker>
             </defs>
-            {layout.arestas.map((aresta) => {
-              const de = mapaPosicionado.get(aresta.de);
-              const para = mapaPosicionado.get(aresta.para);
-              if (!de || !para) return null;
-              const x1 = de.x + LARGURA_NODE;
-              const y1 = de.y + ALTURA_NODE / 2;
-              const x2 = para.x;
-              const y2 = para.y + ALTURA_NODE / 2;
-              const meio = (x1 + x2) / 2;
+            {rotas.map((rota) => {
               const ativa =
-                !modoExecucao || (Boolean(execucao?.[aresta.de]) && Boolean(execucao?.[aresta.para]));
-              const noCaminho = Boolean(de.principal && para.principal);
+                !modoExecucao || (Boolean(execucao?.[rota.de]) && Boolean(execucao?.[rota.para]));
+              const destacada = realce.arestas.has(rota.id);
+              const atenuada = temRealce && !destacada;
+              const cor = !ativa
+                ? "text-muted-foreground/30"
+                : atenuada
+                  ? "text-muted-foreground/15"
+                  : destacada
+                    ? "text-primary"
+                    : rota.principal
+                      ? "text-primary/80"
+                      : "text-muted-foreground/60";
               return (
                 <path
-                  key={aresta.id}
-                  d={`M ${x1} ${y1} C ${meio} ${y1}, ${meio} ${y2}, ${x2} ${y2}`}
+                  key={rota.id}
+                  d={rota.d}
                   fill="none"
                   stroke="currentColor"
-                  strokeWidth={!ativa ? 1 : noCaminho ? 2.6 : 1.4}
+                  strokeWidth={!ativa ? 1 : destacada ? 3 : rota.principal ? 2.6 : 1.4}
+                  strokeDasharray={rota.retorno ? "6 4" : undefined}
                   markerEnd="url(#seta-arquitetura)"
-                  className={
-                    !ativa
-                      ? "text-muted-foreground/30"
-                      : noCaminho
-                        ? "text-primary"
-                        : "text-muted-foreground/60"
-                  }
-                />
+                  className={`pointer-events-auto ${cor}`}
+                >
+                  <title>{descreverConexao(nodes, rota.de, rota.para) ?? ""}</title>
+                </path>
               );
             })}
           </svg>
+
 
           {layout.nodes.map(({ node, x, y, principal }) => {
             const estado = execucao?.[node.id];
             const apagado = modoExecucao && !estado;
             const cor = CORES_CATEGORIA[node.categoria];
+            const destacado = realce.nodes.has(node.id);
+            const atenuado = temRealce && !destacado;
             return (
               <button
                 type="button"
@@ -388,10 +420,11 @@ export function ArquiteturaCanvas({
                 onClick={() => setSelecionado(node.id)}
                 title={node.descricao}
                 className={`absolute flex flex-col justify-center gap-1 rounded-md border bg-card px-3 py-2 text-left transition-opacity focus:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
-                  apagado ? "opacity-30" : principal ? "opacity-100" : "opacity-80"
+                  apagado || atenuado ? "opacity-25" : principal ? "opacity-100" : "opacity-80"
                 } ${principal ? "shadow-md" : "shadow-sm"} ${
                   selecionado === node.id ? "ring-2 ring-primary" : ""
                 }`}
+
                 style={{
                   left: x,
                   top: y,
@@ -444,9 +477,13 @@ export function ArquiteturaCanvas({
 
       <p className="text-xs text-muted-foreground">
         Clique em um componente para abrir o painel com arquivo, função, entradas, saídas, erros
-        possíveis e documentação. Arraste para reposicionar — isso muda apenas o desenho, nunca o
-        funcionamento da Nina.
+        possíveis e documentação — ao clicar, ele e suas conexões diretas ficam em destaque e os
+        demais são atenuados. Use “Destacar caminho” para ver tudo que leva até o componente e tudo
+        que decorre dele. Passe o ponteiro sobre uma linha para ver origem → destino; linhas
+        tracejadas são retornos do fluxo. Arraste para reposicionar — isso muda apenas o desenho,
+        nunca o funcionamento da Nina.
       </p>
+
 
       <NodeDetalhePainel
         node={detalhe}
