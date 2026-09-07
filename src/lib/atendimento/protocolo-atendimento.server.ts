@@ -114,13 +114,25 @@ export async function protocoloAoIniciarHandoff(args: {
   clinicaId: string;
   conversaId: string;
   handoffEventoId?: string | null;
+  /** FASE 3 — comunica o encaminhamento e o protocolo ao paciente. */
+  anunciar?: boolean;
 }): Promise<ProtocoloGerado> {
-  return garantirProtocoloAtendimento({
+  const r = await garantirProtocoloAtendimento({
     clinicaId: args.clinicaId,
     conversaId: args.conversaId,
     gatilho: "handoff",
     handoffEventoId: args.handoffEventoId ?? null,
   });
+  // O paciente só é avisado depois que o número existe de fato.
+  if (r && args.anunciar !== false) {
+    const { anunciarHandoffAoPaciente } = await import("./protocolo-atendimento.server");
+    await anunciarHandoffAoPaciente({
+      clinicaId: args.clinicaId,
+      conversaId: args.conversaId,
+      protocolo: r.protocolo,
+    });
+  }
+  return r;
 }
 
 /** O paciente já recebeu este número neste atendimento? */
@@ -144,20 +156,26 @@ async function protocoloJaInformado(clinicaId: string, conversaId: string, proto
  * silenciada pelo encaminhamento: o envio não reativa a IA.
  * Falha de envio NÃO desfaz o protocolo nem a transferência.
  */
-async function enviarTextoSistema(clinicaId: string, conversaId: string, texto: string) {
+async function enviarTextoSistema(
+  clinicaId: string,
+  conversaId: string,
+  texto: string,
+): Promise<boolean> {
   const conv = await lerConversa(clinicaId, conversaId);
   const { registrarMarcadorSistema } = await import("./handoff.server");
   // Conversa de homologação nunca dispara mensagem real.
   if (!conv || conv.is_teste || !conv.contato_telefone) {
+    // Homologação: a comunicação é registrada na conversa (mesma lógica,
+    // transporte diferente) e conta como entregue.
     await registrarMarcadorSistema({ clinicaId, conversaId, texto });
-    return;
+    return true;
   }
   try {
     const { loadWhatsAppConfig, metaSendText } = await import("@/lib/whatsapp.server");
     const cfg = await loadWhatsAppConfig(clinicaId);
     if (!cfg?.phone_number_id || !cfg.access_token) {
       await registrarMarcadorSistema({ clinicaId, conversaId, texto });
-      return;
+      return false;
     }
     const to = conv.contato_telefone.startsWith("+")
       ? conv.contato_telefone
@@ -180,6 +198,7 @@ async function enviarTextoSistema(clinicaId: string, conversaId: string, texto: 
       status: "sent",
       enviada_por: "sistema",
     });
+    return true;
   } catch (e) {
     // Sem marcar como entregue: o registro fica apenas como aviso interno.
     console.error("[protocolo] falha ao enviar mensagem de protocolo", e);
@@ -188,7 +207,59 @@ async function enviarTextoSistema(clinicaId: string, conversaId: string, texto: 
       conversaId,
       texto: `⚠️ Não foi possível enviar ao paciente: ${texto}`,
     });
+    // Falha de envio NÃO marca como informado: o retry reaproveita o MESMO
+    // protocolo e tenta a comunicação de novo.
+    return false;
   }
+}
+
+/**
+ * FASE 3 — comunica ao paciente a transferência + o protocolo real.
+ * Uma única comunicação lógica por atendimento: se já foi informada, sai.
+ * Se o envio falhar, nada é marcado e a próxima tentativa reusa o protocolo.
+ */
+export async function anunciarHandoffAoPaciente(args: {
+  clinicaId: string;
+  conversaId: string;
+  protocolo: string;
+  userId?: string | null;
+}): Promise<{ informado: boolean }> {
+  const conv = await lerConversa(args.clinicaId, args.conversaId);
+  if (!conv) return { informado: false };
+
+  const jaInformado = await protocoloJaInformado(
+    args.clinicaId,
+    args.conversaId,
+    args.protocolo,
+  );
+  if (!deveInformarProtocolo({ protocolo: args.protocolo, jaInformado }))
+    return { informado: jaInformado };
+
+  const { gerarMensagemHandoff } = await import("./mensagem-handoff.server");
+  const { texto, origem } = await gerarMensagemHandoff({
+    protocolo: args.protocolo,
+    nome: conv.contato_nome,
+    setor: await nomeDepartamento(args.clinicaId, conv.departamento_id),
+    motivo: await motivoDoHandoff(args.clinicaId, args.conversaId),
+  });
+
+  const enviado = await enviarTextoSistema(args.clinicaId, args.conversaId, texto);
+  if (!enviado) return { informado: false };
+
+  const { registrarEvento } = await import("./handoff.server");
+  await registrarEvento({
+    clinicaId: args.clinicaId,
+    conversaId: args.conversaId,
+    evento: "ASSUMIDA",
+    userId: args.userId ?? null,
+    motivo: `Protocolo ${args.protocolo} informado ao paciente`,
+    detalhes: {
+      protocol_number: args.protocolo,
+      protocolo_informado: true,
+      mensagem_origem: origem,
+    },
+  });
+  return { informado: true };
 }
 
 /**
@@ -212,34 +283,13 @@ export async function protocoloAoAtribuirHumano(args: {
   });
   if (!r) return r;
 
-  // O número já pode ter nascido no início do handoff (Fase 1). O anúncio ao
-  // paciente continua acontecendo uma única vez por atendimento.
-  const jaInformado = await protocoloJaInformado(args.clinicaId, args.conversaId, r.protocolo);
-  if (!deveInformarProtocolo({ protocolo: r.protocolo, jaInformado })) return r;
-
-  // FASE 2 — a comunicação é contextual (nome, motivo, setor estruturado),
-  // nunca uma frase única fixa, e sempre carrega o protocolo real.
-  const { gerarMensagemHandoff } = await import("./mensagem-handoff.server");
-  const { texto, origem } = await gerarMensagemHandoff({
-    protocolo: r.protocolo,
-    nome: conv.contato_nome,
-    setor: await nomeDepartamento(args.clinicaId, conv.departamento_id),
-    motivo: await motivoDoHandoff(args.clinicaId, args.conversaId),
-  });
-
-  await enviarTextoSistema(args.clinicaId, args.conversaId, texto);
-  const { registrarEvento } = await import("./handoff.server");
-  await registrarEvento({
+  // O anúncio pode já ter acontecido no início do handoff (Fase 3). Aqui ele
+  // funciona como RETRY: mesmo protocolo, uma única comunicação lógica.
+  await anunciarHandoffAoPaciente({
     clinicaId: args.clinicaId,
     conversaId: args.conversaId,
-    evento: "ASSUMIDA",
+    protocolo: r.protocolo,
     userId: args.userId ?? null,
-    motivo: `Protocolo ${r.protocolo} informado ao paciente`,
-    detalhes: {
-      protocol_number: r.protocolo,
-      protocolo_informado: true,
-      mensagem_origem: origem,
-    },
   });
   return r;
 }
