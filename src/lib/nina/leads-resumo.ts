@@ -103,9 +103,6 @@ export function naoLida(m: MensagemResumoRow, lidoAte: string | null): boolean {
   if (!lidoAte) return true;
   return new Date(m.created_at).getTime() > new Date(lidoAte).getTime();
 }
-const _fim = (
-
-});
 
 /**
  * Monta o resumo de cada lead.
