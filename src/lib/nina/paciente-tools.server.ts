@@ -1334,8 +1334,50 @@ async function executarFerramentaInterna(
         const p = zIdentificar.parse(args);
         const cpf = somenteDigitos(p.cpf);
         if (!isCPFValido(cpf)) return falha("VALIDATION_ERROR", "CPF inválido.");
-        const { data, error } = await supabaseAdmin.rpc("integracao_resolver_paciente", {
-          _clinica_id: ctx.clinicaId,
+
+        // HOMOLOGAÇÃO: jamais tocar em cadastro real de paciente. A identificação
+        // é amarrada a um paciente SINTÉTICO exclusivo do lead de teste — nenhum
+        // CPF real é gravado, consultado ou vinculado.
+        if (ctx.teste || ctx.origem === "homologacao") {
+          const sintetico = await pacienteSinteticoDoLead(ctx, p.nome);
+          if (!sintetico) {
+            await auditar(ctx, "identificar_paciente", { cpf: "***", teste: true }, {
+              ok: false,
+              erro: "TEST_PATIENT_UNAVAILABLE",
+            });
+            return falha(
+              "INTERNAL_ERROR",
+              "Não consegui concluir a identificação no ambiente de homologação.",
+            );
+          }
+          ctx.pacienteId = sintetico.id;
+          ctx.pacienteNome = sintetico.nome;
+          mutarEstado(ctx, {
+            patient: {
+              id: sintetico.id,
+              first_name: sintetico.nome.split(" ")[0] ?? null,
+              identified: true,
+              validated: true,
+            },
+            stage: "CHOOSING_SLOT",
+          });
+          if (ctx.conversaId) {
+            await supabaseAdmin
+              .from("atend_conversas")
+              .update({ contato_paciente_id: sintetico.id, identidade_confirmada: true })
+              .eq("id", ctx.conversaId);
+          }
+          await auditar(ctx, "identificar_paciente", { cpf: "***", teste: true }, {
+            ok: true,
+            id: sintetico.id,
+          });
+          return {
+            ok: true,
+            paciente: { nome: sintetico.nome.split(" ")[0], cadastro: "teste" },
+          };
+        }
+
+
           _cpf_digits: cpf,
           _nome: p.nome,
           _data_nascimento: p.data_nascimento,
