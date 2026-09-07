@@ -143,7 +143,10 @@ function Pagina() {
             </CardContent>
           </Card>
 
-          <InstrucoesNina />
+          <div id="instrucoes-nina" className="scroll-mt-24">
+            <InstrucoesNina />
+          </div>
+
         </TabsContent>
 
 
