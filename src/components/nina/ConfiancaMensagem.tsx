@@ -6,7 +6,7 @@
  * produzida, casado pela execução que gerou a mensagem. Sem registro, o
  * indicador simplesmente não aparece — nunca estimamos um valor.
  */
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { ShieldAlert, ShieldCheck, ShieldQuestion } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -17,35 +17,47 @@ import {
   type ConfiabilidadeDecisaoView,
 } from "@/lib/nina/confianca.functions";
 import { rotuloConfianca } from "@/lib/nina/confianca-badge";
+import {
+  gravarLote,
+  idsParaBuscar,
+  mapaDoCache,
+  type CacheConfianca,
+} from "@/lib/nina/confianca-cache";
 
 export type MapaConfianca = Record<string, ConfiancaDaMensagem>;
 
-/** Busca em lote a confiança das execuções presentes na conversa aberta. */
+/**
+ * Busca em UM ÚNICO lote a confiança das execuções da conversa aberta.
+ *
+ * Desempenho (FASE 11): nunca há consulta por mensagem. O que já foi lido
+ * fica em cache no navegador, então trocar de conversa e voltar não refaz
+ * trabalho, e o que já está em cache continua na tela enquanto o restante
+ * chega — sem piscar e sem atrasar a renderização das mensagens.
+ */
 export function useConfiancaMensagens(
   clinicaId: string | null | undefined,
   execucaoIds: string[],
 ): MapaConfianca {
   const buscar = useServerFn(confiancaDasExecucoes);
-  const [mapa, setMapa] = useState<MapaConfianca>({});
+  const cache = useRef<CacheConfianca>(new Map());
+  const [, forcar] = useState(0);
   const chave = execucaoIds.slice().sort().join(",");
 
   useEffect(() => {
     const ids = chave ? chave.split(",") : [];
-    if (!clinicaId || ids.length === 0) {
-      setMapa({});
-      return;
-    }
+    if (!clinicaId || ids.length === 0) return;
+    const pendentes = idsParaBuscar(cache.current, clinicaId, ids, Date.now());
+    if (pendentes.length === 0) return;
     let ativo = true;
     void (async () => {
       try {
-        const linhas = await buscar({ data: { clinicaId, execucaoIds: ids.slice(0, 300) } });
+        const linhas = await buscar({ data: { clinicaId, execucaoIds: pendentes } });
         if (!ativo) return;
-        const m: MapaConfianca = {};
-        for (const l of linhas) m[l.execucao_id] = l;
-        setMapa(m);
+        gravarLote(cache.current, clinicaId, pendentes, linhas, Date.now());
+        forcar((n) => n + 1);
       } catch {
         // Indicador auxiliar: falha aqui não pode atrapalhar o atendimento.
-        if (ativo) setMapa({});
+        // Nada é gravado no cache, então a próxima rodada tenta de novo.
       }
     })();
     return () => {
@@ -53,7 +65,18 @@ export function useConfiancaMensagens(
     };
   }, [buscar, chave, clinicaId]);
 
-  return mapa;
+  return useMemo(
+    () => (clinicaId ? mapaDoCache(cache.current, clinicaId, chave ? chave.split(",") : []) : {}),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [chave, clinicaId, cache.current.size, forcarVersao(cache.current)],
+  );
+}
+
+/** Assinatura barata para reagir a atualizações do cache no mesmo tamanho. */
+function forcarVersao(cache: CacheConfianca): number {
+  let v = 0;
+  for (const e of cache.values()) v += e.em % 1000;
+  return v;
 }
 
 const ESTILO: Record<
