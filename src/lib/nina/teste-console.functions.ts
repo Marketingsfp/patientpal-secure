@@ -50,32 +50,65 @@ export const listarLeadsTeste = createServerFn({ method: "POST" })
     const leads = await garantirLeads(supabaseAdmin, data.clinicaId);
 
     const ids = leads.map((l) => l.conversa_id).filter(Boolean) as string[];
-    const contagem = new Map<string, number>();
+
+    // Uma única consulta agrupada, limitada às mensagens mais recentes das
+    // conversas ATUAIS dos leads — nunca o histórico completo de cada lead.
+    const AMOSTRA_POR_LEAD = 20;
+    let linhas: any[] = [];
     if (ids.length) {
-      const { data: msgs } = await supabaseAdmin
+      const { data: msgs, error: eMsgs } = await supabaseAdmin
         .from("whatsapp_mensagens")
-        .select("conversa_id")
+        .select("id, conversa_id, direction, body, tipo, enviada_por, created_at, read_at")
         .eq("clinica_id", data.clinicaId)
-        .in("conversa_id", ids);
-      for (const m of (msgs ?? []) as any[])
-        contagem.set(m.conversa_id, (contagem.get(m.conversa_id) ?? 0) + 1);
+        .in("conversa_id", ids)
+        .order("created_at", { ascending: false })
+        .limit(ids.length * AMOSTRA_POR_LEAD);
+      if (eMsgs) throw new Error(eMsgs.message);
+      linhas = (msgs ?? []) as any[];
     }
 
+    // Isolamento: cada lead só enxerga a própria conversa atual.
+    const conversasPorLead: Record<string, string[]> = {};
+    for (const l of leads) conversasPorLead[l.id] = l.conversa_id ? [l.conversa_id] : [];
+    const resumos = resumirLeads(conversasPorLead, linhas as MensagemResumoRow[]);
+
+    // Total real de mensagens da conversa atual (contagem no banco, sem trazer linhas).
+    const totais = new Map<string, number>();
+    await Promise.all(
+      ids.map(async (cid) => {
+        const { count } = await supabaseAdmin
+          .from("whatsapp_mensagens")
+          .select("id", { count: "exact", head: true })
+          .eq("clinica_id", data.clinicaId)
+          .eq("conversa_id", cid);
+        totais.set(cid, count ?? 0);
+      }),
+    );
+
     return {
-      leads: leads.map((l) => ({
-        id: l.id,
-        indice: l.indice,
-        nome: l.nome,
-        telefone: l.telefone_sessao,
-        sessao: l.sessao_seq,
-        conversaId: l.conversa_id,
-        cicloId: l.ciclo_id,
-        cicloIniciadoEm: l.ciclo_iniciado_em,
-        resolvidoEm: l.resolvido_em,
-        status: l.status,
-        mensagens: l.conversa_id ? (contagem.get(l.conversa_id) ?? 0) : 0,
-      })),
+      leads: leads.map((l) => {
+        const r = resumos[l.id]!;
+        return {
+          id: l.id,
+          indice: l.indice,
+          nome: l.nome,
+          telefone: l.telefone_sessao,
+          sessao: l.sessao_seq,
+          conversaId: l.conversa_id,
+          cicloId: l.ciclo_id,
+          cicloIniciadoEm: l.ciclo_iniciado_em,
+          resolvidoEm: l.resolvido_em,
+          status: l.status,
+          mensagens: l.conversa_id ? (totais.get(l.conversa_id) ?? 0) : 0,
+          ultimaMensagemId: r.lastMessageId,
+          ultimaMensagemTexto: r.lastMessageText,
+          ultimaMensagemAutor: r.lastMessageAuthor,
+          ultimaMensagemEm: r.lastMessageAt,
+          naoLidas: r.unreadCount,
+        };
+      }),
     };
+
   });
 
 export const historicoLeadTeste = createServerFn({ method: "POST" })
