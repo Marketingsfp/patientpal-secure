@@ -61,7 +61,8 @@ function ms(v: number | null | undefined) {
 }
 
 export function CargaTeste() {
-  const { clinicaId } = useClinica();
+  const { clinicaAtual } = useClinica();
+  const clinicaId = clinicaAtual?.clinica_id;
   const criar = useServerFn(criarTesteCarga);
   const executar = useServerFn(executarLoteCarga);
   const parar = useServerFn(pararTesteCarga);
