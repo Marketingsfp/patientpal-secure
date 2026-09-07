@@ -8255,48 +8255,81 @@ export type Database = {
       nina_confianca_decisoes: {
         Row: {
           acao: string
+          acao_solicitada: string | null
           ambiente: string
+          bloqueadores: string[]
           bloqueio: string | null
           categorias: Json
           clinica_id: string
           conversation_id: string | null
           created_at: string
+          decisao: string | null
           execucao_id: string | null
+          ferramentas: Json
+          fontes: Json
           id: string
+          intencao: string | null
+          message_id: string | null
           motivos: Json
+          nivel: string | null
+          reason_codes: string[]
+          resultado_final: string | null
           score: number
           trace_id: string | null
           updated_at: string
+          validadores: Json
         }
         Insert: {
           acao: string
+          acao_solicitada?: string | null
           ambiente?: string
+          bloqueadores?: string[]
           bloqueio?: string | null
           categorias?: Json
           clinica_id: string
           conversation_id?: string | null
           created_at?: string
+          decisao?: string | null
           execucao_id?: string | null
+          ferramentas?: Json
+          fontes?: Json
           id?: string
+          intencao?: string | null
+          message_id?: string | null
           motivos?: Json
+          nivel?: string | null
+          reason_codes?: string[]
+          resultado_final?: string | null
           score?: number
           trace_id?: string | null
           updated_at?: string
+          validadores?: Json
         }
         Update: {
           acao?: string
+          acao_solicitada?: string | null
           ambiente?: string
+          bloqueadores?: string[]
           bloqueio?: string | null
           categorias?: Json
           clinica_id?: string
           conversation_id?: string | null
           created_at?: string
+          decisao?: string | null
           execucao_id?: string | null
+          ferramentas?: Json
+          fontes?: Json
           id?: string
+          intencao?: string | null
+          message_id?: string | null
           motivos?: Json
+          nivel?: string | null
+          reason_codes?: string[]
+          resultado_final?: string | null
           score?: number
           trace_id?: string | null
           updated_at?: string
+          validadores?: Json
         }
         Relationships: [
           {
