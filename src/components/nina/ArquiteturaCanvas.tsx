@@ -111,9 +111,17 @@ export function ArquiteturaCanvas({
     setView({ escala, x, y });
   }, [layout]);
 
+  // Visão inicial: escala legível, ancorada no começo do fluxo (o usuário
+  // pode usar "Ajustar à tela" para ver tudo de uma vez).
   useEffect(() => {
     if (!carregou) return;
-    ajustarTela();
+    const area = areaRef.current;
+    if (!area) {
+      ajustarTela();
+      return;
+    }
+    const escala = Math.min(0.75, Math.max(0.5, (area.clientHeight - 48) / layout.altura));
+    setView({ escala, x: 24, y: 24 });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [carregou]);
 
