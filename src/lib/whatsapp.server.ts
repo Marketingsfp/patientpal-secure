@@ -912,7 +912,7 @@ REGRAS DE PRIVACIDADE — NÃO PODEM SER QUEBRADAS:
 
 Se a pergunta fugir do escopo (horários, preços, especialidades, agendamento) ou violar as regras acima, peça gentilmente para a pessoa aguardar um atendente. Não invente dados.
 
-ESPECIALIDADES ATENDIDAS: ${espsCadastradas.join(", ") || "(nenhuma cadastrada)"}
+ESPECIALIDADES ATENDIDAS: ${espsCadastradasTexto}
 
 MÉDICOS:
 ${medicos || "(nenhum)"}
@@ -933,8 +933,7 @@ ${procs || "(nenhum)"}`;
       "${contextoRemetente}": contextoRemetente,
       "${blocoIdentidade}": blocoIdentidade,
       "${blocoFoco}": blocoFoco,
-      '${espsCadastradas.join(", ") || "(nenhuma cadastrada)"}':
-        espsCadastradas.join(", ") || "(nenhuma cadastrada)",
+      '${espsCadastradas.join(", ") || "(nenhuma cadastrada)"}': espsCadastradasTexto,
       '${medicos || "(nenhum)"}': medicos || "(nenhum)",
       '${procs || "(nenhum)"}': procs || "(nenhum)",
     },
