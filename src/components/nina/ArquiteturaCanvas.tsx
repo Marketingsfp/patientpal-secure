@@ -320,7 +320,6 @@ export function ArquiteturaCanvas({
             width={layout.largura}
             height={layout.altura}
             className="pointer-events-none absolute left-0 top-0"
-            aria-hidden="true"
           >
             <defs>
               <marker
@@ -334,37 +333,36 @@ export function ArquiteturaCanvas({
                 <path d="M0,0 L8,4 L0,8 z" fill="currentColor" />
               </marker>
             </defs>
-            {layout.arestas.map((aresta) => {
-              const de = mapaPosicionado.get(aresta.de);
-              const para = mapaPosicionado.get(aresta.para);
-              if (!de || !para) return null;
-              const x1 = de.x + LARGURA_NODE;
-              const y1 = de.y + ALTURA_NODE / 2;
-              const x2 = para.x;
-              const y2 = para.y + ALTURA_NODE / 2;
-              const meio = (x1 + x2) / 2;
+            {rotas.map((rota) => {
               const ativa =
-                !modoExecucao || (Boolean(execucao?.[aresta.de]) && Boolean(execucao?.[aresta.para]));
-              const noCaminho = Boolean(de.principal && para.principal);
+                !modoExecucao || (Boolean(execucao?.[rota.de]) && Boolean(execucao?.[rota.para]));
+              const destacada = realce.arestas.has(rota.id);
+              const atenuada = temRealce && !destacada;
+              const cor = !ativa
+                ? "text-muted-foreground/30"
+                : atenuada
+                  ? "text-muted-foreground/15"
+                  : destacada
+                    ? "text-primary"
+                    : rota.principal
+                      ? "text-primary/80"
+                      : "text-muted-foreground/60";
               return (
                 <path
-                  key={aresta.id}
-                  d={`M ${x1} ${y1} C ${meio} ${y1}, ${meio} ${y2}, ${x2} ${y2}`}
+                  key={rota.id}
+                  d={rota.d}
                   fill="none"
                   stroke="currentColor"
-                  strokeWidth={!ativa ? 1 : noCaminho ? 2.6 : 1.4}
+                  strokeWidth={!ativa ? 1 : destacada ? 3 : rota.principal ? 2.6 : 1.4}
+                  strokeDasharray={rota.retorno ? "6 4" : undefined}
                   markerEnd="url(#seta-arquitetura)"
-                  className={
-                    !ativa
-                      ? "text-muted-foreground/30"
-                      : noCaminho
-                        ? "text-primary"
-                        : "text-muted-foreground/60"
-                  }
-                />
+                  className={`pointer-events-auto ${cor}`}
+                >
+                  <title>{descreverConexao(nodes, rota.de, rota.para) ?? ""}</title>
+                </path>
               );
             })}
-          </svg>
+
 
           {layout.nodes.map(({ node, x, y, principal }) => {
             const estado = execucao?.[node.id];
