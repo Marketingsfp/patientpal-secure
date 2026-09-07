@@ -97,18 +97,27 @@ export async function registrarEvento(args: {
   departamentoId?: string | null;
   motivo?: string | null;
   detalhes?: Record<string, unknown> | null;
-}) {
-  const { error } = await supabaseAdmin.from("atend_conversa_eventos").insert({
-    clinica_id: args.clinicaId,
-    conversa_id: args.conversaId,
-    evento: args.evento,
-    user_id: args.userId ?? null,
-    departamento_id: args.departamentoId ?? null,
-    motivo: args.motivo ?? null,
-    detalhes: (args.detalhes ?? null) as never,
-  });
-  if (error) console.error("[handoff] falha ao registrar evento", args.evento, error.message);
+}): Promise<string | null> {
+  const { data, error } = await supabaseAdmin
+    .from("atend_conversa_eventos")
+    .insert({
+      clinica_id: args.clinicaId,
+      conversa_id: args.conversaId,
+      evento: args.evento,
+      user_id: args.userId ?? null,
+      departamento_id: args.departamentoId ?? null,
+      motivo: args.motivo ?? null,
+      detalhes: (args.detalhes ?? null) as never,
+    })
+    .select("id")
+    .maybeSingle();
+  if (error) {
+    console.error("[handoff] falha ao registrar evento", args.evento, error.message);
+    return null;
+  }
+  return ((data as { id?: string } | null)?.id as string | undefined) ?? null;
 }
+
 
 /** Escolhe o departamento (fila) pelo nome informado pela IA, com fallback. */
 async function resolverDepartamento(clinicaId: string, nome?: string | null) {
