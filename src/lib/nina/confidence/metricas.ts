@@ -79,6 +79,17 @@ export type CalibracaoPorFaixaScore = {
   inversoes: { de: string; para: string; taxaDe: number; taxaPara: number }[];
 };
 
+/** FASE 9 — calibração por tipo de pergunta (valores, agenda, exame...). */
+export type CalibracaoTipo = {
+  tipo: string;
+  mensagens: number;
+  mensagensAlta: number;
+  erros: number;
+  errosAlta: number;
+  taxaErro: number;
+  taxaErroAlta: number;
+};
+
 export type Contagem = { chave: string; total: number };
 export type MediaGrupo = { chave: string; total: number; scoreMedio: number; baixa: number };
 
@@ -141,6 +152,7 @@ export type MetricasConfiabilidade = {
   correlacaoErros: FaixaCorrelacao[];
   calibracaoPorNivel: CalibracaoNivel[];
   calibracaoPorFaixaScore: CalibracaoPorFaixaScore;
+  calibracaoPorTipo: CalibracaoTipo[];
   altaConfiancaComErro: AltaConfiancaComErro;
 };
 
@@ -442,6 +454,55 @@ export function calcularAltaConfiancaComErro(
   };
 }
 
+/**
+ * FASE 9 — mesma leitura de calibração, mas por tipo de pergunta, para responder
+ * se há excesso de confiança em um assunto específico (valores, agenda, exame).
+ * Todos os números vêm dos registros; nada é estimado.
+ */
+export function calcularCalibracaoPorTipo(
+  linhas: LinhaDecisaoMetrica[],
+  erros: ErroReportado[] = [],
+): CalibracaoTipo[] {
+  const idx = indexarErros(erros);
+  const base = new Map<string, CalibracaoTipo>();
+
+  for (const l of linhas) {
+    const score = Number.isFinite(l.score) ? l.score : 0;
+    const alta = nivelDa({ nivel: l.nivel, score }) === "HIGH";
+    const errou = foiReportadaComoErro(l, idx);
+    const cats = l.categorias.length > 0 ? l.categorias : [l.intencao || "nao_classificado"];
+    for (const tipo of cats) {
+      const atual =
+        base.get(tipo) ??
+        {
+          tipo,
+          mensagens: 0,
+          mensagensAlta: 0,
+          erros: 0,
+          errosAlta: 0,
+          taxaErro: 0,
+          taxaErroAlta: 0,
+        };
+      atual.mensagens += 1;
+      if (alta) atual.mensagensAlta += 1;
+      if (errou) {
+        atual.erros += 1;
+        if (alta) atual.errosAlta += 1;
+      }
+      base.set(tipo, atual);
+    }
+  }
+
+  const pct = (n: number, d: number) => (d ? Math.round((n / d) * 1000) / 10 : 0);
+  return [...base.values()]
+    .map((t) => ({
+      ...t,
+      taxaErro: pct(t.erros, t.mensagens),
+      taxaErroAlta: pct(t.errosAlta, t.mensagensAlta),
+    }))
+    .sort((a, b) => b.errosAlta - a.errosAlta || b.mensagens - a.mensagens);
+}
+
 export function calcularMetricasConfiabilidade(
   linhas: LinhaDecisaoMetrica[],
   erros: ErroReportado[] = [],
@@ -525,6 +586,7 @@ export function calcularMetricasConfiabilidade(
     correlacaoErros: correlacionar(linhas, erros),
     calibracaoPorNivel: calcularCalibracaoPorNivel(linhas, erros),
     calibracaoPorFaixaScore: calcularCalibracaoPorFaixaScore(linhas, erros),
+    calibracaoPorTipo: calcularCalibracaoPorTipo(linhas, erros),
     altaConfiancaComErro: calcularAltaConfiancaComErro(linhas, erros),
   };
 }
