@@ -1447,7 +1447,13 @@ ATENDIMENTO HUMANO — REGRA OBRIGATÓRIA:
         conversaId: estadoId.conversaId ?? null,
         entities: dadosColetados,
       };
-      const decisao = decidirNoTurno(estadoTurno);
+      // FASE 9 — a política só difere da padrão se um ajuste tiver sido
+      // aprovado E aplicado por uma pessoa. A Nina nunca altera pesos sozinha.
+      const { politicaEfetiva } = await import(
+        "@/lib/nina/confidence/politica-override.server"
+      );
+      const decisao = decidirNoTurno(estadoTurno, await politicaEfetiva(clinicaId));
+
       // FASE 8 — ATIVAÇÃO PROGRESSIVA: etapa A só observa; B aplica handoff e
       // bloqueio; C acrescenta esclarecimento; D endurece o agendamento.
       const [{ etapaConfianca, modoDaEtapa }, { aplicarEtapa }] = await Promise.all([
