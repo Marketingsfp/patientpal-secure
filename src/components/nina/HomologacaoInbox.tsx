@@ -796,6 +796,14 @@ export function HomologacaoInbox() {
             >
               <div className="flex items-center gap-2">
                 <span className="flex-1 truncate text-sm font-medium">{nomeLead(l)}</span>
+                {Number(l.naoLidas ?? 0) > 0 && (
+                  <Badge
+                    data-testid="nao-lidas-lead-teste"
+                    className="bg-atd-blue px-1.5 py-0 text-xs text-atd-on-strong"
+                  >
+                    {Number(l.naoLidas ?? 0)}
+                  </Badge>
+                )}
                 <Badge className="border border-atd-warn bg-atd-warn-bg text-[10px] text-atd-warn-ink">
                   TESTE
                 </Badge>
