@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 import { NODES_ARQUITETURA } from "../manifesto";
 import { ALTURA_NODE, LARGURA_NODE, calcularLayout } from "../layout";
 import {
