@@ -37,28 +37,57 @@ const ESPACO_LINHA = 116;
 const MARGEM = 60;
 
 /**
- * Profundidade = maior caminho a partir dos pontos de entrada. Ciclos
- * (ex.: modelo → tool → modelo) são tratados por limite de iterações, para
- * que o cálculo termine sempre.
+ * Profundidade = distância mínima a partir dos pontos de entrada (BFS).
+ * Usar a menor distância mantém o desenho compacto e termina sempre, mesmo
+ * com ciclos reais do backend (ex.: modelo → ferramenta → modelo).
  */
 export function calcularProfundidades(nodes: NodeArquitetura[]): Map<string, number> {
   const existentes = new Set(nodes.map((n) => n.id));
-  const profundidade = new Map<string, number>();
-  for (const node of nodes) profundidade.set(node.id, 0);
-
-  const limite = nodes.length + 1;
-  for (let iteracao = 0; iteracao < limite; iteracao += 1) {
-    let mudou = false;
-    for (const node of nodes) {
-      const anteriores = node.anteriores.filter((id) => existentes.has(id));
-      if (anteriores.length === 0) continue;
-      const candidato = Math.max(...anteriores.map((id) => profundidade.get(id) ?? 0)) + 1;
-      if (candidato > (profundidade.get(node.id) ?? 0)) {
-        profundidade.set(node.id, candidato);
-        mudou = true;
-      }
+  const seguintes = new Map<string, string[]>();
+  for (const node of nodes) {
+    seguintes.set(
+      node.id,
+      node.seguintes.filter((id) => existentes.has(id)),
+    );
+  }
+  for (const node of nodes) {
+    for (const anterior of node.anteriores) {
+      if (!existentes.has(anterior)) continue;
+      const lista = seguintes.get(anterior) ?? [];
+      if (!lista.includes(node.id)) lista.push(node.id);
+      seguintes.set(anterior, lista);
     }
-    if (!mudou) break;
+  }
+
+  const profundidade = new Map<string, number>();
+  const fila: string[] = [];
+  for (const node of nodes) {
+    const anteriores = node.anteriores.filter((id) => existentes.has(id));
+    if (anteriores.length === 0) {
+      profundidade.set(node.id, 0);
+      fila.push(node.id);
+    }
+  }
+  // Grafo só com ciclos: usa o primeiro node como raiz para não travar.
+  if (fila.length === 0 && nodes.length > 0) {
+    profundidade.set(nodes[0]!.id, 0);
+    fila.push(nodes[0]!.id);
+  }
+
+  while (fila.length > 0) {
+    const atual = fila.shift()!;
+    const nivel = profundidade.get(atual) ?? 0;
+    for (const proximo of seguintes.get(atual) ?? []) {
+      if (profundidade.has(proximo)) continue;
+      profundidade.set(proximo, nivel + 1);
+      fila.push(proximo);
+    }
+  }
+
+  // Nodes isolados (sem caminho a partir das entradas) ficam na última coluna.
+  const maior = Math.max(0, ...profundidade.values());
+  for (const node of nodes) {
+    if (!profundidade.has(node.id)) profundidade.set(node.id, maior + 1);
   }
 
   return profundidade;
