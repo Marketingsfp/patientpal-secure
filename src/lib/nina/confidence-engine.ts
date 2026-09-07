@@ -73,7 +73,7 @@ export const LIMITE_MEDIA = 50;
 const PADROES: Array<{ categoria: CategoriaConfianca; re: RegExp }> = [
   {
     categoria: "valor",
-    re: /(r\$\s?\d|\d+\s?reais|custa|pre[çc]o|valor(es)?\b|tabela de pre|particular fica|投)/i,
+    re: /(r\$\s?\d|\d+\s?reais|custa|pre[çc]o|valor(es)?\b|tabela de pre|particular fica)/i,
   },
   {
     categoria: "horario",
