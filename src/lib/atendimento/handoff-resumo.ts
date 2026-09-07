@@ -54,6 +54,8 @@ export interface AgendamentoConfirmado {
 
 export interface ResumoHandoff {
   intencao: IntencaoHandoff;
+  /** Protocolo do atendimento (o mesmo informado ao paciente no handoff). */
+  protocolo?: string | null;
   /** 1 frase: o que o paciente quer. */
   motivo_contato: string;
   /** Pares "Nome: João" já prontos para exibir. */
@@ -117,6 +119,7 @@ export function normalizarResumo(
     ultimaPergunta?: string | null;
     etapaInterrompida?: string | null;
     /** Pendências e informações vindas do estado real do fluxo (não da IA). */
+    protocolo?: string | null;
     pendenciasExtras?: string[];
     informacoesExtras?: string[];
   },
@@ -131,6 +134,7 @@ export function normalizarResumo(
   const pendencias = lista([...(extras?.pendenciasExtras ?? []), ...listaBruta(o.pendencias)], 6);
   return {
     intencao,
+    protocolo: texto(extras?.protocolo, 40),
     motivo_contato: texto(o.motivo_contato, 300) ?? "Não identificado pela conversa.",
     informacoes,
     ja_informado: lista(o.ja_informado),
@@ -148,6 +152,7 @@ export function normalizarResumo(
 /** Blocos que realmente têm conteúdo — campo vazio não vai para a tela. */
 export function blocosVisiveis(r: ResumoHandoff): Array<{ titulo: string; itens: string[] }> {
   const b: Array<{ titulo: string; itens: string[] }> = [];
+  if (r.protocolo) b.push({ titulo: "Protocolo", itens: [r.protocolo] });
   if (r.motivo_contato) b.push({ titulo: "Motivo do contato", itens: [r.motivo_contato] });
   if (r.situacao) b.push({ titulo: "Situação", itens: [r.situacao] });
   if (r.informacoes.length) b.push({ titulo: "Informações coletadas", itens: r.informacoes });

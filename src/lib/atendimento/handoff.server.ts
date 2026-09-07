@@ -270,11 +270,21 @@ export async function encaminharParaHumano(args: {
   // banco reaproveita o número quando o ciclo já tem um.
   try {
     const { protocoloAoIniciarHandoff } = await import("./protocolo-atendimento.server");
-    await protocoloAoIniciarHandoff({
+    // FASE 3 — protocolo primeiro, comunicação depois: o paciente nunca recebe
+    // um número que não exista. Vale igual com ou sem atendente online.
+    const p = await protocoloAoIniciarHandoff({
       clinicaId: args.clinicaId,
       conversaId: args.conversaId,
       handoffEventoId,
     });
+    if (p?.protocolo)
+      await registrarMarcadorSistema({
+        clinicaId: args.clinicaId,
+        conversaId: args.conversaId,
+        texto:
+          `🧾 Handoff realizado pela Nina · Protocolo: ${p.protocolo}` +
+          ` · Destino: ${depto?.nome ?? "Não atribuídas"}`,
+      });
   } catch (e) {
     console.error("[handoff] falha ao gerar protocolo do handoff", e);
   }

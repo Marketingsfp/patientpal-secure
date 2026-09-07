@@ -284,7 +284,7 @@ export async function garantirResumoHandoff(args: {
   const { clinicaId, conversaId } = args;
   const { data: convData } = await supabaseAdmin
     .from("atend_conversas")
-    .select("handoff_em, handoff_motivo, contato_paciente_id, contato_nome")
+    .select("handoff_em, handoff_motivo, contato_paciente_id, contato_nome, protocolo_atendimento")
     .eq("id", conversaId)
     .eq("clinica_id", clinicaId)
     .maybeSingle();
@@ -293,6 +293,7 @@ export async function garantirResumoHandoff(args: {
     handoff_motivo?: string | null;
     contato_paciente_id?: string | null;
     contato_nome?: string | null;
+    protocolo_atendimento?: string | null;
   } | null;
   if (!conv) return null;
   if (!conv.handoff_em && !args.ignorarHandoff) return null; // nunca passou por handoff
@@ -328,6 +329,9 @@ export async function garantirResumoHandoff(args: {
     const payload = ajustarResumoPorDesfecho(
       normalizarResumo(bruto, {
         motivoHandoff: conv.handoff_motivo ?? null,
+        // FASE 3 — o resumo entregue ao humano reutiliza o MESMO protocolo
+        // do handoff; nunca é recalculado nem inventado pelo modelo.
+        protocolo: conv.protocolo_atendimento ?? null,
         agendamentoReal: agendado,
         ...(args.extras ?? {}),
       }),
