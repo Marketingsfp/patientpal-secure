@@ -312,6 +312,19 @@ export function HomologacaoInbox() {
     [clinicaId, historico],
   );
 
+  // FASE 8 — "Ver conversa" no Relatório da homologação seleciona o lead aqui.
+  useEffect(() => {
+    function abrir(ev: Event) {
+      const d = (ev as CustomEvent).detail as { leadIndice?: number | null; conversaId?: string | null };
+      const alvo =
+        leads.find((l) => l.conversa_id && l.conversa_id === d?.conversaId) ??
+        (typeof d?.leadIndice === "number" ? leads.find((l) => l.indice === d.leadIndice) : null);
+      if (alvo) setLeadId(alvo.id);
+    }
+    window.addEventListener("nina:abrir-lead-teste", abrir);
+    return () => window.removeEventListener("nina:abrir-lead-teste", abrir);
+  }, [leads]);
+
   useEffect(() => {
     if (!leadId) {
       setMsgs([]);
