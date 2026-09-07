@@ -38,6 +38,10 @@ export type StatusNodeCanvas = {
   horario?: string | null;
   tentativas?: number | null;
   erro?: string | null;
+  /** Resumo já mascarado do que entrou neste node naquela passagem. */
+  entrada?: string | null;
+  /** Resumo já mascarado do que o node devolveu naquela passagem. */
+  resultado?: string | null;
 };
 
 type Props = {
