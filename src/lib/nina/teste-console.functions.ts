@@ -715,6 +715,9 @@ export const resolverConversaTeste = createServerFn({ method: "POST" })
         identidade_perguntada_em: null,
         identidade_tentativas: 0,
         nina_fluxo_estado: null,
+        // Invalida qualquer tarefa pendente do ciclo (espera do paciente,
+        // encerramento automático, follow-up): nada dispara depois de resolver.
+        patient_response_deadline: null,
         handoff_resumo: null,
         handoff_motivo: null,
         closed_at: agora,
