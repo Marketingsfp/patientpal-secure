@@ -125,7 +125,6 @@ export async function protocoloAoIniciarHandoff(args: {
   });
   // O paciente só é avisado depois que o número existe de fato.
   if (r && args.anunciar !== false) {
-    const { anunciarHandoffAoPaciente } = await import("./protocolo-atendimento.server");
     await anunciarHandoffAoPaciente({
       clinicaId: args.clinicaId,
       conversaId: args.conversaId,
