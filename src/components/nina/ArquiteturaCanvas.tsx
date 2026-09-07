@@ -10,6 +10,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Crosshair,
   Maximize2,
+  Route,
   RotateCcw,
   ZoomIn,
   ZoomOut,
