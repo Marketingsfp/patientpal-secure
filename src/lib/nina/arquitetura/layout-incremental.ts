@@ -20,6 +20,7 @@ import {
 import {
   assinaturaAtual,
   calcularDiffArquitetura,
+  diffPendente,
   type AssinaturaNode,
   type DiffArquitetura,
 } from "./sync";
@@ -320,7 +321,7 @@ export type StatusArquitetura = {
  */
 export function statusArquitetura(
   nodes: NodeArquitetura[],
-  diff: DiffArquitetura = calcularDiffArquitetura(),
+  diff: DiffArquitetura = diffPendente(),
 ): StatusArquitetura {
   const problemas = verificarIntegridade(nodes);
   if (problemas.length > 0) {
