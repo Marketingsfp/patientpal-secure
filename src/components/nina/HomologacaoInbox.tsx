@@ -86,6 +86,9 @@ import { useChatScroll } from "@/hooks/use-chat-scroll";
 import { formatarDataHoraMensagem } from "@/lib/atendimento/data-hora";
 import { definirSelecaoTeste } from "@/lib/webmcp/selecao-teste";
 import { assinarAtualizacao } from "@/lib/webmcp/atualizacao";
+import { rotuloAutorResumo } from "@/lib/nina/leads-resumo";
+import { supabase } from "@/integrations/supabase/client";
+
 
 type Lead = {
   id: string;
@@ -97,7 +100,13 @@ type Lead = {
   cicloId?: string | null;
   status: string;
   mensagens: number;
+  /** FASE 2 — resumo da última mensagem conversacional (paciente ou Nina). */
+  ultimaMensagemTexto?: string | null;
+  ultimaMensagemAutor?: "paciente" | "nina" | "atendente" | null;
+  ultimaMensagemEm?: string | null;
+  naoLidas?: number;
 };
+
 
 type Msg = {
   id: string;
