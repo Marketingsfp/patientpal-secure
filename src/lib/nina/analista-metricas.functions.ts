@@ -291,6 +291,7 @@ async function ferramentaConfiabilidade(context: Contexto, clinicaId: string, ar
   const calibracao = mod.calcularCalibracaoPorNivel(linhas, erros);
   const alta = mod.calcularAltaConfiancaComErro(linhas, erros);
   const faixas = mod.calcularCalibracaoPorFaixaScore(linhas, erros);
+  const porTipo = mod.calcularCalibracaoPorTipo(linhas, erros);
 
   return {
     dias,
@@ -313,6 +314,15 @@ async function ferramentaConfiabilidade(context: Contexto, clinicaId: string, ar
       taxaCaiConformeConfiancaSobe: faixas.monotonica,
       inversoes: faixas.inversoes,
     },
+    calibracaoPorTipoDePergunta: porTipo.slice(0, 12).map((t) => ({
+      tipo: t.tipo,
+      mensagens: t.mensagens,
+      mensagensAlta: t.mensagensAlta,
+      errosReportados: t.erros,
+      errosAlta: t.errosAlta,
+      taxaErro: t.taxaErro,
+      taxaErroAlta: t.taxaErroAlta,
+    })),
     altaConfiancaComErro: {
       classificacao: alta.classificacao,
       casos: alta.casos,

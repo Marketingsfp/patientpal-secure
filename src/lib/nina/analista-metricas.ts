@@ -36,6 +36,8 @@ REGRAS DE ANÁLISE
 - Mais erros em números absolutos não significa piora: compare com o volume de mensagens e verifique se os períodos são comparáveis (dias e horas incluídos vêm no resultado).
 - Encaminhar para uma atendente pode ser o fluxo correto, não é falha por si só. Ausência de transferência não prova que o atendimento foi resolvido.
 - HIGH_CONFIDENCE_ERROR (alta confiança reportada como erro) é o caso mais grave: o motor não sinalizou incerteza, então o problema tende a estar na fonte, no validador, na regra, no peso, na identificação da entidade, na ferramenta ou na arquitetura de confiança. Quando houver casos assim, trate-os como prioridade e diga onde investigar, sem afirmar causa.
+- Calibração: use consultar_confiabilidade para responder sobre confiança, superconfiança, faixas acima de 90% ou 95%, comparação de taxa de erro entre níveis, validador mais frequente nos erros de alta confiança e excesso de confiança por assunto (ex.: valores). Todos esses números já vêm calculados; cite-os pelo nome do campo e nunca estime.
+- Só afirme que a confiança está calibrada, ou que há superconfiança, com base nos campos devolvidos (taxaCaiConformeConfiancaSobe, inversoes, taxaErro por faixa/nível/tipo). Com poucas mensagens em uma faixa ou tipo, trate como amostra insuficiente em vez de conclusão.
 - Os erros reportados são apenas os que alguém registrou; não são auditoria de todas as respostas. Diga isso quando falar de qualidade.
 - Associação não é causa. Mais erros pela manhã não prova que o horário causou os erros.
 - Não chame um resultado de "bom" ou "ruim" sem dizer o critério, a comparação ou a meta cadastrada. Se não houver meta cadastrada, diga que não há.
@@ -115,7 +117,7 @@ export const FERRAMENTAS_ANALISTA = [
     type: "function" as const,
     name: "consultar_confiabilidade",
     description:
-      "Consulta agregada e somente leitura da confiança das respostas da Nina: confiança média, distribuição alta/média/baixa, calibração (mensagens x erros reportados por nível) e o indicador HIGH_CONFIDENCE_ERROR (respostas de alta confiança que foram reportadas como erro).",
+      "Consulta agregada e somente leitura da confiança das respostas da Nina: confiança média; calibração por nível (alta/média/baixa) com mensagens, erros reportados e taxa de erro; calibração por faixa de confiança (0-59, 60-69, 70-79, 80-89, 90-94, 95-100) com indicação de a taxa de erro cair conforme a confiança sobe; calibração por tipo de pergunta (valores, agenda, exame etc.) inclusive só entre respostas de alta confiança; e o indicador HIGH_CONFIDENCE_ERROR (respostas de alta confiança reportadas como erro) com validadores, ferramentas, tipos e motivos mais frequentes.",
     parameters: {
       type: "object",
       additionalProperties: false,
@@ -374,6 +376,20 @@ export function valoresPermitidos(resultados: { id: string; dados: any }[]): Map
         for (const [k, v] of Object.entries(item)) guardar(k, v);
       }
     }
+    // Consulta de confiabilidade: formato próprio (calibração por nível, por
+    // faixa de score e por tipo de pergunta). Todo número devolvido pode ser
+    // citado, sempre com o nome do campo de origem.
+    if (dados && typeof dados === "object" && "respostasAvaliadas" in dados) {
+      const percorrer = (valor: unknown, chave: string) => {
+        if (typeof valor === "number") return guardar(chave, valor);
+        if (Array.isArray(valor)) return valor.forEach((v) => percorrer(v, chave));
+        if (valor && typeof valor === "object") {
+          for (const [k, v] of Object.entries(valor as Record<string, unknown>)) percorrer(v, k);
+        }
+      };
+      percorrer(dados, "confiabilidade");
+    }
+
     guardar("taxaErro", dados?.consolidado?.valor);
     guardar("taxaErroNumerador", dados?.consolidado?.numerador);
     guardar("taxaErroDenominador", dados?.consolidado?.denominador);
