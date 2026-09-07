@@ -497,7 +497,7 @@ export const finalizarItemExecucao = createServerFn({ method: "POST" })
       .eq("id", (item as any).simulacao_id ?? "00000000-0000-0000-0000-000000000000")
       .maybeSingle();
 
-    const criterios = (((item as any).cenario_snapshot?.criterios ?? []) as Criterio[]) ?? [];
+    const criterios = ((item as any).cenario_snapshot?.criterios ?? []) as Criterio[];
     const { resultado, avaliados } = avaliarCenario(criterios, {
       respostasNina,
       ferramentas,
