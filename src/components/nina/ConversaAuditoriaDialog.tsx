@@ -104,18 +104,13 @@ export function ConversaAuditoriaDialog({
   }, [dados]);
 
   // Mensagens e eventos em uma única linha do tempo, por horário.
-  const timeline = dados
-    ? [
-        ...dados.mensagens.map((m) => ({ t: m.recebida_em, kind: "msg" as const, msg: m })),
-        ...dados.eventos.map((ev) => ({ t: ev.created_at, kind: "evento" as const, ev })),
-      ].sort((a, b) => (a.t < b.t ? -1 : a.t > b.t ? 1 : 0))
-    : [];
+  const timeline = dados ? montarTimeline(dados.mensagens, dados.eventos) : [];
 
   // Data real da mensagem reportada (≠ data em que o erro foi reportado).
-  const dataMensagem =
-    dados && mensagemId
-      ? (dados.mensagens.find((m) => m.id === mensagemId)?.recebida_em ?? null)
-      : null;
+  // Localização sempre por id — nunca por texto.
+  const dataMensagem = dados
+    ? (localizarMensagem(dados.mensagens, mensagemId)?.recebida_em ?? null)
+    : null;
 
   // CASO 1 — sem conversa vinculada: nunca cair na "primeira conversa do lead".
   const semVinculo = !conversaId;
