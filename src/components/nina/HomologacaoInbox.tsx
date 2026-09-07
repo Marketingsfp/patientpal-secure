@@ -744,9 +744,25 @@ export function HomologacaoInbox() {
                   {l.conversaId ? "conversa ativa" : "nova"}
                 </Badge>
               </div>
+              {l.ultimaMensagemTexto ? (
+                <div className="mt-1.5" data-testid="previa-lead-teste">
+                  <p className="line-clamp-2 text-xs leading-snug text-foreground/80">
+                    <span className="font-medium text-foreground">
+                      {rotuloAutorResumo(l.ultimaMensagemAutor ?? null)}:
+                    </span>{" "}
+                    {l.ultimaMensagemTexto}
+                  </p>
+                  <p className="mt-0.5 text-[11px] text-muted-foreground">
+                    {formatarDataHoraMensagem(l.ultimaMensagemEm)}
+                  </p>
+                </div>
+              ) : (
+                <p className="mt-1.5 text-xs italic text-muted-foreground">Sem mensagens ainda</p>
+              )}
               <div className="mt-1 min-h-[16px] truncate text-xs text-muted-foreground">
                 sessão {l.sessao} · {l.mensagens} mensagens
               </div>
+
               <div className="mt-0.5 min-h-[14px] font-mono text-[11px] text-muted-foreground">
                 {l.telefone} (virtual)
               </div>
