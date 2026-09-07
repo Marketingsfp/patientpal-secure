@@ -107,7 +107,7 @@ export function ArquiteturaCanvas({
     const { escala, x, y } = calcularFitView(layout, {
       largura: area.clientWidth,
       altura: area.clientHeight,
-    }, { escalaMinima: ESCALA_MIN, escalaMaxima: 1.1 });
+    }, { escalaMinima: 0.45, escalaMaxima: 1.1 });
     setView({ escala, x, y });
   }, [layout]);
 
