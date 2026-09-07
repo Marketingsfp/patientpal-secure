@@ -50,7 +50,11 @@ const dadosConsulta = {
 
 describe("ferramentas autorizadas", () => {
   it("é uma lista fechada de consultas somente leitura", () => {
-    expect(NOMES_FERRAMENTAS).toEqual(["consultar_metricas", "obter_configuracao"]);
+    expect(NOMES_FERRAMENTAS).toEqual([
+      "consultar_metricas",
+      "consultar_confiabilidade",
+      "obter_configuracao",
+    ]);
     for (const f of FERRAMENTAS_ANALISTA) {
       expect(f.type).toBe("function");
       expect(f.parameters.additionalProperties).toBe(false);
