@@ -362,6 +362,7 @@ export function ArquiteturaCanvas({
                 </path>
               );
             })}
+          </svg>
 
 
           {layout.nodes.map(({ node, x, y, principal }) => {
