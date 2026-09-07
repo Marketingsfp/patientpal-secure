@@ -16,6 +16,8 @@ export type LinhaDecisaoMetrica = {
   created_at: string;
   ambiente: string | null;
   conversation_id: string | null;
+  /** Execução da Nina que produziu a mensagem (vínculo exato com o reporte). */
+  execucao_id?: string | null;
   score: number;
   nivel: string | null;
   decisao: string | null;
@@ -36,8 +38,20 @@ export type LinhaDecisaoMetrica = {
 export type ErroReportado = {
   id: string;
   conversa_id: string | null;
+  /** Execução exata reportada, quando o reporte guardou esse vínculo. */
+  execucao_id?: string | null;
   created_at: string;
   categoria: string | null;
+};
+
+/** FASE 6 — calibração: confiança declarada × erro efetivamente reportado. */
+export type CalibracaoNivel = {
+  nivel: "HIGH" | "MEDIUM" | "LOW";
+  rotulo: string;
+  mensagens: number;
+  erros: number;
+  /** Percentual com uma casa decimal (0 quando não há mensagens). */
+  taxaErro: number;
 };
 
 export type Contagem = { chave: string; total: number };
