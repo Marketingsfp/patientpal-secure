@@ -145,12 +145,29 @@ export function ConversaAuditoriaDialog({
       ].sort((a, b) => (a.t < b.t ? -1 : a.t > b.t ? 1 : 0))
     : [];
 
+  // Data real da mensagem reportada (≠ data em que o erro foi reportado).
+  const dataMensagem =
+    dados && mensagemId
+      ? (dados.mensagens.find((m) => m.id === mensagemId)?.recebida_em ?? null)
+      : null;
+
+  // CASO 1 — sem conversa vinculada: nunca cair na "primeira conversa do lead".
+  const semVinculo = !conversaId;
+
+  const linhaInfo = (rotulo: string, valor: string | null | undefined) =>
+    valor ? (
+      <div className="flex gap-1">
+        <span className="text-muted-foreground">{rotulo}:</span>
+        <span className="font-medium">{valor}</span>
+      </div>
+    ) : null;
+
   return (
     <Dialog open={aberto} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl">
         <DialogHeader>
           <DialogTitle className="flex flex-wrap items-center gap-2">
-            {dados?.conversa.titulo ?? "Conversa"}
+            Conversa relacionada ao erro
             <Badge variant="outline">Somente leitura</Badge>
             {dados?.conversa.is_teste && <Badge variant="secondary">Homologação</Badge>}
           </DialogTitle>
@@ -160,19 +177,39 @@ export function ConversaAuditoriaDialog({
           </DialogDescription>
         </DialogHeader>
 
-        {carregando && (
+        <div className="grid grid-cols-1 gap-x-6 gap-y-1 rounded-md border bg-muted/30 p-3 text-xs sm:grid-cols-2">
+          {linhaInfo("Paciente", dados?.conversa.titulo ?? null)}
+          {linhaInfo("Erro", erroId ? `#${curto(erroId)}` : null)}
+          {linhaInfo("Conversa", curto(conversaId))}
+          {linhaInfo("Mensagem reportada", curto(mensagemId))}
+          {linhaInfo("Data da mensagem", dataMensagem ? fmtHora(dataMensagem) : null)}
+          {linhaInfo("Erro reportado em", reportadoEm ? fmtHora(reportadoEm) : null)}
+          {linhaInfo("Protocolo", dados?.conversa.protocolo ?? null)}
+        </div>
+
+        {semVinculo && (
+          <p className="rounded-md border border-atd-warn bg-atd-warn-bg px-3 py-4 text-center text-sm text-atd-warn-ink">
+            Não foi possível localizar a conversa exata vinculada a este reporte.
+          </p>
+        )}
+
+        {!semVinculo && carregando && (
           <div className="flex items-center justify-center gap-2 py-10 text-sm text-muted-foreground">
             <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> Carregando conversa…
           </div>
         )}
-        {erro && <p className="py-6 text-center text-sm text-destructive">{erro}</p>}
+        {!semVinculo && erro && (
+          <p className="rounded-md border border-atd-warn bg-atd-warn-bg px-3 py-4 text-center text-sm text-atd-warn-ink">
+            Não foi possível localizar a conversa exata vinculada a este reporte.
+          </p>
+        )}
 
         {dados && !carregando && !erro && (
           <>
             {mensagemId && dados.mensagemEncontrada === false && (
               <div className="rounded-md border border-atd-warn bg-atd-warn-bg px-3 py-2 text-xs text-atd-warn-ink">
-                A mensagem reportada não está mais disponível nesta conversa. O histórico é
-                exibido sem destaque.
+                Conversa localizada, mas a mensagem original do reporte não foi encontrada.
+                Nenhuma outra mensagem é destacada por aproximação.
               </div>
             )}
             <div className="max-h-[60vh] space-y-2 overflow-y-auto rounded-md bg-atd-bg p-3">
