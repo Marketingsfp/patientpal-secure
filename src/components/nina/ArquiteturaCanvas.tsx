@@ -695,7 +695,59 @@ export function ArquiteturaCanvas({
             );
           })}
         </div>
+
+        {/* FASE 7 — minimapa discreto: só navegação, sem consultar o backend. */}
+        <div
+          className="absolute bottom-2 right-2 rounded-md border bg-card/90 p-1 shadow-sm"
+          style={{ width: minimapa.largura + 8, height: minimapa.altura + 8 }}
+          onPointerDown={(evento) => {
+            evento.stopPropagation();
+            const area = areaRef.current;
+            if (!area) return;
+            const caixa = evento.currentTarget.getBoundingClientRect();
+            const alvoX = (evento.clientX - caixa.left - 4) / minimapa.escala;
+            const alvoY = (evento.clientY - caixa.top - 4) / minimapa.escala;
+            setView((atual) => ({
+              escala: atual.escala,
+              x: area.clientWidth / 2 - alvoX * atual.escala,
+              y: area.clientHeight / 2 - alvoY * atual.escala,
+            }));
+          }}
+          aria-label="Minimapa da arquitetura"
+        >
+          <div className="relative h-full w-full">
+            {layout.nodes.map(({ node, x, y }) =>
+              visiveis.has(node.id) ? (
+                <span
+                  key={node.id}
+                  className="absolute rounded-[1px]"
+                  style={{
+                    left: x * minimapa.escala,
+                    top: y * minimapa.escala,
+                    width: Math.max(2, LARGURA_NODE * minimapa.escala),
+                    height: Math.max(2, ALTURA_NODE * minimapa.escala),
+                    backgroundColor: CORES_CATEGORIA[node.categoria],
+                    opacity: resultadosBusca.size > 0 && !resultadosBusca.has(node.id) ? 0.25 : 0.8,
+                  }}
+                />
+              ) : null,
+            )}
+            <span
+              className="pointer-events-none absolute border border-primary"
+              style={{
+                left: (-view.x / view.escala) * minimapa.escala,
+                top: (-view.y / view.escala) * minimapa.escala,
+                width:
+                  ((areaRef.current?.clientWidth ?? 0) / view.escala) * minimapa.escala,
+                height:
+                  ((areaRef.current?.clientHeight ?? 0) / view.escala) * minimapa.escala,
+              }}
+            />
+          </div>
+        </div>
       </div>
+
+
 
       <div className="flex flex-wrap items-center gap-2">
         <span className="inline-flex items-center gap-1.5 rounded-full border border-primary/50 px-2 py-0.5 text-[11px] text-foreground">
