@@ -191,7 +191,7 @@ describe("definição central das instruções", () => {
     expect(bloco.toLowerCase()).not.toContain("planilha");
   });
 
-  it("sem catálogo publicado não há bloco de regras", async () => {
+  it("sem catálogo publicado o bloco continua e manda encaminhar para humano", async () => {
     mock.module("@/integrations/supabase/client.server", () => ({
       supabaseAdmin: {
         from: () => ({
@@ -200,6 +200,9 @@ describe("definição central das instruções", () => {
       },
     }));
     const { blocoPromptCatalogo } = await import("../catalogo-prompt.server");
-    expect(await blocoPromptCatalogo("clinica-1")).toBe("");
+    const bloco = await blocoPromptCatalogo("clinica-1");
+    expect(bloco).toContain("0 exames/procedimentos");
+    expect(bloco).toContain("solicitar_atendente_humano");
+    expect(bloco).toMatch(/única fonte de fatos/i);
   });
 });
