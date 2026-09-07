@@ -1701,7 +1701,7 @@ export const listarMensagensConversa = createServerFn({ method: "POST" })
     let q = context.supabase
       .from("whatsapp_mensagens")
       .select(
-        "id, direction, from_number, to_number, body, tipo, enviada_por, recebida_em, media_url, media_mime, status",
+        "id, direction, from_number, to_number, body, tipo, enviada_por, recebida_em, media_url, media_mime, status, execucao_id",
       )
       .eq("clinica_id", data.clinicaId)
       .eq("conversa_id", data.conversaId);

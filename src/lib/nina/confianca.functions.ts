@@ -567,3 +567,58 @@ export const decidirPropostaConfianca = createServerFn({ method: "POST" })
     }
     return { status: data.decisao };
   });
+
+// --------------------------- Indicador de confiança na Inbox (por mensagem)
+
+export type ConfiancaDaMensagem = {
+  execucao_id: string;
+  score: number;
+  nivel: "HIGH" | "MEDIUM" | "LOW";
+  resultado: string;
+  bloqueadores: string[];
+  registrado_em: string;
+};
+
+/**
+ * Confiança REAL registrada pelo motor no instante em que cada resposta foi
+ * produzida. Nada é recalculado aqui nem no navegador: é leitura direta do
+ * que ficou gravado, casado pela execução que gerou a mensagem.
+ */
+export const confiancaDasExecucoes = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) =>
+    z
+      .object({
+        clinicaId: z.string().uuid(),
+        execucaoIds: z.array(z.string().uuid()).min(1).max(300),
+      })
+      .parse(i),
+  )
+  .handler(async ({ data, context }): Promise<ConfiancaDaMensagem[]> => {
+    const { data: rows, error } = await context.supabase
+      .from("nina_confianca_decisoes")
+      .select("execucao_id, score, nivel, resultado_final, acao, bloqueadores, bloqueio, created_at")
+      .eq("clinica_id", data.clinicaId)
+      .in("execucao_id", data.execucaoIds)
+      .order("created_at", { ascending: true });
+    if (error) throw new Error(error.message);
+
+    // Uma execução pode ter mais de uma decisão (esclarecimento + resposta):
+    // vale a última, que é a que produziu a mensagem entregue.
+    const porExecucao = new Map<string, ConfiancaDaMensagem>();
+    for (const raw of rows ?? []) {
+      const r = raw as Record<string, unknown>;
+      const id = r["execucao_id"] ? String(r["execucao_id"]) : "";
+      if (!id) continue;
+      const bloqueio = r["bloqueio"] ? [String(r["bloqueio"])] : [];
+      porExecucao.set(id, {
+        execucao_id: id,
+        score: Math.round(Number(r["score"]) || 0),
+        nivel: ((r["nivel"] as string) ?? "LOW") as "HIGH" | "MEDIUM" | "LOW",
+        resultado: (r["resultado_final"] as string) ?? (r["acao"] as string) ?? "",
+        bloqueadores: [...new Set([...lista(r["bloqueadores"]), ...bloqueio])],
+        registrado_em: String(r["created_at"] ?? ""),
+      });
+    }
+    return [...porExecucao.values()];
+  });
