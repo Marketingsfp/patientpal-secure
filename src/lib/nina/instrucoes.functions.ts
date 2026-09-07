@@ -270,11 +270,24 @@ export const publicarInstrucoesNina = createServerFn({ method: "POST" })
         escopo: z.enum(ESCOPOS),
         conteudo: z.string().min(1).max(60000),
         comentario: z.string().trim().max(500).optional(),
+        /** Número da versão restaurada, quando a publicação vier do histórico. */
+        restauradaDe: z.number().int().positive().nullable().optional(),
       })
       .parse(input),
   )
   .handler(async ({ data, context }): Promise<VersaoInstrucoes> => {
-    const { supabase } = context as { supabase: any };
+    const { supabase, userId } = context as { supabase: any; userId: string };
+    // FASE 7 — publicar é permissão separada de editar.
+    await exigirCapacidade(supabase, userId, data.clinicaId, "nina.instrucoes.publicar");
+
+    const { data: anterior } = await supabase
+      .from(TAB)
+      .select("versao")
+      .is("clinica_id", null)
+      .eq("escopo", data.escopo)
+      .eq("status", "publicada")
+      .maybeSingle();
+
     const { data: nova, error } = await supabase.rpc("nina_instrucoes_publicar", {
       p_escopo: data.escopo,
       p_conteudo: data.conteudo,
