@@ -317,7 +317,7 @@ export function HomologacaoInbox() {
     function abrir(ev: Event) {
       const d = (ev as CustomEvent).detail as { leadIndice?: number | null; conversaId?: string | null };
       const alvo =
-        leads.find((l) => l.conversa_id && l.conversa_id === d?.conversaId) ??
+        leads.find((l) => l.conversaId && l.conversaId === d?.conversaId) ??
         (typeof d?.leadIndice === "number" ? leads.find((l) => l.indice === d.leadIndice) : null);
       if (alvo) setLeadId(alvo.id);
     }
