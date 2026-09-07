@@ -22,6 +22,8 @@ export type SnapshotInstrucoes = {
   escopo: EscopoRuntime;
   versao: number | null;
   versaoId: string | null;
+  /** Data em que essa versão foi publicada (rastreabilidade histórica). */
+  publicadoEm: string | null;
   /** publicada = banco; cache = última válida conhecida; codigo = fallback. */
   origem: "publicada" | "cache" | "codigo";
   texto: string;
@@ -29,7 +31,13 @@ export type SnapshotInstrucoes = {
 
 const TTL_MS = 30_000;
 
-type Entrada = { conteudo: string; versao: number; versaoId: string; em: number };
+type Entrada = {
+  conteudo: string;
+  versao: number;
+  versaoId: string;
+  publicadoEm: string | null;
+  em: number;
+};
 
 /** Última versão publicada conhecida por escopo (também serve de fallback). */
 const cache = new Map<EscopoRuntime, Entrada>();
@@ -74,14 +82,20 @@ async function lerPublicada(escopo: EscopoRuntime): Promise<Entrada | null> {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   const { data, error } = await (supabaseAdmin as any)
     .from("nina_instrucoes_versoes")
-    .select("id, versao, conteudo")
+    .select("id, versao, conteudo, publicado_em")
     .is("clinica_id", null)
     .eq("escopo", escopo)
     .eq("status", "publicada")
     .maybeSingle();
   if (error) throw new Error(error.message);
   if (!data || typeof data.conteudo !== "string" || data.conteudo.trim() === "") return null;
-  return { conteudo: data.conteudo, versao: data.versao, versaoId: data.id, em: Date.now() };
+  return {
+    conteudo: data.conteudo,
+    versao: data.versao,
+    versaoId: data.id,
+    publicadoEm: data.publicado_em ?? null,
+    em: Date.now(),
+  };
 }
 
 /**
@@ -119,6 +133,7 @@ export async function promptInstrucoes(
         escopo,
         versao: base.versao,
         versaoId: base.versaoId,
+        publicadoEm: base.publicadoEm,
         origem: entrada ? "publicada" : "cache",
         texto: render.texto,
       };
@@ -126,5 +141,12 @@ export async function promptInstrucoes(
     registrarFalha(escopo, `marcador desconhecido ${render.restante} na v${base.versao}`);
   }
 
-  return { escopo, versao: null, versaoId: null, origem: "codigo", texto: fallbackCodigo };
+  return {
+    escopo,
+    versao: null,
+    versaoId: null,
+    publicadoEm: null,
+    origem: "codigo",
+    texto: fallbackCodigo,
+  };
 }

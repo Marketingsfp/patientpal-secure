@@ -318,7 +318,13 @@ export function NodeDetalhePainel({
               <ScrollArea className="flex-1">
                 <div className="space-y-4 p-4">
                   <TabsContent value="visao" className="mt-0 space-y-4">
-                    {NODES_INSTRUCOES.includes(node.id) ? (
+                    {NODES_INSTRUCOES.includes(node.id) && modoExecucao ? (
+                      <p className="rounded-md border p-3 text-xs text-muted-foreground">
+                        Nesta aba você vê a versão usada NAQUELA mensagem (na aba Execução), não a
+                        versão publicada hoje.
+                      </p>
+                    ) : null}
+                    {NODES_INSTRUCOES.includes(node.id) && !modoExecucao ? (
                       <ConfiguracaoInstrucoes
                         onVerInstrucoes={() => {
                           onFechar();

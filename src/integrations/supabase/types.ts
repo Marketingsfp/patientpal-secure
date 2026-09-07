@@ -8289,6 +8289,11 @@ export type Database = {
           model: string
           output_tokens: number | null
           perfil: string
+          prompt_modulos: string[]
+          prompt_origem: string | null
+          prompt_publicado_em: string | null
+          prompt_versao: number | null
+          prompt_versao_id: string | null
           retries: number
           route_reason: string
           success: boolean
@@ -8309,6 +8314,11 @@ export type Database = {
           model: string
           output_tokens?: number | null
           perfil: string
+          prompt_modulos?: string[]
+          prompt_origem?: string | null
+          prompt_publicado_em?: string | null
+          prompt_versao?: number | null
+          prompt_versao_id?: string | null
           retries?: number
           route_reason: string
           success?: boolean
@@ -8329,13 +8339,26 @@ export type Database = {
           model?: string
           output_tokens?: number | null
           perfil?: string
+          prompt_modulos?: string[]
+          prompt_origem?: string | null
+          prompt_publicado_em?: string | null
+          prompt_versao?: number | null
+          prompt_versao_id?: string | null
           retries?: number
           route_reason?: string
           success?: boolean
           thinking_level?: string
           tool_calls?: string[]
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "nina_execucoes_prompt_versao_id_fkey"
+            columns: ["prompt_versao_id"]
+            isOneToOne: false
+            referencedRelation: "nina_instrucoes_versoes"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       nina_faixas_horarias: {
         Row: {

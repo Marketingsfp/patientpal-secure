@@ -90,9 +90,24 @@ function clonar<T>(v: T): T {
   }
 }
 
+/**
+ * FASE 6 — referência (imutável) da versão das Instruções da Nina usada nesta
+ * execução. Guardamos a referência, nunca uma cópia do texto do prompt.
+ */
+export type PromptDaExecucao = {
+  escopo: string;
+  versaoId: string | null;
+  versao: number | null;
+  publicadoEm: string | null;
+  /** publicada = versão do banco; cache = última válida; codigo = fallback. */
+  origem: "publicada" | "cache" | "codigo";
+  conversaId?: string | null;
+};
+
 export type Coletor = {
   etapa: (e: Omit<Etapa, "em"> & { em?: string }) => void;
   mensagensEntrada: (ids: string[]) => void;
+  promptVersao: (ref: PromptDaExecucao) => void;
   pacote: () => PacoteEvidencias;
 };
 
@@ -100,6 +115,10 @@ export type PacoteEvidencias = {
   etapas: Etapa[];
   mensagensEntrada: string[];
   lacunas: string[];
+  /** FASE 6 — versão das instruções usada nesta execução, quando registrada. */
+  prompt: PromptDaExecucao | null;
+  /** FASE 6 — módulos complementares realmente utilizados. */
+  modulos: string[];
 };
 
 /**
@@ -109,6 +128,7 @@ export type PacoteEvidencias = {
 export function criarColetor(agora: () => string = () => new Date().toISOString()): Coletor {
   const etapas: Etapa[] = [];
   let entrada: string[] = [];
+  let prompt: PromptDaExecucao | null = null;
   return {
     etapa(e) {
       // Cópia profunda no ato: a evidência é um snapshot do momento. Uma
@@ -124,10 +144,39 @@ export function criarColetor(agora: () => string = () => new Date().toISOString(
     mensagensEntrada(ids) {
       entrada = [...new Set(ids.filter(Boolean))];
     },
+    promptVersao(ref) {
+      // Snapshot do momento: a primeira referência registrada é a que vale,
+      // mesmo que outra versão seja publicada no meio da execução.
+      if (!prompt) prompt = { ...ref };
+    },
     pacote() {
-      return { etapas, mensagensEntrada: entrada, lacunas: lacunas(etapas, entrada) };
+      return {
+        etapas,
+        mensagensEntrada: entrada,
+        lacunas: lacunas(etapas, entrada),
+        prompt,
+        modulos: modulosUtilizados(etapas),
+      };
     },
   };
+}
+
+/**
+ * FASE 6 — módulos complementares que REALMENTE foram usados na execução,
+ * deduzidos das etapas registradas. Sem etapa correspondente, o módulo não
+ * aparece (nunca listamos módulo que não rodou).
+ */
+export function modulosUtilizados(etapas: readonly Etapa[]): string[] {
+  const usados = new Set<string>();
+  for (const e of etapas) {
+    const alvo = `${e.titulo} ${JSON.stringify(e.dados ?? {})}`.toLowerCase();
+    if (e.fonte === "agenda") usados.add("Agendamento");
+    if (e.fonte === "catalogo") usados.add("Conhecimento");
+    if (/handoff|transfer|atendente humana|atendente humano/.test(alvo)) {
+      usados.add("Transferência");
+    }
+  }
+  return [...usados];
 }
 
 /**
