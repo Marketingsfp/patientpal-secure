@@ -12883,6 +12883,7 @@ export type Database = {
           tipo: string
           to_number: string | null
           transcricao: string | null
+          tratada_internamente: boolean
           wa_message_id: string | null
         }
         Insert: {
@@ -12907,6 +12908,7 @@ export type Database = {
           tipo?: string
           to_number?: string | null
           transcricao?: string | null
+          tratada_internamente?: boolean
           wa_message_id?: string | null
         }
         Update: {
@@ -12931,6 +12933,7 @@ export type Database = {
           tipo?: string
           to_number?: string | null
           transcricao?: string | null
+          tratada_internamente?: boolean
           wa_message_id?: string | null
         }
         Relationships: [

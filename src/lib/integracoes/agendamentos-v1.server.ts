@@ -45,9 +45,11 @@ const uuid = z.string().uuid("Identificador inválido.");
 const criarSchema = z.object({
   id_externo: z.string().min(1).max(120),
   // v1: paciente já cadastrado. v1.1: alternativamente o objeto `paciente`.
-  // Um ou outro — nunca os dois (ver `patient_and_id_conflict`).
+  // v1.2: alternativamente o `verificacao_token` (confirmação por WhatsApp).
+  // Um só dos três — nunca combinados (ver `patient_and_id_conflict`).
   paciente_id: uuid.optional(),
   paciente: pacienteSchema.optional(),
+  verificacao_token: z.string().min(16).max(200).optional(),
   medico_id: uuid.nullish(),
   especialidade_id: uuid.nullish(),
   inicio: isoDatetime,
@@ -58,6 +60,7 @@ const criarSchema = z.object({
   tipo_atendimento: z.enum(["particular", "convenio"]).default("particular"),
   observacoes: z.string().max(2000).nullish(),
 });
+
 
 const reagendarSchema = z.object({
   inicio: isoDatetime,
@@ -184,18 +187,23 @@ async function handleCriar(
   }
   const body = parsed.data;
 
-  if (body.paciente && body.paciente_id) {
+  const formas = [body.paciente_id, body.paciente, body.verificacao_token].filter(
+    (v) => v !== undefined,
+  ).length;
+  if (formas > 1) {
     throw new ApiError({
       status: 422,
       code: "patient_and_id_conflict",
-      message: "Envie 'paciente_id' OU o objeto 'paciente', nunca os dois.",
+      message:
+        "Envie 'paciente_id' OU o objeto 'paciente' OU 'verificacao_token' — nunca mais de um.",
     });
   }
-  if (!body.paciente && !body.paciente_id) {
+  if (formas === 0) {
     throw new ApiError({
       status: 422,
       code: "invalid_body",
-      message: "Informe 'paciente_id' (paciente já cadastrado) ou o objeto 'paciente'.",
+      message:
+        "Informe 'paciente_id' (paciente já cadastrado), o objeto 'paciente' ou 'verificacao_token'.",
     });
   }
   if (body.paciente) {
@@ -210,6 +218,10 @@ async function handleCriar(
       });
     }
   }
+  // Token de verificação identifica um paciente que JÁ existe: exige o escopo
+  // da verificação e nunca o de cadastro.
+  if (body.verificacao_token) exigirEscopo(ctx, "patients:verify");
+
 
   if (Date.parse(body.fim) <= Date.parse(body.inicio)) {
     throw new ApiError({
@@ -238,6 +250,8 @@ async function handleCriar(
   // Resolução do paciente.
   //  • v1 (`paciente_id`): precisa existir; comportamento inalterado.
   //  • v1.1 (`paciente`): encontra pelo CPF na clínica da chave ou cadastra.
+  //  • v1.2 (`verificacao_token`): consome o token de uso único da verificação
+  //    por WhatsApp e resolve o paciente internamente.
   let pacienteId: string;
   let pacienteNome: string;
   let pacienteCriado = false;
@@ -253,22 +267,30 @@ async function handleCriar(
       obsExtra = `Telefone informado no agendamento online: ${resolvido.telefone_divergente}`;
     }
   } else {
+    let alvoId = body.paciente_id ?? null;
+    if (body.verificacao_token) {
+      const { consumirTokenVerificacao } = await import("./verificacao-v1.server");
+      alvoId = await consumirTokenVerificacao(db, ctx.clinica_id, body.verificacao_token);
+    }
     const { data: paciente } = await db
       .from("pacientes")
       .select("id,nome,clinica_id")
-      .eq("id", body.paciente_id!)
+      .eq("id", alvoId!)
       .eq("clinica_id", ctx.clinica_id)
       .maybeSingle();
     if (!paciente) {
       throw new ApiError({
-        status: 422,
-        code: "patient_not_found",
-        message: "Paciente não encontrado nesta clínica. Cadastre o paciente antes de agendar.",
+        status: body.verificacao_token ? 422 : 422,
+        code: body.verificacao_token ? "verification_failed" : "patient_not_found",
+        message: body.verificacao_token
+          ? "Verificação inválida ou expirada. Refaça a confirmação pelo WhatsApp."
+          : "Paciente não encontrado nesta clínica. Cadastre o paciente antes de agendar.",
       });
     }
     pacienteId = paciente.id;
     pacienteNome = paciente.nome;
   }
+
   const paciente = { id: pacienteId, nome: pacienteNome };
   const observacoesFinais =
     [body.observacoes ?? null, obsExtra].filter(Boolean).join(" | ") || null;
@@ -622,9 +644,18 @@ export async function handleIntegracoesV1(request: Request, splat: string): Prom
   const idempotencyKey = request.headers.get("idempotency-key");
   let bodyTexto = "";
 
+  const { ehConsultaDeStatusVerificacao, rotearVerificacaoV1 } = await import(
+    "./verificacao-v1.server"
+  );
+
   try {
     ctx = await autenticarApiKey(db, lerApiKeyDoRequest(request));
-    await consumirRateLimit(db, ctx);
+    // O `status` da verificação é consultado em loop pelo site (a cada 3s) e
+    // tem limite próprio, para não consumir a cota geral da chave.
+    if (!ehConsultaDeStatusVerificacao(request.method, partes)) {
+      await consumirRateLimit(db, ctx);
+    }
+
 
     const ator: AtorAgenda = {
       tipo: "integracao",
@@ -677,19 +708,35 @@ export async function handleIntegracoesV1(request: Request, splat: string): Prom
     ) {
       resultado = await handleReagendar(db, ctx, ator, decodeURIComponent(partes[1]!), bodyTexto);
     } else {
-      // Recursos do Cartão Benefícios (leitura). Devolve null quando o caminho
-      // não é de lá, e aí cai no 404 abaixo.
-      const { rotearCartaoV1 } = await import("./cartao-v1.server");
-      const cartao = await rotearCartaoV1(db, ctx, request.method, partes, url);
-      if (!cartao) {
-        throw new ApiError({
-          status: 404,
-          code: "route_not_found",
-          message: `Rota ${request.method} ${rota} não existe na API v1.`,
-        });
+      // Verificação do paciente por WhatsApp (v1.2).
+      const verificacao = await rotearVerificacaoV1(
+        db,
+        ctx,
+        request.method,
+        partes,
+        url,
+        bodyTexto,
+        ip,
+      );
+      if (verificacao) {
+        resultado = verificacao;
+      } else {
+        // Recursos do Cartão Benefícios (leitura). Devolve null quando o caminho
+        // não é de lá, e aí cai no 404 abaixo.
+        const { rotearCartaoV1 } = await import("./cartao-v1.server");
+        const cartao = await rotearCartaoV1(db, ctx, request.method, partes, url);
+        if (!cartao) {
+          throw new ApiError({
+            status: 404,
+            code: "route_not_found",
+            message: `Rota ${request.method} ${rota} não existe na API v1.`,
+          });
+        }
+        resultado = cartao;
       }
-      resultado = cartao;
     }
+
+
 
     status = resultado.status;
     idExterno = resultado.idExterno ?? null;

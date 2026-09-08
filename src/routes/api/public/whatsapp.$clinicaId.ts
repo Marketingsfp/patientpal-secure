@@ -243,6 +243,57 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
                   console.error("whatsapp mensagem insert error", insErr.message);
                 }
 
+                // ---------------------------------------------------------
+                // Verificação de paciente pelo site (API v1.2).
+                // Esta checagem vem ANTES de reabrir conversa e antes de
+                // decidir se a Nina responde: a mensagem é só um código de
+                // confirmação, não é atendimento. Quando ela é reconhecida,
+                // marcamos a mensagem como tratada internamente, respondemos
+                // uma linha curta e encerramos — sem conversa nova, sem
+                // tarefa e sem acionar a assistente.
+                if (textoPaciente) {
+                  try {
+                    const { reconhecerCodigoVerificacao } = await import(
+                      "@/lib/integracoes/verificacao-v1.server"
+                    );
+                    const r = await reconhecerCodigoVerificacao({
+                      db: supabaseAdmin as never,
+                      clinicaId: params.clinicaId,
+                      texto: textoPaciente,
+                      fromNumber: from,
+                      waMessageId: wa_message_id,
+                    });
+                    if (r.tratada) {
+                      const idMsg = (msgInserida as { id?: string } | null)?.id ?? null;
+                      if (idMsg) {
+                        await supabaseAdmin
+                          .from("whatsapp_mensagens")
+                          .update({ tratada_internamente: true } as never)
+                          .eq("id", idMsg);
+                      }
+                      if (r.resposta && phoneNumberId && cfg.access_token) {
+                        // Janela de 24h aberta pelo próprio paciente. Uma linha,
+                        // sem nome e sem nenhum dado do cadastro.
+                        await metaSendText(
+                          phoneNumberId,
+                          cfg.access_token,
+                          from,
+                          r.resposta,
+                        ).catch((e) =>
+                          console.error("[verificacao] resposta ao paciente falhou", e),
+                        );
+                      }
+                      resultado = "verificacao_tratada";
+                      continue;
+                    }
+                  } catch (e) {
+                    // Falha aqui não pode engolir a mensagem do paciente:
+                    // segue o fluxo normal de atendimento.
+                    console.error("[verificacao] reconhecimento falhou", e);
+                  }
+                }
+
+
                 // Antes de qualquer coisa, vence quem já passou do prazo —
                 // assim uma conversa parada não fica presa na Nina.
                 try {
