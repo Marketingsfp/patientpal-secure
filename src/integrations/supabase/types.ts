@@ -13146,6 +13146,10 @@ export type Database = {
           nao_lidas: number
         }[]
       }
+      atend_pool_telefonia_avaliacao: {
+        Args: { _clinica_id: string; _departamento_id?: string }
+        Returns: Json
+      }
       atend_registrar_leitura: {
         Args: {
           _clinica_id: string
