@@ -505,13 +505,12 @@ function PerfisPage() {
       if (error) throw error;
       toast.success("Permissões salvas");
 
-      // FASE 4 — Telefonia é o que dá entrada na distribuição automática dos
-      // handoffs da Nina. Ao liberar Telefonia para um perfil, quem já está
-      // Online passa a ser elegível na hora: reavaliamos a fila de "Não
-      // atribuídas" imediatamente, em vez de esperar o próximo heartbeat.
-      // Remover a permissão não precisa de nada aqui — o pool é lido ao vivo
-      // no banco, e conversas já atribuídas nunca são retiradas de ninguém.
-      if (clinicaId && matriz[perfilSel]?.["telefonia"] !== "none") {
+      // FASE 3 — quem recebe handoff da Nina é o PERFIL Telefonia. Ao salvar
+      // esse perfil, quem já está Online pode ter virado elegível: reavaliamos
+      // a fila de "Não atribuídas" na hora, em vez de esperar o heartbeat.
+      // O pool é sempre lido ao vivo no banco e conversas já atribuídas nunca
+      // são retiradas de ninguém.
+      if (clinicaId && perfilSel === "telefonia") {
         try {
           const { distribuirFilaPendentes } = await import("@/lib/atendimento.functions");
           const r = await distribuirFilaPendentes({ data: { clinicaId } });
