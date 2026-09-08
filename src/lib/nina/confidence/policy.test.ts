@@ -42,9 +42,13 @@ const v = (nome: string, over: Partial<ResultadoValidador> = {}): ResultadoValid
 });
 
 describe("configuração central", () => {
-  it("os pesos somam 100", () => {
-    const soma = Object.values(POLITICA_PADRAO.pesos).reduce((a, b) => a + b, 0);
-    expect(soma).toBe(100);
+  it("os pesos são relativos e cobrem todos os validadores pontuáveis", () => {
+    // FASE 4: a nota é normalizada pelo peso das dimensões avaliadas, então a
+    // soma não precisa ser 100 — o que importa é nenhum peso negativo e o
+    // validador de workflow estar pontuando.
+    const pesos = Object.values(POLITICA_PADRAO.pesos);
+    expect(pesos.every((p) => p >= 0)).toBe(true);
+    expect(POLITICA_PADRAO.pesos["WorkflowConsistencyValidator"]).toBeGreaterThan(0);
   });
 
   it("faixas: HIGH 90+, MEDIUM 75+, LOW abaixo disso", () => {

@@ -149,15 +149,27 @@ describe("níveis e decisões graduais", () => {
     expect(r.decision).toBe("HANDOFF");
   });
 
-  it("handoff já pedido pelo runtime é respeitado", () => {
+  it("handoff sem bloqueios é respeitado", () => {
+    const r = decidirConfianca(
+      ctx({
+        draftText: "Vou transferir você para uma atendente.",
+        requestedAction: "transferir_humano",
+        businessContext: { ...negocio, handoffSolicitado: true },
+      }),
+    );
+    expect(r.decision).toBe("ALLOW");
+    expect(r.blockers).toEqual([]);
+  });
+
+  it("FASE 4 — handoff NÃO apaga bloqueio de fonte oficial", () => {
     const r = decidirConfianca(
       ctx({
         draftText: "O exame custa R$ 250",
         businessContext: { ...negocio, handoffSolicitado: true },
       }),
     );
-    expect(r.decision).toBe("ALLOW");
-    expect(r.blockers).toEqual([]);
+    expect(r.blockers).toContain("VALOR_SEM_CATALOGO");
+    expect(r.score).toBeLessThan(90);
   });
 
   it("resposta vazia cai para LOW e transfere", () => {
