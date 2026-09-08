@@ -136,6 +136,8 @@ export type ContextoConfianca = {
   conflitos?: ConflitoDeFonte[];
   /** Regras determinísticas da clínica aplicáveis a este turno. */
   regrasNegocio?: RegraNegocio[];
+  /** FASE 4 — estado real do fluxo operacional, quando o runtime o conhece. */
+  operationalState?: EstadoOperacionalTurno;
 };
 
 /** O mesmo campo com valores diferentes em origens diferentes. */
