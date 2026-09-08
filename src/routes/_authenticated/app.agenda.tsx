@@ -8171,9 +8171,50 @@ function AgendaPage() {
   const fmtDiaSemana = (iso: string) => DIAS_SEMANA[new Date(iso).getDay()];
 
   const [filtrosMobileOpen, setFiltrosMobileOpen] = useState(false);
+
+  // Agendas com grade do profissional filtrado, agrupadas por NOME — a mesma
+  // lista que o seletor de profissional usa para se desdobrar em
+  // "FULANO — CONSULTAS" / "FULANO — EXAMES".
+  const agendasDoFiltroMedico = useMemo(() => {
+    const out: { chave: string; nome: string }[] = [];
+    if (filtroMedico === "todos") return out;
+    const vistas = new Set<string>();
+    for (const a of agendasPorMedico.get(filtroMedico) ?? []) {
+      if (!agendasComGrade.has(a.id)) continue;
+      const chave = chaveNomeAgenda(a.nome ?? "");
+      if (!chave || vistas.has(chave)) continue;
+      vistas.add(chave);
+      out.push({ chave, nome: (a.nome ?? "").trim() });
+    }
+    return out;
+  }, [filtroMedico, agendasPorMedico, agendasComGrade]);
+
+  // Quando o profissional escolhido já carrega a agenda no próprio nome, o
+  // dropdown ao lado repete a mesma informação e a recepção acabava olhando (e
+  // clicando) em dois campos para dizer a mesma coisa. Nesses casos ele deixa
+  // de ser menu e vira só o reflexo travado do que o campo Profissional
+  // decidiu:
+  //   - linha desdobrada escolhida    → trava na agenda embutida;
+  //   - profissional com uma agenda só → trava nela, não há o que escolher.
+  // Com "TODOS" no profissional — ou profissional de várias agendas ainda sem
+  // agenda definida, caso do médico logado — o dropdown volta a funcionar.
+  const agendaTravada =
+    filtroMedico !== "todos" &&
+    (filtroAgenda.startsWith("nome:") || agendasDoFiltroMedico.length === 1);
+  const agendaTravadaRotulo = !agendaTravada
+    ? ""
+    : (agendasDoFiltroMedico.find((a) => `nome:${a.chave}` === filtroAgenda)?.nome ??
+      // Enquanto a lista de agendas não terminou de carregar, mostra o próprio
+      // valor do filtro em vez de piscar um "TODAS" que não é verdade.
+      (filtroAgenda.startsWith("nome:")
+        ? filtroAgenda.slice(5).toUpperCase()
+        : (agendasDoFiltroMedico[0]?.nome ?? "TODAS")));
+
   const filtrosAtivosCount =
     (filtroMedico !== "todos" ? 1 : 0) +
-    (filtroAgenda !== "todos" ? 1 : 0) +
+    // Agenda travada não conta como filtro próprio: ela veio junto com o
+    // profissional, e contar dois enganaria quem olha o badge no celular.
+    (filtroAgenda !== "todos" && !agendaTravada ? 1 : 0) +
     (filtroStatus !== "todos" ? 1 : 0) +
     (filtroEspecialidade !== "todos" ? 1 : 0) +
     (filtroCliente.trim() ? 1 : 0) +
@@ -8219,38 +8260,50 @@ function AgendaPage() {
         <Label className="flex h-4 items-center text-[11px] font-bold uppercase tracking-wider text-slate-500">
           Tipo de agenda
         </Label>
-        <Select value={filtroAgenda} onValueChange={setFiltroAgenda}>
-          <SelectTrigger className="h-9 w-full truncate rounded-lg border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-800">
-            <SelectValue placeholder="TODAS" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="todos">TODAS</SelectItem>
-            {(() => {
-              // Quando um médico específico está selecionado, listamos
-              // as agendas dele por id (permite distinguir turnos/salas).
-              // Quando é "TODOS", agrupamos por NOME (ex.: "AGENDA",
-              // "CONSULTAS") para não repetir a mesma opção uma vez
-              // por médico.
-              const agendasFiltro =
-                filtroMedico !== "todos"
-                  ? (agendasPorMedico.get(filtroMedico) ?? [])
-                  : Array.from(agendasPorMedico.values()).flat();
-              const seen = new Set<string>();
-              const out: { key: string; nome: string }[] = [];
-              for (const a of agendasFiltro) {
-                const k = chaveNomeAgenda(a.nome ?? "");
-                if (!k || seen.has(k)) continue;
-                seen.add(k);
-                out.push({ key: k, nome: (a.nome ?? "").trim() });
-              }
-              return out.map((o) => (
-                <SelectItem key={`nome:${o.key}`} value={`nome:${o.key}`}>
-                  {o.nome}
-                </SelectItem>
-              ));
-            })()}
-          </SelectContent>
-        </Select>
+        {agendaTravada ? (
+          // Campo só de leitura: não abre menu, não recebe clique. A agenda
+          // aqui é consequência do profissional escolhido ao lado.
+          <div
+            data-agenda-filtro-tipo-travado
+            title="Definido pelo profissional selecionado"
+            className="flex h-9 w-full cursor-not-allowed select-none items-center truncate rounded-lg border border-slate-200 bg-slate-100 px-2.5 text-xs font-semibold text-slate-500"
+          >
+            {agendaTravadaRotulo}
+          </div>
+        ) : (
+          <Select value={filtroAgenda} onValueChange={setFiltroAgenda}>
+            <SelectTrigger className="h-9 w-full truncate rounded-lg border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-800">
+              <SelectValue placeholder="TODAS" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="todos">TODAS</SelectItem>
+              {(() => {
+                // Quando um médico específico está selecionado, listamos
+                // as agendas dele por id (permite distinguir turnos/salas).
+                // Quando é "TODOS", agrupamos por NOME (ex.: "AGENDA",
+                // "CONSULTAS") para não repetir a mesma opção uma vez
+                // por médico.
+                const agendasFiltro =
+                  filtroMedico !== "todos"
+                    ? (agendasPorMedico.get(filtroMedico) ?? [])
+                    : Array.from(agendasPorMedico.values()).flat();
+                const seen = new Set<string>();
+                const out: { key: string; nome: string }[] = [];
+                for (const a of agendasFiltro) {
+                  const k = chaveNomeAgenda(a.nome ?? "");
+                  if (!k || seen.has(k)) continue;
+                  seen.add(k);
+                  out.push({ key: k, nome: (a.nome ?? "").trim() });
+                }
+                return out.map((o) => (
+                  <SelectItem key={`nome:${o.key}`} value={`nome:${o.key}`}>
+                    {o.nome}
+                  </SelectItem>
+                ));
+              })()}
+            </SelectContent>
+          </Select>
+        )}
       </div>
 
       {/* Situação */}
@@ -13565,6 +13618,18 @@ function MedicoFiltroInput({
 
   const opcoes = useMemo(() => {
     const out: OpcaoProfissional[] = [];
+    // Primeira linha da lista: volta a agenda para todos os profissionais e
+    // destrava o filtro "Tipo de agenda". Sem ela, a única forma de limpar era
+    // o "x" ao lado do campo, que a recepção nem sempre percebe.
+    if (!onlyMedicoId) {
+      out.push({
+        key: "todos",
+        medicoId: "todos",
+        agendaFiltro: "todos",
+        rotulo: "TODOS OS PROFISSIONAIS",
+        busca: norm("TODOS OS PROFISSIONAIS"),
+      });
+    }
     for (const m of lista) {
       const base = rotuloMedico.get(m.id) ?? m.nome;
       // Só entram agendas que geram horário. Sem esse corte, sobras de
@@ -13606,7 +13671,7 @@ function MedicoFiltroInput({
       }
     }
     return out;
-  }, [lista, rotuloMedico, agendasPorMedico, agendasComGrade]);
+  }, [lista, rotuloMedico, agendasPorMedico, agendasComGrade, onlyMedicoId]);
 
   // O texto do campo sai da COMBINAÇÃO profissional + tipo de agenda. Assim,
   // se a recepção mexer no filtro secundário depois de escolher uma linha
@@ -13641,7 +13706,8 @@ function MedicoFiltroInput({
 
   const selecionar = (o: OpcaoProfissional) => {
     onChange(o.medicoId, o.agendaFiltro);
-    setTexto(o.rotulo);
+    // "TODOS" volta ao campo vazio (placeholder), não escreve o rótulo.
+    setTexto(o.medicoId === "todos" ? "" : o.rotulo);
     setAberto(false);
   };
 
