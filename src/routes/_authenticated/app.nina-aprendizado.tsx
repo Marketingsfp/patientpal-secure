@@ -1051,6 +1051,22 @@ function Pagina() {
             </Select>
           </div>
           <div>
+            <Label htmlFor="f-amb">Ambiente</Label>
+            <Select value={fAmbiente} onValueChange={setFAmbiente}>
+              <SelectTrigger id="f-amb" className="mt-1">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {FILTROS_AMBIENTE.map((a) => (
+                  <SelectItem key={a.valor} value={a.valor}>
+                    {a.rotulo}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div>
             <Label htmlFor="f-de">De</Label>
             <Input
               id="f-de"
