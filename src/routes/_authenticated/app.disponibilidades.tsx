@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { confirmDialog } from "@/lib/confirm";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Trash2, Plus, CalendarRange, Pencil, ArrowLeft, Ban, Undo2 } from "lucide-react";
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
@@ -168,6 +168,7 @@ function Page() {
   });
   const [gerarDias, setGerarDias] = useState<number[]>([1, 2, 3, 4, 5, 6]);
   const [gerando, setGerando] = useState(false);
+  const [salvandoGrade, setSalvandoGrade] = useState(false);
   // Remontar o campo "Até" força o input mascarado a reexibir o valor do
   // estado. Sem isso, quando a data digitada é recusada e o estado volta para
   // o valor que já estava lá, o texto inválido continuaria na tela.
@@ -637,7 +638,12 @@ function Page() {
   const geracaoPreview = useMemo(() => {
     type Slot = { data: string; medico_id: string; agenda_id: string; inicio: string; fim: string };
     type BloqueioPiso = { data: string; piso: string; janelaFim: string };
-    const vazio = { slots: [] as Slot[], bloqueiosPorPiso: [] as BloqueioPiso[] };
+    type ForaDaGrade = { data: string; gradeIni: string; gradeFim: string };
+    const vazio = {
+      slots: [] as Slot[],
+      bloqueiosPorPiso: [] as BloqueioPiso[],
+      foraDaGrade: [] as ForaDaGrade[],
+    };
     if (!gerar.data_inicio || !gerar.data_fim) return vazio;
     const ini = new Date(`${gerar.data_inicio}T00:00:00`);
     const fimD = new Date(`${gerar.data_fim}T00:00:00`);
@@ -672,6 +678,7 @@ function Page() {
     });
     const out: Slot[] = [];
     const bloqueiosPorPiso: BloqueioPiso[] = [];
+    const foraDaGrade: ForaDaGrade[] = [];
     for (let i = 0; i < dias; i++) {
       const d = new Date(ini);
       d.setDate(d.getDate() + i);
@@ -698,12 +705,12 @@ function Page() {
           const fallbackDur =
             m.duracao_consulta_min && m.duracao_consulta_min > 0 ? m.duracao_consulta_min : 15;
           // A geração de um dia segue esta ordem:
-          // 1) a disponibilidade semanal cadastrada, recortada pelos horários
-          //    digitados na tela;
-          // 2) se não sobrar nada — o médico não tem disponibilidade nesse dia,
-          //    a janela digitada cai fora dela, ou o que sobrou já está tomado
-          //    por fichas existentes — vale a janela digitada na tela;
-          // 3) se também não houver janela digitada, um bloco padrão 08:00–17:00.
+          // 1) se o médico TEM grade cadastrada nesse dia, ela manda: os
+          //    horários digitados na tela só a recortam, nunca a estendem;
+          // 2) só quando NÃO existe grade cadastrada é que vale a janela
+          //    digitada na tela;
+          // 3) sem grade e sem janela digitada, um bloco padrão 08:00–17:00.
+          const temGrade = ds.length > 0;
           const blocosDaDisp = ds
             .map((x) => {
               const hi0 = hhmm(x.hora_inicio);
@@ -732,16 +739,33 @@ function Page() {
                 hora_inicio: piso && piso > x.hora_inicio ? piso : x.hora_inicio,
               }))
               .filter((x) => x.hora_inicio < x.hora_fim);
-          let blocos =
-            blocosDaDisp.length > 0
-              ? blocosDaDisp
-              : blocosManuais.length > 0
-                ? blocosManuais
-                : blocosPadrao;
-          let dsEfetivo = aplicarPiso(blocos);
-          if (dsEfetivo.length === 0 && blocosManuais.length > 0 && blocos !== blocosManuais) {
-            blocos = blocosManuais;
-            dsEfetivo = aplicarPiso(blocosManuais);
+          // TRAVA DA GRADE: com grade cadastrada, o bloco digitado na tela
+          // deixa de existir como alternativa. Antes, quando o recorte caía
+          // fora da grade — ou quando o piso já tinha consumido a grade toda —
+          // a geração caía no bloco digitado e criava fichas fora do horário
+          // do médico: em 08/09/2026 um profissional com grade até 20:00
+          // recebeu 41 fichas entre 20:25 e 23:45 por esse caminho.
+          const blocos = temGrade
+            ? blocosDaDisp
+            : blocosManuais.length > 0
+              ? blocosManuais
+              : blocosPadrao;
+          const dsEfetivo = aplicarPiso(blocos);
+          // O recorte digitado não encosta na grade desse dia: nada é gerado,
+          // e a tela explica qual é a grade real em vez de mostrar só "~0".
+          if (temGrade && blocosDaDisp.length === 0 && (overrideIni || overrideFim)) {
+            foraDaGrade.push({
+              data: diaIso,
+              gradeIni: ds.reduce(
+                (acc, x) => (!acc || hhmm(x.hora_inicio) < acc ? hhmm(x.hora_inicio) : acc),
+                "",
+              ),
+              gradeFim: ds.reduce(
+                (acc, x) => (hhmm(x.hora_fim) > acc ? hhmm(x.hora_fim) : acc),
+                "",
+              ),
+            });
+            continue;
           }
           if (blocos.length > 0 && dsEfetivo.length === 0 && piso) {
             bloqueiosPorPiso.push({
@@ -796,7 +820,7 @@ function Page() {
         }
       }
     }
-    return { slots: out, bloqueiosPorPiso };
+    return { slots: out, bloqueiosPorPiso, foraDaGrade };
   }, [gerar, gerarDias, medicos, disps, agendas, pisos]);
 
   const slotsPreview = geracaoPreview.slots;
@@ -864,17 +888,27 @@ function Page() {
     const hf = hhmm(gerar.hora_fim);
     if (hi && hf && hi >= hf) return "A hora fim precisa ser maior que a hora início.";
     if (duracaoInvalida) return "A duração de cada atendimento precisa ser de no mínimo 5 minutos.";
+    const fora = geracaoPreview.foraDaGrade[0];
+    if (fora) {
+      const [ano, mes, dia] = fora.data.split("-");
+      const outros = geracaoPreview.foraDaGrade.length - 1;
+      return (
+        `O recorte de horário que você digitou está fora da grade deste médico. Em ${dia}/${mes}/${ano} ele atende das ${fora.gradeIni} às ${fora.gradeFim}.` +
+        ` Apague o recorte para usar a grade inteira, ou digite um horário dentro dela.` +
+        (outros > 0 ? ` O mesmo acontece em mais ${outros} dia(s) do período.` : "")
+      );
+    }
     const bloqueio = geracaoPreview.bloqueiosPorPiso[0];
     if (bloqueio) {
       const [ano, mes, dia] = bloqueio.data.split("-");
       const outros = geracaoPreview.bloqueiosPorPiso.length - 1;
       return (
-        `Em ${dia}/${mes}/${ano} já existem horários criados até ${bloqueio.piso}, e os novos só entram depois do último horário do dia. Como a janela pedida termina às ${bloqueio.janelaFim}, não sobra espaço.` +
-        ` Coloque uma "Hora fim" depois de ${bloqueio.piso} ou escolha outra data.` +
+        `Em ${dia}/${mes}/${ano} já existem horários criados até ${bloqueio.piso}, e os novos só entram depois do último horário do dia. Como o atendimento desse dia termina às ${bloqueio.janelaFim}, não sobra espaço.` +
+        ` Escolha outra data — ou, se o médico realmente atende mais tarde, aumente a grade dele na aba Médicos.` +
         (outros > 0 ? ` O mesmo acontece em mais ${outros} dia(s) do período.` : "")
       );
     }
-    return "Nenhum horário cabe nessa configuração. Confira a hora início, a hora fim e a duração de cada atendimento.";
+    return "Nenhum horário cabe nessa configuração. Confira o recorte de horário e a duração de cada atendimento.";
   }, [
     slotsPreview.length,
     gerar.medico_id,
@@ -886,11 +920,149 @@ function Page() {
     resumoGeracao.diasNoPeriodo,
     duracaoInvalida,
     geracaoPreview.bloqueiosPorPiso,
+    geracaoPreview.foraDaGrade,
   ]);
 
   // Dias que a geração vai pular por já terem fichas criadas depois da janela
   // pedida — avisados na tela mesmo quando o restante do período gera normal.
   const diasIgnoradosPorPiso = new Set(geracaoPreview.bloqueiosPorPiso.map((b) => b.data)).size;
+
+  // Dias que a geração vai pular porque o recorte digitado não encosta na
+  // grade cadastrada do médico naquele dia.
+  const diasForaDaGrade = new Set(geracaoPreview.foraDaGrade.map((b) => b.data)).size;
+
+  // Grade semanal cadastrada do médico escolhido no gerador, agrupada por dia
+  // da semana. É exibida na tela para que a recepção veja de onde saem os
+  // horários — antes o campo em branco parecia "faltando preencher" e ela
+  // digitava uma janela à mão, que era a origem dos erros de balcão.
+  const gradeMedicoSel = useMemo(() => {
+    if (!gerar.medico_id || gerar.medico_id === "all") return [];
+    const porDia = new Map<number, DispRow[]>();
+    for (const l of disps.filter((d) => d.medico_id === gerar.medico_id)) {
+      const atual = porDia.get(l.dia_semana) ?? [];
+      atual.push(l);
+      porDia.set(l.dia_semana, atual);
+    }
+    return Array.from(porDia.entries())
+      .sort((a, b) => a[0] - b[0])
+      .map(([dia, xs]) => ({
+        dia,
+        blocos: xs
+          .slice()
+          .sort((a, b) => a.hora_inicio.localeCompare(b.hora_inicio))
+          .map((x) => ({
+            inicio: hhmm(x.hora_inicio),
+            fim: hhmm(x.hora_fim),
+            intervalo: x.intervalo_min && x.intervalo_min > 0 ? x.intervalo_min : null,
+          })),
+      }));
+  }, [gerar.medico_id, disps]);
+
+  const medicoSelSemGrade =
+    Boolean(gerar.medico_id) && gerar.medico_id !== "all" && gradeMedicoSel.length === 0;
+
+  // Ao escolher o médico, a tela já marca os dias em que ele atende e limpa
+  // qualquer recorte de horário que tenha sobrado da geração anterior. O `ref`
+  // guarda o último médico aplicado para não desmarcar os dias quando a
+  // atendente muda a seleção de propósito depois.
+  const medicoAplicadoRef = useRef<string | null>(null);
+  useEffect(() => {
+    const id = gerar.medico_id;
+    if (!id || id === "all") {
+      medicoAplicadoRef.current = id || null;
+      return;
+    }
+    if (medicoAplicadoRef.current === id) return;
+    if (disps.length === 0) return;
+    medicoAplicadoRef.current = id;
+    const diasDaGrade = Array.from(
+      new Set(disps.filter((d) => d.medico_id === id).map((d) => d.dia_semana)),
+    ).sort((a, b) => a - b);
+    if (diasDaGrade.length > 0) setGerarDias(diasDaGrade);
+    setGerar((g) => ({ ...g, hora_inicio: "", hora_fim: "" }));
+  }, [gerar.medico_id, disps]);
+
+  // Médico sem grade cadastrada: em vez de deixar a recepção digitar o mesmo
+  // horário toda semana, a tela oferece salvar o que ela digitou como grade
+  // fixa. Da próxima vez, gerar a agenda dele vira escolher o período e clicar.
+  const salvarComoGrade = async () => {
+    if (!podeEscrever) {
+      toast.error("Você não tem permissão de edição neste módulo.");
+      return;
+    }
+    if (!clinicaAtual) return;
+    const medicoId = gerar.medico_id;
+    if (!medicoId || medicoId === "all") return;
+    const hi = hhmm(gerar.hora_inicio);
+    const hf = hhmm(gerar.hora_fim);
+    if (!hi || !hf || hi >= hf) {
+      toast.error(
+        "Preencha o horário de início e de fim que este médico atende antes de salvar a grade.",
+      );
+      return;
+    }
+    if (gerarDias.length === 0) {
+      toast.error("Marque os dias da semana em que este médico atende.");
+      return;
+    }
+    if (duracaoInvalida) {
+      toast.error("A duração de cada atendimento precisa ser de no mínimo 5 minutos.");
+      return;
+    }
+    const agendaDoMedico = agendas.find((a) => a.medico_id === medicoId && a.ativo);
+    if (!agendaDoMedico) {
+      toast.error(
+        "Este médico ainda não tem agenda cadastrada. Crie a agenda dele na aba Médicos antes de salvar a grade.",
+      );
+      return;
+    }
+    const nomeMedico = (
+      medicos.find((m) => m.id === medicoId)?.nome ?? "Este médico"
+    ).toUpperCase();
+    const dur = gerar.intervalo_min ? parseInt(gerar.intervalo_min) : null;
+    const ok = await confirmDialog({
+      title: "Salvar grade deste médico",
+      confirmText: "Salvar grade",
+      description:
+        `${nomeMedico} passa a ter grade fixa das ${hi} às ${hf}` +
+        (dur ? `, com ${dur} min por atendimento` : "") +
+        `, em: ${gerarDias.map((d) => DIAS[d]).join(", ")}.\n\n` +
+        "A partir daí, gerar a agenda dele será só escolher o período e clicar em gerar.",
+    });
+    if (!ok) return;
+    setSalvandoGrade(true);
+    try {
+      const payload = gerarDias.map((dia) => ({
+        clinica_id: clinicaAtual.clinica_id,
+        medico_id: medicoId,
+        agenda_id: agendaDoMedico.id,
+        dia_semana: dia,
+        hora_inicio: hi,
+        hora_fim: hf,
+        limite_pacientes: gerar.limite_fichas ? parseInt(gerar.limite_fichas) : null,
+        intervalo_min: dur && dur >= 5 ? dur : null,
+        vigencia_inicio: null,
+        vigencia_fim: null,
+      }));
+      const { error } = await supabase.from("medico_disponibilidades").insert(payload as never);
+      if (error) {
+        mostrarErro(error);
+        return;
+      }
+      toast.success(
+        gerarDias.length > 1
+          ? `Grade salva para ${gerarDias.length} dias da semana`
+          : "Grade salva",
+      );
+      // O recorte digitado já virou grade: limpar evita gerar duas vezes a
+      // mesma janela e faz a tela voltar a exibir "usa a grade completa".
+      setGerar((g) => ({ ...g, hora_inicio: "", hora_fim: "" }));
+      medicoAplicadoRef.current = null;
+      await load();
+    } finally {
+      setSalvandoGrade(false);
+    }
+  };
 
   if (!clinicaAtual) return <p className="text-muted-foreground">Selecione uma clínica.</p>;
 
@@ -1218,16 +1390,85 @@ function Page() {
                     />
                   </div>
                 </div>
+
+                {gradeMedicoSel.length > 0 && (
+                  <div className="mt-3 rounded-md border bg-background p-2">
+                    <p className="text-[12px] font-semibold uppercase tracking-wide text-muted-foreground">
+                      Grade cadastrada deste médico
+                    </p>
+                    <div className="mt-1.5 flex flex-wrap gap-1.5">
+                      {gradeMedicoSel.map((g) => (
+                        <span
+                          key={g.dia}
+                          className="rounded border bg-muted/50 px-2 py-1 text-xs whitespace-nowrap"
+                        >
+                          <strong>{DIAS[g.dia]}</strong>{" "}
+                          {g.blocos
+                            .map(
+                              (b) =>
+                                `${b.inicio}–${b.fim}${b.intervalo ? ` · ${b.intervalo} min` : ""}`,
+                            )
+                            .join("  +  ")}
+                        </span>
+                      ))}
+                    </div>
+                    <p className="mt-2 text-xs text-muted-foreground">
+                      Os dias da semana abaixo já foram marcados por esta grade. É dela que saem os
+                      horários — <strong>não precisa digitar nada no passo 2</strong>.
+                    </p>
+                  </div>
+                )}
+
+                {medicoSelSemGrade && (
+                  <div className="mt-3 rounded-md border border-amber-500/50 bg-amber-50 p-2 dark:bg-amber-950/20">
+                    <p className="text-xs font-semibold text-amber-700 dark:text-amber-500">
+                      Este médico não tem grade semanal cadastrada.
+                    </p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      A geração vai usar o horário digitado no passo 2 e, se ele ficar em branco, o
+                      padrão das 08:00 às 17:00. Para não digitar tudo de novo toda vez, preencha o
+                      horário e a duração no passo 2, marque os dias no passo 3 e salve como grade
+                      fixa deste médico.
+                    </p>
+                    {podeEscrever && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="mt-2"
+                        onClick={salvarComoGrade}
+                        disabled={salvandoGrade}
+                      >
+                        {salvandoGrade ? "Salvando..." : "Salvar como grade deste médico"}
+                      </Button>
+                    )}
+                  </div>
+                )}
               </section>
 
               {/* Grupo 2 — Horários e regras de vaga */}
               <section className="rounded-lg border bg-muted/30 p-3">
-                <p className="mb-2 text-[12px] font-semibold uppercase tracking-wide text-muted-foreground">
-                  2 · Horários e fichas
+                <p className="mb-1 text-[12px] font-semibold uppercase tracking-wide text-muted-foreground">
+                  2 · Recortar horário (opcional) e fichas
+                </p>
+                <p className="mb-2 text-xs text-muted-foreground">
+                  {gradeMedicoSel.length > 0 ? (
+                    <>
+                      <strong>Deixe em branco para usar a grade completa do médico.</strong>{" "}
+                      Preencher aqui só encurta o atendimento do dia — nunca cria ficha fora da
+                      grade cadastrada.
+                    </>
+                  ) : (
+                    <>
+                      Em branco, a geração usa a grade cadastrada do médico. Preencher aqui só
+                      encurta o horário — nunca cria ficha fora da grade.
+                    </>
+                  )}
                 </p>
                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                   <div className="min-w-0">
-                    <label className="text-xs text-muted-foreground">Hora início</label>
+                    <label className="text-xs text-muted-foreground">
+                      Recortar horário — início (opcional)
+                    </label>
                     <Input
                       type="time"
                       className="w-full"
@@ -1236,7 +1477,9 @@ function Page() {
                     />
                   </div>
                   <div className="min-w-0">
-                    <label className="text-xs text-muted-foreground">Hora fim</label>
+                    <label className="text-xs text-muted-foreground">
+                      Recortar horário — fim (opcional)
+                    </label>
                     <Input
                       type="time"
                       className="w-full"
@@ -1281,9 +1524,15 @@ function Page() {
 
               {/* Grupo 3 — Dias da semana */}
               <section className="rounded-lg border bg-muted/30 p-3">
-                <p className="mb-2 text-[12px] font-semibold uppercase tracking-wide text-muted-foreground">
+                <p className="mb-1 text-[12px] font-semibold uppercase tracking-wide text-muted-foreground">
                   3 · Dias da semana
                 </p>
+                {gradeMedicoSel.length > 0 && (
+                  <p className="mb-2 text-xs text-muted-foreground">
+                    Marcados automaticamente pela grade do médico. Desmarque um dia se quiser gerar
+                    só parte da semana.
+                  </p>
+                )}
                 <div className="flex flex-wrap gap-1">
                   {DIAS.map((d, i) => {
                     const ativo = gerarDias.includes(i);
@@ -1371,6 +1620,13 @@ function Page() {
                   <p className="mt-2 text-xs font-medium text-amber-600">
                     {diasIgnoradosPorPiso} dia(s) do período não vão receber horários novos porque
                     já têm fichas criadas depois do horário pedido.
+                  </p>
+                )}
+                {slotsPreview.length > 0 && diasForaDaGrade > 0 && (
+                  <p className="mt-2 text-xs font-medium text-amber-600">
+                    {diasForaDaGrade} dia(s) do período foram pulados porque o recorte de horário
+                    digitado está fora da grade do médico nesses dias. Apague o recorte para usar a
+                    grade inteira.
                   </p>
                 )}
               </section>
