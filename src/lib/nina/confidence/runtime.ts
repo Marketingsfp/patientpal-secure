@@ -204,9 +204,11 @@ export function resumoHandoffEstruturado(e: EstadoDoTurno, r: ResultadoConfianca
     `Paciente identificado: ${e.pacienteIdentificado ? "sim" : "não"}`,
     `Motivo da baixa confiança: ${r.evidence.motivos.join("; ")} (score ${r.score}, nível ${r.level})`,
     `Validações que falharam: ${validacoes.length ? validacoes.join("; ") : "nenhuma"}`,
+    `Não foi possível verificar: ${naoVerificadas.length ? naoVerificadas.join("; ") : "nada"}`,
+    `Cobertura de evidência: ${r.evidenceCoverage ?? 0}%${r.confidenceInsufficient ? " (sem evidência avaliável)" : ""}`,
     `Bloqueadores: ${(r.hardBlockers ?? []).join(", ") || "nenhum"}`,
     `Informação conflitante: ${
-      conflitos && conflitos.status !== "PASS" && conflitos.status !== "NOT_APPLICABLE"
+      conflitos && contaContraANota(conflitos.status)
         ? JSON.stringify(conflitos.evidence)
         : "nenhuma detectada"
     }`,
