@@ -26,9 +26,6 @@ export const TODOS_MODULOS: ReadonlyArray<string> = [
   "fluxo",
   "orcamentos",
   "recepcao",
-  // Nova categoria operacional. Fica disponível na tela de Perfis para ser
-  // ligada/desligada; nenhum preset (fora do admin) recebe acesso automático.
-  "telefonia",
   "triagem-enfermagem",
   "cartao-beneficios",
   "painel",
@@ -242,9 +239,9 @@ export const PRESETS: Record<PerfilKey, Partial<Record<string, Acesso>>> = {
     caixa: "read",
   },
   // Espelha o que a migration grava em perfil_permissoes para o perfil
-  // TELEFONIA — é o padrão de quem recebe os handoffs da Nina.
+  // TELEFONIA — é o padrão de quem recebe os handoffs da Nina. A elegibilidade
+  // vem do PERFIL (clinica_memberships.role = 'telefonia'), não de um módulo.
   telefonia: {
-    telefonia: "write",
     nina: "write",
     chat: "write",
     "atendimento-multiplo": "read",
