@@ -16,7 +16,7 @@ import {
   type ConfiancaDaMensagem,
   type ConfiabilidadeDecisaoView,
 } from "@/lib/nina/confianca.functions";
-import { rotuloConfianca } from "@/lib/nina/confianca-badge";
+import { rotuloConfianca, scoreExibido } from "@/lib/nina/confianca-badge";
 import {
   gravarLote,
   idsParaBuscar,
