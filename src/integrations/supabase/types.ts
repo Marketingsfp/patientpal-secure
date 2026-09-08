@@ -8851,6 +8851,7 @@ export type Database = {
       }
       nina_feedback_erros: {
         Row: {
+          ambiente: string
           aplicacao_evidencia: Json | null
           aplicacao_resumo: string | null
           aplicacao_tipo: string | null
@@ -8882,6 +8883,7 @@ export type Database = {
           mensagem_texto: string | null
           motivo_rejeicao: string | null
           motivo_reversao: string | null
+          nina_session_id: string | null
           observacao: string | null
           origem: string
           pergunta_texto: string | null
@@ -8913,6 +8915,7 @@ export type Database = {
           validacao_status: string | null
         }
         Insert: {
+          ambiente?: string
           aplicacao_evidencia?: Json | null
           aplicacao_resumo?: string | null
           aplicacao_tipo?: string | null
@@ -8944,6 +8947,7 @@ export type Database = {
           mensagem_texto?: string | null
           motivo_rejeicao?: string | null
           motivo_reversao?: string | null
+          nina_session_id?: string | null
           observacao?: string | null
           origem?: string
           pergunta_texto?: string | null
@@ -8975,6 +8979,7 @@ export type Database = {
           validacao_status?: string | null
         }
         Update: {
+          ambiente?: string
           aplicacao_evidencia?: Json | null
           aplicacao_resumo?: string | null
           aplicacao_tipo?: string | null
@@ -9006,6 +9011,7 @@ export type Database = {
           mensagem_texto?: string | null
           motivo_rejeicao?: string | null
           motivo_reversao?: string | null
+          nina_session_id?: string | null
           observacao?: string | null
           origem?: string
           pergunta_texto?: string | null
