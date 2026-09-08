@@ -13112,6 +13112,15 @@ export type Database = {
         Args: { _clinica_id: string; _conversa_id: string; _user_id: string }
         Returns: boolean
       }
+      atend_conversa_de_handoff: {
+        Args: {
+          _atribuida_user_id: string
+          _handoff_motivo: string
+          _handoff_resumo: Json
+          _is_teste: boolean
+        }
+        Returns: boolean
+      }
       atend_distribuir_fila: {
         Args: { _clinica_id: string; _max?: number }
         Returns: number
