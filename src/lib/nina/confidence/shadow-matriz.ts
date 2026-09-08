@@ -6,6 +6,8 @@
  * comparar "o que a Nina responderia" com "o que o motor teria decidido"
  * antes de ligar o bloqueio real em produção.
  */
+import { detectarIntencoes, intencaoAmbigua } from "../atendimento-fase1";
+import { montarContextoCanonicoTurno } from "./contexto-turno";
 import { decidirNoTurno, type EstadoDoTurno } from "./runtime";
 import { aplicarModo, type ModoConfianca } from "./shadow";
 import type { ResultadoConfianca } from "./types";
@@ -299,7 +301,23 @@ export function executarCenarioShadow(
   c: CenarioShadow,
   modo: ModoConfianca = "shadow",
 ): LinhaMatriz {
-  const decisao = decidirNoTurno({ ...c.estado, mensagemPaciente: c.mensagem });
+  // FASE 2 — a ação vem do contexto canônico da mensagem (mesma regra do
+  // atendimento real), nunca de um padrão otimista dentro do motor.
+  // Quando o cenário já declara a intenção observada, ela é o sinal do turno;
+  // só caímos no detector quando o cenário não declara nada.
+  const canonico = montarContextoCanonicoTurno(
+    { mensagemPaciente: c.mensagem, podeAgendar: false },
+    { detectarIntencoes, intencaoAmbigua },
+  );
+  const acaoPadrao =
+    c.estado.intent && canonico.requestedAction === "desconhecida"
+      ? "responder_informacao"
+      : canonico.requestedAction;
+  const decisao = decidirNoTurno({
+    acao: acaoPadrao,
+    ...c.estado,
+    mensagemPaciente: c.mensagem,
+  });
   const aplicado = aplicarModo(decisao, modo);
   return {
     id: c.id,

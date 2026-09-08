@@ -30,7 +30,7 @@ export type FerramentaDoTurno = {
 export type EstadoDoTurno = {
   /** Rascunho da resposta do modelo, quando já existe. */
   texto?: string | null;
-  /** O que a Nina pretende fazer. Padrão: responder informação. */
+  /** O que a Nina pretende fazer. Ausente = `desconhecida` (nunca otimista). */
   acao?: AcaoSolicitada;
   /** Mensagem do paciente neste turno (entra no resumo do handoff). */
   mensagemPaciente?: string | null;
@@ -77,7 +77,9 @@ export function montarContextoDoTurno(e: EstadoDoTurno): ContextoConfianca {
     conversationId: e.conversaId ?? null,
     messageId: e.messageId ?? null,
     intent: e.intent ?? null,
-    requestedAction: e.acao ?? "responder_informacao",
+    // FASE 2: ausência de ação NÃO vira "responder_informacao". Se o runtime
+    // não sabe o que a Nina vai fazer, o motor precisa enxergar isso.
+    requestedAction: e.acao ?? "desconhecida",
     entities: e.entities ?? {},
     retrievedSources: e.retrievedSources ?? [],
     ...(e.intentAmbiguo !== undefined ? { intentAmbiguo: e.intentAmbiguo } : {}),

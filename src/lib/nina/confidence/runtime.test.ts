@@ -13,6 +13,8 @@ import {
 const turno = (over: Partial<EstadoDoTurno> = {}): EstadoDoTurno => ({
   texto: "Oi! Como posso ajudar?",
   mensagemPaciente: "oi",
+  // FASE 2 — a ação passa a vir explícita do contexto canônico do turno.
+  acao: "responder_informacao",
   ferramentas: [],
   catalogoEncontrou: false,
   agendamentoConfirmado: false,

@@ -166,7 +166,8 @@ export function montarRegistroAuditoria(
     messageId: e.messageId ?? null,
     timestamp: e.timestamp ?? new Date().toISOString(),
     intencao: e.intencao ?? null,
-    acaoSolicitada: e.acaoSolicitada ?? "responder_informacao",
+    // FASE 2: sem ação informada o registro diz "desconhecida", não presume.
+    acaoSolicitada: e.acaoSolicitada ?? "desconhecida",
     score: r.score,
     nivel: r.level,
     decisao: r.decision,

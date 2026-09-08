@@ -102,14 +102,22 @@ export function IntentClarityValidator(ctx: ContextoConfianca): ResultadoValidad
   if (confianca !== null && confianca < 0.5) {
     return res(nome, "FAIL", Math.round(confianca * 100), "INTENCAO_BAIXA_CONFIANCA", { intentConfidence: confianca });
   }
-  if (ctx.requestedAction === "desconhecida" && !houveConsulta) {
-    return res(nome, "FAIL", 40, "ACAO_NAO_DEFINIDA", { requestedAction: ctx.requestedAction });
+  // FASE 2: ação desconhecida NUNCA sai do denominador. Ter rodado ferramenta
+  // não prova que o sistema entendeu o pedido — apenas reduz um pouco o risco.
+  if (ctx.requestedAction === "desconhecida") {
+    return houveConsulta
+      ? res(nome, "WARNING", 55, "ACAO_NAO_DEFINIDA", {
+          requestedAction: ctx.requestedAction,
+          intent: ctx.intent ?? null,
+          houveConsulta: true,
+        })
+      : res(nome, "FAIL", 40, "ACAO_NAO_DEFINIDA", {
+          requestedAction: ctx.requestedAction,
+          intent: ctx.intent ?? null,
+        });
   }
   if (confianca !== null && confianca < 0.75) {
     return res(nome, "WARNING", Math.round(confianca * 100), "INTENCAO_PARCIAL", { intentConfidence: confianca });
-  }
-  if (!ctx.intent && ctx.requestedAction === "desconhecida") {
-    return res(nome, "NOT_APPLICABLE", 100, "SEM_INTENCAO_DECLARADA", {});
   }
   return res(nome, "PASS", 100, "INTENCAO_CLARA", { intent: ctx.intent ?? ctx.requestedAction });
 }
