@@ -1,0 +1,4 @@
+ALTER TABLE public.integracao_verificacoes ADD COLUMN IF NOT EXISTS opcoes jsonb;
+ALTER TABLE public.integracao_verificacoes DROP CONSTRAINT IF EXISTS integracao_verificacoes_status_chk;
+ALTER TABLE public.integracao_verificacoes ADD CONSTRAINT integracao_verificacoes_status_chk CHECK (status = ANY (ARRAY['aguardando'::text, 'escolher_paciente'::text, 'verificado'::text, 'nao_localizado'::text, 'expirado'::text]));
+COMMENT ON COLUMN public.integracao_verificacoes.opcoes IS 'Lista [{opcao_id, paciente_id, nome_exibicao}] quando o mesmo WhatsApp casa com 2 a 6 pacientes ativos. O paciente_id nunca sai da API; só o opcao_id.';

@@ -243,6 +243,50 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
                   console.error("whatsapp mensagem insert error", insErr.message);
                 }
 
+                // Verificação do paciente pelo site (API v1.2): a mensagem
+                // carrega o código do desafio. É trânsito do site, não
+                // atendimento — não abre conversa, não chama a Nina.
+                try {
+                  const { interceptarCodigoVerificacao } = await import(
+                    "@/lib/integracoes/verificacao-v1.server"
+                  );
+                  const verif = await interceptarCodigoVerificacao({
+                    db: supabaseAdmin as never,
+                    clinicaId: params.clinicaId,
+                    texto: textoPaciente || body,
+                    fromNumber: from,
+                    mensagemId: msgInserida?.id ?? null,
+                    waMessageId: wa_message_id,
+                  });
+                  if (verif.tratada) {
+                    if (verif.resposta && cfg.access_token && phoneNumberId) {
+                      const { wa_message_id: outId } = await metaSendText(
+                        phoneNumberId,
+                        cfg.access_token,
+                        from,
+                        verif.resposta,
+                      );
+                      await supabaseAdmin.from("whatsapp_mensagens").insert({
+                        clinica_id: params.clinicaId,
+                        wa_message_id: outId,
+                        direction: "out",
+                        from_number: displayPhoneNumber,
+                        to_number: from,
+                        body: verif.resposta,
+                        tipo: "text",
+                        status: "sent",
+                        enviada_por: "sistema",
+                      });
+                    }
+                    resultado = "verificacao_site";
+                    continue;
+                  }
+                } catch (e) {
+                  console.error("[verificacao-site] falha ao tratar código", e);
+                }
+
+
+
                 // Antes de qualquer coisa, vence quem já passou do prazo —
                 // assim uma conversa parada não fica presa na Nina.
                 try {

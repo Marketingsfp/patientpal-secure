@@ -52,7 +52,11 @@ export const ESCOPOS_CONHECIDOS = [
   // v1.1: permite que o POST /appointments resolva/cadastre o paciente a
   // partir de CPF+nome+nascimento+telefone. Nunca concedido por padrão.
   "patients:write",
+  // v1.2: reconhecimento do paciente pelo WhatsApp (desafio, escolha e token
+  // de uso único). Não lê cadastro por CPF nem responde consultas de base.
+  "patients:verify",
 ] as const;
+
 
 export class ApiError extends Error {
   status: number;

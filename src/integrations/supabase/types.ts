@@ -5940,6 +5940,78 @@ export type Database = {
           },
         ]
       }
+      integracao_verificacoes: {
+        Row: {
+          api_key_id: string
+          clinica_id: string
+          codigo: string
+          codigo_normalizado: string
+          consumido_em: string | null
+          created_at: string
+          expira_em: string
+          id: string
+          ip: string | null
+          opcoes: Json | null
+          paciente_id: string | null
+          status: string
+          token_expira_em: string | null
+          token_hash: string | null
+          updated_at: string
+          wa_message_id: string | null
+        }
+        Insert: {
+          api_key_id: string
+          clinica_id: string
+          codigo: string
+          codigo_normalizado: string
+          consumido_em?: string | null
+          created_at?: string
+          expira_em: string
+          id?: string
+          ip?: string | null
+          opcoes?: Json | null
+          paciente_id?: string | null
+          status?: string
+          token_expira_em?: string | null
+          token_hash?: string | null
+          updated_at?: string
+          wa_message_id?: string | null
+        }
+        Update: {
+          api_key_id?: string
+          clinica_id?: string
+          codigo?: string
+          codigo_normalizado?: string
+          consumido_em?: string | null
+          created_at?: string
+          expira_em?: string
+          id?: string
+          ip?: string | null
+          opcoes?: Json | null
+          paciente_id?: string | null
+          status?: string
+          token_expira_em?: string | null
+          token_hash?: string | null
+          updated_at?: string
+          wa_message_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "integracao_verificacoes_api_key_id_fkey"
+            columns: ["api_key_id"]
+            isOneToOne: false
+            referencedRelation: "integracao_api_keys"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "integracao_verificacoes_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       integration_secrets: {
         Row: {
           chave: string
@@ -13954,6 +14026,14 @@ export type Database = {
         Returns: Json
       }
       integracao_revogar_api_key: { Args: { _id: string }; Returns: boolean }
+      integracao_verificacao_pacientes_por_telefone: {
+        Args: { _clinica_id: string; _limite?: number; _ultimos8: string }
+        Returns: {
+          id: string
+          nome: string
+        }[]
+      }
+      integracao_verificacoes_limpar: { Args: never; Returns: number }
       is_admin_global: { Args: { _user_id: string }; Returns: boolean }
       is_admin_ou_gestor: { Args: { _user_id: string }; Returns: boolean }
       is_chat_member: {
@@ -14340,6 +14420,13 @@ export type Database = {
       paciente_cartao_status: {
         Args: { _clinica_id: string; _paciente_id: string }
         Returns: Json
+      }
+      paciente_corrigir_prontuario_estante: {
+        Args: { _paciente_id: string }
+        Returns: {
+          antigo: string
+          novo: string
+        }[]
       }
       paciente_pendencias_cadastro: {
         Args: { _paciente_id: string }
