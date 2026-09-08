@@ -141,6 +141,11 @@ const GRUPOS_BASE: Grupo[] = [
       { key: "fluxo", nome: "Fluxo do paciente", descricao: "Kanban de atendimento" },
       { key: "orcamentos", nome: "Orçamentos", descricao: "Propostas e orçamentos" },
       { key: "recepcao", nome: "Recepção / Filas", descricao: "Check-in e filas" },
+      {
+        key: "telefonia",
+        nome: "Telefonia",
+        descricao: "Atendimento telefônico da clínica",
+      },
       { key: "triagem-enfermagem", nome: "Triagem - Enfermagem", descricao: "Triagem inicial" },
       { key: "cartao-beneficios", nome: "Cartão Benefícios", descricao: "Planos e contratos" },
       {

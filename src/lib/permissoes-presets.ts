@@ -23,6 +23,9 @@ export const TODOS_MODULOS: ReadonlyArray<string> = [
   "fluxo",
   "orcamentos",
   "recepcao",
+  // Nova categoria operacional. Fica disponível na tela de Perfis para ser
+  // ligada/desligada; nenhum preset (fora do admin) recebe acesso automático.
+  "telefonia",
   "triagem-enfermagem",
   "cartao-beneficios",
   "painel",
