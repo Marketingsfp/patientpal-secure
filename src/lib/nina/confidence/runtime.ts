@@ -11,6 +11,7 @@
 import type { DecisaoConfianca } from "../confidence-engine";
 import { decidirConfianca } from "./engine";
 import type { HardBlocker } from "./policy";
+import { contaContraANota } from "./types";
 import type {
   AcaoSolicitada,
   ContextoConfianca,
