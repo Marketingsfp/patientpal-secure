@@ -122,8 +122,11 @@ export const metricasAprendizadoNina = createServerFn({ method: "POST" })
         "id, status, categoria, root_cause, prioridade, unidade_id, grupo_titulo, grupo_chave, validacao_status, created_at",
       )
       .eq("clinica_id", data.clinicaId)
+      // FASE 2 — homologação e teste automatizado não entram na métrica real.
+      .eq("ambiente", "production")
       .gte("created_at", recorte.inicio)
       .lt("created_at", recorte.fim)
+
       .order("created_at", { ascending: true })
       .limit(5000);
 

@@ -170,7 +170,31 @@ type Item = {
   grupo_titulo: string | null;
   /** Execução da Nina que produziu a resposta — chave do snapshot de confiança. */
   execucao_id?: string | null;
+  /** Ambiente do reporte: atendimento real, homologação ou teste automatizado. */
+  ambiente?: string | null;
+  nina_session_id?: string | null;
+  teste_ciclo_id?: string | null;
 };
+
+/** Selo de ambiente — deixa explícito o que NÃO é atendimento real. */
+const AMBIENTE_UI: Record<string, { rotulo: string; classe: string }> = {
+  homologation: {
+    rotulo: "Homologação",
+    classe: "border-amber-500/40 text-amber-700 dark:text-amber-300",
+  },
+  automated_test: {
+    rotulo: "Teste automatizado",
+    classe: "border-sky-500/40 text-sky-700 dark:text-sky-300",
+  },
+};
+
+const FILTROS_AMBIENTE = [
+  { valor: "todos", rotulo: "Todos" },
+  { valor: "production", rotulo: "Produção" },
+  { valor: "homologation", rotulo: "Homologação" },
+  { valor: "automated_test", rotulo: "Teste automatizado" },
+];
+
 
 /** Rótulo/estilo do nível de confiança registrado no momento da resposta. */
 const CONFIANCA_UI: Record<string, { curto: string; classe: string }> = {
@@ -347,6 +371,8 @@ function Pagina() {
   const [fPrioridade, setFPrioridade] = useState("todas");
   const [fCausa, setFCausa] = useState("todas");
   const [fConfianca, setFConfianca] = useState("todas");
+  const [fAmbiente, setFAmbiente] = useState("todos");
+
   const [diagnosticando, setDiagnosticando] = useState<Item | null>(null);
   const [comparacao, setComparacao] = useState<Comparacao | null>(null);
   const [consultandoBase, setConsultandoBase] = useState(false);
@@ -404,6 +430,8 @@ function Pagina() {
           status: aba as any,
           categoria: categoria === "todas" ? null : (categoria as any),
           reportadoPor: autor === "todos" ? null : autor,
+          ambiente: fAmbiente === "todos" ? null : (fAmbiente as any),
+
           de: de || null,
           ate: ate || null,
           limite: 200,
@@ -424,7 +452,7 @@ function Pagina() {
     } finally {
       setCarregando(false);
     }
-  }, [clinicaId, aba, categoria, autor, de, ate, listar]);
+  }, [clinicaId, aba, categoria, autor, fAmbiente, de, ate, listar]);
 
   useEffect(() => {
     void carregar();
@@ -1023,6 +1051,22 @@ function Pagina() {
             </Select>
           </div>
           <div>
+            <Label htmlFor="f-amb">Ambiente</Label>
+            <Select value={fAmbiente} onValueChange={setFAmbiente}>
+              <SelectTrigger id="f-amb" className="mt-1">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {FILTROS_AMBIENTE.map((a) => (
+                  <SelectItem key={a.valor} value={a.valor}>
+                    {a.rotulo}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div>
             <Label htmlFor="f-de">De</Label>
             <Input
               id="f-de"
@@ -1077,6 +1121,12 @@ function Pagina() {
                       {rotuloConversaReporte(it.conversa_id, conversas[it.conversa_id ?? ""])}
                     </span>
                     <Badge variant="outline">{ROTULO_REVISAO[it.status] ?? it.status}</Badge>
+                    {it.ambiente && AMBIENTE_UI[it.ambiente] && (
+                      <Badge variant="outline" className={AMBIENTE_UI[it.ambiente]!.classe}>
+                        Ambiente: {AMBIENTE_UI[it.ambiente]!.rotulo}
+                      </Badge>
+                    )}
+
                     {it.grupo_chave && (ocorrencias[it.grupo_chave] ?? 1) > 1 && (
                       <Badge variant="secondary">
                         {it.grupo_titulo ?? "Problema"} — {ocorrencias[it.grupo_chave]} ocorrências
