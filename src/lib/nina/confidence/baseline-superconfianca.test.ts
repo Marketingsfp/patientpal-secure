@@ -77,19 +77,33 @@ describe("BASELINE 1 — ausência de sinal é tratada como certeza", () => {
     expect(pontuarValidadores(soIntent, POLITICA_PADRAO)).toBe(100);
   });
 
-  it("turno inteiro sem evidência nenhuma sai como HIGH/ALLOW", () => {
+  it("sem ação e sem ferramenta, o motor ainda pontua 40 (único freio existente)", () => {
+    const r = decidirNoTurno(
+      estado({ texto: "Sim, é isso mesmo.", acao: "desconhecida", intent: null }),
+    );
+    // IntentClarityValidator FAIL/ACAO_NAO_DEFINIDA é o único validador
+    // aplicável: ele sozinho define a nota do turno inteiro.
+    expect(r.score).toBe(40);
+    expect(r.evidence.ferramentasExecutadas).toBe(0);
+  });
+
+  it("basta UMA ferramenta técnica bem-sucedida para o mesmo turno virar 100/HIGH/ALLOW", () => {
     const r = decidirNoTurno(
       estado({
         texto: "Sim, é isso mesmo.",
         acao: "desconhecida",
         intent: null,
+        ferramentas: [
+          { nome: "buscar_medicos", capacidade: "listProfessionals", fonte: "agenda", success: true },
+        ],
       }),
     );
+    // A ferramenta apenas rodou; nada no turno sustenta a afirmação do texto.
+    // Com IntentClarity agora NOT_APPLICABLE, todos os validadores saem do
+    // denominador e o `if (total === 0) return 100` de policy.ts:110 assume.
     expect(r.score).toBe(100);
     expect(r.level).toBe("HIGH");
     expect(r.decision).toBe("ALLOW");
-    // Nenhuma ferramenta rodou, nenhuma fonte foi lida.
-    expect(r.evidence.ferramentasExecutadas).toBe(0);
     expect(r.evidence.fontesUteis).toBe(0);
   });
 });
