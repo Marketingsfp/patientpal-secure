@@ -14,6 +14,7 @@ import {
   type PacienteV2,
 } from "./status-utils";
 import { prontuarioExibicao } from "@/lib/prontuario";
+import { BadgeAlertaCritico } from "@/components/paciente/alerta-critico";
 
 interface Props {
   p: PacienteV2;
@@ -69,6 +70,7 @@ export function ClienteCard({ p, compact, onOpen }: Props) {
             <span className={cn("font-medium truncate", compact ? "text-sm" : "text-sm")}>
               {p.nome}
             </span>
+            <BadgeAlertaCritico pacienteId={p.id} compact />
             {prontuario && (
               <span className="text-[11px] font-mono px-1.5 py-0.5 rounded bg-muted">
                 Prontuário {prontuario}

@@ -40,6 +40,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { ClienteForm } from "@/components/clientes/cliente-form";
+import { BadgeAlertaCritico } from "@/components/paciente/alerta-critico";
 import { EditarClienteDialog } from "@/components/clientes/editar-cliente-dialog";
 import { IdadeIcon, calcIdadeAnos } from "@/components/idade-icon";
 import { ClientesShellV2 } from "@/components/clientes-v2/clientes-shell";
@@ -785,6 +786,7 @@ function ClientesPage() {
                       <span className="truncate" title={p.nome}>
                         {p.nome}
                       </span>
+                      <BadgeAlertaCritico pacienteId={p.id} compact />
                       {convenios?.get(p.id) && (
                         <IdCard
                           className="h-4 w-4 text-emerald-600 shrink-0"

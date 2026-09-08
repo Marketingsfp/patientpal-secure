@@ -97,6 +97,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { LancamentoDialog } from "@/components/financeiro/lancamento-dialog";
 import { ProcedimentoCell } from "@/components/agenda/procedimento-cell";
 import { BadgePacienteDistante } from "@/components/paciente/badge-paciente-distante";
+import { BadgeAlertaCritico } from "@/components/paciente/alerta-critico";
 import { PatientSearchInput } from "@/components/patient-search-input";
 import { PacienteQuickActions } from "@/components/agenda/paciente-quick-actions";
 import { FaceCaptureDialog } from "@/components/face/FaceCaptureDialog";
@@ -12165,6 +12166,9 @@ function AgendaPage() {
                                       </span>
                                     )}
                                     {a.paciente_id && (
+                                      <BadgeAlertaCritico pacienteId={a.paciente_id} compact />
+                                    )}
+                                    {a.paciente_id && (
                                       <BadgePacienteDistante
                                         cidade={cidadeMap.get(a.paciente_id)}
                                         compact
@@ -12832,6 +12836,11 @@ function AgendaPage() {
           <DialogHeader className="overflow-x-hidden">
             <div className="flex flex-wrap items-center justify-between gap-2 pr-6">
               <DialogTitle className="min-w-0">Informações do cliente</DialogTitle>
+              <BadgeAlertaCritico
+                pacienteId={pacInfo?.id ?? null}
+                rotulo="ALERTA JUDICIAL"
+                className="whitespace-nowrap"
+              />
               <BadgePacienteDistante
                 cidade={pacEdit.cidade || pacInfo?.cidade}
                 className="whitespace-nowrap text-[12px] shrink-0"

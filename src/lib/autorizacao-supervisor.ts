@@ -26,6 +26,17 @@ export const ESCOPOS_AUTORIZACAO = {
   desconto: ["admin", "gestor", "financeiro"],
   /** Atender um paciente apesar de débito em atraso. */
   liberar_debito: ["admin", "gestor", "financeiro"],
+  /**
+   * Marcar ou retirar o alerta crítico do cadastro do paciente (processo
+   * judicial, reclamação no Procon, disputa jurídica em andamento).
+   *
+   * Não envolve dinheiro, mas é informação jurídica sensível que o sistema
+   * mostra para a equipe inteira na hora do atendimento: quem escreve o texto
+   * tem que ser a supervisão, não o balcão. O `financeiro` fica de fora pelo
+   * mesmo motivo do sem faturamento — é decisão de supervisão, e não de
+   * conferência de valores.
+   */
+  alerta_critico: ["admin", "gestor", "supervisor"],
 } as const;
 
 export type EscopoAutorizacao = keyof typeof ESCOPOS_AUTORIZACAO;

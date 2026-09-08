@@ -11069,6 +11069,10 @@ export type Database = {
       }
       pacientes: {
         Row: {
+          alerta_critico: boolean
+          alerta_definido_em: string | null
+          alerta_definido_por: string | null
+          alerta_motivo: string | null
           ativo: boolean
           bairro: string | null
           cep: string | null
@@ -11111,6 +11115,10 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          alerta_critico?: boolean
+          alerta_definido_em?: string | null
+          alerta_definido_por?: string | null
+          alerta_motivo?: string | null
           ativo?: boolean
           bairro?: string | null
           cep?: string | null
@@ -11153,6 +11161,10 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          alerta_critico?: boolean
+          alerta_definido_em?: string | null
+          alerta_definido_por?: string | null
+          alerta_motivo?: string | null
           ativo?: boolean
           bairro?: string | null
           cep?: string | null

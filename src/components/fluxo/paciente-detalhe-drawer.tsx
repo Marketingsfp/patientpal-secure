@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { FileText, History, X, Loader2 } from "lucide-react";
+import { BannerAlertaCritico } from "@/components/paciente/alerta-critico";
 
 export type FluxoDetalheAg = {
   id: string;
@@ -146,6 +147,8 @@ export function PacienteDetalheDrawer({
               <SheetTitle className="truncate">{ag.paciente_nome}</SheetTitle>
               <SheetDescription>Detalhes do atendimento</SheetDescription>
             </SheetHeader>
+
+            <BannerAlertaCritico pacienteId={pacienteId} className="mt-2" />
 
             <div className="mt-1">
               <Badge

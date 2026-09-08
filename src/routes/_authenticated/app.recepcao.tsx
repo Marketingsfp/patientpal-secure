@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { Bell, Check, X, ExternalLink, Volume2 } from "lucide-react";
 import { BadgePacienteDistante } from "@/components/paciente/badge-paciente-distante";
+import { BadgeAlertaCritico } from "@/components/paciente/alerta-critico";
 import { hojeBR } from "@/lib/date-utils";
 
 export const Route = createFileRoute("/_authenticated/app/recepcao")({
@@ -321,6 +322,7 @@ function RecepcaoPage() {
                     {s.pacientes?.nome ?? "Anônimo"}
                     {s.identificado_por_facial ? " · 📷" : ""}
                   </span>
+                  <BadgeAlertaCritico pacienteId={s.paciente_id} compact />
                   <BadgePacienteDistante cidade={s.pacientes?.cidade} compact />
                 </div>
                 <button

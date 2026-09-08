@@ -28,7 +28,10 @@ import {
   AJUDA_PRONTUARIO,
   PLACEHOLDER_PRONTUARIO,
   conflitoCodigoProntuario,
+  desvioProntuarioParaConfirmar,
+  type DesvioProntuario,
 } from "@/lib/prontuario";
+import { ConfirmarProntuarioDistante } from "@/components/pacientes/confirmar-prontuario-distante";
 import { erroCaractereNome, sanitizarNomePessoa, validarNomePessoa } from "@/lib/nome-pessoa";
 import { maiusculoDigitacao } from "@/lib/texto-maiusculo";
 import { mascaraCPF, mascaraTelefone } from "@/lib/validators";
@@ -36,6 +39,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Textarea } from "@/components/ui/textarea";
+import { AlertTriangle } from "lucide-react";
+import {
+  limparMotivoAlerta,
+  MAX_MOTIVO_ALERTA,
+  podeMarcarAlertaCritico,
+} from "@/lib/paciente/alerta-critico";
+import { invalidarAlertaCritico } from "@/components/paciente/alerta-critico";
 import {
   Dialog,
   DialogContent,
@@ -85,6 +96,9 @@ export interface Paciente {
   responsavel_telefone: string | null;
   responsavel_parentesco: string | null;
   foto_url?: string | null;
+  /** Sinalização vermelha de ocorrência crítica (processo, Procon). */
+  alerta_critico?: boolean | null;
+  alerta_motivo?: string | null;
 }
 
 type FormState = {
@@ -110,6 +124,8 @@ type FormState = {
   responsavel_cpf: string;
   responsavel_telefone: string;
   responsavel_parentesco: string;
+  alerta_critico: boolean;
+  alerta_motivo: string;
 };
 
 const EMPTY: FormState = {
@@ -135,6 +151,8 @@ const EMPTY: FormState = {
   responsavel_cpf: "",
   responsavel_telefone: "",
   responsavel_parentesco: "",
+  alerta_critico: false,
+  alerta_motivo: "",
 };
 
 function calcIdade(dn: string | null): number | null {
@@ -257,6 +275,12 @@ export function ClienteForm({
   const editing = paciente;
   const { clinicaAtual } = useClinica();
   const isAdmin = clinicaAtual?.role === "admin";
+  // Alerta crítico: quem marca é a supervisão autorizada, pessoa a pessoa.
+  // Não basta ter perfil de admin — quase toda a equipe tem esse perfil.
+  const podeMarcarAlerta = podeMarcarAlertaCritico(
+    clinicaAtual?.role,
+    clinicaAtual?.pode_autorizar,
+  );
   const [form, setForm] = useState<FormState>(EMPTY);
   const [tab, setTab] = useState("dados");
   const [saving, setSaving] = useState(false);
@@ -289,6 +313,9 @@ export function ClienteForm({
   const [bioLoading, setBioLoading] = useState(false);
   const [consentOpen, setConsentOpen] = useState(false);
   const [faceOpen, setFaceOpen] = useState(false);
+  // Número de prontuário longe da estante: guarda os dois números enquanto a
+  // recepção confere a ficha. Null = nenhuma pergunta pendente.
+  const [desvioProntuario, setDesvioProntuario] = useState<DesvioProntuario | null>(null);
 
   // Prontuário
   type ProntRow = {
@@ -429,6 +456,8 @@ export function ClienteForm({
       responsavel_cpf: mascaraCPF(editing.responsavel_cpf ?? ""),
       responsavel_telefone: mascaraTelefone(editing.responsavel_telefone ?? ""),
       responsavel_parentesco: editing.responsavel_parentesco ?? "",
+      alerta_critico: editing.alerta_critico === true,
+      alerta_motivo: editing.alerta_motivo ?? "",
     });
     setTab("dados");
     setFotoFile(null);
@@ -1127,8 +1156,11 @@ export function ClienteForm({
     };
   };
 
-  const onSubmit = async (e: FormEvent) => {
-    e.preventDefault();
+  // `prontuarioConfirmado` chega true quando a recepção já respondeu "Confirmar
+  // e Salvar" no aviso de número longe da estante — aí a checagem é pulada e o
+  // cadastro segue com o número digitado.
+  const onSubmit = async (e: FormEvent | null, prontuarioConfirmado = false) => {
+    e?.preventDefault();
     const vNome = validarNomePessoa(form.nome);
     if (!vNome.valido) {
       setErrosNome((er) => ({ ...er, nome: vNome.mensagem }));
@@ -1200,6 +1232,13 @@ export function ClienteForm({
       toast.error(conflito);
       return;
     }
+    // Alerta crítico: tarja vermelha sem motivo escrito deixa a recepção sem
+    // saber o que fazer com o paciente na frente dela. O banco recusa também.
+    const motivoAlerta = limparMotivoAlerta(form.alerta_motivo);
+    if (podeMarcarAlerta && form.alerta_critico && !motivoAlerta) {
+      toast.error("Informe o motivo do alerta crítico.");
+      return;
+    }
     setSaving(true);
     const payload = {
       nome: dados.nome,
@@ -1229,6 +1268,13 @@ export function ClienteForm({
     // Número de serviço / pasta: só admin pode alterar.
     if (isAdmin) {
       payload.numero_pasta = dados.numero_pasta;
+    }
+    // Alerta crítico: só entra no payload de quem tem alçada. Sem isto, a
+    // recepção salvando um telefone reenviaria os campos do alerta e o gatilho
+    // do banco recusaria o cadastro inteiro por uma alteração que ela nem fez.
+    if (podeMarcarAlerta) {
+      payload.alerta_critico = form.alerta_critico;
+      payload.alerta_motivo = form.alerta_critico ? motivoAlerta : null;
     }
     // Número de prontuário: campo livre, digitado pela recepção lendo a ficha
     // antiga. Enviamos exatamente o que foi digitado — o banco só gera número
@@ -1297,6 +1343,10 @@ export function ClienteForm({
     }
 
     setSaving(false);
+    // A tarja vermelha é lida de um cache compartilhado por várias telas.
+    // Sem esta linha, tirar o alerta continuaria mostrando a tarja na fila
+    // até alguém recarregar a página.
+    if (pacienteId) invalidarAlertaCritico(pacienteId);
     toast.success(editing ? "Cliente atualizado." : "Cliente cadastrado.");
     if (pacienteId) onSaved(pacienteId);
   };
@@ -1514,6 +1564,72 @@ export function ClienteForm({
                   />
                   Cliente ativo
                 </label>
+
+                {/* Alerta crítico / atenção especial.
+                    Fica escondido de quem não tem alçada quando o paciente não
+                    está marcado: para a recepção o campo seria só um botão que
+                    ela não pode apertar. Quando o paciente ESTÁ marcado o bloco
+                    aparece para todo mundo, em modo de leitura, porque saber do
+                    processo é justamente o objetivo do recurso. */}
+                {(podeMarcarAlerta || form.alerta_critico) && (
+                  <div
+                    className={`rounded-md border p-3 space-y-2 ${
+                      form.alerta_critico ? "border-red-600 bg-red-600/5" : "border-border"
+                    }`}
+                  >
+                    <label
+                      className={`flex items-start gap-2 text-sm ${
+                        podeMarcarAlerta ? "cursor-pointer" : "cursor-default"
+                      }`}
+                    >
+                      <Checkbox
+                        checked={form.alerta_critico}
+                        disabled={!podeMarcarAlerta}
+                        onCheckedChange={(v) =>
+                          setForm((f) => ({
+                            ...f,
+                            alerta_critico: !!v,
+                            // Desmarcou: o motivo antigo não pode ficar guardado
+                            // no cadastro depois que a ocorrência foi encerrada.
+                            alerta_motivo: v ? f.alerta_motivo : "",
+                          }))
+                        }
+                      />
+                      <span>
+                        <span className="font-semibold inline-flex items-center gap-1.5 text-red-700 dark:text-red-400">
+                          <AlertTriangle className="h-4 w-4" />
+                          Sinalizar Alerta Crítico / Atenção Especial
+                        </span>
+                        <span className="block text-xs text-muted-foreground">
+                          {podeMarcarAlerta
+                            ? "Marca o paciente com tarja vermelha na busca, na fila e no atendimento."
+                            : "Somente a supervisão autorizada pode marcar ou retirar este alerta."}
+                        </span>
+                      </span>
+                    </label>
+                    {form.alerta_critico && (
+                      <div className="space-y-1">
+                        <Label>Motivo do alerta *</Label>
+                        <Textarea
+                          rows={2}
+                          value={form.alerta_motivo}
+                          maxLength={MAX_MOTIVO_ALERTA}
+                          disabled={!podeMarcarAlerta}
+                          readOnly={!podeMarcarAlerta}
+                          placeholder="Ex.: Processo judicial ativo contra a clínica"
+                          onChange={(e) =>
+                            setForm((f) => ({ ...f, alerta_motivo: e.target.value }))
+                          }
+                        />
+                        <p className="text-xs text-muted-foreground">
+                          Este texto aparece para a recepção, a coordenação e o médico. Escreva o
+                          que a equipe precisa saber no balcão — sem detalhe clínico e sem dado do
+                          processo que não deva circular.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
               </TabsContent>
 
               <TabsContent value="endereco" className="space-y-4 pt-4 pb-16">

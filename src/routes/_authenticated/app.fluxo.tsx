@@ -54,6 +54,7 @@ import {
   type FluxoDetalheAg,
 } from "@/components/fluxo/paciente-detalhe-drawer";
 import { BadgePacienteDistante } from "@/components/paciente/badge-paciente-distante";
+import { BadgeAlertaCritico } from "@/components/paciente/alerta-critico";
 import { prontuarioExibicao } from "@/lib/prontuario";
 export const Route = createFileRoute("/_authenticated/app/fluxo")({
   component: FluxoPage,
@@ -944,6 +945,10 @@ function FluxoPage() {
                         >
                           <Clock className="h-3 w-3" /> {formatDuracao(espera)} de espera
                         </span>
+                      )}
+
+                      {a.paciente_id && (
+                        <BadgeAlertaCritico pacienteId={a.paciente_id} compact className="mt-1.5" />
                       )}
 
                       {a.paciente_id && (

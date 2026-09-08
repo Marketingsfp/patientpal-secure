@@ -10,6 +10,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { BadgePacienteDistante } from "@/components/paciente/badge-paciente-distante";
+import { BadgeAlertaCritico } from "@/components/paciente/alerta-critico";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
@@ -415,6 +416,7 @@ function PatientCard({
             <h3 className="text-lg font-bold leading-tight text-foreground">
               {item.paciente_nome}
             </h3>
+            <BadgeAlertaCritico pacienteId={item.paciente_id} rotulo="ALERTA JUDICIAL" />
             <BadgePacienteDistante cidade={item.paciente?.cidade ?? null} compact />
             {item.pago ? (
               <Badge className="bg-emerald-600 text-white hover:bg-emerald-600">PAGO</Badge>

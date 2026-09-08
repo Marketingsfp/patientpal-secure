@@ -19,6 +19,7 @@ import {
   type PacienteV2,
 } from "./status-utils";
 import { prontuarioExibicao } from "@/lib/prontuario";
+import { BannerAlertaCritico } from "@/components/paciente/alerta-critico";
 
 interface Props {
   paciente: PacienteV2 | null;
@@ -43,6 +44,8 @@ export function ClienteDrawer({ paciente, onClose }: Props) {
                 {label} {p.ativo ? "" : "· Inativo"}
               </SheetDescription>
             </SheetHeader>
+
+            <BannerAlertaCritico pacienteId={p.id} className="mt-2" />
 
             <Separator className="my-3" />
 

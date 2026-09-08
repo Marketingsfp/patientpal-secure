@@ -37,6 +37,7 @@ import {
 import { Link } from "@tanstack/react-router";
 import { agendamentosStatusPagamento } from "@/lib/pagamento-status";
 import { BadgePacienteDistante } from "@/components/paciente/badge-paciente-distante";
+import { BadgeAlertaCritico } from "@/components/paciente/alerta-critico";
 import {
   MANCHESTER,
   type ManchesterCor,
@@ -556,6 +557,7 @@ function TriagemEnfermagemConteudo() {
                       )}
                     </div>
                     <div className="flex flex-wrap gap-1.5 justify-end">
+                      <BadgeAlertaCritico pacienteId={g.paciente_id} compact />
                       <BadgePacienteDistante
                         cidade={g.paciente_id ? cidadeMap.get(g.paciente_id) : null}
                         compact

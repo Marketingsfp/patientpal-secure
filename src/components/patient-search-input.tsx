@@ -8,6 +8,7 @@ import { VoiceInput } from "@/components/voice-input";
 import { prontuarioExibicao } from "@/lib/prontuario";
 import { normalizarTermoBusca } from "@/lib/busca-texto";
 import { formatarIdadeCurta } from "@/lib/date-utils";
+import { BadgeAlertaCritico } from "@/components/paciente/alerta-critico";
 
 export interface PatientOption {
   id: string;
@@ -284,6 +285,7 @@ export function PatientSearchInput({
                           </span>
                         )}
                       </span>
+                      <BadgeAlertaCritico pacienteId={p.id} rotulo="ALERTA" compact />
                       {prontuarioExibicao(p) && (
                         <span className="text-xs font-mono px-1.5 py-0.5 rounded bg-muted">
                           Prontuário {prontuarioExibicao(p)}

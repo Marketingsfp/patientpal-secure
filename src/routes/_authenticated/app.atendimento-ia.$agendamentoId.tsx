@@ -41,6 +41,7 @@ import { mostrarErro } from "@/lib/traduzir-erro";
 import { agendamentoStatusPagamento, type StatusPagamento } from "@/lib/pagamento-status";
 import { cadastroMedicoDoUsuario, currentUserIsMedicoOnly } from "@/lib/medico-only";
 import { useRealtimeRefresh } from "@/hooks/use-realtime-refresh";
+import { BannerAlertaCritico } from "@/components/paciente/alerta-critico";
 
 export const Route = createFileRoute("/_authenticated/app/atendimento-ia/$agendamentoId")({
   component: AtendimentoEditorPage,
@@ -1005,6 +1006,11 @@ function AtendimentoEditorPage() {
             </Link>
           </Button>
         </div>
+
+        {/* Alerta crítico do paciente (processo judicial, Procon).
+            Fica ACIMA do bloco de dados de propósito: o médico tem que ver a
+            ocorrência antes de começar a consulta, não depois de rolar a tela. */}
+        <BannerAlertaCritico pacienteId={pacienteId || null} />
 
         {/* a) Dados do paciente */}
         <Card className="p-4">
