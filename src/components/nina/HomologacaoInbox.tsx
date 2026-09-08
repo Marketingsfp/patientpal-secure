@@ -1166,8 +1166,17 @@ export function HomologacaoInbox() {
                       data-nina-audit-trace-id={meta.audit_trace_id ?? undefined}
                       className={`flex items-start gap-2 ${out ? "justify-end" : "justify-start"}`}
                     >
-
+                      {/* Reporte de um clique — mesmo mecanismo do atendimento
+                          real, apenas em respostas da Nina neste teste. */}
+                      {m.enviada_por === "nina" && out && clinicaId && meta.test_conversation_id && (
+                        <ReportarErroNinaBotao
+                          clinicaId={clinicaId}
+                          conversaId={meta.test_conversation_id}
+                          mensagemId={meta.message_id}
+                        />
+                      )}
                       <div
+
                         className={`max-w-[68%] break-words rounded-2xl px-3 py-2 text-sm shadow-sm ${
                           out
                             ? "rounded-br-sm bg-atd-go text-atd-on-strong"
