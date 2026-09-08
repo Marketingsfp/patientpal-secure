@@ -65,10 +65,13 @@ const filtros = z.object({
   categoria: z.string().max(60).nullish(),
   reportadoPor: z.string().uuid().nullish(),
   unidadeId: z.string().uuid().nullish(),
+  /** Separa atendimento real de homologação/teste automatizado. */
+  ambiente: z.enum(["production", "homologation", "automated_test"]).nullish(),
   de: z.string().nullish(),
   ate: z.string().nullish(),
   limite: z.number().int().min(1).max(500).default(200),
 });
+
 
 export const listarRevisaoFeedbackNina = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
