@@ -280,25 +280,6 @@ export function decidirConfianca(
   // FASE 3 — nota E cobertura, medidas na mesma passada e reportadas separadas.
   const medida = medirEvidencia(validators, politica);
 
-  // Handoff já pedido pelo modelo: o pipeline de transferência assume o turno.
-  // O 100 aqui é a segurança de TRANSFERIR, não a veracidade do texto — por
-  // isso a cobertura real continua sendo reportada sem maquiagem.
-  if (ctx.businessContext.handoffSolicitado) {
-    return {
-      score: 100,
-      evidenceCoverage: medida.cobertura,
-      unknownDimensions: medida.desconhecidas,
-      confidenceInsufficient: medida.semEvidencia,
-      level: "HIGH",
-      decision: "ALLOW",
-      blockers: [],
-      hardBlockers: [],
-      checks,
-      validators,
-      evidence: montarEvidencia(ctx, cats, ["handoff já solicitado pelo runtime"]),
-    };
-  }
-
   const risco = riscoDaAcao(ctx);
   const hardBlockers: HardBlocker[] = detectarHardBlockers(
     { bloqueadores: blockers, validators, risco },
