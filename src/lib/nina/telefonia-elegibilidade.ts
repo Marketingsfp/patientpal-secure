@@ -8,7 +8,7 @@
  * IA — se um usuário poderia ou não receber a conversa.
  *
  * Regra definitiva:
- *   Cadastros › Perfis → permissão "telefonia"
+ *   Cadastros › Perfis → perfil "telefonia"
  *   + Online (aceitando novas, presença recente)
  *   + sem pausa aberta
  *   + não administrador
@@ -24,7 +24,7 @@ export type CandidatoDistribuicao = {
   userId: string;
   /** Nome/rótulo apenas para leitura do relatório de teste. */
   nome?: string;
-  /** Perfil possui a permissão "telefonia" em Cadastros › Perfis. */
+  /** Perfil possui a perfil "telefonia" em Cadastros › Perfis. */
   temTelefonia: boolean;
   status: StatusPresenca;
   /** Marcado como "aceitando novas conversas". Padrão: true quando Online. */
@@ -65,7 +65,7 @@ export function verificarElegibilidade(c: CandidatoDistribuicao): VerificacaoEle
   const online = c.status === "ONLINE" && (c.aceitaNovas ?? true) && (c.presencaRecente ?? true);
   let motivo: string | null = null;
 
-  if (!c.temTelefonia) motivo = "sem permissão Telefonia";
+  if (!c.temTelefonia) motivo = "sem o perfil Telefonia";
   else if (c.admin) motivo = "administrador não recebe atribuição automática";
   else if (c.status !== "ONLINE") motivo = `status ${c.status}`;
   else if (!(c.aceitaNovas ?? true)) motivo = "não está aceitando novas";

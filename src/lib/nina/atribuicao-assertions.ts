@@ -9,7 +9,10 @@
 
 export type CandidatoAvaliado = {
   user_id: string;
-  permission_telefonia: boolean;
+  /** Perfil TELEFONIA em Cadastros › Perfis (fonte oficial da elegibilidade). */
+  perfil_telefonia?: boolean;
+  /** Nome antigo do mesmo campo, mantido para eventos já gravados. */
+  permission_telefonia?: boolean;
   presence_status: string;
   aceita_novas?: boolean;
   presenca_recente?: boolean;
@@ -25,6 +28,7 @@ export type AuditoriaAtribuicao = {
   conversation_id: string;
   handoff_event_id?: string | null;
   selected_user_id: string | null;
+  perfil_telefonia?: boolean;
   permission_telefonia?: boolean;
   presence_status?: string | null;
   load_at_selection?: number | null;
@@ -64,9 +68,10 @@ export function verificarAtribuicao(
     (c) => c.user_id === auditoria.selected_user_id,
   );
 
+  // Perfil TELEFONIA: aceita o nome atual e o antigo (eventos já gravados).
   const temTelefonia = escolhido
-    ? escolhido.permission_telefonia
-    : auditoria.permission_telefonia === true;
+    ? (escolhido.perfil_telefonia ?? escolhido.permission_telefonia) === true
+    : (auditoria.perfil_telefonia ?? auditoria.permission_telefonia) === true;
   const online = escolhido
     ? escolhido.presence_status === "ONLINE" &&
       escolhido.aceita_novas !== false &&
@@ -84,7 +89,7 @@ export function verificarAtribuicao(
 
   const falhas: string[] = [];
   if (!auditoria.selected_user_id) falhas.push("nenhum atendente foi atribuído");
-  if (!temTelefonia) falhas.push("atendente atribuído sem permissão Telefonia");
+  if (!temTelefonia) falhas.push("atendente atribuído sem o perfil Telefonia");
   if (!online) falhas.push("atendente atribuído não estava Online");
   if (admin) falhas.push("atendente atribuído é administrador");
   if (duplicada) falhas.push("conversa recebeu mais de uma atribuição automática");
