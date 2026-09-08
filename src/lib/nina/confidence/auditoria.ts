@@ -52,6 +52,12 @@ export type RegistroAuditoriaConfianca = {
   intencao: string | null;
   acaoSolicitada: AcaoSolicitada;
   score: number;
+  /** FASE 3: quanto da evidência relevante foi de fato verificada (0–100). */
+  evidenceCoverage: number;
+  /** Dimensões relevantes que ficaram sem evidência (UNKNOWN). */
+  dimensoesDesconhecidas: string[];
+  /** Não havia evidência avaliável alguma: a nota não significa segurança. */
+  confiancaInsuficiente: boolean;
   nivel: NivelConfianca;
   decisao: DecisaoMotor;
   validadores: ValidadorAuditado[];
