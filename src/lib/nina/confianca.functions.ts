@@ -260,6 +260,8 @@ export const metricasConfiabilidadeNina = createServerFn({ method: "POST" })
       .select("id, conversa_id, execucao_id, created_at, categoria")
       .eq("clinica_id", data.clinicaId)
       .gte("created_at", desde)
+      // FASE 2 — homologação e teste automatizado não entram na métrica real.
+      .eq("ambiente", "production")
       .limit(5000);
 
     // Dentro/fora do horário: reutiliza o classificador central já publicado.
@@ -421,6 +423,8 @@ export const calibracaoConfiancaNina = createServerFn({ method: "POST" })
       .select("id, conversa_id, mensagem_id, execucao_id, categoria, created_at")
       .eq("clinica_id", data.clinicaId)
       .gte("created_at", desde)
+      // FASE 2 — homologação e teste automatizado não entram na métrica real.
+      .eq("ambiente", "production")
       .limit(5000);
 
     const erros: ErroCalibracao[] = (errosRows ?? []).map((raw) => {

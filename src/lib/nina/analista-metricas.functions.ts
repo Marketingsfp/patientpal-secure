@@ -231,6 +231,8 @@ async function ferramentaConfiabilidade(context: Contexto, clinicaId: string, ar
     .select("id, conversa_id, execucao_id, created_at, categoria")
     .eq("clinica_id", clinicaId)
     .gte("created_at", desde)
+    // FASE 2 — homologação e teste automatizado não entram na métrica real.
+    .eq("ambiente", "production")
     .limit(5000);
 
   const texto = (v: unknown) => (v == null ? null : String(v));
