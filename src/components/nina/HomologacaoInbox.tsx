@@ -276,8 +276,6 @@ export function HomologacaoInbox() {
     },
     [conversaId, confiancaPorExecucao, ciclos, leads, leadId],
   );
-  void metadadosDaMensagem;
-
 
 
 
