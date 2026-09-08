@@ -1295,12 +1295,14 @@ export const finalizarPausa = createServerFn({ method: "POST" })
     // ficar Online (mais antiga primeiro, para quem tem menos conversas).
     // Sem isso, a fila só seria reavaliada no próximo heartbeat (até 60s).
     let distribuidas = 0;
-    const { data: n, error: e2 } = await context.supabase.rpc("atend_distribuir_fila", {
-      _clinica_id: data.clinicaId,
-      _max: 20,
-    } as never);
-    if (e2) console.error("[atendimento] falha ao distribuir fila após pausa:", e2.message);
-    else distribuidas = Number(n ?? 0);
+    if (await temTelefonia(context.supabase as never, context.userId, data.clinicaId)) {
+      const { data: n, error: e2 } = await context.supabase.rpc("atend_distribuir_fila", {
+        _clinica_id: data.clinicaId,
+        _max: 20,
+      } as never);
+      if (e2) console.error("[atendimento] falha ao distribuir fila após pausa:", e2.message);
+      else distribuidas = Number(n ?? 0);
+    }
     return { ok: true, distribuidas };
   });
 
@@ -2749,7 +2751,11 @@ export const definirPresenca = createServerFn({ method: "POST" })
     // distribuído na hora (da conversa que espera há mais tempo para a mais
     // recente), sempre para quem tem menos conversas ativas.
     let distribuidas = 0;
-    if (data.status === "ONLINE" && (data.aceitaNovas ?? true)) {
+    if (
+      data.status === "ONLINE" &&
+      (data.aceitaNovas ?? true) &&
+      (await temTelefonia(context.supabase as never, context.userId, data.clinicaId))
+    ) {
       const { data: n, error: e2 } = await context.supabase.rpc("atend_distribuir_fila", {
         _clinica_id: data.clinicaId,
         _max: 20,
