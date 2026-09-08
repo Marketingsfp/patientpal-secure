@@ -8,8 +8,11 @@ import {
   AJUDA_PRONTUARIO,
   PLACEHOLDER_PRONTUARIO,
   conflitoCodigoProntuario,
+  desvioProntuarioParaConfirmar,
   normalizarCodigoProntuario,
+  type DesvioProntuario,
 } from "@/lib/prontuario";
+import { ConfirmarProntuarioDistante } from "@/components/pacientes/confirmar-prontuario-distante";
 import { LIMITES } from "@/lib/seguranca/sanitizar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -56,6 +59,8 @@ export function QuickPatientDialog({
   const [email, setEmail] = useState("");
   const [codigoProntuario, setCodigoProntuario] = useState("");
   const [saving, setSaving] = useState(false);
+  // Número de prontuário longe da estante: aguarda a recepção conferir a ficha.
+  const [desvioProntuario, setDesvioProntuario] = useState<DesvioProntuario | null>(null);
   const [faceOpen, setFaceOpen] = useState(false);
   const [descritor, setDescritor] = useState<number[] | null>(null);
 
@@ -73,8 +78,10 @@ export function QuickPatientDialog({
     }
   }, [open, nomeInicial]);
 
-  async function salvar(e: FormEvent) {
-    e.preventDefault();
+  // `prontuarioConfirmado` chega true quando a recepção já respondeu
+  // "Confirmar e Salvar" no aviso de número longe da estante.
+  async function salvar(e: FormEvent | null, prontuarioConfirmado = false) {
+    e?.preventDefault();
     const vNome = validarNomePessoa(nome);
     if (!vNome.valido || vNome.valor.length < 3) {
       const msg = vNome.mensagem ?? "Informe o nome completo do paciente.";
@@ -105,6 +112,15 @@ export function QuickPatientDialog({
     if (conflito) {
       toast.error(conflito);
       return;
+    }
+    // Conferência do arquivo físico: número com 7 dígitos e livre passa pelas
+    // barreiras acima, mas longe do contador costuma ser erro de digitação.
+    if (!prontuarioConfirmado) {
+      const desvio = await desvioProntuarioParaConfirmar(clinicaId, codigo);
+      if (desvio) {
+        setDesvioProntuario(desvio);
+        return;
+      }
     }
 
     setSaving(true);
@@ -260,6 +276,14 @@ export function QuickPatientDialog({
             toast.success("Foto capturada. Será vinculada ao cadastrar.");
           }}
           titulo="Cadastrar rosto do paciente"
+        />
+        <ConfirmarProntuarioDistante
+          desvio={desvioProntuario}
+          onRevisar={() => setDesvioProntuario(null)}
+          onConfirmar={() => {
+            setDesvioProntuario(null);
+            void salvar(null, true);
+          }}
         />
       </DialogContent>
     </Dialog>

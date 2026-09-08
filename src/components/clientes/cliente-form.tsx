@@ -1232,6 +1232,21 @@ export function ClienteForm({
       toast.error(conflito);
       return;
     }
+    // Conferência do arquivo físico: número digitado muito longe do contador da
+    // estante passa pelas barreiras acima (tem 7 dígitos e está livre), mas
+    // costuma ser erro de digitação. Perguntamos antes de gravar; confirmar
+    // continua possível, porque pasta antiga resgatada é caso legítimo.
+    if (!prontuarioConfirmado) {
+      const desvio = await desvioProntuarioParaConfirmar(
+        clinicaId,
+        dados.codigo_prontuario,
+        editing ? ((editing as any).codigo_prontuario ?? null) : undefined,
+      );
+      if (desvio) {
+        setDesvioProntuario(desvio);
+        return;
+      }
+    }
     // Alerta crítico: tarja vermelha sem motivo escrito deixa a recepção sem
     // saber o que fazer com o paciente na frente dela. O banco recusa também.
     const motivoAlerta = limparMotivoAlerta(form.alerta_motivo);
@@ -2452,6 +2467,15 @@ export function ClienteForm({
           setFaceOpen(false);
         }}
         titulo={`Biometria — ${editing?.nome ?? ""}`}
+      />
+
+      <ConfirmarProntuarioDistante
+        desvio={desvioProntuario}
+        onRevisar={() => setDesvioProntuario(null)}
+        onConfirmar={() => {
+          setDesvioProntuario(null);
+          void onSubmit(null, true);
+        }}
       />
     </>
   );

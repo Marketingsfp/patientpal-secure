@@ -6,8 +6,11 @@ import { notify } from "@/lib/notify";
 import {
   PLACEHOLDER_PRONTUARIO,
   conflitoCodigoProntuario,
+  desvioProntuarioParaConfirmar,
   normalizarCodigoProntuario,
+  type DesvioProntuario,
 } from "@/lib/prontuario";
+import { ConfirmarProntuarioDistante } from "@/components/pacientes/confirmar-prontuario-distante";
 import { LIMITES } from "@/lib/seguranca/sanitizar";
 import {
   Check,
@@ -275,6 +278,8 @@ export function NovoAgendamentoWizard({
   const [qcCpf, setQcCpf] = useState("");
   const [qcProntuario, setQcProntuario] = useState("");
   const [qcSaving, setQcSaving] = useState(false);
+  // Número de prontuário longe da estante: aguarda a recepção conferir a ficha.
+  const [desvioProntuario, setDesvioProntuario] = useState<DesvioProntuario | null>(null);
 
   const resetQuickCreate = () => {
     setShowQuickCreate(false);
@@ -449,7 +454,9 @@ export function NovoAgendamentoWizard({
     (step === "horario" && !!slot) ||
     step === "confirmar";
 
-  async function handleQuickCreatePaciente() {
+  // `prontuarioConfirmado` chega true quando a recepção já respondeu
+  // "Confirmar e Salvar" no aviso de número longe da estante.
+  async function handleQuickCreatePaciente(prontuarioConfirmado = false) {
     if (!clinicaId) return;
     const nome = qcNome.trim();
     const nasc = qcNasc.trim();
@@ -479,6 +486,15 @@ export function NovoAgendamentoWizard({
     if (conflitoPront) {
       notify.error(conflitoPront);
       return;
+    }
+    // Conferência do arquivo físico: número com 7 dígitos e livre passa pelas
+    // barreiras acima, mas longe do contador costuma ser erro de digitação.
+    if (!prontuarioConfirmado) {
+      const desvio = await desvioProntuarioParaConfirmar(clinicaId, codigoProntuario);
+      if (desvio) {
+        setDesvioProntuario(desvio);
+        return;
+      }
     }
     setQcSaving(true);
     try {
@@ -718,7 +734,7 @@ export function NovoAgendamentoWizard({
                   <button
                     type="button"
                     disabled={qcSaving}
-                    onClick={handleQuickCreatePaciente}
+                    onClick={() => void handleQuickCreatePaciente()}
                     className={cn(
                       "inline-flex items-center gap-1.5 h-9 px-4 rounded-lg text-xs font-semibold transition-colors",
                       qcSaving
@@ -1122,6 +1138,14 @@ export function NovoAgendamentoWizard({
       footer={footer}
     >
       {body}
+      <ConfirmarProntuarioDistante
+        desvio={desvioProntuario}
+        onRevisar={() => setDesvioProntuario(null)}
+        onConfirmar={() => {
+          setDesvioProntuario(null);
+          void handleQuickCreatePaciente(true);
+        }}
+      />
     </HhpWizardShell>
   );
 }

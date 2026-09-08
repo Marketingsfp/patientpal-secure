@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { erroCodigoProntuario, prontuarioExibicao } from "./prontuario";
+import { erroCodigoProntuario, precisaConfirmarProntuario, prontuarioExibicao } from "./prontuario";
 
 // O número que vale é o que a recepção digita e confere no campo "Número de
 // prontuário" do cadastro — `codigo_prontuario`. O código herdado da
@@ -109,5 +109,64 @@ describe("erroCodigoProntuario", () => {
 
   it("ignora espaços em volta antes de contar os dígitos", () => {
     expect(erroCodigoProntuario("  2656813  ")).toBeNull();
+  });
+});
+
+// Aviso de conferência do arquivo físico. O contador da clínica estava em
+// 2.438.941 em 08/09/2026; é dele que sai a distância aceita.
+describe("precisaConfirmarProntuario", () => {
+  const CONTADOR = 2438941;
+
+  it("pergunta quando o número está muito à frente da estante", () => {
+    // O caso real: LINDINALVA SANTOS FERREIRA saiu com 2656841, 217.900
+    // números à frente do arquivo físico.
+    expect(precisaConfirmarProntuario("2656841", CONTADOR)).toEqual({
+      contador: CONTADOR,
+      digitado: 2656841,
+    });
+  });
+
+  it("pergunta quando o número está muito atrás da estante", () => {
+    expect(precisaConfirmarProntuario("109326", CONTADOR)).toEqual({
+      contador: CONTADOR,
+      digitado: 109326,
+    });
+  });
+
+  it("deixa passar o número seguinte da estante", () => {
+    expect(precisaConfirmarProntuario("2438942", CONTADOR)).toBeNull();
+  });
+
+  it("deixa passar uma pasta dentro da janela de 5.000", () => {
+    expect(precisaConfirmarProntuario("2434000", CONTADOR)).toBeNull();
+    expect(precisaConfirmarProntuario("2443941", CONTADOR)).toBeNull();
+  });
+
+  it("não pergunta com o campo vazio, que faz o banco gerar o número", () => {
+    expect(precisaConfirmarProntuario("", CONTADOR)).toBeUndefined();
+    expect(precisaConfirmarProntuario(null, CONTADOR)).toBeUndefined();
+    expect(precisaConfirmarProntuario(undefined, CONTADOR)).toBeUndefined();
+  });
+
+  it("não pergunta em código antigo com letra", () => {
+    expect(precisaConfirmarProntuario("AB1234", CONTADOR)).toBeUndefined();
+  });
+
+  it("não pergunta numa edição em que o prontuário não mudou", () => {
+    // Trocar o telefone de um dos 952 cadastros legados não pode virar
+    // pergunta toda vez.
+    expect(precisaConfirmarProntuario("2656841", CONTADOR, "2656841")).toBeUndefined();
+    expect(precisaConfirmarProntuario(" 2656841 ", CONTADOR, "2656841")).toBeUndefined();
+  });
+
+  it("pergunta quando a edição realmente troca o número", () => {
+    expect(precisaConfirmarProntuario("2656841", CONTADOR, "2438900")).toEqual({
+      contador: CONTADOR,
+      digitado: 2656841,
+    });
+  });
+
+  it("deixa gravar quando não foi possível ler o contador", () => {
+    expect(precisaConfirmarProntuario("2656841", Number.NaN)).toBeNull();
   });
 });

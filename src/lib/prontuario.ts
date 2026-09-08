@@ -82,8 +82,7 @@ export async function conflitoCodigoProntuario(
   // continuam válidos como estão: a régua só vale para o que for digitado
   // agora. Sem isso, a recepção não conseguiria nem trocar um telefone.
   const naoMudou =
-    codigoOriginal !== undefined &&
-    (codigo ?? "").trim() === (codigoOriginal ?? "").trim();
+    codigoOriginal !== undefined && (codigo ?? "").trim() === (codigoOriginal ?? "").trim();
   const foraDaRegua = naoMudou ? null : erroCodigoProntuario(codigo);
   if (foraDaRegua) return foraDaRegua;
 
@@ -99,6 +98,111 @@ export async function conflitoCodigoProntuario(
     return `Prontuário ${codigo} já está em uso por: ${usado.nome}`;
   }
   return null;
+}
+
+/**
+ * Distância máxima, para mais ou para menos, entre o número digitado e o
+ * contador da estante antes de o sistema pedir confirmação.
+ *
+ * É o mesmo número da janela usada no banco pelo gatilho
+ * `pacientes_avanca_sequencia_prontuario`: um salto acima disso não arrasta o
+ * contador. Aqui na tela ele cobre o outro lado do problema — o contador fica
+ * protegido, mas o paciente ainda nascia com o número errado sem ninguém
+ * perceber. Foi o que aconteceu com os 562 cadastros na faixa dos 2,65 milhões
+ * gerados até 04/09/2026.
+ */
+export const DESVIO_MAXIMO_PRONTUARIO = 5000;
+
+/** Formata 2438941 como "2.438.941", que é como a recepção lê na pasta. */
+export function formatarProntuario(n: number): string {
+  return n.toLocaleString("pt-BR");
+}
+
+/** O que a tela precisa mostrar quando o número digitado está longe da estante. */
+export interface DesvioProntuario {
+  /** Onde o arquivo físico está, segundo o contador da clínica. */
+  contador: number;
+  /** O número que a recepção digitou. */
+  digitado: number;
+}
+
+/**
+ * Lê em que número o arquivo físico está, pela função `prontuario_sequencia_ver`.
+ *
+ * Devolve null quando não dá para saber — clínica sem contador, perfil sem
+ * permissão de leitura ou falha de rede. Nesses casos o cadastro segue sem
+ * pedir confirmação: o aviso é rede de proteção, nunca uma trava que impeça a
+ * recepção de trabalhar com o paciente na frente dela.
+ */
+export async function lerContadorProntuario(clinicaId: string): Promise<number | null> {
+  try {
+    const { data, error } = await (supabase as any).rpc("prontuario_sequencia_ver", {
+      _clinica_id: clinicaId,
+    });
+    if (error) return null;
+    const linha = (data ?? [])[0];
+    const proximo = linha ? Number(linha.proximo) : NaN;
+    return Number.isFinite(proximo) && proximo > 0 ? proximo : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Diz se o número digitado está longe demais da estante e merece confirmação.
+ *
+ * Devolve os dois números para a tela montar a pergunta, ou null quando pode
+ * gravar direto. Não pede confirmação quando:
+ *  - o campo está vazio (aí o banco gera o número automático, já correto);
+ *  - o número tem letra (códigos herdados do sistema antigo);
+ *  - o número não mudou numa edição — senão trocar o telefone de um dos 952
+ *    cadastros legados viraria uma pergunta toda vez;
+ *  - não foi possível ler o contador.
+ *
+ * Confirmar é sempre possível: pasta antiga resgatada da estante é um caso
+ * real e legítimo.
+ */
+export async function desvioProntuarioParaConfirmar(
+  clinicaId: string,
+  codigo: string | null,
+  codigoOriginal?: string | null,
+): Promise<DesvioProntuario | null> {
+  // Só vai ao banco quando o número digitado é candidato a pergunta. A edição
+  // de cadastro é o caminho mais usado da recepção e quase sempre não mexe no
+  // prontuário; nesses casos nem chega a consultar o contador.
+  if (precisaConfirmarProntuario(codigo, Number.NaN, codigoOriginal) === undefined) {
+    return null;
+  }
+  const contador = await lerContadorProntuario(clinicaId);
+  if (contador === null) return null;
+  return precisaConfirmarProntuario(codigo, contador, codigoOriginal) ?? null;
+}
+
+/**
+ * A decisão em si, sem banco: o número digitado está longe demais do contador?
+ *
+ * Três respostas, de propósito:
+ *  - `undefined` — nem faz sentido perguntar (campo vazio, código com letra, ou
+ *    número que não mudou numa edição). Quem chama pode parar antes de ir ao
+ *    banco ler o contador.
+ *  - `null` — o número está dentro da janela; pode gravar direto.
+ *  - `DesvioProntuario` — pergunte à recepção antes de gravar.
+ */
+export function precisaConfirmarProntuario(
+  codigo: string | null | undefined,
+  contador: number,
+  codigoOriginal?: string | null,
+): DesvioProntuario | null | undefined {
+  const limpo = (codigo ?? "").trim();
+  if (!limpo || !/^\d+$/.test(limpo)) return undefined;
+  if (codigoOriginal !== undefined && limpo === (codigoOriginal ?? "").trim()) {
+    return undefined;
+  }
+  const digitado = Number(limpo);
+  if (!Number.isFinite(digitado)) return undefined;
+  if (!Number.isFinite(contador)) return null;
+  if (Math.abs(digitado - contador) <= DESVIO_MAXIMO_PRONTUARIO) return null;
+  return { contador, digitado };
 }
 
 /** Campos mínimos para decidir qual número mostrar. */

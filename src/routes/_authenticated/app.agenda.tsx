@@ -36,8 +36,11 @@ import {
   AJUDA_PRONTUARIO,
   PLACEHOLDER_PRONTUARIO,
   conflitoCodigoProntuario,
+  desvioProntuarioParaConfirmar,
   normalizarCodigoProntuario,
+  type DesvioProntuario,
 } from "@/lib/prontuario";
+import { ConfirmarProntuarioDistante } from "@/components/pacientes/confirmar-prontuario-distante";
 import { normalizarNomeBusca, normalizarTermoBusca } from "@/lib/busca-texto";
 import { useBuscaDebounced } from "@/hooks/use-debounced-value";
 import { LIMITES } from "@/lib/seguranca/sanitizar";
@@ -1941,6 +1944,8 @@ function AgendaPage() {
   };
   const [pacEdit, setPacEdit] = useState<PacInfoEdit>(emptyPacEdit);
   const [pacEditSaving, setPacEditSaving] = useState(false);
+  // Número de prontuário longe da estante, na edição rápida do paciente.
+  const [desvioProntEdicao, setDesvioProntEdicao] = useState<DesvioProntuario | null>(null);
   // Pré-visualização ampliada da foto do paciente
   const [fotoPreviewOpen, setFotoPreviewOpen] = useState(false);
   // Fecha a pré-visualização com Esc (captura antes do Dialog de trás)
@@ -2010,7 +2015,9 @@ function AgendaPage() {
   const pacIdadeTexto = formatarIdadeCurta(
     pacEdit.data_nascimento || (pacInfo?.data_nascimento as string | null | undefined),
   );
-  const salvarPacEditRapido = async () => {
+  // `prontuarioConfirmado` chega true quando a recepção já respondeu
+  // "Confirmar e Salvar" no aviso de número longe da estante.
+  const salvarPacEditRapido = async (prontuarioConfirmado = false) => {
     if (!pacInfo?.id || !pacEditDirty) return;
     setPacEditSaving(true);
     try {
@@ -2034,6 +2041,21 @@ function AgendaPage() {
           toast.error(conflito);
           setPacEditSaving(false);
           return;
+        }
+        // Conferência do arquivo físico: número com 7 dígitos e livre passa
+        // pelas barreiras acima, mas longe do contador costuma ser digitação
+        // errada. Numa edição, só pergunta se o número mudou.
+        if (!prontuarioConfirmado) {
+          const desvio = await desvioProntuarioParaConfirmar(
+            clinicaDoPaciente,
+            codigoProntuario,
+            pacInfo.codigo_prontuario ?? null,
+          );
+          if (desvio) {
+            setDesvioProntEdicao(desvio);
+            setPacEditSaving(false);
+            return;
+          }
         }
       }
       const patchBase = {
@@ -2279,6 +2301,8 @@ function AgendaPage() {
   const [faceOpen, setFaceOpen] = useState(false);
   const [descritorFace, setDescritorFace] = useState<number[] | null>(null);
   const [savingPac, setSavingPac] = useState(false);
+  // Número de prontuário longe da estante, no cadastro rápido da agenda.
+  const [desvioProntNovo, setDesvioProntNovo] = useState<DesvioProntuario | null>(null);
   // Autor de uma linha do histórico, já resolvido pelo banco (nome + papel).
   // Antes a tela cruzava o e-mail da auditoria com a lista da equipe — que só
   // carrega para admin/gestor. Para a recepção a lista vinha vazia e todo
@@ -2452,8 +2476,10 @@ function AgendaPage() {
     setNotaTexto("");
   };
 
-  const cadastrarPacienteRapido = async (e: FormEvent) => {
-    e.preventDefault();
+  // `prontuarioConfirmado` chega true quando a recepção já respondeu
+  // "Confirmar e Salvar" no aviso de número longe da estante.
+  const cadastrarPacienteRapido = async (e: FormEvent | null, prontuarioConfirmado = false) => {
+    e?.preventDefault();
     if (!podeEscrever) {
       avisoSemPermissaoAgenda();
       return;
@@ -2483,6 +2509,15 @@ function AgendaPage() {
     if (conflitoPront) {
       toast.error(conflitoPront);
       return;
+    }
+    // Conferência do arquivo físico: número com 7 dígitos e livre passa pelas
+    // barreiras acima, mas longe do contador costuma ser erro de digitação.
+    if (!prontuarioConfirmado) {
+      const desvio = await desvioProntuarioParaConfirmar(clinicaAtual.clinica_id, codigoProntuario);
+      if (desvio) {
+        setDesvioProntNovo(desvio);
+        return;
+      }
     }
     setSavingPac(true);
     const { data, error } = await supabase
@@ -13289,6 +13324,23 @@ function AgendaPage() {
           }}
         />
       )}
+
+      <ConfirmarProntuarioDistante
+        desvio={desvioProntEdicao}
+        onRevisar={() => setDesvioProntEdicao(null)}
+        onConfirmar={() => {
+          setDesvioProntEdicao(null);
+          void salvarPacEditRapido(true);
+        }}
+      />
+      <ConfirmarProntuarioDistante
+        desvio={desvioProntNovo}
+        onRevisar={() => setDesvioProntNovo(null)}
+        onConfirmar={() => {
+          setDesvioProntNovo(null);
+          void cadastrarPacienteRapido(null, true);
+        }}
+      />
     </div>
   );
 }
