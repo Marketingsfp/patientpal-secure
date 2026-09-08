@@ -269,7 +269,7 @@ export function HomologacaoInbox() {
       const cicloAtual = ciclos.length > 0 ? (ciclos[ciclos.length - 1] as any) : null;
       return montarMetadadosMensagemNina({
         messageId: m.id,
-        conversaTesteId: conversaId,
+        conversaTesteId: m.conversa_id ?? conversaId,
         isTeste: true,
         cicloId: cicloAtual?.cycle_id ?? leads.find((l) => l.id === leadId)?.cicloId ?? null,
         ninaSessionId: cicloAtual?.nina_session_id ?? null,
