@@ -11,7 +11,7 @@
 import { describe, expect, it } from "bun:test";
 import { decidirConfianca } from "./engine";
 import { decidirNoTurno, montarContextoDoTurno, type EstadoDoTurno } from "./runtime";
-import { pontuarValidadores, POLITICA_PADRAO } from "./policy";
+import { medirEvidencia, pontuarValidadores, POLITICA_PADRAO } from "./policy";
 import { IntentClarityValidator, ToolIntegrityValidator } from "./validators";
 import type { ContextoConfianca, ResultadoValidador } from "./types";
 
@@ -33,7 +33,7 @@ function estado(over: Partial<EstadoDoTurno> = {}): EstadoDoTurno {
 // Caminho: policy.ts:110 `if (total === 0) return 100;`
 // ---------------------------------------------------------------------------
 describe("BASELINE 1 — ausência de sinal é tratada como certeza", () => {
-  it("pontuarValidadores devolve 100 quando TODOS os validadores são NOT_APPLICABLE", () => {
+  it("CORRIGIDO NA FASE 3 — nenhuma dimensão avaliável não vale mais 100", () => {
     const todosNA: ResultadoValidador[] = [
       "IntentClarityValidator",
       "EntityResolutionValidator",
@@ -51,9 +51,12 @@ describe("BASELINE 1 — ausência de sinal é tratada como certeza", () => {
       evidence: {},
     }));
 
-    // Denominador zero. Nenhuma dimensão foi realmente verificada e ainda
-    // assim o motor devolve confiança máxima.
-    expect(pontuarValidadores(todosNA, POLITICA_PADRAO)).toBe(100);
+    // ANTES (v1): denominador zero -> `if (total === 0) return 100`.
+    // AGORA (v2): nada avaliável -> nota 0 e `semEvidencia`, nunca certeza.
+    expect(pontuarValidadores(todosNA, POLITICA_PADRAO)).toBe(0);
+    const medida = medirEvidencia(todosNA, POLITICA_PADRAO);
+    expect(medida.semEvidencia).toBe(true);
+    expect(medida.score).toBe(0);
   });
 
   it("um único validador aplicável já define sozinho os 100 do turno", () => {

@@ -9,6 +9,9 @@ import type { ResultadoConfianca } from "./types";
 
 const base: ResultadoConfianca = {
   score: 94,
+  evidenceCoverage: 100,
+  unknownDimensions: [],
+  confidenceInsufficient: false,
   level: "HIGH",
   decision: "ALLOW",
   blockers: [],

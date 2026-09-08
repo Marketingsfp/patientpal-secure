@@ -17,12 +17,12 @@ import {
 import {
   aplicarPolitica,
   detectarHardBlockers,
-  nivelDaPontuacao,
-  pontuarValidadores,
+  medirEvidencia,
   POLITICA_PADRAO,
   type HardBlocker,
   type PoliticaConfianca,
 } from "./policy";
+import { contaContraANota } from "./types";
 import type {
   Bloqueador,
   ContextoConfianca,
@@ -256,7 +256,9 @@ export function decidirConfianca(
     ...(opcoes.agora ? { agora: opcoes.agora } : {}),
   });
   for (const v of validators) {
-    if (v.status === "PASS" || v.status === "NOT_APPLICABLE") continue;
+    // FASE 3 — UNKNOWN não vira "reprovação" nem penalidade: ele aparece na
+    // cobertura de evidências, que é o lugar honesto para "não sei".
+    if (!contaContraANota(v.status)) continue;
     checks.push(
       check(
         v.validator,
@@ -275,10 +277,18 @@ export function decidirConfianca(
 
   const motivos = reprovados.map((c) => (c.detalhe ? `${c.descricao} — ${c.detalhe}` : c.descricao));
 
+  // FASE 3 — nota E cobertura, medidas na mesma passada e reportadas separadas.
+  const medida = medirEvidencia(validators, politica);
+
   // Handoff já pedido pelo modelo: o pipeline de transferência assume o turno.
+  // O 100 aqui é a segurança de TRANSFERIR, não a veracidade do texto — por
+  // isso a cobertura real continua sendo reportada sem maquiagem.
   if (ctx.businessContext.handoffSolicitado) {
     return {
       score: 100,
+      evidenceCoverage: medida.cobertura,
+      unknownDimensions: medida.desconhecidas,
+      confidenceInsufficient: medida.semEvidencia,
       level: "HIGH",
       decision: "ALLOW",
       blockers: [],
@@ -297,14 +307,13 @@ export function decidirConfianca(
 
   // Pontuação: validadores ponderados pela política, menos as penalidades
   // graduais (verificações que descontam sem bloquear).
-  const scoreValidadores = pontuarValidadores(validators, politica);
   const penalidade = reprovados
     .filter((c) => !c.bloqueador)
     .reduce((soma, c) => soma + c.peso, 0);
 
-  const { score, level, decision } = aplicarPolitica(
+  const { score, level, decision, limitacoes } = aplicarPolitica(
     {
-      scoreValidadores,
+      scoreValidadores: medida.score,
       penalidade,
       bloqueadores: blockers,
       hardBlockers,
@@ -312,14 +321,26 @@ export function decidirConfianca(
       acao: ctx.requestedAction,
       esclarecimentoUsado: ctx.businessContext.esclarecimentoUsado,
       ambiguidadeResolvivel: apenasAmbiguidade(validators, blockers, hardBlockers),
+      cobertura: medida.cobertura,
+      semEvidencia: medida.semEvidencia,
+      dimensoesDesconhecidas: medida.desconhecidas,
     },
     politica,
   );
 
+  for (const l of limitacoes) {
+    motivos.push(`limitação de cobertura: ${l} (cobertura ${medida.cobertura}%)`);
+  }
+  if (medida.desconhecidas.length > 0) {
+    motivos.push(`dimensões sem evidência: ${medida.desconhecidas.join(", ")}`);
+  }
   if (motivos.length === 0) motivos.push("evidências suficientes no sistema");
 
   return {
     score,
+    evidenceCoverage: medida.cobertura,
+    unknownDimensions: medida.desconhecidas,
+    confidenceInsufficient: medida.semEvidencia,
     level,
     decision,
     blockers,
@@ -337,7 +358,7 @@ function apenasAmbiguidade(
   hardBlockers: HardBlocker[],
 ): boolean {
   if (blockers.length > 0 || hardBlockers.length > 0) return false;
-  const reprovados = validators.filter((v) => v.status !== "PASS" && v.status !== "NOT_APPLICABLE");
+  const reprovados = validators.filter((v) => contaContraANota(v.status));
   if (reprovados.length === 0) return false;
   const AMBIGUIDADE = new Set(["IntentClarityValidator", "EntityResolutionValidator"]);
   return reprovados.every((v) => AMBIGUIDADE.has(v.validator));

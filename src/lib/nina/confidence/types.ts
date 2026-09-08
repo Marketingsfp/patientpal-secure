@@ -138,8 +138,27 @@ export type Bloqueador =
   | "REGRA_EXIGE_HUMANO"
   | "REGRA_DE_NEGOCIO_NAO_ATENDIDA";
 
-/** Status padronizado de um validador isolado. */
-export type StatusValidador = "PASS" | "WARNING" | "FAIL" | "BLOCK" | "NOT_APPLICABLE";
+/**
+ * Status padronizado de um validador isolado.
+ *
+ * FASE 3 — a diferença que faltava:
+ * - `NOT_APPLICABLE`: esta dimensão realmente NÃO é necessária para este tipo
+ *   de resposta (uma saudação não precisa da Agenda). Sai da conta com razão.
+ * - `UNKNOWN`: esta dimensão SERIA relevante, mas não há evidência suficiente
+ *   para avaliá-la. Sai da nota, mas derruba a COBERTURA — nunca vira PASS.
+ */
+export type StatusValidador =
+  | "PASS"
+  | "WARNING"
+  | "FAIL"
+  | "BLOCK"
+  | "UNKNOWN"
+  | "NOT_APPLICABLE";
+
+/** Um validador que não passou nem foi dispensado conta contra a nota. */
+export function contaContraANota(status: StatusValidador): boolean {
+  return status !== "PASS" && status !== "NOT_APPLICABLE" && status !== "UNKNOWN";
+}
 
 export type NivelRiscoAcao = "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
 
@@ -181,6 +200,16 @@ export type EvidenciaConfianca = {
 /** Saída estruturada do motor. */
 export type ResultadoConfianca = {
   score: number;
+  /**
+   * FASE 3 — 0..100. Quanto das dimensões RELEVANTES deste turno pôde de fato
+   * ser avaliada. `score` fala dos sinais conhecidos; `evidenceCoverage` diz
+   * quanto do quadro conhecemos. Score 96 com cobertura 38 não é "96% seguro".
+   */
+  evidenceCoverage: number;
+  /** Dimensões relevantes que ficaram UNKNOWN neste turno. */
+  unknownDimensions: string[];
+  /** Nenhuma dimensão relevante pôde ser avaliada (antes isso virava 100). */
+  confidenceInsufficient: boolean;
   level: NivelConfianca;
   decision: DecisaoMotor;
   blockers: Bloqueador[];

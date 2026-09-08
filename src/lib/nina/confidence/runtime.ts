@@ -11,6 +11,7 @@
 import type { DecisaoConfianca } from "../confidence-engine";
 import { decidirConfianca } from "./engine";
 import type { HardBlocker } from "./policy";
+import { contaContraANota } from "./types";
 import type {
   AcaoSolicitada,
   ContextoConfianca,
@@ -180,9 +181,14 @@ export function motivoHandoff(r: ResultadoConfianca): string {
  * precise repetir a conversa inteira.
  */
 export function resumoHandoffEstruturado(e: EstadoDoTurno, r: ResultadoConfianca): string {
+  // FASE 3: reprovado é uma coisa; não verificado é outra. O atendente humano
+  // precisa ver a diferença para não tratar lacuna como erro comprovado.
   const validacoes = (r.validators ?? [])
-    .filter((v) => v.status !== "PASS" && v.status !== "NOT_APPLICABLE")
+    .filter((v) => contaContraANota(v.status))
     .map((v) => `${v.validator} (${v.status}: ${v.reasonCode})`);
+  const naoVerificadas = (r.validators ?? [])
+    .filter((v) => v.status === "UNKNOWN")
+    .map((v) => `${v.validator} (${v.reasonCode})`);
   const conflitos = (r.validators ?? []).find((v) => v.validator === "ConflictValidator");
   const coletadas = Object.entries(e.entities ?? {})
     .filter(([, v]) => v !== null && v !== undefined && String(v).trim() !== "")
@@ -198,9 +204,11 @@ export function resumoHandoffEstruturado(e: EstadoDoTurno, r: ResultadoConfianca
     `Paciente identificado: ${e.pacienteIdentificado ? "sim" : "não"}`,
     `Motivo da baixa confiança: ${r.evidence.motivos.join("; ")} (score ${r.score}, nível ${r.level})`,
     `Validações que falharam: ${validacoes.length ? validacoes.join("; ") : "nenhuma"}`,
+    `Não foi possível verificar: ${naoVerificadas.length ? naoVerificadas.join("; ") : "nada"}`,
+    `Cobertura de evidência: ${r.evidenceCoverage ?? 0}%${r.confidenceInsufficient ? " (sem evidência avaliável)" : ""}`,
     `Bloqueadores: ${(r.hardBlockers ?? []).join(", ") || "nenhum"}`,
     `Informação conflitante: ${
-      conflitos && conflitos.status !== "PASS" && conflitos.status !== "NOT_APPLICABLE"
+      conflitos && contaContraANota(conflitos.status)
         ? JSON.stringify(conflitos.evidence)
         : "nenhuma detectada"
     }`,

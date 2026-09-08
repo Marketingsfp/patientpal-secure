@@ -13,6 +13,7 @@
  * Os valores abaixo são a configuração de partida e devem ser recalibrados
  * quando houver dados reais da Nina.
  */
+import { contaContraANota } from "./types";
 import type {
   Bloqueador,
   DecisaoMotor,
@@ -34,6 +35,24 @@ export type HardBlocker =
   | "STALE_OFFICIAL_SOURCE"
   | "INTERNAL_NOTE_AS_SOURCE";
 
+/**
+ * FASE 3 — teto de confiança por cobertura de evidência.
+ * Todos os números vivem AQUI, versionados, para calibração posterior.
+ * Nenhum deles pode ser reescrito espalhado pelo motor.
+ */
+export type PoliticaCobertura = {
+  /** Abaixo desta cobertura (%) a resposta não pode ser HIGH. */
+  minimaParaHigh: number;
+  /** Abaixo desta cobertura (%) a resposta não pode ser ALLOW. */
+  minimaParaAllow: number;
+  /** Teto da nota final quando a cobertura fica abaixo de `minimaParaHigh`. */
+  tetoScoreCoberturaBaixa: number;
+  /** Dimensões que, desconhecidas, impedem HIGH. */
+  dimensoesCriticas: string[];
+  /** Fontes obrigatórias que, desconhecidas, forçam handoff/bloqueio. */
+  fontesObrigatorias: string[];
+};
+
 export type PoliticaConfianca = {
   /** Peso de cada validador na pontuação 0–100. Soma dos ativos = 100. */
   pesos: Record<string, number>;
@@ -47,15 +66,25 @@ export type PoliticaConfianca = {
   bloqueadoresAbsolutos: Record<string, HardBlocker>;
   /** Ações que gravam algo de verdade: bloqueio nelas vira BLOCK_ACTION. */
   acoesDeEscrita: string[];
+  /** Tetos por cobertura de evidência (Fase 3). */
+  cobertura: PoliticaCobertura;
 };
 
 /**
  * Versão da política de confiança. Sobe sempre que pesos, faixas, penalidades,
- * mínimos por risco ou bloqueadores absolutos mudarem. Fica gravada junto de
- * cada decisão, para que uma avaliação antiga continue lida com a régua da
- * época — nunca com a régua de hoje.
+ * mínimos por risco, bloqueadores absolutos ou a INTERPRETAÇÃO do score
+ * mudarem. Fica gravada junto de cada decisão, para que uma avaliação antiga
+ * continue lida com a régua da época — nunca com a régua de hoje.
+ *
+ * v1 -> v2 (Fase 3): mudança material de significado.
+ *  - `NOT_APPLICABLE` (dimensão dispensável) passou a ser distinguido de
+ *    `UNKNOWN` (dimensão relevante sem evidência);
+ *  - nenhuma evidência avaliável deixou de valer 100 e passou a valer 0 com
+ *    `confidenceInsufficient`;
+ *  - passou a existir `evidence_coverage` e tetos de nota por cobertura.
+ * Snapshots gravados com "v1" continuam válidos sob a régua antiga.
  */
-export const VERSAO_POLITICA = "v1";
+export const VERSAO_POLITICA = "v2";
 
 export const POLITICA_PADRAO: PoliticaConfianca = {
   pesos: {
@@ -91,24 +120,94 @@ export const POLITICA_PADRAO: PoliticaConfianca = {
     NOTA_INTERNA_COMO_FONTE: "INTERNAL_NOTE_AS_SOURCE",
   },
   acoesDeEscrita: ["criar_agendamento", "cancelar_agendamento"],
+  cobertura: {
+    // Valores de partida da Fase 3 — versionados aqui para calibração futura.
+    minimaParaHigh: 70,
+    minimaParaAllow: 50,
+    tetoScoreCoberturaBaixa: 74,
+    dimensoesCriticas: [
+      "OfficialSourceValidator",
+      "ToolIntegrityValidator",
+      "RequiredDataValidator",
+      "IntentClarityValidator",
+    ],
+    fontesObrigatorias: ["OfficialSourceValidator"],
+  },
 };
 
-/** Pontuação ponderada dos validadores (0–100). NOT_APPLICABLE sai da conta. */
+/**
+ * FASE 3 — medida de cobertura das evidências.
+ *
+ * `score` responde "quão bem foram os sinais que eu consegui olhar".
+ * `cobertura` responde "quanto do que importava eu consegui olhar".
+ * As duas coisas são reportadas separadamente e nunca se disfarçam uma na outra.
+ */
+export type MedidaDeEvidencia = {
+  /** Nota ponderada apenas entre as dimensões efetivamente avaliadas (0–100). */
+  score: number;
+  /** Cobertura das evidências (0–100). */
+  cobertura: number;
+  /** Dimensões relevantes que ficaram sem evidência avaliável. */
+  desconhecidas: string[];
+  /** Dimensões dispensadas legitimamente neste tipo de resposta. */
+  naoAplicaveis: string[];
+  /** Nada relevante pôde ser avaliado: confiança insuficiente, não 100. */
+  semEvidencia: boolean;
+};
+
+/**
+ * Pontua e mede cobertura na mesma passada.
+ *
+ * - `NOT_APPLICABLE` sai da nota E da cobertura (a dimensão não era necessária).
+ * - `UNKNOWN` sai da nota mas ENTRA na cobertura como não coberta — é
+ *   exatamente o caso em que antes o silêncio virava certeza.
+ * - Sem nenhuma dimensão avaliável, a nota é 0 com `semEvidencia`, nunca 100.
+ */
+export function medirEvidencia(
+  validators: ResultadoValidador[],
+  politica: PoliticaConfianca = POLITICA_PADRAO,
+): MedidaDeEvidencia {
+  let pesoAvaliado = 0;
+  let pesoRelevante = 0;
+  let obtido = 0;
+  const desconhecidas: string[] = [];
+  const naoAplicaveis: string[] = [];
+
+  for (const v of validators) {
+    const peso = politica.pesos[v.validator] ?? 0;
+    if (v.status === "NOT_APPLICABLE") {
+      naoAplicaveis.push(v.validator);
+      continue;
+    }
+    if (v.status === "UNKNOWN") {
+      desconhecidas.push(v.validator);
+      if (peso > 0) pesoRelevante += peso;
+      continue;
+    }
+    if (peso <= 0) continue;
+    pesoRelevante += peso;
+    pesoAvaliado += peso;
+    const parcial = v.status === "BLOCK" ? 0 : Math.max(0, Math.min(100, v.score));
+    obtido += (peso * parcial) / 100;
+  }
+
+  const semEvidencia = pesoAvaliado === 0;
+  return {
+    // FASE 3: removido o antigo `if (total === 0) return 100`.
+    score: semEvidencia ? 0 : Math.round((obtido / pesoAvaliado) * 100),
+    cobertura: pesoRelevante === 0 ? 0 : Math.round((pesoAvaliado / pesoRelevante) * 100),
+    desconhecidas,
+    naoAplicaveis,
+    semEvidencia,
+  };
+}
+
+/** Compatibilidade: apenas a nota das dimensões avaliadas. */
 export function pontuarValidadores(
   validators: ResultadoValidador[],
   politica: PoliticaConfianca = POLITICA_PADRAO,
 ): number {
-  let total = 0;
-  let obtido = 0;
-  for (const v of validators) {
-    const peso = politica.pesos[v.validator] ?? 0;
-    if (peso <= 0 || v.status === "NOT_APPLICABLE") continue;
-    total += peso;
-    const parcial = v.status === "BLOCK" ? 0 : Math.max(0, Math.min(100, v.score));
-    obtido += (peso * parcial) / 100;
-  }
-  if (total === 0) return 100;
-  return Math.round((obtido / total) * 100);
+  return medirEvidencia(validators, politica).score;
 }
 
 /**
@@ -131,7 +230,9 @@ export function detectarHardBlockers(
   }
   const critico = entrada.risco === "HIGH" || entrada.risco === "CRITICAL";
   for (const v of entrada.validators ?? []) {
-    if (v.status === "PASS" || v.status === "NOT_APPLICABLE") continue;
+    // UNKNOWN não é falha comprovada: limita a decisão pela cobertura,
+    // não inventa um bloqueio absoluto que não foi observado.
+    if (!contaContraANota(v.status)) continue;
     if (v.validator === "EntityResolutionValidator" && critico) out.add("AMBIGUOUS_CRITICAL_ENTITY");
     if (v.validator === "ToolIntegrityValidator" && critico) out.add("TOOL_FAILURE_ON_CRITICAL_ACTION");
   }
@@ -164,43 +265,101 @@ export type EntradaPolitica = {
    * perguntando ao paciente — não transferindo.
    */
   ambiguidadeResolvivel?: boolean;
+  /** FASE 3 — cobertura das evidências (0–100). Ausente = 100 (compat.). */
+  cobertura?: number;
+  /** FASE 3 — nada relevante pôde ser avaliado neste turno. */
+  semEvidencia?: boolean;
+  /** FASE 3 — dimensões relevantes que ficaram UNKNOWN. */
+  dimensoesDesconhecidas?: string[];
 };
 
 export type SaidaPolitica = {
   score: number;
   level: NivelConfianca;
   decision: DecisaoMotor;
+  /** Tetos de cobertura aplicados nesta decisão (auditável). */
+  limitacoes: string[];
 };
 
 /**
- * Aplica a política: primeiro bloqueadores, depois faixa de pontuação.
- * MEDIUM pede esclarecimento uma única vez — depois da resposta do paciente o
- * runtime roda o motor inteiro de novo, nunca reaproveita a pontuação.
+ * Aplica a política: primeiro bloqueadores, depois tetos de cobertura, depois
+ * faixa de pontuação. MEDIUM pede esclarecimento uma única vez — depois da
+ * resposta do paciente o runtime roda o motor inteiro de novo.
  */
 export function aplicarPolitica(
   e: EntradaPolitica,
   politica: PoliticaConfianca = POLITICA_PADRAO,
 ): SaidaPolitica {
   const bloqueado = e.bloqueadores.length > 0 || e.hardBlockers.length > 0;
-  const score = bloqueado
+  const bruto = bloqueado
     ? 0
     : Math.max(0, Math.min(100, Math.round(e.scoreValidadores - e.penalidade)));
-  const level = nivelDaPontuacao(score, politica);
 
   if (bloqueado) {
     return {
-      score,
-      level,
+      score: 0,
+      level: nivelDaPontuacao(0, politica),
       decision: politica.acoesDeEscrita.includes(e.acao) ? "BLOCK_ACTION" : "HANDOFF",
+      limitacoes: [],
     };
   }
 
+  // ---------------- FASE 3: tetos por cobertura de evidência ----------------
+  const cfg = politica.cobertura;
+  const cobertura = e.cobertura ?? 100;
+  const desconhecidas = e.dimensoesDesconhecidas ?? [];
+  const limitacoes: string[] = [];
+  let score = bruto;
+  let permitidoAllow = true;
+
+  // (1) Nenhuma dimensão relevante avaliável: confiança insuficiente.
+  if (e.semEvidencia === true) {
+    score = 0;
+    permitidoAllow = false;
+    limitacoes.push("CONFIDENCE_INSUFFICIENT");
+  }
+
+  // (2) Cobertura baixa limita a nota final — sinal conhecido bom não vale
+  //     por um quadro que não foi visto.
+  if (cobertura < cfg.minimaParaHigh) {
+    score = Math.min(score, cfg.tetoScoreCoberturaBaixa);
+    limitacoes.push("LOW_EVIDENCE_COVERAGE");
+  }
+  if (cobertura < cfg.minimaParaAllow) {
+    permitidoAllow = false;
+    limitacoes.push("COVERAGE_BELOW_ALLOW");
+  }
+
+  // (3) Dimensão crítica desconhecida nunca pode ser HIGH.
+  const criticasDesconhecidas = desconhecidas.filter((d) => cfg.dimensoesCriticas.includes(d));
+  if (criticasDesconhecidas.length > 0) {
+    score = Math.min(score, politica.limites.HIGH - 1);
+    limitacoes.push("CRITICAL_DIMENSION_UNKNOWN");
+  }
+
+  // (4) Fonte obrigatória desconhecida: não se responde no escuro.
+  const fontesDesconhecidas = desconhecidas.filter((d) => cfg.fontesObrigatorias.includes(d));
+  if (fontesDesconhecidas.length > 0) {
+    permitidoAllow = false;
+    limitacoes.push("REQUIRED_SOURCE_UNKNOWN");
+    if (politica.acoesDeEscrita.includes(e.acao)) {
+      return {
+        score: Math.min(score, politica.limites.HIGH - 1),
+        level: nivelDaPontuacao(Math.min(score, politica.limites.HIGH - 1), politica),
+        decision: "BLOCK_ACTION",
+        limitacoes,
+      };
+    }
+  }
+
+  const level = nivelDaPontuacao(score, politica);
   const minimo = politica.minimoPorRisco[e.risco];
   let decision: DecisaoMotor;
-  if (level === "HIGH" && score >= minimo) decision = "ALLOW";
+  if (permitidoAllow && level === "HIGH" && score >= minimo) decision = "ALLOW";
   else if (level === "LOW")
     decision = e.ambiguidadeResolvivel === true && !e.esclarecimentoUsado ? "CLARIFY" : "HANDOFF";
   else decision = e.esclarecimentoUsado ? "HANDOFF" : "CLARIFY";
 
-  return { score, level, decision };
+
+  return { score, level, decision, limitacoes };
 }
