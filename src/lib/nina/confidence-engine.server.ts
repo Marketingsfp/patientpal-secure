@@ -20,6 +20,12 @@ export async function registrarDecisaoConfianca(params: {
   execucaoId: string | null;
   traceId?: string | null;
   teste: boolean;
+  /**
+   * FASE 4 — ambiente explícito. Quando não informado, cai na regra antiga
+   * (teste ⇒ homologação). O Test Runner informa "teste_automatizado" para
+   * que métricas reais nunca recebam execuções automatizadas.
+   */
+  ambiente?: import("./confianca-execucao").AmbienteQA;
   decisao: DecisaoConfianca;
   /** Registro explicável da Fase 5 (opcional para chamadas antigas). */
   auditoria?: RegistroAuditoriaConfianca | null;
@@ -37,7 +43,7 @@ export async function registrarDecisaoConfianca(params: {
       conversation_id: params.conversaId ?? a?.conversationId ?? null,
       execucao_id: params.execucaoId,
       trace_id: params.traceId ?? null,
-      ambiente: params.teste ? "homologacao" : "producao",
+      ambiente: params.ambiente ?? (params.teste ? "homologacao" : "producao"),
       score: params.decisao.score,
       acao: params.decisao.acao,
       bloqueio: params.decisao.bloqueio,

@@ -33,7 +33,7 @@ export const resumoConfiancaNina = createServerFn({ method: "POST" })
       .object({
         clinicaId: z.string().uuid(),
         dias: z.number().int().min(1).max(90).default(7),
-        ambiente: z.enum(["todos", "producao", "homologacao"]).default("todos"),
+        ambiente: z.enum(["todos", "producao", "homologacao", "teste_automatizado"]).default("todos"),
       })
       .parse(i),
   )
@@ -235,7 +235,7 @@ export const metricasConfiabilidadeNina = createServerFn({ method: "POST" })
       .object({
         clinicaId: z.string().uuid(),
         dias: z.number().int().min(1).max(180).default(30),
-        ambiente: z.enum(["todos", "producao", "homologacao"]).default("producao"),
+        ambiente: z.enum(["todos", "producao", "homologacao", "teste_automatizado"]).default("producao"),
       })
       .parse(i),
   )
@@ -370,7 +370,7 @@ export const calibracaoConfiancaNina = createServerFn({ method: "POST" })
       .object({
         clinicaId: z.string().uuid(),
         dias: z.number().int().min(7).max(180).default(30),
-        ambiente: z.enum(["todos", "producao", "homologacao"]).default("producao"),
+        ambiente: z.enum(["todos", "producao", "homologacao", "teste_automatizado"]).default("producao"),
       })
       .parse(i),
   )

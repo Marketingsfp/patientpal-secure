@@ -522,6 +522,8 @@ export async function gerarRespostaNina(
   telefoneRemetente?: string | null,
   opcoes?: {
     teste?: boolean;
+    /** FASE 4 — ambiente explícito de QA (produção/homologação/teste automatizado). */
+    ambiente?: import("@/lib/nina/confianca-execucao").AmbienteQA;
     auditoria?: { execucaoId?: string | null };
     /** IDs reais das mensagens de entrada que originaram esta resposta. */
     mensagensEntrada?: string[];
@@ -581,6 +583,7 @@ async function gerarRespostaNinaInterno(
    */
   opcoes?: {
     teste?: boolean;
+    ambiente?: import("@/lib/nina/confianca-execucao").AmbienteQA;
     auditoria?: { execucaoId?: string | null };
     mensagensEntrada?: string[];
     rastro?: import("@/lib/nina/arquitetura/tracing").Rastro;
@@ -1486,6 +1489,9 @@ ATENDIMENTO HUMANO — REGRA OBRIGATÓRIA:
           execucaoId: respostaIA.execucaoId ?? null,
           traceId: rastro?.ids.trace_id ?? null,
           teste: opcoes?.teste === true,
+          // FASE 4 — separa produção, homologação e teste automatizado.
+          ambiente:
+            opcoes?.ambiente ?? (opcoes?.teste === true ? "homologacao" : "producao"),
           decisao: paraDecisaoLegado(decisao),
           modo,
           teriaPermitido: aplicado.teriaPermitido,

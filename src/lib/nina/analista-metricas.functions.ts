@@ -208,7 +208,7 @@ async function ferramentaConsultarMetricas(
 async function ferramentaConfiabilidade(context: Contexto, clinicaId: string, args: any) {
   const mod = await import("@/lib/nina/confidence/metricas");
   const dias = Math.min(180, Math.max(1, Number(args?.dias) || 30));
-  const ambiente = ["producao", "homologacao", "todos"].includes(args?.ambiente)
+  const ambiente = ["producao", "homologacao", "teste_automatizado", "todos"].includes(args?.ambiente)
     ? args.ambiente
     : "producao";
   const desde = new Date(Date.now() - dias * 24 * 60 * 60 * 1000).toISOString();
