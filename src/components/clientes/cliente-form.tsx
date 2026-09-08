@@ -311,9 +311,6 @@ export function ClienteForm({
   const [bioLoading, setBioLoading] = useState(false);
   const [consentOpen, setConsentOpen] = useState(false);
   const [faceOpen, setFaceOpen] = useState(false);
-  // Número de prontuário longe da estante: guarda os dois números enquanto a
-  // recepção confere a ficha. Null = nenhuma pergunta pendente.
-  const [desvioProntuario, setDesvioProntuario] = useState<DesvioProntuario | null>(null);
 
   // Prontuário
   type ProntRow = {
