@@ -1,4 +1,4 @@
-# API de Agendamentos — Health Hub Pro (v1.1)
+# API de Agendamentos — Health Hub Pro (v1.2)
 
 API REST genérica de agenda, autenticada por **chave de API**. Não é uma
 integração com nenhum sistema específico: é a agenda do Health Hub Pro exposta
@@ -486,3 +486,97 @@ atendimento como "Realizado"; a escrita continua passando pelos núcleos
   cadastro de paciente; `Idempotency-Key` obrigatório no cadastro.
   **Deliberadamente ausente:** endpoint de busca/consulta de paciente (ver 9.1).
 - **v1 (2026-08):** versão inicial, congelada e ainda válida.
+
+---
+
+## 10. v1.2 — reconhecimento do paciente pelo WhatsApp
+
+Evolução compatível: nada da v1/v1.1 mudou de comportamento. O que entrou é uma
+terceira forma de identificar quem está agendando pelo site — sem pedir CPF e
+sem o site nunca tocar na base de pacientes.
+
+### 10.1 Ideia
+
+O visitante do site é quem inicia a conversa no WhatsApp. A clínica **não**
+manda código para ninguém: o site mostra um código curto, o visitante envia esse
+código do próprio celular, e o número remetente é o que identifica o cadastro.
+
+```
+site → POST /patients/verify/start        (recebe MJ-XXXX + link wa.me)
+paciente → manda "…codigo MJ-XXXX" no WhatsApp da clínica
+webhook → reconhece o código e casa o número com a base
+site → GET /patients/verify/status        (polling a cada 3s)
+site → POST /appointments com verificacao_token
+```
+
+### 10.2 Escopo
+
+`patients:verify`. Ele **não** dá acesso a nenhum dado de paciente e é separado
+de `patients:write` (cadastro). No `POST /appointments` com `verificacao_token`,
+só `patients:verify` é exigido.
+
+### 10.3 Endpoints
+
+| Método | Rota | Resumo |
+| --- | --- | --- |
+| POST | `/patients/verify/start` | cria o desafio; corpo `{}`; responde `202` com `desafio_id`, `codigo`, `whatsapp_numero`, `texto_sugerido`, `wa_url`, `expira_em` |
+| GET | `/patients/verify/status?desafio_id=` | `aguardando` \| `escolher_paciente` \| `verificado` \| `expirado` |
+| POST | `/patients/verify/select` | `{ desafio_id, opcao_id }` para escolher entre homônimos |
+
+O desafio vale **15 minutos**; o token, **20 minutos**, e é de **uso único**.
+Colisão de código sorteado é resolvida com re-sorteio (até 5 tentativas).
+
+### 10.4 Como o número vira paciente
+
+O casamento usa `public.integracao_verificacao_pacientes_por_telefone`, que
+compara os **últimos 8 dígitos** do remetente contra os dois telefones do
+cadastro. É de propósito: 35,5% da base não tem DDD gravado, então filtrar por
+DDD perderia cadastro legítimo. O número da própria clínica é excluído.
+
+| Encontrados | Resultado |
+| --- | --- |
+| 1 | `verificado` — token liberado |
+| 2 a 6 | `escolher_paciente` — lista de `opcao_id` + `nome_exibicao` ("Maria S.") |
+| 0, ou 7 e mais | `nao_localizado` |
+
+### 10.5 Privacidade
+
+- `paciente_id` fica só no banco: **nunca** sai em nenhuma resposta da API.
+- `opcao_id` é aleatório e vale só para aquele desafio.
+- `nao_localizado` e desafio inexistente são devolvidos como `expirado`: de fora
+  não dá para descobrir se um telefone tem cadastro na clínica.
+- Código e token são guardados como hash (SHA-256); comparações em tempo
+  constante.
+- A resposta ao paciente no WhatsApp é uma linha só, sem nome e sem dado algum:
+  "Recebemos! Volte para a página do site para concluir seu agendamento."
+
+### 10.6 Efeito no atendimento
+
+A mensagem com o código é interceptada no webhook **antes** de reabrir conversa
+e antes de a Nina ser acionada. Ela é marcada em `whatsapp_mensagens` com
+`tratada_internamente = true` e não gera conversa, tarefa nem resposta do bot.
+Qualquer outra mensagem segue o fluxo de sempre.
+
+### 10.7 Erros
+
+| HTTP | `code` | Quando |
+| --- | --- | --- |
+| 403 | `insufficient_scope` | chave sem `patients:verify` |
+| 422 | `verification_failed` | `opcao_id` alheio ao desafio; token inválido, expirado ou já usado |
+| 422 | `patient_and_id_conflict` | mais de uma forma de identificar o paciente no mesmo corpo |
+| 503 | `verification_unavailable` | clínica sem WhatsApp configurado |
+
+### 10.8 Onde está o código
+
+| Arquivo | Papel |
+| --- | --- |
+| `src/lib/integracoes/verificacao-v1.server.ts` | desafio, status, escolha, token e reconhecimento |
+| `src/lib/integracoes/agendamentos-v1.server.ts` | rotas `/patients/verify/*` e consumo do token no `POST /appointments` |
+| `src/routes/api/public/whatsapp.$clinicaId.ts` | interceptação no webhook de entrada |
+| `public.integracao_verificacoes` | desafios, opções, token (hash) e consumo |
+
+### 10.9 Changelog
+
+- **v1.2 (2026-09):** verificação do paciente pelo WhatsApp; escopo
+  `patients:verify`; `verificacao_token` no `POST /appointments`; marcação
+  `tratada_internamente` nas mensagens de código.

@@ -52,6 +52,10 @@ export const ESCOPOS_CONHECIDOS = [
   // v1.1: permite que o POST /appointments resolva/cadastre o paciente a
   // partir de CPF+nome+nascimento+telefone. Nunca concedido por padrão.
   "patients:write",
+  // v1.2: verificação do paciente pelo WhatsApp (desafio + token de uso único).
+  // Não dá acesso a nenhum dado de paciente.
+  "patients:verify",
+
 ] as const;
 
 export class ApiError extends Error {
@@ -83,7 +87,7 @@ export async function sha256Hex(texto: string): Promise<string> {
 }
 
 /** Comparação de hashes em tempo constante (evita timing attack). */
-function comparaSeguro(a: string, b: string): boolean {
+export function comparaSeguro(a: string, b: string): boolean {
   if (a.length !== b.length) return false;
   let diff = 0;
   for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
@@ -299,6 +303,56 @@ export async function consumirRateLimitPacientes(
     }
   }
 }
+
+/**
+ * Limite próprio para um recurso específico (janelas separadas das gerais).
+ * Usado pela verificação por WhatsApp, cujo `status` é consultado em loop
+ * pelo site e não pode competir com a cota geral da chave.
+ */
+export async function consumirRateLimitCustom(
+  db: SupabaseClient<Database>,
+  ctx: ApiKeyContexto,
+  prefixo: string,
+  limiteMinuto: number,
+  limiteDia: number,
+): Promise<void> {
+  const agora = new Date();
+  const minuto = new Date(
+    Date.UTC(
+      agora.getUTCFullYear(),
+      agora.getUTCMonth(),
+      agora.getUTCDate(),
+      agora.getUTCHours(),
+      agora.getUTCMinutes(),
+    ),
+  ).toISOString();
+  const dia = new Date(
+    Date.UTC(agora.getUTCFullYear(), agora.getUTCMonth(), agora.getUTCDate()),
+  ).toISOString();
+
+  const janelas: Array<[string, string, number]> = [
+    [`${prefixo}_minuto`, minuto, limiteMinuto],
+    [`${prefixo}_dia`, dia, limiteDia],
+  ];
+  for (const [janela, inicio, limite] of janelas) {
+    const { data, error } = await db.rpc("integracao_rate_limit_consumir", {
+      _api_key_id: ctx.api_key_id,
+      _janela: janela,
+      _janela_inicio: inicio,
+      _limite: limite,
+    } as never);
+    if (error) continue;
+    const r = (data ?? {}) as { permitido?: boolean };
+    if (r.permitido === false) {
+      throw new ApiError({
+        status: 429,
+        code: "rate_limit_exceeded",
+        message: "Limite de requisições atingido para esta chave.",
+      });
+    }
+  }
+}
+
 
 
 
