@@ -88,6 +88,8 @@ export const listarRevisaoFeedbackNina = createServerFn({ method: "POST" })
     if (data.categoria) q = q.eq("categoria", data.categoria);
     if (data.reportadoPor) q = q.eq("reportado_por", data.reportadoPor);
     if (data.unidadeId) q = q.eq("unidade_id", data.unidadeId);
+    if (data.ambiente) q = q.eq("ambiente", data.ambiente);
+
     if (data.de) q = q.gte("created_at", `${data.de}T00:00:00`);
     if (data.ate) q = q.lte("created_at", `${data.ate}T23:59:59`);
 
