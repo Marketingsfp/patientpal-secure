@@ -228,15 +228,16 @@ async function handleStatus(
   }
 
   if (status === "verificado") {
-    const tokenPlano = tokensEmMemoria.get(String(reg["id"]));
     const tokenExpira = String(reg["token_expira_em"] ?? "");
     const tokenVencido = tokenExpira ? new Date(tokenExpira).getTime() <= Date.now() : true;
     if (reg["consumido_em"] || tokenVencido) return respostaExpirada();
-    if (!tokenPlano) {
-      // Token só é entregue uma vez, no primeiro status após a verificação.
-      return { status: 200, body: { data: { status: "verificado" } } };
-    }
-    tokensEmMemoria.delete(String(reg["id"]));
+
+    // O token é derivado do desafio com um segredo do servidor: qualquer
+    // instância chega ao mesmo valor sem que o banco guarde segredo reversível.
+    const tokenPlano = await derivarToken(String(reg["id"]), tokenExpira);
+    const confere = comparaSeguro(await sha256Hex(tokenPlano), String(reg["token_hash"] ?? ""));
+    if (!confere) return respostaExpirada();
+
     return {
       status: 200,
       body: {
@@ -254,17 +255,34 @@ async function handleStatus(
 }
 
 /**
- * O token em claro só existe entre a verificação (webhook) e a primeira
- * consulta de status; o banco guarda apenas o hash. Guardar aqui evita
- * persistir segredo reversível.
+ * Segredo do servidor usado só para derivar o token. Nunca sai daqui e nunca é
+ * gravado: o banco guarda apenas o hash do token derivado.
  */
-const tokensEmMemoria = new Map<string, string>();
-
-export function guardarTokenPlano(desafioId: string, token: string): void {
-  tokensEmMemoria.set(desafioId, token);
-  // Rede de segurança: nunca fica em memória além da validade do token.
-  setTimeout(() => tokensEmMemoria.delete(desafioId), MINUTOS_TOKEN * 60_000).unref?.();
+function segredoDerivacao(): string {
+  const s =
+    process.env["INTEGRACAO_VERIFICACAO_SECRET"] ?? process.env["SUPABASE_SERVICE_ROLE_KEY"] ?? "";
+  if (!s) {
+    throw new ApiError(503, "verification_unavailable", "Verificação indisponível.");
+  }
+  return s;
 }
+
+async function derivarToken(desafioId: string, expiraEm: string): Promise<string> {
+  const chave = await crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(segredoDerivacao()),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"],
+  );
+  const assinatura = await crypto.subtle.sign(
+    "HMAC",
+    chave,
+    new TextEncoder().encode(`verificacao-v1|${desafioId}|${expiraEm}`),
+  );
+  return `vt_${hex(new Uint8Array(assinatura))}`;
+}
+
 
 // ------------------------------------------------------------------ select
 
