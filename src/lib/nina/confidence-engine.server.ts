@@ -111,6 +111,11 @@ export async function registrarDecisaoConfianca(params: {
             ferramentas: a.ferramentas,
             bloqueadores: a.bloqueadores,
             resultado_final: a.resultadoFinal,
+            // FASE 6 — cobertura e conflitos auditáveis junto do snapshot.
+            evidence_coverage: a.evidenceCoverage ?? null,
+            conflitos: a.validadores.flatMap((v) =>
+              (v.conflitos ?? []).map((c) => ({ validator: v.validator, ...c })),
+            ),
           }
         : {}),
     } as never);
