@@ -402,7 +402,9 @@ components:
     CriarAgendamento:
       type: object
       required: [id_externo, inicio, fim]
-      description: Informe `paciente_id` (v1) OU `paciente` (v1.1) — nunca os dois.
+      description: >-
+        Informe `paciente_id` (v1) OU `paciente` (v1.1) OU `verificacao_token`
+        (v1.2) — nunca mais de um.
       properties:
         id_externo: { type: string, minLength: 1, maxLength: 120 }
         paciente_id:
@@ -410,6 +412,15 @@ components:
           format: uuid
           description: Paciente já existente na clínica da chave.
         paciente: { $ref: "#/components/schemas/PacienteEntrada" }
+        verificacao_token:
+          type: string
+          minLength: 16
+          maxLength: 200
+          description: >-
+            Token de uso único devolvido pela verificação por WhatsApp (v1.2).
+            Exige o escopo `patients:verify` e NÃO exige `patients:write`.
+            Inválido, expirado ou já usado responde `422 verification_failed`.
+
         medico_id: { type: [string, "null"], format: uuid }
         especialidade_id: { type: [string, "null"], format: uuid }
         inicio: { type: string, format: date-time }
