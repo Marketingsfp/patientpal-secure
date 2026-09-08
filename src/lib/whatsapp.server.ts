@@ -1494,7 +1494,7 @@ ATENDIMENTO HUMANO — REGRA OBRIGATÓRIA:
         // Regras determinísticas do agendamento, derivadas do estado real.
         regrasNegocio:
           canonico.requestedAction === "criar_agendamento"
-            ? [
+            ? ([
                 {
                   id: "agendamento_exige_paciente_identificado",
                   descricao: "Agendar exige paciente identificado",
@@ -1508,8 +1508,8 @@ ATENDIMENTO HUMANO — REGRA OBRIGATÓRIA:
                       fluxoEstado.appointment.slot_fim,
                   ),
                 },
-              ]
-            : undefined,
+              ])
+            : [],
       };
       // FASE 9 — a política só difere da padrão se um ajuste tiver sido
       // aprovado E aplicado por uma pessoa. A Nina nunca altera pesos sozinha.
