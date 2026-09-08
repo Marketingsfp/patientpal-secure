@@ -1156,12 +1156,19 @@ export function HomologacaoInbox() {
                   }
                   const out = m.direction === "out";
                   const daNina = out && m.enviada_por !== "sistema";
+                  const meta = metadadosDaMensagem(m);
                   return (
                     <div
                       key={item.id}
                       data-msg-id={m.id}
+                      data-nina-environment={meta.environment}
+                      data-nina-test-conversation-id={meta.test_conversation_id ?? undefined}
+                      data-nina-cycle-id={meta.cycle_id ?? undefined}
+                      data-nina-session-id={meta.nina_session_id ?? undefined}
+                      data-nina-audit-trace-id={meta.audit_trace_id ?? undefined}
                       className={`flex items-start gap-2 ${out ? "justify-end" : "justify-start"}`}
                     >
+
                       <div
                         className={`max-w-[68%] break-words rounded-2xl px-3 py-2 text-sm shadow-sm ${
                           out
