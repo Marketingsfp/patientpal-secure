@@ -1557,20 +1557,30 @@ ATENDIMENTO HUMANO — REGRA OBRIGATÓRIA:
         if (v !== null && v !== undefined && String(v).trim() !== "") dadosColetados[k] = v;
       }
       if (nome === "agendar") {
-        const { validarAgendamentoAntesDoCommit } = await import(
-          "@/lib/nina/confidence/runtime"
-        );
+        const [{ validarAgendamentoAntesDoCommit }, { etapaConfianca }] = await Promise.all([
+          import("@/lib/nina/confidence/runtime"),
+          import("@/lib/nina/confidence/etapas-flag.server"),
+        ]);
         const gate = validarAgendamentoAntesDoCommit({
           args: argsObj,
           ferramentas: evidenciasFerramentas,
           pacienteIdentificado: Boolean(pacienteIdEfetivo),
           disponibilidadeConfirmada,
         });
+        // FASE 8 — a trava só vale nas clínicas que já avançaram para a etapa D
+        // (rigor no agendamento). Nas demais o motor apenas observa e registra,
+        // exatamente como nas decisões ALLOW/CLARIFY/HANDOFF.
+        const etapaAtual = await etapaConfianca(clinicaId);
+        const aplicaTrava = etapaAtual === "D";
         if (!gate.liberado) {
-          console.warn("[NINA_APPOINTMENT] commit bloqueado pelo Confidence Engine", {
+          console.warn("[NINA_APPOINTMENT] pré-commit reprovado pelo Confidence Engine", {
             conversa_id: estadoId.conversaId,
             faltas: gate.faltas,
+            etapa: etapaAtual,
+            aplicado: aplicaTrava,
           });
+        }
+        if (!gate.liberado && aplicaTrava) {
           rastro?.falhar("tool.execute", gate.motivo, { ferramenta: nome });
           mensagens.push({
             role: "tool",
@@ -1586,6 +1596,7 @@ ATENDIMENTO HUMANO — REGRA OBRIGATÓRIA:
           continue;
         }
       }
+
       rastro?.iniciar("tool.execute", { ferramenta: nome });
       const r = await broker.executar(nome, c.function?.arguments);
       if (r.success && !r.erro) rastro?.concluir("tool.execute", { ferramenta: nome });
