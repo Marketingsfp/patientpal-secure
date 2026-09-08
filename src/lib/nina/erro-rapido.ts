@@ -177,8 +177,11 @@ export function montarRegistroErroRapido(params: {
   reporterUserId: string;
   execucaoId?: string | null;
   auditoriaStatus?: EstadoAuditoria;
+  /** Padrão `production`: nunca marcamos teste por suposição. */
+  ambiente?: AmbienteReporte;
   vinculo?: VinculoComplementar;
 }) {
+
   const v = params.vinculo ?? {};
   return {
     clinica_id: params.clinicaId,
