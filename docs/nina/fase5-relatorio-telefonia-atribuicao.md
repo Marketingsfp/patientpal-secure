@@ -94,7 +94,7 @@ Admin X→ excluído: Admin
 ## 9. Testes executados
 
 - Verificação de tipos: sem erros.
-- Suíte da Nina: **972 testes / 6.600 verificações**, todas passando.
+- Suíte da Nina: **966 testes / 6.600 verificações**, todas passando.
 - Cobrem: Telefonia + Online; sem Telefonia; pausa; offline; administrador;
   empate de carga; capacidade lotada; troca de status durante a seleção;
   ausência total de elegíveis; 10 conversas na fila com 1 e com 3 atendentes;
