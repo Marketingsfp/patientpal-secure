@@ -170,7 +170,31 @@ type Item = {
   grupo_titulo: string | null;
   /** Execução da Nina que produziu a resposta — chave do snapshot de confiança. */
   execucao_id?: string | null;
+  /** Ambiente do reporte: atendimento real, homologação ou teste automatizado. */
+  ambiente?: string | null;
+  nina_session_id?: string | null;
+  teste_ciclo_id?: string | null;
 };
+
+/** Selo de ambiente — deixa explícito o que NÃO é atendimento real. */
+const AMBIENTE_UI: Record<string, { rotulo: string; classe: string }> = {
+  homologation: {
+    rotulo: "Homologação",
+    classe: "border-amber-500/40 text-amber-700 dark:text-amber-300",
+  },
+  automated_test: {
+    rotulo: "Teste automatizado",
+    classe: "border-sky-500/40 text-sky-700 dark:text-sky-300",
+  },
+};
+
+const FILTROS_AMBIENTE = [
+  { valor: "todos", rotulo: "Todos" },
+  { valor: "production", rotulo: "Produção" },
+  { valor: "homologation", rotulo: "Homologação" },
+  { valor: "automated_test", rotulo: "Teste automatizado" },
+];
+
 
 /** Rótulo/estilo do nível de confiança registrado no momento da resposta. */
 const CONFIANCA_UI: Record<string, { curto: string; classe: string }> = {
