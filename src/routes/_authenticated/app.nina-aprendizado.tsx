@@ -371,6 +371,8 @@ function Pagina() {
   const [fPrioridade, setFPrioridade] = useState("todas");
   const [fCausa, setFCausa] = useState("todas");
   const [fConfianca, setFConfianca] = useState("todas");
+  const [fAmbiente, setFAmbiente] = useState("todos");
+
   const [diagnosticando, setDiagnosticando] = useState<Item | null>(null);
   const [comparacao, setComparacao] = useState<Comparacao | null>(null);
   const [consultandoBase, setConsultandoBase] = useState(false);
@@ -428,6 +430,8 @@ function Pagina() {
           status: aba as any,
           categoria: categoria === "todas" ? null : (categoria as any),
           reportadoPor: autor === "todos" ? null : autor,
+          ambiente: fAmbiente === "todos" ? null : (fAmbiente as any),
+
           de: de || null,
           ate: ate || null,
           limite: 200,
