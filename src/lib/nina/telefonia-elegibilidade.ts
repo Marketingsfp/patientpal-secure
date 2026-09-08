@@ -198,3 +198,74 @@ export function conversaAtribuidaPermanece(args: {
 }): boolean {
   return args.atribuidaA !== null;
 }
+
+/**
+ * FASE 4 — fila temporária de "Não atribuídas".
+ *
+ * Cada item guarda o que o evento de entrada na fila precisa preservar:
+ * conversa, motivo do handoff, momento em que ficou sem atendente, prioridade,
+ * setor/unidade e protocolo (quando existir).
+ */
+export type ItemNaoAtribuida = {
+  conversationId: string;
+  handoffReason?: string | null;
+  enteredUnassignedAt: string;
+  prioridade?: number;
+  departamentoId?: string | null;
+  protocolo?: string | null;
+};
+
+/** Ordem da fila: maior prioridade primeiro; depois, quem espera há mais tempo. */
+export function ordenarFilaNaoAtribuidas(itens: ItemNaoAtribuida[]): ItemNaoAtribuida[] {
+  return [...itens].sort(
+    (a, b) =>
+      (b.prioridade ?? 0) - (a.prioridade ?? 0) ||
+      a.enteredUnassignedAt.localeCompare(b.enteredUnassignedAt) ||
+      a.conversationId.localeCompare(b.conversationId),
+  );
+}
+
+/**
+ * Simula a rotina de redistribuição disparada quando alguém com Telefonia fica
+ * Online. Espelha `atend_distribuir_fila_interno`: percorre a fila ordenada e,
+ * quando uma conversa não tem atendente compatível (setor/unidade), segue para
+ * a próxima em vez de travar a fila inteira.
+ */
+export function simularRedistribuicao(
+  candidatos: CandidatoDistribuicao[],
+  fila: ItemNaoAtribuida[],
+  opts: { revalidar?: (userId: string) => CandidatoDistribuicao | null } = {},
+): {
+  atribuicoes: { conversationId: string; userId: string }[];
+  restantes: ItemNaoAtribuida[];
+} {
+  const estado = candidatos.map((c) => ({ ...c, cargaAtiva: c.cargaAtiva ?? 0 }));
+  const atribuicoes: { conversationId: string; userId: string }[] = [];
+  const restantes: ItemNaoAtribuida[] = [];
+  let i = 0;
+
+  for (const item of ordenarFilaNaoAtribuidas(fila)) {
+    const r = simularAtribuicao(estado, {
+      departamentoId: item.departamentoId ?? null,
+      ...(opts.revalidar ? { revalidar: opts.revalidar } : {}),
+    });
+    if (!r.atribuido_a) {
+      restantes.push(item);
+      continue;
+    }
+    atribuicoes.push({ conversationId: item.conversationId, userId: r.atribuido_a });
+    const alvo = estado.find((c) => c.userId === r.atribuido_a);
+    if (alvo) {
+      alvo.cargaAtiva = (alvo.cargaAtiva ?? 0) + 1;
+      alvo.ultimaAtribuicaoEm = new Date(2000, 0, 1, 0, 0, i).toISOString();
+    }
+    i++;
+  }
+
+  return { atribuicoes, restantes };
+}
+
+/** Contador da Central de Atenção após uma rodada de redistribuição. */
+export function contadorNaoAtribuidas(restantes: ItemNaoAtribuida[]): number {
+  return restantes.length;
+}

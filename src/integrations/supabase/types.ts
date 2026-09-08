@@ -13116,6 +13116,10 @@ export type Database = {
         Args: { _clinica_id: string; _max?: number }
         Returns: number
       }
+      atend_distribuir_fila_interno: {
+        Args: { _clinica_id: string; _max?: number }
+        Returns: number
+      }
       atend_espera_por_conversa: {
         Args: { _clinica_id: string; _is_teste?: boolean }
         Returns: {
