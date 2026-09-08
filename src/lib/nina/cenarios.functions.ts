@@ -614,6 +614,21 @@ export const finalizarItemExecucao = createServerFn({ method: "POST" })
       }
     }
 
+    // FASE 4 — confiança declarada pela Nina durante o cenário. Lemos os
+    // snapshots REAIS já persistidos pelo Confidence Decision Engine; nada é
+    // recalculado aqui. Sem snapshot, o item fica sem score (não avaliado).
+    const { resumirConfiancaExecucao } = await import("@/lib/nina/confianca-execucao");
+    let resumoConfianca = resumirConfiancaExecucao([]);
+    if (conversaId) {
+      const { data: snaps } = await supabaseAdmin
+        .from("nina_confianca_decisoes")
+        .select("score, nivel, trace_id, message_id, policy_version")
+        .eq("clinica_id", data.clinicaId)
+        .eq("conversation_id", conversaId)
+        .order("created_at", { ascending: true });
+      resumoConfianca = resumirConfiancaExecucao((snaps ?? []) as any[]);
+    }
+
     const agora = new Date().toISOString();
     await supabaseAdmin
       .from("nina_teste_execucao_itens")
@@ -634,9 +649,16 @@ export const finalizarItemExecucao = createServerFn({ method: "POST" })
         transferida,
         conversa_id: conversaId,
         ciclo_id: cicloId,
+        confianca_amostras: resumoConfianca.amostras,
+        confianca_media: resumoConfianca.media,
+        confianca_min: resumoConfianca.min,
+        confianca_max: resumoConfianca.max,
+        confianca_niveis: resumoConfianca.niveis,
+        confianca_nivel_minimo: resumoConfianca.nivelMinimo,
+        confianca_trace_ids: resumoConfianca.traceIds,
         erro: data.erroCliente ?? null,
         finalizado_em: agora,
-      })
+      } as never)
       .eq("id", (item as any).id);
 
     // Cleanup do ciclo deste lead: encerra (histórico preservado) e libera o

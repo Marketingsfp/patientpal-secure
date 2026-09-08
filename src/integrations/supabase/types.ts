@@ -9981,6 +9981,13 @@ export type Database = {
           cenario_snapshot: Json
           ciclo_id: string | null
           clinica_id: string
+          confianca_amostras: number
+          confianca_max: number | null
+          confianca_media: number | null
+          confianca_min: number | null
+          confianca_niveis: Json
+          confianca_nivel_minimo: string | null
+          confianca_trace_ids: string[]
           conversa_id: string | null
           created_at: string
           criterios_resultado: Json
@@ -10015,6 +10022,13 @@ export type Database = {
           cenario_snapshot?: Json
           ciclo_id?: string | null
           clinica_id: string
+          confianca_amostras?: number
+          confianca_max?: number | null
+          confianca_media?: number | null
+          confianca_min?: number | null
+          confianca_niveis?: Json
+          confianca_nivel_minimo?: string | null
+          confianca_trace_ids?: string[]
           conversa_id?: string | null
           created_at?: string
           criterios_resultado?: Json
@@ -10049,6 +10063,13 @@ export type Database = {
           cenario_snapshot?: Json
           ciclo_id?: string | null
           clinica_id?: string
+          confianca_amostras?: number
+          confianca_max?: number | null
+          confianca_media?: number | null
+          confianca_min?: number | null
+          confianca_niveis?: Json
+          confianca_nivel_minimo?: string | null
+          confianca_trace_ids?: string[]
           conversa_id?: string | null
           created_at?: string
           criterios_resultado?: Json

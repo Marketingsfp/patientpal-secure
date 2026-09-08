@@ -326,12 +326,33 @@ export async function processarMensagemTeste(data: EntradaMensagemTeste, userId:
     let falhaTecnica = false;
     // Auditoria: id da execução que produziu esta resposta.
     const auditoriaNina: { execucaoId?: string | null } = {};
+    // FASE 4 — ambiente real desta execução: se existe uma simulação em
+    // andamento para este lead, a origem é o Test Runner (teste automatizado);
+    // caso contrário é a Homologação manual. Nunca vem do navegador.
+    let simulacaoAtiva = false;
+    try {
+      const { data: simAtiva } = await supabaseAdmin
+        .from("nina_teste_simulacoes")
+        .select("id")
+        .eq("clinica_id", data.clinicaId)
+        .eq("lead_id", lead.id)
+        .eq("status", "executando")
+        .limit(1)
+        .maybeSingle();
+      simulacaoAtiva = !!simAtiva;
+    } catch {
+      simulacaoAtiva = false;
+    }
+    const { ambienteDaExecucao } = await import("@/lib/nina/confianca-execucao");
+    const ambienteQA = ambienteDaExecucao({ teste: true, simulacaoAtiva });
+
     try {
       if (textoPaciente) {
         const { gerarRespostaNina } = await import("@/lib/whatsapp.server");
         diag.model_called = true;
         reply = await gerarRespostaNina(data.clinicaId, textoPaciente, lead.telefone_sessao, {
           teste: true,
+          ambiente: ambienteQA,
           auditoria: auditoriaNina,
           mensagensEntrada: (msgEntrada as { id?: string } | null)?.id
             ? [(msgEntrada as { id: string }).id]
