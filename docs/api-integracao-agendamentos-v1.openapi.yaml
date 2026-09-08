@@ -316,7 +316,133 @@ paths:
         "422": { $ref: "#/components/responses/Unprocessable" }
         "429": { $ref: "#/components/responses/RateLimited" }
 
+  /patients/verify/start:
+    post:
+      tags: [Verificação de paciente]
+      summary: Inicia o desafio de verificação por WhatsApp
+      description: |
+        Escopo exigido: `patients:verify`. Corpo `{}`.
+        Não consulta a base de pacientes e não recebe telefone nem CPF.
+        O visitante manda o código pelo WhatsApp dele; o reconhecimento acontece
+        no webhook de entrada da clínica.
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { type: object }
+      responses:
+        "202":
+          description: Desafio criado
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      desafio_id: { type: string, format: uuid }
+                      codigo: { type: string, examples: ["MJ-7K4C"] }
+                      whatsapp_numero: { type: string }
+                      texto_sugerido: { type: string }
+                      wa_url: { type: string, format: uri }
+                      expira_em: { type: string, format: date-time }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+    options:
+      summary: Pré-voo CORS
+      security: []
+      responses:
+        "204": { description: Sem conteúdo }
+
+  /patients/verify/status:
+    get:
+      tags: [Verificação de paciente]
+      summary: Consulta a situação do desafio
+      description: |
+        Escopo exigido: `patients:verify`. Limite próprio e generoso (o site
+        consulta a cada 3s por até 5 min).
+        `desafio_id` inexistente responde exatamente como `expirado`, e
+        `nao_localizado` também é devolvido como `expirado`: de fora, não é
+        possível distinguir "existe cadastro" de "não existe".
+        O `verificacao_token` é devolvido UMA única vez.
+      parameters:
+        - { name: desafio_id, in: query, required: true, schema: { type: string, format: uuid } }
+      responses:
+        "200":
+          description: Situação do desafio
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      status:
+                        type: string
+                        enum: [aguardando, escolher_paciente, verificado, expirado]
+                      verificacao_token: { type: string }
+                      expira_em: { type: string, format: date-time }
+                      opcoes:
+                        type: array
+                        description: Homônimos (2 a 6). Nunca traz `paciente_id`.
+                        items:
+                          type: object
+                          properties:
+                            opcao_id: { type: string }
+                            nome_exibicao: { type: string, examples: ["Maria S."] }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+    options:
+      summary: Pré-voo CORS
+      security: []
+      responses:
+        "204": { description: Sem conteúdo }
+
+  /patients/verify/select:
+    post:
+      tags: [Verificação de paciente]
+      summary: Escolhe entre homônimos
+      description: |
+        Escopo exigido: `patients:verify`. `opcao_id` que não pertence ao
+        desafio responde `422 verification_failed`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [desafio_id, opcao_id]
+              properties:
+                desafio_id: { type: string, format: uuid }
+                opcao_id: { type: string }
+      responses:
+        "200":
+          description: Verificado — o token sai na próxima consulta de status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      status: { type: string, const: verificado }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "422": { $ref: "#/components/responses/Unprocessable" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+    options:
+      summary: Pré-voo CORS
+      security: []
+      responses:
+        "204": { description: Sem conteúdo }
+
 components:
+
   securitySchemes:
     bearerApiKey:
       type: http
