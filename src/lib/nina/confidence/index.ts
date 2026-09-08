@@ -32,3 +32,8 @@ export {
   type ConfigValidador,
   type ConfigValidadores,
 } from "./validators";
+export {
+  classificarAfirmacaoOperacional,
+  WorkflowConsistencyValidator,
+  type AfirmacaoOperacional,
+} from "./workflow";
