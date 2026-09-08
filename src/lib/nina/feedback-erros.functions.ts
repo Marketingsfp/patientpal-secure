@@ -191,10 +191,25 @@ export const reportarErroRapidoMensagemNina = createServerFn({ method: "POST" })
       protocolo_atendimento: string | null;
       protocolo_sessao_id: string | null;
       teste_ciclo_id: string | null;
+      is_teste: boolean | null;
     };
 
+    // Ambiente vem da própria conversa (nunca de suposição). Em homologação,
+    // a sessão da Nina é lida do ciclo de teste ligado a esta conversa.
+    const ambiente = ambienteDoReporte({ isTeste: conv.is_teste });
+    let ninaSessionId: string | null = null;
+    if (ambiente !== "production" && conv.teste_ciclo_id) {
+      const { data: ciclo } = await context.supabase
+        .from("nina_teste_ciclos")
+        .select("nina_session_id")
+        .eq("id", conv.teste_ciclo_id)
+        .maybeSingle();
+      ninaSessionId = (ciclo as { nina_session_id: string | null } | null)?.nina_session_id ?? null;
+    }
+
     const colunas =
-      "id, status, categoria, origem, created_at, mensagem_id, conversa_id, execucao_id, auditoria_status, contato_paciente_id, contato_telefone, protocolo_atendimento, protocolo_sessao_id, prompt_versao_id, prompt_versao, teste_ciclo_id, trace_id";
+      "id, status, categoria, origem, created_at, mensagem_id, conversa_id, execucao_id, auditoria_status, contato_paciente_id, contato_telefone, protocolo_atendimento, protocolo_sessao_id, prompt_versao_id, prompt_versao, teste_ciclo_id, trace_id, ambiente, nina_session_id";
+
 
     // 1ª barreira: já existe reporte rápido pendente para esta mensagem.
     const { data: existente } = await context.supabase
