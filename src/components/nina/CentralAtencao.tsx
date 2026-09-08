@@ -19,18 +19,6 @@ import { formatarEspera } from "@/lib/atendimento/espera";
 import { cn } from "@/lib/utils";
 
 
-/**
- * Quem enxerga o indicador no cabeçalho.
- *
- * A Central é ferramenta de coordenação: mostra a fila de conversas sem dono e
- * quem está esperando resposta há tempo demais — informação para quem distribui
- * o trabalho, não para quem executa. Médico, caixa e recepção trabalham a
- * própria fila dentro da Inbox e não devem ser interrompidos pelo alerta
- * vermelho do topo, então o botão simplesmente não é montado para eles (nem as
- * consultas que o alimentam são disparadas).
- */
-const PAPEIS_DA_CENTRAL = ["admin", "gestor", "supervisor"];
-
 const VAZIO: ResumoAtencao = {
   total: 0,
   naoAtribuidas: 0,
@@ -51,7 +39,6 @@ const VAZIO: ResumoAtencao = {
 export function CentralAtencao() {
   const { clinicaAtual } = useClinica();
   const clinicaId = clinicaAtual?.clinica_id;
-  const podeVer = PAPEIS_DA_CENTRAL.includes(clinicaAtual?.role ?? "");
   const filaFn = useServerFn(listarFilaHumana);
   const esperaFn = useServerFn(esperaConversas);
   const convsFn = useServerFn(listarConversas);
@@ -74,7 +61,7 @@ export function CentralAtencao() {
 
 
   const carregar = useCallback(async () => {
-    if (!clinicaId || !podeVer) {
+    if (!clinicaId) {
       setFila([]);
       setEspera({});
       return;
@@ -91,11 +78,11 @@ export function CentralAtencao() {
     } catch {
       /* indicador: nunca pode derrubar o cabeçalho */
     }
-  }, [clinicaId, podeVer, filaFn, esperaFn]);
+  }, [clinicaId, filaFn, esperaFn]);
 
   // Nomes das conversas (para o painel). Leitura leve e espaçada.
   const carregarNomes = useCallback(async () => {
-    if (!clinicaId || !podeVer) return;
+    if (!clinicaId) return;
     try {
       const rows = (await convsFn({
         data: { clinicaId, status: "all", canal: "todos", limit: 200 },
@@ -106,7 +93,7 @@ export function CentralAtencao() {
     } catch {
       /* sem nomes o painel ainda funciona */
     }
-  }, [clinicaId, podeVer, convsFn]);
+  }, [clinicaId, convsFn]);
 
   useEffect(() => {
     void carregar();
@@ -129,7 +116,7 @@ export function CentralAtencao() {
     () => {
       void carregar();
     },
-    Boolean(clinicaId) && podeVer,
+    Boolean(clinicaId),
   );
 
   const resumo = useMemo(
@@ -176,7 +163,7 @@ export function CentralAtencao() {
   };
 
 
-  if (!clinicaId || !podeVer) return null;
+  if (!clinicaId) return null;
 
   const alerta = resumo.total > 0;
   const rotulo = rotuloCentral(resumo);
