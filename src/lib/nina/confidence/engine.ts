@@ -309,6 +309,20 @@ export function decidirConfianca(
     politica,
   );
 
+  // FASE 4 — handoff já pedido pelo runtime deixa de ser atalho cego.
+  // Transferir é seguro, então a decisão pode ser liberada; mas isso só vale
+  // quando NENHUM bloqueio (inclusive incoerência de processo ou afirmação
+  // sem prova) foi detectado. A nota e a cobertura seguem sendo as reais.
+  let decisaoFinal = decision;
+  if (
+    ctx.businessContext.handoffSolicitado &&
+    blockers.length === 0 &&
+    hardBlockers.length === 0
+  ) {
+    decisaoFinal = "ALLOW";
+    motivos.push("handoff já solicitado pelo runtime — transferência é o caminho seguro");
+  }
+
   for (const l of limitacoes) {
     motivos.push(`limitação de cobertura: ${l} (cobertura ${medida.cobertura}%)`);
   }
