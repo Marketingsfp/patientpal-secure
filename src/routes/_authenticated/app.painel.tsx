@@ -71,6 +71,38 @@ const dataHoraCurta = (iso: string | null) => {
   return `${dia}/${mes} às ${hora}`;
 };
 
+/** Teto de linhas que o PostgREST devolve numa requisição. */
+const PAGINA = 1000;
+
+/**
+ * Busca todas as linhas de uma consulta sem parar no teto de 1.000 linhas do
+ * PostgREST. A primeira página já pede o total exato (`count: "exact"`) e as
+ * seguintes são buscadas até completar esse total.
+ */
+async function buscarTudo<T>(
+  consulta: (de: number, ate: number) => PromiseLike<{ data: T[] | null; count: number | null }>,
+): Promise<T[]> {
+  const primeira = await consulta(0, PAGINA - 1);
+  const linhas = [...(primeira.data ?? [])];
+  const total = primeira.count ?? linhas.length;
+  for (let inicio = PAGINA; inicio < total; inicio += PAGINA) {
+    const pagina = await consulta(inicio, inicio + PAGINA - 1);
+    linhas.push(...(pagina.data ?? []));
+  }
+  return linhas;
+}
+
+/**
+ * Vaga vazia da grade. A agenda pré-gera os horários livres do médico como
+ * linhas "DISPONIVEL" sem paciente vinculado; elas não são atendimentos e não
+ * podem entrar em nenhum indicador do dia.
+ */
+const ehVagaLivre = (a: { paciente_nome: string | null; paciente_id?: string | null }) => {
+  if (a.paciente_id) return false;
+  const nome = (a.paciente_nome ?? "").trim().toUpperCase();
+  return nome === "" || nome === "DISPONIVEL";
+};
+
 type Ag = {
   id: string;
   paciente_nome: string | null;
@@ -132,15 +164,21 @@ function DashboardOperacional() {
       const de = `${dia}T00:00:00`;
       const ate = `${dia}T23:59:59`;
       const [ags, senhas, alertas, caixas, meds, esps, novos] = await Promise.all([
-        supabase
-          .from("agendamentos")
-          .select(
-            "id,paciente_nome,inicio,status,fluxo_etapa,procedimento,prioridade,medico_id,paciente_id,data_pagamento",
-          )
-          .in("clinica_id", ids)
-          .gte("inicio", de)
-          .lte("inicio", ate)
-          .order("inicio"),
+        buscarTudo<Ag>((pDe, pAte) =>
+          supabase
+            .from("agendamentos")
+            .select(
+              "id,paciente_nome,inicio,status,fluxo_etapa,procedimento,prioridade,medico_id,paciente_id,data_pagamento",
+              { count: "exact" },
+            )
+            .in("clinica_id", ids)
+            .gte("inicio", de)
+            .lte("inicio", ate)
+            .or("paciente_nome.is.null,paciente_nome.neq.DISPONIVEL")
+            .order("inicio")
+            .order("id")
+            .range(pDe, pAte),
+        ),
         supabase
           .from("senhas")
           .select("id,codigo,tipo,numero,status,emitida_em,guiche")
@@ -163,15 +201,19 @@ function DashboardOperacional() {
           .order("aberto_em", { ascending: false }),
         supabase.from("medicos").select("id,nome,especialidade_id").in("clinica_id", ids),
         supabase.from("especialidades").select("id,nome"),
-        supabase
-          .from("pacientes")
-          .select("id")
-          .in("clinica_id", ids)
-          .gte("created_at", `${dia}T00:00:00`)
-          .lte("created_at", `${dia}T23:59:59`),
+        buscarTudo<{ id: string }>((pDe, pAte) =>
+          supabase
+            .from("pacientes")
+            .select("id", { count: "exact" })
+            .in("clinica_id", ids)
+            .gte("created_at", `${dia}T00:00:00`)
+            .lte("created_at", `${dia}T23:59:59`)
+            .order("id")
+            .range(pDe, pAte),
+        ),
       ]);
       return {
-        ags: (ags.data ?? []) as Ag[],
+        ags: ags.filter((a) => !ehVagaLivre(a)),
         senhas: (senhas.data ?? []) as Senha[],
         alertas: (alertas.data ?? []) as Alerta[],
         caixas: (caixas.data ?? []) as CaixaSessao[],
@@ -181,7 +223,7 @@ function DashboardOperacional() {
           especialidade_id: string | null;
         }>,
         especialidades: (esps.data ?? []) as Array<{ id: string; nome: string }>,
-        pacientesNovos: new Set(((novos.data ?? []) as Array<{ id: string }>).map((p) => p.id)),
+        pacientesNovos: new Set(novos.map((p) => p.id)),
       };
     },
   });
