@@ -159,15 +159,15 @@ export function extrairConflitos(
     for (const item of v.slice(0, LIMITE_CONFLITOS)) {
       if (!item || typeof item !== "object" || Array.isArray(item)) continue;
       const obj = item as Record<string, unknown>;
-      const campo = escalar(achar(obj, CHAVE_CAMPO));
+      const campo = escalar(achar(obj, CHAVE_CAMPO), true);
       const lista = achar(obj, CHAVE_ORIGENS);
       if (!Array.isArray(lista)) continue;
       const origens: ConflitoAuditado["origens"] = [];
       for (const o of lista.slice(0, LIMITE_ORIGENS)) {
         if (!o || typeof o !== "object" || Array.isArray(o)) continue;
         const linha = o as Record<string, unknown>;
-        const origem = escalar(achar(linha, CHAVE_ORIGEM));
-        const valor = escalar(achar(linha, CHAVE_VALOR));
+        const origem = escalar(achar(linha, CHAVE_ORIGEM), true);
+        const valor = escalar(achar(linha, CHAVE_VALOR), true);
         if (origem == null && valor == null) continue;
         origens.push({ origem: String(origem ?? "origem não informada"), valor: String(valor ?? "—") });
       }
