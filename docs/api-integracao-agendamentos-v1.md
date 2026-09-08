@@ -486,3 +486,131 @@ atendimento como "Realizado"; a escrita continua passando pelos núcleos
   cadastro de paciente; `Idempotency-Key` obrigatório no cadastro.
   **Deliberadamente ausente:** endpoint de busca/consulta de paciente (ver 9.1).
 - **v1 (2026-08):** versão inicial, congelada e ainda válida.
+
+---
+
+## 10. v1.2 — reconhecimento do paciente pelo WhatsApp
+
+Serve para o site institucional saber quem já é paciente sem pedir os dados de
+novo.
+
+### 10.1 Quem manda a mensagem é o paciente
+
+A clínica **não** dispara mensagem: não há template aprovado na Meta e, fora da
+janela de 24h, a mensagem seria recusada. O desenho é o inverso.
+
+1. O site pede um desafio (`POST /patients/verify/start`) e recebe um código
+   curto e o link do WhatsApp da clínica com o texto pronto.
+2. O paciente aperta enviar no WhatsApp dele.
+3. O webhook de entrada que já existe reconhece o código, identifica o paciente
+   **pelo número que enviou** e marca o desafio.
+4. O site, que está em polling no `GET /patients/verify/status`, recebe os dados
+   e preenche sozinho.
+
+Três ganhos: não precisa de template nem de mensagem ativa (a conversa é aberta
+pelo paciente, dentro das regras da Meta e sem custo); prova a posse do número
+melhor que um código enviado, porque a mensagem sai do aparelho dele; e tira o
+CPF do fluxo — nenhuma tela pública responde se um CPF tem cadastro.
+
+### 10.2 Regra de normalização do telefone
+
+Medição da base real (252.722 pacientes ativos): 55,3% têm 11 dígitos, 28,0%
+têm 8 dígitos (sem DDD), 6,0% têm 9 (sem DDD), 5,6% têm 10 e 4,3% estão vazios.
+**34% da base não tem DDD gravado**, então casar por "DDD + número" descartaria
+um terço dos pacientes.
+
+A comparação é pelos **últimos 8 dígitos** — a parte sempre presente. Da
+`from_number` e das colunas `telefone_norm` / `telefone2_norm` tira-se só
+dígito, e compara-se `right(..., 8)`. Isso absorve máscara, DDI 55, presença ou
+ausência de DDD e nono dígito. Telefone com menos de 8 dígitos é ignorado.
+
+A consulta roda pela função protegida
+`integracao_verificacao_pacientes_por_telefone`, `SECURITY DEFINER`, concedida
+apenas ao `service_role`, apoiada em índices por
+`(clinica_id, right(telefone_norm, 8))`.
+
+### 10.3 Quantos cadastros casam — e o que acontece em cada caso
+
+Número compartilhado não é colisão acidente: é família (mãe cadastrada com o
+mesmo celular dos filhos).
+
+| Cadastros ativos no mesmo número | Resultado |
+| --- | --- |
+| 0 | `nao_localizado` |
+| 1 | `verificado` direto |
+| 2 a 6 | `escolher_paciente` |
+| 7 ou mais | `nao_localizado` (cadastro sujo) |
+
+**Casos de 2 a 6:** o desafio guarda internamente a lista
+`{opcao_id, paciente_id, nome_exibicao}`, mas o `GET /status` devolve apenas:
+
+```json
+{ "data": { "status": "escolher_paciente", "opcoes": [
+  { "opcao_id": "9f2c…", "nome_exibicao": "Maria S." },
+  { "opcao_id": "4b71…", "nome_exibicao": "João S." }
+] } }
+```
+
+O site mostra "Encontramos mais de um cadastro com este WhatsApp. Quem vai ser
+atendido?". `nome_exibicao` é primeiro nome + inicial do sobrenome e ponto —
+sem nome completo, CPF, nascimento, telefone ou e-mail nesta etapa. `opcao_id`
+é aleatório e vale só para aquele desafio; o `paciente_id` real nunca sai da
+API aqui.
+
+A pessoa escolhe em `POST /patients/verify/select`
+(`{ "desafio_id": "...", "opcao_id": "..." }`). `opcao_id` que não pertence ao
+desafio devolve `422 verification_failed`. É **uma escolha por desafio**: depois
+de escolhido não dá para trocar; quem errou recomeça o desafio. O próximo
+`GET /status` devolve o `verificacao_token` e o objeto `paciente` normal.
+
+**Guarda contra número-lixo:** além do corte em 7 cadastros, o próprio número da
+clínica (`whatsapp_configs.display_phone_number`) é ignorado antes de montar as
+opções.
+
+### 10.4 Endpoints
+
+- `POST /patients/verify/start` — escopo `patients:verify`. Corpo vazio (`{}` ou
+  `{ "origem": "site" }`). `202` com `desafio_id`, `codigo`, `whatsapp_numero`,
+  `texto_sugerido`, `wa_url`, `expira_em`. Código é `MJ-` + 4 caracteres sem
+  `O/0/I/1/L`, único entre desafios aguardando. Limite de 20 por IP/hora, além
+  do limite da chave.
+- `GET /patients/verify/status?desafio_id=…` — escopo `patients:verify`.
+- `POST /patients/verify/select` — escopo `patients:verify`.
+
+### 10.5 Token e uso no agendamento
+
+O `verificacao_token` é **de uso único** e sai uma única vez, na primeira
+consulta de status após a verificação; no banco fica só o hash e a expiração.
+`POST /appointments` passa a aceitar `verificacao_token` como terceira forma de
+identificar o paciente — exclusiva em relação a `paciente_id` e `paciente`, e
+exigindo o escopo `patients:verify`. Nada mais do fluxo de agendamento muda.
+
+### 10.6 O que acontece com a mensagem recebida
+
+No webhook existente, logo após inserir em `whatsapp_mensagens` e antes de
+timeout, reabertura, conversa e Nina: a mensagem reconhecida é marcada como
+tratada, não abre conversa, não vira tarefa, não vai para a recepção e não
+chama a Nina. A única resposta enviada é
+"Recebemos! Volte para a página do site para concluir seu agendamento.",
+usando a janela de 24h aberta pelo próprio paciente.
+
+Mensagem com código já expirado **não** é tratada como trânsito do site: o
+desafio é marcado como expirado e a mensagem segue o atendimento normal.
+
+### 10.7 Onde está o código
+
+- `src/lib/integracoes/verificacao-v1.server.ts` — desafio, reconhecimento,
+  escolha, token e interceptação do webhook.
+- `src/lib/integracoes/agendamentos-v1.server.ts` — rotas `verify/*` e consumo
+  do token no `POST /appointments`.
+- `src/routes/api/public/whatsapp.$clinicaId.ts` — interceptação na entrada.
+- Tabela `public.integracao_verificacoes` (RLS negando `anon` e
+  `authenticated`; acesso só pelo `service_role`).
+
+### 10.8 Changelog
+
+- **v1.2 (2026-09):** verificação do paciente pelo WhatsApp (`start`, `status`,
+  `select`), escopo `patients:verify`, `verificacao_token` no
+  `POST /appointments`, casamento pelos últimos 8 dígitos e escolha entre 2 a 6
+  cadastros. **Deliberadamente ausente:** qualquer consulta por CPF e qualquer
+  mensagem ativa da clínica.
