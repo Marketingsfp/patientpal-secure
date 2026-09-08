@@ -260,25 +260,24 @@ export function HomologacaoInbox() {
 
   /** Metadados internos padronizados da mensagem (produção/homologação/teste). */
   const metadadosDaMensagem = useCallback(
-    (m: Msg) =>
-      montarMetadadosMensagemNina({
+    (m: Msg) => {
+      const c = m.execucao_id ? confiancaPorExecucao[String(m.execucao_id)] : undefined;
+      const cicloAtual = ciclos.length > 0 ? (ciclos[ciclos.length - 1] as any) : null;
+      return montarMetadadosMensagemNina({
         messageId: m.id,
         conversaTesteId: conversaId,
         isTeste: true,
-        cicloId: leadAtualRef.current?.cicloId ?? null,
-        ninaSessionId: ninaSessionIdRef.current,
+        cicloId: cicloAtual?.cycle_id ?? leads.find((l) => l.id === leadId)?.cicloId ?? null,
+        ninaSessionId: cicloAtual?.nina_session_id ?? null,
         criadaEm: m.created_at,
         execucaoId: m.execucao_id ?? null,
-        confianca: m.execucao_id
-          ? (() => {
-              const c = confiancaPorExecucao[String(m.execucao_id)];
-              return c ? { score: c.score, nivel: c.nivel } : null;
-            })()
-          : null,
-      }),
-    [conversaId, confiancaPorExecucao],
+        confianca: c ? { score: c.score, nivel: c.nivel } : null,
+      });
+    },
+    [conversaId, confiancaPorExecucao, ciclos, leads, leadId],
   );
   void metadadosDaMensagem;
+
 
 
 
