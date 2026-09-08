@@ -246,6 +246,23 @@ export const confiabilidadeDaExecucao = createServerFn({ method: "POST" })
         ? String((r as unknown as Record<string, unknown>)["policy_version"])
         : null,
       registradoEm: r.created_at,
+      coberturaEvidencias:
+        (r as unknown as Record<string, unknown>)["evidence_coverage"] == null
+          ? null
+          : Number((r as unknown as Record<string, unknown>)["evidence_coverage"]),
+      validadores: registro.validadores.map((v) => ({
+        validator: String((v as { validator?: unknown }).validator ?? ""),
+        status: String((v as { status?: unknown }).status ?? ""),
+        reasonCode: (v as { reasonCode?: unknown }).reasonCode
+          ? String((v as { reasonCode?: unknown }).reasonCode)
+          : null,
+      })),
+      avaliacao: (r as unknown as Record<string, unknown>)["avaliacao"]
+        ? String((r as unknown as Record<string, unknown>)["avaliacao"])
+        : null,
+      engineVersion: (r as unknown as Record<string, unknown>)["engine_version"]
+        ? String((r as unknown as Record<string, unknown>)["engine_version"])
+        : null,
     };
   });
 
