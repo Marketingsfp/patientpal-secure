@@ -83,6 +83,16 @@ import {
   type ConversaEvento,
 } from "@/components/nina/ConversationSystemEvent";
 import { NinaMessage, TypingDots } from "@/components/nina/NinaMessage";
+import {
+  ConfiancaMensagemBadge,
+  ConfiancaNaoAvaliadaBadge,
+  useConfiancaMensagens,
+} from "@/components/nina/ConfiancaMensagem";
+import {
+  execucoesDasRespostasNina,
+  montarMetadadosMensagemNina,
+} from "@/lib/nina/mensagem-meta";
+
 import { ConversaSkeleton } from "@/components/nina/ConversaSkeleton";
 import { useChatScroll } from "@/hooks/use-chat-scroll";
 import { formatarDataHoraMensagem } from "@/lib/atendimento/data-hora";
