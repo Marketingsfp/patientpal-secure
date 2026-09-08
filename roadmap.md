@@ -10,5 +10,5 @@
 - [x] Fase 1 — permissão em Cadastros › Perfis
 - [x] Fase 2 — pool de distribuição filtrado por Telefonia
 - [x] Fase 3 — fila de Não atribuídas só é movimentada por Telefonia
-- [ ] Fase 4 — consistência em realtime: sem cache, reavaliar fila ao salvar perfil, auditoria enriquecida
-- [ ] Fase 5 — elegibilidade determinística testada (8 cenários) e paridade produção/homologação/Test Runner
+- [x] Fase 4 — consistência em realtime: sem cache, reavaliar fila ao salvar perfil, auditoria enriquecida
+- [x] Fase 5 — elegibilidade determinística testada (8 cenários) e paridade produção/homologação/Test Runner
