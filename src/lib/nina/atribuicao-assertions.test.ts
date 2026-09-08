@@ -71,7 +71,7 @@ describe("FASE 5 — assertions objetivas da atribuição", () => {
       auditoria({ candidates_evaluated: [cand("maria", { permission_telefonia: false })] }),
     );
     expect(v.assigned_user_has_telefonia).toBe(false);
-    expect(v.falhas).toContain("atendente atribuído sem permissão Telefonia");
+    expect(v.falhas).toContain("atendente atribuído sem o perfil Telefonia");
   });
 
   it("reprova atribuição para quem está em pausa ou offline", () => {

@@ -33,7 +33,7 @@ describe("FASE 5 — elegibilidade Telefonia para handoff da Nina", () => {
     const v = verificarElegibilidade(maria);
     expect(v.user_online).toBe(true);
     expect(v.eligible_for_nina_handoff).toBe(false);
-    expect(v.motivo).toBe("sem permissão Telefonia");
+    expect(v.motivo).toBe("sem o perfil Telefonia");
     expect(simularAtribuicao([maria]).destino).toBe("nao_atribuidas");
   });
 
