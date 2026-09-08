@@ -122,10 +122,13 @@ export function removerPII(valor: string): string {
     .replace(/\+?\d[\d\s().-]{7,}\d/g, "[telefone]");
 }
 
-function escalar(v: unknown): string | number | boolean | null {
+function escalar(v: unknown, truncar = false): string | number | boolean | null {
   if (typeof v === "number" || typeof v === "boolean") return v;
   if (typeof v === "string") {
-    const limpo = removerPII(v).slice(0, LIMITE_TEXTO);
+    const limpo = removerPII(v);
+    // Texto livre longo continua sendo descartado; só a evidência estruturada
+    // de conflito (whitelist) pode ser truncada em vez de perdida.
+    if (limpo.length > LIMITE_TEXTO) return truncar ? limpo.slice(0, LIMITE_TEXTO) : null;
     return limpo || null;
   }
   return null;
