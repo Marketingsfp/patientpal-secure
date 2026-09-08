@@ -175,6 +175,10 @@ export function montarRegistroAuditoria(
     // FASE 2: sem ação informada o registro diz "desconhecida", não presume.
     acaoSolicitada: e.acaoSolicitada ?? "desconhecida",
     score: r.score,
+    // FASE 3: nota e cobertura viajam separadas — uma não disfarça a outra.
+    evidenceCoverage: r.evidenceCoverage ?? 0,
+    dimensoesDesconhecidas: r.unknownDimensions ?? [],
+    confiancaInsuficiente: r.confidenceInsufficient ?? false,
     nivel: r.level,
     decisao: r.decision,
     validadores,
