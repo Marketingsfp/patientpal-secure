@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Health Hub Pro — API de Agendamentos v1
-  version: "1.1.0"
+  version: "1.2.0"
   description: |
     API REST genérica de agenda do Health Hub Pro, autenticada por chave de API.
     A v1.1 é compatível com a v1: mesma base, nada removido nem alterado.
@@ -9,6 +9,12 @@ info:
     Novidades da v1.1: `POST /appointments` aceita o objeto `paciente`
     (resolve por CPF ou cadastra, com escopo `patients:write`) e existem os
     catálogos `GET /specialties` e `GET /doctors`.
+
+    Novidades da v1.2: reconhecimento do paciente pelo WhatsApp. O site pede um
+    desafio, o **paciente** envia o código pelo WhatsApp dele, e o webhook de
+    entrada identifica o paciente pelo número que enviou. Não há template nem
+    mensagem ativa da clínica (a janela é aberta pelo paciente), a posse do
+    aparelho fica provada e o CPF sai do fluxo de identificação.
 
     Não existe — e não existirá — endpoint de busca de paciente: uma rota
     pública que responde "esse CPF existe?" seria um oráculo de enumeração
@@ -35,6 +41,7 @@ security:
 tags:
   - name: Disponibilidade
   - name: Agendamentos
+  - name: Verificação
 
 paths:
   /availability:
@@ -126,6 +133,68 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "422": { $ref: "#/components/responses/Unprocessable" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+        "500": { $ref: "#/components/responses/ServerError" }
+
+  /patients/verify/start:
+    post:
+      tags: [Verificação]
+      summary: Cria um desafio de WhatsApp
+      description: |
+        Escopo exigido: `patients:verify`. Corpo vazio, `{}` ou `{ "origem": "site" }`.
+        Não consulta a base de pacientes e não aceita CPF, nome ou telefone.
+        Limite: 20 por hora por IP, além do limite da chave.
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                origem: { type: string, maxLength: 40, default: site }
+      responses:
+        "202":
+          description: Desafio criado
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/DesafioVerificacao" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+        "503":
+          description: Clínica sem número de WhatsApp configurado (`whatsapp_unavailable`)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Erro" }
+        "500": { $ref: "#/components/responses/ServerError" }
+
+  /patients/verify/status:
+    get:
+      tags: [Verificação]
+      summary: Consulta o desafio (polling do site)
+      description: |
+        Escopo exigido: `patients:verify`. `desafio_id` inexistente ou malformado
+        recebe a mesma resposta de `expirado`. Contador próprio de 120 consultas
+        por desafio. O `verificacao_token` sai uma única vez.
+      parameters:
+        - in: query
+          name: desafio_id
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Situação do desafio
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/StatusVerificacao" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
         "429": { $ref: "#/components/responses/RateLimited" }
         "500": { $ref: "#/components/responses/ServerError" }
 
@@ -399,10 +468,51 @@ components:
           type: [string, "null"]
           enum: [masculino, feminino, outro, nao_informar, null]
 
+    DesafioVerificacao:
+      type: object
+      properties:
+        desafio_id: { type: string, format: uuid }
+        codigo:
+          type: string
+          pattern: "^MJ-[2-9A-HJ-NP-Z]{4}$"
+          description: Sem os caracteres ambíguos O, 0, I, 1 e L.
+        whatsapp_numero: { type: string, description: Número da clínica, só dígitos. }
+        texto_sugerido: { type: string }
+        wa_url: { type: string, format: uri }
+        expira_em: { type: string, format: date-time, description: 15 minutos. }
+
+    PacienteVerificado:
+      type: object
+      description: Somente estes cinco campos. Nada de endereço, convênio, prontuário ou id interno.
+      properties:
+        nome: { type: string }
+        telefone: { type: [string, "null"] }
+        email: { type: [string, "null"] }
+        sexo: { type: [string, "null"] }
+        data_nascimento: { type: [string, "null"], format: date }
+
+    StatusVerificacao:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [aguardando, verificado, nao_localizado, expirado]
+          description: "`nao_localizado` cobre zero e múltiplos cadastros — o motivo nunca é revelado."
+        expira_em: { type: [string, "null"], format: date-time }
+        verificacao_token:
+          type: [string, "null"]
+          description: Uso único, 20 minutos, devolvido apenas na primeira leitura já verificada.
+        paciente:
+          oneOf:
+            - $ref: "#/components/schemas/PacienteVerificado"
+            - type: "null"
+
     CriarAgendamento:
       type: object
       required: [id_externo, inicio, fim]
-      description: Informe `paciente_id` (v1) OU `paciente` (v1.1) — nunca os dois.
+      description: >-
+        Informe `paciente_id` (v1), `paciente` (v1.1) OU `verificacao_token`
+        (v1.2) — apenas um deles.
       properties:
         id_externo: { type: string, minLength: 1, maxLength: 120 }
         paciente_id:
@@ -410,6 +520,13 @@ components:
           format: uuid
           description: Paciente já existente na clínica da chave.
         paciente: { $ref: "#/components/schemas/PacienteEntrada" }
+        verificacao_token:
+          type: string
+          minLength: 32
+          maxLength: 200
+          description: >-
+            Paciente já reconhecido pelo WhatsApp (v1.2). Exige `patients:verify`
+            e não exige `patients:write`. Consumido no uso.
         medico_id: { type: [string, "null"], format: uuid }
         especialidade_id: { type: [string, "null"], format: uuid }
         inicio: { type: string, format: date-time }
