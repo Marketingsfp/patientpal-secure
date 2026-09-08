@@ -198,6 +198,10 @@ export function montarRegistroErroRapido(params: {
     prompt_versao: v.promptVersao ?? null,
     teste_ciclo_id: v.testeCicloId ?? null,
     trace_id: v.traceId ?? null,
+    nina_session_id: v.ninaSessionId ?? null,
+    ambiente: params.ambiente ?? "production",
+
+
 
     categoria: CATEGORIA_A_CLASSIFICAR,
     correcao: null,

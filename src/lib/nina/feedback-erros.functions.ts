@@ -104,8 +104,10 @@ export const reportarErroRapidoMensagemNina = createServerFn({ method: "POST" })
       montarRegistroErroRapido,
       ehConflitoDuplicidade,
       estadoAuditoria,
+      ambienteDoReporte,
       ORIGEM_ERRO_RAPIDO,
     } = await import("@/lib/nina/erro-rapido");
+
 
     const { data: membro, error: erroMembro } = await context.supabase.rpc("is_member", {
       _user_id: context.userId,
