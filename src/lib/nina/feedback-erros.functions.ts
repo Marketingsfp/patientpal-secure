@@ -233,12 +233,14 @@ export const reportarErroRapidoMensagemNina = createServerFn({ method: "POST" })
           reporterUserId: context.userId,
           execucaoId,
           auditoriaStatus,
+          ambiente,
           vinculo: {
             contatoPacienteId: conv.contato_paciente_id,
             contatoTelefone: conv.contato_telefone,
             protocoloAtendimento: conv.protocolo_atendimento,
             protocoloSessaoId: conv.protocolo_sessao_id,
             testeCicloId: conv.teste_ciclo_id,
+            ninaSessionId,
             promptVersaoId:
               (execucao as { prompt_versao_id?: string | null } | null)?.prompt_versao_id ?? null,
             promptVersao:
@@ -246,6 +248,7 @@ export const reportarErroRapidoMensagemNina = createServerFn({ method: "POST" })
 
             traceId,
           },
+
         }) as never,
       )
       .select(colunas)
