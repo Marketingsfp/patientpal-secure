@@ -5951,6 +5951,7 @@ export type Database = {
           expira_em: string
           id: string
           ip: string | null
+          opcoes: Json | null
           paciente_id: string | null
           status: string
           token_expira_em: string | null
@@ -5968,6 +5969,7 @@ export type Database = {
           expira_em: string
           id?: string
           ip?: string | null
+          opcoes?: Json | null
           paciente_id?: string | null
           status?: string
           token_expira_em?: string | null
@@ -5985,6 +5987,7 @@ export type Database = {
           expira_em?: string
           id?: string
           ip?: string | null
+          opcoes?: Json | null
           paciente_id?: string | null
           status?: string
           token_expira_em?: string | null
@@ -14023,6 +14026,13 @@ export type Database = {
         Returns: Json
       }
       integracao_revogar_api_key: { Args: { _id: string }; Returns: boolean }
+      integracao_verificacao_pacientes_por_telefone: {
+        Args: { _clinica_id: string; _limite?: number; _ultimos8: string }
+        Returns: {
+          id: string
+          nome: string
+        }[]
+      }
       integracao_verificacoes_limpar: { Args: never; Returns: number }
       is_admin_global: { Args: { _user_id: string }; Returns: boolean }
       is_admin_ou_gestor: { Args: { _user_id: string }; Returns: boolean }
@@ -14410,6 +14420,13 @@ export type Database = {
       paciente_cartao_status: {
         Args: { _clinica_id: string; _paciente_id: string }
         Returns: Json
+      }
+      paciente_corrigir_prontuario_estante: {
+        Args: { _paciente_id: string }
+        Returns: {
+          antigo: string
+          novo: string
+        }[]
       }
       paciente_pendencias_cadastro: {
         Args: { _paciente_id: string }

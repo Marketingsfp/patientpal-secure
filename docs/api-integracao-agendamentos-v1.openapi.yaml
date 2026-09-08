@@ -10,12 +10,6 @@ info:
     (resolve por CPF ou cadastra, com escopo `patients:write`) e existem os
     catálogos `GET /specialties` e `GET /doctors`.
 
-    Novidades da v1.2: reconhecimento do paciente pelo WhatsApp. O site pede um
-    desafio, o **paciente** envia o código pelo WhatsApp dele, e o webhook de
-    entrada identifica o paciente pelo número que enviou. Não há template nem
-    mensagem ativa da clínica (a janela é aberta pelo paciente), a posse do
-    aparelho fica provada e o CPF sai do fluxo de identificação.
-
     Não existe — e não existirá — endpoint de busca de paciente: uma rota
     pública que responde "esse CPF existe?" seria um oráculo de enumeração
     sobre a base real de pacientes.
@@ -41,7 +35,7 @@ security:
 tags:
   - name: Disponibilidade
   - name: Agendamentos
-  - name: Verificação
+  - name: Verificação por WhatsApp
 
 paths:
   /availability:
@@ -133,68 +127,6 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "422": { $ref: "#/components/responses/Unprocessable" }
-        "429": { $ref: "#/components/responses/RateLimited" }
-        "500": { $ref: "#/components/responses/ServerError" }
-
-  /patients/verify/start:
-    post:
-      tags: [Verificação]
-      summary: Cria um desafio de WhatsApp
-      description: |
-        Escopo exigido: `patients:verify`. Corpo vazio, `{}` ou `{ "origem": "site" }`.
-        Não consulta a base de pacientes e não aceita CPF, nome ou telefone.
-        Limite: 20 por hora por IP, além do limite da chave.
-      requestBody:
-        required: false
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                origem: { type: string, maxLength: 40, default: site }
-      responses:
-        "202":
-          description: Desafio criado
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  data: { $ref: "#/components/schemas/DesafioVerificacao" }
-        "401": { $ref: "#/components/responses/Unauthorized" }
-        "403": { $ref: "#/components/responses/Forbidden" }
-        "429": { $ref: "#/components/responses/RateLimited" }
-        "503":
-          description: Clínica sem número de WhatsApp configurado (`whatsapp_unavailable`)
-          content:
-            application/json:
-              schema: { $ref: "#/components/schemas/Erro" }
-        "500": { $ref: "#/components/responses/ServerError" }
-
-  /patients/verify/status:
-    get:
-      tags: [Verificação]
-      summary: Consulta o desafio (polling do site)
-      description: |
-        Escopo exigido: `patients:verify`. `desafio_id` inexistente ou malformado
-        recebe a mesma resposta de `expirado`. Contador próprio de 120 consultas
-        por desafio. O `verificacao_token` sai uma única vez.
-      parameters:
-        - in: query
-          name: desafio_id
-          required: true
-          schema: { type: string }
-      responses:
-        "200":
-          description: Situação do desafio
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  data: { $ref: "#/components/schemas/StatusVerificacao" }
-        "401": { $ref: "#/components/responses/Unauthorized" }
-        "403": { $ref: "#/components/responses/Forbidden" }
         "429": { $ref: "#/components/responses/RateLimited" }
         "500": { $ref: "#/components/responses/ServerError" }
 
@@ -385,7 +317,143 @@ paths:
         "422": { $ref: "#/components/responses/Unprocessable" }
         "429": { $ref: "#/components/responses/RateLimited" }
 
+  /patients/verify/start:
+    post:
+      tags: [Verificação por WhatsApp]
+      summary: Cria um desafio para o paciente se identificar pelo WhatsApp
+      description: |
+        Escopo exigido: `patients:verify`.
+        Quem envia a mensagem é o **paciente** — a clínica não dispara nada.
+        A resposta traz o código e o link do WhatsApp já com o texto pronto.
+        Não existe CPF neste fluxo e nenhuma rota responde se um CPF tem cadastro.
+        Limite de 20 desafios por IP por hora, além do limite da chave.
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                origem: { type: string, maxLength: 60 }
+      responses:
+        "202":
+          description: Desafio criado
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      desafio_id: { type: string, format: uuid }
+                      codigo: { type: string, example: "MJ-A2B3" }
+                      whatsapp_numero: { type: string }
+                      texto_sugerido: { type: string }
+                      wa_url: { type: string, format: uri }
+                      expira_em: { type: string, format: date-time }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "422": { $ref: "#/components/responses/Unprocessable" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+        "500": { $ref: "#/components/responses/ServerError" }
+
+  /patients/verify/status:
+    get:
+      tags: [Verificação por WhatsApp]
+      summary: Consulta o desafio (polling pelo site)
+      description: |
+        Escopo exigido: `patients:verify`.
+        `aguardando` — a mensagem ainda não chegou.
+        `escolher_paciente` — o número tem de 2 a 6 cadastros; devolve apenas
+        `opcao_id` (identificador opaco do desafio) e nome abreviado. O
+        `paciente_id` real nunca sai da API nesta etapa.
+        `verificado` — devolve o `verificacao_token` (uso único) e o paciente.
+        O token é entregue **uma única vez**, na primeira consulta após a
+        verificação.
+        `nao_localizado` — nenhum cadastro, ou 7 ou mais (cadastro sujo).
+      parameters:
+        - { name: desafio_id, in: query, required: true, schema: { type: string, format: uuid } }
+      responses:
+        "200":
+          description: Situação do desafio
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      status:
+                        type: string
+                        enum: [aguardando, escolher_paciente, verificado, nao_localizado, expirado]
+                      expira_em: { type: string, format: date-time }
+                      verificacao_token: { type: string }
+                      token_expira_em: { type: string, format: date-time }
+                      opcoes:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            opcao_id: { type: string, format: uuid }
+                            nome_exibicao: { type: string, example: "Maria S." }
+                      paciente:
+                        type: object
+                        properties:
+                          id: { type: string, format: uuid }
+                          nome: { type: string }
+                          telefone: { type: [string, "null"] }
+                          email: { type: [string, "null"] }
+                          sexo: { type: [string, "null"] }
+                          data_nascimento: { type: [string, "null"], format: date }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/Unprocessable" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+        "500": { $ref: "#/components/responses/ServerError" }
+
+  /patients/verify/select:
+    post:
+      tags: [Verificação por WhatsApp]
+      summary: Escolhe quem vai ser atendido quando o número tem mais de um cadastro
+      description: |
+        Escopo exigido: `patients:verify`.
+        Uma escolha por desafio: depois de escolhido não dá para trocar — quem
+        errou recomeça o desafio. `opcao_id` que não pertence ao desafio
+        devolve `422 verification_failed`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [desafio_id, opcao_id]
+              properties:
+                desafio_id: { type: string, format: uuid }
+                opcao_id: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Escolha registrada
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      status: { type: string, enum: [verificado] }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/Unprocessable" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+        "500": { $ref: "#/components/responses/ServerError" }
+
 components:
+
   securitySchemes:
     bearerApiKey:
       type: http
@@ -468,51 +536,12 @@ components:
           type: [string, "null"]
           enum: [masculino, feminino, outro, nao_informar, null]
 
-    DesafioVerificacao:
-      type: object
-      properties:
-        desafio_id: { type: string, format: uuid }
-        codigo:
-          type: string
-          pattern: "^MJ-[2-9A-HJ-NP-Z]{4}$"
-          description: Sem os caracteres ambíguos O, 0, I, 1 e L.
-        whatsapp_numero: { type: string, description: Número da clínica, só dígitos. }
-        texto_sugerido: { type: string }
-        wa_url: { type: string, format: uri }
-        expira_em: { type: string, format: date-time, description: 15 minutos. }
-
-    PacienteVerificado:
-      type: object
-      description: Somente estes cinco campos. Nada de endereço, convênio, prontuário ou id interno.
-      properties:
-        nome: { type: string }
-        telefone: { type: [string, "null"] }
-        email: { type: [string, "null"] }
-        sexo: { type: [string, "null"] }
-        data_nascimento: { type: [string, "null"], format: date }
-
-    StatusVerificacao:
-      type: object
-      properties:
-        status:
-          type: string
-          enum: [aguardando, verificado, nao_localizado, expirado]
-          description: "`nao_localizado` cobre zero e múltiplos cadastros — o motivo nunca é revelado."
-        expira_em: { type: [string, "null"], format: date-time }
-        verificacao_token:
-          type: [string, "null"]
-          description: Uso único, 20 minutos, devolvido apenas na primeira leitura já verificada.
-        paciente:
-          oneOf:
-            - $ref: "#/components/schemas/PacienteVerificado"
-            - type: "null"
-
     CriarAgendamento:
       type: object
       required: [id_externo, inicio, fim]
       description: >-
         Informe `paciente_id` (v1), `paciente` (v1.1) OU `verificacao_token`
-        (v1.2) — apenas um deles.
+        (v1.2) — apenas uma dessas formas.
       properties:
         id_externo: { type: string, minLength: 1, maxLength: 120 }
         paciente_id:
@@ -522,11 +551,12 @@ components:
         paciente: { $ref: "#/components/schemas/PacienteEntrada" }
         verificacao_token:
           type: string
-          minLength: 32
+          minLength: 16
           maxLength: 200
           description: >-
-            Paciente já reconhecido pelo WhatsApp (v1.2). Exige `patients:verify`
-            e não exige `patients:write`. Consumido no uso.
+            Token de uso único devolvido pelo fluxo de verificação por WhatsApp
+            (v1.2). Exige o escopo `patients:verify`.
+
         medico_id: { type: [string, "null"], format: uuid }
         especialidade_id: { type: [string, "null"], format: uuid }
         inicio: { type: string, format: date-time }

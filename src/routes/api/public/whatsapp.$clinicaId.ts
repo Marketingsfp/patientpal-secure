@@ -243,11 +243,9 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
                   console.error("whatsapp mensagem insert error", insErr.message);
                 }
 
-                // v1.2 — Reconhecimento do paciente pelo site institucional.
-                // Se a mensagem traz um código de desafio válido, ela é
-                // consumida aqui: não vira conversa, não aciona a Nina e não
-                // cai na caixa da recepção. Qualquer outra mensagem segue o
-                // fluxo normal, exatamente como antes.
+                // Verificação do paciente pelo site (API v1.2): a mensagem
+                // carrega o código do desafio. É trânsito do site, não
+                // atendimento — não abre conversa, não chama a Nina.
                 try {
                   const { interceptarCodigoVerificacao } = await import(
                     "@/lib/integracoes/verificacao-v1.server"
@@ -257,42 +255,37 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
                     clinicaId: params.clinicaId,
                     texto: textoPaciente || body,
                     fromNumber: from,
-                    waMessageId: wa_message_id || null,
-                    mensagemId: (msgInserida as { id?: string } | null)?.id ?? null,
+                    mensagemId: msgInserida?.id ?? null,
+                    waMessageId: wa_message_id,
                   });
                   if (verif.tratada) {
-                    resultado = "verificacao_site";
-                    // O paciente abriu a janela de 24h: cabe uma linha curta,
-                    // sem nome e sem nenhum dado dele.
-                    if (verif.resposta && phoneNumberId && cfg.access_token) {
-                      try {
-                        const envio = await metaSendText(
-                          phoneNumberId,
-                          cfg.access_token,
-                          from,
-                          verif.resposta,
-                        );
-                        await supabaseAdmin.from("whatsapp_mensagens").insert({
-                          clinica_id: params.clinicaId,
-                          wa_message_id: envio.wa_message_id,
-                          direction: "out",
-                          from_number: displayPhoneNumber,
-                          to_number: from,
-                          body: verif.resposta,
-                          tipo: "text",
-                          status: "sent",
-                          enviada_por: "sistema",
-                          read_at: new Date().toISOString(),
-                        });
-                      } catch (e) {
-                        console.error("[verificacao] confirmação ao paciente falhou", e);
-                      }
+                    if (verif.resposta && cfg.access_token && phoneNumberId) {
+                      const { wa_message_id: outId } = await metaSendText(
+                        phoneNumberId,
+                        cfg.access_token,
+                        from,
+                        verif.resposta,
+                      );
+                      await supabaseAdmin.from("whatsapp_mensagens").insert({
+                        clinica_id: params.clinicaId,
+                        wa_message_id: outId,
+                        direction: "out",
+                        from_number: displayPhoneNumber,
+                        to_number: from,
+                        body: verif.resposta,
+                        tipo: "text",
+                        status: "sent",
+                        enviada_por: "sistema",
+                      });
                     }
+                    resultado = "verificacao_site";
                     continue;
                   }
                 } catch (e) {
-                  console.error("[verificacao] interceptação falhou", e);
+                  console.error("[verificacao-site] falha ao tratar código", e);
                 }
+
+
 
                 // Antes de qualquer coisa, vence quem já passou do prazo —
                 // assim uma conversa parada não fica presa na Nina.

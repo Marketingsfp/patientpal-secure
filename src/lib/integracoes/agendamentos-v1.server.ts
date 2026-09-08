@@ -32,11 +32,6 @@ import {
   type ApiKeyContexto,
 } from "./api.server";
 import { pacienteSchema, resolverPaciente } from "./pacientes-v1.server";
-import {
-  consumirTokenVerificacao,
-  handleVerifyStart,
-  handleVerifyStatus,
-} from "./verificacao-v1.server";
 
 const CAMPOS_AGENDAMENTO =
   "id,clinica_id,paciente_id,paciente_nome,medico_id,especialidade_id,inicio,fim,procedimento,status,observacoes,tipo_atendimento,data_pagamento,origem_integracao,id_externo,created_at,updated_at";
@@ -53,9 +48,9 @@ const criarSchema = z.object({
   // Um ou outro — nunca os dois (ver `patient_and_id_conflict`).
   paciente_id: uuid.optional(),
   paciente: pacienteSchema.optional(),
-  // v1.2: paciente já reconhecido pelo WhatsApp. Substitui as duas formas
-  // acima e não cadastra ninguém.
-  verificacao_token: z.string().min(32).max(200).optional(),
+  // v1.2: paciente já reconhecido pelo WhatsApp. Token de uso único.
+  verificacao_token: z.string().min(16).max(200).optional(),
+
   medico_id: uuid.nullish(),
   especialidade_id: uuid.nullish(),
   inicio: isoDatetime,
@@ -192,19 +187,18 @@ async function handleCriar(
   }
   const body = parsed.data;
 
-  // As três formas de indicar o paciente são mutuamente exclusivas.
-  const formas = [body.paciente_id, body.paciente, body.verificacao_token].filter(
-    (v) => v !== undefined,
+  const formasPaciente = [body.paciente_id, body.paciente, body.verificacao_token].filter(
+    Boolean,
   ).length;
-  if (formas > 1) {
+  if (formasPaciente > 1) {
     throw new ApiError({
       status: 422,
       code: "patient_and_id_conflict",
       message:
-        "Envie 'paciente_id', o objeto 'paciente' OU 'verificacao_token' — apenas um deles.",
+        "Envie 'paciente_id', o objeto 'paciente' OU 'verificacao_token' — apenas uma dessas formas.",
     });
   }
-  if (formas === 0) {
+  if (formasPaciente === 0) {
     throw new ApiError({
       status: 422,
       code: "invalid_body",
@@ -212,6 +206,7 @@ async function handleCriar(
         "Informe 'paciente_id' (paciente já cadastrado), o objeto 'paciente' ou 'verificacao_token'.",
     });
   }
+  if (body.verificacao_token) exigirEscopo(ctx, "patients:verify");
   if (body.paciente) {
     // Cadastro por rota pública exige escopo próprio e idempotência: sem isso,
     // um duplo clique ou um retry vira paciente duplicado na base real.
@@ -224,6 +219,7 @@ async function handleCriar(
       });
     }
   }
+
 
   if (Date.parse(body.fim) <= Date.parse(body.inicio)) {
     throw new ApiError({
@@ -252,18 +248,17 @@ async function handleCriar(
   // Resolução do paciente.
   //  • v1 (`paciente_id`): precisa existir; comportamento inalterado.
   //  • v1.1 (`paciente`): encontra pelo CPF na clínica da chave ou cadastra.
+  //  • v1.2 (`verificacao_token`): paciente já reconhecido pelo WhatsApp.
   let pacienteId: string;
   let pacienteNome: string;
   let pacienteCriado = false;
   let obsExtra: string | null = null;
 
   if (body.verificacao_token) {
-    // Paciente já reconhecido pelo WhatsApp: nada é criado, então o escopo de
-    // cadastro (`patients:write`) não é exigido aqui.
-    exigirEscopo(ctx, "patients:verify");
-    const resolvido = await consumirTokenVerificacao(db, ctx, body.verificacao_token);
-    pacienteId = resolvido.paciente_id;
-    pacienteNome = resolvido.nome;
+    const { consumirTokenVerificacao } = await import("./verificacao-v1.server");
+    const verificado = await consumirTokenVerificacao(db, ctx, body.verificacao_token);
+    pacienteId = verificado.paciente_id;
+    pacienteNome = verificado.nome;
   } else if (body.paciente) {
     const resolvido = await resolverPaciente(db, ctx, body.paciente);
     pacienteId = resolvido.paciente_id;
@@ -274,6 +269,7 @@ async function handleCriar(
       obsExtra = `Telefone informado no agendamento online: ${resolvido.telefone_divergente}`;
     }
   } else {
+
     const { data: paciente } = await db
       .from("pacientes")
       .select("id,nome,clinica_id")
@@ -670,22 +666,6 @@ export async function handleIntegracoesV1(request: Request, splat: string): Prom
     };
     if (replay) {
       resultado = { status: replay.status, body: replay.body };
-    } else if (
-      request.method === "POST" &&
-      partes[0] === "patients" &&
-      partes[1] === "verify" &&
-      partes[2] === "start" &&
-      partes.length === 3
-    ) {
-      resultado = await handleVerifyStart(db, ctx, bodyTexto, ip);
-    } else if (
-      request.method === "GET" &&
-      partes[0] === "patients" &&
-      partes[1] === "verify" &&
-      partes[2] === "status" &&
-      partes.length === 3
-    ) {
-      resultado = await handleVerifyStatus(db, ctx, url);
     } else if (request.method === "GET" && partes[0] === "availability" && partes.length === 1) {
       resultado = await handleAvailability(db, ctx, url);
     } else if (request.method === "GET" && partes[0] === "specialties" && partes.length === 1) {
@@ -713,7 +693,29 @@ export async function handleIntegracoesV1(request: Request, splat: string): Prom
       partes[2] === "reschedule"
     ) {
       resultado = await handleReagendar(db, ctx, ator, decodeURIComponent(partes[1]!), bodyTexto);
+    } else if (
+      partes[0] === "patients" &&
+      partes[1] === "verify" &&
+      partes.length === 3 &&
+      (request.method === "POST" || request.method === "GET")
+    ) {
+      // v1.2 — reconhecimento do paciente pelo WhatsApp.
+      const v = await import("./verificacao-v1.server");
+      if (request.method === "POST" && partes[2] === "start") {
+        resultado = await v.handleVerifyStart(db, ctx, bodyTexto, ip);
+      } else if (request.method === "GET" && partes[2] === "status") {
+        resultado = await v.handleVerifyStatus(db, ctx, url);
+      } else if (request.method === "POST" && partes[2] === "select") {
+        resultado = await v.handleVerifySelect(db, ctx, bodyTexto);
+      } else {
+        throw new ApiError({
+          status: 404,
+          code: "route_not_found",
+          message: `Rota ${request.method} ${rota} não existe na API v1.`,
+        });
+      }
     } else {
+
       // Recursos do Cartão Benefícios (leitura). Devolve null quando o caminho
       // não é de lá, e aí cai no 404 abaixo.
       const { rotearCartaoV1 } = await import("./cartao-v1.server");
