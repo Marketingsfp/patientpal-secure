@@ -8335,10 +8335,12 @@ export type Database = {
           categorias: Json
           claims: Json | null
           clinica_id: string
+          conflitos: Json | null
           conversation_id: string | null
           created_at: string
           decisao: string | null
           engine_version: string | null
+          evidence_coverage: number | null
           execucao_id: string | null
           ferramentas: Json
           fontes: Json
@@ -8370,10 +8372,12 @@ export type Database = {
           categorias?: Json
           claims?: Json | null
           clinica_id: string
+          conflitos?: Json | null
           conversation_id?: string | null
           created_at?: string
           decisao?: string | null
           engine_version?: string | null
+          evidence_coverage?: number | null
           execucao_id?: string | null
           ferramentas?: Json
           fontes?: Json
@@ -8405,10 +8409,12 @@ export type Database = {
           categorias?: Json
           claims?: Json | null
           clinica_id?: string
+          conflitos?: Json | null
           conversation_id?: string | null
           created_at?: string
           decisao?: string | null
           engine_version?: string | null
+          evidence_coverage?: number | null
           execucao_id?: string | null
           ferramentas?: Json
           fontes?: Json
