@@ -193,8 +193,14 @@ export function ConfiancaMensagemBadge({
         <div>
           <p className="text-sm font-medium">
             <Icone className="mr-1 inline h-3.5 w-3.5" aria-hidden />
-            {estilo.rotulo} — {confianca.score}%
+            Confiança da resposta: {scoreExibido(confianca.score)}%
           </p>
+          <p className="text-muted-foreground">Nível: {estilo.rotulo}</p>
+          {detalhe?.coberturaEvidencias != null && (
+            <p className="text-muted-foreground">
+              Cobertura de evidências: {detalhe.coberturaEvidencias}%
+            </p>
+          )}
           <p className="text-muted-foreground">
             Registrado quando a resposta foi produzida. Não é recalculado.
           </p>
