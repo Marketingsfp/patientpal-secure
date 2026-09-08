@@ -1315,22 +1315,19 @@ export const iniciarPausa = createServerFn({ method: "POST" })
   });
 
 /**
- * FASE 3 — Telefonia é a permissão que dá entrada no atendimento humano vindo
- * da Nina. Quem não tem Telefonia não movimenta a fila "Não atribuídas" ao
- * ficar Online ou voltar da pausa. A fonte é a mesma do resto do sistema
- * (Cadastros › Perfis, via `has_module_access`), e o pool em si já é filtrado
- * no banco — aqui apenas evitamos reavaliar a fila à toa.
+ * FASE 3 — quem entra na distribuição automática dos handoffs da Nina é quem
+ * tem o PERFIL Telefonia (Cadastros › Perfis), e não uma permissão avulsa.
+ * A fonte é a mesma do banco (`atend_tem_perfil_telefonia`, que lê
+ * `clinica_memberships.role`), então tela e distribuição nunca divergem.
  */
 async function temTelefonia(
   supabase: { rpc: (fn: string, args: unknown) => Promise<{ data: unknown; error: unknown }> },
   userId: string,
   clinicaId: string,
 ): Promise<boolean> {
-  const { data, error } = await supabase.rpc("has_module_access", {
+  const { data, error } = await supabase.rpc("atend_tem_perfil_telefonia", {
     _user_id: userId,
     _clinica_id: clinicaId,
-    _modulo: "telefonia",
-    _nivel: "read",
   });
   if (error) return false; // fail-closed
   return data === true;
