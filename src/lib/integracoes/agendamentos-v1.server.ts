@@ -100,10 +100,11 @@ async function handleAvailability(
     });
   }
 
-  const { data, error } = await db.rpc("get_horarios_disponiveis", {
+  const { data, error } = await db.rpc("horarios_disponiveis_publico", {
     _clinica_id: ctx.clinica_id,
     _especialidade_id: q.data.especialidade_id ?? null,
     _medico_id: q.data.medico_id ?? null,
+    _de: null,
     _dias: q.data.dias,
     _limite: q.data.limite,
   } as never);
