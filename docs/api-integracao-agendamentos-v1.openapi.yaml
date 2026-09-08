@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Health Hub Pro — API de Agendamentos v1
-  version: "1.1.0"
+  version: "1.2.0"
   description: |
     API REST genérica de agenda do Health Hub Pro, autenticada por chave de API.
     A v1.1 é compatível com a v1: mesma base, nada removido nem alterado.
