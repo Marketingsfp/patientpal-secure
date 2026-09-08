@@ -9,7 +9,10 @@
 
 export type CandidatoAvaliado = {
   user_id: string;
-  permission_telefonia: boolean;
+  /** Perfil TELEFONIA em Cadastros › Perfis (fonte oficial da elegibilidade). */
+  perfil_telefonia?: boolean;
+  /** Nome antigo do mesmo campo, mantido para eventos já gravados. */
+  permission_telefonia?: boolean;
   presence_status: string;
   aceita_novas?: boolean;
   presenca_recente?: boolean;
@@ -25,6 +28,7 @@ export type AuditoriaAtribuicao = {
   conversation_id: string;
   handoff_event_id?: string | null;
   selected_user_id: string | null;
+  perfil_telefonia?: boolean;
   permission_telefonia?: boolean;
   presence_status?: string | null;
   load_at_selection?: number | null;
