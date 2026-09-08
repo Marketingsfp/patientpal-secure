@@ -33,7 +33,11 @@ export type HardBlocker =
   | "INVALID_PATIENT_DATA"
   | "UNSAFE_ACTION"
   | "STALE_OFFICIAL_SOURCE"
-  | "INTERNAL_NOTE_AS_SOURCE";
+  | "INTERNAL_NOTE_AS_SOURCE"
+  // FASE 4 — coerência de processo e prova de ações.
+  | "WORKFLOW_STATE_MISMATCH"
+  | "REQUIRED_TOOL_NOT_CALLED"
+  | "UNSUPPORTED_OPERATIONAL_CLAIM";
 
 /**
  * FASE 3 — teto de confiança por cobertura de evidência.
@@ -54,7 +58,11 @@ export type PoliticaCobertura = {
 };
 
 export type PoliticaConfianca = {
-  /** Peso de cada validador na pontuação 0–100. Soma dos ativos = 100. */
+  /**
+   * Peso de cada validador. Os pesos são RELATIVOS: a nota é normalizada pelo
+   * peso das dimensões efetivamente avaliadas, então a soma não precisa ser
+   * exatamente 100 (ver `medirEvidencia`).
+   */
   pesos: Record<string, number>;
   /** Faixas de decisão por pontuação. */
   limites: { HIGH: number; MEDIUM: number };
@@ -82,9 +90,13 @@ export type PoliticaConfianca = {
  *  - nenhuma evidência avaliável deixou de valer 100 e passou a valer 0 com
  *    `confidenceInsufficient`;
  *  - passou a existir `evidence_coverage` e tetos de nota por cobertura.
- * Snapshots gravados com "v1" continuam válidos sob a régua antiga.
+ * v2 -> v3 (Fase 4): entrou o `WorkflowConsistencyValidator` (peso 15,
+ * dimensão crítica de cobertura) e três bloqueadores canônicos novos:
+ * `WORKFLOW_STATE_MISMATCH`, `REQUIRED_TOOL_NOT_CALLED` e
+ * `UNSUPPORTED_OPERATIONAL_CLAIM`.
+ * Snapshots gravados com "v1"/"v2" continuam válidos sob a régua da época.
  */
-export const VERSAO_POLITICA = "v2";
+export const VERSAO_POLITICA = "v3";
 
 export const POLITICA_PADRAO: PoliticaConfianca = {
   pesos: {
@@ -96,6 +108,9 @@ export const POLITICA_PADRAO: PoliticaConfianca = {
     ToolIntegrityValidator: 15,
     ConflictValidator: 10,
     BusinessRulesValidator: 10,
+    // FASE 4 — coerência do processo pesa como fonte oficial: é ela que
+    // separa "resposta bonita" de "resposta com caminho verificado".
+    WorkflowConsistencyValidator: 15,
     // ActionRisk não pontua: ele endurece o mínimo exigido.
     ActionRiskValidator: 0,
   },
@@ -118,6 +133,9 @@ export const POLITICA_PADRAO: PoliticaConfianca = {
     CAMPO_OBRIGATORIO_AUSENTE: "INVALID_PATIENT_DATA",
     FONTE_NAO_VIGENTE: "STALE_OFFICIAL_SOURCE",
     NOTA_INTERNA_COMO_FONTE: "INTERNAL_NOTE_AS_SOURCE",
+    WORKFLOW_INCONSISTENTE: "WORKFLOW_STATE_MISMATCH",
+    FERRAMENTA_OBRIGATORIA_NAO_CHAMADA: "REQUIRED_TOOL_NOT_CALLED",
+    AFIRMACAO_OPERACIONAL_SEM_PROVA: "UNSUPPORTED_OPERATIONAL_CLAIM",
   },
   acoesDeEscrita: ["criar_agendamento", "cancelar_agendamento"],
   cobertura: {
@@ -130,6 +148,7 @@ export const POLITICA_PADRAO: PoliticaConfianca = {
       "ToolIntegrityValidator",
       "RequiredDataValidator",
       "IntentClarityValidator",
+      "WorkflowConsistencyValidator",
     ],
     fontesObrigatorias: ["OfficialSourceValidator"],
   },
