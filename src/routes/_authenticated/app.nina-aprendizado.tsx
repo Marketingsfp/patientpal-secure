@@ -452,7 +452,7 @@ function Pagina() {
     } finally {
       setCarregando(false);
     }
-  }, [clinicaId, aba, categoria, autor, de, ate, listar]);
+  }, [clinicaId, aba, categoria, autor, fAmbiente, de, ate, listar]);
 
   useEffect(() => {
     void carregar();
