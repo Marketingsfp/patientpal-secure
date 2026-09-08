@@ -1430,13 +1430,32 @@ ATENDIMENTO HUMANO — REGRA OBRIGATÓRIA:
         paraDecisaoLegado,
         resumoHandoffEstruturado,
       } = await import("@/lib/nina/confidence/runtime");
-      const [{ montarRegistroAuditoria }, { detectarIntencoes }] = await Promise.all([
+      const [
+        { montarRegistroAuditoria },
+        { detectarIntencoes, intencaoAmbigua },
+        { montarContextoCanonicoTurno },
+      ] = await Promise.all([
         import("@/lib/nina/confidence/auditoria"),
         import("@/lib/nina/atendimento-fase1"),
+        import("@/lib/nina/confidence/contexto-turno"),
       ]);
+      // FASE 2 — UMA ÚNICA VERDADE: motor e auditoria leem o mesmo objeto.
+      // `podeAgendar` fica em `capacidades` e NÃO define a ação do paciente.
+      const canonico = montarContextoCanonicoTurno(
+        {
+          mensagemPaciente,
+          podeAgendar,
+          messageIdEntrada: opcoes?.mensagensEntrada?.[0] ?? null,
+        },
+        { detectarIntencoes, intencaoAmbigua },
+      );
       const estadoTurno = {
         texto,
         mensagemPaciente,
+        intent: canonico.intent,
+        acao: canonico.requestedAction,
+        intentAmbiguo: canonico.intentAmbiguo,
+        messageId: canonico.messageIdEntrada,
         ferramentas: evidenciasFerramentas,
         catalogoEncontrou,
         agendamentoConfirmado,
@@ -1499,9 +1518,10 @@ ATENDIMENTO HUMANO — REGRA OBRIGATÓRIA:
           // ferramentas e bloqueios. Nunca o rascunho ou o raciocínio interno.
           auditoria: montarRegistroAuditoria(decisao, {
             conversationId: estadoId.conversaId ?? null,
-            messageId: opcoes?.mensagensEntrada?.[0] ?? null,
-            intencao: detectarIntencoes(mensagemPaciente).join(", ") || null,
-            acaoSolicitada: podeAgendar ? "criar_agendamento" : "responder_informacao",
+            messageId: canonico.messageIdEntrada,
+            intencao: canonico.intent,
+            // Mesma ação vista pelo motor. Capacidade de agenda não entra aqui.
+            acaoSolicitada: canonico.requestedAction,
             ferramentas: evidenciasFerramentas,
           }),
         });

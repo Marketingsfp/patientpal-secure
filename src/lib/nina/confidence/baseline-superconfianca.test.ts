@@ -87,7 +87,7 @@ describe("BASELINE 1 — ausência de sinal é tratada como certeza", () => {
     expect(r.evidence.ferramentasExecutadas).toBe(0);
   });
 
-  it("basta UMA ferramenta técnica bem-sucedida para o mesmo turno virar 100/HIGH/ALLOW", () => {
+  it("CORRIGIDO NA FASE 2 — ferramenta técnica não faz mais o turno virar 100", () => {
     const r = decidirNoTurno(
       estado({
         texto: "Sim, é isso mesmo.",
@@ -98,12 +98,11 @@ describe("BASELINE 1 — ausência de sinal é tratada como certeza", () => {
         ],
       }),
     );
-    // A ferramenta apenas rodou; nada no turno sustenta a afirmação do texto.
-    // Com IntentClarity agora NOT_APPLICABLE, todos os validadores saem do
-    // denominador e o `if (total === 0) return 100` de policy.ts:110 assume.
-    expect(r.score).toBe(100);
-    expect(r.level).toBe("HIGH");
-    expect(r.decision).toBe("ALLOW");
+    // ANTES: IntentClarity virava NOT_APPLICABLE, todos os validadores saíam do
+    // denominador e o `if (total === 0) return 100` assumia -> 100/HIGH/ALLOW.
+    // AGORA: ação desconhecida permanece no denominador como WARNING.
+    expect(r.score).toBeLessThan(100);
+    expect(r.decision).not.toBe("ALLOW");
     expect(r.evidence.fontesUteis).toBe(0);
   });
 });
@@ -114,33 +113,29 @@ describe("BASELINE 1 — ausência de sinal é tratada como certeza", () => {
 //          validators.ts:111-114 (IntentClarityValidator)
 // ---------------------------------------------------------------------------
 describe("BASELINE 2 — intenção ausente é convertida em intenção observada", () => {
-  it("runtime substitui ação ausente por responder_informacao", () => {
+  it("CORRIGIDO NA FASE 2 — ação ausente vira desconhecida, não responder_informacao", () => {
     const ctx = montarContextoDoTurno(estado({ intent: null }));
     expect(ctx.intent).toBeNull();
-    // A ausência de ação vira um valor concreto antes de o motor ver o turno.
-    expect(ctx.requestedAction).toBe("responder_informacao");
+    expect(ctx.requestedAction).toBe("desconhecida");
   });
 
-  it("IntentClarityValidator devolve PASS/100/INTENCAO_CLARA sem intenção real", () => {
+  it("CORRIGIDO NA FASE 2 — sem intenção real não existe mais PASS/100/INTENCAO_CLARA", () => {
     const ctx = montarContextoDoTurno(estado({ intent: null }));
     const v = IntentClarityValidator(ctx);
-    expect(v.status).toBe("PASS");
-    expect(v.score).toBe(100);
-    expect(v.reasonCode).toBe("INTENCAO_CLARA");
-    // A evidência registra a ação inventada pelo runtime, não uma intenção.
-    expect(v.evidence["intent"]).toBe("responder_informacao");
+    expect(v.status).toBe("FAIL");
+    expect(v.reasonCode).toBe("ACAO_NAO_DEFINIDA");
+    expect(v.score).toBeLessThan(100);
   });
 
-  it("sem ação declarada, a nota da intenção depende de ter rodado ferramenta", () => {
-    // Sem ferramenta: FAIL/ACAO_NAO_DEFINIDA (score 40).
+  it("CORRIGIDO NA FASE 2 — ferramenta não tira a intenção do denominador", () => {
     const semTool = IntentClarityValidator(
       montarContextoDoTurno(estado({ intent: null, acao: "desconhecida" })),
     );
     expect(semTool.status).toBe("FAIL");
     expect(semTool.reasonCode).toBe("ACAO_NAO_DEFINIDA");
 
-    // Com qualquer ferramenta bem-sucedida: NOT_APPLICABLE com score 100,
-    // ou seja, a dimensão "entendi o pedido" simplesmente deixa de contar.
+    // ANTES: NOT_APPLICABLE/100 (a dimensão "entendi o pedido" deixava de contar).
+    // AGORA: WARNING, ainda pesando na nota do turno.
     const comTool = IntentClarityValidator(
       montarContextoDoTurno(
         estado({
@@ -152,9 +147,9 @@ describe("BASELINE 2 — intenção ausente é convertida em intenção observad
         }),
       ),
     );
-    expect(comTool.status).toBe("NOT_APPLICABLE");
-    expect(comTool.reasonCode).toBe("SEM_INTENCAO_DECLARADA");
-    expect(comTool.score).toBe(100);
+    expect(comTool.status).toBe("WARNING");
+    expect(comTool.reasonCode).toBe("ACAO_NAO_DEFINIDA");
+    expect(comTool.score).toBeLessThan(100);
   });
 });
 
