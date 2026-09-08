@@ -316,7 +316,135 @@ paths:
         "422": { $ref: "#/components/responses/Unprocessable" }
         "429": { $ref: "#/components/responses/RateLimited" }
 
+  /patients/verify/start:
+    post:
+      tags: [Verificação por WhatsApp]
+      summary: Cria um desafio para o paciente se identificar pelo WhatsApp
+      description: |
+        Escopo exigido: `patients:verify`.
+        Quem envia a mensagem é o **paciente** — a clínica não dispara nada.
+        A resposta traz o código e o link do WhatsApp já com o texto pronto.
+        Não existe CPF neste fluxo e nenhuma rota responde se um CPF tem cadastro.
+        Limite de 20 desafios por IP por hora, além do limite da chave.
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                origem: { type: string, maxLength: 60 }
+      responses:
+        "202":
+          description: Desafio criado
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      desafio_id: { type: string, format: uuid }
+                      codigo: { type: string, example: "MJ-A2B3" }
+                      whatsapp_numero: { type: string }
+                      texto_sugerido: { type: string }
+                      wa_url: { type: string, format: uri }
+                      expira_em: { type: string, format: date-time }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "422": { $ref: "#/components/responses/Unprocessable" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+        "500": { $ref: "#/components/responses/ServerError" }
+
+  /patients/verify/status:
+    get:
+      tags: [Verificação por WhatsApp]
+      summary: Consulta o desafio (polling pelo site)
+      description: |
+        Escopo exigido: `patients:verify`.
+        `aguardando` — a mensagem ainda não chegou.
+        `escolher_paciente` — o número tem de 2 a 6 cadastros; devolve apenas
+        `opcao_id` (identificador opaco do desafio) e nome abreviado. O
+        `paciente_id` real nunca sai da API nesta etapa.
+        `verificado` — devolve o `verificacao_token` (uso único) e o paciente.
+        O token é entregue **uma única vez**, na primeira consulta após a
+        verificação.
+        `nao_localizado` — nenhum cadastro, ou 7 ou mais (cadastro sujo).
+      parameters:
+        - { name: desafio_id, in: query, required: true, schema: { type: string, format: uuid } }
+      responses:
+        "200":
+          description: Situação do desafio
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      status:
+                        type: string
+                        enum: [aguardando, escolher_paciente, verificado, nao_localizado, expirado]
+                      expira_em: { type: string, format: date-time }
+                      verificacao_token: { type: string }
+                      token_expira_em: { type: string, format: date-time }
+                      opcoes:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            opcao_id: { type: string, format: uuid }
+                            nome_exibicao: { type: string, example: "Maria S." }
+                      paciente: { $ref: "#/components/schemas/Paciente" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/Unprocessable" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+        "500": { $ref: "#/components/responses/ServerError" }
+
+  /patients/verify/select:
+    post:
+      tags: [Verificação por WhatsApp]
+      summary: Escolhe quem vai ser atendido quando o número tem mais de um cadastro
+      description: |
+        Escopo exigido: `patients:verify`.
+        Uma escolha por desafio: depois de escolhido não dá para trocar — quem
+        errou recomeça o desafio. `opcao_id` que não pertence ao desafio
+        devolve `422 verification_failed`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [desafio_id, opcao_id]
+              properties:
+                desafio_id: { type: string, format: uuid }
+                opcao_id: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Escolha registrada
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      status: { type: string, enum: [verificado] }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/Unprocessable" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+        "500": { $ref: "#/components/responses/ServerError" }
+
 components:
+
   securitySchemes:
     bearerApiKey:
       type: http
