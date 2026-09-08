@@ -145,9 +145,12 @@ function Grupo({
 export function ConfiancaMensagemBadge({
   clinicaId,
   confianca,
+  /** FASE 6 — id da mensagem enviada; vínculo principal do snapshot. */
+  mensagemId,
 }: {
   clinicaId: string;
   confianca: ConfiancaDaMensagem;
+  mensagemId?: string | null;
 }) {
   const detalhar = useServerFn(confiabilidadeDaExecucao);
   const [detalhe, setDetalhe] = useState<ConfiabilidadeDecisaoView | null>(null);
@@ -155,11 +158,19 @@ export function ConfiancaMensagemBadge({
 
   const carregar = useCallback(async () => {
     try {
-      setDetalhe(await detalhar({ data: { clinicaId, execucaoId: confianca.execucao_id } }));
+      setDetalhe(
+        await detalhar({
+          data: {
+            clinicaId,
+            execucaoId: confianca.execucao_id,
+            ...(mensagemId ? { outgoingMessageId: mensagemId } : {}),
+          },
+        }),
+      );
     } catch {
       setDetalhe(null);
     }
-  }, [clinicaId, confianca.execucao_id, detalhar]);
+  }, [clinicaId, confianca.execucao_id, detalhar, mensagemId]);
 
   useEffect(() => {
     if (aberto && !detalhe) void carregar();
