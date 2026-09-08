@@ -13197,6 +13197,10 @@ export type Database = {
           _termo: string
         }
         Returns: {
+          alerta_critico: boolean
+          alerta_definido_em: string | null
+          alerta_definido_por: string | null
+          alerta_motivo: string | null
           ativo: boolean
           bairro: string | null
           cep: string | null
@@ -14351,6 +14355,10 @@ export type Database = {
       pacientes_aniversariantes_hoje: {
         Args: { _clinica_id: string; _limite?: number }
         Returns: {
+          alerta_critico: boolean
+          alerta_definido_em: string | null
+          alerta_definido_por: string | null
+          alerta_motivo: string | null
           ativo: boolean
           bairro: string | null
           cep: string | null
@@ -14743,6 +14751,10 @@ export type Database = {
           }
       pode_escrever_modulo: {
         Args: { _clinica_id: string; _modulos: string[]; _user_id: string }
+        Returns: boolean
+      }
+      pode_marcar_alerta_critico: {
+        Args: { _clinica_id: string; _user_id: string }
         Returns: boolean
       }
       procedimentos_popularidade: {
