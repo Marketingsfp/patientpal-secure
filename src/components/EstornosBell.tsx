@@ -43,6 +43,23 @@ const MAX_LIDAS_GUARDADAS = 200;
 
 const chaveLidas = (userId: string) => `estorno_respostas_lidas_${userId}`;
 
+/**
+ * Quem enxerga a fila de estornos pendentes DA CLÍNICA INTEIRA.
+ *
+ * O balão trazia nome do paciente, descrição e valor de cada pedido — repasse
+ * médico incluído — para qualquer pessoa logada, porque a consulta só filtrava
+ * por clínica. Nos computadores da recepção, dos consultórios e do laboratório
+ * isso é informação financeira que não tem nada a ver com o trabalho de lá.
+ *
+ * Agora a fila só é carregada para quem trabalha no dinheiro: caixa,
+ * financeiro, supervisor, gestor e administrador. Para os demais perfis a
+ * consulta nem sai do navegador e o sino não é montado — some do cabeçalho.
+ *
+ * A resposta do financeiro ao pedido QUE A PRÓPRIA PESSOA FEZ continua chegando
+ * para todo mundo: é o retorno do trabalho dela, não a fila dos outros.
+ */
+const PAPEIS_DO_CAIXA = ["admin", "gestor", "supervisor", "caixa", "financeiro"];
+
 function lerLidas(userId: string | undefined): Set<string> {
   if (!userId) return new Set();
   try {
@@ -77,8 +94,15 @@ export function EstornosBell() {
   // lista fixa de papéis.
   const podeAprovar = usePodeEscrever("financeiro");
 
+  // Ver a fila da clínica é mais restrito do que aprovar: aqui vale o papel,
+  // porque é ele que separa o balcão do caixa. Sem isso, o perfil "médico" ou
+  // "recepção" chegava a ler valor e paciente de todo pedido em aberto.
+  const podeVerFila = PAPEIS_DO_CAIXA.includes(clinicaAtual?.role ?? "");
+
   const load = useCallback(async () => {
-    if (!clinicaAtual) {
+    // A trava começa aqui, na consulta: para quem não é do caixa a lista nem
+    // é pedida ao banco, então não há como ela aparecer na tela por engano.
+    if (!clinicaAtual || !podeVerFila) {
       setItems([]);
       return;
     }
@@ -90,7 +114,7 @@ export function EstornosBell() {
       .order("solicitado_em", { ascending: false })
       .limit(20);
     setItems((data ?? []) as Solic[]);
-  }, [clinicaAtual]);
+  }, [clinicaAtual, podeVerFila]);
 
   // Respostas do financeiro às solicitações QUE EU MESMO enviei.
   const loadRespostas = useCallback(async () => {
@@ -125,16 +149,23 @@ export function EstornosBell() {
 
   // Realtime
   useEffect(() => {
-    if (!clinicaAtual) return;
+    if (!clinicaAtual || !user) return;
+    // A assinatura de tempo real também é estreitada: quem não é do caixa só
+    // escuta os PRÓPRIOS pedidos, para receber o "aprovado/recusado". Assim o
+    // movimento de estorno dos outros nem trafega para a máquina da recepção,
+    // do consultório ou do laboratório.
+    const filtro = podeVerFila
+      ? `clinica_id=eq.${clinicaAtual.clinica_id}`
+      : `solicitado_por=eq.${user.id}`;
     const ch = supabase
-      .channel(`estornos-${clinicaAtual.clinica_id}`)
+      .channel(`estornos-${clinicaAtual.clinica_id}-${podeVerFila ? "fila" : user.id}`)
       .on(
         "postgres_changes",
         {
           event: "*",
           schema: "public",
           table: "estorno_solicitacoes",
-          filter: `clinica_id=eq.${clinicaAtual.clinica_id}`,
+          filter: filtro,
         },
         (payload) => {
           void load();
@@ -185,10 +216,14 @@ export function EstornosBell() {
     return () => {
       void supabase.removeChannel(ch);
     };
-  }, [clinicaAtual, load, loadRespostas, podeAprovar, user?.id]);
+  }, [clinicaAtual, load, loadRespostas, podeAprovar, podeVerFila, user]);
 
   const naoLidas = respostas.filter((r) => !lidas.has(r.id));
   const count = items.length + naoLidas.length;
+
+  // Sem fila para acompanhar e sem resposta pendente, o sino não tem o que
+  // mostrar: some do cabeçalho em vez de abrir um balão vazio.
+  if (!podeVerFila && naoLidas.length === 0) return null;
 
   const marcarLida = (id: string) => {
     const novo = new Set(lidas);
@@ -243,9 +278,11 @@ export function EstornosBell() {
           size="sm"
           className="h-9 w-9 p-0 rounded-full relative"
           title={
-            count > 0
-              ? `${items.length} estorno(s) pendente(s) e ${naoLidas.length} resposta(s) do financeiro`
-              : "Notificações"
+            !podeVerFila
+              ? `${naoLidas.length} resposta(s) do financeiro`
+              : count > 0
+                ? `${items.length} estorno(s) pendente(s) e ${naoLidas.length} resposta(s) do financeiro`
+                : "Notificações"
           }
         >
           <Bell className="h-4 w-4" />
@@ -259,14 +296,21 @@ export function EstornosBell() {
       <PopoverContent align="end" className="w-96 p-0 max-h-[480px] overflow-auto">
         <div className="px-3 py-2 border-b flex items-center gap-2 sticky top-0 bg-background">
           <Undo2 className="h-4 w-4 text-rose-600" />
-          <strong className="text-sm">Solicitações de estorno</strong>
-          <span className="text-xs text-muted-foreground ml-auto">{items.length} pendente(s)</span>
+          <strong className="text-sm">
+            {podeVerFila ? "Solicitações de estorno" : "Respostas do financeiro"}
+          </strong>
+          {podeVerFila && (
+            <span className="text-xs text-muted-foreground ml-auto">
+              {items.length} pendente(s)
+            </span>
+          )}
         </div>
 
         {naoLidas.length > 0 && (
           <div className="border-b bg-muted/40">
             <div className="px-3 py-1.5 flex items-center gap-2">
-              <strong className="text-xs">Respostas do financeiro</strong>
+              {/* Sem a fila acima, o título já é este no cabeçalho do balão. */}
+              {podeVerFila && <strong className="text-xs">Respostas do financeiro</strong>}
               <Button
                 size="sm"
                 variant="ghost"
