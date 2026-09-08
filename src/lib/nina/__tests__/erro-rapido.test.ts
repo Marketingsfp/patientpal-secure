@@ -265,3 +265,43 @@ describe("FASE 1 — vínculo exato do erro", () => {
     expect(v.ok).toBe(false);
   });
 });
+
+// ─────────────── FASE 2 — ambiente do reporte (homologação) ───────────────
+describe("ambiente do reporte", () => {
+  it("conversa real é produção; conversa de teste é homologação", () => {
+    expect(ambienteDoReporte({ isTeste: false })).toBe("production");
+    expect(ambienteDoReporte({ isTeste: true })).toBe("homologation");
+    expect(ambienteDoReporte({ isTeste: true, automatizado: true })).toBe("automated_test");
+  });
+
+  it("registro guarda ambiente, sessão e ciclo sem inventar valores", () => {
+    const r = montarRegistroErroRapido({
+      clinicaId: "c1",
+      conversaId: "conv1",
+      mensagemId: "msg1",
+      snapshot: "A consulta custa R$150.",
+      reporterUserId: "u1",
+      execucaoId: "e1",
+      ambiente: "homologation",
+      vinculo: { testeCicloId: "ciclo1", ninaSessionId: "sess1" },
+    });
+    expect(r.ambiente).toBe("homologation");
+    expect(r.nina_session_id).toBe("sess1");
+    expect(r.teste_ciclo_id).toBe("ciclo1");
+    expect(r.execucao_id).toBe("e1");
+    expect(r.mensagem_texto).toBe("A consulta custa R$150.");
+    expect(r.status).toBe("pending");
+  });
+
+  it("sem informação de teste, o padrão continua produção e sessão vazia", () => {
+    const r = montarRegistroErroRapido({
+      clinicaId: "c1",
+      conversaId: "conv1",
+      mensagemId: "msg1",
+      snapshot: "texto",
+      reporterUserId: "u1",
+    });
+    expect(r.ambiente).toBe("production");
+    expect(r.nina_session_id).toBeNull();
+  });
+});
