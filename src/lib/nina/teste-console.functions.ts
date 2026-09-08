@@ -204,7 +204,7 @@ export const historicoLeadTeste = createServerFn({ method: "POST" })
     // mensagens novas enviadas depois do reset.
     const { data: msgsDesc, error } = await supabaseAdmin
       .from("whatsapp_mensagens")
-      .select("id, direction, body, enviada_por, created_at, execucao_id")
+      .select("id, conversa_id, direction, body, enviada_por, created_at, execucao_id")
       .eq("clinica_id", data.clinicaId)
       .in("conversa_id", ids)
       .order("created_at", { ascending: false })

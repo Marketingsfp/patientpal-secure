@@ -131,6 +131,8 @@ type Lead = {
 
 type Msg = {
   id: string;
+  /** Conversa REAL da mensagem: o lead pode ter vários ciclos/conversas. */
+  conversa_id?: string | null;
   direction: string;
   body: string | null;
   enviada_por: string | null;
