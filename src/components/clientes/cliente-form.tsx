@@ -28,10 +28,8 @@ import {
   AJUDA_PRONTUARIO,
   PLACEHOLDER_PRONTUARIO,
   conflitoCodigoProntuario,
-  desvioProntuarioParaConfirmar,
-  type DesvioProntuario,
 } from "@/lib/prontuario";
-import { ConfirmarProntuarioDistante } from "@/components/pacientes/confirmar-prontuario-distante";
+
 import { erroCaractereNome, sanitizarNomePessoa, validarNomePessoa } from "@/lib/nome-pessoa";
 import { maiusculoDigitacao } from "@/lib/texto-maiusculo";
 import { mascaraCPF, mascaraTelefone } from "@/lib/validators";
