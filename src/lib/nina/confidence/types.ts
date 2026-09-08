@@ -171,7 +171,11 @@ export type Bloqueador =
   | "FONTE_NAO_VIGENTE"
   | "NOTA_INTERNA_COMO_FONTE"
   | "REGRA_EXIGE_HUMANO"
-  | "REGRA_DE_NEGOCIO_NAO_ATENDIDA";
+  | "REGRA_DE_NEGOCIO_NAO_ATENDIDA"
+  // FASE 4 — coerência do PROCESSO que levou à resposta.
+  | "WORKFLOW_INCONSISTENTE"
+  | "FERRAMENTA_OBRIGATORIA_NAO_CHAMADA"
+  | "AFIRMACAO_OPERACIONAL_SEM_PROVA";
 
 /**
  * Status padronizado de um validador isolado.
