@@ -8338,6 +8338,7 @@ export type Database = {
           conversation_id: string | null
           created_at: string
           decisao: string | null
+          engine_version: string | null
           execucao_id: string | null
           ferramentas: Json
           fontes: Json
@@ -8346,7 +8347,9 @@ export type Database = {
           message_id: string | null
           modo: string
           motivos: Json
+          nina_session_id: string | null
           nivel: string | null
+          outgoing_message_id: string | null
           policy_version: string | null
           reason_codes: string[]
           resultado_final: string | null
@@ -8370,6 +8373,7 @@ export type Database = {
           conversation_id?: string | null
           created_at?: string
           decisao?: string | null
+          engine_version?: string | null
           execucao_id?: string | null
           ferramentas?: Json
           fontes?: Json
@@ -8378,7 +8382,9 @@ export type Database = {
           message_id?: string | null
           modo?: string
           motivos?: Json
+          nina_session_id?: string | null
           nivel?: string | null
+          outgoing_message_id?: string | null
           policy_version?: string | null
           reason_codes?: string[]
           resultado_final?: string | null
@@ -8402,6 +8408,7 @@ export type Database = {
           conversation_id?: string | null
           created_at?: string
           decisao?: string | null
+          engine_version?: string | null
           execucao_id?: string | null
           ferramentas?: Json
           fontes?: Json
@@ -8410,7 +8417,9 @@ export type Database = {
           message_id?: string | null
           modo?: string
           motivos?: Json
+          nina_session_id?: string | null
           nivel?: string | null
+          outgoing_message_id?: string | null
           policy_version?: string | null
           reason_codes?: string[]
           resultado_final?: string | null

@@ -104,6 +104,8 @@ export type PoliticaConfianca = {
  * Snapshots gravados com "v1"/"v2"/"v3" continuam válidos sob a régua da época.
  */
 export const VERSAO_POLITICA = "v4";
+/** FASE 6 — versão do motor gravada junto com cada avaliação. */
+export const VERSAO_MOTOR = "engine-v6";
 
 export const POLITICA_PADRAO: PoliticaConfianca = {
   pesos: {

@@ -140,15 +140,23 @@ export function calibrar(
   conversas: ResultadoConversa[] = [],
   politica: PoliticaConfianca = POLITICA_PADRAO,
 ): RelatorioCalibracao {
-  const porConversa = new Set(erros.map((e) => e.conversa_id).filter(Boolean) as string[]);
   const porMensagem = new Set(erros.map((e) => e.mensagem_id).filter(Boolean) as string[]);
   const porExecucao = new Set(erros.map((e) => e.execucao_id).filter(Boolean) as string[]);
+  // FASE 6 — o vínculo por conversa só vale para reportes LEGADOS, que não
+  // guardaram mensagem nem execução. Um erro pontual não pode contaminar
+  // todas as decisões daquela conversa.
+  const porConversaLegado = new Set(
+    erros
+      .filter((e) => !e.mensagem_id && !e.execucao_id)
+      .map((e) => e.conversa_id)
+      .filter(Boolean) as string[],
+  );
   const resultadoDe = new Map(conversas.map((c) => [c.conversa_id, c]));
 
   const temErro = (l: LinhaCalibracao) =>
     (l.message_id != null && porMensagem.has(l.message_id)) ||
     (l.execucao_id != null && porExecucao.has(l.execucao_id)) ||
-    (l.conversation_id != null && porConversa.has(l.conversation_id));
+    (l.conversation_id != null && porConversaLegado.has(l.conversation_id));
 
   const faixas: FaixaScore[] = ["90_100", "75_89", "50_74", "0_49"];
   const porFaixa: CorrelacaoFaixa[] = faixas.map((faixa) => {
