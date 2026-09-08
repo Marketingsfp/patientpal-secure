@@ -1207,8 +1207,10 @@ export function HomologacaoInbox() {
                               {clinicaId && m.execucao_id && confiancaPorExecucao[String(m.execucao_id)] ? (
                                 <ConfiancaMensagemBadge
                                   clinicaId={clinicaId}
+                                  mensagemId={m.id ? String(m.id) : null}
                                   confianca={confiancaPorExecucao[String(m.execucao_id)]!}
                                 />
+
                               ) : (
                                 <ConfiancaNaoAvaliadaBadge />
                               )}
