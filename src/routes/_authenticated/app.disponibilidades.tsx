@@ -421,19 +421,10 @@ function Page() {
   }, [clinicaAtual?.clinica_id]);
 
   // MED-08: nada impedia cadastrar regras de horário semanal que se
-  // contradizem (ex.: Seg 08:00–12:00 e Seg 10:00–14:00 na mesma agenda,
+  // contradizem (ex.: Seg 08:00–12:00 e Seg 10:00–14:00 pro mesmo médico,
   // ou hora fim antes da hora início) — a agenda gerada a partir daí saía
   // com horários duplicados/sobrepostos, sem nenhum aviso na hora do
   // cadastro.
-  //
-  // A checagem é POR AGENDA, não por médico. Um mesmo profissional pode ter
-  // duas agendas rodando no mesmo horário (o Dr. João Hélio atende CONSULTAS
-  // de 15 em 15 min e EXAMES de 20 em 20 min, os dois das 08:00 às 17:00), e
-  // isso é configuração legítima da clínica, não conflito. Comparando por
-  // médico, a tela travava a edição dessas grades: mexer no horário de
-  // CONSULTAS acusava sobreposição com EXAMES e não deixava salvar. Duas
-  // regras sobrepostas DENTRO da mesma agenda continuam barradas, que é onde
-  // o problema real acontece — ali sairia ficha repetida no mesmo horário.
   const vigenciasSeSobrepoem = (
     aIni: string | null,
     aFim: string | null,
@@ -451,7 +442,6 @@ function Page() {
   const encontrarConflito = (
     candidato: {
       medico_id: string;
-      agenda_id: string | null;
       dia_semana: number;
       hora_inicio: string;
       hora_fim: string;
@@ -464,7 +454,6 @@ function Page() {
       (d) =>
         d.id !== ignorarId &&
         d.medico_id === candidato.medico_id &&
-        (d.agenda_id ?? null) === (candidato.agenda_id ?? null) &&
         d.dia_semana === candidato.dia_semana &&
         horariosSeSobrepoem(d.hora_inicio, d.hora_fim, candidato.hora_inicio, candidato.hora_fim) &&
         vigenciasSeSobrepoem(
@@ -503,7 +492,6 @@ function Page() {
     for (const dia of diasSel) {
       const conflito = encontrarConflito({
         medico_id: novo.medico_id,
-        agenda_id: agendaSel,
         dia_semana: dia,
         hora_inicio: novo.hora_inicio,
         hora_fim: novo.hora_fim,
@@ -512,7 +500,7 @@ function Page() {
       });
       if (conflito) {
         toast.error(
-          `Já existe uma regra NESTA AGENDA para ${DIAS[dia]} (${conflito.hora_inicio}–${conflito.hora_fim}) que se sobrepõe a esse horário. Ajuste o horário ou remova a regra antiga primeiro.`,
+          `Já existe uma regra para ${DIAS[dia]} (${conflito.hora_inicio}–${conflito.hora_fim}) que se sobrepõe a esse horário. Ajuste o horário ou remova a regra antiga primeiro.`,
         );
         return;
       }
@@ -592,7 +580,6 @@ function Page() {
       const conflito = encontrarConflito(
         {
           medico_id: atual.medico_id,
-          agenda_id: atual.agenda_id,
           dia_semana: diaNum,
           hora_inicio: editRow.hora_inicio,
           hora_fim: editRow.hora_fim,
@@ -603,7 +590,7 @@ function Page() {
       );
       if (conflito) {
         toast.error(
-          `Já existe uma regra NESTA AGENDA para ${DIAS[diaNum]} (${conflito.hora_inicio}–${conflito.hora_fim}) que se sobrepõe a esse horário.`,
+          `Já existe uma regra para ${DIAS[diaNum]} (${conflito.hora_inicio}–${conflito.hora_fim}) que se sobrepõe a esse horário.`,
         );
         return;
       }

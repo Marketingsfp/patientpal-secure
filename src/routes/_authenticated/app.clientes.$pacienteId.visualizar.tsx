@@ -15,7 +15,6 @@ import { PacienteOdontoPanel } from "@/components/clientes/paciente-odonto-panel
 import { PacienteFisioPanel } from "@/components/clientes/paciente-fisio-panel";
 import { PacienteSessoesPanel } from "@/components/clientes/paciente-sessoes-panel";
 import { prontuarioExibicao } from "@/lib/prontuario";
-import { AvisoProntuarioForaDaEstante } from "@/components/clientes/aviso-prontuario-fora-da-estante";
 import { HiperdiaPanel } from "@/components/hiperdia/hiperdia-panel";
 import { CriteriosSbd2025 } from "@/components/hiperdia/criterios-sbd-2025";
 
@@ -102,13 +101,6 @@ function VisualizarClientePage() {
           </Button>
         )}
       </div>
-
-      {paciente && (
-        <AvisoProntuarioForaDaEstante
-          paciente={paciente}
-          onCorrigido={(novo) => setPaciente((p) => (p ? { ...p, codigo_prontuario: novo } : p))}
-        />
-      )}
 
       {loading ? (
         <div className="rounded-lg border border-border bg-card p-6">
