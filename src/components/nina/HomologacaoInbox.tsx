@@ -1197,8 +1197,8 @@ export function HomologacaoInbox() {
                           className={`mt-1 flex items-center justify-between gap-2 text-[11px] ${out ? "text-atd-on-strong/80" : "text-atd-ink-soft"}`}
                         >
                           <span className="whitespace-nowrap">
-                            {formatarDataHoraMensagem(m.created_at)}{" "}
-                            {daNina ? "· Nina" : "· Paciente (teste)"}
+                            {formatarDataHoraMensagem(m.created_at)} {autoria}
+
                           </span>
                           {daNina && (
                             <span className="flex items-center gap-2">
