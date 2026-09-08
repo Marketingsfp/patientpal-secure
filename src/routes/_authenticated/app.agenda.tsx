@@ -1002,6 +1002,8 @@ function AgendaPage() {
   const [filtroMedico, setFiltroMedico] = useState<string>("todos");
   const [filtroEspecialidade, setFiltroEspecialidade] = useState<string>("todos");
   const [filtroAgenda, setFiltroAgenda] = useState<string>("todos");
+  // Ids de agenda que têm grade de horários ativa (ver a carga em `loadRef`).
+  const [agendasComGrade, setAgendasComGrade] = useState<Set<string>>(new Set());
   const [agendasPorMedico, setAgendasPorMedico] = useState<
     Map<string, { id: string; nome: string; ordem_chegada?: boolean }[]>
   >(new Map());
@@ -3035,7 +3037,7 @@ function AgendaPage() {
 
   const loadRef = async () => {
     if (!clinicaAtual) return;
-    const [m, e, me, pr, sr, mcRows, mp, agendasRes] = await Promise.all([
+    const [m, e, me, pr, sr, mcRows, mp, agendasRes, gradesRes] = await Promise.all([
       getMedicosAgenda(clinicaAtual.clinica_id),
       supabase.from("especialidades").select("id,nome").eq("ativo", true).order("nome"),
       supabase
@@ -3060,6 +3062,19 @@ function AgendaPage() {
         .eq("ativo", true)
         .order("ordem", { ascending: true })
         .order("nome", { ascending: true }),
+      // Quais agendas realmente geram horário. Usado só para decidir se o
+      // seletor de profissional desdobra o nome por agenda: agenda sem grade
+      // ativa não oferece ficha nenhuma para a recepção marcar, então virar
+      // uma linha própria no balcão só atrapalharia. Limite explícito porque
+      // o padrão do PostgREST (1000) cortaria a lista quando a clínica
+      // crescer, e o corte seria silencioso.
+      supabase
+        .from("medico_disponibilidades")
+        .select("agenda_id")
+        .eq("clinica_id", clinicaAtual.clinica_id)
+        .eq("ativo", true)
+        .not("agenda_id", "is", null)
+        .limit(20000),
     ]);
     const agendasData = agendasRes.data;
     const ag = new Map<string, { id: string; nome: string; ordem_chegada?: boolean }[]>();
@@ -3075,6 +3090,13 @@ function AgendaPage() {
       ag.set(a.medico_id, arr);
     }
     setAgendasPorMedico(ag);
+    setAgendasComGrade(
+      new Set(
+        ((gradesRes.data ?? []) as Array<{ agenda_id: string | null }>)
+          .map((g) => g.agenda_id)
+          .filter((id): id is string => !!id),
+      ),
+    );
     // Vínculos serviço↔agenda (para limitar serviços no agendamento conforme agenda escolhida)
     const agendaIds = (agendasData ?? []).map((a) => (a as { id: string }).id);
     const vincPorAgenda = new Map<string, Set<string>>();
@@ -8114,11 +8136,16 @@ function AgendaPage() {
         </Label>
         <MedicoFiltroInput
           medicos={medicos}
+          agendasPorMedico={agendasPorMedico}
+          agendasComGrade={agendasComGrade}
           value={filtroMedico}
-          onChange={(v) => {
+          agendaValue={filtroAgenda}
+          onChange={(v, agenda) => {
             if (!isMedicoOnly) {
               setFiltroMedico(v);
-              setFiltroAgenda("todos");
+              // Profissional com uma agenda só devolve "todos" aqui, que é
+              // exatamente o que a tela fazia antes ao trocar de médico.
+              setFiltroAgenda(agenda);
             }
           }}
           disabled={isMedicoOnly}
@@ -13399,21 +13426,49 @@ function Paginacao({
   );
 }
 
+/**
+ * Uma linha do seletor de profissional.
+ *
+ * Quem tem duas ou mais agendas ativas (ex.: CONSULTAS de 15 min e EXAMES de
+ * 20 min do mesmo médico) aparece desdobrado, uma linha por agenda, para a
+ * recepção escolher profissional e tipo de agenda num clique só, sem precisar
+ * do filtro secundário. O desdobramento é só de EXIBIÇÃO: por baixo continua
+ * sendo o mesmo cadastro de médico, então repasse, prontuário e login do
+ * médico não enxergam diferença nenhuma.
+ */
+type OpcaoProfissional = {
+  key: string;
+  medicoId: string;
+  /** Valor correspondente no filtro "Tipo de agenda". */
+  agendaFiltro: string;
+  /** Rótulo exibido na lista e escrito no campo ao escolher. */
+  rotulo: string;
+  /** Texto normalizado usado na busca por digitação. */
+  busca: string;
+};
+
 function MedicoFiltroInput({
   medicos,
+  agendasPorMedico,
+  agendasComGrade,
   value,
+  agendaValue,
   onChange,
   disabled,
   onlyMedicoId,
   compact,
 }: {
   medicos: Medico[];
+  agendasPorMedico: Map<string, { id: string; nome: string; ordem_chegada?: boolean }[]>;
+  agendasComGrade: Set<string>;
   value: string;
-  onChange: (v: string) => void;
+  agendaValue: string;
+  onChange: (medicoId: string, agendaFiltro: string) => void;
   disabled?: boolean;
   onlyMedicoId?: string | null;
   compact?: boolean;
 }) {
+  const norm = (s: string) => normalizar(s);
   const lista = useMemo(() => {
     const arr = medicos.filter((m) => !onlyMedicoId || m.id === onlyMedicoId);
     // Recursos de enfermagem (prefixados com "🩺 ") aparecem primeiro
@@ -13425,23 +13480,12 @@ function MedicoFiltroInput({
       return a.nome.localeCompare(b.nome, "pt-BR");
     });
   }, [medicos, onlyMedicoId]);
-  const selecionadoNome = useMemo(
-    () => (value === "todos" ? "" : (medicos.find((m) => m.id === value)?.nome ?? "")),
-    [medicos, value],
-  );
-  const [texto, setTexto] = useState(selecionadoNome);
-  const [aberto, setAberto] = useState(false);
-  const [highlight, setHighlight] = useState(0);
-  useEffect(() => {
-    setTexto(selecionadoNome);
-  }, [selecionadoNome]);
 
-  const norm = (s: string) => normalizar(s);
   // Quando dois cadastros ativos têm o mesmo nome, o dropdown mostrava duas
   // linhas idênticas e não dava para saber qual escolher. Em vez de esconder
   // uma delas (o que tornaria um cadastro inalcançável, inclusive homônimos
   // legítimos), numeramos as repetidas para que a diferença fique visível.
-  const rotulo = useMemo(() => {
+  const rotuloMedico = useMemo(() => {
     const contagem = new Map<string, number>();
     for (const m of lista) contagem.set(norm(m.nome), (contagem.get(norm(m.nome)) ?? 0) + 1);
     const vistos = new Map<string, number>();
@@ -13458,18 +13502,86 @@ function MedicoFiltroInput({
     }
     return map;
   }, [lista]);
+
+  const opcoes = useMemo(() => {
+    const out: OpcaoProfissional[] = [];
+    for (const m of lista) {
+      const base = rotuloMedico.get(m.id) ?? m.nome;
+      // Só entram agendas que geram horário. Sem esse corte, sobras de
+      // importação (várias "CONSULTAS (IMPORTADA)" na base, sem nenhum
+      // agendamento) desdobrariam seis profissionais em duas linhas quase
+      // idênticas, e o balcão teria que adivinhar qual das duas usar.
+      //
+      // Agendas de mesmo nome viram uma linha só: o filtro "Tipo de agenda"
+      // trabalha por nome, então duas linhas iguais fariam exatamente a mesma
+      // coisa e só confundiriam quem está no balcão.
+      const agendas: { chave: string; nome: string }[] = [];
+      const vistas = new Set<string>();
+      for (const a of agendasPorMedico.get(m.id) ?? []) {
+        if (!agendasComGrade.has(a.id)) continue;
+        const chave = chaveNomeAgenda(a.nome ?? "");
+        if (!chave || vistas.has(chave)) continue;
+        vistas.add(chave);
+        agendas.push({ chave, nome: (a.nome ?? "").trim() });
+      }
+      // Uma agenda só (ou nenhuma): nome limpo, sem sufixo.
+      if (agendas.length < 2) {
+        out.push({
+          key: m.id,
+          medicoId: m.id,
+          agendaFiltro: "todos",
+          rotulo: base,
+          busca: norm(base),
+        });
+        continue;
+      }
+      for (const a of agendas) {
+        out.push({
+          key: `${m.id}|${a.chave}`,
+          medicoId: m.id,
+          agendaFiltro: `nome:${a.chave}`,
+          rotulo: `${base} — ${a.nome}`,
+          busca: norm(`${base} ${a.nome}`),
+        });
+      }
+    }
+    return out;
+  }, [lista, rotuloMedico, agendasPorMedico, agendasComGrade]);
+
+  // O texto do campo sai da COMBINAÇÃO profissional + tipo de agenda. Assim,
+  // se a recepção mexer no filtro secundário depois de escolher uma linha
+  // desdobrada, o campo acompanha em vez de continuar mostrando a agenda
+  // antiga. Sem correspondência exata (ex.: tipo de agenda em "TODAS"),
+  // volta ao nome limpo do profissional.
+  const selecionadoNome = useMemo(() => {
+    if (value === "todos") return "";
+    const exata = opcoes.find((o) => o.medicoId === value && o.agendaFiltro === agendaValue);
+    if (exata) return exata.rotulo;
+    return rotuloMedico.get(value) ?? medicos.find((m) => m.id === value)?.nome ?? "";
+  }, [opcoes, rotuloMedico, medicos, value, agendaValue]);
+
+  const [texto, setTexto] = useState(selecionadoNome);
+  const [aberto, setAberto] = useState(false);
+  const [highlight, setHighlight] = useState(0);
+  useEffect(() => {
+    setTexto(selecionadoNome);
+  }, [selecionadoNome]);
+
   const sugestoes = useMemo(() => {
-    const t = norm(texto).trim();
-    if (!t) return lista.slice(0, 100);
-    return lista.filter((m) => norm(m.nome).includes(t)).slice(0, 100);
-  }, [lista, texto]);
+    // Busca por palavras soltas: "helio exames" precisa achar a linha
+    // "JOAO HELIO VALENTIM — EXAMES", que tem o travessão no meio e não
+    // casaria numa busca por trecho contínuo.
+    const termos = norm(texto).trim().split(/\s+/).filter(Boolean);
+    if (termos.length === 0) return opcoes.slice(0, 100);
+    return opcoes.filter((o) => termos.every((t) => o.busca.includes(t))).slice(0, 100);
+  }, [opcoes, texto]);
   useEffect(() => {
     setHighlight(0);
   }, [texto, aberto]);
 
-  const selecionar = (m: Medico) => {
-    onChange(m.id);
-    setTexto(m.nome);
+  const selecionar = (o: OpcaoProfissional) => {
+    onChange(o.medicoId, o.agendaFiltro);
+    setTexto(o.rotulo);
     setAberto(false);
   };
 
@@ -13517,7 +13629,9 @@ function MedicoFiltroInput({
             size="icon"
             title="Limpar"
             onClick={() => {
-              onChange("todos");
+              // Limpa o profissional E o tipo de agenda: o desdobramento
+              // escolhe os dois juntos, então desfazer também desfaz os dois.
+              onChange("todos", "todos");
               setTexto("");
             }}
           >
@@ -13527,18 +13641,18 @@ function MedicoFiltroInput({
       </div>
       {aberto && !disabled && sugestoes.length > 0 && (
         <div className="absolute z-50 mt-1 w-full max-h-64 overflow-auto rounded-md border bg-popover shadow-md">
-          {sugestoes.map((m, idx) => (
+          {sugestoes.map((o, idx) => (
             <button
-              key={m.id}
+              key={o.key}
               type="button"
               className={`block w-full text-left px-2 py-1.5 text-sm hover:bg-accent ${idx === highlight ? "bg-accent" : ""}`}
               onMouseEnter={() => setHighlight(idx)}
               onMouseDown={(e) => {
                 e.preventDefault();
-                selecionar(m);
+                selecionar(o);
               }}
             >
-              {rotulo.get(m.id) ?? m.nome}
+              {o.rotulo}
             </button>
           ))}
         </div>
