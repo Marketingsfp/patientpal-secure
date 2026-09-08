@@ -262,7 +262,11 @@ function segredoDerivacao(): string {
   const s =
     process.env["INTEGRACAO_VERIFICACAO_SECRET"] ?? process.env["SUPABASE_SERVICE_ROLE_KEY"] ?? "";
   if (!s) {
-    throw new ApiError(503, "verification_unavailable", "Verificação indisponível.");
+    throw new ApiError({
+      status: 503,
+      code: "verification_unavailable",
+      message: "Verificação indisponível.",
+    });
   }
   return s;
 }
@@ -328,7 +332,7 @@ async function handleSelect(
   );
   if (!escolhida) throw falhou;
 
-  const { token, hash, expira } = await novoToken();
+  const { hash, expira } = await novoToken(parsed.data.desafio_id);
   const { error } = await tabela(db)
     .update({
       status: "verificado",
@@ -341,16 +345,18 @@ async function handleSelect(
     .eq("status", "escolher_paciente");
   if (error) throw falhou;
 
-  guardarTokenPlano(parsed.data.desafio_id, token);
   return { status: 200, body: { data: { status: "verificado" } } };
 }
 
-export async function novoToken(): Promise<{ token: string; hash: string; expira: string }> {
-  const token = hex(aleatorio(32));
+export async function novoToken(
+  desafioId: string,
+): Promise<{ token: string; hash: string; expira: string }> {
+  const expiraEm = new Date(Date.now() + MINUTOS_TOKEN * 60_000).toISOString();
+  const token = await derivarToken(desafioId, expiraEm);
   return {
     token,
     hash: await sha256Hex(token),
-    expira: new Date(Date.now() + MINUTOS_TOKEN * 60_000).toISOString(),
+    expira: expiraEm,
   };
 }
 
@@ -430,7 +436,7 @@ export async function reconhecerCodigoVerificacao(params: {
   const base = { wa_message_id: waMessageId, updated_at: agora };
 
   if (pacientes.length === 1) {
-    const { token, hash, expira } = await novoToken();
+    const { hash, expira } = await novoToken(desafio.id);
     const { error } = await tabela(db)
       .update({
         ...base,
@@ -441,7 +447,7 @@ export async function reconhecerCodigoVerificacao(params: {
       } as never)
       .eq("id", desafio.id)
       .eq("status", "aguardando");
-    if (!error) guardarTokenPlano(desafio.id, token);
+    if (error) return { tratada: false };
   } else if (pacientes.length >= 2 && pacientes.length <= 6) {
     const opcoes = pacientes.map((p) => ({
       opcao_id: hex(aleatorio(12)),
