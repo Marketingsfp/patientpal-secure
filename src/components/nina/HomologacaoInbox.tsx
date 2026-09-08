@@ -131,6 +131,8 @@ type Lead = {
 
 type Msg = {
   id: string;
+  /** Conversa REAL da mensagem: o lead pode ter vários ciclos/conversas. */
+  conversa_id?: string | null;
   direction: string;
   body: string | null;
   enviada_por: string | null;
@@ -267,7 +269,7 @@ export function HomologacaoInbox() {
       const cicloAtual = ciclos.length > 0 ? (ciclos[ciclos.length - 1] as any) : null;
       return montarMetadadosMensagemNina({
         messageId: m.id,
-        conversaTesteId: conversaId,
+        conversaTesteId: m.conversa_id ?? conversaId,
         isTeste: true,
         cicloId: cicloAtual?.cycle_id ?? leads.find((l) => l.id === leadId)?.cicloId ?? null,
         ninaSessionId: cicloAtual?.nina_session_id ?? null,
