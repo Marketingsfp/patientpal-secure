@@ -9,6 +9,7 @@
  * Robustez: um validador que lançar exceção não derruba o atendimento —
  * `executarValidadoresDeConfianca` isola cada execução e devolve WARNING.
  */
+import { contaContraANota } from "./types";
 import type {
   Bloqueador,
   ContextoConfianca,
@@ -18,6 +19,21 @@ import type {
   ResultadoValidador,
   StatusValidador,
 } from "./types";
+
+/** Ações que dependem de dado oficial do sistema (não são conversa solta). */
+const ACOES_COM_DADO_OFICIAL = new Set([
+  "informar_valor",
+  "informar_horario",
+  "informar_profissional",
+  "informar_disponibilidade",
+  "informar_preparo",
+  "informar_regra",
+  "criar_agendamento",
+  "cancelar_agendamento",
+]);
+
+/** Ações que gravam algo de verdade. */
+const ACOES_DE_ESCRITA = new Set(["criar_agendamento", "cancelar_agendamento"]);
 
 // ---------------------------------------------------------------- configuração
 
@@ -129,7 +145,13 @@ export function EntityResolutionValidator(ctx: ContextoConfianca): ResultadoVali
   const nome = "EntityResolutionValidator";
   const candidatos = ctx.entityCandidates ?? {};
   const campos = Object.keys(candidatos);
-  if (campos.length === 0) return res(nome, "NOT_APPLICABLE", 100, "SEM_CANDIDATOS", {});
+  if (campos.length === 0) {
+    // FASE 3 — numa ação de escrita, "ninguém me disse quais eram os
+    // candidatos" não é dispensa: é falta de evidência.
+    return ACOES_DE_ESCRITA.has(ctx.requestedAction)
+      ? res(nome, "UNKNOWN", 0, "CANDIDATOS_NAO_AVALIADOS", { requestedAction: ctx.requestedAction })
+      : res(nome, "NOT_APPLICABLE", 100, "SEM_CANDIDATOS", {});
+  }
 
   const ambiguos = campos.filter((c) => (candidatos[c] ?? []).length > 1);
   const vazios = campos.filter((c) => (candidatos[c] ?? []).length === 0);
@@ -155,7 +177,15 @@ export function EntityResolutionValidator(ctx: ContextoConfianca): ResultadoVali
 export function RequiredDataValidator(ctx: ContextoConfianca): ResultadoValidador {
   const nome = "RequiredDataValidator";
   const req = ctx.requiredFields ?? [];
-  if (req.length === 0) return res(nome, "NOT_APPLICABLE", 100, "SEM_CAMPOS_OBRIGATORIOS", {});
+  if (req.length === 0) {
+    // FASE 3 — agendar/cancelar SEM lista de campos obrigatórios declarada não
+    // é "não precisa de dado": é dado não verificado.
+    return ACOES_DE_ESCRITA.has(ctx.requestedAction)
+      ? res(nome, "UNKNOWN", 0, "CAMPOS_OBRIGATORIOS_NAO_DECLARADOS", {
+          requestedAction: ctx.requestedAction,
+        })
+      : res(nome, "NOT_APPLICABLE", 100, "SEM_CAMPOS_OBRIGATORIOS", {});
+  }
 
   const e = ctx.entities ?? {};
   const faltantes = req.filter((campo) => {
@@ -184,7 +214,15 @@ export function OfficialSourceValidator(
 ): ResultadoValidador {
   const nome = "OfficialSourceValidator";
   const oficiais = categorias.filter((c) => CATEGORIAS_OFICIAIS.has(c));
-  if (oficiais.length === 0) return res(nome, "NOT_APPLICABLE", 100, "SEM_AFIRMACAO_OFICIAL", {});
+  if (oficiais.length === 0) {
+    // FASE 3 — sem saber o que a Nina vai fazer, não dá para afirmar que este
+    // turno dispensa fonte oficial. Saudação dispensa; "desconhecida" não.
+    return ctx.requestedAction === "desconhecida"
+      ? res(nome, "UNKNOWN", 0, "NECESSIDADE_DE_FONTE_INDETERMINADA", {
+          requestedAction: ctx.requestedAction,
+        })
+      : res(nome, "NOT_APPLICABLE", 100, "SEM_AFIRMACAO_OFICIAL", {});
+  }
 
   const internas = ctx.retrievedSources.filter((s) => s.interna === true && s.temConteudo);
   if (internas.length > 0) {
@@ -265,7 +303,17 @@ export function SourceFreshnessValidator(
 /** Falha técnica nunca vira "não temos". */
 export function ToolIntegrityValidator(ctx: ContextoConfianca): ResultadoValidador {
   const nome = "ToolIntegrityValidator";
-  if (ctx.toolResults.length === 0) return res(nome, "NOT_APPLICABLE", 100, "SEM_FERRAMENTAS", {});
+  if (ctx.toolResults.length === 0) {
+    // FASE 3 — conversa simples dispensa ferramenta (NOT_APPLICABLE). Uma ação
+    // que depende de dado oficial, sem NENHUMA consulta, é evidência ausente.
+    const dependeDeDado =
+      ACOES_COM_DADO_OFICIAL.has(ctx.requestedAction) || ctx.requestedAction === "desconhecida";
+    return dependeDeDado && !ctx.retrievedSources.some(fonteUtil)
+      ? res(nome, "UNKNOWN", 0, "SEM_CONSULTA_PARA_ACAO_QUE_EXIGE_DADO", {
+          requestedAction: ctx.requestedAction,
+        })
+      : res(nome, "NOT_APPLICABLE", 100, "SEM_FERRAMENTAS", {});
+  }
 
   const falhas = ctx.toolResults.filter((f) => !ferramentaOk(f));
   if (falhas.length > 0) {
@@ -404,7 +452,8 @@ export function executarValidadoresDeConfianca({
     }
     try {
       const r = run();
-      return { ...r, peso: r.status === "PASS" || r.status === "NOT_APPLICABLE" ? 0 : cfg.peso };
+      // UNKNOWN não desconta ponto: ele derruba a COBERTURA (policy.ts).
+      return { ...r, peso: contaContraANota(r.status) ? cfg.peso : 0 };
     } catch (err) {
       return {
         ...res(nome, "WARNING", 50, "VALIDADOR_FALHOU", {
