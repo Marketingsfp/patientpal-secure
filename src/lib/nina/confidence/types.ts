@@ -77,6 +77,39 @@ export type ContextoNegocio = {
   handoffSolicitado: boolean;
 };
 
+/**
+ * FASE 4 — ESTADO OPERACIONAL REAL DO TURNO.
+ *
+ * Espelho, em leitura, da máquina de estados que JÁ existe no atendimento
+ * (`EstadoFluxoNina.flow.stage` e `EstadoFluxoNina.appointment`). O motor não
+ * cria nem avança estado: ele só compara o que a Nina está dizendo com o que
+ * o sistema realmente registrou.
+ *
+ * Campo ausente = desconhecido. Nunca "não aconteceu".
+ */
+export type EstadoOperacionalTurno = {
+  /** Paciente confirmou que quer agendar (não é a clínica ter agenda). */
+  bookingIntentConfirmed?: boolean;
+  /** O fluxo de agendamento está de fato em andamento nesta conversa. */
+  appointmentFlowActive?: boolean;
+  /** Nome, CPF e data de nascimento completos e identificados. */
+  patientDataComplete?: boolean;
+  /** Existe uma vaga escolhida (início/fim) em negociação. */
+  slotSelected?: boolean;
+  /** O paciente confirmou a vaga oferecida. */
+  finalConfirmationReceived?: boolean;
+  /** Houve tentativa real de gravar o agendamento neste turno/conversa. */
+  appointmentAttempted?: boolean;
+  /** A ferramenta de agendar foi efetivamente chamada. */
+  appointmentToolCalled?: boolean;
+  /** O agendamento foi gravado e confirmado pelo sistema. */
+  appointmentCreated?: boolean;
+  /** Prova persistida do agendamento (appointment_id ou equivalente). */
+  appointmentId?: string | null;
+  /** Etapa corrente da máquina de estados existente. */
+  workflowState?: string | null;
+};
+
 /** Entrada estruturada do motor. */
 export type ContextoConfianca = {
   conversationId?: string | null;
