@@ -252,8 +252,21 @@ export function ConfiancaMensagemBadge({
               )}
             </Secao>
             <Grupo titulo="Validações" linhas={detalhe.linhas.filter((l) => l.grupo === "validador")} />
+            {detalhe.validadores.length > 0 && (
+              <Secao titulo="Dimensões">
+                <ul className="text-muted-foreground">
+                  {detalhe.validadores.map((v) => (
+                    <li key={v.validator}>
+                      {v.validator}: {v.status}
+                      {v.reasonCode ? ` (${v.reasonCode})` : ""}
+                    </li>
+                  ))}
+                </ul>
+              </Secao>
+            )}
             <Grupo titulo="Ferramentas" linhas={detalhe.linhas.filter((l) => l.grupo === "ferramenta")} />
             <Grupo titulo="Fontes" linhas={detalhe.linhas.filter((l) => l.grupo === "fonte")} />
+            <Grupo titulo="Conflitos" linhas={detalhe.linhas.filter((l) => l.grupo === "conflito")} />
             {detalhe.reasonCodes.length > 0 && (
               <Secao titulo="Motivos registrados">
                 <p className="text-muted-foreground">{detalhe.reasonCodes.join(", ")}</p>
@@ -261,6 +274,7 @@ export function ConfiancaMensagemBadge({
             )}
             <p className="text-[10px] text-muted-foreground">
               Política: {detalhe.policyVersion ?? confianca.policy_version ?? "desconhecida"} ·
+              Motor: {detalhe.engineVersion ?? "—"} · Avaliação: {detalhe.avaliacao ?? "—"} ·
               Ambiente: {detalhe.ambiente}
             </p>
           </>
