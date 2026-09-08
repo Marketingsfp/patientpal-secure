@@ -220,7 +220,7 @@ export function FormServico({
       <div className="space-y-1">
         <Label>Nota interna (somente equipe)</Label>
         <Textarea
-          rows={2}
+          rows={6}
           value={estado.nota_interna}
           disabled={somenteLeitura}
           placeholder="Uso interno — não é fornecido à Nina nem ao paciente"

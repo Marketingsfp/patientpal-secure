@@ -399,7 +399,7 @@ export function FormProfissional({
       <div className="space-y-1">
         <Label>Nota interna (somente equipe)</Label>
         <Textarea
-          rows={2}
+          rows={6}
           value={estado.nota_interna}
           disabled={somenteLeitura}
           onChange={(e) => set({ nota_interna: e.target.value })}
