@@ -1312,6 +1312,15 @@ ATENDIMENTO HUMANO — REGRA OBRIGATÓRIA:
   });
 
   let resposta = "";
+  // FASE 5 — guardados para a verificação da RESPOSTA FINAL (answer_confidence),
+  // que roda depois de todo o pós-processamento, sobre o texto realmente enviado.
+  let estadoTurnoFinal:
+    | import("@/lib/nina/confidence/runtime").EstadoDoTurno
+    | null = null;
+  let avaliacaoAcao:
+    | import("@/lib/nina/confidence/types").ResultadoConfianca
+    | null = null;
+  let execucaoIdFinal: string | null = null;
   let houveHandoff = false;
   // Só vira `true` quando a ferramenta "agendar" devolve sucesso COM
   // appointment_id verificado no banco — ou quando a conversa JÁ tem um
@@ -1516,7 +1525,13 @@ ATENDIMENTO HUMANO — REGRA OBRIGATÓRIA:
       const { politicaEfetiva } = await import(
         "@/lib/nina/confidence/politica-override.server"
       );
+      // FASE 5 — esta avaliação é de SEGURANÇA DA AÇÃO (action_safety):
+      // decide esclarecer, transferir ou bloquear ANTES de agir. Ela não é a
+      // nota da mensagem: essa é medida no fim, sobre o texto final.
       const decisao = decidirNoTurno(estadoTurno, await politicaEfetiva(clinicaId));
+      estadoTurnoFinal = estadoTurno;
+      avaliacaoAcao = decisao;
+      execucaoIdFinal = respostaIA.execucaoId ?? null;
 
       // FASE 8 — ATIVAÇÃO PROGRESSIVA: etapa A só observa; B aplica handoff e
       // bloqueio; C acrescenta esclarecimento; D endurece o agendamento.
@@ -1785,6 +1800,80 @@ ATENDIMENTO HUMANO — REGRA OBRIGATÓRIA:
       identidade_tentativas: estadoId.tentativas + 1,
     });
   }
+  // ---------------- FASE 5: FINAL ANSWER VERIFICATION ----------------
+  // A partir daqui o texto não muda mais. É ESTE texto — com saudação
+  // obrigatória, avisos internos e banner de transferência já aplicados — que
+  // é avaliado, persistido e enviado. O score de um texto anterior nunca é
+  // reaproveitado: se a mensagem mudou depois da avaliação da ação, o motor
+  // roda de novo sobre a mensagem final.
+  try {
+    if (estadoTurnoFinal) {
+      const [{ garantirScoreDoTextoEnviado, paraDecisaoLegado }, { montarRegistroAuditoria }, { politicaEfetiva }] =
+        await Promise.all([
+          import("@/lib/nina/confidence/runtime"),
+          import("@/lib/nina/confidence/auditoria"),
+          import("@/lib/nina/confidence/politica-override.server"),
+        ]);
+      const estadoParaTextoFinal = {
+        ...estadoTurnoFinal,
+        texto: resposta,
+        handoffSolicitado: houveHandoff,
+        agendamentoConfirmado,
+      };
+      const gate = garantirScoreDoTextoEnviado(
+        estadoParaTextoFinal,
+        resposta,
+        // A avaliação da ação nunca serve como nota da mensagem final: ela é
+        // action_safety, então o gate sempre a invalida e recalcula.
+        avaliacaoAcao,
+        await politicaEfetiva(clinicaId),
+      );
+      const respostaFinalAvaliada = gate.resultado;
+
+      rastro?.concluir("answer.verify", {
+        score: respostaFinalAvaliada.score,
+        nivel: respostaFinalAvaliada.level,
+        cobertura: respostaFinalAvaliada.evidenceCoverage,
+        claims_total: respostaFinalAvaliada.claims?.total ?? 0,
+        claims_sem_evidencia: respostaFinalAvaliada.claims?.semEvidencia.length ?? 0,
+        recalculado: gate.recalculado,
+        motivo_gate: gate.motivo,
+        texto_hash: respostaFinalAvaliada.textoAvaliadoHash,
+      });
+
+      const { registrarDecisaoConfianca } = await import(
+        "@/lib/nina/confidence-engine.server"
+      );
+      void registrarDecisaoConfianca({
+        clinicaId,
+        conversaId: estadoId.conversaId ?? null,
+        execucaoId: execucaoIdFinal,
+        traceId: rastro?.ids.trace_id ?? null,
+        teste: opcoes?.teste === true,
+        ambiente:
+          opcoes?.ambiente ?? (opcoes?.teste === true ? "homologacao" : "producao"),
+        avaliacao: "answer_confidence",
+        textoFinalHash: respostaFinalAvaliada.textoAvaliadoHash,
+        claims: respostaFinalAvaliada.claims ?? null,
+        decisao: paraDecisaoLegado(respostaFinalAvaliada),
+        modo: "shadow",
+        auditoria: montarRegistroAuditoria(respostaFinalAvaliada, {
+          conversationId: estadoId.conversaId ?? null,
+          messageId: estadoTurnoFinal.messageId ?? null,
+          intencao: estadoTurnoFinal.intent ?? null,
+          acaoSolicitada: estadoTurnoFinal.acao ?? "desconhecida",
+          ferramentas: evidenciasFerramentas,
+        }),
+      });
+    }
+  } catch (e) {
+    // Verificação da resposta final é observabilidade: nunca derruba o envio.
+    console.warn(
+      "[nina-confianca] falha na verificação da resposta final:",
+      e instanceof Error ? e.message : e,
+    );
+  }
+
   // Evidências finais: estado/sessão no momento da resposta, regras aplicáveis,
   // alterações posteriores ao texto do modelo e a mensagem realmente enviada.
   try {

@@ -10,7 +10,8 @@
  */
 import { describe, expect, it } from "bun:test";
 import { decidirConfianca } from "./engine";
-import { decidirNoTurno, montarContextoDoTurno, type EstadoDoTurno } from "./runtime";
+import { decidirNoTurno, garantirScoreDoTextoEnviado, montarContextoDoTurno, verificarRespostaFinalDoTurno, type EstadoDoTurno } from "./runtime";
+import { avaliacaoCorrespondeAoTexto } from "./hash";
 import { medirEvidencia, pontuarValidadores, POLITICA_PADRAO } from "./policy";
 import { IntentClarityValidator, ToolIntegrityValidator } from "./validators";
 import type { ContextoConfianca, ResultadoValidador } from "./types";
@@ -238,36 +239,34 @@ describe("BASELINE 4 — a confiança fica presa ao texto avaliado, não ao envi
     catalogoEncontrou: true,
   });
 
-  it("texto A avaliado e texto B enviado produzem decisões diferentes — e ninguém reavalia", () => {
+  it("FASE 5 — score de um texto nunca é reaproveitado para outro texto", () => {
     const textoA = "O atendimento do cardiologista é por ordem de chegada.";
     const textoB = "A consulta custa R$ 250,00 e já está agendada para segunda.";
 
     const avaliadoA = decidirNoTurno({ ...base, texto: textoA });
-    const seFosseB = decidirNoTurno({ ...base, texto: textoB });
+    // A decisão da AÇÃO não é a nota da mensagem: sem amarra textual.
+    expect(avaliadoA.tipoAvaliacao).toBe("action_safety");
+    expect(avaliadoA.textoAvaliadoHash ?? null).toBeNull();
 
-    // A avaliação de A não descreve B: categorias e/ou nota divergem.
-    const diferente =
-      avaliadoA.score !== seFosseB.score ||
-      avaliadoA.decision !== seFosseB.decision ||
-      JSON.stringify(avaliadoA.evidence.categorias) !==
-        JSON.stringify(seFosseB.evidence.categorias);
-    expect(diferente).toBe(true);
+    // O gate de saída percebe que a mensagem entregue é outra e reavalia.
+    const gate = garantirScoreDoTextoEnviado({ ...base, texto: textoB }, textoB, avaliadoA);
+    expect(gate.recalculado).toBe(true);
+    expect(gate.motivo).toBe("texto_alterado_apos_avaliacao");
+    expect(avaliacaoCorrespondeAoTexto(gate.resultado.textoAvaliadoHash, textoB)).toBe(true);
 
-    // O resultado guardado não carrega o texto avaliado: não há como o
-    // pipeline detectar que a mensagem enviada mudou depois da decisão.
-    expect(Object.keys(avaliadoA)).not.toContain("draftTextHash");
-    expect(Object.keys(avaliadoA)).not.toContain("textoAvaliado");
+    // Reapresentar o MESMO texto reaproveita a avaliação, sem recalcular.
+    const outra = garantirScoreDoTextoEnviado({ ...base, texto: textoB }, textoB, gate.resultado);
+    expect(outra.recalculado).toBe(false);
+    expect(outra.resultado.score).toBe(gate.resultado.score);
   });
 
-  it("o resultado do motor não expõe nenhuma amarra com o texto avaliado", () => {
-    const r = decidirNoTurno({ ...base, texto: "qualquer coisa" });
-    const chaves = Object.keys(r);
-    expect(chaves).toEqual(
-      expect.arrayContaining(["score", "level", "decision", "blockers", "checks", "validators", "evidence"]),
-    );
-    expect(chaves.some((k) => k.toLowerCase().includes("texto") || k.toLowerCase().includes("draft"))).toBe(
-      false,
-    );
+  it("FASE 5 — a avaliação da resposta final fica amarrada ao texto enviado", () => {
+    const r = verificarRespostaFinalDoTurno({ ...base }, "texto final entregue ao paciente");
+    expect(r.tipoAvaliacao).toBe("answer_confidence");
+    expect(r.textoAvaliadoHash).toBeTruthy();
+    expect(avaliacaoCorrespondeAoTexto(r.textoAvaliadoHash, "texto final entregue ao paciente")).toBe(true);
+    // Qualquer alteração posterior invalida o score.
+    expect(avaliacaoCorrespondeAoTexto(r.textoAvaliadoHash, "texto final entregue ao paciente!")).toBe(false);
   });
 });
 

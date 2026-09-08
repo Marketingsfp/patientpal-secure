@@ -37,7 +37,9 @@ export type HardBlocker =
   // FASE 4 — coerência de processo e prova de ações.
   | "WORKFLOW_STATE_MISMATCH"
   | "REQUIRED_TOOL_NOT_CALLED"
-  | "UNSUPPORTED_OPERATIONAL_CLAIM";
+  | "UNSUPPORTED_OPERATIONAL_CLAIM"
+  // FASE 5 — afirmação isolada da resposta final sem fonte.
+  | "UNGROUNDED_CLAIM";
 
 /**
  * FASE 3 — teto de confiança por cobertura de evidência.
@@ -94,9 +96,14 @@ export type PoliticaConfianca = {
  * dimensão crítica de cobertura) e três bloqueadores canônicos novos:
  * `WORKFLOW_STATE_MISMATCH`, `REQUIRED_TOOL_NOT_CALLED` e
  * `UNSUPPORTED_OPERATIONAL_CLAIM`.
- * Snapshots gravados com "v1"/"v2" continuam válidos sob a régua da época.
+ * v3 -> v4 (Fase 5): a avaliação passou a distinguir `action_safety` de
+ * `answer_confidence` (esta última medida sobre o TEXTO FINAL já
+ * pós-processado); entrou o `ClaimGroundingValidator` (peso 20, dimensão
+ * crítica) com o bloqueador `UNGROUNDED_CLAIM`; e foi REMOVIDA a penalidade
+ * `foco_da_resposta` — quantidade de fatos deixou de reduzir a confiança.
+ * Snapshots gravados com "v1"/"v2"/"v3" continuam válidos sob a régua da época.
  */
-export const VERSAO_POLITICA = "v3";
+export const VERSAO_POLITICA = "v4";
 
 export const POLITICA_PADRAO: PoliticaConfianca = {
   pesos: {
@@ -111,6 +118,9 @@ export const POLITICA_PADRAO: PoliticaConfianca = {
     // FASE 4 — coerência do processo pesa como fonte oficial: é ela que
     // separa "resposta bonita" de "resposta com caminho verificado".
     WorkflowConsistencyValidator: 15,
+    // FASE 5 — grounding por afirmação: é o que impede uma frase verdadeira
+    // de "carregar" outra sem fonte na mesma mensagem.
+    ClaimGroundingValidator: 20,
     // ActionRisk não pontua: ele endurece o mínimo exigido.
     ActionRiskValidator: 0,
   },
@@ -118,7 +128,9 @@ export const POLITICA_PADRAO: PoliticaConfianca = {
   penalidades: {
     consulta_realizada: 45,
     paciente_identificado: 20,
-    foco_da_resposta: 15,
+    // FASE 5 — `foco_da_resposta` foi REMOVIDA de propósito: dar valor,
+    // profissional, data, horário e unidade na mesma resposta é a regra da
+    // Nina, não um defeito. Fato sem fonte é medido pelo grounding.
     resposta_nao_vazia: 60,
   },
   minimoPorRisco: { LOW: 50, MEDIUM: 60, HIGH: 80, CRITICAL: 90 },
@@ -136,6 +148,7 @@ export const POLITICA_PADRAO: PoliticaConfianca = {
     WORKFLOW_INCONSISTENTE: "WORKFLOW_STATE_MISMATCH",
     FERRAMENTA_OBRIGATORIA_NAO_CHAMADA: "REQUIRED_TOOL_NOT_CALLED",
     AFIRMACAO_OPERACIONAL_SEM_PROVA: "UNSUPPORTED_OPERATIONAL_CLAIM",
+    AFIRMACAO_SEM_EVIDENCIA: "UNGROUNDED_CLAIM",
   },
   acoesDeEscrita: ["criar_agendamento", "cancelar_agendamento"],
   cobertura: {
@@ -149,6 +162,7 @@ export const POLITICA_PADRAO: PoliticaConfianca = {
       "RequiredDataValidator",
       "IntentClarityValidator",
       "WorkflowConsistencyValidator",
+      "ClaimGroundingValidator",
     ],
     fontesObrigatorias: ["OfficialSourceValidator"],
   },

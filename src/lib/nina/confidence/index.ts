@@ -37,3 +37,21 @@ export {
   WorkflowConsistencyValidator,
   type AfirmacaoOperacional,
 } from "./workflow";
+// FASE 5 — grounding por afirmação e verificação da resposta final.
+export {
+  avaliarGrounding,
+  ClaimGroundingValidator,
+  evidenciasDisponiveis,
+  extrairClaimsDoTexto,
+  type ClaimAvaliado,
+  type ResultadoGrounding,
+} from "./claims";
+export { avaliacaoCorrespondeAoTexto, hashDoTexto } from "./hash";
+export {
+  assegurarAvaliacaoDoTextoFinal,
+  avaliacaoValeParaOTexto,
+  verificarRespostaFinal,
+  verificarSegurancaDaAcao,
+  type EntradaRespostaFinal,
+  type SaidaGateRespostaFinal,
+} from "./final-answer";

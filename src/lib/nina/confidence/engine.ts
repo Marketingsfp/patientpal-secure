@@ -9,6 +9,8 @@
  * (`../confidence-engine`) em vez de criar uma segunda gramática paralela.
  */
 import { detectarCategorias, type CategoriaConfianca } from "../confidence-engine";
+import { avaliarGrounding } from "./claims";
+import { hashDoTexto } from "./hash";
 import {
   executarValidadoresDeConfianca,
   riscoDaAcao,
@@ -221,14 +223,10 @@ export function executarValidadores(ctx: ContextoConfianca): Verificacao[] {
     );
   }
 
-  checks.push(
-    check(
-      "foco_da_resposta",
-      "Resposta não acumula afirmações sensíveis demais",
-      cats.length < 3,
-      POLITICA_PADRAO.penalidades["foco_da_resposta"] ?? 0,
-    ),
-  );
+  // FASE 5 — REMOVIDA a penalidade "foco_da_resposta". Responder valor +
+  // profissional + data + horário + unidade na mesma mensagem é EXATAMENTE o
+  // que a Nina deve fazer. Quantidade de fatos nunca reduz confiança; o que
+  // reduz é fato SEM evidência, medido claim a claim (ClaimGroundingValidator).
 
   if (ctx.draftText !== undefined && ctx.draftText !== null) {
     checks.push(check("resposta_nao_vazia", "A resposta tem conteúdo", ctx.draftText.trim().length > 0, POLITICA_PADRAO.penalidades["resposta_nao_vazia"] ?? 0));
@@ -309,18 +307,22 @@ export function decidirConfianca(
     politica,
   );
 
-  // FASE 4 — handoff já pedido pelo runtime deixa de ser atalho cego.
-  // Transferir é seguro, então a decisão pode ser liberada; mas isso só vale
-  // quando NENHUM bloqueio (inclusive incoerência de processo ou afirmação
-  // sem prova) foi detectado. A nota e a cobertura seguem sendo as reais.
+  const tipoAvaliacao = ctx.tipoAvaliacao ?? "action_safety";
+
+  // FASE 4/5 — handoff já pedido pelo runtime deixa de ser atalho cego.
+  // TRANSFERIR é uma AÇÃO segura (action_safety), então a decisão pode ser
+  // liberada quando não há nenhum bloqueio. Isso NUNCA vale para a avaliação
+  // da mensagem final: "vou chamar uma atendente" não torna o restante do
+  // texto verdadeiro. A nota e a cobertura seguem sendo as reais em ambos.
   let decisaoFinal = decision;
   if (
+    tipoAvaliacao === "action_safety" &&
     ctx.businessContext.handoffSolicitado &&
     blockers.length === 0 &&
     hardBlockers.length === 0
   ) {
     decisaoFinal = "ALLOW";
-    motivos.push("handoff já solicitado pelo runtime — transferência é o caminho seguro");
+    motivos.push("handoff já solicitado pelo runtime — transferir é a ação segura");
   }
 
   for (const l of limitacoes) {
@@ -331,7 +333,25 @@ export function decidirConfianca(
   }
   if (motivos.length === 0) motivos.push("evidências suficientes no sistema");
 
+  const grounding = avaliarGrounding(ctx, ctx.draftText ?? "");
+
   return {
+    tipoAvaliacao,
+    // A amarra com o texto só faz sentido na avaliação da RESPOSTA FINAL:
+    // a avaliação de segurança da ação não é a nota de nenhuma mensagem.
+    textoAvaliadoHash:
+      (ctx.tipoAvaliacao ?? "action_safety") === "answer_confidence"
+        ? hashDoTexto(ctx.draftText ?? null)
+        : null,
+    claims: {
+      total: grounding.total,
+      suportados: grounding.suportados,
+      semEvidencia: grounding.semEvidencia.map((c) => ({
+        tipo: c.tipo,
+        trecho: c.trecho,
+        motivo: c.motivo,
+      })),
+    },
     score,
     evidenceCoverage: medida.cobertura,
     unknownDimensions: medida.desconhecidas,

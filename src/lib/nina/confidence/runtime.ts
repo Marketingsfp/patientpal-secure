@@ -10,6 +10,7 @@
  */
 import type { DecisaoConfianca } from "../confidence-engine";
 import { decidirConfianca } from "./engine";
+import { assegurarAvaliacaoDoTextoFinal, verificarRespostaFinal } from "./final-answer";
 import type { HardBlocker } from "./policy";
 import { contaContraANota } from "./types";
 import type {
@@ -117,7 +118,42 @@ export function decidirNoTurno(
   e: EstadoDoTurno,
   politica?: import("./policy").PoliticaConfianca,
 ): ResultadoConfianca {
-  return decidirConfianca(montarContextoDoTurno(e), politica ? { politica } : {});
+  return decidirConfianca(
+    { ...montarContextoDoTurno(e), tipoAvaliacao: "action_safety" },
+    politica ? { politica } : {},
+  );
+}
+
+/**
+ * FASE 5 — avalia a MENSAGEM FINAL (já pós-processada) que o paciente vai
+ * receber. Roda depois de saudação obrigatória, avisos internos e qualquer
+ * outro ajuste de texto — nunca sobre o rascunho do modelo.
+ */
+export function verificarRespostaFinalDoTurno(
+  e: EstadoDoTurno,
+  textoFinal: string,
+  politica?: import("./policy").PoliticaConfianca,
+): ResultadoConfianca {
+  return verificarRespostaFinal({
+    ctx: montarContextoDoTurno(e),
+    textoFinal,
+    ...(politica ? { politica } : {}),
+  });
+}
+
+/** GATE DE SAÍDA: o score gravado tem de ser o do texto realmente enviado. */
+export function garantirScoreDoTextoEnviado(
+  e: EstadoDoTurno,
+  textoFinal: string,
+  avaliacaoPrevia?: ResultadoConfianca | null,
+  politica?: import("./policy").PoliticaConfianca,
+) {
+  return assegurarAvaliacaoDoTextoFinal({
+    ctx: montarContextoDoTurno(e),
+    textoFinal,
+    ...(avaliacaoPrevia ? { avaliacaoPrevia } : {}),
+    ...(politica ? { politica } : {}),
+  });
 }
 
 

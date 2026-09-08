@@ -10,6 +10,7 @@
  * `executarValidadoresDeConfianca` isola cada execução e devolve WARNING.
  */
 import { contaContraANota } from "./types";
+import { ClaimGroundingValidator } from "./claims";
 import { WorkflowConsistencyValidator } from "./workflow";
 import type {
   Bloqueador,
@@ -61,6 +62,8 @@ export const CONFIG_PADRAO_VALIDADORES: ConfigValidadores = {
   ActionRiskValidator: { ativo: true, peso: 0 },
   // FASE 4 — coerência do processo e prova das ações afirmadas.
   WorkflowConsistencyValidator: { ativo: true, peso: 0 },
+  // FASE 5 — grounding afirmação a afirmação da resposta final.
+  ClaimGroundingValidator: { ativo: true, peso: 0 },
 };
 
 /** Confiança mínima exigida conforme o risco da ação. */
@@ -448,6 +451,8 @@ export function executarValidadoresDeConfianca({
     { nome: "ActionRiskValidator", run: () => ActionRiskValidator(ctx) },
     // FASE 4 — o processo que levou à resposta precisa fazer sentido.
     { nome: "WorkflowConsistencyValidator", run: () => WorkflowConsistencyValidator(ctx) },
+    // FASE 5 — cada afirmação da resposta final precisa da sua própria fonte.
+    { nome: "ClaimGroundingValidator", run: () => ClaimGroundingValidator(ctx) },
   ];
 
   return registro.map(({ nome, run }) => {

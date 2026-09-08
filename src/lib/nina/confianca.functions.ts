@@ -134,16 +134,23 @@ export const confiabilidadeDaExecucao = createServerFn({ method: "POST" })
     z.object({ clinicaId: z.string().uuid(), execucaoId: z.string().uuid() }).parse(i),
   )
   .handler(async ({ data, context }): Promise<ConfiabilidadeDecisaoView | null> => {
-    const { data: row, error } = await context.supabase
-      .from("nina_confianca_decisoes")
-      .select(
-        "created_at, ambiente, score, nivel, intencao, resultado_final, bloqueadores, validadores, ferramentas, fontes, reason_codes, acao_solicitada, policy_version",
-      )
-      .eq("clinica_id", data.clinicaId)
-      .eq("execucao_id", data.execucaoId)
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
+    const colunas =
+      "created_at, ambiente, score, nivel, intencao, resultado_final, bloqueadores, validadores, ferramentas, fontes, reason_codes, acao_solicitada, policy_version, avaliacao";
+    // FASE 5 — o indicador da mensagem é a confiança da RESPOSTA FINAL.
+    // Só quando não existir essa avaliação (execuções antigas) caímos na
+    // avaliação de segurança da ação.
+    const buscar = async (avaliacao: string | null) => {
+      let q = context.supabase
+        .from("nina_confianca_decisoes")
+        .select(colunas)
+        .eq("clinica_id", data.clinicaId)
+        .eq("execucao_id", data.execucaoId);
+      if (avaliacao) q = q.eq("avaliacao", avaliacao);
+      return q.order("created_at", { ascending: false }).limit(1).maybeSingle();
+    };
+    const preferida = await buscar("answer_confidence");
+    if (preferida.error) throw new Error(preferida.error.message);
+    const { data: row, error } = preferida.data ? preferida : await buscar(null);
     if (error) throw new Error(error.message);
     if (!row) return null;
 
@@ -651,19 +658,26 @@ export const confiancaDasExecucoes = createServerFn({ method: "POST" })
   .handler(async ({ data, context }): Promise<ConfiancaDaMensagem[]> => {
     const { data: rows, error } = await context.supabase
       .from("nina_confianca_decisoes")
-      .select("execucao_id, score, nivel, resultado_final, acao, bloqueadores, bloqueio, created_at, policy_version")
+      .select(
+        "execucao_id, score, nivel, resultado_final, acao, bloqueadores, bloqueio, created_at, policy_version, avaliacao",
+      )
       .eq("clinica_id", data.clinicaId)
       .in("execucao_id", data.execucaoIds)
       .order("created_at", { ascending: true });
     if (error) throw new Error(error.message);
 
-    // Uma execução pode ter mais de uma decisão (esclarecimento + resposta):
-    // vale a última, que é a que produziu a mensagem entregue.
+    // Uma execução pode ter mais de uma decisão (segurança da ação + resposta
+    // final). FASE 5: o indicador mostra a confiança da RESPOSTA FINAL; a
+    // avaliação da ação só aparece quando não existe avaliação da resposta.
     const porExecucao = new Map<string, ConfiancaDaMensagem>();
+    const prioridade = new Map<string, number>();
     for (const raw of rows ?? []) {
       const r = raw as Record<string, unknown>;
       const id = r["execucao_id"] ? String(r["execucao_id"]) : "";
       if (!id) continue;
+      const peso = String(r["avaliacao"] ?? "action_safety") === "answer_confidence" ? 2 : 1;
+      if ((prioridade.get(id) ?? 0) > peso) continue;
+      prioridade.set(id, peso);
       const bloqueio = r["bloqueio"] ? [String(r["bloqueio"])] : [];
       porExecucao.set(id, {
         execucao_id: id,

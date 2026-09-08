@@ -8329,9 +8329,11 @@ export type Database = {
           acao: string
           acao_solicitada: string | null
           ambiente: string
+          avaliacao: string
           bloqueadores: string[]
           bloqueio: string | null
           categorias: Json
+          claims: Json | null
           clinica_id: string
           conversation_id: string | null
           created_at: string
@@ -8350,6 +8352,7 @@ export type Database = {
           resultado_final: string | null
           score: number
           teria_permitido: boolean | null
+          texto_final_hash: string | null
           trace_id: string | null
           updated_at: string
           validadores: Json
@@ -8358,9 +8361,11 @@ export type Database = {
           acao: string
           acao_solicitada?: string | null
           ambiente?: string
+          avaliacao?: string
           bloqueadores?: string[]
           bloqueio?: string | null
           categorias?: Json
+          claims?: Json | null
           clinica_id: string
           conversation_id?: string | null
           created_at?: string
@@ -8379,6 +8384,7 @@ export type Database = {
           resultado_final?: string | null
           score?: number
           teria_permitido?: boolean | null
+          texto_final_hash?: string | null
           trace_id?: string | null
           updated_at?: string
           validadores?: Json
@@ -8387,9 +8393,11 @@ export type Database = {
           acao?: string
           acao_solicitada?: string | null
           ambiente?: string
+          avaliacao?: string
           bloqueadores?: string[]
           bloqueio?: string | null
           categorias?: Json
+          claims?: Json | null
           clinica_id?: string
           conversation_id?: string | null
           created_at?: string
@@ -8408,6 +8416,7 @@ export type Database = {
           resultado_final?: string | null
           score?: number
           teria_permitido?: boolean | null
+          texto_final_hash?: string | null
           trace_id?: string | null
           updated_at?: string
           validadores?: Json
