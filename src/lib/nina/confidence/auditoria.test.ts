@@ -8,6 +8,8 @@ import {
 import type { ResultadoConfianca } from "./types";
 
 const base: ResultadoConfianca = {
+  tipoAvaliacao: "answer_confidence",
+  textoAvaliadoHash: null,
   score: 94,
   evidenceCoverage: 100,
   unknownDimensions: [],

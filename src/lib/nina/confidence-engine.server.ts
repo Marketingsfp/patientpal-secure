@@ -35,6 +35,16 @@ export async function registrarDecisaoConfianca(params: {
   teriaPermitido?: boolean;
   /** Versão da política usada nesta avaliação (imutável no histórico). */
   policyVersion?: string;
+  /**
+   * FASE 5 — o que este registro avalia:
+   * - `action_safety`: era seguro executar a ação (padrão histórico);
+   * - `answer_confidence`: a mensagem final realmente enviada ao paciente.
+   */
+  avaliacao?: "action_safety" | "answer_confidence";
+  /** FASE 5 — impressão digital do texto avaliado (gate de saída). */
+  textoFinalHash?: string | null;
+  /** FASE 5 — grounding afirmação a afirmação da resposta final. */
+  claims?: unknown;
 }): Promise<void> {
   try {
     const a = params.auditoria ?? null;
@@ -52,6 +62,9 @@ export async function registrarDecisaoConfianca(params: {
       modo: params.modo ?? "shadow",
       teria_permitido: params.teriaPermitido ?? null,
       policy_version: params.policyVersion ?? VERSAO_POLITICA,
+      avaliacao: params.avaliacao ?? "action_safety",
+      texto_final_hash: params.textoFinalHash ?? null,
+      claims: params.claims ?? null,
       ...(a
         ? {
             message_id: a.messageId,

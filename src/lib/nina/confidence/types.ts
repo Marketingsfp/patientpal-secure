@@ -110,8 +110,46 @@ export type EstadoOperacionalTurno = {
   workflowState?: string | null;
 };
 
+/**
+ * FASE 5 — tipo de afirmação verificável dentro de UMA resposta.
+ * Uma resposta pode conter vários claims independentes; cada um precisa de
+ * fonte própria (ver `claims.ts`).
+ */
+export type TipoClaim =
+  | "valor"
+  | "profissional"
+  | "disponibilidade"
+  | "preparo"
+  | "regra"
+  | "agendamento";
+
+/**
+ * Claim declarado de forma estruturada pelo próprio ciclo do turno (metadata /
+ * structured output do modelo atual, quando existir). Nunca é obrigatório: sem
+ * ele, a verificação usa contexto e a leitura complementar do texto.
+ */
+export type ClaimEstruturado = {
+  id?: string;
+  tipo: TipoClaim;
+  texto: string;
+  fonte?: { tipo: TipoFonte; referencia?: string | null } | null;
+};
+
+/**
+ * FASE 5 — o que está sendo avaliado.
+ *
+ * - `action_safety`: é seguro EXECUTAR a ação (agendar, cancelar, transferir)?
+ * - `answer_confidence`: a MENSAGEM FINAL que o paciente vai receber é
+ *   confiável? É esta que o indicador ao lado da mensagem representa.
+ */
+export type TipoAvaliacao = "action_safety" | "answer_confidence";
+
 /** Entrada estruturada do motor. */
 export type ContextoConfianca = {
+  /** FASE 5 — o que esta avaliação responde. Ausente = `action_safety`. */
+  tipoAvaliacao?: TipoAvaliacao;
+  /** FASE 5 — claims estruturados do turno, quando o runtime os conhece. */
+  claims?: ClaimEstruturado[];
   conversationId?: string | null;
   messageId?: string | null;
   /** Intenção detectada pelo runtime, quando houver. Opcional de propósito. */
@@ -175,7 +213,9 @@ export type Bloqueador =
   // FASE 4 — coerência do PROCESSO que levou à resposta.
   | "WORKFLOW_INCONSISTENTE"
   | "FERRAMENTA_OBRIGATORIA_NAO_CHAMADA"
-  | "AFIRMACAO_OPERACIONAL_SEM_PROVA";
+  | "AFIRMACAO_OPERACIONAL_SEM_PROVA"
+  // FASE 5 — afirmação isolada da resposta final sem fonte que a sustente.
+  | "AFIRMACAO_SEM_EVIDENCIA";
 
 /**
  * Status padronizado de um validador isolado.
@@ -238,6 +278,19 @@ export type EvidenciaConfianca = {
 
 /** Saída estruturada do motor. */
 export type ResultadoConfianca = {
+  /** FASE 5 — o que foi avaliado: segurança da ação ou a resposta final. */
+  tipoAvaliacao: TipoAvaliacao;
+  /**
+   * FASE 5 — impressão digital do texto avaliado. O score só vale para ESTE
+   * texto; se a mensagem mudar depois, a avaliação é invalidada e refeita.
+   */
+  textoAvaliadoHash: string | null;
+  /** FASE 5 — afirmação a afirmação: o que foi verificado e contra qual fonte. */
+  claims?: {
+    total: number;
+    suportados: number;
+    semEvidencia: Array<{ tipo: string; trecho: string; motivo: string }>;
+  };
   score: number;
   /**
    * FASE 3 — 0..100. Quanto das dimensões RELEVANTES deste turno pôde de fato
