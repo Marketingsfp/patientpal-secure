@@ -177,7 +177,7 @@ export function ConfiancaMensagemBadge({
           aria-label={`${estilo.rotulo}: ${confianca.score}%.${
             confianca.erro_reportado ? " Erro reportado por atendente." : ""
           } Ver detalhes.`}
-          title={`${estilo.rotulo} — ${confianca.score}% (visível apenas para a equipe)`}
+          title={`${estilo.rotulo} — ${scoreExibido(confianca.score)}% (visível apenas para a equipe)`}
           className={`inline-flex h-[18px] shrink-0 items-center gap-1 rounded-full border px-1.5 text-[10px] font-medium leading-none ${estilo.classe}`}
         >
           <span aria-hidden className={`h-1.5 w-1.5 rounded-full ${estilo.ponto}`} />
