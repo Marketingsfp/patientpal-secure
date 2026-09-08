@@ -502,6 +502,26 @@ function PerfisPage() {
         .upsert(rows, { onConflict: "perfil_id,modulo" });
       if (error) throw error;
       toast.success("Permissões salvas");
+
+      // FASE 4 — Telefonia é o que dá entrada na distribuição automática dos
+      // handoffs da Nina. Ao liberar Telefonia para um perfil, quem já está
+      // Online passa a ser elegível na hora: reavaliamos a fila de "Não
+      // atribuídas" imediatamente, em vez de esperar o próximo heartbeat.
+      // Remover a permissão não precisa de nada aqui — o pool é lido ao vivo
+      // no banco, e conversas já atribuídas nunca são retiradas de ninguém.
+      if (clinicaId && matriz[perfilSel]?.["telefonia"] !== "none") {
+        try {
+          const { distribuirFilaPendentes } = await import("@/lib/atendimento.functions");
+          const r = await distribuirFilaPendentes({ data: { clinicaId } });
+          if (r.distribuidas > 0) {
+            toast.success(
+              `${r.distribuidas} conversa(s) da fila foram distribuídas para a Telefonia.`,
+            );
+          }
+        } catch (e) {
+          console.error("[perfis] falha ao reavaliar fila após salvar", e);
+        }
+      }
     } catch (e) {
       console.error("[perfis] save error", e);
       toast.error("Falha ao salvar", {
