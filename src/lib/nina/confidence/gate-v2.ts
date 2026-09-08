@@ -10,7 +10,7 @@
  * etapas-flag.server.ts). Nenhuma flag paralela é criada.
  */
 import { montarContextoDoTurno, decidirNoTurno, type EstadoDoTurno } from "./runtime";
-import { assegurarAvaliacaoDoTextoFinal } from "./final-answer";
+import { assegurarAvaliacaoDoTextoFinal, verificarRespostaFinal } from "./final-answer";
 import { aplicarModo, type ModoConfianca } from "./shadow";
 import type { ResultadoConfianca } from "./types";
 
@@ -249,7 +249,13 @@ export const CASOS_GATE_V2: CasoGateV2[] = [
 ];
 
 export function executarCasoGateV2(c: CasoGateV2, modo: ModoConfianca = "shadow"): LinhaGateV2 {
-  const r = decidirNoTurno({ ...c.estado, mensagemPaciente: c.mensagem });
+  // O indicador da mensagem é answer_confidence (Fase 5): quando há texto
+  // final, é ele que vale. Sem texto, avaliamos a segurança da ação.
+  const estado: EstadoDoTurno = { ...c.estado, mensagemPaciente: c.mensagem };
+  const texto = c.estado.texto ?? null;
+  const r = texto
+    ? verificarRespostaFinal({ ctx: montarContextoDoTurno(estado), textoFinal: texto })
+    : decidirNoTurno(estado);
   const aplicado = aplicarModo(r, modo);
   return {
     id: c.id,
