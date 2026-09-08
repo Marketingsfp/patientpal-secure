@@ -2784,6 +2784,113 @@ export const distribuirFilaPendentes = createServerFn({ method: "POST" })
   });
 
 
+/**
+ * Diagnóstico (somente leitura) do pool de distribuição automática.
+ *
+ * Mostra, candidato a candidato, por que ele foi aceito ou rejeitado — as
+ * MESMAS condições que `public.atend_auto_assign_conversa` aplica no banco.
+ * Não atribui, não altera presença e não movimenta a fila: serve para
+ * investigar "por que fulano não recebeu" sem precisar de log temporário.
+ */
+export const diagnosticarPoolTelefonia = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => clinIdSchema.parse(i))
+  .handler(async ({ data, context }) => {
+    await assertMember(context.supabase, context.userId, data.clinicaId);
+    const sb = context.supabase;
+    const clinicaId = data.clinicaId;
+
+    const [{ data: presencas }, { data: pausas }, { data: membros }] = await Promise.all([
+      sb
+        .from("atend_agente_presenca")
+        .select("user_id, status, aceita_novas, visto_em")
+        .eq("clinica_id", clinicaId),
+      sb
+        .from("atend_pausas_log")
+        .select("user_id")
+        .eq("clinica_id", clinicaId)
+        .is("finalizada_em", null),
+      sb
+        .from("clinica_memberships")
+        .select("user_id, role")
+        .eq("clinica_id", clinicaId)
+        .eq("ativo", true),
+    ]);
+
+    const emPausa = new Set((pausas ?? []).map((p: { user_id: string }) => p.user_id));
+    const perfilPorUser = new Map(
+      (membros ?? []).map((m: { user_id: string; role: string }) => [m.user_id, m.role]),
+    );
+    const limite = Date.now() - 5 * 60 * 1000;
+
+    const candidatos = await Promise.all(
+      (presencas ?? []).map(
+        async (p: {
+          user_id: string;
+          status: string;
+          aceita_novas: boolean | null;
+          visto_em: string;
+        }) => {
+          const [{ data: telefonia }, { data: admin }, { count: carga }] = await Promise.all([
+            sb.rpc("has_module_access", {
+              _user_id: p.user_id,
+              _clinica_id: clinicaId,
+              _modulo: "telefonia",
+              _nivel: "read",
+            } as never),
+            sb.rpc("atend_usuario_e_admin", {
+              _user_id: p.user_id,
+              _clinica_id: clinicaId,
+            } as never),
+            sb
+              .from("atend_conversas")
+              .select("id", { count: "exact", head: true })
+              .eq("clinica_id", clinicaId)
+              .eq("atribuida_user_id", p.user_id)
+              .in("status", ["active", "in_progress", "waiting"]),
+          ]);
+
+          const temTelefonia = telefonia === true;
+          const ehAdmin = admin === true;
+          const presencaRecente = Date.parse(p.visto_em) > limite;
+          const online =
+            p.status === "ONLINE" && p.aceita_novas !== false && presencaRecente;
+
+          let motivo: string | null = null;
+          if (!temTelefonia) motivo = "missing_telefonia_permission";
+          else if (ehAdmin) motivo = "admin_excluido";
+          else if (p.status !== "ONLINE") motivo = `status_${p.status.toLowerCase()}`;
+          else if (p.aceita_novas === false) motivo = "nao_aceita_novas";
+          else if (!presencaRecente) motivo = "presenca_desatualizada";
+          else if (emPausa.has(p.user_id)) motivo = "em_pausa";
+
+          return {
+            user_id: p.user_id,
+            perfil: perfilPorUser.get(p.user_id) ?? "desconhecido",
+            telefonia: temTelefonia,
+            status: p.status,
+            aceita_novas: p.aceita_novas !== false,
+            presenca_recente: presencaRecente,
+            em_pausa: emPausa.has(p.user_id),
+            admin: ehAdmin,
+            online,
+            carga_atual: carga ?? 0,
+            elegivel: motivo === null,
+            motivo,
+          };
+        },
+      ),
+    );
+
+    candidatos.sort((a, b) => Number(b.elegivel) - Number(a.elegivel) || a.carga_atual - b.carga_atual);
+    return {
+      clinicaId,
+      avaliadoEm: new Date().toISOString(),
+      elegiveis: candidatos.filter((c) => c.elegivel).length,
+      candidatos,
+    };
+  });
+
 export const listarPresenca = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) => clinIdSchema.parse(i))
