@@ -253,6 +253,35 @@ export function HomologacaoInbox() {
     return itens.sort((a, b) => a.em.localeCompare(b.em));
   }, [msgs, eventosConversa]);
 
+  // FASE 1 — mesma leitura de confiança da Inbox de produção: UM lote por
+  // conversa (sem consulta por balão) e nada é recalculado na tela.
+  const execucoesDaNina = useMemo(() => execucoesDasRespostasNina(msgs), [msgs]);
+  const confiancaPorExecucao = useConfiancaMensagens(clinicaId, execucoesDaNina);
+
+  /** Metadados internos padronizados da mensagem (produção/homologação/teste). */
+  const metadadosDaMensagem = useCallback(
+    (m: Msg) =>
+      montarMetadadosMensagemNina({
+        messageId: m.id,
+        conversaTesteId: conversaId,
+        isTeste: true,
+        cicloId: leadAtualRef.current?.cicloId ?? null,
+        ninaSessionId: ninaSessionIdRef.current,
+        criadaEm: m.created_at,
+        execucaoId: m.execucao_id ?? null,
+        confianca: m.execucao_id
+          ? (() => {
+              const c = confiancaPorExecucao[String(m.execucao_id)];
+              return c ? { score: c.score, nivel: c.nivel } : null;
+            })()
+          : null,
+      }),
+    [conversaId, confiancaPorExecucao],
+  );
+  void metadadosDaMensagem;
+
+
+
   const chat = useChatScroll({
     conversaId: leadId,
     total: timeline.length,
