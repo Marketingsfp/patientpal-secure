@@ -13158,6 +13158,10 @@ export type Database = {
         }
         Returns: string
       }
+      atend_tem_perfil_telefonia: {
+        Args: { _clinica_id: string; _user_id: string }
+        Returns: boolean
+      }
       atend_usuario_e_admin: {
         Args: { _clinica_id: string; _user_id: string }
         Returns: boolean
