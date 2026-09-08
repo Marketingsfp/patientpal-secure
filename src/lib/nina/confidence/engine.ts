@@ -20,6 +20,7 @@ import {
   aplicarPolitica,
   detectarHardBlockers,
   medirEvidencia,
+  nivelDaPontuacao,
   POLITICA_PADRAO,
   type HardBlocker,
   type PoliticaConfianca,
@@ -325,6 +326,19 @@ export function decidirConfianca(
     motivos.push("handoff já solicitado pelo runtime — transferir é a ação segura");
   }
 
+  // FASE 7 — handoff nunca é sinônimo de certeza factual da MENSAGEM. A ação
+  // pode ser segura; a nota da resposta não sobe por causa disso.
+  let scoreFinal = score;
+  let nivelFinal = level;
+  if (tipoAvaliacao === "answer_confidence" && ctx.businessContext.handoffSolicitado) {
+    const teto = politica.limites.HIGH;
+    if (scoreFinal >= teto) {
+      scoreFinal = teto;
+      nivelFinal = nivelDaPontuacao(scoreFinal, politica);
+      motivos.push("transferência é ação segura, mas não comprova o conteúdo da resposta");
+    }
+  }
+
   for (const l of limitacoes) {
     motivos.push(`limitação de cobertura: ${l} (cobertura ${medida.cobertura}%)`);
   }
@@ -352,11 +366,11 @@ export function decidirConfianca(
         motivo: c.motivo,
       })),
     },
-    score,
+    score: scoreFinal,
     evidenceCoverage: medida.cobertura,
     unknownDimensions: medida.desconhecidas,
     confidenceInsufficient: medida.semEvidencia,
-    level,
+    level: nivelFinal,
     decision: decisaoFinal,
     blockers,
     hardBlockers,

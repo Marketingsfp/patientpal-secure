@@ -622,11 +622,29 @@ export const finalizarItemExecucao = createServerFn({ method: "POST" })
     if (conversaId) {
       const { data: snaps } = await supabaseAdmin
         .from("nina_confianca_decisoes")
-        .select("score, nivel, trace_id, message_id, policy_version")
+        .select(
+          "score, nivel, trace_id, message_id, policy_version, evidence_coverage, bloqueadores, outgoing_message_id",
+        )
         .eq("clinica_id", data.clinicaId)
         .eq("conversation_id", conversaId)
         .order("created_at", { ascending: true });
       resumoConfianca = resumirConfiancaExecucao((snaps ?? []) as any[]);
+
+      // FASE 7 — assertions determinísticas do Confidence Engine v2. O sistema
+      // confere invariantes dos snapshots REAIS (nada é recalculado aqui) e
+      // o avaliador de IA continua fora dessas verificações.
+      if ((snaps ?? []).length > 0) {
+        const { verificarConfiancaRunner, criteriosDeConfianca } = await import(
+          "@/lib/nina/confidence/gate-v2"
+        );
+        const criteriosConfianca = criteriosDeConfianca(
+          verificarConfiancaRunner((snaps ?? []) as any[]),
+        );
+        avaliados = [...avaliados, ...(criteriosConfianca as any[])];
+        if (resultado !== "inconclusivo") {
+          resultado = avaliados.every((a) => a.ok) ? "aprovado" : "reprovado";
+        }
+      }
     }
 
     const agora = new Date().toISOString();
