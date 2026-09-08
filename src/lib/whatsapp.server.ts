@@ -1468,6 +1468,48 @@ ATENDIMENTO HUMANO — REGRA OBRIGATÓRIA:
         clinicaId,
         conversaId: estadoId.conversaId ?? null,
         entities: dadosColetados,
+        // FASE 4 — estado REAL do fluxo (leitura da máquina de estados que já
+        // existe). O motor compara o que a Nina diz com o que o sistema tem.
+        estadoOperacional: {
+          bookingIntentConfirmed: fluxoEstado.appointment.intent_confirmed === true,
+          appointmentFlowActive: fluxoEstado.flow.stage !== "IDLE",
+          patientDataComplete: Boolean(
+            fluxoEstado.patient.identified && fluxoEstado.patient.id,
+          ),
+          slotSelected: Boolean(
+            fluxoEstado.appointment.slot_inicio && fluxoEstado.appointment.slot_fim,
+          ),
+          finalConfirmationReceived:
+            fluxoEstado.appointment.slot_confirmed_by_patient === true,
+          appointmentAttempted: evidenciasFerramentas.some(
+            (f) => f.capacidade === "createAppointment" || /agendar/i.test(f.nome),
+          ),
+          appointmentToolCalled: evidenciasFerramentas.some(
+            (f) => f.capacidade === "createAppointment" || /agendar/i.test(f.nome),
+          ),
+          appointmentCreated: agendamentoConfirmado,
+          appointmentId: fluxoEstado.appointment.appointment_id,
+          workflowState: fluxoEstado.flow.stage,
+        },
+        // Regras determinísticas do agendamento, derivadas do estado real.
+        regrasNegocio:
+          canonico.requestedAction === "criar_agendamento"
+            ? ([
+                {
+                  id: "agendamento_exige_paciente_identificado",
+                  descricao: "Agendar exige paciente identificado",
+                  satisfeita: Boolean(pacienteIdEfetivo),
+                },
+                {
+                  id: "agendamento_exige_vaga_confirmada",
+                  descricao: "Agendar exige vaga escolhida e confirmada",
+                  satisfeita: Boolean(
+                    fluxoEstado.appointment.slot_inicio &&
+                      fluxoEstado.appointment.slot_fim,
+                  ),
+                },
+              ])
+            : [],
       };
       // FASE 9 — a política só difere da padrão se um ajuste tiver sido
       // aprovado E aplicado por uma pessoa. A Nina nunca altera pesos sozinha.

@@ -77,6 +77,39 @@ export type ContextoNegocio = {
   handoffSolicitado: boolean;
 };
 
+/**
+ * FASE 4 — ESTADO OPERACIONAL REAL DO TURNO.
+ *
+ * Espelho, em leitura, da máquina de estados que JÁ existe no atendimento
+ * (`EstadoFluxoNina.flow.stage` e `EstadoFluxoNina.appointment`). O motor não
+ * cria nem avança estado: ele só compara o que a Nina está dizendo com o que
+ * o sistema realmente registrou.
+ *
+ * Campo ausente = desconhecido. Nunca "não aconteceu".
+ */
+export type EstadoOperacionalTurno = {
+  /** Paciente confirmou que quer agendar (não é a clínica ter agenda). */
+  bookingIntentConfirmed?: boolean;
+  /** O fluxo de agendamento está de fato em andamento nesta conversa. */
+  appointmentFlowActive?: boolean;
+  /** Nome, CPF e data de nascimento completos e identificados. */
+  patientDataComplete?: boolean;
+  /** Existe uma vaga escolhida (início/fim) em negociação. */
+  slotSelected?: boolean;
+  /** O paciente confirmou a vaga oferecida. */
+  finalConfirmationReceived?: boolean;
+  /** Houve tentativa real de gravar o agendamento neste turno/conversa. */
+  appointmentAttempted?: boolean;
+  /** A ferramenta de agendar foi efetivamente chamada. */
+  appointmentToolCalled?: boolean;
+  /** O agendamento foi gravado e confirmado pelo sistema. */
+  appointmentCreated?: boolean;
+  /** Prova persistida do agendamento (appointment_id ou equivalente). */
+  appointmentId?: string | null;
+  /** Etapa corrente da máquina de estados existente. */
+  workflowState?: string | null;
+};
+
 /** Entrada estruturada do motor. */
 export type ContextoConfianca = {
   conversationId?: string | null;
@@ -103,6 +136,8 @@ export type ContextoConfianca = {
   conflitos?: ConflitoDeFonte[];
   /** Regras determinísticas da clínica aplicáveis a este turno. */
   regrasNegocio?: RegraNegocio[];
+  /** FASE 4 — estado real do fluxo operacional, quando o runtime o conhece. */
+  operationalState?: EstadoOperacionalTurno;
 };
 
 /** O mesmo campo com valores diferentes em origens diferentes. */
@@ -136,7 +171,11 @@ export type Bloqueador =
   | "FONTE_NAO_VIGENTE"
   | "NOTA_INTERNA_COMO_FONTE"
   | "REGRA_EXIGE_HUMANO"
-  | "REGRA_DE_NEGOCIO_NAO_ATENDIDA";
+  | "REGRA_DE_NEGOCIO_NAO_ATENDIDA"
+  // FASE 4 — coerência do PROCESSO que levou à resposta.
+  | "WORKFLOW_INCONSISTENTE"
+  | "FERRAMENTA_OBRIGATORIA_NAO_CHAMADA"
+  | "AFIRMACAO_OPERACIONAL_SEM_PROVA";
 
 /**
  * Status padronizado de um validador isolado.

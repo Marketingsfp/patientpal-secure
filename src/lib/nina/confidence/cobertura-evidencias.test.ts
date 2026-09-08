@@ -197,8 +197,8 @@ describe("FASE 3.4 — cobertura registrada e auditável", () => {
     expect(r.evidence.motivos.join(" ")).toContain("dimensões sem evidência");
   });
 
-  it("a política de confiança está versionada em v2 (interpretação mudou)", () => {
-    expect(VERSAO_POLITICA).toBe("v2");
+  it("a política de confiança está versionada em v3 (interpretação mudou)", () => {
+    expect(VERSAO_POLITICA).toBe("v3");
     expect(POLITICA_PADRAO.cobertura.minimaParaHigh).toBeGreaterThan(0);
   });
 });

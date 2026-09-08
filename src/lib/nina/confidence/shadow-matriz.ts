@@ -192,6 +192,19 @@ export const CENARIOS_SHADOW: CenarioShadow[] = [
       ],
       requiredFields: ["procedimento", "medico", "inicio"],
       entities: { procedimento: "consulta", medico: "Ana", inicio: "2026-09-10T10:00" },
+      // FASE 4 — o processo também precisa provar o que a frase afirma.
+      estadoOperacional: {
+        bookingIntentConfirmed: true,
+        appointmentFlowActive: true,
+        patientDataComplete: true,
+        slotSelected: true,
+        finalConfirmationReceived: true,
+        appointmentAttempted: true,
+        appointmentToolCalled: true,
+        appointmentCreated: true,
+        appointmentId: "apt-matriz-1",
+        workflowState: "APPOINTMENT_CONFIRMED",
+      },
     },
   },
   {

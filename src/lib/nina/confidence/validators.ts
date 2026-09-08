@@ -10,6 +10,7 @@
  * `executarValidadoresDeConfianca` isola cada execução e devolve WARNING.
  */
 import { contaContraANota } from "./types";
+import { WorkflowConsistencyValidator } from "./workflow";
 import type {
   Bloqueador,
   ContextoConfianca,
@@ -58,6 +59,8 @@ export const CONFIG_PADRAO_VALIDADORES: ConfigValidadores = {
   ConflictValidator: { ativo: true, peso: 0 },
   BusinessRulesValidator: { ativo: true, peso: 0 },
   ActionRiskValidator: { ativo: true, peso: 0 },
+  // FASE 4 — coerência do processo e prova das ações afirmadas.
+  WorkflowConsistencyValidator: { ativo: true, peso: 0 },
 };
 
 /** Confiança mínima exigida conforme o risco da ação. */
@@ -443,6 +446,8 @@ export function executarValidadoresDeConfianca({
     { nome: "ConflictValidator", run: () => ConflictValidator(ctx) },
     { nome: "BusinessRulesValidator", run: () => BusinessRulesValidator(ctx) },
     { nome: "ActionRiskValidator", run: () => ActionRiskValidator(ctx) },
+    // FASE 4 — o processo que levou à resposta precisa fazer sentido.
+    { nome: "WorkflowConsistencyValidator", run: () => WorkflowConsistencyValidator(ctx) },
   ];
 
   return registro.map(({ nome, run }) => {
@@ -464,6 +469,8 @@ export function executarValidadoresDeConfianca({
     }
   });
 }
+
+export { WorkflowConsistencyValidator, classificarAfirmacaoOperacional } from "./workflow";
 
 /** Risco da ação conforme o ActionRiskValidator (usado pelo motor). */
 export function riscoDaAcao(ctx: ContextoConfianca): NivelRiscoAcao {

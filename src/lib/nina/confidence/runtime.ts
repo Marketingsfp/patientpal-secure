@@ -56,6 +56,11 @@ export type EstadoDoTurno = {
   conflitos?: ContextoConfianca["conflitos"];
   retrievedSources?: ContextoConfianca["retrievedSources"];
   regrasNegocio?: ContextoConfianca["regrasNegocio"];
+  /**
+   * FASE 4 — estado real do fluxo operacional (leitura da máquina de estados
+   * já existente do atendimento). Ausente = desconhecido, nunca "não houve".
+   */
+  estadoOperacional?: ContextoConfianca["operationalState"];
 };
 
 const CAP_CATALOGO = new Set(["searchKnowledgeBase", "listCatalog"]);
@@ -88,6 +93,7 @@ export function montarContextoDoTurno(e: EstadoDoTurno): ContextoConfianca {
     ...(e.entityCandidates ? { entityCandidates: e.entityCandidates } : {}),
     ...(e.conflitos ? { conflitos: e.conflitos } : {}),
     ...(e.regrasNegocio ? { regrasNegocio: e.regrasNegocio } : {}),
+    ...(e.estadoOperacional ? { operationalState: e.estadoOperacional } : {}),
     toolResults,
     ...(e.requiredFields ? { requiredFields: e.requiredFields } : {}),
     businessContext: {

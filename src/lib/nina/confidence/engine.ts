@@ -280,25 +280,6 @@ export function decidirConfianca(
   // FASE 3 — nota E cobertura, medidas na mesma passada e reportadas separadas.
   const medida = medirEvidencia(validators, politica);
 
-  // Handoff já pedido pelo modelo: o pipeline de transferência assume o turno.
-  // O 100 aqui é a segurança de TRANSFERIR, não a veracidade do texto — por
-  // isso a cobertura real continua sendo reportada sem maquiagem.
-  if (ctx.businessContext.handoffSolicitado) {
-    return {
-      score: 100,
-      evidenceCoverage: medida.cobertura,
-      unknownDimensions: medida.desconhecidas,
-      confidenceInsufficient: medida.semEvidencia,
-      level: "HIGH",
-      decision: "ALLOW",
-      blockers: [],
-      hardBlockers: [],
-      checks,
-      validators,
-      evidence: montarEvidencia(ctx, cats, ["handoff já solicitado pelo runtime"]),
-    };
-  }
-
   const risco = riscoDaAcao(ctx);
   const hardBlockers: HardBlocker[] = detectarHardBlockers(
     { bloqueadores: blockers, validators, risco },
@@ -328,6 +309,20 @@ export function decidirConfianca(
     politica,
   );
 
+  // FASE 4 — handoff já pedido pelo runtime deixa de ser atalho cego.
+  // Transferir é seguro, então a decisão pode ser liberada; mas isso só vale
+  // quando NENHUM bloqueio (inclusive incoerência de processo ou afirmação
+  // sem prova) foi detectado. A nota e a cobertura seguem sendo as reais.
+  let decisaoFinal = decision;
+  if (
+    ctx.businessContext.handoffSolicitado &&
+    blockers.length === 0 &&
+    hardBlockers.length === 0
+  ) {
+    decisaoFinal = "ALLOW";
+    motivos.push("handoff já solicitado pelo runtime — transferência é o caminho seguro");
+  }
+
   for (const l of limitacoes) {
     motivos.push(`limitação de cobertura: ${l} (cobertura ${medida.cobertura}%)`);
   }
@@ -342,7 +337,7 @@ export function decidirConfianca(
     unknownDimensions: medida.desconhecidas,
     confidenceInsufficient: medida.semEvidencia,
     level,
-    decision,
+    decision: decisaoFinal,
     blockers,
     hardBlockers,
     checks,

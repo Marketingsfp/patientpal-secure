@@ -197,15 +197,24 @@ describe("BASELINE 3 — mensagem de falha de agendamento sem tentativa de agend
     expect(r.evidence.motivos.join(" ")).not.toContain("tentativa");
   });
 
-  it("o mesmo turno com texto informativo correto recebe a MESMA avaliação", () => {
-    const comFalha = decidirNoTurno(turno);
+  it("CORRIGIDO NA FASE 4 — falha inventada NÃO recebe a mesma nota da resposta certa", () => {
+    const comFalha = decidirNoTurno({
+      ...turno,
+      estadoOperacional: {
+        appointmentFlowActive: false,
+        bookingIntentConfirmed: false,
+        appointmentAttempted: false,
+        appointmentToolCalled: false,
+        appointmentCreated: false,
+        workflowState: "INFORMATION_RESPONSE",
+      },
+    });
     const informativo = decidirNoTurno({
       ...turno,
       texto: "O atendimento é por ordem de chegada, das 8h às 11h.",
     });
-    // O motor não distingue a resposta certa da mensagem de falha inventada.
-    expect(informativo.score).toBe(comFalha.score);
-    expect(informativo.level).toBe(comFalha.level);
+    expect(comFalha.score).toBeLessThan(informativo.score);
+    expect(comFalha.hardBlockers).toContain("WORKFLOW_STATE_MISMATCH");
   });
 });
 
@@ -266,7 +275,7 @@ describe("BASELINE 4 — a confiança fica presa ao texto avaliado, não ao envi
 // TESTE 5 — handoff curto-circuita o motor
 // Caminho: engine.ts:279-290 (return antecipado com score 100 / HIGH / ALLOW)
 // ---------------------------------------------------------------------------
-describe("BASELINE 5 — handoffSolicitado devolve 100/HIGH/ALLOW sem avaliar nada", () => {
+describe("BASELINE 5 — handoffSolicitado (corrigido na Fase 4)", () => {
   it("um turno que seria bloqueado passa a 100 quando handoffSolicitado = true", () => {
     const semHandoff = decidirNoTurno(
       estado({
@@ -287,11 +296,10 @@ describe("BASELINE 5 — handoffSolicitado devolve 100/HIGH/ALLOW sem avaliar na
         handoffSolicitado: true,
       }),
     );
-    expect(comHandoff.score).toBe(100);
-    expect(comHandoff.level).toBe("HIGH");
-    expect(comHandoff.decision).toBe("ALLOW");
-    expect(comHandoff.blockers).toEqual([]);
-    expect(comHandoff.hardBlockers).toEqual([]);
+    // CORRIGIDO NA FASE 4: handoff não zera mais a avaliação. O bloqueio de
+    // fonte continua visível — a nota reflete o texto, não o atalho.
+    expect(comHandoff.score).toBeLessThan(100);
+    expect(comHandoff.blockers).toContain("VALOR_SEM_CATALOGO");
   });
 
   it("DOCUMENTAÇÃO: esse 100 é segurança da AÇÃO de transferir, não confiabilidade do TEXTO", () => {
@@ -302,9 +310,9 @@ describe("BASELINE 5 — handoffSolicitado devolve 100/HIGH/ALLOW sem avaliar na
         handoffSolicitado: true,
       }),
     );
-    // O texto continua sem fonte oficial, mas nada disso aparece na decisão.
-    expect(r.score).toBe(100);
-    expect(r.evidence.motivos).toContain("handoff já solicitado pelo runtime");
+    // CORRIGIDO NA FASE 4: o texto sem fonte oficial aparece na decisão.
+    expect(r.score).toBeLessThan(100);
+    expect(r.blockers).toContain("VALOR_SEM_CATALOGO");
     expect(r.evidence.fontesUteis).toBe(0);
   });
 });
