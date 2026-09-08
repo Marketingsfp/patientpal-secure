@@ -337,7 +337,7 @@ export function decidirConfianca(
     unknownDimensions: medida.desconhecidas,
     confidenceInsufficient: medida.semEvidencia,
     level,
-    decision,
+    decision: decisaoFinal,
     blockers,
     hardBlockers,
     checks,
