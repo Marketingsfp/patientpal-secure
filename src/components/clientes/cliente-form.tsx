@@ -78,6 +78,12 @@ export interface Paciente {
   codigo_prontuario?: string | null;
   /** Numeração histórica do sistema antigo. Somente leitura — nunca é gravada. */
   codigo_prontuario_anterior?: string | null;
+  /**
+   * Data do cadastro. Some telas carregam com `select("*")` e já a recebiam sem
+   * o tipo declarar; ficou explícita porque o aviso de prontuário fora da faixa
+   * decide pela data — sem ela o aviso nunca apareceria.
+   */
+  created_at?: string | null;
   telefone: string | null;
   telefone2: string | null;
   email: string | null;

@@ -11,6 +11,7 @@ import { ClienteForm, type Paciente } from "@/components/clientes/cliente-form";
 import { PacienteCartoesBeneficios } from "@/components/clientes/paciente-cartoes-beneficios";
 import { PacienteAtendimentosResumo } from "@/components/clientes/paciente-atendimentos-resumo";
 import { prontuarioExibicao } from "@/lib/prontuario";
+import { AvisoProntuarioForaDaEstante } from "@/components/clientes/aviso-prontuario-fora-da-estante";
 
 export const Route = createFileRoute("/_authenticated/app/clientes/$pacienteId/editar")({
   component: EditarClientePage,
@@ -75,6 +76,13 @@ function EditarClientePage() {
           )}
         </div>
       </div>
+
+      {paciente && (
+        <AvisoProntuarioForaDaEstante
+          paciente={paciente}
+          onCorrigido={(novo) => setPaciente((p) => (p ? { ...p, codigo_prontuario: novo } : p))}
+        />
+      )}
 
       <div className="rounded-lg border border-border bg-card p-6">
         {loading ? (
