@@ -336,6 +336,9 @@ function RespostasRapidasPage() {
                 <Label htmlFor="rr-comando">Comando</Label>
                 <Input
                   id="rr-comando"
+                  // Sem caixa alta: o comando é digitado em minúsculas
+                  // (/valor_consulta) e é assim que a equipe o dispara no chat.
+                  uppercase={false}
                   value={form.comando}
                   onChange={(e) => setForm({ ...form, comando: e.target.value })}
                   onBlur={(e) => setForm({ ...form, comando: normalizarComando(e.target.value) })}

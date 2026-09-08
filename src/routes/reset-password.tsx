@@ -77,6 +77,9 @@ function ResetPasswordPage() {
                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
                   id="password"
+                  // Sem caixa alta: com o olhinho aberto o campo vira type="text" e a
+                  // conversão automática alteraria a senha digitada.
+                  uppercase={false}
                   type={showPwd ? "text" : "password"}
                   required
                   className="pl-9 pr-10 h-11"
@@ -99,6 +102,9 @@ function ResetPasswordPage() {
                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
                   id="confirm"
+                  // Sem caixa alta: com o olhinho aberto o campo vira type="text" e a
+                  // conversão automática alteraria a senha digitada.
+                  uppercase={false}
                   type={showPwd ? "text" : "password"}
                   required
                   className="pl-9 h-11"

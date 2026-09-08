@@ -39,6 +39,7 @@ import { AddToOrcamentoDialog } from "@/components/odontologia/add-to-orcamento-
 import { GaleriaOdontoTab } from "@/components/odontologia/galeria-odonto-tab";
 import { OdontoSubnav } from "@/components/odontologia/odonto-subnav";
 import { TabelaPrecosOdontoButton } from "@/components/odontologia/tabela-precos-odonto-button";
+import { aplicarCaixaAlta } from "@/components/ui/caixa-alta";
 
 export const Route = createFileRoute("/_authenticated/app/odontologia/")({
   component: OdontologiaPage,
@@ -461,9 +462,9 @@ function OdontologiaPage() {
                           <div className="md:col-span-2">
                             <Label>Procedimento</Label>
                             <input
-                              className="w-full border rounded-md px-3 py-2 text-sm bg-background"
+                              className="w-full border rounded-md px-3 py-2 text-sm bg-background uppercase placeholder:normal-case"
                               value={procNovo}
-                              onChange={(e) => setProcNovo(e.target.value)}
+                              onChange={(e) => setProcNovo(aplicarCaixaAlta(e.currentTarget))}
                               placeholder="ex.: Restauração de resina"
                             />
                           </div>

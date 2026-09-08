@@ -46,6 +46,7 @@ import { mostrarErro } from "@/lib/traduzir-erro";
 import { cn } from "@/lib/utils";
 
 import { DateInputBR } from "@/components/ui/date-input-br";
+import { aplicarCaixaAlta } from "@/components/ui/caixa-alta";
 // -----------------------------------------------------------------------------
 // Fase F — Wizard V2: agendamento SIMPLES (sem orçamento, sem sessão
 // laboratorial multi-exame, sem encaixe, sem cobrança). Reutiliza 100% das
@@ -685,9 +686,9 @@ export function NovoAgendamentoWizard({
                   <div className="grid grid-cols-1 gap-2">
                     <input
                       value={qcNome}
-                      onChange={(e) => setQcNome(e.target.value)}
+                      onChange={(e) => setQcNome(aplicarCaixaAlta(e.currentTarget))}
                       placeholder="Nome completo *"
-                      className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm"
+                      className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm uppercase placeholder:normal-case"
                     />
                     <div className="grid grid-cols-2 gap-2">
                       <select
@@ -1016,9 +1017,9 @@ export function NovoAgendamentoWizard({
                   </label>
                   <input
                     value={externoClinicaNome}
-                    onChange={(e) => setExternoClinicaNome(e.target.value)}
+                    onChange={(e) => setExternoClinicaNome(aplicarCaixaAlta(e.currentTarget))}
                     placeholder="Ex.: Policlínica Menino Jesus"
-                    className="mt-1 w-full h-9 rounded-md border border-slate-200 px-3 text-sm"
+                    className="mt-1 w-full h-9 rounded-md border border-slate-200 px-3 text-sm uppercase placeholder:normal-case"
                   />
                 </div>
                 <div>

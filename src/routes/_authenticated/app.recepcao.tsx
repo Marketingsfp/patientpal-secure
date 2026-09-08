@@ -9,6 +9,7 @@ import { Bell, Check, X, ExternalLink, Volume2 } from "lucide-react";
 import { BadgePacienteDistante } from "@/components/paciente/badge-paciente-distante";
 import { BadgeAlertaCritico } from "@/components/paciente/alerta-critico";
 import { hojeBR } from "@/lib/date-utils";
+import { aplicarCaixaAlta } from "@/components/ui/caixa-alta";
 
 export const Route = createFileRoute("/_authenticated/app/recepcao")({
   component: RecepcaoPage,
@@ -245,8 +246,8 @@ function RecepcaoPage() {
             <input
               id="guiche-input"
               value={guiche}
-              onChange={(e) => setGuiche(e.target.value.slice(0, 10))}
-              className="w-12 bg-transparent text-sm font-bold outline-none"
+              onChange={(e) => setGuiche(aplicarCaixaAlta(e.currentTarget).slice(0, 10))}
+              className="w-12 bg-transparent text-sm font-bold uppercase outline-none"
             />
           </div>
           <div className="bg-background border border-border/60 rounded-xl px-3 py-1.5 text-xs font-semibold flex items-center gap-2 shadow-2xs">

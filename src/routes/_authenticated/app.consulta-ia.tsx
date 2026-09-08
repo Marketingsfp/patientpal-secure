@@ -11,9 +11,16 @@ import { consultarIA } from "@/lib/consulta-ia.functions";
 import { comTempoLimite } from "@/lib/tempo-limite";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { SemCaixaAlta } from "@/components/ui/caixa-alta";
 
 export const Route = createFileRoute("/_authenticated/app/consulta-ia")({
-  component: ApoioClinicoPage,
+  // Fora da caixa alta automática: a pergunta digitada aqui é conversa com a IA, não
+  // cadastro — ver caixa-alta.tsx.
+  component: () => (
+    <SemCaixaAlta>
+      <ApoioClinicoPage />
+    </SemCaixaAlta>
+  ),
   head: () => ({
     meta: [
       { title: "Apoio Clínico — ClinicaOS" },

@@ -79,6 +79,7 @@ import { TZ_CLINICA } from "@/lib/date-utils";
 import { ConversaAuditoriaDialog } from "@/components/nina/ConversaAuditoriaDialog";
 import { useConfiancaMensagens } from "@/components/nina/ConfiancaMensagem";
 import { combinaFiltroConfianca } from "@/lib/nina/confianca-badge";
+import { SemCaixaAlta } from "@/components/ui/caixa-alta";
 
 
 import {
@@ -140,7 +141,13 @@ export const Route = createFileRoute("/_authenticated/app/nina-aprendizado")({
       { name: "twitter:card", content: "summary" },
     ],
   }),
-  component: Pagina,
+  // Fora da caixa alta automática: o texto revisado aqui é a resposta que a Nina envia ao
+  // paciente — ver caixa-alta.tsx.
+  component: () => (
+    <SemCaixaAlta>
+      <Pagina />
+    </SemCaixaAlta>
+  ),
 });
 
 type Item = {

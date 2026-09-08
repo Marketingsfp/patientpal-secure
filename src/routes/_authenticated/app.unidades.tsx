@@ -359,6 +359,10 @@ function ClinicasTab() {
                       <div className="space-y-2">
                         <Label className="text-xs">Chave PIX</Label>
                         <Input
+                          // Sem caixa alta: chave aleatória e e-mail do PIX
+                          // distinguem maiúscula de minúscula. Converter aqui
+                          // faria o QR Code apontar para uma chave inexistente.
+                          uppercase={false}
                           placeholder="CNPJ, e-mail, telefone ou chave aleatória"
                           value={form.pix_chave}
                           onChange={(e) => setForm({ ...form, pix_chave: e.target.value })}

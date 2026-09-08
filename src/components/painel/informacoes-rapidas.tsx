@@ -512,6 +512,9 @@ function NinaDrawer({ open, onOpenChange }: { open: boolean; onOpenChange: (v: b
         >
           <Input
             ref={inputRef}
+            // Sem caixa alta: aqui não se cadastra nada, se conversa com a
+            // Nina. A pergunta vira balão de conversa e é lida em voz alta.
+            uppercase={false}
             value={input}
             onChange={(e) => setInput(e.target.value)}
             placeholder="Digite ou fale sua pergunta..."

@@ -234,6 +234,9 @@ function LoginPage() {
                   <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
                     id="password"
+                    // Sem caixa alta: com o olhinho aberto o campo vira type="text" e a
+                    // conversão automática alteraria a senha digitada.
+                    uppercase={false}
                     type={showPwd ? "text" : "password"}
                     placeholder="••••••••"
                     required

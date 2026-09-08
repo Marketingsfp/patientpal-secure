@@ -49,6 +49,7 @@ import { AnalistaMetricasIA } from "@/components/nina/AnalistaMetricasIA";
 import { ConfiancaRespostas } from "@/components/nina/ConfiancaRespostas";
 import { MetricasConfiabilidade } from "@/components/nina/MetricasConfiabilidade";
 import { CalibracaoConfianca } from "@/components/nina/CalibracaoConfianca";
+import { SemCaixaAlta } from "@/components/ui/caixa-alta";
 import {
   metricasAprendizadoNina,
   trilhaAuditoriaAprendizadoNina,
@@ -72,7 +73,13 @@ export const Route = createFileRoute("/_authenticated/app/nina-metricas")({
       { name: "twitter:card", content: "summary" },
     ],
   }),
-  component: Pagina,
+  // Fora da caixa alta automática: a pergunta digitada aqui é conversa com a IA, não
+  // cadastro — ver caixa-alta.tsx.
+  component: () => (
+    <SemCaixaAlta>
+      <Pagina />
+    </SemCaixaAlta>
+  ),
 });
 
 type Metricas = Awaited<ReturnType<typeof metricasAprendizadoNina>>;

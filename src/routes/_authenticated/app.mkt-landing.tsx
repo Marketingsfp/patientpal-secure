@@ -13,9 +13,16 @@ import {
 } from "@/components/ui/select";
 import { SimpleCrud } from "@/components/simple-crud/SimpleCrud";
 import { usePodeEscrever } from "@/hooks/use-permissoes";
+import { SemCaixaAlta } from "@/components/ui/caixa-alta";
 
 export const Route = createFileRoute("/_authenticated/app/mkt-landing")({
-  component: LandingPagesAdminWithTabs,
+  // Fora da caixa alta automática: aqui se digita endereço de página, apelido de URL e HTML
+  // — ver caixa-alta.tsx.
+  component: () => (
+    <SemCaixaAlta>
+      <LandingPagesAdminWithTabs />
+    </SemCaixaAlta>
+  ),
   head: () => ({ meta: [{ title: "Landing Pages — ClinicaOS" }] }),
 });
 

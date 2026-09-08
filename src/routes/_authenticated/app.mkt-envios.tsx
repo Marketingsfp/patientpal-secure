@@ -12,9 +12,16 @@ import {
 } from "@/components/ui/select";
 import { SimpleCrud } from "@/components/simple-crud/SimpleCrud";
 import { usePodeEscrever } from "@/hooks/use-permissoes";
+import { SemCaixaAlta } from "@/components/ui/caixa-alta";
 
 export const Route = createFileRoute("/_authenticated/app/mkt-envios")({
-  component: EnviosPageWithTabs,
+  // Fora da caixa alta automática: o destinatário digitado aqui pode ser um e-mail — ver
+  // caixa-alta.tsx.
+  component: () => (
+    <SemCaixaAlta>
+      <EnviosPageWithTabs />
+    </SemCaixaAlta>
+  ),
   head: () => ({ meta: [{ title: "Envios — ClinicaOS" }] }),
 });
 

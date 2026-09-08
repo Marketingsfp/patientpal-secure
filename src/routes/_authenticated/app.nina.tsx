@@ -65,17 +65,20 @@ import { DashboardHomologacao } from "@/components/nina/DashboardHomologacao";
 
 import { AtendMacros } from "@/components/nina/AtendimentoTabs";
 import { AtendInbox } from "@/components/nina/AtendimentoExtraTabs";
+import { SemCaixaAlta } from "@/components/ui/caixa-alta";
 
 
 export const Route = createFileRoute("/_authenticated/app/nina")({
   // A tela de atendimento tem sempre o mesmo endereço (/app/nina): a conversa
   // aberta é uma seleção interna da Inbox. O <Outlet /> permanece só para que
   // links antigos (/app/nina/<id>) sejam redirecionados para cá.
+  // Fora da caixa alta automática: o que se digita aqui é mensagem enviada ao
+  // paciente pelo WhatsApp e conhecimento da Nina — ver caixa-alta.tsx.
   component: () => (
-    <>
+    <SemCaixaAlta>
       <NinaPage />
       <Outlet />
-    </>
+    </SemCaixaAlta>
   ),
   head: () => ({ meta: [{ title: "Nina — WhatsApp — ClinicaOS" }] }),
 });

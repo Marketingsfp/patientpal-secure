@@ -5,9 +5,16 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { SimpleCrud } from "@/components/simple-crud/SimpleCrud";
 import { usePodeEscrever } from "@/hooks/use-permissoes";
+import { SemCaixaAlta } from "@/components/ui/caixa-alta";
 
 export const Route = createFileRoute("/_authenticated/app/integration-secrets")({
-  component: SecretsPageWithTabs,
+  // Fora da caixa alta automática: aqui se digita nome e valor de chave de integração,
+  // sensíveis a maiúsculas — ver caixa-alta.tsx.
+  component: () => (
+    <SemCaixaAlta>
+      <SecretsPageWithTabs />
+    </SemCaixaAlta>
+  ),
   errorComponent: () => (
     <div className="p-6">
       <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-4 text-sm">

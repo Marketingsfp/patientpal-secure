@@ -6,6 +6,7 @@ import { Command as CommandPrimitive } from "cmdk";
 import { Search } from "lucide-react";
 
 import { cn } from "@/lib/utils";
+import { aplicarCaixaAlta, useCaixaAlta } from "@/components/ui/caixa-alta";
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 
@@ -49,20 +50,40 @@ const CommandDialog = ({ children, shouldFilter, ...props }: CommandDialogProps)
 
 const CommandInput = React.forwardRef<
   React.ElementRef<typeof CommandPrimitive.Input>,
-  React.ComponentPropsWithoutRef<typeof CommandPrimitive.Input>
->(({ className, ...props }, ref) => (
-  <div className="flex items-center border-b px-3" cmdk-input-wrapper="">
-    <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
-    <CommandPrimitive.Input
-      ref={ref}
-      className={cn(
-        "flex h-10 w-full rounded-md bg-transparent py-3 text-sm outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50",
-        className,
-      )}
-      {...props}
-    />
-  </div>
-));
+  React.ComponentPropsWithoutRef<typeof CommandPrimitive.Input> & {
+    /** Ver `caixa-alta.tsx`. Padrão: converte enquanto se digita. */
+    uppercase?: boolean;
+  }
+>(({ className, uppercase, onValueChange, onInput, ...props }, ref) => {
+  const emCaixaAlta = useCaixaAlta(uppercase, "text");
+  return (
+    <div className="flex items-center border-b px-3" cmdk-input-wrapper="">
+      <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
+      <CommandPrimitive.Input
+        ref={ref}
+        className={cn(
+          "flex h-10 w-full rounded-md bg-transparent py-3 text-sm outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50",
+          emCaixaAlta && "uppercase placeholder:normal-case",
+          className,
+        )}
+        // Duas conversões de propósito. O `onInput` corre antes do `onChange`
+        // interno do cmdk e já entrega o texto em caixa alta com o cursor no
+        // lugar — é o que evita o cursor pular para o fim quando se corrige
+        // uma letra no meio do termo. O `onValueChange` é a rede de segurança:
+        // se a ordem dos eventos mudar, o termo que vai para a busca ainda sai
+        // em maiúsculo.
+        onInput={(e) => {
+          if (emCaixaAlta) aplicarCaixaAlta(e.currentTarget);
+          onInput?.(e);
+        }}
+        onValueChange={
+          onValueChange && ((v: string) => onValueChange(emCaixaAlta ? v.toUpperCase() : v))
+        }
+        {...props}
+      />
+    </div>
+  );
+});
 
 CommandInput.displayName = CommandPrimitive.Input.displayName;
 

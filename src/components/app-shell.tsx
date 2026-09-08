@@ -168,6 +168,7 @@ import { KeyboardShortcuts } from "@/components/keyboard-shortcuts";
 import { AcessibilidadeProvider } from "@/components/acessibilidade/AcessibilidadeProvider";
 import { AtalhosAcessibilidade } from "@/components/acessibilidade/AtalhosAcessibilidade";
 import { BotaoAcessibilidade } from "@/components/acessibilidade/BotaoAcessibilidade";
+import { aplicarCaixaAlta } from "@/components/ui/caixa-alta";
 
 const VoiceInput = lazy(() =>
   import("@/components/voice-input").then((m) => ({ default: m.VoiceInput })),
@@ -1482,13 +1483,13 @@ function AppShellInner() {
                 <input
                   ref={buscaMenuInputRef}
                   value={buscaMenu}
-                  onChange={(e) => setBuscaMenu(e.target.value)}
+                  onChange={(e) => setBuscaMenu(aplicarCaixaAlta(e.currentTarget))}
                   onKeyDown={(e) => {
                     if (e.key === "Escape") setBuscaMenu("");
                   }}
                   placeholder="Buscar no menu..."
                   aria-label="Buscar no menu"
-                  className="w-full rounded-md bg-white/10 border border-white/15 pl-7 pr-2 py-1.5 text-xs text-white placeholder:text-white/50 outline-none focus:border-white/40 focus:bg-white/15"
+                  className="w-full rounded-md bg-white/10 border border-white/15 pl-7 pr-2 py-1.5 text-xs text-white uppercase placeholder:normal-case placeholder:text-white/50 outline-none focus:border-white/40 focus:bg-white/15"
                 />
               </div>
             </div>

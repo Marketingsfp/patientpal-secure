@@ -31,9 +31,16 @@ import {
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { Plus, Trash2 } from "lucide-react";
+import { SemCaixaAlta } from "@/components/ui/caixa-alta";
 
 export const Route = createFileRoute("/_authenticated/app/lms-admin")({
-  component: LMSAdminPage,
+  // Fora da caixa alta automática: aqui se digita conteúdo de treinamento e endereço de
+  // vídeo — ver caixa-alta.tsx.
+  component: () => (
+    <SemCaixaAlta>
+      <LMSAdminPage />
+    </SemCaixaAlta>
+  ),
 });
 
 type Curso = {

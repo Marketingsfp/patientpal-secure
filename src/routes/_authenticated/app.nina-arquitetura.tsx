@@ -30,6 +30,7 @@ import {
 } from "@/lib/nina/arquitetura/versoes";
 import { mudancaConfiguracaoPrompt } from "@/lib/nina/arquitetura/sync";
 import { historicoInstrucoesNina } from "@/lib/nina/instrucoes.functions";
+import { SemCaixaAlta } from "@/components/ui/caixa-alta";
 
 
 export const Route = createFileRoute("/_authenticated/app/nina-arquitetura")({
@@ -50,7 +51,13 @@ export const Route = createFileRoute("/_authenticated/app/nina-arquitetura")({
       { name: "twitter:card", content: "summary" },
     ],
   }),
-  component: Pagina,
+  // Fora da caixa alta automática: aqui se digita instrução da Nina e código de execução —
+  // ver caixa-alta.tsx.
+  component: () => (
+    <SemCaixaAlta>
+      <Pagina />
+    </SemCaixaAlta>
+  ),
 });
 
 function Pagina() {
