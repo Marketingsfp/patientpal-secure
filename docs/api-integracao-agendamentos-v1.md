@@ -486,3 +486,191 @@ atendimento como "Realizado"; a escrita continua passando pelos núcleos
   cadastro de paciente; `Idempotency-Key` obrigatório no cadastro.
   **Deliberadamente ausente:** endpoint de busca/consulta de paciente (ver 9.1).
 - **v1 (2026-08):** versão inicial, congelada e ainda válida.
+
+---
+
+## 10. v1.2 — reconhecimento do paciente pelo WhatsApp
+
+Compatível com v1 e v1.1: nada foi removido nem alterado nos endpoints que já
+existiam. O objetivo é o site institucional reconhecer quem **já é paciente**
+sem pedir os dados de novo.
+
+### 10.1 Por que a mensagem sai do paciente, e não da clínica
+
+A ideia óbvia — a clínica manda um código por WhatsApp — não funciona e não é a
+mais segura:
+
+- **Regra da Meta.** Fora da janela de 24 horas só passa mensagem de template
+  aprovado. A clínica não tem template aprovado para isso, então a mensagem
+  seria simplesmente recusada.
+- **Custo.** Conversa aberta pela empresa é cobrada; conversa aberta pelo
+  paciente, não.
+- **Prova de posse.** Um código recebido prova, no máximo, que alguém leu o
+  aparelho. Uma mensagem **enviada** prova que quem está do outro lado tem o
+  aparelho na mão, desbloqueado, naquele instante.
+
+Por isso o desenho é invertido: o site gera um código curto, o paciente aperta
+enviar no WhatsApp dele, e o webhook de entrada que já existe reconhece o
+código e identifica o paciente **pelo número que enviou**.
+
+### 10.2 Por que isso é mais seguro que um `GET /patients?cpf=`
+
+Vale a mesma regra da seção 9.1, agora levada até o fim: **não existe nenhuma
+tela pública que responda se um CPF tem cadastro** — e agora o CPF sai também
+do fluxo de identificação.
+
+Um `GET /patients?cpf=` é um oráculo: com uma lista de CPFs (que circulam aos
+montes) e uma chave vazada, dá para varrer a base inteira e descobrir quem é
+paciente da clínica — o que, em clínica, já é dado de saúde. Aqui não há o que
+varrer: quem não tiver o aparelho do paciente na mão não recebe nada. O código
+só vale 15 minutos, só uma vez, e o reconhecimento não é decidido pelo que o
+site mandou, e sim pelo número que a Meta entregou.
+
+Efeitos práticos:
+
+- nenhum endpoint aceita CPF, nome ou telefone como critério de busca;
+- a tabela do desafio **não tem coluna de CPF**;
+- quando não dá para reconhecer, a resposta é sempre a mesma
+  (`nao_localizado`), sem dizer se foi "não achei" ou "achei mais de um".
+
+### 10.3 `POST /patients/verify/start`
+
+Escopo: `patients:verify`. Corpo vazio, `{}` ou `{ "origem": "site" }`.
+
+Resposta `202`:
+
+```json
+{ "data": {
+  "desafio_id": "0b1f...",
+  "codigo": "MJ-4F7K",
+  "whatsapp_numero": "5521999998888",
+  "texto_sugerido": "Quero agendar pelo site - codigo MJ-4F7K",
+  "wa_url": "https://wa.me/5521999998888?text=Quero%20agendar%20pelo%20site%20-%20codigo%20MJ-4F7K",
+  "expira_em": "2026-09-08T18:20:00.000Z"
+} }
+```
+
+- Código: prefixo `MJ-` mais 4 caracteres alfanuméricos, **sem** os ambíguos
+  `O`, `0`, `I`, `1` e `L`. Único entre os desafios ainda aguardando.
+- O número vem de `whatsapp_configs.display_phone_number` da clínica da chave.
+- Este endpoint **não consulta a base de pacientes**.
+- Validade: 15 minutos. Limite: 20 desafios por hora por IP, além do limite
+  normal da chave.
+
+### 10.4 O que acontece na mensagem recebida
+
+No mesmo caminho de entrada que já grava `whatsapp_mensagens` com
+`direction = 'in'`:
+
+1. o texto é normalizado (maiúsculas, sem espaço, sem pontuação) e procura-se
+   um desafio **aguardando e não expirado** daquela clínica;
+2. achou o código → o paciente é identificado **pelo número que enviou**;
+3. exatamente um paciente ativo → desafio vira `verificado`;
+4. nenhum ou mais de um → desafio vira `nao_localizado`, sem registrar motivo;
+5. a mensagem é marcada como já tratada: **não cria conversa, não cai na caixa
+   da recepção e não aciona a Nina**;
+6. como o paciente abriu a janela de 24 horas, ele recebe uma linha curta —
+   *"Recebemos! Volte para a página do site para concluir seu agendamento."* —
+   sem nome e sem nenhum dado dele.
+
+Qualquer mensagem que **não** contenha um código de desafio válido segue o
+fluxo de atendimento exatamente como antes.
+
+### 10.5 Normalização do telefone (o ponto crítico)
+
+A Meta entrega o número como `5521984642531`. A base tem telefone gravado em
+formatos variados: com e sem DDI, com e sem o nono dígito, com máscara. O
+casamento é tolerante e feito assim:
+
+1. tira tudo que não é dígito;
+2. remove o DDI `55` quando sobra um número nacional plausível;
+3. separa DDD (2 dígitos) e número;
+4. gera **as duas formas** do mesmo número:
+   - número com 9 dígitos começando em 9 → `DDD+9XXXXXXXX` e `DDD+XXXXXXXX`;
+   - número com 8 dígitos → `DDD+XXXXXXXX` e `DDD+9XXXXXXXX`;
+5. compara contra as colunas já normalizadas `telefone_norm` e
+   `telefone2_norm` (só dígitos, sem DDI, ambas indexadas);
+6. só aceita quando existe **exatamente um** paciente ativo da clínica.
+
+Casos que **não** casam de propósito: DDI diferente de 55 (sem regra de nono
+dígito, casar errado é pior que não casar) e número com menos de 10 dígitos
+(sem DDD, seria ambíguo demais numa base de 252 mil pacientes).
+
+Exemplo: `5521984642531`, `21984642531`, `(21) 98464-2531` e
+`+55 21 98464-2531` produzem todos o mesmo par `21984642531` / `2184642531`.
+
+### 10.6 `GET /patients/verify/status?desafio_id=...`
+
+Escopo: `patients:verify`.
+
+```json
+{ "data": {
+  "status": "verificado",
+  "verificacao_token": "…",
+  "expira_em": "2026-09-08T18:40:00.000Z",
+  "paciente": {
+    "nome": "…", "telefone": "…", "email": "…",
+    "sexo": "…", "data_nascimento": "…"
+  }
+} }
+```
+
+- `status`: `aguardando` | `verificado` | `nao_localizado` | `expirado`.
+- Do paciente saem **somente** esses cinco campos. Nada de endereço, convênio,
+  prontuário, histórico, agendamentos anteriores ou id interno.
+- `desafio_id` inexistente ou malformado recebe a **mesma** resposta de
+  `expirado` — a rota não serve para sondar quais desafios existem.
+- O site faz polling de 3 em 3 segundos por até 5 minutos: o status tem
+  contador próprio, de 120 consultas por desafio, separado do limite da chave.
+- O token é aleatório, sai **uma única vez** (na primeira leitura já
+  verificada), fica no banco só como hash, vale 20 minutos, é de uso único e
+  está amarrado ao paciente e à clínica.
+
+### 10.7 `POST /appointments` aceita `verificacao_token`
+
+Passa a existir uma terceira forma de indicar o paciente, ao lado de
+`paciente_id` (v1) e `paciente` (v1.1). As três são **mutuamente exclusivas**:
+duas juntas devolvem `422 patient_and_id_conflict`.
+
+Com `verificacao_token`: o token é consumido no uso, resolve o `paciente_id`
+internamente, exige `patients:verify` e **não** exige `patients:write` — não há
+cadastro sendo criado.
+
+### 10.8 Erros novos
+
+| HTTP | Código | Quando |
+| --- | --- | --- |
+| 422 | `verification_failed` | token inválido, expirado ou já usado |
+| 422 | `patient_and_id_conflict` | mandou mais de uma forma de indicar o paciente |
+| 403 | `insufficient_scope` | chave sem `patients:verify` |
+| 429 | `rate_limit_exceeded` | 20 desafios/hora por IP ou 120 status por desafio |
+| 503 | `whatsapp_unavailable` | clínica sem número de WhatsApp configurado |
+| 500 | `verification_start_failed` | falha ao criar o desafio |
+
+### 10.9 O que NÃO mudou
+
+`get_horarios_disponiveis` e todos os endpoints existentes seguem idênticos; a
+tabela `pacientes` não é lida para busca nem alterada em ponto algum deste
+fluxo; `clinica_id` continua vindo só da chave; e o atendimento por WhatsApp
+segue igual — a única mudança na entrada é interceptar mensagens que contenham
+um código de desafio válido.
+
+### 10.10 Onde está o código novo
+
+| Arquivo | Papel |
+| --- | --- |
+| `src/lib/integracoes/verificacao-v1.server.ts` | desafio, reconhecimento, token e normalização do telefone |
+| `src/lib/integracoes/verificacao-v1.test.ts` | testes do código curto e da normalização |
+| `src/routes/api/public/whatsapp.$clinicaId.ts` | interceptação da mensagem de entrada |
+| `public.integracao_verificacoes` | desafios (sem coluna de CPF), RLS negando tudo |
+| `public.integracao_verificacoes_limpar()` | apaga desafios vencidos há mais de 24h |
+
+### 10.11 Changelog
+
+- **v1.2 (2026-09):** `POST /patients/verify/start`,
+  `GET /patients/verify/status`, `verificacao_token` no `POST /appointments`,
+  escopo `patients:verify`, reconhecimento pelo número que enviou a mensagem.
+  **Deliberadamente ausente:** qualquer busca de paciente por CPF, nome ou
+  telefone (ver 10.2).
+- **v1.1 (2026-09):** objeto `paciente` no `POST /appointments`.
+- **v1 (2026-08):** versão inicial, congelada e ainda válida.
