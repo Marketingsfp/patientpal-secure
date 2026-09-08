@@ -104,8 +104,22 @@ export type PoliticaConfianca = {
  * Snapshots gravados com "v1"/"v2"/"v3" continuam válidos sob a régua da época.
  */
 export const VERSAO_POLITICA = "v4";
-/** FASE 6 — versão do motor gravada junto com cada avaliação. */
-export const VERSAO_MOTOR = "engine-v6";
+/**
+ * Versão do motor gravada junto com cada avaliação.
+ * FASE 7 — "Confidence Engine v2": motor com cobertura de evidências,
+ * coerência de workflow, grounding por afirmação e verificação da resposta
+ * final. Snapshots gravados por versões anteriores continuam legíveis: eles
+ * são apenas lidos sob a régua da época (ver `ehVersaoMotorHistorica`).
+ */
+export const VERSAO_MOTOR = "confidence-v2";
+
+/** Versões antigas do motor que continuam válidas apenas para leitura. */
+export const VERSOES_MOTOR_HISTORICAS = ["engine-v6"] as const;
+
+export function ehVersaoMotorHistorica(versao: string | null | undefined): boolean {
+  const v = (versao ?? "").trim();
+  return v !== VERSAO_MOTOR;
+}
 
 export const POLITICA_PADRAO: PoliticaConfianca = {
   pesos: {
