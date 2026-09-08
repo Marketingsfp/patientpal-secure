@@ -145,7 +145,28 @@ export type VinculoComplementar = {
   promptVersao?: number | null;
   testeCicloId?: string | null;
   traceId?: string | null;
+  /** Sessão da Nina no ciclo de teste, quando houver. */
+  ninaSessionId?: string | null;
 };
+
+/** Ambiente de origem do reporte — separa teste de atendimento real. */
+export type AmbienteReporte = "production" | "homologation" | "automated_test";
+
+export const ROTULO_AMBIENTE_REPORTE: Record<AmbienteReporte, string> = {
+  production: "Produção",
+  homologation: "Homologação",
+  automated_test: "Teste automatizado",
+};
+
+/** Classificação do ambiente a partir da conversa de origem. Nunca adivinha. */
+export function ambienteDoReporte(entrada: {
+  isTeste?: boolean | null;
+  automatizado?: boolean | null;
+}): AmbienteReporte {
+  if (!entrada.isTeste) return "production";
+  return entrada.automatizado ? "automated_test" : "homologation";
+}
+
 
 /** Payload de inserção do reporte rápido (sem motivo, categoria detalhada ou correção). */
 export function montarRegistroErroRapido(params: {
