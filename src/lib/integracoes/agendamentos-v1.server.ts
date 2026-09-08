@@ -32,6 +32,11 @@ import {
   type ApiKeyContexto,
 } from "./api.server";
 import { pacienteSchema, resolverPaciente } from "./pacientes-v1.server";
+import {
+  consumirTokenVerificacao,
+  handleVerifyStart,
+  handleVerifyStatus,
+} from "./verificacao-v1.server";
 
 const CAMPOS_AGENDAMENTO =
   "id,clinica_id,paciente_id,paciente_nome,medico_id,especialidade_id,inicio,fim,procedimento,status,observacoes,tipo_atendimento,data_pagamento,origem_integracao,id_externo,created_at,updated_at";
@@ -48,6 +53,9 @@ const criarSchema = z.object({
   // Um ou outro — nunca os dois (ver `patient_and_id_conflict`).
   paciente_id: uuid.optional(),
   paciente: pacienteSchema.optional(),
+  // v1.2: paciente já reconhecido pelo WhatsApp. Substitui as duas formas
+  // acima e não cadastra ninguém.
+  verificacao_token: z.string().min(32).max(200).optional(),
   medico_id: uuid.nullish(),
   especialidade_id: uuid.nullish(),
   inicio: isoDatetime,
@@ -184,18 +192,24 @@ async function handleCriar(
   }
   const body = parsed.data;
 
-  if (body.paciente && body.paciente_id) {
+  // As três formas de indicar o paciente são mutuamente exclusivas.
+  const formas = [body.paciente_id, body.paciente, body.verificacao_token].filter(
+    (v) => v !== undefined,
+  ).length;
+  if (formas > 1) {
     throw new ApiError({
       status: 422,
       code: "patient_and_id_conflict",
-      message: "Envie 'paciente_id' OU o objeto 'paciente', nunca os dois.",
+      message:
+        "Envie 'paciente_id', o objeto 'paciente' OU 'verificacao_token' — apenas um deles.",
     });
   }
-  if (!body.paciente && !body.paciente_id) {
+  if (formas === 0) {
     throw new ApiError({
       status: 422,
       code: "invalid_body",
-      message: "Informe 'paciente_id' (paciente já cadastrado) ou o objeto 'paciente'.",
+      message:
+        "Informe 'paciente_id' (paciente já cadastrado), o objeto 'paciente' ou 'verificacao_token'.",
     });
   }
   if (body.paciente) {
@@ -243,7 +257,14 @@ async function handleCriar(
   let pacienteCriado = false;
   let obsExtra: string | null = null;
 
-  if (body.paciente) {
+  if (body.verificacao_token) {
+    // Paciente já reconhecido pelo WhatsApp: nada é criado, então o escopo de
+    // cadastro (`patients:write`) não é exigido aqui.
+    exigirEscopo(ctx, "patients:verify");
+    const resolvido = await consumirTokenVerificacao(db, ctx, body.verificacao_token);
+    pacienteId = resolvido.paciente_id;
+    pacienteNome = resolvido.nome;
+  } else if (body.paciente) {
     const resolvido = await resolverPaciente(db, ctx, body.paciente);
     pacienteId = resolvido.paciente_id;
     pacienteNome = resolvido.nome;
@@ -649,6 +670,22 @@ export async function handleIntegracoesV1(request: Request, splat: string): Prom
     };
     if (replay) {
       resultado = { status: replay.status, body: replay.body };
+    } else if (
+      request.method === "POST" &&
+      partes[0] === "patients" &&
+      partes[1] === "verify" &&
+      partes[2] === "start" &&
+      partes.length === 3
+    ) {
+      resultado = await handleVerifyStart(db, ctx, bodyTexto, ip);
+    } else if (
+      request.method === "GET" &&
+      partes[0] === "patients" &&
+      partes[1] === "verify" &&
+      partes[2] === "status" &&
+      partes.length === 3
+    ) {
+      resultado = await handleVerifyStatus(db, ctx, url);
     } else if (request.method === "GET" && partes[0] === "availability" && partes.length === 1) {
       resultado = await handleAvailability(db, ctx, url);
     } else if (request.method === "GET" && partes[0] === "specialties" && partes.length === 1) {

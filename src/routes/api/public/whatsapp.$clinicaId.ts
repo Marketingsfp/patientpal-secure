@@ -243,6 +243,57 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
                   console.error("whatsapp mensagem insert error", insErr.message);
                 }
 
+                // v1.2 — Reconhecimento do paciente pelo site institucional.
+                // Se a mensagem traz um código de desafio válido, ela é
+                // consumida aqui: não vira conversa, não aciona a Nina e não
+                // cai na caixa da recepção. Qualquer outra mensagem segue o
+                // fluxo normal, exatamente como antes.
+                try {
+                  const { interceptarCodigoVerificacao } = await import(
+                    "@/lib/integracoes/verificacao-v1.server"
+                  );
+                  const verif = await interceptarCodigoVerificacao({
+                    db: supabaseAdmin as never,
+                    clinicaId: params.clinicaId,
+                    texto: textoPaciente || body,
+                    fromNumber: from,
+                    waMessageId: wa_message_id || null,
+                    mensagemId: (msgInserida as { id?: string } | null)?.id ?? null,
+                  });
+                  if (verif.tratada) {
+                    resultado = "verificacao_site";
+                    // O paciente abriu a janela de 24h: cabe uma linha curta,
+                    // sem nome e sem nenhum dado dele.
+                    if (verif.resposta && phoneNumberId && cfg.access_token) {
+                      try {
+                        const envio = await metaSendText(
+                          phoneNumberId,
+                          cfg.access_token,
+                          from,
+                          verif.resposta,
+                        );
+                        await supabaseAdmin.from("whatsapp_mensagens").insert({
+                          clinica_id: params.clinicaId,
+                          wa_message_id: envio.wa_message_id,
+                          direction: "out",
+                          from_number: displayPhoneNumber,
+                          to_number: from,
+                          body: verif.resposta,
+                          tipo: "text",
+                          status: "sent",
+                          enviada_por: "sistema",
+                          read_at: new Date().toISOString(),
+                        });
+                      } catch (e) {
+                        console.error("[verificacao] confirmação ao paciente falhou", e);
+                      }
+                    }
+                    continue;
+                  }
+                } catch (e) {
+                  console.error("[verificacao] interceptação falhou", e);
+                }
+
                 // Antes de qualquer coisa, vence quem já passou do prazo —
                 // assim uma conversa parada não fica presa na Nina.
                 try {
