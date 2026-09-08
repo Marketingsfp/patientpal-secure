@@ -56,6 +56,8 @@ export type EstadoDoTurno = {
   entityCandidates?: Record<string, string[]>;
   conflitos?: ContextoConfianca["conflitos"];
   retrievedSources?: ContextoConfianca["retrievedSources"];
+  /** FASE 5/7 — claims estruturados declarados pelo próprio ciclo do turno. */
+  claims?: ContextoConfianca["claims"];
   regrasNegocio?: ContextoConfianca["regrasNegocio"];
   /**
    * FASE 4 — estado real do fluxo operacional (leitura da máquina de estados
@@ -93,6 +95,7 @@ export function montarContextoDoTurno(e: EstadoDoTurno): ContextoConfianca {
     ...(e.intentConfidence !== undefined ? { intentConfidence: e.intentConfidence } : {}),
     ...(e.entityCandidates ? { entityCandidates: e.entityCandidates } : {}),
     ...(e.conflitos ? { conflitos: e.conflitos } : {}),
+    ...(e.claims ? { claims: e.claims } : {}),
     ...(e.regrasNegocio ? { regrasNegocio: e.regrasNegocio } : {}),
     ...(e.estadoOperacional ? { operationalState: e.estadoOperacional } : {}),
     toolResults,
