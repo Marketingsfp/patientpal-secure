@@ -83,6 +83,16 @@ import {
   type ConversaEvento,
 } from "@/components/nina/ConversationSystemEvent";
 import { NinaMessage, TypingDots } from "@/components/nina/NinaMessage";
+import {
+  ConfiancaMensagemBadge,
+  ConfiancaNaoAvaliadaBadge,
+  useConfiancaMensagens,
+} from "@/components/nina/ConfiancaMensagem";
+import {
+  execucoesDasRespostasNina,
+  montarMetadadosMensagemNina,
+} from "@/lib/nina/mensagem-meta";
+
 import { ConversaSkeleton } from "@/components/nina/ConversaSkeleton";
 import { useChatScroll } from "@/hooks/use-chat-scroll";
 import { formatarDataHoraMensagem } from "@/lib/atendimento/data-hora";
@@ -242,6 +252,32 @@ export function HomologacaoInbox() {
     ];
     return itens.sort((a, b) => a.em.localeCompare(b.em));
   }, [msgs, eventosConversa]);
+
+  // FASE 1 — mesma leitura de confiança da Inbox de produção: UM lote por
+  // conversa (sem consulta por balão) e nada é recalculado na tela.
+  const execucoesDaNina = useMemo(() => execucoesDasRespostasNina(msgs), [msgs]);
+  const confiancaPorExecucao = useConfiancaMensagens(clinicaId, execucoesDaNina);
+
+  /** Metadados internos padronizados da mensagem (produção/homologação/teste). */
+  const metadadosDaMensagem = useCallback(
+    (m: Msg) => {
+      const c = m.execucao_id ? confiancaPorExecucao[String(m.execucao_id)] : undefined;
+      const cicloAtual = ciclos.length > 0 ? (ciclos[ciclos.length - 1] as any) : null;
+      return montarMetadadosMensagemNina({
+        messageId: m.id,
+        conversaTesteId: conversaId,
+        isTeste: true,
+        cicloId: cicloAtual?.cycle_id ?? leads.find((l) => l.id === leadId)?.cicloId ?? null,
+        ninaSessionId: cicloAtual?.nina_session_id ?? null,
+        criadaEm: m.created_at,
+        execucaoId: m.execucao_id ?? null,
+        confianca: c ? { score: c.score, nivel: c.nivel } : null,
+      });
+    },
+    [conversaId, confiancaPorExecucao, ciclos, leads, leadId],
+  );
+
+
 
   const chat = useChatScroll({
     conversaId: leadId,
@@ -1118,12 +1154,19 @@ export function HomologacaoInbox() {
                   }
                   const out = m.direction === "out";
                   const daNina = out && m.enviada_por !== "sistema";
+                  const meta = metadadosDaMensagem(m);
                   return (
                     <div
                       key={item.id}
                       data-msg-id={m.id}
+                      data-nina-environment={meta.environment}
+                      data-nina-test-conversation-id={meta.test_conversation_id ?? undefined}
+                      data-nina-cycle-id={meta.cycle_id ?? undefined}
+                      data-nina-session-id={meta.nina_session_id ?? undefined}
+                      data-nina-audit-trace-id={meta.audit_trace_id ?? undefined}
                       className={`flex items-start gap-2 ${out ? "justify-end" : "justify-start"}`}
                     >
+
                       <div
                         className={`max-w-[68%] break-words rounded-2xl px-3 py-2 text-sm shadow-sm ${
                           out
@@ -1136,20 +1179,35 @@ export function HomologacaoInbox() {
                           variant={daNina ? "assistant" : "user"}
                         />
                         <div
-                          className={`mt-1 text-[11px] ${out ? "text-atd-on-strong/80" : "text-atd-ink-soft"}`}
+                          className={`mt-1 flex items-center justify-between gap-2 text-[11px] ${out ? "text-atd-on-strong/80" : "text-atd-ink-soft"}`}
                         >
-                          {formatarDataHoraMensagem(m.created_at)}{" "}
-                          {daNina ? "· Nina" : "· Paciente (teste)"}
-                          {daNina && m.execucao_id && (
-                            <button
-                              type="button"
-                              className="ml-2 underline underline-offset-2 hover:opacity-80"
-                              onClick={() => void abrirDetalhe(m.execucao_id as string)}
-                            >
-                              Detalhes técnicos
-                            </button>
+                          <span className="whitespace-nowrap">
+                            {formatarDataHoraMensagem(m.created_at)}{" "}
+                            {daNina ? "· Nina" : "· Paciente (teste)"}
+                          </span>
+                          {daNina && (
+                            <span className="flex items-center gap-2">
+                              {clinicaId && m.execucao_id && confiancaPorExecucao[String(m.execucao_id)] ? (
+                                <ConfiancaMensagemBadge
+                                  clinicaId={clinicaId}
+                                  confianca={confiancaPorExecucao[String(m.execucao_id)]!}
+                                />
+                              ) : (
+                                <ConfiancaNaoAvaliadaBadge />
+                              )}
+                              {m.execucao_id && (
+                                <button
+                                  type="button"
+                                  className="underline underline-offset-2 hover:opacity-80"
+                                  onClick={() => void abrirDetalhe(m.execucao_id as string)}
+                                >
+                                  Detalhes técnicos
+                                </button>
+                              )}
+                            </span>
                           )}
                         </div>
+
                       </div>
                     </div>
                   );

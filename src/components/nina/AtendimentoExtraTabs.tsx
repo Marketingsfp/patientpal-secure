@@ -188,6 +188,8 @@ import {
   ConfiancaNaoAvaliadaBadge,
   useConfiancaMensagens,
 } from "@/components/nina/ConfiancaMensagem";
+import { execucoesDasRespostasNina } from "@/lib/nina/mensagem-meta";
+
 import { devoAutoSelecionarComSelecao, escopoParaConversa } from "@/lib/atendimento/deep-link";
 import {
   avisoSaidaEscopo,
@@ -1781,15 +1783,17 @@ export function AtendInbox() {
   // Confiança REAL registrada pelo motor para cada resposta da Nina desta
   // conversa. Leitura em lote; nada é calculado na tela.
   const execucoesDaNina = useMemo(
-    () => [
-      ...new Set(
-        (msgs as Array<{ direction?: string; enviada_por?: string | null; execucao_id?: string | null }>)
-          .filter((m) => m.direction === "out" && m.enviada_por === "nina" && m.execucao_id)
-          .map((m) => String(m.execucao_id)),
+    () =>
+      execucoesDasRespostasNina(
+        msgs as Array<{
+          direction?: string;
+          enviada_por?: string | null;
+          execucao_id?: string | null;
+        }>,
       ),
-    ],
     [msgs],
   );
+
   const confiancaPorExecucao = useConfiancaMensagens(clinicaId, execucoesDaNina);
 
   // Mensagens e eventos de estado na mesma linha do tempo, em ordem cronológica.
