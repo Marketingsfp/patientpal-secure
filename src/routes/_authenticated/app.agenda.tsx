@@ -419,6 +419,14 @@ const isSlotLivre = (pacienteNome: string | null | undefined) => {
   return nome === "disponivel" || nome === "bloqueio";
 };
 
+// Recusa vinda da policy `agend_delete`: o horário está sem paciente, mas ainda
+// tem lançamento no caixa ou NFS-e apontando para ele (horário que recebeu e
+// depois foi desmarcado). As chaves são ON DELETE SET NULL, então apagar não
+// daria erro — apagaria em silêncio o vínculo entre o dinheiro e o atendimento.
+// A recusa é proposital; o que faltava era a tela dizer o motivo.
+const MSG_EXCLUSAO_RECUSADA =
+  "Este horário tem lançamento ou nota fiscal ligada a ele. Peça a um gestor para resolver.";
+
 // Normaliza as linhas cruas de `agendamentos` para o formato da lista.
 // Fica no módulo porque tanto o `load()` completo quanto o refresh pontual do
 // realtime precisam aplicar exatamente a mesma normalização.
@@ -4493,9 +4501,22 @@ function AgendaPage() {
       ))
     )
       return;
-    const { error } = await supabase.from("agendamentos").delete().eq("id", a.id);
+    // O `.select("id")` não é enfeite: quando a policy `agend_delete` recusa a
+    // linha, o banco responde "sucesso, zero linhas apagadas" — sem erro. Sem
+    // conferir o retorno, a tela comemorava uma exclusão que não aconteceu e o
+    // horário reaparecia na recarga, o que a recepção lia como travamento.
+    const { data: apagados, error } = await supabase
+      .from("agendamentos")
+      .delete()
+      .eq("id", a.id)
+      .select("id");
     if (error) {
       mostrarErro(error as never);
+      return;
+    }
+    if (!apagados || apagados.length === 0) {
+      toast.error(MSG_EXCLUSAO_RECUSADA);
+      await load();
       return;
     }
     toast.success("Horário excluído da grade.");
@@ -4694,14 +4715,30 @@ function AgendaPage() {
       });
       if (!ok) return;
     }
-    const apagarNoBanco = async () => {
-      const { error } = await supabase.from("agendamentos").delete().in("id", ids);
+    // Devolve quantas linhas o banco realmente apagou. Uma recusa da policy não
+    // vem como erro: vem como lote parcial. Quem chama precisa saber disso para
+    // não anunciar uma limpeza que não aconteceu.
+    const apagarNoBanco = async (): Promise<number | null> => {
+      const { data: apagados, error } = await supabase
+        .from("agendamentos")
+        .delete()
+        .in("id", ids)
+        .select("id");
       if (error) {
         mostrarErro(error);
         await load();
-        return;
+        return null;
       }
       await load();
+      return apagados?.length ?? 0;
+    };
+
+    // Mensagem única para os dois caminhos (com e sem "Desfazer"): diz quantos
+    // saíram e quantos o banco recusou, em vez de um "excluído(s)" genérico.
+    const avisarResultado = (apagados: number) => {
+      const recusados = ids.length - apagados;
+      if (apagados > 0) toast.success(`${apagados} horário(s) excluído(s).`);
+      if (recusados > 0) toast.error(`${recusados} não saiu(íram). ${MSG_EXCLUSAO_RECUSADA}`);
     };
 
     if (!uxMelhorias) {
@@ -4709,8 +4746,8 @@ function AgendaPage() {
         !(await confirmDialog(`Excluir ${ids.length} horário(s)? Esta ação não pode ser desfeita.`))
       )
         return;
-      await apagarNoBanco();
-      toast.success(`${ids.length} horário(s) excluído(s).`);
+      const apagados = await apagarNoBanco();
+      if (apagados !== null) avisarResultado(apagados);
       setSelecionados(new Set());
       return;
     }
@@ -4721,7 +4758,15 @@ function AgendaPage() {
     setItems((prev) => prev.filter((a) => !ids.includes(a.id)));
     let desfeito = false;
     const timer = setTimeout(() => {
-      if (!desfeito) void apagarNoBanco();
+      if (desfeito) return;
+      // A linha já sumiu da tela, então o aviso de recusa só pode vir agora,
+      // depois que o banco respondeu. Sem isso o horário recusado voltava para
+      // a grade na recarga seguinte sem nenhuma explicação.
+      void apagarNoBanco().then((apagados) => {
+        if (apagados === null) return;
+        const recusados = ids.length - apagados;
+        if (recusados > 0) toast.error(`${recusados} não saiu(íram). ${MSG_EXCLUSAO_RECUSADA}`);
+      });
     }, 5000);
     toast(`${ids.length} horário(s) excluído(s).`, {
       duration: 5000,
@@ -6229,9 +6274,12 @@ function AgendaPage() {
     // vínculo órfão dispara o falso aviso de "paciente já agendado".
     await supabase.from("agendamento_orcamento_itens").delete().eq("agendamento_id", a.id);
     // Existe um índice único parcial (uq_agend_slot_vazio) que impede dois slots
-    // livres no mesmo (clínica, médico, agenda, início). Se já houver um slot
-    // livre neste horário, apagamos esta linha (o horário já está disponível
-    // pelo outro registro). Caso contrário, liberamos esta linha normalmente.
+    // livres no mesmo (clínica, médico, agenda, início). Quando já há um slot
+    // livre neste horário, apagamos o LIVRE e devolvemos esta linha à grade —
+    // nunca o contrário. Apagar a linha do paciente é recusado pela policy
+    // `agend_delete` para quem não é gestor (ela só libera horário vago), e a
+    // recusa não vem como erro: vinha como "Horário liberado" na tela com o
+    // paciente ainda marcado, justamente no caminho que a recepção usa.
     const { data: livreExistente } = await supabase
       .from("agendamentos")
       .select("id")
@@ -6243,25 +6291,37 @@ function AgendaPage() {
       .eq("status", "agendado")
       .neq("id", a.id)
       .maybeSingle();
-    let error: unknown = null;
     if (livreExistente) {
-      const res = await supabase.from("agendamentos").delete().eq("id", a.id);
-      error = res.error;
-    } else {
-      const res = await supabase
+      const { data: livresApagados, error: erroLivre } = await supabase
         .from("agendamentos")
-        .update({
-          paciente_id: null,
-          paciente_nome: "DISPONÍVEL",
-          procedimento: null,
-          observacoes: null,
-          status: "agendado",
-          data_pagamento: null,
-          orcamento_id: null,
-        } as never)
-        .eq("id", a.id);
-      error = res.error;
+        .delete()
+        .eq("id", livreExistente.id)
+        .select("id");
+      if (erroLivre) {
+        mostrarErro(erroLivre as never);
+        return;
+      }
+      // O slot livre gêmeo também pode estar preso por rastro financeiro (ele
+      // já recebeu e foi desmarcado antes). Sem ele fora do caminho, o update
+      // abaixo esbarraria no índice único, então paramos aqui com o motivo.
+      if (!livresApagados || livresApagados.length === 0) {
+        toast.error(MSG_EXCLUSAO_RECUSADA);
+        await load();
+        return;
+      }
     }
+    const { error } = await supabase
+      .from("agendamentos")
+      .update({
+        paciente_id: null,
+        paciente_nome: "DISPONÍVEL",
+        procedimento: null,
+        observacoes: null,
+        status: "agendado",
+        data_pagamento: null,
+        orcamento_id: null,
+      } as never)
+      .eq("id", a.id);
     if (error) mostrarErro(error as never);
     else {
       toast.success("Horário liberado.");
