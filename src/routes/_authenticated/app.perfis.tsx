@@ -33,6 +33,7 @@ import {
   HeartPulse,
   Stethoscope,
   Briefcase,
+  PhoneCall,
   ChevronDown,
   ChevronRight,
   Save,
@@ -99,6 +100,12 @@ const PERFIS: Array<{
     nome: "ENFERMEIRO",
     icon: HeartPulse,
     descricao: "Atuação clínica de enfermagem: triagem, alertas e acompanhamento de pacientes.",
+  },
+  {
+    key: "telefonia",
+    nome: "TELEFONIA",
+    icon: PhoneCall,
+    descricao: "Atendimento humano das conversas encaminhadas pela Nina.",
   },
 ];
 

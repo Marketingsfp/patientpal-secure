@@ -8,7 +8,10 @@ export type PerfilKey =
   | "recepcao"
   | "caixa"
   | "financeiro"
-  | "enfermeiro";
+  | "enfermeiro"
+  // Perfil próprio (mesmo nível de recepção/caixa): atendimento humano das
+  // conversas encaminhadas pela Nina.
+  | "telefonia";
 
 export type Acesso = "none" | "read" | "write";
 
@@ -237,6 +240,17 @@ export const PRESETS: Record<PerfilKey, Partial<Record<string, Acesso>>> = {
     orcamentos: "write",
     "atendimento-multiplo": "write",
     caixa: "read",
+  },
+  // Espelha o que a migration grava em perfil_permissoes para o perfil
+  // TELEFONIA — é o padrão de quem recebe os handoffs da Nina.
+  telefonia: {
+    telefonia: "write",
+    nina: "write",
+    chat: "write",
+    "atendimento-multiplo": "read",
+    agenda: "read",
+    clientes: "read",
+    "consulta-rapida": "read",
   },
 };
 
