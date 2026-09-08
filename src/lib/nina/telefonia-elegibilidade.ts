@@ -39,7 +39,15 @@ export type CandidatoDistribuicao = {
   presencaRecente?: boolean;
   /** Conversas ativas no momento (usado só no balanceamento). */
   cargaAtiva?: number;
-  /** Último recebimento, para desempate estável. */
+  /**
+   * Limite de conversas simultâneas do atendente (padrão 5). Quem já atingiu
+   * o limite sai do balanceamento — FASE 3.
+   */
+  capacidadeMaxima?: number;
+  /**
+   * Último recebimento (histórico completo), para desempate justo: em empate
+   * de carga, recebe quem está há mais tempo sem conversa.
+   */
   ultimaAtribuicaoEm?: string | null;
   /** Setores a que pertence, quando a conversa tem setor. */
   departamentos?: string[];
@@ -64,6 +72,7 @@ export function verificarElegibilidade(c: CandidatoDistribuicao): VerificacaoEle
   else if (!(c.presencaRecente ?? true)) motivo = "presença desatualizada";
   else if (c.emPausa) motivo = "em pausa";
   else if (c.filaTravada) motivo = "fila travada";
+  else if ((c.cargaAtiva ?? 0) >= (c.capacidadeMaxima ?? 5)) motivo = "capacidade lotada";
 
   return {
     user_has_telefonia: c.temTelefonia,
@@ -95,6 +104,33 @@ export function poolElegivel(
   );
 }
 
+/**
+ * FASE 3 — revalidação imediatamente antes de gravar.
+ *
+ * Espelha o passo do banco: entre escolher e persistir, a pessoa pode ter
+ * entrado em pausa, ficado offline ou perdido a Telefonia. Quem não passa na
+ * reconferência é descartado e a vez vai para a próxima da fila.
+ */
+export function escolherComRevalidacao(
+  candidatos: CandidatoDistribuicao[],
+  opts: {
+    departamentoId?: string | null;
+    /** Estado no instante da gravação; devolve `null` para "sem mudança". */
+    revalidar?: (userId: string) => CandidatoDistribuicao | null;
+  } = {},
+): { escolhido: CandidatoDistribuicao | null; descartados: string[] } {
+  const descartados: string[] = [];
+  for (const c of poolElegivel(candidatos, opts)) {
+    const agora = opts.revalidar?.(c.userId) ?? c;
+    if (!verificarElegibilidade(agora).eligible_for_nina_handoff) {
+      descartados.push(c.userId);
+      continue;
+    }
+    return { escolhido: c, descartados };
+  }
+  return { escolhido: null, descartados };
+}
+
 export type ResultadoDistribuicao = {
   assignment_occurred: boolean;
   /** Quem receberia a conversa; `null` significa fila "Não atribuídas". */
@@ -106,9 +142,12 @@ export type ResultadoDistribuicao = {
 /** Simula a atribuição de UMA conversa (sem tocar em banco algum). */
 export function simularAtribuicao(
   candidatos: CandidatoDistribuicao[],
-  opts: { departamentoId?: string | null } = {},
+  opts: {
+    departamentoId?: string | null;
+    revalidar?: (userId: string) => CandidatoDistribuicao | null;
+  } = {},
 ): ResultadoDistribuicao {
-  const escolhido = poolElegivel(candidatos, opts)[0] ?? null;
+  const { escolhido } = escolherComRevalidacao(candidatos, opts);
   return {
     assignment_occurred: Boolean(escolhido),
     atribuido_a: escolhido?.userId ?? null,
@@ -124,7 +163,10 @@ export function simularAtribuicao(
 export function simularFila(
   candidatos: CandidatoDistribuicao[],
   quantidadeDeConversas: number,
-  opts: { departamentoId?: string | null } = {},
+  opts: {
+    departamentoId?: string | null;
+    revalidar?: (userId: string) => CandidatoDistribuicao | null;
+  } = {},
 ): { atribuicoes: (string | null)[]; naoAtribuidas: number } {
   const estado = candidatos.map((c) => ({ ...c, cargaAtiva: c.cargaAtiva ?? 0 }));
   const atribuicoes: (string | null)[] = [];
