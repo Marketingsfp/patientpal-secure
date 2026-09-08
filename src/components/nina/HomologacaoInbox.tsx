@@ -83,6 +83,8 @@ import {
   type ConversaEvento,
 } from "@/components/nina/ConversationSystemEvent";
 import { NinaMessage, TypingDots } from "@/components/nina/NinaMessage";
+import { ReportarErroNinaBotao } from "@/components/nina/ReportarErroNinaDialog";
+
 import {
   ConfiancaMensagemBadge,
   ConfiancaNaoAvaliadaBadge,
