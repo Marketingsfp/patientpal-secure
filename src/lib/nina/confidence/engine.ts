@@ -20,6 +20,7 @@ import {
   aplicarPolitica,
   detectarHardBlockers,
   medirEvidencia,
+  nivelDaPontuacao,
   POLITICA_PADRAO,
   type HardBlocker,
   type PoliticaConfianca,
