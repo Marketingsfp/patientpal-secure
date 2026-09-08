@@ -109,6 +109,8 @@ import {
 } from "./confidence/auditoria";
 import type { NivelConfianca } from "./confidence/types";
 
+export type ValidadorResumo = { validator: string; status: string; reasonCode: string | null };
+
 export type ConfiabilidadeDecisaoView = {
   score: number;
   nivel: string;
@@ -122,6 +124,13 @@ export type ConfiabilidadeDecisaoView = {
   acaoSolicitada: string | null;
   policyVersion: string | null;
   registradoEm: string;
+  /** FASE 6 — % do que era relevante e pôde ser verificado. */
+  coberturaEvidencias: number | null;
+  /** FASE 6 — status por dimensão, para o painel compacto. */
+  validadores: ValidadorResumo[];
+  /** FASE 6 — o registro avalia a resposta final ou a segurança da ação. */
+  avaliacao: string | null;
+  engineVersion: string | null;
 };
 
 /**
@@ -131,27 +140,46 @@ export type ConfiabilidadeDecisaoView = {
 export const confiabilidadeDaExecucao = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) =>
-    z.object({ clinicaId: z.string().uuid(), execucaoId: z.string().uuid() }).parse(i),
+    z
+      .object({
+        clinicaId: z.string().uuid(),
+        execucaoId: z.string().uuid(),
+        /** FASE 6 — vínculo principal: a mensagem que o paciente recebeu. */
+        outgoingMessageId: z.string().uuid().optional(),
+      })
+      .parse(i),
   )
   .handler(async ({ data, context }): Promise<ConfiabilidadeDecisaoView | null> => {
     const colunas =
-      "created_at, ambiente, score, nivel, intencao, resultado_final, bloqueadores, validadores, ferramentas, fontes, reason_codes, acao_solicitada, policy_version, avaliacao";
-    // FASE 5 — o indicador da mensagem é a confiança da RESPOSTA FINAL.
-    // Só quando não existir essa avaliação (execuções antigas) caímos na
-    // avaliação de segurança da ação.
-    const buscar = async (avaliacao: string | null) => {
+      "created_at, ambiente, score, nivel, intencao, resultado_final, bloqueadores, validadores, ferramentas, fontes, reason_codes, acao_solicitada, policy_version, avaliacao, evidence_coverage, engine_version";
+    // FASE 6 — o snapshot é procurado primeiro pela mensagem realmente
+    // enviada. Só quando esse vínculo não existir (registros antigos) usamos
+    // a execução. FASE 5 — dentro disso, vale a confiança da RESPOSTA FINAL.
+    const buscar = async (avaliacao: string | null, porMensagem: boolean) => {
       let q = context.supabase
         .from("nina_confianca_decisoes")
         .select(colunas)
-        .eq("clinica_id", data.clinicaId)
-        .eq("execucao_id", data.execucaoId);
+        .eq("clinica_id", data.clinicaId);
+      q = porMensagem
+        ? q.eq("outgoing_message_id", data.outgoingMessageId!)
+        : q.eq("execucao_id", data.execucaoId);
       if (avaliacao) q = q.eq("avaliacao", avaliacao);
       return q.order("created_at", { ascending: false }).limit(1).maybeSingle();
     };
-    const preferida = await buscar("answer_confidence");
-    if (preferida.error) throw new Error(preferida.error.message);
-    const { data: row, error } = preferida.data ? preferida : await buscar(null);
-    if (error) throw new Error(error.message);
+    const tentativas: Array<[string | null, boolean]> = data.outgoingMessageId
+      ? [["answer_confidence", true], [null, true], ["answer_confidence", false], [null, false]]
+      : [["answer_confidence", false], [null, false]];
+    let achado: Awaited<ReturnType<typeof buscar>> | null = null;
+    for (const [avaliacao, porMensagem] of tentativas) {
+      const r = await buscar(avaliacao, porMensagem);
+      if (r.error) throw new Error(r.error.message);
+      if (r.data) {
+        achado = r;
+        break;
+      }
+    }
+    const row = achado?.data ?? null;
+    // Sem snapshot válido a mensagem fica "Não avaliada" — nunca 100%.
     if (!row) return null;
 
     // Erro reportado depois pela equipe para esta MESMA resposta.
