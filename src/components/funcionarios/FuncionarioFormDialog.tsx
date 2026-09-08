@@ -41,7 +41,6 @@ const PERFIS = [
   { value: "recepcao", label: "Recepção" },
   { value: "caixa", label: "Caixa" },
   { value: "financeiro", label: "Financeiro" },
-  { value: "telefonia", label: "Telefonia" },
 ] as const;
 
 interface Ref {

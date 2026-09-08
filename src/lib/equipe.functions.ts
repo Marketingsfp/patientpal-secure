@@ -12,7 +12,6 @@ const ROLES = [
   "caixa",
   "financeiro",
   "supervisor",
-  "telefonia",
 ] as const;
 
 async function assertManager(userId: string, clinicaId: string) {

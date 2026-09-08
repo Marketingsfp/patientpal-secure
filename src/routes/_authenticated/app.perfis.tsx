@@ -32,8 +32,8 @@ import {
   DollarSign,
   HeartPulse,
   Stethoscope,
+  Headset,
   Briefcase,
-  PhoneCall,
   ChevronDown,
   ChevronRight,
   Save,
@@ -104,7 +104,7 @@ const PERFIS: Array<{
   {
     key: "telefonia",
     nome: "TELEFONIA",
-    icon: PhoneCall,
+    icon: Headset,
     descricao: "Atendimento humano das conversas encaminhadas pela Nina.",
   },
 ];
@@ -148,11 +148,9 @@ const GRUPOS_BASE: Grupo[] = [
       { key: "fluxo", nome: "Fluxo do paciente", descricao: "Kanban de atendimento" },
       { key: "orcamentos", nome: "Orçamentos", descricao: "Propostas e orçamentos" },
       { key: "recepcao", nome: "Recepção / Filas", descricao: "Check-in e filas" },
-      {
-        key: "telefonia",
-        nome: "Telefonia",
-        descricao: "Atendimento telefônico da clínica",
-      },
+      // Telefonia não é categoria da matriz: é um PERFIL próprio (chave
+      // "telefonia"), listado junto de Recepção, Caixa, Financeiro etc.
+
       { key: "triagem-enfermagem", nome: "Triagem - Enfermagem", descricao: "Triagem inicial" },
       { key: "cartao-beneficios", nome: "Cartão Benefícios", descricao: "Planos e contratos" },
       {
@@ -510,13 +508,12 @@ function PerfisPage() {
       if (error) throw error;
       toast.success("Permissões salvas");
 
-      // FASE 4 — Telefonia é o que dá entrada na distribuição automática dos
-      // handoffs da Nina. Ao liberar Telefonia para um perfil, quem já está
-      // Online passa a ser elegível na hora: reavaliamos a fila de "Não
-      // atribuídas" imediatamente, em vez de esperar o próximo heartbeat.
-      // Remover a permissão não precisa de nada aqui — o pool é lido ao vivo
-      // no banco, e conversas já atribuídas nunca são retiradas de ninguém.
-      if (clinicaId && matriz[perfilSel]?.["telefonia"] !== "none") {
+      // FASE 4 — quem dá entrada na distribuição automática dos handoffs da
+      // Nina é o PERFIL Telefonia. Ao salvar esse perfil, quem já está Online
+      // pode ter virado elegível: reavaliamos a fila de "Não atribuídas" na
+      // hora, em vez de esperar o próximo heartbeat. O pool é lido ao vivo no
+      // banco, e conversas já atribuídas nunca são retiradas de ninguém.
+      if (clinicaId && perfilSel === "telefonia") {
         try {
           const { distribuirFilaPendentes } = await import("@/lib/atendimento.functions");
           const r = await distribuirFilaPendentes({ data: { clinicaId } });

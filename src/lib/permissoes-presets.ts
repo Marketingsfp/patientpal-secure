@@ -9,8 +9,6 @@ export type PerfilKey =
   | "caixa"
   | "financeiro"
   | "enfermeiro"
-  // Perfil próprio (mesmo nível de recepção/caixa): atendimento humano das
-  // conversas encaminhadas pela Nina.
   | "telefonia";
 
 export type Acesso = "none" | "read" | "write";
@@ -26,9 +24,9 @@ export const TODOS_MODULOS: ReadonlyArray<string> = [
   "fluxo",
   "orcamentos",
   "recepcao",
-  // Nova categoria operacional. Fica disponível na tela de Perfis para ser
-  // ligada/desligada; nenhum preset (fora do admin) recebe acesso automático.
-  "telefonia",
+  // "telefonia" saiu daqui: Telefonia é um PERFIL próprio (chave "telefonia"),
+  // no mesmo nível de Recepção/Caixa, e não uma categoria da matriz.
+
   "triagem-enfermagem",
   "cartao-beneficios",
   "painel",
@@ -241,16 +239,14 @@ export const PRESETS: Record<PerfilKey, Partial<Record<string, Acesso>>> = {
     "atendimento-multiplo": "write",
     caixa: "read",
   },
-  // Espelha o que a migration grava em perfil_permissoes para o perfil
-  // TELEFONIA — é o padrão de quem recebe os handoffs da Nina.
+  // Perfil operacional do atendimento humano vindo da Nina.
   telefonia: {
-    telefonia: "write",
     nina: "write",
     chat: "write",
-    "atendimento-multiplo": "read",
     agenda: "read",
     clientes: "read",
     "consulta-rapida": "read",
+    "atendimento-multiplo": "read",
   },
 };
 
