@@ -1121,6 +1121,12 @@ function Pagina() {
                       {rotuloConversaReporte(it.conversa_id, conversas[it.conversa_id ?? ""])}
                     </span>
                     <Badge variant="outline">{ROTULO_REVISAO[it.status] ?? it.status}</Badge>
+                    {it.ambiente && AMBIENTE_UI[it.ambiente] && (
+                      <Badge variant="outline" className={AMBIENTE_UI[it.ambiente]!.classe}>
+                        Ambiente: {AMBIENTE_UI[it.ambiente]!.rotulo}
+                      </Badge>
+                    )}
+
                     {it.grupo_chave && (ocorrencias[it.grupo_chave] ?? 1) > 1 && (
                       <Badge variant="secondary">
                         {it.grupo_titulo ?? "Problema"} — {ocorrencias[it.grupo_chave]} ocorrências
