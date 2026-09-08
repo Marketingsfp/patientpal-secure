@@ -1146,20 +1146,35 @@ export function HomologacaoInbox() {
                           variant={daNina ? "assistant" : "user"}
                         />
                         <div
-                          className={`mt-1 text-[11px] ${out ? "text-atd-on-strong/80" : "text-atd-ink-soft"}`}
+                          className={`mt-1 flex items-center justify-between gap-2 text-[11px] ${out ? "text-atd-on-strong/80" : "text-atd-ink-soft"}`}
                         >
-                          {formatarDataHoraMensagem(m.created_at)}{" "}
-                          {daNina ? "· Nina" : "· Paciente (teste)"}
-                          {daNina && m.execucao_id && (
-                            <button
-                              type="button"
-                              className="ml-2 underline underline-offset-2 hover:opacity-80"
-                              onClick={() => void abrirDetalhe(m.execucao_id as string)}
-                            >
-                              Detalhes técnicos
-                            </button>
+                          <span className="whitespace-nowrap">
+                            {formatarDataHoraMensagem(m.created_at)}{" "}
+                            {daNina ? "· Nina" : "· Paciente (teste)"}
+                          </span>
+                          {daNina && (
+                            <span className="flex items-center gap-2">
+                              {clinicaId && m.execucao_id && confiancaPorExecucao[String(m.execucao_id)] ? (
+                                <ConfiancaMensagemBadge
+                                  clinicaId={clinicaId}
+                                  confianca={confiancaPorExecucao[String(m.execucao_id)]!}
+                                />
+                              ) : (
+                                <ConfiancaNaoAvaliadaBadge />
+                              )}
+                              {m.execucao_id && (
+                                <button
+                                  type="button"
+                                  className="underline underline-offset-2 hover:opacity-80"
+                                  onClick={() => void abrirDetalhe(m.execucao_id as string)}
+                                >
+                                  Detalhes técnicos
+                                </button>
+                              )}
+                            </span>
                           )}
                         </div>
+
                       </div>
                     </div>
                   );
