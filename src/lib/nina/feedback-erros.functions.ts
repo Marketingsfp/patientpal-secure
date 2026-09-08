@@ -121,9 +121,10 @@ export const reportarErroRapidoMensagemNina = createServerFn({ method: "POST" })
     const { data: conversa, error: erroConversa } = await context.supabase
       .from("atend_conversas")
       .select(
-        "id, contato_paciente_id, contato_telefone, protocolo_atendimento, protocolo_sessao_id, teste_ciclo_id",
+        "id, contato_paciente_id, contato_telefone, protocolo_atendimento, protocolo_sessao_id, teste_ciclo_id, is_teste",
       )
       .eq("id", data.conversaId)
+
       .eq("clinica_id", data.clinicaId)
       .maybeSingle();
     if (erroConversa) throw new Error(erroConversa.message);
