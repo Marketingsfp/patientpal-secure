@@ -23,11 +23,19 @@ export type ResultadoFinalAuditoria =
   | "transferido_para_humano"
   | "acao_bloqueada";
 
+/** Um campo com valores divergentes, preservado para auditoria técnica. */
+export type ConflitoAuditado = {
+  campo: string;
+  origens: Array<{ origem: string; valor: string }>;
+};
+
 export type ValidadorAuditado = {
   validator: string;
   status: StatusValidador;
   reasonCode: string;
   evidence: Record<string, string | number | boolean>;
+  /** FASE 6 — evidência estruturada de conflito (campo, origem A/B, valores). */
+  conflitos: ConflitoAuditado[];
 };
 
 export type FerramentaAuditada = {
@@ -48,6 +56,10 @@ export type FonteAuditada = {
 export type RegistroAuditoriaConfianca = {
   conversationId: string | null;
   messageId: string | null;
+  /** FASE 6 — mensagem da Nina efetivamente enviada (vínculo principal). */
+  outgoingMessageId: string | null;
+  /** Sessão da Nina que produziu a resposta. */
+  ninaSessionId: string | null;
   timestamp: string;
   intencao: string | null;
   acaoSolicitada: AcaoSolicitada;
@@ -90,10 +102,81 @@ const CAMPOS_PROIBIDOS = [
 ];
 
 const LIMITE_TEXTO = 120;
+/** FASE 6 — teto de itens e profundidade da evidência estruturada. */
+const LIMITE_CONFLITOS = 8;
+const LIMITE_ORIGENS = 6;
 
 function proibido(chave: string): boolean {
   const k = chave.toLowerCase();
   return CAMPOS_PROIBIDOS.some((p) => k.includes(p));
+}
+
+/**
+ * FASE 6 — remove dado pessoal antes de qualquer valor virar auditoria:
+ * e-mail, telefone, CPF e sequências longas de dígitos viram marcador.
+ */
+export function removerPII(valor: string): string {
+  return valor
+    .replace(/[\w.+-]+@[\w-]+\.[\w.-]+/g, "[email]")
+    .replace(/\b\d{3}\.?\d{3}\.?\d{3}-?\d{2}\b/g, "[cpf]")
+    .replace(/\+?\d[\d\s().-]{7,}\d/g, "[telefone]");
+}
+
+function escalar(v: unknown, truncar = false): string | number | boolean | null {
+  if (typeof v === "number" || typeof v === "boolean") return v;
+  if (typeof v === "string") {
+    const limpo = removerPII(v);
+    // Texto livre longo continua sendo descartado; só a evidência estruturada
+    // de conflito (whitelist) pode ser truncada em vez de perdida.
+    if (limpo.length > LIMITE_TEXTO) return truncar ? limpo.slice(0, LIMITE_TEXTO) : null;
+    return limpo || null;
+  }
+  return null;
+}
+
+/** Chaves aceitas dentro de uma estrutura de conflito (whitelist). */
+const CHAVE_CAMPO = ["campo", "field", "atributo"];
+const CHAVE_ORIGENS = ["valores", "origens", "fontes", "values", "sources"];
+const CHAVE_ORIGEM = ["origem", "fonte", "source"];
+const CHAVE_VALOR = ["valor", "value"];
+
+function achar(obj: Record<string, unknown>, chaves: string[]): unknown {
+  for (const c of chaves) if (c in obj) return obj[c];
+  return undefined;
+}
+
+/**
+ * FASE 6 — preserva a evidência de conflito (campo, origem A/valor A,
+ * origem B/valor B) em formato fechado: whitelist de chaves, profundidade
+ * máxima 2, quantidade e tamanho limitados, sem PII e sem texto livre.
+ */
+export function extrairConflitos(
+  bruta: Record<string, unknown> | undefined | null,
+): ConflitoAuditado[] {
+  const saida: ConflitoAuditado[] = [];
+  for (const [k, v] of Object.entries(bruta ?? {})) {
+    if (!/conflit/i.test(k) || !Array.isArray(v)) continue;
+    for (const item of v.slice(0, LIMITE_CONFLITOS)) {
+      if (!item || typeof item !== "object" || Array.isArray(item)) continue;
+      const obj = item as Record<string, unknown>;
+      const campo = escalar(achar(obj, CHAVE_CAMPO), true);
+      const lista = achar(obj, CHAVE_ORIGENS);
+      if (!Array.isArray(lista)) continue;
+      const origens: ConflitoAuditado["origens"] = [];
+      for (const o of lista.slice(0, LIMITE_ORIGENS)) {
+        if (!o || typeof o !== "object" || Array.isArray(o)) continue;
+        const linha = o as Record<string, unknown>;
+        const origem = escalar(achar(linha, CHAVE_ORIGEM), true);
+        const valor = escalar(achar(linha, CHAVE_VALOR), true);
+        if (origem == null && valor == null) continue;
+        origens.push({ origem: String(origem ?? "origem não informada"), valor: String(valor ?? "—") });
+      }
+      if (origens.length > 0) {
+        saida.push({ campo: String(campo ?? "campo não informado"), origens });
+      }
+    }
+  }
+  return saida.slice(0, LIMITE_CONFLITOS);
 }
 
 /** Mantém só escalares curtos e listas de escalares; descarta o resto. */
@@ -103,16 +186,18 @@ export function sanearEvidencia(
   const saida: Record<string, string | number | boolean> = {};
   for (const [k, v] of Object.entries(bruta ?? {})) {
     if (proibido(k)) continue;
-    if (typeof v === "number" || typeof v === "boolean") {
-      saida[k] = v;
-    } else if (typeof v === "string") {
-      if (v.length <= LIMITE_TEXTO) saida[k] = v;
-    } else if (Array.isArray(v)) {
+    const s = escalar(v);
+    if (s !== null) {
+      saida[k] = s;
+      continue;
+    }
+    if (Array.isArray(v)) {
       const itens = v
-        .filter((i) => ["string", "number", "boolean"].includes(typeof i))
-        .map((i) => String(i))
-        .filter((i) => i.length <= LIMITE_TEXTO);
+        .map((i) => escalar(i))
+        .filter((i): i is string | number | boolean => i !== null)
+        .map((i) => String(i));
       if (itens.length > 0) saida[k] = itens.join(", ").slice(0, 300);
+      else if (/conflit/i.test(k)) saida[k] = v.length; // estrutura vai em `conflitos`
     }
   }
   return saida;
@@ -128,6 +213,9 @@ export function resultadoFinalDa(decisao: DecisaoMotor): ResultadoFinalAuditoria
 export type EntradaAuditoria = {
   conversationId?: string | null;
   messageId?: string | null;
+  /** FASE 6 — id da mensagem realmente enviada, quando já conhecido. */
+  outgoingMessageId?: string | null;
+  ninaSessionId?: string | null;
   intencao?: string | null;
   acaoSolicitada?: AcaoSolicitada;
   timestamp?: string;
@@ -156,6 +244,7 @@ export function montarRegistroAuditoria(
     status: v.status,
     reasonCode: v.reasonCode,
     evidence: sanearEvidencia(v.evidence),
+    conflitos: extrairConflitos(v.evidence),
   }));
 
   const reasonCodes = [
@@ -170,6 +259,8 @@ export function montarRegistroAuditoria(
   return {
     conversationId: e.conversationId ?? null,
     messageId: e.messageId ?? null,
+    outgoingMessageId: e.outgoingMessageId ?? null,
+    ninaSessionId: e.ninaSessionId ?? null,
     timestamp: e.timestamp ?? new Date().toISOString(),
     intencao: e.intencao ?? null,
     // FASE 2: sem ação informada o registro diz "desconhecida", não presume.
@@ -233,7 +324,7 @@ export type LinhaConfiabilidade = {
   rotulo: string;
   detalhe: string | null;
   /** Seção em que a linha é mostrada no painel de detalhes. */
-  grupo: "validador" | "ferramenta" | "fonte";
+  grupo: "validador" | "ferramenta" | "fonte" | "conflito";
   /** Código estruturado do motivo (só evidência observável). */
   reasonCode: string | null;
 };
@@ -260,6 +351,20 @@ export function linhasConfiabilidade(
         reasonCode: v.reasonCode ? String(v.reasonCode) : null,
       };
     });
+
+  // FASE 6 — conflito auditável: campo, origem A/valor A, origem B/valor B.
+  for (const v of registro.validadores) {
+    for (const c of v.conflitos ?? []) {
+      linhas.push({
+        ok: false,
+        rotulo: `Conflito: ${c.campo}`,
+        detalhe: c.origens.map((o) => `${o.origem} = ${o.valor}`).join(" ✕ "),
+        grupo: "conflito",
+        reasonCode: v.reasonCode ? String(v.reasonCode) : null,
+      });
+    }
+  }
+
 
   for (const f of registro.ferramentas) {
     linhas.push({

@@ -27,6 +27,20 @@ const CURTO: Record<string, string> = {
   LOW: "Baixa",
 };
 
+/**
+ * FASE 6 — teto visual de 99% para resposta gerativa da Nina.
+ *
+ * Enquanto não houver calibração estatística suficiente, não exibimos 100%
+ * como certeza absoluta. É proteção semântica de interface: o score gravado
+ * no snapshot NÃO é alterado, e eventos determinísticos seguem seu próprio
+ * conceito, fora desta formatação.
+ */
+export const TETO_VISUAL_GERATIVO = 99;
+
+export function scoreExibido(score: number): number {
+  return Math.min(score, TETO_VISUAL_GERATIVO);
+}
+
 /** Rótulo do selo a partir do snapshot histórico (ou da ausência dele). */
 export function rotuloConfianca(
   confianca: ConfiancaDaMensagem | null | undefined,
@@ -42,11 +56,12 @@ export function rotuloConfianca(
     };
   }
   const curto = CURTO[confianca.nivel] ?? CURTO["LOW"]!;
+  const exibido = scoreExibido(confianca.score);
   return {
     avaliada: true,
-    texto: `${confianca.score}% ${curto}`,
+    texto: `${exibido}% ${curto}`,
     nivel: confianca.nivel,
-    score: confianca.score,
+    score: exibido,
     policyVersion: confianca.policy_version,
     altaConfiancaComErro:
       confianca.nivel === "HIGH" && Boolean(confianca.erro_reportado),

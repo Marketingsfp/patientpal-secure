@@ -12,7 +12,31 @@
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import type { DecisaoConfianca } from "./confidence-engine";
 import type { RegistroAuditoriaConfianca } from "./confidence/auditoria";
-import { VERSAO_POLITICA } from "./confidence/policy";
+import { VERSAO_MOTOR, VERSAO_POLITICA } from "./confidence/policy";
+
+/**
+ * FASE 6 — liga o snapshot já gravado à mensagem da Nina que foi de fato
+ * enviada. O vínculo principal do indicador é `outgoing_message_id`; a
+ * execução continua guardada para o histórico e para os reportes de erro.
+ */
+export async function vincularSnapshotMensagemEnviada(params: {
+  clinicaId: string;
+  execucaoId: string | null | undefined;
+  outgoingMessageId: string | null | undefined;
+}): Promise<void> {
+  if (!params.execucaoId || !params.outgoingMessageId) return;
+  try {
+    await supabaseAdmin
+      .from("nina_confianca_decisoes")
+      .update({ outgoing_message_id: params.outgoingMessageId } as never)
+      .eq("clinica_id", params.clinicaId)
+      .eq("execucao_id", params.execucaoId)
+      .eq("avaliacao", "answer_confidence")
+      .is("outgoing_message_id", null);
+  } catch (e) {
+    console.warn("[nina-confianca] falha ao vincular mensagem enviada:", e instanceof Error ? e.message : e);
+  }
+}
 
 export async function registrarDecisaoConfianca(params: {
   clinicaId: string;
@@ -45,6 +69,12 @@ export async function registrarDecisaoConfianca(params: {
   textoFinalHash?: string | null;
   /** FASE 5 — grounding afirmação a afirmação da resposta final. */
   claims?: unknown;
+  /** FASE 6 — mensagem da Nina efetivamente enviada (vínculo principal). */
+  outgoingMessageId?: string | null;
+  /** FASE 6 — sessão da Nina que produziu a resposta. */
+  ninaSessionId?: string | null;
+  /** FASE 6 — versão do motor de confiança. */
+  engineVersion?: string;
 }): Promise<void> {
   try {
     const a = params.auditoria ?? null;
@@ -62,6 +92,9 @@ export async function registrarDecisaoConfianca(params: {
       modo: params.modo ?? "shadow",
       teria_permitido: params.teriaPermitido ?? null,
       policy_version: params.policyVersion ?? VERSAO_POLITICA,
+      engine_version: params.engineVersion ?? VERSAO_MOTOR,
+      outgoing_message_id: params.outgoingMessageId ?? a?.outgoingMessageId ?? null,
+      nina_session_id: params.ninaSessionId ?? a?.ninaSessionId ?? null,
       avaliacao: params.avaliacao ?? "action_safety",
       texto_final_hash: params.textoFinalHash ?? null,
       claims: params.claims ?? null,
@@ -78,6 +111,11 @@ export async function registrarDecisaoConfianca(params: {
             ferramentas: a.ferramentas,
             bloqueadores: a.bloqueadores,
             resultado_final: a.resultadoFinal,
+            // FASE 6 — cobertura e conflitos auditáveis junto do snapshot.
+            evidence_coverage: a.evidenceCoverage ?? null,
+            conflitos: a.validadores.flatMap((v) =>
+              (v.conflitos ?? []).map((c) => ({ validator: v.validator, ...c })),
+            ),
           }
         : {}),
     } as never);

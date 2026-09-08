@@ -16,7 +16,7 @@ import {
   type ConfiancaDaMensagem,
   type ConfiabilidadeDecisaoView,
 } from "@/lib/nina/confianca.functions";
-import { rotuloConfianca } from "@/lib/nina/confianca-badge";
+import { rotuloConfianca, scoreExibido } from "@/lib/nina/confianca-badge";
 import {
   gravarLote,
   idsParaBuscar,
@@ -145,9 +145,12 @@ function Grupo({
 export function ConfiancaMensagemBadge({
   clinicaId,
   confianca,
+  /** FASE 6 — id da mensagem enviada; vínculo principal do snapshot. */
+  mensagemId,
 }: {
   clinicaId: string;
   confianca: ConfiancaDaMensagem;
+  mensagemId?: string | null;
 }) {
   const detalhar = useServerFn(confiabilidadeDaExecucao);
   const [detalhe, setDetalhe] = useState<ConfiabilidadeDecisaoView | null>(null);
@@ -155,11 +158,19 @@ export function ConfiancaMensagemBadge({
 
   const carregar = useCallback(async () => {
     try {
-      setDetalhe(await detalhar({ data: { clinicaId, execucaoId: confianca.execucao_id } }));
+      setDetalhe(
+        await detalhar({
+          data: {
+            clinicaId,
+            execucaoId: confianca.execucao_id,
+            ...(mensagemId ? { outgoingMessageId: mensagemId } : {}),
+          },
+        }),
+      );
     } catch {
       setDetalhe(null);
     }
-  }, [clinicaId, confianca.execucao_id, detalhar]);
+  }, [clinicaId, confianca.execucao_id, detalhar, mensagemId]);
 
   useEffect(() => {
     if (aberto && !detalhe) void carregar();
@@ -177,7 +188,7 @@ export function ConfiancaMensagemBadge({
           aria-label={`${estilo.rotulo}: ${confianca.score}%.${
             confianca.erro_reportado ? " Erro reportado por atendente." : ""
           } Ver detalhes.`}
-          title={`${estilo.rotulo} — ${confianca.score}% (visível apenas para a equipe)`}
+          title={`${estilo.rotulo} — ${scoreExibido(confianca.score)}% (visível apenas para a equipe)`}
           className={`inline-flex h-[18px] shrink-0 items-center gap-1 rounded-full border px-1.5 text-[10px] font-medium leading-none ${estilo.classe}`}
         >
           <span aria-hidden className={`h-1.5 w-1.5 rounded-full ${estilo.ponto}`} />
@@ -193,8 +204,14 @@ export function ConfiancaMensagemBadge({
         <div>
           <p className="text-sm font-medium">
             <Icone className="mr-1 inline h-3.5 w-3.5" aria-hidden />
-            {estilo.rotulo} — {confianca.score}%
+            Confiança da resposta: {scoreExibido(confianca.score)}%
           </p>
+          <p className="text-muted-foreground">Nível: {estilo.rotulo}</p>
+          {detalhe?.coberturaEvidencias != null && (
+            <p className="text-muted-foreground">
+              Cobertura de evidências: {detalhe.coberturaEvidencias}%
+            </p>
+          )}
           <p className="text-muted-foreground">
             Registrado quando a resposta foi produzida. Não é recalculado.
           </p>
@@ -246,8 +263,21 @@ export function ConfiancaMensagemBadge({
               )}
             </Secao>
             <Grupo titulo="Validações" linhas={detalhe.linhas.filter((l) => l.grupo === "validador")} />
+            {detalhe.validadores.length > 0 && (
+              <Secao titulo="Dimensões">
+                <ul className="text-muted-foreground">
+                  {detalhe.validadores.map((v) => (
+                    <li key={v.validator}>
+                      {v.validator}: {v.status}
+                      {v.reasonCode ? ` (${v.reasonCode})` : ""}
+                    </li>
+                  ))}
+                </ul>
+              </Secao>
+            )}
             <Grupo titulo="Ferramentas" linhas={detalhe.linhas.filter((l) => l.grupo === "ferramenta")} />
             <Grupo titulo="Fontes" linhas={detalhe.linhas.filter((l) => l.grupo === "fonte")} />
+            <Grupo titulo="Conflitos" linhas={detalhe.linhas.filter((l) => l.grupo === "conflito")} />
             {detalhe.reasonCodes.length > 0 && (
               <Secao titulo="Motivos registrados">
                 <p className="text-muted-foreground">{detalhe.reasonCodes.join(", ")}</p>
@@ -255,6 +285,7 @@ export function ConfiancaMensagemBadge({
             )}
             <p className="text-[10px] text-muted-foreground">
               Política: {detalhe.policyVersion ?? confianca.policy_version ?? "desconhecida"} ·
+              Motor: {detalhe.engineVersion ?? "—"} · Avaliação: {detalhe.avaliacao ?? "—"} ·
               Ambiente: {detalhe.ambiente}
             </p>
           </>

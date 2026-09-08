@@ -491,18 +491,36 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
                           from,
                           reply,
                         );
-                        await supabaseAdmin.from("whatsapp_mensagens").insert({
-                          clinica_id: params.clinicaId,
-                          wa_message_id: outId,
-                          direction: "out",
-                          from_number: displayPhoneNumber,
-                          to_number: from,
-                          body: reply,
-                          tipo: "text",
-                          status: "sent",
-                          enviada_por: "nina",
-                          execucao_id: auditoriaNina.execucaoId ?? null,
-                        });
+                        const { data: msgOut } = await supabaseAdmin
+                          .from("whatsapp_mensagens")
+                          .insert({
+                            clinica_id: params.clinicaId,
+                            wa_message_id: outId,
+                            direction: "out",
+                            from_number: displayPhoneNumber,
+                            to_number: from,
+                            body: reply,
+                            tipo: "text",
+                            status: "sent",
+                            enviada_por: "nina",
+                            execucao_id: auditoriaNina.execucaoId ?? null,
+                          })
+                          .select("id")
+                          .maybeSingle();
+                        // FASE 6 — o snapshot de confiança passa a apontar para
+                        // a mensagem que o paciente realmente recebeu.
+                        try {
+                          const { vincularSnapshotMensagemEnviada } = await import(
+                            "@/lib/nina/confidence-engine.server"
+                          );
+                          await vincularSnapshotMensagemEnviada({
+                            clinicaId: params.clinicaId,
+                            execucaoId: auditoriaNina.execucaoId ?? null,
+                            outgoingMessageId: (msgOut as { id?: string } | null)?.id ?? null,
+                          });
+                        } catch {
+                          // Vínculo é auditoria: nunca interrompe o atendimento.
+                        }
                       }
 
                       // Envio confirmado: agora sim a conversa é resolvida pelo

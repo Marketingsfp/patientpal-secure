@@ -1855,6 +1855,9 @@ ATENDIMENTO HUMANO — REGRA OBRIGATÓRIA:
         avaliacao: "answer_confidence",
         textoFinalHash: respostaFinalAvaliada.textoAvaliadoHash,
         claims: respostaFinalAvaliada.claims ?? null,
+        // FASE 6 — sessão da Nina preservada junto do snapshot.
+        ninaSessionId:
+          (fluxoEstado as { session_id?: string | null }).session_id ?? null,
         decisao: paraDecisaoLegado(respostaFinalAvaliada),
         modo: "shadow",
         auditoria: montarRegistroAuditoria(respostaFinalAvaliada, {

@@ -18,6 +18,8 @@ export type LinhaDecisaoMetrica = {
   conversation_id: string | null;
   /** Execução da Nina que produziu a mensagem (vínculo exato com o reporte). */
   execucao_id?: string | null;
+  /** FASE 6 — mensagem da Nina efetivamente enviada (vínculo principal). */
+  message_id?: string | null;
   score: number;
   nivel: string | null;
   decisao: string | null;
@@ -40,6 +42,8 @@ export type ErroReportado = {
   conversa_id: string | null;
   /** Execução exata reportada, quando o reporte guardou esse vínculo. */
   execucao_id?: string | null;
+  /** FASE 6 — mensagem exata reportada, quando o reporte guardou esse vínculo. */
+  mensagem_id?: string | null;
   created_at: string;
   categoria: string | null;
 };
@@ -280,15 +284,25 @@ const ROTULO_NIVEL: Record<CalibracaoNivel["nivel"], string> = {
  * a execução, cai para o vínculo por conversa dentro de 48h — o mesmo critério
  * já usado na correlação por faixa. Nenhum valor é estimado ou fixo.
  */
-type IndiceErros = { execucoes: Set<string>; porConversa: Map<string, number[]> };
+type IndiceErros = {
+  execucoes: Set<string>;
+  mensagens: Set<string>;
+  porConversa: Map<string, number[]>;
+};
 
-/** Índice de reportes: vínculo exato por execução e, na falta dele, por conversa. */
+/**
+ * Índice de reportes. FASE 6: o vínculo é por mensagem ou execução. A conversa
+ * só entra para reportes LEGADOS, que não guardaram nenhum dos dois — assim um
+ * erro isolado não contamina todas as respostas daquela conversa.
+ */
 export function indexarErros(erros: ErroReportado[]): IndiceErros {
   const execucoes = new Set<string>();
+  const mensagens = new Set<string>();
   const porConversa = new Map<string, number[]>();
   for (const e of erros) {
+    if (e.mensagem_id) mensagens.add(e.mensagem_id);
     if (e.execucao_id) execucoes.add(e.execucao_id);
-    else if (e.conversa_id) {
+    if (!e.execucao_id && !e.mensagem_id && e.conversa_id) {
       const t = Date.parse(e.created_at);
       if (Number.isNaN(t)) continue;
       const arr = porConversa.get(e.conversa_id) ?? [];
@@ -296,11 +310,12 @@ export function indexarErros(erros: ErroReportado[]): IndiceErros {
       porConversa.set(e.conversa_id, arr);
     }
   }
-  return { execucoes, porConversa };
+  return { execucoes, mensagens, porConversa };
 }
 
 /** A resposta avaliada foi reportada como erro depois? */
 export function foiReportadaComoErro(l: LinhaDecisaoMetrica, idx: IndiceErros): boolean {
+  if (l.message_id && idx.mensagens.has(l.message_id)) return true;
   if (l.execucao_id && idx.execucoes.has(l.execucao_id)) return true;
   if (!l.conversation_id) return false;
   const marcas = idx.porConversa.get(l.conversation_id);
@@ -335,6 +350,78 @@ export function calcularCalibracaoPorNivel(
       mensagens,
       erros: qtd,
       taxaErro: mensagens ? Math.round((qtd / mensagens) * 1000) / 10 : 0,
+    };
+  });
+}
+
+/** FASE 6 — faixas pedidas para comparar score previsto e acerto observado. */
+export type FaixaCalibracao = {
+  id: string;
+  rotulo: string;
+  mensagens: number;
+  erros: number;
+  /** Média dos scores da faixa (o que o motor previu). */
+  scorePrevisto: number;
+  /** % de respostas sem erro confirmado (o que foi observado). */
+  acertoObservado: number;
+  /** acertoObservado − scorePrevisto: negativo = superconfiança. */
+  desvio: number;
+};
+
+const FAIXAS_CALIBRACAO: { id: string; rotulo: string; min: number; max: number }[] = [
+  { id: "90-99", rotulo: "90–99%", min: 90, max: 100 },
+  { id: "75-89", rotulo: "75–89%", min: 75, max: 89 },
+  { id: "50-74", rotulo: "50–74%", min: 50, max: 74 },
+  { id: "0-49", rotulo: "0–49%", min: 0, max: 49 },
+];
+
+/**
+ * FASE 6 — High Confidence Error Rate: proporção de respostas classificadas
+ * como alta confiança que depois tiveram erro confirmado.
+ */
+export function calcularTaxaErroAltaConfianca(
+  linhas: LinhaDecisaoMetrica[],
+  erros: ErroReportado[] = [],
+): { mensagens: number; erros: number; taxa: number } {
+  const idx = indexarErros(erros);
+  let mensagens = 0;
+  let qtd = 0;
+  for (const l of linhas) {
+    const nivel = nivelDa({ nivel: l.nivel, score: Number.isFinite(l.score) ? l.score : 0 });
+    if (nivel !== "HIGH") continue;
+    mensagens += 1;
+    if (foiReportadaComoErro(l, idx)) qtd += 1;
+  }
+  return { mensagens, erros: qtd, taxa: mensagens ? Math.round((qtd / mensagens) * 1000) / 10 : 0 };
+}
+
+/** FASE 6 — previsto x observado nas faixas 90–99, 75–89, 50–74 e 0–49. */
+export function calcularCalibracaoPorFaixa(
+  linhas: LinhaDecisaoMetrica[],
+  erros: ErroReportado[] = [],
+): FaixaCalibracao[] {
+  const idx = indexarErros(erros);
+  return FAIXAS_CALIBRACAO.map((f) => {
+    const doGrupo = linhas.filter((l) => {
+      const s = Number.isFinite(l.score) ? l.score : 0;
+      return s >= f.min && s <= f.max;
+    });
+    const qtdErros = doGrupo.filter((l) => foiReportadaComoErro(l, idx)).length;
+    const mensagens = doGrupo.length;
+    const scorePrevisto = mensagens
+      ? Math.round((doGrupo.reduce((s, l) => s + (Number.isFinite(l.score) ? l.score : 0), 0) / mensagens) * 10) / 10
+      : 0;
+    const acertoObservado = mensagens
+      ? Math.round(((mensagens - qtdErros) / mensagens) * 1000) / 10
+      : 0;
+    return {
+      id: f.id,
+      rotulo: f.rotulo,
+      mensagens,
+      erros: qtdErros,
+      scorePrevisto,
+      acertoObservado,
+      desvio: mensagens ? Math.round((acertoObservado - scorePrevisto) * 10) / 10 : 0,
     };
   });
 }

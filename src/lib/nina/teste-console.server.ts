@@ -449,21 +449,38 @@ export async function processarMensagemTeste(data: EntradaMensagemTeste, userId:
     }
 
     if (reply.trim() && (!audio || precisaTextoCompleto)) {
-      await supabaseAdmin.from("whatsapp_mensagens").insert({
-        clinica_id: data.clinicaId,
-        conversa_id: conversaId,
-        canal: CANAL_TESTE,
-        wa_message_id: `${waId}-reply`,
-        direction: "out",
-        from_number: CANAL_TESTE,
-        to_number: lead.telefone_sessao,
-        body: reply,
-        tipo: "text",
-        status: "sent",
-        enviada_por: "nina",
-        execucao_id: auditoriaNina.execucaoId ?? null,
-        is_teste: true,
-      });
+      const { data: msgOut } = await supabaseAdmin
+        .from("whatsapp_mensagens")
+        .insert({
+          clinica_id: data.clinicaId,
+          conversa_id: conversaId,
+          canal: CANAL_TESTE,
+          wa_message_id: `${waId}-reply`,
+          direction: "out",
+          from_number: CANAL_TESTE,
+          to_number: lead.telefone_sessao,
+          body: reply,
+          tipo: "text",
+          status: "sent",
+          enviada_por: "nina",
+          execucao_id: auditoriaNina.execucaoId ?? null,
+          is_teste: true,
+        })
+        .select("id")
+        .maybeSingle();
+      // FASE 6 — mesmo vínculo da produção: snapshot ↔ mensagem enviada.
+      try {
+        const { vincularSnapshotMensagemEnviada } = await import(
+          "@/lib/nina/confidence-engine.server"
+        );
+        await vincularSnapshotMensagemEnviada({
+          clinicaId: data.clinicaId,
+          execucaoId: auditoriaNina.execucaoId ?? null,
+          outgoingMessageId: (msgOut as { id?: string } | null)?.id ?? null,
+        });
+      } catch {
+        // Vínculo é auditoria: nunca interrompe a homologação.
+      }
     }
     if (reply.trim()) {
       await supabaseAdmin

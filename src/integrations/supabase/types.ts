@@ -8335,9 +8335,12 @@ export type Database = {
           categorias: Json
           claims: Json | null
           clinica_id: string
+          conflitos: Json | null
           conversation_id: string | null
           created_at: string
           decisao: string | null
+          engine_version: string | null
+          evidence_coverage: number | null
           execucao_id: string | null
           ferramentas: Json
           fontes: Json
@@ -8346,7 +8349,9 @@ export type Database = {
           message_id: string | null
           modo: string
           motivos: Json
+          nina_session_id: string | null
           nivel: string | null
+          outgoing_message_id: string | null
           policy_version: string | null
           reason_codes: string[]
           resultado_final: string | null
@@ -8367,9 +8372,12 @@ export type Database = {
           categorias?: Json
           claims?: Json | null
           clinica_id: string
+          conflitos?: Json | null
           conversation_id?: string | null
           created_at?: string
           decisao?: string | null
+          engine_version?: string | null
+          evidence_coverage?: number | null
           execucao_id?: string | null
           ferramentas?: Json
           fontes?: Json
@@ -8378,7 +8386,9 @@ export type Database = {
           message_id?: string | null
           modo?: string
           motivos?: Json
+          nina_session_id?: string | null
           nivel?: string | null
+          outgoing_message_id?: string | null
           policy_version?: string | null
           reason_codes?: string[]
           resultado_final?: string | null
@@ -8399,9 +8409,12 @@ export type Database = {
           categorias?: Json
           claims?: Json | null
           clinica_id?: string
+          conflitos?: Json | null
           conversation_id?: string | null
           created_at?: string
           decisao?: string | null
+          engine_version?: string | null
+          evidence_coverage?: number | null
           execucao_id?: string | null
           ferramentas?: Json
           fontes?: Json
@@ -8410,7 +8423,9 @@ export type Database = {
           message_id?: string | null
           modo?: string
           motivos?: Json
+          nina_session_id?: string | null
           nivel?: string | null
+          outgoing_message_id?: string | null
           policy_version?: string | null
           reason_codes?: string[]
           resultado_final?: string | null
