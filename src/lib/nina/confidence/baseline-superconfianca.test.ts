@@ -131,15 +131,30 @@ describe("BASELINE 2 — intenção ausente é convertida em intenção observad
     expect(v.evidence["intent"]).toBe("responder_informacao");
   });
 
-  it("o caminho NOT_APPLICABLE/SEM_INTENCAO_DECLARADA é inalcançável pelo runtime", () => {
-    // Só se chega nele passando acao = "desconhecida" explicitamente.
-    const direto = IntentClarityValidator(
+  it("sem ação declarada, a nota da intenção depende de ter rodado ferramenta", () => {
+    // Sem ferramenta: FAIL/ACAO_NAO_DEFINIDA (score 40).
+    const semTool = IntentClarityValidator(
       montarContextoDoTurno(estado({ intent: null, acao: "desconhecida" })),
     );
-    expect(direto.reasonCode).toBe("SEM_INTENCAO_DECLARADA");
-    expect(direto.status).toBe("NOT_APPLICABLE");
-    // …e mesmo NOT_APPLICABLE mantém score 100 e sai do denominador.
-    expect(direto.score).toBe(100);
+    expect(semTool.status).toBe("FAIL");
+    expect(semTool.reasonCode).toBe("ACAO_NAO_DEFINIDA");
+
+    // Com qualquer ferramenta bem-sucedida: NOT_APPLICABLE com score 100,
+    // ou seja, a dimensão "entendi o pedido" simplesmente deixa de contar.
+    const comTool = IntentClarityValidator(
+      montarContextoDoTurno(
+        estado({
+          intent: null,
+          acao: "desconhecida",
+          ferramentas: [
+            { nome: "buscar_medicos", capacidade: "listProfessionals", fonte: "agenda", success: true },
+          ],
+        }),
+      ),
+    );
+    expect(comTool.status).toBe("NOT_APPLICABLE");
+    expect(comTool.reasonCode).toBe("SEM_INTENCAO_DECLARADA");
+    expect(comTool.score).toBe(100);
   });
 });
 
