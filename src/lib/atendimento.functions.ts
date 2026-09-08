@@ -969,7 +969,7 @@ export const meuStatusAgente = createServerFn({ method: "POST" })
         .eq("user_id", context.userId),
       context.supabase
         .from("atend_agente_presenca")
-        .select("status, aceita_novas")
+        .select("status, aceita_novas, visto_em")
         .eq("clinica_id", data.clinicaId)
         .eq("user_id", context.userId)
         .maybeSingle(),
@@ -981,7 +981,53 @@ export const meuStatusAgente = createServerFn({ method: "POST" })
     const filaAberta = presencaStatus
       ? presencaStatus === "ONLINE" && pres?.aceita_novas !== false
       : (rows ?? []).some((r: any) => !r.queue_locked);
-    return { isMember: total > 0, filaAberta, totalDeptos: total, presencaStatus };
+
+    // FASE 2 — status efetivo: é EXATAMENTE o que a distribuição enxerga
+    // (presença recente + aceita novas + sem pausa aberta). A tela passa a
+    // mostrar isto, e não o que ela mesma acha que enviou, para não existir
+    // "frontend Online / backend Offline".
+    const { data: pausaAberta } = await context.supabase
+      .from("atend_pausas_log")
+      .select("id")
+      .eq("clinica_id", data.clinicaId)
+      .eq("user_id", context.userId)
+      .is("finalizada_em", null)
+      .maybeSingle();
+    const presencaEfetiva = statusPresenca({
+      status: presencaStatus,
+      vistoEm: (pres as { visto_em?: string } | null)?.visto_em ?? null,
+      emPausa: !!pausaAberta,
+    });
+    return {
+      isMember: total > 0,
+      filaAberta: presencaEfetiva === "ONLINE" && filaAberta,
+      totalDeptos: total,
+      presencaStatus,
+      presencaEfetiva,
+      vistoEm: (pres as { visto_em?: string } | null)?.visto_em ?? null,
+    };
+  });
+
+/**
+ * FASE 2 — encerra a presença do usuário em todas as clínicas.
+ *
+ * Usado no logout e ao fechar a ÚLTIMA aba: quem sai da sessão não pode
+ * continuar no pool de distribuição. Não mexe nas conversas já atribuídas —
+ * ficar offline só impede novas atribuições.
+ */
+export const encerrarMinhaPresenca = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { error } = await context.supabase
+      .from("atend_agente_presenca")
+      .update({
+        status: "OFFLINE",
+        aceita_novas: false,
+        visto_em: new Date().toISOString(),
+      })
+      .eq("user_id", context.userId);
+    if (error) throw new Error(error.message);
+    return { ok: true };
   });
 
 
@@ -1253,6 +1299,18 @@ export const iniciarPausa = createServerFn({ method: "POST" })
       .select("id")
       .single();
     if (error) throw new Error(error.message);
+    // FASE 2 — entrar em pausa tira do pool NA HORA: a presença gravada passa a
+    // dizer a mesma coisa que a tela ("Em pausa"), sem esperar heartbeat.
+    await context.supabase.from("atend_agente_presenca").upsert(
+      {
+        clinica_id: data.clinicaId,
+        user_id: context.userId,
+        status: "BUSY",
+        aceita_novas: false,
+        visto_em: new Date().toISOString(),
+      },
+      { onConflict: "clinica_id,user_id" },
+    );
     return { id: ins!.id };
   });
 
@@ -1289,6 +1347,20 @@ export const finalizarPausa = createServerFn({ method: "POST" })
       .eq("user_id", context.userId)
       .is("finalizada_em", null);
     if (error) throw new Error(error.message);
+
+    // Sair da pausa devolve a presença para ONLINE na mesma operação, senão a
+    // tela mostraria "Online" e o pool continuaria vendo "BUSY" até o próximo
+    // heartbeat (até 60s de divergência).
+    await context.supabase.from("atend_agente_presenca").upsert(
+      {
+        clinica_id: data.clinicaId,
+        user_id: context.userId,
+        status: "ONLINE",
+        aceita_novas: true,
+        visto_em: new Date().toISOString(),
+      },
+      { onConflict: "clinica_id,user_id" },
+    );
 
     // Voltar da pausa é voltar a estar disponível: reavalia a fila "Não
     // atribuídas" na hora, com o MESMO algoritmo de distribuição usado ao
@@ -2051,110 +2123,25 @@ export const autoAtribuirRoundRobin = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     await assertMember(context.supabase, context.userId, data.clinicaId);
-
-    // Pega departamento alvo
-    let deptId = data.departamentoId;
-    if (!deptId) {
-      const { data: c } = await context.supabase
-        .from("atend_conversas")
-        .select("departamento_id")
-        .eq("id", data.conversaId)
-        .eq("clinica_id", data.clinicaId)
-        .maybeSingle();
-      deptId = c?.departamento_id ?? undefined;
-    }
-    if (!deptId) throw new Error("Conversa sem departamento — configure roteamento.");
-
-    // Membros disponíveis (não em pausa, fila desbloqueada)
-    const { data: membros } = await context.supabase
-      .from("atend_departamento_membros")
-      .select("user_id, max_simultaneas, queue_locked")
-      .eq("clinica_id", data.clinicaId)
-      .eq("departamento_id", deptId)
-      .eq("queue_locked", false);
-    if (!membros || membros.length === 0) {
-      // fica em waiting na fila do departamento
+    // FASE 2 — este era um segundo caminho de atribuição automática que NÃO
+    // olhava presença Online, pausa, Telefonia nem administrador: era a única
+    // rota capaz de entregar conversa para quem não podia receber. Agora ele
+    // delega para a MESMA função do banco usada pela Nina, que aplica todas as
+    // regras e a trava por clínica. Mantido apenas por compatibilidade.
+    if (data.departamentoId) {
       await context.supabase
         .from("atend_conversas")
-        .update({
-          departamento_id: deptId,
-          status: "waiting",
-          aguardando_desde: new Date().toISOString(),
-        })
+        .update({ departamento_id: data.departamentoId })
         .eq("id", data.conversaId)
         .eq("clinica_id", data.clinicaId);
-      return { ok: false, motivo: "Sem agentes disponíveis" };
     }
-
-    // Filtra em pausa
-    const agora = new Date().toISOString();
-    const { data: pausados } = await context.supabase
-      .from("atend_pausas_log")
-      .select("user_id")
-      .is("finalizada_em", null)
-      .eq("clinica_id", data.clinicaId);
-    const pausadosSet = new Set((pausados ?? []).map((p: any) => p.user_id));
-
-    // Carga atual
-    const userIds = membros.map((m: any) => m.user_id).filter((u: string) => !pausadosSet.has(u));
-    if (userIds.length === 0) {
-      await context.supabase
-        .from("atend_conversas")
-        .update({
-          departamento_id: deptId,
-          status: "waiting",
-          aguardando_desde: agora,
-        })
-        .eq("id", data.conversaId)
-        .eq("clinica_id", data.clinicaId);
-      return { ok: false, motivo: "Todos em pausa" };
-    }
-    const { data: cargas } = await context.supabase
-      .from("atend_conversas")
-      .select("atribuida_user_id")
-      .eq("clinica_id", data.clinicaId)
-      .in("status", ["active", "waiting"])
-      .in("atribuida_user_id", userIds);
-    const cargaMap = new Map<string, number>();
-    for (const u of userIds) cargaMap.set(u, 0);
-    for (const r of cargas ?? []) {
-      const k = (r as any).atribuida_user_id;
-      cargaMap.set(k, (cargaMap.get(k) ?? 0) + 1);
-    }
-    const membroMap = new Map((membros ?? []).map((m: any) => [m.user_id, m]));
-    let best: string | null = null;
-    let bestCarga = Infinity;
-    for (const u of userIds) {
-      const carga = cargaMap.get(u) ?? 0;
-      const max = (membroMap.get(u) as any)?.max_simultaneas ?? 5;
-      if (carga >= max) continue;
-      if (carga < bestCarga) {
-        best = u;
-        bestCarga = carga;
-      }
-    }
-    if (!best) {
-      await context.supabase
-        .from("atend_conversas")
-        .update({
-          departamento_id: deptId,
-          status: "waiting",
-          aguardando_desde: agora,
-        })
-        .eq("id", data.conversaId)
-        .eq("clinica_id", data.clinicaId);
-      return { ok: false, motivo: "Capacidade lotada" };
-    }
-    await context.supabase
-      .from("atend_conversas")
-      .update({
-        departamento_id: deptId,
-        atribuida_user_id: best,
-        status: "active",
-      })
-      .eq("id", data.conversaId)
-      .eq("clinica_id", data.clinicaId);
-    return { ok: true, user_id: best };
+    const { data: userId, error } = await context.supabase.rpc("atend_auto_assign_conversa", {
+      _clinica_id: data.clinicaId,
+      _conversa_id: data.conversaId,
+    } as never);
+    if (error) throw new Error(error.message);
+    if (!userId) return { ok: false, motivo: "Sem atendentes elegíveis (Telefonia + Online)" };
+    return { ok: true, user_id: userId as string };
   });
 
 /* =========================================================

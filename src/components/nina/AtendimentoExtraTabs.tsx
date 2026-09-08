@@ -16,6 +16,8 @@ import {
   type RespostaRapida,
 } from "@/lib/atendimento/respostas-rapidas";
 import { normalizarNomeBusca } from "@/lib/busca-texto";
+import { anunciarAba, encerrarAba } from "@/lib/atendimento/presenca-abas";
+import { supabase } from "@/integrations/supabase/client";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
@@ -626,18 +628,26 @@ export function AtendInbox() {
     };
   }, [manualOffline, pausaAtiva, OCIOSO_MS]);
 
+  // FASE 2 — heartbeat coordenado entre abas.
+  //  - o status enviado é o do USUÁRIO, não o de uma aba: se qualquer aba está
+  //    ativa, ele continua Online (a aba de trás não o derruba);
+  //  - fechar uma aba só grava OFFLINE quando não resta nenhuma outra aberta;
+  //  - se o navegador fechar de vez sem avisar, o servidor derruba sozinho
+  //    depois de 5 minutos sem sinal (mesma janela usada na distribuição).
   useEffect(() => {
     if (!clinicaId || !statusCarregado) return;
     const bater = () => {
+      const { outraAtiva } = anunciarAba(online);
+      const efetivo = online || outraAtiva;
       presencaFn({
         data: {
           clinicaId,
-          status: online
+          status: efetivo
             ? ("ONLINE" as const)
             : manualOffline
               ? ("OFFLINE" as const)
               : ("AWAY" as const),
-          aceitaNovas: online,
+          aceitaNovas: efetivo,
         },
       }).catch(() => {
         /* heartbeat: falha isolada não atrapalha o atendimento */
@@ -645,20 +655,53 @@ export function AtendInbox() {
     };
     bater();
     const sair = () => {
+      const { restaOutra } = encerrarAba();
+      if (restaOutra) return; // outra aba do mesmo atendente continua aberta
       presencaFn({
         data: { clinicaId, status: "OFFLINE" as const, aceitaNovas: false },
       }).catch(() => {});
     };
     window.addEventListener("pagehide", sair);
-    if (!online) {
-      return () => window.removeEventListener("pagehide", sair);
-    }
-    const t = setInterval(bater, 60_000);
+    // Bate sempre (inclusive offline/ausente): é o que mantém o registro de
+    // abas vivo e o servidor de acordo com a tela.
+    const t = setInterval(bater, 30_000);
     return () => {
       clearInterval(t);
       window.removeEventListener("pagehide", sair);
     };
   }, [clinicaId, statusCarregado, online, manualOffline, presencaFn]);
+
+  // Reconexão / volta do segundo plano: reconfere o status real do servidor
+  // em vez de confiar no que a aba acha que enviou.
+  useEffect(() => {
+    if (!clinicaId) return;
+    const reconferir = () => {
+      if (document.visibilityState === "visible") carregarStatusAgente();
+    };
+    window.addEventListener("online", reconferir);
+    document.addEventListener("visibilitychange", reconferir);
+    return () => {
+      window.removeEventListener("online", reconferir);
+      document.removeEventListener("visibilitychange", reconferir);
+    };
+  }, [clinicaId, carregarStatusAgente]);
+
+  // Realtime: qualquer mudança de presença (minha ou de outro atendente
+  // autorizado) atualiza a tela na hora, sem esperar o próximo heartbeat.
+  useEffect(() => {
+    if (!clinicaId) return;
+    const canal = supabase
+      .channel(`presenca-atend:${clinicaId}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "atend_agente_presenca", filter: `clinica_id=eq.${clinicaId}` },
+        () => carregarStatusAgente(),
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(canal);
+    };
+  }, [clinicaId, carregarStatusAgente]);
 
 
   const alternarFila = async (abrir: boolean) => {
