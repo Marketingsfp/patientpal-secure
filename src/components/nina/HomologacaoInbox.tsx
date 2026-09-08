@@ -1155,7 +1155,11 @@ export function HomologacaoInbox() {
                     );
                   }
                   const out = m.direction === "out";
-                  const daNina = out && m.enviada_por !== "sistema";
+                  // FASE 3: só a resposta da própria Nina recebe indicador de
+                  // confiança e botão de reporte. Envio humano no teste, não.
+                  const daNina = out && m.enviada_por === "nina";
+                  const autoria = daNina ? "· Nina" : out ? "· Equipe (teste)" : "· Paciente (teste)";
+
                   const meta = metadadosDaMensagem(m);
                   return (
                     <div
