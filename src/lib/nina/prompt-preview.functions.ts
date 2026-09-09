@@ -147,10 +147,11 @@ export const previewRequestNina = createServerFn({ method: "POST" })
     const { FERRAMENTAS_NINA_CONSULTA, FERRAMENTAS_NINA_AGENDAMENTO } = await import(
       "./paciente-tools.server"
     );
-    const lista = [
-      ...(FERRAMENTAS_NINA_CONSULTA as any[]),
-      ...(podeAgendar ? (FERRAMENTAS_NINA_AGENDAMENTO as any[]) : []),
+    const lista: any[] = [
+      ...(FERRAMENTAS_NINA_CONSULTA as readonly any[]),
+      ...(podeAgendar ? (FERRAMENTAS_NINA_AGENDAMENTO as readonly any[]) : []),
     ];
+
     const ferramentas = lista.map((f) => ({
       nome: String(f?.function?.name ?? f?.name ?? "—"),
       descricao: String(f?.function?.description ?? f?.description ?? ""),
