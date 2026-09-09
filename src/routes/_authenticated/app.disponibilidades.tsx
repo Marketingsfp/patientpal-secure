@@ -143,6 +143,11 @@ function Page() {
     dia_semana: "1",
     hora_inicio: "08:00",
     hora_fim: "12:00",
+    // Turno da tarde (opcional): só entra quando a recepção liga o intervalo
+    // de almoço, e aí o dia é gravado como duas faixas.
+    dois_turnos: false,
+    hora_inicio2: "13:30",
+    hora_fim2: "17:00",
     limite_pacientes: "",
     intervalo_min: "",
     vigencia_inicio: "",
@@ -442,7 +447,7 @@ function Page() {
   // O conflito só existe dentro da MESMA agenda: o mesmo médico pode atender
   // CONSULTAS e EXAMES no mesmo dia e horário (a recepção escolhe a agenda ao
   // marcar), então regras de agendas diferentes podem se sobrepor à vontade.
-  const encontrarConflito = (
+  const encontrarConflitos = (
     candidato: {
       medico_id: string;
       agenda_id: string;
@@ -453,8 +458,8 @@ function Page() {
       vigencia_fim: string | null;
     },
     ignorarId?: string,
-  ): DispRow | null =>
-    disps.find(
+  ): DispRow[] =>
+    disps.filter(
       (d) =>
         d.id !== ignorarId &&
         d.medico_id === candidato.medico_id &&
@@ -467,7 +472,7 @@ function Page() {
           candidato.vigencia_inicio,
           candidato.vigencia_fim,
         ),
-    ) ?? null;
+    );
 
   const adicionar = async () => {
     if (!podeEscrever) {
@@ -490,46 +495,117 @@ function Page() {
       toast.error("A hora de término precisa ser depois da hora de início.");
       return;
     }
+    // Dois turnos no mesmo cadastro: é assim que se registra o intervalo de
+    // almoço. Antes só existia um par início/fim, então para partir a manhã da
+    // tarde a recepção tinha de apagar a regra inteira e cadastrar duas vezes.
+    if (novo.dois_turnos) {
+      if (novo.hora_fim2 <= novo.hora_inicio2) {
+        toast.error("No turno da tarde, a hora de término precisa ser depois da hora de início.");
+        return;
+      }
+      if (novo.hora_inicio2 < novo.hora_fim) {
+        toast.error("O turno da tarde precisa começar depois do fim do turno da manhã.");
+        return;
+      }
+    }
     if (novo.vigencia_inicio && novo.vigencia_fim && novo.vigencia_fim < novo.vigencia_inicio) {
       toast.error("A vigência final não pode ser antes da vigência inicial.");
       return;
     }
+    const faixas = novo.dois_turnos
+      ? [
+          { inicio: novo.hora_inicio, fim: novo.hora_fim },
+          { inicio: novo.hora_inicio2, fim: novo.hora_fim2 },
+        ]
+      : [{ inicio: novo.hora_inicio, fim: novo.hora_fim }];
+    // Regras antigas que batem com o que está sendo cadastrado. Em vez de
+    // recusar o cadastro e mandar a recepção apagar na mão, a tela mostra o
+    // que vai ser trocado e substitui tudo de uma vez depois do "sim".
+    const conflitos = new Map<string, DispRow>();
     for (const dia of diasSel) {
-      const conflito = encontrarConflito({
-        medico_id: novo.medico_id,
-        agenda_id: agendaSel,
-        dia_semana: dia,
-        hora_inicio: novo.hora_inicio,
-        hora_fim: novo.hora_fim,
-        vigencia_inicio: novo.vigencia_inicio || null,
-        vigencia_fim: novo.vigencia_fim || null,
+      for (const f of faixas) {
+        for (const c of encontrarConflitos({
+          medico_id: novo.medico_id,
+          agenda_id: agendaSel,
+          dia_semana: dia,
+          hora_inicio: f.inicio,
+          hora_fim: f.fim,
+          vigencia_inicio: novo.vigencia_inicio || null,
+          vigencia_fim: novo.vigencia_fim || null,
+        })) {
+          conflitos.set(c.id, c);
+        }
+      }
+    }
+    const nomeAgenda = agendas.find((a) => a.id === agendaSel)?.nome ?? "selecionada";
+    if (conflitos.size > 0) {
+      const antigos = [...conflitos.values()]
+        .sort((a, b) =>
+          a.dia_semana !== b.dia_semana
+            ? a.dia_semana - b.dia_semana
+            : a.hora_inicio.localeCompare(b.hora_inicio),
+        )
+        .map((c) => `${DIAS[c.dia_semana]} ${hhmm(c.hora_inicio)}–${hhmm(c.hora_fim)}`);
+      const novos = diasSel
+        .slice()
+        .sort((a, b) => a - b)
+        .flatMap((dia) => faixas.map((f) => `${DIAS[dia]} ${f.inicio}–${f.fim}`));
+      const ok = await confirmDialog({
+        title: "Substituir o horário que já existe?",
+        tone: "warning",
+        confirmText: "Substituir",
+        cancelText: "Cancelar",
+        description: (
+          <div className="space-y-2 text-sm">
+            <p>
+              A agenda <strong className="uppercase">{nomeAgenda}</strong> já tem horário cadastrado
+              nesse mesmo período:
+            </p>
+            <p className="font-medium">{antigos.join(" · ")}</p>
+            <p>Ao continuar, esse horário sai e entra no lugar:</p>
+            <p className="font-medium">{novos.join(" · ")}</p>
+            <p className="text-muted-foreground">
+              As fichas já geradas para os próximos dias não mudam sozinhas — depois disso, gere a
+              agenda de novo para valer o horário novo.
+            </p>
+          </div>
+        ),
       });
-      if (conflito) {
-        toast.error(
-          `A agenda ${agendas.find((a) => a.id === conflito.agenda_id)?.nome ?? "selecionada"} já tem uma regra em ${DIAS[dia]} (${conflito.hora_inicio}–${conflito.hora_fim}) que se sobrepõe a esse horário. Ajuste o horário ou remova a regra antiga primeiro.`,
-        );
+      if (!ok) return;
+      const { error: erroDel } = await supabase
+        .from("medico_disponibilidades")
+        .delete()
+        .in("id", [...conflitos.keys()]);
+      if (erroDel) {
+        mostrarErro(erroDel, "falha ao remover o horário antigo");
         return;
       }
     }
-    const payload = diasSel.map((dia) => ({
-      clinica_id: clinicaAtual.clinica_id,
-      medico_id: novo.medico_id,
-      agenda_id: agendaSel,
-      dia_semana: dia,
-      hora_inicio: novo.hora_inicio,
-      hora_fim: novo.hora_fim,
-      limite_pacientes: novo.limite_pacientes ? parseInt(novo.limite_pacientes) : null,
-      intervalo_min: novo.intervalo_min ? parseInt(novo.intervalo_min) : null,
-      vigencia_inicio: novo.vigencia_inicio || null,
-      vigencia_fim: novo.vigencia_fim || null,
-    }));
+    const payload = diasSel.flatMap((dia) =>
+      faixas.map((f) => ({
+        clinica_id: clinicaAtual.clinica_id,
+        medico_id: novo.medico_id,
+        agenda_id: agendaSel,
+        dia_semana: dia,
+        hora_inicio: f.inicio,
+        hora_fim: f.fim,
+        limite_pacientes: novo.limite_pacientes ? parseInt(novo.limite_pacientes) : null,
+        intervalo_min: novo.intervalo_min ? parseInt(novo.intervalo_min) : null,
+        vigencia_inicio: novo.vigencia_inicio || null,
+        vigencia_fim: novo.vigencia_fim || null,
+      })),
+    );
     const { error } = await supabase.from("medico_disponibilidades").insert(payload as never);
     if (error) {
       mostrarErro(error);
       return;
     }
     toast.success(
-      diasSel.length > 1 ? `${diasSel.length} horários adicionados` : "Horário adicionado",
+      conflitos.size > 0
+        ? "Horário substituído"
+        : payload.length > 1
+          ? `${payload.length} horários adicionados`
+          : "Horário adicionado",
     );
     void load();
   };
@@ -583,7 +659,7 @@ function Page() {
     const diaNum = parseInt(editRow.dia_semana);
     const atual = disps.find((d) => d.id === dispEditando);
     if (atual) {
-      const conflito = encontrarConflito(
+      const conflitos = encontrarConflitos(
         {
           medico_id: atual.medico_id,
           agenda_id: atual.agenda_id,
@@ -595,11 +671,52 @@ function Page() {
         },
         dispEditando,
       );
-      if (conflito) {
-        toast.error(
-          `A agenda ${agendas.find((a) => a.id === conflito.agenda_id)?.nome ?? "selecionada"} já tem uma regra em ${DIAS[diaNum]} (${conflito.hora_inicio}–${conflito.hora_fim}) que se sobrepõe a esse horário.`,
-        );
-        return;
+      // Mesma regra da inclusão: encostar num horário antigo não impede a
+      // edição, só pede um "sim" — quem recorta a manhã para abrir o almoço
+      // não precisa apagar nada antes.
+      if (conflitos.length > 0) {
+        const nomeAgenda = agendas.find((a) => a.id === atual.agenda_id)?.nome ?? "selecionada";
+        const antigos = conflitos
+          .map((c) => `${DIAS[c.dia_semana]} ${hhmm(c.hora_inicio)}–${hhmm(c.hora_fim)}`)
+          .join(" · ");
+        const ok = await confirmDialog({
+          title: "Substituir o horário que já existe?",
+          tone: "warning",
+          confirmText: "Substituir",
+          cancelText: "Cancelar",
+          description: (
+            <div className="space-y-2 text-sm">
+              <p>
+                A agenda <strong className="uppercase">{nomeAgenda}</strong> já tem horário
+                cadastrado nesse mesmo período:
+              </p>
+              <p className="font-medium">{antigos}</p>
+              <p>
+                Ao continuar, esse horário sai e fica valendo{" "}
+                <strong>
+                  {DIAS[diaNum]} {editRow.hora_inicio}–{editRow.hora_fim}
+                </strong>
+                .
+              </p>
+              <p className="text-muted-foreground">
+                As fichas já geradas para os próximos dias não mudam sozinhas — depois disso, gere a
+                agenda de novo para valer o horário novo.
+              </p>
+            </div>
+          ),
+        });
+        if (!ok) return;
+        const { error: erroDel } = await supabase
+          .from("medico_disponibilidades")
+          .delete()
+          .in(
+            "id",
+            conflitos.map((c) => c.id),
+          );
+        if (erroDel) {
+          mostrarErro(erroDel, "falha ao remover o horário antigo");
+          return;
+        }
       }
     }
     const payload = {
@@ -1933,7 +2050,9 @@ function Page() {
                         </div>
                       </div>
                       <div>
-                        <label className="text-xs text-muted-foreground">Início</label>
+                        <label className="text-xs text-muted-foreground">
+                          {novo.dois_turnos ? "Manhã de" : "Início"}
+                        </label>
                         <Input
                           type="time"
                           className="w-28"
@@ -1942,7 +2061,9 @@ function Page() {
                         />
                       </div>
                       <div>
-                        <label className="text-xs text-muted-foreground">Fim</label>
+                        <label className="text-xs text-muted-foreground">
+                          {novo.dois_turnos ? "para às" : "Fim"}
+                        </label>
                         <Input
                           type="time"
                           className="w-28"
@@ -1950,6 +2071,47 @@ function Page() {
                           onChange={(e) => setNovo({ ...novo, hora_fim: e.target.value })}
                         />
                       </div>
+                      {novo.dois_turnos ? (
+                        <>
+                          <div>
+                            <label className="text-xs text-muted-foreground">Volta às</label>
+                            <Input
+                              type="time"
+                              className="w-28"
+                              value={novo.hora_inicio2}
+                              onChange={(e) => setNovo({ ...novo, hora_inicio2: e.target.value })}
+                            />
+                          </div>
+                          <div>
+                            <label className="text-xs text-muted-foreground">até</label>
+                            <Input
+                              type="time"
+                              className="w-28"
+                              value={novo.hora_fim2}
+                              onChange={(e) => setNovo({ ...novo, hora_fim2: e.target.value })}
+                            />
+                          </div>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            className="h-9 px-2 text-xs text-muted-foreground"
+                            onClick={() => setNovo({ ...novo, dois_turnos: false })}
+                            title="Voltar a um horário corrido, sem intervalo"
+                          >
+                            <Undo2 className="h-3.5 w-3.5 mr-1" /> Tirar intervalo
+                          </Button>
+                        </>
+                      ) : (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="h-9 px-2.5 text-xs"
+                          onClick={() => setNovo({ ...novo, dois_turnos: true })}
+                          title="Parar para o almoço e voltar à tarde"
+                        >
+                          <Plus className="h-3.5 w-3.5 mr-1" /> Intervalo de almoço
+                        </Button>
+                      )}
                       <div>
                         <label className="text-xs text-muted-foreground">Pacientes/dia</label>
                         <Input
@@ -2001,6 +2163,13 @@ function Page() {
                           <Plus className="h-4 w-4 mr-1" /> Adicionar
                         </Button>
                       )}
+                      <p className="basis-full text-xs text-muted-foreground">
+                        Cada agenda tem o horário dela: o mesmo médico pode atender CONSULTAS e
+                        EXAMES no mesmo dia e hora. Para parar no almoço, use "Intervalo de almoço"
+                        e cadastre a manhã e a tarde de uma vez. Se já houver horário nesse período
+                        nessa mesma agenda, a tela pergunta antes de trocar — não precisa apagar
+                        nada antes.
+                      </p>
                     </CardContent>
                   </Card>
 
