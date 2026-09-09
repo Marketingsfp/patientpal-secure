@@ -1401,7 +1401,7 @@ export function AtendInbox() {
       if (selecaoIdRef.current && selecaoIdRef.current !== alvo) return;
       if ((novas as any[])?.length) {
         setMsgs((prev) => {
-          const juntas = mesclarNovas(prev, novas as any[]);
+          const juntas = conciliarOtimistas(mesclarNovas(prev, novas as any[]));
           const atual = cacheConversas.current.obter(alvo);
           if (atual) cacheConversas.current.guardar(alvo, { ...atual, msgs: juntas });
           return juntas;
