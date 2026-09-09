@@ -4991,10 +4991,59 @@ function AgendaPage() {
   const agendaDeFila = (medicoId: string | null | undefined) =>
     medicoId ? ((agendasPorMedico.get(medicoId) ?? []).find((a) => a.ordem_chegada) ?? null) : null;
 
+  // Fim do TURNO do médico nesse dia, lido da grade semanal da agenda. É esse
+  // horário — e não a meia-noite — que limita até onde a fila pode andar no
+  // relógio. Sem grade cadastrada no dia, assume 19:00 (fim do expediente da
+  // clínica), nunca a madrugada.
+  const fimDoTurnoDoDia = async (
+    medicoId: string,
+    agendaId: string,
+    diaIso: string,
+  ): Promise<Date> => {
+    const padrao = new Date(`${diaIso}T19:00:00`);
+    if (!clinicaAtual) return padrao;
+    // Meio-dia como referência: evita que horário de verão jogue o cálculo do
+    // dia da semana para o dia anterior/seguinte.
+    const dow = new Date(`${diaIso}T12:00:00`).getDay();
+    const { data, error } = await supabase
+      .from("medico_disponibilidades")
+      .select("hora_fim, vigencia_inicio, vigencia_fim")
+      .eq("clinica_id", clinicaAtual.clinica_id)
+      .eq("medico_id", medicoId)
+      .eq("agenda_id", agendaId)
+      .eq("ativo", true)
+      .eq("dia_semana", dow);
+    if (error) return padrao;
+    const vigentes = (
+      (data ?? []) as Array<{
+        hora_fim: string | null;
+        vigencia_inicio: string | null;
+        vigencia_fim: string | null;
+      }>
+    ).filter(
+      (g) =>
+        !!g.hora_fim &&
+        (!g.vigencia_inicio || g.vigencia_inicio <= diaIso) &&
+        (!g.vigencia_fim || g.vigencia_fim >= diaIso),
+    );
+    if (vigentes.length === 0) return padrao;
+    // Grade partida em blocos (manhã/tarde): vale o fim do último bloco.
+    const maior = vigentes
+      .map((g) => (g.hora_fim as string).slice(0, 5))
+      .reduce((a, b) => (b > a ? b : a));
+    return new Date(`${diaIso}T${maior}:00`);
+  };
+
   // Próxima posição da fila num dia: 1 minuto depois do último atendimento já
   // marcado. O passo é de 1 minuto (e não da duração da consulta) porque a
-  // ficha é POSICIONAL — o relógio só ordena a fila — e um passo curto faz o
-  // dia comportar muito mais encaixes antes de esbarrar na virada da noite.
+  // ficha é POSICIONAL — o relógio só ordena a fila.
+  //
+  // Quando o passo de 1 minuto passaria do FIM DO TURNO, a fila não invade a
+  // noite: a ficha nova entra 1 SEGUNDO depois da última. Ela continua sendo a
+  // última da fila (a numeração é posicional e segue estritamente crescente),
+  // mas o relógio para de escorregar — em 09/09/2026 esse escorregamento levou
+  // a agenda de um médico de ordem de chegada até 23:57, com fichas terminando
+  // depois da meia-noite.
   const proximaPosicaoDaFila = async (
     medicoId: string,
     agendaId: string,
@@ -5020,15 +5069,20 @@ function AgendaPage() {
     if (error) return { erro: "Não foi possível ler a fila do médico. Tente de novo." };
     const ultimo = ((data ?? []) as Array<{ inicio: string }>)[0]?.inicio ?? null;
     if (!ultimo) return { inicio: new Date(`${diaIso}T08:00:00`) };
+    const fimTurno = await fimDoTurnoDoDia(medicoId, agendaId, diaIso);
     const proximo = new Date(new Date(ultimo).getTime() + 60000);
-    if (proximo > fimDia) {
+    if (proximo <= fimTurno) return { inicio: proximo };
+    // Turno cheio no relógio: a fila continua, mas comprimida em segundos, para
+    // que a ficha nova fique no fim da fila sem empurrar o horário para a noite.
+    const apertado = new Date(new Date(ultimo).getTime() + 1000);
+    if (apertado > fimDia) {
       return {
         erro:
           "A fila deste médico chegou ao fim do dia (23:59) e não cabe mais ficha nesta data. " +
           "Marque o paciente para o próximo dia de atendimento.",
       };
     }
-    return { inicio: proximo };
+    return { inicio: apertado };
   };
 
   const openNew = async () => {
