@@ -1701,12 +1701,22 @@ async function gerarRespostaNinaInterno(
       "Consegui iniciar aqui, mas preciso de um instante — vou pedir para uma atendente concluir com você.";
   }
 
-  // Validação estrutural da saudação: se esta é a primeira resposta da sessão
-  // e o texto gerado não trouxe todos os elementos obrigatórios (saudação +
-  // Nina + assistente virtual + unidade + abertura), a apresentação é
-  // acrescentada aqui, antes de a mensagem sair.
+  // FASE 6 — a apresentação é comportamento e vem SOMENTE do Behavior Prompt
+  // publicado em Arquitetura. Aqui apenas OBSERVAMOS o resultado (telemetria):
+  // nada é acrescentado ao texto, para não gerar "Sou a Nina... Sou a Nina...".
+  const diagnosticoSaudacao = avaliarSaudacao(resposta, nomeCurtoUnidade, {
+    obrigatoria: saudacaoObrigatoria,
+  });
+  if (diagnosticoSaudacao.saudacaoDuplicada || diagnosticoSaudacao.saudacaoAusente) {
+    console.warn("[NINA_SAUDACAO]", {
+      conversa_id: estadoId.conversaId,
+      saudacao_obrigatoria: saudacaoObrigatoria,
+      saudacao_duplicada: diagnosticoSaudacao.saudacaoDuplicada,
+      saudacao_ausente: diagnosticoSaudacao.saudacaoAusente,
+      elementos: diagnosticoSaudacao.elementos,
+    });
+  }
   if (saudacaoObrigatoria) {
-    resposta = aplicarSaudacaoObrigatoria(resposta, nomeCurtoUnidade);
     const estadoComSaudacao = marcarSaudacaoConcluida(fluxoEstado);
     fluxoEstado.greeting_completed = true;
     await salvarFluxoEstado(
