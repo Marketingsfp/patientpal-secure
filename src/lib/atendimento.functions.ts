@@ -1894,44 +1894,53 @@ export const enviarMensagemConversa = createServerFn({ method: "POST" })
     const { iniciarTraceServidor } = await import("./atendimento/latencia.server");
     const trace = iniciarTraceServidor({ fluxo: "send", conversationId: data.conversaId });
     trace.marcar("SEND_T3_BACKEND_RECEIVED");
-    await assertMember(context.supabase, context.userId, data.clinicaId);
-    {
-      const { assertAcessoConversa } = await import("./atendimento/acesso-conversa.server");
-      await assertAcessoConversa(context.supabase, context.userId, data.clinicaId, data.conversaId);
+    // FASE 5 — as mesmas verificações de antes (associação à clínica, escopo da
+    // conversa e bloqueio de administrador), agora em uma única ida ao banco em
+    // paralelo, junto com a configuração e a checagem de duplicidade.
+    const { carregarContextoEnvio } = await import("./atendimento/contexto-envio.server");
+    const { obterConfigWhatsApp } = await import("./atendimento/config-cache.server");
+
+    const configPromise = trace.medir("loadWhatsAppConfig", () =>
+      obterConfigWhatsApp(data.clinicaId),
+    );
+    const duplicadaPromise = data.clientMessageId
+      ? context.supabase
+          .from("whatsapp_mensagens")
+          .select(
+            "id, conversa_id, direction, from_number, to_number, body, tipo, enviada_por, recebida_em, status, client_message_id, wa_message_id",
+          )
+          .eq("clinica_id", data.clinicaId)
+          .eq("client_message_id", data.clientMessageId)
+          .maybeSingle()
+      : null;
+
+    let ctx;
+    try {
+      ctx = await carregarContextoEnvio(context.supabase, {
+        userId: context.userId,
+        clinicaId: data.clinicaId,
+        conversaId: data.conversaId,
+      });
+    } finally {
+      // Não deixa promessa pendente sem tratamento quando o acesso é negado.
+      void configPromise.catch(() => null);
+      if (duplicadaPromise) void Promise.resolve(duplicadaPromise).catch(() => null);
     }
-    if (await ehAdminClinica(context.supabase, context.userId, data.clinicaId))
-      throw new Error(MSG_ADMIN_NAO_ATENDE);
+    if (ctx.admin) throw new Error(MSG_ADMIN_NAO_ATENDE);
     trace.marcar("SEND_T4_AUTH_DONE");
+
     // IDEMPOTÊNCIA: se este mesmo envio já foi concluído (duplo clique, retry,
     // reenvio acidental), devolvemos a mensagem existente sem chamar o
     // WhatsApp de novo. A checagem é pelo identificador do envio, nunca pelo
     // texto — duas mensagens iguais podem ser legítimas.
-    if (data.clientMessageId) {
-      const { data: jaExiste } = await context.supabase
-        .from("whatsapp_mensagens")
-        .select(
-          "id, conversa_id, direction, from_number, to_number, body, tipo, enviada_por, recebida_em, status, client_message_id, wa_message_id",
-        )
-        .eq("clinica_id", data.clinicaId)
-        .eq("client_message_id", data.clientMessageId)
-        .maybeSingle();
+    if (duplicadaPromise) {
+      const { data: jaExiste } = await duplicadaPromise;
       if (jaExiste) return { duplicada: true as const, mensagem: jaExiste };
     }
-    const cfg = await trace.medir("loadWhatsAppConfig", () => loadWhatsAppConfig(data.clinicaId));
+    const cfg = await configPromise;
     if (!cfg?.phone_number_id || !cfg?.access_token) throw new Error("WhatsApp não configurado.");
     trace.marcar("SEND_T5_CONFIG_READY");
-    const { data: conv, error: cErr } = await context.supabase
-      .from("atend_conversas")
-      .select(
-        "id, contato_telefone, primeiro_resp_em, aguardando_desde, atribuida_user_id, status",
-      )
-      .eq("id", data.conversaId)
-      .eq("clinica_id", data.clinicaId)
-      .maybeSingle();
-    if (cErr) throw new Error(cErr.message);
-    // A conversa pode ter sido encerrada/removida enquanto estava selecionada
-    // no inbox. Nesse caso devolvemos `null` em vez de derrubar a tela.
-    if (!conv) return null;
+    const conv = ctx.conversa;
     if (!conv.contato_telefone) throw new Error("Conversa sem telefone");
     // Bloqueio de atendimento duplicado: só o responsável atual pode responder.
     if (conv.status === "closed")
@@ -1995,28 +2004,6 @@ export const enviarMensagemConversa = createServerFn({ method: "POST" })
     );
     trace.marcar("SEND_T7_META_RESPONSE");
 
-    const { data: gravada } = await context.supabase
-      .from("whatsapp_mensagens")
-      .insert({
-        clinica_id: data.clinicaId,
-        conversa_id: data.conversaId,
-        wa_message_id,
-        direction: "out",
-        from_number: cfg.display_phone_number,
-        to_number: to,
-        body: data.text,
-        tipo: "text",
-        status: "sent",
-        enviada_por: "humano",
-        // Mesmo identificador do clique — nada é gerado de novo aqui.
-        client_message_id: data.clientMessageId ?? null,
-      } as any)
-      .select(
-        "id, conversa_id, direction, from_number, to_number, body, tipo, enviada_por, recebida_em, status, client_message_id, wa_message_id",
-      )
-      .maybeSingle();
-    trace.marcar("SEND_T8_DB_INSERT_DONE");
-
     // SLA primeira resposta
     const patch: any = {
       atribuida_user_id: conv.atribuida_user_id ?? context.userId,
@@ -2032,11 +2019,38 @@ export const enviarMensagemConversa = createServerFn({ method: "POST" })
         );
       }
     }
-    await context.supabase
-      .from("atend_conversas")
-      .update(patch)
-      .eq("id", data.conversaId)
-      .eq("clinica_id", data.clinicaId);
+
+    // Gravação da mensagem e atualização da conversa são independentes entre
+    // si: rodam em paralelo para tirar uma ida ao banco do tempo de resposta.
+    const [gravadaR] = await Promise.all([
+      context.supabase
+        .from("whatsapp_mensagens")
+        .insert({
+          clinica_id: data.clinicaId,
+          conversa_id: data.conversaId,
+          wa_message_id,
+          direction: "out",
+          from_number: cfg.display_phone_number,
+          to_number: to,
+          body: data.text,
+          tipo: "text",
+          status: "sent",
+          enviada_por: "humano",
+          // Mesmo identificador do clique — nada é gerado de novo aqui.
+          client_message_id: data.clientMessageId ?? null,
+        } as any)
+        .select(
+          "id, conversa_id, direction, from_number, to_number, body, tipo, enviada_por, recebida_em, status, client_message_id, wa_message_id",
+        )
+        .maybeSingle(),
+      context.supabase
+        .from("atend_conversas")
+        .update(patch)
+        .eq("id", data.conversaId)
+        .eq("clinica_id", data.clinicaId),
+    ]);
+    const gravada = gravadaR.data;
+    trace.marcar("SEND_T8_DB_INSERT_DONE");
     trace.marcar("SEND_T9_CONVERSATION_UPDATE_DONE");
     trace.marcar("SEND_T10_BACKEND_RESPONSE");
     trace.publicar();

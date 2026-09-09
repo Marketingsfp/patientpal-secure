@@ -635,6 +635,10 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
                             ultimo_teste_erro: null,
                           })
                           .eq("clinica_id", params.clinicaId);
+                        const { invalidarConfigWhatsApp } = await import(
+                          "@/lib/atendimento/config-cache.server"
+                        );
+                        invalidarConfigWhatsApp(params.clinicaId);
                       }
                     }
                   } catch (e) {
