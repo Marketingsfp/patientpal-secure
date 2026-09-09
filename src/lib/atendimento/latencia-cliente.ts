@@ -22,6 +22,7 @@ import {
   type ResumoTrace,
   type Trace,
 } from "./latencia";
+import { detectarOutlier, formatarOutlier } from "./benchmark-latencia";
 
 const CHAVES = ["atendimento:latencia", "nina:perf"];
 
@@ -104,6 +105,12 @@ export function fechar(chave: string): ResumoTrace | null {
     }),
     "\n" + formatarResumo(r),
   );
+  // FASE 7 — outlier: acima de 3 s de processamento INTERNO (Meta não conta).
+  const outlier = detectarOutlier(r);
+  if (outlier) {
+    // eslint-disable-next-line no-console
+    console.warn("[atendimento:latencia]\n" + formatarOutlier(outlier));
+  }
   publicar();
   return r;
 }
