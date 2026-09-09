@@ -55,9 +55,11 @@ import {
   fatiasDeEntrada,
   linhasExtrato,
   resumoPorForma,
+  totaisDaVisao,
   totaisExtrato,
   type MovimentacaoExtrato,
   type TotaisExtrato,
+  type VisaoExtrato,
 } from "@/lib/financeiro/extrato-caixa";
 import { carregarMovimentacao } from "@/lib/financeiro/extrato-carregar";
 // Seletor de Categoria: o recorte que o financeiro usa para auditar uma conta
@@ -1274,22 +1276,27 @@ function Page() {
    * Rodapé do extrato.
    *
    * Vem dos totais do período INTEIRO (`totaisExtrato`), e não da soma das
-   * linhas exibidas: é isso que faz o sintético e o analítico mostrarem
-   * exatamente o mesmo rodapé. Quem confere usa essa igualdade para saber que
-   * nenhuma linha ficou de fora ao trocar de visão.
+   * linhas da PÁGINA exibida: o rodapé é do relatório, não da folha em que se
+   * está. Quem escolhe o recorte certo de cada visão é `totaisDaVisao` — o
+   * analítico fecha com a custódia (sangria dentro, como está impresso na
+   * coluna), o sintético fecha com o resultado (sangria fora, como está
+   * impresso na coluna). A ponte entre os dois é o quadro de fechamento, que
+   * mostra as duas naturezas nas duas visões.
    */
-  const rodapeExtrato = (cols: Coluna[], t: TotaisExtrato) =>
-    cols.map((c, i) => {
-      if (c.chave === "qtd") return t.qtd.toLocaleString("pt-BR");
-      if (c.chave === "pago") return brl(t.pago);
-      if (c.chave === "recebido") return brl(t.recebido);
-      if (c.chave === "saldo") return brl(t.saldo);
+  const rodapeExtrato = (cols: Coluna[], t: TotaisExtrato, visao: VisaoExtrato) => {
+    const v = totaisDaVisao(t, visao);
+    return cols.map((c, i) => {
+      if (c.chave === "qtd") return v.qtd.toLocaleString("pt-BR");
+      if (c.chave === "pago") return brl(v.pago);
+      if (c.chave === "recebido") return brl(v.recebido);
+      if (c.chave === "saldo") return brl(v.saldo);
       if (i === 0) return "TOTAL GERAL";
       // No analítico a contagem não tem coluna própria; fica ao lado do rótulo.
       return i === 1 && rTipo === "analitico"
-        ? `${t.qtd.toLocaleString("pt-BR")} movimentação(ões)`
+        ? `${v.qtd.toLocaleString("pt-BR")} movimentação(ões)`
         : "";
     });
+  };
 
   /**
    * Rodapé de Sessões e Manutenções.
@@ -1368,10 +1375,16 @@ function Page() {
       { rotulo: "Saldo do período", valor: brl(t.resultado) },
     ];
     if (t.transferSaida) {
-      itens.push({ rotulo: "Sangrias (troca de custódia)", valor: brl(t.transferSaida) });
+      itens.push({
+        rotulo: "Sangrias (troca de custódia — fora do resultado)",
+        valor: brl(t.transferSaida),
+      });
     }
     if (t.transferEntrada) {
-      itens.push({ rotulo: "Suprimentos (troca de custódia)", valor: brl(t.transferEntrada) });
+      itens.push({
+        rotulo: "Suprimentos (troca de custódia — fora do resultado)",
+        valor: brl(t.transferEntrada),
+      });
     }
     return itens;
   };
@@ -1381,7 +1394,7 @@ function Page() {
     tipo === "rateio"
       ? rodapeRateio(colunasTabela, totaisR, totaisComp)
       : tipo === "movimentacao"
-        ? rodapeExtrato(colunasTabela, totaisM)
+        ? rodapeExtrato(colunasTabela, totaisM, rTipo)
         : tipo === "sessoes"
           ? rodapeSessoesTela(colunasTabela, totaisS, modoDoFiltro(sFiltro))
           : colunasTabela.map((c, i) => {
@@ -1422,12 +1435,16 @@ function Page() {
    * Mesma linha de totais do extrato, com números crus: na planilha o total
    * tem que continuar sendo número, senão o Excel não soma a coluna.
    */
-  const rodapeExtratoXlsx = (cols: Coluna[], t: TotaisExtrato) => {
+  const rodapeExtratoXlsx = (cols: Coluna[], t: TotaisExtrato, visao: VisaoExtrato) => {
+    // Cada aba fecha com o total da SUA visão, pelo mesmo motivo da tela: a
+    // aba Sintética não traz as sangrias, e um total que as somasse não bateria
+    // com a coluna que o financeiro soma ao lado.
+    const v = totaisDaVisao(t, visao);
     const porChave: Record<string, number> = {
-      qtd: t.qtd,
-      pago: t.pago,
-      recebido: t.recebido,
-      saldo: t.saldo,
+      qtd: v.qtd,
+      pago: v.pago,
+      recebido: v.recebido,
+      saldo: v.saldo,
     };
     return cols.map((c, i) =>
       c.chave in porChave ? porChave[c.chave] : i === 0 ? "TOTAL GERAL" : "",
@@ -1721,7 +1738,7 @@ function Page() {
           linhas: linhasExtrato(res.movs, visao).map((linha) =>
             cols.map((c) => valorXlsx(c, linha[c.chave])),
           ),
-          totais: rodapeExtratoXlsx(cols, tm),
+          totais: rodapeExtratoXlsx(cols, tm, visao),
           resumo: {
             titulo: "Por forma de pagamento",
             itens: resumoPorForma(res.movs).map((i) => ({
@@ -1889,7 +1906,7 @@ function Page() {
           .join(" · "),
         colunas: colunas.map((c) => ({ rotulo: c.rotulo, numerica: alinhaDireita(c) })),
         linhas: data.map((linha) => colunas.map((c) => celula(c, linha[c.chave]))),
-        totais: rodapeExtrato(colunas, tm),
+        totais: rodapeExtrato(colunas, tm, rTipo),
         resumo: resumoDoExtrato(tm),
         composicao: {
           titulo: "Por forma de pagamento",
@@ -2475,7 +2492,24 @@ function Page() {
               mensalidades e adesões do cartão, despesas, repasse médico, boletos e as sangrias e
               suprimentos entre caixas. Lançamento cancelado fica de fora. Ajustes com data
               retroativa entram e vêm marcados na coluna Situação — eles não estavam no cupom
-              impresso daquele dia.
+              impresso daquele dia.{" "}
+              {/* A diferença entre as duas visões precisa estar escrita na tela: quem imprime
+                  o sintético e o analítico lado a lado vê dois TOTAL GERAL diferentes quando
+                  houve sangria, e essa frase é a explicação. */}
+              {rTipo === "sintetico" ? (
+                <>
+                  No <strong>sintético</strong>, a transferência entre caixas (sangria e suprimento){" "}
+                  <strong>não entra em Valor Pago nem no saldo</strong>: é o mesmo dinheiro mudando
+                  de mão dentro da clínica, e aparece só no quadro &quot;Movimentações
+                  internas&quot;.
+                </>
+              ) : (
+                <>
+                  No <strong>analítico</strong> a sangria aparece linha a linha e entra no TOTAL
+                  GERAL, porque aqui se confere dinheiro físico e extrato de banco — o resultado do
+                  período, sem ela, está no card &quot;Saldo do período&quot;.
+                </>
+              )}
             </p>
           )}
           {tipo === "sessoes" && (

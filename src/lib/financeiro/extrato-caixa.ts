@@ -361,11 +361,28 @@ export function linhasAnaliticas(movs: MovimentacaoExtrato[]): LinhaExtrato[] {
  * o resumo quer ver primeiro onde está o dinheiro, não a ordem alfabética.
  * `(SEM CATEGORIA)` desce sempre para o fim, mesmo quando é grande, porque ali
  * é pendência de cadastro e não uma conta de verdade.
+ *
+ * **A transferência entre caixas não vira linha aqui.** Esta tabela é a leitura
+ * gerencial do período — quanto cada conta rendeu e quanto cada conta custou —,
+ * e sangria não é conta nenhuma: é o mesmo dinheiro mudando de mão dentro da
+ * clínica. Enquanto ela tinha linha própria, o sintético de 01/09/2026 somava
+ * R$ 26.502,90 de sangria dentro de "Valor Pago", estourava o total pago para
+ * R$ 52.203,78 e devolvia um resultado negativo de R$ 2.697,10 num dia em que a
+ * clínica não gastou esse dinheiro — só o entregou à tesouraria.
+ *
+ * Ela continua VISÍVEL, em dois lugares que não se misturam com o resultado: na
+ * visão analítica, linha a linha, que é onde a conferência de custódia procura
+ * o dinheiro físico; e no quadro de fechamento, nas linhas "Sangrias" e
+ * "Suprimentos" (troca de custódia). Por isso as duas visões deixam de somar ao
+ * mesmo TOTAL GERAL quando houve sangria no período — quem fecha o rodapé de
+ * cada visão é `totaisDaVisao`, para que o total impresso seja sempre a soma da
+ * coluna que está ali em cima.
  */
 export function linhasSinteticas(movs: MovimentacaoExtrato[]): LinhaExtrato[] {
   const porCategoria = new Map<string, { qtd: number; pago: number; recebido: number }>();
 
   for (const m of movs) {
+    if (ehTransferenciaInterna(m)) continue;
     const valor = Number(m.valor) || 0;
     const cat = categoriaDaLinha(m);
     const c = porCategoria.get(cat) ?? { qtd: 0, pago: 0, recebido: 0 };
@@ -410,6 +427,8 @@ export type TotaisExtrato = {
   despesas: number;
   /** Sangria: dinheiro que saiu da gaveta para o financeiro. */
   transferSaida: number;
+  /** Quantas linhas do período são troca de custódia (sangria + suprimento). */
+  transferQtd: number;
   /** Suprimento: dinheiro que voltou do financeiro para a gaveta. */
   transferEntrada: number;
   /** `receitas - despesas` — o RESULTADO do período, sem a custódia. */
@@ -442,9 +461,11 @@ export function totaisExtrato(movs: MovimentacaoExtrato[]): TotaisExtrato {
   let despesas = 0;
   let transferEntrada = 0;
   let transferSaida = 0;
+  let transferQtd = 0;
   for (const m of movs) {
     const valor = Number(m.valor) || 0;
     if (ehTransferenciaInterna(m)) {
+      transferQtd += 1;
       if (ehSaida(m)) transferSaida += valor;
       else transferEntrada += valor;
     } else if (ehSaida(m)) despesas += valor;
@@ -465,7 +486,46 @@ export function totaisExtrato(movs: MovimentacaoExtrato[]): TotaisExtrato {
     despesas,
     transferEntrada,
     transferSaida,
+    transferQtd,
     resultado: +(receitas - despesas).toFixed(2),
+  };
+}
+
+/** O TOTAL GERAL de uma visão: sempre a soma exata das colunas exibidas nela. */
+export type RodapeVisao = {
+  qtd: number;
+  pago: number;
+  recebido: number;
+  saldo: number;
+};
+
+/**
+ * Rodapé da tabela, na medida da visão que está aberta.
+ *
+ * As duas visões mostram listas diferentes desde que a sangria saiu do
+ * sintético, e o rodapé tem que acompanhar — um TOTAL GERAL que não fecha com
+ * a coluna impressa logo acima dele é pior do que não ter total nenhum.
+ *
+ *  - **Analítica** — a tabela traz TODAS as movimentações, sangria inclusive,
+ *    porque é ali que se confere dinheiro físico e extrato de banco. O total é
+ *    o de custódia: `pago = despesas + sangria`.
+ *  - **Sintética** — a tabela traz só as categorias de resultado. O total é o
+ *    resultado do período: entradas de verdade, saídas de verdade e o saldo
+ *    entre elas, sem a troca de custódia.
+ *
+ * A diferença entre um e outro nunca fica escondida: as linhas "Sangrias" e
+ * "Suprimentos" do quadro de fechamento aparecem nas duas visões, e é por elas
+ * que se caminha de um total ao outro.
+ */
+export function totaisDaVisao(t: TotaisExtrato, visao: VisaoExtrato): RodapeVisao {
+  if (visao === "analitico") {
+    return { qtd: t.qtd, pago: t.pago, recebido: t.recebido, saldo: t.saldo };
+  }
+  return {
+    qtd: t.qtd - t.transferQtd,
+    pago: t.despesas,
+    recebido: t.receitas,
+    saldo: t.resultado,
   };
 }
 

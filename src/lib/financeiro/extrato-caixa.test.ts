@@ -10,6 +10,7 @@ import {
   linhasAnaliticas,
   linhasExtrato,
   linhasSinteticas,
+  totaisDaVisao,
   fatiasDeEntrada,
   obsDaLinha,
   ordenarCronologico,
@@ -302,12 +303,36 @@ describe("linhasSinteticas", () => {
     expect(linhas[linhas.length - 1].categoria).toBe(SEM_CATEGORIA);
   });
 
-  it("a soma das categorias fecha com o total geral", () => {
+  it("a soma das categorias fecha com o rodapé do sintético", () => {
     const linhas = linhasSinteticas(movs);
-    const t = totaisExtrato(movs);
-    expect(linhas.reduce((s, l) => s + (Number(l.pago) || 0), 0)).toBe(t.pago);
-    expect(linhas.reduce((s, l) => s + (Number(l.recebido) || 0), 0)).toBe(t.recebido);
-    expect(linhas.reduce((s, l) => s + Number(l.qtd), 0)).toBe(t.qtd);
+    const v = totaisDaVisao(totaisExtrato(movs), "sintetico");
+    expect(linhas.reduce((s, l) => s + (Number(l.pago) || 0), 0)).toBe(v.pago);
+    expect(linhas.reduce((s, l) => s + (Number(l.recebido) || 0), 0)).toBe(v.recebido);
+    expect(linhas.reduce((s, l) => s + Number(l.qtd), 0)).toBe(v.qtd);
+  });
+
+  /**
+   * O caso real de 01/09/2026, com os números conferidos em produção:
+   * R$ 49.506,68 recebidos, R$ 28.310,88 de despesa e 11 sangrias somando
+   * R$ 26.502,90 entregues à tesouraria. Enquanto a sangria tinha linha
+   * própria nesta tabela, ela entrava em "Valor Pago" com saldo negativo de
+   * R$ 26.502,90 e levava o resultado do dia para o vermelho — num dia em que
+   * a clínica não gastou esse dinheiro, só o passou de mão.
+   */
+  it("sangria não vira linha de despesa no sintético", () => {
+    const comSangria = [
+      mov({ tipo: "receita", valor: 49506.68, categoriaNome: "PARTICULAR" }),
+      mov({ tipo: "despesa", valor: 28310.88, categoriaNome: "REPASSE MEDICO" }),
+      mov({ tipo: "transferencia", transferSentido: "saida", valor: 26502.9 }),
+    ];
+    const linhas = linhasSinteticas(comSangria);
+    expect(linhas.find((l) => l.categoria === CATEGORIA_TRANSFERENCIA)).toBeUndefined();
+    const v = totaisDaVisao(totaisExtrato(comSangria), "sintetico");
+    expect(v.qtd).toBe(2);
+    expect(v.pago).toBe(28310.88);
+    expect(v.saldo).toBe(21195.8);
+    // A analítica continua trazendo a sangria: é lá que se confere custódia.
+    expect(totaisDaVisao(totaisExtrato(comSangria), "analitico").pago).toBe(54813.78);
   });
 
   it("lista vazia devolve lista vazia", () => {
@@ -357,14 +382,25 @@ describe("totaisExtrato", () => {
     expect(t.resultado).toBe(t.saldo);
   });
 
-  it("é o MESMO total nas duas visões — é isso que a conferência usa", () => {
+  it("cada visão fecha com a soma da coluna que ela imprime", () => {
     const t = totaisExtrato(movs);
     const analitica = linhasAnaliticas(movs);
-    expect(analitica.reduce((s, l) => s + (Number(l.pago) || 0), 0)).toBe(t.pago);
-    expect(analitica.reduce((s, l) => s + (Number(l.recebido) || 0), 0)).toBe(t.recebido);
+    const va = totaisDaVisao(t, "analitico");
+    expect(analitica.reduce((s, l) => s + (Number(l.pago) || 0), 0)).toBe(va.pago);
+    expect(analitica.reduce((s, l) => s + (Number(l.recebido) || 0), 0)).toBe(va.recebido);
     const sintetica = linhasSinteticas(movs);
-    expect(sintetica.reduce((s, l) => s + (Number(l.pago) || 0), 0)).toBe(t.pago);
-    expect(sintetica.reduce((s, l) => s + (Number(l.recebido) || 0), 0)).toBe(t.recebido);
+    const vs = totaisDaVisao(t, "sintetico");
+    expect(sintetica.reduce((s, l) => s + (Number(l.pago) || 0), 0)).toBe(vs.pago);
+    expect(sintetica.reduce((s, l) => s + (Number(l.recebido) || 0), 0)).toBe(vs.recebido);
+  });
+
+  it("a distância entre os dois rodapés é exatamente a troca de custódia", () => {
+    const t = totaisExtrato(movs);
+    const va = totaisDaVisao(t, "analitico");
+    const vs = totaisDaVisao(t, "sintetico");
+    expect(va.pago - vs.pago).toBe(t.transferSaida);
+    expect(va.recebido - vs.recebido).toBe(t.transferEntrada);
+    expect(va.qtd - vs.qtd).toBe(t.transferQtd);
   });
 
   it("centavos não escapam pelo arredondamento", () => {
@@ -381,6 +417,7 @@ describe("totaisExtrato", () => {
       despesas: 0,
       transferEntrada: 0,
       transferSaida: 0,
+      transferQtd: 0,
       resultado: 0,
     });
   });
