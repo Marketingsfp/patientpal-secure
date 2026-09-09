@@ -359,9 +359,9 @@ export type ResultadoConfianca = {
    * confiança da mensagem: "preciso confirmar seus dados" pode ser uma
    * resposta excelente enquanto a criação do agendamento está bloqueada.
    */
-  actionSafety: AvaliacaoSegurancaAcao;
+  actionSafety?: AvaliacaoSegurancaAcao;
   /** Dimensões que ainda serão satisfeitas antes da ação (etapa de coleta). */
-  pendingDimensions: string[];
+  pendingDimensions?: string[];
   level: NivelConfianca;
   decision: DecisaoMotor;
   blockers: Bloqueador[];
