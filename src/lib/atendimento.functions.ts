@@ -1905,6 +1905,7 @@ export const enviarMensagemConversa = createServerFn({ method: "POST" })
     }
     if (await ehAdminClinica(context.supabase, context.userId, data.clinicaId))
       throw new Error(MSG_ADMIN_NAO_ATENDE);
+    trace.marcar("SEND_T4_AUTH_DONE");
     // IDEMPOTÊNCIA: se este mesmo envio já foi concluído (duplo clique, retry,
     // reenvio acidental), devolvemos a mensagem existente sem chamar o
     // WhatsApp de novo. A checagem é pelo identificador do envio, nunca pelo
