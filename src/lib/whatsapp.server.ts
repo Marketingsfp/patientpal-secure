@@ -1043,7 +1043,7 @@ async function gerarRespostaNinaInterno(
     canal: "whatsapp",
     ambiente: opcoes?.teste ? "homologacao" : "producao",
     unidade: dadosPublicos,
-    data_hora_atual: agoraTextoLocal(),
+    data_hora_atual: agoraNaClinica(),
     fluxo_fase1_ativo: fase1Ativa,
     intencoes: intencoesTurno,
     intencao_ambigua: intencaoAmbiguaTurno,
