@@ -5,6 +5,11 @@ import {
   type AlvoAtualizacao,
   type EventoRealtime,
 } from "@/lib/atendimento/realtime-roteador";
+import {
+  chaveCanalAtendimento,
+  criarMaquinaConexao,
+  type EstadoConexao,
+} from "@/lib/atendimento/realtime-conexao";
 
 /**
  * FASE 3 — tempo real específico do atendimento.
@@ -29,11 +34,17 @@ export function useRealtimeAtendimento(params: {
   clinicaId: string | null;
   conversaAberta: string | null;
   onAlvos: (alvos: AlvoAtualizacao[], evento: EventoRealtime) => void;
-  /** Chamado quando o canal (re)conecta: hora de reconciliar o que faltou. */
+  /**
+   * Chamado quando o canal é confirmado — inclusive na PRIMEIRA vez. A lista
+   * inicial e a assinatura não são simultâneas: o que mudou nessa janela (uma
+   * transferência, por exemplo) só aparece se a tela conferir de novo aqui.
+   */
   onReconectar?: () => void;
+  /** Estado da conexão (para telemetria/diagnóstico; sem tela nesta fase). */
+  onEstado?: (estado: EstadoConexao) => void;
   enabled?: boolean;
 }) {
-  const { clinicaId, conversaAberta, onAlvos, onReconectar, enabled = true } = params;
+  const { clinicaId, conversaAberta, onAlvos, onReconectar, onEstado, enabled = true } = params;
 
   // As referências mais recentes ficam em refs: trocar de conversa não pode
   // derrubar e recriar o canal (isso reiniciava a conexão a cada lead).
@@ -43,13 +54,17 @@ export function useRealtimeAtendimento(params: {
   onAlvosRef.current = onAlvos;
   const onReconectarRef = useRef(onReconectar);
   onReconectarRef.current = onReconectar;
-  const jaConectou = useRef(false);
+  const onEstadoRef = useRef(onEstado);
+  onEstadoRef.current = onEstado;
   const canalId = useId();
 
   useEffect(() => {
     if (!enabled || !clinicaId) return;
-    jaConectou.current = false;
-    const ch = supabase.channel(`atend:${clinicaId}:${canalId}`);
+    // Uma assinatura por clínica + montagem da tela. A conversa aberta não
+    // entra na chave: trocar de lead não recria o canal.
+    const maquina = criarMaquinaConexao();
+    onEstadoRef.current?.(maquina.estado());
+    const ch = supabase.channel(chaveCanalAtendimento(clinicaId, canalId));
     for (const tabela of TABELAS_ATENDIMENTO) {
       ch.on(
         "postgres_changes" as any,
@@ -76,12 +91,13 @@ export function useRealtimeAtendimento(params: {
       );
     }
     ch.subscribe((status: string) => {
-      if (status !== "SUBSCRIBED") return;
-      // Primeira conexão não é reconexão: a tela já carregou tudo agora.
-      if (!jaConectou.current) {
-        jaConectou.current = true;
-        return;
-      }
+      const acao = maquina.aplicar(status);
+      onEstadoRef.current?.(acao.estado);
+      // Falha, tempo esgotado ou fechamento não são ignorados: o canal fica
+      // marcado como degradado e, quando voltar, a tela confere tudo de novo.
+      if (!acao.reconciliar) return;
+      // Vale também para a PRIMEIRA confirmação: o que mudou entre o carregamento
+      // da lista e a assinatura (uma transferência, por exemplo) aparece aqui.
       onReconectarRef.current?.();
     });
     return () => {
