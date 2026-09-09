@@ -175,6 +175,14 @@ import {
   limparRascunho,
   type Rascunhos,
 } from "@/lib/atendimento/rascunhos-conversa";
+import {
+  conciliarOtimistas,
+  criarMensagemOtimista,
+  ehOtimista,
+  inserirOtimista,
+  marcarFalhaOtimista,
+  preservarOtimistas,
+} from "@/lib/atendimento/envio-otimista";
 import { ResumoHandoffCard } from "@/components/nina/ResumoHandoffCard";
 import { ReportarErroNinaBotao } from "@/components/nina/ReportarErroNinaDialog";
 import { BadgeEspera, RelogioEsperaProvider } from "@/components/nina/BadgeEspera";
@@ -1237,7 +1245,12 @@ export function AtendInbox() {
         const guardadoAgora = cacheConversas.current.obter(alvo);
         const anteriores =
           conversaCarregadaRef.current === alvo ? msgsRef.current : (guardadoAgora?.msgs ?? []);
-        const visiveis = anteriores.length > m.length ? mesclarNovas(anteriores, m) : m;
+        // Mensagem recém-enviada (otimista) não pode sumir por causa de uma
+        // carga do servidor que ainda não a contém.
+        const visiveis = preservarOtimistas(
+          anteriores,
+          anteriores.length > m.length ? mesclarNovas(anteriores, m) : m,
+        );
         setMsgs(visiveis);
         setTemMaisAntigas(
           anteriores.length > m.length ? temMaisAntigasRef.current : podeCarregarMais(m.length, janela),
@@ -2271,9 +2284,17 @@ export function AtendInbox() {
     }
   };
 
-  const enviar = async () => {
+  /**
+   * FASE 1 — envio otimista.
+   *
+   * A bolha aparece na hora, com estado "enviando", e o campo já fica livre
+   * para a próxima mensagem. O envio real continua no servidor, com todas as
+   * validações (permissão, janela de 24h, responsável, admin). Se falhar, a
+   * bolha mostra "não enviada" e o texto volta para o campo daquela conversa.
+   */
+  const enviar = () => {
     const t = draft.trim();
-    if (!t || !sel || !clinicaId || enviando) return;
+    if (!t || !sel || !clinicaId) return;
     // A ação só vale para a conversa que está de fato aberta e carregada.
     if (!acaoPermitida({ alvo: sel.id, selecionadaAgora: selIdRef.current, carregando: carregandoConversa, selecaoAtual: selecaoIdRef.current })) {
       toast.error("Carregando a conversa. Tente novamente em instantes.");
@@ -2285,19 +2306,49 @@ export function AtendInbox() {
     }
     // Conversa de origem: o envio pertence a ela, não à que estiver aberta
     // quando a resposta chegar.
-    const origem = sel.id;
-    setEnviando(true);
-    try {
-      await enviarMsg({ data: { clinicaId, conversaId: origem, text: t } });
-      limparRascunhoDe(origem);
-      cacheConversas.current.invalidar(origem);
-      prefetchMsgs.current.invalidar(origem);
-      if (selIdRef.current === origem) await carregarConversa();
-    } catch (e: any) {
-      mostrarErro(e);
-    } finally {
-      setEnviando(false);
+    const origem: string = sel.id;
+    const otimista = criarMensagemOtimista({
+      conversaId: origem,
+      texto: t,
+      usuarioId: meuId,
+    });
+
+    // 1) Campo livre na hora e bolha visível no mesmo frame.
+    limparRascunhoDe(origem);
+    composerRef.current?.focus();
+    if (selIdRef.current === origem) {
+      setMsgs((prev) => inserirOtimista(prev, otimista));
     }
+    // 2) Cache da conversa de origem: trocar de lead e voltar não some com ela.
+    const guardado = cacheConversas.current.obter(origem);
+    if (guardado) {
+      cacheConversas.current.guardar(origem, {
+        ...guardado,
+        msgs: inserirOtimista(guardado.msgs, otimista),
+      });
+    }
+
+    void (async () => {
+      try {
+        await enviarMsg({ data: { clinicaId, conversaId: origem, text: t } });
+        prefetchMsgs.current.invalidar(origem);
+        // A mensagem real chega pela sincronização; a otimista sai quando o
+        // par real aparecer na lista da conversa de origem.
+        if (selIdRef.current === origem) await carregarConversa();
+      } catch (e: any) {
+        mostrarErro(e);
+        if (selIdRef.current === origem) {
+          setMsgs((prev) => marcarFalhaOtimista(prev, otimista.client_message_id));
+        }
+        const c = cacheConversas.current.obter(origem);
+        if (c) {
+          cacheConversas.current.guardar(origem, {
+            ...c,
+            msgs: marcarFalhaOtimista(c.msgs, otimista.client_message_id),
+          });
+        }
+      }
+    })();
   };
 
   const adicionarNota = async () => {
