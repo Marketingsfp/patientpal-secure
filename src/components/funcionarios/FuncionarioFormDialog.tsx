@@ -27,7 +27,7 @@ import {
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
-import { PERFIS_SISTEMA } from "@/lib/permissoes-presets";
+import { PERFIS_SISTEMA, perfilCanonico } from "@/lib/permissoes-presets";
 
 // "Supervisor" foi removido: não correspondia a nenhum perfil configurável em
 // Perfis de Acesso (sem preset definido, travava o usuário sem acesso algum),
