@@ -131,6 +131,18 @@ export type ConfiabilidadeDecisaoView = {
   /** FASE 6 — o registro avalia a resposta final ou a segurança da ação. */
   avaliacao: string | null;
   engineVersion: string | null;
+  /**
+   * FASE 2 (answer/action) — segurança da AÇÃO, lida do registro próprio dela.
+   * Independente da confiança da resposta: a ação pode estar bloqueada
+   * enquanto a mensagem "preciso confirmar seus dados" é ótima.
+   */
+  seguranca: SegurancaAcaoView | null;
+};
+
+export type SegurancaAcaoView = {
+  status: "ALLOWED" | "BLOCKED" | "NOT_APPLICABLE";
+  acao: string | null;
+  bloqueadores: string[];
 };
 
 /**
@@ -215,6 +227,34 @@ export const confiabilidadeDaExecucao = createServerFn({ method: "POST" })
       fontes: unknown;
     };
 
+    // FASE 2 — registro próprio da SEGURANÇA DA AÇÃO (nunca o da resposta).
+    const { data: segRow } = await context.supabase
+      .from("nina_confianca_decisoes")
+      .select("acao_solicitada, resultado_final, bloqueadores, bloqueio")
+      .eq("clinica_id", data.clinicaId)
+      .eq("execucao_id", data.execucaoId)
+      .eq("avaliacao", "action_safety")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    let seguranca: SegurancaAcaoView | null = null;
+    if (segRow) {
+      const s = segRow as Record<string, unknown>;
+      const acao = s["acao_solicitada"] ? String(s["acao_solicitada"]) : null;
+      const bloqueadores = [
+        ...new Set([...lista(s["bloqueadores"]), ...(s["bloqueio"] ? [String(s["bloqueio"])] : [])]),
+      ];
+      const executavel =
+        acao === "criar_agendamento" ||
+        acao === "cancelar_agendamento" ||
+        acao === "transferir_humano";
+      seguranca = {
+        status: !executavel ? "NOT_APPLICABLE" : bloqueadores.length > 0 ? "BLOCKED" : "ALLOWED",
+        acao,
+        bloqueadores,
+      };
+    }
+
     const registro = {
       validadores: Array.isArray(r.validadores)
         ? (r.validadores as Parameters<typeof linhasConfiabilidade>[0]["validadores"])
@@ -263,6 +303,7 @@ export const confiabilidadeDaExecucao = createServerFn({ method: "POST" })
       engineVersion: (r as unknown as Record<string, unknown>)["engine_version"]
         ? String((r as unknown as Record<string, unknown>)["engine_version"])
         : null,
+      seguranca,
     };
   });
 

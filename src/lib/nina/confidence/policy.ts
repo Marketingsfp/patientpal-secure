@@ -76,6 +76,12 @@ export type PoliticaConfianca = {
   bloqueadoresAbsolutos: Record<string, HardBlocker>;
   /** Ações que gravam algo de verdade: bloqueio nelas vira BLOCK_ACTION. */
   acoesDeEscrita: string[];
+  /**
+   * FASE 2 — dimensões que respondem "é seguro EXECUTAR a ação?" e NÃO
+   * "posso confiar no texto?". Elas continuam valendo integralmente para
+   * `action_safety`; na avaliação da MENSAGEM elas não pontuam nem bloqueiam.
+   */
+  validadoresDeAcao: string[];
   /** Tetos por cobertura de evidência (Fase 3). */
   cobertura: PoliticaCobertura;
 };
@@ -103,7 +109,14 @@ export type PoliticaConfianca = {
  * `foco_da_resposta` — quantidade de fatos deixou de reduzir a confiança.
  * Snapshots gravados com "v1"/"v2"/"v3" continuam válidos sob a régua da época.
  */
-export const VERSAO_POLITICA = "v4";
+/*
+ * v4 -> v5 (Fase 2 answer/action): `action_safety` e `answer_confidence`
+ * passaram a ser realmente independentes. Entrou o status `PENDING` (dado que
+ * ainda será coletado antes da ação — não desconta nota nem cobertura) e as
+ * dimensões de PRÉ-CONDIÇÃO DA AÇÃO (`validadoresDeAcao`) deixaram de pontuar
+ * e de bloquear a avaliação da mensagem. Nenhum limite crítico foi reduzido.
+ */
+export const VERSAO_POLITICA = "v5";
 /**
  * Versão do motor gravada junto com cada avaliação.
  * FASE 7 — "Confidence Engine v2": motor com cobertura de evidências,
@@ -167,6 +180,9 @@ export const POLITICA_PADRAO: PoliticaConfianca = {
     AFIRMACAO_SEM_EVIDENCIA: "UNGROUNDED_CLAIM",
   },
   acoesDeEscrita: ["criar_agendamento", "cancelar_agendamento"],
+  // Pré-condições da EXECUÇÃO (dados do paciente, regras da clínica para
+  // agendar). Elas não dizem nada sobre a veracidade do texto.
+  validadoresDeAcao: ["RequiredDataValidator", "BusinessRulesValidator"],
   cobertura: {
     // Valores de partida da Fase 3 — versionados aqui para calibração futura.
     minimaParaHigh: 70,
@@ -200,6 +216,8 @@ export type MedidaDeEvidencia = {
   desconhecidas: string[];
   /** Dimensões dispensadas legitimamente neste tipo de resposta. */
   naoAplicaveis: string[];
+  /** FASE 2 — dimensões que ainda serão satisfeitas antes da ação. */
+  pendentes: string[];
   /** Nada relevante pôde ser avaliado: confiança insuficiente, não 100. */
   semEvidencia: boolean;
 };
@@ -221,11 +239,18 @@ export function medirEvidencia(
   let obtido = 0;
   const desconhecidas: string[] = [];
   const naoAplicaveis: string[] = [];
+  const pendentes: string[] = [];
 
   for (const v of validators) {
     const peso = politica.pesos[v.validator] ?? 0;
     if (v.status === "NOT_APPLICABLE") {
       naoAplicaveis.push(v.validator);
+      continue;
+    }
+    // FASE 2 — dado que ainda será coletado antes da ação é o curso normal da
+    // conversa: não pontua contra a mensagem nem derruba a cobertura.
+    if (v.status === "PENDING") {
+      pendentes.push(v.validator);
       continue;
     }
     if (v.status === "UNKNOWN") {
@@ -247,6 +272,7 @@ export function medirEvidencia(
     cobertura: pesoRelevante === 0 ? 0 : Math.round((pesoAvaliado / pesoRelevante) * 100),
     desconhecidas,
     naoAplicaveis,
+    pendentes,
     semEvidencia,
   };
 }

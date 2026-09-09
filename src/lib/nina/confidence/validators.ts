@@ -9,7 +9,7 @@
  * Robustez: um validador que lançar exceção não derruba o atendimento —
  * `executarValidadoresDeConfianca` isola cada execução e devolve WARNING.
  */
-import { contaContraANota } from "./types";
+import { acaoExecutavel, contaContraANota } from "./types";
 import { ClaimGroundingValidator } from "./claims";
 import { WorkflowConsistencyValidator } from "./workflow";
 import type {
@@ -200,15 +200,27 @@ export function RequiredDataValidator(ctx: ContextoConfianca): ResultadoValidado
   });
   if (faltantes.length === 0) return res(nome, "PASS", 100, "DADOS_COMPLETOS", { requiredFields: req });
 
-  const escrita = ctx.requestedAction === "criar_agendamento" || ctx.requestedAction === "cancelar_agendamento";
-  return res(
-    nome,
-    escrita ? "BLOCK" : "FAIL",
-    0,
-    "CAMPO_OBRIGATORIO_AUSENTE",
-    { faltantes, requiredFields: req },
-    escrita ? "CAMPO_OBRIGATORIO_AUSENTE" : null,
-  );
+  const escrita = ACOES_DE_ESCRITA.has(ctx.requestedAction);
+  if (escrita) {
+    return res(
+      nome,
+      "BLOCK",
+      0,
+      "CAMPO_OBRIGATORIO_AUSENTE",
+      { faltantes, requiredFields: req },
+      "CAMPO_OBRIGATORIO_AUSENTE",
+    );
+  }
+  // FASE 2 — sem ação executável no turno, dado faltando é etapa de coleta
+  // (PENDING), não erro da resposta. Pedir o dado É a resposta certa.
+  if (!acaoExecutavel(ctx.requestedAction)) {
+    return res(nome, "PENDING", 0, "DADOS_PENDENTES_DE_COLETA", {
+      faltantes,
+      requiredFields: req,
+      requestedAction: ctx.requestedAction,
+    });
+  }
+  return res(nome, "FAIL", 0, "CAMPO_OBRIGATORIO_AUSENTE", { faltantes, requiredFields: req });
 }
 
 // ---------------------------------------------------------------- 4. fonte oficial

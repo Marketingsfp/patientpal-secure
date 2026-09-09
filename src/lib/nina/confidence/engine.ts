@@ -25,8 +25,9 @@ import {
   type HardBlocker,
   type PoliticaConfianca,
 } from "./policy";
-import { contaContraANota } from "./types";
+import { acaoExecutavel, contaContraANota } from "./types";
 import type {
+  AvaliacaoSegurancaAcao,
   Bloqueador,
   ContextoConfianca,
   DecisaoMotor,
@@ -102,6 +103,10 @@ function categoriasDoContexto(ctx: ContextoConfianca): CategoriaConfianca[] {
     criar_agendamento: "agendamento",
     cancelar_agendamento: "agendamento",
   };
+  // FASE 2 — avaliando a MENSAGEM, as categorias vêm do que o texto afirma.
+  // Uma ação pendente não transforma "preciso confirmar seus dados" numa
+  // afirmação de agenda que precise de fonte oficial.
+  if (ctx.tipoAvaliacao === "answer_confidence") return doTexto;
   const extra = porAcao[ctx.requestedAction];
   if (extra && !doTexto.includes(extra)) return [...doTexto, extra];
   return doTexto;
@@ -190,7 +195,10 @@ export function executarValidadores(ctx: ContextoConfianca): Verificacao[] {
     );
   }
 
-  if ((ctx.requiredFields ?? []).length > 0) {
+  // FASE 2 — campo obrigatório só é bloqueio quando existe uma AÇÃO
+  // EXECUTÁVEL prestes a acontecer. Numa etapa de coleta, faltar o nome do
+  // paciente é o motivo de a Nina estar perguntando — não um defeito.
+  if ((ctx.requiredFields ?? []).length > 0 && acaoExecutavel(ctx.requestedAction)) {
     checks.push(
       check(
         "campos_obrigatorios",
@@ -245,7 +253,16 @@ export function decidirConfianca(
   opcoes: { config?: ConfigValidadores; agora?: Date; politica?: PoliticaConfianca } = {},
 ): ResultadoConfianca {
   const cats = categoriasDoContexto(ctx);
-  const checks = executarValidadores(ctx);
+  const politica = opcoes.politica ?? POLITICA_PADRAO;
+  const tipoAvaliacao = ctx.tipoAvaliacao ?? "action_safety";
+  const ehResposta = tipoAvaliacao === "answer_confidence";
+  const executavel = acaoExecutavel(ctx.requestedAction);
+  // FASE 2 — dimensões que dizem "é seguro EXECUTAR?", não "o texto é
+  // confiável?". Na avaliação da MENSAGEM elas saem da nota e do bloqueio;
+  // continuam valendo integralmente para a segurança da ação.
+  const DE_ACAO = new Set([...politica.validadoresDeAcao, "campos_obrigatorios"]);
+
+  const checksBase = executarValidadores(ctx);
 
   // Validadores da Fase 2: independentes, auditáveis e configuráveis.
   const validators = executarValidadoresDeConfianca({
@@ -254,11 +271,13 @@ export function decidirConfianca(
     ...(opcoes.config ? { config: opcoes.config } : {}),
     ...(opcoes.agora ? { agora: opcoes.agora } : {}),
   });
+  const checksTodos = [...checksBase];
   for (const v of validators) {
     // FASE 3 — UNKNOWN não vira "reprovação" nem penalidade: ele aparece na
     // cobertura de evidências, que é o lugar honesto para "não sei".
+    // FASE 2 — PENDING também não: é coleta em andamento, não erro.
     if (!contaContraANota(v.status)) continue;
-    checks.push(
+    checksTodos.push(
       check(
         v.validator,
         v.reasonCode,
@@ -270,20 +289,34 @@ export function decidirConfianca(
     );
   }
 
-  const politica = opcoes.politica ?? POLITICA_PADRAO;
+  // Visão da AÇÃO: enxerga tudo, inclusive as pré-condições de execução.
+  const reprovadosAcao = checksTodos.filter((c) => !c.aprovado);
+  const blockersAcao = [
+    ...new Set(reprovadosAcao.map((c) => c.bloqueador).filter(Boolean)),
+  ] as Bloqueador[];
+
+  // Visão da MENSAGEM: pré-condição de ação não derruba a nota do texto.
+  const checks = ehResposta ? checksTodos.filter((c) => !DE_ACAO.has(c.id)) : checksTodos;
+  const validatorsParaNota = ehResposta
+    ? validators.filter((v) => !DE_ACAO.has(v.validator))
+    : validators;
+
   const reprovados = checks.filter((c) => !c.aprovado);
   const blockers = [...new Set(reprovados.map((c) => c.bloqueador).filter(Boolean))] as Bloqueador[];
 
   const motivos = reprovados.map((c) => (c.detalhe ? `${c.descricao} — ${c.detalhe}` : c.descricao));
 
   // FASE 3 — nota E cobertura, medidas na mesma passada e reportadas separadas.
-  const medida = medirEvidencia(validators, politica);
+  const medida = medirEvidencia(validatorsParaNota, politica);
 
   const risco = riscoDaAcao(ctx);
   const hardBlockers: HardBlocker[] = detectarHardBlockers(
-    { bloqueadores: blockers, validators, risco },
+    { bloqueadores: blockers, validators: validatorsParaNota, risco },
     politica,
   );
+  const hardBlockersAcao: HardBlocker[] = ehResposta
+    ? detectarHardBlockers({ bloqueadores: blockersAcao, validators, risco }, politica)
+    : hardBlockers;
 
   // Pontuação: validadores ponderados pela política, menos as penalidades
   // graduais (verificações que descontam sem bloquear).
@@ -308,7 +341,6 @@ export function decidirConfianca(
     politica,
   );
 
-  const tipoAvaliacao = ctx.tipoAvaliacao ?? "action_safety";
 
   // FASE 4/5 — handoff já pedido pelo runtime deixa de ser atalho cego.
   // TRANSFERIR é uma AÇÃO segura (action_safety), então a decisão pode ser
@@ -349,8 +381,33 @@ export function decidirConfianca(
 
   const grounding = avaliarGrounding(ctx, ctx.draftText ?? "");
 
+  // FASE 2 — segurança da AÇÃO, calculada à parte da nota do texto.
+  // Sem ação executável no turno: NOT_APPLICABLE (nunca bloqueio, nunca 0).
+  const actionSafety: AvaliacaoSegurancaAcao = executavel
+    ? {
+        status:
+          blockersAcao.length > 0 || hardBlockersAcao.length > 0 ? "BLOCKED" : "ALLOWED",
+        acao: ctx.requestedAction,
+        blockers: blockersAcao,
+        hardBlockers: hardBlockersAcao,
+        motivos: reprovadosAcao.map((c) =>
+          c.detalhe ? `${c.descricao} — ${c.detalhe}` : c.descricao,
+        ),
+      }
+    : {
+        status: "NOT_APPLICABLE",
+        acao: ctx.requestedAction,
+        blockers: [],
+        hardBlockers: [],
+        motivos: ["nenhuma ação executável neste turno"],
+      };
+
   return {
     tipoAvaliacao,
+    actionSafety,
+    // Pendências vêm da lista completa: uma pré-condição de ação segue
+    // visível como "ainda será coletada", mesmo fora da nota da mensagem.
+    pendingDimensions: validators.filter((v) => v.status === "PENDING").map((v) => v.validator),
     // A amarra com o texto só faz sentido na avaliação da RESPOSTA FINAL:
     // a avaliação de segurança da ação não é a nota de nenhuma mensagem.
     textoAvaliadoHash:
