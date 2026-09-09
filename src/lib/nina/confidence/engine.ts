@@ -336,7 +336,6 @@ export function decidirConfianca(
     politica,
   );
 
-  const tipoAvaliacao = ctx.tipoAvaliacao ?? "action_safety";
 
   // FASE 4/5 — handoff já pedido pelo runtime deixa de ser atalho cego.
   // TRANSFERIR é uma AÇÃO segura (action_safety), então a decisão pode ser
