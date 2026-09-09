@@ -103,8 +103,8 @@ describe("TESTE C — criação com paciente e vaga confirmados", () => {
         entities: { paciente_id: "p1", slot: "2026-09-10T09:00:00" },
         ferramentas: [
           {
-            nome: "consultar_agenda",
-            capacidade: "agenda",
+            nome: "agendar",
+            capacidade: "createAppointment",
             fonte: "agenda",
             success: true,
             erro: undefined,
@@ -120,7 +120,7 @@ describe("TESTE C — criação com paciente e vaga confirmados", () => {
           appointmentToolCalled: true,
           appointmentCreated: true,
           appointmentId: "ag-1",
-          workflowState: "CREATING_APPOINTMENT",
+          workflowState: "APPOINTMENT_CONFIRMED",
         },
         texto: "Agendamento confirmado.",
       }),
@@ -143,7 +143,7 @@ describe("TESTE D — score original é imutável", () => {
       ferramentas: [
         {
           nome: "consultar_catalogo",
-          capacidade: "catalogo",
+          capacidade: "listCatalog",
           fonte: "catalogo_publicado",
           success: true,
           erro: undefined,
