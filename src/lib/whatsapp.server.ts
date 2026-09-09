@@ -1185,7 +1185,7 @@ async function gerarRespostaNinaInterno(
   // histórico completo, CRM e Agenda inteiros nunca são enviados.
   const { montarContexto } = await import("@/lib/nina/context-builder");
   const contexto = montarContexto({
-    systemBlocos: [systemPromptComHandoff],
+    systemBlocos: [systemPromptFinal],
     historico: historico as MsgIA[],
     mensagemAtual: mensagemPaciente,
     paciente: pacienteIdEfetivo
@@ -1202,7 +1202,7 @@ async function gerarRespostaNinaInterno(
     paciente_identificado: Boolean(pacienteIdEfetivo),
   });
   rastro?.concluir("prompt.compose", {
-    tamanho_prompt: systemPromptComHandoff.length,
+    tamanho_prompt: systemPromptFinal.length,
     ferramentas: Array.isArray(ferramentas) ? ferramentas.length : 0,
     pode_agendar: podeAgendar,
   });
