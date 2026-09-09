@@ -38,7 +38,10 @@ const VAZIO: ResumoAtencao = {
  */
 export function CentralAtencao() {
   const { clinicaAtual } = useClinica();
-  const clinicaId = clinicaAtual?.clinica_id;
+  const { session } = useAuth();
+  // Sem sessão (tela de login, sessão expirada) não há token para as server
+  // functions protegidas: a clínica em cache não basta.
+  const clinicaId = session ? clinicaAtual?.clinica_id : undefined;
   const filaFn = useServerFn(listarFilaHumana);
   const esperaFn = useServerFn(esperaConversas);
   const convsFn = useServerFn(listarConversas);
