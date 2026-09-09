@@ -86,53 +86,12 @@ export function saudacaoPorHorario(fuso: string = FUSO_PADRAO, now: Date = new D
   return "Boa noite";
 }
 
-export type EntradaFase1 = {
-  nomeCurtoUnidade: string;
-  jaSeApresentou: boolean;
-  mensagem: string;
-  fuso?: string;
-  now?: Date;
-};
-
 /**
- * Bloco de prompt da Fase 1. Substitui a antiga instrução de apresentação
- * fixa e acrescenta tom + leitura de intenção.
+ * FASE 6 — o antigo `blocoPromptFase1` foi REMOVIDO.
+ *
+ * Ele montava comportamento conversacional (tom de voz, apresentação, leitura
+ * de intenção, regras de clarificação) e o concatenava ao prompt. Desde a
+ * FASE 3 o comportamento vem exclusivamente do Behavior Prompt publicado em
+ * Arquitetura → Instruções da Nina. Este módulo mantém apenas as funções
+ * determinísticas de detecção usadas por estado, métricas e validações.
  */
-export function blocoPromptFase1(entrada: EntradaFase1): string {
-  const { nomeCurtoUnidade, jaSeApresentou, mensagem } = entrada;
-  const saudacao = saudacaoPorHorario(entrada.fuso ?? FUSO_PADRAO, entrada.now ?? new Date());
-  const intencoes = detectarIntencoes(mensagem);
-  const ambigua = intencaoAmbigua(mensagem, intencoes);
-  const agendar = querAgendar(intencoes);
-
-  const abertura = jaSeApresentou
-    ? "APRESENTAÇÃO: você JÁ se apresentou nesta conversa. NÃO repita a apresentação nem a saudação inicial — responda direto, de forma acolhedora."
-    : `APRESENTAÇÃO (primeira mensagem desta conversa): comece exatamente com "Olá, ${saudacao.toLowerCase()}! 😊 Sou a Nina, assistente virtual da ${nomeCurtoUnidade}." e, na sequência, responda o que foi perguntado. Se a pessoa não perguntou nada ainda, termine com "Como posso te ajudar hoje?".`;
-
-  const leitura =
-    intencoes.length > 0
-      ? `LEITURA DA INTENÇÃO (apoio, não é ordem): a mensagem parece tratar de ${intencoes.join(", ")}.${
-          intencoes.length > 1 ? " São MAIS DE UMA solicitação: responda TODAS na mesma mensagem, na ordem em que apareceram." : ""
-        }`
-      : "LEITURA DA INTENÇÃO: não foi possível identificar a intenção com clareza.";
-
-  const clarificacao = ambigua
-    ? "AMBIGUIDADE: a intenção não está clara. Faça UMA pergunta curta de clarificação (ex.: \"Você gostaria de saber o valor da consulta ou já quer verificar disponibilidade para agendamento?\") em vez de supor."
-    : "A intenção está clara: siga direto com a resposta, sem perguntar o óbvio.";
-
-  const agendamento = agendar
-    ? "A pessoa pediu explicitamente para marcar, remarcar, cancelar ou ver vaga: pode seguir com o fluxo de agendamento normalmente."
-    : "ATENÇÃO: perguntar preço, médico, especialidade, endereço ou preparo NÃO é pedido de agendamento. Responda apenas o que foi perguntado, NÃO peça nome, CPF, nascimento ou telefone e NÃO comece coleta de dados. No máximo, ofereça ajuda para agendar em uma frase curta, sem insistir.";
-
-  return `TOM DE VOZ DA NINA:
-- Educada, gentil, acolhedora, profissional, objetiva e natural — pouco robótica.
-- Respostas curtas (2 a 4 frases). Sem repetir o que a pessoa disse, sem formalidade exagerada, sem encher de emojis (no máximo 1) e sem pressionar para agendar.
-
-${abertura}
-
-${leitura}
-${clarificacao}
-${agendamento}
-
-MUDANÇA DE ASSUNTO: se a pessoa mudar de tema (valor → endereço → agendamento), acompanhe a mudança. Não fique presa à primeira intenção da conversa.`;
-}
