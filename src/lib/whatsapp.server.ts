@@ -950,8 +950,8 @@ async function gerarRespostaNinaInterno(
   }
   // FASE 3: o vínculo só é gravado quando a identidade foi CONFIRMADA pelo
   // fluxo (identificação da Nina), nunca por coincidência de telefone.
-  const identidadeConfirmada = Boolean(fluxoEstado.patient.id && fluxoEstado.patient.validated);
-  if (identidadeConfirmada && pacienteIdEfetivo && estadoId.conversaId && !estadoId.pacienteIdConversa) {
+  const vinculoConfirmado = Boolean(fluxoEstado.patient.id && fluxoEstado.patient.validated);
+  if (vinculoConfirmado && pacienteIdEfetivo && estadoId.conversaId && !estadoId.pacienteIdConversa) {
     const { vincularPacienteConversa } = await import("@/lib/atendimento/vinculo-contato.server");
     await vincularPacienteConversa(supabaseAdmin as never, {
       clinicaId,
