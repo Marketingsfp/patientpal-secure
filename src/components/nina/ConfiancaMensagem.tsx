@@ -320,6 +320,8 @@ export function ConfiancaMensagemBadge({
         ) : (
           <p className="text-muted-foreground">Carregando detalhes…</p>
         )}
+        <InstrucoesUtilizadas clinicaId={clinicaId} execucaoId={confianca.execucao_id} />
+
       </PopoverContent>
     </Popover>
   );
