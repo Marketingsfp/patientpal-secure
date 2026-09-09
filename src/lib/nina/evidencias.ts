@@ -104,10 +104,28 @@ export type PromptDaExecucao = {
   conversaId?: string | null;
 };
 
+/**
+ * FASE 5 — SNAPSHOT IMUTÁVEL do que foi enviado ao modelo, capturado no
+ * instante IMEDIATAMENTE anterior à chamada. Nunca é reconstruído depois:
+ * mensagens antigas jamais são reavaliadas com o prompt atual.
+ */
+export type SnapshotPrompt = {
+  behaviorPromptTemplate: string | null;
+  behaviorPromptRendered: string;
+  behaviorPromptHash: string;
+  envelopeTecnico: string | null;
+  runtimeContext: unknown;
+  requestFinal: string;
+  model: string | null;
+  modelParameters: Record<string, unknown> | null;
+  toolSchemas: unknown;
+};
+
 export type Coletor = {
   etapa: (e: Omit<Etapa, "em"> & { em?: string }) => void;
   mensagensEntrada: (ids: string[]) => void;
   promptVersao: (ref: PromptDaExecucao) => void;
+  promptSnapshot: (snap: SnapshotPrompt) => void;
   pacote: () => PacoteEvidencias;
 };
 
@@ -117,9 +135,12 @@ export type PacoteEvidencias = {
   lacunas: string[];
   /** FASE 6 — versão das instruções usada nesta execução, quando registrada. */
   prompt: PromptDaExecucao | null;
+  /** FASE 5 — conteúdo exato enviado ao modelo nesta execução. */
+  snapshot: SnapshotPrompt | null;
   /** FASE 6 — módulos complementares realmente utilizados. */
   modulos: string[];
 };
+
 
 /**
  * Coletor de uma execução. Acumula em memória e não grava nada sozinho:
