@@ -199,7 +199,7 @@ function EditarFuncionarioPage() {
                 () => ({ email: null as string | null }),
               ),
             ]);
-            const roleAtual = (mem.data?.role as string | undefined) ?? "recepcao";
+            const roleAtual = perfilCanonico(mem.data?.role as string | undefined) ?? "recepcao";
             const ativoAtual = (mem.data?.ativo as boolean | undefined) ?? true;
             setMembershipId((mem.data?.id as string | undefined) ?? null);
             setMembershipRole(roleAtual);
