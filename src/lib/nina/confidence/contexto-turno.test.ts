@@ -37,9 +37,14 @@ describe("FASE 2 — contexto canônico do turno", () => {
     expect(c.intent).not.toBeNull();
   });
 
-  it("intenção de agendamento vira criar_agendamento", () => {
+  // FASE 1 (refatoração) — INTENT ≠ STAGE ≠ AÇÃO EXECUTÁVEL.
+  // Antes este teste afirmava "intenção de agendamento vira criar_agendamento";
+  // isso estava conceitualmente errado e foi corrigido.
+  it("intenção de agendamento NÃO vira criar_agendamento", () => {
     const c = canonico("quero agendar uma consulta para semana que vem", true);
-    expect(c.requestedAction).toBe("criar_agendamento");
+    expect(c.intencoes).toContain("agendamento");
+    expect(c.requestedAction).not.toBe("criar_agendamento");
+    expect(c.requestedAction).toBe("nenhuma");
   });
 
   it("clínica com Agenda habilitada + paciente pedindo preço NÃO vira agendamento", () => {
