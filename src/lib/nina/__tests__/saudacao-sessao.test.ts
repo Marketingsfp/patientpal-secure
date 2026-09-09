@@ -2,7 +2,7 @@ import { describe, expect, it } from "bun:test";
 import { estadoVazio, normalizarEstado } from "../fluxo-estado-normalizar";
 import { novaSessao, reabrirSessao } from "../sessao";
 import {
-  aplicarSaudacaoObrigatoria,
+  avaliarSaudacao,
   checarElementosSaudacao,
   garantirSessaoAtiva,
   marcarSaudacaoConcluida,
@@ -86,28 +86,28 @@ describe("Validação semântica da apresentação", () => {
     expect(saudacaoCompleta("Boa tarde, Jean! Como posso ajudar você hoje?", UNIDADE)).toBe(false);
   });
 
-  it("corrige a resposta do modelo quando falta a apresentação", () => {
-    const corrigida = aplicarSaudacaoObrigatoria(
-      "Boa tarde, Jean! Como posso ajudar você hoje?",
-      UNIDADE,
-    );
-    expect(saudacaoCompleta(corrigida, UNIDADE)).toBe(true);
-    expect(corrigida).toContain("assistente virtual");
-    expect(corrigida).toContain("Menino Jesus");
+  it("FASE 6 — apenas sinaliza ausência da apresentação, sem alterar o texto", () => {
+    const texto = "Boa tarde, Jean! Como posso ajudar você hoje?";
+    const d = avaliarSaudacao(texto, UNIDADE, { obrigatoria: true });
+    expect(d.saudacaoAusente).toBe(true);
+    expect(d.completa).toBe(false);
+    expect(d.saudacaoDuplicada).toBe(false);
   });
 
-  it("não altera uma resposta que já cumpre a regra", () => {
-    const ok = "Olá, bom dia! Sou a Nina, assistente virtual da Policlínica Menino Jesus. Como posso te ajudar?";
-    expect(aplicarSaudacaoObrigatoria(ok, UNIDADE)).toBe(ok);
+  it("FASE 6 — resposta correta não é sinalizada", () => {
+    const ok =
+      "Olá, bom dia! Sou a Nina, assistente virtual da Policlínica Menino Jesus. Como posso te ajudar?";
+    const d = avaliarSaudacao(ok, UNIDADE, { obrigatoria: true });
+    expect(d.completa).toBe(true);
+    expect(d.saudacaoAusente).toBe(false);
+    expect(d.saudacaoDuplicada).toBe(false);
   });
 
-  it("mantém o conteúdo da resposta ao prefixar a apresentação", () => {
-    const corrigida = aplicarSaudacaoObrigatoria(
-      "A consulta de Cardiologia custa R$ 150,00.",
-      UNIDADE,
-    );
-    expect(corrigida).toContain("R$ 150,00");
-    expect(corrigida).toContain("Sou a Nina");
+  it("FASE 6 — detecta apresentação duplicada sem corrigir", () => {
+    const texto =
+      "Olá! Sou a Nina, assistente virtual da Policlínica Menino Jesus. Sou a Nina, assistente virtual da Policlínica Menino Jesus. Como posso te ajudar?";
+    const d = avaliarSaudacao(texto, UNIDADE, { obrigatoria: true });
+    expect(d.saudacaoDuplicada).toBe(true);
   });
 
   it("debug de QA expõe os campos de sessão", () => {

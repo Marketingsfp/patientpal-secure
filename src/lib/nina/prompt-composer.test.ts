@@ -106,3 +106,34 @@ describe("FASE 4 — Arquitetura é a fonte de verdade", () => {
     expect(JSON.stringify(req.runtimeContext)).not.toContain(MARCA);
   });
 });
+
+/**
+ * FASE 6 — regressão: nenhum pós-processador pode injetar comportamento.
+ * O foco é o request final e o texto de saída, não o nome dos arquivos.
+ */
+describe("FASE 6 — sem injeção comportamental depois do composer", () => {
+  it("o system prompt termina no contexto factual (nada é anexado depois)", () => {
+    const req = comporRequestNina({
+      behaviorPrompt: PROMPT_NINA_WHATSAPP_V4,
+      runtimeContext: contextoFatual,
+    });
+    const partes = req.systemPrompt.split(req.behaviorPrompt);
+    expect(partes.length).toBe(2);
+    expect(partes[1]!.includes("Sou a Nina")).toBe(false);
+    expect(req.systemPrompt.trimEnd().endsWith("}")).toBe(true);
+  });
+
+  it("a apresentação não é mais acrescentada ao texto da resposta", () => {
+    const fonte = readFileSync("src/lib/whatsapp.server.ts", "utf8");
+    expect(fonte).not.toContain("aplicarSaudacaoObrigatoria");
+    expect(fonte).not.toContain("fraseApresentacao");
+    expect(fonte).toContain("avaliarSaudacao");
+  });
+
+  it("o módulo de saudação não produz mais texto de apresentação", async () => {
+    const mod = (await import("./saudacao-sessao")) as Record<string, unknown>;
+    expect(mod["aplicarSaudacaoObrigatoria"]).toBeUndefined();
+    expect(mod["fraseApresentacao"]).toBeUndefined();
+    expect(typeof mod["avaliarSaudacao"]).toBe("function");
+  });
+});

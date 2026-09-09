@@ -1,6 +1,6 @@
 import { describe, it, expect } from "bun:test";
 import {
-  blocoPromptFase1,
+  
   detectarIntencoes,
   intencaoAmbigua,
   querAgendar,
@@ -46,47 +46,9 @@ describe("ambiguidade", () => {
   });
 });
 
-describe("bloco de prompt", () => {
-  it("primeira mensagem gera saudação e apresentação", () => {
-    const p = blocoPromptFase1({
-      nomeCurtoUnidade: "Policlínica Menino Jesus",
-      jaSeApresentou: false,
-      mensagem: "Quanto custa cardiologia?",
-      now: em("2026-09-05T18:00:00Z"),
-    });
-    expect(p).toContain("boa tarde");
-    expect(p).toContain("Policlínica Menino Jesus");
-    expect(p).toContain("NÃO peça nome, CPF");
-  });
-
-  it("não repete apresentação depois da primeira resposta", () => {
-    const p = blocoPromptFase1({
-      nomeCurtoUnidade: "Policlínica Menino Jesus",
-      jaSeApresentou: true,
-      mensagem: "E o endereço?",
-      now: em("2026-09-05T18:00:00Z"),
-    });
-    expect(p).toContain("NÃO repita a apresentação");
-    expect(p).not.toContain("Sou a Nina, assistente virtual");
-  });
-
-  it("mensagem ambígua pede clarificação", () => {
-    const p = blocoPromptFase1({
-      nomeCurtoUnidade: "Policlínica Menino Jesus",
-      jaSeApresentou: false,
-      mensagem: "cardiologia",
-      now: em("2026-09-05T13:00:00Z"),
-    });
-    expect(p).toContain("AMBIGUIDADE");
-  });
-
-  it("mudança de assunto está prevista no prompt", () => {
-    const p = blocoPromptFase1({
-      nomeCurtoUnidade: "X",
-      jaSeApresentou: true,
-      mensagem: "e onde fica?",
-      now: em("2026-09-05T13:00:00Z"),
-    });
-    expect(p).toContain("MUDANÇA DE ASSUNTO");
+describe("FASE 6 — nenhum bloco comportamental neste módulo", () => {
+  it("blocoPromptFase1 não existe mais", async () => {
+    const mod = (await import("../atendimento-fase1")) as Record<string, unknown>;
+    expect(mod["blocoPromptFase1"]).toBeUndefined();
   });
 });

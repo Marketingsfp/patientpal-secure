@@ -693,14 +693,14 @@ export const NODES_ARQUITETURA: NodeArquitetura[] = [
   },
   {
     id: "instructions.greeting",
-    nome: "Saudação obrigatória da sessão",
+    nome: "Validação da apresentação da sessão",
     categoria: "INSTRUCOES",
     descricao:
-      "Garante apresentação e saudação por período apenas uma vez por sessão, sem repetir a cada mensagem.",
+      "Observa se a apresentação exigida pela sessão apareceu uma única vez na resposta. Não altera o texto: a apresentação vem do prompt publicado em Arquitetura.",
     arquivo: "src/lib/nina/saudacao-sessao.ts",
-    funcao: "aplicarSaudacaoObrigatoria",
+    funcao: "avaliarSaudacao",
     entrada: "Sessão e texto da resposta",
-    saida: "Bloco de saudação aplicado ou dispensado",
+    saida: "Diagnóstico (ausente/duplicada) para telemetria",
     anteriores: ["session.resolve"],
     seguintes: ["prompt.compose"],
     erros: ["saudação repetida na mesma sessão", "sessão sem marcação de saudação"],
