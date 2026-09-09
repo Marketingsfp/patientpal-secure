@@ -32,6 +32,22 @@ export type AcaoSolicitada =
   | "nenhuma"
   | "desconhecida";
 
+/**
+ * FASE 2 — ações que o sistema realmente EXECUTA (efeito no mundo real).
+ * Só elas passam pela avaliação de segurança da ação. Informar preço,
+ * conversar ou coletar dados não é ação executável.
+ */
+export const ACOES_EXECUTAVEIS: AcaoSolicitada[] = [
+  "criar_agendamento",
+  "cancelar_agendamento",
+  "transferir_humano",
+];
+
+/** Existe uma ação executável prestes a acontecer neste turno? */
+export function acaoExecutavel(acao: AcaoSolicitada): boolean {
+  return ACOES_EXECUTAVEIS.includes(acao);
+}
+
 /** Origem de um fato apresentado ao paciente. */
 export type TipoFonte =
   | "catalogo_publicado"
