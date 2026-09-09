@@ -239,11 +239,18 @@ export function medirEvidencia(
   let obtido = 0;
   const desconhecidas: string[] = [];
   const naoAplicaveis: string[] = [];
+  const pendentes: string[] = [];
 
   for (const v of validators) {
     const peso = politica.pesos[v.validator] ?? 0;
     if (v.status === "NOT_APPLICABLE") {
       naoAplicaveis.push(v.validator);
+      continue;
+    }
+    // FASE 2 — dado que ainda será coletado antes da ação é o curso normal da
+    // conversa: não pontua contra a mensagem nem derruba a cobertura.
+    if (v.status === "PENDING") {
+      pendentes.push(v.validator);
       continue;
     }
     if (v.status === "UNKNOWN") {
