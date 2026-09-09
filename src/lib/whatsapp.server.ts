@@ -771,23 +771,46 @@ async function gerarRespostaNinaInterno(
   const blocoFoco = "";
 
   /* ---------- Confirmação de identidade (uma vez por conversa) ---------- */
+  // FASE 4 — o telefone só traz CANDIDATOS. A pessoa é reconhecida quando o
+  // nome dito por ela casa com um candidato (isso também desempata) ou quando
+  // ela confirma explicitamente um candidato único.
+  const candidatosBusca = pacienteInfo?.candidates ?? [];
+  const candidatoPeloNome =
+    candidatosBusca.find((c) =>
+      c.nome ? textoNorm.includes(normalizar(String(c.nome).split(" ")[0] ?? "")) : false,
+    ) ?? null;
   const respondeuConfirmando =
-    CONFIRMACOES.test(mensagemPaciente) ||
-    (pacienteInfo?.nome
-      ? textoNorm.includes(normalizar(String(pacienteInfo.nome).split(" ")[0] ?? ""))
-      : false);
+    Boolean(candidatoPeloNome) ||
+    (CONFIRMACOES.test(mensagemPaciente) && candidatosBusca.length === 1);
   let identidadeConfirmada = estadoId.confirmada;
   if (!identidadeConfirmada && estadoId.perguntadaEm && respondeuConfirmando) {
     identidadeConfirmada = true;
     await salvarEstadoIdentidade(estadoId, { identidade_confirmada: true });
   }
 
-  const primeiroNome = pacienteInfo?.nome ? String(pacienteInfo.nome).split(" ")[0] : null;
-  const blocoIdentidade = identidadeConfirmada
-    ? `IDENTIDADE: já confirmada nesta conversa${primeiroNome ? ` (${primeiroNome})` : ""}. NUNCA volte a perguntar quem é a pessoa; trate-a pelo primeiro nome.`
-    : estadoId.perguntadaEm
-      ? `IDENTIDADE: você JÁ perguntou a identidade nesta conversa e não houve confirmação clara. NÃO pergunte de novo — siga o atendimento normalmente. Só pergunte mais uma vez (a última) se for indispensável para a ação pedida (ex.: confirmar um agendamento existente dessa pessoa).`
-      : `IDENTIDADE: ainda não perguntada. Você pode confirmar o nome UMA ÚNICA VEZ nesta conversa, e apenas se for necessário. Nunca abra a resposta com a confirmação: responda primeiro o que foi perguntado e, se ainda precisar, peça a confirmação no fim, em uma linha.`;
+  const { resolverIdentidadePaciente, fatosRemetente, primeiroNomeSeguro } = await import(
+    "@/lib/nina/identidade-paciente"
+  );
+  const identidadePaciente = resolverIdentidadePaciente(
+    candidatoPeloNome
+      ? { candidates: [candidatoPeloNome], viaCpf: pacienteInfo?.viaCpf ?? false }
+      : pacienteInfo,
+    {
+      confirmadoNaConversa: identidadeConfirmada,
+      pacienteVinculadoId: estadoId.pacienteIdConversa ?? null,
+    },
+  );
+
+  const primeiroNome = primeiroNomeSeguro(identidadePaciente);
+  const blocoIdentidade =
+    identidadePaciente.status === "CONFIRMED"
+      ? `IDENTIDADE: já confirmada nesta conversa${primeiroNome ? ` (${primeiroNome})` : ""}. NUNCA volte a perguntar quem é a pessoa; trate-a pelo primeiro nome.`
+      : identidadePaciente.status === "AMBIGUOUS"
+        ? `IDENTIDADE: este número está ligado a MAIS DE UM cadastro. NÃO chame a pessoa por nenhum desses nomes, não use dados, convênio, contrato ou histórico de nenhum deles. Peça, em uma linha, o nome completo de quem está falando.`
+        : identidadePaciente.status === "UNIQUE_CANDIDATE"
+          ? `IDENTIDADE: existe um cadastro compatível com este número, mas NÃO está confirmado. Não trate a pessoa por esse nome nem use dados desse cadastro. Se for necessário para a ação pedida, peça a confirmação do nome em uma linha, no fim da resposta.`
+          : `IDENTIDADE: ainda não identificada. Você pode confirmar o nome UMA ÚNICA VEZ nesta conversa, e apenas se for necessário. Nunca abra a resposta com a confirmação: responda primeiro o que foi perguntado e, se ainda precisar, peça a confirmação no fim, em uma linha.`;
+
 
   // SESSÃO DA NINA (memória transitória com TTL deslizante, padrão 4h).
   // Encerrar a conversa NÃO apaga histórico, CRM, agendamentos nem Base: o que
