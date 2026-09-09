@@ -1637,11 +1637,25 @@ export function AtendInbox() {
     if (
       atual.atribuida_user_id !== sel.atribuida_user_id ||
       atual.status !== sel.status ||
-      atual.owner_type !== sel.owner_type
+      atual.owner_type !== sel.owner_type ||
+      // FASE 5 — o nome do perfil no WhatsApp pode mudar a qualquer momento e o
+      // cabeçalho da conversa aberta acompanha isso sem recarregar a tela.
+      atual.whatsapp_profile_name !== sel.whatsapp_profile_name ||
+      atual.contato_nome !== sel.contato_nome ||
+      atual.contato_paciente_id !== sel.contato_paciente_id
     ) {
       setSel((s: any) => ({ ...s, ...atual }));
     }
-  }, [convs, sel?.id, sel?.atribuida_user_id, sel?.status, sel?.owner_type]);
+  }, [
+    convs,
+    sel?.id,
+    sel?.atribuida_user_id,
+    sel?.status,
+    sel?.owner_type,
+    sel?.whatsapp_profile_name,
+    sel?.contato_nome,
+    sel?.contato_paciente_id,
+  ]);
   // Troca de conversa: o conteúdo do lead anterior sai da tela na mesma hora.
   // Se a nova conversa já estiver em cache, o conteúdo dela aparece na hora e
   // é revalidado em segundo plano — nunca o conteúdo da conversa anterior.
