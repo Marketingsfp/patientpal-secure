@@ -1998,7 +1998,7 @@ export function AtendInbox() {
       } else if (evento.table === "atend_conversas" && evento.eventType === "UPDATE") {
         const r = patchListaPorConversa(convsRef.current, (evento as any).new, {
           escopo,
-          userId: meuId,
+          userId: meuId ?? "",
           gestor: souGestor,
         });
         if (r.aplicado) {
