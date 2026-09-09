@@ -217,7 +217,7 @@ import {
   formatarNumeroConversa,
   interpretarBuscaConversa,
 } from "@/lib/atendimento/numero-conversa";
-import { SEM_NOME, nomeConversa, tituloConversa } from "@/lib/atendimento/rotulo-conversa";
+import { SEM_NOME, nomeContato, nomeConversa, tituloConversa } from "@/lib/atendimento/rotulo-conversa";
 import {
   ConfiancaMensagemBadge,
   ConfiancaNaoAvaliadaBadge,
@@ -3579,7 +3579,7 @@ export function AtendInbox() {
             onOpenChange={setAgendaOpen}
             clinicaId={clinicaId}
             conversaId={sel.id}
-            contatoNome={sel.contato_nome ?? null}
+            contatoNome={nomeContato(sel as never)}
             contatoTelefone={sel.contato_telefone ?? null}
             pacienteIdVinculado={contatoAtual?.paciente?.id ?? null}
             onMensagemPronta={(t) => setDraft((d) => (d ? `${d}\n${t}` : t))}

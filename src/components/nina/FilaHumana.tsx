@@ -13,6 +13,7 @@ import { tituloConversa } from "@/lib/atendimento/rotulo-conversa";
 type ConversaFila = {
   id: string;
   contato_nome: string | null;
+  whatsapp_profile_name?: string | null;
   contato_telefone: string | null;
   pacientes?: { nome?: string | null } | null;
   prioridade: number | null;

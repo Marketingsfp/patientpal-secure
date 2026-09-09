@@ -1,3 +1,4 @@
+import { nomeContato } from "@/lib/atendimento/rotulo-conversa";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
@@ -52,6 +53,8 @@ export function CentralAtencao() {
     Array<{
       id: string;
       contato_nome?: string | null;
+      whatsapp_profile_name?: string | null;
+      contato_telefone?: string | null;
       handoff_motivo?: string | null;
       handoff_resumo?: string | null;
     }>
@@ -92,7 +95,7 @@ export function CentralAtencao() {
         data: { clinicaId, status: "all", canal: "todos", limit: 200 },
       })) as unknown as any[];
       const m: Record<string, string | null> = {};
-      for (const r of rows ?? []) m[r.id] = r.contato_nome ?? null;
+      for (const r of rows ?? []) m[r.id] = nomeContato(r);
       setNomes(m);
     } catch {
       /* sem nomes o painel ainda funciona */

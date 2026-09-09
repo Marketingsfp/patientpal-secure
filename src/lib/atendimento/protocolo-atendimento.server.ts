@@ -20,6 +20,7 @@
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { ambienteDoHandoff, deveInformarProtocolo, vinculoProtocolo } from "./protocolo-handoff";
 import { classificarMotivoHandoff, type MotivoHandoff } from "./mensagem-handoff";
+import { nomeContato } from "./rotulo-conversa";
 import type { StatusEnvioHandoff, TransporteHandoff } from "./handoff-auditoria";
 
 
@@ -32,6 +33,7 @@ type LinhaConversa = {
   handoff_em: string | null;
   contato_telefone: string | null;
   contato_nome: string | null;
+  whatsapp_profile_name: string | null;
   departamento_id: string | null;
   is_teste: boolean | null;
   nina_fluxo_estado: unknown;
@@ -46,7 +48,7 @@ async function lerConversa(clinicaId: string, conversaId: string) {
   const { data } = await supabaseAdmin
     .from("atend_conversas")
     .select(
-      "protocolo_atendimento, protocolo_sessao_id, handoff_em, contato_telefone, contato_nome, departamento_id, is_teste, nina_fluxo_estado",
+      "protocolo_atendimento, protocolo_sessao_id, handoff_em, contato_telefone, contato_nome, whatsapp_profile_name, departamento_id, is_teste, nina_fluxo_estado",
     )
     .eq("id", conversaId)
     .eq("clinica_id", clinicaId)
@@ -319,7 +321,8 @@ export async function anunciarHandoffAoPaciente(args: {
   const { gerarMensagemHandoff } = await import("./mensagem-handoff.server");
   const { texto, origem } = await gerarMensagemHandoff({
     protocolo: args.protocolo,
-    nome: conv.contato_nome,
+    // Mesma identidade canônica do cabeçalho da conversa (FASE 2).
+    nome: nomeContato(conv),
     setor,
     motivo: await motivoDoHandoff(args.clinicaId, args.conversaId),
   });
