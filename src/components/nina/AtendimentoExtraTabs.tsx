@@ -3144,7 +3144,7 @@ export function AtendInbox() {
                     aria-label="Respostas rápidas"
                     aria-expanded={!!slash}
                     className="h-9 w-9 shrink-0 p-0 text-atd-ink-soft"
-                    disabled={enviando || !!motivoBloqueio}
+                    disabled={!!motivoBloqueio}
                     onClick={() => {
                       const el = composerRef.current;
                       const pos = el?.selectionStart ?? draft.length;
