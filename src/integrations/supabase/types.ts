@@ -15238,6 +15238,23 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      rel_marcacoes_por_atendente: {
+        Args: {
+          _atend_fim?: string
+          _atend_ini?: string
+          _clinica_id: string
+          _especialidade_id?: string
+          _marc_fim?: string
+          _marc_ini?: string
+          _medico_id?: string
+          _status?: string
+        }
+        Returns: {
+          qtd: number
+          usuario_id: string
+          usuario_nome: string
+        }[]
+      }
       renovar_contrato_extensao: {
         Args: {
           _contrato_id: string
