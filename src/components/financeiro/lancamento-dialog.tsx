@@ -638,12 +638,36 @@ export function LancamentoDialog({
    * Por isso a tela pergunta, em vez de escolher sozinha. Ver `recebidoAntes`.
    */
   const ehDataRetroativa = tipo === "receita" && !!data && data < hojeBR();
-  // Operador corrigiu a data de volta para hoje: a pergunta perde o sentido e
-  // a resposta anterior não pode continuar valendo em silêncio — senão um
-  // pagamento de hoje ficaria fora do caixa sem ninguém perceber.
+  /**
+   * Adiantamento: o atendimento é de HOJE, mas o paciente já entregou o
+   * dinheiro em outro dia (sinal, sinalização prévia, valor deixado adiantado).
+   *
+   * Sem esta opção o balcão ficava sem saída. A trava de "particular paga na
+   * chegada" exige um recebimento registrado, e a única pergunta sobre
+   * dinheiro já recebido só aparecia para atendimento de dia anterior. A
+   * recepção então não tinha como quitar a ficha, e o atendimento não avançava
+   * para presença, realizado, GR nem para o Financeiro.
+   *
+   * O efeito no caixa é exatamente o mesmo da guia retroativa já quitada, e
+   * por isso reaproveita `recebidoAntes`: a linha aparece no extrato de hoje
+   * para a auditoria ver que a guia saiu, mas vale R$ 0,00 na gaveta — o
+   * dinheiro não está lá para ser conferido contra o cupom impresso.
+   */
+  const podeMarcarAdiantamento =
+    tipo === "receita" && !ehDataRetroativa && !ehPagoSistemaAnterior && !ehCategoriaGratuidade;
+  // Trocar a data invalida a resposta anterior — ela foi dada para outra data.
+  // Cobre o caso original (operador corrige uma data retroativa de volta para
+  // hoje) sem impedir que a marcação seja refeita de propósito: um pagamento
+  // de hoje jamais pode ficar fora do caixa em silêncio.
   useEffect(() => {
-    if (!ehDataRetroativa) setRecebidoAntes(false);
-  }, [ehDataRetroativa]);
+    setRecebidoAntes(false);
+  }, [data]);
+  // A marcação só sobrevive enquanto a tela permite fazê-la. Mudar a categoria
+  // para gratuidade, ou a forma para "pago no sistema anterior", depois de
+  // marcar deixaria um estado invisível governando a gaveta.
+  useEffect(() => {
+    if (!podeMarcarAdiantamento && !ehDataRetroativa) setRecebidoAntes(false);
+  }, [podeMarcarAdiantamento, ehDataRetroativa]);
   const recebidoNum = Number(valorRecebido || 0);
   const trocoDinheiro =
     formaPagamento === "dinheiro" && recebidoNum > valorNum ? recebidoNum - valorNum : 0;
@@ -916,6 +940,24 @@ export function LancamentoDialog({
               `ATENÇÃO: se o paciente está mesmo entregando o dinheiro agora, lance com ` +
               `a data de HOJE. Com data retroativa o dinheiro fica na gaveta sem o ` +
               `sistema esperar por ele, e o fechamento vai acusar sobra.\n\n`) +
+          `Deseja continuar?`,
+      );
+      if (!ok) return;
+    }
+    // Adiantamento num atendimento de HOJE. A confirmação existe porque este é
+    // o único caminho em que a ficha é quitada sem nenhum dinheiro entrando na
+    // gaveta em um dia em que a gaveta está aberta — marcar por engano some
+    // com o valor do fechamento e ninguém percebe na conferência do cupom.
+    if (recebidoAntes && !_ehRetroativo && !ehPagoSistemaAnterior) {
+      const ok = await confirmDialog(
+        `Você marcou que este valor JÁ FOI PAGO adiantado, em outro dia.\n\n` +
+          `A ficha será quitada e liberada (presença, Realizado, GR e Financeiro), ` +
+          `e o repasse do prestador será calculado normalmente.\n\n` +
+          `O valor NÃO entra no caixa de hoje e NÃO soma no fechamento — a linha ` +
+          `aparece no extrato valendo R$ 0,00 na gaveta.\n\n` +
+          `ATENÇÃO: se o paciente está entregando o dinheiro AGORA, desmarque esta ` +
+          `opção. Caso contrário o dinheiro fica na gaveta sem o sistema esperar por ` +
+          `ele, e o fechamento vai acusar sobra.\n\n` +
           `Deseja continuar?`,
       );
       if (!ok) return;
@@ -1297,7 +1339,9 @@ export function LancamentoDialog({
     let recebidoAntesObs = "";
     if (recebidoAntes && !ehPagoSistemaAnterior) {
       recebidoAntesObs = [
-        `RECEBIDO ANTES — guia do atendimento de ${formatarDataBR(data)} emitida em ${formatarDataBR(hojeBR())}`,
+        data < hojeBR()
+          ? `RECEBIDO ANTES — guia do atendimento de ${formatarDataBR(data)} emitida em ${formatarDataBR(hojeBR())}`
+          : `ADIANTAMENTO — atendimento de ${formatarDataBR(data)} quitado com valor que o paciente pagou adiantado`,
         pagoAnteriorData ? `Valor recebido em ${formatarDataBR(pagoAnteriorData)}` : "",
         pagoAnteriorRecibo.trim() ? `Recibo/referência nº ${pagoAnteriorRecibo.trim()}` : "",
         "Não entra no caixa de hoje: o dinheiro não passou pela gaveta de hoje. Repasse do prestador calculado normalmente.",
@@ -2303,6 +2347,67 @@ export function LancamentoDialog({
                     <p className="text-[12px] text-sky-800">
                       Preencha ao menos um dos dois — é o que liga esta guia ao recebimento já
                       feito. Se o pagamento foi na Clínica Total, antes da virada, use a forma
+                      &quot;{LABEL_PAGO_SISTEMA_ANTERIOR}&quot; em vez desta opção.
+                    </p>
+                  </>
+                )}
+              </div>
+            )}
+            {/* Atendimento de HOJE que o paciente já pagou adiantado em outro
+                dia (sinal / sinalização prévia). Fechada por padrão: no dia a
+                dia normal a tela não muda em nada — quem paga na chegada segue
+                o caminho de sempre. Aberta, explica o efeito no caixa com as
+                mesmas palavras da guia retroativa, porque o efeito é o mesmo. */}
+            {podeMarcarAdiantamento && (
+              <div
+                className={`space-y-3 rounded-md border p-3 ${
+                  recebidoAntes ? "border-sky-300 bg-sky-50" : "border-dashed bg-muted/20"
+                }`}
+              >
+                <label className="flex cursor-pointer items-start gap-2">
+                  <input
+                    type="checkbox"
+                    className="mt-1"
+                    checked={recebidoAntes}
+                    onChange={(e) => setRecebidoAntes(e.target.checked)}
+                  />
+                  <span className="text-xs">
+                    <strong>O paciente já pagou este valor adiantado, em outro dia.</strong> Marque
+                    quando o dinheiro foi deixado antes (sinal, sinalização prévia, adiantamento) e
+                    não está entrando na gaveta agora.
+                  </span>
+                </label>
+                {recebidoAntes && (
+                  <>
+                    <p className="text-xs text-sky-900">
+                      A ficha fica <strong>quitada</strong> — a presença, o &quot;Realizado&quot;, a
+                      GR e a aba Atendimentos do Financeiro são liberados, e o repasse do prestador
+                      é calculado normalmente. A linha{" "}
+                      <strong>aparece no extrato do caixa de hoje</strong> para a auditoria ver que
+                      a guia foi emitida, mas vale <strong>R$ 0,00 no dinheiro esperado</strong> do
+                      fechamento — o dinheiro não está na gaveta de hoje para ser conferido no
+                      cupom.
+                    </p>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1.5">
+                        <Label>Data em que foi pago</Label>
+                        <DateInputBR
+                          value={pagoAnteriorData}
+                          onChange={(e) => setPagoAnteriorData(e.target.value)}
+                        />
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label>Nº do recibo / referência</Label>
+                        <Input
+                          value={pagoAnteriorRecibo}
+                          onChange={(e) => setPagoAnteriorRecibo(e.target.value)}
+                          placeholder="Ex.: 48213"
+                        />
+                      </div>
+                    </div>
+                    <p className="text-[12px] text-sky-800">
+                      Preencha ao menos um dos dois — é o que liga esta ficha ao dinheiro já
+                      recebido. Se o pagamento foi na Clínica Total, antes da virada, use a forma
                       &quot;{LABEL_PAGO_SISTEMA_ANTERIOR}&quot; em vez desta opção.
                     </p>
                   </>
