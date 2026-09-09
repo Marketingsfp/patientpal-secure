@@ -65,6 +65,7 @@ import {
 import { DateTimeField } from "@/components/agenda/datetime-field";
 import { AgendaPorMedicoDia } from "@/components/agenda/agenda-por-medico-dia";
 import { ResumoDoDiaBar } from "@/components/agenda/resumo-do-dia-bar";
+import { MarcacoesPorAtendente } from "@/components/relatorios/marcacoes-por-atendente";
 import {
   Select,
   SelectContent,
@@ -133,6 +134,7 @@ import { podeAutorizar } from "@/lib/autorizacao-supervisor";
 import {
   CalendarDays,
   BarChart3,
+  Users,
   Plus,
   Pencil,
   Trash2,
@@ -2456,6 +2458,11 @@ function AgendaPage() {
       return false;
     }
   });
+  // Relatório de marcações por atendente, aberto de dentro da Agenda. É o
+  // mesmo componente da aba de Relatórios — supervisão pediu o atalho aqui,
+  // que é onde ela já está quando quer conferir a produtividade do dia.
+  const [marcacoesAberto, setMarcacoesAberto] = useState(false);
+
   const alternarResumo = useCallback(() => {
     setResumoAberto((v) => {
       try {
@@ -4551,6 +4558,12 @@ function AgendaPage() {
   };
 
   const isManager = clinicaAtual?.role === "admin" || clinicaAtual?.role === "gestor";
+
+  // Produtividade individual da equipe é ferramenta de supervisão: aparece
+  // pela marcação pessoa a pessoa (`pode_autorizar`, tela Equipe) somada a um
+  // perfil de gestão — `isManager` sozinho não serve, porque quase toda a
+  // equipe tem perfil de administrador. A função do banco repete a checagem.
+  const ehSupervisor = !!clinicaAtual?.pode_autorizar && isManager;
 
   // Horário vago é GRADE, não histórico: quem tem edição na Agenda (recepção e
   // caixa, além de gestão) pode apagar a linha sem chamar ninguém. Ficha com
@@ -8901,6 +8914,16 @@ function AgendaPage() {
           >
             <BarChart3 className="h-3.5 w-3.5" /> Resumo do dia
           </button>
+          {ehSupervisor && (
+            <button
+              type="button"
+              title="Quantas fichas cada atendente marcou — mesmo relatório da tela Relatórios"
+              className="hidden lg:inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-xs hover:bg-slate-50"
+              onClick={() => setMarcacoesAberto(true)}
+            >
+              <Users className="h-3.5 w-3.5" /> Marcações por atendente
+            </button>
+          )}
           <button
             type="button"
             className="hidden lg:inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-xs hover:bg-slate-50"
@@ -8920,6 +8943,11 @@ function AgendaPage() {
                 <BarChart3 className="h-4 w-4 mr-2" />
                 {resumoAberto ? "Ocultar resumo do dia" : "Resumo do dia"}
               </DropdownMenuItem>
+              {ehSupervisor && (
+                <DropdownMenuItem onClick={() => setMarcacoesAberto(true)}>
+                  <Users className="h-4 w-4 mr-2" /> Marcações por atendente
+                </DropdownMenuItem>
+              )}
               <DropdownMenuItem onClick={exportarAgendaExcel}>
                 <Download className="h-4 w-4 mr-2" /> Exportar Excel
               </DropdownMenuItem>
@@ -11772,6 +11800,33 @@ function AgendaPage() {
             medicoNome={medicos.find((m) => m.id === filtroMedico)?.nome ?? null}
             onFechar={alternarResumo}
           />
+        )}
+
+        {/* Marcações por atendente. Abre já apontado para o dia e o
+            profissional que a Agenda está mostrando, e de lá a supervisão
+            amplia o período se quiser — ninguém redigita data para responder
+            "quem marcou o que está na minha frente".
+
+            `duration-0` mata a animação do modal: a Agenda é seca de
+            propósito, a recepção precisa de resposta instantânea no balcão. */}
+        {ehSupervisor && (
+          <Dialog open={marcacoesAberto} onOpenChange={setMarcacoesAberto}>
+            <DialogContent className="max-w-5xl duration-0">
+              <DialogHeader>
+                <DialogTitle>Marcações por atendente</DialogTitle>
+                <DialogDescription>
+                  Quantas fichas cada colaboradora marcou. É o mesmo relatório da tela Relatórios.
+                </DialogDescription>
+              </DialogHeader>
+              {marcacoesAberto && (
+                <MarcacoesPorAtendente
+                  atendIniInicial={dataRef}
+                  atendFimInicial={dataRef}
+                  medicoIdInicial={filtroMedico}
+                />
+              )}
+            </DialogContent>
+          </Dialog>
         )}
 
         {/* Aviso de expediente encerrado. Existe para que "sumiu horário da

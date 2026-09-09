@@ -62,19 +62,37 @@ function hojeISO(): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
-export function MarcacoesPorAtendente() {
+export type MarcacoesPorAtendenteProps = {
+  /**
+   * Período de atendimento com que a tela abre. Em Relatórios fica vazio e
+   * vale o mês corrente; aberto de dentro da Agenda, chega o dia que a
+   * supervisão já está olhando, para o relatório responder "quem marcou o que
+   * está na minha frente" sem ninguém redigitar data.
+   */
+  atendIniInicial?: string;
+  atendFimInicial?: string;
+  /** `medico_id` do filtro da Agenda, ou "todos". */
+  medicoIdInicial?: string;
+};
+
+export function MarcacoesPorAtendente({
+  atendIniInicial,
+  atendFimInicial,
+  medicoIdInicial,
+}: MarcacoesPorAtendenteProps = {}) {
   const { clinicaAtual } = useClinica();
   const clinicaId = clinicaAtual?.clinica_id;
 
-  // Período de ATENDIMENTO já vem preenchido com o mês corrente: é a pergunta
-  // que a supervisão faz toda semana. O período de MARCAÇÃO nasce vazio, senão
-  // a tela esconderia, sem avisar, tudo que foi marcado em outro mês.
-  const [atendIni, setAtendIni] = useState(inicioDoMes);
-  const [atendFim, setAtendFim] = useState(hojeISO);
+  // Período de ATENDIMENTO já vem preenchido com o mês corrente (ou com o dia
+  // que a Agenda estava mostrando): é a pergunta que a supervisão faz toda
+  // semana. O período de MARCAÇÃO nasce vazio, senão a tela esconderia, sem
+  // avisar, tudo que foi marcado em outro mês.
+  const [atendIni, setAtendIni] = useState(() => atendIniInicial || inicioDoMes());
+  const [atendFim, setAtendFim] = useState(() => atendFimInicial || hojeISO());
   const [marcIni, setMarcIni] = useState("");
   const [marcFim, setMarcFim] = useState("");
   const [situacao, setSituacao] = useState("todos");
-  const [medicoId, setMedicoId] = useState("todos");
+  const [medicoId, setMedicoId] = useState(medicoIdInicial || "todos");
   const [especialidadeId, setEspecialidadeId] = useState("todos");
 
   const [medicos, setMedicos] = useState<Opcao[]>([]);
