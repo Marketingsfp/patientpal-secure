@@ -47,6 +47,20 @@ export function registrarPromptDaExecucao(ref: PromptDaExecucao): void {
   }
 }
 
+/**
+ * FASE 5 — registra o SNAPSHOT IMUTÁVEL do conteúdo enviado ao modelo.
+ * Deve ser chamado imediatamente ANTES da chamada, nunca depois da resposta.
+ */
+export function registrarSnapshotPrompt(snap: SnapshotPrompt): void {
+  try {
+    coletorAtual()?.promptSnapshot(snap);
+  } catch {
+    /* auditoria nunca interrompe o atendimento */
+  }
+}
+
+
+
 /** Atalho seguro: registra a etapa só se existir um coletor no escopo. */
 export function registrarEtapa(etapa: Omit<Etapa, "em"> & { em?: string }): void {
   try {
