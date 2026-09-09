@@ -249,10 +249,15 @@ async function montarDossie(
     objetivo: cenario.objetivo,
     criteriosEsperados: cenario.criterios,
     instrucoes: {
-      versao: ultima?.prompt_versao ?? null,
-      publicadoEm: ultima?.prompt_publicado_em ?? null,
-      origem: ultima?.prompt_origem ?? null,
+      // FASE 5 — os metadados vêm da EXECUÇÃO, e o texto vem do snapshot
+      // gravado naquele momento. Sem snapshot, nada é reconstruído.
+      versao: snapshotPrompt?.prompt_versao ?? ultima?.prompt_versao ?? null,
+      publicadoEm: snapshotPrompt?.prompt_publicado_em ?? ultima?.prompt_publicado_em ?? null,
+      origem: snapshotPrompt?.prompt_origem ?? ultima?.prompt_origem ?? null,
+      hash: snapshotPrompt?.behavior_prompt_hash ?? null,
+      textoUtilizado: snapshotPrompt?.behavior_prompt_rendered ?? null,
     },
+
     turnos,
     ferramentas,
     conhecimento: conhecimento.slice(0, 40),
