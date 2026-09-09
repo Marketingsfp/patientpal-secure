@@ -376,8 +376,31 @@ export function decidirConfianca(
 
   const grounding = avaliarGrounding(ctx, ctx.draftText ?? "");
 
+  // FASE 2 — segurança da AÇÃO, calculada à parte da nota do texto.
+  // Sem ação executável no turno: NOT_APPLICABLE (nunca bloqueio, nunca 0).
+  const actionSafety: AvaliacaoSegurancaAcao = executavel
+    ? {
+        status:
+          blockersAcao.length > 0 || hardBlockersAcao.length > 0 ? "BLOCKED" : "ALLOWED",
+        acao: ctx.requestedAction,
+        blockers: blockersAcao,
+        hardBlockers: hardBlockersAcao,
+        motivos: reprovadosAcao.map((c) =>
+          c.detalhe ? `${c.descricao} — ${c.detalhe}` : c.descricao,
+        ),
+      }
+    : {
+        status: "NOT_APPLICABLE",
+        acao: ctx.requestedAction,
+        blockers: [],
+        hardBlockers: [],
+        motivos: ["nenhuma ação executável neste turno"],
+      };
+
   return {
     tipoAvaliacao,
+    actionSafety,
+    pendingDimensions: medida.pendentes,
     // A amarra com o texto só faz sentido na avaliação da RESPOSTA FINAL:
     // a avaliação de segurança da ação não é a nota de nenhuma mensagem.
     textoAvaliadoHash:
