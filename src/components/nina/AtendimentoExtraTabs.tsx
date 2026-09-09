@@ -413,6 +413,8 @@ export function AtendInbox() {
   // descartadas. Cache por conversation_id evita tela vazia ao reabrir.
   const seqConversa = useRef(0);
   const cacheConversas = useRef(criarCacheConversas(10));
+  // Uma fila de transporte por conversa (a ordem digitada é a ordem enviada).
+  const filaEnvio = useRef(criarFilaEnvio());
   // FASE 4 — cache por ["contact", contactId]: o mesmo paciente aparece na
   // hora em qualquer conversa vinculada, sem lookup por telefone.
   const cacheContatos = useRef(new CacheContatos<any>());
