@@ -294,7 +294,7 @@ function TestarNfse() {
             </div>
             <div className="space-y-1">
               <Label>E-mail (opcional)</Label>
-              <Input value={email} onChange={(e) => setEmail(e.target.value)} />
+              <Input uppercase={false} value={email} onChange={(e) => setEmail(e.target.value)} />
             </div>
           </div>
 

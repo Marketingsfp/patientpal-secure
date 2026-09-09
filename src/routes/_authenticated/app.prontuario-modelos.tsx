@@ -118,6 +118,8 @@ function ModelosPage() {
                 <div className="col-span-12 sm:col-span-3 space-y-1">
                   <Label className="text-xs">Chave</Label>
                   <Input
+                    // Valor sensível a maiúsculas: sem caixa alta automática.
+                    uppercase={false}
                     value={s.chave}
                     onChange={(e) => {
                       const ns = [...f.secoes];
