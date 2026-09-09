@@ -160,6 +160,10 @@ function Page() {
   const hojeIso = hojeBR();
   const [gerar, setGerar] = useState({
     medico_id: "",
+    // Agenda escolhida na geração. Em branco = todas as agendas do médico.
+    // Sem isso, um profissional com CONSULTAS e EXAMES tinha as duas grades
+    // somadas numa linha só e não havia como gerar uma sem a outra.
+    agenda_id: "",
     dias: "30",
     // "De" e "Até" abrem no mesmo dia: gerar um mês inteiro de uma vez é
     // decisão de quem opera, e não o padrão da tela. Quem quiser um período
@@ -810,7 +814,14 @@ function Page() {
       const dow = d.getDay();
       if (!gerarDias.includes(dow)) continue;
       for (const m of alvo) {
-        const agendasDoMedico = agendas.filter((a) => a.medico_id === m.id && a.ativo);
+        const agendasDoMedico = agendas.filter(
+          (a) =>
+            a.medico_id === m.id &&
+            a.ativo &&
+            // Agenda escolhida na tela: gerar EXAMES não pode depender de a
+            // agenda de CONSULTAS do mesmo dia estar vazia.
+            (!gerar.agenda_id || a.id === gerar.agenda_id),
+        );
         // Fallback: se o médico não possui agenda cadastrada, gera sem vínculo de agenda
         const agendasAlvo: Array<{ id: string | null }> =
           agendasDoMedico.length > 0 ? agendasDoMedico : [{ id: null }];
@@ -1063,7 +1074,10 @@ function Page() {
   const gradeMedicoSel = useMemo(() => {
     if (!gerar.medico_id || gerar.medico_id === "all") return [];
     const porDia = new Map<number, DispRow[]>();
-    for (const l of disps.filter((d) => d.medico_id === gerar.medico_id)) {
+    for (const l of disps.filter(
+      (d) =>
+        d.medico_id === gerar.medico_id && (!gerar.agenda_id || d.agenda_id === gerar.agenda_id),
+    )) {
       const atual = porDia.get(l.dia_semana) ?? [];
       atual.push(l);
       porDia.set(l.dia_semana, atual);
@@ -1081,7 +1095,7 @@ function Page() {
             intervalo: x.intervalo_min && x.intervalo_min > 0 ? x.intervalo_min : null,
           })),
       }));
-  }, [gerar.medico_id, disps]);
+  }, [gerar.medico_id, gerar.agenda_id, disps]);
 
   const medicoSelSemGrade =
     Boolean(gerar.medico_id) && gerar.medico_id !== "all" && gradeMedicoSel.length === 0;
@@ -1090,22 +1104,30 @@ function Page() {
   // qualquer recorte de horário que tenha sobrado da geração anterior. O `ref`
   // guarda o último médico aplicado para não desmarcar os dias quando a
   // atendente muda a seleção de propósito depois.
+  // A chave inclui a agenda: trocar de CONSULTAS para EXAMES no mesmo médico
+  // precisa remarcar os dias, porque cada agenda tem os seus.
   const medicoAplicadoRef = useRef<string | null>(null);
   useEffect(() => {
     const id = gerar.medico_id;
+    const agendaAplicada = gerar.agenda_id;
+    const chave = `${id}|${agendaAplicada}`;
     if (!id || id === "all") {
       medicoAplicadoRef.current = id || null;
       return;
     }
-    if (medicoAplicadoRef.current === id) return;
+    if (medicoAplicadoRef.current === chave) return;
     if (disps.length === 0) return;
-    medicoAplicadoRef.current = id;
+    medicoAplicadoRef.current = chave;
     const diasDaGrade = Array.from(
-      new Set(disps.filter((d) => d.medico_id === id).map((d) => d.dia_semana)),
+      new Set(
+        disps
+          .filter((d) => d.medico_id === id && (!agendaAplicada || d.agenda_id === agendaAplicada))
+          .map((d) => d.dia_semana),
+      ),
     ).sort((a, b) => a - b);
     if (diasDaGrade.length > 0) setGerarDias(diasDaGrade);
     setGerar((g) => ({ ...g, hora_inicio: "", hora_fim: "" }));
-  }, [gerar.medico_id, disps]);
+  }, [gerar.medico_id, gerar.agenda_id, disps]);
 
   // Médico sem grade cadastrada: em vez de deixar a recepção digitar o mesmo
   // horário toda semana, a tela oferece salvar o que ela digitou como grade
@@ -1134,7 +1156,10 @@ function Page() {
       toast.error("A duração de cada atendimento precisa ser de no mínimo 5 minutos.");
       return;
     }
-    const agendaDoMedico = agendas.find((a) => a.medico_id === medicoId && a.ativo);
+    // Respeita a agenda escolhida no seletor; sem escolha, a primeira ativa.
+    const agendaDoMedico = gerar.agenda_id
+      ? agendas.find((a) => a.id === gerar.agenda_id)
+      : agendas.find((a) => a.medico_id === medicoId && a.ativo);
     if (!agendaDoMedico) {
       toast.error(
         "Este médico ainda não tem agenda cadastrada. Crie a agenda dele na aba Médicos antes de salvar a grade.",
@@ -1487,12 +1512,33 @@ function Page() {
                   <div className="min-w-0">
                     <label className="text-xs text-muted-foreground">Médico</label>
                     <SearchableSelect
-                      value={gerar.medico_id}
-                      onChange={(v) => setGerar({ ...gerar, medico_id: v })}
+                      value={
+                        gerar.agenda_id ? `${gerar.medico_id}::${gerar.agenda_id}` : gerar.medico_id
+                      }
+                      onChange={(v) => {
+                        const [medicoId, agendaId = ""] = v.split("::");
+                        setGerar({ ...gerar, medico_id: medicoId, agenda_id: agendaId });
+                      }}
                       placeholder="Selecione um médico"
                       searchPlaceholder="Buscar médico..."
                       options={[
-                        ...medicos.map((m) => ({ value: m.id, label: m.nome.toUpperCase() })),
+                        // Médico com mais de uma agenda entra desmembrado —
+                        // "NOME — EXAMES" —, no mesmo padrão do filtro de
+                        // profissional da tela de Agenda. Sem isso as duas
+                        // grades apareciam somadas e não havia como gerar uma
+                        // sem a outra.
+                        ...medicos.flatMap((m) => {
+                          const suas = agendas.filter((a) => a.medico_id === m.id && a.ativo);
+                          const nome = m.nome.toUpperCase();
+                          if (suas.length < 2) return [{ value: m.id, label: nome }];
+                          return [
+                            ...suas.map((a) => ({
+                              value: `${m.id}::${a.id}`,
+                              label: `${nome} — ${a.nome.toUpperCase()}`,
+                            })),
+                            { value: m.id, label: `${nome} — TODAS AS AGENDAS` },
+                          ];
+                        }),
                         { value: "all", label: `Todos os médicos (${medicos.length})` },
                       ]}
                     />
@@ -1519,7 +1565,10 @@ function Page() {
                 {gradeMedicoSel.length > 0 && (
                   <div className="mt-3 rounded-md border bg-background p-2">
                     <p className="text-[12px] font-semibold uppercase tracking-wide text-muted-foreground">
-                      Grade cadastrada deste médico
+                      Grade cadastrada{` `}
+                      {gerar.agenda_id
+                        ? `da agenda ${agendas.find((a) => a.id === gerar.agenda_id)?.nome ?? ""}`
+                        : "deste médico"}
                     </p>
                     <div className="mt-1.5 flex flex-wrap gap-1.5">
                       {gradeMedicoSel.map((g) => (
