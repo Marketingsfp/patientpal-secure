@@ -47,6 +47,7 @@ import {
   CloudRain,
   Sun,
 } from "lucide-react";
+import { MarcacoesPorAtendente } from "@/components/relatorios/marcacoes-por-atendente";
 import { getClimaPeriodo, type ClimaDia } from "@/lib/clima";
 import { CuboBI } from "@/components/relatorios/CuboBI";
 import {
@@ -513,6 +514,15 @@ function RelatoriosPage() {
   const [fim, setFim] = useState(hoje);
   const [loading, setLoading] = useState<string | null>(null);
 
+  // Produtividade individual é ferramenta de supervisão: aparece pela marcação
+  // pessoa a pessoa (`pode_autorizar`, tela Equipe) somada a um perfil de
+  // gestão. Checar só `role === "admin"` mostraria o desempenho da equipe para
+  // as 28 pessoas que têm esse perfil, boa parte operando o balcão. A função
+  // do banco repete a mesma checagem — esconder a aba não é permissão.
+  const ehSupervisor =
+    !!clinicaAtual?.pode_autorizar &&
+    (clinicaAtual.role === "admin" || clinicaAtual.role === "gestor");
+
   async function baixar(r: Relatorio) {
     if (!clinicaAtual?.clinica_id) {
       toast.error("Selecione uma clínica");
@@ -553,6 +563,11 @@ function RelatoriosPage() {
             <TabsTrigger value="agendamentos-diario" className="gap-2">
               <PhoneCall className="h-4 w-4" /> Agendamentos do Dia
             </TabsTrigger>
+            {ehSupervisor && (
+              <TabsTrigger value="marcacoes-atendente" className="gap-2">
+                <Users className="h-4 w-4" /> Marcações por atendente
+              </TabsTrigger>
+            )}
             <TabsTrigger value="downloads" className="gap-2">
               <Download className="h-4 w-4" /> Baixar planilhas
             </TabsTrigger>
@@ -594,6 +609,16 @@ function RelatoriosPage() {
         <TabsContent value="agendamentos-diario" className="mt-4">
           <AgendamentosDiarioView clinicaId={clinicaAtual?.clinica_id} ini={ini} fim={fim} />
         </TabsContent>
+
+        {/* Traz os próprios filtros (período de atendimento x período de
+            marcação, situação, profissional), que são diferentes do "De/Até"
+            do topo — este relatório separa o dia do atendimento do dia em que
+            a atendente lançou a ficha. */}
+        {ehSupervisor && (
+          <TabsContent value="marcacoes-atendente" className="mt-4">
+            <MarcacoesPorAtendente />
+          </TabsContent>
+        )}
 
         <TabsContent value="downloads" className="mt-4">
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
