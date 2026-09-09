@@ -109,7 +109,14 @@ export type PoliticaConfianca = {
  * `foco_da_resposta` — quantidade de fatos deixou de reduzir a confiança.
  * Snapshots gravados com "v1"/"v2"/"v3" continuam válidos sob a régua da época.
  */
-export const VERSAO_POLITICA = "v4";
+/*
+ * v4 -> v5 (Fase 2 answer/action): `action_safety` e `answer_confidence`
+ * passaram a ser realmente independentes. Entrou o status `PENDING` (dado que
+ * ainda será coletado antes da ação — não desconta nota nem cobertura) e as
+ * dimensões de PRÉ-CONDIÇÃO DA AÇÃO (`validadoresDeAcao`) deixaram de pontuar
+ * e de bloquear a avaliação da mensagem. Nenhum limite crítico foi reduzido.
+ */
+export const VERSAO_POLITICA = "v5";
 /**
  * Versão do motor gravada junto com cada avaliação.
  * FASE 7 — "Confidence Engine v2": motor com cobertura de evidências,
@@ -173,6 +180,9 @@ export const POLITICA_PADRAO: PoliticaConfianca = {
     AFIRMACAO_SEM_EVIDENCIA: "UNGROUNDED_CLAIM",
   },
   acoesDeEscrita: ["criar_agendamento", "cancelar_agendamento"],
+  // Pré-condições da EXECUÇÃO (dados do paciente, regras da clínica para
+  // agendar). Elas não dizem nada sobre a veracidade do texto.
+  validadoresDeAcao: ["RequiredDataValidator", "BusinessRulesValidator"],
   cobertura: {
     // Valores de partida da Fase 3 — versionados aqui para calibração futura.
     minimaParaHigh: 70,
