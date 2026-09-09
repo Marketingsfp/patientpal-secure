@@ -1802,14 +1802,16 @@ export function AtendInbox() {
   useRealtimeAtendimento({
     clinicaId: clinicaId ?? null,
     conversaAberta: sel?.id ?? null,
-    enabled: !!clinicaId,
+    // O canal depende do RLS: só é aberto com clínica E sessão já disponíveis.
+    enabled: !!clinicaId && !!meuId,
     onAlvos: (alvos) => {
       const g = agrupadores.current;
       if (!g) return;
       for (const alvo of alvos) g[alvo].agendar();
     },
-    // Reconexão: pode ter passado mensagem, transferência ou encerramento sem
-    // aviso. A tela reconcilia sozinha — ninguém precisa dar F5.
+    // Canal confirmado (primeira vez ou depois de queda): pode ter passado
+    // mensagem, transferência ou encerramento sem aviso. A tela reconcilia
+    // sozinha — ninguém precisa dar F5. Os agrupadores evitam rajada.
     onReconectar: () => {
       const g = agrupadores.current;
       if (!g) return;
