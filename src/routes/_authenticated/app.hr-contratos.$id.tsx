@@ -732,6 +732,8 @@ function EditarFuncionarioPage() {
                           <Label>Nova senha *</Label>
                           <Input
                             type="text"
+                            // Valor sensível a maiúsculas: sem caixa alta automática.
+                            uppercase={false}
                             value={novaSenha}
                             onChange={(e) => setNovaSenha(e.target.value)}
                             placeholder="Mín. 6 caracteres"
@@ -741,6 +743,8 @@ function EditarFuncionarioPage() {
                           <Label>Confirmar senha *</Label>
                           <Input
                             type="text"
+                            // Valor sensível a maiúsculas: sem caixa alta automática.
+                            uppercase={false}
                             value={confirmarSenha}
                             onChange={(e) => setConfirmarSenha(e.target.value)}
                           />
@@ -835,6 +839,8 @@ function EditarFuncionarioPage() {
                           <Label>Senha inicial *</Label>
                           <Input
                             type="text"
+                            // Valor sensível a maiúsculas: sem caixa alta automática.
+                            uppercase={false}
                             value={form.senha}
                             onChange={(e) => setForm({ ...form, senha: e.target.value })}
                             placeholder="Mín. 6 caracteres"
@@ -896,6 +902,8 @@ function EditarFuncionarioPage() {
                       <Label>Senha inicial *</Label>
                       <Input
                         type="text"
+                        // Valor sensível a maiúsculas: sem caixa alta automática.
+                        uppercase={false}
                         value={form.senha}
                         onChange={(e) => setForm({ ...form, senha: e.target.value })}
                         placeholder="Mín. 6 caracteres"

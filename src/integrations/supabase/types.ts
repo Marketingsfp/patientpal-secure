@@ -14619,6 +14619,16 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      pacientes_cadastros_recentes: {
+        Args: { _clinica_id: string; _limite?: number }
+        Returns: {
+          atendente: string
+          codigo_prontuario: string
+          criado_em: string
+          nome: string
+          paciente_id: string
+        }[]
+      }
       pacientes_face_lista: {
         Args: { _clinica_id: string }
         Returns: {

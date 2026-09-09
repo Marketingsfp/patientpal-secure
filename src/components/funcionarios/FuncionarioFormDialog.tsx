@@ -581,6 +581,8 @@ export function FuncionarioFormDialog({
                           <Label>Nova senha *</Label>
                           <Input
                             type="text"
+                            // Valor sensível a maiúsculas: sem caixa alta automática.
+                            uppercase={false}
                             value={novaSenha}
                             onChange={(e) => setNovaSenha(e.target.value)}
                             placeholder="Mín. 6 caracteres"
@@ -590,6 +592,8 @@ export function FuncionarioFormDialog({
                           <Label>Confirmar senha *</Label>
                           <Input
                             type="text"
+                            // Valor sensível a maiúsculas: sem caixa alta automática.
+                            uppercase={false}
                             value={confirmarSenha}
                             onChange={(e) => setConfirmarSenha(e.target.value)}
                           />
@@ -668,6 +672,8 @@ export function FuncionarioFormDialog({
                     <Label>Senha inicial *</Label>
                     <Input
                       type="text"
+                      // Valor sensível a maiúsculas: sem caixa alta automática.
+                      uppercase={false}
                       value={form.senha}
                       onChange={(e) => setForm({ ...form, senha: e.target.value })}
                       placeholder="Mín. 6 caracteres"

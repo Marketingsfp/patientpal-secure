@@ -1916,6 +1916,8 @@ export function MedicoFormDialog({
             <div className="space-y-2">
               <Label>Chave PIX</Label>
               <Input
+                // Valor sensível a maiúsculas: sem caixa alta automática.
+                uppercase={false}
                 value={form.pix_chave}
                 onChange={(e) => setForm({ ...form, pix_chave: e.target.value })}
               />
@@ -2698,6 +2700,8 @@ export function MedicoFormDialog({
                         <Label>Nova senha *</Label>
                         <Input
                           type="text"
+                          // Valor sensível a maiúsculas: sem caixa alta automática.
+                          uppercase={false}
                           value={novaSenha}
                           onChange={(e) => setNovaSenha(e.target.value)}
                           placeholder="Mín. 6 caracteres"
@@ -2707,6 +2711,8 @@ export function MedicoFormDialog({
                         <Label>Confirmar senha *</Label>
                         <Input
                           type="text"
+                          // Valor sensível a maiúsculas: sem caixa alta automática.
+                          uppercase={false}
                           value={confirmarSenha}
                           onChange={(e) => setConfirmarSenha(e.target.value)}
                         />
@@ -2777,6 +2783,8 @@ export function MedicoFormDialog({
                       <Input
                         type="text"
                         placeholder="mín. 6 caracteres"
+                        // Valor sensível a maiúsculas: sem caixa alta automática.
+                        uppercase={false}
                         value={form.senhaUsuario}
                         onChange={(e) => setForm({ ...form, senhaUsuario: e.target.value })}
                       />

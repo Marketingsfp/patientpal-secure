@@ -389,7 +389,7 @@ function NfseConfigPage() {
               </div>
               <div className="space-y-1">
                 <Label>E-mail</Label>
-                <Input value={f.email} onChange={(e) => set({ ...f, email: e.target.value })} />
+                <Input uppercase={false} value={f.email} onChange={(e) => set({ ...f, email: e.target.value })} />
               </div>
             </div>
 
