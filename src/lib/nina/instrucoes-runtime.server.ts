@@ -136,6 +136,7 @@ export async function promptInstrucoes(
         publicadoEm: base.publicadoEm,
         origem: entrada ? "publicada" : "cache",
         texto: render.texto,
+        template: base.conteudo,
       };
     }
     registrarFalha(escopo, `marcador desconhecido ${render.restante} na v${base.versao}`);
@@ -148,5 +149,7 @@ export async function promptInstrucoes(
     publicadoEm: null,
     origem: "codigo",
     texto: fallbackCodigo,
+    template: fallbackCodigo,
   };
 }
+
