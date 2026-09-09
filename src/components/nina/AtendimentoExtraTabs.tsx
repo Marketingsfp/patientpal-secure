@@ -1856,6 +1856,7 @@ export function AtendInbox() {
       g.conversa.cancelar();
       g.apoio.cancelar();
       g.espera.cancelar();
+      g.contadores.cancelar();
     },
     [],
   );
