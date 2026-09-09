@@ -4,7 +4,7 @@ import { classificarEvento, criarAgrupador } from "../realtime-roteador";
 const ctx = { clinicaId: "cl-1", conversaAberta: "A" };
 
 describe("Fase 3 — roteamento de eventos do atendimento", () => {
-  it("mensagem no lead B atualiza lista/espera, mas não o histórico de A", () => {
+  it("mensagem no lead B atualiza a lista, mas não o histórico de A", () => {
     const alvos = classificarEvento(
       { table: "whatsapp_mensagens", eventType: "INSERT", new: { clinica_id: "cl-1", conversa_id: "B" } },
       ctx,
