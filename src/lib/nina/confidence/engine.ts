@@ -103,6 +103,10 @@ function categoriasDoContexto(ctx: ContextoConfianca): CategoriaConfianca[] {
     criar_agendamento: "agendamento",
     cancelar_agendamento: "agendamento",
   };
+  // FASE 2 — avaliando a MENSAGEM, as categorias vêm do que o texto afirma.
+  // Uma ação pendente não transforma "preciso confirmar seus dados" numa
+  // afirmação de agenda que precise de fonte oficial.
+  if (ctx.tipoAvaliacao === "answer_confidence") return doTexto;
   const extra = porAcao[ctx.requestedAction];
   if (extra && !doTexto.includes(extra)) return [...doTexto, extra];
   return doTexto;
@@ -401,7 +405,9 @@ export function decidirConfianca(
   return {
     tipoAvaliacao,
     actionSafety,
-    pendingDimensions: medida.pendentes,
+    // Pendências vêm da lista completa: uma pré-condição de ação segue
+    // visível como "ainda será coletada", mesmo fora da nota da mensagem.
+    pendingDimensions: validators.filter((v) => v.status === "PENDING").map((v) => v.validator),
     // A amarra com o texto só faz sentido na avaliação da RESPOSTA FINAL:
     // a avaliação de segurança da ação não é a nota de nenhuma mensagem.
     textoAvaliadoHash:
