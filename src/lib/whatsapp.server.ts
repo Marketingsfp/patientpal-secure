@@ -1168,12 +1168,10 @@ async function gerarRespostaNinaInterno(
       ? (ctx, nome, args) => executar!(ctx, nome, args as never)
       : null,
   });
-  const systemPromptComHandoff = `${systemPromptFinal}
+  // FASE 3 — as regras de handoff vivem no prompt publicado. Aqui não se
+  // concatena mais nenhum comportamento ao system prompt.
 
-ATENDIMENTO HUMANO — REGRA OBRIGATÓRIA:
-- Você é o 1º nível. Resolva o que souber, com clareza e sem enrolar.
-- Chame a ferramenta "solicitar_atendente_humano" quando: o paciente pedir uma pessoa/atendente/humano; houver reclamação, urgência clínica, cobrança, erro nosso ou conflito; ou você já tiver tentado duas vezes sem resolver.
-- Ao chamar, mande um resumo útil do caso. Depois, avise em uma frase que a equipe assume daqui — não continue tentando resolver sozinha e não prometa prazo.`;
+
 
 
   type MsgIA = {
