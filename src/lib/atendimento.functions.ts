@@ -2019,6 +2019,7 @@ export const enviarMensagemConversa = createServerFn({ method: "POST" })
         "id, conversa_id, direction, from_number, to_number, body, tipo, enviada_por, recebida_em, status, client_message_id, wa_message_id",
       )
       .maybeSingle();
+    trace.marcar("SEND_T8_DB_INSERT_DONE");
 
     // SLA primeira resposta
     const patch: any = {
