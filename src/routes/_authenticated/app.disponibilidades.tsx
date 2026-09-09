@@ -904,7 +904,8 @@ function Page() {
       const outros = geracaoPreview.bloqueiosPorPiso.length - 1;
       return (
         `Em ${dia}/${mes}/${ano} já existem horários criados até ${bloqueio.piso}, e os novos só entram depois do último horário do dia. Como o atendimento desse dia termina às ${bloqueio.janelaFim}, não sobra espaço.` +
-        ` Escolha outra data — ou, se o médico realmente atende mais tarde, aumente a grade dele na aba Médicos.` +
+        ` Para atender UM paciente a mais hoje você não precisa gerar vaga nenhuma: use "+ Adicionar Encaixe" na Agenda, escolha o horário e confirme — o encaixe entra por cima da ficha existente.` +
+        ` Se o médico passou a atender mais tarde TODA semana, aí sim aumente a grade dele na aba Médicos.` +
         (outros > 0 ? ` O mesmo acontece em mais ${outros} dia(s) do período.` : "")
       );
     }

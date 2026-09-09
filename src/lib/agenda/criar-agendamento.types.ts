@@ -42,7 +42,11 @@ export type CriarAgendamentoInput = {
   // (ver MED-03 em criar-agendamento.core.server.ts). Sem isso o servidor
   // devolve `validation_error.confirmavel` e a tela pergunta antes de repetir
   // a gravação com o flag ligado.
-  confirmacoes?: { permitir_conflito_paciente?: boolean };
+  // Encaixe (2026-09-09): a recepção escolheu um horário que não tem vaga
+  // livre na grade — quer sobrepor um paciente a mais em cima de uma ficha já
+  // ocupada. O servidor devolve `confirmavel: "encaixe_sem_vaga"` e a tela
+  // pergunta antes de repetir a gravação com o flag ligado.
+  confirmacoes?: { permitir_conflito_paciente?: boolean; permitir_encaixe_sem_vaga?: boolean };
 };
 
 export type PgErrorLike = {
@@ -83,7 +87,7 @@ export type CriarAgendamentoResult =
       validation_error: {
         message: string;
         toast_duration?: number;
-        confirmavel?: "conflito_paciente";
+        confirmavel?: "conflito_paciente" | "encaixe_sem_vaga";
       };
     }
   | {

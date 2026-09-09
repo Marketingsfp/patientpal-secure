@@ -201,6 +201,7 @@ import { avisarEmitenteDivergente } from "@/lib/nfse-aviso-emitente";
 import { avisarCepDoTomadorInvalido } from "@/lib/nfse-aviso-cep";
 import { montarDiscriminacaoNfse } from "@/lib/nfse-descricao";
 import { criarAgendamento } from "@/lib/agenda/criar-agendamento.functions";
+import { numerarFichasFormatadas } from "@/lib/agenda/ficha-numero";
 import {
   obterEtapaSinal,
   registrarPagamentoEtapaSinal,
@@ -4010,48 +4011,14 @@ function AgendaPage() {
   };
 
   const fichaPorId = useMemo(() => {
-    const m = new Map<string, string>();
-    // Numeração POSICIONAL por (dia, profissional): cada médico ou recurso de
-    // enfermagem tem a própria sequência 001, 002, 003… dentro do dia, na
-    // ordem do horário. O filtro visual (médico, status, cliente…) NÃO afeta
-    // esses números — sempre calculamos sobre TODOS os items carregados, para
-    // que a ficha exibida seja estável entre reloads e entre filtros.
-    const contadores = new Map<string, number>();
+    // Regra única da ficha (posicional por dia/profissional/agenda, com o
+    // encaixe compartilhando o número da ficha sobreposta) vive em
+    // src/lib/agenda/ficha-numero.ts — a guia impressa usa exatamente a mesma.
+    // O filtro visual (médico, status, cliente…) NÃO afeta esses números:
+    // numeramos sempre sobre TODOS os items carregados, para que a ficha
+    // exibida seja estável entre recargas e entre filtros.
     const baseNumeracao = fichaBaseItems.length > 0 ? fichaBaseItems : items;
-    const ordenados = [...baseNumeracao].sort((a, b) => {
-      const t = a.inicio.localeCompare(b.inicio);
-      if (t !== 0) return t;
-      // Mesmo horário: desempata em ordem alfabética do paciente (pt-BR,
-      // acento-insensível) para a numeração da fila ficar crescente e estável.
-      return (a.paciente_nome ?? "").localeCompare(b.paciente_nome ?? "", "pt-BR", {
-        sensitivity: "base",
-      });
-    });
-    ordenados.forEach((a) => {
-      // Usa a data LOCAL (America/Sao_Paulo), não UTC. Antes usávamos
-      // a.inicio.slice(0,10), que pega o dia em UTC — slots que ocorrem
-      // depois das 21:00 locais caem no dia UTC seguinte, o que reiniciava
-      // a numeração da ficha no meio da agenda do mesmo dia.
-      const dia = new Date(a.inicio).toLocaleDateString("en-CA", {
-        timeZone: "America/Sao_Paulo",
-      });
-      // Chave por profissional: usa medico_id (que já engloba recursos de
-      // enfermagem, mapeados como "médicos virtuais" no load()). Slots sem
-      // profissional atribuído são numerados em um bucket próprio por dia.
-      const prof = a.medico_id ?? "__sem_profissional__";
-      // Cada agenda do médico tem sua própria sequência de fichas (001, 002…).
-      // Decisão confirmada com o gestor: ao filtrar por uma agenda específica
-      // (ex.: só CONSULTAS), a numeração fica limpa e sequencial — é assim que
-      // a ficha física funciona por fila. Na Lista SEM filtro de agenda
-      // (todas juntas), números iguais entre agendas diferentes são esperados
-      // (são filas distintas), não duplicação.
-      const agenda = a.agenda_id ?? "__sem_agenda__";
-      const chave = `${dia}::${prof}::${agenda}`;
-      const n = (contadores.get(chave) ?? 0) + 1;
-      contadores.set(chave, n);
-      m.set(a.id, String(n).padStart(3, "0"));
-    });
-    return m;
+    return numerarFichasFormatadas(baseNumeracao);
   }, [items, fichaBaseItems]);
 
   // Janela de encerramentos: mesma do `load()` — do dia de referência em
@@ -5972,7 +5939,10 @@ function AgendaPage() {
     const crono = iniciarCronometro(
       irParaPagamento ? "abrir tela de pagamento" : "salvar agendamento",
     );
-    const enviarAoServidor = (permitirConflitoPaciente: boolean) =>
+    const enviarAoServidor = (confirmacoes: {
+      permitirConflitoPaciente: boolean;
+      permitirEncaixeSemVaga: boolean;
+    }) =>
       fnCriarAgendamento({
         data: {
           clinica_id: clinicaAtual.clinica_id,
@@ -5987,23 +5957,39 @@ function AgendaPage() {
           procedimentos: procedimentosParaSalvar,
           multi_exames_modo: multiExamesModo,
           pending_orc_item_ids: pendingOrcItemIds,
-          confirmacoes: { permitir_conflito_paciente: permitirConflitoPaciente },
+          confirmacoes: {
+            permitir_conflito_paciente: confirmacoes.permitirConflitoPaciente,
+            permitir_encaixe_sem_vaga: confirmacoes.permitirEncaixeSemVaga,
+          },
         },
       });
-    let result = await enviarAoServidor(false);
-    // Paciente com outro atendimento no mesmo horário, mas com OUTRO
-    // profissional: o servidor devolve isso como aviso, não como bloqueio.
-    // Pergunta e, se a recepção confirmar, grava do mesmo jeito.
-    if (
-      !result.ok &&
-      "validation_error" in result &&
-      result.validation_error.confirmavel === "conflito_paciente"
-    ) {
-      if (!(await confirmDialog(result.validation_error.message))) {
-        setSaving(false);
-        return;
+    // Confirmações que a recepção já deu nesta tentativa. Ficam de pé entre as
+    // repetições: quando o servidor devolve um segundo aviso, o "sim" que ela
+    // já deu ao primeiro não pode ser perdido — senão a tela volta a perguntar
+    // a mesma coisa em loop.
+    const confirmado = { permitirConflitoPaciente: false, permitirEncaixeSemVaga: false };
+    let result = await enviarAoServidor(confirmado);
+    // O servidor devolve até dois avisos confirmáveis, um de cada vez:
+    //   • conflito_paciente — o paciente já tem outro atendimento nesse
+    //     horário, com OUTRO profissional;
+    //   • encaixe_sem_vaga — não há vaga livre na grade e a recepção quer
+    //     lançar por cima da ficha existente (encaixe).
+    // Em ambos, pergunta e, se ela confirmar, grava do mesmo jeito.
+    for (let tentativa = 0; tentativa < 2; tentativa++) {
+      if (!result.ok && "validation_error" in result) {
+        const aviso = result.validation_error.confirmavel;
+        if (aviso === "conflito_paciente" || aviso === "encaixe_sem_vaga") {
+          if (!(await confirmDialog(result.validation_error.message))) {
+            setSaving(false);
+            return;
+          }
+          if (aviso === "conflito_paciente") confirmado.permitirConflitoPaciente = true;
+          else confirmado.permitirEncaixeSemVaga = true;
+          result = await enviarAoServidor(confirmado);
+          continue;
+        }
       }
-      result = await enviarAoServidor(true);
+      break;
     }
     crono.marcar("salvar no servidor");
     if (!result.ok) {

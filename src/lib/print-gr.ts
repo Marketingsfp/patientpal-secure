@@ -1,5 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import { nomeDeQuemFaturou } from "@/lib/agenda/gr-atendente.functions";
+import { numerarFichas, type LinhaParaFicha } from "@/lib/agenda/ficha-numero";
 import { valorCelulaRepasse } from "@/lib/repasse-calc";
 import {
   categoriaEhRetorno,
@@ -1075,15 +1076,7 @@ async function printGuiaAtendimentoCore({
       if (a.agenda_id) q.eq("agenda_id", a.agenda_id);
       else q.is("agenda_id", null);
       const { data: lista } = await q;
-      const ordenados = [...(lista ?? [])].sort((x: any, y: any) => {
-        const t = String(x.inicio).localeCompare(String(y.inicio));
-        if (t !== 0) return t;
-        return String(x.paciente_nome ?? "").localeCompare(String(y.paciente_nome ?? ""), "pt-BR", {
-          sensitivity: "base",
-        });
-      });
-      const idx = ordenados.findIndex((r: any) => r.id === a.id);
-      fichaNum = idx >= 0 ? idx + 1 : 0;
+      fichaNum = numerarFichas((lista ?? []) as LinhaParaFicha[]).get(a.id) ?? 0;
     } catch {
       fichaNum = 0;
     }
@@ -1707,19 +1700,7 @@ async function calcularFichas(
         if (agendaId) q.eq("agenda_id", agendaId);
         else q.is("agenda_id", null);
         const { data } = await q;
-        const ordenados = [...(data ?? [])].sort((x: any, y: any) => {
-          const t = String(x.inicio).localeCompare(String(y.inicio));
-          if (t !== 0) return t;
-          return String(x.paciente_nome ?? "").localeCompare(
-            String(y.paciente_nome ?? ""),
-            "pt-BR",
-            {
-              sensitivity: "base",
-            },
-          );
-        });
-        const idx = ordenados.findIndex((r: any) => r.id === a.id);
-        fichas.set(a.id, idx >= 0 ? idx + 1 : 0);
+        fichas.set(a.id, numerarFichas((data ?? []) as LinhaParaFicha[]).get(a.id) ?? 0);
       } catch {
         fichas.set(a.id, 0);
       }

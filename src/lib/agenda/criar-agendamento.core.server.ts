@@ -347,13 +347,61 @@ export async function criarAgendamentoCore(
       const sFim = new Date(s.fim).getTime();
       return sIni <= inicioMs && sFim >= fimMs;
     });
+    // ENCAIXE EM AGENDA DE HORA MARCADA (2026-09-09)
+    // Sem vaga livre cobrindo o intervalo, isto era um bloqueio duro e a
+    // recepção não conseguia colocar um paciente a mais em cima de uma ficha
+    // já ocupada — o caso do LABORATORIO, cuja grade de quarta termina às
+    // 18:00 e já nasce cheia. Agora vira AVISO CONFIRMÁVEL: a tela pergunta e,
+    // se a recepção confirmar, o atendimento entra sobreposto no mesmo minuto.
+    //
+    // Duas travas continuam de pé:
+    //   • só para linha NOVA — remarcar um atendimento que já existe continua
+    //     exigindo vaga livre, senão a remarcação empurraria a ficha de outro
+    //     paciente sem ninguém perceber;
+    //   • a agenda do encaixe é a MESMA da ficha sobreposta, para o encaixe
+    //     entrar na fila do dia em vez de abrir uma fila própria em 001.
+    const slotSobreposto =
+      excluindoEditing.find((s) => {
+        const sIni = new Date(s.inicio).getTime();
+        const sFim = new Date(s.fim).getTime();
+        return sIni <= inicioMs && sFim > inicioMs;
+      }) ?? null;
     if (!slotEscolhido && !agendaOrdemChegada) {
-      return {
-        ok: false,
-        validation_error: {
-          message: `Não há horário livre desse ${rotuloRecurso} cobrindo o intervalo escolhido. Escolha um slot DISPONÍVEL na agenda ou gere mais horários.`,
-        },
-      };
+      if (editing_id) {
+        return {
+          ok: false,
+          validation_error: {
+            message: `Não há horário livre desse ${rotuloRecurso} cobrindo o intervalo escolhido. Escolha um slot DISPONÍVEL na agenda ou gere mais horários.`,
+          },
+        };
+      }
+      if (!data.confirmacoes?.permitir_encaixe_sem_vaga) {
+        const ocupante = (slotSobreposto?.paciente_nome ?? "").trim();
+        const hora = di.toLocaleTimeString("pt-BR", {
+          timeZone: TZ_CLINICA,
+          hour: "2-digit",
+          minute: "2-digit",
+        });
+        const quem = ocupante && !isSlotLivreLocal(ocupante) ? ` (${ocupante})` : "";
+        return {
+          ok: false,
+          validation_error: {
+            message:
+              `Não há vaga livre desse ${rotuloRecurso} às ${hora} — o horário já está ocupado${quem}.\n\n` +
+              `Deseja lançar como ENCAIXE, no mesmo horário, por cima da ficha existente?\n\n` +
+              `O encaixe divide a ficha com o paciente que já está nesse horário; as fichas seguintes do dia não mudam de número.`,
+            confirmavel: "encaixe_sem_vaga",
+          },
+        };
+      }
+      // A agenda do encaixe é a da ficha sobreposta. Quando o horário pedido
+      // não encosta em nenhuma vaga (por exemplo, depois do fim da grade),
+      // cai para a única agenda que gerou os horários do dia.
+      const agendasDoDia = Array.from(
+        new Set(excluindoEditing.map((s) => s.agenda_id).filter((x): x is string => !!x)),
+      );
+      agendaIdParaGravarNoEncaixe =
+        slotSobreposto?.agenda_id ?? (agendasDoDia.length === 1 ? agendasDoDia[0] : null);
     }
     if (!slotEscolhido && agendaOrdemChegada && !editing_id) {
       // Encaixe de fila: não consome vaga da grade, entra como linha nova no
@@ -365,7 +413,8 @@ export async function criarAgendamentoCore(
     }
 
     // ---------- 4b. Tipo da agenda × tipo do procedimento ----------
-    const agendaAlvoId = slotEscolhido?.agenda_id ?? agendaOrdemChegada?.id ?? null;
+    const agendaAlvoId =
+      slotEscolhido?.agenda_id ?? agendaIdParaGravarNoEncaixe ?? agendaOrdemChegada?.id ?? null;
     if (agendaAlvoId && nomesProcParaTipo.length > 0) {
       const daAgenda = (agendasDoMedico ?? []).find((a) => a.id === agendaAlvoId) ?? null;
       let tiposAgenda: Set<string>;
