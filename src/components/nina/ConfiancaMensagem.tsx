@@ -328,6 +328,82 @@ export function ConfiancaMensagemBadge({
 }
 
 /**
+ * FASE 5 — instruções EXATAS que geraram esta resposta. O conteúdo vem do
+ * snapshot gravado naquele momento; sem snapshot, dizemos que não existe —
+ * nunca mostramos o prompt atual no lugar de uma mensagem antiga.
+ */
+function InstrucoesUtilizadas({
+  clinicaId,
+  execucaoId,
+}: {
+  clinicaId: string;
+  execucaoId: string;
+}) {
+  const buscar = useServerFn(snapshotDoPrompt);
+  const [snap, setSnap] = useState<SnapshotPromptView | null>(null);
+  const [buscou, setBuscou] = useState(false);
+  const [ver, setVer] = useState<"prompt" | "enviado" | null>(null);
+
+  useEffect(() => {
+    let ativo = true;
+    void (async () => {
+      try {
+        const r = await buscar({ data: { clinicaId, execucaoId } });
+        if (ativo) setSnap(r);
+      } catch {
+        if (ativo) setSnap(null);
+      } finally {
+        if (ativo) setBuscou(true);
+      }
+    })();
+    return () => {
+      ativo = false;
+    };
+  }, [buscar, clinicaId, execucaoId]);
+
+  if (!buscou) return null;
+  if (!snap) {
+    return (
+      <Secao titulo="Instruções utilizadas">
+        <p className="text-muted-foreground">
+          Snapshot do prompt não disponível para esta execução.
+        </p>
+      </Secao>
+    );
+  }
+  return (
+    <Secao titulo="Instruções utilizadas">
+      <p className="text-muted-foreground">
+        Prompt: {snap.versao ? `v${snap.versao}` : "—"} · Hash: {snap.hash ?? "—"} · Origem:{" "}
+        {snap.origem === "publicada" ? "Arquitetura" : (snap.origem ?? "—")}
+      </p>
+      <div className="mt-1 flex gap-2">
+        <button
+          type="button"
+          className="rounded border px-1.5 py-0.5 text-[10px]"
+          onClick={() => setVer(ver === "prompt" ? null : "prompt")}
+        >
+          Ver prompt utilizado
+        </button>
+        <button
+          type="button"
+          className="rounded border px-1.5 py-0.5 text-[10px]"
+          onClick={() => setVer(ver === "enviado" ? null : "enviado")}
+        >
+          Ver conteúdo efetivamente enviado
+        </button>
+      </div>
+      {ver && (
+        <pre className="mt-1 max-h-48 overflow-auto whitespace-pre-wrap rounded border bg-muted/40 p-2 text-[10px]">
+          {(ver === "prompt" ? snap.promptUtilizado : snap.conteudoEnviado) ?? "—"}
+        </pre>
+      )}
+    </Secao>
+  );
+}
+
+
+/**
  * Mensagem da Nina anterior ao registro de confiança (ou sem avaliação
  * gravada). Nunca inventamos pontuação: dizemos que não foi avaliada.
  */
