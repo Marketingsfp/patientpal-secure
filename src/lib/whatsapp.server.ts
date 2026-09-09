@@ -1,6 +1,6 @@
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { normalizarTelefone } from "@/lib/atendimento/telefone";
-import { blocoDataHoraAgora } from "@/lib/nina-agora";
+import { agoraNaClinica } from "@/lib/nina-agora";
 import { normalizar } from "@/lib/nina-especialidade";
 
 const META_VERSION = "v22.0";
@@ -835,16 +835,16 @@ async function gerarRespostaNinaInterno(
     greeting_required: saudacaoObrigatoria,
     greeting_completed: sessaoNina.estado.greeting_completed === true,
   });
-  const dadosPublicos = [
-    `Nome oficial: ${nomeUnidade}`,
-    enderecoUnidade ? `Endereço: ${enderecoUnidade}` : null,
-    clinicaRow?.telefone ? `Telefone: ${clinicaRow.telefone}` : null,
-    clinicaRow?.email ? `E-mail: ${clinicaRow.email}` : null,
-  ]
-    .filter(Boolean)
-    .join("\n");
+  const dadosPublicos = {
+    nome_oficial: nomeUnidade,
+    nome_curto: nomeCurtoUnidade,
+    endereco: enderecoUnidade || null,
+    telefone: clinicaRow?.telefone ?? null,
+    email: clinicaRow?.email ?? null,
+  };
 
-  // FASE 1 do novo fluxo (saudação/tom/intenção) — ligada por clínica.
+  // FASE 3 — leitura da intenção vira FATO no runtime context (não texto de
+  // prompt). A flag da Fase 1 continua existindo para o restante do fluxo.
   const fase1Ativa = await (async () => {
     try {
       const { flagFluxoFase1Ativa } = await import("@/lib/nina/atendimento-fase1.server");
@@ -853,115 +853,41 @@ async function gerarRespostaNinaInterno(
       return false;
     }
   })();
-  const blocoFase1 = fase1Ativa
-    ? (await import("@/lib/nina/atendimento-fase1")).blocoPromptFase1({
-        nomeCurtoUnidade,
-        jaSeApresentou,
-        mensagem: mensagemPaciente,
-      })
-    : "";
+  const { detectarIntencoes, intencaoAmbigua } = await import("@/lib/nina/atendimento-fase1");
+  const intencoesTurno = detectarIntencoes(mensagemPaciente);
+  const intencaoAmbiguaTurno = intencaoAmbigua(mensagemPaciente, intencoesTurno);
 
-  const blocoClinica = `IDENTIDADE DA CLÍNICA — USE SEMPRE O NOME REAL:
-${dadosPublicos}
-
-- Você é a assistente virtual de "${nomeUnidade}". NUNCA fale como "a clínica" de forma genérica quando o nome está aqui, e NUNCA diga representar outra unidade.
-${
-  fase1Ativa
-    ? blocoFase1
-    : `- ${
-        jaSeApresentou
-          ? "Você JÁ se apresentou nesta conversa. NÃO repita a apresentação — vá direto ao ponto."
-          : `Esta é a PRIMEIRA mensagem da conversa: comece se apresentando exatamente assim: "Oi! Aqui é a Nina, assistente virtual da ${nomeCurtoUnidade} 😊" e só depois responda o que foi perguntado.`
-      }`
-}
-- Se perguntarem "que clínica é essa?", "onde vocês ficam?", "é a ${nomeCurtoUnidade}?" ou pedirem contato/endereço, responda com o nome oficial e com o endereço/telefone acima (apenas os que existirem). Se algum desses dados não estiver acima, diga que confirma com a recepção — não invente.`;
+  // Fatos de identificação do remetente (antes eram parágrafos de instrução).
+  const contextoRemetenteFato = pacienteInfo
+    ? {
+        cadastro_encontrado: true,
+        nome: pacienteInfo.nome ?? null,
+        associado: Boolean(pacienteInfo.associado),
+        convenio: pacienteInfo.associado
+          ? (pacienteInfo.convenio_nome ?? "Cartão Benefícios")
+          : null,
+      }
+    : { cadastro_encontrado: false, nome: null, associado: false, convenio: null };
 
 
-  // Bloco de contexto do remetente + regras condicionais
-  const contextoRemetente = pacienteInfo
-    ? pacienteInfo.associado
-      ? `IDENTIFICAÇÃO: Este paciente JÁ ESTÁ CADASTRADO como "${pacienteInfo.nome}" e é ASSOCIADO ao convênio "${pacienteInfo.convenio_nome ?? "Cartão Benefícios"}". Trate-o como ASSOCIADO — NÃO ofereça valores de particular. Cite o vínculo com naturalidade ("vi aqui que você é associado(a) do ${pacienteInfo.convenio_nome ?? "nosso convênio"}") e aplique as regras/valores do convênio quando falar de exames/consultas. NÃO peça dados de cadastro; ele já está na base.`
-      : `IDENTIFICAÇÃO: Encontrei um cadastro compatível ("${pacienteInfo.nome}"), sem contrato de associado ativo. Confirme o nome com a pessoa antes de continuar e trate como paciente particular. Não peça dados que já constam no cadastro.`
-    : baseImportada
-      ? `IDENTIFICAÇÃO: Não localizei este contato/CPF/nome na base de ${nomeUnidade}. Trate como paciente novo. NÃO peça dados completos agora — pergunte primeiro se a pessoa deseja agendar/se cadastrar. Só peça dados (nome completo, CPF, nascimento, telefone) quando houver intenção CLARA de agendamento, cadastro ou atualização.`
-      : `IDENTIFICAÇÃO: A base de pacientes da unidade "${nomeUnidade}" AINDA NÃO FOI IMPORTADA no sistema. Se a pessoa quiser confirmar cadastro, agendamento ou histórico, responda com educação: "Os dados desta unidade ainda não estão disponíveis no meu sistema — vou te encaminhar para uma atendente humana." NÃO peça CPF, nome completo ou dados cadastrais. Você pode responder normalmente sobre horários de médicos, preços de tabela e informações públicas.`;
-
-  // FASE 4 — este texto é o FALLBACK de código. O Prompt Principal real vem
-  // da versão PUBLICADA em "Instruções da Nina" (carregada logo abaixo).
-  const systemPromptCodigo = `Você é a Nina, assistente virtual da ${nomeUnidade}, respondendo a PACIENTES via WhatsApp. Responda em português do Brasil, de forma direta, cordial e acolhedora com TODOS. Seja breve quando a pergunta for simples (2 a 4 frases) e mais completa quando houver condições, restrições ou várias perguntas — nunca omita uma condição importante só para encurtar.
-
-${blocoClinica}
-
-${blocoDataHoraAgora()}
-
-NUNCA mencione, cite ou inclua o CRM dos médicos nas respostas. Use apenas o nome do médico.
-
-SUA FUNÇÃO COM PACIENTES é EXCLUSIVAMENTE:
-- Informar livremente sobre TODOS os médicos da clínica: nome, especialidades, horários e dias de atendimento.
-- Informar preços de tabela dos procedimentos/exames e o preparo quando houver.
-- Orientar sobre agendamento (encaminhar para a recepção quando precisar confirmar/marcar).
-- Ser cordial, simpática e prestativa em qualquer interação.
-
-${contextoRemetente}
-
-${blocoIdentidade}
-
-REGRAS DE CONFIRMAÇÃO DE IDENTIDADE:
-- A confirmação de identidade acontece NO MÁXIMO UMA VEZ por conversa. Se já perguntou, não repita.
-- Se a pessoa já confirmou (disse "sim", "sou eu" ou o próprio nome), trate-a pelo primeiro nome e nunca mais pergunte.
-- NUNCA abra uma resposta com a confirmação quando a pergunta for objetiva: responda primeiro o que foi perguntado; a confirmação, se ainda for necessária, vem depois, em uma linha.
-
-REGRAS DE ESPECIALIDADE / EXAME:
-- Quando o paciente citar uma especialidade ou procedimento, responda SOMENTE sobre ela — nunca devolva a lista geral de profissionais.
-- Compare nomes sem diferenciar acento, maiúsculas ou singular/plural ("cardio", "cardiologia", "cardiologista" são a mesma coisa).
-- Se não houver ninguém dessa especialidade no dia pedido, diga exatamente isso e ofereça o próximo dia com disponibilidade nela.
-- Se a especialidade não existir no cadastro, diga que a clínica não atende e ofereça listar as que atende.
-- No máximo 5 profissionais por resposta, com horários; se houver mais, diga quantos faltam e ofereça mostrar o restante.
-
-${blocoFoco}
-
-REGRA DE OURO — PEDIDO DE DADOS:
-- Só solicite dados pessoais (nome completo, CPF, nascimento, telefone, endereço) quando a pessoa demonstrar intenção clara de agendar, se cadastrar ou atualizar cadastro.
-- Nunca peça todos os dados de uma vez em uma conversa informativa.
-
-REGRAS DE PRIVACIDADE — NÃO PODEM SER QUEBRADAS:
-1. Trate quem escreve como pessoa externa. NUNCA confirme nem negue se ela ou outra pessoa é paciente da clínica.
-2. NUNCA revele dados financeiros internos (caixa, faturamento, repasses, comissões, contas, boletos, inadimplência) — apenas valores de TABELA pública de exames/convênios.
-3. NUNCA revele dados de pacientes (nomes, telefones, CPF, e-mail, endereço, prontuário, anamnese, diagnósticos, exames, agendamentos individuais, presença na clínica).
-4. NUNCA fale sobre operação interna, equipe, conflitos, decisões administrativas ou qualquer assunto além de horários, preços, especialidades e agendamento.
-5. Se perguntarem sobre cobrança, boleto, saldo, "quem está agendado", "o paciente X veio?" ou qualquer outro dado sigiloso, responda com educação que essa informação é sigilosa e peça para aguardar um atendente humano.
-6. Você NÃO marca, cancela nem confirma agendamento diretamente (a não ser que uma regra abaixo autorize). Você PODE consultar a agenda real para informar horários disponíveis, e orienta a pessoa a concluir com a recepção.
-
-Se a pergunta fugir do escopo (horários, preços, especialidades, agendamento) ou violar as regras acima, peça gentilmente para a pessoa aguardar um atendente. Não invente dados.
-
-ESPECIALIDADES ATENDIDAS: ${espsCadastradasTexto}
-
-MÉDICOS:
-${medicos || "(nenhum)"}
-
-PROCEDIMENTOS:
-${procs || "(nenhum)"}`;
-
-  // FASE 4 — Prompt Principal a partir da versão publicada das Instruções da
-  // Nina. Snapshot único por execução: se a v(n+1) for publicada durante esta
-  // mensagem, esta execução termina com a versão que carregou aqui.
+  // FASE 3 — BEHAVIOR PROMPT: única fonte comportamental é a versão PUBLICADA
+  // em Arquitetura → Instruções da Nina. Placeholders permitidos: só DADOS.
+  // Snapshot único por execução.
   const { promptInstrucoes } = await import("@/lib/nina/instrucoes-runtime.server");
+  const { PROMPT_NINA_WHATSAPP_V4 } = await import("@/lib/nina/prompt/behavior-v4");
   const instrucoesNina = await promptInstrucoes(
     "whatsapp",
     {
       "${nomeUnidade}": nomeUnidade,
-      "${blocoClinica}": blocoClinica,
-      "${blocoDataHoraAgora()}": blocoDataHoraAgora(),
-      "${contextoRemetente}": contextoRemetente,
-      "${blocoIdentidade}": blocoIdentidade,
-      "${blocoFoco}": blocoFoco,
-      '${espsCadastradas.join(", ") || "(nenhuma cadastrada)"}': espsCadastradasTexto,
-      '${medicos || "(nenhum)"}': medicos || "(nenhum)",
-      '${procs || "(nenhum)"}': procs || "(nenhum)",
+      "${nomeCurtoUnidade}": nomeCurtoUnidade,
     },
-    systemPromptCodigo,
+    PROMPT_NINA_WHATSAPP_V4.split("${nomeUnidade}")
+      .join(nomeUnidade)
+      .split("${nomeCurtoUnidade}")
+      .join(nomeCurtoUnidade),
   );
-  const systemPrompt = instrucoesNina.texto;
+  const behaviorPrompt = instrucoesNina.texto;
+
   rastro?.concluir("instructions.published", {
     versao: instrucoesNina.versao ?? null,
     origem: instrucoesNina.origem ?? null,
@@ -987,30 +913,21 @@ ${procs || "(nenhum)"}`;
   // Quando a flag está ligada nesta clínica, a Nina deixa de ser somente
   // leitura: ela consulta a agenda REAL e marca, usando o mesmo núcleo de
   // regras da recepção. Fora disso, nada muda (comportamento antigo intacto).
-  const { ferramentasAgendaAtivas, blocoPromptAgenda, blocoPromptDisponibilidade } = await import(
-    "@/lib/nina/agenda-flag.server"
-  );
+  const { ferramentasAgendaAtivas } = await import("@/lib/nina/agenda-flag.server");
   const podeAgendar = await ferramentasAgendaAtivas(clinicaId);
 
   // Aprendizados APROVADOS pela equipe desta clínica, relevantes para a
   // mensagem atual. Nunca substituem dado vivo (preço/horário/agenda).
-  const { recuperarAprendizados, blocoPromptAprendizados } = await import(
-    "@/lib/nina/aprendizado.server"
-  );
+  const { recuperarAprendizados } = await import("@/lib/nina/aprendizado.server");
   const aprendizados = await recuperarAprendizados(clinicaId, "whatsapp", mensagemPaciente).catch(
     () => [],
   );
-  const blocoAprendizado = blocoPromptAprendizados(aprendizados);
 
   // ------------------------------------------- estado estruturado do fluxo
   // Recarregado da própria conversa. É isto que faz o paciente já
   // identificado continuar identificado na mensagem seguinte.
-  const { blocoPromptSessao: blocoPromptSessaoNina } = await import("@/lib/nina/sessao");
-  const {
-    normalizarEstado,
-    blocoPromptEstado,
-    salvarFluxoEstado,
-  } = await import("@/lib/nina/fluxo-estado.server");
+  const { normalizarEstado, salvarFluxoEstado } = await import("@/lib/nina/fluxo-estado.server");
+
   // Estado já passado pelo TTL de sessão (ver `sessaoNina` acima).
   const fluxoEstado = sessaoNina.estado ?? normalizarEstado(estadoId.fluxoEstadoBruto);
   // Fallbacks de reidratação, em ordem de confiança: estado do fluxo →
@@ -1054,43 +971,30 @@ ${procs || "(nenhum)"}`;
 
   if (rastro && estadoId?.conversaId) rastro.ids.conversation_id = estadoId.conversaId;
 
-  const blocoKb = await (async () => {
-    const { blocoPromptCatalogo } = await import("@/lib/nina/catalogo-prompt.server");
-    return await blocoPromptCatalogo(clinicaId).catch(() => "");
-  })();
-  rastro?.concluir("tool.knowledge.lookup", {
-    base_ativa: Boolean(blocoKb),
-    tamanho: blocoKb.length,
-  });
-
-  // FASE 2 do novo fluxo: respostas factuais fundamentadas no catálogo publicado.
-  // Só texto de prompt; a consulta continua na ferramenta já existente.
-  const blocoFase2 = await (async () => {
+  // FASE 3 — o catálogo entra como FATO (o que existe publicado). As regras de
+  // leitura do catálogo vivem no prompt publicado, não aqui.
+  const catalogoPublicado = await (async () => {
     try {
-      const { flagFluxoFase2Ativa } = await import("@/lib/nina/atendimento-fase2.server");
-      if (!(await flagFluxoFase2Ativa(clinicaId))) return "";
-      const [{ detectarIntencoes }, { blocoPromptFase2 }] = await Promise.all([
-        import("@/lib/nina/atendimento-fase1"),
-        import("@/lib/nina/atendimento-fase2"),
-      ]);
-      return blocoPromptFase2({
-        intencoes: detectarIntencoes(mensagemPaciente),
-        baseAtiva: Boolean(blocoKb),
-      });
+      const { contarCatalogoPublicado } = await import("@/lib/nina/catalogo-prompt.server");
+      return await contarCatalogoPublicado(clinicaId);
     } catch {
-      return "";
+      return { servicos: 0, profissionais: 0 };
     }
   })();
+  const baseAtiva = catalogoPublicado.servicos > 0 || catalogoPublicado.profissionais > 0;
+  rastro?.concluir("tool.knowledge.lookup", {
+    base_ativa: baseAtiva,
+    servicos: catalogoPublicado.servicos,
+    profissionais: catalogoPublicado.profissionais,
+  });
 
-  // FASE 3: só entra em coleta de dados quando o paciente confirma que quer
-  // agendar. Marca BOOKING_INTENT_CONFIRMED no estado da conversa.
-  const blocoFase3 = await (async () => {
+  // FASE 3 (entrada controlada no agendamento): a DECISÃO de estado continua
+  // em código. O que saiu foi só o texto de prompt.
+  await (async () => {
     try {
       const { flagFluxoFase3Ativa } = await import("@/lib/nina/atendimento-fase3.server");
-      if (!(await flagFluxoFase3Ativa(clinicaId))) return "";
-      const { avaliarIntencaoAgendar, blocoPromptFase3 } = await import(
-        "@/lib/nina/atendimento-fase3"
-      );
+      if (!(await flagFluxoFase3Ativa(clinicaId))) return;
+      const { avaliarIntencaoAgendar } = await import("@/lib/nina/atendimento-fase3");
       const { confirmado } = avaliarIntencaoAgendar(mensagemPaciente, fluxoEstado);
       if (confirmado) {
         fluxoEstado.appointment = { ...fluxoEstado.appointment, intent_confirmed: true };
@@ -1098,110 +1002,104 @@ ${procs || "(nenhum)"}`;
           fluxoEstado.flow = { stage: "BOOKING_INTENT_CONFIRMED" };
         }
       }
-      return blocoPromptFase3({ mensagem: mensagemPaciente, estado: fluxoEstado });
     } catch {
-      return "";
+      /* estado permanece como está */
     }
   })();
 
-  // FASE 4: vaga vem só da agenda real; escolha de horário não confirma;
-  // resumo final obrigatório antes de gravar o agendamento.
-  const blocoFase4 = await (async () => {
-    try {
-      const { flagFluxoFase4Ativa } = await import("@/lib/nina/atendimento-fase4.server");
-      if (!(await flagFluxoFase4Ativa(clinicaId))) return "";
-      const { blocoPromptFase4 } = await import("@/lib/nina/atendimento-fase4");
-      return blocoPromptFase4({
-        mensagem: mensagemPaciente,
-        estado: fluxoEstado,
-        nomeUnidade,
-      });
-    } catch {
-      return "";
-    }
-  })();
-
-  // FASE 5: execução real do agendamento (sucesso só com retorno do sistema),
-  // tratamento de falha/slot ocupado e encerramento da conversa.
-  const blocoFase5 = await (async () => {
-    try {
-      const { flagFluxoFase5Ativa } = await import("@/lib/nina/atendimento-fase5.server");
-      if (!(await flagFluxoFase5Ativa(clinicaId))) return "";
-      const { blocoPromptFase5 } = await import("@/lib/nina/atendimento-fase5");
-      return blocoPromptFase5({
-        mensagem: mensagemPaciente,
-        estado: fluxoEstado,
-        nomeUnidade,
-        baseAtiva: Boolean(blocoKb),
-      });
-    } catch {
-      return "";
-    }
-  })();
-
-  // FASE 6: máquina de estados explícita + regras de handoff. Deriva a etapa
-  // atual do estado da conversa e a grava, para a próxima mensagem já chegar
-  // na etapa certa. Não altera dados de agenda nem de cadastro.
-  const blocoFase6 = await (async () => {
+  // FASE 6: máquina de estados explícita. Deriva a etapa atual e a grava, para
+  // a próxima mensagem já chegar na etapa certa.
+  await (async () => {
     try {
       const { flagFluxoFase6Ativa } = await import("@/lib/nina/atendimento-fase6.server");
-      if (!(await flagFluxoFase6Ativa(clinicaId))) return "";
-      const [{ detectarIntencoes }, { blocoPromptFase6, derivarEtapa }] = await Promise.all([
-        import("@/lib/nina/atendimento-fase1"),
-        import("@/lib/nina/atendimento-fase6"),
-      ]);
-      const ctxFase6 = {
+      if (!(await flagFluxoFase6Ativa(clinicaId))) return;
+      const { derivarEtapa } = await import("@/lib/nina/atendimento-fase6");
+      const etapa = derivarEtapa({
         mensagem: mensagemPaciente,
         estado: fluxoEstado,
         primeiraMensagem: !jaSeApresentou,
-        intencoes: detectarIntencoes(mensagemPaciente) as readonly string[],
-      };
-      const etapa = derivarEtapa(ctxFase6);
-      fluxoEstado.flow = { stage: etapa };
-      return blocoPromptFase6({ ...ctxFase6, etapa });
-    } catch {
-      return "";
-    }
-  })();
-
-  // OFERTA COMPLETA: valor (catálogo publicado) + médicos + datas/horários reais
-  // (agenda) + unidade na mesma resposta, sem misturar as fontes.
-  const blocoOferta = await (async () => {
-    try {
-      const { flagOfertaCompletaAtiva } = await import("@/lib/nina/oferta-completa.server");
-      if (!(await flagOfertaCompletaAtiva(clinicaId))) return "";
-      const { blocoPromptOfertaCompleta } = await import("@/lib/nina/oferta-completa");
-      return blocoPromptOfertaCompleta({
-        mensagem: mensagemPaciente,
-        estado: fluxoEstado,
-        nomeUnidade,
-        baseAtiva: Boolean(blocoKb),
+        intencoes: intencoesTurno as readonly string[],
       });
+      fluxoEstado.flow = { stage: etapa };
     } catch {
-      return "";
+      /* etapa permanece como está */
     }
   })();
 
-  const systemPromptFinal = [
-    systemPrompt,
-    blocoPromptDisponibilidade(),
-    blocoKb,
-    blocoFase2,
-    blocoFase3,
-    blocoFase4,
-    blocoFase5,
-    blocoFase6,
-    blocoOferta,
-    podeAgendar ? blocoPromptAgenda() : "",
+  // Campos ainda necessários para identificar o paciente (fato, não ordem).
+  const camposFaltantes = await (async () => {
+    try {
+      const { dadosFaltantes } = await import("@/lib/nina/atendimento-fase3");
+      return dadosFaltantes(fluxoEstado) as readonly string[];
+    } catch {
+      return [] as readonly string[];
+    }
+  })();
 
+  // ------------------------------------------------------------------
+  // FASE 3 — RUNTIME CONTEXT: só FATOS. Nenhuma regra conversacional aqui.
+  // ------------------------------------------------------------------
+  const runtimeContext = {
+    canal: "whatsapp",
+    ambiente: opcoes?.teste ? "homologacao" : "producao",
+    unidade: dadosPublicos,
+    data_hora_atual: agoraNaClinica(),
+    fluxo_fase1_ativo: fase1Ativa,
+    intencoes: intencoesTurno,
+    intencao_ambigua: intencaoAmbiguaTurno,
+    sessao: {
+      session_id: sessaoNina.estado.session_id ?? null,
+      nova_sessao: sessaoSaudacao.novaSessao || sessaoNina.expirou,
+      expirou: sessaoNina.expirou,
+      continuacao: sessaoNina.continuacao,
+      saudacao_obrigatoria: saudacaoObrigatoria,
+    },
+    identidade: {
+      confirmada: identidadeConfirmada,
+      ja_perguntada: Boolean(estadoId.perguntadaEm),
+      primeiro_nome: primeiroNome,
+    },
+    paciente: {
+      ...contextoRemetenteFato,
+      identificado: Boolean(fluxoEstado.patient.identified && fluxoEstado.patient.id),
+      primeiro_nome: fluxoEstado.patient.first_name ?? null,
+    },
+    base_pacientes_importada: baseImportada,
+    campos_faltantes: camposFaltantes,
+    etapa: fluxoEstado.flow.stage,
+    agendamento: {
+      intencao_confirmada: Boolean(fluxoEstado.appointment.intent_confirmed),
+      procedimento: fluxoEstado.appointment.procedure ?? null,
+      especialidade: fluxoEstado.appointment.specialty ?? null,
+      profissional: fluxoEstado.appointment.doctor_name ?? null,
+      data: fluxoEstado.appointment.date ?? null,
+      hora: fluxoEstado.appointment.time ?? null,
+      slot_inicio: fluxoEstado.appointment.slot_inicio ?? null,
+      slot_fim: fluxoEstado.appointment.slot_fim ?? null,
+      agendamento_id: fluxoEstado.appointment.appointment_id ?? null,
+    },
+    catalogo: {
+      publicado: baseAtiva,
+      servicos: catalogoPublicado.servicos,
+      profissionais: catalogoPublicado.profissionais,
+    },
+    ferramentas: {
+      pode_agendar: podeAgendar,
+    },
+    aprendizados: (aprendizados as Array<{ tipo?: string; titulo?: string; conteudo?: string }>)
+      .map((a) => ({
+        tipo: a.tipo ?? null,
+        titulo: a.titulo ?? null,
+        conteudo: a.conteudo ?? null,
+      })),
+  };
 
+  // COMPOSER — ponto único de montagem. Depois daqui nada mais é concatenado
+  // ao system prompt.
+  const { comporRequestNina } = await import("@/lib/nina/prompt-composer");
+  const requestNina = comporRequestNina({ behaviorPrompt, runtimeContext });
+  const systemPromptFinal = requestNina.systemPrompt;
 
-    blocoAprendizado,
-    blocoPromptEstado(fluxoEstado),
-    blocoPromptSessaoNina(sessaoNina),
-  ]
-    .filter(Boolean)
-    .join("\n\n");
 
   let ctxFerramentas: import("@/lib/nina/paciente-tools.server").CtxNinaPaciente | null = null;
   let ferramentas: unknown[] | undefined;
@@ -1270,12 +1168,10 @@ ${procs || "(nenhum)"}`;
       ? (ctx, nome, args) => executar!(ctx, nome, args as never)
       : null,
   });
-  const systemPromptComHandoff = `${systemPromptFinal}
+  // FASE 3 — as regras de handoff vivem no prompt publicado. Aqui não se
+  // concatena mais nenhum comportamento ao system prompt.
 
-ATENDIMENTO HUMANO — REGRA OBRIGATÓRIA:
-- Você é o 1º nível. Resolva o que souber, com clareza e sem enrolar.
-- Chame a ferramenta "solicitar_atendente_humano" quando: o paciente pedir uma pessoa/atendente/humano; houver reclamação, urgência clínica, cobrança, erro nosso ou conflito; ou você já tiver tentado duas vezes sem resolver.
-- Ao chamar, mande um resumo útil do caso. Depois, avise em uma frase que a equipe assume daqui — não continue tentando resolver sozinha e não prometa prazo.`;
+
 
 
   type MsgIA = {
@@ -1289,7 +1185,7 @@ ATENDIMENTO HUMANO — REGRA OBRIGATÓRIA:
   // histórico completo, CRM e Agenda inteiros nunca são enviados.
   const { montarContexto } = await import("@/lib/nina/context-builder");
   const contexto = montarContexto({
-    systemBlocos: [systemPromptComHandoff],
+    systemBlocos: [systemPromptFinal],
     historico: historico as MsgIA[],
     mensagemAtual: mensagemPaciente,
     paciente: pacienteIdEfetivo
@@ -1306,7 +1202,7 @@ ATENDIMENTO HUMANO — REGRA OBRIGATÓRIA:
     paciente_identificado: Boolean(pacienteIdEfetivo),
   });
   rastro?.concluir("prompt.compose", {
-    tamanho_prompt: systemPromptComHandoff.length,
+    tamanho_prompt: systemPromptFinal.length,
     ferramentas: Array.isArray(ferramentas) ? ferramentas.length : 0,
     pode_agendar: podeAgendar,
   });
