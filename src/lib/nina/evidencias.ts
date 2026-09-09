@@ -150,6 +150,7 @@ export function criarColetor(agora: () => string = () => new Date().toISOString(
   const etapas: Etapa[] = [];
   let entrada: string[] = [];
   let prompt: PromptDaExecucao | null = null;
+  let snapshot: SnapshotPrompt | null = null;
   return {
     etapa(e) {
       // Cópia profunda no ato: a evidência é um snapshot do momento. Uma
@@ -170,15 +171,21 @@ export function criarColetor(agora: () => string = () => new Date().toISOString(
       // mesmo que outra versão seja publicada no meio da execução.
       if (!prompt) prompt = { ...ref };
     },
+    promptSnapshot(snap) {
+      // Imutável: o primeiro conteúdo enviado ao modelo é o que vale.
+      if (!snapshot) snapshot = { ...snap };
+    },
     pacote() {
       return {
         etapas,
         mensagensEntrada: entrada,
         lacunas: lacunas(etapas, entrada),
         prompt,
+        snapshot,
         modulos: modulosUtilizados(etapas),
       };
     },
+
   };
 }
 
