@@ -27,6 +27,9 @@ export type SnapshotInstrucoes = {
   /** publicada = banco; cache = última válida conhecida; codigo = fallback. */
   origem: "publicada" | "cache" | "codigo";
   texto: string;
+  /** Conteúdo publicado ANTES da substituição de dados (auditoria). */
+  template: string;
+
 };
 
 const TTL_MS = 30_000;
