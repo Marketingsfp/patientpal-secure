@@ -25,6 +25,10 @@ export const ROUTE_TO_MODULE: Record<string, string | null> = {
   // destrutiva e de gestão, então precisa poder ser escondida de perfis
   // que têm acesso normal à lista de clientes (ex.: Caixa).
   "/app/clientes/duplicados": "clientes-duplicados",
+  // Conferência da numeração acompanha o módulo de clientes: quem confere é a
+  // mesma recepção que cadastra. Sem chave própria, senão a tela nasceria
+  // invisível até o gestor configurar permissão.
+  "/app/clientes/recentes": "clientes",
   // Módulo próprio: a tela altera em lote a classificação de atendimentos já
   // gravados e vincula convênio a contrato — mexe em relatório e em preço do
   // cartão, então não acompanha o acesso normal a Clientes ou Agenda.

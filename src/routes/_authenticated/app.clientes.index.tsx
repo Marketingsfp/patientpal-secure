@@ -12,6 +12,7 @@ import {
   Eye,
   IdCard,
   RefreshCw,
+  ClipboardList,
   Trash2,
 } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -639,6 +640,14 @@ function ClientesPage() {
           >
             <Download className="h-4 w-4 mr-1.5" /> Exportar Excel
           </button>
+          {/* Conferência da numeração. Fica aqui na barra, junto de Exportar,
+              porque quem confere é a mesma recepção que trabalha nesta lista. */}
+          <Link
+            to="/app/clientes/recentes"
+            className="inline-flex items-center bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 font-semibold text-xs px-4 py-2 rounded-lg shadow-sm transition-colors"
+          >
+            <ClipboardList className="h-4 w-4 mr-1.5" /> Cadastros recentes
+          </Link>
           {podeEscrever && (
             <button
               type="button"

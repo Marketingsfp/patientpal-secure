@@ -32,6 +32,7 @@ import {
   type DesvioProntuario,
 } from "@/lib/prontuario";
 import { ConfirmarProntuarioDistante } from "@/components/pacientes/confirmar-prontuario-distante";
+import { AvisoProntuarioForaDaEstante } from "@/components/clientes/aviso-prontuario-fora-da-estante";
 import { erroCaractereNome, sanitizarNomePessoa, validarNomePessoa } from "@/lib/nome-pessoa";
 import { maiusculoDigitacao } from "@/lib/texto-maiusculo";
 import { mascaraCPF, mascaraTelefone } from "@/lib/validators";
@@ -78,6 +79,12 @@ export interface Paciente {
   codigo_prontuario?: string | null;
   /** Numeração histórica do sistema antigo. Somente leitura — nunca é gravada. */
   codigo_prontuario_anterior?: string | null;
+  /**
+   * Data do cadastro. Some telas carregam com `select("*")` e já a recebiam sem
+   * o tipo declarar; ficou explícita porque o aviso de prontuário fora da faixa
+   * decide pela data — sem ela o aviso nunca apareceria.
+   */
+  created_at?: string | null;
   telefone: string | null;
   telefone2: string | null;
   email: string | null;
@@ -1477,6 +1484,20 @@ export function ClienteForm({
                       maxLength={LIMITES.codigo}
                     />
                     <p className="text-xs text-muted-foreground">{AJUDA_PRONTUARIO}</p>
+                    {/* Aviso do estoque legado. Mora aqui, colado no campo, e não
+                        no topo das telas de ficha: a recepção edita o paciente
+                        pelo modal da lista de clientes, e é para o campo que ela
+                        está olhando quando o paciente chega com a guia errada. */}
+                    {editing && (
+                      <AvisoProntuarioForaDaEstante
+                        paciente={{
+                          id: editing.id,
+                          codigo_prontuario: form.codigo_prontuario,
+                          created_at: editing.created_at,
+                        }}
+                        onCorrigido={(novo) => setForm((f) => ({ ...f, codigo_prontuario: novo }))}
+                      />
+                    )}
                   </div>
                   <div className="space-y-1">
                     <Label>

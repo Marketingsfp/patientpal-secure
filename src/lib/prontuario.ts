@@ -24,6 +24,53 @@ export const AJUDA_PRONTUARIO =
 /** Placeholder do campo, igual em todas as telas. */
 export const PLACEHOLDER_PRONTUARIO = "Digite o número da ficha (ex.: 24123)";
 
+/**
+ * Janela em que o gerador automático emitiu números fora do arquivo físico.
+ *
+ * De 08/07/2026 até 04/09/2026 às 12:01:44 o número de um cadastro novo era
+ * "maior número da clínica + 1". Como a migração do sistema antigo trouxe
+ * cadastros numerados até 2.656.939 — números que não fazem parte da sequência
+ * da estante —, todo paciente cadastrado sem número nasceu por volta dos 2,65
+ * milhões, cerca de 218 mil à frente da pasta física. Foram 947 pacientes.
+ *
+ * As duas pontas são datas históricas: a janela está fechada e não se mexe
+ * mais. O fim é o instante exato em que a correção entrou em produção.
+ */
+const FALHA_NUMERACAO_INICIO = Date.parse("2026-07-08T00:00:00-03:00");
+const FALHA_NUMERACAO_FIM = Date.parse("2026-09-04T12:01:44-03:00");
+
+/**
+ * Acima deste número não existe pasta no arquivo físico da clínica. A estante
+ * está na casa dos 2,43 milhões e anda algumas dezenas por dia, então o teto dá
+ * folga de décadas antes de precisar ser revisto.
+ */
+const TETO_DO_ARQUIVO_FISICO = 2_500_000;
+
+/**
+ * Diz se o número de prontuário deste paciente é um dos que o gerador errou.
+ *
+ * Serve para a ficha mostrar o aviso e oferecer o botão de correção. A mesma
+ * regra é conferida de novo no banco, dentro de
+ * `paciente_corrigir_prontuario_estante` — aqui é só para decidir o que
+ * desenhar na tela.
+ *
+ * Repare que a data de cadastro faz parte da regra, e não só o tamanho do
+ * número. Cadastros que vieram da migração também têm números altos, mas
+ * aqueles vieram do sistema antigo e não são nossos para trocar.
+ */
+export function prontuarioForaDaEstante(p: {
+  codigo_prontuario?: string | null;
+  created_at?: string | null;
+}): boolean {
+  const codigo = (p.codigo_prontuario ?? "").trim();
+  if (!/^\d+$/.test(codigo)) return false;
+  if (Number(codigo) <= TETO_DO_ARQUIVO_FISICO) return false;
+  if (!p.created_at) return false;
+  const criado = Date.parse(p.created_at);
+  if (Number.isNaN(criado)) return false;
+  return criado >= FALHA_NUMERACAO_INICIO && criado < FALHA_NUMERACAO_FIM;
+}
+
 /** Remove espaços e caracteres invisíveis; devolve null quando ficar vazio. */
 export function normalizarCodigoProntuario(valor: string | null | undefined): string | null {
   const limpo = limparLinha(valor ?? "").slice(0, LIMITES.codigo);

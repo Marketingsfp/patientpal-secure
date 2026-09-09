@@ -159,6 +159,7 @@ import { Route as AuthenticatedAppConfiguracoesRespostasRapidasRouteImport } fro
 import { Route as AuthenticatedAppConfiguracoesProntuarioRouteImport } from './routes/_authenticated/app.configuracoes.prontuario'
 import { Route as AuthenticatedAppConfiguracoesPainelTotemRouteImport } from './routes/_authenticated/app.configuracoes.painel-totem'
 import { Route as AuthenticatedAppConfiguracoesNfseRouteImport } from './routes/_authenticated/app.configuracoes.nfse'
+import { Route as AuthenticatedAppClientesRecentesRouteImport } from './routes/_authenticated/app.clientes.recentes'
 import { Route as AuthenticatedAppClientesDuplicadosRouteImport } from './routes/_authenticated/app.clientes.duplicados'
 import { Route as AuthenticatedAppCartaoBeneficiosSemConvenioRouteImport } from './routes/_authenticated/app.cartao-beneficios.sem-convenio'
 import { Route as AuthenticatedAppCartaoBeneficiosRelatoriosRouteImport } from './routes/_authenticated/app.cartao-beneficios.relatorios'
@@ -1016,6 +1017,12 @@ const AuthenticatedAppConfiguracoesNfseRoute =
     path: '/configuracoes/nfse',
     getParentRoute: () => AuthenticatedAppRoute,
   } as any)
+const AuthenticatedAppClientesRecentesRoute =
+  AuthenticatedAppClientesRecentesRouteImport.update({
+    id: '/clientes/recentes',
+    path: '/clientes/recentes',
+    getParentRoute: () => AuthenticatedAppRoute,
+  } as any)
 const AuthenticatedAppClientesDuplicadosRoute =
   AuthenticatedAppClientesDuplicadosRouteImport.update({
     id: '/clientes/duplicados',
@@ -1220,6 +1227,7 @@ export interface FileRoutesByFullPath {
   '/app/cartao-beneficios/relatorios': typeof AuthenticatedAppCartaoBeneficiosRelatoriosRoute
   '/app/cartao-beneficios/sem-convenio': typeof AuthenticatedAppCartaoBeneficiosSemConvenioRoute
   '/app/clientes/duplicados': typeof AuthenticatedAppClientesDuplicadosRoute
+  '/app/clientes/recentes': typeof AuthenticatedAppClientesRecentesRoute
   '/app/configuracoes/nfse': typeof AuthenticatedAppConfiguracoesNfseRoute
   '/app/configuracoes/painel-totem': typeof AuthenticatedAppConfiguracoesPainelTotemRoute
   '/app/configuracoes/prontuario': typeof AuthenticatedAppConfiguracoesProntuarioRoute
@@ -1381,6 +1389,7 @@ export interface FileRoutesByTo {
   '/app/cartao-beneficios/relatorios': typeof AuthenticatedAppCartaoBeneficiosRelatoriosRoute
   '/app/cartao-beneficios/sem-convenio': typeof AuthenticatedAppCartaoBeneficiosSemConvenioRoute
   '/app/clientes/duplicados': typeof AuthenticatedAppClientesDuplicadosRoute
+  '/app/clientes/recentes': typeof AuthenticatedAppClientesRecentesRoute
   '/app/configuracoes/nfse': typeof AuthenticatedAppConfiguracoesNfseRoute
   '/app/configuracoes/painel-totem': typeof AuthenticatedAppConfiguracoesPainelTotemRoute
   '/app/configuracoes/prontuario': typeof AuthenticatedAppConfiguracoesProntuarioRoute
@@ -1548,6 +1557,7 @@ export interface FileRoutesById {
   '/_authenticated/app/cartao-beneficios/relatorios': typeof AuthenticatedAppCartaoBeneficiosRelatoriosRoute
   '/_authenticated/app/cartao-beneficios/sem-convenio': typeof AuthenticatedAppCartaoBeneficiosSemConvenioRoute
   '/_authenticated/app/clientes/duplicados': typeof AuthenticatedAppClientesDuplicadosRoute
+  '/_authenticated/app/clientes/recentes': typeof AuthenticatedAppClientesRecentesRoute
   '/_authenticated/app/configuracoes/nfse': typeof AuthenticatedAppConfiguracoesNfseRoute
   '/_authenticated/app/configuracoes/painel-totem': typeof AuthenticatedAppConfiguracoesPainelTotemRoute
   '/_authenticated/app/configuracoes/prontuario': typeof AuthenticatedAppConfiguracoesProntuarioRoute
@@ -1715,6 +1725,7 @@ export interface FileRouteTypes {
     | '/app/cartao-beneficios/relatorios'
     | '/app/cartao-beneficios/sem-convenio'
     | '/app/clientes/duplicados'
+    | '/app/clientes/recentes'
     | '/app/configuracoes/nfse'
     | '/app/configuracoes/painel-totem'
     | '/app/configuracoes/prontuario'
@@ -1876,6 +1887,7 @@ export interface FileRouteTypes {
     | '/app/cartao-beneficios/relatorios'
     | '/app/cartao-beneficios/sem-convenio'
     | '/app/clientes/duplicados'
+    | '/app/clientes/recentes'
     | '/app/configuracoes/nfse'
     | '/app/configuracoes/painel-totem'
     | '/app/configuracoes/prontuario'
@@ -2042,6 +2054,7 @@ export interface FileRouteTypes {
     | '/_authenticated/app/cartao-beneficios/relatorios'
     | '/_authenticated/app/cartao-beneficios/sem-convenio'
     | '/_authenticated/app/clientes/duplicados'
+    | '/_authenticated/app/clientes/recentes'
     | '/_authenticated/app/configuracoes/nfse'
     | '/_authenticated/app/configuracoes/painel-totem'
     | '/_authenticated/app/configuracoes/prontuario'
@@ -3187,6 +3200,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAppConfiguracoesNfseRouteImport
       parentRoute: typeof AuthenticatedAppRoute
     }
+    '/_authenticated/app/clientes/recentes': {
+      id: '/_authenticated/app/clientes/recentes'
+      path: '/clientes/recentes'
+      fullPath: '/app/clientes/recentes'
+      preLoaderRoute: typeof AuthenticatedAppClientesRecentesRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
+    }
     '/_authenticated/app/clientes/duplicados': {
       id: '/_authenticated/app/clientes/duplicados'
       path: '/clientes/duplicados'
@@ -3503,6 +3523,7 @@ interface AuthenticatedAppRouteChildren {
   AuthenticatedAppUnidadesRoute: typeof AuthenticatedAppUnidadesRoute
   AuthenticatedAppIndexRoute: typeof AuthenticatedAppIndexRoute
   AuthenticatedAppClientesDuplicadosRoute: typeof AuthenticatedAppClientesDuplicadosRoute
+  AuthenticatedAppClientesRecentesRoute: typeof AuthenticatedAppClientesRecentesRoute
   AuthenticatedAppConfiguracoesNfseRoute: typeof AuthenticatedAppConfiguracoesNfseRoute
   AuthenticatedAppConfiguracoesPainelTotemRoute: typeof AuthenticatedAppConfiguracoesPainelTotemRoute
   AuthenticatedAppConfiguracoesProntuarioRoute: typeof AuthenticatedAppConfiguracoesProntuarioRoute
@@ -3605,6 +3626,7 @@ const AuthenticatedAppRouteChildren: AuthenticatedAppRouteChildren = {
   AuthenticatedAppIndexRoute: AuthenticatedAppIndexRoute,
   AuthenticatedAppClientesDuplicadosRoute:
     AuthenticatedAppClientesDuplicadosRoute,
+  AuthenticatedAppClientesRecentesRoute: AuthenticatedAppClientesRecentesRoute,
   AuthenticatedAppConfiguracoesNfseRoute:
     AuthenticatedAppConfiguracoesNfseRoute,
   AuthenticatedAppConfiguracoesPainelTotemRoute:
