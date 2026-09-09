@@ -330,6 +330,10 @@ export function AtendInbox() {
   // abrir uma conversa não recria a função e não dispara recargas em cadeia.
   const selRef = useRef<any>(null);
   selRef.current = sel;
+  // FASE 4 — a lista atual também é lida por referência: o ajuste pontual de
+  // uma linha (mensagem nova, troca de responsável) não precisa recarregar as
+  // 200 conversas do filtro.
+  const convsRef = useRef<any[]>([]);
   const conteudoDaConversa = !!sel?.id && conversaCarregadaId === sel.id;
   const dadosSecundariosProntos = !!sel?.id && secundariosCarregadosId === sel.id;
   // Contato exibido: só o da conversa aberta agora. Ter `contato` preenchido
