@@ -351,6 +351,8 @@ export function AtendInbox() {
   // Enquanto a conversa selecionada não terminou de carregar, todas as ações
   // dependentes do conversation_id ficam bloqueadas.
   const carregandoConversa = !!sel?.id && !conteudoDaConversa;
+  // FASE 5 — revisão manual (e confirmada) do cadastro vinculado à conversa.
+  const [revisarVinculoAberto, setRevisarVinculoAberto] = useState(false);
   const [deptos, setDeptos] = useState<any[]>([]);
   const [usuarios, setUsuarios] = useState<any[]>([]);
   const [busca, setBusca] = useState("");
