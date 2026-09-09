@@ -54,7 +54,10 @@ export function classificarEvento(ev: EventoRealtime, ctx: ContextoTela): AlvoAt
 
   switch (ev.table) {
     case "whatsapp_mensagens": {
-      const alvos: AlvoAtualizacao[] = ["lista", "espera"];
+      // FASE 4 — mensagem comum não recalcula a fila de espera: a espera muda
+      // quando a própria conversa muda (transferência, atribuição, desfecho),
+      // e isso chega por `atend_conversas`.
+      const alvos: AlvoAtualizacao[] = ["lista"];
       if (aberta && linha.conversa_id === aberta) alvos.push("conversa");
       return alvos;
     }
