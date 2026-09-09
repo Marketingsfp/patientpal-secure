@@ -95,6 +95,8 @@ export const SEGMENTOS_SEND: Segmento[] = [
   { nome: "meta_api", de: "SEND_T6_META_REQUEST_START", ate: "SEND_T7_META_RESPONSE" },
   { nome: "db_pos_meta", de: "SEND_T7_META_RESPONSE", ate: "SEND_T8_DB_INSERT_DONE" },
   { nome: "update_conversa", de: "SEND_T8_DB_INSERT_DONE", ate: "SEND_T9_CONVERSATION_UPDATE_DONE" },
+  // Tempo do backend ANTES de depender da Meta: é o que está sob nosso controle.
+  { nome: "backend_pre_meta", de: "SEND_T3_BACKEND_RECEIVED", ate: "SEND_T6_META_REQUEST_START" },
   { nome: "backend_total", de: "SEND_T3_BACKEND_RECEIVED", ate: "SEND_T10_BACKEND_RESPONSE" },
   { nome: "reconciliacao", de: "SEND_T10_BACKEND_RESPONSE", ate: "SEND_T12_CANONICAL_RECONCILED" },
   { nome: "realtime", de: "SEND_T10_BACKEND_RESPONSE", ate: "SEND_T11_REALTIME_RECEIVED" },
@@ -260,6 +262,7 @@ export function validarLinhaLog(linha: Record<string, unknown>): boolean {
 
 export const METRICAS = [
   "SEND_UI_RENDER",
+  "SEND_BACKEND_PRE_META",
   "SEND_BACKEND",
   "SEND_META",
   "SEND_TOTAL",
@@ -303,6 +306,7 @@ export function metricasDoResumo(r: ResumoTrace): Partial<Record<Metrica, number
   }
   return limpar({
     SEND_UI_RENDER: s.ui_render,
+    SEND_BACKEND_PRE_META: s.backend_pre_meta,
     SEND_BACKEND: s.backend_total,
     SEND_META: s.meta_api,
     SEND_TOTAL: s.total,
