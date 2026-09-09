@@ -303,6 +303,7 @@ export const confiabilidadeDaExecucao = createServerFn({ method: "POST" })
       engineVersion: (r as unknown as Record<string, unknown>)["engine_version"]
         ? String((r as unknown as Record<string, unknown>)["engine_version"])
         : null,
+      seguranca,
     };
   });
 
