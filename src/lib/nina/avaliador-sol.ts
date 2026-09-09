@@ -216,7 +216,15 @@ export type Dossie = {
   cenario: string | null;
   objetivo: string | null;
   criteriosEsperados: string[];
-  instrucoes: { versao: number | null; publicadoEm: string | null; origem: string | null };
+  instrucoes: {
+    versao: number | null;
+    publicadoEm: string | null;
+    origem: string | null;
+    /** FASE 5 — texto EXATO usado naquela execução. Ausente = mensagem legada. */
+    hash?: string | null;
+    textoUtilizado?: string | null;
+  };
+
   turnos: TurnoDossie[];
   ferramentas: FerramentaDossie[];
   /** Consultas ao conhecimento/catálogo registradas nas evidências. */
