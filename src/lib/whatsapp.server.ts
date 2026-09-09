@@ -890,17 +890,10 @@ async function gerarRespostaNinaInterno(
   const intencoesTurno = detectarIntencoes(mensagemPaciente);
   const intencaoAmbiguaTurno = intencaoAmbigua(mensagemPaciente, intencoesTurno);
 
-  // Fatos de identificação do remetente (antes eram parágrafos de instrução).
-  const contextoRemetenteFato = pacienteInfo
-    ? {
-        cadastro_encontrado: true,
-        nome: pacienteInfo.nome ?? null,
-        associado: Boolean(pacienteInfo.associado),
-        convenio: pacienteInfo.associado
-          ? (pacienteInfo.convenio_nome ?? "Cartão Benefícios")
-          : null,
-      }
-    : { cadastro_encontrado: false, nome: null, associado: false, convenio: null };
+  // Fatos de identificação do remetente. Nome/convênio/benefício só entram
+  // quando a identidade está CONFIRMADA (FASE 4).
+  const contextoRemetenteFato = fatosRemetente(identidadePaciente);
+
 
 
   // FASE 3 — BEHAVIOR PROMPT: única fonte comportamental é a versão PUBLICADA
