@@ -43,6 +43,14 @@ export function AvisoProntuarioForaDaEstante({ paciente, onCorrigido }: Props) {
 
   if (!prontuarioForaDaEstante(paciente)) return null;
 
+  // A data de cadastro fica escrita no aviso de propósito. Sem ela, quem abre a
+  // ficha lê "número errado" e conclui que o sistema acabou de gerar aquele
+  // número — foi o que aconteceu em 09/09/2026. Com a data na tela fica claro
+  // que é um cadastro antigo esperando a pasta chegar ao balcão.
+  const cadastradoEm = paciente.created_at
+    ? new Date(paciente.created_at).toLocaleDateString("pt-BR")
+    : null;
+
   async function corrigir() {
     setSalvando(true);
     const { data, error } = await (supabase as any).rpc("paciente_corrigir_prontuario_estante", {
@@ -71,9 +79,13 @@ export function AvisoProntuarioForaDaEstante({ paciente, onCorrigido }: Props) {
         <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
         <div className="space-y-2">
           <p>
-            O prontuário <b>{paciente.codigo_prontuario}</b> está fora da faixa do arquivo físico.
-            Ele foi gerado por uma falha do sistema entre 08/07 e 04/09 e não corresponde a nenhuma
-            pasta da estante.
+            O prontuário <b>{paciente.codigo_prontuario}</b> está fora da faixa do arquivo físico e
+            não corresponde a nenhuma pasta da estante.
+          </p>
+          <p>
+            {cadastradoEm ? <>Este cadastro é de <b>{cadastradoEm}</b>, de quando</> : "De quando"} o
+            gerador automático ainda errava (entre 08/07 e 04/09). Cadastro feito de hoje em diante
+            já nasce com o número certo da estante.
           </p>
           {podeEscrever && (
             <>
