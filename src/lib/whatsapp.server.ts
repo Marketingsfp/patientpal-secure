@@ -913,30 +913,21 @@ async function gerarRespostaNinaInterno(
   // Quando a flag está ligada nesta clínica, a Nina deixa de ser somente
   // leitura: ela consulta a agenda REAL e marca, usando o mesmo núcleo de
   // regras da recepção. Fora disso, nada muda (comportamento antigo intacto).
-  const { ferramentasAgendaAtivas, blocoPromptAgenda, blocoPromptDisponibilidade } = await import(
-    "@/lib/nina/agenda-flag.server"
-  );
+  const { ferramentasAgendaAtivas } = await import("@/lib/nina/agenda-flag.server");
   const podeAgendar = await ferramentasAgendaAtivas(clinicaId);
 
   // Aprendizados APROVADOS pela equipe desta clínica, relevantes para a
   // mensagem atual. Nunca substituem dado vivo (preço/horário/agenda).
-  const { recuperarAprendizados, blocoPromptAprendizados } = await import(
-    "@/lib/nina/aprendizado.server"
-  );
+  const { recuperarAprendizados } = await import("@/lib/nina/aprendizado.server");
   const aprendizados = await recuperarAprendizados(clinicaId, "whatsapp", mensagemPaciente).catch(
     () => [],
   );
-  const blocoAprendizado = blocoPromptAprendizados(aprendizados);
 
   // ------------------------------------------- estado estruturado do fluxo
   // Recarregado da própria conversa. É isto que faz o paciente já
   // identificado continuar identificado na mensagem seguinte.
-  const { blocoPromptSessao: blocoPromptSessaoNina } = await import("@/lib/nina/sessao");
-  const {
-    normalizarEstado,
-    blocoPromptEstado,
-    salvarFluxoEstado,
-  } = await import("@/lib/nina/fluxo-estado.server");
+  const { normalizarEstado, salvarFluxoEstado } = await import("@/lib/nina/fluxo-estado.server");
+
   // Estado já passado pelo TTL de sessão (ver `sessaoNina` acima).
   const fluxoEstado = sessaoNina.estado ?? normalizarEstado(estadoId.fluxoEstadoBruto);
   // Fallbacks de reidratação, em ordem de confiança: estado do fluxo →
