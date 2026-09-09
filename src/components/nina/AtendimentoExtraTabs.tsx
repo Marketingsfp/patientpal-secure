@@ -841,9 +841,12 @@ export function AtendInbox() {
     }
   }, [clinicaId, contarInboxFn]);
 
+  // FASE 4 — os números dos filtros são conferidos ao entrar na tela, ao
+  // trocar de filtro e depois de cada carga da lista. O tamanho da lista não
+  // dispara mais uma segunda consulta igual à que a carga já fez.
   useEffect(() => {
     void carregarContadores();
-  }, [carregarContadores, convs.length, escopo]);
+  }, [carregarContadores, escopo]);
 
   // Trocar de escopo (ou de usuário/clínica) recomeça a lista: cada filtro tem
   // a sua própria caixa de dados, nada de sobras de outro filtro na tela.
