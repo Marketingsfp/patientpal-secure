@@ -97,6 +97,8 @@ async function registrarStatusWhatsapp(clinicaId: string, ok: boolean, erro?: st
       ultimo_teste_erro: ok ? null : (erro ?? "Falha ao enviar resposta automática").slice(0, 500),
     })
     .eq("clinica_id", clinicaId);
+  const { invalidarConfigWhatsApp } = await import("@/lib/atendimento/config-cache.server");
+  invalidarConfigWhatsApp(clinicaId);
 }
 
 export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
@@ -134,10 +136,18 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
         trace.marcar("RECV_T0_WEBHOOK_RECEIVED");
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
         const rawBody = await request.text();
-        const logId = await registrarLogWebhook(params.clinicaId, "POST", request, rawBody);
+        // FASE 6 — o log bruto continua obrigatório, mas não precisa segurar a
+        // validação: ele é gravado em paralelo e sempre aguardado antes de a
+        // resposta ser devolvida (no `finally`), então nada se perde.
+        const logPromise = registrarLogWebhook(params.clinicaId, "POST", request, rawBody);
+        let logId: string | null = null;
         let resultado = "evento_ignorado";
         try {
-          const cfg = await loadWhatsAppConfig(params.clinicaId).catch(() => null);
+          // Configuração vem do cache curto por clínica (Fase 5): evita um
+          // SELECT em cada evento recebido, e é descartada assim que alguém
+          // altera a configuração.
+          const { obterConfigWhatsApp } = await import("@/lib/atendimento/config-cache.server");
+          const cfg = await obterConfigWhatsApp(params.clinicaId).catch(() => null);
           if (!cfg) {
             resultado = "erro:clínica sem configuração de WhatsApp";
             return new Response("Not found", { status: 404 });
@@ -695,6 +705,7 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
           console.error("whatsapp webhook error", e);
           return new Response("ok", { status: 200 });
         } finally {
+          logId = await logPromise;
           await marcarResultado(logId, resultado);
           // Só tempos e etapas: o log de latência não recebe texto, telefone
           // nem qualquer dado do paciente.
