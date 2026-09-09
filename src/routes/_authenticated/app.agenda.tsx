@@ -63,6 +63,7 @@ import {
 } from "@/components/ui/dialog";
 import { DateTimeField } from "@/components/agenda/datetime-field";
 import { AgendaPorMedicoDia } from "@/components/agenda/agenda-por-medico-dia";
+import { ResumoDoDiaBar } from "@/components/agenda/resumo-do-dia-bar";
 import {
   Select,
   SelectContent,
@@ -130,6 +131,7 @@ import { SupervisorSenhaDialog } from "@/components/supervisor-senha-dialog";
 import { podeAutorizar } from "@/lib/autorizacao-supervisor";
 import {
   CalendarDays,
+  BarChart3,
   Plus,
   Pencil,
   Trash2,
@@ -2401,6 +2403,28 @@ function AgendaPage() {
 
   // Visão "Por médico — vários dias" (estilo planilha)
   const [viewMode, setViewMode] = useState<"dia" | "medico">("dia");
+
+  // Barra "Resumo do dia" (volumetria de fichas do dia/profissional). Começa
+  // fechada — quem não usa não paga a consulta — e a escolha fica guardada no
+  // navegador, para o supervisor que deixa aberta não ter de clicar todo dia.
+  const [resumoAberto, setResumoAberto] = useState(() => {
+    try {
+      return localStorage.getItem("agenda:resumo-dia") === "1";
+    } catch {
+      return false;
+    }
+  });
+  const alternarResumo = useCallback(() => {
+    setResumoAberto((v) => {
+      try {
+        localStorage.setItem("agenda:resumo-dia", v ? "0" : "1");
+      } catch {
+        // Navegador com armazenamento bloqueado: a barra segue funcionando,
+        // só não lembra da escolha.
+      }
+      return !v;
+    });
+  }, []);
 
   const emitirNfseFn = useServerFn(emitirNfse);
   const consultarNfseFn = useServerFn(consultarNfse);
@@ -8771,6 +8795,19 @@ function AgendaPage() {
           </Link>
           <button
             type="button"
+            title="Contagem das fichas do dia (atendidos, faltas, encaixes) sem sair da Agenda"
+            aria-pressed={resumoAberto}
+            className={`hidden lg:inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-semibold shadow-xs ${
+              resumoAberto
+                ? "border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100"
+                : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+            }`}
+            onClick={alternarResumo}
+          >
+            <BarChart3 className="h-3.5 w-3.5" /> Resumo do dia
+          </button>
+          <button
+            type="button"
             className="hidden lg:inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-xs hover:bg-slate-50"
             onClick={exportarAgendaExcel}
           >
@@ -8784,6 +8821,10 @@ function AgendaPage() {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-56">
+              <DropdownMenuItem onClick={alternarResumo}>
+                <BarChart3 className="h-4 w-4 mr-2" />
+                {resumoAberto ? "Ocultar resumo do dia" : "Resumo do dia"}
+              </DropdownMenuItem>
               <DropdownMenuItem onClick={exportarAgendaExcel}>
                 <Download className="h-4 w-4 mr-2" /> Exportar Excel
               </DropdownMenuItem>
@@ -11622,6 +11663,21 @@ function AgendaPage() {
         {/* KPIs REMOVIDOS */}
         {/* ESPAÇAMENTO ENTRE FILTROS E TABELA */}
         <div className="h-4 xl:h-8"></div>
+
+        {/* Resumo do dia: volumetria das fichas da DATA e do PROFISSIONAL
+            escolhidos nos filtros acima. Fica aqui, entre os filtros e a
+            tabela, para a supervisão ler o número junto com a lista que ele
+            resume. A própria barra busca os dados do dia inteiro — ver o
+            comentário no componente. */}
+        {resumoAberto && clinicaAtual && (
+          <ResumoDoDiaBar
+            clinicaId={clinicaAtual.clinica_id}
+            dataRef={dataRef}
+            filtroMedico={filtroMedico}
+            medicoNome={medicos.find((m) => m.id === filtroMedico)?.nome ?? null}
+            onFechar={alternarResumo}
+          />
+        )}
 
         {/* Aviso de expediente encerrado. Existe para que "sumiu horário da
             agenda" nunca seja um mistério: diz quem fechou o dia, quantos
