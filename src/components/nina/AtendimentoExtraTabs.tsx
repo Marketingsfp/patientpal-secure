@@ -508,7 +508,6 @@ export function AtendInbox() {
   const limparRascunhoDe = useCallback((id: string) => {
     setRascunhos((prev) => limparRascunho(prev, id));
   }, []);
-  const [enviando, setEnviando] = useState(false);
   const [novaNota, setNovaNota] = useState("");
   const [transferOpen, setTransferOpen] = useState(false);
   const [agendaOpen, setAgendaOpen] = useState(false);
