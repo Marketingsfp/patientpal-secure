@@ -81,6 +81,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { usePodeEscrever } from "@/hooks/use-permissoes";
 import { useRealtimeAtendimento } from "@/hooks/use-realtime-atendimento";
 import { criarAgrupador, type Agrupador } from "@/lib/atendimento/realtime-roteador";
+import { criarReconciliadorRetomada, motivoDeRetomada } from "@/lib/atendimento/retomada";
 import {
   cursorMaisRecente,
   mesclarNovas,
@@ -1798,6 +1799,47 @@ export function AtendInbox() {
     },
     [],
   );
+
+  // FASE 2 — rede de segurança ao retomar a tela. O tempo real continua sendo o
+  // caminho principal; aqui só conferimos o estado real quando a aba volta do
+  // segundo plano, ganha foco ou a internet volta. Sem consulta periódica.
+  const reconciliarInbox = useCallback(() => {
+    const g = agrupadores.current;
+    if (!g) return;
+    g.lista.agendar();
+    g.espera.agendar();
+    if (selIdRef.current) {
+      g.conversa.agendar();
+      g.apoio.agendar();
+    }
+  }, []);
+
+  const reconciliarRef = useRef(reconciliarInbox);
+  reconciliarRef.current = reconciliarInbox;
+
+  useEffect(() => {
+    if (!clinicaId || !meuId) return;
+    const reconciliador = criarReconciliadorRetomada({
+      executar: () => reconciliarRef.current(),
+    });
+    const aoEvento = (tipo: "focus" | "visibilitychange" | "online") => () => {
+      const motivo = motivoDeRetomada(tipo, document.visibilityState);
+      if (!motivo) return;
+      reconciliador.solicitar(motivo);
+    };
+    const aoFoco = aoEvento("focus");
+    const aoVisibilidade = aoEvento("visibilitychange");
+    const aoVoltarInternet = aoEvento("online");
+    window.addEventListener("focus", aoFoco);
+    document.addEventListener("visibilitychange", aoVisibilidade);
+    window.addEventListener("online", aoVoltarInternet);
+    return () => {
+      window.removeEventListener("focus", aoFoco);
+      document.removeEventListener("visibilitychange", aoVisibilidade);
+      window.removeEventListener("online", aoVoltarInternet);
+      reconciliador.cancelar();
+    };
+  }, [clinicaId, meuId]);
 
   useRealtimeAtendimento({
     clinicaId: clinicaId ?? null,
