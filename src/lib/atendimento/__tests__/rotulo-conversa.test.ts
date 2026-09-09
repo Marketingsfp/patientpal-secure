@@ -2,11 +2,21 @@ import { describe, expect, it } from "bun:test";
 import { SEM_NOME, nomeConversa, tituloConversa } from "../rotulo-conversa";
 
 describe("identificação da conversa", () => {
-  it("usa o nome do paciente vinculado antes de qualquer outra coisa", () => {
+  it("usa o nome do contato WhatsApp antes do paciente vinculado", () => {
     expect(
       nomeConversa({
         pacientes: { nome: "Maria da Silva" },
         contato_nome: "Zap da Maria",
+        contato_telefone: "5588999990000",
+      }),
+    ).toBe("Zap da Maria");
+  });
+
+  it("usa o paciente vinculado apenas quando não há nome de contato", () => {
+    expect(
+      nomeConversa({
+        pacientes: { nome: "Maria da Silva" },
+        contato_nome: null,
         contato_telefone: "5588999990000",
       }),
     ).toBe("Maria da Silva");
