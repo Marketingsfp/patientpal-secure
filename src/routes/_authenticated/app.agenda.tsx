@@ -167,6 +167,7 @@ import {
   Eye,
   Ban,
   MessageSquareText,
+  UtensilsCrossed,
 } from "lucide-react";
 import {
   MOTIVOS_SEM_FATURAMENTO,
@@ -177,6 +178,12 @@ import {
   podeAutorizarSemFaturamento,
   rotuloSemFaturamento,
 } from "@/lib/agenda/sem-faturamento";
+import {
+  vaosEntreHorarios,
+  vaosDaGrade,
+  rotuloDoVao,
+  type FaixaGrade,
+} from "@/lib/agenda/intervalos-grade";
 import { printGuiaAtendimento, printGuiaAtendimentoAgrupada } from "@/lib/print-gr";
 import {
   printComprovanteAgendamento,
@@ -337,6 +344,13 @@ const DIAS_SEMANA = ["DOM", "SEG", "TER", "QUA", "QUI", "SEX", "SAB"];
 // (`fmtData` usa o fuso do navegador). Não dá para usar `inicio.slice(0, 10)`
 // aqui: o `inicio` é gravado em UTC e um horário do fim da tarde cairia no dia
 // seguinte, quebrando a divisória justamente nos últimos atendimentos do dia.
+// "HH:MM" no fuso do navegador. Mesma razão de `chaveDiaLocal`: fatiar a
+// string ISO daria a hora em UTC.
+const horaLocal = (iso: string) => {
+  const d = new Date(iso);
+  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+};
+
 const chaveDiaLocal = (iso: string) => {
   const d = new Date(iso);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -1020,6 +1034,9 @@ function AgendaPage() {
   const [filtroAgenda, setFiltroAgenda] = useState<string>("todos");
   // Ids de agenda que têm grade de horários ativa (ver a carga em `loadRef`).
   const [agendasComGrade, setAgendasComGrade] = useState<Set<string>>(new Set());
+  // Grade cadastrada por `medicoId|agendaId` — origem preferida do intervalo
+  // de almoço mostrado na lista (ver `vaosPorChave`).
+  const [faixasDaGrade, setFaixasDaGrade] = useState<Map<string, FaixaGrade[]>>(new Map());
   const [agendasCarregadas, setAgendasPorMedico] = useState<
     Map<string, { id: string; nome: string; ordem_chegada?: boolean }[]>
   >(new Map());
@@ -3128,7 +3145,9 @@ function AgendaPage() {
       // crescer, e o corte seria silencioso.
       supabase
         .from("medico_disponibilidades")
-        .select("agenda_id")
+        .select(
+          "medico_id, agenda_id, dia_semana, hora_inicio, hora_fim, vigencia_inicio, vigencia_fim",
+        )
         .eq("clinica_id", clinicaAtual.clinica_id)
         .eq("ativo", true)
         .not("agenda_id", "is", null)
@@ -3148,13 +3167,27 @@ function AgendaPage() {
       ag.set(a.medico_id, arr);
     }
     setAgendasPorMedico(ag);
+    const gradeRows = (gradesRes.data ?? []) as Array<
+      FaixaGrade & { medico_id: string | null; agenda_id: string | null }
+    >;
     setAgendasComGrade(
-      new Set(
-        ((gradesRes.data ?? []) as Array<{ agenda_id: string | null }>)
-          .map((g) => g.agenda_id)
-          .filter((id): id is string => !!id),
-      ),
+      new Set(gradeRows.map((g) => g.agenda_id).filter((id): id is string => !!id)),
     );
+    const faixas = new Map<string, FaixaGrade[]>();
+    for (const g of gradeRows) {
+      if (!g.medico_id || !g.agenda_id) continue;
+      const chave = `${g.medico_id}|${g.agenda_id}`;
+      const arr = faixas.get(chave) ?? [];
+      arr.push({
+        dia_semana: g.dia_semana,
+        hora_inicio: g.hora_inicio,
+        hora_fim: g.hora_fim,
+        vigencia_inicio: g.vigencia_inicio,
+        vigencia_fim: g.vigencia_fim,
+      });
+      faixas.set(chave, arr);
+    }
+    setFaixasDaGrade(faixas);
     // Vínculos serviço↔agenda (para limitar serviços no agendamento conforme agenda escolhida)
     const agendaIds = (agendasData ?? []).map((a) => (a as { id: string }).id);
     const vincPorAgenda = new Map<string, Set<string>>();
@@ -4207,6 +4240,38 @@ function AgendaPage() {
     [filtrados],
   );
   const paginados = filtradosOrdenados.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
+  // Intervalos (almoço) de cada médico/agenda em cada dia, calculados sobre
+  // TODAS as fichas carregadas — nunca sobre a lista já filtrada. Esconder os
+  // horários livres, procurar um paciente ou filtrar por situação também abre
+  // buracos na lista, e nenhum deles é intervalo de verdade.
+  const vaosPorChave = useMemo(() => {
+    const porChave = new Map<string, Array<{ inicio: string; fim: string }>>();
+    const contexto = new Map<string, { medicoId: string; agendaId: string; diaIso: string }>();
+    for (const a of items) {
+      if (!a.medico_id || !a.agenda_id) continue;
+      const diaIso = chaveDiaLocal(a.inicio);
+      const chave = `${a.medico_id}|${a.agenda_id}|${diaIso}`;
+      const arr = porChave.get(chave) ?? [];
+      arr.push({ inicio: horaLocal(a.inicio), fim: horaLocal(a.fim) });
+      porChave.set(chave, arr);
+      contexto.set(chave, { medicoId: a.medico_id, agendaId: a.agenda_id, diaIso });
+    }
+    const out = new Map<string, ReturnType<typeof vaosEntreHorarios>>();
+    for (const [chave, pedacos] of porChave) {
+      const ctx = contexto.get(chave)!;
+      // A grade manda: é o horário combinado com o médico. Uma ficha gerada
+      // por engano dentro do almoço (foi o caso das vagas que avançaram sobre
+      // o meio-dia) encurtaria o intervalo se o cálculo saísse das fichas.
+      const grade = faixasDaGrade.get(`${ctx.medicoId}|${ctx.agendaId}`);
+      const daGrade = grade
+        ? vaosDaGrade(grade, ctx.diaIso, new Date(`${ctx.diaIso}T12:00:00`).getDay())
+        : [];
+      const vaos = daGrade.length > 0 ? daGrade : vaosEntreHorarios(pedacos);
+      if (vaos.length > 0) out.set(chave, vaos);
+    }
+    return out;
+  }, [items, faixasDaGrade]);
 
   // Divisória de dias na lista corrida. A janela padrão ("a partir de") mostra
   // o dia escolhido INTEIRO e ainda os agendamentos já marcados dos dias
@@ -12293,6 +12358,32 @@ function AgendaPage() {
                         listaTemVariosDias &&
                         (idx === 0 ||
                           chaveDiaLocal(paginados[idx - 1].inicio) !== chaveDiaLocal(a.inicio));
+                      // Faixa de almoço: aparece entre a última ficha da manhã
+                      // e a primeira da tarde, para quem está marcando ver na
+                      // hora por que a grade pula esse pedaço do dia (ver
+                      // `vaosPorChave`).
+                      const anterior = idx > 0 ? paginados[idx - 1] : null;
+                      const intervalo = (() => {
+                        if (!anterior || abreDia) return null;
+                        if (!a.medico_id || !a.agenda_id) return null;
+                        if (anterior.medico_id !== a.medico_id) return null;
+                        if (anterior.agenda_id !== a.agenda_id) return null;
+                        const diaIso = chaveDiaLocal(a.inicio);
+                        if (chaveDiaLocal(anterior.inicio) !== diaIso) return null;
+                        const vaos = vaosPorChave.get(`${a.medico_id}|${a.agenda_id}|${diaIso}`);
+                        if (!vaos) return null;
+                        // A faixa entra imediatamente antes da primeira ficha
+                        // que começa dentro do intervalo (ou depois dele). Se
+                        // sobrou ficha marcada por cima do almoço, ela aparece
+                        // logo abaixo da faixa — que é como a recepção vê que
+                        // aquele paciente precisa ser remarcado.
+                        const inicioAnterior = horaLocal(anterior.inicio);
+                        const inicioAtual = horaLocal(a.inicio);
+                        return (
+                          vaos.find((v) => inicioAnterior < v.inicio && inicioAtual >= v.inicio) ??
+                          null
+                        );
+                      })();
                       const fichaNum = fichaPorId.get(a.id) ?? "";
                       const realizado = a.status === "realizado";
                       const etapaRow = etapaMap.get(a.id) ?? "aguardando_recepcao";
@@ -12354,6 +12445,27 @@ function AgendaPage() {
                                 className="border-y-2 border-slate-300 bg-slate-200 px-3 py-2 text-[13px] font-bold uppercase tracking-wide text-slate-800"
                               >
                                 {rotuloDiaExtenso(a.inicio)}
+                              </TableCell>
+                            </TableRow>
+                          )}
+                          {intervalo && (
+                            <TableRow className="hover:bg-transparent">
+                              <TableCell
+                                colSpan={11}
+                                className="border-y-2 border-amber-300 bg-amber-100 px-3 py-3 text-center dark:border-amber-700 dark:bg-amber-950/40"
+                              >
+                                <span className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1">
+                                  <UtensilsCrossed className="h-6 w-6 shrink-0 text-amber-700 dark:text-amber-400" />
+                                  <span className="text-2xl font-bold tabular-nums text-amber-900 dark:text-amber-200">
+                                    {intervalo.inicio} – {intervalo.fim}
+                                  </span>
+                                  <span className="text-xl font-bold uppercase tracking-wide text-amber-900 dark:text-amber-200">
+                                    {rotuloDoVao(intervalo)}
+                                  </span>
+                                  <span className="text-sm font-medium text-amber-800 dark:text-amber-300">
+                                    o médico não atende nesse período
+                                  </span>
+                                </span>
                               </TableCell>
                             </TableRow>
                           )}
