@@ -11285,6 +11285,9 @@ export type Database = {
           telefone2: string | null
           telefone2_norm: string | null
           teste: boolean
+          unificado_em: string | null
+          unificado_obs: string | null
+          unificado_para_id: string | null
           updated_at: string
         }
         Insert: {
@@ -11331,6 +11334,9 @@ export type Database = {
           telefone2?: string | null
           telefone2_norm?: string | null
           teste?: boolean
+          unificado_em?: string | null
+          unificado_obs?: string | null
+          unificado_para_id?: string | null
           updated_at?: string
         }
         Update: {
@@ -11377,6 +11383,9 @@ export type Database = {
           telefone2?: string | null
           telefone2_norm?: string | null
           teste?: boolean
+          unificado_em?: string | null
+          unificado_obs?: string | null
+          unificado_para_id?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -11385,6 +11394,13 @@ export type Database = {
             columns: ["clinica_id"]
             isOneToOne: false
             referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pacientes_unificado_para_id_fkey"
+            columns: ["unificado_para_id"]
+            isOneToOne: false
+            referencedRelation: "pacientes"
             referencedColumns: ["id"]
           },
         ]
@@ -12837,6 +12853,54 @@ export type Database = {
           },
         ]
       }
+      unificacao_fase1_plano: {
+        Row: {
+          aplicado_em: string | null
+          classificacao: string
+          clinica_id: string
+          criado_em: string
+          criterio: string
+          desfeito_em: string | null
+          estado_antes: Json
+          grupo: number
+          motivo_vencedor: string | null
+          paciente_id: string
+          papel: string
+          qtd_movimento: number
+          vencedor_id: string
+        }
+        Insert: {
+          aplicado_em?: string | null
+          classificacao: string
+          clinica_id: string
+          criado_em?: string
+          criterio: string
+          desfeito_em?: string | null
+          estado_antes: Json
+          grupo: number
+          motivo_vencedor?: string | null
+          paciente_id: string
+          papel: string
+          qtd_movimento: number
+          vencedor_id: string
+        }
+        Update: {
+          aplicado_em?: string | null
+          classificacao?: string
+          clinica_id?: string
+          criado_em?: string
+          criterio?: string
+          desfeito_em?: string | null
+          estado_antes?: Json
+          grupo?: number
+          motivo_vencedor?: string | null
+          paciente_id?: string
+          papel?: string
+          qtd_movimento?: number
+          vencedor_id?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           clinica_id: string | null
@@ -13437,6 +13501,9 @@ export type Database = {
           telefone2: string | null
           telefone2_norm: string | null
           teste: boolean
+          unificado_em: string | null
+          unificado_obs: string | null
+          unificado_para_id: string | null
           updated_at: string
         }[]
         SetofOptions: {
@@ -14610,6 +14677,9 @@ export type Database = {
           telefone2: string | null
           telefone2_norm: string | null
           teste: boolean
+          unificado_em: string | null
+          unificado_obs: string | null
+          unificado_para_id: string | null
           updated_at: string
         }[]
         SetofOptions: {
