@@ -107,7 +107,7 @@ describe("TESTE C — criação com paciente e vaga confirmados", () => {
             capacidade: "agenda",
             fonte: "agenda",
             success: true,
-            erro: null,
+            erro: undefined,
           },
         ],
         estadoOperacional: {
@@ -146,7 +146,7 @@ describe("TESTE D — score original é imutável", () => {
           capacidade: "catalogo",
           fonte: "catalogo_publicado",
           success: true,
-          erro: null,
+          erro: undefined,
         },
       ],
     });
