@@ -15,12 +15,14 @@ function clienteFake(opts: { encontra?: string | null } = {}) {
         const q: any = {
           select: () => q,
           eq: (col: string, val: string) => {
-            if (col.startsWith("telefone")) buscasTelefone.push(`${col}=${val}`);
+            if (col.startsWith("telefone")) {
+              buscasTelefone.push(`${col}=${val}`);
+              if (col === "telefone2_norm") q.__vazio = true;
+            }
             return q;
           },
-          limit: () => q,
-          maybeSingle: async () => ({
-            data: opts.encontra ? { id: opts.encontra } : null,
+          limit: async () => ({
+            data: !q.__vazio && opts.encontra ? [{ id: opts.encontra, nome: "X" }] : [],
           }),
         };
         return q;
@@ -56,7 +58,7 @@ describe("FASE 4 — abertura do lead pelo vínculo direto", () => {
     expect(metricasContato.lookupsTelefone).toBe(antes);
   });
 
-  it("conversa sem vínculo usa o fallback por telefone e grava o vínculo", async () => {
+  it("conversa sem vínculo apenas sugere candidato — não grava vínculo", async () => {
     const { cliente, buscasTelefone, updates } = clienteFake({ encontra: PAC });
     const r = await resolverContatoConversa(cliente as any, {
       clinicaId: CLI,
@@ -64,28 +66,10 @@ describe("FASE 4 — abertura do lead pelo vínculo direto", () => {
       contatoPacienteId: null,
       contatoTelefone: "5521999998888",
     });
-    expect(r.pacienteId).toBe(PAC);
-    expect(r.viaVinculo).toBe(false);
+    expect(r.status).toBe("UNIQUE_CANDIDATE");
+    expect(r.pacienteId).toBeNull();
     expect(buscasTelefone.length).toBeGreaterThan(0);
-    expect(updates[0]).toEqual({ contato_paciente_id: PAC });
-  });
-
-  it("segunda abertura já usa o ID (fallback acontece uma única vez)", async () => {
-    const primeiro = clienteFake({ encontra: PAC });
-    await resolverContatoConversa(primeiro.cliente as any, {
-      clinicaId: CLI,
-      conversaId: CONV,
-      contatoPacienteId: null,
-      contatoTelefone: "5521999998888",
-    });
-    const segundo = clienteFake({ encontra: PAC });
-    await resolverContatoConversa(segundo.cliente as any, {
-      clinicaId: CLI,
-      conversaId: CONV,
-      contatoPacienteId: PAC,
-      contatoTelefone: "5521999998888",
-    });
-    expect(segundo.buscasTelefone).toEqual([]);
+    expect(updates).toEqual([]);
   });
 
   it("sem telefone e sem vínculo não faz busca alguma", async () => {
