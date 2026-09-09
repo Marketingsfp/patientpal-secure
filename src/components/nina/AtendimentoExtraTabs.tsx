@@ -1807,12 +1807,15 @@ export function AtendInbox() {
   carregarConvsAgrup.current = carregarConvs;
   const carregarEsperaRef = useRef(carregarEspera);
   carregarEsperaRef.current = carregarEspera;
+  const carregarContadoresRef = useRef(carregarContadores);
+  carregarContadoresRef.current = carregarContadores;
 
   const agrupadores = useRef<{
     lista: Agrupador;
     conversa: Agrupador;
     apoio: Agrupador;
     espera: Agrupador;
+    contadores: Agrupador;
   } | null>(null);
   if (agrupadores.current === null) {
     agrupadores.current = {
