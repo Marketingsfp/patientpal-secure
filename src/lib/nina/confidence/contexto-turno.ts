@@ -11,6 +11,7 @@
  *    apenas que a agenda está habilitada; nunca implica `criar_agendamento`.
  */
 import type { IntencaoNina } from "../atendimento-fase1";
+import type { EtapaFluxoNina } from "../fluxo-estado-normalizar";
 import type { AcaoSolicitada } from "./types";
 
 /** Capacidades habilitadas na clínica. Nunca viram intenção. */
@@ -24,7 +25,13 @@ export type ContextoCanonicoTurno = {
   intencoes: IntencaoNina[];
   /** Rótulo textual das intenções, ou `null` quando desconhecida (UNKNOWN). */
   intent: string | null;
-  /** O que a Nina vai fazer, derivado SÓ do que foi observado. */
+  /** Onde a conversa está (máquina de estados existente). */
+  stage: EtapaFluxoNina | null;
+  /**
+   * SOMENTE uma ação executável prestes a acontecer. Intenção NÃO basta:
+   * `criar_agendamento` exige o estágio de criação; `cancelar_agendamento`
+   * exige o cancelamento realmente em execução.
+   */
   requestedAction: AcaoSolicitada;
   /** A mensagem não permite decidir o que o paciente quer. */
   intentAmbiguo: boolean;
@@ -37,14 +44,14 @@ export type ContextoCanonicoTurno = {
 };
 
 /**
- * Prioridade de tradução intenção -> ação. A primeira que casar vence.
+ * Tradução intenção -> ação CONVERSACIONAL. A primeira que casar vence.
  * Pedir valor/horário/médico é informação, não agendamento.
+ *
+ * Intenções críticas (agendamento, remarcação, cancelamento) NÃO aparecem
+ * aqui de propósito: elas descrevem desejo, não execução.
  */
 const PRIORIDADE: Array<[IntencaoNina, AcaoSolicitada]> = [
   ["falar_humano", "transferir_humano"],
-  ["cancelamento", "cancelar_agendamento"],
-  ["remarcacao", "criar_agendamento"],
-  ["agendamento", "criar_agendamento"],
   ["disponibilidade", "informar_disponibilidade"],
   ["valor", "informar_valor"],
   ["financeiro", "informar_valor"],
@@ -54,12 +61,37 @@ const PRIORIDADE: Array<[IntencaoNina, AcaoSolicitada]> = [
   ["medico", "informar_profissional"],
 ];
 
+/** Intenções que descrevem desejo de uma operação crítica, não a operação. */
+const INTENCOES_CRITICAS: IntencaoNina[] = ["agendamento", "remarcacao", "cancelamento"];
+
+/** Sinais do fluxo real que autorizam uma ação executável neste turno. */
+export type GatilhosExecucao = {
+  /** Estágio atual da máquina de estados do atendimento. */
+  stage?: EtapaFluxoNina | null;
+  /** O cancelamento está sendo executado agora (dados e confirmação prontos). */
+  cancelamentoEmExecucao?: boolean;
+};
+
 /**
- * Traduz intenções observadas em ação. Sem intenção legível devolve
- * `desconhecida` — jamais um padrão otimista.
+ * Traduz o turno em ação. Sem intenção legível devolve `desconhecida`;
+ * com intenção crítica sem o estágio de execução devolve `nenhuma`.
  */
-export function acaoDasIntencoes(intencoes: IntencaoNina[]): AcaoSolicitada {
+export function acaoDasIntencoes(
+  intencoes: IntencaoNina[],
+  gatilhos: GatilhosExecucao = {},
+): AcaoSolicitada {
   if (intencoes.length === 0) return "desconhecida";
+
+  // Pedido explícito de humano continua sendo a operação que o sistema executa.
+  if (intencoes.includes("falar_humano")) return "transferir_humano";
+
+  if (intencoes.includes("cancelamento")) {
+    return gatilhos.cancelamentoEmExecucao === true ? "cancelar_agendamento" : "nenhuma";
+  }
+  if (intencoes.includes("agendamento") || intencoes.includes("remarcacao")) {
+    return gatilhos.stage === "CREATING_APPOINTMENT" ? "criar_agendamento" : "nenhuma";
+  }
+
   for (const [intencao, acao] of PRIORIDADE) {
     if (intencoes.includes(intencao)) return acao;
   }
@@ -67,10 +99,22 @@ export function acaoDasIntencoes(intencoes: IntencaoNina[]): AcaoSolicitada {
   return "responder_informacao";
 }
 
+/**
+ * O turno chegou de fato ao estágio de criação, mesmo sem intenção redetectada
+ * na mensagem atual ("sim, pode confirmar" não contém a palavra agendar).
+ */
+function criandoAgendamento(gatilhos: GatilhosExecucao): boolean {
+  return gatilhos.stage === "CREATING_APPOINTMENT";
+}
+
 export type EntradaContextoCanonico = {
   mensagemPaciente: string;
   /** Capacidade da clínica. Entra só em `capacidades`. */
   podeAgendar: boolean;
+  /** Estágio real do fluxo (máquina de estados existente). */
+  stage?: EtapaFluxoNina | null;
+  /** Cancelamento realmente em execução neste turno. */
+  cancelamentoEmExecucao?: boolean;
   messageIdEntrada?: string | null;
   messageIdResposta?: string | null;
 };
@@ -89,15 +133,29 @@ export function montarContextoCanonicoTurno(
   const mensagem = e.mensagemPaciente ?? "";
   const intencoes = deps.detectarIntencoes(mensagem);
   const ambiguo = deps.intencaoAmbigua(mensagem, intencoes);
-  const requestedAction = acaoDasIntencoes(intencoes);
+  const gatilhos: GatilhosExecucao = {
+    stage: e.stage ?? null,
+    cancelamentoEmExecucao: e.cancelamentoEmExecucao === true,
+  };
+  const requestedAction = criandoAgendamento(gatilhos)
+    ? "criar_agendamento"
+    : acaoDasIntencoes(intencoes, gatilhos);
 
   return {
     intencoes,
     intent: intencoes.length > 0 ? intencoes.join(", ") : null,
+    stage: e.stage ?? null,
     requestedAction,
     intentAmbiguo: ambiguo,
     capacidades: { podeAgendar: e.podeAgendar },
     messageIdEntrada: e.messageIdEntrada ?? null,
     messageIdResposta: e.messageIdResposta ?? null,
   };
+}
+
+/** Intenção crítica presente, mas sem execução autorizada neste turno. */
+export function intencaoCriticaSemExecucao(c: ContextoCanonicoTurno): boolean {
+  return (
+    c.requestedAction === "nenhuma" && c.intencoes.some((i) => INTENCOES_CRITICAS.includes(i))
+  );
 }

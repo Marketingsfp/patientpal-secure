@@ -23,6 +23,13 @@ export type AcaoSolicitada =
   | "cancelar_agendamento"
   | "identificar_paciente"
   | "transferir_humano"
+  /**
+   * Turno apenas conversacional: existe intenção legível, mas NENHUMA ação
+   * executável está prestes a acontecer (ex.: "quero agendar" enquanto a
+   * conversa ainda coleta dados). Diferente de "desconhecida", que é ausência
+   * de sinal.
+   */
+  | "nenhuma"
   | "desconhecida";
 
 /** Origem de um fato apresentado ao paciente. */

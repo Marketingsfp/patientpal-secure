@@ -408,6 +408,8 @@ const RISCO_POR_ACAO: Record<string, NivelRiscoAcao> = {
   criar_agendamento: "CRITICAL",
   cancelar_agendamento: "CRITICAL",
   transferir_humano: "LOW",
+  // Turno conversacional: nada executável em jogo.
+  nenhuma: "LOW",
   desconhecida: "MEDIUM",
 };
 
