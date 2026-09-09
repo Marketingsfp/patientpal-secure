@@ -30,6 +30,7 @@ import { ConvenioFuncionarioTab } from "@/components/funcionarios/ConvenioFuncio
 import { PatientSearchInput, type PatientOption } from "@/components/patient-search-input";
 import { QuickPatientDialog } from "@/components/pacientes/quick-patient-dialog";
 import { UserPlus } from "lucide-react";
+import { PERFIS_SISTEMA } from "@/lib/permissoes-presets";
 
 export const Route = createFileRoute("/_authenticated/app/hr-contratos/$id")({
   component: EditarFuncionarioPage,
@@ -44,15 +45,8 @@ interface Ref {
   nome: string;
 }
 
-const PERFIS = [
-  { value: "admin", label: "Administrador" },
-  { value: "gestor", label: "Gestor" },
-  { value: "medico", label: "Médico" },
-  { value: "enfermeiro", label: "Enfermeiro" },
-  { value: "recepcao", label: "Recepção" },
-  { value: "caixa", label: "Caixa" },
-  { value: "financeiro", label: "Financeiro" },
-] as const;
+// Fonte única de perfis (inclui Telefonia); nunca duplicar a lista aqui.
+const PERFIS = PERFIS_SISTEMA;
 
 function EditarFuncionarioPage() {
   const { id } = Route.useParams();

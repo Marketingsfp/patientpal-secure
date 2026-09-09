@@ -15,6 +15,28 @@ export type PerfilKey =
 
 export type Acesso = "none" | "read" | "write";
 
+/**
+ * Fonte única dos perfis selecionáveis no cadastro/edição de usuário.
+ * O `value` é a chave canônica gravada em `clinica_memberships.role`
+ * (minúscula, sem acento); o `label` é só apresentação.
+ */
+export const PERFIS_SISTEMA: ReadonlyArray<{ value: PerfilKey; label: string }> = [
+  { value: "admin", label: "Administrador" },
+  { value: "gestor", label: "Gestor" },
+  { value: "medico", label: "Médico" },
+  { value: "enfermeiro", label: "Enfermeiro" },
+  { value: "recepcao", label: "Recepção" },
+  { value: "caixa", label: "Caixa" },
+  { value: "financeiro", label: "Financeiro" },
+  { value: "telefonia", label: "Telefonia" },
+];
+
+/** Normaliza variações de capitalização/acento para a chave canônica. */
+export function perfilCanonico(role: string | null | undefined): PerfilKey | null {
+  const k = (role ?? "").trim().toLowerCase();
+  return PERFIS_SISTEMA.some((p) => p.value === k) ? (k as PerfilKey) : null;
+}
+
 export const TODOS_MODULOS: ReadonlyArray<string> = [
   // Operação
   "agenda",
