@@ -3,9 +3,13 @@
  *
  * FASE 3: rascunho + publicação versionada + histórico + comparação + restauração.
  * Publicar cria SEMPRE uma versão nova; a anterior é arquivada, nunca apagada.
- * O carregamento do prompt em tempo de execução ainda NÃO usa esta fonte —
- * isso é a próxima fase.
+ *
+ * FASE 3 (backend) + FASE 4 (interface): a versão PUBLICADA no escopo
+ * "whatsapp" é a ÚNICA fonte de comportamento conversacional da Nina do
+ * WhatsApp. Nenhuma outra tela edita comportamento. A auditoria abaixo mostra,
+ * somente leitura, o que de fato chega ao modelo e de onde cada parte vem.
  */
+
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
