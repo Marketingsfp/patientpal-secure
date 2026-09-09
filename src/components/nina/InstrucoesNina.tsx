@@ -50,6 +50,8 @@ import {
   type VersaoHistorico,
 } from "@/lib/nina/instrucoes.functions";
 import { apenasMudancas, compararTextos, resumoDiff } from "@/lib/nina/instrucoes-diff";
+import { previewRequestNina } from "@/lib/nina/prompt-preview.functions";
+
 
 const ROTULO_STATUS: Record<string, string> = {
   publicada: "Atual",
