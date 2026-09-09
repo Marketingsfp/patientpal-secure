@@ -101,6 +101,7 @@ import {
   atualizarMensagemNoCache,
   transformarMensagensNoCache,
 } from "@/lib/atendimento/pos-envio";
+import { patchListaPorConversa, patchListaPorMensagem } from "@/lib/atendimento/patch-inbox";
 import {
   cursorMaisRecente,
   mesclarNovas,
