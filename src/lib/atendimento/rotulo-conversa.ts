@@ -1,15 +1,29 @@
 /**
  * Regra ÚNICA de identificação visual da conversa.
  *
- * Prioridade:
- *   1. nome do PACIENTE efetivamente vinculado (`atend_conversas.contato_paciente_id`);
- *   2. nome do contato já existente na conversa (`contato_nome`), quando é um
- *      nome de verdade — o webhook e o gatilho de criação gravam o próprio
- *      telefone nesse campo, e telefone não é nome;
+ * FASE 1 — duas identidades SEPARADAS, que não são a mesma coisa:
+ *
+ *   CONTACT IDENTITY (identidade do contato WhatsApp)
+ *     quem está falando naquele número/canal, agora.
+ *     Fonte: `atend_conversas.contato_nome` + `contato_telefone`
+ *     (alimentado pelo webhook, em `contacts[].profile.name`).
+ *
+ *   PATIENT IDENTITY (paciente cadastrado)
+ *     registro clínico explicitamente vinculado à conversa.
+ *     Fonte: `atend_conversas.contato_paciente_id` → `pacientes.nome`.
+ *     Pode estar ausente, desatualizado ou vinculado ao paciente errado.
+ *
+ * O paciente cadastrado NÃO substitui silenciosamente o nome do contato no
+ * título da conversa. Prioridade da identificação principal:
+ *   1. `contato_nome`, quando é nome de verdade — o webhook e o gatilho de
+ *      criação gravam o próprio telefone nesse campo, e telefone não é nome;
+ *   2. nome do paciente vinculado, como complemento quando não há nome de
+ *      contato;
  *   3. nada: a interface mostra "Paciente não identificado".
  *
  * Isto é apresentação. Telefone, número da conversa, vínculo e destino de envio
  * continuam sendo os identificadores técnicos e não são alterados aqui.
+ * Nenhuma função deste arquivo grava, vincula, desvincula ou altera cadastro.
  */
 
 export const SEM_NOME = "Paciente não identificado";
@@ -40,12 +54,50 @@ function nomeValido(bruto: unknown, telefone?: string | null): string | null {
   return nome;
 }
 
-/** Nome do paciente/contato quando existe; `null` quando não há nome cadastrado. */
-export function nomeConversa(c: ConversaComNome | null | undefined): string | null {
+/** Nome do CONTATO WhatsApp, quando é um nome de verdade. */
+export function nomeContato(c: ConversaComNome | null | undefined): string | null {
   if (!c) return null;
-  const doPaciente = String(c.pacientes?.nome ?? "").trim();
-  if (doPaciente) return doPaciente;
   return nomeValido(c.contato_nome, c.contato_telefone);
+}
+
+/** Nome do PACIENTE cadastrado vinculado à conversa, quando existe o vínculo. */
+export function nomePacienteVinculado(c: ConversaComNome | null | undefined): string | null {
+  if (!c) return null;
+  const nome = String(c.pacientes?.nome ?? "").trim();
+  return nome || null;
+}
+
+export type OrigemIdentidade = "contato_whatsapp" | "paciente_vinculado" | "nenhuma";
+
+export type IdentidadeConversa = {
+  /** Identidade do contato WhatsApp (quem está conversando). */
+  contato: { nome: string | null; telefone: string | null };
+  /** Identidade clínica vinculada — informativa, nunca substitui o contato. */
+  paciente: { nome: string | null; vinculado: boolean };
+  /** Nome usado como identificação principal da conversa. */
+  principal: string | null;
+  origem: OrigemIdentidade;
+  /** Contato e cadastro têm nomes diferentes: útil para sinalizar na FASE 2. */
+  divergente: boolean;
+};
+
+/** Contrato único: devolve as duas identidades separadas, sem misturá-las. */
+export function identidadeConversa(c: ConversaComNome | null | undefined): IdentidadeConversa {
+  const contato = nomeContato(c);
+  const paciente = nomePacienteVinculado(c);
+  const principal = contato ?? paciente ?? null;
+  return {
+    contato: { nome: contato, telefone: c?.contato_telefone ?? null },
+    paciente: { nome: paciente, vinculado: !!paciente },
+    principal,
+    origem: contato ? "contato_whatsapp" : paciente ? "paciente_vinculado" : "nenhuma",
+    divergente: !!contato && !!paciente && contato.trim() !== paciente.trim(),
+  };
+}
+
+/** Nome principal da conversa; `null` quando não há nome nenhum. */
+export function nomeConversa(c: ConversaComNome | null | undefined): string | null {
+  return identidadeConversa(c).principal;
 }
 
 /** Título exibido na lista, no cabeçalho, na busca e nas filas. */
