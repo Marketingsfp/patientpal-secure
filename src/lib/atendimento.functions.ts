@@ -2154,6 +2154,82 @@ export const obterDadosContato = createServerFn({ method: "POST" })
   });
 
 /* =========================================================
+ *  FASE 5 — revisão manual do vínculo contato ↔ paciente
+ * =========================================================
+ * Nome diferente NÃO prova vínculo errado (responsável, mãe, acompanhante,
+ * apelido, número da empresa). Por isso nada é desvinculado automaticamente:
+ * a troca só acontece aqui, por escolha explícita e confirmada de alguém com
+ * acesso à conversa, e fica registrada em `atend_conversa_eventos`.
+ */
+export const revisarVinculoPacienteConversa = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) =>
+    z
+      .object({
+        clinicaId: z.string().uuid(),
+        conversaId: z.string().uuid(),
+        pacienteId: z.string().uuid(),
+        confirmado: z.literal(true),
+      })
+      .parse(i),
+  )
+  .handler(async ({ data, context }) => {
+    await assertMember(context.supabase, context.userId, data.clinicaId);
+    {
+      const { assertAcessoConversa } = await import("./atendimento/acesso-conversa.server");
+      await assertAcessoConversa(context.supabase, context.userId, data.clinicaId, data.conversaId);
+    }
+    // O paciente precisa ser da mesma clínica da conversa.
+    const { data: pac } = await context.supabase
+      .from("pacientes")
+      .select("id, nome")
+      .eq("id", data.pacienteId)
+      .eq("clinica_id", data.clinicaId)
+      .maybeSingle();
+    if (!pac) throw new Error("Paciente não encontrado nesta clínica.");
+
+    const { data: conv } = await context.supabase
+      .from("atend_conversas")
+      .select("contato_paciente_id")
+      .eq("id", data.conversaId)
+      .eq("clinica_id", data.clinicaId)
+      .maybeSingle();
+    const anterior = (conv as { contato_paciente_id?: string | null } | null)?.contato_paciente_id ?? null;
+    if (anterior === data.pacienteId) return { ok: true, paciente: pac, trocado: false };
+
+    const { vincularPacienteConversa } = await import("./atendimento/vinculo-contato.server");
+    const ok = await vincularPacienteConversa(context.supabase as never, {
+      clinicaId: data.clinicaId,
+      conversaId: data.conversaId,
+      pacienteId: data.pacienteId,
+      // Revisão explícita: pode substituir um vínculo antigo incorreto.
+      forcar: true,
+      origem: "atendente",
+      responsavelUserId: context.userId,
+    });
+    if (!ok) throw new Error("Não foi possível atualizar o vínculo.");
+    // Auditoria adicional guardando o vínculo anterior (o histórico não some).
+    try {
+      await context.supabase.from("atend_conversa_eventos").insert({
+        clinica_id: data.clinicaId,
+        conversa_id: data.conversaId,
+        evento: "vinculo_paciente_revisado",
+        user_id: context.userId,
+        detalhes: {
+          paciente_id_anterior: anterior,
+          paciente_id: data.pacienteId,
+          em: new Date().toISOString(),
+        },
+      });
+    } catch {
+      /* auditoria não bloqueia a revisão */
+    }
+    return { ok: true, paciente: pac, trocado: true };
+  });
+
+
+
+/* =========================================================
  *  ROUND-ROBIN — auto-atribuição
  * ======================================================= */
 export const autoAtribuirRoundRobin = createServerFn({ method: "POST" })

@@ -217,7 +217,14 @@ import {
   formatarNumeroConversa,
   interpretarBuscaConversa,
 } from "@/lib/atendimento/numero-conversa";
-import { SEM_NOME, nomeContato, nomeConversa, tituloConversa } from "@/lib/atendimento/rotulo-conversa";
+import {
+  SEM_NOME,
+  nomeContato,
+  nomeConversa,
+  tituloConversa,
+  divergenciaIdentidade,
+} from "@/lib/atendimento/rotulo-conversa";
+import { RevisarVinculoDialog } from "@/components/nina/RevisarVinculoDialog";
 import {
   ConfiancaMensagemBadge,
   ConfiancaNaoAvaliadaBadge,
@@ -344,6 +351,8 @@ export function AtendInbox() {
   // Enquanto a conversa selecionada não terminou de carregar, todas as ações
   // dependentes do conversation_id ficam bloqueadas.
   const carregandoConversa = !!sel?.id && !conteudoDaConversa;
+  // FASE 5 — revisão manual (e confirmada) do cadastro vinculado à conversa.
+  const [revisarVinculoAberto, setRevisarVinculoAberto] = useState(false);
   const [deptos, setDeptos] = useState<any[]>([]);
   const [usuarios, setUsuarios] = useState<any[]>([]);
   const [busca, setBusca] = useState("");
@@ -1628,11 +1637,25 @@ export function AtendInbox() {
     if (
       atual.atribuida_user_id !== sel.atribuida_user_id ||
       atual.status !== sel.status ||
-      atual.owner_type !== sel.owner_type
+      atual.owner_type !== sel.owner_type ||
+      // FASE 5 — o nome do perfil no WhatsApp pode mudar a qualquer momento e o
+      // cabeçalho da conversa aberta acompanha isso sem recarregar a tela.
+      atual.whatsapp_profile_name !== sel.whatsapp_profile_name ||
+      atual.contato_nome !== sel.contato_nome ||
+      atual.contato_paciente_id !== sel.contato_paciente_id
     ) {
       setSel((s: any) => ({ ...s, ...atual }));
     }
-  }, [convs, sel?.id, sel?.atribuida_user_id, sel?.status, sel?.owner_type]);
+  }, [
+    convs,
+    sel?.id,
+    sel?.atribuida_user_id,
+    sel?.status,
+    sel?.owner_type,
+    sel?.whatsapp_profile_name,
+    sel?.contato_nome,
+    sel?.contato_paciente_id,
+  ]);
   // Troca de conversa: o conteúdo do lead anterior sai da tela na mesma hora.
   // Se a nova conversa já estiver em cache, o conteúdo dela aparece na hora e
   // é revalidado em segundo plano — nunca o conteúdo da conversa anterior.
@@ -3446,22 +3469,17 @@ export function AtendInbox() {
             ) : (
               <>
                 <section>
+                  {/* FASE 5 — o título é SEMPRE quem está falando no WhatsApp. */}
+                  <div className="text-[10px] font-semibold text-muted-foreground uppercase">
+                    Contato do WhatsApp
+                  </div>
                   <div className="font-medium">
-                    {contatoAtual.paciente?.nome ||
-                      nomeConversa(contatoAtual.conversa) ||
-                      SEM_NOME}
+                    {tituloConversa(contatoAtual.conversa) || SEM_NOME}
                   </div>
                   <div className="text-xs text-muted-foreground space-y-0.5 mt-1">
                     {(contatoAtual.conversa?.contato_telefone || contatoAtual.paciente?.telefone) && (
                       <div>
                         📱 {contatoAtual.conversa?.contato_telefone || contatoAtual.paciente?.telefone}
-                      </div>
-                    )}
-                    {contatoAtual.paciente?.email && <div>✉️ {contatoAtual.paciente.email}</div>}
-                    {contatoAtual.paciente?.cpf && <div>CPF: {contatoAtual.paciente.cpf}</div>}
-                    {contatoAtual.paciente?.cidade && (
-                      <div>
-                        📍 {contatoAtual.paciente.cidade}/{contatoAtual.paciente.estado}
                       </div>
                     )}
                     {contatoAtual.conversa?.protocolo && (
@@ -3476,12 +3494,52 @@ export function AtendInbox() {
                       <div>Última mensagem: {fmtData(contatoAtual.conversa.ultima_mensagem_em)}</div>
                     )}
                   </div>
-                  {!contatoAtual.paciente && (
-                    <div className="text-xs text-muted-foreground mt-2">
+                </section>
+
+                <section>
+                  <div className="text-[10px] font-semibold text-muted-foreground uppercase">
+                    Cadastro vinculado
+                  </div>
+                  {contatoAtual.paciente ? (
+                    <>
+                      <div className="font-medium">{contatoAtual.paciente.nome}</div>
+                      <div className="text-xs text-muted-foreground space-y-0.5 mt-1">
+                        {contatoAtual.paciente.telefone && <div>📱 {contatoAtual.paciente.telefone}</div>}
+                        {contatoAtual.paciente.email && <div>✉️ {contatoAtual.paciente.email}</div>}
+                        {contatoAtual.paciente.cpf && <div>CPF: {contatoAtual.paciente.cpf}</div>}
+                        {contatoAtual.paciente.cidade && (
+                          <div>
+                            📍 {contatoAtual.paciente.cidade}/{contatoAtual.paciente.estado}
+                          </div>
+                        )}
+                      </div>
+                      {divergenciaIdentidade(
+                        nomeContato(contatoAtual.conversa),
+                        contatoAtual.paciente.nome,
+                      ) && (
+                        <div className="mt-2 rounded border border-amber-300/60 bg-amber-50 dark:bg-amber-950/30 p-2 text-xs text-amber-800 dark:text-amber-200">
+                          O nome do contato no WhatsApp é diferente do cadastro vinculado. Isso pode ser
+                          normal (responsável, familiar, apelido). Nada foi alterado.
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <div className="text-xs text-muted-foreground mt-1">
                       Não vinculado a paciente cadastrado.
                     </div>
                   )}
+                  {contatoAtual.conversa?.id && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="mt-2 h-7 text-xs"
+                      onClick={() => setRevisarVinculoAberto(true)}
+                    >
+                      Revisar vínculo
+                    </Button>
+                  )}
                 </section>
+
 
 
                 {contatoAtual.agendamentos?.length > 0 && (
@@ -3586,7 +3644,33 @@ export function AtendInbox() {
           />
         )}
 
+        {/* FASE 5 — revisão manual e confirmada do cadastro vinculado. */}
+        {clinicaId && sel?.id && (
+          <RevisarVinculoDialog
+            open={revisarVinculoAberto}
+            onOpenChange={setRevisarVinculoAberto}
+            clinicaId={clinicaId}
+            conversaId={sel.id}
+            contatoNome={nomeContato(sel as never)}
+            contatoTelefone={sel.contato_telefone ?? null}
+            pacienteVinculadoNome={contatoAtual?.paciente?.nome ?? null}
+            onVinculado={() => {
+              const id = sel.id;
+              cacheContatos.current.invalidar(contatoAtual?.paciente?.id);
+              void obterContato({ data: { clinicaId, conversaId: id } })
+                .then((c) => {
+                  if (selIdRef.current !== id) return;
+                  setContato(c as any);
+                  setSecundariosCarregadosId(id);
+                })
+                .catch(() => {});
+            }}
+          />
+        )}
+
         {/* DIALOGS */}
+
+
 
         <Dialog open={assumirOpen} onOpenChange={setAssumirOpen}>
           <DialogContent>

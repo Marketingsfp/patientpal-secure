@@ -100,6 +100,37 @@ export type IdentidadeConversa = {
   divergente: boolean;
 };
 
+function chaveNome(v: string): string {
+  return v
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/**
+ * FASE 5 — divergência "claramente diferente" entre o contato WhatsApp e o
+ * paciente vinculado. Apelido, nome parcial ou nome composto do MESMO nome
+ * (ex.: "Tuane" x "Tuane Alves") não é divergência. Isto só SINALIZA: nada é
+ * desvinculado, trocado ou alterado automaticamente — responsável pelo
+ * WhatsApp, mãe falando pelo filho e acompanhante são casos legítimos.
+ */
+export function divergenciaIdentidade(
+  nomeContatoWhats: string | null | undefined,
+  nomePaciente: string | null | undefined,
+): boolean {
+  const a = chaveNome(String(nomeContatoWhats ?? ""));
+  const b = chaveNome(String(nomePaciente ?? ""));
+  if (!a || !b) return false;
+  if (a === b || a.includes(b) || b.includes(a)) return false;
+  const pa = a.split(" ").filter(Boolean);
+  const pb = b.split(" ").filter(Boolean);
+  // Mesmo primeiro nome ou qualquer parte relevante em comum → não sinaliza.
+  if (pa[0] && pb[0] && pa[0] === pb[0]) return false;
+  return !pa.some((p) => p.length >= 3 && pb.includes(p));
+}
+
 /** Contrato único: devolve as duas identidades separadas, sem misturá-las. */
 export function identidadeConversa(c: ConversaComNome | null | undefined): IdentidadeConversa {
   const contato = nomeContato(c);
@@ -110,7 +141,8 @@ export function identidadeConversa(c: ConversaComNome | null | undefined): Ident
     paciente: { nome: paciente, vinculado: !!paciente },
     principal,
     origem: contato ? "contato_whatsapp" : paciente ? "paciente_vinculado" : "nenhuma",
-    divergente: !!contato && !!paciente && contato.trim() !== paciente.trim(),
+    divergente: divergenciaIdentidade(contato, paciente),
+
   };
 }
 
