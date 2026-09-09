@@ -12,6 +12,7 @@ import {
   metaSendTemplate,
   type WaTemplateComponent,
 } from "./whatsapp.server";
+import { invalidarConfigWhatsApp } from "./atendimento/config-cache.server";
 
 async function assertManager(userId: string, clinicaId: string) {
   const { data, error } = await supabaseAdmin.rpc("can_manage_clinica", {
@@ -38,6 +39,7 @@ export const obterWhatsappConfig = createServerFn({ method: "POST" })
           { onConflict: "clinica_id", ignoreDuplicates: true },
         );
       if (upsertError) throw new Error(upsertError.message);
+      invalidarConfigWhatsApp(data.clinicaId);
       cfg = await loadWhatsAppConfig(data.clinicaId);
       if (!cfg) throw new Error("Falha ao carregar configuração do WhatsApp");
     }
@@ -100,6 +102,7 @@ export const salvarWhatsappConfig = createServerFn({ method: "POST" })
       .from("whatsapp_configs")
       .upsert({ clinica_id: data.clinicaId, ...patch }, { onConflict: "clinica_id" });
     if (error) throw new Error(error.message);
+    invalidarConfigWhatsApp(data.clinicaId);
     return { ok: true };
   });
 
@@ -140,6 +143,7 @@ export const testarConexaoWhatsapp = createServerFn({ method: "POST" })
           ativo: true,
         })
         .eq("clinica_id", data.clinicaId);
+      invalidarConfigWhatsApp(data.clinicaId);
       return {
         ok: true,
         display_phone_number: info.display_phone_number ?? "",
@@ -154,6 +158,7 @@ export const testarConexaoWhatsapp = createServerFn({ method: "POST" })
           ultimo_teste_erro: String(e?.message ?? e).slice(0, 500),
         })
         .eq("clinica_id", data.clinicaId);
+      invalidarConfigWhatsApp(data.clinicaId);
       return { ok: false, error: String(e?.message ?? e) };
     }
   });
@@ -176,6 +181,7 @@ export const statusNumeroWhatsapp = createServerFn({ method: "POST" })
           .from("whatsapp_configs")
           .update({ display_phone_number: info.display_phone_number })
           .eq("clinica_id", data.clinicaId);
+        invalidarConfigWhatsApp(data.clinicaId);
       }
       return { ok: true as const, ...info };
     } catch (e: any) {

@@ -214,26 +214,48 @@ export async function metaRegisterPhone(
   return { success: json?.success !== false };
 }
 
+/** Tempo máximo de espera pela resposta da Meta em um envio de texto. */
+export const META_SEND_TIMEOUT_MS = 20_000;
+
 export async function metaSendText(
   phoneNumberId: string,
   accessToken: string,
   to: string,
   text: string,
+  opts?: { timeoutMs?: number },
 ): Promise<{ wa_message_id: string | null }> {
-  const res = await fetch(`https://graph.facebook.com/${META_VERSION}/${phoneNumberId}/messages`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      messaging_product: "whatsapp",
-      recipient_type: "individual",
-      to,
-      type: "text",
-      text: { body: text.slice(0, 4000) },
-    }),
-  });
+  // Timeout explícito para não segurar o envio indefinidamente. Não há retry
+  // automático: se a conexão cair depois do pedido, a Meta pode ter aceitado a
+  // mensagem, e um reenvio cego duplicaria a mensagem do paciente.
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), opts?.timeoutMs ?? META_SEND_TIMEOUT_MS);
+  let res: Response;
+  try {
+    res = await fetch(`https://graph.facebook.com/${META_VERSION}/${phoneNumberId}/messages`, {
+      method: "POST",
+      signal: controller.signal,
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        messaging_product: "whatsapp",
+        recipient_type: "individual",
+        to,
+        type: "text",
+        text: { body: text.slice(0, 4000) },
+      }),
+    });
+  } catch (e: any) {
+    if (e?.name === "AbortError") {
+      throw new Error(
+        "O WhatsApp não respondeu a tempo. A mensagem pode ou não ter sido entregue — confira a conversa antes de enviar de novo.",
+      );
+    }
+    throw e;
+  } finally {
+    clearTimeout(timer);
+  }
   const json = await res.json().catch(() => ({}));
   if (!res.ok) {
     const metaErr = (json as any)?.error ?? {};
