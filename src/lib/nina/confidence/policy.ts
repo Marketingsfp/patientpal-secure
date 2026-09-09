@@ -76,6 +76,12 @@ export type PoliticaConfianca = {
   bloqueadoresAbsolutos: Record<string, HardBlocker>;
   /** Ações que gravam algo de verdade: bloqueio nelas vira BLOCK_ACTION. */
   acoesDeEscrita: string[];
+  /**
+   * FASE 2 — dimensões que respondem "é seguro EXECUTAR a ação?" e NÃO
+   * "posso confiar no texto?". Elas continuam valendo integralmente para
+   * `action_safety`; na avaliação da MENSAGEM elas não pontuam nem bloqueiam.
+   */
+  validadoresDeAcao: string[];
   /** Tetos por cobertura de evidência (Fase 3). */
   cobertura: PoliticaCobertura;
 };
