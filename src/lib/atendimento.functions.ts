@@ -1907,7 +1907,9 @@ export const enviarMensagemConversa = createServerFn({ method: "POST" })
     if (data.clientMessageId) {
       const { data: jaExiste } = await context.supabase
         .from("whatsapp_mensagens")
-        .select("id, client_message_id, wa_message_id, status, recebida_em")
+        .select(
+          "id, conversa_id, direction, from_number, to_number, body, tipo, enviada_por, recebida_em, status, client_message_id, wa_message_id",
+        )
         .eq("clinica_id", data.clinicaId)
         .eq("client_message_id", data.clientMessageId)
         .maybeSingle();

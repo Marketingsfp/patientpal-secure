@@ -88,6 +88,11 @@ import {
   INTERVALO_FALLBACK_MS,
 } from "@/lib/atendimento/watchdog-realtime";
 import {
+  aplicarPreviaLocalEnvio,
+  atualizarMensagemNoCache,
+  transformarMensagensNoCache,
+} from "@/lib/atendimento/pos-envio";
+import {
   cursorMaisRecente,
   mesclarNovas,
   mesclarEventos,
@@ -2298,6 +2303,12 @@ export function AtendInbox() {
    * gravada. Reenviar reutiliza o identificador: o WhatsApp nunca recebe a
    * mesma mensagem duas vezes.
    */
+  /**
+   * FASE 3 — depois do envio NÃO existe recarga completa da conversa. A linha
+   * definitiva vem no próprio retorno e substitui a bolha; contato, notas,
+   * eventos e a Inbox inteira não são buscados de novo (nada disso muda por
+   * causa de um texto enviado). O tempo real segue corrigindo o que vem de fora.
+   */
   const despacharEnvio = (origem: string, texto: string, clientMessageId: string) => {
     if (!clinicaId) return;
     void (async () => {
@@ -2305,31 +2316,33 @@ export function AtendInbox() {
         const r: any = await enviarMsg({
           data: { clinicaId, conversaId: origem, text: texto, clientMessageId },
         });
-        prefetchMsgs.current.invalidar(origem);
         const oficial = r?.mensagem ?? null;
         if (oficial) {
           // A bolha não some e reaparece: muda de estado (enviando → enviada).
           if (selIdRef.current === origem) setMsgs((prev) => mesclarOficial(prev, oficial));
-          const c0 = cacheConversas.current.obter(origem);
-          if (c0)
-            cacheConversas.current.guardar(origem, {
-              ...c0,
-              msgs: mesclarOficial(c0.msgs, oficial),
-            });
+          atualizarMensagemNoCache(cacheConversas.current, origem, oficial);
+        } else {
+          // Sem linha canônica (caso raro): a próxima confirmação do servidor
+          // reconcilia. Só o prefetch dessa conversa sai de cena.
+          prefetchMsgs.current.invalidar(origem);
         }
-        if (selIdRef.current === origem) await carregarConversa();
+        // Prévia da lista sem recarregar a Inbox; o servidor confirma depois.
+        setConvs((prev) =>
+          aplicarPreviaLocalEnvio(prev as any, {
+            conversaId: origem,
+            texto,
+            quando: oficial?.recebida_em ?? new Date().toISOString(),
+          }) as any[],
+        );
+        registrarDiagnostico("atendimento-inbox", { sync_reason: "envio", full_reload: false });
       } catch (e: any) {
         mostrarErro(e);
         if (selIdRef.current === origem) {
           setMsgs((prev) => marcarFalhaOtimista(prev, clientMessageId));
         }
-        const c = cacheConversas.current.obter(origem);
-        if (c) {
-          cacheConversas.current.guardar(origem, {
-            ...c,
-            msgs: marcarFalhaOtimista(c.msgs, clientMessageId),
-          });
-        }
+        transformarMensagensNoCache(cacheConversas.current, origem, (msgs) =>
+          marcarFalhaOtimista(msgs, clientMessageId),
+        );
       }
     })();
   };
