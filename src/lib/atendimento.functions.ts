@@ -1921,8 +1921,9 @@ export const enviarMensagemConversa = createServerFn({ method: "POST" })
         .maybeSingle();
       if (jaExiste) return { duplicada: true as const, mensagem: jaExiste };
     }
-    const cfg = await loadWhatsAppConfig(data.clinicaId);
+    const cfg = await trace.medir("loadWhatsAppConfig", () => loadWhatsAppConfig(data.clinicaId));
     if (!cfg?.phone_number_id || !cfg?.access_token) throw new Error("WhatsApp não configurado.");
+    trace.marcar("SEND_T5_CONFIG_READY");
     const { data: conv, error: cErr } = await context.supabase
       .from("atend_conversas")
       .select(
