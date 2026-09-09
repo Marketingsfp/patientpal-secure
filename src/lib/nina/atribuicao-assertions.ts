@@ -130,6 +130,9 @@ export function resumoExclusoes(
   nomePorUser: Record<string, string> = {},
 ): string[] {
   const rotulo: Record<string, string> = {
+    // Motivo atual devolvido por `atend_pool_telefonia_avaliacao` (perfil real).
+    sem_perfil_telefonia: "sem Telefonia",
+    // Nome antigo, mantido para eventos já gravados na auditoria.
     missing_telefonia_permission: "sem Telefonia",
     admin_excluido: "Admin",
     em_pausa: "Pausa",

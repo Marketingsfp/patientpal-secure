@@ -78,6 +78,25 @@ async function sincronizarAdminGlobal(userId: string, clinicaId: string, role: s
   if (error) throw new Error(error.message);
 }
 
+/**
+ * FASE 2 — quem passa a ter o perfil TELEFONIA e já está Online vira elegível
+ * na mesma hora. Sem isto, o que está parado em "Não atribuídas" só seria
+ * reavaliado no próximo batimento de presença (até 60s de atraso).
+ *
+ * A distribuição em si continua sendo a MESMA do banco
+ * (`atend_distribuir_fila`), que reconfere perfil, presença, pausa, capacidade,
+ * setor e administrador. Aqui não há segunda regra de elegibilidade, e nenhuma
+ * conversa já atribuída é retirada de ninguém.
+ */
+async function reavaliarFilaTelefonia(clinicaId: string, role: string) {
+  if (role !== "telefonia") return;
+  const { error } = await supabaseAdmin.rpc("atend_distribuir_fila", {
+    _clinica_id: clinicaId,
+    _max: 20,
+  } as never);
+  if (error) console.error("[equipe] falha ao reavaliar fila após perfil Telefonia:", error.message);
+}
+
 export const listarEquipe = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) => z.object({ clinicaId: z.string().uuid() }).parse(input))
@@ -172,6 +191,7 @@ export const cadastrarUsuario = createServerFn({ method: "POST" })
     }
 
     await sincronizarAdminGlobal(userId!, data.clinicaId, data.role);
+    await reavaliarFilaTelefonia(data.clinicaId, data.role);
 
     return { ok: true, userId };
   });
@@ -219,6 +239,7 @@ export const editarMembro = createServerFn({ method: "POST" })
     if (upErr) throw new Error(upErr.message);
 
     await sincronizarAdminGlobal(mem.user_id, data.clinicaId, data.role);
+    await reavaliarFilaTelefonia(data.clinicaId, data.role);
 
     if (data.nome) {
       await supabaseAdmin.from("profiles").upsert({ id: mem.user_id, nome: data.nome });
