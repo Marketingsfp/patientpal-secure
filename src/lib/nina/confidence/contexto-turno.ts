@@ -11,6 +11,7 @@
  *    apenas que a agenda está habilitada; nunca implica `criar_agendamento`.
  */
 import type { IntencaoNina } from "../atendimento-fase1";
+import type { EtapaFluxoNina } from "../fluxo-estado-normalizar";
 import type { AcaoSolicitada } from "./types";
 
 /** Capacidades habilitadas na clínica. Nunca viram intenção. */
