@@ -2077,10 +2077,12 @@ export const obterDadosContato = createServerFn({ method: "POST" })
     let contratos: any[] = [];
     // FASE 4 — como o contato foi obtido nesta abertura ("id" = vínculo direto).
     let contatoVia: "id" | "telefone" | "sem_contato" = "sem_contato";
+    // FASE 3 — status da identidade e candidatos por telefone (sem confirmar).
+    let identidadeStatus: string = "NO_MATCH";
+    let candidatos: Array<{ id: string; nome: string | null }> = [];
 
-    // Fase 2: o vínculo direto (`contato_paciente_id`) é a referência
-    // principal. Só quando ele não existe é que buscamos pelo telefone
-    // normalizado — e, achando, gravamos o vínculo para não repetir.
+    // FASE 3: abrir a conversa NÃO grava vínculo. O telefone apenas sugere
+    // candidatos; dados clínicos só aparecem com vínculo explícito.
     {
       const { resolverContatoConversa } = await import("./atendimento/vinculo-contato.server");
       const resolvido = await resolverContatoConversa(context.supabase, {
@@ -2089,17 +2091,19 @@ export const obterDadosContato = createServerFn({ method: "POST" })
         contatoPacienteId: conv.contato_paciente_id ?? null,
         contatoTelefone: conv.contato_telefone ?? null,
       });
-      if (resolvido.pacienteId) {
+      identidadeStatus = resolvido.status;
+      candidatos = resolvido.candidatos;
+      if (resolvido.status === "EXPLICIT_LINK" && resolvido.pacienteId) {
         const { data: p } = await context.supabase
           .from("pacientes")
           .select("id, nome, telefone, email, cpf, data_nascimento, sexo, cidade, estado")
           .eq("id", resolvido.pacienteId)
           .maybeSingle();
         paciente = p;
-        contatoVia = resolvido.viaVinculo ? "id" : "telefone";
-        if (resolvido.vinculado) (conv as any).contato_paciente_id = resolvido.pacienteId;
+        contatoVia = "id";
       }
     }
+
 
     if (paciente?.id) {
       const [agR, ctR] = await Promise.all([
@@ -2144,6 +2148,8 @@ export const obterDadosContato = createServerFn({ method: "POST" })
       contratos,
       atribuido_nome: atribuidoProfile?.nome ?? null,
       contato_via: contatoVia,
+      identidade_status: identidadeStatus,
+      candidatos_paciente: candidatos,
     };
   });
 
