@@ -141,14 +141,10 @@ export const listarConversas = createServerFn({ method: "POST" })
     ]);
     marcar("autorizacao");
 
-    // Varredura barata e limitada dos prazos já vencidos desta clínica, para
-    // que a transferência automática aconteça mesmo sem mensagem nova.
-    try {
-      const { processarTimeoutsEsperaPaciente } = await import("@/lib/nina/espera-timeout.server");
-      await processarTimeoutsEsperaPaciente({ clinicaId: data.clinicaId, limite: 10 });
-    } catch (e) {
-      console.error("[nina-timeout] varredura na listagem falhou", e);
-    }
+    // FASE 4 — listar é só listar. O vencimento da espera do paciente (regra
+    // dos 30 minutos) continua valendo, mas roda em segundo plano
+    // (`/api/public/nina/espera-timeout`, agendado no banco) e no recebimento
+    // de mensagem — nunca dentro deste request da tela.
     marcar("timeouts");
 
     // Gestor/admin da clínica pode escolher ver tudo; atendente comum, não.

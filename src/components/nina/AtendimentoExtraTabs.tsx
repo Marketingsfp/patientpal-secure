@@ -101,6 +101,7 @@ import {
   atualizarMensagemNoCache,
   transformarMensagensNoCache,
 } from "@/lib/atendimento/pos-envio";
+import { patchListaPorConversa, patchListaPorMensagem } from "@/lib/atendimento/patch-inbox";
 import {
   cursorMaisRecente,
   mesclarNovas,
@@ -330,6 +331,11 @@ export function AtendInbox() {
   // abrir uma conversa não recria a função e não dispara recargas em cadeia.
   const selRef = useRef<any>(null);
   selRef.current = sel;
+  // FASE 4 — a lista atual também é lida por referência: o ajuste pontual de
+  // uma linha (mensagem nova, troca de responsável) não precisa recarregar as
+  // 200 conversas do filtro.
+  const convsRef = useRef<any[]>([]);
+  convsRef.current = convs;
   const conteudoDaConversa = !!sel?.id && conversaCarregadaId === sel.id;
   const dadosSecundariosProntos = !!sel?.id && secundariosCarregadosId === sel.id;
   // Contato exibido: só o da conversa aberta agora. Ter `contato` preenchido
@@ -841,9 +847,12 @@ export function AtendInbox() {
     }
   }, [clinicaId, contarInboxFn]);
 
+  // FASE 4 — os números dos filtros são conferidos ao entrar na tela, ao
+  // trocar de filtro e depois de cada carga da lista. O tamanho da lista não
+  // dispara mais uma segunda consulta igual à que a carga já fez.
   useEffect(() => {
     void carregarContadores();
-  }, [carregarContadores, convs.length, escopo]);
+  }, [carregarContadores, escopo]);
 
   // Trocar de escopo (ou de usuário/clínica) recomeça a lista: cada filtro tem
   // a sua própria caixa de dados, nada de sobras de outro filtro na tela.
@@ -1406,16 +1415,23 @@ export function AtendInbox() {
       await carregarConversa();
       return;
     }
+    // FASE 4 — mensagens e timeline da conversa seguem caminhos separados: uma
+    // mensagem nova aparece na hora, mesmo que a lista de eventos demore.
+    const pEventosSync = listarEventosFn({ data: { clinicaId, conversaId: alvo } })
+      .then((ev) => {
+        if (selIdRef.current !== alvo) return;
+        if (selecaoIdRef.current && selecaoIdRef.current !== alvo) return;
+        if (ev) setEventos((prev) => mesclarEventos(prev, ev as ConversaEvento[]));
+      })
+      .catch(() => {
+        /* timeline é apoio: falha não derruba o histórico de mensagens */
+      });
+
     const execucao = (async () => {
     try {
-      const [novas, ev] = await Promise.all([
-        listarMsgs({
-          data: { clinicaId, conversaId: alvo, limit: JANELA_INICIAL, depoisDe: cursor! },
-        }),
-        listarEventosFn({ data: { clinicaId, conversaId: alvo } }).catch(
-          () => null as ConversaEvento[] | null,
-        ),
-      ]);
+      const novas = await listarMsgs({
+        data: { clinicaId, conversaId: alvo, limit: JANELA_INICIAL, depoisDe: cursor! },
+      });
       if (selIdRef.current !== alvo) return;
       if (selecaoIdRef.current && selecaoIdRef.current !== alvo) return;
       if ((novas as any[])?.length) {
@@ -1426,14 +1442,12 @@ export function AtendInbox() {
           return juntas;
         });
       }
-      if (ev) {
-        setEventos((prev) => mesclarEventos(prev, ev as ConversaEvento[]));
-      }
     } catch {
       // Falha na sincronização não derruba o atendimento: a próxima tentativa
       // (Realtime ou rede de segurança) resolve.
     }
     })();
+    void pEventosSync;
     syncEmVooRef.current = { conversaId: alvo, promise: execucao };
     try {
       await execucao;
@@ -1794,12 +1808,15 @@ export function AtendInbox() {
   carregarConvsAgrup.current = carregarConvs;
   const carregarEsperaRef = useRef(carregarEspera);
   carregarEsperaRef.current = carregarEspera;
+  const carregarContadoresRef = useRef(carregarContadores);
+  carregarContadoresRef.current = carregarContadores;
 
   const agrupadores = useRef<{
     lista: Agrupador;
     conversa: Agrupador;
     apoio: Agrupador;
     espera: Agrupador;
+    contadores: Agrupador;
   } | null>(null);
   if (agrupadores.current === null) {
     agrupadores.current = {
@@ -1823,6 +1840,13 @@ export function AtendInbox() {
         atrasoMs: 1000,
         tetoMs: 5000,
       }),
+      // FASE 4 — os números dos filtros são informativos: entram agrupados e
+      // nunca seguram a exibição de uma mensagem.
+      contadores: criarAgrupador({
+        executar: () => void carregarContadoresRef.current(),
+        atrasoMs: 1000,
+        tetoMs: 5000,
+      }),
     };
   }
   useEffect(
@@ -1833,6 +1857,7 @@ export function AtendInbox() {
       g.conversa.cancelar();
       g.apoio.cancelar();
       g.espera.cancelar();
+      g.contadores.cancelar();
     },
     [],
   );
@@ -1957,16 +1982,43 @@ export function AtendInbox() {
           renderizouDireto = true;
         }
       }
+      // FASE 4 — a lista é ajustada no ponto certo com o que o próprio evento
+      // trouxe. Só quando isso não basta (conversa que entra ou sai do filtro)
+      // é que a lista completa é conferida no servidor.
+      let listaPorPatch = false;
+      if (evento.table === "whatsapp_mensagens" && evento.eventType === "INSERT") {
+        const r = patchListaPorMensagem(convsRef.current, (evento as any).new, {
+          conversaAberta: selIdRef.current,
+        });
+        if (r.aplicado) {
+          listaPorPatch = true;
+          if (r.lista !== convsRef.current) setConvs(r.lista as any[]);
+          g.contadores.agendar();
+        }
+      } else if (evento.table === "atend_conversas" && evento.eventType === "UPDATE") {
+        const r = patchListaPorConversa(convsRef.current, (evento as any).new, {
+          escopo,
+          userId: meuId ?? "",
+          gestor: souGestor,
+        });
+        if (r.aplicado) {
+          listaPorPatch = true;
+          if (r.lista !== convsRef.current) setConvs(r.lista as any[]);
+          g.contadores.agendar();
+        }
+      }
       registrarDiagnostico("atendimento-realtime", {
         table: evento.table,
         event: evento.eventType,
         refresh: alvos.join(","),
         payload_direto: renderizouDireto,
+        lista_patch: listaPorPatch,
       });
       for (const alvo of alvos) {
         // Fallback preservado: sem payload utilizável, o histórico é conferido
         // pelo caminho incremental de sempre.
         if (alvo === "conversa" && renderizouDireto) continue;
+        if (alvo === "lista" && listaPorPatch) continue;
         g[alvo].agendar();
       }
     },
