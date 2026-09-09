@@ -542,3 +542,131 @@ function Comparacao({ antes, depois }: { antes: string; depois: string }) {
     </div>
   );
 }
+
+/**
+ * FASE 4 — auditoria somente leitura do que chega ao modelo.
+ * Não edita nada: apenas separa origem de cada parte do request.
+ */
+function AuditoriaPrompt({
+  clinicaId,
+  aberto,
+  onOpenChange,
+}: {
+  clinicaId: string;
+  aberto: boolean;
+  onOpenChange: (v: boolean) => void;
+}) {
+  const buscar = useServerFn(previewRequestNina);
+  const { data, isLoading, error } = useQuery({
+    queryKey: ["nina-prompt-preview", clinicaId],
+    queryFn: () => buscar({ data: { clinicaId } }),
+    enabled: aberto,
+  });
+  const [verDiferencas, setVerDiferencas] = useState(false);
+
+  return (
+    <Dialog open={aberto} onOpenChange={onOpenChange}>
+      <DialogContent className="max-h-[85vh] max-w-4xl overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>O que chega ao modelo — Nina do WhatsApp</DialogTitle>
+          <DialogDescription>
+            Somente leitura. O comportamento só pode existir na parte “Behavior Prompt”, que vem da
+            versão publicada aqui na Arquitetura.
+          </DialogDescription>
+        </DialogHeader>
+
+        {isLoading ? (
+          <p className="text-sm text-muted-foreground">Montando a visualização…</p>
+        ) : error || !data ? (
+          <p className="text-sm text-muted-foreground">Não foi possível montar a visualização.</p>
+        ) : (
+          <div className="space-y-4">
+            <div className="flex flex-wrap items-center gap-2 text-sm">
+              <Badge variant="secondary">
+                Comportamento: Arquitetura v{data.versao ?? "—"}
+              </Badge>
+              {data.publicadoEm ? (
+                <span className="text-xs text-muted-foreground">
+                  publicada em {dataBr(data.publicadoEm)}
+                </span>
+              ) : null}
+              <Button size="sm" variant="outline" onClick={() => setVerDiferencas((v) => !v)}>
+                {verDiferencas ? "Ocultar diferenças" : "Ver diferenças"}
+              </Button>
+            </div>
+
+            {verDiferencas ? (
+              <section className="space-y-1">
+                <h4 className="text-sm font-medium">
+                  Texto publicado ↔ texto com os dados preenchidos
+                </h4>
+                <p className="text-xs text-muted-foreground">
+                  Mostra apenas a substituição de variáveis (nome da unidade, por exemplo).
+                </p>
+                <Comparacao antes={data.template} depois={data.behaviorPrompt} />
+              </section>
+            ) : null}
+
+            <BlocoLeitura
+              titulo="Prompt de comportamento"
+              origem={`fonte: Arquitetura / versão v${data.versao ?? "—"}`}
+              conteudo={data.behaviorPrompt}
+            />
+            <BlocoLeitura
+              titulo="Contexto dinâmico"
+              origem="fonte: dados do atendimento (exemplo) — somente leitura"
+              conteudo={data.runtimeContextJson}
+            />
+            <BlocoLeitura
+              titulo="Ferramentas / schemas"
+              origem="fonte: código — somente leitura"
+              conteudo={
+                data.ferramentas.length
+                  ? data.ferramentas.map((f) => `${f.nome} — ${f.descricao}`).join("\n")
+                  : "(nenhuma ferramenta ativa)"
+              }
+            />
+            <BlocoLeitura
+              titulo="Envelope técnico"
+              origem="fonte: código — somente leitura"
+              conteudo={data.envelope}
+            />
+            <BlocoLeitura
+              titulo="Conteúdo efetivamente enviado ao modelo"
+              origem="cada parte identificada por origem — somente leitura"
+              conteudo={data.conteudoFinal}
+            />
+          </div>
+        )}
+
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            Fechar
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function BlocoLeitura({
+  titulo,
+  origem,
+  conteudo,
+}: {
+  titulo: string;
+  origem: string;
+  conteudo: string;
+}) {
+  return (
+    <section className="rounded-lg border">
+      <header className="flex flex-wrap items-baseline justify-between gap-2 border-b bg-muted/40 px-3 py-2">
+        <h4 className="text-sm font-medium">{titulo}</h4>
+        <span className="text-xs text-muted-foreground">{origem}</span>
+      </header>
+      <pre className="max-h-[40vh] overflow-auto p-3 font-mono text-xs whitespace-pre-wrap">
+        {conteudo}
+      </pre>
+    </section>
+  );
+}
