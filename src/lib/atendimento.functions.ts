@@ -2041,8 +2041,18 @@ export const enviarMensagemConversa = createServerFn({ method: "POST" })
       .update(patch)
       .eq("id", data.conversaId)
       .eq("clinica_id", data.clinicaId);
+    trace.marcar("SEND_T9_CONVERSATION_UPDATE_DONE");
+    trace.marcar("SEND_T10_BACKEND_RESPONSE");
+    trace.publicar();
 
-    return { ok: true, wa_message_id, mensagem: gravada ?? null };
+    // `latencia` é diagnóstico técnico (tempos e etapas). A tela junta essas
+    // marcas com as dela para montar o trace ponta a ponta.
+    return {
+      ok: true,
+      wa_message_id,
+      mensagem: gravada ?? null,
+      latencia: { traceId: trace.traceId, marcas: trace.marcas(), subprocessos: trace.subprocessos() },
+    };
   });
 
 export const obterDadosContato = createServerFn({ method: "POST" })
