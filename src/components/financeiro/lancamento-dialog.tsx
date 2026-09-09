@@ -944,6 +944,24 @@ export function LancamentoDialog({
       );
       if (!ok) return;
     }
+    // Adiantamento num atendimento de HOJE. A confirmação existe porque este é
+    // o único caminho em que a ficha é quitada sem nenhum dinheiro entrando na
+    // gaveta em um dia em que a gaveta está aberta — marcar por engano some
+    // com o valor do fechamento e ninguém percebe na conferência do cupom.
+    if (recebidoAntes && !_ehRetroativo && !ehPagoSistemaAnterior) {
+      const ok = await confirmDialog(
+        `Você marcou que este valor JÁ FOI PAGO adiantado, em outro dia.\n\n` +
+          `A ficha será quitada e liberada (presença, Realizado, GR e Financeiro), ` +
+          `e o repasse do prestador será calculado normalmente.\n\n` +
+          `O valor NÃO entra no caixa de hoje e NÃO soma no fechamento — a linha ` +
+          `aparece no extrato valendo R$ 0,00 na gaveta.\n\n` +
+          `ATENÇÃO: se o paciente está entregando o dinheiro AGORA, desmarque esta ` +
+          `opção. Caso contrário o dinheiro fica na gaveta sem o sistema esperar por ` +
+          `ele, e o fechamento vai acusar sobra.\n\n` +
+          `Deseja continuar?`,
+      );
+      if (!ok) return;
+    }
     setSaving(true);
     if (descontoAtivo) {
       if (!supervisorInfo && !ehSupervisor) {
@@ -1321,7 +1339,9 @@ export function LancamentoDialog({
     let recebidoAntesObs = "";
     if (recebidoAntes && !ehPagoSistemaAnterior) {
       recebidoAntesObs = [
-        `RECEBIDO ANTES — guia do atendimento de ${formatarDataBR(data)} emitida em ${formatarDataBR(hojeBR())}`,
+        data < hojeBR()
+          ? `RECEBIDO ANTES — guia do atendimento de ${formatarDataBR(data)} emitida em ${formatarDataBR(hojeBR())}`
+          : `ADIANTAMENTO — atendimento de ${formatarDataBR(data)} quitado com valor que o paciente pagou adiantado`,
         pagoAnteriorData ? `Valor recebido em ${formatarDataBR(pagoAnteriorData)}` : "",
         pagoAnteriorRecibo.trim() ? `Recibo/referência nº ${pagoAnteriorRecibo.trim()}` : "",
         "Não entra no caixa de hoje: o dinheiro não passou pela gaveta de hoje. Repasse do prestador calculado normalmente.",
