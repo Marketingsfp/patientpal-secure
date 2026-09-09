@@ -439,9 +439,13 @@ function Page() {
   };
   const horariosSeSobrepoem = (aIni: string, aFim: string, bIni: string, bFim: string) =>
     aIni < bFim && bIni < aFim;
+  // O conflito só existe dentro da MESMA agenda: o mesmo médico pode atender
+  // CONSULTAS e EXAMES no mesmo dia e horário (a recepção escolhe a agenda ao
+  // marcar), então regras de agendas diferentes podem se sobrepor à vontade.
   const encontrarConflito = (
     candidato: {
       medico_id: string;
+      agenda_id: string;
       dia_semana: number;
       hora_inicio: string;
       hora_fim: string;
@@ -454,6 +458,7 @@ function Page() {
       (d) =>
         d.id !== ignorarId &&
         d.medico_id === candidato.medico_id &&
+        d.agenda_id === candidato.agenda_id &&
         d.dia_semana === candidato.dia_semana &&
         horariosSeSobrepoem(d.hora_inicio, d.hora_fim, candidato.hora_inicio, candidato.hora_fim) &&
         vigenciasSeSobrepoem(
@@ -492,6 +497,7 @@ function Page() {
     for (const dia of diasSel) {
       const conflito = encontrarConflito({
         medico_id: novo.medico_id,
+        agenda_id: agendaSel,
         dia_semana: dia,
         hora_inicio: novo.hora_inicio,
         hora_fim: novo.hora_fim,
@@ -500,7 +506,7 @@ function Page() {
       });
       if (conflito) {
         toast.error(
-          `Já existe uma regra para ${DIAS[dia]} (${conflito.hora_inicio}–${conflito.hora_fim}) que se sobrepõe a esse horário. Ajuste o horário ou remova a regra antiga primeiro.`,
+          `A agenda ${agendas.find((a) => a.id === conflito.agenda_id)?.nome ?? "selecionada"} já tem uma regra em ${DIAS[dia]} (${conflito.hora_inicio}–${conflito.hora_fim}) que se sobrepõe a esse horário. Ajuste o horário ou remova a regra antiga primeiro.`,
         );
         return;
       }
@@ -580,6 +586,7 @@ function Page() {
       const conflito = encontrarConflito(
         {
           medico_id: atual.medico_id,
+          agenda_id: atual.agenda_id,
           dia_semana: diaNum,
           hora_inicio: editRow.hora_inicio,
           hora_fim: editRow.hora_fim,
@@ -590,7 +597,7 @@ function Page() {
       );
       if (conflito) {
         toast.error(
-          `Já existe uma regra para ${DIAS[diaNum]} (${conflito.hora_inicio}–${conflito.hora_fim}) que se sobrepõe a esse horário.`,
+          `A agenda ${agendas.find((a) => a.id === conflito.agenda_id)?.nome ?? "selecionada"} já tem uma regra em ${DIAS[diaNum]} (${conflito.hora_inicio}–${conflito.hora_fim}) que se sobrepõe a esse horário.`,
         );
         return;
       }
