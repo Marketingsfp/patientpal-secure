@@ -99,6 +99,7 @@ describe("TESTE C — criação com paciente e vaga confirmados", () => {
         acao: "criar_agendamento",
         intent: "agendamento",
         pacienteIdentificado: true,
+        agendamentoConfirmado: true,
         requiredFields: ["paciente_id", "slot"],
         entities: { paciente_id: "p1", slot: "2026-09-10T09:00:00" },
         ferramentas: [
