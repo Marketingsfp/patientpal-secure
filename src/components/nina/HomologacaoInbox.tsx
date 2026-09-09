@@ -98,6 +98,7 @@ import {
 import { ConversaSkeleton } from "@/components/nina/ConversaSkeleton";
 import { useChatScroll } from "@/hooks/use-chat-scroll";
 import { formatarDataHoraMensagem } from "@/lib/atendimento/data-hora";
+import { textoMarcadorSistema } from "@/lib/atendimento/marcador-handoff";
 import { definirSelecaoTeste } from "@/lib/webmcp/selecao-teste";
 import { assinarAtualizacao } from "@/lib/webmcp/atualizacao";
 import {
