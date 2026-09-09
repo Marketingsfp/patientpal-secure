@@ -3644,7 +3644,33 @@ export function AtendInbox() {
           />
         )}
 
+        {/* FASE 5 — revisão manual e confirmada do cadastro vinculado. */}
+        {clinicaId && sel?.id && (
+          <RevisarVinculoDialog
+            open={revisarVinculoAberto}
+            onOpenChange={setRevisarVinculoAberto}
+            clinicaId={clinicaId}
+            conversaId={sel.id}
+            contatoNome={nomeContato(sel as never)}
+            contatoTelefone={sel.contato_telefone ?? null}
+            pacienteVinculadoNome={contatoAtual?.paciente?.nome ?? null}
+            onVinculado={() => {
+              const id = sel.id;
+              cacheContatos.current.invalidar(contatoAtual?.paciente?.id);
+              void obterContato({ data: { clinicaId, conversaId: id } })
+                .then((c) => {
+                  if (selIdRef.current !== id) return;
+                  setContato(c as any);
+                  setSecundariosCarregadosId(id);
+                })
+                .catch(() => {});
+            }}
+          />
+        )}
+
         {/* DIALOGS */}
+
+
 
         <Dialog open={assumirOpen} onOpenChange={setAssumirOpen}>
           <DialogContent>
