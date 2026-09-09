@@ -217,7 +217,14 @@ import {
   formatarNumeroConversa,
   interpretarBuscaConversa,
 } from "@/lib/atendimento/numero-conversa";
-import { SEM_NOME, nomeContato, nomeConversa, tituloConversa } from "@/lib/atendimento/rotulo-conversa";
+import {
+  SEM_NOME,
+  nomeContato,
+  nomeConversa,
+  tituloConversa,
+  divergenciaIdentidade,
+} from "@/lib/atendimento/rotulo-conversa";
+import { RevisarVinculoDialog } from "@/components/nina/RevisarVinculoDialog";
 import {
   ConfiancaMensagemBadge,
   ConfiancaNaoAvaliadaBadge,
