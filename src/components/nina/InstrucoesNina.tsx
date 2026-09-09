@@ -197,6 +197,11 @@ function Editor({
 
   return (
     <div className="space-y-3">
+      {bloco.escopo === "whatsapp" ? (
+        <p className="text-xs text-muted-foreground">
+          Única fonte de comportamento da Nina do WhatsApp.
+        </p>
+      ) : null}
       <div className="flex flex-wrap items-center gap-2 text-sm">
         <span className="text-muted-foreground">Versão em uso:</span>
         <Badge variant="secondary">
@@ -211,6 +216,7 @@ function Editor({
           </span>
         ) : null}
       </div>
+
 
       <label className="sr-only" htmlFor={`instrucoes-${bloco.escopo}`}>
         Instruções da Nina — {ROTULO_ESCOPO[bloco.escopo]}
