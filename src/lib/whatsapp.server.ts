@@ -815,7 +815,7 @@ async function gerarRespostaNinaInterno(
   // PRIMEIRA resposta de cada sessão operacional (conversa nova, sessão
   // expirada por TTL ou conversa resolvida que voltou a receber mensagem).
   // Não depende do modelo lembrar: o estado manda.
-  const { garantirSessaoAtiva, aplicarSaudacaoObrigatoria, marcarSaudacaoConcluida } =
+  const { garantirSessaoAtiva, avaliarSaudacao, marcarSaudacaoConcluida } =
     await import("@/lib/nina/saudacao-sessao");
   const inicioSessaoTs = Date.parse(String(sessaoNina.estado.session_started_at ?? ""));
   const jaRespondeuNestaSessao = msgsMemoria.some((m: any) => {
