@@ -1454,6 +1454,9 @@ ATENDIMENTO HUMANO — REGRA OBRIGATÓRIA:
         {
           mensagemPaciente,
           podeAgendar,
+          // FASE 1 (refatoração) — intenção não é ação. Só o estágio real do
+          // fluxo autoriza `criar_agendamento`.
+          stage: fluxoEstado.flow.stage,
           messageIdEntrada: opcoes?.mensagensEntrada?.[0] ?? null,
         },
         { detectarIntencoes, intencaoAmbigua },
