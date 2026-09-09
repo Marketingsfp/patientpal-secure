@@ -458,7 +458,7 @@ function EditarFuncionarioPage() {
       ),
     ]);
     setMembershipId((mem.data?.id as string | undefined) ?? null);
-    setMembershipRole((mem.data?.role as string | undefined) ?? "recepcao");
+    setMembershipRole(perfilCanonico(mem.data?.role as string | undefined) ?? "recepcao");
     setMembershipAtivo((mem.data?.ativo as boolean | undefined) ?? true);
     setLoginEmail((emailRes as { email?: string | null })?.email ?? null);
   }
