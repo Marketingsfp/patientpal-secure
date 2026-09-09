@@ -83,6 +83,11 @@ import { useRealtimeAtendimento } from "@/hooks/use-realtime-atendimento";
 import { criarAgrupador, type Agrupador } from "@/lib/atendimento/realtime-roteador";
 import { criarReconciliadorRetomada, motivoDeRetomada } from "@/lib/atendimento/retomada";
 import {
+  criarWatchdog,
+  registrarDiagnostico,
+  INTERVALO_FALLBACK_MS,
+} from "@/lib/atendimento/watchdog-realtime";
+import {
   cursorMaisRecente,
   mesclarNovas,
   mesclarEventos,
@@ -1825,6 +1830,7 @@ export function AtendInbox() {
     const aoEvento = (tipo: "focus" | "visibilitychange" | "online") => () => {
       const motivo = motivoDeRetomada(tipo, document.visibilityState);
       if (!motivo) return;
+      registrarDiagnostico("atendimento-inbox", { sync_reason: motivo });
       reconciliador.solicitar(motivo);
     };
     const aoFoco = aoEvento("focus");
@@ -1841,14 +1847,60 @@ export function AtendInbox() {
     };
   }, [clinicaId, meuId]);
 
+  // FASE 3 — rede de segurança quando o canal instantâneo falha. Enquanto o
+  // canal estiver com problema, a lista e os contadores são conferidos de
+  // tempos em tempos (12s). Assim que o canal volta, a conferência periódica
+  // para na hora e é feita uma última conferência.
+  const watchdog = useRef(criarWatchdog());
+  const timerFallback = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const conferirListaEEspera = useCallback(() => {
+    const g = agrupadores.current;
+    if (!g) return;
+    g.lista.agendar();
+    g.espera.agendar();
+  }, []);
+  const conferirListaRef = useRef(conferirListaEEspera);
+  conferirListaRef.current = conferirListaEEspera;
+
+  const pararFallback = useCallback(() => {
+    if (!timerFallback.current) return;
+    clearInterval(timerFallback.current);
+    timerFallback.current = null;
+  }, []);
+
+  useEffect(() => () => pararFallback(), [pararFallback]);
+
   useRealtimeAtendimento({
     clinicaId: clinicaId ?? null,
     conversaAberta: sel?.id ?? null,
     // O canal depende do RLS: só é aberto com clínica E sessão já disponíveis.
     enabled: !!clinicaId && !!meuId,
-    onAlvos: (alvos) => {
+    onEstado: (estado) => {
+      const decisao = watchdog.current.aoEstado(estado);
+      registrarDiagnostico("atendimento-realtime", { status: estado });
+      if (decisao.fallback === "ativar" && !timerFallback.current) {
+        timerFallback.current = setInterval(() => {
+          watchdog.current.aoSincronizar("fallback");
+          registrarDiagnostico("atendimento-inbox", { sync_reason: "fallback" });
+          conferirListaRef.current();
+        }, INTERVALO_FALLBACK_MS);
+      }
+      if (decisao.fallback === "parar") pararFallback();
+      if (decisao.reconciliar) {
+        watchdog.current.aoSincronizar("reconnect");
+        conferirListaRef.current();
+      }
+    },
+    onAlvos: (alvos, evento) => {
       const g = agrupadores.current;
       if (!g) return;
+      watchdog.current.aoEvento();
+      registrarDiagnostico("atendimento-realtime", {
+        table: evento.table,
+        event: evento.eventType,
+        refresh: alvos.join(","),
+      });
       for (const alvo of alvos) g[alvo].agendar();
     },
     // Canal confirmado (primeira vez ou depois de queda): pode ter passado
@@ -1857,6 +1909,8 @@ export function AtendInbox() {
     onReconectar: () => {
       const g = agrupadores.current;
       if (!g) return;
+      watchdog.current.aoSincronizar("reconnect");
+      registrarDiagnostico("atendimento-inbox", { sync_reason: "reconnect" });
       g.lista.agendar();
       g.espera.agendar();
       if (selIdRef.current) {
