@@ -104,7 +104,6 @@ import {
 } from "@/components/portal-launcher";
 import { CentralAtencao } from "@/components/nina/CentralAtencao";
 
-
 import logoSaoFranciscoCdn from "@/assets/logo-policlinica-sao-francisco-de-paula.png.asset.json";
 import logoMeninoJesus from "@/assets/logo-menino-jesus.png";
 import logoConsultaHoje from "@/assets/logo-consulta-hoje.png";
@@ -429,6 +428,10 @@ const navRows: ReadonlyArray<{ label: string; items: ReadonlyArray<NavItem> }> =
     label: "Cadastros",
     items: [
       { to: "/app/equipe", label: "Médicos", icon: Users },
+      // "Perfis" define o que cada PERFIL abre; "Equipe e acessos" marca, pessoa
+      // a pessoa, quem é da gestão. São coisas diferentes e ficam lado a lado
+      // de propósito: quem procura uma costuma querer a outra.
+      { to: "/app/equipe-acessos", label: "Equipe e acessos", icon: ShieldCheck },
       { to: "/app/perfis", label: "Perfis", icon: KeyRound },
       {
         to: "/app/especialidades",
@@ -1322,7 +1325,6 @@ function AppShellInner() {
                 botão de portal ("Clínica Médica"). */}
             <CentralAtencao />
           </div>
-
 
           <div className="flex flex-1 items-center justify-end gap-3 min-w-0 sm:flex-none sm:justify-center">
             {clinicaAtual && (branding?.logo_url || logoDaClinica(clinicaAtual.clinica.nome)) && (

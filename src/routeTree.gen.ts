@@ -87,6 +87,7 @@ import { Route as AuthenticatedAppFinanceiroRouteImport } from './routes/_authen
 import { Route as AuthenticatedAppExamesResultadosRouteImport } from './routes/_authenticated/app.exames-resultados'
 import { Route as AuthenticatedAppEstoqueRouteImport } from './routes/_authenticated/app.estoque'
 import { Route as AuthenticatedAppEspecialidadesRouteImport } from './routes/_authenticated/app.especialidades'
+import { Route as AuthenticatedAppEquipeAcessosRouteImport } from './routes/_authenticated/app.equipe-acessos'
 import { Route as AuthenticatedAppEquipeRouteImport } from './routes/_authenticated/app.equipe'
 import { Route as AuthenticatedAppDocumentosRouteImport } from './routes/_authenticated/app.documentos'
 import { Route as AuthenticatedAppDisponibilidadesRouteImport } from './routes/_authenticated/app.disponibilidades'
@@ -595,6 +596,12 @@ const AuthenticatedAppEspecialidadesRoute =
   AuthenticatedAppEspecialidadesRouteImport.update({
     id: '/especialidades',
     path: '/especialidades',
+    getParentRoute: () => AuthenticatedAppRoute,
+  } as any)
+const AuthenticatedAppEquipeAcessosRoute =
+  AuthenticatedAppEquipeAcessosRouteImport.update({
+    id: '/equipe-acessos',
+    path: '/equipe-acessos',
     getParentRoute: () => AuthenticatedAppRoute,
   } as any)
 const AuthenticatedAppEquipeRoute = AuthenticatedAppEquipeRouteImport.update({
@@ -1168,6 +1175,7 @@ export interface FileRoutesByFullPath {
   '/app/disponibilidades': typeof AuthenticatedAppDisponibilidadesRoute
   '/app/documentos': typeof AuthenticatedAppDocumentosRoute
   '/app/equipe': typeof AuthenticatedAppEquipeRouteWithChildren
+  '/app/equipe-acessos': typeof AuthenticatedAppEquipeAcessosRoute
   '/app/especialidades': typeof AuthenticatedAppEspecialidadesRoute
   '/app/estoque': typeof AuthenticatedAppEstoqueRoute
   '/app/exames-resultados': typeof AuthenticatedAppExamesResultadosRoute
@@ -1331,6 +1339,7 @@ export interface FileRoutesByTo {
   '/app/dev-orcamentos-shell': typeof AuthenticatedAppDevOrcamentosShellRoute
   '/app/disponibilidades': typeof AuthenticatedAppDisponibilidadesRoute
   '/app/documentos': typeof AuthenticatedAppDocumentosRoute
+  '/app/equipe-acessos': typeof AuthenticatedAppEquipeAcessosRoute
   '/app/especialidades': typeof AuthenticatedAppEspecialidadesRoute
   '/app/estoque': typeof AuthenticatedAppEstoqueRoute
   '/app/exames-resultados': typeof AuthenticatedAppExamesResultadosRoute
@@ -1498,6 +1507,7 @@ export interface FileRoutesById {
   '/_authenticated/app/disponibilidades': typeof AuthenticatedAppDisponibilidadesRoute
   '/_authenticated/app/documentos': typeof AuthenticatedAppDocumentosRoute
   '/_authenticated/app/equipe': typeof AuthenticatedAppEquipeRouteWithChildren
+  '/_authenticated/app/equipe-acessos': typeof AuthenticatedAppEquipeAcessosRoute
   '/_authenticated/app/especialidades': typeof AuthenticatedAppEspecialidadesRoute
   '/_authenticated/app/estoque': typeof AuthenticatedAppEstoqueRoute
   '/_authenticated/app/exames-resultados': typeof AuthenticatedAppExamesResultadosRoute
@@ -1666,6 +1676,7 @@ export interface FileRouteTypes {
     | '/app/disponibilidades'
     | '/app/documentos'
     | '/app/equipe'
+    | '/app/equipe-acessos'
     | '/app/especialidades'
     | '/app/estoque'
     | '/app/exames-resultados'
@@ -1829,6 +1840,7 @@ export interface FileRouteTypes {
     | '/app/dev-orcamentos-shell'
     | '/app/disponibilidades'
     | '/app/documentos'
+    | '/app/equipe-acessos'
     | '/app/especialidades'
     | '/app/estoque'
     | '/app/exames-resultados'
@@ -1995,6 +2007,7 @@ export interface FileRouteTypes {
     | '/_authenticated/app/disponibilidades'
     | '/_authenticated/app/documentos'
     | '/_authenticated/app/equipe'
+    | '/_authenticated/app/equipe-acessos'
     | '/_authenticated/app/especialidades'
     | '/_authenticated/app/estoque'
     | '/_authenticated/app/exames-resultados'
@@ -2694,6 +2707,13 @@ declare module '@tanstack/react-router' {
       path: '/especialidades'
       fullPath: '/app/especialidades'
       preLoaderRoute: typeof AuthenticatedAppEspecialidadesRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
+    }
+    '/_authenticated/app/equipe-acessos': {
+      id: '/_authenticated/app/equipe-acessos'
+      path: '/equipe-acessos'
+      fullPath: '/app/equipe-acessos'
+      preLoaderRoute: typeof AuthenticatedAppEquipeAcessosRouteImport
       parentRoute: typeof AuthenticatedAppRoute
     }
     '/_authenticated/app/equipe': {
@@ -3481,6 +3501,7 @@ interface AuthenticatedAppRouteChildren {
   AuthenticatedAppDisponibilidadesRoute: typeof AuthenticatedAppDisponibilidadesRoute
   AuthenticatedAppDocumentosRoute: typeof AuthenticatedAppDocumentosRoute
   AuthenticatedAppEquipeRoute: typeof AuthenticatedAppEquipeRouteWithChildren
+  AuthenticatedAppEquipeAcessosRoute: typeof AuthenticatedAppEquipeAcessosRoute
   AuthenticatedAppEspecialidadesRoute: typeof AuthenticatedAppEspecialidadesRoute
   AuthenticatedAppEstoqueRoute: typeof AuthenticatedAppEstoqueRoute
   AuthenticatedAppExamesResultadosRoute: typeof AuthenticatedAppExamesResultadosRoute
@@ -3579,6 +3600,7 @@ const AuthenticatedAppRouteChildren: AuthenticatedAppRouteChildren = {
   AuthenticatedAppDisponibilidadesRoute: AuthenticatedAppDisponibilidadesRoute,
   AuthenticatedAppDocumentosRoute: AuthenticatedAppDocumentosRoute,
   AuthenticatedAppEquipeRoute: AuthenticatedAppEquipeRouteWithChildren,
+  AuthenticatedAppEquipeAcessosRoute: AuthenticatedAppEquipeAcessosRoute,
   AuthenticatedAppEspecialidadesRoute: AuthenticatedAppEspecialidadesRoute,
   AuthenticatedAppEstoqueRoute: AuthenticatedAppEstoqueRoute,
   AuthenticatedAppExamesResultadosRoute: AuthenticatedAppExamesResultadosRoute,

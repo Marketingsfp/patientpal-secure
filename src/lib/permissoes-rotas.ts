@@ -93,6 +93,10 @@ export const ROUTE_TO_MODULE: Record<string, string | null> = {
 
   // Cadastros
   "/app/equipe": "equipe",
+  // Acompanha o módulo "equipe": quem já administra o cadastro da equipe é
+  // quem marca a gestão. A tela ainda checa por conta própria se quem abriu é
+  // admin/gestor, e a gravação passa por `editarMembro`, no servidor.
+  "/app/equipe-acessos": "equipe",
   "/app/medico": "medicos",
   "/app/especialidades": "especialidades",
   "/app/procedimentos": "procedimentos",
