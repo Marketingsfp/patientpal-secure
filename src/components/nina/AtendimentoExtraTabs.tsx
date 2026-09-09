@@ -81,6 +81,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { usePodeEscrever } from "@/hooks/use-permissoes";
 import { useRealtimeAtendimento } from "@/hooks/use-realtime-atendimento";
 import { criarAgrupador, type Agrupador } from "@/lib/atendimento/realtime-roteador";
+import { criarReconciliadorRetomada, motivoDeRetomada } from "@/lib/atendimento/retomada";
 import {
   cursorMaisRecente,
   mesclarNovas,
