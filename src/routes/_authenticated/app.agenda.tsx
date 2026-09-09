@@ -6520,8 +6520,13 @@ function AgendaPage() {
         // baixado normalmente, e quem cobra é o parceiro, fora da clínica. Sem
         // esta exceção, o Toxicológico jamais poderia ser dado como realizado.
       } else if (!ehSemFaturamento(a) && !pagosSet.has(a.id) && !a.data_pagamento) {
+        // A mensagem também ensina as duas saídas de quem já pagou. Sem isso a
+        // recepção ficava sem caminho quando o dinheiro tinha entrado antes —
+        // na Clínica Total, ou adiantado em outro dia — e o atendimento
+        // travava aqui sem nenhuma indicação do que fazer.
         toast.error(
-          "Pagamento não identificado. O paciente deve pagar na chegada — registre o recebimento no caixa antes de realizar o atendimento.",
+          'Pagamento não identificado. O paciente deve pagar na chegada — registre o recebimento no caixa antes de realizar o atendimento. Se ele JÁ PAGOU antes, abra a cobrança desta ficha e registre assim: pagamento feito na Clínica Total, use a forma "Pago no sistema anterior"; valor deixado adiantado neste sistema, marque "O paciente já pagou este valor adiantado". Nos dois casos informe a data ou o nº do recibo, e o valor não entra no caixa de hoje.',
+          { duration: 14000 },
         );
         return;
       }

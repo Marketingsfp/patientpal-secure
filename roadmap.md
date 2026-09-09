@@ -1,14 +1,16 @@
-# Roadmap — Instruções da Nina
+# Roadmap
 
-- [x] FASE 1 — Backend: tabela versionada de Instruções da Nina (global, escopos whatsapp + painel interno) + importação da v1 com o conteúdo atual; fallback do código mantido.
-- [x] FASE 2 — Interface: seção "Instruções da Nina" abaixo do canvas em Nina → Arquitetura, editor grande carregado da fonte persistente, botão "Salvar rascunho", sem alterar comportamento da Nina.
-- [x] FASE 3 — Publicação versionada das Instruções da Nina: publicar cria nova versão (anterior arquivada, nunca apagada), histórico com responsável/status/comentário, leitura de versão antiga, comparação e restauração como nova versão. Runtime ainda usa o texto do código.
-- [x] FASE 6 — Rastreabilidade do prompt: cada execução da Nina guarda a referência imutável da versão das Instruções usada (número, data de publicação, origem e módulos realmente utilizados) e a aba Execução mostra a versão histórica daquela mensagem.
-- [x] FASE 7 — Segurança das Instruções da Nina: permissões separadas (ver / editar / publicar / histórico) verificadas no servidor pelo papel real da clínica, publicação restrita a administrador também no banco, auditoria de rascunho, publicação e restauração no audit_log (sem secrets). Homologação com publicação real pendente de autorização do time.
+## Em andamento
+- [x] FASE 4 — tirar Inbox/eventos/contadores/espera do caminho crítico da mensagem
+- [ ] FASE 4 — agendar em segundo plano a regra de espera de 30 minutos (rota `/api/public/nina/espera-timeout`)
 
-## Telefonia (permissão de atendimento humano da Nina)
-- [x] Fase 1 — permissão em Cadastros › Perfis
-- [x] Fase 2 — pool de distribuição filtrado por Telefonia
-- [x] Fase 3 — fila de Não atribuídas só é movimentada por Telefonia
-- [x] Fase 4 — consistência em realtime: sem cache, reavaliar fila ao salvar perfil, auditoria enriquecida
-- [x] Fase 5 — elegibilidade determinística testada (8 cenários) e paridade produção/homologação/Test Runner
+## Fila
+- [x] Aplicar a migração do relatório "Marcações por atendente" exatamente como enviada (índice + `rel_marcacoes_por_atendente`)
+- [ ] API integração v1.3 — defeito 1: deduzir procedimento no servidor + código `procedure_not_resolved`
+- [ ] API integração v1.3 — defeito 2: `procedimento_id/nome/tipo` em `GET /availability`
+- [ ] API integração v1.3 — defeito 3: `horarios_disponiveis_publico` coerente com o núcleo (duração e agenda aberta)
+- [ ] API integração v1.3 — defeito 4: `com_horario=true` em `/specialties` e `/doctors`
+- [ ] API integração v1.3 — atualizar documentação e OpenAPI
+- [x] Adiantamento: opção "já pagou adiantado" na cobrança (dialog, confirmação, rastro)
+- [x] Adiantamento: mensagem da agenda ensinando as duas saídas
+- [x] Adiantamento: migração do texto da trava `fn_agendamento_exige_pagamento`
