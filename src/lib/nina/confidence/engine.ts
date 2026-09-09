@@ -25,7 +25,7 @@ import {
   type HardBlocker,
   type PoliticaConfianca,
 } from "./policy";
-import { contaContraANota } from "./types";
+import { acaoExecutavel, contaContraANota } from "./types";
 import type {
   Bloqueador,
   ContextoConfianca,
@@ -190,7 +190,10 @@ export function executarValidadores(ctx: ContextoConfianca): Verificacao[] {
     );
   }
 
-  if ((ctx.requiredFields ?? []).length > 0) {
+  // FASE 2 — campo obrigatório só é bloqueio quando existe uma AÇÃO
+  // EXECUTÁVEL prestes a acontecer. Numa etapa de coleta, faltar o nome do
+  // paciente é o motivo de a Nina estar perguntando — não um defeito.
+  if ((ctx.requiredFields ?? []).length > 0 && acaoExecutavel(ctx.requestedAction)) {
     checks.push(
       check(
         "campos_obrigatorios",
