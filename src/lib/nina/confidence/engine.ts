@@ -27,6 +27,7 @@ import {
 } from "./policy";
 import { acaoExecutavel, contaContraANota } from "./types";
 import type {
+  AvaliacaoSegurancaAcao,
   Bloqueador,
   ContextoConfianca,
   DecisaoMotor,
