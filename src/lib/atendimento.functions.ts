@@ -1794,7 +1794,7 @@ export const listarMensagensConversa = createServerFn({ method: "POST" })
     let q = context.supabase
       .from("whatsapp_mensagens")
       .select(
-        "id, direction, from_number, to_number, body, tipo, enviada_por, recebida_em, media_url, media_mime, status, execucao_id",
+        "id, direction, from_number, to_number, body, tipo, enviada_por, recebida_em, media_url, media_mime, status, execucao_id, client_message_id",
       )
       .eq("clinica_id", data.clinicaId)
       .eq("conversa_id", data.conversaId);
@@ -1835,7 +1835,7 @@ export const carregarJanelaMensagem = createServerFn({ method: "POST" })
       await assertAcessoConversa(context.supabase, context.userId, data.clinicaId, data.conversaId);
     }
     const COLUNAS =
-      "id, direction, from_number, to_number, body, tipo, enviada_por, recebida_em, media_url, media_mime, status";
+      "id, direction, from_number, to_number, body, tipo, enviada_por, recebida_em, media_url, media_mime, status, client_message_id";
     const { data: alvo, error: eAlvo } = await context.supabase
       .from("whatsapp_mensagens")
       .select(COLUNAS)
@@ -1885,6 +1885,10 @@ export const enviarMensagemConversa = createServerFn({ method: "POST" })
         clinicaId: z.string().uuid(),
         conversaId: z.string().uuid(),
         text: z.string().trim().min(1).max(3500),
+        // Identificador do envio gerado pelo navegador (Fase 2). É o mesmo da
+        // bolha otimista e da linha gravada: garante que duplo clique ou
+        // retry não criem uma segunda mensagem no WhatsApp.
+        clientMessageId: z.string().uuid().optional(),
       })
       .parse(i),
   )
@@ -1896,6 +1900,19 @@ export const enviarMensagemConversa = createServerFn({ method: "POST" })
     }
     if (await ehAdminClinica(context.supabase, context.userId, data.clinicaId))
       throw new Error(MSG_ADMIN_NAO_ATENDE);
+    // IDEMPOTÊNCIA: se este mesmo envio já foi concluído (duplo clique, retry,
+    // reenvio acidental), devolvemos a mensagem existente sem chamar o
+    // WhatsApp de novo. A checagem é pelo identificador do envio, nunca pelo
+    // texto — duas mensagens iguais podem ser legítimas.
+    if (data.clientMessageId) {
+      const { data: jaExiste } = await context.supabase
+        .from("whatsapp_mensagens")
+        .select("id, client_message_id, wa_message_id, status, recebida_em")
+        .eq("clinica_id", data.clinicaId)
+        .eq("client_message_id", data.clientMessageId)
+        .maybeSingle();
+      if (jaExiste) return { duplicada: true as const, mensagem: jaExiste };
+    }
     const cfg = await loadWhatsAppConfig(data.clinicaId);
     if (!cfg?.phone_number_id || !cfg?.access_token) throw new Error("WhatsApp não configurado.");
     const { data: conv, error: cErr } = await context.supabase
@@ -1971,18 +1988,26 @@ export const enviarMensagemConversa = createServerFn({ method: "POST" })
       data.text,
     );
 
-    await context.supabase.from("whatsapp_mensagens").insert({
-      clinica_id: data.clinicaId,
-      conversa_id: data.conversaId,
-      wa_message_id,
-      direction: "out",
-      from_number: cfg.display_phone_number,
-      to_number: to,
-      body: data.text,
-      tipo: "text",
-      status: "sent",
-      enviada_por: "humano",
-    });
+    const { data: gravada } = await context.supabase
+      .from("whatsapp_mensagens")
+      .insert({
+        clinica_id: data.clinicaId,
+        conversa_id: data.conversaId,
+        wa_message_id,
+        direction: "out",
+        from_number: cfg.display_phone_number,
+        to_number: to,
+        body: data.text,
+        tipo: "text",
+        status: "sent",
+        enviada_por: "humano",
+        // Mesmo identificador do clique — nada é gerado de novo aqui.
+        client_message_id: data.clientMessageId ?? null,
+      } as any)
+      .select(
+        "id, conversa_id, direction, from_number, to_number, body, tipo, enviada_por, recebida_em, status, client_message_id, wa_message_id",
+      )
+      .maybeSingle();
 
     // SLA primeira resposta
     const patch: any = {
@@ -2005,7 +2030,7 @@ export const enviarMensagemConversa = createServerFn({ method: "POST" })
       .eq("id", data.conversaId)
       .eq("clinica_id", data.clinicaId);
 
-    return { ok: true, wa_message_id };
+    return { ok: true, wa_message_id, mensagem: gravada ?? null };
   });
 
 export const obterDadosContato = createServerFn({ method: "POST" })

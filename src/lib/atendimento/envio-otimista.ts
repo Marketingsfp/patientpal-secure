@@ -30,14 +30,33 @@ export type MensagemOtimista = {
   optimistic: true;
 };
 
+/**
+ * Chave LÓGICA da mensagem (Fase 2).
+ *
+ * A bolha da tela e a linha do banco são a MESMA mensagem quando compartilham
+ * o `client_message_id` — mesmo que o `id` local ("optimistic:...") seja
+ * diferente do id do banco. Mensagens antigas (sem esse campo) continuam
+ * identificadas pelo próprio `id`.
+ */
+export function chaveLogica(m: any): string {
+  const c = m?.client_message_id;
+  if (typeof c === "string" && c) return `cmid:${c}`;
+  return `id:${String(m?.id ?? "")}`;
+}
+
 export function ehOtimista(m: any): boolean {
   return !!m?.optimistic || (typeof m?.id === "string" && m.id.startsWith(PREFIXO_OTIMISTA));
 }
 
+/** Sempre um UUID: o servidor valida o formato antes de aceitar o envio. */
 export function novoClientMessageId(): string {
   const c: any = typeof crypto !== "undefined" ? crypto : undefined;
   if (c?.randomUUID) return c.randomUUID();
-  return `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (ch) => {
+    const r = (Math.random() * 16) | 0;
+    const v = ch === "x" ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
 }
 
 export function criarMensagemOtimista(p: {
@@ -88,6 +107,24 @@ export function marcarFalhaOtimista(msgs: any[], clientMessageId: string): any[]
 }
 
 function temEquivalenteReal(otimista: any, lista: any[]): boolean {
+  const cmid = otimista?.client_message_id;
+  // Caminho oficial (Fase 2): o par é provado pelo identificador do envio.
+  if (cmid && lista.some((m) => !ehOtimista(m) && m?.client_message_id === cmid)) return true;
+  // Se a mensagem oficial JÁ traz identificador de envio, ela não pode ser
+  // confundida com outra: sem par por identificador, não há par.
+  if (cmid && lista.some((m) => !ehOtimista(m) && m?.client_message_id)) {
+    const iguais = lista.filter((m) => !ehOtimista(m) && m?.client_message_id === cmid);
+    if (iguais.length === 0) {
+      // Continua valendo a comparação antiga apenas para linhas SEM
+      // identificador (mensagens gravadas antes desta fase).
+      return paridadePorTexto(otimista, lista.filter((m) => !m?.client_message_id));
+    }
+  }
+  return paridadePorTexto(otimista, lista);
+}
+
+/** Compatibilidade com mensagens antigas: texto + autoria humana + janela. */
+function paridadePorTexto(otimista: any, lista: any[]): boolean {
   const corpo = String(otimista?.body ?? "").trim();
   const nascida = instante(otimista);
   return lista.some(
@@ -102,13 +139,32 @@ function temEquivalenteReal(otimista: any, lista: any[]): boolean {
 
 /**
  * Remove as mensagens otimistas que já têm a mensagem real correspondente na
- * lista (o servidor não devolve o `client_message_id`, então o par é feito
- * pelo texto + autoria humana + janela de tempo).
+ * lista. A prioridade é o `client_message_id`; o texto só é usado como
+ * compatibilidade com mensagens antigas, que não têm esse identificador.
  */
 export function conciliarOtimistas(msgs: any[]): any[] {
   const lista = msgs ?? [];
   if (!lista.some(ehOtimista)) return lista;
   return lista.filter((m) => !ehOtimista(m) || !temEquivalenteReal(m, lista));
+}
+
+/**
+ * Mescla a mensagem oficial (resposta do servidor ou Realtime) sobre a bolha
+ * otimista de mesmo `client_message_id`: a bolha não some e reaparece, apenas
+ * muda de estado (`sending` → `sent`) e passa a usar o id do banco.
+ */
+export function mesclarOficial(msgs: any[], oficial: any): any[] {
+  const cmid = oficial?.client_message_id;
+  const lista = msgs ?? [];
+  if (!cmid) return ordenar([...lista.filter((m) => m?.id !== oficial?.id), oficial]);
+  let trocou = false;
+  const nova = lista.flatMap((m) => {
+    if (m?.client_message_id !== cmid) return [m];
+    if (trocou) return [];
+    trocou = true;
+    return [{ ...m, ...oficial, optimistic: false }];
+  });
+  return ordenar(trocou ? nova : [...nova, oficial]);
 }
 
 /**

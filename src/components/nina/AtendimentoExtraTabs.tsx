@@ -181,6 +181,8 @@ import {
   ehOtimista,
   inserirOtimista,
   marcarFalhaOtimista,
+  mesclarOficial,
+  novoClientMessageId,
   preservarOtimistas,
 } from "@/lib/atendimento/envio-otimista";
 import { ResumoHandoffCard } from "@/components/nina/ResumoHandoffCard";
@@ -2291,6 +2293,62 @@ export function AtendInbox() {
    * validações (permissão, janela de 24h, responsável, admin). Se falhar, a
    * bolha mostra "não enviada" e o texto volta para o campo daquela conversa.
    */
+  /**
+   * FASE 2 — o mesmo identificador acompanha a bolha, a chamada e a linha
+   * gravada. Reenviar reutiliza o identificador: o WhatsApp nunca recebe a
+   * mesma mensagem duas vezes.
+   */
+  const despacharEnvio = (origem: string, texto: string, clientMessageId: string) => {
+    if (!clinicaId) return;
+    void (async () => {
+      try {
+        const r: any = await enviarMsg({
+          data: { clinicaId, conversaId: origem, text: texto, clientMessageId },
+        });
+        prefetchMsgs.current.invalidar(origem);
+        const oficial = r?.mensagem ?? null;
+        if (oficial) {
+          // A bolha não some e reaparece: muda de estado (enviando → enviada).
+          if (selIdRef.current === origem) setMsgs((prev) => mesclarOficial(prev, oficial));
+          const c0 = cacheConversas.current.obter(origem);
+          if (c0)
+            cacheConversas.current.guardar(origem, {
+              ...c0,
+              msgs: mesclarOficial(c0.msgs, oficial),
+            });
+        }
+        if (selIdRef.current === origem) await carregarConversa();
+      } catch (e: any) {
+        mostrarErro(e);
+        if (selIdRef.current === origem) {
+          setMsgs((prev) => marcarFalhaOtimista(prev, clientMessageId));
+        }
+        const c = cacheConversas.current.obter(origem);
+        if (c) {
+          cacheConversas.current.guardar(origem, {
+            ...c,
+            msgs: marcarFalhaOtimista(c.msgs, clientMessageId),
+          });
+        }
+      }
+    })();
+  };
+
+  /** Reenvio explícito (nunca automático) da bolha que falhou. */
+  const tentarNovamente = (m: any) => {
+    if (!clinicaId || !m?.client_message_id) return;
+    const origem = String(m.conversa_id ?? selIdRef.current ?? "");
+    if (!origem) return;
+    const voltarAEnviando = (lista: any[]) =>
+      lista.map((x) =>
+        x?.client_message_id === m.client_message_id ? { ...x, status: "sending" } : x,
+      );
+    if (selIdRef.current === origem) setMsgs((prev) => voltarAEnviando(prev));
+    const c = cacheConversas.current.obter(origem);
+    if (c) cacheConversas.current.guardar(origem, { ...c, msgs: voltarAEnviando(c.msgs) });
+    despacharEnvio(origem, String(m.body ?? ""), String(m.client_message_id));
+  };
+
   const enviar = () => {
     const t = draft.trim();
     if (!t || !sel || !clinicaId) return;
@@ -2306,10 +2364,12 @@ export function AtendInbox() {
     // Conversa de origem: o envio pertence a ela, não à que estiver aberta
     // quando a resposta chegar.
     const origem: string = sel.id;
+    const clientMessageId = novoClientMessageId();
     const otimista = criarMensagemOtimista({
       conversaId: origem,
       texto: t,
       usuarioId: meuId,
+      clientMessageId,
     });
 
     // 1) Campo livre na hora e bolha visível no mesmo frame.
@@ -2327,27 +2387,7 @@ export function AtendInbox() {
       });
     }
 
-    void (async () => {
-      try {
-        await enviarMsg({ data: { clinicaId, conversaId: origem, text: t } });
-        prefetchMsgs.current.invalidar(origem);
-        // A mensagem real chega pela sincronização; a otimista sai quando o
-        // par real aparecer na lista da conversa de origem.
-        if (selIdRef.current === origem) await carregarConversa();
-      } catch (e: any) {
-        mostrarErro(e);
-        if (selIdRef.current === origem) {
-          setMsgs((prev) => marcarFalhaOtimista(prev, otimista.client_message_id));
-        }
-        const c = cacheConversas.current.obter(origem);
-        if (c) {
-          cacheConversas.current.guardar(origem, {
-            ...c,
-            msgs: marcarFalhaOtimista(c.msgs, otimista.client_message_id),
-          });
-        }
-      }
-    })();
+    despacharEnvio(origem, t, clientMessageId);
   };
 
   const adicionarNota = async () => {
@@ -3078,13 +3118,24 @@ export function AtendInbox() {
                         }`}
                       >
                         <div className="whitespace-pre-wrap">{m.body || `[${m.tipo}]`}</div>
+                        {ehOtimista(m) && m.status === "failed" && (
+                          <div className="mt-1 flex items-center gap-2 text-[11px]">
+                            <span className="whitespace-nowrap">⚠ Não enviada</span>
+                            <button
+                              type="button"
+                              className="underline underline-offset-2"
+                              onClick={() => tentarNovamente(m)}
+                            >
+                              Tentar novamente
+                            </button>
+                          </div>
+                        )}
                         <div
                           className={`text-[11px] mt-1 flex items-center justify-between gap-2 ${out ? "text-atd-on-strong/80" : "text-atd-ink-soft"}`}
                         >
                           <span className="whitespace-nowrap">
                             {fmtHora(m.recebida_em)} {m.enviada_por === "nina" && "· Nina"}
-                            {ehOtimista(m) &&
-                              (m.status === "failed" ? " · não enviada" : " · enviando…")}
+                            {ehOtimista(m) && m.status !== "failed" && " · enviando…"}
                           </span>
                           {daNina &&
                             (clinicaId && m.execucao_id && confiancaPorExecucao[String(m.execucao_id)] ? (

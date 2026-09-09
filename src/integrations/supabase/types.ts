@@ -13134,6 +13134,7 @@ export type Database = {
         Row: {
           body: string | null
           canal: string
+          client_message_id: string | null
           clinica_id: string
           conversa_id: string | null
           created_at: string
@@ -13159,6 +13160,7 @@ export type Database = {
         Insert: {
           body?: string | null
           canal?: string
+          client_message_id?: string | null
           clinica_id: string
           conversa_id?: string | null
           created_at?: string
@@ -13184,6 +13186,7 @@ export type Database = {
         Update: {
           body?: string | null
           canal?: string
+          client_message_id?: string | null
           clinica_id?: string
           conversa_id?: string | null
           created_at?: string

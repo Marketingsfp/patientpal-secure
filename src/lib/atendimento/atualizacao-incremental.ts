@@ -11,6 +11,8 @@
  * - se não houver referência (tela vazia), o carregamento normal assume.
  */
 
+import { chaveLogica } from "./envio-otimista";
+
 function instante(m: any): number {
   return new Date(m?.recebida_em ?? m?.created_at ?? 0).getTime();
 }
@@ -32,8 +34,15 @@ export function cursorMaisRecente(msgs: any[]): string | null {
  */
 export function mesclarNovas(atuais: any[], novas: any[]): any[] {
   const mapa = new Map<string, any>();
-  for (const m of atuais ?? []) if (m?.id) mapa.set(m.id, m);
-  for (const m of novas ?? []) if (m?.id) mapa.set(m.id, m);
+  for (const m of atuais ?? []) if (m?.id) mapa.set(chaveLogica(m), m);
+  for (const m of novas ?? []) {
+    if (!m?.id) continue;
+    const chave = chaveLogica(m);
+    const anterior = mapa.get(chave);
+    // A oficial prevalece sobre a otimista, mas mesclada: a bolha muda de
+    // estado em vez de sumir e reaparecer.
+    mapa.set(chave, anterior ? { ...anterior, ...m, optimistic: !!m.optimistic } : m);
+  }
   return [...mapa.values()].sort((a, b) => instante(a) - instante(b));
 }
 
