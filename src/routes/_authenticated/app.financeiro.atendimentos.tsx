@@ -103,9 +103,25 @@ import { ComprovantesTab } from "@/components/financeiro/comprovantes-tab";
 import { HistoricoAtendimentoDialog } from "@/components/financeiro/historico-atendimento-dialog";
 import { resolverRepasse, formaDoAtendimento, type RepasseTerceiro } from "@/lib/repasse-calc";
 
+/** "2026-09-08" — só aceita o formato exato, para não semear filtro inválido. */
+const ehDataIso = (v: unknown): v is string =>
+  typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v);
+
 export const Route = createFileRoute("/_authenticated/app/financeiro/atendimentos")({
   component: AtendimentosPage,
   head: () => ({ meta: [{ title: "Atendimentos — Financeiro" }] }),
+  /**
+   * `?de=&ate=` abre a tela já filtrada num dia.
+   *
+   * Existe para o card "Repasses de dias anteriores" do painel do Financeiro
+   * poder mandar a tesouraria direto ao dia pendente, em vez de a pessoa ter
+   * que reconfigurar o filtro de data a cada dia da fila. Parâmetro ausente ou
+   * malformado é simplesmente ignorado, e a tela abre em hoje como sempre.
+   */
+  validateSearch: (search: Record<string, unknown>): { de?: string; ate?: string } => ({
+    de: ehDataIso(search.de) ? search.de : undefined,
+    ate: ehDataIso(search.ate) ? search.ate : undefined,
+  }),
 });
 
 interface Atend {
@@ -274,9 +290,12 @@ function AtendimentosPage() {
   const [form, setForm] = useState(EMPTY);
   // Filtros do relatório
   const hoje = new Date().toISOString().slice(0, 10);
+  const buscaUrl = Route.useSearch();
   const [fMedico, setFMedico] = useState<string>("todos");
-  const [fIni, setFIni] = useState<string>(hoje);
-  const [fFim, setFFim] = useState<string>(hoje);
+  // `?de=&ate=` só semeia o estado inicial: a partir daí o filtro é da pessoa,
+  // e mexer nele não reescreve a URL nem volta sozinho para a data do link.
+  const [fIni, setFIni] = useState<string>(buscaUrl.de ?? hoje);
+  const [fFim, setFFim] = useState<string>(buscaUrl.ate ?? buscaUrl.de ?? hoje);
   const [fStatus, setFStatus] = useState<"todos" | "aberto" | "pago">("aberto");
   const [fPaciente, setFPaciente] = useState<string>("");
   const [fOrdem, setFOrdem] = useState<

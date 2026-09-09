@@ -11,6 +11,7 @@ import {
   Undo2,
   Printer,
   AlertTriangle,
+  Info,
   Search,
   X,
 } from "lucide-react";
@@ -47,10 +48,10 @@ import {
   TERMO_MINIMO,
 } from "@/lib/financeiro/busca-movimento";
 import {
+  avisoRetroativos,
   ehLancamentoRetroativo,
   mapaDaGaveta,
   totaisRetroativos,
-  diaBR,
   TIPOS_QUE_PESAM_NA_GAVETA,
 } from "@/lib/financeiro/retroativos";
 import {
@@ -1549,6 +1550,9 @@ function Page() {
   // que a recepção não consegue achar varrendo datas. Fora da busca global a
   // regra segue igual — a tela é a conferência do cupom do dia.
   const escondendoRetroativos = ocultarRetroativos && !buscaGlobal;
+  // Texto e tom do aviso de retroativos. Fica fora do JSX porque a regra de
+  // "isto assusta ou só informa?" é de negócio, não de layout — e é testada.
+  const avisoRetro = avisoRetroativos(retro, fmt, escondendoRetroativos);
   // Aviso obrigatório enquanto a busca ignora as datas: sem ele, os cards de
   // Receita/Despesa/Saldo somando várias datas passariam por fechamento do dia.
   const avisoBusca = avisoDaBuscaGlobal({
@@ -2443,28 +2447,36 @@ function Page() {
 
       {/* O que não é dinheiro da gaveta deste dia. O aviso é obrigatório
           quando a lista esconde linhas: some sem explicação, vira "sumiu
-          lançamento" no balcão. */}
-      {retro.quantidade > 0 && (
-        <div className="rounded-md border border-amber-300 bg-amber-50 px-4 py-3 flex flex-wrap items-start gap-x-3 gap-y-2">
-          <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
-          <div className="flex-1 min-w-[16rem] text-sm text-amber-900 space-y-1">
+          lançamento" no balcão.
+
+          O TOM vem do conteúdo, não do simples fato de existir retroativo.
+          Só despesa é informação contábil e sai em azul: despesa da clínica
+          nunca passa pela gaveta da recepção — o dinheiro sai de lá por
+          sangria e quem paga é a tesouraria. Receita retroativa continua em
+          âmbar, porque ali o cupom daquele dia realmente não viu o dinheiro.
+          O texto inteiro vem de `avisoRetroativos`, que tem teste. */}
+      {avisoRetro && (
+        <div
+          className={`rounded-md border px-4 py-3 flex flex-wrap items-start gap-x-3 gap-y-2 ${
+            avisoRetro.tom === "atencao"
+              ? "border-amber-300 bg-amber-50"
+              : "border-sky-300 bg-sky-50"
+          }`}
+        >
+          {avisoRetro.tom === "atencao" ? (
+            <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
+          ) : (
+            <Info className="h-4 w-4 text-sky-600 shrink-0 mt-0.5" />
+          )}
+          <div
+            className={`flex-1 min-w-[16rem] text-sm space-y-1 ${
+              avisoRetro.tom === "atencao" ? "text-amber-900" : "text-sky-900"
+            }`}
+          >
             <p>
-              <strong>
-                {retro.quantidade} lançamento{retro.quantidade === 1 ? "" : "s"} retroativo
-                {retro.quantidade === 1 ? "" : "s"}
-              </strong>{" "}
-              {escondendoRetroativos ? "fora" : "dentro"} do caixa deste período
-              {retro.receitas > 0 ? ` — ${fmt(retro.receitas)} em receitas` : ""}
-              {retro.despesas > 0 ? ` — ${fmt(retro.despesas)} em despesas` : ""}.
+              <strong>{avisoRetro.titulo}</strong>
             </p>
-            <p className="text-xs">
-              Competência de {retro.dias.slice(0, 4).map(diaBR).join(", ")}
-              {retro.dias.length > 4 ? ` e mais ${retro.dias.length - 4} dia(s)` : ""}, digitados
-              depois: esses valores não estão no cupom impresso desses dias.{" "}
-              {escondendoRetroativos
-                ? "Eles continuam inteiros no Painel Executivo e nos relatórios por competência."
-                : "Incluídos aqui, o total acima deixa de bater com o cupom impresso da recepção."}
-            </p>
+            <p className="text-xs">{avisoRetro.detalhe}</p>
           </div>
           {/* Na busca em todas as datas o botão sai: ali os retroativos são
               sempre mostrados, e um botão que não muda nada só confunde. */}
@@ -2472,7 +2484,11 @@ function Page() {
             <Button
               variant="outline"
               size="sm"
-              className="shrink-0 border-amber-400 bg-white hover:bg-amber-100"
+              className={`shrink-0 bg-white ${
+                avisoRetro.tom === "atencao"
+                  ? "border-amber-400 hover:bg-amber-100"
+                  : "border-sky-400 hover:bg-sky-100"
+              }`}
               onClick={() => setOcultarRetroativos(!ocultarRetroativos)}
             >
               {ocultarRetroativos ? "Incluir ajustes retroativos" : "Ocultar retroativos"}

@@ -170,3 +170,110 @@ export function totaisRetroativos(
 export function diaBR(iso: string): string {
   return iso ? `${iso.slice(8, 10)}/${iso.slice(5, 7)}/${iso.slice(0, 4)}` : "";
 }
+
+// ---------------------------------------------------------------------------
+// Texto do aviso na tela
+//
+// O aviso antigo tratava receita e despesa retroativa como a mesma coisa e
+// dizia, para as duas, que "esses valores não estão no cupom impresso desses
+// dias". Para receita isso é verdade e importa: o dinheiro de uma guia
+// faturada depois realmente não saiu no cupom daquele dia, e quem confere
+// precisa saber. Para DESPESA a frase é enganosa, porque sugere que ela
+// deveria estar no cupom — e ela nunca esteve.
+//
+// Despesa da clínica não passa pela gaveta da recepção. O dinheiro sai da
+// gaveta por SANGRIA, indo para a tesouraria, e é a tesouraria que paga as
+// despesas no módulo Financeiro. Isso não é interpretação: o tipo de movimento
+// "despesa" nunca teve um único registro em `caixa_movimentos` em toda a
+// história do sistema, e nenhuma das 249 despesas lançadas em setembro/2026
+// tem movimento de caixa vinculado.
+//
+// Na prática o aviso alarmista custava tempo: em 09/09/2026 um repasse médico
+// de R$ 3.557,50, lançado corretamente com a competência do dia do
+// atendimento, virou uma investigação de meia manhã atrás de um erro que não
+// existia. Por isso o caso "só despesa" agora informa em azul, em vez de
+// alertar em âmbar.
+// ---------------------------------------------------------------------------
+
+/** Tom visual do aviso: azul informa, âmbar pede conferência. */
+export type TomDoAviso = "informativo" | "atencao";
+
+export interface AvisoRetroativos {
+  tom: TomDoAviso;
+  /** Primeira linha, em negrito: o que foi encontrado. */
+  titulo: string;
+  /** Segunda linha, menor: o que isso significa para quem está conferindo. */
+  detalhe: string;
+}
+
+/** "08/09/2026" ou "19/08/2026, 20/08/2026 e mais 2 dia(s)". */
+function listaDeDias(dias: string[]): string {
+  const mostrados = dias.slice(0, 4).map(diaBR).join(", ");
+  return dias.length > 4 ? `${mostrados} e mais ${dias.length - 4} dia(s)` : mostrados;
+}
+
+/** Concorda "1 lançamento retroativo" / "3 lançamentos retroativos". */
+function plural(n: number, singular: string, plural_: string): string {
+  return `${n} ${n === 1 ? singular : plural_}`;
+}
+
+/**
+ * Monta o aviso de retroativos da tela Movimento de Caixa.
+ *
+ * Devolve `null` quando não há nada a avisar. `fmt` formata moeda e vem de
+ * fora para esta função continuar sem dependência de UI.
+ *
+ * @param escondendo A tela está com o botão "Ocultar retroativos" ligado?
+ */
+export function avisoRetroativos(
+  t: TotaisRetroativos,
+  fmt: (n: number) => string,
+  escondendo: boolean,
+): AvisoRetroativos | null {
+  if (t.quantidade === 0) return null;
+
+  const temReceitas = t.receitas > 0;
+  const temDespesas = t.despesas > 0;
+  const dias = listaDeDias(t.dias);
+
+  // Só despesa: nada aqui afeta a conferência física. É informação contábil.
+  if (temDespesas && !temReceitas) {
+    return {
+      tom: "informativo",
+      titulo:
+        `${plural(t.quantidade, "despesa lançada", "despesas lançadas")} depois do dia a que ` +
+        `se refere${t.quantidade === 1 ? "" : "m"} — ${fmt(t.despesas)}, com competência de ${dias}.`,
+      detalhe:
+        "Isso é competência contábil, não um erro: a despesa pertence ao dia em que o gasto " +
+        "aconteceu, mesmo tendo sido digitada depois. Não afeta o cupom impresso nem o caixa " +
+        "físico da recepção — despesa da clínica é paga pela tesouraria, com o dinheiro que sai " +
+        "da gaveta por sangria. O valor entra normalmente no resultado do dia de competência." +
+        (escondendo
+          ? " Está oculto aqui para o total bater com o cupom da recepção."
+          : " Incluído aqui, o total de despesas acima é o do dia de competência, não o do cupom."),
+    };
+  }
+
+  // Receita retroativa: aí sim o cupom daquele dia não viu esse dinheiro.
+  const partes = [
+    temReceitas ? `${fmt(t.receitas)} em receitas` : "",
+    temDespesas ? `${fmt(t.despesas)} em despesas` : "",
+  ].filter(Boolean);
+
+  return {
+    tom: "atencao",
+    titulo:
+      `${plural(t.quantidade, "lançamento retroativo", "lançamentos retroativos")} ` +
+      `${escondendo ? "fora" : "dentro"} do caixa deste período — ${partes.join(" e ")}.`,
+    detalhe:
+      `Competência de ${dias}, digitados depois: esse dinheiro não está no cupom impresso ` +
+      "daqueles dias. " +
+      (escondendo
+        ? "Continuam inteiros no Painel Executivo e nos relatórios por competência."
+        : "Incluídos aqui, o total acima deixa de bater com o cupom impresso da recepção.") +
+      (temDespesas
+        ? " As despesas da lista não afetam o cupom em nenhum caso: elas são pagas pela " +
+          "tesouraria, não saem da gaveta da recepção."
+        : ""),
+  };
+}

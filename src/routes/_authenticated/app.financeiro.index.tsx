@@ -26,6 +26,7 @@ import {
   type RateioLinha,
 } from "@/lib/financeiro/rateio-receita";
 import { LancamentoDialog } from "@/components/financeiro/lancamento-dialog";
+import { CardPendenciasRepasse } from "@/components/financeiro/card-pendencias-repasse";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
   Table,
@@ -226,6 +227,11 @@ function FinDashboard() {
           </div>
         )}
       </div>
+
+      {/* Fila de repasses de dias anteriores. Fica no topo, antes dos números
+          do período, porque é a primeira coisa que a tesouraria resolve de
+          manhã — e some sozinho quando não há nada pendente. */}
+      <CardPendenciasRepasse />
 
       <div className="flex gap-2">
         {(["hoje", "semana", "mes"] as Periodo[]).map((p) => (
