@@ -1,3 +1,4 @@
+import { nomeContato } from "./rotulo-conversa";
 /**
  * Central de Atenção — regras puras.
  *
@@ -49,6 +50,8 @@ export type CategoriaAtencao = "nao_atribuida" | "critica" | "aguardando";
 export interface LinhaFila {
   id: string;
   contato_nome?: string | null;
+  whatsapp_profile_name?: string | null;
+  contato_telefone?: string | null;
   handoff_motivo?: string | null;
   handoff_resumo?: string | null;
 }
@@ -107,7 +110,11 @@ export function calcularAtencao(args: {
   const agora = args.agora ?? Date.now();
   const nomes = { ...(args.nomes ?? {}) };
   const fila = args.naoAtribuidas.filter(veioDoHandoff);
-  for (const c of fila) if (c.contato_nome) nomes[c.id] = c.contato_nome;
+  // Identidade do contato WhatsApp — nunca o cadastro de paciente.
+  for (const c of fila) {
+    const n = nomeContato(c);
+    if (n) nomes[c.id] = n;
+  }
 
   const idsNaoAtribuidas = new Set(fila.map((c) => c.id));
   const idsCriticas = new Set<string>();

@@ -790,6 +790,8 @@ export type Database = {
           ultima_msg_preview: string | null
           unread_count: number
           updated_at: string
+          whatsapp_profile_name: string | null
+          whatsapp_profile_name_updated_at: string | null
         }
         Insert: {
           aguardando_desde?: string | null
@@ -840,6 +842,8 @@ export type Database = {
           ultima_msg_preview?: string | null
           unread_count?: number
           updated_at?: string
+          whatsapp_profile_name?: string | null
+          whatsapp_profile_name_updated_at?: string | null
         }
         Update: {
           aguardando_desde?: string | null
@@ -890,6 +894,8 @@ export type Database = {
           ultima_msg_preview?: string | null
           unread_count?: number
           updated_at?: string
+          whatsapp_profile_name?: string | null
+          whatsapp_profile_name_updated_at?: string | null
         }
         Relationships: [
           {

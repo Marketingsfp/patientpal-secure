@@ -187,7 +187,7 @@ export const listarConversas = createServerFn({ method: "POST" })
       if (safe.length > 0) {
         // Busca por nome também alcança o cadastro do paciente vinculado.
         // Uma única consulta em lote, com teto — nunca por item da lista.
-        let filtro = `contato_nome.ilike.%${safe}%,contato_telefone.ilike.%${safe}%,protocol_number.ilike.%${safe}%`;
+        let filtro = `contato_nome.ilike.%${safe}%,whatsapp_profile_name.ilike.%${safe}%,contato_telefone.ilike.%${safe}%,protocol_number.ilike.%${safe}%`;
         const { data: pacs } = await context.supabase
           .from("pacientes")
           .select("id")
@@ -2275,7 +2275,7 @@ export const supervisaoLive = createServerFn({ method: "POST" })
     const { data: convs } = await context.supabase
       .from("atend_conversas")
       .select(
-        "id, status, contato_nome, contato_telefone, ultima_msg_em, ultima_msg_preview, aguardando_desde, atribuida_user_id, departamento_id, sla_first_response_seg, unread_count",
+        "id, status, contato_nome, whatsapp_profile_name, contato_telefone, ultima_msg_em, ultima_msg_preview, aguardando_desde, atribuida_user_id, departamento_id, sla_first_response_seg, unread_count",
       )
       .eq("clinica_id", data.clinicaId)
       .in("status", ["active", "waiting", "bot_attending"])
@@ -2465,7 +2465,7 @@ export const listarFilaHumana = createServerFn({ method: "POST" })
     let q = context.supabase
       .from("atend_conversas")
       .select(
-        "id, contato_nome, contato_telefone, canal, status, departamento_id, prioridade, aguardando_desde, handoff_motivo, handoff_resumo, ultima_msg_preview, ultima_msg_em, unread_count, pacientes:contato_paciente_id(nome)",
+        "id, contato_nome, whatsapp_profile_name, contato_telefone, canal, status, departamento_id, prioridade, aguardando_desde, handoff_motivo, handoff_resumo, ultima_msg_preview, ultima_msg_em, unread_count, pacientes:contato_paciente_id(nome)",
       )
       .eq("clinica_id", data.clinicaId)
       // Fila global "Não atribuídas": tudo que aguarda uma pessoa e ainda não

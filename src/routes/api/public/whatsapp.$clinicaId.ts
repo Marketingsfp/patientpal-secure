@@ -647,10 +647,10 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
                   }
                 }
 
-                // Nome do perfil do WhatsApp (vem em value.contacts[].profile.name).
-                // Só preenche quando a conversa ainda não tem nome ou está
-                // mostrando o próprio número — nunca sobrescreve um nome que a
-                // recepção digitou nem o nome do paciente já vinculado.
+                // Identidade do CONTATO WhatsApp (value.contacts[].profile.name).
+                // Guardada em campo próprio: é quem está falando no número, e
+                // nunca toca em cadastro de paciente. O campo legado
+                // `contato_nome` só é preenchido quando ainda mostra o número.
                 const perfilNome = textoLimpo(
                   (value?.contacts ?? []).find(
                     (c: any) => String(c?.wa_id ?? "").replace(/\D/g, "") === fromDigits,
@@ -660,21 +660,30 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
                   try {
                     const { data: convs } = await supabaseAdmin
                       .from("atend_conversas")
-                      .select("id, contato_nome, contato_telefone")
+                      .select("id, contato_nome, contato_telefone, whatsapp_profile_name")
                       .eq("clinica_id", params.clinicaId)
                       .in("contato_telefone", [fromDigits, `+${fromDigits}`]);
+                    const nome = perfilNome.slice(0, 120);
                     for (const c of (convs ?? []) as Array<{
                       id: string;
                       contato_nome: string | null;
+                      whatsapp_profile_name: string | null;
                     }>) {
+                      const patch: {
+                        whatsapp_profile_name?: string;
+                        whatsapp_profile_name_updated_at?: string;
+                        contato_nome?: string;
+                      } = {};
+                      if ((c.whatsapp_profile_name ?? "").trim() !== nome) {
+                        patch.whatsapp_profile_name = nome;
+                        patch.whatsapp_profile_name_updated_at = new Date().toISOString();
+                      }
                       const atual = (c.contato_nome ?? "").trim();
                       // vazio ou apenas dígitos/“+” = ainda está mostrando o número
                       const soNumero = atual === "" || /^\+?\d+$/.test(atual);
-                      if (!soNumero) continue;
-                      await supabaseAdmin
-                        .from("atend_conversas")
-                        .update({ contato_nome: perfilNome.slice(0, 120) })
-                        .eq("id", c.id);
+                      if (soNumero) patch.contato_nome = nome;
+                      if (Object.keys(patch).length === 0) continue;
+                      await supabaseAdmin.from("atend_conversas").update(patch).eq("id", c.id);
                     }
                   } catch (e) {
                     console.error("whatsapp perfil nome error", e);
