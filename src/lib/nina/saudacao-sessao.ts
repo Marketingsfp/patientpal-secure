@@ -98,40 +98,49 @@ export function saudacaoCompleta(texto: string, nomeCurtoUnidade: string): boole
   return e.saudacao && e.nina && e.assistenteVirtual && e.unidade && e.abertura;
 }
 
-/** Frase de apresentação padrão (usada como reforço quando o modelo esquece). */
-export function fraseApresentacao(
-  nomeCurtoUnidade: string,
-  opcoes?: { fuso?: string; now?: Date; comAbertura?: boolean },
-): string {
-  const saud = saudacaoPorHorario(opcoes?.fuso ?? FUSO_PADRAO, opcoes?.now ?? new Date());
-  const abertura = opcoes?.comAbertura === false ? "" : " Como posso te ajudar hoje?";
-  return `Olá, ${saud.toLowerCase()}! 😊 Sou a Nina, assistente virtual da ${nomeCurtoUnidade}.${abertura}`;
-}
+export type DiagnosticoSaudacao = {
+  /** A apresentação obrigatória era esperada nesta resposta. */
+  obrigatoria: boolean;
+  /** Todos os elementos da apresentação estão presentes. */
+  completa: boolean;
+  elementos: ElementosSaudacao;
+  /** A resposta apresentou a Nina mais de uma vez. */
+  saudacaoDuplicada: boolean;
+  /** Era obrigatória e o modelo não apresentou a Nina. */
+  saudacaoAusente: boolean;
+};
 
 /**
- * Aplica a regra: se a apresentação é obrigatória e a resposta gerada não a
- * contém, prefixa a apresentação sem alterar o conteúdo da resposta.
+ * FASE 6 — validação NÃO MUTANTE da apresentação.
+ *
+ * O comportamento conversacional (inclusive a apresentação) vem exclusivamente
+ * do Behavior Prompt publicado em Arquitetura. Este módulo apenas OBSERVA a
+ * resposta gerada e devolve telemetria; nunca reescreve o texto, para não
+ * produzir apresentações duplicadas ("Sou a Nina... Sou a Nina...").
  */
-export function aplicarSaudacaoObrigatoria(
+export function avaliarSaudacao(
   texto: string,
   nomeCurtoUnidade: string,
-  opcoes?: { fuso?: string; now?: Date },
-): string {
+  opcoes?: { obrigatoria?: boolean },
+): DiagnosticoSaudacao {
   const resposta = (texto ?? "").trim();
-  if (saudacaoCompleta(resposta, nomeCurtoUnidade)) return resposta;
-  const soSaudacao = resposta.length === 0;
-  const frase = fraseApresentacao(nomeCurtoUnidade, {
-    ...(opcoes?.fuso ? { fuso: opcoes.fuso } : {}),
-    ...(opcoes?.now ? { now: opcoes.now } : {}),
-    comAbertura: soSaudacao || !/\?/.test(resposta),
-  });
-  if (soSaudacao) return frase;
-  // Evita duplicar cumprimento: remove um "Olá/Oi/Bom dia..." inicial da resposta.
-  const limpo = resposta.replace(
-    /^((ol[áa]|oi|bom dia|boa tarde|boa noite)[,!.\s]*)+/i,
-    "",
-  );
-  return `${frase} ${limpo}`.trim();
+  const elementos = checarElementosSaudacao(resposta, nomeCurtoUnidade);
+  const completa =
+    elementos.saudacao &&
+    elementos.nina &&
+    elementos.assistenteVirtual &&
+    elementos.unidade &&
+    elementos.abertura;
+  const t = semAcento(resposta);
+  const apresentacoes = (t.match(/sou a nina|assistente virtual/g) ?? []).length;
+  const obrigatoria = opcoes?.obrigatoria !== false;
+  return {
+    obrigatoria,
+    completa,
+    elementos,
+    saudacaoDuplicada: apresentacoes > 1,
+    saudacaoAusente: obrigatoria && !completa,
+  };
 }
 
 /** Informação de depuração (somente QA/homologação — nunca vai ao paciente). */
