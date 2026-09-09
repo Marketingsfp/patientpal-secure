@@ -392,7 +392,7 @@ async function identificarPaciente(
   clinicaId: string,
   mensagem: string,
   telefoneRemetente: string | null,
-) {
+): Promise<import("@/lib/nina/identidade-paciente").BuscaIdentidade | null> {
   const ids = extrairIdentificadores(mensagem);
   const telBusca = telefoneRemetente ?? ids.telefone;
   if (!ids.cpf && !telBusca && !ids.nome) return null;
@@ -413,8 +413,18 @@ async function identificarPaciente(
     associado: boolean;
     convenio_nome: string | null;
   }>;
-  return rows[0] ?? null;
+  // FASE 4 — devolve TODOS os candidatos. `rows[0]` não decide identidade.
+  return {
+    candidates: rows.map((r) => ({
+      id: r.id,
+      nome: r.nome ?? null,
+      associado: Boolean(r.associado),
+      convenio_nome: r.convenio_nome ?? null,
+    })),
+    viaCpf: Boolean(ids.cpf),
+  };
 }
+
 
 /**
  * Estado de identidade da conversa (por telefone), para a Nina não repetir a
