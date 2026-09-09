@@ -127,6 +127,11 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
 
       // Meta envia POST para cada evento
       POST: async ({ request, params }) => {
+        // FASE 1 (telemetria) — apenas medição do caminho de recebimento.
+        // Nenhuma validação, ordem ou regra do webhook foi alterada.
+        const { iniciarTraceServidor } = await import("@/lib/atendimento/latencia.server");
+        const trace = iniciarTraceServidor({ fluxo: "recv" });
+        trace.marcar("RECV_T0_WEBHOOK_RECEIVED");
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
         const rawBody = await request.text();
         const logId = await registrarLogWebhook(params.clinicaId, "POST", request, rawBody);
@@ -149,6 +154,8 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
             cfg.app_secret && verifySignature(cfg.app_secret, rawBody, sigHeader),
           );
           if (!assinaturaOk) resultado = "assinatura_invalida";
+          trace.marcar("RECV_T1_SIGNATURE_VALIDATED");
+          trace.marcar("RECV_T2_CONFIG_READY");
 
           let payload: any;
           try {
@@ -158,6 +165,7 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
             return new Response("Bad request", { status: 400 });
           }
 
+          trace.marcar("RECV_T3_PAYLOAD_PARSED");
           let processou = false;
           const entries: any[] = payload?.entry ?? [];
           for (const entry of entries) {
@@ -214,6 +222,7 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
                 // mesmo evento (retry/duplicidade), o insert falha aqui e a
                 // mensagem NÃO é processada de novo — nada de resposta dupla
                 // nem de reabertura repetida.
+                trace.marcar("RECV_T4_DB_INSERT_START");
                 const { data: msgInserida, error: insErr } = await supabaseAdmin
                   .from("whatsapp_mensagens")
                   .insert({
@@ -232,6 +241,8 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
                   })
                   .select("id")
                   .maybeSingle();
+                trace.marcar("RECV_T5_DB_INSERT_DONE");
+                trace.marcar("RECV_T6_REALTIME_AVAILABLE");
                 if (insErr) {
                   const duplicada =
                     (insErr as { code?: string }).code === "23505" ||
