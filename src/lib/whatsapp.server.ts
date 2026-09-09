@@ -957,13 +957,11 @@ async function gerarRespostaNinaInterno(
   // Estado já passado pelo TTL de sessão (ver `sessaoNina` acima).
   const fluxoEstado = sessaoNina.estado ?? normalizarEstado(estadoId.fluxoEstadoBruto);
   // Fallbacks de reidratação, em ordem de confiança: estado do fluxo →
-  // paciente já vinculado à conversa → casamento pelo telefone do remetente.
+  // paciente já vinculado à conversa → identidade CONFIRMADA nesta execução.
+  // FASE 4: candidato compatível por telefone NÃO entra aqui.
   let pacienteIdEfetivo =
-    fluxoEstado.patient.id ??
-    estadoId.pacienteIdConversa ??
-    (telefoneNorm && pacienteInfo?.id ? String(pacienteInfo.id) : null);
-  let pacienteNomeEfetivo =
-    telefoneNorm && pacienteInfo?.nome ? String(pacienteInfo.nome) : null;
+    fluxoEstado.patient.id ?? estadoId.pacienteIdConversa ?? identidadePaciente.paciente?.id ?? null;
+  let pacienteNomeEfetivo = identidadePaciente.paciente?.nome ?? null;
   if (pacienteIdEfetivo && !pacienteNomeEfetivo) {
     const { data: pRow } = await supabaseAdmin
       .from("pacientes")
