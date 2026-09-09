@@ -248,19 +248,48 @@ export type Bloqueador =
  *   de resposta (uma saudação não precisa da Agenda). Sai da conta com razão.
  * - `UNKNOWN`: esta dimensão SERIA relevante, mas não há evidência suficiente
  *   para avaliá-la. Sai da nota, mas derruba a COBERTURA — nunca vira PASS.
+ *
+ * FASE 2 (answer/action):
+ * - `PENDING`: a informação AINDA SERÁ coletada antes da ação (o paciente
+ *   nem informou o nome ainda). É o curso normal de uma etapa de coleta:
+ *   não é erro da mensagem, não desconta nota e não derruba cobertura.
  */
 export type StatusValidador =
   | "PASS"
   | "WARNING"
   | "FAIL"
   | "BLOCK"
+  | "PENDING"
   | "UNKNOWN"
   | "NOT_APPLICABLE";
 
 /** Um validador que não passou nem foi dispensado conta contra a nota. */
 export function contaContraANota(status: StatusValidador): boolean {
-  return status !== "PASS" && status !== "NOT_APPLICABLE" && status !== "UNKNOWN";
+  return (
+    status !== "PASS" &&
+    status !== "NOT_APPLICABLE" &&
+    status !== "UNKNOWN" &&
+    status !== "PENDING"
+  );
 }
+
+/** FASE 2 — resultado da avaliação de SEGURANÇA DA AÇÃO. */
+export type StatusSegurancaAcao = "ALLOWED" | "BLOCKED" | "NOT_APPLICABLE";
+
+/**
+ * "É seguro EXECUTAR esta ação?" — deliberadamente separado de
+ * "posso confiar no conteúdo desta mensagem?" (answer_confidence).
+ * Sem ação executável no turno o status é `NOT_APPLICABLE`: nunca bloqueio,
+ * nunca score 0.
+ */
+export type AvaliacaoSegurancaAcao = {
+  status: StatusSegurancaAcao;
+  acao: AcaoSolicitada;
+  /** Só existe quando há ação executável. */
+  blockers: Bloqueador[];
+  hardBlockers: string[];
+  motivos: string[];
+};
 
 export type NivelRiscoAcao = "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
 
