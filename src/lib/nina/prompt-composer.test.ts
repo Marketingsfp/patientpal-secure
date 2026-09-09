@@ -79,3 +79,30 @@ describe("NinaPromptComposer", () => {
     expect(fonte).toContain("comporRequestNina");
   });
 });
+
+/**
+ * FASE 4 — teste fundamental da fonte de verdade.
+ * Um marcador colocado no prompt publicado precisa chegar ao modelo
+ * exatamente UMA vez, sem nenhum helper removê-lo ou duplicá-lo.
+ */
+describe("FASE 4 — Arquitetura é a fonte de verdade", () => {
+  const MARCA = "ARQUITETURA_SOURCE_OF_TRUTH_TEST";
+
+  it("leva o marcador do prompt publicado ao modelo exatamente uma vez", () => {
+    const req = comporRequestNina({
+      behaviorPrompt: `${MARCA}\nRegras conversacionais publicadas.`,
+      runtimeContext: { canal: "whatsapp", intencoes: ["informacao"] },
+    });
+    expect(req.systemPrompt.split(MARCA).length - 1).toBe(1);
+    expect(req.behaviorPrompt.split(MARCA).length - 1).toBe(1);
+  });
+
+  it("não deixa o marcador vazar para o envelope nem para o contexto factual", () => {
+    const req = comporRequestNina({
+      behaviorPrompt: `${MARCA}\nRegras conversacionais publicadas.`,
+      runtimeContext: { canal: "whatsapp" },
+    });
+    expect(req.envelope).not.toContain(MARCA);
+    expect(JSON.stringify(req.runtimeContext)).not.toContain(MARCA);
+  });
+});
