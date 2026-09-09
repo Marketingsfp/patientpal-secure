@@ -27,22 +27,14 @@ import {
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
+import { PERFIS_SISTEMA, perfilCanonico } from "@/lib/permissoes-presets";
 
 // "Supervisor" foi removido: não correspondia a nenhum perfil configurável em
 // Perfis de Acesso (sem preset definido, travava o usuário sem acesso algum),
 // e o conceito real de "supervisor" usado no sistema (autorizar desconto/
 // estorno) já é calculado a partir de admin/gestor/financeiro, não de um
 // perfil próprio.
-const PERFIS = [
-  { value: "admin", label: "Administrador" },
-  { value: "gestor", label: "Gestor" },
-  { value: "medico", label: "Médico" },
-  { value: "enfermeiro", label: "Enfermeiro" },
-  { value: "recepcao", label: "Recepção" },
-  { value: "caixa", label: "Caixa" },
-  { value: "financeiro", label: "Financeiro" },
-  { value: "telefonia", label: "Telefonia" },
-] as const;
+const PERFIS = PERFIS_SISTEMA;
 
 interface Ref {
   id: string;
@@ -185,7 +177,9 @@ export function FuncionarioFormDialog({
       const telefone = (prof?.telefone as string | undefined) ?? "";
       const telefone2 =
         ((prof as { telefone2?: string | null } | null)?.telefone2 as string | undefined) ?? "";
-      const currentRole = (mem?.role as string | undefined) ?? "recepcao";
+      // Normaliza variações de capitalização para a chave canônica, senão o
+      // Select abre vazio e um "TELEFONIA" viraria "recepcao" ao salvar.
+      const currentRole = perfilCanonico(mem?.role as string | undefined) ?? "recepcao";
       const autorizaAtual =
         (mem as { pode_autorizar?: boolean | null } | null)?.pode_autorizar === true;
       setMembershipId((mem?.id as string | undefined) ?? null);
