@@ -3446,22 +3446,17 @@ export function AtendInbox() {
             ) : (
               <>
                 <section>
+                  {/* FASE 5 — o título é SEMPRE quem está falando no WhatsApp. */}
+                  <div className="text-[10px] font-semibold text-muted-foreground uppercase">
+                    Contato do WhatsApp
+                  </div>
                   <div className="font-medium">
-                    {contatoAtual.paciente?.nome ||
-                      nomeConversa(contatoAtual.conversa) ||
-                      SEM_NOME}
+                    {tituloConversa(contatoAtual.conversa) || SEM_NOME}
                   </div>
                   <div className="text-xs text-muted-foreground space-y-0.5 mt-1">
                     {(contatoAtual.conversa?.contato_telefone || contatoAtual.paciente?.telefone) && (
                       <div>
                         📱 {contatoAtual.conversa?.contato_telefone || contatoAtual.paciente?.telefone}
-                      </div>
-                    )}
-                    {contatoAtual.paciente?.email && <div>✉️ {contatoAtual.paciente.email}</div>}
-                    {contatoAtual.paciente?.cpf && <div>CPF: {contatoAtual.paciente.cpf}</div>}
-                    {contatoAtual.paciente?.cidade && (
-                      <div>
-                        📍 {contatoAtual.paciente.cidade}/{contatoAtual.paciente.estado}
                       </div>
                     )}
                     {contatoAtual.conversa?.protocolo && (
@@ -3476,12 +3471,52 @@ export function AtendInbox() {
                       <div>Última mensagem: {fmtData(contatoAtual.conversa.ultima_mensagem_em)}</div>
                     )}
                   </div>
-                  {!contatoAtual.paciente && (
-                    <div className="text-xs text-muted-foreground mt-2">
+                </section>
+
+                <section>
+                  <div className="text-[10px] font-semibold text-muted-foreground uppercase">
+                    Cadastro vinculado
+                  </div>
+                  {contatoAtual.paciente ? (
+                    <>
+                      <div className="font-medium">{contatoAtual.paciente.nome}</div>
+                      <div className="text-xs text-muted-foreground space-y-0.5 mt-1">
+                        {contatoAtual.paciente.telefone && <div>📱 {contatoAtual.paciente.telefone}</div>}
+                        {contatoAtual.paciente.email && <div>✉️ {contatoAtual.paciente.email}</div>}
+                        {contatoAtual.paciente.cpf && <div>CPF: {contatoAtual.paciente.cpf}</div>}
+                        {contatoAtual.paciente.cidade && (
+                          <div>
+                            📍 {contatoAtual.paciente.cidade}/{contatoAtual.paciente.estado}
+                          </div>
+                        )}
+                      </div>
+                      {divergenciaIdentidade(
+                        nomeContato(contatoAtual.conversa),
+                        contatoAtual.paciente.nome,
+                      ) && (
+                        <div className="mt-2 rounded border border-amber-300/60 bg-amber-50 dark:bg-amber-950/30 p-2 text-xs text-amber-800 dark:text-amber-200">
+                          O nome do contato no WhatsApp é diferente do cadastro vinculado. Isso pode ser
+                          normal (responsável, familiar, apelido). Nada foi alterado.
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <div className="text-xs text-muted-foreground mt-1">
                       Não vinculado a paciente cadastrado.
                     </div>
                   )}
+                  {contatoAtual.conversa?.id && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="mt-2 h-7 text-xs"
+                      onClick={() => setRevisarVinculoAberto(true)}
+                    >
+                      Revisar vínculo
+                    </Button>
+                  )}
                 </section>
+
 
 
                 {contatoAtual.agendamentos?.length > 0 && (
