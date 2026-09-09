@@ -1839,6 +1839,13 @@ export function AtendInbox() {
         atrasoMs: 1000,
         tetoMs: 5000,
       }),
+      // FASE 4 — os números dos filtros são informativos: entram agrupados e
+      // nunca seguram a exibição de uma mensagem.
+      contadores: criarAgrupador({
+        executar: () => void carregarContadoresRef.current(),
+        atrasoMs: 1000,
+        tetoMs: 5000,
+      }),
     };
   }
   useEffect(
