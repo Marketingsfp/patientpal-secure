@@ -192,8 +192,10 @@ function Editor({
       toast.error(e instanceof Error ? e.message : "Não foi possível publicar as instruções."),
   });
 
+  const [auditoriaAberta, setAuditoriaAberta] = useState(false);
   const alterado = texto !== (base?.conteudo ?? "");
   const vazio = texto.trim().length === 0;
+
 
   return (
     <div className="space-y-3">
