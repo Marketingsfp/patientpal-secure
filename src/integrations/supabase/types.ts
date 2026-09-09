@@ -3306,6 +3306,96 @@ export type Database = {
           },
         ]
       }
+      correcao_contratos_fantasma_20260909: {
+        Row: {
+          cancelado_em_antes: string | null
+          contrato_id: string | null
+          corrigido_em: string | null
+          motivo_antes: string | null
+          numero: number | null
+          paciente_id: string | null
+          paciente_nome: string | null
+          prontuario: string | null
+          status_antes: string | null
+          valor_mensal: number | null
+        }
+        Insert: {
+          cancelado_em_antes?: string | null
+          contrato_id?: string | null
+          corrigido_em?: string | null
+          motivo_antes?: string | null
+          numero?: number | null
+          paciente_id?: string | null
+          paciente_nome?: string | null
+          prontuario?: string | null
+          status_antes?: string | null
+          valor_mensal?: number | null
+        }
+        Update: {
+          cancelado_em_antes?: string | null
+          contrato_id?: string | null
+          corrigido_em?: string | null
+          motivo_antes?: string | null
+          numero?: number | null
+          paciente_id?: string | null
+          paciente_nome?: string | null
+          prontuario?: string | null
+          status_antes?: string | null
+          valor_mensal?: number | null
+        }
+        Relationships: []
+      }
+      correcao_parcelas_fantasma_20260909: {
+        Row: {
+          contrato_cancelado_em: string | null
+          contrato_id: string | null
+          contrato_numero: number | null
+          corrigido_em: string | null
+          ja_estava_vencida: boolean | null
+          mensalidade_id: string | null
+          numero_parcela: number | null
+          observacoes_antes: string | null
+          paciente_id: string | null
+          paciente_nome: string | null
+          prontuario: string | null
+          status_antes: string | null
+          valor: number | null
+          vencimento: string | null
+        }
+        Insert: {
+          contrato_cancelado_em?: string | null
+          contrato_id?: string | null
+          contrato_numero?: number | null
+          corrigido_em?: string | null
+          ja_estava_vencida?: boolean | null
+          mensalidade_id?: string | null
+          numero_parcela?: number | null
+          observacoes_antes?: string | null
+          paciente_id?: string | null
+          paciente_nome?: string | null
+          prontuario?: string | null
+          status_antes?: string | null
+          valor?: number | null
+          vencimento?: string | null
+        }
+        Update: {
+          contrato_cancelado_em?: string | null
+          contrato_id?: string | null
+          contrato_numero?: number | null
+          corrigido_em?: string | null
+          ja_estava_vencida?: boolean | null
+          mensalidade_id?: string | null
+          numero_parcela?: number | null
+          observacoes_antes?: string | null
+          paciente_id?: string | null
+          paciente_nome?: string | null
+          prontuario?: string | null
+          status_antes?: string | null
+          valor?: number | null
+          vencimento?: string | null
+        }
+        Relationships: []
+      }
       crm_etapas: {
         Row: {
           ativo: boolean
