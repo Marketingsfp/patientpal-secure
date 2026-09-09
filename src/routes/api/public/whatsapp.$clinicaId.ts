@@ -692,6 +692,9 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
           return new Response("ok", { status: 200 });
         } finally {
           await marcarResultado(logId, resultado);
+          // Só tempos e etapas: o log de latência não recebe texto, telefone
+          // nem qualquer dado do paciente.
+          trace.publicar(resultado.startsWith("erro:") ? "erro" : "ok");
         }
       },
     },
