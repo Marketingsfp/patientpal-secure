@@ -30,7 +30,7 @@ import { ConvenioFuncionarioTab } from "@/components/funcionarios/ConvenioFuncio
 import { PatientSearchInput, type PatientOption } from "@/components/patient-search-input";
 import { QuickPatientDialog } from "@/components/pacientes/quick-patient-dialog";
 import { UserPlus } from "lucide-react";
-import { PERFIS_SISTEMA } from "@/lib/permissoes-presets";
+import { PERFIS_SISTEMA, perfilCanonico } from "@/lib/permissoes-presets";
 
 export const Route = createFileRoute("/_authenticated/app/hr-contratos/$id")({
   component: EditarFuncionarioPage,
