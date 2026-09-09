@@ -18,6 +18,11 @@ import {
 } from "@/lib/nina/confianca.functions";
 import { rotuloConfianca, scoreExibido } from "@/lib/nina/confianca-badge";
 import {
+  snapshotDoPrompt,
+  type SnapshotPromptView,
+} from "@/lib/nina/prompt-snapshot.functions";
+
+import {
   gravarLote,
   idsParaBuscar,
   mapaDoCache,
