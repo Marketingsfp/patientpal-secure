@@ -9580,6 +9580,83 @@ export type Database = {
           },
         ]
       }
+      nina_prompt_snapshots: {
+        Row: {
+          behavior_prompt_hash: string | null
+          behavior_prompt_rendered: string | null
+          behavior_prompt_template: string | null
+          clinica_id: string | null
+          conversation_id: string | null
+          created_at: string
+          envelope_tecnico: string | null
+          escopo: string
+          execucao_id: string
+          id: string
+          message_id: string | null
+          model: string | null
+          model_parameters: Json | null
+          prompt_origem: string | null
+          prompt_publicado_em: string | null
+          prompt_versao: number | null
+          prompt_versao_id: string | null
+          request_final: string | null
+          runtime_context: Json | null
+          tool_schemas: Json | null
+        }
+        Insert: {
+          behavior_prompt_hash?: string | null
+          behavior_prompt_rendered?: string | null
+          behavior_prompt_template?: string | null
+          clinica_id?: string | null
+          conversation_id?: string | null
+          created_at?: string
+          envelope_tecnico?: string | null
+          escopo?: string
+          execucao_id: string
+          id?: string
+          message_id?: string | null
+          model?: string | null
+          model_parameters?: Json | null
+          prompt_origem?: string | null
+          prompt_publicado_em?: string | null
+          prompt_versao?: number | null
+          prompt_versao_id?: string | null
+          request_final?: string | null
+          runtime_context?: Json | null
+          tool_schemas?: Json | null
+        }
+        Update: {
+          behavior_prompt_hash?: string | null
+          behavior_prompt_rendered?: string | null
+          behavior_prompt_template?: string | null
+          clinica_id?: string | null
+          conversation_id?: string | null
+          created_at?: string
+          envelope_tecnico?: string | null
+          escopo?: string
+          execucao_id?: string
+          id?: string
+          message_id?: string | null
+          model?: string | null
+          model_parameters?: Json | null
+          prompt_origem?: string | null
+          prompt_publicado_em?: string | null
+          prompt_versao?: number | null
+          prompt_versao_id?: string | null
+          request_final?: string | null
+          runtime_context?: Json | null
+          tool_schemas?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nina_prompt_snapshots_execucao_id_fkey"
+            columns: ["execucao_id"]
+            isOneToOne: true
+            referencedRelation: "nina_execucoes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       nina_teste_avaliacoes: {
         Row: {
           achados: Json
