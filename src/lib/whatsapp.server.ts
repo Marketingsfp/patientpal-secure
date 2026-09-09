@@ -870,26 +870,24 @@ async function gerarRespostaNinaInterno(
     : { cadastro_encontrado: false, nome: null, associado: false, convenio: null };
 
 
-  // FASE 4 — Prompt Principal a partir da versão publicada das Instruções da
-  // Nina. Snapshot único por execução: se a v(n+1) for publicada durante esta
-  // mensagem, esta execução termina com a versão que carregou aqui.
+  // FASE 3 — BEHAVIOR PROMPT: única fonte comportamental é a versão PUBLICADA
+  // em Arquitetura → Instruções da Nina. Placeholders permitidos: só DADOS.
+  // Snapshot único por execução.
   const { promptInstrucoes } = await import("@/lib/nina/instrucoes-runtime.server");
+  const { PROMPT_NINA_WHATSAPP_V4 } = await import("@/lib/nina/prompt/behavior-v4");
   const instrucoesNina = await promptInstrucoes(
     "whatsapp",
     {
       "${nomeUnidade}": nomeUnidade,
-      "${blocoClinica}": blocoClinica,
-      "${blocoDataHoraAgora()}": blocoDataHoraAgora(),
-      "${contextoRemetente}": contextoRemetente,
-      "${blocoIdentidade}": blocoIdentidade,
-      "${blocoFoco}": blocoFoco,
-      '${espsCadastradas.join(", ") || "(nenhuma cadastrada)"}': espsCadastradasTexto,
-      '${medicos || "(nenhum)"}': medicos || "(nenhum)",
-      '${procs || "(nenhum)"}': procs || "(nenhum)",
+      "${nomeCurtoUnidade}": nomeCurtoUnidade,
     },
-    systemPromptCodigo,
+    PROMPT_NINA_WHATSAPP_V4.split("${nomeUnidade}")
+      .join(nomeUnidade)
+      .split("${nomeCurtoUnidade}")
+      .join(nomeCurtoUnidade),
   );
-  const systemPrompt = instrucoesNina.texto;
+  const behaviorPrompt = instrucoesNina.texto;
+
   rastro?.concluir("instructions.published", {
     versao: instrucoesNina.versao ?? null,
     origem: instrucoesNina.origem ?? null,
