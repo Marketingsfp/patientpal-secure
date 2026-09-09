@@ -13023,6 +13023,45 @@ export type Database = {
           },
         ]
       }
+      usuario_medicos: {
+        Row: {
+          clinica_id: string
+          created_at: string
+          id: string
+          medico_id: string
+          user_id: string
+        }
+        Insert: {
+          clinica_id: string
+          created_at?: string
+          id?: string
+          medico_id: string
+          user_id: string
+        }
+        Update: {
+          clinica_id?: string
+          created_at?: string
+          id?: string
+          medico_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "usuario_medicos_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "usuario_medicos_medico_id_fkey"
+            columns: ["medico_id"]
+            isOneToOne: false
+            referencedRelation: "medicos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       whatsapp_configs: {
         Row: {
           access_token: string | null
@@ -14478,6 +14517,7 @@ export type Database = {
         }
         Returns: string
       }
+      medicos_do_usuario: { Args: never; Returns: string[] }
       medicos_face_lista: {
         Args: { _clinica_id: string }
         Returns: {
