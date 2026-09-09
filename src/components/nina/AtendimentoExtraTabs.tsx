@@ -1981,16 +1981,43 @@ export function AtendInbox() {
           renderizouDireto = true;
         }
       }
+      // FASE 4 — a lista é ajustada no ponto certo com o que o próprio evento
+      // trouxe. Só quando isso não basta (conversa que entra ou sai do filtro)
+      // é que a lista completa é conferida no servidor.
+      let listaPorPatch = false;
+      if (evento.table === "whatsapp_mensagens" && evento.eventType === "INSERT") {
+        const r = patchListaPorMensagem(convsRef.current, (evento as any).new, {
+          conversaAberta: selIdRef.current,
+        });
+        if (r.aplicado) {
+          listaPorPatch = true;
+          if (r.lista !== convsRef.current) setConvs(r.lista as any[]);
+          g.contadores.agendar();
+        }
+      } else if (evento.table === "atend_conversas" && evento.eventType === "UPDATE") {
+        const r = patchListaPorConversa(convsRef.current, (evento as any).new, {
+          escopo,
+          userId: meuId,
+          gestor: souGestor,
+        });
+        if (r.aplicado) {
+          listaPorPatch = true;
+          if (r.lista !== convsRef.current) setConvs(r.lista as any[]);
+          g.contadores.agendar();
+        }
+      }
       registrarDiagnostico("atendimento-realtime", {
         table: evento.table,
         event: evento.eventType,
         refresh: alvos.join(","),
         payload_direto: renderizouDireto,
+        lista_patch: listaPorPatch,
       });
       for (const alvo of alvos) {
         // Fallback preservado: sem payload utilizável, o histórico é conferido
         // pelo caminho incremental de sempre.
         if (alvo === "conversa" && renderizouDireto) continue;
+        if (alvo === "lista" && listaPorPatch) continue;
         g[alvo].agendar();
       }
     },
