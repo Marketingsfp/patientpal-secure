@@ -111,6 +111,39 @@ export async function gravarEvidencias(
       await registrarTracePrompt(execucaoId, clinicaId, pacote.prompt, pacote.modulos);
     }
 
+    // FASE 5 — snapshot imutável do que foi enviado ao modelo. `ignoreDuplicates`
+    // garante que uma segunda gravação NUNCA reescreva o registro original.
+    if (pacote.snapshot) {
+      const s = pacote.snapshot;
+      const { error: e4 } = await supabaseAdmin
+        .from("nina_prompt_snapshots")
+        .upsert(
+          {
+            execucao_id: execucaoId,
+            clinica_id: clinicaId,
+            conversation_id: pacote.prompt?.conversaId ?? null,
+            escopo: pacote.prompt?.escopo ?? "whatsapp",
+            prompt_versao_id: pacote.prompt?.versaoId ?? null,
+            prompt_versao: pacote.prompt?.versao ?? null,
+            prompt_publicado_em: pacote.prompt?.publicadoEm ?? null,
+            prompt_origem: pacote.prompt?.origem ?? null,
+            behavior_prompt_template: s.behaviorPromptTemplate,
+            behavior_prompt_rendered: s.behaviorPromptRendered,
+            behavior_prompt_hash: s.behaviorPromptHash,
+            envelope_tecnico: s.envelopeTecnico,
+            runtime_context: s.runtimeContext as never,
+            request_final: s.requestFinal,
+            model: s.model,
+            model_parameters: s.modelParameters as never,
+            tool_schemas: s.toolSchemas as never,
+          } as never,
+          { onConflict: "execucao_id", ignoreDuplicates: true },
+        );
+      if (e4) console.warn("[nina-evidencias] falha ao gravar snapshot do prompt:", e4.message);
+    }
+
+
+
     if (pacote.mensagensEntrada.length) {
       const { error: e2 } = await supabaseAdmin
         .from("nina_execucoes")
