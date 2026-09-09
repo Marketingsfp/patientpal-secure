@@ -197,6 +197,7 @@ import {
   novoClientMessageId,
   preservarOtimistas,
 } from "@/lib/atendimento/envio-otimista";
+import { criarFilaEnvio } from "@/lib/atendimento/fila-envio";
 import { ResumoHandoffCard } from "@/components/nina/ResumoHandoffCard";
 import { ReportarErroNinaBotao } from "@/components/nina/ReportarErroNinaDialog";
 import { BadgeEspera, RelogioEsperaProvider } from "@/components/nina/BadgeEspera";
@@ -2339,7 +2340,9 @@ export function AtendInbox() {
    */
   const despacharEnvio = (origem: string, texto: string, clientMessageId: string) => {
     if (!clinicaId) return;
-    void (async () => {
+    // FASE 2 — a bolha é imediata, mas o transporte sai em ordem: uma fila por
+    // conversa garante A → B → C. Conversas diferentes não se atrapalham.
+    void filaEnvio.current.enfileirar(origem, async () => {
       try {
         marcarEtapa(clientMessageId, "SEND_T2_REQUEST_STARTED", "send");
         const r: any = await enviarMsg({
@@ -2377,7 +2380,7 @@ export function AtendInbox() {
           marcarFalhaOtimista(msgs, clientMessageId),
         );
       }
-    })();
+    });
   };
 
   /** Reenvio explícito (nunca automático) da bolha que falhou. */
