@@ -13,8 +13,6 @@
  */
 import type { EstadoFluxoNina } from "./fluxo-estado-normalizar";
 import { novoSessionId } from "./sessao";
-import { saudacaoPorHorario } from "./atendimento-fase1";
-import { FUSO_PADRAO } from "@/lib/nina-agora";
 
 export type SessaoSaudacao = {
   estado: EstadoFluxoNina;
