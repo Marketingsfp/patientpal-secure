@@ -81,6 +81,8 @@ import { useAuth } from "@/hooks/use-auth";
 import { usePodeEscrever } from "@/hooks/use-permissoes";
 import { useRealtimeAtendimento } from "@/hooks/use-realtime-atendimento";
 import { criarAgrupador, type Agrupador } from "@/lib/atendimento/realtime-roteador";
+// FASE 3 — a linha entregue pelo tempo real é usada direto (sem nova consulta).
+import { normalizarMensagemRealtime } from "@/lib/atendimento/mensagem-realtime";
 // FASE 1 — telemetria de latência (só medição; desligada por padrão).
 import {
   abrirTrace,
@@ -1938,12 +1940,35 @@ export function AtendInbox() {
           marcarEtapa(`recv:${idMsg}`, "RECV_T7_REALTIME_BROWSER", "recv");
         }
       }
+      // FASE 3 — MESSAGE_RENDER é imediato: a mensagem que o tempo real
+      // entregou vira bolha agora, sem debounce e sem buscar a mesma linha de
+      // novo. Lista, contadores e eventos continuam agrupados.
+      let renderizouDireto = false;
+      if (evento.table === "whatsapp_mensagens") {
+        const r = normalizarMensagemRealtime(evento, {
+          clinicaId: clinicaId ?? null,
+          conversaAberta: selIdRef.current,
+        });
+        if (r.usar) {
+          // Mesma mensagem chegando duas vezes (ou junto da resposta do envio)
+          // não vira duas bolhas: a chave lógica reconcilia.
+          setMsgs((prev) => mesclarNovas(prev, [r.mensagem]));
+          atualizarMensagemNoCache(cacheConversas.current, r.conversaId, r.mensagem);
+          renderizouDireto = true;
+        }
+      }
       registrarDiagnostico("atendimento-realtime", {
         table: evento.table,
         event: evento.eventType,
         refresh: alvos.join(","),
+        payload_direto: renderizouDireto,
       });
-      for (const alvo of alvos) g[alvo].agendar();
+      for (const alvo of alvos) {
+        // Fallback preservado: sem payload utilizável, o histórico é conferido
+        // pelo caminho incremental de sempre.
+        if (alvo === "conversa" && renderizouDireto) continue;
+        g[alvo].agendar();
+      }
     },
     // Canal confirmado (primeira vez ou depois de queda): pode ter passado
     // mensagem, transferência ou encerramento sem aviso. A tela reconcilia
