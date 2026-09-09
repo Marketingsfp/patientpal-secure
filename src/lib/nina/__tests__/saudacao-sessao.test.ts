@@ -2,7 +2,7 @@ import { describe, expect, it } from "bun:test";
 import { estadoVazio, normalizarEstado } from "../fluxo-estado-normalizar";
 import { novaSessao, reabrirSessao } from "../sessao";
 import {
-  aplicarSaudacaoObrigatoria,
+  avaliarSaudacao,
   checarElementosSaudacao,
   garantirSessaoAtiva,
   marcarSaudacaoConcluida,
