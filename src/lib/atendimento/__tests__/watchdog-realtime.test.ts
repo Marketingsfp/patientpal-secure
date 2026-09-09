@@ -16,7 +16,7 @@ describe("FASE 3 — vigia da conexão e rede de segurança", () => {
   it("canal com problema liga a conferência periódica uma única vez", () => {
     const w = criarWatchdog();
     w.aoEstado("SUBSCRIBED");
-    expect(w.aoEstado("CHANNEL_ERROR" in {} ? "DEGRADED" : "DEGRADED").fallback).toBe("ativar");
+    expect(w.aoEstado("DEGRADED").fallback).toBe("ativar");
     expect(w.aoEstado("DISCONNECTED").fallback).toBe("manter");
     expect(w.snapshot().fallbackAtivo).toBe(true);
   });
