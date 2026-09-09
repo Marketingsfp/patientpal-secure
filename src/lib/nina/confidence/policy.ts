@@ -216,6 +216,8 @@ export type MedidaDeEvidencia = {
   desconhecidas: string[];
   /** Dimensões dispensadas legitimamente neste tipo de resposta. */
   naoAplicaveis: string[];
+  /** FASE 2 — dimensões que ainda serão satisfeitas antes da ação. */
+  pendentes: string[];
   /** Nada relevante pôde ser avaliado: confiança insuficiente, não 100. */
   semEvidencia: boolean;
 };
