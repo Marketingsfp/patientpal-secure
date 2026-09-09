@@ -142,9 +142,9 @@ export async function vincularPacienteConversa(
         await supabase.from("atend_conversa_eventos").insert({
           clinica_id: params.clinicaId,
           conversa_id: params.conversaId,
-          tipo: "vinculo_paciente",
+          evento: "vinculo_paciente",
           user_id: params.responsavelUserId ?? null,
-          payload: {
+          detalhes: {
             paciente_id: params.pacienteId,
             origem: params.origem,
             em: new Date().toISOString(),
