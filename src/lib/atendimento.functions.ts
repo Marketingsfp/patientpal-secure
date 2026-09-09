@@ -1893,6 +1893,11 @@ export const enviarMensagemConversa = createServerFn({ method: "POST" })
       .parse(i),
   )
   .handler(async ({ data, context }) => {
+    // FASE 1 (telemetria) — só medição: nenhuma validação, ordem ou regra
+    // deste envio foi alterada por causa do trace.
+    const { iniciarTraceServidor } = await import("./atendimento/latencia.server");
+    const trace = iniciarTraceServidor({ fluxo: "send", conversationId: data.conversaId });
+    trace.marcar("SEND_T3_BACKEND_RECEIVED");
     await assertMember(context.supabase, context.userId, data.clinicaId);
     {
       const { assertAcessoConversa } = await import("./atendimento/acesso-conversa.server");
