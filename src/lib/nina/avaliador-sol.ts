@@ -298,11 +298,19 @@ export function montarInputSol(d: Dossie): { role: "user"; content: string }[] {
       d.criteriosEsperados.length ? d.criteriosEsperados.map((c) => `- ${c}`).join("\n") : "(nenhum critério cadastrado)"
     }`,
   );
-  partes.push(
-    `# VERSÃO DAS INSTRUÇÕES DA NINA\nversão: ${d.instrucoes.versao ?? "—"} | publicada em: ${
+  {
+    const cab = `# INSTRUÇÕES DA NINA UTILIZADAS NESTA RESPOSTA\nversão: ${
+      d.instrucoes.versao ?? "—"
+    } | hash: ${d.instrucoes.hash ?? "—"} | publicadoEm: ${
       d.instrucoes.publicadoEm ?? "—"
-    } | origem: ${d.instrucoes.origem ?? "—"}\n(O texto das instruções não é fornecido ao avaliador; use os critérios esperados e as evidências.)`,
-  );
+    } | origem: ${d.instrucoes.origem ?? "—"}`;
+    partes.push(
+      d.instrucoes.textoUtilizado
+        ? `${cab}\n\n<instrucoes_utilizadas>\n${d.instrucoes.textoUtilizado}\n</instrucoes_utilizadas>`
+        : `${cab}\n\nSnapshot do prompt não disponível para esta execução.\nNÃO presuma o conteúdo das instruções nem use a versão atual. Avalie as demais dimensões normalmente e trate "aderencia_instrucoes" como evidência insuficiente.`,
+    );
+  }
+
 
   partes.push(
     `# CONVERSA\n${
