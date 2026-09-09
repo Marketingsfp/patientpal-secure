@@ -3202,19 +3202,15 @@ export function AtendInbox() {
                     }
                     rows={1}
                     className="min-h-9 resize-none border-atd-border bg-atd-surface focus-visible:border-atd-blue focus-visible:ring-2 focus-visible:ring-atd-blue/30"
-                    disabled={enviando || !!motivoBloqueio}
+                    disabled={!!motivoBloqueio}
                   />
 
                   <Button
                     onClick={enviar}
-                    disabled={enviando || !draft.trim() || !!motivoBloqueio}
+                    disabled={!draft.trim() || !!motivoBloqueio}
                     className="bg-atd-go text-atd-on-strong hover:bg-atd-go-hover disabled:bg-atd-idle-bg disabled:text-atd-ink-soft"
                   >
-                    {enviando ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <Send className="h-4 w-4" />
-                    )}
+                    <Send className="h-4 w-4" />
                   </Button>
                 </div>
               </div>
