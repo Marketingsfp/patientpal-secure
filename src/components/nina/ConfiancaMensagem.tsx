@@ -216,6 +216,34 @@ export function ConfiancaMensagemBadge({
             Registrado quando a resposta foi produzida. Não é recalculado.
           </p>
         </div>
+        {/* FASE 2 — segurança da AÇÃO é outra coisa: o indicador da bolha é a
+            confiança da RESPOSTA. Uma ação bloqueada não reprova o texto. */}
+        <div className="rounded border bg-muted/40 p-2">
+          <p className="font-medium">
+            Segurança da ação:{" "}
+            {detalhe?.seguranca?.status === "BLOCKED"
+              ? "Bloqueada"
+              : detalhe?.seguranca?.status === "ALLOWED"
+                ? "Liberada"
+                : "Não aplicável"}
+          </p>
+          {detalhe?.seguranca?.acao && detalhe.seguranca.status !== "NOT_APPLICABLE" && (
+            <p className="text-muted-foreground">Ação: {detalhe.seguranca.acao}</p>
+          )}
+          {detalhe?.seguranca?.status === "BLOCKED" &&
+            detalhe.seguranca.bloqueadores.length > 0 && (
+              <ul className="list-disc pl-4 text-muted-foreground">
+                {detalhe.seguranca.bloqueadores.map((b) => (
+                  <li key={b}>{b}</li>
+                ))}
+              </ul>
+            )}
+          {!detalhe?.seguranca && (
+            <p className="text-muted-foreground">
+              Nenhuma ação executável foi avaliada neste turno.
+            </p>
+          )}
+        </div>
         {confianca.bloqueadores.length > 0 && (
           <div className="rounded border border-destructive/40 bg-destructive/10 p-2 text-destructive">
             <p className="font-medium">Bloqueio objetivo</p>
