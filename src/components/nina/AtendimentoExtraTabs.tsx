@@ -3089,7 +3089,7 @@ export function AtendInbox() {
                     return (
                       <div key={m.id} className="flex justify-center">
                         <div className="max-w-[85%] whitespace-pre-wrap rounded-lg border border-atd-blue/20 bg-atd-blue-tint px-3 py-2 text-center text-xs text-atd-blue-ink">
-                          {m.body}
+                          {textoMarcadorSistema(m.body)}
                           <div className="mt-1 text-[10px] opacity-70">
                             {fmtHora(m.recebida_em)}
                           </div>
