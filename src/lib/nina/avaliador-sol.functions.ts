@@ -196,6 +196,21 @@ async function montarDossie(
   const execucaoIds = execucoes.map((e) => e.id);
   const ultima = ((execs ?? []) as any[]).at(-1) ?? null;
 
+  // FASE 5 — snapshot IMUTÁVEL da execução que produziu a última resposta.
+  // Ausente = mensagem legada: o prompt atual NUNCA é usado no lugar dela.
+  let snapshotPrompt: any = null;
+  if (ultima?.id) {
+    const { data: snap } = await admin
+      .from("nina_prompt_snapshots")
+      .select(
+        "behavior_prompt_rendered, behavior_prompt_hash, prompt_versao, prompt_publicado_em, prompt_origem",
+      )
+      .eq("execucao_id", ultima.id)
+      .maybeSingle();
+    snapshotPrompt = snap ?? null;
+  }
+
+
   // Consultas ao conhecimento/catálogo registradas nas evidências (sem
   // raciocínio interno: só o que foi consultado e o que voltou).
   const conhecimento: Dossie["conhecimento"] = [];
