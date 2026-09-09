@@ -3083,6 +3083,8 @@ export function AtendInbox() {
                         >
                           <span className="whitespace-nowrap">
                             {fmtHora(m.recebida_em)} {m.enviada_por === "nina" && "· Nina"}
+                            {ehOtimista(m) &&
+                              (m.status === "failed" ? " · não enviada" : " · enviando…")}
                           </span>
                           {daNina &&
                             (clinicaId && m.execucao_id && confiancaPorExecucao[String(m.execucao_id)] ? (
