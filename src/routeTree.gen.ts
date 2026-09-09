@@ -90,6 +90,7 @@ import { Route as AuthenticatedAppEspecialidadesRouteImport } from './routes/_au
 import { Route as AuthenticatedAppEquipeRouteImport } from './routes/_authenticated/app.equipe'
 import { Route as AuthenticatedAppDocumentosRouteImport } from './routes/_authenticated/app.documentos'
 import { Route as AuthenticatedAppDisponibilidadesRouteImport } from './routes/_authenticated/app.disponibilidades'
+import { Route as AuthenticatedAppEquipeAcessosRouteImport } from './routes/_authenticated/app.equipe-acessos'
 import { Route as AuthenticatedAppDevOrcamentosShellRouteImport } from './routes/_authenticated/app.dev-orcamentos-shell'
 import { Route as AuthenticatedAppDevListShellRouteImport } from './routes/_authenticated/app.dev-list-shell'
 import { Route as AuthenticatedAppDevHhpRouteImport } from './routes/_authenticated/app.dev-hhp'
@@ -612,6 +613,12 @@ const AuthenticatedAppDisponibilidadesRoute =
   AuthenticatedAppDisponibilidadesRouteImport.update({
     id: '/disponibilidades',
     path: '/disponibilidades',
+    getParentRoute: () => AuthenticatedAppRoute,
+  } as any)
+const AuthenticatedAppEquipeAcessosRoute =
+  AuthenticatedAppEquipeAcessosRouteImport.update({
+    id: '/equipe-acessos',
+    path: '/equipe-acessos',
     getParentRoute: () => AuthenticatedAppRoute,
   } as any)
 const AuthenticatedAppDevOrcamentosShellRoute =
@@ -1166,6 +1173,7 @@ export interface FileRoutesByFullPath {
   '/app/dev-list-shell': typeof AuthenticatedAppDevListShellRoute
   '/app/dev-orcamentos-shell': typeof AuthenticatedAppDevOrcamentosShellRoute
   '/app/disponibilidades': typeof AuthenticatedAppDisponibilidadesRoute
+  '/app/equipe-acessos': typeof AuthenticatedAppEquipeAcessosRoute
   '/app/documentos': typeof AuthenticatedAppDocumentosRoute
   '/app/equipe': typeof AuthenticatedAppEquipeRouteWithChildren
   '/app/especialidades': typeof AuthenticatedAppEspecialidadesRoute
@@ -1330,6 +1338,7 @@ export interface FileRoutesByTo {
   '/app/dev-list-shell': typeof AuthenticatedAppDevListShellRoute
   '/app/dev-orcamentos-shell': typeof AuthenticatedAppDevOrcamentosShellRoute
   '/app/disponibilidades': typeof AuthenticatedAppDisponibilidadesRoute
+  '/app/equipe-acessos': typeof AuthenticatedAppEquipeAcessosRoute
   '/app/documentos': typeof AuthenticatedAppDocumentosRoute
   '/app/especialidades': typeof AuthenticatedAppEspecialidadesRoute
   '/app/estoque': typeof AuthenticatedAppEstoqueRoute
@@ -1496,6 +1505,7 @@ export interface FileRoutesById {
   '/_authenticated/app/dev-list-shell': typeof AuthenticatedAppDevListShellRoute
   '/_authenticated/app/dev-orcamentos-shell': typeof AuthenticatedAppDevOrcamentosShellRoute
   '/_authenticated/app/disponibilidades': typeof AuthenticatedAppDisponibilidadesRoute
+  '/_authenticated/app/equipe-acessos': typeof AuthenticatedAppEquipeAcessosRoute
   '/_authenticated/app/documentos': typeof AuthenticatedAppDocumentosRoute
   '/_authenticated/app/equipe': typeof AuthenticatedAppEquipeRouteWithChildren
   '/_authenticated/app/especialidades': typeof AuthenticatedAppEspecialidadesRoute
@@ -2717,6 +2727,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAppDisponibilidadesRouteImport
       parentRoute: typeof AuthenticatedAppRoute
     }
+    '/_authenticated/app/equipe-acessos': {
+      id: '/_authenticated/app/equipe-acessos'
+      path: '/equipe-acessos'
+      fullPath: '/app/equipe-acessos'
+      preLoaderRoute: typeof AuthenticatedAppEquipeAcessosRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
+    }
     '/_authenticated/app/dev-orcamentos-shell': {
       id: '/_authenticated/app/dev-orcamentos-shell'
       path: '/dev-orcamentos-shell'
@@ -3479,6 +3496,7 @@ interface AuthenticatedAppRouteChildren {
   AuthenticatedAppDevListShellRoute: typeof AuthenticatedAppDevListShellRoute
   AuthenticatedAppDevOrcamentosShellRoute: typeof AuthenticatedAppDevOrcamentosShellRoute
   AuthenticatedAppDisponibilidadesRoute: typeof AuthenticatedAppDisponibilidadesRoute
+  AuthenticatedAppEquipeAcessosRoute: typeof AuthenticatedAppEquipeAcessosRoute
   AuthenticatedAppDocumentosRoute: typeof AuthenticatedAppDocumentosRoute
   AuthenticatedAppEquipeRoute: typeof AuthenticatedAppEquipeRouteWithChildren
   AuthenticatedAppEspecialidadesRoute: typeof AuthenticatedAppEspecialidadesRoute
@@ -3577,6 +3595,7 @@ const AuthenticatedAppRouteChildren: AuthenticatedAppRouteChildren = {
   AuthenticatedAppDevOrcamentosShellRoute:
     AuthenticatedAppDevOrcamentosShellRoute,
   AuthenticatedAppDisponibilidadesRoute: AuthenticatedAppDisponibilidadesRoute,
+  AuthenticatedAppEquipeAcessosRoute: AuthenticatedAppEquipeAcessosRoute,
   AuthenticatedAppDocumentosRoute: AuthenticatedAppDocumentosRoute,
   AuthenticatedAppEquipeRoute: AuthenticatedAppEquipeRouteWithChildren,
   AuthenticatedAppEspecialidadesRoute: AuthenticatedAppEspecialidadesRoute,
