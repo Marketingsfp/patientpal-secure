@@ -2148,6 +2148,8 @@ export const obterDadosContato = createServerFn({ method: "POST" })
       contratos,
       atribuido_nome: atribuidoProfile?.nome ?? null,
       contato_via: contatoVia,
+      identidade_status: identidadeStatus,
+      candidatos_paciente: candidatos,
     };
   });
 
