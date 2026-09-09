@@ -9,7 +9,14 @@
  */
 import { AsyncLocalStorage } from "node:async_hooks";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
-import { criarColetor, type Coletor, type Etapa, type PromptDaExecucao } from "./evidencias";
+import {
+  criarColetor,
+  type Coletor,
+  type Etapa,
+  type PromptDaExecucao,
+  type SnapshotPrompt,
+} from "./evidencias";
+
 
 const escopo = new AsyncLocalStorage<Coletor>();
 
