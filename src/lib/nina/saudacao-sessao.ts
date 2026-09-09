@@ -130,7 +130,7 @@ export function avaliarSaudacao(
     elementos.unidade &&
     elementos.abertura;
   const t = semAcento(resposta);
-  const apresentacoes = (t.match(/sou a nina|assistente virtual/g) ?? []).length;
+  const apresentacoes = (t.match(/sou a nina|nina[,]? assistente virtual/g) ?? []).length;
   const obrigatoria = opcoes?.obrigatoria !== false;
   return {
     obrigatoria,
