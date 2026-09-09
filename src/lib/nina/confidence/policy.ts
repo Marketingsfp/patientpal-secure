@@ -272,6 +272,7 @@ export function medirEvidencia(
     cobertura: pesoRelevante === 0 ? 0 : Math.round((pesoAvaliado / pesoRelevante) * 100),
     desconhecidas,
     naoAplicaveis,
+    pendentes,
     semEvidencia,
   };
 }
