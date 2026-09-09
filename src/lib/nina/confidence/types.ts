@@ -354,6 +354,14 @@ export type ResultadoConfianca = {
   unknownDimensions: string[];
   /** Nenhuma dimensão relevante pôde ser avaliada (antes isso virava 100). */
   confidenceInsufficient: boolean;
+  /**
+   * FASE 2 — segurança da AÇÃO, medida à parte. Um bloqueio aqui NÃO zera a
+   * confiança da mensagem: "preciso confirmar seus dados" pode ser uma
+   * resposta excelente enquanto a criação do agendamento está bloqueada.
+   */
+  actionSafety: AvaliacaoSegurancaAcao;
+  /** Dimensões que ainda serão satisfeitas antes da ação (etapa de coleta). */
+  pendingDimensions: string[];
   level: NivelConfianca;
   decision: DecisaoMotor;
   blockers: Bloqueador[];
