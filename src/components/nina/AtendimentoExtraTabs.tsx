@@ -81,6 +81,13 @@ import { useAuth } from "@/hooks/use-auth";
 import { usePodeEscrever } from "@/hooks/use-permissoes";
 import { useRealtimeAtendimento } from "@/hooks/use-realtime-atendimento";
 import { criarAgrupador, type Agrupador } from "@/lib/atendimento/realtime-roteador";
+// FASE 1 — telemetria de latência (só medição; desligada por padrão).
+import {
+  abrirTrace,
+  anexarMarcasDoServidor,
+  marcarEtapa,
+  obterTrace,
+} from "@/lib/atendimento/latencia-cliente";
 import { criarReconciliadorRetomada, motivoDeRetomada } from "@/lib/atendimento/retomada";
 import {
   criarWatchdog,
@@ -1916,6 +1923,18 @@ export function AtendInbox() {
       const g = agrupadores.current;
       if (!g) return;
       watchdog.current.aoEvento();
+      // Chegada de mensagem por tempo real: abre/atualiza o trace de recebimento.
+      if (evento.table === "whatsapp_mensagens") {
+        const linha: any = (evento as any).new ?? {};
+        const idMsg = String(linha?.id ?? "");
+        const cmid = linha?.client_message_id ? String(linha.client_message_id) : "";
+        if (cmid && obterTrace(cmid)) {
+          marcarEtapa(cmid, "SEND_T11_REALTIME_RECEIVED", "send");
+        } else if (idMsg && linha?.direction === "in") {
+          abrirTrace(`recv:${idMsg}`, "recv", String(linha?.conversa_id ?? ""));
+          marcarEtapa(`recv:${idMsg}`, "RECV_T7_REALTIME_BROWSER", "recv");
+        }
+      }
       registrarDiagnostico("atendimento-realtime", {
         table: evento.table,
         event: evento.eventType,
@@ -1976,6 +1995,14 @@ export function AtendInbox() {
     ];
     return itens.sort((a, b) => a.at - b.at);
   }, [msgs, eventos]);
+
+  // FASE 1 — mensagem recebida já desenhada na conversa: fecha o trace RECV.
+  useEffect(() => {
+    for (const m of msgs as any[]) {
+      const chave = `recv:${String(m?.id ?? "")}`;
+      if (obterTrace(chave)) marcarEtapa(chave, "RECV_T8_MESSAGE_RENDERED", "recv");
+    }
+  }, [msgs]);
 
   // Scroll do chat: abre sempre na última interação real (mensagem ou evento).
   const ultimoItemId =
@@ -2314,9 +2341,12 @@ export function AtendInbox() {
     if (!clinicaId) return;
     void (async () => {
       try {
+        marcarEtapa(clientMessageId, "SEND_T2_REQUEST_STARTED", "send");
         const r: any = await enviarMsg({
           data: { clinicaId, conversaId: origem, text: texto, clientMessageId },
         });
+        marcarEtapa(clientMessageId, "SEND_T10_BACKEND_RESPONSE", "send");
+        anexarMarcasDoServidor(clientMessageId, r?.latencia?.marcas);
         const oficial = r?.mensagem ?? null;
         if (oficial) {
           // A bolha não some e reaparece: muda de estado (enviando → enviada).
@@ -2336,6 +2366,8 @@ export function AtendInbox() {
           }) as any[],
         );
         registrarDiagnostico("atendimento-inbox", { sync_reason: "envio", full_reload: false });
+        // Etapa final do envio: fecha o trace e alimenta p50/p95/p99.
+        marcarEtapa(clientMessageId, "SEND_T12_CANONICAL_RECONCILED", "send");
       } catch (e: any) {
         mostrarErro(e);
         if (selIdRef.current === origem) {
@@ -2379,6 +2411,8 @@ export function AtendInbox() {
     // quando a resposta chegar.
     const origem: string = sel.id;
     const clientMessageId = novoClientMessageId();
+    abrirTrace(clientMessageId, "send", origem);
+    marcarEtapa(clientMessageId, "SEND_T0_CLICK", "send");
     const otimista = criarMensagemOtimista({
       conversaId: origem,
       texto: t,
@@ -2401,6 +2435,7 @@ export function AtendInbox() {
       });
     }
 
+    marcarEtapa(clientMessageId, "SEND_T1_OPTIMISTIC_RENDER", "send");
     despacharEnvio(origem, t, clientMessageId);
   };
 
