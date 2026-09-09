@@ -971,43 +971,30 @@ async function gerarRespostaNinaInterno(
 
   if (rastro && estadoId?.conversaId) rastro.ids.conversation_id = estadoId.conversaId;
 
-  const blocoKb = await (async () => {
-    const { blocoPromptCatalogo } = await import("@/lib/nina/catalogo-prompt.server");
-    return await blocoPromptCatalogo(clinicaId).catch(() => "");
-  })();
-  rastro?.concluir("tool.knowledge.lookup", {
-    base_ativa: Boolean(blocoKb),
-    tamanho: blocoKb.length,
-  });
-
-  // FASE 2 do novo fluxo: respostas factuais fundamentadas no catálogo publicado.
-  // Só texto de prompt; a consulta continua na ferramenta já existente.
-  const blocoFase2 = await (async () => {
+  // FASE 3 — o catálogo entra como FATO (o que existe publicado). As regras de
+  // leitura do catálogo vivem no prompt publicado, não aqui.
+  const catalogoPublicado = await (async () => {
     try {
-      const { flagFluxoFase2Ativa } = await import("@/lib/nina/atendimento-fase2.server");
-      if (!(await flagFluxoFase2Ativa(clinicaId))) return "";
-      const [{ detectarIntencoes }, { blocoPromptFase2 }] = await Promise.all([
-        import("@/lib/nina/atendimento-fase1"),
-        import("@/lib/nina/atendimento-fase2"),
-      ]);
-      return blocoPromptFase2({
-        intencoes: detectarIntencoes(mensagemPaciente),
-        baseAtiva: Boolean(blocoKb),
-      });
+      const { contarCatalogoPublicado } = await import("@/lib/nina/catalogo-prompt.server");
+      return await contarCatalogoPublicado(clinicaId);
     } catch {
-      return "";
+      return { servicos: 0, profissionais: 0 };
     }
   })();
+  const baseAtiva = catalogoPublicado.servicos > 0 || catalogoPublicado.profissionais > 0;
+  rastro?.concluir("tool.knowledge.lookup", {
+    base_ativa: baseAtiva,
+    servicos: catalogoPublicado.servicos,
+    profissionais: catalogoPublicado.profissionais,
+  });
 
-  // FASE 3: só entra em coleta de dados quando o paciente confirma que quer
-  // agendar. Marca BOOKING_INTENT_CONFIRMED no estado da conversa.
-  const blocoFase3 = await (async () => {
+  // FASE 3 (entrada controlada no agendamento): a DECISÃO de estado continua
+  // em código. O que saiu foi só o texto de prompt.
+  await (async () => {
     try {
       const { flagFluxoFase3Ativa } = await import("@/lib/nina/atendimento-fase3.server");
-      if (!(await flagFluxoFase3Ativa(clinicaId))) return "";
-      const { avaliarIntencaoAgendar, blocoPromptFase3 } = await import(
-        "@/lib/nina/atendimento-fase3"
-      );
+      if (!(await flagFluxoFase3Ativa(clinicaId))) return;
+      const { avaliarIntencaoAgendar } = await import("@/lib/nina/atendimento-fase3");
       const { confirmado } = avaliarIntencaoAgendar(mensagemPaciente, fluxoEstado);
       if (confirmado) {
         fluxoEstado.appointment = { ...fluxoEstado.appointment, intent_confirmed: true };
@@ -1015,110 +1002,104 @@ async function gerarRespostaNinaInterno(
           fluxoEstado.flow = { stage: "BOOKING_INTENT_CONFIRMED" };
         }
       }
-      return blocoPromptFase3({ mensagem: mensagemPaciente, estado: fluxoEstado });
     } catch {
-      return "";
+      /* estado permanece como está */
     }
   })();
 
-  // FASE 4: vaga vem só da agenda real; escolha de horário não confirma;
-  // resumo final obrigatório antes de gravar o agendamento.
-  const blocoFase4 = await (async () => {
-    try {
-      const { flagFluxoFase4Ativa } = await import("@/lib/nina/atendimento-fase4.server");
-      if (!(await flagFluxoFase4Ativa(clinicaId))) return "";
-      const { blocoPromptFase4 } = await import("@/lib/nina/atendimento-fase4");
-      return blocoPromptFase4({
-        mensagem: mensagemPaciente,
-        estado: fluxoEstado,
-        nomeUnidade,
-      });
-    } catch {
-      return "";
-    }
-  })();
-
-  // FASE 5: execução real do agendamento (sucesso só com retorno do sistema),
-  // tratamento de falha/slot ocupado e encerramento da conversa.
-  const blocoFase5 = await (async () => {
-    try {
-      const { flagFluxoFase5Ativa } = await import("@/lib/nina/atendimento-fase5.server");
-      if (!(await flagFluxoFase5Ativa(clinicaId))) return "";
-      const { blocoPromptFase5 } = await import("@/lib/nina/atendimento-fase5");
-      return blocoPromptFase5({
-        mensagem: mensagemPaciente,
-        estado: fluxoEstado,
-        nomeUnidade,
-        baseAtiva: Boolean(blocoKb),
-      });
-    } catch {
-      return "";
-    }
-  })();
-
-  // FASE 6: máquina de estados explícita + regras de handoff. Deriva a etapa
-  // atual do estado da conversa e a grava, para a próxima mensagem já chegar
-  // na etapa certa. Não altera dados de agenda nem de cadastro.
-  const blocoFase6 = await (async () => {
+  // FASE 6: máquina de estados explícita. Deriva a etapa atual e a grava, para
+  // a próxima mensagem já chegar na etapa certa.
+  await (async () => {
     try {
       const { flagFluxoFase6Ativa } = await import("@/lib/nina/atendimento-fase6.server");
-      if (!(await flagFluxoFase6Ativa(clinicaId))) return "";
-      const [{ detectarIntencoes }, { blocoPromptFase6, derivarEtapa }] = await Promise.all([
-        import("@/lib/nina/atendimento-fase1"),
-        import("@/lib/nina/atendimento-fase6"),
-      ]);
-      const ctxFase6 = {
+      if (!(await flagFluxoFase6Ativa(clinicaId))) return;
+      const { derivarEtapa } = await import("@/lib/nina/atendimento-fase6");
+      const etapa = derivarEtapa({
         mensagem: mensagemPaciente,
         estado: fluxoEstado,
         primeiraMensagem: !jaSeApresentou,
-        intencoes: detectarIntencoes(mensagemPaciente) as readonly string[],
-      };
-      const etapa = derivarEtapa(ctxFase6);
-      fluxoEstado.flow = { stage: etapa };
-      return blocoPromptFase6({ ...ctxFase6, etapa });
-    } catch {
-      return "";
-    }
-  })();
-
-  // OFERTA COMPLETA: valor (catálogo publicado) + médicos + datas/horários reais
-  // (agenda) + unidade na mesma resposta, sem misturar as fontes.
-  const blocoOferta = await (async () => {
-    try {
-      const { flagOfertaCompletaAtiva } = await import("@/lib/nina/oferta-completa.server");
-      if (!(await flagOfertaCompletaAtiva(clinicaId))) return "";
-      const { blocoPromptOfertaCompleta } = await import("@/lib/nina/oferta-completa");
-      return blocoPromptOfertaCompleta({
-        mensagem: mensagemPaciente,
-        estado: fluxoEstado,
-        nomeUnidade,
-        baseAtiva: Boolean(blocoKb),
+        intencoes: intencoesTurno as readonly string[],
       });
+      fluxoEstado.flow = { stage: etapa };
     } catch {
-      return "";
+      /* etapa permanece como está */
     }
   })();
 
-  const systemPromptFinal = [
-    systemPrompt,
-    blocoPromptDisponibilidade(),
-    blocoKb,
-    blocoFase2,
-    blocoFase3,
-    blocoFase4,
-    blocoFase5,
-    blocoFase6,
-    blocoOferta,
-    podeAgendar ? blocoPromptAgenda() : "",
+  // Campos ainda necessários para identificar o paciente (fato, não ordem).
+  const camposFaltantes = await (async () => {
+    try {
+      const { dadosFaltantes } = await import("@/lib/nina/atendimento-fase3");
+      return dadosFaltantes(fluxoEstado) as readonly string[];
+    } catch {
+      return [] as readonly string[];
+    }
+  })();
 
+  // ------------------------------------------------------------------
+  // FASE 3 — RUNTIME CONTEXT: só FATOS. Nenhuma regra conversacional aqui.
+  // ------------------------------------------------------------------
+  const runtimeContext = {
+    canal: "whatsapp",
+    ambiente: opcoes?.teste ? "homologacao" : "producao",
+    unidade: dadosPublicos,
+    data_hora_atual: agoraTextoLocal(),
+    fluxo_fase1_ativo: fase1Ativa,
+    intencoes: intencoesTurno,
+    intencao_ambigua: intencaoAmbiguaTurno,
+    sessao: {
+      session_id: sessaoNina.estado.session_id ?? null,
+      nova_sessao: sessaoSaudacao.novaSessao || sessaoNina.expirou,
+      expirou: sessaoNina.expirou,
+      continuacao: sessaoNina.continuacao,
+      saudacao_obrigatoria: saudacaoObrigatoria,
+    },
+    identidade: {
+      confirmada: identidadeConfirmada,
+      ja_perguntada: Boolean(estadoId.perguntadaEm),
+      primeiro_nome: primeiroNome,
+    },
+    paciente: {
+      ...contextoRemetenteFato,
+      identificado: Boolean(fluxoEstado.patient.identified && fluxoEstado.patient.id),
+      primeiro_nome: fluxoEstado.patient.first_name ?? null,
+    },
+    base_pacientes_importada: baseImportada,
+    campos_faltantes: camposFaltantes,
+    etapa: fluxoEstado.flow.stage,
+    agendamento: {
+      intencao_confirmada: Boolean(fluxoEstado.appointment.intent_confirmed),
+      procedimento: fluxoEstado.appointment.procedure ?? null,
+      especialidade: fluxoEstado.appointment.specialty ?? null,
+      profissional: fluxoEstado.appointment.doctor_name ?? null,
+      data: fluxoEstado.appointment.date ?? null,
+      hora: fluxoEstado.appointment.time ?? null,
+      slot_inicio: fluxoEstado.appointment.slot_inicio ?? null,
+      slot_fim: fluxoEstado.appointment.slot_fim ?? null,
+      agendamento_id: fluxoEstado.appointment.appointment_id ?? null,
+    },
+    catalogo: {
+      publicado: baseAtiva,
+      servicos: catalogoPublicado.servicos,
+      profissionais: catalogoPublicado.profissionais,
+    },
+    ferramentas: {
+      pode_agendar: podeAgendar,
+    },
+    aprendizados: (aprendizados as Array<{ tipo?: string; titulo?: string; conteudo?: string }>)
+      .map((a) => ({
+        tipo: a.tipo ?? null,
+        titulo: a.titulo ?? null,
+        conteudo: a.conteudo ?? null,
+      })),
+  };
 
+  // COMPOSER — ponto único de montagem. Depois daqui nada mais é concatenado
+  // ao system prompt.
+  const { comporRequestNina } = await import("@/lib/nina/prompt-composer");
+  const requestNina = comporRequestNina({ behaviorPrompt, runtimeContext });
+  const systemPromptFinal = requestNina.systemPrompt;
 
-    blocoAprendizado,
-    blocoPromptEstado(fluxoEstado),
-    blocoPromptSessaoNina(sessaoNina),
-  ]
-    .filter(Boolean)
-    .join("\n\n");
 
   let ctxFerramentas: import("@/lib/nina/paciente-tools.server").CtxNinaPaciente | null = null;
   let ferramentas: unknown[] | undefined;
