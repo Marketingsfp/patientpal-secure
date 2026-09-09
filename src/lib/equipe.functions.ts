@@ -94,7 +94,8 @@ async function reavaliarFilaTelefonia(clinicaId: string, role: string) {
     _clinica_id: clinicaId,
     _max: 20,
   } as never);
-  if (error) console.error("[equipe] falha ao reavaliar fila após perfil Telefonia:", error.message);
+  if (error)
+    console.error("[equipe] falha ao reavaliar fila após perfil Telefonia:", error.message);
 }
 
 export const listarEquipe = createServerFn({ method: "POST" })
@@ -291,4 +292,65 @@ export const definirSenhaFuncionario = createServerFn({ method: "POST" })
     });
     if (error) throw new Error(error.message);
     return { ok: true };
+  });
+
+/**
+ * Grava quais profissionais uma pessoa da equipe pode ver e agendar.
+ *
+ * Lista vazia significa "sem restrição": a pessoa volta a enxergar a clínica
+ * inteira, que é o comportamento de quase toda a equipe. Por isso a gravação é
+ * sempre um "apaga e regrava" — marcar e desmarcar precisam custar o mesmo.
+ *
+ * A trava de verdade fica nas políticas do banco (`medicos_do_usuario()`);
+ * esta função existe para que só quem gerencia a equipe possa alterar o escopo.
+ */
+export const salvarMedicosDoUsuario = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) =>
+    z
+      .object({
+        clinicaId: z.string().uuid(),
+        userId: z.string().uuid(),
+        medicoIds: z.array(z.string().uuid()).max(200),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    await assertManager(context.userId, data.clinicaId);
+    await assertUserBelongsToClinica(data.userId, data.clinicaId);
+
+    // Só aceita médicos da própria clínica: sem esta conferência um id de outra
+    // unidade entraria no escopo e abriria uma agenda que não é daqui.
+    const ids = [...new Set(data.medicoIds)];
+    if (ids.length > 0) {
+      const { data: validos, error: vErr } = await supabaseAdmin
+        .from("medicos")
+        .select("id")
+        .eq("clinica_id", data.clinicaId)
+        .in("id", ids);
+      if (vErr) throw new Error(vErr.message);
+      if ((validos ?? []).length !== ids.length) {
+        throw new Error("Algum profissional selecionado não pertence a esta clínica");
+      }
+    }
+
+    const { error: delErr } = await supabaseAdmin
+      .from("usuario_medicos")
+      .delete()
+      .eq("clinica_id", data.clinicaId)
+      .eq("user_id", data.userId);
+    if (delErr) throw new Error(delErr.message);
+
+    if (ids.length > 0) {
+      const { error: insErr } = await supabaseAdmin.from("usuario_medicos").insert(
+        ids.map((medicoId) => ({
+          clinica_id: data.clinicaId,
+          user_id: data.userId,
+          medico_id: medicoId,
+        })),
+      );
+      if (insErr) throw new Error(insErr.message);
+    }
+
+    return { ok: true, total: ids.length };
   });

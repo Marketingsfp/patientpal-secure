@@ -6,6 +6,7 @@ import {
   getFuncionarioLogin,
   definirSenhaFuncionario,
   editarMembro,
+  salvarMedicosDoUsuario,
 } from "@/lib/equipe.functions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -39,6 +40,13 @@ const PERFIS = PERFIS_SISTEMA;
 interface Ref {
   id: string;
   nome: string;
+}
+
+/** Compara duas listas de ids ignorando a ordem em que foram marcados. */
+function mesmaLista(a: string[], b: string[]) {
+  if (a.length !== b.length) return false;
+  const set = new Set(a);
+  return b.every((id) => set.has(id));
 }
 
 interface Props {
@@ -78,6 +86,7 @@ export function FuncionarioFormDialog({
   const getLoginFn = useServerFn(getFuncionarioLogin);
   const definirSenhaFn = useServerFn(definirSenhaFuncionario);
   const editarMembroFn = useServerFn(editarMembro);
+  const salvarMedicosDoUsuarioFn = useServerFn(salvarMedicosDoUsuario);
   const [setores, setSetores] = useState<Ref[]>([]);
   const [disponiveis, setDisponiveis] = useState<
     Array<{ id: string; nome: string; setor_id: string | null; status: string }>
@@ -89,6 +98,10 @@ export function FuncionarioFormDialog({
   const [membershipId, setMembershipId] = useState<string | null>(null);
   const [perfilOriginal, setPerfilOriginal] = useState<string | null>(null);
   const [autorizaOriginal, setAutorizaOriginal] = useState(false);
+  // Escopo por profissional (ver o bloco "Agendas que esta pessoa pode ver").
+  const [medicosDaClinica, setMedicosDaClinica] = useState<Ref[]>([]);
+  const [medicosEscopo, setMedicosEscopo] = useState<string[]>([]);
+  const [escopoOriginal, setEscopoOriginal] = useState<string[]>([]);
   const [ativoOriginal, setAtivoOriginal] = useState<boolean>(true);
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -101,7 +114,7 @@ export function FuncionarioFormDialog({
   useEffect(() => {
     if (!open || !clinicaId) return;
     void (async () => {
-      const [st, disp] = await Promise.all([
+      const [st, disp, meds] = await Promise.all([
         supabase
           .from("setores")
           .select("id,nome")
@@ -114,8 +127,15 @@ export function FuncionarioFormDialog({
           .eq("clinica_id", clinicaId)
           .is("user_id", null)
           .order("funcionario_nome"),
+        supabase
+          .from("medicos")
+          .select("id,nome")
+          .eq("clinica_id", clinicaId)
+          .eq("ativo", true)
+          .order("nome"),
       ]);
       setSetores((st.data ?? []) as Ref[]);
+      setMedicosDaClinica((meds.data ?? []) as Ref[]);
       setDisponiveis(
         (disp.data ?? []) as Array<{
           id: string;
@@ -138,30 +158,41 @@ export function FuncionarioFormDialog({
       setPerfilOriginal(null);
       setAutorizaOriginal(false);
       setAtivoOriginal(true);
+      setMedicosEscopo([]);
+      setEscopoOriginal([]);
       setForm(emptyForm(clinicaId));
       return;
     }
     void (async () => {
       setLoading(true);
-      const [{ data: contratos }, { data: prof }, { data: mem }] = await Promise.all([
-        supabase
-          .from("hr_contratos")
-          .select("*")
-          .eq("clinica_id", clinicaId)
-          .eq("user_id", editingUserId)
-          .order("created_at", { ascending: false }),
-        supabase
-          .from("profiles")
-          .select("nome, telefone, telefone2")
-          .eq("id", editingUserId)
-          .maybeSingle(),
-        supabase
-          .from("clinica_memberships")
-          .select("id, role, ativo, pode_autorizar")
-          .eq("clinica_id", clinicaId)
-          .eq("user_id", editingUserId)
-          .maybeSingle(),
-      ]);
+      const [{ data: contratos }, { data: prof }, { data: mem }, { data: escopo }] =
+        await Promise.all([
+          supabase
+            .from("hr_contratos")
+            .select("*")
+            .eq("clinica_id", clinicaId)
+            .eq("user_id", editingUserId)
+            .order("created_at", { ascending: false }),
+          supabase
+            .from("profiles")
+            .select("nome, telefone, telefone2")
+            .eq("id", editingUserId)
+            .maybeSingle(),
+          supabase
+            .from("clinica_memberships")
+            .select("id, role, ativo, pode_autorizar")
+            .eq("clinica_id", clinicaId)
+            .eq("user_id", editingUserId)
+            .maybeSingle(),
+          supabase
+            .from("usuario_medicos")
+            .select("medico_id")
+            .eq("clinica_id", clinicaId)
+            .eq("user_id", editingUserId),
+        ]);
+      const escopoAtual = ((escopo ?? []) as Array<{ medico_id: string }>).map((r) => r.medico_id);
+      setMedicosEscopo(escopoAtual);
+      setEscopoOriginal(escopoAtual);
       // Um funcionário pode ter mais de um hr_contratos na mesma clínica (histórico
       // de contratos, ou duplicatas legadas de um bug de salvamento). Nunca usar
       // .maybeSingle() aqui: com 2+ linhas ela falha silenciosamente (data null),
@@ -362,6 +393,23 @@ export function FuncionarioFormDialog({
         return;
       }
     }
+    // Escopo por profissional: só grava quando a marcação mudou, para não
+    // reescrever o vínculo de quem foi editado por outro motivo.
+    if (editingUserId && !mesmaLista(medicosEscopo, escopoOriginal)) {
+      try {
+        await salvarMedicosDoUsuarioFn({
+          data: {
+            clinicaId: form.clinica_id,
+            userId: editingUserId,
+            medicoIds: medicosEscopo,
+          },
+        });
+        setEscopoOriginal(medicosEscopo);
+      } catch (e) {
+        toast.error((e as Error)?.message ?? "Erro ao salvar as agendas liberadas");
+        return;
+      }
+    }
     // Atualiza telefones em profiles quando há um usuário vinculado
     const targetUserId = editingUserId ?? userId ?? prefillUserId ?? null;
     if (targetUserId) {
@@ -555,6 +603,58 @@ export function FuncionarioFormDialog({
                         </span>
                       </span>
                     </label>
+                    {/*
+                      Escopo por profissional. Nasce desmarcado e desmarcado
+                      quer dizer "vê a clínica inteira", que é como toda a
+                      equipe trabalha. Só quem foi limitado de propósito — uma
+                      secretária que atende dois médicos, por exemplo — tem
+                      nomes marcados aqui, e passa a enxergar a Agenda apenas
+                      deles. A trava não é só visual: as políticas do banco
+                      aplicam a mesma lista.
+                    */}
+                    <div className="mt-3 rounded-md border p-2">
+                      <p className="text-xs font-semibold">Agendas que esta pessoa pode ver</p>
+                      <p className="mt-0.5 text-xs text-muted-foreground">
+                        {medicosEscopo.length === 0
+                          ? "Nenhum marcado: vê e agenda para todos os profissionais da clínica."
+                          : `Vê e agenda somente para ${medicosEscopo.length} profissional(is) marcado(s).`}
+                      </p>
+                      <div className="mt-2 max-h-40 overflow-y-auto pr-1">
+                        {medicosDaClinica.length === 0 ? (
+                          <p className="text-xs text-muted-foreground">
+                            Nenhum profissional ativo cadastrado.
+                          </p>
+                        ) : (
+                          medicosDaClinica.map((med) => (
+                            <label key={med.id} className="flex items-center gap-2 py-0.5 text-xs">
+                              <input
+                                type="checkbox"
+                                checked={medicosEscopo.includes(med.id)}
+                                onChange={(e) =>
+                                  setMedicosEscopo((atual) =>
+                                    e.target.checked
+                                      ? [...atual, med.id]
+                                      : atual.filter((id) => id !== med.id),
+                                  )
+                                }
+                              />
+                              <span>{med.nome}</span>
+                            </label>
+                          ))
+                        )}
+                      </div>
+                      {medicosEscopo.length > 0 && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="mt-2"
+                          onClick={() => setMedicosEscopo([])}
+                        >
+                          Liberar todos os profissionais
+                        </Button>
+                      )}
+                    </div>
                   </div>
                 )}
                 <div className="border-t pt-4 space-y-3">

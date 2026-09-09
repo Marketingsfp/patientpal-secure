@@ -24,6 +24,7 @@ import { buscarCartaoPagoDaFamilia, type CartaoDaFamilia } from "@/lib/convenio/
 import { useClinica } from "@/hooks/use-clinica";
 import { usePodeEscrever } from "@/hooks/use-permissoes";
 import { useMedicoContext } from "@/hooks/use-medico-context";
+import { useMedicosPermitidos } from "@/hooks/use-medicos-permitidos";
 import { EncerrarExpedienteButton } from "@/components/medicos/EncerrarExpedienteButton";
 import {
   carregarExpedientesEncerrados,
@@ -958,6 +959,10 @@ function AgendaPage() {
   const turboDisabled = useTurboDisabled();
   const podeEscrever = usePodeEscrever("agenda");
   const { medicoId: medicoLogadoId, isMedicoOnly } = useMedicoContext();
+  // Escopo por profissional: quem foi restrito na tela de Equipe (por exemplo,
+  // uma secretária que atende só dois médicos) enxerga a agenda apenas deles.
+  // `null` significa "sem restrição", que é o caso de toda a equipe hoje.
+  const { medicosPermitidos } = useMedicosPermitidos();
   const [usuarioEhMedico, setUsuarioEhMedico] = useState(false);
   const corClinica = (() => {
     const n = (clinicaAtual?.clinica.nome ?? "").toLowerCase();
@@ -1015,9 +1020,20 @@ function AgendaPage() {
   const [filtroAgenda, setFiltroAgenda] = useState<string>("todos");
   // Ids de agenda que têm grade de horários ativa (ver a carga em `loadRef`).
   const [agendasComGrade, setAgendasComGrade] = useState<Set<string>>(new Set());
-  const [agendasPorMedico, setAgendasPorMedico] = useState<
+  const [agendasCarregadas, setAgendasPorMedico] = useState<
     Map<string, { id: string; nome: string; ordem_chegada?: boolean }[]>
   >(new Map());
+  // Mesmo escopo aplicado aos médicos: sem isso o filtro "Tipo de agenda"
+  // ainda ofereceria as agendas dos profissionais que a pessoa não pode abrir.
+  const agendasPorMedico = useMemo(() => {
+    if (!medicosPermitidos) return agendasCarregadas;
+    const liberados = new Set(medicosPermitidos);
+    const out = new Map<string, { id: string; nome: string; ordem_chegada?: boolean }[]>();
+    for (const [medicoId, lista] of agendasCarregadas) {
+      if (liberados.has(medicoId)) out.set(medicoId, lista);
+    }
+    return out;
+  }, [agendasCarregadas, medicosPermitidos]);
   // Lookup id-da-agenda → nome, usado pelo filtro "Tipo de agenda" quando
   // agrupa por NOME (evita duplicidades quando vários médicos têm agendas
   // homônimas, ex.: "AGENDA", "CONSULTAS").
@@ -1177,7 +1193,16 @@ function AgendaPage() {
   const [convenioMap, setConvenioMap] = useState<Map<string, string>>(new Map());
   const [cidadeMap, setCidadeMap] = useState<Map<string, string | null>>(new Map());
   const [etapaMap, setEtapaMap] = useState<Map<string, string>>(new Map());
-  const [medicos, setMedicos] = useState<Medico[]>([]);
+  const [medicosCarregados, setMedicos] = useState<Medico[]>([]);
+  // Aplica o escopo por profissional num ponto só. Tudo que a tela desenha
+  // (colunas do dia, filtro de profissional, seleção dentro do agendamento)
+  // parte desta lista, então quem foi restrito na Equipe não chega nem a ver
+  // o nome dos outros médicos. A trava real está nas políticas do banco.
+  const medicos = useMemo(() => {
+    if (!medicosPermitidos) return medicosCarregados;
+    const liberados = new Set(medicosPermitidos);
+    return medicosCarregados.filter((m) => liberados.has(m.id));
+  }, [medicosCarregados, medicosPermitidos]);
   const [recursoIds, setRecursoIds] = useState<Set<string>>(new Set());
   const [exames, setExames] = useState<{ id: string; nome: string }[]>([]);
   const [procedimentosList, setProcedimentosList] = useState<
