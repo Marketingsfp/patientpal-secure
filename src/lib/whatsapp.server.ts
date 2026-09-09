@@ -948,14 +948,16 @@ async function gerarRespostaNinaInterno(
     pacienteNomeEfetivo = (pRow as any)?.nome ?? null;
     if (!pacienteNomeEfetivo) pacienteIdEfetivo = null; // cadastro sumiu/outra clínica
   }
-  // Fase 2: assim que o contato é identificado, o vínculo vira a referência
-  // principal da conversa — evita repetir o lookup por telefone.
-  if (pacienteIdEfetivo && estadoId.conversaId && !estadoId.pacienteIdConversa) {
+  // FASE 3: o vínculo só é gravado quando a identidade foi CONFIRMADA pelo
+  // fluxo (identificação da Nina), nunca por coincidência de telefone.
+  const identidadeConfirmada = Boolean(fluxoEstado.patient.id && fluxoEstado.patient.validated);
+  if (identidadeConfirmada && pacienteIdEfetivo && estadoId.conversaId && !estadoId.pacienteIdConversa) {
     const { vincularPacienteConversa } = await import("@/lib/atendimento/vinculo-contato.server");
     await vincularPacienteConversa(supabaseAdmin as never, {
       clinicaId,
       conversaId: estadoId.conversaId,
       pacienteId: pacienteIdEfetivo,
+      origem: "nina_identificacao",
     });
   }
   if (pacienteIdEfetivo && !fluxoEstado.patient.identified) {
