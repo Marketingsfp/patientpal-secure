@@ -334,6 +334,7 @@ export function AtendInbox() {
   // uma linha (mensagem nova, troca de responsável) não precisa recarregar as
   // 200 conversas do filtro.
   const convsRef = useRef<any[]>([]);
+  convsRef.current = convs;
   const conteudoDaConversa = !!sel?.id && conversaCarregadaId === sel.id;
   const dadosSecundariosProntos = !!sel?.id && secundariosCarregadosId === sel.id;
   // Contato exibido: só o da conversa aberta agora. Ter `contato` preenchido
