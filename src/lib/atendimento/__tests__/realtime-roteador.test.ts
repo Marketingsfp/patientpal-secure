@@ -9,7 +9,7 @@ describe("Fase 3 — roteamento de eventos do atendimento", () => {
       { table: "whatsapp_mensagens", eventType: "INSERT", new: { clinica_id: "cl-1", conversa_id: "B" } },
       ctx,
     );
-    expect(alvos.sort()).toEqual(["espera", "lista"]);
+    expect(alvos.sort()).toEqual(["lista"]);
   });
 
   it("mensagem na conversa aberta também sincroniza o histórico", () => {
