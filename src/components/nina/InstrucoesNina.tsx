@@ -258,7 +258,21 @@ function Editor({
         >
           Histórico de versões
         </Button>
+        {bloco.escopo === "whatsapp" ? (
+          <Button variant="ghost" onClick={() => setAuditoriaAberta(true)}>
+            Ver o que chega ao modelo
+          </Button>
+        ) : null}
       </div>
+
+      {bloco.escopo === "whatsapp" ? (
+        <AuditoriaPrompt
+          clinicaId={clinicaId}
+          aberto={auditoriaAberta}
+          onOpenChange={setAuditoriaAberta}
+        />
+      ) : null}
+
 
       {!podePublicar ? (
         <p className="text-xs text-muted-foreground">
