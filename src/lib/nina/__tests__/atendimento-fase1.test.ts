@@ -1,6 +1,6 @@
 import { describe, it, expect } from "bun:test";
 import {
-  blocoPromptFase1,
+  
   detectarIntencoes,
   intencaoAmbigua,
   querAgendar,
