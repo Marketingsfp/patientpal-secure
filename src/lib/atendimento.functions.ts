@@ -1893,6 +1893,11 @@ export const enviarMensagemConversa = createServerFn({ method: "POST" })
       .parse(i),
   )
   .handler(async ({ data, context }) => {
+    // FASE 1 (telemetria) — só medição: nenhuma validação, ordem ou regra
+    // deste envio foi alterada por causa do trace.
+    const { iniciarTraceServidor } = await import("./atendimento/latencia.server");
+    const trace = iniciarTraceServidor({ fluxo: "send", conversationId: data.conversaId });
+    trace.marcar("SEND_T3_BACKEND_RECEIVED");
     await assertMember(context.supabase, context.userId, data.clinicaId);
     {
       const { assertAcessoConversa } = await import("./atendimento/acesso-conversa.server");
@@ -1900,6 +1905,7 @@ export const enviarMensagemConversa = createServerFn({ method: "POST" })
     }
     if (await ehAdminClinica(context.supabase, context.userId, data.clinicaId))
       throw new Error(MSG_ADMIN_NAO_ATENDE);
+    trace.marcar("SEND_T4_AUTH_DONE");
     // IDEMPOTÊNCIA: se este mesmo envio já foi concluído (duplo clique, retry,
     // reenvio acidental), devolvemos a mensagem existente sem chamar o
     // WhatsApp de novo. A checagem é pelo identificador do envio, nunca pelo
@@ -1915,8 +1921,9 @@ export const enviarMensagemConversa = createServerFn({ method: "POST" })
         .maybeSingle();
       if (jaExiste) return { duplicada: true as const, mensagem: jaExiste };
     }
-    const cfg = await loadWhatsAppConfig(data.clinicaId);
+    const cfg = await trace.medir("loadWhatsAppConfig", () => loadWhatsAppConfig(data.clinicaId));
     if (!cfg?.phone_number_id || !cfg?.access_token) throw new Error("WhatsApp não configurado.");
+    trace.marcar("SEND_T5_CONFIG_READY");
     const { data: conv, error: cErr } = await context.supabase
       .from("atend_conversas")
       .select(
@@ -1983,12 +1990,14 @@ export const enviarMensagemConversa = createServerFn({ method: "POST" })
     const to = conv.contato_telefone.startsWith("+")
       ? conv.contato_telefone
       : `+${conv.contato_telefone}`;
+    trace.marcar("SEND_T6_META_REQUEST_START");
     const { wa_message_id } = await metaSendText(
       cfg.phone_number_id,
       cfg.access_token,
       to,
       data.text,
     );
+    trace.marcar("SEND_T7_META_RESPONSE");
 
     const { data: gravada } = await context.supabase
       .from("whatsapp_mensagens")
@@ -2010,6 +2019,7 @@ export const enviarMensagemConversa = createServerFn({ method: "POST" })
         "id, conversa_id, direction, from_number, to_number, body, tipo, enviada_por, recebida_em, status, client_message_id, wa_message_id",
       )
       .maybeSingle();
+    trace.marcar("SEND_T8_DB_INSERT_DONE");
 
     // SLA primeira resposta
     const patch: any = {
@@ -2031,8 +2041,18 @@ export const enviarMensagemConversa = createServerFn({ method: "POST" })
       .update(patch)
       .eq("id", data.conversaId)
       .eq("clinica_id", data.clinicaId);
+    trace.marcar("SEND_T9_CONVERSATION_UPDATE_DONE");
+    trace.marcar("SEND_T10_BACKEND_RESPONSE");
+    trace.publicar();
 
-    return { ok: true, wa_message_id, mensagem: gravada ?? null };
+    // `latencia` é diagnóstico técnico (tempos e etapas). A tela junta essas
+    // marcas com as dela para montar o trace ponta a ponta.
+    return {
+      ok: true,
+      wa_message_id,
+      mensagem: gravada ?? null,
+      latencia: { traceId: trace.traceId, marcas: trace.marcas(), subprocessos: trace.subprocessos() },
+    };
   });
 
 export const obterDadosContato = createServerFn({ method: "POST" })
