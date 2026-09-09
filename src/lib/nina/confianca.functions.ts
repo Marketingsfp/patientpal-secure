@@ -131,6 +131,18 @@ export type ConfiabilidadeDecisaoView = {
   /** FASE 6 — o registro avalia a resposta final ou a segurança da ação. */
   avaliacao: string | null;
   engineVersion: string | null;
+  /**
+   * FASE 2 (answer/action) — segurança da AÇÃO, lida do registro próprio dela.
+   * Independente da confiança da resposta: a ação pode estar bloqueada
+   * enquanto a mensagem "preciso confirmar seus dados" é ótima.
+   */
+  seguranca: SegurancaAcaoView | null;
+};
+
+export type SegurancaAcaoView = {
+  status: "ALLOWED" | "BLOCKED" | "NOT_APPLICABLE";
+  acao: string | null;
+  bloqueadores: string[];
 };
 
 /**
