@@ -638,12 +638,36 @@ export function LancamentoDialog({
    * Por isso a tela pergunta, em vez de escolher sozinha. Ver `recebidoAntes`.
    */
   const ehDataRetroativa = tipo === "receita" && !!data && data < hojeBR();
-  // Operador corrigiu a data de volta para hoje: a pergunta perde o sentido e
-  // a resposta anterior não pode continuar valendo em silêncio — senão um
-  // pagamento de hoje ficaria fora do caixa sem ninguém perceber.
+  /**
+   * Adiantamento: o atendimento é de HOJE, mas o paciente já entregou o
+   * dinheiro em outro dia (sinal, sinalização prévia, valor deixado adiantado).
+   *
+   * Sem esta opção o balcão ficava sem saída. A trava de "particular paga na
+   * chegada" exige um recebimento registrado, e a única pergunta sobre
+   * dinheiro já recebido só aparecia para atendimento de dia anterior. A
+   * recepção então não tinha como quitar a ficha, e o atendimento não avançava
+   * para presença, realizado, GR nem para o Financeiro.
+   *
+   * O efeito no caixa é exatamente o mesmo da guia retroativa já quitada, e
+   * por isso reaproveita `recebidoAntes`: a linha aparece no extrato de hoje
+   * para a auditoria ver que a guia saiu, mas vale R$ 0,00 na gaveta — o
+   * dinheiro não está lá para ser conferido contra o cupom impresso.
+   */
+  const podeMarcarAdiantamento =
+    tipo === "receita" && !ehDataRetroativa && !ehPagoSistemaAnterior && !ehCategoriaGratuidade;
+  // Trocar a data invalida a resposta anterior — ela foi dada para outra data.
+  // Cobre o caso original (operador corrige uma data retroativa de volta para
+  // hoje) sem impedir que a marcação seja refeita de propósito: um pagamento
+  // de hoje jamais pode ficar fora do caixa em silêncio.
   useEffect(() => {
-    if (!ehDataRetroativa) setRecebidoAntes(false);
-  }, [ehDataRetroativa]);
+    setRecebidoAntes(false);
+  }, [data]);
+  // A marcação só sobrevive enquanto a tela permite fazê-la. Mudar a categoria
+  // para gratuidade, ou a forma para "pago no sistema anterior", depois de
+  // marcar deixaria um estado invisível governando a gaveta.
+  useEffect(() => {
+    if (!podeMarcarAdiantamento && !ehDataRetroativa) setRecebidoAntes(false);
+  }, [podeMarcarAdiantamento, ehDataRetroativa]);
   const recebidoNum = Number(valorRecebido || 0);
   const trocoDinheiro =
     formaPagamento === "dinheiro" && recebidoNum > valorNum ? recebidoNum - valorNum : 0;
