@@ -175,8 +175,9 @@ async function montarDossie(
   const { data: execs } = await admin
     .from("nina_execucoes")
     .select(
-      "id, model, success, error_category, handoff, tool_calls, knowledge_status, prompt_versao, prompt_versao_id, created_at",
+      "id, model, success, error_category, handoff, tool_calls, knowledge_status, prompt_versao, prompt_versao_id, prompt_publicado_em, prompt_origem, created_at",
     )
+
     .eq("clinica_id", clinicaId)
     .eq("conversation_id", conversaId)
     .order("created_at", { ascending: true })
