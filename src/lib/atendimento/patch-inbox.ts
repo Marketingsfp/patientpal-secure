@@ -72,7 +72,7 @@ export function patchListaPorMensagem(
   if (!alvo) return { lista, aplicado: false, reconciliar: true };
 
   const entrada = linha?.["direction"] === "in";
-  const previa = textoPrevia(linha) ?? alvo.ultima_msg_preview ?? null;
+  const previa = textoPrevia(linha ?? {}) ?? alvo.ultima_msg_preview ?? null;
   const maisNova = instante(quando) >= instante(alvo.ultima_msg_em);
   const contaNaoLida = entrada && ctx.conversaAberta !== conversaId;
 
