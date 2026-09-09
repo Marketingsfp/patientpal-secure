@@ -248,7 +248,16 @@ export function decidirConfianca(
   opcoes: { config?: ConfigValidadores; agora?: Date; politica?: PoliticaConfianca } = {},
 ): ResultadoConfianca {
   const cats = categoriasDoContexto(ctx);
-  const checks = executarValidadores(ctx);
+  const politica = opcoes.politica ?? POLITICA_PADRAO;
+  const tipoAvaliacao = ctx.tipoAvaliacao ?? "action_safety";
+  const ehResposta = tipoAvaliacao === "answer_confidence";
+  const executavel = acaoExecutavel(ctx.requestedAction);
+  // FASE 2 — dimensões que dizem "é seguro EXECUTAR?", não "o texto é
+  // confiável?". Na avaliação da MENSAGEM elas saem da nota e do bloqueio;
+  // continuam valendo integralmente para a segurança da ação.
+  const DE_ACAO = new Set([...politica.validadoresDeAcao, "campos_obrigatorios"]);
+
+  const checksBase = executarValidadores(ctx);
 
   // Validadores da Fase 2: independentes, auditáveis e configuráveis.
   const validators = executarValidadoresDeConfianca({
@@ -257,11 +266,13 @@ export function decidirConfianca(
     ...(opcoes.config ? { config: opcoes.config } : {}),
     ...(opcoes.agora ? { agora: opcoes.agora } : {}),
   });
+  const checksTodos = [...checksBase];
   for (const v of validators) {
     // FASE 3 — UNKNOWN não vira "reprovação" nem penalidade: ele aparece na
     // cobertura de evidências, que é o lugar honesto para "não sei".
+    // FASE 2 — PENDING também não: é coleta em andamento, não erro.
     if (!contaContraANota(v.status)) continue;
-    checks.push(
+    checksTodos.push(
       check(
         v.validator,
         v.reasonCode,
@@ -273,20 +284,34 @@ export function decidirConfianca(
     );
   }
 
-  const politica = opcoes.politica ?? POLITICA_PADRAO;
+  // Visão da AÇÃO: enxerga tudo, inclusive as pré-condições de execução.
+  const reprovadosAcao = checksTodos.filter((c) => !c.aprovado);
+  const blockersAcao = [
+    ...new Set(reprovadosAcao.map((c) => c.bloqueador).filter(Boolean)),
+  ] as Bloqueador[];
+
+  // Visão da MENSAGEM: pré-condição de ação não derruba a nota do texto.
+  const checks = ehResposta ? checksTodos.filter((c) => !DE_ACAO.has(c.id)) : checksTodos;
+  const validatorsParaNota = ehResposta
+    ? validators.filter((v) => !DE_ACAO.has(v.validator))
+    : validators;
+
   const reprovados = checks.filter((c) => !c.aprovado);
   const blockers = [...new Set(reprovados.map((c) => c.bloqueador).filter(Boolean))] as Bloqueador[];
 
   const motivos = reprovados.map((c) => (c.detalhe ? `${c.descricao} — ${c.detalhe}` : c.descricao));
 
   // FASE 3 — nota E cobertura, medidas na mesma passada e reportadas separadas.
-  const medida = medirEvidencia(validators, politica);
+  const medida = medirEvidencia(validatorsParaNota, politica);
 
   const risco = riscoDaAcao(ctx);
   const hardBlockers: HardBlocker[] = detectarHardBlockers(
-    { bloqueadores: blockers, validators, risco },
+    { bloqueadores: blockers, validators: validatorsParaNota, risco },
     politica,
   );
+  const hardBlockersAcao: HardBlocker[] = ehResposta
+    ? detectarHardBlockers({ bloqueadores: blockersAcao, validators, risco }, politica)
+    : hardBlockers;
 
   // Pontuação: validadores ponderados pela política, menos as penalidades
   // graduais (verificações que descontam sem bloquear).
