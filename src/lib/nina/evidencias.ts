@@ -104,10 +104,28 @@ export type PromptDaExecucao = {
   conversaId?: string | null;
 };
 
+/**
+ * FASE 5 — SNAPSHOT IMUTÁVEL do que foi enviado ao modelo, capturado no
+ * instante IMEDIATAMENTE anterior à chamada. Nunca é reconstruído depois:
+ * mensagens antigas jamais são reavaliadas com o prompt atual.
+ */
+export type SnapshotPrompt = {
+  behaviorPromptTemplate: string | null;
+  behaviorPromptRendered: string;
+  behaviorPromptHash: string;
+  envelopeTecnico: string | null;
+  runtimeContext: unknown;
+  requestFinal: string;
+  model: string | null;
+  modelParameters: Record<string, unknown> | null;
+  toolSchemas: unknown;
+};
+
 export type Coletor = {
   etapa: (e: Omit<Etapa, "em"> & { em?: string }) => void;
   mensagensEntrada: (ids: string[]) => void;
   promptVersao: (ref: PromptDaExecucao) => void;
+  promptSnapshot: (snap: SnapshotPrompt) => void;
   pacote: () => PacoteEvidencias;
 };
 
@@ -117,9 +135,12 @@ export type PacoteEvidencias = {
   lacunas: string[];
   /** FASE 6 — versão das instruções usada nesta execução, quando registrada. */
   prompt: PromptDaExecucao | null;
+  /** FASE 5 — conteúdo exato enviado ao modelo nesta execução. */
+  snapshot: SnapshotPrompt | null;
   /** FASE 6 — módulos complementares realmente utilizados. */
   modulos: string[];
 };
+
 
 /**
  * Coletor de uma execução. Acumula em memória e não grava nada sozinho:
@@ -129,6 +150,7 @@ export function criarColetor(agora: () => string = () => new Date().toISOString(
   const etapas: Etapa[] = [];
   let entrada: string[] = [];
   let prompt: PromptDaExecucao | null = null;
+  let snapshot: SnapshotPrompt | null = null;
   return {
     etapa(e) {
       // Cópia profunda no ato: a evidência é um snapshot do momento. Uma
@@ -149,15 +171,21 @@ export function criarColetor(agora: () => string = () => new Date().toISOString(
       // mesmo que outra versão seja publicada no meio da execução.
       if (!prompt) prompt = { ...ref };
     },
+    promptSnapshot(snap) {
+      // Imutável: o primeiro conteúdo enviado ao modelo é o que vale.
+      if (!snapshot) snapshot = { ...snap };
+    },
     pacote() {
       return {
         etapas,
         mensagensEntrada: entrada,
         lacunas: lacunas(etapas, entrada),
         prompt,
+        snapshot,
         modulos: modulosUtilizados(etapas),
       };
     },
+
   };
 }
 

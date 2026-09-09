@@ -1207,6 +1207,36 @@ async function gerarRespostaNinaInterno(
     pode_agendar: podeAgendar,
   });
 
+  // FASE 5 — SNAPSHOT IMUTÁVEL, capturado AGORA (antes da chamada ao modelo).
+  // É este conteúdo, e não o prompt atual, que audita e avalia esta mensagem.
+  {
+    const { hashDoTexto } = await import("@/lib/nina/confidence/hash");
+    const { registrarSnapshotPrompt } = await import("@/lib/nina/evidencias.server");
+    registrarSnapshotPrompt({
+      behaviorPromptTemplate: instrucoesNina.template ?? null,
+      behaviorPromptRendered: behaviorPrompt,
+      behaviorPromptHash: hashDoTexto(behaviorPrompt) ?? "",
+      envelopeTecnico: requestNina.envelope,
+      runtimeContext: requestNina.runtimeContext,
+      requestFinal: systemPromptFinal,
+      // O modelo efetivamente roteado fica em `nina_execucoes.model` da MESMA
+      // execução; aqui guardamos os parâmetros decididos antes da chamada.
+      model: null,
+      modelParameters: {
+        perfil: "whatsapp",
+        pode_agendar: podeAgendar,
+        max_rodadas: podeAgendar ? 6 : 3,
+        mensagens_contexto: mensagens.length,
+      },
+      toolSchemas: (ferramentas ?? []).map((f) => {
+        const fn = (f as { function?: { name?: string } })?.function;
+        return fn?.name ?? null;
+      }),
+    });
+  }
+
+
+
   let resposta = "";
   // FASE 5 — guardados para a verificação da RESPOSTA FINAL (answer_confidence),
   // que roda depois de todo o pós-processamento, sobre o texto realmente enviado.

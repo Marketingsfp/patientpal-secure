@@ -27,6 +27,9 @@ export type SnapshotInstrucoes = {
   /** publicada = banco; cache = última válida conhecida; codigo = fallback. */
   origem: "publicada" | "cache" | "codigo";
   texto: string;
+  /** Conteúdo publicado ANTES da substituição de dados (auditoria). */
+  template: string;
+
 };
 
 const TTL_MS = 30_000;
@@ -136,6 +139,7 @@ export async function promptInstrucoes(
         publicadoEm: base.publicadoEm,
         origem: entrada ? "publicada" : "cache",
         texto: render.texto,
+        template: base.conteudo,
       };
     }
     registrarFalha(escopo, `marcador desconhecido ${render.restante} na v${base.versao}`);
@@ -148,5 +152,7 @@ export async function promptInstrucoes(
     publicadoEm: null,
     origem: "codigo",
     texto: fallbackCodigo,
+    template: fallbackCodigo,
   };
 }
+

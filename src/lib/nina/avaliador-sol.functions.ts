@@ -175,8 +175,9 @@ async function montarDossie(
   const { data: execs } = await admin
     .from("nina_execucoes")
     .select(
-      "id, model, success, error_category, handoff, tool_calls, knowledge_status, prompt_versao, prompt_versao_id, created_at",
+      "id, model, success, error_category, handoff, tool_calls, knowledge_status, prompt_versao, prompt_versao_id, prompt_publicado_em, prompt_origem, created_at",
     )
+
     .eq("clinica_id", clinicaId)
     .eq("conversation_id", conversaId)
     .order("created_at", { ascending: true })
@@ -194,6 +195,21 @@ async function montarDossie(
   }));
   const execucaoIds = execucoes.map((e) => e.id);
   const ultima = ((execs ?? []) as any[]).at(-1) ?? null;
+
+  // FASE 5 — snapshot IMUTÁVEL da execução que produziu a última resposta.
+  // Ausente = mensagem legada: o prompt atual NUNCA é usado no lugar dela.
+  let snapshotPrompt: any = null;
+  if (ultima?.id) {
+    const { data: snap } = await admin
+      .from("nina_prompt_snapshots")
+      .select(
+        "behavior_prompt_rendered, behavior_prompt_hash, prompt_versao, prompt_publicado_em, prompt_origem",
+      )
+      .eq("execucao_id", ultima.id)
+      .maybeSingle();
+    snapshotPrompt = snap ?? null;
+  }
+
 
   // Consultas ao conhecimento/catálogo registradas nas evidências (sem
   // raciocínio interno: só o que foi consultado e o que voltou).
@@ -248,10 +264,15 @@ async function montarDossie(
     objetivo: cenario.objetivo,
     criteriosEsperados: cenario.criterios,
     instrucoes: {
-      versao: ultima?.prompt_versao ?? null,
-      publicadoEm: ultima?.prompt_publicado_em ?? null,
-      origem: ultima?.prompt_origem ?? null,
+      // FASE 5 — os metadados vêm da EXECUÇÃO, e o texto vem do snapshot
+      // gravado naquele momento. Sem snapshot, nada é reconstruído.
+      versao: snapshotPrompt?.prompt_versao ?? ultima?.prompt_versao ?? null,
+      publicadoEm: snapshotPrompt?.prompt_publicado_em ?? ultima?.prompt_publicado_em ?? null,
+      origem: snapshotPrompt?.prompt_origem ?? ultima?.prompt_origem ?? null,
+      hash: snapshotPrompt?.behavior_prompt_hash ?? null,
+      textoUtilizado: snapshotPrompt?.behavior_prompt_rendered ?? null,
     },
+
     turnos,
     ferramentas,
     conhecimento: conhecimento.slice(0, 40),

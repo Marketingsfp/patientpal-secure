@@ -9,7 +9,14 @@
  */
 import { AsyncLocalStorage } from "node:async_hooks";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
-import { criarColetor, type Coletor, type Etapa, type PromptDaExecucao } from "./evidencias";
+import {
+  criarColetor,
+  type Coletor,
+  type Etapa,
+  type PromptDaExecucao,
+  type SnapshotPrompt,
+} from "./evidencias";
+
 
 const escopo = new AsyncLocalStorage<Coletor>();
 
@@ -39,6 +46,20 @@ export function registrarPromptDaExecucao(ref: PromptDaExecucao): void {
     /* rastreabilidade nunca interrompe o atendimento */
   }
 }
+
+/**
+ * FASE 5 — registra o SNAPSHOT IMUTÁVEL do conteúdo enviado ao modelo.
+ * Deve ser chamado imediatamente ANTES da chamada, nunca depois da resposta.
+ */
+export function registrarSnapshotPrompt(snap: SnapshotPrompt): void {
+  try {
+    coletorAtual()?.promptSnapshot(snap);
+  } catch {
+    /* auditoria nunca interrompe o atendimento */
+  }
+}
+
+
 
 /** Atalho seguro: registra a etapa só se existir um coletor no escopo. */
 export function registrarEtapa(etapa: Omit<Etapa, "em"> & { em?: string }): void {
@@ -89,6 +110,39 @@ export async function gravarEvidencias(
       if (e3) console.warn("[nina-evidencias] falha ao vincular versão do prompt:", e3.message);
       await registrarTracePrompt(execucaoId, clinicaId, pacote.prompt, pacote.modulos);
     }
+
+    // FASE 5 — snapshot imutável do que foi enviado ao modelo. `ignoreDuplicates`
+    // garante que uma segunda gravação NUNCA reescreva o registro original.
+    if (pacote.snapshot) {
+      const s = pacote.snapshot;
+      const { error: e4 } = await supabaseAdmin
+        .from("nina_prompt_snapshots")
+        .upsert(
+          {
+            execucao_id: execucaoId,
+            clinica_id: clinicaId,
+            conversation_id: pacote.prompt?.conversaId ?? null,
+            escopo: pacote.prompt?.escopo ?? "whatsapp",
+            prompt_versao_id: pacote.prompt?.versaoId ?? null,
+            prompt_versao: pacote.prompt?.versao ?? null,
+            prompt_publicado_em: pacote.prompt?.publicadoEm ?? null,
+            prompt_origem: pacote.prompt?.origem ?? null,
+            behavior_prompt_template: s.behaviorPromptTemplate,
+            behavior_prompt_rendered: s.behaviorPromptRendered,
+            behavior_prompt_hash: s.behaviorPromptHash,
+            envelope_tecnico: s.envelopeTecnico,
+            runtime_context: s.runtimeContext as never,
+            request_final: s.requestFinal,
+            model: s.model,
+            model_parameters: s.modelParameters as never,
+            tool_schemas: s.toolSchemas as never,
+          } as never,
+          { onConflict: "execucao_id", ignoreDuplicates: true },
+        );
+      if (e4) console.warn("[nina-evidencias] falha ao gravar snapshot do prompt:", e4.message);
+    }
+
+
 
     if (pacote.mensagensEntrada.length) {
       const { error: e2 } = await supabaseAdmin
