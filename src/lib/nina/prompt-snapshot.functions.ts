@@ -17,10 +17,10 @@ export type SnapshotPromptView = {
   promptUtilizado: string | null;
   conteudoEnviado: string | null;
   envelope: string | null;
-  contextoDinamico: unknown;
-  ferramentas: unknown;
+  contextoDinamico: string | null;
+  ferramentas: string | null;
   modelo: string | null;
-  parametros: unknown;
+  parametros: string | null;
 };
 
 export const snapshotDoPrompt = createServerFn({ method: "POST" })
@@ -47,9 +47,19 @@ export const snapshotDoPrompt = createServerFn({ method: "POST" })
       promptUtilizado: (r["behavior_prompt_rendered"] as string | null) ?? null,
       conteudoEnviado: (r["request_final"] as string | null) ?? null,
       envelope: (r["envelope_tecnico"] as string | null) ?? null,
-      contextoDinamico: r["runtime_context"] ?? null,
-      ferramentas: r["tool_schemas"] ?? null,
+      contextoDinamico: json(r["runtime_context"]),
+      ferramentas: json(r["tool_schemas"]),
       modelo: (r["model"] as string | null) ?? null,
-      parametros: r["model_parameters"] ?? null,
+      parametros: json(r["model_parameters"]),
     };
   });
+
+/** JSON legível para exibição somente leitura. */
+function json(valor: unknown): string | null {
+  if (valor === null || valor === undefined) return null;
+  try {
+    return JSON.stringify(valor, null, 2);
+  } catch {
+    return null;
+  }
+}
