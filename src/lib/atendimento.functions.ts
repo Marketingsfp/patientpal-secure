@@ -1990,12 +1990,14 @@ export const enviarMensagemConversa = createServerFn({ method: "POST" })
     const to = conv.contato_telefone.startsWith("+")
       ? conv.contato_telefone
       : `+${conv.contato_telefone}`;
+    trace.marcar("SEND_T6_META_REQUEST_START");
     const { wa_message_id } = await metaSendText(
       cfg.phone_number_id,
       cfg.access_token,
       to,
       data.text,
     );
+    trace.marcar("SEND_T7_META_RESPONSE");
 
     const { data: gravada } = await context.supabase
       .from("whatsapp_mensagens")
