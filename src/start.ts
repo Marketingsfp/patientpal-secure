@@ -7,10 +7,12 @@ const SERVER_FN_VERSION_MISMATCH = "SERVER_FN_VERSION_MISMATCH";
 const SERVER_FN_RELOAD_KEY = "__server_fn_version_reload__";
 
 function isMissingServerFunction(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
   return (
-    error instanceof TypeError &&
-    error.message.includes("Cannot read properties of undefined") &&
-    error.message.includes("method")
+    error.message.includes("Invalid server function ID") ||
+    (error instanceof TypeError &&
+      error.message.includes("Cannot read properties of undefined") &&
+      error.message.includes("method"))
   );
 }
 
