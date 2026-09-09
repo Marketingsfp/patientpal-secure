@@ -1406,16 +1406,23 @@ export function AtendInbox() {
       await carregarConversa();
       return;
     }
+    // FASE 4 — mensagens e timeline da conversa seguem caminhos separados: uma
+    // mensagem nova aparece na hora, mesmo que a lista de eventos demore.
+    const pEventosSync = listarEventosFn({ data: { clinicaId, conversaId: alvo } })
+      .then((ev) => {
+        if (selIdRef.current !== alvo) return;
+        if (selecaoIdRef.current && selecaoIdRef.current !== alvo) return;
+        if (ev) setEventos((prev) => mesclarEventos(prev, ev as ConversaEvento[]));
+      })
+      .catch(() => {
+        /* timeline é apoio: falha não derruba o histórico de mensagens */
+      });
+
     const execucao = (async () => {
     try {
-      const [novas, ev] = await Promise.all([
-        listarMsgs({
-          data: { clinicaId, conversaId: alvo, limit: JANELA_INICIAL, depoisDe: cursor! },
-        }),
-        listarEventosFn({ data: { clinicaId, conversaId: alvo } }).catch(
-          () => null as ConversaEvento[] | null,
-        ),
-      ]);
+      const novas = await listarMsgs({
+        data: { clinicaId, conversaId: alvo, limit: JANELA_INICIAL, depoisDe: cursor! },
+      });
       if (selIdRef.current !== alvo) return;
       if (selecaoIdRef.current && selecaoIdRef.current !== alvo) return;
       if ((novas as any[])?.length) {
@@ -1426,14 +1433,12 @@ export function AtendInbox() {
           return juntas;
         });
       }
-      if (ev) {
-        setEventos((prev) => mesclarEventos(prev, ev as ConversaEvento[]));
-      }
     } catch {
       // Falha na sincronização não derruba o atendimento: a próxima tentativa
       // (Realtime ou rede de segurança) resolve.
     }
     })();
+    void pEventosSync;
     syncEmVooRef.current = { conversaId: alvo, promise: execucao };
     try {
       await execucao;
