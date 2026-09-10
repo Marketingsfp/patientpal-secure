@@ -429,3 +429,23 @@ export function agruparTimeline(entrada: {
 
   return { itens: limpos, eventoParaItem, marcadorParaItem };
 }
+
+/**
+ * Handoffs que, na linha do tempo, não foram seguidos de nenhuma atribuição
+ * antes do próximo handoff — ou seja, a conversa ficou realmente aguardando
+ * atendente. Puro: só olha a ordem dos itens já agrupados.
+ */
+export function handoffsAguardandoAtendente(itens: ItemTimelineAgrupado[]): Set<string> {
+  const aguardando = new Set<string>();
+  let ultimoHandoff: GrupoHandoff | null = null;
+  for (const item of itens) {
+    if (item.tipo === "HANDOFF") {
+      if (ultimoHandoff) aguardando.add(ultimoHandoff.chave);
+      ultimoHandoff = item;
+      continue;
+    }
+    if (item.tipo === "ATRIBUICAO" && ultimoHandoff) ultimoHandoff = null;
+  }
+  if (ultimoHandoff) aguardando.add(ultimoHandoff.chave);
+  return aguardando;
+}
