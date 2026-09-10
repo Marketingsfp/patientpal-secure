@@ -84,7 +84,12 @@ function textoPrevia(linha: Record<string, any>): string | null {
 export function patchListaPorMensagem(
   lista: LinhaLista[],
   linha: Record<string, any> | null | undefined,
-  ctx: { conversaAberta: string | null },
+  ctx: {
+    conversaAberta: string | null;
+    /** FASE 4 — mantém a ordem do eixo de Visualização ativo. */
+    visualizacao?: VisualizacaoPatch;
+    espera?: Record<string, string>;
+  },
 ): ResultadoPatch {
   const conversaId = String(linha?.["conversa_id"] ?? "");
   const quando = linha?.["created_at"] ?? linha?.["criado_em"] ?? null;
@@ -92,7 +97,15 @@ export function patchListaPorMensagem(
     return { lista: lista ?? [], aplicado: false, reconciliar: true };
   }
   const alvo = lista.find((c) => c.id === conversaId);
-  if (!alvo) return { lista, aplicado: false, reconciliar: true };
+  // Em "Resolvidas" uma mensagem nova não pertence ao recorte; em "Maior
+  // espera" a entrada/saída depende da métrica canônica, conferida à parte.
+  if (!alvo) {
+    return {
+      lista,
+      aplicado: false,
+      reconciliar: (ctx.visualizacao ?? "recentes") === "recentes",
+    };
+  }
 
   const entrada = linha?.["direction"] === "in";
   const previa = textoPrevia(linha ?? {}) ?? alvo.ultima_msg_preview ?? null;
