@@ -1347,6 +1347,15 @@ async function gerarRespostaNinaInterno(
       : null,
   });
   const mensagens: MsgIA[] = contexto.messages as MsgIA[];
+  // FASE 4 — a pendência de esclarecimento entra no contrato de SISTEMA
+  // (estado e restrições), nunca como uma falsa mensagem do paciente.
+  {
+    const { blocoContratoEsclarecimento, normalizarPendencia: normPend } = await import(
+      "@/lib/nina/confidence/esclarecimento"
+    );
+    const bloco = blocoContratoEsclarecimento(normPend(fluxoEstado.clarification));
+    if (bloco) mensagens.push({ role: "system", content: bloco });
+  }
   rastro?.concluir("context.load", {
     mensagens_contexto: mensagens.length,
     paciente_identificado: Boolean(pacienteIdEfetivo),
@@ -1573,7 +1582,6 @@ async function gerarRespostaNinaInterno(
       // bloqueadores). Vale igual para atendimento real e homologação.
       const {
         decidirNoTurno,
-        instrucaoEsclarecimentoDirigida,
         motivoHandoff,
         paraDecisaoLegado,
         resumoHandoffEstruturado,
