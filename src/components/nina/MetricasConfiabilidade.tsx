@@ -163,9 +163,78 @@ export function MetricasConfiabilidade({ clinicaId }: { clinicaId: string | null
         ) : (
           <>
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <Bloco titulo="Mensagens de saída">
+                <p className="text-2xl font-semibold tabular-nums">
+                  {formatarNumero(dados?.denominadores.mensagensDeSaida ?? 0)}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {formatarNumero(dados?.denominadores.avaliacoesResposta ?? 0)} avaliações de
+                  resposta · {formatarNumero(dados?.denominadores.avaliacoesAcao ?? 0)} de ação ·{" "}
+                  {formatarNumero(dados?.denominadores.operacoes ?? 0)} operações
+                </p>
+                {dados?.amostra.truncado && (
+                  <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">
+                    Recorte parcial: leitura limitada a {formatarNumero(dados.amostra.limite)}{" "}
+                    registros do período.
+                  </p>
+                )}
+              </Bloco>
+              <Bloco titulo="Acerto observado">
+                {dados?.acerto.disponivel ? (
+                  <>
+                    <p className="text-2xl font-semibold tabular-nums">
+                      {formatarPercentual(dados.acerto.taxaAcerto ?? 0)}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      Sobre {formatarNumero(dados.acerto.revisadas)} saídas revisadas ·{" "}
+                      {formatarPercentual(dados.acerto.cobertura)} de cobertura
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-2xl font-semibold tabular-nums text-muted-foreground">—</p>
+                    <p className="text-xs text-muted-foreground">
+                      {dados?.acerto.motivo ?? "Sem revisão suficiente para calcular acerto."}
+                    </p>
+                  </>
+                )}
+              </Bloco>
+              <Bloco titulo="Revisão humana">
+                <p className="text-sm">Não revisadas: {dados?.revisao.NAO_REVISADA ?? 0}</p>
+                <p className="text-sm">Erro confirmado: {dados?.revisao.ERRO_CONFIRMADO ?? 0}</p>
+                <p className="text-sm">Em análise: {dados?.revisao.ERRO_REPORTADO ?? 0}</p>
+                <p className="text-sm">Reporte descartado: {dados?.revisao.REPORTE_DESCARTADO ?? 0}</p>
+                <p className="text-xs text-muted-foreground">
+                  Reportes antigos sem vínculo exato: {dados?.revisao.LEGADO_SEM_VINCULO ?? 0}
+                </p>
+              </Bloco>
+              <Bloco titulo="Resultados confirmados">
+                <p className="text-sm">
+                  Transferências: {dados?.resultados.transferenciasConfirmadas ?? 0} confirmadas de{" "}
+                  {dados?.resultados.transferenciasRecomendadas ?? 0} recomendadas
+                </p>
+                <p className="text-sm">
+                  Em observação: {dados?.resultados.transferenciasEmObservacao ?? 0}
+                </p>
+                <p className="text-sm">
+                  Reservas com prova na agenda: {dados?.resultados.agendamentosConfirmados ?? 0}
+                  {(dados?.resultados.agendamentosSemProva ?? 0) > 0
+                    ? ` · ${dados?.resultados.agendamentosSemProva} sem prova`
+                    : ""}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Falhas de ferramenta: {dados?.resultados.falhasOperacionais ?? 0}
+                </p>
+              </Bloco>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
               <Bloco titulo="Confiança média">
                 <p className="text-2xl font-semibold tabular-nums">{dados?.scoreMedio}%</p>
-                <p className="text-xs text-muted-foreground">{total} respostas avaliadas</p>
+                <p className="text-xs text-muted-foreground">
+                  {formatarNumero(dados?.denominadores.avaliacoesTotais ?? total)} avaliações ·{" "}
+                  {formatarNumero(dados?.denominadores.rodadas ?? 0)} rodadas
+                </p>
               </Bloco>
               <Bloco titulo="Distribuição">
                 <p className="text-sm">Alta: {dados?.distribuicao.HIGH} ({pct(dados?.distribuicao.HIGH ?? 0)}%)</p>
@@ -173,7 +242,9 @@ export function MetricasConfiabilidade({ clinicaId }: { clinicaId: string | null
                 <p className="text-sm">Baixa: {dados?.distribuicao.LOW} ({pct(dados?.distribuicao.LOW ?? 0)}%)</p>
               </Bloco>
               <Bloco titulo="Encaminhamentos">
-                <p className="text-sm">Transferências por baixa confiança: {dados?.handoffsBaixaConfianca}</p>
+                <p className="text-sm">
+                  Transferências recomendadas por baixa confiança: {dados?.handoffsBaixaConfianca}
+                </p>
                 <p className="text-sm">Perguntas de esclarecimento: {dados?.esclarecimentos}</p>
                 <p className="text-sm">Respostas liberadas: {dados?.respostasLiberadas}</p>
               </Bloco>
