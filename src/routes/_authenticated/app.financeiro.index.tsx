@@ -5,12 +5,12 @@ import {
   Calendar,
   Coins,
   CreditCard,
-  FileSpreadsheet,
+  
   FlaskConical,
   Handshake,
   Minus,
   Plus,
-  Printer,
+  
   Receipt,
   Stethoscope,
   TrendingDown,
@@ -18,8 +18,6 @@ import {
   Users,
   Wallet,
 } from "lucide-react";
-import { toast } from "sonner";
-import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useClinica } from "@/hooks/use-clinica";
 import { usePodeEscrever } from "@/hooks/use-permissoes";
@@ -46,26 +44,17 @@ import {
   carregarPainelFinanceiro,
   type DadosPainel,
 } from "@/lib/financeiro/painel-financeiro-carregar";
-import { imprimirRelatorio } from "@/lib/print-relatorio-financeiro";
-import { exportarRelatorioXlsx } from "@/lib/exportar-xlsx";
 import { LancamentoDialog } from "@/components/financeiro/lancamento-dialog";
 import { CardPendenciasRepasse } from "@/components/financeiro/card-pendencias-repasse";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableFooter,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+  DetalhamentoDialog,
+  int,
+  KpiCard,
+  pct,
+  type Celula,
+  type Detalhe,
+  type Visao,
+} from "@/components/financeiro/painel-detalhamento";
 
 export const Route = createFileRoute("/_authenticated/app/financeiro/")({
   component: FinDashboard,
@@ -99,11 +88,6 @@ type Drill =
   | "atendimentos"
   | "ticket"
   | CategoriaAtendimento;
-
-type Visao = "sintetico" | "analitico";
-
-const pct = (v: number) => `${v.toFixed(1).replace(".", ",")}%`;
-const int = (n: number) => n.toLocaleString("pt-BR");
 
 /**
  * Financeiro → Dashboard.
@@ -368,9 +352,15 @@ function FinDashboard() {
 
       {drill && dados && resumo && (
         <DetalhamentoDialog
-          drill={drill}
-          dados={dados}
-          resumo={resumo}
+          montar={(visao) => montarDetalhe(drill, dados, resumo, visao)}
+          rotuloSintetico={
+            drill === "operacionais" || drill === "outras"
+              ? "Por categoria"
+              : drill === "totais"
+                ? "Por conta"
+                : "Por profissional"
+          }
+          arquivo={`financeiro_${drill}`}
           de={de}
           ate={ate}
           clinicaNome={clinicaAtual?.clinica.nome ?? "Clínica"}
@@ -386,27 +376,10 @@ const margem = (valor: number, base: number) => (base === 0 ? 0 : (valor / base)
 // ============================================================================
 // Detalhamento em tela cheia
 // ----------------------------------------------------------------------------
-// Cada card abre uma tabela montada por `montarDetalhe`. A MESMA tabela é
-// desenhada na tela, impressa em A4 e exportada para Excel — é o que garante
-// que o papel e a planilha mostram exatamente o que a tela mostrou.
+// Cada card abre uma tabela montada por `montarDetalhe` e desenhada pelo
+// `DetalhamentoDialog` compartilhado com o Movimento de Caixa
+// (`@/components/financeiro/painel-detalhamento`).
 // ============================================================================
-
-type TipoCol = "texto" | "moeda" | "numero" | "data";
-type Celula = string | number | null;
-
-interface Detalhe {
-  titulo: string;
-  explicacao: string;
-  colunas: Array<{ rotulo: string; tipo: TipoCol }>;
-  linhas: Celula[][];
-  totais?: Celula[];
-  /** Quadro de fechamento, abaixo da tabela e no papel. */
-  resumo?: Array<{ rotulo: string; valor: number }>;
-  /** Quebra por forma de pagamento (só na receita). */
-  composicao?: Array<{ rotulo: string; valor: number }>;
-  /** Existe visão sintética (agrupada) além da lista. */
-  temSintetico: boolean;
-}
 
 const TITULO_ATENDIMENTO: Record<CategoriaAtendimento, string> = {
   cartao: "Consultas Cartão",
