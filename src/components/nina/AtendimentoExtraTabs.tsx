@@ -553,6 +553,9 @@ export function AtendInbox() {
         (c: any) => faixaEsperaAtd(minutosDesde(espera[c.id])) === "critico",
       );
     }
+    // "Maior tempo esperando" usa a métrica canônica de paciente aguardando:
+    // conversa em que a clínica é que aguarda o paciente fica de fora.
+    base = base.filter((c: any) => conversaNaVisualizacao(visualizacao, espera[c.id]));
     if (ordem !== "espera") return base;
     return [...base].sort((a: any, b: any) => {
       const ta = espera[a.id] ? new Date(espera[a.id]).getTime() : Infinity;
@@ -564,7 +567,7 @@ export function AtendInbox() {
     const ativar = () => setSoNaoAtribuidas(true);
     const ativarCriticas = () => {
       setSoCriticas(true);
-      setOrdem("espera");
+      setVisualizacao("espera");
     };
     try {
       if (window.sessionStorage.getItem(FILTRO_NAO_ATRIBUIDAS_KEY) === "1") {
