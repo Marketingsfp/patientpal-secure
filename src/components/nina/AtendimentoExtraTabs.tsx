@@ -3454,8 +3454,25 @@ export function AtendInbox() {
                 )}
 
                 {(conteudoDaConversa ? timeline : []).map((item) => {
-                  if (item.kind === "evento") {
-                    return <ConversationSystemEvent key={`ev-${item.ev.id}`} evento={item.ev} />;
+                  if (item.kind === "grupo") {
+                    const g = item.item;
+                    if (g.tipo === "HANDOFF") {
+                      return (
+                        <div key={`g-${g.chave}`}>
+                          <HandoffGroupCard grupo={g} />
+                          {item.aguardando && <EsperaAtendenteCard protocolo={g.protocolo} />}
+                        </div>
+                      );
+                    }
+                    if (g.tipo === "ATRIBUICAO") {
+                      return <AtribuicaoGroupCard key={`g-${g.chave}`} grupo={g} />;
+                    }
+                    return (
+                      <ConversationSystemEvent
+                        key={`ev-${g.chave}`}
+                        evento={g.evento as unknown as ConversaEvento}
+                      />
+                    );
                   }
                   const m = item.msg;
                   const out = m.direction === "out";
