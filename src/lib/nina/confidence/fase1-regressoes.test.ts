@@ -65,7 +65,7 @@ describe("FASE 1 — evidência real por afirmação", () => {
   });
 
   it("afirmação de agendamento sem prova persistida continua sem evidência", () => {
-    const estado = turnoBase({ acao: "criar_agendamento", tipoTurno: "AGENDAMENTO" });
+    const estado = turnoBase({ acao: "criar_agendamento", tipoTurno: "OPERACAO" });
     const g = avaliarGrounding(
       montarContextoDoTurno(estado),
       "Pronto, seu agendamento está confirmado!",
@@ -179,7 +179,7 @@ describe("FASE 1 — pré-condições antes da ação", () => {
   it("consentimento/regra da clínica não atendida bloqueia a ação", () => {
     const estado = turnoBase({
       acao: "criar_agendamento",
-      tipoTurno: "AGENDAMENTO",
+      tipoTurno: "OPERACAO",
       pacienteIdentificado: true,
       ferramentas: [FERRAMENTA_CATALOGO_OK],
       catalogoEncontrou: true,
