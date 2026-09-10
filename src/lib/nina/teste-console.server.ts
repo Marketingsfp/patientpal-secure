@@ -620,7 +620,7 @@ export async function processarMensagemTeste(data: EntradaMensagemTeste, userId:
         | "OBSOLETA"
         | "ERRO",
       absorvidaPeloLote: false,
-      batchId: loteId || null,
+      batchId: loteDoTurno || null,
       revisao: revisaoTurno || null,
     };
 }
