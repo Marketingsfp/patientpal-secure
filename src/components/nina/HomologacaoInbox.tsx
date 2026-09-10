@@ -377,6 +377,30 @@ export function HomologacaoInbox() {
         },
         (payload) => {
           const nova = (payload as any).new as MensagemResumoRow | null;
+          // Timeline em tempo real: a mensagem entra na hora na conversa
+          // aberta, sem esperar recarga do histórico. Só entra se for desta
+          // clínica, desta conversa e do ambiente de HOMOLOGAÇÃO — mensagem
+          // real do WhatsApp nunca aparece aqui.
+          if (
+            aceitaMensagemRealtime(nova as unknown as LinhaMensagemRealtime, {
+              ambiente: "homologacao",
+              clinicaId,
+              conversaId: leadAbertoRef.current,
+            })
+          ) {
+            setMsgs((atuais) =>
+              mesclarMensagemTimeline(
+                atuais,
+                paraMensagemTimeline(nova as unknown as LinhaMensagemRealtime),
+              ),
+            );
+            const oficial = (nova as any).wa_message_id as string | null;
+            if (oficial) {
+              for (const [chave, o] of otimistasRef.current) {
+                if (o.msg.wa_message_id === oficial) otimistasRef.current.delete(chave);
+              }
+            }
+          }
           if (nova?.id && nova.conversa_id && !aplicadasRef.current.has(nova.id)) {
             const jaAplicada = false;
             const abertoAgora =
