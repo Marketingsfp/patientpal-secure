@@ -28,6 +28,35 @@ function turno(over: Partial<EstadoDoTurno> = {}): EstadoDoTurno {
       },
     ],
     catalogoEncontrou: true,
+    // FASE 2 — fatos que o servidor extrai do retorno real do catálogo.
+    fatos: [
+      {
+        consulta: "consultar_base_conhecimento",
+        capacidade: "searchKnowledgeBase",
+        entidade: "procedimento",
+        campo: "preco",
+        valor: "R$ 150,00",
+        fonte: "catalogo_publicado",
+        chave: { procedimento: "cardiologia" },
+      },
+      {
+        consulta: "consultar_base_conhecimento",
+        capacidade: "searchKnowledgeBase",
+        entidade: "profissional",
+        campo: "nome",
+        valor: "Dr. João",
+        fonte: "catalogo_publicado",
+      },
+      {
+        consulta: "consultar_base_conhecimento",
+        capacidade: "searchKnowledgeBase",
+        entidade: "procedimento",
+        campo: "preparo",
+        valor: "Não é preciso jejum",
+        fonte: "catalogo_publicado",
+        chave: { procedimento: "cardiologia" },
+      },
+    ],
     ...over,
   } as EstadoDoTurno;
 }
@@ -75,6 +104,25 @@ describe("FASE 5 — claim-level grounding", () => {
             capacidade: "checkAvailability",
             fonte: "agenda",
             success: true,
+          },
+        ],
+        fatos: [
+          {
+            consulta: "consultar_base_conhecimento",
+            capacidade: "searchKnowledgeBase",
+            entidade: "procedimento",
+            campo: "preco",
+            valor: "R$ 150,00",
+            fonte: "catalogo_publicado",
+            chave: { procedimento: "cardiologia" },
+          },
+          {
+            consulta: "consultar_agenda",
+            capacidade: "checkAvailability",
+            entidade: "vaga",
+            campo: "slot",
+            valor: "sábado 14h",
+            fonte: "agenda",
           },
         ],
       }),

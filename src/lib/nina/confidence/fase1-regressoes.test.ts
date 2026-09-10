@@ -33,7 +33,7 @@ import {
 } from "./fixtures/clinica-ficticia";
 
 describe("FASE 1 — evidência real por afirmação", () => {
-  it.failing(
+  it(
     "preço divergente do catálogo com a MESMA consulta não pode ser dado como apoiado",
     () => {
       // Fato da fixture: R$ 250,00. A Nina escreveu R$ 180,00.
@@ -53,7 +53,7 @@ describe("FASE 1 — evidência real por afirmação", () => {
     },
   );
 
-  it.failing("endereço afirmado sem nenhuma fonte precisa aparecer como afirmação sem evidência", () => {
+  it("endereço afirmado sem nenhuma fonte precisa aparecer como afirmação sem evidência", () => {
     const estado = turnoBase({ acao: "responder_informacao", tipoTurno: "INFORMACAO" });
     const ctx = montarContextoDoTurno(estado);
     const g = avaliarGrounding(
@@ -75,7 +75,7 @@ describe("FASE 1 — evidência real por afirmação", () => {
 });
 
 describe("FASE 1 — o motor não pode reprovar o que está correto", () => {
-  it.failing("negativa apoiada no catálogo (não realizamos o exame) não vira bloqueio", () => {
+  it("negativa apoiada no catálogo (não realizamos o exame) não vira bloqueio", () => {
     expect(CATALOGO_PUBLICADO.ressonanciaMagnetica.realizadoPelaClinica).toBe(false);
     const estado = turnoBase({
       acao: "informar_regra",
@@ -87,7 +87,7 @@ describe("FASE 1 — o motor não pode reprovar o que está correto", () => {
     expect(r.decision).toBe("ALLOW");
   });
 
-  it.failing("reserva criada em turno anterior pode ser confirmada sem nova chamada de ferramenta", () => {
+  it("reserva criada em turno anterior pode ser confirmada sem nova chamada de ferramenta", () => {
     const estado = turnoBase({
       acao: "responder_informacao",
       tipoTurno: "INFORMACAO",
@@ -113,7 +113,7 @@ describe("FASE 1 — o motor não pode reprovar o que está correto", () => {
     expect(r.decision).toBe("ALLOW");
   });
 
-  it.failing("ferramenta que falhou e foi refeita com sucesso não pode contar como falha do turno", () => {
+  it("ferramenta que falhou e foi refeita com sucesso não pode contar como falha do turno", () => {
     const estado = turnoBase({
       acao: "informar_valor",
       tipoTurno: "INFORMACAO",

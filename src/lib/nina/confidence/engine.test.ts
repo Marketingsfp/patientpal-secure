@@ -59,7 +59,21 @@ describe("bloqueadores absolutos", () => {
 
   it("valor com catálogo publicado é liberado", () => {
     const r = decidirConfianca(
-      ctx({ draftText: "O exame custa R$ 250", toolResults: [tool()] }),
+      ctx({
+        draftText: "O exame custa R$ 250",
+        toolResults: [tool()],
+        // FASE 2 — o preço afirmado precisa bater com o preço recuperado.
+        fatos: [
+          {
+            consulta: "buscar_procedimentos",
+            capacidade: "listCatalog",
+            entidade: "procedimento",
+            campo: "preco",
+            valor: "R$ 250,00",
+            fonte: "catalogo_publicado",
+          },
+        ],
+      }),
     );
     expect(r.blockers).toEqual([]);
     expect(r.decision).toBe("ALLOW");
