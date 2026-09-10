@@ -474,7 +474,7 @@ export async function processarMensagemTeste(data: EntradaMensagemTeste, userId:
     // Resposta atrasada: se o ciclo foi encerrado (ou já é outro) enquanto a
     // Nina pensava, a resposta é descartada e nunca entra na conversa nova.
     if (atual.conversa_id !== conversaId || atual.ciclo_id !== cicloId) {
-      await encerrarTurno("SUPERSEDED");
+      statusFinal = "SUPERSEDED";
       return {
         duplicada: false,
         reply: null,
