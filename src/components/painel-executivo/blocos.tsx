@@ -564,8 +564,8 @@ export function BlocoCartaoBeneficios({
           icone={TrendingUp}
           titulo="Ticket médio por contrato"
           valor={ct ? money(ct.ticketMedio) : "—"}
-          detalhe={ct ? `${int(ct.ativos)} contrato(s) ativo(s)` : undefined}
-          ajuda="Receita prevista dividida pelos contratos ativos. Só a mensalidade entra: a taxa de adesão é cobrada uma única vez, na emissão do cartão."
+          detalhe={ct ? `${int(ct.ativos)} contrato(s) pagante(s)` : undefined}
+          ajuda="Receita prevista dividida pelos contratos ativos pagantes — os dependentes de R$ 0 não entram na divisão. Só a mensalidade entra: a taxa de adesão é cobrada uma única vez, na emissão do cartão."
         />
       </div>
     </Bloco>
