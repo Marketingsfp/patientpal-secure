@@ -495,7 +495,7 @@ export async function processarMensagemTeste(data: EntradaMensagemTeste, userId:
           revisaoProcessada: revisaoTurno,
         })
       ) {
-        await encerrarTurno("SUPERSEDED");
+        statusFinal = "SUPERSEDED";
         return {
           duplicada: false,
           reply: null,
