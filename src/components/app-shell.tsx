@@ -508,48 +508,9 @@ const navRows: ReadonlyArray<{ label: string; items: ReadonlyArray<NavItem> }> =
       { to: "/app/crm", label: "CRM", icon: Target },
       { to: "/app/alertas-enfermagem", label: "Enfermeira IA — Alertas", icon: BellRing },
       { to: "/app/consulta-rapida", label: "Informações rápidas", icon: BookOpen },
-      {
-        label: "Nina — WhatsApp",
-        icon: MessageCircle,
-        children: [
-          { to: "/app/nina", hash: "atend-inbox", label: "Conversas WhatsApp", icon: Inbox },
-          { to: "/app/nina", hash: "atend-macros", label: "/ Mensagens prontas", icon: Zap },
-          {
-            to: "/app/nina",
-            hash: "base-conhecimento",
-            label: "Base de conhecimentos",
-            icon: BookOpen,
-          },
-          {
-            to: "/app/nina",
-            hash: "homologacao",
-            label: "Homologação (envio de testes)",
-            icon: FlaskConical,
-          },
-          {
-            to: "/app/nina-aprendizado",
-            label: "Revisão de Aprendizados",
-            icon: ShieldCheck,
-          },
-          {
-            to: "/app/nina-metricas",
-            label: "Métricas de Aprendizado",
-            icon: BarChart3,
-          },
-          { to: "/app/nina", hash: "config", label: "Configuração", icon: KeyRound },
-          {
-            to: "/app/nina",
-            hash: "templates",
-            label: "Templates aprovados (Meta)",
-            icon: FileText,
-          },
-          {
-            to: "/app/nina-arquitetura",
-            label: "Arquitetura",
-            icon: Network,
-          },
-        ],
-      },
+      // O antigo grupo "Nina — WhatsApp" saiu daqui: tudo de atendimento por
+      // mensagem passou a viver no portal "Atendimento / WhatsApp", nas seções
+      // "Atendimento", "Nina" e "Configurações do WhatsApp" logo abaixo.
       {
         // Grupo expansível por especialidade. Cada filho tem rota própria —
         // antes os dois apontavam para a mesma rota e a tela escolhia a aba
@@ -596,9 +557,52 @@ const navRows: ReadonlyArray<{ label: string; items: ReadonlyArray<NavItem> }> =
       { to: "/app/configuracoes/prontuario", label: "Numeração de Prontuário", icon: FolderOpen },
       { to: "/app/configuracoes/painel-totem", label: "Painel & Totem", icon: KeyRound },
       { to: "/app/configuracoes/voz", label: "Voz & Áudio (TTS)", icon: KeyRound },
-      { to: "/app/configuracoes/respostas-rapidas", label: "Mensagens rápidas", icon: Zap },
       { to: "/app/clinicas", label: "Clínicas", icon: Building2 },
       { to: "/app/backups", label: "Backups", icon: ShieldCheck },
+    ],
+  },
+  // ---------------------------------------------------------------------
+  // Portal "Atendimento / WhatsApp". As três seções abaixo só aparecem
+  // nesse portal (o filtro do menu é por rótulo de seção). Nenhum endereço
+  // mudou: são os mesmos itens que antes ficavam em "Inteligência" e
+  // "Configurações", e o módulo de permissão continua sendo "nina".
+  // ---------------------------------------------------------------------
+  {
+    label: "Atendimento",
+    items: [
+      { to: "/app/nina", hash: "atend-inbox", label: "Conversas WhatsApp", icon: Inbox },
+      { to: "/app/nina", hash: "atend-macros", label: "/ Mensagens prontas", icon: Zap },
+      { to: "/app/configuracoes/respostas-rapidas", label: "Mensagens rápidas", icon: Zap },
+    ],
+  },
+  {
+    label: "Nina",
+    items: [
+      {
+        to: "/app/nina",
+        hash: "base-conhecimento",
+        label: "Base de conhecimentos",
+        icon: BookOpen,
+      },
+      {
+        to: "/app/nina",
+        hash: "homologacao",
+        label: "Homologação (envio de testes)",
+        icon: FlaskConical,
+      },
+      { to: "/app/nina-aprendizado", label: "Revisão de Aprendizados", icon: ShieldCheck },
+      { to: "/app/nina-metricas", label: "Métricas de Aprendizado", icon: BarChart3 },
+      { to: "/app/nina-arquitetura", label: "Arquitetura", icon: Network },
+    ],
+  },
+  {
+    label: "Configurações do WhatsApp",
+    items: [
+      { to: "/app/nina", hash: "config", label: "Configuração", icon: KeyRound },
+      { to: "/app/nina", hash: "templates", label: "Templates aprovados (Meta)", icon: FileText },
+      // Continua também em "Configurações" da Clínica Médica: o TTS serve
+      // à Nina e ao painel/totem.
+      { to: "/app/configuracoes/voz", label: "Voz & Áudio (TTS)", icon: KeyRound },
     ],
   },
 ];
@@ -609,6 +613,29 @@ const navRows: ReadonlyArray<{ label: string; items: ReadonlyArray<NavItem> }> =
 const ROTAS_HOME_PORTAL: ReadonlySet<string> = new Set(
   Object.values(SUBSYSTEMS).map((s) => s.home),
 );
+
+/**
+ * A qual portal uma tela pertence, olhando a seção do menu em que ela está.
+ * Serve para que um link antigo (ex.: /app/nina, que agora vive no portal
+ * "Atendimento / WhatsApp") não fique "fora do menu" quando o usuário estiver
+ * com outro portal ativo: o portal correto é assumido automaticamente.
+ * Telas em seções compartilhadas (Gestão, Configurações) devolvem `null` —
+ * elas pertencem a mais de um portal e não devem trocar nada.
+ */
+function portalDaRota(path: string): SubsystemId | null {
+  const secao = navRows.find((row) =>
+    row.items.some((it) =>
+      isParent(it)
+        ? it.children.some((c) => c.to === path)
+        : it.to === path || (it.aliases ?? []).includes(path),
+    ),
+  );
+  if (!secao) return null;
+  const donos = (Object.keys(SUBSYSTEMS) as SubsystemId[]).filter((id) =>
+    SUBSYSTEMS[id].groups.includes(secao.label),
+  );
+  return donos.length === 1 ? donos[0]! : null;
+}
 
 /**
  * Famílias de rotas em que a tela é a MESMA instância mesmo quando o endereço
@@ -952,6 +979,19 @@ function AppShellInner() {
     fecharSeletorPortais();
     if (mudou) navigate({ to: SUBSYSTEMS[id].home });
   };
+  // Link antigo/atalho para uma tela de outro portal: assume o portal dono da
+  // tela em vez de deixar o menu sem o item. Não navega, não mexe em permissão.
+  const caminhoAtivo = location.pathname;
+  useEffect(() => {
+    if (!subsystem) return;
+    const path =
+      caminhoAtivo.length > 1 && caminhoAtivo.endsWith("/")
+        ? caminhoAtivo.slice(0, -1)
+        : caminhoAtivo;
+    const dono = portalDaRota(path);
+    if (dono && dono !== subsystem) setSubsystem(dono);
+  }, [caminhoAtivo, subsystem]);
+
   const isChooser = location.pathname === "/app" || location.pathname === "/app/";
   const isEmbed = (() => {
     const s = (location as unknown as { search?: unknown }).search;

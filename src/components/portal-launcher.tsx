@@ -1,4 +1,4 @@
-import { Stethoscope, Users, ArrowRight } from "lucide-react";
+import { Stethoscope, Users, MessageCircle, ArrowRight } from "lucide-react";
 import { useSyncExternalStore } from "react";
 import { SUBSYSTEMS, type SubsystemId } from "@/lib/subsystem";
 import { cn } from "@/lib/utils";
@@ -20,6 +20,18 @@ const PORTAIS: Array<{
     icon: Users,
     descricao: "Gestão da equipe: jornada, cadastro e rotinas de RH.",
     itens: ["Marcação de ponto", "Funcionários", "Férias", "Holerites", "Treinamentos"],
+  },
+  {
+    id: "atendimento",
+    icon: MessageCircle,
+    descricao: "Conversas de WhatsApp, mensagens prontas e tudo da Nina.",
+    itens: [
+      "Conversas",
+      "Mensagens prontas",
+      "Base de conhecimentos",
+      "Métricas",
+      "Configuração",
+    ],
   },
 ];
 
@@ -61,7 +73,7 @@ export function PortalLauncher({
           </p>
         </div>
 
-        <div className="grid gap-6 sm:grid-cols-2 lg:gap-8">
+        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 lg:gap-8">
           {PORTAIS.map((portal) => {
             const Icon = portal.icon;
             return (
