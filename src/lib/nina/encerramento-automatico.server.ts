@@ -83,11 +83,16 @@ export async function avaliarEncerramentoAutomatico(args: {
     .maybeSingle();
   const nomeUnidade = ((clinica as { nome?: string } | null)?.nome ?? "").trim() || "nossa unidade";
 
+  // A despedida publicada é um template: `{unidade}` é resolvido aqui.
+  const despedidaRenderizada = (args.despedidaPublicada ?? "").trim()
+    ? (args.despedidaPublicada as string).replace(/\{unidade\}/g, nomeUnidade)
+    : null;
+
   return {
     encerrar: true,
     motivo: decisao.motivo,
     conversaId: String(conv.id),
-    resposta: garantirMensagemFinal(args.resposta, nomeUnidade, args.despedidaPublicada ?? null),
+    resposta: garantirMensagemFinal(args.resposta, nomeUnidade, despedidaRenderizada),
   };
 }
 
