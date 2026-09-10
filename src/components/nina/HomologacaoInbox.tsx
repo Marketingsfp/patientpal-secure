@@ -923,12 +923,10 @@ export function HomologacaoInbox() {
   };
 
   const terraRodando = modo === "terra" && sim?.status === "executando";
+  // O processamento da Nina NÃO entra aqui: ele acontece em segundo plano e o
+  // testador continua escrevendo e enviando normalmente, como num chat real.
   const composerBloqueado =
-    !podeEscrever ||
-    !leadId ||
-    processando ||
-    terraRodando ||
-    (tipo !== "text" && tipo !== "audio");
+    !podeEscrever || !leadId || terraRodando || (tipo !== "text" && tipo !== "audio");
 
   return (
     <div id="homologacao-inbox" className="flex h-[calc(100vh-11rem)] min-h-[560px] gap-3">
