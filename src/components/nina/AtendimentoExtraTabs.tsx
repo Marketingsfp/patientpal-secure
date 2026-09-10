@@ -2284,7 +2284,7 @@ export function AtendInbox() {
       ? null
       : (() => {
           const u = timeline[timeline.length - 1];
-          return u.kind === "msg" ? `m-${u.msg.id}` : `e-${u.ev.id}`;
+          return u.kind === "msg" ? `m-${u.msg.id}` : `e-${u.item.chave}`;
         })();
   const chat = useChatScroll({
     conversaId: sel?.id ?? null,
