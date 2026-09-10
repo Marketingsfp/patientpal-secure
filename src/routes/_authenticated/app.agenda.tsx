@@ -10613,6 +10613,21 @@ function AgendaPage() {
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
+            <div className="rounded-md border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-200">
+              <p className="font-semibold">O paciente já pagou? Não use esta opção.</p>
+              <p className="mt-1">
+                "Sem faturamento" tira o atendimento do financeiro e o médico fica sem repasse. É só
+                para exame que a clínica não cobra — por exemplo o Toxicológico, pago direto ao
+                laboratório.
+              </p>
+              <p className="mt-1">
+                Se ele pagou na <strong>Clínica Total</strong>: feche esta janela, clique no{" "}
+                <strong>$</strong> da ficha e escolha a forma{" "}
+                <strong>"Pago no sistema anterior"</strong>. Se pagou{" "}
+                <strong>neste sistema, em outro dia</strong>: no mesmo <strong>$</strong>, marque{" "}
+                <strong>"O paciente já pagou este valor adiantado"</strong>.
+              </p>
+            </div>
             <p className="text-xs text-muted-foreground">
               O atendimento deixará de ser cobrado no caixa da clínica (o paciente paga direto ao
               parceiro). O motivo abaixo fica gravado no histórico do agendamento, junto com quem
