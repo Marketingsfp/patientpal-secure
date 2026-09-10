@@ -443,8 +443,14 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
                     // `traceId` é o identificador do turno (FASE 1): preenchido
                     // por `gerarRespostaNina` e usado para ligar a mensagem
                     // entregue ao registro da execução.
-                    const auditoriaNina: { execucaoId?: string | null; traceId?: string | null } =
-                      {};
+                    const auditoriaNina: {
+                      execucaoId?: string | null;
+                      traceId?: string | null;
+                      // FASE 5 — snapshot da avaliação final do texto enviado.
+                      decisaoId?: string | null;
+                      textoFinalHash?: string | null;
+                    } = {};
+
                     // Mensagens de entrada reais desta resposta. O paciente pode
                     // ter escrito em partes: pegamos as mensagens dele ainda sem
                     // resposta, na ordem em que chegaram.
@@ -685,29 +691,71 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
                                 audio.mime,
                                 `nina.${audio.ext}`,
                               );
+                              // O áudio é OUTRA representação: quando é resumo
+                              // falado, o conteúdo difere do texto avaliado e
+                              // recebe o seu próprio registro.
+                              const representacaoAudio = longa
+                                ? ("audio_resumo" as const)
+                                : ("audio_integral" as const);
+                              const { registrarEntregaSaida } = await import(
+                                "@/lib/nina/confidence-engine.server"
+                              );
+                              const { hashDoTexto } = await import("@/lib/nina/confidence/hash");
+                              const hashFalado = hashDoTexto(falado);
+                              await registrarEntregaSaida({
+                                clinicaId: params.clinicaId,
+                                decisaoId: auditoriaNina.decisaoId ?? null,
+                                execucaoId: auditoriaNina.execucaoId ?? null,
+                                conversaId: convId,
+                                representacao: representacaoAudio,
+                                estado: "envio_tentado",
+                                textoHash: hashFalado,
+                              });
                               const { wa_message_id: audioId } = await metaSendAudio(
                                 phoneNumberId,
                                 cfg.access_token,
                                 from,
                                 mediaId,
                               );
-                              await supabaseAdmin.from("whatsapp_mensagens").insert({
-                                clinica_id: params.clinicaId,
-                                wa_message_id: audioId,
-                                direction: "out",
-                                from_number: displayPhoneNumber,
-                                to_number: from,
-                                body: `🎤 ${falado}`,
-                                tipo: "audio",
-                                transcricao: falado,
-                                media_mime: audio.mime,
-                                status: "sent",
-                                enviada_por: "nina",
-                                execucao_id: auditoriaNina.execucaoId ?? null,
+                              const { data: msgAudio, error: erroAudio } = await supabaseAdmin
+                                .from("whatsapp_mensagens")
+                                .insert({
+                                  clinica_id: params.clinicaId,
+                                  wa_message_id: audioId,
+                                  direction: "out",
+                                  from_number: displayPhoneNumber,
+                                  to_number: from,
+                                  body: `🎤 ${falado}`,
+                                  tipo: "audio",
+                                  transcricao: falado,
+                                  media_mime: audio.mime,
+                                  status: "sent",
+                                  enviada_por: "nina",
+                                  execucao_id: auditoriaNina.execucaoId ?? null,
+                                })
+                                .select("id")
+                                .maybeSingle();
+                              if (erroAudio) {
+                                console.error("[nina] falha ao gravar áudio enviado", erroAudio);
+                              }
+                              // Confirmada só porque a Meta devolveu id da
+                              // mensagem — não pela simples existência da linha.
+                              await registrarEntregaSaida({
+                                clinicaId: params.clinicaId,
+                                decisaoId: auditoriaNina.decisaoId ?? null,
+                                execucaoId: auditoriaNina.execucaoId ?? null,
+                                conversaId: convId,
+                                outgoingMessageId:
+                                  (msgAudio as { id?: string } | null)?.id ?? null,
+                                representacao: representacaoAudio,
+                                estado: audioId ? "confirmada" : "falhou",
+                                textoHash: hashFalado,
+                                transporteId: audioId ?? null,
                               });
                               audioEnviado = true;
                               precisaTextoCompleto = longa;
                             }
+
                           }
                         } catch (e) {
                           console.error("Nina resposta em áudio falhou (caindo para texto)", e);
@@ -715,13 +763,46 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
                       }
 
                       if (!audioEnviado || precisaTextoCompleto) {
-                        const { wa_message_id: outId } = await metaSendText(
-                          phoneNumberId,
-                          cfg.access_token,
-                          from,
-                          reply,
+                        const { registrarEntregaSaida } = await import(
+                          "@/lib/nina/confidence-engine.server"
                         );
-                        const { data: msgOut } = await supabaseAdmin
+                        const { hashDoTexto } = await import("@/lib/nina/confidence/hash");
+                        const hashEnviado = hashDoTexto(reply);
+                        const vinculoBase = {
+                          clinicaId: params.clinicaId,
+                          decisaoId: auditoriaNina.decisaoId ?? null,
+                          execucaoId: auditoriaNina.execucaoId ?? null,
+                          conversaId: convId,
+                          representacao: "texto_completo" as const,
+                          textoHash: hashEnviado,
+                        };
+                        // O hash do texto que sai é comparável ao avaliado: se
+                        // divergir, o registro mostra isso em vez de esconder.
+                        await registrarEntregaSaida({
+                          ...vinculoBase,
+                          estado: "envio_tentado",
+                          detalhe: {
+                            hash_avaliado: auditoriaNina.textoFinalHash ?? null,
+                            confere: (auditoriaNina.textoFinalHash ?? null) === hashEnviado,
+                          },
+                        });
+                        let outId: string | null = null;
+                        try {
+                          ({ wa_message_id: outId } = await metaSendText(
+                            phoneNumberId,
+                            cfg.access_token,
+                            from,
+                            reply,
+                          ));
+                        } catch (e) {
+                          await registrarEntregaSaida({
+                            ...vinculoBase,
+                            estado: "falhou",
+                            detalhe: { erro: e instanceof Error ? e.message : String(e) },
+                          });
+                          throw e;
+                        }
+                        const { data: msgOut, error: erroMsgOut } = await supabaseAdmin
                           .from("whatsapp_mensagens")
                           .insert({
                             clinica_id: params.clinicaId,
@@ -737,20 +818,17 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
                           })
                           .select("id")
                           .maybeSingle();
-                        // FASE 6 — o snapshot de confiança passa a apontar para
-                        // a mensagem que o paciente realmente recebeu.
-                        try {
-                          const { vincularSnapshotMensagemEnviada } = await import(
-                            "@/lib/nina/confidence-engine.server"
-                          );
-                          await vincularSnapshotMensagemEnviada({
-                            clinicaId: params.clinicaId,
-                            execucaoId: auditoriaNina.execucaoId ?? null,
-                            outgoingMessageId: (msgOut as { id?: string } | null)?.id ?? null,
-                          });
-                        } catch {
-                          // Vínculo é auditoria: nunca interrompe o atendimento.
+                        if (erroMsgOut) {
+                          console.error("[nina] falha ao gravar mensagem enviada", erroMsgOut);
                         }
+                        // Entregue = a Meta devolveu identificador de transporte.
+                        await registrarEntregaSaida({
+                          ...vinculoBase,
+                          outgoingMessageId: (msgOut as { id?: string } | null)?.id ?? null,
+                          estado: outId ? "confirmada" : "falhou",
+                          transporteId: outId,
+                        });
+
                         // FASE 1 — liga o turno à mensagem realmente entregue.
                         try {
                           const { gravarEntregaDoTurno } = await import(

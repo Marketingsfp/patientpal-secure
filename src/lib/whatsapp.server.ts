@@ -1463,7 +1463,11 @@ async function gerarRespostaNinaInterno(
   const nomesFerramentasTurno: string[] = [];
   let conflitoFerramenta = false;
   let nivelAnteriorTurno: "low" | "medium" | "high" | undefined;
+  // FASE 5 — quantas rodadas de modelo o turno consumiu. Caminho sem modelo
+  // termina com 0 e é registrado como tal, sem inventar execução de LLM.
+  let rodadasDoTurno = 0;
   for (let rodada = 0; rodada < MAX_RODADAS; rodada++) {
+    rodadasDoTurno = rodada + 1;
     // Toda chamada de modelo da Nina passa pelo Nina AI Gateway.
     const { ninaAIGateway } = await import("@/lib/nina/ai-gateway.server");
     if (rastro && rodada > 0) rastro.novoCiclo();
@@ -2180,7 +2184,47 @@ async function gerarRespostaNinaInterno(
       identidade_tentativas: estadoId.tentativas + 1,
     });
   }
+  // ---------------- FASE 5: FINALIZAÇÃO ANTES DA AVALIAÇÃO ----------------
+  // Template publicado, despedida e checagem de promessa sem prova acontecem
+  // AQUI, antes de a nota ser calculada. Assim o texto avaliado é exatamente o
+  // texto entregue: o transporte não acrescenta nada depois. Quem envia chama
+  // o mesmo serviço com a mesma chave de turno e recebe o resultado guardado,
+  // sem repetir nenhum efeito.
+  const chaveTurnoFinalizacao =
+    (opcoes?.auditoria as { traceId?: string } | undefined)?.traceId ??
+    rastro?.ids.trace_id ??
+    `${clinicaId}|${telefoneNorm ?? "-"}|${estadoId.conversaId ?? "-"}`;
+  try {
+    if (resposta) {
+      const [{ finalizarResposta }, { criarResultado }] = await Promise.all([
+        import("@/lib/nina/resposta/finalizacao.server"),
+        import("@/lib/nina/resposta/contrato"),
+      ]);
+      const baseResultado =
+        ((opcoes?.auditoria as { resultado?: unknown } | undefined)?.resultado as
+          | import("@/lib/nina/resposta/contrato").ResultadoRespostaNina
+          | undefined) ?? criarResultado({ origem: "modelo", texto: resposta });
+      const finalizada = await finalizarResposta({
+        clinicaId,
+        canal: opcoes?.teste === true ? "test-console" : "whatsapp",
+        chaveTurno: chaveTurnoFinalizacao,
+        conversaId: estadoId.conversaId ?? null,
+        telefone: telefoneNorm ?? null,
+        mensagemPaciente: mensagemPaciente || null,
+        resultado: { ...baseResultado, texto: resposta },
+        // Encerramento automático só no caminho real de atendimento.
+        avaliarEncerramento: opcoes?.teste !== true && Boolean(mensagemPaciente),
+      });
+      if (finalizada.texto) resposta = finalizada.texto;
+      if (opcoes?.auditoria) {
+        (opcoes.auditoria as { finalizacao?: unknown }).finalizacao = finalizada;
+      }
+    }
+  } catch (e) {
+    console.error("[nina] finalização antes da avaliação falhou", e);
+  }
   // ---------------- FASE 5: FINAL ANSWER VERIFICATION ----------------
+
   // A partir daqui o texto não muda mais. É ESTE texto — com saudação
   // obrigatória, avisos internos e banner de transferência já aplicados — que
   // é avaliado, persistido e enviado. O score de um texto anterior nunca é
@@ -2221,10 +2265,16 @@ async function gerarRespostaNinaInterno(
         texto_hash: respostaFinalAvaliada.textoAvaliadoHash,
       });
 
-      const { registrarDecisaoConfianca } = await import(
+      const { registrarDecisaoConfianca, registrarEntregaSaida } = await import(
         "@/lib/nina/confidence-engine.server"
       );
-      void registrarDecisaoConfianca({
+      const { identidadeEvidencias } = await import("@/lib/nina/confidence/entrega");
+      const { registroTurnoAtual } = await import("@/lib/nina/rastreio/turno.server");
+      const registroDoTurno = registroTurnoAtual();
+      const evidenciasHash = identidadeEvidencias(evidenciasFerramentas as unknown[]);
+      // FASE 5 — a gravação é AGUARDADA: o vínculo da saída depende do id
+      // desta linha, e disparar as duas em paralelo criava corrida.
+      const registro = await registrarDecisaoConfianca({
         clinicaId,
         conversaId: estadoId.conversaId ?? null,
         execucaoId: execucaoIdFinal,
@@ -2240,6 +2290,13 @@ async function gerarRespostaNinaInterno(
           (fluxoEstado as { session_id?: string | null }).session_id ?? null,
         decisao: paraDecisaoLegado(respostaFinalAvaliada),
         modo: "shadow",
+        // FASE 5 — contexto ao qual esta nota pertence.
+        revisaoConversa: opcoes?.lote?.revisao ?? null,
+        evidenciasHash,
+        origemResposta: registroDoTurno?.origemResposta ?? null,
+        // Caminho sem modelo fica com 0 rodadas: nada de execução inventada.
+        rodadas: registroDoTurno?.rodadas ?? rodadasDoTurno,
+        representacao: "texto_completo",
         auditoria: montarRegistroAuditoria(respostaFinalAvaliada, {
           conversationId: estadoId.conversaId ?? null,
           messageId: estadoTurnoFinal.messageId ?? null,
@@ -2253,6 +2310,37 @@ async function gerarRespostaNinaInterno(
           ferramentas: evidenciasFerramentas,
         }),
       });
+      // O snapshot da resposta final viaja para quem vai enviar: é ele que liga
+      // a nota à mensagem realmente gravada, sem violar a imutabilidade.
+      if (opcoes?.auditoria) {
+        (
+          opcoes.auditoria as {
+            decisaoId?: string | null;
+            textoFinalHash?: string | null;
+          }
+        ).decisaoId = registro.id;
+        (
+          opcoes.auditoria as { textoFinalHash?: string | null }
+        ).textoFinalHash = respostaFinalAvaliada.textoAvaliadoHash ?? null;
+      }
+      // Saída PREPARADA: avaliada e aprovada. Ainda não foi gravada nem enviada.
+      if (registro.ok) {
+        await registrarEntregaSaida({
+          clinicaId,
+          decisaoId: registro.id,
+          execucaoId: execucaoIdFinal,
+          conversaId: estadoId.conversaId ?? null,
+          representacao: "texto_completo",
+          estado: "preparada",
+          textoHash: respostaFinalAvaliada.textoAvaliadoHash ?? null,
+          detalhe: {
+            origem: registroDoTurno?.origemResposta ?? null,
+            recalculado: gate.recalculado,
+            motivo_gate: gate.motivo,
+          },
+        });
+      }
+
       // FASE 1 — a nota da mensagem final também entra no registro do turno.
       const { registrarConfiancaDoTurno } = await import("@/lib/nina/rastreio/turno.server");
       registrarConfiancaDoTurno({
