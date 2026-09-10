@@ -1,0 +1,181 @@
+import { describe, expect, it } from "bun:test";
+import type { RateioLinha } from "./rateio-receita";
+import {
+  categoriaDoAtendimento,
+  classificarDespesas,
+  grupoDaDespesa,
+  producaoDoRateio,
+  repassePorMedico,
+  resumoPainel,
+  somarPorCategoria,
+  type LancamentoPainel,
+} from "./painel-financeiro";
+
+const linha = (p: Partial<RateioLinha>): RateioLinha => ({
+  id: Math.random().toString(36).slice(2),
+  data: "2026-09-10",
+  medico_id: "m1",
+  medico_nome: "DRA. ISIS",
+  especialidade_id: null,
+  especialidade_nome: "CLINICA",
+  procedimento: "CONSULTA",
+  servico_nome: "CONSULTA",
+  condicao: "PARTICULAR",
+  tipo_servico: "CONSULTA",
+  grupo: null,
+  categoria_nome: "PARTICULAR",
+  receita: 100,
+  repasse: 50,
+  terceiro: 0,
+  liquido: 50,
+  margem: 50,
+  formas: [{ forma: "dinheiro", valor: p.receita ?? 100 }],
+  ...p,
+});
+
+const lanc = (p: Partial<LancamentoPainel>): LancamentoPainel => ({
+  id: Math.random().toString(36).slice(2),
+  data: "2026-09-10",
+  descricao: "",
+  valor: 0,
+  categoria_nome: "OUTROS",
+  forma_pagamento: "dinheiro",
+  ...p,
+});
+
+describe("grupoDaDespesa", () => {
+  it("repasse pago pela tela de repasse sai da despesa operacional", () => {
+    expect(grupoDaDespesa("REPASSE MEDICO", "REPASSE MEDICO — ISIS (3 ATEND.)")).toBe(
+      "repasse_pago",
+    );
+    expect(grupoDaDespesa("REPASSE TERCEIRO", "ERGOMETRIA")).toBe("repasse_pago");
+    expect(grupoDaDespesa("Repasse Médico", "x")).toBe("repasse_pago");
+  });
+
+  it("repasse gravado sem categoria é reconhecido pela descrição", () => {
+    expect(grupoDaDespesa("(SEM CATEGORIA)", "REPASSE MEDICO — SAMUEL (17 ATEND.)")).toBe(
+      "repasse_pago",
+    );
+    expect(grupoDaDespesa(null, "Repasse Médico — Karen")).toBe("repasse_pago");
+  });
+
+  it("complemento médico fica à parte", () => {
+    expect(grupoDaDespesa("COMPLEMENTO MEDICO", "ELAIR")).toBe("complemento_medico");
+  });
+
+  it("conta da clínica é operacional, inclusive comissionamento", () => {
+    for (const cat of ["IPTU", "SALARIOS", "BOLETOS", "COMISSIONAMENTO", "COMPLEMENTO"]) {
+      expect(grupoDaDespesa(cat, "QUALQUER")).toBe("operacional");
+    }
+  });
+});
+
+describe("categoriaDoAtendimento", () => {
+  it("separa consulta do cartão, consulta particular, exame e o resto", () => {
+    expect(categoriaDoAtendimento({ tipo_servico: "CONSULTA", condicao: "CARTÃO CONSULTA" })).toBe(
+      "cartao",
+    );
+    expect(categoriaDoAtendimento({ tipo_servico: "CONSULTA", condicao: "CARTÃO DESCONTO" })).toBe(
+      "cartao",
+    );
+    expect(categoriaDoAtendimento({ tipo_servico: "CONSULTA", condicao: "CONVÊNIO" })).toBe(
+      "particular",
+    );
+    expect(categoriaDoAtendimento({ tipo_servico: "EXAME", condicao: "CARTÃO CONSULTA" })).toBe(
+      "exame",
+    );
+    expect(categoriaDoAtendimento({ tipo_servico: "PROCEDIMENTO", condicao: "PARTICULAR" })).toBe(
+      "outro",
+    );
+    expect(categoriaDoAtendimento({ tipo_servico: "(SEM TIPO)", condicao: "PARTICULAR" })).toBe(
+      "outro",
+    );
+  });
+
+  it("as contagens somam o total do Rateio", () => {
+    const p = producaoDoRateio([
+      linha({ condicao: "CARTÃO CONSULTA" }),
+      linha({}),
+      linha({ condicao: "CONVÊNIO" }),
+      linha({ tipo_servico: "EXAME" }),
+      linha({ tipo_servico: "PROCEDIMENTO" }),
+    ]);
+    expect(p).toEqual({
+      total: 5,
+      consultasCartao: 1,
+      consultasParticulares: 2,
+      consultasConvenio: 1,
+      exames: 1,
+      outros: 1,
+    });
+    expect(p.consultasCartao + p.consultasParticulares + p.exames + p.outros).toBe(p.total);
+  });
+});
+
+describe("resumoPainel", () => {
+  const rateio = [
+    linha({ receita: 200, repasse: 100, terceiro: 0 }),
+    linha({ receita: 300, repasse: 120, terceiro: 30, tipo_servico: "EXAME" }),
+  ];
+  const despesas = classificarDespesas([
+    lanc({ categoria_nome: "REPASSE MEDICO", descricao: "REPASSE MEDICO — ISIS", valor: 900 }),
+    lanc({ categoria_nome: "IPTU", valor: 40 }),
+    lanc({ categoria_nome: "SALARIOS", valor: 60 }),
+    lanc({ categoria_nome: "COMPLEMENTO MEDICO", valor: 10 }),
+  ]);
+  const outras = [lanc({ categoria_nome: "MENSALIDADE CARTAO CONSULTA", valor: 50 })];
+  const r = resumoPainel({ rateio, despesas, outrasReceitas: outras });
+
+  it("receita bruta, repasse e atendimentos são os do Rateio", () => {
+    expect(r.receitaBruta).toBe(500);
+    expect(r.repasse).toBe(220);
+    expect(r.terceiro).toBe(30);
+    expect(r.producao.total).toBe(2);
+    expect(r.liquidoAtendimentos).toBe(250);
+    expect(r.ticketMedio).toBe(250);
+  });
+
+  it("repasse pago não entra de novo como despesa", () => {
+    expect(r.despesasOperacionais).toBe(100);
+    expect(r.complementoMedico).toBe(10);
+    expect(r.repassePagoNoPeriodo).toBe(900);
+    expect(r.despesasTotais).toBe(220 + 30 + 10 + 100);
+  });
+
+  it("saldo = receita bruta + outras receitas − despesas totais", () => {
+    expect(r.outrasReceitas).toBe(50);
+    expect(r.saldo).toBe(500 + 50 - 360);
+  });
+
+  it("composição por forma fecha com a receita bruta", () => {
+    const soma = r.formas.reduce((s, f) => s + f.valor, 0);
+    expect(soma).toBe(r.receitaBruta);
+  });
+});
+
+describe("agrupamentos do detalhamento", () => {
+  it("soma despesas por categoria, da maior para a menor", () => {
+    const g = somarPorCategoria([
+      lanc({ categoria_nome: "IPTU", valor: 10 }),
+      lanc({ categoria_nome: "SALARIOS", valor: 30 }),
+      lanc({ categoria_nome: "IPTU", valor: 25 }),
+    ]);
+    expect(g).toEqual([
+      { rotulo: "IPTU", qtd: 2, valor: 35 },
+      { rotulo: "SALARIOS", qtd: 1, valor: 30 },
+    ]);
+  });
+
+  it("soma repasse por médico e ignora quem não tem repasse", () => {
+    const g = repassePorMedico([
+      linha({ medico_id: "a", medico_nome: "A", repasse: 10 }),
+      linha({ medico_id: "b", medico_nome: "B", repasse: 40, terceiro: 5 }),
+      linha({ medico_id: "a", medico_nome: "A", repasse: 15 }),
+      linha({ medico_id: null, medico_nome: "Sem profissional", repasse: 0 }),
+    ]);
+    expect(g.map((x) => [x.medico, x.qtd, x.repasse, x.terceiro])).toEqual([
+      ["B", 1, 40, 5],
+      ["A", 2, 25, 0],
+    ]);
+  });
+});
