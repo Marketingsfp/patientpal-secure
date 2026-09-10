@@ -430,6 +430,11 @@ export async function processarMensagemTeste(data: EntradaMensagemTeste, userId:
     };
     /** Desfecho do turno; vira SUPERSEDED quando a execução é descartada. */
     let statusFinal: "PROCESSED" | "SUPERSEDED" = "PROCESSED";
+    /** FASE 5 — origem determinística do texto, quando não veio do modelo. */
+    let resultadoTurno: {
+      origem: import("@/lib/nina/resposta/contrato").OrigemResultado;
+      chave: string;
+    } | null = null;
 
     // Tudo o que vier depois do claim fica sob `finally`: sucesso, exceção,
     // resposta obsoleta ou erro do modelo sempre liberam lote e trava.
@@ -462,8 +467,12 @@ export async function processarMensagemTeste(data: EntradaMensagemTeste, userId:
           }
         }
       } else if (audioFalhou) {
+        const { CHAVE_TEMPLATE_AUDIO_FALHOU } = await import("@/lib/whatsapp-midia.server");
+        resultadoTurno = { origem: "midia", chave: CHAVE_TEMPLATE_AUDIO_FALHOU };
         reply = RESPOSTA_AUDIO_FALHOU;
       } else {
+        const { chaveTemplateMidia } = await import("@/lib/whatsapp-midia.server");
+        resultadoTurno = { origem: "midia", chave: chaveTemplateMidia(data.tipo) };
         reply = respostaMidiaNaoSuportada(data.tipo);
       }
     } catch (e) {
@@ -474,6 +483,7 @@ export async function processarMensagemTeste(data: EntradaMensagemTeste, userId:
       diag.error_code = "NINA_PIPELINE_ERROR";
       diag.error_message = String((e as Error)?.message ?? e).slice(0, 300);
       console.error("[NINA_MESSAGE_PROCESSING]", { ...diag, duration_ms: Date.now() - t0 });
+      resultadoTurno = { origem: "erro", chave: "erro.tecnico" };
       reply =
         "Não consegui consultar essa informação neste momento. Posso tentar novamente ou verificar outro horário para você.";
     }
@@ -483,6 +493,39 @@ export async function processarMensagemTeste(data: EntradaMensagemTeste, userId:
       diag.error_code = diag.error_code ?? "EMPTY_MODEL_RESPONSE";
       reply =
         "Não consegui concluir essa consulta agora. Pode me dizer novamente o médico e o horário desejado?";
+    }
+
+    // FASE 5 — a Homologação usa o MESMO serviço de finalização do WhatsApp:
+    // o texto avaliado aqui é o texto que aparece na conversa de teste.
+    if (reply.trim()) {
+      try {
+        const { finalizarResposta } = await import("@/lib/nina/resposta/finalizacao.server");
+        const { criarResultado } = await import("@/lib/nina/resposta/contrato");
+        const doGate = (
+          auditoriaNina as {
+            resultado?: import("@/lib/nina/resposta/contrato").ResultadoRespostaNina;
+          }
+        ).resultado;
+        const base =
+          doGate ??
+          criarResultado({
+            origem: resultadoTurno?.origem ?? "modelo",
+            texto: reply,
+            chaveTemplate: resultadoTurno?.chave ?? null,
+          });
+        const finalizada = await finalizarResposta({
+          clinicaId: data.clinicaId,
+          canal: "test-console",
+          chaveTurno: auditoriaNina.traceId ?? loteId ?? `${conversaId}|${mensagemId ?? ""}`,
+          conversaId,
+          resultado: { ...base, texto: reply },
+          // Homologação nunca resolve conversa de produção.
+          avaliarEncerramento: false,
+        });
+        reply = finalizada.texto;
+      } catch (e) {
+        console.error("[NINA_TESTE] finalização da resposta falhou", e);
+      }
     }
 
     // A conversa pode ter sido resolvida enquanto a Nina pensava: descarta.
