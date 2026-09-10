@@ -1,0 +1,2 @@
+ALTER TABLE public.nina_confianca_decisoes ADD COLUMN IF NOT EXISTS turn_type text;
+COMMENT ON COLUMN public.nina_confianca_decisoes.turn_type IS 'FASE 3 - natureza do turno avaliado (SAUDACAO, ESCLARECIMENTO, INFORMACAO, OPERACAO, HANDOFF).';

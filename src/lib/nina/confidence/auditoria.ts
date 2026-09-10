@@ -69,6 +69,8 @@ export type RegistroAuditoriaConfianca = {
   timestamp: string;
   intencao: string | null;
   acaoSolicitada: AcaoSolicitada | null;
+  /** FASE 3 — natureza do turno avaliado (saudação, esclarecimento, ...). */
+  tipoTurno: import("./turno-tipo").TipoTurno | null;
   score: number;
   /** FASE 3: quanto da evidência relevante foi de fato verificada (0–100). */
   evidenceCoverage: number;
@@ -229,6 +231,8 @@ export type EntradaAuditoria = {
   executionId?: string | null;
   intencao?: string | null;
   acaoSolicitada?: AcaoSolicitada | null;
+  /** FASE 3 — tipo do turno, para o painel dizer o que foi avaliado. */
+  turnType?: import("./turno-tipo").TipoTurno | null;
   timestamp?: string;
   ferramentas?: Array<{
     nome: string;
@@ -283,6 +287,7 @@ export function montarRegistroAuditoria(
     // FASE 1: `null` = turno sem ação (saudação). Só a AUSÊNCIA de informação
     // vira "desconhecida".
     acaoSolicitada: e.acaoSolicitada === undefined ? "desconhecida" : e.acaoSolicitada,
+    tipoTurno: e.turnType ?? null,
     score: r.score,
     // FASE 3: nota e cobertura viajam separadas — uma não disfarça a outra.
     evidenceCoverage: r.evidenceCoverage ?? 0,
@@ -330,6 +335,16 @@ export const ROTULO_NIVEL: Record<NivelConfianca, string> = {
   LOW: "Baixa",
 };
 
+/** FASE 3 — como o painel nomeia o tipo do turno avaliado. */
+export const ROTULO_TIPO_TURNO: Record<string, string> = {
+  SAUDACAO: "Saudação",
+  ESCLARECIMENTO: "Esclarecimento",
+  INFORMACAO: "Informação",
+  OPERACAO: "Operação",
+  HANDOFF: "Transferência",
+};
+
+
 export const ROTULO_RESULTADO: Record<ResultadoFinalAuditoria, string> = {
   resposta_liberada: "Resposta liberada pela Nina.",
   pergunta_de_esclarecimento: "Pergunta de esclarecimento ao paciente.",
@@ -346,11 +361,12 @@ export type LinhaConfiabilidade = {
   /** Código estruturado do motivo (só evidência observável). */
   reasonCode: string | null;
   /**
-   * FASE 2 — como a linha deve ser lida no painel:
-   * `ok` (atendido), `pendente` (ainda em coleta, NÃO é erro) e
-   * `falha` (inconsistência real). `NOT_APPLICABLE` nem vira linha.
+   * FASE 2/3 — como a linha deve ser lida no painel:
+   * `ok` (atendido), `pendente` (ainda em coleta, NÃO é erro),
+   * `nao_aplicavel` (não pertence a este turno) e `falha` (inconsistência
+   * real). Só `falha` é erro; as demais são neutras.
    */
-  estado?: "ok" | "pendente" | "falha";
+  estado?: "ok" | "pendente" | "nao_aplicavel" | "falha";
 };
 
 /** Linhas ✓/✕ mostradas na seção "Confiabilidade" da auditoria. */
@@ -358,7 +374,6 @@ export function linhasConfiabilidade(
   registro: Pick<RegistroAuditoriaConfianca, "validadores" | "ferramentas" | "fontes">,
 ): LinhaConfiabilidade[] {
   const linhas: LinhaConfiabilidade[] = registro.validadores
-    .filter((v) => v.status !== "NOT_APPLICABLE")
     .map((v) => {
       const detalhes = Object.entries(v.evidence)
         .map(([k, val]) => `${k}: ${val}`)
@@ -366,7 +381,9 @@ export function linhasConfiabilidade(
       const detalhe =
         v.status === "PASS"
           ? (detalhes[0] ?? null)
-          : [v.reasonCode, ...detalhes].filter(Boolean).join(" — ");
+          : v.status === "NOT_APPLICABLE"
+            ? null
+            : [v.reasonCode, ...detalhes].filter(Boolean).join(" — ");
       return {
         // PENDING é etapa de coleta: não é acerto, mas também não é erro.
         ok: v.status === "PASS",
@@ -375,9 +392,16 @@ export function linhasConfiabilidade(
         grupo: "validador" as const,
         reasonCode: v.reasonCode ? String(v.reasonCode) : null,
         estado:
-          v.status === "PASS" ? ("ok" as const) : v.status === "PENDING" ? ("pendente" as const) : ("falha" as const),
+          v.status === "PASS"
+            ? ("ok" as const)
+            : v.status === "PENDING"
+              ? ("pendente" as const)
+              : v.status === "NOT_APPLICABLE"
+                ? ("nao_aplicavel" as const)
+                : ("falha" as const),
       };
     });
+
 
   // FASE 6 — conflito auditável: campo, origem A/valor A, origem B/valor B.
   for (const v of registro.validadores) {

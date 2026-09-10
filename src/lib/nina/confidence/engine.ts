@@ -9,7 +9,7 @@
  * (`../confidence-engine`) em vez de criar uma segunda gramática paralela.
  */
 import { detectarCategorias, type CategoriaConfianca } from "../confidence-engine";
-import { avaliarGrounding } from "./claims";
+import { avaliarGrounding, extrairClaimsDoTexto } from "./claims";
 import { hashDoTexto } from "./hash";
 import {
   executarValidadoresDeConfianca,
@@ -88,9 +88,46 @@ function camposFaltantes(ctx: ContextoConfianca): string[] {
 }
 
 /**
+ * Categorias que só exigem fonte oficial quando o texto AFIRMA algo daquele
+ * tipo. Citar o assunto ("vou verificar o horário") não é afirmar um fato.
+ */
+const CATEGORIA_POR_CLAIM: Partial<Record<string, CategoriaConfianca[]>> = {
+  valor: ["valor"],
+  profissional: ["profissional"],
+  disponibilidade: ["disponibilidade", "horario"],
+  preparo: ["preparo"],
+  regra: ["regra"],
+  agendamento: ["agendamento"],
+};
+
+const CATEGORIAS_QUE_EXIGEM_AFIRMACAO = new Set<CategoriaConfianca>([
+  "valor",
+  "profissional",
+  "disponibilidade",
+  "horario",
+  "preparo",
+  "regra",
+  "agendamento",
+]);
+
+function filtrarCategoriasAfirmadas(
+  detectadas: CategoriaConfianca[],
+  texto: string,
+): CategoriaConfianca[] {
+  const afirmadas = new Set<CategoriaConfianca>();
+  for (const c of extrairClaimsDoTexto(texto)) {
+    for (const cat of CATEGORIA_POR_CLAIM[c.tipo] ?? []) afirmadas.add(cat);
+  }
+  return detectadas.filter(
+    (c) => !CATEGORIAS_QUE_EXIGEM_AFIRMACAO.has(c) || afirmadas.has(c),
+  );
+}
+
+/**
  * Categorias sensíveis: vindas do texto (quando houver) somadas à ação
  * pretendida, para que o motor funcione mesmo sem rascunho de resposta.
  */
+
 function categoriasDoContexto(ctx: ContextoConfianca): CategoriaConfianca[] {
   const doTexto = detectarCategorias(ctx.draftText ?? "");
   const porAcao: Partial<Record<string, CategoriaConfianca>> = {
@@ -106,7 +143,14 @@ function categoriasDoContexto(ctx: ContextoConfianca): CategoriaConfianca[] {
   // FASE 2 — avaliando a MENSAGEM, as categorias vêm do que o texto afirma.
   // Uma ação pendente não transforma "preciso confirmar seus dados" numa
   // afirmação de agenda que precise de fonte oficial.
-  if (ctx.tipoAvaliacao === "answer_confidence") return doTexto;
+  // FASE 3 — e citar o assunto não é afirmar um fato sobre ele. "Esse horário
+  // ainda precisa ser confirmado. Vou verificar." fala de horário sem afirmar
+  // horário nenhum: só exige fonte oficial a categoria realmente AFIRMADA no
+  // texto, medida pela mesma gramática de claims usada no grounding.
+  if (ctx.tipoAvaliacao === "answer_confidence") {
+    return filtrarCategoriasAfirmadas(doTexto, ctx.draftText ?? "");
+  }
+
   const extra = porAcao[acaoOuNenhuma(ctx.requestedAction)];
   if (extra && !doTexto.includes(extra)) return [...doTexto, extra];
   return doTexto;

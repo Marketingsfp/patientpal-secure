@@ -131,7 +131,7 @@ function Grupo({
     ok: boolean;
     rotulo: string;
     detalhe: string | null;
-    estado?: "ok" | "pendente" | "falha";
+    estado?: "ok" | "pendente" | "nao_aplicavel" | "falha";
   }[];
 }) {
   if (linhas.length === 0) return null;
@@ -139,16 +139,24 @@ function Grupo({
     <Secao titulo={titulo}>
       <ul className="space-y-0.5">
         {linhas.map((l, i) => {
-          // FASE 2 — "em coleta" é etapa normal do atendimento, não erro.
+          // FASE 2/3 — "em coleta" e "não aplicável" são estados normais do
+          // atendimento. Só inconsistência real aparece como erro.
           const estado = l.estado ?? (l.ok ? "ok" : "falha");
-          const simbolo = estado === "ok" ? "✓" : estado === "pendente" ? "…" : "✕";
-          const cor = estado === "falha" ? "text-destructive" : estado === "pendente" ? "text-muted-foreground" : "";
+          const simbolo =
+            estado === "ok" ? "✓" : estado === "falha" ? "✕" : estado === "pendente" ? "…" : "—";
+          const cor = estado === "falha" ? "text-destructive" : estado === "ok" ? "" : "text-muted-foreground";
+          const sufixo =
+            estado === "pendente"
+              ? " (em coleta)"
+              : estado === "nao_aplicavel"
+                ? ": não aplicável"
+                : "";
           return (
             <li key={`${l.rotulo}-${i}`} className="flex items-start gap-1">
               <span aria-hidden>{simbolo}</span>
               <span className={cor}>
                 {l.rotulo}
-                {estado === "pendente" ? " (em coleta)" : ""}
+                {sufixo}
                 {l.detalhe ? ` — ${l.detalhe}` : ""}
               </span>
             </li>
@@ -158,6 +166,7 @@ function Grupo({
     </Secao>
   );
 }
+
 
 export function ConfiancaMensagemBadge({
   clinicaId,

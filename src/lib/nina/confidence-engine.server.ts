@@ -103,6 +103,9 @@ export async function registrarDecisaoConfianca(params: {
             message_id: a.messageId,
             intencao: a.intencao,
             acao_solicitada: a.acaoSolicitada,
+            // FASE 3 — o tipo do turno explica QUAIS critérios se aplicavam.
+            turn_type: a.tipoTurno ?? null,
+
             nivel: a.nivel,
             decisao: a.decisao,
             validadores: a.validadores,
