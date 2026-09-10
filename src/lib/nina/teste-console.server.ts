@@ -610,9 +610,6 @@ export async function processarMensagemTeste(data: EntradaMensagemTeste, userId:
     if (diag.processing_status !== "failed") diag.processing_status = "completed";
     console.info("[NINA_MESSAGE_PROCESSING]", diag);
 
-    const loteDoTurno = loteId;
-    await encerrarTurno("PROCESSED");
-
     return {
       duplicada: false,
       reply,
@@ -625,9 +622,13 @@ export async function processarMensagemTeste(data: EntradaMensagemTeste, userId:
         | "OBSOLETA"
         | "ERRO",
       absorvidaPeloLote: false,
-      batchId: loteDoTurno || null,
+      batchId: loteId || null,
       revisao: revisaoTurno || null,
     };
+    } finally {
+      // Garantia única: nenhum lote/lock fica preso, em qualquer desfecho.
+      await encerrarTurno(statusFinal);
+    }
 }
 
 export { LIMITE_MENSAGENS_LEAD, CANAL_TESTE, TOTAL_LEADS, telefoneSessao, garantirLeads, carregarLead, garantirCiclo, conversasDoLead, podarMensagensLead };
