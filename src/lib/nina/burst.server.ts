@@ -51,7 +51,7 @@ export async function aguardarTurnoNina(input: {
     const { data, error } = await supabaseAdmin.rpc("nina_batch_registrar", {
       _clinica_id: input.clinicaId,
       _telefone: input.telefone,
-      _conversa_id: input.conversaId ?? null,
+      _conversa_id: (input.conversaId ?? undefined) as string,
       _mensagem_id: input.mensagemId,
     });
     if (error) throw error;
@@ -121,7 +121,7 @@ export async function concluirTurnoNina(
   try {
     await supabaseAdmin.rpc("nina_batch_concluir", {
       _batch_id: batchId,
-      _execucao_id: execucaoId ?? null,
+      _execucao_id: (execucaoId ?? undefined) as string,
       _status: "PROCESSED",
     });
   } catch (e) {
