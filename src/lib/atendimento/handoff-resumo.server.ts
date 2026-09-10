@@ -311,6 +311,26 @@ export async function garantirResumoHandoff(args: {
   if (!linha) return null;
   if (linha.status === "ok" && !args.forcar) return linha;
 
+  // FASE 4 — trava de geração na ORIGEM (compare-and-swap por `updated_at`):
+  // duas chamadas concorrentes (card + timeline, realtime, retry, dois
+  // atendentes na mesma conversa) chegavam aqui juntas, geravam o resumo duas
+  // vezes e gravavam dois eventos. Só quem vence o CAS gera; o perdedor
+  // devolve o resumo vigente sem chamar a IA e sem registrar evento.
+  {
+    const { data: reivindicada } = await supabaseAdmin
+      .from(TABELA as never)
+      .update({ status: "gerando", erro: null, updated_at: new Date().toISOString() } as never)
+      .eq("id", linha.id)
+      .eq("updated_at", linha.updated_at)
+      .select("*")
+      .maybeSingle();
+    if (!reivindicada) {
+      const atual = await ultimaLinha(clinicaId, conversaId);
+      return atual ?? linha;
+    }
+    linha = reivindicada as LinhaResumo;
+  }
+
   const desfecho = (linha.desfecho ?? "handoff_humano") as DesfechoConversa;
   try {
     const [texto, agendado] = await Promise.all([
@@ -345,12 +365,23 @@ export async function garantirResumoHandoff(args: {
       .maybeSingle();
     linha = (data as LinhaResumo | null) ?? { ...linha, status: "ok", payload };
 
-    await registrarEvento({
-      clinicaId,
-      conversaId,
-      evento: "RESUMO_IA_GERADO" as never,
-      detalhes: { versao: linha.versao },
-    });
+    // Idempotência do evento: a mesma versão do resumo nunca gera dois avisos.
+    const { data: eventoExistente } = await supabaseAdmin
+      .from("atend_conversa_eventos")
+      .select("id")
+      .eq("conversa_id", conversaId)
+      .eq("evento", "RESUMO_IA_GERADO")
+      .eq("detalhes->>versao", String(linha.versao))
+      .limit(1)
+      .maybeSingle();
+    if (!eventoExistente) {
+      await registrarEvento({
+        clinicaId,
+        conversaId,
+        evento: "RESUMO_IA_GERADO" as never,
+        detalhes: { versao: linha.versao },
+      });
+    }
     return linha;
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Falha desconhecida";
