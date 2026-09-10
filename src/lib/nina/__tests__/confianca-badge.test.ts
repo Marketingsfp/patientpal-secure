@@ -74,7 +74,7 @@ describe("FASE 10 — selo de confiança por mensagem", () => {
     for (const vazio of [null, undefined]) {
       const r = rotuloConfianca(vazio);
       expect(r.avaliada).toBe(false);
-      expect(r.texto).toBe("Não avaliada");
+      expect(r.texto).toBe("Resposta não avaliada");
       expect(r.score).toBeNull();
       expect(r.nivel).toBeNull();
       expect(r.policyVersion).toBeNull();

@@ -91,7 +91,7 @@ describe("FASE 6 — score exibido", () => {
   it("mensagem sem snapshot é Não avaliada, nunca 100%", () => {
     const r = rotuloConfianca(null);
     expect(r.avaliada).toBe(false);
-    expect(r.texto).toBe("Não avaliada");
+    expect(r.texto).toBe("Resposta não avaliada");
     expect(r.score).toBeNull();
   });
 });
