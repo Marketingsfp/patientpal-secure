@@ -213,7 +213,6 @@ import {
 } from "@/lib/atendimento/envio-otimista";
 import { criarFilaEnvio } from "@/lib/atendimento/fila-envio";
 import { ResumoHandoffCard } from "@/components/nina/ResumoHandoffCard";
-import { ResumoNinaTimelineCard } from "@/components/nina/ResumoNinaTimelineCard";
 import { ReportarErroNinaBotao } from "@/components/nina/ReportarErroNinaDialog";
 import { BadgeEspera, RelogioEsperaProvider } from "@/components/nina/BadgeEspera";
 import { formatarDataHoraMensagem } from "@/lib/atendimento/data-hora";
@@ -2281,18 +2280,6 @@ export function AtendInbox() {
       .sort((a, b) => a.at - b.at);
   }, [msgs, eventos]);
 
-  // FASE 4 — o aviso "Resumo interno da Nina gerado" some da timeline: no lugar
-  // dele o CONTEÚDO do resumo vigente aparece uma única vez, na posição do
-  // último aviso (a transição para o atendimento humano).
-  const chaveResumoNaTimeline = useMemo(() => {
-    let chave: string | null = null;
-    for (const item of timeline) {
-      if (item.kind !== "grupo") continue;
-      const g = item.item;
-      if (g.tipo === "EVENTO" && g.evento.evento === "RESUMO_IA_GERADO") chave = g.chave;
-    }
-    return chave;
-  }, [timeline]);
 
   // FASE 1 — mensagem recebida já desenhada na conversa: fecha o trace RECV.
   useEffect(() => {
@@ -3491,17 +3478,9 @@ export function AtendInbox() {
                     if (g.tipo === "ATRIBUICAO") {
                       return <AtribuicaoGroupCard key={`g-${g.chave}`} grupo={g} />;
                     }
-                    if (g.evento.evento === "RESUMO_IA_GERADO") {
-                      if (!clinicaId || g.chave !== chaveResumoNaTimeline) return null;
-                      return (
-                        <ResumoNinaTimelineCard
-                          key={`resumo-${g.chave}`}
-                          clinicaId={clinicaId}
-                          conversaId={sel.id}
-                          criadoEm={g.criadoEm}
-                        />
-                      );
-                    }
+                    // O resumo da Nina fica apenas no painel superior da
+                    // conversa: o aviso de geração não vira bloco na timeline.
+                    if (g.evento.evento === "RESUMO_IA_GERADO") return null;
                     return (
                       <ConversationSystemEvent
                         key={`ev-${g.chave}`}
