@@ -469,12 +469,38 @@ export async function processarMensagemTeste(data: EntradaMensagemTeste, userId:
     // Resposta atrasada: se o ciclo foi encerrado (ou já é outro) enquanto a
     // Nina pensava, a resposta é descartada e nunca entra na conversa nova.
     if (atual.conversa_id !== conversaId || atual.ciclo_id !== cicloId) {
+      await encerrarTurno("SUPERSEDED");
       return {
         duplicada: false,
         reply: null,
         erro: "Conversa resolvida durante o processamento.",
         audio: null,
+        processamento: "OBSOLETA" as const,
       };
+    }
+
+    // FASE 4 — chegou mensagem nova durante a geração? Então esta resposta é
+    // velha: não é gravada. O próximo lote reprocessa com o contexto completo.
+    if (revisaoTurno) {
+      const { respostaObsoleta } = await import("@/lib/nina/revisao-conversa.server");
+      if (
+        await respostaObsoleta({
+          clinicaId: data.clinicaId,
+          telefone: lead.telefone_sessao,
+          revisaoProcessada: revisaoTurno,
+        })
+      ) {
+        await encerrarTurno("SUPERSEDED");
+        return {
+          duplicada: false,
+          reply: null,
+          erro: null,
+          audio: null,
+          transferida: false,
+          processamento: "OBSOLETA" as const,
+          absorvidaPeloLote: true,
+        };
+      }
     }
 
     // Revalida o dono ANTES de "enviar": a própria Nina pode ter transferido
