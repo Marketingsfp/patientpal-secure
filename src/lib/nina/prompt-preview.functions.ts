@@ -16,6 +16,7 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
 import { capacidadesDoPapel } from "./arquitetura/permissoes";
 import { ENVELOPE_TECNICO, comporRequestNina } from "./prompt-composer";
+import { renderizarTemplateInstrucoes } from "./instrucoes-template";
 
 export type ParteRequest = {
   /** Rótulo de origem, exibido no conteúdo final. */
@@ -27,6 +28,10 @@ export type ParteRequest = {
 export type PreviewRequestNina = {
   versao: number | null;
   publicadoEm: string | null;
+  /** FASE 2 — de onde veio o texto exibido: versão publicada ou código. */
+  origemTemplate: "publicada" | "codigo";
+  /** Marcador que ficaria sem substituição, quando houver. */
+  marcadorPendente: string | null;
   /** Template publicado, ainda com os placeholders de dados. */
   template: string;
   /** Behavior prompt já renderizado (placeholders substituídos). */
@@ -38,14 +43,6 @@ export type PreviewRequestNina = {
   /** Conteúdo efetivamente enviado ao modelo (system prompt final). */
   conteudoFinal: string;
 };
-
-function renderizar(template: string, valores: Record<string, string>): string {
-  let texto = template;
-  for (const [marcador, valor] of Object.entries(valores)) {
-    texto = texto.split(marcador).join(valor);
-  }
-  return texto;
-}
 
 export const previewRequestNina = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -85,11 +82,18 @@ export const previewRequestNina = createServerFn({ method: "POST" })
         ?.trim() || nomeUnidade;
 
     const { PROMPT_NINA_WHATSAPP_V4 } = await import("./prompt/behavior-v4");
-    const template = (versao?.conteudo as string | undefined) ?? PROMPT_NINA_WHATSAPP_V4;
-    const behaviorPrompt = renderizar(template, {
+    // FASE 2 — a prévia usa a MESMA renderização do runtime e da publicação.
+    // Sem versão publicada, o texto exibido é o do código e isso é dito na
+    // resposta (origem "codigo"), nunca apresentado como versão publicada.
+    const publicado = versao?.conteudo as string | undefined;
+    const template = publicado ?? PROMPT_NINA_WHATSAPP_V4;
+    const origemTemplate: "publicada" | "codigo" = publicado ? "publicada" : "codigo";
+    const render = renderizarTemplateInstrucoes(template, {
       "${nomeUnidade}": nomeUnidade,
       "${nomeCurtoUnidade}": nomeCurtoUnidade,
     });
+    const marcadorPendente = render.ok ? null : render.restante;
+    const behaviorPrompt = render.ok ? render.texto : template;
 
     // Catálogo publicado — só a contagem (fato), nunca conteúdo sensível.
     const catalogo = await (async () => {
@@ -181,6 +185,8 @@ export const previewRequestNina = createServerFn({ method: "POST" })
     return {
       versao: (versao?.versao as number | undefined) ?? null,
       publicadoEm: (versao?.publicado_em as string | undefined) ?? null,
+      origemTemplate,
+      marcadorPendente,
       template,
       behaviorPrompt: req.behaviorPrompt,
       runtimeContextJson: JSON.stringify(runtimeContext, null, 2),

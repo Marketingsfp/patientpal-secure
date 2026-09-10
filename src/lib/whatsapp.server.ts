@@ -972,6 +972,9 @@ async function gerarRespostaNinaInterno(
       .join(nomeUnidade)
       .split("${nomeCurtoUnidade}")
       .join(nomeCurtoUnidade),
+    // FASE 2 — versão FIXA por turno: todas as rodadas usam este snapshot,
+    // mesmo que alguém publique no meio da resposta.
+    rastro?.ids.trace_id ?? null,
   );
   const behaviorPrompt = instrucoesNina.texto;
 
@@ -1009,13 +1012,10 @@ async function gerarRespostaNinaInterno(
       versao: instrucoesNina.versao,
       publicadoEm: instrucoesNina.publicadoEm,
       origem: instrucoesNina.origem,
-      fallbackPorErro: instrucoesNina.origem === "codigo",
-      motivo:
-        instrucoesNina.origem === "codigo"
-          ? "sem versão publicada utilizável — texto do código"
-          : instrucoesNina.origem === "cache"
-            ? "versão publicada servida do cache da instância"
-            : null,
+      // FASE 2 — o próprio runtime informa se houve falha e por quê; não é
+      // mais deduzido aqui.
+      fallbackPorErro: instrucoesNina.fallbackPorErro,
+      motivo: instrucoesNina.motivo,
       hash: hashPrompt(behaviorPrompt),
       carregadoEm: new Date().toISOString(),
     });
