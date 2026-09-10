@@ -104,6 +104,8 @@ import {
   ROTULO_NIVEL,
   ROTULO_RESULTADO,
   ROTULO_TIPO_TURNO,
+  ROTULO_DECISAO_TURNO,
+  ROTULO_MOTIVO_TURNO,
   linhasConfiabilidade,
   type LinhaConfiabilidade,
   type ResultadoFinalAuditoria,
@@ -140,6 +142,10 @@ export type ConfiabilidadeDecisaoView = {
    * enquanto a mensagem "preciso confirmar seus dados" é ótima.
    */
   seguranca: SegurancaAcaoView | null;
+  /** FASE 5 — decisão do turno (continuar, perguntar, suspender, transferir). */
+  decisaoTurno: string | null;
+  /** FASE 5 — motivo legível da decisão, para o painel explicar o porquê. */
+  motivoDecisao: string | null;
 };
 
 export type SegurancaAcaoView = {
@@ -233,7 +239,9 @@ export const confiabilidadeDaExecucao = createServerFn({ method: "POST" })
     // FASE 2 — registro próprio da SEGURANÇA DA AÇÃO (nunca o da resposta).
     const { data: segRow } = await context.supabase
       .from("nina_confianca_decisoes")
-      .select("acao_solicitada, resultado_final, bloqueadores, bloqueio")
+      .select(
+        "acao_solicitada, resultado_final, bloqueadores, bloqueio, handoff_decision, handoff_reason",
+      )
       .eq("clinica_id", data.clinicaId)
       .eq("execucao_id", data.execucaoId)
       .eq("avaliacao", "action_safety")
@@ -311,6 +319,15 @@ export const confiabilidadeDaExecucao = createServerFn({ method: "POST" })
         ? String((r as unknown as Record<string, unknown>)["engine_version"])
         : null,
       seguranca,
+      // FASE 5 — decisão e motivo ficam ao lado da nota, nunca no lugar dela.
+      decisaoTurno: (() => {
+        const d = (segRow as Record<string, unknown> | null)?.["handoff_decision"];
+        return d ? (ROTULO_DECISAO_TURNO[String(d)] ?? String(d)) : null;
+      })(),
+      motivoDecisao: (() => {
+        const m = (segRow as Record<string, unknown> | null)?.["handoff_reason"];
+        return m ? (ROTULO_MOTIVO_TURNO[String(m)] ?? String(m)) : null;
+      })(),
     };
   });
 

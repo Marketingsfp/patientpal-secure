@@ -8440,6 +8440,9 @@ export type Database = {
           execucao_id: string | null
           ferramentas: Json
           fontes: Json
+          handoff_decision: string | null
+          handoff_ocorreu: boolean | null
+          handoff_reason: string | null
           id: string
           intencao: string | null
           message_id: string | null
@@ -8478,6 +8481,9 @@ export type Database = {
           execucao_id?: string | null
           ferramentas?: Json
           fontes?: Json
+          handoff_decision?: string | null
+          handoff_ocorreu?: boolean | null
+          handoff_reason?: string | null
           id?: string
           intencao?: string | null
           message_id?: string | null
@@ -8516,6 +8522,9 @@ export type Database = {
           execucao_id?: string | null
           ferramentas?: Json
           fontes?: Json
+          handoff_decision?: string | null
+          handoff_ocorreu?: boolean | null
+          handoff_reason?: string | null
           id?: string
           intencao?: string | null
           message_id?: string | null

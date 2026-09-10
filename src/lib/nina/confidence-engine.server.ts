@@ -75,6 +75,13 @@ export async function registrarDecisaoConfianca(params: {
   ninaSessionId?: string | null;
   /** FASE 6 — versão do motor de confiança. */
   engineVersion?: string;
+  /**
+   * FASE 5 — telemetria da política de handoff (sem dado sensível):
+   * o que foi decidido, por quê, e se o turno virou transferência.
+   */
+  handoffDecision?: string | null;
+  handoffReason?: string | null;
+  handoffOcorreu?: boolean | null;
 }): Promise<void> {
   try {
     const a = params.auditoria ?? null;
@@ -97,6 +104,9 @@ export async function registrarDecisaoConfianca(params: {
       nina_session_id: params.ninaSessionId ?? a?.ninaSessionId ?? null,
       avaliacao: params.avaliacao ?? "action_safety",
       texto_final_hash: params.textoFinalHash ?? null,
+      handoff_decision: params.handoffDecision ?? null,
+      handoff_reason: params.handoffReason ?? null,
+      handoff_ocorreu: params.handoffOcorreu ?? null,
       claims: params.claims ?? null,
       ...(a
         ? {

@@ -227,12 +227,17 @@ export function ConfiancaMensagemBadge({
         </button>
       </PopoverTrigger>
       <PopoverContent align="end" className="max-h-96 w-80 space-y-2 overflow-y-auto text-xs">
-        <div>
+        {/* FASE 5 — cada coisa no seu lugar: tipo do turno, nota da resposta,
+            ação, segurança da ação, decisão e motivo. "Não aplicável" é
+            estado normal e nunca aparece em vermelho. */}
+        <Secao titulo="Tipo do turno">
+          <p>{detalhe?.tipoTurno ?? "—"}</p>
+        </Secao>
+        <Secao titulo="Confiança da resposta">
           <p className="text-sm font-medium">
             <Icone className="mr-1 inline h-3.5 w-3.5" aria-hidden />
-            Confiança da resposta: {scoreExibido(confianca.score)}%
+            {scoreExibido(confianca.score)}% · {estilo.curto}
           </p>
-          <p className="text-muted-foreground">Nível: {estilo.rotulo}</p>
           {detalhe?.coberturaEvidencias != null && (
             <p className="text-muted-foreground">
               Cobertura de evidências: {detalhe.coberturaEvidencias}%
@@ -241,21 +246,26 @@ export function ConfiancaMensagemBadge({
           <p className="text-muted-foreground">
             Registrado quando a resposta foi produzida. Não é recalculado.
           </p>
-        </div>
-        {/* FASE 2 — segurança da AÇÃO é outra coisa: o indicador da bolha é a
-            confiança da RESPOSTA. Uma ação bloqueada não reprova o texto. */}
-        <div className="rounded border bg-muted/40 p-2">
-          <p className="font-medium">
-            Segurança da ação:{" "}
+        </Secao>
+        <Secao titulo="Ação">
+          <p className={detalhe?.seguranca?.acao ? "" : "text-muted-foreground"}>
+            {detalhe?.seguranca?.acao ?? "Nenhuma"}
+          </p>
+        </Secao>
+        {/* Segurança da AÇÃO é outra coisa: o indicador da bolha é a confiança
+            da RESPOSTA. Uma ação bloqueada não reprova o texto. */}
+        <Secao titulo="Segurança da ação">
+          <p
+            className={
+              detalhe?.seguranca?.status === "BLOCKED" ? "text-destructive" : "text-muted-foreground"
+            }
+          >
             {detalhe?.seguranca?.status === "BLOCKED"
               ? "Bloqueada"
               : detalhe?.seguranca?.status === "ALLOWED"
                 ? "Liberada"
                 : "Não aplicável"}
           </p>
-          {detalhe?.seguranca?.acao && detalhe.seguranca.status !== "NOT_APPLICABLE" && (
-            <p className="text-muted-foreground">Ação: {detalhe.seguranca.acao}</p>
-          )}
           {detalhe?.seguranca?.status === "BLOCKED" &&
             detalhe.seguranca.bloqueadores.length > 0 && (
               <ul className="list-disc pl-4 text-muted-foreground">
@@ -264,12 +274,16 @@ export function ConfiancaMensagemBadge({
                 ))}
               </ul>
             )}
-          {!detalhe?.seguranca && (
-            <p className="text-muted-foreground">
-              Nenhuma ação executável foi avaliada neste turno.
-            </p>
-          )}
-        </div>
+        </Secao>
+        <Secao titulo="Decisão">
+          <p>{detalhe?.decisaoTurno ?? detalhe?.resultado ?? "—"}</p>
+        </Secao>
+        {detalhe?.motivoDecisao && (
+          <Secao titulo="Motivo">
+            <p className="text-muted-foreground">{detalhe.motivoDecisao}</p>
+          </Secao>
+        )}
+
         {confianca.bloqueadores.length > 0 && (
           <div className="rounded border border-destructive/40 bg-destructive/10 p-2 text-destructive">
             <p className="font-medium">Bloqueio objetivo</p>
@@ -307,12 +321,8 @@ export function ConfiancaMensagemBadge({
         </Secao>
         {detalhe ? (
           <>
-            <Secao titulo="Decisão">
-              <p>{detalhe.resultado}</p>
-              {/* FASE 3 — o tipo do turno diz QUAIS critérios se aplicavam. */}
-              {detalhe.tipoTurno && (
-                <p className="text-muted-foreground">Tipo do turno: {detalhe.tipoTurno}</p>
-              )}
+            <Secao titulo="Resultado registrado">
+              <p className="text-muted-foreground">{detalhe.resultado}</p>
               {detalhe.acaoSolicitada && (
                 <p className="text-muted-foreground">Ação avaliada: {detalhe.acaoSolicitada}</p>
               )}
@@ -320,6 +330,7 @@ export function ConfiancaMensagemBadge({
                 <p className="text-muted-foreground">Intenção: {detalhe.intencao}</p>
               )}
             </Secao>
+
             <Grupo titulo="Validações" linhas={detalhe.linhas.filter((l) => l.grupo === "validador")} />
             {detalhe.validadores.length > 0 && (
               <Secao titulo="Dimensões">
