@@ -122,7 +122,7 @@ describe("FASE 2 — status da consulta", () => {
 describe("FASE 2 — correspondência entre afirmação e fato", () => {
   it("fato de outro procedimento não sustenta a afirmação", () => {
     const r = corresponder(fatosDoCatalogo(), {
-      entidade: "procedimento",
+      entidades: ["procedimento"],
       campo: "preco",
       valor: "R$ 150,00",
       monetario: true,
@@ -133,7 +133,7 @@ describe("FASE 2 — correspondência entre afirmação e fato", () => {
 
   it("mesmo procedimento com valor divergente é divergência, não ausência", () => {
     const r = corresponder(fatosDoCatalogo(), {
-      entidade: "procedimento",
+      entidades: ["procedimento"],
       campo: "preco",
       valor: "R$ 999,00",
       monetario: true,
