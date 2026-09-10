@@ -299,14 +299,14 @@ export function OfficialSourceValidator(
     return res(nome, "PASS", 100, "NEGATIVA_APOIADA_EM_CONSULTA_OFICIAL", { categorias: oficiais });
   }
   if (atendido) {
-      return res(nome, "PASS", 100, "FONTE_OFICIAL_PRESENTE", {
+    return res(nome, "PASS", 100, "FONTE_OFICIAL_PRESENTE", {
       categorias: oficiais,
       catalogoOk,
       agendaOk,
       reservaPersistida,
     });
   }
-  }
+
   const blocker: Bloqueador = oficiais.includes("valor")
     ? "VALOR_SEM_CATALOGO"
     : precisaAgenda
