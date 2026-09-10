@@ -51,7 +51,7 @@ describe("caso 1 — 'quero agendar' é intenção, não ação", () => {
 
   it("não vira criar_agendamento", () => {
     expect(c.requestedAction).not.toBe("criar_agendamento");
-    expect(c.requestedAction).toBe("nenhuma");
+    expect(c.requestedAction).toBeNull();
     expect(intencaoCriticaSemExecucao(c)).toBe(true);
   });
 
@@ -74,7 +74,7 @@ describe("caso 1 — 'quero agendar' é intenção, não ação", () => {
       "WAITING_SLOT_SELECTION",
       "WAITING_FINAL_CONFIRMATION",
     ] as const) {
-      expect(ctx("quero agendar", { stage }).requestedAction).toBe("nenhuma");
+      expect(ctx("quero agendar", { stage }).requestedAction).toBeNull();
     }
   });
 });
@@ -84,7 +84,7 @@ describe("caso 2 — remarcação", () => {
     const c = ctx("quero remarcar minha consulta");
     expect(c.intencoes).toContain("remarcacao");
     expect(c.requestedAction).not.toBe("criar_agendamento");
-    expect(c.requestedAction).toBe("nenhuma");
+    expect(c.requestedAction).toBeNull();
   });
 });
 
@@ -93,7 +93,7 @@ describe("caso 3 — cancelamento", () => {
     const c = ctx("quero cancelar");
     expect(c.intencoes).toContain("cancelamento");
     expect(c.requestedAction).not.toBe("cancelar_agendamento");
-    expect(c.requestedAction).toBe("nenhuma");
+    expect(c.requestedAction).toBeNull();
   });
 
   it("só vira cancelar_agendamento quando o cancelamento está em execução", () => {

@@ -269,7 +269,7 @@ export function ClaimGroundingValidator(ctx: ContextoConfianca): ResultadoValida
   if (!temTexto && estruturados.length === 0) {
     // Sem texto final não dá para verificar afirmação nenhuma. Se a ação
     // dependeria de dado oficial, isso é UNKNOWN (derruba cobertura), não PASS.
-    return ACOES_COM_DADO_OFICIAL.has(ctx.requestedAction)
+    return ctx.requestedAction !== null && ACOES_COM_DADO_OFICIAL.has(ctx.requestedAction)
       ? res("UNKNOWN", 0, "SEM_TEXTO_PARA_VERIFICAR", { avaliadas: 0 })
       : res("NOT_APPLICABLE", 100, "NADA_A_VERIFICAR", {});
   }

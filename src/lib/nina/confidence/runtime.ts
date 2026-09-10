@@ -9,6 +9,7 @@
  * Mesma regra para atendimento real e homologação: muda só o campo `ambiente`.
  */
 import type { DecisaoConfianca } from "../confidence-engine";
+import type { TipoTurno } from "./turno-tipo";
 import { decidirConfianca } from "./engine";
 import { assegurarAvaliacaoDoTextoFinal, verificarRespostaFinal } from "./final-answer";
 import type { HardBlocker } from "./policy";
@@ -32,8 +33,13 @@ export type FerramentaDoTurno = {
 export type EstadoDoTurno = {
   /** Rascunho da resposta do modelo, quando já existe. */
   texto?: string | null;
-  /** O que a Nina pretende fazer. Ausente = `desconhecida` (nunca otimista). */
-  acao?: AcaoSolicitada;
+  /**
+   * O que a Nina pretende fazer. Ausente (`undefined`) = `desconhecida`
+   * (nunca otimista). `null` = turno legitimamente sem ação executável.
+   */
+  acao?: AcaoSolicitada | null;
+  /** FASE 1 — natureza do turno; comanda a matriz de exigências. */
+  tipoTurno?: TipoTurno | null;
   /** Mensagem do paciente neste turno (entra no resumo do handoff). */
   mensagemPaciente?: string | null;
   /** Intenção detectada pelo runtime, quando houver. */
@@ -88,7 +94,8 @@ export function montarContextoDoTurno(e: EstadoDoTurno): ContextoConfianca {
     intent: e.intent ?? null,
     // FASE 2: ausência de ação NÃO vira "responder_informacao". Se o runtime
     // não sabe o que a Nina vai fazer, o motor precisa enxergar isso.
-    requestedAction: e.acao ?? "desconhecida",
+    requestedAction: e.acao === undefined ? "desconhecida" : e.acao,
+    ...(e.tipoTurno !== undefined ? { turnType: e.tipoTurno } : {}),
     entities: e.entities ?? {},
     retrievedSources: e.retrievedSources ?? [],
     ...(e.intentAmbiguo !== undefined ? { intentAmbiguo: e.intentAmbiguo } : {}),

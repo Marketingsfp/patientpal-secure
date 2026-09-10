@@ -46,6 +46,18 @@ export {
   type ClaimAvaliado,
   type ResultadoGrounding,
 } from "./claims";
+// FASE 1 — tipo do turno e matriz central de aplicabilidade dos validadores.
+export {
+  acaoDoTipoDeTurno,
+  aplicabilidadeDoTurno,
+  APLICABILIDADE_DESCONHECIDA,
+  classificarTipoTurno,
+  ehSaudacaoPura,
+  MATRIZ_APLICABILIDADE,
+  pedidoLegivelDeEsclarecimento,
+  type AplicabilidadeTurno,
+  type TipoTurno,
+} from "./turno-tipo";
 export { avaliacaoCorrespondeAoTexto, hashDoTexto } from "./hash";
 export {
   assegurarAvaliacaoDoTextoFinal,

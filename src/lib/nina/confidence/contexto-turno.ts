@@ -13,6 +13,7 @@
 import type { IntencaoNina } from "../atendimento-fase1";
 import type { EtapaFluxoNina } from "../fluxo-estado-normalizar";
 import type { AcaoSolicitada } from "./types";
+import { acaoDoTipoDeTurno, classificarTipoTurno, type TipoTurno } from "./turno-tipo";
 
 /** Capacidades habilitadas na clínica. Nunca viram intenção. */
 export type CapacidadesDoTurno = {
@@ -46,7 +47,9 @@ export type ContextoCanonicoTurno = {
    * `criar_agendamento` exige o estágio de criação; `cancelar_agendamento`
    * exige o cancelamento realmente em execução.
    */
-  requestedAction: AcaoSolicitada;
+  requestedAction: AcaoSolicitada | null;
+  /** FASE 1 — natureza do turno (saudação, esclarecimento, informação...). */
+  turnType: TipoTurno;
   /** A mensagem não permite decidir o que o paciente quer. */
   intentAmbiguo: boolean;
   /** Capacidades da clínica — informativo, fora da decisão de intenção. */
@@ -155,12 +158,22 @@ export function montarContextoCanonicoTurno(
     stage: e.stage ?? null,
     cancelamentoEmExecucao: e.cancelamentoEmExecucao === true,
   };
-  const requestedAction = criandoAgendamento(gatilhos)
+  const acaoCalculada: AcaoSolicitada = criandoAgendamento(gatilhos)
     ? "criar_agendamento"
     : acaoDasIntencoes(intencoes, gatilhos);
+  const turnType = classificarTipoTurno({
+    mensagem,
+    intencoes,
+    acao: acaoCalculada,
+    intentAmbiguo: ambiguo,
+  });
+  // "nenhuma ação" ≠ "ação desconhecida": a matriz de aplicabilidade depende
+  // dessa distinção para não exigir fonte/ferramenta de uma saudação.
+  const requestedAction = acaoDoTipoDeTurno(turnType, acaoCalculada, mensagem);
 
   return {
     intencoes,
+    turnType,
     intent: intencoes.length > 0 ? intencoes.join(", ") : null,
     stage: e.stage ?? null,
     requestedAction,
@@ -184,6 +197,7 @@ export function tamanhoDoLote(c: ContextoCanonicoTurno): number {
 /** Intenção crítica presente, mas sem execução autorizada neste turno. */
 export function intencaoCriticaSemExecucao(c: ContextoCanonicoTurno): boolean {
   return (
-    c.requestedAction === "nenhuma" && c.intencoes.some((i) => INTENCOES_CRITICAS.includes(i))
+    (c.requestedAction === null || c.requestedAction === "nenhuma") &&
+    c.intencoes.some((i) => INTENCOES_CRITICAS.includes(i))
   );
 }

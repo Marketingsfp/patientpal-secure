@@ -44,7 +44,7 @@ describe("FASE 2 — contexto canônico do turno", () => {
     const c = canonico("quero agendar uma consulta para semana que vem", true);
     expect(c.intencoes).toContain("agendamento");
     expect(c.requestedAction).not.toBe("criar_agendamento");
-    expect(c.requestedAction).toBe("nenhuma");
+    expect(c.requestedAction).toBeNull();
   });
 
   it("clínica com Agenda habilitada + paciente pedindo preço NÃO vira agendamento", () => {

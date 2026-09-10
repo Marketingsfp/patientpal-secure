@@ -25,7 +25,7 @@ import {
   type HardBlocker,
   type PoliticaConfianca,
 } from "./policy";
-import { acaoExecutavel, contaContraANota } from "./types";
+import { acaoExecutavel, acaoOuNenhuma, contaContraANota } from "./types";
 import type {
   AvaliacaoSegurancaAcao,
   Bloqueador,
@@ -107,7 +107,7 @@ function categoriasDoContexto(ctx: ContextoConfianca): CategoriaConfianca[] {
   // Uma ação pendente não transforma "preciso confirmar seus dados" numa
   // afirmação de agenda que precise de fonte oficial.
   if (ctx.tipoAvaliacao === "answer_confidence") return doTexto;
-  const extra = porAcao[ctx.requestedAction];
+  const extra = porAcao[acaoOuNenhuma(ctx.requestedAction)];
   if (extra && !doTexto.includes(extra)) return [...doTexto, extra];
   return doTexto;
 }
@@ -331,7 +331,7 @@ export function decidirConfianca(
       bloqueadores: blockers,
       hardBlockers,
       risco,
-      acao: ctx.requestedAction,
+      acao: acaoOuNenhuma(ctx.requestedAction),
       esclarecimentoUsado: ctx.businessContext.esclarecimentoUsado,
       ambiguidadeResolvivel: apenasAmbiguidade(validators, blockers, hardBlockers),
       cobertura: medida.cobertura,
@@ -387,7 +387,7 @@ export function decidirConfianca(
     ? {
         status:
           blockersAcao.length > 0 || hardBlockersAcao.length > 0 ? "BLOCKED" : "ALLOWED",
-        acao: ctx.requestedAction,
+        acao: acaoOuNenhuma(ctx.requestedAction),
         blockers: blockersAcao,
         hardBlockers: hardBlockersAcao,
         motivos: reprovadosAcao.map((c) =>
@@ -396,7 +396,7 @@ export function decidirConfianca(
       }
     : {
         status: "NOT_APPLICABLE",
-        acao: ctx.requestedAction,
+        acao: acaoOuNenhuma(ctx.requestedAction),
         blockers: [],
         hardBlockers: [],
         motivos: ["nenhuma ação executável neste turno"],
