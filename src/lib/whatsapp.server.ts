@@ -1354,7 +1354,8 @@ async function gerarRespostaNinaInterno(
       "@/lib/nina/confidence/esclarecimento"
     );
     const bloco = blocoContratoEsclarecimento(normPend(fluxoEstado.clarification));
-    if (bloco) mensagens.push({ role: "system", content: bloco });
+    // Logo após o prompt publicado, antes do histórico do paciente.
+    if (bloco) mensagens.splice(1, 0, { role: "system", content: bloco });
   }
   rastro?.concluir("context.load", {
     mensagens_contexto: mensagens.length,
