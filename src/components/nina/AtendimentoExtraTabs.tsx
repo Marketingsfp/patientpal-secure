@@ -373,6 +373,8 @@ export function AtendInbox() {
   // Só visualização: não transfere, não atribui e não marca leitura de ninguém.
   const [atendenteSelecionadoId, setAtendenteSelecionadoId] = useState<string | null>(null);
   const [souGestor, setSouGestor] = useState(false);
+  // Busca dentro do seletor de atendente (só filtra o que a lista mostra).
+  const [buscaAtendente, setBuscaAtendente] = useState("");
   // Administrador acompanha tudo, mas não atende: só supervisão.
   const [souAdmin, setSouAdmin] = useState(false);
   // Contagem própria de cada filtro (nunca reaproveita o número de outro).
@@ -383,6 +385,34 @@ export function AtendInbox() {
     fechadas: 0,
     equipe: 0,
   });
+  // FASE 3 — reset seguro: trocando de clínica, perdendo a permissão de
+  // supervisão ou saindo o atendente da equipe, o filtro volta para "todos".
+  // Nunca fica um user_id de outra clínica preso na tela.
+  useEffect(() => {
+    setAtendenteSelecionadoId(null);
+    setBuscaAtendente("");
+  }, [clinicaId]);
+  useEffect(() => {
+    if (!atendenteSelecionadoId) return;
+    if (!souGestor) {
+      setAtendenteSelecionadoId(null);
+      return;
+    }
+    if (usuarios.length && !usuarios.some((u: any) => u.user_id === atendenteSelecionadoId)) {
+      setAtendenteSelecionadoId(null);
+    }
+  }, [atendenteSelecionadoId, souGestor, usuarios]);
+
+  const atendentesFiltrados = useMemo(() => {
+    const termo = normalizarNomeBusca(buscaAtendente);
+    if (!termo) return usuarios;
+    return usuarios.filter((u: any) => normalizarNomeBusca(String(u.nome ?? "")).includes(termo));
+  }, [usuarios, buscaAtendente]);
+  const nomeAtendenteSelecionado = useMemo(
+    () => usuarios.find((u: any) => u.user_id === atendenteSelecionadoId)?.nome ?? null,
+    [usuarios, atendenteSelecionadoId],
+  );
+
   const soNaoAtribuidas = escopo === "nao_atribuidas";
   const setSoNaoAtribuidas = (v: boolean) => setEscopo(v ? "nao_atribuidas" : ESCOPO_INBOX_PADRAO);
   // DECISÃO ATUAL — a conversa aberta é uma SELEÇÃO INTERNA da Inbox, pelo id
@@ -2041,12 +2071,19 @@ export function AtendInbox() {
           if (r.lista !== convsRef.current) setConvs(r.lista as any[]);
           g.contadores.agendar();
         }
-      } else if (evento.table === "atend_conversas" && evento.eventType === "UPDATE") {
+      } else if (
+        evento.table === "atend_conversas" &&
+        (evento.eventType === "UPDATE" || evento.eventType === "INSERT")
+      ) {
+        // FASE 3 — transferência, handoff da Nina ou encerramento entram e
+        // saem da lista na hora, respeitando o atendente e o estado escolhidos.
         const r = patchListaPorConversa(convsRef.current, (evento as any).new, {
           escopo,
           userId: meuId ?? "",
           gestor: souGestor,
           atendenteId: atendenteSelecionadoId,
+          status: filtroStatus,
+          buscando: !!buscaTexto || buscaInterp.exigeNumero,
         });
         if (r.aplicado) {
           listaPorPatch = true;
@@ -2888,23 +2925,47 @@ export function AtendInbox() {
               <Select
                 value={atendenteSelecionadoId ?? "todos"}
                 onValueChange={(v) => setAtendenteSelecionadoId(v === "todos" ? null : v)}
-                onOpenChange={setPainelMenuAberto}
+                onOpenChange={(aberto) => {
+                  setPainelMenuAberto(aberto);
+                  if (!aberto) setBuscaAtendente("");
+                }}
               >
                 <SelectTrigger className="h-8 text-xs" aria-label="Filtrar por atendente">
-                  <SelectValue placeholder="Atendente: Todos" />
+                  <SelectValue placeholder="Atendente: Todos">
+                    {`Atendente: ${nomeAtendenteSelecionado ?? "Todos os atendentes"}`}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent className="z-50 min-w-[--radix-select-trigger-width]">
+                  {/* Com equipe grande, dá para achar pelo nome sem rolar a
+                      lista inteira. Nada é buscado no servidor por isto. */}
+                  {usuarios.length > 8 && (
+                    <div className="px-2 pb-1 pt-1">
+                      <Input
+                        value={buscaAtendente}
+                        onChange={(e) => setBuscaAtendente(e.target.value)}
+                        onKeyDown={(e) => e.stopPropagation()}
+                        placeholder="Buscar atendente"
+                        className="h-7 text-xs"
+                        aria-label="Buscar atendente"
+                      />
+                    </div>
+                  )}
                   <SelectItem value="todos">Atendente: Todos os atendentes</SelectItem>
                   {/* Os números do seletor de escopo são sempre globais do
                       filtro (Minhas, Nina, Equipe...). Quando um atendente
                       está selecionado, a quantidade dele aparece ao lado da
                       lista, para não misturar as duas contagens. */}
-                  {usuarios.map((u: any) => (
+                  {atendentesFiltrados.map((u: any) => (
                     <SelectItem key={u.user_id} value={u.user_id}>
                       {u.nome}
                       {u.presenca ? ` · ${ROTULO_PRESENCA[u.presenca as PresencaAtendente]}` : ""}
                     </SelectItem>
                   ))}
+                  {usuarios.length > 8 && atendentesFiltrados.length === 0 && (
+                    <div className="px-2 py-2 text-xs text-muted-foreground">
+                      Nenhum atendente com esse nome.
+                    </div>
+                  )}
                 </SelectContent>
               </Select>
             )}

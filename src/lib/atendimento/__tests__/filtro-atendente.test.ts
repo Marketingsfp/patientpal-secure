@@ -84,16 +84,18 @@ describe("tempo real", () => {
     expect(podeEntrarNaLista({ id: "c1", atribuida_user_id: JEAN }, ctx)).toBe(true);
   });
 
-  it("atualização de conversa fora do filtro pede reconciliação, não some com a lista", () => {
+  // FASE 3 — a conversa que deixa de ser de Jean sai da lista na hora, sem
+  // recarregar as 200 conversas do filtro.
+  it("atualização de conversa que sai do filtro remove a linha sem recarregar", () => {
     const lista = [{ id: "c1", atribuida_user_id: JEAN, ultima_msg_em: "2026-01-01T00:00:00Z" }];
     const r = patchListaPorConversa(
       lista as any,
       { id: "c1", atribuida_user_id: MARIA },
       { escopo: "equipe", userId: MARIA, gestor: true, atendenteId: JEAN },
     );
-    expect(r.aplicado).toBe(false);
-    expect(r.reconciliar).toBe(true);
-    expect(r.lista).toHaveLength(1);
+    expect(r.aplicado).toBe(true);
+    expect(r.reconciliar).toBe(false);
+    expect(r.lista).toHaveLength(0);
   });
 });
 

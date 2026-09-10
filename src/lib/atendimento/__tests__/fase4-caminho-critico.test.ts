@@ -79,14 +79,16 @@ describe("FASE 4 — Inbox fora do caminho crítico da mensagem", () => {
     expect(r.lista.find((c) => c.id === "B")!["status"]).toBe("waiting");
   });
 
-  it("conversa que sai do filtro exige conferência da lista", () => {
+  // FASE 3 — sair do filtro passou a ser resolvido na própria tela.
+  it("conversa que sai do filtro é removida sem recarregar a lista", () => {
     const r = patchListaPorConversa(
       lista,
       { ...lista[1], atribuida_user_id: "u2" },
       { escopo: "minhas", userId: "u1", gestor: false },
     );
-    expect(r.aplicado).toBe(false);
-    expect(r.reconciliar).toBe(true);
+    expect(r.aplicado).toBe(true);
+    expect(r.reconciliar).toBe(false);
+    expect(r.lista.some((c) => c.id === lista[1]!.id)).toBe(false);
   });
 
   it("mensagem comum não recalcula a fila de espera", () => {
