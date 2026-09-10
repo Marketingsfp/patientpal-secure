@@ -106,6 +106,14 @@ import {
   type MensagemResumoRow,
 } from "@/lib/nina/leads-resumo";
 import { supabase } from "@/integrations/supabase/client";
+import {
+  aceitaMensagemRealtime,
+  mesclarMensagemTimeline,
+  paraMensagemTimeline,
+  reconciliarHistorico,
+  waIdDoEnvio,
+  type LinhaMensagemRealtime,
+} from "@/lib/nina/homologacao-realtime";
 
 
 type Lead = {
