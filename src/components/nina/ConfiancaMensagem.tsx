@@ -127,21 +127,33 @@ function Grupo({
   linhas,
 }: {
   titulo: string;
-  linhas: { ok: boolean; rotulo: string; detalhe: string | null }[];
+  linhas: {
+    ok: boolean;
+    rotulo: string;
+    detalhe: string | null;
+    estado?: "ok" | "pendente" | "falha";
+  }[];
 }) {
   if (linhas.length === 0) return null;
   return (
     <Secao titulo={titulo}>
       <ul className="space-y-0.5">
-        {linhas.map((l, i) => (
-          <li key={`${l.rotulo}-${i}`} className="flex items-start gap-1">
-            <span aria-hidden>{l.ok ? "✓" : "✕"}</span>
-            <span className={l.ok ? "" : "text-destructive"}>
-              {l.rotulo}
-              {l.detalhe ? ` — ${l.detalhe}` : ""}
-            </span>
-          </li>
-        ))}
+        {linhas.map((l, i) => {
+          // FASE 2 — "em coleta" é etapa normal do atendimento, não erro.
+          const estado = l.estado ?? (l.ok ? "ok" : "falha");
+          const simbolo = estado === "ok" ? "✓" : estado === "pendente" ? "…" : "✕";
+          const cor = estado === "falha" ? "text-destructive" : estado === "pendente" ? "text-muted-foreground" : "";
+          return (
+            <li key={`${l.rotulo}-${i}`} className="flex items-start gap-1">
+              <span aria-hidden>{simbolo}</span>
+              <span className={cor}>
+                {l.rotulo}
+                {estado === "pendente" ? " (em coleta)" : ""}
+                {l.detalhe ? ` — ${l.detalhe}` : ""}
+              </span>
+            </li>
+          );
+        })}
       </ul>
     </Secao>
   );
