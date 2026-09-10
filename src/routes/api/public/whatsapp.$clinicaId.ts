@@ -656,6 +656,22 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
                         } catch {
                           // Vínculo é auditoria: nunca interrompe o atendimento.
                         }
+                        // FASE 1 — liga o turno à mensagem realmente entregue.
+                        try {
+                          const { gravarEntregaDoTurno } = await import(
+                            "@/lib/nina/rastreio/turno.server"
+                          );
+                          await gravarEntregaDoTurno({
+                            clinicaId: params.clinicaId,
+                            turnoId: auditoriaNina.traceId ?? null,
+                            execucaoId: auditoriaNina.execucaoId ?? null,
+                            conversaId: convId,
+                            outgoingMessageId: (msgOut as { id?: string } | null)?.id ?? null,
+                            canal: "whatsapp",
+                          });
+                        } catch {
+                          // Rastreabilidade nunca interrompe o atendimento.
+                        }
                       }
 
                       // Envio confirmado: agora sim a conversa é resolvida pelo
