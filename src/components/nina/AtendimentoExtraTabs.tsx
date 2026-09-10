@@ -489,6 +489,9 @@ export function AtendInbox() {
   // A ordenação vem da visualização escolhida (ver `ordem`, acima).
   // conversaId -> instante da 1ª mensagem do paciente ainda sem resposta.
   const [espera, setEspera] = useState<Record<string, string>>({});
+  // Leitura estável da métrica de espera dentro dos callbacks do Realtime.
+  const esperaRef = useRef<Record<string, string>>({});
+  esperaRef.current = espera;
   // Sequenciais das recargas: descartam respostas fora de ordem (uma mensagem
   // nova dispara vários eventos de Realtime quase ao mesmo tempo).
   const seqConvs = useRef(0);
