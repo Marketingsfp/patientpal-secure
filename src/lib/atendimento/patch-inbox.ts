@@ -11,6 +11,8 @@
  * dispensada aqui.
  */
 import {
+  atendenteFiltroEfetivo,
+  conversaDoAtendente,
   conversaVisivelNoEscopo,
   type EscopoInbox,
   type ConversaEscopo,
