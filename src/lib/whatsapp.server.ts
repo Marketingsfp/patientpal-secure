@@ -1743,8 +1743,6 @@ async function gerarRespostaNinaInterno(
             acaoSolicitada: canonico.requestedAction,
             turnType: canonico.turnType ?? null,
             ferramentas: evidenciasFerramentas,
-            fatos: fatosDoTurno,
-            consultas: consolidarTentativas(consultasDoTurno),
           }),
         });
         // FASE 1 — política/etapa de confiança aplicada neste turno.
@@ -1836,8 +1834,6 @@ async function gerarRespostaNinaInterno(
         const gate = validarAgendamentoAntesDoCommit({
           args: argsObj,
           ferramentas: evidenciasFerramentas,
-          fatos: fatosDoTurno,
-          consultas: consolidarTentativas(consultasDoTurno),
           pacienteIdentificado: Boolean(pacienteIdEfetivo),
           disponibilidadeConfirmada,
         });
@@ -2154,8 +2150,6 @@ async function gerarRespostaNinaInterno(
           acaoSolicitada: estadoTurnoFinal.acao ?? "desconhecida",
           turnType: estadoTurnoFinal.tipoTurno ?? null,
           ferramentas: evidenciasFerramentas,
-          fatos: fatosDoTurno,
-          consultas: consolidarTentativas(consultasDoTurno),
         }),
       });
       // FASE 1 — a nota da mensagem final também entra no registro do turno.
