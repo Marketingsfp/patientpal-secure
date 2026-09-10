@@ -605,6 +605,7 @@ export async function processarMensagemTeste(data: EntradaMensagemTeste, userId:
     if (diag.processing_status !== "failed") diag.processing_status = "completed";
     console.info("[NINA_MESSAGE_PROCESSING]", diag);
 
+    const loteDoTurno = loteId;
     await encerrarTurno("PROCESSED");
 
     return {
