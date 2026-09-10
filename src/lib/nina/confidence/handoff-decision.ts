@@ -109,11 +109,17 @@ function faltaDadoDoPaciente(r: ResultadoConfianca): boolean {
  * Falta de fonte oficial nunca é recuperável por pergunta: o dado não existe
  * publicado, e inventar está fora de questão.
  */
-export function situacaoRecuperavel(r: ResultadoConfianca): boolean {
+export function situacaoRecuperavel(
+  r: ResultadoConfianca,
+  tipoTurno?: TipoTurno | null,
+): boolean {
   const bloqueios = (r.hardBlockers ?? []).map(String);
   if (bloqueios.some((b) => BLOQUEIOS_SEM_FONTE.has(b))) return false;
   if (bloqueios.some((b) => BLOQUEIOS_RECUPERAVEIS.has(b))) return true;
   if (bloqueios.length > 0) return false;
+  // Um turno de esclarecimento é, por definição, falta de contexto do
+  // paciente: "quero uma informação" se resolve perguntando o quê.
+  if (tipoTurno === "ESCLARECIMENTO" || tipoTurno === "SAUDACAO") return true;
   return faltaDadoDoPaciente(r);
 }
 
@@ -128,7 +134,7 @@ export function decidirHandoff(e: EntradaDecisaoHandoff): PlanoDeHandoff {
   const tentativas = e.tentativasEsclarecimento ?? 0;
   const esgotou = tentativas >= politica.maxTentativasEsclarecimento;
   const bloqueios = (r.hardBlockers ?? []).map(String);
-  const recuperavel = situacaoRecuperavel(r);
+  const recuperavel = situacaoRecuperavel(r, e.tipoTurno);
   const acaoBloqueada = r.actionSafety?.status === "BLOCKED";
 
   // CATEGORIA 5 — pedido explícito por humano: regra própria, não depende
