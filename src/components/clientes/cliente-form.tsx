@@ -358,6 +358,7 @@ export function ClienteForm({
     procedimento: string | null;
     medico_nome: string | null;
     especialidade: string | null;
+    status: string | null;
   };
   const [histList, setHistList] = useState<HistRow[]>([]);
   const [histLoading, setHistLoading] = useState(false);
@@ -788,7 +789,7 @@ export function ClienteForm({
     setFiltroAtivo(false);
   }, [prontList]);
 
-  // Carrega histórico de atendimentos realizados do paciente
+  // Carrega todos os agendamentos do paciente (qualquer situação)
   useEffect(() => {
     if (!editing) {
       setHistList([]);
@@ -800,7 +801,7 @@ export function ClienteForm({
         .from("agendamentos")
         .select("id, inicio, procedimento, medico_id, status")
         .eq("paciente_id", editing.id)
-        .eq("status", "realizado")
+        
         .order("inicio", { ascending: false });
       if (error) {
         toast.error("Não foi possível carregar o histórico.");
@@ -2030,7 +2031,7 @@ export function ClienteForm({
                 ) : histList.length === 0 ? (
                   <div className="py-10 text-center text-muted-foreground text-sm">
                     <History className="h-6 w-6 mx-auto mb-2 opacity-50" />
-                    Nenhuma consulta ou exame realizado para este paciente.
+                    Nenhum atendimento registrado para este paciente.
                   </div>
                 ) : (
                   <>
@@ -2097,7 +2098,7 @@ export function ClienteForm({
                         <History className="h-6 w-6 mx-auto mb-2 opacity-50" />
                         {histFiltroAtivo
                           ? "Nenhum registro encontrado com esses filtros."
-                          : "Nenhuma consulta ou exame realizado para este paciente."}
+                          : "Nenhum atendimento registrado para este paciente."}
                       </div>
                     ) : (
                       <div className="rounded-lg border border-border bg-card overflow-x-auto">
