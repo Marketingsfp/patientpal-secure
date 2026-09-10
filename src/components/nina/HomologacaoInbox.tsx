@@ -526,7 +526,7 @@ export function HomologacaoInbox() {
       }
       return false;
     },
-    [clinicaId, historico],
+    [clinicaId, historico, otimistasDoLead],
   );
 
   // FASE 8 — "Ver conversa" no Relatório da homologação seleciona o lead aqui.
