@@ -107,12 +107,15 @@ describe("reconciliação sem duplicar", () => {
   });
 
   it("três mensagens rápidas continuam três bolhas depois da confirmação", () => {
-    let lista: MensagemTimeline[] = [otimista("a", "Olá"), otimista("b", "Quero marcar"), otimista("c", "Neurologista")];
+    const textos = { a: "Olá", b: "Quero marcar", c: "Neurologista" } as const;
+    let lista: MensagemTimeline[] = [otimista("a", textos.a), otimista("b", textos.b), otimista("c", textos.c)];
     expect(lista).toHaveLength(3);
-    for (const [i, chave] of ["a", "b", "c"].entries()) {
+    for (const [i, chave] of (["a", "b", "c"] as const).entries()) {
       lista = mesclarMensagemTimeline(
         lista,
-        paraMensagemTimeline(linha({ id: `db-${i}`, wa_message_id: waIdDoEnvio("lead", chave) })),
+        paraMensagemTimeline(
+          linha({ id: `db-${i}`, body: textos[chave], wa_message_id: waIdDoEnvio("lead", chave) }),
+        ),
       );
     }
     expect(lista).toHaveLength(3);
