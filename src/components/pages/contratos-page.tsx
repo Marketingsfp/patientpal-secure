@@ -7462,6 +7462,123 @@ h1, h2, h3 { margin: 0 0 6mm; }
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <Dialog
+        open={!!reverterAlvo}
+        onOpenChange={(o) => {
+          if (!o && !reverterBusy) {
+            setReverterAlvo(null);
+            setReverterOpcao(null);
+            setReverterDestino("");
+          }
+        }}
+      >
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Reverter pagamento da parcela</DialogTitle>
+            <DialogDescription>
+              {reverterAlvo
+                ? `Parcela ${reverterAlvo.numero_parcela} — ${BRL(reverterAlvo.valor)} — paga em ${fmtD(reverterAlvo.pago_em)}. O que aconteceu de verdade?`
+                : null}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <label className="flex cursor-pointer gap-2 rounded-md border p-3 text-sm">
+              <input
+                type="radio"
+                className="mt-1"
+                checked={reverterOpcao === "mover"}
+                onChange={() => setReverterOpcao("mover")}
+              />
+              <span>
+                <span className="font-medium">
+                  O pagamento é de outra parcela (corrigir a numeração)
+                </span>
+                <span className="mt-1 block text-xs text-muted-foreground">
+                  O dinheiro continua recebido. Só muda de qual parcela ele é. Nada é mexido no
+                  caixa.
+                </span>
+                {reverterOpcao === "mover" ? (
+                  <span className="mt-2 block">
+                    <Select value={reverterDestino} onValueChange={setReverterDestino}>
+                      <SelectTrigger className="h-9">
+                        <SelectValue placeholder="Parcela que deve ficar como paga" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {mens
+                          .filter((p) => p.status === "pendente")
+                          .map((p) => (
+                            <SelectItem key={p.id} value={p.id}>
+                              {`Parcela ${p.numero_parcela} — vence ${fmtD(p.vencimento)} — ${BRL(p.valor)}`}
+                            </SelectItem>
+                          ))}
+                      </SelectContent>
+                    </Select>
+                  </span>
+                ) : null}
+              </span>
+            </label>
+
+            <label className="flex cursor-pointer gap-2 rounded-md border p-3 text-sm">
+              <input
+                type="radio"
+                className="mt-1"
+                checked={reverterOpcao === "sem_devolucao"}
+                onChange={() => setReverterOpcao("sem_devolucao")}
+              />
+              <span>
+                <span className="font-medium">
+                  Cancelar o pagamento, sem devolver dinheiro ao paciente
+                </span>
+                <span className="mt-1 block text-xs text-muted-foreground">
+                  Fica só o registro do estorno. Se o caixa daquele dia já foi fechado, nenhuma
+                  gaveta é mexida.
+                </span>
+              </span>
+            </label>
+
+            <label className="flex cursor-pointer gap-2 rounded-md border p-3 text-sm">
+              <input
+                type="radio"
+                className="mt-1"
+                checked={reverterOpcao === "devolucao"}
+                onChange={() => setReverterOpcao("devolucao")}
+              />
+              <span>
+                <span className="font-medium">Estou devolvendo o dinheiro ao paciente agora</span>
+                <span className="mt-1 block text-xs text-muted-foreground">
+                  A saída sai do seu caixa aberto, porque o dinheiro está saindo da sua gaveta
+                  agora.
+                </span>
+              </span>
+            </label>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setReverterAlvo(null);
+                setReverterOpcao(null);
+                setReverterDestino("");
+              }}
+              disabled={reverterBusy}
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={confirmarReverter}
+              disabled={
+                reverterBusy ||
+                !podeEscrever ||
+                !reverterOpcao ||
+                (reverterOpcao === "mover" && !reverterDestino)
+              }
+            >
+              {reverterBusy ? "Processando…" : "Confirmar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
