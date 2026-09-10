@@ -328,6 +328,7 @@ export function agruparTimeline(entrada: {
         statusAtendente: txt(d["status_atendente"]) ?? txt(d["perfil"]),
         transferencia: e.evento === "TRANSFERIDA",
         origemNome: txt(e.de_nome),
+        realizadaPorNome: e.evento === "TRANSFERIDA" ? txt(e.user_nome) : null,
         setorNome: txt(d["setor_nome"]),
         eventoIds: [e.id],
         marcadorIds: [],
