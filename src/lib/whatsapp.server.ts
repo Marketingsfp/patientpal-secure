@@ -526,6 +526,8 @@ async function salvarEstadoIdentidade(
  * gravado e vinculado à execução que produziu a resposta. Nada aqui altera o
  * comportamento da Nina: falha de auditoria não interrompe o atendimento.
  */
+import { ehFerramentaCritica } from "@/lib/nina/revisao";
+
 export async function gerarRespostaNina(
   clinicaId: string,
   mensagemPaciente: string,
@@ -1280,6 +1282,8 @@ async function gerarRespostaNinaInterno(
     | null = null;
   let execucaoIdFinal: string | null = null;
   let houveHandoff = false;
+  // FASE 4 — vira true quando a conversa avançou durante a geração.
+  let turnoObsoleto = false;
   // Só vira `true` quando a ferramenta "agendar" devolve sucesso COM
   // appointment_id verificado no banco — ou quando a conversa JÁ tem um
   // agendamento gravado (senão a Nina não conseguiria nem falar sobre a
