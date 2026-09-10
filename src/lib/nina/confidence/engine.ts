@@ -176,7 +176,18 @@ export function executarValidadores(ctx: ContextoConfianca): Verificacao[] {
   const catalogo = temCatalogoPublicado(ctx);
   const agenda = temConfirmacaoAgenda(ctx);
   const faltando = camposFaltantes(ctx);
-  const falhas = ctx.toolResults.filter((f) => !ferramentaOk(f));
+  // FASE 2 — falha REFEITA com sucesso não conta como falha vigente do turno
+  // (mesma regra do ToolIntegrityValidator; antes eram duas regras diferentes).
+  const ultimoOk = new Map<string, number>();
+  ctx.toolResults.forEach((f, i) => {
+    if (ferramentaOk(f)) ultimoOk.set(`${f.nome}|${f.capacidade ?? ""}`, i);
+  });
+  const falhas = ctx.toolResults.filter(
+    (f, i) => !ferramentaOk(f) && (ultimoOk.get(`${f.nome}|${f.capacidade ?? ""}`) ?? -1) <= i,
+  );
+  // FASE 2 — reserva já persistida comprova o horário reservado.
+  const reservaPersistida =
+    ctx.operationalState?.appointmentCreated === true && Boolean(ctx.operationalState?.appointmentId);
 
   const checks: Verificacao[] = [];
 
@@ -220,7 +231,7 @@ export function executarValidadores(ctx: ContextoConfianca): Verificacao[] {
       check(
         "agenda_ou_catalogo_confirmou",
         "Disponibilidade, horário ou profissional confirmado pela agenda ou pelo catálogo",
-        agenda || catalogo,
+        agenda || catalogo || reservaPersistida,
         100,
         "AGENDA_SEM_CONFIRMACAO",
       ),
