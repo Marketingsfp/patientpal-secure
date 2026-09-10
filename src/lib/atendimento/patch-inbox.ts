@@ -186,10 +186,15 @@ export function patchListaPorConversa(
     // `atribuida_user_id` (fica nulo ao encerrar): vale quem era responsável
     // no momento da resolução, ou quem resolveu.
     const alvo = atendenteAlvo ?? (ctx.gestor ? null : ctx.userId);
+    const semRegistroDeResolucao =
+      linha?.["last_assigned_user_id"] == null && linha?.["resolved_by"] == null;
     const dono =
       !alvo ||
       linha?.["last_assigned_user_id"] === alvo ||
-      linha?.["resolved_by"] === alvo;
+      linha?.["resolved_by"] === alvo ||
+      // Conversa que ainda mantém o responsável na coluna atual (encerramento
+      // antigo ou evento parcial): não inventa histórico, só não descarta.
+      (semRegistroDeResolucao && linha?.["atribuida_user_id"] === alvo);
     visivel = fechada && dono;
   } else {
     visivel =
