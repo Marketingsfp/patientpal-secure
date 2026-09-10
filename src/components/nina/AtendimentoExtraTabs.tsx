@@ -940,6 +940,7 @@ export function AtendInbox() {
     userId: meuId,
     escopo,
     atendenteId: atendenteSelecionadoId,
+    visualizacao,
   });
   useEffect(() => {
     seqConvs.current++;
@@ -954,6 +955,7 @@ export function AtendInbox() {
       userId: meuId,
       escopo,
       atendenteId: atendenteSelecionadoId,
+      visualizacao,
     });
     try {
       const brutas = await medirRequest("listarConversas", listarConvs({
@@ -964,6 +966,7 @@ export function AtendInbox() {
           canal: "todos",
           escopo,
           atendenteId: atendenteSelecionadoId,
+          visualizacao,
           limit: 200,
         },
       }));
@@ -973,7 +976,13 @@ export function AtendInbox() {
       // Se o filtro/usuário mudou enquanto a resposta vinha, ela é descartada.
       if (
         chavePedido !==
-        chaveInbox({ clinicaId, userId: meuId, escopo, atendenteId: atendenteSelecionadoId })
+        chaveInbox({
+          clinicaId,
+          userId: meuId,
+          escopo,
+          atendenteId: atendenteSelecionadoId,
+          visualizacao,
+        })
       )
         return;
       // FASE 4 — segunda conferência no navegador: só entra na lista o que
