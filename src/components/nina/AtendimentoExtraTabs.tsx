@@ -2270,6 +2270,19 @@ export function AtendInbox() {
     return itens.sort((a, b) => a.at - b.at);
   }, [msgs, eventos]);
 
+  // FASE 4 — o aviso "Resumo interno da Nina gerado" some da timeline: no lugar
+  // dele o CONTEÚDO do resumo vigente aparece uma única vez, na posição do
+  // último aviso (a transição para o atendimento humano).
+  const chaveResumoNaTimeline = useMemo(() => {
+    let chave: string | null = null;
+    for (const item of timeline) {
+      if (item.kind !== "grupo") continue;
+      const g = item.item;
+      if (g.tipo === "EVENTO" && g.evento.evento === "RESUMO_IA_GERADO") chave = g.chave;
+    }
+    return chave;
+  }, [timeline]);
+
   // FASE 1 — mensagem recebida já desenhada na conversa: fecha o trace RECV.
   useEffect(() => {
     for (const m of msgs as any[]) {
