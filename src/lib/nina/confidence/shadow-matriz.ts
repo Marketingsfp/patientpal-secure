@@ -89,6 +89,7 @@ export const CENARIOS_SHADOW: CenarioShadow[] = [
       texto: "Sim, atendemos cardiologia.",
       catalogoEncontrou: true,
       ferramentas: [catalogoOk],
+      fatos: [fatoServicoCardiologia],
     },
   },
   {
@@ -102,6 +103,7 @@ export const CENARIOS_SHADOW: CenarioShadow[] = [
       texto: "A ultrassonografia abdominal custa R$ 180,00.",
       catalogoEncontrou: true,
       ferramentas: [catalogoOk],
+      fatos: [fatoPrecoUltrassom],
     },
   },
   {
