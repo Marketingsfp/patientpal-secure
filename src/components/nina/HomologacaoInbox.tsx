@@ -17,7 +17,6 @@ import {
   CheckCheck,
   Download,
   FlaskConical,
-  Loader2,
   RefreshCw,
   Send,
   Wrench,
@@ -183,7 +182,14 @@ export function HomologacaoInbox() {
   const [texto, setTexto] = useState("");
   const [carregando, setCarregando] = useState(true);
   const [carregandoConversa, setCarregandoConversa] = useState(false);
-  const [processando, setProcessando] = useState(false);
+  /**
+   * Quantos envios estão sendo processados pela Nina AGORA. É contador, não
+   * boolean: podem existir vários envios em andamento ao mesmo tempo, e o
+   * indicador só some quando o último termina. Serve apenas para informar
+   * ("Nina está digitando") — nunca para travar o composer.
+   */
+  const [emProcessamento, setEmProcessamento] = useState(0);
+  const processando = emProcessamento > 0;
   const [erro, setErro] = useState<string | null>(null);
   const [ultimoTexto, setUltimoTexto] = useState("");
   const [tipo, setTipo] = useState<TipoMensagem>("text");
@@ -400,6 +406,35 @@ export function HomologacaoInbox() {
    * que nenhum card receba mensagens, horário ou contador de outro.
    */
   const leadSelecionadoRef = useRef<string | null>(null);
+
+  /**
+   * Bolhas otimistas: a mensagem do testador aparece na hora e continua na
+   * tela até o histórico do servidor já contê-la. Ficam guardadas por lead —
+   * uma bolha do Teste 01 nunca aparece no Teste 02.
+   */
+  const otimistasRef = useRef<Map<string, { leadId: string; msg: Msg }>>(new Map());
+  const otimistasDoLead = useCallback(
+    (id: string | null) =>
+      id
+        ? [...otimistasRef.current.values()].filter((o) => o.leadId === id).map((o) => o.msg)
+        : [],
+    [],
+  );
+  const registrarOtimista = useCallback(
+    (lead: string, msg: Msg) => {
+      otimistasRef.current.set(msg.id.replace("otimista:", ""), { leadId: lead, msg });
+      if (leadSelecionadoRef.current === lead) setMsgs((atuais) => [...atuais, msg]);
+    },
+    [],
+  );
+  const concluirOtimista = useCallback((chave: string) => {
+    const o = otimistasRef.current.get(chave);
+    otimistasRef.current.delete(chave);
+    if (o && leadSelecionadoRef.current === o.leadId) {
+      setMsgs((atuais) => atuais.filter((m) => m.id !== o.msg.id));
+    }
+  }, []);
+
   const carregarHistorico = useCallback(
     async (id: string) => {
       if (!clinicaId) return;
@@ -411,7 +446,9 @@ export function HomologacaoInbox() {
           conversaId: string | null;
         };
         if (leadSelecionadoRef.current !== id) return; // resposta atrasada
-        setMsgs(r.mensagens);
+        // As mensagens ainda em envio continuam visíveis: uma carga do
+        // servidor não pode apagar o que o testador acabou de mandar.
+        setMsgs([...r.mensagens, ...otimistasDoLead(id)]);
         setEventosConversa(r.eventos ?? []);
         setConversaId(r.conversaId);
         if (r.conversaId) {
@@ -429,7 +466,7 @@ export function HomologacaoInbox() {
         mostrarErro(e);
       }
     },
-    [clinicaId, historico, ferramentasFn],
+    [clinicaId, historico, ferramentasFn, otimistasDoLead],
   );
 
   /**
@@ -476,7 +513,7 @@ export function HomologacaoInbox() {
             eventos?: ConversaEvento[];
             conversaId: string | null;
           };
-          setMsgs(r.mensagens);
+          setMsgs([...r.mensagens, ...otimistasDoLead(id)]);
           setEventosConversa(r.eventos ?? []);
           setConversaId(r.conversaId);
           const ultima = r.mensagens[r.mensagens.length - 1];
@@ -488,7 +525,7 @@ export function HomologacaoInbox() {
       }
       return false;
     },
-    [clinicaId, historico],
+    [clinicaId, historico, otimistasDoLead],
   );
 
   // FASE 8 — "Ver conversa" no Relatório da homologação seleciona o lead aqui.
@@ -568,22 +605,46 @@ export function HomologacaoInbox() {
     [carregarLeads, carregarHistorico, leadId],
   );
 
+  /**
+   * Envio do chat manual — a bolha aparece na hora e o campo fica livre.
+   *
+   * O processamento da Nina continua igual, só que em segundo plano: nada
+   * aqui espera banco, modelo, ferramentas ou resposta antes de liberar o
+   * testador para escrever a próxima mensagem. Cada envio guarda o lead de
+   * origem e descarta qualquer efeito visual se o testador já trocou de lead.
+   */
   const dispararMensagem = async (
     conteudo: string,
     tipoForcado?: TipoMensagem,
   ): Promise<{ ok: boolean; transferida: boolean; erro: string | null }> => {
-    if (!clinicaId || !leadId) return { ok: false, transferida: false, erro: null };
+    const leadOrigem = leadId;
+    const conversaOrigem = conversaId;
+    if (!clinicaId || !leadOrigem) return { ok: false, transferida: false, erro: null };
     const tipoEnvio = tipoForcado ?? tipo;
     const corpo = conteudo.trim();
     // Só texto exige conteúdo: áudio sem transcrição e mídias simulam o webhook real.
     if (tipoEnvio === "text" && !corpo) return { ok: false, transferida: false, erro: null };
-    setProcessando(true);
+    const chave = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
+    // 1) campo livre e foco de volta, ANTES de qualquer chamada.
+    setTexto("");
+    composerRef.current?.focus();
     setErro(null);
     setUltimoTexto(corpo);
+    // 2) bolha imediata na timeline do lead de origem.
+    registrarOtimista(leadOrigem, {
+      id: `otimista:${chave}`,
+      conversa_id: conversaOrigem,
+      direction: "in",
+      body: corpo,
+      enviada_por: "paciente",
+      created_at: new Date().toISOString(),
+    });
+    const meuLead = () => leadSelecionadoRef.current === leadOrigem;
+    setEmProcessamento((n) => n + 1);
     try {
-      const chave = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
       const r = (await enviar({
-        data: { clinicaId, leadId, tipo: tipoEnvio, texto: corpo, chave },
+        data: { clinicaId, leadId: leadOrigem, tipo: tipoEnvio, texto: corpo, chave },
       })) as {
         duplicada: boolean;
         reply: string | null;
@@ -591,25 +652,29 @@ export function HomologacaoInbox() {
         transferida?: boolean;
         audio: { base64: string; mime: string; texto: string } | null;
       };
-      setTexto("");
-      setAudio(r.audio ? `data:${r.audio.mime};base64,${r.audio.base64}` : null);
-      await carregarHistorico(leadId);
+      concluirOtimista(chave);
+      if (meuLead()) {
+        setAudio(r.audio ? `data:${r.audio.mime};base64,${r.audio.base64}` : null);
+        await carregarHistorico(leadOrigem);
+      }
       await carregarLeads();
-      if (r.erro) setErro(r.erro);
-      else if (!r.reply)
-        setErro(
-          "A Nina não respondeu. Se a conversa foi transferida para atendimento humano, use “Resolver / Reiniciar teste” antes de começar um novo teste.",
-        );
+      if (meuLead()) {
+        if (r.erro) setErro(r.erro);
+        else if (!r.reply)
+          setErro(
+            "A Nina não respondeu. Se a conversa foi transferida para atendimento humano, use “Resolver / Reiniciar teste” antes de começar um novo teste.",
+          );
+      }
       return { ok: !r.erro && !!r.reply, transferida: !!r.transferida, erro: r.erro ?? null };
     } catch (e: any) {
-      const chegou = await aguardarResposta(leadId);
-      setTexto("");
+      const chegou = meuLead() ? await aguardarResposta(leadOrigem) : false;
+      concluirOtimista(chave);
       await carregarLeads();
       const msg = String(e?.message ?? e);
-      if (!chegou) setErro(msg);
+      if (!chegou && meuLead()) setErro(msg);
       return { ok: chegou, transferida: false, erro: chegou ? null : msg };
     } finally {
-      setProcessando(false);
+      setEmProcessamento((n) => Math.max(0, n - 1));
     }
   };
 
@@ -740,7 +805,7 @@ export function HomologacaoInbox() {
 
   const resolverConversa = async () => {
     if (!clinicaId || !leadId || !conversaId) return;
-    setProcessando(true);
+    setEmProcessamento((n) => n + 1);
     try {
       await resolver({
         data: { clinicaId, leadId, conversaId, removerAgendamentos: limparAgenda },
@@ -759,7 +824,7 @@ export function HomologacaoInbox() {
     } catch (e: any) {
       mostrarErro(e);
     } finally {
-      setProcessando(false);
+      setEmProcessamento((n) => Math.max(0, n - 1));
     }
   };
 
@@ -857,12 +922,10 @@ export function HomologacaoInbox() {
   };
 
   const terraRodando = modo === "terra" && sim?.status === "executando";
+  // O processamento da Nina NÃO entra aqui: ele acontece em segundo plano e o
+  // testador continua escrevendo e enviando normalmente, como num chat real.
   const composerBloqueado =
-    !podeEscrever ||
-    !leadId ||
-    processando ||
-    terraRodando ||
-    (tipo !== "text" && tipo !== "audio");
+    !podeEscrever || !leadId || terraRodando || (tipo !== "text" && tipo !== "audio");
 
   return (
     <div id="homologacao-inbox" className="flex h-[calc(100vh-11rem)] min-h-[560px] gap-3">
@@ -1603,15 +1666,11 @@ export function HomologacaoInbox() {
                 <Button
                   onClick={() => void dispararMensagem(texto)}
                   disabled={
-                    processando || !podeEscrever || !leadId || (tipo === "text" && !texto.trim())
+                    composerBloqueado || (tipo === "text" && !texto.trim())
                   }
                   className="bg-atd-go text-atd-on-strong hover:bg-atd-go-hover disabled:bg-atd-idle-bg disabled:text-atd-ink-soft"
                 >
-                  {processando ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Send className="h-4 w-4" />
-                  )}
+                  <Send className="h-4 w-4" />
                   <span className="ml-2 hidden sm:inline">Enviar como paciente</span>
                 </Button>
               </div>
