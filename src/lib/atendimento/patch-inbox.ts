@@ -212,7 +212,7 @@ export function patchListaPorConversa(
   const mudou = Object.keys(mesclada).some((k) => mesclada[k] !== existente[k]);
   if (!mudou) return { lista, aplicado: true, reconciliar: false };
   return {
-    lista: ordenar(lista.map((c) => (c.id === id ? mesclada : c))),
+    lista: ordenar(lista.map((c) => (c.id === id ? mesclada : c)), visualizacao, espera),
     aplicado: true,
     reconciliar: false,
   };
