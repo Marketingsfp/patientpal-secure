@@ -271,7 +271,11 @@ export function executarValidadores(ctx: ContextoConfianca): Verificacao[] {
     check(
       "consulta_realizada",
       "Houve consulta ao sistema para embasar a afirmação",
-      cats.length === 0 || ctx.toolResults.length > 0 || ctx.retrievedSources.some(fonteUtil),
+      cats.length === 0 ||
+        ctx.toolResults.length > 0 ||
+        ctx.retrievedSources.some(fonteUtil) ||
+        // FASE 2 — a reserva feita em turno anterior já é a consulta que embasa.
+        reservaPersistida,
       POLITICA_PADRAO.penalidades["consulta_realizada"] ?? 0,
     ),
   );

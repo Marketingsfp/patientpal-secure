@@ -404,6 +404,12 @@ export function ToolIntegrityValidator(ctx: ContextoConfianca): ResultadoValidad
   }
   const efetivas = ctx.toolResults.filter((f) => ferramentaOk(f));
   const vazias = efetivas.filter((f) => f.temConteudo === false);
+  if (efetivas.length > 0 && vazias.length === efetivas.length && somenteNegativasApoiadas(ctx)) {
+    // Consulta que respondeu SEM itens é exatamente a prova de uma negativa.
+    return res(nome, "PASS", 100, "CONSULTA_VAZIA_SUSTENTA_NEGATIVA", {
+      ferramentas: vazias.map((f) => f.nome),
+    });
+  }
   if (efetivas.length > 0 && vazias.length === efetivas.length) {
     return res(nome, "WARNING", 60, "RETORNO_VAZIO", {
       ferramentas: vazias.map((f) => f.nome),
