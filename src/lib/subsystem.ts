@@ -1,4 +1,4 @@
-export type SubsystemId = "recepcao" | "gestao-pessoas";
+export type SubsystemId = "recepcao" | "gestao-pessoas" | "atendimento";
 
 const KEY = "appshell:subsystem";
 const EVT = "subsystem-change";
@@ -22,12 +22,19 @@ export const SUBSYSTEMS: Record<SubsystemId, { label: string; home: string; grou
     home: "/app/hr-ponto",
     groups: ["Recursos Humanos", "Gestão", "Configurações"],
   },
+  atendimento: {
+    label: "Atendimento / WhatsApp",
+    home: "/app/nina",
+    groups: ["Atendimento", "Nina", "Configurações do WhatsApp"],
+  },
 };
+
+const IDS = Object.keys(SUBSYSTEMS) as SubsystemId[];
 
 export function getSubsystem(): SubsystemId | null {
   if (typeof window === "undefined") return null;
   const v = window.localStorage.getItem(KEY);
-  return v === "recepcao" || v === "gestao-pessoas" ? v : null;
+  return IDS.includes(v as SubsystemId) ? (v as SubsystemId) : null;
 }
 
 export function setSubsystem(id: SubsystemId | null) {
