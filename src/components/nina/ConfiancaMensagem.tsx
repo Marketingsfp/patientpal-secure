@@ -16,7 +16,12 @@ import {
   type ConfiancaDaMensagem,
   type ConfiabilidadeDecisaoView,
 } from "@/lib/nina/confianca.functions";
-import { rotuloConfianca, scoreExibido } from "@/lib/nina/confianca-badge";
+import {
+  ROTULO_INDICE_EVIDENCIA,
+  rotuloConfianca,
+  scoreExibido,
+  textoIndiceEvidencia,
+} from "@/lib/nina/confianca-badge";
 import {
   snapshotDoPrompt,
   type SnapshotPromptView,
@@ -111,6 +116,15 @@ const ESTILO: Record<
   },
 };
 
+/** Sem avaliação da resposta: selo neutro, nunca verde/amarelo/vermelho. */
+const ESTILO_NEUTRO = {
+  classe: "border-border/60 text-muted-foreground",
+  ponto: "bg-muted-foreground/50",
+  curto: "—",
+  rotulo: "Resposta não avaliada",
+  Icone: ShieldQuestion,
+};
+
 function Secao({ titulo, children }: { titulo: string; children: React.ReactNode }) {
   return (
     <div className="space-y-0.5">
@@ -202,8 +216,10 @@ export function ConfiancaMensagemBadge({
     if (aberto && !detalhe) void carregar();
   }, [aberto, carregar, detalhe]);
 
-  const estilo = ESTILO[confianca.nivel] ?? ESTILO["LOW"]!;
   const rotulo = rotuloConfianca(confianca);
+  // FASE 6 — sem avaliação da RESPOSTA, o selo é neutro: nota de ação nunca
+  // é apresentada como confiança do texto.
+  const estilo = rotulo.avaliada ? (ESTILO[confianca.nivel] ?? ESTILO["LOW"]!) : ESTILO_NEUTRO;
   const { Icone } = estilo;
 
   return (
@@ -211,10 +227,14 @@ export function ConfiancaMensagemBadge({
       <PopoverTrigger asChild>
         <button
           type="button"
-          aria-label={`${estilo.rotulo}: ${confianca.score}%.${
-            confianca.erro_reportado ? " Erro reportado por atendente." : ""
-          } Ver detalhes.`}
-          title={`${estilo.rotulo} — ${scoreExibido(confianca.score)}% (visível apenas para a equipe)`}
+          aria-label={`${estilo.rotulo}${
+            rotulo.avaliada ? `: índice de evidência ${scoreExibido(confianca.score)} de 100.` : "."
+          }${confianca.erro_reportado ? " Erro reportado por atendente." : ""} Ver detalhes.`}
+          title={
+            rotulo.avaliada
+              ? `${estilo.rotulo} — ${ROTULO_INDICE_EVIDENCIA}: ${textoIndiceEvidencia(confianca.score)} (visível apenas para a equipe)`
+              : "A resposta não foi avaliada; existe apenas avaliação de segurança da ação (visível apenas para a equipe)."
+          }
           className={`inline-flex h-[18px] shrink-0 items-center gap-1 rounded-full border px-1.5 text-[10px] font-medium leading-none ${estilo.classe}`}
         >
           <span aria-hidden className={`h-1.5 w-1.5 rounded-full ${estilo.ponto}`} />
@@ -233,19 +253,38 @@ export function ConfiancaMensagemBadge({
         <Secao titulo="Tipo do turno">
           <p>{detalhe?.tipoTurno ?? "—"}</p>
         </Secao>
-        <Secao titulo="Confiança da resposta">
-          <p className="text-sm font-medium">
-            <Icone className="mr-1 inline h-3.5 w-3.5" aria-hidden />
-            {scoreExibido(confianca.score)}% · {estilo.curto}
-          </p>
-          {detalhe?.coberturaEvidencias != null && (
+        <Secao titulo={ROTULO_INDICE_EVIDENCIA}>
+          {rotulo.avaliada ? (
+            <>
+              <p className="text-sm font-medium">
+                <Icone className="mr-1 inline h-3.5 w-3.5" aria-hidden />
+                {textoIndiceEvidencia(confianca.score)} · {estilo.curto}
+              </p>
+              {detalhe?.coberturaEvidencias != null && (
+                <p className="text-muted-foreground">
+                  Cobertura das evidências: {detalhe.coberturaEvidencias}% do que era relevante.
+                </p>
+              )}
+              {detalhe?.validadores.some((v) => v.status === "UNKNOWN") && (
+                <p className="text-muted-foreground">
+                  Lacunas:{" "}
+                  {detalhe.validadores
+                    .filter((v) => v.status === "UNKNOWN")
+                    .map((v) => v.validator)
+                    .join(", ")}
+                </p>
+              )}
+              <p className="text-muted-foreground">
+                Índice de evidência verificada — não é probabilidade de acerto. Registrado quando a
+                resposta foi produzida e não é recalculado.
+              </p>
+            </>
+          ) : (
             <p className="text-muted-foreground">
-              Cobertura de evidências: {detalhe.coberturaEvidencias}%
+              Resposta não avaliada. Existe apenas avaliação da segurança da ação, que não é a nota
+              do texto.
             </p>
           )}
-          <p className="text-muted-foreground">
-            Registrado quando a resposta foi produzida. Não é recalculado.
-          </p>
         </Secao>
         <Secao titulo="Ação">
           <p className={detalhe?.seguranca?.acao ? "" : "text-muted-foreground"}>
@@ -275,8 +314,20 @@ export function ConfiancaMensagemBadge({
               </ul>
             )}
         </Secao>
-        <Secao titulo="Decisão">
-          <p>{detalhe?.decisaoTurno ?? detalhe?.resultado ?? "—"}</p>
+        {/* FASE 6 — três coisas distintas: o que o motor recomendou, o que a
+            etapa de ativação deixou valer e o que de fato aconteceu. */}
+        <Secao titulo="Decisão recomendada pelo motor">
+          <p>{detalhe?.decisaoRecomendada ?? "—"}</p>
+        </Secao>
+        <Secao titulo="Aplicação (etapa de ativação)">
+          <p className="text-muted-foreground">
+            Etapa {detalhe?.etapaAtivacao ?? "—"} ·{" "}
+            {detalhe?.modo === "enforce" ? "decide" : "apenas observa"}
+            {detalhe?.teriaPermitido === false ? " · o motor não teria liberado" : ""}
+          </p>
+        </Secao>
+        <Secao titulo="Efeito realizado">
+          <p>{detalhe?.decisaoTurno ?? detalhe?.efeitoRealizado ?? detalhe?.resultado ?? "—"}</p>
         </Secao>
         {detalhe?.motivoDecisao && (
           <Secao titulo="Motivo">
@@ -354,8 +405,10 @@ export function ConfiancaMensagemBadge({
             )}
             <p className="text-[10px] text-muted-foreground">
               Política: {detalhe.policyVersion ?? confianca.policy_version ?? "desconhecida"} ·
-              Motor: {detalhe.engineVersion ?? "—"} · Avaliação: {detalhe.avaliacao ?? "—"} ·
-              Ambiente: {detalhe.ambiente}
+              Motor: {detalhe.engineVersion ?? "—"} · Configuração:{" "}
+              {detalhe.configId ?? confianca.config_id ?? "não registrada"}
+              {detalhe.configOrigem ? ` (${detalhe.configOrigem})` : ""} · Avaliação:{" "}
+              {detalhe.avaliacao ?? "—"} · Ambiente: {detalhe.ambiente}
             </p>
           </>
         ) : (

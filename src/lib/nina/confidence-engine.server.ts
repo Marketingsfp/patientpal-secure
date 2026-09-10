@@ -180,6 +180,13 @@ export async function registrarDecisaoConfianca(params: {
   rodadas?: number | null;
   /** Representação avaliada: texto completo, áudio integral ou resumo falado. */
   representacao?: RepresentacaoSaida | null;
+  /**
+   * FASE 6 — identidade da CONFIGURAÇÃO efetiva (diferente da versão do
+   * algoritmo), de onde ela veio e etapa de ativação da clínica no turno.
+   */
+  configId?: string | null;
+  configOrigem?: string | null;
+  etapaAtivacao?: string | null;
 }): Promise<ResultadoRegistro> {
   try {
     const a = params.auditoria ?? null;
@@ -189,6 +196,10 @@ export async function registrarDecisaoConfianca(params: {
       origem_resposta: params.origemResposta ?? null,
       rodadas: params.rodadas ?? null,
       representacao: params.representacao ?? "texto_completo",
+      config_id: params.configId ?? null,
+      config_origem: params.configOrigem ?? null,
+      etapa_ativacao: params.etapaAtivacao ?? null,
+
 
       clinica_id: params.clinicaId,
       conversation_id: params.conversaId ?? a?.conversationId ?? null,

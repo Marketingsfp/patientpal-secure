@@ -1699,25 +1699,25 @@ async function gerarRespostaNinaInterno(
       };
       // FASE 9 — a política só difere da padrão se um ajuste tiver sido
       // aprovado E aplicado por uma pessoa. A Nina nunca altera pesos sozinha.
-      const { politicaEfetiva } = await import(
-        "@/lib/nina/confidence/politica-override.server"
+      // FASE 6 — configuração efetiva e etapa carregadas UMA VEZ por turno:
+      // mudança publicada no meio da resposta só vale no próximo turno.
+      const { configuracaoDoTurno } = await import(
+        "@/lib/nina/confidence/configuracao-turno.server"
       );
+      const cfgTurno = await configuracaoDoTurno(clinicaId);
       // FASE 5 — esta avaliação é de SEGURANÇA DA AÇÃO (action_safety):
       // decide esclarecer, transferir ou bloquear ANTES de agir. Ela não é a
       // nota da mensagem: essa é medida no fim, sobre o texto final.
-      const decisao = decidirNoTurno(estadoTurno, await politicaEfetiva(clinicaId));
+      const decisao = decidirNoTurno(estadoTurno, cfgTurno.configuracao.parametros);
       estadoTurnoFinal = estadoTurno;
       avaliacaoAcao = decisao;
       execucaoIdFinal = respostaIA.execucaoId ?? null;
 
       // FASE 8 — ATIVAÇÃO PROGRESSIVA: etapa A só observa; B aplica handoff e
       // bloqueio; C acrescenta esclarecimento; D endurece o agendamento.
-      const [{ etapaConfianca, modoDaEtapa }, { aplicarEtapa }] = await Promise.all([
-        import("@/lib/nina/confidence/etapas-flag.server"),
-        import("@/lib/nina/confidence/etapas"),
-      ]);
-      const etapa = await etapaConfianca(clinicaId);
-      const modo = modoDaEtapa(etapa);
+      const { aplicarEtapa } = await import("@/lib/nina/confidence/etapas");
+      const etapa = cfgTurno.etapa;
+      const modo = cfgTurno.modo;
       const aplicado = aplicarEtapa(decisao, etapa);
 
       // FASE 4 — confiança baixa, sozinha, NÃO transfere. O destino do turno
@@ -1763,6 +1763,10 @@ async function gerarRespostaNinaInterno(
           decisao: paraDecisaoLegado(decisao),
           modo,
           teriaPermitido: aplicado.teriaPermitido,
+          // FASE 6 — configuração histórica realmente usada neste turno.
+          configId: cfgTurno.configuracao.configId,
+          configOrigem: cfgTurno.configuracao.origem,
+          etapaAtivacao: etapa,
           // FASE 5 — telemetria da política de handoff, sem dado do paciente.
           handoffDecision: plano.decision,
           handoffReason: plano.reason,
@@ -1904,9 +1908,9 @@ async function gerarRespostaNinaInterno(
         if (v !== null && v !== undefined && String(v).trim() !== "") dadosColetados[k] = v;
       }
       if (nome === "agendar") {
-        const [{ validarAgendamentoAntesDoCommit }, { etapaConfianca }] = await Promise.all([
+        const [{ validarAgendamentoAntesDoCommit }, { configuracaoDoTurno }] = await Promise.all([
           import("@/lib/nina/confidence/runtime"),
-          import("@/lib/nina/confidence/etapas-flag.server"),
+          import("@/lib/nina/confidence/configuracao-turno.server"),
         ]);
         const gate = validarAgendamentoAntesDoCommit({
           args: argsObj,
@@ -1917,7 +1921,7 @@ async function gerarRespostaNinaInterno(
         // FASE 8 — a trava só vale nas clínicas que já avançaram para a etapa D
         // (rigor no agendamento). Nas demais o motor apenas observa e registra,
         // exatamente como nas decisões ALLOW/CLARIFY/HANDOFF.
-        const etapaAtual = await etapaConfianca(clinicaId);
+        const etapaAtual = (await configuracaoDoTurno(clinicaId)).etapa;
         const aplicaTrava = etapaAtual === "D";
         if (!gate.liberado) {
           console.warn("[NINA_APPOINTMENT] pré-commit reprovado pelo Confidence Engine", {
@@ -2232,12 +2236,18 @@ async function gerarRespostaNinaInterno(
   // roda de novo sobre a mensagem final.
   try {
     if (estadoTurnoFinal) {
-      const [{ garantirScoreDoTextoEnviado, paraDecisaoLegado }, { montarRegistroAuditoria }, { politicaEfetiva }] =
-        await Promise.all([
-          import("@/lib/nina/confidence/runtime"),
-          import("@/lib/nina/confidence/auditoria"),
-          import("@/lib/nina/confidence/politica-override.server"),
-        ]);
+      const [
+        { garantirScoreDoTextoEnviado, paraDecisaoLegado },
+        { montarRegistroAuditoria },
+        { configuracaoDoTurno },
+      ] = await Promise.all([
+        import("@/lib/nina/confidence/runtime"),
+        import("@/lib/nina/confidence/auditoria"),
+        import("@/lib/nina/confidence/configuracao-turno.server"),
+      ]);
+      // Mesma configuração do início do turno: publicar um ajuste durante a
+      // geração não muda a régua no meio da avaliação.
+      const cfgFinal = await configuracaoDoTurno(clinicaId);
       const estadoParaTextoFinal = {
         ...estadoTurnoFinal,
         texto: resposta,
@@ -2250,7 +2260,7 @@ async function gerarRespostaNinaInterno(
         // A avaliação da ação nunca serve como nota da mensagem final: ela é
         // action_safety, então o gate sempre a invalida e recalcula.
         avaliacaoAcao,
-        await politicaEfetiva(clinicaId),
+        cfgFinal.configuracao.parametros,
       );
       const respostaFinalAvaliada = gate.resultado;
 
@@ -2297,6 +2307,10 @@ async function gerarRespostaNinaInterno(
         // Caminho sem modelo fica com 0 rodadas: nada de execução inventada.
         rodadas: registroDoTurno?.rodadas ?? rodadasDoTurno,
         representacao: "texto_completo",
+        // FASE 6 — a mesma configuração histórica do turno.
+        configId: cfgFinal.configuracao.configId,
+        configOrigem: cfgFinal.configuracao.origem,
+        etapaAtivacao: cfgFinal.etapa,
         auditoria: montarRegistroAuditoria(respostaFinalAvaliada, {
           conversationId: estadoId.conversaId ?? null,
           messageId: estadoTurnoFinal.messageId ?? null,

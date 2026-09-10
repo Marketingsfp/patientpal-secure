@@ -14,9 +14,11 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   calibracaoConfiancaNina,
+  configuracaoConfiancaVigente,
   decidirPropostaConfianca,
   listarPropostasConfianca,
   registrarPropostasConfianca,
+  type ConfiguracaoConfiancaView,
   type PropostaConfiancaView,
 } from "@/lib/nina/confianca.functions";
 import type { RelatorioCalibracao } from "@/lib/nina/confidence/calibracao";
@@ -34,6 +36,15 @@ const ROTULO_STATUS: Record<string, string> = {
   rejeitada: "Rejeitada",
   aplicada: "Em vigor",
   revertida: "Revertida",
+  // FASE 6 — aprovada, mas depende de mudança no sistema: nunca "Em vigor".
+  implementacao_pendente: "Implementação pendente",
+};
+
+const ROTULO_ORIGEM: Record<string, string> = {
+  padrao: "Configuração padrão",
+  clinica: "Configuração da clínica",
+  cache_vencido: "Última configuração conhecida (leitura indisponível)",
+  fallback_padrao: "Padrão de emergência (leitura indisponível)",
 };
 
 export function CalibracaoConfianca({ clinicaId }: { clinicaId: string }) {
@@ -42,6 +53,8 @@ export function CalibracaoConfianca({ clinicaId }: { clinicaId: string }) {
   const registrar = useServerFn(registrarPropostasConfianca);
   const decidir = useServerFn(decidirPropostaConfianca);
 
+  const lerConfiguracao = useServerFn(configuracaoConfiancaVigente);
+  const [config, setConfig] = useState<ConfiguracaoConfiancaView | null>(null);
   const [dados, setDados] = useState<RelatorioCalibracao | null>(null);
   const [propostas, setPropostas] = useState<PropostaConfiancaView[]>([]);
   const [carregando, setCarregando] = useState(false);
@@ -50,18 +63,20 @@ export function CalibracaoConfianca({ clinicaId }: { clinicaId: string }) {
     if (!clinicaId) return;
     setCarregando(true);
     try {
-      const [r, p] = await Promise.all([
+      const [r, p, c] = await Promise.all([
         calibrar({ data: { clinicaId, dias: 30, ambiente: "producao" } }),
         listar({ data: { clinicaId } }),
+        lerConfiguracao({ data: { clinicaId } }).catch(() => null),
       ]);
       setDados(r);
       setPropostas(p);
+      setConfig(c);
     } catch {
       setDados(null);
     } finally {
       setCarregando(false);
     }
-  }, [calibrar, clinicaId, listar]);
+  }, [calibrar, clinicaId, lerConfiguracao, listar]);
 
   useEffect(() => {
     void carregar();
@@ -90,7 +105,10 @@ export function CalibracaoConfianca({ clinicaId }: { clinicaId: string }) {
     }
   };
 
-  const decidirProposta = async (id: string, decisao: "aprovada" | "rejeitada" | "aplicada") => {
+  const decidirProposta = async (
+    id: string,
+    decisao: "aprovada" | "rejeitada" | "aplicada" | "revertida",
+  ) => {
     try {
       await decidir({ data: { clinicaId, propostaId: id, decisao } });
       toast.success(`Proposta ${ROTULO_STATUS[decisao]?.toLowerCase() ?? decisao}.`);
@@ -116,6 +134,48 @@ export function CalibracaoConfianca({ clinicaId }: { clinicaId: string }) {
         </Button>
       </CardHeader>
       <CardContent className="space-y-4">
+        {/* FASE 6 — a configuração em vigor aparece com identidade própria:
+            mudar um limite gera outra identidade e as respostas antigas
+            continuam com a configuração da época. */}
+        <div className="rounded-md border p-3 text-sm">
+          <p className="text-xs font-medium text-muted-foreground">Configuração em vigor</p>
+          {!config ? (
+            <p className="text-muted-foreground">Não foi possível ler a configuração agora.</p>
+          ) : (
+            <div className="space-y-1">
+              <p>
+                <span className="font-medium">{ROTULO_ORIGEM[config.origem] ?? config.origem}</span>{" "}
+                · identidade {config.configId}
+              </p>
+              <p className="text-muted-foreground">
+                Limites: alta a partir de {config.limites.HIGH}, intermediária a partir de{" "}
+                {config.limites.MEDIUM} · Etapa de ativação {config.etapa} · Algoritmo{" "}
+                {config.versaoPolitica}/{config.versaoMotor}
+                {config.vigenteDesde
+                  ? ` · em vigor desde ${new Date(config.vigenteDesde).toLocaleString("pt-BR")}`
+                  : ""}
+              </p>
+              {config.degradada && (
+                <p className="text-destructive">
+                  Atenção: a configuração da clínica não pôde ser lida ({config.motivoDegradacao}).
+                  O sistema está usando a configuração indicada acima até a leitura voltar.
+                </p>
+              )}
+              {config.descartadas.length > 0 && (
+                <p className="text-destructive">
+                  Ajustes recusados na validação (a configuração válida foi preservada):{" "}
+                  {config.descartadas.map((d) => `${d.alvo} (${d.motivo})`).join(", ")}
+                </p>
+              )}
+              {config.implementacaoPendente.length > 0 && (
+                <p className="text-muted-foreground">
+                  Aprovados, porém dependem de mudança no sistema:{" "}
+                  {config.implementacaoPendente.map((d) => d.alvo).join(", ")}
+                </p>
+              )}
+            </div>
+          )}
+        </div>
         {!dados ? (
           <p className="text-sm text-muted-foreground">
             {carregando ? "Carregando…" : "Sem dados no período."}
@@ -247,6 +307,20 @@ export function CalibracaoConfianca({ clinicaId }: { clinicaId: string }) {
                           >
                             Colocar em vigor
                           </Button>
+                        )}
+                        {p.status === "aplicada" && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => void decidirProposta(p.id, "revertida")}
+                          >
+                            Reverter
+                          </Button>
+                        )}
+                        {p.status === "implementacao_pendente" && (
+                          <span className="text-xs text-muted-foreground">
+                            Depende de mudança no sistema para produzir efeito.
+                          </span>
                         )}
                       </span>
                     </li>

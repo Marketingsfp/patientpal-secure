@@ -8431,11 +8431,14 @@ export type Database = {
           categorias: Json
           claims: Json | null
           clinica_id: string
+          config_id: string | null
+          config_origem: string | null
           conflitos: Json | null
           conversation_id: string | null
           created_at: string
           decisao: string | null
           engine_version: string | null
+          etapa_ativacao: string | null
           evidence_coverage: number | null
           evidencias_hash: string | null
           execucao_id: string | null
@@ -8477,11 +8480,14 @@ export type Database = {
           categorias?: Json
           claims?: Json | null
           clinica_id: string
+          config_id?: string | null
+          config_origem?: string | null
           conflitos?: Json | null
           conversation_id?: string | null
           created_at?: string
           decisao?: string | null
           engine_version?: string | null
+          etapa_ativacao?: string | null
           evidence_coverage?: number | null
           evidencias_hash?: string | null
           execucao_id?: string | null
@@ -8523,11 +8529,14 @@ export type Database = {
           categorias?: Json
           claims?: Json | null
           clinica_id?: string
+          config_id?: string | null
+          config_origem?: string | null
           conflitos?: Json | null
           conversation_id?: string | null
           created_at?: string
           decisao?: string | null
           engine_version?: string | null
+          etapa_ativacao?: string | null
           evidence_coverage?: number | null
           evidencias_hash?: string | null
           execucao_id?: string | null

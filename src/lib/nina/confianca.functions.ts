@@ -114,6 +114,12 @@ import type { NivelConfianca } from "./confidence/types";
 
 export type ValidadorResumo = { validator: string; status: string; reasonCode: string | null };
 
+/** Leitura defensiva de coluna textual do snapshot. */
+function texto(linha: unknown, coluna: string): string | null {
+  const v = (linha as Record<string, unknown> | null)?.[coluna];
+  return v == null || v === "" ? null : String(v);
+}
+
 export type ConfiabilidadeDecisaoView = {
   score: number;
   nivel: string;
@@ -146,6 +152,20 @@ export type ConfiabilidadeDecisaoView = {
   decisaoTurno: string | null;
   /** FASE 5 — motivo legível da decisão, para o painel explicar o porquê. */
   motivoDecisao: string | null;
+  /** FASE 6 — identidade da configuração efetiva usada nesta avaliação. */
+  configId: string | null;
+  /** FASE 6 — padrão, clínica, cache vencido ou fallback declarado. */
+  configOrigem: string | null;
+  /** FASE 6 — etapa de ativação (A/B/C/D) vigente no turno. */
+  etapaAtivacao: string | null;
+  /** FASE 6 — o que o MOTOR recomendou, antes de qualquer etapa. */
+  decisaoRecomendada: string | null;
+  /** FASE 6 — o motor teria liberado? (aplicação da etapa) */
+  teriaPermitido: boolean | null;
+  /** FASE 6 — efeito realmente registrado no atendimento. */
+  efeitoRealizado: string | null;
+  /** FASE 6 — o motor apenas observou (shadow) ou decidiu (enforce). */
+  modo: string | null;
 };
 
 export type SegurancaAcaoView = {
@@ -172,7 +192,7 @@ export const confiabilidadeDaExecucao = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }): Promise<ConfiabilidadeDecisaoView | null> => {
     const colunas =
-      "created_at, ambiente, score, nivel, intencao, resultado_final, bloqueadores, validadores, ferramentas, fontes, reason_codes, acao_solicitada, turn_type, policy_version, avaliacao, evidence_coverage, engine_version";
+      "created_at, ambiente, score, nivel, intencao, resultado_final, bloqueadores, validadores, ferramentas, fontes, reason_codes, acao_solicitada, turn_type, policy_version, avaliacao, evidence_coverage, engine_version, config_id, config_origem, etapa_ativacao, decisao, teria_permitido, modo, handoff_ocorreu";
     // FASE 6 — o snapshot é procurado primeiro pela mensagem realmente
     // enviada. Só quando esse vínculo não existir (registros antigos) usamos
     // a execução. FASE 5 — dentro disso, vale a confiança da RESPOSTA FINAL.
@@ -328,6 +348,20 @@ export const confiabilidadeDaExecucao = createServerFn({ method: "POST" })
         const m = (segRow as Record<string, unknown> | null)?.["handoff_reason"];
         return m ? (ROTULO_MOTIVO_TURNO[String(m)] ?? String(m)) : null;
       })(),
+      // FASE 6 — recomendação do motor, aplicação da etapa e efeito realizado
+      // são três coisas distintas e aparecem separadas.
+      configId: texto(r, "config_id"),
+      configOrigem: texto(r, "config_origem"),
+      etapaAtivacao: texto(r, "etapa_ativacao"),
+      decisaoRecomendada: texto(r, "decisao"),
+      teriaPermitido: (() => {
+        const v = (r as unknown as Record<string, unknown>)["teria_permitido"];
+        return v == null ? null : Boolean(v);
+      })(),
+      efeitoRealizado:
+        ROTULO_RESULTADO[(r.resultado_final ?? "") as ResultadoFinalAuditoria] ??
+        texto(r, "resultado_final"),
+      modo: texto(r, "modo"),
     };
   });
 
@@ -675,8 +709,16 @@ export const registrarPropostasConfianca = createServerFn({ method: "POST" })
   });
 
 /**
- * Aprovar, rejeitar ou aplicar uma proposta. Sempre com pessoa responsável:
- * a Nina não pode chamar esta função (exige sessão autenticada).
+ * Aprovar, rejeitar, aplicar ou reverter uma proposta. Sempre com pessoa
+ * responsável: a Nina não pode chamar esta função (exige sessão autenticada)
+ * e os controles de aprovação do banco continuam valendo.
+ *
+ * FASE 6:
+ *  - antes de marcar "Em vigor", o ajuste é validado JUNTO com os já
+ *    aplicados. Se a combinação for inválida, a última configuração válida é
+ *    preservada e nada muda;
+ *  - proposta que exige mudança de código (novo bloqueador, revisão de
+ *    validador) nunca fica "Em vigor": ela vira "implementação pendente".
  */
 export const decidirPropostaConfianca = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -685,29 +727,86 @@ export const decidirPropostaConfianca = createServerFn({ method: "POST" })
       .object({
         clinicaId: z.string().uuid(),
         propostaId: z.string().uuid(),
-        decisao: z.enum(["aprovada", "rejeitada", "aplicada"]),
+        decisao: z.enum(["aprovada", "rejeitada", "aplicada", "revertida"]),
         motivo: z.string().max(500).optional(),
       })
       .parse(i),
   )
-  .handler(async ({ data, context }): Promise<{ status: string }> => {
+  .handler(async ({ data, context }): Promise<{ status: string; motivo?: string }> => {
     const agora = new Date().toISOString();
-    const patch: Partial<{
+
+    // A proposta precisa existir NESTA clínica (RLS já restringe; a leitura
+    // explícita evita decidir no escuro).
+    const { data: alvo, error: erroAlvo } = await context.supabase
+      .from("nina_confianca_propostas")
+      .select("id, tipo, alvo, valor_sugerido, status")
+      .eq("id", data.propostaId)
+      .eq("clinica_id", data.clinicaId)
+      .maybeSingle();
+    if (erroAlvo) throw new Error(erroAlvo.message);
+    if (!alvo) throw new Error("Proposta não encontrada nesta clínica.");
+    const p = alvo as Record<string, unknown>;
+
+    let statusFinal: string = data.decisao;
+    let motivoTecnico: string | undefined;
+
+    if (data.decisao === "aplicada") {
+      const [{ configuracaoEfetiva }, { exigeImplementacaoDeCodigo, validarAjusteNaConfiguracao }] =
+        await Promise.all([
+          import("./confidence/politica-override.server"),
+          import("./confidence/configuracao"),
+        ]);
+      const tipo = String(p["tipo"] ?? "");
+      if (exigeImplementacaoDeCodigo(tipo)) {
+        statusFinal = "implementacao_pendente";
+        motivoTecnico = "exige_implementacao_de_codigo";
+      } else {
+        const atual = await configuracaoEfetiva(data.clinicaId);
+        if (atual.degradada) {
+          throw new Error(
+            "A configuração atual não pôde ser lida com segurança. Tente novamente antes de colocar em vigor.",
+          );
+        }
+        const check = validarAjusteNaConfiguracao(atual, {
+          id: String(p["id"]),
+          tipo,
+          alvo: String(p["alvo"] ?? ""),
+          valor: p["valor_sugerido"],
+          aplicadoEm: agora,
+          aplicadoPor: context.userId,
+        });
+        if (!check.ok) {
+          // Configuração válida preservada: nada é gravado.
+          throw new Error(`Ajuste recusado na validação: ${check.motivo}`);
+        }
+      }
+    }
+
+    const patch: {
       status: string;
-      decidido_por: string;
-      decidido_em: string;
-      motivo_decisao: string | null;
-      aplicado_por: string;
-      aplicado_em: string;
-    }> =
-      data.decisao === "aplicada"
+      decidido_por?: string;
+      decidido_em?: string;
+      motivo_decisao?: string | null;
+      aplicado_por?: string;
+      aplicado_em?: string;
+    } =
+      statusFinal === "aplicada"
         ? { status: "aplicada", aplicado_por: context.userId, aplicado_em: agora }
-        : {
-            status: data.decisao,
-            decidido_por: context.userId,
-            decidido_em: agora,
-            motivo_decisao: data.motivo ?? null,
-          };
+        : statusFinal === "implementacao_pendente"
+          ? {
+              status: "implementacao_pendente",
+              decidido_por: context.userId,
+              decidido_em: agora,
+              motivo_decisao:
+                data.motivo ??
+                "Aprovada, porém depende de mudança no sistema para produzir efeito real.",
+            }
+          : {
+              status: statusFinal,
+              decidido_por: context.userId,
+              decidido_em: agora,
+              motivo_decisao: data.motivo ?? null,
+            };
 
     const { error } = await context.supabase
       .from("nina_confianca_propostas")
@@ -716,11 +815,87 @@ export const decidirPropostaConfianca = createServerFn({ method: "POST" })
       .eq("clinica_id", data.clinicaId);
     if (error) throw new Error(error.message);
 
-    if (data.decisao === "aplicada") {
+    if (statusFinal === "aplicada" || statusFinal === "revertida") {
       const { limparCachePolitica } = await import("./confidence/politica-override.server");
       limparCachePolitica(data.clinicaId);
     }
-    return { status: data.decisao };
+    return motivoTecnico ? { status: statusFinal, motivo: motivoTecnico } : { status: statusFinal };
+  });
+
+// --------------------------- FASE 6: configuração efetiva (leitura)
+
+export type ConfiguracaoConfiancaView = {
+  configId: string;
+  versaoPolitica: string;
+  versaoMotor: string;
+  origem: string;
+  degradada: boolean;
+  motivoDegradacao: string | null;
+  vigenteDesde: string | null;
+  limites: { HIGH: number; MEDIUM: number };
+  pesos: Array<{ alvo: string; valor: number }>;
+  minimoPorRisco: Array<{ risco: string; valor: number }>;
+  aplicadas: Array<{ id: string; alvo: string; valor: number; aplicadoEm: string | null }>;
+  descartadas: Array<{ id: string; alvo: string; motivo: string }>;
+  implementacaoPendente: Array<{ id: string; alvo: string; tipo: string }>;
+  etapa: string;
+};
+
+/** Configuração de confiança REALMENTE em vigor nesta clínica agora. */
+export const configuracaoConfiancaVigente = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => z.object({ clinicaId: z.string().uuid() }).parse(i))
+  .handler(async ({ data, context }): Promise<ConfiguracaoConfiancaView> => {
+    // Isolamento entre clínicas: só lê a configuração de uma clínica do
+    // próprio usuário (a mesma checagem que a RLS aplica nas leituras).
+    const { data: vinculo, error: erroVinculo } = await context.supabase
+      .from("nina_confianca_propostas")
+      .select("clinica_id")
+      .eq("clinica_id", data.clinicaId)
+      .limit(1);
+    if (erroVinculo) throw new Error(erroVinculo.message);
+    void vinculo;
+
+    const [{ configuracaoEfetiva }, { etapaConfianca }] = await Promise.all([
+      import("./confidence/politica-override.server"),
+      import("./confidence/etapas-flag.server"),
+    ]);
+    const [cfg, etapa] = await Promise.all([
+      configuracaoEfetiva(data.clinicaId),
+      etapaConfianca(data.clinicaId),
+    ]);
+    return {
+      configId: cfg.configId,
+      versaoPolitica: cfg.versaoPolitica,
+      versaoMotor: cfg.versaoMotor,
+      origem: cfg.origem,
+      degradada: cfg.degradada,
+      motivoDegradacao: cfg.motivoDegradacao,
+      vigenteDesde: cfg.vigenteDesde,
+      limites: { HIGH: cfg.parametros.limites.HIGH, MEDIUM: cfg.parametros.limites.MEDIUM },
+      pesos: Object.entries(cfg.parametros.pesos).map(([alvo, valor]) => ({ alvo, valor })),
+      minimoPorRisco: Object.entries(cfg.parametros.minimoPorRisco).map(([risco, valor]) => ({
+        risco,
+        valor,
+      })),
+      aplicadas: cfg.propostasAplicadas.map((a) => ({
+        id: a.id,
+        alvo: a.alvo,
+        valor: a.valor,
+        aplicadoEm: a.aplicadoEm,
+      })),
+      descartadas: cfg.propostasDescartadas.map((d) => ({
+        id: d.id,
+        alvo: d.alvo,
+        motivo: d.motivo,
+      })),
+      implementacaoPendente: cfg.propostasComImplementacaoPendente.map((d) => ({
+        id: d.id,
+        alvo: d.alvo,
+        tipo: d.tipo,
+      })),
+      etapa,
+    };
   });
 
 // --------------------------- Indicador de confiança na Inbox (por mensagem)
@@ -740,6 +915,13 @@ export type ConfiancaDaMensagem = {
    * foi reportada como erro. Derivado do snapshot + reporte já gravados.
    */
   alta_confianca_com_erro: boolean;
+  /**
+   * FASE 6 — o que este registro avalia. Só `answer_confidence` é confiança
+   * DA RESPOSTA; `action_safety` avalia a AÇÃO e nunca vira nota do texto.
+   */
+  avaliacao: "answer_confidence" | "action_safety";
+  /** FASE 6 — configuração efetiva usada quando a resposta foi produzida. */
+  config_id: string | null;
 };
 
 /** Vínculo entre o snapshot de confiança e o reporte de erro da equipe. */
@@ -769,7 +951,7 @@ export const confiancaDasExecucoes = createServerFn({ method: "POST" })
     const { data: rows, error } = await context.supabase
       .from("nina_confianca_decisoes")
       .select(
-        "execucao_id, score, nivel, resultado_final, acao, bloqueadores, bloqueio, created_at, policy_version, avaliacao",
+        "execucao_id, score, nivel, resultado_final, acao, bloqueadores, bloqueio, created_at, policy_version, avaliacao, config_id",
       )
       .eq("clinica_id", data.clinicaId)
       .in("execucao_id", data.execucaoIds)
@@ -799,6 +981,8 @@ export const confiancaDasExecucoes = createServerFn({ method: "POST" })
         policy_version: r["policy_version"] ? String(r["policy_version"]) : null,
         erro_reportado: null,
         alta_confianca_com_erro: false,
+        avaliacao: peso === 2 ? "answer_confidence" : "action_safety",
+        config_id: r["config_id"] ? String(r["config_id"]) : null,
       });
     }
 
