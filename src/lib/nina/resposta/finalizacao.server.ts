@@ -156,12 +156,12 @@ export async function finalizarResposta(
   // 4) Rastreabilidade: fica registrado que o texto passou pela finalização.
   try {
     const { registrarTransformacaoResposta } = await import("@/lib/nina/rastreio/turno.server");
-    registrarTransformacaoResposta(
-      "finalizacao",
-      `origem=${resultado.origem}; template=${resultado.chaveTemplate ?? "-"}; canal=${pedido.canal}`,
-      hashDoTexto(pedido.resultado.texto ?? ""),
-      finalizada.textoHash,
-    );
+    registrarTransformacaoResposta({
+      etapa: "finalizacao",
+      motivo: `origem=${resultado.origem}; template=${resultado.chaveTemplate ?? "-"}; canal=${pedido.canal}`,
+      antesHash: hashDoTexto(pedido.resultado.texto ?? ""),
+      depoisHash: finalizada.textoHash,
+    });
   } catch {
     /* rastreabilidade nunca interrompe o atendimento */
   }
