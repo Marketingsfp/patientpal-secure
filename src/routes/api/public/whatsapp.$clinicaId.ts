@@ -480,6 +480,7 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
                       reply = await gerarRespostaNina(params.clinicaId, turno.texto, from, {
                         auditoria: auditoriaNina,
                         mensagensEntrada: entradasTurno,
+                        lote: { batchId: turno.batchId || null, revisao: turno.revisao || null },
                         revisao: turno.revisao
                           ? { telefone: fromDigits || from, valor: turno.revisao }
                           : undefined,

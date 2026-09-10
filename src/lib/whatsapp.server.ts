@@ -544,6 +544,12 @@ export async function gerarRespostaNina(
      * para não executar ação crítica sobre estado já ultrapassado.
      */
     revisao?: { telefone: string; valor: number };
+    /**
+     * FASE 5 — lote (Message Burst) tratado como UM turno do paciente.
+     * `mensagensEntrada` continua sendo o histórico físico; aqui viaja o
+     * vínculo lógico usado por intenção, estado, Confidence e auditoria.
+     */
+    lote?: { batchId: string | null; revisao: number | null };
   },
 ): Promise<string> {
   const { comColetor } = await import("@/lib/nina/evidencias.server");
@@ -563,6 +569,9 @@ export async function gerarRespostaNina(
   rastro.iniciar("message.inbound", {
     origem: opcoes?.teste ? "homologacao" : "whatsapp",
     tamanho_mensagem: mensagemPaciente.length,
+    // FASE 5 — turno lógico: quantas mensagens físicas ele agrega.
+    batch_id: opcoes?.lote?.batchId ?? null,
+    mensagens_no_lote: opcoes?.mensagensEntrada?.length ?? 1,
   });
 
   try {
@@ -604,6 +613,7 @@ async function gerarRespostaNinaInterno(
     auditoria?: { execucaoId?: string | null };
     mensagensEntrada?: string[];
     revisao?: { telefone: string; valor: number };
+    lote?: { batchId: string | null; revisao: number | null };
     rastro?: import("@/lib/nina/arquitetura/tracing").Rastro;
   },
 ): Promise<string> {
@@ -1420,6 +1430,13 @@ async function gerarRespostaNinaInterno(
           // fluxo autoriza `criar_agendamento`.
           stage: fluxoEstado.flow.stage,
           messageIdEntrada: opcoes?.mensagensEntrada?.[0] ?? null,
+          // FASE 5 — a intenção e o estágio são lidos do TURNO COMPLETO
+          // (`mensagemPaciente` já é o lote inteiro), não de cada fragmento.
+          lote: {
+            batchId: opcoes?.lote?.batchId ?? null,
+            messageIds: opcoes?.mensagensEntrada ?? [],
+            conversationRevision: opcoes?.lote?.revisao ?? null,
+          },
         },
         { detectarIntencoes, intencaoAmbigua },
       );
@@ -1541,6 +1558,10 @@ async function gerarRespostaNinaInterno(
           auditoria: montarRegistroAuditoria(decisao, {
             conversationId: estadoId.conversaId ?? null,
             messageId: canonico.messageIdEntrada,
+            batchId: canonico.lote.batchId,
+            batchMessageIds: canonico.lote.messageIds,
+            conversationRevision: canonico.lote.conversationRevision,
+            executionId: respostaIA.execucaoId ?? null,
             intencao: canonico.intent,
             // Mesma ação vista pelo motor. Capacidade de agenda não entra aqui.
             acaoSolicitada: canonico.requestedAction,
@@ -1868,6 +1889,10 @@ async function gerarRespostaNinaInterno(
         auditoria: montarRegistroAuditoria(respostaFinalAvaliada, {
           conversationId: estadoId.conversaId ?? null,
           messageId: estadoTurnoFinal.messageId ?? null,
+          batchId: opcoes?.lote?.batchId ?? null,
+          batchMessageIds: opcoes?.mensagensEntrada ?? [],
+          conversationRevision: opcoes?.lote?.revisao ?? null,
+          executionId: execucaoIdFinal ?? null,
           intencao: estadoTurnoFinal.intent ?? null,
           acaoSolicitada: estadoTurnoFinal.acao ?? "desconhecida",
           ferramentas: evidenciasFerramentas,
