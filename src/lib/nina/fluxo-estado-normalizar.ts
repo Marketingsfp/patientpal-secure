@@ -3,6 +3,14 @@
  * Separado do arquivo .server para poder ser usado em qualquer camada.
  */
 
+import {
+  normalizarPendencia,
+  pendenciaVazia,
+  type PendenciaEsclarecimento,
+} from "./confidence/esclarecimento";
+
+export type { PendenciaEsclarecimento };
+
 export type EtapaFluxoNina =
   | "IDLE"
   | "BOOKING_INTENT_CONFIRMED"
@@ -66,6 +74,12 @@ export type EstadoFluxoNina = {
 
   };
   flow: { stage: EtapaFluxoNina };
+  /**
+   * FASE 4 — pergunta de esclarecimento aguardando resposta do paciente.
+   * Sobrevive a reinício, lote agrupado e retomada; a tentativa só é
+   * consumida quando o paciente responde e a dúvida continua.
+   */
+  clarification?: PendenciaEsclarecimento;
   updated_at: string | null;
   /** Identificador da sessão operacional atual (nova sessão = novo id). */
   session_id?: string | null;
@@ -104,6 +118,7 @@ export function estadoVazio(): EstadoFluxoNina {
 
     },
     flow: { stage: "IDLE" },
+    clarification: pendenciaVazia(),
     updated_at: null,
     session_id: null,
     session_started_at: null,
@@ -126,6 +141,7 @@ export function normalizarEstado(bruto: unknown): EstadoFluxoNina {
 
     appointment: { ...base.appointment, ...(o["appointment"] ?? {}) },
     flow: { stage: (o["flow"]?.stage ?? "IDLE") as EtapaFluxoNina },
+    clarification: normalizarPendencia(o["clarification"]),
     updated_at: o["updated_at"] ?? null,
     session_id: o["session_id"] ?? null,
     session_started_at: o["session_started_at"] ?? null,

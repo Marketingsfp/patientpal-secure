@@ -1347,6 +1347,16 @@ async function gerarRespostaNinaInterno(
       : null,
   });
   const mensagens: MsgIA[] = contexto.messages as MsgIA[];
+  // FASE 4 — a pendência de esclarecimento entra no contrato de SISTEMA
+  // (estado e restrições), nunca como uma falsa mensagem do paciente.
+  {
+    const { blocoContratoEsclarecimento, normalizarPendencia: normPend } = await import(
+      "@/lib/nina/confidence/esclarecimento"
+    );
+    const bloco = blocoContratoEsclarecimento(normPend(fluxoEstado.clarification));
+    // Logo após o prompt publicado, antes do histórico do paciente.
+    if (bloco) mensagens.splice(1, 0, { role: "system", content: bloco });
+  }
   rastro?.concluir("context.load", {
     mensagens_contexto: mensagens.length,
     paciente_identificado: Boolean(pacienteIdEfetivo),
@@ -1424,9 +1434,22 @@ async function gerarRespostaNinaInterno(
   const fatosDoTurno: import("@/lib/nina/confidence/evidencia").FatoRecuperado[] = [];
   const consultasDoTurno: import("@/lib/nina/confidence/evidencia").ConsultaDoTurno[] = [];
   let esclarecimentoConfiancaUsado = false;
-  // FASE 4 — quantas vezes a Nina já tentou esclarecer neste atendimento.
-  // O limite vive na política central (POLITICA_RECUPERACAO_PADRAO).
+  // FASE 4 — esclarecimento é ESTADO da conversa, não rodada interna do
+  // modelo. A pendência persistida sobrevive a reinício, lote agrupado e
+  // retomada; a tentativa só é consumida quando o paciente responde e a
+  // dúvida continua. O limite vive na política central.
+  const {
+    abrirPendencia,
+    fecharPendencia,
+    normalizarPendencia,
+    perguntaParaPaciente,
+    reavaliarPendencia,
+  } = await import("@/lib/nina/confidence/esclarecimento");
+  const pendenciaAnterior = normalizarPendencia(fluxoEstado.clarification);
+  let pendenciaAvaliada = false;
   let tentativasEsclarecimentoConfianca = 0;
+  // FASE 4 — desfecho explícito quando o laço termina sem resposta aprovada.
+  let limiteRodadasAtingido = false;
   // Disponibilidade confirmada em tempo real nesta conversa (pré-commit).
   let disponibilidadeConfirmada = false;
   // Dados já coletados no turno — entram no resumo estruturado do handoff.
@@ -1535,10 +1558,12 @@ async function gerarRespostaNinaInterno(
           texto: texto.slice(0, 200),
         });
         mensagens.push({ role: "assistant", content: texto });
+        // FASE 4 — restrição interna viaja no contrato de sistema, nunca como
+        // uma falsa mensagem do paciente.
         mensagens.push({
-          role: "user",
+          role: "system",
           content:
-            "[SISTEMA] Nenhum agendamento foi gravado. É PROIBIDO dizer que agendou, que está agendando ou que vai agendar sem chamar a ferramenta 'agendar' e receber appointment_id. Chame agora a ferramenta 'agendar' com os campos inicio/fim exatos do horário confirmado. Se não for possível, responda apenas: 'Não consegui concluir seu agendamento neste momento. Vou verificar novamente.'",
+            "Nenhum agendamento foi gravado. É PROIBIDO dizer que agendou, que está agendando ou que vai agendar sem chamar a ferramenta 'agendar' e receber appointment_id. Chame agora a ferramenta 'agendar' com os campos inicio/fim exatos do horário confirmado. Se não for possível, responda apenas: 'Não consegui concluir seu agendamento neste momento. Vou verificar novamente.'",
         });
         continue;
       }
@@ -1558,7 +1583,6 @@ async function gerarRespostaNinaInterno(
       // bloqueadores). Vale igual para atendimento real e homologação.
       const {
         decidirNoTurno,
-        instrucaoEsclarecimentoDirigida,
         motivoHandoff,
         paraDecisaoLegado,
         resumoHandoffEstruturado,
@@ -1592,6 +1616,16 @@ async function gerarRespostaNinaInterno(
         },
         { detectarIntencoes, intencaoAmbigua },
       );
+      if (!pendenciaAvaliada) {
+        const rev = reavaliarPendencia({
+          anterior: pendenciaAnterior,
+          intentAtual: canonico.intent ?? null,
+          messageIdAtual: canonico.messageIdEntrada ?? null,
+        });
+        tentativasEsclarecimentoConfianca = rev.tentativas;
+        fluxoEstado.clarification = rev.pendencia;
+        pendenciaAvaliada = true;
+      }
       const estadoTurno = {
         texto,
         mensagemPaciente,
@@ -1757,17 +1791,27 @@ async function gerarRespostaNinaInterno(
         });
       }
 
-      // Confiança intermediária: UMA pergunta objetiva ao paciente e depois o
-      // motor roda inteiro de novo (nada de reaproveitar a pontuação).
-      if (
-        (plano.decision === "CLARIFY" || (plano.decision === "BLOCK_ACTION" && plano.clarify)) &&
-        rodada < MAX_RODADAS - 1
-      ) {
+      // FASE 4 — confiança intermediária: UMA pergunta curta ao paciente, a
+      // pendência é persistida e o TURNO TERMINA. A reavaliação depende de
+      // nova entrada do paciente — reavaliar a mesma mensagem não consome
+      // tentativa nem justifica transferência.
+      if (plano.decision === "CLARIFY" || (plano.decision === "BLOCK_ACTION" && plano.clarify)) {
         esclarecimentoConfiancaUsado = true;
-        tentativasEsclarecimentoConfianca += 1;
-        mensagens.push({ role: "assistant", content: texto });
-        mensagens.push({ role: "user", content: instrucaoEsclarecimentoDirigida(decisao) });
-        continue;
+        fluxoEstado.clarification = abrirPendencia({
+          resultado: decisao,
+          intent: canonico.intent ?? null,
+          messageId: canonico.messageIdEntrada ?? null,
+          tentativasConsumidas: tentativasEsclarecimentoConfianca,
+        });
+        resposta = perguntaParaPaciente(decisao, canonico.turnType);
+        {
+          const { registrarOrigemResposta } = await import("@/lib/nina/rastreio/turno.server");
+          registrarOrigemResposta(
+            "codigo",
+            `pergunta de esclarecimento emitida (${plano.reason}); turno encerrado aguardando o paciente`,
+          );
+        }
+        break;
       }
 
       // Confiança baixa ou bloqueio absoluto: transfere pelo mesmo caminho já
@@ -1785,23 +1829,52 @@ async function gerarRespostaNinaInterno(
             urgencia: "normal",
           }),
         );
-        if (rh.success) houveHandoff = true;
-        resposta = rh.success
-          ? "Para não te passar uma informação errada, vou chamar uma atendente da nossa equipe para confirmar isso com você."
-          : texto;
+        // FASE 4 — só se anuncia transferência DEPOIS da confirmação do
+        // serviço. Em falha, o paciente recebe a verdade sobre a limitação;
+        // o rascunho reprovado nunca é enviado.
+        const { desfechoDeHandoff } = await import("@/lib/nina/confidence/desfecho");
+        const desfecho = desfechoDeHandoff({
+          confirmado: rh.success === true,
+          motivo: `${plano.decision}/${plano.reason}`,
+          erro: rh.erro ?? null,
+        });
+        if (desfecho.handoffConfirmado) houveHandoff = true;
+        if (!desfecho.handoffConfirmado) {
+          console.error("[NINA_HANDOFF] transferência não confirmada", {
+            conversa_id: estadoId.conversaId,
+            motivo: plano.reason,
+            erro: rh.erro ?? null,
+          });
+        }
+        // Estado recuperável: a pendência fica registrada para a retomada.
+        fluxoEstado.clarification = fecharPendencia();
+        resposta = desfecho.resposta;
         {
           const { registrarOrigemResposta } = await import("@/lib/nina/rastreio/turno.server");
-          registrarOrigemResposta(
-            rh.success ? "codigo" : "modelo",
-            rh.success
-              ? `texto fixo de transferência (${plano.decision}/${plano.reason})`
-              : "transferência não concluída — texto do modelo mantido",
-          );
+          registrarOrigemResposta("codigo", `${desfecho.estado}: ${desfecho.explicacao}`);
         }
+        registrarEtapa({
+          tipo: "resposta_original",
+          fonte: "sistema",
+          titulo: `Desfecho do turno: ${desfecho.estado}`,
+          dados: {
+            estado: desfecho.estado,
+            handoff_confirmado: desfecho.handoffConfirmado,
+            requer_retomada_humana: desfecho.requerRetomadaHumana,
+            decisao_recomendada: decisao.decision,
+            decisao_aplicada: aplicado.decisaoEfetiva,
+            plano: plano.decision,
+            motivo: plano.reason,
+            erro: desfecho.erro,
+          },
+          codigo: { arquivo: "src/lib/whatsapp.server.ts", funcao: "gerarRespostaNinaInterno" },
+        });
         break;
       }
 
       resposta = texto;
+      // A dúvida foi resolvida neste turno: a pendência deixa de existir.
+      fluxoEstado.clarification = fecharPendencia();
       {
         const { registrarOrigemResposta } = await import("@/lib/nina/rastreio/turno.server");
         registrarOrigemResposta("modelo", "texto devolvido pelo modelo, sem substituição");
@@ -1963,6 +2036,34 @@ async function gerarRespostaNinaInterno(
         registrarOrigemResposta("nenhuma", "turno abortado por revisão obsoleta da conversa");
       }
       break;
+    }
+    if (rodada === MAX_RODADAS - 1) limiteRodadasAtingido = true;
+  }
+
+  // FASE 4 — LIMITE DE RODADAS: desfecho explícito. O último rascunho NÃO
+  // vira resposta aprovada; tenta-se a transferência e o paciente recebe a
+  // verdade sobre o que aconteceu.
+  if (limiteRodadasAtingido && !turnoObsoleto && resposta.trim() === "") {
+    const rhLimite = await broker
+      .executar(
+        "solicitar_atendente_humano",
+        JSON.stringify({
+          motivo: `LIMITE_RODADAS: ${MAX_RODADAS} rodadas sem resposta aprovada`,
+          urgencia: "normal",
+        }),
+      )
+      .catch(() => ({ success: false, erro: "handoff_indisponivel" }) as { success: boolean; erro?: string });
+    const { desfechoLimiteRodadas } = await import("@/lib/nina/confidence/desfecho");
+    const desfecho = desfechoLimiteRodadas({
+      handoffConfirmado: rhLimite.success === true,
+      rodadas: MAX_RODADAS,
+      erro: rhLimite.erro ?? null,
+    });
+    if (desfecho.handoffConfirmado) houveHandoff = true;
+    resposta = desfecho.resposta;
+    {
+      const { registrarOrigemResposta } = await import("@/lib/nina/rastreio/turno.server");
+      registrarOrigemResposta("codigo", `${desfecho.estado}: ${desfecho.explicacao}`);
     }
   }
 
