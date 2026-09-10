@@ -242,6 +242,14 @@ export const listarConversas = createServerFn({ method: "POST" })
         q = q.or(filtro);
       }
     }
+    // --- Ordenação e limite (sempre por último) ----------------------------
+    q = q.order(plano.ordenarPor, { ascending: plano.ascendente, nullsFirst: false });
+    // Desempate estável: conversa sem a coluna da visualização não embaralha.
+    if (plano.ordenarPor !== "ultima_msg_em") {
+      q = q.order("ultima_msg_em", { ascending: false });
+    }
+    q = q.limit(data.limit);
+
     const { data: rows, error } = await q;
     marcar("consulta");
     if (error) throw new Error(error.message);
