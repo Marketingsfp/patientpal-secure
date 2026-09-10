@@ -266,6 +266,22 @@ export function executarValidadores(ctx: ContextoConfianca): Verificacao[] {
     );
   }
 
+  // FASE 8 — ação de ESCRITA exige paciente identificado ANTES de liberar.
+  // A validação de commit já exigia isso; a decisão do turno passava sem ela,
+  // liberando "vou marcar para você" sem saber para quem.
+  if (POLITICA_PADRAO.acoesDeEscrita.includes(acaoOuNenhuma(ctx.requestedAction))) {
+    checks.push(
+      check(
+        "paciente_identificado_acao",
+        "Paciente identificado antes de executar a ação",
+        ctx.businessContext.pacienteIdentificado,
+        100,
+        "PACIENTE_NAO_IDENTIFICADO",
+        ctx.businessContext.pacienteIdentificado ? null : "paciente não identificado no turno",
+      ),
+    );
+  }
+
   // ---- verificações graduais (descontam pontos, não bloqueiam) ----
   checks.push(
     check(
@@ -319,7 +335,11 @@ export function decidirConfianca(
   // FASE 2 — dimensões que dizem "é seguro EXECUTAR?", não "o texto é
   // confiável?". Na avaliação da MENSAGEM elas saem da nota e do bloqueio;
   // continuam valendo integralmente para a segurança da ação.
-  const DE_ACAO = new Set([...politica.validadoresDeAcao, "campos_obrigatorios"]);
+  const DE_ACAO = new Set([
+    ...politica.validadoresDeAcao,
+    "campos_obrigatorios",
+    "paciente_identificado_acao",
+  ]);
 
   const checksBase = executarValidadores(ctx);
 
