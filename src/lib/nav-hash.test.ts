@@ -71,7 +71,7 @@ describe("menu lateral usa a construção genérica", () => {
   // que percorre os itens de cada seção.
   it("existe uma única renderização de item simples", () => {
     expect(SHELL.match(/data-nav-to=\{item\.to\}/g)?.length ?? 0).toBe(1);
-    expect(SHELL.match(/row\.items\.map\(/g)?.length ?? 0).toBe(1);
+    expect(SHELL.match(/row\.items\.map\(\(item\)/g)?.length ?? 0).toBe(1);
   });
 
   // Nenhum destino (rota + hash) pode estar cadastrado duas vezes na mesma
