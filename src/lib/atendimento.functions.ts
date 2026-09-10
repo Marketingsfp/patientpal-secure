@@ -12,7 +12,12 @@ import {
   filtroEscopoInbox,
   escopoComAtendente,
 } from "@/lib/atendimento/escopo-inbox";
-import { planoVisualizacao } from "@/lib/atendimento/filtros-inbox";
+import {
+  filtroResponsavel,
+  idsPorEsperaCrescente,
+  ordenarPorEspera,
+  planoVisualizacao,
+} from "@/lib/atendimento/filtros-inbox";
 import { loadWhatsAppConfig, metaSendText } from "./whatsapp.server";
 import {
   MSG_ADMIN_NAO_ATENDE,
@@ -179,12 +184,18 @@ export const listarConversas = createServerFn({ method: "POST" })
     // (`atend_espera_por_conversa`): conversa em que a clínica é que aguarda
     // o paciente fica de fora. O conjunto vem antes do corte da lista.
     let idsEspera: string[] | null = null;
+    const mapaEspera: Record<string, string> = {};
     if (plano.exigeEsperaPaciente) {
       const { data: esperas } = await context.supabase.rpc("atend_espera_por_conversa", {
         _clinica_id: data.clinicaId,
         _is_teste: false,
       });
-      idsEspera = ((esperas ?? []) as any[]).map((e) => e.conversa_id).filter(Boolean);
+      for (const e of (esperas ?? []) as any[]) {
+        if (e?.conversa_id && e?.aguardando_desde) mapaEspera[e.conversa_id] = e.aguardando_desde;
+      }
+      // Recorte pela métrica canônica ANTES do LIMIT: se houver mais conversas
+      // aguardando do que o teto da lista, ficam as de maior espera.
+      idsEspera = idsPorEsperaCrescente(mapaEspera).slice(0, data.limit);
       if (idsEspera.length === 0) {
         marcar("consulta");
         return [];
@@ -203,14 +214,23 @@ export const listarConversas = createServerFn({ method: "POST" })
     // --- Escopo (de quem é a conversa) -------------------------------------
     // Filtro por responsável direto no banco, antes de ordenar e cortar a
     // lista — nunca depois de baixar tudo para o navegador.
-    if (atendenteFiltro) q = q.eq("atribuida_user_id", atendenteFiltro);
-    if (filtroEscopo.tipo === "atribuida") q = q.eq("atribuida_user_id", filtroEscopo.userId);
+    // FASE 3 — em conversa resolvida o responsável ativo já foi limpo, então a
+    // responsabilidade canônica é `last_assigned_user_id` (gravado antes da
+    // limpeza) ou, na falta dele, `resolved_by`.
+    const porResponsavel = (query: any, userId: string, resolvidas: boolean) => {
+      const f = filtroResponsavel(userId, { somenteResolvidas: resolvidas });
+      return f.tipo === "ou" ? query.or(f.expr) : query.eq(f.coluna, f.userId);
+    };
+
+    if (atendenteFiltro) q = porResponsavel(q, atendenteFiltro, plano.somenteResolvidas);
+    if (filtroEscopo.tipo === "atribuida")
+      q = porResponsavel(q, filtroEscopo.userId, plano.somenteResolvidas);
     else if (filtroEscopo.tipo === "sem_responsavel")
       q = q.is("atribuida_user_id", null).neq("owner_type", "AI");
     else if (filtroEscopo.tipo === "nina") q = q.eq("owner_type", "AI");
     else if (filtroEscopo.tipo === "fechadas") {
       q = q.in("status", [...STATUS_FECHADOS]);
-      if (filtroEscopo.userId) q = q.eq("atribuida_user_id", filtroEscopo.userId);
+      if (filtroEscopo.userId) q = porResponsavel(q, filtroEscopo.userId, true);
     }
 
     // --- Visualização (estado da conversa) ---------------------------------
@@ -282,7 +302,15 @@ export const listarConversas = createServerFn({ method: "POST" })
         etapas: marcos,
       });
     }
-    return (rows ?? []).map((r: any) => ({ ...r, nao_lidas: naoLidas.get(r.id) ?? 0 }));
+    const saida = (rows ?? []).map((r: any) => ({
+      ...r,
+      nao_lidas: naoLidas.get(r.id) ?? 0,
+      // Métrica canônica de espera (mesma da Central "Prioridades Agora"),
+      // devolvida pronta para a tela não recalcular duração item a item.
+      ...(plano.exigeEsperaPaciente ? { aguardando_desde: mapaEspera[r.id] ?? r.aguardando_desde } : {}),
+    }));
+    // Quem começou a esperar antes vem primeiro, pela métrica canônica.
+    return plano.exigeEsperaPaciente ? ordenarPorEspera(saida, mapaEspera) : saida;
   });
 
 
