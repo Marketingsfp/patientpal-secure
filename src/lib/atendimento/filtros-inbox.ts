@@ -77,9 +77,57 @@ export function atendenteConsulta(e: EstadoFiltrosInbox): string | null {
   return null;
 }
 
-/** Status enviado à consulta. */
-export function statusConsulta(v: VisualizacaoInbox): "all" | "closed" {
-  return v === "resolvidas" ? "closed" : "all";
+/**
+ * Status enviado à consulta.
+ *
+ * FASE 2 — o estado da conversa passou a ser responsabilidade da
+ * visualização (aplicada no backend), que cobre `closed` E `finished`.
+ * O parâmetro `status` continua existindo para outros usos, mas a Inbox
+ * envia sempre "all" e deixa a matriz decidir.
+ */
+export function statusConsulta(_v: VisualizacaoInbox): "all" {
+  return "all";
+}
+
+/**
+ * FASE 2 — plano de consulta de uma visualização. É o que permite montar a
+ * query de forma composicional (escopo → estado → ordenação → limite), sem
+ * uma implementação diferente para cada combinação.
+ */
+export interface PlanoVisualizacao {
+  /** Só conversas encerradas/resolvidas. */
+  somenteResolvidas: boolean;
+  /** Só conversas em que o paciente está aguardando (métrica canônica). */
+  exigeEsperaPaciente: boolean;
+  /** Coluna de ordenação aplicada no banco. */
+  ordenarPor: "ultima_msg_em" | "resolved_at" | "aguardando_desde";
+  /** Ascendente = mais antigo primeiro (maior espera). */
+  ascendente: boolean;
+}
+
+export function planoVisualizacao(v: VisualizacaoInbox): PlanoVisualizacao {
+  if (v === "resolvidas") {
+    return {
+      somenteResolvidas: true,
+      exigeEsperaPaciente: false,
+      ordenarPor: "resolved_at",
+      ascendente: false,
+    };
+  }
+  if (v === "espera") {
+    return {
+      somenteResolvidas: false,
+      exigeEsperaPaciente: true,
+      ordenarPor: "aguardando_desde",
+      ascendente: true,
+    };
+  }
+  return {
+    somenteResolvidas: false,
+    exigeEsperaPaciente: false,
+    ordenarPor: "ultima_msg_em",
+    ascendente: false,
+  };
 }
 
 /** Ordenação natural de cada visualização. */
