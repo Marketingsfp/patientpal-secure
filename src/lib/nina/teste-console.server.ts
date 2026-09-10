@@ -337,6 +337,8 @@ export async function processarMensagemTeste(data: EntradaMensagemTeste, userId:
 
     let reply = "";
     let falhaTecnica = false;
+    /** Entrada lógica da Nina: uma mensagem OU o turno consolidado do lote. */
+    let textoDoTurno = textoPaciente;
     // Auditoria: id da execução que produziu esta resposta.
     const auditoriaNina: { execucaoId?: string | null } = {};
     // FASE 4 — ambiente real desta execução: se existe uma simulação em
