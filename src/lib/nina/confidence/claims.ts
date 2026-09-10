@@ -486,6 +486,25 @@ export function avaliarGrounding(ctx: ContextoConfianca, texto?: string | null):
       }
     }
 
+    // Reserva já persistida comprova o horário que ela mesma reservou.
+    if (
+      (tipo === "disponibilidade" || tipo === "escala") &&
+      typeof canalDoTipo === "string" &&
+      canalDoTipo.startsWith("appointment_id:")
+    ) {
+      push({
+        tipo,
+        trecho,
+        origem,
+        modalidade,
+        situacao: "confirmado",
+        suportado: true,
+        fonte: canalDoTipo,
+        motivo: "horário comprovado pela reserva já persistida",
+      });
+      return;
+    }
+
     // --------- sem fato correspondente
     const houveCanal = Boolean(canalDoTipo) || ferramentaExecutada(ctx, capsDoTipo(tipo));
     if (!houveCanal) {
@@ -634,7 +653,8 @@ export function ClaimGroundingValidator(ctx: ContextoConfianca): ResultadoValida
       ACOES_COM_DADO_OFICIAL.has(ctx.requestedAction) &&
       !ctx.requestedAction.startsWith("criar_") &&
       !ctx.requestedAction.startsWith("cancelar_");
-    return acaoInformativa && temTexto
+    // Negativa apoiada em consulta oficial é resposta correta, não lacuna.
+    return acaoInformativa && temTexto && !somenteNegativasApoiadas(ctx, texto)
       ? res("UNKNOWN", 0, "SEM_AFIRMACAO_RECONHECIDA_EM_ACAO_OFICIAL", {
           requestedAction: ctx.requestedAction,
         })
