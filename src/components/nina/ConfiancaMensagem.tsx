@@ -111,6 +111,15 @@ const ESTILO: Record<
   },
 };
 
+/** Sem avaliação da resposta: selo neutro, nunca verde/amarelo/vermelho. */
+const ESTILO_NEUTRO = {
+  classe: "border-border/60 text-muted-foreground",
+  ponto: "bg-muted-foreground/50",
+  curto: "—",
+  rotulo: "Resposta não avaliada",
+  Icone: ShieldQuestion,
+};
+
 function Secao({ titulo, children }: { titulo: string; children: React.ReactNode }) {
   return (
     <div className="space-y-0.5">
@@ -202,8 +211,10 @@ export function ConfiancaMensagemBadge({
     if (aberto && !detalhe) void carregar();
   }, [aberto, carregar, detalhe]);
 
-  const estilo = ESTILO[confianca.nivel] ?? ESTILO["LOW"]!;
   const rotulo = rotuloConfianca(confianca);
+  // FASE 6 — sem avaliação da RESPOSTA, o selo é neutro: nota de ação nunca
+  // é apresentada como confiança do texto.
+  const estilo = rotulo.avaliada ? (ESTILO[confianca.nivel] ?? ESTILO["LOW"]!) : ESTILO_NEUTRO;
   const { Icone } = estilo;
 
   return (
@@ -211,10 +222,14 @@ export function ConfiancaMensagemBadge({
       <PopoverTrigger asChild>
         <button
           type="button"
-          aria-label={`${estilo.rotulo}: ${confianca.score}%.${
-            confianca.erro_reportado ? " Erro reportado por atendente." : ""
-          } Ver detalhes.`}
-          title={`${estilo.rotulo} — ${scoreExibido(confianca.score)}% (visível apenas para a equipe)`}
+          aria-label={`${estilo.rotulo}${
+            rotulo.avaliada ? `: índice de evidência ${scoreExibido(confianca.score)} de 100.` : "."
+          }${confianca.erro_reportado ? " Erro reportado por atendente." : ""} Ver detalhes.`}
+          title={
+            rotulo.avaliada
+              ? `${estilo.rotulo} — ${ROTULO_INDICE_EVIDENCIA}: ${textoIndiceEvidencia(confianca.score)} (visível apenas para a equipe)`
+              : "A resposta não foi avaliada; existe apenas avaliação de segurança da ação (visível apenas para a equipe)."
+          }
           className={`inline-flex h-[18px] shrink-0 items-center gap-1 rounded-full border px-1.5 text-[10px] font-medium leading-none ${estilo.classe}`}
         >
           <span aria-hidden className={`h-1.5 w-1.5 rounded-full ${estilo.ponto}`} />

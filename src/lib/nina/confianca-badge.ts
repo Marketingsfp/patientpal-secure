@@ -41,17 +41,23 @@ export function scoreExibido(score: number): number {
   return Math.min(score, TETO_VISUAL_GERATIVO);
 }
 
-/** Rótulo do selo a partir do snapshot histórico (ou da ausência dele). */
+/**
+ * Rótulo do selo a partir do snapshot histórico (ou da ausência dele).
+ *
+ * FASE 6 — avaliação de AÇÃO não é confiança do TEXTO. Quando só existe
+ * `action_safety`, a mensagem aparece como "Resposta não avaliada": a nota da
+ * ação nunca é apresentada como se fosse a nota da resposta.
+ */
 export function rotuloConfianca(
   confianca: ConfiancaDaMensagem | null | undefined,
 ): RotuloConfianca {
-  if (!confianca) {
+  if (!confianca || confianca.avaliacao !== "answer_confidence") {
     return {
       avaliada: false,
-      texto: "Não avaliada",
+      texto: "Resposta não avaliada",
       nivel: null,
       score: null,
-      policyVersion: null,
+      policyVersion: confianca?.policy_version ?? null,
       altaConfiancaComErro: false,
     };
   }
@@ -72,7 +78,23 @@ export function rotuloConfianca(
 export function ehAltaConfiancaComErro(
   confianca: ConfiancaDaMensagem | null | undefined,
 ): boolean {
-  return Boolean(confianca && confianca.nivel === "HIGH" && confianca.erro_reportado);
+  return Boolean(
+    confianca &&
+      confianca.avaliacao === "answer_confidence" &&
+      confianca.nivel === "HIGH" &&
+      confianca.erro_reportado,
+  );
+}
+
+/**
+ * FASE 6 — a nota é ÍNDICE DE EVIDÊNCIA (0–100), não probabilidade de acerto.
+ * Ela mede quanto do que importava pôde ser verificado e como esses sinais
+ * foram — nunca uma chance estatística calibrada.
+ */
+export const ROTULO_INDICE_EVIDENCIA = "Índice de evidência (0–100)";
+
+export function textoIndiceEvidencia(score: number): string {
+  return `${scoreExibido(score)}/100`;
 }
 
 /** Filtro de confiança da Revisão de Aprendizados. */

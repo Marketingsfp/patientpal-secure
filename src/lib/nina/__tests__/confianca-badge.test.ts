@@ -22,6 +22,8 @@ function snapshot(over: Partial<ConfiancaDaMensagem>): ConfiancaDaMensagem {
     policy_version: "v1",
     erro_reportado: null,
     alta_confianca_com_erro: false,
+    avaliacao: "answer_confidence",
+    config_id: "cfg:v5:teste",
     ...over,
   };
 }
