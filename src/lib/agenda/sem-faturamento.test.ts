@@ -2,6 +2,7 @@ import { describe, expect, it } from "bun:test";
 import {
   MOTIVO_SEM_FATURAMENTO_OUTRO,
   ehSemFaturamento,
+  motivoIndicaPagamentoJaFeito,
   motivoSemFaturamentoFinal,
   podeAutorizarSemFaturamento,
   rotuloSemFaturamento,
@@ -99,5 +100,35 @@ describe("rotuloSemFaturamento", () => {
     expect(rotuloSemFaturamento({ sem_faturamento: true, sem_faturamento_em: "xxx" })).toContain(
       "parceiro",
     );
+  });
+});
+
+describe("motivoIndicaPagamentoJaFeito", () => {
+  it("reconhece os motivos reais de quem já tinha pagado", () => {
+    for (const t of [
+      "PAGAMENTO ESTÁ NO SISTEMA ANTIGO NO CLINICA TOTAL",
+      "PACIENTE PAGOU NO SISTEMA ANTIGO NO DIA 02-09",
+      "PACIENTE ESTÁ PAGO NO SISTEMA ANTIGO",
+      "PAGAMENTO ESTÁ NO SITEMA ANTIGO",
+      "ESTAVA NO OUTRO SISTEMA ANTIGO E NÃO FOI FATURADO NO NOVO",
+      "paciente veio no dia 28/08 nao estava utilizando o sistema novo",
+      "paciente ja estava pago no dia anterior pelo plano dia 01/09",
+    ]) {
+      expect(motivoIndicaPagamentoJaFeito(t)).toBe(true);
+    }
+  });
+
+  it("não acusa os usos corretos da marcação", () => {
+    for (const t of [
+      "Paciente paga direto ao laboratório parceiro",
+      "Convênio X fatura direto com o parceiro",
+      "funcionaria da clinica",
+      "DRA ROBERTA NAO ASSINOU O ATESTADO E NAO COMPARECEU A CLINICA 08/09/2026",
+      "Perícia do INSS",
+      "",
+    ]) {
+      expect(motivoIndicaPagamentoJaFeito(t)).toBe(false);
+    }
+    expect(motivoIndicaPagamentoJaFeito(null)).toBe(false);
   });
 });

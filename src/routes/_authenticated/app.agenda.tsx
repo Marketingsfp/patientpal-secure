@@ -176,6 +176,7 @@ import {
   MOTIVO_SEM_FATURAMENTO_OUTRO,
   definirSemFaturamento,
   ehSemFaturamento,
+  motivoIndicaPagamentoJaFeito,
   motivoSemFaturamentoFinal,
   podeAutorizarSemFaturamento,
   rotuloSemFaturamento,
@@ -10612,6 +10613,21 @@ function AgendaPage() {
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
+            <div className="rounded-md border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-200">
+              <p className="font-semibold">O paciente já pagou? Não use esta opção.</p>
+              <p className="mt-1">
+                "Sem faturamento" tira o atendimento do financeiro e o médico fica sem repasse. É só
+                para exame que a clínica não cobra — por exemplo o Toxicológico, pago direto ao
+                laboratório.
+              </p>
+              <p className="mt-1">
+                Se ele pagou na <strong>Clínica Total</strong>: feche esta janela, clique no{" "}
+                <strong>$</strong> da ficha e escolha a forma{" "}
+                <strong>"Pago no sistema anterior"</strong>. Se pagou{" "}
+                <strong>neste sistema, em outro dia</strong>: no mesmo <strong>$</strong>, marque{" "}
+                <strong>"O paciente já pagou este valor adiantado"</strong>.
+              </p>
+            </div>
             <p className="text-xs text-muted-foreground">
               O atendimento deixará de ser cobrado no caixa da clínica (o paciente paga direto ao
               parceiro). O motivo abaixo fica gravado no histórico do agendamento, junto com quem
@@ -10644,6 +10660,19 @@ function AgendaPage() {
                 />
               </div>
             )}
+            {semFatMotivo === MOTIVO_SEM_FATURAMENTO_OUTRO &&
+              motivoIndicaPagamentoJaFeito(semFatMotivoLivre) && (
+                <div className="rounded-md border border-red-300 bg-red-50 p-3 text-xs text-red-800 dark:border-red-800 dark:bg-red-950/40 dark:text-red-200">
+                  <p className="font-semibold">Pelo motivo digitado, o paciente já pagou.</p>
+                  <p className="mt-1">
+                    Marcando "sem faturamento", este atendimento não entra no faturamento e o médico
+                    não recebe o repasse. Use o <strong>$</strong> da ficha com{" "}
+                    <strong>"Pago no sistema anterior"</strong> (pagou na Clínica Total) ou{" "}
+                    <strong>"O paciente já pagou este valor adiantado"</strong> (pagou aqui em outro
+                    dia).
+                  </p>
+                </div>
+              )}
             {!podeAutorizarSemFat && (
               <p className="text-xs text-amber-700 dark:text-amber-400">
                 Esta ação é restrita à supervisão (admin, gestor ou supervisor). Ao confirmar, será
@@ -10665,14 +10694,23 @@ function AgendaPage() {
             </Button>
             <Button
               type="button"
+              variant={
+                semFatMotivo === MOTIVO_SEM_FATURAMENTO_OUTRO &&
+                motivoIndicaPagamentoJaFeito(semFatMotivoLivre)
+                  ? "destructive"
+                  : "default"
+              }
               onClick={() => void confirmarSemFaturamento()}
               disabled={semFatSalvando}
             >
               {semFatSalvando
                 ? "Gravando…"
-                : podeAutorizarSemFat
-                  ? "Marcar sem faturamento"
-                  : "Autorizar e marcar"}
+                : semFatMotivo === MOTIVO_SEM_FATURAMENTO_OUTRO &&
+                    motivoIndicaPagamentoJaFeito(semFatMotivoLivre)
+                  ? "Marcar mesmo assim"
+                  : podeAutorizarSemFat
+                    ? "Marcar sem faturamento"
+                    : "Autorizar e marcar"}
             </Button>
           </DialogFooter>
         </DialogContent>
