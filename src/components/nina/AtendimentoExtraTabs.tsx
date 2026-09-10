@@ -121,6 +121,16 @@ import {
   type ConversaEvento,
 } from "@/components/nina/ConversationSystemEvent";
 import {
+  agruparTimeline,
+  handoffsAguardandoAtendente,
+  type ItemTimelineAgrupado,
+} from "@/lib/atendimento/timeline-grupos";
+import {
+  AtribuicaoGroupCard,
+  EsperaAtendenteCard,
+  HandoffGroupCard,
+} from "@/components/nina/ConversationEventGroup";
+import {
   listarConversas,
   obterConversa,
   buscarConversaPorNumero,
