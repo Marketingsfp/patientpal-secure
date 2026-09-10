@@ -498,7 +498,7 @@ export function HomologacaoInbox() {
         if (leadSelecionadoRef.current !== id) return; // resposta atrasada
         // As mensagens ainda em envio continuam visíveis: uma carga do
         // servidor não pode apagar o que o testador acabou de mandar.
-        setMsgs([...r.mensagens, ...otimistasDoLead(id)]);
+        setMsgs(reconciliarHistorico(r.mensagens, otimistasDoLead(id)));
         setEventosConversa(r.eventos ?? []);
         setConversaId(r.conversaId);
         if (r.conversaId) {
