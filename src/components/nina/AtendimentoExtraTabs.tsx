@@ -3198,11 +3198,6 @@ export function AtendInbox() {
                       Teste
                     </Badge>
                   )}
-                  {c.protocol_number && (
-                    <code className="text-[11px] text-muted-foreground">
-                      Protocolo: {c.protocol_number}
-                    </code>
-                  )}
                   <BadgeEspera desde={espera[c.id]} className="ml-auto" />
                 </div>
                 <div className="mt-1 min-h-[16px] truncate text-xs text-muted-foreground">
@@ -3287,7 +3282,6 @@ export function AtendInbox() {
                           </button>
                         </span>
                       )}
-                      {sel.protocol_number && <span>· Protocolo: {sel.protocol_number}</span>}
                       {sel.sla_first_response_seg != null && (
                         <> · 1ª resp: {fmtSeg(sel.sla_first_response_seg)}</>
                       )}
@@ -3695,9 +3689,6 @@ export function AtendInbox() {
                       <div>
                         📱 {contatoAtual.conversa?.contato_telefone || contatoAtual.paciente?.telefone}
                       </div>
-                    )}
-                    {contatoAtual.conversa?.protocolo && (
-                      <div>Protocolo: {contatoAtual.conversa.protocolo}</div>
                     )}
                     {contatoAtual.conversa?.canal && <div>Canal: {contatoAtual.conversa.canal}</div>}
                     {contatoAtual.conversa?.status && <div>Status: {contatoAtual.conversa.status}</div>}
