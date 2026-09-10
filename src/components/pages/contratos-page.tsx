@@ -4175,11 +4175,12 @@ function DetalheContrato({
     load();
   };
 
-  // Botão "Reverter": antes só zerava os campos da mensalidade, sem tocar no
-  // lançamento nem no caixa — podia sobrar mensalidade pendente com dinheiro
-  // confirmado no caixa. Agora usa a mesma rotina de estorno do módulo
-  // Financeiro > Estorno (cancela o lançamento, reverte o caixa e reabre a
-  // mensalidade), centralizando os dois pontos de entrada num único fluxo.
+  // Botão "Reverter": não decide mais sozinho. Quando a parcela tem pagamento
+  // vinculado, abre o diálogo para a pessoa dizer o que aconteceu de verdade —
+  // trocar a parcela do pagamento (numeração errada), estornar sem devolução
+  // (nada saiu da gaveta) ou devolver o dinheiro agora (sai da gaveta de quem
+  // devolve). Sem esse passo, corrigir numeração tirava dinheiro do caixa de
+  // quem clicou.
   const reverterMensalidade = async (m: Mens) => {
     if (!podeEscrever) {
       toast.error("Você não tem permissão de edição neste módulo.");
@@ -4191,24 +4192,66 @@ function DetalheContrato({
       await marcarPago(m.id, false);
       return;
     }
-    const resultado = await estornarLancamentoReceita(m.lancamento_id, clinicaAtual?.clinica_id);
-    if (!resultado.ok) {
-      if (resultado.motivo === "bloqueado") {
-        toast.error(resultado.mensagem);
-      } else {
-        mostrarErro(resultado.error, resultado.mensagem);
-      }
-      return;
-    }
-    toast.success(
-      resultado.aviso === "lancado_no_caixa_de_quem_recebeu"
-        ? "Pagamento estornado. O caixa do pagamento original já estava fechado, então a saída foi lançada no caixa aberto de quem recebeu o valor."
-        : resultado.aviso === "lancado_em_sessao_atual"
-          ? "Pagamento estornado. A saída foi lançada no SEU caixa aberto, porque o caixa do pagamento original já estava fechado e quem recebeu o valor não tem caixa aberto."
-          : "Pagamento estornado: lançamento cancelado, caixa revertido e mensalidade reaberta.",
-    );
-    load();
+    setReverterAlvo(m);
+    setReverterOpcao(null);
+    setReverterDestino("");
   };
+
+  const confirmarReverter = async () => {
+    const m = reverterAlvo;
+    if (!m || !m.lancamento_id || !reverterOpcao) return;
+    setReverterBusy(true);
+    try {
+      if (reverterOpcao === "mover") {
+        if (!reverterDestino) {
+          toast.error("Escolha a parcela que deve ficar como paga.");
+          return;
+        }
+        const { data, error } = await supabase.rpc("mover_pagamento_mensalidade", {
+          _de: m.id,
+          _para: reverterDestino,
+        } as never);
+        if (error) {
+          mostrarErro(error, "Falha ao mover o pagamento de parcela");
+          return;
+        }
+        const r = (data ?? {}) as { ok?: boolean; mensagem?: string };
+        if (!r.ok) {
+          toast.error(r.mensagem ?? "Não foi possível mover o pagamento.");
+          return;
+        }
+        toast.success("Pagamento movido de parcela. Nada foi mexido no caixa.");
+      } else {
+        const resultado = await estornarLancamentoReceita(
+          m.lancamento_id,
+          clinicaAtual?.clinica_id,
+          reverterOpcao === "devolucao",
+        );
+        if (!resultado.ok) {
+          if (resultado.motivo === "bloqueado") {
+            toast.error(resultado.mensagem);
+          } else {
+            mostrarErro(resultado.error, resultado.mensagem);
+          }
+          return;
+        }
+        toast.success(
+          resultado.aviso === "lancado_no_caixa_de_quem_devolveu"
+            ? "Pagamento estornado. O caixa do pagamento já estava fechado, então a devolução saiu do seu caixa aberto."
+            : resultado.aviso === "registrado_sem_mexer_na_gaveta"
+              ? "Pagamento estornado. Como o caixa daquele dia já estava fechado e não houve devolução, ficou só o registro — nenhuma gaveta foi mexida."
+              : "Pagamento estornado: lançamento cancelado, caixa revertido e mensalidade reaberta.",
+        );
+      }
+      setReverterAlvo(null);
+      setReverterOpcao(null);
+      setReverterDestino("");
+      load();
+    } finally {
+      setReverterBusy(false);
+    }
+  };
+
 
   // Marca uma parcela pendente como "paga historicamente":
   // atualiza status/pago_em/valor_pago SEM criar lançamento no caixa.
