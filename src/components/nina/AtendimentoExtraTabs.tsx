@@ -553,10 +553,11 @@ export function AtendInbox() {
         (c: any) => faixaEsperaAtd(minutosDesde(espera[c.id])) === "critico",
       );
     }
-    // "Maior tempo esperando" usa a métrica canônica de paciente aguardando:
-    // conversa em que a clínica é que aguarda o paciente fica de fora.
-    base = base.filter((c: any) => conversaNaVisualizacao(visualizacao, espera[c.id]));
+    // FASE 2 — o recorte de "paciente aguardando" já vem do backend. Aqui só
+    // sobra a ordenação exata pela métrica canônica e a remoção de conversas
+    // que deixaram de aguardar entre uma atualização e outra.
     if (ordem !== "espera") return base;
+    base = base.filter((c: any) => conversaNaVisualizacao(visualizacao, espera[c.id]));
     return [...base].sort((a: any, b: any) => {
       const ta = espera[a.id] ? new Date(espera[a.id]).getTime() : Infinity;
       const tb = espera[b.id] ? new Date(espera[b.id]).getTime() : Infinity;
@@ -939,6 +940,7 @@ export function AtendInbox() {
     userId: meuId,
     escopo,
     atendenteId: atendenteSelecionadoId,
+    visualizacao,
   });
   useEffect(() => {
     seqConvs.current++;
@@ -953,6 +955,7 @@ export function AtendInbox() {
       userId: meuId,
       escopo,
       atendenteId: atendenteSelecionadoId,
+      visualizacao,
     });
     try {
       const brutas = await medirRequest("listarConversas", listarConvs({
@@ -963,6 +966,7 @@ export function AtendInbox() {
           canal: "todos",
           escopo,
           atendenteId: atendenteSelecionadoId,
+          visualizacao,
           limit: 200,
         },
       }));
@@ -972,7 +976,13 @@ export function AtendInbox() {
       // Se o filtro/usuário mudou enquanto a resposta vinha, ela é descartada.
       if (
         chavePedido !==
-        chaveInbox({ clinicaId, userId: meuId, escopo, atendenteId: atendenteSelecionadoId })
+        chaveInbox({
+          clinicaId,
+          userId: meuId,
+          escopo,
+          atendenteId: atendenteSelecionadoId,
+          visualizacao,
+        })
       )
         return;
       // FASE 4 — segunda conferência no navegador: só entra na lista o que
@@ -1059,7 +1069,7 @@ export function AtendInbox() {
     } catch (e: any) {
       mostrarErro(e);
     }
-  }, [clinicaId, filtroStatus, buscaTexto, buscaInterp.exigeNumero, escopo, atendenteSelecionadoId, listarConvs, carregarContadores, meuId, souGestor, abrirConversa]);
+  }, [clinicaId, filtroStatus, buscaTexto, buscaInterp.exigeNumero, escopo, atendenteSelecionadoId, visualizacao, listarConvs, carregarContadores, meuId, souGestor, abrirConversa]);
 
   // FASE 2 — busca pelo número permanente (#1342). Consulta exata no backend,
   // fora do filtro atual e sem baixar a lista inteira. Só leitura: encontrar
@@ -1721,7 +1731,7 @@ export function AtendInbox() {
   carregarConvsRef.current = carregarConvs;
   useEffect(() => {
     void carregarConvsRef.current();
-  }, [clinicaId, filtroStatus, buscaTexto, escopo, atendenteSelecionadoId, meuId, souGestor]);
+  }, [clinicaId, filtroStatus, buscaTexto, escopo, atendenteSelecionadoId, visualizacao, meuId, souGestor]);
   // O responsável pode mudar a qualquer momento (transferência, distribuição
   // automática, tomada por outra pessoa). A lista chega por Realtime, então a
   // conversa aberta sempre acompanha o que está gravado no banco.
