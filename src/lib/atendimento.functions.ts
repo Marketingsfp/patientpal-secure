@@ -214,14 +214,23 @@ export const listarConversas = createServerFn({ method: "POST" })
     // --- Escopo (de quem é a conversa) -------------------------------------
     // Filtro por responsável direto no banco, antes de ordenar e cortar a
     // lista — nunca depois de baixar tudo para o navegador.
-    if (atendenteFiltro) q = q.eq("atribuida_user_id", atendenteFiltro);
-    if (filtroEscopo.tipo === "atribuida") q = q.eq("atribuida_user_id", filtroEscopo.userId);
+    // FASE 3 — em conversa resolvida o responsável ativo já foi limpo, então a
+    // responsabilidade canônica é `last_assigned_user_id` (gravado antes da
+    // limpeza) ou, na falta dele, `resolved_by`.
+    const porResponsavel = (query: any, userId: string, resolvidas: boolean) => {
+      const f = filtroResponsavel(userId, { somenteResolvidas: resolvidas });
+      return f.tipo === "ou" ? query.or(f.expr) : query.eq(f.coluna, f.userId);
+    };
+
+    if (atendenteFiltro) q = porResponsavel(q, atendenteFiltro, plano.somenteResolvidas);
+    if (filtroEscopo.tipo === "atribuida")
+      q = porResponsavel(q, filtroEscopo.userId, plano.somenteResolvidas);
     else if (filtroEscopo.tipo === "sem_responsavel")
       q = q.is("atribuida_user_id", null).neq("owner_type", "AI");
     else if (filtroEscopo.tipo === "nina") q = q.eq("owner_type", "AI");
     else if (filtroEscopo.tipo === "fechadas") {
       q = q.in("status", [...STATUS_FECHADOS]);
-      if (filtroEscopo.userId) q = q.eq("atribuida_user_id", filtroEscopo.userId);
+      if (filtroEscopo.userId) q = porResponsavel(q, filtroEscopo.userId, true);
     }
 
     // --- Visualização (estado da conversa) ---------------------------------
