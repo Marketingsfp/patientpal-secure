@@ -615,6 +615,29 @@ const ROTAS_HOME_PORTAL: ReadonlySet<string> = new Set(
 );
 
 /**
+ * A qual portal uma tela pertence, olhando a seção do menu em que ela está.
+ * Serve para que um link antigo (ex.: /app/nina, que agora vive no portal
+ * "Atendimento / WhatsApp") não fique "fora do menu" quando o usuário estiver
+ * com outro portal ativo: o portal correto é assumido automaticamente.
+ * Telas em seções compartilhadas (Gestão, Configurações) devolvem `null` —
+ * elas pertencem a mais de um portal e não devem trocar nada.
+ */
+function portalDaRota(path: string): SubsystemId | null {
+  const secao = navRows.find((row) =>
+    row.items.some((it) =>
+      isParent(it)
+        ? it.children.some((c) => c.to === path)
+        : it.to === path || (it.aliases ?? []).includes(path),
+    ),
+  );
+  if (!secao) return null;
+  const donos = (Object.keys(SUBSYSTEMS) as SubsystemId[]).filter((id) =>
+    SUBSYSTEMS[id].groups.includes(secao.label),
+  );
+  return donos.length === 1 ? donos[0]! : null;
+}
+
+/**
  * Famílias de rotas em que a tela é a MESMA instância mesmo quando o endereço
  * muda (ex.: links antigos /app/nina/<conversa>, que apenas voltam para a
  * Inbox). Trocar a `key` da área principal nesses casos remontaria a tela
