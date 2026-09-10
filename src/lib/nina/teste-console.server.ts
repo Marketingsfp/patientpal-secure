@@ -85,62 +85,40 @@ async function garantirCiclo(
   if (lead.conversa_id && lead.ciclo_id)
     return { conversaId: lead.conversa_id, cicloId: lead.ciclo_id };
 
-  const { novoNinaSessionId } = await import("@/lib/nina/ciclo-teste");
-  const agoraISO = new Date().toISOString();
-  const { data: ciclo, error: eCiclo } = await admin
-    .from("nina_teste_ciclos")
-    .insert({
-      clinica_id: clinicaId,
-      lead_id: lead.id,
-      indice: lead.indice,
-      sessao_seq: lead.sessao_seq,
-      telefone_sessao: lead.telefone_sessao,
-      status: "ativo",
-      started_at: agoraISO,
-      criado_por: userId,
-    })
-    .select("id")
-    .maybeSingle();
-  if (eCiclo) throw new Error(eCiclo.message);
-  const cicloId = (ciclo as any)?.id as string;
+  // Criação atômica no banco: advisory lock por lead + índice único parcial
+  // (nina_teste_ciclos_um_ativo_por_lead). Requisições concorrentes do mesmo
+  // primeiro burst reutilizam exatamente o ciclo/conversa vencedores.
+  const { data, error } = await admin.rpc("nina_teste_garantir_ciclo", {
+    p_clinica_id: clinicaId,
+    p_lead_id: lead.id,
+    p_user_id: userId,
+  });
 
-  let conversaId = lead.conversa_id;
-  if (!conversaId) {
-    const { data, error } = await admin
-      .from("atend_conversas")
-      .insert({
-        clinica_id: clinicaId,
-        canal: CANAL_TESTE,
-        contato_telefone: lead.telefone_sessao,
-        contato_nome: lead.nome,
-        status: "bot_attending",
-        owner_type: "AI",
-        ai_enabled: true,
-        is_teste: true,
-        teste_ciclo_id: cicloId,
-        ultima_msg_em: new Date().toISOString(),
-      })
-      .select("id")
+  let cicloId: string | null = null;
+  let conversaId: string | null = null;
+  let criado = false;
+
+  if (error) {
+    // Defensivo: se ainda assim houver conflito de unicidade, reconsulta o vencedor.
+    const { data: ativo } = await admin
+      .from("nina_teste_ciclos")
+      .select("id, conversa_id")
+      .eq("lead_id", lead.id)
+      .eq("status", "ativo")
       .maybeSingle();
-    if (error) throw new Error(error.message);
-    conversaId = (data as any)?.id as string;
+    if (!ativo?.id || !ativo?.conversa_id) throw new Error(error.message);
+    cicloId = ativo.id as string;
+    conversaId = ativo.conversa_id as string;
   } else {
-    await admin.from("atend_conversas").update({ teste_ciclo_id: cicloId }).eq("id", conversaId);
+    const row = Array.isArray(data) ? data[0] : data;
+    cicloId = (row as any)?.ciclo_id ?? null;
+    conversaId = (row as any)?.conversa_id ?? null;
+    criado = Boolean((row as any)?.criado);
   }
 
-  await admin
-    .from("nina_teste_ciclos")
-    .update({ conversa_id: conversaId, nina_session_id: novoNinaSessionId(cicloId) })
-    .eq("id", cicloId);
-  await admin
-    .from("nina_teste_leads")
-    .update({
-      conversa_id: conversaId,
-      ciclo_id: cicloId,
-      ciclo_iniciado_em: agoraISO,
-      status: "ativa",
-    })
-    .eq("id", lead.id);
+  if (!cicloId || !conversaId) throw new Error("Falha ao garantir ciclo de teste");
+
+  if (!criado) return { conversaId, cicloId };
 
   // Divisor visual de início de ciclo (só leitura humana; não vai ao modelo).
   try {
