@@ -66,6 +66,12 @@ export type EstadoFluxoNina = {
 
   };
   flow: { stage: EtapaFluxoNina };
+  /**
+   * FASE 4 — pergunta de esclarecimento aguardando resposta do paciente.
+   * Sobrevive a reinício, lote agrupado e retomada; a tentativa só é
+   * consumida quando o paciente responde e a dúvida continua.
+   */
+  clarification?: PendenciaEsclarecimento;
   updated_at: string | null;
   /** Identificador da sessão operacional atual (nova sessão = novo id). */
   session_id?: string | null;
