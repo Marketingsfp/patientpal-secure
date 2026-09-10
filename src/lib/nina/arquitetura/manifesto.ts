@@ -49,6 +49,15 @@ export type NodeArquitetura = {
   tabelas?: string[];
   /** Erros reais que este ponto pode produzir ou tratar. */
   erros: string[];
+  /**
+   * FASE 5 — quem controla o texto que sai daqui:
+   *  - "modelo": comportamento configurado nas Instruções da Nina;
+   *  - "mensagem_automatica": template versionado, editável e publicável;
+   *  - "regra_tecnica": regra protegida, não editável pela configuração.
+   */
+  controle?: "modelo" | "mensagem_automatica" | "regra_tecnica";
+  /** Onde se edita a configuração que controla esta resposta. */
+  configuracao?: string;
 };
 
 export const NODES_ARQUITETURA: NodeArquitetura[] = [
@@ -516,6 +525,39 @@ export const NODES_ARQUITETURA: NodeArquitetura[] = [
 
   // ───────────────────────── SAÍDA ─────────────────────────
   {
+    id: "response.templates",
+    nome: "Templates das mensagens automáticas",
+    categoria: "INSTRUCOES",
+    descricao:
+      "Textos versionados das mensagens que NÃO passam pelo modelo: coleta de dados, erro, confirmação de agendamento, transferência, mídia e despedida. Sem versão publicada, vale o texto padrão do sistema.",
+    arquivo: "src/lib/nina/resposta/templates.server.ts",
+    funcao: "carregarTemplatesPublicados",
+    entrada: "Clínica e escopo do turno",
+    saida: "Mapa de chave para texto publicado",
+    anteriores: [],
+    seguintes: ["response.finalize"],
+    tabelas: ["nina_mensagens_templates"],
+    erros: ["template inválido", "variável não permitida", "sem publicação (usa o padrão)"],
+    controle: "mensagem_automatica",
+    configuracao: "Nina › Arquitetura › Mensagens automáticas",
+  },
+  {
+    id: "response.finalize",
+    nome: "Finalização da resposta",
+    categoria: "SAIDA",
+    descricao:
+      "Ponto único onde toda resposta (modelo, gate, transferência, mídia, erro e encerramento) recebe o texto final, antes da avaliação de confiança e do envio. O transporte não acrescenta nada depois.",
+    arquivo: "src/lib/nina/resposta/finalizacao.server.ts",
+    funcao: "finalizarResposta",
+    entrada: "Resultado estruturado do turno",
+    saida: "Texto final aprovado e decisão de encerramento",
+    anteriores: ["llm.generate", "response.templates"],
+    seguintes: ["response.validate"],
+    erros: ["texto vazio", "ação sem evidência real de gravação"],
+    controle: "regra_tecnica",
+    configuracao: "Regra técnica protegida (não editável)",
+  },
+  {
     id: "response.validate",
     nome: "Validação da resposta",
     categoria: "VALIDACAO",
@@ -525,9 +567,11 @@ export const NODES_ARQUITETURA: NodeArquitetura[] = [
     funcao: "gerarRespostaNinaInterno",
     entrada: "Texto do modelo",
     saida: "Texto aprovado para envio",
-    anteriores: ["llm.generate"],
+    anteriores: ["response.finalize"],
     seguintes: ["message.outbound"],
     erros: ["resposta vazia", "conteúdo bloqueado"],
+    controle: "regra_tecnica",
+    configuracao: "Regra técnica protegida (não editável)",
   },
   {
     id: "message.outbound",
@@ -1005,7 +1049,7 @@ export const NODES_ARQUITETURA: NodeArquitetura[] = [
 ];
 
 export const MANIFESTO_ARQUITETURA = {
-  versao: 4,
+  versao: 5,
   descricao:
     "Descrição estruturada da arquitetura real da Nina. Não executa nada e não substitui o código.",
   categorias: CATEGORIAS_ARQUITETURA,

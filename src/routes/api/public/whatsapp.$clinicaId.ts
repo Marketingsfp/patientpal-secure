@@ -434,6 +434,11 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
                     const { RESPOSTA_AUDIO_FALHOU, respostaMidiaNaoSuportada } =
                       await import("@/lib/whatsapp-midia.server");
                     let reply = "";
+                    // FASE 5 — contrato do resultado deste turno. Todo texto
+                    // passa pela finalização antes de ser avaliado e enviado.
+                    const { criarResultado } = await import("@/lib/nina/resposta/contrato");
+                    let resultadoTurno: import("@/lib/nina/resposta/contrato").ResultadoRespostaNina | null =
+                      null;
                     // Auditoria: id da execução que produziu esta resposta.
                     // `traceId` é o identificador do turno (FASE 1): preenchido
                     // por `gerarRespostaNina` e usado para ligar a mensagem
@@ -531,9 +536,32 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
                         }
                       }
                     } else if (audioFalhou) {
-                      reply = RESPOSTA_AUDIO_FALHOU;
+                      const { CHAVE_TEMPLATE_AUDIO_FALHOU } = await import(
+                        "@/lib/whatsapp-midia.server"
+                      );
+                      resultadoTurno = criarResultado({
+                        origem: "midia",
+                        texto: RESPOSTA_AUDIO_FALHOU,
+                        chaveTemplate: CHAVE_TEMPLATE_AUDIO_FALHOU,
+                      });
+                      reply = resultadoTurno.texto;
                     } else {
-                      reply = respostaMidiaNaoSuportada(tipo);
+                      const { chaveTemplateMidia } = await import("@/lib/whatsapp-midia.server");
+                      resultadoTurno = criarResultado({
+                        origem: "midia",
+                        texto: respostaMidiaNaoSuportada(tipo),
+                        chaveTemplate: chaveTemplateMidia(tipo),
+                      });
+                      reply = resultadoTurno.texto;
+                    }
+                    // Gate de identificação: o contrato veio junto da geração.
+                    if (!resultadoTurno) {
+                      const doGate = (
+                        auditoriaNina as {
+                          resultado?: import("@/lib/nina/resposta/contrato").ResultadoRespostaNina;
+                        }
+                      ).resultado;
+                      if (doGate) resultadoTurno = doGate;
                     }
 
                     // Revalida o dono ANTES de enviar: um atendente pode ter
@@ -560,27 +588,33 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
                       }
                     }
 
-                    // Encerramento automático: decidido ANTES do envio (para
-                    // completar a mensagem final), aplicado SÓ depois que o
-                    // envio for confirmado.
+                    // FASE 5 — FINALIZAÇÃO ÚNICA: saudação, banner de handoff,
+                    // erro, mídia e despedida passam pelo mesmo serviço antes
+                    // da avaliação final e do envio. O transporte manda o texto
+                    // aprovado, sem acrescentar nada depois.
                     let encerrarConversaId: string | null = null;
-                    if (reply && from && textoPaciente) {
+                    if (reply) {
                       try {
-                        const { avaliarEncerramentoAutomatico } = await import(
-                          "@/lib/nina/encerramento-automatico.server"
+                        const { finalizarResposta } = await import(
+                          "@/lib/nina/resposta/finalizacao.server"
                         );
-                        const av = await avaliarEncerramentoAutomatico({
+                        const base =
+                          resultadoTurno ?? criarResultado({ origem: "modelo", texto: reply });
+                        const finalizada = await finalizarResposta({
                           clinicaId: params.clinicaId,
+                          canal: "whatsapp",
+                          chaveTurno:
+                            auditoriaNina.traceId ?? loteId ?? `${params.clinicaId}|${from}|${(msgInserida as { id?: string } | null)?.id ?? ""}`,
+                          conversaId: convId,
                           telefone: from,
-                          mensagemPaciente: textoPaciente,
-                          resposta: reply,
+                          mensagemPaciente: textoPaciente || null,
+                          resultado: { ...base, texto: reply },
+                          avaliarEncerramento: Boolean(textoPaciente),
                         });
-                        if (av.encerrar && av.conversaId) {
-                          reply = av.resposta;
-                          encerrarConversaId = av.conversaId;
-                        }
+                        reply = finalizada.texto;
+                        encerrarConversaId = finalizada.encerrarConversaId;
                       } catch (e) {
-                        console.error("[nina] avaliação de encerramento falhou", e);
+                        console.error("[nina] finalização da resposta falhou", e);
                       }
                     }
                     // FASE 4 — antes de QUALQUER envio: a resposta ainda vale?

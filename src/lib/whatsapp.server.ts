@@ -536,7 +536,11 @@ export async function gerarRespostaNina(
     teste?: boolean;
     /** FASE 4 — ambiente explícito de QA (produção/homologação/teste automatizado). */
     ambiente?: import("@/lib/nina/confianca-execucao").AmbienteQA;
-    auditoria?: { execucaoId?: string | null };
+    auditoria?: {
+      execucaoId?: string | null;
+      /** FASE 5 — contrato do resultado quando a resposta é determinística. */
+      resultado?: unknown;
+    };
     /** IDs reais das mensagens de entrada que originaram esta resposta. */
     mensagensEntrada?: string[];
     /**
@@ -1248,11 +1252,18 @@ async function gerarRespostaNinaInterno(
   // ---------------------------------------------------------------------
   if (podeAgendar && ctxFerramentas && executar !== null) {
     const { aplicarGateIdentificacao } = await import("@/lib/nina/identificacao-gate.server");
+    // FASE 5 — o texto do gate sai do template publicado (ou do padrão).
+    const { carregarTemplatesPublicados } = await import("@/lib/nina/resposta/templates.server");
+    const templatesGate = await carregarTemplatesPublicados({
+      clinicaId,
+      inicioDeTurno: true,
+    }).catch(() => ({ textos: {}, versaoInstrucoes: null, recusadas: [] }));
     const respostaGate = await aplicarGateIdentificacao({
       mensagem: mensagemPaciente,
       estado: fluxoEstado,
       ctx: ctxFerramentas,
       executar,
+      textos: templatesGate.textos,
     }).catch((e) => {
       console.error("[NINA_BOOKING_FLOW] gate falhou", e);
       return null;
@@ -1270,13 +1281,21 @@ async function gerarRespostaNinaInterno(
         tipo: "resposta_original",
         fonte: "sistema",
         titulo: "Resposta produzida pelo gate de identificação (sem modelo)",
-        dados: { origem: "gate", tamanho: respostaGate.length },
+        dados: {
+          origem: "gate",
+          tamanho: respostaGate.texto.length,
+          template: respostaGate.chaveTemplate,
+        },
         codigo: {
           arquivo: "src/lib/nina/identificacao-gate.server.ts",
           funcao: "aplicarGateIdentificacao",
         },
       });
-      return respostaGate;
+      // O contrato completo viaja na auditoria: quem envia precisa saber o
+      // que já está comprovado e o que é proibido afirmar.
+      if (opcoes?.auditoria)
+        (opcoes.auditoria as { resultado?: unknown }).resultado = respostaGate;
+      return respostaGate.texto;
     }
   }
 

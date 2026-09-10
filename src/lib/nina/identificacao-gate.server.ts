@@ -24,6 +24,8 @@ import type {
   ResultadoFerramenta,
 } from "./paciente-tools.server";
 import { isCPFValido, somenteDigitos } from "@/lib/cpf";
+import { criarResultado, type ResultadoRespostaNina } from "./resposta/contrato";
+import { textoDaChave, type TextosTemplates } from "./resposta/templates";
 
 /* ------------------------------------------------------------ confirmações */
 
@@ -127,21 +129,19 @@ export function extrairDadosIdentificacao(texto: string): DadosIdentificacao {
 
 /* -------------------------------------------------------------- mensagens */
 
-const PEDIDO_COMPLETO =
-  "Perfeito! Para prosseguir com o agendamento, por favor, me informe:\n\n" +
-  "• Nome completo\n• CPF\n• Data de nascimento (DD/MM/AAAA)";
-
-function pedidoDoQueFalta(faltando: string[]): string {
-  if (faltando.length === 3) return PEDIDO_COMPLETO;
+/**
+ * FASE 5 — o gate não escreve mais texto conversacional por conta própria:
+ * ele escolhe a CHAVE do template e as variáveis. O texto sai do template
+ * publicado (ou do padrão do código, que é o texto que já existia aqui).
+ */
+function rotularFaltantes(faltando: string[]): string {
   const rotulos: Record<string, string> = {
     nome: "seu *nome completo*",
     cpf: "seu *CPF*",
     data_nascimento: "sua *data de nascimento* (DD/MM/AAAA)",
   };
   const lista = faltando.map((f) => rotulos[f]!);
-  const texto =
-    lista.length === 1 ? lista[0]! : `${lista.slice(0, -1).join(", ")} e ${lista.at(-1)!}`;
-  return `Obrigada! Só falta ${texto} para eu concluir o agendamento.`;
+  return lista.length === 1 ? lista[0]! : `${lista.slice(0, -1).join(", ")} e ${lista.at(-1)!}`;
 }
 
 /* ------------------------------------------------------------------- gate */
@@ -151,6 +151,23 @@ type Executar = (
   nome: string,
   args: unknown,
 ) => Promise<ResultadoFerramenta>;
+
+/** Monta o resultado determinístico do gate já com o texto do template. */
+function resultadoGate(
+  textos: TextosTemplates | null | undefined,
+  chave: string,
+  variaveis: Record<string, string>,
+  extra?: Partial<ResultadoRespostaNina>,
+): ResultadoRespostaNina {
+  const t = textoDaChave(chave, variaveis, textos ?? null);
+  return criarResultado({
+    origem: "gate",
+    texto: t.texto,
+    chaveTemplate: chave,
+    variaveis,
+    ...(extra ?? {}),
+  });
+}
 
 function log(etapa: string, extra: Record<string, unknown>) {
   console.log(`[NINA_BOOKING_FLOW] ${etapa}`, JSON.stringify(extra));
@@ -168,8 +185,11 @@ export async function aplicarGateIdentificacao(params: {
   estado: EstadoFluxoNina;
   ctx: CtxNinaPaciente;
   executar: Executar;
-}): Promise<string | null> {
+  /** Textos publicados dos templates determinísticos (FASE 5). */
+  textos?: TextosTemplates | null;
+}): Promise<ResultadoRespostaNina | null> {
   const { mensagem, estado, ctx, executar } = params;
+  const textos = params.textos ?? null;
   const a = estado.appointment;
   const p = estado.patient;
   const temVaga = Boolean(a.slot_inicio && a.slot_fim && (a.doctor_id || a.doctor_name));
@@ -192,7 +212,10 @@ export async function aplicarGateIdentificacao(params: {
       hora: a.time,
       stage: estado.flow.stage,
     });
-    return PEDIDO_COMPLETO;
+    return resultadoGate(textos, "fluxo.coleta.completa", {}, {
+      camposPendentes: ["nome", "cpf", "data_nascimento"],
+      restricoes: ["nao_afirmar_agendamento_sem_gravacao"],
+    });
   }
 
   // 2) Coleta em andamento: acumula o que veio e só chama a busca com os três
@@ -227,9 +250,18 @@ export async function aplicarGateIdentificacao(params: {
       const cpfInvalido =
         faltando.includes("cpf") && digitos.length >= 11 && !isCPFValido(digitos.slice(0, 11));
       log("dados_incompletos", { conversa: ctx.conversaId, faltando });
-      return cpfInvalido
-        ? "O CPF informado não confere. Pode conferir e me mandar de novo, por favor?"
-        : pedidoDoQueFalta([...faltando]);
+      if (cpfInvalido)
+        return resultadoGate(textos, "fluxo.coleta.cpf_invalido", {}, {
+          camposPendentes: [...faltando],
+        });
+      return faltando.length === 3
+        ? resultadoGate(textos, "fluxo.coleta.completa", {}, { camposPendentes: [...faltando] })
+        : resultadoGate(
+            textos,
+            "fluxo.coleta.faltando",
+            { lista: rotularFaltantes([...faltando]) },
+            { camposPendentes: [...faltando] },
+          );
     }
 
     estado.flow.stage = "IDENTIFYING_PATIENT";
@@ -245,10 +277,17 @@ export async function aplicarGateIdentificacao(params: {
         // Não é erro técnico e não é motivo de handoff: os dados não bateram.
         p.pending = { nome: null, cpf: null, data_nascimento: null };
         estado.flow.stage = "AWAITING_PATIENT_DATA";
-        return `${(r as { mensagem: string }).mensagem}\n\nPode me mandar novamente nome completo, CPF e data de nascimento (DD/MM/AAAA)?`;
+        return resultadoGate(
+          textos,
+          "fluxo.identificacao.divergencia",
+          { mensagem: (r as { mensagem: string }).mensagem },
+          { camposPendentes: ["nome", "cpf", "data_nascimento"] },
+        );
       }
       estado.flow.stage = "AWAITING_PATIENT_DATA";
-      return "Tive uma instabilidade aqui ao consultar o cadastro. Pode me mandar os dados de novo em instantes?";
+      return resultadoGate(textos, "fluxo.identificacao.instabilidade", {}, {
+        camposPendentes: ["nome", "cpf", "data_nascimento"],
+      });
     }
 
     // Identificado: apaga os dados pessoais do estado da conversa.
@@ -278,16 +317,44 @@ export async function aplicarGateIdentificacao(params: {
         conversa: ctx.conversaId,
         appointment_id: (ag as unknown as { appointment_id: string }).appointment_id,
       });
-      return `Prontinho! ✅ Seu agendamento foi realizado com sucesso.\n\n*Profissional:* ${
-        d.medico ?? a.doctor_name ?? "-"
-      }\n*Data:* ${d.date ?? a.date ?? "-"}\n*Horário:* ${d.time ?? a.time ?? "-"}\n\nChegue com 15 minutos de antecedência e traga um documento com foto.`;
+      const appointmentId = (ag as unknown as { appointment_id: string }).appointment_id;
+      return resultadoGate(
+        textos,
+        "fluxo.agendamento.confirmado",
+        {
+          profissional: String(d.medico ?? a.doctor_name ?? "-"),
+          data: String(d.date ?? a.date ?? "-"),
+          horario: String(d.time ?? a.time ?? "-"),
+        },
+        {
+          fatosConfirmados: ["agendamento_gravado"],
+          acoesConcluidas: [
+            {
+              acao: "agendar",
+              idempotencia: `agendar|${ctx.conversaId}|${a.slot_inicio ?? ""}`,
+              confirmada: true,
+              evidencia: appointmentId,
+            },
+          ],
+        },
+      );
     }
 
     const erroAg = (ag as { erro?: string }).erro;
     log("agendamento_falhou", { conversa: ctx.conversaId, erro: erroAg });
     if (erroAg === "APPOINTMENT_ALREADY_EXISTS") {
       estado.flow.stage = "BOOKED";
-      return "Esse horário já está reservado para você — não precisa marcar de novo 💛";
+      return resultadoGate(textos, "fluxo.agendamento.duplicado", {}, {
+        fatosConfirmados: ["agendamento_ja_existente"],
+        acoesConcluidas: [
+          {
+            acao: "agendar",
+            idempotencia: `agendar|${ctx.conversaId}|${a.slot_inicio ?? ""}`,
+            confirmada: true,
+            evidencia: "duplicado",
+          },
+        ],
+      });
     }
     // Vaga tomada durante a coleta: limpa e deixa o modelo oferecer outras.
     a.slot_inicio = null;
