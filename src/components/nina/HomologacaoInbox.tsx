@@ -467,7 +467,7 @@ export function HomologacaoInbox() {
         mostrarErro(e);
       }
     },
-    [clinicaId, historico, ferramentasFn],
+    [clinicaId, historico, ferramentasFn, otimistasDoLead],
   );
 
   /**
