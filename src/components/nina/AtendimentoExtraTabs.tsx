@@ -209,6 +209,22 @@ import { formatarDataHoraMensagem } from "@/lib/atendimento/data-hora";
 import { textoMarcadorSistema } from "@/lib/atendimento/marcador-handoff";
 import { ESCOPO_INBOX_PADRAO, type EscopoInbox } from "@/lib/atendimento/escopo-inbox";
 import {
+  ESCOPO_BASE_PADRAO,
+  ROTULO_VISUALIZACAO,
+  VISUALIZACAO_PADRAO,
+  atendenteConsulta,
+  conversaNaVisualizacao,
+  escopoConsulta,
+  estadoDeEscopoLegado,
+  lerValorEscopo,
+  ordemVisualizacao,
+  rotuloEscopo,
+  statusConsulta,
+  valorEscopoControle,
+  type EscopoBaseInbox,
+  type VisualizacaoInbox,
+} from "@/lib/atendimento/filtros-inbox";
+import {
   MSG_ADMIN_NAO_ATENDE,
   ROTULO_PRESENCA,
   type PresencaAtendente,
