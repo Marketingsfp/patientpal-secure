@@ -404,6 +404,8 @@ export async function processarMensagemTeste(data: EntradaMensagemTeste, userId:
           transferida: false,
           processamento: "AGRUPADA" as const,
           absorvidaPeloLote: true,
+          mensagemPersistida: true,
+          mensagemId,
         };
       }
       loteId = turno.batchId;
@@ -494,7 +496,11 @@ export async function processarMensagemTeste(data: EntradaMensagemTeste, userId:
         reply: null,
         erro: "Conversa resolvida durante o processamento.",
         audio: null,
+        transferida: false,
         processamento: "OBSOLETA" as const,
+        absorvidaPeloLote: false,
+        mensagemPersistida: true,
+        mensagemId,
       };
     }
 
@@ -518,6 +524,8 @@ export async function processarMensagemTeste(data: EntradaMensagemTeste, userId:
           transferida: false,
           processamento: "OBSOLETA" as const,
           absorvidaPeloLote: true,
+          mensagemPersistida: true,
+          mensagemId,
         };
       }
     }
@@ -634,10 +642,14 @@ export async function processarMensagemTeste(data: EntradaMensagemTeste, userId:
         | "RESPONDIDA"
         | "AGRUPADA"
         | "OBSOLETA"
+        | "DUPLICADA"
+        | "SEM_RESPOSTA"
         | "ERRO",
       absorvidaPeloLote: false,
       batchId: loteId || null,
       revisao: revisaoTurno || null,
+      mensagemPersistida: true,
+      mensagemId,
     };
     } finally {
       // Garantia única: nenhum lote/lock fica preso, em qualquer desfecho.
