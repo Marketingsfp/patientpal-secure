@@ -5,9 +5,55 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
+import {
+  agruparSaidas,
+  calcularResultadosConfirmados,
+  classificarStatusReporte,
+  descreverAmostra,
+  normalizarAmbiente,
+  variantesAmbiente,
+  type LinhaSaida,
+  type ProvaAgendamento,
+  type ProvaTransferencia,
+  type ReporteRevisao,
+} from "./confidence/denominadores";
+
+/**
+ * FASE 7 — filtro de ambiente tolerante ao schema real: as decisões gravam
+ * "producao"/"homologacao" e os reportes gravam "production"/"homologation".
+ */
+function filtrarAmbiente<T>(q: T, ambiente: string): T {
+  if (ambiente === "todos") return q;
+  const variantes = variantesAmbiente(normalizarAmbiente(ambiente));
+  if (variantes.length === 0) return q;
+  return (q as unknown as { in: (c: string, v: string[]) => T }).in("ambiente", variantes);
+}
+
+/** FASE 7 — leitura paginada: evita contar apenas o começo do recorte. */
+async function lerPaginado<T>(
+  montar: (de: number, ate: number) => PromiseLike<{ data: T[] | null; error: { message: string } | null }>,
+  limite: number,
+  pagina = 1000,
+): Promise<{ linhas: T[]; truncado: boolean }> {
+  const linhas: T[] = [];
+  for (let inicio = 0; inicio < limite; inicio += pagina) {
+    const fim = Math.min(inicio + pagina, limite) - 1;
+    const { data, error } = await montar(inicio, fim);
+    if (error) throw new Error(error.message);
+    const lote = data ?? [];
+    linhas.push(...lote);
+    if (lote.length < fim - inicio + 1) return { linhas, truncado: false };
+  }
+  return { linhas, truncado: linhas.length >= limite };
+}
 
 export type ResumoConfianca = {
+  /** FASE 7 — mensagens de saída distintas (não avaliações). */
   total: number;
+  /** Avaliações registradas (resposta + ação). */
+  avaliacoes: number;
+  amostra: import("./confidence/denominadores").Amostra;
+  resultados: import("./confidence/denominadores").ResultadosConfirmados;
   responder: number;
   esclarecer: number;
   transferir: number;
@@ -41,12 +87,14 @@ export const resumoConfiancaNina = createServerFn({ method: "POST" })
     const desde = new Date(Date.now() - data.dias * 24 * 60 * 60 * 1000).toISOString();
     let q = context.supabase
       .from("nina_confianca_decisoes")
-      .select("id, created_at, ambiente, acao, score, bloqueio, motivos, categorias, conversation_id")
+      .select(
+        "id, created_at, ambiente, acao, decisao, score, bloqueio, motivos, categorias, conversation_id, execucao_id, message_id, outgoing_message_id, avaliacao, modo, handoff_ocorreu",
+      )
       .eq("clinica_id", data.clinicaId)
       .gte("created_at", desde)
       .order("created_at", { ascending: false })
       .limit(2000);
-    if (data.ambiente !== "todos") q = q.eq("ambiente", data.ambiente);
+    q = filtrarAmbiente(q, data.ambiente);
     const { data: rows, error } = await q;
     if (error) throw new Error(error.message);
 
@@ -60,7 +108,19 @@ export const resumoConfiancaNina = createServerFn({ method: "POST" })
       motivos: unknown;
       categorias: unknown;
       conversation_id: string | null;
+      decisao?: string | null;
+      execucao_id?: string | null;
+      message_id?: string | null;
+      outgoing_message_id?: string | null;
+      avaliacao?: string | null;
+      modo?: string | null;
+      handoff_ocorreu?: boolean | null;
     }>;
+
+    // FASE 7 — duas avaliações da mesma saída contam UMA mensagem.
+    const unidades = agruparSaidas(linhas as unknown as LinhaSaida[]);
+    const resultados = calcularResultadosConfirmados(linhas as unknown as LinhaSaida[]);
+    const amostra = descreverAmostra(linhas.length, 2000, unidades.length);
 
     const bloqueios = new Map<string, number>();
     const categorias = new Map<string, number>();
@@ -74,7 +134,10 @@ export const resumoConfiancaNina = createServerFn({ method: "POST" })
     const conta = (a: string) => linhas.filter((l) => l.acao === a).length;
 
     return {
-      total: linhas.length,
+      total: unidades.length,
+      avaliacoes: linhas.length,
+      amostra,
+      resultados,
       responder: conta("responder"),
       esclarecer: conta("esclarecer"),
       transferir: conta("transferir"),
