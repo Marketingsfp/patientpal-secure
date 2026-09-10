@@ -49,6 +49,8 @@ export type GrupoHandoff = {
   urgencia: string | null;
   protocolo: string | null;
   filaInicial: number | null;
+  /** Nome da fila/destino inicial (ex.: "Não atribuídas"), quando informado. */
+  filaNome: string | null;
   origem: OrigemHandoff | null;
   status: "SOLICITADO" | "NA_FILA" | "PROTOCOLO_GERADO" | "PROTOCOLO_INFORMADO";
   auditoria: { registrada: boolean; completa: boolean | null; faltando: string[] };
@@ -118,6 +120,22 @@ const normalizarNome = (v: string | null | undefined) =>
     .replace(/[\u0300-\u036f]/g, "")
     .trim()
     .toLowerCase();
+
+/**
+ * O card já se intitula "Atribuição automática": o critério guardado no motivo
+ * ("Atribuição automática (menor carga)") vira só "Menor carga", sem repetir.
+ */
+function criterioAtribuicao(motivo: string | null): string | null {
+  if (!motivo) return null;
+  const m = /^Atribuição autom[áa]tica\s*\((.+)\)\.?$/i.exec(motivo);
+  const valor = m?.[1]?.trim() ?? motivo;
+  return valor.charAt(0).toUpperCase() + valor.slice(1);
+}
+
+/** Fila/destino inicial citado no marcador de handoff ("· Destino: X"). */
+function destinoDoTexto(texto: string): string | null {
+  return txt(/·\s*Destino:\s*([^·\n]+)/.exec(texto)?.[1]);
+}
 
 /** Protocolo oficial MJ-* citado no texto de um marcador de sistema. */
 export function protocoloDoTexto(texto: string | null | undefined): string | null {
@@ -227,6 +245,7 @@ export function agruparTimeline(entrada: {
         urgencia: txt(d["urgencia"]),
         protocolo: null,
         filaInicial: null,
+        filaNome: null,
         origem: origemHandoff(e),
         status: "SOLICITADO",
         auditoria: { registrada: false, completa: null, faltando: [] },
@@ -312,7 +331,7 @@ export function agruparTimeline(entrada: {
       );
       if (existente) {
         existente.eventoIds.push(e.id);
-        existente.criterio = existente.criterio ?? txt(e.motivo);
+        existente.criterio = existente.criterio ?? criterioAtribuicao(txt(e.motivo));
         existente.fimMs = t;
         eventoParaItem.set(e.id, existente.chave);
         continue;
@@ -324,8 +343,9 @@ export function agruparTimeline(entrada: {
         atendenteUserId: destinoId,
         atendenteNome: destinoNome,
         automatica: d["manual"] !== true,
-        criterio: txt(e.motivo) ?? txt(d["metodo"]),
-        statusAtendente: txt(d["status_atendente"]) ?? txt(d["perfil"]),
+        criterio: criterioAtribuicao(txt(e.motivo)) ?? txt(d["metodo"]),
+        statusAtendente:
+          txt(d["status_atendente"]) ?? txt(d["presence_status"]) ?? txt(d["perfil"]),
         transferencia: e.evento === "TRANSFERIDA",
         origemNome: txt(e.de_nome),
         realizadaPorNome: e.evento === "TRANSFERIDA" ? txt(e.user_nome) : null,
@@ -389,6 +409,7 @@ export function agruparTimeline(entrada: {
               ));
       if (alvo) {
         alvo.marcadorIds.push(m.id);
+        alvo.filaNome = alvo.filaNome ?? destinoDoTexto(corpo);
         marcadorParaItem.set(m.id, alvo.chave);
       }
       continue;
