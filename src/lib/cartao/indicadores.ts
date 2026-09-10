@@ -62,7 +62,7 @@ export interface ResumoContratos {
   novos: number;
   /** Soma das mensalidades desses contratos novos. */
   novosValor: number;
-  /** Receita prevista dividida pelos contratos ativos. 0 quando não há ativo. */
+  /** Receita prevista dividida pelos contratos pagantes. 0 quando não há nenhum. */
   ticketMedio: number;
 }
 
