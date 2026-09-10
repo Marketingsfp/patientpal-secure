@@ -480,6 +480,9 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
                       reply = await gerarRespostaNina(params.clinicaId, turno.texto, from, {
                         auditoria: auditoriaNina,
                         mensagensEntrada: entradasTurno,
+                        revisao: turno.revisao
+                          ? { telefone: fromDigits || from, valor: turno.revisao }
+                          : undefined,
                       });
                       execTurno = auditoriaNina.execucaoId ?? null;
                       // Instrumentação mínima para métricas: marca quais
