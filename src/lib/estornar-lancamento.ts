@@ -2,21 +2,18 @@ import { supabase } from "@/integrations/supabase/client";
 import { logAction } from "@/hooks/use-crud";
 
 /**
- * Para onde a saída de caixa foi, quando o caixa do pagamento original já
- * estava fechado. A devolução é dinheiro saindo de uma gaveta física, então
- * quem a recebe importa para a conferência do dia:
+ * O que aconteceu com a gaveta no estorno:
  *
- *   'lancado_no_caixa_de_quem_recebeu' — caso normal. Foi para o caixa aberto
- *       de quem recebeu o pagamento, que é a gaveta de onde o dinheiro sai.
- *   'lancado_em_sessao_atual' — exceção. Essa pessoa não tinha caixa aberto, e
- *       a saída foi para o caixa de quem executou o estorno (em geral o admin
- *       que aprovou a solicitação). Precisa ser dito na tela, senão ele fecha
- *       o dia com uma falta que não é dele.
- *
- * Sem nenhum dos dois, a saída caiu na própria sessão do recebimento, que
- * ainda estava aberta, e não há nada a avisar.
+ *   (sem aviso) — o caixa do pagamento ainda estava aberto: a saída foi
+ *       lançada nele mesmo, como sempre.
+ *   'lancado_no_caixa_de_quem_devolveu' — o caixa do pagamento já estava
+ *       fechado e alguém está devolvendo o dinheiro ao paciente agora: a saída
+ *       sai do caixa aberto de quem devolve.
+ *   'registrado_sem_mexer_na_gaveta' — o caixa do pagamento já estava fechado e
+ *       não houve devolução: ficou só o registro, R$ 0,00 na gaveta.
  */
-export type EstornoAviso = "lancado_no_caixa_de_quem_recebeu" | "lancado_em_sessao_atual";
+export type EstornoAviso = "lancado_no_caixa_de_quem_devolveu" | "registrado_sem_mexer_na_gaveta";
+
 
 export type EstornoLancamentoResultado =
   | { ok: true; aviso?: EstornoAviso | string | null }
