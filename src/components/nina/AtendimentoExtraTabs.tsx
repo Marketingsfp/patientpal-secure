@@ -3491,17 +3491,9 @@ export function AtendInbox() {
                     if (g.tipo === "ATRIBUICAO") {
                       return <AtribuicaoGroupCard key={`g-${g.chave}`} grupo={g} />;
                     }
-                    if (g.evento.evento === "RESUMO_IA_GERADO") {
-                      if (!clinicaId || g.chave !== chaveResumoNaTimeline) return null;
-                      return (
-                        <ResumoNinaTimelineCard
-                          key={`resumo-${g.chave}`}
-                          clinicaId={clinicaId}
-                          conversaId={sel.id}
-                          criadoEm={g.criadoEm}
-                        />
-                      );
-                    }
+                    // O resumo da Nina fica apenas no painel superior da
+                    // conversa: o aviso de geração não vira bloco na timeline.
+                    if (g.evento.evento === "RESUMO_IA_GERADO") return null;
                     return (
                       <ConversationSystemEvent
                         key={`ev-${g.chave}`}
