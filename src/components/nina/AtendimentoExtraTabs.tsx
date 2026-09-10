@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useHoverTolerante } from "@/hooks/use-hover-tolerante";
 import {
   ListaRespostasRapidas,
@@ -157,7 +157,7 @@ import {
 
 
 import { idConversaValido } from "@/lib/atendimento/abrir-conversa";
-import { conversaEhDaNina, statusEhRepresentacaoDaNina } from "@/lib/atendimento/badge-nina";
+import { statusEhRepresentacaoDaNina, tiposDeBadgeDoCard } from "@/lib/atendimento/badge-nina";
 import { assinarSelecaoConversa } from "@/lib/webmcp/selecao-conversa";
 import { AgendaConversaDrawer } from "@/components/nina/AgendaConversaDrawer";
 import { ConversaSkeleton, ContatoSkeleton } from "@/components/nina/ConversaSkeleton";
