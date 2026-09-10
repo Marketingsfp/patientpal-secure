@@ -354,7 +354,11 @@ export async function processarMensagemTeste(data: EntradaMensagemTeste, userId:
     /** Entrada lógica da Nina: uma mensagem OU o turno consolidado do lote. */
     let textoDoTurno = textoPaciente;
     // Auditoria: id da execução que produziu esta resposta.
-    const auditoriaNina: { execucaoId?: string | null } = {};
+    const auditoriaNina: {
+      execucaoId?: string | null;
+      traceId?: string | null;
+      resultado?: import("@/lib/nina/resposta/contrato").ResultadoRespostaNina;
+    } = {};
     // FASE 4 — ambiente real desta execução: se existe uma simulação em
     // andamento para este lead, a origem é o Test Runner (teste automatizado);
     // caso contrário é a Homologação manual. Nunca vem do navegador.
