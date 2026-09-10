@@ -142,22 +142,47 @@ export function patchListaPorConversa(
     status?: FiltroStatusInbox | null;
     /** Busca por texto/número ativa: a lista vem reduzida pelo servidor. */
     buscando?: boolean;
+    /** FASE 4 — eixo de Visualização ativo (Recentes/Resolvidas/Espera). */
+    visualizacao?: VisualizacaoPatch;
+    /** Métrica canônica de paciente aguardando (`atend_espera_por_conversa`). */
+    espera?: Record<string, string>;
   },
 ): ResultadoPatch {
   const id = String(linha?.["id"] ?? "");
   if (!id || !Array.isArray(lista)) {
     return { lista: lista ?? [], aplicado: false, reconciliar: true };
   }
-  const visivel =
-    conversaVisivelNoEscopo(linha as ConversaEscopo, {
-      ...ctx,
-      escopo: escopoComAtendente(ctx.escopo, ctx.atendenteId, ctx.gestor),
-    }) &&
-    conversaDoAtendente(
-      linha as ConversaEscopo,
-      atendenteFiltroEfetivo(ctx.atendenteId, ctx.gestor),
-    ) &&
-    statusCombina(linha as Record<string, any>, ctx.status);
+  const visualizacao: VisualizacaoPatch = ctx.visualizacao ?? "recentes";
+  const espera = ctx.espera ?? {};
+  const atendenteAlvo = atendenteFiltroEfetivo(ctx.atendenteId, ctx.gestor);
+  const fechada = STATUS_FECHADOS.includes(
+    String(linha?.["status"] ?? "") as (typeof STATUS_FECHADOS)[number],
+  );
+
+  let visivel: boolean;
+  if (visualizacao === "resolvidas") {
+    // FASE 3/4 — responsabilidade da conversa resolvida NÃO é
+    // `atribuida_user_id` (fica nulo ao encerrar): vale quem era responsável
+    // no momento da resolução, ou quem resolveu.
+    const alvo = atendenteAlvo ?? (ctx.gestor ? null : ctx.userId);
+    const dono =
+      !alvo ||
+      linha?.["last_assigned_user_id"] === alvo ||
+      linha?.["resolved_by"] === alvo;
+    visivel = fechada && dono;
+  } else {
+    visivel =
+      !fechada &&
+      conversaVisivelNoEscopo(linha as ConversaEscopo, {
+        ...ctx,
+        escopo: escopoComAtendente(ctx.escopo, ctx.atendenteId, ctx.gestor),
+      }) &&
+      conversaDoAtendente(linha as ConversaEscopo, atendenteAlvo) &&
+      statusCombina(linha as Record<string, any>, ctx.status);
+    // "Maior espera" mostra só quem o paciente deixou aguardando; a métrica
+    // canônica vem da consulta de espera, nunca é recalculada aqui.
+    if (visivel && visualizacao === "espera" && !espera[id]) visivel = false;
+  }
   const existente = lista.find((c) => c.id === id);
 
   // Saiu do filtro (transferida para outra pessoa, encerrada, devolvida à
