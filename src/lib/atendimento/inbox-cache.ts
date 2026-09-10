@@ -37,6 +37,8 @@ export function chaveInbox(args: {
   userId: string | null;
   escopo: EscopoInbox;
   atendenteId?: string | null;
+  /** FASE 2 — o segundo eixo (estado/ordenação) também separa a caixa. */
+  visualizacao?: string | null;
 }): string {
   return [
     "inbox",
@@ -44,6 +46,7 @@ export function chaveInbox(args: {
     args.userId ?? "-",
     args.escopo,
     args.atendenteId ?? "-",
+    args.visualizacao ?? "-",
   ].join("|");
 }
 
