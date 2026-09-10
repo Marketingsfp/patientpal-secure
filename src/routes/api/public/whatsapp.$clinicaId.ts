@@ -475,6 +475,16 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
                       if (!turno) {
                         // Uma mensagem mais nova do mesmo paciente assume o
                         // turno: esta invocação encerra sem responder.
+                        const { registrarTurnoSemModelo } = await import(
+                          "@/lib/nina/rastreio/turno.server"
+                        );
+                        await registrarTurnoSemModelo({
+                          clinicaId: params.clinicaId,
+                          conversaId: convId,
+                          mensagensEntrada: entradasNina,
+                          origem: "nenhuma",
+                          motivo: "turno assumido por mensagem mais nova (agrupamento)",
+                        });
                         continue;
                       }
                       loteId = turno.batchId;
