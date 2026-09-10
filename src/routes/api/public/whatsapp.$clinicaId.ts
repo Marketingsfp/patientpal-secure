@@ -254,6 +254,21 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
                   console.error("whatsapp mensagem insert error", insErr.message);
                 }
 
+                // FASE 4 — Stale Response Guard: cada mensagem recebida avança
+                // a revisão da conversa. Uma geração da Nina em andamento
+                // passa a ser obsoleta a partir daqui.
+                try {
+                  const { incrementarRevisaoConversa } = await import(
+                    "@/lib/nina/revisao-conversa.server"
+                  );
+                  await incrementarRevisaoConversa({
+                    clinicaId: params.clinicaId,
+                    telefone: fromDigits || from,
+                  });
+                } catch (e) {
+                  console.error("[nina] revisão da conversa não avançou", e);
+                }
+
                 // ---------------------------------------------------------
                 // Verificação de paciente pelo site (API v1.2).
                 // Esta checagem vem ANTES de reabrir conversa e antes de
@@ -392,6 +407,8 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
                   let lockTurno: import("@/lib/nina/lock-conversa.server").LockConversa | null =
                     null;
                   let execTurno: string | null = null;
+                  let revisaoTurno = 0;
+                  let turnoSuperseded = false;
                   try {
                     if (!phoneNumberId) {
                       throw new Error(
@@ -458,6 +475,7 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
                       }
                       loteId = turno.batchId;
                       lockTurno = turno.lock;
+                      revisaoTurno = turno.revisao;
                       if (turno.mensagens.length) entradasTurno = turno.mensagens;
                       reply = await gerarRespostaNina(params.clinicaId, turno.texto, from, {
                         auditoria: auditoriaNina,
@@ -513,6 +531,28 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
                         }
                       } catch (e) {
                         console.error("[nina] avaliação de encerramento falhou", e);
+                      }
+                    }
+                    // FASE 4 — antes de QUALQUER envio: a resposta ainda vale?
+                    if (reply && revisaoTurno) {
+                      const { respostaObsoleta } = await import(
+                        "@/lib/nina/revisao-conversa.server"
+                      );
+                      const obsoleta = await respostaObsoleta({
+                        clinicaId: params.clinicaId,
+                        telefone: fromDigits || from,
+                        revisaoProcessada: revisaoTurno,
+                      });
+                      if (obsoleta) {
+                        // Chegou mensagem nova durante a geração: a resposta
+                        // antiga é descartada e o próximo lote reprocessa com
+                        // o contexto completo.
+                        console.warn("[nina] resposta obsoleta descartada", {
+                          revisao_processada: revisaoTurno,
+                          lote: loteId || null,
+                        });
+                        turnoSuperseded = true;
+                        reply = "";
                       }
                     }
                     if (reply) {
@@ -677,7 +717,12 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
                     if (loteId || lockTurno) {
                       try {
                         const { concluirTurnoNina } = await import("@/lib/nina/burst.server");
-                        await concluirTurnoNina(loteId, execTurno, lockTurno);
+                        await concluirTurnoNina(
+                          loteId,
+                          execTurno,
+                          lockTurno,
+                          turnoSuperseded ? "SUPERSEDED" : "PROCESSED",
+                        );
                       } catch (e) {
                         console.error("[nina] encerramento do turno falhou", e);
                       }
