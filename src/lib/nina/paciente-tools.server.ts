@@ -27,6 +27,11 @@ import { z } from "zod";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { isCPFValido, somenteDigitos } from "@/lib/cpf";
 import { normalizar, raizEspecialidade } from "@/lib/nina-especialidade";
+import { autorizarAcao, type CodigoRecusa } from "./acoes/autorizacao";
+import {
+  verificarResultadoAgendamento,
+  type RegistroAgendamento,
+} from "./acoes/resultado";
 
 /** Códigos de erro estáveis — a Nina usa para decidir como continuar a conversa. */
 export type CodigoErroNina =
@@ -39,6 +44,8 @@ export type CodigoErroNina =
   | "SLOT_UNAVAILABLE"
   | "APPOINTMENT_ALREADY_EXISTS"
   | "APPOINTMENT_CREATION_FAILED"
+  | "APPOINTMENT_UNCERTAIN"
+  | "ACTION_NOT_AUTHORIZED"
   | "VALIDATION_ERROR"
   | "PERMISSION_DENIED"
   | "INTERNAL_ERROR";
@@ -1543,33 +1550,125 @@ async function executarFerramentaInterna(
         // horário nunca gera dois registros (índice único no banco).
         const idExterno = `${ctx.conversaId ?? ctx.telefone ?? "sem-conversa"}|${medicoIdReal}|${p.inicio}`;
 
-        // --- Idempotência: mesma intenção, mesmo horário, um único registro.
+        // --- FASE 3: idempotência ANTES de qualquer gravação. Consultar uma
+        // reserva anterior não exige criar de novo: a prova sai da leitura do
+        // registro existente, com os dados REAIS dele (nunca os do pedido).
         const { data: jaExiste } = await supabaseAdmin
           .from("agendamentos")
-          .select("id, inicio")
+          .select("id, clinica_id, paciente_id, medico_id, inicio, fim, status")
           .eq("clinica_id", ctx.clinicaId)
           .eq("paciente_id", ctx.pacienteId)
           .eq("inicio", p.inicio)
           .not("status", "in", "(cancelado)")
           .maybeSingle();
         if (jaExiste) {
+          const anterior = verificarResultadoAgendamento(
+            { clinicaId: ctx.clinicaId, pacienteId: ctx.pacienteId },
+            jaExiste as RegistroAgendamento,
+            { jaExistia: true },
+          );
           await auditar(ctx, "agendar", p, {
-            ok: true,
-            erro: "APPOINTMENT_ALREADY_EXISTS",
-            id: (jaExiste as { id: string }).id,
+            ok: anterior.estado === "EXISTING",
+            erro: anterior.estado === "EXISTING" ? "APPOINTMENT_ALREADY_EXISTS" : "APPOINTMENT_UNCERTAIN",
+            id: anterior.agendamentoId ?? undefined,
           });
+          if (anterior.estado !== "EXISTING")
+            return falha(
+              "APPOINTMENT_UNCERTAIN",
+              "Não consegui confirmar com segurança o agendamento existente.",
+              { divergencias: anterior.divergencias },
+            );
+          const reg = anterior.registro!;
           return {
             ok: true,
             duplicado: true,
+            estado_acao: "EXISTING",
+            appointment_id: anterior.agendamentoId,
+            agendamento_id: anterior.agendamentoId,
+            status: reg.status ?? null,
+            doctor_id: reg.medico_id ?? null,
+            patient_id: reg.paciente_id ?? null,
+            verificado_no_banco: true,
             // Mesmo atendimento: reaproveita o protocolo já gerado.
             protocolo: await protocoloDoAgendamento(ctx),
             agendamento: {
-              data: formatarData(p.inicio),
-              hora: formatarHora(p.inicio),
+              // Dados da reserva EXISTENTE, não do pedido novo.
+              data: formatarData(String(reg.inicio ?? p.inicio)),
+              hora: formatarHora(String(reg.inicio ?? p.inicio)),
               procedimento: p.procedimento,
             },
           };
         }
+
+        // --- FASE 3: autorização prévia da operação pretendida. Criar um
+        // agendamento NOVO nunca exige appointment_id; exige paciente validado,
+        // clínica, profissional, procedimento, intervalo, VAGA correspondente
+        // (revalidada agora) e consentimento amarrado ao slot resumido.
+        const vagasReais = await consultarDisponibilidadeCore({
+          clinicaId: ctx.clinicaId,
+          medicoId: medicoIdReal,
+          dias: 90,
+          data: p.inicio.slice(0, 10),
+        }).catch(() => [] as SlotNina[]);
+        const ofertaCorrente = ctx.estado?.appointment;
+        const consentimentoExplicito =
+          ofertaCorrente?.slot_confirmed_by_patient === true ||
+          ofertaCorrente?.intent_confirmed === true ||
+          // Sem estado estruturado (chat interno/console) o consentimento vem
+          // da própria chamada, que só ocorre após a confirmação do paciente.
+          !ctx.estado;
+        const auth = autorizarAcao({
+          operacao: "criar_agendamento",
+          clinicaId: ctx.clinicaId,
+          paciente: {
+            id: ctx.pacienteId,
+            nome: ctx.pacienteNome,
+            identificado: true,
+            validado: true,
+          },
+          medicoId: medicoIdReal,
+          procedimento: p.procedimento,
+          intervalo: { inicio: p.inicio, fim: p.fim },
+          disponibilidadeConsultada: true,
+          vagasConsultadas: vagasReais.map((s) => ({
+            medicoId: s.medico_id,
+            inicio: s.inicio,
+            fim: s.fim,
+          })),
+          consentimento: {
+            confirmado: consentimentoExplicito,
+            // Sem oferta registrada, o próprio slot pedido é o resumido.
+            medicoId: ofertaCorrente?.doctor_id ?? medicoIdReal,
+            inicio: ofertaCorrente?.slot_inicio ?? p.inicio,
+            fim: ofertaCorrente?.slot_fim ?? p.fim,
+          },
+          idempotenciaBase: ctx.conversaId ?? ctx.telefone ?? null,
+        });
+        if (!auth.autorizado) {
+          const semVagaCorrespondente = auth.motivos.some(
+            (m: CodigoRecusa) => m === "SEM_VAGA_DISPONIVEL" || m === "VAGA_NAO_CORRESPONDENTE",
+          );
+          logAgenda("agendar", {
+            medico: rMed.nome,
+            medico_id: medicoIdReal,
+            inicio: p.inicio,
+            confirmado: false,
+            erro: semVagaCorrespondente ? "SLOT_UNAVAILABLE" : "ACTION_NOT_AUTHORIZED",
+            detalhe: auth.motivos.join(","),
+          });
+          await auditar(ctx, "agendar", p, {
+            ok: false,
+            erro: semVagaCorrespondente ? "SLOT_UNAVAILABLE" : "ACTION_NOT_AUTHORIZED",
+          });
+          return falha(
+            semVagaCorrespondente ? "SLOT_UNAVAILABLE" : "ACTION_NOT_AUTHORIZED",
+            semVagaCorrespondente
+              ? "Esse horário não está mais disponível."
+              : "Ainda faltam confirmações para marcar esse horário.",
+            { motivos: auth.motivos },
+          );
+        }
+
 
         // --- Mesma mecânica da tela de Agenda: marcar é CONVERTER o slot
         // "DISPONIVEL" que cobre o intervalo, e não inserir uma linha nova ao
@@ -1674,30 +1773,46 @@ async function executarFerramentaInterna(
             .eq("clinica_id", ctx.clinicaId);
         }
 
-        // --- Verificação pós-gravação: só chamamos de sucesso o que dá para
-        // reler no banco. Se o SELECT não achar, o resultado vira falha — a
-        // Nina jamais confirma um agendamento que não está persistido.
+        // --- FASE 3: prova do resultado. Relê o registro e confere ID, estado,
+        // paciente, profissional e horário. Sem leitura conferida o desfecho é
+        // INCERTO — a Nina jamais confirma o que não está comprovado.
         const { data: conferido } = await supabaseAdmin
           .from("agendamentos")
           .select("id, clinica_id, paciente_id, medico_id, inicio, fim, status")
           .eq("id", r.id)
           .eq("clinica_id", ctx.clinicaId)
           .maybeSingle();
-        if (!conferido) {
+        const desfecho = verificarResultadoAgendamento(
+          {
+            clinicaId: ctx.clinicaId,
+            pacienteId: ctx.pacienteId,
+            medicoId: medicoIdReal,
+            inicio: p.inicio,
+            fim: p.fim,
+          },
+          (conferido ?? null) as RegistroAgendamento | null,
+        );
+        if (desfecho.estado !== "CREATED") {
           logAgenda("agendar", {
             medico: rMed.nome,
             medico_id: medicoIdReal,
             inicio: p.inicio,
             confirmado: false,
-            erro: "APPOINTMENT_NOT_PERSISTED",
+            erro: conferido ? "APPOINTMENT_UNCERTAIN" : "APPOINTMENT_NOT_PERSISTED",
+            detalhe: desfecho.divergencias.join(","),
             agendamento_id: r.id,
           });
-          await auditar(ctx, "agendar", p, { ok: false, erro: "APPOINTMENT_NOT_PERSISTED" });
+          await auditar(ctx, "agendar", p, {
+            ok: false,
+            erro: conferido ? "APPOINTMENT_UNCERTAIN" : "APPOINTMENT_NOT_PERSISTED",
+          });
           return falha(
-            "APPOINTMENT_CREATION_FAILED",
+            conferido ? "APPOINTMENT_UNCERTAIN" : "APPOINTMENT_CREATION_FAILED",
             "Não consegui confirmar a gravação do agendamento no sistema.",
+            { divergencias: desfecho.divergencias },
           );
         }
+
 
         logAgenda("agendar", {
           medico: rMed.nome,
@@ -1726,6 +1841,7 @@ async function executarFerramentaInterna(
           // Contrato estruturado: a Nina só confirma quando vê `success` e
           // `appointment_id`.
           success: true,
+          estado_acao: "CREATED",
           appointment_id: r.id,
           // Gerado no banco só depois da gravação conferida.
           protocolo: await protocoloDoAgendamento(ctx),

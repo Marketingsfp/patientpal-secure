@@ -442,16 +442,33 @@ export function decidirConfianca(
 
   // FASE 2 — segurança da AÇÃO, calculada à parte da nota do texto.
   // Sem ação executável no turno: NOT_APPLICABLE (nunca bloqueio, nunca 0).
+  // FASE 3 — ausência de bloqueador não basta: uma decisão que ainda exige
+  // esclarecimento, evidência ou transferência não pode sair como ALLOWED.
+  const bloqueada = blockersAcao.length > 0 || hardBlockersAcao.length > 0;
+  const validadoresAcaoPendentes = validators
+    .filter((v) => v.status === "PENDING")
+    .map((v) => v.validator);
+  const decisaoExigeMaisAlgo = decisaoFinal !== "ALLOW";
+  const motivosPendencia: string[] = [];
+  if (!bloqueada && decisaoExigeMaisAlgo)
+    motivosPendencia.push(`decisão do motor ainda exige ${decisaoFinal.toLowerCase()}`);
+  if (!bloqueada && validadoresAcaoPendentes.length > 0)
+    motivosPendencia.push(
+      `dimensões sem evidência conclusiva: ${validadoresAcaoPendentes.join(", ")}`,
+    );
+
   const actionSafety: AvaliacaoSegurancaAcao = executavel
     ? {
-        status:
-          blockersAcao.length > 0 || hardBlockersAcao.length > 0 ? "BLOCKED" : "ALLOWED",
+        status: bloqueada ? "BLOCKED" : motivosPendencia.length > 0 ? "PENDING" : "ALLOWED",
         acao: acaoOuNenhuma(ctx.requestedAction),
         blockers: blockersAcao,
         hardBlockers: hardBlockersAcao,
-        motivos: reprovadosAcao.map((c) =>
-          c.detalhe ? `${c.descricao} — ${c.detalhe}` : c.descricao,
-        ),
+        motivos: [
+          ...reprovadosAcao.map((c) =>
+            c.detalhe ? `${c.descricao} — ${c.detalhe}` : c.descricao,
+          ),
+          ...motivosPendencia,
+        ],
       }
     : {
         status: "NOT_APPLICABLE",

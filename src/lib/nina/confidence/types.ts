@@ -320,7 +320,12 @@ export function contaContraANota(status: StatusValidador): boolean {
 }
 
 /** FASE 2 — resultado da avaliação de SEGURANÇA DA AÇÃO. */
-export type StatusSegurancaAcao = "ALLOWED" | "BLOCKED" | "NOT_APPLICABLE";
+/**
+ * FASE 3 — ausência de bloqueador NÃO é autorização. Quando a decisão do motor
+ * ainda pede esclarecimento, evidência ou transferência, a ação fica `PENDING`
+ * (não é liberada e também não é um bloqueio definitivo).
+ */
+export type StatusSegurancaAcao = "ALLOWED" | "PENDING" | "BLOCKED" | "NOT_APPLICABLE";
 
 /**
  * "É seguro EXECUTAR esta ação?" — deliberadamente separado de
