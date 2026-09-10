@@ -224,6 +224,7 @@ import {
   type EscopoBaseInbox,
   type VisualizacaoInbox,
 } from "@/lib/atendimento/filtros-inbox";
+import { lerFiltrosInbox, salvarFiltrosInbox } from "@/lib/atendimento/filtros-persistencia";
 import {
   MSG_ADMIN_NAO_ATENDE,
   ROTULO_PRESENCA,
