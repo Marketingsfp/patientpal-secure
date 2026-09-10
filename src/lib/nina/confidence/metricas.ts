@@ -8,6 +8,25 @@
  * Nada aqui expõe texto do paciente: só códigos, contagens e médias.
  */
 
+import {
+  agruparSaidas,
+  calcularAcertoObservado,
+  calcularDenominadores,
+  calcularResultadosConfirmados,
+  descreverAmostra,
+  indexarRevisoes,
+  resumirRevisao,
+  type AcertoObservado,
+  type Amostra,
+  type Denominadores,
+  type LinhaSaida,
+  type ProvaAgendamento,
+  type ProvaTransferencia,
+  type ReporteRevisao,
+  type ResultadosConfirmados,
+  type ResumoRevisao,
+} from "./denominadores";
+
 export type PeriodoOperacao = "DENTRO_DO_HORARIO" | "FORA_DO_HORARIO" | "NAO_CLASSIFICAVEL";
 
 /** Linha de decisão já enriquecida com data local e período de operação. */
@@ -136,8 +155,30 @@ export type AltaConfiancaComErro = {
   };
 };
 
+export type OpcoesMetricas = {
+  /** Reportes humanos com status, para separar revisão de ausência de revisão. */
+  reportes?: ReporteRevisao[];
+  /** Saídas revisadas por uma pessoa e consideradas corretas. */
+  revisadasCorretas?: string[];
+  provasTransferencia?: ProvaTransferencia[];
+  provasAgendamento?: ProvaAgendamento[];
+  falhasOperacionais?: number;
+  /** Teto de leitura aplicado na consulta (para declarar truncamento). */
+  limiteLeitura?: number;
+};
+
 export type MetricasConfiabilidade = {
   total: number;
+  /** FASE 7 — denominadores separados: mensagens, avaliações, rodadas, operações. */
+  denominadores: Denominadores;
+  /** FASE 7 — estados de revisão humana por saída. */
+  revisao: ResumoRevisao;
+  /** FASE 7 — acerto só sobre itens revisados, com cobertura e amostra. */
+  acerto: AcertoObservado;
+  /** FASE 7 — resultados confirmados pelos serviços (não pela decisão do motor). */
+  resultados: ResultadosConfirmados;
+  /** FASE 7 — tamanho da amostra e indicação de recorte parcial. */
+  amostra: Amostra;
   scoreMedio: number;
   distribuicao: { HIGH: number; MEDIUM: number; LOW: number };
   handoffsBaixaConfianca: number;
@@ -593,6 +634,7 @@ export function calcularCalibracaoPorTipo(
 export function calcularMetricasConfiabilidade(
   linhas: LinhaDecisaoMetrica[],
   erros: ErroReportado[] = [],
+  opcoes: OpcoesMetricas = {},
 ): MetricasConfiabilidade {
   const distribuicao = { HIGH: 0, MEDIUM: 0, LOW: 0 };
   const motivos = new Map<string, number>();
@@ -653,8 +695,35 @@ export function calcularMetricasConfiabilidade(
     acumular(porPeriodo, l.periodo, score, baixa);
   }
 
+  // FASE 7 — denominadores, revisão e resultados confirmados.
+  const saidas = linhas as unknown as LinhaSaida[];
+  const unidades = agruparSaidas(saidas);
+  const reportes: ReporteRevisao[] =
+    opcoes.reportes ??
+    erros.map((e) => ({
+      id: e.id,
+      conversa_id: e.conversa_id ?? null,
+      mensagem_id: e.mensagem_id ?? null,
+      execucao_id: e.execucao_id ?? null,
+      status: null,
+      created_at: e.created_at,
+      categoria: e.categoria ?? null,
+    }));
+  const idxRevisao = indexarRevisoes(reportes, opcoes.revisadasCorretas ?? []);
+  const limiteLeitura = opcoes.limiteLeitura ?? Number.POSITIVE_INFINITY;
+
   return {
     total: linhas.length,
+    denominadores: calcularDenominadores(saidas),
+    revisao: resumirRevisao(unidades, idxRevisao),
+    acerto: calcularAcertoObservado(unidades, idxRevisao),
+    resultados: calcularResultadosConfirmados(
+      saidas,
+      opcoes.provasTransferencia ?? [],
+      opcoes.provasAgendamento ?? [],
+      opcoes.falhasOperacionais ?? 0,
+    ),
+    amostra: descreverAmostra(linhas.length, limiteLeitura, unidades.length),
     scoreMedio: linhas.length ? Math.round((soma / linhas.length) * 10) / 10 : 0,
     distribuicao,
     handoffsBaixaConfianca: handoffsBaixa,
