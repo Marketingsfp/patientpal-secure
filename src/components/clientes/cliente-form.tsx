@@ -813,6 +813,7 @@ export function ClienteForm({
         inicio: string;
         procedimento: string | null;
         medico_id: string | null;
+        status: string | null;
       }>;
       const medicoIds = Array.from(
         new Set(rows.map((r) => r.medico_id).filter((x): x is string => !!x)),
@@ -850,6 +851,7 @@ export function ClienteForm({
             procedimento: r.procedimento,
             medico_nome: med?.nome ?? null,
             especialidade: med?.especialidade_id ? (espMap[med.especialidade_id] ?? null) : null,
+            status: r.status ?? null,
           };
         }),
       );
