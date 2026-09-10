@@ -93,10 +93,22 @@ export function patchListaPorMensagem(
   return { lista: ordenar(atualizada), aplicado: true, reconciliar: false };
 }
 
+/** O estado escolhido no seletor "Todas / Em espera / Ativas / Fechadas". */
+export type FiltroStatusInbox = "all" | "active" | "waiting" | "closed" | string;
+
+function statusCombina(conversa: Record<string, any>, filtro?: FiltroStatusInbox | null): boolean {
+  if (!filtro || filtro === "all") return true;
+  return String(conversa["status"] ?? "") === filtro;
+}
+
 /**
  * Mudança na própria conversa (`atend_conversas`): responsável, status,
- * prévia, horário. Se a conversa passou a pertencer (ou deixou de pertencer)
- * ao filtro atual, a lista precisa ser conferida no servidor.
+ * prévia, horário.
+ *
+ * FASE 3 — quando o próprio evento já traz a linha inteira, a conversa que
+ * passa a pertencer ao filtro é inserida na hora e a que deixa de pertencer
+ * sai na hora, sem buscar as 200 conversas de novo. A lista completa só é
+ * conferida quando o evento não basta (busca por texto ativa, por exemplo).
  */
 export function patchListaPorConversa(
   lista: LinhaLista[],
@@ -107,6 +119,10 @@ export function patchListaPorConversa(
     gestor: boolean;
     /** FASE 1 — filtro de supervisão por atendente (só visualização). */
     atendenteId?: string | null;
+    /** Seletor de estado (Ativas, Em espera, Fechadas, Todas). */
+    status?: FiltroStatusInbox | null;
+    /** Busca por texto/número ativa: a lista vem reduzida pelo servidor. */
+    buscando?: boolean;
   },
 ): ResultadoPatch {
   const id = String(linha?.["id"] ?? "");
@@ -121,12 +137,31 @@ export function patchListaPorConversa(
     conversaDoAtendente(
       linha as ConversaEscopo,
       atendenteFiltroEfetivo(ctx.atendenteId, ctx.gestor),
-    );
+    ) &&
+    statusCombina(linha as Record<string, any>, ctx.status);
   const existente = lista.find((c) => c.id === id);
 
-  // Entrou no filtro (nova, transferida para mim, devolvida à fila) ou saiu
-  // dele: só a lista do servidor sabe a posição correta.
-  if (!existente || !visivel) return { lista, aplicado: false, reconciliar: true };
+  // Saiu do filtro (transferida para outra pessoa, encerrada, devolvida à
+  // fila): some da lista imediatamente, sem recarregar nada.
+  if (existente && !visivel) {
+    return { lista: lista.filter((c) => c.id !== id), aplicado: true, reconciliar: false };
+  }
+
+  // Entrou no filtro (transferência, handoff da Nina, atribuição automática):
+  // aparece na hora, na posição correta pela última mensagem.
+  if (!existente && visivel) {
+    // Durante uma busca a lista é um recorte do servidor: não dá para saber
+    // localmente se a conversa pertence ao resultado.
+    if (ctx.buscando) return { lista, aplicado: false, reconciliar: true };
+    if (linha?.["is_teste"] === true) return { lista, aplicado: true, reconciliar: false };
+    return {
+      lista: ordenar([...lista, { ...(linha as LinhaLista) }]),
+      aplicado: true,
+      reconciliar: false,
+    };
+  }
+
+  if (!existente) return { lista, aplicado: true, reconciliar: false };
 
   const mesclada = { ...existente, ...linha };
   const mudou = Object.keys(mesclada).some((k) => mesclada[k] !== existente[k]);
