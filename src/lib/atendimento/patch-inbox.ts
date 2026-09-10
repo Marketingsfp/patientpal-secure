@@ -170,7 +170,10 @@ export function patchListaPorConversa(
   if (!id || !Array.isArray(lista)) {
     return { lista: lista ?? [], aplicado: false, reconciliar: true };
   }
-  const visualizacao: VisualizacaoPatch = ctx.visualizacao ?? "recentes";
+  // Compatibilidade: chamadas antigas informam só o escopo "fechadas", que é
+  // exatamente a visualização de Resolvidas.
+  const visualizacao: VisualizacaoPatch =
+    ctx.visualizacao ?? (ctx.escopo === "fechadas" ? "resolvidas" : "recentes");
   const espera = ctx.espera ?? {};
   const atendenteAlvo = atendenteFiltroEfetivo(ctx.atendenteId, ctx.gestor);
   const fechada = STATUS_FECHADOS.includes(
