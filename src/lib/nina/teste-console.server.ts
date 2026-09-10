@@ -237,7 +237,19 @@ export async function processarMensagemTeste(data: EntradaMensagemTeste, userId:
       .eq("clinica_id", data.clinicaId)
       .eq("wa_message_id", waId)
       .maybeSingle();
-    if (jaExiste) return { duplicada: true, reply: null as string | null, erro: null, audio: null };
+    if (jaExiste)
+      return {
+        duplicada: true,
+        reply: null as string | null,
+        erro: null,
+        audio: null,
+        transferida: false,
+        processamento: "DUPLICADA" as const,
+        absorvidaPeloLote: false,
+        // A mensagem do paciente já existe: envio bem-sucedido, sem regravar.
+        mensagemPersistida: true,
+        mensagemId: ((jaExiste as { id?: string } | null)?.id ?? null) as string | null,
+      };
 
     const agora = new Date().toISOString();
     const { data: msgEntrada } = await supabaseAdmin.from("whatsapp_mensagens").insert({
