@@ -2696,7 +2696,7 @@ export function AtendInbox() {
     }
   };
 
-  const statusBadge = (s: string) => {
+  const statusBadge = (s: string, opts?: { ocultarNina?: boolean }) => {
     if (s === "active")
       return (
         <Badge className="bg-atd-ok-bg text-atd-ok-ink hover:bg-atd-ok-bg border border-atd-ok/30">
@@ -2709,12 +2709,15 @@ export function AtendInbox() {
           ⏳ Em espera
         </Badge>
       );
-    if (s === "bot_attending")
+    if (statusEhRepresentacaoDaNina(s)) {
+      // O indicador canônico da Nina é renderizado uma única vez pelo card.
+      if (opts?.ocultarNina) return null;
       return (
         <Badge className="bg-atd-ai-bg text-atd-ai-ink hover:bg-atd-ai-bg border border-atd-ai/30">
           ✦ Nina
         </Badge>
       );
+    }
     if (s === "closed" || s === "finished")
       return (
         <Badge className="bg-atd-idle-bg text-atd-idle-ink hover:bg-atd-idle-bg border border-atd-border">
