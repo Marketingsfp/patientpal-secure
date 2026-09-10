@@ -206,7 +206,18 @@ export async function processarMensagemTeste(data: EntradaMensagemTeste, userId:
     const textoPaciente = data.tipo === "text" || ehAudio ? data.texto : "";
     const audioFalhou = ehAudio && !textoPaciente;
     if (data.tipo === "text" && !textoPaciente) {
-      return { duplicada: false, reply: null as string | null, erro: "Mensagem vazia.", audio: null };
+      // Nada foi gravado: o envio em si não aconteceu.
+      return {
+        duplicada: false,
+        reply: null as string | null,
+        erro: "Mensagem vazia.",
+        audio: null,
+        transferida: false,
+        processamento: "ERRO" as const,
+        absorvidaPeloLote: false,
+        mensagemPersistida: false,
+        mensagemId: null as string | null,
+      };
     }
 
     // Mesmo corpo gravado pelo webhook real (áudio recebe o prefixo 🎤).
