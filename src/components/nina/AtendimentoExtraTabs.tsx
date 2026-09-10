@@ -3487,7 +3487,7 @@ export function AtendInbox() {
                         <div className="whitespace-pre-wrap">{m.body || `[${m.tipo}]`}</div>
                         {ehOtimista(m) && m.status === "failed" && (
                           <div className="mt-1 flex items-center gap-2 text-[11px]">
-                            <span className="whitespace-nowrap">⚠ Não enviada</span>
+                            <span className="whitespace-nowrap">⚠ Falha ao enviar</span>
                             <button
                               type="button"
                               className="underline underline-offset-2"
@@ -3500,9 +3500,10 @@ export function AtendInbox() {
                         <div
                           className={`text-[11px] mt-1 flex items-center justify-between gap-2 ${out ? "text-atd-on-strong/80" : "text-atd-ink-soft"}`}
                         >
+                          {/* Envio otimista: durante o envio normal a bolha não
+                              exibe nenhum status — só a hora. Falha aparece acima. */}
                           <span className="whitespace-nowrap">
                             {fmtHora(m.recebida_em)} {m.enviada_por === "nina" && "· Nina"}
-                            {ehOtimista(m) && m.status !== "failed" && " · enviando…"}
                           </span>
                           {daNina &&
                             (clinicaId && m.execucao_id && confiancaPorExecucao[String(m.execucao_id)] ? (
