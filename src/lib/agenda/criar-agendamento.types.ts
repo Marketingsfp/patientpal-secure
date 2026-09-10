@@ -47,6 +47,11 @@ export type CriarAgendamentoInput = {
   // ocupada. O servidor devolve `confirmavel: "encaixe_sem_vaga"` e a tela
   // pergunta antes de repetir a gravação com o flag ligado.
   confirmacoes?: { permitir_conflito_paciente?: boolean; permitir_encaixe_sem_vaga?: boolean };
+  // Agenda que a recepção está olhando na tela (filtro "Agenda"). Só é usada
+  // para decidir em qual agenda entra um ENCAIXE que não cai em cima de
+  // nenhuma ficha — por exemplo depois do fim da grade, num médico com duas
+  // agendas no mesmo dia. O servidor confere se ela é mesmo deste médico.
+  agenda_preferida_id?: string | null;
 };
 
 export type PgErrorLike = {
