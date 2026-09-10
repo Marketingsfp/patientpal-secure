@@ -273,6 +273,19 @@ export async function processarMensagemTeste(data: EntradaMensagemTeste, userId:
     // Teto atingido → apaga as mensagens mais antigas do lead para caber as novas.
     await podarMensagensLead(supabaseAdmin, data.clinicaId, { ...lead, conversa_id: conversaId });
 
+    const mensagemId = (msgEntrada as { id?: string } | null)?.id ?? null;
+    // FASE 4 (mesmo mecanismo da produção): a mensagem JÁ está gravada e já
+    // apareceu na tela; só agora a conversa muda de revisão. Qualquer resposta
+    // gerada antes disso passa a ser considerada obsoleta.
+    const { incrementarRevisaoConversa } = await import("@/lib/nina/revisao-conversa.server");
+    await incrementarRevisaoConversa({
+      clinicaId: data.clinicaId,
+      telefone: lead.telefone_sessao,
+      conversaId,
+    });
+
+
+
 
 
     // Nina desligada na clínica → mesmo comportamento do WhatsApp: não responde.
