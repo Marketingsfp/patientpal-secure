@@ -183,7 +183,14 @@ export function HomologacaoInbox() {
   const [texto, setTexto] = useState("");
   const [carregando, setCarregando] = useState(true);
   const [carregandoConversa, setCarregandoConversa] = useState(false);
-  const [processando, setProcessando] = useState(false);
+  /**
+   * Quantos envios estão sendo processados pela Nina AGORA. É contador, não
+   * boolean: podem existir vários envios em andamento ao mesmo tempo, e o
+   * indicador só some quando o último termina. Serve apenas para informar
+   * ("Nina está digitando") — nunca para travar o composer.
+   */
+  const [emProcessamento, setEmProcessamento] = useState(0);
+  const processando = emProcessamento > 0;
   const [erro, setErro] = useState<string | null>(null);
   const [ultimoTexto, setUltimoTexto] = useState("");
   const [tipo, setTipo] = useState<TipoMensagem>("text");
