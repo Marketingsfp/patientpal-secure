@@ -166,7 +166,7 @@ export const confiabilidadeDaExecucao = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }): Promise<ConfiabilidadeDecisaoView | null> => {
     const colunas =
-      "created_at, ambiente, score, nivel, intencao, resultado_final, bloqueadores, validadores, ferramentas, fontes, reason_codes, acao_solicitada, policy_version, avaliacao, evidence_coverage, engine_version";
+      "created_at, ambiente, score, nivel, intencao, resultado_final, bloqueadores, validadores, ferramentas, fontes, reason_codes, acao_solicitada, turn_type, policy_version, avaliacao, evidence_coverage, engine_version";
     // FASE 6 — o snapshot é procurado primeiro pela mensagem realmente
     // enviada. Só quando esse vínculo não existir (registros antigos) usamos
     // a execução. FASE 5 — dentro disso, vale a confiança da RESPOSTA FINAL.
