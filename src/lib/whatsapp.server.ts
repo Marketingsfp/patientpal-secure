@@ -537,6 +537,11 @@ export async function gerarRespostaNina(
     auditoria?: { execucaoId?: string | null };
     /** IDs reais das mensagens de entrada que originaram esta resposta. */
     mensagensEntrada?: string[];
+    /**
+     * FASE 4 — revisão da conversa que esta geração está processando. Serve
+     * para não executar ação crítica sobre estado já ultrapassado.
+     */
+    revisao?: { telefone: string; valor: number };
   },
 ): Promise<string> {
   const { comColetor } = await import("@/lib/nina/evidencias.server");
@@ -596,6 +601,7 @@ async function gerarRespostaNinaInterno(
     ambiente?: import("@/lib/nina/confianca-execucao").AmbienteQA;
     auditoria?: { execucaoId?: string | null };
     mensagensEntrada?: string[];
+    revisao?: { telefone: string; valor: number };
     rastro?: import("@/lib/nina/arquitetura/tracing").Rastro;
   },
 ): Promise<string> {
@@ -1629,6 +1635,31 @@ async function gerarRespostaNinaInterno(
         }
       }
 
+      // FASE 4 — ação crítica NUNCA roda sobre estado obsoleto: se chegou
+      // mensagem nova durante a geração, o turno é abortado antes de gravar.
+      if (opcoes?.revisao?.valor && ehFerramentaCritica(nome)) {
+        const { respostaObsoleta } = await import("@/lib/nina/revisao-conversa.server");
+        const obsoleta = await respostaObsoleta({
+          clinicaId,
+          telefone: opcoes.revisao.telefone,
+          revisaoProcessada: opcoes.revisao.valor,
+        });
+        if (obsoleta) {
+          console.warn("[nina] ação crítica abortada por revisão obsoleta", {
+            ferramenta: nome,
+            revisao_processada: opcoes.revisao.valor,
+          });
+          rastro?.falhar("tool.execute", "STALE_CONVERSATION_REVISION", { ferramenta: nome });
+          mensagens.push({
+            role: "tool",
+            tool_call_id: c.id,
+            content: JSON.stringify({ ok: false, erro: "STALE_CONVERSATION_REVISION" }),
+          });
+          turnoObsoleto = true;
+          break;
+        }
+      }
+
       rastro?.iniciar("tool.execute", { ferramenta: nome });
       const r = await broker.executar(nome, c.function?.arguments);
       if (r.success && !r.erro) rastro?.concluir("tool.execute", { ferramenta: nome });
@@ -1673,6 +1704,11 @@ async function gerarRespostaNinaInterno(
         tool_call_id: c.id,
         content: JSON.stringify(resultado).slice(0, 8000),
       });
+    }
+    if (turnoObsoleto) {
+      // Sem resposta: o próximo lote reprocessa com o contexto atualizado.
+      resposta = "";
+      break;
     }
   }
 
