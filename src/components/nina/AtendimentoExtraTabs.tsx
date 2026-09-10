@@ -157,6 +157,7 @@ import {
 
 
 import { idConversaValido } from "@/lib/atendimento/abrir-conversa";
+import { conversaEhDaNina, statusEhRepresentacaoDaNina } from "@/lib/atendimento/badge-nina";
 import { assinarSelecaoConversa } from "@/lib/webmcp/selecao-conversa";
 import { AgendaConversaDrawer } from "@/components/nina/AgendaConversaDrawer";
 import { ConversaSkeleton, ContatoSkeleton } from "@/components/nina/ConversaSkeleton";
