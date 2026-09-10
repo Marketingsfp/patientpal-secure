@@ -102,11 +102,20 @@ export function mensagemFinalCompleta(resposta: string, nomeUnidade: string): bo
   return temAgradecimento && temUnidade && temEncerramento && temRetorno;
 }
 
-/** Garante a mensagem final: completa a resposta do modelo quando faltar algo. */
-export function garantirMensagemFinal(resposta: string, nomeUnidade: string): string {
+/**
+ * Garante a mensagem final: completa a resposta do modelo quando faltar algo.
+ * FASE 5 — `despedidaPublicada` permite que a clínica escreva a própria
+ * despedida pelos templates; sem publicação vale o texto padrão de sempre.
+ */
+export function garantirMensagemFinal(
+  resposta: string,
+  nomeUnidade: string,
+  despedidaPublicada?: string | null,
+): string {
   const texto = (resposta ?? "").trim();
+  const padraoOuPublicada = (despedidaPublicada ?? "").trim();
   if (texto && mensagemFinalCompleta(texto, nomeUnidade)) return texto;
-  const padrao = mensagemFinalPadrao(nomeUnidade);
+  const padrao = padraoOuPublicada || mensagemFinalPadrao(nomeUnidade);
   return texto ? `${texto}\n\n${padrao}` : padrao;
 }
 

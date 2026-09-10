@@ -43,6 +43,8 @@ export async function avaliarEncerramentoAutomatico(args: {
   mensagemPaciente: string;
   resposta: string;
   handoffPendente?: boolean;
+  /** FASE 5 — despedida publicada nos templates (quando existir). */
+  despedidaPublicada?: string | null;
 }): Promise<AvaliacaoEncerramento> {
   const negativo = (motivo: string): AvaliacaoEncerramento => ({
     encerrar: false,
@@ -85,7 +87,7 @@ export async function avaliarEncerramentoAutomatico(args: {
     encerrar: true,
     motivo: decisao.motivo,
     conversaId: String(conv.id),
-    resposta: garantirMensagemFinal(args.resposta, nomeUnidade),
+    resposta: garantirMensagemFinal(args.resposta, nomeUnidade, args.despedidaPublicada ?? null),
   };
 }
 
