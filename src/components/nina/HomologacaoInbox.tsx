@@ -463,12 +463,26 @@ export function HomologacaoInbox() {
     },
     [],
   );
+  /**
+   * O envio terminou. A bolha NÃO é removida: quem a substitui é a mensagem
+   * oficial que chega pelo Realtime (mesma identidade `wa_message_id`), sem
+   * piscar. Aqui só deixa de ser "pendente" para o controle interno.
+   */
   const concluirOtimista = useCallback((chave: string) => {
-    const o = otimistasRef.current.get(chave);
     otimistasRef.current.delete(chave);
-    if (o && leadSelecionadoRef.current === o.leadId) {
-      setMsgs((atuais) => atuais.filter((m) => m.id !== o.msg.id));
-    }
+  }, []);
+
+  /**
+   * Falha de UMA mensagem: só ela é marcada. As outras seguem normalmente —
+   * não existe estado de erro global travando a conversa.
+   */
+  const falharOtimista = useCallback((chave: string) => {
+    const o = otimistasRef.current.get(chave);
+    if (!o) return;
+    otimistasRef.current.set(chave, { ...o, msg: { ...o.msg, estado: "failed" } });
+    setMsgs((atuais) =>
+      atuais.map((m) => (m.id === o.msg.id ? { ...m, estado: "failed" as const } : m)),
+    );
   }, []);
 
   const carregarHistorico = useCallback(
