@@ -1671,11 +1671,7 @@ export function HomologacaoInbox() {
                   }
                   className="bg-atd-go text-atd-on-strong hover:bg-atd-go-hover disabled:bg-atd-idle-bg disabled:text-atd-ink-soft"
                 >
-                  {false ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Send className="h-4 w-4" />
-                  )}
+                  <Send className="h-4 w-4" />
                   <span className="ml-2 hidden sm:inline">Enviar como paciente</span>
                 </Button>
               </div>
