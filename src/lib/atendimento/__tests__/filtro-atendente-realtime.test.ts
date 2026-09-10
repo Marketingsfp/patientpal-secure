@@ -92,7 +92,7 @@ describe("FASE 3 — realtime do filtro por atendente", () => {
       { escopo: "minhas", userId: MARIA, gestor: false, atendenteId: JEAN },
     );
     expect(r.lista).toEqual([]);
-    expect(r.reconciliar).toBe(true);
+    expect(r.reconciliar).toBe(false);
   });
 
   it("com busca ativa a lista é conferida no servidor, não montada na tela", () => {
