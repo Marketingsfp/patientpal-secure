@@ -123,7 +123,11 @@ export function patchListaPorMensagem(
       nao_lidas: contaNaoLida ? Number(c.nao_lidas ?? 0) + 1 : (c.nao_lidas ?? 0),
     };
   });
-  return { lista: ordenar(atualizada), aplicado: true, reconciliar: false };
+  return {
+    lista: ordenar(atualizada, ctx.visualizacao ?? "recentes", ctx.espera ?? {}),
+    aplicado: true,
+    reconciliar: false,
+  };
 }
 
 /** O estado escolhido no seletor "Todas / Em espera / Ativas / Fechadas". */
