@@ -302,7 +302,15 @@ export const listarConversas = createServerFn({ method: "POST" })
         etapas: marcos,
       });
     }
-    return (rows ?? []).map((r: any) => ({ ...r, nao_lidas: naoLidas.get(r.id) ?? 0 }));
+    const saida = (rows ?? []).map((r: any) => ({
+      ...r,
+      nao_lidas: naoLidas.get(r.id) ?? 0,
+      // Métrica canônica de espera (mesma da Central "Prioridades Agora"),
+      // devolvida pronta para a tela não recalcular duração item a item.
+      ...(plano.exigeEsperaPaciente ? { aguardando_desde: mapaEspera[r.id] ?? r.aguardando_desde } : {}),
+    }));
+    // Quem começou a esperar antes vem primeiro, pela métrica canônica.
+    return plano.exigeEsperaPaciente ? ordenarPorEspera(saida, mapaEspera) : saida;
   });
 
 
