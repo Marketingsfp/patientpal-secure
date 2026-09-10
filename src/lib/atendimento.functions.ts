@@ -6,6 +6,7 @@ import { hojeBR, janelaDiaClinica } from "@/lib/date-utils";
 import { z } from "zod";
 import {
   STATUS_FECHADOS,
+  atendenteFiltroEfetivo,
   escopoEscondeFechadas,
   normalizarEscopo,
   filtroEscopoInbox,
