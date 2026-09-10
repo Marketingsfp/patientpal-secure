@@ -318,7 +318,9 @@ export async function processarMensagemTeste(data: EntradaMensagemTeste, userId:
         reply: null,
         erro: "Conversa está com atendimento humano — a Nina não responde (igual ao WhatsApp).",
         audio: null,
-        transferida: true,
+        // Mantido como no contrato anterior: quem observa transferência usa
+        // `transferida` da resposta gerada, não deste bloqueio prévio.
+        transferida: false,
         processamento: "SEM_RESPOSTA" as const,
         absorvidaPeloLote: false,
         mensagemPersistida: true,
