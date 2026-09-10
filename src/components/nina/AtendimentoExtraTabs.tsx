@@ -1159,7 +1159,13 @@ export function AtendInbox() {
         setConvs((prev: any[]) =>
           prev.some((x: any) => x.id === row.id) ? prev : [row, ...prev],
         );
-        if (destino !== escopo) setEscopo(destino);
+        if (destino !== escopo) {
+          // Link direto: traduz o escopo antigo para os dois eixos atuais.
+          const alvo = estadoDeEscopoLegado(destino);
+          setEscopoBase(alvo.base);
+          setNaoAtribuidasFiltro(alvo.naoAtribuidas);
+          if (alvo.visualizacao) setVisualizacao(alvo.visualizacao);
+        }
       } catch (e: any) {
         if (selecaoIdRef.current !== idPedido) return;
         const msg = String(e?.message ?? "");
