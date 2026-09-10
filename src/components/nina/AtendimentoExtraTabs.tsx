@@ -3066,35 +3066,56 @@ export function AtendInbox() {
                   )}
                 </div>
                 <div className="flex min-h-[24px] flex-wrap items-center gap-1.5 mt-1">
-                  {statusBadge(c.status, { ocultarNina: conversaEhDaNina(c) })}
-                  {c.owner_type === "NONE" && (
-                    <Badge className="bg-atd-danger text-atd-on-strong text-[11px]">🔴 Não atribuída</Badge>
-                  )}
-                  {c.owner_type === "HUMAN" && (
-                    <Badge className="bg-atd-human-bg text-atd-human-ink text-[11px] border border-atd-human-ink/20">👤 Humano</Badge>
-                  )}
-                  {conversaEhDaNina(c) && (
-                    <Badge className="bg-atd-ai-bg text-atd-ai-ink text-[11px] border border-atd-ai/30">✦ Nina</Badge>
-                  )}
-                  {c.handoff_motivo === "patient_response_timeout" && (
-                    <Badge
-                      title="Transferida automaticamente: o paciente não respondeu no prazo"
-                      className="bg-atd-warn-bg text-atd-warn-ink text-[11px] border border-atd-warn"
-                    >
-                      🟡 Timeout da Nina — sem resposta por 30 min
-                    </Badge>
-                  )}
-                  {c.atribuida_user_id && (
-                    <Badge
-                      className={`text-[11px] ${
-                        c.atribuida_user_id === meuId
-                          ? "bg-atd-go/15 text-atd-ink border border-atd-go/30"
-                          : "bg-atd-warn-bg text-atd-warn-ink border border-atd-warn"
-                      }`}
-                    >
-                      {c.atribuida_user_id === meuId ? "Você" : nomeUsuario(c.atribuida_user_id)}
-                    </Badge>
-                  )}
+                  {/* Lista canônica e já deduplicada por chave semântica. */}
+                  {tiposDeBadgeDoCard(c).map((tipo) => {
+                    if (tipo === "status") return <Fragment key={tipo}>{statusBadge(c.status)}</Fragment>;
+                    if (tipo === "sem-responsavel")
+                      return (
+                        <Badge key={tipo} className="bg-atd-danger text-atd-on-strong text-[11px]">
+                          🔴 Não atribuída
+                        </Badge>
+                      );
+                    if (tipo === "humano")
+                      return (
+                        <Badge
+                          key={tipo}
+                          className="bg-atd-human-bg text-atd-human-ink text-[11px] border border-atd-human-ink/20"
+                        >
+                          👤 Humano
+                        </Badge>
+                      );
+                    if (tipo === "nina")
+                      return (
+                        <Badge
+                          key={tipo}
+                          className="bg-atd-ai-bg text-atd-ai-ink text-[11px] border border-atd-ai/30"
+                        >
+                          ✦ Nina
+                        </Badge>
+                      );
+                    if (tipo === "timeout-nina")
+                      return (
+                        <Badge
+                          key={tipo}
+                          title="Transferida automaticamente: o paciente não respondeu no prazo"
+                          className="bg-atd-warn-bg text-atd-warn-ink text-[11px] border border-atd-warn"
+                        >
+                          🟡 Timeout da Nina — sem resposta por 30 min
+                        </Badge>
+                      );
+                    return (
+                      <Badge
+                        key={tipo}
+                        className={`text-[11px] ${
+                          c.atribuida_user_id === meuId
+                            ? "bg-atd-go/15 text-atd-ink border border-atd-go/30"
+                            : "bg-atd-warn-bg text-atd-warn-ink border border-atd-warn"
+                        }`}
+                      >
+                        {c.atribuida_user_id === meuId ? "Você" : nomeUsuario(c.atribuida_user_id)}
+                      </Badge>
+                    );
+                  })}
                   {formatarNumeroConversa(c.numero_conversa) && (
                     <code className="text-[11px] text-muted-foreground">
                       Conversa {formatarNumeroConversa(c.numero_conversa)}
