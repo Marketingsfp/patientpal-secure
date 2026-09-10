@@ -972,7 +972,7 @@ function Page() {
     { value: "transferencia", label: "Transferência" },
     { value: "convenio", label: "Convênio" },
   ];
-  const TIPOS_FORMA_EDITAVEL = new Set<MovTipo>(["recebimento", "despesa", "estorno"]);
+  const TIPOS_FORMA_EDITAVEL = new Set<MovTipo>(["recebimento", "despesa"]);
   const [salvandoFormaId, setSalvandoFormaId] = useState<string | null>(null);
 
   // Diálogo de detalhes do cartão (crédito/débito) na edição inline da Forma.
