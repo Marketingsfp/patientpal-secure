@@ -13,6 +13,7 @@ import {
   recuperarLotesTravados,
   type LockConversa,
 } from "@/lib/nina/lock-conversa.server";
+import { revisaoAtualConversa } from "@/lib/nina/revisao-conversa.server";
 
 export type TurnoNina = {
   batchId: string;
@@ -25,6 +26,11 @@ export type TurnoNina = {
    * ferramentas, memória, estado, Confidence Engine, handoff e envio).
    */
   lock: LockConversa | null;
+  /**
+   * FASE 4 — revisão da conversa usada por esta geração. Antes de enviar,
+   * compara-se com a revisão atual: se mudou, a resposta é obsoleta.
+   */
+  revisao: number;
 };
 
 const dormir = (ms: number) =>
@@ -60,6 +66,7 @@ export async function aguardarTurnoNina(input: {
       mensagens: input.mensagensFallback ?? (input.mensagemId ? [input.mensagemId] : []),
       texto: input.textoAtual,
       lock,
+      revisao: await revisaoAtualConversa(input.clinicaId, input.telefone),
     };
   };
 
@@ -128,6 +135,9 @@ export async function aguardarTurnoNina(input: {
       mensagens: ids.length ? ids : [input.mensagemId],
       texto: await montarTextoDoLote(ids, input.textoAtual),
       lock,
+      // Revisão congelada no momento do claim: tudo que chegar depois torna
+      // esta geração obsoleta.
+      revisao: await revisaoAtualConversa(input.clinicaId, input.telefone),
     };
   } catch (e) {
     console.error("[nina] burst: reivindicação falhou", e);
@@ -160,6 +170,7 @@ export async function concluirTurnoNina(
   batchId: string,
   execucaoId?: string | null,
   lock?: LockConversa | null,
+  status: "PROCESSED" | "SUPERSEDED" = "PROCESSED",
 ): Promise<void> {
   if (!batchId) {
     await liberarLockConversa(lock ?? null);
@@ -169,7 +180,7 @@ export async function concluirTurnoNina(
     await supabaseAdmin.rpc("nina_batch_concluir", {
       _batch_id: batchId,
       _execucao_id: (execucaoId ?? undefined) as string,
-      _status: "PROCESSED",
+      _status: status,
     });
   } catch (e) {
     console.error("[nina] burst: conclusão do lote falhou", e);
