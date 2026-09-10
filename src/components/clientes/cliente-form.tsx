@@ -163,6 +163,38 @@ const EMPTY: FormState = {
   alerta_motivo: "",
 };
 
+// Rótulo em português da situação do agendamento (enum agendamento_status).
+// Valor desconhecido: mostra o próprio texto.
+function situacaoAgendamentoRotulo(status: string | null): string {
+  switch (status) {
+    case "agendado":
+      return "Agendado";
+    case "confirmado":
+      return "Confirmado";
+    case "realizado":
+      return "Realizado";
+    case "cancelado":
+      return "Cancelado";
+    case "faltou":
+      return "Faltou";
+    default:
+      return status ?? "—";
+  }
+}
+
+function situacaoAgendamentoClasse(status: string | null): string {
+  switch (status) {
+    case "realizado":
+      return "border-emerald-500/40 text-emerald-700 dark:text-emerald-400";
+    case "cancelado":
+      return "border-destructive/40 text-destructive";
+    case "faltou":
+      return "border-muted-foreground/40 text-muted-foreground";
+    default:
+      return "border-border text-foreground";
+  }
+}
+
 function calcIdade(dn: string | null): number | null {
   if (!dn) return null;
   const d = new Date(dn + "T00:00:00");
