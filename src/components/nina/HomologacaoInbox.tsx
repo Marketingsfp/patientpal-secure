@@ -83,6 +83,7 @@ import {
 } from "@/components/nina/ConversationSystemEvent";
 import { NinaMessage, TypingDots } from "@/components/nina/NinaMessage";
 import { ReportarErroNinaBotao } from "@/components/nina/ReportarErroNinaDialog";
+import { RegistroTurnoResumo } from "@/components/nina/RegistroTurnoResumo";
 
 import {
   ConfiancaMensagemBadge,
@@ -1760,12 +1761,15 @@ export function HomologacaoInbox() {
           <DialogHeader>
             <DialogTitle>Detalhes técnicos da resposta</DialogTitle>
             <DialogDescription>
-              Mesma execução registrada pelo atendimento real da Nina.
+              Mesma execução registrada pelo atendimento real da Nina. É o registro desta resposta —
+              não a prévia da versão atual.
             </DialogDescription>
           </DialogHeader>
           {detalheCarregando && <p className="text-sm text-muted-foreground">Carregando…</p>}
           {!detalheCarregando && detalhe?.execucao && (
             <div className="space-y-3 text-xs">
+              {/* FASE 3 — registro do turno (fase 1) desta mensagem. */}
+              <RegistroTurnoResumo eventos={(detalhe.eventos ?? []) as any[]} compacto />
               <div className="grid grid-cols-1 gap-x-4 gap-y-1 sm:grid-cols-2">
                 {[
                   ["Modelo", detalhe.execucao.model],

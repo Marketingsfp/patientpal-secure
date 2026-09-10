@@ -152,6 +152,10 @@ function Editor({
   const atualizar = () => {
     queryClient.invalidateQueries({ queryKey: ["nina-instrucoes", clinicaId] });
     queryClient.invalidateQueries({ queryKey: ["nina-instrucoes-historico", bloco.escopo] });
+    // FASE 3 — publicar/restaurar precisa refazer a prévia sem recarregar a
+    // aplicação. A chave leva clínica/escopo/contexto/versão, então
+    // invalidamos pelo prefixo.
+    queryClient.invalidateQueries({ queryKey: ["nina-prompt-preview"] });
   };
 
   const salvarFn = useServerFn(salvarRascunhoInstrucoes);
@@ -203,21 +207,44 @@ function Editor({
     <div className="space-y-3">
       {bloco.escopo === "whatsapp" ? (
         <p className="text-xs text-muted-foreground">
-          Única fonte de comportamento da Nina do WhatsApp.
+          Única fonte de comportamento da Nina do WhatsApp — vale para todas as clínicas.
         </p>
       ) : null}
+
+      {/* FASE 3 — três coisas diferentes, cada uma com o seu texto. */}
+      <div className="grid gap-2 sm:grid-cols-3">
+        <div className="rounded-md border p-2 text-xs">
+          <p className="font-medium">Rascunho (em edição)</p>
+          <p className="text-muted-foreground">
+            {bloco.rascunho
+              ? `v${bloco.rascunho.versao} — é o texto da caixa abaixo. Não está em uso.`
+              : "Nenhum rascunho salvo. A caixa abaixo mostra a versão publicada."}
+          </p>
+        </div>
+        <div className="rounded-md border p-2 text-xs">
+          <p className="font-medium">Publicada (em uso agora)</p>
+          <p className="text-muted-foreground">
+            {bloco.publicada
+              ? `v${bloco.publicada.versao} — publicada em ${dataBr(bloco.publicada.publicado_em)}.`
+              : "Nenhuma versão publicada."}
+            {bloco.escopo === "whatsapp" ? " Alcance: todas as clínicas." : ""}
+          </p>
+        </div>
+        <div className="rounded-md border p-2 text-xs">
+          <p className="font-medium">Usada nesta resposta</p>
+          <p className="text-muted-foreground">
+            Depende de cada mensagem. Abra a execução da mensagem (Homologação ou rastreamento) —
+            uma resposta antiga continua mostrando a versão dela.
+          </p>
+        </div>
+      </div>
+
       <div className="flex flex-wrap items-center gap-2 text-sm">
-        <span className="text-muted-foreground">Versão em uso:</span>
         <Badge variant="secondary">
-          {bloco.publicada ? `v${bloco.publicada.versao} — atual` : "nenhuma publicada"}
+          {bloco.publicada ? `Publicada: v${bloco.publicada.versao}` : "nenhuma publicada"}
         </Badge>
         {bloco.rascunho ? (
-          <Badge variant="outline">Rascunho v{bloco.rascunho.versao} em edição</Badge>
-        ) : null}
-        {bloco.publicada ? (
-          <span className="text-xs text-muted-foreground">
-            publicada em {dataBr(bloco.publicada.publicado_em)}
-          </span>
+          <Badge variant="outline">Rascunho v{bloco.rascunho.versao} — não está em uso</Badge>
         ) : null}
       </div>
 
@@ -264,7 +291,7 @@ function Editor({
         </Button>
         {bloco.escopo === "whatsapp" ? (
           <Button variant="ghost" onClick={() => setAuditoriaAberta(true)}>
-            Ver o que chega ao modelo
+            Ver prévia com contexto de exemplo
           </Button>
         ) : null}
       </div>
@@ -274,6 +301,7 @@ function Editor({
           clinicaId={clinicaId}
           aberto={auditoriaAberta}
           onOpenChange={setAuditoriaAberta}
+          versaoPublicada={bloco.publicada?.versao ?? null}
         />
       ) : null}
 
@@ -546,21 +574,28 @@ function Comparacao({ antes, depois }: { antes: string; depois: string }) {
 }
 
 /**
- * FASE 4 — auditoria somente leitura do que chega ao modelo.
- * Não edita nada: apenas separa origem de cada parte do request.
+ * FASE 3 — PRÉVIA COM CONTEXTO DE EXEMPLO (somente leitura).
+ *
+ * Mostra a versão PUBLICADA montada com um atendimento fictício. Não é o
+ * registro de nenhuma resposta real: para saber o que gerou uma resposta
+ * específica, abra a execução daquela mensagem.
  */
 function AuditoriaPrompt({
   clinicaId,
   aberto,
   onOpenChange,
+  versaoPublicada,
 }: {
   clinicaId: string;
   aberto: boolean;
   onOpenChange: (v: boolean) => void;
+  versaoPublicada: number | null;
 }) {
   const buscar = useServerFn(previewRequestNina);
   const { data, isLoading, error } = useQuery({
-    queryKey: ["nina-prompt-preview", clinicaId],
+    // A chave distingue clínica, escopo, contexto e a versão publicada
+    // conhecida pela tela: publicar troca a chave e a prévia se refaz.
+    queryKey: ["nina-prompt-preview", clinicaId, "whatsapp", "exemplo", versaoPublicada],
     queryFn: () => buscar({ data: { clinicaId } }),
     enabled: aberto,
   });
@@ -570,10 +605,10 @@ function AuditoriaPrompt({
     <Dialog open={aberto} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[85vh] max-w-4xl overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>O que chega ao modelo — Nina do WhatsApp</DialogTitle>
+          <DialogTitle>Prévia com contexto de exemplo — Nina do WhatsApp</DialogTitle>
           <DialogDescription>
-            Somente leitura. O comportamento só pode existir na parte “Behavior Prompt”, que vem da
-            versão publicada aqui na Arquitetura.
+            Somente leitura, com um atendimento fictício. Não é o registro de uma resposta real: o
+            que foi usado em uma resposta específica aparece na execução daquela mensagem.
           </DialogDescription>
         </DialogHeader>
 
@@ -587,6 +622,10 @@ function AuditoriaPrompt({
               <Badge variant="secondary">
                 Comportamento: Arquitetura v{data.versao ?? "—"}
               </Badge>
+              {data.alcanceGlobal ? (
+                <Badge variant="outline">Vale para todas as clínicas</Badge>
+              ) : null}
+              <Badge variant="outline">Contexto de exemplo</Badge>
               {data.publicadoEm ? (
                 <span className="text-xs text-muted-foreground">
                   publicada em {dataBr(data.publicadoEm)}
@@ -596,6 +635,18 @@ function AuditoriaPrompt({
                 {verDiferencas ? "Ocultar diferenças" : "Ver diferenças"}
               </Button>
             </div>
+
+            {data.origemTemplate === "codigo" ? (
+              <p className="rounded-md border border-destructive/40 bg-destructive/5 p-2 text-xs">
+                Nenhuma versão publicada foi lida: o texto abaixo é o do código, usado como
+                alternativa. Não trate isto como a versão publicada.
+              </p>
+            ) : null}
+            {data.marcadorPendente ? (
+              <p className="rounded-md border border-destructive/40 bg-destructive/5 p-2 text-xs">
+                O marcador <code>{data.marcadorPendente}</code> ficaria sem substituição.
+              </p>
+            ) : null}
 
             {verDiferencas ? (
               <section className="space-y-1">
@@ -615,13 +666,13 @@ function AuditoriaPrompt({
               conteudo={data.behaviorPrompt}
             />
             <BlocoLeitura
-              titulo="Contexto dinâmico"
-              origem="fonte: dados do atendimento (exemplo) — somente leitura"
+              titulo="Contexto dinâmico (exemplo)"
+              origem="fonte: atendimento fictício — somente leitura"
               conteudo={data.runtimeContextJson}
             />
             <BlocoLeitura
               titulo="Ferramentas / schemas"
-              origem="fonte: código — somente leitura"
+              origem="fonte: mesmo registro de ferramentas do atendimento"
               conteudo={
                 data.ferramentas.length
                   ? data.ferramentas.map((f) => `${f.nome} — ${f.descricao}`).join("\n")
@@ -634,8 +685,8 @@ function AuditoriaPrompt({
               conteudo={data.envelope}
             />
             <BlocoLeitura
-              titulo="Conteúdo efetivamente enviado ao modelo"
-              origem="cada parte identificada por origem — somente leitura"
+              titulo="Prompt montado nesta prévia"
+              origem="montado pelo mesmo compositor do atendimento, com dados de exemplo"
               conteudo={data.conteudoFinal}
             />
           </div>

@@ -1,13 +1,15 @@
 /**
- * FASE 4 — Auditoria do prompt da Nina do WhatsApp.
+ * FASE 4 / FASE 3 — PRÉVIA COM CONTEXTO DE EXEMPLO.
  *
- * Monta, SOMENTE LEITURA, a mesma requisição que o runtime envia ao modelo,
- * separada por origem:
- *   1. Envelope técnico (fixo, em código);
- *   2. Behavior Prompt (versão PUBLICADA em Arquitetura — única fonte de
- *      comportamento);
- *   3. Contexto dinâmico (fatos do atendimento);
- *   4. Ferramentas/schemas (código).
+ * Isto NÃO é o registro de uma resposta real: é a versão publicada montada
+ * com um atendimento fictício, para conferir o texto antes de usar. O que foi
+ * usado em uma resposta específica só sai do snapshot daquela execução.
+ *
+ * Para a montagem ser fiel, ela usa exatamente:
+ *   - o compositor compartilhado (`comporRequestNina`) — nada de concatenação
+ *     própria fingindo ser o payload real;
+ *   - o mesmo registro de ferramentas do atendimento, inclusive a de
+ *     transferência para atendente e as de agenda quando estão habilitadas.
  *
  * Nada aqui grava, publica ou altera atendimento. Nenhum secret é exposto.
  */
@@ -26,6 +28,12 @@ export type ParteRequest = {
 };
 
 export type PreviewRequestNina = {
+  /** Escopo desta prévia. Hoje só a Nina do WhatsApp é montada aqui. */
+  escopo: "whatsapp";
+  /** As instruções do WhatsApp valem para todas as clínicas. */
+  alcanceGlobal: boolean;
+  /** Deixa explícito que o contexto é de exemplo, não de um atendimento real. */
+  contexto: "exemplo";
   versao: number | null;
   publicadoEm: string | null;
   /** FASE 2 — de onde veio o texto exibido: versão publicada ou código. */
@@ -40,7 +48,10 @@ export type PreviewRequestNina = {
   ferramentas: Array<{ nome: string; descricao: string; parametros: string }>;
   envelope: string;
   partes: ParteRequest[];
-  /** Conteúdo efetivamente enviado ao modelo (system prompt final). */
+  /**
+   * System prompt montado pelo compositor compartilhado — o mesmo formato que
+   * o atendimento envia, apenas com contexto de exemplo.
+   */
   conteudoFinal: string;
 };
 
@@ -148,12 +159,17 @@ export const previewRequestNina = createServerFn({ method: "POST" })
 
     const req = comporRequestNina({ behaviorPrompt, runtimeContext });
 
+    // MESMO registro de ferramentas do atendimento: consulta sempre, agenda
+    // conforme a habilitação da clínica e transferência para atendente
+    // sempre — é assim que o runtime monta a lista.
     const { FERRAMENTAS_NINA_CONSULTA, FERRAMENTAS_NINA_AGENDAMENTO } = await import(
       "./paciente-tools.server"
     );
+    const { FERRAMENTA_HANDOFF } = await import("./handoff-tool.server");
     const lista: any[] = [
       ...(FERRAMENTAS_NINA_CONSULTA as readonly any[]),
       ...(podeAgendar ? (FERRAMENTAS_NINA_AGENDAMENTO as readonly any[]) : []),
+      FERRAMENTA_HANDOFF as any,
     ];
 
     const ferramentas = lista.map((f) => ({
@@ -167,7 +183,7 @@ export const previewRequestNina = createServerFn({ method: "POST" })
       { rotulo: "Technical Safety Envelope", origem: "codigo", conteudo: req.envelope },
       { rotulo: rotuloBehavior, origem: "arquitetura", conteudo: req.behaviorPrompt },
       {
-        rotulo: "Runtime Context",
+        rotulo: "Runtime Context (exemplo)",
         origem: "runtime",
         conteudo: JSON.stringify(runtimeContext, null, 2),
       },
@@ -178,11 +194,10 @@ export const previewRequestNina = createServerFn({ method: "POST" })
       },
     ];
 
-    const conteudoFinal = partes
-      .map((p) => `[${p.rotulo}]\n${p.conteudo}`)
-      .join("\n\n────────────────────────\n\n");
-
     return {
+      escopo: "whatsapp",
+      alcanceGlobal: true,
+      contexto: "exemplo",
       versao: (versao?.versao as number | undefined) ?? null,
       publicadoEm: (versao?.publicado_em as string | undefined) ?? null,
       origemTemplate,
@@ -193,6 +208,7 @@ export const previewRequestNina = createServerFn({ method: "POST" })
       ferramentas,
       envelope: ENVELOPE_TECNICO,
       partes,
-      conteudoFinal,
+      // Saída do compositor compartilhado — não é uma colagem feita na tela.
+      conteudoFinal: req.systemPrompt,
     };
   });
