@@ -358,6 +358,9 @@ export async function processarMensagemTeste(data: EntradaMensagemTeste, userId:
       execucaoId?: string | null;
       traceId?: string | null;
       resultado?: import("@/lib/nina/resposta/contrato").ResultadoRespostaNina;
+      // FASE 5 — snapshot da avaliação final do texto entregue.
+      decisaoId?: string | null;
+      textoFinalHash?: string | null;
     } = {};
     // FASE 4 — ambiente real desta execução: se existe uma simulação em
     // andamento para este lead, a origem é o Test Runner (teste automatizado);
@@ -631,7 +634,7 @@ export async function processarMensagemTeste(data: EntradaMensagemTeste, userId:
     }
 
     if (reply.trim() && (!audio || precisaTextoCompleto)) {
-      const { data: msgOut } = await supabaseAdmin
+      const { data: msgOut, error: erroMsgOut } = await supabaseAdmin
         .from("whatsapp_mensagens")
         .insert({
           clinica_id: data.clinicaId,
@@ -650,20 +653,34 @@ export async function processarMensagemTeste(data: EntradaMensagemTeste, userId:
         })
         .select("id")
         .maybeSingle();
-      // FASE 6 — mesmo vínculo da produção: snapshot ↔ mensagem enviada.
+      if (erroMsgOut) console.error("[NINA_TESTE] falha ao gravar resposta", erroMsgOut);
+      // FASE 5 — mesmos estados da produção, no canal isolado de homologação.
       try {
-        const { vincularSnapshotMensagemEnviada } = await import(
+        const { registrarEntregaSaida } = await import(
           "@/lib/nina/confidence-engine.server"
         );
-        await vincularSnapshotMensagemEnviada({
+        const { hashDoTexto } = await import("@/lib/nina/confidence/hash");
+        const idSaida = (msgOut as { id?: string } | null)?.id ?? null;
+        await registrarEntregaSaida({
           clinicaId: data.clinicaId,
+          decisaoId: auditoriaNina.decisaoId ?? null,
           execucaoId: auditoriaNina.execucaoId ?? null,
-          outgoingMessageId: (msgOut as { id?: string } | null)?.id ?? null,
+          conversaId,
+          outgoingMessageId: idSaida,
+          representacao: "texto_completo",
+          // Homologação não tem transporte real: persistida, nunca "confirmada".
+          estado: idSaida ? "persistida" : "falhou",
+          textoHash: hashDoTexto(reply),
+          detalhe: {
+            canal: CANAL_TESTE,
+            hash_avaliado: auditoriaNina.textoFinalHash ?? null,
+          },
         });
       } catch {
         // Vínculo é auditoria: nunca interrompe a homologação.
       }
     }
+
     if (reply.trim()) {
       await supabaseAdmin
         .from("atend_conversas")

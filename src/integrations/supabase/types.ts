@@ -8437,6 +8437,7 @@ export type Database = {
           decisao: string | null
           engine_version: string | null
           evidence_coverage: number | null
+          evidencias_hash: string | null
           execucao_id: string | null
           ferramentas: Json
           fontes: Json
@@ -8450,10 +8451,14 @@ export type Database = {
           motivos: Json
           nina_session_id: string | null
           nivel: string | null
+          origem_resposta: string | null
           outgoing_message_id: string | null
           policy_version: string | null
           reason_codes: string[]
+          representacao: string | null
           resultado_final: string | null
+          revisao_conversa: number | null
+          rodadas: number | null
           score: number
           teria_permitido: boolean | null
           texto_final_hash: string | null
@@ -8478,6 +8483,7 @@ export type Database = {
           decisao?: string | null
           engine_version?: string | null
           evidence_coverage?: number | null
+          evidencias_hash?: string | null
           execucao_id?: string | null
           ferramentas?: Json
           fontes?: Json
@@ -8491,10 +8497,14 @@ export type Database = {
           motivos?: Json
           nina_session_id?: string | null
           nivel?: string | null
+          origem_resposta?: string | null
           outgoing_message_id?: string | null
           policy_version?: string | null
           reason_codes?: string[]
+          representacao?: string | null
           resultado_final?: string | null
+          revisao_conversa?: number | null
+          rodadas?: number | null
           score?: number
           teria_permitido?: boolean | null
           texto_final_hash?: string | null
@@ -8519,6 +8529,7 @@ export type Database = {
           decisao?: string | null
           engine_version?: string | null
           evidence_coverage?: number | null
+          evidencias_hash?: string | null
           execucao_id?: string | null
           ferramentas?: Json
           fontes?: Json
@@ -8532,10 +8543,14 @@ export type Database = {
           motivos?: Json
           nina_session_id?: string | null
           nivel?: string | null
+          origem_resposta?: string | null
           outgoing_message_id?: string | null
           policy_version?: string | null
           reason_codes?: string[]
+          representacao?: string | null
           resultado_final?: string | null
+          revisao_conversa?: number | null
+          rodadas?: number | null
           score?: number
           teria_permitido?: boolean | null
           texto_final_hash?: string | null
@@ -8619,6 +8634,59 @@ export type Database = {
           valor_sugerido?: string | null
         }
         Relationships: []
+      }
+      nina_confianca_vinculos: {
+        Row: {
+          clinica_id: string
+          conversation_id: string | null
+          created_at: string
+          decisao_id: string | null
+          detalhe: Json | null
+          estado: string
+          execucao_id: string | null
+          id: string
+          outgoing_message_id: string | null
+          representacao: string
+          texto_hash: string | null
+          transporte_id: string | null
+        }
+        Insert: {
+          clinica_id: string
+          conversation_id?: string | null
+          created_at?: string
+          decisao_id?: string | null
+          detalhe?: Json | null
+          estado?: string
+          execucao_id?: string | null
+          id?: string
+          outgoing_message_id?: string | null
+          representacao?: string
+          texto_hash?: string | null
+          transporte_id?: string | null
+        }
+        Update: {
+          clinica_id?: string
+          conversation_id?: string | null
+          created_at?: string
+          decisao_id?: string | null
+          detalhe?: Json | null
+          estado?: string
+          execucao_id?: string | null
+          id?: string
+          outgoing_message_id?: string | null
+          representacao?: string
+          texto_hash?: string | null
+          transporte_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nina_confianca_vinculos_decisao_id_fkey"
+            columns: ["decisao_id"]
+            isOneToOne: false
+            referencedRelation: "nina_confianca_decisoes"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       nina_conversa_locks: {
         Row: {

@@ -14,29 +14,115 @@ import type { DecisaoConfianca } from "./confidence-engine";
 import type { RegistroAuditoriaConfianca } from "./confidence/auditoria";
 import { VERSAO_MOTOR, VERSAO_POLITICA } from "./confidence/policy";
 
+import type { EstadoEntrega, RepresentacaoSaida } from "./confidence/entrega";
+
+/** Desfecho rastreável de uma gravação de auditoria. */
+export type ResultadoRegistro = {
+  ok: boolean;
+  id: string | null;
+  erro: string | null;
+};
+
+function falha(contexto: string, erro: unknown): ResultadoRegistro {
+  const msg = erro instanceof Error ? erro.message : String(erro);
+  console.warn(`[nina-confianca] ${contexto}: ${msg}`);
+  return { ok: false, id: null, erro: msg };
+}
+
 /**
- * FASE 6 — liga o snapshot já gravado à mensagem da Nina que foi de fato
- * enviada. O vínculo principal do indicador é `outgoing_message_id`; a
- * execução continua guardada para o histórico e para os reportes de erro.
+ * FASE 5 — VÍNCULO DA SAÍDA (append-only).
+ *
+ * Antes isto era um UPDATE em `nina_confianca_decisoes`, que a trigger de
+ * imutabilidade do histórico SEMPRE rejeitava: nenhum snapshot ficava ligado à
+ * mensagem enviada. Agora o vínculo é uma linha nova em
+ * `nina_confianca_vinculos` — a imutabilidade do resultado é preservada e cada
+ * estado da saída (preparada, persistida, envio tentado, confirmada, falhou)
+ * vira um registro próprio, por representação (texto, áudio, resumo falado).
+ */
+export async function registrarEntregaSaida(params: {
+  clinicaId: string;
+  decisaoId?: string | null;
+  execucaoId?: string | null;
+  conversaId?: string | null;
+  outgoingMessageId?: string | null;
+  representacao: RepresentacaoSaida;
+  estado: EstadoEntrega;
+  textoHash?: string | null;
+  /** Identificador devolvido pelo transporte (ex.: wa_message_id). */
+  transporteId?: string | null;
+  detalhe?: Record<string, unknown> | null;
+}): Promise<ResultadoRegistro> {
+  try {
+    let decisaoId = params.decisaoId ?? null;
+    // Sem o id em mãos, procura o snapshot da resposta final desta execução.
+    if (!decisaoId && params.execucaoId) {
+      const { data, error } = await supabaseAdmin
+        .from("nina_confianca_decisoes")
+        .select("id")
+        .eq("clinica_id", params.clinicaId)
+        .eq("execucao_id", params.execucaoId)
+        .eq("avaliacao", "answer_confidence")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (error) return falha("busca do snapshot da resposta final", error);
+      decisaoId = (data as { id?: string } | null)?.id ?? null;
+    }
+    const { data, error } = await supabaseAdmin
+      .from("nina_confianca_vinculos")
+      .insert({
+        clinica_id: params.clinicaId,
+        decisao_id: decisaoId,
+        execucao_id: params.execucaoId ?? null,
+        conversation_id: params.conversaId ?? null,
+        outgoing_message_id: params.outgoingMessageId ?? null,
+        representacao: params.representacao,
+        estado: params.estado,
+        texto_hash: params.textoHash ?? null,
+        transporte_id: params.transporteId ?? null,
+        detalhe: params.detalhe ?? null,
+      } as never)
+      .select("id")
+      .maybeSingle();
+    // O Supabase devolve o erro no objeto, sem lançar exceção: checar os dois.
+    if (error) return falha("registro do vínculo de entrega", error);
+    return { ok: true, id: (data as { id?: string } | null)?.id ?? null, erro: null };
+  } catch (e) {
+    return falha("registro do vínculo de entrega", e);
+  }
+}
+
+/**
+ * Compatibilidade: mesma intenção do vínculo antigo, agora sem UPDATE. Grava a
+ * mensagem enviada como saída persistida da representação em texto.
  */
 export async function vincularSnapshotMensagemEnviada(params: {
   clinicaId: string;
   execucaoId: string | null | undefined;
   outgoingMessageId: string | null | undefined;
-}): Promise<void> {
-  if (!params.execucaoId || !params.outgoingMessageId) return;
-  try {
-    await supabaseAdmin
-      .from("nina_confianca_decisoes")
-      .update({ outgoing_message_id: params.outgoingMessageId } as never)
-      .eq("clinica_id", params.clinicaId)
-      .eq("execucao_id", params.execucaoId)
-      .eq("avaliacao", "answer_confidence")
-      .is("outgoing_message_id", null);
-  } catch (e) {
-    console.warn("[nina-confianca] falha ao vincular mensagem enviada:", e instanceof Error ? e.message : e);
+  conversaId?: string | null;
+  decisaoId?: string | null;
+  representacao?: RepresentacaoSaida;
+  estado?: EstadoEntrega;
+  textoHash?: string | null;
+  transporteId?: string | null;
+}): Promise<ResultadoRegistro> {
+  if (!params.outgoingMessageId && !params.decisaoId && !params.execucaoId) {
+    return { ok: false, id: null, erro: "sem_identificadores" };
   }
+  return registrarEntregaSaida({
+    clinicaId: params.clinicaId,
+    decisaoId: params.decisaoId ?? null,
+    execucaoId: params.execucaoId ?? null,
+    conversaId: params.conversaId ?? null,
+    outgoingMessageId: params.outgoingMessageId ?? null,
+    representacao: params.representacao ?? "texto_completo",
+    estado: params.estado ?? "persistida",
+    textoHash: params.textoHash ?? null,
+    transporteId: params.transporteId ?? null,
+  });
 }
+
 
 export async function registrarDecisaoConfianca(params: {
   clinicaId: string;
@@ -82,10 +168,28 @@ export async function registrarDecisaoConfianca(params: {
   handoffDecision?: string | null;
   handoffReason?: string | null;
   handoffOcorreu?: boolean | null;
-}): Promise<void> {
+  /**
+   * FASE 5 — contexto ao qual esta nota pertence. Sem estes campos, uma nota
+   * poderia ser reaproveitada só porque o texto tem o mesmo hash.
+   */
+  revisaoConversa?: number | null;
+  evidenciasHash?: string | null;
+  /** De onde veio o texto: modelo, gate, handoff, mídia, erro, encerramento. */
+  origemResposta?: string | null;
+  /** Quantas rodadas de modelo o turno consumiu (0 = caminho sem modelo). */
+  rodadas?: number | null;
+  /** Representação avaliada: texto completo, áudio integral ou resumo falado. */
+  representacao?: RepresentacaoSaida | null;
+}): Promise<ResultadoRegistro> {
   try {
     const a = params.auditoria ?? null;
-    await supabaseAdmin.from("nina_confianca_decisoes").insert({
+    const { data, error } = await supabaseAdmin.from("nina_confianca_decisoes").insert({
+      revisao_conversa: params.revisaoConversa ?? a?.conversationRevision ?? null,
+      evidencias_hash: params.evidenciasHash ?? null,
+      origem_resposta: params.origemResposta ?? null,
+      rodadas: params.rodadas ?? null,
+      representacao: params.representacao ?? "texto_completo",
+
       clinica_id: params.clinicaId,
       conversation_id: params.conversaId ?? a?.conversationId ?? null,
       execucao_id: params.execucaoId,
@@ -131,8 +235,11 @@ export async function registrarDecisaoConfianca(params: {
             ),
           }
         : {}),
-    } as never);
+    } as never).select("id").maybeSingle();
+    // Erro do Supabase vem no objeto: sem checar, a gravação "some" em silêncio.
+    if (error) return falha("registro da decisão de confiança", error);
+    return { ok: true, id: (data as { id?: string } | null)?.id ?? null, erro: null };
   } catch (e) {
-    console.warn("[nina-confianca] falha ao registrar decisão:", e instanceof Error ? e.message : e);
+    return falha("registro da decisão de confiança", e);
   }
 }
