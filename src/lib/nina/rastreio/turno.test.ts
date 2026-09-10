@@ -2,7 +2,7 @@
  * FASE 1 (Rastreabilidade) — testes do registro do turno.
  * Módulo puro: nada de banco, nada de WhatsApp, nada de produção.
  */
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 import {
   criarRegistroTurno,
   finalizarRegistroTurno,
