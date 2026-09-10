@@ -625,9 +625,14 @@ export function ClaimGroundingValidator(ctx: ContextoConfianca): ResultadoValida
   if (r.total === 0) {
     // Zero afirmações em uma ação que depende de dado oficial não é "nada a
     // verificar": é verificação que não aconteceu.
-    return ctx.requestedAction !== null &&
+    // Ações de escrita já são cobertas pelo validador de workflow (prova de
+    // gravação); aqui só interessa a resposta que INFORMA algo oficial.
+    const acaoInformativa =
+      ctx.requestedAction !== null &&
       ACOES_COM_DADO_OFICIAL.has(ctx.requestedAction) &&
-      temTexto
+      !ctx.requestedAction.startsWith("criar_") &&
+      !ctx.requestedAction.startsWith("cancelar_");
+    return acaoInformativa && temTexto
       ? res("UNKNOWN", 0, "SEM_AFIRMACAO_RECONHECIDA_EM_ACAO_OFICIAL", {
           requestedAction: ctx.requestedAction,
         })
