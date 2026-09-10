@@ -213,6 +213,7 @@ export const NODES_ARQUITETURA: NodeArquitetura[] = [
       "instructions.phases",
       "identity.gate",
       "prompt.compose",
+      "response.templates",
     ],
 
     tabelas: ["clinicas", "unidades", "whatsapp_mensagens"],
@@ -316,7 +317,7 @@ export const NODES_ARQUITETURA: NodeArquitetura[] = [
       "offer.complete",
       "voice.reasoning",
     ],
-    seguintes: ["tool.execute", "response.validate", "error.handle", "metrics.record"],
+    seguintes: ["tool.execute", "response.finalize", "error.handle", "metrics.record"],
     erros: ["limite de uso", "créditos insuficientes", "tempo esgotado", "resposta inválida"],
   },
   {
@@ -534,7 +535,7 @@ export const NODES_ARQUITETURA: NodeArquitetura[] = [
     funcao: "carregarTemplatesPublicados",
     entrada: "Clínica e escopo do turno",
     saida: "Mapa de chave para texto publicado",
-    anteriores: [],
+    anteriores: ["context.load"],
     seguintes: ["response.finalize"],
     tabelas: ["nina_mensagens_templates"],
     erros: ["template inválido", "variável não permitida", "sem publicação (usa o padrão)"],
