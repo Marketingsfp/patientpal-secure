@@ -16,7 +16,12 @@ import {
   type ConfiancaDaMensagem,
   type ConfiabilidadeDecisaoView,
 } from "@/lib/nina/confianca.functions";
-import { rotuloConfianca, scoreExibido } from "@/lib/nina/confianca-badge";
+import {
+  ROTULO_INDICE_EVIDENCIA,
+  rotuloConfianca,
+  scoreExibido,
+  textoIndiceEvidencia,
+} from "@/lib/nina/confianca-badge";
 import {
   snapshotDoPrompt,
   type SnapshotPromptView,
