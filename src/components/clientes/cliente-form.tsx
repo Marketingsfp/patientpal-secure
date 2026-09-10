@@ -2108,6 +2108,7 @@ export function ClienteForm({
                               <th className="px-3 py-2">Especialidade</th>
                               <th className="px-3 py-2">Serviço</th>
                               <th className="px-3 py-2">Médico</th>
+                              <th className="px-3 py-2 w-32">Situação</th>
                             </tr>
                           </thead>
                           <tbody>
