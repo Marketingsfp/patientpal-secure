@@ -665,6 +665,12 @@ export function somenteNegativasApoiadas(ctx: ContextoConfianca, texto?: string 
   const t = (texto ?? ctx.draftText ?? "").trim();
   if (!t) return false;
   const r = avaliarGrounding(ctx, t);
-  if (r.total === 0) return false;
+  const consultaOficial =
+    consultaRespondeu(ctx, CAP_CATALOGO) ?? consultaRespondeu(ctx, CAP_AGENDA);
+  if (r.total === 0) {
+    // Frase negativa que o extrator não classificou como claim: ainda assim,
+    // uma negativa só vale com consulta oficial que respondeu.
+    return Boolean(consultaOficial) && classificarModalidade(t) === "negacao";
+  }
   return r.claims.every((c) => c.modalidade === "negacao" && c.suportado);
 }
