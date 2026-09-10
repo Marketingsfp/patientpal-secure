@@ -10694,14 +10694,23 @@ function AgendaPage() {
             </Button>
             <Button
               type="button"
+              variant={
+                semFatMotivo === MOTIVO_SEM_FATURAMENTO_OUTRO &&
+                motivoIndicaPagamentoJaFeito(semFatMotivoLivre)
+                  ? "destructive"
+                  : "default"
+              }
               onClick={() => void confirmarSemFaturamento()}
               disabled={semFatSalvando}
             >
               {semFatSalvando
                 ? "Gravando…"
-                : podeAutorizarSemFat
-                  ? "Marcar sem faturamento"
-                  : "Autorizar e marcar"}
+                : semFatMotivo === MOTIVO_SEM_FATURAMENTO_OUTRO &&
+                    motivoIndicaPagamentoJaFeito(semFatMotivoLivre)
+                  ? "Marcar mesmo assim"
+                  : podeAutorizarSemFat
+                    ? "Marcar sem faturamento"
+                    : "Autorizar e marcar"}
             </Button>
           </DialogFooter>
         </DialogContent>
