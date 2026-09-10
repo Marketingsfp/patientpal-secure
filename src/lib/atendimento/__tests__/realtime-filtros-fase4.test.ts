@@ -2,7 +2,7 @@
  * FASE 4 — Realtime dos filtros compactos (Escopo × Visualização) e memória
  * do filtro. Só apresentação: RBAC segue no backend.
  */
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 import { patchListaPorConversa, patchListaPorMensagem } from "../patch-inbox";
 import {
   lerFiltrosInbox,
