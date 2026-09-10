@@ -14,6 +14,7 @@
  * sistema vem dos bloqueadores objetivos, não do percentual.
  */
 import { POLITICA_PADRAO, type PoliticaConfianca } from "./policy";
+import { classificarStatusReporte } from "./denominadores";
 
 export type LinhaCalibracao = {
   id: string;
@@ -32,6 +33,10 @@ export type LinhaCalibracao = {
   reason_codes: string[];
   categorias: string[];
   validadores: Array<{ validator: string; status: string; reasonCode?: string | null }>;
+  /** FASE 7 — versão da política vigente quando a decisão foi tomada. */
+  policy_version?: string | null;
+  /** FASE 7 — "shadow" = observacional. */
+  modo?: string | null;
 };
 
 export type ErroCalibracao = {
@@ -41,6 +46,8 @@ export type ErroCalibracao = {
   execucao_id: string | null;
   categoria: string | null;
   created_at: string;
+  /** FASE 7 — status do reporte: só o confirmado conta como erro. */
+  status?: string | null;
 };
 
 /** Resultado observado da conversa (fonte: atendimento). */
@@ -110,8 +117,50 @@ export type RelatorioCalibracao = {
   altaConfiancaComErro: number;
   /** Transferências que a conversa mostrou não serem necessárias. */
   handoffsSemErroPosterior: number;
+  /** FASE 7 — bloqueios/transferências sem erro confirmado nem handoff real. */
+  bloqueioIndevido: number;
+  /** FASE 7 — reportes ainda sem revisão conclusiva (não contam como erro). */
+  reportesPendentes: number;
+  /** FASE 7 — amostra usada para gerar propostas. */
+  amostra: AmostraCalibracao;
   propostas: PropostaAjuste[];
 };
+
+export type AmostraCalibracao = {
+  /** Decisões elegíveis depois do filtro de versão da política. */
+  elegiveis: number;
+  /** Decisões efetivamente usadas nas propostas. */
+  usadas: number;
+  estratificada: boolean;
+  tamanhoPorFaixa: number;
+  politicaVersao: string | null;
+  porFaixa: Array<{ faixa: FaixaScore; disponiveis: number; usadas: number }>;
+};
+
+export type OpcoesCalibracao = {
+  /** Restringe a amostra às decisões de uma versão de política. */
+  politicaVersao?: string | null;
+  /** Máximo de decisões por faixa na amostra estratificada. */
+  amostraPorFaixa?: number;
+};
+
+/** Amostra estratificada e determinística: passo fixo dentro de cada faixa. */
+export function amostrarEstratificado(
+  decisoes: LinhaCalibracao[],
+  tamanhoPorFaixa: number,
+): LinhaCalibracao[] {
+  const out: LinhaCalibracao[] = [];
+  for (const faixa of ["90_100", "75_89", "50_74", "0_49"] as FaixaScore[]) {
+    const grupo = decisoes.filter((l) => faixaDoScore(Number(l.score) || 0) === faixa);
+    if (grupo.length <= tamanhoPorFaixa) {
+      out.push(...grupo);
+      continue;
+    }
+    const passo = grupo.length / tamanhoPorFaixa;
+    for (let i = 0; i < tamanhoPorFaixa; i += 1) out.push(grupo[Math.floor(i * passo)]!);
+  }
+  return out;
+}
 
 const LIBERADAS = new Set(["ALLOW", "responder", "resposta_liberada"]);
 const HANDOFFS = new Set(["HANDOFF", "BLOCK_ACTION", "transferir", "transferido_para_humano"]);
@@ -135,11 +184,28 @@ export const AMOSTRA_MINIMA = 20;
 export const TAXA_ERRO_ALERTA = 10;
 
 export function calibrar(
-  decisoes: LinhaCalibracao[],
-  erros: ErroCalibracao[],
+  decisoesEntrada: LinhaCalibracao[],
+  errosEntrada: ErroCalibracao[],
   conversas: ResultadoConversa[] = [],
   politica: PoliticaConfianca = POLITICA_PADRAO,
+  opcoes: OpcoesCalibracao = {},
 ): RelatorioCalibracao {
+  const politicaVersao = opcoes.politicaVersao ?? null;
+  const tamanhoPorFaixa = opcoes.amostraPorFaixa ?? 200;
+  // FASE 7 — modo observacional não vale para calibrar decisão aplicada.
+  const elegiveis = decisoesEntrada.filter(
+    (l) =>
+      String(l.modo ?? "").toLowerCase() !== "shadow" &&
+      (!politicaVersao || (l.policy_version ?? null) === politicaVersao),
+  );
+  const decisoes = amostrarEstratificado(elegiveis, tamanhoPorFaixa);
+  const reportesPendentes = errosEntrada.filter(
+    (e) => e.status != null && classificarStatusReporte(e.status) !== "ERRO_CONFIRMADO",
+  ).length;
+  // Só erro confirmado conta como erro observado.
+  const erros = errosEntrada.filter(
+    (e) => e.status == null || classificarStatusReporte(e.status) === "ERRO_CONFIRMADO",
+  );
   const porMensagem = new Set(erros.map((e) => e.mensagem_id).filter(Boolean) as string[]);
   const porExecucao = new Set(erros.map((e) => e.execucao_id).filter(Boolean) as string[]);
   // FASE 6 — o vínculo por conversa só vale para reportes LEGADOS, que não
@@ -221,6 +287,24 @@ export function calibrar(
   const handoffsSemErroPosterior = decisoes.filter(
     (l) => classe(l) === "handoff" && !temErro(l),
   ).length;
+  const bloqueioIndevido = decisoes.filter((l) => {
+    if (classe(l) !== "handoff" || temErro(l)) return false;
+    const r = l.conversation_id ? resultadoDe.get(l.conversation_id) : undefined;
+    return r ? !r.houveHandoff : false;
+  }).length;
+
+  const amostra: AmostraCalibracao = {
+    elegiveis: elegiveis.length,
+    usadas: decisoes.length,
+    estratificada: decisoes.length < elegiveis.length,
+    tamanhoPorFaixa,
+    politicaVersao,
+    porFaixa: (["90_100", "75_89", "50_74", "0_49"] as FaixaScore[]).map((faixa) => ({
+      faixa,
+      disponiveis: elegiveis.filter((l) => faixaDoScore(Number(l.score) || 0) === faixa).length,
+      usadas: decisoes.filter((l) => faixaDoScore(Number(l.score) || 0) === faixa).length,
+    })),
+  };
 
   return {
     total: decisoes.length,
@@ -232,6 +316,9 @@ export function calibrar(
     porCategoria,
     altaConfiancaComErro,
     handoffsSemErroPosterior,
+    bloqueioIndevido,
+    reportesPendentes,
+    amostra,
     propostas: gerarPropostas(
       { porFaixa, porValidadorQueFalhou, porCategoria, altaConfiancaComErro },
       politica,
