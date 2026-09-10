@@ -138,6 +138,10 @@ type Msg = {
   enviada_por: string | null;
   created_at: string;
   execucao_id?: string | null;
+  /** Identidade idempotente do envio — usada para reconciliar a bolha. */
+  wa_message_id?: string | null;
+  /** Estado individual desta mensagem (nunca um estado global da tela). */
+  estado?: "pending" | "confirmed" | "failed";
 };
 
 /** Rastro técnico de uma chamada de ferramenta feita pela Nina no teste. */
