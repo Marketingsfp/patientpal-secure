@@ -64,28 +64,37 @@ class StorePersistente {
   }
 }
 
-/** Simulador: mensagens com horários definidos, sem timers reais. */
+/** Simulador orientado a eventos: registros e despertares em ordem de tempo. */
 function simular(entradas: Array<{ chave: string; id: string; texto: string; emMs: number }>) {
   const store = new StorePersistente();
   const execucoes: Array<{ batchId: string; mensagens: string[]; texto: string }> = [];
   const textos = new Map(entradas.map((e) => [e.id, e.texto]));
 
-  const invocacoes = entradas.map((e) => {
-    const { batchId, revision, firstMs } = store.registrar(e.chave, e.id, e.emMs);
-    const { esperaMs, forcar } = decidirEspera(e.emMs, firstMs);
-    return { ...e, batchId, revision, forcar, acordaEm: e.emMs + esperaMs };
-  });
+  type Evento =
+    | { t: number; tipo: "chegada"; chave: string; id: string }
+    | { t: number; tipo: "acorda"; batchId: string; revision: number; forcar: boolean };
 
-  // Ordena pelo instante em que cada invocação acorda (relógio simulado).
-  for (const inv of [...invocacoes].sort((a, b) => a.acordaEm - b.acordaEm)) {
-    const r = store.reivindicar(inv.batchId, inv.revision, inv.forcar);
+  const fila: Evento[] = entradas
+    .map((e) => ({ t: e.emMs, tipo: "chegada" as const, chave: e.chave, id: e.id }))
+    .sort((a, b) => a.t - b.t);
+
+  while (fila.length) {
+    fila.sort((a, b) => a.t - b.t);
+    const ev = fila.shift()!;
+    if (ev.tipo === "chegada") {
+      const { batchId, revision, firstMs } = store.registrar(ev.chave, ev.id, ev.t);
+      const { esperaMs, forcar } = decidirEspera(ev.t, firstMs);
+      fila.push({ t: ev.t + esperaMs, tipo: "acorda", batchId, revision, forcar });
+      continue;
+    }
+    const r = store.reivindicar(ev.batchId, ev.revision, ev.forcar);
     if (!r.reivindicado) continue;
     execucoes.push({
-      batchId: inv.batchId,
+      batchId: ev.batchId,
       mensagens: r.mensagens,
       texto: montarTurnoPaciente(r.mensagens.map((id) => textos.get(id) ?? "")),
     });
-    store.concluir(inv.batchId);
+    store.concluir(ev.batchId);
   }
   return { execucoes, lotes: store.total };
 }
