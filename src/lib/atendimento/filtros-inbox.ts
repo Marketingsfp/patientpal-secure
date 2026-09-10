@@ -177,3 +177,54 @@ export function estadoDeEscopoLegado(destino: EscopoInbox): {
   }
   return { base: destino as EscopoBaseInbox, visualizacao: null, naoAtribuidas: false };
 }
+
+/* =========================================================
+ *  FASE 3 — RESPONSABILIDADE DA CONVERSA RESOLVIDA
+ * ======================================================= */
+
+/**
+ * Ao resolver, o núcleo único de encerramento (`resolverConversaCore`) grava
+ * `last_assigned_user_id` com o responsável do momento ANTES de limpar
+ * `atribuida_user_id`, e `resolved_by` com quem executou a resolução.
+ *
+ * Por isso, "Resolvidas do Jean" NÃO pode olhar `atribuida_user_id` (que fica
+ * nulo depois do encerramento). A regra canônica é:
+ *
+ *   responsável no momento da resolução (`last_assigned_user_id`)
+ *   ou, na ausência dele, quem resolveu (`resolved_by`).
+ *
+ * Nada é inventado para conversas históricas: sem nenhum dos dois campos, a
+ * conversa simplesmente não pertence ao escopo de ninguém.
+ */
+export function filtroResponsavel(
+  userId: string,
+  plano: Pick<PlanoVisualizacao, "somenteResolvidas">,
+): { tipo: "coluna"; coluna: "atribuida_user_id"; userId: string } | { tipo: "ou"; expr: string } {
+  if (plano.somenteResolvidas) {
+    return { tipo: "ou", expr: `last_assigned_user_id.eq.${userId},resolved_by.eq.${userId}` };
+  }
+  return { tipo: "coluna", coluna: "atribuida_user_id", userId };
+}
+
+/**
+ * Ordenação determinística de "Maior tempo esperando" pela métrica canônica
+ * (`atend_espera_por_conversa`): quem começou a esperar antes vem primeiro.
+ * Roda sobre o conjunto já recortado, nunca recalcula duração no navegador.
+ */
+export function ordenarPorEspera<T extends { id: string }>(
+  linhas: T[],
+  esperaPorConversa: Record<string, string>,
+): T[] {
+  const chave = (id: string) => {
+    const t = Date.parse(esperaPorConversa[id] ?? "");
+    return Number.isFinite(t) ? t : Number.POSITIVE_INFINITY;
+  };
+  return [...linhas].sort((a, b) => chave(a.id) - chave(b.id));
+}
+
+/** Ids aguardando resposta da clínica, do mais antigo para o mais recente. */
+export function idsPorEsperaCrescente(esperaPorConversa: Record<string, string>): string[] {
+  return Object.keys(esperaPorConversa).sort(
+    (a, b) => Date.parse(esperaPorConversa[a]!) - Date.parse(esperaPorConversa[b]!),
+  );
+}
