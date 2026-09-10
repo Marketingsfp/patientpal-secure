@@ -6,6 +6,7 @@ import {
   estadoDeEscopoLegado,
   lerValorEscopo,
   ordemVisualizacao,
+  planoVisualizacao,
   rotuloEscopo,
   statusConsulta,
   valorEscopoControle,
