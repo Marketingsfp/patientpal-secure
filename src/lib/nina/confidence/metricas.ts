@@ -39,6 +39,18 @@ export type LinhaDecisaoMetrica = {
   execucao_id?: string | null;
   /** FASE 6 — mensagem da Nina efetivamente enviada (vínculo principal). */
   message_id?: string | null;
+  /** FASE 7 — mensagem de saída persistida (vínculo mais forte que message_id). */
+  outgoing_message_id?: string | null;
+  /** FASE 7 — "answer_confidence" | "action_safety". */
+  avaliacao?: string | null;
+  /** FASE 7 — "shadow" quando a decisão é apenas observacional. */
+  modo?: string | null;
+  /** FASE 7 — prova de que a transferência realmente ocorreu. */
+  handoff_ocorreu?: boolean | null;
+  handoff_decision?: string | null;
+  acao_solicitada?: string | null;
+  resultado_final?: string | null;
+  rodadas?: number | null;
   score: number;
   nivel: string | null;
   decisao: string | null;
