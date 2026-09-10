@@ -41,9 +41,28 @@ function instante(v: any): number {
   return Number.isFinite(t) ? t : 0;
 }
 
-function ordenar(lista: LinhaLista[]): LinhaLista[] {
+/**
+ * FASE 4 — a ordem do card segue o eixo de Visualização ativo, igual à do
+ * servidor: Recentes por última mensagem, Resolvidas por data de resolução,
+ * Maior espera pela métrica canônica de paciente aguardando.
+ */
+export type VisualizacaoPatch = "recentes" | "resolvidas" | "espera";
+
+function ordenar(
+  lista: LinhaLista[],
+  visualizacao: VisualizacaoPatch = "recentes",
+  espera: Record<string, string> = {},
+): LinhaLista[] {
   return [...lista].sort((a, b) => {
-    const d = instante(b.ultima_msg_em) - instante(a.ultima_msg_em);
+    let d = 0;
+    if (visualizacao === "resolvidas") {
+      d = instante(b["resolved_at"] ?? b["closed_at"]) - instante(a["resolved_at"] ?? a["closed_at"]);
+    } else if (visualizacao === "espera") {
+      const ta = espera[a.id] ? instante(espera[a.id]) : Number.POSITIVE_INFINITY;
+      const tb = espera[b.id] ? instante(espera[b.id]) : Number.POSITIVE_INFINITY;
+      d = ta - tb;
+    }
+    if (d === 0) d = instante(b.ultima_msg_em) - instante(a.ultima_msg_em);
     return d !== 0 ? d : a.id.localeCompare(b.id);
   });
 }
