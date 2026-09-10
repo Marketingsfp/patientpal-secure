@@ -184,7 +184,7 @@ export const listarConversas = createServerFn({ method: "POST" })
     // (`atend_espera_por_conversa`): conversa em que a clínica é que aguarda
     // o paciente fica de fora. O conjunto vem antes do corte da lista.
     let idsEspera: string[] | null = null;
-    let mapaEspera: Record<string, string> = {};
+    const mapaEspera: Record<string, string> = {};
     if (plano.exigeEsperaPaciente) {
       const { data: esperas } = await context.supabase.rpc("atend_espera_por_conversa", {
         _clinica_id: data.clinicaId,
