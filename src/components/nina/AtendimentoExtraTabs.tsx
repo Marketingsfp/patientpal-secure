@@ -2117,7 +2117,12 @@ export function AtendInbox() {
       if (evento.table === "whatsapp_mensagens" && evento.eventType === "INSERT") {
         const r = patchListaPorMensagem(convsRef.current, (evento as any).new, {
           conversaAberta: selIdRef.current,
+          visualizacao,
+          espera: esperaRef.current,
         });
+        // "Maior espera" depende da métrica canônica: a mensagem pode iniciar
+        // ou encerrar a espera do paciente, então a métrica é reconferida.
+        if (visualizacao === "espera") g.espera.agendar();
         if (r.aplicado) {
           listaPorPatch = true;
           if (r.lista !== convsRef.current) setConvs(r.lista as any[]);
