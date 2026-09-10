@@ -2882,6 +2882,28 @@ export function AtendInbox() {
                 )}
               </SelectContent>
             </Select>
+            {/* FASE 1 — supervisão: só quem já pode ver conversas de terceiros.
+                Filtro de visualização; nada de atribuição muda por causa dele. */}
+            {souGestor && (
+              <Select
+                value={atendenteSelecionadoId ?? "todos"}
+                onValueChange={(v) => setAtendenteSelecionadoId(v === "todos" ? null : v)}
+                onOpenChange={setPainelMenuAberto}
+              >
+                <SelectTrigger className="h-8 text-xs" aria-label="Filtrar por atendente">
+                  <SelectValue placeholder="Atendente: Todos" />
+                </SelectTrigger>
+                <SelectContent className="z-50 min-w-[--radix-select-trigger-width]">
+                  <SelectItem value="todos">Atendente: Todos os atendentes</SelectItem>
+                  {usuarios.map((u: any) => (
+                    <SelectItem key={u.user_id} value={u.user_id}>
+                      {u.nome}
+                      {u.presenca ? ` · ${ROTULO_PRESENCA[u.presenca as PresencaAtendente]}` : ""}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
             <Select
               value={filtroStatus}
               onValueChange={(v) => setFiltroStatus(v as any)}
