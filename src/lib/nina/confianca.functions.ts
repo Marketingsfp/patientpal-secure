@@ -456,27 +456,35 @@ export const metricasConfiabilidadeNina = createServerFn({ method: "POST" })
   .handler(async ({ data, context }): Promise<MetricasConfiabilidade> => {
     const desde = new Date(Date.now() - data.dias * 24 * 60 * 60 * 1000).toISOString();
 
-    let q = context.supabase
-      .from("nina_confianca_decisoes")
-      .select(
-        "id, created_at, ambiente, conversation_id, execucao_id, score, nivel, decisao, acao, intencao, categorias, bloqueadores, bloqueio, reason_codes, validadores, ferramentas",
-      )
-      .eq("clinica_id", data.clinicaId)
-      .gte("created_at", desde)
-      .order("created_at", { ascending: false })
-      .limit(5000);
-    if (data.ambiente !== "todos") q = q.eq("ambiente", data.ambiente);
-    const { data: rows, error } = await q;
-    if (error) throw new Error(error.message);
+    const LIMITE = 5000;
+    const { linhas: rows, truncado } = await lerPaginado<Record<string, unknown>>(
+      (de, ate) =>
+        filtrarAmbiente(
+          context.supabase
+            .from("nina_confianca_decisoes")
+            .select(
+              "id, created_at, ambiente, conversation_id, execucao_id, message_id, outgoing_message_id, avaliacao, modo, handoff_decision, handoff_ocorreu, rodadas, acao_solicitada, resultado_final, score, nivel, decisao, acao, intencao, categorias, bloqueadores, bloqueio, reason_codes, validadores, ferramentas, claims",
+            )
+            .eq("clinica_id", data.clinicaId)
+            .gte("created_at", desde)
+            .order("created_at", { ascending: false }),
+          data.ambiente,
+        ).range(de, ate) as unknown as PromiseLike<{
+          data: Record<string, unknown>[] | null;
+          error: { message: string } | null;
+        }>,
+      LIMITE,
+    );
 
-    const { data: errosRows } = await context.supabase
-      .from("nina_feedback_erros")
-      .select("id, conversa_id, execucao_id, created_at, categoria")
-      .eq("clinica_id", data.clinicaId)
-      .gte("created_at", desde)
-      // FASE 2 — homologação e teste automatizado não entram na métrica real.
-      .eq("ambiente", "production")
-      .limit(5000);
+    // FASE 7 — o recorte de homologação usa os reportes de homologação.
+    const { data: errosRows } = await filtrarAmbiente(
+      context.supabase
+        .from("nina_feedback_erros")
+        .select("id, conversa_id, mensagem_id, execucao_id, status, created_at, categoria")
+        .eq("clinica_id", data.clinicaId)
+        .gte("created_at", desde),
+      data.ambiente,
+    ).limit(LIMITE);
 
     // Dentro/fora do horário: reutiliza o classificador central já publicado.
     let calendarios: Awaited<
@@ -521,6 +529,15 @@ export const metricasConfiabilidadeNina = createServerFn({ method: "POST" })
         ambiente: (r["ambiente"] as string) ?? null,
         conversation_id: (r["conversation_id"] as string) ?? null,
         execucao_id: (r["execucao_id"] as string) ?? null,
+        message_id: (r["message_id"] as string) ?? null,
+        outgoing_message_id: (r["outgoing_message_id"] as string) ?? null,
+        avaliacao: (r["avaliacao"] as string) ?? null,
+        modo: (r["modo"] as string) ?? null,
+        handoff_decision: (r["handoff_decision"] as string) ?? null,
+        handoff_ocorreu: (r["handoff_ocorreu"] as boolean | null) ?? null,
+        rodadas: Number(r["rodadas"]) || 0,
+        acao_solicitada: (r["acao_solicitada"] as string) ?? null,
+        resultado_final: (r["resultado_final"] as string) ?? null,
         score: Number(r["score"]) || 0,
         nivel: (r["nivel"] as string) ?? null,
         decisao: (r["decisao"] as string) ?? null,
@@ -548,19 +565,97 @@ export const metricasConfiabilidadeNina = createServerFn({ method: "POST" })
       };
     });
 
-    const erros: ErroReportado[] = (errosRows ?? []).map((raw) => {
+    const reportes: ReporteRevisao[] = (errosRows ?? []).map((raw) => {
       const e = raw as Record<string, unknown>;
       return {
         id: String(e["id"] ?? ""),
         conversa_id: (e["conversa_id"] as string) ?? null,
+        mensagem_id: (e["mensagem_id"] as string) ?? null,
         execucao_id: (e["execucao_id"] as string) ?? null,
+        status: (e["status"] as string) ?? null,
         created_at: String(e["created_at"] ?? ""),
         categoria: (e["categoria"] as string) ?? null,
       };
     });
 
-    return calcularMetricasConfiabilidade(linhas, erros);
+    // Só erro CONFIRMADO entra nas taxas de erro herdadas.
+    const erros: ErroReportado[] = reportes
+      .filter((r) => classificarStatusReporte(r.status) === "ERRO_CONFIRMADO")
+      .map((r) => ({
+        id: r.id,
+        conversa_id: r.conversa_id,
+        mensagem_id: r.mensagem_id,
+        execucao_id: r.execucao_id,
+        created_at: r.created_at,
+        categoria: r.categoria ?? null,
+      }));
+
+    const provasTransferencia = await lerProvasTransferencia(
+      context.supabase,
+      linhas.map((l) => l.conversation_id),
+    );
+    const provasAgendamento = await lerProvasAgendamento(context.supabase, rows);
+    const falhasOperacionais = linhas.reduce(
+      (s, l) => s + l.ferramentas.filter((f) => !f.sucesso).length,
+      0,
+    );
+
+    return calcularMetricasConfiabilidade(linhas, erros, {
+      reportes,
+      provasTransferencia,
+      provasAgendamento,
+      falhasOperacionais,
+      limiteLeitura: truncado ? linhas.length : LIMITE,
+    });
   });
+
+/** FASE 7 — transferência confirmada é a registrada no atendimento. */
+async function lerProvasTransferencia(
+  supabase: { from: (t: string) => any },
+  conversas: Array<string | null>,
+): Promise<ProvaTransferencia[]> {
+  const ids = [...new Set(conversas.filter(Boolean) as string[])].slice(0, 1000);
+  if (ids.length === 0) return [];
+  const { data } = await supabase
+    .from("atend_conversas")
+    .select("id, handoff_em")
+    .in("id", ids);
+  return ((data ?? []) as Array<{ id: string; handoff_em: string | null }>).map((c) => ({
+    conversa_id: c.id,
+    houveHandoff: Boolean(c.handoff_em),
+  }));
+}
+
+/** FASE 7 — reserva só conta como confirmada quando existe na agenda. */
+async function lerProvasAgendamento(
+  supabase: { from: (t: string) => any },
+  rows: Array<Record<string, unknown>>,
+): Promise<ProvaAgendamento[]> {
+  const candidatos = new Map<string, string | null>();
+  const coletar = (valor: unknown, conversa: string | null) => {
+    if (!valor) return;
+    const texto = JSON.stringify(valor);
+    for (const m of texto.matchAll(
+      /"agendamento_id"\s*:\s*"([0-9a-fA-F-]{36})"/g,
+    )) {
+      candidatos.set(m[1]!, conversa);
+    }
+  };
+  for (const r of rows) {
+    const conversa = (r["conversation_id"] as string) ?? null;
+    coletar(r["claims"], conversa);
+    coletar(r["ferramentas"], conversa);
+  }
+  const ids = [...candidatos.keys()].slice(0, 1000);
+  if (ids.length === 0) return [];
+  const { data } = await supabase.from("agendamentos").select("id").in("id", ids);
+  const existentes = new Set(((data ?? []) as Array<{ id: string }>).map((a) => a.id));
+  return ids.map((id) => ({
+    agendamento_id: id,
+    conversa_id: candidatos.get(id) ?? null,
+    existeNaAgenda: existentes.has(id),
+  }));
+}
 
 // ------------------------------------------------ FASE 9: autoavaliação
 
