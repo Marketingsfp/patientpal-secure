@@ -604,7 +604,7 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
                           clinicaId: params.clinicaId,
                           canal: "whatsapp",
                           chaveTurno:
-                            auditoriaNina.traceId ?? loteId ?? `${params.clinicaId}|${from}|${idMsg ?? ""}`,
+                            auditoriaNina.traceId ?? loteId ?? `${params.clinicaId}|${from}|${(msgInserida as { id?: string } | null)?.id ?? ""}`,
                           conversaId: convId,
                           telefone: from,
                           mensagemPaciente: textoPaciente || null,
