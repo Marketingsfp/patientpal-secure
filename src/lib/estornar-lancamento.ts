@@ -46,10 +46,12 @@ export type EstornoLancamentoResultado =
 export async function estornarLancamentoReceita(
   lancamentoId: string,
   clinicaId?: string,
+  devolucaoAgora = false,
 ): Promise<EstornoLancamentoResultado> {
   const { data, error } = await supabase.rpc("estornar_lancamento_receita", {
     _lancamento_id: lancamentoId,
     _clinica_id: clinicaId ?? null,
+    _devolucao_agora: devolucaoAgora,
   } as never);
   if (error) {
     return { ok: false, motivo: "erro", mensagem: "Falha ao estornar lançamento", error };
