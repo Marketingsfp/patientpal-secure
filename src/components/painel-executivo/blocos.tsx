@@ -158,14 +158,18 @@ export function BlocoTopoExecutivo({
           carregando={carregando}
           tom="azul"
           icone={CreditCard}
-          titulo="Contratos ativos do cartão"
+          titulo="Contratos ativos pagantes"
           valor={ct ? int(ct.ativos) : "—"}
           detalhe={
             ct
-              ? `Receita prevista ${money(ct.receitaPrevista)}`
+              ? `Receita prevista ${money(ct.receitaPrevista)}${
+                  ct.semMensalidade > 0
+                    ? ` · ${int(ct.semMensalidade)} dependente(s) de R$ 0 fora da conta`
+                    : ""
+                }`
               : "Não foi possível somar os contratos"
           }
-          ajuda="Todos os contratos do Cartão Benefícios com situação 'ativo' na clínica, e a soma das mensalidades deles. É a carteira inteira, não uma página de lista."
+          ajuda="Contratos do Cartão Benefícios com situação 'ativo' e mensalidade maior que zero, e a soma das mensalidades deles. Contrato ativo de R$ 0 não entra: são dependentes vinculados ao titular, que não pagam mensalidade própria — a quantidade deles aparece na linha de baixo. É a carteira inteira, não uma página de lista."
         />
 
         {/*
@@ -560,8 +564,8 @@ export function BlocoCartaoBeneficios({
           icone={TrendingUp}
           titulo="Ticket médio por contrato"
           valor={ct ? money(ct.ticketMedio) : "—"}
-          detalhe={ct ? `${int(ct.ativos)} contrato(s) ativo(s)` : undefined}
-          ajuda="Receita prevista dividida pelos contratos ativos. Só a mensalidade entra: a taxa de adesão é cobrada uma única vez, na emissão do cartão."
+          detalhe={ct ? `${int(ct.ativos)} contrato(s) pagante(s)` : undefined}
+          ajuda="Receita prevista dividida pelos contratos ativos pagantes — os dependentes de R$ 0 não entram na divisão. Só a mensalidade entra: a taxa de adesão é cobrada uma única vez, na emissão do cartão."
         />
       </div>
     </Bloco>

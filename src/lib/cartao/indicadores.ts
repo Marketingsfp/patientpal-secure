@@ -42,8 +42,18 @@ export interface MensalidadeIndicadorRow {
 }
 
 export interface ResumoContratos {
-  /** Contratos com situação "ativo" na clínica inteira. */
+  /**
+   * Contratos PAGANTES: situação "ativo" e mensalidade maior que zero.
+   *
+   * O contrato ativo de R$ 0 fica de fora (ver `semMensalidade`). Na Menino
+   * Jesus eram 243 em 10/09/2026, todos criados pelo vínculo automático
+   * titular-dependente de 13/06/2026 — são dependentes, não contratos que
+   * pagam. Contá-los inflava o card de 1.624 para 1.867 e puxava o ticket
+   * médio de R$ 126 para R$ 110.
+   */
   ativos: number;
+  /** Contratos ativos com mensalidade zero ou vazia — dependentes vinculados. */
+  semMensalidade: number;
   /** Soma das mensalidades dos contratos ativos — a receita prevista do mês. */
   receitaPrevista: number;
   /** Cancelados, inativos ou encerrados. Não entram na receita prevista. */
@@ -52,7 +62,7 @@ export interface ResumoContratos {
   novos: number;
   /** Soma das mensalidades desses contratos novos. */
   novosValor: number;
-  /** Receita prevista dividida pelos contratos ativos. 0 quando não há ativo. */
+  /** Receita prevista dividida pelos contratos pagantes. 0 quando não há nenhum. */
   ticketMedio: number;
 }
 
@@ -115,6 +125,7 @@ export function resumirContratos(
 ): ResumoContratos {
   const r: ResumoContratos = {
     ativos: 0,
+    semMensalidade: 0,
     receitaPrevista: 0,
     inativos: 0,
     novos: 0,
@@ -125,8 +136,12 @@ export function resumirContratos(
     const status = (c.status ?? "").toLowerCase();
     const valor = num(c.valor_mensal);
     if (status === "ativo") {
-      r.ativos += 1;
-      r.receitaPrevista += valor;
+      if (valor > 0) {
+        r.ativos += 1;
+        r.receitaPrevista += valor;
+      } else {
+        r.semMensalidade += 1;
+      }
     } else if (STATUS_INATIVOS.includes(status)) {
       r.inativos += 1;
     }
