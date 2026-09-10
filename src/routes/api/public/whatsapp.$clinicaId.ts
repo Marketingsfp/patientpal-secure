@@ -310,6 +310,22 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
                         );
                       }
                       resultado = "verificacao_tratada";
+                      // FASE 1 — resposta determinística ANTES da Nina: fica
+                      // registrada como caminho sem modelo.
+                      try {
+                        const { registrarTurnoSemModelo } = await import(
+                          "@/lib/nina/rastreio/turno.server"
+                        );
+                        await registrarTurnoSemModelo({
+                          clinicaId: params.clinicaId,
+                          conversaId: null,
+                          ...(idMsg ? { mensagensEntrada: [idMsg] } : {}),
+                          origem: r.resposta ? "gate" : "nenhuma",
+                          motivo: "código de verificação reconhecido antes da Nina",
+                        });
+                      } catch {
+                        /* rastreabilidade nunca interrompe o atendimento */
+                      }
                       continue;
                     }
                   } catch (e) {
