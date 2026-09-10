@@ -175,6 +175,17 @@ describe("FASE 3.3 — dispensa legítima continua possível", () => {
         retrievedSources: [
           { tipo: "catalogo_publicado", temConteudo: true, publicado: true, referencia: "proc#1" },
         ],
+        fatos: [
+          {
+            entidade: "preco",
+            chave: "ultrassonografia abdominal",
+            valor: 180,
+            texto: "R$ 180,00",
+            fonte: "catalogo_publicado",
+            referencia: "proc#1",
+            vigente: true,
+          },
+        ],
       }),
     );
     expect(r.decision).toBe("ALLOW");

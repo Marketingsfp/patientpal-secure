@@ -350,7 +350,9 @@ describe("BASELINE 6 — sucesso técnico da ferramenta é tratado como prova do
   it("consulta ao catálogo sem registro é WARNING, não bloqueio de integridade", () => {
     const ctx: ContextoConfianca = montarContextoDoTurno(
       estado({
-        texto: "Não temos esse exame.",
+        // FASE 2 — texto afirmativo: negativa apoiada em consulta vazia agora
+        // é PASS legítimo, então o WARNING é testado com uma afirmação.
+        texto: "Esse exame é feito na unidade central.",
         acao: "responder_informacao",
         ferramentas: [
           {
