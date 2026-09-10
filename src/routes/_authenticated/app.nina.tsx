@@ -145,6 +145,7 @@ function NinaPage() {
         <TabsContent value="homologacao">
           <DashboardHomologacao />
           <HomologacaoInbox />
+          <VerificacoesHomologacao />
           <CenariosTeste />
           <CargaTeste />
           <RelatorioHomologacao />
