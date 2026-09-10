@@ -345,6 +345,12 @@ export type LinhaConfiabilidade = {
   grupo: "validador" | "ferramenta" | "fonte" | "conflito";
   /** Código estruturado do motivo (só evidência observável). */
   reasonCode: string | null;
+  /**
+   * FASE 2 — como a linha deve ser lida no painel:
+   * `ok` (atendido), `pendente` (ainda em coleta, NÃO é erro) e
+   * `falha` (inconsistência real). `NOT_APPLICABLE` nem vira linha.
+   */
+  estado?: "ok" | "pendente" | "falha";
 };
 
 /** Linhas ✓/✕ mostradas na seção "Confiabilidade" da auditoria. */
@@ -362,11 +368,14 @@ export function linhasConfiabilidade(
           ? (detalhes[0] ?? null)
           : [v.reasonCode, ...detalhes].filter(Boolean).join(" — ");
       return {
+        // PENDING é etapa de coleta: não é acerto, mas também não é erro.
         ok: v.status === "PASS",
         rotulo: ROTULO_VALIDADOR[v.validator] ?? v.validator,
         detalhe: detalhe || null,
         grupo: "validador" as const,
         reasonCode: v.reasonCode ? String(v.reasonCode) : null,
+        estado:
+          v.status === "PASS" ? ("ok" as const) : v.status === "PENDING" ? ("pendente" as const) : ("falha" as const),
       };
     });
 
