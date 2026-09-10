@@ -1,5 +1,0 @@
-import { montarContextoDoTurno } from "../src/lib/nina/confidence/runtime";
-import { verificarRespostaFinal } from "../src/lib/nina/confidence/final-answer";
-const st:any={ambiente:"homologacao",catalogoEncontrou:true,agendamentoConfirmado:false,pacienteIdentificado:false,esclarecimentoUsado:false,handoffSolicitado:false,intent:"agendamento",acao:"criar_agendamento",texto:"Vou marcar para você agora.",ferramentas:[{nome:"buscar_agenda",capacidade:"searchAvailability",fonte:"agenda",success:true}],retrievedSources:[{tipo:"agenda",temConteudo:true,publicado:true,ativo:true}],estadoOperacional:{bookingIntentConfirmed:false,appointmentFlowActive:true,appointmentAttempted:true,appointmentToolCalled:false,appointmentCreated:false,workflowState:"SLOT_SELECTED"},mensagemPaciente:"Marca aí"};
-const r:any=verificarRespostaFinal({ctx:montarContextoDoTurno(st),textoFinal:st.texto});
-console.log(JSON.stringify({score:r.score,level:r.level,dec:r.decision,as:r.actionSafety,block:r.blockers??r.bloqueadores},null,1));
