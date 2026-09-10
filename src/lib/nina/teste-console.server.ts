@@ -359,18 +359,85 @@ export async function processarMensagemTeste(data: EntradaMensagemTeste, userId:
     const { ambienteDaExecucao } = await import("@/lib/nina/confianca-execucao");
     const ambienteQA = ambienteDaExecucao({ teste: true, simulacaoAtiva });
 
+    // FASE 2/3 — MESMO agrupamento do WhatsApp real: mensagens seguidas do
+    // mesmo lead formam UM turno lógico, com UMA execução da Nina. A janela e
+    // a trava são as canônicas (`burst.server`), sem espera nova aqui.
+    let loteId = "";
+    let lockTurno: import("@/lib/nina/lock-conversa.server").LockConversa | null = null;
+    let revisaoTurno = 0;
+    let entradasTurno: string[] = mensagemId ? [mensagemId] : [];
+    if (textoPaciente) {
+      const { aguardarTurnoNina } = await import("@/lib/nina/burst.server");
+      const turno = await aguardarTurnoNina({
+        clinicaId: data.clinicaId,
+        telefone: lead.telefone_sessao,
+        conversaId,
+        mensagemId,
+        textoAtual: textoPaciente,
+        mensagensFallback: entradasTurno,
+      });
+      if (!turno) {
+        // Situação NORMAL: uma mensagem mais nova do mesmo lead ficou
+        // responsável pelo turno. Esta chamada encerra sem gerar resposta —
+        // não é erro, não tenta de novo e não avisa "a Nina não respondeu".
+        return {
+          duplicada: false,
+          reply: null as string | null,
+          erro: null as string | null,
+          audio: null,
+          transferida: false,
+          processamento: "AGRUPADA" as const,
+          absorvidaPeloLote: true,
+        };
+      }
+      loteId = turno.batchId;
+      lockTurno = turno.lock;
+      revisaoTurno = turno.revisao;
+      if (turno.mensagens.length) entradasTurno = turno.mensagens;
+      textoDoTurno = turno.texto;
+    }
+
+    /** Fecha o lote e solta a trava — sempre, qualquer que seja o desfecho. */
+    const encerrarTurno = async (status: "PROCESSED" | "SUPERSEDED" = "PROCESSED") => {
+      if (!loteId && !lockTurno) return;
+      try {
+        const { concluirTurnoNina } = await import("@/lib/nina/burst.server");
+        await concluirTurnoNina(loteId, auditoriaNina.execucaoId ?? null, lockTurno, status);
+      } catch (e) {
+        console.error("[NINA_TESTE] encerramento do turno falhou", e);
+      } finally {
+        loteId = "";
+        lockTurno = null;
+      }
+    };
+
     try {
       if (textoPaciente) {
         const { gerarRespostaNina } = await import("@/lib/whatsapp.server");
         diag.model_called = true;
-        reply = await gerarRespostaNina(data.clinicaId, textoPaciente, lead.telefone_sessao, {
+        reply = await gerarRespostaNina(data.clinicaId, textoDoTurno, lead.telefone_sessao, {
           teste: true,
           ambiente: ambienteQA,
           auditoria: auditoriaNina,
-          mensagensEntrada: (msgEntrada as { id?: string } | null)?.id
-            ? [(msgEntrada as { id: string }).id]
-            : [],
+          mensagensEntrada: entradasTurno,
+          lote: { batchId: loteId || null, revisao: revisaoTurno || null },
+          revisao: revisaoTurno
+            ? { telefone: lead.telefone_sessao, valor: revisaoTurno }
+            : undefined,
         });
+        // Rastreabilidade: as mensagens físicas do lote apontam para a única
+        // execução que as processou.
+        if (auditoriaNina.execucaoId && entradasTurno.length) {
+          try {
+            await supabaseAdmin
+              .from("whatsapp_mensagens")
+              .update({ execucao_id: auditoriaNina.execucaoId })
+              .in("id", entradasTurno)
+              .is("execucao_id", null);
+          } catch (e) {
+            console.error("[NINA_TESTE] marcação de execução na entrada falhou", e);
+          }
+        }
       } else if (audioFalhou) {
         reply = RESPOSTA_AUDIO_FALHOU;
       } else {
