@@ -705,8 +705,17 @@ export function HomologacaoInbox() {
         erro: string | null;
         transferida?: boolean;
         audio: { base64: string; mime: string; texto: string } | null;
+        processamento?: "RESPONDIDA" | "AGRUPADA" | "OBSOLETA" | "ERRO";
+        absorvidaPeloLote?: boolean;
       };
       concluirOtimista(chave);
+      // Mensagem absorvida por um envio mais recente do mesmo lead: é o
+      // agrupamento normal (as três viram um turno só). Não é falta de
+      // resposta e não deve mostrar aviso.
+      const agrupada =
+        r.absorvidaPeloLote === true ||
+        r.processamento === "AGRUPADA" ||
+        r.processamento === "OBSOLETA";
       if (meuLead()) {
         setAudio(r.audio ? `data:${r.audio.mime};base64,${r.audio.base64}` : null);
         // Conciliação eventual (ferramentas, eventos, execuções): a timeline
@@ -716,12 +725,16 @@ export function HomologacaoInbox() {
       void carregarLeads();
       if (meuLead()) {
         if (r.erro) setErro(r.erro);
-        else if (!r.reply)
+        else if (!r.reply && !agrupada)
           setErro(
             "A Nina não respondeu. Se a conversa foi transferida para atendimento humano, use “Resolver / Reiniciar teste” antes de começar um novo teste.",
           );
       }
-      return { ok: !r.erro && !!r.reply, transferida: !!r.transferida, erro: r.erro ?? null };
+      return {
+        ok: agrupada ? true : !r.erro && !!r.reply,
+        transferida: !!r.transferida,
+        erro: r.erro ?? null,
+      };
     } catch (e: any) {
       const chegou = meuLead() ? await aguardarResposta(leadOrigem) : false;
       if (chegou) concluirOtimista(chave);
