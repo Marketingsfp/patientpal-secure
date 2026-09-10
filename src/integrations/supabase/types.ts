@@ -8455,6 +8455,7 @@ export type Database = {
           teria_permitido: boolean | null
           texto_final_hash: string | null
           trace_id: string | null
+          turn_type: string | null
           updated_at: string
           validadores: Json
         }
@@ -8492,6 +8493,7 @@ export type Database = {
           teria_permitido?: boolean | null
           texto_final_hash?: string | null
           trace_id?: string | null
+          turn_type?: string | null
           updated_at?: string
           validadores?: Json
         }
@@ -8529,6 +8531,7 @@ export type Database = {
           teria_permitido?: boolean | null
           texto_final_hash?: string | null
           trace_id?: string | null
+          turn_type?: string | null
           updated_at?: string
           validadores?: Json
         }

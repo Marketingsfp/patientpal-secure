@@ -1568,6 +1568,7 @@ async function gerarRespostaNinaInterno(
             intencao: canonico.intent,
             // Mesma ação vista pelo motor. Capacidade de agenda não entra aqui.
             acaoSolicitada: canonico.requestedAction,
+            turnType: canonico.turnType ?? null,
             ferramentas: evidenciasFerramentas,
           }),
         });
@@ -1898,6 +1899,7 @@ async function gerarRespostaNinaInterno(
           executionId: execucaoIdFinal ?? null,
           intencao: estadoTurnoFinal.intent ?? null,
           acaoSolicitada: estadoTurnoFinal.acao ?? "desconhecida",
+          turnType: estadoTurnoFinal.tipoTurno ?? null,
           ferramentas: evidenciasFerramentas,
         }),
       });

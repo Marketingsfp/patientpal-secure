@@ -103,6 +103,7 @@ export const resumoConfiancaNina = createServerFn({ method: "POST" })
 import {
   ROTULO_NIVEL,
   ROTULO_RESULTADO,
+  ROTULO_TIPO_TURNO,
   linhasConfiabilidade,
   type LinhaConfiabilidade,
   type ResultadoFinalAuditoria,
@@ -122,6 +123,8 @@ export type ConfiabilidadeDecisaoView = {
   reasonCodes: string[];
   erroReportado: ErroReportadoVinculado | null;
   acaoSolicitada: string | null;
+  /** FASE 3 — natureza do turno avaliado, já com rótulo legível. */
+  tipoTurno: string | null;
   policyVersion: string | null;
   registradoEm: string;
   /** FASE 6 — % do que era relevante e pôde ser verificado. */
@@ -163,7 +166,7 @@ export const confiabilidadeDaExecucao = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }): Promise<ConfiabilidadeDecisaoView | null> => {
     const colunas =
-      "created_at, ambiente, score, nivel, intencao, resultado_final, bloqueadores, validadores, ferramentas, fontes, reason_codes, acao_solicitada, policy_version, avaliacao, evidence_coverage, engine_version";
+      "created_at, ambiente, score, nivel, intencao, resultado_final, bloqueadores, validadores, ferramentas, fontes, reason_codes, acao_solicitada, turn_type, policy_version, avaliacao, evidence_coverage, engine_version";
     // FASE 6 — o snapshot é procurado primeiro pela mensagem realmente
     // enviada. Só quando esse vínculo não existir (registros antigos) usamos
     // a execução. FASE 5 — dentro disso, vale a confiança da RESPOSTA FINAL.
@@ -281,6 +284,10 @@ export const confiabilidadeDaExecucao = createServerFn({ method: "POST" })
       erroReportado: erroVinculado,
       acaoSolicitada: (r as unknown as Record<string, unknown>)["acao_solicitada"]
         ? String((r as unknown as Record<string, unknown>)["acao_solicitada"])
+        : null,
+      tipoTurno: (r as unknown as Record<string, unknown>)["turn_type"]
+        ? (ROTULO_TIPO_TURNO[String((r as unknown as Record<string, unknown>)["turn_type"])] ??
+          String((r as unknown as Record<string, unknown>)["turn_type"]))
         : null,
       policyVersion: (r as unknown as Record<string, unknown>)["policy_version"]
         ? String((r as unknown as Record<string, unknown>)["policy_version"])
