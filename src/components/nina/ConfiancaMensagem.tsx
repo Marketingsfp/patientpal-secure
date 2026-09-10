@@ -253,19 +253,38 @@ export function ConfiancaMensagemBadge({
         <Secao titulo="Tipo do turno">
           <p>{detalhe?.tipoTurno ?? "—"}</p>
         </Secao>
-        <Secao titulo="Confiança da resposta">
-          <p className="text-sm font-medium">
-            <Icone className="mr-1 inline h-3.5 w-3.5" aria-hidden />
-            {scoreExibido(confianca.score)}% · {estilo.curto}
-          </p>
-          {detalhe?.coberturaEvidencias != null && (
+        <Secao titulo={ROTULO_INDICE_EVIDENCIA}>
+          {rotulo.avaliada ? (
+            <>
+              <p className="text-sm font-medium">
+                <Icone className="mr-1 inline h-3.5 w-3.5" aria-hidden />
+                {textoIndiceEvidencia(confianca.score)} · {estilo.curto}
+              </p>
+              {detalhe?.coberturaEvidencias != null && (
+                <p className="text-muted-foreground">
+                  Cobertura das evidências: {detalhe.coberturaEvidencias}% do que era relevante.
+                </p>
+              )}
+              {detalhe?.validadores.some((v) => v.status === "UNKNOWN") && (
+                <p className="text-muted-foreground">
+                  Lacunas:{" "}
+                  {detalhe.validadores
+                    .filter((v) => v.status === "UNKNOWN")
+                    .map((v) => v.validator)
+                    .join(", ")}
+                </p>
+              )}
+              <p className="text-muted-foreground">
+                Índice de evidência verificada — não é probabilidade de acerto. Registrado quando a
+                resposta foi produzida e não é recalculado.
+              </p>
+            </>
+          ) : (
             <p className="text-muted-foreground">
-              Cobertura de evidências: {detalhe.coberturaEvidencias}%
+              Resposta não avaliada. Existe apenas avaliação da segurança da ação, que não é a nota
+              do texto.
             </p>
           )}
-          <p className="text-muted-foreground">
-            Registrado quando a resposta foi produzida. Não é recalculado.
-          </p>
         </Secao>
         <Secao titulo="Ação">
           <p className={detalhe?.seguranca?.acao ? "" : "text-muted-foreground"}>
