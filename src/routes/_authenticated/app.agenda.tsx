@@ -6066,6 +6066,20 @@ function AgendaPage() {
     const crono = iniciarCronometro(
       irParaPagamento ? "abrir tela de pagamento" : "salvar agendamento",
     );
+    // Agenda que a recepção está olhando. O servidor usa para decidir em qual
+    // agenda entra um ENCAIXE fora de qualquer ficha (ex.: depois do fim da
+    // grade num médico com CONSULTAS e EXAMES no mesmo dia) — é nela que a
+    // recepção vai procurar o encaixe depois de salvar. Com o filtro por NOME
+    // (todos os profissionais), resolve o nome para a agenda deste médico.
+    const agendaPreferidaId = (() => {
+      if (!form.medico_id || filtroAgenda === "todos") return null;
+      const doMedico = agendasPorMedico.get(form.medico_id) ?? [];
+      if (filtroAgenda.startsWith("nome:")) {
+        const alvo = filtroAgenda.slice(5);
+        return doMedico.find((a) => chaveNomeAgenda(a.nome) === alvo)?.id ?? null;
+      }
+      return doMedico.some((a) => a.id === filtroAgenda) ? filtroAgenda : null;
+    })();
     const enviarAoServidor = (confirmacoes: {
       permitirConflitoPaciente: boolean;
       permitirEncaixeSemVaga: boolean;
@@ -6088,6 +6102,7 @@ function AgendaPage() {
             permitir_conflito_paciente: confirmacoes.permitirConflitoPaciente,
             permitir_encaixe_sem_vaga: confirmacoes.permitirEncaixeSemVaga,
           },
+          agenda_preferida_id: agendaPreferidaId,
         },
       });
     // Confirmações que a recepção já deu nesta tentativa. Ficam de pé entre as
