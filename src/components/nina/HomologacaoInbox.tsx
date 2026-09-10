@@ -681,7 +681,9 @@ export function HomologacaoInbox() {
     composerRef.current?.focus();
     setErro(null);
     setUltimoTexto(corpo);
-    // 2) bolha imediata na timeline do lead de origem.
+    // 2) bolha imediata na timeline do lead de origem, já com a MESMA
+    // identidade que o servidor vai gravar: quando o Realtime trouxer a
+    // mensagem oficial, ela mescla nesta bolha em vez de criar outra.
     registrarOtimista(leadOrigem, {
       id: `otimista:${chave}`,
       conversa_id: conversaOrigem,
@@ -689,6 +691,8 @@ export function HomologacaoInbox() {
       body: corpo,
       enviada_por: "paciente",
       created_at: new Date().toISOString(),
+      wa_message_id: waIdDoEnvio(leadOrigem, chave),
+      estado: "pending",
     });
     const meuLead = () => leadSelecionadoRef.current === leadOrigem;
     setEmProcessamento((n) => n + 1);
@@ -705,9 +709,11 @@ export function HomologacaoInbox() {
       concluirOtimista(chave);
       if (meuLead()) {
         setAudio(r.audio ? `data:${r.audio.mime};base64,${r.audio.base64}` : null);
-        await carregarHistorico(leadOrigem);
+        // Conciliação eventual (ferramentas, eventos, execuções): a timeline
+        // em si já foi atualizada pelo Realtime, sem esperar esta chamada.
+        void carregarHistorico(leadOrigem);
       }
-      await carregarLeads();
+      void carregarLeads();
       if (meuLead()) {
         if (r.erro) setErro(r.erro);
         else if (!r.reply)
@@ -718,8 +724,9 @@ export function HomologacaoInbox() {
       return { ok: !r.erro && !!r.reply, transferida: !!r.transferida, erro: r.erro ?? null };
     } catch (e: any) {
       const chegou = meuLead() ? await aguardarResposta(leadOrigem) : false;
-      concluirOtimista(chave);
-      await carregarLeads();
+      if (chegou) concluirOtimista(chave);
+      else falharOtimista(chave);
+      void carregarLeads();
       const msg = String(e?.message ?? e);
       if (!chegou && meuLead()) setErro(msg);
       return { ok: chegou, transferida: false, erro: chegou ? null : msg };
