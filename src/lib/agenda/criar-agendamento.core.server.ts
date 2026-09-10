@@ -23,8 +23,9 @@
 // Escopo de clínica: para ator "integracao" (service role, sem RLS) a clínica
 // é conferida no código, obrigatoriamente, antes de qualquer leitura/gravação.
 
-import { hojeBR, janelaDiaClinica, TZ_CLINICA } from "@/lib/date-utils";
+import { dataClinicaDe, hojeBR, janelaDiaClinica, TZ_CLINICA } from "@/lib/date-utils";
 import { assertEscopoClinica, type CtxAgenda } from "./ator.server";
+import { posicionarEncaixe } from "./encaixe-posicao";
 import type {
   CriarAgendamentoInput,
   CriarAgendamentoResult,
@@ -109,8 +110,12 @@ export async function criarAgendamentoCore(
 
   const di = new Date(payload.inicio);
   const df = new Date(payload.fim);
-  const inicioDia = new Date(di.getFullYear(), di.getMonth(), di.getDate(), 0, 0, 0).toISOString();
-  const fimDia = new Date(di.getFullYear(), di.getMonth(), di.getDate(), 23, 59, 59).toISOString();
+  // Dia civil da CLÍNICA, não o do Worker (que roda em UTC): no fuso UTC a
+  // janela ia das 21:00 da véspera às 20:59 do dia, misturando dois dias —
+  // e a posição do encaixe depende de saber exatamente quais fichas são do dia.
+  const { inicio: inicioDia, fimExclusivo: fimDiaExclusivo } = janelaDiaClinica(
+    dataClinicaDe(payload.inicio) ?? hojeBR(),
+  );
 
   // Nomes usados na checagem "tipo da agenda × tipo do procedimento" (4b).
   const nomesProcParaTipo = (
@@ -121,6 +126,7 @@ export async function criarAgendamentoCore(
 
   type AgendaComTipos = {
     id: string;
+    nome: string | null;
     ativo: boolean | null;
     // Agenda por ORDEM DE CHEGADA (ficha livre): o médico não atende por hora
     // marcada, a grade só serve para ordenar a fila. Nessas agendas a recepção
@@ -173,7 +179,7 @@ export async function criarAgendamentoCore(
             .eq("clinica_id", clinica_id)
             .eq("medico_id", recursoId)
             .gte("inicio", inicioDia)
-            .lte("inicio", fimDia)
+            .lt("inicio", fimDiaExclusivo)
             .limit(500)
             .then((r) => r.data)
         : Promise.resolve(null),
@@ -190,7 +196,7 @@ export async function criarAgendamentoCore(
       recursoId
         ? supabase
             .from("medico_agendas")
-            .select("id, ativo, ordem_chegada, medico_agenda_procedimentos(procedimentos(tipo))")
+            .select("id, nome, ativo, ordem_chegada, medico_agenda_procedimentos(procedimentos(tipo))")
             .eq("clinica_id", clinica_id)
             .eq("medico_id", recursoId)
             .then((r) => (r.error ? null : (r.data as unknown as AgendaComTipos[])))
@@ -316,6 +322,11 @@ export async function criarAgendamentoCore(
   // (dia, médico, agenda) — ver `fichaPorId` na Agenda e `print-gr.ts` — e uma
   // linha sem agenda formaria uma fila própria, voltando a imprimir "001".
   let agendaIdParaGravarNoEncaixe: string | null = null;
+  // Horário gravado. Só difere do pedido no encaixe que cai DENTRO de uma
+  // ficha: ele passa a começar no instante exato dela, para dividir o número
+  // (ver `posicionarEncaixe`).
+  let inicioParaGravar = payload.inicio;
+  let fimParaGravar = payload.fim;
 
   // ---------- 2/3/4. Agenda aberta + slot livre cobrindo o intervalo ----------
   if (precisaValidarAgenda && recursoId) {
@@ -358,14 +369,12 @@ export async function criarAgendamentoCore(
     //   • só para linha NOVA — remarcar um atendimento que já existe continua
     //     exigindo vaga livre, senão a remarcação empurraria a ficha de outro
     //     paciente sem ninguém perceber;
-    //   • a agenda do encaixe é a MESMA da ficha sobreposta, para o encaixe
-    //     entrar na fila do dia em vez de abrir uma fila própria em 001.
-    const slotSobreposto =
-      excluindoEditing.find((s) => {
-        const sIni = new Date(s.inicio).getTime();
-        const sFim = new Date(s.fim).getTime();
-        return sIni <= inicioMs && sFim > inicioMs;
-      }) ?? null;
+    //   • o encaixe SEMPRE ganha agenda e posição segura na fila — ver
+    //     `posicionarEncaixe` (encaixe-posicao.ts). Antes, com o horário depois
+    //     do fim da grade num médico com duas agendas no dia, a linha era
+    //     gravada sem agenda, sumia da tela filtrada e a recepção relançava.
+    //     A agenda e a posição são resolvidas ANTES de perguntar, para a
+    //     recepção nunca confirmar um encaixe que em seguida seria recusado.
     if (!slotEscolhido && !agendaOrdemChegada) {
       if (editing_id) {
         return {
@@ -375,33 +384,64 @@ export async function criarAgendamentoCore(
           },
         };
       }
-      if (!data.confirmacoes?.permitir_encaixe_sem_vaga) {
-        const ocupante = (slotSobreposto?.paciente_nome ?? "").trim();
-        const hora = di.toLocaleTimeString("pt-BR", {
+      const formatarHora = (iso: string) =>
+        new Date(iso).toLocaleTimeString("pt-BR", {
           timeZone: TZ_CLINICA,
           hour: "2-digit",
           minute: "2-digit",
         });
-        const quem = ocupante && !isSlotLivreLocal(ocupante) ? ` (${ocupante})` : "";
+      const posicao = posicionarEncaixe({
+        inicio: payload.inicio,
+        fim: payload.fim,
+        linhasDoDia: excluindoEditing,
+        agendasDoMedico: (agendasDoMedico ?? []).map((a) => ({
+          id: a.id,
+          nome: a.nome,
+          ativo: a.ativo,
+          tipos: (a.medico_agenda_procedimentos ?? [])
+            .map((l) => l.procedimentos?.tipo)
+            .filter((t): t is string => !!t),
+        })),
+        agendaPreferidaId: data.agenda_preferida_id ?? null,
+        tiposDosProcedimentos: ((procsEscolhidos ?? []) as Array<{ tipo: string | null }>)
+          .map((p) => p.tipo)
+          .filter((t): t is string => !!t),
+        formatarHora,
+      });
+      if (!posicao.ok) {
+        return { ok: false, validation_error: { message: posicao.erro, toast_duration: 12000 } };
+      }
+      if (!data.confirmacoes?.permitir_encaixe_sem_vaga) {
+        const hora = formatarHora(payload.inicio);
+        const naAgenda = posicao.agendaNome ? ` na agenda ${posicao.agendaNome}` : "";
+        let message: string;
+        if (posicao.modo === "sobre_ficha") {
+          const ocupante = (posicao.ocupante ?? "").trim();
+          const quem = ocupante && !isSlotLivreLocal(ocupante) ? ` (${ocupante})` : "";
+          const horaFicha = formatarHora(posicao.inicio);
+          const ajuste =
+            horaFicha !== hora ? ` O encaixe entra às ${horaFicha}, no horário dessa ficha.` : "";
+          message =
+            `Não há vaga livre desse ${rotuloRecurso} às ${hora}${naAgenda} — o horário já está ocupado${quem}.\n\n` +
+            `Deseja lançar como ENCAIXE, no mesmo horário, por cima da ficha existente?${ajuste}\n\n` +
+            `O encaixe divide a ficha com o paciente que já está nesse horário; as fichas seguintes do dia não mudam de número.`;
+        } else {
+          const termina = posicao.fimDaAgenda
+            ? ` — a agenda termina às ${formatarHora(posicao.fimDaAgenda)}`
+            : "";
+          message =
+            `Não há vaga desse ${rotuloRecurso} às ${hora}${naAgenda}${termina}.\n\n` +
+            `Deseja lançar como ENCAIXE, depois do último horário do dia?\n\n` +
+            `O encaixe recebe a próxima ficha da fila; as fichas que já foram entregues não mudam de número.`;
+        }
         return {
           ok: false,
-          validation_error: {
-            message:
-              `Não há vaga livre desse ${rotuloRecurso} às ${hora} — o horário já está ocupado${quem}.\n\n` +
-              `Deseja lançar como ENCAIXE, no mesmo horário, por cima da ficha existente?\n\n` +
-              `O encaixe divide a ficha com o paciente que já está nesse horário; as fichas seguintes do dia não mudam de número.`,
-            confirmavel: "encaixe_sem_vaga",
-          },
+          validation_error: { message, confirmavel: "encaixe_sem_vaga" },
         };
       }
-      // A agenda do encaixe é a da ficha sobreposta. Quando o horário pedido
-      // não encosta em nenhuma vaga (por exemplo, depois do fim da grade),
-      // cai para a única agenda que gerou os horários do dia.
-      const agendasDoDia = Array.from(
-        new Set(excluindoEditing.map((s) => s.agenda_id).filter((x): x is string => !!x)),
-      );
-      agendaIdParaGravarNoEncaixe =
-        slotSobreposto?.agenda_id ?? (agendasDoDia.length === 1 ? agendasDoDia[0] : null);
+      agendaIdParaGravarNoEncaixe = posicao.agendaId;
+      inicioParaGravar = posicao.inicio;
+      fimParaGravar = posicao.fim;
     }
     if (!slotEscolhido && agendaOrdemChegada && !editing_id) {
       // Encaixe de fila: não consome vaga da grade, entra como linha nova no
@@ -502,8 +542,8 @@ export async function criarAgendamentoCore(
       _paciente_id: payload.paciente_id,
       _paciente_nome: payload.paciente_nome,
       _medico_id: payload.medico_id,
-      _inicio: payload.inicio,
-      _fim: payload.fim,
+      _inicio: inicioParaGravar,
+      _fim: fimParaGravar,
       _procedimentos: procedimentos,
       _status: payload.status,
       _observacoes: payload.observacoes,
@@ -538,8 +578,8 @@ export async function criarAgendamentoCore(
       _paciente_id: payload.paciente_id,
       _paciente_nome: payload.paciente_nome,
       _medico_id: payload.medico_id,
-      _inicio: payload.inicio,
-      _fim: payload.fim,
+      _inicio: inicioParaGravar,
+      _fim: fimParaGravar,
       _procedimento: procedimentoFinal,
       _status: payload.status,
       _observacoes: payload.observacoes,
@@ -565,11 +605,12 @@ export async function criarAgendamentoCore(
     novoId = resultado.id;
   }
 
-  // ---------- 6a. Agenda do encaixe de ordem de chegada ----------
-  // A RPC transacional insere sem `agenda_id`. Numa agenda de ordem de chegada
-  // o encaixe não veio de nenhuma vaga da grade, então o vínculo é gravado
-  // aqui — é ele que faz a ficha continuar a sequência do dia (091, 092…) em
-  // vez de abrir uma fila separada começando em 001.
+  // ---------- 6a. Agenda do encaixe ----------
+  // A RPC transacional insere sem `agenda_id`. O encaixe (de ordem de chegada
+  // ou de hora marcada) não veio de nenhuma vaga da grade, então o vínculo é
+  // gravado aqui — é ele que faz a ficha continuar a sequência do dia (091,
+  // 092…) e aparecer na agenda filtrada, em vez de abrir uma fila separada
+  // começando em 001.
   if (agendaIdParaGravarNoEncaixe && novoId) {
     const { error: eAgenda } = await supabase
       .from("agendamentos")
