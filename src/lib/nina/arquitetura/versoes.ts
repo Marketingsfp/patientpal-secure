@@ -50,6 +50,30 @@ const contarTools = (snapshot: AssinaturaNode[]) =>
 
 const SNAPSHOT_ATUAL = assinaturaAtual();
 
+/** IDs acrescentados na versão 5 (finalização única das respostas — Fase 5). */
+const IDS_FINALIZACAO = new Set(["response.templates", "response.finalize"]);
+
+/** Foto estrutural da versão 4 (antes da finalização única entrar no mapa). */
+const SNAPSHOT_V4: AssinaturaNode[] = SNAPSHOT_ATUAL.filter(
+  (n) => !IDS_FINALIZACAO.has(n.id),
+).map((n) =>
+  n.id === "llm.generate"
+    ? {
+        ...n,
+        anteriores: n.anteriores.filter((a) => !IDS_FINALIZACAO.has(a)),
+        seguintes: n.seguintes
+          .filter((sg) => !IDS_FINALIZACAO.has(sg))
+          .concat("response.validate"),
+      }
+    : n.id === "response.validate"
+      ? { ...n, anteriores: ["llm.generate"] }
+      : {
+          ...n,
+          anteriores: n.anteriores.filter((a) => !IDS_FINALIZACAO.has(a)),
+          seguintes: n.seguintes.filter((sg) => !IDS_FINALIZACAO.has(sg)),
+        },
+);
+
 /** IDs acrescentados na versão 4 (infraestrutura de homologação). */
 const IDS_HOMOLOGACAO = new Set([
   "test.cycle",
@@ -64,7 +88,7 @@ const IDS_HOMOLOGACAO = new Set([
 ]);
 
 /** Foto estrutural da versão 3 (antes de a homologação entrar no mapa). */
-const SNAPSHOT_V3: AssinaturaNode[] = SNAPSHOT_ATUAL.filter(
+const SNAPSHOT_V3: AssinaturaNode[] = SNAPSHOT_V4.filter(
   (n) => !IDS_HOMOLOGACAO.has(n.id),
 ).map((n) => ({
   ...n,
@@ -142,8 +166,24 @@ export const HISTORICO_ARQUITETURA: VersaoArquitetura[] = [
     snapshot: SNAPSHOT_V3,
   },
   {
-    versao: MANIFESTO_ARQUITETURA.versao,
+    versao: 4,
     data: "2026-09-08",
+    deploy: null,
+    commit: null,
+    versaoPrompt: "Instruções da Nina (versão publicada)",
+    modelo: "google/gemini-2.5-flash",
+    quantidadeNodes: SNAPSHOT_V4.length,
+    quantidadeTools: contarTools(SNAPSHOT_V4),
+    alteracoes: [
+      "A homologação entrou no mapa: entrada de teste, ciclo dos leads, paciente simulado (Terra), cenários e teste de carga (Luna).",
+      "A avaliação do Sol aparece como etapa posterior à resposta, fora do caminho de geração.",
+      "Relatório, envio para Revisão de Aprendizados e teste de regressão passaram a ser componentes visíveis.",
+    ],
+    snapshot: SNAPSHOT_V4,
+  },
+  {
+    versao: MANIFESTO_ARQUITETURA.versao,
+    data: "2026-09-10",
     deploy: null,
     commit: null,
     versaoPrompt: "Instruções da Nina (versão publicada)",
@@ -151,9 +191,9 @@ export const HISTORICO_ARQUITETURA: VersaoArquitetura[] = [
     quantidadeNodes: SNAPSHOT_ATUAL.length,
     quantidadeTools: contarTools(SNAPSHOT_ATUAL),
     alteracoes: [
-      "A homologação entrou no mapa: entrada de teste, ciclo dos leads, paciente simulado (Terra), cenários e teste de carga (Luna).",
-      "A avaliação do Sol aparece como etapa posterior à resposta, fora do caminho de geração.",
-      "Relatório, envio para Revisão de Aprendizados e teste de regressão passaram a ser componentes visíveis.",
+      "Novo componente: Templates das mensagens automáticas, com versão publicada por clínica e texto padrão como reserva.",
+      "Novo componente: Finalização da resposta — ponto único por onde passam as respostas do modelo e as mensagens automáticas antes da validação e do envio.",
+      "A geração do modelo passou a apontar para a finalização, e não mais direto para a validação da resposta.",
     ],
     snapshot: SNAPSHOT_ATUAL,
   },

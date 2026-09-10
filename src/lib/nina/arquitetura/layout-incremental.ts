@@ -124,21 +124,36 @@ function colide(a: Posicao, b: Posicao) {
   );
 }
 
-/** Empurra verticalmente até o node não sobrepor nenhum outro já colocado. */
+/**
+ * Procura o lugar livre MAIS PRÓXIMO do ponto desejado.
+ *
+ * Antes o node só descia/subia na mesma coluna: em coluna cheia ele acabava
+ * dezenas de linhas longe do componente com que se relaciona. Agora a busca
+ * também anda para os lados, sempre começando pelas posições mais perto.
+ */
 function acomodar(posicao: Posicao, ocupadas: Posicao[]): Posicao {
-  let candidata = { ...posicao };
-  let passo = 1;
-  let seguranca = 0;
-  while (ocupadas.some((o) => colide(candidata, o)) && seguranca < 200) {
-    const deslocamento = Math.ceil(passo / 2) * ESPACO_LINHA;
-    candidata = {
-      x: posicao.x,
-      y: posicao.y + (passo % 2 === 1 ? deslocamento : -deslocamento),
-    };
-    passo += 1;
-    seguranca += 1;
+  if (!ocupadas.some((o) => colide(posicao, o))) return { ...posicao };
+
+  const candidatas: Posicao[] = [];
+  for (const dx of [0, -0.5, 0.5, -1, 1]) {
+    for (let dy = -12; dy <= 12; dy += 1) {
+      if (dx === 0 && dy === 0) continue;
+      candidatas.push({
+        x: Math.round(posicao.x + dx * ESPACO_COLUNA),
+        y: Math.round(posicao.y + dy * ESPACO_LINHA),
+      });
+    }
   }
-  return candidata;
+  // Mais perto primeiro: o desenho continua legível e o node fica junto do
+  // componente relacionado.
+  candidatas.sort(
+    (a, b) =>
+      Math.hypot(a.x - posicao.x, a.y - posicao.y) - Math.hypot(b.x - posicao.x, b.y - posicao.y),
+  );
+  for (const c of candidatas) {
+    if (!ocupadas.some((o) => colide(c, o))) return c;
+  }
+  return { ...posicao };
 }
 
 /**
@@ -174,15 +189,51 @@ export function aplicarDiffIncremental(
     // 2. Recoloca a região afetada perto de quem já está no lugar.
     const ocupadas = () => Object.values(canonical);
     const pendentes = nodes.filter((n) => canonical[n.id] == null);
-    // Coloca primeiro quem tem mais vizinhos já posicionados.
-    pendentes.sort((a, b) => referencia(b, canonical).qtd - referencia(a, canonical).qtd);
-    for (const node of pendentes) {
-      const { x, y, qtd } = referencia(node, canonical);
+    // Coloca sempre o próximo que tiver MAIS vizinhos já posicionados, e
+    // recalcula a cada passo: assim um componente novo só é colocado depois
+    // do componente com que ele se relaciona, e fica ao lado dele — nunca
+    // jogado no canto do desenho.
+    const restantes = new Set(pendentes.map((n) => n.id));
+    while (restantes.size > 0) {
+      let escolhido = pendentes.find((n) => restantes.has(n.id))!;
+      let melhor = referencia(escolhido, canonical).qtd;
+      for (const node of pendentes) {
+        if (!restantes.has(node.id)) continue;
+        const qtd = referencia(node, canonical).qtd;
+        if (qtd > melhor) {
+          melhor = qtd;
+          escolhido = node;
+        }
+      }
+      // Quem já tinha lugar continua onde estava enquanto isso não atrapalhar
+      // ninguém: mexer no desenho inteiro a cada ligação nova desorienta quem
+      // está lendo o mapa.
+      const anterior = estadoAnterior.canonical[escolhido.id];
+      if (anterior && !ocupadas().some((o) => colide(anterior, o))) {
+        canonical[escolhido.id] = anterior;
+        restantes.delete(escolhido.id);
+        continue;
+      }
+      const { x, y, qtd } = referencia(escolhido, canonical);
       const alvo =
         qtd > 0
           ? { x: Math.round(x), y: Math.round(y) }
-          : (estadoAnterior.canonical[node.id] ?? basePos.get(node.id)!);
-      canonical[node.id] = acomodar(alvo, ocupadas());
+          : (anterior ?? basePos.get(escolhido.id)!);
+      canonical[escolhido.id] = acomodar(alvo, ocupadas());
+      restantes.delete(escolhido.id);
+    }
+
+    // 2b. Componentes NOVOS: agora que todos os vizinhos já têm lugar,
+    // reposiciona cada um ao lado de quem se relaciona com ele. Sem este
+    // passo, um componente criado depois dos vizinhos ficava no canto.
+    for (const id of diff.adicionados) {
+      const node = nodes.find((n) => n.id === id);
+      if (!node) continue;
+      const semEle: Record<string, Posicao> = { ...canonical };
+      delete semEle[id];
+      const { x, y, qtd } = referencia(node, semEle);
+      if (qtd === 0) continue;
+      canonical[id] = acomodar({ x: Math.round(x), y: Math.round(y) }, Object.values(semEle));
     }
   }
 
