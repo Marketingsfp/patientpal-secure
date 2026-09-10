@@ -59,6 +59,7 @@ import {
 } from "@/components/ui/dialog";
 import { HomologacaoInbox } from "@/components/nina/HomologacaoInbox";
 import { CenariosTeste } from "@/components/nina/CenariosTeste";
+import { VerificacoesHomologacao } from "@/components/nina/VerificacoesHomologacao";
 import { CargaTeste } from "@/components/nina/CargaTeste";
 import { RelatorioHomologacao } from "@/components/nina/RelatorioHomologacao";
 import { DashboardHomologacao } from "@/components/nina/DashboardHomologacao";
