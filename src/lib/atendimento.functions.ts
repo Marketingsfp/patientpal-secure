@@ -179,12 +179,18 @@ export const listarConversas = createServerFn({ method: "POST" })
     // (`atend_espera_por_conversa`): conversa em que a clínica é que aguarda
     // o paciente fica de fora. O conjunto vem antes do corte da lista.
     let idsEspera: string[] | null = null;
+    let mapaEspera: Record<string, string> = {};
     if (plano.exigeEsperaPaciente) {
       const { data: esperas } = await context.supabase.rpc("atend_espera_por_conversa", {
         _clinica_id: data.clinicaId,
         _is_teste: false,
       });
-      idsEspera = ((esperas ?? []) as any[]).map((e) => e.conversa_id).filter(Boolean);
+      for (const e of (esperas ?? []) as any[]) {
+        if (e?.conversa_id && e?.aguardando_desde) mapaEspera[e.conversa_id] = e.aguardando_desde;
+      }
+      // Recorte pela métrica canônica ANTES do LIMIT: se houver mais conversas
+      // aguardando do que o teto da lista, ficam as de maior espera.
+      idsEspera = idsPorEsperaCrescente(mapaEspera).slice(0, data.limit);
       if (idsEspera.length === 0) {
         marcar("consulta");
         return [];
