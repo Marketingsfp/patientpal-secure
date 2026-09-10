@@ -252,17 +252,19 @@ function Page() {
       return {
         executado: true,
         resposta:
-          r.aviso === "lancado_no_caixa_de_quem_recebeu"
-            ? "Sangria estornada — compensação lançada no caixa aberto de quem fez a sangria (sessão original já fechada)."
-            : r.aviso === "lancado_em_sessao_atual"
-              ? "Sangria estornada — compensação lançada no SEU caixa aberto (sessão original fechada e quem fez a sangria não tem caixa aberto)."
-              : "Sangria estornada — compensação lançada na mesma sessão de caixa.",
+          r.aviso === "registrado_sem_mexer_na_gaveta"
+            ? "Sangria estornada — era de um dia já fechado; ficou só o registro, sem mexer em nenhuma gaveta."
+            : "Sangria estornada — compensação lançada na mesma sessão de caixa.",
       };
     }
     if (!s.lancamento_id) {
       return { executado: false, resposta: "Aprovado manualmente (sem lançamento vinculado)" };
     }
-    const resultado = await estornarLancamentoReceita(s.lancamento_id, clinicaAtual?.clinica_id);
+    const resultado = await estornarLancamentoReceita(
+      s.lancamento_id,
+      clinicaAtual?.clinica_id,
+      s.tipo === "devolucao",
+    );
     if (!resultado.ok) {
       if (resultado.motivo === "bloqueado") {
         toast.error(resultado.mensagem);
@@ -271,21 +273,15 @@ function Page() {
       }
       return null;
     }
-    // Quando o caixa do pagamento original já estava fechado, a saída foi para
-    // outro caixa — registra QUAL na resposta, para quem consultar a
-    // solicitação depois entender por que o valor não está no dia original.
-    //
-    // A distinção importa na conferência da gaveta: o normal é a devolução cair
-    // no caixa de quem recebeu o dinheiro. Cair no caixa de quem aprovou é a
-    // exceção (aquela pessoa não tinha caixa aberto) e precisa ficar explícita,
-    // senão o aprovador fecha o dia com uma falta que não é dele.
+    // Regra: estorno de pagamento de dia já fechado só mexe em gaveta quando
+    // alguém está devolvendo o dinheiro agora — e sai da gaveta de quem devolve.
     return {
       executado: true,
       resposta:
-        resultado.aviso === "lancado_no_caixa_de_quem_recebeu"
-          ? "Estorno executado — saída lançada no caixa aberto de quem recebeu o valor (o caixa do pagamento original já estava fechado)."
-          : resultado.aviso === "lancado_em_sessao_atual"
-            ? "Estorno executado — saída lançada no SEU caixa aberto, porque o caixa do pagamento original já estava fechado e quem recebeu o valor não tem caixa aberto."
+        resultado.aviso === "lancado_no_caixa_de_quem_devolveu"
+          ? "Estorno executado — o caixa do pagamento já estava fechado; a devolução saiu do caixa aberto de quem pediu o estorno."
+          : resultado.aviso === "registrado_sem_mexer_na_gaveta"
+            ? "Estorno executado — o caixa do pagamento já estava fechado e não houve devolução ao paciente; ficou só o registro, sem mexer em nenhuma gaveta."
             : "Estorno executado",
     };
   };
