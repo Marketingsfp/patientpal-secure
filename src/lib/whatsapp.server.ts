@@ -1315,6 +1315,9 @@ async function gerarRespostaNinaInterno(
   }> = [];
   let catalogoEncontrou = false;
   let esclarecimentoConfiancaUsado = false;
+  // FASE 4 — quantas vezes a Nina já tentou esclarecer neste atendimento.
+  // O limite vive na política central (POLITICA_RECUPERACAO_PADRAO).
+  let tentativasEsclarecimentoConfianca = 0;
   // Disponibilidade confirmada em tempo real nesta conversa (pré-commit).
   let disponibilidadeConfirmada = false;
   // Dados já coletados no turno — entram no resumo estruturado do handoff.
@@ -1527,7 +1530,22 @@ async function gerarRespostaNinaInterno(
       const etapa = await etapaConfianca(clinicaId);
       const modo = modoDaEtapa(etapa);
       const aplicado = aplicarEtapa(decisao, etapa);
+
+      // FASE 4 — confiança baixa, sozinha, NÃO transfere. O destino do turno
+      // combina motivo da incerteza, tipo do turno, recuperabilidade,
+      // segurança da ação e política operacional.
+      const { decidirHandoff } = await import("@/lib/nina/confidence/handoff-decision");
+      const plano = decidirHandoff({
+        avaliacaoAcao: decisao,
+        decisaoEfetiva: aplicado.decisaoEfetiva,
+        tipoTurno: canonico.turnType,
+        pedidoHumanoExplicito: canonico.turnType === "HANDOFF",
+        tentativasEsclarecimento: tentativasEsclarecimentoConfianca,
+      });
       rastro?.concluir("confidence.decision", {
+        handoff_decision: plano.decision,
+        handoff_reason: plano.reason,
+        handoff_recuperavel: plano.recuperavel,
         score: decisao.score,
         nivel: decisao.level,
         acao: decisao.decision,
@@ -1576,8 +1594,12 @@ async function gerarRespostaNinaInterno(
 
       // Confiança intermediária: UMA pergunta objetiva ao paciente e depois o
       // motor roda inteiro de novo (nada de reaproveitar a pontuação).
-      if (aplicado.decisaoEfetiva === "CLARIFY" && rodada < MAX_RODADAS - 1) {
+      if (
+        (plano.decision === "CLARIFY" || (plano.decision === "BLOCK_ACTION" && plano.clarify)) &&
+        rodada < MAX_RODADAS - 1
+      ) {
         esclarecimentoConfiancaUsado = true;
+        tentativasEsclarecimentoConfianca += 1;
         mensagens.push({ role: "assistant", content: texto });
         mensagens.push({ role: "user", content: instrucaoEsclarecimentoDirigida(decisao) });
         continue;
@@ -1586,11 +1608,14 @@ async function gerarRespostaNinaInterno(
       // Confiança baixa ou bloqueio absoluto: transfere pelo mesmo caminho já
       // existente (evento, fila, protocolo e aviso ao paciente), levando o
       // resumo estruturado para a atendente.
-      if (aplicado.decisaoEfetiva === "HANDOFF" || aplicado.decisaoEfetiva === "BLOCK_ACTION") {
+      // Só chega aqui quando a Nina não tem como resolver sozinha: bloqueio
+      // sem recuperação, fonte oficial ausente, pedido explícito por pessoa
+      // ou esclarecimento repetido sem avanço.
+      if (plano.decision === "HANDOFF" || plano.decision === "BLOCK_ACTION") {
         const rh = await broker.executar(
           "solicitar_atendente_humano",
           JSON.stringify({
-            motivo: motivoHandoff(decisao),
+            motivo: `${plano.reason}: ${plano.explicacao} — ${motivoHandoff(decisao)}`.slice(0, 500),
             resumo: resumoHandoffEstruturado(estadoTurno, decisao),
             urgencia: "normal",
           }),
