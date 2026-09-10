@@ -130,12 +130,32 @@ describe("assertions do Test Runner", () => {
     expect(v.confidence_linked_to_message).toBe(false);
   });
 
+  // FASE 8 — contrato novo (exigência AUMENTADA, não reduzida): além das 4
+  // invariantes originais, o runner confere correspondência com as saídas
+  // esperadas, tipo de avaliação, nota/nível, versão de política, escopo
+  // (clínica/conversa), execução e hash do texto entregue. São 12 critérios.
   it("aprova snapshot íntegro e gera critérios legíveis", () => {
-    const v = verificarConfiancaRunner([
-      { score: 88, nivel: "MEDIUM", evidence_coverage: 95, outgoing_message_id: "m1" },
-    ]);
+    const v = verificarConfiancaRunner(
+      [
+        {
+          score: 88,
+          nivel: "MEDIUM",
+          evidence_coverage: 95,
+          outgoing_message_id: "m1",
+          policy_version: "v5",
+          avaliacao: "answer_confidence",
+          clinica_id: "cli-1",
+          conversation_id: "conv-1",
+          execucao_id: "ex-1",
+          texto_final_hash: "t1:abc:10",
+        },
+      ],
+      [{ id: "m1", execucao_id: "ex-1", texto_hash: "t1:abc:10" }],
+      { clinicaId: "cli-1", conversaId: "conv-1" },
+    );
     const criterios = criteriosDeConfianca(v);
-    expect(criterios).toHaveLength(4);
+    expect(criterios).toHaveLength(12);
     expect(criterios.every((c) => c.ok)).toBe(true);
   });
 });
+

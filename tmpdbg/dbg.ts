@@ -1,0 +1,12 @@
+import { montarContextoDoTurno } from "../src/lib/nina/confidence/runtime";
+import { verificarRespostaFinal } from "../src/lib/nina/confidence/final-answer";
+const base:any = { ambiente:"homologacao", catalogoEncontrou:true, agendamentoConfirmado:false, pacienteIdentificado:false, esclarecimentoUsado:false, handoffSolicitado:false };
+const catalogoOk={nome:"buscar_procedimentos",capacidade:"searchKnowledgeBase",fonte:"catalogo_publicado",success:true};
+const fonteCatalogo={tipo:"catalogo_publicado",temConteudo:true,publicado:true,ativo:true};
+const fato={consulta:"buscar_procedimentos",capacidade:"searchKnowledgeBase",entidade:"procedimento",campo:"preco",valor:"R$ 150,00",fonte:"catalogo_publicado",chave:{procedimento:"consulta de cardiologia"}};
+const st:any={...base,intent:"informacao",acao:"responder_informacao",texto:"O ultrassom custa R$ 150,00.",ferramentas:[catalogoOk],retrievedSources:[fonteCatalogo],fatos:[fato],mensagemPaciente:"Tem esse serviço?"};
+const r = verificarRespostaFinal({ctx:montarContextoDoTurno(st),textoFinal:st.texto});
+console.log(JSON.stringify({score:r.score,level:r.level,dec:r.decision,claims:r.claims,cov:r.evidenceCoverage},null,1).slice(0,1500));
+import { avaliarGrounding } from "../src/lib/nina/confidence/claims";
+const ctx = montarContextoDoTurno(st);
+console.log(JSON.stringify((avaliarGrounding as any)(ctx, st.texto), null, 1));
