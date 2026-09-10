@@ -979,6 +979,19 @@ function AppShellInner() {
     fecharSeletorPortais();
     if (mudou) navigate({ to: SUBSYSTEMS[id].home });
   };
+  // Link antigo/atalho para uma tela de outro portal: assume o portal dono da
+  // tela em vez de deixar o menu sem o item. Não navega, não mexe em permissão.
+  const caminhoAtivo = location.pathname;
+  useEffect(() => {
+    if (!subsystem) return;
+    const path =
+      caminhoAtivo.length > 1 && caminhoAtivo.endsWith("/")
+        ? caminhoAtivo.slice(0, -1)
+        : caminhoAtivo;
+    const dono = portalDaRota(path);
+    if (dono && dono !== subsystem) setSubsystem(dono);
+  }, [caminhoAtivo, subsystem]);
+
   const isChooser = location.pathname === "/app" || location.pathname === "/app/";
   const isEmbed = (() => {
     const s = (location as unknown as { search?: unknown }).search;
