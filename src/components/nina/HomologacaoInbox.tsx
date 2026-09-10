@@ -825,7 +825,7 @@ export function HomologacaoInbox() {
     } catch (e: any) {
       mostrarErro(e);
     } finally {
-      setProcessando(false);
+      setEmProcessamento((n) => Math.max(0, n - 1));
     }
   };
 
