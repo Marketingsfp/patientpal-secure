@@ -197,6 +197,35 @@ export function CalibracaoConfianca({ clinicaId }: { clinicaId: string }) {
                 <p className="text-xs text-muted-foreground">Confiança alta com erro</p>
                 <p className="text-lg font-semibold">{dados.altaConfiancaComErro}</p>
               </div>
+              <div className="rounded-md border p-3">
+                <p className="text-xs text-muted-foreground">Bloqueio possivelmente indevido</p>
+                <p className="text-lg font-semibold">{dados.bloqueioIndevido}</p>
+                <p className="text-[11px] text-muted-foreground">
+                  Transferência recomendada sem erro confirmado e sem transferência registrada.
+                </p>
+              </div>
+              <div className="rounded-md border p-3">
+                <p className="text-xs text-muted-foreground">Reportes ainda em revisão</p>
+                <p className="text-lg font-semibold">{dados.reportesPendentes}</p>
+                <p className="text-[11px] text-muted-foreground">
+                  Não contam como erro nem como acerto.
+                </p>
+              </div>
+              <div className="rounded-md border p-3">
+                <p className="text-xs text-muted-foreground">Amostra usada</p>
+                <p className="text-lg font-semibold">
+                  {dados.amostra.usadas} de {dados.amostra.elegiveis}
+                </p>
+                <p className="text-[11px] text-muted-foreground">
+                  {dados.amostra.estratificada
+                    ? `Amostra estratificada (até ${dados.amostra.tamanhoPorFaixa} por faixa)`
+                    : "Todas as decisões elegíveis"}
+                  {dados.amostra.politicaVersao
+                    ? ` · política ${dados.amostra.politicaVersao}`
+                    : ""}
+                  . Modo observacional fica de fora.
+                </p>
+              </div>
             </div>
 
             <div className="overflow-x-auto rounded-md border">

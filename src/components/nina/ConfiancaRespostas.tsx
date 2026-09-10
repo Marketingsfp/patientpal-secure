@@ -102,12 +102,21 @@ export function ConfiancaRespostas({ clinicaId }: { clinicaId: string | null | u
                 sufixo={`${pct(dados!.esclarecer)}%`}
               />
               <Bloco
-                titulo="Transferiu"
-                valor={dados!.transferir}
-                sufixo={`${pct(dados!.transferir)}%`}
+                titulo="Transferência confirmada"
+                valor={dados!.resultados.transferenciasConfirmadas}
+                sufixo={`de ${dados!.resultados.transferenciasRecomendadas} recomendadas`}
               />
               <Bloco titulo="Confiança média" valor={dados!.scoreMedio} sufixo="de 100" />
             </div>
+
+            <p className="text-[11px] text-muted-foreground">
+              {dados!.total} mensagens de saída · {dados!.avaliacoes} avaliações registradas
+              (resposta e ação da mesma mensagem contam uma vez).
+              {dados!.resultados.transferenciasEmObservacao > 0
+                ? ` ${dados!.resultados.transferenciasEmObservacao} recomendações em modo observação não transferiram o atendimento.`
+                : ""}
+              {dados!.amostra.truncado ? " Recorte parcial: leitura limitada ao teto do período." : ""}
+            </p>
 
             {dados!.porBloqueio.length > 0 && (
               <div>
