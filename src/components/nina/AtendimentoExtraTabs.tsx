@@ -382,13 +382,16 @@ export function AtendInbox() {
   >(null);
   // Opção "Bot" removida da lista de status a pedido da equipe: conversas sob
   // a Nina continuam acessíveis pelo filtro de escopo "Nina".
-  const [filtroStatus, setFiltroStatus] = useState<"all" | "active" | "waiting" | "closed">("all");
-  // Escopo da Inbox: por padrão "Minhas conversas" (somente as atribuídas ao
-  // atendente logado). O filtro é aplicado no backend.
-  const [escopo, setEscopo] = useState<EscopoInbox>(ESCOPO_INBOX_PADRAO);
-  // FASE 1 — filtro de supervisão por atendente. `null` = todos os atendentes.
+  // FASE 1 — a Inbox tem só DOIS controles: Escopo (de quem são as conversas)
+  // e Visualização (que tipo de conversa). Status e ordenação deixaram de ser
+  // controles próprios — cada visualização já define os dois.
+  const [escopoBase, setEscopoBase] = useState<EscopoBaseInbox>(ESCOPO_BASE_PADRAO);
+  const [visualizacao, setVisualizacao] = useState<VisualizacaoInbox>(VISUALIZACAO_PADRAO);
+  // Fila de não atribuídas: continua existindo, acionada pela Central de Atenção.
+  const [naoAtribuidasFiltro, setNaoAtribuidasFiltro] = useState(false);
+  // Atendente escolhido dentro do seletor de Escopo. `null` = todos.
   // Só visualização: não transfere, não atribui e não marca leitura de ninguém.
-  const [atendenteSelecionadoId, setAtendenteSelecionadoId] = useState<string | null>(null);
+  const [atendenteEscolhidoId, setAtendenteEscolhidoId] = useState<string | null>(null);
   const [souGestor, setSouGestor] = useState(false);
   // Busca dentro do seletor de atendente (só filtra o que a lista mostra).
   const [buscaAtendente, setBuscaAtendente] = useState("");
@@ -406,19 +409,19 @@ export function AtendInbox() {
   // supervisão ou saindo o atendente da equipe, o filtro volta para "todos".
   // Nunca fica um user_id de outra clínica preso na tela.
   useEffect(() => {
-    setAtendenteSelecionadoId(null);
+    setAtendenteEscolhidoId(null);
     setBuscaAtendente("");
   }, [clinicaId]);
   useEffect(() => {
-    if (!atendenteSelecionadoId) return;
+    if (!atendenteEscolhidoId) return;
     if (!souGestor) {
-      setAtendenteSelecionadoId(null);
+      setAtendenteEscolhidoId(null);
       return;
     }
-    if (usuarios.length && !usuarios.some((u: any) => u.user_id === atendenteSelecionadoId)) {
-      setAtendenteSelecionadoId(null);
+    if (usuarios.length && !usuarios.some((u: any) => u.user_id === atendenteEscolhidoId)) {
+      setAtendenteEscolhidoId(null);
     }
-  }, [atendenteSelecionadoId, souGestor, usuarios]);
+  }, [atendenteEscolhidoId, souGestor, usuarios]);
 
   const atendentesFiltrados = useMemo(() => {
     const termo = normalizarNomeBusca(buscaAtendente);
@@ -426,12 +429,26 @@ export function AtendInbox() {
     return usuarios.filter((u: any) => normalizarNomeBusca(String(u.nome ?? "")).includes(termo));
   }, [usuarios, buscaAtendente]);
   const nomeAtendenteSelecionado = useMemo(
-    () => usuarios.find((u: any) => u.user_id === atendenteSelecionadoId)?.nome ?? null,
-    [usuarios, atendenteSelecionadoId],
+    () => usuarios.find((u: any) => u.user_id === atendenteEscolhidoId)?.nome ?? null,
+    [usuarios, atendenteEscolhidoId],
   );
 
-  const soNaoAtribuidas = escopo === "nao_atribuidas";
-  const setSoNaoAtribuidas = (v: boolean) => setEscopo(v ? "nao_atribuidas" : ESCOPO_INBOX_PADRAO);
+  // Tradução única dos dois eixos para os filtros que a consulta já usava.
+  const estadoFiltros = {
+    base: escopoBase,
+    atendenteId: atendenteEscolhidoId,
+    visualizacao,
+    naoAtribuidas: naoAtribuidasFiltro,
+    gestor: souGestor,
+    meuId,
+  };
+  const escopo: EscopoInbox = escopoConsulta(estadoFiltros);
+  const atendenteSelecionadoId = atendenteConsulta(estadoFiltros);
+  const filtroStatus = statusConsulta(visualizacao);
+  const ordem = ordemVisualizacao(visualizacao);
+
+  const soNaoAtribuidas = naoAtribuidasFiltro;
+  const setSoNaoAtribuidas = (v: boolean) => setNaoAtribuidasFiltro(v);
   // DECISÃO ATUAL — a conversa aberta é uma SELEÇÃO INTERNA da Inbox, pelo id
   // interno da conversa. O endereço da tela é sempre /app/nina: abrir um lead
   // não cria, altera nem lê endereço individual.
