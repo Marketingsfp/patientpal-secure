@@ -221,3 +221,60 @@ describe("agrupamento semântico da timeline", () => {
     for (const e of eventos) expect(eventoParaItem.has(e.id)).toBe(true);
   });
 });
+
+describe("FASE 3 — espera por atendente", () => {
+  const handoff = (chave: string, criadoEm: string) =>
+    ({
+      tipo: "HANDOFF",
+      chave,
+      criadoEm,
+      motivo: null,
+      urgencia: null,
+      protocolo: "MJ-7",
+      filaInicial: null,
+      origem: "IA",
+      status: "NA_FILA",
+      auditoria: { registrada: false, completa: null, faltando: [] },
+      eventoIds: [],
+      marcadorIds: [],
+    }) as any;
+  const atribuicao = (chave: string, criadoEm: string) =>
+    ({
+      tipo: "ATRIBUICAO",
+      chave,
+      criadoEm,
+      atendenteUserId: null,
+      atendenteNome: "JEAN",
+      automatica: true,
+      criterio: "menor carga",
+      statusAtendente: "online",
+      transferencia: false,
+      origemNome: null,
+      realizadaPorNome: null,
+      setorNome: null,
+      eventoIds: [],
+      marcadorIds: [],
+    }) as any;
+
+  it("handoff seguido de atribuição não fica aguardando", () => {
+    const r = handoffsAguardandoAtendente([
+      handoff("h1", "2026-09-10T11:23:00Z"),
+      atribuicao("a1", "2026-09-10T11:23:05Z"),
+    ]);
+    expect(r.size).toBe(0);
+  });
+
+  it("handoff sem atribuição posterior fica aguardando", () => {
+    const r = handoffsAguardandoAtendente([handoff("h1", "2026-09-10T11:23:00Z")]);
+    expect([...r]).toEqual(["h1"]);
+  });
+
+  it("com dois handoffs, só o que não recebeu atribuição fica aguardando", () => {
+    const r = handoffsAguardandoAtendente([
+      handoff("h1", "2026-09-10T11:00:00Z"),
+      atribuicao("a1", "2026-09-10T11:01:00Z"),
+      handoff("h2", "2026-09-10T12:00:00Z"),
+    ]);
+    expect([...r]).toEqual(["h2"]);
+  });
+});
