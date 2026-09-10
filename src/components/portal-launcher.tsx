@@ -73,7 +73,7 @@ export function PortalLauncher({
           </p>
         </div>
 
-        <div className="grid gap-6 sm:grid-cols-2 lg:gap-8">
+        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 lg:gap-8">
           {PORTAIS.map((portal) => {
             const Icon = portal.icon;
             return (
