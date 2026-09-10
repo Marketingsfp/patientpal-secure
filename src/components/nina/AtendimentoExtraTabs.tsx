@@ -121,6 +121,16 @@ import {
   type ConversaEvento,
 } from "@/components/nina/ConversationSystemEvent";
 import {
+  agruparTimeline,
+  handoffsAguardandoAtendente,
+  type ItemTimelineAgrupado,
+} from "@/lib/atendimento/timeline-grupos";
+import {
+  AtribuicaoGroupCard,
+  EsperaAtendenteCard,
+  HandoffGroupCard,
+} from "@/components/nina/ConversationEventGroup";
+import {
   listarConversas,
   obterConversa,
   buscarConversaPorNumero,
@@ -2225,20 +2235,36 @@ export function AtendInbox() {
   const confiancaPorExecucao = useConfiancaMensagens(clinicaId, execucoesDaNina);
 
   // Mensagens e eventos de estado na mesma linha do tempo, em ordem cronológica.
+  // FASE 3 — eventos internos do mesmo processo viram um bloco compacto único.
   const timeline = useMemo(() => {
+    const agrupado = agruparTimeline({
+      eventos: eventos as unknown as Parameters<typeof agruparTimeline>[0]["eventos"],
+      marcadores: msgs.map((m: any) => ({
+        id: String(m.id),
+        body: m.body ?? null,
+        created_at: String(m.recebida_em ?? m.created_at ?? ""),
+        enviada_por: m.enviada_por ?? null,
+        status: m.status ?? null,
+      })),
+    });
+    const aguardando = handoffsAguardandoAtendente(agrupado.itens);
+
     const itens: (
       | { kind: "msg"; at: number; msg: any }
-      | { kind: "evento"; at: number; ev: ConversaEvento }
+      | { kind: "grupo"; at: number; item: ItemTimelineAgrupado; aguardando: boolean }
     )[] = [
-      ...msgs.map((m) => ({
-        kind: "msg" as const,
-        at: new Date(m.recebida_em ?? m.created_at ?? 0).getTime(),
-        msg: m,
-      })),
-      ...eventos.map((ev) => ({
-        kind: "evento" as const,
-        at: new Date(ev.created_at).getTime(),
-        ev,
+      ...msgs
+        .filter((m: any) => !agrupado.marcadorParaItem.has(String(m.id)))
+        .map((m) => ({
+          kind: "msg" as const,
+          at: new Date(m.recebida_em ?? m.created_at ?? 0).getTime(),
+          msg: m,
+        })),
+      ...agrupado.itens.map((item) => ({
+        kind: "grupo" as const,
+        at: new Date(item.criadoEm).getTime(),
+        item,
+        aguardando: item.tipo === "HANDOFF" && aguardando.has(item.chave),
       })),
     ];
     return itens.sort((a, b) => a.at - b.at);
@@ -2258,7 +2284,7 @@ export function AtendInbox() {
       ? null
       : (() => {
           const u = timeline[timeline.length - 1];
-          return u.kind === "msg" ? `m-${u.msg.id}` : `e-${u.ev.id}`;
+          return u.kind === "msg" ? `m-${u.msg.id}` : `e-${u.item.chave}`;
         })();
   const chat = useChatScroll({
     conversaId: sel?.id ?? null,
@@ -3428,8 +3454,25 @@ export function AtendInbox() {
                 )}
 
                 {(conteudoDaConversa ? timeline : []).map((item) => {
-                  if (item.kind === "evento") {
-                    return <ConversationSystemEvent key={`ev-${item.ev.id}`} evento={item.ev} />;
+                  if (item.kind === "grupo") {
+                    const g = item.item;
+                    if (g.tipo === "HANDOFF") {
+                      return (
+                        <div key={`g-${g.chave}`}>
+                          <HandoffGroupCard grupo={g} />
+                          {item.aguardando && <EsperaAtendenteCard protocolo={g.protocolo} />}
+                        </div>
+                      );
+                    }
+                    if (g.tipo === "ATRIBUICAO") {
+                      return <AtribuicaoGroupCard key={`g-${g.chave}`} grupo={g} />;
+                    }
+                    return (
+                      <ConversationSystemEvent
+                        key={`ev-${g.chave}`}
+                        evento={g.evento as unknown as ConversaEvento}
+                      />
+                    );
                   }
                   const m = item.msg;
                   const out = m.direction === "out";

@@ -67,6 +67,8 @@ export type GrupoAtribuicao = {
   statusAtendente: string | null;
   transferencia: boolean;
   origemNome: string | null;
+  /** Quem executou a transferência manual (autor da ação). */
+  realizadaPorNome: string | null;
   setorNome: string | null;
   eventoIds: string[];
   marcadorIds: string[];
@@ -326,6 +328,7 @@ export function agruparTimeline(entrada: {
         statusAtendente: txt(d["status_atendente"]) ?? txt(d["perfil"]),
         transferencia: e.evento === "TRANSFERIDA",
         origemNome: txt(e.de_nome),
+        realizadaPorNome: e.evento === "TRANSFERIDA" ? txt(e.user_nome) : null,
         setorNome: txt(d["setor_nome"]),
         eventoIds: [e.id],
         marcadorIds: [],
@@ -425,4 +428,24 @@ export function agruparTimeline(entrada: {
   for (const i of limpos) delete (i as Record<string, unknown>)["fimMs"];
 
   return { itens: limpos, eventoParaItem, marcadorParaItem };
+}
+
+/**
+ * Handoffs que, na linha do tempo, não foram seguidos de nenhuma atribuição
+ * antes do próximo handoff — ou seja, a conversa ficou realmente aguardando
+ * atendente. Puro: só olha a ordem dos itens já agrupados.
+ */
+export function handoffsAguardandoAtendente(itens: ItemTimelineAgrupado[]): Set<string> {
+  const aguardando = new Set<string>();
+  let ultimoHandoff: GrupoHandoff | null = null;
+  for (const item of itens) {
+    if (item.tipo === "HANDOFF") {
+      if (ultimoHandoff) aguardando.add(ultimoHandoff.chave);
+      ultimoHandoff = item;
+      continue;
+    }
+    if (item.tipo === "ATRIBUICAO" && ultimoHandoff) ultimoHandoff = null;
+  }
+  if (ultimoHandoff) aguardando.add(ultimoHandoff.chave);
+  return aguardando;
 }
