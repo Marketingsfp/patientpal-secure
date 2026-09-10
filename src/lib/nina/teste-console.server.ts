@@ -206,7 +206,18 @@ export async function processarMensagemTeste(data: EntradaMensagemTeste, userId:
     const textoPaciente = data.tipo === "text" || ehAudio ? data.texto : "";
     const audioFalhou = ehAudio && !textoPaciente;
     if (data.tipo === "text" && !textoPaciente) {
-      return { duplicada: false, reply: null as string | null, erro: "Mensagem vazia.", audio: null };
+      // Nada foi gravado: o envio em si não aconteceu.
+      return {
+        duplicada: false,
+        reply: null as string | null,
+        erro: "Mensagem vazia.",
+        audio: null,
+        transferida: false,
+        processamento: "ERRO" as const,
+        absorvidaPeloLote: false,
+        mensagemPersistida: false,
+        mensagemId: null as string | null,
+      };
     }
 
     // Mesmo corpo gravado pelo webhook real (áudio recebe o prefixo 🎤).
@@ -226,7 +237,19 @@ export async function processarMensagemTeste(data: EntradaMensagemTeste, userId:
       .eq("clinica_id", data.clinicaId)
       .eq("wa_message_id", waId)
       .maybeSingle();
-    if (jaExiste) return { duplicada: true, reply: null as string | null, erro: null, audio: null };
+    if (jaExiste)
+      return {
+        duplicada: true,
+        reply: null as string | null,
+        erro: null,
+        audio: null,
+        transferida: false,
+        processamento: "DUPLICADA" as const,
+        absorvidaPeloLote: false,
+        // A mensagem do paciente já existe: envio bem-sucedido, sem regravar.
+        mensagemPersistida: true,
+        mensagemId: ((jaExiste as { id?: string } | null)?.id ?? null) as string | null,
+      };
 
     const agora = new Date().toISOString();
     const { data: msgEntrada } = await supabaseAdmin.from("whatsapp_mensagens").insert({
@@ -269,11 +292,17 @@ export async function processarMensagemTeste(data: EntradaMensagemTeste, userId:
     // Nina desligada na clínica → mesmo comportamento do WhatsApp: não responde.
     const { ninaDesativadaNaClinica } = await import("@/lib/nina-desligada.server");
     if (await ninaDesativadaNaClinica(data.clinicaId)) {
+      // A mensagem do paciente ESTÁ gravada; só a Nina não responde.
       return {
         duplicada: false,
         reply: null,
         erro: "A Nina está desativada nesta clínica.",
         audio: null,
+        transferida: false,
+        processamento: "SEM_RESPOSTA" as const,
+        absorvidaPeloLote: false,
+        mensagemPersistida: true,
+        mensagemId,
       };
     }
 
@@ -289,6 +318,13 @@ export async function processarMensagemTeste(data: EntradaMensagemTeste, userId:
         reply: null,
         erro: "Conversa está com atendimento humano — a Nina não responde (igual ao WhatsApp).",
         audio: null,
+        // Mantido como no contrato anterior: quem observa transferência usa
+        // `transferida` da resposta gerada, não deste bloqueio prévio.
+        transferida: false,
+        processamento: "SEM_RESPOSTA" as const,
+        absorvidaPeloLote: false,
+        mensagemPersistida: true,
+        mensagemId,
       };
     }
 
@@ -368,6 +404,8 @@ export async function processarMensagemTeste(data: EntradaMensagemTeste, userId:
           transferida: false,
           processamento: "AGRUPADA" as const,
           absorvidaPeloLote: true,
+          mensagemPersistida: true,
+          mensagemId,
         };
       }
       loteId = turno.batchId;
@@ -458,7 +496,11 @@ export async function processarMensagemTeste(data: EntradaMensagemTeste, userId:
         reply: null,
         erro: "Conversa resolvida durante o processamento.",
         audio: null,
+        transferida: false,
         processamento: "OBSOLETA" as const,
+        absorvidaPeloLote: false,
+        mensagemPersistida: true,
+        mensagemId,
       };
     }
 
@@ -482,6 +524,8 @@ export async function processarMensagemTeste(data: EntradaMensagemTeste, userId:
           transferida: false,
           processamento: "OBSOLETA" as const,
           absorvidaPeloLote: true,
+          mensagemPersistida: true,
+          mensagemId,
         };
       }
     }
@@ -598,10 +642,14 @@ export async function processarMensagemTeste(data: EntradaMensagemTeste, userId:
         | "RESPONDIDA"
         | "AGRUPADA"
         | "OBSOLETA"
+        | "DUPLICADA"
+        | "SEM_RESPOSTA"
         | "ERRO",
       absorvidaPeloLote: false,
       batchId: loteId || null,
       revisao: revisaoTurno || null,
+      mensagemPersistida: true,
+      mensagemId,
     };
     } finally {
       // Garantia única: nenhum lote/lock fica preso, em qualquer desfecho.
