@@ -2944,6 +2944,14 @@ function DetalheContrato({
     </div>
   );
   const [mens, setMens] = useState<Mens[]>([]);
+  // Diálogo do botão "Reverter" de uma parcela já paga: a pessoa diz o que
+  // aconteceu de verdade antes de qualquer coisa mexer (ou não) na gaveta.
+  const [reverterAlvo, setReverterAlvo] = useState<Mens | null>(null);
+  const [reverterOpcao, setReverterOpcao] = useState<"mover" | "sem_devolucao" | "devolucao" | null>(
+    null,
+  );
+  const [reverterDestino, setReverterDestino] = useState<string>("");
+  const [reverterBusy, setReverterBusy] = useState(false);
   // Rascunhos de edição da tabela Mensalidades (vencimento/valor/pago_em).
   // Só persistem no banco quando o usuário clica em "Salvar alterações".
   type RascunhoMens = { vencimento?: string; valor?: number; pago_em?: string | null };
@@ -4175,11 +4183,12 @@ function DetalheContrato({
     load();
   };
 
-  // Botão "Reverter": antes só zerava os campos da mensalidade, sem tocar no
-  // lançamento nem no caixa — podia sobrar mensalidade pendente com dinheiro
-  // confirmado no caixa. Agora usa a mesma rotina de estorno do módulo
-  // Financeiro > Estorno (cancela o lançamento, reverte o caixa e reabre a
-  // mensalidade), centralizando os dois pontos de entrada num único fluxo.
+  // Botão "Reverter": não decide mais sozinho. Quando a parcela tem pagamento
+  // vinculado, abre o diálogo para a pessoa dizer o que aconteceu de verdade —
+  // trocar a parcela do pagamento (numeração errada), estornar sem devolução
+  // (nada saiu da gaveta) ou devolver o dinheiro agora (sai da gaveta de quem
+  // devolve). Sem esse passo, corrigir numeração tirava dinheiro do caixa de
+  // quem clicou.
   const reverterMensalidade = async (m: Mens) => {
     if (!podeEscrever) {
       toast.error("Você não tem permissão de edição neste módulo.");
@@ -4191,24 +4200,66 @@ function DetalheContrato({
       await marcarPago(m.id, false);
       return;
     }
-    const resultado = await estornarLancamentoReceita(m.lancamento_id, clinicaAtual?.clinica_id);
-    if (!resultado.ok) {
-      if (resultado.motivo === "bloqueado") {
-        toast.error(resultado.mensagem);
-      } else {
-        mostrarErro(resultado.error, resultado.mensagem);
-      }
-      return;
-    }
-    toast.success(
-      resultado.aviso === "lancado_no_caixa_de_quem_recebeu"
-        ? "Pagamento estornado. O caixa do pagamento original já estava fechado, então a saída foi lançada no caixa aberto de quem recebeu o valor."
-        : resultado.aviso === "lancado_em_sessao_atual"
-          ? "Pagamento estornado. A saída foi lançada no SEU caixa aberto, porque o caixa do pagamento original já estava fechado e quem recebeu o valor não tem caixa aberto."
-          : "Pagamento estornado: lançamento cancelado, caixa revertido e mensalidade reaberta.",
-    );
-    load();
+    setReverterAlvo(m);
+    setReverterOpcao(null);
+    setReverterDestino("");
   };
+
+  const confirmarReverter = async () => {
+    const m = reverterAlvo;
+    if (!m || !m.lancamento_id || !reverterOpcao) return;
+    setReverterBusy(true);
+    try {
+      if (reverterOpcao === "mover") {
+        if (!reverterDestino) {
+          toast.error("Escolha a parcela que deve ficar como paga.");
+          return;
+        }
+        const { data, error } = await supabase.rpc("mover_pagamento_mensalidade", {
+          _de: m.id,
+          _para: reverterDestino,
+        } as never);
+        if (error) {
+          mostrarErro(error, "Falha ao mover o pagamento de parcela");
+          return;
+        }
+        const r = (data ?? {}) as { ok?: boolean; mensagem?: string };
+        if (!r.ok) {
+          toast.error(r.mensagem ?? "Não foi possível mover o pagamento.");
+          return;
+        }
+        toast.success("Pagamento movido de parcela. Nada foi mexido no caixa.");
+      } else {
+        const resultado = await estornarLancamentoReceita(
+          m.lancamento_id,
+          clinicaAtual?.clinica_id,
+          reverterOpcao === "devolucao",
+        );
+        if (!resultado.ok) {
+          if (resultado.motivo === "bloqueado") {
+            toast.error(resultado.mensagem);
+          } else {
+            mostrarErro(resultado.error, resultado.mensagem);
+          }
+          return;
+        }
+        toast.success(
+          resultado.aviso === "lancado_no_caixa_de_quem_devolveu"
+            ? "Pagamento estornado. O caixa do pagamento já estava fechado, então a devolução saiu do seu caixa aberto."
+            : resultado.aviso === "registrado_sem_mexer_na_gaveta"
+              ? "Pagamento estornado. Como o caixa daquele dia já estava fechado e não houve devolução, ficou só o registro — nenhuma gaveta foi mexida."
+              : "Pagamento estornado: lançamento cancelado, caixa revertido e mensalidade reaberta.",
+        );
+      }
+      setReverterAlvo(null);
+      setReverterOpcao(null);
+      setReverterDestino("");
+      load();
+    } finally {
+      setReverterBusy(false);
+    }
+  };
+
 
   // Marca uma parcela pendente como "paga historicamente":
   // atualiza status/pago_em/valor_pago SEM criar lançamento no caixa.
@@ -7407,6 +7458,123 @@ h1, h2, h3 { margin: 0 0 6mm; }
               disabled={regerandoRetro || !podeEscrever}
             >
               {regerandoRetro ? "Gerando…" : "Confirmar e regenerar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={!!reverterAlvo}
+        onOpenChange={(o) => {
+          if (!o && !reverterBusy) {
+            setReverterAlvo(null);
+            setReverterOpcao(null);
+            setReverterDestino("");
+          }
+        }}
+      >
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Reverter pagamento da parcela</DialogTitle>
+            <DialogDescription>
+              {reverterAlvo
+                ? `Parcela ${reverterAlvo.numero_parcela} — ${BRL(reverterAlvo.valor)} — paga em ${fmtD(reverterAlvo.pago_em)}. O que aconteceu de verdade?`
+                : null}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <label className="flex cursor-pointer gap-2 rounded-md border p-3 text-sm">
+              <input
+                type="radio"
+                className="mt-1"
+                checked={reverterOpcao === "mover"}
+                onChange={() => setReverterOpcao("mover")}
+              />
+              <span>
+                <span className="font-medium">
+                  O pagamento é de outra parcela (corrigir a numeração)
+                </span>
+                <span className="mt-1 block text-xs text-muted-foreground">
+                  O dinheiro continua recebido. Só muda de qual parcela ele é. Nada é mexido no
+                  caixa.
+                </span>
+                {reverterOpcao === "mover" ? (
+                  <span className="mt-2 block">
+                    <Select value={reverterDestino} onValueChange={setReverterDestino}>
+                      <SelectTrigger className="h-9">
+                        <SelectValue placeholder="Parcela que deve ficar como paga" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {mens
+                          .filter((p) => p.status === "pendente")
+                          .map((p) => (
+                            <SelectItem key={p.id} value={p.id}>
+                              {`Parcela ${p.numero_parcela} — vence ${fmtD(p.vencimento)} — ${BRL(p.valor)}`}
+                            </SelectItem>
+                          ))}
+                      </SelectContent>
+                    </Select>
+                  </span>
+                ) : null}
+              </span>
+            </label>
+
+            <label className="flex cursor-pointer gap-2 rounded-md border p-3 text-sm">
+              <input
+                type="radio"
+                className="mt-1"
+                checked={reverterOpcao === "sem_devolucao"}
+                onChange={() => setReverterOpcao("sem_devolucao")}
+              />
+              <span>
+                <span className="font-medium">
+                  Cancelar o pagamento, sem devolver dinheiro ao paciente
+                </span>
+                <span className="mt-1 block text-xs text-muted-foreground">
+                  Fica só o registro do estorno. Se o caixa daquele dia já foi fechado, nenhuma
+                  gaveta é mexida.
+                </span>
+              </span>
+            </label>
+
+            <label className="flex cursor-pointer gap-2 rounded-md border p-3 text-sm">
+              <input
+                type="radio"
+                className="mt-1"
+                checked={reverterOpcao === "devolucao"}
+                onChange={() => setReverterOpcao("devolucao")}
+              />
+              <span>
+                <span className="font-medium">Estou devolvendo o dinheiro ao paciente agora</span>
+                <span className="mt-1 block text-xs text-muted-foreground">
+                  A saída sai do seu caixa aberto, porque o dinheiro está saindo da sua gaveta
+                  agora.
+                </span>
+              </span>
+            </label>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setReverterAlvo(null);
+                setReverterOpcao(null);
+                setReverterDestino("");
+              }}
+              disabled={reverterBusy}
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={confirmarReverter}
+              disabled={
+                reverterBusy ||
+                !podeEscrever ||
+                !reverterOpcao ||
+                (reverterOpcao === "mover" && !reverterDestino)
+              }
+            >
+              {reverterBusy ? "Processando…" : "Confirmar"}
             </Button>
           </DialogFooter>
         </DialogContent>
