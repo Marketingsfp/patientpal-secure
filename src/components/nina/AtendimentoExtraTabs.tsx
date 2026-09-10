@@ -369,6 +369,9 @@ export function AtendInbox() {
   // Escopo da Inbox: por padrão "Minhas conversas" (somente as atribuídas ao
   // atendente logado). O filtro é aplicado no backend.
   const [escopo, setEscopo] = useState<EscopoInbox>(ESCOPO_INBOX_PADRAO);
+  // FASE 1 — filtro de supervisão por atendente. `null` = todos os atendentes.
+  // Só visualização: não transfere, não atribui e não marca leitura de ninguém.
+  const [atendenteSelecionadoId, setAtendenteSelecionadoId] = useState<string | null>(null);
   const [souGestor, setSouGestor] = useState(false);
   // Administrador acompanha tudo, mas não atende: só supervisão.
   const [souAdmin, setSouAdmin] = useState(false);
@@ -865,7 +868,12 @@ export function AtendInbox() {
 
   // Trocar de escopo (ou de usuário/clínica) recomeça a lista: cada filtro tem
   // a sua própria caixa de dados, nada de sobras de outro filtro na tela.
-  const chaveAtual = chaveInbox({ clinicaId: clinicaId ?? null, userId: meuId, escopo });
+  const chaveAtual = chaveInbox({
+    clinicaId: clinicaId ?? null,
+    userId: meuId,
+    escopo,
+    atendenteId: atendenteSelecionadoId,
+  });
   useEffect(() => {
     seqConvs.current++;
     setConvs([]);
@@ -874,7 +882,12 @@ export function AtendInbox() {
   const carregarConvs = useCallback(async () => {
     if (!clinicaId) return;
     const pedido = ++seqConvs.current;
-    const chavePedido = chaveInbox({ clinicaId, userId: meuId, escopo });
+    const chavePedido = chaveInbox({
+      clinicaId,
+      userId: meuId,
+      escopo,
+      atendenteId: atendenteSelecionadoId,
+    });
     try {
       const brutas = await medirRequest("listarConversas", listarConvs({
         data: {
@@ -883,6 +896,7 @@ export function AtendInbox() {
           busca: buscaTexto || undefined,
           canal: "todos",
           escopo,
+          atendenteId: atendenteSelecionadoId,
           limit: 200,
         },
       }));
@@ -890,11 +904,20 @@ export function AtendInbox() {
       // atual — era isso que fazia o cartão mudar e "voltar" sozinho.
       if (pedido !== seqConvs.current) return;
       // Se o filtro/usuário mudou enquanto a resposta vinha, ela é descartada.
-      if (chavePedido !== chaveInbox({ clinicaId, userId: meuId, escopo })) return;
+      if (
+        chavePedido !==
+        chaveInbox({ clinicaId, userId: meuId, escopo, atendenteId: atendenteSelecionadoId })
+      )
+        return;
       // FASE 4 — segunda conferência no navegador: só entra na lista o que
       // realmente pertence a este filtro, mesmo que um evento em tempo real
       // traga uma conversa que acabou de mudar de responsável.
-      const ctxEscopo = { escopo, userId: meuId, gestor: souGestor };
+      const ctxEscopo = {
+        escopo,
+        userId: meuId,
+        gestor: souGestor,
+        atendenteId: atendenteSelecionadoId,
+      };
       const rows = filtrarPorEscopo(brutas as any[], ctxEscopo);
       // A conversa aberta deixou de pertencer a este filtro (transferida,
       // devolvida à fila, resolvida ou reaberta com a Nina)? Sai da tela na
@@ -970,7 +993,7 @@ export function AtendInbox() {
     } catch (e: any) {
       mostrarErro(e);
     }
-  }, [clinicaId, filtroStatus, buscaTexto, buscaInterp.exigeNumero, escopo, listarConvs, carregarContadores, meuId, souGestor, abrirConversa]);
+  }, [clinicaId, filtroStatus, buscaTexto, buscaInterp.exigeNumero, escopo, atendenteSelecionadoId, listarConvs, carregarContadores, meuId, souGestor, abrirConversa]);
 
   // FASE 2 — busca pelo número permanente (#1342). Consulta exata no backend,
   // fora do filtro atual e sem baixar a lista inteira. Só leitura: encontrar
@@ -1626,7 +1649,7 @@ export function AtendInbox() {
   carregarConvsRef.current = carregarConvs;
   useEffect(() => {
     void carregarConvsRef.current();
-  }, [clinicaId, filtroStatus, buscaTexto, escopo, meuId, souGestor]);
+  }, [clinicaId, filtroStatus, buscaTexto, escopo, atendenteSelecionadoId, meuId, souGestor]);
   // O responsável pode mudar a qualquer momento (transferência, distribuição
   // automática, tomada por outra pessoa). A lista chega por Realtime, então a
   // conversa aberta sempre acompanha o que está gravado no banco.
@@ -2023,6 +2046,7 @@ export function AtendInbox() {
           escopo,
           userId: meuId ?? "",
           gestor: souGestor,
+          atendenteId: atendenteSelecionadoId,
         });
         if (r.aplicado) {
           listaPorPatch = true;
@@ -2858,6 +2882,28 @@ export function AtendInbox() {
                 )}
               </SelectContent>
             </Select>
+            {/* FASE 1 — supervisão: só quem já pode ver conversas de terceiros.
+                Filtro de visualização; nada de atribuição muda por causa dele. */}
+            {souGestor && (
+              <Select
+                value={atendenteSelecionadoId ?? "todos"}
+                onValueChange={(v) => setAtendenteSelecionadoId(v === "todos" ? null : v)}
+                onOpenChange={setPainelMenuAberto}
+              >
+                <SelectTrigger className="h-8 text-xs" aria-label="Filtrar por atendente">
+                  <SelectValue placeholder="Atendente: Todos" />
+                </SelectTrigger>
+                <SelectContent className="z-50 min-w-[--radix-select-trigger-width]">
+                  <SelectItem value="todos">Atendente: Todos os atendentes</SelectItem>
+                  {usuarios.map((u: any) => (
+                    <SelectItem key={u.user_id} value={u.user_id}>
+                      {u.nome}
+                      {u.presenca ? ` · ${ROTULO_PRESENCA[u.presenca as PresencaAtendente]}` : ""}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
             <Select
               value={filtroStatus}
               onValueChange={(v) => setFiltroStatus(v as any)}

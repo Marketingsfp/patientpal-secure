@@ -136,3 +136,33 @@ export function usuarioPodeVerConversa(
     conversaVisivelNoEscopo(conversa, { escopo, userId: args.userId, gestor: false }),
   );
 }
+
+/* ---------------------------------------------------------------
+ * FASE 1 — filtro de supervisão por atendente.
+ *
+ * É SÓ VISUALIZAÇÃO: nenhuma atribuição, transferência, status ou leitura
+ * muda por causa dele. A chave é sempre o `user_id` (nome pode repetir ou
+ * mudar) e só vale para quem já pode supervisionar conversas de terceiros.
+ * ------------------------------------------------------------- */
+
+/**
+ * Atendente efetivamente aplicado ao filtro. Sem permissão de supervisão o
+ * filtro é ignorado — nunca amplia o que a pessoa já podia ver.
+ */
+export function atendenteFiltroEfetivo(
+  atendenteId: string | null | undefined,
+  gestor: boolean,
+): string | null {
+  if (!gestor) return null;
+  const id = (atendenteId ?? "").trim();
+  return id ? id : null;
+}
+
+/** A conversa está sob responsabilidade deste atendente agora? */
+export function conversaDoAtendente(
+  conversa: ConversaEscopo,
+  atendenteId: string | null,
+): boolean {
+  if (!atendenteId) return true;
+  return conversa.atribuida_user_id === atendenteId;
+}

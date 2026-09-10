@@ -11,6 +11,8 @@
  * dispensada aqui.
  */
 import {
+  atendenteFiltroEfetivo,
+  conversaDoAtendente,
   conversaVisivelNoEscopo,
   type EscopoInbox,
   type ConversaEscopo,
@@ -98,13 +100,24 @@ export function patchListaPorMensagem(
 export function patchListaPorConversa(
   lista: LinhaLista[],
   linha: Record<string, any> | null | undefined,
-  ctx: { escopo: EscopoInbox; userId: string; gestor: boolean },
+  ctx: {
+    escopo: EscopoInbox;
+    userId: string;
+    gestor: boolean;
+    /** FASE 1 — filtro de supervisão por atendente (só visualização). */
+    atendenteId?: string | null;
+  },
 ): ResultadoPatch {
   const id = String(linha?.["id"] ?? "");
   if (!id || !Array.isArray(lista)) {
     return { lista: lista ?? [], aplicado: false, reconciliar: true };
   }
-  const visivel = conversaVisivelNoEscopo(linha as ConversaEscopo, ctx);
+  const visivel =
+    conversaVisivelNoEscopo(linha as ConversaEscopo, ctx) &&
+    conversaDoAtendente(
+      linha as ConversaEscopo,
+      atendenteFiltroEfetivo(ctx.atendenteId, ctx.gestor),
+    );
   const existente = lista.find((c) => c.id === id);
 
   // Entrou no filtro (nova, transferida para mim, devolvida à fila) ou saiu

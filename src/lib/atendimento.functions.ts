@@ -6,6 +6,7 @@ import { hojeBR, janelaDiaClinica } from "@/lib/date-utils";
 import { z } from "zod";
 import {
   STATUS_FECHADOS,
+  atendenteFiltroEfetivo,
   escopoEscondeFechadas,
   normalizarEscopo,
   filtroEscopoInbox,
@@ -109,6 +110,9 @@ export const listarConversas = createServerFn({ method: "POST" })
           .enum(["minhas", "nina", "nao_atribuidas", "fechadas", "equipe", "todas"])
           .default("minhas")
           .transform((v) => normalizarEscopo(v)),
+        // FASE 1 — filtro de supervisão por atendente. Apenas visualização:
+        // não transfere, não atribui, não muda status nem leitura.
+        atendenteId: z.string().uuid().nullish(),
         limit: z.number().int().min(1).max(500).default(200),
       })
       .parse(i),
@@ -165,6 +169,10 @@ export const listarConversas = createServerFn({ method: "POST" })
       .eq("clinica_id", data.clinicaId)
       .order("ultima_msg_em", { ascending: false })
       .limit(data.limit);
+    // FASE 1 — supervisão por atendente: só vale para quem já pode ver
+    // conversas de terceiros; sem essa permissão o parâmetro é ignorado.
+    const atendenteFiltro = atendenteFiltroEfetivo(data.atendenteId, gestor);
+    if (atendenteFiltro) q = q.eq("atribuida_user_id", atendenteFiltro);
     // Escopo aplicado na própria consulta (nunca filtrado só no frontend).
     if (filtroEscopo.tipo === "atribuida") q = q.eq("atribuida_user_id", filtroEscopo.userId);
     else if (filtroEscopo.tipo === "sem_responsavel")

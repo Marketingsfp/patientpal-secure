@@ -9,6 +9,8 @@
  * Tudo aqui é função pura, para ser testável sem tela.
  */
 import {
+  atendenteFiltroEfetivo,
+  conversaDoAtendente,
   conversaVisivelNoEscopo,
   type ConversaEscopo,
   type EscopoInbox,
@@ -20,6 +22,8 @@ export interface ContextoEscopo {
   escopo: EscopoInbox;
   userId: string | null;
   gestor: boolean;
+  /** FASE 1 — filtro de supervisão por atendente (só visualização). */
+  atendenteId?: string | null;
 }
 
 /**
@@ -31,8 +35,15 @@ export function chaveInbox(args: {
   clinicaId: string | null;
   userId: string | null;
   escopo: EscopoInbox;
+  atendenteId?: string | null;
 }): string {
-  return ["inbox", args.clinicaId ?? "-", args.userId ?? "-", args.escopo].join("|");
+  return [
+    "inbox",
+    args.clinicaId ?? "-",
+    args.userId ?? "-",
+    args.escopo,
+    args.atendenteId ?? "-",
+  ].join("|");
 }
 
 /**
@@ -42,8 +53,14 @@ export function chaveInbox(args: {
  */
 export function filtrarPorEscopo<T extends LinhaCache>(linhas: T[], ctx: ContextoEscopo): T[] {
   if (!ctx.userId) return linhas;
-  const visiveis = linhas.filter((l) =>
-    conversaVisivelNoEscopo(l, { escopo: ctx.escopo, userId: ctx.userId as string, gestor: ctx.gestor }),
+  const atendente = atendenteFiltroEfetivo(ctx.atendenteId, ctx.gestor);
+  const visiveis = linhas.filter(
+    (l) =>
+      conversaVisivelNoEscopo(l, {
+        escopo: ctx.escopo,
+        userId: ctx.userId as string,
+        gestor: ctx.gestor,
+      }) && conversaDoAtendente(l, atendente),
   );
   return visiveis.length === linhas.length ? linhas : visiveis;
 }
@@ -51,11 +68,13 @@ export function filtrarPorEscopo<T extends LinhaCache>(linhas: T[], ctx: Context
 /** Um registro recebido em tempo real pode entrar na lista deste filtro? */
 export function podeEntrarNaLista(linha: LinhaCache, ctx: ContextoEscopo): boolean {
   if (!ctx.userId) return true;
-  return conversaVisivelNoEscopo(linha, {
-    escopo: ctx.escopo,
-    userId: ctx.userId,
-    gestor: ctx.gestor,
-  });
+  return (
+    conversaVisivelNoEscopo(linha, {
+      escopo: ctx.escopo,
+      userId: ctx.userId,
+      gestor: ctx.gestor,
+    }) && conversaDoAtendente(linha, atendenteFiltroEfetivo(ctx.atendenteId, ctx.gestor))
+  );
 }
 
 /** Ids que estavam na tela e não pertencem mais ao filtro — o cache deles cai. */
