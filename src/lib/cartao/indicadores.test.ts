@@ -132,6 +132,29 @@ describe("resumirContratos", () => {
     expect(r.receitaPrevista).toBe(0);
     expect(r.ticketMedio).toBe(0);
   });
+
+  it("contrato ativo de R$ 0 (dependente) não conta como pagante", () => {
+    const r = resumirContratos(
+      [
+        contrato({ valor_mensal: 100 }),
+        contrato({ valor_mensal: 150 }),
+        contrato({ valor_mensal: 0 }),
+        contrato({ valor_mensal: null }),
+      ],
+      "2026-08-01",
+    );
+    expect(r.ativos).toBe(2);
+    expect(r.semMensalidade).toBe(2);
+    expect(r.receitaPrevista).toBeCloseTo(250, 2);
+    // O ticket médio divide só pelos pagantes; com os dependentes seria 62,50.
+    expect(r.ticketMedio).toBeCloseTo(125, 2);
+  });
+
+  it("contrato cancelado de R$ 0 não vira dependente ativo", () => {
+    const r = resumirContratos([contrato({ status: "cancelado", valor_mensal: 0 })], "2026-08-01");
+    expect(r.semMensalidade).toBe(0);
+    expect(r.inativos).toBe(1);
+  });
 });
 
 describe("resumirMensalidades", () => {
