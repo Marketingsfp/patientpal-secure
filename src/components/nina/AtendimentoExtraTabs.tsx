@@ -559,7 +559,6 @@ export function AtendInbox() {
     if (ordem !== "espera") return base;
     base = base.filter((c: any) => conversaNaVisualizacao(visualizacao, espera[c.id]));
     return [...base].sort((a: any, b: any) => {
-    return [...base].sort((a: any, b: any) => {
       const ta = espera[a.id] ? new Date(espera[a.id]).getTime() : Infinity;
       const tb = espera[b.id] ? new Date(espera[b.id]).getTime() : Infinity;
       return ta - tb;
