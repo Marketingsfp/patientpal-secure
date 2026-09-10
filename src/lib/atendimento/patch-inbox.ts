@@ -13,6 +13,7 @@
 import {
   atendenteFiltroEfetivo,
   conversaDoAtendente,
+  escopoComAtendente,
   conversaVisivelNoEscopo,
   type EscopoInbox,
   type ConversaEscopo,
@@ -113,7 +114,10 @@ export function patchListaPorConversa(
     return { lista: lista ?? [], aplicado: false, reconciliar: true };
   }
   const visivel =
-    conversaVisivelNoEscopo(linha as ConversaEscopo, ctx) &&
+    conversaVisivelNoEscopo(linha as ConversaEscopo, {
+      ...ctx,
+      escopo: escopoComAtendente(ctx.escopo, ctx.atendenteId, ctx.gestor),
+    }) &&
     conversaDoAtendente(
       linha as ConversaEscopo,
       atendenteFiltroEfetivo(ctx.atendenteId, ctx.gestor),

@@ -10,6 +10,7 @@ import {
   escopoEscondeFechadas,
   normalizarEscopo,
   filtroEscopoInbox,
+  escopoComAtendente,
 } from "@/lib/atendimento/escopo-inbox";
 import { loadWhatsAppConfig, metaSendText } from "./whatsapp.server";
 import {
@@ -153,8 +154,13 @@ export const listarConversas = createServerFn({ method: "POST" })
 
     // Gestor/admin da clínica pode escolher ver tudo; atendente comum, não.
     const gestor = !!podeGerirRes;
+    // FASE 2 — supervisão por atendente: só vale para quem já pode ver
+    // conversas de terceiros; sem essa permissão o parâmetro é ignorado e o
+    // atendente continua vendo exatamente o que já via.
+    const atendenteFiltro = atendenteFiltroEfetivo(data.atendenteId, gestor);
+    const escopoAplicado = escopoComAtendente(data.escopo, data.atendenteId, gestor);
     const filtroEscopo = filtroEscopoInbox({
-      escopo: data.escopo,
+      escopo: escopoAplicado,
       userId: context.userId,
       gestor,
     });
@@ -169,9 +175,8 @@ export const listarConversas = createServerFn({ method: "POST" })
       .eq("clinica_id", data.clinicaId)
       .order("ultima_msg_em", { ascending: false })
       .limit(data.limit);
-    // FASE 1 — supervisão por atendente: só vale para quem já pode ver
-    // conversas de terceiros; sem essa permissão o parâmetro é ignorado.
-    const atendenteFiltro = atendenteFiltroEfetivo(data.atendenteId, gestor);
+    // Filtro por responsável direto no banco, antes de ordenar e cortar a
+    // lista — nunca depois de baixar tudo para o navegador.
     if (atendenteFiltro) q = q.eq("atribuida_user_id", atendenteFiltro);
     // Escopo aplicado na própria consulta (nunca filtrado só no frontend).
     if (filtroEscopo.tipo === "atribuida") q = q.eq("atribuida_user_id", filtroEscopo.userId);
@@ -183,7 +188,7 @@ export const listarConversas = createServerFn({ method: "POST" })
       if (filtroEscopo.userId) q = q.eq("atribuida_user_id", filtroEscopo.userId);
     }
     // Filtros operacionais mostram só conversas em andamento.
-    if (escopoEscondeFechadas(data.escopo, gestor)) {
+    if (escopoEscondeFechadas(escopoAplicado, gestor)) {
       q = q.not("status", "in", `(${STATUS_FECHADOS.join(",")})`);
     }
     if (data.status !== "all") q = q.eq("status", data.status);
