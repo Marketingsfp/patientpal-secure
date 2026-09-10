@@ -57,6 +57,26 @@ const agendaOk = {
   success: true,
 };
 
+/** FASE 2 — fatos que o servidor extrairia do retorno do catálogo. */
+const fatoPrecoUltrassom = {
+  consulta: "buscar_procedimentos",
+  capacidade: "searchKnowledgeBase",
+  entidade: "procedimento" as const,
+  campo: "preco",
+  valor: "R$ 180,00",
+  fonte: "catalogo_publicado" as const,
+  chave: { procedimento: "ultrassonografia abdominal" },
+};
+const fatoServicoCardiologia = {
+  consulta: "buscar_procedimentos",
+  capacidade: "searchKnowledgeBase",
+  entidade: "servico" as const,
+  campo: "oferecido",
+  valor: "cardiologia",
+  fonte: "catalogo_publicado" as const,
+};
+
+
 export const CENARIOS_SHADOW: CenarioShadow[] = [
   {
     id: "pergunta-simples-correta",
