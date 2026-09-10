@@ -575,22 +575,46 @@ export function HomologacaoInbox() {
     [carregarLeads, carregarHistorico, leadId],
   );
 
+  /**
+   * Envio do chat manual — a bolha aparece na hora e o campo fica livre.
+   *
+   * O processamento da Nina continua igual, só que em segundo plano: nada
+   * aqui espera banco, modelo, ferramentas ou resposta antes de liberar o
+   * testador para escrever a próxima mensagem. Cada envio guarda o lead de
+   * origem e descarta qualquer efeito visual se o testador já trocou de lead.
+   */
   const dispararMensagem = async (
     conteudo: string,
     tipoForcado?: TipoMensagem,
   ): Promise<{ ok: boolean; transferida: boolean; erro: string | null }> => {
-    if (!clinicaId || !leadId) return { ok: false, transferida: false, erro: null };
+    const leadOrigem = leadId;
+    const conversaOrigem = conversaId;
+    if (!clinicaId || !leadOrigem) return { ok: false, transferida: false, erro: null };
     const tipoEnvio = tipoForcado ?? tipo;
     const corpo = conteudo.trim();
     // Só texto exige conteúdo: áudio sem transcrição e mídias simulam o webhook real.
     if (tipoEnvio === "text" && !corpo) return { ok: false, transferida: false, erro: null };
-    setProcessando(true);
+    const chave = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
+    // 1) campo livre e foco de volta, ANTES de qualquer chamada.
+    setTexto("");
+    composerRef.current?.focus();
     setErro(null);
     setUltimoTexto(corpo);
+    // 2) bolha imediata na timeline do lead de origem.
+    registrarOtimista(leadOrigem, {
+      id: `otimista:${chave}`,
+      conversa_id: conversaOrigem,
+      direction: "in",
+      body: corpo,
+      enviada_por: "paciente",
+      created_at: new Date().toISOString(),
+    });
+    const meuLead = () => leadSelecionadoRef.current === leadOrigem;
+    setEmProcessamento((n) => n + 1);
     try {
-      const chave = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
       const r = (await enviar({
-        data: { clinicaId, leadId, tipo: tipoEnvio, texto: corpo, chave },
+        data: { clinicaId, leadId: leadOrigem, tipo: tipoEnvio, texto: corpo, chave },
       })) as {
         duplicada: boolean;
         reply: string | null;
@@ -598,25 +622,29 @@ export function HomologacaoInbox() {
         transferida?: boolean;
         audio: { base64: string; mime: string; texto: string } | null;
       };
-      setTexto("");
-      setAudio(r.audio ? `data:${r.audio.mime};base64,${r.audio.base64}` : null);
-      await carregarHistorico(leadId);
+      concluirOtimista(chave);
+      if (meuLead()) {
+        setAudio(r.audio ? `data:${r.audio.mime};base64,${r.audio.base64}` : null);
+        await carregarHistorico(leadOrigem);
+      }
       await carregarLeads();
-      if (r.erro) setErro(r.erro);
-      else if (!r.reply)
-        setErro(
-          "A Nina não respondeu. Se a conversa foi transferida para atendimento humano, use “Resolver / Reiniciar teste” antes de começar um novo teste.",
-        );
+      if (meuLead()) {
+        if (r.erro) setErro(r.erro);
+        else if (!r.reply)
+          setErro(
+            "A Nina não respondeu. Se a conversa foi transferida para atendimento humano, use “Resolver / Reiniciar teste” antes de começar um novo teste.",
+          );
+      }
       return { ok: !r.erro && !!r.reply, transferida: !!r.transferida, erro: r.erro ?? null };
     } catch (e: any) {
-      const chegou = await aguardarResposta(leadId);
-      setTexto("");
+      const chegou = meuLead() ? await aguardarResposta(leadOrigem) : false;
+      concluirOtimista(chave);
       await carregarLeads();
       const msg = String(e?.message ?? e);
-      if (!chegou) setErro(msg);
+      if (!chegou && meuLead()) setErro(msg);
       return { ok: chegou, transferida: false, erro: chegou ? null : msg };
     } finally {
-      setProcessando(false);
+      setEmProcessamento((n) => Math.max(0, n - 1));
     }
   };
 
