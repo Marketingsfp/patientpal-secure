@@ -11,7 +11,7 @@
  */
 import { acaoExecutavel, acaoOuNenhuma, contaContraANota } from "./types";
 import { aplicabilidadeDoTurno } from "./turno-tipo";
-import { ClaimGroundingValidator } from "./claims";
+import { ClaimGroundingValidator, somenteNegativasApoiadas } from "./claims";
 import { WorkflowConsistencyValidator } from "./workflow";
 import type {
   Bloqueador,
