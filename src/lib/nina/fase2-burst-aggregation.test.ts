@@ -5,7 +5,7 @@
  * revisão e reserva atômica) para validar que mensagens rápidas formam UM
  * turno da Nina, sem alterar a exibição das mensagens.
  */
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 import {
   MAX_BURST_WINDOW_MS,
   QUIET_WINDOW_MS,
