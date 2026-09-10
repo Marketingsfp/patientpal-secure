@@ -2144,6 +2144,8 @@ export function AtendInbox() {
           atendenteId: atendenteSelecionadoId,
           status: filtroStatus,
           buscando: !!buscaTexto || buscaInterp.exigeNumero,
+          visualizacao,
+          espera: esperaRef.current,
         });
         if (r.aplicado) {
           listaPorPatch = true;
