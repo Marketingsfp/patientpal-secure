@@ -1,6 +1,8 @@
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { normalizarTelefone } from "@/lib/atendimento/telefone";
+import { consolidarTentativas } from "@/lib/nina/confidence/evidencia";
 import { agoraNaClinica } from "@/lib/nina-agora";
+
 import { normalizar } from "@/lib/nina-especialidade";
 
 const META_VERSION = "v22.0";
