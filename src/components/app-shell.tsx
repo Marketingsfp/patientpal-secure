@@ -508,48 +508,9 @@ const navRows: ReadonlyArray<{ label: string; items: ReadonlyArray<NavItem> }> =
       { to: "/app/crm", label: "CRM", icon: Target },
       { to: "/app/alertas-enfermagem", label: "Enfermeira IA — Alertas", icon: BellRing },
       { to: "/app/consulta-rapida", label: "Informações rápidas", icon: BookOpen },
-      {
-        label: "Nina — WhatsApp",
-        icon: MessageCircle,
-        children: [
-          { to: "/app/nina", hash: "atend-inbox", label: "Conversas WhatsApp", icon: Inbox },
-          { to: "/app/nina", hash: "atend-macros", label: "/ Mensagens prontas", icon: Zap },
-          {
-            to: "/app/nina",
-            hash: "base-conhecimento",
-            label: "Base de conhecimentos",
-            icon: BookOpen,
-          },
-          {
-            to: "/app/nina",
-            hash: "homologacao",
-            label: "Homologação (envio de testes)",
-            icon: FlaskConical,
-          },
-          {
-            to: "/app/nina-aprendizado",
-            label: "Revisão de Aprendizados",
-            icon: ShieldCheck,
-          },
-          {
-            to: "/app/nina-metricas",
-            label: "Métricas de Aprendizado",
-            icon: BarChart3,
-          },
-          { to: "/app/nina", hash: "config", label: "Configuração", icon: KeyRound },
-          {
-            to: "/app/nina",
-            hash: "templates",
-            label: "Templates aprovados (Meta)",
-            icon: FileText,
-          },
-          {
-            to: "/app/nina-arquitetura",
-            label: "Arquitetura",
-            icon: Network,
-          },
-        ],
-      },
+      // O antigo grupo "Nina — WhatsApp" saiu daqui: tudo de atendimento por
+      // mensagem passou a viver no portal "Atendimento / WhatsApp", nas seções
+      // "Atendimento", "Nina" e "Configurações do WhatsApp" logo abaixo.
       {
         // Grupo expansível por especialidade. Cada filho tem rota própria —
         // antes os dois apontavam para a mesma rota e a tela escolhia a aba
