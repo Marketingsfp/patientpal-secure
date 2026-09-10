@@ -2,26 +2,12 @@
  * Card interno com o resumo automático da Nina no handoff.
  * Uso interno da equipe: nada aqui é enviado ao paciente.
  */
-import { useCallback, useEffect, useRef, useState } from "react";
-import { useServerFn } from "@tanstack/react-start";
+import { useState } from "react";
 import { ChevronDown, ChevronRight, RefreshCw, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useRealtimeRefresh } from "@/hooks/use-realtime-refresh";
-import { obterResumoHandoff } from "@/lib/atendimento/handoff-resumo.functions";
-import { blocosVisiveis, ROTULO_INTENCAO, type ResumoHandoff } from "@/lib/atendimento/handoff-resumo";
+import { ROTULO_INTENCAO, blocosVisiveis } from "@/lib/atendimento/handoff-resumo";
 import { rotuloDesfecho } from "@/lib/atendimento/resumo-desfecho";
-import { marcarTroca, medirRequest } from "@/lib/atendimento/perf-troca";
-
-
-type Linha = {
-  status: "gerando" | "ok" | "erro";
-  payload: ResumoHandoff | null;
-  erro: string | null;
-  versao: number;
-  situacao?: string | null;
-  desfecho?: string | null;
-} | null;
-
+import { useResumoHandoff } from "@/components/nina/use-resumo-handoff";
 
 export function ResumoHandoffCard({
   clinicaId,
@@ -30,61 +16,15 @@ export function ResumoHandoffCard({
   clinicaId: string;
   conversaId: string;
 }) {
-  const obter = useServerFn(obterResumoHandoff);
-  const [linha, setLinha] = useState<Linha>(null);
-  const [carregando, setCarregando] = useState(false);
+  // FASE 4 — estado único por conversa: o card do topo e o bloco da timeline
+  // compartilham a MESMA busca, então o servidor gera o resumo uma vez só.
+  const { linha, carregando, atualizado, carregar, limparAtualizado } = useResumoHandoff(
+    clinicaId,
+    conversaId,
+    { assinarRealtime: true },
+  );
   // Regra: cada conversa começa com o resumo RECOLHIDO.
   const [aberto, setAberto] = useState(false);
-  const [atualizado, setAtualizado] = useState(false);
-  const jaBuscado = useRef<string | null>(null);
-
-  const carregar = useCallback(
-    async (forcar = false) => {
-      setCarregando(true);
-      try {
-        const r = (await medirRequest(
-          "obterResumoHandoff",
-          obter({ data: { clinicaId, conversaId, forcar } }),
-          conversaId,
-        )) as Linha;
-        marcarTroca("T7_resumo", conversaId);
-        setLinha((anterior) => {
-          if (anterior && r && anterior.versao !== r.versao) setAtualizado(true);
-          return r;
-        });
-      } catch {
-        setLinha({ status: "erro", payload: null, erro: "Não foi possível gerar o resumo.", versao: 0 });
-      } finally {
-        setCarregando(false);
-      }
-    },
-    [clinicaId, conversaId, obter],
-  );
-
-  // Uma única busca por conversa na abertura. Antes, a função de busca era
-  // recriada em outra renderização e o resumo era pedido duas vezes seguidas.
-  useEffect(() => {
-    const chave = `${clinicaId}|${conversaId}`;
-    if (jaBuscado.current === chave) return;
-    jaBuscado.current = chave;
-    void carregar(false);
-  }, [carregar, clinicaId, conversaId]);
-
-  // Resumo gerado pelo servidor (inclusive no timeout) aparece sem refresh.
-  // Só o próprio resumo dispara recarga. Antes, qualquer alteração em
-  // "atend_conversas" (toda mensagem nova atualiza a conversa) pedia o resumo
-  // de novo — era uma requisição repetida a cada mensagem.
-  // FASE 3 — além de assinar só a tabela do resumo, o canal é filtrado pela
-  // clínica e o evento de outra conversa é descartado sem nenhuma requisição.
-  useRealtimeRefresh(
-    ["atend_handoff_resumos"],
-    () => void carregar(false),
-    !!clinicaId && !!conversaId,
-    {
-      filtro: clinicaId ? `clinica_id=eq.${clinicaId}` : undefined,
-      interessa: (linha) => linha.conversa_id === conversaId,
-    },
-  );
 
   if (!linha) return null;
 
