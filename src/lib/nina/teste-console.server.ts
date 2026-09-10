@@ -412,7 +412,12 @@ export async function processarMensagemTeste(data: EntradaMensagemTeste, userId:
         lockTurno = null;
       }
     };
+    /** Desfecho do turno; vira SUPERSEDED quando a execução é descartada. */
+    let statusFinal: "PROCESSED" | "SUPERSEDED" = "PROCESSED";
 
+    // Tudo o que vier depois do claim fica sob `finally`: sucesso, exceção,
+    // resposta obsoleta ou erro do modelo sempre liberam lote e trava.
+    try {
     try {
       if (textoPaciente) {
         const { gerarRespostaNina } = await import("@/lib/whatsapp.server");
