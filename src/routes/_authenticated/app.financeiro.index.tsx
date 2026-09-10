@@ -5,12 +5,10 @@ import {
   Calendar,
   Coins,
   CreditCard,
-  
   FlaskConical,
   Handshake,
   Minus,
   Plus,
-  
   Receipt,
   Stethoscope,
   TrendingDown,
