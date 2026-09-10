@@ -125,6 +125,7 @@ export function resumirContratos(
 ): ResumoContratos {
   const r: ResumoContratos = {
     ativos: 0,
+    semMensalidade: 0,
     receitaPrevista: 0,
     inativos: 0,
     novos: 0,
