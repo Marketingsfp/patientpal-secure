@@ -163,7 +163,9 @@ export function evidenciasDisponiveis(ctx: ContextoConfianca): Record<TipoClaim,
   return {
     valor: catalogo,
     profissional,
-    disponibilidade: agenda,
+    // FASE 2 — uma reserva já persistida comprova o horário reservado, mesmo
+    // sem nova consulta de agenda neste turno.
+    disponibilidade: agenda ?? provaAgendamento,
     preparo: catalogo,
     regra: catalogo ?? instrucoes,
     agendamento: provaAgendamento,
@@ -652,4 +654,17 @@ function res(
   evidence: Record<string, unknown>,
 ): ResultadoValidador {
   return { validator: NOME, status, score, reasonCode, evidence, blocker: null };
+}
+
+/**
+ * FASE 2 — o turno afirma apenas NEGATIVAS já apoiadas em consulta oficial?
+ * "Não realizamos esse exame" depois de uma busca que respondeu sem itens é
+ * uma resposta correta, não uma afirmação sem fonte.
+ */
+export function somenteNegativasApoiadas(ctx: ContextoConfianca, texto?: string | null): boolean {
+  const t = (texto ?? ctx.draftText ?? "").trim();
+  if (!t) return false;
+  const r = avaliarGrounding(ctx, t);
+  if (r.total === 0) return false;
+  return r.claims.every((c) => c.modalidade === "negacao" && c.suportado);
 }

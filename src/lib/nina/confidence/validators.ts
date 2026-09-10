@@ -285,13 +285,27 @@ export function OfficialSourceValidator(
         ferramentaOk(f),
     ) || ctx.retrievedSources.some((s) => s.tipo === "agenda" && fonteUtil(s));
 
+  // FASE 2 — reserva já persistida é prova de agenda para o horário reservado.
+  const reservaPersistida =
+    ctx.operationalState?.appointmentCreated === true && Boolean(ctx.operationalState?.appointmentId);
+
   const precisaAgenda = oficiais.some(
     (c) => c === "horario" || c === "disponibilidade" || c === "profissional" || c === "agendamento",
   );
-  const atendido = precisaAgenda ? catalogoOk || agendaOk : catalogoOk;
+  const atendido = precisaAgenda ? catalogoOk || agendaOk || reservaPersistida : catalogoOk;
 
+  if (!atendido && somenteNegativasApoiadas(ctx)) {
+    // Consulta oficial que respondeu SEM itens sustenta a negativa.
+    return res(nome, "PASS", 100, "NEGATIVA_APOIADA_EM_CONSULTA_OFICIAL", { categorias: oficiais });
+  }
   if (atendido) {
-    return res(nome, "PASS", 100, "FONTE_OFICIAL_PRESENTE", { categorias: oficiais, catalogoOk, agendaOk });
+      return res(nome, "PASS", 100, "FONTE_OFICIAL_PRESENTE", {
+      categorias: oficiais,
+      catalogoOk,
+      agendaOk,
+      reservaPersistida,
+    });
+  }
   }
   const blocker: Bloqueador = oficiais.includes("valor")
     ? "VALOR_SEM_CATALOGO"
