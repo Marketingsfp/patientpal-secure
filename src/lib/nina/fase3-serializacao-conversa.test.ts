@@ -93,7 +93,7 @@ describe("FASE 3 — lock por conversa", () => {
 
 describe("FASE 3 — claim do lote", () => {
   test("COLLECTING → PROCESSING acontece uma única vez", () => {
-    let status: "COLLECTING" | "PROCESSING" = "COLLECTING";
+    let status: "COLLECTING" | "PROCESSING" = "COLLECTING" as "COLLECTING" | "PROCESSING";
     const claim = () => {
       if (status !== "COLLECTING") return false;
       status = "PROCESSING";
