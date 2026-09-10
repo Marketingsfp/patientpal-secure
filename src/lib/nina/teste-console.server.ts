@@ -292,11 +292,17 @@ export async function processarMensagemTeste(data: EntradaMensagemTeste, userId:
     // Nina desligada na clínica → mesmo comportamento do WhatsApp: não responde.
     const { ninaDesativadaNaClinica } = await import("@/lib/nina-desligada.server");
     if (await ninaDesativadaNaClinica(data.clinicaId)) {
+      // A mensagem do paciente ESTÁ gravada; só a Nina não responde.
       return {
         duplicada: false,
         reply: null,
         erro: "A Nina está desativada nesta clínica.",
         audio: null,
+        transferida: false,
+        processamento: "SEM_RESPOSTA" as const,
+        absorvidaPeloLote: false,
+        mensagemPersistida: true,
+        mensagemId,
       };
     }
 
@@ -312,6 +318,11 @@ export async function processarMensagemTeste(data: EntradaMensagemTeste, userId:
         reply: null,
         erro: "Conversa está com atendimento humano — a Nina não responde (igual ao WhatsApp).",
         audio: null,
+        transferida: true,
+        processamento: "SEM_RESPOSTA" as const,
+        absorvidaPeloLote: false,
+        mensagemPersistida: true,
+        mensagemId,
       };
     }
 
