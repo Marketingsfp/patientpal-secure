@@ -220,3 +220,31 @@ export async function definirSemFaturamento(
   }
   return { ok: true, patch };
 }
+
+/**
+ * Pistas, no motivo digitado, de que o paciente JÁ PAGOU — na Clínica Total
+ * (sistema antigo) ou neste sistema em outro dia. Nesses casos "sem
+ * faturamento" é o caminho errado: tira o atendimento do financeiro e o médico
+ * fica sem repasse. O certo é o $ da ficha com "Pago no sistema anterior" ou
+ * "O paciente já pagou este valor adiantado".
+ *
+ * As palavras saíram dos motivos reais gravados de 01/09 a 10/09/2026. "paga"
+ * e "fatura" ficam de fora de propósito: "o paciente paga direto ao parceiro"
+ * e "o convênio fatura direto" são os usos corretos da marcação.
+ */
+const PISTAS_PAGAMENTO_JA_FEITO: RegExp[] = [
+  /\b(pagou|pago|pagos|paga?mento|pagamentos|pagto|pgto|quitad[oa]s?|adiantad[oa]s?|faturad[oa]s?|faturou)\b/,
+  /\b(sistema|sitema|sistma|sistem)\s+(antigo|anterior|novo|velho)\b/,
+  /\boutro\s+sistema\b/,
+  /\bclinica\s*total\b/,
+];
+
+/** true → o motivo sugere pagamento já feito; a tela deve avisar (sem travar). */
+export function motivoIndicaPagamentoJaFeito(texto: string | null | undefined): boolean {
+  const norm = (texto ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+  if (!norm.trim()) return false;
+  return PISTAS_PAGAMENTO_JA_FEITO.some((re) => re.test(norm));
+}
