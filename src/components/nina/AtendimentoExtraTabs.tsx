@@ -209,6 +209,22 @@ import { formatarDataHoraMensagem } from "@/lib/atendimento/data-hora";
 import { textoMarcadorSistema } from "@/lib/atendimento/marcador-handoff";
 import { ESCOPO_INBOX_PADRAO, type EscopoInbox } from "@/lib/atendimento/escopo-inbox";
 import {
+  ESCOPO_BASE_PADRAO,
+  ROTULO_VISUALIZACAO,
+  VISUALIZACAO_PADRAO,
+  atendenteConsulta,
+  conversaNaVisualizacao,
+  escopoConsulta,
+  estadoDeEscopoLegado,
+  lerValorEscopo,
+  ordemVisualizacao,
+  rotuloEscopo,
+  statusConsulta,
+  valorEscopoControle,
+  type EscopoBaseInbox,
+  type VisualizacaoInbox,
+} from "@/lib/atendimento/filtros-inbox";
+import {
   MSG_ADMIN_NAO_ATENDE,
   ROTULO_PRESENCA,
   type PresencaAtendente,
@@ -366,13 +382,16 @@ export function AtendInbox() {
   >(null);
   // Opção "Bot" removida da lista de status a pedido da equipe: conversas sob
   // a Nina continuam acessíveis pelo filtro de escopo "Nina".
-  const [filtroStatus, setFiltroStatus] = useState<"all" | "active" | "waiting" | "closed">("all");
-  // Escopo da Inbox: por padrão "Minhas conversas" (somente as atribuídas ao
-  // atendente logado). O filtro é aplicado no backend.
-  const [escopo, setEscopo] = useState<EscopoInbox>(ESCOPO_INBOX_PADRAO);
-  // FASE 1 — filtro de supervisão por atendente. `null` = todos os atendentes.
+  // FASE 1 — a Inbox tem só DOIS controles: Escopo (de quem são as conversas)
+  // e Visualização (que tipo de conversa). Status e ordenação deixaram de ser
+  // controles próprios — cada visualização já define os dois.
+  const [escopoBase, setEscopoBase] = useState<EscopoBaseInbox>(ESCOPO_BASE_PADRAO);
+  const [visualizacao, setVisualizacao] = useState<VisualizacaoInbox>(VISUALIZACAO_PADRAO);
+  // Fila de não atribuídas: continua existindo, acionada pela Central de Atenção.
+  const [naoAtribuidasFiltro, setNaoAtribuidasFiltro] = useState(false);
+  // Atendente escolhido dentro do seletor de Escopo. `null` = todos.
   // Só visualização: não transfere, não atribui e não marca leitura de ninguém.
-  const [atendenteSelecionadoId, setAtendenteSelecionadoId] = useState<string | null>(null);
+  const [atendenteEscolhidoId, setAtendenteEscolhidoId] = useState<string | null>(null);
   const [souGestor, setSouGestor] = useState(false);
   // Busca dentro do seletor de atendente (só filtra o que a lista mostra).
   const [buscaAtendente, setBuscaAtendente] = useState("");
@@ -390,19 +409,19 @@ export function AtendInbox() {
   // supervisão ou saindo o atendente da equipe, o filtro volta para "todos".
   // Nunca fica um user_id de outra clínica preso na tela.
   useEffect(() => {
-    setAtendenteSelecionadoId(null);
+    setAtendenteEscolhidoId(null);
     setBuscaAtendente("");
   }, [clinicaId]);
   useEffect(() => {
-    if (!atendenteSelecionadoId) return;
+    if (!atendenteEscolhidoId) return;
     if (!souGestor) {
-      setAtendenteSelecionadoId(null);
+      setAtendenteEscolhidoId(null);
       return;
     }
-    if (usuarios.length && !usuarios.some((u: any) => u.user_id === atendenteSelecionadoId)) {
-      setAtendenteSelecionadoId(null);
+    if (usuarios.length && !usuarios.some((u: any) => u.user_id === atendenteEscolhidoId)) {
+      setAtendenteEscolhidoId(null);
     }
-  }, [atendenteSelecionadoId, souGestor, usuarios]);
+  }, [atendenteEscolhidoId, souGestor, usuarios]);
 
   const atendentesFiltrados = useMemo(() => {
     const termo = normalizarNomeBusca(buscaAtendente);
@@ -410,12 +429,26 @@ export function AtendInbox() {
     return usuarios.filter((u: any) => normalizarNomeBusca(String(u.nome ?? "")).includes(termo));
   }, [usuarios, buscaAtendente]);
   const nomeAtendenteSelecionado = useMemo(
-    () => usuarios.find((u: any) => u.user_id === atendenteSelecionadoId)?.nome ?? null,
-    [usuarios, atendenteSelecionadoId],
+    () => usuarios.find((u: any) => u.user_id === atendenteEscolhidoId)?.nome ?? null,
+    [usuarios, atendenteEscolhidoId],
   );
 
-  const soNaoAtribuidas = escopo === "nao_atribuidas";
-  const setSoNaoAtribuidas = (v: boolean) => setEscopo(v ? "nao_atribuidas" : ESCOPO_INBOX_PADRAO);
+  // Tradução única dos dois eixos para os filtros que a consulta já usava.
+  const estadoFiltros = {
+    base: escopoBase,
+    atendenteId: atendenteEscolhidoId,
+    visualizacao,
+    naoAtribuidas: naoAtribuidasFiltro,
+    gestor: souGestor,
+    meuId,
+  };
+  const escopo: EscopoInbox = escopoConsulta(estadoFiltros);
+  const atendenteSelecionadoId = atendenteConsulta(estadoFiltros);
+  const filtroStatus = statusConsulta(visualizacao);
+  const ordem = ordemVisualizacao(visualizacao);
+
+  const soNaoAtribuidas = naoAtribuidasFiltro;
+  const setSoNaoAtribuidas = (v: boolean) => setNaoAtribuidasFiltro(v);
   // DECISÃO ATUAL — a conversa aberta é uma SELEÇÃO INTERNA da Inbox, pelo id
   // interno da conversa. O endereço da tela é sempre /app/nina: abrir um lead
   // não cria, altera nem lê endereço individual.
@@ -453,8 +486,7 @@ export function AtendInbox() {
 
   // Filtro "somente espera crítica" — acionado pela Central de Atenção.
   const [soCriticas, setSoCriticas] = useState(false);
-  // Ordenação da lista: recentes (padrão) ou quem espera há mais tempo.
-  const [ordem, setOrdem] = useState<"recentes" | "espera">("recentes");
+  // A ordenação vem da visualização escolhida (ver `ordem`, acima).
   // conversaId -> instante da 1ª mensagem do paciente ainda sem resposta.
   const [espera, setEspera] = useState<Record<string, string>>({});
   // Sequenciais das recargas: descartam respostas fora de ordem (uma mensagem
@@ -521,6 +553,9 @@ export function AtendInbox() {
         (c: any) => faixaEsperaAtd(minutosDesde(espera[c.id])) === "critico",
       );
     }
+    // "Maior tempo esperando" usa a métrica canônica de paciente aguardando:
+    // conversa em que a clínica é que aguarda o paciente fica de fora.
+    base = base.filter((c: any) => conversaNaVisualizacao(visualizacao, espera[c.id]));
     if (ordem !== "espera") return base;
     return [...base].sort((a: any, b: any) => {
       const ta = espera[a.id] ? new Date(espera[a.id]).getTime() : Infinity;
@@ -532,7 +567,7 @@ export function AtendInbox() {
     const ativar = () => setSoNaoAtribuidas(true);
     const ativarCriticas = () => {
       setSoCriticas(true);
-      setOrdem("espera");
+      setVisualizacao("espera");
     };
     try {
       if (window.sessionStorage.getItem(FILTRO_NAO_ATRIBUIDAS_KEY) === "1") {
@@ -862,7 +897,7 @@ export function AtendInbox() {
         setSouGestor(!!r?.gestor);
         setSouAdmin(!!r?.admin);
         // Administrador não tem conversas próprias: abre já na visão da equipe.
-        if (r?.admin) setEscopo((e) => (e === ESCOPO_INBOX_PADRAO ? "equipe" : e));
+        if (r?.admin) setEscopoBase((b) => (b === ESCOPO_BASE_PADRAO ? "equipe" : b));
       })
       .catch(() => {
         if (!vivo) return;
@@ -1124,7 +1159,13 @@ export function AtendInbox() {
         setConvs((prev: any[]) =>
           prev.some((x: any) => x.id === row.id) ? prev : [row, ...prev],
         );
-        if (destino !== escopo) setEscopo(destino);
+        if (destino !== escopo) {
+          // Link direto: traduz o escopo antigo para os dois eixos atuais.
+          const alvo = estadoDeEscopoLegado(destino);
+          setEscopoBase(alvo.base);
+          setNaoAtribuidasFiltro(alvo.naoAtribuidas);
+          if (alvo.visualizacao) setVisualizacao(alvo.visualizacao);
+        }
       } catch (e: any) {
         if (selecaoIdRef.current !== idPedido) return;
         const msg = String(e?.message ?? "");
@@ -2901,112 +2942,101 @@ export function AtendInbox() {
                 )}
               </div>
             )}
-            <Select
-              value={escopo}
-              onValueChange={(v) => setEscopo(v as EscopoInbox)}
-              onOpenChange={setPainelMenuAberto}
-            >
-              <SelectTrigger className="h-8 text-xs" aria-label="Escopo das conversas">
-                <SelectValue placeholder="Não atribuídas" />
-
-              </SelectTrigger>
-              <SelectContent className="z-50 min-w-[--radix-select-trigger-width]">
-                <SelectItem value="minhas">Minhas conversas ({contadores.minhas})</SelectItem>
-                <SelectItem value="nina">Nina ({contadores.nina})</SelectItem>
-                {/* FASE 2 — "Não atribuídas" saiu da interface comum da Inbox:
-                    a fila é consultada pela Central de Atenção no cabeçalho.
-                    O escopo continua existindo e é ativado por ela. */}
-
-                <SelectItem value="fechadas">Fechadas ({contadores.fechadas})</SelectItem>
-                {souGestor && (
-                  <SelectItem value="equipe">Equipe ({contadores.equipe})</SelectItem>
-                )}
-              </SelectContent>
-            </Select>
-            {/* FASE 1 — supervisão: só quem já pode ver conversas de terceiros.
-                Filtro de visualização; nada de atribuição muda por causa dele. */}
-            {souGestor && (
+            {/* FASE 1 — dois eixos compactos na mesma linha:
+                [ Escopo ▾ ] [ Visualização ▾ ]. Atendentes ficam dentro do
+                Escopo (por user_id); a supervisão continua sendo decidida no
+                backend, o menu só reflete a permissão que já existe. */}
+            <div className="flex flex-wrap items-center gap-1.5">
               <Select
-                value={atendenteSelecionadoId ?? "todos"}
-                onValueChange={(v) => setAtendenteSelecionadoId(v === "todos" ? null : v)}
+                value={valorEscopoControle(escopoBase, atendenteEscolhidoId)}
+                onValueChange={(v) => {
+                  const alvo = lerValorEscopo(v);
+                  setEscopoBase(alvo.base);
+                  setAtendenteEscolhidoId(alvo.atendenteId);
+                  setNaoAtribuidasFiltro(false);
+                }}
                 onOpenChange={(aberto) => {
                   setPainelMenuAberto(aberto);
                   if (!aberto) setBuscaAtendente("");
                 }}
               >
-                <SelectTrigger className="h-8 text-xs" aria-label="Filtrar por atendente">
-                  <SelectValue placeholder="Atendente: Todos">
-                    {`Atendente: ${nomeAtendenteSelecionado ?? "Todos os atendentes"}`}
-                  </SelectValue>
+                <SelectTrigger
+                  className="h-8 min-w-0 flex-1 basis-[7.5rem] text-xs"
+                  aria-label="Escopo das conversas"
+                  title={rotuloEscopo(escopoBase, nomeAtendenteSelecionado)}
+                >
+                  <span className="truncate">
+                    {rotuloEscopo(escopoBase, nomeAtendenteSelecionado)}
+                  </span>
                 </SelectTrigger>
                 <SelectContent className="z-50 min-w-[--radix-select-trigger-width]">
-                  {/* Com equipe grande, dá para achar pelo nome sem rolar a
-                      lista inteira. Nada é buscado no servidor por isto. */}
-                  {usuarios.length > 8 && (
-                    <div className="px-2 pb-1 pt-1">
-                      <Input
-                        value={buscaAtendente}
-                        onChange={(e) => setBuscaAtendente(e.target.value)}
-                        onKeyDown={(e) => e.stopPropagation()}
-                        placeholder="Buscar atendente"
-                        className="h-7 text-xs"
-                        aria-label="Buscar atendente"
-                      />
-                    </div>
+                  <SelectItem value="minhas">Minhas conversas ({contadores.minhas})</SelectItem>
+                  {souGestor && (
+                    <SelectItem value="equipe">Todas as conversas ({contadores.equipe})</SelectItem>
                   )}
-                  <SelectItem value="todos">Atendente: Todos os atendentes</SelectItem>
-                  {/* Os números do seletor de escopo são sempre globais do
-                      filtro (Minhas, Nina, Equipe...). Quando um atendente
-                      está selecionado, a quantidade dele aparece ao lado da
-                      lista, para não misturar as duas contagens. */}
-                  {atendentesFiltrados.map((u: any) => (
-                    <SelectItem key={u.user_id} value={u.user_id}>
-                      {u.nome}
-                      {u.presenca ? ` · ${ROTULO_PRESENCA[u.presenca as PresencaAtendente]}` : ""}
-                    </SelectItem>
-                  ))}
-                  {usuarios.length > 8 && atendentesFiltrados.length === 0 && (
-                    <div className="px-2 py-2 text-xs text-muted-foreground">
-                      Nenhum atendente com esse nome.
-                    </div>
+                  <SelectItem value="nina">Nina ({contadores.nina})</SelectItem>
+                  {/* FASE 2 — "Não atribuídas" continua fora do menu comum:
+                      a fila é acionada pela Central de Atenção. */}
+                  {souGestor && (
+                    <>
+                      <div className="mt-1 border-t px-2 pb-1 pt-2 text-[10px] uppercase tracking-wide text-muted-foreground">
+                        Atendentes
+                      </div>
+                      {/* Com equipe grande, dá para achar pelo nome sem rolar a
+                          lista inteira. Nada é buscado no servidor por isto. */}
+                      {usuarios.length > 8 && (
+                        <div className="px-2 pb-1">
+                          <Input
+                            value={buscaAtendente}
+                            onChange={(e) => setBuscaAtendente(e.target.value)}
+                            onKeyDown={(e) => e.stopPropagation()}
+                            placeholder="Pesquisar atendente"
+                            className="h-7 text-xs"
+                            aria-label="Pesquisar atendente"
+                          />
+                        </div>
+                      )}
+                      {atendentesFiltrados.map((u: any) => (
+                        <SelectItem key={u.user_id} value={valorEscopoControle("equipe", u.user_id)}>
+                          {u.nome}
+                          {u.presenca
+                            ? ` · ${ROTULO_PRESENCA[u.presenca as PresencaAtendente]}`
+                            : ""}
+                        </SelectItem>
+                      ))}
+                      {usuarios.length > 8 && atendentesFiltrados.length === 0 && (
+                        <div className="px-2 py-2 text-xs text-muted-foreground">
+                          Nenhum atendente com esse nome.
+                        </div>
+                      )}
+                    </>
                   )}
                 </SelectContent>
               </Select>
-            )}
-            {souGestor && atendenteSelecionadoId && (
-              <span className="self-center text-[11px] text-muted-foreground">
-                {convs.length} conversa{convs.length === 1 ? "" : "s"} deste atendente
-              </span>
-            )}
-            <Select
-              value={filtroStatus}
-              onValueChange={(v) => setFiltroStatus(v as any)}
-              onOpenChange={setPainelMenuAberto}
-            >
-              <SelectTrigger className="h-8 text-xs">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent className="z-50 min-w-[--radix-select-trigger-width]">
-                <SelectItem value="all">Todas</SelectItem>
-                <SelectItem value="waiting">Em espera</SelectItem>
-                <SelectItem value="active">Ativas</SelectItem>
-                
-                <SelectItem value="closed">Fechadas</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select
-              value={ordem}
-              onValueChange={(v) => setOrdem(v as "recentes" | "espera")}
-              onOpenChange={setPainelMenuAberto}
-            >
-              <SelectTrigger className="h-8 text-xs" aria-label="Ordenar conversas">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent className="z-50 min-w-[--radix-select-trigger-width]">
-                <SelectItem value="recentes">Ordenar por: mais recentes</SelectItem>
-                <SelectItem value="espera">Ordenar por: mais antigos aguardando</SelectItem>
-              </SelectContent>
-            </Select>
+              <Select
+                value={visualizacao}
+                onValueChange={(v) => setVisualizacao(v as VisualizacaoInbox)}
+                onOpenChange={setPainelMenuAberto}
+              >
+                <SelectTrigger
+                  className="h-8 min-w-0 flex-1 basis-[7.5rem] text-xs"
+                  aria-label="Visualização das conversas"
+                  title={ROTULO_VISUALIZACAO[visualizacao]}
+                >
+                  <span className="truncate">{ROTULO_VISUALIZACAO[visualizacao]}</span>
+                </SelectTrigger>
+                <SelectContent className="z-50 min-w-[--radix-select-trigger-width]">
+                  <SelectItem value="recentes">Recentes</SelectItem>
+                  <SelectItem value="resolvidas">
+                    Resolvidas ({contadores.fechadas})
+                  </SelectItem>
+                  <SelectItem value="espera">Maior tempo esperando</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <span className="text-[11px] text-muted-foreground">
+              Conversas · {convsVisiveis.length}
+            </span>
             {soNaoAtribuidas && (
               <button
                 type="button"
