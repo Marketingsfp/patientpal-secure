@@ -509,7 +509,7 @@ const navRows: ReadonlyArray<{ label: string; items: ReadonlyArray<NavItem> }> =
       { to: "/app/alertas-enfermagem", label: "Enfermeira IA — Alertas", icon: BellRing },
       { to: "/app/consulta-rapida", label: "Informações rápidas", icon: BookOpen },
       // O antigo grupo "Nina — WhatsApp" saiu daqui: tudo de atendimento por
-      // mensagem passou a viver no portal "Atendimento / WhatsApp", nas seções
+      // mensagem passou a viver no portal "OS ZAP", nas seções
       // "Atendimento", "Nina" e "Configurações do WhatsApp" logo abaixo.
       {
         // Grupo expansível por especialidade. Cada filho tem rota própria —
@@ -562,7 +562,7 @@ const navRows: ReadonlyArray<{ label: string; items: ReadonlyArray<NavItem> }> =
     ],
   },
   // ---------------------------------------------------------------------
-  // Portal "Atendimento / WhatsApp". As três seções abaixo só aparecem
+  // Portal "OS ZAP" (atendimento por WhatsApp). As três seções abaixo só aparecem
   // nesse portal (o filtro do menu é por rótulo de seção). Nenhum endereço
   // mudou: são os mesmos itens que antes ficavam em "Inteligência" e
   // "Configurações", e o módulo de permissão continua sendo "nina".
@@ -600,9 +600,6 @@ const navRows: ReadonlyArray<{ label: string; items: ReadonlyArray<NavItem> }> =
     items: [
       { to: "/app/nina", hash: "config", label: "Configuração", icon: KeyRound },
       { to: "/app/nina", hash: "templates", label: "Templates aprovados (Meta)", icon: FileText },
-      // Continua também em "Configurações" da Clínica Médica: o TTS serve
-      // à Nina e ao painel/totem.
-      { to: "/app/configuracoes/voz", label: "Voz & Áudio (TTS)", icon: KeyRound },
     ],
   },
 ];
@@ -617,7 +614,7 @@ const ROTAS_HOME_PORTAL: ReadonlySet<string> = new Set(
 /**
  * A qual portal uma tela pertence, olhando a seção do menu em que ela está.
  * Serve para que um link antigo (ex.: /app/nina, que agora vive no portal
- * "Atendimento / WhatsApp") não fique "fora do menu" quando o usuário estiver
+ * OS ZAP) não fique "fora do menu" quando o usuário estiver
  * com outro portal ativo: o portal correto é assumido automaticamente.
  * Telas em seções compartilhadas (Gestão, Configurações) devolvem `null` —
  * elas pertencem a mais de um portal e não devem trocar nada.
@@ -1096,6 +1093,13 @@ function AppShellInner() {
   // rodapé e tocaria neles para cair em "Acesso negado".
   const bottomNavItens = useMemo(
     () => BOTTOM_NAV_ITENS.filter((i) => leafAllowed(i.to, allowedModules)),
+    [allowedModules],
+  );
+
+  // Portal sem nenhuma tela liberada não aparece no hub nem no seletor.
+  // O OS ZAP depende do módulo "nina", o mesmo de sempre — nenhum módulo novo.
+  const portaisOcultos = useMemo<SubsystemId[]>(
+    () => (leafAllowed("/app/nina", allowedModules) ? [] : ["os-zap"]),
     [allowedModules],
   );
 
@@ -1809,7 +1813,11 @@ function AppShellInner() {
           >
             <X className="h-4 w-4" />
           </button>
-          <PortalLauncher onPick={escolherPortal} className="min-h-[100dvh]" />
+          <PortalLauncher
+            onPick={escolherPortal}
+            className="min-h-[100dvh]"
+            ocultos={portaisOcultos}
+          />
         </div>
       )}
     </div>

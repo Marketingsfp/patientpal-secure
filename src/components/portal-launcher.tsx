@@ -22,16 +22,10 @@ const PORTAIS: Array<{
     itens: ["Marcação de ponto", "Funcionários", "Férias", "Holerites", "Treinamentos"],
   },
   {
-    id: "atendimento",
+    id: "os-zap",
     icon: MessageCircle,
     descricao: "Conversas de WhatsApp, mensagens prontas e tudo da Nina.",
-    itens: [
-      "Conversas",
-      "Mensagens prontas",
-      "Base de conhecimentos",
-      "Métricas",
-      "Configuração",
-    ],
+    itens: ["Conversas", "Mensagens prontas", "Base de conhecimentos", "Métricas"],
   },
 ];
 
@@ -39,10 +33,14 @@ const PORTAIS: Array<{
 export function PortalLauncher({
   onPick,
   className,
+  ocultos,
 }: {
   onPick: (id: SubsystemId) => void;
   className?: string;
+  /** Portais que o usuário não pode acessar — o cartão nem aparece. */
+  ocultos?: readonly SubsystemId[];
 }) {
+  const visiveis = PORTAIS.filter((p) => !(ocultos ?? []).includes(p.id));
   return (
     <div
       className={cn(
@@ -74,7 +72,7 @@ export function PortalLauncher({
         </div>
 
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 lg:gap-8">
-          {PORTAIS.map((portal) => {
+          {visiveis.map((portal) => {
             const Icon = portal.icon;
             return (
               <button
