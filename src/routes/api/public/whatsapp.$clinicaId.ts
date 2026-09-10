@@ -561,6 +561,21 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
                         });
                         turnoSuperseded = true;
                         reply = "";
+                        // FASE 1 — o turno existiu e não entregou nada: fica
+                        // registrado com o motivo, sem inventar uma entrega.
+                        const { registrarTurnoSemModelo } = await import(
+                          "@/lib/nina/rastreio/turno.server"
+                        );
+                        await registrarTurnoSemModelo({
+                          ...(auditoriaNina.traceId ? { turnoId: auditoriaNina.traceId } : {}),
+                          clinicaId: params.clinicaId,
+                          conversaId: convId,
+                          mensagensEntrada: entradasNina,
+                          batchId: loteId || null,
+                          revisaoConversa: revisaoTurno || null,
+                          origem: "nenhuma",
+                          motivo: "resposta descartada por revisão obsoleta da conversa",
+                        });
                       }
                     }
                     if (reply) {
