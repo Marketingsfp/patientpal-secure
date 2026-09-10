@@ -486,8 +486,7 @@ export function AtendInbox() {
 
   // Filtro "somente espera crítica" — acionado pela Central de Atenção.
   const [soCriticas, setSoCriticas] = useState(false);
-  // Ordenação da lista: recentes (padrão) ou quem espera há mais tempo.
-  const [ordem, setOrdem] = useState<"recentes" | "espera">("recentes");
+  // A ordenação vem da visualização escolhida (ver `ordem`, acima).
   // conversaId -> instante da 1ª mensagem do paciente ainda sem resposta.
   const [espera, setEspera] = useState<Record<string, string>>({});
   // Sequenciais das recargas: descartam respostas fora de ordem (uma mensagem
