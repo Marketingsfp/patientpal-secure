@@ -69,6 +69,7 @@ import { descriptorDaFoto, registrarBiometriaPaciente } from "@/lib/biometria";
 import { useClinica } from "@/hooks/use-clinica";
 
 import { DateInputBR } from "@/components/ui/date-input-br";
+import { Badge } from "@/components/ui/badge";
 export interface Paciente {
   id: string;
   nome: string;
