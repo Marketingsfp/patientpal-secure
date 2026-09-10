@@ -152,19 +152,41 @@ export type TipoClaim =
   | "disponibilidade"
   | "preparo"
   | "regra"
-  | "agendamento";
+  | "agendamento"
+  // FASE 2 — cobertura de serviço, local, convênio, restrição e escala.
+  | "servico"
+  | "endereco"
+  | "unidade"
+  | "convenio"
+  | "restricao"
+  | "escala";
+
+/**
+ * FASE 2 — como a frase se relaciona com o fato. Uma recusa prudente
+ * ("não tenho o preço confirmado") NÃO é afirmação de preço.
+ */
+export type ModalidadeClaim = "afirmacao" | "negacao" | "pergunta" | "hipotese";
 
 /**
  * Claim declarado de forma estruturada pelo próprio ciclo do turno (metadata /
  * structured output do modelo atual, quando existir). Nunca é obrigatório: sem
  * ele, a verificação usa contexto e a leitura complementar do texto.
+ *
+ * FASE 2: claim sugerido pelo modelo NÃO é evidência. O servidor confronta
+ * `valor` + `chave` com os fatos recuperados antes de aceitar qualquer um.
  */
 export type ClaimEstruturado = {
   id?: string;
   tipo: TipoClaim;
   texto: string;
   fonte?: { tipo: TipoFonte; referencia?: string | null } | null;
+  modalidade?: ModalidadeClaim;
+  /** Valor afirmado (preço, endereço, horário...). */
+  valor?: string | null;
+  /** A que caso a afirmação se refere (procedimento, médico, dia, unidade). */
+  chave?: import("./evidencia").ChaveFato | null;
 };
+
 
 /**
  * FASE 5 — o que está sendo avaliado.
@@ -197,6 +219,15 @@ export type ContextoConfianca = {
   entities?: Record<string, unknown>;
   retrievedSources: FonteRecuperada[];
   toolResults: ResultadoFerramenta[];
+  /**
+   * FASE 2 — fatos concretos extraídos pelo SERVIDOR dos retornos reais das
+   * ferramentas. É contra estes fatos que cada afirmação é conferida.
+   * Ausente = o turno não propagou evidência (avaliação incompleta, não "ok").
+   */
+  fatos?: import("./evidencia").FatoRecuperado[];
+  /** FASE 2 — estado real de cada consulta do turno, com tentativas/retry. */
+  consultas?: import("./evidencia").ConsultaDoTurno[];
+
   /** Campos obrigatórios para a ação pretendida. */
   requiredFields?: string[];
   businessContext: ContextoNegocio;

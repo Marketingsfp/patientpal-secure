@@ -1,6 +1,8 @@
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { normalizarTelefone } from "@/lib/atendimento/telefone";
+import { consolidarTentativas } from "@/lib/nina/confidence/evidencia";
 import { agoraNaClinica } from "@/lib/nina-agora";
+
 import { normalizar } from "@/lib/nina-especialidade";
 
 const META_VERSION = "v22.0";
@@ -1418,6 +1420,9 @@ async function gerarRespostaNinaInterno(
     erro?: string | undefined;
   }> = [];
   let catalogoEncontrou = false;
+  // FASE 2 — fatos concretos e consultas do turno (com retry consolidado).
+  const fatosDoTurno: import("@/lib/nina/confidence/evidencia").FatoRecuperado[] = [];
+  const consultasDoTurno: import("@/lib/nina/confidence/evidencia").ConsultaDoTurno[] = [];
   let esclarecimentoConfiancaUsado = false;
   // FASE 4 — quantas vezes a Nina já tentou esclarecer neste atendimento.
   // O limite vive na política central (POLITICA_RECUPERACAO_PADRAO).
@@ -1598,6 +1603,8 @@ async function gerarRespostaNinaInterno(
         intentAmbiguo: canonico.intentAmbiguo,
         messageId: canonico.messageIdEntrada,
         ferramentas: evidenciasFerramentas,
+        fatos: fatosDoTurno,
+        consultas: consolidarTentativas(consultasDoTurno),
         catalogoEncontrou,
         agendamentoConfirmado,
         pacienteIdentificado: Boolean(pacienteIdEfetivo),
@@ -1907,6 +1914,24 @@ async function gerarRespostaNinaInterno(
         });
       }
       nomesFerramentasTurno.push(nome);
+      // Evidência estruturada: fatos reais do retorno + status da consulta.
+      try {
+        const { extrairEvidencia } = await import("@/lib/nina/confidence/evidencia-extrator");
+        const ex = extrairEvidencia({
+          ferramenta: nome,
+          capacidade: r.capacidade,
+          fonte: r.fonte,
+          args: c.function?.arguments ?? null,
+          success: r.success,
+          erro: r.erro ?? null,
+          dados: r.dados,
+          clinicaId,
+        } as never);
+        fatosDoTurno.push(...ex.fatos);
+        consultasDoTurno.push(ex.consulta);
+      } catch {
+        // Extração é observacional: nunca interrompe o atendimento.
+      }
       // Evidência para o Confidence Engine (não altera o que o modelo vê).
       evidenciasFerramentas.push({
         nome,

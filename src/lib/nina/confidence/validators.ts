@@ -11,7 +11,7 @@
  */
 import { acaoExecutavel, acaoOuNenhuma, contaContraANota } from "./types";
 import { aplicabilidadeDoTurno } from "./turno-tipo";
-import { ClaimGroundingValidator } from "./claims";
+import { ClaimGroundingValidator, somenteNegativasApoiadas } from "./claims";
 import { WorkflowConsistencyValidator } from "./workflow";
 import type {
   Bloqueador,
@@ -285,14 +285,28 @@ export function OfficialSourceValidator(
         ferramentaOk(f),
     ) || ctx.retrievedSources.some((s) => s.tipo === "agenda" && fonteUtil(s));
 
+  // FASE 2 — reserva já persistida é prova de agenda para o horário reservado.
+  const reservaPersistida =
+    ctx.operationalState?.appointmentCreated === true && Boolean(ctx.operationalState?.appointmentId);
+
   const precisaAgenda = oficiais.some(
     (c) => c === "horario" || c === "disponibilidade" || c === "profissional" || c === "agendamento",
   );
-  const atendido = precisaAgenda ? catalogoOk || agendaOk : catalogoOk;
+  const atendido = precisaAgenda ? catalogoOk || agendaOk || reservaPersistida : catalogoOk;
 
-  if (atendido) {
-    return res(nome, "PASS", 100, "FONTE_OFICIAL_PRESENTE", { categorias: oficiais, catalogoOk, agendaOk });
+  if (!atendido && somenteNegativasApoiadas(ctx)) {
+    // Consulta oficial que respondeu SEM itens sustenta a negativa.
+    return res(nome, "PASS", 100, "NEGATIVA_APOIADA_EM_CONSULTA_OFICIAL", { categorias: oficiais });
   }
+  if (atendido) {
+    return res(nome, "PASS", 100, "FONTE_OFICIAL_PRESENTE", {
+      categorias: oficiais,
+      catalogoOk,
+      agendaOk,
+      reservaPersistida,
+    });
+  }
+
   const blocker: Bloqueador = oficiais.includes("valor")
     ? "VALOR_SEM_CATALOGO"
     : precisaAgenda
@@ -359,21 +373,56 @@ export function ToolIntegrityValidator(ctx: ContextoConfianca): ResultadoValidad
       : res(nome, "NOT_APPLICABLE", 100, "SEM_FERRAMENTAS", {});
   }
 
-  const falhas = ctx.toolResults.filter((f) => !ferramentaOk(f));
+  // FASE 2 — falha RECUPERADA não contamina o turno: se a MESMA consulta foi
+  // refeita com sucesso, o resultado vigente é o sucesso. O histórico continua
+  // registrado como evidência, mas não bloqueia.
+  const identidade = (f: (typeof ctx.toolResults)[number]) => `${f.nome}|${f.capacidade ?? ""}`;
+  const ultimoOkPorConsulta = new Map<string, number>();
+  ctx.toolResults.forEach((f, i) => {
+    if (ferramentaOk(f)) ultimoOkPorConsulta.set(identidade(f), i);
+  });
+  const recuperadas = ctx.toolResults.filter(
+    (f, i) => !ferramentaOk(f) && (ultimoOkPorConsulta.get(identidade(f)) ?? -1) > i,
+  );
+  const falhas = ctx.toolResults.filter(
+    (f, i) => !ferramentaOk(f) && (ultimoOkPorConsulta.get(identidade(f)) ?? -1) <= i,
+  );
   if (falhas.length > 0) {
     return res(
       nome,
       "BLOCK",
       0,
       "FERRAMENTA_FALHOU",
-      { falhas: falhas.map((f) => ({ nome: f.nome, erro: f.erro ?? "sem resposta" })) },
+      {
+        falhas: falhas.map((f) => ({ nome: f.nome, erro: f.erro ?? "sem resposta" })),
+        ...(recuperadas.length > 0
+          ? { recuperadas: recuperadas.map((f) => ({ nome: f.nome, erro: f.erro ?? null })) }
+          : {}),
+      },
       "FERRAMENTA_FALHOU",
     );
   }
-  const vazias = ctx.toolResults.filter((f) => f.temConteudo === false);
-  if (vazias.length === ctx.toolResults.length) {
-    return res(nome, "WARNING", 60, "RETORNO_VAZIO", { ferramentas: vazias.map((f) => f.nome) });
+  const efetivas = ctx.toolResults.filter((f) => ferramentaOk(f));
+  const vazias = efetivas.filter((f) => f.temConteudo === false);
+  if (efetivas.length > 0 && vazias.length === efetivas.length && somenteNegativasApoiadas(ctx)) {
+    // Consulta que respondeu SEM itens é exatamente a prova de uma negativa.
+    return res(nome, "PASS", 100, "CONSULTA_VAZIA_SUSTENTA_NEGATIVA", {
+      ferramentas: vazias.map((f) => f.nome),
+    });
   }
+  if (efetivas.length > 0 && vazias.length === efetivas.length) {
+    return res(nome, "WARNING", 60, "RETORNO_VAZIO", {
+      ferramentas: vazias.map((f) => f.nome),
+      ...(recuperadas.length > 0 ? { tentativasRecuperadas: recuperadas.length } : {}),
+    });
+  }
+  if (recuperadas.length > 0) {
+    return res(nome, "PASS", 100, "FERRAMENTAS_INTEGRAS_APOS_RETRY", {
+      executadas: ctx.toolResults.length,
+      recuperadas: recuperadas.map((f) => ({ nome: f.nome, erro: f.erro ?? null })),
+    });
+  }
+
   return res(nome, "PASS", 100, "FERRAMENTAS_INTEGRAS", { executadas: ctx.toolResults.length });
 }
 

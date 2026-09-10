@@ -1,31 +1,39 @@
 /**
  * FASE 5 — CLAIM-LEVEL GROUNDING.
+ * FASE 2 — CORRESPONDÊNCIA ENTRE AFIRMAÇÃO E FATO RECUPERADO.
  *
- * O problema que este módulo resolve: `catalogoEncontrou = true` era tratado
- * como se validasse a RESPOSTA INTEIRA. Uma resposta, porém, costuma conter
- * várias afirmações independentes:
+ * O problema original: `catalogoEncontrou = true` era tratado como se
+ * validasse a RESPOSTA INTEIRA. Uma resposta, porém, costuma conter várias
+ * afirmações independentes:
  *
- *   "Cardiologia custa R$ 150"        -> catálogo publicado (campo valor)
+ *   "Cardiologia custa R$ 150"        -> catálogo publicado (campo preco)
  *   "Dr. João atende"                  -> catálogo publicado (profissional)
- *   "há vaga sábado às 14h"            -> Agenda
+ *   "há vaga sábado às 14h"            -> Agenda (slot concreto)
  *
- * Se a terceira afirmação não tem evidência, a resposta NÃO é confiável só
- * porque o catálogo respondeu à primeira.
+ * A partir da FASE 2, cada afirmação é confrontada com o FATO correspondente
+ * (`ctx.fatos`, extraído pelo servidor do retorno real das ferramentas):
  *
- * Regras deste módulo:
- * 1. Cada afirmação sensível é rastreada individualmente até uma fonte.
- * 2. Nada de chamada extra de modelo (GPT/Sol) no caminho crítico: a
- *    verificação usa contexto estruturado, tool results, fontes recuperadas,
- *    estado operacional e regras determinísticas.
- * 3. Claims estruturados vindos do próprio ciclo do modelo (quando existirem)
- *    têm prioridade; a extração por texto é camada COMPLEMENTAR, nunca a única
- *    fonte de verdade do significado operacional.
- * 4. "Muitos fatos" nunca é penalidade. O que penaliza é fato SEM evidência.
+ * - preço de outro procedimento não apoia o preço afirmado;
+ * - escala publicada não prova vaga;
+ * - recusa prudente ("não tenho o preço confirmado") não é afirmação de preço;
+ * - quando a evidência exigida não foi propagada, o resultado é INCOMPLETO
+ *   (UNKNOWN), nunca aprovação silenciosa.
  */
 import { classificarAfirmacaoOperacional } from "./workflow";
+import {
+  corresponder,
+  consolidarTentativas,
+  houveTruncamento,
+  normalizarTexto,
+  type ChaveFato,
+  type ConsultaDoTurno,
+  type EntidadeFato,
+  type FatoRecuperado,
+} from "./evidencia";
 import type {
   ClaimEstruturado,
   ContextoConfianca,
+  ModalidadeClaim,
   ResultadoFerramenta,
   ResultadoValidador,
   TipoClaim,
@@ -38,6 +46,9 @@ const CAP_CATALOGO = new Set(["searchKnowledgeBase", "listCatalog"]);
 const CAP_AGENDA = new Set(["checkAvailability", "listSlots", "createAppointment"]);
 const CAP_PROFISSIONAL = new Set(["listProfessionals", "getProfessional"]);
 
+/** Limite de afirmações avaliadas por resposta — ao estourar, a avaliação é incompleta. */
+const LIMITE_CLAIMS = 60;
+
 /** Fontes que podem sustentar cada tipo de afirmação. */
 const FONTES_ACEITAS: Record<TipoClaim, TipoFonte[]> = {
   valor: ["catalogo_publicado"],
@@ -46,7 +57,38 @@ const FONTES_ACEITAS: Record<TipoClaim, TipoFonte[]> = {
   preparo: ["catalogo_publicado"],
   regra: ["catalogo_publicado", "instrucoes"],
   agendamento: ["agenda"],
+  servico: ["catalogo_publicado"],
+  endereco: ["catalogo_publicado", "instrucoes"],
+  unidade: ["catalogo_publicado", "instrucoes"],
+  convenio: ["catalogo_publicado"],
+  restricao: ["catalogo_publicado", "instrucoes"],
+  escala: ["catalogo_publicado", "agenda"],
 };
+
+/** Onde procurar o fato de cada tipo de afirmação. */
+const ALVO_DO_FATO: Record<TipoClaim, { entidades: EntidadeFato[]; campos: string[]; monetario?: boolean }> = {
+  valor: { entidades: ["procedimento", "servico"], campos: ["preco"], monetario: true },
+  preparo: { entidades: ["procedimento"], campos: ["preparo"] },
+  profissional: { entidades: ["profissional"], campos: ["nome"] },
+  disponibilidade: { entidades: ["vaga"], campos: ["slot"] },
+  escala: { entidades: ["escala"], campos: ["dia_atendimento", "funcionamento"] },
+  agendamento: { entidades: ["agendamento"], campos: ["appointment_id"] },
+  endereco: { entidades: ["endereco", "unidade"], campos: ["endereco"] },
+  unidade: { entidades: ["unidade", "clinica"], campos: ["nome", "endereco"] },
+  convenio: { entidades: ["convenio"], campos: ["cobertura", "aceito"] },
+  servico: { entidades: ["servico", "procedimento"], campos: ["oferecido", "nome"] },
+  restricao: { entidades: ["restricao"], campos: ["observacao"] },
+  regra: { entidades: ["restricao", "procedimento"], campos: ["observacao", "regra"] },
+};
+
+/** Como o claim terminou. */
+export type SituacaoClaim =
+  | "confirmado"
+  | "divergente"
+  | "fora_do_escopo"
+  | "sem_fonte"
+  /** Havia canal de evidência, mas o fato não foi propagado ao motor. */
+  | "nao_verificado";
 
 export type ClaimAvaliado = {
   id: string;
@@ -55,9 +97,13 @@ export type ClaimAvaliado = {
   trecho: string;
   /** Como o claim entrou: estrutura do turno ou leitura complementar do texto. */
   origem: "estruturado" | "texto";
+  modalidade: ModalidadeClaim;
+  situacao: SituacaoClaim;
   suportado: boolean;
   /** Fonte concreta que sustentou o claim (quando houve). */
   fonte: string | null;
+  /** Valor que a fonte traz, quando diferente do afirmado. */
+  valorDaFonte?: string | null;
   motivo: string;
 };
 
@@ -65,7 +111,12 @@ export type ResultadoGrounding = {
   claims: ClaimAvaliado[];
   total: number;
   suportados: number;
+  /** Afirmou sem fonte, ou afirmou o que a fonte contradiz. */
   semEvidencia: ClaimAvaliado[];
+  /** Não deu para verificar: evidência não propagada ou avaliação truncada. */
+  naoVerificados: ClaimAvaliado[];
+  /** A avaliação está incompleta (limite de claims ou retorno truncado). */
+  truncado: boolean;
 };
 
 // ------------------------------------------------------- evidência disponível
@@ -80,13 +131,20 @@ function ferramentaComConteudo(ctx: ContextoConfianca, caps: Set<string>): boole
   );
 }
 
+function ferramentaExecutada(ctx: ContextoConfianca, caps: Set<string>): boolean {
+  return ctx.toolResults.some((f) => f.capacidade !== null && caps.has(f.capacidade) && ok(f));
+}
+
 function fonteDisponivel(ctx: ContextoConfianca, tipo: TipoFonte): boolean {
   return ctx.retrievedSources.some(
     (s) => s.tipo === tipo && s.temConteudo && s.publicado !== false && s.interna !== true,
   );
 }
 
-/** Evidências efetivamente presentes neste turno, por tipo de afirmação. */
+/**
+ * Canal de evidência existente por tipo de afirmação. Continua valendo como
+ * mapa de ORIGEM possível — não como prova de que o fato específico existe.
+ */
 export function evidenciasDisponiveis(ctx: ContextoConfianca): Record<TipoClaim, string | null> {
   const catalogo =
     ferramentaComConteudo(ctx, CAP_CATALOGO) || fonteDisponivel(ctx, "catalogo_publicado")
@@ -105,17 +163,56 @@ export function evidenciasDisponiveis(ctx: ContextoConfianca): Record<TipoClaim,
   return {
     valor: catalogo,
     profissional,
-    disponibilidade: agenda,
+    // FASE 2 — uma reserva já persistida comprova o horário reservado, mesmo
+    // sem nova consulta de agenda neste turno.
+    disponibilidade: agenda ?? provaAgendamento,
     preparo: catalogo,
     regra: catalogo ?? instrucoes,
     agendamento: provaAgendamento,
+    servico: catalogo,
+    endereco: catalogo ?? instrucoes,
+    unidade: catalogo ?? instrucoes,
+    convenio: catalogo,
+    restricao: catalogo ?? instrucoes,
+    escala: catalogo ?? agenda,
   };
+}
+
+/** Consultas do turno: as propagadas pelo servidor ou, na falta, as inferidas. */
+export function consultasDoTurno(ctx: ContextoConfianca): ConsultaDoTurno[] {
+  if (ctx.consultas && ctx.consultas.length > 0) return consolidarTentativas(ctx.consultas);
+  return consolidarTentativas(
+    ctx.toolResults.map((f) => ({
+      id: `${f.nome}|${f.capacidade ?? ""}`,
+      consulta: f.nome,
+      capacidade: f.capacidade,
+      status: !ok(f) ? "falha" : f.temConteudo === false ? "vazio" : "nao_verificado",
+      tentativas: 1,
+      falhasAnteriores: [],
+      erro: f.erro ?? null,
+    })),
+  );
+}
+
+/** Uma consulta desse tipo respondeu corretamente (com ou sem itens)? */
+function consultaRespondeu(ctx: ContextoConfianca, caps: Set<string>): ConsultaDoTurno | null {
+  return (
+    consultasDoTurno(ctx).find(
+      (c) => c.capacidade !== null && caps.has(c.capacidade) && c.status !== "falha",
+    ) ?? null
+  );
+}
+
+function capsDoTipo(tipo: TipoClaim): Set<string> {
+  if (tipo === "disponibilidade" || tipo === "agendamento") return CAP_AGENDA;
+  if (tipo === "profissional") return new Set([...CAP_CATALOGO, ...CAP_PROFISSIONAL]);
+  return CAP_CATALOGO;
 }
 
 // ------------------------------------------------ extração complementar (texto)
 
 const PADROES: Array<{ tipo: TipoClaim; re: RegExp }> = [
-  { tipo: "valor", re: /R\$\s?\d[\d.,]*|custa\s+\d|valor\s+(é|de)\s+\d/gi },
+  { tipo: "valor", re: /R\$\s?\d[\d.,]*|custa\s+\d[\d.,]*|valor\s+(é|de)\s+\d[\d.,]*/gi },
   {
     tipo: "profissional",
     re: /\b(dr|dra|doutor|doutora)\.?\s+[A-ZÀ-Ú][\p{L}]+(\s+[A-ZÀ-Ú][\p{L}]+)?/giu,
@@ -130,19 +227,62 @@ const PADROES: Array<{ tipo: TipoClaim; re: RegExp }> = [
   },
   {
     tipo: "regra",
-    re: /((é|e)\s+obrigat[óo]rio[^.!?\n]*)|(n[ãa]o\s+aceitamos[^.!?\n]*)|(o\s+conv[êe]nio[^.!?\n]{0,60}(cobre|n[ãa]o\s+cobre)[^.!?\n]*)/gi,
+    re: /((é|e)\s+obrigat[óo]rio[^.!?\n]*)|(n[ãa]o\s+aceitamos[^.!?\n]*)/gi,
+  },
+  // FASE 2 — cobertura de endereço, serviço e convênio.
+  {
+    tipo: "endereco",
+    re: /((ficamos|estamos|atendemos|fica|funcionamos)\s+(na|no|em)\s+[^.!?\n]{6,90})|((rua|av\.?|avenida|travessa|rodovia)\s+[^.!?\n]{4,90})/gi,
+  },
+  {
+    tipo: "convenio",
+    re: /(conv[êe]nio[^.!?\n]*)|((aceitamos|atendemos|cobre|cobrimos)\s+[^.!?\n]{0,40}(plano|conv[êe]nio|unimed|amil|bradesco)[^.!?\n]*)/gi,
+  },
+  {
+    tipo: "servico",
+    re: /((realizamos|fazemos|oferecemos|temos)\s+(o\s+|a\s+)?(exame|procedimento|consulta)[^.!?\n]*)/gi,
   },
 ];
+
+const RE_NEGACAO =
+  /\b(n[ãa]o|nao)\b[^.!?\n]{0,60}|(\bsem\s+(informa[çc][ãa]o|confirma[çc][ãa]o|previs[ãa]o)\b)|(\bainda\s+n[ãa]o\b)/i;
+const RE_HIPOTESE = /\b(geralmente|normalmente|costuma|em m[ée]dia|acredito|acho que|talvez|deve ser)\b/i;
+
+/** Frase que contém o trecho — a modalidade é lida na frase, não na palavra. */
+function fraseDoTrecho(texto: string, trecho: string): string {
+  const partes = texto.split(/(?<=[.!?\n])\s+/);
+  return partes.find((p) => p.includes(trecho)) ?? texto;
+}
+
+export function classificarModalidade(frase: string): ModalidadeClaim {
+  const f = frase.trim();
+  if (!f) return "afirmacao";
+  if (/\?\s*$/.test(f)) return "pergunta";
+  if (RE_HIPOTESE.test(f)) return "hipotese";
+  if (RE_NEGACAO.test(f)) return "negacao";
+  return "afirmacao";
+}
+
+/** Valor citado na afirmação (para conferir contra o fato). */
+function valorAfirmado(tipo: TipoClaim, trecho: string): string | null {
+  if (tipo === "valor") {
+    const m = trecho.match(/R\$\s?[\d.,]+|\d[\d.,]*/);
+    return m ? m[0] : null;
+  }
+  return null;
+}
+
+export type ClaimDoTexto = { tipo: TipoClaim; trecho: string; modalidade: ModalidadeClaim };
 
 /**
  * Camada COMPLEMENTAR: lê o texto final procurando afirmações sensíveis.
  * Nunca é usada como única fonte de verdade do significado operacional —
  * afirmações de agendamento vêm da gramática já existente do workflow.
  */
-export function extrairClaimsDoTexto(texto: string): Array<{ tipo: TipoClaim; trecho: string }> {
+export function extrairClaimsDoTexto(texto: string): ClaimDoTexto[] {
   const t = (texto ?? "").trim();
   if (!t) return [];
-  const achados: Array<{ tipo: TipoClaim; trecho: string }> = [];
+  const achados: ClaimDoTexto[] = [];
   const vistos = new Set<string>();
 
   for (const { tipo, re } of PADROES) {
@@ -151,15 +291,20 @@ export function extrairClaimsDoTexto(texto: string): Array<{ tipo: TipoClaim; tr
       const chave = `${tipo}:${trecho.toLowerCase()}`;
       if (!trecho || vistos.has(chave)) continue;
       vistos.add(chave);
-      achados.push({ tipo, trecho });
-      if (achados.length >= 30) return achados;
+      const modalidade = classificarModalidade(fraseDoTrecho(t, trecho));
+      achados.push({ tipo, trecho, modalidade });
+      if (achados.length >= LIMITE_CLAIMS) return achados;
     }
   }
 
   // Afirmação operacional de agendamento: gramática única, a do workflow.
   const operacional = classificarAfirmacaoOperacional(t);
   if (operacional === "sucesso_agendamento") {
-    achados.push({ tipo: "agendamento", trecho: "afirmação de agendamento concluído" });
+    achados.push({
+      tipo: "agendamento",
+      trecho: "afirmação de agendamento concluído",
+      modalidade: "afirmacao",
+    });
   }
   return achados;
 }
@@ -171,77 +316,264 @@ export function extrairClaimsDoTexto(texto: string): Array<{ tipo: TipoClaim; tr
  * Determinístico: nenhuma chamada de modelo acontece aqui.
  */
 export function avaliarGrounding(ctx: ContextoConfianca, texto?: string | null): ResultadoGrounding {
-  const disponivel = evidenciasDisponiveis(ctx);
+  const canal = evidenciasDisponiveis(ctx);
+  const fatos: FatoRecuperado[] | null = ctx.fatos ?? null;
   const estruturados: ClaimEstruturado[] = ctx.claims ?? [];
   const claims: ClaimAvaliado[] = [];
   const vistos = new Set<string>();
+  let truncado = houveTruncamento(consultasDoTurno(ctx));
+
+  const push = (c: Omit<ClaimAvaliado, "id">) => {
+    claims.push({ id: `${c.tipo}-${claims.length + 1}`, ...c });
+  };
 
   const registrar = (
     tipo: TipoClaim,
     trecho: string,
     origem: ClaimAvaliado["origem"],
     fonteDeclarada: TipoFonte | null,
+    modalidade: ModalidadeClaim,
+    valor: string | null,
+    chave: ChaveFato | null,
   ) => {
-    const chave = `${tipo}:${trecho.toLowerCase()}`;
-    if (vistos.has(chave)) return;
-    vistos.add(chave);
+    const idem = `${tipo}:${normalizarTexto(trecho)}`;
+    if (vistos.has(idem)) return;
+    vistos.add(idem);
+    if (claims.length >= LIMITE_CLAIMS) {
+      truncado = true;
+      return;
+    }
 
-    const fonte = disponivel[tipo];
+    // Pergunta não afirma nada — nada a verificar.
+    if (modalidade === "pergunta") return;
+
     const aceitas = FONTES_ACEITAS[tipo];
-    const declaradaValida =
-      fonteDeclarada === null || aceitas.includes(fonteDeclarada) || tipo === "agendamento";
+    const canalDoTipo = canal[tipo];
 
-    if (!fonte) {
-      claims.push({
-        id: `${tipo}-${claims.length + 1}`,
+    // Hipótese explícita não é fato verificado, mas também não é fato sem fonte.
+    if (modalidade === "hipotese") {
+      push({
         tipo,
         trecho,
         origem,
+        modalidade,
+        situacao: "nao_verificado",
         suportado: false,
         fonte: null,
-        motivo:
-          tipo === "agendamento"
-            ? "afirmação de agendamento sem prova persistida (appointment_id)"
-            : `sem evidência de ${aceitas.join(" ou ")} para esta afirmação`,
+        motivo: "afirmação apresentada como estimativa — não confirmada em fonte oficial",
       });
       return;
     }
-    if (!declaradaValida) {
-      claims.push({
-        id: `${tipo}-${claims.length + 1}`,
+
+    // Negativa: precisa que a consulta correspondente TENHA respondido.
+    if (modalidade === "negacao") {
+      const consulta = consultaRespondeu(ctx, capsDoTipo(tipo));
+      const fonteOficial = canalDoTipo ?? (consulta ? aceitas[0] ?? null : null);
+      if (consulta) {
+        push({
+          tipo,
+          trecho,
+          origem,
+          modalidade,
+          situacao: "confirmado",
+          suportado: true,
+          fonte: fonteOficial,
+          motivo:
+            consulta.status === "vazio"
+              ? "negativa apoiada em consulta que respondeu sem itens"
+              : "negativa apoiada em consulta oficial do turno",
+        });
+        return;
+      }
+      push({
         tipo,
         trecho,
         origem,
+        modalidade,
+        situacao: "sem_fonte",
         suportado: false,
-        fonte,
+        fonte: null,
+        motivo: `negativa sem consulta a ${aceitas.join(" ou ")} neste turno`,
+      });
+      return;
+    }
+
+    // Agendamento: a prova é o registro persistido, não o texto.
+    if (tipo === "agendamento") {
+      const provaFato =
+        fatos && fatos.some((f) => f.entidade === "agendamento" && f.valor);
+      const prova = canal.agendamento ?? (provaFato ? "agenda" : null);
+      push({
+        tipo,
+        trecho,
+        origem,
+        modalidade,
+        situacao: prova ? "confirmado" : "sem_fonte",
+        suportado: Boolean(prova),
+        fonte: prova,
+        motivo: prova
+          ? "agendamento comprovado por registro persistido"
+          : "afirmação de agendamento sem prova persistida (appointment_id)",
+      });
+      return;
+    }
+
+    if (fonteDeclarada !== null && !aceitas.includes(fonteDeclarada)) {
+      push({
+        tipo,
+        trecho,
+        origem,
+        modalidade,
+        situacao: "sem_fonte",
+        suportado: false,
+        fonte: canalDoTipo,
         motivo: `fonte declarada (${fonteDeclarada}) não é oficial para ${tipo}`,
       });
       return;
     }
-    claims.push({
-      id: `${tipo}-${claims.length + 1}`,
+
+    // --------- confronto com o FATO recuperado (caminho principal da FASE 2)
+    const alvo = ALVO_DO_FATO[tipo];
+    if (fatos) {
+      for (const campo of alvo.campos) {
+        const r = corresponder(fatos, {
+          entidades: alvo.entidades,
+          campo,
+          valor,
+          ...(alvo.monetario ? { monetario: true } : {}),
+          chave,
+        });
+        if (r.situacao === "confirmado") {
+          push({
+            tipo,
+            trecho,
+            origem,
+            modalidade,
+            situacao: "confirmado",
+            suportado: true,
+            fonte: r.fato.fonte,
+            motivo: "afirmação corresponde ao registro recuperado",
+          });
+          return;
+        }
+        if (r.situacao === "divergente") {
+          push({
+            tipo,
+            trecho,
+            origem,
+            modalidade,
+            situacao: "divergente",
+            suportado: false,
+            fonte: r.fato.fonte,
+            valorDaFonte: r.esperado,
+            motivo: `valor afirmado diverge da fonte (fonte: ${r.esperado ?? "vazio"})`,
+          });
+          return;
+        }
+        if (r.situacao === "fora_do_escopo") {
+          push({
+            tipo,
+            trecho,
+            origem,
+            modalidade,
+            situacao: "fora_do_escopo",
+            suportado: false,
+            fonte: canalDoTipo,
+            motivo: "a fonte consultada não cobre este caso (procedimento/profissional/dia)",
+          });
+          return;
+        }
+      }
+    }
+
+    // Reserva já persistida comprova o horário que ela mesma reservou.
+    if (
+      (tipo === "disponibilidade" || tipo === "escala") &&
+      typeof canalDoTipo === "string" &&
+      canalDoTipo.startsWith("appointment_id:")
+    ) {
+      push({
+        tipo,
+        trecho,
+        origem,
+        modalidade,
+        situacao: "confirmado",
+        suportado: true,
+        fonte: canalDoTipo,
+        motivo: "horário comprovado pela reserva já persistida",
+      });
+      return;
+    }
+
+    // --------- sem fato correspondente
+    const houveCanal = Boolean(canalDoTipo) || ferramentaExecutada(ctx, capsDoTipo(tipo));
+    if (!houveCanal) {
+      push({
+        tipo,
+        trecho,
+        origem,
+        modalidade,
+        situacao: "sem_fonte",
+        suportado: false,
+        fonte: null,
+        motivo: `sem evidência de ${aceitas.join(" ou ")} para esta afirmação`,
+      });
+      return;
+    }
+    if (fatos) {
+      push({
+        tipo,
+        trecho,
+        origem,
+        modalidade,
+        situacao: "sem_fonte",
+        suportado: false,
+        fonte: null,
+        motivo: "a consulta não retornou este dado — afirmação não comprovada",
+      });
+      return;
+    }
+    // Canal existia, mas o turno não propagou os fatos: avaliação INCOMPLETA.
+    push({
       tipo,
       trecho,
       origem,
-      suportado: true,
-      fonte,
-      motivo: "afirmação apoiada em registro do sistema",
+      modalidade,
+      situacao: "nao_verificado",
+      suportado: false,
+      fonte: canalDoTipo,
+      motivo: "evidência estruturada não propagada ao motor — verificação incompleta",
     });
   };
 
   for (const c of estruturados) {
-    registrar(c.tipo, (c.texto ?? "").trim().slice(0, 160) || c.tipo, "estruturado", c.fonte?.tipo ?? null);
+    const trecho = (c.texto ?? "").trim().slice(0, 160) || c.tipo;
+    registrar(
+      c.tipo,
+      trecho,
+      "estruturado",
+      c.fonte?.tipo ?? null,
+      c.modalidade ?? classificarModalidade(trecho),
+      c.valor ?? valorAfirmado(c.tipo, trecho),
+      c.chave ?? null,
+    );
   }
-  for (const c of extrairClaimsDoTexto(texto ?? ctx.draftText ?? "")) {
-    registrar(c.tipo, c.trecho, "texto", null);
+  const textoFinal = texto ?? ctx.draftText ?? "";
+  for (const c of extrairClaimsDoTexto(textoFinal)) {
+    registrar(c.tipo, c.trecho, "texto", null, c.modalidade, valorAfirmado(c.tipo, c.trecho), null);
   }
 
-  const semEvidencia = claims.filter((c) => !c.suportado);
+  const semEvidencia = claims.filter(
+    (c) => !c.suportado && c.situacao !== "nao_verificado",
+  );
+  const naoVerificados = claims.filter((c) => c.situacao === "nao_verificado");
   return {
     claims,
     total: claims.length,
-    suportados: claims.length - semEvidencia.length,
+    suportados: claims.filter((c) => c.suportado).length,
     semEvidencia,
+    naoVerificados,
+    truncado,
   };
 }
 
@@ -259,7 +591,8 @@ const ACOES_COM_DADO_OFICIAL = new Set([
 
 /**
  * Validador de grounding por afirmação. Substitui a lógica de "muitos fatos =
- * menos confiança": o que derruba a nota é FATO SEM EVIDÊNCIA.
+ * menos confiança": o que derruba a nota é FATO SEM EVIDÊNCIA — e o que não
+ * pôde ser verificado vira UNKNOWN, nunca aprovação.
  */
 export function ClaimGroundingValidator(ctx: ContextoConfianca): ResultadoValidador {
   const texto = ctx.draftText ?? "";
@@ -275,32 +608,63 @@ export function ClaimGroundingValidator(ctx: ContextoConfianca): ResultadoValida
   }
 
   const r = avaliarGrounding(ctx, texto);
-  if (r.total === 0) {
-    return res("NOT_APPLICABLE", 100, "SEM_AFIRMACOES_VERIFICAVEIS", { avaliadas: 0 });
+
+  if (r.semEvidencia.length > 0) {
+    return {
+      validator: NOME,
+      status: "BLOCK",
+      score: r.total > 0 ? Math.round((r.suportados / r.total) * 100) : 0,
+      reasonCode: r.semEvidencia.some((c) => c.situacao === "divergente")
+        ? "AFIRMACAO_DIVERGE_DA_FONTE"
+        : "AFIRMACAO_SEM_EVIDENCIA",
+      evidence: {
+        total: r.total,
+        suportados: r.suportados,
+        semEvidencia: r.semEvidencia.map((c) => ({
+          tipo: c.tipo,
+          trecho: c.trecho,
+          situacao: c.situacao,
+          motivo: c.motivo,
+          ...(c.valorDaFonte !== undefined ? { valorDaFonte: c.valorDaFonte } : {}),
+        })),
+      },
+      blocker: "AFIRMACAO_SEM_EVIDENCIA",
+    };
   }
-  if (r.semEvidencia.length === 0) {
-    return res("PASS", 100, "TODAS_AS_AFIRMACOES_COM_FONTE", {
+
+  if (r.naoVerificados.length > 0) {
+    return res("UNKNOWN", 0, "AFIRMACAO_NAO_VERIFICADA", {
       total: r.total,
-      claims: r.claims.map((c) => ({ tipo: c.tipo, fonte: c.fonte })),
+      naoVerificados: r.naoVerificados.map((c) => ({ tipo: c.tipo, motivo: c.motivo })),
     });
   }
 
-  return {
-    validator: NOME,
-    status: "BLOCK",
-    score: Math.round((r.suportados / r.total) * 100),
-    reasonCode: "AFIRMACAO_SEM_EVIDENCIA",
-    evidence: {
-      total: r.total,
-      suportados: r.suportados,
-      semEvidencia: r.semEvidencia.map((c) => ({
-        tipo: c.tipo,
-        trecho: c.trecho,
-        motivo: c.motivo,
-      })),
-    },
-    blocker: "AFIRMACAO_SEM_EVIDENCIA",
-  };
+  if (r.truncado) {
+    return res("UNKNOWN", 0, "AVALIACAO_INCOMPLETA", { total: r.total, truncado: true });
+  }
+
+  if (r.total === 0) {
+    // Zero afirmações em uma ação que depende de dado oficial não é "nada a
+    // verificar": é verificação que não aconteceu.
+    // Ações de escrita já são cobertas pelo validador de workflow (prova de
+    // gravação); aqui só interessa a resposta que INFORMA algo oficial.
+    const acaoInformativa =
+      ctx.requestedAction !== null &&
+      ACOES_COM_DADO_OFICIAL.has(ctx.requestedAction) &&
+      !ctx.requestedAction.startsWith("criar_") &&
+      !ctx.requestedAction.startsWith("cancelar_");
+    // Negativa apoiada em consulta oficial é resposta correta, não lacuna.
+    return acaoInformativa && temTexto && !somenteNegativasApoiadas(ctx, texto)
+      ? res("UNKNOWN", 0, "SEM_AFIRMACAO_RECONHECIDA_EM_ACAO_OFICIAL", {
+          requestedAction: ctx.requestedAction,
+        })
+      : res("NOT_APPLICABLE", 100, "SEM_AFIRMACOES_VERIFICAVEIS", { avaliadas: 0 });
+  }
+
+  return res("PASS", 100, "TODAS_AS_AFIRMACOES_COM_FONTE", {
+    total: r.total,
+    claims: r.claims.map((c) => ({ tipo: c.tipo, fonte: c.fonte })),
+  });
 }
 
 function res(
@@ -310,4 +674,23 @@ function res(
   evidence: Record<string, unknown>,
 ): ResultadoValidador {
   return { validator: NOME, status, score, reasonCode, evidence, blocker: null };
+}
+
+/**
+ * FASE 2 — o turno afirma apenas NEGATIVAS já apoiadas em consulta oficial?
+ * "Não realizamos esse exame" depois de uma busca que respondeu sem itens é
+ * uma resposta correta, não uma afirmação sem fonte.
+ */
+export function somenteNegativasApoiadas(ctx: ContextoConfianca, texto?: string | null): boolean {
+  const t = (texto ?? ctx.draftText ?? "").trim();
+  if (!t) return false;
+  const r = avaliarGrounding(ctx, t);
+  const consultaOficial =
+    consultaRespondeu(ctx, CAP_CATALOGO) ?? consultaRespondeu(ctx, CAP_AGENDA);
+  if (r.total === 0) {
+    // Frase negativa que o extrator não classificou como claim: ainda assim,
+    // uma negativa só vale com consulta oficial que respondeu.
+    return Boolean(consultaOficial) && classificarModalidade(t) === "negacao";
+  }
+  return r.claims.every((c) => c.modalidade === "negacao" && c.suportado);
 }

@@ -66,7 +66,23 @@ describe("decisão no turno real", () => {
 
   it("preço com catálogo publicado é liberado", () => {
     const r = decidirNoTurno(
-      turno({ texto: "A consulta custa R$ 150", ferramentas: [cat()], catalogoEncontrou: true }),
+      turno({
+        texto: "A consulta custa R$ 150",
+        ferramentas: [cat()],
+        catalogoEncontrou: true,
+        // FASE 2 — evidência factual propagada pelo servidor.
+        fatos: [
+          {
+            consulta: "consultar_base_conhecimento",
+            capacidade: "searchKnowledgeBase",
+            entidade: "procedimento",
+            campo: "preco",
+            valor: "R$ 150,00",
+            fonte: "catalogo_publicado",
+            chave: { procedimento: "consulta" },
+          },
+        ],
+      }),
     );
     expect(r.decision).toBe("ALLOW");
   });
