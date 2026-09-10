@@ -12,6 +12,7 @@ import {
   filtroEscopoInbox,
   escopoComAtendente,
 } from "@/lib/atendimento/escopo-inbox";
+import { planoVisualizacao } from "@/lib/atendimento/filtros-inbox";
 import { loadWhatsAppConfig, metaSendText } from "./whatsapp.server";
 import {
   MSG_ADMIN_NAO_ATENDE,
