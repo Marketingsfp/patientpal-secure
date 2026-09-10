@@ -806,7 +806,7 @@ export function HomologacaoInbox() {
 
   const resolverConversa = async () => {
     if (!clinicaId || !leadId || !conversaId) return;
-    setProcessando(true);
+    setEmProcessamento((n) => n + 1);
     try {
       await resolver({
         data: { clinicaId, leadId, conversaId, removerAgendamentos: limparAgenda },
