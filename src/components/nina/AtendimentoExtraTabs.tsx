@@ -3066,14 +3066,14 @@ export function AtendInbox() {
                   )}
                 </div>
                 <div className="flex min-h-[24px] flex-wrap items-center gap-1.5 mt-1">
-                  {statusBadge(c.status)}
+                  {statusBadge(c.status, { ocultarNina: conversaEhDaNina(c) })}
                   {c.owner_type === "NONE" && (
                     <Badge className="bg-atd-danger text-atd-on-strong text-[11px]">🔴 Não atribuída</Badge>
                   )}
                   {c.owner_type === "HUMAN" && (
                     <Badge className="bg-atd-human-bg text-atd-human-ink text-[11px] border border-atd-human-ink/20">👤 Humano</Badge>
                   )}
-                  {c.owner_type === "AI" && (
+                  {conversaEhDaNina(c) && (
                     <Badge className="bg-atd-ai-bg text-atd-ai-ink text-[11px] border border-atd-ai/30">✦ Nina</Badge>
                   )}
                   {c.handoff_motivo === "patient_response_timeout" && (
