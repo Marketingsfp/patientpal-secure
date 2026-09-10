@@ -514,7 +514,7 @@ export function HomologacaoInbox() {
             eventos?: ConversaEvento[];
             conversaId: string | null;
           };
-          setMsgs(r.mensagens);
+          setMsgs([...r.mensagens, ...otimistasDoLead(id)]);
           setEventosConversa(r.eventos ?? []);
           setConversaId(r.conversaId);
           const ultima = r.mensagens[r.mensagens.length - 1];
