@@ -219,6 +219,7 @@ describe("cenário 12 — isolamento produção x homologação", () => {
     conversa_id: "conv-1",
     direction: "in" as const,
     body: "oi",
+    clinica_id: "cli-1",
     created_at: new Date().toISOString(),
   };
 
@@ -226,31 +227,31 @@ describe("cenário 12 — isolamento produção x homologação", () => {
     expect(
       aceitaMensagemRealtime(
         { ...base, is_teste: true, canal: CANAL_HOMOLOGACAO },
-        { ambiente: "homologacao", conversaId: "conv-1" },
+        { ambiente: "homologacao", clinicaId: "cli-1", conversaId: "conv-1" },
       ),
     ).toBe(true);
     // Mensagem real nunca entra na Homologação.
     expect(
       aceitaMensagemRealtime(
         { ...base, is_teste: false, canal: "whatsapp" },
-        { ambiente: "homologacao", conversaId: "conv-1" },
+        { ambiente: "homologacao", clinicaId: "cli-1", conversaId: "conv-1" },
       ),
     ).toBe(false);
     // Outra conversa também não.
     expect(
       aceitaMensagemRealtime(
         { ...base, is_teste: true, canal: CANAL_HOMOLOGACAO },
-        { ambiente: "homologacao", conversaId: "conv-2" },
+        { ambiente: "homologacao", clinicaId: "cli-1", conversaId: "conv-2" },
       ),
     ).toBe(false);
   });
 
   it("produção nunca recebe mensagem de teste", () => {
     expect(
-      aceitaMensagemRealtime({ ...base, is_teste: true, canal: CANAL_HOMOLOGACAO }, { ambiente: "producao" }),
+      aceitaMensagemRealtime({ ...base, is_teste: true, canal: CANAL_HOMOLOGACAO }, { ambiente: "producao", clinicaId: "cli-1", conversaId: "conv-1" }),
     ).toBe(false);
     expect(
-      aceitaMensagemRealtime({ ...base, is_teste: false, canal: "whatsapp" }, { ambiente: "producao" }),
+      aceitaMensagemRealtime({ ...base, is_teste: false, canal: "whatsapp" }, { ambiente: "producao", clinicaId: "cli-1", conversaId: "conv-1" }),
     ).toBe(true);
   });
 });
