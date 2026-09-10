@@ -60,6 +60,12 @@ export type RegistroAuditoriaConfianca = {
   outgoingMessageId: string | null;
   /** Sessão da Nina que produziu a resposta. */
   ninaSessionId: string | null;
+  /** FASE 5 — lote de entrada: quais mensagens do paciente geraram a resposta. */
+  batchId: string | null;
+  batchMessageIds: string[];
+  batchSize: number;
+  conversationRevision: number | null;
+  executionId: string | null;
   timestamp: string;
   intencao: string | null;
   acaoSolicitada: AcaoSolicitada;
@@ -216,6 +222,11 @@ export type EntradaAuditoria = {
   /** FASE 6 — id da mensagem realmente enviada, quando já conhecido. */
   outgoingMessageId?: string | null;
   ninaSessionId?: string | null;
+  /** FASE 5 — rastreabilidade do lote (somente identificadores, nunca texto). */
+  batchId?: string | null;
+  batchMessageIds?: string[];
+  conversationRevision?: number | null;
+  executionId?: string | null;
   intencao?: string | null;
   acaoSolicitada?: AcaoSolicitada;
   timestamp?: string;
@@ -261,6 +272,11 @@ export function montarRegistroAuditoria(
     messageId: e.messageId ?? null,
     outgoingMessageId: e.outgoingMessageId ?? null,
     ninaSessionId: e.ninaSessionId ?? null,
+    batchId: e.batchId || null,
+    batchMessageIds: (e.batchMessageIds ?? (e.messageId ? [e.messageId] : [])).slice(0, 50),
+    batchSize: (e.batchMessageIds ?? (e.messageId ? [e.messageId] : [])).length,
+    conversationRevision: e.conversationRevision ?? null,
+    executionId: e.executionId ?? null,
     timestamp: e.timestamp ?? new Date().toISOString(),
     intencao: e.intencao ?? null,
     // FASE 2: sem ação informada o registro diz "desconhecida", não presume.

@@ -20,6 +20,20 @@ export type CapacidadesDoTurno = {
   podeAgendar: boolean;
 };
 
+/**
+ * FASE 5 — o turno do paciente é o LOTE inteiro (Message Burst Aggregation).
+ * Três mensagens físicas seguidas formam UM turno lógico: uma intenção, uma
+ * transição de estágio, uma avaliação de confiança e uma resposta.
+ */
+export type LoteDoTurno = {
+  /** Identificador do lote (vazio quando a mensagem veio sozinha). */
+  batchId: string | null;
+  /** IDs reais das mensagens do paciente que formam este turno, em ordem. */
+  messageIds: string[];
+  /** Revisão da conversa congelada por esta geração (FASE 4). */
+  conversationRevision: number | null;
+};
+
 export type ContextoCanonicoTurno = {
   /** Intenções observadas na mensagem do paciente (pode ser vazio). */
   intencoes: IntencaoNina[];
@@ -41,6 +55,8 @@ export type ContextoCanonicoTurno = {
   messageIdEntrada: string | null;
   /** Mensagem de saída da Nina, quando já existir (vínculo da decisão). */
   messageIdResposta: string | null;
+  /** FASE 5 — lote de entrada avaliado como um único turno. */
+  lote: LoteDoTurno;
 };
 
 /**
@@ -117,6 +133,8 @@ export type EntradaContextoCanonico = {
   cancelamentoEmExecucao?: boolean;
   messageIdEntrada?: string | null;
   messageIdResposta?: string | null;
+  /** FASE 5 — lote de mensagens que compõe este turno. */
+  lote?: Partial<LoteDoTurno> | null;
 };
 
 /**
@@ -150,7 +168,17 @@ export function montarContextoCanonicoTurno(
     capacidades: { podeAgendar: e.podeAgendar },
     messageIdEntrada: e.messageIdEntrada ?? null,
     messageIdResposta: e.messageIdResposta ?? null,
+    lote: {
+      batchId: e.lote?.batchId || null,
+      messageIds: e.lote?.messageIds ?? (e.messageIdEntrada ? [e.messageIdEntrada] : []),
+      conversationRevision: e.lote?.conversationRevision ?? null,
+    },
   };
+}
+
+/** Quantas mensagens físicas do paciente originaram este turno lógico. */
+export function tamanhoDoLote(c: ContextoCanonicoTurno): number {
+  return c.lote.messageIds.length;
 }
 
 /** Intenção crítica presente, mas sem execução autorizada neste turno. */
