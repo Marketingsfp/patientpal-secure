@@ -168,6 +168,28 @@ export const listarConversas = createServerFn({ method: "POST" })
       gestor,
     });
 
+    // FASE 2 — matriz Escopo × Visualização montada de forma composicional:
+    // base → escopo → estado da visualização → busca → ordenação → limite.
+    // Nunca há uma implementação diferente por combinação, e todo o corte
+    // acontece no banco, antes do LIMIT.
+    const plano = planoVisualizacao(data.visualizacao);
+
+    // "Maior tempo esperando" usa a métrica canônica de paciente aguardando
+    // (`atend_espera_por_conversa`): conversa em que a clínica é que aguarda
+    // o paciente fica de fora. O conjunto vem antes do corte da lista.
+    let idsEspera: string[] | null = null;
+    if (plano.exigeEsperaPaciente) {
+      const { data: esperas } = await context.supabase.rpc("atend_espera_por_conversa", {
+        _clinica_id: data.clinicaId,
+        _is_teste: false,
+      });
+      idsEspera = ((esperas ?? []) as any[]).map((e) => e.conversa_id).filter(Boolean);
+      if (idsEspera.length === 0) {
+        marcar("consulta");
+        return [];
+      }
+    }
+
     let q = context.supabase
       .from("atend_conversas")
       // O nome do paciente vinculado vem embutido na MESMA consulta (sem
@@ -175,13 +197,12 @@ export const listarConversas = createServerFn({ method: "POST" })
       .select("*, pacientes:contato_paciente_id(nome)")
       // Conversas do console de homologação nunca aparecem no atendimento real.
       .eq("is_teste", false)
-      .eq("clinica_id", data.clinicaId)
-      .order("ultima_msg_em", { ascending: false })
-      .limit(data.limit);
+      .eq("clinica_id", data.clinicaId);
+
+    // --- Escopo (de quem é a conversa) -------------------------------------
     // Filtro por responsável direto no banco, antes de ordenar e cortar a
     // lista — nunca depois de baixar tudo para o navegador.
     if (atendenteFiltro) q = q.eq("atribuida_user_id", atendenteFiltro);
-    // Escopo aplicado na própria consulta (nunca filtrado só no frontend).
     if (filtroEscopo.tipo === "atribuida") q = q.eq("atribuida_user_id", filtroEscopo.userId);
     else if (filtroEscopo.tipo === "sem_responsavel")
       q = q.is("atribuida_user_id", null).neq("owner_type", "AI");
@@ -190,10 +211,16 @@ export const listarConversas = createServerFn({ method: "POST" })
       q = q.in("status", [...STATUS_FECHADOS]);
       if (filtroEscopo.userId) q = q.eq("atribuida_user_id", filtroEscopo.userId);
     }
-    // Filtros operacionais mostram só conversas em andamento.
-    if (escopoEscondeFechadas(escopoAplicado, gestor)) {
+
+    // --- Visualização (estado da conversa) ---------------------------------
+    if (plano.somenteResolvidas) {
+      q = q.in("status", [...STATUS_FECHADOS]);
+    } else if (escopoEscondeFechadas(escopoAplicado, gestor)) {
+      // Filtros operacionais mostram só conversas em andamento.
       q = q.not("status", "in", `(${STATUS_FECHADOS.join(",")})`);
     }
+    if (idsEspera) q = q.in("id", idsEspera);
+
     if (data.status !== "all") q = q.eq("status", data.status);
     if (data.canal !== "todos") q = q.eq("canal", data.canal);
     if (data.busca) {
