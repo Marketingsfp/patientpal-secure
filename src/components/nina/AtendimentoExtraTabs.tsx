@@ -224,6 +224,7 @@ import {
   type EscopoBaseInbox,
   type VisualizacaoInbox,
 } from "@/lib/atendimento/filtros-inbox";
+import { lerFiltrosInbox, salvarFiltrosInbox } from "@/lib/atendimento/filtros-persistencia";
 import {
   MSG_ADMIN_NAO_ATENDE,
   ROTULO_PRESENCA,
@@ -409,8 +410,20 @@ export function AtendInbox() {
   // supervisão ou saindo o atendente da equipe, o filtro volta para "todos".
   // Nunca fica um user_id de outra clínica preso na tela.
   useEffect(() => {
-    setAtendenteEscolhidoId(null);
+    // FASE 4 — ao trocar de clínica (ou recarregar) o filtro volta ao que foi
+    // usado NAQUELA clínica; nunca a um atendente de outra.
     setBuscaAtendente("");
+    const salvo = lerFiltrosInbox(
+      typeof window === "undefined" ? null : window.localStorage,
+      clinicaId,
+      { gestor: souGestor, usuariosIds: usuarios.map((u: any) => String(u.user_id)) },
+    );
+    setEscopoBase(salvo.base);
+    setVisualizacao(salvo.visualizacao);
+    setAtendenteEscolhidoId(salvo.atendenteId);
+    // Restauração acontece por clínica; mudanças posteriores de equipe são
+    // tratadas pelo efeito de validação abaixo.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [clinicaId]);
   useEffect(() => {
     if (!atendenteEscolhidoId) return;
@@ -422,6 +435,15 @@ export function AtendInbox() {
       setAtendenteEscolhidoId(null);
     }
   }, [atendenteEscolhidoId, souGestor, usuarios]);
+  // Memória do filtro: só grava o que já foi validado na tela.
+  useEffect(() => {
+    if (!clinicaId) return;
+    salvarFiltrosInbox(typeof window === "undefined" ? null : window.localStorage, clinicaId, {
+      base: escopoBase,
+      visualizacao,
+      atendenteId: souGestor ? atendenteEscolhidoId : null,
+    });
+  }, [clinicaId, escopoBase, visualizacao, atendenteEscolhidoId, souGestor]);
 
   const atendentesFiltrados = useMemo(() => {
     const termo = normalizarNomeBusca(buscaAtendente);
@@ -489,6 +511,9 @@ export function AtendInbox() {
   // A ordenação vem da visualização escolhida (ver `ordem`, acima).
   // conversaId -> instante da 1ª mensagem do paciente ainda sem resposta.
   const [espera, setEspera] = useState<Record<string, string>>({});
+  // Leitura estável da métrica de espera dentro dos callbacks do Realtime.
+  const esperaRef = useRef<Record<string, string>>({});
+  esperaRef.current = espera;
   // Sequenciais das recargas: descartam respostas fora de ordem (uma mensagem
   // nova dispara vários eventos de Realtime quase ao mesmo tempo).
   const seqConvs = useRef(0);
@@ -2117,7 +2142,12 @@ export function AtendInbox() {
       if (evento.table === "whatsapp_mensagens" && evento.eventType === "INSERT") {
         const r = patchListaPorMensagem(convsRef.current, (evento as any).new, {
           conversaAberta: selIdRef.current,
+          visualizacao,
+          espera: esperaRef.current,
         });
+        // "Maior espera" depende da métrica canônica: a mensagem pode iniciar
+        // ou encerrar a espera do paciente, então a métrica é reconferida.
+        if (visualizacao === "espera") g.espera.agendar();
         if (r.aplicado) {
           listaPorPatch = true;
           if (r.lista !== convsRef.current) setConvs(r.lista as any[]);
@@ -2136,6 +2166,8 @@ export function AtendInbox() {
           atendenteId: atendenteSelecionadoId,
           status: filtroStatus,
           buscando: !!buscaTexto || buscaInterp.exigeNumero,
+          visualizacao,
+          espera: esperaRef.current,
         });
         if (r.aplicado) {
           listaPorPatch = true;

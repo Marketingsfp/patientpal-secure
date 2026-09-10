@@ -15,6 +15,7 @@ import {
   conversaDoAtendente,
   escopoComAtendente,
   conversaVisivelNoEscopo,
+  STATUS_FECHADOS,
   type EscopoInbox,
   type ConversaEscopo,
 } from "./escopo-inbox";
@@ -41,9 +42,28 @@ function instante(v: any): number {
   return Number.isFinite(t) ? t : 0;
 }
 
-function ordenar(lista: LinhaLista[]): LinhaLista[] {
+/**
+ * FASE 4 — a ordem do card segue o eixo de Visualização ativo, igual à do
+ * servidor: Recentes por última mensagem, Resolvidas por data de resolução,
+ * Maior espera pela métrica canônica de paciente aguardando.
+ */
+export type VisualizacaoPatch = "recentes" | "resolvidas" | "espera";
+
+function ordenar(
+  lista: LinhaLista[],
+  visualizacao: VisualizacaoPatch = "recentes",
+  espera: Record<string, string> = {},
+): LinhaLista[] {
   return [...lista].sort((a, b) => {
-    const d = instante(b.ultima_msg_em) - instante(a.ultima_msg_em);
+    let d = 0;
+    if (visualizacao === "resolvidas") {
+      d = instante(b["resolved_at"] ?? b["closed_at"]) - instante(a["resolved_at"] ?? a["closed_at"]);
+    } else if (visualizacao === "espera") {
+      const ta = espera[a.id] ? instante(espera[a.id]) : Number.POSITIVE_INFINITY;
+      const tb = espera[b.id] ? instante(espera[b.id]) : Number.POSITIVE_INFINITY;
+      d = ta - tb;
+    }
+    if (d === 0) d = instante(b.ultima_msg_em) - instante(a.ultima_msg_em);
     return d !== 0 ? d : a.id.localeCompare(b.id);
   });
 }
@@ -64,7 +84,12 @@ function textoPrevia(linha: Record<string, any>): string | null {
 export function patchListaPorMensagem(
   lista: LinhaLista[],
   linha: Record<string, any> | null | undefined,
-  ctx: { conversaAberta: string | null },
+  ctx: {
+    conversaAberta: string | null;
+    /** FASE 4 — mantém a ordem do eixo de Visualização ativo. */
+    visualizacao?: VisualizacaoPatch;
+    espera?: Record<string, string>;
+  },
 ): ResultadoPatch {
   const conversaId = String(linha?.["conversa_id"] ?? "");
   const quando = linha?.["created_at"] ?? linha?.["criado_em"] ?? null;
@@ -72,7 +97,15 @@ export function patchListaPorMensagem(
     return { lista: lista ?? [], aplicado: false, reconciliar: true };
   }
   const alvo = lista.find((c) => c.id === conversaId);
-  if (!alvo) return { lista, aplicado: false, reconciliar: true };
+  // Em "Resolvidas" uma mensagem nova não pertence ao recorte; em "Maior
+  // espera" a entrada/saída depende da métrica canônica, conferida à parte.
+  if (!alvo) {
+    return {
+      lista,
+      aplicado: false,
+      reconciliar: (ctx.visualizacao ?? "recentes") === "recentes",
+    };
+  }
 
   const entrada = linha?.["direction"] === "in";
   const previa = textoPrevia(linha ?? {}) ?? alvo.ultima_msg_preview ?? null;
@@ -90,7 +123,11 @@ export function patchListaPorMensagem(
       nao_lidas: contaNaoLida ? Number(c.nao_lidas ?? 0) + 1 : (c.nao_lidas ?? 0),
     };
   });
-  return { lista: ordenar(atualizada), aplicado: true, reconciliar: false };
+  return {
+    lista: ordenar(atualizada, ctx.visualizacao ?? "recentes", ctx.espera ?? {}),
+    aplicado: true,
+    reconciliar: false,
+  };
 }
 
 /** O estado escolhido no seletor "Todas / Em espera / Ativas / Fechadas". */
@@ -123,22 +160,55 @@ export function patchListaPorConversa(
     status?: FiltroStatusInbox | null;
     /** Busca por texto/número ativa: a lista vem reduzida pelo servidor. */
     buscando?: boolean;
+    /** FASE 4 — eixo de Visualização ativo (Recentes/Resolvidas/Espera). */
+    visualizacao?: VisualizacaoPatch;
+    /** Métrica canônica de paciente aguardando (`atend_espera_por_conversa`). */
+    espera?: Record<string, string>;
   },
 ): ResultadoPatch {
   const id = String(linha?.["id"] ?? "");
   if (!id || !Array.isArray(lista)) {
     return { lista: lista ?? [], aplicado: false, reconciliar: true };
   }
-  const visivel =
-    conversaVisivelNoEscopo(linha as ConversaEscopo, {
-      ...ctx,
-      escopo: escopoComAtendente(ctx.escopo, ctx.atendenteId, ctx.gestor),
-    }) &&
-    conversaDoAtendente(
-      linha as ConversaEscopo,
-      atendenteFiltroEfetivo(ctx.atendenteId, ctx.gestor),
-    ) &&
-    statusCombina(linha as Record<string, any>, ctx.status);
+  // Compatibilidade: chamadas antigas informam só o escopo "fechadas", que é
+  // exatamente a visualização de Resolvidas.
+  const visualizacao: VisualizacaoPatch =
+    ctx.visualizacao ?? (ctx.escopo === "fechadas" ? "resolvidas" : "recentes");
+  const espera = ctx.espera ?? {};
+  const atendenteAlvo = atendenteFiltroEfetivo(ctx.atendenteId, ctx.gestor);
+  const fechada = STATUS_FECHADOS.includes(
+    String(linha?.["status"] ?? "") as (typeof STATUS_FECHADOS)[number],
+  );
+
+  let visivel: boolean;
+  if (visualizacao === "resolvidas") {
+    // FASE 3/4 — responsabilidade da conversa resolvida NÃO é
+    // `atribuida_user_id` (fica nulo ao encerrar): vale quem era responsável
+    // no momento da resolução, ou quem resolveu.
+    const alvo = atendenteAlvo ?? (ctx.gestor ? null : ctx.userId);
+    const semRegistroDeResolucao =
+      linha?.["last_assigned_user_id"] == null && linha?.["resolved_by"] == null;
+    const dono =
+      !alvo ||
+      linha?.["last_assigned_user_id"] === alvo ||
+      linha?.["resolved_by"] === alvo ||
+      // Conversa que ainda mantém o responsável na coluna atual (encerramento
+      // antigo ou evento parcial): não inventa histórico, só não descarta.
+      (semRegistroDeResolucao && linha?.["atribuida_user_id"] === alvo);
+    visivel = fechada && dono;
+  } else {
+    visivel =
+      !fechada &&
+      conversaVisivelNoEscopo(linha as ConversaEscopo, {
+        ...ctx,
+        escopo: escopoComAtendente(ctx.escopo, ctx.atendenteId, ctx.gestor),
+      }) &&
+      conversaDoAtendente(linha as ConversaEscopo, atendenteAlvo) &&
+      statusCombina(linha as Record<string, any>, ctx.status);
+    // "Maior espera" mostra só quem o paciente deixou aguardando; a métrica
+    // canônica vem da consulta de espera, nunca é recalculada aqui.
+    if (visivel && visualizacao === "espera" && !espera[id]) visivel = false;
+  }
   const existente = lista.find((c) => c.id === id);
 
   // Saiu do filtro (transferida para outra pessoa, encerrada, devolvida à
@@ -155,7 +225,7 @@ export function patchListaPorConversa(
     if (ctx.buscando) return { lista, aplicado: false, reconciliar: true };
     if (linha?.["is_teste"] === true) return { lista, aplicado: true, reconciliar: false };
     return {
-      lista: ordenar([...lista, { ...(linha as LinhaLista) }]),
+      lista: ordenar([...lista, { ...(linha as LinhaLista) }], visualizacao, espera),
       aplicado: true,
       reconciliar: false,
     };
@@ -167,7 +237,7 @@ export function patchListaPorConversa(
   const mudou = Object.keys(mesclada).some((k) => mesclada[k] !== existente[k]);
   if (!mudou) return { lista, aplicado: true, reconciliar: false };
   return {
-    lista: ordenar(lista.map((c) => (c.id === id ? mesclada : c))),
+    lista: ordenar(lista.map((c) => (c.id === id ? mesclada : c)), visualizacao, espera),
     aplicado: true,
     reconciliar: false,
   };
