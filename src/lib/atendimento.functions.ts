@@ -114,6 +114,9 @@ export const listarConversas = createServerFn({ method: "POST" })
         // FASE 1 — filtro de supervisão por atendente. Apenas visualização:
         // não transfere, não atribui, não muda status nem leitura.
         atendenteId: z.string().uuid().nullish(),
+        // FASE 2 — segundo eixo do filtro (estado + ordenação). Aplicado no
+        // banco, antes do LIMIT, para nunca esconder resultado válido.
+        visualizacao: z.enum(["recentes", "resolvidas", "espera"]).default("recentes"),
         limit: z.number().int().min(1).max(500).default(200),
       })
       .parse(i),
