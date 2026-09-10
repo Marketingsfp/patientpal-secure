@@ -419,7 +419,11 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
                       await import("@/lib/whatsapp-midia.server");
                     let reply = "";
                     // Auditoria: id da execução que produziu esta resposta.
-                    const auditoriaNina: { execucaoId?: string | null } = {};
+                    // `traceId` é o identificador do turno (FASE 1): preenchido
+                    // por `gerarRespostaNina` e usado para ligar a mensagem
+                    // entregue ao registro da execução.
+                    const auditoriaNina: { execucaoId?: string | null; traceId?: string | null } =
+                      {};
                     // Mensagens de entrada reais desta resposta. O paciente pode
                     // ter escrito em partes: pegamos as mensagens dele ainda sem
                     // resposta, na ordem em que chegaram.
