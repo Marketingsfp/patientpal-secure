@@ -9,7 +9,8 @@
  * Robustez: um validador que lançar exceção não derruba o atendimento —
  * `executarValidadoresDeConfianca` isola cada execução e devolve WARNING.
  */
-import { acaoExecutavel, contaContraANota } from "./types";
+import { acaoExecutavel, acaoOuNenhuma, contaContraANota } from "./types";
+import { aplicabilidadeDoTurno } from "./turno-tipo";
 import { ClaimGroundingValidator } from "./claims";
 import { WorkflowConsistencyValidator } from "./workflow";
 import type {
@@ -116,6 +117,14 @@ function res(
 export function IntentClarityValidator(ctx: ContextoConfianca): ResultadoValidador {
   const nome = "IntentClarityValidator";
   const confianca = ctx.intentConfidence ?? null;
+  // FASE 1 — saudação e esclarecimento são turnos legítimos sem ação: pedir
+  // clareza aqui era o falso negativo do "oi".
+  if (ctx.turnType === "SAUDACAO") {
+    return res(nome, "PASS", 100, "SAUDACAO", { turnType: ctx.turnType });
+  }
+  if (ctx.turnType === "ESCLARECIMENTO" && ctx.requestedAction === null) {
+    return res(nome, "PASS", 100, "ESCLARECIMENTO_EM_CURSO", { turnType: ctx.turnType });
+  }
   const houveConsulta = ctx.toolResults.some(ferramentaOk) || ctx.retrievedSources.some(fonteUtil);
 
   if (ctx.intentAmbiguo === true) {
@@ -141,7 +150,9 @@ export function IntentClarityValidator(ctx: ContextoConfianca): ResultadoValidad
   if (confianca !== null && confianca < 0.75) {
     return res(nome, "WARNING", Math.round(confianca * 100), "INTENCAO_PARCIAL", { intentConfidence: confianca });
   }
-  return res(nome, "PASS", 100, "INTENCAO_CLARA", { intent: ctx.intent ?? ctx.requestedAction });
+  return res(nome, "PASS", 100, "INTENCAO_CLARA", {
+    intent: ctx.intent ?? acaoOuNenhuma(ctx.requestedAction),
+  });
 }
 
 // ---------------------------------------------------------------- 2. entidade
@@ -149,13 +160,14 @@ export function IntentClarityValidator(ctx: ContextoConfianca): ResultadoValidad
 /** O item pedido foi identificado sem ambiguidade? */
 export function EntityResolutionValidator(ctx: ContextoConfianca): ResultadoValidador {
   const nome = "EntityResolutionValidator";
+  const acao = acaoOuNenhuma(ctx.requestedAction);
   const candidatos = ctx.entityCandidates ?? {};
   const campos = Object.keys(candidatos);
   if (campos.length === 0) {
     // FASE 3 — numa ação de escrita, "ninguém me disse quais eram os
     // candidatos" não é dispensa: é falta de evidência.
-    return ACOES_DE_ESCRITA.has(ctx.requestedAction)
-      ? res(nome, "UNKNOWN", 0, "CANDIDATOS_NAO_AVALIADOS", { requestedAction: ctx.requestedAction })
+    return ACOES_DE_ESCRITA.has(acao)
+      ? res(nome, "UNKNOWN", 0, "CANDIDATOS_NAO_AVALIADOS", { requestedAction: acao })
       : res(nome, "NOT_APPLICABLE", 100, "SEM_CANDIDATOS", {});
   }
 
@@ -182,13 +194,14 @@ export function EntityResolutionValidator(ctx: ContextoConfianca): ResultadoVali
 /** Existem os dados mínimos para a próxima etapa — e só eles. */
 export function RequiredDataValidator(ctx: ContextoConfianca): ResultadoValidador {
   const nome = "RequiredDataValidator";
+  const acao = acaoOuNenhuma(ctx.requestedAction);
   const req = ctx.requiredFields ?? [];
   if (req.length === 0) {
     // FASE 3 — agendar/cancelar SEM lista de campos obrigatórios declarada não
     // é "não precisa de dado": é dado não verificado.
-    return ACOES_DE_ESCRITA.has(ctx.requestedAction)
+    return ACOES_DE_ESCRITA.has(acao)
       ? res(nome, "UNKNOWN", 0, "CAMPOS_OBRIGATORIOS_NAO_DECLARADOS", {
-          requestedAction: ctx.requestedAction,
+          requestedAction: acao,
         })
       : res(nome, "NOT_APPLICABLE", 100, "SEM_CAMPOS_OBRIGATORIOS", {});
   }
@@ -200,7 +213,7 @@ export function RequiredDataValidator(ctx: ContextoConfianca): ResultadoValidado
   });
   if (faltantes.length === 0) return res(nome, "PASS", 100, "DADOS_COMPLETOS", { requiredFields: req });
 
-  const escrita = ACOES_DE_ESCRITA.has(ctx.requestedAction);
+  const escrita = ACOES_DE_ESCRITA.has(acao);
   if (escrita) {
     return res(
       nome,
@@ -217,7 +230,7 @@ export function RequiredDataValidator(ctx: ContextoConfianca): ResultadoValidado
     return res(nome, "PENDING", 0, "DADOS_PENDENTES_DE_COLETA", {
       faltantes,
       requiredFields: req,
-      requestedAction: ctx.requestedAction,
+      requestedAction: acao,
     });
   }
   return res(nome, "FAIL", 0, "CAMPO_OBRIGATORIO_AUSENTE", { faltantes, requiredFields: req });
@@ -233,6 +246,12 @@ export function OfficialSourceValidator(
   const nome = "OfficialSourceValidator";
   const oficiais = categorias.filter((c) => CATEGORIAS_OFICIAIS.has(c));
   if (oficiais.length === 0) {
+    // FASE 1 — a matriz central decide se este tipo de turno exige fonte.
+    if (!aplicabilidadeDoTurno(ctx.turnType).requiresSource) {
+      return res(nome, "NOT_APPLICABLE", 100, "TURNO_NAO_EXIGE_FONTE", {
+        turnType: ctx.turnType ?? null,
+      });
+    }
     // FASE 3 — sem saber o que a Nina vai fazer, não dá para afirmar que este
     // turno dispensa fonte oficial. Saudação dispensa; "desconhecida" não.
     return ctx.requestedAction === "desconhecida"
@@ -322,10 +341,17 @@ export function SourceFreshnessValidator(
 export function ToolIntegrityValidator(ctx: ContextoConfianca): ResultadoValidador {
   const nome = "ToolIntegrityValidator";
   if (ctx.toolResults.length === 0) {
+    // FASE 1 — a matriz central decide se este tipo de turno exige consulta.
+    if (!aplicabilidadeDoTurno(ctx.turnType).requiresTool) {
+      return res(nome, "NOT_APPLICABLE", 100, "TURNO_NAO_EXIGE_CONSULTA", {
+        turnType: ctx.turnType ?? null,
+      });
+    }
     // FASE 3 — conversa simples dispensa ferramenta (NOT_APPLICABLE). Uma ação
     // que depende de dado oficial, sem NENHUMA consulta, é evidência ausente.
     const dependeDeDado =
-      ACOES_COM_DADO_OFICIAL.has(ctx.requestedAction) || ctx.requestedAction === "desconhecida";
+      ACOES_COM_DADO_OFICIAL.has(acaoOuNenhuma(ctx.requestedAction)) ||
+      ctx.requestedAction === "desconhecida";
     return dependeDeDado && !ctx.retrievedSources.some(fonteUtil)
       ? res(nome, "UNKNOWN", 0, "SEM_CONSULTA_PARA_ACAO_QUE_EXIGE_DADO", {
           requestedAction: ctx.requestedAction,
@@ -428,10 +454,11 @@ const RISCO_POR_ACAO: Record<string, NivelRiscoAcao> = {
 /** Classifica o impacto da ação e a exigência de confiança correspondente. */
 export function ActionRiskValidator(ctx: ContextoConfianca): ResultadoValidador {
   const nome = "ActionRiskValidator";
-  const risco = RISCO_POR_ACAO[ctx.requestedAction] ?? "MEDIUM";
+  const acao = acaoOuNenhuma(ctx.requestedAction);
+  const risco = RISCO_POR_ACAO[acao] ?? "MEDIUM";
   const minimo = MINIMO_POR_RISCO[risco];
   const status: StatusValidador = risco === "CRITICAL" ? "WARNING" : "PASS";
-  return res(nome, status, 100, `RISCO_${risco}`, { risco, minimoExigido: minimo, acao: ctx.requestedAction });
+  return res(nome, status, 100, `RISCO_${risco}`, { risco, minimoExigido: minimo, acao });
 }
 
 // ---------------------------------------------------------------- orquestração
@@ -493,5 +520,10 @@ export { WorkflowConsistencyValidator, classificarAfirmacaoOperacional } from ".
 
 /** Risco da ação conforme o ActionRiskValidator (usado pelo motor). */
 export function riscoDaAcao(ctx: ContextoConfianca): NivelRiscoAcao {
-  return RISCO_POR_ACAO[ctx.requestedAction] ?? "MEDIUM";
+  const acao = acaoOuNenhuma(ctx.requestedAction);
+  // FASE 1 — turno sem ação executável não carrega risco de ação.
+  if (!aplicabilidadeDoTurno(ctx.turnType).requiresActionSafety && !acaoExecutavel(ctx.requestedAction)) {
+    return "LOW";
+  }
+  return RISCO_POR_ACAO[acao] ?? "MEDIUM";
 }

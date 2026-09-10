@@ -68,7 +68,7 @@ export type RegistroAuditoriaConfianca = {
   executionId: string | null;
   timestamp: string;
   intencao: string | null;
-  acaoSolicitada: AcaoSolicitada;
+  acaoSolicitada: AcaoSolicitada | null;
   score: number;
   /** FASE 3: quanto da evidência relevante foi de fato verificada (0–100). */
   evidenceCoverage: number;
@@ -228,7 +228,7 @@ export type EntradaAuditoria = {
   conversationRevision?: number | null;
   executionId?: string | null;
   intencao?: string | null;
-  acaoSolicitada?: AcaoSolicitada;
+  acaoSolicitada?: AcaoSolicitada | null;
   timestamp?: string;
   ferramentas?: Array<{
     nome: string;
@@ -280,7 +280,9 @@ export function montarRegistroAuditoria(
     timestamp: e.timestamp ?? new Date().toISOString(),
     intencao: e.intencao ?? null,
     // FASE 2: sem ação informada o registro diz "desconhecida", não presume.
-    acaoSolicitada: e.acaoSolicitada ?? "desconhecida",
+    // FASE 1: `null` = turno sem ação (saudação). Só a AUSÊNCIA de informação
+    // vira "desconhecida".
+    acaoSolicitada: e.acaoSolicitada === undefined ? "desconhecida" : e.acaoSolicitada,
     score: r.score,
     // FASE 3: nota e cobertura viajam separadas — uma não disfarça a outra.
     evidenceCoverage: r.evidenceCoverage ?? 0,

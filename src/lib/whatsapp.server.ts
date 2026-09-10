@@ -1445,6 +1445,9 @@ async function gerarRespostaNinaInterno(
         mensagemPaciente,
         intent: canonico.intent,
         acao: canonico.requestedAction,
+        // FASE 1 — natureza do turno: uma saudação não exige fonte, ferramenta
+        // nem avaliação de segurança de ação.
+        tipoTurno: canonico.turnType,
         intentAmbiguo: canonico.intentAmbiguo,
         messageId: canonico.messageIdEntrada,
         ferramentas: evidenciasFerramentas,

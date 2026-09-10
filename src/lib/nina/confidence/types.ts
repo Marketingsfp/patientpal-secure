@@ -43,9 +43,17 @@ export const ACOES_EXECUTAVEIS: AcaoSolicitada[] = [
   "transferir_humano",
 ];
 
-/** Existe uma ação executável prestes a acontecer neste turno? */
-export function acaoExecutavel(acao: AcaoSolicitada): boolean {
-  return ACOES_EXECUTAVEIS.includes(acao);
+/**
+ * Existe uma ação executável prestes a acontecer neste turno?
+ * `null` = o turno legitimamente não tem ação (saudação/esclarecimento).
+ */
+export function acaoExecutavel(acao: AcaoSolicitada | null): boolean {
+  return acao !== null && ACOES_EXECUTAVEIS.includes(acao);
+}
+
+/** Normaliza a ação para uso interno: ausência de ação vira `nenhuma`. */
+export function acaoOuNenhuma(acao: AcaoSolicitada | null | undefined): AcaoSolicitada {
+  return acao ?? "nenhuma";
 }
 
 /** Origem de um fato apresentado ao paciente. */
@@ -177,7 +185,14 @@ export type ContextoConfianca = {
   messageId?: string | null;
   /** Intenção detectada pelo runtime, quando houver. Opcional de propósito. */
   intent?: string | null;
-  requestedAction: AcaoSolicitada;
+  /**
+   * FASE 1 (turnType) — `null` significa NENHUMA ação executável neste turno
+   * (saudação, esclarecimento). É diferente de `"desconhecida"`, que é o
+   * sistema não ter entendido o pedido.
+   */
+  requestedAction: AcaoSolicitada | null;
+  /** FASE 1 (turnType) — natureza do turno; comanda a matriz de exigências. */
+  turnType?: import("./turno-tipo").TipoTurno | null;
   /** Entidades extraídas (procedimento, convênio, data, unidade...). */
   entities?: Record<string, unknown>;
   retrievedSources: FonteRecuperada[];

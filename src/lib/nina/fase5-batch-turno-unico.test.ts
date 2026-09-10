@@ -39,7 +39,7 @@ describe("FASE 5 — batch = um turno lógico", () => {
     expect(c.intencoes).toContain("agendamento");
     expect(c.intentAmbiguo).toBe(false);
     // Intenção ≠ ação: sem o estágio de criação nada é executado.
-    expect(c.requestedAction).toBe("nenhuma");
+    expect(c.requestedAction).toBeNull();
     // 1 transição lógica: o estágio vem do fluxo, não do número de mensagens.
     expect(c.stage).toBeNull();
     // Histórico físico preservado: 3 mensagens, 1 turno.

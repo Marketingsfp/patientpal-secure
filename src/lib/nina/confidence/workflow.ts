@@ -115,7 +115,7 @@ function ferramentaAgendarChamada(ctx: ContextoConfianca, st: EstadoOperacionalT
  */
 export function WorkflowConsistencyValidator(ctx: ContextoConfianca): ResultadoValidador {
   const afirmacao = classificarAfirmacaoOperacional(ctx.draftText);
-  const acaoEscrita = ACOES_DE_ESCRITA.has(ctx.requestedAction);
+  const acaoEscrita = ctx.requestedAction !== null && ACOES_DE_ESCRITA.has(ctx.requestedAction);
   const st = ctx.operationalState;
 
   // Nada operacional em jogo: esta dimensão não é necessária neste turno.
