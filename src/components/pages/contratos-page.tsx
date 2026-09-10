@@ -2944,6 +2944,14 @@ function DetalheContrato({
     </div>
   );
   const [mens, setMens] = useState<Mens[]>([]);
+  // Diálogo do botão "Reverter" de uma parcela já paga: a pessoa diz o que
+  // aconteceu de verdade antes de qualquer coisa mexer (ou não) na gaveta.
+  const [reverterAlvo, setReverterAlvo] = useState<Mens | null>(null);
+  const [reverterOpcao, setReverterOpcao] = useState<"mover" | "sem_devolucao" | "devolucao" | null>(
+    null,
+  );
+  const [reverterDestino, setReverterDestino] = useState<string>("");
+  const [reverterBusy, setReverterBusy] = useState(false);
   // Rascunhos de edição da tabela Mensalidades (vencimento/valor/pago_em).
   // Só persistem no banco quando o usuário clica em "Salvar alterações".
   type RascunhoMens = { vencimento?: string; valor?: number; pago_em?: string | null };
