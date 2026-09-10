@@ -9751,6 +9751,62 @@ export type Database = {
           },
         ]
       }
+      nina_mensagens_templates: {
+        Row: {
+          atualizado_em: string
+          categoria: string
+          chave: string
+          clinica_id: string | null
+          criado_em: string
+          escopo: string
+          id: string
+          instrucoes_versao_id: string | null
+          publicado_em: string | null
+          publicado_por: string | null
+          status: string
+          texto: string
+          versao: number
+        }
+        Insert: {
+          atualizado_em?: string
+          categoria?: string
+          chave: string
+          clinica_id?: string | null
+          criado_em?: string
+          escopo?: string
+          id?: string
+          instrucoes_versao_id?: string | null
+          publicado_em?: string | null
+          publicado_por?: string | null
+          status?: string
+          texto: string
+          versao?: number
+        }
+        Update: {
+          atualizado_em?: string
+          categoria?: string
+          chave?: string
+          clinica_id?: string | null
+          criado_em?: string
+          escopo?: string
+          id?: string
+          instrucoes_versao_id?: string | null
+          publicado_em?: string | null
+          publicado_por?: string | null
+          status?: string
+          texto?: string
+          versao?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nina_mensagens_templates_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       nina_message_batch_itens: {
         Row: {
           batch_id: string
