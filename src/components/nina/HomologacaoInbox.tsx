@@ -17,7 +17,6 @@ import {
   CheckCheck,
   Download,
   FlaskConical,
-  Loader2,
   RefreshCw,
   Send,
   Wrench,
