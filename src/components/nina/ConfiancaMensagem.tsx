@@ -309,6 +309,10 @@ export function ConfiancaMensagemBadge({
           <>
             <Secao titulo="Decisão">
               <p>{detalhe.resultado}</p>
+              {/* FASE 3 — o tipo do turno diz QUAIS critérios se aplicavam. */}
+              {detalhe.tipoTurno && (
+                <p className="text-muted-foreground">Tipo do turno: {detalhe.tipoTurno}</p>
+              )}
               {detalhe.acaoSolicitada && (
                 <p className="text-muted-foreground">Ação avaliada: {detalhe.acaoSolicitada}</p>
               )}
