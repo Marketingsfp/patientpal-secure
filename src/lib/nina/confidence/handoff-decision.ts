@@ -34,6 +34,7 @@ export type MotivoDecisaoHandoff =
   | "REPEATED_CLARIFICATION_FAILURE"
   | "PATIENT_DISSATISFACTION"
   | "LOW_CONFIDENCE_UNRECOVERABLE"
+  | "PUBLISHED_EXCEPTION"
   | "ANSWER_ALLOWED";
 
 /**
@@ -62,6 +63,13 @@ export type EntradaDecisaoHandoff = {
   insatisfacaoDetectada?: boolean;
   /** Quantas vezes a Nina já esclareceu nesta conversa. */
   tentativasEsclarecimento?: number;
+  /**
+   * FASE 4 — uma exceção PUBLICADA aplicável rege este turno (ex.: verificação
+   * de homologação). A intenção "ambígua" da entrada não pode transformar uma
+   * resposta correta em CLARIFY. As proteções continuam antes desta regra:
+   * pedido humano, insatisfação, ação crítica bloqueada e fonte ausente.
+   */
+  excecaoPublicadaAplicavel?: boolean;
   politica?: PoliticaRecuperacao;
 };
 
@@ -213,6 +221,20 @@ export function decidirHandoff(e: EntradaDecisaoHandoff): PlanoDeHandoff {
       recuperavel: false,
       clarify: false,
       explicacao: `esclarecimento tentado ${tentativas}x sem avançar`,
+    };
+  }
+
+  // FASE 4 — exceção publicada aplicável rege este turno: a entrada pode
+  // parecer ambígua, mas a resposta correta já foi definida pela exceção.
+  // Chega aqui só depois das proteções (pedido humano, insatisfação, ação
+  // crítica bloqueada e fonte oficial ausente), que continuam vencendo.
+  if (e.excecaoPublicadaAplicavel) {
+    return {
+      decision: "CONTINUE",
+      reason: "PUBLISHED_EXCEPTION",
+      recuperavel: true,
+      clarify: false,
+      explicacao: "exceção publicada aplicável a este turno dispensa esclarecimento",
     };
   }
 

@@ -12,7 +12,11 @@
  * Módulo puro: sem banco, sem rede, sem estado.
  */
 
-export type EscopoInstrucoesTemplate = "whatsapp" | "painel_interno";
+/**
+ * `homologacao` é um escopo ISOLADO: publica pelo mesmo caminho oficial, mas
+ * nunca é lido pelo atendimento de produção — só pela verificação de fonte.
+ */
+export type EscopoInstrucoesTemplate = "whatsapp" | "painel_interno" | "homologacao";
 
 /**
  * Marcadores realmente substituídos em cada escopo. Qualquer outro `${...}`
@@ -21,6 +25,8 @@ export type EscopoInstrucoesTemplate = "whatsapp" | "painel_interno";
 export const MARCADORES_PERMITIDOS: Record<EscopoInstrucoesTemplate, readonly string[]> = {
   whatsapp: ["${nomeUnidade}", "${nomeCurtoUnidade}"],
   painel_interno: ["${contextoTexto}"],
+  // Verificação de fonte: texto literal, sem substituição de dados.
+  homologacao: [],
 };
 
 /** Todos os `${...}` presentes no texto, na ordem em que aparecem. */
