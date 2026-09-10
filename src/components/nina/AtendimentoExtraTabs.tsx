@@ -157,6 +157,7 @@ import {
 
 
 import { idConversaValido } from "@/lib/atendimento/abrir-conversa";
+import { conversaEhDaNina, statusEhRepresentacaoDaNina } from "@/lib/atendimento/badge-nina";
 import { assinarSelecaoConversa } from "@/lib/webmcp/selecao-conversa";
 import { AgendaConversaDrawer } from "@/components/nina/AgendaConversaDrawer";
 import { ConversaSkeleton, ContatoSkeleton } from "@/components/nina/ConversaSkeleton";
@@ -2696,7 +2697,7 @@ export function AtendInbox() {
     }
   };
 
-  const statusBadge = (s: string) => {
+  const statusBadge = (s: string, opts?: { ocultarNina?: boolean }) => {
     if (s === "active")
       return (
         <Badge className="bg-atd-ok-bg text-atd-ok-ink hover:bg-atd-ok-bg border border-atd-ok/30">
@@ -2709,12 +2710,15 @@ export function AtendInbox() {
           ⏳ Em espera
         </Badge>
       );
-    if (s === "bot_attending")
+    if (statusEhRepresentacaoDaNina(s)) {
+      // O indicador canônico da Nina é renderizado uma única vez pelo card.
+      if (opts?.ocultarNina) return null;
       return (
         <Badge className="bg-atd-ai-bg text-atd-ai-ink hover:bg-atd-ai-bg border border-atd-ai/30">
           ✦ Nina
         </Badge>
       );
+    }
     if (s === "closed" || s === "finished")
       return (
         <Badge className="bg-atd-idle-bg text-atd-idle-ink hover:bg-atd-idle-bg border border-atd-border">
@@ -3062,14 +3066,14 @@ export function AtendInbox() {
                   )}
                 </div>
                 <div className="flex min-h-[24px] flex-wrap items-center gap-1.5 mt-1">
-                  {statusBadge(c.status)}
+                  {statusBadge(c.status, { ocultarNina: conversaEhDaNina(c) })}
                   {c.owner_type === "NONE" && (
                     <Badge className="bg-atd-danger text-atd-on-strong text-[11px]">🔴 Não atribuída</Badge>
                   )}
                   {c.owner_type === "HUMAN" && (
                     <Badge className="bg-atd-human-bg text-atd-human-ink text-[11px] border border-atd-human-ink/20">👤 Humano</Badge>
                   )}
-                  {c.owner_type === "AI" && (
+                  {conversaEhDaNina(c) && (
                     <Badge className="bg-atd-ai-bg text-atd-ai-ink text-[11px] border border-atd-ai/30">✦ Nina</Badge>
                   )}
                   {c.handoff_motivo === "patient_response_timeout" && (
