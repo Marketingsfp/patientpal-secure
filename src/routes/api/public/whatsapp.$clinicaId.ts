@@ -263,7 +263,7 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
                   );
                   await incrementarRevisaoConversa({
                     clinicaId: params.clinicaId,
-                    telefone: fromDigits || from,
+                    telefone: String(from ?? "").replace(/\D/g, "") || from,
                   });
                 } catch (e) {
                   console.error("[nina] revisão da conversa não avançou", e);
