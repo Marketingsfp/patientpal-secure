@@ -37,7 +37,7 @@ export function ResumoHandoffCard({
           className="flex min-w-0 flex-1 items-center gap-2 rounded text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-500"
           onClick={() => {
             setAberto((v) => !v);
-            setAtualizado(false);
+            limparAtualizado();
           }}
           aria-expanded={aberto}
         >
