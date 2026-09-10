@@ -385,6 +385,34 @@ export function AtendInbox() {
     fechadas: 0,
     equipe: 0,
   });
+  // FASE 3 — reset seguro: trocando de clínica, perdendo a permissão de
+  // supervisão ou saindo o atendente da equipe, o filtro volta para "todos".
+  // Nunca fica um user_id de outra clínica preso na tela.
+  useEffect(() => {
+    setAtendenteSelecionadoId(null);
+    setBuscaAtendente("");
+  }, [clinicaId]);
+  useEffect(() => {
+    if (!atendenteSelecionadoId) return;
+    if (!souGestor) {
+      setAtendenteSelecionadoId(null);
+      return;
+    }
+    if (usuarios.length && !usuarios.some((u: any) => u.user_id === atendenteSelecionadoId)) {
+      setAtendenteSelecionadoId(null);
+    }
+  }, [atendenteSelecionadoId, souGestor, usuarios]);
+
+  const atendentesFiltrados = useMemo(() => {
+    const termo = normalizarNomeBusca(buscaAtendente);
+    if (!termo) return usuarios;
+    return usuarios.filter((u: any) => normalizarNomeBusca(String(u.nome ?? "")).includes(termo));
+  }, [usuarios, buscaAtendente]);
+  const nomeAtendenteSelecionado = useMemo(
+    () => usuarios.find((u: any) => u.user_id === atendenteSelecionadoId)?.nome ?? null,
+    [usuarios, atendenteSelecionadoId],
+  );
+
   const soNaoAtribuidas = escopo === "nao_atribuidas";
   const setSoNaoAtribuidas = (v: boolean) => setEscopo(v ? "nao_atribuidas" : ESCOPO_INBOX_PADRAO);
   // DECISÃO ATUAL — a conversa aberta é uma SELEÇÃO INTERNA da Inbox, pelo id
