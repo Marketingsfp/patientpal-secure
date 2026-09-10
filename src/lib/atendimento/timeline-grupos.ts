@@ -67,6 +67,8 @@ export type GrupoAtribuicao = {
   statusAtendente: string | null;
   transferencia: boolean;
   origemNome: string | null;
+  /** Quem executou a transferência manual (autor da ação). */
+  realizadaPorNome: string | null;
   setorNome: string | null;
   eventoIds: string[];
   marcadorIds: string[];
