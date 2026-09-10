@@ -9676,6 +9676,83 @@ export type Database = {
           },
         ]
       }
+      nina_message_batch_itens: {
+        Row: {
+          batch_id: string
+          created_at: string
+          id: string
+          mensagem_id: string
+          ordem: number
+        }
+        Insert: {
+          batch_id: string
+          created_at?: string
+          id?: string
+          mensagem_id: string
+          ordem: number
+        }
+        Update: {
+          batch_id?: string
+          created_at?: string
+          id?: string
+          mensagem_id?: string
+          ordem?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nina_message_batch_itens_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "nina_message_batches"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      nina_message_batches: {
+        Row: {
+          claimed_at: string | null
+          clinica_id: string
+          conversa_id: string | null
+          created_at: string
+          execucao_id: string | null
+          first_message_at: string
+          id: string
+          last_message_at: string
+          processed_at: string | null
+          revision: number
+          status: string
+          telefone: string
+        }
+        Insert: {
+          claimed_at?: string | null
+          clinica_id: string
+          conversa_id?: string | null
+          created_at?: string
+          execucao_id?: string | null
+          first_message_at?: string
+          id?: string
+          last_message_at?: string
+          processed_at?: string | null
+          revision?: number
+          status?: string
+          telefone: string
+        }
+        Update: {
+          claimed_at?: string | null
+          clinica_id?: string
+          conversa_id?: string | null
+          created_at?: string
+          execucao_id?: string | null
+          first_message_at?: string
+          id?: string
+          last_message_at?: string
+          processed_at?: string | null
+          revision?: number
+          status?: string
+          telefone?: string
+        }
+        Relationships: []
+      }
       nina_prompt_snapshots: {
         Row: {
           behavior_prompt_hash: string | null
@@ -14571,6 +14648,31 @@ export type Database = {
           status: Database["public"]["Enums"]["agendamento_status"]
           teleconsulta: boolean
           token_publico: string
+        }[]
+      }
+      nina_batch_concluir: {
+        Args: { _batch_id: string; _execucao_id?: string; _status?: string }
+        Returns: undefined
+      }
+      nina_batch_registrar: {
+        Args: {
+          _clinica_id: string
+          _conversa_id: string
+          _mensagem_id: string
+          _telefone: string
+        }
+        Returns: {
+          batch_id: string
+          first_message_at: string
+          revision: number
+        }[]
+      }
+      nina_batch_reivindicar: {
+        Args: { _batch_id: string; _forcar?: boolean; _revision: number }
+        Returns: {
+          mensagens: string[]
+          reivindicado: boolean
+          revision: number
         }[]
       }
       nina_calendario_publicar: {
