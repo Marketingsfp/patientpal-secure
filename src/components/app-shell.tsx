@@ -1688,12 +1688,13 @@ function AppShellInner() {
                         }
                         const aliases: string[] = (item as { aliases?: string[] }).aliases ?? [];
                         const active =
-                          itemDeMenuAtivo(location.pathname, item.to) ||
-                          aliases.some((a) => itemDeMenuAtivo(location.pathname, a));
-                        const href = item.to;
+                          leafIsActive(item.to, item.hash) ||
+                          (!item.hash &&
+                            aliases.some((a) => itemDeMenuAtivo(location.pathname, a)));
+                        const href = hrefDoNavLeaf(item);
                         return (
                           <a
-                            key={item.to}
+                            key={navItemKey(item)}
                             href={href}
                             data-nav-to={item.to}
                             data-nav-active={active ? "true" : undefined}
