@@ -7,6 +7,12 @@
  */
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { decidirEspera, montarTurnoPaciente } from "@/lib/nina/burst";
+import {
+  adquirirLockConversa,
+  liberarLockConversa,
+  recuperarLotesTravados,
+  type LockConversa,
+} from "@/lib/nina/lock-conversa.server";
 
 export type TurnoNina = {
   batchId: string;
@@ -14,6 +20,11 @@ export type TurnoNina = {
   mensagens: string[];
   /** Texto do turno lógico (uma ou várias mensagens, sempre separadas). */
   texto: string;
+  /**
+   * FASE 3 — trava da conversa mantida durante TODO o turno (modelo,
+   * ferramentas, memória, estado, Confidence Engine, handoff e envio).
+   */
+  lock: LockConversa | null;
 };
 
 const dormir = (ms: number) =>
@@ -36,13 +47,27 @@ export async function aguardarTurnoNina(input: {
   /** Fallback quando o lote não pôde ser registrado. */
   mensagensFallback?: string[];
 }): Promise<TurnoNina | null> {
-  const fallback = (): TurnoNina => ({
-    batchId: "",
-    mensagens: input.mensagensFallback ?? (input.mensagemId ? [input.mensagemId] : []),
-    texto: input.textoAtual,
-  });
+  const fallback = async (): Promise<TurnoNina | null> => {
+    // Mesmo sem lote, o turno só roda com a conversa travada.
+    const lock = await adquirirLockConversa({
+      clinicaId: input.clinicaId,
+      telefone: input.telefone,
+      conversaId: input.conversaId ?? null,
+    });
+    if (!lock) return null;
+    return {
+      batchId: "",
+      mensagens: input.mensagensFallback ?? (input.mensagemId ? [input.mensagemId] : []),
+      texto: input.textoAtual,
+      lock,
+    };
+  };
 
   if (!input.mensagemId || !input.telefone) return fallback();
+
+  // Recuperação: lote reservado por uma execução que falhou volta a ficar
+  // disponível, para a conversa não travar para sempre.
+  await recuperarLotesTravados(input.clinicaId, input.telefone);
 
   let batchId = "";
   let revision = 0;
@@ -70,6 +95,18 @@ export async function aguardarTurnoNina(input: {
   const { esperaMs, forcar } = decidirEspera(Date.now(), primeiraMs);
   await dormir(esperaMs);
 
+  // Serialização por conversa ANTES de qualquer decisão/ferramenta.
+  const lock = await adquirirLockConversa({
+    clinicaId: input.clinicaId,
+    telefone: input.telefone,
+    conversaId: input.conversaId ?? null,
+    batchId,
+  });
+  if (!lock) {
+    console.warn("[nina] lock: conversa ocupada, turno adiado", { batchId });
+    return null;
+  }
+
   try {
     const { data, error } = await supabaseAdmin.rpc("nina_batch_reivindicar", {
       _batch_id: batchId,
@@ -80,16 +117,22 @@ export async function aguardarTurnoNina(input: {
     const linha = (Array.isArray(data) ? data[0] : data) as
       | { reivindicado?: boolean; mensagens?: string[] }
       | null;
-    if (!linha?.reivindicado) return null; // mensagem mais nova assume o turno
+    if (!linha?.reivindicado) {
+      // Mensagem mais nova assume o turno: solta a trava e encerra.
+      await liberarLockConversa(lock);
+      return null;
+    }
     const ids = linha.mensagens ?? [];
     return {
       batchId,
       mensagens: ids.length ? ids : [input.mensagemId],
       texto: await montarTextoDoLote(ids, input.textoAtual),
+      lock,
     };
   } catch (e) {
     console.error("[nina] burst: reivindicação falhou", e);
-    return fallback();
+    await liberarLockConversa(lock);
+    return null;
   }
 }
 
@@ -112,12 +155,16 @@ async function montarTextoDoLote(ids: string[], textoAtual: string): Promise<str
   }
 }
 
-/** Fecha o lote depois que a Nina respondeu (ou falhou). */
+/** Fecha o lote e solta a trava da conversa (mesmo em caso de falha). */
 export async function concluirTurnoNina(
   batchId: string,
   execucaoId?: string | null,
+  lock?: LockConversa | null,
 ): Promise<void> {
-  if (!batchId) return;
+  if (!batchId) {
+    await liberarLockConversa(lock ?? null);
+    return;
+  }
   try {
     await supabaseAdmin.rpc("nina_batch_concluir", {
       _batch_id: batchId,
@@ -126,5 +173,7 @@ export async function concluirTurnoNina(
     });
   } catch (e) {
     console.error("[nina] burst: conclusão do lote falhou", e);
+  } finally {
+    await liberarLockConversa(lock ?? null);
   }
 }

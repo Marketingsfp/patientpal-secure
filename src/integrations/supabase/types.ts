@@ -8608,6 +8608,42 @@ export type Database = {
         }
         Relationships: []
       }
+      nina_conversa_locks: {
+        Row: {
+          adquirido_em: string
+          batch_id: string | null
+          chave: string
+          clinica_id: string
+          conversa_id: string | null
+          expira_em: string
+          liberado_em: string | null
+          token: string
+          updated_at: string
+        }
+        Insert: {
+          adquirido_em?: string
+          batch_id?: string | null
+          chave: string
+          clinica_id: string
+          conversa_id?: string | null
+          expira_em: string
+          liberado_em?: string | null
+          token: string
+          updated_at?: string
+        }
+        Update: {
+          adquirido_em?: string
+          batch_id?: string | null
+          chave?: string
+          clinica_id?: string
+          conversa_id?: string | null
+          expira_em?: string
+          liberado_em?: string | null
+          token?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       nina_execucao_evidencias: {
         Row: {
           clinica_id: string | null
@@ -14654,6 +14690,14 @@ export type Database = {
         Args: { _batch_id: string; _execucao_id?: string; _status?: string }
         Returns: undefined
       }
+      nina_batch_recuperar_travados: {
+        Args: {
+          _clinica_id: string
+          _idade_segundos?: number
+          _telefone: string
+        }
+        Returns: number
+      }
       nina_batch_registrar: {
         Args: {
           _clinica_id: string
@@ -14755,6 +14799,24 @@ export type Database = {
           similaridade: number
           tipo: string
         }[]
+      }
+      nina_lock_adquirir: {
+        Args: {
+          _batch_id?: string
+          _chave: string
+          _clinica_id: string
+          _conversa_id?: string
+          _lease_segundos?: number
+        }
+        Returns: string
+      }
+      nina_lock_liberar: {
+        Args: { _chave: string; _token: string }
+        Returns: boolean
+      }
+      nina_lock_renovar: {
+        Args: { _chave: string; _lease_segundos?: number; _token: string }
+        Returns: boolean
       }
       nina_metricas_analise: {
         Args: {
