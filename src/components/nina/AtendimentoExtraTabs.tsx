@@ -553,10 +553,12 @@ export function AtendInbox() {
         (c: any) => faixaEsperaAtd(minutosDesde(espera[c.id])) === "critico",
       );
     }
-    // "Maior tempo esperando" usa a métrica canônica de paciente aguardando:
-    // conversa em que a clínica é que aguarda o paciente fica de fora.
-    base = base.filter((c: any) => conversaNaVisualizacao(visualizacao, espera[c.id]));
+    // FASE 2 — o recorte de "paciente aguardando" já vem do backend. Aqui só
+    // sobra a ordenação exata pela métrica canônica e a remoção de conversas
+    // que deixaram de aguardar entre uma atualização e outra.
     if (ordem !== "espera") return base;
+    base = base.filter((c: any) => conversaNaVisualizacao(visualizacao, espera[c.id]));
+    return [...base].sort((a: any, b: any) => {
     return [...base].sort((a: any, b: any) => {
       const ta = espera[a.id] ? new Date(espera[a.id]).getTime() : Infinity;
       const tb = espera[b.id] ? new Date(espera[b.id]).getTime() : Infinity;
