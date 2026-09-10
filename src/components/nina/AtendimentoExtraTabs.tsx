@@ -2925,23 +2925,47 @@ export function AtendInbox() {
               <Select
                 value={atendenteSelecionadoId ?? "todos"}
                 onValueChange={(v) => setAtendenteSelecionadoId(v === "todos" ? null : v)}
-                onOpenChange={setPainelMenuAberto}
+                onOpenChange={(aberto) => {
+                  setPainelMenuAberto(aberto);
+                  if (!aberto) setBuscaAtendente("");
+                }}
               >
                 <SelectTrigger className="h-8 text-xs" aria-label="Filtrar por atendente">
-                  <SelectValue placeholder="Atendente: Todos" />
+                  <SelectValue placeholder="Atendente: Todos">
+                    {`Atendente: ${nomeAtendenteSelecionado ?? "Todos os atendentes"}`}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent className="z-50 min-w-[--radix-select-trigger-width]">
+                  {/* Com equipe grande, dá para achar pelo nome sem rolar a
+                      lista inteira. Nada é buscado no servidor por isto. */}
+                  {usuarios.length > 8 && (
+                    <div className="px-2 pb-1 pt-1">
+                      <Input
+                        value={buscaAtendente}
+                        onChange={(e) => setBuscaAtendente(e.target.value)}
+                        onKeyDown={(e) => e.stopPropagation()}
+                        placeholder="Buscar atendente"
+                        className="h-7 text-xs"
+                        aria-label="Buscar atendente"
+                      />
+                    </div>
+                  )}
                   <SelectItem value="todos">Atendente: Todos os atendentes</SelectItem>
                   {/* Os números do seletor de escopo são sempre globais do
                       filtro (Minhas, Nina, Equipe...). Quando um atendente
                       está selecionado, a quantidade dele aparece ao lado da
                       lista, para não misturar as duas contagens. */}
-                  {usuarios.map((u: any) => (
+                  {atendentesFiltrados.map((u: any) => (
                     <SelectItem key={u.user_id} value={u.user_id}>
                       {u.nome}
                       {u.presenca ? ` · ${ROTULO_PRESENCA[u.presenca as PresencaAtendente]}` : ""}
                     </SelectItem>
                   ))}
+                  {usuarios.length > 8 && atendentesFiltrados.length === 0 && (
+                    <div className="px-2 py-2 text-xs text-muted-foreground">
+                      Nenhum atendente com esse nome.
+                    </div>
+                  )}
                 </SelectContent>
               </Select>
             )}
