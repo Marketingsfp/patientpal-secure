@@ -15,6 +15,7 @@ import {
   conversaDoAtendente,
   escopoComAtendente,
   conversaVisivelNoEscopo,
+  STATUS_FECHADOS,
   type EscopoInbox,
   type ConversaEscopo,
 } from "./escopo-inbox";
