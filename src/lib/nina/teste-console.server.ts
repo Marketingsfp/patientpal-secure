@@ -605,12 +605,22 @@ export async function processarMensagemTeste(data: EntradaMensagemTeste, userId:
     if (diag.processing_status !== "failed") diag.processing_status = "completed";
     console.info("[NINA_MESSAGE_PROCESSING]", diag);
 
+    await encerrarTurno("PROCESSED");
+
     return {
       duplicada: false,
       reply,
       erro: falhaTecnica ? diag.error_message : null,
       audio,
       transferida,
+      processamento: (falhaTecnica ? "ERRO" : "RESPONDIDA") as
+        | "RESPONDIDA"
+        | "AGRUPADA"
+        | "OBSOLETA"
+        | "ERRO",
+      absorvidaPeloLote: false,
+      batchId: loteId || null,
+      revisao: revisaoTurno || null,
     };
 }
 
