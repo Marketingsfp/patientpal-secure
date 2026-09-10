@@ -136,8 +136,12 @@ export function resumirContratos(
     const status = (c.status ?? "").toLowerCase();
     const valor = num(c.valor_mensal);
     if (status === "ativo") {
-      r.ativos += 1;
-      r.receitaPrevista += valor;
+      if (valor > 0) {
+        r.ativos += 1;
+        r.receitaPrevista += valor;
+      } else {
+        r.semMensalidade += 1;
+      }
     } else if (STATUS_INATIVOS.includes(status)) {
       r.inativos += 1;
     }
