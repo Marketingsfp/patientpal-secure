@@ -1321,7 +1321,8 @@ export function HomologacaoInbox() {
                         >
                           <span className="whitespace-nowrap">
                             {formatarDataHoraMensagem(m.created_at)} {autoria}
-
+                            {/* Falha é sempre DESTA mensagem: as outras seguem. */}
+                            {m.estado === "failed" && " · ⚠ falhou"}
                           </span>
                           {daNina && (
                             <span className="flex items-center gap-2">
