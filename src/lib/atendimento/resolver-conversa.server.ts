@@ -34,12 +34,16 @@ export async function resolverConversaCore(
 ): Promise<{ ok: true; protocol: string | null }> {
   const { data: dono } = await db
     .from("atend_conversas")
-    .select("atribuida_user_id, last_assigned_user_id, nina_fluxo_estado")
+    .select("atribuida_user_id, last_assigned_user_id, nina_fluxo_estado, protocolo_atendimento")
     .eq("id", args.conversaId)
     .eq("clinica_id", args.clinicaId)
     .maybeSingle();
 
-  const { data: prot } = await db.rpc("atend_gerar_protocolo", { _clinica_id: args.clinicaId });
+  // O número legado ATD-* deixou de ser gerado: o atendimento tem UM único
+  // protocolo, o oficial (`protocolo_atendimento`), criado no handoff. Aqui
+  // apenas lemos o que já existe — nada novo é numerado ao encerrar.
+  const prot =
+    (dono as { protocolo_atendimento?: string | null } | null)?.protocolo_atendimento ?? null;
 
   // Prazos de espera e estados transacionais morrem com a resolução.
   const { limparEsperaPaciente } = await import("@/lib/nina/espera-paciente.server");
@@ -68,7 +72,6 @@ export async function resolverConversaCore(
       resolved_by: args.userId,
       resolved_at: agoraISO,
       closed_at: agoraISO,
-      protocol_number: (prot as string) ?? null,
       nina_fluxo_estado: { ...estadoEncerrado, updated_at: agoraISO },
       handoff_resumo: null,
       handoff_motivo: null,
@@ -86,7 +89,7 @@ export async function resolverConversaCore(
     user_id: args.userId,
     motivo: args.motivo ?? null,
     detalhes: {
-      protocolo: (prot as string) ?? null,
+      protocolo: prot,
       resolvido_por: args.userId,
       resolvido_em: agoraISO,
       ultimo_atendente: ultimoAtendente,
@@ -110,5 +113,5 @@ export async function resolverConversaCore(
     console.error("[resolver-conversa] falha ao atualizar resumo", e);
   }
 
-  return { ok: true, protocol: (prot as string) ?? null };
+  return { ok: true, protocol: prot };
 }

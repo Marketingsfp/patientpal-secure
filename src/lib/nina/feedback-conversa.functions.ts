@@ -143,7 +143,9 @@ export const lerConversaAuditoria = createServerFn({ method: "POST" })
         numero: (c["numero_conversa"] as string | null) ?? null,
         status: (c["status"] as string | null) ?? null,
         is_teste: Boolean(c["is_teste"]),
-        protocolo: (c["protocolo"] as string | null) ?? null,
+        // Protocolo OFICIAL do atendimento. O antigo número ATD-* deixou de
+        // ser protocolo: não é gerado nem exibido em lugar nenhum.
+        protocolo: (c["protocolo_atendimento"] as string | null) ?? null,
         // Nome usado para rotular as mensagens enviadas por atendente humana.
         atendente_nome: responsavelId ? (nomes.get(responsavelId) ?? null) : null,
       },
