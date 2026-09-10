@@ -2942,112 +2942,101 @@ export function AtendInbox() {
                 )}
               </div>
             )}
-            <Select
-              value={escopo}
-              onValueChange={(v) => setEscopo(v as EscopoInbox)}
-              onOpenChange={setPainelMenuAberto}
-            >
-              <SelectTrigger className="h-8 text-xs" aria-label="Escopo das conversas">
-                <SelectValue placeholder="Não atribuídas" />
-
-              </SelectTrigger>
-              <SelectContent className="z-50 min-w-[--radix-select-trigger-width]">
-                <SelectItem value="minhas">Minhas conversas ({contadores.minhas})</SelectItem>
-                <SelectItem value="nina">Nina ({contadores.nina})</SelectItem>
-                {/* FASE 2 — "Não atribuídas" saiu da interface comum da Inbox:
-                    a fila é consultada pela Central de Atenção no cabeçalho.
-                    O escopo continua existindo e é ativado por ela. */}
-
-                <SelectItem value="fechadas">Fechadas ({contadores.fechadas})</SelectItem>
-                {souGestor && (
-                  <SelectItem value="equipe">Equipe ({contadores.equipe})</SelectItem>
-                )}
-              </SelectContent>
-            </Select>
-            {/* FASE 1 — supervisão: só quem já pode ver conversas de terceiros.
-                Filtro de visualização; nada de atribuição muda por causa dele. */}
-            {souGestor && (
+            {/* FASE 1 — dois eixos compactos na mesma linha:
+                [ Escopo ▾ ] [ Visualização ▾ ]. Atendentes ficam dentro do
+                Escopo (por user_id); a supervisão continua sendo decidida no
+                backend, o menu só reflete a permissão que já existe. */}
+            <div className="flex flex-wrap items-center gap-1.5">
               <Select
-                value={atendenteSelecionadoId ?? "todos"}
-                onValueChange={(v) => setAtendenteSelecionadoId(v === "todos" ? null : v)}
+                value={valorEscopoControle(escopoBase, atendenteEscolhidoId)}
+                onValueChange={(v) => {
+                  const alvo = lerValorEscopo(v);
+                  setEscopoBase(alvo.base);
+                  setAtendenteEscolhidoId(alvo.atendenteId);
+                  setNaoAtribuidasFiltro(false);
+                }}
                 onOpenChange={(aberto) => {
                   setPainelMenuAberto(aberto);
                   if (!aberto) setBuscaAtendente("");
                 }}
               >
-                <SelectTrigger className="h-8 text-xs" aria-label="Filtrar por atendente">
-                  <SelectValue placeholder="Atendente: Todos">
-                    {`Atendente: ${nomeAtendenteSelecionado ?? "Todos os atendentes"}`}
-                  </SelectValue>
+                <SelectTrigger
+                  className="h-8 min-w-0 flex-1 basis-[7.5rem] text-xs"
+                  aria-label="Escopo das conversas"
+                  title={rotuloEscopo(escopoBase, nomeAtendenteSelecionado)}
+                >
+                  <span className="truncate">
+                    {rotuloEscopo(escopoBase, nomeAtendenteSelecionado)}
+                  </span>
                 </SelectTrigger>
                 <SelectContent className="z-50 min-w-[--radix-select-trigger-width]">
-                  {/* Com equipe grande, dá para achar pelo nome sem rolar a
-                      lista inteira. Nada é buscado no servidor por isto. */}
-                  {usuarios.length > 8 && (
-                    <div className="px-2 pb-1 pt-1">
-                      <Input
-                        value={buscaAtendente}
-                        onChange={(e) => setBuscaAtendente(e.target.value)}
-                        onKeyDown={(e) => e.stopPropagation()}
-                        placeholder="Buscar atendente"
-                        className="h-7 text-xs"
-                        aria-label="Buscar atendente"
-                      />
-                    </div>
+                  <SelectItem value="minhas">Minhas conversas ({contadores.minhas})</SelectItem>
+                  {souGestor && (
+                    <SelectItem value="equipe">Todas as conversas ({contadores.equipe})</SelectItem>
                   )}
-                  <SelectItem value="todos">Atendente: Todos os atendentes</SelectItem>
-                  {/* Os números do seletor de escopo são sempre globais do
-                      filtro (Minhas, Nina, Equipe...). Quando um atendente
-                      está selecionado, a quantidade dele aparece ao lado da
-                      lista, para não misturar as duas contagens. */}
-                  {atendentesFiltrados.map((u: any) => (
-                    <SelectItem key={u.user_id} value={u.user_id}>
-                      {u.nome}
-                      {u.presenca ? ` · ${ROTULO_PRESENCA[u.presenca as PresencaAtendente]}` : ""}
-                    </SelectItem>
-                  ))}
-                  {usuarios.length > 8 && atendentesFiltrados.length === 0 && (
-                    <div className="px-2 py-2 text-xs text-muted-foreground">
-                      Nenhum atendente com esse nome.
-                    </div>
+                  <SelectItem value="nina">Nina ({contadores.nina})</SelectItem>
+                  {/* FASE 2 — "Não atribuídas" continua fora do menu comum:
+                      a fila é acionada pela Central de Atenção. */}
+                  {souGestor && (
+                    <>
+                      <div className="mt-1 border-t px-2 pb-1 pt-2 text-[10px] uppercase tracking-wide text-muted-foreground">
+                        Atendentes
+                      </div>
+                      {/* Com equipe grande, dá para achar pelo nome sem rolar a
+                          lista inteira. Nada é buscado no servidor por isto. */}
+                      {usuarios.length > 8 && (
+                        <div className="px-2 pb-1">
+                          <Input
+                            value={buscaAtendente}
+                            onChange={(e) => setBuscaAtendente(e.target.value)}
+                            onKeyDown={(e) => e.stopPropagation()}
+                            placeholder="Pesquisar atendente"
+                            className="h-7 text-xs"
+                            aria-label="Pesquisar atendente"
+                          />
+                        </div>
+                      )}
+                      {atendentesFiltrados.map((u: any) => (
+                        <SelectItem key={u.user_id} value={valorEscopoControle("equipe", u.user_id)}>
+                          {u.nome}
+                          {u.presenca
+                            ? ` · ${ROTULO_PRESENCA[u.presenca as PresencaAtendente]}`
+                            : ""}
+                        </SelectItem>
+                      ))}
+                      {usuarios.length > 8 && atendentesFiltrados.length === 0 && (
+                        <div className="px-2 py-2 text-xs text-muted-foreground">
+                          Nenhum atendente com esse nome.
+                        </div>
+                      )}
+                    </>
                   )}
                 </SelectContent>
               </Select>
-            )}
-            {souGestor && atendenteSelecionadoId && (
-              <span className="self-center text-[11px] text-muted-foreground">
-                {convs.length} conversa{convs.length === 1 ? "" : "s"} deste atendente
-              </span>
-            )}
-            <Select
-              value={filtroStatus}
-              onValueChange={(v) => setFiltroStatus(v as any)}
-              onOpenChange={setPainelMenuAberto}
-            >
-              <SelectTrigger className="h-8 text-xs">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent className="z-50 min-w-[--radix-select-trigger-width]">
-                <SelectItem value="all">Todas</SelectItem>
-                <SelectItem value="waiting">Em espera</SelectItem>
-                <SelectItem value="active">Ativas</SelectItem>
-                
-                <SelectItem value="closed">Fechadas</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select
-              value={ordem}
-              onValueChange={(v) => setOrdem(v as "recentes" | "espera")}
-              onOpenChange={setPainelMenuAberto}
-            >
-              <SelectTrigger className="h-8 text-xs" aria-label="Ordenar conversas">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent className="z-50 min-w-[--radix-select-trigger-width]">
-                <SelectItem value="recentes">Ordenar por: mais recentes</SelectItem>
-                <SelectItem value="espera">Ordenar por: mais antigos aguardando</SelectItem>
-              </SelectContent>
-            </Select>
+              <Select
+                value={visualizacao}
+                onValueChange={(v) => setVisualizacao(v as VisualizacaoInbox)}
+                onOpenChange={setPainelMenuAberto}
+              >
+                <SelectTrigger
+                  className="h-8 min-w-0 flex-1 basis-[7.5rem] text-xs"
+                  aria-label="Visualização das conversas"
+                  title={ROTULO_VISUALIZACAO[visualizacao]}
+                >
+                  <span className="truncate">{ROTULO_VISUALIZACAO[visualizacao]}</span>
+                </SelectTrigger>
+                <SelectContent className="z-50 min-w-[--radix-select-trigger-width]">
+                  <SelectItem value="recentes">Recentes</SelectItem>
+                  <SelectItem value="resolvidas">
+                    Resolvidas ({contadores.fechadas})
+                  </SelectItem>
+                  <SelectItem value="espera">Maior tempo esperando</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <span className="text-[11px] text-muted-foreground">
+              Conversas · {convsVisiveis.length}
+            </span>
             {soNaoAtribuidas && (
               <button
                 type="button"
