@@ -689,13 +689,13 @@ export const calibracaoConfiancaNina = createServerFn({ method: "POST" })
     let q = context.supabase
       .from("nina_confianca_decisoes")
       .select(
-        "id, created_at, ambiente, conversation_id, message_id, execucao_id, score, nivel, decisao, acao, resultado_final, acao_solicitada, bloqueadores, bloqueio, reason_codes, categorias, validadores",
+        "id, created_at, ambiente, conversation_id, message_id, outgoing_message_id, execucao_id, score, nivel, decisao, acao, modo, policy_version, handoff_ocorreu, resultado_final, acao_solicitada, bloqueadores, bloqueio, reason_codes, categorias, validadores, claims",
       )
       .eq("clinica_id", data.clinicaId)
       .gte("created_at", desde)
       .order("created_at", { ascending: false })
       .limit(5000);
-    if (data.ambiente !== "todos") q = q.eq("ambiente", data.ambiente);
+    q = filtrarAmbiente(q, data.ambiente);
     const { data: rows, error } = await q;
     if (error) throw new Error(error.message);
 
@@ -709,6 +709,8 @@ export const calibracaoConfiancaNina = createServerFn({ method: "POST" })
         conversation_id: (r["conversation_id"] as string) ?? null,
         message_id: (r["message_id"] as string) ?? null,
         execucao_id: (r["execucao_id"] as string) ?? null,
+        modo: (r["modo"] as string) ?? null,
+        policy_version: (r["policy_version"] as string) ?? null,
         score: Number(r["score"]) || 0,
         nivel: (r["nivel"] as string) ?? null,
         decisao: ((r["decisao"] as string) ?? (r["acao"] as string)) ?? null,
@@ -727,14 +729,15 @@ export const calibracaoConfiancaNina = createServerFn({ method: "POST" })
       };
     });
 
-    const { data: errosRows } = await context.supabase
+    // FASE 7 — cada ambiente usa os próprios reportes.
+    const { data: errosRows } = await filtrarAmbiente(
+      context.supabase
       .from("nina_feedback_erros")
-      .select("id, conversa_id, mensagem_id, execucao_id, categoria, created_at")
+      .select("id, conversa_id, mensagem_id, execucao_id, categoria, status, created_at")
       .eq("clinica_id", data.clinicaId)
-      .gte("created_at", desde)
-      // FASE 2 — homologação e teste automatizado não entram na métrica real.
-      .eq("ambiente", "production")
-      .limit(5000);
+      .gte("created_at", desde),
+      data.ambiente,
+    ).limit(5000);
 
     const erros: ErroCalibracao[] = (errosRows ?? []).map((raw) => {
       const e = raw as Record<string, unknown>;
@@ -744,6 +747,7 @@ export const calibracaoConfiancaNina = createServerFn({ method: "POST" })
         mensagem_id: (e["mensagem_id"] as string) ?? null,
         execucao_id: (e["execucao_id"] as string) ?? null,
         categoria: (e["categoria"] as string) ?? null,
+        status: (e["status"] as string) ?? null,
         created_at: String(e["created_at"] ?? ""),
       };
     });
@@ -757,23 +761,31 @@ export const calibracaoConfiancaNina = createServerFn({ method: "POST" })
         .from("atend_conversas")
         .select("id, status, handoff_em")
         .in("id", ids.slice(0, 1000));
-      // "Agendamento correto" = o motor só libera a confirmação depois do
-      // retorno real do backend; então a decisão liberada de uma ação de
-      // agendamento é a evidência de que ela aconteceu de verdade.
-      const tentouAgendar = new Map<string, boolean>();
-      for (const d of decisoes) {
-        if (!d.conversation_id) continue;
-        if (!(d.acao_solicitada ?? "").includes("agendamento")) continue;
-        const ok = d.resultado_final === "resposta_liberada" || d.decisao === "ALLOW";
-        tentouAgendar.set(d.conversation_id, (tentouAgendar.get(d.conversation_id) ?? false) || ok);
+      // FASE 7 — reserva confirmada exige prova na agenda; decisão ALLOW não
+      // comprova execução.
+      const provas = await lerProvasAgendamento(context.supabase, (rows ?? []) as Array<Record<string, unknown>>);
+      const pediuAgendamento = new Set(
+        decisoes
+          .filter((d) => (d.acao_solicitada ?? "").includes("agendamento") && d.conversation_id)
+          .map((d) => d.conversation_id as string),
+      );
+      const confirmadoPorConversa = new Map<string, boolean>();
+      for (const p of provas) {
+        if (!p.conversa_id) continue;
+        confirmadoPorConversa.set(
+          p.conversa_id,
+          (confirmadoPorConversa.get(p.conversa_id) ?? false) || p.existeNaAgenda,
+        );
       }
       conversas = (convRows ?? []).map((raw) => {
         const c = raw as { id: string; status: string | null; handoff_em: string | null };
+        const confirmado = confirmadoPorConversa.get(c.id);
         return {
           conversa_id: c.id,
           status: c.status,
           houveHandoff: Boolean(c.handoff_em),
-          agendamentoConfirmado: tentouAgendar.has(c.id) ? tentouAgendar.get(c.id)! : null,
+          agendamentoConfirmado:
+            confirmado === true ? true : pediuAgendamento.has(c.id) ? false : null,
         };
       });
     }
