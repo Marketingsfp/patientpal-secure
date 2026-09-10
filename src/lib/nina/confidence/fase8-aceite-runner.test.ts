@@ -341,7 +341,9 @@ describe("matriz — negação, pergunta, recusa prudente e vaga", () => {
       },
       "Qual o valor do implante?",
     );
-    expect(r.score).toBeLessThan(100);
+    // Recusa prudente não afirma fato: não pode haver afirmação "suportada"
+    // sendo contada como acerto factual, e nada é bloqueado.
+    expect(r.claims.suportados).toBe(0);
     expect(bloqueado(r)).toBe(false);
   });
 
