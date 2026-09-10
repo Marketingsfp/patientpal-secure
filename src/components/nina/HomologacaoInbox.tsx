@@ -106,6 +106,14 @@ import {
   type MensagemResumoRow,
 } from "@/lib/nina/leads-resumo";
 import { supabase } from "@/integrations/supabase/client";
+import {
+  aceitaMensagemRealtime,
+  mesclarMensagemTimeline,
+  paraMensagemTimeline,
+  reconciliarHistorico,
+  waIdDoEnvio,
+  type LinhaMensagemRealtime,
+} from "@/lib/nina/homologacao-realtime";
 
 
 type Lead = {
@@ -138,6 +146,10 @@ type Msg = {
   enviada_por: string | null;
   created_at: string;
   execucao_id?: string | null;
+  /** Identidade idempotente do envio — usada para reconciliar a bolha. */
+  wa_message_id?: string | null;
+  /** Estado individual desta mensagem (nunca um estado global da tela). */
+  estado?: "pending" | "confirmed" | "failed";
 };
 
 /** Rastro técnico de uma chamada de ferramenta feita pela Nina no teste. */
@@ -365,6 +377,30 @@ export function HomologacaoInbox() {
         },
         (payload) => {
           const nova = (payload as any).new as MensagemResumoRow | null;
+          // Timeline em tempo real: a mensagem entra na hora na conversa
+          // aberta, sem esperar recarga do histórico. Só entra se for desta
+          // clínica, desta conversa e do ambiente de HOMOLOGAÇÃO — mensagem
+          // real do WhatsApp nunca aparece aqui.
+          if (
+            aceitaMensagemRealtime(nova as unknown as LinhaMensagemRealtime, {
+              ambiente: "homologacao",
+              clinicaId,
+              conversaId: leadAbertoRef.current,
+            })
+          ) {
+            setMsgs((atuais) =>
+              mesclarMensagemTimeline(
+                atuais,
+                paraMensagemTimeline(nova as unknown as LinhaMensagemRealtime),
+              ),
+            );
+            const oficial = (nova as any).wa_message_id as string | null;
+            if (oficial) {
+              for (const [chave, o] of otimistasRef.current) {
+                if (o.msg.wa_message_id === oficial) otimistasRef.current.delete(chave);
+              }
+            }
+          }
           if (nova?.id && nova.conversa_id && !aplicadasRef.current.has(nova.id)) {
             const jaAplicada = false;
             const abertoAgora =
@@ -427,12 +463,26 @@ export function HomologacaoInbox() {
     },
     [],
   );
+  /**
+   * O envio terminou. A bolha NÃO é removida: quem a substitui é a mensagem
+   * oficial que chega pelo Realtime (mesma identidade `wa_message_id`), sem
+   * piscar. Aqui só deixa de ser "pendente" para o controle interno.
+   */
   const concluirOtimista = useCallback((chave: string) => {
-    const o = otimistasRef.current.get(chave);
     otimistasRef.current.delete(chave);
-    if (o && leadSelecionadoRef.current === o.leadId) {
-      setMsgs((atuais) => atuais.filter((m) => m.id !== o.msg.id));
-    }
+  }, []);
+
+  /**
+   * Falha de UMA mensagem: só ela é marcada. As outras seguem normalmente —
+   * não existe estado de erro global travando a conversa.
+   */
+  const falharOtimista = useCallback((chave: string) => {
+    const o = otimistasRef.current.get(chave);
+    if (!o) return;
+    otimistasRef.current.set(chave, { ...o, msg: { ...o.msg, estado: "failed" } });
+    setMsgs((atuais) =>
+      atuais.map((m) => (m.id === o.msg.id ? { ...m, estado: "failed" as const } : m)),
+    );
   }, []);
 
   const carregarHistorico = useCallback(
@@ -448,7 +498,7 @@ export function HomologacaoInbox() {
         if (leadSelecionadoRef.current !== id) return; // resposta atrasada
         // As mensagens ainda em envio continuam visíveis: uma carga do
         // servidor não pode apagar o que o testador acabou de mandar.
-        setMsgs([...r.mensagens, ...otimistasDoLead(id)]);
+        setMsgs(reconciliarHistorico(r.mensagens, otimistasDoLead(id)));
         setEventosConversa(r.eventos ?? []);
         setConversaId(r.conversaId);
         if (r.conversaId) {
@@ -513,7 +563,7 @@ export function HomologacaoInbox() {
             eventos?: ConversaEvento[];
             conversaId: string | null;
           };
-          setMsgs([...r.mensagens, ...otimistasDoLead(id)]);
+          setMsgs(reconciliarHistorico(r.mensagens, otimistasDoLead(id)));
           setEventosConversa(r.eventos ?? []);
           setConversaId(r.conversaId);
           const ultima = r.mensagens[r.mensagens.length - 1];
@@ -631,7 +681,9 @@ export function HomologacaoInbox() {
     composerRef.current?.focus();
     setErro(null);
     setUltimoTexto(corpo);
-    // 2) bolha imediata na timeline do lead de origem.
+    // 2) bolha imediata na timeline do lead de origem, já com a MESMA
+    // identidade que o servidor vai gravar: quando o Realtime trouxer a
+    // mensagem oficial, ela mescla nesta bolha em vez de criar outra.
     registrarOtimista(leadOrigem, {
       id: `otimista:${chave}`,
       conversa_id: conversaOrigem,
@@ -639,6 +691,8 @@ export function HomologacaoInbox() {
       body: corpo,
       enviada_por: "paciente",
       created_at: new Date().toISOString(),
+      wa_message_id: waIdDoEnvio(leadOrigem, chave),
+      estado: "pending",
     });
     const meuLead = () => leadSelecionadoRef.current === leadOrigem;
     setEmProcessamento((n) => n + 1);
@@ -655,9 +709,11 @@ export function HomologacaoInbox() {
       concluirOtimista(chave);
       if (meuLead()) {
         setAudio(r.audio ? `data:${r.audio.mime};base64,${r.audio.base64}` : null);
-        await carregarHistorico(leadOrigem);
+        // Conciliação eventual (ferramentas, eventos, execuções): a timeline
+        // em si já foi atualizada pelo Realtime, sem esperar esta chamada.
+        void carregarHistorico(leadOrigem);
       }
-      await carregarLeads();
+      void carregarLeads();
       if (meuLead()) {
         if (r.erro) setErro(r.erro);
         else if (!r.reply)
@@ -668,8 +724,9 @@ export function HomologacaoInbox() {
       return { ok: !r.erro && !!r.reply, transferida: !!r.transferida, erro: r.erro ?? null };
     } catch (e: any) {
       const chegou = meuLead() ? await aguardarResposta(leadOrigem) : false;
-      concluirOtimista(chave);
-      await carregarLeads();
+      if (chegou) concluirOtimista(chave);
+      else falharOtimista(chave);
+      void carregarLeads();
       const msg = String(e?.message ?? e);
       if (!chegou && meuLead()) setErro(msg);
       return { ok: chegou, transferida: false, erro: chegou ? null : msg };
@@ -1264,7 +1321,8 @@ export function HomologacaoInbox() {
                         >
                           <span className="whitespace-nowrap">
                             {formatarDataHoraMensagem(m.created_at)} {autoria}
-
+                            {/* Falha é sempre DESTA mensagem: as outras seguem. */}
+                            {m.estado === "failed" && " · ⚠ falhou"}
                           </span>
                           {daNina && (
                             <span className="flex items-center gap-2">
