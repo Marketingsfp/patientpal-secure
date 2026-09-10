@@ -2268,7 +2268,17 @@ export function AtendInbox() {
         aguardando: item.tipo === "HANDOFF" && aguardando.has(item.chave),
       })),
     ];
-    return itens.sort((a, b) => a.at - b.at);
+    // Um mesmo registro nunca pode entrar duas vezes na lista (mensagem
+    // repetida pelo tempo real, por exemplo): a chave de desenho é única.
+    const vistos = new Set<string>();
+    return itens
+      .filter((i) => {
+        const chave = i.kind === "msg" ? `m-${String(i.msg.id)}` : `g-${i.item.chave}`;
+        if (vistos.has(chave)) return false;
+        vistos.add(chave);
+        return true;
+      })
+      .sort((a, b) => a.at - b.at);
   }, [msgs, eventos]);
 
   // FASE 4 — o aviso "Resumo interno da Nina gerado" some da timeline: no lugar
@@ -3501,9 +3511,11 @@ export function AtendInbox() {
                   }
                   const m = item.msg;
                   const out = m.direction === "out";
-                  if (m.enviada_por === "sistema") {
+                  // Só marcador interno vira faixa central. Mensagem real
+                  // enviada ao paciente (status de envio) fica como conversa.
+                  if (m.enviada_por === "sistema" && m.status === "system") {
                     return (
-                      <div key={m.id} className="flex justify-center">
+                      <div key={`m-${m.id}`} className="flex justify-center">
                         <div className="max-w-[85%] whitespace-pre-wrap rounded-lg border border-atd-blue/20 bg-atd-blue-tint px-3 py-2 text-center text-xs text-atd-blue-ink">
                           {textoMarcadorSistema(m.body)}
                           <div className="mt-1 text-[10px] opacity-70">
@@ -3518,7 +3530,7 @@ export function AtendInbox() {
                   const destacada = msgDestacada === m.id;
                   return (
                     <div
-                      key={m.id}
+                      key={`m-${m.id}`}
                       data-msg-id={m.id}
                       className={`flex items-start gap-2 ${out ? "justify-end" : "justify-start"} ${
                         destacada

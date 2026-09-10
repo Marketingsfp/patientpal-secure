@@ -118,7 +118,8 @@ describe("agrupamento semântico da timeline", () => {
     expect(atrib[0].atendenteNome).toBe("JEAN TELEFONE");
     expect(atrib[0].atendenteUserId).toBe("u-jean");
     expect(atrib[0].automatica).toBe(true);
-    expect(atrib[0].criterio).toBe("Atribuição automática (menor carga)");
+    // FASE 5: o título do card já diz "Atribuição automática" — o critério não repete.
+    expect(atrib[0].criterio).toBe("Menor carga");
     expect(atrib[0].statusAtendente).toBe("ONLINE");
     expect(atrib[0].marcadorIds).toEqual(["s3"]);
     expect(marcadorParaItem.get("s3")).toBe(atrib[0].chave);
@@ -277,5 +278,51 @@ describe("FASE 3 — espera por atendente", () => {
       handoff("h2", "2026-09-10T12:00:00Z"),
     ]);
     expect([...r]).toEqual(["h2"]);
+  });
+});
+
+// FASE 5 — regressão sobre a sequência real de um handoff de produção:
+// sete registros internos + três marcadores devem virar dois cards.
+describe("FASE 5 — sequência real de handoff", () => {
+  const eventos = [
+    { id: "e1", evento: "REABERTA", user_id: null, motivo: "Conversa reaberta", detalhes: null, created_at: "2026-09-09T18:17:02.212Z" },
+    { id: "h1", evento: "HANDOFF_SOLICITADO", user_id: null, motivo: "Paciente solicitou falar com atendente humana.", detalhes: { urgencia: "normal", solicitado_por: "IA" }, created_at: "2026-09-09T18:17:38.469Z" },
+    { id: "f1", evento: "ENTROU_NA_FILA", user_id: null, motivo: null, detalhes: { posicao: 4 }, created_at: "2026-09-09T18:17:38.593Z" },
+    { id: "p1", evento: "HANDOFF_SOLICITADO", user_id: null, motivo: "Protocolo MJ-3 gerado (handoff)", detalhes: { protocol_number: "MJ-3", handoff_event_id: "h1" }, created_at: "2026-09-09T18:17:38.948Z" },
+    { id: "p2", evento: "ASSUMIDA", user_id: null, motivo: "Protocolo MJ-3 informado ao paciente", detalhes: { protocol_number: "MJ-3", protocolo_informado: true }, created_at: "2026-09-09T18:17:41.715Z" },
+    { id: "a1", evento: "ASSUMIDA", user_id: "u1", motivo: "Atribuição automática (menor carga)", detalhes: { metodo: "distribuicao_automatica", perfil: "telefonia", presence_status: "ONLINE", atendente_user_id: "u1" }, created_at: "2026-09-09T18:17:43.922Z", user_nome: "JEAN TELEFONE" },
+    { id: "x1", evento: "HANDOFF_AUDITORIA", user_id: null, motivo: "Handoff auditado · Protocolo MJ-3", detalhes: { protocol_number: "MJ-3", handoff_event_id: "h1", auditoria_completa: true, auditoria_faltando: [] }, created_at: "2026-09-09T18:17:46.112Z" },
+  ];
+  const marcadores = [
+    { id: "m1", body: "Vou encaminhar seu atendimento…\nProtocolo do atendimento: MJ-3", created_at: "2026-09-09T18:17:41.617Z", enviada_por: "sistema", status: "sent" },
+    { id: "m2", body: "🧾 Handoff realizado pela Nina · Protocolo: MJ-3 · Destino: Não atribuídas", created_at: "2026-09-09T18:17:41.921Z", enviada_por: "sistema", status: "system" },
+    { id: "m3", body: "🔁 Conversa transferida da Nina para atendimento humano · Motivo: x · Posição 4", created_at: "2026-09-09T18:17:43.680Z", enviada_por: "sistema", status: "system" },
+    { id: "m4", body: "👤 Atribuída automaticamente a JEAN TELEFONE (online).", created_at: "2026-09-09T18:17:44.220Z", enviada_por: "sistema", status: "system" },
+  ];
+
+  it("gera um card de handoff e um de atribuição, sem eventos soltos redundantes", () => {
+    const r = agruparTimeline({ eventos: eventos as any, marcadores: marcadores as any });
+    expect(r.itens.map((i) => i.tipo)).toEqual(["EVENTO", "HANDOFF", "ATRIBUICAO"]);
+
+    const h = r.itens[1] as any;
+    expect(h.protocolo).toBe("MJ-3");
+    expect(h.filaNome).toBe("Não atribuídas");
+    expect(h.filaInicial).toBe(4);
+    expect(h.status).toBe("PROTOCOLO_INFORMADO");
+    expect(h.auditoria).toEqual({ registrada: true, completa: true, faltando: [] });
+    expect(h.eventoIds).toEqual(["h1", "f1", "p1", "p2", "x1"]);
+
+    const a = r.itens[2] as any;
+    expect(a.atendenteNome).toBe("JEAN TELEFONE");
+    expect(a.criterio).toBe("Menor carga");
+    expect(a.statusAtendente).toBe("ONLINE");
+    expect(a.marcadorIds).toEqual(["m4"]);
+  });
+
+  it("mensagem real enviada ao paciente nunca é absorvida por um card", () => {
+    const r = agruparTimeline({ eventos: eventos as any, marcadores: marcadores as any });
+    expect(r.marcadorParaItem.has("m1")).toBe(false);
+    expect(r.marcadorParaItem.get("m2")).toBe("h1");
+    expect(r.marcadorParaItem.get("m3")).toBe("h1");
   });
 });

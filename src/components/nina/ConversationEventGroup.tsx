@@ -66,8 +66,14 @@ export function HandoffGroupCard({ grupo }: { grupo: GrupoHandoff }) {
 
   const linha2: Array<{ rotulo?: string; valor: string }> = [];
   if (grupo.protocolo) linha2.push({ rotulo: "Protocolo", valor: grupo.protocolo });
-  if (grupo.filaInicial != null)
-    linha2.push({ rotulo: "Fila inicial", valor: `posição ${grupo.filaInicial}` });
+  if (grupo.filaNome || grupo.filaInicial != null)
+    linha2.push({
+      rotulo: "Fila inicial",
+      valor:
+        grupo.filaNome && grupo.filaInicial != null
+          ? `${grupo.filaNome} (posição ${grupo.filaInicial})`
+          : (grupo.filaNome ?? `posição ${grupo.filaInicial}`),
+    });
   if (grupo.urgencia) linha2.push({ rotulo: "Urgência", valor: grupo.urgencia });
 
   const linha3: Array<{ rotulo?: string; valor: string }> = [];
