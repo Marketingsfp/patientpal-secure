@@ -407,6 +407,35 @@ export function HomologacaoInbox() {
    * que nenhum card receba mensagens, horário ou contador de outro.
    */
   const leadSelecionadoRef = useRef<string | null>(null);
+
+  /**
+   * Bolhas otimistas: a mensagem do testador aparece na hora e continua na
+   * tela até o histórico do servidor já contê-la. Ficam guardadas por lead —
+   * uma bolha do Teste 01 nunca aparece no Teste 02.
+   */
+  const otimistasRef = useRef<Map<string, { leadId: string; msg: Msg }>>(new Map());
+  const otimistasDoLead = useCallback(
+    (id: string | null) =>
+      id
+        ? [...otimistasRef.current.values()].filter((o) => o.leadId === id).map((o) => o.msg)
+        : [],
+    [],
+  );
+  const registrarOtimista = useCallback(
+    (lead: string, msg: Msg) => {
+      otimistasRef.current.set(msg.id.replace("otimista:", ""), { leadId: lead, msg });
+      if (leadSelecionadoRef.current === lead) setMsgs((atuais) => [...atuais, msg]);
+    },
+    [],
+  );
+  const concluirOtimista = useCallback((chave: string) => {
+    const o = otimistasRef.current.get(chave);
+    otimistasRef.current.delete(chave);
+    if (o && leadSelecionadoRef.current === o.leadId) {
+      setMsgs((atuais) => atuais.filter((m) => m.id !== o.msg.id));
+    }
+  }, []);
+
   const carregarHistorico = useCallback(
     async (id: string) => {
       if (!clinicaId) return;
@@ -418,7 +447,9 @@ export function HomologacaoInbox() {
           conversaId: string | null;
         };
         if (leadSelecionadoRef.current !== id) return; // resposta atrasada
-        setMsgs(r.mensagens);
+        // As mensagens ainda em envio continuam visíveis: uma carga do
+        // servidor não pode apagar o que o testador acabou de mandar.
+        setMsgs([...r.mensagens, ...otimistasDoLead(id)]);
         setEventosConversa(r.eventos ?? []);
         setConversaId(r.conversaId);
         if (r.conversaId) {
