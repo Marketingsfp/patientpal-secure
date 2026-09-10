@@ -8644,6 +8644,33 @@ export type Database = {
         }
         Relationships: []
       }
+      nina_conversa_revisoes: {
+        Row: {
+          chave: string
+          clinica_id: string
+          conversa_id: string | null
+          revision: number
+          telefone: string
+          updated_at: string
+        }
+        Insert: {
+          chave: string
+          clinica_id: string
+          conversa_id?: string | null
+          revision?: number
+          telefone: string
+          updated_at?: string
+        }
+        Update: {
+          chave?: string
+          clinica_id?: string
+          conversa_id?: string | null
+          revision?: number
+          telefone?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       nina_execucao_evidencias: {
         Row: {
           clinica_id: string | null
@@ -14863,6 +14890,14 @@ export type Database = {
           p_inicios: string[]
         }
         Returns: Json
+      }
+      nina_revisao_atual: {
+        Args: { _clinica_id: string; _telefone: string }
+        Returns: number
+      }
+      nina_revisao_incrementar: {
+        Args: { _clinica_id: string; _conversa_id?: string; _telefone: string }
+        Returns: number
       }
       nina_teste_nao_lidas: {
         Args: { _clinica_id: string; _conversa_ids: string[] }
