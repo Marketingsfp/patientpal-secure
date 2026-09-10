@@ -14242,7 +14242,11 @@ export type Database = {
         }[]
       }
       estornar_lancamento_receita: {
-        Args: { _clinica_id: string; _lancamento_id: string }
+        Args: {
+          _clinica_id: string
+          _devolucao_agora?: boolean
+          _lancamento_id: string
+        }
         Returns: Json
       }
       estornar_repasse_atendimento: {
@@ -14260,7 +14264,11 @@ export type Database = {
         Returns: Json
       }
       estorno_receita_destinos: {
-        Args: { _lancamento_id: string; _uid: string }
+        Args: {
+          _devolucao_agora: boolean
+          _lancamento_id: string
+          _uid: string
+        }
         Returns: {
           clinica_id: string
           descricao: string
@@ -14269,6 +14277,7 @@ export type Database = {
           lancamento_id: string
           origem: string
           sessao_destino: string
+          tipo_mov: string
           valor: number
         }[]
       }
@@ -14857,6 +14866,10 @@ export type Database = {
           teleconsulta: boolean
           token_publico: string
         }[]
+      }
+      mover_pagamento_mensalidade: {
+        Args: { _de: string; _para: string }
+        Returns: Json
       }
       nina_batch_concluir: {
         Args: { _batch_id: string; _execucao_id?: string; _status?: string }
