@@ -284,7 +284,9 @@ export type Bloqueador =
   | "FERRAMENTA_OBRIGATORIA_NAO_CHAMADA"
   | "AFIRMACAO_OPERACIONAL_SEM_PROVA"
   // FASE 5 — afirmação isolada da resposta final sem fonte que a sustente.
-  | "AFIRMACAO_SEM_EVIDENCIA";
+  | "AFIRMACAO_SEM_EVIDENCIA"
+  // FASE 8 — ação de escrita sem paciente identificado no turno.
+  | "PACIENTE_NAO_IDENTIFICADO";
 
 /**
  * Status padronizado de um validador isolado.

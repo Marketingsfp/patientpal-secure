@@ -508,7 +508,13 @@ export function resumoComparacaoShadow(linhas: ComparacaoShadow[]) {
 }
 
 /* ------------------------------------------------------------------ *
- * ASSERTIONS DETERMINÍSTICAS PARA O TEST RUNNER
+ * ASSERTIONS DETERMINÍSTICAS PARA O TEST RUNNER (FASE 8)
+ *
+ * Regra da Fase 8: a verificação COMEÇA pela lista de saídas esperadas.
+ * Snapshot ausente não pode significar "critério não executado" — se houve
+ * saída que exige avaliação e não há avaliação correspondente, o cenário
+ * REPROVA. O id da mensagem de entrada (message_id) nunca substitui o
+ * outgoing_message_id.
  * ------------------------------------------------------------------ */
 
 export type SnapshotItemRunner = {
@@ -518,37 +524,156 @@ export type SnapshotItemRunner = {
   bloqueadores?: unknown;
   outgoing_message_id?: string | null;
   message_id?: string | null;
+  clinica_id?: string | null;
+  conversation_id?: string | null;
+  execucao_id?: string | null;
+  policy_version?: string | null;
+  engine_version?: string | null;
+  avaliacao?: string | null;
+  texto_final_hash?: string | null;
+};
+
+/** Mensagem realmente enviada pela Nina no cenário. */
+export type SaidaEsperadaRunner = {
+  id: string;
+  direction?: string | null;
+  clinica_id?: string | null;
+  conversa_id?: string | null;
+  execucao_id?: string | null;
+  /** Hash do texto entregue; quando ausente, a conferência de hash é neutra. */
+  texto_hash?: string | null;
+  /** Saídas puramente técnicas (ex.: eco de sistema) podem dispensar avaliação. */
+  exigeAvaliacao?: boolean;
+};
+
+export type ContextoRunner = {
+  clinicaId?: string | null;
+  conversaId?: string | null;
 };
 
 export type VerificacaoConfiancaRunner = {
+  /** Houve avaliação registrada para as saídas que exigem avaliação. */
   confidence_snapshot_present: boolean;
+  /** TODA saída esperada tem avaliação própria (nenhuma segunda saída órfã). */
+  all_outputs_evaluated: boolean;
+  /** Nenhuma avaliação se apoia apenas no id da mensagem de entrada. */
+  no_input_id_as_output: boolean;
   confidence_linked_to_message: boolean;
+  /** Tipo de avaliação declarado e conhecido. */
+  evaluation_type_valid: boolean;
+  /** Nota e nível dentro dos domínios válidos. */
+  score_and_level_valid: boolean;
+  policy_version_present: boolean;
+  /** Clínica e conversa da avaliação batem com o cenário. */
+  scope_matches: boolean;
+  /** Execução/turno da avaliação bate com a execução da saída. */
+  execution_matches: boolean;
+  /** Hash do texto avaliado corresponde ao texto entregue. */
+  text_hash_matches: boolean;
   no_score_100_without_evidence: boolean;
   no_high_with_blocker: boolean;
 };
+
+const NIVEIS_VALIDOS = new Set(["HIGH", "MEDIUM", "LOW", "VERY_LOW", "PENDING", "UNKNOWN"]);
+const AVALIACOES_VALIDAS = new Set(["answer_confidence", "action_safety"]);
 
 function listaBloqueadores(v: unknown): string[] {
   return Array.isArray(v) ? v.map((x) => String(x)) : [];
 }
 
+const txt = (v: unknown): string | null => {
+  const s = typeof v === "string" ? v.trim() : "";
+  return s ? s : null;
+};
+
 /**
  * Verificações do SISTEMA sobre os snapshots reais persistidos no cenário.
- * Nada é recalculado: só conferimos invariantes do motor v2.
+ * Nada é recalculado: conferimos correspondência, escopo e integridade.
  */
 export function verificarConfiancaRunner(
   snapshots: SnapshotItemRunner[],
+  saidas: SaidaEsperadaRunner[] = [],
+  ctx: ContextoRunner = {},
 ): VerificacaoConfiancaRunner {
   const lista = snapshots ?? [];
+  const esperadas = (saidas ?? []).filter((s) => s.exigeAvaliacao !== false);
+  const temEscopoDeclarado = esperadas.length > 0;
+
+  // Índice pela ÚNICA chave aceita para uma saída: outgoing_message_id.
+  const porSaida = new Map<string, SnapshotItemRunner[]>();
+  for (const s of lista) {
+    const chave = txt(s.outgoing_message_id);
+    if (!chave) continue;
+    porSaida.set(chave, [...(porSaida.get(chave) ?? []), s]);
+  }
+
+  const avaliadas = esperadas.filter((s) => (porSaida.get(s.id) ?? []).length > 0);
+  const semAvaliacao = esperadas.length - avaliadas.length;
+
+  const presente = temEscopoDeclarado ? avaliadas.length > 0 : lista.length > 0;
+
+  const clinicaCtx = txt(ctx.clinicaId);
+  const conversaCtx = txt(ctx.conversaId);
+
+  const escopoOk = lista.every((s) => {
+    const clinicaOk = !clinicaCtx || !txt(s.clinica_id) || txt(s.clinica_id) === clinicaCtx;
+    const conversaOk =
+      !conversaCtx || !txt(s.conversation_id) || txt(s.conversation_id) === conversaCtx;
+    return clinicaOk && conversaOk;
+  });
+
+  const execucaoOk = esperadas.every((saida) => {
+    const esperadaExec = txt(saida.execucao_id);
+    if (!esperadaExec) return true;
+    return (porSaida.get(saida.id) ?? []).every((s) => {
+      const exec = txt(s.execucao_id);
+      return !exec || exec === esperadaExec;
+    });
+  });
+
+  const hashOk = esperadas.every((saida) => {
+    const esperadoHash = txt(saida.texto_hash);
+    if (!esperadoHash) return true;
+    return (porSaida.get(saida.id) ?? []).every((s) => {
+      const h = txt(s.texto_final_hash);
+      // answer_confidence avalia o texto: hash precisa bater.
+      if (txt(s.avaliacao) === "action_safety" && !h) return true;
+      return !h || h === esperadoHash;
+    });
+  });
+
   return {
-    confidence_snapshot_present: lista.length > 0,
-    confidence_linked_to_message: lista.every(
-      (s) => !!(s.outgoing_message_id?.trim() || s.message_id?.trim()),
+    confidence_snapshot_present: presente,
+    all_outputs_evaluated: semAvaliacao === 0,
+    no_input_id_as_output: lista.every(
+      (s) => !!txt(s.outgoing_message_id) || !txt(s.message_id),
     ),
+    confidence_linked_to_message: lista.every((s) => !!txt(s.outgoing_message_id)),
+    evaluation_type_valid: lista.every((s) => {
+      const a = txt(s.avaliacao);
+      return !a || AVALIACOES_VALIDAS.has(a);
+    }),
+    score_and_level_valid: lista.every((s) => {
+      const score = s.score;
+      const nivel = txt(s.nivel);
+      const scoreOk =
+        score === null || score === undefined
+          ? true
+          : Number.isFinite(score) && score >= 0 && score <= 100;
+      const nivelOk = !nivel || NIVEIS_VALIDOS.has(nivel.toUpperCase());
+      return scoreOk && nivelOk;
+    }),
+    policy_version_present: lista.every((s) => !!txt(s.policy_version)),
+    scope_matches: escopoOk,
+    execution_matches: execucaoOk,
+    text_hash_matches: hashOk,
     no_score_100_without_evidence: lista.every(
       (s) => (s.score ?? 0) < 100 || (s.evidence_coverage ?? 0) >= 100,
     ),
     no_high_with_blocker: lista.every(
-      (s) => String(s.nivel ?? "").toUpperCase() !== "HIGH" || listaBloqueadores(s.bloqueadores).length === 0,
+      (s) =>
+        String(s.nivel ?? "").toUpperCase() !== "HIGH" ||
+        listaBloqueadores(s.bloqueadores).length === 0,
     ),
   };
 }
@@ -558,9 +683,41 @@ const ROTULOS_RUNNER: Record<keyof VerificacaoConfiancaRunner, { ok: string; fal
     ok: "Confiança avaliada e registrada.",
     falha: "Nenhuma avaliação de confiança foi registrada (mensagem ficaria 'Não avaliada').",
   },
+  all_outputs_evaluated: {
+    ok: "Toda mensagem enviada tem avaliação correspondente.",
+    falha: "Há mensagem enviada sem avaliação correspondente.",
+  },
+  no_input_id_as_output: {
+    ok: "Nenhuma avaliação usa o id da mensagem recebida como se fosse a enviada.",
+    falha: "Há avaliação identificada apenas pela mensagem recebida.",
+  },
   confidence_linked_to_message: {
     ok: "Cada avaliação está ligada à mensagem enviada.",
     falha: "Há avaliação sem vínculo com a mensagem enviada.",
+  },
+  evaluation_type_valid: {
+    ok: "Tipo de avaliação válido (resposta ou segurança da ação).",
+    falha: "Há avaliação com tipo desconhecido.",
+  },
+  score_and_level_valid: {
+    ok: "Nota e nível dentro dos valores válidos.",
+    falha: "Há avaliação com nota ou nível inválido.",
+  },
+  policy_version_present: {
+    ok: "Todas as avaliações registram a versão da política.",
+    falha: "Há avaliação sem versão de política registrada.",
+  },
+  scope_matches: {
+    ok: "Avaliações pertencem à clínica e à conversa do cenário.",
+    falha: "Há avaliação de outra clínica ou de outra conversa.",
+  },
+  execution_matches: {
+    ok: "Avaliação e mensagem pertencem à mesma execução.",
+    falha: "Há avaliação de execução diferente da mensagem enviada.",
+  },
+  text_hash_matches: {
+    ok: "O texto avaliado é o texto entregue.",
+    falha: "O texto avaliado não corresponde ao texto entregue.",
   },
   no_score_100_without_evidence: {
     ok: "Nenhum score 100 sem cobertura total de evidências.",
@@ -582,3 +739,4 @@ export function criteriosDeConfianca(
     detalhe: v[chave] ? ROTULOS_RUNNER[chave].ok : ROTULOS_RUNNER[chave].falha,
   }));
 }
+

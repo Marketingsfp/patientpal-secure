@@ -66,6 +66,72 @@ const FONTES_ACEITAS: Record<TipoClaim, TipoFonte[]> = {
 };
 
 /** Onde procurar o fato de cada tipo de afirmação. */
+/**
+ * Vocabulário mínimo de assuntos clínicos que o paciente/rascunho pode nomear.
+ * Serve só para detectar quando a frase fala EXPLICITAMENTE de um assunto —
+ * não é lista de respostas nem fonte de dado.
+ */
+const TERMOS_DE_ASSUNTO = [
+  "ultrassom",
+  "ultrassonografia",
+  "raio x",
+  "raio-x",
+  "radiografia",
+  "ressonancia",
+  "tomografia",
+  "endoscopia",
+  "colonoscopia",
+  "mamografia",
+  "eletrocardiograma",
+  "hemograma",
+  "biopsia",
+  "vacina",
+  "cirurgia",
+  "implante",
+  "limpeza",
+  "clareamento",
+  "consulta",
+  "retorno",
+  "exame",
+  "unidade",
+];
+
+/**
+ * A afirmação extraída do TEXTO fala do mesmo assunto do fato recuperado?
+ *
+ * Regra: se a frase não nomeia assunto algum, nada há para conferir (o valor
+ * segue validado pelo fato). Se a frase nomeia um assunto (ex.: "ultrassom")
+ * que não aparece no assunto do fato (ex.: "consulta de cardiologia"), o valor
+ * coincidir é coincidência — não prova.
+ */
+function assuntoDoFatoCompativel(
+  fato: FatoRecuperado,
+  trecho: string,
+  fatos: FatoRecuperado[] = [],
+): boolean {
+  const chave = fato.chave ?? {};
+  const assuntoFato = [chave.procedimento, chave.medicoNome, chave.especialidade, chave.convenio]
+    .map((v) => normalizarTexto(v))
+    .filter((v) => v.length > 0)
+    .join(" ");
+  if (!assuntoFato) return true;
+  const texto = normalizarTexto(trecho);
+  // Qualificador de escopo: se a frase fixa uma UNIDADE e o dado recuperado
+  // não é daquela unidade, o valor não vale para o que foi afirmado.
+  if (texto.includes("unidade")) {
+    const unidadeDaChave = normalizarTexto(chave.unidadeId);
+    const unidadeRecuperada = fatos
+      .filter((f) => f.entidade === "unidade")
+      .map((f) => normalizarTexto(f.valor))
+      .some((v) => v.length > 0 && texto.includes(v));
+    if (!unidadeDaChave && !unidadeRecuperada) return false;
+  }
+
+  const mencionados = TERMOS_DE_ASSUNTO.filter((t) => t !== "unidade" && texto.includes(t));
+  if (mencionados.length === 0) return true;
+  return mencionados.some((t) => assuntoFato.includes(t));
+}
+
 const ALVO_DO_FATO: Record<TipoClaim, { entidades: EntidadeFato[]; campos: string[]; monetario?: boolean }> = {
   valor: { entidades: ["procedimento", "servico"], campos: ["preco"], monetario: true },
   preparo: { entidades: ["procedimento"], campos: ["preparo"] },
@@ -444,6 +510,34 @@ export function avaliarGrounding(ctx: ContextoConfianca, texto?: string | null):
           chave,
         });
         if (r.situacao === "confirmado") {
+          // FASE 8 — o valor bater não basta: a afirmação precisa ser do MESMO
+          // assunto do dado recuperado. Claims extraídos do texto não trazem
+          // chave; se o texto nomeia um assunto diferente do assunto do fato
+          // (outro procedimento, outro profissional, outra unidade), a
+          // correspondência não comprova nada e vira verificação incompleta.
+          // Claims de texto trazem só o trecho do valor; o assunto costuma
+          // estar na frase inteira, então conferimos contra a resposta toda.
+          if (
+            origem === "texto" &&
+            !assuntoDoFatoCompativel(
+              r.fato,
+              `${texto ?? ctx.draftText ?? ""} ${trecho}`,
+              fatos ?? [],
+            )
+          ) {
+            push({
+              tipo,
+              trecho,
+              origem,
+              modalidade,
+              situacao: "nao_verificado",
+              suportado: false,
+              fonte: r.fato.fonte,
+              motivo:
+                "o dado recuperado é de outro assunto — não foi possível ligar a afirmação à fonte",
+            });
+            return;
+          }
           push({
             tipo,
             trecho,
