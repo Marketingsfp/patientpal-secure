@@ -557,9 +557,52 @@ const navRows: ReadonlyArray<{ label: string; items: ReadonlyArray<NavItem> }> =
       { to: "/app/configuracoes/prontuario", label: "Numeração de Prontuário", icon: FolderOpen },
       { to: "/app/configuracoes/painel-totem", label: "Painel & Totem", icon: KeyRound },
       { to: "/app/configuracoes/voz", label: "Voz & Áudio (TTS)", icon: KeyRound },
-      { to: "/app/configuracoes/respostas-rapidas", label: "Mensagens rápidas", icon: Zap },
       { to: "/app/clinicas", label: "Clínicas", icon: Building2 },
       { to: "/app/backups", label: "Backups", icon: ShieldCheck },
+    ],
+  },
+  // ---------------------------------------------------------------------
+  // Portal "Atendimento / WhatsApp". As três seções abaixo só aparecem
+  // nesse portal (o filtro do menu é por rótulo de seção). Nenhum endereço
+  // mudou: são os mesmos itens que antes ficavam em "Inteligência" e
+  // "Configurações", e o módulo de permissão continua sendo "nina".
+  // ---------------------------------------------------------------------
+  {
+    label: "Atendimento",
+    items: [
+      { to: "/app/nina", hash: "atend-inbox", label: "Conversas WhatsApp", icon: Inbox },
+      { to: "/app/nina", hash: "atend-macros", label: "/ Mensagens prontas", icon: Zap },
+      { to: "/app/configuracoes/respostas-rapidas", label: "Mensagens rápidas", icon: Zap },
+    ],
+  },
+  {
+    label: "Nina",
+    items: [
+      {
+        to: "/app/nina",
+        hash: "base-conhecimento",
+        label: "Base de conhecimentos",
+        icon: BookOpen,
+      },
+      {
+        to: "/app/nina",
+        hash: "homologacao",
+        label: "Homologação (envio de testes)",
+        icon: FlaskConical,
+      },
+      { to: "/app/nina-aprendizado", label: "Revisão de Aprendizados", icon: ShieldCheck },
+      { to: "/app/nina-metricas", label: "Métricas de Aprendizado", icon: BarChart3 },
+      { to: "/app/nina-arquitetura", label: "Arquitetura", icon: Network },
+    ],
+  },
+  {
+    label: "Configurações do WhatsApp",
+    items: [
+      { to: "/app/nina", hash: "config", label: "Configuração", icon: KeyRound },
+      { to: "/app/nina", hash: "templates", label: "Templates aprovados (Meta)", icon: FileText },
+      // Continua também em "Configurações" da Clínica Médica: o TTS serve
+      // à Nina e ao painel/totem.
+      { to: "/app/configuracoes/voz", label: "Voz & Áudio (TTS)", icon: KeyRound },
     ],
   },
 ];
