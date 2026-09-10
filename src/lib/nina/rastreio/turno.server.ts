@@ -18,6 +18,7 @@ import {
   finalizarRegistroTurno,
   lacunasDoTurno,
   resumoTurnoParaTrace,
+  NODE_ENTREGA_TURNO,
   NODE_RESUMO_TURNO,
   type BaseRegistroTurno,
   type ConfiancaDoTurno,
