@@ -104,7 +104,11 @@ const TERMOS_DE_ASSUNTO = [
  * que não aparece no assunto do fato (ex.: "consulta de cardiologia"), o valor
  * coincidir é coincidência — não prova.
  */
-function assuntoDoFatoCompativel(fato: FatoRecuperado, trecho: string): boolean {
+function assuntoDoFatoCompativel(
+  fato: FatoRecuperado,
+  trecho: string,
+  fatos: FatoRecuperado[] = [],
+): boolean {
   const chave = fato.chave ?? {};
   const assuntoFato = [chave.procedimento, chave.medicoNome, chave.especialidade, chave.convenio]
     .map((v) => normalizarTexto(v))
@@ -114,8 +118,14 @@ function assuntoDoFatoCompativel(fato: FatoRecuperado, trecho: string): boolean 
   const texto = normalizarTexto(trecho);
   // Qualificador de escopo: se a frase fixa uma UNIDADE e o dado recuperado
   // não é daquela unidade, o valor não vale para o que foi afirmado.
-  const chaveUnidade = normalizarTexto(chave.unidadeId);
-  if (texto.includes("unidade") && !chaveUnidade) return false;
+  if (texto.includes("unidade")) {
+    const unidadeDaChave = normalizarTexto(chave.unidadeId);
+    const unidadeRecuperada = fatos
+      .filter((f) => f.entidade === "unidade")
+      .map((f) => normalizarTexto(f.valor))
+      .some((v) => v.length > 0 && texto.includes(v));
+    if (!unidadeDaChave && !unidadeRecuperada) return false;
+  }
 
   const mencionados = TERMOS_DE_ASSUNTO.filter((t) => t !== "unidade" && texto.includes(t));
   if (mencionados.length === 0) return true;
@@ -509,7 +519,11 @@ export function avaliarGrounding(ctx: ContextoConfianca, texto?: string | null):
           // estar na frase inteira, então conferimos contra a resposta toda.
           if (
             origem === "texto" &&
-            !assuntoDoFatoCompativel(r.fato, `${texto ?? ctx.draftText ?? ""} ${trecho}`)
+            !assuntoDoFatoCompativel(
+              r.fato,
+              `${texto ?? ctx.draftText ?? ""} ${trecho}`,
+              fatos ?? [],
+            )
           ) {
             push({
               tipo,
