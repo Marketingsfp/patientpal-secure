@@ -24,6 +24,7 @@ import type {
   ResultadoFerramenta,
 } from "./paciente-tools.server";
 import { isCPFValido, somenteDigitos } from "@/lib/cpf";
+import { autorizarAcao } from "./acoes/autorizacao";
 import { criarResultado, type ResultadoRespostaNina } from "./resposta/contrato";
 import { textoDaChave, type TextosTemplates } from "./resposta/templates";
 
@@ -264,6 +265,28 @@ export async function aplicarGateIdentificacao(params: {
           );
     }
 
+    // FASE 3 — mesma porta de autorização usada pelas ferramentas: o retorno
+    // antecipado do gate não escapa da conferência de pré-condições.
+    const autorizacaoIdent = autorizarAcao({
+      operacao: "identificar_paciente",
+      clinicaId: ctx.clinicaId,
+      dadosIdentificacao: {
+        nome: p.pending.nome,
+        cpf: p.pending.cpf,
+        data_nascimento: p.pending.data_nascimento,
+      },
+      idempotenciaBase: ctx.conversaId ?? ctx.telefone ?? null,
+    });
+    if (!autorizacaoIdent.autorizado) {
+      log("identificacao_nao_autorizada", {
+        conversa: ctx.conversaId,
+        motivos: autorizacaoIdent.motivos,
+      });
+      return resultadoGate(textos, "fluxo.coleta.completa", {}, {
+        camposPendentes: ["nome", "cpf", "data_nascimento"],
+      });
+    }
+
     estado.flow.stage = "IDENTIFYING_PATIENT";
     const r = await executar(ctx, "identificar_paciente", {
       nome: p.pending.nome,
@@ -304,7 +327,43 @@ export async function aplicarGateIdentificacao(params: {
 
     // 3) Revalida a vaga e grava. `agendar` já revalida o slot e confere a
     //    gravação no banco — é a mesma porta usada pela Agenda.
+    // FASE 3 — a identificação acabou de ser concluída NESTE turno: o estado
+    // atualizado já habilita a operação, sem exigir nova consulta só porque o
+    // turno mudou. O que a autorização confere são as pré-condições reais.
     estado.flow.stage = "REVALIDATING_SLOT";
+    const autorizacaoAgendar = autorizarAcao({
+      operacao: "criar_agendamento",
+      clinicaId: ctx.clinicaId,
+      paciente: { id: ctx.pacienteId, identificado: true, validado: true, atualizadoNoTurno: true },
+      medicoId: a.doctor_id ?? a.doctor_name,
+      procedimento: a.procedure ?? a.specialty ?? "Consulta",
+      intervalo: { inicio: a.slot_inicio, fim: a.slot_fim },
+      disponibilidadeConsultada: true,
+      // A vaga oferecida e resumida ao paciente é a única elegível aqui; a
+      // revalidação contra a agenda acontece na ferramenta/núcleo.
+      vagasConsultadas: [
+        {
+          medicoId: String(a.doctor_id ?? a.doctor_name ?? ""),
+          inicio: String(a.slot_inicio ?? ""),
+          fim: String(a.slot_fim ?? ""),
+        },
+      ],
+      consentimento: {
+        confirmado: a.intent_confirmed === true || a.slot_confirmed_by_patient === true,
+        medicoId: a.doctor_id ?? a.doctor_name,
+        inicio: a.slot_inicio,
+        fim: a.slot_fim,
+      },
+      idempotenciaBase: ctx.conversaId ?? ctx.telefone ?? null,
+    });
+    if (!autorizacaoAgendar.autorizado) {
+      log("agendamento_nao_autorizado", {
+        conversa: ctx.conversaId,
+        motivos: autorizacaoAgendar.motivos,
+      });
+      estado.flow.stage = "CHOOSING_SLOT";
+      return null; // sem efeito: o modelo reconduz a escolha do horário
+    }
     const ag = await executar(ctx, "agendar", {
       medico_id: a.doctor_id ?? a.doctor_name,
       inicio: a.slot_inicio,
@@ -342,6 +401,24 @@ export async function aplicarGateIdentificacao(params: {
 
     const erroAg = (ag as { erro?: string }).erro;
     log("agendamento_falhou", { conversa: ctx.conversaId, erro: erroAg });
+    // Reserva anterior encontrada pela idempotência: consultada, nunca criada
+    // de novo. A prova é o ID lido do registro existente.
+    if (ag.ok && (ag as unknown as { duplicado?: boolean }).duplicado === true) {
+      const idExistente = (ag as unknown as { appointment_id?: string | null }).appointment_id ?? null;
+      estado.flow.stage = "BOOKED";
+      if (idExistente) a.appointment_id = idExistente;
+      return resultadoGate(textos, "fluxo.agendamento.duplicado", {}, {
+        fatosConfirmados: ["agendamento_ja_existente"],
+        acoesConcluidas: [
+          {
+            acao: "agendar",
+            idempotencia: `agendar|${ctx.conversaId}|${a.slot_inicio ?? ""}`,
+            confirmada: true,
+            evidencia: idExistente ?? "duplicado",
+          },
+        ],
+      });
+    }
     if (erroAg === "APPOINTMENT_ALREADY_EXISTS") {
       estado.flow.stage = "BOOKED";
       return resultadoGate(textos, "fluxo.agendamento.duplicado", {}, {
