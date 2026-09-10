@@ -1574,6 +1574,10 @@ async function gerarRespostaNinaInterno(
           decisao: paraDecisaoLegado(decisao),
           modo,
           teriaPermitido: aplicado.teriaPermitido,
+          // FASE 5 — telemetria da política de handoff, sem dado do paciente.
+          handoffDecision: plano.decision,
+          handoffReason: plano.reason,
+          handoffOcorreu: plano.decision === "HANDOFF",
           // Evidência observável apenas: validadores, motivos, fontes,
           // ferramentas e bloqueios. Nunca o rascunho ou o raciocínio interno.
           auditoria: montarRegistroAuditoria(decisao, {

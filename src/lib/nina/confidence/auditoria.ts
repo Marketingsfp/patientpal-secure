@@ -345,6 +345,26 @@ export const ROTULO_TIPO_TURNO: Record<string, string> = {
 };
 
 
+/** FASE 5 — como o painel nomeia a decisão do turno e o motivo dela. */
+export const ROTULO_DECISAO_TURNO: Record<string, string> = {
+  CONTINUE: "Continuar com a Nina",
+  CLARIFY: "Perguntar ao paciente",
+  BLOCK_ACTION: "Ação suspensa",
+  HANDOFF: "Chamar atendente",
+};
+
+export const ROTULO_MOTIVO_TURNO: Record<string, string> = {
+  GREETING: "Saudação válida — nenhuma ação operacional necessária",
+  MISSING_PATIENT_CONTEXT: "Falta um dado do paciente; uma pergunta resolve",
+  MISSING_REQUIRED_SOURCE: "A informação exige fonte oficial que não foi encontrada",
+  CRITICAL_ACTION_BLOCKED: "Ação crítica sem confirmação segura",
+  EXPLICIT_HUMAN_REQUEST: "O paciente pediu para falar com uma pessoa",
+  REPEATED_CLARIFICATION_FAILURE: "Esclarecimento repetido sem avanço",
+  PATIENT_DISSATISFACTION: "Sinal de insatisfação do paciente",
+  LOW_CONFIDENCE_UNRECOVERABLE: "Confiança insuficiente e sem recuperação possível",
+  ANSWER_ALLOWED: "Resposta liberada pelo motor",
+};
+
 export const ROTULO_RESULTADO: Record<ResultadoFinalAuditoria, string> = {
   resposta_liberada: "Resposta liberada pela Nina.",
   pergunta_de_esclarecimento: "Pergunta de esclarecimento ao paciente.",
