@@ -405,8 +405,10 @@ export function ConfiancaMensagemBadge({
             )}
             <p className="text-[10px] text-muted-foreground">
               Política: {detalhe.policyVersion ?? confianca.policy_version ?? "desconhecida"} ·
-              Motor: {detalhe.engineVersion ?? "—"} · Avaliação: {detalhe.avaliacao ?? "—"} ·
-              Ambiente: {detalhe.ambiente}
+              Motor: {detalhe.engineVersion ?? "—"} · Configuração:{" "}
+              {detalhe.configId ?? confianca.config_id ?? "não registrada"}
+              {detalhe.configOrigem ? ` (${detalhe.configOrigem})` : ""} · Avaliação:{" "}
+              {detalhe.avaliacao ?? "—"} · Ambiente: {detalhe.ambiente}
             </p>
           </>
         ) : (
