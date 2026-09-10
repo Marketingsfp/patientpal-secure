@@ -166,3 +166,21 @@ export function conversaDoAtendente(
   if (!atendenteId) return true;
   return conversa.atribuida_user_id === atendenteId;
 }
+
+/**
+ * Filtro por atendente + filtro de escopo na mesma consulta.
+ *
+ * "Minhas conversas" e "Não atribuídas" também falam de responsável. Quando um
+ * supervisor escolhe um atendente, é esse atendente que manda: o escopo passa a
+ * ser o da equipe, senão a lista viria sempre vazia. Os demais filtros (Nina,
+ * Fechadas, status, canal, busca, ordenação) continuam valendo normalmente.
+ */
+export function escopoComAtendente(
+  escopo: EscopoInbox,
+  atendenteId: string | null | undefined,
+  gestor: boolean,
+): EscopoInbox {
+  if (!atendenteFiltroEfetivo(atendenteId, gestor)) return escopo;
+  if (escopo === "minhas" || escopo === "nao_atribuidas") return "equipe";
+  return escopo;
+}
