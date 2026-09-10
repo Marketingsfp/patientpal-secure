@@ -1667,11 +1667,11 @@ export function HomologacaoInbox() {
                 <Button
                   onClick={() => void dispararMensagem(texto)}
                   disabled={
-                    processando || !podeEscrever || !leadId || (tipo === "text" && !texto.trim())
+                    composerBloqueado || (tipo === "text" && !texto.trim())
                   }
                   className="bg-atd-go text-atd-on-strong hover:bg-atd-go-hover disabled:bg-atd-idle-bg disabled:text-atd-ink-soft"
                 >
-                  {processando ? (
+                  {false ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
                   ) : (
                     <Send className="h-4 w-4" />
