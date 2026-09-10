@@ -112,7 +112,12 @@ function assuntoDoFatoCompativel(fato: FatoRecuperado, trecho: string): boolean 
     .join(" ");
   if (!assuntoFato) return true;
   const texto = normalizarTexto(trecho);
-  const mencionados = TERMOS_DE_ASSUNTO.filter((t) => texto.includes(t));
+  // Qualificador de escopo: se a frase fixa uma UNIDADE e o dado recuperado
+  // não é daquela unidade, o valor não vale para o que foi afirmado.
+  const chaveUnidade = normalizarTexto(chave.unidadeId);
+  if (texto.includes("unidade") && !chaveUnidade) return false;
+
+  const mencionados = TERMOS_DE_ASSUNTO.filter((t) => t !== "unidade" && texto.includes(t));
   if (mencionados.length === 0) return true;
   return mencionados.some((t) => assuntoFato.includes(t));
 }

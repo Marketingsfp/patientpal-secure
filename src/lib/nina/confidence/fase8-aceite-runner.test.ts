@@ -419,7 +419,9 @@ describe("matriz — ações: identificação, consentimento e prova", () => {
       },
       "Marca aí",
     );
-    expect(bloqueado(r)).toBe(true);
+    // A ação é barrada; a avaliação do TEXTO é uma medida separada.
+    expect(r.actionSafety?.status).toBe("BLOCKED");
+    expect(r.actionSafety?.blockers).toContain("PACIENTE_NAO_IDENTIFICADO");
   });
 
   it("reserva anterior é reconhecida como existente, não como nova", () => {
