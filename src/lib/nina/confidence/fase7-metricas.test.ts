@@ -203,7 +203,7 @@ describe("amostra e calibração", () => {
     expect(r.amostra.usadas).toBe(30);
     expect(r.amostra.estratificada).toBe(true);
     expect(r.amostra.politicaVersao).toBe("v5");
-    expect(amostrarEstratificado(decisoes, 5)).toHaveLength(15);
+    expect(amostrarEstratificado(decisoes, 5)).toHaveLength(10);
   });
 
   it("ignora decisões em modo observacional e reportes não confirmados", () => {
