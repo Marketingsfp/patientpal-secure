@@ -446,10 +446,9 @@ export function decidirConfianca(
   // esclarecimento, evidência ou transferência não pode sair como ALLOWED.
   const bloqueada = blockersAcao.length > 0 || hardBlockersAcao.length > 0;
   const validadoresAcaoPendentes = validators
-    .filter((v) => v.status === "PENDING" || v.status === "UNKNOWN")
+    .filter((v) => v.status === "PENDING")
     .map((v) => v.validator);
-  const decisaoExigeMaisAlgo =
-    decisaoFinal === "CLARIFY" || decisaoFinal === "HANDOFF" || decisaoFinal === "BLOCK";
+  const decisaoExigeMaisAlgo = decisaoFinal !== "ALLOW";
   const motivosPendencia: string[] = [];
   if (!bloqueada && decisaoExigeMaisAlgo)
     motivosPendencia.push(`decisão do motor ainda exige ${decisaoFinal.toLowerCase()}`);
