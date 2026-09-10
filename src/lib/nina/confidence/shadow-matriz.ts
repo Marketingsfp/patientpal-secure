@@ -212,6 +212,16 @@ export const CENARIOS_SHADOW: CenarioShadow[] = [
         { nome: "agendar", capacidade: "createAppointment", fonte: "agenda", success: true },
         { nome: "identificar_paciente", capacidade: "getPatient", fonte: "cadastro", success: true },
       ],
+      fatos: [
+        {
+          consulta: "agendar",
+          capacidade: "createAppointment",
+          entidade: "agendamento",
+          campo: "appointment_id",
+          valor: "fict-agend-shadow",
+          fonte: "agenda",
+        },
+      ],
       requiredFields: ["procedimento", "medico", "inicio"],
       entities: { procedimento: "consulta", medico: "Ana", inicio: "2026-09-10T10:00" },
       // FASE 4 — o processo também precisa provar o que a frase afirma.
@@ -266,6 +276,17 @@ export const CENARIOS_SHADOW: CenarioShadow[] = [
       texto: "É necessário jejum de 6 horas.",
       catalogoEncontrou: true,
       ferramentas: [catalogoOk],
+      fatos: [
+        {
+          consulta: "buscar_procedimentos",
+          capacidade: "searchKnowledgeBase",
+          entidade: "procedimento",
+          campo: "preparo",
+          valor: "Jejum de 6 horas",
+          fonte: "catalogo_publicado",
+          chave: { procedimento: "ultrassom abdominal" },
+        },
+      ],
     },
   },
   {
