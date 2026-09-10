@@ -536,7 +536,11 @@ export async function gerarRespostaNina(
     teste?: boolean;
     /** FASE 4 — ambiente explícito de QA (produção/homologação/teste automatizado). */
     ambiente?: import("@/lib/nina/confianca-execucao").AmbienteQA;
-    auditoria?: { execucaoId?: string | null };
+    auditoria?: {
+      execucaoId?: string | null;
+      /** FASE 5 — contrato do resultado quando a resposta é determinística. */
+      resultado?: unknown;
+    };
     /** IDs reais das mensagens de entrada que originaram esta resposta. */
     mensagensEntrada?: string[];
     /**

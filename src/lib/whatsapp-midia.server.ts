@@ -1,4 +1,5 @@
 import { VOCABULARIO_DICA, corrigirFala } from "@/lib/voz-correcoes";
+import { MAPA_TEMPLATES } from "@/lib/nina/resposta/templates";
 
 const META_VERSION_MEDIA = "v26.0";
 
@@ -108,14 +109,26 @@ export async function transcreverAudioWhatsapp(
   }
 }
 
-export const RESPOSTA_AUDIO_FALHOU =
-  "Não consegui ouvir seu áudio direito 😕 Pode me escrever por texto, por favor?";
+/**
+ * FASE 5 — os textos de mídia agora moram nos templates versionados. Estes
+ * exports continuam existindo para compatibilidade e devolvem o texto PADRÃO
+ * (sem publicação). O caminho de envio usa a finalização, que aplica o
+ * template publicado quando existir.
+ */
+export const CHAVES_TEMPLATE_MIDIA: Record<string, string> = {
+  image: "midia.imagem",
+  document: "midia.documento",
+  sticker: "midia.figurinha",
+};
+
+export function chaveTemplateMidia(tipo: string): string {
+  return CHAVES_TEMPLATE_MIDIA[tipo] ?? "midia.outro";
+}
+
+export const CHAVE_TEMPLATE_AUDIO_FALHOU = "midia.audio_falhou";
+
+export const RESPOSTA_AUDIO_FALHOU = MAPA_TEMPLATES["midia.audio_falhou"]!.padrao;
 
 export function respostaMidiaNaoSuportada(tipo: string): string {
-  if (tipo === "image")
-    return "Recebi sua imagem 📷 No momento não consigo analisar imagens por aqui — um atendente vai olhar e responder. Se puder, me descreva por texto o que precisa.";
-  if (tipo === "document")
-    return "Recebi seu documento 📄 Um atendente vai conferir e responder. Se puder, me diga por texto do que se trata.";
-  if (tipo === "sticker") return "Recebi 😊 Como posso te ajudar?";
-  return "Recebi sua mensagem. Um atendente vai olhar e responder em breve. Se preferir, me escreva por texto o que precisa.";
+  return MAPA_TEMPLATES[chaveTemplateMidia(tipo)]!.padrao;
 }
