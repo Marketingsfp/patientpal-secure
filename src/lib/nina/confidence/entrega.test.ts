@@ -8,7 +8,7 @@
  *  - "existe linha no banco" não é "o paciente recebeu";
  *  - saídas sem vínculo são detectadas, não silenciadas.
  */
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 import {
   avaliacaoAindaVale,
   descreverSaida,
