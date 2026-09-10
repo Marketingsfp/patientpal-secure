@@ -2,6 +2,7 @@ import { describe, expect, it } from "bun:test";
 import {
   MOTIVO_SEM_FATURAMENTO_OUTRO,
   ehSemFaturamento,
+  motivoIndicaPagamentoJaFeito,
   motivoSemFaturamentoFinal,
   podeAutorizarSemFaturamento,
   rotuloSemFaturamento,

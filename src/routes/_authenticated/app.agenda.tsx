@@ -176,6 +176,7 @@ import {
   MOTIVO_SEM_FATURAMENTO_OUTRO,
   definirSemFaturamento,
   ehSemFaturamento,
+  motivoIndicaPagamentoJaFeito,
   motivoSemFaturamentoFinal,
   podeAutorizarSemFaturamento,
   rotuloSemFaturamento,
