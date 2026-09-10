@@ -2041,12 +2041,19 @@ export function AtendInbox() {
           if (r.lista !== convsRef.current) setConvs(r.lista as any[]);
           g.contadores.agendar();
         }
-      } else if (evento.table === "atend_conversas" && evento.eventType === "UPDATE") {
+      } else if (
+        evento.table === "atend_conversas" &&
+        (evento.eventType === "UPDATE" || evento.eventType === "INSERT")
+      ) {
+        // FASE 3 — transferência, handoff da Nina ou encerramento entram e
+        // saem da lista na hora, respeitando o atendente e o estado escolhidos.
         const r = patchListaPorConversa(convsRef.current, (evento as any).new, {
           escopo,
           userId: meuId ?? "",
           gestor: souGestor,
           atendenteId: atendenteSelecionadoId,
+          status: filtroStatus,
+          buscando: !!buscaTexto || buscaInterp.exigeNumero,
         });
         if (r.aplicado) {
           listaPorPatch = true;
