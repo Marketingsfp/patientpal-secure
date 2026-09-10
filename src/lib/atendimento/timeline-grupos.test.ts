@@ -1,6 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import {
   agruparTimeline,
+  handoffsAguardandoAtendente,
   type EventoTimeline,
   type MarcadorSistemaTimeline,
 } from "./timeline-grupos";
