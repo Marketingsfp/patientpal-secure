@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 import { conversaEhDaNina, statusEhRepresentacaoDaNina } from "../badge-nina";
 
 /** Conta quantos indicadores "✦ Nina" o card renderizaria. */
