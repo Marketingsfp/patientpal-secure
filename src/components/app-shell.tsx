@@ -1553,16 +1553,12 @@ function AppShellInner() {
                 <p className="px-3 py-2 text-xs text-white/60">Nenhum item encontrado.</p>
               )}
               {searchedNavRows.map((row, indiceGrupo) => {
-                const leafIsActive = (to: string, hash?: string) => {
-                  const pathOk = itemDeMenuAtivo(location.pathname, to);
-                  if (!pathOk) return false;
-                  if (!hash) return true;
-                  return (location.hash ?? "").replace(/^#/, "") === hash;
-                };
+                const leafIsActive = (to: string, hash?: string) =>
+                  navLeafAtivo(itemDeMenuAtivo(location.pathname, to), location.hash, hash);
                 const itemHasActive = (it: NavItem): boolean =>
                   isParent(it)
                     ? it.children.some((c) => leafIsActive(c.to, c.hash))
-                    : leafIsActive(it.to);
+                    : leafIsActive(it.to, it.hash);
                 const groupHasActive = row.items.some(itemHasActive);
                 const hideLabel =
                   subsystem === "gestao-pessoas" && row.label === "Recursos Humanos";
