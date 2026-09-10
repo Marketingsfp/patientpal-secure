@@ -574,27 +574,70 @@ export async function gerarRespostaNina(
     mensagens_no_lote: opcoes?.mensagensEntrada?.length ?? 1,
   });
 
-  try {
-    const { resultado, coletor } = await comColetor(async (c) => {
-      if (opcoes?.mensagensEntrada?.length) c.mensagensEntrada(opcoes.mensagensEntrada);
-      return await gerarRespostaNinaInterno(clinicaId, mensagemPaciente, telefoneRemetente, {
-        ...opcoes,
-        auditoria,
-        rastro,
-      });
-    });
-    rastro.concluir("message.inbound", { resposta_tamanho: resultado.length });
-    const { gravarEvidencias } = await import("@/lib/nina/evidencias.server");
-    await gravarEvidencias(auditoria.execucaoId ?? null, clinicaId, coletor);
-    return resultado;
-  } catch (e) {
-    rastro.falhar("error.handle", e);
-    rastro.falhar("message.inbound", e);
-    throw e;
-  } finally {
-    const { descarregarRastro } = await import("@/lib/nina/arquitetura/tracing.server");
-    descarregarRastro(clinicaId, rastro);
-  }
+  // FASE 1 (Rastreabilidade) — registro do turno: versão usada, se o modelo foi
+  // chamado, origem do texto, transformações, confiança e lacunas.
+  const {
+    comRegistroTurno,
+    gravarResumoTurno,
+    diagnosticoAutorizado,
+    registrarOrigemResposta,
+    registrarEntregaDoTurno,
+  } = await import("@/lib/nina/rastreio/turno.server");
+  const podeDiagnosticar = await diagnosticoAutorizado(clinicaId);
+
+  const { resultado: saida, registro } = await comRegistroTurno(
+    {
+      turnoId: traceId,
+      clinicaId,
+      ambiente: opcoes?.ambiente ?? (opcoes?.teste ? "homologacao" : "producao"),
+      teste: opcoes?.teste === true,
+      batchId: opcoes?.lote?.batchId ?? null,
+      mensagensEntrada: opcoes?.mensagensEntrada ?? [],
+      revisaoConversa: opcoes?.lote?.revisao ?? null,
+      diagnostico: podeDiagnosticar,
+    },
+    async () => {
+      try {
+        const { resultado, coletor } = await comColetor(async (c) => {
+          if (opcoes?.mensagensEntrada?.length) c.mensagensEntrada(opcoes.mensagensEntrada);
+          return await gerarRespostaNinaInterno(clinicaId, mensagemPaciente, telefoneRemetente, {
+            ...opcoes,
+            auditoria,
+            rastro,
+          });
+        });
+        rastro.concluir("message.inbound", { resposta_tamanho: resultado.length });
+        const { hashDoTexto } = await import("@/lib/nina/confidence/hash");
+        registrarEntregaDoTurno({
+          mensagemId: null,
+          textoHash: hashDoTexto(resultado),
+          tamanho: resultado.length,
+          canal: opcoes?.teste ? "test-console" : "whatsapp",
+        });
+        const { gravarEvidencias } = await import("@/lib/nina/evidencias.server");
+        await gravarEvidencias(auditoria.execucaoId ?? null, clinicaId, coletor);
+        return { ok: true as const, resultado };
+      } catch (e) {
+        rastro.falhar("error.handle", e);
+        rastro.falhar("message.inbound", e);
+        registrarOrigemResposta(
+          "fallback_erro",
+          e instanceof Error ? e.message.slice(0, 200) : "falha na geração",
+        );
+        return { ok: false as const, erro: e };
+      }
+    },
+  );
+
+  // Gravação AGUARDADA: nada depende de tarefa que o runtime possa abandonar.
+  await gravarResumoTurno(registro);
+  const { descarregarRastroAguardando } = await import(
+    "@/lib/nina/arquitetura/tracing.server"
+  );
+  await descarregarRastroAguardando(clinicaId, rastro);
+
+  if (!saida.ok) throw saida.erro;
+  return saida.resultado;
 }
 
 async function gerarRespostaNinaInterno(
@@ -951,6 +994,31 @@ async function gerarRespostaNinaInterno(
       origem: instrucoesNina.origem,
       conversaId: estadoId.conversaId ?? null,
     });
+    // FASE 1 (Rastreabilidade) — SELEÇÃO DA VERSÃO registrada separadamente da
+    // origem da resposta. `cache` aqui é funcionamento normal (TTL); só é
+    // fallback por erro quando não houve versão publicada utilizável.
+    const { hashDoTexto: hashPrompt } = await import("@/lib/nina/confidence/hash");
+    const {
+      registrarVersaoPromptDoTurno,
+      registrarConversaDoTurno,
+    } = await import("@/lib/nina/rastreio/turno.server");
+    registrarConversaDoTurno(estadoId.conversaId ?? null);
+    registrarVersaoPromptDoTurno({
+      escopo: "whatsapp",
+      versaoId: instrucoesNina.versaoId,
+      versao: instrucoesNina.versao,
+      publicadoEm: instrucoesNina.publicadoEm,
+      origem: instrucoesNina.origem,
+      fallbackPorErro: instrucoesNina.origem === "codigo",
+      motivo:
+        instrucoesNina.origem === "codigo"
+          ? "sem versão publicada utilizável — texto do código"
+          : instrucoesNina.origem === "cache"
+            ? "versão publicada servida do cache da instância"
+            : null,
+      hash: hashPrompt(behaviorPrompt),
+      carregadoEm: new Date().toISOString(),
+    });
   }
 
   // ---------------------------------------------------------------- agendar
@@ -1191,6 +1259,23 @@ async function gerarRespostaNinaInterno(
     });
     if (respostaGate) {
       await salvarFluxoEstado(supabaseAdmin as never, clinicaId, estadoId.conversaId, fluxoEstado);
+      // FASE 1 — caminho SEM modelo: o texto veio da regra determinística de
+      // identificação. Nenhuma chamada ao modelo é inventada no registro.
+      {
+        const { registrarOrigemResposta } = await import("@/lib/nina/rastreio/turno.server");
+        registrarOrigemResposta("gate", "gate de identificação respondeu antes do modelo");
+      }
+      rastro?.pular("llm.generate", "gate de identificação respondeu antes do modelo");
+      registrarEtapa({
+        tipo: "resposta_original",
+        fonte: "sistema",
+        titulo: "Resposta produzida pelo gate de identificação (sem modelo)",
+        dados: { origem: "gate", tamanho: respostaGate.length },
+        codigo: {
+          arquivo: "src/lib/nina/identificacao-gate.server.ts",
+          funcao: "aplicarGateIdentificacao",
+        },
+      });
       return respostaGate;
     }
   }
@@ -1360,6 +1445,39 @@ async function gerarRespostaNinaInterno(
     }
     // O trace passa a apontar para a execução real registrada pelo gateway.
     if (rastro && respostaIA.execucaoId) rastro.ids.execution_id = respostaIA.execucaoId;
+    // FASE 1 — contagem explícita de rodadas do modelo neste turno.
+    {
+      const { registrarRodadaModelo, registroTurnoAtual } = await import(
+        "@/lib/nina/rastreio/turno.server"
+      );
+      registrarRodadaModelo({
+        execucaoId: respostaIA.execucaoId ?? null,
+        modelo: respostaIA.modelo ?? null,
+      });
+      // DIAGNÓSTICO AUTORIZADO: só quando a clínica ligou a flag. Guarda o
+      // payload efetivo da rodada (mensagens e schemas), com marca de corte.
+      if (registroTurnoAtual()?.diagnostico) {
+        const { truncarParaDiagnostico } = await import("@/lib/nina/rastreio/turno");
+        const payload = truncarParaDiagnostico(mensagens, 12000);
+        const schemas = truncarParaDiagnostico(ferramentas ?? [], 8000);
+        registrarEtapa({
+          tipo: "contexto_modelo",
+          fonte: "sistema",
+          titulo: `Payload efetivo enviado ao modelo (rodada ${rodada + 1})`,
+          dados: {
+            rodada: rodada + 1,
+            execucao_id: respostaIA.execucaoId ?? null,
+            modelo: respostaIA.modelo ?? null,
+            mensagens: payload.texto,
+            mensagens_truncado: payload.truncado,
+            ferramentas_schema: schemas.texto,
+            ferramentas_truncado: schemas.truncado,
+            resposta_original: truncarParaDiagnostico(respostaIA.conteudo ?? "", 8000).texto,
+          },
+          codigo: { arquivo: "src/lib/whatsapp.server.ts", funcao: "gerarRespostaNinaInterno" },
+        });
+      }
+    }
 
     if (!respostaIA.ok) {
       rastro?.falhar("llm.generate", respostaIA.erro ?? "Falha IA", {
@@ -1402,6 +1520,13 @@ async function gerarRespostaNinaInterno(
       }
       if (podeAgendar && !agendamentoConfirmado && AFIRMA_AGENDAMENTO.test(texto)) {
         resposta = "Não consegui concluir seu agendamento neste momento. Vou verificar novamente.";
+        {
+          const { registrarOrigemResposta } = await import("@/lib/nina/rastreio/turno.server");
+          registrarOrigemResposta(
+            "codigo",
+            "texto do modelo substituído: falso sucesso de agendamento sem gravação",
+          );
+        }
         break;
       }
       // --------- CONFIDENCE DECISION ENGINE: antes de a resposta sair ---------
@@ -1594,6 +1719,16 @@ async function gerarRespostaNinaInterno(
             ferramentas: evidenciasFerramentas,
           }),
         });
+        // FASE 1 — política/etapa de confiança aplicada neste turno.
+        const { registrarConfiancaDoTurno } = await import("@/lib/nina/rastreio/turno.server");
+        registrarConfiancaDoTurno({
+          avaliacao: "action_safety",
+          decisao: plano.decision,
+          etapa,
+          modo,
+          score: decisao.score,
+          nivel: decisao.level,
+        });
       }
 
       // Confiança intermediária: UMA pergunta objetiva ao paciente e depois o
@@ -1628,10 +1763,23 @@ async function gerarRespostaNinaInterno(
         resposta = rh.success
           ? "Para não te passar uma informação errada, vou chamar uma atendente da nossa equipe para confirmar isso com você."
           : texto;
+        {
+          const { registrarOrigemResposta } = await import("@/lib/nina/rastreio/turno.server");
+          registrarOrigemResposta(
+            rh.success ? "codigo" : "modelo",
+            rh.success
+              ? `texto fixo de transferência (${plano.decision}/${plano.reason})`
+              : "transferência não concluída — texto do modelo mantido",
+          );
+        }
         break;
       }
 
       resposta = texto;
+      {
+        const { registrarOrigemResposta } = await import("@/lib/nina/rastreio/turno.server");
+        registrarOrigemResposta("modelo", "texto devolvido pelo modelo, sem substituição");
+      }
       break;
     }
 
@@ -1766,6 +1914,10 @@ async function gerarRespostaNinaInterno(
     if (turnoObsoleto) {
       // Sem resposta: o próximo lote reprocessa com o contexto atualizado.
       resposta = "";
+      {
+        const { registrarOrigemResposta } = await import("@/lib/nina/rastreio/turno.server");
+        registrarOrigemResposta("nenhuma", "turno abortado por revisão obsoleta da conversa");
+      }
       break;
     }
   }
@@ -1800,9 +1952,28 @@ async function gerarRespostaNinaInterno(
 
 
 
+  // FASE 1 — daqui para baixo TODA alteração do texto é registrada como
+  // transformação, para responder "quem mudou a resposta do modelo".
+  const { registrarTransformacaoResposta, registrarOrigemResposta: marcarOrigem } = await import(
+    "@/lib/nina/rastreio/turno.server"
+  );
+  const { hashDoTexto: hashTurno } = await import("@/lib/nina/confidence/hash");
+  const transformar = (etapa: string, motivo: string, antes: string, depois: string) => {
+    if (antes === depois) return;
+    registrarTransformacaoResposta({
+      etapa,
+      motivo,
+      antesHash: hashTurno(antes),
+      depoisHash: hashTurno(depois),
+    });
+  };
+
   if (!resposta && houveHandoff) {
+    const antes = resposta;
     resposta =
       "Certo! Já chamei uma atendente da nossa equipe para continuar com você por aqui 💛";
+    transformar("handoff.texto_padrao", "handoff sem texto do modelo", antes, resposta);
+    marcarOrigem("codigo", "texto fixo de transferência (sem texto do modelo)");
   }
 
   // Aviso explícito ao paciente: ele precisa saber que saiu da IA e foi para
@@ -1811,14 +1982,19 @@ async function gerarRespostaNinaInterno(
     const AVISO_TRANSFERENCIA =
       "🔁 *Transferido para atendimento humano.* Você não está mais falando com a Nina — uma atendente da equipe assume esta conversa e responde por aqui mesmo.";
     if (!resposta.includes("Transferido para atendimento humano")) {
+      const antes = resposta;
       resposta = `${resposta.trim()}\n\n${AVISO_TRANSFERENCIA}`.trim();
+      transformar("handoff.aviso", "aviso obrigatório de transferência", antes, resposta);
     }
   }
 
 
   if (!resposta) {
+    const antes = resposta;
     resposta =
       "Consegui iniciar aqui, mas preciso de um instante — vou pedir para uma atendente concluir com você.";
+    transformar("resposta.vazia", "modelo não devolveu texto utilizável", antes, resposta);
+    marcarOrigem("fallback_erro", "turno terminou sem texto do modelo");
   }
 
   // FASE 6 — a apresentação é comportamento e vem SOMENTE do Behavior Prompt
@@ -1931,6 +2107,16 @@ async function gerarRespostaNinaInterno(
           turnType: estadoTurnoFinal.tipoTurno ?? null,
           ferramentas: evidenciasFerramentas,
         }),
+      });
+      // FASE 1 — a nota da mensagem final também entra no registro do turno.
+      const { registrarConfiancaDoTurno } = await import("@/lib/nina/rastreio/turno.server");
+      registrarConfiancaDoTurno({
+        avaliacao: "answer_confidence",
+        decisao: respostaFinalAvaliada.decision ?? null,
+        etapa: null,
+        modo: "shadow",
+        score: respostaFinalAvaliada.score,
+        nivel: respostaFinalAvaliada.level,
       });
     }
   } catch (e) {

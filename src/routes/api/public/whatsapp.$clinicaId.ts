@@ -310,6 +310,22 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
                         );
                       }
                       resultado = "verificacao_tratada";
+                      // FASE 1 — resposta determinística ANTES da Nina: fica
+                      // registrada como caminho sem modelo.
+                      try {
+                        const { registrarTurnoSemModelo } = await import(
+                          "@/lib/nina/rastreio/turno.server"
+                        );
+                        await registrarTurnoSemModelo({
+                          clinicaId: params.clinicaId,
+                          conversaId: null,
+                          ...(idMsg ? { mensagensEntrada: [idMsg] } : {}),
+                          origem: r.resposta ? "gate" : "nenhuma",
+                          motivo: "código de verificação reconhecido antes da Nina",
+                        });
+                      } catch {
+                        /* rastreabilidade nunca interrompe o atendimento */
+                      }
                       continue;
                     }
                   } catch (e) {
@@ -419,7 +435,11 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
                       await import("@/lib/whatsapp-midia.server");
                     let reply = "";
                     // Auditoria: id da execução que produziu esta resposta.
-                    const auditoriaNina: { execucaoId?: string | null } = {};
+                    // `traceId` é o identificador do turno (FASE 1): preenchido
+                    // por `gerarRespostaNina` e usado para ligar a mensagem
+                    // entregue ao registro da execução.
+                    const auditoriaNina: { execucaoId?: string | null; traceId?: string | null } =
+                      {};
                     // Mensagens de entrada reais desta resposta. O paciente pode
                     // ter escrito em partes: pegamos as mensagens dele ainda sem
                     // resposta, na ordem em que chegaram.
@@ -471,6 +491,16 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
                       if (!turno) {
                         // Uma mensagem mais nova do mesmo paciente assume o
                         // turno: esta invocação encerra sem responder.
+                        const { registrarTurnoSemModelo } = await import(
+                          "@/lib/nina/rastreio/turno.server"
+                        );
+                        await registrarTurnoSemModelo({
+                          clinicaId: params.clinicaId,
+                          conversaId: convId,
+                          mensagensEntrada: entradasNina,
+                          origem: "nenhuma",
+                          motivo: "turno assumido por mensagem mais nova (agrupamento)",
+                        });
                         continue;
                       }
                       loteId = turno.batchId;
@@ -511,7 +541,23 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
                     // é descartada para o paciente não receber IA e humano juntos.
                     if (reply && from) {
                       const agora = await estadoConversaPorTelefone(params.clinicaId, from);
-                      if (!ninaPodeResponder(agora)) reply = "";
+                      if (!ninaPodeResponder(agora)) {
+                        reply = "";
+                        // FASE 1 — atendente assumiu durante a geração.
+                        const { registrarTurnoSemModelo } = await import(
+                          "@/lib/nina/rastreio/turno.server"
+                        );
+                        await registrarTurnoSemModelo({
+                          ...(auditoriaNina.traceId ? { turnoId: auditoriaNina.traceId } : {}),
+                          clinicaId: params.clinicaId,
+                          conversaId: convId,
+                          mensagensEntrada: entradasNina,
+                          batchId: loteId || null,
+                          revisaoConversa: revisaoTurno || null,
+                          origem: "nenhuma",
+                          motivo: "atendente humano assumiu a conversa antes do envio",
+                        });
+                      }
                     }
 
                     // Encerramento automático: decidido ANTES do envio (para
@@ -557,6 +603,21 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
                         });
                         turnoSuperseded = true;
                         reply = "";
+                        // FASE 1 — o turno existiu e não entregou nada: fica
+                        // registrado com o motivo, sem inventar uma entrega.
+                        const { registrarTurnoSemModelo } = await import(
+                          "@/lib/nina/rastreio/turno.server"
+                        );
+                        await registrarTurnoSemModelo({
+                          ...(auditoriaNina.traceId ? { turnoId: auditoriaNina.traceId } : {}),
+                          clinicaId: params.clinicaId,
+                          conversaId: convId,
+                          mensagensEntrada: entradasNina,
+                          batchId: loteId || null,
+                          revisaoConversa: revisaoTurno || null,
+                          origem: "nenhuma",
+                          motivo: "resposta descartada por revisão obsoleta da conversa",
+                        });
                       }
                     }
                     if (reply) {
@@ -655,6 +716,22 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
                           });
                         } catch {
                           // Vínculo é auditoria: nunca interrompe o atendimento.
+                        }
+                        // FASE 1 — liga o turno à mensagem realmente entregue.
+                        try {
+                          const { gravarEntregaDoTurno } = await import(
+                            "@/lib/nina/rastreio/turno.server"
+                          );
+                          await gravarEntregaDoTurno({
+                            clinicaId: params.clinicaId,
+                            turnoId: auditoriaNina.traceId ?? null,
+                            execucaoId: auditoriaNina.execucaoId ?? null,
+                            conversaId: convId,
+                            outgoingMessageId: (msgOut as { id?: string } | null)?.id ?? null,
+                            canal: "whatsapp",
+                          });
+                        } catch {
+                          // Rastreabilidade nunca interrompe o atendimento.
                         }
                       }
 
