@@ -314,8 +314,20 @@ export function ConfiancaMensagemBadge({
               </ul>
             )}
         </Secao>
-        <Secao titulo="Decisão">
-          <p>{detalhe?.decisaoTurno ?? detalhe?.resultado ?? "—"}</p>
+        {/* FASE 6 — três coisas distintas: o que o motor recomendou, o que a
+            etapa de ativação deixou valer e o que de fato aconteceu. */}
+        <Secao titulo="Decisão recomendada pelo motor">
+          <p>{detalhe?.decisaoRecomendada ?? "—"}</p>
+        </Secao>
+        <Secao titulo="Aplicação (etapa de ativação)">
+          <p className="text-muted-foreground">
+            Etapa {detalhe?.etapaAtivacao ?? "—"} ·{" "}
+            {detalhe?.modo === "enforce" ? "decide" : "apenas observa"}
+            {detalhe?.teriaPermitido === false ? " · o motor não teria liberado" : ""}
+          </p>
+        </Secao>
+        <Secao titulo="Efeito realizado">
+          <p>{detalhe?.decisaoTurno ?? detalhe?.efeitoRealizado ?? detalhe?.resultado ?? "—"}</p>
         </Secao>
         {detalhe?.motivoDecisao && (
           <Secao titulo="Motivo">
