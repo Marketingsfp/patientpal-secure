@@ -515,7 +515,23 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
                     // é descartada para o paciente não receber IA e humano juntos.
                     if (reply && from) {
                       const agora = await estadoConversaPorTelefone(params.clinicaId, from);
-                      if (!ninaPodeResponder(agora)) reply = "";
+                      if (!ninaPodeResponder(agora)) {
+                        reply = "";
+                        // FASE 1 — atendente assumiu durante a geração.
+                        const { registrarTurnoSemModelo } = await import(
+                          "@/lib/nina/rastreio/turno.server"
+                        );
+                        await registrarTurnoSemModelo({
+                          ...(auditoriaNina.traceId ? { turnoId: auditoriaNina.traceId } : {}),
+                          clinicaId: params.clinicaId,
+                          conversaId: convId,
+                          mensagensEntrada: entradasNina,
+                          batchId: loteId || null,
+                          revisaoConversa: revisaoTurno || null,
+                          origem: "nenhuma",
+                          motivo: "atendente humano assumiu a conversa antes do envio",
+                        });
+                      }
                     }
 
                     // Encerramento automático: decidido ANTES do envio (para
