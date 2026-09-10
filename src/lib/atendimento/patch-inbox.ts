@@ -200,7 +200,7 @@ export function patchListaPorConversa(
     if (ctx.buscando) return { lista, aplicado: false, reconciliar: true };
     if (linha?.["is_teste"] === true) return { lista, aplicado: true, reconciliar: false };
     return {
-      lista: ordenar([...lista, { ...(linha as LinhaLista) }]),
+      lista: ordenar([...lista, { ...(linha as LinhaLista) }], visualizacao, espera),
       aplicado: true,
       reconciliar: false,
     };
