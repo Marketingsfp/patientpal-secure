@@ -46,6 +46,10 @@ export async function gravarEventosTrace(
 /**
  * Esvazia o rastro e grava em segundo plano. Retorna imediatamente para não
  * atrasar a resposta ao paciente.
+ *
+ * ATENÇÃO: no runtime de deploy (worker serverless) a requisição pode ser
+ * encerrada logo depois, e a gravação em segundo plano é perdida. Para o
+ * rastro do turno use `descarregarRastroAguardando`.
  */
 export function descarregarRastro(clinicaId: string | null, rastro: Rastro): void {
   try {
@@ -54,6 +58,25 @@ export function descarregarRastro(clinicaId: string | null, rastro: Rastro): voi
     void gravarEventosTrace(clinicaId, eventos);
   } catch {
     /* observabilidade nunca interrompe o atendimento */
+  }
+}
+
+/**
+ * FASE 1 (Rastreabilidade) — mesma drenagem, porém AGUARDADA dentro da
+ * requisição. Usada no fim do turno da Nina para que a evidência exista mesmo
+ * quando o worker encerra assim que o handler devolve a resposta.
+ */
+export async function descarregarRastroAguardando(
+  clinicaId: string | null,
+  rastro: Rastro,
+): Promise<number> {
+  try {
+    const eventos = rastro.drenar();
+    if (!eventos.length) return 0;
+    return await gravarEventosTrace(clinicaId, eventos);
+  } catch {
+    /* observabilidade nunca interrompe o atendimento */
+    return 0;
   }
 }
 
