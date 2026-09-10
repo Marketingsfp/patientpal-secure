@@ -6,7 +6,7 @@
  * homologação usa seus próprios reportes; reserva só conta com prova na agenda;
  * amostra e truncamento aparecem.
  */
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 import {
   agruparSaidas,
   calcularAcertoObservado,
