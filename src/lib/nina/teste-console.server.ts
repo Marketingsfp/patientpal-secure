@@ -412,7 +412,12 @@ export async function processarMensagemTeste(data: EntradaMensagemTeste, userId:
         lockTurno = null;
       }
     };
+    /** Desfecho do turno; vira SUPERSEDED quando a execução é descartada. */
+    let statusFinal: "PROCESSED" | "SUPERSEDED" = "PROCESSED";
 
+    // Tudo o que vier depois do claim fica sob `finally`: sucesso, exceção,
+    // resposta obsoleta ou erro do modelo sempre liberam lote e trava.
+    try {
     try {
       if (textoPaciente) {
         const { gerarRespostaNina } = await import("@/lib/whatsapp.server");
@@ -469,7 +474,7 @@ export async function processarMensagemTeste(data: EntradaMensagemTeste, userId:
     // Resposta atrasada: se o ciclo foi encerrado (ou já é outro) enquanto a
     // Nina pensava, a resposta é descartada e nunca entra na conversa nova.
     if (atual.conversa_id !== conversaId || atual.ciclo_id !== cicloId) {
-      await encerrarTurno("SUPERSEDED");
+      statusFinal = "SUPERSEDED";
       return {
         duplicada: false,
         reply: null,
@@ -490,7 +495,7 @@ export async function processarMensagemTeste(data: EntradaMensagemTeste, userId:
           revisaoProcessada: revisaoTurno,
         })
       ) {
-        await encerrarTurno("SUPERSEDED");
+        statusFinal = "SUPERSEDED";
         return {
           duplicada: false,
           reply: null,
@@ -605,9 +610,6 @@ export async function processarMensagemTeste(data: EntradaMensagemTeste, userId:
     if (diag.processing_status !== "failed") diag.processing_status = "completed";
     console.info("[NINA_MESSAGE_PROCESSING]", diag);
 
-    const loteDoTurno = loteId;
-    await encerrarTurno("PROCESSED");
-
     return {
       duplicada: false,
       reply,
@@ -620,9 +622,13 @@ export async function processarMensagemTeste(data: EntradaMensagemTeste, userId:
         | "OBSOLETA"
         | "ERRO",
       absorvidaPeloLote: false,
-      batchId: loteDoTurno || null,
+      batchId: loteId || null,
       revisao: revisaoTurno || null,
     };
+    } finally {
+      // Garantia única: nenhum lote/lock fica preso, em qualquer desfecho.
+      await encerrarTurno(statusFinal);
+    }
 }
 
 export { LIMITE_MENSAGENS_LEAD, CANAL_TESTE, TOTAL_LEADS, telefoneSessao, garantirLeads, carregarLead, garantirCiclo, conversasDoLead, podarMensagensLead };
