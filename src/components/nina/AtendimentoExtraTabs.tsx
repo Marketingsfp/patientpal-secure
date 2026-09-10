@@ -409,8 +409,20 @@ export function AtendInbox() {
   // supervisão ou saindo o atendente da equipe, o filtro volta para "todos".
   // Nunca fica um user_id de outra clínica preso na tela.
   useEffect(() => {
-    setAtendenteEscolhidoId(null);
+    // FASE 4 — ao trocar de clínica (ou recarregar) o filtro volta ao que foi
+    // usado NAQUELA clínica; nunca a um atendente de outra.
     setBuscaAtendente("");
+    const salvo = lerFiltrosInbox(
+      typeof window === "undefined" ? null : window.localStorage,
+      clinicaId,
+      { gestor: souGestor, usuariosIds: usuarios.map((u: any) => String(u.user_id)) },
+    );
+    setEscopoBase(salvo.base);
+    setVisualizacao(salvo.visualizacao);
+    setAtendenteEscolhidoId(salvo.atendenteId);
+    // Restauração acontece por clínica; mudanças posteriores de equipe são
+    // tratadas pelo efeito de validação abaixo.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [clinicaId]);
   useEffect(() => {
     if (!atendenteEscolhidoId) return;
@@ -422,6 +434,15 @@ export function AtendInbox() {
       setAtendenteEscolhidoId(null);
     }
   }, [atendenteEscolhidoId, souGestor, usuarios]);
+  // Memória do filtro: só grava o que já foi validado na tela.
+  useEffect(() => {
+    if (!clinicaId) return;
+    salvarFiltrosInbox(typeof window === "undefined" ? null : window.localStorage, clinicaId, {
+      base: escopoBase,
+      visualizacao,
+      atendenteId: souGestor ? atendenteEscolhidoId : null,
+    });
+  }, [clinicaId, escopoBase, visualizacao, atendenteEscolhidoId, souGestor]);
 
   const atendentesFiltrados = useMemo(() => {
     const termo = normalizarNomeBusca(buscaAtendente);
