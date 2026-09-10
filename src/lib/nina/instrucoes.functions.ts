@@ -15,6 +15,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
 import { capacidadesDoPapel, type CapacidadeArquitetura } from "./arquitetura/permissoes";
+import { validarTemplateInstrucoes } from "./instrucoes-template";
 
 const TAB = "nina_instrucoes_versoes";
 
@@ -279,6 +280,12 @@ export const publicarInstrucoesNina = createServerFn({ method: "POST" })
     const { supabase, userId } = context as { supabase: any; userId: string };
     // FASE 7 — publicar é permissão separada de editar.
     await exigirCapacidade(supabase, userId, data.clinicaId, "nina.instrucoes.publicar");
+
+    // FASE 2 — marcador desconhecido é reprovado ANTES de mexer na versão
+    // ativa: a publicação nem chega ao banco e a versão em uso continua.
+    const validacao = validarTemplateInstrucoes(data.escopo, data.conteudo);
+    if (!validacao.ok) throw new Error(validacao.mensagem);
+
 
     const { data: anterior } = await supabase
       .from(TAB)
