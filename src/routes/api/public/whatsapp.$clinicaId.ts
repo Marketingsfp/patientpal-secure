@@ -430,11 +430,37 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
                         return atual ? [atual] : [];
                       }
                     })();
+                    // FASE 2 — Burst Aggregation: mensagens seguidas do mesmo
+                    // paciente viram UM turno lógico para a Nina. A mensagem já
+                    // foi persistida e publicada no Realtime acima; aqui só a
+                    // decisão da IA espera a quiet window.
+                    let loteId = "";
+                    let entradasTurno = entradasNina;
                     if (textoPaciente) {
-                      reply = await gerarRespostaNina(params.clinicaId, textoPaciente, from, {
-                        auditoria: auditoriaNina,
-                        mensagensEntrada: entradasNina,
+                      const { aguardarTurnoNina } = await import("@/lib/nina/burst.server");
+                      const turno = await aguardarTurnoNina({
+                        clinicaId: params.clinicaId,
+                        telefone: fromDigits || from,
+                        conversaId: convId,
+                        mensagemId: (msgInserida as { id?: string } | null)?.id ?? null,
+                        textoAtual: textoPaciente,
+                        mensagensFallback: entradasNina,
                       });
+                      if (!turno) {
+                        // Uma mensagem mais nova do mesmo paciente assume o
+                        // turno: esta invocação encerra sem responder.
+                        continue;
+                      }
+                      loteId = turno.batchId;
+                      if (turno.mensagens.length) entradasTurno = turno.mensagens;
+                      reply = await gerarRespostaNina(params.clinicaId, turno.texto, from, {
+                        auditoria: auditoriaNina,
+                        mensagensEntrada: entradasTurno,
+                      });
+                      await (await import("@/lib/nina/burst.server")).concluirTurnoNina(
+                        loteId,
+                        auditoriaNina.execucaoId ?? null,
+                      );
                       // Instrumentação mínima para métricas: marca quais
                       // mensagens recebidas foram realmente processadas por
                       // esta execução. Não altera decisão, resposta ou fluxo.
