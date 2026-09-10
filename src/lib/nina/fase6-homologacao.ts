@@ -183,7 +183,7 @@ export function simularConversas(
     .sort((a, b) => a.emMs - b.emMs)
     .map((msg) => ({ t: msg.emMs, ordem: ordem++, tipo: "chegada" as const, msg }));
 
-  const empilhar = (ev: Omit<Evento, "ordem">) => {
+  const empilhar = (ev: SemOrdem<Evento>) => {
     fila.push({ ...(ev as Evento), ordem: ordem++ });
   };
 
