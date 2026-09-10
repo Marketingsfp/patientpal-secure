@@ -1365,9 +1365,9 @@ function AppShellInner() {
                 {subsystemLabel ?? "Portais"}
               </span>
             </button>
-            {/* Central de Atenção: posição fixa imediatamente à direita do
-                botão de portal ("Clínica Médica"). */}
-            <CentralAtencao />
+            {/* Central de Atenção: exclusiva do portal OS ZAP, imediatamente à
+                direita do botão de portal. */}
+            {subsystem === "os-zap" && <CentralAtencao />}
           </div>
 
           <div className="flex flex-1 items-center justify-end gap-3 min-w-0 sm:flex-none sm:justify-center">
