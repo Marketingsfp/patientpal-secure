@@ -11,6 +11,7 @@
 import {
   atendenteFiltroEfetivo,
   conversaDoAtendente,
+  escopoComAtendente,
   conversaVisivelNoEscopo,
   type ConversaEscopo,
   type EscopoInbox,
@@ -54,10 +55,11 @@ export function chaveInbox(args: {
 export function filtrarPorEscopo<T extends LinhaCache>(linhas: T[], ctx: ContextoEscopo): T[] {
   if (!ctx.userId) return linhas;
   const atendente = atendenteFiltroEfetivo(ctx.atendenteId, ctx.gestor);
+  const escopo = escopoComAtendente(ctx.escopo, ctx.atendenteId, ctx.gestor);
   const visiveis = linhas.filter(
     (l) =>
       conversaVisivelNoEscopo(l, {
-        escopo: ctx.escopo,
+        escopo,
         userId: ctx.userId as string,
         gestor: ctx.gestor,
       }) && conversaDoAtendente(l, atendente),
@@ -70,7 +72,7 @@ export function podeEntrarNaLista(linha: LinhaCache, ctx: ContextoEscopo): boole
   if (!ctx.userId) return true;
   return (
     conversaVisivelNoEscopo(linha, {
-      escopo: ctx.escopo,
+      escopo: escopoComAtendente(ctx.escopo, ctx.atendenteId, ctx.gestor),
       userId: ctx.userId,
       gestor: ctx.gestor,
     }) && conversaDoAtendente(linha, atendenteFiltroEfetivo(ctx.atendenteId, ctx.gestor))

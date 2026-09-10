@@ -5,7 +5,11 @@
  * nunca amplia o que a pessoa já podia ver.
  */
 import { describe, expect, it } from "bun:test";
-import { atendenteFiltroEfetivo, conversaDoAtendente } from "@/lib/atendimento/escopo-inbox";
+import {
+  atendenteFiltroEfetivo,
+  conversaDoAtendente,
+  escopoComAtendente,
+} from "@/lib/atendimento/escopo-inbox";
 import { chaveInbox, filtrarPorEscopo, podeEntrarNaLista } from "@/lib/atendimento/inbox-cache";
 import { patchListaPorConversa } from "@/lib/atendimento/patch-inbox";
 
@@ -100,5 +104,40 @@ describe("nada de atribuição muda", () => {
     expect(conversaDoAtendente(conversa, MARIA)).toBe(false);
     // A conversa continua exatamente como estava.
     expect(conversa).toEqual({ atribuida_user_id: JEAN });
+  });
+});
+
+describe("FASE 2 — combinação com os outros filtros", () => {
+  it("com atendente escolhido, 'Minhas conversas' passa a mostrar as dele", () => {
+    expect(escopoComAtendente("minhas", JEAN, true)).toBe("equipe");
+    expect(escopoComAtendente("nao_atribuidas", JEAN, true)).toBe("equipe");
+  });
+
+  it("Nina, Fechadas e Equipe continuam como estão", () => {
+    expect(escopoComAtendente("nina", JEAN, true)).toBe("nina");
+    expect(escopoComAtendente("fechadas", JEAN, true)).toBe("fechadas");
+    expect(escopoComAtendente("equipe", JEAN, true)).toBe("equipe");
+  });
+
+  it("sem atendente escolhido nada muda", () => {
+    expect(escopoComAtendente("minhas", null, true)).toBe("minhas");
+  });
+
+  it("atendente comum não muda de escopo mesmo forçando outro user_id", () => {
+    expect(escopoComAtendente("minhas", JEAN, false)).toBe("minhas");
+  });
+
+  it("supervisor vendo Jean em 'Minhas conversas' vê as de Jean, não as próprias", () => {
+    const linhas = [
+      { id: "c1", atribuida_user_id: JEAN, status: "active" },
+      { id: "c2", atribuida_user_id: MARIA, status: "active" },
+    ];
+    const r = filtrarPorEscopo(linhas, {
+      escopo: "minhas",
+      userId: MARIA,
+      gestor: true,
+      atendenteId: JEAN,
+    });
+    expect(r.map((l) => l.id)).toEqual(["c1"]);
   });
 });

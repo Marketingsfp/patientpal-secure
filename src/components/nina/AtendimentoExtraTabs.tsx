@@ -2895,6 +2895,10 @@ export function AtendInbox() {
                 </SelectTrigger>
                 <SelectContent className="z-50 min-w-[--radix-select-trigger-width]">
                   <SelectItem value="todos">Atendente: Todos os atendentes</SelectItem>
+                  {/* Os números do seletor de escopo são sempre globais do
+                      filtro (Minhas, Nina, Equipe...). Quando um atendente
+                      está selecionado, a quantidade dele aparece ao lado da
+                      lista, para não misturar as duas contagens. */}
                   {usuarios.map((u: any) => (
                     <SelectItem key={u.user_id} value={u.user_id}>
                       {u.nome}
@@ -2903,6 +2907,11 @@ export function AtendInbox() {
                   ))}
                 </SelectContent>
               </Select>
+            )}
+            {souGestor && atendenteSelecionadoId && (
+              <span className="self-center text-[11px] text-muted-foreground">
+                {convs.length} conversa{convs.length === 1 ? "" : "s"} deste atendente
+              </span>
             )}
             <Select
               value={filtroStatus}
