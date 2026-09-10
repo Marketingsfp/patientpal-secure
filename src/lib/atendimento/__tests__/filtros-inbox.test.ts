@@ -45,7 +45,13 @@ describe("filtros da Inbox em dois eixos", () => {
   it("resolvidas usa o histórico encerrado do escopo", () => {
     const e = base({ visualizacao: "resolvidas", gestor: true });
     expect(escopoConsulta(e)).toBe("fechadas");
-    expect(statusConsulta(e.visualizacao)).toBe("closed");
+    // O estado agora é decidido pela visualização no backend (closed + finished).
+    expect(statusConsulta(e.visualizacao)).toBe("all");
+    expect(planoVisualizacao(e.visualizacao)).toMatchObject({
+      somenteResolvidas: true,
+      ordenarPor: "resolved_at",
+      ascendente: false,
+    });
     // Supervisor pedindo as SUAS resolvidas não recebe o histórico da clínica.
     expect(atendenteConsulta(e)).toBe("eu");
     expect(atendenteConsulta({ ...e, base: "equipe" })).toBeNull();
