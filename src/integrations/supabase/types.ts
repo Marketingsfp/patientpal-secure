@@ -14899,6 +14899,14 @@ export type Database = {
         Args: { _clinica_id: string; _conversa_id?: string; _telefone: string }
         Returns: number
       }
+      nina_teste_garantir_ciclo: {
+        Args: { p_clinica_id: string; p_lead_id: string; p_user_id: string }
+        Returns: {
+          ciclo_id: string
+          conversa_id: string
+          criado: boolean
+        }[]
+      }
       nina_teste_nao_lidas: {
         Args: { _clinica_id: string; _conversa_ids: string[] }
         Returns: {
