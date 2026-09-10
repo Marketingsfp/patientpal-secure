@@ -386,6 +386,12 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
 
 
                 if (deveResponder) {
+                  // FASE 3 — a trava da conversa vale por TODO o turno e é
+                  // solta no finally, inclusive quando a execução falha.
+                  let loteId = "";
+                  let lockTurno: import("@/lib/nina/lock-conversa.server").LockConversa | null =
+                    null;
+                  let execTurno: string | null = null;
                   try {
                     if (!phoneNumberId) {
                       throw new Error(
@@ -434,7 +440,6 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
                     // paciente viram UM turno lógico para a Nina. A mensagem já
                     // foi persistida e publicada no Realtime acima; aqui só a
                     // decisão da IA espera a quiet window.
-                    let loteId = "";
                     let entradasTurno = entradasNina;
                     if (textoPaciente) {
                       const { aguardarTurnoNina } = await import("@/lib/nina/burst.server");
@@ -452,15 +457,13 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
                         continue;
                       }
                       loteId = turno.batchId;
+                      lockTurno = turno.lock;
                       if (turno.mensagens.length) entradasTurno = turno.mensagens;
                       reply = await gerarRespostaNina(params.clinicaId, turno.texto, from, {
                         auditoria: auditoriaNina,
                         mensagensEntrada: entradasTurno,
                       });
-                      await (await import("@/lib/nina/burst.server")).concluirTurnoNina(
-                        loteId,
-                        auditoriaNina.execucaoId ?? null,
-                      );
+                      execTurno = auditoriaNina.execucaoId ?? null;
                       // Instrumentação mínima para métricas: marca quais
                       // mensagens recebidas foram realmente processadas por
                       // esta execução. Não altera decisão, resposta ou fluxo.
@@ -670,6 +673,15 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
                       false,
                       String((e as Error)?.message ?? e),
                     );
+                  } finally {
+                    if (loteId || lockTurno) {
+                      try {
+                        const { concluirTurnoNina } = await import("@/lib/nina/burst.server");
+                        await concluirTurnoNina(loteId, execTurno, lockTurno);
+                      } catch (e) {
+                        console.error("[nina] encerramento do turno falhou", e);
+                      }
+                    }
                   }
                 }
 
