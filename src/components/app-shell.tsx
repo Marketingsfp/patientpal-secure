@@ -96,6 +96,7 @@ import {
   SUBSYSTEMS,
   type SubsystemId,
 } from "@/lib/subsystem";
+import { hrefDoNavLeaf, navLeafAtivo } from "@/lib/nav-hash";
 import {
   PortalLauncher,
   abrirSeletorPortais,
