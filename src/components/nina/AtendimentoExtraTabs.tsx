@@ -373,6 +373,8 @@ export function AtendInbox() {
   // Só visualização: não transfere, não atribui e não marca leitura de ninguém.
   const [atendenteSelecionadoId, setAtendenteSelecionadoId] = useState<string | null>(null);
   const [souGestor, setSouGestor] = useState(false);
+  // Busca dentro do seletor de atendente (só filtra o que a lista mostra).
+  const [buscaAtendente, setBuscaAtendente] = useState("");
   // Administrador acompanha tudo, mas não atende: só supervisão.
   const [souAdmin, setSouAdmin] = useState(false);
   // Contagem própria de cada filtro (nunca reaproveita o número de outro).
