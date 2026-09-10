@@ -10660,6 +10660,19 @@ function AgendaPage() {
                 />
               </div>
             )}
+            {semFatMotivo === MOTIVO_SEM_FATURAMENTO_OUTRO &&
+              motivoIndicaPagamentoJaFeito(semFatMotivoLivre) && (
+                <div className="rounded-md border border-red-300 bg-red-50 p-3 text-xs text-red-800 dark:border-red-800 dark:bg-red-950/40 dark:text-red-200">
+                  <p className="font-semibold">Pelo motivo digitado, o paciente já pagou.</p>
+                  <p className="mt-1">
+                    Marcando "sem faturamento", este atendimento não entra no faturamento e o médico
+                    não recebe o repasse. Use o <strong>$</strong> da ficha com{" "}
+                    <strong>"Pago no sistema anterior"</strong> (pagou na Clínica Total) ou{" "}
+                    <strong>"O paciente já pagou este valor adiantado"</strong> (pagou aqui em outro
+                    dia).
+                  </p>
+                </div>
+              )}
             {!podeAutorizarSemFat && (
               <p className="text-xs text-amber-700 dark:text-amber-400">
                 Esta ação é restrita à supervisão (admin, gestor ou supervisor). Ao confirmar, será
