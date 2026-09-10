@@ -69,6 +69,7 @@ import { descriptorDaFoto, registrarBiometriaPaciente } from "@/lib/biometria";
 import { useClinica } from "@/hooks/use-clinica";
 
 import { DateInputBR } from "@/components/ui/date-input-br";
+import { Badge } from "@/components/ui/badge";
 export interface Paciente {
   id: string;
   nome: string;
@@ -161,6 +162,38 @@ const EMPTY: FormState = {
   alerta_critico: false,
   alerta_motivo: "",
 };
+
+// Rótulo em português da situação do agendamento (enum agendamento_status).
+// Valor desconhecido: mostra o próprio texto.
+function situacaoAgendamentoRotulo(status: string | null): string {
+  switch (status) {
+    case "agendado":
+      return "Agendado";
+    case "confirmado":
+      return "Confirmado";
+    case "realizado":
+      return "Realizado";
+    case "cancelado":
+      return "Cancelado";
+    case "faltou":
+      return "Faltou";
+    default:
+      return status ?? "—";
+  }
+}
+
+function situacaoAgendamentoClasse(status: string | null): string {
+  switch (status) {
+    case "realizado":
+      return "border-emerald-500/40 text-emerald-700 dark:text-emerald-400";
+    case "cancelado":
+      return "border-destructive/40 text-destructive";
+    case "faltou":
+      return "border-muted-foreground/40 text-muted-foreground";
+    default:
+      return "border-border text-foreground";
+  }
+}
 
 function calcIdade(dn: string | null): number | null {
   if (!dn) return null;
@@ -357,6 +390,7 @@ export function ClienteForm({
     procedimento: string | null;
     medico_nome: string | null;
     especialidade: string | null;
+    status: string | null;
   };
   const [histList, setHistList] = useState<HistRow[]>([]);
   const [histLoading, setHistLoading] = useState(false);
@@ -787,7 +821,7 @@ export function ClienteForm({
     setFiltroAtivo(false);
   }, [prontList]);
 
-  // Carrega histórico de atendimentos realizados do paciente
+  // Carrega todos os agendamentos do paciente (qualquer situação)
   useEffect(() => {
     if (!editing) {
       setHistList([]);
@@ -799,7 +833,7 @@ export function ClienteForm({
         .from("agendamentos")
         .select("id, inicio, procedimento, medico_id, status")
         .eq("paciente_id", editing.id)
-        .eq("status", "realizado")
+        
         .order("inicio", { ascending: false });
       if (error) {
         toast.error("Não foi possível carregar o histórico.");
@@ -811,6 +845,7 @@ export function ClienteForm({
         inicio: string;
         procedimento: string | null;
         medico_id: string | null;
+        status: string | null;
       }>;
       const medicoIds = Array.from(
         new Set(rows.map((r) => r.medico_id).filter((x): x is string => !!x)),
@@ -848,6 +883,7 @@ export function ClienteForm({
             procedimento: r.procedimento,
             medico_nome: med?.nome ?? null,
             especialidade: med?.especialidade_id ? (espMap[med.especialidade_id] ?? null) : null,
+            status: r.status ?? null,
           };
         }),
       );
@@ -2029,7 +2065,7 @@ export function ClienteForm({
                 ) : histList.length === 0 ? (
                   <div className="py-10 text-center text-muted-foreground text-sm">
                     <History className="h-6 w-6 mx-auto mb-2 opacity-50" />
-                    Nenhuma consulta ou exame realizado para este paciente.
+                    Nenhum atendimento registrado para este paciente.
                   </div>
                 ) : (
                   <>
@@ -2096,7 +2132,7 @@ export function ClienteForm({
                         <History className="h-6 w-6 mx-auto mb-2 opacity-50" />
                         {histFiltroAtivo
                           ? "Nenhum registro encontrado com esses filtros."
-                          : "Nenhuma consulta ou exame realizado para este paciente."}
+                          : "Nenhum atendimento registrado para este paciente."}
                       </div>
                     ) : (
                       <div className="rounded-lg border border-border bg-card overflow-x-auto">
@@ -2107,6 +2143,7 @@ export function ClienteForm({
                               <th className="px-3 py-2">Especialidade</th>
                               <th className="px-3 py-2">Serviço</th>
                               <th className="px-3 py-2">Médico</th>
+                              <th className="px-3 py-2 w-32">Situação</th>
                             </tr>
                           </thead>
                           <tbody>
@@ -2123,6 +2160,14 @@ export function ClienteForm({
                                   {h.procedimento ?? "CONSULTA"}
                                 </td>
                                 <td className="px-3 py-2 uppercase">{h.medico_nome ?? "—"}</td>
+                                <td className="px-3 py-2">
+                                  <Badge
+                                    variant="outline"
+                                    className={situacaoAgendamentoClasse(h.status)}
+                                  >
+                                    {situacaoAgendamentoRotulo(h.status)}
+                                  </Badge>
+                                </td>
                               </tr>
                             ))}
                           </tbody>
