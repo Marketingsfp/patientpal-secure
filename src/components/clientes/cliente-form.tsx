@@ -2124,6 +2124,14 @@ export function ClienteForm({
                                   {h.procedimento ?? "CONSULTA"}
                                 </td>
                                 <td className="px-3 py-2 uppercase">{h.medico_nome ?? "—"}</td>
+                                <td className="px-3 py-2">
+                                  <Badge
+                                    variant="outline"
+                                    className={situacaoAgendamentoClasse(h.status)}
+                                  >
+                                    {situacaoAgendamentoRotulo(h.status)}
+                                  </Badge>
+                                </td>
                               </tr>
                             ))}
                           </tbody>
