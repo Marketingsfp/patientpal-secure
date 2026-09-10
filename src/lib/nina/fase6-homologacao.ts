@@ -159,6 +159,9 @@ type Evento =
   | { t: number; ordem: number; tipo: "acorda"; conversa: string; batchId: string; revision: number; forcar: boolean }
   | { t: number; ordem: number; tipo: "fim"; execucao: ExecucaoNina };
 
+/** Omit distributivo: preserva as variantes da união. */
+type SemOrdem<T> = T extends unknown ? Omit<T, "ordem"> : never;
+
 export type ResultadoSimulacao = {
   execucoes: ExecucaoNina[];
   enviadas: ExecucaoNina[];
