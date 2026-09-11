@@ -1630,9 +1630,25 @@ async function gerarRespostaNinaInterno(
         fluxoEstado.clarification = rev.pendencia;
         pendenciaAvaliada = true;
       }
+      // FASE 1 (motor) — instruções PUBLICADAS desta execução entram no
+      // contexto avaliado como conteúdo confiável, na versão do turno.
+      const { montarInstrucoesDoTurno } = await import(
+        "@/lib/nina/confidence/contexto-avaliacao"
+      );
+      const { hashDoTexto: hashInstrucoes } = await import("@/lib/nina/confidence/hash");
+      const instrucoesDoTurno = montarInstrucoesDoTurno({
+        escopo: "whatsapp",
+        versao: instrucoesNina.versao ?? null,
+        versaoId: instrucoesNina.versaoId ?? null,
+        publicadoEm: instrucoesNina.publicadoEm ?? null,
+        origem: instrucoesNina.origem ?? null,
+        hash: hashInstrucoes(behaviorPrompt),
+        texto: behaviorPrompt,
+      });
       const estadoTurno = {
         texto,
         mensagemPaciente,
+        instrucoes: instrucoesDoTurno,
         intent: canonico.intent,
         acao: canonico.requestedAction,
         // FASE 1 — natureza do turno: uma saudação não exige fonte, ferramenta
