@@ -69,6 +69,8 @@ export type RegraPublicada = {
   verificacao: VerificacaoRegra;
   /** Texto exatamente exigido, quando a regra for literal. */
   literal: string | null;
+  /** Como o literal deve ser conferido. `null` quando não há literal. */
+  operador: OperadorLiteral | null;
   /** Categorias de conteúdo proibidas, quando a regra for proibição. */
   proibicoes: CategoriaProibida[];
   /** Descrição curta e auditável (texto publicado, sem marcador de lista). */
