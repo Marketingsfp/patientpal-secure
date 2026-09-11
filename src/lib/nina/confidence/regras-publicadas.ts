@@ -201,18 +201,45 @@ const EXIGENCIA_LITERAL_ABERTA =
  * Genérico: qualquer instrução que mande responder/enviar/incluir um texto
  * exato é conferível — não existe exceção para nenhum marcador específico.
  */
-export function literalExigido(obrigacao: string): string | null {
-  const padroes: RegExp[] = [
-    /(?:responda|responder|envie|enviar|retorne|retornar|escreva|escrever)\s+(?:exatamente|apenas|somente|literalmente)\s*[:\-]?\s*["“']?([^"”'\n.;]+)/i,
-    /(?:inclua|incluir|use|usar)\s+(?:o\s+)?(?:marcador|codigo|código|texto|token)\s*[:\-]?\s*["“']?([^"”'\n.;]+)/i,
-    /(?:responda|responder)\s+com\s+(?:o\s+)?(?:marcador|codigo|código|texto|token)\s*[:\-]?\s*["“']?([^"”'\n.;]+)/i,
+export function exigenciaLiteral(
+  obrigacao: string,
+): { literal: string; operador: OperadorLiteral } | null {
+  const padroes: Array<[RegExp, OperadorLiteral]> = [
+    [
+      /(?:responda|responder|envie|enviar|retorne|retornar|escreva|escrever)\s+(?:exatamente|apenas|somente|literalmente)\s*[:\-]?\s*["“']?([^"”'\n.;]+)/i,
+      "igualdade",
+    ],
+    [
+      /(?:inclua|incluir|use|usar)\s+(?:o\s+)?(?:marcador|codigo|código|texto|token)\s*[:\-]?\s*["“']?([^"”'\n.;]+)/i,
+      "inclusao",
+    ],
+    [
+      /(?:responda|responder)\s+com\s+(?:o\s+)?(?:marcador|codigo|código|texto|token)\s*[:\-]?\s*["“']?([^"”'\n.;]+)/i,
+      "inclusao",
+    ],
   ];
-  for (const p of padroes) {
+  for (const [p, operador] of padroes) {
     const m = p.exec(obrigacao);
     const bruto = m?.[1]?.trim();
-    if (bruto && bruto.length >= 2) return bruto;
+    if (bruto && bruto.length >= 2) return { literal: bruto, operador };
   }
   return null;
+}
+
+/** Compatibilidade: apenas o texto exigido, sem o operador. */
+export function literalExigido(obrigacao: string): string | null {
+  return exigenciaLiteral(obrigacao)?.literal ?? null;
+}
+
+/**
+ * Operador de uma exigência literal escrita em bloco ("responda EXATAMENTE:").
+ * "inclua"/"use"/"responda com o marcador" pedem presença; o resto pede que a
+ * resposta INTEIRA seja o texto exigido.
+ */
+export function operadorDoBloco(plano: string): OperadorLiteral {
+  return /\b(inclua|incluir|use|usar)\b/i.test(plano) || /\bcom\s*:\s*$/i.test(plano)
+    ? "inclusao"
+    : "igualdade";
 }
 
 const CATEGORIAS: Array<[CategoriaProibida, RegExp]> = [
