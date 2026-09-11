@@ -55,11 +55,6 @@ export const Route = createFileRoute("/_authenticated")({
 });
 
 function AuthenticatedApp() {
-  // Aviso de versão nova para TODAS as telas do sistema. Antes só a tela do
-  // Caixa checava: os computadores da recepção ficam com a Agenda aberta o dia
-  // inteiro e nunca souberam de uma publicação nova, então a equipe seguia
-  // usando a versão antiga e relatando como defeito um problema já corrigido.
-  useAutoReloadOnNewBuild(true);
   return (
     <ClinicaProvider>
       <AppShell />
