@@ -2668,6 +2668,149 @@ async function gerarRespostaNinaInterno(
           erro: saidaControlada.erro,
         });
       }
+
+      // ---- CONFORMIDADE COM AS INSTRUÇÕES PUBLICADAS x CONTROLE DE ENVIO ----
+      // Detectar a violação não basta: o candidato NÃO é entregue quando uma
+      // regra publicada bloqueante foi descumprida (ou não pôde ser
+      // conferida), mesmo com nota média ou alta e mesmo na etapa A.
+      if (!bloqueio.bloquear && revisao.bloqueiaEntrega) {
+        const { decidirEntregaPorConformidade, instrucaoDeCorrecaoPorRegras } = await import(
+          "@/lib/nina/confidence/conformidade-entrega"
+        );
+        const decisaoEntrega = decidirEntregaPorConformidade({
+          conformidade: revisao.conformidade,
+          tentativa: correcoesPorRegras,
+          limiteTentativas: revisao.limiteTentativas,
+          correcaoDisponivel: podeCorrigirPorRegras,
+        });
+        rastro?.concluir("answer.rule_compliance", {
+          estado: revisao.conformidade.estado,
+          motivo: revisao.conformidade.motivoBloqueio,
+          violacoes: revisao.conformidade.violacoes.map((v) => v.regraId ?? v.id),
+          nao_verificadas: revisao.conformidade.naoVerificadas.map((v) => v.regraId ?? v.id),
+          score: respostaFinalAvaliada.score,
+          nivel: respostaFinalAvaliada.level,
+          nota_nao_compensa: true,
+          entregar: decisaoEntrega.entregar,
+          corrigir: decisaoEntrega.corrigir,
+          desfecho_humano: decisaoEntrega.desfechoHumano,
+          tentativa: decisaoEntrega.tentativa,
+          limite: decisaoEntrega.limiteTentativas,
+        });
+
+        if (decisaoEntrega.corrigir) {
+          // Correção TEXTUAL: o modelo reescreve. Nenhuma ferramenta é
+          // oferecida, então nenhuma operação com efeito externo se repete.
+          const { ninaAIGateway } = await import("@/lib/nina/ai-gateway.server");
+          const correcaoIA = await ninaAIGateway({
+            clinicaId,
+            perfil: "whatsapp",
+            conversaId: estadoId.conversaId ?? null,
+            ferramentasUsadas: nomesFerramentasTurno,
+            messages: [
+              ...mensagens,
+              { role: "assistant", content: resposta },
+              { role: "system", content: instrucaoDeCorrecaoPorRegras(revisao.conformidade) },
+            ] as never,
+            raciocinio: {
+              mensagem: mensagemPaciente,
+              rodada: correcoesPorRegras + 1,
+              temFerramentas: false,
+              ferramentasExecutadas: nomesFerramentasTurno.length,
+              nomesFerramentas: nomesFerramentasTurno,
+              houveConflito: conflitoFerramenta,
+            },
+          }).catch(() => null);
+          const textoCorrigido = (
+            correcaoIA && correcaoIA.ok ? (correcaoIA.conteudo ?? "") : ""
+          ).trim();
+          if (textoCorrigido && textoCorrigido !== resposta) {
+            const antesCorrecao = resposta;
+            resposta = textoCorrigido;
+            correcoesPorRegras += 1;
+            repetirVerificacaoRegras = true;
+            transformar(
+              "confianca.regras.correcao",
+              `${revisao.conformidade.motivoBloqueio}: nova versão pedida ao modelo (tentativa ${correcoesPorRegras}/${revisao.limiteTentativas})`,
+              antesCorrecao,
+              resposta,
+            );
+            // Origem registrada: o texto continua sendo do MODELO, corrigido
+            // após a verificação — nada é substituído por código.
+            marcarOrigem(
+              "modelo_transformado",
+              "reescrita do próprio modelo após violação de regra publicada",
+            );
+          } else {
+            // Sem nova versão utilizável: encerra a correção e vai ao desfecho.
+            podeCorrigirPorRegras = false;
+            repetirVerificacaoRegras = true;
+          }
+        } else {
+          // Exigência crítica segue descumprida ou não verificável: o
+          // candidato é bloqueado e vale o desfecho de atendimento humano.
+          let resultadoRegra:
+            | { tipo: "real"; confirmado: boolean; comprovacao?: string | null; erro?: string | null }
+            | { tipo: "simulado" };
+          if (ambienteSaida === "homologacao") {
+            resultadoRegra = { tipo: "simulado" };
+          } else if (houveHandoff) {
+            resultadoRegra = {
+              tipo: "real",
+              confirmado: true,
+              comprovacao: estadoId.conversaId ?? null,
+            };
+          } else {
+            const rhRegra = await broker
+              .executar(
+                "solicitar_atendente_humano",
+                JSON.stringify({
+                  motivo: `${revisao.conformidade.motivoBloqueio}: resposta bloqueada por instrução publicada`,
+                  urgencia: "normal",
+                }),
+              )
+              .catch(
+                () =>
+                  ({ success: false, erro: "handoff_indisponivel" }) as {
+                    success: boolean;
+                    erro?: string;
+                  },
+              );
+            if (rhRegra.success === true) houveHandoff = true;
+            resultadoRegra = {
+              tipo: "real",
+              confirmado: rhRegra.success === true,
+              comprovacao: rhRegra.success === true ? (estadoId.conversaId ?? null) : null,
+              erro: rhRegra.erro ?? null,
+            };
+          }
+          const saidaRegra = saidaControladaBaixaConfianca(resultadoRegra);
+          const antesRegra = resposta;
+          resposta = saidaRegra.aviso;
+          transformar(
+            "confianca.regras.bloqueio",
+            `${revisao.conformidade.motivoBloqueio}: conteúdo candidato descartado (${saidaRegra.encaminhamento})`,
+            antesRegra,
+            resposta,
+          );
+          marcarOrigem("codigo", `${saidaRegra.registro} (origem: ${saidaRegra.origem})`);
+          rastro?.concluir("answer.rule_block", {
+            motivo: revisao.conformidade.motivoBloqueio,
+            estado: revisao.conformidade.estado,
+            score: respostaFinalAvaliada.score,
+            nivel: respostaFinalAvaliada.level,
+            etapa: cfgFinal.etapa,
+            ambiente: ambienteSaida,
+            candidato_descartado: true,
+            candidato_hash: respostaFinalAvaliada.textoAvaliadoHash ?? null,
+            encaminhamento: saidaRegra.encaminhamento,
+            encaminhamento_confirmado: saidaRegra.encaminhamentoConfirmado,
+            correcoes_tentadas: correcoesPorRegras,
+            limite_tentativas: revisao.limiteTentativas,
+            erro: saidaRegra.erro,
+          });
+        }
+      }
     }
   } catch (e) {
     // Falha técnica do avaliador NUNCA vira aprovação: fica registrada como
