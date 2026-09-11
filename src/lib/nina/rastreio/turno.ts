@@ -271,6 +271,7 @@ export function criarRegistroTurno(base: BaseRegistroTurno): RegistroTurno {
     motivoOrigem: null,
     transformacoes: [],
     confianca: null,
+    avaliacoes: [],
     entrega: null,
     diagnostico: base.diagnostico === true,
     iniciadoEm: base.iniciadoEm ?? new Date().toISOString(),
