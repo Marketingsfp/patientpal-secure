@@ -452,8 +452,20 @@ function Page() {
   }, [ocultarRetroativos]);
   /** nome do procedimento (maiúsculo) → tipo cadastrado (consulta/exame/…). */
   const [procTipos, setProcTipos] = useState<Map<string, string>>(() => new Map());
+  /**
+   * Contrato ativo do Cartão Benefícios de cada paciente — é o que diz se um
+   * atendimento foi pela tabela do Cartão. `null` enquanto carrega.
+   */
+  const [mapaConvenio, setMapaConvenio] = useState<MapaConvenioPaciente | null>(null);
+  /**
+   * id → nome de TODAS as categorias, inclusive as desativadas. `cats` só traz
+   * as ativas (é a lista do formulário), mas em setembro/2026 112 pagamentos de
+   * repasse e 14 adesões ainda apontavam para categorias desativadas — sem o
+   * nome delas, a adesão caía em "Outros" e o repasse virava despesa comum.
+   */
+  const [nomesCategoria, setNomesCategoria] = useState<Map<string, string>>(() => new Map());
   /** Card da composição em que o usuário clicou; null = mostrando tudo. */
-  const [filtroGrupo, setFiltroGrupo] = useState<GrupoReceita | null>(null);
+  const [filtroGrupo, setFiltroGrupo] = useState<FiltroCard | null>(null);
   /** "analitico" = uma linha por lançamento; "sintetico" = uma por categoria. */
   const [modoLista, setModoLista] = useState<"analitico" | "sintetico">("analitico");
   /** Os filtros finos ficam recolhidos: a barra do dia a dia é data + tipo. */
