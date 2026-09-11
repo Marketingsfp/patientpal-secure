@@ -16,6 +16,8 @@
 export type MensagemContexto = {
   role: string;
   content: string | null;
+  /** Id físico da mensagem (quando vem do histórico gravado). */
+  id?: string | null;
   tool_calls?: Array<{ id: string; function?: { name?: string; arguments?: string } }>;
   tool_call_id?: string;
 };
@@ -50,6 +52,13 @@ export type EntradaContexto = {
   historico: MensagemContexto[];
   /** Mensagem atual do paciente. */
   mensagemAtual: string;
+  /**
+   * Ids físicos das mensagens que compõem a mensagem atual deste turno. O
+   * histórico já contém essas mensagens gravadas; sem isso elas apareceriam
+   * duas vezes no contexto. A deduplicação é por ID: mensagens de texto igual
+   * enviadas em turnos diferentes continuam preservadas.
+   */
+  idsMensagemAtual?: readonly string[] | null;
   /** Somente os campos mínimos do paciente. */
   paciente?: PacienteContexto | null;
   /** Conhecimento já recuperado (resultado do retrieval, não a planilha). */
@@ -65,6 +74,8 @@ export type ContextoMontado = {
   metricas: {
     mensagens_historico_disponiveis: number;
     mensagens_historico_enviadas: number;
+    /** Quantas cópias da mensagem atual foram removidas do histórico. */
+    mensagens_atuais_deduplicadas: number;
     resultados_tool_enviados: number;
     tem_conhecimento: boolean;
     tem_paciente: boolean;
@@ -92,6 +103,36 @@ export function selecionarMensagensRelevantes(
   return janela.slice(inicio);
 }
 
+/**
+ * Remove do histórico as mensagens que JÁ são a mensagem atual deste turno.
+ * Critério primário: o ID físico. Sem ID, cai para um critério estreito — a
+ * última mensagem do histórico, do paciente, com o mesmo texto: a que acabou
+ * de ser gravada. Uma repetição legítima em outro turno é sempre seguida da
+ * resposta da Nina, então não é atingida.
+ */
+export function removerMensagemAtualDuplicada(
+  historico: MensagemContexto[],
+  mensagemAtual: string,
+  ids?: readonly string[] | null,
+): { mensagens: MensagemContexto[]; removidas: number } {
+  const alvo = new Set((ids ?? []).filter((i) => typeof i === "string" && i.length > 0));
+  if (alvo.size > 0) {
+    const mensagens = historico.filter((m) => !(m.id && alvo.has(m.id)));
+    return { mensagens, removidas: historico.length - mensagens.length };
+  }
+  const ultimo = historico[historico.length - 1];
+  if (
+    ultimo &&
+    ultimo.role === "user" &&
+    typeof ultimo.content === "string" &&
+    ultimo.content.trim() === mensagemAtual.trim() &&
+    mensagemAtual.trim() !== ""
+  ) {
+    return { mensagens: historico.slice(0, -1), removidas: 1 };
+  }
+  return { mensagens: historico, removidas: 0 };
+}
+
 export function montarContexto(entrada: EntradaContexto): ContextoMontado {
   const limites = { ...LIMITES_PADRAO, ...(entrada.limites ?? {}) };
   const system = entrada.systemBlocos
@@ -99,7 +140,12 @@ export function montarContexto(entrada: EntradaContexto): ContextoMontado {
     .join("\n\n");
 
   let truncou = false;
-  const relevantes = selecionarMensagensRelevantes(entrada.historico, limites.maxMensagens).map(
+  const dedup = removerMensagemAtualDuplicada(
+    entrada.historico,
+    entrada.mensagemAtual,
+    entrada.idsMensagemAtual,
+  );
+  const relevantes = selecionarMensagensRelevantes(dedup.mensagens, limites.maxMensagens).map(
     (m) => {
       if (typeof m.content !== "string") return m;
       const c = cortar(m.content, limites.maxCaracteresMensagem);
@@ -144,6 +190,7 @@ export function montarContexto(entrada: EntradaContexto): ContextoMontado {
     metricas: {
       mensagens_historico_disponiveis: entrada.historico.length,
       mensagens_historico_enviadas: relevantes.length,
+      mensagens_atuais_deduplicadas: dedup.removidas,
       resultados_tool_enviados: resultados.length,
       tem_conhecimento: Boolean(entrada.conhecimento),
       tem_paciente: Boolean(entrada.paciente?.identificado),

@@ -62,6 +62,8 @@ export type RestricaoEstruturada = {
   /** De onde veio (versão publicada, verificação de homologação, fluxo). */
   origem: string;
   descricao: string;
+  /** Por que esta restrição está no contrato deste turno (auditoria). */
+  motivo?: string;
   /** Códigos de regra geral que esta exceção substitui neste turno. */
   suprime?: readonly string[];
   /** Instrução literal que o modelo deve receber, quando houver. */
@@ -141,7 +143,10 @@ export function saudacaoObrigatoriaEfetiva(
 export function textoContratoPrecedencia(r: ResultadoPrecedencia): string {
   const comTexto = r.vigentes.filter((v) => (v.texto ?? "").trim().length > 0);
   if (comTexto.length === 0) return "";
-  const linhas = comTexto.map((v) => `- [${v.nivel}] ${v.codigo}: ${v.texto}`);
+  const linhas = comTexto.map(
+    (v) =>
+      `- [${v.nivel}] ${v.codigo}${v.motivo ? ` (origem: ${v.origem}; motivo: ${v.motivo})` : ""}: ${v.texto}`,
+  );
   return [
     "CONTRATO DE PRECEDÊNCIA DESTE TURNO (ordem de força: envelope técnico > inegociável > exceção publicada > regra geral):",
     ...linhas,
@@ -151,7 +156,12 @@ export function textoContratoPrecedencia(r: ResultadoPrecedencia): string {
 /** Resumo auditável, sem PII: o que valeu e o que foi suprimido. */
 export function resumoPrecedencia(r: ResultadoPrecedencia) {
   return {
-    vigentes: r.vigentes.map((v) => ({ codigo: v.codigo, nivel: v.nivel, origem: v.origem })),
+    vigentes: r.vigentes.map((v) => ({
+      codigo: v.codigo,
+      nivel: v.nivel,
+      origem: v.origem,
+      motivo: v.motivo ?? null,
+    })),
     regras_gerais_suprimidas: r.suprimidas,
     supressoes_recusadas: r.supressoesRecusadas,
     eventos: r.eventos.map((ev) => ev.codigo),

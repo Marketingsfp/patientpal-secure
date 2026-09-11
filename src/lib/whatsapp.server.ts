@@ -694,7 +694,7 @@ async function gerarRespostaNinaInterno(
       telefoneRemetente
         ? supabaseAdmin
             .from("whatsapp_mensagens")
-            .select("direction, body, created_at")
+            .select("id, direction, body, created_at")
             .eq("clinica_id", clinicaId)
             // Marcadores de sistema (divisores de ciclo, avisos internos) são
             // só para leitura humana: nunca entram no contexto do modelo.
@@ -902,6 +902,9 @@ async function gerarRespostaNinaInterno(
     .map((m: any) => ({
       role: m.direction === "out" ? "assistant" : "user",
       content: String(m.body ?? "").slice(0, 1500),
+      // O ID físico viaja com a mensagem: é ele que permite tirar do histórico
+      // a mensagem atual do turno sem apagar repetições legítimas.
+      id: m.id ? String(m.id) : null,
     }))
     .filter((m: any) => m.content);
 
@@ -1155,6 +1158,51 @@ async function gerarRespostaNinaInterno(
   })();
 
   // ------------------------------------------------------------------
+  // PRECEDÊNCIA DO TURNO — antes do modelo, e agora também no fluxo NORMAL.
+  // As regras da versão publicada aplicáveis a ESTA mensagem, ambiente e
+  // sessão resolvem o conflito com a regra geral de apresentação. Se a
+  // exceção publicada proíbe saudação, o contexto deixa de dizer que ela é
+  // obrigatória — em vez de o prompt mandar uma coisa e o fato dizer outra.
+  const { resolverPrecedenciaDoTurno } = await import("@/lib/nina/prompt/precedencia-turno");
+  const { hashDoTexto: hashPrecedencia } = await import("@/lib/nina/confidence/hash");
+  // Instruções adicionais do turno (esclarecimento, correção de rota) entram
+  // pelo MESMO contrato, com origem, prioridade e motivo registrados.
+  const instrucoesAdicionaisTurno: Array<{
+    codigo: string;
+    origem: string;
+    motivo: string;
+    texto: string;
+  }> = [];
+  {
+    const { blocoContratoEsclarecimento, normalizarPendencia: normPend } = await import(
+      "@/lib/nina/confidence/esclarecimento"
+    );
+    const bloco = blocoContratoEsclarecimento(normPend(fluxoEstado.clarification));
+    if (bloco) {
+      instrucoesAdicionaisTurno.push({
+        codigo: "ESCLARECIMENTO_PENDENTE",
+        origem: "motor de confiabilidade (estado do fluxo)",
+        motivo: "há pendência de esclarecimento aberta nesta conversa",
+        texto: bloco,
+      });
+    }
+  }
+  const precedenciaTurno = resolverPrecedenciaDoTurno({
+    instrucoesAdicionais: instrucoesAdicionaisTurno,
+    textoPublicado: behaviorPrompt,
+    escopo: "whatsapp",
+    hash: hashPrecedencia(behaviorPrompt) ?? null,
+    versao: instrucoesNina.versao != null ? String(instrucoesNina.versao) : null,
+    versaoId: instrucoesNina.versaoId ?? null,
+    publicadoEm: instrucoesNina.publicadoEm ?? null,
+    mensagemPaciente,
+    ambiente: opcoes?.teste ? "homologacao" : "producao",
+    saudacaoObrigatoria,
+  });
+  const saudacaoObrigatoriaEfetivaTurno = precedenciaTurno.saudacaoObrigatoria;
+  const saudacaoDispensadaPor = precedenciaTurno.saudacaoDispensadaPor;
+
+  // ------------------------------------------------------------------
   // FASE 3 — RUNTIME CONTEXT: só FATOS. Nenhuma regra conversacional aqui.
   // ------------------------------------------------------------------
   const runtimeContext = {
@@ -1170,7 +1218,11 @@ async function gerarRespostaNinaInterno(
       nova_sessao: sessaoSaudacao.novaSessao || sessaoNina.expirou,
       expirou: sessaoNina.expirou,
       continuacao: sessaoNina.continuacao,
-      saudacao_obrigatoria: saudacaoObrigatoria,
+      // Fato JÁ resolvido pela precedência: quando uma exceção publicada
+      // aplicável proíbe saudação, o contexto não pode continuar dizendo que
+      // ela é obrigatória.
+      saudacao_obrigatoria: saudacaoObrigatoriaEfetivaTurno,
+      saudacao_dispensada_por: saudacaoDispensadaPor,
     },
     identidade: {
       confirmada: identidadeConfirmada,
@@ -1215,7 +1267,11 @@ async function gerarRespostaNinaInterno(
   // COMPOSER — ponto único de montagem. Depois daqui nada mais é concatenado
   // ao system prompt.
   const { comporRequestNina } = await import("@/lib/nina/prompt-composer");
-  const requestNina = comporRequestNina({ behaviorPrompt, runtimeContext });
+  const requestNina = comporRequestNina({
+    behaviorPrompt,
+    runtimeContext,
+    contratoPrecedencia: precedenciaTurno.contrato,
+  });
   const systemPromptFinal = requestNina.systemPrompt;
 
 
@@ -1338,6 +1394,8 @@ async function gerarRespostaNinaInterno(
     systemBlocos: [systemPromptFinal],
     historico: historico as MsgIA[],
     mensagemAtual: mensagemPaciente,
+    // Deduplicação por ID: a mensagem atual já está gravada no histórico.
+    idsMensagemAtual: opcoes?.mensagensEntrada ?? null,
     paciente: pacienteIdEfetivo
       ? {
           primeiro_nome: pacienteNomeEfetivo ? pacienteNomeEfetivo.split(" ")[0]! : null,
@@ -1346,17 +1404,10 @@ async function gerarRespostaNinaInterno(
         }
       : null,
   });
+  // FASE 4 — a pendência de esclarecimento entra no contrato de SISTEMA, e
+  // agora dentro do CONTRATO DE PRECEDÊNCIA do turno (com origem, prioridade e
+  // motivo), montado no composer. Nada mais é concatenado aqui.
   const mensagens: MsgIA[] = contexto.messages as MsgIA[];
-  // FASE 4 — a pendência de esclarecimento entra no contrato de SISTEMA
-  // (estado e restrições), nunca como uma falsa mensagem do paciente.
-  {
-    const { blocoContratoEsclarecimento, normalizarPendencia: normPend } = await import(
-      "@/lib/nina/confidence/esclarecimento"
-    );
-    const bloco = blocoContratoEsclarecimento(normPend(fluxoEstado.clarification));
-    // Logo após o prompt publicado, antes do histórico do paciente.
-    if (bloco) mensagens.splice(1, 0, { role: "system", content: bloco });
-  }
   rastro?.concluir("context.load", {
     mensagens_contexto: mensagens.length,
     paciente_identificado: Boolean(pacienteIdEfetivo),
@@ -2179,7 +2230,7 @@ async function gerarRespostaNinaInterno(
   // publicado em Arquitetura. Aqui apenas OBSERVAMOS o resultado (telemetria):
   // nada é acrescentado ao texto, para não gerar "Sou a Nina... Sou a Nina...".
   const diagnosticoSaudacao = avaliarSaudacao(resposta, nomeCurtoUnidade, {
-    obrigatoria: saudacaoObrigatoria,
+    obrigatoria: saudacaoObrigatoriaEfetivaTurno,
   });
   if (diagnosticoSaudacao.saudacaoDuplicada || diagnosticoSaudacao.saudacaoAusente) {
     console.warn("[NINA_SAUDACAO]", {
@@ -2190,7 +2241,14 @@ async function gerarRespostaNinaInterno(
       elementos: diagnosticoSaudacao.elementos,
     });
   }
-  if (saudacaoObrigatoria) {
+  // `greeting_completed` passa a significar APRESENTAÇÃO REALMENTE FEITA.
+  // Apresentação dispensada por exceção publicada é registrada à parte
+  // (`greeting_waived`), sem fingir que a Nina se apresentou.
+  if (saudacaoObrigatoria && !saudacaoObrigatoriaEfetivaTurno) {
+    fluxoEstado.greeting_waived = true;
+    fluxoEstado.greeting_waived_by = saudacaoDispensadaPor;
+    await salvarFluxoEstado(supabaseAdmin as never, clinicaId, estadoId.conversaId, fluxoEstado);
+  } else if (saudacaoObrigatoriaEfetivaTurno && !diagnosticoSaudacao.saudacaoAusente) {
     const estadoComSaudacao = marcarSaudacaoConcluida(fluxoEstado);
     fluxoEstado.greeting_completed = true;
     await salvarFluxoEstado(

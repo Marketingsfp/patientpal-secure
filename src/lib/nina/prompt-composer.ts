@@ -77,12 +77,20 @@ export type EntradaComposer = {
   runtimeContext: RuntimeContextNina;
   /** Envelope técnico (default: o fixo desta fase). */
   envelope?: string;
+  /**
+   * Contrato de precedência do turno: regras publicadas aplicáveis, exceções e
+   * instruções adicionais (esclarecimento, correção), cada uma com origem,
+   * prioridade e motivo. É o ÚNICO lugar por onde entra instrução que não seja
+   * o comportamento publicado.
+   */
+  contratoPrecedencia?: string | null;
 };
 
 export type RequestNina = {
   systemPrompt: string;
   envelope: string;
   behaviorPrompt: string;
+  contratoPrecedencia: string;
   runtimeContext: RuntimeContextNina;
   /** Caminhos do runtime context que pareciam instrução (apenas diagnóstico). */
   avisos: string[];
@@ -102,14 +110,21 @@ export function comporRequestNina(entrada: EntradaComposer): RequestNina {
   if (avisos.length > 0) {
     console.warn("[NINA_PROMPT_COMPOSER] runtime context com texto imperativo", avisos);
   }
+  const contratoPrecedencia = (entrada.contratoPrecedencia ?? "").trim();
   const json = JSON.stringify(entrada.runtimeContext, null, 2);
-  const systemPrompt = [envelope, behaviorPrompt, `${CABECALHO_CONTEXTO}\n${json}`]
+  const systemPrompt = [
+    envelope,
+    behaviorPrompt,
+    contratoPrecedencia,
+    `${CABECALHO_CONTEXTO}\n${json}`,
+  ]
     .filter(Boolean)
     .join("\n\n");
   return {
     systemPrompt,
     envelope,
     behaviorPrompt,
+    contratoPrecedencia,
     runtimeContext: entrada.runtimeContext,
     avisos,
   };
