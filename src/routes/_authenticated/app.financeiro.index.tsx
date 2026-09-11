@@ -149,7 +149,8 @@ function FinDashboard() {
     // debaixo do botão novo.
     const silenciosa = ultimaCarga.current?.chave === chave;
     let cancelado = false;
-    if (!silenciosa) setCarregando(true);
+    if (silenciosa) setAtualizando(true);
+    else setCarregando(true);
     (async () => {
       try {
         let ctx = ctxRef.current?.clinicaId === clinicaId ? ctxRef.current.ctx : null;
@@ -161,20 +162,31 @@ function FinDashboard() {
         if (!cancelado) {
           setDados(d);
           setAtualizadoEm(new Date());
-          ultimaCarga.current = { chave, em: Date.now() };
+          setFalhouAtualizar(false);
         }
       } catch (e) {
         // Falha na atualização automática não vira alerta a cada dois minutos:
-        // os números anteriores ficam, e o "Atualizado às" mostra de quando são.
-        // Guardar a chave também na falha faz as próximas tentativas deste
-        // período serem silenciosas — o alerta aparece uma vez só.
-        if (!cancelado && !silenciosa) {
-          setDados(null);
-          ultimaCarga.current = { chave, em: Date.now() };
-          mostrarErro(e, "falha ao carregar os números do período");
+        // os números anteriores ficam, e o relógio avisa que a última
+        // tentativa falhou. Guardar a chave também na falha (no `finally`) faz
+        // as próximas tentativas deste período serem silenciosas — o alerta
+        // aparece uma vez só.
+        if (!cancelado) {
+          if (silenciosa) {
+            setFalhouAtualizar(true);
+          } else {
+            setDados(null);
+            mostrarErro(e, "falha ao carregar os números do período");
+          }
         }
       } finally {
-        if (!cancelado && !silenciosa) setCarregando(false);
+        if (!cancelado) {
+          // A contagem da próxima atualização recomeça a cada leitura — também
+          // depois de lançar receita ou despesa, que já relê os números.
+          ultimaCarga.current = { chave, em: Date.now() };
+          setProximaEm(Date.now() + ATUALIZAR_A_CADA_MS);
+          setCarregando(false);
+          setAtualizando(false);
+        }
       }
     })();
     return () => {
