@@ -449,6 +449,63 @@ function FinDashboard() {
 
 const margem = (valor: number, base: number) => (base === 0 ? 0 : (valor / base) * 100);
 
+/**
+ * Relógio da atualização automática: quando foi a última leitura e quanto
+ * falta para a próxima, contando de segundo em segundo — o dono pediu ver a
+ * contagem para ter certeza de que a tela está viva. Clicar atualiza na hora.
+ *
+ * Fica num componente à parte porque bate a cada segundo: se o segundo
+ * redesenhasse o Dashboard inteiro, redesenharia junto a tabela do
+ * detalhamento aberto, que no "Mês" tem milhares de linhas.
+ */
+function ContagemAtualizacao({
+  atualizadoEm,
+  proximaEm,
+  atualizando,
+  falhou,
+  onAtualizarAgora,
+}: {
+  atualizadoEm: Date | null;
+  proximaEm: number | null;
+  atualizando: boolean;
+  falhou: boolean;
+  onAtualizarAgora: () => void;
+}) {
+  const [agora, setAgora] = useState(() => Date.now());
+  useEffect(() => {
+    const id = window.setInterval(() => setAgora(Date.now()), 1000);
+    return () => window.clearInterval(id);
+  }, []);
+
+  if (proximaEm === null) return null;
+  const faltam = Math.max(0, Math.ceil((proximaEm - agora) / 1000));
+  const relogio = `${Math.floor(faltam / 60)}:${String(faltam % 60).padStart(2, "0")}`;
+
+  return (
+    <button
+      type="button"
+      onClick={onAtualizarAgora}
+      disabled={atualizando}
+      title="Atualizar agora"
+      className="inline-flex items-center gap-1.5 rounded-md border border-border bg-background px-2 py-1 text-xs tabular-nums text-muted-foreground hover:bg-muted/50 disabled:cursor-default"
+    >
+      <RefreshCw aria-hidden className={cn("h-3.5 w-3.5", atualizando && "animate-spin")} />
+      {atualizadoEm && (
+        <span>
+          Atualizado às{" "}
+          {atualizadoEm.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+        </span>
+      )}
+      <span aria-hidden>·</span>
+      <span className="font-medium text-foreground">
+        {atualizando ? "atualizando…" : `próxima em ${relogio}`}
+      </span>
+      {falhou && !atualizando && <span className="text-warning">· a última tentativa falhou</span>}
+    </button>
+  );
+}
+
+
 /** Nome do botão da visão agrupada de cada detalhamento. */
 const rotuloSinteticoDe = (d: Drill) =>
   d === "operacionais" ? "Por categoria" : d === "totais" ? "Por conta" : "Por profissional";
