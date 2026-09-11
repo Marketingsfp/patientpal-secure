@@ -782,6 +782,12 @@ export function filtrarRateio(
     // deixa de fora tanto a consulta quanto o atendimento cujo serviço saiu do
     // cadastro, do mesmo jeito que o filtro de Grupo já faz.
     if (tipoAlvo && l.tipo_servico !== tipoAlvo) return false;
+    // Mesma condição da coluna Modalidade, que é também a que escolhe a coluna
+    // da grade de repasse: o filtro nunca diverge do que está impresso.
+    if (filtros.modalidade === "cartao" && !condicaoEhCartao(l.condicao)) return false;
+    if (filtros.modalidade === "particular" && l.condicao !== ROTULO_CONDICAO.particular) {
+      return false;
+    }
     if (servicoAlvo || grupoAlvo) {
       // O serviço vem do cadastro (ver `chaveDoServico`): o atendimento gravado
       // como "CONSULTA (CARDIOLOGIA)" tem que entrar no filtro "CONSULTA".
