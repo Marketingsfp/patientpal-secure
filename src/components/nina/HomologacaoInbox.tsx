@@ -1779,7 +1779,9 @@ export function HomologacaoInbox() {
                   ["Origem das instruções", detalhe.execucao.prompt_origem],
                   ["Publicada em", detalhe.execucao.prompt_publicado_em],
                   ["Conhecimento", detalhe.execucao.knowledge_status],
-                  ["Ferramentas", detalhe.execucao.tool_calls],
+                  // FASE 5 — este campo é o registro da execução; o confronto
+                  // entre disponíveis e chamadas fica no bloco abaixo.
+                  ["Ferramentas chamadas (registro da execução)", detalhe.execucao.tool_calls],
                   ["Transferência", detalhe.execucao.handoff ? "sim" : "não"],
                   [
                     // FASE 2 — retorno técnico da chamada; não comprova
@@ -1796,7 +1798,9 @@ export function HomologacaoInbox() {
                   <div key={String(k)}>
                     <span className="text-muted-foreground">{k}:</span>{" "}
                     <span className="font-mono">
-                      {v === null || v === undefined || v === "" ? "—" : String(v)}
+                      {/* FASE 5 — campo sem informação é "Não registrado", nunca
+                          um traço mudo que pareça ausência de uso. */}
+                      {valorOuNaoRegistrado(v)}
                     </span>
                   </div>
                 ))}
