@@ -571,7 +571,35 @@ export function avaliarObrigacoes(
       : doPaciente.some((a) => a.status === "cumprida");
 
   const restricoes = avaliacoes.filter((a) => a.obrigacao.origem === "instrucoes_publicadas");
-  const restricoesCumpridas = restricoes.every((a) => a.status !== "descumprida");
+
+  // Regras da publicação vigente cuja condição NÃO foi acionada neste turno.
+  const validas = regrasValidasParaPublicacao(ctx.instrucoes?.regras, ctx.instrucoes?.hash);
+  const aplicaveis = validas.filter((r) =>
+    regraSeAplica(r, {
+      mensagemPaciente: ctx.mensagemPaciente ?? null,
+      ambiente: ctx.businessContext?.ambiente ?? null,
+    }),
+  );
+  const regrasNaoAplicaveis = validas.length - aplicaveis.length;
+  const falhaDeInterpretacao =
+    (ctx.instrucoes?.regras?.length ?? 0) > 0 && validas.length === 0
+      ? true
+      : restricoes.length > 0 && restricoes.every((a) => a.motivo === "REGRA_NAO_INTERPRETADA");
+
+  // Ausência de regra NUNCA é aprovação: só `cumpridas` produz `true`.
+  const estadoRestricoes: EstadoRestricoes = falhaDeInterpretacao
+    ? "falha_na_interpretacao"
+    : restricoes.some((a) => a.status === "descumprida")
+      ? "descumpridas"
+      : restricoes.some((a) => a.status === "cumprida")
+        ? "cumpridas"
+        : restricoes.length > 0
+          ? "indeterminadas"
+          : validas.length === 0
+            ? "nenhuma_regra_publicada"
+            : "nenhuma_regra_aplicavel";
+  const restricoesCumpridas: boolean | null =
+    estadoRestricoes === "cumpridas" ? true : estadoRestricoes === "descumpridas" ? false : null;
 
   const esclarecimentoPertinente = avaliacoes.some(
     (a) => a.status === "cumprida" && a.motivo === "ESCLARECIMENTO_PERTINENTE",
