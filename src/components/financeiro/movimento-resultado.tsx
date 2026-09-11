@@ -570,23 +570,23 @@ function montarDetalhe(
       colunas: [
         { rotulo: "Data", tipo: "data" },
         { rotulo: "Hora", tipo: "texto" },
-        { rotulo: "Ficha", tipo: "texto" },
         { rotulo: "Descrição", tipo: "texto" },
         { rotulo: "Profissional", tipo: "texto" },
         { rotulo: "Condição", tipo: "texto" },
         { rotulo: "Tipo", tipo: "texto" },
         { rotulo: "Forma", tipo: "texto" },
+        { rotulo: "Lançado por", tipo: "texto" },
         { rotulo: "Valor", tipo: "moeda" },
       ],
       linhas: atend.map((l) => [
         l.data,
         hora(l),
-        l.ficha_numero != null ? String(l.ficha_numero) : "",
         l.descricao,
         l.medico_nome ?? "",
         l.condicao ? LABEL_CONDICAO[l.condicao] : "",
         l.grupo ? LABEL_GRUPO_MOV[l.grupo] : "",
         LABEL_FORMA[l.forma],
+        l.usuario_nome,
         Number(l.valor),
       ]),
       totais: [
@@ -653,6 +653,7 @@ function montarDetalhe(
         { rotulo: "Categoria", tipo: "texto" },
         { rotulo: "Descrição", tipo: "texto" },
         { rotulo: "Forma", tipo: "texto" },
+        { rotulo: "Lançado por", tipo: "texto" },
         { rotulo: "Valor", tipo: "moeda" },
       ],
       linhas: pagos.map((l) => [
@@ -661,9 +662,10 @@ function montarDetalhe(
         l.categoria_nome,
         l.descricao,
         LABEL_FORMA[l.forma],
+        l.usuario_nome,
         Number(l.valor),
       ]),
-      totais: [plural(pagos.length, "pagamento", "pagamentos"), "", "", "", "", total],
+      totais: [plural(pagos.length, "pagamento", "pagamentos"), "", "", "", "", "", total],
     };
   }
 
@@ -724,6 +726,7 @@ function montarDetalhe(
         { rotulo: drill === "outras" ? "Tipo" : "Categoria", tipo: "texto" },
         { rotulo: "Descrição", tipo: "texto" },
         { rotulo: "Forma", tipo: "texto" },
+        { rotulo: "Lançado por", tipo: "texto" },
         { rotulo: "Valor", tipo: "moeda" },
       ],
       linhas: itens.map((l) => [
@@ -732,9 +735,10 @@ function montarDetalhe(
         drill === "outras" && l.grupo ? LABEL_GRUPO_MOV[l.grupo] : l.categoria_nome,
         l.descricao,
         LABEL_FORMA[l.forma],
+        l.usuario_nome,
         Number(l.valor),
       ]),
-      totais: [plural(itens.length, "lançamento", "lançamentos"), "", "", "", "", total],
+      totais: [plural(itens.length, "lançamento", "lançamentos"), "", "", "", "", "", total],
     };
   }
 
@@ -780,6 +784,7 @@ function montarDetalhe(
         { rotulo: "Categoria", tipo: "texto" },
         { rotulo: "Descrição", tipo: "texto" },
         { rotulo: "Forma", tipo: "texto" },
+        { rotulo: "Lançado por", tipo: "texto" },
         { rotulo: "Valor", tipo: "moeda" },
       ],
       linhas: despesas.map((l) => [
@@ -789,10 +794,12 @@ function montarDetalhe(
         l.categoria_nome,
         l.descricao,
         LABEL_FORMA[l.forma],
+        l.usuario_nome,
         Number(l.valor),
       ]),
       totais: [
         plural(despesas.length, "lançamento", "lançamentos"),
+        "",
         "",
         "",
         "",

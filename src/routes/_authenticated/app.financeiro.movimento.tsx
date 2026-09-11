@@ -501,14 +501,31 @@ function Page() {
         offset += CHUNK;
         if (offset >= MAX) break;
       }
-      // Enriquecer com nome do médico e nº da ficha do agendamento vinculado.
-      const medIds = Array.from(
-        new Set(
-          finList
-            .map((l) => (l as unknown as { medico_id?: string | null }).medico_id)
-            .filter((x): x is string => !!x),
-        ),
-      );
+      // Enriquecer com médico, paciente, serviço e nº da ficha do agendamento
+      // vinculado.
+      //
+      // Médico e paciente vêm do AGENDAMENTO quando o lançamento não tem: em
+      // 10/09/2026, 292 dos 299 recebimentos de atendimento estavam sem
+      // `medico_id` e sem `paciente_id` no lançamento. Sem o médico, a coluna
+      // Profissional do detalhamento saía em branco; sem o paciente, o contrato
+      // do Cartão Benefícios só era reconhecido quando o lançamento já trazia a
+      // modalidade gravada (hoje é o caso de todos, mas nada garante isso).
+      //
+      // As consultas vão em lotes: o filtro `.in(...)` viaja na URL, e algumas
+      // centenas de ids de uma vez estouram o limite de tamanho — a consulta
+      // volta com erro, não com menos linhas, e a tela ficava sem nada.
+      const LOTE_IDS = 150;
+      const emLotes = async <T,>(
+        ids: string[],
+        consulta: (lote: string[]) => PromiseLike<{ data: unknown }>,
+      ): Promise<T[]> => {
+        const out: T[] = [];
+        for (let i = 0; i < ids.length; i += LOTE_IDS) {
+          const { data } = await consulta(ids.slice(i, i + LOTE_IDS));
+          out.push(...((data ?? []) as T[]));
+        }
+        return out;
+      };
       const agIds = Array.from(
         new Set(
           finList
@@ -516,39 +533,47 @@ function Page() {
             .filter((x): x is string => !!x),
         ),
       );
-      const medMap = new Map<string, string>();
-      if (medIds.length) {
-        const { data: meds } = await supabase.from("medicos").select("id, nome").in("id", medIds);
-        for (const m of (meds ?? []) as Array<{ id: string; nome: string | null }>) {
-          medMap.set(m.id, m.nome ?? "");
-        }
-      }
-      const fichaMap = new Map<string, number | null>();
-      // `procedimento` vem junto da ficha: é ele que separa Consultas de
-      // Exames/Procedimentos na composição da receita, e a consulta ao
-      // agendamento já estava sendo feita de qualquer forma.
-      const procMap = new Map<string, string | null>();
-      if (agIds.length) {
-        const { data: ags } = await supabase
+      const ags = await emLotes<{
+        id: string;
+        ficha_numero: number | null;
+        procedimento: string | null;
+        medico_id: string | null;
+        paciente_id: string | null;
+      }>(agIds, (lote) =>
+        supabase
           .from("agendamentos")
-          .select("id, ficha_numero, procedimento")
-          .in("id", agIds);
-        for (const a of (ags ?? []) as Array<{
-          id: string;
-          ficha_numero: number | null;
-          procedimento: string | null;
-        }>) {
-          fichaMap.set(a.id, a.ficha_numero);
-          procMap.set(a.id, a.procedimento);
-        }
+          .select("id, ficha_numero, procedimento, medico_id, paciente_id")
+          .in("id", lote),
+      );
+      const agMap = new Map(ags.map((a) => [a.id, a]));
+      const medIds = Array.from(
+        new Set(
+          [
+            ...finList.map((l) => (l as unknown as { medico_id?: string | null }).medico_id),
+            ...ags.map((a) => a.medico_id),
+          ].filter((x): x is string => !!x),
+        ),
+      );
+      const medMap = new Map<string, string>();
+      for (const m of await emLotes<{ id: string; nome: string | null }>(medIds, (lote) =>
+        supabase.from("medicos").select("id, nome").in("id", lote),
+      )) {
+        medMap.set(m.id, m.nome ?? "");
       }
       finList = finList.map((l) => {
-        const raw = l as unknown as { medico_id?: string | null; agendamento_id?: string | null };
+        const raw = l as unknown as {
+          medico_id?: string | null;
+          agendamento_id?: string | null;
+          paciente_id?: string | null;
+        };
+        const ag = raw.agendamento_id ? agMap.get(raw.agendamento_id) : undefined;
+        const medicoId = raw.medico_id ?? ag?.medico_id ?? null;
         return {
           ...l,
-          medico_nome: raw.medico_id ? (medMap.get(raw.medico_id) ?? null) : null,
-          ficha_numero: raw.agendamento_id ? (fichaMap.get(raw.agendamento_id) ?? null) : null,
-          procedimento: raw.agendamento_id ? (procMap.get(raw.agendamento_id) ?? null) : null,
+          medico_nome: medicoId ? (medMap.get(medicoId) ?? null) : null,
+          ficha_numero: ag?.ficha_numero ?? null,
+          procedimento: ag?.procedimento ?? null,
+          paciente_id: raw.paciente_id ?? ag?.paciente_id ?? null,
         };
       });
       // 1c) Mensalidades do Cartão Benefícios quitadas neste período
@@ -1531,11 +1556,13 @@ function Page() {
   // Calculada ANTES do filtro por card, senão clicar em "Consultas" zeraria
   // todos os outros cards e a tela deixaria de ser comparável. Os cards
   // mostram sempre o período inteiro; quem se estreita é a lista de baixo.
+  const nomesUsuario = new Map(usuarios.map((u) => [u.id, u.nome]));
   const classificadas = classificarMovimento(itensVisiveis, {
     periodo: { de: fromDate, ate: toDate },
     procTipos,
     mapaConvenio,
     nomeCategoria: (id) => (id ? (nomesCategoria.get(id) ?? null) : null),
+    nomeUsuario: (id) => (id ? (nomesUsuario.get(id) ?? null) : null),
   });
   const displayItems = filtroGrupo
     ? itensVisiveis.filter((_, i) => linhaCasaComFiltro(classificadas[i], filtroGrupo))
