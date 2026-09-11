@@ -16,7 +16,16 @@
 import { AlertTriangle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ROTULO_LACUNA_TURNO, ROTULO_ORIGEM } from "@/lib/nina/rastreio/turno";
+import {
+  alteracaoDaTransformacao,
+  avaliarTransformacoes,
+  origemComSituacao,
+  ROTULO_LACUNA_TURNO,
+  ROTULO_ORIGEM,
+  ROTULO_SITUACAO_TRANSFORMACAO,
+  type OrigemResposta,
+  type SituacaoTransformacoes,
+} from "@/lib/nina/rastreio/turno";
 
 type EventoComMetadata = { node_id?: string | null; metadata?: unknown };
 
@@ -30,6 +39,29 @@ export function resumoDoTurno(
 
 function texto(v: unknown, vazio = "—") {
   return v === null || v === undefined || v === "" ? vazio : String(v);
+}
+
+/**
+ * Situação real das etapas pós-modelo. Prefere o que ficou gravado; registros
+ * antigos (sem o campo) são reclassificados pelos próprios hashes gravados —
+ * nunca por suposição.
+ */
+export function situacaoDasTransformacoes(
+  resumo: Record<string, unknown>,
+): SituacaoTransformacoes {
+  const gravada = resumo["situacao_transformacoes"];
+  if (typeof gravada === "string" && gravada in ROTULO_SITUACAO_TRANSFORMACAO) {
+    return gravada as SituacaoTransformacoes;
+  }
+  const lista = Array.isArray(resumo["transformacoes"])
+    ? (resumo["transformacoes"] as Array<Record<string, unknown>>)
+    : [];
+  return avaliarTransformacoes(
+    lista.map((t) => ({
+      antesHash: (t["antes_hash"] ?? t["antesHash"] ?? null) as string | null,
+      depoisHash: (t["depois_hash"] ?? t["depoisHash"] ?? null) as string | null,
+    })),
+  );
 }
 
 export function RegistroTurnoResumo({
@@ -58,7 +90,11 @@ export function RegistroTurnoResumo({
   const lacunas = (resumo["lacunas"] ?? []) as string[];
   const confianca = (resumo["confianca"] ?? null) as Record<string, unknown> | null;
   const entrega = (resumo["entrega"] ?? null) as Record<string, unknown> | null;
-  const origem = resumo["origem_resposta"] as string | null;
+  const situacao = situacaoDasTransformacoes(resumo);
+  const origem = origemComSituacao(
+    (resumo["origem_resposta"] ?? null) as OrigemResposta | null,
+    situacao,
+  );
 
   return (
     <Corpo compacto={compacto}>
@@ -118,15 +154,28 @@ export function RegistroTurnoResumo({
         <p className="text-xs uppercase text-muted-foreground">
           Intervenções depois da resposta do modelo
         </p>
-        {transformacoes.length === 0 ? (
-          <p className="text-muted-foreground">Nenhuma — o texto saiu como o modelo devolveu.</p>
-        ) : (
+        <p className={situacao === "alterado" ? "" : "text-muted-foreground"}>
+          {ROTULO_SITUACAO_TRANSFORMACAO[situacao]}
+        </p>
+        {transformacoes.length > 0 && (
           <ul className="list-disc pl-5">
-            {transformacoes.map((t, i) => (
-              <li key={`${String(t["etapa"])}-${i}`}>
-                {String(t["etapa"])} — {String(t["motivo"])}
-              </li>
-            ))}
+            {transformacoes.map((t, i) => {
+              const mudou = alteracaoDaTransformacao({
+                antesHash: (t["antes_hash"] ?? t["antesHash"] ?? null) as string | null,
+                depoisHash: (t["depois_hash"] ?? t["depoisHash"] ?? null) as string | null,
+              });
+              const efeito =
+                mudou === true
+                  ? "alterou o texto"
+                  : mudou === false
+                    ? "sem alteração do texto"
+                    : "efeito não comprovado";
+              return (
+                <li key={`${String(t["etapa"])}-${i}`}>
+                  {String(t["etapa"])} — {String(t["motivo"])} · {efeito}
+                </li>
+              );
+            })}
           </ul>
         )}
       </div>

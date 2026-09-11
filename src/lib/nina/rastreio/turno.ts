@@ -66,7 +66,12 @@ export type SelecaoVersaoPrompt = {
   carregadoEm: string;
 };
 
-/** Alteração aplicada ao texto DEPOIS que o modelo respondeu. */
+/**
+ * Passagem por uma etapa que PODE alterar o texto depois que o modelo
+ * respondeu. Registrar a passagem não é o mesmo que alterar: a comparação dos
+ * hashes (gerados sempre pelo mesmo critério, `hashDoTexto`) é que diz se
+ * houve mudança efetiva.
+ */
 export type TransformacaoResposta = {
   /** Identificador curto da etapa (ex.: "handoff.aviso", "encerramento"). */
   etapa: string;
@@ -75,6 +80,74 @@ export type TransformacaoResposta = {
   depoisHash: string | null;
   em: string;
 };
+
+/** A etapa mudou o texto? `null` = sem hash suficiente para afirmar. */
+export function alteracaoDaTransformacao(t: {
+  antesHash?: string | null;
+  depoisHash?: string | null;
+}): boolean | null {
+  const a = t.antesHash ?? null;
+  const d = t.depoisHash ?? null;
+  if (!a || !d) return null;
+  return a !== d;
+}
+
+export type SituacaoTransformacoes =
+  /** Nenhuma etapa registrada depois do modelo. */
+  | "sem_transformacoes"
+  /** Etapas rodaram, texto final idêntico ao inicial e nenhuma mudou nada. */
+  | "sem_alteracao"
+  /** O texto final é diferente do texto inicial. */
+  | "alterado"
+  /** Houve mudança no meio, mas o texto final voltou ao original. */
+  | "revertido"
+  /** Falta hash para afirmar qualquer coisa. */
+  | "indeterminado";
+
+export const ROTULO_SITUACAO_TRANSFORMACAO: Record<SituacaoTransformacoes, string> = {
+  sem_transformacoes: "Nenhuma — o texto saiu como o modelo devolveu",
+  sem_alteracao: "Finalização executada, sem alteração do texto",
+  alterado: "Texto do modelo alterado pelo sistema",
+  revertido:
+    "Houve alteração intermediária, mas o texto final é igual ao texto original do modelo",
+  indeterminado: "Não foi possível determinar se houve alteração",
+};
+
+/**
+ * Classifica o conjunto de etapas registradas. Compara sempre hash com hash,
+ * do mesmo critério; sem hash, declara indeterminado em vez de supor.
+ */
+export function avaliarTransformacoes(
+  transformacoes: readonly {
+    antesHash?: string | null;
+    depoisHash?: string | null;
+  }[],
+): SituacaoTransformacoes {
+  if (transformacoes.length === 0) return "sem_transformacoes";
+  const estados = transformacoes.map(alteracaoDaTransformacao);
+  const primeira = transformacoes[0]!.antesHash ?? null;
+  const ultima = transformacoes[transformacoes.length - 1]!.depoisHash ?? null;
+  if (!primeira || !ultima) {
+    // Sem as pontas, só uma mudança comprovada no meio permite afirmar algo.
+    return estados.some((e) => e === true) ? "alterado" : "indeterminado";
+  }
+  if (primeira !== ultima) return "alterado";
+  if (estados.some((e) => e === null)) return "indeterminado";
+  return estados.some((e) => e === true) ? "revertido" : "sem_alteracao";
+}
+
+/**
+ * Origem coerente com a evidência: só vira "modelo_transformado" quando houve
+ * mudança comprovada do texto.
+ */
+export function origemComSituacao(
+  origem: OrigemResposta | null,
+  situacao: SituacaoTransformacoes,
+): OrigemResposta | null {
+  if (origem === "modelo" && situacao === "alterado") return "modelo_transformado";
+  if (origem === "modelo_transformado" && situacao !== "alterado") return "modelo";
+  return origem;
+}
 
 export type ConfiancaDoTurno = {
   /** "action_safety" | "answer_confidence" */
@@ -161,18 +234,16 @@ export function criarRegistroTurno(base: BaseRegistroTurno): RegistroTurno {
 }
 
 /**
- * Fecha o registro. A origem "modelo" vira "modelo_transformado" quando o
- * código alterou o texto depois — é isso que responde "quem mudou a resposta".
+ * Fecha o registro. A origem "modelo" só vira "modelo_transformado" quando há
+ * evidência de MUDANÇA do texto (hash antes ≠ hash depois). Passar pelo
+ * finalizador sem mudar nada não é transformação.
  */
 export function finalizarRegistroTurno(
   r: RegistroTurno,
   em: string = new Date().toISOString(),
 ): RegistroTurno {
-  const origem =
-    r.origemResposta === "modelo" && r.transformacoes.length > 0
-      ? "modelo_transformado"
-      : r.origemResposta;
-  return { ...r, origemResposta: origem, encerradoEm: em };
+  const situacao = avaliarTransformacoes(r.transformacoes);
+  return { ...r, origemResposta: origemComSituacao(r.origemResposta, situacao), encerradoEm: em };
 }
 
 export const ROTULO_LACUNA_TURNO: Record<string, string> = {
@@ -243,8 +314,11 @@ export function resumoTurnoParaTrace(r: RegistroTurno): Record<string, unknown> 
       motivo: t.motivo,
       antes_hash: t.antesHash,
       depois_hash: t.depoisHash,
+      /** true = mudou, false = passou sem mudar, null = sem hash para afirmar */
+      alterou: alteracaoDaTransformacao(t),
       em: t.em,
     })),
+    situacao_transformacoes: avaliarTransformacoes(r.transformacoes),
     confianca: r.confianca,
     entrega: r.entrega,
     diagnostico_autorizado: r.diagnostico,
