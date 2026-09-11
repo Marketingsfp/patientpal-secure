@@ -400,7 +400,10 @@ export function ToolIntegrityValidator(ctx: ContextoConfianca): ResultadoValidad
   // FASE 2 — falha RECUPERADA não contamina o turno: se a MESMA consulta foi
   // refeita com sucesso, o resultado vigente é o sucesso. O histórico continua
   // registrado como evidência, mas não bloqueia.
-  const identidade = (f: (typeof ctx.toolResults)[number]) => `${f.nome}|${f.capacidade ?? ""}`;
+  // Identidade da consulta = nome + capacidade + ESCOPO. Sem o escopo, um
+  // sucesso em outra pergunta mascararia a falha da pergunta original.
+  const identidade = (f: (typeof ctx.toolResults)[number]) =>
+    `${f.nome}|${f.capacidade ?? ""}|${(f.escopo ?? "").trim()}`;
   const ultimoOkPorConsulta = new Map<string, number>();
   ctx.toolResults.forEach((f, i) => {
     if (ferramentaOk(f)) ultimoOkPorConsulta.set(identidade(f), i);

@@ -94,6 +94,12 @@ export type ResultadoFerramenta = {
   erro?: string | null;
   /** Devolveu dado utilizável. */
   temConteudo?: boolean;
+  /**
+   * FASE 5 — ESCOPO da consulta (argumentos normalizados). Uma nova tentativa
+   * só "recupera" uma falha quando repete a MESMA consulta: mesmo nome, mesma
+   * capacidade e mesmo escopo. Sucesso de outra consulta não apaga a falha.
+   */
+  escopo?: string | null;
 };
 
 /** Contexto operacional do atendimento. */

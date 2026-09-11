@@ -1428,6 +1428,8 @@ async function gerarRespostaNinaInterno(
     fonte: string | null;
     success: boolean;
     erro?: string | undefined;
+    /** FASE 5 — escopo (argumentos) da consulta, para identificar retry real. */
+    escopo?: string | null;
   }> = [];
   let catalogoEncontrou = false;
   // FASE 2 — fatos concretos e consultas do turno (com retry consolidado).
@@ -2040,6 +2042,9 @@ async function gerarRespostaNinaInterno(
         fonte: r.fonte,
         success: r.success,
         erro: r.erro,
+        // FASE 5 — escopo da consulta: só conta como falha recuperada quando a
+        // NOVA tentativa repete exatamente a mesma pergunta.
+        escopo: String(c.function?.arguments ?? "").trim().slice(0, 400) || null,
       });
       if (
         r.success &&
@@ -2254,8 +2259,32 @@ async function gerarRespostaNinaInterno(
   // é avaliado, persistido e enviado. O score de um texto anterior nunca é
   // reaproveitado: se a mensagem mudou depois da avaliação da ação, o motor
   // roda de novo sobre a mensagem final.
+  // FASE 5 — REVISÃO FINAL ÚNICA: toda origem de texto (modelo, template,
+  // gate, fallback, encerramento, transferência e limite de rodadas) passa por
+  // este mesmo ponto, depois dos ajustes de conteúdo e antes da persistência e
+  // do envio. Quando o turno não chegou a montar o estado do modelo, a revisão
+  // roda sobre um estado mínimo VERDADEIRO: o que falta continua ausente.
+  const estadoParaRevisao = estadoTurnoFinal ?? {
+    texto: resposta,
+    mensagemPaciente: mensagemPaciente || null,
+    intent: null,
+    acao: null,
+    tipoTurno: null,
+    messageId: null,
+    ferramentas: evidenciasFerramentas,
+    catalogoEncontrou,
+    agendamentoConfirmado,
+    pacienteIdentificado: Boolean(pacienteIdEfetivo),
+    esclarecimentoUsado: esclarecimentoConfiancaUsado,
+    handoffSolicitado: houveHandoff,
+    ambiente: (opcoes?.teste === true ? "homologacao" : "producao") as
+      | "producao"
+      | "homologacao",
+    clinicaId,
+    conversaId: estadoId.conversaId ?? null,
+  };
   try {
-    if (estadoTurnoFinal) {
+    if (resposta) {
       const [
         { garantirScoreDoTextoEnviado, paraDecisaoLegado },
         { montarRegistroAuditoria },
@@ -2269,7 +2298,7 @@ async function gerarRespostaNinaInterno(
       // geração não muda a régua no meio da avaliação.
       const cfgFinal = await configuracaoDoTurno(clinicaId);
       const estadoParaTextoFinal = {
-        ...estadoTurnoFinal,
+        ...estadoParaRevisao,
         texto: resposta,
         handoffSolicitado: houveHandoff,
         agendamentoConfirmado,
@@ -2333,14 +2362,14 @@ async function gerarRespostaNinaInterno(
         etapaAtivacao: cfgFinal.etapa,
         auditoria: montarRegistroAuditoria(respostaFinalAvaliada, {
           conversationId: estadoId.conversaId ?? null,
-          messageId: estadoTurnoFinal.messageId ?? null,
+          messageId: estadoParaRevisao.messageId ?? null,
           batchId: opcoes?.lote?.batchId ?? null,
           batchMessageIds: opcoes?.mensagensEntrada ?? [],
           conversationRevision: opcoes?.lote?.revisao ?? null,
           executionId: execucaoIdFinal ?? null,
-          intencao: estadoTurnoFinal.intent ?? null,
-          acaoSolicitada: estadoTurnoFinal.acao ?? "desconhecida",
-          turnType: estadoTurnoFinal.tipoTurno ?? null,
+          intencao: estadoParaRevisao.intent ?? null,
+          acaoSolicitada: estadoParaRevisao.acao ?? "desconhecida",
+          turnType: estadoParaRevisao.tipoTurno ?? null,
           ferramentas: evidenciasFerramentas,
         }),
       });
@@ -2377,24 +2406,99 @@ async function gerarRespostaNinaInterno(
 
       // FASE 1 — a nota da mensagem final também entra no registro do turno.
       const { registrarConfiancaDoTurno } = await import("@/lib/nina/rastreio/turno.server");
+      // FASE 5 — REVISÃO FINAL: avaliação, decisão recomendada, decisão
+      // aplicada e resultado comprovado, cada uma no seu lugar. A etapa da
+      // clínica continua mandando (A só observa); as proteções obrigatórias
+      // são identificadas à parte porque valem em qualquer etapa.
+      const { origemDaSaida, revisarSaida, confirmarResultadoRevisao } = await import(
+        "@/lib/nina/confidence/revisao-final"
+      );
+      const revisao = revisarSaida({
+        origem: origemDaSaida(registroDoTurno?.origemResposta ?? null, {
+          handoff: houveHandoff,
+          limiteRodadas: limiteRodadasAtingido,
+        }),
+        textoFinal: resposta,
+        avaliacao: respostaFinalAvaliada,
+        etapa: cfgFinal.etapa,
+        risco: agendamentoConfirmado || houveHandoff ? "operacional" : "informativo",
+        operacaoAfirmada: agendamentoConfirmado,
+        operacaoComprovada: Boolean(fluxoEstado.appointment.appointment_id),
+      });
+      const comprovado = confirmarResultadoRevisao(revisao, {
+        executada: revisao.aplicada,
+        comprovacao: houveHandoff ? (estadoId.conversaId ?? null) : null,
+      });
+      rastro?.concluir("answer.review", {
+        origem: revisao.origem,
+        motivo: revisao.motivo,
+        acao_recomendada: revisao.acaoRecomendada,
+        acao_aplicada: revisao.acaoAplicada,
+        aplicada: revisao.aplicada,
+        apenas_observou: revisao.apenasObservou,
+        protecao_obrigatoria: revisao.protecaoObrigatoria,
+        etapa: revisao.etapa,
+        motivo_nao_aplicacao: revisao.motivoNaoAplicacao,
+        degradado: revisao.degradado,
+        aprovada: revisao.aprovada,
+        resultado_comprovado: comprovado.comprovado,
+      });
+
       registrarConfiancaDoTurno({
         avaliacao: "answer_confidence",
         decisao: respostaFinalAvaliada.decision ?? null,
-        etapa: null,
-        modo: "shadow",
-        // FASE 2 — observação: classifica a mensagem final, não altera nem
-        // bloqueia a resposta já entregue.
-        aplicada: false,
+        etapa: cfgFinal.etapa,
+        modo: revisao.aplicada ? "enforce" : "shadow",
+        // A revisão diz se ESTA avaliação alterou o atendimento. Etapa A
+        // observa; proteção obrigatória aplica e fica declarada como tal.
+        aplicada: revisao.aplicada,
         score: respostaFinalAvaliada.score,
         nivel: respostaFinalAvaliada.level,
       });
     }
   } catch (e) {
-    // Verificação da resposta final é observabilidade: nunca derruba o envio.
-    console.warn(
-      "[nina-confianca] falha na verificação da resposta final:",
-      e instanceof Error ? e.message : e,
-    );
+    // Falha técnica do avaliador NUNCA vira aprovação: fica registrada como
+    // liberação degradada (ou desfecho explícito, conforme o risco).
+    const erro = e instanceof Error ? e.message : String(e);
+    console.warn("[nina-confianca] falha na verificação da resposta final:", erro);
+    try {
+      const { origemDaSaida, revisarSaida } = await import(
+        "@/lib/nina/confidence/revisao-final"
+      );
+      const { registroTurnoAtual, registrarConfiancaDoTurno } = await import(
+        "@/lib/nina/rastreio/turno.server"
+      );
+      const revisao = revisarSaida({
+        origem: origemDaSaida(registroTurnoAtual()?.origemResposta ?? null, {
+          handoff: houveHandoff,
+          limiteRodadas: limiteRodadasAtingido,
+        }),
+        textoFinal: resposta,
+        avaliacao: null,
+        falhaAvaliador: erro,
+        etapa: "A",
+        risco: agendamentoConfirmado || houveHandoff ? "operacional" : "informativo",
+        operacaoAfirmada: agendamentoConfirmado,
+        operacaoComprovada: Boolean(fluxoEstado.appointment.appointment_id),
+      });
+      rastro?.falhar("answer.review", "AVALIADOR_INDISPONIVEL", {
+        origem: revisao.origem,
+        acao_recomendada: revisao.acaoRecomendada,
+        degradado: revisao.degradado,
+        aprovada: revisao.aprovada,
+      });
+      registrarConfiancaDoTurno({
+        avaliacao: "answer_confidence",
+        decisao: null,
+        etapa: null,
+        modo: "shadow",
+        aplicada: false,
+        score: null,
+        nivel: null,
+      });
+    } catch {
+      /* registro da degradação nunca interrompe o atendimento */
+    }
   }
 
   // Evidências finais: estado/sessão no momento da resposta, regras aplicáveis,
