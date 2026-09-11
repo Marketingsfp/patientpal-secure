@@ -51,7 +51,7 @@ export type RegraPublicada = {
   ordem: number;
   /** Quando a regra se aplica. `sempre` = sem condição declarada no texto. */
   condicao: CondicaoRegra;
-  /** Ambiente declarado no texto (seção/трecho). `qualquer` = não restringe. */
+  /** Ambiente declarado no texto (seção/trecho). `qualquer` = não restringe. */
   ambiente: AmbienteRegra;
   escopo: string;
   natureza: "exigencia" | "proibicao";
