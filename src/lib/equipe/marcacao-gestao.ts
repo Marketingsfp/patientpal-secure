@@ -55,6 +55,7 @@ export type MembroEquipe = {
   role: string;
   ativo: boolean;
   podeAutorizar: boolean;
+  podeGerirHorarios: boolean;
 };
 
 /**

@@ -132,6 +132,8 @@ interface DispRow extends DispExt {
 function Page() {
   const { clinicaAtual } = useClinica();
   const podeEscrever = usePodeEscrever("disponibilidades");
+  // Perfil com escrita no módulo OU marcação individual feita em Equipe e acessos.
+  const podeGerirHorarios = podeEscrever || !!clinicaAtual?.pode_gerir_horarios;
   const [medicos, setMedicos] = useState<Medico[]>([]);
   const [disps, setDisps] = useState<DispRow[]>([]);
   const [agendas, setAgendas] = useState<Agenda[]>([]);
@@ -479,7 +481,7 @@ function Page() {
     );
 
   const adicionar = async () => {
-    if (!podeEscrever) {
+    if (!podeGerirHorarios) {
       toast.error("Você não tem permissão de edição neste módulo.");
       return;
     }
@@ -643,7 +645,7 @@ function Page() {
   };
 
   const salvarEdicao = async () => {
-    if (!podeEscrever) {
+    if (!podeGerirHorarios) {
       toast.error("Você não tem permissão de edição neste módulo.");
       return;
     }
@@ -747,7 +749,7 @@ function Page() {
   };
 
   const remover = async (id: string) => {
-    if (!podeEscrever) {
+    if (!podeGerirHorarios) {
       toast.error("Você não tem permissão de edição neste módulo.");
       return;
     }
@@ -1133,7 +1135,7 @@ function Page() {
   // horário toda semana, a tela oferece salvar o que ela digitou como grade
   // fixa. Da próxima vez, gerar a agenda dele vira escolher o período e clicar.
   const salvarComoGrade = async () => {
-    if (!podeEscrever) {
+    if (!podeGerirHorarios) {
       toast.error("Você não tem permissão de edição neste módulo.");
       return;
     }
@@ -1231,7 +1233,7 @@ function Page() {
     .sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR", { sensitivity: "base" }));
 
   const gerarAgenda = async () => {
-    if (!podeEscrever) {
+    if (!podeGerirHorarios) {
       toast.error("Você não tem permissão de edição neste módulo.");
       return;
     }
@@ -1389,7 +1391,7 @@ function Page() {
   };
 
   const aplicarBloqueio = async () => {
-    if (!podeEscrever) {
+    if (!podeGerirHorarios) {
       toast.error("Você não tem permissão de edição neste módulo.");
       return;
     }
@@ -1455,7 +1457,7 @@ function Page() {
   };
 
   const desfazerBloqueio = async (id: string) => {
-    if (!podeEscrever || !bloqueioMedico) return;
+    if (!podeGerirHorarios || !bloqueioMedico) return;
     setDesfazendoId(id);
     try {
       const { error } = await supabase
@@ -1604,7 +1606,7 @@ function Page() {
                       horário e a duração no passo 2, marque os dias no passo 3 e salve como grade
                       fixa deste médico.
                     </p>
-                    {podeEscrever && (
+                    {podeGerirHorarios && (
                       <Button
                         size="sm"
                         variant="outline"
@@ -1805,7 +1807,7 @@ function Page() {
                 )}
               </section>
 
-              {podeEscrever && (
+              {podeGerirHorarios && (
                 <Button
                   className="w-full sm:w-auto"
                   onClick={gerarAgenda}
@@ -2201,7 +2203,7 @@ function Page() {
                           onChange={(e) => setNovo({ ...novo, vigencia_fim: e.target.value })}
                         />
                       </div>
-                      {podeEscrever && (
+                      {podeGerirHorarios && (
                         <Button
                           onClick={() => {
                             setNovo({ ...novo, medico_id: m.id });
@@ -2382,7 +2384,7 @@ function Page() {
                                   </TableCell>
                                   <TableCell className="text-right">
                                     <div className="flex justify-end gap-2">
-                                      {podeEscrever && (
+                                      {podeGerirHorarios && (
                                         <>
                                           <button
                                             onClick={() => {

@@ -66,7 +66,7 @@ function EquipeAcessosPage() {
     try {
       const { data: mems, error } = await supabase
         .from("clinica_memberships")
-        .select("id, user_id, role, ativo, pode_autorizar")
+        .select("id, user_id, role, ativo, pode_autorizar, pode_gerir_horarios")
         .eq("clinica_id", clinicaAtual.clinica_id);
       if (error) throw error;
       const linhas = (mems ?? []) as Array<{
@@ -75,6 +75,7 @@ function EquipeAcessosPage() {
         role: string;
         ativo: boolean;
         pode_autorizar: boolean | null;
+        pode_gerir_horarios: boolean | null;
       }>;
       const ids = linhas.map((l) => l.user_id);
       const nomes = new Map<string, string>();
@@ -94,6 +95,7 @@ function EquipeAcessosPage() {
           role: l.role,
           ativo: l.ativo,
           podeAutorizar: !!l.pode_autorizar,
+          podeGerirHorarios: !!l.pode_gerir_horarios,
         })),
       );
     } catch (e) {
@@ -146,6 +148,45 @@ function EquipeAcessosPage() {
     }
   }
 
+  async function alternarHorarios(m: MembroEquipe) {
+    if (!clinicaAtual) return;
+    const ligando = !m.podeGerirHorarios;
+    const ok = await confirmDialog(
+      ligando
+        ? `Liberar ${m.nome} para criar horário médico?\n\n` +
+            `Ela poderá cadastrar, alterar e excluir os horários semanais dos médicos e gerar as vagas na agenda. Não ganha nenhum outro acesso.`
+        : `Tirar de ${m.nome} a permissão de criar horário médico?\n\n` +
+            `As vagas que ela já gerou continuam na agenda.`,
+    );
+    if (!ok) return;
+    setSalvando(m.membershipId);
+    try {
+      await editarMembroFn({
+        data: {
+          clinicaId: clinicaAtual.clinica_id,
+          membershipId: m.membershipId,
+          role: m.role as never,
+          ativo: m.ativo,
+          podeGerirHorarios: ligando,
+        },
+      });
+      setMembros((prev) =>
+        prev.map((x) =>
+          x.membershipId === m.membershipId ? { ...x, podeGerirHorarios: ligando } : x,
+        ),
+      );
+      toast.success(
+        ligando
+          ? `${m.nome} agora cria horário médico.`
+          : `${m.nome} não cria mais horário médico.`,
+      );
+    } catch (e) {
+      mostrarErro(e);
+    } finally {
+      setSalvando(null);
+    }
+  }
+
   const lista = useMemo(() => ordenarMembros(filtrarMembros(membros, busca)), [membros, busca]);
   const marcados = membros.filter((m) => m.podeAutorizar && m.ativo).length;
 
@@ -165,7 +206,8 @@ function EquipeAcessosPage() {
         <h1 className="text-2xl font-semibold">Equipe e acessos</h1>
         <p className="text-sm text-muted-foreground">
           Quem é da gestão nesta clínica — quem autoriza desconto, cortesia e sem faturamento com a
-          própria senha, e quem enxerga os relatórios de supervisão.
+          própria senha, e quem enxerga os relatórios de supervisão. Aqui também se libera, pessoa a
+          pessoa, quem cria horário de médico e gera as vagas da agenda.
         </p>
       </div>
 
@@ -200,18 +242,19 @@ function EquipeAcessosPage() {
               <TableHead className="w-44">Perfil de acesso</TableHead>
               <TableHead className="w-28">Situação</TableHead>
               <TableHead className="w-48 text-center">É da gestão</TableHead>
+              <TableHead className="w-44 text-center">Cria horário médico</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {carregando ? (
               <TableRow>
-                <TableCell colSpan={4} className="py-6 text-center text-sm text-muted-foreground">
+                <TableCell colSpan={5} className="py-6 text-center text-sm text-muted-foreground">
                   Carregando a equipe…
                 </TableCell>
               </TableRow>
             ) : lista.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={4} className="py-6 text-center text-sm text-muted-foreground">
+                <TableCell colSpan={5} className="py-6 text-center text-sm text-muted-foreground">
                   <Users className="mx-auto mb-2 h-5 w-5 opacity-50" />
                   Ninguém encontrado com esse termo.
                 </TableCell>
@@ -255,6 +298,27 @@ function EquipeAcessosPage() {
                             {salvando === m.membershipId
                               ? "Salvando…"
                               : m.podeAutorizar
+                                ? "Sim"
+                                : "Não"}
+                          </span>
+                        </label>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-center">
+                      {m.role === "admin" || m.role === "gestor" ? (
+                        <span className="text-xs text-muted-foreground">Já tem pelo perfil</span>
+                      ) : (
+                        <label className="inline-flex cursor-pointer items-center gap-2">
+                          <input
+                            type="checkbox"
+                            checked={m.podeGerirHorarios}
+                            disabled={salvando === m.membershipId}
+                            onChange={() => void alternarHorarios(m)}
+                          />
+                          <span className="text-xs font-medium">
+                            {salvando === m.membershipId
+                              ? "Salvando…"
+                              : m.podeGerirHorarios
                                 ? "Sim"
                                 : "Não"}
                           </span>

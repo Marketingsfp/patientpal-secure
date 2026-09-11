@@ -13,6 +13,8 @@ export interface ClinicaMembership {
    * administrativas. Ver `@/lib/autorizacao-supervisor`.
    */
   pode_autorizar?: boolean | null;
+  /** Marcação individual: cadastra horário semanal de médico e gera as vagas. */
+  pode_gerir_horarios?: boolean | null;
   clinica: {
     id: string;
     nome: string;
@@ -127,7 +129,7 @@ export function ClinicaProvider({ children }: { children: ReactNode }) {
     const { data, error } = await supabase
       .from("clinica_memberships")
       .select(
-        "id, clinica_id, role, pode_autorizar, clinica:clinicas(id, nome, cidade, estado, branding, base_importada)",
+        "id, clinica_id, role, pode_autorizar, pode_gerir_horarios, clinica:clinicas(id, nome, cidade, estado, branding, base_importada)",
       )
       .eq("user_id", user.id)
       .eq("ativo", true);

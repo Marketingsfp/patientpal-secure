@@ -2818,6 +2818,7 @@ export type Database = {
           created_at: string
           id: string
           pode_autorizar: boolean
+          pode_gerir_horarios: boolean
           role: Database["public"]["Enums"]["app_role"]
           user_id: string
         }
@@ -2827,6 +2828,7 @@ export type Database = {
           created_at?: string
           id?: string
           pode_autorizar?: boolean
+          pode_gerir_horarios?: boolean
           role: Database["public"]["Enums"]["app_role"]
           user_id: string
         }
@@ -2836,6 +2838,7 @@ export type Database = {
           created_at?: string
           id?: string
           pode_autorizar?: boolean
+          pode_gerir_horarios?: boolean
           role?: Database["public"]["Enums"]["app_role"]
           user_id?: string
         }
@@ -15547,6 +15550,10 @@ export type Database = {
           }
       pode_escrever_modulo: {
         Args: { _clinica_id: string; _modulos: string[]; _user_id: string }
+        Returns: boolean
+      }
+      pode_gerir_horarios_medicos: {
+        Args: { _clinica_id: string; _user_id: string }
         Returns: boolean
       }
       pode_marcar_alerta_critico: {
