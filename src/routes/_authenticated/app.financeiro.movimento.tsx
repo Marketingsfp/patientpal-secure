@@ -984,19 +984,41 @@ function Page() {
     // tabela que diz se um atendimento é consulta, exame ou procedimento —
     // `agendamentos.tipo_atendimento` responde outra pergunta (particular ×
     // convênio) e não serve para isto.
+    //
+    // Paginado: o PostgREST devolve no máximo 1.000 linhas por consulta, e o
+    // cadastro tem 4.522 serviços ativos. O `.limit(20000)` que havia aqui não
+    // passava desse teto, e os exames que ficavam de fora caíam em "Outros" —
+    // em 10/09/2026, R$ 23.120,50 de um dia, quando só R$ 893 eram de fato
+    // recebimento sem atendimento.
     void (async () => {
-      const { data: procs } = await supabase
-        .from("procedimentos")
-        .select("nome, tipo")
-        .eq("clinica_id", clinicaAtual.clinica_id)
-        .eq("ativo", true)
-        .limit(20000);
       const mapa = new Map<string, string>();
-      for (const p of (procs ?? []) as Array<{ nome: string | null; tipo: string | null }>) {
-        if (p.nome && p.tipo) mapa.set(p.nome.trim().toUpperCase(), p.tipo);
+      const PAGINA = 1000;
+      for (let pagina = 0; pagina < 50; pagina++) {
+        const { data: procs, error } = await supabase
+          .from("procedimentos")
+          .select("id, nome, tipo")
+          .eq("clinica_id", clinicaAtual.clinica_id)
+          .eq("ativo", true)
+          .order("id")
+          .range(pagina * PAGINA, pagina * PAGINA + PAGINA - 1);
+        if (error) {
+          mostrarErro(error, "falha ao ler o cadastro de serviços");
+          break;
+        }
+        const lote = (procs ?? []) as Array<{ nome: string | null; tipo: string | null }>;
+        for (const p of lote) {
+          if (p.nome && p.tipo) mapa.set(p.nome.trim().toUpperCase(), p.tipo);
+        }
+        if (lote.length < PAGINA) break;
       }
       setProcTipos(mapa);
     })();
+    void carregarMapaConvenioPacientes(clinicaAtual.clinica_id)
+      .then(setMapaConvenio)
+      .catch(() => setMapaConvenio(new Map()));
+    void carregarCategorias(clinicaAtual.clinica_id)
+      .then((todas) => setNomesCategoria(mapaDeCategorias(todas)))
+      .catch(() => setNomesCategoria(new Map()));
     const [c, b, m, meds] = await Promise.all([
       supabase
         .from("fin_categorias")
