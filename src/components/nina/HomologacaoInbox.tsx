@@ -1780,7 +1780,14 @@ export function HomologacaoInbox() {
                   ["Conhecimento", detalhe.execucao.knowledge_status],
                   ["Ferramentas", detalhe.execucao.tool_calls],
                   ["Transferência", detalhe.execucao.handoff ? "sim" : "não"],
-                  ["Sucesso", detalhe.execucao.success ? "sim" : "não"],
+                  [
+                    // FASE 2 — retorno técnico da chamada; não comprova
+                    // cumprimento do prompt.
+                    "Chamada ao modelo",
+                    detalhe.execucao.success
+                      ? "concluída sem erro registrado"
+                      : "falhou (erro registrado)",
+                  ],
                   ["Erro", detalhe.execucao.error_category],
                   ["Tempo (ms)", detalhe.execucao.latency_ms],
                   ["Trace", detalhe.traceId],
