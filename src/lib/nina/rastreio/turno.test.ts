@@ -9,6 +9,8 @@ import {
   avaliarTransformacoes,
   descreverAvaliacaoConfianca,
   criarRegistroTurno,
+  evidenciaSaidaDoTurno,
+  eventoEntregaDoTurno,
   finalizarRegistroTurno,
   lacunasDoTurno,
   origemComSituacao,
