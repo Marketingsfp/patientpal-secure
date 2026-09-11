@@ -357,23 +357,19 @@ export function referenciaDoFato(f: FatoRecuperado): string {
 }
 
 /**
- * Confronta UMA afirmação com os fatos do mesmo escopo.
+ * FASE 3 — fatos do campo e fatos do MESMO ESCOPO da afirmação.
  *
- * - `confirmado`: existe fato do mesmo escopo com o mesmo valor.
- * - `divergente`: existe fato do mesmo escopo com valor diferente.
- * - `fora_do_escopo`: há fatos do campo, mas nenhum do caso afirmado.
- * - `indeterminado`: a frase promete um valor específico que não foi possível
- *   extrair — não dá para confirmar nem contradizer.
- * - `sem_fato`: nenhum fato desse campo neste turno.
+ * Serve tanto para conferir uma afirmação positiva quanto para saber se uma
+ * negativa ("não temos vaga") é contrariada por algo que a consulta devolveu.
  */
-export function correspondenciaDaAfirmacao(
+export function fatosNoEscopoDaAfirmacao(
   fatos: FatoRecuperado[],
-  pedido: PedidoAfirmacao,
-): CorrespondenciaAfirmacao {
+  pedido: Omit<PedidoAfirmacao, "valor" | "tipo"> & { tipo?: TipoClaim; valor?: string | null },
+): { doCampo: FatoRecuperado[]; noEscopo: FatoRecuperado[] } {
   const doCampo = fatos.filter(
     (f) => pedido.entidades.includes(f.entidade) && pedido.campos.some((c) => mesmoTexto(f.campo, c)),
   );
-  if (doCampo.length === 0) return { situacao: "sem_fato" };
+  if (doCampo.length === 0) return { doCampo, noEscopo: [] };
 
   const discriminaveis = new Set<keyof ChaveFato>();
   for (const campo of QUALIFICADORES) {
@@ -405,9 +401,30 @@ export function correspondenciaDaAfirmacao(
     if (ok) avalizados.add(campo);
   }
 
-  const noEscopo = doCampo.filter((f) =>
-    noEscopoDaAfirmacao(f, pedido.chave, discriminaveis, avalizados),
-  );
+  return {
+    doCampo,
+    noEscopo: doCampo.filter((f) =>
+      noEscopoDaAfirmacao(f, pedido.chave, discriminaveis, avalizados),
+    ),
+  };
+}
+
+/**
+ * Confronta UMA afirmação com os fatos do mesmo escopo.
+ *
+ * - `confirmado`: existe fato do mesmo escopo com o mesmo valor.
+ * - `divergente`: existe fato do mesmo escopo com valor diferente.
+ * - `fora_do_escopo`: há fatos do campo, mas nenhum do caso afirmado.
+ * - `indeterminado`: a frase promete um valor específico que não foi possível
+ *   extrair — não dá para confirmar nem contradizer.
+ * - `sem_fato`: nenhum fato desse campo neste turno.
+ */
+export function correspondenciaDaAfirmacao(
+  fatos: FatoRecuperado[],
+  pedido: PedidoAfirmacao,
+): CorrespondenciaAfirmacao {
+  const { doCampo, noEscopo } = fatosNoEscopoDaAfirmacao(fatos, pedido);
+  if (doCampo.length === 0) return { situacao: "sem_fato" };
   if (noEscopo.length === 0) return { situacao: "fora_do_escopo" };
 
   if (pedido.valor === null || pedido.valor.trim() === "") {
