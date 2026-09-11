@@ -143,24 +143,22 @@ export const criarTesteCarga = createServerFn({ method: "POST" })
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { garantirLeads } = await import("@/lib/nina/teste-console.server");
+
+    // FASE 3 — um run por vez: duplo clique, retry da tela ou duas chamadas
+    // simultâneas não podem criar duas execuções.
+    const { data: emAndamento } = await supabaseAdmin
+      .from("nina_teste_carga")
+      .select("id, status")
+      .eq("clinica_id", data.clinicaId)
+      .in("status", ["preparando", "executando"])
+      .limit(1);
+    if ((emAndamento ?? []).length)
+      throw new Error("Já existe um teste de carga em andamento nesta clínica.");
+
     const leads = await garantirLeads(supabaseAdmin, data.clinicaId);
     if (!leads.length) throw new Error("Nenhum lead de teste disponível nesta clínica");
 
-    // FASE 2 — PREPARAÇÃO DOS LEADS: os participantes desta execução (e só
-    // eles) passam por reset real e confirmado ANTES de qualquer mensagem.
-    // Se um único lead falhar, o teste não começa — nada é enviado.
-    const { prepararLeadsCarga } = await import("@/lib/nina/carga-preflight.server");
-    const { descreverFalhaPreflight, leadsParticipantes } = await import(
-      "@/lib/nina/carga-preflight"
-    );
-    const participantes = leadsParticipantes(leads, config.leadsAtivos);
-    const preflight = await prepararLeadsCarga({
-      admin: supabaseAdmin,
-      clinicaId: data.clinicaId,
-      leads: participantes,
-      userId: context.userId,
-    });
-    if (!preflight.pronto) throw new Error(descreverFalhaPreflight(preflight));
+
 
 
     const plano = planoDeMensagens(config);
