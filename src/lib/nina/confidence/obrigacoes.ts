@@ -230,7 +230,10 @@ export function derivarObrigacoesDoTurno(ctx: ContextoConfianca): Obrigacao[] {
           tipo: "pergunta",
           origem: "mensagem_paciente",
           descricao: "Responder a pergunta do paciente",
-          verificacao: "semantica",
+          // Conferência mínima e determinística: pergunta não pode ser
+          // devolvida com saudação vazia. O ACERTO do conteúdo é medido pelo
+          // grounding (Fases 2 e 3), não aqui.
+          verificacao: "deterministica",
         });
       }
     }
@@ -300,6 +303,15 @@ function avaliarUma(
     return { obrigacao: o, status: "descumprida", motivo: "TOPICO_NAO_ATENDIDO" };
   }
 
+  if (o.tipo === "pergunta") {
+    if (resposta.trim() === "" || pareceSaudacao(resposta)) {
+      return { obrigacao: o, status: "descumprida", motivo: "PERGUNTA_NAO_RESPONDIDA" };
+    }
+    return contemPergunta(resposta)
+      ? { obrigacao: o, status: "cumprida", motivo: "ESCLARECIMENTO_PERTINENTE" }
+      : { obrigacao: o, status: "cumprida", motivo: "RESPOSTA_SUBSTANTIVA" };
+  }
+
   if (o.tipo === "esclarecimento") {
     return contemPergunta(resposta)
       ? { obrigacao: o, status: "cumprida", motivo: "ESCLARECIMENTO_PERTINENTE" }
@@ -344,6 +356,9 @@ export function avaliarObrigacoes(
   const limitacoes: string[] = [];
   if ((ctx.mensagemPaciente ?? "").trim() === "") {
     limitacoes.push("MENSAGEM_DO_PACIENTE_NAO_REGISTRADA");
+  }
+  if (avaliacoes.some((a) => a.obrigacao.tipo === "pergunta" && a.status === "cumprida")) {
+    limitacoes.push("CONTEUDO_DA_RESPOSTA_NAO_CONFERIDO_NESTA_DIMENSAO");
   }
   if (avaliacoes.some((a) => a.status === "indeterminada")) {
     limitacoes.push("OBRIGACAO_DE_LINGUAGEM_ABERTA_NAO_VERIFICADA");

@@ -46,7 +46,7 @@ const tool = (o: Partial<ResultadoFerramenta> = {}): ResultadoFerramenta => ({
 describe("contrato comum dos validadores", () => {
   it("todo validador devolve validator, status, score, reasonCode e evidence", () => {
     const rs = executarValidadoresDeConfianca({ ctx: ctx() });
-    expect(rs.length).toBe(11);
+    expect(rs.length).toBe(12);
     for (const r of rs) {
       expect(typeof r.validator).toBe("string");
       expect(["PASS", "WARNING", "FAIL", "BLOCK", "NOT_APPLICABLE"]).toContain(r.status);
@@ -76,7 +76,7 @@ describe("contrato comum dos validadores", () => {
       },
     });
     const rs = executarValidadoresDeConfianca({ ctx: quebrado });
-    expect(rs.length).toBe(11);
+    expect(rs.length).toBe(12);
     expect(rs.some((r) => r.reasonCode === "VALIDADOR_FALHOU")).toBe(true);
   });
 });
