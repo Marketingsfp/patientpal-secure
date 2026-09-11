@@ -124,6 +124,7 @@ export const dispararBackupAgora = createServerFn({ method: "POST" })
       .select("role")
       .eq("user_id", context.userId)
       .eq("role", "admin")
+      .eq("ativo", true)
       .limit(1);
     if (!mems || mems.length === 0) {
       throw new Error("Somente administradores podem disparar backup");
