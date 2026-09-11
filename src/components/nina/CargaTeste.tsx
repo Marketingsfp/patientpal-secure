@@ -132,13 +132,17 @@ export function CargaTeste() {
 
   const iniciar = async (confirmado: boolean) => {
     if (!clinicaId) return;
+    if (iniciando.current) return;
     const cfg = configAtual();
     if (exigeConfirmacao(cfg) && !confirmado) {
       setConfirmar(true);
       return;
     }
     setConfirmar(false);
+    confirmadoRef.current = confirmado;
+    iniciando.current = true;
     setRodando(true);
+    setErroPreparo(null);
     cancelado.current = false;
     try {
       const criada: any = await criar({
@@ -153,6 +157,23 @@ export function CargaTeste() {
       const id = criada.carga.id as string;
       setCargaId(id);
       await recarregar();
+
+      // PREPARANDO LEADS — nenhum disparo antes de todos ficarem prontos.
+      const totalLeads = Number(criada.participantes ?? 0);
+      setPreparo({ prontos: 0, total: totalLeads });
+      let pronto = false;
+      while (!pronto && !cancelado.current) {
+        const p: any = await preparar({ data: { clinicaId, cargaId: id } });
+        setPreparo({ prontos: p.prontos, total: p.total || totalLeads });
+        if (p.erro || p.status === "erro") {
+          setErroPreparo(p.erro ?? "Preparação falhou.");
+          await recarregar();
+          return;
+        }
+        pronto = Boolean(p.pronto);
+      }
+      if (!pronto) return;
+      setPreparo(null);
 
       // O servidor executa por lotes; aqui só pedimos o próximo lote.
       let status = "executando";
