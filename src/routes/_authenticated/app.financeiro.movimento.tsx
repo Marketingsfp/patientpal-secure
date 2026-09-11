@@ -2097,7 +2097,7 @@ function Page() {
       {/* Cards de resultado do caixa, formas de pagamento, atendimentos por
           condição e mensalidades — mesma composição do Financeiro →
           Dashboard, pela régua da gaveta. Os seis cards de resultado abrem o
-          detalhamento em tela cheia; os menores filtram a lista abaixo. */}
+          detalhamento em nova aba; os menores filtram a lista abaixo. */}
       <MovimentoResultado
         linhas={classificadas}
         totaisPeriodo={{ r: totais.r, d: totais.d }}
