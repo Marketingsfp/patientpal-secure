@@ -29,6 +29,8 @@ export type FerramentaDoTurno = {
   fonte: string | null;
   success: boolean;
   erro?: string | undefined;
+  /** Argumentos normalizados da consulta (identidade + escopo da tentativa). */
+  escopo?: string | null;
 };
 
 export type EstadoDoTurno = {
@@ -94,6 +96,7 @@ export function montarContextoDoTurno(e: EstadoDoTurno): ContextoConfianca {
     fonte: f.fonte,
     success: f.success,
     erro: f.erro ?? null,
+    escopo: f.escopo ?? null,
     temConteudo:
       f.capacidade !== null && CAP_CATALOGO.has(f.capacidade)
         ? e.catalogoEncontrou
