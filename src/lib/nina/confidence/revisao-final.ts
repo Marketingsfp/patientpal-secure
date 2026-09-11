@@ -22,6 +22,10 @@
  *   - a revisão é textual: ela nunca reexecuta operação com efeito externo
  *     (gravar agendamento, transferir, enviar) para "tentar de novo".
  */
+import {
+  conformidadeDasInstrucoes,
+  type ConformidadeInstrucoes,
+} from "./conformidade-entrega";
 import { etapaAtinge, type EtapaAtivacao } from "./etapas";
 import type { ResultadoConfianca } from "./types";
 
@@ -93,6 +97,8 @@ export type MotivoRevisao =
   | "FALTA_EVIDENCIA_RECUPERAVEL"
   | "CONTRADICAO_COM_FONTE"
   | "OBRIGACAO_DESCUMPRIDA"
+  | "REGRA_PUBLICADA_VIOLADA"
+  | "REGRA_PUBLICADA_NAO_VERIFICADA"
   | "OPERACAO_SEM_COMPROVACAO"
   | "IMPASSE"
   | "AVALIADOR_INDISPONIVEL";
@@ -114,6 +120,11 @@ export const ACAO_POR_MOTIVO: Record<MotivoRevisao, AcaoRevisao> = {
   FALTA_EVIDENCIA_RECUPERAVEL: "NOVA_CONSULTA",
   CONTRADICAO_COM_FONTE: "CORRIGIR_E_REAVALIAR",
   OBRIGACAO_DESCUMPRIDA: "CORRIGIR_E_REAVALIAR",
+  // Violação de regra publicada: pede correção do TEXTO e reavaliação; se o
+  // limite de tentativas acabar, vira impasse com desfecho explícito.
+  REGRA_PUBLICADA_VIOLADA: "CORRIGIR_E_REAVALIAR",
+  // Exigência crítica que não pôde ser conferida nunca é aprovação.
+  REGRA_PUBLICADA_NAO_VERIFICADA: "DESFECHO_EXPLICITO",
   OPERACAO_SEM_COMPROVACAO: "IMPEDIR_AFIRMACAO_SUCESSO",
   IMPASSE: "DESFECHO_EXPLICITO",
   AVALIADOR_INDISPONIVEL: "DESFECHO_EXPLICITO",
@@ -127,6 +138,8 @@ export const ACAO_POR_MOTIVO: Record<MotivoRevisao, AcaoRevisao> = {
 export const PROTECOES_OBRIGATORIAS: MotivoRevisao[] = [
   "OPERACAO_SEM_COMPROVACAO",
   "CONTRADICAO_COM_FONTE",
+  "REGRA_PUBLICADA_VIOLADA",
+  "REGRA_PUBLICADA_NAO_VERIFICADA",
 ];
 
 const CODIGOS_CONTRADICAO = [
@@ -186,6 +199,14 @@ export function motivoDaRevisao(
   const codigos = codigosNegativos(r);
   if (contem(codigos, CODIGOS_SEM_COMPROVACAO)) return "OPERACAO_SEM_COMPROVACAO";
   if (contem(codigos, CODIGOS_CONTRADICAO)) return "CONTRADICAO_COM_FONTE";
+  // Conformidade com as instruções PUBLICADAS é lida à parte da nota: uma
+  // violação bloqueante vale mesmo com score alto e decisão ALLOW.
+  const conf = conformidadeDasInstrucoes(r);
+  if (conf.bloqueante) {
+    return conf.motivoBloqueio === "REGRA_PUBLICADA_DESCUMPRIDA"
+      ? "REGRA_PUBLICADA_VIOLADA"
+      : "REGRA_PUBLICADA_NAO_VERIFICADA";
+  }
   if (
     (r.validators ?? []).some(
       (v) => v.validator === "InstructionComplianceValidator" && v.status === "FAIL",
@@ -265,6 +286,13 @@ export type RevisaoFinal = {
   } | null;
   avaliadorFalhou: boolean;
   erroAvaliador: string | null;
+  /**
+   * Conformidade com as instruções publicadas, SEPARADA da nota numérica.
+   * Nota alta não compensa descumprimento crítico.
+   */
+  conformidade: ConformidadeInstrucoes;
+  /** A entrega do candidato está impedida por não conformidade bloqueante? */
+  bloqueiaEntrega: boolean;
   // 2) DECISÃO RECOMENDADA
   motivo: MotivoRevisao;
   acaoRecomendada: AcaoRevisao;
@@ -351,8 +379,12 @@ export function revisarSaida(e: EntradaRevisaoFinal): RevisaoFinal {
     ? null
     : `etapa_${e.etapa}_apenas_observa (a ação ${acaoRecomendada} exige etapa ${etapaMinima(acaoRecomendada)})`;
 
+  const conformidade = conformidadeDasInstrucoes(e.avaliacao);
   const aprovada =
-    !avaliadorFalhou && motivo === "SEM_PROBLEMA" && acaoRecomendada === "LIBERAR";
+    !avaliadorFalhou &&
+    !conformidade.bloqueante &&
+    motivo === "SEM_PROBLEMA" &&
+    acaoRecomendada === "LIBERAR";
 
   return {
     origem: e.origem,
@@ -367,6 +399,8 @@ export function revisarSaida(e: EntradaRevisaoFinal): RevisaoFinal {
       : null,
     avaliadorFalhou,
     erroAvaliador: e.falhaAvaliador ?? null,
+    conformidade,
+    bloqueiaEntrega: conformidade.bloqueante,
     motivo,
     acaoRecomendada,
     etapa: e.etapa,

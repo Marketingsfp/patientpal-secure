@@ -71,17 +71,43 @@ export type ResultadoVerificacaoFonte = {
 export const ESCOPO_DA_PROVA_FONTE =
   "Prova apenas que a regra publicada chegou ao modelo e foi cumprida na primeira resposta. Não aprova o pipeline completo.";
 
+/**
+ * Desfechos que NÃO cumprem a regra publicada. Encaminhar para atendimento
+ * humano ou cair em texto de contingência resolve o atendimento, mas não é a
+ * resposta exigida: no teste de aderência isso é "não atendido".
+ */
+const DESFECHOS_QUE_NAO_CUMPREM =
+  /(chamar uma pessoa da nossa equipe|pessoa da nossa equipe retome|n[ãa]o consegui concluir|vou verificar novamente|encaminh(ar|ei|ando) (voc[êe] )?para (o|um) atendimento)/i;
+
 /** Avalia a aderência sem julgar o resto do atendimento. */
 export function avaliarAderenciaFonte(entrada: {
   par: ParMarcador;
   payload: string;
   primeiraResposta: string;
-}): { regraChegouAoPayload: boolean; primeiraRespostaCumpriu: boolean } {
+  /** Origem registrada do texto entregue, quando conhecida. */
+  origemResposta?: string | null;
+}): {
+  regraChegouAoPayload: boolean;
+  primeiraRespostaCumpriu: boolean;
+  desfechoSubstituiuResposta: boolean;
+  motivo: string | null;
+} {
   const payload = entrada.payload ?? "";
   const resposta = (entrada.primeiraResposta ?? "").trim();
+  const origem = String(entrada.origemResposta ?? "");
+  const desfechoSubstituiuResposta =
+    DESFECHOS_QUE_NAO_CUMPREM.test(resposta) ||
+    ["transferencia", "fallback", "fallback_erro", "limite_rodadas"].includes(origem);
+  const contemMarcador = resposta.toUpperCase().includes(entrada.par.marcador.toUpperCase());
   return {
     regraChegouAoPayload: payload.includes(entrada.par.marcador),
-    primeiraRespostaCumpriu: resposta.toUpperCase().includes(entrada.par.marcador.toUpperCase()),
+    primeiraRespostaCumpriu: contemMarcador && !desfechoSubstituiuResposta,
+    desfechoSubstituiuResposta,
+    motivo: desfechoSubstituiuResposta
+      ? "ENCAMINHAMENTO_OU_FALLBACK_NAO_CUMPRE_A_REGRA"
+      : contemMarcador
+        ? null
+        : "MARCADOR_EXIGIDO_AUSENTE",
   };
 }
 
@@ -162,9 +188,19 @@ export function resumirAtendimentoCompleto(
   const decisao = texto(conf?.["decisao"]);
   const mensagemEntregueId = texto(entrega?.["mensagemId"]) ?? texto(entrega?.["mensagem_id"]);
 
+  // Encaminhamento, bloqueio por regra publicada ou contingência resolvem o
+  // atendimento, mas NÃO são a resposta exigida: nunca contam como aprovação.
+  const origem = texto(resumo["origem_resposta"]) ?? "";
+  const houveDesfechoSubstituto =
+    ["transferencia", "fallback", "fallback_erro", "limite_rodadas"].includes(origem) ||
+    intervencoes.some((i) =>
+      /confianca\.(baixa|regras\.bloqueio)|handoff|encaminh/i.test(i.etapa),
+    );
+
   let resultado: ResultadoAtendimentoCompleto["resultado"];
   if (!mensagemEntregueId) resultado = "SEM_EVIDENCIA";
   else if (decisao && decisao !== "ALLOW" && decisao !== "CONTINUE") resultado = "REPROVADO";
+  else if (houveDesfechoSubstituto) resultado = "REPROVADO";
   else if (intervencoes.length > 0) resultado = "APROVADO_COM_INTERVENCAO";
   else resultado = "APROVADO";
 
