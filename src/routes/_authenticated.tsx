@@ -1,7 +1,7 @@
 import { createFileRoute, redirect } from "@tanstack/react-router";
 import { AppShell } from "@/components/app-shell";
 import { ClinicaProvider } from "@/hooks/use-clinica";
-import { useAutoReloadOnNewBuild } from "@/hooks/use-auto-reload-on-new-build";
+
 import { supabase } from "@/integrations/supabase/client";
 import { isMedicoOnlyUser } from "@/lib/medico-only";
 import { lerSessaoEmCache } from "@/lib/sessao-cache";
