@@ -22,6 +22,13 @@
  */
 import { normalizarTexto } from "./evidencia";
 import { classificarNatureza, oracoesDaResposta } from "./modalidade";
+import {
+  literalExigido,
+  regraSeAplica,
+  regrasValidasParaPublicacao,
+  type CategoriaProibida,
+  type RegraPublicada,
+} from "./regras-publicadas";
 import type { ContextoConfianca, ResultadoValidador, StatusValidador } from "./types";
 
 // ------------------------------------------------------------------ tipos
