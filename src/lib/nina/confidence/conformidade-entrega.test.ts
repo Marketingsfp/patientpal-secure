@@ -4,7 +4,7 @@
  * Detectar a violação não basta: o candidato tem de ficar bloqueado mesmo com
  * nota média/alta e mesmo na etapa de observação.
  */
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 
 import {
   conformidadeDasInstrucoes,
