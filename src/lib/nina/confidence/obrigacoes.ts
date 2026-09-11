@@ -351,6 +351,29 @@ function avaliarUma(
     };
   }
 
+  // Regra publicada não interpretada NUNCA vira cumprimento.
+  if (o.tipo === "restricao_nao_interpretada") {
+    return { obrigacao: o, status: "indeterminada", motivo: "REGRA_NAO_INTERPRETADA" };
+  }
+
+  if (o.tipo === "restricao_proibicao") {
+    const violadas = categoriasVioladas(resposta, o.proibicoes ?? [], o.literalEsperado ?? null);
+    if (violadas.length > 0) {
+      return {
+        obrigacao: o,
+        status: "descumprida",
+        motivo: `CONTEUDO_PROIBIDO_PRESENTE:${violadas.join(",")}`,
+      };
+    }
+    const conferiveis = (o.proibicoes ?? []).filter(
+      (c) => c !== "texto_adicional" && c !== "explicacao",
+    );
+    if (conferiveis.length === 0 && !o.literalEsperado) {
+      return { obrigacao: o, status: "indeterminada", motivo: "PROIBICAO_NAO_VERIFICAVEL" };
+    }
+    return { obrigacao: o, status: "cumprida", motivo: "NENHUM_CONTEUDO_PROIBIDO" };
+  }
+
   if (o.tipo === "informacao_solicitada" && o.topico) {
     const topico = TOPICOS.find((t) => t.id === o.topico);
     if (!topico) {
