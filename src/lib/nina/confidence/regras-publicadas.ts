@@ -444,6 +444,7 @@ export function extrairRegrasPublicadas(
       prioridade: prioridadeDe(u.plano, "semantica"),
       verificacao: "semantica",
       literal: null,
+      operador: null,
       proibicoes: [],
       descricao: u.plano,
       interpretada: true,
