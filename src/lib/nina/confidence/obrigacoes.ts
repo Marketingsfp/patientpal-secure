@@ -335,6 +335,35 @@ export function reconheceAusencia(texto: string): boolean {
   });
 }
 
+const DESPEDIDA =
+  /\b(ate logo|ate mais|ate breve|abraco|qualquer duvida|estamos a disposicao|fico a disposicao|tenha um[a]? (bom|boa))\b/;
+
+/**
+ * Conferência determinística das categorias proibidas pela publicação.
+ * "explicação" e "qualquer outro texto" só são conferíveis quando a mesma
+ * publicação exige um texto literal — aí a resposta tem de ser só ele.
+ */
+export function categoriasVioladas(
+  resposta: string,
+  proibicoes: readonly CategoriaProibida[],
+  literalEsperado: string | null,
+): CategoriaProibida[] {
+  const bruto = resposta.trim();
+  const n = normalizarTexto(resposta);
+  const excedeLiteral =
+    literalEsperado !== null && normalizarTexto(literalEsperado).trim() !== n.trim();
+
+  const violadas: CategoriaProibida[] = [];
+  for (const c of proibicoes) {
+    if (c === "saudacao" && SAUDACAO.test(n)) violadas.push(c);
+    if (c === "emoji" && /\p{Extended_Pictographic}/u.test(bruto)) violadas.push(c);
+    if (c === "pergunta" && bruto.includes("?")) violadas.push(c);
+    if (c === "despedida" && DESPEDIDA.test(n)) violadas.push(c);
+    if ((c === "explicacao" || c === "texto_adicional") && excedeLiteral) violadas.push(c);
+  }
+  return [...new Set(violadas)];
+}
+
 function avaliarUma(
   o: Obrigacao,
   resposta: string,
