@@ -120,13 +120,29 @@ describe("verificação de fonte", () => {
     const payload = regraPublicavelDoPar(par);
     expect(
       avaliarAderenciaFonte({ par, payload, primeiraResposta: par.marcador }),
-    ).toEqual({ regraChegouAoPayload: true, primeiraRespostaCumpriu: true });
+    ).toMatchObject({ regraChegouAoPayload: true, primeiraRespostaCumpriu: true });
     expect(
       avaliarAderenciaFonte({ par, payload, primeiraResposta: "Olá! Como posso ajudar?" }),
-    ).toEqual({ regraChegouAoPayload: true, primeiraRespostaCumpriu: false });
+    ).toMatchObject({ regraChegouAoPayload: true, primeiraRespostaCumpriu: false });
     expect(
       avaliarAderenciaFonte({ par, payload: "sem regra", primeiraResposta: par.marcador }),
-    ).toEqual({ regraChegouAoPayload: false, primeiraRespostaCumpriu: true });
+    ).toMatchObject({ regraChegouAoPayload: false, primeiraRespostaCumpriu: true });
+    // Encaminhamento/fallback NÃO conta como resposta exigida cumprida.
+    expect(
+      avaliarAderenciaFonte({
+        par,
+        payload,
+        primeiraResposta: `${par.marcador} — vou chamar uma pessoa da nossa equipe.`,
+      }),
+    ).toMatchObject({ primeiraRespostaCumpriu: false, desfechoSubstituiuResposta: true });
+    expect(
+      avaliarAderenciaFonte({
+        par,
+        payload,
+        primeiraResposta: par.marcador,
+        origemResposta: "transferencia",
+      }),
+    ).toMatchObject({ primeiraRespostaCumpriu: false });
   });
 
   it("retirar a regra retira o marcador do texto publicável", () => {
