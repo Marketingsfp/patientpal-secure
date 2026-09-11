@@ -235,6 +235,45 @@ export function derivarObrigacoesDoTurno(ctx: ContextoConfianca): Obrigacao[] {
     }
   }
 
+  // Representação verificável da publicação, quando o turno a carrega.
+  const regras = regrasValidasParaPublicacao(ctx.instrucoes?.regras, ctx.instrucoes?.hash).filter(
+    (r) =>
+      regraSeAplica(r, {
+        mensagemPaciente: ctx.mensagemPaciente ?? null,
+        ambiente: ctx.businessContext?.ambiente ?? null,
+      }),
+  );
+
+  if (regras.length > 0) {
+    const literalDoTurno =
+      regras.find((r) => r.verificacao === "literal")?.literal ?? null;
+    for (const r of regras) {
+      const base = {
+        id: `instrucao:${r.ordem}`,
+        origem: "instrucoes_publicadas" as const,
+        descricao: r.descricao,
+        regra: r,
+      };
+      if (r.verificacao === "literal" && r.literal) {
+        out.push({ ...base, tipo: "restricao_literal", literal: r.literal, verificacao: "deterministica" });
+      } else if (r.verificacao === "proibicao_de_conteudo") {
+        out.push({
+          ...base,
+          tipo: "restricao_proibicao",
+          proibicoes: r.proibicoes,
+          literalEsperado: literalDoTurno,
+          verificacao: "deterministica",
+        });
+      } else if (r.verificacao === "nao_interpretada") {
+        out.push({ ...base, tipo: "restricao_nao_interpretada", verificacao: "semantica" });
+      } else {
+        out.push({ ...base, tipo: "restricao_aberta", verificacao: "semantica" });
+      }
+    }
+    return out;
+  }
+
+  // Compatibilidade: turnos que só carregam obrigações em texto simples.
   const publicadas = ctx.instrucoes?.obrigacoes ?? [];
   publicadas.forEach((texto, i) => {
     const literal = literalExigido(texto);
