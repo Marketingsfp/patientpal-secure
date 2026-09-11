@@ -913,6 +913,42 @@ export async function obterInfoConvenioPaciente(params: {
           }) as typeof agsFiltrados;
         }
       }
+      // Revisão/retorno gratuito NÃO consome a cota do cartão. A REVISAO é
+      // cadastrada como "consulta"; sem esta exclusão ela contaria como a
+      // consulta do dia do contrato e uma consulta de verdade no mesmo dia
+      // (outra especialidade, titular ou dependente) sairia pelo excedente.
+      {
+        const candidatosRevisao = (
+          agsFiltrados as Array<{ procedimento?: string | null }>
+        ).filter((a) => {
+          const n = normalizarNomeServico(a.procedimento);
+          return n === "REVISAO" || n === "RETORNO";
+        });
+        if (candidatosRevisao.length > 0) {
+          const nomesRevisao = Array.from(
+            new Set(
+              candidatosRevisao
+                .map((a) => (a.procedimento ?? "").replace(/\s*\([^()]*\)\s*$/, "").trim())
+                .filter(Boolean),
+            ),
+          );
+          const { data: procsRev } = await supabase
+            .from("procedimentos")
+            .select(`nome,${COLUNAS_PRECO_REVISAO}`)
+            .eq("clinica_id", clinicaId)
+            .in("nome", nomesRevisao);
+          const gratuitos = new Set(
+            ((procsRev ?? []) as any[])
+              .filter((p) => ehRevisaoGratuita(p.nome, p))
+              .map((p) => normalizarNomeServico(p.nome)),
+          );
+          if (gratuitos.size > 0) {
+            agsFiltrados = (agsFiltrados as Array<{ procedimento?: string | null }>).filter(
+              (a) => !gratuitos.has(normalizarNomeServico(a.procedimento)),
+            ) as typeof agsFiltrados;
+          }
+        }
+      }
       // Regra: o limite só é consumido quando o agendamento efetivamente foi
       // pago. O status na tabela `agendamentos` nem sempre muda para
       // "realizado" após a cobrança no caixa — o sinal mais confiável é a
