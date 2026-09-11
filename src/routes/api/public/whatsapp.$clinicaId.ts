@@ -449,6 +449,12 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
                       // FASE 5 — snapshot da avaliação final do texto enviado.
                       decisaoId?: string | null;
                       textoFinalHash?: string | null;
+                      // FASE 6 — avalia o conteúdo preparado para fala quando
+                      // ele difere do texto avaliado (resumo falado).
+                      avaliarRepresentacao?: (
+                        texto: string,
+                        representacao: "audio_integral" | "audio_resumo",
+                      ) => Promise<{ decisaoId: string | null; textoHash: string | null } | null>;
                     } = {};
 
                     // Mensagens de entrada reais desta resposta. O paciente pode
@@ -702,9 +708,26 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
                               );
                               const { hashDoTexto } = await import("@/lib/nina/confidence/hash");
                               const hashFalado = hashDoTexto(falado);
+                              // Conteúdo falado diferente do texto avaliado =>
+                              // avaliação PRÓPRIA. Sem ela, o áudio fica sem
+                              // nota; nunca herda a nota do texto completo.
+                              const { falaPrecisaDeAvaliacaoPropria } = await import(
+                                "@/lib/nina/confidence/identidade-saida"
+                              );
+                              const precisa = falaPrecisaDeAvaliacaoPropria({
+                                textoAvaliadoHash: auditoriaNina.textoFinalHash,
+                                conteudoFalado: falado,
+                              }).precisa;
+                              const decisaoAudio = precisa
+                                ? ((await auditoriaNina.avaliarRepresentacao?.(
+                                    falado,
+                                    representacaoAudio,
+                                  )) ?? null)
+                                : { decisaoId: auditoriaNina.decisaoId ?? null, textoHash: hashFalado };
+                              const decisaoIdAudio = decisaoAudio?.decisaoId ?? null;
                               await registrarEntregaSaida({
                                 clinicaId: params.clinicaId,
-                                decisaoId: auditoriaNina.decisaoId ?? null,
+                                decisaoId: decisaoIdAudio,
                                 execucaoId: auditoriaNina.execucaoId ?? null,
                                 conversaId: convId,
                                 representacao: representacaoAudio,
@@ -742,7 +765,7 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
                               // mensagem — não pela simples existência da linha.
                               await registrarEntregaSaida({
                                 clinicaId: params.clinicaId,
-                                decisaoId: auditoriaNina.decisaoId ?? null,
+                                decisaoId: decisaoIdAudio,
                                 execucaoId: auditoriaNina.execucaoId ?? null,
                                 conversaId: convId,
                                 outgoingMessageId:
