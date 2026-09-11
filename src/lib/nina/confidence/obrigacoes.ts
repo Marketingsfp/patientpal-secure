@@ -155,9 +155,18 @@ function pareceSaudacao(texto: string): boolean {
   return SAUDACAO.test(n);
 }
 
+/** Sinais de que a resposta está buscando esclarecer, e não entregando fato. */
+const PEDE_ESCLARECIMENTO =
+  /\b(qual|quais|voce (?:quer|prefere|precisa)|me diga|me informe|poderia informar|depende|para qual|sobre qual)\b/;
+
 /** A resposta contém uma pergunta dirigida ao paciente. */
 export function contemPergunta(texto: string): boolean {
   return texto.includes("?");
+}
+
+/** A resposta busca esclarecer o pedido (pergunta ou pedido de detalhe). */
+export function buscaEsclarecer(texto: string): boolean {
+  return contemPergunta(texto) || PEDE_ESCLARECIMENTO.test(normalizarTexto(texto));
 }
 
 // --------------------------------------------------- obrigações do paciente
@@ -297,7 +306,7 @@ function avaliarUma(
       return { obrigacao: o, status: "cumprida", motivo: "TOPICO_ATENDIDO" };
     }
     // Perguntar de volta sobre o mesmo tópico é conduta válida do turno.
-    if (contemPergunta(resposta) && topico.pedido.test(n)) {
+    if (buscaEsclarecer(resposta) && topico.pedido.test(n)) {
       return { obrigacao: o, status: "cumprida", motivo: "ESCLARECIMENTO_PERTINENTE" };
     }
     return { obrigacao: o, status: "descumprida", motivo: "TOPICO_NAO_ATENDIDO" };
@@ -313,7 +322,7 @@ function avaliarUma(
   }
 
   if (o.tipo === "esclarecimento") {
-    return contemPergunta(resposta)
+    return buscaEsclarecer(resposta)
       ? { obrigacao: o, status: "cumprida", motivo: "ESCLARECIMENTO_PERTINENTE" }
       : { obrigacao: o, status: "descumprida", motivo: "SEM_ESCLARECIMENTO" };
   }
@@ -417,12 +426,25 @@ export function InstructionComplianceValidator(
     };
   }
 
-  const descumpridas = r.avaliacoes.filter((a) => a.status === "descumprida");
-  const verificaveis = r.avaliacoes.filter((a) => a.status !== "indeterminada");
+  // Intenção ambígua NÃO é resposta inadequada: enquanto o pedido não estiver
+  // claro, a obrigação vinda da mensagem fica PENDENTE e quem decide é a
+  // dimensão de ambiguidade. Restrição publicada continua valendo sempre.
+  const ambiguo = ctx.intentAmbiguo === true;
+  const pendentes = ambiguo
+    ? r.avaliacoes.filter(
+        (a) => a.obrigacao.origem === "mensagem_paciente" && a.status === "descumprida",
+      )
+    : [];
+  const consideradas = r.avaliacoes.filter((a) => !pendentes.includes(a));
+  const descumpridas = consideradas.filter((a) => a.status === "descumprida");
+  const verificaveis = consideradas.filter((a) => a.status !== "indeterminada");
 
   let status: StatusValidador;
   let reasonCode: string;
-  if (verificaveis.length === 0) {
+  if (verificaveis.length === 0 && pendentes.length > 0) {
+    status = "PENDING";
+    reasonCode = "AMBIGUIDADE_A_RESOLVER";
+  } else if (verificaveis.length === 0) {
     status = "UNKNOWN";
     reasonCode = "OBRIGACOES_NAO_VERIFICAVEIS";
   } else if (descumpridas.length === 0) {
@@ -439,7 +461,12 @@ export function InstructionComplianceValidator(
   return {
     validator: nome,
     status,
-    score: status === "PASS" ? 100 : status === "UNKNOWN" ? 0 : r.completude,
+    score:
+      status === "PASS" || status === "PENDING"
+        ? 100
+        : status === "UNKNOWN"
+          ? 0
+          : r.completude,
     reasonCode,
     evidence: {
       relevante: r.relevante,
@@ -454,6 +481,7 @@ export function InstructionComplianceValidator(
         motivo: a.motivo,
       })),
       limitacoes: r.limitacoes,
+      pendentesPorAmbiguidade: pendentes.map((a) => a.obrigacao.id),
     },
     blocker: null,
   };
