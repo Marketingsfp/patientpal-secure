@@ -195,6 +195,14 @@ export function motivoDaRevisao(
   const codigos = codigosNegativos(r);
   if (contem(codigos, CODIGOS_SEM_COMPROVACAO)) return "OPERACAO_SEM_COMPROVACAO";
   if (contem(codigos, CODIGOS_CONTRADICAO)) return "CONTRADICAO_COM_FONTE";
+  // Conformidade com as instruções PUBLICADAS é lida à parte da nota: uma
+  // violação bloqueante vale mesmo com score alto e decisão ALLOW.
+  const conf = conformidadeDasInstrucoes(r);
+  if (conf.bloqueante) {
+    return conf.motivoBloqueio === "REGRA_PUBLICADA_DESCUMPRIDA"
+      ? "REGRA_PUBLICADA_VIOLADA"
+      : "REGRA_PUBLICADA_NAO_VERIFICADA";
+  }
   if (
     (r.validators ?? []).some(
       (v) => v.validator === "InstructionComplianceValidator" && v.status === "FAIL",
