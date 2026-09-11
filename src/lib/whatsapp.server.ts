@@ -1244,7 +1244,11 @@ async function gerarRespostaNinaInterno(
   // COMPOSER — ponto único de montagem. Depois daqui nada mais é concatenado
   // ao system prompt.
   const { comporRequestNina } = await import("@/lib/nina/prompt-composer");
-  const requestNina = comporRequestNina({ behaviorPrompt, runtimeContext });
+  const requestNina = comporRequestNina({
+    behaviorPrompt,
+    runtimeContext,
+    contratoPrecedencia: precedenciaTurno.contrato,
+  });
   const systemPromptFinal = requestNina.systemPrompt;
 
 
