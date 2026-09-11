@@ -47,6 +47,8 @@ import {
 } from "@/lib/nina/simulador-terra.functions";
 import { AvaliacaoSol } from "@/components/nina/AvaliacaoSol";
 import { descreverEventoRastreio } from "@/lib/nina/arquitetura/estado-evento";
+import { valorOuNaoRegistrado } from "@/lib/nina/evidencias-resumo";
+import { EvidenciasLimites } from "@/components/nina/EvidenciasLimites";
 
 import {
   CENARIOS_SUGERIDOS,
