@@ -729,6 +729,11 @@ export async function processarMensagemTeste(data: EntradaMensagemTeste, userId:
       revisao: revisaoTurno || null,
       mensagemPersistida: true,
       mensagemId,
+      // Identificadores EXATOS deste turno: quem for auditar recupera o
+      // registro por ID, nunca pelo "último resumo da clínica".
+      turnoId: auditoriaNina.traceId ?? null,
+      execucaoId: auditoriaNina.execucaoId ?? null,
+      conversaId,
     };
     } finally {
       // Garantia única: nenhum lote/lock fica preso, em qualquer desfecho.
