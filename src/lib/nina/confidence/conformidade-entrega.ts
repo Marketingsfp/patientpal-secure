@@ -16,6 +16,7 @@
  *
  * Módulo puro: sem banco, sem rede, sem modelo.
  */
+import type { VerificacaoExigencia } from "@/lib/nina/rastreio/auditoria-instrucoes";
 import type { PrioridadeRegra } from "./regras-publicadas";
 import type { ResultadoConfianca } from "./types";
 
@@ -186,6 +187,40 @@ export function conformidadeDasInstrucoes(
     explicacao: bloqueante
       ? `conformidade=${estado}; bloqueio=${motivoBloqueio}; a nota agregada não libera esta saída`
       : `conformidade=${estado}; sem bloqueio por instruções publicadas`,
+  };
+}
+
+/**
+ * AUDITORIA — resultado da verificação de CADA exigência publicada deste
+ * turno, cumpridas inclusive. Sem validador não existe lista: ausência de
+ * verificação nunca vira "cumpridas".
+ */
+export function verificacoesDasInstrucoes(avaliacao: ResultadoConfianca | null | undefined): {
+  verificacoes: VerificacaoExigencia[];
+  falhaDeInterpretacao: boolean;
+} {
+  const validador = (avaliacao?.validators ?? []).find(
+    (v) => v.validator === VALIDADOR_INSTRUCOES,
+  );
+  if (!validador) return { verificacoes: [], falhaDeInterpretacao: false };
+  const verificacoes = lerObrigacoes(validador.evidence)
+    .filter((o) => o.origem === "instrucoes_publicadas")
+    .map((o) => {
+      const status = String(o.status ?? "indeterminada");
+      const estado: VerificacaoExigencia["estado"] =
+        status === "cumprida" || status === "descumprida" || status === "nao_aplicavel"
+          ? status
+          : "indeterminada";
+      return {
+        regraId: typeof o.regraId === "string" ? o.regraId : null,
+        descricao: String((o as { descricao?: unknown }).descricao ?? o.id ?? "-"),
+        estado,
+        motivo: o.motivo === undefined || o.motivo === null ? null : String(o.motivo),
+      };
+    });
+  return {
+    verificacoes,
+    falhaDeInterpretacao: validador.reasonCode === "FALHA_NA_INTERPRETACAO_DAS_REGRAS",
   };
 }
 
