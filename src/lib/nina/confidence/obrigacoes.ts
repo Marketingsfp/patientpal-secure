@@ -182,23 +182,10 @@ function topicosPedidos(mensagem: string): Topico[] {
 // ------------------------------------------------ obrigações das instruções
 
 /**
- * Lê, do texto de uma obrigação PUBLICADA, o trecho literal exigido.
- * Genérico: qualquer instrução que mande responder/enviar/incluir um texto
- * exato é conferível — não existe exceção para nenhum marcador específico.
+ * Leitura do literal exigido: agora mora na representação das regras
+ * publicadas e é reexportada aqui por compatibilidade.
  */
-export function literalExigido(obrigacao: string): string | null {
-  const padroes: RegExp[] = [
-    /(?:responda|responder|envie|enviar|retorne|retornar|escreva|escrever)\s+(?:exatamente|apenas|somente|literalmente)\s*[:\-]?\s*["“']?([^"”'\n.;]+)/i,
-    /(?:inclua|incluir|use|usar)\s+(?:o\s+)?(?:marcador|codigo|código|texto|token)\s*[:\-]?\s*["“']?([^"”'\n.;]+)/i,
-    /(?:responda|responder)\s+com\s+(?:o\s+)?(?:marcador|codigo|código|texto|token)\s*[:\-]?\s*["“']?([^"”'\n.;]+)/i,
-  ];
-  for (const p of padroes) {
-    const m = p.exec(obrigacao);
-    const bruto = m?.[1]?.trim();
-    if (bruto && bruto.length >= 2) return bruto;
-  }
-  return null;
-}
+export { literalExigido } from "./regras-publicadas";
 
 // ------------------------------------------------------------- derivação
 
