@@ -2385,6 +2385,59 @@ async function gerarRespostaNinaInterno(
         (
           opcoes.auditoria as { textoFinalHash?: string | null }
         ).textoFinalHash = respostaFinalAvaliada.textoAvaliadoHash ?? null;
+        // FASE 6 — quem entrega a resposta em ÁUDIO precisa avaliar o conteúdo
+        // que vai ser falado quando ele diferir do texto. O resumo falado é
+        // outro conteúdo e nunca herda a nota do texto completo.
+        (
+          opcoes.auditoria as {
+            avaliarRepresentacao?: (
+              texto: string,
+              representacao: "audio_integral" | "audio_resumo",
+            ) => Promise<{ decisaoId: string | null; textoHash: string | null } | null>;
+          }
+        ).avaliarRepresentacao = async (textoFalado, representacao) => {
+          try {
+            const gateFala = garantirScoreDoTextoEnviado(
+              { ...estadoParaTextoFinal, texto: textoFalado },
+              textoFalado,
+              null,
+              cfgFinal.configuracao.parametros,
+            );
+            const avaliacaoFala = gateFala.resultado;
+            const registroFala = await registrarDecisaoConfianca({
+              clinicaId,
+              conversaId: estadoId.conversaId ?? null,
+              execucaoId: execucaoIdFinal,
+              traceId: rastro?.ids.trace_id ?? null,
+              teste: opcoes?.teste === true,
+              ambiente:
+                opcoes?.ambiente ?? (opcoes?.teste === true ? "homologacao" : "producao"),
+              avaliacao: "answer_confidence",
+              textoFinalHash: avaliacaoFala.textoAvaliadoHash,
+              claims: avaliacaoFala.claims ?? null,
+              decisao: paraDecisaoLegado(avaliacaoFala),
+              modo: "shadow",
+              revisaoConversa: opcoes?.lote?.revisao ?? null,
+              evidenciasHash,
+              origemResposta: registroDoTurno?.origemResposta ?? null,
+              rodadas: registroDoTurno?.rodadas ?? rodadasDoTurno,
+              representacao,
+              configId: cfgFinal.configuracao.configId,
+              configOrigem: cfgFinal.configuracao.origem,
+              etapaAtivacao: cfgFinal.etapa,
+            });
+            return {
+              decisaoId: registroFala.id,
+              textoHash: avaliacaoFala.textoAvaliadoHash ?? null,
+            };
+          } catch (e) {
+            console.warn(
+              "[nina-confianca] avaliação do conteúdo falado falhou:",
+              e instanceof Error ? e.message : e,
+            );
+            return null;
+          }
+        };
       }
       // Saída PREPARADA: avaliada e aprovada. Ainda não foi gravada nem enviada.
       if (registro.ok) {
