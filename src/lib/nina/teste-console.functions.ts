@@ -391,114 +391,16 @@ export const resolverConversaTeste = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     await assertMembership(context.supabase, context.userId, data.clinicaId);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const lead = await carregarLead(supabaseAdmin, data.clinicaId, data.leadId);
-    // Só encerra a conversa informada: nunca uma sessão nova já iniciada.
-    if (lead.conversa_id !== data.conversaId) return { ok: true, jaResolvida: true };
-
-    const agora = new Date().toISOString();
-    await supabaseAdmin
-      .from("atend_conversas")
-      .update({
-        status: "finished",
-        owner_type: "NONE",
-        ai_enabled: false,
-        atribuida_user_id: null,
-        identidade_confirmada: false,
-        identidade_perguntada_em: null,
-        identidade_tentativas: 0,
-        nina_fluxo_estado: null,
-        // Invalida qualquer tarefa pendente do ciclo (espera do paciente,
-        // encerramento automático, follow-up): nada dispara depois de resolver.
-        patient_response_deadline: null,
-        handoff_resumo: null,
-        handoff_motivo: null,
-        closed_at: agora,
-        resolved_at: agora,
-      })
-      .eq("id", data.conversaId)
-      .eq("clinica_id", data.clinicaId);
-
-    // Eventos persistentes na linha do tempo (nada de popup): o histórico
-    // continua visível no console e mostra, no ponto exato, quem encerrou e
-    // que a memória da Nina foi zerada.
-    const { registrarMarcadorSistema, registrarEvento } = await import(
-      "@/lib/atendimento/handoff.server"
-    );
-    await registrarEvento({
+    const { resetarLeadTeste } = await import("@/lib/nina/teste-console.server");
+    // Rotina canônica única de reset (mesma usada pelo preflight do teste de carga).
+    return await resetarLeadTeste(supabaseAdmin, {
       clinicaId: data.clinicaId,
+      leadId: data.leadId,
       conversaId: data.conversaId,
-      evento: "FINALIZADA",
       userId: context.userId,
-      detalhes: { sessao: lead.sessao_seq, origem: "console_teste" },
+      removerAgendamentos: data.removerAgendamentos,
+      origem: "console_teste",
     });
-    await registrarEvento({
-      clinicaId: data.clinicaId,
-      conversaId: data.conversaId,
-      evento: "IA_MEMORIA_RESETADA",
-      userId: context.userId,
-      detalhes: { sessao: lead.sessao_seq },
-    });
-
-    // Limpeza opcional: apaga da agenda o que a Nina marcou nesta sessão de
-    // teste. Só alcança registros de homologação (is_mock_data) desta conversa.
-    let agendamentosRemovidos = 0;
-    if (data.removerAgendamentos) {
-      const { data: apagados } = await supabaseAdmin
-        .from("agendamentos")
-        .delete()
-        .eq("clinica_id", data.clinicaId)
-        .eq("origem_integracao", "nina_homologacao")
-        .eq("is_mock_data", true)
-        .like("id_externo", `${data.conversaId}|%`)
-        .select("id");
-      agendamentosRemovidos = (apagados ?? []).length;
-      if (agendamentosRemovidos > 0) {
-        await registrarMarcadorSistema({
-          clinicaId: data.clinicaId,
-          conversaId: data.conversaId,
-          texto: `🧹 ${agendamentosRemovidos} agendamento(s) de teste removido(s) da agenda.`,
-        }).catch(() => {});
-      }
-    }
-
-    // Nova sessão = novo telefone virtual → a Nina não alcança nada do histórico
-    // arquivado (que fica só para auditoria).
-    const proxima = lead.sessao_seq + 1;
-
-    // Encerra o ciclo atual (histórico preservado para auditoria) — a próxima
-    // mensagem cria um novo test_cycle_id, sem memória do ciclo anterior.
-    if (lead.ciclo_id) {
-      const { patchEncerrarCiclo } = await import("@/lib/nina/ciclo-teste");
-      await supabaseAdmin
-        .from("nina_teste_ciclos")
-        .update({
-          ...patchEncerrarCiclo("resolvido_manual", agora),
-          resolvido_por: context.userId,
-        } as never)
-        .eq("id", lead.ciclo_id)
-        .eq("clinica_id", data.clinicaId);
-    }
-
-    await supabaseAdmin
-      .from("nina_teste_leads")
-      .update({
-        sessao_seq: proxima,
-        telefone_sessao: telefoneSessao(lead.indice, proxima),
-        conversa_id: null,
-        ciclo_id: null,
-        ciclo_iniciado_em: null,
-        resolvido_em: agora,
-        status: "ativa",
-      })
-      .eq("id", lead.id);
-
-    return {
-      ok: true,
-      jaResolvida: false,
-      sessao: proxima,
-      cicloEncerrado: lead.ciclo_id,
-      agendamentosRemovidos,
-    };
   });
 
 
