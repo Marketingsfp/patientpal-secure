@@ -15,6 +15,7 @@ import { toast } from "sonner";
 import { X } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { reportarErroRapidoMensagemNina } from "@/lib/nina/feedback-erros.functions";
+import { invalidarConfianca } from "@/lib/nina/confianca-cache";
 import { ROTULO_REPORTE, TEXTO_REPORTE_FALHA, avisoReporte } from "@/lib/nina/erro-rapido";
 
 type Props = {
@@ -22,10 +23,18 @@ type Props = {
   /** Conversa da mensagem clicada — não a conversa selecionada no momento da resposta. */
   conversaId: string;
   mensagemId: string;
+  /** FASE 6 — execução da resposta, para atualizar o indicador na hora. */
+  execucaoId?: string | null;
   className?: string;
 };
 
-export function ReportarErroNinaBotao({ clinicaId, conversaId, mensagemId, className }: Props) {
+export function ReportarErroNinaBotao({
+  clinicaId,
+  conversaId,
+  mensagemId,
+  execucaoId,
+  className,
+}: Props) {
   const [enviando, setEnviando] = useState(false);
   const [reportado, setReportado] = useState(false);
   const emCurso = useRef(false);
@@ -43,6 +52,9 @@ export function ReportarErroNinaBotao({ clinicaId, conversaId, mensagemId, class
     try {
       const r = await reportar({ data: alvo });
       setReportado(true);
+      // FASE 6 — o indicador de erro reportado é atualizado imediatamente,
+      // sem esperar o tempo de recarga do selo.
+      if (execucaoId) invalidarConfianca(clinicaId, execucaoId);
       const aviso = avisoReporte(r as { duplicado?: boolean } | null);
       if (aviso.tipo === "duplicado") toast.info(aviso.texto);
       else toast.success(aviso.texto);
