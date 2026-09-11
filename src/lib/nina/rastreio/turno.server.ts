@@ -134,7 +134,11 @@ export function registrarAuditoriaInstrucoes(
       rodada,
       diagnostico: entrada.diagnostico ?? r.diagnostico,
       execucaoId: entrada.execucaoId ?? r.execucaoId,
-      versao: entrada.versao ?? r.prompt?.versao ?? null,
+      versao:
+        entrada.versao ??
+        (r.prompt?.versao === null || r.prompt?.versao === undefined
+          ? null
+          : String(r.prompt.versao)),
       versaoId: entrada.versaoId ?? r.prompt?.versaoId ?? null,
       promptHash: entrada.promptHash ?? r.prompt?.hash ?? null,
     });
