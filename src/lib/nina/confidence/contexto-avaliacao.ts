@@ -135,14 +135,26 @@ export type EntradaInstrucoesDoTurno = {
 };
 
 export function montarInstrucoesDoTurno(e: EntradaInstrucoesDoTurno): InstrucoesDoTurno {
+  // Texto e representação verificável vêm da MESMA publicação: o hash usado
+  // aqui é o do texto avaliado, então alterar o texto invalida a
+  // representação anterior (ver `regrasValidasParaPublicacao`).
+  const hash = e.hash ?? hashDoTexto(e.texto ?? null);
+  const { regras, limitacoes } = extrairRegrasPublicadas(e.texto ?? null, {
+    escopo: e.escopo,
+    versao: e.versao ?? null,
+    versaoId: e.versaoId ?? null,
+    hash,
+  });
   return {
     escopo: e.escopo,
     versao: e.versao ?? null,
     versaoId: e.versaoId ?? null,
     publicadoEm: e.publicadoEm ?? null,
     origem: e.origem ?? null,
-    hash: e.hash ?? null,
-    obrigacoes: obrigacoesDoPrompt(e.texto ?? null),
+    hash,
+    obrigacoes: regras.map((r) => r.descricao),
+    regras,
+    limitacoes,
   };
 }
 
