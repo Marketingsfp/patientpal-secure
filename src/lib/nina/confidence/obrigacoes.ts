@@ -397,15 +397,24 @@ export function categoriasVioladas(
   resposta: string,
   proibicoes: readonly CategoriaProibida[],
   literalEsperado: string | null,
+  operadorEsperado: OperadorLiteral | null = "igualdade",
 ): CategoriaProibida[] {
   const bruto = resposta.trim();
   const n = normalizarTexto(resposta);
+  // "Não acrescente": qualquer conteúdo além do exigido é excesso.
+  // - igualdade: a resposta inteira tem de ser o literal;
+  // - inclusão: o que sobra depois de retirar o literal não pode ter conteúdo.
   const excedeLiteral =
-    literalEsperado !== null && normalizarTexto(literalEsperado).trim() !== n.trim();
+    literalEsperado === null
+      ? false
+      : operadorEsperado === "inclusao"
+        ? espacos(bruto).replace(espacos(literalEsperado), "").replace(/[\s.,;:!]/g, "") !== ""
+        : espacos(bruto) !== espacos(literalEsperado);
 
   const violadas: CategoriaProibida[] = [];
   for (const c of proibicoes) {
-    if (c === "saudacao" && SAUDACAO.test(n)) violadas.push(c);
+    // Saudação PROIBIDA é conferida em qualquer posição: "X. Olá!" também viola.
+    if (c === "saudacao" && SAUDACAO_EM_QUALQUER_POSICAO.test(n)) violadas.push(c);
     if (c === "emoji" && /\p{Extended_Pictographic}/u.test(bruto)) violadas.push(c);
     if (c === "pergunta" && bruto.includes("?")) violadas.push(c);
     if (c === "despedida" && DESPEDIDA.test(n)) violadas.push(c);
