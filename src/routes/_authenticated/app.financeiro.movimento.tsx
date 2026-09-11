@@ -2896,7 +2896,7 @@ function Page() {
                     Página {currentPage} de {totalPages} —{" "}
                     {displayItems.length.toLocaleString("pt-BR")} linha(s)
                     {decomporMisto ? " (mistos decompostos)" : ""} no período
-                    {filtroGrupo ? ` · filtrado por "${LABEL_GRUPO[filtroGrupo]}"` : ""}.
+                    {filtroGrupo ? ` · filtrado por "${rotuloFiltro(filtroGrupo)}"` : ""}.
                   </div>
                 );
               })()}
