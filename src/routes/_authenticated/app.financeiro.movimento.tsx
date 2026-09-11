@@ -1564,54 +1564,21 @@ function Page() {
     ? linhasDoPeriodo.filter((l) => !l._retroativo)
     : linhasDoPeriodo;
 
-  // Composição da receita: de onde veio cada real do período.
+  // Classificação de cada linha para os cards: atendimento por condição
+  // (Particular, Cartão, Convênio), mensalidades, avulsos e, na despesa,
+  // repasse × operacional. A regra mora em `@/lib/financeiro/movimento-resultado`.
   //
   // Calculada ANTES do filtro por card, senão clicar em "Consultas" zeraria
   // todos os outros cards e a tela deixaria de ser comparável. Os cards
   // mostram sempre o período inteiro; quem se estreita é a lista de baixo.
-  const periodo = { de: fromDate, ate: toDate };
-  const nomeDaCategoria = new Map(cats.map((c) => [c.id, c.nome]));
-  const grupoDaLinha = (l: Lanc): GrupoReceita =>
-    classificarReceita(
-      {
-        tipo: l.tipo,
-        categoria: l.categoria_id ? (nomeDaCategoria.get(l.categoria_id) ?? null) : null,
-        procedimento: l.procedimento,
-        mensalidadeVencimento: l.mensalidadeVencimento,
-        mensalidadeParcela: l.mensalidadeParcela,
-      },
-      periodo,
-      procTipos,
-    );
-  const receitasVisiveis = itensVisiveis.filter((l) => l.tipo === "receita");
-  const composicao = totaisPorGrupo(
-    receitasVisiveis.map((l) => ({ grupo: grupoDaLinha(l), valor: l.valor })),
-  );
-  const formasRecebidas = totaisPorForma(
-    receitasVisiveis.map((l) => ({ balde: baldeDaLinha(l), valor: l.valor })),
-  );
-  const totalParticular = Number(
-    (composicao.consulta.total + composicao.exame_procedimento.total).toFixed(2),
-  );
-  // Recorrentes são as parcelas mensais — é exatamente o que os três cards de
-  // situação detalham, então este total sempre fecha com a soma deles.
-  const totalRecorrentes = Number(
-    (
-      composicao.mensalidade_periodo.total +
-      composicao.mensalidade_atrasada.total +
-      composicao.mensalidade_antecipada.total
-    ).toFixed(2),
-  );
-  const qtdRecorrentes =
-    composicao.mensalidade_periodo.qtd +
-    composicao.mensalidade_atrasada.qtd +
-    composicao.mensalidade_antecipada.qtd;
-  // O bloco inteiro é adesão + recorrentes: quem entrou agora no cartão mais
-  // quem já era cliente e pagou a parcela do mês.
-  const totalMensalidades = Number((totalRecorrentes + composicao.adesao.total).toFixed(2));
-  const qtdMensalidades = qtdRecorrentes + composicao.adesao.qtd;
+  const classificadas = classificarMovimento(itensVisiveis, {
+    periodo: { de: fromDate, ate: toDate },
+    procTipos,
+    mapaConvenio,
+    nomeCategoria: (id) => (id ? (nomesCategoria.get(id) ?? null) : null),
+  });
   const displayItems = filtroGrupo
-    ? itensVisiveis.filter((l) => l.tipo === "receita" && grupoDaLinha(l) === filtroGrupo)
+    ? itensVisiveis.filter((_, i) => linhaCasaComFiltro(classificadas[i], filtroGrupo))
     : itensVisiveis;
 
   // Cards de Receita/Despesa/Saldo.
