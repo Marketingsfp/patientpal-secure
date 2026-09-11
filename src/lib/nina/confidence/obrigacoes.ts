@@ -21,7 +21,7 @@
  * Módulo puro: sem banco, sem rede, sem modelo.
  */
 import { normalizarTexto } from "./evidencia";
-import { oracoesDaResposta } from "./modalidade";
+import { classificarNatureza, oracoesDaResposta } from "./modalidade";
 import type { ContextoConfianca, ResultadoValidador, StatusValidador } from "./types";
 
 // ------------------------------------------------------------------ tipos
@@ -281,6 +281,17 @@ export type RevisorSemantico = (entrada: {
   resposta: string;
 }) => StatusObrigacao | null;
 
+/**
+ * Reconhecer que não tem a informação (e encaminhar) é conduta CORRETA da
+ * Nina — nunca descumprimento. Quem decide o desfecho é o handoff.
+ */
+export function reconheceAusencia(texto: string): boolean {
+  return oracoesDaResposta(texto).some((o) => {
+    const n = classificarNatureza(o.texto);
+    return n === "desconhecido_declarado" || n === "recusa_ou_limitacao" || n === "falha_declarada";
+  });
+}
+
 function avaliarUma(
   o: Obrigacao,
   resposta: string,
@@ -305,6 +316,9 @@ function avaliarUma(
     if (topico.resposta.test(n)) {
       return { obrigacao: o, status: "cumprida", motivo: "TOPICO_ATENDIDO" };
     }
+    if (reconheceAusencia(resposta)) {
+      return { obrigacao: o, status: "cumprida", motivo: "AUSENCIA_RECONHECIDA" };
+    }
     // Perguntar de volta sobre o mesmo tópico é conduta válida do turno.
     if (buscaEsclarecer(resposta) && topico.pedido.test(n)) {
       return { obrigacao: o, status: "cumprida", motivo: "ESCLARECIMENTO_PERTINENTE" };
@@ -315,6 +329,9 @@ function avaliarUma(
   if (o.tipo === "pergunta") {
     if (resposta.trim() === "" || pareceSaudacao(resposta)) {
       return { obrigacao: o, status: "descumprida", motivo: "PERGUNTA_NAO_RESPONDIDA" };
+    }
+    if (reconheceAusencia(resposta)) {
+      return { obrigacao: o, status: "cumprida", motivo: "AUSENCIA_RECONHECIDA" };
     }
     return contemPergunta(resposta)
       ? { obrigacao: o, status: "cumprida", motivo: "ESCLARECIMENTO_PERTINENTE" }
