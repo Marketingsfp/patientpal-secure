@@ -469,7 +469,12 @@ function avaliarUma(
   }
 
   if (o.tipo === "restricao_proibicao") {
-    const violadas = categoriasVioladas(resposta, o.proibicoes ?? [], o.literalEsperado ?? null);
+    const violadas = categoriasVioladas(
+      resposta,
+      o.proibicoes ?? [],
+      o.literalEsperado ?? null,
+      o.operador ?? "igualdade",
+    );
     if (violadas.length > 0) {
       return {
         obrigacao: o,
