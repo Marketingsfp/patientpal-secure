@@ -552,7 +552,12 @@ export function avaliarObrigacoes(
   revisor: RevisorSemantico | null = null,
 ): ResultadoObrigacoes {
   const obrigacoes = derivarObrigacoesDoTurno(ctx);
-  const avaliacoes = obrigacoes.map((o) => avaliarUma(o, resposta, revisor));
+  const avaliacoes = obrigacoes.map((o) =>
+    avaliarUma(o, resposta, revisor, {
+      mensagemPaciente: ctx.mensagemPaciente ?? null,
+      ambiente: ctx.businessContext?.ambiente ?? null,
+    }),
+  );
 
   const verificaveis = avaliacoes.filter((a) => a.status !== "indeterminada");
   const cumpridas = verificaveis.filter((a) => a.status === "cumprida");
