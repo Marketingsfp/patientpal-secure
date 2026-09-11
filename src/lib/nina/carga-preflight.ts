@@ -17,6 +17,10 @@ export type ResultadoPreflightLead = {
   situacao: SituacaoPreflight;
   /** true quando o lead já estava limpo (nada foi encerrado). */
   jaLimpo: boolean;
+  /** Ciclo de teste anterior que foi encerrado neste reset, quando havia. */
+  cicloEncerrado?: string | null;
+  /** Sessão (telefone virtual) do lead depois do reset. */
+  sessao?: number | null;
   /** Motivo técnico curto, apenas quando falhou. */
   erro?: string;
 };
@@ -61,6 +65,10 @@ export type BaselineLead = {
   previousCycleResolved: true;
   ready: true;
   jaLimpo: boolean;
+  /** Ciclo anterior encerrado neste reset (null quando o lead já estava limpo). */
+  cicloEncerrado?: string | null;
+  /** Sessão/telefone virtual do lead depois do reset. */
+  sessao?: number | null;
 };
 
 export function baselineLead(entrada: {
@@ -77,6 +85,30 @@ export function baselineLead(entrada: {
     previousCycleResolved: true,
     ready: true,
     jaLimpo: entrada.resultado.jaLimpo,
+    cicloEncerrado: entrada.resultado.cicloEncerrado ?? null,
+    sessao: entrada.resultado.sessao ?? null,
+  };
+}
+
+/** FASE 4 — métricas técnicas do preflight, exibidas nos detalhes do run. */
+export type MetricasPreflight = {
+  leadsPreparados: number;
+  leadsTotal: number;
+  falhas: number;
+  memoriasResetadas: number;
+  ciclosAnterioresEncerrados: number;
+};
+
+export function metricasPreflight(
+  baselines: BaselineLead[],
+  total?: number,
+): MetricasPreflight {
+  return {
+    leadsPreparados: baselines.length,
+    leadsTotal: total ?? baselines.length,
+    falhas: Math.max(0, (total ?? baselines.length) - baselines.length),
+    memoriasResetadas: baselines.filter((b) => !b.jaLimpo).length,
+    ciclosAnterioresEncerrados: baselines.filter((b) => Boolean(b.cicloEncerrado)).length,
   };
 }
 
@@ -103,7 +135,9 @@ export function descreverPreparacaoParcial(prontos: number, total: number): stri
  */
 export async function prepararLeads<T extends LeadMinimo>(entrada: {
   leads: T[];
-  resetar: (lead: T) => Promise<{ jaResolvida?: boolean }>;
+  resetar: (
+    lead: T,
+  ) => Promise<{ jaResolvida?: boolean; cicloEncerrado?: string | null; sessao?: number | null }>;
   /** Quantos resets simultâneos (padrão 4). */
   paralelismo?: number;
 }): Promise<ResumoPreflight> {
@@ -124,6 +158,8 @@ export async function prepararLeads<T extends LeadMinimo>(entrada: {
           indice: lead.indice,
           situacao: "READY",
           jaLimpo: Boolean(r?.jaResolvida),
+          cicloEncerrado: r?.cicloEncerrado ?? null,
+          sessao: r?.sessao ?? null,
         };
       } catch (e) {
         resultados[i] = {

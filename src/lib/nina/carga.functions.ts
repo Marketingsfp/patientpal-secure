@@ -590,10 +590,19 @@ export const detalheTesteCarga = createServerFn({ method: "POST" })
     );
 
     const conversas = new Set(lista.map((a) => a.lead_indice)).size;
+    // FASE 4 — métricas técnicas do preflight (não entram nas métricas de carga).
+    const { metricasPreflight } = await import("@/lib/nina/carga-preflight");
+    const planoDetalhe = (carga.plano ?? []) as any[];
+    const totalParticipantes = new Set(planoDetalhe.map((p: any) => p.leadId)).size;
+    const preflight = metricasPreflight(
+      ((carga.preflight ?? []) as any[]) as any,
+      totalParticipantes || undefined,
+    );
     return {
       carga: { ...carga, plano: undefined, variacoes: undefined },
       amostras: lista.slice(-200),
       metricas: { ...metricas, duracaoMs, conversasEnvolvidas: conversas },
+      preflight,
       // Custo monetário não é medido: o provedor não devolve preço por chamada.
       custoMedido: false,
     };
