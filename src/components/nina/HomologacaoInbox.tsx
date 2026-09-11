@@ -46,6 +46,7 @@ import {
   simulacaoAtualTerra,
 } from "@/lib/nina/simulador-terra.functions";
 import { AvaliacaoSol } from "@/components/nina/AvaliacaoSol";
+import { descreverEventoRastreio } from "@/lib/nina/arquitetura/estado-evento";
 
 import {
   CENARIOS_SUGERIDOS,
@@ -1813,19 +1814,18 @@ export function HomologacaoInbox() {
                 <div>
                   <p className="mb-1 font-medium text-muted-foreground">Etapas do fluxo</p>
                   <div className="space-y-0.5 font-mono text-[11px]">
-                    {detalhe.eventos.map((ev: any, i: number) => (
-                      <div key={i}>
-                        <span
-                          className={
-                            ev.status === "erro" ? "text-destructive" : "text-emerald-600"
-                          }
-                        >
-                          {ev.status === "erro" ? "✖" : "✔"}
-                        </span>{" "}
-                        {ev.node_id}
-                        {ev.duration_ms != null ? ` (${ev.duration_ms}ms)` : ""}
-                      </div>
-                    ))}
+                    {detalhe.eventos.map((ev: any, i: number) => {
+                      // FASE 4 — contrato real de estados (ok/error/running/
+                      // skipped/cancelled). ✔ só para sucesso confirmado.
+                      const e = descreverEventoRastreio(ev);
+                      return (
+                        <div key={i}>
+                          <span className={e.classe}>{e.simbolo}</span> {ev.node_id}
+                          <span className="text-muted-foreground"> · {e.rotulo}</span>
+                          {ev.duration_ms != null ? ` (${ev.duration_ms}ms)` : ""}
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               )}
