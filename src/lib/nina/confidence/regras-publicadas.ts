@@ -45,6 +45,16 @@ export type CategoriaProibida =
 
 export type PrioridadeRegra = "critica" | "alta" | "normal";
 
+/**
+ * Operador exigido pela regra literal:
+ * - `igualdade`: "responda EXATAMENTE" — a resposta INTEIRA tem de ser o texto;
+ * - `inclusao`: "inclua o marcador" — o trecho precisa estar presente.
+ *
+ * A distinção é obrigatória: conferir "responda exatamente" com presença
+ * (`includes`) aprova resposta com saudação, emoji e texto extra.
+ */
+export type OperadorLiteral = "igualdade" | "inclusao";
+
 export type RegraPublicada = {
   /** Estável dentro de uma publicação: hash do texto + ordem. */
   id: string;
@@ -59,6 +69,8 @@ export type RegraPublicada = {
   verificacao: VerificacaoRegra;
   /** Texto exatamente exigido, quando a regra for literal. */
   literal: string | null;
+  /** Como o literal deve ser conferido. `null` quando não há literal. */
+  operador: OperadorLiteral | null;
   /** Categorias de conteúdo proibidas, quando a regra for proibição. */
   proibicoes: CategoriaProibida[];
   /** Descrição curta e auditável (texto publicado, sem marcador de lista). */
@@ -189,18 +201,45 @@ const EXIGENCIA_LITERAL_ABERTA =
  * Genérico: qualquer instrução que mande responder/enviar/incluir um texto
  * exato é conferível — não existe exceção para nenhum marcador específico.
  */
-export function literalExigido(obrigacao: string): string | null {
-  const padroes: RegExp[] = [
-    /(?:responda|responder|envie|enviar|retorne|retornar|escreva|escrever)\s+(?:exatamente|apenas|somente|literalmente)\s*[:\-]?\s*["“']?([^"”'\n.;]+)/i,
-    /(?:inclua|incluir|use|usar)\s+(?:o\s+)?(?:marcador|codigo|código|texto|token)\s*[:\-]?\s*["“']?([^"”'\n.;]+)/i,
-    /(?:responda|responder)\s+com\s+(?:o\s+)?(?:marcador|codigo|código|texto|token)\s*[:\-]?\s*["“']?([^"”'\n.;]+)/i,
+export function exigenciaLiteral(
+  obrigacao: string,
+): { literal: string; operador: OperadorLiteral } | null {
+  const padroes: Array<[RegExp, OperadorLiteral]> = [
+    [
+      /(?:responda|responder|envie|enviar|retorne|retornar|escreva|escrever)\s+(?:exatamente|apenas|somente|literalmente)\s*[:\-]?\s*["“']?([^"”'\n.;]+)/i,
+      "igualdade",
+    ],
+    [
+      /(?:inclua|incluir|use|usar)\s+(?:o\s+)?(?:marcador|codigo|código|texto|token)\s*[:\-]?\s*["“']?([^"”'\n.;]+)/i,
+      "inclusao",
+    ],
+    [
+      /(?:responda|responder)\s+com\s+(?:o\s+)?(?:marcador|codigo|código|texto|token)\s*[:\-]?\s*["“']?([^"”'\n.;]+)/i,
+      "inclusao",
+    ],
   ];
-  for (const p of padroes) {
+  for (const [p, operador] of padroes) {
     const m = p.exec(obrigacao);
     const bruto = m?.[1]?.trim();
-    if (bruto && bruto.length >= 2) return bruto;
+    if (bruto && bruto.length >= 2) return { literal: bruto, operador };
   }
   return null;
+}
+
+/** Compatibilidade: apenas o texto exigido, sem o operador. */
+export function literalExigido(obrigacao: string): string | null {
+  return exigenciaLiteral(obrigacao)?.literal ?? null;
+}
+
+/**
+ * Operador de uma exigência literal escrita em bloco ("responda EXATAMENTE:").
+ * "inclua"/"use"/"responda com o marcador" pedem presença; o resto pede que a
+ * resposta INTEIRA seja o texto exigido.
+ */
+export function operadorDoBloco(plano: string): OperadorLiteral {
+  return /\b(inclua|incluir|use|usar)\b/i.test(plano) || /\bcom\s*:\s*$/i.test(plano)
+    ? "inclusao"
+    : "igualdade";
 }
 
 const CATEGORIAS: Array<[CategoriaProibida, RegExp]> = [
@@ -308,6 +347,7 @@ export function extrairRegrasPublicadas(
             prioridade: prioridadeDe(u.plano, "literal"),
             verificacao: "literal",
             literal: alvo.plano,
+            operador: operadorDoBloco(u.plano),
             proibicoes: [],
             descricao: `${u.plano} ${alvo.plano}`.trim(),
             interpretada: true,
@@ -325,6 +365,7 @@ export function extrairRegrasPublicadas(
         prioridade: "alta",
         verificacao: "nao_interpretada",
         literal: null,
+        operador: null,
         proibicoes: [],
         descricao: u.plano,
         interpretada: false,
@@ -358,15 +399,16 @@ export function extrairRegrasPublicadas(
         : { tipo: "mensagem_contem", valor: bruto };
     }
 
-    const literal = literalExigido(u.plano);
-    if (literal) {
+    const exigencia = exigenciaLiteral(u.plano);
+    if (exigencia) {
       registrar(u, {
         condicao: condicaoLocal,
         ambiente: ambienteSecao,
         natureza: "exigencia",
         prioridade: prioridadeDe(u.plano, "literal"),
         verificacao: "literal",
-        literal,
+        literal: exigencia.literal,
+        operador: exigencia.operador,
         proibicoes: [],
         descricao: u.plano,
         interpretada: true,
@@ -386,6 +428,7 @@ export function extrairRegrasPublicadas(
         prioridade: prioridadeDe(u.plano, verificacao),
         verificacao,
         literal: null,
+        operador: null,
         proibicoes,
         descricao: u.plano,
         interpretada: true,
@@ -401,6 +444,7 @@ export function extrairRegrasPublicadas(
       prioridade: prioridadeDe(u.plano, "semantica"),
       verificacao: "semantica",
       literal: null,
+      operador: null,
       proibicoes: [],
       descricao: u.plano,
       interpretada: true,

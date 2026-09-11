@@ -23,10 +23,11 @@
 import { normalizarTexto } from "./evidencia";
 import { classificarNatureza, oracoesDaResposta } from "./modalidade";
 import {
-  literalExigido,
+  exigenciaLiteral,
   regraSeAplica,
   regrasValidasParaPublicacao,
   type CategoriaProibida,
+  type OperadorLiteral,
   type RegraPublicada,
 } from "./regras-publicadas";
 import type { ContextoConfianca, ResultadoValidador, StatusValidador } from "./types";
@@ -61,6 +62,8 @@ export type Obrigacao = {
   topico?: string | null;
   /** Texto exato exigido, quando a obrigação for literal. */
   literal?: string | null;
+  /** Operador da exigência literal: igualdade integral ou presença do trecho. */
+  operador?: OperadorLiteral | null;
   /** Categorias proibidas, quando a obrigação for proibição de conteúdo. */
   proibicoes?: CategoriaProibida[];
   /** Texto literal exigido no mesmo turno (para conferir "nada além disso"). */
@@ -71,7 +74,27 @@ export type Obrigacao = {
   verificacao: "deterministica" | "semantica";
 };
 
-export type StatusObrigacao = "cumprida" | "descumprida" | "indeterminada";
+/**
+ * Estados distintos e auditáveis de UMA obrigação:
+ * - `cumprida` / `descumprida`: conferência determinística concluída;
+ * - `nao_aplicavel`: a condição publicada não foi acionada neste turno;
+ * - `indeterminada`: não foi possível conferir (linguagem aberta sem revisão,
+ *   regra não interpretada). NUNCA é lida como cumprimento.
+ */
+export type StatusObrigacao =
+  | "cumprida"
+  | "descumprida"
+  | "nao_aplicavel"
+  | "indeterminada";
+
+/** Estado agregado das restrições publicadas neste turno. */
+export type EstadoRestricoes =
+  | "cumpridas"
+  | "descumpridas"
+  | "indeterminadas"
+  | "nenhuma_regra_publicada"
+  | "nenhuma_regra_aplicavel"
+  | "falha_na_interpretacao";
 
 export type AvaliacaoObrigacao = {
   obrigacao: Obrigacao;
@@ -86,8 +109,16 @@ export type ResultadoObrigacoes = {
   relevante: boolean;
   /** Percentual de obrigações verificáveis efetivamente cumpridas (0..100). */
   completude: number;
-  /** Nenhuma restrição publicada foi descumprida. */
-  restricoesCumpridas: boolean;
+  /**
+   * `true` só quando existe restrição publicada CONFERIDA e cumprida.
+   * `null` quando não há regra aplicável ou nada pôde ser conferido — ausência
+   * de regra nunca é aprovação.
+   */
+  restricoesCumpridas: boolean | null;
+  /** Estado agregado e auditável das restrições publicadas. */
+  estadoRestricoes: EstadoRestricoes;
+  /** Regras da publicação vigente cuja condição não foi acionada. */
+  regrasNaoAplicaveis: number;
   /** A resposta é compatível com o estágio da conversa. */
   compativelComEstagio: boolean;
   /** O turno respondeu com uma pergunta de esclarecimento pertinente. */
@@ -161,6 +192,19 @@ const TOPICOS: Topico[] = [
 /** Só cumprimento/cortesia, sem conteúdo que atenda a algum pedido. */
 const SAUDACAO =
   /^(oi|ola|bom dia|boa tarde|boa noite|tudo bem|como vai|seja bem[- ]vind[oa]|obrigad[oa])\b/;
+
+/** Mesma lista, em qualquer posição — usada para conferir saudação PROIBIDA. */
+const SAUDACAO_EM_QUALQUER_POSICAO =
+  /(^|[\s.,;:!?"'()-])(oi|ola|bom dia|boa tarde|boa noite|tudo bem|como vai|seja bem[- ]vind[oa])\b/;
+
+/**
+ * Única normalização permitida na conferência literal: colapso de espaços em
+ * branco e remoção de espaços nas pontas. Caixa, acentuação e pontuação são
+ * preservadas — correspondência literal é literal.
+ */
+function espacos(t: string): string {
+  return t.replace(/\s+/g, " ").trim();
+}
 
 const CONTEUDO_ALEM_DA_SAUDACAO =
   /\b(rua|avenida|numero|bairro|cep|r\$|valor|horario|vaga|jejum|convenio|estacionamento|dr|dra|agenda)\b/;
@@ -264,8 +308,9 @@ export function derivarObrigacoesDoTurno(ctx: ContextoConfianca): Obrigacao[] {
   // Quando o turno traz a representação estruturada, é ela que vale — mesmo
   // vazia (regra fora da condição/ambiente, ou representação desatualizada).
   if (Array.isArray(ctx.instrucoes?.regras)) {
-    const literalDoTurno =
-      regras.find((r) => r.verificacao === "literal")?.literal ?? null;
+    const regraLiteralDoTurno = regras.find((r) => r.verificacao === "literal");
+    const literalDoTurno = regraLiteralDoTurno?.literal ?? null;
+    const operadorDoTurno = regraLiteralDoTurno?.operador ?? null;
     for (const r of regras) {
       const base = {
         id: `instrucao:${r.ordem}`,
@@ -274,13 +319,20 @@ export function derivarObrigacoesDoTurno(ctx: ContextoConfianca): Obrigacao[] {
         regra: r,
       };
       if (r.verificacao === "literal" && r.literal) {
-        out.push({ ...base, tipo: "restricao_literal", literal: r.literal, verificacao: "deterministica" });
+        out.push({
+          ...base,
+          tipo: "restricao_literal",
+          literal: r.literal,
+          operador: r.operador ?? "igualdade",
+          verificacao: "deterministica",
+        });
       } else if (r.verificacao === "proibicao_de_conteudo") {
         out.push({
           ...base,
           tipo: "restricao_proibicao",
           proibicoes: r.proibicoes,
           literalEsperado: literalDoTurno,
+          operador: operadorDoTurno,
           verificacao: "deterministica",
         });
       } else if (r.verificacao === "nao_interpretada") {
@@ -295,15 +347,16 @@ export function derivarObrigacoesDoTurno(ctx: ContextoConfianca): Obrigacao[] {
   // Compatibilidade: turnos que só carregam obrigações em texto simples.
   const publicadas = ctx.instrucoes?.obrigacoes ?? [];
   publicadas.forEach((texto, i) => {
-    const literal = literalExigido(texto);
+    const exigencia = exigenciaLiteral(texto);
     out.push(
-      literal
+      exigencia
         ? {
             id: `instrucao:${i}`,
             tipo: "restricao_literal",
             origem: "instrucoes_publicadas",
             descricao: texto,
-            literal,
+            literal: exigencia.literal,
+            operador: exigencia.operador,
             verificacao: "deterministica",
           }
         : {
@@ -321,9 +374,17 @@ export function derivarObrigacoesDoTurno(ctx: ContextoConfianca): Obrigacao[] {
 
 // ------------------------------------------------------------- avaliação
 
+/**
+ * Revisão semântica COMPLEMENTAR para regra aberta. Recebe contexto suficiente
+ * para avaliar a condição da regra (mensagem do paciente, ambiente e o trecho
+ * publicado). Ausência de revisão NÃO aprova nada: fica `indeterminada`.
+ */
 export type RevisorSemantico = (entrada: {
   obrigacao: Obrigacao;
   resposta: string;
+  mensagemPaciente?: string | null;
+  ambiente?: string | null;
+  trechoPublicado?: string | null;
 }) => StatusObrigacao | null;
 
 /**
@@ -349,15 +410,24 @@ export function categoriasVioladas(
   resposta: string,
   proibicoes: readonly CategoriaProibida[],
   literalEsperado: string | null,
+  operadorEsperado: OperadorLiteral | null = "igualdade",
 ): CategoriaProibida[] {
   const bruto = resposta.trim();
   const n = normalizarTexto(resposta);
+  // "Não acrescente": qualquer conteúdo além do exigido é excesso.
+  // - igualdade: a resposta inteira tem de ser o literal;
+  // - inclusão: o que sobra depois de retirar o literal não pode ter conteúdo.
   const excedeLiteral =
-    literalEsperado !== null && normalizarTexto(literalEsperado).trim() !== n.trim();
+    literalEsperado === null
+      ? false
+      : operadorEsperado === "inclusao"
+        ? espacos(bruto).replace(espacos(literalEsperado), "").replace(/[\s.,;:!]/g, "") !== ""
+        : espacos(bruto) !== espacos(literalEsperado);
 
   const violadas: CategoriaProibida[] = [];
   for (const c of proibicoes) {
-    if (c === "saudacao" && SAUDACAO.test(n)) violadas.push(c);
+    // Saudação PROIBIDA é conferida em qualquer posição: "X. Olá!" também viola.
+    if (c === "saudacao" && SAUDACAO_EM_QUALQUER_POSICAO.test(n)) violadas.push(c);
     if (c === "emoji" && /\p{Extended_Pictographic}/u.test(bruto)) violadas.push(c);
     if (c === "pergunta" && bruto.includes("?")) violadas.push(c);
     if (c === "despedida" && DESPEDIDA.test(n)) violadas.push(c);
@@ -370,15 +440,27 @@ function avaliarUma(
   o: Obrigacao,
   resposta: string,
   revisor: RevisorSemantico | null,
+  contexto?: { mensagemPaciente?: string | null; ambiente?: string | null },
 ): AvaliacaoObrigacao {
   const n = normalizarTexto(resposta);
 
   if (o.tipo === "restricao_literal" && o.literal) {
-    const ok = normalizarTexto(resposta).includes(normalizarTexto(o.literal));
+    const operador: OperadorLiteral = o.operador ?? "igualdade";
+    if (operador === "inclusao") {
+      const ok = espacos(resposta).includes(espacos(o.literal));
+      return {
+        obrigacao: o,
+        status: ok ? "cumprida" : "descumprida",
+        motivo: ok ? "TEXTO_LITERAL_PRESENTE" : "TEXTO_LITERAL_AUSENTE",
+      };
+    }
+    // "Responda EXATAMENTE": igualdade do conteúdo integral, com caixa e
+    // acentuação preservadas. Presença não basta.
+    const ok = espacos(resposta) === espacos(o.literal);
     return {
       obrigacao: o,
       status: ok ? "cumprida" : "descumprida",
-      motivo: ok ? "TEXTO_LITERAL_PRESENTE" : "TEXTO_LITERAL_AUSENTE",
+      motivo: ok ? "TEXTO_LITERAL_EXATO" : "TEXTO_LITERAL_DIVERGENTE",
     };
   }
 
@@ -388,7 +470,12 @@ function avaliarUma(
   }
 
   if (o.tipo === "restricao_proibicao") {
-    const violadas = categoriasVioladas(resposta, o.proibicoes ?? [], o.literalEsperado ?? null);
+    const violadas = categoriasVioladas(
+      resposta,
+      o.proibicoes ?? [],
+      o.literalEsperado ?? null,
+      o.operador ?? "igualdade",
+    );
     if (violadas.length > 0) {
       return {
         obrigacao: o,
@@ -442,8 +529,17 @@ function avaliarUma(
   }
 
   // Linguagem aberta: só a revisão semântica complementar pode opinar, e ela
-  // nunca substitui a comprovação de fatos ou operações.
-  const parecer = revisor ? revisor({ obrigacao: o, resposta }) : null;
+  // nunca substitui a comprovação de fatos ou operações. Sem revisão, o estado
+  // é `indeterminada` — jamais aprovação presumida.
+  const parecer = revisor
+    ? revisor({
+        obrigacao: o,
+        resposta,
+        mensagemPaciente: contexto?.mensagemPaciente ?? null,
+        ambiente: contexto?.ambiente ?? null,
+        trechoPublicado: o.regra?.trecho ?? null,
+      })
+    : null;
   if (parecer) {
     return { obrigacao: o, status: parecer, motivo: "REVISAO_SEMANTICA" };
   }
@@ -456,7 +552,12 @@ export function avaliarObrigacoes(
   revisor: RevisorSemantico | null = null,
 ): ResultadoObrigacoes {
   const obrigacoes = derivarObrigacoesDoTurno(ctx);
-  const avaliacoes = obrigacoes.map((o) => avaliarUma(o, resposta, revisor));
+  const avaliacoes = obrigacoes.map((o) =>
+    avaliarUma(o, resposta, revisor, {
+      mensagemPaciente: ctx.mensagemPaciente ?? null,
+      ambiente: ctx.businessContext?.ambiente ?? null,
+    }),
+  );
 
   const verificaveis = avaliacoes.filter((a) => a.status !== "indeterminada");
   const cumpridas = verificaveis.filter((a) => a.status === "cumprida");
@@ -470,7 +571,35 @@ export function avaliarObrigacoes(
       : doPaciente.some((a) => a.status === "cumprida");
 
   const restricoes = avaliacoes.filter((a) => a.obrigacao.origem === "instrucoes_publicadas");
-  const restricoesCumpridas = restricoes.every((a) => a.status !== "descumprida");
+
+  // Regras da publicação vigente cuja condição NÃO foi acionada neste turno.
+  const validas = regrasValidasParaPublicacao(ctx.instrucoes?.regras, ctx.instrucoes?.hash);
+  const aplicaveis = validas.filter((r) =>
+    regraSeAplica(r, {
+      mensagemPaciente: ctx.mensagemPaciente ?? null,
+      ambiente: ctx.businessContext?.ambiente ?? null,
+    }),
+  );
+  const regrasNaoAplicaveis = validas.length - aplicaveis.length;
+  const falhaDeInterpretacao =
+    (ctx.instrucoes?.regras?.length ?? 0) > 0 && validas.length === 0
+      ? true
+      : restricoes.length > 0 && restricoes.every((a) => a.motivo === "REGRA_NAO_INTERPRETADA");
+
+  // Ausência de regra NUNCA é aprovação: só `cumpridas` produz `true`.
+  const estadoRestricoes: EstadoRestricoes = falhaDeInterpretacao
+    ? "falha_na_interpretacao"
+    : restricoes.some((a) => a.status === "descumprida")
+      ? "descumpridas"
+      : restricoes.some((a) => a.status === "cumprida")
+        ? "cumpridas"
+        : restricoes.length > 0
+          ? "indeterminadas"
+          : validas.length === 0
+            ? "nenhuma_regra_publicada"
+            : "nenhuma_regra_aplicavel";
+  const restricoesCumpridas: boolean | null =
+    estadoRestricoes === "cumpridas" ? true : estadoRestricoes === "descumpridas" ? false : null;
 
   const esclarecimentoPertinente = avaliacoes.some(
     (a) => a.status === "cumprida" && a.motivo === "ESCLARECIMENTO_PERTINENTE",
@@ -510,6 +639,8 @@ export function avaliarObrigacoes(
     relevante,
     completude,
     restricoesCumpridas,
+    estadoRestricoes,
+    regrasNaoAplicaveis,
     compativelComEstagio,
     esclarecimentoPertinente,
     limitacoes,
@@ -542,13 +673,37 @@ export function InstructionComplianceValidator(
   }
 
   const r = avaliarObrigacoes(ctx, texto, revisor);
+
+  // Falha ao interpretar as regras publicadas não é cumprimento: fica UNKNOWN.
+  if (r.estadoRestricoes === "falha_na_interpretacao") {
+    return {
+      validator: nome,
+      status: "UNKNOWN",
+      score: 0,
+      reasonCode: "FALHA_NA_INTERPRETACAO_DAS_REGRAS",
+      evidence: {
+        estadoRestricoes: r.estadoRestricoes,
+        regrasNaoAplicaveis: r.regrasNaoAplicaveis,
+        limitacoes: r.limitacoes,
+      },
+      blocker: null,
+    };
+  }
+
   if (r.obrigacoes.length === 0) {
     return {
       validator: nome,
       status: "NOT_APPLICABLE",
       score: 100,
-      reasonCode: "SEM_OBRIGACAO_IDENTIFICADA",
-      evidence: { limitacoes: r.limitacoes },
+      reasonCode:
+        r.estadoRestricoes === "nenhuma_regra_aplicavel"
+          ? "NENHUMA_REGRA_APLICAVEL"
+          : "SEM_OBRIGACAO_IDENTIFICADA",
+      evidence: {
+        estadoRestricoes: r.estadoRestricoes,
+        regrasNaoAplicaveis: r.regrasNaoAplicaveis,
+        limitacoes: r.limitacoes,
+      },
       blocker: null,
     };
   }
@@ -574,9 +729,18 @@ export function InstructionComplianceValidator(
   } else if (verificaveis.length === 0) {
     status = "UNKNOWN";
     reasonCode = "OBRIGACOES_NAO_VERIFICAVEIS";
+  } else if (descumpridas.length === 0 && r.estadoRestricoes === "indeterminadas") {
+    // Existe regra publicada aplicável que não pôde ser conferida: não aprova.
+    status = "UNKNOWN";
+    reasonCode = "RESTRICAO_PUBLICADA_NAO_VERIFICADA";
   } else if (descumpridas.length === 0) {
     status = "PASS";
     reasonCode = r.esclarecimentoPertinente ? "ESCLARECIMENTO_PERTINENTE" : "OBRIGACOES_CUMPRIDAS";
+  } else if (descumpridas.some((a) => a.obrigacao.origem === "instrucoes_publicadas")) {
+    // Violação de regra publicada é sempre falha, mesmo com esclarecimento
+    // pertinente ou fatos corretos no restante da resposta.
+    status = "FAIL";
+    reasonCode = "RESTRICAO_PUBLICADA_DESCUMPRIDA";
   } else if (descumpridas.length === verificaveis.length) {
     status = "FAIL";
     reasonCode = r.compativelComEstagio ? "OBRIGACAO_NAO_CUMPRIDA" : "RESPOSTA_FORA_DO_PEDIDO";
@@ -599,6 +763,8 @@ export function InstructionComplianceValidator(
       relevante: r.relevante,
       completude: r.completude,
       restricoesCumpridas: r.restricoesCumpridas,
+      estadoRestricoes: r.estadoRestricoes,
+      regrasNaoAplicaveis: r.regrasNaoAplicaveis,
       compativelComEstagio: r.compativelComEstagio,
       obrigacoes: r.avaliacoes.map((a) => ({
         id: a.obrigacao.id,
