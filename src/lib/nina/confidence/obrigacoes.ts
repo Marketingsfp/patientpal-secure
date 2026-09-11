@@ -23,10 +23,11 @@
 import { normalizarTexto } from "./evidencia";
 import { classificarNatureza, oracoesDaResposta } from "./modalidade";
 import {
-  literalExigido,
+  exigenciaLiteral,
   regraSeAplica,
   regrasValidasParaPublicacao,
   type CategoriaProibida,
+  type OperadorLiteral,
   type RegraPublicada,
 } from "./regras-publicadas";
 import type { ContextoConfianca, ResultadoValidador, StatusValidador } from "./types";
