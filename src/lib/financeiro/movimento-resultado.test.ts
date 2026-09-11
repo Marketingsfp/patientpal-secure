@@ -124,6 +124,15 @@ describe("classificarMovimento", () => {
     expect(m.grupo).toBe("mensalidade_periodo");
   });
 
+  it("guarda o nome de quem lançou, vazio quando o usuário não foi gravado", () => {
+    const [a, b] = classificarMovimento([l({ criado_por: "u1" }), l({ criado_por: null })], {
+      ...ctx,
+      nomeUsuario: (id) => (id === "u1" ? "ANA RECEPCAO" : null),
+    });
+    expect(a.usuario_nome).toBe("ANA RECEPCAO");
+    expect(b.usuario_nome).toBe("");
+  });
+
   it("despesa ganha o grupo do Dashboard", () => {
     const d = classificarMovimento(
       [

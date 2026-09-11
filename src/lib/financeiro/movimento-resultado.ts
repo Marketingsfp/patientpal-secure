@@ -95,12 +95,16 @@ export interface LinhaMovimento {
   agendamento_id?: string | null;
   medico_nome?: string | null;
   ficha_numero?: number | null;
+  /** Usuário que fez o lançamento. */
+  criado_por?: string | null;
   /** Lançamento de origem, quando a linha é uma parte de pagamento misto. */
   _mistoPaiId?: string;
 }
 
 export interface LinhaClassificada extends LinhaMovimento {
   categoria_nome: string;
+  /** Nome de quem lançou; vazio quando o lançamento não guardou o usuário. */
+  usuario_nome: string;
   forma: FormaCanonica;
   /** Só receita. */
   grupo: GrupoMovimento | null;
@@ -116,6 +120,8 @@ export interface ContextoClassificacao {
   procTipos: Map<string, string>;
   mapaConvenio: MapaConvenioPaciente | null;
   nomeCategoria: (id: string | null) => string | null;
+  /** Nome do funcionário pelo id do usuário. */
+  nomeUsuario?: (id: string | null) => string | null;
 }
 
 /** Serviço escrito na descrição do pagamento: "PACIENTE — EXAMES LABORATORIAIS". */
@@ -191,11 +197,13 @@ export function classificarMovimento(
     const categoria_nome =
       (ctx.nomeCategoria(l.categoria_id) ?? "").trim().toUpperCase() || SEM_CATEGORIA;
     const forma = l.formaCanonica ?? classificarForma(l.forma_pagamento);
+    const usuario_nome = ctx.nomeUsuario?.(l.criado_por ?? null) ?? "";
     if (l.tipo === "receita") {
       const grupo = grupoDaReceita(l, ctx);
       return {
         ...l,
         categoria_nome,
+        usuario_nome,
         forma,
         grupo,
         condicao: ehAtendimento(grupo) ? condicaoDoLancamento(l, ctx.mapaConvenio) : null,
@@ -205,6 +213,7 @@ export function classificarMovimento(
     return {
       ...l,
       categoria_nome,
+      usuario_nome,
       forma,
       grupo: null,
       condicao: null,
