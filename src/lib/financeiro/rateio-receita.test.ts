@@ -5,6 +5,7 @@ import {
   compararRateio,
   filtrarRateio,
   margemClinica,
+  rotuloFormasDaLinha,
   totaisRateio,
   type RateioContexto,
   type RateioGrupo,
@@ -123,6 +124,20 @@ describe("chaveGrupo", () => {
   });
 });
 
+describe("rotuloFormasDaLinha", () => {
+  it("usa os nomes do Fechamento de Caixa e junta o misto decomposto", () => {
+    expect(rotuloFormasDaLinha([{ forma: "pix", valor: 10 }])).toBe("PIX");
+    expect(
+      rotuloFormasDaLinha([
+        { forma: "dinheiro", valor: 50 },
+        { forma: "debito", valor: 70 },
+        { forma: "dinheiro", valor: 5 },
+      ]),
+    ).toBe("Dinheiro + Cartão de Débito");
+    expect(rotuloFormasDaLinha([])).toBe("Sem informação");
+  });
+});
+
 describe("filtrarRateio", () => {
   const ctx = {
     grupoPorServico: new Map([
@@ -184,6 +199,19 @@ describe("filtrarRateio", () => {
   it("filtra por profissional", () => {
     const r = filtrarRateio(ctx, linhas, { ...base, medicoId: "med-2" });
     expect(r.map((l) => l.id)).toEqual(["2"]);
+  });
+
+  it("filtra por modalidade: o Cartão junta Cartão Consulta e Cartão Desconto", () => {
+    const porModalidade = [
+      linha({ id: "1", condicao: "PARTICULAR" }),
+      linha({ id: "2", condicao: "CARTÃO CONSULTA" }),
+      linha({ id: "3", condicao: "CARTÃO DESCONTO" }),
+    ];
+    const ids = (modalidade: "particular" | "cartao" | null) =>
+      filtrarRateio(ctx, porModalidade, { ...base, modalidade }).map((l) => l.id);
+    expect(ids("particular")).toEqual(["1"]);
+    expect(ids("cartao")).toEqual(["2", "3"]);
+    expect(ids(null)).toEqual(["1", "2", "3"]);
   });
 
   it("nao mexe nas linhas quando nenhum filtro foi escolhido", () => {

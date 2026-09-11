@@ -154,7 +154,7 @@ describe("colunas do sintetico", () => {
       "condicao",
     );
     expect(grupos.map((g) => g.rotulo)).toEqual(["CARTÃO CONSULTA", "PARTICULAR"]);
-    expect(colunasRateio("sintetico", "condicao", false)[0].rotulo).toBe("Condição");
+    expect(colunasRateio("sintetico", "condicao", false)[0].rotulo).toBe("Modalidade");
   });
 
   it("a especialidade so entra no agrupamento por profissional", () => {
