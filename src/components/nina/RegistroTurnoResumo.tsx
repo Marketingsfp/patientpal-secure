@@ -317,7 +317,7 @@ export function RegistroTurnoResumo({
             Sem evidência registrada
           </p>
           <ul className="flex flex-wrap gap-1">
-            {lacunas.map((l) => (
+            {lacunasVisiveis.map((l) => (
               <li key={l}>
                 <Badge variant="outline">{ROTULO_LACUNA_TURNO[l] ?? l}</Badge>
               </li>
