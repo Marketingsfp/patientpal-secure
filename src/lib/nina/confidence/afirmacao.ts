@@ -381,7 +381,24 @@ export function correspondenciaDaAfirmacao(
     if (temAlgum) discriminaveis.add(campo);
   }
 
-  const noEscopo = doCampo.filter((f) => noEscopoDaAfirmacao(f, pedido.chave, discriminaveis));
+  // Unidade e convênio citados na frase podem estar avalizados por OUTRO fato
+  // do mesmo turno (ex.: um fato da entidade "unidade" com aquele nome).
+  const avalizados = new Set<keyof ChaveFato>();
+  for (const campo of QUALIFICADORES_ESTRITOS) {
+    const pedida = pedido.chave[campo];
+    if (pedida === undefined || pedida === null || String(pedida).trim() === "") continue;
+    const entidadeDoCampo = campo === "unidadeId" ? "unidade" : "convenio";
+    const ok = fatos.some((f) => {
+      const c = f.chave ?? {};
+      if (c[campo] !== undefined && mesmoQualificador(campo, pedida, c[campo])) return true;
+      return f.entidade === entidadeDoCampo && mesmoTexto(pedida, f.valor);
+    });
+    if (ok) avalizados.add(campo);
+  }
+
+  const noEscopo = doCampo.filter((f) =>
+    noEscopoDaAfirmacao(f, pedido.chave, discriminaveis, avalizados),
+  );
   if (noEscopo.length === 0) return { situacao: "fora_do_escopo" };
 
   if (pedido.valor === null || pedido.valor.trim() === "") {
