@@ -30,6 +30,7 @@ const linha = (p: Partial<RateioLinha>): RateioLinha => ({
   liquido: 50,
   margem: 50,
   formas: [{ forma: "dinheiro", valor: p.receita ?? 100 }],
+  forma_pagamento: "Dinheiro",
   ...p,
 });
 

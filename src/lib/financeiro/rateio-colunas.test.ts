@@ -21,6 +21,7 @@ const linha: RateioLinha = {
   liquido: 40,
   margem: 40,
   formas: [{ forma: "dinheiro", valor: 100 }],
+  forma_pagamento: "Dinheiro",
 };
 
 /**
@@ -153,7 +154,7 @@ describe("colunas do sintetico", () => {
       "condicao",
     );
     expect(grupos.map((g) => g.rotulo)).toEqual(["CARTÃO CONSULTA", "PARTICULAR"]);
-    expect(colunasRateio("sintetico", "condicao", false)[0].rotulo).toBe("Condição");
+    expect(colunasRateio("sintetico", "condicao", false)[0].rotulo).toBe("Modalidade");
   });
 
   it("a especialidade so entra no agrupamento por profissional", () => {
@@ -213,6 +214,11 @@ describe("colunas do analitico", () => {
     const rotulos = colunasRateio("analitico", "data", false).map((c) => c.rotulo);
     expect(rotulos).toContain("Tipo de serviço");
     expect(rotulos.indexOf("Tipo de serviço")).toBe(rotulos.indexOf("Serviço") + 1);
+  });
+
+  it("traz a modalidade e, logo depois, a forma de pagamento", () => {
+    const rotulos = colunasRateio("analitico", "data", false).map((c) => c.rotulo);
+    expect(rotulos.indexOf("Forma de pagamento")).toBe(rotulos.indexOf("Modalidade") + 1);
   });
 
   it("nao ganha as colunas de comparacao, que so existem no sintetico", () => {

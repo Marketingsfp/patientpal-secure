@@ -45,6 +45,7 @@ import {
 } from "@/lib/convenio/modalidade";
 import {
   classificarForma,
+  LABEL_FORMA,
   partesDoPagamentoMisto,
   type ParteMisto,
 } from "@/lib/financeiro/formas-pagamento";
@@ -109,6 +110,31 @@ const ROTULO_CONDICAO: Record<string, string> = {
   cartao_consulta: "CARTÃO CONSULTA",
   cartao_desconto: "CARTÃO DESCONTO",
 };
+
+/**
+ * Filtro "Modalidade" da tela: Particular ou qualquer um dos cartões
+ * (Cartão Consulta e Cartão Desconto são produtos do Cartão Benefícios).
+ * `null` = todas.
+ */
+export type RateioModalidade = "particular" | "cartao";
+
+/** true → a condição da linha é de um dos cartões do Cartão Benefícios. */
+export const condicaoEhCartao = (condicao: string): boolean =>
+  condicao === ROTULO_CONDICAO.cartao_consulta || condicao === ROTULO_CONDICAO.cartao_desconto;
+
+/**
+ * Coluna "Forma de pagamento" do analítico: as formas em que a receita da
+ * linha entrou, com os mesmos nomes do Fechamento de Caixa. Pagamento misto
+ * já chega decomposto em `formas` e sai como "Dinheiro + PIX".
+ */
+export function rotuloFormasDaLinha(formas: readonly ParteMisto[]): string {
+  const vistas: string[] = [];
+  for (const p of formas) {
+    const rotulo = LABEL_FORMA[p.forma];
+    if (!vistas.includes(rotulo)) vistas.push(rotulo);
+  }
+  return vistas.length ? vistas.join(" + ") : LABEL_FORMA.sem_informacao;
+}
 
 /** Um atendimento já com a receita repartida entre prestador e clínica. */
 export interface RateioLinha {
@@ -182,6 +208,8 @@ export interface RateioLinha {
    * demais casos é uma parte só.
    */
   formas: ParteMisto[];
+  /** `formas` em texto, para a coluna do analítico (ver `rotuloFormasDaLinha`). */
+  forma_pagamento: string;
 }
 
 /** Uma linha do relatório sintético (um agrupador). */
@@ -226,6 +254,8 @@ export interface RateioFiltros {
   servico?: string | null;
   /** Tipo do serviço em caixa alta (CONSULTA/EXAME/...). `null` = todos. */
   tipo?: string | null;
+  /** Particular ou Cartão (ver `RateioModalidade`). `null` = todas. */
+  modalidade?: RateioModalidade | null;
 }
 
 /** Médico como aparece no seletor do relatório. */
@@ -610,6 +640,13 @@ function reparte(
       : repasseCalculado;
   const terceiro = calc.terceiro?.valor ?? 0;
   const liquido = round2(receita - repasse - terceiro);
+  const formas = repartirPorForma(
+    receita,
+    params.valorPago,
+    params.formaPagamento ?? null,
+    params.observacoes ?? null,
+    params.composicaoPagamento,
+  );
   return {
     id: params.id,
     data: params.data,
@@ -641,13 +678,8 @@ function reparte(
     terceiro: round2(terceiro),
     liquido,
     margem: margemClinica(receita, liquido),
-    formas: repartirPorForma(
-      receita,
-      params.valorPago,
-      params.formaPagamento ?? null,
-      params.observacoes ?? null,
-      params.composicaoPagamento,
-    ),
+    formas,
+    forma_pagamento: rotuloFormasDaLinha(formas),
   };
 }
 
@@ -782,6 +814,12 @@ export function filtrarRateio(
     // deixa de fora tanto a consulta quanto o atendimento cujo serviço saiu do
     // cadastro, do mesmo jeito que o filtro de Grupo já faz.
     if (tipoAlvo && l.tipo_servico !== tipoAlvo) return false;
+    // Mesma condição da coluna Modalidade, que é também a que escolhe a coluna
+    // da grade de repasse: o filtro nunca diverge do que está impresso.
+    if (filtros.modalidade === "cartao" && !condicaoEhCartao(l.condicao)) return false;
+    if (filtros.modalidade === "particular" && l.condicao !== ROTULO_CONDICAO.particular) {
+      return false;
+    }
     if (servicoAlvo || grupoAlvo) {
       // O serviço vem do cadastro (ver `chaveDoServico`): o atendimento gravado
       // como "CONSULTA (CARDIOLOGIA)" tem que entrar no filtro "CONSULTA".

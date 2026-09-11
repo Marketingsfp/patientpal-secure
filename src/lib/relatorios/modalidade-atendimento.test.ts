@@ -1,5 +1,18 @@
 import { describe, expect, it } from "bun:test";
+import type { MapaConvenioPaciente } from "@/lib/convenio/modalidade";
 import { agruparPagamentosPorAtendimento, resumirPagamentos } from "./modalidade-atendimento";
+
+const mapa: MapaConvenioPaciente = new Map([
+  [
+    "pac-cartao",
+    {
+      contratoId: "c1",
+      convenioId: "v1",
+      convenioNome: "CARTÃO CONSULTA",
+      modalidade: "cartao_consulta",
+    },
+  ],
+]);
 
 describe("resumirPagamentos", () => {
   it("atendimento sem lançamento confirmado fica 'Sem pagamento' nas duas colunas", () => {
@@ -27,11 +40,34 @@ describe("resumirPagamentos", () => {
     ).toBe("cartao");
   });
 
-  it("outra modalidade de convênio preenchida vira Convênio", () => {
+  it("sem marca no lançamento, o contrato ativo do paciente do atendimento decide (regra do Rateio)", () => {
+    const lanc = { forma_pagamento: "dinheiro", convenio_modalidade: null };
+    expect(resumirPagamentos([lanc], { mapa, pacienteId: "pac-cartao" }).modalidade).toBe("cartao");
+    expect(resumirPagamentos([lanc], { mapa, pacienteId: "outro" }).modalidade).toBe("particular");
+  });
+
+  it("o paciente gravado no lançamento vence o do atendimento", () => {
     expect(
-      resumirPagamentos([{ forma_pagamento: "pix", convenio_modalidade: "outro_plano" }])
-        .modalidade,
-    ).toBe("convenio");
+      resumirPagamentos(
+        [{ forma_pagamento: "pix", convenio_modalidade: null, paciente_id: "outro" }],
+        {
+          mapa,
+          pacienteId: "pac-cartao",
+        },
+      ).modalidade,
+    ).toBe("particular");
+  });
+
+  it("lançamento antigo sem marca e sem contrato cai no texto da descrição", () => {
+    expect(
+      resumirPagamentos([
+        {
+          forma_pagamento: "pix",
+          convenio_modalidade: null,
+          descricao: "MARIA — CONSULTA CARTÃO CONSULTA",
+        },
+      ]).modalidade,
+    ).toBe("cartao");
   });
 
   it("duas formas diferentes, ou o lançamento 'misto', viram Misto", () => {

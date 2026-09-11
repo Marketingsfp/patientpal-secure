@@ -138,6 +138,7 @@ import {
   type RateioAgruparPor,
   type RateioContexto,
   type RateioLinha,
+  type RateioModalidade,
   type RateioTipo,
   type RateioTotais,
 } from "@/lib/financeiro/rateio-receita";
@@ -701,6 +702,8 @@ function Page() {
   // isso: em oftalmologia, consulta e exames estão todos no grupo
   // "OFTALMOLOGIA". Não confundir com `rTipo`, que é sintético/analítico.
   const [rTipoServico, setRTipoServico] = useState("todos");
+  // Particular x Cartão Benefícios — a mesma condição da coluna Modalidade.
+  const [rModalidade, setRModalidade] = useState<"todas" | RateioModalidade>("todas");
   const [rServico, setRServico] = useState("todos");
   const [rTipo, setRTipo] = useState<RateioTipo>("sintetico");
   const [rAgrupar, setRAgrupar] = useState<RateioAgruparPor>("data");
@@ -822,6 +825,7 @@ function Page() {
             rEspecialidade,
             rGrupo,
             rTipoServico,
+            rModalidade,
             rServico,
             comparar ? `${periodoComp.de}:${periodoComp.ate}` : "sem-comparacao",
           ].join("|")
@@ -1475,6 +1479,9 @@ function Page() {
       partes.push(`Grupo: ${g?.rotulo ?? rGrupo}`);
     }
     if (rTipoServico !== "todos") partes.push(`Tipo de serviço: ${rTipoServico}`);
+    if (rModalidade !== "todas") {
+      partes.push(`Modalidade: ${rModalidade === "cartao" ? "Cartão Benefícios" : "Particular"}`);
+    }
     if (rServico !== "todos") partes.push(`Serviço: ${rServico}`);
     // Sem esta linha, uma folha com o total menor circula sem dizer por que o
     // total é menor — que é exatamente a dúvida de quem confere.
@@ -1534,6 +1541,7 @@ function Page() {
           especialidadeId: rEspecialidade === "todas" ? null : rEspecialidade,
           grupo: rGrupo === "todos" ? null : rGrupo,
           tipo: rTipoServico === "todos" ? null : rTipoServico,
+          modalidade: rModalidade === "todas" ? null : rModalidade,
           servico: rServico === "todos" ? null : rServico,
         };
         const [atual, anterior] = await Promise.all([
@@ -2089,7 +2097,7 @@ function Page() {
           {tipo === "rateio" && (
             <>
               {/* Bloco 2 — recorte da base: quem atendeu e o que foi feito. */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
                 <div className="space-y-1.5">
                   <Label className={ROTULO}>Profissional</Label>
                   <Select value={rMedico} onValueChange={setRMedico} disabled={!ctxRateio}>
@@ -2171,6 +2179,22 @@ function Page() {
                           {t}
                         </SelectItem>
                       ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label className={ROTULO}>Modalidade</Label>
+                  <Select
+                    value={rModalidade}
+                    onValueChange={(v) => setRModalidade(v as "todas" | RateioModalidade)}
+                  >
+                    <SelectTrigger className={CAMPO}>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="todas">TODAS</SelectItem>
+                      <SelectItem value="particular">PARTICULAR</SelectItem>
+                      <SelectItem value="cartao">CARTÃO BENEFÍCIOS</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -2279,7 +2303,7 @@ function Page() {
                           <SelectItem value="especialidade">ESPECIALIDADE</SelectItem>
                           <SelectItem value="servico">SERVIÇO</SelectItem>
                           <SelectItem value="tipo">TIPO DE SERVIÇO (CONSULTA/EXAME)</SelectItem>
-                          <SelectItem value="condicao">CONDIÇÃO (PARTICULAR/CARTÃO)</SelectItem>
+                          <SelectItem value="condicao">MODALIDADE (PARTICULAR/CARTÃO)</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
