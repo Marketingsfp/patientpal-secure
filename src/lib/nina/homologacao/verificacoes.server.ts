@@ -30,6 +30,7 @@ import {
 } from "@/lib/nina/homologacao/modo-tecnico";
 import {
   ESCOPO_DA_PROVA_FONTE,
+  PARTES_NAO_PERCORRIDAS_FONTE,
   avaliarAderenciaFonte,
   regraPublicavelDoPar,
   resumirAtendimentoCompleto,
@@ -106,6 +107,7 @@ export async function verificarFonteEAderencia(
     modelo: null,
     erro: null,
     escopoDaProva: ESCOPO_DA_PROVA_FONTE,
+    partesNaoPercorridas: PARTES_NAO_PERCORRIDAS_FONTE,
   };
 
   // O modo técnico é decidido AQUI, no servidor, e nunca pelo texto enviado.

@@ -70,6 +70,8 @@ export type ResultadoVerificacaoFonte = {
   erro: string | null;
   /** Aviso permanente: escopo desta verificação. */
   escopoDaProva: string;
+  /** Partes do atendimento normal que este caminho isolado NÃO percorre. */
+  partesNaoPercorridas: readonly string[];
 };
 
 export const ESCOPO_DA_PROVA_FONTE =
