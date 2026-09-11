@@ -188,9 +188,19 @@ export function resumirAtendimentoCompleto(
   const decisao = texto(conf?.["decisao"]);
   const mensagemEntregueId = texto(entrega?.["mensagemId"]) ?? texto(entrega?.["mensagem_id"]);
 
+  // Encaminhamento, bloqueio por regra publicada ou contingência resolvem o
+  // atendimento, mas NÃO são a resposta exigida: nunca contam como aprovação.
+  const origem = texto(resumo["origem_resposta"]) ?? "";
+  const houveDesfechoSubstituto =
+    ["transferencia", "fallback", "fallback_erro", "limite_rodadas"].includes(origem) ||
+    intervencoes.some((i) =>
+      /confianca\.(baixa|regras\.bloqueio)|handoff|encaminh/i.test(i.etapa),
+    );
+
   let resultado: ResultadoAtendimentoCompleto["resultado"];
   if (!mensagemEntregueId) resultado = "SEM_EVIDENCIA";
   else if (decisao && decisao !== "ALLOW" && decisao !== "CONTINUE") resultado = "REPROVADO";
+  else if (houveDesfechoSubstituto) resultado = "REPROVADO";
   else if (intervencoes.length > 0) resultado = "APROVADO_COM_INTERVENCAO";
   else resultado = "APROVADO";
 
