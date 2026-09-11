@@ -236,7 +236,7 @@ export async function obterInfoConvenioPaciente(params: {
     if (!procRow) {
       const { data: fuzzy } = await supabase
         .from("procedimentos")
-        .select("id,nome,tipo")
+        .select(COLS_PROC)
         .eq("clinica_id", clinicaId)
         .eq("ativo", true)
         .ilike("nome", `%${procNomeBase}%`)
@@ -250,6 +250,14 @@ export async function obterInfoConvenioPaciente(params: {
             .includes(procNorm),
         ) ?? null;
     }
+  }
+  // Revisão/retorno gratuito: o cartão não pode dar preço a um serviço que o
+  // paciente particular já leva de graça. Devolve `null` como se não houvesse
+  // convênio para ESTE atendimento — a Agenda cai no caminho automático "SEM
+  // COBRANÇA" e o Caixa usa o preço do cadastro (R$ 0,00), sem desconto, sem
+  // aviso de "sem benefício" e sem aviso de limite.
+  if (procRow && ehRevisaoGratuita((procRow as any).nome ?? procNomeBase, procRow as any)) {
+    return null;
   }
   const procedimentoId = (procRow as any)?.id ?? null;
   const procedimentoTipo = ((procRow as any)?.tipo ?? "").toString().toLowerCase() || null;
