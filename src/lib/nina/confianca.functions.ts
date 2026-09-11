@@ -1212,9 +1212,9 @@ export type ConfiancaDaMensagem = {
    * completo, áudio integral ou resumo falado. Sem isto o selo do texto
    * apareceria em cima de um áudio com outro conteúdo.
    */
-  representacao: string | null;
+  representacao?: string | null;
   /** FASE 6 — impressão digital do conteúdo avaliado (confere com o entregue?). */
-  texto_final_hash: string | null;
+  texto_final_hash?: string | null;
 };
 
 /** Vínculo entre o snapshot de confiança e o reporte de erro da equipe. */
