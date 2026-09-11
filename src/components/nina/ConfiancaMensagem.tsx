@@ -28,11 +28,17 @@ import {
 } from "@/lib/nina/prompt-snapshot.functions";
 
 import {
+  assinarInvalidacaoConfianca,
   gravarLote,
   idsParaBuscar,
   mapaDoCache,
   type CacheConfianca,
 } from "@/lib/nina/confianca-cache";
+import {
+  confiancaAplicavelAMensagem,
+  representacaoDaMensagem,
+  TEXTO_MOTIVO_VINCULO,
+} from "@/lib/nina/confidence/identidade-saida";
 
 export type MapaConfianca = Record<string, ConfiancaDaMensagem>;
 
@@ -52,6 +58,9 @@ export function useConfiancaMensagens(
   const cache = useRef<CacheConfianca>(new Map());
   const [, forcar] = useState(0);
   const chave = execucaoIds.slice().sort().join(",");
+
+  // FASE 6 — um reporte de erro recém-gravado invalida a execução na hora.
+  useEffect(() => assinarInvalidacaoConfianca(() => forcar((n) => n + 1)), []);
 
   useEffect(() => {
     const ids = chave ? chave.split(",") : [];
@@ -73,7 +82,8 @@ export function useConfiancaMensagens(
     return () => {
       ativo = false;
     };
-  }, [buscar, chave, clinicaId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [buscar, chave, clinicaId, forcarVersao(cache.current)]);
 
   return useMemo(
     () => (clinicaId ? mapaDoCache(cache.current, clinicaId, chave ? chave.split(",") : []) : {}),
