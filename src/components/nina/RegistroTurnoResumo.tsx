@@ -92,6 +92,22 @@ export function RegistroTurnoResumo({
   const transformacoes = (resumo["transformacoes"] ?? []) as Array<Record<string, unknown>>;
   const lacunas = (resumo["lacunas"] ?? []) as string[];
   const confianca = (resumo["confianca"] ?? null) as Record<string, unknown> | null;
+  // FASE 2 — registros antigos guardam só uma avaliação; usamos como fallback.
+  const avaliacoes = (
+    Array.isArray(resumo["avaliacoes"])
+      ? (resumo["avaliacoes"] as Array<Record<string, unknown>>)
+      : confianca
+        ? [confianca]
+        : []
+  ) as Array<Record<string, unknown>>;
+  const operacional =
+    avaliacoes.find(
+      (a) =>
+        !avaliacaoEmObservacao({
+          modo: (a["modo"] ?? null) as string | null,
+          aplicada: (a["aplicada"] ?? null) as boolean | null,
+        }),
+    ) ?? null;
   const entrega = (resumo["entrega"] ?? null) as Record<string, unknown> | null;
   const situacao = situacaoDasTransformacoes(resumo);
   const origem = origemComSituacao(
