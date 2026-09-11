@@ -2277,10 +2277,26 @@ async function gerarRespostaNinaInterno(
   // texto entregue: o transporte não acrescenta nada depois. Quem envia chama
   // o mesmo serviço com a mesma chave de turno e recebe o resultado guardado,
   // sem repetir nenhum efeito.
-  const chaveTurnoFinalizacao =
+  const chaveTurnoFinalizacaoBase =
     (opcoes?.auditoria as { traceId?: string } | undefined)?.traceId ??
     rastro?.ids.trace_id ??
     `${clinicaId}|${telefoneNorm ?? "-"}|${estadoId.conversaId ?? "-"}`;
+  // CONTROLE DE ENVIO x VERIFICAÇÃO: finalização e avaliação rodam no mesmo
+  // laço. Quando uma regra publicada bloqueante é descumprida, o modelo
+  // reescreve o texto e TUDO é conferido de novo — inclusive templates e
+  // demais intervenções —, respeitando o limite de tentativas.
+  let correcoesPorRegras = 0;
+  let podeCorrigirPorRegras = true;
+  let repetirVerificacaoRegras = true;
+  let passeVerificacaoRegras = 0;
+  const LIMITE_PASSES_VERIFICACAO = 4;
+  while (repetirVerificacaoRegras) {
+  repetirVerificacaoRegras = false;
+  passeVerificacaoRegras += 1;
+  const chaveTurnoFinalizacao =
+    passeVerificacaoRegras === 1
+      ? chaveTurnoFinalizacaoBase
+      : `${chaveTurnoFinalizacaoBase}#correcao-${passeVerificacaoRegras}`;
   try {
     if (resposta) {
       const [{ finalizarResposta }, { criarResultado }] = await Promise.all([
