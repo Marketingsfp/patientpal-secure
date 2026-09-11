@@ -194,6 +194,12 @@ import {
 } from "@/lib/print-comprovante-agendamento";
 import { VoiceInput } from "@/components/voice-input";
 import { exportToExcel } from "@/lib/export-csv";
+import {
+  agruparPagamentosPorAtendimento,
+  LABEL_MODALIDADE,
+  resumirPagamentos,
+  type PagamentoDoAtendimento,
+} from "@/lib/relatorios/modalidade-atendimento";
 import { usePickEmitente } from "@/components/nfse/use-pick-emitente";
 import { usePickTomador, aplicarValorParcial } from "@/components/nfse/use-pick-tomador";
 import { useRevisaoNfseLote, type LinhaNfseLote } from "@/components/nfse/nfse-lote-dialog";
@@ -8641,23 +8647,52 @@ function AgendaPage() {
     </div>
   );
 
-  const exportarAgendaExcel = () => {
-    if (!filtrados.length) {
+  const exportarAgendaExcel = async () => {
+    if (!filtrados.length || !clinicaAtual) {
       toast.info("Sem dados para exportar.");
       return;
     }
+    // Modalidade (Particular / Cartão Benefícios) e forma de pagamento saem
+    // do lançamento de receita confirmado — a marcação "Particular/Convênio"
+    // da ficha não separa o Cartão (ver `@/lib/relatorios/modalidade-atendimento`).
+    // Buscado só no clique, para não pesar o carregamento da Agenda no balcão.
+    // Não traz valor.
+    const ids = filtrados.filter((a) => !isSlotLivre(a.paciente_nome)).map((a) => a.id);
+    const lancs: Array<PagamentoDoAtendimento & { agendamento_id: string | null }> = [];
+    const CHUNK = 200;
+    for (let i = 0; i < ids.length; i += CHUNK) {
+      const { data, error } = await supabase
+        .from("fin_lancamentos")
+        .select("agendamento_id, forma_pagamento, convenio_modalidade")
+        .eq("clinica_id", clinicaAtual.clinica_id)
+        .eq("tipo", "receita")
+        .eq("status", "confirmado")
+        .in("agendamento_id", ids.slice(i, i + CHUNK));
+      if (error) {
+        mostrarErro(error);
+        return;
+      }
+      lancs.push(...(data ?? []));
+    }
+    const pagPorAtendimento = agruparPagamentosPorAtendimento(lancs);
     exportToExcel(
-      filtrados.map((a) => ({
-        data: new Date(a.inicio).toLocaleDateString("pt-BR"),
-        dia: fmtDiaSemana(a.inicio),
-        inicio: fmtHora(a.inicio),
-        fim: fmtHora(a.fim),
-        profissional: medicoNomeAgendamento(a),
-        paciente: a.paciente_nome,
-        procedimento: a.procedimento ?? rotuloFallbackProc(a.medico_id),
-        status: a.status,
-        observacoes: limparObsAuto(a.observacoes),
-      })),
+      filtrados.map((a) => {
+        const livre = isSlotLivre(a.paciente_nome);
+        const pagamento = resumirPagamentos(pagPorAtendimento.get(a.id) ?? []);
+        return {
+          data: new Date(a.inicio).toLocaleDateString("pt-BR"),
+          dia: fmtDiaSemana(a.inicio),
+          inicio: fmtHora(a.inicio),
+          fim: fmtHora(a.fim),
+          profissional: medicoNomeAgendamento(a),
+          paciente: a.paciente_nome,
+          procedimento: a.procedimento ?? rotuloFallbackProc(a.medico_id),
+          modalidade: livre ? "" : LABEL_MODALIDADE[pagamento.modalidade],
+          forma: livre ? "" : pagamento.forma,
+          status: a.status,
+          observacoes: limparObsAuto(a.observacoes),
+        };
+      }),
       `agenda-${dataRef}`,
       [
         { key: "data", label: "Data" },
@@ -8667,6 +8702,8 @@ function AgendaPage() {
         { key: "profissional", label: "Profissional" },
         { key: "paciente", label: "Cliente" },
         { key: "procedimento", label: "Serviço" },
+        { key: "modalidade", label: "Modalidade" },
+        { key: "forma", label: "Forma de pagamento" },
         { key: "status", label: "Status" },
         { key: "observacoes", label: "Observações" },
       ],
