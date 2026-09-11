@@ -62,6 +62,8 @@ export type Obrigacao = {
   topico?: string | null;
   /** Texto exato exigido, quando a obrigação for literal. */
   literal?: string | null;
+  /** Operador da exigência literal: igualdade integral ou presença do trecho. */
+  operador?: OperadorLiteral | null;
   /** Categorias proibidas, quando a obrigação for proibição de conteúdo. */
   proibicoes?: CategoriaProibida[];
   /** Texto literal exigido no mesmo turno (para conferir "nada além disso"). */
