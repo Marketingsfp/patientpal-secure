@@ -334,15 +334,16 @@ export function derivarObrigacoesDoTurno(ctx: ContextoConfianca): Obrigacao[] {
   // Compatibilidade: turnos que só carregam obrigações em texto simples.
   const publicadas = ctx.instrucoes?.obrigacoes ?? [];
   publicadas.forEach((texto, i) => {
-    const literal = literalExigido(texto);
+    const exigencia = exigenciaLiteral(texto);
     out.push(
-      literal
+      exigencia
         ? {
             id: `instrucao:${i}`,
             tipo: "restricao_literal",
             origem: "instrucoes_publicadas",
             descricao: texto,
-            literal,
+            literal: exigencia.literal,
+            operador: exigencia.operador,
             verificacao: "deterministica",
           }
         : {
