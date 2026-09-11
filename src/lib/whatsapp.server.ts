@@ -902,6 +902,9 @@ async function gerarRespostaNinaInterno(
     .map((m: any) => ({
       role: m.direction === "out" ? "assistant" : "user",
       content: String(m.body ?? "").slice(0, 1500),
+      // O ID físico viaja com a mensagem: é ele que permite tirar do histórico
+      // a mensagem atual do turno sem apagar repetições legítimas.
+      id: m.id ? String(m.id) : null,
     }))
     .filter((m: any) => m.content);
 
