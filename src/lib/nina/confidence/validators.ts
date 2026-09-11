@@ -11,6 +11,7 @@
  */
 import { acaoExecutavel, acaoOuNenhuma, contaContraANota } from "./types";
 import { aplicabilidadeDoTurno } from "./turno-tipo";
+import { detectarConflitosEntreFatos } from "./evidencia";
 import { ClaimGroundingValidator, somenteNegativasApoiadas } from "./claims";
 import { WorkflowConsistencyValidator } from "./workflow";
 import type {
@@ -335,6 +336,26 @@ export function SourceFreshnessValidator(
     else if (s.expiraEm && new Date(s.expiraEm).getTime() < agora.getTime()) {
       problemas.push({ referencia: ref, motivo: "expirado" });
     }
+  }
+  // FASE 1 (motor) — campo ausente não vira aprovação: quando o turno exige
+  // fonte e a origem não informou NENHUM sinal de vigência, a verificação
+  // ficou incompleta (UNKNOWN), não "vigente".
+  const semSinal = usadas.filter(
+    (s) =>
+      s.publicado === undefined &&
+      s.ativo === undefined &&
+      s.expiraEm === undefined &&
+      !s.substituidoPor,
+  );
+  if (
+    problemas.length === 0 &&
+    semSinal.length === usadas.length &&
+    aplicabilidadeDoTurno(ctx.turnType).requiresSource
+  ) {
+    return res(nome, "UNKNOWN", 0, "VIGENCIA_NAO_REGISTRADA", {
+      fontes: usadas.map((s) => s.referencia ?? s.tipo),
+      turnType: ctx.turnType ?? null,
+    });
   }
   if (problemas.length === 0) return res(nome, "PASS", 100, "FONTES_VIGENTES", { fontes: usadas.length });
 
