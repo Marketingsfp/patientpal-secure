@@ -261,7 +261,9 @@ export function derivarObrigacoesDoTurno(ctx: ContextoConfianca): Obrigacao[] {
       }),
   );
 
-  if (regras.length > 0) {
+  // Quando o turno traz a representação estruturada, é ela que vale — mesmo
+  // vazia (regra fora da condição/ambiente, ou representação desatualizada).
+  if (Array.isArray(ctx.instrucoes?.regras)) {
     const literalDoTurno =
       regras.find((r) => r.verificacao === "literal")?.literal ?? null;
     for (const r of regras) {
