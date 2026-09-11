@@ -143,7 +143,10 @@ export function saudacaoObrigatoriaEfetiva(
 export function textoContratoPrecedencia(r: ResultadoPrecedencia): string {
   const comTexto = r.vigentes.filter((v) => (v.texto ?? "").trim().length > 0);
   if (comTexto.length === 0) return "";
-  const linhas = comTexto.map((v) => `- [${v.nivel}] ${v.codigo}: ${v.texto}`);
+  const linhas = comTexto.map(
+    (v) =>
+      `- [${v.nivel}] ${v.codigo}${v.motivo ? ` (origem: ${v.origem}; motivo: ${v.motivo})` : ""}: ${v.texto}`,
+  );
   return [
     "CONTRATO DE PRECEDÊNCIA DESTE TURNO (ordem de força: envelope técnico > inegociável > exceção publicada > regra geral):",
     ...linhas,
