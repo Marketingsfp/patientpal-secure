@@ -91,6 +91,13 @@ export type EstadoFluxoNina = {
    * começa em `false`.
    */
   greeting_completed?: boolean;
+  /**
+   * Apresentação DISPENSADA por exceção publicada aplicável — não é o mesmo
+   * que apresentação realizada.
+   */
+  greeting_waived?: boolean;
+  /** Código da regra publicada que dispensou a apresentação. */
+  greeting_waived_by?: string | null;
 };
 
 export function estadoVazio(): EstadoFluxoNina {
@@ -123,6 +130,8 @@ export function estadoVazio(): EstadoFluxoNina {
     session_id: null,
     session_started_at: null,
     greeting_completed: false,
+    greeting_waived: false,
+    greeting_waived_by: null,
   };
 }
 
@@ -146,6 +155,8 @@ export function normalizarEstado(bruto: unknown): EstadoFluxoNina {
     session_id: o["session_id"] ?? null,
     session_started_at: o["session_started_at"] ?? null,
     greeting_completed: o["greeting_completed"] === true,
+    greeting_waived: o["greeting_waived"] === true,
+    greeting_waived_by: o["greeting_waived_by"] ?? null,
   };
 }
 
