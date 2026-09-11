@@ -261,6 +261,8 @@ function Editor({
         className="min-h-[520px] resize-y overflow-auto whitespace-pre font-mono text-xs leading-relaxed"
       />
 
+      <RegrasPublicadasRevisao texto={texto} escopo={bloco.escopo} />
+
       <Input
         value={comentario}
         onChange={(e) => setComentario(e.target.value)}
