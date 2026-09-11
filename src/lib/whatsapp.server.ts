@@ -1195,7 +1195,11 @@ async function gerarRespostaNinaInterno(
       nova_sessao: sessaoSaudacao.novaSessao || sessaoNina.expirou,
       expirou: sessaoNina.expirou,
       continuacao: sessaoNina.continuacao,
-      saudacao_obrigatoria: saudacaoObrigatoria,
+      // Fato JÁ resolvido pela precedência: quando uma exceção publicada
+      // aplicável proíbe saudação, o contexto não pode continuar dizendo que
+      // ela é obrigatória.
+      saudacao_obrigatoria: saudacaoObrigatoriaEfetivaTurno,
+      saudacao_dispensada_por: saudacaoDispensadaPor,
     },
     identidade: {
       confirmada: identidadeConfirmada,
