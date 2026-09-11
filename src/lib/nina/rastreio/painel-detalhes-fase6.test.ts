@@ -29,7 +29,7 @@ import {
   type ConfiancaDoTurno,
   type SelecaoVersaoPrompt,
 } from "./turno";
-import { apresentarEstadoEvento } from "../arquitetura/estado-evento";
+import { apresentarEstadoEvento, estadoConhecido } from "../arquitetura/estado-evento";
 import {
   limitesDaCaptura,
   resumirEntradasDoModelo,
