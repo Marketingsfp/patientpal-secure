@@ -74,6 +74,8 @@ export type ContextoMontado = {
   metricas: {
     mensagens_historico_disponiveis: number;
     mensagens_historico_enviadas: number;
+    /** Quantas cópias da mensagem atual foram removidas do histórico. */
+    mensagens_atuais_deduplicadas: number;
     resultados_tool_enviados: number;
     tem_conhecimento: boolean;
     tem_paciente: boolean;
