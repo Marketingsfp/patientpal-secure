@@ -1608,6 +1608,26 @@ async function gerarRespostaNinaInterno(
         execucaoId: respostaIA.execucaoId ?? null,
         modelo: respostaIA.modelo ?? null,
       });
+      // AUDITORIA — como as instruções publicadas foram aplicadas NESTA rodada,
+      // com a resposta ORIGINAL do modelo, antes de qualquer intervenção.
+      {
+        const { registrarAuditoriaInstrucoes } = await import(
+          "@/lib/nina/rastreio/turno.server"
+        );
+        registrarAuditoriaInstrucoes({
+          rodada: rodada + 1,
+          execucaoId: respostaIA.execucaoId ?? null,
+          modelo: respostaIA.modelo ?? null,
+          blocos: auditoriaRegrasTurno.blocos,
+          regrasIdentificadas: auditoriaRegrasTurno.identificadas,
+          regrasAplicaveis: auditoriaRegrasTurno.aplicaveis,
+          regrasNaoInterpretadas: auditoriaRegrasTurno.naoInterpretadas,
+          regrasSuprimidas: auditoriaRegrasTurno.suprimidas,
+          falhaDeInterpretacao: auditoriaRegrasTurno.falhaDeInterpretacao,
+          limitacoes: auditoriaRegrasTurno.limitacoes,
+          respostaOriginal: respostaIA.conteudo ?? null,
+        });
+      }
       // DIAGNÓSTICO AUTORIZADO: só quando a clínica ligou a flag. Guarda o
       // payload efetivo da rodada (mensagens e schemas), com marca de corte.
       if (registroTurnoAtual()?.diagnostico) {
