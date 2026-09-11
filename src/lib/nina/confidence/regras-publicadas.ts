@@ -428,6 +428,7 @@ export function extrairRegrasPublicadas(
         prioridade: prioridadeDe(u.plano, verificacao),
         verificacao,
         literal: null,
+        operador: null,
         proibicoes,
         descricao: u.plano,
         interpretada: true,
