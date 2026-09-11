@@ -62,6 +62,8 @@ export type RestricaoEstruturada = {
   /** De onde veio (versão publicada, verificação de homologação, fluxo). */
   origem: string;
   descricao: string;
+  /** Por que esta restrição está no contrato deste turno (auditoria). */
+  motivo?: string;
   /** Códigos de regra geral que esta exceção substitui neste turno. */
   suprime?: readonly string[];
   /** Instrução literal que o modelo deve receber, quando houver. */
