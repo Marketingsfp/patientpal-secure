@@ -2497,69 +2497,6 @@ function Page() {
         </div>
       )}
 
-      <Dialog open={detalhe !== null} onOpenChange={(v) => !v && setDetalhe(null)}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>
-              {detalhe === "saldo"
-                ? `Saldo do período — ${fmt(totais.saldo)}`
-                : `${detalhe === "receita" ? "Receitas" : "Despesas"} do período — ${fmt(detalhe === "receita" ? totais.r : totais.d)}`}
-            </DialogTitle>
-          </DialogHeader>
-          <div className="max-h-[60vh] overflow-auto">
-            {(() => {
-              const list =
-                detalhe === "saldo" ? displayItems : displayItems.filter((i) => i.tipo === detalhe);
-              if (list.length === 0)
-                return (
-                  <p className="text-sm text-muted-foreground py-6 text-center">Sem lançamentos.</p>
-                );
-              const catMap = new Map(cats.map((c) => [c.id, c.nome]));
-              return (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Data</TableHead>
-                      {detalhe === "saldo" && <TableHead>Tipo</TableHead>}
-                      <TableHead>Descrição</TableHead>
-                      <TableHead>Categoria</TableHead>
-                      <TableHead className="text-right">Valor</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {list.map((l) => (
-                      <TableRow key={l.id}>
-                        <TableCell className="text-sm whitespace-nowrap">
-                          {l.data
-                            ? l.data.slice(8, 10) +
-                              "/" +
-                              l.data.slice(5, 7) +
-                              "/" +
-                              l.data.slice(0, 4) +
-                              (l.hora ? " " + l.hora : "")
-                            : ""}
-                        </TableCell>
-                        {detalhe === "saldo" && (
-                          <TableCell className="capitalize">{l.tipo}</TableCell>
-                        )}
-                        <TableCell>{l.descricao}</TableCell>
-                        <TableCell className="text-sm text-muted-foreground">
-                          {l.categoria_id ? (catMap.get(l.categoria_id) ?? "—") : "—"}
-                        </TableCell>
-                        <TableCell
-                          className={`text-right font-medium ${l.tipo === "receita" ? "text-green-600" : "text-red-600"}`}
-                        >
-                          {fmt(Number(l.valor))}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              );
-            })()}
-          </div>
-        </DialogContent>
-      </Dialog>
 
       <Card>
         <CardContent className="pt-6 space-y-3">
