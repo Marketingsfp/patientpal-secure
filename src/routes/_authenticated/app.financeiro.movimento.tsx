@@ -1556,11 +1556,13 @@ function Page() {
   // Calculada ANTES do filtro por card, senão clicar em "Consultas" zeraria
   // todos os outros cards e a tela deixaria de ser comparável. Os cards
   // mostram sempre o período inteiro; quem se estreita é a lista de baixo.
+  const nomesUsuario = new Map(usuarios.map((u) => [u.id, u.nome]));
   const classificadas = classificarMovimento(itensVisiveis, {
     periodo: { de: fromDate, ate: toDate },
     procTipos,
     mapaConvenio,
     nomeCategoria: (id) => (id ? (nomesCategoria.get(id) ?? null) : null),
+    nomeUsuario: (id) => (id ? (nomesUsuario.get(id) ?? null) : null),
   });
   const displayItems = filtroGrupo
     ? itensVisiveis.filter((_, i) => linhaCasaComFiltro(classificadas[i], filtroGrupo))
