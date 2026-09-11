@@ -148,6 +148,45 @@ function EquipeAcessosPage() {
     }
   }
 
+  async function alternarHorarios(m: MembroEquipe) {
+    if (!clinicaAtual) return;
+    const ligando = !m.podeGerirHorarios;
+    const ok = await confirmDialog(
+      ligando
+        ? `Liberar ${m.nome} para criar horário médico?\n\n` +
+            `Ela poderá cadastrar, alterar e excluir os horários semanais dos médicos e gerar as vagas na agenda. Não ganha nenhum outro acesso.`
+        : `Tirar de ${m.nome} a permissão de criar horário médico?\n\n` +
+            `As vagas que ela já gerou continuam na agenda.`,
+    );
+    if (!ok) return;
+    setSalvando(m.membershipId);
+    try {
+      await editarMembroFn({
+        data: {
+          clinicaId: clinicaAtual.clinica_id,
+          membershipId: m.membershipId,
+          role: m.role as never,
+          ativo: m.ativo,
+          podeGerirHorarios: ligando,
+        },
+      });
+      setMembros((prev) =>
+        prev.map((x) =>
+          x.membershipId === m.membershipId ? { ...x, podeGerirHorarios: ligando } : x,
+        ),
+      );
+      toast.success(
+        ligando
+          ? `${m.nome} agora cria horário médico.`
+          : `${m.nome} não cria mais horário médico.`,
+      );
+    } catch (e) {
+      mostrarErro(e);
+    } finally {
+      setSalvando(null);
+    }
+  }
+
   const lista = useMemo(() => ordenarMembros(filtrarMembros(membros, busca)), [membros, busca]);
   const marcados = membros.filter((m) => m.podeAutorizar && m.ativo).length;
 
