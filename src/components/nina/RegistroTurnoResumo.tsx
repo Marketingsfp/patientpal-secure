@@ -130,13 +130,41 @@ export function RegistroTurnoResumo({
             : ""}
         </p>
         <p>
-          <span className="text-muted-foreground">Confiança: </span>
-          {confianca
-            ? `${texto(confianca["avaliacao"])} · ${texto(confianca["decisao"])}${
-                confianca["score"] != null ? ` · ${texto(confianca["score"])}` : ""
+          <span className="text-muted-foreground">Ação aplicada ao atendimento: </span>
+          {operacional
+            ? `${texto(operacional["decisao"], "não registrada")}${
+                operacional["etapa"] ? ` · etapa ${texto(operacional["etapa"])}` : ""
               }`
-            : "não registrada"}
+            : "nenhuma intervenção de confiança registrada neste turno"}
         </p>
+      </div>
+
+      {/* FASE 2 — cada avaliação com tipo, nota, decisão registrada e modo. */}
+      <div className="mt-2 space-y-1">
+        <p className="text-muted-foreground">Avaliações de confiança</p>
+        {avaliacoes.length === 0 ? (
+          <p>não registrada</p>
+        ) : (
+          avaliacoes.map((a, i) => {
+            const observacao = avaliacaoEmObservacao({
+              modo: (a["modo"] ?? null) as string | null,
+              aplicada: (a["aplicada"] ?? null) as boolean | null,
+            });
+            return (
+              <p key={`${texto(a["avaliacao"])}-${i}`}>
+                {descreverAvaliacaoConfianca({
+                  avaliacao: String(a["avaliacao"] ?? ""),
+                  decisao: (a["decisao"] ?? null) as string | null,
+                  etapa: (a["etapa"] ?? null) as string | null,
+                  modo: (a["modo"] ?? null) as string | null,
+                  score: (a["score"] ?? null) as number | null,
+                  nivel: (a["nivel"] ?? null) as string | null,
+                })}
+                {observacao ? ` — ${TEXTO_AVALIACAO_EM_OBSERVACAO}` : ""}
+              </p>
+            );
+          })
+        )}
       </div>
 
       {/* Fallback do prompt: sempre visível, nunca escondido em rodapé. */}
