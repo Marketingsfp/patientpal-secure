@@ -2826,7 +2826,7 @@ function Page() {
                   <div className="px-4 py-2 text-xs text-muted-foreground bg-muted/30 border-b">
                     Visão sintética — {resumo2.linhas.length} categoria(s),{" "}
                     {resumo2.total.qtd.toLocaleString("pt-BR")} lançamento(s) no período
-                    {filtroGrupo ? ` · filtrado por "${LABEL_GRUPO[filtroGrupo]}"` : ""}.
+                    {filtroGrupo ? ` · filtrado por "${rotuloFiltro(filtroGrupo)}"` : ""}.
                   </div>
                   <div className="overflow-x-auto">
                     <Table>
