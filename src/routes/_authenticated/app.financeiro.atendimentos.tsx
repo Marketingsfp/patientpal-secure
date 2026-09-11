@@ -231,6 +231,14 @@ const EMPTY = {
 const fmt = (n: number) => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
 /**
+ * Linha de `fin_atendimentos` que o banco cria para a ficha marcada como SEM
+ * FATURAMENTO na agenda (gatilho `fn_sem_faturamento_sync_financeiro`). Ela
+ * existe só para o repasse do profissional: não há dinheiro da clínica nela.
+ */
+const ehLinhaSemFaturamento = (forma: string | null | undefined): boolean =>
+  (forma ?? "").trim().toLowerCase() === "sem_faturamento";
+
+/**
  * Deriva HH:mm de um timestamp de pagamento somente quando ele tem hora
  * explícita (>00:00 UTC). Registros antigos foram backfillados de `date` para
  * timestamptz em 00:00 UTC — comparar em UTC evita falso-positivo quando o
@@ -277,6 +285,9 @@ function AtendimentosPage() {
   const [pacientes, setPacientes] = useState<Pac[]>([]);
   const [convenios, setConvenios] = useState<Convenio[]>([]);
   const [procValores, setProcValores] = useState<Map<string, number>>(new Map());
+  // Preço de tabela (dinheiro/PIX) — a base do repasse no SEM FATURAMENTO, a
+  // mesma que a GR usa para imprimir o valor do prestador.
+  const [procValoresPix, setProcValoresPix] = useState<Map<string, number>>(new Map());
   const [procTipos, setProcTipos] = useState<Map<string, string>>(new Map());
   const [procLaudo, setProcLaudo] = useState<Map<string, boolean>>(new Map());
   // Vínculo de convênio por paciente (contrato ativo) — decide Cartão
@@ -1361,6 +1372,16 @@ function AtendimentosPage() {
   };
   const calcRepasse = (medicoId: string | null, total: number, procNome: string | null): number =>
     calcRepasseFull(medicoId, total, procNome).repasse;
+  // Preço de tabela do serviço, casando o nome da agenda com o cadastro pelas
+  // mesmas variantes (sem os sufixos entre parênteses) que a GR usa.
+  const valorTabelaPix = (procNome: string | null): number => {
+    if (!procNome) return 0;
+    for (const alvo of procVariants(procNome)) {
+      const v = procValoresPix.get(alvo);
+      if (v != null) return v;
+    }
+    return 0;
+  };
 
   const load = async () => {
     if (!clinicaAtual) {
@@ -1574,6 +1595,45 @@ function AtendimentosPage() {
 
     const manuais: Atend[] = manuaisRaw.map((r) => {
       const pago = Number(r.valor_total);
+      // SEM FATURAMENTO (linha criada pelo banco a partir da marcação na
+      // agenda): o paciente não pagou nada à clínica, mas o profissional
+      // atendeu e recebe sobre o valor de tabela — a mesma regra da GR, que já
+      // imprimiu esse valor para ele. A clínica fica com zero. Um repasse já
+      // gravado (baixa, pagamento ou edição manual) prevalece sobre o cálculo.
+      if (ehLinhaSemFaturamento(r.forma_pagamento)) {
+        const base = valorTabelaPix(r.procedimento);
+        const { repasse, terceiro } = calcRepasseFull(
+          r.medico_id,
+          base,
+          r.procedimento,
+          null,
+          resolverModalidade({ pacienteId: r.paciente_id, mapa: mapaConvenio }),
+        );
+        const gravado = Number(r.valor_medico) || 0;
+        return {
+          id: r.id,
+          data: r.data,
+          procedimento: r.procedimento,
+          valor_total: 0,
+          valor_medico: gravado > 0 ? gravado : repasse,
+          valor_clinica: 0,
+          ...marcaTerceiro("manual", r.id, terceiro),
+          status: r.status,
+          forma_pagamento: r.forma_pagamento,
+          medico_id: r.medico_id,
+          paciente_id: r.paciente_id,
+          paciente_nome_extra: (r as any).paciente?.nome ?? null,
+          origem: "manual",
+          repasse_pago: !!r.repasse_pago,
+          repasse_pago_em: r.repasse_pago_em,
+          repasse_pago_at: (r as any).repasse_pago_at ?? null,
+          repasse_forma_pagamento: r.repasse_forma_pagamento,
+          repasse_conta_id: (r as any).repasse_conta_id ?? null,
+          laudo_status: (r as any).laudo_status ?? null,
+          medico_laudador_id: (r as any).medico_laudador_id ?? null,
+          valor_laudo: Number((r as any).valor_laudo ?? 0),
+        };
+      }
       // Recalcula repasse usando convênio cadastrado por procedimento
       // (ex.: PREVENTIVO R$ 10,40). Mantém o valor armazenado apenas como
       // fallback caso o cálculo retorne 0 e o banco já tenha um valor manual.
@@ -1739,6 +1799,7 @@ function AtendimentosPage() {
         nome: string | null;
         valor_padrao?: number | string | null;
         valor_dinheiro?: number | string | null;
+        valor_dinheiro_pix?: number | string | null;
         tipo?: string | null;
         requer_laudo?: boolean | null;
       }> = [];
@@ -1748,7 +1809,7 @@ function AtendimentosPage() {
       for (;;) {
         const { data, error } = await supabase
           .from("procedimentos")
-          .select("nome, valor_padrao, valor_dinheiro, tipo, requer_laudo")
+          .select("nome, valor_padrao, valor_dinheiro, valor_dinheiro_pix, tipo, requer_laudo")
           .eq("clinica_id", clinicaId)
           .eq("ativo", true)
           .range(offset, offset + CHUNK - 1);
@@ -1830,6 +1891,7 @@ function AtendimentosPage() {
     setPacientes((p.data ?? []) as Pac[]);
     setContas((c.data ?? []) as Conta[]);
     const pmap = new Map<string, number>();
+    const pixMap = new Map<string, number>();
     const tmap = new Map<string, string>();
     const lmap = new Map<string, boolean>();
     for (const pr of procs) {
@@ -1838,10 +1900,13 @@ function AtendimentosPage() {
       const key = norm(String(pr.nome));
       // mantém o maior valor caso haja duplicidade entre unidades
       if (v > (pmap.get(key) ?? 0)) pmap.set(key, v);
+      const vPix = Number(pr.valor_dinheiro_pix ?? 0) || 0;
+      if (vPix > (pixMap.get(key) ?? 0)) pixMap.set(key, vPix);
       if (pr.tipo && !tmap.has(key)) tmap.set(key, String(pr.tipo));
       if (pr.requer_laudo) lmap.set(key, true);
     }
     setProcValores(pmap);
+    setProcValoresPix(pixMap);
     setProcTipos(tmap);
     setProcLaudo(lmap);
     setConvenios(convenios);
@@ -1866,6 +1931,7 @@ function AtendimentosPage() {
       medicos.length,
       convenios.length,
       procValores.size,
+      procValoresPix.size,
       mapaConvenio,
     ],
   );
@@ -1940,6 +2006,16 @@ function AtendimentosPage() {
       toast.error("Você não tem permissão de edição neste módulo.");
       return;
     }
+    // A linha acompanha a marcação da agenda: apagada aqui, voltaria sozinha
+    // na próxima alteração da ficha. Quem decide que não há atendimento é a
+    // agenda (remover a marcação, cancelar ou dar falta).
+    if (a.origem === "manual" && ehLinhaSemFaturamento(a.forma_pagamento)) {
+      toast.error(
+        "Este atendimento vem de uma ficha marcada como SEM FATURAMENTO na Agenda. Para tirá-lo daqui, remova a marcação, cancele ou dê falta na ficha da Agenda.",
+        { duration: 10000 },
+      );
+      return;
+    }
     if (!(await confirmDialog("Excluir atendimento?"))) return;
 
     try {
@@ -1993,9 +2069,16 @@ function AtendimentosPage() {
           return;
         }
       } else {
+        // Sem faturamento: o repasse é calculado na tela (tabela do serviço).
+        // Gravá-lo na baixa faz os demais relatórios, que leem o valor
+        // guardado, enxergarem o mesmo número que o setor de repasse vê aqui.
         const { error } = await supabase
           .from("fin_atendimentos")
-          .update({ status: "realizado" })
+          .update(
+            ehLinhaSemFaturamento(a.forma_pagamento)
+              ? { status: "realizado", valor_medico: Number(a.valor_medico) || 0 }
+              : { status: "realizado" },
+          )
           .eq("id", a.id);
         if (error) {
           mostrarErro(error);
@@ -2115,6 +2198,18 @@ function AtendimentosPage() {
           .from("fin_atendimentos")
           .update({ status: "realizado" })
           .in("id", manualIds);
+        if (error) {
+          mostrarErro(error);
+          return;
+        }
+      }
+      // Sem faturamento: grava o repasse calculado na tela (ver `darBaixa`).
+      for (const a of alvos) {
+        if (a.origem !== "manual" || !ehLinhaSemFaturamento(a.forma_pagamento)) continue;
+        const { error } = await supabase
+          .from("fin_atendimentos")
+          .update({ valor_medico: Number(a.valor_medico) || 0 })
+          .eq("id", a.id);
         if (error) {
           mostrarErro(error);
           return;
@@ -2657,6 +2752,16 @@ function AtendimentosPage() {
                 .update({ valor_medico: valorItem })
                 .eq("id", item.id);
             }
+          }
+        } else {
+          // Sem faturamento pago sem passar pela baixa desta tela (a ficha foi
+          // dada como realizada na agenda): o repasse ainda era só o calculado.
+          for (const item of list) {
+            if (item.origem !== "manual" || !ehLinhaSemFaturamento(item.forma_pagamento)) continue;
+            await supabase
+              .from("fin_atendimentos")
+              .update({ valor_medico: Number(item.valor_medico) || 0 })
+              .eq("id", item.id);
           }
         }
       }
@@ -3328,6 +3433,14 @@ function AtendimentosPage() {
                             title={procedimentoNome}
                           >
                             {procedimentoNome}
+                            {ehLinhaSemFaturamento(a.forma_pagamento) && (
+                              <div
+                                className="text-[10px] font-semibold text-amber-700 dark:text-amber-500"
+                                title="Marcado na Agenda como sem faturamento: a clínica não recebeu por este atendimento. O repasse é calculado sobre o valor de tabela do serviço, como na guia impressa."
+                              >
+                                SEM FATURAMENTO
+                              </div>
+                            )}
                           </TableCell>
 
                           {!isMedicoOnly && (
