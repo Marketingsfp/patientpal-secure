@@ -101,6 +101,36 @@ export function selecionarMensagensRelevantes(
   return janela.slice(inicio);
 }
 
+/**
+ * Remove do histórico as mensagens que JÁ são a mensagem atual deste turno.
+ * Critério primário: o ID físico. Sem ID, cai para um critério estreito — a
+ * última mensagem do histórico, do paciente, com o mesmo texto: a que acabou
+ * de ser gravada. Uma repetição legítima em outro turno é sempre seguida da
+ * resposta da Nina, então não é atingida.
+ */
+export function removerMensagemAtualDuplicada(
+  historico: MensagemContexto[],
+  mensagemAtual: string,
+  ids?: readonly string[] | null,
+): { mensagens: MensagemContexto[]; removidas: number } {
+  const alvo = new Set((ids ?? []).filter((i) => typeof i === "string" && i.length > 0));
+  if (alvo.size > 0) {
+    const mensagens = historico.filter((m) => !(m.id && alvo.has(m.id)));
+    return { mensagens, removidas: historico.length - mensagens.length };
+  }
+  const ultimo = historico[historico.length - 1];
+  if (
+    ultimo &&
+    ultimo.role === "user" &&
+    typeof ultimo.content === "string" &&
+    ultimo.content.trim() === mensagemAtual.trim() &&
+    mensagemAtual.trim() !== ""
+  ) {
+    return { mensagens: historico.slice(0, -1), removidas: 1 };
+  }
+  return { mensagens: historico, removidas: 0 };
+}
+
 export function montarContexto(entrada: EntradaContexto): ContextoMontado {
   const limites = { ...LIMITES_PADRAO, ...(entrada.limites ?? {}) };
   const system = entrada.systemBlocos
