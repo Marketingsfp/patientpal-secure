@@ -528,8 +528,17 @@ function avaliarUma(
   }
 
   // Linguagem aberta: só a revisão semântica complementar pode opinar, e ela
-  // nunca substitui a comprovação de fatos ou operações.
-  const parecer = revisor ? revisor({ obrigacao: o, resposta }) : null;
+  // nunca substitui a comprovação de fatos ou operações. Sem revisão, o estado
+  // é `indeterminada` — jamais aprovação presumida.
+  const parecer = revisor
+    ? revisor({
+        obrigacao: o,
+        resposta,
+        mensagemPaciente: contexto?.mensagemPaciente ?? null,
+        ambiente: contexto?.ambiente ?? null,
+        trechoPublicado: o.regra?.trecho ?? null,
+      })
+    : null;
   if (parecer) {
     return { obrigacao: o, status: parecer, motivo: "REVISAO_SEMANTICA" };
   }
