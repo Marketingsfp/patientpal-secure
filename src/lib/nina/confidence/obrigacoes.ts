@@ -361,9 +361,17 @@ export function derivarObrigacoesDoTurno(ctx: ContextoConfianca): Obrigacao[] {
 
 // ------------------------------------------------------------- avaliação
 
+/**
+ * Revisão semântica COMPLEMENTAR para regra aberta. Recebe contexto suficiente
+ * para avaliar a condição da regra (mensagem do paciente, ambiente e o trecho
+ * publicado). Ausência de revisão NÃO aprova nada: fica `indeterminada`.
+ */
 export type RevisorSemantico = (entrada: {
   obrigacao: Obrigacao;
   resposta: string;
+  mensagemPaciente?: string | null;
+  ambiente?: string | null;
+  trechoPublicado?: string | null;
 }) => StatusObrigacao | null;
 
 /**
