@@ -673,13 +673,37 @@ export function InstructionComplianceValidator(
   }
 
   const r = avaliarObrigacoes(ctx, texto, revisor);
+
+  // Falha ao interpretar as regras publicadas não é cumprimento: fica UNKNOWN.
+  if (r.estadoRestricoes === "falha_na_interpretacao") {
+    return {
+      validator: nome,
+      status: "UNKNOWN",
+      score: 0,
+      reasonCode: "FALHA_NA_INTERPRETACAO_DAS_REGRAS",
+      evidence: {
+        estadoRestricoes: r.estadoRestricoes,
+        regrasNaoAplicaveis: r.regrasNaoAplicaveis,
+        limitacoes: r.limitacoes,
+      },
+      blocker: null,
+    };
+  }
+
   if (r.obrigacoes.length === 0) {
     return {
       validator: nome,
       status: "NOT_APPLICABLE",
       score: 100,
-      reasonCode: "SEM_OBRIGACAO_IDENTIFICADA",
-      evidence: { limitacoes: r.limitacoes },
+      reasonCode:
+        r.estadoRestricoes === "nenhuma_regra_aplicavel"
+          ? "NENHUMA_REGRA_APLICAVEL"
+          : "SEM_OBRIGACAO_IDENTIFICADA",
+      evidence: {
+        estadoRestricoes: r.estadoRestricoes,
+        regrasNaoAplicaveis: r.regrasNaoAplicaveis,
+        limitacoes: r.limitacoes,
+      },
       blocker: null,
     };
   }
