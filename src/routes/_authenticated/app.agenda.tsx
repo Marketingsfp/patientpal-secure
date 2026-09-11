@@ -1,7 +1,11 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { confirmDialog } from "@/lib/confirm";
 import { pedirMotivo } from "@/lib/motivo";
-import { carimbarConvenioNosLancamentos } from "@/lib/convenio/modalidade";
+import {
+  carimbarConvenioNosLancamentos,
+  carregarMapaConvenioPacientes,
+  type MapaConvenioPaciente,
+} from "@/lib/convenio/modalidade";
 import {
   escolherContratoAtivo,
   LIMITE_CONTRATOS_CANDIDATOS,
@@ -8653,17 +8657,24 @@ function AgendaPage() {
       return;
     }
     // Modalidade (Particular / Cartão Benefícios) e forma de pagamento saem
-    // do lançamento de receita confirmado — a marcação "Particular/Convênio"
-    // da ficha não separa o Cartão (ver `@/lib/relatorios/modalidade-atendimento`).
-    // Buscado só no clique, para não pesar o carregamento da Agenda no balcão.
-    // Não traz valor.
+    // do lançamento de receita confirmado, pela mesma regra do Rateio da
+    // Receita — a marcação "Particular/Convênio" da ficha não separa o Cartão
+    // (ver `@/lib/relatorios/modalidade-atendimento`). Buscado só no clique,
+    // para não pesar o carregamento da Agenda no balcão. Não traz valor.
     const ids = filtrados.filter((a) => !isSlotLivre(a.paciente_nome)).map((a) => a.id);
     const lancs: Array<PagamentoDoAtendimento & { agendamento_id: string | null }> = [];
+    let mapaConvenio: MapaConvenioPaciente;
+    try {
+      mapaConvenio = await carregarMapaConvenioPacientes(clinicaAtual.clinica_id);
+    } catch (e) {
+      mostrarErro(e);
+      return;
+    }
     const CHUNK = 200;
     for (let i = 0; i < ids.length; i += CHUNK) {
       const { data, error } = await supabase
         .from("fin_lancamentos")
-        .select("agendamento_id, forma_pagamento, convenio_modalidade")
+        .select("agendamento_id, forma_pagamento, convenio_modalidade, descricao, paciente_id")
         .eq("clinica_id", clinicaAtual.clinica_id)
         .eq("tipo", "receita")
         .eq("status", "confirmado")
@@ -8678,7 +8689,10 @@ function AgendaPage() {
     exportToExcel(
       filtrados.map((a) => {
         const livre = isSlotLivre(a.paciente_nome);
-        const pagamento = resumirPagamentos(pagPorAtendimento.get(a.id) ?? []);
+        const pagamento = resumirPagamentos(pagPorAtendimento.get(a.id) ?? [], {
+          mapa: mapaConvenio,
+          pacienteId: a.paciente_id,
+        });
         return {
           data: new Date(a.inicio).toLocaleDateString("pt-BR"),
           dia: fmtDiaSemana(a.inicio),
