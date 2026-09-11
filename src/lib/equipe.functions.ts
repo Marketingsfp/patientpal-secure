@@ -204,6 +204,9 @@ export const cadastrarUsuario = createServerFn({ method: "POST" })
     const { data: list } = await supabaseAdmin.auth.admin.listUsers({ page: 1, perPage: 200 });
     const existing = list?.users?.find((u) => u.email?.toLowerCase() === data.email.toLowerCase());
     if (existing) {
+      // Conta já existente (por exemplo, de outra unidade): só pode ser anexada
+      // por quem administra todas as unidades dela.
+      await assertPodeAlterarConta(context.userId, existing.id);
       userId = existing.id;
     } else {
       const { data: created, error: cErr } = await supabaseAdmin.auth.admin.createUser({
