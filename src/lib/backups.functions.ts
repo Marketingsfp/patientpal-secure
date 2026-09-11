@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { z } from "zod";
 
 const BUCKET = "backups-diarios";
 
@@ -33,7 +34,7 @@ function resolverProjectRef(): string {
 /** Lista os dias com backup salvo para a clínica do usuário. */
 export const listarBackups = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: { clinica_id: string }) => d)
+  .inputValidator((input: unknown) => z.object({ clinica_id: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
     // Garante que o usuário é admin da clínica
     const { data: mem } = await context.supabase
@@ -41,6 +42,7 @@ export const listarBackups = createServerFn({ method: "POST" })
       .select("role")
       .eq("user_id", context.userId)
       .eq("clinica_id", data.clinica_id)
+      .eq("ativo", true)
       .maybeSingle();
     if ((mem as { role?: string } | null)?.role !== "admin") {
       throw new Error("Somente administradores podem acessar backups");
@@ -69,13 +71,21 @@ export const listarBackups = createServerFn({ method: "POST" })
 /** Retorna URLs assinadas para baixar todos os arquivos de um dia (10 min). */
 export const baixarBackupDoDia = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: { clinica_id: string; data: string }) => d)
+  .inputValidator((input: unknown) =>
+    z
+      .object({
+        clinica_id: z.string().uuid(),
+        data: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+      })
+      .parse(input),
+  )
   .handler(async ({ data, context }) => {
     const { data: mem } = await context.supabase
       .from("clinica_memberships")
       .select("role")
       .eq("user_id", context.userId)
       .eq("clinica_id", data.clinica_id)
+      .eq("ativo", true)
       .maybeSingle();
     if ((mem as { role?: string } | null)?.role !== "admin") {
       throw new Error("Somente administradores podem baixar backups");
@@ -114,6 +124,7 @@ export const dispararBackupAgora = createServerFn({ method: "POST" })
       .select("role")
       .eq("user_id", context.userId)
       .eq("role", "admin")
+      .eq("ativo", true)
       .limit(1);
     if (!mems || mems.length === 0) {
       throw new Error("Somente administradores podem disparar backup");
