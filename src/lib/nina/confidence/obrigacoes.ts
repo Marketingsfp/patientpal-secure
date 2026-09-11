@@ -772,6 +772,12 @@ export function InstructionComplianceValidator(
         origem: a.obrigacao.origem,
         status: a.status,
         motivo: a.motivo,
+        // Prioridade e origem publicada viajam na evidência: é isso que
+        // permite ao controle de envio saber se a violação é bloqueante.
+        prioridade: a.obrigacao.regra?.prioridade ?? null,
+        natureza: a.obrigacao.regra?.natureza ?? null,
+        verificacao: a.obrigacao.verificacao,
+        regraId: a.obrigacao.regra?.id ?? null,
       })),
       limitacoes: r.limitacoes,
       pendentesPorAmbiguidade: pendentes.map((a) => a.obrigacao.id),
