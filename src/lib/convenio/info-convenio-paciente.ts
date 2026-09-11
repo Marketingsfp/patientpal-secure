@@ -19,6 +19,11 @@ import {
   LIMITE_CONTRATOS_CANDIDATOS,
 } from "@/lib/convenio/escolher-contrato-ativo";
 import { DIAS_TOLERANCIA_MENSALIDADE } from "@/lib/cb-regras";
+import {
+  COLUNAS_PRECO_REVISAO,
+  ehRevisaoGratuita,
+  normalizarNomeServico,
+} from "@/lib/convenio/revisao-gratuita";
 
 /**
  * Data de hoje no fuso LOCAL, formato "YYYY-MM-DD". `new Date().toISOString()`
@@ -208,10 +213,11 @@ export async function obterInfoConvenioPaciente(params: {
   // errada do médico placeholder (ex.: Mamografia 10% em vez de
   // Tomografia 5%).
   let procRow: { id: string; nome: string; tipo: string | null } | null = null;
+  const COLS_PROC = `id,nome,tipo,${COLUNAS_PRECO_REVISAO}`;
   if (procNomeBase) {
     const { data: exact } = await supabase
       .from("procedimentos")
-      .select("id,nome,tipo")
+      .select(COLS_PROC)
       .eq("clinica_id", clinicaId)
       .eq("ativo", true)
       .ilike("nome", procNomeBase)
@@ -230,7 +236,7 @@ export async function obterInfoConvenioPaciente(params: {
     if (!procRow) {
       const { data: fuzzy } = await supabase
         .from("procedimentos")
-        .select("id,nome,tipo")
+        .select(COLS_PROC)
         .eq("clinica_id", clinicaId)
         .eq("ativo", true)
         .ilike("nome", `%${procNomeBase}%`)
@@ -244,6 +250,14 @@ export async function obterInfoConvenioPaciente(params: {
             .includes(procNorm),
         ) ?? null;
     }
+  }
+  // Revisão/retorno gratuito: o cartão não pode dar preço a um serviço que o
+  // paciente particular já leva de graça. Devolve `null` como se não houvesse
+  // convênio para ESTE atendimento — a Agenda cai no caminho automático "SEM
+  // COBRANÇA" e o Caixa usa o preço do cadastro (R$ 0,00), sem desconto, sem
+  // aviso de "sem benefício" e sem aviso de limite.
+  if (procRow && ehRevisaoGratuita((procRow as any).nome ?? procNomeBase, procRow as any)) {
+    return null;
   }
   const procedimentoId = (procRow as any)?.id ?? null;
   const procedimentoTipo = ((procRow as any)?.tipo ?? "").toString().toLowerCase() || null;
@@ -897,6 +911,42 @@ export async function obterInfoConvenioPaciente(params: {
             if (!t) return tipoRegra !== "consulta";
             return t === tipoRegra;
           }) as typeof agsFiltrados;
+        }
+      }
+      // Revisão/retorno gratuito NÃO consome a cota do cartão. A REVISAO é
+      // cadastrada como "consulta"; sem esta exclusão ela contaria como a
+      // consulta do dia do contrato e uma consulta de verdade no mesmo dia
+      // (outra especialidade, titular ou dependente) sairia pelo excedente.
+      {
+        const candidatosRevisao = (
+          agsFiltrados as Array<{ procedimento?: string | null }>
+        ).filter((a) => {
+          const n = normalizarNomeServico(a.procedimento);
+          return n === "REVISAO" || n === "RETORNO";
+        });
+        if (candidatosRevisao.length > 0) {
+          const nomesRevisao = Array.from(
+            new Set(
+              candidatosRevisao
+                .map((a) => (a.procedimento ?? "").replace(/\s*\([^()]*\)\s*$/, "").trim())
+                .filter(Boolean),
+            ),
+          );
+          const { data: procsRev } = await supabase
+            .from("procedimentos")
+            .select(`nome,${COLUNAS_PRECO_REVISAO}`)
+            .eq("clinica_id", clinicaId)
+            .in("nome", nomesRevisao);
+          const gratuitos = new Set(
+            ((procsRev ?? []) as any[])
+              .filter((p) => ehRevisaoGratuita(p.nome, p))
+              .map((p) => normalizarNomeServico(p.nome)),
+          );
+          if (gratuitos.size > 0) {
+            agsFiltrados = (agsFiltrados as Array<{ procedimento?: string | null }>).filter(
+              (a) => !gratuitos.has(normalizarNomeServico(a.procedimento)),
+            ) as typeof agsFiltrados;
+          }
         }
       }
       // Regra: o limite só é consumido quando o agendamento efetivamente foi
