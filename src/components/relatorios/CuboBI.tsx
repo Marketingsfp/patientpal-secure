@@ -30,6 +30,7 @@ import {
   LABEL_MODALIDADE,
   resumirPagamentos,
 } from "@/lib/relatorios/modalidade-atendimento";
+import { carregarMapaConvenioPacientes } from "@/lib/convenio/modalidade";
 import {
   Download,
   Save,
@@ -98,7 +99,7 @@ const CUBOS: CubeSpec[] = [
     ],
     load: async ({ clinicaId, ini, fim }) => {
       const fimDia = fim + "T23:59:59";
-      const [rows, pagamentos] = await Promise.all([
+      const [rows, pagamentos, mapaConvenio] = await Promise.all([
         fetchAllRows(() =>
           supabase
             .from("agendamentos")
@@ -109,16 +110,16 @@ const CUBOS: CubeSpec[] = [
             .order("inicio", { ascending: true }),
         ),
         // Modalidade e forma de pagamento vêm do lançamento de receita
-        // confirmado do atendimento — a marcação "Particular/Convênio" da
-        // agenda não serve para separar o Cartão (ver
-        // `@/lib/relatorios/modalidade-atendimento`). O recorte é pela data do
-        // ATENDIMENTO, não do lançamento, para casar com as linhas acima mesmo
-        // quando o pagamento foi feito em outro dia. Não traz valor.
+        // confirmado do atendimento, pela mesma regra do Rateio da Receita —
+        // a marcação "Particular/Convênio" da agenda não serve para separar o
+        // Cartão (ver `@/lib/relatorios/modalidade-atendimento`). O recorte é
+        // pela data do ATENDIMENTO, não do lançamento, para casar com as linhas
+        // acima mesmo quando o pagamento foi feito em outro dia. Não traz valor.
         fetchAllRows(() =>
           supabase
             .from("fin_lancamentos")
             .select(
-              "id, agendamento_id, forma_pagamento, convenio_modalidade, agendamentos!inner(inicio)",
+              "id, agendamento_id, forma_pagamento, convenio_modalidade, descricao, paciente_id, agendamentos!inner(inicio)",
             )
             .eq("clinica_id", clinicaId)
             .eq("tipo", "receita")
@@ -127,6 +128,9 @@ const CUBOS: CubeSpec[] = [
             .lte("agendamentos.inicio", fimDia)
             .order("id", { ascending: true }),
         ),
+        // Contrato ativo de cada paciente: 2ª regra da modalidade, a mesma que
+        // o Rateio usa quando o lançamento não tem a marca do cartão.
+        carregarMapaConvenioPacientes(clinicaId),
       ]);
       const pagPorAtendimento = agruparPagamentosPorAtendimento(pagamentos);
       const [medMap, pacMap, espPorProc, espPorMedico] = await Promise.all([
@@ -145,7 +149,10 @@ const CUBOS: CubeSpec[] = [
         lookupEspecialidadePorMedico(rows.map((r) => r.medico_id)),
       ]);
       return rows.map((r) => {
-        const pagamento = resumirPagamentos(pagPorAtendimento.get(r.id) ?? []);
+        const pagamento = resumirPagamentos(pagPorAtendimento.get(r.id) ?? [], {
+          mapa: mapaConvenio,
+          pacienteId: r.paciente_id,
+        });
         return transformDate(r.inicio, {
           status: r.status ?? "—",
           medico: medMap.get(r.medico_id) ?? "Sem médico",
