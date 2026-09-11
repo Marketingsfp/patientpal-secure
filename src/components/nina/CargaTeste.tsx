@@ -166,6 +166,7 @@ export function CargaTeste() {
         const p: any = await preparar({ data: { clinicaId, cargaId: id } });
         setPreparo({ prontos: p.prontos, total: p.total || totalLeads });
         if (p.erro || p.status === "erro") {
+          setPreparo(null);
           setErroPreparo(p.erro ?? "Preparação falhou.");
           await recarregar();
           return;
