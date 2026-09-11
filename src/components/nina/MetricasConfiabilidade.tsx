@@ -229,12 +229,20 @@ export function MetricasConfiabilidade({ clinicaId }: { clinicaId: string | null
             </div>
 
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              <Bloco titulo="Confiança média">
+              <Bloco titulo="Confiança média das respostas">
                 <p className="text-2xl font-semibold tabular-nums">{dados?.scoreMedio}%</p>
+                {/* FASE 7 — só avaliações da resposta entram nesta média; a
+                    segurança da ação é contada à parte, no bloco Bloqueios. */}
                 <p className="text-xs text-muted-foreground">
-                  {formatarNumero(dados?.denominadores.avaliacoesTotais ?? total)} avaliações ·{" "}
+                  {formatarNumero(dados?.escopo.avaliacoesResposta ?? 0)} respostas avaliadas em{" "}
+                  {formatarNumero(dados?.escopo.mensagens ?? 0)} mensagens ·{" "}
                   {formatarNumero(dados?.denominadores.rodadas ?? 0)} rodadas
                 </p>
+                {!dados?.escopo.comparavel && (
+                  <p className="text-xs text-muted-foreground">
+                    O período mistura ambientes ou versões diferentes: comparar com cuidado.
+                  </p>
+                )}
               </Bloco>
               <Bloco titulo="Distribuição">
                 <p className="text-sm">Alta: {dados?.distribuicao.HIGH} ({pct(dados?.distribuicao.HIGH ?? 0)}%)</p>
@@ -251,6 +259,13 @@ export function MetricasConfiabilidade({ clinicaId }: { clinicaId: string | null
               <Bloco titulo="Bloqueios">
                 <p className="text-2xl font-semibold tabular-nums">{dados?.bloqueadores}</p>
                 <p className="text-xs text-muted-foreground">{dados?.acoesBloqueadas} ações bloqueadas</p>
+                <p className="text-xs text-muted-foreground">
+                  Segurança da ação: {formatarNumero(dados?.seguranca.avaliadas ?? 0)} ações
+                  avaliadas
+                  {dados?.seguranca.avaliadas
+                    ? ` · média própria de ${dados.seguranca.scoreMedio}%`
+                    : ""}
+                </p>
               </Bloco>
             </div>
 

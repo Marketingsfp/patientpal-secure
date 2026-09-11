@@ -804,7 +804,7 @@ export const calibracaoConfiancaNina = createServerFn({ method: "POST" })
     let q = context.supabase
       .from("nina_confianca_decisoes")
       .select(
-        "id, created_at, ambiente, conversation_id, message_id, outgoing_message_id, execucao_id, score, nivel, decisao, acao, modo, policy_version, handoff_ocorreu, resultado_final, acao_solicitada, bloqueadores, bloqueio, reason_codes, categorias, validadores, claims",
+        "id, created_at, ambiente, conversation_id, message_id, outgoing_message_id, execucao_id, avaliacao, score, nivel, decisao, acao, modo, policy_version, handoff_ocorreu, resultado_final, acao_solicitada, bloqueadores, bloqueio, reason_codes, categorias, validadores, claims",
       )
       .eq("clinica_id", data.clinicaId)
       .gte("created_at", desde)
@@ -823,7 +823,9 @@ export const calibracaoConfiancaNina = createServerFn({ method: "POST" })
         ambiente: (r["ambiente"] as string) ?? null,
         conversation_id: (r["conversation_id"] as string) ?? null,
         message_id: (r["message_id"] as string) ?? null,
+        outgoing_message_id: (r["outgoing_message_id"] as string) ?? null,
         execucao_id: (r["execucao_id"] as string) ?? null,
+        avaliacao: (r["avaliacao"] as string) ?? null,
         modo: (r["modo"] as string) ?? null,
         policy_version: (r["policy_version"] as string) ?? null,
         score: Number(r["score"]) || 0,
@@ -906,7 +908,24 @@ export const calibracaoConfiancaNina = createServerFn({ method: "POST" })
     }
 
 
-    return calibrar(decisoes, erros, conversas);
+    // FASE 7 — a calibração compara com a configuração REALMENTE em vigor
+    // nesta clínica, não com a política padrão.
+    let politica = undefined as undefined | import("./confidence/policy").PoliticaConfianca;
+    let origemPolitica = "padrao";
+    let configId: string | null = null;
+    try {
+      const { configuracaoEfetiva } = await import("./confidence/politica-override.server");
+      const cfg = await configuracaoEfetiva(data.clinicaId);
+      politica = cfg.parametros;
+      origemPolitica = cfg.origem;
+      configId = cfg.configId;
+    } catch {
+      politica = undefined;
+      origemPolitica = "padrao";
+      configId = null;
+    }
+
+    return calibrar(decisoes, erros, conversas, politica, { origemPolitica, configId });
   });
 
 export type PropostaConfiancaView = {

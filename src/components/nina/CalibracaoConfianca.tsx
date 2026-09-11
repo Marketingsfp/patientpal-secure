@@ -182,6 +182,28 @@ export function CalibracaoConfianca({ clinicaId }: { clinicaId: string }) {
           </p>
         ) : (
           <>
+            {/* FASE 7 — sem amostra suficiente o painel diz que é inconclusivo,
+                em vez de dar a impressão de calibração aprovada. */}
+            {!dados.conclusao.conclusiva && (
+              <div className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm">
+                <p className="font-medium">Resultado inconclusivo</p>
+                <p className="text-muted-foreground">
+                  {dados.conclusao.motivo} Com menos de {dados.conclusao.amostraMinima} respostas
+                  avaliadas não é possível dizer se a calibração está boa ou ruim.
+                </p>
+              </div>
+            )}
+            <p className="text-xs text-muted-foreground">
+              Comparação feita com os limites em vigor: alta a partir de{" "}
+              {dados.politicaAplicada.limiteAlta}, intermediária a partir de{" "}
+              {dados.politicaAplicada.limiteIntermediaria} (
+              {ROTULO_ORIGEM[dados.politicaAplicada.origem] ?? dados.politicaAplicada.origem}
+              {dados.politicaAplicada.configId
+                ? ` · identidade ${dados.politicaAplicada.configId}`
+                : ""}
+              ). A cobertura considera as verificações aplicáveis a cada resposta; o que não pôde
+              ser extraído ou avaliado não conta como acerto.
+            </p>
             <div className="grid gap-2 sm:grid-cols-3">
               <div className="rounded-md border p-3">
                 <p className="text-xs text-muted-foreground">Respostas avaliadas</p>
@@ -275,7 +297,9 @@ export function CalibracaoConfianca({ clinicaId }: { clinicaId: string }) {
               </div>
               {dados.propostas.length === 0 ? (
                 <p className="text-sm text-muted-foreground">
-                  Nenhum ajuste sugerido: a calibração está dentro do esperado.
+                  {dados.conclusao.conclusiva
+                    ? "Nenhum ajuste sugerido: a calibração está dentro do esperado."
+                    : "Nenhum ajuste sugerido — mas a amostra é insuficiente, então isso não comprova que a calibração está adequada."}
                 </p>
               ) : (
                 <ul className="space-y-2 text-sm">
@@ -285,6 +309,7 @@ export function CalibracaoConfianca({ clinicaId }: { clinicaId: string }) {
                         {p.alvo}: {String(p.valorAtual ?? "—")} → {String(p.valorSugerido ?? "—")}
                       </p>
                       <p className="text-muted-foreground">{p.justificativa}</p>
+                      <p className="text-muted-foreground">{p.efeito}</p>
                       <p className="text-xs text-muted-foreground">
                         Base: {p.evidencia.amostra} casos, {p.evidencia.comErro} com erro (
                         {p.evidencia.taxaErro}%)

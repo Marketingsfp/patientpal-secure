@@ -15,6 +15,7 @@
  */
 import { POLITICA_PADRAO, type PoliticaConfianca } from "./policy";
 import { classificarStatusReporte } from "./denominadores";
+import { separarAvaliacoes } from "./escopo-metricas";
 
 export type LinhaCalibracao = {
   id: string;
@@ -37,6 +38,10 @@ export type LinhaCalibracao = {
   policy_version?: string | null;
   /** FASE 7 — "shadow" = observacional. */
   modo?: string | null;
+  /** FASE 7 — answer_confidence (resposta) ou action_safety (ação). */
+  avaliacao?: string | null;
+  /** FASE 7 — mensagem entregue, usada para não contar a saída duas vezes. */
+  outgoing_message_id?: string | null;
 };
 
 export type ErroCalibracao = {
@@ -101,6 +106,8 @@ export type PropostaAjuste = {
   valorSugerido: number | string | null;
   justificativa: string;
   evidencia: { amostra: number; comErro: number; taxaErro: number };
+  /** FASE 7 — o que muda na prática se a proposta for aprovada. */
+  efeito: string;
   /** Sempre "pendente": nenhuma proposta entra em vigor sozinha. */
   status: "pendente";
 };
@@ -124,6 +131,25 @@ export type RelatorioCalibracao = {
   /** FASE 7 — amostra usada para gerar propostas. */
   amostra: AmostraCalibracao;
   propostas: PropostaAjuste[];
+  /** FASE 7 — sem amostra suficiente o resultado é inconclusivo, não "bom". */
+  conclusao: ConclusaoCalibracao;
+  /** FASE 7 — configuração realmente vigente usada na comparação. */
+  politicaAplicada: PoliticaAplicada;
+};
+
+export type ConclusaoCalibracao = {
+  conclusiva: boolean;
+  amostraMinima: number;
+  /** Explicação em linguagem direta do porquê. */
+  motivo: string;
+};
+
+export type PoliticaAplicada = {
+  limiteAlta: number;
+  limiteIntermediaria: number;
+  /** "padrao" | "clinica" | outra origem informada por quem chamou. */
+  origem: string;
+  configId: string | null;
 };
 
 export type AmostraCalibracao = {
@@ -142,6 +168,9 @@ export type OpcoesCalibracao = {
   politicaVersao?: string | null;
   /** Máximo de decisões por faixa na amostra estratificada. */
   amostraPorFaixa?: number;
+  /** FASE 7 — identidade da configuração efetiva que foi passada em `politica`. */
+  origemPolitica?: string;
+  configId?: string | null;
 };
 
 /** Amostra estratificada e determinística: passo fixo dentro de cada faixa. */
@@ -193,7 +222,13 @@ export function calibrar(
   const politicaVersao = opcoes.politicaVersao ?? null;
   const tamanhoPorFaixa = opcoes.amostraPorFaixa ?? 200;
   // FASE 7 — modo observacional não vale para calibrar decisão aplicada.
-  const elegiveis = decisoesEntrada.filter(
+  // FASE 7 — a calibração dos limites de confiança olha a avaliação da
+  // RESPOSTA. Segurança da ação tem outra escala e não entra aqui. A mesma
+  // saída conta uma vez só.
+  const semDuplicadas = separarAvaliacoes(
+    decisoesEntrada.map((l) => ({ ...l, id: l.id })),
+  ).respostas as LinhaCalibracao[];
+  const elegiveis = semDuplicadas.filter(
     (l) =>
       String(l.modo ?? "").toLowerCase() !== "shadow" &&
       (!politicaVersao || (l.policy_version ?? null) === politicaVersao),
@@ -323,6 +358,27 @@ export function calibrar(
       { porFaixa, porValidadorQueFalhou, porCategoria, altaConfiancaComErro },
       politica,
     ),
+    conclusao:
+      decisoes.length >= AMOSTRA_MINIMA
+        ? {
+            conclusiva: true,
+            amostraMinima: AMOSTRA_MINIMA,
+            motivo: `Analisadas ${decisoes.length} respostas avaliadas no período.`,
+          }
+        : {
+            conclusiva: false,
+            amostraMinima: AMOSTRA_MINIMA,
+            motivo:
+              decisoes.length === 0
+                ? "Nenhuma resposta avaliada no período: não há como afirmar que a calibração está boa nem ruim."
+                : `Apenas ${decisoes.length} respostas avaliadas no período (mínimo de ${AMOSTRA_MINIMA}): resultado inconclusivo.`,
+          },
+    politicaAplicada: {
+      limiteAlta: politica.limites.HIGH,
+      limiteIntermediaria: politica.limites.MEDIUM,
+      origem: opcoes.origemPolitica ?? (politica === POLITICA_PADRAO ? "padrao" : "informada"),
+      configId: opcoes.configId ?? null,
+    },
   };
 }
 
@@ -340,26 +396,42 @@ function gerarPropostas(
   // 1) Faixa alta errando: o limite de "alta confiança" está frouxo.
   const alta = r.porFaixa.find((f) => f.faixa === "90_100");
   if (alta && alta.decisoes >= AMOSTRA_MINIMA && alta.taxaErro > TAXA_ERRO_ALERTA) {
-    out.push({
-      tipo: "AJUSTAR_LIMITE",
-      alvo: "limites.HIGH",
-      valorAtual: politica.limites.HIGH,
-      valorSugerido: Math.min(98, politica.limites.HIGH + 4),
-      justificativa:
-        "Respostas liberadas com confiança alta estão sendo reportadas como erro acima do aceitável.",
-      evidencia: { amostra: alta.decisoes, comErro: alta.comErroReportado, taxaErro: alta.taxaErro },
-      status: "pendente",
-    });
+    const sugerido = Math.min(98, politica.limites.HIGH + 4);
+    // FASE 7 — endurecer é subir o limite que está REALMENTE em vigor. Se o
+    // valor sugerido não é maior que o vigente, não há proposta a fazer.
+    if (sugerido > politica.limites.HIGH) {
+      out.push({
+        tipo: "AJUSTAR_LIMITE",
+        alvo: "limites.HIGH",
+        valorAtual: politica.limites.HIGH,
+        valorSugerido: sugerido,
+        justificativa:
+          "Respostas liberadas com confiança alta estão sendo reportadas como erro acima do aceitável.",
+        evidencia: {
+          amostra: alta.decisoes,
+          comErro: alta.comErroReportado,
+          taxaErro: alta.taxaErro,
+        },
+        efeito: `Passa a exigir ${sugerido} em vez de ${politica.limites.HIGH} para tratar a resposta como de confiança alta: menos respostas liberadas direto.`,
+        status: "pendente",
+      });
+    }
   }
 
   // 2) Faixa média liberando demais.
   const media = r.porFaixa.find((f) => f.faixa === "75_89");
-  if (media && media.decisoes >= AMOSTRA_MINIMA && media.taxaErro > TAXA_ERRO_ALERTA) {
+  const sugeridoMedio = Math.min(politica.limites.HIGH - 1, politica.limites.MEDIUM + 5);
+  if (
+    media &&
+    media.decisoes >= AMOSTRA_MINIMA &&
+    media.taxaErro > TAXA_ERRO_ALERTA &&
+    sugeridoMedio > politica.limites.MEDIUM
+  ) {
     out.push({
       tipo: "AJUSTAR_LIMITE",
       alvo: "limites.MEDIUM",
       valorAtual: politica.limites.MEDIUM,
-      valorSugerido: Math.min(politica.limites.HIGH - 1, politica.limites.MEDIUM + 5),
+      valorSugerido: sugeridoMedio,
       justificativa:
         "A faixa intermediária concentra erros reportados; esclarecer ou transferir mais cedo.",
       evidencia: {
@@ -367,6 +439,7 @@ function gerarPropostas(
         comErro: media.comErroReportado,
         taxaErro: media.taxaErro,
       },
+      efeito: `Passa a exigir ${sugeridoMedio} em vez de ${politica.limites.MEDIUM} para a faixa intermediária: mais esclarecimentos e transferências antes de responder.`,
       status: "pendente",
     });
   }
@@ -376,6 +449,7 @@ function gerarPropostas(
     if (v.decisoes < AMOSTRA_MINIMA || v.taxaErro <= TAXA_ERRO_ALERTA) continue;
     const pesoAtual = politica.pesos[v.chave] ?? 0;
     if (pesoAtual <= 0) continue;
+    if (Math.min(30, pesoAtual + 5) <= pesoAtual) continue;
     out.push({
       tipo: "AJUSTAR_PESO",
       alvo: `pesos.${v.chave}`,
@@ -383,6 +457,7 @@ function gerarPropostas(
       valorSugerido: Math.min(30, pesoAtual + 5),
       justificativa: `Quando ${v.chave} não passa, o erro reportado é frequente; o peso atual não está refletindo esse risco.`,
       evidencia: { amostra: v.decisoes, comErro: v.comErroReportado, taxaErro: v.taxaErro },
+      efeito: `Peso de ${v.chave} passa de ${pesoAtual} para ${Math.min(30, pesoAtual + 5)}: falhar nessa verificação derruba mais a pontuação.`,
       status: "pendente",
     });
   }
@@ -397,6 +472,7 @@ function gerarPropostas(
       valorSugerido: "exigir_fonte_oficial_confirmada",
       justificativa: `A categoria "${c.chave}" concentra erros reportados; avaliar bloqueador objetivo em vez de depender da pontuação.`,
       evidencia: { amostra: c.decisoes, comErro: c.comErroReportado, taxaErro: c.taxaErro },
+      efeito: `Passa a exigir fonte oficial confirmada nas respostas da categoria "${c.chave}", em vez de depender só da pontuação.`,
       status: "pendente",
     });
   }
