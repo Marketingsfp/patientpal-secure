@@ -184,16 +184,21 @@ export const criarTesteCarga = createServerFn({ method: "POST" })
       };
     });
 
+    const participantes = [...new Set(planoFinal.map((p) => p.leadId))];
+
+    // FASE 3 — o run nasce em PREPARANDO: nenhum disparo pode acontecer antes
+    // de todos os leads participantes estarem READY.
     const { data: linha, error } = await supabaseAdmin
       .from("nina_teste_carga")
       .insert({
         clinica_id: data.clinicaId,
         nome: data.nome,
         perfil: config.perfil,
-        status: "executando",
+        status: "preparando",
         config,
         variacoes,
         plano: planoFinal,
+        preflight: [],
         confirmado: data.confirmado,
         total_planejado: planoFinal.length,
         modelo_gerador: data.usarLuna ? garantirPapel("carga", MODELO_LUNA) : null,
@@ -203,7 +208,107 @@ export const criarTesteCarga = createServerFn({ method: "POST" })
       .select("id, status, total_planejado")
       .maybeSingle();
     if (error) throw new Error(error.message);
-    return { carga: linha, config };
+    return { carga: linha, config, participantes: participantes.length };
+  });
+
+/**
+ * FASE 3 — prepara os leads participantes em lotes pequenos, para a tela
+ * mostrar o progresso (0/10 … 10/10). É idempotente: leads já com baseline
+ * READY não são resetados de novo. Só quando TODOS ficam prontos o run passa
+ * para `executando` — que é o único status em que o disparo é liberado.
+ */
+export const prepararLeadsTesteCarga = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) =>
+    z.object({ clinicaId: z.string().uuid(), cargaId: z.string().uuid() }).parse(input),
+  )
+  .handler(async ({ data, context }: { data: any; context: Ctx }) => {
+    await assertMembership(context.supabase, context.userId, data.clinicaId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { prepararLeadsCarga } = await import("@/lib/nina/carga-preflight.server");
+    const {
+      LOTE_PREFLIGHT,
+      baselineLead,
+      descreverFalhaPreflight,
+      descreverPreparacaoParcial,
+      pendentesPreflight,
+    } = await import("@/lib/nina/carga-preflight");
+
+    const carga = await carregarCarga(supabaseAdmin, data.clinicaId, data.cargaId);
+    const plano = (carga.plano ?? []) as any[];
+    const participantes = [
+      ...new Map(
+        plano.map((p: any) => [p.leadId, { id: p.leadId as string, indice: p.leadIndice as number }]),
+      ).values(),
+    ];
+    const baselines = (carga.preflight ?? []) as any[];
+
+    if (carga.status !== "preparando") {
+      return {
+        status: carga.status,
+        pronto: carga.status === "executando",
+        prontos: baselines.length,
+        total: participantes.length,
+        erro: null as string | null,
+      };
+    }
+
+    const pendentes = pendentesPreflight(participantes, baselines).slice(0, LOTE_PREFLIGHT);
+    const resumo = pendentes.length
+      ? await prepararLeadsCarga({
+          admin: supabaseAdmin,
+          clinicaId: data.clinicaId,
+          leads: pendentes as any,
+          userId: context.userId,
+        })
+      : { pronto: true, total: 0, prontos: 0, falhas: [], resultados: [] };
+
+    const novos = resumo.resultados
+      .filter((r) => r.situacao === "READY")
+      .map((resultado) => baselineLead({ runId: carga.id, resultado }));
+    const acumulado = [...baselines, ...novos];
+
+    if (resumo.falhas.length) {
+      await supabaseAdmin
+        .from("nina_teste_carga")
+        .update({
+          status: "erro",
+          preflight: acumulado,
+          finalizado_em: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", carga.id);
+      return {
+        status: "erro",
+        pronto: false,
+        prontos: acumulado.length,
+        total: participantes.length,
+        erro: `${descreverPreparacaoParcial(acumulado.length, participantes.length)} ${descreverFalhaPreflight(
+          resumo as any,
+        )}`.trim(),
+      };
+    }
+
+    const todosProntos = acumulado.length >= participantes.length;
+    await supabaseAdmin
+      .from("nina_teste_carga")
+      .update({
+        preflight: acumulado,
+        ...(todosProntos
+          ? { status: "executando", iniciado_em: new Date().toISOString() }
+          : {}),
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", carga.id)
+      .eq("status", "preparando");
+
+    return {
+      status: todosProntos ? "executando" : "preparando",
+      pronto: todosProntos,
+      prontos: acumulado.length,
+      total: participantes.length,
+      erro: null as string | null,
+    };
   });
 
 async function carregarCarga(admin: any, clinicaId: string, id: string) {
