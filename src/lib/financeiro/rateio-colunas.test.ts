@@ -21,6 +21,7 @@ const linha: RateioLinha = {
   liquido: 40,
   margem: 40,
   formas: [{ forma: "dinheiro", valor: 100 }],
+  forma_pagamento: "Dinheiro",
 };
 
 /**

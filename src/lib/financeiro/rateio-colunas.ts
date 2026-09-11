@@ -44,7 +44,9 @@ export const ROTULO_AGRUPADOR: Record<RateioAgruparPor, string> = {
   especialidade: "Especialidade",
   servico: "Serviço",
   tipo: "Tipo de serviço",
-  condicao: "Condição",
+  // O campo continua `condicao`; o nome na tela é "Modalidade", o mesmo do
+  // Cubo BI e do Excel da Agenda, a pedido da equipe.
+  condicao: "Modalidade",
 };
 
 /**
@@ -110,7 +112,10 @@ export function colunasRateio(
     { chave: "tipo_servico", rotulo: "Tipo de serviço", formato: "texto" },
     // Separa a "Consulta Cartão" da consulta particular sem precisar de um
     // serviço duplicado no cadastro.
-    { chave: "condicao", rotulo: "Condição", formato: "texto" },
+    { chave: "condicao", rotulo: "Modalidade", formato: "texto" },
+    // Separada da modalidade de propósito: paciente do Cartão também paga em
+    // dinheiro, e "Consulta Dinheiro" misturaria os dois.
+    { chave: "forma_pagamento", rotulo: "Forma de pagamento", formato: "texto" },
     { chave: "receita", rotulo: "Receita bruta", formato: "moeda", somar: true },
     { chave: "repasse", rotulo: "Repasse prestador", formato: "moeda", somar: true },
     { chave: "liquido", rotulo: "Líquido clínica", formato: "moeda", somar: true },
