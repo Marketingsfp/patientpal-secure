@@ -193,6 +193,19 @@ const TOPICOS: Topico[] = [
 const SAUDACAO =
   /^(oi|ola|bom dia|boa tarde|boa noite|tudo bem|como vai|seja bem[- ]vind[oa]|obrigad[oa])\b/;
 
+/** Mesma lista, em qualquer posição — usada para conferir saudação PROIBIDA. */
+const SAUDACAO_EM_QUALQUER_POSICAO =
+  /(^|[\s.,;:!?"'()-])(oi|ola|bom dia|boa tarde|boa noite|tudo bem|como vai|seja bem[- ]vind[oa])\b/;
+
+/**
+ * Única normalização permitida na conferência literal: colapso de espaços em
+ * branco e remoção de espaços nas pontas. Caixa, acentuação e pontuação são
+ * preservadas — correspondência literal é literal.
+ */
+function espacos(t: string): string {
+  return t.replace(/\s+/g, " ").trim();
+}
+
 const CONTEUDO_ALEM_DA_SAUDACAO =
   /\b(rua|avenida|numero|bairro|cep|r\$|valor|horario|vaga|jejum|convenio|estacionamento|dr|dra|agenda)\b/;
 
