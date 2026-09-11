@@ -54,19 +54,19 @@ import {
   totaisRetroativos,
   TIPOS_QUE_PESAM_NA_GAVETA,
 } from "@/lib/financeiro/retroativos";
+import { resumoSintetico } from "@/lib/financeiro/composicao-receita";
+import { carregarCategorias, mapaDeCategorias } from "@/lib/financeiro/categorias-carregar";
 import {
-  classificarReceita,
-  totaisPorGrupo,
-  totaisPorForma,
-  GRUPOS_RECEITA,
-  LABEL_GRUPO,
-  AJUDA_GRUPO,
-  LEGENDA_GRUPO,
-  FILTRO_DA_FORMA,
-  barraDeFormas,
-  resumoSintetico,
-  type GrupoReceita,
-} from "@/lib/financeiro/composicao-receita";
+  carregarMapaConvenioPacientes,
+  type MapaConvenioPaciente,
+} from "@/lib/convenio/modalidade";
+import {
+  classificarMovimento,
+  linhaCasaComFiltro,
+  rotuloFiltro,
+  type FiltroCard,
+} from "@/lib/financeiro/movimento-resultado";
+import { MovimentoResultado } from "@/components/financeiro/movimento-resultado";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { DateInputBR } from "@/components/ui/date-input-br";
