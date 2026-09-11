@@ -379,8 +379,12 @@ export function revisarSaida(e: EntradaRevisaoFinal): RevisaoFinal {
     ? null
     : `etapa_${e.etapa}_apenas_observa (a ação ${acaoRecomendada} exige etapa ${etapaMinima(acaoRecomendada)})`;
 
+  const conformidade = conformidadeDasInstrucoes(e.avaliacao);
   const aprovada =
-    !avaliadorFalhou && motivo === "SEM_PROBLEMA" && acaoRecomendada === "LIBERAR";
+    !avaliadorFalhou &&
+    !conformidade.bloqueante &&
+    motivo === "SEM_PROBLEMA" &&
+    acaoRecomendada === "LIBERAR";
 
   return {
     origem: e.origem,
@@ -395,6 +399,8 @@ export function revisarSaida(e: EntradaRevisaoFinal): RevisaoFinal {
       : null,
     avaliadorFalhou,
     erroAvaliador: e.falhaAvaliador ?? null,
+    conformidade,
+    bloqueiaEntrega: conformidade.bloqueante,
     motivo,
     acaoRecomendada,
     etapa: e.etapa,
