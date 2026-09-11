@@ -2241,7 +2241,14 @@ async function gerarRespostaNinaInterno(
       elementos: diagnosticoSaudacao.elementos,
     });
   }
-  if (saudacaoObrigatoria) {
+  // `greeting_completed` passa a significar APRESENTAÇÃO REALMENTE FEITA.
+  // Apresentação dispensada por exceção publicada é registrada à parte
+  // (`greeting_waived`), sem fingir que a Nina se apresentou.
+  if (saudacaoObrigatoria && !saudacaoObrigatoriaEfetivaTurno) {
+    fluxoEstado.greeting_waived = true;
+    fluxoEstado.greeting_waived_by = saudacaoDispensadaPor;
+    await salvarFluxoEstado(supabaseAdmin as never, clinicaId, estadoId.conversaId, fluxoEstado);
+  } else if (saudacaoObrigatoriaEfetivaTurno && !diagnosticoSaudacao.saudacaoAusente) {
     const estadoComSaudacao = marcarSaudacaoConcluida(fluxoEstado);
     fluxoEstado.greeting_completed = true;
     await salvarFluxoEstado(
