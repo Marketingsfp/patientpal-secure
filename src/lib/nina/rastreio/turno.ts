@@ -366,6 +366,9 @@ export function resumoTurnoParaTrace(r: RegistroTurno): Record<string, unknown> 
     })),
     situacao_transformacoes: avaliarTransformacoes(r.transformacoes),
     confianca: r.confianca,
+    /** FASE 2 — cada avaliação com seu modo; shadow não vira intervenção. */
+    avaliacoes: r.avaliacoes,
+    avaliacao_operacional: avaliacaoOperacional(r.avaliacoes ?? []),
     entrega: r.entrega,
     diagnostico_autorizado: r.diagnostico,
     lacunas: lacunasDoTurno(r),
