@@ -56,6 +56,15 @@ function turno(over: Partial<EstadoDoTurno> = {}): EstadoDoTurno {
         fonte: "catalogo_publicado",
         chave: { procedimento: "cardiologia" },
       },
+      // FASE 2 — a unidade citada na resposta também vem do catálogo.
+      {
+        consulta: "consultar_base_conhecimento",
+        capacidade: "searchKnowledgeBase",
+        entidade: "unidade",
+        campo: "nome",
+        valor: "Centro",
+        fonte: "catalogo_publicado",
+      },
     ],
     ...over,
   } as EstadoDoTurno;
