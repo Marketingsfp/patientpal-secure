@@ -105,23 +105,20 @@ export function camposObrigatoriosDaAcao(acao: AcaoSolicitada | null | undefined
 
 // ------------------------------------------------------------- instruções
 
-const LINHA_OBRIGATORIA =
-  /\b(nunca|jamais|sempre|obrigat[óo]ri|proibid|n[ãa]o pode|n[ãa]o deve|deve|dever[áa]|é vedado)\b/i;
-
 /**
- * Obrigações explícitas do texto publicado. Serve para o motor saber contra o
- * que a resposta deveria ser conferida; NÃO reescreve nem interpreta o prompt.
+ * Obrigações explícitas do texto publicado, em texto simples.
+ *
+ * Agora é uma VISTA da representação estruturada (`extrairRegrasPublicadas`):
+ * a mesma leitura que preserva blocos de várias linhas, condição e proibição.
+ * Sem limite de quantidade e sem cortar texto — regra não some em silêncio.
  */
-export function obrigacoesDoPrompt(texto: string | null | undefined, limite = 40): string[] {
-  if (!texto) return [];
-  const linhas = String(texto)
-    .split(/\r?\n/)
-    .map((l) => l.replace(/^[\s\-*•\d.)]+/, "").trim())
-    .filter((l) => l.length >= 8 && LINHA_OBRIGATORIA.test(l));
+export function obrigacoesDoPrompt(texto: string | null | undefined, escopo = "whatsapp"): string[] {
+  const { regras } = extrairRegrasPublicadas(texto, { escopo });
   const unicas: string[] = [];
-  for (const l of linhas) {
-    if (!unicas.some((u) => normalizarTexto(u) === normalizarTexto(l))) unicas.push(l.slice(0, 300));
-    if (unicas.length >= limite) break;
+  for (const r of regras) {
+    if (!unicas.some((u) => normalizarTexto(u) === normalizarTexto(r.descricao))) {
+      unicas.push(r.descricao);
+    }
   }
   return unicas;
 }
