@@ -422,6 +422,37 @@ export function CargaTeste() {
           </span>
         </div>
 
+        {preparo ? (
+          <div className="flex items-center gap-2 rounded-lg border p-3 text-sm">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            {preparo.prontos >= preparo.total && preparo.total > 0 ? (
+              <span>
+                {preparo.prontos}/{preparo.total} — prontos · Iniciando teste...
+              </span>
+            ) : (
+              <span>
+                Preparando Leads de Teste... {preparo.prontos}/{preparo.total}
+              </span>
+            )}
+          </div>
+        ) : null}
+
+        {erroPreparo ? (
+          <div className="space-y-2 rounded-lg border border-destructive/40 p-3 text-sm">
+            <p className="font-medium">Preparação falhou.</p>
+            <p className="text-muted-foreground">{erroPreparo}</p>
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={rodando || !clinicaId}
+              onClick={() => void iniciar(confirmadoRef.current)}
+            >
+              <RefreshCw className="mr-2 h-4 w-4" /> Tentar novamente
+            </Button>
+          </div>
+        ) : null}
+
+
         {detalhe ? (
           <div className="space-y-3 rounded-lg border p-4">
             <div className="flex flex-wrap items-center gap-2">
