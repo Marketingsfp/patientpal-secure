@@ -4,7 +4,10 @@
  */
 import { describe, expect, it } from "bun:test";
 import {
+  avaliacaoEmObservacao,
+  avaliacaoOperacional,
   avaliarTransformacoes,
+  descreverAvaliacaoConfianca,
   criarRegistroTurno,
   finalizarRegistroTurno,
   lacunasDoTurno,
