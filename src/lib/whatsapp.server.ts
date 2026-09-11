@@ -1165,7 +1165,30 @@ async function gerarRespostaNinaInterno(
   // obrigatória — em vez de o prompt mandar uma coisa e o fato dizer outra.
   const { resolverPrecedenciaDoTurno } = await import("@/lib/nina/prompt/precedencia-turno");
   const { hashDoTexto: hashPrecedencia } = await import("@/lib/nina/confidence/hash");
+  // Instruções adicionais do turno (esclarecimento, correção de rota) entram
+  // pelo MESMO contrato, com origem, prioridade e motivo registrados.
+  const instrucoesAdicionaisTurno: Array<{
+    codigo: string;
+    origem: string;
+    motivo: string;
+    texto: string;
+  }> = [];
+  {
+    const { blocoContratoEsclarecimento, normalizarPendencia: normPend } = await import(
+      "@/lib/nina/confidence/esclarecimento"
+    );
+    const bloco = blocoContratoEsclarecimento(normPend(fluxoEstado.clarification));
+    if (bloco) {
+      instrucoesAdicionaisTurno.push({
+        codigo: "ESCLARECIMENTO_PENDENTE",
+        origem: "motor de confiabilidade (estado do fluxo)",
+        motivo: "há pendência de esclarecimento aberta nesta conversa",
+        texto: bloco,
+      });
+    }
+  }
   const precedenciaTurno = resolverPrecedenciaDoTurno({
+    instrucoesAdicionais: instrucoesAdicionaisTurno,
     textoPublicado: behaviorPrompt,
     escopo: "whatsapp",
     hash: hashPrecedencia(behaviorPrompt) ?? null,
