@@ -1394,6 +1394,8 @@ async function gerarRespostaNinaInterno(
     systemBlocos: [systemPromptFinal],
     historico: historico as MsgIA[],
     mensagemAtual: mensagemPaciente,
+    // Deduplicação por ID: a mensagem atual já está gravada no histórico.
+    idsMensagemAtual: opcoes?.mensagensEntrada ?? null,
     paciente: pacienteIdEfetivo
       ? {
           primeiro_nome: pacienteNomeEfetivo ? pacienteNomeEfetivo.split(" ")[0]! : null,
