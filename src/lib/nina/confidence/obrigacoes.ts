@@ -729,9 +729,18 @@ export function InstructionComplianceValidator(
   } else if (verificaveis.length === 0) {
     status = "UNKNOWN";
     reasonCode = "OBRIGACOES_NAO_VERIFICAVEIS";
+  } else if (descumpridas.length === 0 && r.estadoRestricoes === "indeterminadas") {
+    // Existe regra publicada aplicável que não pôde ser conferida: não aprova.
+    status = "UNKNOWN";
+    reasonCode = "RESTRICAO_PUBLICADA_NAO_VERIFICADA";
   } else if (descumpridas.length === 0) {
     status = "PASS";
     reasonCode = r.esclarecimentoPertinente ? "ESCLARECIMENTO_PERTINENTE" : "OBRIGACOES_CUMPRIDAS";
+  } else if (descumpridas.some((a) => a.obrigacao.origem === "instrucoes_publicadas")) {
+    // Violação de regra publicada é sempre falha, mesmo com esclarecimento
+    // pertinente ou fatos corretos no restante da resposta.
+    status = "FAIL";
+    reasonCode = "RESTRICAO_PUBLICADA_DESCUMPRIDA";
   } else if (descumpridas.length === verificaveis.length) {
     status = "FAIL";
     reasonCode = r.compativelComEstagio ? "OBRIGACAO_NAO_CUMPRIDA" : "RESPOSTA_FORA_DO_PEDIDO";
