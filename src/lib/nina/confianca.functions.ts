@@ -174,6 +174,13 @@ import {
   type ResultadoFinalAuditoria,
 } from "./confidence/auditoria";
 import type { NivelConfianca } from "./confidence/types";
+import {
+  resultadoRegistrado,
+  selecionarAvaliacaoDaSaida,
+  TEXTO_MOTIVO_VINCULO,
+  TEXTO_SEM_EFEITO,
+  type MotivoVinculo,
+} from "./confidence/identidade-saida";
 
 export type ValidadorResumo = { validator: string; status: string; reasonCode: string | null };
 
@@ -229,6 +236,19 @@ export type ConfiabilidadeDecisaoView = {
   efeitoRealizado: string | null;
   /** FASE 6 — o motor apenas observou (shadow) ou decidiu (enforce). */
   modo: string | null;
+  /**
+   * FASE 6 (identidade da saída) — esta avaliação descreve a saída consultada?
+   * Quando `false`, o painel mostra o motivo e NÃO apresenta nota.
+   */
+  avaliacaoDisponivel: boolean;
+  /** Motivo legível do vínculo (exato, conteúdo divergente, registro antigo...). */
+  vinculoMotivo: string;
+  /** Código do motivo, para testes e telemetria. */
+  vinculoCodigo: string;
+  /** Representação efetivamente avaliada. */
+  representacao: string | null;
+  /** O conteúdo entregue foi conferido contra o conteúdo avaliado? */
+  conteudoConferido: boolean;
 };
 
 export type SegurancaAcaoView = {
@@ -250,41 +270,81 @@ export const confiabilidadeDaExecucao = createServerFn({ method: "POST" })
         execucaoId: z.string().uuid(),
         /** FASE 6 — vínculo principal: a mensagem que o paciente recebeu. */
         outgoingMessageId: z.string().uuid().optional(),
+        /** FASE 6 — conversa da mensagem (isolamento explícito). */
+        conversaId: z.string().uuid().optional(),
+        /** FASE 6 — texto/áudio realmente entregue nesta bolha. */
+        conteudo: z.string().max(20000).optional(),
+        /** FASE 6 — forma da saída: texto completo ou áudio. */
+        representacao: z.enum(["texto_completo", "audio_integral", "audio_resumo", "audio"]).optional(),
       })
       .parse(i),
   )
   .handler(async ({ data, context }): Promise<ConfiabilidadeDecisaoView | null> => {
     const colunas =
-      "created_at, ambiente, score, nivel, intencao, resultado_final, bloqueadores, validadores, ferramentas, fontes, reason_codes, acao_solicitada, turn_type, policy_version, avaliacao, evidence_coverage, engine_version, config_id, config_origem, etapa_ativacao, decisao, teria_permitido, modo, handoff_ocorreu";
+      "created_at, ambiente, score, nivel, intencao, resultado_final, bloqueadores, validadores, ferramentas, fontes, reason_codes, acao_solicitada, turn_type, policy_version, avaliacao, evidence_coverage, engine_version, config_id, config_origem, etapa_ativacao, decisao, teria_permitido, modo, handoff_ocorreu, representacao, texto_final_hash, conversation_id, outgoing_message_id, execucao_id";
     // FASE 6 — o snapshot é procurado primeiro pela mensagem realmente
     // enviada. Só quando esse vínculo não existir (registros antigos) usamos
     // a execução. FASE 5 — dentro disso, vale a confiança da RESPOSTA FINAL.
-    const buscar = async (avaliacao: string | null, porMensagem: boolean) => {
+    // FASE 6 — todos os candidatos do MESMO atendimento (mensagem enviada e
+    // execução) são carregados e a escolha é feita pelos vínculos canônicos:
+    // clínica, conversa, turno, execução, mensagem, representação e hash.
+    const buscarCandidatos = async (porMensagem: boolean) => {
       let q = context.supabase
         .from("nina_confianca_decisoes")
         .select(colunas)
-        .eq("clinica_id", data.clinicaId);
+        .eq("clinica_id", data.clinicaId)
+        .eq("avaliacao", "answer_confidence");
       q = porMensagem
         ? q.eq("outgoing_message_id", data.outgoingMessageId!)
         : q.eq("execucao_id", data.execucaoId);
-      if (avaliacao) q = q.eq("avaliacao", avaliacao);
-      return q.order("created_at", { ascending: false }).limit(1).maybeSingle();
+      return q.order("created_at", { ascending: false }).limit(10);
     };
-    const tentativas: Array<[string | null, boolean]> = data.outgoingMessageId
-      ? [["answer_confidence", true], [null, true], ["answer_confidence", false], [null, false]]
-      : [["answer_confidence", false], [null, false]];
-    let achado: Awaited<ReturnType<typeof buscar>> | null = null;
-    for (const [avaliacao, porMensagem] of tentativas) {
-      const r = await buscar(avaliacao, porMensagem);
+    const candidatos: Array<Record<string, unknown>> = [];
+    if (data.outgoingMessageId) {
+      const r = await buscarCandidatos(true);
       if (r.error) throw new Error(r.error.message);
-      if (r.data) {
-        achado = r;
-        break;
-      }
+      candidatos.push(...((r.data ?? []) as unknown as Array<Record<string, unknown>>));
     }
-    const row = achado?.data ?? null;
+    if (candidatos.length === 0) {
+      const r = await buscarCandidatos(false);
+      if (r.error) throw new Error(r.error.message);
+      candidatos.push(...((r.data ?? []) as unknown as Array<Record<string, unknown>>));
+    }
+
+    const escolha = selecionarAvaliacaoDaSaida(
+      candidatos.map((c) => ({
+        clinicaId: data.clinicaId,
+        conversaId: c["conversation_id"] ? String(c["conversation_id"]) : null,
+        execucaoId: c["execucao_id"] ? String(c["execucao_id"]) : null,
+        outgoingMessageId: c["outgoing_message_id"] ? String(c["outgoing_message_id"]) : null,
+        representacao: c["representacao"] ? String(c["representacao"]) : null,
+        textoHash: c["texto_final_hash"] ? String(c["texto_final_hash"]) : null,
+        linha: c,
+      })),
+      {
+        clinicaId: data.clinicaId,
+        conversaId: data.conversaId ?? null,
+        execucaoId: data.execucaoId,
+        outgoingMessageId: data.outgoingMessageId ?? null,
+        representacao: data.representacao ?? "texto_completo",
+        conteudo: data.conteudo ?? null,
+      },
+    );
     // Sem snapshot válido a mensagem fica "Não avaliada" — nunca 100%.
-    if (!row) return null;
+    if (!escolha.avaliacao) {
+      if (escolha.motivo === "sem_avaliacao") return null;
+      return semAvaliacaoAplicavel(escolha.motivo, escolha.conteudoConferido, null);
+    }
+    const row = escolha.avaliacao.linha;
+    if (!escolha.suficiente) {
+      // Existe avaliação, mas ela não descreve ESTA saída. O painel diz isso
+      // em vez de emprestar a nota de outro conteúdo.
+      return semAvaliacaoAplicavel(
+        escolha.motivo,
+        escolha.conteudoConferido,
+        row["representacao"] ? String(row["representacao"]) : null,
+      );
+    }
 
     // Erro reportado depois pela equipe para esta MESMA resposta.
     const { data: erroRow } = await context.supabase
@@ -364,9 +424,12 @@ export const confiabilidadeDaExecucao = createServerFn({ method: "POST" })
     return {
       score: Math.round(Number(r.score) || 0),
       nivel: ROTULO_NIVEL[(r.nivel ?? "LOW") as NivelConfianca] ?? "—",
-      resultado:
-        ROTULO_RESULTADO[(r.resultado_final ?? "transferido_para_humano") as ResultadoFinalAuditoria] ??
-        "—",
+      // FASE 6 — efeito COMPROVADO. Sem efeito gravado não se inventa um
+      // desfecho (antes, um registro sem resultado virava "transferido").
+      resultado: resultadoRegistrado({
+        resultadoFinal: r.resultado_final,
+        rotulo: (v) => ROTULO_RESULTADO[v as ResultadoFinalAuditoria] ?? null,
+      }),
       intencao: r.intencao,
       ambiente: r.ambiente,
       bloqueadores: r.bloqueadores ?? [],
@@ -421,12 +484,64 @@ export const confiabilidadeDaExecucao = createServerFn({ method: "POST" })
         const v = (r as unknown as Record<string, unknown>)["teria_permitido"];
         return v == null ? null : Boolean(v);
       })(),
-      efeitoRealizado:
-        ROTULO_RESULTADO[(r.resultado_final ?? "") as ResultadoFinalAuditoria] ??
-        texto(r, "resultado_final"),
+      efeitoRealizado: r.resultado_final
+        ? (ROTULO_RESULTADO[r.resultado_final as ResultadoFinalAuditoria] ??
+          texto(r, "resultado_final"))
+        : null,
       modo: texto(r, "modo"),
+      // FASE 6 — identidade da saída avaliada.
+      avaliacaoDisponivel: true,
+      vinculoMotivo: TEXTO_MOTIVO_VINCULO[escolha.motivo],
+      vinculoCodigo: escolha.motivo,
+      representacao: texto(r, "representacao"),
+      conteudoConferido: escolha.conteudoConferido,
     };
   });
+
+/**
+ * FASE 6 — existe registro, mas ele não descreve a saída consultada. O painel
+ * recebe o motivo explícito e nenhuma nota.
+ */
+function semAvaliacaoAplicavel(
+  motivo: MotivoVinculo,
+  conteudoConferido: boolean,
+  representacao: string | null,
+): ConfiabilidadeDecisaoView {
+  return {
+    score: 0,
+    nivel: "—",
+    resultado: TEXTO_SEM_EFEITO,
+    intencao: null,
+    ambiente: "",
+    bloqueadores: [],
+    linhas: [],
+    reasonCodes: [],
+    erroReportado: null,
+    acaoSolicitada: null,
+    tipoTurno: null,
+    policyVersion: null,
+    registradoEm: "",
+    coberturaEvidencias: null,
+    validadores: [],
+    avaliacao: null,
+    engineVersion: null,
+    seguranca: null,
+    decisaoTurno: null,
+    motivoDecisao: null,
+    configId: null,
+    configOrigem: null,
+    etapaAtivacao: null,
+    decisaoRecomendada: null,
+    teriaPermitido: null,
+    efeitoRealizado: null,
+    modo: null,
+    avaliacaoDisponivel: false,
+    vinculoMotivo: TEXTO_MOTIVO_VINCULO[motivo],
+    vinculoCodigo: motivo,
+    representacao,
+    conteudoConferido,
+  };
+}
 
 // ------------------------------------------------ FASE 6: métricas de confiabilidade
 
@@ -1092,6 +1207,14 @@ export type ConfiancaDaMensagem = {
   avaliacao: "answer_confidence" | "action_safety";
   /** FASE 6 — configuração efetiva usada quando a resposta foi produzida. */
   config_id: string | null;
+  /**
+   * FASE 6 (identidade da saída) — o que exatamente foi avaliado: texto
+   * completo, áudio integral ou resumo falado. Sem isto o selo do texto
+   * apareceria em cima de um áudio com outro conteúdo.
+   */
+  representacao?: string | null;
+  /** FASE 6 — impressão digital do conteúdo avaliado (confere com o entregue?). */
+  texto_final_hash?: string | null;
 };
 
 /** Vínculo entre o snapshot de confiança e o reporte de erro da equipe. */
@@ -1121,7 +1244,7 @@ export const confiancaDasExecucoes = createServerFn({ method: "POST" })
     const { data: rows, error } = await context.supabase
       .from("nina_confianca_decisoes")
       .select(
-        "execucao_id, score, nivel, resultado_final, acao, bloqueadores, bloqueio, created_at, policy_version, avaliacao, config_id",
+        "execucao_id, score, nivel, resultado_final, acao, bloqueadores, bloqueio, created_at, policy_version, avaliacao, config_id, representacao, texto_final_hash",
       )
       .eq("clinica_id", data.clinicaId)
       .in("execucao_id", data.execucaoIds)
@@ -1153,6 +1276,8 @@ export const confiancaDasExecucoes = createServerFn({ method: "POST" })
         alta_confianca_com_erro: false,
         avaliacao: peso === 2 ? "answer_confidence" : "action_safety",
         config_id: r["config_id"] ? String(r["config_id"]) : null,
+        representacao: r["representacao"] ? String(r["representacao"]) : null,
+        texto_final_hash: r["texto_final_hash"] ? String(r["texto_final_hash"]) : null,
       });
     }
 
