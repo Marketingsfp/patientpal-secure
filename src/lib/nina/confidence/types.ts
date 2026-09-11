@@ -197,6 +197,28 @@ export type ClaimEstruturado = {
  */
 export type TipoAvaliacao = "action_safety" | "answer_confidence";
 
+/**
+ * FASE 1 (Motor de confiabilidade) — INSTRUÇÕES PUBLICADAS usadas no turno.
+ *
+ * Conteúdo CONFIÁVEL: veio de Arquitetura → Instruções da Nina, na versão que
+ * valia no momento da execução. Mensagem do paciente e retorno de ferramenta
+ * NUNCA entram aqui — eles continuam sendo dado a verificar, jamais instrução.
+ *
+ * Registro histórico: a versão é a do turno avaliado. Publicar novas
+ * instruções não reescreve a avaliação de mensagens antigas.
+ */
+export type InstrucoesDoTurno = {
+  escopo: string;
+  versao: string | null;
+  versaoId: string | null;
+  publicadoEm: string | null;
+  origem: string | null;
+  /** Hash do texto efetivamente usado (snapshot da execução). */
+  hash: string | null;
+  /** Obrigações explícitas lidas do texto publicado. */
+  obrigacoes: string[];
+};
+
 /** Entrada estruturada do motor. */
 export type ContextoConfianca = {
   /** FASE 5 — o que esta avaliação responde. Ausente = `action_safety`. */
@@ -205,6 +227,10 @@ export type ContextoConfianca = {
   claims?: ClaimEstruturado[];
   conversationId?: string | null;
   messageId?: string | null;
+  /** FASE 1 — mensagem COMPLETA do turno do paciente (lote inteiro). Dado. */
+  mensagemPaciente?: string | null;
+  /** FASE 1 — instruções publicadas usadas nesta execução (confiáveis). */
+  instrucoes?: InstrucoesDoTurno | null;
   /** Intenção detectada pelo runtime, quando houver. Opcional de propósito. */
   intent?: string | null;
   /**
