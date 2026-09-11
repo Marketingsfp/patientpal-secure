@@ -173,6 +173,13 @@ interface Lanc {
   mensalidadeVencimento?: string | null;
   /** Nº da parcela da mensalidade; 0 ou negativo é taxa de adesão. */
   mensalidadeParcela?: number | null;
+  /** Agendamento, paciente, modalidade do convênio e empresa conveniada do
+   *  lançamento — é o que separa Particular, Cartão e Convênio nos cards
+   *  (ver `@/lib/financeiro/movimento-resultado`). */
+  agendamento_id?: string | null;
+  paciente_id?: string | null;
+  convenio_modalidade?: string | null;
+  empresa_id?: string | null;
 }
 /** Rótulos amigáveis das formas de pagamento (usados no recibo impresso). */
 const FORMA_LABEL: Record<string, string> = {
