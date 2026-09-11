@@ -1158,6 +1158,27 @@ async function gerarRespostaNinaInterno(
   })();
 
   // ------------------------------------------------------------------
+  // PRECEDÊNCIA DO TURNO — antes do modelo, e agora também no fluxo NORMAL.
+  // As regras da versão publicada aplicáveis a ESTA mensagem, ambiente e
+  // sessão resolvem o conflito com a regra geral de apresentação. Se a
+  // exceção publicada proíbe saudação, o contexto deixa de dizer que ela é
+  // obrigatória — em vez de o prompt mandar uma coisa e o fato dizer outra.
+  const { resolverPrecedenciaDoTurno } = await import("@/lib/nina/prompt/precedencia-turno");
+  const precedenciaTurno = resolverPrecedenciaDoTurno({
+    textoPublicado: behaviorPrompt,
+    escopo: "whatsapp",
+    hash: hashDoTexto(behaviorPrompt) ?? null,
+    versao: instrucoesNina.versao != null ? String(instrucoesNina.versao) : null,
+    versaoId: instrucoesNina.versaoId ?? null,
+    publicadoEm: instrucoesNina.publicadoEm ?? null,
+    mensagemPaciente,
+    ambiente: opcoes?.teste ? "homologacao" : "producao",
+    saudacaoObrigatoria,
+  });
+  const saudacaoObrigatoriaEfetivaTurno = precedenciaTurno.saudacaoObrigatoria;
+  const saudacaoDispensadaPor = precedenciaTurno.saudacaoDispensadaPor;
+
+  // ------------------------------------------------------------------
   // FASE 3 — RUNTIME CONTEXT: só FATOS. Nenhuma regra conversacional aqui.
   // ------------------------------------------------------------------
   const runtimeContext = {
