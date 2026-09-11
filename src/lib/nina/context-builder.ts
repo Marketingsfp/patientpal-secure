@@ -52,6 +52,13 @@ export type EntradaContexto = {
   historico: MensagemContexto[];
   /** Mensagem atual do paciente. */
   mensagemAtual: string;
+  /**
+   * Ids físicos das mensagens que compõem a mensagem atual deste turno. O
+   * histórico já contém essas mensagens gravadas; sem isso elas apareceriam
+   * duas vezes no contexto. A deduplicação é por ID: mensagens de texto igual
+   * enviadas em turnos diferentes continuam preservadas.
+   */
+  idsMensagemAtual?: readonly string[] | null;
   /** Somente os campos mínimos do paciente. */
   paciente?: PacienteContexto | null;
   /** Conhecimento já recuperado (resultado do retrieval, não a planilha). */
