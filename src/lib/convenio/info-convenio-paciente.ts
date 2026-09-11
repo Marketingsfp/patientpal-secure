@@ -208,10 +208,11 @@ export async function obterInfoConvenioPaciente(params: {
   // errada do médico placeholder (ex.: Mamografia 10% em vez de
   // Tomografia 5%).
   let procRow: { id: string; nome: string; tipo: string | null } | null = null;
+  const COLS_PROC = `id,nome,tipo,${COLUNAS_PRECO_REVISAO}`;
   if (procNomeBase) {
     const { data: exact } = await supabase
       .from("procedimentos")
-      .select("id,nome,tipo")
+      .select(COLS_PROC)
       .eq("clinica_id", clinicaId)
       .eq("ativo", true)
       .ilike("nome", procNomeBase)
