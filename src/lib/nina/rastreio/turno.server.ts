@@ -14,6 +14,7 @@ import { AsyncLocalStorage } from "node:async_hooks";
 import { sanitizarMetadata, type EventoTrace } from "@/lib/nina/arquitetura/tracing";
 import { gravarEventosTrace } from "@/lib/nina/arquitetura/tracing.server";
 import {
+  avaliacaoOperacional,
   criarRegistroTurno,
   finalizarRegistroTurno,
   lacunasDoTurno,
