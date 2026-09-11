@@ -110,14 +110,21 @@ export function comporRequestNina(entrada: EntradaComposer): RequestNina {
   if (avisos.length > 0) {
     console.warn("[NINA_PROMPT_COMPOSER] runtime context com texto imperativo", avisos);
   }
+  const contratoPrecedencia = (entrada.contratoPrecedencia ?? "").trim();
   const json = JSON.stringify(entrada.runtimeContext, null, 2);
-  const systemPrompt = [envelope, behaviorPrompt, `${CABECALHO_CONTEXTO}\n${json}`]
+  const systemPrompt = [
+    envelope,
+    behaviorPrompt,
+    contratoPrecedencia,
+    `${CABECALHO_CONTEXTO}\n${json}`,
+  ]
     .filter(Boolean)
     .join("\n\n");
   return {
     systemPrompt,
     envelope,
     behaviorPrompt,
+    contratoPrecedencia,
     runtimeContext: entrada.runtimeContext,
     avisos,
   };
