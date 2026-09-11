@@ -1569,6 +1569,13 @@ async function gerarRespostaNinaInterno(
   // FASE 5 — quantas rodadas de modelo o turno consumiu. Caminho sem modelo
   // termina com 0 e é registrado como tal, sem inventar execução de LLM.
   let rodadasDoTurno = 0;
+  // AUDITORIA — resultado da verificação de cada exigência publicada, lido da
+  // avaliação final. Fica vazio quando o validador não rodou; ausência de
+  // verificação nunca vira "restrições cumpridas".
+  let verificacoesInstrucoesTurno: {
+    verificacoes: import("@/lib/nina/rastreio/auditoria-instrucoes").VerificacaoExigencia[];
+    falhaDeInterpretacao: boolean;
+  } | null = null;
   for (let rodada = 0; rodada < MAX_RODADAS; rodada++) {
     rodadasDoTurno = rodada + 1;
     // Toda chamada de modelo da Nina passa pelo Nina AI Gateway.
@@ -2626,6 +2633,12 @@ async function gerarRespostaNinaInterno(
         operacaoAfirmada: agendamentoConfirmado,
         operacaoComprovada: Boolean(fluxoEstado.appointment.appointment_id),
       });
+      {
+        const { verificacoesDasInstrucoes } = await import(
+          "@/lib/nina/confidence/conformidade-entrega"
+        );
+        verificacoesInstrucoesTurno = verificacoesDasInstrucoes(respostaFinalAvaliada);
+      }
       const comprovado = confirmarResultadoRevisao(revisao, {
         executada: revisao.aplicada,
         comprovacao: houveHandoff ? (estadoId.conversaId ?? null) : null,
@@ -2990,6 +3003,22 @@ async function gerarRespostaNinaInterno(
         titulo: "Alterações aplicadas depois da resposta do modelo",
         dados: { antes: respostaDoModelo, depois: resposta },
         codigo,
+      });
+    }
+    // Fecha a auditoria com o texto REALMENTE entregue (inclusive quando a
+    // entrega é encaminhamento ou aviso controlado) e suas intervenções.
+    {
+      const { fecharAuditoriaInstrucoesDoTurno } = await import(
+        "@/lib/nina/rastreio/turno.server"
+      );
+      fecharAuditoriaInstrucoesDoTurno({
+        textoEntregue: resposta,
+        ...(verificacoesInstrucoesTurno
+          ? {
+              verificacoes: verificacoesInstrucoesTurno.verificacoes,
+              estadoFalhaDeInterpretacao: verificacoesInstrucoesTurno.falhaDeInterpretacao,
+            }
+          : {}),
       });
     }
     registrarEtapa({
