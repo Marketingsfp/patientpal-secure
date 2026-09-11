@@ -527,6 +527,32 @@ export function avaliarGrounding(ctx: ContextoConfianca, texto?: string | null):
           }).noEscopo.filter((f) => String(f.valor ?? "").trim() !== "")
         : [];
 
+      // O próprio fato pode DECLARAR a ausência ("preparo: Não é preciso
+      // jejum"): aí a negativa está apoiada, não contrariada.
+      const apoiador = contrarios.find((f) => {
+        const v = normalizarTexto(f.valor);
+        const tr = normalizarTexto(trecho);
+        return (
+          classificarNatureza(String(f.valor ?? "")) === "ausencia_afirmada" ||
+          (v !== "" && (v.includes(tr) || tr.includes(v)))
+        );
+      });
+      if (apoiador) {
+        push({
+          tipo,
+          trecho,
+          origem,
+          modalidade,
+          natureza,
+          situacao: "confirmado",
+          suportado: true,
+          fonte: fonteOficial,
+          referencia: referenciaDoFato(apoiador),
+          motivo: "negativa apoiada em fato do mesmo escopo que declara a ausência",
+        });
+        return;
+      }
+
       if (contrarios.length > 0) {
         const f = contrarios[0]!;
         push({
