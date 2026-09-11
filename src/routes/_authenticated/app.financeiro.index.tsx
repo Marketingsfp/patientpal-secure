@@ -9,6 +9,7 @@ import {
   Minus,
   Plus,
   Receipt,
+  RefreshCw,
   Stethoscope,
   TrendingDown,
   TrendingUp,
