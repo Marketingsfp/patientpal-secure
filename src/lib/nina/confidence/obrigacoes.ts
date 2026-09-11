@@ -444,11 +444,22 @@ function avaliarUma(
   const n = normalizarTexto(resposta);
 
   if (o.tipo === "restricao_literal" && o.literal) {
-    const ok = normalizarTexto(resposta).includes(normalizarTexto(o.literal));
+    const operador: OperadorLiteral = o.operador ?? "igualdade";
+    if (operador === "inclusao") {
+      const ok = espacos(resposta).includes(espacos(o.literal));
+      return {
+        obrigacao: o,
+        status: ok ? "cumprida" : "descumprida",
+        motivo: ok ? "TEXTO_LITERAL_PRESENTE" : "TEXTO_LITERAL_AUSENTE",
+      };
+    }
+    // "Responda EXATAMENTE": igualdade do conteúdo integral, com caixa e
+    // acentuação preservadas. Presença não basta.
+    const ok = espacos(resposta) === espacos(o.literal);
     return {
       obrigacao: o,
       status: ok ? "cumprida" : "descumprida",
-      motivo: ok ? "TEXTO_LITERAL_PRESENTE" : "TEXTO_LITERAL_AUSENTE",
+      motivo: ok ? "TEXTO_LITERAL_EXATO" : "TEXTO_LITERAL_DIVERGENTE",
     };
   }
 
