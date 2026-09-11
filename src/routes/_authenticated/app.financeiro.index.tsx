@@ -254,19 +254,18 @@ function FinDashboard() {
             </Button>
           ))}
         </div>
+        <ContagemAtualizacao
+          atualizadoEm={atualizadoEm}
+          proximaEm={proximaEm}
+          atualizando={atualizando || carregando}
+          falhou={falhouAtualizar}
+          onAtualizarAgora={() => setReload((r) => r + 1)}
+        />
         <p className="text-xs text-muted-foreground">
           {fmtDate(de)}
           {de !== ate && ` a ${fmtDate(ate)}`} · atendimentos e repasse pela mesma conta do Rateio
           da Receita (Relatórios), no dia do atendimento. Clique em um card para ver o detalhamento
           em tela cheia.
-          {atualizadoEm && (
-            <>
-              {" "}
-              Atualizado às{" "}
-              {atualizadoEm.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })} —
-              atualiza sozinho a cada 2 minutos.
-            </>
-          )}
         </p>
       </div>
 
