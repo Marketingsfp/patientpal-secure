@@ -216,6 +216,11 @@ describe("colunas do analitico", () => {
     expect(rotulos.indexOf("Tipo de serviço")).toBe(rotulos.indexOf("Serviço") + 1);
   });
 
+  it("traz a modalidade e, logo depois, a forma de pagamento", () => {
+    const rotulos = colunasRateio("analitico", "data", false).map((c) => c.rotulo);
+    expect(rotulos.indexOf("Forma de pagamento")).toBe(rotulos.indexOf("Modalidade") + 1);
+  });
+
   it("nao ganha as colunas de comparacao, que so existem no sintetico", () => {
     const chaves = colunasRateio("analitico", "data", true).map((c) => c.chave);
     expect(chaves).not.toContain("variacaoValor");
