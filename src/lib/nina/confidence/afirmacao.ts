@@ -296,6 +296,8 @@ function noEscopoDaAfirmacao(
   for (const campo of QUALIFICADORES) {
     const pedido = chave[campo];
     if (pedido === undefined || pedido === null || String(pedido).trim() === "") continue;
+    if (campo === "procedimento" && PROCEDIMENTOS_GENERICOS.has(normalizarTexto(String(pedido))))
+      continue;
     // Nenhum fato deste campo traz o qualificador: ele não discrimina nada
     // neste turno, então não serve nem para aprovar nem para reprovar —
     // exceto unidade e convênio, que restringem o caso afirmado e só podem
