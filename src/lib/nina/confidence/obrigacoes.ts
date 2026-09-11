@@ -74,7 +74,27 @@ export type Obrigacao = {
   verificacao: "deterministica" | "semantica";
 };
 
-export type StatusObrigacao = "cumprida" | "descumprida" | "indeterminada";
+/**
+ * Estados distintos e auditáveis de UMA obrigação:
+ * - `cumprida` / `descumprida`: conferência determinística concluída;
+ * - `nao_aplicavel`: a condição publicada não foi acionada neste turno;
+ * - `indeterminada`: não foi possível conferir (linguagem aberta sem revisão,
+ *   regra não interpretada). NUNCA é lida como cumprimento.
+ */
+export type StatusObrigacao =
+  | "cumprida"
+  | "descumprida"
+  | "nao_aplicavel"
+  | "indeterminada";
+
+/** Estado agregado das restrições publicadas neste turno. */
+export type EstadoRestricoes =
+  | "cumpridas"
+  | "descumpridas"
+  | "indeterminadas"
+  | "nenhuma_regra_publicada"
+  | "nenhuma_regra_aplicavel"
+  | "falha_na_interpretacao";
 
 export type AvaliacaoObrigacao = {
   obrigacao: Obrigacao;
