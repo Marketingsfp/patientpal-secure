@@ -773,4 +773,3 @@ function montarDetalhe(drill: Drill, dados: DadosPainel, r: ResumoPainel, visao:
     temSintetico: false,
   };
 }
-
