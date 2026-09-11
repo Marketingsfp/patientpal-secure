@@ -131,14 +131,12 @@ export function resolverPrecedenciaDoTurno(e: EntradaPrecedenciaTurno): Preceden
     hash: e.hash ?? null,
     versao: e.versao ?? null,
     versaoId: e.versaoId ?? null,
-    publicadoEm: e.publicadoEm ?? null,
   });
 
+  const ambiente =
+    e.ambiente === "producao" || e.ambiente === "homologacao" ? e.ambiente : null;
   const aplicaveis = extracao.regras.filter((r) =>
-    regraSeAplica(r, {
-      mensagemPaciente: e.mensagemPaciente ?? null,
-      ambiente: e.ambiente ?? null,
-    }),
+    regraSeAplica(r, { mensagemPaciente: e.mensagemPaciente ?? null, ambiente }),
   );
 
   // Regra não interpretada não vira exceção: só limitação registrada.
