@@ -150,6 +150,30 @@ export function RegistroTurnoResumo({
         }),
     ) ?? null;
   const entrega = (resumo["entrega"] ?? null) as Record<string, unknown> | null;
+  // FASE 3 — o resumo nasce antes da persistência da resposta; os eventos de
+  // saída posteriores completam o vínculo (nunca reescrevem o resumo).
+  const eventoResumo = eventos.find((e) => e?.node_id === "turn.summary");
+  const saida = evidenciaSaidaDoTurno({
+    entregaDoResumo: entrega
+      ? {
+          mensagemId: (entrega["mensagemId"] ?? entrega["mensagem_id"] ?? null) as string | null,
+          canal: (entrega["canal"] ?? null) as string | null,
+          tamanho: (entrega["tamanho"] ?? null) as number | null,
+          textoHash: (entrega["textoHash"] ?? entrega["texto_hash"] ?? null) as string | null,
+        }
+      : null,
+    eventos: eventosDeSaidaDoTurno(eventos, {
+      turnoId: (resumo["turno_id"] ?? eventoResumo?.trace_id ?? null) as string | null,
+      execucaoId: (resumo["execucao_id"] ?? eventoResumo?.execution_id ?? null) as string | null,
+      conversaId: (eventoResumo?.conversation_id ?? null) as string | null,
+    }),
+    ambiente: (resumo["ambiente"] ?? null) as string | null,
+    teste: (resumo["teste"] ?? null) as boolean | null,
+  });
+  // A lacuna do resumo some quando o vínculo foi comprovado depois dele.
+  const lacunasVisiveis = saida.mensagemId
+    ? lacunas.filter((l) => l !== "mensagem_entregue")
+    : lacunas;
   const situacao = situacaoDasTransformacoes(resumo);
   const origem = origemComSituacao(
     (resumo["origem_resposta"] ?? null) as OrigemResposta | null,
