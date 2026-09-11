@@ -24,6 +24,14 @@ import { supabase } from "@/integrations/supabase/client";
  * há onde pendurar uma categoria. É justamente essa ausência de lançamento que
  * mantém o caixa e os relatórios de contas a receber limpos.
  *
+ * O PROFISSIONAL, porém, atendeu e recebe repasse sobre o valor de tabela (é o
+ * que a GR imprime para ele). Para o setor de repasse enxergar e pagar esse
+ * valor, o banco mantém uma linha em `fin_atendimentos` com
+ * `forma_pagamento = 'sem_faturamento'`, valor total e parte da clínica zerados
+ * (gatilho `fn_sem_faturamento_sync_financeiro`). Ela aparece em Financeiro →
+ * Atendimentos no dia do atendimento e some sozinha se a marcação sair, a
+ * ficha for cancelada ou virar falta.
+ *
  * DUAS TRAVAS, porque a marcação apaga uma receita da clínica com um clique:
  *
  *   1. Só a supervisão marca ou desmarca (`ROLES_AUTORIZAM_SEM_FATURAMENTO`).
