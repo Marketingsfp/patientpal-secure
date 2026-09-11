@@ -286,6 +286,13 @@ export type RevisaoFinal = {
   } | null;
   avaliadorFalhou: boolean;
   erroAvaliador: string | null;
+  /**
+   * Conformidade com as instruções publicadas, SEPARADA da nota numérica.
+   * Nota alta não compensa descumprimento crítico.
+   */
+  conformidade: ConformidadeInstrucoes;
+  /** A entrega do candidato está impedida por não conformidade bloqueante? */
+  bloqueiaEntrega: boolean;
   // 2) DECISÃO RECOMENDADA
   motivo: MotivoRevisao;
   acaoRecomendada: AcaoRevisao;
