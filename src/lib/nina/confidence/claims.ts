@@ -32,12 +32,21 @@ import {
 } from "./evidencia";
 import {
   correspondenciaDaAfirmacao,
+  fatosNoEscopoDaAfirmacao,
   qualificadoresDaAfirmacao,
-  
+  referenciaDoFato,
   segmentoNaPosicao,
   valorDaAfirmacao,
   TERMOS_DE_ASSUNTO,
 } from "./afirmacao";
+import {
+  classificarNatureza,
+  modalidadeDaNatureza,
+  oracaoNaPosicao,
+  pareceConterDadoOperacional,
+  NATUREZAS_NAO_FACTUAIS,
+  type NaturezaAfirmacao,
+} from "./modalidade";
 import type {
   ClaimEstruturado,
   ContextoConfianca,
@@ -144,6 +153,8 @@ export type ClaimAvaliado = {
   /** Como o claim entrou: estrutura do turno ou leitura complementar do texto. */
   origem: "estruturado" | "texto";
   modalidade: ModalidadeClaim;
+  /** FASE 3 — natureza da oração (ausência, desconhecido, falha, recusa...). */
+  natureza?: NaturezaAfirmacao;
   situacao: SituacaoClaim;
   suportado: boolean;
   /** Fonte concreta que sustentou o claim (quando houve). */
@@ -167,6 +178,8 @@ export type ResultadoGrounding = {
   naoVerificados: ClaimAvaliado[];
   /** A avaliação está incompleta (limite de claims ou retorno truncado). */
   truncado: boolean;
+  /** FASE 3 — limitações conhecidas da extração/avaliação deste turno. */
+  limitacoes: string[];
 };
 
 // ------------------------------------------------------- evidência disponível
@@ -253,6 +266,13 @@ function consultaRespondeu(ctx: ContextoConfianca, caps: Set<string>): ConsultaD
   );
 }
 
+/** FASE 3 — houve consulta desse tipo que FALHOU no turno? */
+function consultaFalhou(ctx: ContextoConfianca, caps: Set<string>): boolean {
+  return consultasDoTurno(ctx).some(
+    (c) => c.capacidade !== null && caps.has(c.capacidade) && c.status === "falha",
+  );
+}
+
 function capsDoTipo(tipo: TipoClaim): Set<string> {
   if (tipo === "disponibilidade" || tipo === "agendamento") return CAP_AGENDA;
   if (tipo === "profissional") return new Set([...CAP_CATALOGO, ...CAP_PROFISSIONAL]);
@@ -326,6 +346,8 @@ export type ClaimDoTexto = {
   tipo: TipoClaim;
   trecho: string;
   modalidade: ModalidadeClaim;
+  /** FASE 3 — natureza lida na ORAÇÃO da própria afirmação. */
+  natureza: NaturezaAfirmacao;
   /**
    * FASE 2 — segmento da resposta a que a afirmação pertence. Qualificadores
    * (procedimento, profissional, unidade, dia, hora, convênio, condição) são
@@ -351,9 +373,12 @@ export function extrairClaimsDoTexto(texto: string): ClaimDoTexto[] {
       const chave = `${tipo}:${trecho.toLowerCase()}`;
       if (!trecho || vistos.has(chave)) continue;
       vistos.add(chave);
-      const frase = segmentoNaPosicao(t, m.index ?? t.indexOf(trecho));
-      const modalidade = classificarModalidade(fraseDoTrecho(t, trecho));
-      achados.push({ tipo, trecho, modalidade, frase });
+      const posicao = m.index ?? t.indexOf(trecho);
+      const frase = segmentoNaPosicao(t, posicao);
+      // FASE 3 — a modalidade é lida na ORAÇÃO, não na frase inteira: o "não"
+      // de uma oração não contamina o preço afirmado na oração seguinte.
+      const natureza = classificarNatureza(oracaoNaPosicao(t, posicao));
+      achados.push({ tipo, trecho, modalidade: modalidadeDaNatureza(natureza), natureza, frase });
       if (achados.length >= LIMITE_CLAIMS) return achados;
     }
   }
@@ -365,6 +390,7 @@ export function extrairClaimsDoTexto(texto: string): ClaimDoTexto[] {
       tipo: "agendamento",
       trecho: "afirmação de agendamento concluído",
       modalidade: "afirmacao",
+      natureza: "afirmacao_positiva",
       frase: t,
     });
   }
@@ -399,6 +425,8 @@ export function avaliarGrounding(ctx: ContextoConfianca, texto?: string | null):
     chave: ChaveFato | null,
     /** FASE 2 — segmento da resposta onde a afirmação foi feita. */
     frase?: string,
+    /** FASE 3 — natureza da oração; derivada da modalidade quando ausente. */
+    naturezaInformada?: NaturezaAfirmacao,
   ) => {
     const idem = `${tipo}:${normalizarTexto(trecho)}`;
     if (vistos.has(idem)) return;
@@ -408,8 +436,40 @@ export function avaliarGrounding(ctx: ContextoConfianca, texto?: string | null):
       return;
     }
 
+    const natureza: NaturezaAfirmacao =
+      naturezaInformada ??
+      (modalidade === "pergunta"
+        ? "pergunta"
+        : modalidade === "hipotese"
+          ? "hipotese"
+          : modalidade === "negacao"
+            ? "ausencia_afirmada"
+            : "afirmacao_positiva");
+
     // Pergunta não afirma nada — nada a verificar.
-    if (modalidade === "pergunta") return;
+    if (natureza === "pergunta") return;
+
+    // FASE 3 — declarar desconhecimento, falha de consulta ou recusa NÃO é
+    // afirmar um fato: fica registrado como não verificável, sem penalizar.
+    if (NATUREZAS_NAO_FACTUAIS.has(natureza)) {
+      push({
+        tipo,
+        trecho,
+        origem,
+        modalidade,
+        natureza,
+        situacao: "nao_verificado",
+        suportado: false,
+        fonte: null,
+        motivo:
+          natureza === "falha_declarada"
+            ? "a resposta declara falha na consulta — não afirma fato a verificar"
+            : natureza === "desconhecido_declarado"
+              ? "a resposta declara desconhecer a informação — não afirma fato a verificar"
+              : "a resposta recusa ou limita o atendimento — não afirma fato a verificar",
+      });
+      return;
+    }
 
     const aceitas = FONTES_ACEITAS[tipo];
     const canalDoTipo = canal[tipo];
@@ -429,35 +489,131 @@ export function avaliarGrounding(ctx: ContextoConfianca, texto?: string | null):
       return;
     }
 
-    // Negativa: precisa que a consulta correspondente TENHA respondido.
+    // Negativa FACTUAL ("não temos vaga"): precisa de evidência do MESMO
+    // escopo. Consulta bem-sucedida, sozinha, não comprova ausência.
     if (modalidade === "negacao") {
-      const consulta = consultaRespondeu(ctx, capsDoTipo(tipo));
+      const caps = capsDoTipo(tipo);
+      const consulta = consultaRespondeu(ctx, caps);
+      const falhou = consultaFalhou(ctx, caps);
       const fonteOficial = canalDoTipo ?? (consulta ? aceitas[0] ?? null : null);
-      if (consulta) {
+
+      if (!consulta) {
         push({
           tipo,
           trecho,
           origem,
           modalidade,
-          situacao: "confirmado",
-          suportado: true,
-          fonte: fonteOficial,
-          motivo:
-            consulta.status === "vazio"
-              ? "negativa apoiada em consulta que respondeu sem itens"
-              : "negativa apoiada em consulta oficial do turno",
+          natureza,
+          situacao: "sem_fonte",
+          suportado: false,
+          fonte: null,
+          motivo: falhou
+            ? "a consulta falhou neste turno — falha não comprova inexistência"
+            : `negativa sem consulta a ${aceitas.join(" ou ")} neste turno`,
         });
         return;
       }
+
+      // Algum fato do mesmo escopo contraria a negativa?
+      const alvoNeg = ALVO_DO_FATO[tipo];
+      const segmentoNeg = (frase ?? trecho).trim();
+      const chaveNeg = chave ?? qualificadoresDaAfirmacao(segmentoNeg);
+      const contrarios = fatos
+        ? fatosNoEscopoDaAfirmacao(fatos, {
+            entidades: alvoNeg.entidades,
+            campos: alvoNeg.campos,
+            frase: segmentoNeg,
+            chave: chaveNeg,
+          }).noEscopo.filter((f) => String(f.valor ?? "").trim() !== "")
+        : [];
+
+      // O próprio fato pode DECLARAR a ausência ("preparo: Não é preciso
+      // jejum"): aí a negativa está apoiada, não contrariada.
+      const apoiador = contrarios.find((f) => {
+        const v = normalizarTexto(f.valor);
+        const tr = normalizarTexto(trecho);
+        return (
+          classificarNatureza(String(f.valor ?? "")) === "ausencia_afirmada" ||
+          (v !== "" && (v.includes(tr) || tr.includes(v)))
+        );
+      });
+      if (apoiador) {
+        push({
+          tipo,
+          trecho,
+          origem,
+          modalidade,
+          natureza,
+          situacao: "confirmado",
+          suportado: true,
+          fonte: fonteOficial,
+          referencia: referenciaDoFato(apoiador),
+          motivo: "negativa apoiada em fato do mesmo escopo que declara a ausência",
+        });
+        return;
+      }
+
+      if (contrarios.length > 0) {
+        const f = contrarios[0]!;
+        push({
+          tipo,
+          trecho,
+          origem,
+          modalidade,
+          natureza,
+          situacao: "divergente",
+          suportado: false,
+          fonte: fonteOficial,
+          valorDaFonte: f.valor,
+          referencia: referenciaDoFato(f),
+          motivo: "a consulta retornou dado no escopo afirmado — a negativa contradiz a fonte",
+        });
+        return;
+      }
+
+      // Retorno cortado não comprova ausência.
+      if (consulta.status === "parcial" || consulta.truncado === true) {
+        push({
+          tipo,
+          trecho,
+          origem,
+          modalidade,
+          natureza,
+          situacao: "nao_verificado",
+          suportado: false,
+          fonte: fonteOficial,
+          motivo: "consulta incompleta ou truncada — não comprova inexistência",
+        });
+        return;
+      }
+
+      if (consulta.status === "vazio") {
+        push({
+          tipo,
+          trecho,
+          origem,
+          modalidade,
+          natureza,
+          situacao: "confirmado",
+          suportado: true,
+          fonte: fonteOficial,
+          motivo: "negativa apoiada em consulta que respondeu sem itens no escopo afirmado",
+        });
+        return;
+      }
+
+      // Respondeu, mas não dá para dizer que o escopo afirmado foi coberto.
       push({
         tipo,
         trecho,
         origem,
         modalidade,
-        situacao: "sem_fonte",
+        natureza,
+        situacao: "nao_verificado",
         suportado: false,
-        fonte: null,
-        motivo: `negativa sem consulta a ${aceitas.join(" ou ")} neste turno`,
+        fonte: fonteOficial,
+        motivo:
+          "a consulta respondeu, mas não há evidência de ausência no escopo afirmado",
       });
       return;
     }
@@ -745,6 +901,7 @@ export function avaliarGrounding(ctx: ContextoConfianca, texto?: string | null):
       valorAfirmado(c.tipo, c.trecho),
       null,
       c.frase,
+      c.natureza,
     );
   }
 
@@ -752,6 +909,17 @@ export function avaliarGrounding(ctx: ContextoConfianca, texto?: string | null):
     (c) => !c.suportado && c.situacao !== "nao_verificado",
   );
   const naoVerificados = claims.filter((c) => c.situacao === "nao_verificado");
+
+  // FASE 3 — limitações da própria extração ficam registradas: "zero
+  // afirmações reconhecidas" nunca é prova de que não havia o que verificar.
+  const limitacoes: string[] = [];
+  if (truncado) limitacoes.push("avaliação truncada — nem todas as afirmações foram avaliadas");
+  if (claims.length === 0 && pareceConterDadoOperacional(textoFinal)) {
+    limitacoes.push(
+      "a resposta contém dado operacional que o extrator não reconheceu como afirmação",
+    );
+  }
+
   return {
     claims,
     total: claims.length,
@@ -759,6 +927,7 @@ export function avaliarGrounding(ctx: ContextoConfianca, texto?: string | null):
     semEvidencia,
     naoVerificados,
     truncado,
+    limitacoes,
   };
 }
 
@@ -829,6 +998,13 @@ export function ClaimGroundingValidator(ctx: ContextoConfianca): ResultadoValida
   }
 
   if (r.total === 0) {
+    // FASE 3 — extrator não reconheceu nada, mas a resposta tem dado
+    // operacional: isso é limitação da extração, não ausência de afirmação.
+    if (r.limitacoes.length > 0) {
+      return res("UNKNOWN", 0, "AFIRMACAO_NAO_RECONHECIDA_PELO_EXTRATOR", {
+        limitacoes: r.limitacoes,
+      });
+    }
     // Zero afirmações em uma ação que depende de dado oficial não é "nada a
     // verificar": é verificação que não aconteceu.
     // Ações de escrita já são cobertas pelo validador de workflow (prova de
@@ -870,12 +1046,17 @@ export function somenteNegativasApoiadas(ctx: ContextoConfianca, texto?: string 
   const t = (texto ?? ctx.draftText ?? "").trim();
   if (!t) return false;
   const r = avaliarGrounding(ctx, t);
-  const consultaOficial =
-    consultaRespondeu(ctx, CAP_CATALOGO) ?? consultaRespondeu(ctx, CAP_AGENDA);
+  // FASE 3 — só um retorno REALMENTE vazio sustenta a ausência; consulta que
+  // trouxe itens, parcial ou truncada não comprova inexistência.
+  const consultaVazia = [
+    consultaRespondeu(ctx, CAP_CATALOGO),
+    consultaRespondeu(ctx, CAP_AGENDA),
+  ].find((c) => c !== null && c.status === "vazio" && c.truncado !== true);
   if (r.total === 0) {
+    if (r.limitacoes.length > 0) return false;
     // Frase negativa que o extrator não classificou como claim: ainda assim,
-    // uma negativa só vale com consulta oficial que respondeu.
-    return Boolean(consultaOficial) && classificarModalidade(t) === "negacao";
+    // uma negativa só vale com consulta oficial que respondeu sem itens.
+    return Boolean(consultaVazia) && classificarNatureza(t) === "ausencia_afirmada";
   }
   return r.claims.every((c) => c.modalidade === "negacao" && c.suportado);
 }
