@@ -9,6 +9,8 @@ import {
   avaliarTransformacoes,
   descreverAvaliacaoConfianca,
   criarRegistroTurno,
+  evidenciaSaidaDoTurno,
+  eventoEntregaDoTurno,
   finalizarRegistroTurno,
   lacunasDoTurno,
   origemComSituacao,
@@ -252,5 +254,72 @@ describe("FASE 2 — avaliações de confiança", () => {
     expect((resumo["avaliacao_operacional"] as Record<string, unknown>)["avaliacao"]).toBe(
       "action_safety",
     );
+  });
+});
+
+describe("FASE 3 — evidência da saída", () => {
+  it("console: resposta persistida, sem afirmar envio pelo WhatsApp", () => {
+    const s = evidenciaSaidaDoTurno({
+      entregaDoResumo: { mensagemId: null, canal: "test-console", tamanho: 42, textoHash: "h" },
+      eventos: [{ turnoId: "t", mensagemId: "m1", canal: "test-console", estado: "persistida" }],
+      ambiente: "homologacao",
+      teste: true,
+    });
+    expect(s.estado).toBe("persistida");
+    expect(s.console).toBe(true);
+    expect(s.mensagemId).toBe("m1");
+    expect(s.descricao).toContain("persistida no console");
+    expect(s.faltando).toBeNull();
+  });
+
+  it("evento posterior completa o resumo gravado com mensagemId nulo", () => {
+    const s = evidenciaSaidaDoTurno({
+      entregaDoResumo: { mensagemId: null, canal: "whatsapp", tamanho: 10, textoHash: "h" },
+      eventos: [{ turnoId: "t", mensagemId: "m2", canal: "whatsapp", estado: "confirmada", transporteId: "wamid" }],
+    });
+    expect(s.estado).toBe("confirmada");
+    expect(s.mensagemId).toBe("m2");
+  });
+
+  it("falha de persistência é registrada como falha", () => {
+    const s = evidenciaSaidaDoTurno({
+      entregaDoResumo: { mensagemId: null, canal: "whatsapp", tamanho: 1, textoHash: null },
+      eventos: [{ turnoId: "t", mensagemId: null, canal: "whatsapp", estado: "falhou" }],
+    });
+    expect(s.estado).toBe("falhou");
+  });
+
+  it("sem confirmação de transporte, diz exatamente o que falta", () => {
+    const s = evidenciaSaidaDoTurno({
+      entregaDoResumo: { mensagemId: null, canal: "whatsapp", tamanho: 5, textoHash: null },
+      eventos: [{ turnoId: "t", mensagemId: "m3", canal: "whatsapp", estado: "persistida" }],
+    });
+    expect(s.estado).toBe("persistida");
+    expect(s.faltando).toContain("confirmação de entrega");
+  });
+
+  it("registro antigo sem evento de saída não vira falha de entrega", () => {
+    const s = evidenciaSaidaDoTurno({
+      entregaDoResumo: { mensagemId: null, canal: "whatsapp", tamanho: 5, textoHash: null },
+      eventos: [],
+    });
+    expect(s.estado).toBe("preparada");
+    expect(s.faltando).toContain("identificador da mensagem");
+  });
+
+  it("sem resumo e sem evento: indeterminada", () => {
+    expect(evidenciaSaidaDoTurno({ entregaDoResumo: null, eventos: [] }).estado).toBe(
+      "indeterminada",
+    );
+  });
+
+  it("não associa saída de outro turno/conversa", () => {
+    expect(
+      eventoEntregaDoTurno({ turnoId: "t2" }, { turnoId: "t1" }),
+    ).toBe(false);
+    expect(
+      eventoEntregaDoTurno({ turnoId: "t1", conversaId: "c2" }, { turnoId: "t1", conversaId: "c1" }),
+    ).toBe(false);
+    expect(eventoEntregaDoTurno({ turnoId: "t1", conversaId: "c1" }, { turnoId: "t1", conversaId: "c1" })).toBe(true);
   });
 });

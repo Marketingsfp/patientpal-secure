@@ -21,6 +21,10 @@ import {
   avaliacaoEmObservacao,
   avaliarTransformacoes,
   descreverAvaliacaoConfianca,
+  eventoEntregaDoTurno,
+  evidenciaSaidaDoTurno,
+  NODE_ENTREGA_TURNO,
+  type EventoEntregaTurno,
   TEXTO_AVALIACAO_EM_OBSERVACAO,
   origemComSituacao,
   ROTULO_LACUNA_TURNO,
@@ -30,14 +34,51 @@ import {
   type SituacaoTransformacoes,
 } from "@/lib/nina/rastreio/turno";
 
-type EventoComMetadata = { node_id?: string | null; metadata?: unknown };
+type EventoComMetadata = {
+  node_id?: string | null;
+  trace_id?: string | null;
+  execution_id?: string | null;
+  conversation_id?: string | null;
+  message_id?: string | null;
+  metadata?: unknown;
+};
+
+function metadataDe(ev: EventoComMetadata | undefined): Record<string, unknown> | null {
+  const meta = ev?.metadata;
+  return meta && typeof meta === "object" ? (meta as Record<string, unknown>) : null;
+}
 
 export function resumoDoTurno(
   eventos: readonly EventoComMetadata[],
 ): Record<string, unknown> | null {
-  const ev = eventos.find((e) => e?.node_id === "turn.summary");
-  const meta = ev?.metadata;
-  return meta && typeof meta === "object" ? (meta as Record<string, unknown>) : null;
+  return metadataDe(eventos.find((e) => e?.node_id === "turn.summary"));
+}
+
+/**
+ * FASE 3 — eventos de saída (`turn.delivery`) que pertencem A ESTE turno.
+ * O resumo é gravado antes da persistência da resposta; a evidência do
+ * vínculo chega depois, em evento próprio. Só entram eventos do mesmo turno
+ * (ou mesma execução) e da mesma conversa — nunca por proximidade de tempo.
+ */
+export function eventosDeSaidaDoTurno(
+  eventos: readonly EventoComMetadata[],
+  alvo: { turnoId?: string | null; execucaoId?: string | null; conversaId?: string | null },
+): EventoEntregaTurno[] {
+  return eventos
+    .filter((e) => e?.node_id === NODE_ENTREGA_TURNO)
+    .map((e) => {
+      const m = metadataDe(e) ?? {};
+      return {
+        turnoId: (m["turno_id"] ?? e.trace_id ?? null) as string | null,
+        execucaoId: (m["execucao_id"] ?? e.execution_id ?? null) as string | null,
+        conversaId: (m["conversa_id"] ?? e.conversation_id ?? null) as string | null,
+        mensagemId: (m["outgoing_message_id"] ?? e.message_id ?? null) as string | null,
+        canal: (m["canal"] ?? null) as string | null,
+        estado: (m["estado"] ?? null) as string | null,
+        transporteId: (m["transporte_id"] ?? null) as string | null,
+      } satisfies EventoEntregaTurno;
+    })
+    .filter((ev) => eventoEntregaDoTurno(ev, alvo));
 }
 
 function texto(v: unknown, vazio = "—") {
@@ -109,6 +150,30 @@ export function RegistroTurnoResumo({
         }),
     ) ?? null;
   const entrega = (resumo["entrega"] ?? null) as Record<string, unknown> | null;
+  // FASE 3 — o resumo nasce antes da persistência da resposta; os eventos de
+  // saída posteriores completam o vínculo (nunca reescrevem o resumo).
+  const eventoResumo = eventos.find((e) => e?.node_id === "turn.summary");
+  const saida = evidenciaSaidaDoTurno({
+    entregaDoResumo: entrega
+      ? {
+          mensagemId: (entrega["mensagemId"] ?? entrega["mensagem_id"] ?? null) as string | null,
+          canal: (entrega["canal"] ?? null) as string | null,
+          tamanho: (entrega["tamanho"] ?? null) as number | null,
+          textoHash: (entrega["textoHash"] ?? entrega["texto_hash"] ?? null) as string | null,
+        }
+      : null,
+    eventos: eventosDeSaidaDoTurno(eventos, {
+      turnoId: (resumo["turno_id"] ?? eventoResumo?.trace_id ?? null) as string | null,
+      execucaoId: (resumo["execucao_id"] ?? eventoResumo?.execution_id ?? null) as string | null,
+      conversaId: (eventoResumo?.conversation_id ?? null) as string | null,
+    }),
+    ambiente: (resumo["ambiente"] ?? null) as string | null,
+    teste: (resumo["teste"] ?? null) as boolean | null,
+  });
+  // A lacuna do resumo some quando o vínculo foi comprovado depois dele.
+  const lacunasVisiveis = saida.mensagemId
+    ? lacunas.filter((l) => l !== "mensagem_entregue")
+    : lacunas;
   const situacao = situacaoDasTransformacoes(resumo);
   const origem = origemComSituacao(
     (resumo["origem_resposta"] ?? null) as OrigemResposta | null,
@@ -227,23 +292,32 @@ export function RegistroTurnoResumo({
         )}
       </div>
 
-      <p>
-        <span className="text-muted-foreground">Mensagem entregue: </span>
-        {entrega?.["mensagemId"]
-          ? `${texto(entrega["mensagemId"])}${
-              entrega["tamanho"] != null ? ` · ${texto(entrega["tamanho"])} caracteres` : ""
-            }`
-          : "não vinculada a este turno"}
-      </p>
+      {/* FASE 3 — estado da saída: só o que os eventos comprovam. */}
+      <div>
+        <p className="text-xs uppercase text-muted-foreground">Saída desta resposta</p>
+        <p>
+          {saida.descricao}
+          {saida.tamanho != null ? ` · ${saida.tamanho} caracteres` : ""}
+          {saida.canal ? ` · canal ${saida.canal}` : ""}
+        </p>
+        <p className="text-muted-foreground">
+          {saida.mensagemId
+            ? `Mensagem vinculada a este turno: ${saida.mensagemId}`
+            : "Mensagem gravada ainda não vinculada a este turno"}
+        </p>
+        {saida.faltando ? (
+          <p className="text-muted-foreground">Falta: {saida.faltando}</p>
+        ) : null}
+      </div>
 
-      {lacunas.length > 0 && (
+      {lacunasVisiveis.length > 0 && (
         <div className="space-y-1">
           <p className="flex items-center gap-2 text-xs uppercase text-muted-foreground">
             <AlertTriangle className="h-3.5 w-3.5" aria-hidden />
             Sem evidência registrada
           </p>
           <ul className="flex flex-wrap gap-1">
-            {lacunas.map((l) => (
+            {lacunasVisiveis.map((l) => (
               <li key={l}>
                 <Badge variant="outline">{ROTULO_LACUNA_TURNO[l] ?? l}</Badge>
               </li>

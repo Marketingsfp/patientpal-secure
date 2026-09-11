@@ -676,6 +676,21 @@ export async function processarMensagemTeste(data: EntradaMensagemTeste, userId:
             hash_avaliado: auditoriaNina.textoFinalHash ?? null,
           },
         });
+        // FASE 3 — o resumo do turno é gravado ANTES da persistência (com
+        // mensagemId nulo). Só aqui existe o id da saída: o vínculo é
+        // completado por um evento posterior, sem reescrever o resumo.
+        const { gravarEntregaDoTurno } = await import("@/lib/nina/rastreio/turno.server");
+        await gravarEntregaDoTurno({
+          clinicaId: data.clinicaId,
+          turnoId: auditoriaNina.traceId ?? null,
+          execucaoId: auditoriaNina.execucaoId ?? null,
+          conversaId,
+          outgoingMessageId: idSaida,
+          canal: CANAL_TESTE,
+          textoHash: hashDoTexto(reply),
+          // Homologação não tem transporte real: persistida, nunca confirmada.
+          estado: idSaida ? "persistida" : "falhou",
+        });
       } catch {
         // Vínculo é auditoria: nunca interrompe a homologação.
       }
