@@ -77,12 +77,20 @@ export type EntradaComposer = {
   runtimeContext: RuntimeContextNina;
   /** Envelope técnico (default: o fixo desta fase). */
   envelope?: string;
+  /**
+   * Contrato de precedência do turno: regras publicadas aplicáveis, exceções e
+   * instruções adicionais (esclarecimento, correção), cada uma com origem,
+   * prioridade e motivo. É o ÚNICO lugar por onde entra instrução que não seja
+   * o comportamento publicado.
+   */
+  contratoPrecedencia?: string | null;
 };
 
 export type RequestNina = {
   systemPrompt: string;
   envelope: string;
   behaviorPrompt: string;
+  contratoPrecedencia: string;
   runtimeContext: RuntimeContextNina;
   /** Caminhos do runtime context que pareciam instrução (apenas diagnóstico). */
   avisos: string[];
