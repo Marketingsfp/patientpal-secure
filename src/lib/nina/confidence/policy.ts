@@ -150,6 +150,9 @@ export const POLITICA_PADRAO: PoliticaConfianca = {
     // FASE 5 — grounding por afirmação: é o que impede uma frase verdadeira
     // de "carregar" outra sem fonte na mesma mensagem.
     ClaimGroundingValidator: 20,
+    // FASE 4 (confiabilidade) — a resposta precisa ENTREGAR o que o turno
+    // exigia: pedido do paciente e restrições das instruções publicadas.
+    InstructionComplianceValidator: 15,
     // ActionRisk não pontua: ele endurece o mínimo exigido.
     ActionRiskValidator: 0,
   },
@@ -196,6 +199,7 @@ export const POLITICA_PADRAO: PoliticaConfianca = {
       "IntentClarityValidator",
       "WorkflowConsistencyValidator",
       "ClaimGroundingValidator",
+      "InstructionComplianceValidator",
     ],
     fontesObrigatorias: ["OfficialSourceValidator"],
   },
