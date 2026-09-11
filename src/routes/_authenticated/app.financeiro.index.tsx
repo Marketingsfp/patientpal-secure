@@ -16,7 +16,9 @@ import {
   Users,
   Wallet,
 } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { abrirDetalheEmNovaAba } from "@/lib/financeiro/detalhe-aba";
 import { useClinica } from "@/hooks/use-clinica";
 import { usePodeEscrever } from "@/hooks/use-permissoes";
 import { brl, fmtDate, rangeFromPeriodo, type Periodo } from "@/lib/financeiro/format";
@@ -145,6 +147,30 @@ function FinDashboard() {
   const v = (n: (r: ResumoPainel) => number, formato: (x: number) => string = brl) =>
     carregando || !resumo ? "…" : formato(n(resumo));
 
+  /**
+   * Abre o detalhamento do card em NOVA ABA, como a diretoria pediu: a visão
+   * geral fica numa aba e o detalhamento em outra. As duas visões vão prontas
+   * para a aba nova (ver `@/lib/financeiro/detalhe-aba`). Se o navegador
+   * bloquear a aba, o detalhamento abre por cima da tela, como era antes.
+   */
+  const abrir = (d: Drill) => {
+    if (!dados || !resumo || carregando) return;
+    const sintetico = montarDetalhe(d, dados, resumo, "sintetico");
+    const abriu = abrirDetalheEmNovaAba("/app/financeiro/detalhe", {
+      sintetico: sintetico.temSintetico ? sintetico : null,
+      analitico: montarDetalhe(d, dados, resumo, "analitico"),
+      rotuloSintetico: rotuloSinteticoDe(d),
+      arquivo: `financeiro_${d}`,
+      de,
+      ate,
+      clinicaNome: clinicaAtual?.clinica.nome ?? "Clínica",
+    });
+    if (!abriu) {
+      toast.info("O navegador não abriu a nova aba — o detalhamento abriu aqui mesmo.");
+      setDrill(d);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -188,8 +214,8 @@ function FinDashboard() {
         <p className="text-xs text-muted-foreground">
           {fmtDate(de)}
           {de !== ate && ` a ${fmtDate(ate)}`} · receita, repasse e atendimentos pela mesma conta do
-          Rateio da Receita (Relatórios), no dia do atendimento. Clique em um card para ver o
-          detalhamento.
+          Rateio da Receita (Relatórios), no dia do atendimento. Clique em um card para abrir o
+          detalhamento em nova aba.
         </p>
       </div>
 
@@ -351,13 +377,7 @@ function FinDashboard() {
       {drill && dados && resumo && (
         <DetalhamentoDialog
           montar={(visao) => montarDetalhe(drill, dados, resumo, visao)}
-          rotuloSintetico={
-            drill === "operacionais" || drill === "outras"
-              ? "Por categoria"
-              : drill === "totais"
-                ? "Por conta"
-                : "Por profissional"
-          }
+          rotuloSintetico={rotuloSinteticoDe(drill)}
           arquivo={`financeiro_${drill}`}
           de={de}
           ate={ate}
@@ -370,6 +390,14 @@ function FinDashboard() {
 }
 
 const margem = (valor: number, base: number) => (base === 0 ? 0 : (valor / base) * 100);
+
+/** Nome do botão da visão agrupada de cada detalhamento. */
+const rotuloSinteticoDe = (d: Drill) =>
+  d === "operacionais" || d === "outras"
+    ? "Por categoria"
+    : d === "totais"
+      ? "Por conta"
+      : "Por profissional";
 
 // ============================================================================
 // Detalhamento em tela cheia

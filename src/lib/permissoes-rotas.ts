@@ -133,6 +133,10 @@ export const ROUTE_TO_MODULE: Record<string, string | null> = {
   "/app/financeiro/estorno": "financeiro-estorno",
   "/app/financeiro/lembretes": "financeiro",
   "/app/financeiro/movimento": "financeiro-movcaixa",
+  // Detalhamento dos cards aberto em nova aba: cada endereço herda o módulo da
+  // tela de onde veio, para quem só tem o Movimento de Caixa abrir o dele.
+  "/app/financeiro/detalhe": "financeiro",
+  "/app/financeiro/movimento-detalhe": "financeiro-movcaixa",
   "/app/financeiro/notas": "financeiro",
   // "A Receber" acompanha o módulo de Atendimentos: quem cobra o atendimento
   // é quem precisa enxergar e quitar o saldo devedor dele.
