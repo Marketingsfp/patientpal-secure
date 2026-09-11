@@ -34,7 +34,7 @@ function resolverProjectRef(): string {
 /** Lista os dias com backup salvo para a clínica do usuário. */
 export const listarBackups = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: { clinica_id: string }) => d)
+  .inputValidator((input: unknown) => z.object({ clinica_id: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
     // Garante que o usuário é admin da clínica
     const { data: mem } = await context.supabase
@@ -42,6 +42,7 @@ export const listarBackups = createServerFn({ method: "POST" })
       .select("role")
       .eq("user_id", context.userId)
       .eq("clinica_id", data.clinica_id)
+      .eq("ativo", true)
       .maybeSingle();
     if ((mem as { role?: string } | null)?.role !== "admin") {
       throw new Error("Somente administradores podem acessar backups");
