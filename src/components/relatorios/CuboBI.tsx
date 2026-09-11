@@ -26,6 +26,11 @@ import { exportToExcel } from "@/lib/export-csv";
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import {
+  agruparPagamentosPorAtendimento,
+  LABEL_MODALIDADE,
+  resumirPagamentos,
+} from "@/lib/relatorios/modalidade-atendimento";
+import {
   Download,
   Save,
   Trash2,
@@ -80,6 +85,8 @@ const CUBOS: CubeSpec[] = [
       { key: "medico", label: "Médico", kind: "string" },
       { key: "especialidade", label: "Especialidade", kind: "string" },
       { key: "procedimento", label: "Serviço", kind: "string" },
+      { key: "modalidade", label: "Modalidade (Particular / Cartão)", kind: "string" },
+      { key: "forma_pagamento", label: "Forma de pagamento", kind: "string" },
       { key: "dia", label: "Dia", kind: "date" },
       { key: "mes", label: "Mês", kind: "string" },
       { key: "mes_ano", label: "Mês/Ano", kind: "string" },
@@ -90,15 +97,38 @@ const CUBOS: CubeSpec[] = [
       { key: "paciente", label: "Paciente", kind: "string" },
     ],
     load: async ({ clinicaId, ini, fim }) => {
-      const rows = await fetchAllRows(() =>
-        supabase
-          .from("agendamentos")
-          .select("inicio, status, procedimento, paciente_nome, medico_id, paciente_id")
-          .eq("clinica_id", clinicaId)
-          .gte("inicio", ini)
-          .lte("inicio", fim + "T23:59:59")
-          .order("inicio", { ascending: true }),
-      );
+      const fimDia = fim + "T23:59:59";
+      const [rows, pagamentos] = await Promise.all([
+        fetchAllRows(() =>
+          supabase
+            .from("agendamentos")
+            .select("id, inicio, status, procedimento, paciente_nome, medico_id, paciente_id")
+            .eq("clinica_id", clinicaId)
+            .gte("inicio", ini)
+            .lte("inicio", fimDia)
+            .order("inicio", { ascending: true }),
+        ),
+        // Modalidade e forma de pagamento vêm do lançamento de receita
+        // confirmado do atendimento — a marcação "Particular/Convênio" da
+        // agenda não serve para separar o Cartão (ver
+        // `@/lib/relatorios/modalidade-atendimento`). O recorte é pela data do
+        // ATENDIMENTO, não do lançamento, para casar com as linhas acima mesmo
+        // quando o pagamento foi feito em outro dia. Não traz valor.
+        fetchAllRows(() =>
+          supabase
+            .from("fin_lancamentos")
+            .select(
+              "id, agendamento_id, forma_pagamento, convenio_modalidade, agendamentos!inner(inicio)",
+            )
+            .eq("clinica_id", clinicaId)
+            .eq("tipo", "receita")
+            .eq("status", "confirmado")
+            .gte("agendamentos.inicio", ini)
+            .lte("agendamentos.inicio", fimDia)
+            .order("id", { ascending: true }),
+        ),
+      ]);
+      const pagPorAtendimento = agruparPagamentosPorAtendimento(pagamentos);
       const [medMap, pacMap, espPorProc, espPorMedico] = await Promise.all([
         lookupNames(
           "medicos",
@@ -114,8 +144,9 @@ const CUBOS: CubeSpec[] = [
         ),
         lookupEspecialidadePorMedico(rows.map((r) => r.medico_id)),
       ]);
-      return rows.map((r) =>
-        transformDate(r.inicio, {
+      return rows.map((r) => {
+        const pagamento = resumirPagamentos(pagPorAtendimento.get(r.id) ?? []);
+        return transformDate(r.inicio, {
           status: r.status ?? "—",
           medico: medMap.get(r.medico_id) ?? "Sem médico",
           especialidade:
@@ -124,9 +155,11 @@ const CUBOS: CubeSpec[] = [
             espPorMedico.get(r.medico_id) ??
             "—",
           procedimento: r.procedimento ?? "—",
+          modalidade: LABEL_MODALIDADE[pagamento.modalidade],
+          forma_pagamento: pagamento.forma,
           paciente: pacMap.get(r.paciente_id) ?? r.paciente_nome ?? "—",
-        }),
-      );
+        });
+      });
     },
   },
   {
@@ -602,7 +635,17 @@ interface CubeConfig {
   measureAgg: AggKind;
   viz: VizKind;
   topN: number;
+  /**
+   * Filtro "mostrar só": campo + valor exato (ex.: Modalidade = Cartão
+   * Benefícios). Opcional porque as visualizações salvas antes dele não têm.
+   * Não vale para o cubo Financeiro, que já chega agregado do banco.
+   */
+  filtroKey?: string | null;
+  filtroValor?: string | null;
 }
+
+/** Campos fora do filtro "mostrar só": a lista de valores seria enorme. */
+const CAMPOS_SEM_FILTRO = new Set(["paciente"]);
 
 interface SavedView {
   name: string;
@@ -735,13 +778,49 @@ export function CuboBI({ clinicaId, ini, fim }: { clinicaId?: string; ini: strin
           ? "sum"
           : c.measureAgg
         : "count";
-      return { ...c, rowKey, subRowKey, subSubRowKey, colKey, measureField, measureAgg };
+      const filtroKey =
+        cube.id !== "financeiro" && c.filtroKey && keys.includes(c.filtroKey) ? c.filtroKey : null;
+      const filtroValor = filtroKey ? (c.filtroValor ?? null) : null;
+      return {
+        ...c,
+        rowKey,
+        subRowKey,
+        subSubRowKey,
+        colKey,
+        measureField,
+        measureAgg,
+        filtroKey,
+        filtroValor,
+      };
     });
   }, [cube]);
 
+  const filtroKey = cube.id !== "financeiro" ? (cfg.filtroKey ?? null) : null;
+  const filtroValor = filtroKey ? (cfg.filtroValor ?? null) : null;
+
+  // Valores oferecidos no "Mostrar só", tirados do próprio período carregado.
+  const valoresFiltro = useMemo(() => {
+    if (!filtroKey) return [];
+    const set = new Set<string>();
+    for (const r of rawRows) {
+      const v = String(r[filtroKey] ?? "—");
+      if (v !== "") set.add(v);
+    }
+    return sortLabels(Array.from(set), filtroKey);
+  }, [rawRows, filtroKey]);
+
+  // Linhas que entram na tabela, nos gráficos e no Excel.
+  const rows = useMemo(
+    () =>
+      filtroKey && filtroValor !== null
+        ? rawRows.filter((r) => String(r[filtroKey] ?? "—") === filtroValor)
+        : rawRows,
+    [rawRows, filtroKey, filtroValor],
+  );
+
   const piv = useMemo(() => {
-    return pivot(rawRows, cfg.rowKey, cfg.colKey, cfg.measureField, cfg.measureAgg);
-  }, [rawRows, cfg.rowKey, cfg.colKey, cfg.measureField, cfg.measureAgg]);
+    return pivot(rows, cfg.rowKey, cfg.colKey, cfg.measureField, cfg.measureAgg);
+  }, [rows, cfg.rowKey, cfg.colKey, cfg.measureField, cfg.measureAgg]);
 
   const topRows = useMemo(() => {
     const n = Math.min(100, Math.max(1, cfg.topN));
@@ -831,17 +910,55 @@ export function CuboBI({ clinicaId, ini, fim }: { clinicaId?: string; ini: strin
       toast.info("Sem dados para exportar");
       return;
     }
-    const rows = piv.rowLabels.map((rl, ri) => {
-      const obj: Record<string, any> = {
-        [cube.fields.find((f) => f.key === cfg.rowKey)?.label ?? cfg.rowKey]: rl,
-      };
-      piv.colLabels.forEach((cl, ci) => {
-        obj[cl] = piv.matrix[ri][ci];
+    // Com "Detalhar linha por" escolhido, o Excel sai com uma linha por
+    // combinação (ex.: Médico + Serviço), cada nível na sua coluna — antes só
+    // o primeiro nível era exportado e o detalhamento da tela se perdia.
+    const niveis = [cfg.rowKey, cfg.subRowKey, cfg.subRowKey ? cfg.subSubRowKey : null].filter(
+      (k): k is string => !!k,
+    );
+    const labelDe = (k: string) => cube.fields.find((f) => f.key === k)?.label ?? k;
+    const headers = [
+      ...niveis.map((k, i) => ({ key: `n${i}`, label: labelDe(k) })),
+      ...piv.colLabels.map((cl, ci) => ({ key: `c${ci}`, label: cl })),
+      { key: "total", label: "Total" },
+    ];
+    const linhas: Record<string, unknown>[] = [];
+    const emitir = (subset: Row[], nivel: number, prefixo: string[]) => {
+      const p = pivot(subset, niveis[nivel], cfg.colKey, cfg.measureField, cfg.measureAgg);
+      p.rowLabels.forEach((rl, ri) => {
+        const caminho = [...prefixo, rl];
+        if (nivel < niveis.length - 1) {
+          emitir(
+            subset.filter((r) => String(r[niveis[nivel]] ?? "—") === rl),
+            nivel + 1,
+            caminho,
+          );
+          return;
+        }
+        const obj: Record<string, unknown> = { total: p.totalByRow[ri] };
+        caminho.forEach((v, i) => (obj[`n${i}`] = v));
+        piv.colLabels.forEach((cl, ci) => {
+          const idx = p.colLabels.indexOf(cl);
+          obj[`c${ci}`] = idx >= 0 ? p.matrix[ri][idx] : 0;
+        });
+        linhas.push(obj);
       });
-      obj.Total = piv.totalByRow[ri];
-      return obj;
-    });
-    exportToExcel(rows, `cubo-${cube.id}-${new Date().toISOString().slice(0, 10)}`);
+    };
+    emitir(rows, 0, []);
+    const sufixoFiltro =
+      filtroKey && filtroValor !== null
+        ? "-" +
+          filtroValor
+            .normalize("NFD")
+            .replace(/\p{M}/gu, "")
+            .replace(/[^a-zA-Z0-9]+/g, "-")
+            .toLowerCase()
+        : "";
+    exportToExcel(
+      linhas,
+      `cubo-${cube.id}${sufixoFiltro}-${new Date().toISOString().slice(0, 10)}`,
+      headers,
+    );
   }
 
   return (
@@ -1026,6 +1143,58 @@ export function CuboBI({ clinicaId, ini, fim }: { clinicaId?: string; ini: strin
             </div>
           </div>
 
+          {cube.id !== "financeiro" && (
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <div className="space-y-1.5">
+                <Label>Filtrar por</Label>
+                <Select
+                  value={filtroKey ?? "__none__"}
+                  onValueChange={(v) =>
+                    setCfg((c) => ({
+                      ...c,
+                      filtroKey: v === "__none__" ? null : v,
+                      filtroValor: null,
+                    }))
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">Sem filtro</SelectItem>
+                    {cube.fields
+                      .filter((f) => f.kind !== "number" && !CAMPOS_SEM_FILTRO.has(f.key))
+                      .map((f) => (
+                        <SelectItem key={f.key} value={f.key}>
+                          {f.label}
+                        </SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Mostrar só</Label>
+                <Select
+                  value={filtroValor ?? "__all__"}
+                  onValueChange={(v) => setField("filtroValor", v === "__all__" ? null : v)}
+                  disabled={!filtroKey}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__all__">Todos</SelectItem>
+                    {valoresFiltro.map((v) => (
+                      <SelectItem key={v} value={v}>
+                        {v}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          )}
+
           <div className="grid gap-3 sm:grid-cols-[1fr_140px]">
             <div className="space-y-1.5">
               <Label>Visualização</Label>
@@ -1100,6 +1269,9 @@ export function CuboBI({ clinicaId, ini, fim }: { clinicaId?: string; ini: strin
             {cfg.colKey && cfg.viz !== "pizza"
               ? ` × ${cube.fields.find((f) => f.key === cfg.colKey)?.label}`
               : ""}
+            {filtroKey && filtroValor !== null
+              ? ` — só ${cube.fields.find((f) => f.key === filtroKey)?.label}: ${filtroValor}`
+              : ""}
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -1152,7 +1324,7 @@ export function CuboBI({ clinicaId, ini, fim }: { clinicaId?: string; ini: strin
                     const isOpen = expanded.has(rl);
                     const subRows = cfg.subRowKey
                       ? (() => {
-                          const subset = rawRows.filter((r) => String(r[cfg.rowKey] ?? "—") === rl);
+                          const subset = rows.filter((r) => String(r[cfg.rowKey] ?? "—") === rl);
                           return pivot(
                             subset,
                             cfg.subRowKey!,
@@ -1199,7 +1371,7 @@ export function CuboBI({ clinicaId, ini, fim }: { clinicaId?: string; ini: strin
                               const isSubOpen = expanded.has(subKey);
                               const subSubRows = cfg.subSubRowKey
                                 ? (() => {
-                                    const subset = rawRows.filter(
+                                    const subset = rows.filter(
                                       (r) =>
                                         String(r[cfg.rowKey] ?? "—") === rl &&
                                         String(r[cfg.subRowKey!] ?? "—") === srl,
