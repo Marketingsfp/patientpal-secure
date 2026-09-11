@@ -213,6 +213,8 @@ export const editarMembro = createServerFn({ method: "POST" })
          * querer uma permissão que a diretoria concedeu.
          */
         podeAutorizar: z.boolean().optional(),
+        /** Cria horário semanal de médico e gera vagas. Só grava quando vem informado. */
+        podeGerirHorarios: z.boolean().optional(),
         nome: z.string().min(2).max(120).optional(),
         novaSenha: z.string().min(6).max(100).optional().or(z.literal("")),
       })
@@ -235,6 +237,9 @@ export const editarMembro = createServerFn({ method: "POST" })
         role: data.role,
         ativo: data.ativo,
         ...(data.podeAutorizar === undefined ? {} : { pode_autorizar: data.podeAutorizar }),
+        ...(data.podeGerirHorarios === undefined
+          ? {}
+          : { pode_gerir_horarios: data.podeGerirHorarios }),
       })
       .eq("id", data.membershipId);
     if (upErr) throw new Error(upErr.message);

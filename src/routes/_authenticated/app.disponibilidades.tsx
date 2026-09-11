@@ -132,6 +132,8 @@ interface DispRow extends DispExt {
 function Page() {
   const { clinicaAtual } = useClinica();
   const podeEscrever = usePodeEscrever("disponibilidades");
+  // Perfil com escrita no módulo OU marcação individual feita em Equipe e acessos.
+  const podeGerirHorarios = podeEscrever || !!clinicaAtual?.pode_gerir_horarios;
   const [medicos, setMedicos] = useState<Medico[]>([]);
   const [disps, setDisps] = useState<DispRow[]>([]);
   const [agendas, setAgendas] = useState<Agenda[]>([]);
