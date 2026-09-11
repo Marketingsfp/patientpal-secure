@@ -1313,12 +1313,12 @@ async function gerarRespostaNinaInterno(
         {
           rotulo: "contrato de precedência",
           origem: "resolvedor de precedência do turno",
-          texto: precedenciaTurno.contrato,
+          texto: requestNina.contratoPrecedencia,
         },
         {
           rotulo: "contexto de execução",
           origem: "sistema (fatos do turno)",
-          texto: requestNina.runtime,
+          texto: JSON.stringify(requestNina.runtimeContext),
         },
       ],
     };
