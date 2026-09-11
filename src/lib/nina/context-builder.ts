@@ -16,6 +16,8 @@
 export type MensagemContexto = {
   role: string;
   content: string | null;
+  /** Id físico da mensagem (quando vem do histórico gravado). */
+  id?: string | null;
   tool_calls?: Array<{ id: string; function?: { name?: string; arguments?: string } }>;
   tool_call_id?: string;
 };
