@@ -1274,6 +1274,56 @@ async function gerarRespostaNinaInterno(
   });
   const systemPromptFinal = requestNina.systemPrompt;
 
+  // AUDITORIA DAS INSTRUÇÕES — regras identificadas no texto publicado deste
+  // turno. Aplicáveis vêm da precedência já resolvida; as demais ficam
+  // registradas como NÃO aplicáveis, e as sem interpretação como limitação.
+  const auditoriaRegrasTurno = await (async () => {
+    const { extrairRegrasPublicadas } = await import(
+      "@/lib/nina/confidence/regras-publicadas"
+    );
+    const extracao = extrairRegrasPublicadas(behaviorPrompt, {
+      escopo: "whatsapp",
+      hash: hashPrecedencia(behaviorPrompt) ?? null,
+      versao: instrucoesNina.versao != null ? String(instrucoesNina.versao) : null,
+      versaoId: instrucoesNina.versaoId ?? null,
+    });
+    const aplicaveis = precedenciaTurno.regrasAplicaveis;
+    const naoInterpretadas = extracao.regras.filter((r) => !r.interpretada);
+    return {
+      identificadas: extracao.regras,
+      aplicaveis,
+      naoInterpretadas,
+      // Falha de interpretação: há texto com regras, mas NENHUMA foi
+      // interpretada — nunca é o mesmo que "sem regras".
+      falhaDeInterpretacao:
+        extracao.regras.length > 0 && extracao.regras.every((r) => !r.interpretada),
+      limitacoes: precedenciaTurno.resumo.limitacoes,
+      suprimidas: precedenciaTurno.resultado.suprimidas.map((codigo) => ({
+        codigo,
+        motivo: "suprimida por exceção publicada aplicável a este turno",
+        por: precedenciaTurno.saudacaoDispensadaPor,
+      })),
+      blocos: [
+        { rotulo: "envelope técnico", origem: "sistema", texto: requestNina.envelope },
+        {
+          rotulo: "comportamento publicado",
+          origem: "aba Arquitetura (versão publicada)",
+          texto: behaviorPrompt,
+        },
+        {
+          rotulo: "contrato de precedência",
+          origem: "resolvedor de precedência do turno",
+          texto: precedenciaTurno.contrato,
+        },
+        {
+          rotulo: "contexto de execução",
+          origem: "sistema (fatos do turno)",
+          texto: requestNina.runtime,
+        },
+      ],
+    };
+  })();
+
 
   let ctxFerramentas: import("@/lib/nina/paciente-tools.server").CtxNinaPaciente | null = null;
   let ferramentas: unknown[] | undefined;
