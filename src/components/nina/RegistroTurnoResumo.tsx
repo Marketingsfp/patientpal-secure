@@ -292,16 +292,25 @@ export function RegistroTurnoResumo({
         )}
       </div>
 
-      <p>
-        <span className="text-muted-foreground">Mensagem entregue: </span>
-        {entrega?.["mensagemId"]
-          ? `${texto(entrega["mensagemId"])}${
-              entrega["tamanho"] != null ? ` · ${texto(entrega["tamanho"])} caracteres` : ""
-            }`
-          : "não vinculada a este turno"}
-      </p>
+      {/* FASE 3 — estado da saída: só o que os eventos comprovam. */}
+      <div>
+        <p className="text-xs uppercase text-muted-foreground">Saída desta resposta</p>
+        <p>
+          {saida.descricao}
+          {saida.tamanho != null ? ` · ${saida.tamanho} caracteres` : ""}
+          {saida.canal ? ` · canal ${saida.canal}` : ""}
+        </p>
+        <p className="text-muted-foreground">
+          {saida.mensagemId
+            ? `Mensagem vinculada a este turno: ${saida.mensagemId}`
+            : "Mensagem gravada ainda não vinculada a este turno"}
+        </p>
+        {saida.faltando ? (
+          <p className="text-muted-foreground">Falta: {saida.faltando}</p>
+        ) : null}
+      </div>
 
-      {lacunas.length > 0 && (
+      {lacunasVisiveis.length > 0 && (
         <div className="space-y-1">
           <p className="flex items-center gap-2 text-xs uppercase text-muted-foreground">
             <AlertTriangle className="h-3.5 w-3.5" aria-hidden />
