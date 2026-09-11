@@ -109,8 +109,16 @@ export type ResultadoObrigacoes = {
   relevante: boolean;
   /** Percentual de obrigações verificáveis efetivamente cumpridas (0..100). */
   completude: number;
-  /** Nenhuma restrição publicada foi descumprida. */
-  restricoesCumpridas: boolean;
+  /**
+   * `true` só quando existe restrição publicada CONFERIDA e cumprida.
+   * `null` quando não há regra aplicável ou nada pôde ser conferido — ausência
+   * de regra nunca é aprovação.
+   */
+  restricoesCumpridas: boolean | null;
+  /** Estado agregado e auditável das restrições publicadas. */
+  estadoRestricoes: EstadoRestricoes;
+  /** Regras da publicação vigente cuja condição não foi acionada. */
+  regrasNaoAplicaveis: number;
   /** A resposta é compatível com o estágio da conversa. */
   compativelComEstagio: boolean;
   /** O turno respondeu com uma pergunta de esclarecimento pertinente. */
