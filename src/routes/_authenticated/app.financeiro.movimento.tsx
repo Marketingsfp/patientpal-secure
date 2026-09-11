@@ -521,7 +521,7 @@ function Page() {
         let q = supabase
           .from("fin_lancamentos")
           .select(
-            "id, tipo, descricao, valor, data, status, categoria_id, conta_id, forma_pagamento, composicao_pagamento, observacoes, criado_por, medico_id, agendamento_id, created_at",
+            "id, tipo, descricao, valor, data, status, categoria_id, conta_id, forma_pagamento, composicao_pagamento, observacoes, criado_por, medico_id, agendamento_id, created_at, paciente_id, convenio_modalidade, empresa_id",
           )
           .eq("clinica_id", clinicaAtual.clinica_id)
           .order("data", { ascending: false })
