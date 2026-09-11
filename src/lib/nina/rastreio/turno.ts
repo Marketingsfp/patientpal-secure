@@ -363,6 +363,12 @@ export type RegistroTurno = {
   /** FASE 2 — TODAS as avaliações do turno, na ordem em que ocorreram. */
   avaliacoes: ConfiancaDoTurno[];
   entrega: EntregaDoTurno | null;
+  /**
+   * Auditoria de aplicação das instruções publicadas, UMA por rodada do
+   * modelo: prompt enviado, regras, verificação por exigência, resposta
+   * original e texto entregue.
+   */
+  auditoriaInstrucoes: AuditoriaInstrucoesRodada[];
   /** Diagnóstico autorizado nesta clínica (captura de payload por rodada). */
   diagnostico: boolean;
   iniciadoEm: string;
