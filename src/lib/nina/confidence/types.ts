@@ -221,8 +221,12 @@ export type InstrucoesDoTurno = {
   origem: string | null;
   /** Hash do texto efetivamente usado (snapshot da execução). */
   hash: string | null;
-  /** Obrigações explícitas lidas do texto publicado. */
+  /** Obrigações explícitas lidas do texto publicado (compatibilidade). */
   obrigacoes: string[];
+  /** Representação verificável das regras publicadas, presa a esta versão. */
+  regras?: import("./regras-publicadas").RegraPublicada[];
+  /** O que não pôde ser interpretado/verificado nesta publicação. */
+  limitacoes?: string[];
 };
 
 /** Entrada estruturada do motor. */

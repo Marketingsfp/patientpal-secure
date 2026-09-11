@@ -22,6 +22,13 @@
  */
 import { normalizarTexto } from "./evidencia";
 import { classificarNatureza, oracoesDaResposta } from "./modalidade";
+import {
+  literalExigido,
+  regraSeAplica,
+  regrasValidasParaPublicacao,
+  type CategoriaProibida,
+  type RegraPublicada,
+} from "./regras-publicadas";
 import type { ContextoConfianca, ResultadoValidador, StatusValidador } from "./types";
 
 // ------------------------------------------------------------------ tipos
@@ -38,7 +45,11 @@ export type TipoObrigacao =
   /** Restrição literal das instruções publicadas (texto/marcador exigido). */
   | "restricao_literal"
   /** Restrição de forma das instruções publicadas (linguagem aberta). */
-  | "restricao_aberta";
+  | "restricao_aberta"
+  /** Proibição de conteúdo declarada nas instruções publicadas. */
+  | "restricao_proibicao"
+  /** Regra publicada que NÃO pôde ser interpretada com segurança. */
+  | "restricao_nao_interpretada";
 
 export type Obrigacao = {
   id: string;
@@ -50,6 +61,12 @@ export type Obrigacao = {
   topico?: string | null;
   /** Texto exato exigido, quando a obrigação for literal. */
   literal?: string | null;
+  /** Categorias proibidas, quando a obrigação for proibição de conteúdo. */
+  proibicoes?: CategoriaProibida[];
+  /** Texto literal exigido no mesmo turno (para conferir "nada além disso"). */
+  literalEsperado?: string | null;
+  /** Regra publicada de origem: condição, ambiente, prioridade, versão, hash. */
+  regra?: RegraPublicada;
   /** Como esta obrigação pode ser conferida. */
   verificacao: "deterministica" | "semantica";
 };
@@ -182,23 +199,10 @@ function topicosPedidos(mensagem: string): Topico[] {
 // ------------------------------------------------ obrigações das instruções
 
 /**
- * Lê, do texto de uma obrigação PUBLICADA, o trecho literal exigido.
- * Genérico: qualquer instrução que mande responder/enviar/incluir um texto
- * exato é conferível — não existe exceção para nenhum marcador específico.
+ * Leitura do literal exigido: agora mora na representação das regras
+ * publicadas e é reexportada aqui por compatibilidade.
  */
-export function literalExigido(obrigacao: string): string | null {
-  const padroes: RegExp[] = [
-    /(?:responda|responder|envie|enviar|retorne|retornar|escreva|escrever)\s+(?:exatamente|apenas|somente|literalmente)\s*[:\-]?\s*["“']?([^"”'\n.;]+)/i,
-    /(?:inclua|incluir|use|usar)\s+(?:o\s+)?(?:marcador|codigo|código|texto|token)\s*[:\-]?\s*["“']?([^"”'\n.;]+)/i,
-    /(?:responda|responder)\s+com\s+(?:o\s+)?(?:marcador|codigo|código|texto|token)\s*[:\-]?\s*["“']?([^"”'\n.;]+)/i,
-  ];
-  for (const p of padroes) {
-    const m = p.exec(obrigacao);
-    const bruto = m?.[1]?.trim();
-    if (bruto && bruto.length >= 2) return bruto;
-  }
-  return null;
-}
+export { literalExigido } from "./regras-publicadas";
 
 // ------------------------------------------------------------- derivação
 
@@ -248,6 +252,47 @@ export function derivarObrigacoesDoTurno(ctx: ContextoConfianca): Obrigacao[] {
     }
   }
 
+  // Representação verificável da publicação, quando o turno a carrega.
+  const regras = regrasValidasParaPublicacao(ctx.instrucoes?.regras, ctx.instrucoes?.hash).filter(
+    (r) =>
+      regraSeAplica(r, {
+        mensagemPaciente: ctx.mensagemPaciente ?? null,
+        ambiente: ctx.businessContext?.ambiente ?? null,
+      }),
+  );
+
+  // Quando o turno traz a representação estruturada, é ela que vale — mesmo
+  // vazia (regra fora da condição/ambiente, ou representação desatualizada).
+  if (Array.isArray(ctx.instrucoes?.regras)) {
+    const literalDoTurno =
+      regras.find((r) => r.verificacao === "literal")?.literal ?? null;
+    for (const r of regras) {
+      const base = {
+        id: `instrucao:${r.ordem}`,
+        origem: "instrucoes_publicadas" as const,
+        descricao: r.descricao,
+        regra: r,
+      };
+      if (r.verificacao === "literal" && r.literal) {
+        out.push({ ...base, tipo: "restricao_literal", literal: r.literal, verificacao: "deterministica" });
+      } else if (r.verificacao === "proibicao_de_conteudo") {
+        out.push({
+          ...base,
+          tipo: "restricao_proibicao",
+          proibicoes: r.proibicoes,
+          literalEsperado: literalDoTurno,
+          verificacao: "deterministica",
+        });
+      } else if (r.verificacao === "nao_interpretada") {
+        out.push({ ...base, tipo: "restricao_nao_interpretada", verificacao: "semantica" });
+      } else {
+        out.push({ ...base, tipo: "restricao_aberta", verificacao: "semantica" });
+      }
+    }
+    return out;
+  }
+
+  // Compatibilidade: turnos que só carregam obrigações em texto simples.
   const publicadas = ctx.instrucoes?.obrigacoes ?? [];
   publicadas.forEach((texto, i) => {
     const literal = literalExigido(texto);
@@ -292,6 +337,35 @@ export function reconheceAusencia(texto: string): boolean {
   });
 }
 
+const DESPEDIDA =
+  /\b(ate logo|ate mais|ate breve|abraco|qualquer duvida|estamos a disposicao|fico a disposicao|tenha um[a]? (bom|boa))\b/;
+
+/**
+ * Conferência determinística das categorias proibidas pela publicação.
+ * "explicação" e "qualquer outro texto" só são conferíveis quando a mesma
+ * publicação exige um texto literal — aí a resposta tem de ser só ele.
+ */
+export function categoriasVioladas(
+  resposta: string,
+  proibicoes: readonly CategoriaProibida[],
+  literalEsperado: string | null,
+): CategoriaProibida[] {
+  const bruto = resposta.trim();
+  const n = normalizarTexto(resposta);
+  const excedeLiteral =
+    literalEsperado !== null && normalizarTexto(literalEsperado).trim() !== n.trim();
+
+  const violadas: CategoriaProibida[] = [];
+  for (const c of proibicoes) {
+    if (c === "saudacao" && SAUDACAO.test(n)) violadas.push(c);
+    if (c === "emoji" && /\p{Extended_Pictographic}/u.test(bruto)) violadas.push(c);
+    if (c === "pergunta" && bruto.includes("?")) violadas.push(c);
+    if (c === "despedida" && DESPEDIDA.test(n)) violadas.push(c);
+    if ((c === "explicacao" || c === "texto_adicional") && excedeLiteral) violadas.push(c);
+  }
+  return [...new Set(violadas)];
+}
+
 function avaliarUma(
   o: Obrigacao,
   resposta: string,
@@ -306,6 +380,29 @@ function avaliarUma(
       status: ok ? "cumprida" : "descumprida",
       motivo: ok ? "TEXTO_LITERAL_PRESENTE" : "TEXTO_LITERAL_AUSENTE",
     };
+  }
+
+  // Regra publicada não interpretada NUNCA vira cumprimento.
+  if (o.tipo === "restricao_nao_interpretada") {
+    return { obrigacao: o, status: "indeterminada", motivo: "REGRA_NAO_INTERPRETADA" };
+  }
+
+  if (o.tipo === "restricao_proibicao") {
+    const violadas = categoriasVioladas(resposta, o.proibicoes ?? [], o.literalEsperado ?? null);
+    if (violadas.length > 0) {
+      return {
+        obrigacao: o,
+        status: "descumprida",
+        motivo: `CONTEUDO_PROIBIDO_PRESENTE:${violadas.join(",")}`,
+      };
+    }
+    const conferiveis = (o.proibicoes ?? []).filter(
+      (c) => c !== "texto_adicional" && c !== "explicacao",
+    );
+    if (conferiveis.length === 0 && !o.literalEsperado) {
+      return { obrigacao: o, status: "indeterminada", motivo: "PROIBICAO_NAO_VERIFICAVEL" };
+    }
+    return { obrigacao: o, status: "cumprida", motivo: "NENHUM_CONTEUDO_PROIBIDO" };
   }
 
   if (o.tipo === "informacao_solicitada" && o.topico) {
@@ -389,6 +486,19 @@ export function avaliarObrigacoes(
   if (avaliacoes.some((a) => a.status === "indeterminada")) {
     limitacoes.push("OBRIGACAO_DE_LINGUAGEM_ABERTA_NAO_VERIFICADA");
   }
+  if (avaliacoes.some((a) => a.motivo === "REGRA_NAO_INTERPRETADA")) {
+    limitacoes.push("REGRA_PUBLICADA_NAO_INTERPRETADA");
+  }
+  const regrasDoTurno = ctx.instrucoes?.regras;
+  if (
+    regrasDoTurno &&
+    regrasDoTurno.length > 0 &&
+    regrasValidasParaPublicacao(regrasDoTurno, ctx.instrucoes?.hash).length === 0
+  ) {
+    limitacoes.push("REPRESENTACAO_DAS_REGRAS_DESATUALIZADA");
+  }
+  // Limitações declaradas pela própria publicação (o que ela não garante).
+  for (const l of ctx.instrucoes?.limitacoes ?? []) if (!limitacoes.includes(l)) limitacoes.push(l);
   if (resposta.trim() === "") limitacoes.push("RESPOSTA_NAO_REGISTRADA");
 
   // Estágio: responder um pedido concreto apenas com saudação é incompatível.
