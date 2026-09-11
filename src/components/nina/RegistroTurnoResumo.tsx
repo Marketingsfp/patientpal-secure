@@ -206,7 +206,9 @@ export function RegistroTurnoResumo({
           {resumo["teste"] ? " · teste" : ""}
         </p>
         <p>
-          <span className="text-muted-foreground">Mensagens do turno: </span>
+          {/* FASE 5 — mensagens RECEBIDAS; as entradas enviadas ao modelo são
+              contadas à parte, porque podem divergir. */}
+          <span className="text-muted-foreground">Mensagens recebidas no turno: </span>
           {texto(resumo["mensagens_entrada"], "0")}
           {resumo["batch_id"] ? " (agrupadas)" : ""}
           {resumo["revisao_conversa"] != null
