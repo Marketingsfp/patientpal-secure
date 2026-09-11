@@ -19,6 +19,8 @@
  * - Nada aqui consulta banco, rede ou modelo: é função pura e testável.
  */
 import { detectarConflitosEntreFatos, normalizarTexto } from "./evidencia";
+import { hashDoTexto } from "./hash";
+import { extrairRegrasPublicadas } from "./regras-publicadas";
 import type { FatoRecuperado } from "./evidencia";
 import type {
   AcaoSolicitada,
