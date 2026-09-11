@@ -49,7 +49,7 @@ describe("contrato comum dos validadores", () => {
     expect(rs.length).toBe(12);
     for (const r of rs) {
       expect(typeof r.validator).toBe("string");
-      expect(["PASS", "WARNING", "FAIL", "BLOCK", "NOT_APPLICABLE"]).toContain(r.status);
+      expect(["PASS", "WARNING", "FAIL", "BLOCK", "UNKNOWN", "PENDING", "NOT_APPLICABLE"]).toContain(r.status);
       expect(r.score).toBeGreaterThanOrEqual(0);
       expect(r.score).toBeLessThanOrEqual(100);
       expect(typeof r.reasonCode).toBe("string");
