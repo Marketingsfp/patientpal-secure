@@ -639,6 +639,8 @@ export function avaliarObrigacoes(
     relevante,
     completude,
     restricoesCumpridas,
+    estadoRestricoes,
+    regrasNaoAplicaveis,
     compativelComEstagio,
     esclarecimentoPertinente,
     limitacoes,
