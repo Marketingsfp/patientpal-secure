@@ -18,7 +18,10 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   alteracaoDaTransformacao,
+  avaliacaoEmObservacao,
   avaliarTransformacoes,
+  descreverAvaliacaoConfianca,
+  TEXTO_AVALIACAO_EM_OBSERVACAO,
   origemComSituacao,
   ROTULO_LACUNA_TURNO,
   ROTULO_ORIGEM,
