@@ -305,13 +305,20 @@ export function derivarObrigacoesDoTurno(ctx: ContextoConfianca): Obrigacao[] {
         regra: r,
       };
       if (r.verificacao === "literal" && r.literal) {
-        out.push({ ...base, tipo: "restricao_literal", literal: r.literal, verificacao: "deterministica" });
+        out.push({
+          ...base,
+          tipo: "restricao_literal",
+          literal: r.literal,
+          operador: r.operador ?? "igualdade",
+          verificacao: "deterministica",
+        });
       } else if (r.verificacao === "proibicao_de_conteudo") {
         out.push({
           ...base,
           tipo: "restricao_proibicao",
           proibicoes: r.proibicoes,
           literalEsperado: literalDoTurno,
+          operador: operadorDoTurno,
           verificacao: "deterministica",
         });
       } else if (r.verificacao === "nao_interpretada") {
