@@ -187,14 +187,29 @@ export function ConfiancaMensagemBadge({
   confianca,
   /** FASE 6 — id da mensagem enviada; vínculo principal do snapshot. */
   mensagemId,
+  /** FASE 6 — conversa da mensagem (isolamento explícito). */
+  conversaId,
+  /**
+   * FASE 6 — a bolha em que o selo aparece. Serve para conferir se a avaliação
+   * é DESTA saída: um áudio com resumo falado tem outro conteúdo e não pode
+   * herdar a nota do texto completo.
+   */
+  mensagem,
 }: {
   clinicaId: string;
   confianca: ConfiancaDaMensagem;
   mensagemId?: string | null;
+  conversaId?: string | null;
+  mensagem?: { tipo?: string | null; texto?: string | null; transcricao?: string | null } | null;
 }) {
   const detalhar = useServerFn(confiabilidadeDaExecucao);
   const [detalhe, setDetalhe] = useState<ConfiabilidadeDecisaoView | null>(null);
   const [aberto, setAberto] = useState(false);
+
+  const identidade = useMemo(
+    () => (mensagem ? representacaoDaMensagem(mensagem) : null),
+    [mensagem],
+  );
 
   const carregar = useCallback(async () => {
     try {
@@ -204,22 +219,46 @@ export function ConfiancaMensagemBadge({
             clinicaId,
             execucaoId: confianca.execucao_id,
             ...(mensagemId ? { outgoingMessageId: mensagemId } : {}),
+            ...(conversaId ? { conversaId } : {}),
+            ...(identidade
+              ? {
+                  representacao: identidade.representacao,
+                  ...(identidade.conteudo ? { conteudo: identidade.conteudo.slice(0, 20000) } : {}),
+                }
+              : {}),
           },
         }),
       );
     } catch {
       setDetalhe(null);
     }
-  }, [clinicaId, confianca.execucao_id, detalhar, mensagemId]);
+  }, [clinicaId, confianca.execucao_id, conversaId, detalhar, identidade, mensagemId]);
 
   useEffect(() => {
     if (aberto && !detalhe) void carregar();
   }, [aberto, carregar, detalhe]);
 
   const rotulo = rotuloConfianca(confianca);
+  // FASE 6 — o selo do lote é da execução; se ele descreve OUTRA forma de
+  // entrega ou outro conteúdo, a bolha fica "não avaliada" com o motivo.
+  const vinculo = useMemo(
+    () =>
+      mensagem
+        ? confiancaAplicavelAMensagem(
+            {
+              representacao: confianca.representacao ?? null,
+              texto_final_hash: confianca.texto_final_hash ?? null,
+            },
+            mensagem,
+          )
+        : null,
+    [confianca.representacao, confianca.texto_final_hash, mensagem],
+  );
+  const aplicavel = vinculo ? vinculo.aplicavel : true;
   // FASE 6 — sem avaliação da RESPOSTA, o selo é neutro: nota de ação nunca
   // é apresentada como confiança do texto.
-  const estilo = rotulo.avaliada ? (ESTILO[confianca.nivel] ?? ESTILO["LOW"]!) : ESTILO_NEUTRO;
+  const estilo =
+    rotulo.avaliada && aplicavel ? (ESTILO[confianca.nivel] ?? ESTILO["LOW"]!) : ESTILO_NEUTRO;
   const { Icone } = estilo;
 
   return (
@@ -228,17 +267,19 @@ export function ConfiancaMensagemBadge({
         <button
           type="button"
           aria-label={`${estilo.rotulo}${
-            rotulo.avaliada ? `: índice de evidência ${scoreExibido(confianca.score)} de 100.` : "."
+            rotulo.avaliada && aplicavel
+              ? `: índice de evidência ${scoreExibido(confianca.score)} de 100.`
+              : "."
           }${confianca.erro_reportado ? " Erro reportado por atendente." : ""} Ver detalhes.`}
           title={
-            rotulo.avaliada
+            rotulo.avaliada && aplicavel
               ? `${estilo.rotulo} — ${ROTULO_INDICE_EVIDENCIA}: ${textoIndiceEvidencia(confianca.score)} (visível apenas para a equipe)`
               : "A resposta não foi avaliada; existe apenas avaliação de segurança da ação (visível apenas para a equipe)."
           }
           className={`inline-flex h-[18px] shrink-0 items-center gap-1 rounded-full border px-1.5 text-[10px] font-medium leading-none ${estilo.classe}`}
         >
           <span aria-hidden className={`h-1.5 w-1.5 rounded-full ${estilo.ponto}`} />
-          {rotulo.texto}
+          {aplicavel ? rotulo.texto : ESTILO_NEUTRO.curto}
           {confianca.erro_reportado && (
             <span className="font-semibold text-destructive" aria-hidden>
               !
@@ -253,8 +294,17 @@ export function ConfiancaMensagemBadge({
         <Secao titulo="Tipo do turno">
           <p>{detalhe?.tipoTurno ?? "—"}</p>
         </Secao>
+        {(vinculo && !vinculo.aplicavel) || (detalhe && !detalhe.avaliacaoDisponivel) ? (
+          <Secao titulo="Vínculo com esta saída">
+            <p className="text-muted-foreground">
+              {detalhe && !detalhe.avaliacaoDisponivel
+                ? detalhe.vinculoMotivo
+                : TEXTO_MOTIVO_VINCULO[vinculo!.motivo]}
+            </p>
+          </Secao>
+        ) : null}
         <Secao titulo={ROTULO_INDICE_EVIDENCIA}>
-          {rotulo.avaliada ? (
+          {rotulo.avaliada && aplicavel && detalhe?.avaliacaoDisponivel !== false ? (
             <>
               <p className="text-sm font-medium">
                 <Icone className="mr-1 inline h-3.5 w-3.5" aria-hidden />

@@ -24,6 +24,28 @@ export const TTL_CONFIANCA_MS = 60_000;
 /** Teto por lote, alinhado ao limite aceito pela função de servidor. */
 export const LOTE_MAXIMO = 300;
 
+/**
+ * FASE 6 — reporte de erro recém-gravado. O TTL de 60s deixaria o indicador
+ * desatualizado por até um minuto; aqui a execução é marcada como vencida na
+ * hora, para todos os leitores do navegador.
+ */
+const invalidadas = new Map<string, number>();
+const ouvintes = new Set<() => void>();
+
+export function invalidarConfianca(clinicaId: string, execucaoId: string, agora = Date.now()): void {
+  if (!clinicaId || !execucaoId) return;
+  invalidadas.set(chaveCache(clinicaId, execucaoId), agora);
+  for (const fn of ouvintes) fn();
+}
+
+/** Avisa a Inbox de que algo foi invalidado (para refazer o lote). */
+export function assinarInvalidacaoConfianca(fn: () => void): () => void {
+  ouvintes.add(fn);
+  return () => {
+    ouvintes.delete(fn);
+  };
+}
+
 export function chaveCache(clinicaId: string, execucaoId: string): string {
   return `${clinicaId}:${execucaoId}`;
 }
@@ -44,8 +66,11 @@ export function idsParaBuscar(
   for (const id of execucaoIds) {
     if (!id || vistos.has(id)) continue;
     vistos.add(id);
-    const entrada = cache.get(chaveCache(clinicaId, id));
-    if (!entrada || agora - entrada.em >= ttlMs) pendentes.push(id);
+    const k = chaveCache(clinicaId, id);
+    const entrada = cache.get(k);
+    const invalidadaEm = invalidadas.get(k);
+    const vencidaPorReporte = entrada != null && invalidadaEm != null && invalidadaEm >= entrada.em;
+    if (!entrada || vencidaPorReporte || agora - entrada.em >= ttlMs) pendentes.push(id);
   }
   return pendentes.slice(0, LOTE_MAXIMO);
 }
