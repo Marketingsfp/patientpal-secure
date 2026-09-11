@@ -4,9 +4,11 @@
  */
 import { describe, expect, it } from "bun:test";
 import {
+  avaliarTransformacoes,
   criarRegistroTurno,
   finalizarRegistroTurno,
   lacunasDoTurno,
+  origemComSituacao,
   resumoTurnoParaTrace,
   truncarParaDiagnostico,
   MARCA_TRUNCADO,
@@ -123,5 +125,59 @@ describe("registro do turno", () => {
     const longo = truncarParaDiagnostico("x".repeat(50), 10);
     expect(longo.truncado).toBe(true);
     expect(longo.texto.endsWith(MARCA_TRUNCADO)).toBe(true);
+  });
+});
+
+describe("situação das transformações (FASE 1 — fidelidade)", () => {
+  const t = (antes: string | null, depois: string | null, etapa = "finalizacao") => ({
+    etapa,
+    motivo: "m",
+    antesHash: antes,
+    depoisHash: depois,
+    em: "2026-09-11T10:00:00.000Z",
+  });
+
+  it("passagem pelo finalizador sem mudar o texto não é transformação", () => {
+    expect(avaliarTransformacoes([t("t1:a:1", "t1:a:1")])).toBe("sem_alteracao");
+    const r = criarRegistroTurno({ turnoId: "x" });
+    r.origemResposta = "modelo";
+    r.transformacoes.push(t("t1:a:1", "t1:a:1"));
+    expect(finalizarRegistroTurno(r).origemResposta).toBe("modelo");
+  });
+
+  it("mudança efetiva é registrada como alteração", () => {
+    expect(avaliarTransformacoes([t("t1:a:1", "t1:b:2")])).toBe("alterado");
+  });
+
+  it("alteração intermediária com retorno ao original é 'revertido'", () => {
+    expect(avaliarTransformacoes([t("t1:a:1", "t1:b:2"), t("t1:b:2", "t1:a:1")])).toBe("revertido");
+    const r = criarRegistroTurno({ turnoId: "x" });
+    r.origemResposta = "modelo";
+    r.transformacoes.push(t("t1:a:1", "t1:b:2"), t("t1:b:2", "t1:a:1"));
+    expect(finalizarRegistroTurno(r).origemResposta).toBe("modelo");
+  });
+
+  it("sem hash suficiente, declara indeterminado em vez de supor", () => {
+    expect(avaliarTransformacoes([t(null, null)])).toBe("indeterminado");
+    expect(avaliarTransformacoes([t("t1:a:1", null)])).toBe("indeterminado");
+  });
+
+  it("nenhuma etapa registrada", () => {
+    expect(avaliarTransformacoes([])).toBe("sem_transformacoes");
+  });
+
+  it("origem antiga 'modelo_transformado' sem evidência volta a 'modelo'", () => {
+    expect(origemComSituacao("modelo_transformado", "sem_alteracao")).toBe("modelo");
+    expect(origemComSituacao("modelo_transformado", "alterado")).toBe("modelo_transformado");
+    expect(origemComSituacao("codigo", "alterado")).toBe("codigo");
+  });
+
+  it("o resumo do trace carrega a situação e o efeito de cada etapa", () => {
+    const r = criarRegistroTurno({ turnoId: "x" });
+    r.origemResposta = "modelo";
+    r.transformacoes.push(t("t1:a:1", "t1:a:1"));
+    const resumo = resumoTurnoParaTrace(finalizarRegistroTurno(r)) as Record<string, unknown>;
+    expect(resumo["situacao_transformacoes"]).toBe("sem_alteracao");
+    expect((resumo["transformacoes"] as Array<Record<string, unknown>>)[0]!["alterou"]).toBe(false);
   });
 });

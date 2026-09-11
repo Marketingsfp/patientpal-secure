@@ -14,6 +14,8 @@
  * Módulo PURO: sem banco, sem rede. Nenhuma resposta é escrita aqui — o que
  * a configuração define é o MARCADOR esperado, não o texto do modelo.
  */
+import { alteracaoDaTransformacao } from "@/lib/nina/rastreio/turno";
+
 
 /** Par de teste: uma regra publicável e o marcador que ela exige. */
 export type ParMarcador = {
@@ -141,10 +143,20 @@ export function resumirAtendimentoCompleto(
   const transformacoes = Array.isArray(resumo["transformacoes"])
     ? (resumo["transformacoes"] as Record<string, unknown>[])
     : [];
-  const intervencoes = transformacoes.map((t) => ({
-    etapa: texto(t["etapa"]) ?? "desconhecida",
-    motivo: texto(t["motivo"]) ?? "sem motivo registrado",
-  }));
+  // Passar por uma etapa não é intervir: quando os hashes provam que o texto
+  // não mudou, aquela etapa não conta como intervenção.
+  const intervencoes = transformacoes
+    .filter(
+      (t) =>
+        alteracaoDaTransformacao({
+          antesHash: (t["antes_hash"] ?? t["antesHash"] ?? null) as string | null,
+          depoisHash: (t["depois_hash"] ?? t["depoisHash"] ?? null) as string | null,
+        }) !== false,
+    )
+    .map((t) => ({
+      etapa: texto(t["etapa"]) ?? "desconhecida",
+      motivo: texto(t["motivo"]) ?? "sem motivo registrado",
+    }));
   const entrega = (resumo["entrega"] ?? null) as Record<string, unknown> | null;
   const lacunas = Array.isArray(resumo["lacunas"]) ? (resumo["lacunas"] as string[]) : [];
   const decisao = texto(conf?.["decisao"]);

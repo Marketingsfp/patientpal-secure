@@ -3,7 +3,7 @@
  * Teste puro: sem banco, sem rede, sem render.
  */
 import { describe, expect, it } from "bun:test";
-import { resumoDoTurno } from "../RegistroTurnoResumo";
+import { resumoDoTurno, situacaoDasTransformacoes } from "../RegistroTurnoResumo";
 
 describe("resumoDoTurno", () => {
   it("devolve o metadata do evento turn.summary", () => {
@@ -20,5 +20,29 @@ describe("resumoDoTurno", () => {
 
   it("ignora metadata que não é objeto", () => {
     expect(resumoDoTurno([{ node_id: "turn.summary", metadata: "texto" }])).toBeNull();
+  });
+});
+
+describe("situacaoDasTransformacoes", () => {
+  it("usa a situação gravada quando existe", () => {
+    expect(situacaoDasTransformacoes({ situacao_transformacoes: "alterado" })).toBe("alterado");
+  });
+
+  it("registro antigo sem o campo é reclassificado pelos hashes gravados", () => {
+    expect(
+      situacaoDasTransformacoes({
+        transformacoes: [{ etapa: "finalizacao", antes_hash: "t1:a:1", depois_hash: "t1:a:1" }],
+      }),
+    ).toBe("sem_alteracao");
+    expect(
+      situacaoDasTransformacoes({
+        transformacoes: [{ etapa: "finalizacao", antes_hash: "t1:a:1", depois_hash: "t1:b:2" }],
+      }),
+    ).toBe("alterado");
+  });
+
+  it("sem transformações e sem hash", () => {
+    expect(situacaoDasTransformacoes({})).toBe("sem_transformacoes");
+    expect(situacaoDasTransformacoes({ transformacoes: [{ etapa: "x" }] })).toBe("indeterminado");
   });
 });
