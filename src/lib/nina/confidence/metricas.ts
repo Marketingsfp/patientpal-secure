@@ -8,6 +8,7 @@
  * Nada aqui expõe texto do paciente: só códigos, contagens e médias.
  */
 
+import { descreverMistura, separarAvaliacoes } from "./escopo-metricas";
 import {
   agruparSaidas,
   calcularAcertoObservado,
@@ -211,6 +212,38 @@ export type MetricasConfiabilidade = {
   calibracaoPorFaixaScore: CalibracaoPorFaixaScore;
   calibracaoPorTipo: CalibracaoTipo[];
   altaConfiancaComErro: AltaConfiancaComErro;
+  /** FASE 7 — o que cada número está medindo e o que ficou de fora. */
+  escopo: EscopoMetricas;
+  /** FASE 7 — segurança da ação, contada à parte da confiança da resposta. */
+  seguranca: MetricasSeguranca;
+};
+
+/** FASE 7 — recorte usado nos indicadores de resposta. */
+export type EscopoMetricas = {
+  /** Mensagens distintas presentes no período (resposta e/ou ação). */
+  mensagens: number;
+  /** Avaliações de confiança da resposta usadas nas médias e faixas. */
+  avaliacoesResposta: number;
+  /** Avaliações de segurança da ação, fora das médias de resposta. */
+  avaliacoesAcao: number;
+  /** Registros sem tipo gravado, tratados como avaliação da resposta. */
+  semTipoRegistrado: number;
+  /** Repetições da mesma saída e mesmo tipo, contadas uma vez só. */
+  duplicadosDescartados: number;
+  /** Registros lidos no banco antes da separação. */
+  registrosLidos: number;
+  ambientes: string[];
+  versoesPolitica: string[];
+  /** Falso quando o recorte mistura ambientes ou versões de política. */
+  comparavel: boolean;
+};
+
+/** FASE 7 — indicadores próprios da segurança da ação. */
+export type MetricasSeguranca = {
+  avaliadas: number;
+  bloqueadas: number;
+  liberadas: number;
+  scoreMedio: number;
 };
 
 const DIAS = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"];
@@ -648,6 +681,13 @@ export function calcularMetricasConfiabilidade(
   erros: ErroReportado[] = [],
   opcoes: OpcoesMetricas = {},
 ): MetricasConfiabilidade {
+  // FASE 7 — confiança da resposta e segurança da ação não entram na mesma
+  // média, e a mesma saída não é contada duas vezes no mesmo indicador.
+  const separacao = separarAvaliacoes(linhas);
+  const respostas = separacao.respostas;
+  const acoes = separacao.seguranca;
+  const mistura = descreverMistura(linhas);
+
   const distribuicao = { HIGH: 0, MEDIUM: 0, LOW: 0 };
   const motivos = new Map<string, number>();
   const ferramentas = new Map<string, number>();
@@ -665,7 +705,7 @@ export function calcularMetricasConfiabilidade(
   let bloqueadas = 0;
   let totalBloqueadores = 0;
 
-  for (const l of linhas) {
+  for (const l of respostas) {
     const score = Number.isFinite(l.score) ? l.score : 0;
     soma += score;
     const nivel = nivelDa({ nivel: l.nivel, score });
@@ -675,7 +715,6 @@ export function calcularMetricasConfiabilidade(
 
     if (decisao === "CLARIFY") esclarecimentos += 1;
     if (decisao === "ALLOW") liberadas += 1;
-    if (decisao === "BLOCK_ACTION") bloqueadas += 1;
     if ((decisao === "HANDOFF" || decisao === "BLOCK_ACTION") && baixa) handoffsBaixa += 1;
 
     totalBloqueadores += l.bloqueadores.length;
@@ -707,6 +746,32 @@ export function calcularMetricasConfiabilidade(
     acumular(porPeriodo, l.periodo, score, baixa);
   }
 
+  // FASE 7 — segurança da ação tem contagem própria: bloqueio de ação não
+  // entra na média de confiança das respostas.
+  let somaAcoes = 0;
+  let acoesLiberadas = 0;
+  for (const l of acoes) {
+    const score = Number.isFinite(l.score) ? l.score : 0;
+    somaAcoes += score;
+    const decisao = decisaoDa(l);
+    if (decisao === "BLOCK_ACTION") bloqueadas += 1;
+    if (decisao === "ALLOW") acoesLiberadas += 1;
+    totalBloqueadores += l.bloqueadores.length;
+    for (const b of l.bloqueadores) somar(motivos, b);
+    if (decisao === "BLOCK_ACTION") {
+      for (const c of l.reason_codes) {
+        somar(motivos, c);
+        if (ehAusencia(c)) somar(ausentes, c);
+      }
+      for (const v of l.validadores) {
+        if (v.status === "FAIL" || v.status === "BLOCK") somar(validadoresHandoff, v.validator);
+      }
+    }
+    for (const f of l.ferramentas) {
+      if (!f.sucesso) somar(ferramentas, f.nome);
+    }
+  }
+
   // FASE 7 — denominadores, revisão e resultados confirmados.
   const saidas = linhas as unknown as LinhaSaida[];
   const unidades = agruparSaidas(saidas);
@@ -725,7 +790,7 @@ export function calcularMetricasConfiabilidade(
   const limiteLeitura = opcoes.limiteLeitura ?? Number.POSITIVE_INFINITY;
 
   return {
-    total: linhas.length,
+    total: respostas.length,
     denominadores: calcularDenominadores(saidas),
     revisao: resumirRevisao(unidades, idxRevisao),
     acerto: calcularAcertoObservado(unidades, idxRevisao),
@@ -735,8 +800,8 @@ export function calcularMetricasConfiabilidade(
       opcoes.provasAgendamento ?? [],
       opcoes.falhasOperacionais ?? 0,
     ),
-    amostra: descreverAmostra(linhas.length, limiteLeitura, unidades.length),
-    scoreMedio: linhas.length ? Math.round((soma / linhas.length) * 10) / 10 : 0,
+    amostra: descreverAmostra(respostas.length, limiteLeitura, unidades.length),
+    scoreMedio: respostas.length ? Math.round((soma / respostas.length) * 10) / 10 : 0,
     distribuicao,
     handoffsBaixaConfianca: handoffsBaixa,
     esclarecimentos,
@@ -751,10 +816,27 @@ export function calcularMetricasConfiabilidade(
     porDia: medias(porDia, true),
     porDiaSemana: medias(porDow),
     porPeriodoOperacao: medias(porPeriodo),
-    correlacaoErros: correlacionar(linhas, erros),
-    calibracaoPorNivel: calcularCalibracaoPorNivel(linhas, erros),
-    calibracaoPorFaixaScore: calcularCalibracaoPorFaixaScore(linhas, erros),
-    calibracaoPorTipo: calcularCalibracaoPorTipo(linhas, erros),
-    altaConfiancaComErro: calcularAltaConfiancaComErro(linhas, erros),
+    correlacaoErros: correlacionar(respostas, erros),
+    calibracaoPorNivel: calcularCalibracaoPorNivel(respostas, erros),
+    calibracaoPorFaixaScore: calcularCalibracaoPorFaixaScore(respostas, erros),
+    calibracaoPorTipo: calcularCalibracaoPorTipo(respostas, erros),
+    altaConfiancaComErro: calcularAltaConfiancaComErro(respostas, erros),
+    escopo: {
+      mensagens: separacao.saidas,
+      avaliacoesResposta: respostas.length,
+      avaliacoesAcao: acoes.length,
+      semTipoRegistrado: separacao.semTipo,
+      duplicadosDescartados: separacao.duplicadosDescartados,
+      registrosLidos: linhas.length,
+      ambientes: mistura.ambientes,
+      versoesPolitica: mistura.versoesPolitica,
+      comparavel: mistura.comparavel,
+    },
+    seguranca: {
+      avaliadas: acoes.length,
+      bloqueadas,
+      liberadas: acoesLiberadas,
+      scoreMedio: acoes.length ? Math.round((somaAcoes / acoes.length) * 10) / 10 : 0,
+    },
   };
 }
