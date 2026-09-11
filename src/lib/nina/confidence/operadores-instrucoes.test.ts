@@ -45,7 +45,7 @@ const instrucoes = (texto: string, versao = "6") =>
 
 const ctx = (
   draftText: string,
-  o: { mensagem?: string; texto?: string; ambiente?: string } = {},
+  o: { mensagem?: string; texto?: string; ambiente?: "homologacao" | "producao" } = {},
 ): ContextoConfianca => ({
   requestedAction: null,
   retrievedSources: [],
