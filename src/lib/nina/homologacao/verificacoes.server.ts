@@ -30,6 +30,7 @@ import {
 } from "@/lib/nina/homologacao/modo-tecnico";
 import {
   ESCOPO_DA_PROVA_FONTE,
+  PARTES_NAO_PERCORRIDAS_FONTE,
   avaliarAderenciaFonte,
   regraPublicavelDoPar,
   resumirAtendimentoCompleto,
@@ -100,10 +101,13 @@ export async function verificarFonteEAderencia(
     fallbackPorErro: false,
     regraChegouAoPayload: false,
     primeiraRespostaCumpriu: false,
+    sistemaAlterouTexto: false,
+    entregaCumpriu: false,
     hashPayload: null,
     modelo: null,
     erro: null,
     escopoDaProva: ESCOPO_DA_PROVA_FONTE,
+    partesNaoPercorridas: PARTES_NAO_PERCORRIDAS_FONTE,
   };
 
   // O modo técnico é decidido AQUI, no servidor, e nunca pelo texto enviado.
@@ -180,6 +184,11 @@ export async function verificarFonteEAderencia(
       modelo: resposta.modelo ?? null,
       regraChegouAoPayload: aderencia.regraChegouAoPayload,
       primeiraRespostaCumpriu: resposta.ok ? aderencia.primeiraRespostaCumpriu : false,
+      // Caminho isolado: nenhum passo do sistema altera o texto aqui. Fica
+      // declarado para que "entrega cumpriu" não seja lido como prova do
+      // atendimento completo.
+      sistemaAlterouTexto: aderencia.sistemaAlterouTexto,
+      entregaCumpriu: resposta.ok ? aderencia.entregaCumpriu : false,
       erro: resposta.ok ? null : (resposta.erro ?? "falha na chamada ao modelo"),
     };
   } catch (err) {
@@ -249,6 +258,9 @@ export async function verificarAtendimentoCompleto(entrada: {
   reply: string | null;
   processamento: string;
   transferida: boolean;
+  /** Identificadores exatos do turno auditado (sem eles não há evidência). */
+  turnoId: string | null;
+  execucaoId: string | null;
   turno: ResultadoAtendimentoCompleto;
 }> {
   const { processarMensagemTeste } = await import("@/lib/nina/teste-console.server");
@@ -263,19 +275,32 @@ export async function verificarAtendimentoCompleto(entrada: {
     entrada.userId,
   );
 
+  // Vínculo por ID EXATO do turno/execução. Buscar "o último resumo da
+  // clínica" podia associar OUTRO atendimento a este teste — inclusive um
+  // teste simultâneo — então sem ID não há evidência.
+  const ids = r as { turnoId?: string | null; execucaoId?: string | null };
+  const turnoId = ids.turnoId ?? null;
+  const execucaoId = ids.execucaoId ?? null;
+
   let resumo: Record<string, unknown> | null = null;
   try {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { NODE_RESUMO_TURNO } = await import("@/lib/nina/rastreio/turno");
-    const { data } = await (supabaseAdmin as any)
-      .from("nina_trace_eventos")
-      .select("metadata, started_at")
-      .eq("clinica_id", entrada.clinicaId)
-      .eq("node_id", NODE_RESUMO_TURNO)
-      .order("started_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-    resumo = (data?.metadata ?? null) as Record<string, unknown> | null;
+    if (turnoId || execucaoId) {
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      const { NODE_RESUMO_TURNO } = await import("@/lib/nina/rastreio/turno");
+      const consulta = (supabaseAdmin as any)
+        .from("nina_trace_eventos")
+        .select("metadata, started_at")
+        .eq("clinica_id", entrada.clinicaId)
+        .eq("node_id", NODE_RESUMO_TURNO);
+      const { data } = await (turnoId
+        ? consulta.eq("trace_id", turnoId)
+        : consulta.eq("execution_id", execucaoId)
+      )
+        .order("started_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      resumo = (data?.metadata ?? null) as Record<string, unknown> | null;
+    }
   } catch {
     resumo = null;
   }
@@ -284,6 +309,8 @@ export async function verificarAtendimentoCompleto(entrada: {
     reply: r.reply ?? null,
     processamento: r.processamento,
     transferida: r.transferida === true,
+    turnoId,
+    execucaoId,
     turno: resumirAtendimentoCompleto(resumo),
   };
 }

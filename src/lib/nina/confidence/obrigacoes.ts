@@ -770,6 +770,8 @@ export function InstructionComplianceValidator(
         id: a.obrigacao.id,
         tipo: a.obrigacao.tipo,
         origem: a.obrigacao.origem,
+        // Descrição auditável da exigência (a mesma do texto publicado).
+        descricao: a.obrigacao.descricao,
         status: a.status,
         motivo: a.motivo,
         // Prioridade e origem publicada viajam na evidência: é isso que

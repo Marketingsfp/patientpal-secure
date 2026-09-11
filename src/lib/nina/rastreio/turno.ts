@@ -18,6 +18,8 @@
  * consentimento, idempotência, revisão da conversa e prova de gravação
  * continuam em código/banco. Aqui só existe registro.
  */
+import type { AuditoriaInstrucoesRodada } from "./auditoria-instrucoes";
+import { auditoriaParaTrace } from "./auditoria-instrucoes";
 
 /** De onde veio o texto realmente entregue (ou por que não houve texto). */
 export const ORIGENS_RESPOSTA = [
@@ -363,6 +365,12 @@ export type RegistroTurno = {
   /** FASE 2 — TODAS as avaliações do turno, na ordem em que ocorreram. */
   avaliacoes: ConfiancaDoTurno[];
   entrega: EntregaDoTurno | null;
+  /**
+   * Auditoria de aplicação das instruções publicadas, UMA por rodada do
+   * modelo: prompt enviado, regras, verificação por exigência, resposta
+   * original e texto entregue.
+   */
+  auditoriaInstrucoes: AuditoriaInstrucoesRodada[];
   /** Diagnóstico autorizado nesta clínica (captura de payload por rodada). */
   diagnostico: boolean;
   iniciadoEm: string;
@@ -403,6 +411,7 @@ export function criarRegistroTurno(base: BaseRegistroTurno): RegistroTurno {
     confianca: null,
     avaliacoes: [],
     entrega: null,
+    auditoriaInstrucoes: [],
     diagnostico: base.diagnostico === true,
     iniciadoEm: base.iniciadoEm ?? new Date().toISOString(),
     encerradoEm: null,
@@ -431,6 +440,9 @@ export const ROTULO_LACUNA_TURNO: Record<string, string> = {
   execucao_modelo: "Modelo chamado sem execução registrada",
   confianca: "Política de confiança não registrada para este turno",
   mensagem_entregue: "Mensagem entregue não vinculada ao turno",
+  interpretacao_das_regras:
+    "Regras publicadas não puderam ser interpretadas nesta rodada — não há como afirmar cumprimento",
+  auditoria_instrucoes: "Aplicação das instruções publicadas não registrada nesta execução",
 };
 
 /** O que NÃO pôde ser comprovado. Lacuna é declarada, nunca preenchida. */
@@ -449,6 +461,11 @@ export function lacunasDoTurno(r: RegistroTurno): string[] {
   if (r.modeloChamado && !r.confianca) faltas.push("confianca");
   if (r.origemResposta && r.origemResposta !== "nenhuma" && !r.entrega?.mensagemId) {
     faltas.push("mensagem_entregue");
+  }
+  const auditorias = r.auditoriaInstrucoes ?? [];
+  if (r.modeloChamado && auditorias.length === 0) faltas.push("auditoria_instrucoes");
+  if (auditorias.some((a) => a.estado === "falha_de_interpretacao")) {
+    faltas.push("interpretacao_das_regras");
   }
   return faltas;
 }
@@ -500,6 +517,7 @@ export function resumoTurnoParaTrace(r: RegistroTurno): Record<string, unknown> 
     avaliacoes: r.avaliacoes,
     avaliacao_operacional: avaliacaoOperacional(r.avaliacoes ?? []),
     entrega: r.entrega,
+    auditoria_instrucoes: (r.auditoriaInstrucoes ?? []).map(auditoriaParaTrace),
     diagnostico_autorizado: r.diagnostico,
     lacunas: lacunasDoTurno(r),
     iniciado_em: r.iniciadoEm,

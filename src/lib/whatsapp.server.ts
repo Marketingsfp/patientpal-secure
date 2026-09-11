@@ -1274,6 +1274,56 @@ async function gerarRespostaNinaInterno(
   });
   const systemPromptFinal = requestNina.systemPrompt;
 
+  // AUDITORIA DAS INSTRUÇÕES — regras identificadas no texto publicado deste
+  // turno. Aplicáveis vêm da precedência já resolvida; as demais ficam
+  // registradas como NÃO aplicáveis, e as sem interpretação como limitação.
+  const auditoriaRegrasTurno = await (async () => {
+    const { extrairRegrasPublicadas } = await import(
+      "@/lib/nina/confidence/regras-publicadas"
+    );
+    const extracao = extrairRegrasPublicadas(behaviorPrompt, {
+      escopo: "whatsapp",
+      hash: hashPrecedencia(behaviorPrompt) ?? null,
+      versao: instrucoesNina.versao != null ? String(instrucoesNina.versao) : null,
+      versaoId: instrucoesNina.versaoId ?? null,
+    });
+    const aplicaveis = precedenciaTurno.regrasAplicaveis;
+    const naoInterpretadas = extracao.regras.filter((r) => !r.interpretada);
+    return {
+      identificadas: extracao.regras,
+      aplicaveis,
+      naoInterpretadas,
+      // Falha de interpretação: há texto com regras, mas NENHUMA foi
+      // interpretada — nunca é o mesmo que "sem regras".
+      falhaDeInterpretacao:
+        extracao.regras.length > 0 && extracao.regras.every((r) => !r.interpretada),
+      limitacoes: precedenciaTurno.resumo.limitacoes,
+      suprimidas: precedenciaTurno.resultado.suprimidas.map((codigo) => ({
+        codigo,
+        motivo: "suprimida por exceção publicada aplicável a este turno",
+        por: precedenciaTurno.saudacaoDispensadaPor,
+      })),
+      blocos: [
+        { rotulo: "envelope técnico", origem: "sistema", texto: requestNina.envelope },
+        {
+          rotulo: "comportamento publicado",
+          origem: "aba Arquitetura (versão publicada)",
+          texto: behaviorPrompt,
+        },
+        {
+          rotulo: "contrato de precedência",
+          origem: "resolvedor de precedência do turno",
+          texto: requestNina.contratoPrecedencia,
+        },
+        {
+          rotulo: "contexto de execução",
+          origem: "sistema (fatos do turno)",
+          texto: JSON.stringify(requestNina.runtimeContext),
+        },
+      ],
+    };
+  })();
+
 
   let ctxFerramentas: import("@/lib/nina/paciente-tools.server").CtxNinaPaciente | null = null;
   let ferramentas: unknown[] | undefined;
@@ -1519,6 +1569,13 @@ async function gerarRespostaNinaInterno(
   // FASE 5 — quantas rodadas de modelo o turno consumiu. Caminho sem modelo
   // termina com 0 e é registrado como tal, sem inventar execução de LLM.
   let rodadasDoTurno = 0;
+  // AUDITORIA — resultado da verificação de cada exigência publicada, lido da
+  // avaliação final. Fica vazio quando o validador não rodou; ausência de
+  // verificação nunca vira "restrições cumpridas".
+  let verificacoesInstrucoesTurno: {
+    verificacoes: import("@/lib/nina/rastreio/auditoria-instrucoes").VerificacaoExigencia[];
+    falhaDeInterpretacao: boolean;
+  } | null = null;
   for (let rodada = 0; rodada < MAX_RODADAS; rodada++) {
     rodadasDoTurno = rodada + 1;
     // Toda chamada de modelo da Nina passa pelo Nina AI Gateway.
@@ -1558,6 +1615,26 @@ async function gerarRespostaNinaInterno(
         execucaoId: respostaIA.execucaoId ?? null,
         modelo: respostaIA.modelo ?? null,
       });
+      // AUDITORIA — como as instruções publicadas foram aplicadas NESTA rodada,
+      // com a resposta ORIGINAL do modelo, antes de qualquer intervenção.
+      {
+        const { registrarAuditoriaInstrucoes } = await import(
+          "@/lib/nina/rastreio/turno.server"
+        );
+        registrarAuditoriaInstrucoes({
+          rodada: rodada + 1,
+          execucaoId: respostaIA.execucaoId ?? null,
+          modelo: respostaIA.modelo ?? null,
+          blocos: auditoriaRegrasTurno.blocos,
+          regrasIdentificadas: auditoriaRegrasTurno.identificadas,
+          regrasAplicaveis: auditoriaRegrasTurno.aplicaveis,
+          regrasNaoInterpretadas: auditoriaRegrasTurno.naoInterpretadas,
+          regrasSuprimidas: auditoriaRegrasTurno.suprimidas,
+          falhaDeInterpretacao: auditoriaRegrasTurno.falhaDeInterpretacao,
+          limitacoes: auditoriaRegrasTurno.limitacoes,
+          respostaOriginal: respostaIA.conteudo ?? null,
+        });
+      }
       // DIAGNÓSTICO AUTORIZADO: só quando a clínica ligou a flag. Guarda o
       // payload efetivo da rodada (mensagens e schemas), com marca de corte.
       if (registroTurnoAtual()?.diagnostico) {
@@ -2556,6 +2633,12 @@ async function gerarRespostaNinaInterno(
         operacaoAfirmada: agendamentoConfirmado,
         operacaoComprovada: Boolean(fluxoEstado.appointment.appointment_id),
       });
+      {
+        const { verificacoesDasInstrucoes } = await import(
+          "@/lib/nina/confidence/conformidade-entrega"
+        );
+        verificacoesInstrucoesTurno = verificacoesDasInstrucoes(respostaFinalAvaliada);
+      }
       const comprovado = confirmarResultadoRevisao(revisao, {
         executada: revisao.aplicada,
         comprovacao: houveHandoff ? (estadoId.conversaId ?? null) : null,
@@ -2920,6 +3003,22 @@ async function gerarRespostaNinaInterno(
         titulo: "Alterações aplicadas depois da resposta do modelo",
         dados: { antes: respostaDoModelo, depois: resposta },
         codigo,
+      });
+    }
+    // Fecha a auditoria com o texto REALMENTE entregue (inclusive quando a
+    // entrega é encaminhamento ou aviso controlado) e suas intervenções.
+    {
+      const { fecharAuditoriaInstrucoesDoTurno } = await import(
+        "@/lib/nina/rastreio/turno.server"
+      );
+      fecharAuditoriaInstrucoesDoTurno({
+        textoEntregue: resposta,
+        ...(verificacoesInstrucoesTurno
+          ? {
+              verificacoes: verificacoesInstrucoesTurno.verificacoes,
+              estadoFalhaDeInterpretacao: verificacoesInstrucoesTurno.falhaDeInterpretacao,
+            }
+          : {}),
       });
     }
     registrarEtapa({

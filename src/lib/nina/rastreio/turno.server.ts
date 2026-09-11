@@ -14,6 +14,14 @@ import { AsyncLocalStorage } from "node:async_hooks";
 import { sanitizarMetadata, type EventoTrace } from "@/lib/nina/arquitetura/tracing";
 import { gravarEventosTrace } from "@/lib/nina/arquitetura/tracing.server";
 import {
+  estadoDaAuditoria,
+  fecharAuditoriaRodada,
+  montarAuditoriaRodada,
+  type EntradaAuditoriaRodada,
+  type VerificacaoExigencia,
+} from "./auditoria-instrucoes";
+import {
+  alteracaoDaTransformacao,
   avaliacaoOperacional,
   criarRegistroTurno,
   finalizarRegistroTurno,
@@ -107,6 +115,81 @@ export function registrarConfiancaDoTurno(c: ConfiancaDoTurno): void {
 export function registrarEntregaDoTurno(e: EntregaDoTurno): void {
   seguro((r) => {
     r.entrega = { ...e };
+  });
+}
+
+/**
+ * AUDITORIA DE INSTRUÇÕES — uma entrada por rodada do modelo. O registro é
+ * escrito no turno ATUAL (escopo da requisição), então dois atendimentos
+ * simultâneos nunca compartilham evidência.
+ */
+export function registrarAuditoriaInstrucoes(
+  entrada: Omit<EntradaAuditoriaRodada, "rodada"> & { rodada?: number },
+): void {
+  seguro((r) => {
+    if (!Array.isArray(r.auditoriaInstrucoes)) r.auditoriaInstrucoes = [];
+    const rodada = entrada.rodada ?? Math.max(r.rodadas, 1);
+    const auditoria = montarAuditoriaRodada({
+      ...entrada,
+      rodada,
+      diagnostico: entrada.diagnostico ?? r.diagnostico,
+      execucaoId: entrada.execucaoId ?? r.execucaoId,
+      versao:
+        entrada.versao ??
+        (r.prompt?.versao === null || r.prompt?.versao === undefined
+          ? null
+          : String(r.prompt.versao)),
+      versaoId: entrada.versaoId ?? r.prompt?.versaoId ?? null,
+      promptHash: entrada.promptHash ?? r.prompt?.hash ?? null,
+    });
+    const i = r.auditoriaInstrucoes.findIndex((a) => a.rodada === rodada);
+    if (i >= 0) r.auditoriaInstrucoes[i] = auditoria;
+    else r.auditoriaInstrucoes.push(auditoria);
+  });
+}
+
+/**
+ * Fecha as auditorias do turno com o texto REALMENTE entregue e as
+ * intervenções registradas. Só o hash é obrigatório: o texto integral fica
+ * condicionado ao diagnóstico autorizado da clínica.
+ */
+export function fecharAuditoriaInstrucoesDoTurno(dados: {
+  textoEntregue?: string | null;
+  verificacoes?: readonly VerificacaoExigencia[];
+  estadoFalhaDeInterpretacao?: boolean;
+}): void {
+  seguro((r) => {
+    const auditorias = r.auditoriaInstrucoes ?? [];
+    if (auditorias.length === 0) return;
+    const intervencoes = r.transformacoes.map((t) => ({
+      etapa: t.etapa,
+      motivo: t.motivo,
+      alterou: alteracaoDaTransformacao(t),
+    }));
+    const ultima = auditorias.length - 1;
+    r.auditoriaInstrucoes = auditorias.map((a, i) =>
+      i === ultima
+        ? fecharAuditoriaRodada(
+            dados.verificacoes
+              ? {
+                  ...a,
+                  verificacoes: [...dados.verificacoes],
+                  estado: estadoDaAuditoria({
+                    verificacoes: dados.verificacoes,
+                    regrasIdentificadas: a.regrasIdentificadas.length,
+                    regrasAplicaveis: a.regrasAplicaveis.length,
+                    falhaDeInterpretacao: dados.estadoFalhaDeInterpretacao === true,
+                  }),
+                }
+              : a,
+            {
+              entregue: dados.textoEntregue ?? null,
+              intervencoes,
+              diagnostico: r.diagnostico,
+            },
+          )
+        : fecharAuditoriaRodada(a, { intervencoes, diagnostico: r.diagnostico }),
+    );
   });
 }
 
