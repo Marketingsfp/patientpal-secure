@@ -81,7 +81,13 @@ export function CargaTeste() {
   const [detalhe, setDetalhe] = useState<any>(null);
   const [rodando, setRodando] = useState(false);
   const [confirmar, setConfirmar] = useState(false);
+  // FASE 3 — preparação dos leads antes do primeiro disparo.
+  const [preparo, setPreparo] = useState<{ prontos: number; total: number } | null>(null);
+  const [erroPreparo, setErroPreparo] = useState<string | null>(null);
   const cancelado = useRef(false);
+  /** Trava local contra duplo clique (o backend também recusa dois runs). */
+  const iniciando = useRef(false);
+  const confirmadoRef = useRef(false);
 
   const configAtual = useCallback((): ConfigCarga => {
     const distribuicao = cenarios
