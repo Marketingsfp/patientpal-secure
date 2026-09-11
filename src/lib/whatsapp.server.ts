@@ -2508,6 +2508,108 @@ async function gerarRespostaNinaInterno(
         score: respostaFinalAvaliada.score,
         nivel: respostaFinalAvaliada.level,
       });
+
+      // REGRA OBRIGATÓRIA — BAIXA CONFIABILIDADE ENCAMINHA PARA HUMANO.
+      // Prevalece sobre a etapa de ativação (inclusive A) e sobre a decisão
+      // recomendada pelo motor (inclusive CLARIFY). O conteúdo candidato é
+      // descartado para envio em TODAS as representações (texto, áudio e
+      // resumo falado, que derivam deste texto) e o paciente recebe apenas o
+      // aviso controlado.
+      const {
+        decidirBloqueioBaixaConfianca,
+        saidaControladaBaixaConfianca,
+        ehAvisoControlado,
+      } = await import("@/lib/nina/confidence/baixa-confiabilidade");
+      const ambienteSaida: "producao" | "homologacao" =
+        opcoes?.ambiente === "producao" && opcoes?.teste !== true
+          ? "producao"
+          : opcoes?.ambiente || opcoes?.teste === true
+            ? "homologacao"
+            : "producao";
+      const bloqueio = decidirBloqueioBaixaConfianca({
+        nivel: respostaFinalAvaliada.level ?? null,
+        score: respostaFinalAvaliada.score ?? null,
+        decisaoMotor: respostaFinalAvaliada.decision ?? null,
+        etapa: cfgFinal.etapa,
+        ambiente: ambienteSaida,
+        configId: cfgFinal.configuracao.configId,
+        jaEncaminhado: houveHandoff,
+        avisoJaAplicado: ehAvisoControlado(resposta),
+        conteudoCandidatoHash: respostaFinalAvaliada.textoAvaliadoHash ?? null,
+      });
+      if (bloqueio.bloquear && !bloqueio.jaAplicado) {
+        let resultadoEnc:
+          | { tipo: "real"; confirmado: boolean; comprovacao?: string | null; erro?: string | null }
+          | { tipo: "simulado" };
+        if (ambienteSaida === "homologacao") {
+          // Homologação NÃO tem atribuição real: o desfecho é simulado.
+          resultadoEnc = { tipo: "simulado" };
+        } else if (!bloqueio.encaminhar) {
+          // Idempotência: o encaminhamento deste turno já aconteceu.
+          resultadoEnc = {
+            tipo: "real",
+            confirmado: true,
+            comprovacao: estadoId.conversaId ?? null,
+          };
+        } else {
+          const rhBaixa = await broker
+            .executar(
+              "solicitar_atendente_humano",
+              JSON.stringify({
+                motivo:
+                  "BAIXA_CONFIABILIDADE: resposta reprovada na avaliação final (nível Baixa)",
+                urgencia: "normal",
+              }),
+            )
+            .catch(
+              () =>
+                ({ success: false, erro: "handoff_indisponivel" }) as {
+                  success: boolean;
+                  erro?: string;
+                },
+            );
+          if (rhBaixa.success === true) houveHandoff = true;
+          resultadoEnc = {
+            tipo: "real",
+            confirmado: rhBaixa.success === true,
+            comprovacao: rhBaixa.success === true ? (estadoId.conversaId ?? null) : null,
+            erro: rhBaixa.erro ?? null,
+          };
+        }
+        const saidaControlada = saidaControladaBaixaConfianca(resultadoEnc);
+        const antesBloqueio = resposta;
+        resposta = saidaControlada.aviso;
+        transformar(
+          "confianca.baixa.encaminhamento",
+          `${bloqueio.motivo}: conteúdo candidato descartado (${saidaControlada.encaminhamento})`,
+          antesBloqueio,
+          resposta,
+        );
+        marcarOrigem(
+          "codigo",
+          `${saidaControlada.registro} (origem: ${saidaControlada.origem})`,
+        );
+        rastro?.concluir("answer.low_confidence_handoff", {
+          motivo: bloqueio.motivo,
+          nivel: bloqueio.nivel,
+          score: bloqueio.score,
+          decisao_motor: bloqueio.decisaoMotor,
+          etapa: bloqueio.etapa,
+          precede_etapa_ativacao: bloqueio.precedeEtapaAtivacao,
+          precede_decisao_motor: bloqueio.precedeDecisaoMotor,
+          config_id: bloqueio.configId,
+          ambiente: ambienteSaida,
+          conteudo_candidato_hash: bloqueio.conteudoCandidatoHash,
+          candidato_descartado: true,
+          encaminhamento: saidaControlada.encaminhamento,
+          encaminhamento_confirmado: saidaControlada.encaminhamentoConfirmado,
+          exige_intervencao: saidaControlada.exigeIntervencao,
+          registro: saidaControlada.registro,
+          aviso_origem: saidaControlada.origem,
+          aviso_herda_nota_do_candidato: false,
+          erro: saidaControlada.erro,
+        });
+      }
     }
   } catch (e) {
     // Falha técnica do avaliador NUNCA vira aprovação: fica registrada como
