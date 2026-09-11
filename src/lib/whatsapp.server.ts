@@ -694,7 +694,7 @@ async function gerarRespostaNinaInterno(
       telefoneRemetente
         ? supabaseAdmin
             .from("whatsapp_mensagens")
-            .select("direction, body, created_at")
+            .select("id, direction, body, created_at")
             .eq("clinica_id", clinicaId)
             // Marcadores de sistema (divisores de ciclo, avisos internos) são
             // só para leitura humana: nunca entram no contexto do modelo.
