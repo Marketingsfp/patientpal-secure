@@ -2497,7 +2497,6 @@ function Page() {
         </div>
       )}
 
-
       <Card>
         <CardContent className="pt-6 space-y-3">
           {/* Barra do dia a dia: período, visão, tipo e as duas saídas em
