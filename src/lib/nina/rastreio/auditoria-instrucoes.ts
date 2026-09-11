@@ -23,7 +23,13 @@
  */
 import { hashDoTexto } from "@/lib/nina/confidence/hash";
 import type { RegraPublicada } from "@/lib/nina/confidence/regras-publicadas";
-import { truncarParaDiagnostico } from "./turno";
+
+/** Igual à marca usada no rastreio: corte é declarado, nunca silencioso. */
+export const MARCA_TRUNCADO_AUDITORIA = "…[truncado]";
+
+function truncar(valor: string, max: number): string {
+  return valor.length <= max ? valor : `${valor.slice(0, max)}${MARCA_TRUNCADO_AUDITORIA}`;
+}
 
 /** Estado auditável de UMA exigência publicada nesta rodada. */
 export type EstadoExigencia =
@@ -122,7 +128,7 @@ function textoAuditado(
   if (valor === null || valor === undefined) return null;
   const base: TextoAuditado = { hash: hashDoTexto(valor), tamanho: valor.length };
   if (!diagnostico) return base;
-  return { ...base, texto: truncarParaDiagnostico(valor, MAX_TEXTO_DIAGNOSTICO).texto };
+  return { ...base, texto: truncar(valor, MAX_TEXTO_DIAGNOSTICO) };
 }
 
 export function referenciaRegra(r: RegraPublicada, diagnostico = false): ReferenciaRegra {
@@ -138,7 +144,7 @@ export function referenciaRegra(r: RegraPublicada, diagnostico = false): Referen
     versao: r.versao ?? null,
     hash: r.hash ?? null,
   };
-  if (diagnostico) ref.trecho = truncarParaDiagnostico(r.trecho ?? "", 2000).texto;
+  if (diagnostico) ref.trecho = truncar(r.trecho ?? "", 2000);
   return ref;
 }
 
@@ -210,7 +216,7 @@ export function montarAuditoriaRodada(e: EntradaAuditoriaRodada): AuditoriaInstr
           hash: hashDoTexto(b.texto as string),
         };
         if (diag) {
-          bloco.texto = truncarParaDiagnostico(b.texto as string, MAX_TEXTO_DIAGNOSTICO).texto;
+          bloco.texto = truncar(b.texto as string, MAX_TEXTO_DIAGNOSTICO);
         }
         return bloco;
       }),
