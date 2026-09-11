@@ -206,7 +206,8 @@ function EquipeAcessosPage() {
         <h1 className="text-2xl font-semibold">Equipe e acessos</h1>
         <p className="text-sm text-muted-foreground">
           Quem é da gestão nesta clínica — quem autoriza desconto, cortesia e sem faturamento com a
-          própria senha, e quem enxerga os relatórios de supervisão.
+          própria senha, e quem enxerga os relatórios de supervisão. Aqui também se libera, pessoa a
+          pessoa, quem cria horário de médico e gera as vagas da agenda.
         </p>
       </div>
 
@@ -241,18 +242,19 @@ function EquipeAcessosPage() {
               <TableHead className="w-44">Perfil de acesso</TableHead>
               <TableHead className="w-28">Situação</TableHead>
               <TableHead className="w-48 text-center">É da gestão</TableHead>
+              <TableHead className="w-44 text-center">Cria horário médico</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {carregando ? (
               <TableRow>
-                <TableCell colSpan={4} className="py-6 text-center text-sm text-muted-foreground">
+                <TableCell colSpan={5} className="py-6 text-center text-sm text-muted-foreground">
                   Carregando a equipe…
                 </TableCell>
               </TableRow>
             ) : lista.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={4} className="py-6 text-center text-sm text-muted-foreground">
+                <TableCell colSpan={5} className="py-6 text-center text-sm text-muted-foreground">
                   <Users className="mx-auto mb-2 h-5 w-5 opacity-50" />
                   Ninguém encontrado com esse termo.
                 </TableCell>
@@ -296,6 +298,27 @@ function EquipeAcessosPage() {
                             {salvando === m.membershipId
                               ? "Salvando…"
                               : m.podeAutorizar
+                                ? "Sim"
+                                : "Não"}
+                          </span>
+                        </label>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-center">
+                      {m.role === "admin" || m.role === "gestor" ? (
+                        <span className="text-xs text-muted-foreground">Já tem pelo perfil</span>
+                      ) : (
+                        <label className="inline-flex cursor-pointer items-center gap-2">
+                          <input
+                            type="checkbox"
+                            checked={m.podeGerirHorarios}
+                            disabled={salvando === m.membershipId}
+                            onChange={() => void alternarHorarios(m)}
+                          />
+                          <span className="text-xs font-medium">
+                            {salvando === m.membershipId
+                              ? "Salvando…"
+                              : m.podeGerirHorarios
                                 ? "Sim"
                                 : "Não"}
                           </span>
