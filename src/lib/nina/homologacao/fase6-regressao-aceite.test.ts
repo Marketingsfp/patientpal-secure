@@ -298,7 +298,7 @@ describe("3. marcadores de verificação de fonte (aderência do modelo)", () =>
     expect(entrega.origem).toBe("modelo");
     expect(ROTULO_ORIGEM_RESULTADO.modelo).toBe("Comportamento do modelo");
     // A prova de fonte não aprova o pipeline inteiro — isso fica escrito.
-    expect(ESCOPO_DA_PROVA_FONTE).toContain("Não aprova o pipeline completo");
+    expect(ESCOPO_DA_PROVA_FONTE).toContain("Não aprova o atendimento completo");
   });
 
   it("sem registro do turno, o atendimento completo é SEM_EVIDENCIA (nunca aprovado)", () => {
