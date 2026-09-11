@@ -140,7 +140,8 @@ describe("resumoPainel", () => {
     expect(r.despesasOperacionais).toBe(100);
     expect(r.complementoMedico).toBe(10);
     expect(r.repassePagoNoPeriodo).toBe(900);
-    expect(r.despesasTotais).toBe(220 + 30 + 10 + 100);
+    expect(r.custoPrestadores).toBe(220 + 30 + 10);
+    expect(r.despesasTotais).toBe(r.custoPrestadores + 100);
   });
 
   it("saldo = receita bruta + outras receitas − despesas totais", () => {

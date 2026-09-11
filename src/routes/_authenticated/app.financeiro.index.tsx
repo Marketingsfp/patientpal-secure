@@ -338,19 +338,19 @@ function FinDashboard() {
             onClick={() => abrir("repasse")}
             icon={Handshake}
             label="Repasse a médicos / prestadores"
-            value={v((r) => r.repasse)}
+            value={v((r) => r.custoPrestadores)}
             accent="warning"
             detalhe={
               resumo && !carregando
                 ? [
-                    "Custo direto dos atendimentos",
+                    `Custo total com prestadores: ${brl(resumo.repasse)} da grade`,
                     resumo.terceiro > 0 && `+ ${brl(resumo.terceiro)} de terceiros`,
                     resumo.complementoMedico > 0 &&
                       `+ ${brl(resumo.complementoMedico)} de complemento médico`,
                   ]
                     .filter(Boolean)
                     .join(" · ")
-                : "Custo direto dos atendimentos"
+                : "Custo total com prestadores"
             }
           />
           <KpiCard
@@ -367,7 +367,7 @@ function FinDashboard() {
             label="Despesas totais"
             value={v((r) => r.despesasTotais)}
             accent="destructive"
-            detalhe="Repasse + despesas operacionais"
+            detalhe="Custo total com prestadores + despesas operacionais"
           />
           <KpiCard
             onClick={() => abrir("saldo")}
@@ -714,14 +714,11 @@ function montarDetalhe(drill: Drill, dados: DadosPainel, r: ResumoPainel, visao:
       ...(r.complementoMedico > 0
         ? [{ rotulo: "Complemento médico lançado", valor: r.complementoMedico }]
         : []),
-      {
-        rotulo: "Custo total com prestadores",
-        valor: r.repasse + r.terceiro + r.complementoMedico,
-      },
+      { rotulo: "Custo total com prestadores", valor: r.custoPrestadores },
       { rotulo: "Já pago no caixa no período (informativo)", valor: r.repassePagoNoPeriodo },
     ];
     const explicacao =
-      "Repasse devido pelos atendimentos do período, calculado pela grade de cada médico — o mesmo número do Rateio da Receita. O valor já pago no caixa aparece só para conferência: ele quita atendimentos de dias anteriores e por isso não entra de novo nas despesas.";
+      "O número do card é o custo total com prestadores: o repasse devido pelos atendimentos do período, calculado pela grade de cada médico (o mesmo do Rateio da Receita), mais a parte de terceiros e o complemento médico lançado como despesa. A tabela lista os atendimentos; o complemento, que não é de um atendimento, aparece só no resumo. O valor já pago no caixa aparece só para conferência: ele quita atendimentos de dias anteriores e por isso não entra de novo nas despesas.";
     if (visao === "sintetico") {
       const grupos = repassePorMedico(dados.rateio);
       return {
@@ -849,6 +846,7 @@ function montarDetalhe(drill: Drill, dados: DadosPainel, r: ResumoPainel, visao:
       ...(r.complementoMedico > 0
         ? [{ rotulo: "Complemento médico", valor: r.complementoMedico }]
         : []),
+      { rotulo: "Custo total com prestadores", valor: r.custoPrestadores },
       { rotulo: "Despesas operacionais", valor: r.despesasOperacionais },
       { rotulo: "Despesas totais", valor: r.despesasTotais },
     ];

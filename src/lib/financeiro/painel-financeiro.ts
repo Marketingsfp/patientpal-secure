@@ -31,6 +31,9 @@
  *  - Complemento médico: pagamento extra a médico lançado como despesa, que a
  *    grade não calcula. Não é despesa operacional, mas também não está no
  *    Rateio — por isso aparece à parte e entra nas Despesas totais.
+ *  - Card de Repasse: o custo total com prestadores (grade + terceiros +
+ *    complemento médico), pedido do dono em 11/09/2026 — o mesmo número que
+ *    entra nas Despesas totais, para os três cards fecharem entre si.
  *
  * Saldo = Receita bruta + Outras receitas − Repasse − Terceiros
  *         − Complemento médico − Despesas operacionais.
@@ -167,8 +170,14 @@ export interface ResumoPainel {
   /** Parte do dono do equipamento, quando existe. */
   terceiro: number;
   complementoMedico: number;
+  /**
+   * Repasse (grade) + terceiros + complemento médico: o número grande do card
+   * de Repasse. Até 11/09/2026 o card mostrava só a grade, e o terceiro e o
+   * complemento ficavam escondidos na linha de baixo.
+   */
+  custoPrestadores: number;
   despesasOperacionais: number;
-  /** Repasse + terceiros + complemento + operacionais. */
+  /** Custo com prestadores + operacionais. */
   despesasTotais: number;
   /** Líquido do Rateio (receita bruta − repasse − terceiros). */
   liquidoAtendimentos: number;
@@ -207,7 +216,8 @@ export function resumoPainel(params: {
   terceiro = round2(terceiro);
   despesasOperacionais = round2(despesasOperacionais);
   complementoMedico = round2(complementoMedico);
-  const despesasTotais = round2(repasse + terceiro + complementoMedico + despesasOperacionais);
+  const custoPrestadores = round2(repasse + terceiro + complementoMedico);
+  const despesasTotais = round2(custoPrestadores + despesasOperacionais);
   const producao = producaoDoRateio(params.rateio);
   // O lançamento avulso tem uma forma só; entra na mesma soma por balde que
   // os atendimentos, para as fatias fecharem com o total do card.
@@ -223,6 +233,7 @@ export function resumoPainel(params: {
     repasse,
     terceiro,
     complementoMedico,
+    custoPrestadores,
     despesasOperacionais,
     despesasTotais,
     liquidoAtendimentos: round2(receitaBruta - repasse - terceiro),
