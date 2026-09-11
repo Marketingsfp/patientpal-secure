@@ -15271,7 +15271,6 @@ export type Database = {
           codigo: string
           guiche: string
           id: string
-          paciente_id: string
           paciente_nome: string
           status: string
           tipo: string
