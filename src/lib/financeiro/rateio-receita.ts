@@ -226,6 +226,8 @@ export interface RateioFiltros {
   servico?: string | null;
   /** Tipo do serviço em caixa alta (CONSULTA/EXAME/...). `null` = todos. */
   tipo?: string | null;
+  /** Particular ou Cartão (ver `RateioModalidade`). `null` = todas. */
+  modalidade?: RateioModalidade | null;
 }
 
 /** Médico como aparece no seletor do relatório. */
@@ -610,6 +612,13 @@ function reparte(
       : repasseCalculado;
   const terceiro = calc.terceiro?.valor ?? 0;
   const liquido = round2(receita - repasse - terceiro);
+  const formas = repartirPorForma(
+    receita,
+    params.valorPago,
+    params.formaPagamento ?? null,
+    params.observacoes ?? null,
+    params.composicaoPagamento,
+  );
   return {
     id: params.id,
     data: params.data,
@@ -641,13 +650,8 @@ function reparte(
     terceiro: round2(terceiro),
     liquido,
     margem: margemClinica(receita, liquido),
-    formas: repartirPorForma(
-      receita,
-      params.valorPago,
-      params.formaPagamento ?? null,
-      params.observacoes ?? null,
-      params.composicaoPagamento,
-    ),
+    formas,
+    forma_pagamento: rotuloFormasDaLinha(formas),
   };
 }
 
