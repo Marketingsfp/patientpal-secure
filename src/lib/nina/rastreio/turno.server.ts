@@ -93,7 +93,12 @@ export function registrarTransformacaoResposta(
 
 export function registrarConfiancaDoTurno(c: ConfiancaDoTurno): void {
   seguro((r) => {
-    r.confianca = { ...c };
+    if (!Array.isArray(r.avaliacoes)) r.avaliacoes = [];
+    r.avaliacoes.push({ ...c });
+    // FASE 2 — o campo antigo passa a apontar para a avaliação OPERACIONAL
+    // (a que pôde alterar o atendimento). Uma avaliação em observação nunca
+    // sobrescreve uma operacional já registrada.
+    r.confianca = avaliacaoOperacional(r.avaliacoes) ?? { ...c };
   });
 }
 
