@@ -1164,10 +1164,11 @@ async function gerarRespostaNinaInterno(
   // exceção publicada proíbe saudação, o contexto deixa de dizer que ela é
   // obrigatória — em vez de o prompt mandar uma coisa e o fato dizer outra.
   const { resolverPrecedenciaDoTurno } = await import("@/lib/nina/prompt/precedencia-turno");
+  const { hashDoTexto: hashPrecedencia } = await import("@/lib/nina/confidence/hash");
   const precedenciaTurno = resolverPrecedenciaDoTurno({
     textoPublicado: behaviorPrompt,
     escopo: "whatsapp",
-    hash: hashDoTexto(behaviorPrompt) ?? null,
+    hash: hashPrecedencia(behaviorPrompt) ?? null,
     versao: instrucoesNina.versao != null ? String(instrucoesNina.versao) : null,
     versaoId: instrucoesNina.versaoId ?? null,
     publicadoEm: instrucoesNina.publicadoEm ?? null,
