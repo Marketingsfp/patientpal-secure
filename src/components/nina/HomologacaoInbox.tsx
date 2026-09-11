@@ -46,6 +46,7 @@ import {
   simulacaoAtualTerra,
 } from "@/lib/nina/simulador-terra.functions";
 import { AvaliacaoSol } from "@/components/nina/AvaliacaoSol";
+import { descreverEventoRastreio } from "@/lib/nina/arquitetura/estado-evento";
 
 import {
   CENARIOS_SUGERIDOS,
