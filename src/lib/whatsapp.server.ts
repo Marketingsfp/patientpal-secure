@@ -2230,7 +2230,7 @@ async function gerarRespostaNinaInterno(
   // publicado em Arquitetura. Aqui apenas OBSERVAMOS o resultado (telemetria):
   // nada é acrescentado ao texto, para não gerar "Sou a Nina... Sou a Nina...".
   const diagnosticoSaudacao = avaliarSaudacao(resposta, nomeCurtoUnidade, {
-    obrigatoria: saudacaoObrigatoria,
+    obrigatoria: saudacaoObrigatoriaEfetivaTurno,
   });
   if (diagnosticoSaudacao.saudacaoDuplicada || diagnosticoSaudacao.saudacaoAusente) {
     console.warn("[NINA_SAUDACAO]", {
