@@ -365,6 +365,7 @@ export function extrairRegrasPublicadas(
         prioridade: "alta",
         verificacao: "nao_interpretada",
         literal: null,
+        operador: null,
         proibicoes: [],
         descricao: u.plano,
         interpretada: false,
