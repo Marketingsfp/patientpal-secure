@@ -70,6 +70,13 @@ export const TERMOS_DE_ASSUNTO = [
   "unidade",
 ];
 
+/**
+ * Palavras genéricas de procedimento: não identificam OUTRO procedimento, então
+ * não servem para tirar um fato do escopo ("a consulta custa X" continua
+ * podendo ser conferida contra o preço da consulta de cardiologia recuperada).
+ */
+const PROCEDIMENTOS_GENERICOS = new Set(["consulta", "atendimento", "exame", "procedimento"]);
+
 const DIAS_SEMANA = [
   "domingo",
   "segunda",
