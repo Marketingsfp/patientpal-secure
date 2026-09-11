@@ -45,6 +45,7 @@ import {
 } from "@/lib/convenio/modalidade";
 import {
   classificarForma,
+  LABEL_FORMA,
   partesDoPagamentoMisto,
   type ParteMisto,
 } from "@/lib/financeiro/formas-pagamento";
@@ -109,6 +110,31 @@ const ROTULO_CONDICAO: Record<string, string> = {
   cartao_consulta: "CARTÃO CONSULTA",
   cartao_desconto: "CARTÃO DESCONTO",
 };
+
+/**
+ * Filtro "Modalidade" da tela: Particular ou qualquer um dos cartões
+ * (Cartão Consulta e Cartão Desconto são produtos do Cartão Benefícios).
+ * `null` = todas.
+ */
+export type RateioModalidade = "particular" | "cartao";
+
+/** true → a condição da linha é de um dos cartões do Cartão Benefícios. */
+export const condicaoEhCartao = (condicao: string): boolean =>
+  condicao === ROTULO_CONDICAO.cartao_consulta || condicao === ROTULO_CONDICAO.cartao_desconto;
+
+/**
+ * Coluna "Forma de pagamento" do analítico: as formas em que a receita da
+ * linha entrou, com os mesmos nomes do Fechamento de Caixa. Pagamento misto
+ * já chega decomposto em `formas` e sai como "Dinheiro + PIX".
+ */
+export function rotuloFormasDaLinha(formas: readonly ParteMisto[]): string {
+  const vistas: string[] = [];
+  for (const p of formas) {
+    const rotulo = LABEL_FORMA[p.forma];
+    if (!vistas.includes(rotulo)) vistas.push(rotulo);
+  }
+  return vistas.length ? vistas.join(" + ") : LABEL_FORMA.sem_informacao;
+}
 
 /** Um atendimento já com a receita repartida entre prestador e clínica. */
 export interface RateioLinha {
@@ -182,6 +208,8 @@ export interface RateioLinha {
    * demais casos é uma parte só.
    */
   formas: ParteMisto[];
+  /** `formas` em texto, para a coluna do analítico (ver `rotuloFormasDaLinha`). */
+  forma_pagamento: string;
 }
 
 /** Uma linha do relatório sintético (um agrupador). */
