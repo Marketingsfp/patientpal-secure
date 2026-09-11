@@ -36,6 +36,55 @@ async function assertUserBelongsToClinica(userId: string, clinicaId: string) {
 }
 
 /**
+ * Senha e nome são da CONTA, não do vínculo: valem em todas as unidades em que
+ * a pessoa trabalha. Por isso, alterar um dos dois exige administrar TODAS as
+ * unidades ativas dela — senão o administrador de uma unidade conseguiria entrar
+ * na conta de alguém que também tem acesso a outra unidade. A conta de
+ * administrador da plataforma só é alterada por outro administrador da
+ * plataforma. A própria pessoa sempre pode alterar a própria conta.
+ */
+async function assertPodeAlterarConta(callerId: string, alvoId: string) {
+  if (callerId === alvoId) return;
+
+  const { data: vinculos, error } = await supabaseAdmin
+    .from("clinica_memberships")
+    .select("clinica_id")
+    .eq("user_id", alvoId)
+    .eq("ativo", true);
+  if (error) throw new Error(error.message);
+
+  for (const v of vinculos ?? []) {
+    const { data: gerencia, error: gErr } = await supabaseAdmin.rpc("can_manage_clinica", {
+      _user_id: callerId,
+      _clinica_id: v.clinica_id,
+    });
+    if (gErr) throw new Error(gErr.message);
+    if (!gerencia) {
+      throw new Error(
+        "Esta pessoa também tem acesso a outra unidade que você não administra. " +
+          "A senha e o nome dela só podem ser alterados por quem administra todas as unidades dela.",
+      );
+    }
+  }
+
+  const { data: alvoPlataforma, error: pErr } = await supabaseAdmin.rpc("is_platform_admin", {
+    _user_id: alvoId,
+  });
+  if (pErr) throw new Error(pErr.message);
+  if (alvoPlataforma) {
+    const { data: callerPlataforma, error: cErr } = await supabaseAdmin.rpc("is_platform_admin", {
+      _user_id: callerId,
+    });
+    if (cErr) throw new Error(cErr.message);
+    if (!callerPlataforma) {
+      throw new Error(
+        "A conta de administrador da plataforma só pode ser alterada por outro administrador da plataforma.",
+      );
+    }
+  }
+}
+
+/**
  * Mantém a tabela legada `user_roles` coerente com o papel gravado em
  * `clinica_memberships`, que é a ÚNICA fonte de verdade do acesso ao sistema:
  * todas as políticas RLS e as funções `is_member` / `can_manage_clinica` /
