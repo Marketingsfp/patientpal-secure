@@ -9,6 +9,7 @@ import {
   Minus,
   Plus,
   Receipt,
+  RefreshCw,
   Stethoscope,
   TrendingDown,
   TrendingUp,
@@ -72,7 +73,8 @@ function periodoAteHoje(periodo: Periodo) {
 }
 
 /**
- * De quanto em quanto tempo os números se atualizam sozinhos, sem F5.
+ * De quanto em quanto tempo os números se atualizam sozinhos, sem F5. A tela
+ * mostra a contagem regressiva até a próxima (`ContagemAtualizacao`).
  *
  * Dois minutos porque cada atualização refaz o Rateio do período inteiro — no
  * "Mês" são milhares de atendimentos —, e um intervalo menor multiplicaria a
@@ -128,6 +130,11 @@ function FinDashboard() {
   const [carregando, setCarregando] = useState(true);
   const [aberto, setAberto] = useState<DetalheAberto | null>(null);
   const [atualizadoEm, setAtualizadoEm] = useState<Date | null>(null);
+  /** Quando a próxima atualização automática vai acontecer (relógio da tela). */
+  const [proximaEm, setProximaEm] = useState<number | null>(null);
+  const [atualizando, setAtualizando] = useState(false);
+  /** A última atualização automática falhou; a tela segue com os números anteriores. */
+  const [falhouAtualizar, setFalhouAtualizar] = useState(false);
 
   /**
    * Grade de repasse e catálogos: pesados e iguais para qualquer período, então
@@ -149,7 +156,8 @@ function FinDashboard() {
     // debaixo do botão novo.
     const silenciosa = ultimaCarga.current?.chave === chave;
     let cancelado = false;
-    if (!silenciosa) setCarregando(true);
+    if (silenciosa) setAtualizando(true);
+    else setCarregando(true);
     (async () => {
       try {
         let ctx = ctxRef.current?.clinicaId === clinicaId ? ctxRef.current.ctx : null;
@@ -161,20 +169,31 @@ function FinDashboard() {
         if (!cancelado) {
           setDados(d);
           setAtualizadoEm(new Date());
-          ultimaCarga.current = { chave, em: Date.now() };
+          setFalhouAtualizar(false);
         }
       } catch (e) {
         // Falha na atualização automática não vira alerta a cada dois minutos:
-        // os números anteriores ficam, e o "Atualizado às" mostra de quando são.
-        // Guardar a chave também na falha faz as próximas tentativas deste
-        // período serem silenciosas — o alerta aparece uma vez só.
-        if (!cancelado && !silenciosa) {
-          setDados(null);
-          ultimaCarga.current = { chave, em: Date.now() };
-          mostrarErro(e, "falha ao carregar os números do período");
+        // os números anteriores ficam, e o relógio avisa que a última
+        // tentativa falhou. Guardar a chave também na falha (no `finally`) faz
+        // as próximas tentativas deste período serem silenciosas — o alerta
+        // aparece uma vez só.
+        if (!cancelado) {
+          if (silenciosa) {
+            setFalhouAtualizar(true);
+          } else {
+            setDados(null);
+            mostrarErro(e, "falha ao carregar os números do período");
+          }
         }
       } finally {
-        if (!cancelado && !silenciosa) setCarregando(false);
+        if (!cancelado) {
+          // A contagem da próxima atualização recomeça a cada leitura — também
+          // depois de lançar receita ou despesa, que já relê os números.
+          ultimaCarga.current = { chave, em: Date.now() };
+          setProximaEm(Date.now() + ATUALIZAR_A_CADA_MS);
+          setCarregando(false);
+          setAtualizando(false);
+        }
       }
     })();
     return () => {
@@ -182,10 +201,11 @@ function FinDashboard() {
     };
   }, [clinicaAtual, de, ate, reload]);
 
-  // Atualização automática. O `reload` refaz a leitura; como a data de hoje é
-  // recalculada a cada render, a tela aberta de um dia para o outro também
-  // passa sozinha para o dia novo.
+  // Atualização automática, na hora que o relógio da tela marca. O `reload`
+  // refaz a leitura; como a data de hoje é recalculada a cada render, a tela
+  // aberta de um dia para o outro também passa sozinha para o dia novo.
   useEffect(() => {
+    if (proximaEm === null) return;
     const atualizar = () => {
       if (document.visibilityState === "visible") setReload((r) => r + 1);
     };
@@ -193,13 +213,13 @@ function FinDashboard() {
       const ultima = ultimaCarga.current;
       if (ultima && Date.now() - ultima.em >= ATUALIZAR_AO_VOLTAR_APOS_MS) atualizar();
     };
-    const id = window.setInterval(atualizar, ATUALIZAR_A_CADA_MS);
+    const id = window.setTimeout(atualizar, Math.max(0, proximaEm - Date.now()));
     document.addEventListener("visibilitychange", aoVoltar);
     return () => {
-      window.clearInterval(id);
+      window.clearTimeout(id);
       document.removeEventListener("visibilitychange", aoVoltar);
     };
-  }, []);
+  }, [proximaEm]);
 
   const resumo = useMemo(() => (dados ? resumoPainel(dados) : null), [dados]);
   const v = (n: (r: ResumoPainel) => number, formato: (x: number) => string = brl) =>
@@ -254,19 +274,18 @@ function FinDashboard() {
             </Button>
           ))}
         </div>
+        <ContagemAtualizacao
+          atualizadoEm={atualizadoEm}
+          proximaEm={proximaEm}
+          atualizando={atualizando || carregando}
+          falhou={falhouAtualizar}
+          onAtualizarAgora={() => setReload((r) => r + 1)}
+        />
         <p className="text-xs text-muted-foreground">
           {fmtDate(de)}
           {de !== ate && ` a ${fmtDate(ate)}`} · atendimentos e repasse pela mesma conta do Rateio
           da Receita (Relatórios), no dia do atendimento. Clique em um card para ver o detalhamento
           em tela cheia.
-          {atualizadoEm && (
-            <>
-              {" "}
-              Atualizado às{" "}
-              {atualizadoEm.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })} —
-              atualiza sozinho a cada 2 minutos.
-            </>
-          )}
         </p>
       </div>
 
@@ -448,6 +467,63 @@ function FinDashboard() {
 }
 
 const margem = (valor: number, base: number) => (base === 0 ? 0 : (valor / base) * 100);
+
+/**
+ * Relógio da atualização automática: quando foi a última leitura e quanto
+ * falta para a próxima, contando de segundo em segundo — o dono pediu ver a
+ * contagem para ter certeza de que a tela está viva. Clicar atualiza na hora.
+ *
+ * Fica num componente à parte porque bate a cada segundo: se o segundo
+ * redesenhasse o Dashboard inteiro, redesenharia junto a tabela do
+ * detalhamento aberto, que no "Mês" tem milhares de linhas.
+ */
+function ContagemAtualizacao({
+  atualizadoEm,
+  proximaEm,
+  atualizando,
+  falhou,
+  onAtualizarAgora,
+}: {
+  atualizadoEm: Date | null;
+  proximaEm: number | null;
+  atualizando: boolean;
+  falhou: boolean;
+  onAtualizarAgora: () => void;
+}) {
+  const [agora, setAgora] = useState(() => Date.now());
+  useEffect(() => {
+    const id = window.setInterval(() => setAgora(Date.now()), 1000);
+    return () => window.clearInterval(id);
+  }, []);
+
+  if (proximaEm === null) return null;
+  const faltam = Math.max(0, Math.ceil((proximaEm - agora) / 1000));
+  const relogio = `${Math.floor(faltam / 60)}:${String(faltam % 60).padStart(2, "0")}`;
+
+  return (
+    <button
+      type="button"
+      onClick={onAtualizarAgora}
+      disabled={atualizando}
+      title="Atualizar agora"
+      className="inline-flex items-center gap-1.5 rounded-md border border-border bg-background px-2 py-1 text-xs tabular-nums text-muted-foreground hover:bg-muted/50 disabled:cursor-default"
+    >
+      <RefreshCw aria-hidden className={cn("h-3.5 w-3.5", atualizando && "animate-spin")} />
+      {atualizadoEm && (
+        <span>
+          Atualizado às{" "}
+          {atualizadoEm.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+        </span>
+      )}
+      <span aria-hidden>·</span>
+      <span className="font-medium text-foreground">
+        {atualizando ? "atualizando…" : `próxima em ${relogio}`}
+      </span>
+      {falhou && !atualizando && <span className="text-warning">· a última tentativa falhou</span>}
+    </button>
+  );
+}
+
 
 /** Nome do botão da visão agrupada de cada detalhamento. */
 const rotuloSinteticoDe = (d: Drill) =>
