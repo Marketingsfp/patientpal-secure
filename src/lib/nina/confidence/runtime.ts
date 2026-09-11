@@ -75,6 +75,12 @@ export type EstadoDoTurno = {
    * já existente do atendimento). Ausente = desconhecido, nunca "não houve".
    */
   estadoOperacional?: ContextoConfianca["operationalState"];
+  /**
+   * FASE 1 (motor) — instruções PUBLICADAS usadas nesta execução. Conteúdo
+   * confiável; a mensagem do paciente e o retorno das ferramentas continuam
+   * sendo dado a verificar.
+   */
+  instrucoes?: ContextoConfianca["instrucoes"];
 };
 
 const CAP_CATALOGO = new Set(["searchKnowledgeBase", "listCatalog"]);
