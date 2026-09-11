@@ -182,10 +182,11 @@ function FinDashboard() {
     };
   }, [clinicaAtual, de, ate, reload]);
 
-  // Atualização automática. O `reload` refaz a leitura; como a data de hoje é
-  // recalculada a cada render, a tela aberta de um dia para o outro também
-  // passa sozinha para o dia novo.
+  // Atualização automática, na hora que o relógio da tela marca. O `reload`
+  // refaz a leitura; como a data de hoje é recalculada a cada render, a tela
+  // aberta de um dia para o outro também passa sozinha para o dia novo.
   useEffect(() => {
+    if (proximaEm === null) return;
     const atualizar = () => {
       if (document.visibilityState === "visible") setReload((r) => r + 1);
     };
@@ -193,13 +194,13 @@ function FinDashboard() {
       const ultima = ultimaCarga.current;
       if (ultima && Date.now() - ultima.em >= ATUALIZAR_AO_VOLTAR_APOS_MS) atualizar();
     };
-    const id = window.setInterval(atualizar, ATUALIZAR_A_CADA_MS);
+    const id = window.setTimeout(atualizar, Math.max(0, proximaEm - Date.now()));
     document.addEventListener("visibilitychange", aoVoltar);
     return () => {
-      window.clearInterval(id);
+      window.clearTimeout(id);
       document.removeEventListener("visibilitychange", aoVoltar);
     };
-  }, []);
+  }, [proximaEm]);
 
   const resumo = useMemo(() => (dados ? resumoPainel(dados) : null), [dados]);
   const v = (n: (r: ResumoPainel) => number, formato: (x: number) => string = brl) =>
