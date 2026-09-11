@@ -30,6 +30,14 @@ import {
   type EntidadeFato,
   type FatoRecuperado,
 } from "./evidencia";
+import {
+  correspondenciaDaAfirmacao,
+  qualificadoresDaAfirmacao,
+  
+  segmentoNaPosicao,
+  valorDaAfirmacao,
+  TERMOS_DE_ASSUNTO,
+} from "./afirmacao";
 import type {
   ClaimEstruturado,
   ContextoConfianca,
@@ -66,35 +74,7 @@ const FONTES_ACEITAS: Record<TipoClaim, TipoFonte[]> = {
 };
 
 /** Onde procurar o fato de cada tipo de afirmação. */
-/**
- * Vocabulário mínimo de assuntos clínicos que o paciente/rascunho pode nomear.
- * Serve só para detectar quando a frase fala EXPLICITAMENTE de um assunto —
- * não é lista de respostas nem fonte de dado.
- */
-const TERMOS_DE_ASSUNTO = [
-  "ultrassom",
-  "ultrassonografia",
-  "raio x",
-  "raio-x",
-  "radiografia",
-  "ressonancia",
-  "tomografia",
-  "endoscopia",
-  "colonoscopia",
-  "mamografia",
-  "eletrocardiograma",
-  "hemograma",
-  "biopsia",
-  "vacina",
-  "cirurgia",
-  "implante",
-  "limpeza",
-  "clareamento",
-  "consulta",
-  "retorno",
-  "exame",
-  "unidade",
-];
+/** O vocabulário de assuntos vive em `afirmacao.ts` (FASE 2). */
 
 /**
  * A afirmação extraída do TEXTO fala do mesmo assunto do fato recuperado?
@@ -170,6 +150,10 @@ export type ClaimAvaliado = {
   fonte: string | null;
   /** Valor que a fonte traz, quando diferente do afirmado. */
   valorDaFonte?: string | null;
+  /** FASE 2 — referência auditável do fato usado (fonte:consulta#registro). */
+  referencia?: string | null;
+  /** FASE 2 — valor efetivamente extraído da afirmação, quando houve. */
+  valorAfirmado?: string | null;
   motivo: string;
 };
 
@@ -338,7 +322,17 @@ function valorAfirmado(tipo: TipoClaim, trecho: string): string | null {
   return null;
 }
 
-export type ClaimDoTexto = { tipo: TipoClaim; trecho: string; modalidade: ModalidadeClaim };
+export type ClaimDoTexto = {
+  tipo: TipoClaim;
+  trecho: string;
+  modalidade: ModalidadeClaim;
+  /**
+   * FASE 2 — segmento da resposta a que a afirmação pertence. Qualificadores
+   * (procedimento, profissional, unidade, dia, hora, convênio, condição) são
+   * lidos AQUI, nunca em outro ponto da resposta.
+   */
+  frase: string;
+};
 
 /**
  * Camada COMPLEMENTAR: lê o texto final procurando afirmações sensíveis.
@@ -357,8 +351,9 @@ export function extrairClaimsDoTexto(texto: string): ClaimDoTexto[] {
       const chave = `${tipo}:${trecho.toLowerCase()}`;
       if (!trecho || vistos.has(chave)) continue;
       vistos.add(chave);
+      const frase = segmentoNaPosicao(t, m.index ?? t.indexOf(trecho));
       const modalidade = classificarModalidade(fraseDoTrecho(t, trecho));
-      achados.push({ tipo, trecho, modalidade });
+      achados.push({ tipo, trecho, modalidade, frase });
       if (achados.length >= LIMITE_CLAIMS) return achados;
     }
   }
@@ -370,6 +365,7 @@ export function extrairClaimsDoTexto(texto: string): ClaimDoTexto[] {
       tipo: "agendamento",
       trecho: "afirmação de agendamento concluído",
       modalidade: "afirmacao",
+      frase: t,
     });
   }
   return achados;
@@ -401,6 +397,8 @@ export function avaliarGrounding(ctx: ContextoConfianca, texto?: string | null):
     modalidade: ModalidadeClaim,
     valor: string | null,
     chave: ChaveFato | null,
+    /** FASE 2 — segmento da resposta onde a afirmação foi feita. */
+    frase?: string,
   ) => {
     const idem = `${tipo}:${normalizarTexto(trecho)}`;
     if (vistos.has(idem)) return;
@@ -500,6 +498,89 @@ export function avaliarGrounding(ctx: ContextoConfianca, texto?: string | null):
 
     // --------- confronto com o FATO recuperado (caminho principal da FASE 2)
     const alvo = ALVO_DO_FATO[tipo];
+
+    /**
+     * FASE 2 — correspondência factual da afirmação.
+     *
+     * Cada afirmação é lida no seu próprio segmento: valor + qualificadores
+     * (procedimento, profissional, unidade, dia, hora, convênio, condição de
+     * pagamento). Preço de um procedimento não aprova o preço de outro, e
+     * endereço/preparo/horário só passam quando o VALOR bate com a fonte.
+     */
+    const segmento = (frase ?? trecho).trim();
+    if (fatos && fatos.length > 0 && segmento) {
+      const chaveDaFrase = chave ?? qualificadoresDaAfirmacao(segmento);
+      const valorDaFrase = valor ?? valorDaAfirmacao(tipo, segmento);
+      const r = correspondenciaDaAfirmacao(fatos, {
+        tipo,
+        entidades: alvo.entidades,
+        campos: alvo.campos,
+        frase: segmento,
+        chave: chaveDaFrase,
+        valor: valorDaFrase,
+      });
+
+      if (r.situacao === "confirmado") {
+        push({
+          tipo,
+          trecho,
+          origem,
+          modalidade,
+          situacao: "confirmado",
+          suportado: true,
+          fonte: r.fato.fonte,
+          referencia: r.referencia,
+          valorAfirmado: valorDaFrase,
+          motivo: "afirmação corresponde ao registro recuperado do mesmo caso",
+        });
+        return;
+      }
+      if (r.situacao === "divergente") {
+        push({
+          tipo,
+          trecho,
+          origem,
+          modalidade,
+          situacao: "divergente",
+          suportado: false,
+          fonte: r.fato.fonte,
+          referencia: r.referencia,
+          valorAfirmado: valorDaFrase,
+          valorDaFonte: r.valorDaFonte,
+          motivo: `valor afirmado diverge da fonte (fonte: ${r.valorDaFonte ?? "vazio"})`,
+        });
+        return;
+      }
+      if (r.situacao === "fora_do_escopo") {
+        push({
+          tipo,
+          trecho,
+          origem,
+          modalidade,
+          situacao: "fora_do_escopo",
+          suportado: false,
+          fonte: canalDoTipo,
+          valorAfirmado: valorDaFrase,
+          motivo:
+            "a fonte consultada não cobre este caso (procedimento/profissional/unidade/dia/convênio)",
+        });
+        return;
+      }
+      if (r.situacao === "indeterminado") {
+        push({
+          tipo,
+          trecho,
+          origem,
+          modalidade,
+          situacao: "nao_verificado",
+          suportado: false,
+          fonte: canalDoTipo,
+          motivo: r.motivo,
+        });
+        return;
+      }
+    }
+
     if (fatos) {
       for (const campo of alvo.campos) {
         const r = corresponder(fatos, {
@@ -650,11 +731,21 @@ export function avaliarGrounding(ctx: ContextoConfianca, texto?: string | null):
       c.modalidade ?? classificarModalidade(trecho),
       c.valor ?? valorAfirmado(c.tipo, trecho),
       c.chave ?? null,
+      c.texto ?? trecho,
     );
   }
   const textoFinal = texto ?? ctx.draftText ?? "";
   for (const c of extrairClaimsDoTexto(textoFinal)) {
-    registrar(c.tipo, c.trecho, "texto", null, c.modalidade, valorAfirmado(c.tipo, c.trecho), null);
+    registrar(
+      c.tipo,
+      c.trecho,
+      "texto",
+      null,
+      c.modalidade,
+      valorAfirmado(c.tipo, c.trecho),
+      null,
+      c.frase,
+    );
   }
 
   const semEvidencia = claims.filter(
