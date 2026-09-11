@@ -146,6 +146,23 @@ export const criarTesteCarga = createServerFn({ method: "POST" })
     const leads = await garantirLeads(supabaseAdmin, data.clinicaId);
     if (!leads.length) throw new Error("Nenhum lead de teste disponível nesta clínica");
 
+    // FASE 2 — PREPARAÇÃO DOS LEADS: os participantes desta execução (e só
+    // eles) passam por reset real e confirmado ANTES de qualquer mensagem.
+    // Se um único lead falhar, o teste não começa — nada é enviado.
+    const { prepararLeadsCarga } = await import("@/lib/nina/carga-preflight.server");
+    const { descreverFalhaPreflight, leadsParticipantes } = await import(
+      "@/lib/nina/carga-preflight"
+    );
+    const participantes = leadsParticipantes(leads, config.leadsAtivos);
+    const preflight = await prepararLeadsCarga({
+      admin: supabaseAdmin,
+      clinicaId: data.clinicaId,
+      leads: participantes,
+      userId: context.userId,
+    });
+    if (!preflight.pronto) throw new Error(descreverFalhaPreflight(preflight));
+
+
     const plano = planoDeMensagens(config);
     const cenariosUnicos = [...new Set(plano.map((p) => p.cenario))];
 
