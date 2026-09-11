@@ -58,8 +58,12 @@ export type ResultadoVerificacaoFonte = {
   fallbackPorErro: boolean;
   /** A regra publicada apareceu no payload enviado ao modelo. */
   regraChegouAoPayload: boolean;
-  /** A PRIMEIRA resposta do modelo cumpriu a regra. */
+  /** A PRIMEIRA resposta do modelo cumpriu a regra (igualdade literal). */
   primeiraRespostaCumpriu: boolean;
+  /** O sistema alterou o texto do modelo antes de considerar a resposta. */
+  sistemaAlterouTexto: boolean;
+  /** O texto FINAL desta verificação cumpriu a regra. */
+  entregaCumpriu: boolean;
   /** Impressão digital do texto enviado (auditoria, sem expor o prompt). */
   hashPayload: string | null;
   modelo: string | null;
@@ -69,7 +73,19 @@ export type ResultadoVerificacaoFonte = {
 };
 
 export const ESCOPO_DA_PROVA_FONTE =
-  "Prova apenas que a regra publicada chegou ao modelo e foi cumprida na primeira resposta. Não aprova o pipeline completo.";
+  "Caminho ISOLADO de verificação: prova apenas que a regra publicada chegou ao payload do modelo e que a primeira resposta a cumpriu. Não aprova o atendimento completo.";
+
+/**
+ * O que este caminho isolado NÃO percorre. Fica visível no resultado para
+ * que a aprovação da fonte nunca seja lida como aprovação do atendimento.
+ */
+export const PARTES_NAO_PERCORRIDAS_FONTE: readonly string[] = [
+  "ferramentas da Nina (agenda, paciente, catálogo)",
+  "motor de confiabilidade e políticas de confiança",
+  "bloqueio por baixa confiança e encaminhamento humano",
+  "finalização, templates e transformações da resposta",
+  "persistência da conversa e envio da mensagem",
+];
 
 /**
  * Desfechos que NÃO cumprem a regra publicada. Encaminhar para atendimento
@@ -79,35 +95,59 @@ export const ESCOPO_DA_PROVA_FONTE =
 const DESFECHOS_QUE_NAO_CUMPREM =
   /(chamar uma pessoa da nossa equipe|pessoa da nossa equipe retome|n[ãa]o consegui concluir|vou verificar novamente|encaminh(ar|ei|ando) (voc[êe] )?para (o|um) atendimento)/i;
 
-/** Avalia a aderência sem julgar o resto do atendimento. */
+/**
+ * Avalia a aderência sem julgar o resto do atendimento.
+ *
+ * A regra publicada exige responder EXATAMENTE o marcador e nada mais: a
+ * conferência é de IGUALDADE LITERAL do texto, preservando caixa e
+ * acentuação. `includes` aprovaria resposta com saudação ou texto extra —
+ * exatamente o que a regra proíbe.
+ *
+ * Os resultados ficam SEPARADOS: o que o modelo produziu, se o sistema
+ * alterou o texto e o que a entrega final cumpriu. Marcador produzido por
+ * código nunca prova obediência do modelo.
+ */
 export function avaliarAderenciaFonte(entrada: {
   par: ParMarcador;
   payload: string;
   primeiraResposta: string;
+  /** Texto final desta verificação, quando o sistema alterou o do modelo. */
+  textoEntregue?: string | null;
   /** Origem registrada do texto entregue, quando conhecida. */
   origemResposta?: string | null;
 }): {
   regraChegouAoPayload: boolean;
   primeiraRespostaCumpriu: boolean;
+  sistemaAlterouTexto: boolean;
+  entregaCumpriu: boolean;
   desfechoSubstituiuResposta: boolean;
   motivo: string | null;
 } {
   const payload = entrada.payload ?? "";
-  const resposta = (entrada.primeiraResposta ?? "").trim();
+  const original = (entrada.primeiraResposta ?? "").trim();
+  const entregue = (entrada.textoEntregue ?? entrada.primeiraResposta ?? "").trim();
   const origem = String(entrada.origemResposta ?? "");
   const desfechoSubstituiuResposta =
-    DESFECHOS_QUE_NAO_CUMPREM.test(resposta) ||
+    DESFECHOS_QUE_NAO_CUMPREM.test(entregue) ||
     ["transferencia", "fallback", "fallback_erro", "limite_rodadas"].includes(origem);
-  const contemMarcador = resposta.toUpperCase().includes(entrada.par.marcador.toUpperCase());
+  // Igualdade literal: nada antes, nada depois, sem trocar caixa/acentuação.
+  const exato = (t: string) => t === entrada.par.marcador;
+  const modeloCumpriu = exato(original);
+  const sistemaAlterouTexto = entregue !== original;
+  const entregaCumpriu = exato(entregue) && !desfechoSubstituiuResposta;
   return {
     regraChegouAoPayload: payload.includes(entrada.par.marcador),
-    primeiraRespostaCumpriu: contemMarcador && !desfechoSubstituiuResposta,
+    primeiraRespostaCumpriu: modeloCumpriu && !desfechoSubstituiuResposta,
+    sistemaAlterouTexto,
+    entregaCumpriu,
     desfechoSubstituiuResposta,
     motivo: desfechoSubstituiuResposta
       ? "ENCAMINHAMENTO_OU_FALLBACK_NAO_CUMPRE_A_REGRA"
-      : contemMarcador
+      : modeloCumpriu
         ? null
-        : "MARCADOR_EXIGIDO_AUSENTE",
+        : original.toUpperCase().includes(entrada.par.marcador.toUpperCase())
+          ? "RESPOSTA_COM_TEXTO_ALEM_DO_MARCADOR_EXIGIDO"
+          : "MARCADOR_EXIGIDO_AUSENTE",
   };
 }
 
