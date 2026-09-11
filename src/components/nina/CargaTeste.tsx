@@ -47,6 +47,7 @@ import {
   executarLoteCarga,
   listarTestesCarga,
   pararTesteCarga,
+  prepararLeadsTesteCarga,
 } from "@/lib/nina/carga.functions";
 
 const CENARIOS_PADRAO = [
@@ -64,6 +65,7 @@ export function CargaTeste() {
   const { clinicaAtual } = useClinica();
   const clinicaId = clinicaAtual?.clinica_id;
   const criar = useServerFn(criarTesteCarga);
+  const preparar = useServerFn(prepararLeadsTesteCarga);
   const executar = useServerFn(executarLoteCarga);
   const parar = useServerFn(pararTesteCarga);
   const listar = useServerFn(listarTestesCarga);
@@ -79,7 +81,13 @@ export function CargaTeste() {
   const [detalhe, setDetalhe] = useState<any>(null);
   const [rodando, setRodando] = useState(false);
   const [confirmar, setConfirmar] = useState(false);
+  // FASE 3 — preparação dos leads antes do primeiro disparo.
+  const [preparo, setPreparo] = useState<{ prontos: number; total: number } | null>(null);
+  const [erroPreparo, setErroPreparo] = useState<string | null>(null);
   const cancelado = useRef(false);
+  /** Trava local contra duplo clique (o backend também recusa dois runs). */
+  const iniciando = useRef(false);
+  const confirmadoRef = useRef(false);
 
   const configAtual = useCallback((): ConfigCarga => {
     const distribuicao = cenarios
@@ -124,13 +132,17 @@ export function CargaTeste() {
 
   const iniciar = async (confirmado: boolean) => {
     if (!clinicaId) return;
+    if (iniciando.current) return;
     const cfg = configAtual();
     if (exigeConfirmacao(cfg) && !confirmado) {
       setConfirmar(true);
       return;
     }
     setConfirmar(false);
+    confirmadoRef.current = confirmado;
+    iniciando.current = true;
     setRodando(true);
+    setErroPreparo(null);
     cancelado.current = false;
     try {
       const criada: any = await criar({
@@ -146,6 +158,24 @@ export function CargaTeste() {
       setCargaId(id);
       await recarregar();
 
+      // PREPARANDO LEADS — nenhum disparo antes de todos ficarem prontos.
+      const totalLeads = Number(criada.participantes ?? 0);
+      setPreparo({ prontos: 0, total: totalLeads });
+      let pronto = false;
+      while (!pronto && !cancelado.current) {
+        const p: any = await preparar({ data: { clinicaId, cargaId: id } });
+        setPreparo({ prontos: p.prontos, total: p.total || totalLeads });
+        if (p.erro || p.status === "erro") {
+          setPreparo(null);
+          setErroPreparo(p.erro ?? "Preparação falhou.");
+          await recarregar();
+          return;
+        }
+        pronto = Boolean(p.pronto);
+      }
+      if (!pronto) return;
+      setPreparo(null);
+
       // O servidor executa por lotes; aqui só pedimos o próximo lote.
       let status = "executando";
       while (status === "executando" && !cancelado.current) {
@@ -158,6 +188,7 @@ export function CargaTeste() {
     } catch (e) {
       mostrarErro(e);
     } finally {
+      iniciando.current = false;
       setRodando(false);
     }
   };
@@ -391,6 +422,37 @@ export function CargaTeste() {
             {cfgPrevia.mensagensPorMinuto} msg/min
           </span>
         </div>
+
+        {preparo ? (
+          <div className="flex items-center gap-2 rounded-lg border p-3 text-sm">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            {preparo.prontos >= preparo.total && preparo.total > 0 ? (
+              <span>
+                {preparo.prontos}/{preparo.total} — prontos · Iniciando teste...
+              </span>
+            ) : (
+              <span>
+                Preparando Leads de Teste... {preparo.prontos}/{preparo.total}
+              </span>
+            )}
+          </div>
+        ) : null}
+
+        {erroPreparo ? (
+          <div className="space-y-2 rounded-lg border border-destructive/40 p-3 text-sm">
+            <p className="font-medium">Preparação falhou.</p>
+            <p className="text-muted-foreground">{erroPreparo}</p>
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={rodando || !clinicaId}
+              onClick={() => void iniciar(confirmadoRef.current)}
+            >
+              <RefreshCw className="mr-2 h-4 w-4" /> Tentar novamente
+            </Button>
+          </div>
+        ) : null}
+
 
         {detalhe ? (
           <div className="space-y-3 rounded-lg border p-4">

@@ -48,6 +48,54 @@ export function descreverFalhaPreflight(resumo: ResumoPreflight): string {
 
 type LeadMinimo = { id: string; indice: number };
 
+/** FASE 3 — quantos leads são preparados por chamada (progresso visual). */
+export const LOTE_PREFLIGHT = 3;
+
+/** Baseline mínimo gravado por lead depois do reset e antes do 1º disparo. */
+export type BaselineLead = {
+  runId: string;
+  leadId: string;
+  leadIndice: number;
+  preparedAt: string;
+  memoryReset: true;
+  previousCycleResolved: true;
+  ready: true;
+  jaLimpo: boolean;
+};
+
+export function baselineLead(entrada: {
+  runId: string;
+  resultado: ResultadoPreflightLead;
+  agora?: Date;
+}): BaselineLead {
+  return {
+    runId: entrada.runId,
+    leadId: entrada.resultado.leadId,
+    leadIndice: entrada.resultado.indice,
+    preparedAt: (entrada.agora ?? new Date()).toISOString(),
+    memoryReset: true,
+    previousCycleResolved: true,
+    ready: true,
+    jaLimpo: entrada.resultado.jaLimpo,
+  };
+}
+
+/** Idempotência: leads que ainda não têm baseline READY neste run. */
+export function pendentesPreflight<T extends LeadMinimo>(
+  leads: T[],
+  baselines: { leadId: string }[],
+): T[] {
+  const prontos = new Set(baselines.map((b) => b.leadId));
+  return leads.filter((l) => !prontos.has(l.id));
+}
+
+/** Mensagem de preparação interrompida, no formato pedido pelo operador. */
+export function descreverPreparacaoParcial(prontos: number, total: number): string {
+  const falharam = Math.max(0, total - prontos);
+  const plural = falharam === 1 ? "1 lead não pôde ser resetado" : `${falharam} leads não puderam ser resetados`;
+  return `${prontos} de ${total} Leads foram preparados. O teste não foi iniciado porque ${plural}.`;
+}
+
 /**
  * Executa o reset de todos os participantes com paralelismo limitado e devolve
  * o resumo. Um lead só é marcado READY DEPOIS de o reset ter terminado e sido

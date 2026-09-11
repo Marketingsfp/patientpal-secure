@@ -1,0 +1,1 @@
+ALTER TABLE public.nina_teste_carga ADD COLUMN IF NOT EXISTS preflight jsonb NOT NULL DEFAULT '[]'::jsonb;
