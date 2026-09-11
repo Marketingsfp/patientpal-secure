@@ -736,5 +736,204 @@ export async function processarMensagemTeste(data: EntradaMensagemTeste, userId:
     }
 }
 
+/**
+ * FASE 2 — RESET REAL de um lead de teste (rotina canônica única).
+ *
+ * É exatamente o que o botão "Resolver" do console de homologação faz, agora
+ * extraído para poder ser reutilizado também pelo preflight do teste de carga.
+ * Além de encerrar a conversa e zerar a memória da Nina, corta os resíduos que
+ * poderiam alcançar o próximo ciclo: trava da conversa, lote de mensagens
+ * pendente e marcador de espera do paciente.
+ *
+ * Nunca apaga histórico: conversas, mensagens, execuções e ciclos anteriores
+ * continuam gravados para auditoria.
+ */
+export async function resetarLeadTeste(
+  admin: any,
+  entrada: {
+    clinicaId: string;
+    leadId: string;
+    /** Quando informado, só reseta se o lead ainda estiver nesta conversa. */
+    conversaId?: string | null;
+    userId: string | null;
+    removerAgendamentos?: boolean;
+    origem?: string;
+  },
+): Promise<{
+  ok: true;
+  jaResolvida: boolean;
+  sessao: number;
+  cicloEncerrado: string | null;
+  agendamentosRemovidos: number;
+}> {
+  const lead = await carregarLead(admin, entrada.clinicaId, entrada.leadId);
+
+  // Idempotência: sem conversa aberta o lead já está limpo — nada a fazer,
+  // nenhum evento novo, nenhum ciclo extra.
+  if (!lead.conversa_id)
+    return {
+      ok: true,
+      jaResolvida: true,
+      sessao: lead.sessao_seq,
+      cicloEncerrado: null,
+      agendamentosRemovidos: 0,
+    };
+  // Só encerra a conversa informada: nunca uma sessão nova já iniciada.
+  if (entrada.conversaId && lead.conversa_id !== entrada.conversaId)
+    return {
+      ok: true,
+      jaResolvida: true,
+      sessao: lead.sessao_seq,
+      cicloEncerrado: null,
+      agendamentosRemovidos: 0,
+    };
+
+  const conversaId = lead.conversa_id;
+  const agora = new Date().toISOString();
+
+  // 1) Impede que processamento antigo continue produzindo efeitos.
+  //    A revisão da conversa sobe ANTES do resto: qualquer resposta que a Nina
+  //    ainda estiver gerando do ciclo anterior passa a ser obsoleta.
+  try {
+    const { incrementarRevisaoConversa } = await import("@/lib/nina/revisao-conversa.server");
+    await incrementarRevisaoConversa({
+      clinicaId: entrada.clinicaId,
+      telefone: lead.telefone_sessao,
+      conversaId,
+    });
+  } catch (e) {
+    console.error("[NINA_TESTE] revisão da conversa não pôde ser incrementada", e);
+  }
+
+  // Lotes de mensagens ainda abertos/reservados viram SUPERSEDED: não geram
+  // resposta e não travam a conversa nova.
+  await admin
+    .from("nina_message_batches")
+    .update({ status: "SUPERSEDED", processed_at: agora })
+    .eq("clinica_id", entrada.clinicaId)
+    .eq("conversa_id", conversaId)
+    .in("status", ["COLLECTING", "PROCESSING"]);
+
+  // Trava (lease de até 90s) do ciclo anterior é liberada de imediato.
+  await admin
+    .from("nina_conversa_locks")
+    .update({ liberado_em: agora, expira_em: agora })
+    .eq("clinica_id", entrada.clinicaId)
+    .eq("chave", `${entrada.clinicaId}:${lead.telefone_sessao}`)
+    .is("liberado_em", null);
+
+  // 2) Encerra a conversa e zera a memória real da Nina.
+  await admin
+    .from("atend_conversas")
+    .update({
+      status: "finished",
+      owner_type: "NONE",
+      ai_enabled: false,
+      atribuida_user_id: null,
+      identidade_confirmada: false,
+      identidade_perguntada_em: null,
+      identidade_tentativas: 0,
+      nina_fluxo_estado: null,
+      // Invalida qualquer tarefa pendente do ciclo (espera do paciente,
+      // encerramento automático, follow-up): nada dispara depois de resolver.
+      patient_response_deadline: null,
+      awaiting_patient_since: null,
+      handoff_resumo: null,
+      handoff_motivo: null,
+      closed_at: agora,
+      resolved_at: agora,
+    })
+    .eq("id", conversaId)
+    .eq("clinica_id", entrada.clinicaId);
+
+  // Eventos persistentes na linha do tempo (nada de popup): o histórico
+  // continua visível no console e mostra, no ponto exato, quem encerrou e
+  // que a memória da Nina foi zerada.
+  const { registrarMarcadorSistema, registrarEvento } = await import(
+    "@/lib/atendimento/handoff.server"
+  );
+  await registrarEvento({
+    clinicaId: entrada.clinicaId,
+    conversaId,
+    evento: "FINALIZADA",
+    userId: entrada.userId,
+    detalhes: { sessao: lead.sessao_seq, origem: entrada.origem ?? "console_teste" },
+  });
+  await registrarEvento({
+    clinicaId: entrada.clinicaId,
+    conversaId,
+    evento: "IA_MEMORIA_RESETADA",
+    userId: entrada.userId,
+    detalhes: { sessao: lead.sessao_seq },
+  });
+
+  // Limpeza opcional: apaga da agenda o que a Nina marcou nesta sessão de
+  // teste. Só alcança registros de homologação (is_mock_data) desta conversa.
+  let agendamentosRemovidos = 0;
+  if (entrada.removerAgendamentos) {
+    const { data: apagados } = await admin
+      .from("agendamentos")
+      .delete()
+      .eq("clinica_id", entrada.clinicaId)
+      .eq("origem_integracao", "nina_homologacao")
+      .eq("is_mock_data", true)
+      .like("id_externo", `${conversaId}|%`)
+      .select("id");
+    agendamentosRemovidos = (apagados ?? []).length;
+    if (agendamentosRemovidos > 0) {
+      await registrarMarcadorSistema({
+        clinicaId: entrada.clinicaId,
+        conversaId,
+        texto: `🧹 ${agendamentosRemovidos} agendamento(s) de teste removido(s) da agenda.`,
+      }).catch(() => {});
+    }
+  }
+
+  // Nova sessão = novo telefone virtual → a Nina não alcança nada do histórico
+  // arquivado (que fica só para auditoria).
+  const proxima = lead.sessao_seq + 1;
+
+  // Encerra o ciclo atual (histórico preservado para auditoria) — a próxima
+  // mensagem cria um novo test_cycle_id, sem memória do ciclo anterior.
+  if (lead.ciclo_id) {
+    const { patchEncerrarCiclo } = await import("@/lib/nina/ciclo-teste");
+    await admin
+      .from("nina_teste_ciclos")
+      .update({
+        ...patchEncerrarCiclo("resolvido_manual", agora),
+        resolvido_por: entrada.userId,
+      } as never)
+      .eq("id", lead.ciclo_id)
+      .eq("clinica_id", entrada.clinicaId);
+  }
+
+  await admin
+    .from("nina_teste_leads")
+    .update({
+      sessao_seq: proxima,
+      telefone_sessao: telefoneSessao(lead.indice, proxima),
+      conversa_id: null,
+      ciclo_id: null,
+      ciclo_iniciado_em: null,
+      resolvido_em: agora,
+      status: "ativa",
+    })
+    .eq("id", lead.id);
+
+  // 3) Confirmação de que o reset foi PERSISTIDO: só depois disso o chamador
+  //    pode considerar o lead pronto.
+  const depois = await carregarLead(admin, entrada.clinicaId, entrada.leadId);
+  if (depois.conversa_id || depois.ciclo_id)
+    throw new Error("Reset não confirmado: o lead continua com conversa/ciclo abertos");
+
+  return {
+    ok: true,
+    jaResolvida: false,
+    sessao: proxima,
+    cicloEncerrado: lead.ciclo_id,
+    agendamentosRemovidos,
+  };
+}
+
 export { LIMITE_MENSAGENS_LEAD, CANAL_TESTE, TOTAL_LEADS, telefoneSessao, garantirLeads, carregarLead, garantirCiclo, conversasDoLead, podarMensagensLead };
 export type { LeadRow };
