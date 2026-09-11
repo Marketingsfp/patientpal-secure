@@ -478,6 +478,14 @@ export function CargaTeste() {
               </div>
               <div>Conversas envolvidas: {m?.conversasEnvolvidas ?? "—"}</div>
             </div>
+            {detalhe.preflight ? (
+              <p className="text-xs text-muted-foreground">
+                Preparação dos leads — preparados: {detalhe.preflight.leadsPreparados}/
+                {detalhe.preflight.leadsTotal} · falhas: {detalhe.preflight.falhas} · memórias
+                resetadas: {detalhe.preflight.memoriasResetadas} · ciclos anteriores encerrados:{" "}
+                {detalhe.preflight.ciclosAnterioresEncerrados}
+              </p>
+            ) : null}
             <p className="text-xs text-muted-foreground">
               Custo em dinheiro não é medido: o provedor não devolve preço por chamada. Só os tokens
               são registrados.
