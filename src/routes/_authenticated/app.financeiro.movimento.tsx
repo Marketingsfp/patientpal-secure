@@ -387,7 +387,6 @@ function Page() {
   // depois das 21h e a tela aparecia vazia no fim do expediente.
   const [fromDate, setFromDate] = useState(hojeBR);
   const [toDate, setToDate] = useState(hojeBR);
-  
   const [resumo, setResumo] = useState<{ r: number; d: number; saldo: number; totalRows: number }>({
     r: 0,
     d: 0,
