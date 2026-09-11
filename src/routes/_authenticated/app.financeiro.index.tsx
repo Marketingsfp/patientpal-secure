@@ -3,7 +3,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Activity,
   Calendar,
-  Coins,
   CreditCard,
   FlaskConical,
   Handshake,
@@ -16,9 +15,7 @@ import {
   Users,
   Wallet,
 } from "lucide-react";
-import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { abrirDetalheEmNovaAba } from "@/lib/financeiro/detalhe-aba";
 import { useClinica } from "@/hooks/use-clinica";
 import { usePodeEscrever } from "@/hooks/use-permissoes";
 import { brl, fmtDate, rangeFromPeriodo, type Periodo } from "@/lib/financeiro/format";
@@ -75,6 +72,18 @@ function periodoAteHoje(periodo: Periodo) {
 }
 
 /**
+ * De quanto em quanto tempo os números se atualizam sozinhos, sem F5.
+ *
+ * Dois minutos porque cada atualização refaz o Rateio do período inteiro — no
+ * "Mês" são milhares de atendimentos —, e um intervalo menor multiplicaria a
+ * carga no banco sem mudar o que a tesouraria decide olhando a tela. A aba
+ * escondida não atualiza; ao voltar para ela, a tela atualiza na hora se a
+ * última leitura tiver mais de um minuto.
+ */
+const ATUALIZAR_A_CADA_MS = 2 * 60_000;
+const ATUALIZAR_AO_VOLTAR_APOS_MS = 60_000;
+
+/**
  * Detalhamento aberto pelo clique em um card. Os de atendimento ("cartao",
  * "particular"…) são a mesma lista do Rateio, recortada pelo tipo.
  */
@@ -83,11 +92,23 @@ type Drill =
   | "repasse"
   | "operacionais"
   | "totais"
-  | "outras"
   | "saldo"
   | "atendimentos"
   | "ticket"
   | CategoriaAtendimento;
+
+/**
+ * O detalhamento guarda os números do momento em que foi aberto: a
+ * atualização automática continua por trás, mas a tabela que a pessoa está
+ * lendo, imprimindo ou exportando não muda sozinha no meio da conferência.
+ */
+interface DetalheAberto {
+  drill: Drill;
+  dados: DadosPainel;
+  resumo: ResumoPainel;
+  de: string;
+  ate: string;
+}
 
 /**
  * Financeiro → Dashboard.
@@ -105,21 +126,30 @@ function FinDashboard() {
   const [reload, setReload] = useState(0);
   const [dados, setDados] = useState<DadosPainel | null>(null);
   const [carregando, setCarregando] = useState(true);
-  const [drill, setDrill] = useState<Drill | null>(null);
+  const [aberto, setAberto] = useState<DetalheAberto | null>(null);
+  const [atualizadoEm, setAtualizadoEm] = useState<Date | null>(null);
 
   /**
    * Grade de repasse e catálogos: pesados e iguais para qualquer período, então
    * são buscados uma vez por clínica e reaproveitados ao trocar Hoje/Semana/Mês.
    */
   const ctxRef = useRef<{ clinicaId: string; ctx: RateioContexto } | null>(null);
+  /** Clínica + período dos números na tela, e quando foram lidos. */
+  const ultimaCarga = useRef<{ chave: string; em: number } | null>(null);
 
   const { de, ate } = periodoAteHoje(periodo);
 
   useEffect(() => {
     if (!clinicaAtual) return;
     const clinicaId = clinicaAtual.clinica_id;
+    const chave = `${clinicaId}|${de}|${ate}`;
+    // Atualização do mesmo período (automática ou depois de lançar receita ou
+    // despesa) troca os números sem piscar "…" nos cards. Trocar de período ou
+    // de clínica mostra o "…", para ninguém ler o número do período anterior
+    // debaixo do botão novo.
+    const silenciosa = ultimaCarga.current?.chave === chave;
     let cancelado = false;
-    setCarregando(true);
+    if (!silenciosa) setCarregando(true);
     (async () => {
       try {
         let ctx = ctxRef.current?.clinicaId === clinicaId ? ctxRef.current.ctx : null;
@@ -128,14 +158,23 @@ function FinDashboard() {
           ctxRef.current = { clinicaId, ctx };
         }
         const d = await carregarPainelFinanceiro(ctx, clinicaId, de, ate);
-        if (!cancelado) setDados(d);
-      } catch (e) {
         if (!cancelado) {
+          setDados(d);
+          setAtualizadoEm(new Date());
+          ultimaCarga.current = { chave, em: Date.now() };
+        }
+      } catch (e) {
+        // Falha na atualização automática não vira alerta a cada dois minutos:
+        // os números anteriores ficam, e o "Atualizado às" mostra de quando são.
+        // Guardar a chave também na falha faz as próximas tentativas deste
+        // período serem silenciosas — o alerta aparece uma vez só.
+        if (!cancelado && !silenciosa) {
           setDados(null);
+          ultimaCarga.current = { chave, em: Date.now() };
           mostrarErro(e, "falha ao carregar os números do período");
         }
       } finally {
-        if (!cancelado) setCarregando(false);
+        if (!cancelado && !silenciosa) setCarregando(false);
       }
     })();
     return () => {
@@ -143,32 +182,36 @@ function FinDashboard() {
     };
   }, [clinicaAtual, de, ate, reload]);
 
+  // Atualização automática. O `reload` refaz a leitura; como a data de hoje é
+  // recalculada a cada render, a tela aberta de um dia para o outro também
+  // passa sozinha para o dia novo.
+  useEffect(() => {
+    const atualizar = () => {
+      if (document.visibilityState === "visible") setReload((r) => r + 1);
+    };
+    const aoVoltar = () => {
+      const ultima = ultimaCarga.current;
+      if (ultima && Date.now() - ultima.em >= ATUALIZAR_AO_VOLTAR_APOS_MS) atualizar();
+    };
+    const id = window.setInterval(atualizar, ATUALIZAR_A_CADA_MS);
+    document.addEventListener("visibilitychange", aoVoltar);
+    return () => {
+      window.clearInterval(id);
+      document.removeEventListener("visibilitychange", aoVoltar);
+    };
+  }, []);
+
   const resumo = useMemo(() => (dados ? resumoPainel(dados) : null), [dados]);
   const v = (n: (r: ResumoPainel) => number, formato: (x: number) => string = brl) =>
     carregando || !resumo ? "…" : formato(n(resumo));
 
   /**
-   * Abre o detalhamento do card em NOVA ABA, como a diretoria pediu: a visão
-   * geral fica numa aba e o detalhamento em outra. As duas visões vão prontas
-   * para a aba nova (ver `@/lib/financeiro/detalhe-aba`). Se o navegador
-   * bloquear a aba, o detalhamento abre por cima da tela, como era antes.
+   * Abre o detalhamento do card em tela cheia, dentro do próprio sistema — o
+   * dono pediu em 11/09/2026 que o clique não abrisse outra guia do navegador.
    */
-  const abrir = (d: Drill) => {
+  const abrir = (drill: Drill) => {
     if (!dados || !resumo || carregando) return;
-    const sintetico = montarDetalhe(d, dados, resumo, "sintetico");
-    const abriu = abrirDetalheEmNovaAba("/app/financeiro/detalhe", {
-      sintetico: sintetico.temSintetico ? sintetico : null,
-      analitico: montarDetalhe(d, dados, resumo, "analitico"),
-      rotuloSintetico: rotuloSinteticoDe(d),
-      arquivo: `financeiro_${d}`,
-      de,
-      ate,
-      clinicaNome: clinicaAtual?.clinica.nome ?? "Clínica",
-    });
-    if (!abriu) {
-      toast.info("O navegador não abriu a nova aba — o detalhamento abriu aqui mesmo.");
-      setDrill(d);
-    }
+    setAberto({ drill, dados, resumo, de, ate });
   };
 
   return (
@@ -196,7 +239,7 @@ function FinDashboard() {
       {/* Fila de repasses de dias anteriores. Fica no topo, antes dos números
           do período, porque é a primeira coisa que a tesouraria resolve de
           manhã — e some sozinho quando não há nada pendente. */}
-      <CardPendenciasRepasse />
+      <CardPendenciasRepasse atualizacao={reload} />
 
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
         <div className="flex gap-2">
@@ -213,9 +256,17 @@ function FinDashboard() {
         </div>
         <p className="text-xs text-muted-foreground">
           {fmtDate(de)}
-          {de !== ate && ` a ${fmtDate(ate)}`} · receita, repasse e atendimentos pela mesma conta do
-          Rateio da Receita (Relatórios), no dia do atendimento. Clique em um card para abrir o
-          detalhamento em nova aba.
+          {de !== ate && ` a ${fmtDate(ate)}`} · atendimentos e repasse pela mesma conta do Rateio
+          da Receita (Relatórios), no dia do atendimento. Clique em um card para ver o detalhamento
+          em tela cheia.
+          {atualizadoEm && (
+            <>
+              {" "}
+              Atualizado às{" "}
+              {atualizadoEm.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })} —
+              atualiza sozinho a cada 2 minutos.
+            </>
+          )}
         </p>
       </div>
 
@@ -224,17 +275,32 @@ function FinDashboard() {
           Resultado do período
         </h2>
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {/* Ocupa duas linhas: é o card mais alto (quebra por forma), e assim
+              os outros quatro fecham um quadro 2×2 ao lado dele. */}
           <KpiCard
             onClick={() => abrir("receita")}
             icon={TrendingUp}
             label="Receita bruta"
-            value={v((r) => r.receitaBruta)}
+            value={v((r) => r.receitaTotal)}
             accent="success"
-            detalhe="Atendimentos do período"
+            detalhe="Atendimentos + mensalidades do Cartão, adesões e avulsos"
+            className="md:row-span-2"
           >
             {resumo && !carregando && (
               <ul className="mt-2 space-y-0.5 border-t border-border/60 pt-2">
-                {resumo.formas.map((f) => (
+                <li className="flex items-center justify-between gap-2 text-xs">
+                  <span className="text-muted-foreground">Atendimentos</span>
+                  <span className="shrink-0 tabular-nums">{brl(resumo.receitaBruta)}</span>
+                </li>
+                <li className="flex items-center justify-between gap-2 text-xs">
+                  <span className="text-muted-foreground">Mensalidades, adesões e avulsos</span>
+                  <span className="shrink-0 tabular-nums">{brl(resumo.outrasReceitas)}</span>
+                </li>
+              </ul>
+            )}
+            {resumo && !carregando && (
+              <ul className="mt-2 space-y-0.5 border-t border-border/60 pt-2">
+                {resumo.formasReceitaTotal.map((f) => (
                   <li key={f.forma} className="flex items-center justify-between gap-2 text-xs">
                     <span className="flex min-w-0 items-center gap-1.5 text-muted-foreground">
                       <span
@@ -277,14 +343,6 @@ function FinDashboard() {
             detalhe="Contas, folha, compras — sem repasse médico"
           />
           <KpiCard
-            onClick={() => abrir("outras")}
-            icon={Coins}
-            label="Outras receitas"
-            value={v((r) => r.outrasReceitas)}
-            accent="success"
-            detalhe="Mensalidades do Cartão, adesões e avulsos"
-          />
-          <KpiCard
             onClick={() => abrir("totais")}
             icon={TrendingDown}
             label="Despesas totais"
@@ -300,7 +358,7 @@ function FinDashboard() {
             accent={resumo && resumo.saldo < 0 ? "destructive" : "primary"}
             detalhe={
               resumo && !carregando
-                ? `Margem de ${pct(margem(resumo.saldo, resumo.receitaBruta + resumo.outrasReceitas))} · receitas − despesas totais`
+                ? `Margem de ${pct(margem(resumo.saldo, resumo.receitaTotal))} · receitas − despesas totais`
                 : "Receitas − despesas totais"
             }
           />
@@ -362,7 +420,7 @@ function FinDashboard() {
             label="Ticket médio"
             value={v((r) => r.ticketMedio)}
             accent="primary"
-            detalhe="Receita bruta ÷ atendimentos"
+            detalhe="Receita dos atendimentos ÷ atendimentos"
           />
         </div>
       </section>
@@ -374,15 +432,15 @@ function FinDashboard() {
         onSaved={() => setReload((r) => r + 1)}
       />
 
-      {drill && dados && resumo && (
+      {aberto && (
         <DetalhamentoDialog
-          montar={(visao) => montarDetalhe(drill, dados, resumo, visao)}
-          rotuloSintetico={rotuloSinteticoDe(drill)}
-          arquivo={`financeiro_${drill}`}
-          de={de}
-          ate={ate}
+          montar={(visao) => montarDetalhe(aberto.drill, aberto.dados, aberto.resumo, visao)}
+          rotuloSintetico={rotuloSinteticoDe(aberto.drill)}
+          arquivo={`financeiro_${aberto.drill}`}
+          de={aberto.de}
+          ate={aberto.ate}
           clinicaNome={clinicaAtual?.clinica.nome ?? "Clínica"}
-          onClose={() => setDrill(null)}
+          onClose={() => setAberto(null)}
         />
       )}
     </div>
@@ -393,11 +451,7 @@ const margem = (valor: number, base: number) => (base === 0 ? 0 : (valor / base)
 
 /** Nome do botão da visão agrupada de cada detalhamento. */
 const rotuloSinteticoDe = (d: Drill) =>
-  d === "operacionais" || d === "outras"
-    ? "Por categoria"
-    : d === "totais"
-      ? "Por conta"
-      : "Por profissional";
+  d === "operacionais" ? "Por categoria" : d === "totais" ? "Por conta" : "Por profissional";
 
 // ============================================================================
 // Detalhamento em tela cheia
@@ -446,11 +500,22 @@ function montarDetalhe(drill: Drill, dados: DadosPainel, r: ResumoPainel, visao:
           : drill === "ticket"
             ? "Ticket médio"
             : TITULO_ATENDIMENTO[drill];
-    const receita = recorte.reduce((s, l) => s + l.receita, 0);
+    // A Receita bruta soma as outras receitas (mensalidade, adesão, avulso):
+    // elas entram na lista sem repasse, inteiras no líquido da clínica.
+    const outras = drill === "receita" ? dados.outrasReceitas : [];
+    const receitaAtend = recorte.reduce((s, l) => s + l.receita, 0);
+    const receitaOutras = outras.reduce((s, i) => s + i.valor, 0);
+    const receita = receitaAtend + receitaOutras;
     const repasse = recorte.reduce((s, l) => s + l.repasse, 0);
     const terceiro = recorte.reduce((s, l) => s + l.terceiro, 0);
-    const liquido = recorte.reduce((s, l) => s + l.liquido, 0);
+    const liquido = recorte.reduce((s, l) => s + l.liquido, 0) + receitaOutras;
     const resumo = [
+      ...(drill === "receita"
+        ? [
+            { rotulo: "Atendimentos", valor: receitaAtend },
+            { rotulo: "Mensalidades, adesões e avulsos", valor: receitaOutras },
+          ]
+        : []),
       { rotulo: "Receita bruta", valor: receita },
       { rotulo: "Repasse a médicos", valor: repasse },
       ...(terceiro > 0 ? [{ rotulo: "Terceiros (dono do equipamento)", valor: terceiro }] : []),
@@ -460,7 +525,15 @@ function montarDetalhe(drill: Drill, dados: DadosPainel, r: ResumoPainel, visao:
       { rotulo: "Líquido da clínica", valor: liquido },
     ];
     const explicacao =
-      "Mesma lista do Rateio da Receita (Financeiro → Relatórios): cada atendimento no dia em que foi atendido, com o repasse pela grade do médico.";
+      drill === "receita"
+        ? "Atendimentos pela mesma lista do Rateio da Receita (Financeiro → Relatórios), cada um no dia em que foi atendido e com o repasse pela grade do médico, mais as receitas que não são atendimento — mensalidade do Cartão, adesão, recebimento avulso —, que não têm repasse e entram inteiras no líquido da clínica."
+        : "Mesma lista do Rateio da Receita (Financeiro → Relatórios): cada atendimento no dia em que foi atendido, com o repasse pela grade do médico.";
+    const composicao =
+      drill === "receita"
+        ? r.formasReceitaTotal.map((f) => ({ rotulo: f.rotulo, valor: f.valor }))
+        : undefined;
+    // Rótulo da linha das outras receitas na coluna de profissional.
+    const OUTRAS = "MENSALIDADES, ADESÕES E AVULSOS";
     if (visao === "sintetico") {
       const porMedico = new Map<
         string,
@@ -483,52 +556,66 @@ function montarDetalhe(drill: Drill, dados: DadosPainel, r: ResumoPainel, visao:
         porMedico.set(k, g);
       }
       const grupos = Array.from(porMedico.values()).sort((a, b) => b.rec - a.rec);
+      const linhas: Celula[][] = grupos.map((g) => [g.nome, g.esp, g.qtd, g.rec, g.rep, g.liq]);
+      for (const g of somarPorCategoria(outras))
+        linhas.push([OUTRAS, g.rotulo, g.qtd, g.valor, 0, g.valor]);
       return {
         titulo,
         explicacao,
         colunas: [
           { rotulo: "Profissional", tipo: "texto" },
-          { rotulo: "Especialidade", tipo: "texto" },
+          { rotulo: outras.length ? "Especialidade / Categoria" : "Especialidade", tipo: "texto" },
           { rotulo: "Qtd.", tipo: "numero" },
           { rotulo: "Receita", tipo: "moeda" },
           { rotulo: "Repasse", tipo: "moeda" },
           { rotulo: "Líquido clínica", tipo: "moeda" },
         ],
-        linhas: grupos.map((g) => [g.nome, g.esp, g.qtd, g.rec, g.rep, g.liq]),
-        totais: ["TOTAL", "", recorte.length, receita, repasse + terceiro, liquido],
+        linhas,
+        totais: ["TOTAL", "", recorte.length + outras.length, receita, repasse + terceiro, liquido],
         resumo,
-        composicao:
-          drill === "receita"
-            ? r.formas.map((f) => ({ rotulo: f.rotulo, valor: f.valor }))
-            : undefined,
+        composicao,
         temSintetico: true,
       };
     }
+    const linhas: Celula[][] = recorte.map((l) => [
+      l.data,
+      l.medico_nome,
+      l.servico_nome,
+      l.condicao,
+      formasDaLinha(l),
+      l.receita,
+      l.repasse + l.terceiro,
+      l.liquido,
+    ]);
+    for (const i of outras)
+      linhas.push([
+        i.data,
+        OUTRAS,
+        i.descricao,
+        i.categoria_nome,
+        LABEL_FORMA[classificarForma(i.forma_pagamento)],
+        i.valor,
+        0,
+        i.valor,
+      ]);
     return {
       titulo,
       explicacao,
       colunas: [
         { rotulo: "Data", tipo: "data" },
         { rotulo: "Profissional", tipo: "texto" },
-        { rotulo: "Serviço", tipo: "texto" },
-        { rotulo: "Condição", tipo: "texto" },
+        { rotulo: outras.length ? "Serviço / Descrição" : "Serviço", tipo: "texto" },
+        { rotulo: outras.length ? "Condição / Categoria" : "Condição", tipo: "texto" },
         { rotulo: "Forma de pagamento", tipo: "texto" },
         { rotulo: "Receita", tipo: "moeda" },
         { rotulo: "Repasse", tipo: "moeda" },
         { rotulo: "Líquido clínica", tipo: "moeda" },
       ],
-      linhas: recorte.map((l) => [
-        l.data,
-        l.medico_nome,
-        l.servico_nome,
-        l.condicao,
-        formasDaLinha(l),
-        l.receita,
-        l.repasse + l.terceiro,
-        l.liquido,
-      ]),
+      linhas,
       totais: [
-        `${int(recorte.length)} atendimento(s)`,
+        outras.length
+          ? `${int(recorte.length)} atendimento(s) + ${int(outras.length)} lançamento(s)`
+          : `${int(recorte.length)} atendimento(s)`,
         "",
         "",
         "",
@@ -538,10 +625,7 @@ function montarDetalhe(drill: Drill, dados: DadosPainel, r: ResumoPainel, visao:
         liquido,
       ],
       resumo,
-      composicao:
-        drill === "receita"
-          ? r.formas.map((f) => ({ rotulo: f.rotulo, valor: f.valor }))
-          : undefined,
+      composicao,
       temSintetico: true,
     };
   }
@@ -634,15 +718,13 @@ function montarDetalhe(drill: Drill, dados: DadosPainel, r: ResumoPainel, visao:
     };
   }
 
-  // --- Listas de lançamento (operacionais, outras receitas) -----------------
-  if (drill === "operacionais" || drill === "outras") {
-    const itens = drill === "operacionais" ? operacionais : dados.outrasReceitas;
-    const total = drill === "operacionais" ? r.despesasOperacionais : r.outrasReceitas;
-    const titulo = drill === "operacionais" ? "Despesas operacionais" : "Outras receitas";
+  // --- Despesas operacionais -------------------------------------------------
+  if (drill === "operacionais") {
+    const itens = operacionais;
+    const total = r.despesasOperacionais;
+    const titulo = "Despesas operacionais";
     const explicacao =
-      drill === "operacionais"
-        ? "Despesas confirmadas no período, sem os pagamentos de repasse (categorias REPASSE MEDICO e REPASSE TERCEIRO) e sem o complemento médico — esses já estão no card de Repasse. Pagamento a médico lançado em outra categoria (COMISSIONAMENTO, por exemplo) continua aqui."
-        : "Receitas confirmadas no período que não são atendimento — mensalidade do Cartão, adesão, recebimento avulso. Ficam fora do Rateio porque não têm médico a repassar, mas entram no saldo da clínica.";
+      "Despesas confirmadas no período, sem os pagamentos de repasse (categorias REPASSE MEDICO e REPASSE TERCEIRO) e sem o complemento médico — esses já estão no card de Repasse. Pagamento a médico lançado em outra categoria (COMISSIONAMENTO, por exemplo) continua aqui.";
     if (visao === "sintetico") {
       const grupos = somarPorCategoria(itens);
       return {
@@ -764,7 +846,7 @@ function montarDetalhe(drill: Drill, dados: DadosPainel, r: ResumoPainel, visao:
   }
 
   // --- Saldo: demonstrativo --------------------------------------------------
-  const receitaTotal = r.receitaBruta + r.outrasReceitas;
+  const receitaTotal = r.receitaTotal;
   const linha = (rotulo: string, valor: number): Celula[] => [
     rotulo,
     valor,

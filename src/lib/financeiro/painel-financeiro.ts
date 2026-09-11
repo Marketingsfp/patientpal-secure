@@ -19,7 +19,11 @@
  *  - Outras receitas: o que o Rateio deixa de fora por não ter prestador —
  *    mensalidade do Cartão, adesão, recebimento avulso. É dinheiro da clínica
  *    (em setembro de 2026, R$ 37 mil só de mensalidade em dez dias) e por isso
- *    entra no saldo, num card próprio para não desfigurar a Receita bruta.
+ *    entra no saldo. Desde 11/09/2026 o card de Receita bruta mostra a soma
+ *    das duas (`receitaTotal`), a pedido do dono: tinha card próprio, e a
+ *    receita do dia ficava partida em dois lugares. A receita só dos
+ *    atendimentos (`receitaBruta`) continua separada porque é a do Rateio e a
+ *    base do ticket médio.
  *  - Despesas operacionais: despesa confirmada no período, SEM os pagamentos
  *    de repasse. Esses pagamentos ficam de fora porque o custo do médico já
  *    está no card de Repasse (pelo valor devido do período); somar os dois
@@ -33,6 +37,7 @@
  */
 import type { RateioLinha } from "@/lib/financeiro/rateio-receita";
 import { receitaPorForma, type FatiaDaReceita } from "@/lib/financeiro/receita-por-forma";
+import { classificarForma } from "@/lib/financeiro/formas-pagamento";
 import { SEM_CATEGORIA } from "@/lib/financeiro/filtro-categoria";
 
 const round2 = (v: number) => +v.toFixed(2);
@@ -148,10 +153,15 @@ export function producaoDoRateio(
 
 /** Todos os números dos cards de resultado. */
 export interface ResumoPainel {
+  /** Receita dos atendimentos — a mesma do Rateio. */
   receitaBruta: number;
-  /** Quebra da receita bruta por forma de pagamento (mesma do Rateio). */
+  /** Quebra da receita dos atendimentos por forma de pagamento (mesma do Rateio). */
   formas: FatiaDaReceita[];
   outrasReceitas: number;
+  /** Atendimentos + outras receitas: o número grande do card de Receita bruta. */
+  receitaTotal: number;
+  /** Quebra de `receitaTotal` por forma de pagamento; soma igual a ela. */
+  formasReceitaTotal: FatiaDaReceita[];
   /** Repasse devido aos médicos pelos atendimentos do período (grade). */
   repasse: number;
   /** Parte do dono do equipamento, quando existe. */
@@ -199,10 +209,17 @@ export function resumoPainel(params: {
   complementoMedico = round2(complementoMedico);
   const despesasTotais = round2(repasse + terceiro + complementoMedico + despesasOperacionais);
   const producao = producaoDoRateio(params.rateio);
+  // O lançamento avulso tem uma forma só; entra na mesma soma por balde que
+  // os atendimentos, para as fatias fecharem com o total do card.
+  const outrasComFormas = params.outrasReceitas.map((r) => ({
+    formas: [{ forma: classificarForma(r.forma_pagamento), valor: r.valor }],
+  }));
   return {
     receitaBruta,
     formas: receitaPorForma(params.rateio),
     outrasReceitas: round2(outrasReceitas),
+    receitaTotal: round2(receitaBruta + outrasReceitas),
+    formasReceitaTotal: receitaPorForma([...params.rateio, ...outrasComFormas]),
     repasse,
     terceiro,
     complementoMedico,

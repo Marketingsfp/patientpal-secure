@@ -152,6 +152,21 @@ describe("resumoPainel", () => {
     const soma = r.formas.reduce((s, f) => s + f.valor, 0);
     expect(soma).toBe(r.receitaBruta);
   });
+
+  it("receita total soma as outras receitas, e a quebra por forma fecha com ela", () => {
+    const comPix = resumoPainel({
+      rateio,
+      despesas,
+      outrasReceitas: [...outras, lanc({ valor: 80, forma_pagamento: "PIX" })],
+    });
+    expect(comPix.receitaTotal).toBe(500 + 50 + 80);
+    const soma = comPix.formasReceitaTotal.reduce((s, f) => s + f.valor, 0);
+    expect(soma).toBe(comPix.receitaTotal);
+    expect(comPix.formasReceitaTotal.find((f) => f.forma === "pix")?.valor).toBe(80);
+    expect(comPix.formasReceitaTotal.find((f) => f.forma === "dinheiro")?.valor).toBe(550);
+    // O ticket médio continua só dos atendimentos.
+    expect(comPix.ticketMedio).toBe(250);
+  });
 });
 
 describe("agrupamentos do detalhamento", () => {

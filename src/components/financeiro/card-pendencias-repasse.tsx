@@ -46,11 +46,26 @@ const VAZIO: PendenciasDeRepasse = { dias: [], totalAtendimentos: 0, diaMaisAnti
  * para conferir. O que aparece é o valor cobrado dos pacientes, rotulado como
  * tal, para dar noção de tamanho da fila.
  */
-export function CardPendenciasRepasse() {
+export function CardPendenciasRepasse({
+  atualizacao = 0,
+}: {
+  /**
+   * Muda quando o Dashboard se atualiza sozinho; o card relê a fila junto,
+   * sem sumir da tela enquanto relê.
+   */
+  atualizacao?: number;
+} = {}) {
   const { clinicaAtual } = useClinica();
   const [fila, setFila] = useState<PendenciasDeRepasse>(VAZIO);
   const [carregando, setCarregando] = useState(true);
   const hoje = hojeBR();
+  const clinicaId = clinicaAtual?.clinica_id;
+
+  // Trocar de clínica ou virar o dia recomeça do zero; a atualização
+  // automática só troca a fila quando a leitura nova chega.
+  useEffect(() => {
+    setCarregando(true);
+  }, [clinicaId, hoje]);
 
   useEffect(() => {
     if (!clinicaAtual) {
@@ -61,7 +76,6 @@ export function CardPendenciasRepasse() {
     let cancelado = false;
     const { de, ate } = janelaDePendencias(hoje);
     void (async () => {
-      setCarregando(true);
       // Duas origens, as mesmas que a tela de Atendimentos soma: o atendimento
       // que nasceu na agenda (fin_lancamentos com agendamento) e o lançado à
       // mão pelo financeiro (fin_atendimentos).
@@ -128,7 +142,7 @@ export function CardPendenciasRepasse() {
       cancelado = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [clinicaAtual?.clinica_id, hoje]);
+  }, [clinicaId, hoje, atualizacao]);
 
   if (carregando || fila.dias.length === 0) return null;
 

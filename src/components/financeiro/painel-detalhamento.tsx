@@ -7,16 +7,18 @@
  * Imprimir e Baixar Excel —, e duas cópias acabariam divergindo na primeira
  * correção feita só numa delas.
  *
- * O detalhamento abre em NOVA ABA (`PaginaDetalhe` + `detalhe-aba`). O
- * `DetalhamentoDialog`, por cima da própria tela, fica como plano B para
- * quando o navegador bloqueia a aba nova.
+ * No Financeiro → Dashboard o detalhamento abre em TELA CHEIA por cima da
+ * própria tela (`DetalhamentoDialog`): em 11/09/2026 o dono pediu que o card
+ * não abrisse mais outra guia do navegador. O Movimento de Caixa continua
+ * abrindo em NOVA ABA (`PaginaDetalhe` + `detalhe-aba`), com o mesmo diálogo
+ * como plano B para quando o navegador bloqueia a aba nova.
  *
  * O corpo recebe uma tabela já montada (`Detalhe`) e a desenha na tela,
  * imprime em A4 e exporta para Excel. É o que garante que o papel e a planilha
  * mostram exatamente o que a tela mostrou.
  */
 import { useMemo, useState, type ReactNode } from "react";
-import { ExternalLink, FileSpreadsheet, Printer } from "lucide-react";
+import { ExternalLink, FileSpreadsheet, Maximize2, Printer } from "lucide-react";
 import { toast } from "sonner";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -281,8 +283,9 @@ export function DetalhamentoCorpo({
 }
 
 /**
- * Detalhamento por cima da própria tela. Plano B: só aparece quando o
- * navegador bloqueia a aba nova ou recusa guardar a lista para ela.
+ * Detalhamento em tela cheia, por cima da própria tela. É o caminho normal do
+ * Financeiro → Dashboard e o plano B do Movimento de Caixa (quando o navegador
+ * bloqueia a aba nova ou recusa guardar a lista para ela).
  */
 export function DetalhamentoDialog({
   onClose,
@@ -290,7 +293,7 @@ export function DetalhamentoDialog({
 }: PropsDetalhamento & { onClose: () => void }) {
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="flex h-[94dvh] w-[96vw] max-w-[1400px] flex-col gap-3 overflow-hidden">
+      <DialogContent className="left-0 top-0 flex h-dvh max-h-dvh w-screen max-w-none translate-x-0 translate-y-0 flex-col gap-3 overflow-hidden rounded-none border-0 sm:rounded-none">
         <DetalhamentoCorpo
           {...props}
           alturaTabela="min-h-0 flex-1"
@@ -315,6 +318,8 @@ export function KpiCard({
   accent,
   detalhe,
   onClick,
+  novaAba = false,
+  className,
   children,
 }: {
   icon: React.ElementType;
@@ -323,10 +328,14 @@ export function KpiCard({
   accent: "primary" | "success" | "destructive" | "warning";
   /** Linha curta abaixo do valor, dizendo o que o número inclui. */
   detalhe?: string;
-  /** Abre o detalhamento em nova aba. */
+  /** Abre o detalhamento do card. */
   onClick?: () => void;
+  /** O clique abre outra aba (Movimento de Caixa) em vez da tela cheia. */
+  novaAba?: boolean;
+  className?: string;
   children?: React.ReactNode;
 }) {
+  const IconeAbrir = novaAba ? ExternalLink : Maximize2;
   const colorMap = {
     primary: "text-primary bg-primary/10",
     success: "text-success bg-success/10",
@@ -339,7 +348,13 @@ export function KpiCard({
       // Teclado também abre o detalhamento: o card é o único caminho até ele.
       role={onClick ? "button" : undefined}
       tabIndex={onClick ? 0 : undefined}
-      title={onClick ? "Abrir o detalhamento em nova aba" : undefined}
+      title={
+        onClick
+          ? novaAba
+            ? "Abrir o detalhamento em nova aba"
+            : "Abrir o detalhamento em tela cheia"
+          : undefined
+      }
       onKeyDown={
         onClick
           ? (e) => {
@@ -350,11 +365,11 @@ export function KpiCard({
             }
           : undefined
       }
-      className={
-        onClick
-          ? "group cursor-pointer hover:bg-muted/50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
-          : ""
-      }
+      className={cn(
+        onClick &&
+          "group cursor-pointer hover:bg-muted/50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40",
+        className,
+      )}
     >
       <CardContent className="pt-6 flex items-start gap-3">
         <div
@@ -365,9 +380,9 @@ export function KpiCard({
         <div className="flex-1 min-w-0">
           <p className="flex items-start justify-between gap-2 text-[12px] uppercase tracking-wide text-muted-foreground leading-tight">
             <span className="line-clamp-2">{label}</span>
-            {/* Avisa que o clique abre outra aba, e não uma janela aqui. */}
+            {/* Avisa o que o clique abre: outra aba ou a tela cheia. */}
             {onClick && (
-              <ExternalLink
+              <IconeAbrir
                 aria-hidden
                 className="h-3.5 w-3.5 shrink-0 opacity-50 group-hover:opacity-100"
               />

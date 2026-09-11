@@ -236,6 +236,7 @@ export function MovimentoResultado({
     <div className="space-y-3">
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
         <KpiCard
+          novaAba
           onClick={() => abrir("receita")}
           icon={TrendingUp}
           label="Receita bruta (atendimentos)"
@@ -259,6 +260,7 @@ export function MovimentoResultado({
           )}
         </KpiCard>
         <KpiCard
+          novaAba
           onClick={() => abrir("repasse")}
           icon={Handshake}
           label="Repasse médico pago no caixa"
@@ -273,6 +275,7 @@ export function MovimentoResultado({
             .join(" · ")}
         />
         <KpiCard
+          novaAba
           onClick={() => abrir("operacionais")}
           icon={Receipt}
           label="Despesas operacionais"
@@ -281,6 +284,7 @@ export function MovimentoResultado({
           detalhe="Contas, folha, compras — sem repasse médico"
         />
         <KpiCard
+          novaAba
           onClick={() => abrir("outras")}
           icon={Coins}
           label="Outras receitas"
@@ -289,6 +293,7 @@ export function MovimentoResultado({
           detalhe="Mensalidades do Cartão, adesões e avulsos"
         />
         <KpiCard
+          novaAba
           onClick={() => abrir("totais")}
           icon={TrendingDown}
           label="Despesas totais"
@@ -297,6 +302,7 @@ export function MovimentoResultado({
           detalhe="Repasse + despesas operacionais"
         />
         <KpiCard
+          novaAba
           onClick={() => abrir("saldo")}
           icon={Wallet}
           label="Saldo líquido do caixa"
