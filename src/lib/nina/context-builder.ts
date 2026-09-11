@@ -188,6 +188,7 @@ export function montarContexto(entrada: EntradaContexto): ContextoMontado {
     metricas: {
       mensagens_historico_disponiveis: entrada.historico.length,
       mensagens_historico_enviadas: relevantes.length,
+      mensagens_atuais_deduplicadas: dedup.removidas,
       resultados_tool_enviados: resultados.length,
       tem_conhecimento: Boolean(entrada.conhecimento),
       tem_paciente: Boolean(entrada.paciente?.identificado),
