@@ -202,7 +202,8 @@ describe("FASE 6 — painel coerente para a execução de referência", () => {
     expect(ok!.simbolo).toBe("✔");
     expect(running!.simbolo).not.toBe("✔");
     expect(skipped!.simbolo).not.toBe("✔");
-    expect(apresentarEstadoEvento("estado-que-nao-existe").conhecido).toBe(false);
+    expect(estadoConhecido("estado-que-nao-existe")).toBe(false);
+    expect(apresentarEstadoEvento("estado-que-nao-existe").rotulo).toBe("estado desconhecido");
     expect(apresentarEstadoEvento("estado-que-nao-existe").simbolo).not.toBe("✔");
   });
 
