@@ -128,6 +128,11 @@ function FinDashboard() {
   const [carregando, setCarregando] = useState(true);
   const [aberto, setAberto] = useState<DetalheAberto | null>(null);
   const [atualizadoEm, setAtualizadoEm] = useState<Date | null>(null);
+  /** Quando a próxima atualização automática vai acontecer (relógio da tela). */
+  const [proximaEm, setProximaEm] = useState<number | null>(null);
+  const [atualizando, setAtualizando] = useState(false);
+  /** A última atualização automática falhou; a tela segue com os números anteriores. */
+  const [falhouAtualizar, setFalhouAtualizar] = useState(false);
 
   /**
    * Grade de repasse e catálogos: pesados e iguais para qualquer período, então
