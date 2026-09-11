@@ -347,6 +347,7 @@ export function extrairRegrasPublicadas(
             prioridade: prioridadeDe(u.plano, "literal"),
             verificacao: "literal",
             literal: alvo.plano,
+            operador: operadorDoBloco(u.plano),
             proibicoes: [],
             descricao: `${u.plano} ${alvo.plano}`.trim(),
             interpretada: true,
