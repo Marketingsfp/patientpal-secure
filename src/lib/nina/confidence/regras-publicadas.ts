@@ -45,6 +45,16 @@ export type CategoriaProibida =
 
 export type PrioridadeRegra = "critica" | "alta" | "normal";
 
+/**
+ * Operador exigido pela regra literal:
+ * - `igualdade`: "responda EXATAMENTE" — a resposta INTEIRA tem de ser o texto;
+ * - `inclusao`: "inclua o marcador" — o trecho precisa estar presente.
+ *
+ * A distinção é obrigatória: conferir "responda exatamente" com presença
+ * (`includes`) aprova resposta com saudação, emoji e texto extra.
+ */
+export type OperadorLiteral = "igualdade" | "inclusao";
+
 export type RegraPublicada = {
   /** Estável dentro de uma publicação: hash do texto + ordem. */
   id: string;
