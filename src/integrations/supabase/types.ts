@@ -10187,6 +10187,7 @@ export type Database = {
           output_tokens: number
           perfil: string
           plano: Json
+          preflight: Json
           provedor_gerador: string | null
           retries: number
           status: string
@@ -10218,6 +10219,7 @@ export type Database = {
           output_tokens?: number
           perfil?: string
           plano?: Json
+          preflight?: Json
           provedor_gerador?: string | null
           retries?: number
           status?: string
@@ -10249,6 +10251,7 @@ export type Database = {
           output_tokens?: number
           perfil?: string
           plano?: Json
+          preflight?: Json
           provedor_gerador?: string | null
           retries?: number
           status?: string
