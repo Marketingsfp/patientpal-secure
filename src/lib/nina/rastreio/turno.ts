@@ -18,6 +18,8 @@
  * consentimento, idempotência, revisão da conversa e prova de gravação
  * continuam em código/banco. Aqui só existe registro.
  */
+import type { AuditoriaInstrucoesRodada } from "./auditoria-instrucoes";
+import { auditoriaParaTrace } from "./auditoria-instrucoes";
 
 /** De onde veio o texto realmente entregue (ou por que não houve texto). */
 export const ORIGENS_RESPOSTA = [
@@ -340,11 +342,6 @@ export function evidenciaSaidaDoTurno(dados: {
   return { estado, mensagemId, canal, tamanho, console, descricao, faltando };
 }
 
-import type {
-  AuditoriaInstrucoesRodada,
-} from "./auditoria-instrucoes";
-import { auditoriaParaTrace } from "./auditoria-instrucoes";
-
 export type RegistroTurno = {
   /** Identificador do turno — o mesmo `trace_id` da execução. */
   turnoId: string;
@@ -443,6 +440,9 @@ export const ROTULO_LACUNA_TURNO: Record<string, string> = {
   execucao_modelo: "Modelo chamado sem execução registrada",
   confianca: "Política de confiança não registrada para este turno",
   mensagem_entregue: "Mensagem entregue não vinculada ao turno",
+  interpretacao_das_regras:
+    "Regras publicadas não puderam ser interpretadas nesta rodada — não há como afirmar cumprimento",
+  auditoria_instrucoes: "Aplicação das instruções publicadas não registrada nesta execução",
 };
 
 /** O que NÃO pôde ser comprovado. Lacuna é declarada, nunca preenchida. */
@@ -461,6 +461,11 @@ export function lacunasDoTurno(r: RegistroTurno): string[] {
   if (r.modeloChamado && !r.confianca) faltas.push("confianca");
   if (r.origemResposta && r.origemResposta !== "nenhuma" && !r.entrega?.mensagemId) {
     faltas.push("mensagem_entregue");
+  }
+  const auditorias = r.auditoriaInstrucoes ?? [];
+  if (r.modeloChamado && auditorias.length === 0) faltas.push("auditoria_instrucoes");
+  if (auditorias.some((a) => a.estado === "falha_de_interpretacao")) {
+    faltas.push("interpretacao_das_regras");
   }
   return faltas;
 }
