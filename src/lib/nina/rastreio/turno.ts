@@ -230,6 +230,8 @@ export type RegistroTurno = {
   motivoOrigem: string | null;
   transformacoes: TransformacaoResposta[];
   confianca: ConfiancaDoTurno | null;
+  /** FASE 2 — TODAS as avaliações do turno, na ordem em que ocorreram. */
+  avaliacoes: ConfiancaDoTurno[];
   entrega: EntregaDoTurno | null;
   /** Diagnóstico autorizado nesta clínica (captura de payload por rodada). */
   diagnostico: boolean;
