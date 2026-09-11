@@ -399,15 +399,16 @@ export function extrairRegrasPublicadas(
         : { tipo: "mensagem_contem", valor: bruto };
     }
 
-    const literal = literalExigido(u.plano);
-    if (literal) {
+    const exigencia = exigenciaLiteral(u.plano);
+    if (exigencia) {
       registrar(u, {
         condicao: condicaoLocal,
         ambiente: ambienteSecao,
         natureza: "exigencia",
         prioridade: prioridadeDe(u.plano, "literal"),
         verificacao: "literal",
-        literal,
+        literal: exigencia.literal,
+        operador: exigencia.operador,
         proibicoes: [],
         descricao: u.plano,
         interpretada: true,
