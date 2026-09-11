@@ -19,6 +19,11 @@ import {
   LIMITE_CONTRATOS_CANDIDATOS,
 } from "@/lib/convenio/escolher-contrato-ativo";
 import { DIAS_TOLERANCIA_MENSALIDADE } from "@/lib/cb-regras";
+import {
+  COLUNAS_PRECO_REVISAO,
+  ehRevisaoGratuita,
+  normalizarNomeServico,
+} from "@/lib/convenio/revisao-gratuita";
 
 /**
  * Data de hoje no fuso LOCAL, formato "YYYY-MM-DD". `new Date().toISOString()`
