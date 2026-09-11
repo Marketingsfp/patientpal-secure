@@ -489,6 +489,14 @@ export function avaliarObrigacoes(
   if (avaliacoes.some((a) => a.motivo === "REGRA_NAO_INTERPRETADA")) {
     limitacoes.push("REGRA_PUBLICADA_NAO_INTERPRETADA");
   }
+  const regrasDoTurno = ctx.instrucoes?.regras;
+  if (
+    regrasDoTurno &&
+    regrasDoTurno.length > 0 &&
+    regrasValidasParaPublicacao(regrasDoTurno, ctx.instrucoes?.hash).length === 0
+  ) {
+    limitacoes.push("REPRESENTACAO_DAS_REGRAS_DESATUALIZADA");
+  }
   // Limitações declaradas pela própria publicação (o que ela não garante).
   for (const l of ctx.instrucoes?.limitacoes ?? []) if (!limitacoes.includes(l)) limitacoes.push(l);
   if (resposta.trim() === "") limitacoes.push("RESPOSTA_NAO_REGISTRADA");
