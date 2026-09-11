@@ -16,6 +16,7 @@ function membro(nome: string, role: string, podeAutorizar = false, ativo = true)
     role,
     ativo,
     podeAutorizar,
+    podeGerirHorarios: false,
   };
 }
 

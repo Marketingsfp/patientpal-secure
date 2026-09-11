@@ -66,7 +66,7 @@ function EquipeAcessosPage() {
     try {
       const { data: mems, error } = await supabase
         .from("clinica_memberships")
-        .select("id, user_id, role, ativo, pode_autorizar")
+        .select("id, user_id, role, ativo, pode_autorizar, pode_gerir_horarios")
         .eq("clinica_id", clinicaAtual.clinica_id);
       if (error) throw error;
       const linhas = (mems ?? []) as Array<{
@@ -75,6 +75,7 @@ function EquipeAcessosPage() {
         role: string;
         ativo: boolean;
         pode_autorizar: boolean | null;
+        pode_gerir_horarios: boolean | null;
       }>;
       const ids = linhas.map((l) => l.user_id);
       const nomes = new Map<string, string>();
@@ -94,6 +95,7 @@ function EquipeAcessosPage() {
           role: l.role,
           ativo: l.ativo,
           podeAutorizar: !!l.pode_autorizar,
+          podeGerirHorarios: !!l.pode_gerir_horarios,
         })),
       );
     } catch (e) {
