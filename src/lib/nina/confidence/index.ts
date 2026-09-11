@@ -59,6 +59,20 @@ export {
   type TipoTurno,
 } from "./turno-tipo";
 export { avaliacaoCorrespondeAoTexto, hashDoTexto } from "./hash";
+// Representação verificável das instruções publicadas (aba Arquitetura).
+export {
+  extrairRegrasPublicadas,
+  literalExigido,
+  regraSeAplica,
+  regrasValidasParaPublicacao,
+  revisarRegrasDoTexto,
+  unidadesDoTexto,
+  type CategoriaProibida,
+  type CondicaoRegra,
+  type ExtracaoRegras,
+  type RegraPublicada,
+  type VerificacaoRegra,
+} from "./regras-publicadas";
 export {
   assegurarAvaliacaoDoTextoFinal,
   avaliacaoValeParaOTexto,
