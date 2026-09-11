@@ -440,6 +440,7 @@ function avaliarUma(
   o: Obrigacao,
   resposta: string,
   revisor: RevisorSemantico | null,
+  contexto?: { mensagemPaciente?: string | null; ambiente?: string | null },
 ): AvaliacaoObrigacao {
   const n = normalizarTexto(resposta);
 
