@@ -73,7 +73,8 @@ function periodoAteHoje(periodo: Periodo) {
 }
 
 /**
- * De quanto em quanto tempo os números se atualizam sozinhos, sem F5.
+ * De quanto em quanto tempo os números se atualizam sozinhos, sem F5. A tela
+ * mostra a contagem regressiva até a próxima (`ContagemAtualizacao`).
  *
  * Dois minutos porque cada atualização refaz o Rateio do período inteiro — no
  * "Mês" são milhares de atendimentos —, e um intervalo menor multiplicaria a
