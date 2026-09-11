@@ -14,6 +14,7 @@ import { aplicabilidadeDoTurno } from "./turno-tipo";
 import { detectarConflitosEntreFatos } from "./evidencia";
 import { ClaimGroundingValidator, somenteNegativasApoiadas } from "./claims";
 import { WorkflowConsistencyValidator } from "./workflow";
+import { InstructionComplianceValidator } from "./obrigacoes";
 import type {
   Bloqueador,
   ContextoConfianca,
@@ -66,6 +67,8 @@ export const CONFIG_PADRAO_VALIDADORES: ConfigValidadores = {
   WorkflowConsistencyValidator: { ativo: true, peso: 0 },
   // FASE 5 — grounding afirmação a afirmação da resposta final.
   ClaimGroundingValidator: { ativo: true, peso: 0 },
+  // FASE 4 (confiabilidade) — relevância, completude e cumprimento das instruções.
+  InstructionComplianceValidator: { ativo: true, peso: 0 },
 };
 
 /** Confiança mínima exigida conforme o risco da ação. */
@@ -572,6 +575,8 @@ export function executarValidadoresDeConfianca({
     { nome: "WorkflowConsistencyValidator", run: () => WorkflowConsistencyValidator(ctx) },
     // FASE 5 — cada afirmação da resposta final precisa da sua própria fonte.
     { nome: "ClaimGroundingValidator", run: () => ClaimGroundingValidator(ctx) },
+    // FASE 4 (confiabilidade) — a resposta precisa entregar o que o turno exigia.
+    { nome: "InstructionComplianceValidator", run: () => InstructionComplianceValidator(ctx) },
   ];
 
   return registro.map(({ nome, run }) => {
@@ -595,6 +600,7 @@ export function executarValidadoresDeConfianca({
 }
 
 export { WorkflowConsistencyValidator, classificarAfirmacaoOperacional } from "./workflow";
+export { InstructionComplianceValidator } from "./obrigacoes";
 
 /** Risco da ação conforme o ActionRiskValidator (usado pelo motor). */
 export function riscoDaAcao(ctx: ContextoConfianca): NivelRiscoAcao {
