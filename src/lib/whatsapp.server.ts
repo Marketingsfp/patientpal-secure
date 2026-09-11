@@ -2712,6 +2712,9 @@ async function gerarRespostaNinaInterno(
     } catch {
       /* registro da degradação nunca interrompe o atendimento */
     }
+    }
+    // Limite duro do laço: nenhuma correção infinita, mesmo com erro.
+    if (passeVerificacaoRegras > LIMITE_PASSES_VERIFICACAO) repetirVerificacaoRegras = false;
   }
 
   // Evidências finais: estado/sessão no momento da resposta, regras aplicáveis,
