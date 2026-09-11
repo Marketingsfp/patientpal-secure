@@ -340,6 +340,11 @@ export function evidenciaSaidaDoTurno(dados: {
   return { estado, mensagemId, canal, tamanho, console, descricao, faltando };
 }
 
+import type {
+  AuditoriaInstrucoesRodada,
+} from "./auditoria-instrucoes";
+import { auditoriaParaTrace } from "./auditoria-instrucoes";
+
 export type RegistroTurno = {
   /** Identificador do turno — o mesmo `trace_id` da execução. */
   turnoId: string;
@@ -409,6 +414,7 @@ export function criarRegistroTurno(base: BaseRegistroTurno): RegistroTurno {
     confianca: null,
     avaliacoes: [],
     entrega: null,
+    auditoriaInstrucoes: [],
     diagnostico: base.diagnostico === true,
     iniciadoEm: base.iniciadoEm ?? new Date().toISOString(),
     encerradoEm: null,
@@ -506,6 +512,7 @@ export function resumoTurnoParaTrace(r: RegistroTurno): Record<string, unknown> 
     avaliacoes: r.avaliacoes,
     avaliacao_operacional: avaliacaoOperacional(r.avaliacoes ?? []),
     entrega: r.entrega,
+    auditoria_instrucoes: (r.auditoriaInstrucoes ?? []).map(auditoriaParaTrace),
     diagnostico_autorizado: r.diagnostico,
     lacunas: lacunasDoTurno(r),
     iniciado_em: r.iniciadoEm,
