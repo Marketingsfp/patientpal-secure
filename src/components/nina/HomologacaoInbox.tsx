@@ -1801,6 +1801,14 @@ export function HomologacaoInbox() {
                 ))}
               </div>
 
+              {/* FASE 2 — o retorno técnico da chamada não é conferência de
+                  conteúdo. Nenhuma validação é inventada aqui. */}
+              <p className="text-muted-foreground">
+                Conferência de conteúdo: não há validação automática de cumprimento das instruções
+                neste registro. A chamada concluída sem erro não comprova que a resposta seguiu o
+                prompt.
+              </p>
+
               {detalhe.eventos?.length > 0 && (
                 <div>
                   <p className="mb-1 font-medium text-muted-foreground">Etapas do fluxo</p>
