@@ -484,6 +484,11 @@ export function avaliarObrigacoes(
   if (avaliacoes.some((a) => a.status === "indeterminada")) {
     limitacoes.push("OBRIGACAO_DE_LINGUAGEM_ABERTA_NAO_VERIFICADA");
   }
+  if (avaliacoes.some((a) => a.motivo === "REGRA_NAO_INTERPRETADA")) {
+    limitacoes.push("REGRA_PUBLICADA_NAO_INTERPRETADA");
+  }
+  // Limitações declaradas pela própria publicação (o que ela não garante).
+  for (const l of ctx.instrucoes?.limitacoes ?? []) if (!limitacoes.includes(l)) limitacoes.push(l);
   if (resposta.trim() === "") limitacoes.push("RESPOSTA_NAO_REGISTRADA");
 
   // Estágio: responder um pedido concreto apenas com saudação é incompatível.
