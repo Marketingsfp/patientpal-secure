@@ -22,6 +22,10 @@
  *   - a revisão é textual: ela nunca reexecuta operação com efeito externo
  *     (gravar agendamento, transferir, enviar) para "tentar de novo".
  */
+import {
+  conformidadeDasInstrucoes,
+  type ConformidadeInstrucoes,
+} from "./conformidade-entrega";
 import { etapaAtinge, type EtapaAtivacao } from "./etapas";
 import type { ResultadoConfianca } from "./types";
 
