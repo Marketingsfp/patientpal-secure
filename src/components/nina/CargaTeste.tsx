@@ -187,6 +187,7 @@ export function CargaTeste() {
     } catch (e) {
       mostrarErro(e);
     } finally {
+      iniciando.current = false;
       setRodando(false);
     }
   };
