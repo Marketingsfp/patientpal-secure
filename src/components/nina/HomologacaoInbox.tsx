@@ -47,6 +47,8 @@ import {
 } from "@/lib/nina/simulador-terra.functions";
 import { AvaliacaoSol } from "@/components/nina/AvaliacaoSol";
 import { descreverEventoRastreio } from "@/lib/nina/arquitetura/estado-evento";
+import { valorOuNaoRegistrado } from "@/lib/nina/evidencias-resumo";
+import { EvidenciasLimites } from "@/components/nina/EvidenciasLimites";
 
 import {
   CENARIOS_SUGERIDOS,
@@ -1779,7 +1781,9 @@ export function HomologacaoInbox() {
                   ["Origem das instruções", detalhe.execucao.prompt_origem],
                   ["Publicada em", detalhe.execucao.prompt_publicado_em],
                   ["Conhecimento", detalhe.execucao.knowledge_status],
-                  ["Ferramentas", detalhe.execucao.tool_calls],
+                  // FASE 5 — este campo é o registro da execução; o confronto
+                  // entre disponíveis e chamadas fica no bloco abaixo.
+                  ["Ferramentas chamadas (registro da execução)", detalhe.execucao.tool_calls],
                   ["Transferência", detalhe.execucao.handoff ? "sim" : "não"],
                   [
                     // FASE 2 — retorno técnico da chamada; não comprova
@@ -1796,11 +1800,17 @@ export function HomologacaoInbox() {
                   <div key={String(k)}>
                     <span className="text-muted-foreground">{k}:</span>{" "}
                     <span className="font-mono">
-                      {v === null || v === undefined || v === "" ? "—" : String(v)}
+                      {/* FASE 5 — campo sem informação é "Não registrado", nunca
+                          um traço mudo que pareça ausência de uso. */}
+                      {valorOuNaoRegistrado(v)}
                     </span>
                   </div>
                 ))}
               </div>
+
+              {/* FASE 5 — entradas enviadas, ferramentas e limites da captura. */}
+              <EvidenciasLimites etapas={(detalhe.etapas ?? []) as any[]} />
+
 
               {/* FASE 2 — o retorno técnico da chamada não é conferência de
                   conteúdo. Nenhuma validação é inventada aqui. */}
