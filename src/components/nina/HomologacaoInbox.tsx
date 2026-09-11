@@ -1808,6 +1808,10 @@ export function HomologacaoInbox() {
                 ))}
               </div>
 
+              {/* FASE 5 — entradas enviadas, ferramentas e limites da captura. */}
+              <EvidenciasLimites etapas={(detalhe.etapas ?? []) as any[]} />
+
+
               {/* FASE 2 — o retorno técnico da chamada não é conferência de
                   conteúdo. Nenhuma validação é inventada aqui. */}
               <p className="text-muted-foreground">
