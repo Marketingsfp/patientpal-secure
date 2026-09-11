@@ -246,3 +246,66 @@ export function falhasVigentes(consultas: ConsultaDoTurno[]): ConsultaDoTurno[] 
 export function houveTruncamento(consultas: ConsultaDoTurno[]): boolean {
   return consultas.some((c) => c.truncado === true || c.status === "parcial");
 }
+
+// ------------------------------------------------------------------ conflitos
+
+/**
+ * FASE 1 (Motor de confiabilidade) — campos que só admitem UM valor por escopo.
+ * Dia de atendimento, horário e vaga são listas: valores diferentes ali são
+ * opções, não contradição.
+ */
+const CAMPOS_UNIVALORADOS = new Set(["preco", "endereco", "preparo", "cobertura", "appointment_id"]);
+
+function escopoDoFato(f: FatoRecuperado): string {
+  const c = f.chave ?? {};
+  return [
+    f.entidade,
+    normalizarTexto(f.campo),
+    normalizarTexto(c.procedimento),
+    normalizarTexto(c.medicoId ?? c.medicoNome),
+    normalizarTexto(c.especialidade),
+    normalizarTexto(c.unidadeId),
+    normalizarTexto(c.convenio),
+    normalizarTexto(c.condicoes),
+    normalizarTexto(c.data),
+    normalizarHora(c.hora) ?? "",
+  ].join("|");
+}
+
+/**
+ * Detecta contradição REAL entre fatos do mesmo campo e do mesmo escopo.
+ * Não depende de uma lista de conflitos preenchida por fora: compara o que as
+ * consultas do turno devolveram de fato.
+ */
+export function detectarConflitosEntreFatos(
+  fatos: FatoRecuperado[],
+): import("./types").ConflitoDeFonte[] {
+  const grupos = new Map<string, FatoRecuperado[]>();
+  for (const f of fatos) {
+    if (!CAMPOS_UNIVALORADOS.has(normalizarTexto(f.campo))) continue;
+    if (f.valor === null || String(f.valor).trim() === "") continue;
+    const chave = escopoDoFato(f);
+    grupos.set(chave, [...(grupos.get(chave) ?? []), f]);
+  }
+
+  const conflitos: import("./types").ConflitoDeFonte[] = [];
+  for (const [chave, doGrupo] of grupos) {
+    const monetario = normalizarTexto(doGrupo[0]!.campo) === "preco";
+    const distintos: FatoRecuperado[] = [];
+    for (const f of doGrupo) {
+      const jaTem = distintos.some((d) =>
+        monetario ? mesmoValorMonetario(d.valor, f.valor) : mesmoTexto(d.valor, f.valor),
+      );
+      if (!jaTem) distintos.push(f);
+    }
+    if (distintos.length < 2) continue;
+    conflitos.push({
+      campo: chave,
+      valores: distintos.map((f) => ({
+        origem: `${f.fonte}:${f.consulta}${f.registro ? `#${f.registro}` : ""}`,
+        valor: String(f.valor),
+      })),
+    });
+  }
+  return conflitos;
+}

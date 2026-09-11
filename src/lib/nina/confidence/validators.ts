@@ -11,6 +11,7 @@
  */
 import { acaoExecutavel, acaoOuNenhuma, contaContraANota } from "./types";
 import { aplicabilidadeDoTurno } from "./turno-tipo";
+import { detectarConflitosEntreFatos } from "./evidencia";
 import { ClaimGroundingValidator, somenteNegativasApoiadas } from "./claims";
 import { WorkflowConsistencyValidator } from "./workflow";
 import type {
@@ -336,6 +337,26 @@ export function SourceFreshnessValidator(
       problemas.push({ referencia: ref, motivo: "expirado" });
     }
   }
+  // FASE 1 (motor) — campo ausente não vira aprovação: quando o turno exige
+  // fonte e a origem não informou NENHUM sinal de vigência, a verificação
+  // ficou incompleta (UNKNOWN), não "vigente".
+  const semSinal = usadas.filter(
+    (s) =>
+      s.publicado === undefined &&
+      s.ativo === undefined &&
+      s.expiraEm === undefined &&
+      !s.substituidoPor,
+  );
+  if (
+    problemas.length === 0 &&
+    semSinal.length === usadas.length &&
+    aplicabilidadeDoTurno(ctx.turnType).requiresSource
+  ) {
+    return res(nome, "UNKNOWN", 0, "VIGENCIA_NAO_REGISTRADA", {
+      fontes: usadas.map((s) => s.referencia ?? s.tipo),
+      turnType: ctx.turnType ?? null,
+    });
+  }
   if (problemas.length === 0) return res(nome, "PASS", 100, "FONTES_VIGENTES", { fontes: usadas.length });
 
   const vigentes = usadas.length - problemas.length;
@@ -431,19 +452,27 @@ export function ToolIntegrityValidator(ctx: ContextoConfianca): ResultadoValidad
 /** Duas origens discordando não permitem escolha arbitrária. */
 export function ConflictValidator(ctx: ContextoConfianca): ResultadoValidador {
   const nome = "ConflictValidator";
-  const conflitos = (ctx.conflitos ?? []).filter((c) => {
+  // FASE 1 (motor) — o conflito é detectado nos FATOS do turno, não apenas na
+  // lista que alguém preencheu por fora.
+  const informados = ctx.conflitos ?? [];
+  const detectados = detectarConflitosEntreFatos(ctx.fatos ?? []);
+  const avaliados = [...informados];
+  for (const c of detectados) {
+    if (!avaliados.some((x) => x.campo === c.campo)) avaliados.push(c);
+  }
+  const conflitos = avaliados.filter((c) => {
     const distintos = new Set(c.valores.map((v) => v.valor.trim().toLowerCase()));
     return distintos.size > 1;
   });
-  if ((ctx.conflitos ?? []).length === 0) return res(nome, "NOT_APPLICABLE", 100, "SEM_CONFLITOS", {});
-  if (conflitos.length === 0) return res(nome, "PASS", 100, "ORIGENS_CONCORDAM", { avaliados: ctx.conflitos?.length });
+  if (avaliados.length === 0) return res(nome, "NOT_APPLICABLE", 100, "SEM_CONFLITOS", {});
+  if (conflitos.length === 0) return res(nome, "PASS", 100, "ORIGENS_CONCORDAM", { avaliados: avaliados.length });
 
   return res(
     nome,
     "BLOCK",
     0,
     "CONFLITO_DE_FONTE",
-    { conflitos },
+    { conflitos, detectadosNosFatos: detectados.length },
     "CONFLITO_DE_FONTE",
   );
 }

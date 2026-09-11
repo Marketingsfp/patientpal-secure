@@ -11,6 +11,7 @@
 import type { DecisaoConfianca } from "../confidence-engine";
 import type { TipoTurno } from "./turno-tipo";
 import { decidirConfianca } from "./engine";
+import { enriquecerContextoAvaliacao } from "./contexto-avaliacao";
 import { assegurarAvaliacaoDoTextoFinal, verificarRespostaFinal } from "./final-answer";
 import type { HardBlocker } from "./policy";
 import { contaContraANota } from "./types";
@@ -75,6 +76,12 @@ export type EstadoDoTurno = {
    * já existente do atendimento). Ausente = desconhecido, nunca "não houve".
    */
   estadoOperacional?: ContextoConfianca["operationalState"];
+  /**
+   * FASE 1 (motor) — instruções PUBLICADAS usadas nesta execução. Conteúdo
+   * confiável; a mensagem do paciente e o retorno das ferramentas continuam
+   * sendo dado a verificar.
+   */
+  instrucoes?: ContextoConfianca["instrucoes"];
 };
 
 const CAP_CATALOGO = new Set(["searchKnowledgeBase", "listCatalog"]);
@@ -93,10 +100,17 @@ export function montarContextoDoTurno(e: EstadoDoTurno): ContextoConfianca {
         : f.success && !f.erro,
   }));
 
-  return {
+  // FASE 1 (motor) — o contexto avaliado é completado com o que o turno já
+  // tem: fontes derivadas dos fatos, conflitos detectados, candidatos de
+  // entidade e campos obrigatórios da ação. Nada é inventado: o que a origem
+  // não informou continua ausente.
+  return enriquecerContextoAvaliacao({
     conversationId: e.conversaId ?? null,
     messageId: e.messageId ?? null,
     intent: e.intent ?? null,
+    // Mensagem COMPLETA do turno (lote inteiro) — dado, nunca instrução.
+    mensagemPaciente: e.mensagemPaciente ?? null,
+    ...(e.instrucoes ? { instrucoes: e.instrucoes } : {}),
     // FASE 2: ausência de ação NÃO vira "responder_informacao". Se o runtime
     // não sabe o que a Nina vai fazer, o motor precisa enxergar isso.
     requestedAction: e.acao === undefined ? "desconhecida" : e.acao,
@@ -124,7 +138,7 @@ export function montarContextoDoTurno(e: EstadoDoTurno): ContextoConfianca {
       handoffSolicitado: e.handoffSolicitado,
     },
     draftText: e.texto ?? null,
-  };
+  });
 }
 
 /**
