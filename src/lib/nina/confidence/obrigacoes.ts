@@ -763,6 +763,8 @@ export function InstructionComplianceValidator(
       relevante: r.relevante,
       completude: r.completude,
       restricoesCumpridas: r.restricoesCumpridas,
+      estadoRestricoes: r.estadoRestricoes,
+      regrasNaoAplicaveis: r.regrasNaoAplicaveis,
       compativelComEstagio: r.compativelComEstagio,
       obrigacoes: r.avaliacoes.map((a) => ({
         id: a.obrigacao.id,
