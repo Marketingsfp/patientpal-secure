@@ -349,6 +349,7 @@ export const definirSenhaFuncionario = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     await assertManager(context.userId, data.clinicaId);
     await assertUserBelongsToClinica(data.userId, data.clinicaId);
+    await assertPodeAlterarConta(context.userId, data.userId);
     const { error } = await supabaseAdmin.auth.admin.updateUserById(data.userId, {
       password: data.novaSenha,
     });
