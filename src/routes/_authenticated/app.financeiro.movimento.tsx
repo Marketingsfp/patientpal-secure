@@ -99,7 +99,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Switch } from "@/components/ui/switch";
-import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
+
 import { Pilulas } from "@/components/financeiro/pilulas";
 import { SolicitarEstornoDialog } from "@/components/financeiro/SolicitarEstornoDialog";
 import {
