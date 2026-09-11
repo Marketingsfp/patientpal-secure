@@ -841,6 +841,14 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
                             conversaId: convId,
                             outgoingMessageId: (msgOut as { id?: string } | null)?.id ?? null,
                             canal: "whatsapp",
+                            // Só estados comprovados: transporte confirmado
+                            // pela Meta (outId) ou apenas gravado.
+                            estado: outId
+                              ? "confirmada"
+                              : (msgOut as { id?: string } | null)?.id
+                                ? "persistida"
+                                : "falhou",
+                            transporteId: outId ?? null,
                           });
                         } catch {
                           // Rastreabilidade nunca interrompe o atendimento.

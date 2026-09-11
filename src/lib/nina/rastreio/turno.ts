@@ -210,6 +210,136 @@ export type EntregaDoTurno = {
   canal: string | null;
 };
 
+/* ------------------------------------------------- FASE 3 — estado da saída */
+
+/**
+ * Estados COMPROVADOS da saída. Não existe estado deduzido: sem evidência,
+ * o estado é "indeterminada".
+ *  - preparada: o texto existe, mas nenhuma mensagem gravada foi vinculada;
+ *  - persistida: a mensagem de saída foi gravada (no console, o fim da linha);
+ *  - enviada: houve entrega ao transporte, sem confirmação registrada;
+ *  - confirmada: o transporte confirmou (id de transporte registrado);
+ *  - falhou: a persistência/envio falhou de forma registrada.
+ */
+export const ESTADOS_SAIDA = [
+  "preparada",
+  "persistida",
+  "enviada",
+  "confirmada",
+  "falhou",
+  "indeterminada",
+] as const;
+export type EstadoSaida = (typeof ESTADOS_SAIDA)[number];
+
+export const CANAL_CONSOLE = "test-console";
+
+export type EventoEntregaTurno = {
+  turnoId?: string | null;
+  execucaoId?: string | null;
+  conversaId?: string | null;
+  mensagemId?: string | null;
+  canal?: string | null;
+  estado?: string | null;
+  transporteId?: string | null;
+  em?: string | null;
+};
+
+export type EvidenciaSaida = {
+  estado: EstadoSaida;
+  mensagemId: string | null;
+  canal: string | null;
+  tamanho: number | null;
+  /** Homologação/console: nunca há transporte real. */
+  console: boolean;
+  descricao: string;
+  /** Qual vínculo/confirmação exatamente falta (null = nada falta). */
+  faltando: string | null;
+};
+
+const DESCRICAO_SAIDA: Record<EstadoSaida, string> = {
+  preparada: "Resposta preparada — ainda sem vínculo com a mensagem gravada",
+  persistida: "Resposta gravada na conversa",
+  enviada: "Envio registrado ao transporte",
+  confirmada: "Entrega confirmada pelo transporte",
+  falhou: "Falha registrada ao gravar ou enviar a resposta",
+  indeterminada: "Não há registro suficiente para afirmar o estado da saída",
+};
+
+/**
+ * O evento de saída pertence a ESTE turno? Nunca associa por proximidade:
+ * exige o mesmo turno (ou a mesma execução) e, quando as duas pontas
+ * registram conversa, a mesma conversa. O isolamento por clínica é feito na
+ * consulta (os eventos já vêm filtrados pela clínica).
+ */
+export function eventoEntregaDoTurno(
+  evento: EventoEntregaTurno,
+  alvo: { turnoId?: string | null; execucaoId?: string | null; conversaId?: string | null },
+): boolean {
+  const mesmoTurno =
+    (!!alvo.turnoId && evento.turnoId === alvo.turnoId) ||
+    (!!alvo.execucaoId && !!evento.execucaoId && evento.execucaoId === alvo.execucaoId);
+  if (!mesmoTurno) return false;
+  if (alvo.conversaId && evento.conversaId && evento.conversaId !== alvo.conversaId) return false;
+  return true;
+}
+
+/**
+ * Junta o que o resumo do turno registrou (gravado ANTES da persistência, por
+ * isso costuma trazer `mensagemId: null`) com os eventos de saída gravados
+ * depois. O resumo é imutável: a evidência posterior o completa, nunca o
+ * substitui — e a ausência de evidência jamais vira "falha de entrega".
+ */
+export function evidenciaSaidaDoTurno(dados: {
+  entregaDoResumo?: Partial<EntregaDoTurno> | null;
+  eventos?: readonly EventoEntregaTurno[];
+  ambiente?: string | null;
+  teste?: boolean | null;
+}): EvidenciaSaida {
+  const resumo = dados.entregaDoResumo ?? null;
+  const eventos = dados.eventos ?? [];
+  const ultimo = eventos.length ? eventos[eventos.length - 1]! : null;
+
+  const canal = ultimo?.canal ?? resumo?.canal ?? null;
+  const console =
+    canal === CANAL_CONSOLE || dados.teste === true || dados.ambiente === "homologacao";
+  const mensagemId = ultimo?.mensagemId ?? resumo?.mensagemId ?? null;
+  const tamanho = resumo?.tamanho ?? null;
+
+  let estado: EstadoSaida;
+  const registrado = ultimo?.estado ?? null;
+  if (registrado && (ESTADOS_SAIDA as readonly string[]).includes(registrado)) {
+    estado = registrado as EstadoSaida;
+  } else if (ultimo) {
+    estado = mensagemId ? (ultimo.transporteId ? "confirmada" : console ? "persistida" : "enviada") : "falhou";
+  } else if (mensagemId) {
+    estado = console ? "persistida" : "enviada";
+  } else if (resumo) {
+    estado = "preparada";
+  } else {
+    estado = "indeterminada";
+  }
+
+  let descricao = DESCRICAO_SAIDA[estado];
+  if (console && estado === "persistida") {
+    descricao = "Resposta persistida no console — homologação não envia pelo WhatsApp";
+  } else if (!console && estado === "persistida") {
+    descricao = "Resposta gravada na conversa — sem confirmação de transporte registrada";
+  } else if (!console && estado === "enviada") {
+    descricao = "Envio registrado — sem confirmação do transporte";
+  }
+
+  let faltando: string | null = null;
+  if (!mensagemId && estado !== "falhou") {
+    faltando = "identificador da mensagem gravada não vinculado a este turno";
+  } else if (!console && (estado === "persistida" || estado === "enviada")) {
+    faltando = "confirmação de entrega pelo transporte não registrada";
+  } else if (estado === "indeterminada") {
+    faltando = "nenhum registro de saída para este turno";
+  }
+
+  return { estado, mensagemId, canal, tamanho, console, descricao, faltando };
+}
+
 export type RegistroTurno = {
   /** Identificador do turno — o mesmo `trace_id` da execução. */
   turnoId: string;

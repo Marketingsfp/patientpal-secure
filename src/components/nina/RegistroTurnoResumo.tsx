@@ -21,6 +21,10 @@ import {
   avaliacaoEmObservacao,
   avaliarTransformacoes,
   descreverAvaliacaoConfianca,
+  eventoEntregaDoTurno,
+  evidenciaSaidaDoTurno,
+  NODE_ENTREGA_TURNO,
+  type EventoEntregaTurno,
   TEXTO_AVALIACAO_EM_OBSERVACAO,
   origemComSituacao,
   ROTULO_LACUNA_TURNO,
@@ -30,14 +34,51 @@ import {
   type SituacaoTransformacoes,
 } from "@/lib/nina/rastreio/turno";
 
-type EventoComMetadata = { node_id?: string | null; metadata?: unknown };
+type EventoComMetadata = {
+  node_id?: string | null;
+  trace_id?: string | null;
+  execution_id?: string | null;
+  conversation_id?: string | null;
+  message_id?: string | null;
+  metadata?: unknown;
+};
+
+function metadataDe(ev: EventoComMetadata | undefined): Record<string, unknown> | null {
+  const meta = ev?.metadata;
+  return meta && typeof meta === "object" ? (meta as Record<string, unknown>) : null;
+}
 
 export function resumoDoTurno(
   eventos: readonly EventoComMetadata[],
 ): Record<string, unknown> | null {
-  const ev = eventos.find((e) => e?.node_id === "turn.summary");
-  const meta = ev?.metadata;
-  return meta && typeof meta === "object" ? (meta as Record<string, unknown>) : null;
+  return metadataDe(eventos.find((e) => e?.node_id === "turn.summary"));
+}
+
+/**
+ * FASE 3 — eventos de saída (`turn.delivery`) que pertencem A ESTE turno.
+ * O resumo é gravado antes da persistência da resposta; a evidência do
+ * vínculo chega depois, em evento próprio. Só entram eventos do mesmo turno
+ * (ou mesma execução) e da mesma conversa — nunca por proximidade de tempo.
+ */
+export function eventosDeSaidaDoTurno(
+  eventos: readonly EventoComMetadata[],
+  alvo: { turnoId?: string | null; execucaoId?: string | null; conversaId?: string | null },
+): EventoEntregaTurno[] {
+  return eventos
+    .filter((e) => e?.node_id === NODE_ENTREGA_TURNO)
+    .map((e) => {
+      const m = metadataDe(e) ?? {};
+      return {
+        turnoId: (m["turno_id"] ?? e.trace_id ?? null) as string | null,
+        execucaoId: (m["execucao_id"] ?? e.execution_id ?? null) as string | null,
+        conversaId: (m["conversa_id"] ?? e.conversation_id ?? null) as string | null,
+        mensagemId: (m["outgoing_message_id"] ?? e.message_id ?? null) as string | null,
+        canal: (m["canal"] ?? null) as string | null,
+        estado: (m["estado"] ?? null) as string | null,
+        transporteId: (m["transporte_id"] ?? null) as string | null,
+      } satisfies EventoEntregaTurno;
+    })
+    .filter((ev) => eventoEntregaDoTurno(ev, alvo));
 }
 
 function texto(v: unknown, vazio = "—") {

@@ -24,6 +24,7 @@ import {
   type BaseRegistroTurno,
   type ConfiancaDoTurno,
   type EntregaDoTurno,
+  type EstadoSaida,
   type OrigemResposta,
   type RegistroTurno,
   type SelecaoVersaoPrompt,
@@ -190,6 +191,10 @@ export async function gravarEntregaDoTurno(dados: {
   outgoingMessageId: string | null;
   canal: string;
   textoHash?: string | null;
+  /** FASE 3 — estado COMPROVADO da saída (ver ESTADOS_SAIDA). */
+  estado?: EstadoSaida | null;
+  /** Identificador do transporte (só existe quando houve envio real). */
+  transporteId?: string | null;
 }): Promise<void> {
   if (!dados.turnoId && !dados.execucaoId) return;
   const agora = new Date().toISOString();
@@ -208,9 +213,12 @@ export async function gravarEntregaDoTurno(dados: {
     metadata: sanitizarMetadata({
       turno_id: dados.turnoId,
       execucao_id: dados.execucaoId,
+      conversa_id: dados.conversaId,
       outgoing_message_id: dados.outgoingMessageId,
       canal: dados.canal,
       texto_hash: dados.textoHash ?? null,
+      estado: dados.estado ?? null,
+      transporte_id: dados.transporteId ?? null,
     }),
   };
   try {

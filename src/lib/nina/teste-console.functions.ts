@@ -534,7 +534,9 @@ export const detalheExecucaoTeste = createServerFn({ method: "POST" })
 
     const { data: eventos } = await supabaseAdmin
       .from("nina_trace_eventos")
-      .select("trace_id, node_id, event_type, status, duration_ms, started_at, metadata")
+      .select(
+        "trace_id, execution_id, conversation_id, message_id, node_id, event_type, status, duration_ms, started_at, metadata",
+      )
       .eq("clinica_id", data.clinicaId)
       .eq("execution_id", data.execucaoId)
       .order("started_at", { ascending: true })
@@ -547,7 +549,9 @@ export const detalheExecucaoTeste = createServerFn({ method: "POST" })
     if (traceId) {
       const { data: todos } = await supabaseAdmin
         .from("nina_trace_eventos")
-        .select("trace_id, node_id, event_type, status, duration_ms, started_at, metadata")
+        .select(
+          "trace_id, execution_id, conversation_id, message_id, node_id, event_type, status, duration_ms, started_at, metadata",
+        )
         .eq("clinica_id", data.clinicaId)
         .eq("trace_id", traceId)
         .order("started_at", { ascending: true })
