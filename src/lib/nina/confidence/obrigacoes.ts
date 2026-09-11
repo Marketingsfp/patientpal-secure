@@ -45,7 +45,11 @@ export type TipoObrigacao =
   /** Restrição literal das instruções publicadas (texto/marcador exigido). */
   | "restricao_literal"
   /** Restrição de forma das instruções publicadas (linguagem aberta). */
-  | "restricao_aberta";
+  | "restricao_aberta"
+  /** Proibição de conteúdo declarada nas instruções publicadas. */
+  | "restricao_proibicao"
+  /** Regra publicada que NÃO pôde ser interpretada com segurança. */
+  | "restricao_nao_interpretada";
 
 export type Obrigacao = {
   id: string;
@@ -57,6 +61,12 @@ export type Obrigacao = {
   topico?: string | null;
   /** Texto exato exigido, quando a obrigação for literal. */
   literal?: string | null;
+  /** Categorias proibidas, quando a obrigação for proibição de conteúdo. */
+  proibicoes?: CategoriaProibida[];
+  /** Texto literal exigido no mesmo turno (para conferir "nada além disso"). */
+  literalEsperado?: string | null;
+  /** Regra publicada de origem: condição, ambiente, prioridade, versão, hash. */
+  regra?: RegraPublicada;
   /** Como esta obrigação pode ser conferida. */
   verificacao: "deterministica" | "semantica";
 };
