@@ -2315,8 +2315,12 @@ async function gerarRespostaNinaInterno(
         telefone: telefoneNorm ?? null,
         mensagemPaciente: mensagemPaciente || null,
         resultado: { ...baseResultado, texto: resposta },
-        // Encerramento automático só no caminho real de atendimento.
-        avaliarEncerramento: opcoes?.teste !== true && Boolean(mensagemPaciente),
+        // Encerramento automático só no caminho real de atendimento e SÓ no
+        // primeiro passe: correção de texto não repete efeito externo.
+        avaliarEncerramento:
+          passeVerificacaoRegras === 1 &&
+          opcoes?.teste !== true &&
+          Boolean(mensagemPaciente),
       });
       if (finalizada.texto) resposta = finalizada.texto;
       if (opcoes?.auditoria) {
