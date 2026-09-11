@@ -62,6 +62,11 @@ export function useResumoHandoff(
     alvo.subs.add(fn);
     return () => {
       alvo.subs.delete(fn);
+      // Sem nenhum consumidor montado o realtime desta conversa deixa de
+      // valer: o resumo em cache pode envelhecer enquanto o atendente está em
+      // outra conversa. O conteúdo continua guardado (evita piscar ao voltar),
+      // mas a próxima montagem busca de novo.
+      if (alvo.subs.size === 0) alvo.buscado = false;
     };
   }, [chave]);
 
