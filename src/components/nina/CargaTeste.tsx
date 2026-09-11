@@ -47,6 +47,7 @@ import {
   executarLoteCarga,
   listarTestesCarga,
   pararTesteCarga,
+  prepararLeadsTesteCarga,
 } from "@/lib/nina/carga.functions";
 
 const CENARIOS_PADRAO = [
