@@ -1780,7 +1780,14 @@ export function HomologacaoInbox() {
                   ["Conhecimento", detalhe.execucao.knowledge_status],
                   ["Ferramentas", detalhe.execucao.tool_calls],
                   ["Transferência", detalhe.execucao.handoff ? "sim" : "não"],
-                  ["Sucesso", detalhe.execucao.success ? "sim" : "não"],
+                  [
+                    // FASE 2 — retorno técnico da chamada; não comprova
+                    // cumprimento do prompt.
+                    "Chamada ao modelo",
+                    detalhe.execucao.success
+                      ? "concluída sem erro registrado"
+                      : "falhou (erro registrado)",
+                  ],
                   ["Erro", detalhe.execucao.error_category],
                   ["Tempo (ms)", detalhe.execucao.latency_ms],
                   ["Trace", detalhe.traceId],
@@ -1793,6 +1800,14 @@ export function HomologacaoInbox() {
                   </div>
                 ))}
               </div>
+
+              {/* FASE 2 — o retorno técnico da chamada não é conferência de
+                  conteúdo. Nenhuma validação é inventada aqui. */}
+              <p className="text-muted-foreground">
+                Conferência de conteúdo: não há validação automática de cumprimento das instruções
+                neste registro. A chamada concluída sem erro não comprova que a resposta seguiu o
+                prompt.
+              </p>
 
               {detalhe.eventos?.length > 0 && (
                 <div>

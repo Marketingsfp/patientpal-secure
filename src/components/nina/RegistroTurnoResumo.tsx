@@ -18,7 +18,10 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   alteracaoDaTransformacao,
+  avaliacaoEmObservacao,
   avaliarTransformacoes,
+  descreverAvaliacaoConfianca,
+  TEXTO_AVALIACAO_EM_OBSERVACAO,
   origemComSituacao,
   ROTULO_LACUNA_TURNO,
   ROTULO_ORIGEM,
@@ -89,6 +92,22 @@ export function RegistroTurnoResumo({
   const transformacoes = (resumo["transformacoes"] ?? []) as Array<Record<string, unknown>>;
   const lacunas = (resumo["lacunas"] ?? []) as string[];
   const confianca = (resumo["confianca"] ?? null) as Record<string, unknown> | null;
+  // FASE 2 — registros antigos guardam só uma avaliação; usamos como fallback.
+  const avaliacoes = (
+    Array.isArray(resumo["avaliacoes"])
+      ? (resumo["avaliacoes"] as Array<Record<string, unknown>>)
+      : confianca
+        ? [confianca]
+        : []
+  ) as Array<Record<string, unknown>>;
+  const operacional =
+    avaliacoes.find(
+      (a) =>
+        !avaliacaoEmObservacao({
+          modo: (a["modo"] ?? null) as string | null,
+          aplicada: (a["aplicada"] ?? null) as boolean | null,
+        }),
+    ) ?? null;
   const entrega = (resumo["entrega"] ?? null) as Record<string, unknown> | null;
   const situacao = situacaoDasTransformacoes(resumo);
   const origem = origemComSituacao(
@@ -130,13 +149,41 @@ export function RegistroTurnoResumo({
             : ""}
         </p>
         <p>
-          <span className="text-muted-foreground">Confiança: </span>
-          {confianca
-            ? `${texto(confianca["avaliacao"])} · ${texto(confianca["decisao"])}${
-                confianca["score"] != null ? ` · ${texto(confianca["score"])}` : ""
+          <span className="text-muted-foreground">Ação aplicada ao atendimento: </span>
+          {operacional
+            ? `${texto(operacional["decisao"], "não registrada")}${
+                operacional["etapa"] ? ` · etapa ${texto(operacional["etapa"])}` : ""
               }`
-            : "não registrada"}
+            : "nenhuma intervenção de confiança registrada neste turno"}
         </p>
+      </div>
+
+      {/* FASE 2 — cada avaliação com tipo, nota, decisão registrada e modo. */}
+      <div className="mt-2 space-y-1">
+        <p className="text-muted-foreground">Avaliações de confiança</p>
+        {avaliacoes.length === 0 ? (
+          <p>não registrada</p>
+        ) : (
+          avaliacoes.map((a, i) => {
+            const observacao = avaliacaoEmObservacao({
+              modo: (a["modo"] ?? null) as string | null,
+              aplicada: (a["aplicada"] ?? null) as boolean | null,
+            });
+            return (
+              <p key={`${texto(a["avaliacao"])}-${i}`}>
+                {descreverAvaliacaoConfianca({
+                  avaliacao: String(a["avaliacao"] ?? ""),
+                  decisao: (a["decisao"] ?? null) as string | null,
+                  etapa: (a["etapa"] ?? null) as string | null,
+                  modo: (a["modo"] ?? null) as string | null,
+                  score: (a["score"] ?? null) as number | null,
+                  nivel: (a["nivel"] ?? null) as string | null,
+                })}
+                {observacao ? ` — ${TEXTO_AVALIACAO_EM_OBSERVACAO}` : ""}
+              </p>
+            );
+          })
+        )}
       </div>
 
       {/* Fallback do prompt: sempre visível, nunca escondido em rodapé. */}

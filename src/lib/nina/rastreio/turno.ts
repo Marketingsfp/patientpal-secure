@@ -158,7 +158,50 @@ export type ConfiancaDoTurno = {
   modo: string | null;
   score: number | null;
   nivel: string | null;
+  /**
+   * FASE 2 — a decisão desta avaliação foi APLICADA ao atendimento?
+   * `false` = observação (shadow): classifica, não altera nem bloqueia.
+   * `null`/ausente = não registrado; não se deduz pela nota.
+   */
+  aplicada?: boolean | null;
 };
+
+export const TEXTO_AVALIACAO_EM_OBSERVACAO =
+  "Avaliação em observação: esta avaliação não altera nem bloqueia a resposta";
+
+export const ROTULO_TIPO_AVALIACAO: Record<string, string> = {
+  action_safety: "Segurança da ação (operacional)",
+  answer_confidence: "Confiança da mensagem final",
+};
+
+/** Shadow ou marcada como não aplicada = classificação, nunca intervenção. */
+export function avaliacaoEmObservacao(c: {
+  modo?: string | null;
+  aplicada?: boolean | null;
+}): boolean {
+  if (c.aplicada === true) return false;
+  if (c.aplicada === false) return true;
+  return c.modo === "shadow";
+}
+
+/**
+ * Frase única da avaliação: tipo, nota, decisão REGISTRADA e modo. Nada é
+ * deduzido — o que não foi registrado aparece como "não registrada".
+ */
+export function descreverAvaliacaoConfianca(c: ConfiancaDoTurno): string {
+  const tipo = ROTULO_TIPO_AVALIACAO[c.avaliacao] ?? c.avaliacao;
+  const nota = c.score == null ? "nota não registrada" : `nota ${c.score}`;
+  const decisao = c.decisao ? `decisão registrada ${c.decisao}` : "decisão não registrada";
+  const modo = c.modo ? `modo ${c.modo}` : "modo não registrado";
+  return `${tipo} · ${nota} · ${decisao} · ${modo}`;
+}
+
+/** A avaliação operacional (a que de fato pôde alterar o atendimento). */
+export function avaliacaoOperacional(
+  avaliacoes: readonly ConfiancaDoTurno[],
+): ConfiancaDoTurno | null {
+  return [...avaliacoes].reverse().find((c) => !avaliacaoEmObservacao(c)) ?? null;
+}
 
 export type EntregaDoTurno = {
   mensagemId: string | null;
@@ -187,6 +230,8 @@ export type RegistroTurno = {
   motivoOrigem: string | null;
   transformacoes: TransformacaoResposta[];
   confianca: ConfiancaDoTurno | null;
+  /** FASE 2 — TODAS as avaliações do turno, na ordem em que ocorreram. */
+  avaliacoes: ConfiancaDoTurno[];
   entrega: EntregaDoTurno | null;
   /** Diagnóstico autorizado nesta clínica (captura de payload por rodada). */
   diagnostico: boolean;
@@ -226,6 +271,7 @@ export function criarRegistroTurno(base: BaseRegistroTurno): RegistroTurno {
     motivoOrigem: null,
     transformacoes: [],
     confianca: null,
+    avaliacoes: [],
     entrega: null,
     diagnostico: base.diagnostico === true,
     iniciadoEm: base.iniciadoEm ?? new Date().toISOString(),
@@ -320,6 +366,9 @@ export function resumoTurnoParaTrace(r: RegistroTurno): Record<string, unknown> 
     })),
     situacao_transformacoes: avaliarTransformacoes(r.transformacoes),
     confianca: r.confianca,
+    /** FASE 2 — cada avaliação com seu modo; shadow não vira intervenção. */
+    avaliacoes: r.avaliacoes,
+    avaliacao_operacional: avaliacaoOperacional(r.avaliacoes ?? []),
     entrega: r.entrega,
     diagnostico_autorizado: r.diagnostico,
     lacunas: lacunasDoTurno(r),

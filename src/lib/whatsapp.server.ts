@@ -1794,6 +1794,8 @@ async function gerarRespostaNinaInterno(
           decisao: plano.decision,
           etapa,
           modo,
+          // FASE 2 — decisão operacional: fora do modo shadow ela foi aplicada.
+          aplicada: modo !== "shadow",
           score: decisao.score,
           nivel: decisao.level,
         });
@@ -2362,6 +2364,9 @@ async function gerarRespostaNinaInterno(
         decisao: respostaFinalAvaliada.decision ?? null,
         etapa: null,
         modo: "shadow",
+        // FASE 2 — observação: classifica a mensagem final, não altera nem
+        // bloqueia a resposta já entregue.
+        aplicada: false,
         score: respostaFinalAvaliada.score,
         nivel: respostaFinalAvaliada.level,
       });

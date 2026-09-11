@@ -4,7 +4,10 @@
  */
 import { describe, expect, it } from "bun:test";
 import {
+  avaliacaoEmObservacao,
+  avaliacaoOperacional,
   avaliarTransformacoes,
+  descreverAvaliacaoConfianca,
   criarRegistroTurno,
   finalizarRegistroTurno,
   lacunasDoTurno,
@@ -179,5 +182,75 @@ describe("situação das transformações (FASE 1 — fidelidade)", () => {
     const resumo = resumoTurnoParaTrace(finalizarRegistroTurno(r)) as Record<string, unknown>;
     expect(resumo["situacao_transformacoes"]).toBe("sem_alteracao");
     expect((resumo["transformacoes"] as Array<Record<string, unknown>>)[0]!["alterou"]).toBe(false);
+  });
+});
+
+// ============================================================================
+// FASE 2 — confiança: avaliação, modo e ação aplicada
+// ============================================================================
+describe("FASE 2 — avaliações de confiança", () => {
+  const base = { etapa: null, nivel: null } as const;
+
+  it("CLARIFY em shadow é observação, nunca intervenção aplicada", () => {
+    const c = {
+      ...base,
+      avaliacao: "answer_confidence",
+      decisao: "CLARIFY",
+      modo: "shadow",
+      score: 65,
+      aplicada: false,
+    };
+    expect(avaliacaoEmObservacao(c)).toBe(true);
+    expect(descreverAvaliacaoConfianca(c)).toBe(
+      "Confiança da mensagem final · nota 65 · decisão registrada CLARIFY · modo shadow",
+    );
+    expect(avaliacaoOperacional([c])).toBeNull();
+  });
+
+  it("avaliação operacional com ação comprovada é separada da shadow", () => {
+    const op = {
+      ...base,
+      avaliacao: "action_safety",
+      decisao: "ALLOW",
+      modo: "enforce",
+      score: 90,
+      aplicada: true,
+    };
+    const shadow = {
+      ...base,
+      avaliacao: "answer_confidence",
+      decisao: "CLARIFY",
+      modo: "shadow",
+      score: 65,
+      aplicada: false,
+    };
+    expect(avaliacaoOperacional([op, shadow])).toEqual(op);
+    expect(avaliacaoEmObservacao(op)).toBe(false);
+  });
+
+  it("sem informação suficiente não deduz nota nem decisão", () => {
+    const c = {
+      ...base,
+      avaliacao: "action_safety",
+      decisao: null,
+      modo: null,
+      score: null,
+    };
+    expect(descreverAvaliacaoConfianca(c)).toBe(
+      "Segurança da ação (operacional) · nota não registrada · decisão não registrada · modo não registrado",
+    );
+  });
+
+  it("o resumo do turno leva todas as avaliações e a operacional", () => {
+    const r = criarRegistroTurno({ turnoId: "t1" });
+    r.avaliacoes = [
+      { ...base, avaliacao: "action_safety", decisao: "ALLOW", modo: "enforce", score: 90, aplicada: true },
+      { ...base, avaliacao: "answer_confidence", decisao: "CLARIFY", modo: "shadow", score: 65, aplicada: false },
+    ];
+    const resumo = resumoTurnoParaTrace(r) as Record<string, unknown>;
+    expect((resumo["avaliacoes"] as unknown[]).length).toBe(2);
+    expect((resumo["avaliacao_operacional"] as Record<string, unknown>)["avaliacao"]).toBe(
+      "action_safety",
+    );
   });
 });
