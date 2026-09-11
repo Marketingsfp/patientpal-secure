@@ -65,6 +65,7 @@ export function CargaTeste() {
   const { clinicaAtual } = useClinica();
   const clinicaId = clinicaAtual?.clinica_id;
   const criar = useServerFn(criarTesteCarga);
+  const preparar = useServerFn(prepararLeadsTesteCarga);
   const executar = useServerFn(executarLoteCarga);
   const parar = useServerFn(pararTesteCarga);
   const listar = useServerFn(listarTestesCarga);
