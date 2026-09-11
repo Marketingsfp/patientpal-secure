@@ -210,7 +210,7 @@ export function MovimentoResultado({
     <div className="space-y-3">
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
         <KpiCard
-          onClick={() => setDrill("receita")}
+          onClick={() => abrir("receita")}
           icon={TrendingUp}
           label="Receita bruta (atendimentos)"
           value={v(r.atendimentos.total)}
@@ -233,7 +233,7 @@ export function MovimentoResultado({
           )}
         </KpiCard>
         <KpiCard
-          onClick={() => setDrill("repasse")}
+          onClick={() => abrir("repasse")}
           icon={Handshake}
           label="Repasse médico pago no caixa"
           value={brl(r.repassePago.total)}
@@ -247,7 +247,7 @@ export function MovimentoResultado({
             .join(" · ")}
         />
         <KpiCard
-          onClick={() => setDrill("operacionais")}
+          onClick={() => abrir("operacionais")}
           icon={Receipt}
           label="Despesas operacionais"
           value={brl(r.operacionais.total)}
@@ -255,7 +255,7 @@ export function MovimentoResultado({
           detalhe="Contas, folha, compras — sem repasse médico"
         />
         <KpiCard
-          onClick={() => setDrill("outras")}
+          onClick={() => abrir("outras")}
           icon={Coins}
           label="Outras receitas"
           value={v(r.outras.total)}
@@ -263,7 +263,7 @@ export function MovimentoResultado({
           detalhe="Mensalidades do Cartão, adesões e avulsos"
         />
         <KpiCard
-          onClick={() => setDrill("totais")}
+          onClick={() => abrir("totais")}
           icon={TrendingDown}
           label="Despesas totais"
           value={brl(r.despesas)}
@@ -271,7 +271,7 @@ export function MovimentoResultado({
           detalhe="Repasse + despesas operacionais"
         />
         <KpiCard
-          onClick={() => setDrill("saldo")}
+          onClick={() => abrir("saldo")}
           icon={Wallet}
           label="Saldo líquido do caixa"
           value={brl(r.saldo)}

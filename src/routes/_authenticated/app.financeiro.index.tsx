@@ -225,7 +225,7 @@ function FinDashboard() {
         </h2>
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           <KpiCard
-            onClick={() => setDrill("receita")}
+            onClick={() => abrir("receita")}
             icon={TrendingUp}
             label="Receita bruta"
             value={v((r) => r.receitaBruta)}
@@ -250,7 +250,7 @@ function FinDashboard() {
             )}
           </KpiCard>
           <KpiCard
-            onClick={() => setDrill("repasse")}
+            onClick={() => abrir("repasse")}
             icon={Handshake}
             label="Repasse a médicos / prestadores"
             value={v((r) => r.repasse)}
@@ -269,7 +269,7 @@ function FinDashboard() {
             }
           />
           <KpiCard
-            onClick={() => setDrill("operacionais")}
+            onClick={() => abrir("operacionais")}
             icon={Receipt}
             label="Despesas operacionais"
             value={v((r) => r.despesasOperacionais)}
@@ -277,7 +277,7 @@ function FinDashboard() {
             detalhe="Contas, folha, compras — sem repasse médico"
           />
           <KpiCard
-            onClick={() => setDrill("outras")}
+            onClick={() => abrir("outras")}
             icon={Coins}
             label="Outras receitas"
             value={v((r) => r.outrasReceitas)}
@@ -285,7 +285,7 @@ function FinDashboard() {
             detalhe="Mensalidades do Cartão, adesões e avulsos"
           />
           <KpiCard
-            onClick={() => setDrill("totais")}
+            onClick={() => abrir("totais")}
             icon={TrendingDown}
             label="Despesas totais"
             value={v((r) => r.despesasTotais)}
@@ -293,7 +293,7 @@ function FinDashboard() {
             detalhe="Repasse + despesas operacionais"
           />
           <KpiCard
-            onClick={() => setDrill("saldo")}
+            onClick={() => abrir("saldo")}
             icon={Wallet}
             label="Líquido da clínica / Saldo"
             value={v((r) => r.saldo)}
@@ -313,21 +313,21 @@ function FinDashboard() {
         </h2>
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           <KpiCard
-            onClick={() => setDrill("atendimentos")}
+            onClick={() => abrir("atendimentos")}
             icon={Users}
             label="Atendimentos (total)"
             value={v((r) => r.producao.total, int)}
             accent="primary"
           />
           <KpiCard
-            onClick={() => setDrill("cartao")}
+            onClick={() => abrir("cartao")}
             icon={CreditCard}
             label="Consultas Cartão"
             value={v((r) => r.producao.consultasCartao, int)}
             accent="primary"
           />
           <KpiCard
-            onClick={() => setDrill("particular")}
+            onClick={() => abrir("particular")}
             icon={Stethoscope}
             label="Consultas Particulares"
             value={v((r) => r.producao.consultasParticulares, int)}
@@ -339,7 +339,7 @@ function FinDashboard() {
             }
           />
           <KpiCard
-            onClick={() => setDrill("exame")}
+            onClick={() => abrir("exame")}
             icon={FlaskConical}
             label="Exames"
             value={v((r) => r.producao.exames, int)}
@@ -349,7 +349,7 @@ function FinDashboard() {
               cards de contagem não fecharia com o total. */}
           {resumo && resumo.producao.outros > 0 && (
             <KpiCard
-              onClick={() => setDrill("outro")}
+              onClick={() => abrir("outro")}
               icon={Activity}
               label="Procedimentos e outros"
               value={v((r) => r.producao.outros, int)}
@@ -357,7 +357,7 @@ function FinDashboard() {
             />
           )}
           <KpiCard
-            onClick={() => setDrill("ticket")}
+            onClick={() => abrir("ticket")}
             icon={Calendar}
             label="Ticket médio"
             value={v((r) => r.ticketMedio)}
