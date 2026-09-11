@@ -11,6 +11,7 @@
 import type { DecisaoConfianca } from "../confidence-engine";
 import type { TipoTurno } from "./turno-tipo";
 import { decidirConfianca } from "./engine";
+import { enriquecerContextoAvaliacao } from "./contexto-avaliacao";
 import { assegurarAvaliacaoDoTextoFinal, verificarRespostaFinal } from "./final-answer";
 import type { HardBlocker } from "./policy";
 import { contaContraANota } from "./types";
