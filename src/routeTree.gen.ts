@@ -143,11 +143,13 @@ import { Route as AuthenticatedAppFinanceiroRelatoriosRouteImport } from './rout
 import { Route as AuthenticatedAppFinanceiroRegrasIaRouteImport } from './routes/_authenticated/app.financeiro.regras-ia'
 import { Route as AuthenticatedAppFinanceiroPendenciasRouteImport } from './routes/_authenticated/app.financeiro.pendencias'
 import { Route as AuthenticatedAppFinanceiroNotasRouteImport } from './routes/_authenticated/app.financeiro.notas'
+import { Route as AuthenticatedAppFinanceiroMovimentoDetalheRouteImport } from './routes/_authenticated/app.financeiro.movimento-detalhe'
 import { Route as AuthenticatedAppFinanceiroMovimentoRouteImport } from './routes/_authenticated/app.financeiro.movimento'
 import { Route as AuthenticatedAppFinanceiroLembretesRouteImport } from './routes/_authenticated/app.financeiro.lembretes'
 import { Route as AuthenticatedAppFinanceiroEstornoRouteImport } from './routes/_authenticated/app.financeiro.estorno'
 import { Route as AuthenticatedAppFinanceiroEstatisticasRouteImport } from './routes/_authenticated/app.financeiro.estatisticas'
 import { Route as AuthenticatedAppFinanceiroEmpresasRouteImport } from './routes/_authenticated/app.financeiro.empresas'
+import { Route as AuthenticatedAppFinanceiroDetalheRouteImport } from './routes/_authenticated/app.financeiro.detalhe'
 import { Route as AuthenticatedAppFinanceiroContasRouteImport } from './routes/_authenticated/app.financeiro.contas'
 import { Route as AuthenticatedAppFinanceiroCategoriasRouteImport } from './routes/_authenticated/app.financeiro.categorias'
 import { Route as AuthenticatedAppFinanceiroBiRouteImport } from './routes/_authenticated/app.financeiro.bi'
@@ -922,6 +924,12 @@ const AuthenticatedAppFinanceiroNotasRoute =
     path: '/notas',
     getParentRoute: () => AuthenticatedAppFinanceiroRoute,
   } as any)
+const AuthenticatedAppFinanceiroMovimentoDetalheRoute =
+  AuthenticatedAppFinanceiroMovimentoDetalheRouteImport.update({
+    id: '/movimento-detalhe',
+    path: '/movimento-detalhe',
+    getParentRoute: () => AuthenticatedAppFinanceiroRoute,
+  } as any)
 const AuthenticatedAppFinanceiroMovimentoRoute =
   AuthenticatedAppFinanceiroMovimentoRouteImport.update({
     id: '/movimento',
@@ -950,6 +958,12 @@ const AuthenticatedAppFinanceiroEmpresasRoute =
   AuthenticatedAppFinanceiroEmpresasRouteImport.update({
     id: '/empresas',
     path: '/empresas',
+    getParentRoute: () => AuthenticatedAppFinanceiroRoute,
+  } as any)
+const AuthenticatedAppFinanceiroDetalheRoute =
+  AuthenticatedAppFinanceiroDetalheRouteImport.update({
+    id: '/detalhe',
+    path: '/detalhe',
     getParentRoute: () => AuthenticatedAppFinanceiroRoute,
   } as any)
 const AuthenticatedAppFinanceiroContasRoute =
@@ -1248,11 +1262,13 @@ export interface FileRoutesByFullPath {
   '/app/financeiro/bi': typeof AuthenticatedAppFinanceiroBiRoute
   '/app/financeiro/categorias': typeof AuthenticatedAppFinanceiroCategoriasRoute
   '/app/financeiro/contas': typeof AuthenticatedAppFinanceiroContasRoute
+  '/app/financeiro/detalhe': typeof AuthenticatedAppFinanceiroDetalheRoute
   '/app/financeiro/empresas': typeof AuthenticatedAppFinanceiroEmpresasRoute
   '/app/financeiro/estatisticas': typeof AuthenticatedAppFinanceiroEstatisticasRoute
   '/app/financeiro/estorno': typeof AuthenticatedAppFinanceiroEstornoRoute
   '/app/financeiro/lembretes': typeof AuthenticatedAppFinanceiroLembretesRoute
   '/app/financeiro/movimento': typeof AuthenticatedAppFinanceiroMovimentoRoute
+  '/app/financeiro/movimento-detalhe': typeof AuthenticatedAppFinanceiroMovimentoDetalheRoute
   '/app/financeiro/notas': typeof AuthenticatedAppFinanceiroNotasRoute
   '/app/financeiro/pendencias': typeof AuthenticatedAppFinanceiroPendenciasRoute
   '/app/financeiro/regras-ia': typeof AuthenticatedAppFinanceiroRegrasIaRoute
@@ -1411,11 +1427,13 @@ export interface FileRoutesByTo {
   '/app/financeiro/bi': typeof AuthenticatedAppFinanceiroBiRoute
   '/app/financeiro/categorias': typeof AuthenticatedAppFinanceiroCategoriasRoute
   '/app/financeiro/contas': typeof AuthenticatedAppFinanceiroContasRoute
+  '/app/financeiro/detalhe': typeof AuthenticatedAppFinanceiroDetalheRoute
   '/app/financeiro/empresas': typeof AuthenticatedAppFinanceiroEmpresasRoute
   '/app/financeiro/estatisticas': typeof AuthenticatedAppFinanceiroEstatisticasRoute
   '/app/financeiro/estorno': typeof AuthenticatedAppFinanceiroEstornoRoute
   '/app/financeiro/lembretes': typeof AuthenticatedAppFinanceiroLembretesRoute
   '/app/financeiro/movimento': typeof AuthenticatedAppFinanceiroMovimentoRoute
+  '/app/financeiro/movimento-detalhe': typeof AuthenticatedAppFinanceiroMovimentoDetalheRoute
   '/app/financeiro/notas': typeof AuthenticatedAppFinanceiroNotasRoute
   '/app/financeiro/pendencias': typeof AuthenticatedAppFinanceiroPendenciasRoute
   '/app/financeiro/regras-ia': typeof AuthenticatedAppFinanceiroRegrasIaRoute
@@ -1580,11 +1598,13 @@ export interface FileRoutesById {
   '/_authenticated/app/financeiro/bi': typeof AuthenticatedAppFinanceiroBiRoute
   '/_authenticated/app/financeiro/categorias': typeof AuthenticatedAppFinanceiroCategoriasRoute
   '/_authenticated/app/financeiro/contas': typeof AuthenticatedAppFinanceiroContasRoute
+  '/_authenticated/app/financeiro/detalhe': typeof AuthenticatedAppFinanceiroDetalheRoute
   '/_authenticated/app/financeiro/empresas': typeof AuthenticatedAppFinanceiroEmpresasRoute
   '/_authenticated/app/financeiro/estatisticas': typeof AuthenticatedAppFinanceiroEstatisticasRoute
   '/_authenticated/app/financeiro/estorno': typeof AuthenticatedAppFinanceiroEstornoRoute
   '/_authenticated/app/financeiro/lembretes': typeof AuthenticatedAppFinanceiroLembretesRoute
   '/_authenticated/app/financeiro/movimento': typeof AuthenticatedAppFinanceiroMovimentoRoute
+  '/_authenticated/app/financeiro/movimento-detalhe': typeof AuthenticatedAppFinanceiroMovimentoDetalheRoute
   '/_authenticated/app/financeiro/notas': typeof AuthenticatedAppFinanceiroNotasRoute
   '/_authenticated/app/financeiro/pendencias': typeof AuthenticatedAppFinanceiroPendenciasRoute
   '/_authenticated/app/financeiro/regras-ia': typeof AuthenticatedAppFinanceiroRegrasIaRoute
@@ -1749,11 +1769,13 @@ export interface FileRouteTypes {
     | '/app/financeiro/bi'
     | '/app/financeiro/categorias'
     | '/app/financeiro/contas'
+    | '/app/financeiro/detalhe'
     | '/app/financeiro/empresas'
     | '/app/financeiro/estatisticas'
     | '/app/financeiro/estorno'
     | '/app/financeiro/lembretes'
     | '/app/financeiro/movimento'
+    | '/app/financeiro/movimento-detalhe'
     | '/app/financeiro/notas'
     | '/app/financeiro/pendencias'
     | '/app/financeiro/regras-ia'
@@ -1912,11 +1934,13 @@ export interface FileRouteTypes {
     | '/app/financeiro/bi'
     | '/app/financeiro/categorias'
     | '/app/financeiro/contas'
+    | '/app/financeiro/detalhe'
     | '/app/financeiro/empresas'
     | '/app/financeiro/estatisticas'
     | '/app/financeiro/estorno'
     | '/app/financeiro/lembretes'
     | '/app/financeiro/movimento'
+    | '/app/financeiro/movimento-detalhe'
     | '/app/financeiro/notas'
     | '/app/financeiro/pendencias'
     | '/app/financeiro/regras-ia'
@@ -2080,11 +2104,13 @@ export interface FileRouteTypes {
     | '/_authenticated/app/financeiro/bi'
     | '/_authenticated/app/financeiro/categorias'
     | '/_authenticated/app/financeiro/contas'
+    | '/_authenticated/app/financeiro/detalhe'
     | '/_authenticated/app/financeiro/empresas'
     | '/_authenticated/app/financeiro/estatisticas'
     | '/_authenticated/app/financeiro/estorno'
     | '/_authenticated/app/financeiro/lembretes'
     | '/_authenticated/app/financeiro/movimento'
+    | '/_authenticated/app/financeiro/movimento-detalhe'
     | '/_authenticated/app/financeiro/notas'
     | '/_authenticated/app/financeiro/pendencias'
     | '/_authenticated/app/financeiro/regras-ia'
@@ -3101,6 +3127,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAppFinanceiroNotasRouteImport
       parentRoute: typeof AuthenticatedAppFinanceiroRoute
     }
+    '/_authenticated/app/financeiro/movimento-detalhe': {
+      id: '/_authenticated/app/financeiro/movimento-detalhe'
+      path: '/movimento-detalhe'
+      fullPath: '/app/financeiro/movimento-detalhe'
+      preLoaderRoute: typeof AuthenticatedAppFinanceiroMovimentoDetalheRouteImport
+      parentRoute: typeof AuthenticatedAppFinanceiroRoute
+    }
     '/_authenticated/app/financeiro/movimento': {
       id: '/_authenticated/app/financeiro/movimento'
       path: '/movimento'
@@ -3134,6 +3167,13 @@ declare module '@tanstack/react-router' {
       path: '/empresas'
       fullPath: '/app/financeiro/empresas'
       preLoaderRoute: typeof AuthenticatedAppFinanceiroEmpresasRouteImport
+      parentRoute: typeof AuthenticatedAppFinanceiroRoute
+    }
+    '/_authenticated/app/financeiro/detalhe': {
+      id: '/_authenticated/app/financeiro/detalhe'
+      path: '/detalhe'
+      fullPath: '/app/financeiro/detalhe'
+      preLoaderRoute: typeof AuthenticatedAppFinanceiroDetalheRouteImport
       parentRoute: typeof AuthenticatedAppFinanceiroRoute
     }
     '/_authenticated/app/financeiro/contas': {
@@ -3407,11 +3447,13 @@ interface AuthenticatedAppFinanceiroRouteChildren {
   AuthenticatedAppFinanceiroBiRoute: typeof AuthenticatedAppFinanceiroBiRoute
   AuthenticatedAppFinanceiroCategoriasRoute: typeof AuthenticatedAppFinanceiroCategoriasRoute
   AuthenticatedAppFinanceiroContasRoute: typeof AuthenticatedAppFinanceiroContasRoute
+  AuthenticatedAppFinanceiroDetalheRoute: typeof AuthenticatedAppFinanceiroDetalheRoute
   AuthenticatedAppFinanceiroEmpresasRoute: typeof AuthenticatedAppFinanceiroEmpresasRoute
   AuthenticatedAppFinanceiroEstatisticasRoute: typeof AuthenticatedAppFinanceiroEstatisticasRoute
   AuthenticatedAppFinanceiroEstornoRoute: typeof AuthenticatedAppFinanceiroEstornoRoute
   AuthenticatedAppFinanceiroLembretesRoute: typeof AuthenticatedAppFinanceiroLembretesRoute
   AuthenticatedAppFinanceiroMovimentoRoute: typeof AuthenticatedAppFinanceiroMovimentoRoute
+  AuthenticatedAppFinanceiroMovimentoDetalheRoute: typeof AuthenticatedAppFinanceiroMovimentoDetalheRoute
   AuthenticatedAppFinanceiroNotasRoute: typeof AuthenticatedAppFinanceiroNotasRoute
   AuthenticatedAppFinanceiroPendenciasRoute: typeof AuthenticatedAppFinanceiroPendenciasRoute
   AuthenticatedAppFinanceiroRegrasIaRoute: typeof AuthenticatedAppFinanceiroRegrasIaRoute
@@ -3434,6 +3476,8 @@ const AuthenticatedAppFinanceiroRouteChildren: AuthenticatedAppFinanceiroRouteCh
       AuthenticatedAppFinanceiroCategoriasRoute,
     AuthenticatedAppFinanceiroContasRoute:
       AuthenticatedAppFinanceiroContasRoute,
+    AuthenticatedAppFinanceiroDetalheRoute:
+      AuthenticatedAppFinanceiroDetalheRoute,
     AuthenticatedAppFinanceiroEmpresasRoute:
       AuthenticatedAppFinanceiroEmpresasRoute,
     AuthenticatedAppFinanceiroEstatisticasRoute:
@@ -3444,6 +3488,8 @@ const AuthenticatedAppFinanceiroRouteChildren: AuthenticatedAppFinanceiroRouteCh
       AuthenticatedAppFinanceiroLembretesRoute,
     AuthenticatedAppFinanceiroMovimentoRoute:
       AuthenticatedAppFinanceiroMovimentoRoute,
+    AuthenticatedAppFinanceiroMovimentoDetalheRoute:
+      AuthenticatedAppFinanceiroMovimentoDetalheRoute,
     AuthenticatedAppFinanceiroNotasRoute: AuthenticatedAppFinanceiroNotasRoute,
     AuthenticatedAppFinanceiroPendenciasRoute:
       AuthenticatedAppFinanceiroPendenciasRoute,

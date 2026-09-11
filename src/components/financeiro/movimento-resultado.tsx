@@ -9,8 +9,8 @@
  * `@/lib/financeiro/movimento-resultado`; aqui só se desenha.
  *
  * Dois tipos de clique, de propósito:
- *  - os seis cards de resultado abrem o detalhamento em tela cheia (agrupado
- *    e linha a linha, com Imprimir e Baixar Excel), o mesmo do Dashboard;
+ *  - os seis cards de resultado abrem o detalhamento em NOVA ABA (agrupado e
+ *    linha a linha, com Imprimir e Baixar Excel), o mesmo do Dashboard;
  *  - os cards menores (Consultas/Exames de cada condição, mensalidades,
  *    avulsos) filtram a lista de lançamentos logo abaixo, como já faziam.
  */
@@ -25,7 +25,9 @@ import {
   X,
   AlertTriangle,
 } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { abrirDetalheEmNovaAba } from "@/lib/financeiro/detalhe-aba";
 import { Card, CardContent } from "@/components/ui/card";
 import { brl } from "@/lib/financeiro/format";
 import { LABEL_FORMA } from "@/lib/financeiro/formas-pagamento";
@@ -178,6 +180,30 @@ export function MovimentoResultado({
   const v = (n: number) => (pronto ? brl(n) : "…");
   const alternar = (f: FiltroCard) => onFiltro(mesmoFiltro(filtro, f) ? null : f);
 
+  /**
+   * Abre o detalhamento do card em NOVA ABA, com as duas visões já montadas a
+   * partir das linhas desta tela — os mesmos filtros e a mesma chave dos
+   * retroativos do card clicado. Se o navegador bloquear a aba, o
+   * detalhamento abre por cima da tela, como era antes.
+   */
+  const abrir = (d: Drill) => {
+    if (!pronto) return;
+    const sintetico = montarDetalhe(d, linhas, r, "sintetico");
+    const abriu = abrirDetalheEmNovaAba("/app/financeiro/movimento-detalhe", {
+      sintetico: sintetico.temSintetico ? sintetico : null,
+      analitico: montarDetalhe(d, linhas, r, "analitico"),
+      rotuloSintetico: ROTULO_SINTETICO[d],
+      arquivo: `movimento_caixa_${d}`,
+      de,
+      ate,
+      clinicaNome,
+    });
+    if (!abriu) {
+      toast.info("O navegador não abriu a nova aba — o detalhamento abriu aqui mesmo.");
+      setDrill(d);
+    }
+  };
+
   const receitas = linhas.filter((l) => l.tipo === "receita");
   const formasRecebidas = totaisPorForma(receitas.map((l) => ({ balde: l.forma, valor: l.valor })));
   const recorrentes: TotalQtd = {
@@ -210,7 +236,7 @@ export function MovimentoResultado({
     <div className="space-y-3">
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
         <KpiCard
-          onClick={() => setDrill("receita")}
+          onClick={() => abrir("receita")}
           icon={TrendingUp}
           label="Receita bruta (atendimentos)"
           value={v(r.atendimentos.total)}
@@ -233,7 +259,7 @@ export function MovimentoResultado({
           )}
         </KpiCard>
         <KpiCard
-          onClick={() => setDrill("repasse")}
+          onClick={() => abrir("repasse")}
           icon={Handshake}
           label="Repasse médico pago no caixa"
           value={brl(r.repassePago.total)}
@@ -247,7 +273,7 @@ export function MovimentoResultado({
             .join(" · ")}
         />
         <KpiCard
-          onClick={() => setDrill("operacionais")}
+          onClick={() => abrir("operacionais")}
           icon={Receipt}
           label="Despesas operacionais"
           value={brl(r.operacionais.total)}
@@ -255,7 +281,7 @@ export function MovimentoResultado({
           detalhe="Contas, folha, compras — sem repasse médico"
         />
         <KpiCard
-          onClick={() => setDrill("outras")}
+          onClick={() => abrir("outras")}
           icon={Coins}
           label="Outras receitas"
           value={v(r.outras.total)}
@@ -263,7 +289,7 @@ export function MovimentoResultado({
           detalhe="Mensalidades do Cartão, adesões e avulsos"
         />
         <KpiCard
-          onClick={() => setDrill("totais")}
+          onClick={() => abrir("totais")}
           icon={TrendingDown}
           label="Despesas totais"
           value={brl(r.despesas)}
@@ -271,7 +297,7 @@ export function MovimentoResultado({
           detalhe="Repasse + despesas operacionais"
         />
         <KpiCard
-          onClick={() => setDrill("saldo")}
+          onClick={() => abrir("saldo")}
           icon={Wallet}
           label="Saldo líquido do caixa"
           value={brl(r.saldo)}

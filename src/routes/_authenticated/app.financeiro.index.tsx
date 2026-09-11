@@ -16,7 +16,9 @@ import {
   Users,
   Wallet,
 } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { abrirDetalheEmNovaAba } from "@/lib/financeiro/detalhe-aba";
 import { useClinica } from "@/hooks/use-clinica";
 import { usePodeEscrever } from "@/hooks/use-permissoes";
 import { brl, fmtDate, rangeFromPeriodo, type Periodo } from "@/lib/financeiro/format";
@@ -145,6 +147,30 @@ function FinDashboard() {
   const v = (n: (r: ResumoPainel) => number, formato: (x: number) => string = brl) =>
     carregando || !resumo ? "…" : formato(n(resumo));
 
+  /**
+   * Abre o detalhamento do card em NOVA ABA, como a diretoria pediu: a visão
+   * geral fica numa aba e o detalhamento em outra. As duas visões vão prontas
+   * para a aba nova (ver `@/lib/financeiro/detalhe-aba`). Se o navegador
+   * bloquear a aba, o detalhamento abre por cima da tela, como era antes.
+   */
+  const abrir = (d: Drill) => {
+    if (!dados || !resumo || carregando) return;
+    const sintetico = montarDetalhe(d, dados, resumo, "sintetico");
+    const abriu = abrirDetalheEmNovaAba("/app/financeiro/detalhe", {
+      sintetico: sintetico.temSintetico ? sintetico : null,
+      analitico: montarDetalhe(d, dados, resumo, "analitico"),
+      rotuloSintetico: rotuloSinteticoDe(d),
+      arquivo: `financeiro_${d}`,
+      de,
+      ate,
+      clinicaNome: clinicaAtual?.clinica.nome ?? "Clínica",
+    });
+    if (!abriu) {
+      toast.info("O navegador não abriu a nova aba — o detalhamento abriu aqui mesmo.");
+      setDrill(d);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -188,8 +214,8 @@ function FinDashboard() {
         <p className="text-xs text-muted-foreground">
           {fmtDate(de)}
           {de !== ate && ` a ${fmtDate(ate)}`} · receita, repasse e atendimentos pela mesma conta do
-          Rateio da Receita (Relatórios), no dia do atendimento. Clique em um card para ver o
-          detalhamento.
+          Rateio da Receita (Relatórios), no dia do atendimento. Clique em um card para abrir o
+          detalhamento em nova aba.
         </p>
       </div>
 
@@ -199,7 +225,7 @@ function FinDashboard() {
         </h2>
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           <KpiCard
-            onClick={() => setDrill("receita")}
+            onClick={() => abrir("receita")}
             icon={TrendingUp}
             label="Receita bruta"
             value={v((r) => r.receitaBruta)}
@@ -224,7 +250,7 @@ function FinDashboard() {
             )}
           </KpiCard>
           <KpiCard
-            onClick={() => setDrill("repasse")}
+            onClick={() => abrir("repasse")}
             icon={Handshake}
             label="Repasse a médicos / prestadores"
             value={v((r) => r.repasse)}
@@ -243,7 +269,7 @@ function FinDashboard() {
             }
           />
           <KpiCard
-            onClick={() => setDrill("operacionais")}
+            onClick={() => abrir("operacionais")}
             icon={Receipt}
             label="Despesas operacionais"
             value={v((r) => r.despesasOperacionais)}
@@ -251,7 +277,7 @@ function FinDashboard() {
             detalhe="Contas, folha, compras — sem repasse médico"
           />
           <KpiCard
-            onClick={() => setDrill("outras")}
+            onClick={() => abrir("outras")}
             icon={Coins}
             label="Outras receitas"
             value={v((r) => r.outrasReceitas)}
@@ -259,7 +285,7 @@ function FinDashboard() {
             detalhe="Mensalidades do Cartão, adesões e avulsos"
           />
           <KpiCard
-            onClick={() => setDrill("totais")}
+            onClick={() => abrir("totais")}
             icon={TrendingDown}
             label="Despesas totais"
             value={v((r) => r.despesasTotais)}
@@ -267,7 +293,7 @@ function FinDashboard() {
             detalhe="Repasse + despesas operacionais"
           />
           <KpiCard
-            onClick={() => setDrill("saldo")}
+            onClick={() => abrir("saldo")}
             icon={Wallet}
             label="Líquido da clínica / Saldo"
             value={v((r) => r.saldo)}
@@ -287,21 +313,21 @@ function FinDashboard() {
         </h2>
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           <KpiCard
-            onClick={() => setDrill("atendimentos")}
+            onClick={() => abrir("atendimentos")}
             icon={Users}
             label="Atendimentos (total)"
             value={v((r) => r.producao.total, int)}
             accent="primary"
           />
           <KpiCard
-            onClick={() => setDrill("cartao")}
+            onClick={() => abrir("cartao")}
             icon={CreditCard}
             label="Consultas Cartão"
             value={v((r) => r.producao.consultasCartao, int)}
             accent="primary"
           />
           <KpiCard
-            onClick={() => setDrill("particular")}
+            onClick={() => abrir("particular")}
             icon={Stethoscope}
             label="Consultas Particulares"
             value={v((r) => r.producao.consultasParticulares, int)}
@@ -313,7 +339,7 @@ function FinDashboard() {
             }
           />
           <KpiCard
-            onClick={() => setDrill("exame")}
+            onClick={() => abrir("exame")}
             icon={FlaskConical}
             label="Exames"
             value={v((r) => r.producao.exames, int)}
@@ -323,7 +349,7 @@ function FinDashboard() {
               cards de contagem não fecharia com o total. */}
           {resumo && resumo.producao.outros > 0 && (
             <KpiCard
-              onClick={() => setDrill("outro")}
+              onClick={() => abrir("outro")}
               icon={Activity}
               label="Procedimentos e outros"
               value={v((r) => r.producao.outros, int)}
@@ -331,7 +357,7 @@ function FinDashboard() {
             />
           )}
           <KpiCard
-            onClick={() => setDrill("ticket")}
+            onClick={() => abrir("ticket")}
             icon={Calendar}
             label="Ticket médio"
             value={v((r) => r.ticketMedio)}
@@ -351,13 +377,7 @@ function FinDashboard() {
       {drill && dados && resumo && (
         <DetalhamentoDialog
           montar={(visao) => montarDetalhe(drill, dados, resumo, visao)}
-          rotuloSintetico={
-            drill === "operacionais" || drill === "outras"
-              ? "Por categoria"
-              : drill === "totais"
-                ? "Por conta"
-                : "Por profissional"
-          }
+          rotuloSintetico={rotuloSinteticoDe(drill)}
           arquivo={`financeiro_${drill}`}
           de={de}
           ate={ate}
@@ -370,6 +390,14 @@ function FinDashboard() {
 }
 
 const margem = (valor: number, base: number) => (base === 0 ? 0 : (valor / base) * 100);
+
+/** Nome do botão da visão agrupada de cada detalhamento. */
+const rotuloSinteticoDe = (d: Drill) =>
+  d === "operacionais" || d === "outras"
+    ? "Por categoria"
+    : d === "totais"
+      ? "Por conta"
+      : "Por profissional";
 
 // ============================================================================
 // Detalhamento em tela cheia
