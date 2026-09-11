@@ -283,6 +283,11 @@ export const editarMembro = createServerFn({ method: "POST" })
     if (mErr || !mem) throw new Error("Membro não encontrado");
     if (mem.clinica_id !== data.clinicaId) throw new Error("Membro não pertence a esta clínica");
 
+    // Trocar nome ou senha mexe na conta inteira, não só neste vínculo.
+    if (data.nome || (data.novaSenha && data.novaSenha.length >= 6)) {
+      await assertPodeAlterarConta(context.userId, mem.user_id);
+    }
+
     const { error: upErr } = await supabaseAdmin
       .from("clinica_memberships")
       .update({
