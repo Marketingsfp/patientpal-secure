@@ -138,7 +138,12 @@ export function montarContexto(entrada: EntradaContexto): ContextoMontado {
     .join("\n\n");
 
   let truncou = false;
-  const relevantes = selecionarMensagensRelevantes(entrada.historico, limites.maxMensagens).map(
+  const dedup = removerMensagemAtualDuplicada(
+    entrada.historico,
+    entrada.mensagemAtual,
+    entrada.idsMensagemAtual,
+  );
+  const relevantes = selecionarMensagensRelevantes(dedup.mensagens, limites.maxMensagens).map(
     (m) => {
       if (typeof m.content !== "string") return m;
       const c = cortar(m.content, limites.maxCaracteresMensagem);
