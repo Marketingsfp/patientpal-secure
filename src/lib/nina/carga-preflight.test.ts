@@ -130,6 +130,8 @@ describe("preparação em lotes com progresso (fase 3)", () => {
       previousCycleResolved: true,
       ready: true,
       jaLimpo: false,
+      cicloEncerrado: null,
+      sessao: null,
     });
   });
 
