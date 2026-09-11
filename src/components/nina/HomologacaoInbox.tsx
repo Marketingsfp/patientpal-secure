@@ -1349,7 +1349,7 @@ export function HomologacaoInbox() {
                                   clinicaId={clinicaId}
                                   mensagemId={m.id ? String(m.id) : null}
                                   conversaId={meta.test_conversation_id ?? null}
-                                  mensagem={{ tipo: m.tipo ?? null, texto: m.body ?? null }}
+                                  mensagem={{ texto: m.body ?? null }}
                                   confianca={confiancaPorExecucao[String(m.execucao_id)]!}
                                 />
 
