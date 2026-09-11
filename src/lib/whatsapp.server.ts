@@ -1404,17 +1404,10 @@ async function gerarRespostaNinaInterno(
         }
       : null,
   });
+  // FASE 4 — a pendência de esclarecimento entra no contrato de SISTEMA, e
+  // agora dentro do CONTRATO DE PRECEDÊNCIA do turno (com origem, prioridade e
+  // motivo), montado no composer. Nada mais é concatenado aqui.
   const mensagens: MsgIA[] = contexto.messages as MsgIA[];
-  // FASE 4 — a pendência de esclarecimento entra no contrato de SISTEMA
-  // (estado e restrições), nunca como uma falsa mensagem do paciente.
-  {
-    const { blocoContratoEsclarecimento, normalizarPendencia: normPend } = await import(
-      "@/lib/nina/confidence/esclarecimento"
-    );
-    const bloco = blocoContratoEsclarecimento(normPend(fluxoEstado.clarification));
-    // Logo após o prompt publicado, antes do histórico do paciente.
-    if (bloco) mensagens.splice(1, 0, { role: "system", content: bloco });
-  }
   rastro?.concluir("context.load", {
     mensagens_contexto: mensagens.length,
     paciente_identificado: Boolean(pacienteIdEfetivo),
