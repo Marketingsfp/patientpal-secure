@@ -3528,6 +3528,7 @@ export function AtendInbox() {
                           clinicaId={clinicaId}
                           conversaId={m.conversa_id ?? sel.id}
                           mensagemId={m.id}
+                          execucaoId={m.execucao_id ? String(m.execucao_id) : null}
                         />
                       )}
                       <div
@@ -3563,6 +3564,12 @@ export function AtendInbox() {
                               <ConfiancaMensagemBadge
                                 clinicaId={clinicaId}
                                 mensagemId={m.id ? String(m.id) : null}
+                                conversaId={m.conversa_id ?? sel.id}
+                                mensagem={{
+                                  tipo: m.tipo ?? null,
+                                  texto: m.body ?? null,
+                                  transcricao: (m as { transcricao?: string | null }).transcricao ?? null,
+                                }}
                                 confianca={confiancaPorExecucao[String(m.execucao_id)]!}
                               />
 

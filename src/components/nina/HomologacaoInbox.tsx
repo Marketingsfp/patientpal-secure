@@ -1319,6 +1319,7 @@ export function HomologacaoInbox() {
                           clinicaId={clinicaId}
                           conversaId={meta.test_conversation_id}
                           mensagemId={meta.message_id}
+                          execucaoId={m.execucao_id ? String(m.execucao_id) : null}
                         />
                       )}
                       <div
@@ -1347,6 +1348,8 @@ export function HomologacaoInbox() {
                                 <ConfiancaMensagemBadge
                                   clinicaId={clinicaId}
                                   mensagemId={m.id ? String(m.id) : null}
+                                  conversaId={meta.test_conversation_id ?? null}
+                                  mensagem={{ tipo: m.tipo ?? null, texto: m.body ?? null }}
                                   confianca={confiancaPorExecucao[String(m.execucao_id)]!}
                                 />
 
