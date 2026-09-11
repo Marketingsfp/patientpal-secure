@@ -1638,7 +1638,9 @@ async function gerarRespostaNinaInterno(
       const { hashDoTexto: hashInstrucoes } = await import("@/lib/nina/confidence/hash");
       const instrucoesDoTurno = montarInstrucoesDoTurno({
         escopo: "whatsapp",
-        versao: instrucoesNina.versao ?? null,
+        versao: instrucoesNina.versao === null || instrucoesNina.versao === undefined
+          ? null
+          : String(instrucoesNina.versao),
         versaoId: instrucoesNina.versaoId ?? null,
         publicadoEm: instrucoesNina.publicadoEm ?? null,
         origem: instrucoesNina.origem ?? null,
