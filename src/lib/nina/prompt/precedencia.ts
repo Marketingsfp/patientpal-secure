@@ -156,7 +156,12 @@ export function textoContratoPrecedencia(r: ResultadoPrecedencia): string {
 /** Resumo auditável, sem PII: o que valeu e o que foi suprimido. */
 export function resumoPrecedencia(r: ResultadoPrecedencia) {
   return {
-    vigentes: r.vigentes.map((v) => ({ codigo: v.codigo, nivel: v.nivel, origem: v.origem })),
+    vigentes: r.vigentes.map((v) => ({
+      codigo: v.codigo,
+      nivel: v.nivel,
+      origem: v.origem,
+      motivo: v.motivo ?? null,
+    })),
     regras_gerais_suprimidas: r.suprimidas,
     supressoes_recusadas: r.supressoesRecusadas,
     eventos: r.eventos.map((ev) => ev.codigo),
