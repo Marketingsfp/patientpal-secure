@@ -597,6 +597,10 @@ export const aplicarCorrecaoComIA = createServerFn({ method: "POST" })
                 comentario: String(args.comentario ?? "Correção assistida de erro reportado"),
               });
               publicado = true;
+              versaoPrompt = {
+                anterior: r.anterior == null ? null : String(r.anterior),
+                nova: r.versao == null ? null : String(r.versao),
+              };
               alvoVerificacao = {
                 tipo: "prompt",
                 conteudo: String(args.conteudo ?? ""),
