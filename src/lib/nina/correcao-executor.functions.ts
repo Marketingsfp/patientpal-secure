@@ -505,6 +505,11 @@ export const aplicarCorrecaoComIA = createServerFn({ method: "POST" })
 
     try {
       for (let rodada = 0; rodada < LIMITE_RODADAS_EXECUTOR; rodada++) {
+        if (prazoExcedido(inicioMs, Date.now())) {
+          motivoFinal = "Tempo máximo desta correção excedido. Execução interrompida.";
+          passo("sistema", "Tempo excedido", motivoFinal, false);
+          break;
+        }
         const saida = await chamarExecutor(entradaModelo, ferramentas);
         const chamadas = saida.itens.filter((i: any) => i?.type === "function_call");
         entradaModelo.push(...saida.itens);
@@ -523,6 +528,11 @@ export const aplicarCorrecaoComIA = createServerFn({ method: "POST" })
           }
           let retorno: unknown;
           try {
+            // Teto real de operações: nenhuma ferramenta passa do limite.
+            const limite = podeExecutar(contagem, c.name as OperacaoLimitada);
+            if (!limite.ok) throw new Error(limite.motivo);
+            contagem = registrarOperacao(contagem, c.name as OperacaoLimitada);
+
             if (c.name === "ler_catalogo") {
               retorno = await ferramentasServer.lerCatalogo(
                 supabase,
@@ -538,6 +548,12 @@ export const aplicarCorrecaoComIA = createServerFn({ method: "POST" })
               });
               valorAnterior = r.anterior;
               publicado = true;
+              alvoVerificacao = {
+                tipo: "catalogo",
+                itemId: String(args.item_id),
+                campo: String(args.campo),
+                valorNovo: String(args.valor_novo ?? ""),
+              };
               retorno = r;
               passo(
                 "gravar_item_catalogo",
