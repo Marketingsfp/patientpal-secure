@@ -33,7 +33,7 @@ import {
 } from "./baixa-confiabilidade";
 import { classificarTipoTurno, type TipoTurno } from "./turno-tipo";
 import type { AcaoSolicitada, ResultadoConfianca } from "./types";
-import type { IntencaoNina } from "../confidence-engine";
+import type { IntencaoNina } from "../atendimento-fase1";
 
 /**
  * Tudo que tem efeito real fora da Nina. Homologação recebe portas que
@@ -159,7 +159,17 @@ export async function executarCadeiaDeEnvio(e: EntradaCadeia): Promise<Resultado
     ambiente: e.ambiente,
     conversaId: "conversa-fase3",
     messageId: "mensagem-fase3",
-    instrucoes: { hash, regras, ...(limitacoes.length ? { limitacoes } : {}) },
+    instrucoes: {
+      escopo: "whatsapp",
+      versao: "fase3",
+      versaoId: "fase3",
+      publicadoEm: null,
+      origem: "arquitetura_publicada",
+      hash,
+      obrigacoes: [],
+      regras,
+      ...(limitacoes.length ? { limitacoes } : {}),
+    },
     ...(e.fatos ? { fatos: e.fatos } : {}),
   };
 
