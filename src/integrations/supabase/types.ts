@@ -8784,6 +8784,7 @@ export type Database = {
           passos: Json
           proposta: Json
           proposta_assinatura: string
+          relatorio: Json | null
           resultado_final: string | null
           resumo: Json | null
           status: string
@@ -8811,6 +8812,7 @@ export type Database = {
           passos?: Json
           proposta: Json
           proposta_assinatura: string
+          relatorio?: Json | null
           resultado_final?: string | null
           resumo?: Json | null
           status?: string
@@ -8838,6 +8840,7 @@ export type Database = {
           passos?: Json
           proposta?: Json
           proposta_assinatura?: string
+          relatorio?: Json | null
           resultado_final?: string | null
           resumo?: Json | null
           status?: string
