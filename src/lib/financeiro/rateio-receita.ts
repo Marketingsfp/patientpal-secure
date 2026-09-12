@@ -155,6 +155,16 @@ export interface RateioLinha {
   /** Competência: dia em que o pagamento entrou no caixa. */
   data: string;
   origem: RateioOrigem;
+  /** Paciente do atendimento/recebimento, quando o lançamento tem vínculo. */
+  paciente_id: string | null;
+  /** Nome do paciente; vazio quando o lançamento não tem paciente vinculado. */
+  paciente_nome: string;
+  /**
+   * Primeira vez do paciente na clínica: o atendimento caiu no MESMO dia do
+   * primeiro agendamento não cancelado dele. `null` quando não dá para dizer
+   * (recebimento sem paciente vinculado ou sem histórico de agenda).
+   */
+  primeira_vez: boolean | null;
   medico_id: string | null;
   medico_nome: string;
 
