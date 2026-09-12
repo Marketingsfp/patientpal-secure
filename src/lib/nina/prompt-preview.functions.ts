@@ -279,7 +279,7 @@ export const previewRequestNina = createServerFn({ method: "POST" })
       },
       contratoPrecedencia: precedencia.contrato,
       regrasAplicaveis: precedencia.regrasAplicaveis.map((r) => ({
-        descricao: r.descricao ?? r.texto ?? "regra publicada",
+        descricao: r.descricao,
         interpretada: r.interpretada,
       })),
       limitacoesPrecedencia: precedencia.resumo.limitacoes,
