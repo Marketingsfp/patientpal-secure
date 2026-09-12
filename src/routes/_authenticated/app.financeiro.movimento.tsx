@@ -70,6 +70,8 @@ import { MovimentoResultado } from "@/components/financeiro/movimento-resultado"
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { DateInputBR } from "@/components/ui/date-input-br";
+import { DateRangeFilter, type DatePreset } from "@/components/date-range-filter";
+
 import { CurrencyInput } from "@/components/ui/currency-input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
