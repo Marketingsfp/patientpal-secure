@@ -17,8 +17,15 @@
  * imprime em A4 e exporta para Excel. É o que garante que o papel e a planilha
  * mostram exatamente o que a tela mostrou.
  */
-import { useMemo, useState, type ReactNode } from "react";
-import { ExternalLink, FileSpreadsheet, Maximize2, Printer } from "lucide-react";
+import { useMemo, useRef, useState, type ReactNode } from "react";
+import {
+  ChevronDown,
+  ChevronUp,
+  ExternalLink,
+  FileSpreadsheet,
+  Maximize2,
+  Printer,
+} from "lucide-react";
 import { toast } from "sonner";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
