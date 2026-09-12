@@ -104,6 +104,32 @@ export type EntradaSaudacao = {
 };
 
 /**
+ * Critério ÚNICO de "afirmação sem lastro", usado pelo atendimento real e
+ * pelos testes de encadeamento.
+ *
+ * Não basta olhar as afirmações já classificadas como sem evidência: uma
+ * afirmação que o extrator NÃO reconheceu (validador UNKNOWN) também não tem
+ * lastro conferido. Tratá-la como inofensiva deixava passar, dentro de uma
+ * saudação, frases como "já confirmei seu agendamento".
+ */
+export function afirmacaoSemLastro(
+  avaliacao:
+    | {
+        claims?: { semEvidencia: unknown[] } | null;
+        validators?: Array<{ validator: string; status: string }> | null;
+      }
+    | null
+    | undefined,
+): boolean {
+  if (!avaliacao) return false;
+  if ((avaliacao.claims?.semEvidencia.length ?? 0) > 0) return true;
+  const sensiveis = ["ClaimGroundingValidator", "ActionProofValidator"];
+  return (avaliacao.validators ?? []).some(
+    (v) => sensiveis.includes(v.validator) && (v.status === "FAIL" || v.status === "UNKNOWN"),
+  );
+}
+
+/**
  * A exceção de saudação vale? Só quando o turno é social E nenhuma das
  * condições de risco foi observada. Qualquer uma delas devolve a decisão ao
  * critério normal de confiança.

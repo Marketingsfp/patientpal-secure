@@ -2788,7 +2788,7 @@ async function gerarRespostaNinaInterno(
             (estadoParaRevisao.tipoTurno === "ESCLARECIMENTO" &&
               (estadoParaRevisao.acao ?? null) === null),
           acaoOperacional: (estadoParaRevisao.acao ?? null) !== null,
-          afirmacaoSemFonte: (respostaFinalAvaliada.claims?.semEvidencia.length ?? 0) > 0,
+          afirmacaoSemFonte: afirmacaoSemLastro(respostaFinalAvaliada),
           pedidoDeHumano: houveHandoff,
           conflitoDeIdentidade: diagnosticoSaudacao.saudacaoDuplicada === true,
           conformidadeBloqueante: revisao.bloqueiaEntrega === true,
