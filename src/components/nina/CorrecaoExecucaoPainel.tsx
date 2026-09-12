@@ -141,6 +141,8 @@ export function CorrecaoExecucaoPainel({
           </p>
         </details>
       )}
+
+      <CorrecaoRelatorioCard relatorio={relatorio ?? null} />
     </div>
   );
 }
