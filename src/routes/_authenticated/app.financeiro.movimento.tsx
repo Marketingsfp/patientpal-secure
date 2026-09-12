@@ -2649,6 +2649,61 @@ function Page() {
                       clínica, por isso não entram nas saídas acima.
                     </div>
                   )}
+                  <div className="border-t px-4 py-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground bg-muted/30">
+                    Resumo por tipo de moeda — conferência de caixa
+                    {decomporMisto ? " (mistos decompostos)" : ""}
+                  </div>
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Forma de pagamento</TableHead>
+                          <TableHead className="text-right">Pagamento</TableHead>
+                          <TableHead className="text-right">Recebimento</TableHead>
+                          <TableHead className="text-right">Saldo</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {linhasMoeda.map((m) => (
+                          <TableRow key={m.chave}>
+                            <TableCell className="font-medium">{m.label}</TableCell>
+                            <TableCell className="text-right tabular-nums text-red-600">
+                              {m.pagamento ? fmt(m.pagamento) : "—"}
+                            </TableCell>
+                            <TableCell className="text-right tabular-nums text-green-600">
+                              {m.recebimento ? fmt(m.recebimento) : "—"}
+                            </TableCell>
+                            <TableCell
+                              className={`text-right tabular-nums font-medium ${
+                                m.saldo >= 0 ? "text-green-600" : "text-red-600"
+                              }`}
+                            >
+                              {fmt(m.saldo)}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                        <TableRow className="bg-muted/40 font-semibold">
+                          <TableCell>TOTAL</TableCell>
+                          <TableCell className="text-right tabular-nums text-red-600">
+                            {fmt(totalMoeda.pagamento)}
+                          </TableCell>
+                          <TableCell className="text-right tabular-nums text-green-600">
+                            {fmt(totalMoeda.recebimento)}
+                          </TableCell>
+                          <TableCell
+                            className={`text-right tabular-nums ${
+                              totalMoeda.recebimento - totalMoeda.pagamento >= 0
+                                ? "text-green-600"
+                                : "text-red-600"
+                            }`}
+                          >
+                            {fmt(totalMoeda.recebimento - totalMoeda.pagamento)}
+                          </TableCell>
+                        </TableRow>
+                      </TableBody>
+                    </Table>
+                  </div>
+
 
                 </>
               );
