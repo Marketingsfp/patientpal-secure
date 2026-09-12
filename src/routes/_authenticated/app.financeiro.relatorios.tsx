@@ -2576,7 +2576,16 @@ function Page() {
           <CardResumo
             titulo="Repasse ao prestador"
             valor={brl(totaisR.repasse)}
-            detalhe={comparacaoVisivel ? `${brl(totaisComp.repasse)} antes` : undefined}
+            detalhe={
+              comparacaoVisivel
+                ? `${brl(totaisComp.repasse)} antes`
+                : // As duas leituras lado a lado, como no Dashboard e no
+                  // Movimento: aqui o devido pelos atendimentos; ao lado, o
+                  // que saiu do caixa no mesmo período.
+                  repassePagoRateio !== null
+                  ? `Devido pelos atendimentos · pago no caixa: ${brl(repassePagoRateio)}`
+                  : "Devido pelos atendimentos"
+            }
             delta={deltaDe(totaisR.repasse, totaisComp.repasse)}
             invertido
           />
