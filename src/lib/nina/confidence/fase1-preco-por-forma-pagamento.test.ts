@@ -99,7 +99,7 @@ describe("FASE 1 — controle A/B da validação monetária", () => {
     expect(valores.every((c) => c.suportado)).toBe(true);
   });
 
-  it("A) PENDENTE DA FASE 3: o motor ainda compara o cartão com o dinheiro", () => {
+  it("A) CORRIGIDO NA FASE 3: cada valor é conferido com a sua forma de pagamento", () => {
     const { fatos } = extrairEvidencia(retornoDaFerramenta());
     const r = avaliarGrounding(
       contexto(fatos),
@@ -108,10 +108,8 @@ describe("FASE 1 — controle A/B da validação monetária", () => {
     const valores = r.claims.filter((c) => c.tipo === "valor");
     const cartao = valores.find((c) => /60/.test(c.trecho));
     expect(cartao).toBeDefined();
-    // A evidência do cartão JÁ existe (teste da Fase 2). O que falta é a
-    // correspondência escolher o fato da mesma condição — trabalho da Fase 3.
     expect(fatos.some((f) => f.chave?.condicoes === "cartao" && f.valor === "60")).toBe(true);
-    expect(cartao!.situacao).toBe("divergente");
-    expect(cartao!.valorDaFonte).toBe("51");
+    expect(cartao!.situacao).toBe("confirmado");
+    expect(valores.every((c) => c.suportado)).toBe(true);
   });
 });

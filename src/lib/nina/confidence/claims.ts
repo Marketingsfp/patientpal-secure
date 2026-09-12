@@ -31,6 +31,7 @@ import {
   type FatoRecuperado,
 } from "./evidencia";
 import {
+  chaveDaAfirmacaoMonetaria,
   correspondenciaDaAfirmacao,
   fatosNoEscopoDaAfirmacao,
   qualificadoresDaAfirmacao,
@@ -39,6 +40,7 @@ import {
   valorDaAfirmacao,
   TERMOS_DE_ASSUNTO,
 } from "./afirmacao";
+
 import {
   classificarNatureza,
   modalidadeDaNatureza,
@@ -121,7 +123,10 @@ function assuntoDoFatoCompativel(
   return mencionados.some((t) => assuntoFato.includes(t));
 }
 
-const ALVO_DO_FATO: Record<TipoClaim, { entidades: EntidadeFato[]; campos: string[]; monetario?: boolean }> = {
+const ALVO_DO_FATO: Record<
+  TipoClaim,
+  { entidades: EntidadeFato[]; campos: string[]; monetario?: boolean }
+> = {
   valor: { entidades: ["procedimento", "servico"], campos: ["preco"], monetario: true },
   preparo: { entidades: ["procedimento"], campos: ["preparo"] },
   profissional: { entidades: ["profissional"], campos: ["nome"] },
@@ -316,7 +321,8 @@ const PADROES: Array<{ tipo: TipoClaim; re: RegExp }> = [
 
 const RE_NEGACAO =
   /\b(n[ãa]o|nao)\b[^.!?\n]{0,60}|(\bsem\s+(informa[çc][ãa]o|confirma[çc][ãa]o|previs[ãa]o)\b)|(\bainda\s+n[ãa]o\b)/i;
-const RE_HIPOTESE = /\b(geralmente|normalmente|costuma|em m[ée]dia|acredito|acho que|talvez|deve ser)\b/i;
+const RE_HIPOTESE =
+  /\b(geralmente|normalmente|costuma|em m[ée]dia|acredito|acho que|talvez|deve ser)\b/i;
 
 /** Frase que contém o trecho — a modalidade é lida na frase, não na palavra. */
 function fraseDoTrecho(texto: string, trecho: string): string {
@@ -403,7 +409,10 @@ export function extrairClaimsDoTexto(texto: string): ClaimDoTexto[] {
  * Avalia claim a claim contra a evidência realmente disponível no turno.
  * Determinístico: nenhuma chamada de modelo acontece aqui.
  */
-export function avaliarGrounding(ctx: ContextoConfianca, texto?: string | null): ResultadoGrounding {
+export function avaliarGrounding(
+  ctx: ContextoConfianca,
+  texto?: string | null,
+): ResultadoGrounding {
   const canal = evidenciasDisponiveis(ctx);
   const fatos: FatoRecuperado[] | null = ctx.fatos ?? null;
   const estruturados: ClaimEstruturado[] = ctx.claims ?? [];
@@ -495,7 +504,7 @@ export function avaliarGrounding(ctx: ContextoConfianca, texto?: string | null):
       const caps = capsDoTipo(tipo);
       const consulta = consultaRespondeu(ctx, caps);
       const falhou = consultaFalhou(ctx, caps);
-      const fonteOficial = canalDoTipo ?? (consulta ? aceitas[0] ?? null : null);
+      const fonteOficial = canalDoTipo ?? (consulta ? (aceitas[0] ?? null) : null);
 
       if (!consulta) {
         push({
@@ -612,16 +621,14 @@ export function avaliarGrounding(ctx: ContextoConfianca, texto?: string | null):
         situacao: "nao_verificado",
         suportado: false,
         fonte: fonteOficial,
-        motivo:
-          "a consulta respondeu, mas não há evidência de ausência no escopo afirmado",
+        motivo: "a consulta respondeu, mas não há evidência de ausência no escopo afirmado",
       });
       return;
     }
 
     // Agendamento: a prova é o registro persistido, não o texto.
     if (tipo === "agendamento") {
-      const provaFato =
-        fatos && fatos.some((f) => f.entidade === "agendamento" && f.valor);
+      const provaFato = fatos && fatos.some((f) => f.entidade === "agendamento" && f.valor);
       const prova = canal.agendamento ?? (provaFato ? "agenda" : null);
       push({
         tipo,
@@ -665,8 +672,21 @@ export function avaliarGrounding(ctx: ContextoConfianca, texto?: string | null):
      */
     const segmento = (frase ?? trecho).trim();
     if (fatos && fatos.length > 0 && segmento) {
-      const chaveDaFrase = chave ?? qualificadoresDaAfirmacao(segmento);
-      const valorDaFrase = valor ?? valorDaAfirmacao(tipo, segmento);
+      // FASE 3 — afirmação monetária: o valor e a CONDIÇÃO vêm do recorte do
+      // próprio valor ("R$ 51,00 no dinheiro" / "R$ 60,00 no cartão"),
+      // enquanto procedimento/profissional/unidade seguem vindo do segmento.
+      const monetaria = tipo === "valor";
+      const chaveDaFrase =
+        chave ??
+        (monetaria
+          ? chaveDaAfirmacaoMonetaria(segmento, trecho)
+          : qualificadoresDaAfirmacao(segmento));
+      const valorDaFrase =
+        valor ??
+        (monetaria
+          ? (valorDaAfirmacao(tipo, trecho) ?? valorDaAfirmacao(tipo, segmento))
+          : valorDaAfirmacao(tipo, segmento));
+
       const r = correspondenciaDaAfirmacao(fatos, {
         tipo,
         entidades: alvo.entidades,
@@ -718,6 +738,7 @@ export function avaliarGrounding(ctx: ContextoConfianca, texto?: string | null):
           fonte: canalDoTipo,
           valorAfirmado: valorDaFrase,
           motivo:
+            r.motivo ??
             "a fonte consultada não cobre este caso (procedimento/profissional/unidade/dia/convênio)",
         });
         return;
@@ -905,9 +926,7 @@ export function avaliarGrounding(ctx: ContextoConfianca, texto?: string | null):
     );
   }
 
-  const semEvidencia = claims.filter(
-    (c) => !c.suportado && c.situacao !== "nao_verificado",
-  );
+  const semEvidencia = claims.filter((c) => !c.suportado && c.situacao !== "nao_verificado");
   const naoVerificados = claims.filter((c) => c.situacao === "nao_verificado");
 
   // FASE 3 — limitações da própria extração ficam registradas: "zero
