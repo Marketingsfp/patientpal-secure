@@ -99,7 +99,13 @@ export function classificarDespesas(despesas: LancamentoPainel[]): DespesaPainel
   return despesas.map((d) => ({ ...d, grupo: grupoDaDespesa(d.categoria_nome, d.descricao) }));
 }
 
-/** Contagem de atendimentos por tipo, na mesma base do Rateio. */
+/**
+ * Contagem de atendimentos.
+ *
+ * Desde 12/09/2026 cada PAGAMENTO recebido conta como um atendimento, a
+ * pedido da direção: consulta, exame, procedimento, adesão, mensalidade e
+ * recebimento avulso. O que não tem serviço de prestador entra em `outros`.
+ */
 export interface ProducaoPainel {
   total: number;
   consultasCartao: number;
@@ -108,9 +114,10 @@ export interface ProducaoPainel {
   /** Quantas das consultas particulares são de convênio. */
   consultasConvenio: number;
   exames: number;
-  /** Procedimento, "outro" e serviço fora do cadastro. */
+  /** Procedimento, "outro", serviço fora do cadastro e recebimento avulso. */
   outros: number;
 }
+
 
 export type CategoriaAtendimento = "cartao" | "particular" | "exame" | "outro";
 
