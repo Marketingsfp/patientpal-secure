@@ -8,25 +8,22 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { carregarEvidenciasExecucao } from "./evidencias.functions";
 import {
   INSTRUCOES_AVALIADOR,
   LIMITE_ANALISES_POR_ERRO,
   MODELO_ANALISE,
   SCHEMA_ANALISE,
   VERSAO_CRITERIOS_ANALISE,
-  montarPacote,
   montarPromptAnalise,
   normalizarResultado,
+  pacoteDaInvestigacao,
   type PacoteEvidencias,
   type ResultadoAnalise,
   type Verificacao,
 } from "./analise-erro";
+import { resumoDoPacote, type PacoteInvestigacao, type ResumoPacote } from "./evidencias-pacote";
 
-type ResumoEvidencias = {
-  entradas: number;
-  etapas: number;
-  lacunas: string[];
+type ResumoEvidencias = ResumoPacote & {
   verificacoes: Verificacao[];
   modelo_da_execucao: string | null;
 };
@@ -43,6 +40,9 @@ type Analise = {
   conclusao: string | null;
   resultado: ResultadoAnalise | null;
   evidencias_resumo: ResumoEvidencias | null;
+  /** Hash do pacote de evidências que fundamentou esta análise. */
+  pacote_hash: string | null;
+  pacote_revisao: number | null;
   input_tokens: number | null;
   output_tokens: number | null;
   duracao_ms: number | null;
@@ -52,8 +52,9 @@ type Analise = {
   concluida_em: string | null;
 };
 
+// O pacote completo não vai na listagem (payload grande): só hash e revisão.
 const COLUNAS =
-  "id, feedback_id, versao, modelo, status, criterios_versao, conclusao, resultado, evidencias_resumo, input_tokens, output_tokens, duracao_ms, erro, solicitado_por, created_at, concluida_em";
+  "id, feedback_id, versao, modelo, status, criterios_versao, conclusao, resultado, evidencias_resumo, pacote_hash, pacote_revisao, input_tokens, output_tokens, duracao_ms, erro, solicitado_por, created_at, concluida_em";
 
 async function exigirPermissao(context: any, clinicaId: string) {
   const { data: pode, error } = await (context.supabase as any).rpc("nina_fb_pode_revisar", {
@@ -150,11 +151,9 @@ async function chamarAvaliador(
   return { texto, inputTokens, outputTokens };
 }
 
-function resumoEvidencias(p: PacoteEvidencias): ResumoEvidencias {
+function resumoEvidencias(p: PacoteEvidencias, inv: PacoteInvestigacao): ResumoEvidencias {
   return {
-    entradas: p.entradas.length,
-    etapas: p.etapas.length,
-    lacunas: p.lacunas,
+    ...resumoDoPacote(inv),
     verificacoes: p.verificacoes,
     modelo_da_execucao: p.execucao?.modelo ?? null,
   };
@@ -264,37 +263,15 @@ export const analisarErroNinaComIA = createServerFn({ method: "POST" })
 
     const inicio = Date.now();
     try {
-      let evid: any = { disponivel: false };
-      if (reporte.execucao_id) {
-        evid = await carregarEvidenciasExecucao(
-          context.supabase,
-          data.clinicaId,
-          reporte.execucao_id,
-        );
-      }
-
-      const pacote = montarPacote({
-        mensagemReportada: reporte.mensagem_texto ?? "",
-        entradas: (evid?.entradas ?? evid?.pergunta?.entradas ?? []).map((e: any) => ({
-          em: e.em ?? null,
-          texto: e.texto ?? "",
-        })),
-        execucao: evid?.execucao
-          ? {
-              modelo: evid.execucao.model ?? null,
-              nivel: evid.execucao.thinking_level ?? null,
-              latenciaMs: evid.execucao.latency_ms ?? null,
-              knowledgeStatus: evid.execucao.knowledge_status ?? null,
-              toolCalls: evid.execucao.tool_calls ?? null,
-              sucesso: evid.execucao.success ?? null,
-              categoriaErro: evid.execucao.error_category ?? null,
-              handoff: evid.execucao.handoff ?? null,
-              em: evid.execucao.created_at ?? null,
-            }
-          : null,
-        etapas: (evid?.etapas ?? []) as any[],
-        lacunas: (evid?.lacunas ?? (reporte.execucao_id ? [] : ["Sem registro técnico vinculado."])) as string[],
+      // FASE 1 — pacote único de evidências (leitura dirigida, com hash).
+      const { montarPacoteInvestigacao } = await import("./evidencias-pacote.server");
+      const investigacao = await montarPacoteInvestigacao(context.supabase, {
+        clinicaId: data.clinicaId,
+        feedbackId: data.feedbackId,
+        analiseId: criada.id,
+        origem: "reconstruido",
       });
+      const pacote = pacoteDaInvestigacao(investigacao);
 
       const { texto, inputTokens, outputTokens } = await chamarAvaliador(
         montarPromptAnalise(pacote),
@@ -315,7 +292,11 @@ export const analisarErroNinaComIA = createServerFn({ method: "POST" })
           status: "done",
           conclusao: resultado.conclusao,
           resultado,
-          evidencias_resumo: resumoEvidencias(pacote),
+          evidencias_resumo: resumoEvidencias(pacote, investigacao),
+          // Pacote persistido: a correção usa exatamente o que fundamentou a proposta.
+          pacote: investigacao,
+          pacote_hash: investigacao.hash,
+          pacote_revisao: investigacao.revisao,
           input_tokens: inputTokens,
           output_tokens: outputTokens,
           duracao_ms: Date.now() - inicio,

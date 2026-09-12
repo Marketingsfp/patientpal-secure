@@ -1380,10 +1380,10 @@ function Pagina() {
                               </p>
                               {analiseUsouOutroConjunto(
                                 (analises[it.id] as unknown as {
-                                  evidencias_resumo?: { entradas?: number; etapas?: number } | null;
+                                  evidencias_resumo?: { hash?: string | null } | null;
                                 }).evidencias_resumo ?? null,
                                 ((versoesAnalise[it.id]?.[1] as unknown as
-                                  | { evidencias_resumo?: { entradas: number; etapas: number } }
+                                  | { evidencias_resumo?: { hash?: string | null } }
                                   | undefined)?.evidencias_resumo ?? null),
                               ) && (
                                 <p className="rounded-md border border-border bg-muted/40 p-2 text-xs">
