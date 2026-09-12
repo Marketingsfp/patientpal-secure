@@ -469,7 +469,7 @@ describe("FASE 6 — resultado do executor", () => {
     const comPassos = montarRelatorio(
       relatorio({
         passos: [
-          { ordem: 1, ferramenta: "catalogo", titulo: "Gravou item", detalhe: "ok", ok: true, em: "x" },
+          { ordem: 1, ferramenta: "gravar_item_catalogo", titulo: "Gravou item", detalhe: "ok", ok: true, em: "x" },
         ],
       }),
     );
@@ -499,16 +499,14 @@ ARQUITETURA_CONFIRMADA_9381
 
 Não acrescente saudação, explicação ou qualquer outro texto.`;
 
+const META = { escopo: "whatsapp", versao: "6", versaoId: "v6", hash: "hash-v6" };
+
 describe("FASE 6 — atendimento", () => {
   it("12. saudação simples não gera transferência indevida", () => {
-    const regras = extrairRegrasPublicadas(TEXTO_APRESENTACAO);
-    const aplicaveisNaSaudacao = regras.regras.filter(
-      (r) => r.condicao == null || r.condicao.trim() === "",
-    );
-    // Nenhuma proibição incondicional de perguntar recai sobre "ola bom dia".
-    expect(
-      aplicaveisNaSaudacao.some((r) => /como posso ajudar/i.test(r.texto ?? "")),
-    ).toBe(false);
+    const regras = extrairRegrasPublicadas(TEXTO_APRESENTACAO, META);
+    const incondicionais = regras.regras.filter((r) => r.condicao.tipo === "sempre");
+    // Nenhuma proibição incondicional de "pergunta" recai sobre "ola bom dia".
+    expect(incondicionais.some((r) => r.proibicoes.includes("pergunta"))).toBe(false);
   });
 
   it("12b. falha na tentativa de correção não anuncia transferência concluída", () => {
@@ -534,12 +532,15 @@ describe("FASE 6 — atendimento", () => {
   });
 
   it("14. marcador condicional só vale para a entrada prevista", () => {
-    const { regras } = extrairRegrasPublicadas(TEXTO_MARCADOR);
-    const exata = regras.find((r) => /ARQUITETURA_CONFIRMADA_9381/.test(r.texto ?? ""));
+    const { regras } = extrairRegrasPublicadas(TEXTO_MARCADOR, META);
+    const exata = regras.find((r) => r.literal === "ARQUITETURA_CONFIRMADA_9381");
     expect(exata).toBeTruthy();
-    expect(String(exata?.condicao ?? "")).toContain("TESTE-ARQUITETURA-9381");
-    // A condição existe: a regra não se aplica a "ola bom dia".
-    expect(String(exata?.condicao ?? "").trim()).not.toBe("");
+    expect(exata?.operador).toBe("igualdade");
+    // A condição existe e é a entrada exata: não alcança "ola bom dia".
+    expect(exata?.condicao).toMatchObject({
+      tipo: "mensagem_exata",
+      valor: "TESTE-ARQUITETURA-9381",
+    });
   });
 });
 
