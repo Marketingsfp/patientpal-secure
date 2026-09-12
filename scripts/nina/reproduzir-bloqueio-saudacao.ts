@@ -26,8 +26,8 @@ import {
   InstructionComplianceValidator,
 } from "../../src/lib/nina/confidence/obrigacoes";
 import {
+  aplicarPolitica,
   medirEvidencia,
-  nivelDaPontuacao,
   POLITICA_PADRAO,
 } from "../../src/lib/nina/confidence/policy";
 import { decidirHandoff } from "../../src/lib/nina/confidence/handoff-decision";
@@ -147,14 +147,28 @@ const validadoresAntes: ResultadoValidador[] = [
   antes,
 ];
 const medida = medirEvidencia(validadoresAntes, POLITICA_PADRAO);
-const nivelAntes = nivelDaPontuacao(Math.min(medida.score, medida.tetoScore ?? 100));
+const saida = aplicarPolitica(
+  {
+    scoreValidadores: medida.score,
+    penalidade: 0,
+    bloqueadores: [],
+    hardBlockers: [],
+    risco: "LOW",
+    acao: "nenhuma",
+    esclarecimentoUsado: false,
+    cobertura: medida.cobertura,
+    semEvidencia: medida.semEvidencia,
+    dimensoesDesconhecidas: medida.desconhecidas,
+  },
+  POLITICA_PADRAO,
+);
 console.log(
-  `  cobertura=${medida.cobertura} teto=${medida.tetoScore ?? "—"} score=${Math.min(medida.score, medida.tetoScore ?? 100)} nivel=${nivelAntes}`,
+  `  cobertura=${medida.cobertura} score=${saida.score} nivel=${saida.level} decisao=${saida.decision} limitacoes=${JSON.stringify(saida.limitacoes)}`,
 );
 const bloqueioAntes = decidirBloqueioBaixaConfianca({
-  nivel: nivelAntes,
-  score: Math.min(medida.score, medida.tetoScore ?? 100),
-  decisaoMotor: r.decision,
+  nivel: saida.level,
+  score: saida.score,
+  decisaoMotor: saida.decision,
   etapa: "D",
   ambiente: "homologacao",
 });
