@@ -173,6 +173,7 @@ export function decidirBloqueioBaixaConfianca(
     configId: e.configId ?? null,
     conteudoCandidatoHash: e.conteudoCandidatoHash ?? null,
     jaAplicado,
+    impedimentoSaudacao: excecao.impedimento,
   };
   if (!aplicavel) {
     return {
