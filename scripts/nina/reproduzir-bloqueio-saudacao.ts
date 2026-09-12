@@ -69,6 +69,7 @@ const ctx: ContextoConfianca = {
   turnType: canonico.turnType,
   intentAmbiguo: canonico.intentAmbiguo,
   fatos: [],
+  toolResults: [],
   instrucoes,
 } as unknown as ContextoConfianca;
 
