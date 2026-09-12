@@ -161,17 +161,19 @@ describe("resumoPainel", () => {
   });
 
 
-  it("repasse pago não entra de novo como despesa", () => {
+  it("despesa é a do caixa: repasse pago, complemento pago e operacionais", () => {
     expect(r.despesasOperacionais).toBe(100);
     expect(r.complementoMedico).toBe(10);
     expect(r.repassePagoNoPeriodo).toBe(900);
+    // O devido continua disponível, lado a lado com o pago.
     expect(r.custoPrestadores).toBe(220 + 30 + 10);
-    expect(r.despesasTotais).toBe(r.custoPrestadores + 100);
+    expect(r.custoPrestadoresPago).toBe(900 + 10);
+    expect(r.despesasTotais).toBe(910 + 100);
   });
 
-  it("saldo = receita bruta + outras receitas − despesas totais", () => {
+  it("saldo = receita bruta + outras receitas − despesas do caixa", () => {
     expect(r.outrasReceitas).toBe(50);
-    expect(r.saldo).toBe(500 + 50 - 360);
+    expect(r.saldo).toBe(500 + 50 - 1010);
   });
 
   it("composição por forma fecha com a receita bruta", () => {
