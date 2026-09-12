@@ -143,6 +143,8 @@ export type DecisaoBloqueioBaixaConfianca = {
   precedeDecisaoMotor: boolean;
   /** Já aplicado antes: nada é repetido. */
   jaAplicado: boolean;
+  /** Por que a exceção de saudação não valeu (auditoria). */
+  impedimentoSaudacao: string | null;
   explicacao: string;
 };
 
