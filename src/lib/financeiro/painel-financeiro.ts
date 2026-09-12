@@ -264,8 +264,12 @@ export function resumoPainel(params: {
   terceiro = round2(terceiro);
   despesasOperacionais = round2(despesasOperacionais);
   complementoMedico = round2(complementoMedico);
+  repassePagoNoPeriodo = round2(repassePagoNoPeriodo);
   const custoPrestadores = round2(repasse + terceiro + complementoMedico);
-  const despesasTotais = round2(custoPrestadores + despesasOperacionais);
+  // Despesa e saldo seguem a régua do caixa (decisão de 12/09/2026): entra o
+  // que realmente saiu — repasse pago e complemento pago —, não o devido.
+  const custoPrestadoresPago = round2(repassePagoNoPeriodo + complementoMedico);
+  const despesasTotais = round2(custoPrestadoresPago + despesasOperacionais);
   // Cada pagamento recebido conta como um atendimento: os do Rateio pelo tipo
   // do serviço; mensalidade e adesão em cards próprios, e o recebimento avulso
   // em "outros". Os cards de contagem somam exatamente o total.
