@@ -995,14 +995,8 @@ function montarDetalhe(drill: Drill, dados: DadosPainel, r: ResumoPainel, visao:
         temSintetico: true,
       };
     }
-    const linhas: Celula[][] = repassePorMedico(dados.rateio).map((g) => [
-      "",
-      "Repasse",
-      g.medico,
-      `${int(g.qtd)} atendimento(s)`,
-      g.repasse + g.terceiro,
-    ]);
-    for (const d of [...complementos, ...operacionais])
+    const linhas: Celula[][] = [];
+    for (const d of [...repassesPagos, ...complementos, ...operacionais])
       linhas.push([
         d.data,
         d.grupo === "operacional" ? "Operacional" : "Repasse",
