@@ -23,7 +23,15 @@ export type EscopoInstrucoesTemplate = "whatsapp" | "painel_interno" | "homologa
  * é considerado erro de escrita e reprovado ANTES de publicar.
  */
 export const MARCADORES_PERMITIDOS: Record<EscopoInstrucoesTemplate, readonly string[]> = {
-  whatsapp: ["${nomeUnidade}", "${nomeCurtoUnidade}"],
+  // FASE 2 — os marcadores de apresentação recebem a IDENTIDADE EFETIVA da
+  // mesma versão publicada do turno (nunca `clinicas.nome`).
+  whatsapp: [
+    "${nomeUnidade}",
+    "${nomeCurtoUnidade}",
+    "${nomeAssistente}",
+    "${nomeEstabelecimento}",
+    "${tipoEstabelecimento}",
+  ],
   painel_interno: ["${contextoTexto}"],
   // Verificação de fonte: texto literal, sem substituição de dados.
   homologacao: [],

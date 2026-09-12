@@ -214,7 +214,10 @@ function snapshotDoCodigo(
  */
 export async function promptInstrucoes(
   escopo: EscopoRuntime,
-  valores: Record<string, string>,
+  // FASE 2 — quando os valores dependem do PRÓPRIO texto da versão (identidade
+  // de apresentação publicada), passe uma função: ela recebe o template exato
+  // do snapshot do turno, garantindo instruções e identidade da MESMA versão.
+  valores: Record<string, string> | ((template: string) => Record<string, string>),
   fallbackCodigo: string,
   turnoId?: string | null,
 ): Promise<SnapshotInstrucoes> {
@@ -261,7 +264,9 @@ export async function promptInstrucoes(
       );
       registrarFalha(escopo, snapshot.motivo ?? "cache vencido");
     } else {
-      const render = renderizarTemplateInstrucoes(ultima.conteudo, valores);
+      const valoresDoTurno =
+        typeof valores === "function" ? valores(ultima.conteudo) : valores;
+      const render = renderizarTemplateInstrucoes(ultima.conteudo, valoresDoTurno);
       if (render.ok) {
         snapshot = {
           escopo,

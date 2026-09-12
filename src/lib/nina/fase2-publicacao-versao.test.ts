@@ -88,7 +88,15 @@ beforeEach(() => {
 // -------------------------------------------------------------- 1. templates
 describe("template compartilhado", () => {
   it("aceita apenas os marcadores realmente substituídos em cada escopo", () => {
-    expect(MARCADORES_PERMITIDOS.whatsapp).toEqual(["${nomeUnidade}", "${nomeCurtoUnidade}"]);
+    // FASE 2 (identidade) — os marcadores de apresentação recebem a identidade
+    // efetiva publicada no mesmo texto do turno.
+    expect(MARCADORES_PERMITIDOS.whatsapp).toEqual([
+      "${nomeUnidade}",
+      "${nomeCurtoUnidade}",
+      "${nomeAssistente}",
+      "${nomeEstabelecimento}",
+      "${tipoEstabelecimento}",
+    ]);
     expect(MARCADORES_PERMITIDOS.painel_interno).toEqual(["${contextoTexto}"]);
     expect(validarTemplateInstrucoes("whatsapp", "Olá, aqui é a ${nomeCurtoUnidade}.").ok).toBe(true);
   });
