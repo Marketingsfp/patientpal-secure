@@ -649,13 +649,20 @@ function reparte(
       })
     : { total: params.valorPago, repasse: 0, terceiro: null };
 
-  const receita = calc.total > 0 ? calc.total : params.valorPago;
+  // Cortesia e gratuidade: o paciente foi atendido e não pagou nada. A grade
+  // de repasse devolveria o valor de TABELA do serviço (R$ 60,00 num ECG, por
+  // exemplo), e era isso que fazia o Rateio e o Dashboard mostrarem R$ 120,00
+  // a mais do que entrou no caixa em 11/09/2026. Sem dinheiro não há receita
+  // nem repasse — a linha continua no relatório, valendo zero.
+  const semPagamento = num(params.valorPago) <= 0;
+  const receita = semPagamento ? 0 : calc.total > 0 ? calc.total : params.valorPago;
   const repasseCalculado = calc.repasse > 0 ? calc.repasse : num(params.repasseGravado ?? 0);
-  const repasse =
-    params.override !== null && params.override !== undefined && Number.isFinite(params.override)
+  const repasse = semPagamento
+    ? 0
+    : params.override !== null && params.override !== undefined && Number.isFinite(params.override)
       ? params.override
       : repasseCalculado;
-  const terceiro = calc.terceiro?.valor ?? 0;
+  const terceiro = semPagamento ? 0 : (calc.terceiro?.valor ?? 0);
   const liquido = round2(receita - repasse - terceiro);
   const formas = repartirPorForma(
     receita,
