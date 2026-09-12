@@ -28,6 +28,12 @@ import {
   precisaEscolher as presPrecisaEscolher,
   textoSituacao as presTexto,
 } from "@/lib/atendimento/controle-presenca";
+import {
+  SINCRONIA_INICIAL,
+  aplicarAtualizacao,
+  avisarOutrasAbas,
+  ouvirOutrasAbas,
+} from "@/lib/atendimento/presenca-sync";
 import { supabase } from "@/integrations/supabase/client";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
