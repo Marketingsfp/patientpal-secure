@@ -15,7 +15,10 @@
  */
 import { detectarIntencoes, intencaoAmbigua } from "../../src/lib/nina/atendimento-fase1";
 import { montarContextoCanonicoTurno } from "../../src/lib/nina/confidence/contexto-turno";
-import { montarInstrucoesDoTurno } from "../../src/lib/nina/confidence/contexto-avaliacao";
+import {
+  montarInstrucoesDoTurno,
+  enriquecerContextoAvaliacao,
+} from "../../src/lib/nina/confidence/contexto-avaliacao";
 import {
   avaliarObrigacoes,
   InstructionComplianceValidator,
@@ -60,7 +63,7 @@ const instrucoes = montarInstrucoesDoTurno({
   texto: TEXTO_PUBLICADO,
 });
 
-const ctx: ContextoConfianca = {
+const ctxBase = {
   tipoAvaliacao: "answer_confidence",
   draftText: RESPOSTA,
   mensagemPaciente: MENSAGEM,
@@ -72,6 +75,7 @@ const ctx: ContextoConfianca = {
   toolResults: [],
   instrucoes,
 } as unknown as ContextoConfianca;
+const ctx: ContextoConfianca = enriquecerContextoAvaliacao(ctxBase);
 
 linha("1. Regras extraídas da publicação");
 for (const r of instrucoes.regras ?? []) {
