@@ -2655,16 +2655,17 @@ function Page() {
               próprio Rateio. */}
           {saldoCaixaRateio ? (
             <CardResumo
-              titulo="Líquido da clínica / Saldo"
+              titulo="Sobrou no caixa da clínica"
               valor={brl(saldoCaixaRateio.saldo)}
-              detalhe={`Margem de ${pct(
+              detalhe={`Tudo que entrou no caixa menos tudo que foi pago (repasses e despesas) · fica com a clínica ${pct(
                 saldoCaixaRateio.receitaTotal > 0
                   ? (saldoCaixaRateio.saldo / saldoCaixaRateio.receitaTotal) * 100
                   : 0,
-              )} · receitas − despesas pagas no caixa`}
+              )} do que entrou`}
               linhas={[
+                { rotulo: "Onde esse dinheiro está", secao: true },
                 {
-                  rotulo: "Em espécie (gaveta)",
+                  rotulo: "Em espécie (na gaveta)",
                   valor: brl(saldoCaixaRateio.saldoMeios.especie.saldo),
                 },
                 {
@@ -2680,8 +2681,13 @@ function Page() {
                       },
                     ]
                   : []),
-                { rotulo: "Líquido dos atendimentos (Rateio)", valor: brl(totaisR.liquido) },
+                { rotulo: "Só dos atendimentos da tabela abaixo", secao: true },
+                {
+                  rotulo: "Receita − repasse ao prestador",
+                  valor: brl(totaisR.liquido),
+                },
               ]}
+              nota="O valor grande considera todo o movimento do caixa no período, inclusive despesas. A linha do fim considera apenas consultas e exames, sem despesas — por isso os dois números são diferentes."
             />
           ) : (
             <CardResumo
