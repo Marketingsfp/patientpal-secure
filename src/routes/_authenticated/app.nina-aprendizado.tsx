@@ -1385,14 +1385,36 @@ function Pagina() {
                                 </details>
                               )}
                               {analises[it.id]!.status === "done" && (
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => void usarSugestaoIA(it)}
-                                >
-                                  Usar sugestão da IA no rascunho
-                                </Button>
+                                <div className="flex flex-wrap gap-2">
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => void usarSugestaoIA(it)}
+                                  >
+                                    Usar sugestão da IA no rascunho
+                                  </Button>
+                                  {analises[it.id]!.resultado?.proposta && (
+                                    <Button
+                                      size="sm"
+                                      disabled={Boolean(corrigindo[it.id])}
+                                      title="Aplica a proposta exibida, na camada e no alcance mostrados."
+                                      onClick={() => void aplicarComIA(it.id)}
+                                    >
+                                      {corrigindo[it.id] ? (
+                                        <Loader2
+                                          className="mr-1 h-4 w-4 animate-spin"
+                                          aria-hidden="true"
+                                        />
+                                      ) : null}
+                                      Aplicar correção
+                                    </Button>
+                                  )}
+                                </div>
                               )}
+                              <CorrecaoExecucaoPainel
+                                execucao={execucoes[it.id] ?? null}
+                                emAndamento={Boolean(corrigindo[it.id])}
+                              />}
                             </div>
                           ) : (
                             <p className="text-xs text-muted-foreground">
