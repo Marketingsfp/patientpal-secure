@@ -239,6 +239,6 @@ describe("FASE 3 — greeting_completed acompanha o que saiu", () => {
 
     expect(r.motivoDecisao).toContain(String(r.bloqueio.motivo ?? ""));
     expect(r.motivoDecisao).toContain("simulado");
-    expect(r.mensagemFinal).toBe(r.saidaControlada?.aviso);
+    expect(r.mensagemFinal).toBe(r.saidaControlada?.aviso ?? "");
   });
 });
