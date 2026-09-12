@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 import { assinaturaProposta, avaliarProntidao } from "../correcao-prontidao";
 import type { PropostaCorrecao } from "../analise-erro";
 
