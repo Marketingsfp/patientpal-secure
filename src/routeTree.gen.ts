@@ -141,6 +141,7 @@ import { Route as AuthenticatedAppHrContratosIdRouteImport } from './routes/_aut
 import { Route as AuthenticatedAppFisioterapiaPacotesRouteImport } from './routes/_authenticated/app.fisioterapia.pacotes'
 import { Route as AuthenticatedAppFinanceiroRelatoriosRouteImport } from './routes/_authenticated/app.financeiro.relatorios'
 import { Route as AuthenticatedAppFinanceiroRegrasIaRouteImport } from './routes/_authenticated/app.financeiro.regras-ia'
+import { Route as AuthenticatedAppFinanceiroProjecaoRouteImport } from './routes/_authenticated/app.financeiro.projecao'
 import { Route as AuthenticatedAppFinanceiroPendenciasRouteImport } from './routes/_authenticated/app.financeiro.pendencias'
 import { Route as AuthenticatedAppFinanceiroNotasRouteImport } from './routes/_authenticated/app.financeiro.notas'
 import { Route as AuthenticatedAppFinanceiroMovimentoDetalheRouteImport } from './routes/_authenticated/app.financeiro.movimento-detalhe'
@@ -912,6 +913,12 @@ const AuthenticatedAppFinanceiroRegrasIaRoute =
     path: '/regras-ia',
     getParentRoute: () => AuthenticatedAppFinanceiroRoute,
   } as any)
+const AuthenticatedAppFinanceiroProjecaoRoute =
+  AuthenticatedAppFinanceiroProjecaoRouteImport.update({
+    id: '/projecao',
+    path: '/projecao',
+    getParentRoute: () => AuthenticatedAppFinanceiroRoute,
+  } as any)
 const AuthenticatedAppFinanceiroPendenciasRoute =
   AuthenticatedAppFinanceiroPendenciasRouteImport.update({
     id: '/pendencias',
@@ -1271,6 +1278,7 @@ export interface FileRoutesByFullPath {
   '/app/financeiro/movimento-detalhe': typeof AuthenticatedAppFinanceiroMovimentoDetalheRoute
   '/app/financeiro/notas': typeof AuthenticatedAppFinanceiroNotasRoute
   '/app/financeiro/pendencias': typeof AuthenticatedAppFinanceiroPendenciasRoute
+  '/app/financeiro/projecao': typeof AuthenticatedAppFinanceiroProjecaoRoute
   '/app/financeiro/regras-ia': typeof AuthenticatedAppFinanceiroRegrasIaRoute
   '/app/financeiro/relatorios': typeof AuthenticatedAppFinanceiroRelatoriosRoute
   '/app/fisioterapia/pacotes': typeof AuthenticatedAppFisioterapiaPacotesRoute
@@ -1436,6 +1444,7 @@ export interface FileRoutesByTo {
   '/app/financeiro/movimento-detalhe': typeof AuthenticatedAppFinanceiroMovimentoDetalheRoute
   '/app/financeiro/notas': typeof AuthenticatedAppFinanceiroNotasRoute
   '/app/financeiro/pendencias': typeof AuthenticatedAppFinanceiroPendenciasRoute
+  '/app/financeiro/projecao': typeof AuthenticatedAppFinanceiroProjecaoRoute
   '/app/financeiro/regras-ia': typeof AuthenticatedAppFinanceiroRegrasIaRoute
   '/app/financeiro/relatorios': typeof AuthenticatedAppFinanceiroRelatoriosRoute
   '/app/fisioterapia/pacotes': typeof AuthenticatedAppFisioterapiaPacotesRoute
@@ -1607,6 +1616,7 @@ export interface FileRoutesById {
   '/_authenticated/app/financeiro/movimento-detalhe': typeof AuthenticatedAppFinanceiroMovimentoDetalheRoute
   '/_authenticated/app/financeiro/notas': typeof AuthenticatedAppFinanceiroNotasRoute
   '/_authenticated/app/financeiro/pendencias': typeof AuthenticatedAppFinanceiroPendenciasRoute
+  '/_authenticated/app/financeiro/projecao': typeof AuthenticatedAppFinanceiroProjecaoRoute
   '/_authenticated/app/financeiro/regras-ia': typeof AuthenticatedAppFinanceiroRegrasIaRoute
   '/_authenticated/app/financeiro/relatorios': typeof AuthenticatedAppFinanceiroRelatoriosRoute
   '/_authenticated/app/fisioterapia/pacotes': typeof AuthenticatedAppFisioterapiaPacotesRoute
@@ -1778,6 +1788,7 @@ export interface FileRouteTypes {
     | '/app/financeiro/movimento-detalhe'
     | '/app/financeiro/notas'
     | '/app/financeiro/pendencias'
+    | '/app/financeiro/projecao'
     | '/app/financeiro/regras-ia'
     | '/app/financeiro/relatorios'
     | '/app/fisioterapia/pacotes'
@@ -1943,6 +1954,7 @@ export interface FileRouteTypes {
     | '/app/financeiro/movimento-detalhe'
     | '/app/financeiro/notas'
     | '/app/financeiro/pendencias'
+    | '/app/financeiro/projecao'
     | '/app/financeiro/regras-ia'
     | '/app/financeiro/relatorios'
     | '/app/fisioterapia/pacotes'
@@ -2113,6 +2125,7 @@ export interface FileRouteTypes {
     | '/_authenticated/app/financeiro/movimento-detalhe'
     | '/_authenticated/app/financeiro/notas'
     | '/_authenticated/app/financeiro/pendencias'
+    | '/_authenticated/app/financeiro/projecao'
     | '/_authenticated/app/financeiro/regras-ia'
     | '/_authenticated/app/financeiro/relatorios'
     | '/_authenticated/app/fisioterapia/pacotes'
@@ -3113,6 +3126,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAppFinanceiroRegrasIaRouteImport
       parentRoute: typeof AuthenticatedAppFinanceiroRoute
     }
+    '/_authenticated/app/financeiro/projecao': {
+      id: '/_authenticated/app/financeiro/projecao'
+      path: '/projecao'
+      fullPath: '/app/financeiro/projecao'
+      preLoaderRoute: typeof AuthenticatedAppFinanceiroProjecaoRouteImport
+      parentRoute: typeof AuthenticatedAppFinanceiroRoute
+    }
     '/_authenticated/app/financeiro/pendencias': {
       id: '/_authenticated/app/financeiro/pendencias'
       path: '/pendencias'
@@ -3456,6 +3476,7 @@ interface AuthenticatedAppFinanceiroRouteChildren {
   AuthenticatedAppFinanceiroMovimentoDetalheRoute: typeof AuthenticatedAppFinanceiroMovimentoDetalheRoute
   AuthenticatedAppFinanceiroNotasRoute: typeof AuthenticatedAppFinanceiroNotasRoute
   AuthenticatedAppFinanceiroPendenciasRoute: typeof AuthenticatedAppFinanceiroPendenciasRoute
+  AuthenticatedAppFinanceiroProjecaoRoute: typeof AuthenticatedAppFinanceiroProjecaoRoute
   AuthenticatedAppFinanceiroRegrasIaRoute: typeof AuthenticatedAppFinanceiroRegrasIaRoute
   AuthenticatedAppFinanceiroRelatoriosRoute: typeof AuthenticatedAppFinanceiroRelatoriosRoute
   AuthenticatedAppFinanceiroIndexRoute: typeof AuthenticatedAppFinanceiroIndexRoute
@@ -3493,6 +3514,8 @@ const AuthenticatedAppFinanceiroRouteChildren: AuthenticatedAppFinanceiroRouteCh
     AuthenticatedAppFinanceiroNotasRoute: AuthenticatedAppFinanceiroNotasRoute,
     AuthenticatedAppFinanceiroPendenciasRoute:
       AuthenticatedAppFinanceiroPendenciasRoute,
+    AuthenticatedAppFinanceiroProjecaoRoute:
+      AuthenticatedAppFinanceiroProjecaoRoute,
     AuthenticatedAppFinanceiroRegrasIaRoute:
       AuthenticatedAppFinanceiroRegrasIaRoute,
     AuthenticatedAppFinanceiroRelatoriosRoute:
