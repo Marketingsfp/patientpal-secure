@@ -138,9 +138,52 @@ function Page() {
     })();
   }, [clinicaAtual?.clinica_id, inicio, hojeIso]);
 
-  const r: ResultadoProjecao = useMemo(
-    () => projetarMes({ inicio, fim, hoje: hojeIso, dias, meta: meta || undefined }),
+  // A base de comparação sai agregada do banco (`fin_resumo_periodo`): são
+  // milhares de lançamentos no mês anterior, e aqui só interessa o total.
+  useEffect(() => {
+    (async () => {
+      if (!clinicaAtual) return;
+      const { data, error } = await supabase.rpc("fin_resumo_periodo", {
+        p_clinica: clinicaAtual.clinica_id,
+        p_ini: mesAnterior.de,
+        p_fim: mesAnterior.ate,
+      });
+      if (error) return;
+      const linhas = (data ?? []) as Array<{ tipo: string; status: string; total: number }>;
+      const receita = linhas
+        .filter((l) => l.tipo === "receita" && l.status === "confirmado")
+        .reduce((s, l) => s + (Number(l.total) || 0), 0);
+      setBaseMesAnterior(receita);
+    })();
+  }, [clinicaAtual?.clinica_id, mesAnterior.de, mesAnterior.ate]);
+
+  const entrada: EntradaProjecao = useMemo(
+    () => ({ inicio, fim, hoje: hojeIso, dias, meta: meta || undefined }),
     [inicio, fim, hojeIso, dias, meta],
+  );
+  const r: ResultadoProjecao = useMemo(() => projetarMes(entrada), [entrada]);
+
+  const metas = useMemo(
+    () => simularCrescimento(r, { baseMesAnterior, metaCustomizada: meta || undefined }),
+    [r, baseMesAnterior, meta],
+  );
+
+  const tendencia = useMemo(() => serieTendencia(entrada, r), [entrada, r]);
+  const seriesTendencia = useMemo(
+    () => [
+      {
+        name: "Realizado",
+        color: "#13b5a3",
+        values: tendencia.map((p) => p.realizado),
+      },
+      {
+        name: "Projetado",
+        color: "#3b82f6",
+        values: tendencia.map((p) => p.projetado),
+        tracejada: true,
+      },
+    ],
+    [tendencia],
   );
 
   const salvarMeta = (valor: number) => {
