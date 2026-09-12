@@ -235,7 +235,7 @@ describe("FASE 3 — greeting_completed acompanha o que saiu", () => {
   test("mensagem final exibida é coerente com o rastreio da decisão", async () => {
     const r = await cadeia({ candidata: "Olá! Sou a Nina. A consulta custa R$ 250,00." });
 
-    expect(r.motivoDecisao).toContain(r.bloqueio.motivo ?? "");
+    expect(r.motivoDecisao).toContain(String(r.bloqueio.motivo ?? ""));
     expect(r.motivoDecisao).toContain("simulado");
     expect(r.mensagemFinal).toBe(r.saidaControlada?.aviso);
   });
