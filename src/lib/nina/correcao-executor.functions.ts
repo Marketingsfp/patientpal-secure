@@ -348,6 +348,43 @@ export const aplicarCorrecaoComIA = createServerFn({ method: "POST" })
      * pacote, proposta, ambiente e alcance. Recarregar a tela retoma daqui.
      */
     const assinatura = assinaturaProposta(proposta);
+    const inicioMs = Date.now();
+
+    /**
+     * FASE 3 — repetição: duplo clique, refresh ou retomada da mesma proposta
+     * geram a mesma chave. Se já existe aplicação com essa chave, o resultado
+     * dela é devolvido; nada é aplicado duas vezes.
+     */
+    const chave = chaveIdempotencia({
+      feedbackId: data.feedbackId,
+      analiseId: String(analise.id),
+      assinaturaProposta: assinatura,
+      pacoteHash: pacote.hash,
+    });
+    const { data: jaExiste } = await supabase
+      .from("nina_correcao_execucoes")
+      .select("id, resumo, acao_id, status")
+      .eq("clinica_id", data.clinicaId)
+      .eq("idempotencia_chave", chave)
+      .maybeSingle();
+    if (jaExiste?.resumo)
+      return {
+        ...(jaExiste.resumo as ResumoExecucao),
+        acaoId: (jaExiste.acao_id as string | null) ?? null,
+      };
+    if (jaExiste)
+      throw new Error("Esta mesma correção já está sendo aplicada. Aguarde o resultado.");
+
+    const { count: tentativasAnteriores } = await supabase
+      .from("nina_correcao_execucoes")
+      .select("id", { count: "exact", head: true })
+      .eq("clinica_id", data.clinicaId)
+      .eq("feedback_id", data.feedbackId);
+    if ((tentativasAnteriores ?? 0) >= MAX_TENTATIVAS)
+      throw new Error(
+        `Já houve ${tentativasAnteriores} tentativas de aplicação para este erro. Analise novamente antes de insistir.`,
+      );
+
     const { data: execLinha, error: eExec } = await supabase
       .from("nina_correcao_execucoes")
       .insert({
@@ -364,6 +401,10 @@ export const aplicarCorrecaoComIA = createServerFn({ method: "POST" })
         etapa: "verificando",
         status: "em_curso",
         passos: [],
+        idempotencia_chave: chave,
+        resultado_final: "preparado",
+        alvo_revisao: proposta.revisaoBase ?? null,
+        tentativas: (tentativasAnteriores ?? 0) + 1,
       })
       .select("id")
       .single();
