@@ -125,6 +125,43 @@ export function AnaliseErroIAResultado({
         </ul>
       </details>
 
+      {r.proposta && (
+        <div className="space-y-1 rounded-md border border-primary/40 bg-primary/5 p-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="text-xs font-medium">Proposta de correção</p>
+            <Badge variant="outline">{ROTULO_CAMADA_PROPOSTA[r.proposta.camada]}</Badge>
+            {!r.proposta.aplicavelAutomaticamente && (
+              <Badge variant="secondary">Depende de mudança no código</Badge>
+            )}
+          </div>
+          <p className="text-xs">
+            <span className="font-medium">Alvo:</span> {r.proposta.alvo}
+          </p>
+          <div className="grid gap-2 md:grid-cols-2">
+            <div>
+              <p className="text-[11px] text-muted-foreground">Como está hoje</p>
+              <p className="whitespace-pre-wrap rounded-md border border-border bg-muted/40 p-1.5 text-xs">
+                {r.proposta.valorAtual ?? "—"}
+              </p>
+            </div>
+            <div>
+              <p className="text-[11px] text-muted-foreground">Como deve ficar</p>
+              <p className="whitespace-pre-wrap rounded-md border border-primary/40 p-1.5 text-xs">
+                {r.proposta.valorNovo}
+              </p>
+            </div>
+          </div>
+          {r.proposta.justificativa && (
+            <p className="text-xs text-muted-foreground">{r.proposta.justificativa}</p>
+          )}
+          {r.proposta.alcance && (
+            <p className="text-xs text-muted-foreground">
+              <span className="font-medium">Alcance:</span> {r.proposta.alcance}
+            </p>
+          )}
+        </div>
+      )}
+
       {r.proximaVerificacao && (
         <p className="text-xs text-muted-foreground">
           <span className="font-medium">Próxima verificação:</span> {r.proximaVerificacao}
