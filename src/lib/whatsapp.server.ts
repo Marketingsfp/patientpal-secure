@@ -2764,6 +2764,7 @@ async function gerarRespostaNinaInterno(
         decidirBloqueioBaixaConfianca,
         saidaControladaBaixaConfianca,
         ehAvisoControlado,
+        afirmacaoSemLastro,
       } = await import("@/lib/nina/confidence/baixa-confiabilidade");
       const ambienteSaida: "producao" | "homologacao" =
         opcoes?.ambiente === "producao" && opcoes?.teste !== true
