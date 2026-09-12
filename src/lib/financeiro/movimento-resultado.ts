@@ -348,6 +348,8 @@ export function resumoMovimento(linhas: LinhaClassificada[]): ResumoMovimento {
     },
     outras: { ...totOutras, porGrupo },
     receitas: totalReceitas,
+    receitaBruta: { ...contar(receitas), formas: quebraPorForma(receitas) },
+
     repassePago,
     complementoMedico,
     operacionais,
