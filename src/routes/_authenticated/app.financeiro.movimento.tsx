@@ -2534,6 +2534,50 @@ function Page() {
                     valor: l.valor,
                   })),
               );
+              // Resumo por tipo de moeda — a conferência de caixa do fim do
+              // dia: quanto entrou e quanto saiu em cada forma de pagamento.
+              // Mesma regra da impressão: mistos decompostos quando a opção
+              // estiver ligada, Dinheiro/PIX/Débito/Crédito sempre visíveis e
+              // sem transferência entre caixas (troca de custódia).
+              const moedas = new Map<FormaCanonica, { pagamento: number; recebimento: number }>();
+              const somaMoeda = (k: FormaCanonica, v: number, receita: boolean) => {
+                const m = moedas.get(k) ?? { pagamento: 0, recebimento: 0 };
+                if (receita) m.recebimento += v;
+                else m.pagamento += v;
+                moedas.set(k, m);
+              };
+              for (const l of displayItems) {
+                if (l.tipo === "transferencia") continue;
+                const v = Number(l.valor) || 0;
+                const receita = l.tipo === "receita";
+                const partes = decomporMisto
+                  ? partesDoPagamentoMisto(l.forma_pagamento, l.observacoes, l.composicao_pagamento)
+                  : [];
+                if (partes.length) for (const p of partes) somaMoeda(p.forma, p.valor, receita);
+                else somaMoeda(baldeDaLinha(l), v, receita);
+              }
+              const linhasMoeda = ORDEM_FORMAS.filter(
+                (k) =>
+                  moedas.has(k) ||
+                  (FORMAS_SEMPRE_VISIVEIS.includes(k) && filterForma === "todos"),
+              ).map((k) => {
+                const m = moedas.get(k) ?? { pagamento: 0, recebimento: 0 };
+                return {
+                  chave: k,
+                  label: LABEL_FORMA[k],
+                  pagamento: m.pagamento,
+                  recebimento: m.recebimento,
+                  saldo: m.recebimento - m.pagamento,
+                };
+              });
+              const totalMoeda = linhasMoeda.reduce(
+                (t, m) => ({
+                  pagamento: t.pagamento + m.pagamento,
+                  recebimento: t.recebimento + m.recebimento,
+                }),
+                { pagamento: 0, recebimento: 0 },
+              );
+
               return (
                 <>
                   <div className="px-4 py-2 text-xs text-muted-foreground bg-muted/30 border-b">
