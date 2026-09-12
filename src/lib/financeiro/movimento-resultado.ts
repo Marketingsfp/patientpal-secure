@@ -267,7 +267,68 @@ export interface ResumoMovimento {
   operacionais: TotalQtd;
   despesas: number;
   saldo: number;
+  /**
+   * O mesmo saldo, separado pelo lugar onde o dinheiro está: a GAVETA
+   * (espécie) e o BANCO (PIX, cartões, boleto, transferência). É o que
+   * permite conferir se a sobra em dinheiro do fechamento bate — antes o card
+   * mostrava só um número só, misturando o que está na mão com o que só cai
+   * na conta.
+   */
+  saldoMeios: SaldoPorMeio;
 }
+
+export interface MeioSaldo {
+  /** Receitas recebidas nesse meio. */
+  entradas: number;
+  /** Despesas pagas nesse meio. */
+  saidas: number;
+  /** entradas − saídas. */
+  saldo: number;
+}
+
+export interface SaldoPorMeio {
+  /** Dinheiro vivo — o que precisa estar na gaveta. */
+  especie: MeioSaldo;
+  /** PIX, cartões, boleto e transferência — cai na conta. */
+  banco: MeioSaldo;
+  /** Convênio, gratuidade, misto não decomposto e sem informação. */
+  outros: MeioSaldo;
+}
+
+/** Formas que representam dinheiro em conta bancária. */
+const FORMAS_BANCO: FormaCanonica[] = [
+  "pix",
+  "debito",
+  "credito",
+  "legado_cartao",
+  "boleto",
+  "transferencia",
+];
+
+const meioDaForma = (f: FormaCanonica): keyof SaldoPorMeio =>
+  f === "dinheiro" ? "especie" : FORMAS_BANCO.includes(f) ? "banco" : "outros";
+
+/**
+ * Separa entradas e saídas do período em espécie, banco e outros.
+ * Função pura: recebe as mesmas linhas já classificadas do movimento.
+ */
+export function saldoPorMeio(linhas: LinhaClassificada[]): SaldoPorMeio {
+  const zero = (): MeioSaldo => ({ entradas: 0, saidas: 0, saldo: 0 });
+  const out: SaldoPorMeio = { especie: zero(), banco: zero(), outros: zero() };
+  for (const l of linhas) {
+    const alvo = out[meioDaForma(l.forma)];
+    const v = Number(l.valor) || 0;
+    if (l.tipo === "receita") alvo.entradas += v;
+    else alvo.saidas += v;
+  }
+  for (const k of ["especie", "banco", "outros"] as const) {
+    out[k].entradas = round2(out[k].entradas);
+    out[k].saidas = round2(out[k].saidas);
+    out[k].saldo = round2(out[k].entradas - out[k].saidas);
+  }
+  return out;
+}
+
 
 
 /**
