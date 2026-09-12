@@ -99,7 +99,11 @@ export function segmentosDaResposta(texto: string): Array<{ texto: string; inici
   const t = texto ?? "";
   const segmentos: Array<{ texto: string; inicio: number }> = [];
   let inicio = 0;
-  const re = /[.!?;\n]+/g;
+  // O ponto de abreviações comuns ("Dra. Marina") não encerra a afirmação:
+  // separar ali arrancaria o profissional do preço que ele qualifica.
+  const re =
+    /(?<!\b(?:[Dd]r|[Dd]ra|[Ss]r|[Ss]ra|[Ss]rta|[Pp]rof|[Pp]rofa|[Ee]sp|[Aa]v|[Nn]º|[Nn]o))[.!?;\n]+/g;
+
   let m: RegExpExecArray | null;
   while ((m = re.exec(t)) !== null) {
     segmentos.push({ texto: t.slice(inicio, m.index), inicio });
