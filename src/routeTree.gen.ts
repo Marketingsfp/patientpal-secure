@@ -132,6 +132,7 @@ import { Route as ApiPublicNinaEsperaTimeoutRouteImport } from './routes/api/pub
 import { Route as ApiPublicHooksBackupDiarioRouteImport } from './routes/api/public/hooks/backup-diario'
 import { Route as ApiPublicFocusnfeWebhookRouteImport } from './routes/api/public/focusnfe.webhook'
 import { Route as ApiIntegrationsV1SplatRouteImport } from './routes/api/integrations/v1/$'
+import { Route as AuthenticatedAppProcedimentosImportarRouteImport } from './routes/_authenticated/app.procedimentos.importar'
 import { Route as AuthenticatedAppOdontologiaOrcamentosRouteImport } from './routes/_authenticated/app.odontologia.orcamentos'
 import { Route as AuthenticatedAppNinaConversationIdRouteImport } from './routes/_authenticated/app.nina.$conversationId'
 import { Route as AuthenticatedAppNfseTestarRouteImport } from './routes/_authenticated/app.nfse.testar'
@@ -859,6 +860,12 @@ const ApiIntegrationsV1SplatRoute = ApiIntegrationsV1SplatRouteImport.update({
   path: '/api/integrations/v1/$',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthenticatedAppProcedimentosImportarRoute =
+  AuthenticatedAppProcedimentosImportarRouteImport.update({
+    id: '/importar',
+    path: '/importar',
+    getParentRoute: () => AuthenticatedAppProcedimentosRoute,
+  } as any)
 const AuthenticatedAppOdontologiaOrcamentosRoute =
   AuthenticatedAppOdontologiaOrcamentosRouteImport.update({
     id: '/odontologia/orcamentos',
@@ -1225,7 +1232,7 @@ export interface FileRoutesByFullPath {
   '/app/painel-executivo': typeof AuthenticatedAppPainelExecutivoRoute
   '/app/perfis': typeof AuthenticatedAppPerfisRoute
   '/app/planos': typeof AuthenticatedAppPlanosRoute
-  '/app/procedimentos': typeof AuthenticatedAppProcedimentosRoute
+  '/app/procedimentos': typeof AuthenticatedAppProcedimentosRouteWithChildren
   '/app/prontuario-modelos': typeof AuthenticatedAppProntuarioModelosRoute
   '/app/prontuarios': typeof AuthenticatedAppProntuariosRoute
   '/app/recepcao': typeof AuthenticatedAppRecepcaoRoute
@@ -1288,6 +1295,7 @@ export interface FileRoutesByFullPath {
   '/app/nfse/testar': typeof AuthenticatedAppNfseTestarRoute
   '/app/nina/$conversationId': typeof AuthenticatedAppNinaConversationIdRoute
   '/app/odontologia/orcamentos': typeof AuthenticatedAppOdontologiaOrcamentosRoute
+  '/app/procedimentos/importar': typeof AuthenticatedAppProcedimentosImportarRoute
   '/api/integrations/v1/$': typeof ApiIntegrationsV1SplatRoute
   '/api/public/focusnfe/webhook': typeof ApiPublicFocusnfeWebhookRoute
   '/api/public/hooks/backup-diario': typeof ApiPublicHooksBackupDiarioRoute
@@ -1391,7 +1399,7 @@ export interface FileRoutesByTo {
   '/app/painel-executivo': typeof AuthenticatedAppPainelExecutivoRoute
   '/app/perfis': typeof AuthenticatedAppPerfisRoute
   '/app/planos': typeof AuthenticatedAppPlanosRoute
-  '/app/procedimentos': typeof AuthenticatedAppProcedimentosRoute
+  '/app/procedimentos': typeof AuthenticatedAppProcedimentosRouteWithChildren
   '/app/prontuario-modelos': typeof AuthenticatedAppProntuarioModelosRoute
   '/app/prontuarios': typeof AuthenticatedAppProntuariosRoute
   '/app/recepcao': typeof AuthenticatedAppRecepcaoRoute
@@ -1454,6 +1462,7 @@ export interface FileRoutesByTo {
   '/app/nfse/testar': typeof AuthenticatedAppNfseTestarRoute
   '/app/nina/$conversationId': typeof AuthenticatedAppNinaConversationIdRoute
   '/app/odontologia/orcamentos': typeof AuthenticatedAppOdontologiaOrcamentosRoute
+  '/app/procedimentos/importar': typeof AuthenticatedAppProcedimentosImportarRoute
   '/api/integrations/v1/$': typeof ApiIntegrationsV1SplatRoute
   '/api/public/focusnfe/webhook': typeof ApiPublicFocusnfeWebhookRoute
   '/api/public/hooks/backup-diario': typeof ApiPublicHooksBackupDiarioRoute
@@ -1563,7 +1572,7 @@ export interface FileRoutesById {
   '/_authenticated/app/painel-executivo': typeof AuthenticatedAppPainelExecutivoRoute
   '/_authenticated/app/perfis': typeof AuthenticatedAppPerfisRoute
   '/_authenticated/app/planos': typeof AuthenticatedAppPlanosRoute
-  '/_authenticated/app/procedimentos': typeof AuthenticatedAppProcedimentosRoute
+  '/_authenticated/app/procedimentos': typeof AuthenticatedAppProcedimentosRouteWithChildren
   '/_authenticated/app/prontuario-modelos': typeof AuthenticatedAppProntuarioModelosRoute
   '/_authenticated/app/prontuarios': typeof AuthenticatedAppProntuariosRoute
   '/_authenticated/app/recepcao': typeof AuthenticatedAppRecepcaoRoute
@@ -1626,6 +1635,7 @@ export interface FileRoutesById {
   '/_authenticated/app/nfse/testar': typeof AuthenticatedAppNfseTestarRoute
   '/_authenticated/app/nina/$conversationId': typeof AuthenticatedAppNinaConversationIdRoute
   '/_authenticated/app/odontologia/orcamentos': typeof AuthenticatedAppOdontologiaOrcamentosRoute
+  '/_authenticated/app/procedimentos/importar': typeof AuthenticatedAppProcedimentosImportarRoute
   '/api/integrations/v1/$': typeof ApiIntegrationsV1SplatRoute
   '/api/public/focusnfe/webhook': typeof ApiPublicFocusnfeWebhookRoute
   '/api/public/hooks/backup-diario': typeof ApiPublicHooksBackupDiarioRoute
@@ -1798,6 +1808,7 @@ export interface FileRouteTypes {
     | '/app/nfse/testar'
     | '/app/nina/$conversationId'
     | '/app/odontologia/orcamentos'
+    | '/app/procedimentos/importar'
     | '/api/integrations/v1/$'
     | '/api/public/focusnfe/webhook'
     | '/api/public/hooks/backup-diario'
@@ -1964,6 +1975,7 @@ export interface FileRouteTypes {
     | '/app/nfse/testar'
     | '/app/nina/$conversationId'
     | '/app/odontologia/orcamentos'
+    | '/app/procedimentos/importar'
     | '/api/integrations/v1/$'
     | '/api/public/focusnfe/webhook'
     | '/api/public/hooks/backup-diario'
@@ -2135,6 +2147,7 @@ export interface FileRouteTypes {
     | '/_authenticated/app/nfse/testar'
     | '/_authenticated/app/nina/$conversationId'
     | '/_authenticated/app/odontologia/orcamentos'
+    | '/_authenticated/app/procedimentos/importar'
     | '/api/integrations/v1/$'
     | '/api/public/focusnfe/webhook'
     | '/api/public/hooks/backup-diario'
@@ -3063,6 +3076,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiIntegrationsV1SplatRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_authenticated/app/procedimentos/importar': {
+      id: '/_authenticated/app/procedimentos/importar'
+      path: '/importar'
+      fullPath: '/app/procedimentos/importar'
+      preLoaderRoute: typeof AuthenticatedAppProcedimentosImportarRouteImport
+      parentRoute: typeof AuthenticatedAppProcedimentosRoute
+    }
     '/_authenticated/app/odontologia/orcamentos': {
       id: '/_authenticated/app/odontologia/orcamentos'
       path: '/odontologia/orcamentos'
@@ -3540,6 +3560,21 @@ const AuthenticatedAppNinaRouteChildren: AuthenticatedAppNinaRouteChildren = {
 const AuthenticatedAppNinaRouteWithChildren =
   AuthenticatedAppNinaRoute._addFileChildren(AuthenticatedAppNinaRouteChildren)
 
+interface AuthenticatedAppProcedimentosRouteChildren {
+  AuthenticatedAppProcedimentosImportarRoute: typeof AuthenticatedAppProcedimentosImportarRoute
+}
+
+const AuthenticatedAppProcedimentosRouteChildren: AuthenticatedAppProcedimentosRouteChildren =
+  {
+    AuthenticatedAppProcedimentosImportarRoute:
+      AuthenticatedAppProcedimentosImportarRoute,
+  }
+
+const AuthenticatedAppProcedimentosRouteWithChildren =
+  AuthenticatedAppProcedimentosRoute._addFileChildren(
+    AuthenticatedAppProcedimentosRouteChildren,
+  )
+
 interface AuthenticatedAppRouteChildren {
   AuthenticatedAppAgendaRoute: typeof AuthenticatedAppAgendaRoute
   AuthenticatedAppAgendaMedicosRoute: typeof AuthenticatedAppAgendaMedicosRoute
@@ -3599,7 +3634,7 @@ interface AuthenticatedAppRouteChildren {
   AuthenticatedAppPainelExecutivoRoute: typeof AuthenticatedAppPainelExecutivoRoute
   AuthenticatedAppPerfisRoute: typeof AuthenticatedAppPerfisRoute
   AuthenticatedAppPlanosRoute: typeof AuthenticatedAppPlanosRoute
-  AuthenticatedAppProcedimentosRoute: typeof AuthenticatedAppProcedimentosRoute
+  AuthenticatedAppProcedimentosRoute: typeof AuthenticatedAppProcedimentosRouteWithChildren
   AuthenticatedAppProntuarioModelosRoute: typeof AuthenticatedAppProntuarioModelosRoute
   AuthenticatedAppProntuariosRoute: typeof AuthenticatedAppProntuariosRoute
   AuthenticatedAppRecepcaoRoute: typeof AuthenticatedAppRecepcaoRoute
@@ -3700,7 +3735,8 @@ const AuthenticatedAppRouteChildren: AuthenticatedAppRouteChildren = {
   AuthenticatedAppPainelExecutivoRoute: AuthenticatedAppPainelExecutivoRoute,
   AuthenticatedAppPerfisRoute: AuthenticatedAppPerfisRoute,
   AuthenticatedAppPlanosRoute: AuthenticatedAppPlanosRoute,
-  AuthenticatedAppProcedimentosRoute: AuthenticatedAppProcedimentosRoute,
+  AuthenticatedAppProcedimentosRoute:
+    AuthenticatedAppProcedimentosRouteWithChildren,
   AuthenticatedAppProntuarioModelosRoute:
     AuthenticatedAppProntuarioModelosRoute,
   AuthenticatedAppProntuariosRoute: AuthenticatedAppProntuariosRoute,
