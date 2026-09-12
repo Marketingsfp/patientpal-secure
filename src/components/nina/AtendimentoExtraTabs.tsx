@@ -155,6 +155,7 @@ import {
   meuStatusAgente,
   devolverParaNina,
   definirPresenca,
+  definirPresencaManual,
   esperaConversas,
   assumirConversa,
   marcarLida,
@@ -335,6 +336,7 @@ export function AtendInbox() {
   const listarReasonsFn = useServerFn(listarPauseReasons);
   const meuStatusFn = useServerFn(meuStatusAgente);
   const presencaFn = useServerFn(definirPresenca);
+  const presencaManualFn = useServerFn(definirPresencaManual);
   const esperaFn = useServerFn(esperaConversas);
   const assumirFn = useServerFn(assumirConversa);
   const obterConversaFn = useServerFn(obterConversa);
@@ -2815,7 +2817,7 @@ export function AtendInbox() {
               </Badge>
               <Circle
                 className={`h-3 w-3 fill-current ${
-                  pausaAtiva || ausenteAuto
+                  emPausa
                     ? "text-atd-warn"
                     : filaAberta
                       ? "text-atd-ok"
@@ -2853,9 +2855,9 @@ export function AtendInbox() {
               </Button>
               <Button
                 size="sm"
-                variant={pausaAtiva || ausenteAuto ? "default" : "outline"}
+                variant={emPausa ? "default" : "outline"}
                 className={`h-7 px-1 text-[11px] ${
-                  pausaAtiva || ausenteAuto
+                  emPausa
                     ? "bg-atd-warn hover:bg-atd-warn/90 text-atd-warn-ink"
                     : "text-atd-warn-ink border-atd-warn/40"
                 }`}
@@ -2866,9 +2868,9 @@ export function AtendInbox() {
 
               <Button
                 size="sm"
-                variant={!pausaAtiva && !filaAberta ? "default" : "outline"}
+                variant={manualOffline ? "default" : "outline"}
                 className={`h-7 px-1 text-[11px] ${
-                  !pausaAtiva && !filaAberta
+                  manualOffline
                     ? "bg-atd-idle hover:bg-atd-idle/90 text-atd-on-strong"
                     : "text-atd-idle-ink border-atd-border"
                 }`}
@@ -2877,7 +2879,7 @@ export function AtendInbox() {
                 <PowerOff className="h-3 w-3 mr-1" /> Offline
               </Button>
             </div>
-            {ausenteAuto && !pausaAtiva && (
+            {false && (
               <p className="text-[11px] text-atd-warn-ink">
                 Pausa automática por inatividade — mexa na tela para voltar a receber conversas.
               </p>
