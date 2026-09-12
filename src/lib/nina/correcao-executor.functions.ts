@@ -631,7 +631,7 @@ export const aplicarCorrecaoComIA = createServerFn({ method: "POST" })
         .eq("clinica_id", data.clinicaId);
     }
 
-    return {
+    const resumo: ResumoExecucao = {
       status,
       camada: proposta.camada,
       passos,
@@ -640,6 +640,20 @@ export const aplicarCorrecaoComIA = createServerFn({ method: "POST" })
       valorAnterior,
       valorNovo: proposta.valorNovo,
       motivo: motivoFinal,
-      acaoId: (acao?.id as string | undefined) ?? null,
     };
+
+    await supabase
+      .from("nina_correcao_execucoes")
+      .update({
+        etapa: "concluido",
+        status: status === "falhou" ? "falhou" : "concluida",
+        passos,
+        resumo,
+        erro: status === "falhou" ? motivoFinal : null,
+        acao_id: acao?.id ?? null,
+      })
+      .eq("id", execucaoId)
+      .eq("clinica_id", data.clinicaId);
+
+    return { ...resumo, acaoId: (acao?.id as string | undefined) ?? null };
   });
