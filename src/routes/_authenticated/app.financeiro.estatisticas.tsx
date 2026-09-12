@@ -193,41 +193,32 @@ function Page() {
       // procedimento, adesão, mensalidade, avulso, qualquer serviço pago.
       // Cortesias (atendimento feito sem cobrança) também contam, por isso
       // entram os atendimentos de valor zero que não geraram lançamento.
-      let cntA = 0;
+      let pagos = 0;
+      let cortesias = 0;
       let totA = 0;
-      const lancRows = (lancRes.data ?? []) as Array<{
-        tipo: string;
-        descricao: string;
-        valor: number;
-        data: string;
-        status: string;
-        paciente_id: string | null;
-      }>;
       for (const l of lancRows) {
         if (l.tipo !== "receita" || l.status !== "confirmado") continue;
-        cntA += 1;
+        pagos += 1;
         totA += Number(l.valor) || 0;
       }
-      for (const a of (atend.data ?? []) as Array<{
-        id: string;
-        data: string;
-        valor_total: number;
-        status: string;
-      }>) {
+      for (const a of atendRows) {
         if (a.status === "cancelado") continue;
         if ((Number(a.valor_total) || 0) > 0) continue; // já contado pelo pagamento no caixa
-        cntA += 1;
+        cortesias += 1;
       }
+      const cntA = pagos + cortesias;
 
       setStats({
         receita: r,
         despesa: d,
         atendimentos: cntA,
+        pagos,
+        cortesias,
         notas: notas.count ?? 0,
         pendentes: p,
         ticket: cntA > 0 ? totA / cntA : 0,
       });
-      setAtends((atend.data ?? []) as typeof atends);
+      setAtends(atendRows as typeof atends);
       setLancs(lancRows as typeof lancs);
       setNotasList((notasFull.data ?? []) as typeof notasList);
       setLoading(false);
