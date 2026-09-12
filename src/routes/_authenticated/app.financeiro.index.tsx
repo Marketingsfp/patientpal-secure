@@ -469,7 +469,31 @@ function FinDashboard() {
                 ? `Margem de ${pct(margem(resumo.saldo, resumo.receitaTotal))} · receitas − despesas pagas no caixa`
                 : "Receitas − despesas pagas no caixa"
             }
-          />
+          >
+            {/* A mesma quebra do Movimento de Caixa: onde o dinheiro está. */}
+            {resumo && !carregando && (
+              <ul className="mt-2 space-y-0.5 border-t border-border/60 pt-2">
+                <li className="flex items-center justify-between gap-2 text-xs">
+                  <span className="text-muted-foreground">Em espécie (gaveta)</span>
+                  <span className="shrink-0 tabular-nums">{brl(resumo.saldoMeios.especie.saldo)}</span>
+                </li>
+                <li className="flex items-center justify-between gap-2 text-xs">
+                  <span className="text-muted-foreground">Em banco (PIX, cartão, boleto)</span>
+                  <span className="shrink-0 tabular-nums">{brl(resumo.saldoMeios.banco.saldo)}</span>
+                </li>
+                {(resumo.saldoMeios.outros.entradas !== 0 ||
+                  resumo.saldoMeios.outros.saidas !== 0) && (
+                  <li className="flex items-center justify-between gap-2 text-xs">
+                    <span className="text-muted-foreground">Outros (convênio, sem informação)</span>
+                    <span className="shrink-0 tabular-nums">
+                      {brl(resumo.saldoMeios.outros.saldo)}
+                    </span>
+                  </li>
+                )}
+              </ul>
+            )}
+          </KpiCard>
+
         </div>
       </section>
 
