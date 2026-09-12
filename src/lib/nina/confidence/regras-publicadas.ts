@@ -24,10 +24,28 @@
 
 export type AmbienteRegra = "producao" | "homologacao" | "qualquer";
 
+/**
+ * Situação da CONVERSA que condiciona a regra. Diferente da condição por
+ * mensagem: aqui o texto publicado não cita um conteúdo a comparar, e sim um
+ * estado do atendimento ("quando ela já explicou o que precisa", "nas
+ * mensagens seguintes", "na primeira mensagem").
+ *
+ * Sem isto, uma proibição válida apenas depois que a pessoa expôs a demanda
+ * era lida como proibição universal — e reprovava até uma saudação correta.
+ */
+export type SituacaoRegra =
+  /** A pessoa já declarou o que precisa. */
+  | "demanda_declarada"
+  /** A apresentação já foi feita antes deste turno. */
+  | "apresentacao_ja_feita"
+  /** É o primeiro turno respondido da sessão. */
+  | "primeira_mensagem";
+
 export type CondicaoRegra =
   | { tipo: "sempre" }
   | { tipo: "mensagem_exata"; valor: string }
-  | { tipo: "mensagem_contem"; valor: string };
+  | { tipo: "mensagem_contem"; valor: string }
+  | { tipo: "situacao"; situacao: SituacaoRegra; valor: string };
 
 export type VerificacaoRegra =
   | "literal"
