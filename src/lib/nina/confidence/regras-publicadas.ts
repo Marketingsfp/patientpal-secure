@@ -496,7 +496,7 @@ export function extrairRegrasPublicadas(
       // Condição escrita na própria frase da regra. A situação da conversa
       // tem precedência: "quando ela já explicou o que precisa" não é um
       // conteúdo a procurar na mensagem, é um estado do atendimento.
-      let condicaoLocal = condicao;
+      let condicaoLocal: CondicaoRegra = condicao;
       const situacao = situacaoDaFrase(frase);
       if (situacao) {
         condicaoLocal = {
