@@ -1898,6 +1898,22 @@ function Page() {
           <h1 className="text-2xl font-semibold">Movimento de Caixa</h1>
           <p className="text-sm text-muted-foreground">Receitas e despesas do período</p>
         </div>
+        {/* Atalhos de período no cabeçalho: é a troca mais frequente do dia,
+            então fica à vista sem precisar rolar até a barra de filtros. */}
+        <div className="min-w-0 flex-1">
+          <DateRangeFilter
+            value={{ from: fromDate, to: toDate }}
+            preset={presetPeriodo}
+            mostrarCampos={false}
+            onChange={(r, p) => {
+              setPresetPeriodo(p);
+              if (p !== "periodo") {
+                setFromDate(r.from);
+                setToDate(r.to);
+              }
+            }}
+          />
+        </div>
         <div className="flex gap-2">
           <Dialog open={open} onOpenChange={setOpen}>
             {podeEscrever && (
@@ -2245,22 +2261,12 @@ function Page() {
 
       <Card>
         <CardContent className="pt-6 space-y-3">
-          {/* Barra do dia a dia: período, visão, tipo e as duas saídas em
-              papel. Tudo o mais fica atrás de "Mais filtros" — a recepção usa
-              data e tipo o tempo todo, e o resto é exceção. Nenhum filtro foi
-              removido, só recolhido. */}
-          <DateRangeFilter
-            value={{ from: fromDate, to: toDate }}
-            preset={presetPeriodo}
-            mostrarCampos={false}
-            onChange={(r, p) => {
-              setPresetPeriodo(p);
-              if (p !== "periodo") {
-                setFromDate(r.from);
-                setToDate(r.to);
-              }
-            }}
-          />
+          {/* Barra do dia a dia: visão, tipo e as duas saídas em papel. Os
+              atalhos de período subiram para o cabeçalho da página. Tudo o
+              mais fica atrás de "Mais filtros" — a recepção usa data e tipo o
+              tempo todo, e o resto é exceção. Nenhum filtro foi removido, só
+              recolhido. */}
+
           <div className="flex flex-wrap items-end gap-3">
             <div className="space-y-1">
               <Label className="text-xs">De</Label>
