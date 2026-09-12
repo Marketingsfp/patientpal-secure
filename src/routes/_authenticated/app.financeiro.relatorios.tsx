@@ -1544,7 +1544,7 @@ function Page() {
           modalidade: rModalidade === "todas" ? null : rModalidade,
           servico: rServico === "todos" ? null : rServico,
         };
-        const [atual, anterior] = await Promise.all([
+        const [atual, anterior, pago] = await Promise.all([
           carregarRateio(ctxRateio, { ...filtrosComuns, de: from, ate: to }),
           comparar
             ? carregarRateio(ctxRateio, {
@@ -1553,7 +1553,11 @@ function Page() {
                 ate: periodoComp.ate,
               })
             : Promise.resolve([] as RateioLinha[]),
+          // A outra leitura do repasse, a da gaveta: mostrada ao lado do
+          // devido para esta tela bater com o Dashboard e o Movimento.
+          carregarRepassePago(ctxRateio, clinicaAtual.clinica_id, from, to).catch(() => null),
         ]);
+        setRepassePagoRateio(pago);
         brutasRateio = atual;
         brutasComp = anterior;
         cruas = filtrarPorCategoria(atual, categorias, (l) => l.categoria_nome);
