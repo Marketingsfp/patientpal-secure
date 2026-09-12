@@ -602,6 +602,33 @@ export function repartirPorForma(
   return saida;
 }
 
+/**
+ * Retorno de consulta ou cortesia da diretoria — as duas liberações em que
+ * nem a clínica nem o prestador recebem.
+ *
+ * A categoria financeira é a fonte certa, mas o atendimento liberado na Agenda
+ * grava o lançamento SEM categoria: o rótulo escolhido pela recepção sobra só
+ * no fim da descrição ("FULANA — REVISAO (GINECOLOGIA) — SEM COBRANCA"). Por
+ * isso, quando não há categoria e não entrou dinheiro, vale o último pedaço da
+ * descrição. Só nesse caso: descrição livre de um recebimento normal ("UBER
+ * PARA RETORNO DE PACIENTE", R$ 17,00) não pode zerar repasse de ninguém.
+ *
+ * A gratuidade do Cartão fica DE FORA de propósito — lá o prestador recebe.
+ */
+export function liberacaoDaLinha(
+  ctx: Pick<RateioContexto, "categoriaNomePorId">,
+  params: { categoriaId?: string | null; descricao?: string | null; valorPago: number },
+): "retorno" | "cortesia" | null {
+  const categoria = params.categoriaId ? ctx.categoriaNomePorId.get(params.categoriaId) : null;
+  const porCategoria = classificarLiberacao(categoria);
+  if (porCategoria) return porCategoria === "convenio" ? null : porCategoria;
+  if (categoria || num(params.valorPago) > 0) return null;
+  const partes = (params.descricao ?? "").split("—");
+  if (partes.length < 2) return null;
+  const tipo = classificarLiberacao(partes[partes.length - 1]);
+  return tipo === "retorno" || tipo === "cortesia" ? tipo : null;
+}
+
 function reparte(
   ctx: RateioContexto,
   params: {
