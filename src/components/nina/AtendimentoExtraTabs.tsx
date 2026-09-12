@@ -720,6 +720,8 @@ export function AtendInbox() {
         listarReasonsFn({ data: { clinicaId } }),
       ]);
       setFilaAberta(s.filaAberta);
+      setEstadoManual((s as { estadoManual?: EstadoManualPresenca | null }).estadoManual ?? null);
+      setVersaoPresenca((s as { estadoManualVersao?: number }).estadoManualVersao ?? 0);
       setPausaAtiva(p);
       setPauseReasons(rs);
       setStatusCarregado(true);
@@ -732,97 +734,29 @@ export function AtendInbox() {
     carregarStatusAgente();
   }, [carregarStatusAgente]);
 
-  // Presença real + automática:
-  //  - sem mexer no mouse/teclado por 5 min, ou com o sistema em segundo plano
-  //    (outra aba/janela minimizada), o atendente entra em pausa automática e
-  //    para de receber conversas novas;
-  //  - qualquer interação traz de volta para online;
-  //  - ao fechar a página, avisa offline na hora (e, se o aviso não chegar, o
-  //    servidor derruba a presença sozinho depois de 5 minutos sem sinal).
-  // A pausa manual e o offline manual continuam mandando: a automação nunca
-  // "reabre" quem escolheu ficar offline.
-  const OCIOSO_MS = 5 * 60 * 1000;
-  const [ausenteAuto, setAusenteAuto] = useState(false);
-  const manualOffline = !pausaAtiva && !filaAberta;
-  const online = !pausaAtiva && filaAberta && !ausenteAuto;
+  // FASE 2 — presença 100% MANUAL.
+  // Não existe mais pausa por inatividade, ausência por aba oculta, offline ao
+  // fechar a página nem queda por heartbeat vencido: o estado só muda quando o
+  // atendente clica em Online, Offline ou Em pausa.
+  const [estadoManual, setEstadoManual] = useState<EstadoManualPresenca | null>(null);
+  const [versaoPresenca, setVersaoPresenca] = useState(0);
+  const online = estadoManual === "ONLINE" && !pausaAtiva;
+  const emPausa = estadoManual === "PAUSA" || !!pausaAtiva;
+  const manualOffline = estadoManual === "OFFLINE";
 
-  useEffect(() => {
-    if (manualOffline || pausaAtiva) {
-      setAusenteAuto(false);
-      return;
-    }
-    let timer: ReturnType<typeof setTimeout>;
-    const armar = () => {
-      clearTimeout(timer);
-      timer = setTimeout(() => setAusenteAuto(true), OCIOSO_MS);
-    };
-    const acordar = () => {
-      if (document.visibilityState === "hidden") return;
-      setAusenteAuto(false);
-      armar();
-    };
-    const aoTrocarVisibilidade = () => {
-      if (document.visibilityState === "hidden") {
-        clearTimeout(timer);
-        setAusenteAuto(true);
-      } else {
-        acordar();
-      }
-    };
-    const eventos = ["mousemove", "mousedown", "keydown", "wheel", "touchstart", "focus"] as const;
-    eventos.forEach((e) => window.addEventListener(e, acordar, { passive: true }));
-    document.addEventListener("visibilitychange", aoTrocarVisibilidade);
-    if (document.visibilityState === "hidden") setAusenteAuto(true);
-    else armar();
-    return () => {
-      clearTimeout(timer);
-      eventos.forEach((e) => window.removeEventListener(e, acordar));
-      document.removeEventListener("visibilitychange", aoTrocarVisibilidade);
-    };
-  }, [manualOffline, pausaAtiva, OCIOSO_MS]);
-
-  // FASE 2 — heartbeat coordenado entre abas.
-  //  - o status enviado é o do USUÁRIO, não o de uma aba: se qualquer aba está
-  //    ativa, ele continua Online (a aba de trás não o derruba);
-  //  - fechar uma aba só grava OFFLINE quando não resta nenhuma outra aberta;
-  //  - se o navegador fechar de vez sem avisar, o servidor derruba sozinho
-  //    depois de 5 minutos sem sinal (mesma janela usada na distribuição).
+  // Sinal de vida (apenas informação técnica de conexão). Este caminho NUNCA
+  // altera a escolha de presença — nem ao fechar a aba.
   useEffect(() => {
     if (!clinicaId || !statusCarregado) return;
     const bater = () => {
-      const { outraAtiva } = anunciarAba(online);
-      const efetivo = online || outraAtiva;
-      presencaFn({
-        data: {
-          clinicaId,
-          status: efetivo
-            ? ("ONLINE" as const)
-            : manualOffline
-              ? ("OFFLINE" as const)
-              : ("AWAY" as const),
-          aceitaNovas: efetivo,
-        },
-      }).catch(() => {
+      presencaFn({ data: { clinicaId } }).catch(() => {
         /* heartbeat: falha isolada não atrapalha o atendimento */
       });
     };
     bater();
-    const sair = () => {
-      const { restaOutra } = encerrarAba();
-      if (restaOutra) return; // outra aba do mesmo atendente continua aberta
-      presencaFn({
-        data: { clinicaId, status: "OFFLINE" as const, aceitaNovas: false },
-      }).catch(() => {});
-    };
-    window.addEventListener("pagehide", sair);
-    // Bate sempre (inclusive offline/ausente): é o que mantém o registro de
-    // abas vivo e o servidor de acordo com a tela.
     const t = setInterval(bater, 30_000);
-    return () => {
-      clearInterval(t);
-      window.removeEventListener("pagehide", sair);
-    };
-  }, [clinicaId, statusCarregado, online, manualOffline, presencaFn]);
+    return () => clearInterval(t);
+  }, [clinicaId, statusCarregado, presencaFn]);
 
   // Reconexão / volta do segundo plano: reconfere o status real do servidor
   // em vez de confiar no que a aba acha que enviou.
