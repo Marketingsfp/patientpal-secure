@@ -2194,12 +2194,27 @@ function Page() {
               papel. Tudo o mais fica atrás de "Mais filtros" — a recepção usa
               data e tipo o tempo todo, e o resto é exceção. Nenhum filtro foi
               removido, só recolhido. */}
+          <DateRangeFilter
+            value={{ from: fromDate, to: toDate }}
+            preset={presetPeriodo}
+            mostrarCampos={false}
+            onChange={(r, p) => {
+              setPresetPeriodo(p);
+              if (p !== "periodo") {
+                setFromDate(r.from);
+                setToDate(r.to);
+              }
+            }}
+          />
           <div className="flex flex-wrap items-end gap-3">
             <div className="space-y-1">
               <Label className="text-xs">De</Label>
               <DateInputBR
                 value={fromDate}
-                onChange={(e) => setFromDate(e.target.value)}
+                onChange={(e) => {
+                  setPresetPeriodo("periodo");
+                  setFromDate(e.target.value);
+                }}
                 className="w-40"
               />
             </div>
@@ -2207,9 +2222,13 @@ function Page() {
               <Label className="text-xs">Até</Label>
               <DateInputBR
                 value={toDate}
-                onChange={(e) => setToDate(e.target.value)}
+                onChange={(e) => {
+                  setPresetPeriodo("periodo");
+                  setToDate(e.target.value);
+                }}
                 className="w-40"
               />
+
             </div>
             <div className="space-y-1">
               <Label className="text-xs">Visão</Label>
