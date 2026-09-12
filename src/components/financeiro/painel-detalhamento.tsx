@@ -273,39 +273,67 @@ export function DetalhamentoCorpo({
         </div>
       )}
 
-      <div className={cn("overflow-auto rounded-md border", alturaTabela)}>
-        {det.linhas.length === 0 ? (
-          <p className="py-10 text-center text-sm text-muted-foreground">Nada no período.</p>
-        ) : (
-          <Table>
-            <TableHeader className="sticky top-0 z-10 bg-background">
-              <TableRow>
-                {det.colunas.map((c) => (
-                  <TableHead key={c.rotulo} className={numerica(c.tipo) ? "text-right" : ""}>
-                    {c.rotulo}
-                  </TableHead>
-                ))}
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {det.linhas.map((l, i) => (
-                <TableRow key={i}>
-                  {l.map((c, j) => (
-                    <TableCell
-                      key={j}
-                      className={cn(
-                        "py-1.5",
-                        numerica(det.colunas[j].tipo) && "text-right tabular-nums",
-                        det.colunas[j].tipo === "data" && "whitespace-nowrap",
-                        typeof c === "number" && c < 0 && "text-destructive",
-                      )}
-                    >
-                      {textoCelula(det.colunas[j].tipo, c)}
-                    </TableCell>
+      <div className="relative min-h-0 flex-1">
+        <div
+          ref={rolagem}
+          tabIndex={0}
+          onKeyDown={teclado}
+          aria-label="Tabela do detalhamento — use as setas para rolar"
+          className={cn(
+            "h-full overflow-auto rounded-md border outline-none focus-visible:ring-2 focus-visible:ring-primary/40",
+            alturaTabela,
+          )}
+        >
+          {det.linhas.length === 0 ? (
+            <p className="py-10 text-center text-sm text-muted-foreground">Nada no período.</p>
+          ) : (
+            <Table>
+              <TableHeader className="sticky top-0 z-10 bg-background">
+                <TableRow>
+                  {det.colunas.map((c) => (
+                    <TableHead key={c.rotulo} className={numerica(c.tipo) ? "text-right" : ""}>
+                      {c.rotulo}
+                    </TableHead>
                   ))}
                 </TableRow>
-              ))}
-            </TableBody>
+              </TableHeader>
+              <TableBody>
+                {det.linhas.map((l, i) => (
+                  <TableRow
+                    key={i}
+                    onClick={detalharLinha ? () => abrirLinha(l, i) : undefined}
+                    role={detalharLinha ? "button" : undefined}
+                    tabIndex={detalharLinha ? 0 : undefined}
+                    title={detalharLinha ? "Ver os pacientes desta linha" : undefined}
+                    onKeyDown={
+                      detalharLinha
+                        ? (e) => {
+                            if (e.key === "Enter" || e.key === " ") {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              abrirLinha(l, i);
+                            }
+                          }
+                        : undefined
+                    }
+                    className={detalharLinha ? "cursor-pointer hover:bg-muted/60" : undefined}
+                  >
+                    {l.map((c, j) => (
+                      <TableCell
+                        key={j}
+                        className={cn(
+                          "py-1.5",
+                          numerica(det.colunas[j].tipo) && "text-right tabular-nums",
+                          det.colunas[j].tipo === "data" && "whitespace-nowrap",
+                          typeof c === "number" && c < 0 && "text-destructive",
+                        )}
+                      >
+                        {textoCelula(det.colunas[j].tipo, c)}
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                ))}
+              </TableBody>
             {det.totais && (
               <TableFooter className="sticky bottom-0 bg-muted">
                 <TableRow>
