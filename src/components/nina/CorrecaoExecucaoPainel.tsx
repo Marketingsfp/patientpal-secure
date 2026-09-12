@@ -41,10 +41,15 @@ export function CorrecaoExecucaoPainel({
   execucao,
   emAndamento,
   etapa,
+  resultadoFinal,
+  verificacao,
 }: {
   execucao: ResumoExecucao | null;
   emAndamento?: boolean;
   etapa?: EtapaExecucao | null;
+  /** Estado técnico real: preparado, aplicado, aguardando publicação, verificado. */
+  resultadoFinal?: ResultadoFinalExecucao | null;
+  verificacao?: { conferido: boolean; alvo: string; motivo: string } | null;
 }) {
   if (emAndamento) {
     return (
