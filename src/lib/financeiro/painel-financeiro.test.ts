@@ -137,7 +137,19 @@ describe("resumoPainel", () => {
     expect(r.terceiro).toBe(30);
     // 2 atendimentos do Rateio + 1 mensalidade recebida.
     expect(r.producao.total).toBe(3);
-    expect(r.producao.outros).toBe(1);
+    // A mensalidade tem card próprio; "outros" fica só com avulso/procedimento.
+    expect(r.producao.mensalidades).toBe(1);
+    expect(r.producao.adesoes).toBe(0);
+    expect(r.producao.outros).toBe(0);
+    expect(
+      r.producao.consultasCartao +
+        r.producao.consultasParticulares +
+        r.producao.exames +
+        r.producao.outros +
+        r.producao.mensalidades +
+        r.producao.adesoes,
+    ).toBe(r.producao.total);
+
     expect(r.liquidoAtendimentos).toBe(250);
     // Ticket médio = (500 + 50) / 3.
     expect(r.ticketMedio).toBe(183.33);
