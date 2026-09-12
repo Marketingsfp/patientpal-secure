@@ -2509,18 +2509,30 @@ function Page() {
                têm como divergir. */
             (() => {
               const catMap = new Map(cats.map((c) => [c.id, c.nome]));
+              // Transferência entre caixas (sangria/suprimento) NÃO entra no
+              // resumo por categoria: é o mesmo dinheiro mudando de custódia
+              // (da gaveta para o financeiro), não despesa nem receita. Se
+              // entrasse como "Saída", inflava o total pago e derrubava o
+              // saldo do período. Continua visível na visão analítica e no
+              // rodapé de troca de custódia, logo abaixo da tabela.
+              const transf = displayItems.filter((l) => l.tipo === "transferencia");
+              const transfSaida = transf
+                .filter((l) => l.transferSentido !== "entrada")
+                .reduce((s, l) => s + (Number(l.valor) || 0), 0);
+              const transfEntrada = transf
+                .filter((l) => l.transferSentido === "entrada")
+                .reduce((s, l) => s + (Number(l.valor) || 0), 0);
               const resumo2 = resumoSintetico(
-                displayItems.map((l) => ({
-                  categoria:
-                    l.tipo === "transferencia"
-                      ? "Transferências entre caixas"
-                      : l.categoria_id
-                        ? (catMap.get(l.categoria_id) ?? "(sem categoria)")
-                        : "(sem categoria)",
-                  tipo: l.tipo,
-                  sentido: l.transferSentido ?? null,
-                  valor: l.valor,
-                })),
+                displayItems
+                  .filter((l) => l.tipo !== "transferencia")
+                  .map((l) => ({
+                    categoria: l.categoria_id
+                      ? (catMap.get(l.categoria_id) ?? "(sem categoria)")
+                      : "(sem categoria)",
+                    tipo: l.tipo,
+                    sentido: l.transferSentido ?? null,
+                    valor: l.valor,
+                  })),
               );
               return (
                 <>
@@ -2529,6 +2541,7 @@ function Page() {
                     {resumo2.total.qtd.toLocaleString("pt-BR")} lançamento(s) no período
                     {filtroGrupo ? ` · filtrado por "${rotuloFiltro(filtroGrupo)}"` : ""}.
                   </div>
+
                   <div className="overflow-x-auto">
                     <Table>
                       <TableHeader>
@@ -2584,6 +2597,15 @@ function Page() {
                       </TableBody>
                     </Table>
                   </div>
+                  {transf.length > 0 && (
+                    <div className="border-t bg-muted/20 px-4 py-2 text-xs text-muted-foreground">
+                      Troca de custódia fora do resultado — {transf.length} lançamento(s):
+                      sangrias (caixa → financeiro) {fmt(transfSaida)} · suprimentos (financeiro →
+                      caixa) {fmt(transfEntrada)}. Não são despesa: o dinheiro continua com a
+                      clínica, por isso não entram nas saídas acima.
+                    </div>
+                  )}
+
                 </>
               );
             })()
