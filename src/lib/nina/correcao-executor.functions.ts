@@ -566,12 +566,27 @@ export const aplicarCorrecaoComIA = createServerFn({ method: "POST" })
             } else if (c.name === "publicar_prompt") {
               const anterior = await ferramentasServer.lerPromptPublicado(supabase);
               valorAnterior = anterior?.conteudo ?? null;
+              // Concorrência: se a versão em vigor mudou desde a análise, recusa.
+              if (
+                proposta.revisaoBase &&
+                anterior &&
+                String(proposta.revisaoBase) !== String(anterior.id) &&
+                String(proposta.revisaoBase) !== String(anterior.versao)
+              )
+                throw new Error(
+                  `A Arquitetura foi publicada por outra pessoa depois desta análise (em vigor: versão ${anterior.versao}). Analise de novo antes de aplicar.`,
+                );
               await atualizarEtapa("publicando");
               const r = await ferramentasServer.publicarPrompt(supabase, userId, data.clinicaId, {
                 conteudo: String(args.conteudo ?? ""),
                 comentario: String(args.comentario ?? "Correção assistida de erro reportado"),
               });
               publicado = true;
+              alvoVerificacao = {
+                tipo: "prompt",
+                conteudo: String(args.conteudo ?? ""),
+                versao: Number(r.versao) || null,
+              };
               retorno = r;
               passo(
                 "publicar_prompt",
