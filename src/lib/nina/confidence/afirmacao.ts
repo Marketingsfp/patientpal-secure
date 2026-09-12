@@ -409,7 +409,7 @@ function valoresIguais(tipo: TipoClaim, afirmado: string, doFato: unknown): bool
 export type CorrespondenciaAfirmacao =
   | { situacao: "confirmado"; fato: FatoRecuperado; referencia: string }
   | { situacao: "divergente"; fato: FatoRecuperado; referencia: string; valorDaFonte: string | null }
-  | { situacao: "fora_do_escopo" }
+  | { situacao: "fora_do_escopo"; motivo?: string }
   | { situacao: "indeterminado"; motivo: string }
   | { situacao: "sem_fato" };
 
