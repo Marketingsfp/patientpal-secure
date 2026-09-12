@@ -101,9 +101,11 @@ describe("categoriaDoAtendimento", () => {
       linha({ condicao: "CONVÊNIO" }),
       linha({ tipo_servico: "EXAME" }),
       linha({ tipo_servico: "PROCEDIMENTO" }),
+      // Revisão de cortesia: atendida, sem cobrança.
+      linha({ receita: 0, repasse: 0 }),
     ]);
     expect(p).toEqual({
-      total: 5,
+      total: 6,
       consultasCartao: 1,
       consultasParticulares: 2,
       consultasConvenio: 1,
@@ -111,9 +113,11 @@ describe("categoriaDoAtendimento", () => {
       outros: 1,
       mensalidades: 0,
       adesoes: 0,
-
+      cortesias: 1,
     });
-    expect(p.consultasCartao + p.consultasParticulares + p.exames + p.outros).toBe(p.total);
+    expect(
+      p.consultasCartao + p.consultasParticulares + p.exames + p.outros + p.cortesias,
+    ).toBe(p.total);
   });
 });
 
