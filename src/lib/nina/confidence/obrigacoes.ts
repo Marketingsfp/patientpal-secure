@@ -595,12 +595,13 @@ export function avaliarObrigacoes(
 
   // Regras da publicação vigente cuja condição NÃO foi acionada neste turno.
   const validas = regrasValidasParaPublicacao(ctx.instrucoes?.regras, ctx.instrucoes?.hash);
-  const aplicaveis = validas.filter((r) =>
-    regraSeAplica(r, {
-      mensagemPaciente: ctx.mensagemPaciente ?? null,
-      ambiente: ctx.businessContext?.ambiente ?? null,
-    }),
+  const aplicaveis = validas.filter((r) => aplicabilidadeDaRegra(r, sinais) === "aplica");
+  const indeterminadasPorSituacao = validas.filter(
+    (r) => aplicabilidadeDaRegra(r, sinais) === "indeterminada",
   );
+  if (indeterminadasPorSituacao.length > 0) {
+    limitacoes.push("SITUACAO_DA_REGRA_NAO_CONHECIDA");
+  }
   const regrasNaoAplicaveis = validas.length - aplicaveis.length;
   const falhaDeInterpretacao =
     (ctx.instrucoes?.regras?.length ?? 0) > 0 && validas.length === 0
