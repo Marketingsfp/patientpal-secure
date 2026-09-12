@@ -4,6 +4,7 @@ import {
   chaveGrupo,
   compararRateio,
   filtrarRateio,
+  liberacaoDaLinha,
   margemClinica,
   rotuloFormasDaLinha,
   totaisRateio,
@@ -313,5 +314,53 @@ describe("compararRateio", () => {
     const r = compararRateio([grupo({ receita: 90 })], [], "profissional", 0);
     expect(r[0].variacaoPercentual).toBeNull();
     expect(r[0].variacaoValor).toBe(90);
+  });
+});
+
+/**
+ * Atendimento que sai por R$ 0,00 tem três motivos diferentes, e só dois deles
+ * zeram o repasse do prestador. Ver `liberacaoDaLinha`.
+ */
+describe("liberacaoDaLinha", () => {
+  const ctx = { categoriaNomePorId: new Map<string, string>([["cat-cortesia", "CORTESIA"]]) };
+
+  it("revisão sem cobrança lançada na agenda zera o repasse", () => {
+    expect(
+      liberacaoDaLinha(ctx, {
+        descricao: "TATIANA GOULART — REVISAO (NEUROLOGIA) — SEM COBRANCA",
+        valorPago: 0,
+      }),
+    ).toBe("cortesia");
+  });
+
+  it("gratuidade do Cartão NÃO zera: quem remunera é a mensalidade do paciente", () => {
+    expect(
+      liberacaoDaLinha(ctx, {
+        descricao: "MARIA BERNADETE — ELETROCARDIOGRAMA (ECG) — CONVENIO CARTAO CONSULTA (GRATUIDADE)",
+        valorPago: 0,
+      }),
+    ).toBeNull();
+  });
+
+  it("sem faturamento não zera: a marcação tira só a parte da clínica", () => {
+    expect(
+      liberacaoDaLinha(ctx, {
+        descricao: "SEM FATURAMENTO — EXAME DE PARCEIRO (TOXICOLOGICO / DETRAN)",
+        valorPago: 0,
+      }),
+    ).toBeNull();
+  });
+
+  it("categoria CORTESIA vale mesmo com valor recebido", () => {
+    expect(liberacaoDaLinha(ctx, { categoriaId: "cat-cortesia", valorPago: 120 })).toBe("cortesia");
+  });
+
+  it("descrição livre com a palavra retorno num recebimento normal não zera nada", () => {
+    expect(
+      liberacaoDaLinha(ctx, {
+        descricao: "UBER PARA RETORNO DE PACIENTE O LUAN SOLICITOU CX MAYARA",
+        valorPago: 17,
+      }),
+    ).toBeNull();
   });
 });
