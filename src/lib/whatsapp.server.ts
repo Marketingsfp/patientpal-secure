@@ -1246,7 +1246,11 @@ async function gerarRespostaNinaInterno(
   const runtimeContext = {
     canal: "whatsapp",
     ambiente: opcoes?.teste ? "homologacao" : "producao",
+    // Dados ADMINISTRATIVOS da clínica correta (cadastro): nome oficial,
+    // endereço e contatos. Não é a identidade de apresentação.
     unidade: dadosPublicos,
+    // FASE 2 — identidade de APRESENTAÇÃO da versão publicada do turno.
+    identidade_atendimento: fatosIdentidade(identidadeEfetiva),
     data_hora_atual: agoraNaClinica(),
     fluxo_fase1_ativo: fase1Ativa,
     intencoes: intencoesTurno,
