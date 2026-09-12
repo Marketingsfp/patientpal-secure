@@ -255,7 +255,10 @@ export function resumoPainel(params: {
     saldo: round2(receitaBruta + outrasReceitas - despesasTotais),
     repassePagoNoPeriodo: round2(repassePagoNoPeriodo),
     producao,
-    ticketMedio: producao.total > 0 ? round2(receitaBruta / producao.total) : 0,
+    // Ticket médio da entrada de caixa: receita total ÷ pagamentos recebidos.
+    ticketMedio:
+      producao.total > 0 ? round2(round2(receitaBruta + outrasReceitas) / producao.total) : 0,
+
   };
 }
 
