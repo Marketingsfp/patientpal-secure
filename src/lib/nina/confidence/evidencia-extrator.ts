@@ -55,6 +55,161 @@ function texto(v: unknown): string | null {
   return s === "" ? null : s;
 }
 
+// ------------------------------------------------- FASE 2 (preço por condição)
+
+/**
+ * Uma referência monetária concreta do retorno: valor + a condição em que
+ * aquele valor vale. `forma`/`condicao` só existem quando a ferramenta as
+ * informou — nada é suposto.
+ */
+export type PrecoCondicao = {
+  /** dinheiro, cartao, pix... exatamente como o produtor declarou. */
+  forma: string | null;
+  /** "a partir de", "3x sem juros", "à vista"... */
+  condicao: string | null;
+  /** Valor como texto, preservando o formato original. */
+  valor: string;
+  /** Valor em centavos — base de comparação e de deduplicação. */
+  centavos: number | null;
+};
+
+const FORMAS_POR_CAMPO: Record<string, string> = {
+  preco_dinheiro: "dinheiro",
+  valor_dinheiro: "dinheiro",
+  preco_cartao: "cartao",
+  valor_cartao: "cartao",
+  preco_pix: "pix",
+  valor_pix: "pix",
+};
+
+function centavosDe(v: unknown): number | null {
+  const n = valorMonetario(v);
+  return n === null ? null : Math.round(n * 100);
+}
+
+/** Qualificadores que mudam o sentido do valor e não podem ser descartados. */
+function qualificador(v: unknown): string | null {
+  const s = normalizarTexto(v);
+  if (!s) return null;
+  if (s.includes("a partir de")) return "a partir de";
+  const parcela = s.match(/(\d+)\s*x/);
+  if (parcela) return `${parcela[1]}x`;
+  if (s.includes("a vista")) return "a vista";
+  return null;
+}
+
+function precoDe(valor: unknown, forma: string | null, condicao: string | null): PrecoCondicao | null {
+  const t = texto(valor);
+  if (t === null) return null;
+  const centavos = centavosDe(t);
+  if (centavos === null) return null;
+  return { forma, condicao: condicao ?? qualificador(t), valor: t, centavos };
+}
+
+/**
+ * Lê todas as referências monetárias de um registro, em qualquer dos formatos
+ * usados pelos produtores: campos por forma (`preco_dinheiro`/`preco_cartao`),
+ * lista/mapa `formas_pagamento` (inclusive dentro de `precos`/`extras`) e o
+ * campo resumido `preco`/`price`.
+ */
+export function precosDoRegistro(registro: unknown): PrecoCondicao[] {
+  const x = obj(registro);
+  const achados: PrecoCondicao[] = [];
+
+  for (const [campo, forma] of Object.entries(FORMAS_POR_CAMPO)) {
+    const p = precoDe(x[campo], forma, null);
+    if (p) achados.push(p);
+  }
+
+  const containers = [x, obj(x["precos"]), obj(x["extras"]), obj(obj(x["extras"])["precos"])];
+  for (const c of containers) {
+    const fp = c["formas_pagamento"] ?? c["formasPagamento"] ?? c["condicoes_pagamento"];
+    if (Array.isArray(fp)) {
+      for (const item of fp) {
+        const o = obj(item);
+        const forma = texto(o["forma"]) ?? texto(o["tipo"]) ?? texto(o["nome"]) ?? texto(o["pagamento"]);
+        const valor = o["valor"] ?? o["preco"] ?? o["price"];
+        const cond = texto(o["condicao"]) ?? texto(o["condicoes"]) ?? texto(o["observacao"]);
+        const p = precoDe(valor, forma, cond);
+        if (p) achados.push(p);
+      }
+    } else if (fp && typeof fp === "object") {
+      for (const [forma, valor] of Object.entries(fp as Record<string, unknown>)) {
+        const p = precoDe(valor, forma, null);
+        if (p) achados.push(p);
+      }
+    }
+  }
+
+  // Resumo do próprio registro: entra sem forma, nunca apagando as detalhadas.
+  const resumo = precoDe(x["preco"] ?? x["price"] ?? x["valor"], null, null);
+  if (resumo) achados.push(resumo);
+
+  return dedupPrecos(achados);
+}
+
+/**
+ * Mesma condição + mesmo valor = mesma referência (registros/records
+ * duplicados, resumo repetindo uma condição detalhada).
+ */
+function dedupPrecos(precos: PrecoCondicao[]): PrecoCondicao[] {
+  const vistos = new Map<string, PrecoCondicao>();
+  const semForma: PrecoCondicao[] = [];
+  for (const p of precos) {
+    const chave = `${normalizarTexto(p.forma)}|${normalizarTexto(p.condicao)}|${p.centavos}`;
+    if (p.forma === null) {
+      semForma.push(p);
+      continue;
+    }
+    if (!vistos.has(chave)) vistos.set(chave, p);
+  }
+  const detalhados = [...vistos.values()];
+  // O resumo só vira evidência própria quando o valor não é coberto por
+  // nenhuma condição detalhada (senão seria o mesmo fato, sem forma).
+  for (const p of semForma) {
+    const jaCoberto = detalhados.some((d) => d.centavos === p.centavos);
+    const repetido = detalhados.some(
+      (d) => d.forma === null && d.centavos === p.centavos,
+    );
+    if (!jaCoberto && !repetido) detalhados.push(p);
+  }
+  return detalhados;
+}
+
+/** Rótulo da condição guardado na chave do fato (`null` quando não informada). */
+export function rotuloCondicao(p: PrecoCondicao): string | null {
+  const partes = [p.forma, p.condicao].filter((v): v is string => !!v && v.trim() !== "");
+  return partes.length > 0 ? partes.join(" ") : null;
+}
+
+/** Identidade de um registro, para não duplicar `registros` × `records`. */
+function identidadeRegistro(registro: unknown): string {
+  const x = obj(registro);
+  const id = texto(x["id"]);
+  if (id) return `id:${id}`;
+  return JSON.stringify([
+    normalizarTexto(x["procedimento"]),
+    normalizarTexto(x["medico"]),
+    normalizarTexto(x["dia"]),
+    normalizarTexto(x["horario"]),
+    precosDoRegistro(x).map((p) => `${normalizarTexto(rotuloCondicao(p))}=${p.centavos}`),
+  ]);
+}
+
+/** Une `registros` e `records` sem repetir o mesmo dado. */
+export function registrosDoRetorno(d: Record<string, unknown>): unknown[] {
+  const brutos = [
+    ...(Array.isArray(d["registros"]) ? (d["registros"] as unknown[]) : []),
+    ...(Array.isArray(d["records"]) ? (d["records"] as unknown[]) : []),
+  ];
+  const porIdentidade = new Map<string, unknown>();
+  for (const r of brutos) {
+    const k = identidadeRegistro(r);
+    if (!porIdentidade.has(k)) porIdentidade.set(k, r);
+  }
+  return [...porIdentidade.values()];
+}
+
 /** Identidade da consulta: mesma ferramenta + mesmos argumentos = mesma consulta. */
 export function identidadeConsulta(ferramenta: string, args: unknown): string {
   let normalizado = "";
