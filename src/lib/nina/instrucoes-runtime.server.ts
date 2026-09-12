@@ -264,7 +264,9 @@ export async function promptInstrucoes(
       );
       registrarFalha(escopo, snapshot.motivo ?? "cache vencido");
     } else {
-      const render = renderizarTemplateInstrucoes(ultima.conteudo, valores);
+      const valoresDoTurno =
+        typeof valores === "function" ? valores(ultima.conteudo) : valores;
+      const render = renderizarTemplateInstrucoes(ultima.conteudo, valoresDoTurno);
       if (render.ok) {
         snapshot = {
           escopo,
