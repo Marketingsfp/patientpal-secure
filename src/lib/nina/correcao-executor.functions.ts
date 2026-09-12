@@ -457,6 +457,8 @@ export const aplicarCorrecaoComIA = createServerFn({ method: "POST" })
       motivo: "Teste ainda não executado.",
     };
     let publicado = false;
+    /** FASE 5 — versão real da Arquitetura antes/depois, quando houve publicação. */
+    let versaoPrompt: { anterior: string | null; nova: string | null } | null = null;
     let valorAnterior: string | null = proposta.valorAtual;
     let pendenciaTecnica: string | null = null;
     let motivoFinal = "";
