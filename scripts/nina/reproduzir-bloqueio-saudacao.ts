@@ -15,15 +15,16 @@
  */
 import { detectarIntencoes, intencaoAmbigua } from "../../src/lib/nina/atendimento-fase1";
 import { montarContextoCanonicoTurno } from "../../src/lib/nina/confidence/contexto-turno";
+import { montarInstrucoesDoTurno } from "../../src/lib/nina/confidence/contexto-avaliacao";
 import {
-  montarInstrucoesDoTurno,
-  enriquecerContextoAvaliacao,
-} from "../../src/lib/nina/confidence/contexto-avaliacao";
+  montarContextoDoTurno,
+  verificarRespostaFinalDoTurno,
+  type EstadoDoTurno,
+} from "../../src/lib/nina/confidence/runtime";
 import {
   avaliarObrigacoes,
   InstructionComplianceValidator,
 } from "../../src/lib/nina/confidence/obrigacoes";
-import { decidirConfianca } from "../../src/lib/nina/confidence/engine";
 import {
   medirEvidencia,
   nivelDaPontuacao,
@@ -63,19 +64,22 @@ const instrucoes = montarInstrucoesDoTurno({
   texto: TEXTO_PUBLICADO,
 });
 
-const ctxBase = {
-  tipoAvaliacao: "answer_confidence",
-  draftText: RESPOSTA,
+const estado: EstadoDoTurno = {
+  texto: RESPOSTA,
   mensagemPaciente: MENSAGEM,
   intent: canonico.intent,
-  requestedAction: canonico.requestedAction,
-  turnType: canonico.turnType,
+  acao: canonico.requestedAction,
+  tipoTurno: canonico.turnType,
   intentAmbiguo: canonico.intentAmbiguo,
-  fatos: [],
-  toolResults: [],
+  ferramentas: [],
+  catalogoEncontrou: false,
+  agendamentoConfirmado: false,
+  pacienteIdentificado: false,
+  esclarecimentoUsado: false,
+  handoffSolicitado: false,
   instrucoes,
-} as unknown as ContextoConfianca;
-const ctx: ContextoConfianca = enriquecerContextoAvaliacao(ctxBase);
+};
+const ctx: ContextoConfianca = montarContextoDoTurno(estado);
 
 linha("1. Regras extraídas da publicação");
 for (const r of instrucoes.regras ?? []) {
@@ -101,7 +105,7 @@ const atual = InstructionComplianceValidator(ctx, null);
 console.log(`  status=${atual.status} score=${atual.score} reason=${atual.reasonCode}`);
 
 linha("5. Motor completo (implementação ATUAL)");
-const r = decidirConfianca(ctx);
+const r = verificarRespostaFinalDoTurno(estado, RESPOSTA);
 console.log(
   `  score=${r.score} cobertura=${r.evidenceCoverage} nivel=${r.level} decisao=${r.decision} hardBlockers=${JSON.stringify(r.hardBlockers ?? [])} unknown=${JSON.stringify(r.unknownDimensions)}`,
 );
