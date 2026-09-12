@@ -1944,7 +1944,9 @@ export function AtendInbox() {
   // atualiza o texto sozinho; o banco só é consultado quando algo muda
   // (realtime) ou a cada 60s como rede de segurança.
   const carregarEspera = useCallback(async () => {
-    if (!clinicaId) return;
+    // Sem sessão ativa não há token para as funções protegidas: a consulta
+    // sairia sem cabeçalho de autorização e falharia no servidor.
+    if (!clinicaId || !session) return;
     const pedido = ++seqEspera.current;
     try {
       const m = (await esperaFn({ data: { clinicaId, isTeste: false } })) as unknown as Record<
