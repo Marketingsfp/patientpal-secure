@@ -127,6 +127,7 @@ import {
   type AlvoDoContato,
 } from "@/components/sessoes/registrar-contato-dialog";
 import { useAcessoModulo } from "@/hooks/use-permissoes";
+import { carregarRepassePago } from "@/lib/financeiro/painel-financeiro-carregar";
 import {
   agruparRateio,
   carregarContextoRateio,
