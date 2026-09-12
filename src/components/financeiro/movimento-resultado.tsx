@@ -239,18 +239,18 @@ export function MovimentoResultado({
           novaAba
           onClick={() => abrir("receita")}
           icon={TrendingUp}
-          label="Receita bruta (atendimentos)"
-          value={v(r.atendimentos.total)}
+          label="Receita bruta"
+          value={v(r.receitaBruta.total)}
           accent="success"
           detalhe={
             pronto
-              ? `${plural(r.atendimentos.fichas, "ficha", "fichas")} · Particular, Cartão e Convênio`
-              : "Atendimentos recebidos no caixa"
+              ? `${plural(r.receitaBruta.qtd, "atendimento", "atendimentos")} · consultas, exames, procedimentos, mensalidades e avulsos`
+              : "Tudo que entrou no caixa"
           }
         >
           {pronto && (
             <ul className="mt-2 space-y-0.5 border-t border-border/60 pt-2">
-              {r.atendimentos.formas.map((f) => (
+              {r.receitaBruta.formas.map((f) => (
                 <li key={f.rotulo} className="flex items-center justify-between gap-2 text-xs">
                   <span className="text-muted-foreground">{f.rotulo}</span>
                   <span className="tabular-nums">{brl(f.valor)}</span>
@@ -258,6 +258,7 @@ export function MovimentoResultado({
               ))}
             </ul>
           )}
+
         </KpiCard>
         <KpiCard
           novaAba
