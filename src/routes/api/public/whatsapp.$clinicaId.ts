@@ -612,11 +612,19 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
                         );
                         const base =
                           resultadoTurno ?? criarResultado({ origem: "modelo", texto: reply });
+                        const chaveTurnoEnvio =
+                          auditoriaNina.traceId ??
+                          loteId ??
+                          `${params.clinicaId}|${from}|${(msgInserida as { id?: string } | null)?.id ?? ""}`;
+                        // FASE 4 — o transporte envia a ÚLTIMA versão aprovada
+                        // do turno. Se o texto que chegou aqui já é essa
+                        // aprovação, a finalização apenas a devolve; uma
+                        // correção nunca é desfeita por um candidato antigo.
                         const finalizada = await finalizarResposta({
                           clinicaId: params.clinicaId,
                           canal: "whatsapp",
-                          chaveTurno:
-                            auditoriaNina.traceId ?? loteId ?? `${params.clinicaId}|${from}|${(msgInserida as { id?: string } | null)?.id ?? ""}`,
+                          chaveTurno: chaveTurnoEnvio,
+                          chaveTurnoRaiz: chaveTurnoEnvio,
                           conversaId: convId,
                           telefone: from,
                           mensagemPaciente: textoPaciente || null,

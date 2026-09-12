@@ -2441,6 +2441,8 @@ async function gerarRespostaNinaInterno(
         clinicaId,
         canal: opcoes?.teste === true ? "test-console" : "whatsapp",
         chaveTurno: chaveTurnoFinalizacao,
+        // FASE 4 — o transporte procura a última aprovação por esta raiz.
+        chaveTurnoRaiz: chaveTurnoFinalizacaoBase,
         conversaId: estadoId.conversaId ?? null,
         telefone: telefoneNorm ?? null,
         mensagemPaciente: mensagemPaciente || null,
