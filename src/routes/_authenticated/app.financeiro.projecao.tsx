@@ -6,7 +6,15 @@ import { useClinica } from "@/hooks/use-clinica";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { projetarMes, type DiaCaixa, type ResultadoProjecao } from "@/lib/financeiro/projecao";
+import {
+  projetarMes,
+  serieTendencia,
+  simularCrescimento,
+  type DiaCaixa,
+  type EntradaProjecao,
+  type ResultadoProjecao,
+} from "@/lib/financeiro/projecao";
+import { MiniLineChart } from "@/components/charts/MiniLineChart";
 
 export const Route = createFileRoute("/_authenticated/app/financeiro/projecao")({
   component: Page,
