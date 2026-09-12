@@ -2793,6 +2793,9 @@ async function gerarRespostaNinaInterno(
           pedidoDeHumano: houveHandoff,
           conflitoDeIdentidade: diagnosticoSaudacao.saudacaoDuplicada === true,
           conformidadeBloqueante: revisao.bloqueiaEntrega === true,
+          conformidadeNaoVerificada:
+            revisao.conformidade?.estado === "nao_verificada" ||
+            revisao.conformidade?.estado === "indeterminada",
         },
         bloqueadoresAbsolutos: respostaFinalAvaliada.hardBlockers ?? [],
         conteudoCandidatoHash: respostaFinalAvaliada.textoAvaliadoHash ?? null,

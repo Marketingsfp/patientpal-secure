@@ -101,6 +101,12 @@ export type EntradaSaudacao = {
   conflitoDeIdentidade?: boolean;
   /** Há descumprimento bloqueante de regra publicada. */
   conformidadeBloqueante?: boolean;
+  /**
+   * Há regra publicada APLICÁVEL a este turno que não pôde ser conferida.
+   * Não é descumprimento, mas também não é aval: a exceção social só vale
+   * quando nada aplicável ficou sem verificação.
+   */
+  conformidadeNaoVerificada?: boolean;
 };
 
 /**
@@ -145,6 +151,7 @@ export function excecaoSaudacaoAplicavel(s: EntradaSaudacao | undefined): {
     [s.pedidoDeHumano, "PEDIDO_DE_ATENDIMENTO_HUMANO"],
     [s.conflitoDeIdentidade, "CONFLITO_DE_IDENTIDADE"],
     [s.conformidadeBloqueante, "CONFORMIDADE_BLOQUEANTE"],
+    [s.conformidadeNaoVerificada, "CONFORMIDADE_NAO_VERIFICADA"],
   ];
   const achado = impedimentos.find(([v]) => v === true);
   return achado ? { aplica: false, impedimento: achado[1] } : { aplica: true, impedimento: null };

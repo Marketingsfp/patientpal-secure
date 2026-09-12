@@ -197,6 +197,8 @@ export async function executarCadeiaDeEnvio(e: EntradaCadeia): Promise<Resultado
       pedidoDeHumano,
       conflitoDeIdentidade: e.conflitoDeIdentidade === true,
       conformidadeBloqueante: conformidade.bloqueante,
+      conformidadeNaoVerificada:
+        conformidade.estado === "nao_verificada" || conformidade.estado === "indeterminada",
     },
     bloqueadoresAbsolutos: avaliacao.hardBlockers ?? [],
     conteudoCandidatoHash: avaliacao.textoAvaliadoHash ?? null,
