@@ -2759,6 +2759,12 @@ async function gerarRespostaNinaInterno(
         configId: cfgFinal.configuracao.configId,
         jaEncaminhado: houveHandoff,
         avisoJaAplicado: ehAvisoControlado(resposta),
+        // Saudação (ou esclarecimento sem ação) não encaminha por nota baixa.
+        turnoSocialSemAcao:
+          estadoParaRevisao.tipoTurno === "SAUDACAO" ||
+          (estadoParaRevisao.tipoTurno === "ESCLARECIMENTO" &&
+            (estadoParaRevisao.acao ?? null) === null),
+        bloqueadoresAbsolutos: respostaFinalAvaliada.hardBlockers ?? [],
         conteudoCandidatoHash: respostaFinalAvaliada.textoAvaliadoHash ?? null,
       });
       if (bloqueio.bloquear && !bloqueio.jaAplicado) {

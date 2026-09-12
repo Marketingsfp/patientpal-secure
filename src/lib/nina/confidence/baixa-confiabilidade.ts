@@ -68,6 +68,13 @@ export type EntradaBloqueioBaixaConfianca = {
   avisoJaAplicado?: boolean;
   /** Hash do conteúdo candidato avaliado (rastreabilidade, sem PII). */
   conteudoCandidatoHash?: string | null;
+  /**
+   * Turno social sem ação operacional (saudação, ou esclarecimento em curso
+   * sem ação pedida). Uma saudação simples nunca encaminha para humano.
+   */
+  turnoSocialSemAcao?: boolean;
+  /** Bloqueadores absolutos observados no turno. */
+  bloqueadoresAbsolutos?: string[];
 };
 
 export type DecisaoBloqueioBaixaConfianca = {
@@ -100,7 +107,11 @@ export function nivelExigeEncaminhamento(nivel: NivelConfianca | null | undefine
 export function decidirBloqueioBaixaConfianca(
   e: EntradaBloqueioBaixaConfianca,
 ): DecisaoBloqueioBaixaConfianca {
-  const aplicavel = nivelExigeEncaminhamento(e.nivel);
+  // Saudação (e esclarecimento sem ação) nunca encaminha por nota baixa:
+  // não há ação operacional em risco e não há bloqueador absoluto.
+  const isencaoSocial =
+    e.turnoSocialSemAcao === true && (e.bloqueadoresAbsolutos?.length ?? 0) === 0;
+  const aplicavel = nivelExigeEncaminhamento(e.nivel) && !isencaoSocial;
   const jaAplicado = e.avisoJaAplicado === true;
   const base = {
     nivel: e.nivel ?? null,
@@ -120,7 +131,9 @@ export function decidirBloqueioBaixaConfianca(
       motivo: null,
       precedeEtapaAtivacao: false,
       precedeDecisaoMotor: false,
-      explicacao: `nivel=${e.nivel ?? "indisponivel"}: regra de baixa confiabilidade não se aplica`,
+      explicacao: isencaoSocial
+        ? "turno social sem ação operacional: saudação não encaminha para humano"
+        : `nivel=${e.nivel ?? "indisponivel"}: regra de baixa confiabilidade não se aplica`,
     };
   }
   return {
