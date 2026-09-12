@@ -870,6 +870,7 @@ export const aplicarCorrecaoComIA = createServerFn({ method: "POST" })
           status: status === "falhou" ? "falhou" : "concluida",
           passos,
           resumo,
+          relatorio,
           verificacao,
           resultado_final: resultadoFinal,
           alvo_revisao: verificacao?.revisao ?? proposta.revisaoBase ?? null,
@@ -888,6 +889,7 @@ export const aplicarCorrecaoComIA = createServerFn({ method: "POST" })
           status: "falhou",
           passos,
           resumo,
+          relatorio: { ...relatorio, resultado: "falhou" },
           resultado_final: "falhou",
           erro: msg,
         })
@@ -896,5 +898,5 @@ export const aplicarCorrecaoComIA = createServerFn({ method: "POST" })
       throw new Error(msg);
     }
 
-    return { ...resumo, acaoId: acao?.id ?? null };
+    return { ...resumo, acaoId: acao?.id ?? null, relatorio };
   });
