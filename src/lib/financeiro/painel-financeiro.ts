@@ -307,11 +307,12 @@ export function resumoPainel(params: {
     terceiro,
     complementoMedico,
     custoPrestadores,
+    custoPrestadoresPago,
     despesasOperacionais,
     despesasTotais,
     liquidoAtendimentos: round2(receitaBruta - repasse - terceiro),
     saldo: round2(receitaBruta + outrasReceitas - despesasTotais),
-    repassePagoNoPeriodo: round2(repassePagoNoPeriodo),
+    repassePagoNoPeriodo,
     producao,
     // Ticket médio da entrada de caixa: receita total ÷ pagamentos recebidos.
     ticketMedio:
