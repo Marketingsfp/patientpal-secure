@@ -139,6 +139,7 @@ export function montarContextoDoTurno(e: EstadoDoTurno): ContextoConfianca {
       agendamentoConfirmado: e.agendamentoConfirmado,
       esclarecimentoUsado: e.esclarecimentoUsado,
       handoffSolicitado: e.handoffSolicitado,
+      apresentacaoJaFeita: e.apresentacaoJaFeita ?? null,
     },
     draftText: e.texto ?? null,
   });
