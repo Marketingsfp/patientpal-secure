@@ -6,6 +6,10 @@ import { Badge } from "@/components/ui/badge";
 import { CheckCircle2, Loader2, XCircle } from "lucide-react";
 import type { ResumoExecucao } from "@/lib/nina/correcao-executor";
 import { ETAPAS_EXECUCAO, ROTULO_ETAPA, type EtapaExecucao } from "@/lib/nina/correcao-prontidao";
+import {
+  ROTULO_RESULTADO_FINAL,
+  type ResultadoFinalExecucao,
+} from "@/lib/nina/correcao-limites";
 
 const ROTULO_STATUS: Record<ResumoExecucao["status"], string> = {
   aplicado: "Correção aplicada e comprovada",
