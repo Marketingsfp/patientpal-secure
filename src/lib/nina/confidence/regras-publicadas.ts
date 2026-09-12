@@ -609,17 +609,54 @@ export function extrairRegrasPublicadas(
 export type EntradaAplicabilidade = {
   mensagemPaciente?: string | null;
   ambiente?: "producao" | "homologacao" | null;
+  /** A pessoa já declarou o que precisa nesta conversa. */
+  demandaDeclarada?: boolean | null;
+  /** A apresentação já havia sido feita ANTES deste turno. */
+  apresentacaoJaFeita?: boolean | null;
+  /** Este é o primeiro turno respondido da sessão. */
+  primeiraMensagem?: boolean | null;
 };
 
-/** A regra vale para ESTE turno? Ambiente e condição declarada no texto. */
-export function regraSeAplica(regra: RegraPublicada, e: EntradaAplicabilidade): boolean {
-  if (regra.ambiente !== "qualquer" && e.ambiente && regra.ambiente !== e.ambiente) return false;
+/**
+ * "aplica" = vale para este turno; "nao_aplica" = a situação exigida não
+ * ocorreu; "indeterminada" = o sistema não sabe dizer. Indeterminada NÃO é
+ * descumprimento: só não conta como verificada.
+ */
+export type Aplicabilidade = "aplica" | "nao_aplica" | "indeterminada";
+
+function sinalDaSituacao(s: SituacaoRegra, e: EntradaAplicabilidade): boolean | null {
+  if (s === "demanda_declarada") return e.demandaDeclarada ?? null;
+  if (s === "apresentacao_ja_feita") return e.apresentacaoJaFeita ?? null;
+  if (e.primeiraMensagem != null) return e.primeiraMensagem;
+  return e.apresentacaoJaFeita == null ? null : !e.apresentacaoJaFeita;
+}
+
+/** A regra vale para ESTE turno? Ambiente, situação da conversa e condição. */
+export function aplicabilidadeDaRegra(
+  regra: RegraPublicada,
+  e: EntradaAplicabilidade,
+): Aplicabilidade {
+  if (regra.ambiente !== "qualquer" && e.ambiente && regra.ambiente !== e.ambiente) {
+    return "nao_aplica";
+  }
+  if (regra.condicao.tipo === "sempre") return "aplica";
+  if (regra.condicao.tipo === "situacao") {
+    const sinal = sinalDaSituacao(regra.condicao.situacao, e);
+    if (sinal === true) return "aplica";
+    if (sinal === false) return "nao_aplica";
+    return "indeterminada";
+  }
   const msg = (e.mensagemPaciente ?? "").trim();
-  if (regra.condicao.tipo === "sempre") return true;
-  if (msg === "") return false;
+  if (msg === "") return "nao_aplica";
   const alvo = chave(regra.condicao.valor);
   const atual = chave(msg);
-  return regra.condicao.tipo === "mensagem_exata" ? atual === alvo : atual.includes(alvo);
+  const bate = regra.condicao.tipo === "mensagem_exata" ? atual === alvo : atual.includes(alvo);
+  return bate ? "aplica" : "nao_aplica";
+}
+
+/** Compatibilidade: indeterminada continua entrando como candidata. */
+export function regraSeAplica(regra: RegraPublicada, e: EntradaAplicabilidade): boolean {
+  return aplicabilidadeDaRegra(regra, e) !== "nao_aplica";
 }
 
 /**
