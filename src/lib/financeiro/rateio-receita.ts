@@ -817,8 +817,9 @@ export async function carregarRateio(
     linhas.push(
       reparte(ctx, {
         id: r.id as string,
-        // Competência do rateio: o dia marcado na agenda.
-        data: ag?.inicio ? ag.inicio.slice(0, 10) : String(r.data ?? "").slice(0, 10),
+        // Competência: o dia em que o pagamento entrou no caixa.
+        data: String(r.data ?? "").slice(0, 10),
+
         medicoId: (r.medico_id as string) ?? ag?.medico_id ?? null,
         pacienteId: (r.paciente_id as string) ?? ag?.paciente_id ?? null,
         procedimento: ag?.procedimento ?? null,
