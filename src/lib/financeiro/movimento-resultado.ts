@@ -416,6 +416,7 @@ export function resumoMovimento(linhas: LinhaClassificada[]): ResumoMovimento {
     operacionais,
     despesas: totalDespesas,
     saldo: round2(totalReceitas - totalDespesas),
+    saldoMeios: saldoPorMeio(linhas),
   };
 }
 
