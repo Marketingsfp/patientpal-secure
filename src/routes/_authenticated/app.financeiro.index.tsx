@@ -627,12 +627,16 @@ function montarDetalhe(drill: Drill, dados: DadosPainel, r: ResumoPainel, visao:
     drill === "cartao" ||
     drill === "particular" ||
     drill === "exame" ||
-    drill === "outro"
+    drill === "outro" ||
+    drill === "mensalidade" ||
+    drill === "adesao"
   ) {
     const recorte =
       drill === "cartao" || drill === "particular" || drill === "exame" || drill === "outro"
         ? dados.rateio.filter((l) => categoriaDoAtendimento(l) === drill)
-        : dados.rateio;
+        : drill === "mensalidade" || drill === "adesao"
+          ? []
+          : dados.rateio;
     const titulo =
       drill === "receita"
         ? "Receita bruta"
@@ -640,10 +644,26 @@ function montarDetalhe(drill: Drill, dados: DadosPainel, r: ResumoPainel, visao:
           ? "Atendimentos"
           : drill === "ticket"
             ? "Ticket médio"
-            : TITULO_ATENDIMENTO[drill];
-    // A Receita bruta soma as outras receitas (mensalidade, adesão, avulso):
-    // elas entram na lista sem repasse, inteiras no líquido da clínica.
-    const outras = drill === "receita" ? dados.outrasReceitas : [];
+            : drill === "mensalidade"
+              ? "Mensalidades"
+              : drill === "adesao"
+                ? "Adesões"
+                : TITULO_ATENDIMENTO[drill];
+    // Os recebimentos sem agendamento (mensalidade, adesão, avulso) entram na
+    // lista sem repasse, inteiros no líquido da clínica. Eles aparecem na
+    // Receita bruta, no total de Atendimentos e nos cards próprios de cada tipo
+    // — é assim que a soma dos cards fecha com o total.
+    const outras =
+      drill === "receita" || drill === "atendimentos" || drill === "ticket"
+        ? dados.outrasReceitas
+        : drill === "mensalidade" || drill === "adesao"
+          ? dados.outrasReceitas.filter(
+              (o) => categoriaDaOutraReceita(o) === (drill === "adesao" ? "adesao" : "mensalidade"),
+            )
+          : drill === "outro"
+            ? dados.outrasReceitas.filter((o) => categoriaDaOutraReceita(o) === "avulso")
+            : [];
+
     const receitaAtend = recorte.reduce((s, l) => s + l.receita, 0);
     const receitaOutras = outras.reduce((s, i) => s + i.valor, 0);
     const receita = receitaAtend + receitaOutras;
