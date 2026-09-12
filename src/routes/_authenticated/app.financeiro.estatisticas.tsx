@@ -233,12 +233,14 @@ function Page() {
     icon: Icon,
     color,
     onClick,
+    detalhe,
   }: {
     label: string;
     value: string;
     icon: typeof PieIcon;
     color: string;
     onClick?: () => void;
+    detalhe?: React.ReactNode;
   }) => (
     <Card
       onClick={onClick}
@@ -249,6 +251,9 @@ function Page() {
           <div>
             <p className="text-sm text-muted-foreground">{label}</p>
             <p className="text-2xl font-semibold mt-1">{loading ? "..." : value}</p>
+            {!loading && detalhe ? (
+              <div className="mt-2 text-xs text-muted-foreground leading-relaxed">{detalhe}</div>
+            ) : null}
           </div>
           <div className={`h-10 w-10 rounded-lg flex items-center justify-center ${color}`}>
             <Icon className="h-5 w-5" />
