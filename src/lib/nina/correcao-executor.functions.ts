@@ -639,13 +639,77 @@ export const aplicarCorrecaoComIA = createServerFn({ method: "POST" })
 
     await atualizarEtapa("verificando_resultado");
 
+    /**
+     * FASE 3 — camada de código: nada é aplicado sem serviço de execução real.
+     * Sem ele, a mudança fica registrada e o estado é "aguardando publicação".
+     */
+    let resultadoCodigo: Awaited<
+      ReturnType<typeof import("./executor-codigo.server").aplicarMudancaCodigo>
+    > | null = null;
+    if (!aplicavel) {
+      const { aplicarMudancaCodigo } = await import("./executor-codigo.server");
+      resultadoCodigo = await aplicarMudancaCodigo({
+        chaveIdempotencia: chave,
+        clinicaId: data.clinicaId,
+        feedbackId: data.feedbackId,
+        alvo: proposta.alvo,
+        arquivos: proposta.arquivos ?? [],
+        patch: proposta.patch ?? null,
+        revisaoBase: proposta.revisaoBase ?? null,
+        instrucao: pendenciaTecnica ?? proposta.justificativa,
+        tempoMaximoMs: Math.max(5000, TEMPO_MAXIMO_MS - (Date.now() - inicioMs)),
+      });
+      passo(
+        "sistema",
+        resultadoCodigo.aplicado ? "Código aplicado e publicado" : "Mudança de código registrada",
+        `${resultadoCodigo.motivo}${resultadoCodigo.dependencia ? ` ${resultadoCodigo.dependencia}` : ""}`,
+        resultadoCodigo.aplicado || !resultadoCodigo.disponivel,
+      );
+    }
+
+    /** Conferência do valor efetivo: gravar não basta, o sistema relê. */
+    let verificacao: import("./correcao-verificacao.server").Verificacao | null = null;
+    if (alvoVerificacao) {
+      const v = await import("./correcao-verificacao.server");
+      verificacao =
+        alvoVerificacao.tipo === "catalogo"
+          ? await v.verificarItemCatalogo(supabase, data.clinicaId, {
+              itemId: alvoVerificacao.itemId,
+              campo: alvoVerificacao.campo,
+              valorEsperado: alvoVerificacao.valorNovo,
+            })
+          : await v.verificarPromptPublicado(supabase, {
+              conteudoEsperado: alvoVerificacao.conteudo,
+              versaoEsperada: alvoVerificacao.versao,
+            });
+      passo(
+        "sistema",
+        verificacao.conferido ? "Valor efetivo conferido" : "Valor efetivo não confere",
+        `${verificacao.alvo}: ${verificacao.motivo}`,
+        verificacao.conferido,
+      );
+    }
+
     const status: ResumoExecucao["status"] = !aplicavel
-      ? "pendente_tecnico"
+      ? resultadoCodigo?.aplicado
+        ? "aplicado"
+        : "pendente_tecnico"
       : publicado && teste.aprovado
         ? "aplicado"
         : "falhou";
 
-    if (!motivoFinal) motivoFinal = teste.motivo;
+    /** Estado técnico separado: preparado ≠ aplicado ≠ publicado ≠ verificado. */
+    const resultadoFinal: ResultadoFinalExecucao = !aplicavel
+      ? resultadoCodigo?.publicado
+        ? "verificado"
+        : "aguardando_publicacao"
+      : !publicado
+        ? "falhou"
+        : verificacao?.conferido && teste.aprovado
+          ? "verificado"
+          : "aplicado";
+
+    if (!motivoFinal) motivoFinal = resultadoCodigo?.motivo ?? teste.motivo;
 
     // Registro rastreável — mesmas tabelas do fluxo existente.
     const agora = new Date().toISOString();
