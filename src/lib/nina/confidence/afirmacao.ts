@@ -496,7 +496,28 @@ export function correspondenciaDaAfirmacao(
 ): CorrespondenciaAfirmacao {
   const { doCampo, noEscopo } = fatosNoEscopoDaAfirmacao(fatos, pedido);
   if (doCampo.length === 0) return { situacao: "sem_fato" };
-  if (noEscopo.length === 0) return { situacao: "fora_do_escopo" };
+  if (noEscopo.length === 0) {
+    // FASE 3 — separar "a fonte não cobre este caso" de "a fonte cobre o caso,
+    // mas não esta forma de pagamento". Diferença entre dinheiro e cartão não
+    // é conflito de fonte: é referência insuficiente para aquela condição.
+    const condicaoPedida = pedido.chave.condicoes;
+    if (condicaoPedida) {
+      const semCondicao = { ...pedido.chave };
+      delete semCondicao.condicoes;
+      const { noEscopo: mesmoCaso } = fatosNoEscopoDaAfirmacao(fatos, {
+        ...pedido,
+        chave: semCondicao,
+      });
+      if (mesmoCaso.length > 0) {
+        return {
+          situacao: "fora_do_escopo",
+          motivo: `a fonte cobre este caso, mas não comprova o valor para "${condicaoPedida}" (referência insuficiente para esta forma de pagamento)`,
+        };
+      }
+    }
+    return { situacao: "fora_do_escopo" };
+  }
+
 
   if (pedido.valor === null || pedido.valor.trim() === "") {
     if (afirmacaoEspecifica(pedido.tipo, pedido.frase)) {
