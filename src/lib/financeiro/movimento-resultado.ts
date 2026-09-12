@@ -38,6 +38,12 @@ import { resolverModalidade, type MapaConvenioPaciente } from "@/lib/convenio/mo
 import { formaDoAtendimento } from "@/lib/repasse-calc";
 import { grupoDaDespesa, type GrupoDespesa } from "@/lib/financeiro/painel-financeiro";
 import { SEM_CATEGORIA } from "@/lib/financeiro/filtro-categoria";
+import {
+  fecharSaldoPorMeio,
+  somarNoMeio,
+  zeroSaldoPorMeio,
+  type SaldoPorMeio,
+} from "@/lib/financeiro/meio-pagamento";
 
 const round2 = (v: number) => +v.toFixed(2);
 
