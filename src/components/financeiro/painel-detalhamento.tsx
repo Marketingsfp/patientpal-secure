@@ -84,6 +84,12 @@ export interface PropsDetalhamento {
   de: string;
   ate: string;
   clinicaNome: string;
+  /**
+   * Abre o detalhe de UMA linha da tabela (quem foi atendido naquela linha).
+   * Devolver `null` deixa a linha sem clique. Quando não é informado, a tabela
+   * continua só de leitura — é o que o Movimento de Caixa usa hoje.
+   */
+  detalharLinha?: (args: { visao: Visao; indice: number; linha: Celula[] }) => Detalhe | null;
 }
 
 /**
