@@ -334,8 +334,10 @@ function mesmoQualificador(campo: keyof ChaveFato, afirmado: unknown, doFato: un
     const hf = normalizarHora(doFato);
     return h !== null && hf !== null && h === hf;
   }
+  if (campo === "condicoes") return mesmaCondicaoPagamento(afirmado, doFato);
   return mesmoTexto(afirmado, doFato);
 }
+
 
 const QUALIFICADORES: Array<keyof ChaveFato> = [
   "procedimento",
