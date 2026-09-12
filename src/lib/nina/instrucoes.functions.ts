@@ -16,6 +16,7 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
 import { capacidadesDoPapel, type CapacidadeArquitetura } from "./arquitetura/permissoes";
 import { validarTemplateInstrucoes } from "./instrucoes-template";
+import { validarIdentidadeParaPublicacao } from "./identidade-atendimento";
 
 const TAB = "nina_instrucoes_versoes";
 
