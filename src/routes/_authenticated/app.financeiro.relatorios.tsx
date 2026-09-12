@@ -534,6 +534,7 @@ function CardResumo({
   invertido = false,
   composicao,
   linhas,
+  nota,
 }: {
   titulo: string;
   valor: string;
@@ -544,8 +545,11 @@ function CardResumo({
   invertido?: boolean;
   /** Quebra por forma de pagamento, listada abaixo do valor. */
   composicao?: FatiaDaReceita[];
-  /** Linhas livres abaixo do valor — usado na quebra espécie/banco. */
-  linhas?: { rotulo: string; valor: string }[];
+  /** Linhas livres abaixo do valor — usado na quebra espécie/banco.
+   *  `secao` vira um subtítulo que separa blocos de leitura diferentes. */
+  linhas?: { rotulo: string; valor?: string; secao?: boolean }[];
+  /** Frase curta de rodapé explicando como ler o card. */
+  nota?: string;
 }) {
   const bom = delta == null ? true : invertido ? delta <= 0 : delta >= 0;
   const Icone = delta == null || delta === 0 ? Minus : delta > 0 ? ArrowUpRight : ArrowDownRight;
@@ -584,14 +588,24 @@ function CardResumo({
         {composicao && <ComposicaoPorForma fatias={composicao} />}
         {linhas && linhas.length > 0 && (
           <ul className="mt-2 space-y-0.5 border-t border-slate-100 pt-2">
-            {linhas.map((l) => (
-              <li key={l.rotulo} className="flex items-center justify-between gap-2 text-xs">
-                <span className="text-muted-foreground">{l.rotulo}</span>
-                <span className="shrink-0 tabular-nums">{l.valor}</span>
-              </li>
-            ))}
+            {linhas.map((l) =>
+              l.secao ? (
+                <li
+                  key={l.rotulo}
+                  className="pt-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-500"
+                >
+                  {l.rotulo}
+                </li>
+              ) : (
+                <li key={l.rotulo} className="flex items-center justify-between gap-2 text-xs">
+                  <span className="text-muted-foreground">{l.rotulo}</span>
+                  <span className="shrink-0 tabular-nums">{l.valor}</span>
+                </li>
+              ),
+            )}
           </ul>
         )}
+        {nota && <p className="mt-2 text-[11px] leading-snug text-muted-foreground">{nota}</p>}
       </CardContent>
     </Card>
   );
@@ -2641,16 +2655,17 @@ function Page() {
               próprio Rateio. */}
           {saldoCaixaRateio ? (
             <CardResumo
-              titulo="Líquido da clínica / Saldo"
+              titulo="Sobrou no caixa da clínica"
               valor={brl(saldoCaixaRateio.saldo)}
-              detalhe={`Margem de ${pct(
+              detalhe={`Tudo que entrou no caixa menos tudo que foi pago (repasses e despesas) · fica com a clínica ${pct(
                 saldoCaixaRateio.receitaTotal > 0
                   ? (saldoCaixaRateio.saldo / saldoCaixaRateio.receitaTotal) * 100
                   : 0,
-              )} · receitas − despesas pagas no caixa`}
+              )} do que entrou`}
               linhas={[
+                { rotulo: "Onde esse dinheiro está", secao: true },
                 {
-                  rotulo: "Em espécie (gaveta)",
+                  rotulo: "Em espécie (na gaveta)",
                   valor: brl(saldoCaixaRateio.saldoMeios.especie.saldo),
                 },
                 {
@@ -2666,8 +2681,13 @@ function Page() {
                       },
                     ]
                   : []),
-                { rotulo: "Líquido dos atendimentos (Rateio)", valor: brl(totaisR.liquido) },
+                { rotulo: "Só dos atendimentos da tabela abaixo", secao: true },
+                {
+                  rotulo: "Receita − repasse ao prestador",
+                  valor: brl(totaisR.liquido),
+                },
               ]}
+              nota="O valor grande considera todo o movimento do caixa no período, inclusive despesas. A linha do fim considera apenas consultas e exames, sem despesas — por isso os dois números são diferentes."
             />
           ) : (
             <CardResumo
