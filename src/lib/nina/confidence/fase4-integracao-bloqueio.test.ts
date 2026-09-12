@@ -87,7 +87,7 @@ describe("FASE 4 — as evidências completas chegam à verificação final", ()
       textoFinal: texto,
     });
     expect(r.tipoAvaliacao).toBe("answer_confidence");
-    expect(r.nivel).not.toBe("LOW");
+    expect(r.level).not.toBe("LOW");
     const claims = monetarias([ECG], texto);
     expect(claims).toHaveLength(2);
     expect(claims.every((c) => c.suportado)).toBe(true);
@@ -102,7 +102,7 @@ describe("FASE 4 — as evidências completas chegam à verificação final", ()
       ctx: contexto(fatosDe([ECG]), "producao"),
       textoFinal: texto,
     });
-    expect(r.nivel).toBe("LOW");
+    expect(r.level).toBe("LOW");
   });
 
   it("a avaliação vale para o texto exato (hash do texto final)", () => {
@@ -120,7 +120,7 @@ describe("FASE 4 — as evidências completas chegam à verificação final", ()
       ctx: contexto(fatosDe([ECG]), "homologacao"),
       textoFinal: "No cartão o eletrocardiograma sai por R$ 999,00.",
     });
-    expect(r.nivel).toBe("LOW");
+    expect(r.level).toBe("LOW");
   });
 });
 
@@ -172,9 +172,19 @@ describe("FASE 4 — o resumo legado não reduz mais os preços a uma referênci
 
   it("catálogo publicado aplica a mesma regra", () => {
     const r = montarResultadoCatalogo({
-      registros: [{ ...ECG }],
-      base: { versao: 6 },
-    } as never) as Record<string, unknown>;
+      servicos: [
+        {
+          id: "s1",
+          nome: "Eletrocardiograma",
+          formas_pagamento: [
+            { forma: "Dinheiro", valor: 51 },
+            { forma: "Cartão", valor: 60 },
+          ],
+        },
+      ] as never,
+      profissionais: [],
+      hojeISO: "2026-01-05",
+    }) as Record<string, unknown>;
     expect(String(r["price"])).toContain("51,00");
     expect(String(r["price"])).toContain("60,00");
   });
