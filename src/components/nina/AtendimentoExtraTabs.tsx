@@ -16,7 +16,7 @@ import {
   type RespostaRapida,
 } from "@/lib/atendimento/respostas-rapidas";
 import { normalizarNomeBusca } from "@/lib/busca-texto";
-import { anunciarAba, encerrarAba } from "@/lib/atendimento/presenca-abas";
+import type { EstadoManualPresenca } from "@/lib/atendimento/presenca-manual";
 import { supabase } from "@/integrations/supabase/client";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
