@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from "
 import type { Session, User } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { lerSessaoEmCache } from "@/lib/sessao-cache";
-import { encerrarMinhaPresenca } from "@/lib/atendimento.functions";
+
 
 interface AuthContextValue {
   user: User | null;
