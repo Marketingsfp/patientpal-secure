@@ -127,7 +127,9 @@ export function projetarMes(e: EntradaProjecao): ResultadoProjecao {
     saldo: cent(projReceita - projDespesa),
     atendimentos: Math.round(
       atendimentos +
-        (comMovimento.length > 0 ? (atendimentos / comMovimento.length) * diasProdutivosRestantes : 0),
+        (comMovimento.length > 0
+          ? (atendimentos / comMovimento.length) * diasProdutivosRestantes
+          : 0),
     ),
   };
 
@@ -187,7 +189,10 @@ export function pontosDeAtencao(
     pontos.push({
       id: "dias-parados",
       titulo: `${semMovimento.length} dia(s) sem nenhuma entrada no caixa`,
-      detalhe: semMovimento.slice(0, 6).map((d) => fmtDia(d.data)).join(", "),
+      detalhe: semMovimento
+        .slice(0, 6)
+        .map((d) => fmtDia(d.data))
+        .join(", "),
       gravidade: semMovimento.length >= 4 ? "alta" : "info",
     });
   }
@@ -234,7 +239,10 @@ export function pontosDeAtencao(
   }
 
   const ticketBaixo = comMovimento.filter(
-    (d) => d.atendimentos > 0 && realizado.ticket > 0 && d.receita / d.atendimentos < realizado.ticket * 0.7,
+    (d) =>
+      d.atendimentos > 0 &&
+      realizado.ticket > 0 &&
+      d.receita / d.atendimentos < realizado.ticket * 0.7,
   );
   if (ticketBaixo.length >= 2) {
     pontos.push({

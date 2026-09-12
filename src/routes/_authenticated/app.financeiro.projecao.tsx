@@ -221,7 +221,9 @@ function Page() {
               Já realizado: <span className="font-medium text-foreground">{realizado}</span>
             </p>
           </div>
-          <div className={`h-10 w-10 shrink-0 rounded-lg flex items-center justify-center ${color}`}>
+          <div
+            className={`h-10 w-10 shrink-0 rounded-lg flex items-center justify-center ${color}`}
+          >
             <Icon className="h-5 w-5" />
           </div>
         </div>
@@ -319,8 +321,9 @@ function Page() {
             </div>
             <div className="text-sm">
               <p className="text-muted-foreground">
-                Ritmo atual: <span className="font-medium text-foreground">{fmt(r.mediaDiaria)}</span>{" "}
-                e {r.mediaAtendimentosDia} atendimento(s) por dia de movimento.
+                Ritmo atual:{" "}
+                <span className="font-medium text-foreground">{fmt(r.mediaDiaria)}</span> e{" "}
+                {r.mediaAtendimentosDia} atendimento(s) por dia de movimento.
               </p>
             </div>
           </div>
