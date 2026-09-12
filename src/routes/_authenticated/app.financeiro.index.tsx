@@ -690,14 +690,7 @@ function montarDetalhe(drill: Drill, dados: DadosPainel, r: ResumoPainel, visao:
   ) {
     // A cortesia/gratuidade sai dos cards por tipo e tem lista própria — é
     // assim que a soma dos cards continua fechando com o total.
-    const recorte =
-      drill === "cartao" || drill === "particular" || drill === "exame" || drill === "outro"
-        ? dados.rateio.filter((l) => !ehCortesia(l) && categoriaDoAtendimento(l) === drill)
-        : drill === "cortesia"
-          ? dados.rateio.filter(ehCortesia)
-          : drill === "mensalidade" || drill === "adesao"
-            ? []
-            : dados.rateio;
+    const recorte = recorteAtendimentos(drill, dados);
     const titulo =
       drill === "receita"
         ? "Receita bruta"
