@@ -86,7 +86,9 @@ describe("catálogo como fonte de conhecimento da Nina", () => {
       hojeISO: "2026-09-06",
     });
     expect(r.knowledge_status).toBe("found");
-    expect(r.price).toBe("R$ 152,00");
+    // FASE 4 — o resumo preserva as duas formas quando os valores divergem.
+    expect(r.price).toBe("R$ 152,00 (dinheiro) / R$ 180,00 (cartão)");
+
     expect(r.doctors).toContain("Rosângela Riolino");
     expect(r.doctors).toContain("Alex Louza");
     expect(r.trace.map((t) => t.record_id)).toEqual(["s1", "p1"]);
