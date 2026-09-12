@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { confirmDialog } from "@/lib/confirm";
 import { SectionTabs, SERVICOS_TABS, SERVICOS_META } from "@/components/section-tabs";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
@@ -11,6 +11,7 @@ import {
   Sparkles,
   CreditCard,
   Download,
+  Upload,
   ArrowUp,
   ArrowDown,
   ArrowUpDown,
@@ -396,6 +397,7 @@ const PACOTES_EXAMES: PacoteExames[] = [
 ];
 
 function ProcedimentosPage() {
+  const navigate = useNavigate();
   const { clinicaAtual } = useClinica();
   const podeEscrever = usePodeEscrever("procedimentos");
 
@@ -1248,6 +1250,14 @@ function ProcedimentosPage() {
           >
             <Download className="h-4 w-4 mr-2" /> Exportar Excel
           </Button>
+          {podeEscrever && (
+            <Button
+              variant="outline"
+              onClick={() => navigate({ to: "/app/procedimentos/importar" })}
+            >
+              <Upload className="h-4 w-4 mr-2" /> Importar Planilha
+            </Button>
+          )}
           {podeEscrever && (
             <Button onClick={openNew}>
               <Plus className="h-4 w-4 mr-2" /> Novo
