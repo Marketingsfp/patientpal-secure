@@ -105,20 +105,28 @@ function Page() {
       setLoading(true);
       const since = range.from;
       const hoje = range.to;
-      const [resumoRes, atend, notas, lancRes, notasFull] = await Promise.all([
+      const [resumoRes, atendRows, notas, lancRows, notasFull] = await Promise.all([
         supabase.rpc("fin_resumo_periodo", {
           p_clinica: clinicaAtual.clinica_id,
           p_ini: since,
           p_fim: hoje,
         }),
-        supabase
-          .from("fin_atendimentos")
-          .select("id, data, procedimento, valor_total, status")
-          .eq("clinica_id", clinicaAtual.clinica_id)
-          .gte("data", since)
-          .lte("data", hoje)
-          .order("data", { ascending: false })
-          .limit(2000),
+        paginado<{
+          id: string;
+          data: string;
+          procedimento: string | null;
+          valor_total: number;
+          status: string;
+        }>(() =>
+          supabase
+            .from("fin_atendimentos")
+            .select("id, data, procedimento, valor_total, status")
+            .eq("clinica_id", clinicaAtual.clinica_id)
+            .gte("data", since)
+            .lte("data", hoje)
+            .order("data", { ascending: false })
+            .order("id"),
+        ),
         // Notas emitidas saem de `nfse`, que é onde o sistema grava a NFS-e de
         // verdade. Antes vinham de `fin_notas_pacientes` — um cadastro manual
         // que nunca foi usado (zero registros em produção), então este card
