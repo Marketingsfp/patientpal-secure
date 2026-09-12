@@ -67,6 +67,9 @@ import {
   analisarErroNinaComIA,
   listarAnalisesErroNina,
 } from "@/lib/nina/analise-erro.functions";
+import { aplicarCorrecaoComIA } from "@/lib/nina/correcao-executor.functions";
+import type { ResumoExecucao } from "@/lib/nina/correcao-executor";
+import { CorrecaoExecucaoPainel } from "@/components/nina/CorrecaoExecucaoPainel";
 
 import {
   editarSugestaoFeedbackNina,
@@ -407,7 +410,7 @@ function Pagina() {
   const [analiseIAAtiva, setAnaliseIAAtiva] = useState(true);
   // Correção assistida: execução em andamento e resumo do que foi feito.
   const [corrigindo, setCorrigindo] = useState<Record<string, boolean>>({});
-  const [execucoes, setExecucoes] = useState<Record<string, ResumoExecucao>>({});
+  const [correcoes, setCorrecoes] = useState<Record<string, ResumoExecucao>>({});
   const aplicarComIAFn = useServerFn(aplicarCorrecaoComIA);
 
   /**
@@ -421,7 +424,7 @@ function Pagina() {
       const r = (await aplicarComIAFn({
         data: { clinicaId, feedbackId: id },
       })) as unknown as ResumoExecucao;
-      setExecucoes((e) => ({ ...e, [id]: r }));
+      setCorrecoes((e) => ({ ...e, [id]: r }));
       if (r.status === "aplicado") toast.success("Correção aplicada e comprovada em homologação.");
       else if (r.status === "pendente_tecnico")
         toast.info("Mudança registrada para quem publica código.");
@@ -1440,7 +1443,7 @@ function Pagina() {
                                 </div>
                               )}
                               <CorrecaoExecucaoPainel
-                                execucao={execucoes[it.id] ?? null}
+                                execucao={correcoes[it.id] ?? null}
                                 emAndamento={Boolean(corrigindo[it.id])}
                               />
                             </div>
