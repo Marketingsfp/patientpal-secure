@@ -72,10 +72,11 @@ export function verificarAtribuicao(
   const temTelefonia = escolhido
     ? (escolhido.perfil_telefonia ?? escolhido.permission_telefonia) === true
     : (auditoria.perfil_telefonia ?? auditoria.permission_telefonia) === true;
+  // FASE 2 — presença é manual: `presenca_recente` (heartbeat) é só informação
+  // técnica e não decide mais se o atendente estava disponível.
   const online = escolhido
     ? escolhido.presence_status === "ONLINE" &&
       escolhido.aceita_novas !== false &&
-      escolhido.presenca_recente !== false &&
       escolhido.em_pausa !== true
     : auditoria.presence_status === "ONLINE";
   const admin = escolhido ? escolhido.admin : false;
