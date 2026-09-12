@@ -24,6 +24,7 @@ import {
   type DecisaoConformidadeEntrega,
 } from "./conformidade-entrega";
 import {
+  afirmacaoSemLastro,
   decidirBloqueioBaixaConfianca,
   ehAvisoControlado,
   saidaControladaBaixaConfianca,
@@ -192,7 +193,7 @@ export async function executarCadeiaDeEnvio(e: EntradaCadeia): Promise<Resultado
         tipoTurno === "SAUDACAO" ||
         (tipoTurno === "ESCLARECIMENTO" && (e.acao ?? null) === null),
       acaoOperacional: (e.acao ?? null) !== null,
-      afirmacaoSemFonte: (avaliacao.claims?.semEvidencia.length ?? 0) > 0,
+      afirmacaoSemFonte: afirmacaoSemLastro(avaliacao),
       pedidoDeHumano,
       conflitoDeIdentidade: e.conflitoDeIdentidade === true,
       conformidadeBloqueante: conformidade.bloqueante,
