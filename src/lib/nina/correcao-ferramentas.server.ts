@@ -101,10 +101,22 @@ export async function gravarItemCatalogo(
   if (!atual) throw new Error("Item do catálogo não encontrado nesta clínica.");
 
   const anterior = (atual as Record<string, unknown>)[entrada.campo];
+
+  // `valor` é numérico no banco: aceita "R$ 180,00" e grava 180.00.
+  let valorGravar: string | number = entrada.valorNovo;
+  if (entrada.campo === "valor") {
+    const n = Number(
+      entrada.valorNovo.replace(/[^\d,.-]/g, "").replace(/\.(?=\d{3}\b)/g, "").replace(",", "."),
+    );
+    if (!Number.isFinite(n))
+      throw new Error(`Valor inválido para o catálogo: "${entrada.valorNovo}".`);
+    valorGravar = n;
+  }
+
   const { error: erroUpd } = await supabase
     .from("nina_cat_servicos")
     .update({
-      [entrada.campo]: entrada.valorNovo,
+      [entrada.campo]: valorGravar,
       status: "PUBLICADO",
       rascunho: null,
       publicado_em: new Date().toISOString(),
