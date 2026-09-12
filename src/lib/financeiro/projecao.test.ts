@@ -1,5 +1,11 @@
 import { describe, expect, it } from "bun:test";
-import { projetarMes, type DiaCaixa } from "./projecao";
+import {
+  projetarMes,
+  serieTendencia,
+  simularCrescimento,
+  type DiaCaixa,
+  type EntradaProjecao,
+} from "./projecao";
 
 const dia = (data: string, receita: number, despesa = 0, atendimentos = 10): DiaCaixa => ({
   data,
