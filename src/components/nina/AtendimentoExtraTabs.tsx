@@ -339,7 +339,7 @@ export function AtendInbox() {
   const assumirFn = useServerFn(assumirConversa);
   const obterConversaFn = useServerFn(obterConversa);
   const buscarPorNumeroFn = useServerFn(buscarConversaPorNumero);
-  const { user } = useAuth();
+  const { user, session } = useAuth();
   const meuId = user?.id ?? null;
   const podeAtender = usePodeEscrever("nina");
 
