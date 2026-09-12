@@ -3,7 +3,12 @@
  * Somente leitura: não chama modelo nem altera a revisão.
  */
 import { Badge } from "@/components/ui/badge";
-import { ROTULO_VEREDITO, type ResultadoAnalise, type Verificacao } from "@/lib/nina/analise-erro";
+import {
+  ROTULO_CAMADA_PROPOSTA,
+  ROTULO_VEREDITO,
+  type ResultadoAnalise,
+  type Verificacao,
+} from "@/lib/nina/analise-erro";
 
 const ROTULO_CHECK: Record<Verificacao["resultado"], string> = {
   ok: "OK",
