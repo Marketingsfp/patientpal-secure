@@ -2759,11 +2759,19 @@ async function gerarRespostaNinaInterno(
         configId: cfgFinal.configuracao.configId,
         jaEncaminhado: houveHandoff,
         avisoJaAplicado: ehAvisoControlado(resposta),
-        // Saudação (ou esclarecimento sem ação) não encaminha por nota baixa.
-        turnoSocialSemAcao:
-          estadoParaRevisao.tipoTurno === "SAUDACAO" ||
-          (estadoParaRevisao.tipoTurno === "ESCLARECIMENTO" &&
-            (estadoParaRevisao.acao ?? null) === null),
+        // Exceção de saudação: só vale com TODAS as condições observadas.
+        // Nenhuma delas é suposta — cada uma vem de um sinal deste turno.
+        saudacao: {
+          turnoSocial:
+            estadoParaRevisao.tipoTurno === "SAUDACAO" ||
+            (estadoParaRevisao.tipoTurno === "ESCLARECIMENTO" &&
+              (estadoParaRevisao.acao ?? null) === null),
+          acaoOperacional: (estadoParaRevisao.acao ?? null) !== null,
+          afirmacaoSemFonte: (respostaFinalAvaliada.claims?.semEvidencia.length ?? 0) > 0,
+          pedidoDeHumano: houveHandoff,
+          conflitoDeIdentidade: diagnosticoSaudacao.saudacaoDuplicada === true,
+          conformidadeBloqueante: revisao.bloqueiaEntrega === true,
+        },
         bloqueadoresAbsolutos: respostaFinalAvaliada.hardBlockers ?? [],
         conteudoCandidatoHash: respostaFinalAvaliada.textoAvaliadoHash ?? null,
       });
