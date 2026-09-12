@@ -406,6 +406,8 @@ export const aplicarCorrecaoComIA = createServerFn({ method: "POST" })
           : "Camada vive em código: o executor registra a mudança para quem publica código."
       }`,
     );
+    await atualizarEtapa("aplicando");
+
 
     const ferramentas = definicoesFerramentas(proposta.camada);
     const entradaModelo: any[] = [
