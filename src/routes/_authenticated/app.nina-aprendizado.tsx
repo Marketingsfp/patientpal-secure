@@ -411,20 +411,52 @@ function Pagina() {
   // Correção assistida: execução em andamento e resumo do que foi feito.
   const [corrigindo, setCorrigindo] = useState<Record<string, boolean>>({});
   const [correcoes, setCorrecoes] = useState<Record<string, ResumoExecucao>>({});
+  const [etapaCorrecao, setEtapaCorrecao] = useState<Record<string, EtapaExecucao>>({});
   const aplicarComIAFn = useServerFn(aplicarCorrecaoComIA);
+  const execucaoAtualFn = useServerFn(execucaoCorrecaoAtual);
+
+  /** Retoma o andamento salvo de uma correção ao abrir/recarregar a tela. */
+  const carregarExecucaoCorrecao = async (id: string) => {
+    if (!clinicaId) return;
+    try {
+      const linha = (await execucaoAtualFn({ data: { clinicaId, feedbackId: id } })) as any;
+      if (!linha) return;
+      setEtapaCorrecao((e) => ({ ...e, [id]: linha.etapa as EtapaExecucao }));
+      setCorrigindo((c) => ({ ...c, [id]: linha.status === "em_curso" }));
+      if (linha.resumo) setCorrecoes((e) => ({ ...e, [id]: linha.resumo as ResumoExecucao }));
+    } catch {
+      /* somente leitura: sem andamento salvo, o cartão segue normal */
+    }
+  };
 
   /**
    * O clique é a autorização: executa a proposta já exibida no cartão, no
    * escopo e ambiente mostrados. Sem nova cadeia de confirmação.
    */
-  const aplicarComIA = async (id: string) => {
+  const aplicarComIA = async (id: string, prontidao: Prontidao) => {
     if (!clinicaId) return;
+    if (!prontidao.habilitado) {
+      toast.warning(prontidao.motivo);
+      return;
+    }
+    const analise = analises[id];
+    const proposta = analise?.resultado?.proposta ?? null;
     setCorrigindo((c) => ({ ...c, [id]: true }));
+    setEtapaCorrecao((e) => ({ ...e, [id]: "verificando" }));
     try {
       const r = (await aplicarComIAFn({
-        data: { clinicaId, feedbackId: id },
+        data: {
+          clinicaId,
+          feedbackId: id,
+          analiseId: analise?.id ?? null,
+          propostaAssinatura: assinaturaProposta(proposta),
+          pacoteHash:
+            ((analise as unknown as { pacote_hash?: string | null } | undefined)?.pacote_hash ??
+              null),
+        },
       })) as unknown as ResumoExecucao;
       setCorrecoes((e) => ({ ...e, [id]: r }));
+      setEtapaCorrecao((e) => ({ ...e, [id]: "concluido" }));
       if (r.status === "aplicado") toast.success("Correção aplicada e comprovada em homologação.");
       else if (r.status === "pendente_tecnico")
         toast.info("Mudança registrada para quem publica código.");
