@@ -80,9 +80,20 @@ export function CorrecaoExecucaoPainel({
             Teste em homologação: {execucao.teste.aprovado ? "aprovado" : "reprovado"}
           </Badge>
         )}
+        {resultadoFinal && (
+          <Badge variant={resultadoFinal === "verificado" ? "default" : "secondary"}>
+            {ROTULO_RESULTADO_FINAL[resultadoFinal]}
+          </Badge>
+        )}
       </div>
 
       <p className="text-xs text-muted-foreground">{execucao.motivo}</p>
+
+      {verificacao && (
+        <p className="text-xs text-muted-foreground">
+          <span className="font-medium">Conferência:</span> {verificacao.alvo} — {verificacao.motivo}
+        </p>
+      )}
 
       <div className="grid gap-2 md:grid-cols-2">
         <div>
