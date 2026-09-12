@@ -251,13 +251,26 @@ export function resumoPainel(params: {
   const custoPrestadores = round2(repasse + terceiro + complementoMedico);
   const despesasTotais = round2(custoPrestadores + despesasOperacionais);
   // Cada pagamento recebido conta como um atendimento: os do Rateio pelo tipo
-  // do serviço, e mensalidade/adesão/avulso em "outros".
+  // do serviço; mensalidade e adesão em cards próprios, e o recebimento avulso
+  // em "outros". Os cards de contagem somam exatamente o total.
   const producaoAtend = producaoDoRateio(params.rateio);
+  let mensalidades = 0;
+  let adesoes = 0;
+  let avulsos = 0;
+  for (const o of params.outrasReceitas) {
+    const c = categoriaDaOutraReceita(o);
+    if (c === "mensalidade") mensalidades++;
+    else if (c === "adesao") adesoes++;
+    else avulsos++;
+  }
   const producao: ProducaoPainel = {
     ...producaoAtend,
     total: producaoAtend.total + params.outrasReceitas.length,
-    outros: producaoAtend.outros + params.outrasReceitas.length,
+    outros: producaoAtend.outros + avulsos,
+    mensalidades,
+    adesoes,
   };
+
 
   // O lançamento avulso tem uma forma só; entra na mesma soma por balde que
   // os atendimentos, para as fatias fecharem com o total do card.
