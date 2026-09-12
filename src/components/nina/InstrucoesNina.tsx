@@ -301,7 +301,7 @@ function Editor({
         </Button>
         <Button
           onClick={() => setConfirmando(true)}
-          disabled={!podePublicar || publicar.isPending || vazio}
+          disabled={!podePublicar || publicar.isPending || vazio || identidadeInvalida}
         >
           {publicar.isPending ? "Publicando…" : "Publicar instruções"}
         </Button>
