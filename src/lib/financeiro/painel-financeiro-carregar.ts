@@ -109,14 +109,22 @@ export async function carregarPainelFinanceiro(
  * Quanto saiu do caixa para médicos e prestadores no período: repasse pago
  * MAIS o complemento médico pago. Desde 12/09/2026 os dois andam juntos —
  * se saiu no dia, entra na mesma soma, no Dashboard, no Movimento de Caixa
- * e no Rateio.
+ * e no Rateio. A quebra fica disponível para exibição.
  */
-export async function carregarRepassePago(
+export interface RepassePagoDetalhe {
+  repasse: number;
+  complemento: number;
+  total: number;
+}
+
+const cent = (v: number) => Math.round(v * 100) / 100;
+
+export async function carregarRepassePagoDetalhado(
   ctx: RateioContexto,
   clinicaId: string,
   de: string,
   ate: string,
-): Promise<number> {
+): Promise<RepassePagoDetalhe> {
   const linhas = await paginado(() =>
     supabase
       .from("fin_lancamentos")
@@ -140,8 +148,19 @@ export async function carregarRepassePago(
       forma_pagamento: r.forma_pagamento,
     })),
   );
-  const total = despesas
-    .filter((d) => d.grupo === "repasse_pago" || d.grupo === "complemento_medico")
-    .reduce((s, d) => s + d.valor, 0);
-  return Math.round(total * 100) / 100;
+  const soma = (grupo: string) =>
+    cent(despesas.filter((d) => d.grupo === grupo).reduce((s, d) => s + d.valor, 0));
+  const repasse = soma("repasse_pago");
+  const complemento = soma("complemento_medico");
+  return { repasse, complemento, total: cent(repasse + complemento) };
 }
+
+export async function carregarRepassePago(
+  ctx: RateioContexto,
+  clinicaId: string,
+  de: string,
+  ate: string,
+): Promise<number> {
+  return (await carregarRepassePagoDetalhado(ctx, clinicaId, de, ate)).total;
+}
+
