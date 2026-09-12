@@ -985,7 +985,7 @@ function EditarFuncionarioPage() {
             <Link to="/app/hr-contratos">Cancelar</Link>
           </Button>
           {podeEscrever && (
-            <Button onClick={salvar} disabled={saving || loading}>
+            <Button onClick={() => void salvar()} disabled={saving || loading}>
               {saving ? "Salvando…" : "Salvar"}
             </Button>
           )}
