@@ -283,12 +283,13 @@ export function MovimentoResultado({
           onClick={() => abrir("repasse")}
           icon={Handshake}
           label="Repasse médico pago no caixa"
-          value={brl(r.repassePago.total)}
+          value={brl(Math.round((r.repassePago.total + r.complementoMedico.total) * 100) / 100)}
           accent="warning"
           detalhe={[
             plural(r.repassePago.qtd, "pagamento", "pagamentos"),
-            r.complementoMedico.total > 0 &&
-              `+ ${brl(r.complementoMedico.total)} de complemento médico`,
+            r.complementoMedico.total > 0
+              ? `repasse ${brl(r.repassePago.total)} + complemento ${brl(r.complementoMedico.total)}`
+              : null,
           ]
             .filter(Boolean)
             .join(" · ")}

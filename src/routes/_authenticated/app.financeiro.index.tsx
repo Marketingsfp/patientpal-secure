@@ -393,12 +393,19 @@ function FinDashboard() {
             onClick={() => abrir("repasse")}
             icon={Handshake}
             label="Repasse a médicos / prestadores"
-            value={v((r) => r.repassePagoNoPeriodo)}
+            value={v((r) => r.custoPrestadoresPago)}
             accent="warning"
-            detalhe="Pago no caixa no período"
+            detalhe="Pago no caixa no período — repasse + complemento"
           >
             {resumo && !carregando && (
               <ul className="mt-2 space-y-0.5 border-t border-border/60 pt-2">
+                <li className="flex items-center justify-between gap-2 text-xs">
+                  <span className="text-muted-foreground">
+                    Repasse {brl(resumo.repassePagoNoPeriodo)}
+                    {resumo.complementoMedico > 0 &&
+                      ` · complemento ${brl(resumo.complementoMedico)}`}
+                  </span>
+                </li>
                 <li className="flex items-center justify-between gap-2 text-xs">
                   <span className="text-muted-foreground">Devido pelos atendimentos</span>
                   <span className="shrink-0 tabular-nums">{brl(resumo.custoPrestadores)}</span>
