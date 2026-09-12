@@ -3152,7 +3152,9 @@ export const listarPresenca = createServerFn({ method: "POST" })
     await assertMember(context.supabase, context.userId, data.clinicaId);
     const { data: rows, error } = await context.supabase
       .from("atend_agente_presenca")
-      .select("user_id, status, aceita_novas, visto_em")
+      // FASE 5/6 — leitura informativa: `estado_manual` é a fonte oficial;
+      // `status`/`visto_em` seguem apenas como sinal técnico de conexão.
+      .select("user_id, estado_manual, estado_manual_em, status, visto_em")
       .eq("clinica_id", data.clinicaId);
     if (error) throw new Error(error.message);
     return rows ?? [];
