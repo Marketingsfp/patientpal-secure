@@ -334,26 +334,76 @@ export function DetalhamentoCorpo({
                   </TableRow>
                 ))}
               </TableBody>
-            {det.totais && (
-              <TableFooter className="sticky bottom-0 bg-muted">
-                <TableRow>
-                  {det.totais.map((c, j) => (
-                    <TableCell
-                      key={j}
-                      className={cn(
-                        "font-semibold",
-                        numerica(det.colunas[j].tipo) && "text-right tabular-nums",
-                      )}
-                    >
-                      {textoCelula(det.colunas[j].tipo, c)}
-                    </TableCell>
-                  ))}
-                </TableRow>
-              </TableFooter>
-            )}
-          </Table>
+              {det.totais && (
+                <TableFooter className="sticky bottom-0 bg-muted">
+                  <TableRow>
+                    {det.totais.map((c, j) => (
+                      <TableCell
+                        key={j}
+                        className={cn(
+                          "font-semibold",
+                          numerica(det.colunas[j].tipo) && "text-right tabular-nums",
+                        )}
+                      >
+                        {textoCelula(det.colunas[j].tipo, c)}
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                </TableFooter>
+              )}
+            </Table>
+          )}
+        </div>
+
+        {det.linhas.length > 0 && (
+          <div className="pointer-events-none absolute bottom-3 right-4 flex flex-col gap-1">
+            <Button
+              type="button"
+              size="icon"
+              variant="secondary"
+              aria-label="Subir a lista"
+              className="pointer-events-auto h-8 w-8 rounded-full shadow"
+              onClick={() => rolar(-0.5)}
+            >
+              <ChevronUp className="h-4 w-4" />
+            </Button>
+            <Button
+              type="button"
+              size="icon"
+              variant="secondary"
+              aria-label="Descer a lista"
+              className="pointer-events-auto h-8 w-8 rounded-full shadow"
+              onClick={() => rolar(0.5)}
+            >
+              <ChevronDown className="h-4 w-4" />
+            </Button>
+          </div>
         )}
       </div>
+
+      {sub && (
+        <Dialog open onOpenChange={(o) => !o && setSub(null)}>
+          <DialogContent className="flex max-h-[88vh] max-w-5xl flex-col gap-3">
+            <DetalhamentoCorpo
+              montar={() => sub}
+              rotuloSintetico={rotuloSintetico}
+              arquivo={`${arquivo}_pacientes`}
+              de={de}
+              ate={ate}
+              clinicaNome={clinicaNome}
+              alturaTabela="min-h-0 flex-1"
+              cabecalho={(d, p) => (
+                <DialogHeader>
+                  <DialogTitle>{d.titulo}</DialogTitle>
+                  <DialogDescription>
+                    {p} · {d.explicacao}
+                  </DialogDescription>
+                </DialogHeader>
+              )}
+            />
+          </DialogContent>
+        </Dialog>
+      )}
 
       {det.composicao && (
         <div className="flex flex-wrap gap-x-6 gap-y-1 text-xs text-muted-foreground">
