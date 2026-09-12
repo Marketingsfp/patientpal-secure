@@ -49,6 +49,33 @@ export function mensagemErroGateway(status: number): string {
 }
 
 /**
+ * O provedor recusa requisição que termine em turno do modelo
+ * ("Requests ending with a model turn are not supported.", HTTP 400). Como as
+ * mensagens de sistema são reposicionadas antes do histórico, uma instrução
+ * `system` colocada DEPOIS de um `assistant` deixa o pedido terminando no
+ * turno do modelo. Aqui essa instrução final passa a ser um turno de quem
+ * pede — mesmo conteúdo, mesma ordem, sem inventar texto.
+ */
+export function normalizarMensagensParaProvedor(mensagens: ChatMensagem[]): {
+  mensagens: ChatMensagem[];
+  ajuste: "nenhum" | "system_final_convertido" | "termina_em_assistant";
+} {
+  if (mensagens.length === 0) return { mensagens, ajuste: "nenhum" };
+  const efetivas = mensagens.filter((m) => m.role !== "system");
+  const ultimaEfetiva = efetivas[efetivas.length - 1];
+  if (!ultimaEfetiva || ultimaEfetiva.role !== "assistant") {
+    return { mensagens, ajuste: "nenhum" };
+  }
+  const ultima = mensagens[mensagens.length - 1]!;
+  if (ultima.role === "system" && String(ultima.content ?? "").trim() !== "") {
+    const copia = mensagens.slice(0, -1);
+    copia.push({ ...ultima, role: "user" });
+    return { mensagens: copia, ajuste: "system_final_convertido" };
+  }
+  return { mensagens, ajuste: "termina_em_assistant" };
+}
+
+/**
  * Chamada não-streaming. Sem timeout artificial de propósito: abortar a
  * geração não devolve o crédito e ainda perde a resposta.
  */
@@ -56,6 +83,17 @@ export async function chamarModeloGemini(opcoes: OpcoesChamada): Promise<Respost
   const key = process.env["LOVABLE_API_KEY"];
   if (!key) {
     return { ok: false, conteudo: "", toolCalls: [], erro: "LOVABLE_API_KEY ausente" };
+  }
+
+  const envio = normalizarMensagensParaProvedor(opcoes.messages);
+  if (envio.ajuste === "termina_em_assistant") {
+    console.error("[nina-ai-gateway] composição inválida: pedido termina no turno do modelo");
+    return {
+      ok: false,
+      conteudo: "",
+      toolCalls: [],
+      erro: "Composição inválida: o pedido termina no turno do modelo",
+    };
   }
 
   const res = await fetch(ENDPOINT, {
@@ -69,7 +107,7 @@ export async function chamarModeloGemini(opcoes: OpcoesChamada): Promise<Respost
         : {}),
       ...(opcoes.tools ? { tools: opcoes.tools } : {}),
       ...(opcoes.maxTokens ? { max_tokens: opcoes.maxTokens } : {}),
-      messages: opcoes.messages,
+      messages: envio.mensagens,
     }),
   });
 
@@ -113,6 +151,11 @@ export async function chamarModeloGeminiStream(
   const key = process.env["LOVABLE_API_KEY"];
   if (!key) return { ok: false, erro: "LOVABLE_API_KEY ausente" };
 
+  const envio = normalizarMensagensParaProvedor(opcoes.messages);
+  if (envio.ajuste === "termina_em_assistant") {
+    return { ok: false, erro: "Composição inválida: o pedido termina no turno do modelo" };
+  }
+
   const res = await fetch(ENDPOINT, {
     method: "POST",
     headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
@@ -124,7 +167,7 @@ export async function chamarModeloGeminiStream(
         : {}),
       ...(opcoes.tools ? { tools: opcoes.tools } : {}),
       ...(opcoes.maxTokens ? { max_tokens: opcoes.maxTokens } : {}),
-      messages: opcoes.messages,
+      messages: envio.mensagens,
     }),
   });
 

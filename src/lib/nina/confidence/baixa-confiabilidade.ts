@@ -40,8 +40,13 @@ export const AVISO_ENCAMINHAMENTO_HUMANO =
 export const AVISO_ENCAMINHAMENTO_FALHOU =
   "Não consegui concluir seu atendimento por aqui agora. Já registrei sua mensagem para que uma pessoa da nossa equipe retome com você.";
 
-/** Aviso exibido na homologação (encaminhamento simulado, sem atribuição). */
-export const AVISO_ENCAMINHAMENTO_SIMULADO = AVISO_ENCAMINHAMENTO_HUMANO;
+/**
+ * Aviso exibido na homologação. NÃO pode ser igual ao aviso de encaminhamento
+ * concluído: em homologação nada é atribuído a ninguém, então anunciar
+ * transferência realizada seria fabricar um desfecho que não aconteceu.
+ */
+export const AVISO_ENCAMINHAMENTO_SIMULADO =
+  "Não vou seguir com esta resposta agora. Sua mensagem fica registrada para que uma pessoa da nossa equipe continue por aqui.";
 
 export const MOTIVO_BLOQUEIO_BAIXA_CONFIANCA = "CONFIANCA_BAIXA_ENCAMINHA_HUMANO";
 
@@ -212,7 +217,9 @@ export function ehAvisoControlado(texto: string | null | undefined): boolean {
   return (
     t === AVISO_ENCAMINHAMENTO_HUMANO ||
     t === AVISO_ENCAMINHAMENTO_FALHOU ||
+    t === AVISO_ENCAMINHAMENTO_SIMULADO ||
     t.includes(AVISO_ENCAMINHAMENTO_HUMANO) ||
-    t.includes(AVISO_ENCAMINHAMENTO_FALHOU)
+    t.includes(AVISO_ENCAMINHAMENTO_FALHOU) ||
+    t.includes(AVISO_ENCAMINHAMENTO_SIMULADO)
   );
 }

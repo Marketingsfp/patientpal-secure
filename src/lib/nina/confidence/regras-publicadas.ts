@@ -256,6 +256,22 @@ function categoriasProibidas(plano: string): CategoriaProibida[] {
   return CATEGORIAS.filter(([, re]) => re.test(k)).map(([c]) => c);
 }
 
+/** Palavra que condiciona a proibição a uma situação declarada no texto. */
+const CONDICAO_NA_ORACAO = /\b(quando|se|caso|enquanto|sempre que|a menos que|salvo)\b/i;
+
+/**
+ * Recorta a oração que carrega a proibição, do "não …/nunca …" até o fim da
+ * frase. Sem esse recorte, palavras da frase vizinha entram como conteúdo
+ * proibido.
+ */
+function oracaoDaProibicao(plano: string): string {
+  const m = PROIBICAO.exec(plano);
+  if (!m || m.index === undefined) return plano;
+  const resto = plano.slice(m.index);
+  const fim = /[.;!?]\s/.exec(resto);
+  return fim ? resto.slice(0, fim.index + 1) : resto;
+}
+
 function prioridadeDe(plano: string, verificacao: VerificacaoRegra): PrioridadeRegra {
   if (/\b(EXATAMENTE|NUNCA|JAMAIS|OBRIGAT[ÓO]RIO|PROIBIDO)\b/.test(plano)) return "critica";
   if (verificacao === "literal" || verificacao === "proibicao_de_conteudo") return "alta";
@@ -418,7 +434,33 @@ export function extrairRegrasPublicadas(
     }
 
     if (PROIBICAO.test(u.plano)) {
-      const proibicoes = categoriasProibidas(u.plano);
+      // A categoria proibida é lida SOMENTE na oração da proibição. Lida no
+      // parágrafo inteiro, uma frase vizinha ("responda à pergunta") fazia a
+      // regra proibir o que o próprio texto publicado manda fazer.
+      const oracao = oracaoDaProibicao(u.plano);
+      const proibicoes = categoriasProibidas(oracao);
+      // Proibição condicionada ("… quando ela já explicou o que precisa") só
+      // vale quando a condição vale. Se a condição não pôde ser representada,
+      // a regra fica NÃO INTERPRETADA — nunca vira proibição para todo turno.
+      const condicaoNaoRepresentada =
+        condicaoLocal.tipo === "sempre" && CONDICAO_NA_ORACAO.test(oracao);
+      if (proibicoes.length > 0 && condicaoNaoRepresentada) {
+        limitacoes.push("CONDICAO_DA_PROIBICAO_NAO_VERIFICAVEL");
+        registrar(u, {
+          condicao: condicaoLocal,
+          ambiente: ambienteSecao,
+          natureza: "proibicao",
+          prioridade: "normal",
+          verificacao: "nao_interpretada",
+          literal: null,
+          operador: null,
+          proibicoes: [],
+          descricao: u.plano,
+          interpretada: false,
+          motivo: "CONDICAO_DA_PROIBICAO_NAO_VERIFICAVEL",
+        });
+        continue;
+      }
       const verificacao: VerificacaoRegra =
         proibicoes.length > 0 ? "proibicao_de_conteudo" : "semantica";
       registrar(u, {
