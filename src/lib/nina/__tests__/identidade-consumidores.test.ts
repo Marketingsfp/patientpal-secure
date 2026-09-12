@@ -1,7 +1,7 @@
 /**
  * FASE 3 — todos os consumidores usam a identidade publicada.
  */
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 import { avaliarSaudacao, checarElementosSaudacao } from "../saudacao-sessao";
 import {
   nomeCompletoEstabelecimento,
