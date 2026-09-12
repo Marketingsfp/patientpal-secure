@@ -263,6 +263,12 @@ export const INSTRUCOES_AVALIADOR = [
   "A causa permanece hipótese quando as evidências não a comprovam.",
   "Verificações objetivas já executadas são fatos: não as contradiga nem as anule.",
   "Responda em português do Brasil, de forma objetiva, sem expor raciocínio interno.",
+  "Além do diagnóstico, devolva em `proposta` a mudança concreta que corrigiria a causa",
+  "demonstrada: camada responsável, alvo exato, valor atual, valor novo, justificativa e alcance.",
+  "Camadas possíveis: catalogo (informação oficial publicada), modelo (prompt da Arquitetura),",
+  "busca, ferramenta e fluxo (estas três vivem em código e não são aplicadas automaticamente).",
+  "Sem causa demonstrada, devolva proposta nula: não invente mudança.",
+  "Nunca proponha alterar a identidade do atendimento nem regras operacionais fora da causa.",
 ].join(" ");
 
 export function montarPacote(entrada: {
