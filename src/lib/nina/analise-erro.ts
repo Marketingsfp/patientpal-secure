@@ -375,6 +375,7 @@ export const SCHEMA_ANALISE = {
     "causa_eh_hipotese",
     "proxima_verificacao",
     "limitacoes",
+    "proposta",
   ],
   properties: {
     veredito: {
@@ -404,6 +405,22 @@ export const SCHEMA_ANALISE = {
     causa_eh_hipotese: { type: "boolean" },
     proxima_verificacao: { type: ["string", "null"] },
     limitacoes: { type: "array", items: { type: "string" } },
+    proposta: {
+      type: ["object", "null"],
+      additionalProperties: false,
+      required: ["camada", "alvo", "valor_atual", "valor_novo", "justificativa", "alcance"],
+      properties: {
+        camada: {
+          type: "string",
+          enum: ["catalogo", "modelo", "busca", "ferramenta", "fluxo"],
+        },
+        alvo: { type: "string" },
+        valor_atual: { type: ["string", "null"] },
+        valor_novo: { type: "string" },
+        justificativa: { type: "string" },
+        alcance: { type: "string" },
+      },
+    },
   },
 } as const;
 
