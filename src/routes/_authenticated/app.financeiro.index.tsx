@@ -575,6 +575,9 @@ function FinDashboard() {
         <DetalhamentoDialog
           montar={(visao) => montarDetalhe(aberto.drill, aberto.dados, aberto.resumo, visao)}
           rotuloSintetico={rotuloSinteticoDe(aberto.drill)}
+          detalharLinha={({ visao, indice }) =>
+            montarPacientesDaLinha(aberto.drill, aberto.dados, visao, indice)
+          }
           arquivo={`financeiro_${aberto.drill}`}
           de={aberto.de}
           ate={aberto.ate}
