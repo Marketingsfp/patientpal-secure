@@ -553,6 +553,10 @@ export type Database = {
           aceita_novas: boolean
           clinica_id: string
           created_at: string
+          estado_manual: string | null
+          estado_manual_em: string | null
+          estado_manual_por: string | null
+          estado_manual_versao: number
           id: string
           status: string
           updated_at: string
@@ -563,6 +567,10 @@ export type Database = {
           aceita_novas?: boolean
           clinica_id: string
           created_at?: string
+          estado_manual?: string | null
+          estado_manual_em?: string | null
+          estado_manual_por?: string | null
+          estado_manual_versao?: number
           id?: string
           status?: string
           updated_at?: string
@@ -573,6 +581,10 @@ export type Database = {
           aceita_novas?: boolean
           clinica_id?: string
           created_at?: string
+          estado_manual?: string | null
+          estado_manual_em?: string | null
+          estado_manual_por?: string | null
+          estado_manual_versao?: number
           id?: string
           status?: string
           updated_at?: string
@@ -1443,6 +1455,39 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      atend_presenca_manual_log: {
+        Row: {
+          clinica_id: string
+          created_at: string
+          definido_por: string
+          estado: string
+          id: string
+          origem: string
+          user_id: string
+          versao: number
+        }
+        Insert: {
+          clinica_id: string
+          created_at?: string
+          definido_por: string
+          estado: string
+          id?: string
+          origem?: string
+          user_id: string
+          versao?: number
+        }
+        Update: {
+          clinica_id?: string
+          created_at?: string
+          definido_por?: string
+          estado?: string
+          id?: string
+          origem?: string
+          user_id?: string
+          versao?: number
+        }
+        Relationships: []
       }
       atend_protocolo_atendimento_config: {
         Row: {
