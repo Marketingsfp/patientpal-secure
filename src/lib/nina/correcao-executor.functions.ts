@@ -263,7 +263,13 @@ export const execucaoCorrecaoAtual = createServerFn({ method: "POST" })
 export const aplicarCorrecaoComIA = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) => Entrada.parse(i))
-  .handler(async ({ data, context }): Promise<ResumoExecucao & { acaoId: string | null }> => {
+  .handler(
+    async ({
+      data,
+      context,
+    }): Promise<
+      ResumoExecucao & { acaoId: string | null; relatorio: RelatorioCorrecao | null }
+    > => {
     const supabase = context.supabase as any;
     const userId = context.userId;
     await exigirPermissao(supabase, userId, data.clinicaId);
