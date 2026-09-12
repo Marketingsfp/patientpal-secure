@@ -80,6 +80,7 @@ import {
   type Prontidao,
 } from "@/lib/nina/correcao-prontidao";
 import { CorrecaoExecucaoPainel } from "@/components/nina/CorrecaoExecucaoPainel";
+import type { RelatorioCorrecao } from "@/lib/nina/correcao-relatorio";
 
 import {
   editarSugestaoFeedbackNina,
