@@ -760,6 +760,13 @@ function Page() {
   const [ctxRateio, setCtxRateio] = useState<RateioContexto | null>(null);
   /** Repasse que saiu do caixa no período — comparação com o devido do Rateio. */
   const [repassePagoRateio, setRepassePagoRateio] = useState<RepassePagoDetalhe | null>(null);
+  /**
+   * O mesmo fechamento de caixa do Dashboard (receitas − despesas pagas no
+   * caixa, com a quebra em espécie e banco). Só é carregado quando o Rateio
+   * está sem filtro de profissional/serviço: com recorte, o saldo do caixa do
+   * período inteiro não corresponderia às linhas da tabela.
+   */
+  const [saldoCaixaRateio, setSaldoCaixaRateio] = useState<ResumoPainel | null>(null);
   const [ctxCarregando, setCtxCarregando] = useState(false);
   const ctxPedido = useRef(false);
 
