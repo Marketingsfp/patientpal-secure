@@ -235,7 +235,7 @@ function Page() {
       setNotasList((notasFull.data ?? []) as typeof notasList);
       setLoading(false);
     })();
-  }, [clinicaAtual?.clinica_id, range.from, range.to]);
+  }, [clinicaAtual?.clinica_id, range.from, fimEfetivo]);
 
   const Stat = ({
     label,
