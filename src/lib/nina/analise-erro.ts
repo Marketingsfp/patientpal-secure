@@ -317,6 +317,35 @@ export function montarPromptAnalise(p: PacoteEvidencias): string {
 /* Resultado estruturado                                               */
 /* ------------------------------------------------------------------ */
 
+/**
+ * Camada onde a correção precisa acontecer. Só `catalogo` e `modelo` são
+ * configuração viva no banco; as demais dependem de mudança de código e por
+ * isso NUNCA são aplicadas automaticamente.
+ */
+export type CamadaProposta = "catalogo" | "modelo" | "busca" | "ferramenta" | "fluxo";
+
+export const CAMADAS_APLICAVEIS: CamadaProposta[] = ["catalogo", "modelo"];
+
+export const ROTULO_CAMADA_PROPOSTA: Record<CamadaProposta, string> = {
+  catalogo: "Catálogo publicado",
+  modelo: "Prompt da Arquitetura",
+  busca: "Busca da Base (código)",
+  ferramenta: "Integração / ferramenta (código)",
+  fluxo: "Fluxo de atendimento (código)",
+};
+
+/** Proposta concreta de mudança, exibida no mesmo cartão do diagnóstico. */
+export type PropostaCorrecao = {
+  camada: CamadaProposta;
+  alvo: string;
+  valorAtual: string | null;
+  valorNovo: string;
+  justificativa: string;
+  alcance: string;
+  /** Definido pelo sistema, nunca pelo modelo. */
+  aplicavelAutomaticamente: boolean;
+};
+
 export type ResultadoAnalise = {
   veredito: Veredito;
   conclusao: string;
@@ -329,6 +358,7 @@ export type ResultadoAnalise = {
   proximaVerificacao: string | null;
   limitacoes: string[];
   verificacoes: Verificacao[];
+  proposta: PropostaCorrecao | null;
 };
 
 export const SCHEMA_ANALISE = {
