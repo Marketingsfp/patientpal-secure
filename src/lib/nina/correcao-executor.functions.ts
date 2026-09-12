@@ -42,6 +42,7 @@ import {
   type ResumoExecucao,
 } from "./correcao-executor";
 import type { PacoteInvestigacao } from "./evidencias-pacote";
+import { montarRelatorio, type RelatorioCorrecao } from "./correcao-relatorio";
 
 const GATEWAY = "https://ai.gateway.lovable.dev/v1/responses";
 
@@ -229,7 +230,7 @@ export const execucaoCorrecaoAtual = createServerFn({ method: "POST" })
     const { data: linha, error } = await supabase
       .from("nina_correcao_execucoes")
       .select(
-        "id, etapa, status, passos, resumo, erro, autorizado_por, autorizado_em, analise_id, pacote_hash, proposta_assinatura, ambiente, escopo, resultado_final, verificacao, alvo_revisao, tentativas",
+        "id, etapa, status, passos, resumo, relatorio, erro, autorizado_por, autorizado_em, analise_id, pacote_hash, proposta_assinatura, ambiente, escopo, resultado_final, verificacao, alvo_revisao, tentativas",
       )
       .eq("clinica_id", data.clinicaId)
       .eq("feedback_id", data.feedbackId)
@@ -243,6 +244,7 @@ export const execucaoCorrecaoAtual = createServerFn({ method: "POST" })
       status: "em_curso" | "concluida" | "falhou";
       passos: PassoExecucao[];
       resumo: ResumoExecucao | null;
+      relatorio: RelatorioCorrecao | null;
       erro: string | null;
       autorizado_por: string;
       autorizado_em: string;
