@@ -1,0 +1,1 @@
+ALTER TABLE public.nina_correcao_execucoes ADD COLUMN IF NOT EXISTS relatorio jsonb;

@@ -42,6 +42,7 @@ import {
   type ResumoExecucao,
 } from "./correcao-executor";
 import type { PacoteInvestigacao } from "./evidencias-pacote";
+import { montarRelatorio, type RelatorioCorrecao } from "./correcao-relatorio";
 
 const GATEWAY = "https://ai.gateway.lovable.dev/v1/responses";
 
@@ -229,7 +230,7 @@ export const execucaoCorrecaoAtual = createServerFn({ method: "POST" })
     const { data: linha, error } = await supabase
       .from("nina_correcao_execucoes")
       .select(
-        "id, etapa, status, passos, resumo, erro, autorizado_por, autorizado_em, analise_id, pacote_hash, proposta_assinatura, ambiente, escopo, resultado_final, verificacao, alvo_revisao, tentativas",
+        "id, etapa, status, passos, resumo, relatorio, erro, autorizado_por, autorizado_em, analise_id, pacote_hash, proposta_assinatura, ambiente, escopo, resultado_final, verificacao, alvo_revisao, tentativas",
       )
       .eq("clinica_id", data.clinicaId)
       .eq("feedback_id", data.feedbackId)
@@ -243,6 +244,7 @@ export const execucaoCorrecaoAtual = createServerFn({ method: "POST" })
       status: "em_curso" | "concluida" | "falhou";
       passos: PassoExecucao[];
       resumo: ResumoExecucao | null;
+      relatorio: RelatorioCorrecao | null;
       erro: string | null;
       autorizado_por: string;
       autorizado_em: string;
@@ -261,7 +263,13 @@ export const execucaoCorrecaoAtual = createServerFn({ method: "POST" })
 export const aplicarCorrecaoComIA = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) => Entrada.parse(i))
-  .handler(async ({ data, context }): Promise<ResumoExecucao & { acaoId: string | null }> => {
+  .handler(
+    async ({
+      data,
+      context,
+    }): Promise<
+      ResumoExecucao & { acaoId: string | null; relatorio: RelatorioCorrecao | null }
+    > => {
     const supabase = context.supabase as any;
     const userId = context.userId;
     await exigirPermissao(supabase, userId, data.clinicaId);
@@ -367,7 +375,7 @@ export const aplicarCorrecaoComIA = createServerFn({ method: "POST" })
     });
     const { data: jaExiste } = await supabase
       .from("nina_correcao_execucoes")
-      .select("id, resumo, acao_id, status")
+      .select("id, resumo, relatorio, acao_id, status")
       .eq("clinica_id", data.clinicaId)
       .eq("idempotencia_chave", chave)
       .maybeSingle();
@@ -375,6 +383,7 @@ export const aplicarCorrecaoComIA = createServerFn({ method: "POST" })
       return {
         ...(jaExiste.resumo as ResumoExecucao),
         acaoId: (jaExiste.acao_id as string | null) ?? null,
+        relatorio: (jaExiste.relatorio as RelatorioCorrecao | null) ?? null,
       };
     if (jaExiste)
       throw new Error("Esta mesma correção já está sendo aplicada. Aguarde o resultado.");
@@ -448,6 +457,8 @@ export const aplicarCorrecaoComIA = createServerFn({ method: "POST" })
       motivo: "Teste ainda não executado.",
     };
     let publicado = false;
+    /** FASE 5 — versão real da Arquitetura antes/depois, quando houve publicação. */
+    let versaoPrompt: { anterior: string | null; nova: string | null } | null = null;
     let valorAnterior: string | null = proposta.valorAtual;
     let pendenciaTecnica: string | null = null;
     let motivoFinal = "";
@@ -586,6 +597,10 @@ export const aplicarCorrecaoComIA = createServerFn({ method: "POST" })
                 comentario: String(args.comentario ?? "Correção assistida de erro reportado"),
               });
               publicado = true;
+              versaoPrompt = {
+                anterior: r.anterior == null ? null : String(r.anterior),
+                nova: r.versao == null ? null : String(r.versao),
+              };
               alvoVerificacao = {
                 tipo: "prompt",
                 conteudo: String(args.conteudo ?? ""),
@@ -727,6 +742,46 @@ export const aplicarCorrecaoComIA = createServerFn({ method: "POST" })
       valorNovo: proposta.valorNovo,
       motivo: motivoFinal,
     };
+    /**
+     * FASE 5 — "Resultado da correção": montado a partir do que o executor de
+     * fato fez (gravou, publicou, testou, reconferiu), não da afirmação do
+     * avaliador. Proposta ≠ patch ≠ teste aprovado ≠ publicação concluída.
+     */
+    const relatorio: RelatorioCorrecao = montarRelatorio({
+      proposta,
+      status,
+      resultadoFinal,
+      aplicavel,
+      publicado,
+      valorAnterior,
+      motivo: motivoFinal,
+      passos,
+      teste,
+      verificacao,
+      codigo: resultadoCodigo,
+      evidencias: {
+        analiseId: String(analise.id),
+        pacoteHash: pacote.hash,
+        pacoteRevisao: pacote.revisao,
+        origem: pacote.origem,
+        ambiente: pacote.identificacao.ambiente,
+        entradas: pacote.entradas.length,
+        lacunas: pacote.lacunas.map((l) => ({ rotulo: l.rotulo, motivo: l.motivo })),
+        cortes: pacote.cortes,
+      },
+      trabalho: {
+        execucaoId,
+        solicitadoPor: userId,
+        modelo: MODELO_EXECUTOR,
+        provedor: "Lovable AI Gateway",
+        inicio: new Date(inicioMs).toISOString(),
+        fim: agora,
+        idempotenciaChave: chave,
+        tentativa: (tentativasAnteriores ?? 0) + 1,
+      },
+      versaoPrompt,
+    });
+
     let acao: { id: string } | null = null;
 
     try {
@@ -815,6 +870,7 @@ export const aplicarCorrecaoComIA = createServerFn({ method: "POST" })
           status: status === "falhou" ? "falhou" : "concluida",
           passos,
           resumo,
+          relatorio,
           verificacao,
           resultado_final: resultadoFinal,
           alvo_revisao: verificacao?.revisao ?? proposta.revisaoBase ?? null,
@@ -833,6 +889,7 @@ export const aplicarCorrecaoComIA = createServerFn({ method: "POST" })
           status: "falhou",
           passos,
           resumo,
+          relatorio: { ...relatorio, resultado: "falhou" },
           resultado_final: "falhou",
           erro: msg,
         })
@@ -841,5 +898,5 @@ export const aplicarCorrecaoComIA = createServerFn({ method: "POST" })
       throw new Error(msg);
     }
 
-    return { ...resumo, acaoId: acao?.id ?? null };
+    return { ...resumo, acaoId: acao?.id ?? null, relatorio };
   });

@@ -10,6 +10,8 @@ import {
   ROTULO_RESULTADO_FINAL,
   type ResultadoFinalExecucao,
 } from "@/lib/nina/correcao-limites";
+import type { RelatorioCorrecao } from "@/lib/nina/correcao-relatorio";
+import { CorrecaoRelatorioCard } from "./CorrecaoRelatorioCard";
 
 const ROTULO_STATUS: Record<ResumoExecucao["status"], string> = {
   aplicado: "Correção aplicada e comprovada",
@@ -47,6 +49,7 @@ export function CorrecaoExecucaoPainel({
   etapa,
   resultadoFinal,
   verificacao,
+  relatorio,
 }: {
   execucao: ResumoExecucao | null;
   emAndamento?: boolean;
@@ -54,6 +57,8 @@ export function CorrecaoExecucaoPainel({
   /** Estado técnico real: preparado, aplicado, aguardando publicação, verificado. */
   resultadoFinal?: ResultadoFinalExecucao | null;
   verificacao?: { conferido: boolean; alvo: string; motivo: string } | null;
+  /** FASE 5 — relatório vindo dos fatos do executor. */
+  relatorio?: RelatorioCorrecao | null;
 }) {
   if (emAndamento) {
     return (
@@ -136,6 +141,8 @@ export function CorrecaoExecucaoPainel({
           </p>
         </details>
       )}
+
+      <CorrecaoRelatorioCard relatorio={relatorio ?? null} />
     </div>
   );
 }
