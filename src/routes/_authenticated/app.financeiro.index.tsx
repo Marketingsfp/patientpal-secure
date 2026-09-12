@@ -33,6 +33,7 @@ import { classificarForma, LABEL_FORMA } from "@/lib/financeiro/formas-pagamento
 import {
   categoriaDoAtendimento,
   categoriaDaOutraReceita,
+  ehCortesia,
 
   repassePorMedico,
   resumoPainel,
