@@ -20,6 +20,17 @@ import {
   type EtapaExecucao,
 } from "./correcao-prontidao";
 import {
+  MAX_TENTATIVAS,
+  TEMPO_MAXIMO_MS,
+  chaveIdempotencia,
+  podeExecutar,
+  prazoExcedido,
+  registrarOperacao,
+  type ContagemOperacoes,
+  type OperacaoLimitada,
+  type ResultadoFinalExecucao,
+} from "./correcao-limites";
+import {
   INSTRUCOES_EXECUTOR,
   LIMITE_RODADAS_EXECUTOR,
   MODELO_EXECUTOR,
