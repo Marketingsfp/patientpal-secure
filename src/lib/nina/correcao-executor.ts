@@ -112,8 +112,9 @@ export function avaliarTeste(entrada: {
   }
   const alvo = norm(entrada.valorNovo);
   const numeros = alvo.match(/\d+/g);
+  const numerosNaResposta: string[] = nova.match(/\d+/g) ?? [];
   const contemValor = numeros?.length
-    ? numeros.every((n) => (nova.match(/\d+/g) ?? []).includes(n))
+    ? numeros.every((n) => numerosNaResposta.includes(n))
     : alvo.length > 0 && nova.includes(alvo);
   if (!contemValor) {
     return {
