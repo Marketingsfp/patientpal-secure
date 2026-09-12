@@ -2505,10 +2505,12 @@ function Page() {
           </div>
           {tipo === "rateio" && (
             <p className="text-xs text-muted-foreground">
-              Considera os atendimentos do período (mesma base da aba Atendimentos). Mensalidades de
-              cartão, adesões e recebimentos avulsos não entram, porque não têm prestador a
-              repassar.
+              Considera tudo que entrou no caixa no período, pelo dia do pagamento: consultas,
+              exames, procedimentos, adesões, mensalidades de cartão e recebimentos avulsos. Cada
+              pagamento recebido conta como um atendimento; o que não tem prestador aparece sem
+              repasse.
             </p>
+
           )}
           {tipo === "movimentacao" && (
             <p className="text-xs text-muted-foreground">
