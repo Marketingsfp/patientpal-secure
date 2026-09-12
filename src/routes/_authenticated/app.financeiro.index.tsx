@@ -829,16 +829,17 @@ function montarDetalhe(drill: Drill, dados: DadosPainel, r: ResumoPainel, visao:
   // --- Repasse ---------------------------------------------------------------
   if (drill === "repasse") {
     const resumo = [
-      { rotulo: "Repasse a médicos (grade)", valor: r.repasse },
-      ...(r.terceiro > 0 ? [{ rotulo: "Terceiros (dono do equipamento)", valor: r.terceiro }] : []),
+      { rotulo: "Repasse pago no caixa no período", valor: r.repassePagoNoPeriodo },
       ...(r.complementoMedico > 0
-        ? [{ rotulo: "Complemento médico lançado", valor: r.complementoMedico }]
+        ? [{ rotulo: "Complemento médico pago", valor: r.complementoMedico }]
         : []),
-      { rotulo: "Custo total com prestadores", valor: r.custoPrestadores },
-      { rotulo: "Já pago no caixa no período (informativo)", valor: r.repassePagoNoPeriodo },
+      { rotulo: "Total pago no caixa", valor: r.custoPrestadoresPago },
+      { rotulo: "Repasse a médicos devido (grade)", valor: r.repasse },
+      ...(r.terceiro > 0 ? [{ rotulo: "Terceiros (dono do equipamento)", valor: r.terceiro }] : []),
+      { rotulo: "Total devido pelos atendimentos", valor: r.custoPrestadores },
     ];
     const explicacao =
-      "O número do card é o custo total com prestadores: o repasse devido pelos atendimentos do período, calculado pela grade de cada médico (o mesmo do Rateio da Receita), mais a parte de terceiros e o complemento médico lançado como despesa. A tabela lista os atendimentos; o complemento, que não é de um atendimento, aparece só no resumo. O valor já pago no caixa aparece só para conferência: ele quita atendimentos de dias anteriores e por isso não entra de novo nas despesas.";
+      "Duas leituras do mesmo repasse. PAGO NO CAIXA é o que saiu da gaveta no período — é ele que forma as despesas e o saldo, igual ao Movimento de Caixa. DEVIDO é o que os atendimentos do período geraram pela grade de cada médico, mais terceiros — é o número do Rateio da Receita. Eles quase nunca são iguais, porque o pagamento de hoje quita atendimentos de dias anteriores. A tabela abaixo lista o devido, atendimento por atendimento.";
     if (visao === "sintetico") {
       const grupos = repassePorMedico(dados.rateio);
       return {
