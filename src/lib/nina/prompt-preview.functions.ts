@@ -19,6 +19,12 @@ import { z } from "zod";
 import { capacidadesDoPapel } from "./arquitetura/permissoes";
 import { ENVELOPE_TECNICO, comporRequestNina } from "./prompt-composer";
 import { renderizarTemplateInstrucoes } from "./instrucoes-template";
+import {
+  fatosIdentidade,
+  resolverIdentidadeEfetiva,
+  valoresIdentidade,
+} from "./identidade-efetiva";
+import { resolverPrecedenciaDoTurno } from "./prompt/precedencia-turno";
 
 export type ParteRequest = {
   /** Rótulo de origem, exibido no conteúdo final. */
@@ -38,6 +44,22 @@ export type PreviewRequestNina = {
   publicadoEm: string | null;
   /** FASE 2 — de onde veio o texto exibido: versão publicada ou código. */
   origemTemplate: "publicada" | "codigo";
+  /** FASE 4 — origem real da configuração montada nesta prévia. */
+  fonteConteudo: "rascunho" | "publicada" | "codigo";
+  /** FASE 4 — identidade efetiva resolvida do MESMO texto desta prévia. */
+  identidade: {
+    ok: boolean;
+    assistente: string;
+    estabelecimento: string;
+    tipoEstabelecimento: string;
+    origem: string;
+    motivo: string;
+    pendenciaAdministrativa: string | null;
+  };
+  /** FASE 4 — contrato de precedência realmente usado no runtime. */
+  contratoPrecedencia: string;
+  regrasAplicaveis: Array<{ descricao: string; interpretada: boolean }>;
+  limitacoesPrecedencia: string[];
   /** Marcador que ficaria sem substituição, quando houver. */
   marcadorPendente: string | null;
   /** Template publicado, ainda com os placeholders de dados. */
@@ -57,7 +79,15 @@ export type PreviewRequestNina = {
 
 export const previewRequestNina = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) => z.object({ clinicaId: z.string().uuid() }).parse(input))
+  .inputValidator((input: unknown) =>
+    z
+      .object({
+        clinicaId: z.string().uuid(),
+        // FASE 4 — prévia do rascunho em edição (nada é publicado por isto).
+        conteudoRascunho: z.string().max(200_000).optional(),
+      })
+      .parse(input),
+  )
   .handler(async ({ data: entrada, context }): Promise<PreviewRequestNina> => {
     const { supabase, userId } = context as { supabase: any; userId: string };
     const { data: papeis } = await supabase
@@ -97,12 +127,25 @@ export const previewRequestNina = createServerFn({ method: "POST" })
     // Sem versão publicada, o texto exibido é o do código e isso é dito na
     // resposta (origem "codigo"), nunca apresentado como versão publicada.
     const publicado = versao?.conteudo as string | undefined;
-    const template = publicado ?? PROMPT_NINA_WHATSAPP_V4;
-    const origemTemplate: "publicada" | "codigo" = publicado ? "publicada" : "codigo";
-    const render = renderizarTemplateInstrucoes(template, {
-      "${nomeUnidade}": nomeUnidade,
-      "${nomeCurtoUnidade}": nomeCurtoUnidade,
+    const rascunho = entrada.conteudoRascunho?.trim() ? entrada.conteudoRascunho : null;
+    const template = rascunho ?? publicado ?? PROMPT_NINA_WHATSAPP_V4;
+    const origemTemplate: "publicada" | "codigo" =
+      rascunho || publicado ? "publicada" : "codigo";
+    const fonteConteudo: "rascunho" | "publicada" | "codigo" = rascunho
+      ? "rascunho"
+      : publicado
+        ? "publicada"
+        : "codigo";
+
+    // FASE 4 — a prévia resolve a identidade EXATAMENTE como o atendimento:
+    // do próprio texto desta versão, nunca de `clinicas.nome`.
+    const identidadeEfetiva = resolverIdentidadeEfetiva({
+      template,
+      origem: fonteConteudo === "codigo" ? "codigo" : "publicada",
+      versao: (versao?.versao as number | undefined) ?? null,
+      versaoId: null,
     });
+    const render = renderizarTemplateInstrucoes(template, valoresIdentidade(identidadeEfetiva));
     const marcadorPendente = render.ok ? null : render.restante;
     const behaviorPrompt = render.ok ? render.texto : template;
 
@@ -132,6 +175,8 @@ export const previewRequestNina = createServerFn({ method: "POST" })
     const runtimeContext = {
       canal: "whatsapp",
       ambiente: "pre-visualizacao",
+      identidade_atendimento: fatosIdentidade(identidadeEfetiva),
+      // Dados ADMINISTRATIVOS da clínica — não são identidade de apresentação.
       unidade: {
         nome_oficial: nomeUnidade,
         nome_curto: nomeCurtoUnidade,
@@ -157,7 +202,23 @@ export const previewRequestNina = createServerFn({ method: "POST" })
       aprendizados: [],
     };
 
-    const req = comporRequestNina({ behaviorPrompt, runtimeContext });
+    // FASE 4 — mesmo contrato de precedência que entra no runtime: regras
+    // publicadas aplicáveis, exceções e prioridade. Nada é omitido na prévia.
+    const precedencia = resolverPrecedenciaDoTurno({
+      textoPublicado: template,
+      escopo: "whatsapp",
+      versao: versao?.versao != null ? String(versao.versao) : null,
+      publicadoEm: (versao?.publicado_em as string | undefined) ?? null,
+      mensagemPaciente: null,
+      ambiente: "producao",
+      saudacaoObrigatoria: true,
+    });
+
+    const req = comporRequestNina({
+      behaviorPrompt,
+      runtimeContext,
+      contratoPrecedencia: precedencia.contrato,
+    });
 
     // MESMO registro de ferramentas do atendimento: consulta sempre, agenda
     // conforme a habilitação da clínica e transferência para atendente
@@ -183,6 +244,11 @@ export const previewRequestNina = createServerFn({ method: "POST" })
       { rotulo: "Technical Safety Envelope", origem: "codigo", conteudo: req.envelope },
       { rotulo: rotuloBehavior, origem: "arquitetura", conteudo: req.behaviorPrompt },
       {
+        rotulo: "Contrato de precedência do turno",
+        origem: "arquitetura",
+        conteudo: precedencia.contrato || "(nenhuma restrição adicional neste exemplo)",
+      },
+      {
         rotulo: "Runtime Context (exemplo)",
         origem: "runtime",
         conteudo: JSON.stringify(runtimeContext, null, 2),
@@ -201,6 +267,22 @@ export const previewRequestNina = createServerFn({ method: "POST" })
       versao: (versao?.versao as number | undefined) ?? null,
       publicadoEm: (versao?.publicado_em as string | undefined) ?? null,
       origemTemplate,
+      fonteConteudo,
+      identidade: {
+        ok: identidadeEfetiva.ok,
+        assistente: identidadeEfetiva.apresentacao.assistente,
+        estabelecimento: identidadeEfetiva.apresentacao.estabelecimento,
+        tipoEstabelecimento: identidadeEfetiva.apresentacao.tipoEstabelecimento,
+        origem: identidadeEfetiva.origem,
+        motivo: identidadeEfetiva.motivo,
+        pendenciaAdministrativa: identidadeEfetiva.pendenciaAdministrativa,
+      },
+      contratoPrecedencia: precedencia.contrato,
+      regrasAplicaveis: precedencia.regrasAplicaveis.map((r) => ({
+        descricao: r.descricao ?? r.texto ?? "regra publicada",
+        interpretada: r.interpretada,
+      })),
+      limitacoesPrecedencia: precedencia.resumo.limitacoes,
       marcadorPendente,
       template,
       behaviorPrompt: req.behaviorPrompt,
