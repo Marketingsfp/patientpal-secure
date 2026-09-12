@@ -753,6 +753,8 @@ function Page() {
   const [compAte, setCompAte] = useState("");
   /** Catálogos e grade de repasse; só carregam quando o Rateio é escolhido. */
   const [ctxRateio, setCtxRateio] = useState<RateioContexto | null>(null);
+  /** Repasse que saiu do caixa no período — comparação com o devido do Rateio. */
+  const [repassePagoRateio, setRepassePagoRateio] = useState<number | null>(null);
   const [ctxCarregando, setCtxCarregando] = useState(false);
   const ctxPedido = useRef(false);
 
