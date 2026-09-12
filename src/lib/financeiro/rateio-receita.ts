@@ -726,6 +726,11 @@ function reparte(
     id: params.id,
     data: params.data,
     origem: params.origem ?? "atendimento",
+    paciente_id: params.pacienteId,
+    // Nome e "primeira vez" são resolvidos no fim do carregamento, numa
+    // consulta só para todos os pacientes do período (ver `enriquecerPacientes`).
+    paciente_nome: "",
+    primeira_vez: null,
 
     medico_id: params.medicoId,
     medico_nome: medico?.nome ?? "Sem profissional",
