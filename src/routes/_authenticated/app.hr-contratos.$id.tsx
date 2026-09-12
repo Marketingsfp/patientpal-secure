@@ -264,7 +264,42 @@ function EditarFuncionarioPage() {
     })();
   }, [clinicaAtual?.clinica_id, id]);
 
-  async function salvar() {
+  /** Só os dígitos do CPF, para comparar "123.456.789-00" com "12345678900". */
+  function apenasDigitos(v: string | null | undefined): string {
+    return (v ?? "").replace(/\D/g, "");
+  }
+
+  /**
+   * Procura um funcionário já cadastrado na clínica atual, ignorando o próprio
+   * registro quando estamos editando. CPF igual é sempre a mesma pessoa; nome
+   * igual pode ser homônimo, então a tela decide o que fazer com cada caso.
+   */
+  async function procurarDuplicado(): Promise<{
+    tipo: "cpf" | "nome";
+    reg: DuplicadoInfo;
+  } | null> {
+    const cpfDigitos = apenasDigitos(form.cpf);
+    const nomeNormalizado = form.funcionario_nome.trim().toUpperCase();
+    const { data, error } = await supabase
+      .from("hr_contratos")
+      .select("id,numero,funcionario_nome,cpf,cargo_id,setor_id,data_admissao")
+      .eq("clinica_id", form.clinica_id);
+    if (error || !data) return null;
+
+    const candidatos = data.filter((c) => isNovo || c.id !== id);
+    const porCpf = cpfDigitos
+      ? candidatos.find((c) => apenasDigitos(c.cpf as string | null) === cpfDigitos)
+      : undefined;
+    if (porCpf) return { tipo: "cpf", reg: porCpf as DuplicadoInfo };
+
+    const porNome = candidatos.find(
+      (c) => ((c.funcionario_nome as string) ?? "").trim().toUpperCase() === nomeNormalizado,
+    );
+    if (porNome) return { tipo: "nome", reg: porNome as DuplicadoInfo };
+    return null;
+  }
+
+  async function salvar(ignorarNomeIgual = false) {
     if (!podeEscrever) {
       toast.error("Você não tem permissão de edição neste módulo.");
       return;
