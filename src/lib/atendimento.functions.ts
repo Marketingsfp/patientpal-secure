@@ -2935,7 +2935,15 @@ export const listarEventosConversa = createServerFn({ method: "POST" })
     });
   });
 
-/** Presença do atendente (Disponível / Ocupado / Ausente / Offline). */
+/**
+ * Sinal de vida / estado técnico da conexão.
+ *
+ * FASE 1 — este caminho NUNCA muda a escolha manual do atendente. Quando já
+ * existe escolha gravada (`estado_manual`), o que chega aqui é ignorado: só o
+ * `visto_em` é atualizado e `status`/`aceita_novas` continuam derivados da
+ * escolha. Sem escolha registrada, o comportamento antigo é mantido para não
+ * quebrar telas legadas — mas nada disso vira escolha manual.
+ */
 export const definirPresenca = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) =>
@@ -2949,12 +2957,22 @@ export const definirPresenca = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     await assertMember(context.supabase, context.userId, data.clinicaId);
+    const { data: atual } = await context.supabase
+      .from("atend_agente_presenca")
+      .select("estado_manual")
+      .eq("clinica_id", data.clinicaId)
+      .eq("user_id", context.userId)
+      .maybeSingle();
+    const manual = (atual as { estado_manual?: string | null } | null)?.estado_manual ?? null;
+    const tecnico = ehEstadoManual(manual)
+      ? tecnicoDoEstadoManual(manual)
+      : { status: data.status, aceitaNovas: data.aceitaNovas ?? data.status === "ONLINE" };
     const { error } = await context.supabase.from("atend_agente_presenca").upsert(
       {
         clinica_id: data.clinicaId,
         user_id: context.userId,
-        status: data.status,
-        aceita_novas: data.aceitaNovas ?? data.status === "ONLINE",
+        status: tecnico.status,
+        aceita_novas: tecnico.aceitaNovas,
         visto_em: new Date().toISOString(),
       },
       { onConflict: "clinica_id,user_id" },
