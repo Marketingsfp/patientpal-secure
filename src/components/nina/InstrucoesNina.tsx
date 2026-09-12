@@ -250,6 +250,14 @@ function Editor({
       </div>
 
 
+      {bloco.escopo === "whatsapp" ? (
+        <IdentidadeAtendimentoCampos
+          texto={texto}
+          onTextoChange={setTexto}
+          somenteLeitura={!podeEditar}
+        />
+      ) : null}
+
       <label className="sr-only" htmlFor={`instrucoes-${bloco.escopo}`}>
         Instruções da Nina — {ROTULO_ESCOPO[bloco.escopo]}
       </label>
