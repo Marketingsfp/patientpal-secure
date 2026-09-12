@@ -438,6 +438,44 @@ function Page() {
   }, [filterFicha]);
 
   /**
+   * Conferência com o Rateio do período (repasse devido e cortesias). É uma
+   * leitura à parte, que não interfere na lista nem nos totais do caixa: se
+   * falhar, a tela segue igual, só sem os dois números de comparação.
+   */
+  useEffect(() => {
+    if (!clinicaAtual) {
+      setConferencia(null);
+      return;
+    }
+    const clinicaId = clinicaAtual.clinica_id;
+    let cancelado = false;
+    setConferencia(null);
+    (async () => {
+      try {
+        let ctx = ctxRateioRef.current?.clinicaId === clinicaId ? ctxRateioRef.current.ctx : null;
+        if (!ctx) {
+          ctx = await carregarContextoRateio(clinicaId);
+          ctxRateioRef.current = { clinicaId, ctx };
+        }
+        const linhas = await carregarRateio(ctx, { clinicaId, de: fromDate, ate: toDate });
+        if (cancelado) return;
+        let repasseDevido = 0;
+        let cortesias = 0;
+        for (const l of linhas) {
+          repasseDevido += l.repasse + l.terceiro;
+          if (l.origem === "atendimento" && l.receita <= 0) cortesias++;
+        }
+        setConferencia({ repasseDevido: Math.round(repasseDevido * 100) / 100, cortesias });
+      } catch {
+        if (!cancelado) setConferencia(null);
+      }
+    })();
+    return () => {
+      cancelado = true;
+    };
+  }, [clinicaAtual?.clinica_id, fromDate, toDate]);
+
+  /**
    * true → a busca por texto vale para o histórico inteiro da clínica, sem a
    * trava De/Até. Só liga com a chave marcada E um termo de tamanho razoável
    * (ver `@/lib/financeiro/busca-movimento`): marcar a chave com a caixa
