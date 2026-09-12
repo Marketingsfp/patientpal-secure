@@ -488,7 +488,7 @@ function FinDashboard() {
           <KpiCard
             onClick={() => abrir("cartao")}
             icon={CreditCard}
-            label="Consultas Cartão"
+            label="Cartão Consulta"
             value={v((r) => r.producao.consultasCartao, int)}
             accent="primary"
           />
@@ -658,7 +658,7 @@ const rotuloSinteticoDe = (d: Drill) =>
 // ============================================================================
 
 const TITULO_ATENDIMENTO: Record<CategoriaAtendimento, string> = {
-  cartao: "Consultas Cartão",
+  cartao: "Cartão Consulta",
   particular: "Consultas Particulares",
   exame: "Exames",
   outro: "Procedimentos e outros",
