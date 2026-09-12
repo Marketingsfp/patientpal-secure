@@ -266,40 +266,34 @@ export function extrairEvidencia(r: RetornoFerramenta): ExtracaoEvidencia {
     case "listCatalog": {
       const procedimento = texto(d["procedimento"]) ?? texto(d["procedure"]);
       const preco = texto(d["preco"]) ?? texto(d["price"]);
-      const registros = Array.isArray(d["registros"]) ? (d["registros"] as unknown[]) : [];
+      const registros = registrosDoRetorno(d);
       const profissionais = Array.isArray(d["profissionais"]) ? (d["profissionais"] as unknown[]) : [];
       const especialidades = Array.isArray(d["especialidades"]) ? (d["especialidades"] as unknown[]) : [];
       const dias = Array.isArray(d["dias"]) ? (d["dias"] as unknown[]) : [];
       const observacoes = Array.isArray(d["observacoes"]) ? (d["observacoes"] as unknown[]) : [];
       const clinica = obj(d["clinica"]);
 
-      if (preco) {
-        fatos.push({
-          ...base,
-          entidade: "procedimento",
-          campo: "preco",
-          valor: preco,
-          ...comVersao,
-          chave: { procedimento },
-          registro: texto((obj(registros[0]))["id"]),
-        });
-      }
+      // FASE 2 — cada condição de pagamento vira uma evidência própria.
+      const centavosDetalhados = new Set<number>();
       for (const reg of registros) {
         const x = obj(reg);
         const item = texto(x["procedimento"]) ?? procedimento;
-        const precoReg = texto(x["preco_dinheiro"]) ?? texto(x["preco_cartao"]);
-        if (precoReg) {
+        const unidade =
+          texto(x["unidade"]) ?? texto(obj(x["extras"])["unidade"]) ?? texto(clinica["nome"]);
+        for (const p of precosDoRegistro(x)) {
+          if (p.centavos !== null) centavosDetalhados.add(p.centavos);
           fatos.push({
             ...base,
             entidade: "procedimento",
             campo: "preco",
-            valor: precoReg,
+            valor: p.valor,
             registro: texto(x["id"]),
             ...comVersao,
             chave: {
               procedimento: item,
               medicoNome: texto(x["medico"]),
-              condicoes: texto(x["preco_dinheiro"]) ? "dinheiro" : "cartao",
+              unidadeId: unidade,
+              condicoes: rotuloCondicao(p),
             },
           });
         }
