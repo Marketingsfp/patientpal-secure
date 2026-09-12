@@ -78,12 +78,15 @@ describe("FASE 1 — caminho dos dados do preço", () => {
     expect((dados as unknown as Record<string, unknown>)["registros"]).toBeUndefined();
   });
 
-  it("DEFEITO ATUAL: a evidência entregue ao motor perde o preço do cartão", () => {
+  it("FASE 2 — a evidência preserva dinheiro e cartão separadamente", () => {
     const { fatos } = extrairEvidencia(retornoDaFerramenta());
-    const precos = fatos.filter((f) => f.campo === "preco").map((f) => f.valor);
-    // Correção esperada: ["R$ 51,00", "R$ 60,00"], um fato por forma de pagamento.
-    expect(precos).toEqual(["R$ 51,00"]);
-    expect(precos).not.toContain("R$ 60,00");
+    const precos = fatos
+      .filter((f) => f.campo === "preco")
+      .map((f) => [f.chave?.condicoes, f.valor]);
+    expect(precos).toEqual([
+      ["dinheiro", "51"],
+      ["cartao", "60"],
+    ]);
   });
 });
 
