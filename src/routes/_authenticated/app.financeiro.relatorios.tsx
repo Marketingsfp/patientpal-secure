@@ -2575,20 +2575,21 @@ function Page() {
           />
           <CardResumo
             titulo="Repasse ao prestador"
-            valor={brl(totaisR.repasse)}
+            // Igual ao Dashboard e ao Movimento: o número principal é o que
+            // saiu do caixa no período (repasse + complemento médico), com o
+            // devido pelos atendimentos logo abaixo.
+            valor={brl(repassePagoRateio ?? totaisR.repasse)}
             detalhe={
               comparacaoVisivel
                 ? `${brl(totaisComp.repasse)} antes`
-                : // As duas leituras lado a lado, como no Dashboard e no
-                  // Movimento: aqui o devido pelos atendimentos; ao lado, o
-                  // que saiu do caixa no mesmo período.
-                  repassePagoRateio !== null
-                  ? `Devido pelos atendimentos · pago no caixa: ${brl(repassePagoRateio)}`
+                : repassePagoRateio !== null
+                  ? `Pago no caixa no período · devido pelos atendimentos: ${brl(totaisR.repasse)}`
                   : "Devido pelos atendimentos"
             }
             delta={deltaDe(totaisR.repasse, totaisComp.repasse)}
             invertido
           />
+
           <CardResumo
             titulo="Líquido da clínica"
             valor={brl(totaisR.liquido)}
