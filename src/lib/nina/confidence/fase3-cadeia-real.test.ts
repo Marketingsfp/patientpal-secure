@@ -154,7 +154,7 @@ describe("FASE 3 — a proteção continua valendo dentro de uma saudação", ()
 
     // Turno deixa de ser saudação pura; a conformidade não pôde ser conferida.
     expect(r.tipoTurno).not.toBe("SAUDACAO");
-    expect(["sem_verificacao", "descumprida", "falha_na_interpretacao"]).toContain(
+    expect(["nao_verificada", "descumprida", "falha_na_interpretacao"]).toContain(
       r.conformidade.estado,
     );
     if (r.nivel === "LOW") {
