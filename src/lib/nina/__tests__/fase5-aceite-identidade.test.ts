@@ -277,12 +277,12 @@ describe("D — conversa nova e conversa antiga", () => {
     const antiga = garantirSessaoAtiva({
       session_id: "sess-antiga",
       greeting_completed: true,
-      flow: { stage: "COLLECTING" },
+      flow: { stage: "IDENTIFYING_PATIENT" },
     } as any);
     expect(antiga.novaSessao).toBe(false);
     expect(antiga.saudacaoObrigatoria).toBe(false);
     expect(antiga.estado.session_id).toBe("sess-antiga");
-    expect(antiga.estado.flow.stage).toBe("COLLECTING");
+    expect(antiga.estado.flow.stage).toBe("IDENTIFYING_PATIENT");
 
     // A identidade vigente é a nova, mesmo com histórico citando a antiga.
     expect(identidade.apresentacao.assistente).toBe("Lia");
