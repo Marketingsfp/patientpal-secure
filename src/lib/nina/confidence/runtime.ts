@@ -53,6 +53,11 @@ export type EstadoDoTurno = {
   pacienteIdentificado: boolean;
   esclarecimentoUsado: boolean;
   handoffSolicitado: boolean;
+  /**
+   * A apresentação da assistente JÁ havia sido entregue antes deste turno.
+   * Ausente = desconhecido; nunca vale como "não foi feita".
+   */
+  apresentacaoJaFeita?: boolean | null;
   ambiente?: "producao" | "homologacao";
   clinicaId?: string | null;
   conversaId?: string | null;
