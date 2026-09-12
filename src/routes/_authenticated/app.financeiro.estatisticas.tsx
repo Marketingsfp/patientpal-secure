@@ -141,14 +141,24 @@ function Page() {
           .eq("status", "emitida")
           .gte("data_emissao", since)
           .lte("data_emissao", hoje),
-        supabase
-          .from("fin_lancamentos")
-          .select("id, tipo, descricao, valor, data, status, paciente_id")
-          .eq("clinica_id", clinicaAtual.clinica_id)
-          .gte("data", since)
-          .lte("data", hoje)
-          .order("data", { ascending: false })
-          .limit(5000),
+        paginado<{
+          id: string;
+          tipo: string;
+          descricao: string;
+          valor: number;
+          data: string;
+          status: string;
+          paciente_id: string | null;
+        }>(() =>
+          supabase
+            .from("fin_lancamentos")
+            .select("id, tipo, descricao, valor, data, status, paciente_id")
+            .eq("clinica_id", clinicaAtual.clinica_id)
+            .gte("data", since)
+            .lte("data", hoje)
+            .order("data", { ascending: false })
+            .order("id"),
+        ),
         supabase
           .from("nfse")
           .select("id, numero, tomador_nome, data_emissao, valor_servicos, status")
