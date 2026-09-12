@@ -1958,7 +1958,7 @@ export function AtendInbox() {
     } catch {
       /* indicador auxiliar: falha não pode atrapalhar o atendimento */
     }
-  }, [clinicaId, esperaFn]);
+  }, [clinicaId, session, esperaFn]);
 
   useEffect(() => {
     void carregarEspera();
