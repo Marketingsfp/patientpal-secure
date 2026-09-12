@@ -13,7 +13,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { classifyAtendimento } from "@/lib/atendimento-classify";
 import {
   DateRangeFilter,
   computeRange,
