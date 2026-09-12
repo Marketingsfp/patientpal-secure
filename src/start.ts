@@ -1,7 +1,9 @@
 import { createStart, createMiddleware } from "@tanstack/react-start";
 
 import { renderErrorPage } from "./lib/error-page";
-import { attachSupabaseAuth } from "@/integrations/supabase/auth-attacher";
+// Substitui o anexador gerado: este também aceita a sessão guardada no
+// navegador quando `getSession()` falha ou devolve vazio momentaneamente.
+import { anexarTokenSessao } from "@/lib/auth-token-attacher";
 
 const SERVER_FN_VERSION_MISMATCH = "SERVER_FN_VERSION_MISMATCH";
 const SERVER_FN_RELOAD_KEY = "__server_fn_version_reload__";
@@ -69,5 +71,5 @@ const recoverStaleServerFunction = createMiddleware({ type: "function" }).client
 
 export const startInstance = createStart(() => ({
   requestMiddleware: [errorMiddleware],
-  functionMiddleware: [recoverStaleServerFunction, attachSupabaseAuth],
+  functionMiddleware: [recoverStaleServerFunction, anexarTokenSessao],
 }));
