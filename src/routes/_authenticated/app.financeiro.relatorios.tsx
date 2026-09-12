@@ -588,14 +588,24 @@ function CardResumo({
         {composicao && <ComposicaoPorForma fatias={composicao} />}
         {linhas && linhas.length > 0 && (
           <ul className="mt-2 space-y-0.5 border-t border-slate-100 pt-2">
-            {linhas.map((l) => (
-              <li key={l.rotulo} className="flex items-center justify-between gap-2 text-xs">
-                <span className="text-muted-foreground">{l.rotulo}</span>
-                <span className="shrink-0 tabular-nums">{l.valor}</span>
-              </li>
-            ))}
+            {linhas.map((l) =>
+              l.secao ? (
+                <li
+                  key={l.rotulo}
+                  className="pt-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-500"
+                >
+                  {l.rotulo}
+                </li>
+              ) : (
+                <li key={l.rotulo} className="flex items-center justify-between gap-2 text-xs">
+                  <span className="text-muted-foreground">{l.rotulo}</span>
+                  <span className="shrink-0 tabular-nums">{l.valor}</span>
+                </li>
+              ),
+            )}
           </ul>
         )}
+        {nota && <p className="mt-2 text-[11px] leading-snug text-muted-foreground">{nota}</p>}
       </CardContent>
     </Card>
   );
