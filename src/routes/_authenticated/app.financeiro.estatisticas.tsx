@@ -27,12 +27,34 @@ export const Route = createFileRoute("/_authenticated/app/financeiro/estatistica
 
 const fmt = (n: number) => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
+/**
+ * O banco devolve no máximo 1.000 linhas por consulta. Sem paginar, um mês
+ * cheio de caixa era cortado em 1.000 lançamentos e o card de Atendimentos
+ * mostrava um número muito menor que o Dashboard/Movimento/Rateio.
+ */
+const PAGINA = 1000;
+const MAX_PAGINAS = 50;
+
+async function paginado<T>(montar: () => any): Promise<T[]> {
+  const out: T[] = [];
+  for (let p = 0; p < MAX_PAGINAS; p++) {
+    const { data, error } = await montar().range(p * PAGINA, (p + 1) * PAGINA - 1);
+    if (error) throw error;
+    const lote = (data ?? []) as T[];
+    out.push(...lote);
+    if (lote.length < PAGINA) break;
+  }
+  return out;
+}
+
 function Page() {
   const { clinicaAtual } = useClinica();
   const [stats, setStats] = useState({
     receita: 0,
     despesa: 0,
     atendimentos: 0,
+    pagos: 0,
+    cortesias: 0,
     notas: 0,
     pendentes: 0,
     ticket: 0,
@@ -85,20 +107,28 @@ function Page() {
       setLoading(true);
       const since = range.from;
       const hoje = range.to;
-      const [resumoRes, atend, notas, lancRes, notasFull] = await Promise.all([
+      const [resumoRes, atendRows, notas, lancRows, notasFull] = await Promise.all([
         supabase.rpc("fin_resumo_periodo", {
           p_clinica: clinicaAtual.clinica_id,
           p_ini: since,
           p_fim: hoje,
         }),
-        supabase
-          .from("fin_atendimentos")
-          .select("id, data, procedimento, valor_total, status")
-          .eq("clinica_id", clinicaAtual.clinica_id)
-          .gte("data", since)
-          .lte("data", hoje)
-          .order("data", { ascending: false })
-          .limit(2000),
+        paginado<{
+          id: string;
+          data: string;
+          procedimento: string | null;
+          valor_total: number;
+          status: string;
+        }>(() =>
+          supabase
+            .from("fin_atendimentos")
+            .select("id, data, procedimento, valor_total, status")
+            .eq("clinica_id", clinicaAtual.clinica_id)
+            .gte("data", since)
+            .lte("data", hoje)
+            .order("data", { ascending: false })
+            .order("id"),
+        ),
         // Notas emitidas saem de `nfse`, que é onde o sistema grava a NFS-e de
         // verdade. Antes vinham de `fin_notas_pacientes` — um cadastro manual
         // que nunca foi usado (zero registros em produção), então este card
@@ -113,14 +143,24 @@ function Page() {
           .eq("status", "emitida")
           .gte("data_emissao", since)
           .lte("data_emissao", hoje),
-        supabase
-          .from("fin_lancamentos")
-          .select("id, tipo, descricao, valor, data, status, paciente_id")
-          .eq("clinica_id", clinicaAtual.clinica_id)
-          .gte("data", since)
-          .lte("data", hoje)
-          .order("data", { ascending: false })
-          .limit(5000),
+        paginado<{
+          id: string;
+          tipo: string;
+          descricao: string;
+          valor: number;
+          data: string;
+          status: string;
+          paciente_id: string | null;
+        }>(() =>
+          supabase
+            .from("fin_lancamentos")
+            .select("id, tipo, descricao, valor, data, status, paciente_id")
+            .eq("clinica_id", clinicaAtual.clinica_id)
+            .gte("data", since)
+            .lte("data", hoje)
+            .order("data", { ascending: false })
+            .order("id"),
+        ),
         supabase
           .from("nfse")
           .select("id, numero, tomador_nome, data_emissao, valor_servicos, status")
@@ -155,41 +195,32 @@ function Page() {
       // procedimento, adesão, mensalidade, avulso, qualquer serviço pago.
       // Cortesias (atendimento feito sem cobrança) também contam, por isso
       // entram os atendimentos de valor zero que não geraram lançamento.
-      let cntA = 0;
+      let pagos = 0;
+      let cortesias = 0;
       let totA = 0;
-      const lancRows = (lancRes.data ?? []) as Array<{
-        tipo: string;
-        descricao: string;
-        valor: number;
-        data: string;
-        status: string;
-        paciente_id: string | null;
-      }>;
       for (const l of lancRows) {
         if (l.tipo !== "receita" || l.status !== "confirmado") continue;
-        cntA += 1;
+        pagos += 1;
         totA += Number(l.valor) || 0;
       }
-      for (const a of (atend.data ?? []) as Array<{
-        id: string;
-        data: string;
-        valor_total: number;
-        status: string;
-      }>) {
+      for (const a of atendRows) {
         if (a.status === "cancelado") continue;
         if ((Number(a.valor_total) || 0) > 0) continue; // já contado pelo pagamento no caixa
-        cntA += 1;
+        cortesias += 1;
       }
+      const cntA = pagos + cortesias;
 
       setStats({
         receita: r,
         despesa: d,
         atendimentos: cntA,
+        pagos,
+        cortesias,
         notas: notas.count ?? 0,
         pendentes: p,
         ticket: cntA > 0 ? totA / cntA : 0,
       });
-      setAtends((atend.data ?? []) as typeof atends);
+      setAtends(atendRows as typeof atends);
       setLancs(lancRows as typeof lancs);
       setNotasList((notasFull.data ?? []) as typeof notasList);
       setLoading(false);
@@ -202,12 +233,14 @@ function Page() {
     icon: Icon,
     color,
     onClick,
+    detalhe,
   }: {
     label: string;
     value: string;
     icon: typeof PieIcon;
     color: string;
     onClick?: () => void;
+    detalhe?: React.ReactNode;
   }) => (
     <Card
       onClick={onClick}
@@ -218,6 +251,9 @@ function Page() {
           <div>
             <p className="text-sm text-muted-foreground">{label}</p>
             <p className="text-2xl font-semibold mt-1">{loading ? "..." : value}</p>
+            {!loading && detalhe ? (
+              <div className="mt-2 text-xs text-muted-foreground leading-relaxed">{detalhe}</div>
+            ) : null}
           </div>
           <div className={`h-10 w-10 rounded-lg flex items-center justify-center ${color}`}>
             <Icon className="h-5 w-5" />
@@ -276,6 +312,18 @@ function Page() {
           value={String(stats.atendimentos)}
           icon={TrendingUp}
           color="bg-blue-500/10 text-blue-600"
+          detalhe={
+            <>
+              <p>
+                {stats.pagos.toLocaleString("pt-BR")} pagamentos recebidos no caixa +{" "}
+                {stats.cortesias.toLocaleString("pt-BR")} cortesias sem cobrança
+              </p>
+              <p className="mt-1">
+                Cada pagamento de entrada conta 1 atendimento: consulta, exame, procedimento,
+                adesão, mensalidade e demais serviços.
+              </p>
+            </>
+          }
         />
         <Stat
           onClick={() => setDrill("notas")}
