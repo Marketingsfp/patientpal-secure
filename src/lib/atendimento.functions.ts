@@ -1366,8 +1366,9 @@ export const iniciarPausa = createServerFn({ method: "POST" })
       .select("id")
       .single();
     if (error) throw new Error(error.message);
-    // FASE 2 — entrar em pausa tira do pool NA HORA: a presença gravada passa a
-    // dizer a mesma coisa que a tela ("Em pausa"), sem esperar heartbeat.
+    // Entrar em pausa é uma escolha explícita do atendente no controle de
+    // presença: grava também o estado manual, para que nada (heartbeat,
+    // recarga, reconexão) mude isso depois.
     await context.supabase.from("atend_agente_presenca").upsert(
       {
         clinica_id: data.clinicaId,
@@ -1375,6 +1376,9 @@ export const iniciarPausa = createServerFn({ method: "POST" })
         status: "BUSY",
         aceita_novas: false,
         visto_em: new Date().toISOString(),
+        estado_manual: "PAUSA",
+        estado_manual_em: new Date().toISOString(),
+        estado_manual_por: context.userId,
       },
       { onConflict: "clinica_id,user_id" },
     );
@@ -1412,9 +1416,8 @@ export const finalizarPausa = createServerFn({ method: "POST" })
       .is("finalizada_em", null);
     if (error) throw new Error(error.message);
 
-    // Sair da pausa devolve a presença para ONLINE na mesma operação, senão a
-    // tela mostraria "Online" e o pool continuaria vendo "BUSY" até o próximo
-    // heartbeat (até 60s de divergência).
+    // Encerrar a pausa também é escolha explícita: volta para Online e grava
+    // isso como estado manual, nunca como efeito de conexão ou atividade.
     await context.supabase.from("atend_agente_presenca").upsert(
       {
         clinica_id: data.clinicaId,
@@ -1422,6 +1425,9 @@ export const finalizarPausa = createServerFn({ method: "POST" })
         status: "ONLINE",
         aceita_novas: true,
         visto_em: new Date().toISOString(),
+        estado_manual: "ONLINE",
+        estado_manual_em: new Date().toISOString(),
+        estado_manual_por: context.userId,
       },
       { onConflict: "clinica_id,user_id" },
     );
