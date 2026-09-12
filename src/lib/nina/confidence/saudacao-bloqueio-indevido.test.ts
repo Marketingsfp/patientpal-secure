@@ -13,7 +13,7 @@
  *  - a exceção de saudação cai quando há ação, afirmação sem fonte, pedido de
  *    humano, conflito de identidade ou descumprimento bloqueante.
  */
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 import { extrairRegrasPublicadas, aplicabilidadeDaRegra } from "./regras-publicadas";
 import { InstructionComplianceValidator } from "./obrigacoes";
 import {
@@ -29,7 +29,7 @@ Na primeira mensagem de cada conversa, apresente-se assim: "Olá! Sou a Nina, as
 const HASH = "publicacao-teste";
 
 function contexto(over: Partial<ContextoConfianca>): ContextoConfianca {
-  const { regras, limitacoes } = extrairRegrasPublicadas(TEXTO_PUBLICADO, { hash: HASH });
+  const { regras, limitacoes } = extrairRegrasPublicadas(TEXTO_PUBLICADO, { escopo: "atendimento", hash: HASH });
   return {
     draftText: "Olá! Sou a Nina, assistente da Policlínica Menino Jesus. Como posso ajudar?",
     mensagemPaciente: "oi boa tarde",
@@ -48,7 +48,7 @@ function contexto(over: Partial<ContextoConfianca>): ContextoConfianca {
 }
 
 describe("regra condicionada é lida por frase", () => {
-  const { regras } = extrairRegrasPublicadas(TEXTO_PUBLICADO, { hash: HASH });
+  const { regras } = extrairRegrasPublicadas(TEXTO_PUBLICADO, { escopo: "atendimento", hash: HASH });
   const proibicao = regras.find((r) => /n[ãa]o acrescente/i.test(r.descricao));
 
   it("guarda a situação declarada no texto, não a mensagem", () => {
@@ -81,7 +81,7 @@ describe("saudação correta não vira evidência desconhecida", () => {
     const r = InstructionComplianceValidator(
       contexto({
         mensagemPaciente: "quanto custa a consulta de cardiologia?",
-        turnType: "PERGUNTA",
+        turnType: "INFORMACAO",
         draftText: "Olá! Sou a Nina. A consulta de cardiologia custa R$ 200.",
       }),
     );
@@ -103,7 +103,7 @@ describe("exceção de saudação é estruturada", () => {
     ["pedidoDeHumano", "PEDIDO_DE_ATENDIMENTO_HUMANO"],
     ["conflitoDeIdentidade", "CONFLITO_DE_IDENTIDADE"],
     ["conformidadeBloqueante", "CONFORMIDADE_BLOQUEANTE"],
-  ] as const)("cai com %s", (campo, impedimento) => {
+  ] as const)("cai com %s", (campo: string, impedimento: string) => {
     const r = excecaoSaudacaoAplicavel({ ...base, [campo]: true });
     expect(r.aplica).toBe(false);
     expect(r.impedimento).toBe(impedimento);
