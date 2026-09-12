@@ -127,7 +127,10 @@ import {
   type AlvoDoContato,
 } from "@/components/sessoes/registrar-contato-dialog";
 import { useAcessoModulo } from "@/hooks/use-permissoes";
-import { carregarRepassePago } from "@/lib/financeiro/painel-financeiro-carregar";
+import {
+  carregarRepassePagoDetalhado,
+  type RepassePagoDetalhe,
+} from "@/lib/financeiro/painel-financeiro-carregar";
 import {
   agruparRateio,
   carregarContextoRateio,
@@ -754,7 +757,7 @@ function Page() {
   /** Catálogos e grade de repasse; só carregam quando o Rateio é escolhido. */
   const [ctxRateio, setCtxRateio] = useState<RateioContexto | null>(null);
   /** Repasse que saiu do caixa no período — comparação com o devido do Rateio. */
-  const [repassePagoRateio, setRepassePagoRateio] = useState<number | null>(null);
+  const [repassePagoRateio, setRepassePagoRateio] = useState<RepassePagoDetalhe | null>(null);
   const [ctxCarregando, setCtxCarregando] = useState(false);
   const ctxPedido = useRef(false);
 
@@ -1558,7 +1561,9 @@ function Page() {
             : Promise.resolve([] as RateioLinha[]),
           // A outra leitura do repasse, a da gaveta: mostrada ao lado do
           // devido para esta tela bater com o Dashboard e o Movimento.
-          carregarRepassePago(ctxRateio, clinicaAtual.clinica_id, from, to).catch(() => null),
+          carregarRepassePagoDetalhado(ctxRateio, clinicaAtual.clinica_id, from, to).catch(
+            () => null,
+          ),
         ]);
         setRepassePagoRateio(pago);
         brutasRateio = atual;
@@ -2578,12 +2583,12 @@ function Page() {
             // Igual ao Dashboard e ao Movimento: o número principal é o que
             // saiu do caixa no período (repasse + complemento médico), com o
             // devido pelos atendimentos logo abaixo.
-            valor={brl(repassePagoRateio ?? totaisR.repasse)}
+            valor={brl(repassePagoRateio ? repassePagoRateio.total : totaisR.repasse)}
             detalhe={
               comparacaoVisivel
                 ? `${brl(totaisComp.repasse)} antes`
                 : repassePagoRateio !== null
-                  ? `Pago no caixa no período · devido pelos atendimentos: ${brl(totaisR.repasse)}`
+                  ? `Pago no caixa: repasse ${brl(repassePagoRateio.repasse)} + complemento médico ${brl(repassePagoRateio.complemento)} · devido pelos atendimentos: ${brl(totaisR.repasse)}`
                   : "Devido pelos atendimentos"
             }
             delta={deltaDe(totaisR.repasse, totaisComp.repasse)}
