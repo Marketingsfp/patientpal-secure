@@ -53,6 +53,8 @@ function Page() {
     receita: 0,
     despesa: 0,
     atendimentos: 0,
+    pagos: 0,
+    cortesias: 0,
     notas: 0,
     pendentes: 0,
     ticket: 0,
