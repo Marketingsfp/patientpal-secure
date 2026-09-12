@@ -702,14 +702,30 @@ function reparte(
   };
 }
 
-/** Busca os atendimentos do período e devolve cada um já rateado. */
+/**
+ * Busca os recebimentos do período e devolve cada um já rateado.
+ *
+ * Régua da data (mudou em 12/09/2026, a pedido da direção): vale o dia em que
+ * o dinheiro ENTROU NO CAIXA (`fin_lancamentos.data`), e não mais o dia
+ * marcado na agenda. Era a única forma de o Dashboard, o Movimento de Caixa e
+ * este relatório mostrarem o mesmo número para o mesmo dia — antes o Movimento
+ * contava pela gaveta e os outros dois pela agenda.
+ *
+ * O que entra: pagamento de agendamento, atendimento lançado à mão e TODO o
+ * resto que entrou no caixa (mensalidade do Cartão, adesão, procedimento,
+ * recebimento avulso). Esses últimos entram como `origem: "avulso"`, com
+ * repasse zero — cada pagamento recebido conta como um atendimento.
+ */
 export async function carregarRateio(
   ctx: RateioContexto,
   filtros: RateioFiltros,
 ): Promise<RateioLinha[]> {
   const { clinicaId, de, ate } = filtros;
 
-  const [manuaisRaw, agendaRaw] = await Promise.all([
+  const COLUNAS_LANC =
+    "id, data, descricao, valor, valor_medico_override, convenio_modalidade, categoria_id, medico_id, paciente_id, agendamento_id, forma_pagamento, observacoes, composicao_pagamento";
+
+  const [manuaisRaw, agendaRaw, avulsosRaw] = await Promise.all([
     buscarTudo<Record<string, unknown>>(() =>
       supabase
         .from("fin_atendimentos")
@@ -725,17 +741,32 @@ export async function carregarRateio(
       supabase
         .from("fin_lancamentos")
         .select(
-          "id, data, descricao, valor, valor_medico_override, convenio_modalidade, categoria_id, medico_id, paciente_id, agendamento_id, forma_pagamento, observacoes, composicao_pagamento, agendamento:agendamentos!inner(procedimento, medico_id, paciente_id, inicio)",
+          `${COLUNAS_LANC}, agendamento:agendamentos!inner(procedimento, medico_id, paciente_id, inicio)`,
         )
         .eq("clinica_id", clinicaId)
         .eq("tipo", "receita")
         .eq("status", "confirmado")
         .not("agendamento_id", "is", null)
-        .gte("agendamento.inicio", `${de}T00:00:00`)
-        .lte("agendamento.inicio", `${ate}T23:59:59.999`)
+        .gte("data", de)
+        .lte("data", ate)
+        .order("data"),
+    ),
+    // Recebimento sem agendamento: mensalidade, adesão, avulso. Não tem
+    // prestador a repassar, mas é entrada de caixa e conta como atendimento.
+    buscarTudo<Record<string, unknown>>(() =>
+      supabase
+        .from("fin_lancamentos")
+        .select(COLUNAS_LANC)
+        .eq("clinica_id", clinicaId)
+        .eq("tipo", "receita")
+        .eq("status", "confirmado")
+        .is("agendamento_id", null)
+        .gte("data", de)
+        .lte("data", ate)
         .order("data"),
     ),
   ]);
+
 
   // Um atendimento manual criado a partir de um pagamento da agenda espelha o
   // mesmo dinheiro do lançamento — contar os dois dobraria a receita.
