@@ -2916,52 +2916,45 @@ export const definirPresenca = createServerFn({ method: "POST" })
     z
       .object({
         clinicaId: z.string().uuid(),
-        status: z.enum(["ONLINE", "BUSY", "AWAY", "OFFLINE"]),
+        // Aceito apenas por compatibilidade com telas antigas: o valor é
+        // IGNORADO. Nenhum cliente pode restaurar o comportamento automático.
+        status: z.string().optional(),
         aceitaNovas: z.boolean().optional(),
       })
       .parse(i),
   )
   .handler(async ({ data, context }) => {
     await assertMember(context.supabase, context.userId, data.clinicaId);
+    const agora = new Date().toISOString();
     const { data: atual } = await context.supabase
       .from("atend_agente_presenca")
-      .select("estado_manual")
+      .select("id")
       .eq("clinica_id", data.clinicaId)
       .eq("user_id", context.userId)
       .maybeSingle();
-    const manual = (atual as { estado_manual?: string | null } | null)?.estado_manual ?? null;
-    const tecnico = ehEstadoManual(manual)
-      ? tecnicoDoEstadoManual(manual)
-      : { status: data.status, aceitaNovas: data.aceitaNovas ?? data.status === "ONLINE" };
-    const { error } = await context.supabase.from("atend_agente_presenca").upsert(
-      {
+
+    if (atual) {
+      // Só o sinal de vida é atualizado: status/aceita_novas/estado_manual
+      // permanecem exatamente como a escolha do atendente deixou.
+      const { error } = await context.supabase
+        .from("atend_agente_presenca")
+        .update({ visto_em: agora })
+        .eq("clinica_id", data.clinicaId)
+        .eq("user_id", context.userId);
+      if (error) throw new Error(error.message);
+    } else {
+      // Primeiro sinal, sem escolha registrada: entra fora do pool e aguarda
+      // a escolha explícita do atendente (nada vira escolha automaticamente).
+      const { error } = await context.supabase.from("atend_agente_presenca").insert({
         clinica_id: data.clinicaId,
         user_id: context.userId,
-        status: tecnico.status,
-        aceita_novas: tecnico.aceitaNovas,
-        visto_em: new Date().toISOString(),
-      },
-      { onConflict: "clinica_id,user_id" },
-    );
-    if (error) throw new Error(error.message);
-
-    // Ao ficar online, o que estava parado na fila "Não atribuídas" é
-    // distribuído na hora (da conversa que espera há mais tempo para a mais
-    // recente), sempre para quem tem menos conversas ativas.
-    let distribuidas = 0;
-    if (
-      tecnico.status === "ONLINE" &&
-      tecnico.aceitaNovas &&
-      (await temTelefonia(context.supabase as never, context.userId, data.clinicaId))
-    ) {
-      const { data: n, error: e2 } = await context.supabase.rpc("atend_distribuir_fila", {
-        _clinica_id: data.clinicaId,
-        _max: 20,
-      } as never);
-      if (e2) console.error("[atendimento] falha ao distribuir fila:", e2.message);
-      else distribuidas = Number(n ?? 0);
+        status: "OFFLINE",
+        aceita_novas: false,
+        visto_em: agora,
+      });
+      if (error) throw new Error(error.message);
     }
-    return { ok: true, distribuidas };
+    return { ok: true, distribuidas: 0 };
   });
 
 /**
