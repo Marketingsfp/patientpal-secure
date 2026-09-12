@@ -2876,7 +2876,10 @@ async function gerarRespostaNinaInterno(
             messages: [
               ...mensagens,
               { role: "assistant", content: resposta },
-              { role: "system", content: instrucaoDeCorrecaoPorRegras(revisao.conformidade) },
+              // Pedido de reescrita vai como turno de quem pede: instrução de
+              // sistema depois do turno do modelo deixava o pedido terminando
+              // no turno do modelo e o provedor recusava com HTTP 400.
+              { role: "user", content: instrucaoDeCorrecaoPorRegras(revisao.conformidade) },
             ] as never,
             raciocinio: {
               mensagem: mensagemPaciente,
@@ -2886,7 +2889,30 @@ async function gerarRespostaNinaInterno(
               nomesFerramentas: nomesFerramentasTurno,
               houveConflito: conflitoFerramenta,
             },
-          }).catch(() => null);
+          }).catch((e: unknown) => ({
+            ok: false as const,
+            conteudo: "",
+            status: null,
+            erro: e instanceof Error ? e.message : String(e),
+          }));
+          const falhaCorrecao =
+            correcaoIA && correcaoIA.ok
+              ? null
+              : {
+                  status: (correcaoIA as { status?: number | null } | null)?.status ?? null,
+                  erro: (correcaoIA as { erro?: string | null } | null)?.erro ?? "sem_resposta",
+                };
+          if (falhaCorrecao) {
+            // Falha técnica do provedor não é "resposta reprovada": fica
+            // registrada como falha, sem virar prova de nada.
+            rastro?.concluir("answer.rule_correction_failed", {
+              motivo: revisao.conformidade.motivoBloqueio,
+              tentativa: correcoesPorRegras + 1,
+              status: falhaCorrecao.status,
+              erro: falhaCorrecao.erro,
+              falha_tecnica: true,
+            });
+          }
           const textoCorrigido = (
             correcaoIA && correcaoIA.ok ? (correcaoIA.conteudo ?? "") : ""
           ).trim();
