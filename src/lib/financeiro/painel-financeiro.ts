@@ -120,6 +120,12 @@ export interface ProducaoPainel {
   mensalidades: number;
   /** Taxas de adesão (e inclusão de dependente) recebidas no período. */
   adesoes: number;
+  /**
+   * Atendimento feito sem cobrança: revisão de cortesia e gratuidade do
+   * Cartão. Conta como atendimento e vale R$ 0,00; fica em card próprio para
+   * não inflar consultas e exames.
+   */
+  cortesias: number;
 }
 
 /** Como o recebimento sem agendamento entra nos cards de contagem. */
@@ -160,8 +166,11 @@ export function categoriaDoAtendimento(
   return "outro";
 }
 
+/** Atendimento feito sem cobrança (cortesia da casa ou gratuidade do Cartão). */
+export const ehCortesia = (l: Pick<RateioLinha, "receita">): boolean => Number(l.receita ?? 0) <= 0;
+
 export function producaoDoRateio(
-  linhas: Array<Pick<RateioLinha, "tipo_servico" | "condicao">>,
+  linhas: Array<Pick<RateioLinha, "tipo_servico" | "condicao" | "receita">>,
 ): ProducaoPainel {
   const p: ProducaoPainel = {
     total: linhas.length,
@@ -172,9 +181,13 @@ export function producaoDoRateio(
     outros: 0,
     mensalidades: 0,
     adesoes: 0,
-
+    cortesias: 0,
   };
   for (const l of linhas) {
+    if (ehCortesia(l)) {
+      p.cortesias++;
+      continue;
+    }
     const c = categoriaDoAtendimento(l);
     if (c === "cartao") p.consultasCartao++;
     else if (c === "particular") {

@@ -33,6 +33,7 @@ import { classificarForma, LABEL_FORMA } from "@/lib/financeiro/formas-pagamento
 import {
   categoriaDoAtendimento,
   categoriaDaOutraReceita,
+  ehCortesia,
 
   repassePorMedico,
   resumoPainel,
@@ -119,6 +120,7 @@ type Drill =
   | "ticket"
   | "mensalidade"
   | "adesao"
+  | "cortesia"
   | CategoriaAtendimento;
 
 
@@ -499,6 +501,20 @@ function FinDashboard() {
             value={v((r) => r.producao.adesoes, int)}
             accent="warning"
           />
+          {/* Atendido sem cobrança: revisão de cortesia e gratuidade do plano
+              da casa. Conta no total e vale R$ 0,00. */}
+          {resumo && resumo.producao.cortesias > 0 && (
+            <KpiCard
+              onClick={() => abrir("cortesia")}
+              icon={Stethoscope}
+              label="Cortesias e gratuidades"
+              value={v((r) => r.producao.cortesias, int)}
+              accent="primary"
+              detalhe="Atendidos sem cobrança (R$ 0,00)"
+            />
+          )}
+
+
 
           <KpiCard
             onClick={() => abrir("ticket")}
@@ -631,14 +647,19 @@ function montarDetalhe(drill: Drill, dados: DadosPainel, r: ResumoPainel, visao:
     drill === "exame" ||
     drill === "outro" ||
     drill === "mensalidade" ||
-    drill === "adesao"
+    drill === "adesao" ||
+    drill === "cortesia"
   ) {
+    // A cortesia/gratuidade sai dos cards por tipo e tem lista própria — é
+    // assim que a soma dos cards continua fechando com o total.
     const recorte =
       drill === "cartao" || drill === "particular" || drill === "exame" || drill === "outro"
-        ? dados.rateio.filter((l) => categoriaDoAtendimento(l) === drill)
-        : drill === "mensalidade" || drill === "adesao"
-          ? []
-          : dados.rateio;
+        ? dados.rateio.filter((l) => !ehCortesia(l) && categoriaDoAtendimento(l) === drill)
+        : drill === "cortesia"
+          ? dados.rateio.filter(ehCortesia)
+          : drill === "mensalidade" || drill === "adesao"
+            ? []
+            : dados.rateio;
     const titulo =
       drill === "receita"
         ? "Receita bruta"
@@ -650,7 +671,9 @@ function montarDetalhe(drill: Drill, dados: DadosPainel, r: ResumoPainel, visao:
               ? "Mensalidades"
               : drill === "adesao"
                 ? "Adesões"
-                : TITULO_ATENDIMENTO[drill];
+                : drill === "cortesia"
+                  ? "Cortesias e gratuidades"
+                  : TITULO_ATENDIMENTO[drill];
     // Os recebimentos sem agendamento (mensalidade, adesão, avulso) entram na
     // lista sem repasse, inteiros no líquido da clínica. Eles aparecem na
     // Receita bruta, no total de Atendimentos e nos cards próprios de cada tipo
