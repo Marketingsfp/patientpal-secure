@@ -350,6 +350,73 @@ function Page() {
       </Card>
 
       <Card>
+        <CardContent className="pt-6 space-y-4">
+          <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+            <h2 className="text-lg font-semibold">Simulação de crescimento</h2>
+            {baseMesAnterior > 0 ? (
+              <p className="text-xs text-muted-foreground">
+                Base de comparação: {mesAnterior.nome} fechou em{" "}
+                <span className="font-medium text-foreground">{fmt(baseMesAnterior)}</span>.
+              </p>
+            ) : null}
+          </div>
+
+          {metas.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              Sem receita registrada em {mesAnterior.nome} para comparar. Digite uma meta acima para
+              simular.
+            </p>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+              {metas.map((m) => (
+                <div key={m.rotulo} className="rounded-lg border p-4 space-y-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-sm font-semibold">{m.rotulo}</span>
+                    <span
+                      className={
+                        m.alcancavel
+                          ? "text-[11px] font-medium uppercase tracking-wide text-green-600"
+                          : "text-[11px] font-medium uppercase tracking-wide text-amber-600"
+                      }
+                    >
+                      {m.alcancavel ? "no ritmo" : "exige mais"}
+                    </span>
+                  </div>
+                  <p className="text-xl font-semibold tabular-nums">{fmt(m.alvo)}</p>
+                  <dl className="text-xs text-muted-foreground space-y-1">
+                    <div className="flex justify-between gap-2">
+                      <dt>Falta</dt>
+                      <dd className="tabular-nums text-foreground">{fmt(m.falta)}</dd>
+                    </div>
+                    <div className="flex justify-between gap-2">
+                      <dt>Por dia de movimento</dt>
+                      <dd className="tabular-nums text-foreground">{fmt(m.porDiaRestante)}</dd>
+                    </div>
+                    <div className="flex justify-between gap-2">
+                      <dt>Atendimentos/dia</dt>
+                      <dd className="tabular-nums text-foreground">{m.atendimentosPorDia}</dd>
+                    </div>
+                    <div className="flex justify-between gap-2">
+                      <dt>Ritmo x hoje</dt>
+                      <dd className="tabular-nums text-foreground">
+                        {m.esforcoPercentual > 0
+                          ? `+${m.esforcoPercentual}%`
+                          : `${m.esforcoPercentual}%`}
+                      </dd>
+                    </div>
+                  </dl>
+                </div>
+              ))}
+            </div>
+          )}
+          <p className="text-xs text-muted-foreground">
+            "Dia de movimento" é dia com caixa aberto — a clínica atende de segunda a sábado, e o
+            domingo não entra na conta.
+          </p>
+        </CardContent>
+      </Card>
+
+      <Card>
         <CardContent className="pt-6">
           <h2 className="text-lg font-semibold flex items-center gap-2">
             <AlertTriangle className="h-5 w-5 text-amber-500" />O que dá para melhorar
