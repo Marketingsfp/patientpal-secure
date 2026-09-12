@@ -386,25 +386,34 @@ function FinDashboard() {
               </ul>
             )}
           </KpiCard>
+          {/* Repasse em duas leituras lado a lado (decisão de 12/09/2026):
+              o DEVIDO pelos atendimentos do período e o PAGO no caixa. A
+              despesa e o saldo usam o pago; o devido serve para conferência. */}
           <KpiCard
             onClick={() => abrir("repasse")}
             icon={Handshake}
             label="Repasse a médicos / prestadores"
-            value={v((r) => r.custoPrestadores)}
+            value={v((r) => r.repassePagoNoPeriodo)}
             accent="warning"
-            detalhe={
-              resumo && !carregando
-                ? [
-                    `Custo total com prestadores: ${brl(resumo.repasse)} da grade`,
-                    resumo.terceiro > 0 && `+ ${brl(resumo.terceiro)} de terceiros`,
-                    resumo.complementoMedico > 0 &&
-                      `+ ${brl(resumo.complementoMedico)} de complemento médico`,
-                  ]
-                    .filter(Boolean)
-                    .join(" · ")
-                : "Custo total com prestadores"
-            }
-          />
+            detalhe="Pago no caixa no período"
+          >
+            {resumo && !carregando && (
+              <ul className="mt-2 space-y-0.5 border-t border-border/60 pt-2">
+                <li className="flex items-center justify-between gap-2 text-xs">
+                  <span className="text-muted-foreground">Devido pelos atendimentos</span>
+                  <span className="shrink-0 tabular-nums">{brl(resumo.custoPrestadores)}</span>
+                </li>
+                <li className="flex items-center justify-between gap-2 text-xs">
+                  <span className="text-muted-foreground">
+                    Grade {brl(resumo.repasse)}
+                    {resumo.terceiro > 0 && ` · terceiros ${brl(resumo.terceiro)}`}
+                    {resumo.complementoMedico > 0 &&
+                      ` · complemento ${brl(resumo.complementoMedico)}`}
+                  </span>
+                </li>
+              </ul>
+            )}
+          </KpiCard>
           <KpiCard
             onClick={() => abrir("operacionais")}
             icon={Receipt}
@@ -419,7 +428,7 @@ function FinDashboard() {
             label="Despesas totais"
             value={v((r) => r.despesasTotais)}
             accent="destructive"
-            detalhe="Custo total com prestadores + despesas operacionais"
+            detalhe="Repasse e complemento pagos no caixa + despesas operacionais"
           />
           <KpiCard
             onClick={() => abrir("saldo")}
@@ -429,8 +438,8 @@ function FinDashboard() {
             accent={resumo && resumo.saldo < 0 ? "destructive" : "primary"}
             detalhe={
               resumo && !carregando
-                ? `Margem de ${pct(margem(resumo.saldo, resumo.receitaTotal))} · receitas − despesas totais`
-                : "Receitas − despesas totais"
+                ? `Margem de ${pct(margem(resumo.saldo, resumo.receitaTotal))} · receitas − despesas pagas no caixa`
+                : "Receitas − despesas pagas no caixa"
             }
           />
         </div>
