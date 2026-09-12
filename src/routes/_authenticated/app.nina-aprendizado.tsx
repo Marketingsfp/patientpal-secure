@@ -1414,7 +1414,7 @@ function Pagina() {
                               <CorrecaoExecucaoPainel
                                 execucao={execucoes[it.id] ?? null}
                                 emAndamento={Boolean(corrigindo[it.id])}
-                              />}
+                              />
                             </div>
                           ) : (
                             <p className="text-xs text-muted-foreground">
