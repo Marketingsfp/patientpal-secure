@@ -1,7 +1,7 @@
 /**
  * FASE 5 — o relatório vem dos FATOS do executor, não da afirmação do modelo.
  */
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 import { montarRelatorio, type EntradaRelatorio } from "../correcao-relatorio";
 import type { PropostaCorrecao } from "../analise-erro";
 
