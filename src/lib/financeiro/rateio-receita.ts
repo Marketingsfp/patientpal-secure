@@ -766,6 +766,55 @@ function reparte(
 }
 
 /**
+ * Preenche, nas linhas já rateadas, o NOME do paciente e se aquele atendimento
+ * foi a PRIMEIRA VEZ dele na clínica.
+ *
+ * Vem depois do rateio, e não dentro dele, para ser uma consulta só por
+ * período (e não uma por atendimento): a lista do mês tem milhares de linhas.
+ * "Primeira vez" compara o dia do atendimento com o dia do primeiro
+ * agendamento não cancelado do paciente (`fin_pacientes_primeiro_atendimento`).
+ * Se a consulta falhar, a lista continua valendo — só fica sem essa marcação.
+ */
+async function enriquecerPacientes(clinicaId: string, linhas: RateioLinha[]): Promise<void> {
+  const ids = [...new Set(linhas.map((l) => l.paciente_id).filter((x): x is string => !!x))];
+  if (ids.length === 0) return;
+
+  const nomes = new Map<string, string>();
+  for (let i = 0; i < ids.length; i += PAGINA) {
+    const { data } = await supabase
+      .from("pacientes")
+      .select("id, nome")
+      .in("id", ids.slice(i, i + PAGINA));
+    for (const p of (data ?? []) as Array<{ id: string; nome: string | null }>) {
+      nomes.set(p.id, (p.nome ?? "").trim());
+    }
+  }
+
+  const primeiro = new Map<string, string>();
+  for (let i = 0; i < ids.length; i += PAGINA) {
+    const { data } = await supabase.rpc("fin_pacientes_primeiro_atendimento", {
+      _clinica_id: clinicaId,
+      _ids: ids.slice(i, i + PAGINA),
+    });
+    for (const r of ((data as unknown[] | null) ?? []) as Array<{
+      paciente_id: string;
+      primeiro: string | null;
+    }>) {
+      if (r.primeiro) primeiro.set(r.paciente_id, String(r.primeiro).slice(0, 10));
+    }
+  }
+
+  for (const l of linhas) {
+    if (!l.paciente_id) continue;
+    l.paciente_nome = nomes.get(l.paciente_id) ?? "";
+    const p = primeiro.get(l.paciente_id);
+    l.primeira_vez = p ? l.data <= p : null;
+  }
+}
+
+
+
+/**
  * Busca os recebimentos do período e devolve cada um já rateado.
  *
  * Régua da data (mudou em 12/09/2026, a pedido da direção): vale o dia em que
