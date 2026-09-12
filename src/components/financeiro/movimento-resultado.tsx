@@ -555,22 +555,24 @@ function montarDetalhe(
   const hora = (l: LinhaClassificada) => l.hora ?? "";
 
   if (drill === "receita") {
-    const atend = receitas.filter((l) => ehAtendimento(l.grupo));
+    const atend = receitas;
     const resumo = [
       { rotulo: "Receita de atendimentos", valor: r.atendimentos.total },
       ...CONDICOES.filter((c) => r.atendimentos.porCondicao[c].qtd > 0).map((c) => ({
         rotulo: LABEL_CONDICAO[c],
         valor: r.atendimentos.porCondicao[c].total,
       })),
+      { rotulo: "Mensalidades, adesões e avulsos", valor: r.outras.total },
     ];
     const base = {
-      titulo: "Receita bruta (atendimentos)",
+      titulo: "Receita bruta",
       explicacao:
-        "Pagamentos de atendimento que passaram pelo caixa no período, separados em Particular, Cartão Benefícios e Convênio. Mensalidades, adesões e recebimentos avulsos estão em Outras receitas.",
+        "Tudo que entrou no caixa no período: consultas, exames, procedimentos, adesões, mensalidades e recebimentos avulsos. Cada pagamento recebido conta como um atendimento.",
       resumo,
-      composicao: r.atendimentos.formas,
+      composicao: r.receitaBruta.formas,
       temSintetico: true,
     };
+
     if (visao === "sintetico") {
       const linhasSint: Celula[][] = [];
       for (const c of CONDICOES) {
