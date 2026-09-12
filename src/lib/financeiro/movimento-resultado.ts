@@ -256,12 +256,19 @@ export interface ResumoMovimento {
   /** Mensalidades, adesões e recebimentos avulsos. */
   outras: TotalQtd & { porGrupo: Record<GrupoMovimento, TotalQtd> };
   receitas: number;
+  /**
+   * Receita bruta do caixa: tudo que entrou, na mesma régua do Dashboard, com
+   * a quebra por forma de pagamento e a contagem de pagamentos recebidos —
+   * cada pagamento conta como um atendimento (12/09/2026).
+   */
+  receitaBruta: TotalQtd & { formas: Array<{ rotulo: string; valor: number }> };
   repassePago: TotalQtd;
   complementoMedico: TotalQtd;
   operacionais: TotalQtd;
   despesas: number;
   saldo: number;
 }
+
 
 /**
  * Quantidade de PAGAMENTOS: as partes de um pagamento misto contam uma vez
