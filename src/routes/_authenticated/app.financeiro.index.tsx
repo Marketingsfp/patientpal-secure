@@ -115,7 +115,10 @@ type Drill =
   | "saldo"
   | "atendimentos"
   | "ticket"
+  | "mensalidade"
+  | "adesao"
   | CategoriaAtendimento;
+
 
 /**
  * O detalhamento guarda os números do momento em que foi aberto: a
