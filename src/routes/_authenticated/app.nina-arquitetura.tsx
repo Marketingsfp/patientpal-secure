@@ -31,6 +31,7 @@ import {
 import { mudancaConfiguracaoPrompt } from "@/lib/nina/arquitetura/sync";
 import { historicoInstrucoesNina } from "@/lib/nina/instrucoes.functions";
 import { SemCaixaAlta } from "@/components/ui/caixa-alta";
+import { useAuth } from "@/hooks/use-auth";
 
 
 export const Route = createFileRoute("/_authenticated/app/nina-arquitetura")({
@@ -62,6 +63,7 @@ export const Route = createFileRoute("/_authenticated/app/nina-arquitetura")({
 
 function Pagina() {
   const { clinicaAtual } = useClinica();
+  const { session, loading: authLoading } = useAuth();
   const clinicaId = clinicaAtual?.clinica_id ?? null;
   const [modo, setModo] = useState<"arquitetura" | "execucao" | "alteracoes">("arquitetura");
 
@@ -93,9 +95,14 @@ function Pagina() {
 
   const buscarCapacidades = useServerFn(capacidadesArquitetura);
   const { data: permissao } = useQuery({
-    queryKey: ["arquitetura-capacidades", clinicaId],
-    enabled: !!clinicaId,
-    queryFn: () => buscarCapacidades({ data: { clinicaId: clinicaId! } }),
+    queryKey: ["arquitetura-capacidades", clinicaId, session?.user.id],
+    enabled: !authLoading && !!session?.access_token && !!clinicaId,
+    queryFn: () => {
+      if (!clinicaId || !session?.access_token) {
+        throw new Error("Sessão ainda não está pronta");
+      }
+      return buscarCapacidades({ data: { clinicaId } });
+    },
   });
 
   const capacidades = permissao?.capacidades ?? [];
