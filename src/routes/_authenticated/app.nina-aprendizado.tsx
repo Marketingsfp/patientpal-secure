@@ -67,8 +67,18 @@ import {
   analisarErroNinaComIA,
   listarAnalisesErroNina,
 } from "@/lib/nina/analise-erro.functions";
-import { aplicarCorrecaoComIA } from "@/lib/nina/correcao-executor.functions";
+import {
+  aplicarCorrecaoComIA,
+  execucaoCorrecaoAtual,
+} from "@/lib/nina/correcao-executor.functions";
 import type { ResumoExecucao } from "@/lib/nina/correcao-executor";
+import {
+  assinaturaProposta,
+  avaliarProntidao,
+  ROTULO_BOTAO_APLICAR,
+  type EtapaExecucao,
+  type Prontidao,
+} from "@/lib/nina/correcao-prontidao";
 import { CorrecaoExecucaoPainel } from "@/components/nina/CorrecaoExecucaoPainel";
 
 import {
