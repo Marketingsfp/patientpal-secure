@@ -2634,12 +2634,49 @@ function Page() {
             invertido
           />
 
-          <CardResumo
-            titulo="Líquido da clínica"
-            valor={brl(totaisR.liquido)}
-            detalhe={`Margem de ${pct(totaisR.margem)}`}
-            delta={deltaDe(totaisR.liquido, totaisComp.liquido)}
-          />
+          {/* Mesma régua do Dashboard: receitas menos tudo que saiu do caixa,
+              com a quebra de onde o dinheiro está. Quando o Rateio está
+              recortado por profissional/serviço, o fechamento de caixa não
+              corresponde às linhas da tabela — aí segue valendo o líquido do
+              próprio Rateio. */}
+          {saldoCaixaRateio ? (
+            <CardResumo
+              titulo="Líquido da clínica / Saldo"
+              valor={brl(saldoCaixaRateio.saldo)}
+              detalhe={`Margem de ${pct(
+                saldoCaixaRateio.receitaTotal > 0
+                  ? (saldoCaixaRateio.saldo / saldoCaixaRateio.receitaTotal) * 100
+                  : 0,
+              )} · receitas − despesas pagas no caixa`}
+              linhas={[
+                {
+                  rotulo: "Em espécie (gaveta)",
+                  valor: brl(saldoCaixaRateio.saldoMeios.especie.saldo),
+                },
+                {
+                  rotulo: "Em banco (PIX, cartão, boleto)",
+                  valor: brl(saldoCaixaRateio.saldoMeios.banco.saldo),
+                },
+                ...(saldoCaixaRateio.saldoMeios.outros.entradas !== 0 ||
+                saldoCaixaRateio.saldoMeios.outros.saidas !== 0
+                  ? [
+                      {
+                        rotulo: "Outros (convênio, sem informação)",
+                        valor: brl(saldoCaixaRateio.saldoMeios.outros.saldo),
+                      },
+                    ]
+                  : []),
+                { rotulo: "Líquido dos atendimentos (Rateio)", valor: brl(totaisR.liquido) },
+              ]}
+            />
+          ) : (
+            <CardResumo
+              titulo="Líquido da clínica"
+              valor={brl(totaisR.liquido)}
+              detalhe={`Margem de ${pct(totaisR.margem)} · líquido do Rateio (recorte aplicado)`}
+              delta={deltaDe(totaisR.liquido, totaisComp.liquido)}
+            />
+          )}
         </div>
       )}
 
