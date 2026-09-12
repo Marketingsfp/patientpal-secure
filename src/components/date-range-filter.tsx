@@ -37,16 +37,29 @@ export { computeRange };
 export type { DateRange, DatePreset };
 
 /** Ordem das pílulas na barra. */
-const PRESETS: DatePreset[] = ["hoje", "semana", "quinzena", "mes", "periodo"];
+const PRESETS: DatePreset[] = ["hoje", "ontem", "semana", "quinzena", "mes", "periodo"];
 
 export interface DateRangeFilterProps {
   value: DateRange;
   preset: DatePreset;
   onChange: (range: DateRange, preset: DatePreset) => void;
   className?: string;
+  /**
+   * Mostrar os dois calendários quando "Período" está escolhido. O Movimento
+   * de Caixa já tem os campos De/Até próprios, então lá as pílulas entram
+   * sozinhas para não duplicar a mesma data em dois lugares.
+   */
+  mostrarCampos?: boolean;
 }
 
-export function DateRangeFilter({ value, preset, onChange, className }: DateRangeFilterProps) {
+export function DateRangeFilter({
+  value,
+  preset,
+  onChange,
+  className,
+  mostrarCampos = true,
+}: DateRangeFilterProps) {
+
   const [openFrom, setOpenFrom] = useState(false);
   const [openTo, setOpenTo] = useState(false);
   const fromDate = useMemo(
@@ -96,7 +109,7 @@ export function DateRangeFilter({ value, preset, onChange, className }: DateRang
             </TabsList>
           </Tabs>
         </TooltipProvider>
-        {preset === "periodo" && (
+        {preset === "periodo" && mostrarCampos && (
           <div className="flex items-center gap-2">
             <Popover open={openFrom} onOpenChange={setOpenFrom}>
               <PopoverTrigger asChild>

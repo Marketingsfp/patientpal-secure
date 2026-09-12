@@ -24,11 +24,12 @@
 export type DateRange = { from: string; to: string };
 
 /** As pílulas do seletor, na ordem em que aparecem na tela. */
-export type DatePreset = "hoje" | "semana" | "quinzena" | "mes" | "periodo";
+export type DatePreset = "hoje" | "ontem" | "semana" | "quinzena" | "mes" | "periodo";
 
 /** Rótulo curto de cada pílula — o mesmo texto escrito dentro dela. */
 export const ROTULO_PRESET: Record<DatePreset, string> = {
   hoje: "Dia",
+  ontem: "Ontem",
   semana: "Semana",
   quinzena: "Quinzena",
   mes: "Mês",
@@ -41,6 +42,7 @@ export const ROTULO_PRESET: Record<DatePreset, string> = {
  */
 const TITULO_PRESET: Record<DatePreset, string> = {
   hoje: "Hoje",
+  ontem: "Ontem",
   semana: "Semana atual",
   quinzena: "Quinzena atual",
   mes: "Mês atual",
@@ -53,11 +55,13 @@ const TITULO_PRESET: Record<DatePreset, string> = {
  */
 const REGRA_PRESET: Record<DatePreset, string> = {
   hoje: "Somente o dia de hoje.",
+  ontem: "Somente o dia anterior a hoje.",
   semana: "Da semana em que hoje está: de domingo a sábado.",
   quinzena: "A quinzena em que hoje está: do dia 1 ao 15, ou do 16 ao fim do mês.",
   mes: "Do primeiro ao último dia do mês em que hoje está.",
   periodo: "Datas escolhidas à mão nos campos ao lado.",
 };
+
 
 const toISO = (d: Date) => {
   const x = new Date(d);
@@ -85,6 +89,12 @@ export function computeRange(preset: DatePreset, ref: Date = new Date()): DateRa
   const today = new Date(ref);
   today.setHours(0, 0, 0, 0);
   if (preset === "hoje") return { from: toISO(today), to: toISO(today) };
+  if (preset === "ontem") {
+    const ontem = new Date(today);
+    ontem.setDate(today.getDate() - 1);
+    return { from: toISO(ontem), to: toISO(ontem) };
+  }
+
   if (preset === "semana") {
     const dow = today.getDay(); // 0 = dom
     const start = new Date(today);

@@ -70,6 +70,8 @@ import { MovimentoResultado } from "@/components/financeiro/movimento-resultado"
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { DateInputBR } from "@/components/ui/date-input-br";
+import { DateRangeFilter, type DatePreset } from "@/components/date-range-filter";
+
 import { CurrencyInput } from "@/components/ui/currency-input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -314,6 +316,11 @@ function Page() {
   // depois das 21h e a tela aparecia vazia no fim do expediente.
   const [fromDate, setFromDate] = useState(hojeBR);
   const [toDate, setToDate] = useState(hojeBR);
+  // Mesmas pílulas do Dashboard e dos Relatórios (Dia, Ontem, Semana,
+  // Quinzena, Mês, Período). Elas só escrevem em De/Até — quem manda no que a
+  // tela busca continua sendo o par de datas.
+  const [presetPeriodo, setPresetPeriodo] = useState<DatePreset>("hoje");
+
   const [resumo, setResumo] = useState<{ r: number; d: number; saldo: number; totalRows: number }>({
     r: 0,
     d: 0,
@@ -2187,12 +2194,27 @@ function Page() {
               papel. Tudo o mais fica atrás de "Mais filtros" — a recepção usa
               data e tipo o tempo todo, e o resto é exceção. Nenhum filtro foi
               removido, só recolhido. */}
+          <DateRangeFilter
+            value={{ from: fromDate, to: toDate }}
+            preset={presetPeriodo}
+            mostrarCampos={false}
+            onChange={(r, p) => {
+              setPresetPeriodo(p);
+              if (p !== "periodo") {
+                setFromDate(r.from);
+                setToDate(r.to);
+              }
+            }}
+          />
           <div className="flex flex-wrap items-end gap-3">
             <div className="space-y-1">
               <Label className="text-xs">De</Label>
               <DateInputBR
                 value={fromDate}
-                onChange={(e) => setFromDate(e.target.value)}
+                onChange={(e) => {
+                  setPresetPeriodo("periodo");
+                  setFromDate(e.target.value);
+                }}
                 className="w-40"
               />
             </div>
@@ -2200,9 +2222,13 @@ function Page() {
               <Label className="text-xs">Até</Label>
               <DateInputBR
                 value={toDate}
-                onChange={(e) => setToDate(e.target.value)}
+                onChange={(e) => {
+                  setPresetPeriodo("periodo");
+                  setToDate(e.target.value);
+                }}
                 className="w-40"
               />
+
             </div>
             <div className="space-y-1">
               <Label className="text-xs">Visão</Label>
