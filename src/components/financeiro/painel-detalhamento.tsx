@@ -108,6 +108,7 @@ export function DetalhamentoCorpo({
   de,
   ate,
   clinicaNome,
+  detalharLinha,
   cabecalho,
   alturaTabela,
 }: PropsDetalhamento & {
@@ -120,6 +121,51 @@ export function DetalhamentoCorpo({
   const det = useMemo(() => montar(visao), [montar, visao]);
   const periodo = periodoLegivel(de, ate);
   const numerica = (t: TipoCol) => t === "moeda" || t === "numero";
+
+  // Detalhe de UMA linha (os pacientes daquela linha), aberto por cima.
+  const [sub, setSub] = useState<Detalhe | null>(null);
+
+  // Rolagem pelas setas: a tabela recebe o foco e as setas do teclado rolam a
+  // lista; os dois botões fazem o mesmo com o mouse, meia tela por clique.
+  const rolagem = useRef<HTMLDivElement>(null);
+  const rolar = (fator: number) => {
+    const el = rolagem.current;
+    if (!el) return;
+    el.scrollBy({ top: el.clientHeight * fator, behavior: "smooth" });
+  };
+  const teclado = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    const el = rolagem.current;
+    if (!el) return;
+    const passo = 56;
+    const mapa: Record<string, number | "topo" | "fim"> = {
+      ArrowDown: passo,
+      ArrowUp: -passo,
+      PageDown: el.clientHeight * 0.9,
+      PageUp: -el.clientHeight * 0.9,
+      Home: "topo",
+      End: "fim",
+    };
+    const acao = mapa[e.key];
+    if (acao === undefined) return;
+    e.preventDefault();
+    if (acao === "topo") el.scrollTo({ top: 0, behavior: "smooth" });
+    else if (acao === "fim") el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+    else el.scrollBy({ top: acao, behavior: "smooth" });
+  };
+
+  const abrirLinha = (linha: Celula[], indice: number) => {
+    if (!detalharLinha) return;
+    const d = detalharLinha({ visao, indice, linha });
+    if (!d) {
+      toast.info("Esta linha não tem pacientes para detalhar");
+      return;
+    }
+    if (d.linhas.length === 0) {
+      toast.info("Nenhum paciente nesta linha");
+      return;
+    }
+    setSub(d);
+  };
 
   const imprimir = () => {
     if (det.linhas.length === 0) {
