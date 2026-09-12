@@ -90,10 +90,7 @@ describe("FASE 1 — caminho dos dados do preço", () => {
 describe("FASE 1 — controle A/B da validação monetária", () => {
   it("B) pergunta só sobre dinheiro: a afirmação de R$ 51,00 é confirmada", () => {
     const { fatos } = extrairEvidencia(retornoDaFerramenta());
-    const r = avaliarGrounding(
-      contexto(fatos),
-      "O eletrocardiograma custa R$ 51,00 no dinheiro.",
-    );
+    const r = avaliarGrounding(contexto(fatos), "O eletrocardiograma custa R$ 51,00 no dinheiro.");
     const valores = r.claims.filter((c) => c.tipo === "valor");
     expect(valores.length).toBeGreaterThan(0);
     expect(valores.every((c) => c.suportado)).toBe(true);
