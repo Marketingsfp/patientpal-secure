@@ -470,7 +470,14 @@ export function extrairRegrasPublicadas(
       continue;
     }
 
-    if (!NORMATIVO.test(u.plano)) {
+    // Uma unidade pode reunir várias frases normativas com CONDIÇÕES
+    // DIFERENTES ("apresente-se assim: …" + "não acrescente … quando ela já
+    // explicou"). Lidas juntas, a condição de uma contaminava a outra. Cada
+    // frase vira sua própria regra, com a sua condição.
+    const frases = frasesDaUnidade(u.plano);
+    const normativas = frases.filter((f) => NORMATIVO.test(f));
+
+    if (normativas.length === 0) {
       // Não é regra. Ainda assim pode declarar o ambiente da seção
       // (ex.: "Esta regra vale exclusivamente para homologação").
       const amb = /\bregra\b/i.test(u.plano) ? ambienteDoTexto(u.plano) : null;
@@ -485,93 +492,109 @@ export function extrairRegrasPublicadas(
       continue;
     }
 
-    // Condição escrita na mesma frase da regra.
-    let condicaoLocal = condicao;
-    const inline = CONDICAO_INLINE.exec(u.plano);
-    if (inline?.[1]) {
-      const bruto = inline[1].trim();
-      condicaoLocal = /\bexatamente\b/i.test(bruto)
-        ? { tipo: "mensagem_exata", valor: bruto.replace(/.*\bexatamente\b\s*:?\s*/i, "").trim() }
-        : { tipo: "mensagem_contem", valor: bruto };
-    }
+    for (const frase of normativas) {
+      // Condição escrita na própria frase da regra. A situação da conversa
+      // tem precedência: "quando ela já explicou o que precisa" não é um
+      // conteúdo a procurar na mensagem, é um estado do atendimento.
+      let condicaoLocal = condicao;
+      const situacao = situacaoDaFrase(frase);
+      if (situacao) {
+        condicaoLocal = {
+          tipo: "situacao",
+          situacao: situacao.situacao,
+          valor: situacao.valor,
+        };
+      } else {
+        const inline = CONDICAO_INLINE.exec(frase);
+        if (inline?.[1]) {
+          const bruto = inline[1].trim();
+          condicaoLocal = /\bexatamente\b/i.test(bruto)
+            ? {
+                tipo: "mensagem_exata",
+                valor: bruto.replace(/.*\bexatamente\b\s*:?\s*/i, "").trim(),
+              }
+            : { tipo: "mensagem_contem", valor: bruto };
+        }
+      }
 
-    const exigencia = exigenciaLiteral(u.plano);
-    if (exigencia) {
-      registrar(u, {
-        condicao: condicaoLocal,
-        ambiente: ambienteSecao,
-        natureza: "exigencia",
-        prioridade: prioridadeDe(u.plano, "literal"),
-        verificacao: "literal",
-        literal: exigencia.literal,
-        operador: exigencia.operador,
-        proibicoes: [],
-        descricao: u.plano,
-        interpretada: true,
-        motivo: null,
-      });
-      continue;
-    }
+      const exigencia = exigenciaLiteral(frase);
+      if (exigencia) {
+        registrar(u, {
+          condicao: condicaoLocal,
+          ambiente: ambienteSecao,
+          natureza: "exigencia",
+          prioridade: prioridadeDe(frase, "literal"),
+          verificacao: "literal",
+          literal: exigencia.literal,
+          operador: exigencia.operador,
+          proibicoes: [],
+          descricao: frase,
+          interpretada: true,
+          motivo: null,
+        });
+        continue;
+      }
 
-    if (PROIBICAO.test(u.plano)) {
-      // A categoria proibida é lida SOMENTE na oração da proibição. Lida no
-      // parágrafo inteiro, uma frase vizinha ("responda à pergunta") fazia a
-      // regra proibir o que o próprio texto publicado manda fazer.
-      const oracao = oracaoDaProibicao(u.plano);
-      const proibicoes = categoriasProibidas(oracao);
-      // Proibição condicionada ("… quando ela já explicou o que precisa") só
-      // vale quando a condição vale. Se a condição não pôde ser representada,
-      // a regra fica NÃO INTERPRETADA — nunca vira proibição para todo turno.
-      const condicaoNaoRepresentada =
-        condicaoLocal.tipo === "sempre" && CONDICAO_NA_ORACAO.test(oracao);
-      if (proibicoes.length > 0 && condicaoNaoRepresentada) {
-        limitacoes.push("CONDICAO_DA_PROIBICAO_NAO_VERIFICAVEL");
+      if (PROIBICAO.test(frase)) {
+        // A categoria proibida é lida SOMENTE na oração da proibição. Lida no
+        // parágrafo inteiro, uma frase vizinha ("responda à pergunta") fazia a
+        // regra proibir o que o próprio texto publicado manda fazer.
+        const oracao = oracaoDaProibicao(frase);
+        const proibicoes = categoriasProibidas(oracao);
+        // Proibição condicionada ("… quando ela já explicou o que precisa") só
+        // vale quando a condição vale. Se a condição não pôde ser representada,
+        // a regra fica NÃO INTERPRETADA — nunca vira proibição para todo turno.
+        const condicaoNaoRepresentada =
+          condicaoLocal.tipo === "sempre" && CONDICAO_NA_ORACAO.test(oracao);
+        if (proibicoes.length > 0 && condicaoNaoRepresentada) {
+          limitacoes.push("CONDICAO_DA_PROIBICAO_NAO_VERIFICAVEL");
+          registrar(u, {
+            condicao: condicaoLocal,
+            ambiente: ambienteSecao,
+            natureza: "proibicao",
+            prioridade: "normal",
+            verificacao: "nao_interpretada",
+            literal: null,
+            operador: null,
+            proibicoes: [],
+            descricao: frase,
+            interpretada: false,
+            motivo: "CONDICAO_DA_PROIBICAO_NAO_VERIFICAVEL",
+          });
+          continue;
+        }
+        const verificacao: VerificacaoRegra =
+          proibicoes.length > 0 ? "proibicao_de_conteudo" : "semantica";
         registrar(u, {
           condicao: condicaoLocal,
           ambiente: ambienteSecao,
           natureza: "proibicao",
-          prioridade: "normal",
-          verificacao: "nao_interpretada",
+          prioridade: prioridadeDe(frase, verificacao),
+          verificacao,
           literal: null,
           operador: null,
-          proibicoes: [],
-          descricao: u.plano,
-          interpretada: false,
-          motivo: "CONDICAO_DA_PROIBICAO_NAO_VERIFICAVEL",
+          proibicoes,
+          descricao: frase,
+          interpretada: true,
+          motivo: null,
         });
         continue;
       }
-      const verificacao: VerificacaoRegra =
-        proibicoes.length > 0 ? "proibicao_de_conteudo" : "semantica";
+
       registrar(u, {
         condicao: condicaoLocal,
         ambiente: ambienteSecao,
-        natureza: "proibicao",
-        prioridade: prioridadeDe(u.plano, verificacao),
-        verificacao,
+        natureza: "exigencia",
+        prioridade: prioridadeDe(frase, "semantica"),
+        verificacao: "semantica",
         literal: null,
         operador: null,
-        proibicoes,
-        descricao: u.plano,
+        proibicoes: [],
+        descricao: frase,
         interpretada: true,
         motivo: null,
       });
-      continue;
     }
-
-    registrar(u, {
-      condicao: condicaoLocal,
-      ambiente: ambienteSecao,
-      natureza: "exigencia",
-      prioridade: prioridadeDe(u.plano, "semantica"),
-      verificacao: "semantica",
-      literal: null,
-      operador: null,
-      proibicoes: [],
-      descricao: u.plano,
-      interpretada: true,
-      motivo: null,
-    });
   }
 
   if (regras.some((r) => !r.interpretada)) limitacoes.push("REGRA_PUBLICADA_NAO_INTERPRETADA");
