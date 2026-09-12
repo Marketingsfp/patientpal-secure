@@ -187,8 +187,11 @@ describe("FASE 5 — cenários obrigatórios de aceite", () => {
   it("11. dados equivalentes repetidos não viram conflito artificial", () => {
     const repetido = { found: true, registros: [ECG], records: [{ ...ECG }] };
     const fatos = extrairEvidencia(retornoBruto(repetido)).fatos;
-    const precos = fatos.filter((f) => f.campo === "preco");
-    expect(precos.filter((f) => f.motivo === "conflict")).toHaveLength(0);
+    // Mesma condição + mesmo valor = uma referência só (sem duplicar).
+    const cartao = fatos.filter(
+      (f) => f.campo === "preco" && (f.chave?.condicoes ?? "").includes("cart"),
+    );
+    expect(cartao).toHaveLength(1);
     const r = monetariasDeFatos(fatos, "O eletrocardiograma custa R$ 60,00 no cartão.");
     expect(r[0]!.situacao).toBe("confirmado");
   });
