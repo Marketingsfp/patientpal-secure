@@ -160,6 +160,7 @@ export function MovimentoResultado({
   de,
   ate,
   clinicaNome,
+  conferencia,
 }: {
   /** Linhas visíveis do período (sem os retroativos escondidos), já classificadas. */
   linhas: LinhaClassificada[];
@@ -174,6 +175,13 @@ export function MovimentoResultado({
   de: string;
   ate: string;
   clinicaNome: string;
+  /**
+   * Números do Rateio do mesmo período, para esta tela falar a mesma língua do
+   * Dashboard e do relatório: o repasse DEVIDO pelos atendimentos (aqui só se
+   * paga) e as cortesias — atendimentos sem cobrança, que contam na produção
+   * mas não entram no caixa. Nulo enquanto carrega ou se a leitura falhar.
+   */
+  conferencia?: { repasseDevido: number; cortesias: number } | null;
 }) {
   const [drill, setDrill] = useState<Drill | null>(null);
   const r = resumoMovimento(linhas);
