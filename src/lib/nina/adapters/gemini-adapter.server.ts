@@ -85,6 +85,17 @@ export async function chamarModeloGemini(opcoes: OpcoesChamada): Promise<Respost
     return { ok: false, conteudo: "", toolCalls: [], erro: "LOVABLE_API_KEY ausente" };
   }
 
+  const envio = normalizarMensagensParaProvedor(opcoes.messages);
+  if (envio.ajuste === "termina_em_assistant") {
+    console.error("[nina-ai-gateway] composição inválida: pedido termina no turno do modelo");
+    return {
+      ok: false,
+      conteudo: "",
+      toolCalls: [],
+      erro: "Composição inválida: o pedido termina no turno do modelo",
+    };
+  }
+
   const res = await fetch(ENDPOINT, {
     method: "POST",
     headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
@@ -96,7 +107,7 @@ export async function chamarModeloGemini(opcoes: OpcoesChamada): Promise<Respost
         : {}),
       ...(opcoes.tools ? { tools: opcoes.tools } : {}),
       ...(opcoes.maxTokens ? { max_tokens: opcoes.maxTokens } : {}),
-      messages: opcoes.messages,
+      messages: envio.mensagens,
     }),
   });
 
