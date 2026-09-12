@@ -304,21 +304,26 @@ export function resumoMovimento(linhas: LinhaClassificada[]): ResumoMovimento {
   // Dinheiro, PIX e Cartão sempre aparecem, mesmo zerados — são as três
   // colunas que a recepção confere. As demais formas só quando têm valor, para
   // a lista fechar com o total.
-  const porForma = new Map<FormaCanonica, number>();
-  for (const l of atend) porForma.set(l.forma, (porForma.get(l.forma) ?? 0) + Number(l.valor));
-  const formas: Array<{ rotulo: string; valor: number }> = [
-    { rotulo: "Dinheiro", valor: round2(porForma.get("dinheiro") ?? 0) },
-    { rotulo: "PIX", valor: round2(porForma.get("pix") ?? 0) },
-    {
-      rotulo: "Cartão",
-      valor: round2(CARTAO_NA_BARRA.reduce((s, f) => s + (porForma.get(f) ?? 0), 0)),
-    },
-  ];
-  for (const f of ORDEM_FORMAS) {
-    if (f === "dinheiro" || f === "pix" || CARTAO_NA_BARRA.includes(f)) continue;
-    const v = round2(porForma.get(f) ?? 0);
-    if (v !== 0) formas.push({ rotulo: LABEL_FORMA[f], valor: v });
-  }
+  const quebraPorForma = (linhas: LinhaClassificada[]): Array<{ rotulo: string; valor: number }> => {
+    const porForma = new Map<FormaCanonica, number>();
+    for (const l of linhas) porForma.set(l.forma, (porForma.get(l.forma) ?? 0) + Number(l.valor));
+    const saida: Array<{ rotulo: string; valor: number }> = [
+      { rotulo: "Dinheiro", valor: round2(porForma.get("dinheiro") ?? 0) },
+      { rotulo: "PIX", valor: round2(porForma.get("pix") ?? 0) },
+      {
+        rotulo: "Cartão",
+        valor: round2(CARTAO_NA_BARRA.reduce((s, f) => s + (porForma.get(f) ?? 0), 0)),
+      },
+    ];
+    for (const f of ORDEM_FORMAS) {
+      if (f === "dinheiro" || f === "pix" || CARTAO_NA_BARRA.includes(f)) continue;
+      const v = round2(porForma.get(f) ?? 0);
+      if (v !== 0) saida.push({ rotulo: LABEL_FORMA[f], valor: v });
+    }
+    return saida;
+  };
+  const formas = quebraPorForma(atend);
+
 
   const porGrupo = Object.fromEntries(
     (["consulta", "exame_procedimento", ...GRUPOS_OUTRAS] as GrupoMovimento[]).map((g) => [
