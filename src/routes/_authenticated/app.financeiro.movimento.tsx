@@ -67,6 +67,11 @@ import {
   type FiltroCard,
 } from "@/lib/financeiro/movimento-resultado";
 import { MovimentoResultado } from "@/components/financeiro/movimento-resultado";
+import {
+  carregarContextoRateio,
+  carregarRateio,
+  type RateioContexto,
+} from "@/lib/financeiro/rateio-receita";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { DateInputBR } from "@/components/ui/date-input-br";
