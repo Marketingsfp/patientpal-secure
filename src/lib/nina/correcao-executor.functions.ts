@@ -13,7 +13,12 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { normalizarProposta, type PropostaCorrecao } from "./analise-erro";
+import { garantirProposta, normalizarProposta, type PropostaCorrecao } from "./analise-erro";
+import {
+  assinaturaProposta,
+  avaliarProntidao,
+  type EtapaExecucao,
+} from "./correcao-prontidao";
 import {
   INSTRUCOES_EXECUTOR,
   LIMITE_RODADAS_EXECUTOR,
