@@ -160,6 +160,7 @@ export function MovimentoResultado({
   de,
   ate,
   clinicaNome,
+  conferencia,
 }: {
   /** Linhas visíveis do período (sem os retroativos escondidos), já classificadas. */
   linhas: LinhaClassificada[];
@@ -174,6 +175,13 @@ export function MovimentoResultado({
   de: string;
   ate: string;
   clinicaNome: string;
+  /**
+   * Números do Rateio do mesmo período, para esta tela falar a mesma língua do
+   * Dashboard e do relatório: o repasse DEVIDO pelos atendimentos (aqui só se
+   * paga) e as cortesias — atendimentos sem cobrança, que contam na produção
+   * mas não entram no caixa. Nulo enquanto carrega ou se a leitura falhar.
+   */
+  conferencia?: { repasseDevido: number; cortesias: number } | null;
 }) {
   const [drill, setDrill] = useState<Drill | null>(null);
   const r = resumoMovimento(linhas);
@@ -244,7 +252,7 @@ export function MovimentoResultado({
           accent="success"
           detalhe={
             pronto
-              ? `${plural(r.receitaBruta.qtd, "atendimento", "atendimentos")} · consultas, exames, procedimentos, mensalidades e avulsos`
+              ? `${plural(r.receitaBruta.qtd + (conferencia?.cortesias ?? 0), "atendimento", "atendimentos")} · consultas, exames, procedimentos, mensalidades e avulsos`
               : "Tudo que entrou no caixa"
           }
         >
@@ -256,6 +264,16 @@ export function MovimentoResultado({
                   <span className="tabular-nums">{brl(f.valor)}</span>
                 </li>
               ))}
+              {/* Cortesia e gratuidade: o atendimento aconteceu e conta na
+                  produção, mas não entrou dinheiro — por isso R$ 0,00. */}
+              {(conferencia?.cortesias ?? 0) > 0 && (
+                <li className="flex items-center justify-between gap-2 text-xs">
+                  <span className="text-muted-foreground">
+                    Cortesias e gratuidades ({int(conferencia?.cortesias ?? 0)})
+                  </span>
+                  <span className="tabular-nums">{brl(0)}</span>
+                </li>
+              )}
             </ul>
           )}
 
@@ -274,7 +292,19 @@ export function MovimentoResultado({
           ]
             .filter(Boolean)
             .join(" · ")}
-        />
+        >
+          {/* A outra leitura do repasse, a mesma do Dashboard e do Rateio: o
+              devido pelos atendimentos do período. Despesa e saldo desta tela
+              continuam sendo só o que saiu da gaveta. */}
+          {conferencia && (
+            <ul className="mt-2 space-y-0.5 border-t border-border/60 pt-2">
+              <li className="flex items-center justify-between gap-2 text-xs">
+                <span className="text-muted-foreground">Devido pelos atendimentos</span>
+                <span className="tabular-nums">{brl(conferencia.repasseDevido)}</span>
+              </li>
+            </ul>
+          )}
+        </KpiCard>
         <KpiCard
           novaAba
           onClick={() => abrir("operacionais")}

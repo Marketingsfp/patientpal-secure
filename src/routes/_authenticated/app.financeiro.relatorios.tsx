@@ -127,6 +127,7 @@ import {
   type AlvoDoContato,
 } from "@/components/sessoes/registrar-contato-dialog";
 import { useAcessoModulo } from "@/hooks/use-permissoes";
+import { carregarRepassePago } from "@/lib/financeiro/painel-financeiro-carregar";
 import {
   agruparRateio,
   carregarContextoRateio,
@@ -752,6 +753,8 @@ function Page() {
   const [compAte, setCompAte] = useState("");
   /** Catálogos e grade de repasse; só carregam quando o Rateio é escolhido. */
   const [ctxRateio, setCtxRateio] = useState<RateioContexto | null>(null);
+  /** Repasse que saiu do caixa no período — comparação com o devido do Rateio. */
+  const [repassePagoRateio, setRepassePagoRateio] = useState<number | null>(null);
   const [ctxCarregando, setCtxCarregando] = useState(false);
   const ctxPedido = useRef(false);
 
@@ -1544,7 +1547,7 @@ function Page() {
           modalidade: rModalidade === "todas" ? null : rModalidade,
           servico: rServico === "todos" ? null : rServico,
         };
-        const [atual, anterior] = await Promise.all([
+        const [atual, anterior, pago] = await Promise.all([
           carregarRateio(ctxRateio, { ...filtrosComuns, de: from, ate: to }),
           comparar
             ? carregarRateio(ctxRateio, {
@@ -1553,7 +1556,11 @@ function Page() {
                 ate: periodoComp.ate,
               })
             : Promise.resolve([] as RateioLinha[]),
+          // A outra leitura do repasse, a da gaveta: mostrada ao lado do
+          // devido para esta tela bater com o Dashboard e o Movimento.
+          carregarRepassePago(ctxRateio, clinicaAtual.clinica_id, from, to).catch(() => null),
         ]);
+        setRepassePagoRateio(pago);
         brutasRateio = atual;
         brutasComp = anterior;
         cruas = filtrarPorCategoria(atual, categorias, (l) => l.categoria_nome);
@@ -2569,7 +2576,16 @@ function Page() {
           <CardResumo
             titulo="Repasse ao prestador"
             valor={brl(totaisR.repasse)}
-            detalhe={comparacaoVisivel ? `${brl(totaisComp.repasse)} antes` : undefined}
+            detalhe={
+              comparacaoVisivel
+                ? `${brl(totaisComp.repasse)} antes`
+                : // As duas leituras lado a lado, como no Dashboard e no
+                  // Movimento: aqui o devido pelos atendimentos; ao lado, o
+                  // que saiu do caixa no mesmo período.
+                  repassePagoRateio !== null
+                  ? `Devido pelos atendimentos · pago no caixa: ${brl(repassePagoRateio)}`
+                  : "Devido pelos atendimentos"
+            }
             delta={deltaDe(totaisR.repasse, totaisComp.repasse)}
             invertido
           />

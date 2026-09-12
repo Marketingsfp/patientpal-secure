@@ -386,25 +386,34 @@ function FinDashboard() {
               </ul>
             )}
           </KpiCard>
+          {/* Repasse em duas leituras lado a lado (decisão de 12/09/2026):
+              o DEVIDO pelos atendimentos do período e o PAGO no caixa. A
+              despesa e o saldo usam o pago; o devido serve para conferência. */}
           <KpiCard
             onClick={() => abrir("repasse")}
             icon={Handshake}
             label="Repasse a médicos / prestadores"
-            value={v((r) => r.custoPrestadores)}
+            value={v((r) => r.repassePagoNoPeriodo)}
             accent="warning"
-            detalhe={
-              resumo && !carregando
-                ? [
-                    `Custo total com prestadores: ${brl(resumo.repasse)} da grade`,
-                    resumo.terceiro > 0 && `+ ${brl(resumo.terceiro)} de terceiros`,
-                    resumo.complementoMedico > 0 &&
-                      `+ ${brl(resumo.complementoMedico)} de complemento médico`,
-                  ]
-                    .filter(Boolean)
-                    .join(" · ")
-                : "Custo total com prestadores"
-            }
-          />
+            detalhe="Pago no caixa no período"
+          >
+            {resumo && !carregando && (
+              <ul className="mt-2 space-y-0.5 border-t border-border/60 pt-2">
+                <li className="flex items-center justify-between gap-2 text-xs">
+                  <span className="text-muted-foreground">Devido pelos atendimentos</span>
+                  <span className="shrink-0 tabular-nums">{brl(resumo.custoPrestadores)}</span>
+                </li>
+                <li className="flex items-center justify-between gap-2 text-xs">
+                  <span className="text-muted-foreground">
+                    Grade {brl(resumo.repasse)}
+                    {resumo.terceiro > 0 && ` · terceiros ${brl(resumo.terceiro)}`}
+                    {resumo.complementoMedico > 0 &&
+                      ` · complemento ${brl(resumo.complementoMedico)}`}
+                  </span>
+                </li>
+              </ul>
+            )}
+          </KpiCard>
           <KpiCard
             onClick={() => abrir("operacionais")}
             icon={Receipt}
@@ -419,7 +428,7 @@ function FinDashboard() {
             label="Despesas totais"
             value={v((r) => r.despesasTotais)}
             accent="destructive"
-            detalhe="Custo total com prestadores + despesas operacionais"
+            detalhe="Repasse e complemento pagos no caixa + despesas operacionais"
           />
           <KpiCard
             onClick={() => abrir("saldo")}
@@ -429,8 +438,8 @@ function FinDashboard() {
             accent={resumo && resumo.saldo < 0 ? "destructive" : "primary"}
             detalhe={
               resumo && !carregando
-                ? `Margem de ${pct(margem(resumo.saldo, resumo.receitaTotal))} · receitas − despesas totais`
-                : "Receitas − despesas totais"
+                ? `Margem de ${pct(margem(resumo.saldo, resumo.receitaTotal))} · receitas − despesas pagas no caixa`
+                : "Receitas − despesas pagas no caixa"
             }
           />
         </div>
@@ -636,6 +645,7 @@ const formasDaLinha = (l: RateioLinha) =>
 function montarDetalhe(drill: Drill, dados: DadosPainel, r: ResumoPainel, visao: Visao): Detalhe {
   const operacionais = dados.despesas.filter((d) => d.grupo === "operacional");
   const complementos = dados.despesas.filter((d) => d.grupo === "complemento_medico");
+  const repassesPagos = dados.despesas.filter((d) => d.grupo === "repasse_pago");
 
   // --- Listas de atendimento (Receita, Atendimentos, Ticket e os tipos) -----
   if (
@@ -819,16 +829,17 @@ function montarDetalhe(drill: Drill, dados: DadosPainel, r: ResumoPainel, visao:
   // --- Repasse ---------------------------------------------------------------
   if (drill === "repasse") {
     const resumo = [
-      { rotulo: "Repasse a médicos (grade)", valor: r.repasse },
-      ...(r.terceiro > 0 ? [{ rotulo: "Terceiros (dono do equipamento)", valor: r.terceiro }] : []),
+      { rotulo: "Repasse pago no caixa no período", valor: r.repassePagoNoPeriodo },
       ...(r.complementoMedico > 0
-        ? [{ rotulo: "Complemento médico lançado", valor: r.complementoMedico }]
+        ? [{ rotulo: "Complemento médico pago", valor: r.complementoMedico }]
         : []),
-      { rotulo: "Custo total com prestadores", valor: r.custoPrestadores },
-      { rotulo: "Já pago no caixa no período (informativo)", valor: r.repassePagoNoPeriodo },
+      { rotulo: "Total pago no caixa", valor: r.custoPrestadoresPago },
+      { rotulo: "Repasse a médicos devido (grade)", valor: r.repasse },
+      ...(r.terceiro > 0 ? [{ rotulo: "Terceiros (dono do equipamento)", valor: r.terceiro }] : []),
+      { rotulo: "Total devido pelos atendimentos", valor: r.custoPrestadores },
     ];
     const explicacao =
-      "O número do card é o custo total com prestadores: o repasse devido pelos atendimentos do período, calculado pela grade de cada médico (o mesmo do Rateio da Receita), mais a parte de terceiros e o complemento médico lançado como despesa. A tabela lista os atendimentos; o complemento, que não é de um atendimento, aparece só no resumo. O valor já pago no caixa aparece só para conferência: ele quita atendimentos de dias anteriores e por isso não entra de novo nas despesas.";
+      "Duas leituras do mesmo repasse. PAGO NO CAIXA é o que saiu da gaveta no período — é ele que forma as despesas e o saldo, igual ao Movimento de Caixa. DEVIDO é o que os atendimentos do período geraram pela grade de cada médico, mais terceiros — é o número do Rateio da Receita. Eles quase nunca são iguais, porque o pagamento de hoje quita atendimentos de dias anteriores. A tabela abaixo lista o devido, atendimento por atendimento.";
     if (visao === "sintetico") {
       const grupos = repassePorMedico(dados.rateio);
       return {
@@ -951,33 +962,20 @@ function montarDetalhe(drill: Drill, dados: DadosPainel, r: ResumoPainel, visao:
   // --- Despesas totais ------------------------------------------------------
   if (drill === "totais") {
     const resumo = [
-      { rotulo: "Repasse a médicos (grade)", valor: r.repasse },
-      ...(r.terceiro > 0 ? [{ rotulo: "Terceiros (dono do equipamento)", valor: r.terceiro }] : []),
+      { rotulo: "Repasse pago no caixa", valor: r.repassePagoNoPeriodo },
       ...(r.complementoMedico > 0
-        ? [{ rotulo: "Complemento médico", valor: r.complementoMedico }]
+        ? [{ rotulo: "Complemento médico pago", valor: r.complementoMedico }]
         : []),
-      { rotulo: "Custo total com prestadores", valor: r.custoPrestadores },
       { rotulo: "Despesas operacionais", valor: r.despesasOperacionais },
-      { rotulo: "Despesas totais", valor: r.despesasTotais },
+      { rotulo: "Despesas totais (caixa)", valor: r.despesasTotais },
+      { rotulo: "Repasse devido pelos atendimentos (conferência)", valor: r.custoPrestadores },
     ];
     const explicacao =
-      "Tudo o que o período custou: o repasse devido aos médicos (grade), a parte de terceiros, o complemento médico e as despesas operacionais.";
+      "Tudo o que saiu do caixa no período: o repasse pago aos médicos e prestadores, o complemento médico e as despesas operacionais — a mesma conta do Movimento de Caixa. O repasse devido pelos atendimentos do período aparece só no resumo, para conferência.";
     if (visao === "sintetico") {
-      const linhas: Celula[][] = [
-        [
-          "Repasse",
-          "Repasse a médicos (grade)",
-          dados.rateio.filter((l) => l.repasse > 0).length,
-          r.repasse,
-        ],
-      ];
-      if (r.terceiro > 0)
-        linhas.push([
-          "Repasse",
-          "Terceiros (dono do equipamento)",
-          dados.rateio.filter((l) => l.terceiro > 0).length,
-          r.terceiro,
-        ]);
+      const linhas: Celula[][] = [];
+      for (const g of somarPorCategoria(repassesPagos))
+        linhas.push(["Repasse", g.rotulo, g.qtd, g.valor]);
       if (r.complementoMedico > 0)
         linhas.push(["Repasse", "COMPLEMENTO MEDICO", complementos.length, r.complementoMedico]);
       for (const g of somarPorCategoria(operacionais))
@@ -997,14 +995,8 @@ function montarDetalhe(drill: Drill, dados: DadosPainel, r: ResumoPainel, visao:
         temSintetico: true,
       };
     }
-    const linhas: Celula[][] = repassePorMedico(dados.rateio).map((g) => [
-      "",
-      "Repasse",
-      g.medico,
-      `${int(g.qtd)} atendimento(s)`,
-      g.repasse + g.terceiro,
-    ]);
-    for (const d of [...complementos, ...operacionais])
+    const linhas: Celula[][] = [];
+    for (const d of [...repassesPagos, ...complementos, ...operacionais])
       linhas.push([
         d.data,
         d.grupo === "operacional" ? "Operacional" : "Repasse",
@@ -1040,15 +1032,14 @@ function montarDetalhe(drill: Drill, dados: DadosPainel, r: ResumoPainel, visao:
     linha("Receita bruta (atendimentos)", r.receitaBruta),
     linha("(+) Outras receitas", r.outrasReceitas),
     linha("(=) Receita total", receitaTotal),
-    linha("(−) Repasse a médicos", -r.repasse),
+    linha("(−) Repasse pago no caixa", -r.repassePagoNoPeriodo),
   ];
-  if (r.terceiro > 0) linhas.push(linha("(−) Terceiros (dono do equipamento)", -r.terceiro));
   if (r.complementoMedico > 0) linhas.push(linha("(−) Complemento médico", -r.complementoMedico));
   linhas.push(linha("(−) Despesas operacionais", -r.despesasOperacionais));
   return {
     titulo: "Líquido da clínica / Saldo",
     explicacao:
-      "Demonstrativo do período. O repasse entra pelo valor devido dos atendimentos (grade), não pelo que foi pago no caixa, para cada atendimento pesar no dia em que aconteceu.",
+      "Demonstrativo do período pela régua do caixa: entra o que foi recebido e sai o que foi pago, igual ao Movimento de Caixa. O repasse devido pelos atendimentos do período aparece só no resumo, para conferência com o Rateio da Receita.",
     colunas: [
       { rotulo: "Conta", tipo: "texto" },
       { rotulo: "Valor", tipo: "moeda" },
@@ -1059,8 +1050,8 @@ function montarDetalhe(drill: Drill, dados: DadosPainel, r: ResumoPainel, visao:
     resumo: [
       { rotulo: "Líquido dos atendimentos (Rateio)", valor: r.liquidoAtendimentos },
       {
-        rotulo: "Repasse já pago no caixa no período (informativo)",
-        valor: r.repassePagoNoPeriodo,
+        rotulo: "Repasse devido pelos atendimentos (conferência)",
+        valor: r.custoPrestadores,
       },
       { rotulo: "Saldo do período", valor: r.saldo },
     ],

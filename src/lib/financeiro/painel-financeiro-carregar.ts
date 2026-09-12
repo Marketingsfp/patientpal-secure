@@ -104,3 +104,43 @@ export async function carregarPainelFinanceiro(
       })),
   };
 }
+
+/**
+ * Quanto de repasse a médicos e prestadores saiu do caixa no período. É a
+ * outra leitura do repasse — a da gaveta —, mostrada ao lado do devido para
+ * o Dashboard, o Movimento de Caixa e o Rateio darem a mesma resposta.
+ */
+export async function carregarRepassePago(
+  ctx: RateioContexto,
+  clinicaId: string,
+  de: string,
+  ate: string,
+): Promise<number> {
+  const linhas = await paginado(() =>
+    supabase
+      .from("fin_lancamentos")
+      .select(COLUNAS)
+      .eq("clinica_id", clinicaId)
+      .eq("tipo", "despesa")
+      .eq("status", "confirmado")
+      .gte("data", de)
+      .lte("data", ate)
+      .order("id"),
+  );
+  const despesas = classificarDespesas(
+    linhas.map((r) => ({
+      id: r.id,
+      data: String(r.data ?? "").slice(0, 10),
+      descricao: r.descricao ?? "",
+      valor: Number(r.valor ?? 0) || 0,
+      categoria_nome:
+        (r.categoria_id ? ctx.categoriaNomePorId.get(r.categoria_id) : "")?.trim().toUpperCase() ||
+        SEM_CATEGORIA,
+      forma_pagamento: r.forma_pagamento,
+    })),
+  );
+  const total = despesas
+    .filter((d) => d.grupo === "repasse_pago")
+    .reduce((s, d) => s + d.valor, 0);
+  return Math.round(total * 100) / 100;
+}

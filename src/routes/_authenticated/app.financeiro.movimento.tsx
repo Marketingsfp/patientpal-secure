@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import {
   Plus,
   Pencil,
@@ -67,6 +67,11 @@ import {
   type FiltroCard,
 } from "@/lib/financeiro/movimento-resultado";
 import { MovimentoResultado } from "@/components/financeiro/movimento-resultado";
+import {
+  carregarContextoRateio,
+  carregarRateio,
+  type RateioContexto,
+} from "@/lib/financeiro/rateio-receita";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { DateInputBR } from "@/components/ui/date-input-br";
@@ -327,6 +332,17 @@ function Page() {
     saldo: 0,
     totalRows: 0,
   });
+  /**
+   * Conferência com o Rateio do mesmo período: repasse DEVIDO pelos
+   * atendimentos e cortesias (atendidos sem cobrança). Esta tela continua
+   * fechando o caixa pelo que entrou e saiu da gaveta; estes dois números
+   * aparecem ao lado só para as três telas falarem a mesma língua.
+   */
+  const [conferencia, setConferencia] = useState<{
+    repasseDevido: number;
+    cortesias: number;
+  } | null>(null);
+  const ctxRateioRef = useRef<{ clinicaId: string; ctx: RateioContexto } | null>(null);
   const [filterStatus, setFilterStatus] = useState<"confirmado" | "todos" | "pendente">(
     "confirmado",
   );
@@ -420,6 +436,44 @@ function Page() {
     const t = setTimeout(() => setFilterFichaDebounced(filterFicha.trim()), 300);
     return () => clearTimeout(t);
   }, [filterFicha]);
+
+  /**
+   * Conferência com o Rateio do período (repasse devido e cortesias). É uma
+   * leitura à parte, que não interfere na lista nem nos totais do caixa: se
+   * falhar, a tela segue igual, só sem os dois números de comparação.
+   */
+  useEffect(() => {
+    if (!clinicaAtual) {
+      setConferencia(null);
+      return;
+    }
+    const clinicaId = clinicaAtual.clinica_id;
+    let cancelado = false;
+    setConferencia(null);
+    (async () => {
+      try {
+        let ctx = ctxRateioRef.current?.clinicaId === clinicaId ? ctxRateioRef.current.ctx : null;
+        if (!ctx) {
+          ctx = await carregarContextoRateio(clinicaId);
+          ctxRateioRef.current = { clinicaId, ctx };
+        }
+        const linhas = await carregarRateio(ctx, { clinicaId, de: fromDate, ate: toDate });
+        if (cancelado) return;
+        let repasseDevido = 0;
+        let cortesias = 0;
+        for (const l of linhas) {
+          repasseDevido += l.repasse + l.terceiro;
+          if (l.origem === "atendimento" && l.receita <= 0) cortesias++;
+        }
+        setConferencia({ repasseDevido: Math.round(repasseDevido * 100) / 100, cortesias });
+      } catch {
+        if (!cancelado) setConferencia(null);
+      }
+    })();
+    return () => {
+      cancelado = true;
+    };
+  }, [clinicaAtual?.clinica_id, fromDate, toDate]);
 
   /**
    * true → a busca por texto vale para o histórico inteiro da clínica, sem a
@@ -2116,6 +2170,7 @@ function Page() {
         de={fromDate}
         ate={toDate}
         clinicaNome={clinicaAtual?.clinica.nome ?? "Clínica"}
+        conferencia={conferencia}
       />
 
       {/* Enquanto a busca ignora o período, a tela não é mais a conferência

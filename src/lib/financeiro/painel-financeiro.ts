@@ -216,18 +216,21 @@ export interface ResumoPainel {
   terceiro: number;
   complementoMedico: number;
   /**
-   * Repasse (grade) + terceiros + complemento médico: o número grande do card
-   * de Repasse. Até 11/09/2026 o card mostrava só a grade, e o terceiro e o
-   * complemento ficavam escondidos na linha de baixo.
+   * Repasse (grade) + terceiros + complemento médico — o DEVIDO pelos
+   * atendimentos do período. Continua aparecendo lado a lado com o pago, mas
+   * desde 12/09/2026 não é mais ele que forma a despesa e o saldo: quem manda
+   * na despesa é o caixa (veja `custoPrestadoresPago`).
    */
   custoPrestadores: number;
+  /** Repasse pago no caixa + complemento médico pago — a régua da gaveta. */
+  custoPrestadoresPago: number;
   despesasOperacionais: number;
-  /** Custo com prestadores + operacionais. */
+  /** Custo com prestadores PAGO no caixa + despesas operacionais. */
   despesasTotais: number;
   /** Líquido do Rateio (receita bruta − repasse − terceiros). */
   liquidoAtendimentos: number;
   saldo: number;
-  /** Repasse efetivamente pago no período — informativo, não entra no saldo. */
+  /** Repasse efetivamente pago no período — é ele que entra na despesa. */
   repassePagoNoPeriodo: number;
   producao: ProducaoPainel;
   ticketMedio: number;
@@ -261,8 +264,12 @@ export function resumoPainel(params: {
   terceiro = round2(terceiro);
   despesasOperacionais = round2(despesasOperacionais);
   complementoMedico = round2(complementoMedico);
+  repassePagoNoPeriodo = round2(repassePagoNoPeriodo);
   const custoPrestadores = round2(repasse + terceiro + complementoMedico);
-  const despesasTotais = round2(custoPrestadores + despesasOperacionais);
+  // Despesa e saldo seguem a régua do caixa (decisão de 12/09/2026): entra o
+  // que realmente saiu — repasse pago e complemento pago —, não o devido.
+  const custoPrestadoresPago = round2(repassePagoNoPeriodo + complementoMedico);
+  const despesasTotais = round2(custoPrestadoresPago + despesasOperacionais);
   // Cada pagamento recebido conta como um atendimento: os do Rateio pelo tipo
   // do serviço; mensalidade e adesão em cards próprios, e o recebimento avulso
   // em "outros". Os cards de contagem somam exatamente o total.
@@ -300,11 +307,12 @@ export function resumoPainel(params: {
     terceiro,
     complementoMedico,
     custoPrestadores,
+    custoPrestadoresPago,
     despesasOperacionais,
     despesasTotais,
     liquidoAtendimentos: round2(receitaBruta - repasse - terceiro),
     saldo: round2(receitaBruta + outrasReceitas - despesasTotais),
-    repassePagoNoPeriodo: round2(repassePagoNoPeriodo),
+    repassePagoNoPeriodo,
     producao,
     // Ticket médio da entrada de caixa: receita total ÷ pagamentos recebidos.
     ticketMedio:
