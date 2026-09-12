@@ -325,6 +325,9 @@ function Editor({
           aberto={auditoriaAberta}
           onOpenChange={setAuditoriaAberta}
           versaoPublicada={bloco.publicada?.versao ?? null}
+          // FASE 4 — com alteração não publicada, a prévia mostra o rascunho
+          // em edição e diz isso; nada é publicado por abrir a prévia.
+          conteudoRascunho={alterado ? texto : null}
         />
       ) : null}
 
@@ -608,18 +611,30 @@ function AuditoriaPrompt({
   aberto,
   onOpenChange,
   versaoPublicada,
+  conteudoRascunho,
 }: {
   clinicaId: string;
   aberto: boolean;
   onOpenChange: (v: boolean) => void;
   versaoPublicada: number | null;
+  conteudoRascunho?: string | null;
 }) {
   const buscar = useServerFn(previewRequestNina);
   const { data, isLoading, error } = useQuery({
     // A chave distingue clínica, escopo, contexto e a versão publicada
     // conhecida pela tela: publicar troca a chave e a prévia se refaz.
-    queryKey: ["nina-prompt-preview", clinicaId, "whatsapp", "exemplo", versaoPublicada],
-    queryFn: () => buscar({ data: { clinicaId } }),
+    queryKey: [
+      "nina-prompt-preview",
+      clinicaId,
+      "whatsapp",
+      "exemplo",
+      versaoPublicada,
+      conteudoRascunho ?? null,
+    ],
+    queryFn: () =>
+      buscar({
+        data: conteudoRascunho ? { clinicaId, conteudoRascunho } : { clinicaId },
+      }),
     enabled: aberto,
   });
   const [verDiferencas, setVerDiferencas] = useState(false);
@@ -649,6 +664,13 @@ function AuditoriaPrompt({
                 <Badge variant="outline">Vale para todas as clínicas</Badge>
               ) : null}
               <Badge variant="outline">Contexto de exemplo</Badge>
+              <Badge variant={data.fonteConteudo === "rascunho" ? "destructive" : "outline"}>
+                {data.fonteConteudo === "rascunho"
+                  ? "Rascunho em edição (não publicado)"
+                  : data.fonteConteudo === "publicada"
+                    ? "Versão publicada"
+                    : "Texto do código"}
+              </Badge>
               {data.publicadoEm ? (
                 <span className="text-xs text-muted-foreground">
                   publicada em {dataBr(data.publicadoEm)}
@@ -683,6 +705,38 @@ function AuditoriaPrompt({
               </section>
             ) : null}
 
+            <section className="rounded-lg border p-3 text-sm">
+              <h4 className="mb-1 font-medium">Identidade do atendimento nesta prévia</h4>
+              {data.identidade.ok ? (
+                <p className="text-muted-foreground">
+                  Atendente <strong>{data.identidade.assistente}</strong> ·{" "}
+                  {data.identidade.tipoEstabelecimento}{" "}
+                  <strong>{data.identidade.estabelecimento}</strong> · origem:{" "}
+                  {data.fonteConteudo}
+                </p>
+              ) : (
+                <p className="rounded-md border border-destructive/40 bg-destructive/5 p-2 text-xs">
+                  {data.identidade.pendenciaAdministrativa ??
+                    "Sem identidade válida: o atendimento responderia sem citar nomes."}
+                </p>
+              )}
+            </section>
+
+            <BlocoLeitura
+              titulo="Contrato de precedência do turno"
+              origem={
+                data.regrasAplicaveis.length
+                  ? `${data.regrasAplicaveis.length} regra(s) publicada(s) aplicável(is)${
+                      data.limitacoesPrecedencia.length
+                        ? ` · limitações: ${data.limitacoesPrecedencia.join(", ")}`
+                        : ""
+                    }`
+                  : "nenhuma regra publicada aplicável a este exemplo"
+              }
+              conteudo={
+                data.contratoPrecedencia || "(nenhuma restrição adicional neste exemplo)"
+              }
+            />
             <BlocoLeitura
               titulo="Prompt de comportamento"
               origem={`fonte: Arquitetura / versão v${data.versao ?? "—"}`}
