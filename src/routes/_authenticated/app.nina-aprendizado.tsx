@@ -1531,6 +1531,10 @@ function Pagina() {
                                 execucao={correcoes[it.id] ?? null}
                                 emAndamento={Boolean(corrigindo[it.id])}
                                 etapa={etapaCorrecao[it.id] ?? null}
+                                resultadoFinal={
+                                  (resultadoCorrecao[it.id]?.resultadoFinal as never) ?? null
+                                }
+                                verificacao={resultadoCorrecao[it.id]?.verificacao ?? null}
                               />
                             </div>
                           ) : (
