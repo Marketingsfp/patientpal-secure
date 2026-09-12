@@ -501,6 +501,20 @@ function FinDashboard() {
             value={v((r) => r.producao.adesoes, int)}
             accent="warning"
           />
+          {/* Atendido sem cobrança: revisão de cortesia e gratuidade do plano
+              da casa. Conta no total e vale R$ 0,00. */}
+          {resumo && resumo.producao.cortesias > 0 && (
+            <KpiCard
+              onClick={() => abrir("cortesia")}
+              icon={Stethoscope}
+              label="Cortesias e gratuidades"
+              value={v((r) => r.producao.cortesias, int)}
+              accent="muted"
+              detalhe="Atendidos sem cobrança (R$ 0,00)"
+            />
+          )}
+
+
 
           <KpiCard
             onClick={() => abrir("ticket")}
