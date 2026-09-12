@@ -375,7 +375,7 @@ export const aplicarCorrecaoComIA = createServerFn({ method: "POST" })
     });
     const { data: jaExiste } = await supabase
       .from("nina_correcao_execucoes")
-      .select("id, resumo, acao_id, status")
+      .select("id, resumo, relatorio, acao_id, status")
       .eq("clinica_id", data.clinicaId)
       .eq("idempotencia_chave", chave)
       .maybeSingle();
@@ -383,6 +383,7 @@ export const aplicarCorrecaoComIA = createServerFn({ method: "POST" })
       return {
         ...(jaExiste.resumo as ResumoExecucao),
         acaoId: (jaExiste.acao_id as string | null) ?? null,
+        relatorio: (jaExiste.relatorio as RelatorioCorrecao | null) ?? null,
       };
     if (jaExiste)
       throw new Error("Esta mesma correção já está sendo aplicada. Aguarde o resultado.");
