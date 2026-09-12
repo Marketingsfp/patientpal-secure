@@ -17,8 +17,15 @@
  * imprime em A4 e exporta para Excel. É o que garante que o papel e a planilha
  * mostram exatamente o que a tela mostrou.
  */
-import { useMemo, useState, type ReactNode } from "react";
-import { ExternalLink, FileSpreadsheet, Maximize2, Printer } from "lucide-react";
+import { useMemo, useRef, useState, type ReactNode } from "react";
+import {
+  ChevronDown,
+  ChevronUp,
+  ExternalLink,
+  FileSpreadsheet,
+  Maximize2,
+  Printer,
+} from "lucide-react";
 import { toast } from "sonner";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -77,6 +84,12 @@ export interface PropsDetalhamento {
   de: string;
   ate: string;
   clinicaNome: string;
+  /**
+   * Abre o detalhe de UMA linha da tabela (quem foi atendido naquela linha).
+   * Devolver `null` deixa a linha sem clique. Quando não é informado, a tabela
+   * continua só de leitura — é o que o Movimento de Caixa usa hoje.
+   */
+  detalharLinha?: (args: { visao: Visao; indice: number; linha: Celula[] }) => Detalhe | null;
 }
 
 /**
@@ -95,6 +108,7 @@ export function DetalhamentoCorpo({
   de,
   ate,
   clinicaNome,
+  detalharLinha,
   cabecalho,
   alturaTabela,
 }: PropsDetalhamento & {
@@ -107,6 +121,51 @@ export function DetalhamentoCorpo({
   const det = useMemo(() => montar(visao), [montar, visao]);
   const periodo = periodoLegivel(de, ate);
   const numerica = (t: TipoCol) => t === "moeda" || t === "numero";
+
+  // Detalhe de UMA linha (os pacientes daquela linha), aberto por cima.
+  const [sub, setSub] = useState<Detalhe | null>(null);
+
+  // Rolagem pelas setas: a tabela recebe o foco e as setas do teclado rolam a
+  // lista; os dois botões fazem o mesmo com o mouse, meia tela por clique.
+  const rolagem = useRef<HTMLDivElement>(null);
+  const rolar = (fator: number) => {
+    const el = rolagem.current;
+    if (!el) return;
+    el.scrollBy({ top: el.clientHeight * fator, behavior: "smooth" });
+  };
+  const teclado = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    const el = rolagem.current;
+    if (!el) return;
+    const passo = 56;
+    const mapa: Record<string, number | "topo" | "fim"> = {
+      ArrowDown: passo,
+      ArrowUp: -passo,
+      PageDown: el.clientHeight * 0.9,
+      PageUp: -el.clientHeight * 0.9,
+      Home: "topo",
+      End: "fim",
+    };
+    const acao = mapa[e.key];
+    if (acao === undefined) return;
+    e.preventDefault();
+    if (acao === "topo") el.scrollTo({ top: 0, behavior: "smooth" });
+    else if (acao === "fim") el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+    else el.scrollBy({ top: acao, behavior: "smooth" });
+  };
+
+  const abrirLinha = (linha: Celula[], indice: number) => {
+    if (!detalharLinha) return;
+    const d = detalharLinha({ visao, indice, linha });
+    if (!d) {
+      toast.info("Esta linha não tem pacientes para detalhar");
+      return;
+    }
+    if (d.linhas.length === 0) {
+      toast.info("Nenhum paciente nesta linha");
+      return;
+    }
+    setSub(d);
+  };
 
   const imprimir = () => {
     if (det.linhas.length === 0) {
@@ -214,59 +273,137 @@ export function DetalhamentoCorpo({
         </div>
       )}
 
-      <div className={cn("overflow-auto rounded-md border", alturaTabela)}>
-        {det.linhas.length === 0 ? (
-          <p className="py-10 text-center text-sm text-muted-foreground">Nada no período.</p>
-        ) : (
-          <Table>
-            <TableHeader className="sticky top-0 z-10 bg-background">
-              <TableRow>
-                {det.colunas.map((c) => (
-                  <TableHead key={c.rotulo} className={numerica(c.tipo) ? "text-right" : ""}>
-                    {c.rotulo}
-                  </TableHead>
-                ))}
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {det.linhas.map((l, i) => (
-                <TableRow key={i}>
-                  {l.map((c, j) => (
-                    <TableCell
-                      key={j}
-                      className={cn(
-                        "py-1.5",
-                        numerica(det.colunas[j].tipo) && "text-right tabular-nums",
-                        det.colunas[j].tipo === "data" && "whitespace-nowrap",
-                        typeof c === "number" && c < 0 && "text-destructive",
-                      )}
-                    >
-                      {textoCelula(det.colunas[j].tipo, c)}
-                    </TableCell>
-                  ))}
-                </TableRow>
-              ))}
-            </TableBody>
-            {det.totais && (
-              <TableFooter className="sticky bottom-0 bg-muted">
+      <div className="relative min-h-0 flex-1">
+        <div
+          ref={rolagem}
+          tabIndex={0}
+          onKeyDown={teclado}
+          aria-label="Tabela do detalhamento — use as setas para rolar"
+          className={cn(
+            "h-full overflow-auto rounded-md border outline-none focus-visible:ring-2 focus-visible:ring-primary/40",
+            alturaTabela,
+          )}
+        >
+          {det.linhas.length === 0 ? (
+            <p className="py-10 text-center text-sm text-muted-foreground">Nada no período.</p>
+          ) : (
+            <Table>
+              <TableHeader className="sticky top-0 z-10 bg-background">
                 <TableRow>
-                  {det.totais.map((c, j) => (
-                    <TableCell
-                      key={j}
-                      className={cn(
-                        "font-semibold",
-                        numerica(det.colunas[j].tipo) && "text-right tabular-nums",
-                      )}
-                    >
-                      {textoCelula(det.colunas[j].tipo, c)}
-                    </TableCell>
+                  {det.colunas.map((c) => (
+                    <TableHead key={c.rotulo} className={numerica(c.tipo) ? "text-right" : ""}>
+                      {c.rotulo}
+                    </TableHead>
                   ))}
                 </TableRow>
-              </TableFooter>
-            )}
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {det.linhas.map((l, i) => (
+                  <TableRow
+                    key={i}
+                    onClick={detalharLinha ? () => abrirLinha(l, i) : undefined}
+                    role={detalharLinha ? "button" : undefined}
+                    tabIndex={detalharLinha ? 0 : undefined}
+                    title={detalharLinha ? "Ver os pacientes desta linha" : undefined}
+                    onKeyDown={
+                      detalharLinha
+                        ? (e) => {
+                            if (e.key === "Enter" || e.key === " ") {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              abrirLinha(l, i);
+                            }
+                          }
+                        : undefined
+                    }
+                    className={detalharLinha ? "cursor-pointer hover:bg-muted/60" : undefined}
+                  >
+                    {l.map((c, j) => (
+                      <TableCell
+                        key={j}
+                        className={cn(
+                          "py-1.5",
+                          numerica(det.colunas[j].tipo) && "text-right tabular-nums",
+                          det.colunas[j].tipo === "data" && "whitespace-nowrap",
+                          typeof c === "number" && c < 0 && "text-destructive",
+                        )}
+                      >
+                        {textoCelula(det.colunas[j].tipo, c)}
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                ))}
+              </TableBody>
+              {det.totais && (
+                <TableFooter className="sticky bottom-0 bg-muted">
+                  <TableRow>
+                    {det.totais.map((c, j) => (
+                      <TableCell
+                        key={j}
+                        className={cn(
+                          "font-semibold",
+                          numerica(det.colunas[j].tipo) && "text-right tabular-nums",
+                        )}
+                      >
+                        {textoCelula(det.colunas[j].tipo, c)}
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                </TableFooter>
+              )}
+            </Table>
+          )}
+        </div>
+
+        {det.linhas.length > 0 && (
+          <div className="pointer-events-none absolute bottom-3 right-4 flex flex-col gap-1">
+            <Button
+              type="button"
+              size="icon"
+              variant="secondary"
+              aria-label="Subir a lista"
+              className="pointer-events-auto h-8 w-8 rounded-full shadow"
+              onClick={() => rolar(-0.5)}
+            >
+              <ChevronUp className="h-4 w-4" />
+            </Button>
+            <Button
+              type="button"
+              size="icon"
+              variant="secondary"
+              aria-label="Descer a lista"
+              className="pointer-events-auto h-8 w-8 rounded-full shadow"
+              onClick={() => rolar(0.5)}
+            >
+              <ChevronDown className="h-4 w-4" />
+            </Button>
+          </div>
         )}
       </div>
+
+      {sub && (
+        <Dialog open onOpenChange={(o) => !o && setSub(null)}>
+          <DialogContent className="flex max-h-[88vh] max-w-5xl flex-col gap-3">
+            <DetalhamentoCorpo
+              montar={() => sub}
+              rotuloSintetico={rotuloSintetico}
+              arquivo={`${arquivo}_pacientes`}
+              de={de}
+              ate={ate}
+              clinicaNome={clinicaNome}
+              alturaTabela="min-h-0 flex-1"
+              cabecalho={(d, p) => (
+                <DialogHeader>
+                  <DialogTitle>{d.titulo}</DialogTitle>
+                  <DialogDescription>
+                    {p} · {d.explicacao}
+                  </DialogDescription>
+                </DialogHeader>
+              )}
+            />
+          </DialogContent>
+        </Dialog>
+      )}
 
       {det.composicao && (
         <div className="flex flex-wrap gap-x-6 gap-y-1 text-xs text-muted-foreground">

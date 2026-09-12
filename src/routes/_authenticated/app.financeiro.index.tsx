@@ -575,6 +575,9 @@ function FinDashboard() {
         <DetalhamentoDialog
           montar={(visao) => montarDetalhe(aberto.drill, aberto.dados, aberto.resumo, visao)}
           rotuloSintetico={rotuloSinteticoDe(aberto.drill)}
+          detalharLinha={({ visao, indice }) =>
+            montarPacientesDaLinha(aberto.drill, aberto.dados, visao, indice)
+          }
           arquivo={`financeiro_${aberto.drill}`}
           de={aberto.de}
           ate={aberto.ate}
@@ -664,6 +667,105 @@ const TITULO_ATENDIMENTO: Record<CategoriaAtendimento, string> = {
   outro: "Procedimentos e outros",
 };
 
+/**
+ * Quais atendimentos entram em cada card. Mora fora de `montarDetalhe` porque
+ * a lista de pacientes de uma linha (o clique na tabela) precisa do MESMO
+ * recorte — se as duas contas divergirem, o detalhe mostra gente a mais.
+ */
+function recorteAtendimentos(drill: Drill, dados: DadosPainel): RateioLinha[] {
+  if (drill === "cartao" || drill === "particular" || drill === "exame" || drill === "outro")
+    return dados.rateio.filter((l) => !ehCortesia(l) && categoriaDoAtendimento(l) === drill);
+  if (drill === "cortesia") return dados.rateio.filter(ehCortesia);
+  if (drill === "mensalidade" || drill === "adesao") return [];
+  return dados.rateio;
+}
+
+/** Agrupamento por profissional da visão sintética, na mesma ordem da tabela. */
+function gruposPorMedico(recorte: RateioLinha[]) {
+  const mapa = new Map<string, { chave: string; rec: number }>();
+  for (const l of recorte) {
+    const k = l.medico_id ?? "sem";
+    const g = mapa.get(k) ?? { chave: k, rec: 0 };
+    g.rec += l.receita;
+    mapa.set(k, g);
+  }
+  return Array.from(mapa.values()).sort((a, b) => b.rec - a.rec);
+}
+
+/**
+ * Pacientes atendidos na linha clicada da tabela.
+ *
+ * Na visão agrupada, todos os atendimentos daquele profissional; na lista
+ * linha a linha, o atendimento daquela linha. As linhas de mensalidade, adesão
+ * e avulso não têm paciente atendido, então não abrem (devolve `null`).
+ */
+function montarPacientesDaLinha(
+  drill: Drill,
+  dados: DadosPainel,
+  visao: Visao,
+  indice: number,
+): Detalhe | null {
+  const recorte = recorteAtendimentos(drill, dados);
+  let alvo: RateioLinha[];
+  let quem: string;
+  if (visao === "sintetico") {
+    const grupos = gruposPorMedico(recorte);
+    const g = grupos[indice];
+    if (!g) return null;
+    alvo = recorte.filter((l) => (l.medico_id ?? "sem") === g.chave);
+    quem = alvo[0]?.medico_nome ?? "Sem profissional";
+  } else {
+    const l = recorte[indice];
+    if (!l) return null;
+    alvo = [l];
+    quem = l.medico_nome;
+  }
+
+  return {
+    titulo: `Pacientes atendidos — ${quem}`,
+    explicacao:
+      "Quem foi atendido nesta linha, com serviço, condição, forma de pagamento e valor. Pode ser impresso e baixado em planilha.",
+    colunas: [
+      { rotulo: "Data", tipo: "data" },
+      { rotulo: "Paciente", tipo: "texto" },
+      { rotulo: "1ª vez", tipo: "texto" },
+      { rotulo: "Profissional", tipo: "texto" },
+      { rotulo: "Serviço", tipo: "texto" },
+      { rotulo: "Condição", tipo: "texto" },
+      { rotulo: "Forma de pagamento", tipo: "texto" },
+      { rotulo: "Receita", tipo: "moeda" },
+      { rotulo: "Repasse", tipo: "moeda" },
+      { rotulo: "Líquido clínica", tipo: "moeda" },
+    ],
+    linhas: alvo.map((l) => [
+      l.data,
+      l.paciente_nome || "—",
+      l.primeira_vez === null ? "—" : l.primeira_vez ? "Sim" : "Não",
+      l.medico_nome,
+      l.servico_nome,
+      l.condicao,
+      formasDaLinha(l),
+      l.receita,
+      l.repasse + l.terceiro,
+      l.liquido,
+    ]),
+    totais: [
+      `${int(alvo.length)} atendimento(s)`,
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      alvo.reduce((s, l) => s + l.receita, 0),
+      alvo.reduce((s, l) => s + l.repasse + l.terceiro, 0),
+      alvo.reduce((s, l) => s + l.liquido, 0),
+    ],
+    temSintetico: false,
+  };
+}
+
+
 const formasDaLinha = (l: RateioLinha) =>
   l.formas
     .filter((f) => f.valor !== 0)
@@ -690,14 +792,7 @@ function montarDetalhe(drill: Drill, dados: DadosPainel, r: ResumoPainel, visao:
   ) {
     // A cortesia/gratuidade sai dos cards por tipo e tem lista própria — é
     // assim que a soma dos cards continua fechando com o total.
-    const recorte =
-      drill === "cartao" || drill === "particular" || drill === "exame" || drill === "outro"
-        ? dados.rateio.filter((l) => !ehCortesia(l) && categoriaDoAtendimento(l) === drill)
-        : drill === "cortesia"
-          ? dados.rateio.filter(ehCortesia)
-          : drill === "mensalidade" || drill === "adesao"
-            ? []
-            : dados.rateio;
+    const recorte = recorteAtendimentos(drill, dados);
     const titulo =
       drill === "receita"
         ? "Receita bruta"
