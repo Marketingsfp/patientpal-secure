@@ -95,18 +95,28 @@ function Page() {
   >(null);
   const [preset, setPreset] = useState<DatePreset>("mes");
   const [range, setRange] = useState<DateRange>(() => computeRange("mes"));
+  /**
+   * O caixa tem parcelas já confirmadas com data futura. O Dashboard fecha o
+   * período no dia de hoje; aqui é a mesma régua, senão "Mês" somaria os dias
+   * que ainda não aconteceram e os dois números não batiam.
+   */
+  const fimEfetivo = useMemo(() => {
+    const hojeIso = new Date().toLocaleDateString("en-CA");
+    return range.to > hojeIso ? hojeIso : range.to;
+  }, [range.to]);
+
   const periodoLabel = useMemo(() => {
     const f = new Date(range.from + "T00:00:00").toLocaleDateString("pt-BR");
-    const t = new Date(range.to + "T00:00:00").toLocaleDateString("pt-BR");
+    const t = new Date(fimEfetivo + "T00:00:00").toLocaleDateString("pt-BR");
     return `${f} a ${t}`;
-  }, [range]);
+  }, [range.from, fimEfetivo]);
 
   useEffect(() => {
     (async () => {
       if (!clinicaAtual) return;
       setLoading(true);
       const since = range.from;
-      const hoje = range.to;
+      const hoje = fimEfetivo;
       const [resumoRes, atendRows, notas, lancRows, notasFull] = await Promise.all([
         supabase.rpc("fin_resumo_periodo", {
           p_clinica: clinicaAtual.clinica_id,
