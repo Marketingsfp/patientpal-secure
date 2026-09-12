@@ -14,6 +14,7 @@ import {
 const linha = (p: Partial<RateioLinha>): RateioLinha => ({
   id: Math.random().toString(36).slice(2),
   data: "2026-09-10",
+  origem: "atendimento",
   medico_id: "m1",
   medico_nome: "DRA. ISIS",
   especialidade_id: null,
