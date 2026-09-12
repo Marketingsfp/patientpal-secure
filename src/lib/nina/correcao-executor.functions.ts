@@ -25,6 +25,7 @@ import {
   type ResultadoTeste,
   type ResumoExecucao,
 } from "./correcao-executor";
+import type { PacoteInvestigacao } from "./evidencias-pacote";
 
 const GATEWAY = "https://ai.gateway.lovable.dev/v1/responses";
 
@@ -215,7 +216,7 @@ export const aplicarCorrecaoComIA = createServerFn({ method: "POST" })
 
     const { data: analise, error: eAn } = await supabase
       .from("nina_feedback_analises")
-      .select("id, status, resultado, conclusao")
+      .select("id, status, resultado, conclusao, pacote, pacote_hash, pacote_revisao")
       .eq("clinica_id", data.clinicaId)
       .eq("feedback_id", data.feedbackId)
       .eq("status", "done")
@@ -232,6 +233,32 @@ export const aplicarCorrecaoComIA = createServerFn({ method: "POST" })
       normalizarProposta(resultado["proposta"]);
     if (!proposta)
       throw new Error("A análise não produziu proposta de mudança. Reanalise antes de aplicar.");
+
+    /**
+     * FASE 1 — a correção usa o MESMO pacote que fundamentou a proposta.
+     * Análises antigas (sem pacote persistido) são reconstruídas com as
+     * evidências disponíveis e a revisão sobe; nada é reanalisado à força.
+     */
+    let pacote = (analise.pacote as PacoteInvestigacao | null) ?? null;
+    if (!pacote) {
+      const { montarPacoteInvestigacao } = await import("./evidencias-pacote.server");
+      pacote = await montarPacoteInvestigacao(context.supabase, {
+        clinicaId: data.clinicaId,
+        feedbackId: data.feedbackId,
+        analiseId: String(analise.id),
+        origem: "enriquecido",
+        revisaoAnterior: (analise.pacote_revisao as number | null) ?? 0,
+      });
+      await supabase
+        .from("nina_feedback_analises")
+        .update({
+          pacote,
+          pacote_hash: pacote.hash,
+          pacote_revisao: pacote.revisao,
+        })
+        .eq("id", analise.id)
+        .eq("clinica_id", data.clinicaId);
+    }
 
     const passos: PassoExecucao[] = [];
     const passo = (
@@ -285,6 +312,21 @@ export const aplicarCorrecaoComIA = createServerFn({ method: "POST" })
               diagnostico: String(analise.conclusao ?? ""),
               perguntaOriginal: (fb.pergunta_texto as string | null) ?? null,
               respostaErrada: String(fb.mensagem_texto ?? ""),
+              evidencias: {
+                hash: pacote.hash,
+                revisao: pacote.revisao,
+                origem: pacote.origem,
+                ambiente: pacote.identificacao.ambiente,
+                entradas: pacote.entradas.map((m) => ({
+                  id: m.id,
+                  em: m.em,
+                  texto: m.texto,
+                  ausente: m.ausente,
+                })),
+                prompt: pacote.prompt,
+                lacunas: pacote.lacunas,
+                cortes: pacote.cortes,
+              },
             }),
           },
         ],
@@ -418,7 +460,17 @@ export const aplicarCorrecaoComIA = createServerFn({ method: "POST" })
         valor_novo: proposta.valorNovo,
         status: status === "aplicado" ? "done" : "open",
         evidencia: { proposta, teste, publicado, executor: MODELO_EXECUTOR },
-        execucao: { status, passos, teste, motivo: motivoFinal, modelo: MODELO_EXECUTOR },
+        execucao: {
+          status,
+          passos,
+          teste,
+          motivo: motivoFinal,
+          modelo: MODELO_EXECUTOR,
+          // Origem verificável do que fundamentou a correção.
+          pacote_hash: pacote.hash,
+          pacote_revisao: pacote.revisao,
+          analise_id: String(analise.id),
+        },
         criado_por: userId,
         concluido_por: status === "aplicado" ? userId : null,
         concluido_em: status === "aplicado" ? agora : null,

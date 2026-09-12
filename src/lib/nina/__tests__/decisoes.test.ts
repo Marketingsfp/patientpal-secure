@@ -49,14 +49,15 @@ describe("decisões humanas", () => {
     expect(rotuloDecisao(null)).toBe("—");
   });
 
-  test("análise com outro conjunto de evidências é sinalizada, sem nova chamada", () => {
+  test("conjunto de evidências é comparado por hash, não por contagem", () => {
+    // Hashes diferentes: conjunto diferente, comprovado.
+    expect(analiseUsouOutroConjunto({ hash: "aaa" }, { hash: "bbb" })).toBe(true);
+    expect(analiseUsouOutroConjunto({ hash: "aaa" }, { hash: "aaa" })).toBe(false);
+    // Contagem igual ou diferente NÃO comprova nada sem hash.
     expect(analiseUsouOutroConjunto({ entradas: 2, etapas: 5 }, { entradas: 3, etapas: 5 })).toBe(
-      true,
-    );
-    expect(analiseUsouOutroConjunto({ entradas: 2, etapas: 5 }, { entradas: 2, etapas: 5 })).toBe(
       false,
     );
-    expect(analiseUsouOutroConjunto(null, { entradas: 1, etapas: 1 })).toBe(false);
+    expect(analiseUsouOutroConjunto(null, { hash: "aaa" })).toBe(false);
   });
 
   test("causa técnica não sugere alterar o catálogo", () => {

@@ -10,15 +10,28 @@ import {
   verificacoesDeterministicas,
 } from "../analise-erro";
 
+import type { EtapaEvidencia } from "../evidencias-pacote";
+
+const etapa = (p: Partial<EtapaEvidencia>): EtapaEvidencia => ({
+  tipo: "consulta",
+  fonte: "catalogo",
+  titulo: "Busca no catálogo",
+  em: "2026-09-01T10:00:00.000Z",
+  dados: {},
+  codigo: null,
+  execucaoId: "exec-1",
+  ...p,
+});
+
 const base = {
   mensagemReportada: "O exame custa R$ 100.",
-  entradas: [{ em: null, texto: "quanto custa o exame de sangue?" }],
+  entradas: [{ id: "m1", em: null, texto: "quanto custa o exame de sangue?" }],
   execucao: {
     modelo: "google/gemini-3.7-flash",
     latenciaMs: 900,
     sucesso: true,
   },
-  etapas: [{ etapa: "retrieval", fonte: "catalogo", titulo: "Busca no catálogo" }],
+  etapas: [etapa({})],
   lacunas: [] as string[],
 };
 
@@ -41,7 +54,7 @@ describe("análise assistida — modelo e mascaramento", () => {
 
 describe("verificações determinísticas", () => {
   it("erro conhecido: pergunta de preço sem consulta ao catálogo é falha objetiva", () => {
-    const v = verificacoesDeterministicas({ ...base, etapas: [{ fonte: "modelo" }] });
+    const v = verificacoesDeterministicas({ ...base, etapas: [etapa({ fonte: "modelo" })] });
     const c = v.find((x) => x.id === "consulta_catalogo");
     expect(c?.resultado).toBe("falha");
     expect(temFalhaObjetiva(v)).toBe(true);
@@ -56,7 +69,7 @@ describe("verificações determinísticas", () => {
     expect(ehSaudacaoSimples("Oi, tudo bem?")).toBe(true);
     const v = verificacoesDeterministicas({
       ...base,
-      entradas: [{ em: null, texto: "Oi" }],
+      entradas: [{ id: "m2", em: null, texto: "Oi" }],
       etapas: [],
     });
     expect(v.find((x) => x.id === "consulta_catalogo")?.resultado).toBe("nao_aplicavel");
@@ -97,7 +110,7 @@ describe("pacote e resultado", () => {
   });
 
   it("o avaliador não anula falha objetiva comprovada", () => {
-    const v = verificacoesDeterministicas({ ...base, etapas: [{ fonte: "modelo" }] });
+    const v = verificacoesDeterministicas({ ...base, etapas: [etapa({ fonte: "modelo" })] });
     const r = normalizarResultado(
       { veredito: "sem_erro", conclusao: "tudo certo", limitacoes: [] },
       v,

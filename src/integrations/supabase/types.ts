@@ -9088,6 +9088,9 @@ export type Database = {
           input_tokens: number | null
           modelo: string
           output_tokens: number | null
+          pacote: Json | null
+          pacote_hash: string | null
+          pacote_revisao: number
           resultado: Json | null
           solicitado_por: string
           status: string
@@ -9108,6 +9111,9 @@ export type Database = {
           input_tokens?: number | null
           modelo: string
           output_tokens?: number | null
+          pacote?: Json | null
+          pacote_hash?: string | null
+          pacote_revisao?: number
           resultado?: Json | null
           solicitado_por: string
           status?: string
@@ -9128,6 +9134,9 @@ export type Database = {
           input_tokens?: number | null
           modelo?: string
           output_tokens?: number | null
+          pacote?: Json | null
+          pacote_hash?: string | null
+          pacote_revisao?: number
           resultado?: Json | null
           solicitado_por?: string
           status?: string

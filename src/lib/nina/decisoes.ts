@@ -70,23 +70,30 @@ export const MSG_CONFLITO =
   "Outra pessoa alterou este reporte enquanto você revisava. Recarregue a lista e refaça a decisão.";
 
 export type ResumoEvidenciasAnalise = {
+  /** FASE 1 — identificação verificável do conjunto de evidências. */
+  hash?: string | null;
   entradas?: number;
   etapas?: number;
   lacunas?: string[];
 } | null;
 
 /**
- * A análise ficou defasada? Comparação por conjunto de evidências, nunca por
- * data solta — e NUNCA dispara nova chamada paga automaticamente.
+ * A análise ficou defasada? Comparação pelo HASH do pacote de evidências.
+ *
+ * Contagem de mensagens ou etapas NÃO comprova que duas análises usaram as
+ * mesmas evidências: sem hash dos dois lados não se afirma nada (`false`), e
+ * nada aqui dispara nova chamada paga automaticamente.
  */
 export function analiseUsouOutroConjunto(
   resumo: ResumoEvidenciasAnalise,
-  atual: { entradas: number; etapas: number } | null,
+  atual: { hash?: string | null; entradas?: number; etapas?: number } | null,
 ): boolean {
   if (!resumo || !atual) return false;
-  const entradas = resumo.entradas ?? 0;
-  const etapas = resumo.etapas ?? 0;
-  return atual.entradas !== entradas || atual.etapas !== etapas;
+  const hashAnalise = resumo.hash ?? null;
+  const hashAtual = atual.hash ?? null;
+  if (hashAnalise && hashAtual) return hashAnalise !== hashAtual;
+  // Sem hash não é possível comprovar equivalência — nem divergência.
+  return false;
 }
 
 /** Só sugere mexer no catálogo quando a causa aponta para o catálogo. */
