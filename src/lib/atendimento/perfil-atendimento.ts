@@ -44,18 +44,19 @@ export function apenasDestinatariosValidos<T extends { role?: string | null }>(
 
 export type PresencaAtendente = "ONLINE" | "PAUSA" | "OFFLINE";
 
-/** Janela em que o heartbeat de presença ainda vale (igual à distribuição). */
-const PRESENCA_VALIDA_MS = 5 * 60 * 1000;
-
+/**
+ * FASE 2 — a presença é MANUAL. `visto_em` (heartbeat) é apenas sinal técnico
+ * de conexão e não participa mais deste cálculo: aba oculta, queda de rede,
+ * página fechada ou heartbeat vencido não derrubam a escolha do atendente.
+ */
 export function statusPresenca(p: {
   status: string | null | undefined;
-  vistoEm: string | null | undefined;
+  /** Informativo apenas — mantido por compatibilidade de chamadas. */
+  vistoEm?: string | null | undefined;
   emPausa: boolean;
 }): PresencaAtendente {
   if (p.emPausa) return "PAUSA";
-  const visto = p.vistoEm ? Date.parse(p.vistoEm) : NaN;
-  const recente = Number.isFinite(visto) && Date.now() - visto < PRESENCA_VALIDA_MS;
-  if ((p.status ?? "").toUpperCase() === "ONLINE" && recente) return "ONLINE";
+  if ((p.status ?? "").toUpperCase() === "ONLINE") return "ONLINE";
   return "OFFLINE";
 }
 

@@ -16,7 +16,7 @@ import {
   type RespostaRapida,
 } from "@/lib/atendimento/respostas-rapidas";
 import { normalizarNomeBusca } from "@/lib/busca-texto";
-import { anunciarAba, encerrarAba } from "@/lib/atendimento/presenca-abas";
+import type { EstadoManualPresenca } from "@/lib/atendimento/presenca-manual";
 import { supabase } from "@/integrations/supabase/client";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
@@ -155,6 +155,7 @@ import {
   meuStatusAgente,
   devolverParaNina,
   definirPresenca,
+  definirPresencaManual,
   esperaConversas,
   assumirConversa,
   marcarLida,
@@ -335,6 +336,7 @@ export function AtendInbox() {
   const listarReasonsFn = useServerFn(listarPauseReasons);
   const meuStatusFn = useServerFn(meuStatusAgente);
   const presencaFn = useServerFn(definirPresenca);
+  const presencaManualFn = useServerFn(definirPresencaManual);
   const esperaFn = useServerFn(esperaConversas);
   const assumirFn = useServerFn(assumirConversa);
   const obterConversaFn = useServerFn(obterConversa);
@@ -720,6 +722,8 @@ export function AtendInbox() {
         listarReasonsFn({ data: { clinicaId } }),
       ]);
       setFilaAberta(s.filaAberta);
+      setEstadoManual((s as { estadoManual?: EstadoManualPresenca | null }).estadoManual ?? null);
+      setVersaoPresenca((s as { estadoManualVersao?: number }).estadoManualVersao ?? 0);
       setPausaAtiva(p);
       setPauseReasons(rs);
       setStatusCarregado(true);
@@ -732,97 +736,29 @@ export function AtendInbox() {
     carregarStatusAgente();
   }, [carregarStatusAgente]);
 
-  // Presença real + automática:
-  //  - sem mexer no mouse/teclado por 5 min, ou com o sistema em segundo plano
-  //    (outra aba/janela minimizada), o atendente entra em pausa automática e
-  //    para de receber conversas novas;
-  //  - qualquer interação traz de volta para online;
-  //  - ao fechar a página, avisa offline na hora (e, se o aviso não chegar, o
-  //    servidor derruba a presença sozinho depois de 5 minutos sem sinal).
-  // A pausa manual e o offline manual continuam mandando: a automação nunca
-  // "reabre" quem escolheu ficar offline.
-  const OCIOSO_MS = 5 * 60 * 1000;
-  const [ausenteAuto, setAusenteAuto] = useState(false);
-  const manualOffline = !pausaAtiva && !filaAberta;
-  const online = !pausaAtiva && filaAberta && !ausenteAuto;
+  // FASE 2 — presença 100% MANUAL.
+  // Não existe mais pausa por inatividade, ausência por aba oculta, offline ao
+  // fechar a página nem queda por heartbeat vencido: o estado só muda quando o
+  // atendente clica em Online, Offline ou Em pausa.
+  const [estadoManual, setEstadoManual] = useState<EstadoManualPresenca | null>(null);
+  const [versaoPresenca, setVersaoPresenca] = useState(0);
+  const online = estadoManual === "ONLINE" && !pausaAtiva;
+  const emPausa = estadoManual === "PAUSA" || !!pausaAtiva;
+  const manualOffline = estadoManual === "OFFLINE";
 
-  useEffect(() => {
-    if (manualOffline || pausaAtiva) {
-      setAusenteAuto(false);
-      return;
-    }
-    let timer: ReturnType<typeof setTimeout>;
-    const armar = () => {
-      clearTimeout(timer);
-      timer = setTimeout(() => setAusenteAuto(true), OCIOSO_MS);
-    };
-    const acordar = () => {
-      if (document.visibilityState === "hidden") return;
-      setAusenteAuto(false);
-      armar();
-    };
-    const aoTrocarVisibilidade = () => {
-      if (document.visibilityState === "hidden") {
-        clearTimeout(timer);
-        setAusenteAuto(true);
-      } else {
-        acordar();
-      }
-    };
-    const eventos = ["mousemove", "mousedown", "keydown", "wheel", "touchstart", "focus"] as const;
-    eventos.forEach((e) => window.addEventListener(e, acordar, { passive: true }));
-    document.addEventListener("visibilitychange", aoTrocarVisibilidade);
-    if (document.visibilityState === "hidden") setAusenteAuto(true);
-    else armar();
-    return () => {
-      clearTimeout(timer);
-      eventos.forEach((e) => window.removeEventListener(e, acordar));
-      document.removeEventListener("visibilitychange", aoTrocarVisibilidade);
-    };
-  }, [manualOffline, pausaAtiva, OCIOSO_MS]);
-
-  // FASE 2 — heartbeat coordenado entre abas.
-  //  - o status enviado é o do USUÁRIO, não o de uma aba: se qualquer aba está
-  //    ativa, ele continua Online (a aba de trás não o derruba);
-  //  - fechar uma aba só grava OFFLINE quando não resta nenhuma outra aberta;
-  //  - se o navegador fechar de vez sem avisar, o servidor derruba sozinho
-  //    depois de 5 minutos sem sinal (mesma janela usada na distribuição).
+  // Sinal de vida (apenas informação técnica de conexão). Este caminho NUNCA
+  // altera a escolha de presença — nem ao fechar a aba.
   useEffect(() => {
     if (!clinicaId || !statusCarregado) return;
     const bater = () => {
-      const { outraAtiva } = anunciarAba(online);
-      const efetivo = online || outraAtiva;
-      presencaFn({
-        data: {
-          clinicaId,
-          status: efetivo
-            ? ("ONLINE" as const)
-            : manualOffline
-              ? ("OFFLINE" as const)
-              : ("AWAY" as const),
-          aceitaNovas: efetivo,
-        },
-      }).catch(() => {
+      presencaFn({ data: { clinicaId } }).catch(() => {
         /* heartbeat: falha isolada não atrapalha o atendimento */
       });
     };
     bater();
-    const sair = () => {
-      const { restaOutra } = encerrarAba();
-      if (restaOutra) return; // outra aba do mesmo atendente continua aberta
-      presencaFn({
-        data: { clinicaId, status: "OFFLINE" as const, aceitaNovas: false },
-      }).catch(() => {});
-    };
-    window.addEventListener("pagehide", sair);
-    // Bate sempre (inclusive offline/ausente): é o que mantém o registro de
-    // abas vivo e o servidor de acordo com a tela.
     const t = setInterval(bater, 30_000);
-    return () => {
-      clearInterval(t);
-      window.removeEventListener("pagehide", sair);
-    };
-  }, [clinicaId, statusCarregado, online, manualOffline, presencaFn]);
+    return () => clearInterval(t);
+  }, [clinicaId, statusCarregado, presencaFn]);
 
   // Reconexão / volta do segundo plano: reconfere o status real do servidor
   // em vez de confiar no que a aba acha que enviou.
@@ -868,20 +804,33 @@ export function AtendInbox() {
     }
   };
 
+  // FASE 2 — único caminho que muda a presença: a escolha explícita aqui.
+  const gravarPresencaManual = async (estado: EstadoManualPresenca) => {
+    if (!clinicaId) return null;
+    const r = (await presencaManualFn({
+      data: { clinicaId, estado, versao: versaoPresenca },
+    })) as { ok?: boolean; conflito?: boolean; versao?: number; distribuidas?: number } | null;
+    if (r?.conflito) {
+      await carregarStatusAgente();
+      toast.error("A presença foi alterada em outro lugar. Confira o controle de presença.");
+      return null;
+    }
+    setEstadoManual(estado);
+    if (typeof r?.versao === "number") setVersaoPresenca(r.versao);
+    else setVersaoPresenca((v) => v + 1);
+    return r;
+  };
+
   const definirStatus = async (status: "online" | "pausa" | "offline") => {
     if (!clinicaId) return;
     try {
       if (status === "online") {
         if (pausaAtiva) await finalizarPausaFn({ data: { clinicaId } });
-        await travarFilaFn({ data: { clinicaId, travada: false } });
         setPausaAtiva(null);
-        setAusenteAuto(false);
+        const r = await gravarPresencaManual("ONLINE");
+        if (!r) return;
         setFilaAberta(true);
-
-        const r = await presencaFn({
-          data: { clinicaId, status: "ONLINE" as const, aceitaNovas: true },
-        });
-        const n = (r as { distribuidas?: number } | null)?.distribuidas ?? 0;
+        const n = r.distribuidas ?? 0;
         toast.success(
           n > 0
             ? `Você está online — ${n} conversa(s) da fila vieram para os atendentes`
@@ -890,12 +839,10 @@ export function AtendInbox() {
         await carregarConvs();
       } else if (status === "offline") {
         if (pausaAtiva) await finalizarPausaFn({ data: { clinicaId } });
-        await travarFilaFn({ data: { clinicaId, travada: true } });
         setPausaAtiva(null);
+        const r = await gravarPresencaManual("OFFLINE");
+        if (!r) return;
         setFilaAberta(false);
-        await presencaFn({
-          data: { clinicaId, status: "OFFLINE" as const, aceitaNovas: false },
-        });
         toast.success("Você está offline");
       } else {
         if (!pauseReasons.length) {
@@ -2870,7 +2817,7 @@ export function AtendInbox() {
               </Badge>
               <Circle
                 className={`h-3 w-3 fill-current ${
-                  pausaAtiva || ausenteAuto
+                  emPausa
                     ? "text-atd-warn"
                     : filaAberta
                       ? "text-atd-ok"
@@ -2908,9 +2855,9 @@ export function AtendInbox() {
               </Button>
               <Button
                 size="sm"
-                variant={pausaAtiva || ausenteAuto ? "default" : "outline"}
+                variant={emPausa ? "default" : "outline"}
                 className={`h-7 px-1 text-[11px] ${
-                  pausaAtiva || ausenteAuto
+                  emPausa
                     ? "bg-atd-warn hover:bg-atd-warn/90 text-atd-warn-ink"
                     : "text-atd-warn-ink border-atd-warn/40"
                 }`}
@@ -2921,9 +2868,9 @@ export function AtendInbox() {
 
               <Button
                 size="sm"
-                variant={!pausaAtiva && !filaAberta ? "default" : "outline"}
+                variant={manualOffline ? "default" : "outline"}
                 className={`h-7 px-1 text-[11px] ${
-                  !pausaAtiva && !filaAberta
+                  manualOffline
                     ? "bg-atd-idle hover:bg-atd-idle/90 text-atd-on-strong"
                     : "text-atd-idle-ink border-atd-border"
                 }`}
@@ -2932,9 +2879,9 @@ export function AtendInbox() {
                 <PowerOff className="h-3 w-3 mr-1" /> Offline
               </Button>
             </div>
-            {ausenteAuto && !pausaAtiva && (
-              <p className="text-[11px] text-atd-warn-ink">
-                Pausa automática por inatividade — mexa na tela para voltar a receber conversas.
+            {!estadoManual && (
+              <p className="text-[11px] text-muted-foreground">
+                Escolha o seu estado para começar a receber conversas.
               </p>
             )}
             {pausaAtiva?.atend_pause_reasons?.nome && (

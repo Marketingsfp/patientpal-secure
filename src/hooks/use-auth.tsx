@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from "
 import type { Session, User } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { lerSessaoEmCache } from "@/lib/sessao-cache";
-import { encerrarMinhaPresenca } from "@/lib/atendimento.functions";
+
 
 interface AuthContextValue {
   user: User | null;
@@ -100,10 +100,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         loading,
         signOut: async () => {
           try {
-            // Sair da sessão tira do pool de distribuição na hora: ninguém
-            // pode continuar "Online para atender" depois do logout. As
-            // conversas já atribuídas não são mexidas.
-            await encerrarMinhaPresenca().catch(() => {});
+            // FASE 2 — sair da sessão NÃO altera a presença do OS ZAP: ela só
+            // muda por escolha explícita no controle de presença.
             await supabase.auth.signOut();
           } finally {
             limparEstadoLocal();

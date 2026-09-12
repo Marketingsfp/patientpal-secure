@@ -1022,21 +1022,9 @@ export const travarMinhaFila = createServerFn({ method: "POST" })
       .eq("clinica_id", data.clinicaId)
       .eq("user_id", context.userId);
     if (error) throw new Error(error.message);
-    // A presença é a fonte da verdade da distribuição: fechar a fila precisa
-    // derrubar o "ONLINE", senão o atendente continua recebendo conversas
-    // mesmo aparecendo como offline na tela (e quem não está em nenhum
-    // departamento não tinha nenhum bloqueio aplicado).
-    const { error: eP } = await context.supabase.from("atend_agente_presenca").upsert(
-      {
-        clinica_id: data.clinicaId,
-        user_id: context.userId,
-        status: data.travada ? "OFFLINE" : "ONLINE",
-        aceita_novas: !data.travada,
-        visto_em: new Date().toISOString(),
-      },
-      { onConflict: "clinica_id,user_id" },
-    );
-    if (eP) throw new Error(eP.message);
+    // FASE 2 — travar/destravar a fila do departamento NÃO mexe mais na
+    // presença: "filaAberta = false" deixou de ser prova de que o atendente
+    // escolheu Offline. A presença só muda em `definirPresencaManual`.
     return { ok: true };
   });
 
@@ -1061,17 +1049,14 @@ export const meuStatusAgente = createServerFn({ method: "POST" })
         .maybeSingle(),
     ]);
     const total = rows?.length ?? 0;
-    // Fonte da verdade: a presença registrada. Só cai no critério antigo
-    // (departamentos) quando ainda não existe presença gravada.
+    // FASE 2 — fonte única: a presença registrada (consequência da escolha
+    // manual). Sem presença gravada, o atendente ainda não escolheu e NÃO é
+    // considerado disponível; `queue_locked` não vira mais escolha de Offline.
     const presencaStatus = (pres?.status as string | undefined) ?? null;
-    const filaAberta = presencaStatus
-      ? presencaStatus === "ONLINE" && pres?.aceita_novas !== false
-      : (rows ?? []).some((r: any) => !r.queue_locked);
+    const filaAberta = presencaStatus === "ONLINE" && pres?.aceita_novas !== false;
 
-    // FASE 2 — status efetivo: é EXATAMENTE o que a distribuição enxerga
-    // (presença recente + aceita novas + sem pausa aberta). A tela passa a
-    // mostrar isto, e não o que ela mesma acha que enviou, para não existir
-    // "frontend Online / backend Offline".
+    // Status efetivo: exatamente o que a distribuição enxerga (escolha manual
+    // + pausa aberta). O tempo desde o último sinal de conexão não entra.
     const { data: pausaAberta } = await context.supabase
       .from("atend_pausas_log")
       .select("id")
@@ -1081,7 +1066,6 @@ export const meuStatusAgente = createServerFn({ method: "POST" })
       .maybeSingle();
     const presencaEfetiva = statusPresenca({
       status: presencaStatus,
-      vistoEm: (pres as { visto_em?: string } | null)?.visto_em ?? null,
       emPausa: !!pausaAberta,
     });
     // FASE 1 — escolha manual: fonte oficial, separada do sinal de conexão.
@@ -1109,27 +1093,9 @@ export const meuStatusAgente = createServerFn({ method: "POST" })
     };
   });
 
-/**
- * FASE 2 — encerra a presença do usuário em todas as clínicas.
- *
- * Usado no logout e ao fechar a ÚLTIMA aba: quem sai da sessão não pode
- * continuar no pool de distribuição. Não mexe nas conversas já atribuídas —
- * ficar offline só impede novas atribuições.
- */
-export const encerrarMinhaPresenca = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
-  .handler(async ({ context }) => {
-    const { error } = await context.supabase
-      .from("atend_agente_presenca")
-      .update({
-        status: "OFFLINE",
-        aceita_novas: false,
-        visto_em: new Date().toISOString(),
-      })
-      .eq("user_id", context.userId);
-    if (error) throw new Error(error.message);
-    return { ok: true };
-  });
+/* FASE 2 — `encerrarMinhaPresenca` foi removida: sair da sessão, fechar a
+ * página ou perder a conexão não podem mais mudar a escolha de presença.
+ * O único caminho de gravação é `definirPresencaManual`. */
 
 
 /* =========================================================
@@ -1400,8 +1366,9 @@ export const iniciarPausa = createServerFn({ method: "POST" })
       .select("id")
       .single();
     if (error) throw new Error(error.message);
-    // FASE 2 — entrar em pausa tira do pool NA HORA: a presença gravada passa a
-    // dizer a mesma coisa que a tela ("Em pausa"), sem esperar heartbeat.
+    // Entrar em pausa é uma escolha explícita do atendente no controle de
+    // presença: grava também o estado manual, para que nada (heartbeat,
+    // recarga, reconexão) mude isso depois.
     await context.supabase.from("atend_agente_presenca").upsert(
       {
         clinica_id: data.clinicaId,
@@ -1409,6 +1376,9 @@ export const iniciarPausa = createServerFn({ method: "POST" })
         status: "BUSY",
         aceita_novas: false,
         visto_em: new Date().toISOString(),
+        estado_manual: "PAUSA",
+        estado_manual_em: new Date().toISOString(),
+        estado_manual_por: context.userId,
       },
       { onConflict: "clinica_id,user_id" },
     );
@@ -1446,9 +1416,8 @@ export const finalizarPausa = createServerFn({ method: "POST" })
       .is("finalizada_em", null);
     if (error) throw new Error(error.message);
 
-    // Sair da pausa devolve a presença para ONLINE na mesma operação, senão a
-    // tela mostraria "Online" e o pool continuaria vendo "BUSY" até o próximo
-    // heartbeat (até 60s de divergência).
+    // Encerrar a pausa também é escolha explícita: volta para Online e grava
+    // isso como estado manual, nunca como efeito de conexão ou atividade.
     await context.supabase.from("atend_agente_presenca").upsert(
       {
         clinica_id: data.clinicaId,
@@ -1456,6 +1425,9 @@ export const finalizarPausa = createServerFn({ method: "POST" })
         status: "ONLINE",
         aceita_novas: true,
         visto_em: new Date().toISOString(),
+        estado_manual: "ONLINE",
+        estado_manual_em: new Date().toISOString(),
+        estado_manual_por: context.userId,
       },
       { onConflict: "clinica_id,user_id" },
     );
@@ -2950,52 +2922,45 @@ export const definirPresenca = createServerFn({ method: "POST" })
     z
       .object({
         clinicaId: z.string().uuid(),
-        status: z.enum(["ONLINE", "BUSY", "AWAY", "OFFLINE"]),
+        // Aceito apenas por compatibilidade com telas antigas: o valor é
+        // IGNORADO. Nenhum cliente pode restaurar o comportamento automático.
+        status: z.string().optional(),
         aceitaNovas: z.boolean().optional(),
       })
       .parse(i),
   )
   .handler(async ({ data, context }) => {
     await assertMember(context.supabase, context.userId, data.clinicaId);
+    const agora = new Date().toISOString();
     const { data: atual } = await context.supabase
       .from("atend_agente_presenca")
-      .select("estado_manual")
+      .select("id")
       .eq("clinica_id", data.clinicaId)
       .eq("user_id", context.userId)
       .maybeSingle();
-    const manual = (atual as { estado_manual?: string | null } | null)?.estado_manual ?? null;
-    const tecnico = ehEstadoManual(manual)
-      ? tecnicoDoEstadoManual(manual)
-      : { status: data.status, aceitaNovas: data.aceitaNovas ?? data.status === "ONLINE" };
-    const { error } = await context.supabase.from("atend_agente_presenca").upsert(
-      {
+
+    if (atual) {
+      // Só o sinal de vida é atualizado: status/aceita_novas/estado_manual
+      // permanecem exatamente como a escolha do atendente deixou.
+      const { error } = await context.supabase
+        .from("atend_agente_presenca")
+        .update({ visto_em: agora })
+        .eq("clinica_id", data.clinicaId)
+        .eq("user_id", context.userId);
+      if (error) throw new Error(error.message);
+    } else {
+      // Primeiro sinal, sem escolha registrada: entra fora do pool e aguarda
+      // a escolha explícita do atendente (nada vira escolha automaticamente).
+      const { error } = await context.supabase.from("atend_agente_presenca").insert({
         clinica_id: data.clinicaId,
         user_id: context.userId,
-        status: tecnico.status,
-        aceita_novas: tecnico.aceitaNovas,
-        visto_em: new Date().toISOString(),
-      },
-      { onConflict: "clinica_id,user_id" },
-    );
-    if (error) throw new Error(error.message);
-
-    // Ao ficar online, o que estava parado na fila "Não atribuídas" é
-    // distribuído na hora (da conversa que espera há mais tempo para a mais
-    // recente), sempre para quem tem menos conversas ativas.
-    let distribuidas = 0;
-    if (
-      tecnico.status === "ONLINE" &&
-      tecnico.aceitaNovas &&
-      (await temTelefonia(context.supabase as never, context.userId, data.clinicaId))
-    ) {
-      const { data: n, error: e2 } = await context.supabase.rpc("atend_distribuir_fila", {
-        _clinica_id: data.clinicaId,
-        _max: 20,
-      } as never);
-      if (e2) console.error("[atendimento] falha ao distribuir fila:", e2.message);
-      else distribuidas = Number(n ?? 0);
+        status: "OFFLINE",
+        aceita_novas: false,
+        visto_em: agora,
+      });
+      if (error) throw new Error(error.message);
     }
-    return { ok: true, distribuidas };
+    return { ok: true, distribuidas: 0 };
   });
 
 /**
