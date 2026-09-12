@@ -38,6 +38,7 @@ const subnav = [
   { to: "/app/financeiro/notas", label: "Notas Pacientes", icon: FileText },
   { to: "/app/financeiro/relatorios", label: "Relatórios", icon: FileBarChart },
   { to: "/app/financeiro/estatisticas", label: "Estatísticas", icon: PieChart },
+  { to: "/app/financeiro/projecao", label: "Projeção", icon: Target },
   { to: "/app/financeiro/lembretes", label: "Lembretes", icon: Bell },
   { to: "/app/financeiro/categorias", label: "Categorias", icon: Tag },
   { to: "/app/financeiro/contas", label: "Contas", icon: Wallet },
