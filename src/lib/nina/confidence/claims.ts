@@ -31,7 +31,9 @@ import {
   type FatoRecuperado,
 } from "./evidencia";
 import {
+  type ClasseDiagnostico,
   chaveDaAfirmacaoMonetaria,
+
   correspondenciaDaAfirmacao,
   fatosNoEscopoDaAfirmacao,
   qualificadoresDaAfirmacao,
@@ -170,8 +172,34 @@ export type ClaimAvaliado = {
   referencia?: string | null;
   /** FASE 2 — valor efetivamente extraído da afirmação, quando houve. */
   valorAfirmado?: string | null;
+  /** FASE 4 — detalhamento da comparação monetária realizada. */
+  diagnostico?: DiagnosticoAfirmacao;
   motivo: string;
 };
+
+/**
+ * FASE 4 — o que foi comparado, contra o quê, e com que resultado.
+ *
+ * Existe para conferência humana: cada afirmação monetária registra o trecho,
+ * o valor afirmado, o item, a forma/condição identificada, a referência usada,
+ * o valor esperado, a fonte/registro e o resultado da comparação.
+ */
+export type DiagnosticoAfirmacao = {
+  trecho: string;
+  valorAfirmado: string | null;
+  item: string | null;
+  profissional: string | null;
+  forma: string | null;
+  condicao: string | null;
+  referencia: string | null;
+  valorEsperado: string | null;
+  fonte: string | null;
+  registro: string | null;
+  versao: string | null;
+  resultado: ClasseDiagnostico | "nao_verificado";
+  motivo: string;
+};
+
 
 export type ResultadoGrounding = {
   claims: ClaimAvaliado[];
@@ -696,7 +724,40 @@ export function avaliarGrounding(
         valor: valorDaFrase,
       });
 
+      // FASE 4 — relatório da comparação: o que foi afirmado, contra qual
+      // referência foi conferido e com que resultado. Só para afirmações
+      // monetárias, que são as que dependem de forma/condição.
+      const diag = (
+        resultado: ClasseDiagnostico | "nao_verificado",
+        motivo: string,
+        fato?: FatoRecuperado,
+        referencia?: string | null,
+      ): { diagnostico: DiagnosticoAfirmacao } | Record<string, never> =>
+        monetaria
+          ? {
+              diagnostico: {
+                trecho,
+                valorAfirmado: valorDaFrase,
+                item: chaveDaFrase.procedimento ?? chaveDaFrase.especialidade ?? null,
+                profissional: chaveDaFrase.medicoNome ?? null,
+                forma: chaveDaFrase.condicoes ?? null,
+                // Condição da REFERÊNCIA usada (pode ser nula quando a fonte
+                // não declarou forma de pagamento).
+                condicao: fato?.chave?.condicoes ?? null,
+                referencia: referencia ?? null,
+                valorEsperado: fato ? String(fato.valor ?? "") || null : null,
+                fonte: fato?.fonte ?? null,
+                registro: fato?.registro ?? null,
+                versao: fato?.versao ?? null,
+                resultado,
+                motivo,
+              },
+            }
+          : {};
+
+
       if (r.situacao === "confirmado") {
+        const motivo = "afirmação corresponde ao registro recuperado do mesmo caso";
         push({
           tipo,
           trecho,
@@ -707,11 +768,16 @@ export function avaliarGrounding(
           fonte: r.fato.fonte,
           referencia: r.referencia,
           valorAfirmado: valorDaFrase,
-          motivo: "afirmação corresponde ao registro recuperado do mesmo caso",
+          ...diag("valor_correto", motivo, r.fato, r.referencia),
+          motivo,
         });
         return;
       }
       if (r.situacao === "divergente") {
+        const motivo =
+          r.classe === "conflito_referencias"
+            ? `referências equivalentes discordam entre si (uma delas: ${r.valorDaFonte ?? "vazio"})`
+            : `valor afirmado diverge da fonte (fonte: ${r.valorDaFonte ?? "vazio"})`;
         push({
           tipo,
           trecho,
@@ -723,11 +789,15 @@ export function avaliarGrounding(
           referencia: r.referencia,
           valorAfirmado: valorDaFrase,
           valorDaFonte: r.valorDaFonte,
-          motivo: `valor afirmado diverge da fonte (fonte: ${r.valorDaFonte ?? "vazio"})`,
+          ...diag(r.classe ?? "valor_divergente", motivo, r.fato, r.referencia),
+          motivo,
         });
         return;
       }
       if (r.situacao === "fora_do_escopo") {
+        const motivo =
+          r.motivo ??
+          "a fonte consultada não cobre este caso (procedimento/profissional/unidade/dia/convênio)";
         push({
           tipo,
           trecho,
@@ -737,9 +807,8 @@ export function avaliarGrounding(
           suportado: false,
           fonte: canalDoTipo,
           valorAfirmado: valorDaFrase,
-          motivo:
-            r.motivo ??
-            "a fonte consultada não cobre este caso (procedimento/profissional/unidade/dia/convênio)",
+          ...diag(r.classe ?? "referencia_ausente", motivo),
+          motivo,
         });
         return;
       }
@@ -752,10 +821,12 @@ export function avaliarGrounding(
           situacao: "nao_verificado",
           suportado: false,
           fonte: canalDoTipo,
+          ...diag(r.classe ?? "nao_verificado", r.motivo),
           motivo: r.motivo,
         });
         return;
       }
+
     }
 
     if (fatos) {

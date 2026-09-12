@@ -405,17 +405,39 @@ function valoresIguais(tipo: TipoClaim, afirmado: string, doFato: unknown): bool
   return mesmoTexto(afirmado, doFato);
 }
 
+/**
+ * FASE 4 — classe do diagnóstico monetário, para o relatório auditável.
+ *
+ * Distingue as quatro situações que antes se confundiam em "divergente":
+ * valor errado na mesma condição, referência ausente para aquela condição,
+ * condição ambígua (a fonte tem vários preços e a frase não diz qual) e
+ * conflito entre referências equivalentes (mesma condição, valores diferentes).
+ */
+export type ClasseDiagnostico =
+  | "valor_correto"
+  | "valor_divergente"
+  | "referencia_ausente"
+  | "condicao_ambigua"
+  | "conflito_referencias";
+
 export type CorrespondenciaAfirmacao =
-  | { situacao: "confirmado"; fato: FatoRecuperado; referencia: string }
+  | {
+      situacao: "confirmado";
+      fato: FatoRecuperado;
+      referencia: string;
+      classe?: ClasseDiagnostico;
+    }
   | {
       situacao: "divergente";
       fato: FatoRecuperado;
       referencia: string;
       valorDaFonte: string | null;
+      classe?: ClasseDiagnostico;
     }
-  | { situacao: "fora_do_escopo"; motivo?: string }
-  | { situacao: "indeterminado"; motivo: string }
+  | { situacao: "fora_do_escopo"; motivo?: string; classe?: ClasseDiagnostico }
+  | { situacao: "indeterminado"; motivo: string; classe?: ClasseDiagnostico }
   | { situacao: "sem_fato" };
+
 
 export type PedidoAfirmacao = {
   tipo: TipoClaim;
@@ -516,11 +538,12 @@ export function correspondenciaDaAfirmacao(
       if (mesmoCaso.length > 0) {
         return {
           situacao: "fora_do_escopo",
+          classe: "referencia_ausente",
           motivo: `a fonte cobre este caso, mas não comprova o valor para "${condicaoPedida}" (referência insuficiente para esta forma de pagamento)`,
         };
       }
     }
-    return { situacao: "fora_do_escopo" };
+    return { situacao: "fora_do_escopo", classe: "referencia_ausente" };
   }
 
   if (pedido.valor === null || pedido.valor.trim() === "") {
@@ -532,6 +555,7 @@ export function correspondenciaDaAfirmacao(
     }
     return {
       situacao: "confirmado",
+      classe: "valor_correto",
       fato: noEscopo[0]!,
       referencia: referenciaDoFato(noEscopo[0]!),
     };
@@ -539,13 +563,41 @@ export function correspondenciaDaAfirmacao(
 
   const batendo = noEscopo.find((f) => valoresIguais(pedido.tipo, pedido.valor!, f.valor));
   if (batendo)
-    return { situacao: "confirmado", fato: batendo, referencia: referenciaDoFato(batendo) };
+    return {
+      situacao: "confirmado",
+      classe: "valor_correto",
+      fato: batendo,
+      referencia: referenciaDoFato(batendo),
+    };
 
+  // FASE 4 — nenhum valor bate: separar as três causas possíveis.
+  const condicaoDe = (f: FatoRecuperado) => normalizarTexto(f.chave?.condicoes ?? "") || "";
+  const porCondicao = new Map<string, Set<string>>();
+  for (const f of noEscopo) {
+    const c = condicaoDe(f);
+    const atual = porCondicao.get(c) ?? new Set<string>();
+    atual.add(String(f.valor ?? "").trim());
+    porCondicao.set(c, atual);
+  }
+  const conflitoEquivalente = [...porCondicao.values()].some((v) => v.size > 1);
+  const condicoesDistintas = porCondicao.size > 1;
   const primeiro = noEscopo[0]!;
+
+  if (!pedido.chave.condicoes && condicoesDistintas) {
+    return {
+      situacao: "indeterminado",
+      classe: "condicao_ambigua",
+      motivo:
+        "a fonte tem valores diferentes por condição de pagamento e a afirmação não diz a qual se refere",
+    };
+  }
+
   return {
     situacao: "divergente",
+    classe: conflitoEquivalente ? "conflito_referencias" : "valor_divergente",
     fato: primeiro,
     referencia: referenciaDoFato(primeiro),
     valorDaFonte: primeiro.valor,
   };
+
 }

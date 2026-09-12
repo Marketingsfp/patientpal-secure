@@ -15,9 +15,11 @@
  */
 import {
   detectarConflitos,
+  resumoDePrecos,
   type RegistroConhecimento,
   type ResultadoConhecimento,
 } from "./knowledge-contract";
+
 import { paraNumero, resumoHorarios, valorResumo } from "./catalogo";
 
 /** Serviço publicado, já sem colunas internas. */
@@ -298,13 +300,15 @@ export function montarResultadoCatalogo(entrada: {
 
   const conflitos = detectarConflitos(registros);
   const primeiro = registros[0]!;
-  const preco = paraNumero(primeiro.preco_dinheiro) ?? paraNumero(primeiro.preco_cartao);
+  // FASE 4 — preserva dinheiro e cartão quando divergem (antes só dinheiro).
+  const preco = resumoDePrecos(primeiro.preco_dinheiro, primeiro.preco_cartao);
 
   const comum = {
     ...base,
     found: true,
     procedure: primeiro.procedimento ?? null,
-    price: preco === null ? null : `R$ ${preco.toFixed(2).replace(".", ",")}`,
+    price: preco,
+
     doctors: [
       ...new Set(
         registros
