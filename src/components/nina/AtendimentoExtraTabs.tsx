@@ -802,20 +802,33 @@ export function AtendInbox() {
     }
   };
 
+  // FASE 2 — único caminho que muda a presença: a escolha explícita aqui.
+  const gravarPresencaManual = async (estado: EstadoManualPresenca) => {
+    if (!clinicaId) return null;
+    const r = (await presencaManualFn({
+      data: { clinicaId, estado, versao: versaoPresenca },
+    })) as { ok?: boolean; conflito?: boolean; versao?: number; distribuidas?: number } | null;
+    if (r?.conflito) {
+      await carregarStatusAgente();
+      toast.error("A presença foi alterada em outro lugar. Confira o controle de presença.");
+      return null;
+    }
+    setEstadoManual(estado);
+    if (typeof r?.versao === "number") setVersaoPresenca(r.versao);
+    else setVersaoPresenca((v) => v + 1);
+    return r;
+  };
+
   const definirStatus = async (status: "online" | "pausa" | "offline") => {
     if (!clinicaId) return;
     try {
       if (status === "online") {
         if (pausaAtiva) await finalizarPausaFn({ data: { clinicaId } });
-        await travarFilaFn({ data: { clinicaId, travada: false } });
         setPausaAtiva(null);
-        setAusenteAuto(false);
+        const r = await gravarPresencaManual("ONLINE");
+        if (!r) return;
         setFilaAberta(true);
-
-        const r = await presencaFn({
-          data: { clinicaId, status: "ONLINE" as const, aceitaNovas: true },
-        });
-        const n = (r as { distribuidas?: number } | null)?.distribuidas ?? 0;
+        const n = r.distribuidas ?? 0;
         toast.success(
           n > 0
             ? `Você está online — ${n} conversa(s) da fila vieram para os atendentes`
@@ -824,12 +837,10 @@ export function AtendInbox() {
         await carregarConvs();
       } else if (status === "offline") {
         if (pausaAtiva) await finalizarPausaFn({ data: { clinicaId } });
-        await travarFilaFn({ data: { clinicaId, travada: true } });
         setPausaAtiva(null);
+        const r = await gravarPresencaManual("OFFLINE");
+        if (!r) return;
         setFilaAberta(false);
-        await presencaFn({
-          data: { clinicaId, status: "OFFLINE" as const, aceitaNovas: false },
-        });
         toast.success("Você está offline");
       } else {
         if (!pauseReasons.length) {
