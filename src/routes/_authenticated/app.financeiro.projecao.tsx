@@ -275,6 +275,30 @@ function Page() {
       </div>
 
       <Card>
+        <CardContent className="pt-6 space-y-3">
+          <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+            <h2 className="text-lg font-semibold">Tendência do mês</h2>
+            <p className="text-xs text-muted-foreground">
+              <span className="font-medium text-foreground">Realizado</span> — o que já entrou,
+              somado dia a dia · <span className="font-medium text-foreground">Projetado</span>{" "}
+              (tracejado) — o mesmo acumulado seguindo no ritmo atual até {fim.slice(8)}/
+              {fim.slice(5, 7)}.
+            </p>
+          </div>
+          {loading ? (
+            <p className="text-sm text-muted-foreground">Carregando...</p>
+          ) : (
+            <MiniLineChart
+              labels={tendencia.map((p) => p.rotulo)}
+              series={seriesTendencia}
+              height={280}
+              formatY={(n) => fmt(n)}
+            />
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
         <CardContent className="pt-6 space-y-4">
           <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
             <div className="space-y-1">
