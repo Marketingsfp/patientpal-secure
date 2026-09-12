@@ -447,6 +447,13 @@ export const aplicarCorrecaoComIA = createServerFn({ method: "POST" })
     let valorAnterior: string | null = proposta.valorAtual;
     let pendenciaTecnica: string | null = null;
     let motivoFinal = "";
+    /** Contagem real de operações desta correção (teto por ferramenta). */
+    let contagem: ContagemOperacoes = {};
+    /** O que precisa ser relido depois da gravação para conferir o efetivo. */
+    let alvoVerificacao:
+      | { tipo: "catalogo"; itemId: string; campo: string; valorNovo: string }
+      | { tipo: "prompt"; conteudo: string; versao: number | null }
+      | null = null;
 
     const aplicavel = podeAplicarAutomaticamente(proposta);
     passo(
