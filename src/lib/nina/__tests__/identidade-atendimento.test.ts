@@ -2,7 +2,7 @@
  * FASE 1 — leitura determinística da identidade do atendimento.
  * Nenhuma chamada de IA: só texto publicado.
  */
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 import {
   ABERTURA_IDENTIDADE,
   FECHAMENTO_IDENTIDADE,
