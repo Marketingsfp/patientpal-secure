@@ -25,6 +25,14 @@ import {
   statusPresenca,
 
 } from "@/lib/atendimento/perfil-atendimento";
+import {
+  ESTADOS_MANUAIS,
+  ehEstadoManual,
+  precisaEscolherPresenca,
+  tecnicoDoEstadoManual,
+  versaoAceita,
+  type EstadoManualPresenca,
+} from "@/lib/atendimento/presenca-manual";
 
 /* =========================================================
  *  Helpers
