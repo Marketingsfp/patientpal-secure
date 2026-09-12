@@ -429,7 +429,28 @@ function FinDashboard() {
             value={v((r) => r.despesasTotais)}
             accent="destructive"
             detalhe="Repasse e complemento pagos no caixa + despesas operacionais"
-          />
+          >
+            {/* A conta aberta evita a dúvida de 12/09/2026: o complemento
+                médico pago no caixa também entra aqui, além do repasse. */}
+            {resumo && !carregando && (
+              <ul className="mt-2 space-y-0.5 border-t border-border/60 pt-2">
+                <li className="flex items-center justify-between gap-2 text-xs">
+                  <span className="text-muted-foreground">Repasse pago no caixa</span>
+                  <span className="shrink-0 tabular-nums">{brl(resumo.repassePagoNoPeriodo)}</span>
+                </li>
+                {resumo.complementoMedico > 0 && (
+                  <li className="flex items-center justify-between gap-2 text-xs">
+                    <span className="text-muted-foreground">Complemento médico pago</span>
+                    <span className="shrink-0 tabular-nums">{brl(resumo.complementoMedico)}</span>
+                  </li>
+                )}
+                <li className="flex items-center justify-between gap-2 text-xs">
+                  <span className="text-muted-foreground">Despesas operacionais</span>
+                  <span className="shrink-0 tabular-nums">{brl(resumo.despesasOperacionais)}</span>
+                </li>
+              </ul>
+            )}
+          </KpiCard>
           <KpiCard
             onClick={() => abrir("saldo")}
             icon={Wallet}
