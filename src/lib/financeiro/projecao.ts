@@ -247,3 +247,123 @@ export function pontosDeAtencao(
 
   return pontos;
 }
+
+/**
+ * SIMULAÇÃO DE CRESCIMENTO
+ *
+ * Quanto precisa entrar por dia para o mês fechar X% acima do mês anterior.
+ *
+ * A base é o mês anterior FECHADO, e não a média dos últimos meses: é assim
+ * que a gestão lê crescimento ("agosto fechou em tanto; quero 10% a mais").
+ * A tela sempre mostra qual foi a base, porque um mês anterior atípico muda o
+ * alvo inteiro.
+ *
+ * "Dia de movimento" e não "dia útil": a clínica atende de segunda a sábado —
+ * o sábado responde por perto de 10% do caixa —, e domingo é vazio. Dividir o
+ * que falta por dias úteis de calendário pediria um ritmo que nunca existiu.
+ */
+export interface MetaCrescimento {
+  /** 5, 10, 15… ou 0 quando é a meta digitada à mão. */
+  percentual: number;
+  /** Nome curto para a tela: "+10%" ou "Meta digitada". */
+  rotulo: string;
+  alvo: number;
+  falta: number;
+  porDiaRestante: number;
+  atendimentosPorDia: number;
+  /** O ritmo de hoje chega lá sem mudar nada? */
+  alcancavel: boolean;
+  /** Quanto o ritmo precisa subir sobre a média atual, em %. */
+  esforcoPercentual: number;
+}
+
+export interface EntradaSimulacao {
+  /** Receita do mês anterior fechado. Sem ela não há o que simular. */
+  baseMesAnterior: number;
+  /** Percentuais de crescimento a simular. */
+  percentuais?: number[];
+  /** Meta em reais digitada na tela, se houver. */
+  metaCustomizada?: number;
+}
+
+/**
+ * Monta uma linha de simulação por percentual pedido (e a meta digitada, se
+ * houver). Devolve lista vazia quando não há base de comparação.
+ */
+export function simularCrescimento(r: ResultadoProjecao, e: EntradaSimulacao): MetaCrescimento[] {
+  const diasProdutivos =
+    r.diasCorridos > 0 ? (r.diasRestantes * r.realizado.diasComMovimento) / r.diasCorridos : 0;
+  const ticket = r.realizado.ticket;
+  const media = r.mediaDiaria;
+
+  const montar = (alvoBruto: number, percentual: number, rotulo: string): MetaCrescimento => {
+    const alvo = cent(alvoBruto);
+    const falta = cent(Math.max(alvo - r.realizado.receita, 0));
+    const porDia = diasProdutivos > 0 ? cent(falta / diasProdutivos) : falta;
+    return {
+      percentual,
+      rotulo,
+      alvo,
+      falta,
+      porDiaRestante: porDia,
+      atendimentosPorDia: ticket > 0 ? Math.ceil(porDia / ticket) : 0,
+      alcancavel: r.projetado.receita >= alvo,
+      esforcoPercentual: media > 0 ? Math.round(((porDia - media) / media) * 100) : 0,
+    };
+  };
+
+  const linhas: MetaCrescimento[] = [];
+  if (e.baseMesAnterior > 0) {
+    for (const p of e.percentuais ?? [5, 10, 15]) {
+      linhas.push(montar(e.baseMesAnterior * (1 + p / 100), p, `+${p}%`));
+    }
+  }
+  if (e.metaCustomizada && e.metaCustomizada > 0) {
+    linhas.push(montar(e.metaCustomizada, 0, "Meta digitada"));
+  }
+  return linhas;
+}
+
+/** Um dia da curva de tendência. `realizado` é null nos dias que ainda não vieram. */
+export interface PontoTendencia {
+  data: string;
+  /** Ex.: "03/09" — pronto para o eixo X. */
+  rotulo: string;
+  /** Receita acumulada até o dia, ou null se o dia ainda não aconteceu. */
+  realizado: number | null;
+  /** Curva projetada acumulada, que segue o realizado até hoje. */
+  projetado: number;
+}
+
+/**
+ * Curva do mês: o acumulado que já entrou e, a partir de hoje, o mesmo
+ * acumulado seguindo no ritmo atual até o último dia.
+ *
+ * As duas linhas se encontram no dia de hoje de propósito — é o que deixa
+ * visível, no gráfico, onde termina o fato e começa a estimativa.
+ */
+export function serieTendencia(e: EntradaProjecao, r: ResultadoProjecao): PontoTendencia[] {
+  const porDia = new Map(e.dias.map((d) => [d.data, d.receita]));
+  const totalDias = diaDoMes(e.fim);
+  const hojeDia = Math.min(diaDoMes(e.hoje), totalDias);
+  const diasProdutivosRestantes =
+    r.diasCorridos > 0 ? r.realizado.diasComMovimento / r.diasCorridos : 0;
+
+  const pontos: PontoTendencia[] = [];
+  let acumulado = 0;
+  let projetado = 0;
+  for (let dia = 1; dia <= totalDias; dia++) {
+    const data = `${e.inicio.slice(0, 7)}-${String(dia).padStart(2, "0")}`;
+    if (dia <= hojeDia) {
+      acumulado = cent(acumulado + (porDia.get(data) ?? 0));
+      projetado = acumulado;
+      pontos.push({ data, rotulo: fmtDia(data), realizado: acumulado, projetado });
+    } else {
+      // Cada dia futuro rende a média diária, descontada pela chance de o dia
+      // não ter movimento (domingo, feriado) observada no próprio mês.
+      projetado = cent(projetado + r.mediaDiaria * diasProdutivosRestantes);
+      pontos.push({ data, rotulo: fmtDia(data), realizado: null, projetado });
+    }
+  }
+  return pontos;
+}
