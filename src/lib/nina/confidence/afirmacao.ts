@@ -205,7 +205,10 @@ export function recorteDaAfirmacao(frase: string, trecho: string): string {
   if (!f || !alvo) return f;
   const pos = f.indexOf(alvo);
   if (pos < 0) return f;
-  const re = /\s*(?:,|;|\be\b|\bou\b|\/|\||–|—)\s*/g;
+  // A vírgula só separa quando vem seguida de espaço: "R$ 1.500,00" é um
+  // único valor, não duas afirmações.
+  const re = /,\s+|\s*(?:;|\be\b|\bou\b|\/|\||–|—)\s*/g;
+
   let inicio = 0;
   let m: RegExpExecArray | null;
   while ((m = re.exec(f)) !== null) {
