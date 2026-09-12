@@ -23,14 +23,35 @@
 import { normalizarTexto } from "./evidencia";
 import { classificarNatureza, oracoesDaResposta } from "./modalidade";
 import {
+  aplicabilidadeDaRegra,
   exigenciaLiteral,
-  regraSeAplica,
   regrasValidasParaPublicacao,
   type CategoriaProibida,
+  type EntradaAplicabilidade,
   type OperadorLiteral,
   type RegraPublicada,
 } from "./regras-publicadas";
+import { ehSaudacaoPura } from "./turno-tipo";
 import type { ContextoConfianca, ResultadoValidador, StatusValidador } from "./types";
+
+/**
+ * Sinais da CONVERSA usados para saber se uma regra condicionada a uma
+ * situação vale neste turno. Tudo determinístico e lido do próprio contexto —
+ * nada é inferido por modelo.
+ */
+export function sinaisDaConversa(ctx: ContextoConfianca): EntradaAplicabilidade {
+  const msg = (ctx.mensagemPaciente ?? "").trim();
+  const demandaDeclarada =
+    msg === "" ? null : ctx.turnType === "SAUDACAO" ? false : !ehSaudacaoPura(msg);
+  const apresentacaoJaFeita = ctx.businessContext?.apresentacaoJaFeita ?? null;
+  return {
+    mensagemPaciente: ctx.mensagemPaciente ?? null,
+    ambiente: ctx.businessContext?.ambiente ?? null,
+    demandaDeclarada,
+    apresentacaoJaFeita,
+    primeiraMensagem: apresentacaoJaFeita == null ? null : !apresentacaoJaFeita,
+  };
+}
 
 // ------------------------------------------------------------------ tipos
 
