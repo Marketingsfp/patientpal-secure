@@ -42,6 +42,12 @@ import type { RateioLinha } from "@/lib/financeiro/rateio-receita";
 import { receitaPorForma, type FatiaDaReceita } from "@/lib/financeiro/receita-por-forma";
 import { classificarForma } from "@/lib/financeiro/formas-pagamento";
 import { SEM_CATEGORIA } from "@/lib/financeiro/filtro-categoria";
+import {
+  fecharSaldoPorMeio,
+  somarNoMeio,
+  zeroSaldoPorMeio,
+  type SaldoPorMeio,
+} from "@/lib/financeiro/meio-pagamento";
 
 const round2 = (v: number) => +v.toFixed(2);
 
@@ -230,6 +236,12 @@ export interface ResumoPainel {
   /** Líquido do Rateio (receita bruta − repasse − terceiros). */
   liquidoAtendimentos: number;
   saldo: number;
+  /**
+   * O mesmo saldo separado pelo lugar onde o dinheiro está: GAVETA (espécie),
+   * BANCO (PIX, cartões, boleto, transferência) e OUTROS (convênio, sem
+   * informação). Mesma separação do Movimento de Caixa.
+   */
+  saldoMeios: SaldoPorMeio;
   /** Repasse efetivamente pago no período — é ele que entra na despesa. */
   repassePagoNoPeriodo: number;
   producao: ProducaoPainel;
@@ -297,6 +309,18 @@ export function resumoPainel(params: {
   const outrasComFormas = params.outrasReceitas.map((r) => ({
     formas: [{ forma: classificarForma(r.forma_pagamento), valor: r.valor }],
   }));
+  // Saldo por meio: as entradas vêm já repartidas por forma (inclusive nos
+  // pagamentos mistos) e as saídas pela forma do lançamento de despesa — as
+  // mesmas despesas que formam `despesasTotais`.
+  const saldoMeios = zeroSaldoPorMeio();
+  for (const l of params.rateio)
+    for (const f of l.formas ?? []) somarNoMeio(saldoMeios, f.forma, f.valor, "receita");
+  for (const o of params.outrasReceitas)
+    somarNoMeio(saldoMeios, classificarForma(o.forma_pagamento), o.valor, "receita");
+  for (const d of params.despesas)
+    somarNoMeio(saldoMeios, classificarForma(d.forma_pagamento), d.valor, "despesa");
+  fecharSaldoPorMeio(saldoMeios);
+
   return {
     receitaBruta,
     formas: receitaPorForma(params.rateio),
@@ -312,6 +336,7 @@ export function resumoPainel(params: {
     despesasTotais,
     liquidoAtendimentos: round2(receitaBruta - repasse - terceiro),
     saldo: round2(receitaBruta + outrasReceitas - despesasTotais),
+    saldoMeios,
     repassePagoNoPeriodo,
     producao,
     // Ticket médio da entrada de caixa: receita total ÷ pagamentos recebidos.

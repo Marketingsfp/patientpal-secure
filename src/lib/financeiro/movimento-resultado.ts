@@ -38,6 +38,12 @@ import { resolverModalidade, type MapaConvenioPaciente } from "@/lib/convenio/mo
 import { formaDoAtendimento } from "@/lib/repasse-calc";
 import { grupoDaDespesa, type GrupoDespesa } from "@/lib/financeiro/painel-financeiro";
 import { SEM_CATEGORIA } from "@/lib/financeiro/filtro-categoria";
+import {
+  fecharSaldoPorMeio,
+  somarNoMeio,
+  zeroSaldoPorMeio,
+  type SaldoPorMeio,
+} from "@/lib/financeiro/meio-pagamento";
 
 const round2 = (v: number) => +v.toFixed(2);
 
@@ -277,56 +283,16 @@ export interface ResumoMovimento {
   saldoMeios: SaldoPorMeio;
 }
 
-export interface MeioSaldo {
-  /** Receitas recebidas nesse meio. */
-  entradas: number;
-  /** Despesas pagas nesse meio. */
-  saidas: number;
-  /** entradas − saídas. */
-  saldo: number;
-}
-
-export interface SaldoPorMeio {
-  /** Dinheiro vivo — o que precisa estar na gaveta. */
-  especie: MeioSaldo;
-  /** PIX, cartões, boleto e transferência — cai na conta. */
-  banco: MeioSaldo;
-  /** Convênio, gratuidade, misto não decomposto e sem informação. */
-  outros: MeioSaldo;
-}
-
-/** Formas que representam dinheiro em conta bancária. */
-const FORMAS_BANCO: FormaCanonica[] = [
-  "pix",
-  "debito",
-  "credito",
-  "legado_cartao",
-  "boleto",
-  "transferencia",
-];
-
-const meioDaForma = (f: FormaCanonica): keyof SaldoPorMeio =>
-  f === "dinheiro" ? "especie" : FORMAS_BANCO.includes(f) ? "banco" : "outros";
+export type { MeioSaldo, SaldoPorMeio } from "@/lib/financeiro/meio-pagamento";
 
 /**
  * Separa entradas e saídas do período em espécie, banco e outros.
  * Função pura: recebe as mesmas linhas já classificadas do movimento.
  */
 export function saldoPorMeio(linhas: LinhaClassificada[]): SaldoPorMeio {
-  const zero = (): MeioSaldo => ({ entradas: 0, saidas: 0, saldo: 0 });
-  const out: SaldoPorMeio = { especie: zero(), banco: zero(), outros: zero() };
-  for (const l of linhas) {
-    const alvo = out[meioDaForma(l.forma)];
-    const v = Number(l.valor) || 0;
-    if (l.tipo === "receita") alvo.entradas += v;
-    else alvo.saidas += v;
-  }
-  for (const k of ["especie", "banco", "outros"] as const) {
-    out[k].entradas = round2(out[k].entradas);
-    out[k].saidas = round2(out[k].saidas);
-    out[k].saldo = round2(out[k].entradas - out[k].saidas);
-  }
-  return out;
+  const out = zeroSaldoPorMeio();
+  for (const l of linhas) somarNoMeio(out, l.forma, Number(l.valor) || 0, l.tipo as "receita" | "despesa");
+  return fecharSaldoPorMeio(out);
 }
 
 
