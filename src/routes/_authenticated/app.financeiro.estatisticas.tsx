@@ -13,7 +13,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { classifyAtendimento } from "@/lib/atendimento-classify";
 import {
   DateRangeFilter,
   computeRange,
@@ -151,9 +150,12 @@ function Page() {
           else if (row.tipo === "despesa") d += v;
         }
       }
-      // Atendimentos = visitas únicas (paciente × dia) com receita classificada como atendimento
-      // Cobre tanto o fluxo nativo (fin_atendimentos) quanto lançamentos importados (fin_lancamentos)
-      const visitas = new Set<string>();
+      // Mesma régua do Dashboard, do Movimento de Caixa e do Rateio: cada
+      // pagamento que entrou no caixa conta 1 atendimento — consulta, exame,
+      // procedimento, adesão, mensalidade, avulso, qualquer serviço pago.
+      // Cortesias (atendimento feito sem cobrança) também contam, por isso
+      // entram os atendimentos de valor zero que não geraram lançamento.
+      let cntA = 0;
       let totA = 0;
       const lancRows = (lancRes.data ?? []) as Array<{
         tipo: string;
@@ -164,12 +166,8 @@ function Page() {
         paciente_id: string | null;
       }>;
       for (const l of lancRows) {
-        if (l.tipo !== "receita" || l.status === "cancelado") continue;
-        if (classifyAtendimento(l.descricao) === null) continue; // ignora mensalidade/adesão/venda de cartão
-        const key = (l.paciente_id ?? `_${l.descricao}`) + "|" + l.data;
-        if (!visitas.has(key)) {
-          visitas.add(key);
-        }
+        if (l.tipo !== "receita" || l.status !== "confirmado") continue;
+        cntA += 1;
         totA += Number(l.valor) || 0;
       }
       for (const a of (atend.data ?? []) as Array<{
@@ -179,11 +177,10 @@ function Page() {
         status: string;
       }>) {
         if (a.status === "cancelado") continue;
-        const key = "AT|" + a.id;
-        visitas.add(key);
-        totA += Number(a.valor_total) || 0;
+        if ((Number(a.valor_total) || 0) > 0) continue; // já contado pelo pagamento no caixa
+        cntA += 1;
       }
-      const cntA = visitas.size;
+
       setStats({
         receita: r,
         despesa: d,
