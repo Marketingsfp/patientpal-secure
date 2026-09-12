@@ -629,6 +629,9 @@ export function avaliarObrigacoes(
   if ((ctx.mensagemPaciente ?? "").trim() === "") {
     limitacoes.push("MENSAGEM_DO_PACIENTE_NAO_REGISTRADA");
   }
+  if (situacaoDesconhecida) {
+    limitacoes.push("SITUACAO_DA_REGRA_NAO_CONHECIDA");
+  }
   if (avaliacoes.some((a) => a.obrigacao.tipo === "pergunta" && a.status === "cumprida")) {
     limitacoes.push("CONTEUDO_DA_RESPOSTA_NAO_CONFERIDO_NESTA_DIMENSAO");
   }
