@@ -314,6 +314,11 @@ function Page() {
   // depois das 21h e a tela aparecia vazia no fim do expediente.
   const [fromDate, setFromDate] = useState(hojeBR);
   const [toDate, setToDate] = useState(hojeBR);
+  // Mesmas pílulas do Dashboard e dos Relatórios (Dia, Ontem, Semana,
+  // Quinzena, Mês, Período). Elas só escrevem em De/Até — quem manda no que a
+  // tela busca continua sendo o par de datas.
+  const [presetPeriodo, setPresetPeriodo] = useState<DatePreset>("hoje");
+
   const [resumo, setResumo] = useState<{ r: number; d: number; saldo: number; totalRows: number }>({
     r: 0,
     d: 0,
