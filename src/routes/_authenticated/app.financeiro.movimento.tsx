@@ -2170,6 +2170,7 @@ function Page() {
         de={fromDate}
         ate={toDate}
         clinicaNome={clinicaAtual?.clinica.nome ?? "Clínica"}
+        conferencia={conferencia}
       />
 
       {/* Enquanto a busca ignora o período, a tela não é mais a conferência
