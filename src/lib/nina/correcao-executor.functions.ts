@@ -229,7 +229,7 @@ export const execucaoCorrecaoAtual = createServerFn({ method: "POST" })
     const { data: linha, error } = await supabase
       .from("nina_correcao_execucoes")
       .select(
-        "id, etapa, status, passos, resumo, erro, autorizado_por, autorizado_em, analise_id, pacote_hash, proposta_assinatura, ambiente, escopo",
+        "id, etapa, status, passos, resumo, erro, autorizado_por, autorizado_em, analise_id, pacote_hash, proposta_assinatura, ambiente, escopo, resultado_final, verificacao, alvo_revisao, tentativas",
       )
       .eq("clinica_id", data.clinicaId)
       .eq("feedback_id", data.feedbackId)
@@ -251,6 +251,10 @@ export const execucaoCorrecaoAtual = createServerFn({ method: "POST" })
       proposta_assinatura: string;
       ambiente: string | null;
       escopo: string | null;
+      resultado_final: ResultadoFinalExecucao | null;
+      verificacao: { conferido: boolean; alvo: string; motivo: string } | null;
+      alvo_revisao: string | null;
+      tentativas: number | null;
     };
   });
 
