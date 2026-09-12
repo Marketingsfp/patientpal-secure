@@ -181,7 +181,7 @@ export function decidirBloqueioBaixaConfianca(
       precedeEtapaAtivacao: false,
       precedeDecisaoMotor: false,
       explicacao: isencaoSocial
-        ? "turno social sem ação operacional: saudação não encaminha para humano"
+        ? "saudação sem ação operacional, sem afirmação sem fonte e sem pedido de humano: não encaminha"
         : `nivel=${e.nivel ?? "indisponivel"}: regra de baixa confiabilidade não se aplica`,
     };
   }
