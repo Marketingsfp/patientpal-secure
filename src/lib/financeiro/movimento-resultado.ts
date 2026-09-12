@@ -291,7 +291,12 @@ export type { MeioSaldo, SaldoPorMeio } from "@/lib/financeiro/meio-pagamento";
  */
 export function saldoPorMeio(linhas: LinhaClassificada[]): SaldoPorMeio {
   const out = zeroSaldoPorMeio();
-  for (const l of linhas) somarNoMeio(out, l.forma, Number(l.valor) || 0, l.tipo as "receita" | "despesa");
+  for (const l of linhas) {
+    // Sangria e suprimento (tipo "transferencia") são troca de custódia entre
+    // a gaveta e o financeiro — não são entrada nem saída de caixa.
+    if (l.tipo !== "receita" && l.tipo !== "despesa") continue;
+    somarNoMeio(out, l.forma, Number(l.valor) || 0, l.tipo);
+  }
   return fecharSaldoPorMeio(out);
 }
 
