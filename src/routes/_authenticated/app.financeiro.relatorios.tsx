@@ -2648,55 +2648,15 @@ function Page() {
             invertido
           />
 
-          {/* Mesma régua do Dashboard: receitas menos tudo que saiu do caixa,
-              com a quebra de onde o dinheiro está. Quando o Rateio está
-              recortado por profissional/serviço, o fechamento de caixa não
-              corresponde às linhas da tabela — aí segue valendo o líquido do
-              próprio Rateio. */}
-          {saldoCaixaRateio ? (
-            <CardResumo
-              titulo="Sobrou no caixa da clínica"
-              valor={brl(saldoCaixaRateio.saldo)}
-              detalhe={`Tudo que entrou no caixa menos tudo que foi pago (repasses e despesas) · fica com a clínica ${pct(
-                saldoCaixaRateio.receitaTotal > 0
-                  ? (saldoCaixaRateio.saldo / saldoCaixaRateio.receitaTotal) * 100
-                  : 0,
-              )} do que entrou`}
-              linhas={[
-                { rotulo: "Onde esse dinheiro está", secao: true },
-                {
-                  rotulo: "Em espécie (na gaveta)",
-                  valor: brl(saldoCaixaRateio.saldoMeios.especie.saldo),
-                },
-                {
-                  rotulo: "Em banco (PIX, cartão, boleto)",
-                  valor: brl(saldoCaixaRateio.saldoMeios.banco.saldo),
-                },
-                ...(saldoCaixaRateio.saldoMeios.outros.entradas !== 0 ||
-                saldoCaixaRateio.saldoMeios.outros.saidas !== 0
-                  ? [
-                      {
-                        rotulo: "Outros (convênio, sem informação)",
-                        valor: brl(saldoCaixaRateio.saldoMeios.outros.saldo),
-                      },
-                    ]
-                  : []),
-                { rotulo: "Só dos atendimentos da tabela abaixo", secao: true },
-                {
-                  rotulo: "Receita − repasse ao prestador",
-                  valor: brl(totaisR.liquido),
-                },
-              ]}
-              nota="O valor grande considera todo o movimento do caixa no período, inclusive despesas. A linha do fim considera apenas consultas e exames, sem despesas — por isso os dois números são diferentes."
-            />
-          ) : (
-            <CardResumo
-              titulo="Líquido da clínica"
-              valor={brl(totaisR.liquido)}
-              detalhe={`Margem de ${pct(totaisR.margem)} · líquido do Rateio (recorte aplicado)`}
-              delta={deltaDe(totaisR.liquido, totaisComp.liquido)}
-            />
-          )}
+          {/* O Rateio responde outra pergunta que o Dashboard: aqui o líquido é
+              só receita menos repasse dos atendimentos da tabela, sem despesas
+              do caixa. Manter as duas contas separadas é proposital. */}
+          <CardResumo
+            titulo="Líquido da clínica"
+            valor={brl(totaisR.liquido)}
+            detalhe={`Margem de ${pct(totaisR.margem)} · receita menos repasse dos atendimentos`}
+            delta={deltaDe(totaisR.liquido, totaisComp.liquido)}
+          />
         </div>
       )}
 
