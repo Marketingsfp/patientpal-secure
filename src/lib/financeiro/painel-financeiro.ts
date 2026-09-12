@@ -170,6 +170,9 @@ export function producaoDoRateio(
     consultasConvenio: 0,
     exames: 0,
     outros: 0,
+    mensalidades: 0,
+    adesoes: 0,
+
   };
   for (const l of linhas) {
     const c = categoriaDoAtendimento(l);
