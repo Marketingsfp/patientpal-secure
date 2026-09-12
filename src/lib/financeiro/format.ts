@@ -4,7 +4,7 @@ export const brl = (v: number | string | null | undefined) =>
 export const fmtDate = (iso: string | null | undefined) =>
   iso ? new Date(iso + (iso.length === 10 ? "T00:00:00" : "")).toLocaleDateString("pt-BR") : "—";
 
-export type Periodo = "hoje" | "semana" | "mes" | "personalizado";
+export type Periodo = "hoje" | "ontem" | "semana" | "mes" | "personalizado";
 
 export function rangeFromPeriodo(p: Periodo, custom?: { from: Date; to: Date }) {
   const now = new Date();
@@ -12,6 +12,12 @@ export function rangeFromPeriodo(p: Periodo, custom?: { from: Date; to: Date }) 
   const end = new Date(now);
   if (p === "hoje") {
     start.setHours(0, 0, 0, 0);
+    end.setHours(23, 59, 59, 999);
+  } else if (p === "ontem") {
+    // Dia anterior inteiro: a tesouraria fecha o caixa do dia que passou.
+    start.setDate(start.getDate() - 1);
+    start.setHours(0, 0, 0, 0);
+    end.setDate(end.getDate() - 1);
     end.setHours(23, 59, 59, 999);
   } else if (p === "semana") {
     const d = start.getDay();

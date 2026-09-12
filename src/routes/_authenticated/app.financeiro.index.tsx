@@ -66,11 +66,29 @@ export const Route = createFileRoute("/_authenticated/app/financeiro/")({
  * Somando o mês inteiro, o card de Receitas mostrava dinheiro que ainda não
  * entrou (em 01/09/2026 eram R$ 9.547,00 de vencimentos de 02/09 a 29/09).
  */
-function periodoAteHoje(periodo: Periodo) {
+function periodoAteHoje(periodo: Periodo, custom?: { de: string; ate: string }) {
+  if (periodo === "personalizado") {
+    // O intervalo digitado é usado como está, só ordenado e limitado a hoje —
+    // pela mesma razão dos períodos prontos: vencimento futuro não é receita.
+    const hoje = hojeBR();
+    const de = custom?.de || hoje;
+    const ate = custom?.ate || hoje;
+    const [ini, fim] = de <= ate ? [de, ate] : [ate, de];
+    return { de: ini, ate: fim > hoje ? hoje : fim };
+  }
   const { from, to } = rangeFromPeriodo(periodo);
   const hoje = hojeBR();
   return { de: from, ate: to > hoje ? hoje : to };
 }
+
+/** Rótulo de cada botão do filtro de período do dashboard. */
+const ROTULO_PERIODO: Record<Periodo, string> = {
+  hoje: "Hoje",
+  ontem: "Ontem",
+  semana: "Semana",
+  mes: "Mês",
+  personalizado: "Período",
+};
 
 /**
  * De quanto em quanto tempo os números se atualizam sozinhos, sem F5. A tela
@@ -124,6 +142,11 @@ function FinDashboard() {
   const { clinicaAtual } = useClinica();
   const podeEscrever = usePodeEscrever("financeiro");
   const [periodo, setPeriodo] = useState<Periodo>("mes");
+  /** Datas do botão "Período" (intervalo escolhido pela pessoa). */
+  const [custom, setCustom] = useState<{ de: string; ate: string }>(() => ({
+    de: hojeBR(),
+    ate: hojeBR(),
+  }));
   const [open, setOpen] = useState<null | "receita" | "despesa">(null);
   const [reload, setReload] = useState(0);
   const [dados, setDados] = useState<DadosPainel | null>(null);
@@ -144,7 +167,7 @@ function FinDashboard() {
   /** Clínica + período dos números na tela, e quando foram lidos. */
   const ultimaCarga = useRef<{ chave: string; em: number } | null>(null);
 
-  const { de, ate } = periodoAteHoje(periodo);
+  const { de, ate } = periodoAteHoje(periodo, custom);
 
   useEffect(() => {
     if (!clinicaAtual) return;
@@ -262,17 +285,38 @@ function FinDashboard() {
       <CardPendenciasRepasse atualizacao={reload} />
 
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-        <div className="flex gap-2">
-          {(["hoje", "semana", "mes"] as Periodo[]).map((p) => (
+        <div className="flex flex-wrap items-center gap-2">
+          {(["hoje", "ontem", "semana", "mes", "personalizado"] as Periodo[]).map((p) => (
             <Button
               key={p}
               size="sm"
               variant={periodo === p ? "default" : "outline"}
               onClick={() => setPeriodo(p)}
             >
-              {p === "hoje" ? "Hoje" : p === "semana" ? "Semana" : "Mês"}
+              {ROTULO_PERIODO[p]}
             </Button>
           ))}
+          {periodo === "personalizado" && (
+            <div className="flex items-center gap-2">
+              <input
+                type="date"
+                aria-label="Início do período"
+                className="h-8 rounded-md border border-input bg-background px-2 text-sm"
+                value={custom.de}
+                max={hojeBR()}
+                onChange={(e) => setCustom((c) => ({ ...c, de: e.target.value || c.de }))}
+              />
+              <span className="text-sm text-muted-foreground">até</span>
+              <input
+                type="date"
+                aria-label="Fim do período"
+                className="h-8 rounded-md border border-input bg-background px-2 text-sm"
+                value={custom.ate}
+                max={hojeBR()}
+                onChange={(e) => setCustom((c) => ({ ...c, ate: e.target.value || c.ate }))}
+              />
+            </div>
+          )}
         </div>
         <ContagemAtualizacao
           atualizadoEm={atualizadoEm}
