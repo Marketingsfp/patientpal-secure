@@ -1,0 +1,1 @@
+REVOKE EXECUTE ON FUNCTION public.atend_presenca_serializa() FROM PUBLIC, anon, authenticated;
