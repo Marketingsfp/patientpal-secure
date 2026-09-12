@@ -263,7 +263,28 @@ export function fecharAuditoriaRodada(
   };
 }
 
-/** Serialização para o `turn.summary`. Sem texto de paciente fora do diagnóstico. */
+/**
+ * Serialização para o `turn.summary`. Sem texto de paciente fora do
+ * diagnóstico.
+ *
+ * O rastro sanitiza metadata a partir de certa profundidade: um objeto
+ * aninhado vira "[objeto]" e a evidência se perde. Por isso cada lista vai
+ * ACHATADA em linhas legíveis — a auditoria continua conferível no banco.
+ */
+function linhaRegra(r: ReferenciaRegra): string {
+  const partes = [
+    r.id,
+    r.natureza ?? "-",
+    r.prioridade ?? "-",
+    r.verificacao ?? "-",
+    r.condicao ? `condicao=${r.condicao}` : "condicao=-",
+    r.ambiente ? `ambiente=${r.ambiente}` : "ambiente=-",
+    r.hash ?? "-",
+    r.descricao,
+  ];
+  return partes.join(" | ");
+}
+
 export function auditoriaParaTrace(a: AuditoriaInstrucoesRodada): Record<string, unknown> {
   return {
     rodada: a.rodada,
@@ -272,18 +293,25 @@ export function auditoriaParaTrace(a: AuditoriaInstrucoesRodada): Record<string,
     versao: a.versao,
     versao_id: a.versaoId,
     prompt_hash: a.promptHash,
-    blocos: a.blocos,
-    regras_identificadas: a.regrasIdentificadas,
-    regras_aplicaveis: a.regrasAplicaveis,
-    regras_nao_aplicaveis: a.regrasNaoAplicaveis,
-    regras_nao_interpretadas: a.regrasNaoInterpretadas,
-    regras_suprimidas: a.regrasSuprimidas,
-    verificacoes: a.verificacoes,
+    blocos: a.blocos.map((b) => `${b.rotulo} | ${b.origem} | ${b.hash ?? "-"} | ${b.tamanho}`),
+    regras_identificadas: a.regrasIdentificadas.map(linhaRegra),
+    regras_aplicaveis: a.regrasAplicaveis.map(linhaRegra),
+    regras_nao_aplicaveis: a.regrasNaoAplicaveis.map(linhaRegra),
+    regras_nao_interpretadas: a.regrasNaoInterpretadas.map(linhaRegra),
+    regras_suprimidas: a.regrasSuprimidas.map(
+      (s) => `${s.codigo} | ${s.motivo ?? "-"} | por=${s.por ?? "-"}`,
+    ),
+    verificacoes: a.verificacoes.map(
+      (v) => `${v.regraId ?? "-"} | ${v.estado} | ${v.motivo ?? "-"} | ${v.descricao}`,
+    ),
     estado: a.estado,
     resposta_original: a.respostaOriginal,
-    intervencoes: a.intervencoes,
+    intervencoes: a.intervencoes.map(
+      (i) => `${i.etapa} | alterou=${i.alterou === null ? "-" : i.alterou} | ${i.motivo}`,
+    ),
     entregue: a.entregue,
     limitacoes: a.limitacoes,
     em: a.em,
   };
 }
+
