@@ -2984,8 +2984,8 @@ export const definirPresenca = createServerFn({ method: "POST" })
     // recente), sempre para quem tem menos conversas ativas.
     let distribuidas = 0;
     if (
-      data.status === "ONLINE" &&
-      (data.aceitaNovas ?? true) &&
+      tecnico.status === "ONLINE" &&
+      tecnico.aceitaNovas &&
       (await temTelefonia(context.supabase as never, context.userId, data.clinicaId))
     ) {
       const { data: n, error: e2 } = await context.supabase.rpc("atend_distribuir_fila", {
@@ -2996,6 +2996,95 @@ export const definirPresenca = createServerFn({ method: "POST" })
       else distribuidas = Number(n ?? 0);
     }
     return { ok: true, distribuidas };
+  });
+
+/**
+ * FASE 1 — ÚNICA operação que grava a escolha manual de presença.
+ *
+ * • Só o próprio atendente altera a própria presença (`context.userId`), nunca
+ *   a de outra pessoa: nenhum `userId` é aceito na entrada.
+ * • Só os três estados permitidos são aceitos (Online, Offline, Em pausa).
+ * • Concorrência: a tela envia a versão que leu; se já mudou em outro lugar, a
+ *   gravação é recusada com a versão atual, em vez de sobrescrever.
+ * • Registra estado, quem alterou, quando e versão — e guarda o histórico em
+ *   `atend_presenca_manual_log`, sem apagar nada.
+ */
+export const definirPresencaManual = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) =>
+    z
+      .object({
+        clinicaId: z.string().uuid(),
+        estado: z.enum(ESTADOS_MANUAIS),
+        versao: z.number().int().nonnegative().optional(),
+      })
+      .parse(i),
+  )
+  .handler(async ({ data, context }) => {
+    await assertMember(context.supabase, context.userId, data.clinicaId);
+
+    const { data: atual } = await context.supabase
+      .from("atend_agente_presenca")
+      .select("estado_manual_versao")
+      .eq("clinica_id", data.clinicaId)
+      .eq("user_id", context.userId)
+      .maybeSingle();
+    const versaoAtual =
+      (atual as { estado_manual_versao?: number | null } | null)?.estado_manual_versao ?? 0;
+    if (!versaoAceita(versaoAtual, data.versao)) {
+      return { ok: false as const, conflito: true as const, versao: versaoAtual };
+    }
+
+    const agora = new Date().toISOString();
+    const novaVersao = versaoAtual + 1;
+    const tecnico = tecnicoDoEstadoManual(data.estado);
+    const { error } = await context.supabase.from("atend_agente_presenca").upsert(
+      {
+        clinica_id: data.clinicaId,
+        user_id: context.userId,
+        status: tecnico.status,
+        aceita_novas: tecnico.aceitaNovas,
+        visto_em: agora,
+        estado_manual: data.estado,
+        estado_manual_em: agora,
+        estado_manual_por: context.userId,
+        estado_manual_versao: novaVersao,
+      },
+      { onConflict: "clinica_id,user_id" },
+    );
+    if (error) throw new Error(error.message);
+
+    const { error: eLog } = await context.supabase.from("atend_presenca_manual_log").insert({
+      clinica_id: data.clinicaId,
+      user_id: context.userId,
+      estado: data.estado,
+      versao: novaVersao,
+      definido_por: context.userId,
+    });
+    if (eLog) console.error("[atendimento] falha ao registrar histórico de presença:", eLog.message);
+
+    // Escolher Online devolve a pessoa ao pool e reavalia "Não atribuídas".
+    let distribuidas = 0;
+    if (
+      data.estado === "ONLINE" &&
+      (await temTelefonia(context.supabase as never, context.userId, data.clinicaId))
+    ) {
+      const { data: n, error: e2 } = await context.supabase.rpc("atend_distribuir_fila", {
+        _clinica_id: data.clinicaId,
+        _max: 20,
+      } as never);
+      if (e2) console.error("[atendimento] falha ao distribuir fila:", e2.message);
+      else distribuidas = Number(n ?? 0);
+    }
+
+    return {
+      ok: true as const,
+      conflito: false as const,
+      estado: data.estado,
+      versao: novaVersao,
+      em: agora,
+      distribuidas,
+    };
   });
 
 /**
