@@ -534,6 +534,7 @@ function CardResumo({
   invertido = false,
   composicao,
   linhas,
+  nota,
 }: {
   titulo: string;
   valor: string;
@@ -544,8 +545,11 @@ function CardResumo({
   invertido?: boolean;
   /** Quebra por forma de pagamento, listada abaixo do valor. */
   composicao?: FatiaDaReceita[];
-  /** Linhas livres abaixo do valor — usado na quebra espécie/banco. */
-  linhas?: { rotulo: string; valor: string }[];
+  /** Linhas livres abaixo do valor — usado na quebra espécie/banco.
+   *  `secao` vira um subtítulo que separa blocos de leitura diferentes. */
+  linhas?: { rotulo: string; valor?: string; secao?: boolean }[];
+  /** Frase curta de rodapé explicando como ler o card. */
+  nota?: string;
 }) {
   const bom = delta == null ? true : invertido ? delta <= 0 : delta >= 0;
   const Icone = delta == null || delta === 0 ? Minus : delta > 0 ? ArrowUpRight : ArrowDownRight;
