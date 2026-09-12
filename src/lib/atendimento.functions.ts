@@ -1093,27 +1093,9 @@ export const meuStatusAgente = createServerFn({ method: "POST" })
     };
   });
 
-/**
- * FASE 2 — encerra a presença do usuário em todas as clínicas.
- *
- * Usado no logout e ao fechar a ÚLTIMA aba: quem sai da sessão não pode
- * continuar no pool de distribuição. Não mexe nas conversas já atribuídas —
- * ficar offline só impede novas atribuições.
- */
-export const encerrarMinhaPresenca = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
-  .handler(async ({ context }) => {
-    const { error } = await context.supabase
-      .from("atend_agente_presenca")
-      .update({
-        status: "OFFLINE",
-        aceita_novas: false,
-        visto_em: new Date().toISOString(),
-      })
-      .eq("user_id", context.userId);
-    if (error) throw new Error(error.message);
-    return { ok: true };
-  });
+/* FASE 2 — `encerrarMinhaPresenca` foi removida: sair da sessão, fechar a
+ * página ou perder a conexão não podem mais mudar a escolha de presença.
+ * O único caminho de gravação é `definirPresencaManual`. */
 
 
 /* =========================================================
