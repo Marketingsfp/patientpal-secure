@@ -2794,8 +2794,8 @@ async function gerarRespostaNinaInterno(
           conflitoDeIdentidade: diagnosticoSaudacao.saudacaoDuplicada === true,
           conformidadeBloqueante: revisao.bloqueiaEntrega === true,
           conformidadeNaoVerificada:
-            revisao.conformidade?.estado === "nao_verificada" ||
-            revisao.conformidade?.estado === "indeterminada",
+            revisao.conformidade?.estado === "sem_verificacao" ||
+            revisao.conformidade?.estado === "falha_na_interpretacao",
         },
         bloqueadoresAbsolutos: respostaFinalAvaliada.hardBlockers ?? [],
         conteudoCandidatoHash: respostaFinalAvaliada.textoAvaliadoHash ?? null,
