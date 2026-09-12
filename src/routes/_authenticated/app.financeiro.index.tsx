@@ -327,10 +327,11 @@ function FinDashboard() {
         />
         <p className="text-xs text-muted-foreground">
           {fmtDate(de)}
-          {de !== ate && ` a ${fmtDate(ate)}`} · atendimentos e repasse pela mesma conta do Rateio
-          da Receita (Relatórios), no dia do atendimento. Clique em um card para ver o detalhamento
-          em tela cheia.
+          {de !== ate && ` a ${fmtDate(ate)}`} · tudo que entrou no caixa, pelo dia do pagamento —
+          mesma conta do Movimento de Caixa e do Rateio da Receita (Relatórios). Clique em um card
+          para ver o detalhamento em tela cheia.
         </p>
+
       </div>
 
       <section className="space-y-2">
