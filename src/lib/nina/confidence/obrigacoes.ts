@@ -744,40 +744,24 @@ export function InstructionComplianceValidator(
   const descumpridas = consideradas.filter((a) => a.status === "descumprida");
   const verificaveis = consideradas.filter((a) => a.status !== "indeterminada");
 
-  // Turno social sem ação operacional (saudação, ou esclarecimento em curso):
-  // uma regra publicada em aberto que não pôde ser conferida NÃO é indício de
-  // descumprimento. Marcá-la como UNKNOWN derrubava a cobertura de evidências
-  // e rebaixava uma saudação correta para Baixa.
-  const turnoSocialSemAcao =
-    ctx.turnType === "SAUDACAO" ||
-    (ctx.turnType === "ESCLARECIMENTO" && (ctx.requestedAction ?? null) === null);
-
+  // Não existe mais isenção por "turno social". O que decide é a REGRA: se a
+  // condição dela não ocorreu, ela já saiu na aplicabilidade; se ocorreu e não
+  // pôde ser conferida, continua UNKNOWN, em qualquer tipo de turno.
   let status: StatusValidador;
   let reasonCode: string;
   if (verificaveis.length === 0 && pendentes.length > 0) {
     status = "PENDING";
     reasonCode = "AMBIGUIDADE_A_RESOLVER";
-  } else if (verificaveis.length === 0 && turnoSocialSemAcao) {
-    status = "NOT_APPLICABLE";
-    reasonCode = "TURNO_SOCIAL_SEM_OBRIGACAO_VERIFICAVEL";
   } else if (verificaveis.length === 0) {
     status = "UNKNOWN";
     reasonCode = "OBRIGACOES_NAO_VERIFICAVEIS";
-  } else if (
-    descumpridas.length === 0 &&
-    r.estadoRestricoes === "indeterminadas" &&
-    !turnoSocialSemAcao
-  ) {
+  } else if (descumpridas.length === 0 && r.estadoRestricoes === "indeterminadas") {
     // Existe regra publicada aplicável que não pôde ser conferida: não aprova.
     status = "UNKNOWN";
     reasonCode = "RESTRICAO_PUBLICADA_NAO_VERIFICADA";
   } else if (descumpridas.length === 0) {
     status = "PASS";
-    reasonCode = r.esclarecimentoPertinente
-      ? "ESCLARECIMENTO_PERTINENTE"
-      : r.estadoRestricoes === "indeterminadas"
-        ? "TURNO_SOCIAL_SEM_RESTRICAO_APLICAVEL"
-        : "OBRIGACOES_CUMPRIDAS";
+    reasonCode = r.esclarecimentoPertinente ? "ESCLARECIMENTO_PERTINENTE" : "OBRIGACOES_CUMPRIDAS";
   } else if (descumpridas.some((a) => a.obrigacao.origem === "instrucoes_publicadas")) {
     // Violação de regra publicada é sempre falha, mesmo com esclarecimento
     // pertinente ou fatos corretos no restante da resposta.
