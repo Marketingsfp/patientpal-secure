@@ -120,6 +120,12 @@ export interface ProducaoPainel {
   mensalidades: number;
   /** Taxas de adesão (e inclusão de dependente) recebidas no período. */
   adesoes: number;
+  /**
+   * Atendimento feito sem cobrança: revisão de cortesia e gratuidade do
+   * Cartão. Conta como atendimento e vale R$ 0,00; fica em card próprio para
+   * não inflar consultas e exames.
+   */
+  cortesias: number;
 }
 
 /** Como o recebimento sem agendamento entra nos cards de contagem. */
