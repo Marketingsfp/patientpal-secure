@@ -405,6 +405,34 @@ function Pagina() {
   const [decidindo, setDecidindo] = useState(false);
   // Chave de ativação da análise por IA (não afeta reporte nem auditoria).
   const [analiseIAAtiva, setAnaliseIAAtiva] = useState(true);
+  // Correção assistida: execução em andamento e resumo do que foi feito.
+  const [corrigindo, setCorrigindo] = useState<Record<string, boolean>>({});
+  const [execucoes, setExecucoes] = useState<Record<string, ResumoExecucao>>({});
+  const aplicarComIAFn = useServerFn(aplicarCorrecaoComIA);
+
+  /**
+   * O clique é a autorização: executa a proposta já exibida no cartão, no
+   * escopo e ambiente mostrados. Sem nova cadeia de confirmação.
+   */
+  const aplicarComIA = async (id: string) => {
+    if (!clinicaId) return;
+    setCorrigindo((c) => ({ ...c, [id]: true }));
+    try {
+      const r = (await aplicarComIAFn({
+        data: { clinicaId, feedbackId: id },
+      })) as unknown as ResumoExecucao;
+      setExecucoes((e) => ({ ...e, [id]: r }));
+      if (r.status === "aplicado") toast.success("Correção aplicada e comprovada em homologação.");
+      else if (r.status === "pendente_tecnico")
+        toast.info("Mudança registrada para quem publica código.");
+      else toast.warning(r.motivo);
+      await Promise.all([carregar(), carregarAcoes()]);
+    } catch (e) {
+      mostrarErro(e);
+    } finally {
+      setCorrigindo((c) => ({ ...c, [id]: false }));
+    }
+  };
 
   const decidirProblema = useServerFn(decidirProblemaFeedbackNina);
   const listarDecisoes = useServerFn(listarDecisoesFeedbackNina);
