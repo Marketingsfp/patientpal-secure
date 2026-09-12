@@ -71,5 +71,5 @@ const recoverStaleServerFunction = createMiddleware({ type: "function" }).client
 
 export const startInstance = createStart(() => ({
   requestMiddleware: [errorMiddleware],
-  functionMiddleware: [recoverStaleServerFunction, attachSupabaseAuth],
+  functionMiddleware: [recoverStaleServerFunction, anexarTokenSessao],
 }));
