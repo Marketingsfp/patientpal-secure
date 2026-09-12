@@ -14,6 +14,7 @@ import {
 const linha = (p: Partial<RateioLinha>): RateioLinha => ({
   id: Math.random().toString(36).slice(2),
   data: "2026-09-10",
+  origem: "atendimento",
   medico_id: "m1",
   medico_nome: "DRA. ISIS",
   especialidade_id: null,
@@ -127,14 +128,18 @@ describe("resumoPainel", () => {
   const outras = [lanc({ categoria_nome: "MENSALIDADE CARTAO CONSULTA", valor: 50 })];
   const r = resumoPainel({ rateio, despesas, outrasReceitas: outras });
 
-  it("receita bruta, repasse e atendimentos são os do Rateio", () => {
+  it("receita bruta e repasse são os do Rateio; cada pagamento conta 1 atendimento", () => {
     expect(r.receitaBruta).toBe(500);
     expect(r.repasse).toBe(220);
     expect(r.terceiro).toBe(30);
-    expect(r.producao.total).toBe(2);
+    // 2 atendimentos do Rateio + 1 mensalidade recebida.
+    expect(r.producao.total).toBe(3);
+    expect(r.producao.outros).toBe(1);
     expect(r.liquidoAtendimentos).toBe(250);
-    expect(r.ticketMedio).toBe(250);
+    // Ticket médio = (500 + 50) / 3.
+    expect(r.ticketMedio).toBe(183.33);
   });
+
 
   it("repasse pago não entra de novo como despesa", () => {
     expect(r.despesasOperacionais).toBe(100);
@@ -165,9 +170,11 @@ describe("resumoPainel", () => {
     expect(soma).toBe(comPix.receitaTotal);
     expect(comPix.formasReceitaTotal.find((f) => f.forma === "pix")?.valor).toBe(80);
     expect(comPix.formasReceitaTotal.find((f) => f.forma === "dinheiro")?.valor).toBe(550);
-    // O ticket médio continua só dos atendimentos.
-    expect(comPix.ticketMedio).toBe(250);
+    // Cada recebimento também conta como atendimento: (500+50+80) / 4.
+    expect(comPix.producao.total).toBe(4);
+    expect(comPix.ticketMedio).toBe(157.5);
   });
+
 });
 
 describe("agrupamentos do detalhamento", () => {

@@ -1,6 +1,12 @@
 /**
  * Acesso ao banco dos cards do Financeiro → Dashboard. A regra de cada card
  * vive em `painel-financeiro` (módulo puro, testado); aqui só se busca.
+ *
+ * Desde 12/09/2026 a receita inteira — atendimentos e recebimentos sem
+ * agendamento — vem de uma fonte só, `carregarRateio`, pelo dia em que o
+ * dinheiro entrou no caixa. Antes as mensalidades e os avulsos eram buscados
+ * aqui à parte, e era isso que fazia o Dashboard, o Movimento de Caixa e o
+ * relatório de Rateio mostrarem três números diferentes para o mesmo dia.
  */
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -43,8 +49,10 @@ async function paginado(montar: () => any): Promise<LancRaw[]> {
 }
 
 export interface DadosPainel {
+  /** Só as linhas de atendimento (com prestador). */
   rateio: RateioLinha[];
   despesas: DespesaPainel[];
+  /** Mensalidades, adesões e avulsos — as linhas `avulso` do mesmo rateio. */
   outrasReceitas: LancamentoPainel[];
 }
 
@@ -54,7 +62,7 @@ export async function carregarPainelFinanceiro(
   de: string,
   ate: string,
 ): Promise<DadosPainel> {
-  const [rateio, despesasRaw, receitasRaw, manuais] = await Promise.all([
+  const [todasAsLinhas, despesasRaw] = await Promise.all([
     carregarRateio(ctx, { clinicaId, de, ate }),
     paginado(() =>
       supabase
@@ -68,37 +76,7 @@ export async function carregarPainelFinanceiro(
         .order("data", { ascending: false })
         .order("id"),
     ),
-    // Receita sem agendamento: é exatamente o que o Rateio deixa de fora.
-    paginado(() =>
-      supabase
-        .from("fin_lancamentos")
-        .select(COLUNAS)
-        .eq("clinica_id", clinicaId)
-        .eq("tipo", "receita")
-        .eq("status", "confirmado")
-        .is("agendamento_id", null)
-        .gte("data", de)
-        .lte("data", ate)
-        .order("data", { ascending: false })
-        .order("id"),
-    ),
-    // Atendimento lançado à mão pode apontar para um lançamento sem
-    // agendamento; esse dinheiro já está no Rateio e não pode entrar de novo
-    // em Outras receitas.
-    supabase
-      .from("fin_atendimentos")
-      .select("lancamento_id")
-      .eq("clinica_id", clinicaId)
-      .gte("data", de)
-      .lte("data", ate)
-      .not("lancamento_id", "is", null),
   ]);
-  if (manuais.error) throw manuais.error;
-  const jaNoRateio = new Set(
-    ((manuais.data ?? []) as Array<{ lancamento_id: string | null }>)
-      .map((m) => m.lancamento_id)
-      .filter((x): x is string => !!x),
-  );
 
   const paraPainel = (r: LancRaw): LancamentoPainel => ({
     id: r.id,
@@ -112,8 +90,17 @@ export async function carregarPainelFinanceiro(
   });
 
   return {
-    rateio,
+    rateio: todasAsLinhas.filter((l) => l.origem === "atendimento"),
     despesas: classificarDespesas(despesasRaw.map(paraPainel)),
-    outrasReceitas: receitasRaw.filter((r) => !jaNoRateio.has(r.id)).map(paraPainel),
+    outrasReceitas: todasAsLinhas
+      .filter((l) => l.origem === "avulso")
+      .map((l) => ({
+        id: l.id,
+        data: l.data,
+        descricao: l.servico_nome,
+        valor: l.receita,
+        categoria_nome: l.categoria_nome,
+        forma_pagamento: l.formas[0]?.forma ?? null,
+      })),
   };
 }

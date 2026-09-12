@@ -15,6 +15,7 @@ import {
 const linha = (over: Partial<RateioLinha>): RateioLinha => ({
   id: over.id ?? "x",
   data: "2026-08-03",
+  origem: "atendimento",
   medico_id: "med-1",
   medico_nome: "DRA. ANA",
   especialidade_id: "esp-1",

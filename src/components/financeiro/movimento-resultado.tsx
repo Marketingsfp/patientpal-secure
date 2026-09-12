@@ -239,18 +239,18 @@ export function MovimentoResultado({
           novaAba
           onClick={() => abrir("receita")}
           icon={TrendingUp}
-          label="Receita bruta (atendimentos)"
-          value={v(r.atendimentos.total)}
+          label="Receita bruta"
+          value={v(r.receitaBruta.total)}
           accent="success"
           detalhe={
             pronto
-              ? `${plural(r.atendimentos.fichas, "ficha", "fichas")} · Particular, Cartão e Convênio`
-              : "Atendimentos recebidos no caixa"
+              ? `${plural(r.receitaBruta.qtd, "atendimento", "atendimentos")} · consultas, exames, procedimentos, mensalidades e avulsos`
+              : "Tudo que entrou no caixa"
           }
         >
           {pronto && (
             <ul className="mt-2 space-y-0.5 border-t border-border/60 pt-2">
-              {r.atendimentos.formas.map((f) => (
+              {r.receitaBruta.formas.map((f) => (
                 <li key={f.rotulo} className="flex items-center justify-between gap-2 text-xs">
                   <span className="text-muted-foreground">{f.rotulo}</span>
                   <span className="tabular-nums">{brl(f.valor)}</span>
@@ -258,6 +258,7 @@ export function MovimentoResultado({
               ))}
             </ul>
           )}
+
         </KpiCard>
         <KpiCard
           novaAba
@@ -554,22 +555,24 @@ function montarDetalhe(
   const hora = (l: LinhaClassificada) => l.hora ?? "";
 
   if (drill === "receita") {
-    const atend = receitas.filter((l) => ehAtendimento(l.grupo));
+    const atend = receitas;
     const resumo = [
       { rotulo: "Receita de atendimentos", valor: r.atendimentos.total },
       ...CONDICOES.filter((c) => r.atendimentos.porCondicao[c].qtd > 0).map((c) => ({
         rotulo: LABEL_CONDICAO[c],
         valor: r.atendimentos.porCondicao[c].total,
       })),
+      { rotulo: "Mensalidades, adesões e avulsos", valor: r.outras.total },
     ];
     const base = {
-      titulo: "Receita bruta (atendimentos)",
+      titulo: "Receita bruta",
       explicacao:
-        "Pagamentos de atendimento que passaram pelo caixa no período, separados em Particular, Cartão Benefícios e Convênio. Mensalidades, adesões e recebimentos avulsos estão em Outras receitas.",
+        "Tudo que entrou no caixa no período: consultas, exames, procedimentos, adesões, mensalidades e recebimentos avulsos. Cada pagamento recebido conta como um atendimento.",
       resumo,
-      composicao: r.atendimentos.formas,
+      composicao: r.receitaBruta.formas,
       temSintetico: true,
     };
+
     if (visao === "sintetico") {
       const linhasSint: Celula[][] = [];
       for (const c of CONDICOES) {
@@ -585,6 +588,11 @@ function montarDetalhe(
             d.exame.total,
           ]);
       }
+      for (const g of GRUPOS_OUTRAS) {
+        const d = r.outras.porGrupo[g];
+        if (d.qtd === 0) continue;
+        linhasSint.push(["Outras receitas", LABEL_GRUPO_MOV[g], d.qtd, d.total]);
+      }
       return {
         ...base,
         colunas: [
@@ -594,9 +602,10 @@ function montarDetalhe(
           { rotulo: "Valor", tipo: "moeda" },
         ],
         linhas: linhasSint,
-        totais: ["TOTAL", "", r.atendimentos.qtd, r.atendimentos.total],
+        totais: ["TOTAL", "", r.receitaBruta.qtd, r.receitaBruta.total],
       };
     }
+
     return {
       ...base,
       colunas: [
@@ -622,7 +631,7 @@ function montarDetalhe(
         Number(l.valor),
       ]),
       totais: [
-        plural(r.atendimentos.qtd, "pagamento", "pagamentos"),
+        plural(r.receitaBruta.qtd, "atendimento", "atendimentos"),
         "",
         "",
         "",
@@ -630,8 +639,9 @@ function montarDetalhe(
         "",
         "",
         "",
-        r.atendimentos.total,
+        r.receitaBruta.total,
       ],
+
     };
   }
 

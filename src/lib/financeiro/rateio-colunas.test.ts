@@ -5,6 +5,7 @@ import { agruparRateio, compararRateio, type RateioLinha } from "./rateio-receit
 const linha: RateioLinha = {
   id: "1",
   data: "2026-08-25",
+  origem: "atendimento",
   medico_id: "med-1",
   medico_nome: "DRA. ANA",
   especialidade_id: "esp-1",

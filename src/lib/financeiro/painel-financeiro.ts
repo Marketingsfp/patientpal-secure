@@ -99,7 +99,13 @@ export function classificarDespesas(despesas: LancamentoPainel[]): DespesaPainel
   return despesas.map((d) => ({ ...d, grupo: grupoDaDespesa(d.categoria_nome, d.descricao) }));
 }
 
-/** Contagem de atendimentos por tipo, na mesma base do Rateio. */
+/**
+ * Contagem de atendimentos.
+ *
+ * Desde 12/09/2026 cada PAGAMENTO recebido conta como um atendimento, a
+ * pedido da direção: consulta, exame, procedimento, adesão, mensalidade e
+ * recebimento avulso. O que não tem serviço de prestador entra em `outros`.
+ */
 export interface ProducaoPainel {
   total: number;
   consultasCartao: number;
@@ -108,9 +114,10 @@ export interface ProducaoPainel {
   /** Quantas das consultas particulares são de convênio. */
   consultasConvenio: number;
   exames: number;
-  /** Procedimento, "outro" e serviço fora do cadastro. */
+  /** Procedimento, "outro", serviço fora do cadastro e recebimento avulso. */
   outros: number;
 }
+
 
 export type CategoriaAtendimento = "cartao" | "particular" | "exame" | "outro";
 
@@ -218,7 +225,15 @@ export function resumoPainel(params: {
   complementoMedico = round2(complementoMedico);
   const custoPrestadores = round2(repasse + terceiro + complementoMedico);
   const despesasTotais = round2(custoPrestadores + despesasOperacionais);
-  const producao = producaoDoRateio(params.rateio);
+  // Cada pagamento recebido conta como um atendimento: os do Rateio pelo tipo
+  // do serviço, e mensalidade/adesão/avulso em "outros".
+  const producaoAtend = producaoDoRateio(params.rateio);
+  const producao: ProducaoPainel = {
+    ...producaoAtend,
+    total: producaoAtend.total + params.outrasReceitas.length,
+    outros: producaoAtend.outros + params.outrasReceitas.length,
+  };
+
   // O lançamento avulso tem uma forma só; entra na mesma soma por balde que
   // os atendimentos, para as fatias fecharem com o total do card.
   const outrasComFormas = params.outrasReceitas.map((r) => ({
@@ -240,7 +255,10 @@ export function resumoPainel(params: {
     saldo: round2(receitaBruta + outrasReceitas - despesasTotais),
     repassePagoNoPeriodo: round2(repassePagoNoPeriodo),
     producao,
-    ticketMedio: producao.total > 0 ? round2(receitaBruta / producao.total) : 0,
+    // Ticket médio da entrada de caixa: receita total ÷ pagamentos recebidos.
+    ticketMedio:
+      producao.total > 0 ? round2(round2(receitaBruta + outrasReceitas) / producao.total) : 0,
+
   };
 }
 
