@@ -341,7 +341,30 @@ export function MovimentoResultado({
           value={brl(r.saldo)}
           accent={r.saldo < 0 ? "destructive" : "primary"}
           detalhe="Receitas − despesas · sangria e suprimento não contam"
-        />
+        >
+          {/* O mesmo saldo separado por onde o dinheiro está: a gaveta
+              (espécie) e a conta do banco (PIX, cartões, boleto,
+              transferência). Sem isso não dava para conferir a sobra em
+              dinheiro no fechamento. */}
+          {pronto && (
+            <ul className="mt-2 space-y-0.5 border-t border-border/60 pt-2">
+              <li className="flex items-center justify-between gap-2 text-xs">
+                <span className="text-muted-foreground">Em espécie (gaveta)</span>
+                <span className="tabular-nums">{brl(r.saldoMeios.especie.saldo)}</span>
+              </li>
+              <li className="flex items-center justify-between gap-2 text-xs">
+                <span className="text-muted-foreground">Em banco (PIX, cartão, boleto)</span>
+                <span className="tabular-nums">{brl(r.saldoMeios.banco.saldo)}</span>
+              </li>
+              {(r.saldoMeios.outros.entradas !== 0 || r.saldoMeios.outros.saidas !== 0) && (
+                <li className="flex items-center justify-between gap-2 text-xs">
+                  <span className="text-muted-foreground">Outros (convênio, sem informação)</span>
+                  <span className="tabular-nums">{brl(r.saldoMeios.outros.saldo)}</span>
+                </li>
+              )}
+            </ul>
+          )}
+        </KpiCard>
       </div>
 
       {divergente && (
