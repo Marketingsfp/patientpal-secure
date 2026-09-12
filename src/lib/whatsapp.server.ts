@@ -2443,6 +2443,14 @@ async function gerarRespostaNinaInterno(
         chaveTurno: chaveTurnoFinalizacao,
         // FASE 4 — o transporte procura a última aprovação por esta raiz.
         chaveTurnoRaiz: chaveTurnoFinalizacaoBase,
+        // FASE 4 — identidade do turno registrada junto do texto entregue.
+        identidade: {
+          versao: identidadeEfetiva.versao,
+          versaoId: identidadeEfetiva.versaoId,
+          origem: identidadeEfetiva.origem,
+          assistente: identidadeEfetiva.apresentacao.assistente,
+          estabelecimento: identidadeEfetiva.apresentacao.estabelecimento,
+        },
         conversaId: estadoId.conversaId ?? null,
         telefone: telefoneNorm ?? null,
         mensagemPaciente: mensagemPaciente || null,

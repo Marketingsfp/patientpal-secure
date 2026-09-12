@@ -45,6 +45,18 @@ export type PedidoFinalizacao = {
   handoffPendente?: boolean;
   /** Avaliar encerramento automático (só no caminho real do WhatsApp). */
   avaliarEncerramento?: boolean;
+  /**
+   * FASE 4 — identidade publicada JÁ resolvida para este turno. Registrada
+   * junto do texto para diagnosticar divergências. A finalização não vai ao
+   * banco procurar identidade: quem monta o turno já a resolveu.
+   */
+  identidade?: {
+    versao: number | null;
+    versaoId: string | null;
+    origem: string;
+    assistente: string;
+    estabelecimento: string;
+  } | null;
 };
 
 export type RespostaFinalizada = {
@@ -212,21 +224,7 @@ export async function finalizarResposta(
 
   // FASE 4 — identidade publicada do turno, registrada junto do texto para
   // diagnosticar divergências entre prévia, payload e mensagem entregue.
-  const identidade = await (async () => {
-    try {
-      const { identidadeEfetivaAtual } = await import("@/lib/nina/identidade-efetiva.server");
-      const ef = await identidadeEfetivaAtual("whatsapp", raiz);
-      return {
-        versao: ef.versao,
-        versaoId: ef.versaoId,
-        origem: ef.origem,
-        assistente: ef.apresentacao.assistente,
-        estabelecimento: ef.apresentacao.estabelecimento,
-      };
-    } catch {
-      return null;
-    }
-  })();
+  const identidade = pedido.identidade ?? null;
 
   const finalizada: RespostaFinalizada = {
     texto,
