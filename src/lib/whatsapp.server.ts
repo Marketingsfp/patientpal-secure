@@ -2348,7 +2348,8 @@ async function gerarRespostaNinaInterno(
   // FASE 6 — a apresentação é comportamento e vem SOMENTE do Behavior Prompt
   // publicado em Arquitetura. Aqui apenas OBSERVAMOS o resultado (telemetria):
   // nada é acrescentado ao texto, para não gerar "Sou a Nina... Sou a Nina...".
-  const diagnosticoSaudacao = avaliarSaudacao(resposta, nomeCurtoUnidade, {
+  // FASE 2 — a apresentação é conferida contra o nome PUBLICADO do turno.
+  const diagnosticoSaudacao = avaliarSaudacao(resposta, nomeApresentacao, {
     obrigatoria: saudacaoObrigatoriaEfetivaTurno,
   });
   if (diagnosticoSaudacao.saudacaoDuplicada || diagnosticoSaudacao.saudacaoAusente) {
