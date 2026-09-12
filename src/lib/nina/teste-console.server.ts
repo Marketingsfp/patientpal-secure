@@ -524,6 +524,9 @@ export async function processarMensagemTeste(data: EntradaMensagemTeste, userId:
           clinicaId: data.clinicaId,
           canal: "test-console",
           chaveTurno: auditoriaNina.traceId ?? loteId ?? `${conversaId}|${mensagemId ?? ""}`,
+          // FASE 4 — mesma raiz do turno: a Homologação também entrega a
+          // última versão aprovada, nunca um candidato anterior à correção.
+          chaveTurnoRaiz: auditoriaNina.traceId ?? loteId ?? `${conversaId}|${mensagemId ?? ""}`,
           conversaId,
           resultado: { ...base, texto: reply },
           // Homologação nunca resolve conversa de produção.
