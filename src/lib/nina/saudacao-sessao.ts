@@ -65,9 +65,40 @@ function semAcento(t: string): string {
     .toLowerCase();
 }
 
+/**
+ * FASE 3 — a apresentação é conferida contra a IDENTIDADE PUBLICADA do turno,
+ * nunca contra a palavra "Nina" nem contra o nome administrativo da clínica.
+ */
+export type IdentidadeApresentacao = {
+  /** Nome da atendente virtual publicado na Arquitetura. */
+  assistente?: string | null;
+  /** Nome do estabelecimento publicado na Arquitetura. */
+  estabelecimento?: string | null;
+};
+
+export type EntradaIdentidadeSaudacao = string | IdentidadeApresentacao;
+
+function normalizarIdentidade(
+  entrada: EntradaIdentidadeSaudacao,
+): { assistente: string; estabelecimento: string } {
+  // Compatibilidade: chamadas antigas passavam só o nome curto da unidade.
+  if (typeof entrada === "string") {
+    return { assistente: "", estabelecimento: entrada ?? "" };
+  }
+  return {
+    assistente: entrada?.assistente ?? "",
+    estabelecimento: entrada?.estabelecimento ?? "",
+  };
+}
+
+function escaparRegex(t: string): string {
+  return t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 export type ElementosSaudacao = {
   saudacao: boolean;
-  nina: boolean;
+  /** O nome da assistente PUBLICADO aparece na resposta. */
+  assistente: boolean;
   assistenteVirtual: boolean;
   unidade: boolean;
   abertura: boolean;
@@ -76,24 +107,31 @@ export type ElementosSaudacao = {
 /** Verifica, semanticamente, os elementos obrigatórios da apresentação. */
 export function checarElementosSaudacao(
   texto: string,
-  nomeCurtoUnidade: string,
+  identidadeOuUnidade?: EntradaIdentidadeSaudacao,
 ): ElementosSaudacao {
   const t = semAcento(texto ?? "");
-  const unidade = semAcento(nomeCurtoUnidade ?? "")
-    .replace(/^(policlinica|clinica|hospital)\s+/, "")
+  const ident = normalizarIdentidade(identidadeOuUnidade ?? "");
+  const unidade = semAcento(ident.estabelecimento)
+    // Não duplica o tipo do estabelecimento na comparação.
+    .replace(/^(policlinica|clinica|hospital|unidade|centro)\s+/, "")
     .trim();
+  const assistente = semAcento(ident.assistente).trim();
   return {
     saudacao: /\b(bom dia|boa tarde|boa noite|ola|oi)\b/.test(t),
-    nina: /\bnina\b/.test(t),
+    // Sem identidade publicada não há nome a exigir: o elemento não reprova.
+    assistente: assistente.length > 0 ? t.includes(assistente) : true,
     assistenteVirtual: /assistente virtual/.test(t),
     unidade: unidade.length > 0 ? t.includes(unidade) : true,
     abertura: /(ajudar|ajudo|posso te ajudar|em que posso|como posso)/.test(t),
   };
 }
 
-export function saudacaoCompleta(texto: string, nomeCurtoUnidade: string): boolean {
-  const e = checarElementosSaudacao(texto, nomeCurtoUnidade);
-  return e.saudacao && e.nina && e.assistenteVirtual && e.unidade && e.abertura;
+export function saudacaoCompleta(
+  texto: string,
+  identidadeOuUnidade: EntradaIdentidadeSaudacao,
+): boolean {
+  const e = checarElementosSaudacao(texto, identidadeOuUnidade);
+  return e.saudacao && e.assistente && e.assistenteVirtual && e.unidade && e.abertura;
 }
 
 export type DiagnosticoSaudacao = {
@@ -102,35 +140,45 @@ export type DiagnosticoSaudacao = {
   /** Todos os elementos da apresentação estão presentes. */
   completa: boolean;
   elementos: ElementosSaudacao;
-  /** A resposta apresentou a Nina mais de uma vez. */
+  /** A resposta apresentou a assistente mais de uma vez. */
   saudacaoDuplicada: boolean;
-  /** Era obrigatória e o modelo não apresentou a Nina. */
+  /** Era obrigatória e o modelo não fez a apresentação publicada. */
   saudacaoAusente: boolean;
 };
 
 /**
  * FASE 6 — validação NÃO MUTANTE da apresentação.
  *
- * O comportamento conversacional (inclusive a apresentação) vem exclusivamente
- * do Behavior Prompt publicado em Arquitetura. Este módulo apenas OBSERVA a
- * resposta gerada e devolve telemetria; nunca reescreve o texto, para não
- * produzir apresentações duplicadas ("Sou a Nina... Sou a Nina...").
+ * O comportamento conversacional (inclusive quando e como se apresentar) vem
+ * exclusivamente do Behavior Prompt publicado em Arquitetura. Este módulo
+ * apenas OBSERVA a resposta gerada e devolve telemetria; nunca reescreve o
+ * texto e nunca acrescenta obrigação de apresentação fora do prompt.
  */
 export function avaliarSaudacao(
   texto: string,
-  nomeCurtoUnidade: string,
+  identidadeOuUnidade: EntradaIdentidadeSaudacao,
   opcoes?: { obrigatoria?: boolean },
 ): DiagnosticoSaudacao {
   const resposta = (texto ?? "").trim();
-  const elementos = checarElementosSaudacao(resposta, nomeCurtoUnidade);
+  const elementos = checarElementosSaudacao(resposta, identidadeOuUnidade);
   const completa =
     elementos.saudacao &&
-    elementos.nina &&
+    elementos.assistente &&
     elementos.assistenteVirtual &&
     elementos.unidade &&
     elementos.abertura;
   const t = semAcento(resposta);
-  const apresentacoes = (t.match(/sou a nina|nina[,]? assistente virtual/g) ?? []).length;
+  const nome = semAcento(normalizarIdentidade(identidadeOuUnidade).assistente).trim();
+  const apresentacoes = nome
+    ? (
+        t.match(
+          new RegExp(
+            `sou a ${escaparRegex(nome)}|${escaparRegex(nome)}[,]? assistente virtual`,
+            "g",
+          ),
+        ) ?? []
+      ).length
+    : (t.match(/sou a assistente virtual|assistente virtual d[aeo]/g) ?? []).length;
   const obrigatoria = opcoes?.obrigatoria !== false;
   return {
     obrigatoria,
