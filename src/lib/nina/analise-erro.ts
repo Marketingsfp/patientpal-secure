@@ -492,7 +492,19 @@ export const SCHEMA_ANALISE = {
     proposta: {
       type: ["object", "null"],
       additionalProperties: false,
-      required: ["camada", "alvo", "valor_atual", "valor_novo", "justificativa", "alcance"],
+      required: [
+        "camada",
+        "alvo",
+        "valor_atual",
+        "valor_novo",
+        "justificativa",
+        "alcance",
+        "escopo",
+        "ambiente",
+        "arquivos",
+        "patch",
+        "revisao_base",
+      ],
       properties: {
         camada: {
           type: "string",
@@ -503,6 +515,11 @@ export const SCHEMA_ANALISE = {
         valor_novo: { type: "string" },
         justificativa: { type: "string" },
         alcance: { type: "string" },
+        escopo: { type: ["string", "null"], enum: ["local", "global", null] },
+        ambiente: { type: ["string", "null"] },
+        arquivos: { type: "array", items: { type: "string" } },
+        patch: { type: ["string", "null"] },
+        revisao_base: { type: ["string", "null"] },
       },
     },
   },
