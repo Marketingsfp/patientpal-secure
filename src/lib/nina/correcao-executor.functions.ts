@@ -491,6 +491,7 @@ export const aplicarCorrecaoComIA = createServerFn({ method: "POST" })
             } else if (c.name === "publicar_prompt") {
               const anterior = await ferramentasServer.lerPromptPublicado(supabase);
               valorAnterior = anterior?.conteudo ?? null;
+              await atualizarEtapa("publicando");
               const r = await ferramentasServer.publicarPrompt(supabase, userId, data.clinicaId, {
                 conteudo: String(args.conteudo ?? ""),
                 comentario: String(args.comentario ?? "Correção assistida de erro reportado"),
@@ -503,6 +504,7 @@ export const aplicarCorrecaoComIA = createServerFn({ method: "POST" })
                 `Versão ${r.anterior ?? "—"} → ${r.versao}. Identidade preservada.`,
               );
             } else if (c.name === "testar_em_homologacao") {
+              await atualizarEtapa("testando");
               teste = await ferramentasServer.testarEmHomologacao(data.clinicaId, userId, {
                 pergunta: String(args.pergunta ?? fb.pergunta_texto ?? ""),
                 respostaErrada: String(fb.mensagem_texto ?? ""),
