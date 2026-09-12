@@ -18,7 +18,12 @@
  * inelegível mesmo em ambiente de teste.
  */
 
-export type StatusPresenca = "ONLINE" | "BUSY" | "AWAY" | "OFFLINE";
+/**
+ * FASE 5/6 — a escolha manual é ONLINE, PAUSA ou OFFLINE. Os rótulos técnicos
+ * antigos (BUSY/AWAY) permanecem aceitos apenas para registros históricos e,
+ * como qualquer valor diferente de ONLINE, não recebem conversas novas.
+ */
+export type StatusPresenca = "ONLINE" | "PAUSA" | "BUSY" | "AWAY" | "OFFLINE";
 
 export type CandidatoDistribuicao = {
   userId: string;
