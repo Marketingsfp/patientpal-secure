@@ -89,6 +89,25 @@ function moeda(v: number | string | null | undefined): string | null {
   return `R$ ${n.toFixed(2).replace(".", ",")}`;
 }
 
+/**
+ * FASE 4 — resumo de preço que NÃO reduz várias formas a uma só.
+ *
+ * O campo `price`/`preco` é um resumo legado consumido por telas e pelo
+ * modelo. Quando dinheiro e cartão têm valores diferentes, devolver só um
+ * deles apaga a outra referência e leva a Nina a afirmar um preço que não
+ * vale para a forma perguntada. Aqui as duas formas ficam explícitas.
+ */
+export function resumoDePrecos(
+  dinheiro: number | string | null | undefined,
+  cartao: number | string | null | undefined,
+): string | null {
+  const d = moeda(dinheiro);
+  const c = moeda(cartao);
+  if (d && c && d !== c) return `${d} (dinheiro) / ${c} (cartão)`;
+  return d ?? c;
+}
+
+
 function unico(lista: Array<string | null | undefined>): string[] {
   const set = new Set<string>();
   for (const item of lista) {
@@ -189,7 +208,7 @@ export function montarResultadoConhecimento(entrada: {
 
   const conflitos = detectarConflitos(registros);
   const primeiro = registros[0]!;
-  const preco = moeda(primeiro.preco_dinheiro) ?? moeda(primeiro.preco_cartao);
+  const preco = resumoDePrecos(primeiro.preco_dinheiro, primeiro.preco_cartao);
 
   const comum = {
     ...base,
