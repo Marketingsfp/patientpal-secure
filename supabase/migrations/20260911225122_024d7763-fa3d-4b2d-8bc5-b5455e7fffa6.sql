@@ -1,0 +1,1 @@
+ALTER TABLE public.nina_feedback_acoes ADD COLUMN IF NOT EXISTS execucao jsonb;

@@ -8997,6 +8997,7 @@ export type Database = {
           created_at: string
           criado_por: string
           evidencia: Json | null
+          execucao: Json | null
           feedback_id: string
           homologado: boolean
           id: string
@@ -9018,6 +9019,7 @@ export type Database = {
           created_at?: string
           criado_por: string
           evidencia?: Json | null
+          execucao?: Json | null
           feedback_id: string
           homologado?: boolean
           id?: string
@@ -9039,6 +9041,7 @@ export type Database = {
           created_at?: string
           criado_por?: string
           evidencia?: Json | null
+          execucao?: Json | null
           feedback_id?: string
           homologado?: boolean
           id?: string

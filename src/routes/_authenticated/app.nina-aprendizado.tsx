@@ -67,6 +67,9 @@ import {
   analisarErroNinaComIA,
   listarAnalisesErroNina,
 } from "@/lib/nina/analise-erro.functions";
+import { aplicarCorrecaoComIA } from "@/lib/nina/correcao-executor.functions";
+import type { ResumoExecucao } from "@/lib/nina/correcao-executor";
+import { CorrecaoExecucaoPainel } from "@/components/nina/CorrecaoExecucaoPainel";
 
 import {
   editarSugestaoFeedbackNina,
@@ -405,6 +408,34 @@ function Pagina() {
   const [decidindo, setDecidindo] = useState(false);
   // Chave de ativação da análise por IA (não afeta reporte nem auditoria).
   const [analiseIAAtiva, setAnaliseIAAtiva] = useState(true);
+  // Correção assistida: execução em andamento e resumo do que foi feito.
+  const [corrigindo, setCorrigindo] = useState<Record<string, boolean>>({});
+  const [correcoes, setCorrecoes] = useState<Record<string, ResumoExecucao>>({});
+  const aplicarComIAFn = useServerFn(aplicarCorrecaoComIA);
+
+  /**
+   * O clique é a autorização: executa a proposta já exibida no cartão, no
+   * escopo e ambiente mostrados. Sem nova cadeia de confirmação.
+   */
+  const aplicarComIA = async (id: string) => {
+    if (!clinicaId) return;
+    setCorrigindo((c) => ({ ...c, [id]: true }));
+    try {
+      const r = (await aplicarComIAFn({
+        data: { clinicaId, feedbackId: id },
+      })) as unknown as ResumoExecucao;
+      setCorrecoes((e) => ({ ...e, [id]: r }));
+      if (r.status === "aplicado") toast.success("Correção aplicada e comprovada em homologação.");
+      else if (r.status === "pendente_tecnico")
+        toast.info("Mudança registrada para quem publica código.");
+      else toast.warning(r.motivo);
+      await Promise.all([carregar(), carregarAcoes()]);
+    } catch (e) {
+      mostrarErro(e);
+    } finally {
+      setCorrigindo((c) => ({ ...c, [id]: false }));
+    }
+  };
 
   const decidirProblema = useServerFn(decidirProblemaFeedbackNina);
   const listarDecisoes = useServerFn(listarDecisoesFeedbackNina);
@@ -1385,14 +1416,36 @@ function Pagina() {
                                 </details>
                               )}
                               {analises[it.id]!.status === "done" && (
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => void usarSugestaoIA(it)}
-                                >
-                                  Usar sugestão da IA no rascunho
-                                </Button>
+                                <div className="flex flex-wrap gap-2">
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => void usarSugestaoIA(it)}
+                                  >
+                                    Usar sugestão da IA no rascunho
+                                  </Button>
+                                  {analises[it.id]!.resultado?.proposta && (
+                                    <Button
+                                      size="sm"
+                                      disabled={Boolean(corrigindo[it.id])}
+                                      title="Aplica a proposta exibida, na camada e no alcance mostrados."
+                                      onClick={() => void aplicarComIA(it.id)}
+                                    >
+                                      {corrigindo[it.id] ? (
+                                        <Loader2
+                                          className="mr-1 h-4 w-4 animate-spin"
+                                          aria-hidden="true"
+                                        />
+                                      ) : null}
+                                      Aplicar correção
+                                    </Button>
+                                  )}
+                                </div>
                               )}
+                              <CorrecaoExecucaoPainel
+                                execucao={correcoes[it.id] ?? null}
+                                emAndamento={Boolean(corrigindo[it.id])}
+                              />
                             </div>
                           ) : (
                             <p className="text-xs text-muted-foreground">

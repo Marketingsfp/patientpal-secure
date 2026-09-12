@@ -263,6 +263,12 @@ export const INSTRUCOES_AVALIADOR = [
   "A causa permanece hipótese quando as evidências não a comprovam.",
   "Verificações objetivas já executadas são fatos: não as contradiga nem as anule.",
   "Responda em português do Brasil, de forma objetiva, sem expor raciocínio interno.",
+  "Além do diagnóstico, devolva em `proposta` a mudança concreta que corrigiria a causa",
+  "demonstrada: camada responsável, alvo exato, valor atual, valor novo, justificativa e alcance.",
+  "Camadas possíveis: catalogo (informação oficial publicada), modelo (prompt da Arquitetura),",
+  "busca, ferramenta e fluxo (estas três vivem em código e não são aplicadas automaticamente).",
+  "Sem causa demonstrada, devolva proposta nula: não invente mudança.",
+  "Nunca proponha alterar a identidade do atendimento nem regras operacionais fora da causa.",
 ].join(" ");
 
 export function montarPacote(entrada: {
@@ -317,6 +323,35 @@ export function montarPromptAnalise(p: PacoteEvidencias): string {
 /* Resultado estruturado                                               */
 /* ------------------------------------------------------------------ */
 
+/**
+ * Camada onde a correção precisa acontecer. Só `catalogo` e `modelo` são
+ * configuração viva no banco; as demais dependem de mudança de código e por
+ * isso NUNCA são aplicadas automaticamente.
+ */
+export type CamadaProposta = "catalogo" | "modelo" | "busca" | "ferramenta" | "fluxo";
+
+export const CAMADAS_APLICAVEIS: CamadaProposta[] = ["catalogo", "modelo"];
+
+export const ROTULO_CAMADA_PROPOSTA: Record<CamadaProposta, string> = {
+  catalogo: "Catálogo publicado",
+  modelo: "Prompt da Arquitetura",
+  busca: "Busca da Base (código)",
+  ferramenta: "Integração / ferramenta (código)",
+  fluxo: "Fluxo de atendimento (código)",
+};
+
+/** Proposta concreta de mudança, exibida no mesmo cartão do diagnóstico. */
+export type PropostaCorrecao = {
+  camada: CamadaProposta;
+  alvo: string;
+  valorAtual: string | null;
+  valorNovo: string;
+  justificativa: string;
+  alcance: string;
+  /** Definido pelo sistema, nunca pelo modelo. */
+  aplicavelAutomaticamente: boolean;
+};
+
 export type ResultadoAnalise = {
   veredito: Veredito;
   conclusao: string;
@@ -329,6 +364,7 @@ export type ResultadoAnalise = {
   proximaVerificacao: string | null;
   limitacoes: string[];
   verificacoes: Verificacao[];
+  proposta: PropostaCorrecao | null;
 };
 
 export const SCHEMA_ANALISE = {
@@ -345,6 +381,7 @@ export const SCHEMA_ANALISE = {
     "causa_eh_hipotese",
     "proxima_verificacao",
     "limitacoes",
+    "proposta",
   ],
   properties: {
     veredito: {
@@ -374,6 +411,22 @@ export const SCHEMA_ANALISE = {
     causa_eh_hipotese: { type: "boolean" },
     proxima_verificacao: { type: ["string", "null"] },
     limitacoes: { type: "array", items: { type: "string" } },
+    proposta: {
+      type: ["object", "null"],
+      additionalProperties: false,
+      required: ["camada", "alvo", "valor_atual", "valor_novo", "justificativa", "alcance"],
+      properties: {
+        camada: {
+          type: "string",
+          enum: ["catalogo", "modelo", "busca", "ferramenta", "fluxo"],
+        },
+        alvo: { type: "string" },
+        valor_atual: { type: ["string", "null"] },
+        valor_novo: { type: "string" },
+        justificativa: { type: "string" },
+        alcance: { type: "string" },
+      },
+    },
   },
 } as const;
 
@@ -436,5 +489,34 @@ export function normalizarResultado(
       o["proxima_verificacao"] == null ? null : String(o["proxima_verificacao"]).slice(0, 600),
     limitacoes,
     verificacoes,
+    proposta: normalizarProposta(o["proposta"]),
+  };
+}
+
+const CAMADAS: CamadaProposta[] = ["catalogo", "modelo", "busca", "ferramenta", "fluxo"];
+
+/**
+ * Normaliza a proposta de mudança devolvida pelo avaliador.
+ *
+ * `aplicavelAutomaticamente` NÃO vem do modelo: é decidido aqui pela camada.
+ * Camadas que vivem em código nunca são aplicadas pelo executor — ele só
+ * escreve a mudança proposta para quem tem acesso ao repositório.
+ */
+export function normalizarProposta(bruto: unknown): PropostaCorrecao | null {
+  if (!bruto || typeof bruto !== "object") return null;
+  const p = bruto as Record<string, unknown>;
+  const camada = CAMADAS.includes(p["camada"] as CamadaProposta)
+    ? (p["camada"] as CamadaProposta)
+    : null;
+  const valorNovo = String(p["valor_novo"] ?? "").trim().slice(0, 4000);
+  if (!camada || !valorNovo) return null;
+  return {
+    camada,
+    alvo: String(p["alvo"] ?? "").slice(0, 300) || "Alvo não especificado.",
+    valorAtual: p["valor_atual"] == null ? null : String(p["valor_atual"]).slice(0, 4000),
+    valorNovo,
+    justificativa: String(p["justificativa"] ?? "").slice(0, 2000),
+    alcance: String(p["alcance"] ?? "").slice(0, 600),
+    aplicavelAutomaticamente: CAMADAS_APLICAVEIS.includes(camada),
   };
 }
