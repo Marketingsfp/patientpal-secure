@@ -215,6 +215,13 @@ const SAUDACAO =
   /^(oi|ola|bom dia|boa tarde|boa noite|tudo bem|como vai|seja bem[- ]vind[oa]|obrigad[oa])\b/;
 
 /** Mesma lista, em qualquer posição — usada para conferir saudação PROIBIDA. */
+/**
+ * Repetição da APRESENTAÇÃO: a assistente dizendo de novo quem é. Só formas
+ * de auto-identificação contam — "bom dia" sozinho NÃO é apresentação.
+ */
+const APRESENTACAO_PESSOAL =
+  /\b(sou a |sou o |meu nome (e|eh) |aqui (e|eh) a |assistente virtual)/;
+
 const SAUDACAO_EM_QUALQUER_POSICAO =
   /(^|[\s.,;:!?"'()-])(oi|ola|bom dia|boa tarde|boa noite|tudo bem|como vai|seja bem[- ]vind[oa])\b/;
 
@@ -449,6 +456,7 @@ export function categoriasVioladas(
   for (const c of proibicoes) {
     // Saudação PROIBIDA é conferida em qualquer posição: "X. Olá!" também viola.
     if (c === "saudacao" && SAUDACAO_EM_QUALQUER_POSICAO.test(n)) violadas.push(c);
+    if (c === "apresentacao" && APRESENTACAO_PESSOAL.test(n)) violadas.push(c);
     if (c === "emoji" && /\p{Extended_Pictographic}/u.test(bruto)) violadas.push(c);
     if (c === "pergunta" && bruto.includes("?")) violadas.push(c);
     if (c === "despedida" && DESPEDIDA.test(n)) violadas.push(c);
