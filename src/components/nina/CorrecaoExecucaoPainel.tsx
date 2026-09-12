@@ -5,6 +5,7 @@
 import { Badge } from "@/components/ui/badge";
 import { CheckCircle2, Loader2, XCircle } from "lucide-react";
 import type { ResumoExecucao } from "@/lib/nina/correcao-executor";
+import { ETAPAS_EXECUCAO, ROTULO_ETAPA, type EtapaExecucao } from "@/lib/nina/correcao-prontidao";
 
 const ROTULO_STATUS: Record<ResumoExecucao["status"], string> = {
   aplicado: "Correção aplicada e comprovada",
@@ -12,19 +13,48 @@ const ROTULO_STATUS: Record<ResumoExecucao["status"], string> = {
   falhou: "Correção não concluída",
 };
 
+/** Andamento salvo: reabrir a página volta a mostrar o mesmo trabalho. */
+function Etapas({ etapa }: { etapa: EtapaExecucao }) {
+  const atual = ETAPAS_EXECUCAO.indexOf(etapa);
+  return (
+    <ol className="flex flex-wrap gap-2 text-[11px]">
+      {ETAPAS_EXECUCAO.filter((e) => e !== "concluido").map((e, i) => (
+        <li
+          key={e}
+          className={
+            i < atual
+              ? "text-muted-foreground"
+              : i === atual
+                ? "font-medium text-primary"
+                : "text-muted-foreground/60"
+          }
+        >
+          {i < atual ? "✓ " : i === atual ? "▶ " : "• "}
+          {ROTULO_ETAPA[e]}
+        </li>
+      ))}
+    </ol>
+  );
+}
+
 export function CorrecaoExecucaoPainel({
   execucao,
   emAndamento,
+  etapa,
 }: {
   execucao: ResumoExecucao | null;
   emAndamento?: boolean;
+  etapa?: EtapaExecucao | null;
 }) {
   if (emAndamento) {
     return (
-      <p className="flex items-center gap-2 text-xs text-muted-foreground">
-        <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
-        Aplicando a correção: alterando a camada indicada e testando em homologação…
-      </p>
+      <div className="space-y-1">
+        <p className="flex items-center gap-2 text-xs text-muted-foreground">
+          <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
+          Aplicando a correção autorizada…
+        </p>
+        <Etapas etapa={etapa ?? "verificando"} />
+      </div>
     );
   }
   if (!execucao) return null;

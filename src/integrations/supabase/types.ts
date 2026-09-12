@@ -8763,6 +8763,83 @@ export type Database = {
         }
         Relationships: []
       }
+      nina_correcao_execucoes: {
+        Row: {
+          acao_id: string | null
+          ambiente: string | null
+          analise_id: string | null
+          autorizado_em: string
+          autorizado_por: string
+          clinica_id: string
+          created_at: string
+          erro: string | null
+          escopo: string | null
+          etapa: string
+          feedback_id: string
+          id: string
+          pacote_hash: string | null
+          pacote_revisao: number | null
+          passos: Json
+          proposta: Json
+          proposta_assinatura: string
+          resumo: Json | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          acao_id?: string | null
+          ambiente?: string | null
+          analise_id?: string | null
+          autorizado_em?: string
+          autorizado_por: string
+          clinica_id: string
+          created_at?: string
+          erro?: string | null
+          escopo?: string | null
+          etapa?: string
+          feedback_id: string
+          id?: string
+          pacote_hash?: string | null
+          pacote_revisao?: number | null
+          passos?: Json
+          proposta: Json
+          proposta_assinatura: string
+          resumo?: Json | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          acao_id?: string | null
+          ambiente?: string | null
+          analise_id?: string | null
+          autorizado_em?: string
+          autorizado_por?: string
+          clinica_id?: string
+          created_at?: string
+          erro?: string | null
+          escopo?: string | null
+          etapa?: string
+          feedback_id?: string
+          id?: string
+          pacote_hash?: string | null
+          pacote_revisao?: number | null
+          passos?: Json
+          proposta?: Json
+          proposta_assinatura?: string
+          resumo?: Json | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nina_correcao_execucoes_feedback_id_fkey"
+            columns: ["feedback_id"]
+            isOneToOne: false
+            referencedRelation: "nina_feedback_erros"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       nina_execucao_evidencias: {
         Row: {
           clinica_id: string | null

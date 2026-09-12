@@ -67,8 +67,18 @@ import {
   analisarErroNinaComIA,
   listarAnalisesErroNina,
 } from "@/lib/nina/analise-erro.functions";
-import { aplicarCorrecaoComIA } from "@/lib/nina/correcao-executor.functions";
+import {
+  aplicarCorrecaoComIA,
+  execucaoCorrecaoAtual,
+} from "@/lib/nina/correcao-executor.functions";
 import type { ResumoExecucao } from "@/lib/nina/correcao-executor";
+import {
+  assinaturaProposta,
+  avaliarProntidao,
+  ROTULO_BOTAO_APLICAR,
+  type EtapaExecucao,
+  type Prontidao,
+} from "@/lib/nina/correcao-prontidao";
 import { CorrecaoExecucaoPainel } from "@/components/nina/CorrecaoExecucaoPainel";
 
 import {
@@ -411,20 +421,52 @@ function Pagina() {
   // Correção assistida: execução em andamento e resumo do que foi feito.
   const [corrigindo, setCorrigindo] = useState<Record<string, boolean>>({});
   const [correcoes, setCorrecoes] = useState<Record<string, ResumoExecucao>>({});
+  const [etapaCorrecao, setEtapaCorrecao] = useState<Record<string, EtapaExecucao>>({});
   const aplicarComIAFn = useServerFn(aplicarCorrecaoComIA);
+  const execucaoAtualFn = useServerFn(execucaoCorrecaoAtual);
+
+  /** Retoma o andamento salvo de uma correção ao abrir/recarregar a tela. */
+  const carregarExecucaoCorrecao = async (id: string) => {
+    if (!clinicaId) return;
+    try {
+      const linha = (await execucaoAtualFn({ data: { clinicaId, feedbackId: id } })) as any;
+      if (!linha) return;
+      setEtapaCorrecao((e) => ({ ...e, [id]: linha.etapa as EtapaExecucao }));
+      setCorrigindo((c) => ({ ...c, [id]: linha.status === "em_curso" }));
+      if (linha.resumo) setCorrecoes((e) => ({ ...e, [id]: linha.resumo as ResumoExecucao }));
+    } catch {
+      /* somente leitura: sem andamento salvo, o cartão segue normal */
+    }
+  };
 
   /**
    * O clique é a autorização: executa a proposta já exibida no cartão, no
    * escopo e ambiente mostrados. Sem nova cadeia de confirmação.
    */
-  const aplicarComIA = async (id: string) => {
+  const aplicarComIA = async (id: string, prontidao: Prontidao) => {
     if (!clinicaId) return;
+    if (!prontidao.habilitado) {
+      toast.warning(prontidao.motivo);
+      return;
+    }
+    const analise = analises[id];
+    const proposta = analise?.resultado?.proposta ?? null;
     setCorrigindo((c) => ({ ...c, [id]: true }));
+    setEtapaCorrecao((e) => ({ ...e, [id]: "verificando" }));
     try {
       const r = (await aplicarComIAFn({
-        data: { clinicaId, feedbackId: id },
+        data: {
+          clinicaId,
+          feedbackId: id,
+          analiseId: analise?.id ?? null,
+          propostaAssinatura: assinaturaProposta(proposta),
+          pacoteHash:
+            ((analise as unknown as { pacote_hash?: string | null } | undefined)?.pacote_hash ??
+              null),
+        },
       })) as unknown as ResumoExecucao;
       setCorrecoes((e) => ({ ...e, [id]: r }));
+      setEtapaCorrecao((e) => ({ ...e, [id]: "concluido" }));
       if (r.status === "aplicado") toast.success("Correção aplicada e comprovada em homologação.");
       else if (r.status === "pendente_tecnico")
         toast.info("Mudança registrada para quem publica código.");
@@ -1234,7 +1276,10 @@ function Pagina() {
                       aria-expanded={Boolean(abertos[it.id])}
                       onClick={() => {
                         setAbertos((a) => ({ ...a, [it.id]: !a[it.id] }));
-                        if (!abertos[it.id] && podeRevisar) void carregarAnalise(it.id);
+                        if (!abertos[it.id] && podeRevisar) {
+                          void carregarAnalise(it.id);
+                          void carregarExecucaoCorrecao(it.id);
+                        }
                       }}
                     >
                       {abertos[it.id] ? "Ocultar detalhes" : "Ver detalhes"}
@@ -1424,27 +1469,51 @@ function Pagina() {
                                   >
                                     Usar sugestão da IA no rascunho
                                   </Button>
-                                  {analises[it.id]!.resultado?.proposta && (
-                                    <Button
-                                      size="sm"
-                                      disabled={Boolean(corrigindo[it.id])}
-                                      title="Aplica a proposta exibida, na camada e no alcance mostrados."
-                                      onClick={() => void aplicarComIA(it.id)}
-                                    >
-                                      {corrigindo[it.id] ? (
-                                        <Loader2
-                                          className="mr-1 h-4 w-4 animate-spin"
-                                          aria-hidden="true"
-                                        />
-                                      ) : null}
-                                      Aplicar correção
-                                    </Button>
-                                  )}
+                                  {(() => {
+                                    const analise = analises[it.id]!;
+                                    const prontidao = avaliarProntidao({
+                                      statusAnalise: (analise.status as any) ?? null,
+                                      resultado: analise.resultado ?? null,
+                                      proposta: analise.resultado?.proposta ?? null,
+                                      temPermissao: podeRevisar,
+                                      executorDisponivel: true,
+                                      execucaoEmCurso: Boolean(corrigindo[it.id]),
+                                    });
+                                    if (
+                                      prontidao.codigo === "sem_proposta" ||
+                                      prontidao.codigo === "nenhuma_alteracao_necessaria"
+                                    )
+                                      return null;
+                                    return (
+                                      <div className="flex flex-col gap-1">
+                                        <Button
+                                          size="sm"
+                                          disabled={!prontidao.habilitado}
+                                          title={prontidao.motivo}
+                                          onClick={() => void aplicarComIA(it.id, prontidao)}
+                                        >
+                                          {corrigindo[it.id] ? (
+                                            <Loader2
+                                              className="mr-1 h-4 w-4 animate-spin"
+                                              aria-hidden="true"
+                                            />
+                                          ) : null}
+                                          {ROTULO_BOTAO_APLICAR}
+                                        </Button>
+                                        {!prontidao.habilitado && (
+                                          <span className="text-[11px] text-muted-foreground">
+                                            {prontidao.motivo}
+                                          </span>
+                                        )}
+                                      </div>
+                                    );
+                                  })()}
                                 </div>
                               )}
                               <CorrecaoExecucaoPainel
                                 execucao={correcoes[it.id] ?? null}
                                 emAndamento={Boolean(corrigindo[it.id])}
+                                etapa={etapaCorrecao[it.id] ?? null}
                               />
                             </div>
                           ) : (

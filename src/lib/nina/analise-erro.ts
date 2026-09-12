@@ -426,6 +426,16 @@ export type PropostaCorrecao = {
   valorNovo: string;
   justificativa: string;
   alcance: string;
+  /** Onde a mudança vale: só esta clínica ou todas. */
+  escopo: "local" | "global" | null;
+  /** Ambiente alvo declarado pelo avaliador (produção, homologação…). */
+  ambiente: string | null;
+  /** Arquivos/configurações atingidos pela mudança. */
+  arquivos: string[];
+  /** Patch concreto para camadas que vivem em código. Texto — não é aplicado aqui. */
+  patch: string | null;
+  /** Revisão contra a qual o patch foi preparado. */
+  revisaoBase: string | null;
   /** Definido pelo sistema, nunca pelo modelo. */
   aplicavelAutomaticamente: boolean;
 };
@@ -492,7 +502,19 @@ export const SCHEMA_ANALISE = {
     proposta: {
       type: ["object", "null"],
       additionalProperties: false,
-      required: ["camada", "alvo", "valor_atual", "valor_novo", "justificativa", "alcance"],
+      required: [
+        "camada",
+        "alvo",
+        "valor_atual",
+        "valor_novo",
+        "justificativa",
+        "alcance",
+        "escopo",
+        "ambiente",
+        "arquivos",
+        "patch",
+        "revisao_base",
+      ],
       properties: {
         camada: {
           type: "string",
@@ -503,6 +525,11 @@ export const SCHEMA_ANALISE = {
         valor_novo: { type: "string" },
         justificativa: { type: "string" },
         alcance: { type: "string" },
+        escopo: { type: ["string", "null"], enum: ["local", "global", null] },
+        ambiente: { type: ["string", "null"] },
+        arquivos: { type: "array", items: { type: "string" } },
+        patch: { type: ["string", "null"] },
+        revisao_base: { type: ["string", "null"] },
       },
     },
   },
@@ -588,6 +615,13 @@ export function normalizarProposta(bruto: unknown): PropostaCorrecao | null {
     : null;
   const valorNovo = String(p["valor_novo"] ?? "").trim().slice(0, 4000);
   if (!camada || !valorNovo) return null;
+  const escopoBruto = p["escopo"];
+  const arquivos = Array.isArray(p["arquivos"])
+    ? (p["arquivos"] as unknown[])
+        .map((a) => String(a ?? "").trim().slice(0, 300))
+        .filter(Boolean)
+        .slice(0, 30)
+    : [];
   return {
     camada,
     alvo: String(p["alvo"] ?? "").slice(0, 300) || "Alvo não especificado.",
@@ -595,6 +629,47 @@ export function normalizarProposta(bruto: unknown): PropostaCorrecao | null {
     valorNovo,
     justificativa: String(p["justificativa"] ?? "").slice(0, 2000),
     alcance: String(p["alcance"] ?? "").slice(0, 600),
+    escopo: escopoBruto === "local" || escopoBruto === "global" ? escopoBruto : null,
+    ambiente: p["ambiente"] == null ? null : String(p["ambiente"]).slice(0, 120),
+    arquivos,
+    patch: p["patch"] == null ? null : String(p["patch"]).slice(0, 20000),
+    revisaoBase: p["revisao_base"] == null ? null : String(p["revisao_base"]).slice(0, 200),
+    aplicavelAutomaticamente: CAMADAS_APLICAVEIS.includes(camada),
+  };
+}
+
+/**
+ * Completa propostas já persistidas (camelCase) que foram gravadas antes dos
+ * campos de ambiente/escopo/patch existirem. Nada é inventado: campos ausentes
+ * permanecem nulos ou vazios.
+ */
+export function garantirProposta(bruto: unknown): PropostaCorrecao | null {
+  if (!bruto || typeof bruto !== "object") return null;
+  const p = bruto as Record<string, unknown>;
+  const camada = CAMADAS.includes(p["camada"] as CamadaProposta)
+    ? (p["camada"] as CamadaProposta)
+    : null;
+  const valorNovo = String(p["valorNovo"] ?? p["valor_novo"] ?? "").trim();
+  if (!camada || !valorNovo) return normalizarProposta(bruto);
+  const escopo = p["escopo"];
+  return {
+    camada,
+    alvo: String(p["alvo"] ?? "") || "Alvo não especificado.",
+    valorAtual:
+      p["valorAtual"] == null && p["valor_atual"] == null
+        ? null
+        : String(p["valorAtual"] ?? p["valor_atual"]),
+    valorNovo,
+    justificativa: String(p["justificativa"] ?? ""),
+    alcance: String(p["alcance"] ?? ""),
+    escopo: escopo === "local" || escopo === "global" ? escopo : null,
+    ambiente: p["ambiente"] == null ? null : String(p["ambiente"]),
+    arquivos: Array.isArray(p["arquivos"]) ? (p["arquivos"] as unknown[]).map(String) : [],
+    patch: p["patch"] == null ? null : String(p["patch"]),
+    revisaoBase:
+      p["revisaoBase"] == null && p["revisao_base"] == null
+        ? null
+        : String(p["revisaoBase"] ?? p["revisao_base"]),
     aplicavelAutomaticamente: CAMADAS_APLICAVEIS.includes(camada),
   };
 }

@@ -159,12 +159,45 @@ export function AnaliseErroIAResultado({
           {r.proposta.justificativa && (
             <p className="text-xs text-muted-foreground">{r.proposta.justificativa}</p>
           )}
-          {r.proposta.alcance && (
+          {r.proposta.arquivos.length > 0 && (
             <p className="text-xs text-muted-foreground">
-              <span className="font-medium">Alcance:</span> {r.proposta.alcance}
+              <span className="font-medium">Arquivos e configurações atingidos:</span>{" "}
+              {r.proposta.arquivos.join(", ")}
+            </p>
+          )}
+          <p className="text-xs text-muted-foreground">
+            <span className="font-medium">Ambiente:</span> {r.proposta.ambiente ?? "não informado"} ·{" "}
+            <span className="font-medium">Alcance:</span>{" "}
+            {r.proposta.escopo === "global"
+              ? "todas as clínicas"
+              : r.proposta.escopo === "local"
+                ? "somente esta clínica"
+                : "não informado"}
+            {r.proposta.alcance ? ` — ${r.proposta.alcance}` : ""}
+          </p>
+          {r.proposta.patch && (
+            <details className="rounded-md border border-border p-2">
+              <summary className="cursor-pointer text-xs font-medium">
+                Mudança no código proposta
+                {r.proposta.revisaoBase ? ` (base ${r.proposta.revisaoBase})` : ""}
+              </summary>
+              <pre className="mt-1 max-h-64 overflow-auto whitespace-pre-wrap text-[11px]">
+                {r.proposta.patch}
+              </pre>
+            </details>
+          )}
+          {!r.proposta.aplicavelAutomaticamente && !r.proposta.patch && (
+            <p className="text-xs text-muted-foreground">
+              Falta a mudança escrita no código: sem ela não há o que aplicar.
             </p>
           )}
         </div>
+      )}
+
+      {!r.proposta && r.veredito === "sem_erro" && (
+        <p className="rounded-md border border-border p-2 text-xs font-medium">
+          Nenhuma alteração necessária.
+        </p>
       )}
 
       {r.proximaVerificacao && (

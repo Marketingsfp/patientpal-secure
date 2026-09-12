@@ -13,7 +13,12 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { normalizarProposta, type PropostaCorrecao } from "./analise-erro";
+import { garantirProposta, normalizarProposta, type PropostaCorrecao } from "./analise-erro";
+import {
+  assinaturaProposta,
+  avaliarProntidao,
+  type EtapaExecucao,
+} from "./correcao-prontidao";
 import {
   INSTRUCOES_EXECUTOR,
   LIMITE_RODADAS_EXECUTOR,
@@ -195,7 +200,48 @@ async function chamarExecutor(input: any[], ferramentas: any[]): Promise<SaidaMo
 const Entrada = z.object({
   clinicaId: z.string().uuid(),
   feedbackId: z.string().uuid(),
+  /** Análise cuja proposta o usuário viu na tela ao autorizar. */
+  analiseId: z.string().uuid().nullable().optional(),
+  /** Assinatura da proposta exibida — divergiu, nada é aplicado. */
+  propostaAssinatura: z.string().min(1).nullable().optional(),
+  pacoteHash: z.string().nullable().optional(),
 });
+
+/** Estado atual da aplicação de uma correção (para retomar após recarregar). */
+export const execucaoCorrecaoAtual = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) =>
+    z.object({ clinicaId: z.string().uuid(), feedbackId: z.string().uuid() }).parse(i),
+  )
+  .handler(async ({ data, context }) => {
+    const supabase = context.supabase as any;
+    const { data: linha, error } = await supabase
+      .from("nina_correcao_execucoes")
+      .select(
+        "id, etapa, status, passos, resumo, erro, autorizado_por, autorizado_em, analise_id, pacote_hash, proposta_assinatura, ambiente, escopo",
+      )
+      .eq("clinica_id", data.clinicaId)
+      .eq("feedback_id", data.feedbackId)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    return (linha ?? null) as null | {
+      id: string;
+      etapa: EtapaExecucao;
+      status: "em_curso" | "concluida" | "falhou";
+      passos: PassoExecucao[];
+      resumo: ResumoExecucao | null;
+      erro: string | null;
+      autorizado_por: string;
+      autorizado_em: string;
+      analise_id: string | null;
+      pacote_hash: string | null;
+      proposta_assinatura: string;
+      ambiente: string | null;
+      escopo: string | null;
+    };
+  });
 
 export const aplicarCorrecaoComIA = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -214,25 +260,51 @@ export const aplicarCorrecaoComIA = createServerFn({ method: "POST" })
     if (eFb) throw new Error(eFb.message);
     if (!fb) throw new Error("Erro reportado não encontrado nesta clínica.");
 
-    const { data: analise, error: eAn } = await supabase
+    // A análise usada é a que estava na tela; sem id, a mais recente concluída.
+    let consulta = supabase
       .from("nina_feedback_analises")
       .select("id, status, resultado, conclusao, pacote, pacote_hash, pacote_revisao")
       .eq("clinica_id", data.clinicaId)
-      .eq("feedback_id", data.feedbackId)
-      .eq("status", "done")
-      .order("versao", { ascending: false })
-      .limit(1)
-      .maybeSingle();
+      .eq("feedback_id", data.feedbackId);
+    consulta = data.analiseId
+      ? consulta.eq("id", data.analiseId)
+      : consulta.eq("status", "done").order("versao", { ascending: false }).limit(1);
+    const { data: analise, error: eAn } = await consulta.maybeSingle();
     if (eAn) throw new Error(eAn.message);
     if (!analise)
       throw new Error("Analise o erro com IA antes de aplicar a correção: não há proposta na tela.");
 
     const resultado = (analise.resultado ?? {}) as Record<string, unknown>;
     const proposta =
-      (resultado["proposta"] as PropostaCorrecao | null) ??
-      normalizarProposta(resultado["proposta"]);
-    if (!proposta)
-      throw new Error("A análise não produziu proposta de mudança. Reanalise antes de aplicar.");
+      garantirProposta(resultado["proposta"]) ?? normalizarProposta(resultado["proposta"]);
+
+    /**
+     * FASE 2 — o mesmo gate da tela roda aqui: permissão, análise concluída,
+     * proposta aplicável, executor disponível e proposta idêntica à exibida.
+     */
+    const { data: emCurso } = await supabase
+      .from("nina_correcao_execucoes")
+      .select("id")
+      .eq("clinica_id", data.clinicaId)
+      .eq("feedback_id", data.feedbackId)
+      .eq("status", "em_curso")
+      .maybeSingle();
+
+    const prontidao = avaliarProntidao({
+      statusAnalise: (analise.status as "processing" | "done" | "failed") ?? null,
+      resultado: (analise.resultado as any) ?? null,
+      proposta,
+      temPermissao: true,
+      executorDisponivel: Boolean(process.env["LOVABLE_API_KEY"]),
+      execucaoEmCurso: Boolean(emCurso),
+      assinaturaExibida: data.propostaAssinatura ?? null,
+    });
+    if (!prontidao.habilitado || !proposta) throw new Error(prontidao.motivo);
+
+    if (data.pacoteHash && analise.pacote_hash && data.pacoteHash !== String(analise.pacote_hash))
+      throw new Error(
+        "As evidências desta análise mudaram desde o que foi exibido. Confira a proposta atualizada antes de aplicar.",
+      );
 
     /**
      * FASE 1 — a correção usa o MESMO pacote que fundamentou a proposta.
@@ -260,7 +332,41 @@ export const aplicarCorrecaoComIA = createServerFn({ method: "POST" })
         .eq("clinica_id", data.clinicaId);
     }
 
+    /**
+     * Registro de autorização e progresso: quem clicou, quando, qual análise,
+     * pacote, proposta, ambiente e alcance. Recarregar a tela retoma daqui.
+     */
+    const assinatura = assinaturaProposta(proposta);
+    const { data: execLinha, error: eExec } = await supabase
+      .from("nina_correcao_execucoes")
+      .insert({
+        clinica_id: data.clinicaId,
+        feedback_id: data.feedbackId,
+        analise_id: analise.id,
+        pacote_hash: pacote.hash,
+        pacote_revisao: pacote.revisao,
+        proposta,
+        proposta_assinatura: assinatura,
+        ambiente: proposta.ambiente ?? pacote.identificacao.ambiente ?? null,
+        escopo: proposta.escopo,
+        autorizado_por: userId,
+        etapa: "verificando",
+        status: "em_curso",
+        passos: [],
+      })
+      .select("id")
+      .single();
+    if (eExec) throw new Error("Já existe uma aplicação em andamento para este erro.");
+    const execucaoId = execLinha?.id as string;
+
     const passos: PassoExecucao[] = [];
+    const atualizarEtapa = async (etapa: EtapaExecucao) => {
+      await supabase
+        .from("nina_correcao_execucoes")
+        .update({ etapa, passos })
+        .eq("id", execucaoId)
+        .eq("clinica_id", data.clinicaId);
+    };
     const passo = (
       ferramenta: PassoExecucao["ferramenta"],
       titulo: string,
@@ -276,6 +382,7 @@ export const aplicarCorrecaoComIA = createServerFn({ method: "POST" })
         em: new Date().toISOString(),
       });
     };
+
 
     let teste: ResultadoTeste = {
       executado: false,
@@ -299,6 +406,8 @@ export const aplicarCorrecaoComIA = createServerFn({ method: "POST" })
           : "Camada vive em código: o executor registra a mudança para quem publica código."
       }`,
     );
+    await atualizarEtapa("aplicando");
+
 
     const ferramentas = definicoesFerramentas(proposta.camada);
     const entradaModelo: any[] = [
@@ -382,6 +491,7 @@ export const aplicarCorrecaoComIA = createServerFn({ method: "POST" })
             } else if (c.name === "publicar_prompt") {
               const anterior = await ferramentasServer.lerPromptPublicado(supabase);
               valorAnterior = anterior?.conteudo ?? null;
+              await atualizarEtapa("publicando");
               const r = await ferramentasServer.publicarPrompt(supabase, userId, data.clinicaId, {
                 conteudo: String(args.conteudo ?? ""),
                 comentario: String(args.comentario ?? "Correção assistida de erro reportado"),
@@ -394,6 +504,7 @@ export const aplicarCorrecaoComIA = createServerFn({ method: "POST" })
                 `Versão ${r.anterior ?? "—"} → ${r.versao}. Identidade preservada.`,
               );
             } else if (c.name === "testar_em_homologacao") {
+              await atualizarEtapa("testando");
               teste = await ferramentasServer.testarEmHomologacao(data.clinicaId, userId, {
                 pergunta: String(args.pergunta ?? fb.pergunta_texto ?? ""),
                 respostaErrada: String(fb.mensagem_texto ?? ""),
@@ -435,6 +546,8 @@ export const aplicarCorrecaoComIA = createServerFn({ method: "POST" })
       motivoFinal = e instanceof Error ? e.message : "Falha desconhecida na correção.";
       passo("sistema", "Execução interrompida", motivoFinal, false);
     }
+
+    await atualizarEtapa("verificando_resultado");
 
     const status: ResumoExecucao["status"] = !aplicavel
       ? "pendente_tecnico"
@@ -518,7 +631,7 @@ export const aplicarCorrecaoComIA = createServerFn({ method: "POST" })
         .eq("clinica_id", data.clinicaId);
     }
 
-    return {
+    const resumo: ResumoExecucao = {
       status,
       camada: proposta.camada,
       passos,
@@ -527,6 +640,20 @@ export const aplicarCorrecaoComIA = createServerFn({ method: "POST" })
       valorAnterior,
       valorNovo: proposta.valorNovo,
       motivo: motivoFinal,
-      acaoId: (acao?.id as string | undefined) ?? null,
     };
+
+    await supabase
+      .from("nina_correcao_execucoes")
+      .update({
+        etapa: "concluido",
+        status: status === "falhou" ? "falhou" : "concluida",
+        passos,
+        resumo,
+        erro: status === "falhou" ? motivoFinal : null,
+        acao_id: acao?.id ?? null,
+      })
+      .eq("id", execucaoId)
+      .eq("clinica_id", data.clinicaId);
+
+    return { ...resumo, acaoId: (acao?.id as string | undefined) ?? null };
   });
