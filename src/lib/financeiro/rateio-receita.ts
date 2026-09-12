@@ -136,13 +136,27 @@ export function rotuloFormasDaLinha(formas: readonly ParteMisto[]): string {
   return vistas.length ? vistas.join(" + ") : LABEL_FORMA.sem_informacao;
 }
 
+/**
+ * Origem da linha do rateio.
+ *
+ *  - `atendimento`: pagamento ligado a um agendamento ou atendimento lançado
+ *    à mão — tem prestador e pode gerar repasse;
+ *  - `avulso`: todo o resto que entrou no caixa (mensalidade do Cartão,
+ *    adesão, recebimento avulso). Desde 12/09/2026 entra no relatório, a
+ *    pedido da direção: cada pagamento recebido conta como um atendimento e
+ *    soma na receita bruta das três telas. Repasse sempre zero.
+ */
+export type RateioOrigem = "atendimento" | "avulso";
+
 /** Um atendimento já com a receita repartida entre prestador e clínica. */
 export interface RateioLinha {
   id: string;
-  /** Competência: dia do atendimento. */
+  /** Competência: dia em que o pagamento entrou no caixa. */
   data: string;
+  origem: RateioOrigem;
   medico_id: string | null;
   medico_nome: string;
+
   especialidade_id: string | null;
   especialidade_nome: string;
   procedimento: string | null;
