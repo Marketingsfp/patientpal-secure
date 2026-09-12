@@ -22,6 +22,16 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
@@ -43,6 +53,17 @@ export const Route = createFileRoute("/_authenticated/app/hr-contratos/$id")({
 interface Ref {
   id: string;
   nome: string;
+}
+
+/** Cadastro já existente encontrado na conferência antes de gravar. */
+interface DuplicadoInfo {
+  id: string;
+  numero: number | null;
+  funcionario_nome: string;
+  cpf: string | null;
+  cargo_id: string | null;
+  setor_id: string | null;
+  data_admissao: string | null;
 }
 
 // Fonte única de perfis (inclui Telefonia); nunca duplicar a lista aqui.
@@ -108,6 +129,10 @@ function EditarFuncionarioPage() {
   });
   const [pacienteSel, setPacienteSel] = useState<PatientOption | null>(null);
   const [quickOpen, setQuickOpen] = useState(false);
+  // Cadastro repetido encontrado antes de gravar (trava do clique duplo).
+  const [duplicado, setDuplicado] = useState<{ tipo: "cpf" | "nome"; reg: DuplicadoInfo } | null>(
+    null,
+  );
 
   useEffect(() => {
     if (!clinicaAtual) return;
@@ -264,7 +289,42 @@ function EditarFuncionarioPage() {
     })();
   }, [clinicaAtual?.clinica_id, id]);
 
-  async function salvar() {
+  /** Só os dígitos do CPF, para comparar "123.456.789-00" com "12345678900". */
+  function apenasDigitos(v: string | null | undefined): string {
+    return (v ?? "").replace(/\D/g, "");
+  }
+
+  /**
+   * Procura um funcionário já cadastrado na clínica atual, ignorando o próprio
+   * registro quando estamos editando. CPF igual é sempre a mesma pessoa; nome
+   * igual pode ser homônimo, então a tela decide o que fazer com cada caso.
+   */
+  async function procurarDuplicado(): Promise<{
+    tipo: "cpf" | "nome";
+    reg: DuplicadoInfo;
+  } | null> {
+    const cpfDigitos = apenasDigitos(form.cpf);
+    const nomeNormalizado = form.funcionario_nome.trim().toUpperCase();
+    const { data, error } = await supabase
+      .from("hr_contratos")
+      .select("id,numero,funcionario_nome,cpf,cargo_id,setor_id,data_admissao")
+      .eq("clinica_id", form.clinica_id);
+    if (error || !data) return null;
+
+    const candidatos = data.filter((c) => isNovo || c.id !== id);
+    const porCpf = cpfDigitos
+      ? candidatos.find((c) => apenasDigitos(c.cpf as string | null) === cpfDigitos)
+      : undefined;
+    if (porCpf) return { tipo: "cpf", reg: porCpf as DuplicadoInfo };
+
+    const porNome = candidatos.find(
+      (c) => ((c.funcionario_nome as string) ?? "").trim().toUpperCase() === nomeNormalizado,
+    );
+    if (porNome) return { tipo: "nome", reg: porNome as DuplicadoInfo };
+    return null;
+  }
+
+  async function salvar(ignorarNomeIgual = false) {
     if (!podeEscrever) {
       toast.error("Você não tem permissão de edição neste módulo.");
       return;
@@ -295,6 +355,14 @@ function EditarFuncionarioPage() {
       }
     }
     setSaving(true);
+
+    // Conferência contra cadastro repetido (inclusive o clique duplo no Salvar).
+    const achado = await procurarDuplicado();
+    if (achado && (achado.tipo === "cpf" || !ignorarNomeIgual)) {
+      setSaving(false);
+      setDuplicado(achado);
+      return;
+    }
 
     let userId: string | null = null;
     if (criandoLogin) {
@@ -927,7 +995,7 @@ function EditarFuncionarioPage() {
             <Link to="/app/hr-contratos">Cancelar</Link>
           </Button>
           {podeEscrever && (
-            <Button onClick={salvar} disabled={saving || loading}>
+            <Button onClick={() => void salvar()} disabled={saving || loading}>
               {saving ? "Salvando…" : "Salvar"}
             </Button>
           )}
@@ -951,6 +1019,67 @@ function EditarFuncionarioPage() {
           }}
         />
       )}
+
+      <AlertDialog open={!!duplicado} onOpenChange={(o) => !o && setDuplicado(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {duplicado?.tipo === "cpf"
+                ? "Este funcionário já está cadastrado"
+                : "Já existe um funcionário com este nome"}
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-1 text-sm">
+                <div>
+                  <strong>Nº:</strong> {duplicado?.reg.numero ?? "—"}
+                </div>
+                <div>
+                  <strong>Nome:</strong> {duplicado?.reg.funcionario_nome}
+                </div>
+                <div>
+                  <strong>Cargo:</strong>{" "}
+                  {cargos.find((c) => c.id === duplicado?.reg.cargo_id)?.nome ?? "—"}
+                </div>
+                <div>
+                  <strong>Setor:</strong>{" "}
+                  {setores.find((s) => s.id === duplicado?.reg.setor_id)?.nome ?? "—"}
+                </div>
+                <div>
+                  <strong>Admissão:</strong>{" "}
+                  {duplicado?.reg.data_admissao
+                    ? duplicado.reg.data_admissao.split("-").reverse().join("/")
+                    : "—"}
+                </div>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setDuplicado(null)}>Cancelar</AlertDialogCancel>
+            {duplicado?.tipo === "nome" && (
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setDuplicado(null);
+                  void salvar(true);
+                }}
+              >
+                É outra pessoa, cadastrar mesmo assim
+              </Button>
+            )}
+            <AlertDialogAction
+              onClick={() => {
+                const destino = duplicado?.reg.id;
+                setDuplicado(null);
+                if (destino) {
+                  void navigate({ to: "/app/hr-contratos/$id", params: { id: destino } });
+                }
+              }}
+            >
+              Abrir cadastro existente
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
