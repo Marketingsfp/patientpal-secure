@@ -100,10 +100,7 @@ export function montarBlocoIdentidade(identidade: IdentidadeAtendimento): string
  */
 export function extrairIdentidade(texto: string): LeituraIdentidade {
   const aberturas = ocorrencias(texto, ABERTURA_IDENTIDADE);
-  const fechamentos = ocorrencias(texto, FECHAMENTO_IDENTIDADE).filter(
-    // "[/IDENTIDADE..." também contém "[IDENTIDADE..."? Não contém — o "/" difere.
-    () => true,
-  );
+  const fechamentos = ocorrencias(texto, FECHAMENTO_IDENTIDADE);
 
   if (aberturas.length === 0) {
     return {
