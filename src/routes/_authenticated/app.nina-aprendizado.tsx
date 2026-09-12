@@ -1466,27 +1466,51 @@ function Pagina() {
                                   >
                                     Usar sugestão da IA no rascunho
                                   </Button>
-                                  {analises[it.id]!.resultado?.proposta && (
-                                    <Button
-                                      size="sm"
-                                      disabled={Boolean(corrigindo[it.id])}
-                                      title="Aplica a proposta exibida, na camada e no alcance mostrados."
-                                      onClick={() => void aplicarComIA(it.id)}
-                                    >
-                                      {corrigindo[it.id] ? (
-                                        <Loader2
-                                          className="mr-1 h-4 w-4 animate-spin"
-                                          aria-hidden="true"
-                                        />
-                                      ) : null}
-                                      Aplicar correção
-                                    </Button>
-                                  )}
+                                  {(() => {
+                                    const analise = analises[it.id]!;
+                                    const prontidao = avaliarProntidao({
+                                      statusAnalise: (analise.status as any) ?? null,
+                                      resultado: analise.resultado ?? null,
+                                      proposta: analise.resultado?.proposta ?? null,
+                                      temPermissao: podeRevisar,
+                                      executorDisponivel: true,
+                                      execucaoEmCurso: Boolean(corrigindo[it.id]),
+                                    });
+                                    if (
+                                      prontidao.codigo === "sem_proposta" ||
+                                      prontidao.codigo === "nenhuma_alteracao_necessaria"
+                                    )
+                                      return null;
+                                    return (
+                                      <div className="flex flex-col gap-1">
+                                        <Button
+                                          size="sm"
+                                          disabled={!prontidao.habilitado}
+                                          title={prontidao.motivo}
+                                          onClick={() => void aplicarComIA(it.id, prontidao)}
+                                        >
+                                          {corrigindo[it.id] ? (
+                                            <Loader2
+                                              className="mr-1 h-4 w-4 animate-spin"
+                                              aria-hidden="true"
+                                            />
+                                          ) : null}
+                                          {ROTULO_BOTAO_APLICAR}
+                                        </Button>
+                                        {!prontidao.habilitado && (
+                                          <span className="text-[11px] text-muted-foreground">
+                                            {prontidao.motivo}
+                                          </span>
+                                        )}
+                                      </div>
+                                    );
+                                  })()}
                                 </div>
                               )}
                               <CorrecaoExecucaoPainel
                                 execucao={correcoes[it.id] ?? null}
                                 emAndamento={Boolean(corrigindo[it.id])}
+                                etapa={etapaCorrecao[it.id] ?? null}
                               />
                             </div>
                           ) : (
