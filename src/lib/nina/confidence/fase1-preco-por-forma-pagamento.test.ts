@@ -71,7 +71,7 @@ function contexto(fatos: FatoRecuperado[]): ContextoConfianca {
 describe("FASE 1 — caminho dos dados do preço", () => {
   it("a ferramenta devolve os dois preços em `records` e resume só o dinheiro em `price`", () => {
     const dados = montarResultadoConhecimento({ registros: [REGISTRO] });
-    expect(dados.price).toBe("51,00");
+    expect(dados.price).toBe("R$ 51,00");
     expect(dados.records).toHaveLength(1);
     expect(dados.records[0]!.preco_cartao).toBe(60);
     // O contrato NÃO expõe a chave `registros` — só `records`.
@@ -81,9 +81,9 @@ describe("FASE 1 — caminho dos dados do preço", () => {
   it("DEFEITO ATUAL: a evidência entregue ao motor perde o preço do cartão", () => {
     const { fatos } = extrairEvidencia(retornoDaFerramenta());
     const precos = fatos.filter((f) => f.campo === "preco").map((f) => f.valor);
-    // Correção esperada: ["51,00", "60,00"], um fato por forma de pagamento.
-    expect(precos).toEqual(["51,00"]);
-    expect(precos).not.toContain("60,00");
+    // Correção esperada: ["R$ 51,00", "R$ 60,00"], um fato por forma de pagamento.
+    expect(precos).toEqual(["R$ 51,00"]);
+    expect(precos).not.toContain("R$ 60,00");
   });
 });
 
@@ -112,6 +112,6 @@ describe("FASE 1 — controle A/B da validação monetária", () => {
     // cartão com cartão em vez de cartão com dinheiro.
     expect(cartao!.suportado).toBe(false);
     expect(cartao!.situacao).toBe("divergente");
-    expect(cartao!.valorDaFonte).toBe("51,00");
+    expect(cartao!.valorDaFonte).toBe("R$ 51,00");
   });
 });
