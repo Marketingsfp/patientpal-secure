@@ -45,6 +45,17 @@ interface Ref {
   nome: string;
 }
 
+/** Cadastro já existente encontrado na conferência antes de gravar. */
+interface DuplicadoInfo {
+  id: string;
+  numero: number | null;
+  funcionario_nome: string;
+  cpf: string | null;
+  cargo_id: string | null;
+  setor_id: string | null;
+  data_admissao: string | null;
+}
+
 // Fonte única de perfis (inclui Telefonia); nunca duplicar a lista aqui.
 const PERFIS = PERFIS_SISTEMA;
 
