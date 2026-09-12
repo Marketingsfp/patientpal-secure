@@ -667,8 +667,19 @@ export function avaliarGrounding(ctx: ContextoConfianca, texto?: string | null):
      */
     const segmento = (frase ?? trecho).trim();
     if (fatos && fatos.length > 0 && segmento) {
-      const chaveDaFrase = chave ?? qualificadoresDaAfirmacao(segmento);
-      const valorDaFrase = valor ?? valorDaAfirmacao(tipo, segmento);
+      // FASE 3 — afirmação monetária: o valor e a CONDIÇÃO vêm do recorte do
+      // próprio valor ("R$ 51,00 no dinheiro" / "R$ 60,00 no cartão"),
+      // enquanto procedimento/profissional/unidade seguem vindo do segmento.
+      const monetaria = tipo === "valor";
+      const chaveDaFrase =
+        chave ??
+        (monetaria ? chaveDaAfirmacaoMonetaria(segmento, trecho) : qualificadoresDaAfirmacao(segmento));
+      const valorDaFrase =
+        valor ??
+        (monetaria
+          ? (valorDaAfirmacao(tipo, trecho) ?? valorDaAfirmacao(tipo, segmento))
+          : valorDaAfirmacao(tipo, segmento));
+
       const r = correspondenciaDaAfirmacao(fatos, {
         tipo,
         entidades: alvo.entidades,
