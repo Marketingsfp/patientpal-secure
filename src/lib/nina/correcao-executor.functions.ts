@@ -742,6 +742,46 @@ export const aplicarCorrecaoComIA = createServerFn({ method: "POST" })
       valorNovo: proposta.valorNovo,
       motivo: motivoFinal,
     };
+    /**
+     * FASE 5 — "Resultado da correção": montado a partir do que o executor de
+     * fato fez (gravou, publicou, testou, reconferiu), não da afirmação do
+     * avaliador. Proposta ≠ patch ≠ teste aprovado ≠ publicação concluída.
+     */
+    const relatorio: RelatorioCorrecao = montarRelatorio({
+      proposta,
+      status,
+      resultadoFinal,
+      aplicavel,
+      publicado,
+      valorAnterior,
+      motivo: motivoFinal,
+      passos,
+      teste,
+      verificacao,
+      codigo: resultadoCodigo,
+      evidencias: {
+        analiseId: String(analise.id),
+        pacoteHash: pacote.hash,
+        pacoteRevisao: pacote.revisao,
+        origem: pacote.origem,
+        ambiente: pacote.identificacao.ambiente,
+        entradas: pacote.entradas.length,
+        lacunas: pacote.lacunas.map((l) => ({ rotulo: l.rotulo, motivo: l.motivo })),
+        cortes: pacote.cortes,
+      },
+      trabalho: {
+        execucaoId,
+        solicitadoPor: userId,
+        modelo: MODELO_EXECUTOR,
+        provedor: "Lovable AI Gateway",
+        inicio: new Date(inicioMs).toISOString(),
+        fim: agora,
+        idempotenciaChave: chave,
+        tentativa: (tentativasAnteriores ?? 0) + 1,
+      },
+      versaoPrompt,
+    });
+
     let acao: { id: string } | null = null;
 
     try {
