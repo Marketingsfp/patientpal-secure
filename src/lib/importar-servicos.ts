@@ -108,10 +108,7 @@ export function normalizarValor(valor: unknown): number {
   if (valor == null || valor === "") return 0;
   if (typeof valor === "number") return Number.isFinite(valor) ? Math.max(0, valor) : 0;
 
-  let texto = String(valor)
-    .replace(/r\$/gi, "")
-    .replace(/\s/g, "")
-    .trim();
+  let texto = String(valor).replace(/r\$/gi, "").replace(/\s/g, "").trim();
   if (!texto) return 0;
 
   const temVirgula = texto.includes(",");
@@ -265,9 +262,10 @@ export async function lerPlanilhaServicos(
   if (pareceCsv(opcoes.nomeArquivo, bytes)) {
     const texto = semBom(new TextDecoder("utf-8").decode(bytes));
     const primeiraLinha = texto.split(/\r?\n/)[0] ?? "";
-    const separador = (primeiraLinha.match(/;/g) ?? []).length >= (primeiraLinha.match(/,/g) ?? []).length
-      ? ";"
-      : ",";
+    const separador =
+      (primeiraLinha.match(/;/g) ?? []).length >= (primeiraLinha.match(/,/g) ?? []).length
+        ? ";"
+        : ",";
     wb = XLSX.read(texto, { type: "string", FS: separador, raw: true });
   } else {
     wb = XLSX.read(arquivo, { type: "array" });
@@ -350,9 +348,7 @@ export async function lerPlanilhaServicos(
     const linhaExcel = indice + indiceCabecalho + 2;
     const nome = normalizarMaiusculas(bruta[col.nome!]);
 
-    const vaziaDeVerdade = Object.values(bruta).every(
-      (v) => v == null || String(v).trim() === "",
-    );
+    const vaziaDeVerdade = Object.values(bruta).every((v) => v == null || String(v).trim() === "");
     if (vaziaDeVerdade) return;
 
     if (!nome) {
