@@ -128,14 +128,18 @@ describe("resumoPainel", () => {
   const outras = [lanc({ categoria_nome: "MENSALIDADE CARTAO CONSULTA", valor: 50 })];
   const r = resumoPainel({ rateio, despesas, outrasReceitas: outras });
 
-  it("receita bruta, repasse e atendimentos são os do Rateio", () => {
+  it("receita bruta e repasse são os do Rateio; cada pagamento conta 1 atendimento", () => {
     expect(r.receitaBruta).toBe(500);
     expect(r.repasse).toBe(220);
     expect(r.terceiro).toBe(30);
-    expect(r.producao.total).toBe(2);
+    // 2 atendimentos do Rateio + 1 mensalidade recebida.
+    expect(r.producao.total).toBe(3);
+    expect(r.producao.outros).toBe(1);
     expect(r.liquidoAtendimentos).toBe(250);
-    expect(r.ticketMedio).toBe(250);
+    // Ticket médio = (500 + 50) / 3.
+    expect(r.ticketMedio).toBe(183.33);
   });
+
 
   it("repasse pago não entra de novo como despesa", () => {
     expect(r.despesasOperacionais).toBe(100);
