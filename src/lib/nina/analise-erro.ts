@@ -483,5 +483,34 @@ export function normalizarResultado(
       o["proxima_verificacao"] == null ? null : String(o["proxima_verificacao"]).slice(0, 600),
     limitacoes,
     verificacoes,
+    proposta: normalizarProposta(o["proposta"]),
+  };
+}
+
+const CAMADAS: CamadaProposta[] = ["catalogo", "modelo", "busca", "ferramenta", "fluxo"];
+
+/**
+ * Normaliza a proposta de mudança devolvida pelo avaliador.
+ *
+ * `aplicavelAutomaticamente` NÃO vem do modelo: é decidido aqui pela camada.
+ * Camadas que vivem em código nunca são aplicadas pelo executor — ele só
+ * escreve a mudança proposta para quem tem acesso ao repositório.
+ */
+export function normalizarProposta(bruto: unknown): PropostaCorrecao | null {
+  if (!bruto || typeof bruto !== "object") return null;
+  const p = bruto as Record<string, unknown>;
+  const camada = CAMADAS.includes(p["camada"] as CamadaProposta)
+    ? (p["camada"] as CamadaProposta)
+    : null;
+  const valorNovo = String(p["valor_novo"] ?? "").trim().slice(0, 4000);
+  if (!camada || !valorNovo) return null;
+  return {
+    camada,
+    alvo: String(p["alvo"] ?? "").slice(0, 300) || "Alvo não especificado.",
+    valorAtual: p["valor_atual"] == null ? null : String(p["valor_atual"]).slice(0, 4000),
+    valorNovo,
+    justificativa: String(p["justificativa"] ?? "").slice(0, 2000),
+    alcance: String(p["alcance"] ?? "").slice(0, 600),
+    aplicavelAutomaticamente: CAMADAS_APLICAVEIS.includes(camada),
   };
 }
