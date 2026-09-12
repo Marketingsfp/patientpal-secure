@@ -48,11 +48,22 @@ function Page() {
   const [loading, setLoading] = useState(true);
   const [dias, setDias] = useState<DiaCaixa[]>([]);
   const [meta, setMeta] = useState<number>(0);
+  /** Receita confirmada do mês anterior fechado — base das metas de crescimento. */
+  const [baseMesAnterior, setBaseMesAnterior] = useState(0);
 
   const hoje = useMemo(() => new Date(), []);
   const inicio = useMemo(() => iso(new Date(hoje.getFullYear(), hoje.getMonth(), 1)), [hoje]);
   const fim = useMemo(() => iso(new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0)), [hoje]);
   const hojeIso = useMemo(() => iso(hoje), [hoje]);
+
+  const mesAnterior = useMemo(() => {
+    const ini = new Date(hoje.getFullYear(), hoje.getMonth() - 1, 1);
+    return {
+      de: iso(ini),
+      ate: iso(new Date(hoje.getFullYear(), hoje.getMonth(), 0)),
+      nome: ini.toLocaleDateString("pt-BR", { month: "long", year: "numeric" }),
+    };
+  }, [hoje]);
 
   const chaveMeta = clinicaAtual ? `fin-meta-${clinicaAtual.clinica_id}-${inicio}` : "";
 
