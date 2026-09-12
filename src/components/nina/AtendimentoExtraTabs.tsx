@@ -724,28 +724,57 @@ export function AtendInbox() {
   };
 
 
+  // FASE 4 — guarda de concorrência: só vale a informação MAIS NOVA do mesmo
+  // escopo (clínica + atendente). Resposta atrasada, heartbeat, reconexão ou
+  // aba antiga nunca reescrevem uma escolha mais recente.
+  const sincronia = useRef(SINCRONIA_INICIAL);
+  const seqPresenca = useRef(0);
+
   const carregarStatusAgente = useCallback(async () => {
-    if (!clinicaId) return;
+    if (!clinicaId || !meuId) return;
+    const seq = ++seqPresenca.current;
     try {
       const [s, p, rs] = await Promise.all([
         meuStatusFn({ data: { clinicaId } }),
         pausaAtualFn({ data: { clinicaId } }),
         listarReasonsFn({ data: { clinicaId } }),
       ]);
-      setFilaAberta(s.filaAberta);
-      setEstadoManual((s as { estadoManual?: EstadoManualPresenca | null }).estadoManual ?? null);
-      setVersaoPresenca((s as { estadoManualVersao?: number }).estadoManualVersao ?? 0);
-      setPausaAtiva(p);
+      const estado = (s as { estadoManual?: EstadoManualPresenca | null }).estadoManual ?? null;
+      const versao = (s as { estadoManualVersao?: number }).estadoManualVersao ?? 0;
+      const r = aplicarAtualizacao(
+        sincronia.current,
+        { clinicaId, userId: meuId },
+        { clinicaId, userId: meuId, estado, versao, seq },
+      );
       setPauseReasons(rs);
       setStatusCarregado(true);
-      const confirmado = p
-        ? ("PAUSA" as EstadoManualPresenca)
-        : ((s as { estadoManual?: EstadoManualPresenca | null }).estadoManual ?? null);
+      if (!r.aceita) return; // resposta fora de ordem: mantém a escolha atual
+      sincronia.current = r.estado;
+      setFilaAberta(s.filaAberta);
+      setEstadoManual(estado);
+      setVersaoPresenca(versao);
+      setPausaAtiva(p);
+      const confirmado = p ? ("PAUSA" as EstadoManualPresenca) : estado;
       setControle((c) => presAoCarregar(c, confirmado));
     } catch {
       // Estado auxiliar da fila: se falhar, a aba segue com os valores atuais.
     }
-  }, [clinicaId, meuStatusFn, pausaAtualFn, listarReasonsFn]);
+  }, [clinicaId, meuId, meuStatusFn, pausaAtualFn, listarReasonsFn]);
+
+  // Aviso direto entre abas do mesmo navegador (uma única assinatura).
+  useEffect(() => {
+    if (!clinicaId || !meuId) return ouvirOutrasAbas(() => {});
+    return ouvirOutrasAbas((a) => {
+      const r = aplicarAtualizacao(sincronia.current, { clinicaId, userId: meuId }, a);
+      if (!r.aceita) return;
+      sincronia.current = r.estado;
+      setEstadoManual(r.estado.estado);
+      setVersaoPresenca(r.estado.versao);
+      if (r.estado.estado !== "PAUSA") setPausaAtiva(null);
+      setControle((c) => presAoCarregar(c, r.estado.estado));
+      carregarStatusAgente();
+    });
+  }, [clinicaId, meuId, carregarStatusAgente]);
 
   useEffect(() => {
     carregarStatusAgente();
