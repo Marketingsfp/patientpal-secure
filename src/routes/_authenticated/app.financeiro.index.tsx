@@ -119,6 +119,7 @@ type Drill =
   | "ticket"
   | "mensalidade"
   | "adesao"
+  | "cortesia"
   | CategoriaAtendimento;
 
 
