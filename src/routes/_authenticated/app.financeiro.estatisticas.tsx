@@ -312,6 +312,18 @@ function Page() {
           value={String(stats.atendimentos)}
           icon={TrendingUp}
           color="bg-blue-500/10 text-blue-600"
+          detalhe={
+            <>
+              <p>
+                {stats.pagos.toLocaleString("pt-BR")} pagamentos recebidos no caixa +{" "}
+                {stats.cortesias.toLocaleString("pt-BR")} cortesias sem cobrança
+              </p>
+              <p className="mt-1">
+                Cada pagamento de entrada conta 1 atendimento: consulta, exame, procedimento,
+                adesão, mensalidade e demais serviços.
+              </p>
+            </>
+          }
         />
         <Stat
           onClick={() => setDrill("notas")}
