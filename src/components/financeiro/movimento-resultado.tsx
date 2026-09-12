@@ -631,7 +631,7 @@ function montarDetalhe(
         Number(l.valor),
       ]),
       totais: [
-        plural(r.atendimentos.qtd, "pagamento", "pagamentos"),
+        plural(r.receitaBruta.qtd, "atendimento", "atendimentos"),
         "",
         "",
         "",
@@ -639,8 +639,9 @@ function montarDetalhe(
         "",
         "",
         "",
-        r.atendimentos.total,
+        r.receitaBruta.total,
       ],
+
     };
   }
 
