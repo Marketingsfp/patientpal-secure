@@ -1559,7 +1559,18 @@ function Page() {
           modalidade: rModalidade === "todas" ? null : rModalidade,
           servico: rServico === "todos" ? null : rServico,
         };
-        const [atual, anterior, pago] = await Promise.all([
+        // Sem recorte de profissional/serviço, o fechamento de caixa do
+        // período inteiro é o mesmo do Dashboard — só então faz sentido
+        // mostrá-lo aqui.
+        const semRecorte =
+          rMedico === "todos" &&
+          rEspecialidade === "todas" &&
+          rGrupo === "todos" &&
+          rTipoServico === "todos" &&
+          rModalidade === "todas" &&
+          rServico === "todos" &&
+          categorias.length === 0;
+        const [atual, anterior, pago, painel] = await Promise.all([
           carregarRateio(ctxRateio, { ...filtrosComuns, de: from, ate: to }),
           comparar
             ? carregarRateio(ctxRateio, {
@@ -1573,8 +1584,14 @@ function Page() {
           carregarRepassePagoDetalhado(ctxRateio, clinicaAtual.clinica_id, from, to).catch(
             () => null,
           ),
+          semRecorte
+            ? carregarPainelFinanceiro(ctxRateio, clinicaAtual.clinica_id, from, to)
+                .then(resumoPainel)
+                .catch(() => null)
+            : Promise.resolve(null),
         ]);
         setRepassePagoRateio(pago);
+        setSaldoCaixaRateio(painel);
         brutasRateio = atual;
         brutasComp = anterior;
         cruas = filtrarPorCategoria(atual, categorias, (l) => l.categoria_nome);
