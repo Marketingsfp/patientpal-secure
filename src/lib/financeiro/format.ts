@@ -1,3 +1,6 @@
+import { dataClinicaDe, hojeBR } from "@/lib/date-utils";
+import { addDias } from "@/lib/financeiro/periodos";
+
 export const brl = (v: number | string | null | undefined) =>
   new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(Number(v ?? 0));
 
