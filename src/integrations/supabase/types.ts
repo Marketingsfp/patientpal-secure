@@ -8766,6 +8766,7 @@ export type Database = {
       nina_correcao_execucoes: {
         Row: {
           acao_id: string | null
+          alvo_revisao: string | null
           ambiente: string | null
           analise_id: string | null
           autorizado_em: string
@@ -8777,17 +8778,22 @@ export type Database = {
           etapa: string
           feedback_id: string
           id: string
+          idempotencia_chave: string | null
           pacote_hash: string | null
           pacote_revisao: number | null
           passos: Json
           proposta: Json
           proposta_assinatura: string
+          resultado_final: string | null
           resumo: Json | null
           status: string
+          tentativas: number
           updated_at: string
+          verificacao: Json | null
         }
         Insert: {
           acao_id?: string | null
+          alvo_revisao?: string | null
           ambiente?: string | null
           analise_id?: string | null
           autorizado_em?: string
@@ -8799,17 +8805,22 @@ export type Database = {
           etapa?: string
           feedback_id: string
           id?: string
+          idempotencia_chave?: string | null
           pacote_hash?: string | null
           pacote_revisao?: number | null
           passos?: Json
           proposta: Json
           proposta_assinatura: string
+          resultado_final?: string | null
           resumo?: Json | null
           status?: string
+          tentativas?: number
           updated_at?: string
+          verificacao?: Json | null
         }
         Update: {
           acao_id?: string | null
+          alvo_revisao?: string | null
           ambiente?: string | null
           analise_id?: string | null
           autorizado_em?: string
@@ -8821,14 +8832,18 @@ export type Database = {
           etapa?: string
           feedback_id?: string
           id?: string
+          idempotencia_chave?: string | null
           pacote_hash?: string | null
           pacote_revisao?: number | null
           passos?: Json
           proposta?: Json
           proposta_assinatura?: string
+          resultado_final?: string | null
           resumo?: Json | null
           status?: string
+          tentativas?: number
           updated_at?: string
+          verificacao?: Json | null
         }
         Relationships: [
           {
