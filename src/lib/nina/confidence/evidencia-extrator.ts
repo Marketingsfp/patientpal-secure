@@ -8,6 +8,7 @@
  * Puro: recebe o objeto já lido pelo broker e devolve dados. Sem banco, sem
  * rede. É por isso que dá para testar cada formato de retorno.
  */
+import { normalizarTexto, valorMonetario } from "./evidencia";
 import type { ConsultaDoTurno, FatoRecuperado, StatusConsulta } from "./evidencia";
 import type { TipoFonte } from "./types";
 
