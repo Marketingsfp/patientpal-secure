@@ -116,7 +116,29 @@ export interface ProducaoPainel {
   exames: number;
   /** Procedimento, "outro", serviço fora do cadastro e recebimento avulso. */
   outros: number;
+  /** Parcelas de mensalidade do Cartão recebidas no período. */
+  mensalidades: number;
+  /** Taxas de adesão (e inclusão de dependente) recebidas no período. */
+  adesoes: number;
 }
+
+/** Como o recebimento sem agendamento entra nos cards de contagem. */
+export type CategoriaOutraReceita = "mensalidade" | "adesao" | "avulso";
+
+/**
+ * A adesão e a mensalidade não têm serviço cadastrado: o que as identifica é o
+ * texto do lançamento gerado pelo contrato ("… — CONTRATO", "MENSALIDADE",
+ * "ADESÃO", "TAXA DE INCLUSÃO DE DEPENDENTE"). O resto é recebimento avulso.
+ */
+export function categoriaDaOutraReceita(
+  l: Pick<LancamentoPainel, "descricao" | "categoria_nome">,
+): CategoriaOutraReceita {
+  const t = normalizar(`${l.descricao ?? ""} ${l.categoria_nome ?? ""}`);
+  if (t.includes("ADESAO") || t.includes("INCLUSAO DE DEPENDENTE")) return "adesao";
+  if (t.includes("MENSALIDADE") || t.includes("CONTRATO")) return "mensalidade";
+  return "avulso";
+}
+
 
 
 export type CategoriaAtendimento = "cartao" | "particular" | "exame" | "outro";
