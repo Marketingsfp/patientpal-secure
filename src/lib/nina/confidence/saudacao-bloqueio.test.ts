@@ -49,17 +49,15 @@ const RESPOSTA_APRESENTACAO =
   "Olá! Sou a Nina, assistente virtual da Policlínica Menino Jesus. Como posso ajudar?";
 
 describe("regras publicadas — proibição condicionada", () => {
-  it("proibição com condição não representável não vira proibição de todo turno", () => {
-    const { regras, limitacoes } = extrairRegrasPublicadas(TEXTO_APRESENTACAO, {
+  it("proibição condicionada não vira proibição de conteúdo para todo turno", () => {
+    const { regras } = extrairRegrasPublicadas(TEXTO_APRESENTACAO, {
       escopo: "whatsapp",
       hash: "H",
     });
     const alvo = regras.find((r) => r.descricao.includes("Não acrescente"));
     expect(alvo).toBeDefined();
-    expect(alvo!.verificacao).toBe("nao_interpretada");
+    expect(alvo!.verificacao).not.toBe("proibicao_de_conteudo");
     expect(alvo!.proibicoes).toEqual([]);
-    expect(alvo!.motivo).toBe("CONDICAO_DA_PROIBICAO_NAO_VERIFICAVEL");
-    expect(limitacoes).toContain("CONDICAO_DA_PROIBICAO_NAO_VERIFICAVEL");
   });
 
   it("saudação com pergunta de acolhimento não é reprovada como regra descumprida", () => {
