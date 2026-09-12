@@ -3085,6 +3085,18 @@ async function gerarRespostaNinaInterno(
     if (passeVerificacaoRegras > LIMITE_PASSES_VERIFICACAO) repetirVerificacaoRegras = false;
   }
 
+  // A apresentação só é dada por feita quando o texto que sai é MESMO a
+  // resposta da Nina. Se o candidato foi descartado (aviso controlado), a
+  // pessoa não recebeu apresentação: o próximo turno volta a apresentá-la.
+  try {
+    const { ehAvisoControlado: avisoControlado } = await import(
+      "@/lib/nina/confidence/baixa-confiabilidade"
+    );
+    await confirmarApresentacaoEntregue(!avisoControlado(resposta));
+  } catch {
+    /* marcação de apresentação nunca interrompe o atendimento */
+  }
+
   // Evidências finais: estado/sessão no momento da resposta, regras aplicáveis,
   // alterações posteriores ao texto do modelo e a mensagem realmente enviada.
   try {
