@@ -166,8 +166,11 @@ export function categoriaDoAtendimento(
   return "outro";
 }
 
+/** Atendimento feito sem cobrança (cortesia da casa ou gratuidade do Cartão). */
+export const ehCortesia = (l: Pick<RateioLinha, "receita">): boolean => Number(l.receita ?? 0) <= 0;
+
 export function producaoDoRateio(
-  linhas: Array<Pick<RateioLinha, "tipo_servico" | "condicao">>,
+  linhas: Array<Pick<RateioLinha, "tipo_servico" | "condicao" | "receita">>,
 ): ProducaoPainel {
   const p: ProducaoPainel = {
     total: linhas.length,
@@ -178,9 +181,13 @@ export function producaoDoRateio(
     outros: 0,
     mensalidades: 0,
     adesoes: 0,
-
+    cortesias: 0,
   };
   for (const l of linhas) {
+    if (ehCortesia(l)) {
+      p.cortesias++;
+      continue;
+    }
     const c = categoriaDoAtendimento(l);
     if (c === "cartao") p.consultasCartao++;
     else if (c === "particular") {
