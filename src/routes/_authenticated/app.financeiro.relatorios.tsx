@@ -128,9 +128,11 @@ import {
 } from "@/components/sessoes/registrar-contato-dialog";
 import { useAcessoModulo } from "@/hooks/use-permissoes";
 import {
+  carregarPainelFinanceiro,
   carregarRepassePagoDetalhado,
   type RepassePagoDetalhe,
 } from "@/lib/financeiro/painel-financeiro-carregar";
+import { resumoPainel, type ResumoPainel } from "@/lib/financeiro/painel-financeiro";
 import {
   agruparRateio,
   carregarContextoRateio,
@@ -531,6 +533,7 @@ function CardResumo({
   delta,
   invertido = false,
   composicao,
+  linhas,
 }: {
   titulo: string;
   valor: string;
@@ -541,6 +544,8 @@ function CardResumo({
   invertido?: boolean;
   /** Quebra por forma de pagamento, listada abaixo do valor. */
   composicao?: FatiaDaReceita[];
+  /** Linhas livres abaixo do valor — usado na quebra espécie/banco. */
+  linhas?: { rotulo: string; valor: string }[];
 }) {
   const bom = delta == null ? true : invertido ? delta <= 0 : delta >= 0;
   const Icone = delta == null || delta === 0 ? Minus : delta > 0 ? ArrowUpRight : ArrowDownRight;
@@ -577,6 +582,16 @@ function CardResumo({
           </div>
         )}
         {composicao && <ComposicaoPorForma fatias={composicao} />}
+        {linhas && linhas.length > 0 && (
+          <ul className="mt-2 space-y-0.5 border-t border-slate-100 pt-2">
+            {linhas.map((l) => (
+              <li key={l.rotulo} className="flex items-center justify-between gap-2 text-xs">
+                <span className="text-muted-foreground">{l.rotulo}</span>
+                <span className="shrink-0 tabular-nums">{l.valor}</span>
+              </li>
+            ))}
+          </ul>
+        )}
       </CardContent>
     </Card>
   );
@@ -758,6 +773,13 @@ function Page() {
   const [ctxRateio, setCtxRateio] = useState<RateioContexto | null>(null);
   /** Repasse que saiu do caixa no período — comparação com o devido do Rateio. */
   const [repassePagoRateio, setRepassePagoRateio] = useState<RepassePagoDetalhe | null>(null);
+  /**
+   * O mesmo fechamento de caixa do Dashboard (receitas − despesas pagas no
+   * caixa, com a quebra em espécie e banco). Só é carregado quando o Rateio
+   * está sem filtro de profissional/serviço: com recorte, o saldo do caixa do
+   * período inteiro não corresponderia às linhas da tabela.
+   */
+  const [saldoCaixaRateio, setSaldoCaixaRateio] = useState<ResumoPainel | null>(null);
   const [ctxCarregando, setCtxCarregando] = useState(false);
   const ctxPedido = useRef(false);
 
@@ -1550,7 +1572,18 @@ function Page() {
           modalidade: rModalidade === "todas" ? null : rModalidade,
           servico: rServico === "todos" ? null : rServico,
         };
-        const [atual, anterior, pago] = await Promise.all([
+        // Sem recorte de profissional/serviço, o fechamento de caixa do
+        // período inteiro é o mesmo do Dashboard — só então faz sentido
+        // mostrá-lo aqui.
+        const semRecorte =
+          rMedico === "todos" &&
+          rEspecialidade === "todas" &&
+          rGrupo === "todos" &&
+          rTipoServico === "todos" &&
+          rModalidade === "todas" &&
+          rServico === "todos" &&
+          categorias.length === 0;
+        const [atual, anterior, pago, painel] = await Promise.all([
           carregarRateio(ctxRateio, { ...filtrosComuns, de: from, ate: to }),
           comparar
             ? carregarRateio(ctxRateio, {
@@ -1564,8 +1597,14 @@ function Page() {
           carregarRepassePagoDetalhado(ctxRateio, clinicaAtual.clinica_id, from, to).catch(
             () => null,
           ),
+          semRecorte
+            ? carregarPainelFinanceiro(ctxRateio, clinicaAtual.clinica_id, from, to)
+                .then(resumoPainel)
+                .catch(() => null)
+            : Promise.resolve(null),
         ]);
         setRepassePagoRateio(pago);
+        setSaldoCaixaRateio(painel);
         brutasRateio = atual;
         brutasComp = anterior;
         cruas = filtrarPorCategoria(atual, categorias, (l) => l.categoria_nome);
@@ -2595,12 +2634,49 @@ function Page() {
             invertido
           />
 
-          <CardResumo
-            titulo="Líquido da clínica"
-            valor={brl(totaisR.liquido)}
-            detalhe={`Margem de ${pct(totaisR.margem)}`}
-            delta={deltaDe(totaisR.liquido, totaisComp.liquido)}
-          />
+          {/* Mesma régua do Dashboard: receitas menos tudo que saiu do caixa,
+              com a quebra de onde o dinheiro está. Quando o Rateio está
+              recortado por profissional/serviço, o fechamento de caixa não
+              corresponde às linhas da tabela — aí segue valendo o líquido do
+              próprio Rateio. */}
+          {saldoCaixaRateio ? (
+            <CardResumo
+              titulo="Líquido da clínica / Saldo"
+              valor={brl(saldoCaixaRateio.saldo)}
+              detalhe={`Margem de ${pct(
+                saldoCaixaRateio.receitaTotal > 0
+                  ? (saldoCaixaRateio.saldo / saldoCaixaRateio.receitaTotal) * 100
+                  : 0,
+              )} · receitas − despesas pagas no caixa`}
+              linhas={[
+                {
+                  rotulo: "Em espécie (gaveta)",
+                  valor: brl(saldoCaixaRateio.saldoMeios.especie.saldo),
+                },
+                {
+                  rotulo: "Em banco (PIX, cartão, boleto)",
+                  valor: brl(saldoCaixaRateio.saldoMeios.banco.saldo),
+                },
+                ...(saldoCaixaRateio.saldoMeios.outros.entradas !== 0 ||
+                saldoCaixaRateio.saldoMeios.outros.saidas !== 0
+                  ? [
+                      {
+                        rotulo: "Outros (convênio, sem informação)",
+                        valor: brl(saldoCaixaRateio.saldoMeios.outros.saldo),
+                      },
+                    ]
+                  : []),
+                { rotulo: "Líquido dos atendimentos (Rateio)", valor: brl(totaisR.liquido) },
+              ]}
+            />
+          ) : (
+            <CardResumo
+              titulo="Líquido da clínica"
+              valor={brl(totaisR.liquido)}
+              detalhe={`Margem de ${pct(totaisR.margem)} · líquido do Rateio (recorte aplicado)`}
+              delta={deltaDe(totaisR.liquido, totaisComp.liquido)}
+            />
+          )}
         </div>
       )}
 
