@@ -680,6 +680,7 @@ export function avaliarGrounding(ctx: ContextoConfianca, texto?: string | null):
           ? (valorDaAfirmacao(tipo, trecho) ?? valorDaAfirmacao(tipo, segmento))
           : valorDaAfirmacao(tipo, segmento));
 
+      if (process.env["DBG3"]) console.error("DBG", JSON.stringify({tipo,trecho,segmento,chaveDaFrase,valorDaFrase,entidades:alvo.entidades,campos:alvo.campos}));
       const r = correspondenciaDaAfirmacao(fatos, {
         tipo,
         entidades: alvo.entidades,
