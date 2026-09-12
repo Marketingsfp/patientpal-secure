@@ -17,6 +17,17 @@ import {
 } from "@/lib/atendimento/respostas-rapidas";
 import { normalizarNomeBusca } from "@/lib/busca-texto";
 import type { EstadoManualPresenca } from "@/lib/atendimento/presenca-manual";
+import {
+  CONTROLE_INICIAL,
+  aoCarregar as presAoCarregar,
+  aoConfirmar as presAoConfirmar,
+  aoFalhar as presAoFalhar,
+  aoIniciarGravacao as presAoIniciar,
+  opcaoDesabilitada as presDesabilitada,
+  opcaoSelecionada as presSelecionada,
+  precisaEscolher as presPrecisaEscolher,
+  textoSituacao as presTexto,
+} from "@/lib/atendimento/controle-presenca";
 import { supabase } from "@/integrations/supabase/client";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
@@ -727,6 +738,10 @@ export function AtendInbox() {
       setPausaAtiva(p);
       setPauseReasons(rs);
       setStatusCarregado(true);
+      const confirmado = p
+        ? ("PAUSA" as EstadoManualPresenca)
+        : ((s as { estadoManual?: EstadoManualPresenca | null }).estadoManual ?? null);
+      setControle((c) => presAoCarregar(c, confirmado));
     } catch {
       // Estado auxiliar da fila: se falhar, a aba segue com os valores atuais.
     }
@@ -742,6 +757,8 @@ export function AtendInbox() {
   // atendente clica em Online, Offline ou Em pausa.
   const [estadoManual, setEstadoManual] = useState<EstadoManualPresenca | null>(null);
   const [versaoPresenca, setVersaoPresenca] = useState(0);
+  // FASE 3 — o visual segue o estado confirmado pelo servidor.
+  const [controle, setControle] = useState(CONTROLE_INICIAL);
   const online = estadoManual === "ONLINE" && !pausaAtiva;
   const emPausa = estadoManual === "PAUSA" || !!pausaAtiva;
   const manualOffline = estadoManual === "OFFLINE";
@@ -812,10 +829,12 @@ export function AtendInbox() {
     })) as { ok?: boolean; conflito?: boolean; versao?: number; distribuidas?: number } | null;
     if (r?.conflito) {
       await carregarStatusAgente();
+      setControle((c) => presAoFalhar(c, "A presença foi alterada em outro lugar. Tente de novo."));
       toast.error("A presença foi alterada em outro lugar. Confira o controle de presença.");
       return null;
     }
     setEstadoManual(estado);
+    setControle((c) => presAoConfirmar(c, estado));
     if (typeof r?.versao === "number") setVersaoPresenca(r.versao);
     else setVersaoPresenca((v) => v + 1);
     return r;
@@ -823,6 +842,10 @@ export function AtendInbox() {
 
   const definirStatus = async (status: "online" | "pausa" | "offline") => {
     if (!clinicaId) return;
+    if (controle.salvando) return; // evita clique duplicado
+    const alvo: EstadoManualPresenca =
+      status === "online" ? "ONLINE" : status === "offline" ? "OFFLINE" : "PAUSA";
+    setControle((c) => presAoIniciar(c, alvo));
     try {
       if (status === "online") {
         if (pausaAtiva) await finalizarPausaFn({ data: { clinicaId } });
@@ -846,13 +869,16 @@ export function AtendInbox() {
         toast.success("Você está offline");
       } else {
         if (!pauseReasons.length) {
+          setControle((c) => presAoFalhar(c, "Nenhum motivo de pausa configurado"));
           toast.error("Nenhum motivo de pausa configurado");
           return;
         }
         setPausaReasonSel(pauseReasons[0].id);
         setPausaDialogOpen(true);
+        setControle((c) => ({ ...c, salvando: null }));
       }
     } catch (e: any) {
+      setControle((c) => presAoFalhar(c, e?.message ?? "Não foi possível salvar a presença."));
       mostrarErro(e);
     }
   };
@@ -860,12 +886,15 @@ export function AtendInbox() {
 
   const confirmarPausa = async () => {
     if (!clinicaId || !pausaReasonSel) return;
+    setControle((c) => presAoIniciar(c, "PAUSA"));
     try {
       await iniciarPausaFn({ data: { clinicaId, reasonId: pausaReasonSel } });
       setPausaDialogOpen(false);
+      setEstadoManual("PAUSA");
       await carregarStatusAgente();
       toast.success("Em pausa");
     } catch (e: any) {
+      setControle((c) => presAoFalhar(c, e?.message ?? "Não foi possível entrar em pausa."));
       mostrarErro(e);
     }
   };
@@ -2842,47 +2871,106 @@ export function AtendInbox() {
               </Button>
             </div>
 
-            <div className="grid grid-cols-3 gap-1">
+            {/* FASE 3 — controle manual: o selecionado é sempre o que o servidor confirmou. */}
+            <div
+              role="radiogroup"
+              aria-label="Minha disponibilidade"
+              className="grid grid-cols-3 gap-1"
+            >
               <Button
                 size="sm"
-                variant={online ? "default" : "outline"}
+                role="radio"
+                aria-checked={presSelecionada(controle, "ONLINE")}
+                aria-label="Online"
+                disabled={presDesabilitada(controle)}
+                variant={presSelecionada(controle, "ONLINE") ? "default" : "outline"}
                 className={`h-7 px-1 text-[11px] ${
-                  online ? "bg-atd-ok hover:bg-atd-ok/90 text-atd-on-strong" : "text-atd-ok border-atd-ok/40"
+                  presSelecionada(controle, "ONLINE")
+                    ? "bg-atd-ok hover:bg-atd-ok/90 text-atd-on-strong ring-2 ring-offset-1 ring-atd-ok"
+                    : "text-atd-ok border-atd-ok/40"
                 }`}
                 onClick={() => definirStatus("online")}
               >
-                <Circle className="h-2.5 w-2.5 mr-1 fill-current" /> Online
+                {controle.salvando === "ONLINE" ? (
+                  <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                ) : (
+                  <Circle className="h-2.5 w-2.5 mr-1 fill-current" />
+                )}
+                Online
+                {presSelecionada(controle, "ONLINE") && <span className="sr-only"> (selecionado)</span>}
               </Button>
               <Button
                 size="sm"
-                variant={emPausa ? "default" : "outline"}
+                role="radio"
+                aria-checked={presSelecionada(controle, "PAUSA")}
+                aria-label="Em pausa"
+                disabled={presDesabilitada(controle)}
+                variant={presSelecionada(controle, "PAUSA") ? "default" : "outline"}
                 className={`h-7 px-1 text-[11px] ${
-                  emPausa
-                    ? "bg-atd-warn hover:bg-atd-warn/90 text-atd-warn-ink"
+                  presSelecionada(controle, "PAUSA")
+                    ? "bg-atd-warn hover:bg-atd-warn/90 text-atd-warn-ink ring-2 ring-offset-1 ring-atd-warn"
                     : "text-atd-warn-ink border-atd-warn/40"
                 }`}
                 onClick={() => definirStatus("pausa")}
               >
-                <Coffee className="h-3 w-3 mr-1" /> Pausa
+                {controle.salvando === "PAUSA" ? (
+                  <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                ) : (
+                  <Coffee className="h-3 w-3 mr-1" />
+                )}
+                Pausa
+                {presSelecionada(controle, "PAUSA") && <span className="sr-only"> (selecionado)</span>}
               </Button>
 
               <Button
                 size="sm"
-                variant={manualOffline ? "default" : "outline"}
+                role="radio"
+                aria-checked={presSelecionada(controle, "OFFLINE")}
+                aria-label="Offline"
+                disabled={presDesabilitada(controle)}
+                variant={presSelecionada(controle, "OFFLINE") ? "default" : "outline"}
                 className={`h-7 px-1 text-[11px] ${
-                  manualOffline
-                    ? "bg-atd-idle hover:bg-atd-idle/90 text-atd-on-strong"
+                  presSelecionada(controle, "OFFLINE")
+                    ? "bg-atd-idle hover:bg-atd-idle/90 text-atd-on-strong ring-2 ring-offset-1 ring-atd-idle"
                     : "text-atd-idle-ink border-atd-border"
                 }`}
                 onClick={() => definirStatus("offline")}
               >
-                <PowerOff className="h-3 w-3 mr-1" /> Offline
+                {controle.salvando === "OFFLINE" ? (
+                  <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                ) : (
+                  <PowerOff className="h-3 w-3 mr-1" />
+                )}
+                Offline
+                {presSelecionada(controle, "OFFLINE") && <span className="sr-only"> (selecionado)</span>}
               </Button>
             </div>
-            {!estadoManual && (
+            <p
+              aria-live="polite"
+              className={`text-[11px] ${
+                controle.erro
+                  ? "text-destructive"
+                  : presPrecisaEscolher(controle)
+                    ? "font-medium text-atd-warn-ink"
+                    : "text-muted-foreground"
+              }`}
+            >
+              {presTexto(controle)}
+            </p>
+            {presPrecisaEscolher(controle) && (
               <p className="text-[11px] text-muted-foreground">
-                Escolha o seu estado para começar a receber conversas.
+                Escolha Online, Em pausa ou Offline para definir se você recebe novas conversas.
               </p>
+            )}
+            {controle.erro && !controle.salvando && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-6 w-full text-[11px]"
+                onClick={() => setControle((c) => ({ ...c, erro: null }))}
+              >
+                Tentar de novo
+              </Button>
             )}
             {pausaAtiva?.atend_pause_reasons?.nome && (
 
