@@ -69,13 +69,60 @@ export type EntradaBloqueioBaixaConfianca = {
   /** Hash do conteúdo candidato avaliado (rastreabilidade, sem PII). */
   conteudoCandidatoHash?: string | null;
   /**
-   * Turno social sem ação operacional (saudação, ou esclarecimento em curso
-   * sem ação pedida). Uma saudação simples nunca encaminha para humano.
+   * Exceção estruturada de saudação: uma abertura de conversa correta não é
+   * encaminhada só porque a nota ficou baixa. Todas as condições precisam
+   * valer ao mesmo tempo (ver `excecaoSaudacaoAplicavel`).
+   */
+  saudacao?: EntradaSaudacao;
+  /**
+   * @deprecated Use `saudacao`. Mantido para chamadas antigas: equivale a
+   * declarar apenas que o turno é social, com as demais condições ausentes.
    */
   turnoSocialSemAcao?: boolean;
   /** Bloqueadores absolutos observados no turno. */
   bloqueadoresAbsolutos?: string[];
 };
+
+/**
+ * Condições OBSERVADAS do turno de saudação. Nenhuma delas é suposta: o
+ * runtime informa o que verificou. Campo ausente = não observado, e "não
+ * observado" nunca vale como impedimento.
+ */
+export type EntradaSaudacao = {
+  /** O turno é abertura/saudação (ou esclarecimento sem ação pedida). */
+  turnoSocial: boolean;
+  /** Houve ação operacional pedida ou executada neste turno. */
+  acaoOperacional?: boolean;
+  /** A resposta afirma preço, horário ou disponibilidade sem fonte. */
+  afirmacaoSemFonte?: boolean;
+  /** A pessoa pediu para falar com uma pessoa da equipe. */
+  pedidoDeHumano?: boolean;
+  /** A apresentação contradiz a identidade configurada da assistente. */
+  conflitoDeIdentidade?: boolean;
+  /** Há descumprimento bloqueante de regra publicada. */
+  conformidadeBloqueante?: boolean;
+};
+
+/**
+ * A exceção de saudação vale? Só quando o turno é social E nenhuma das
+ * condições de risco foi observada. Qualquer uma delas devolve a decisão ao
+ * critério normal de confiança.
+ */
+export function excecaoSaudacaoAplicavel(s: EntradaSaudacao | undefined): {
+  aplica: boolean;
+  impedimento: string | null;
+} {
+  if (!s || s.turnoSocial !== true) return { aplica: false, impedimento: "TURNO_NAO_SOCIAL" };
+  const impedimentos: Array<[boolean | undefined, string]> = [
+    [s.acaoOperacional, "ACAO_OPERACIONAL_NO_TURNO"],
+    [s.afirmacaoSemFonte, "AFIRMACAO_SEM_FONTE"],
+    [s.pedidoDeHumano, "PEDIDO_DE_ATENDIMENTO_HUMANO"],
+    [s.conflitoDeIdentidade, "CONFLITO_DE_IDENTIDADE"],
+    [s.conformidadeBloqueante, "CONFORMIDADE_BLOQUEANTE"],
+  ];
+  const achado = impedimentos.find(([v]) => v === true);
+  return achado ? { aplica: false, impedimento: achado[1] } : { aplica: true, impedimento: null };
+}
 
 export type DecisaoBloqueioBaixaConfianca = {
   /** O conteúdo candidato deve ser descartado para envio? */
@@ -96,6 +143,8 @@ export type DecisaoBloqueioBaixaConfianca = {
   precedeDecisaoMotor: boolean;
   /** Já aplicado antes: nada é repetido. */
   jaAplicado: boolean;
+  /** Por que a exceção de saudação não valeu (auditoria). */
+  impedimentoSaudacao: string | null;
   explicacao: string;
 };
 
@@ -107,10 +156,12 @@ export function nivelExigeEncaminhamento(nivel: NivelConfianca | null | undefine
 export function decidirBloqueioBaixaConfianca(
   e: EntradaBloqueioBaixaConfianca,
 ): DecisaoBloqueioBaixaConfianca {
-  // Saudação (e esclarecimento sem ação) nunca encaminha por nota baixa:
-  // não há ação operacional em risco e não há bloqueador absoluto.
-  const isencaoSocial =
-    e.turnoSocialSemAcao === true && (e.bloqueadoresAbsolutos?.length ?? 0) === 0;
+  // Saudação correta nunca encaminha por nota baixa: não há ação operacional
+  // em risco, nem afirmação sem fonte, nem bloqueador absoluto.
+  const saudacao: EntradaSaudacao | undefined =
+    e.saudacao ?? (e.turnoSocialSemAcao === true ? { turnoSocial: true } : undefined);
+  const excecao = excecaoSaudacaoAplicavel(saudacao);
+  const isencaoSocial = excecao.aplica && (e.bloqueadoresAbsolutos?.length ?? 0) === 0;
   const aplicavel = nivelExigeEncaminhamento(e.nivel) && !isencaoSocial;
   const jaAplicado = e.avisoJaAplicado === true;
   const base = {
@@ -122,6 +173,7 @@ export function decidirBloqueioBaixaConfianca(
     configId: e.configId ?? null,
     conteudoCandidatoHash: e.conteudoCandidatoHash ?? null,
     jaAplicado,
+    impedimentoSaudacao: excecao.impedimento,
   };
   if (!aplicavel) {
     return {
@@ -132,7 +184,7 @@ export function decidirBloqueioBaixaConfianca(
       precedeEtapaAtivacao: false,
       precedeDecisaoMotor: false,
       explicacao: isencaoSocial
-        ? "turno social sem ação operacional: saudação não encaminha para humano"
+        ? "saudação sem ação operacional, sem afirmação sem fonte e sem pedido de humano: não encaminha"
         : `nivel=${e.nivel ?? "indisponivel"}: regra de baixa confiabilidade não se aplica`,
     };
   }

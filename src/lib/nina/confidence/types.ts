@@ -112,6 +112,11 @@ export type ContextoNegocio = {
   esclarecimentoUsado: boolean;
   /** O próprio modelo já pediu atendimento humano. */
   handoffSolicitado: boolean;
+  /**
+   * A apresentação da assistente JÁ havia sido feita antes deste turno.
+   * Ausente = desconhecido (nunca "não foi feita").
+   */
+  apresentacaoJaFeita?: boolean | null;
 };
 
 /**

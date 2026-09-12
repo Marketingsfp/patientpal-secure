@@ -53,6 +53,11 @@ export type EstadoDoTurno = {
   pacienteIdentificado: boolean;
   esclarecimentoUsado: boolean;
   handoffSolicitado: boolean;
+  /**
+   * A apresentação da assistente JÁ havia sido entregue antes deste turno.
+   * Ausente = desconhecido; nunca vale como "não foi feita".
+   */
+  apresentacaoJaFeita?: boolean | null;
   ambiente?: "producao" | "homologacao";
   clinicaId?: string | null;
   conversaId?: string | null;
@@ -139,6 +144,7 @@ export function montarContextoDoTurno(e: EstadoDoTurno): ContextoConfianca {
       agendamentoConfirmado: e.agendamentoConfirmado,
       esclarecimentoUsado: e.esclarecimentoUsado,
       handoffSolicitado: e.handoffSolicitado,
+      apresentacaoJaFeita: e.apresentacaoJaFeita ?? null,
     },
     draftText: e.texto ?? null,
   });

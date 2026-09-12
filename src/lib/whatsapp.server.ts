@@ -2371,14 +2371,32 @@ async function gerarRespostaNinaInterno(
       elementos: diagnosticoSaudacao.elementos,
     });
   }
-  // `greeting_completed` passa a significar APRESENTAÇÃO REALMENTE FEITA.
+  // `greeting_completed` passa a significar APRESENTAÇÃO REALMENTE ENTREGUE.
+  // Por isso a marcação fica PENDENTE aqui e só é gravada depois da decisão
+  // final de entrega: se o texto for descartado, o paciente não recebeu
+  // apresentação nenhuma e o próximo turno não pode achar que recebeu.
   // Apresentação dispensada por exceção publicada é registrada à parte
   // (`greeting_waived`), sem fingir que a Nina se apresentou.
+  let apresentacaoPendente: "dispensada" | "feita" | null = null;
   if (saudacaoObrigatoria && !saudacaoObrigatoriaEfetivaTurno) {
-    fluxoEstado.greeting_waived = true;
-    fluxoEstado.greeting_waived_by = saudacaoDispensadaPor;
-    await salvarFluxoEstado(supabaseAdmin as never, clinicaId, estadoId.conversaId, fluxoEstado);
+    apresentacaoPendente = "dispensada";
   } else if (saudacaoObrigatoriaEfetivaTurno && !diagnosticoSaudacao.saudacaoAusente) {
+    apresentacaoPendente = "feita";
+  }
+  /** Grava a marcação da apresentação só quando a resposta de fato sai. */
+  const confirmarApresentacaoEntregue = async (entregue: boolean) => {
+    if (apresentacaoPendente === null) return;
+    if (apresentacaoPendente === "dispensada") {
+      fluxoEstado.greeting_waived = true;
+      fluxoEstado.greeting_waived_by = saudacaoDispensadaPor;
+      await salvarFluxoEstado(supabaseAdmin as never, clinicaId, estadoId.conversaId, fluxoEstado);
+      apresentacaoPendente = null;
+      return;
+    }
+    if (!entregue) {
+      apresentacaoPendente = null;
+      return;
+    }
     const estadoComSaudacao = marcarSaudacaoConcluida(fluxoEstado);
     fluxoEstado.greeting_completed = true;
     await salvarFluxoEstado(
@@ -2387,7 +2405,8 @@ async function gerarRespostaNinaInterno(
       estadoId.conversaId,
       estadoComSaudacao,
     );
-  }
+    apresentacaoPendente = null;
+  };
 
   // Se a resposta pediu confirmação de identidade, marca na conversa para não repetir.
   if (
@@ -2495,6 +2514,8 @@ async function gerarRespostaNinaInterno(
     pacienteIdentificado: Boolean(pacienteIdEfetivo),
     esclarecimentoUsado: esclarecimentoConfiancaUsado,
     handoffSolicitado: houveHandoff,
+    // A apresentação já tinha sido entregue ANTES deste turno.
+    apresentacaoJaFeita: jaSeApresentou,
     ambiente: (opcoes?.teste === true ? "homologacao" : "producao") as
       | "producao"
       | "homologacao",
@@ -2759,11 +2780,19 @@ async function gerarRespostaNinaInterno(
         configId: cfgFinal.configuracao.configId,
         jaEncaminhado: houveHandoff,
         avisoJaAplicado: ehAvisoControlado(resposta),
-        // Saudação (ou esclarecimento sem ação) não encaminha por nota baixa.
-        turnoSocialSemAcao:
-          estadoParaRevisao.tipoTurno === "SAUDACAO" ||
-          (estadoParaRevisao.tipoTurno === "ESCLARECIMENTO" &&
-            (estadoParaRevisao.acao ?? null) === null),
+        // Exceção de saudação: só vale com TODAS as condições observadas.
+        // Nenhuma delas é suposta — cada uma vem de um sinal deste turno.
+        saudacao: {
+          turnoSocial:
+            estadoParaRevisao.tipoTurno === "SAUDACAO" ||
+            (estadoParaRevisao.tipoTurno === "ESCLARECIMENTO" &&
+              (estadoParaRevisao.acao ?? null) === null),
+          acaoOperacional: (estadoParaRevisao.acao ?? null) !== null,
+          afirmacaoSemFonte: (respostaFinalAvaliada.claims?.semEvidencia.length ?? 0) > 0,
+          pedidoDeHumano: houveHandoff,
+          conflitoDeIdentidade: diagnosticoSaudacao.saudacaoDuplicada === true,
+          conformidadeBloqueante: revisao.bloqueiaEntrega === true,
+        },
         bloqueadoresAbsolutos: respostaFinalAvaliada.hardBlockers ?? [],
         conteudoCandidatoHash: respostaFinalAvaliada.textoAvaliadoHash ?? null,
       });
@@ -3056,6 +3085,18 @@ async function gerarRespostaNinaInterno(
     }
     // Limite duro do laço: nenhuma correção infinita, mesmo com erro.
     if (passeVerificacaoRegras > LIMITE_PASSES_VERIFICACAO) repetirVerificacaoRegras = false;
+  }
+
+  // A apresentação só é dada por feita quando o texto que sai é MESMO a
+  // resposta da Nina. Se o candidato foi descartado (aviso controlado), a
+  // pessoa não recebeu apresentação: o próximo turno volta a apresentá-la.
+  try {
+    const { ehAvisoControlado: avisoControlado } = await import(
+      "@/lib/nina/confidence/baixa-confiabilidade"
+    );
+    await confirmarApresentacaoEntregue(!avisoControlado(resposta));
+  } catch {
+    /* marcação de apresentação nunca interrompe o atendimento */
   }
 
   // Evidências finais: estado/sessão no momento da resposta, regras aplicáveis,

@@ -24,10 +24,28 @@
 
 export type AmbienteRegra = "producao" | "homologacao" | "qualquer";
 
+/**
+ * Situação da CONVERSA que condiciona a regra. Diferente da condição por
+ * mensagem: aqui o texto publicado não cita um conteúdo a comparar, e sim um
+ * estado do atendimento ("quando ela já explicou o que precisa", "nas
+ * mensagens seguintes", "na primeira mensagem").
+ *
+ * Sem isto, uma proibição válida apenas depois que a pessoa expôs a demanda
+ * era lida como proibição universal — e reprovava até uma saudação correta.
+ */
+export type SituacaoRegra =
+  /** A pessoa já declarou o que precisa. */
+  | "demanda_declarada"
+  /** A apresentação já foi feita antes deste turno. */
+  | "apresentacao_ja_feita"
+  /** É o primeiro turno respondido da sessão. */
+  | "primeira_mensagem";
+
 export type CondicaoRegra =
   | { tipo: "sempre" }
   | { tipo: "mensagem_exata"; valor: string }
-  | { tipo: "mensagem_contem"; valor: string };
+  | { tipo: "mensagem_contem"; valor: string }
+  | { tipo: "situacao"; situacao: SituacaoRegra; valor: string };
 
 export type VerificacaoRegra =
   | "literal"
@@ -278,6 +296,68 @@ function prioridadeDe(plano: string, verificacao: VerificacaoRegra): PrioridadeR
   return "normal";
 }
 
+/**
+ * Situação da conversa declarada no próprio texto publicado. Determinístico e
+ * por forma: nenhuma situação é inferida de conteúdo específico da clínica.
+ */
+const SITUACOES: Array<[SituacaoRegra, RegExp]> = [
+  [
+    "demanda_declarada",
+    /\b(quando|se|caso|sempre que)\b[^.;!?]*\b(j[áa]\s+(explicou|disse|informou|falou|descreveu|pediu|perguntou|relatou)|j[áa]\s+fez\s+uma\s+pergunta)\b/i,
+  ],
+  [
+    "apresentacao_ja_feita",
+    /\b(nas mensagens seguintes|nas pr[óo]ximas mensagens|depois de (se )?apresentar|j[áa] (se )?apresentou|sem repetir a apresenta[çc][ãa]o|n[ãa]o repita a apresenta[çc][ãa]o)\b/i,
+  ],
+  [
+    "primeira_mensagem",
+    /\b(na primeira (mensagem|resposta)|no primeiro contato|ao iniciar (a|uma) (conversa|sess[ãa]o)|(de|em) uma nova sess[ãa]o)\b/i,
+  ],
+];
+
+/** Lê a situação de conversa que condiciona a frase, quando declarada. */
+export function situacaoDaFrase(plano: string): { situacao: SituacaoRegra; valor: string } | null {
+  for (const [situacao, re] of SITUACOES) {
+    const m = re.exec(plano);
+    if (m) return { situacao, valor: m[0].trim() };
+  }
+  return null;
+}
+
+/**
+ * Divide uma unidade em frases, preservando aspas: o texto exigido dentro de
+ * aspas ("Olá, …! Sou a … Como posso ajudar?") continua inteiro, e cada frase
+ * normativa passa a carregar a SUA condição em vez de herdar a da vizinha.
+ */
+export function frasesDaUnidade(plano: string): string[] {
+  const frases: string[] = [];
+  let atual = "";
+  let aspas = false;
+  const ABRE = /[«"“'']/;
+  for (let i = 0; i < plano.length; i++) {
+    const c = plano[i]!;
+    if (ABRE.test(c)) aspas = !aspas;
+    atual += c;
+    if (!aspas && /[.;!?]/.test(c)) {
+      const proximo = plano[i + 1];
+      if (proximo === undefined || /\s/.test(proximo)) {
+        if (atual.trim().length >= 12) {
+          frases.push(atual.trim());
+          atual = "";
+        }
+      }
+    }
+  }
+  if (atual.trim() !== "") {
+    if (frases.length > 0 && atual.trim().length < 12) {
+      frases[frases.length - 1] = `${frases[frases.length - 1]} ${atual.trim()}`.trim();
+    } else {
+      frases.push(atual.trim());
+    }
+  }
+  return frases.length > 0 ? frases : [plano.trim()];
+}
+
 // -------------------------------------------------------------- extração
 
 /**
@@ -390,7 +470,14 @@ export function extrairRegrasPublicadas(
       continue;
     }
 
-    if (!NORMATIVO.test(u.plano)) {
+    // Uma unidade pode reunir várias frases normativas com CONDIÇÕES
+    // DIFERENTES ("apresente-se assim: …" + "não acrescente … quando ela já
+    // explicou"). Lidas juntas, a condição de uma contaminava a outra. Cada
+    // frase vira sua própria regra, com a sua condição.
+    const frases = frasesDaUnidade(u.plano);
+    const normativas = frases.filter((f) => NORMATIVO.test(f));
+
+    if (normativas.length === 0) {
       // Não é regra. Ainda assim pode declarar o ambiente da seção
       // (ex.: "Esta regra vale exclusivamente para homologação").
       const amb = /\bregra\b/i.test(u.plano) ? ambienteDoTexto(u.plano) : null;
@@ -405,93 +492,109 @@ export function extrairRegrasPublicadas(
       continue;
     }
 
-    // Condição escrita na mesma frase da regra.
-    let condicaoLocal = condicao;
-    const inline = CONDICAO_INLINE.exec(u.plano);
-    if (inline?.[1]) {
-      const bruto = inline[1].trim();
-      condicaoLocal = /\bexatamente\b/i.test(bruto)
-        ? { tipo: "mensagem_exata", valor: bruto.replace(/.*\bexatamente\b\s*:?\s*/i, "").trim() }
-        : { tipo: "mensagem_contem", valor: bruto };
-    }
+    for (const frase of normativas) {
+      // Condição escrita na própria frase da regra. A situação da conversa
+      // tem precedência: "quando ela já explicou o que precisa" não é um
+      // conteúdo a procurar na mensagem, é um estado do atendimento.
+      let condicaoLocal: CondicaoRegra = condicao;
+      const situacao = situacaoDaFrase(frase);
+      if (situacao) {
+        condicaoLocal = {
+          tipo: "situacao",
+          situacao: situacao.situacao,
+          valor: situacao.valor,
+        };
+      } else {
+        const inline = CONDICAO_INLINE.exec(frase);
+        if (inline?.[1]) {
+          const bruto = inline[1].trim();
+          condicaoLocal = /\bexatamente\b/i.test(bruto)
+            ? {
+                tipo: "mensagem_exata",
+                valor: bruto.replace(/.*\bexatamente\b\s*:?\s*/i, "").trim(),
+              }
+            : { tipo: "mensagem_contem", valor: bruto };
+        }
+      }
 
-    const exigencia = exigenciaLiteral(u.plano);
-    if (exigencia) {
-      registrar(u, {
-        condicao: condicaoLocal,
-        ambiente: ambienteSecao,
-        natureza: "exigencia",
-        prioridade: prioridadeDe(u.plano, "literal"),
-        verificacao: "literal",
-        literal: exigencia.literal,
-        operador: exigencia.operador,
-        proibicoes: [],
-        descricao: u.plano,
-        interpretada: true,
-        motivo: null,
-      });
-      continue;
-    }
+      const exigencia = exigenciaLiteral(frase);
+      if (exigencia) {
+        registrar(u, {
+          condicao: condicaoLocal,
+          ambiente: ambienteSecao,
+          natureza: "exigencia",
+          prioridade: prioridadeDe(frase, "literal"),
+          verificacao: "literal",
+          literal: exigencia.literal,
+          operador: exigencia.operador,
+          proibicoes: [],
+          descricao: frase,
+          interpretada: true,
+          motivo: null,
+        });
+        continue;
+      }
 
-    if (PROIBICAO.test(u.plano)) {
-      // A categoria proibida é lida SOMENTE na oração da proibição. Lida no
-      // parágrafo inteiro, uma frase vizinha ("responda à pergunta") fazia a
-      // regra proibir o que o próprio texto publicado manda fazer.
-      const oracao = oracaoDaProibicao(u.plano);
-      const proibicoes = categoriasProibidas(oracao);
-      // Proibição condicionada ("… quando ela já explicou o que precisa") só
-      // vale quando a condição vale. Se a condição não pôde ser representada,
-      // a regra fica NÃO INTERPRETADA — nunca vira proibição para todo turno.
-      const condicaoNaoRepresentada =
-        condicaoLocal.tipo === "sempre" && CONDICAO_NA_ORACAO.test(oracao);
-      if (proibicoes.length > 0 && condicaoNaoRepresentada) {
-        limitacoes.push("CONDICAO_DA_PROIBICAO_NAO_VERIFICAVEL");
+      if (PROIBICAO.test(frase)) {
+        // A categoria proibida é lida SOMENTE na oração da proibição. Lida no
+        // parágrafo inteiro, uma frase vizinha ("responda à pergunta") fazia a
+        // regra proibir o que o próprio texto publicado manda fazer.
+        const oracao = oracaoDaProibicao(frase);
+        const proibicoes = categoriasProibidas(oracao);
+        // Proibição condicionada ("… quando ela já explicou o que precisa") só
+        // vale quando a condição vale. Se a condição não pôde ser representada,
+        // a regra fica NÃO INTERPRETADA — nunca vira proibição para todo turno.
+        const condicaoNaoRepresentada =
+          condicaoLocal.tipo === "sempre" && CONDICAO_NA_ORACAO.test(oracao);
+        if (proibicoes.length > 0 && condicaoNaoRepresentada) {
+          limitacoes.push("CONDICAO_DA_PROIBICAO_NAO_VERIFICAVEL");
+          registrar(u, {
+            condicao: condicaoLocal,
+            ambiente: ambienteSecao,
+            natureza: "proibicao",
+            prioridade: "normal",
+            verificacao: "nao_interpretada",
+            literal: null,
+            operador: null,
+            proibicoes: [],
+            descricao: frase,
+            interpretada: false,
+            motivo: "CONDICAO_DA_PROIBICAO_NAO_VERIFICAVEL",
+          });
+          continue;
+        }
+        const verificacao: VerificacaoRegra =
+          proibicoes.length > 0 ? "proibicao_de_conteudo" : "semantica";
         registrar(u, {
           condicao: condicaoLocal,
           ambiente: ambienteSecao,
           natureza: "proibicao",
-          prioridade: "normal",
-          verificacao: "nao_interpretada",
+          prioridade: prioridadeDe(frase, verificacao),
+          verificacao,
           literal: null,
           operador: null,
-          proibicoes: [],
-          descricao: u.plano,
-          interpretada: false,
-          motivo: "CONDICAO_DA_PROIBICAO_NAO_VERIFICAVEL",
+          proibicoes,
+          descricao: frase,
+          interpretada: true,
+          motivo: null,
         });
         continue;
       }
-      const verificacao: VerificacaoRegra =
-        proibicoes.length > 0 ? "proibicao_de_conteudo" : "semantica";
+
       registrar(u, {
         condicao: condicaoLocal,
         ambiente: ambienteSecao,
-        natureza: "proibicao",
-        prioridade: prioridadeDe(u.plano, verificacao),
-        verificacao,
+        natureza: "exigencia",
+        prioridade: prioridadeDe(frase, "semantica"),
+        verificacao: "semantica",
         literal: null,
         operador: null,
-        proibicoes,
-        descricao: u.plano,
+        proibicoes: [],
+        descricao: frase,
         interpretada: true,
         motivo: null,
       });
-      continue;
     }
-
-    registrar(u, {
-      condicao: condicaoLocal,
-      ambiente: ambienteSecao,
-      natureza: "exigencia",
-      prioridade: prioridadeDe(u.plano, "semantica"),
-      verificacao: "semantica",
-      literal: null,
-      operador: null,
-      proibicoes: [],
-      descricao: u.plano,
-      interpretada: true,
-      motivo: null,
-    });
   }
 
   if (regras.some((r) => !r.interpretada)) limitacoes.push("REGRA_PUBLICADA_NAO_INTERPRETADA");
@@ -506,17 +609,54 @@ export function extrairRegrasPublicadas(
 export type EntradaAplicabilidade = {
   mensagemPaciente?: string | null;
   ambiente?: "producao" | "homologacao" | null;
+  /** A pessoa já declarou o que precisa nesta conversa. */
+  demandaDeclarada?: boolean | null;
+  /** A apresentação já havia sido feita ANTES deste turno. */
+  apresentacaoJaFeita?: boolean | null;
+  /** Este é o primeiro turno respondido da sessão. */
+  primeiraMensagem?: boolean | null;
 };
 
-/** A regra vale para ESTE turno? Ambiente e condição declarada no texto. */
-export function regraSeAplica(regra: RegraPublicada, e: EntradaAplicabilidade): boolean {
-  if (regra.ambiente !== "qualquer" && e.ambiente && regra.ambiente !== e.ambiente) return false;
+/**
+ * "aplica" = vale para este turno; "nao_aplica" = a situação exigida não
+ * ocorreu; "indeterminada" = o sistema não sabe dizer. Indeterminada NÃO é
+ * descumprimento: só não conta como verificada.
+ */
+export type Aplicabilidade = "aplica" | "nao_aplica" | "indeterminada";
+
+function sinalDaSituacao(s: SituacaoRegra, e: EntradaAplicabilidade): boolean | null {
+  if (s === "demanda_declarada") return e.demandaDeclarada ?? null;
+  if (s === "apresentacao_ja_feita") return e.apresentacaoJaFeita ?? null;
+  if (e.primeiraMensagem != null) return e.primeiraMensagem;
+  return e.apresentacaoJaFeita == null ? null : !e.apresentacaoJaFeita;
+}
+
+/** A regra vale para ESTE turno? Ambiente, situação da conversa e condição. */
+export function aplicabilidadeDaRegra(
+  regra: RegraPublicada,
+  e: EntradaAplicabilidade,
+): Aplicabilidade {
+  if (regra.ambiente !== "qualquer" && e.ambiente && regra.ambiente !== e.ambiente) {
+    return "nao_aplica";
+  }
+  if (regra.condicao.tipo === "sempre") return "aplica";
+  if (regra.condicao.tipo === "situacao") {
+    const sinal = sinalDaSituacao(regra.condicao.situacao, e);
+    if (sinal === true) return "aplica";
+    if (sinal === false) return "nao_aplica";
+    return "indeterminada";
+  }
   const msg = (e.mensagemPaciente ?? "").trim();
-  if (regra.condicao.tipo === "sempre") return true;
-  if (msg === "") return false;
+  if (msg === "") return "nao_aplica";
   const alvo = chave(regra.condicao.valor);
   const atual = chave(msg);
-  return regra.condicao.tipo === "mensagem_exata" ? atual === alvo : atual.includes(alvo);
+  const bate = regra.condicao.tipo === "mensagem_exata" ? atual === alvo : atual.includes(alvo);
+  return bate ? "aplica" : "nao_aplica";
+}
+
+/** Compatibilidade: indeterminada continua entrando como candidata. */
+export function regraSeAplica(regra: RegraPublicada, e: EntradaAplicabilidade): boolean {
+  return aplicabilidadeDaRegra(regra, e) !== "nao_aplica";
 }
 
 /**
