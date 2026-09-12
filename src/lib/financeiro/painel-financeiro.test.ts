@@ -109,6 +109,9 @@ describe("categoriaDoAtendimento", () => {
       consultasConvenio: 1,
       exames: 1,
       outros: 1,
+      mensalidades: 0,
+      adesoes: 0,
+
     });
     expect(p.consultasCartao + p.consultasParticulares + p.exames + p.outros).toBe(p.total);
   });
