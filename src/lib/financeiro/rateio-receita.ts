@@ -606,7 +606,10 @@ function reparte(
   params: {
     id: string;
     data: string;
+    /** Sem valor = atendimento (ver `RateioOrigem`). */
+    origem?: RateioOrigem;
     medicoId: string | null;
+
     pacienteId: string | null;
     procedimento: string | null;
     valorPago: number;
