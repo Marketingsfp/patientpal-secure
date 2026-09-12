@@ -645,6 +645,7 @@ const formasDaLinha = (l: RateioLinha) =>
 function montarDetalhe(drill: Drill, dados: DadosPainel, r: ResumoPainel, visao: Visao): Detalhe {
   const operacionais = dados.despesas.filter((d) => d.grupo === "operacional");
   const complementos = dados.despesas.filter((d) => d.grupo === "complemento_medico");
+  const repassesPagos = dados.despesas.filter((d) => d.grupo === "repasse_pago");
 
   // --- Listas de atendimento (Receita, Atendimentos, Ticket e os tipos) -----
   if (
