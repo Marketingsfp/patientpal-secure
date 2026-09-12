@@ -16,6 +16,8 @@ import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { RegrasPublicadasRevisao } from "@/components/nina/RegrasPublicadasRevisao";
+import { IdentidadeAtendimentoCampos } from "@/components/nina/IdentidadeAtendimentoCampos";
+import { validarIdentidadeParaPublicacao } from "@/lib/nina/identidade-atendimento";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
@@ -202,6 +204,16 @@ function Editor({
   const [auditoriaAberta, setAuditoriaAberta] = useState(false);
   const alterado = texto !== (base?.conteudo ?? "");
   const vazio = texto.trim().length === 0;
+  // FASE 1 — bloco de identidade duplicado/incompleto reprova a publicação
+  // antes de sair da tela. Bloco ausente não bloqueia: fica como pendência.
+  const identidade = useMemo(
+    () =>
+      bloco.escopo === "whatsapp"
+        ? validarIdentidadeParaPublicacao(texto)
+        : ({ ok: true, identidade: null, pendente: false } as const),
+    [bloco.escopo, texto],
+  );
+  const identidadeInvalida = !identidade.ok;
 
 
   return (
@@ -250,6 +262,14 @@ function Editor({
       </div>
 
 
+      {bloco.escopo === "whatsapp" ? (
+        <IdentidadeAtendimentoCampos
+          texto={texto}
+          onTextoChange={setTexto}
+          somenteLeitura={!podeEditar}
+        />
+      ) : null}
+
       <label className="sr-only" htmlFor={`instrucoes-${bloco.escopo}`}>
         Instruções da Nina — {ROTULO_ESCOPO[bloco.escopo]}
       </label>
@@ -281,7 +301,7 @@ function Editor({
         </Button>
         <Button
           onClick={() => setConfirmando(true)}
-          disabled={!podePublicar || publicar.isPending || vazio}
+          disabled={!podePublicar || publicar.isPending || vazio || identidadeInvalida}
         >
           {publicar.isPending ? "Publicando…" : "Publicar instruções"}
         </Button>
