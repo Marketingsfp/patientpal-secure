@@ -1053,7 +1053,9 @@ export const meuStatusAgente = createServerFn({ method: "POST" })
         .eq("user_id", context.userId),
       context.supabase
         .from("atend_agente_presenca")
-        .select("status, aceita_novas, visto_em")
+        .select(
+          "status, aceita_novas, visto_em, estado_manual, estado_manual_em, estado_manual_por, estado_manual_versao",
+        )
         .eq("clinica_id", data.clinicaId)
         .eq("user_id", context.userId)
         .maybeSingle(),
@@ -1082,6 +1084,16 @@ export const meuStatusAgente = createServerFn({ method: "POST" })
       vistoEm: (pres as { visto_em?: string } | null)?.visto_em ?? null,
       emPausa: !!pausaAberta,
     });
+    // FASE 1 — escolha manual: fonte oficial, separada do sinal de conexão.
+    const manual = pres as {
+      estado_manual?: string | null;
+      estado_manual_em?: string | null;
+      estado_manual_por?: string | null;
+      estado_manual_versao?: number | null;
+    } | null;
+    const estadoManual = ehEstadoManual(manual?.estado_manual)
+      ? (manual!.estado_manual as EstadoManualPresenca)
+      : null;
     return {
       isMember: total > 0,
       filaAberta: presencaEfetiva === "ONLINE" && filaAberta,
@@ -1089,6 +1101,11 @@ export const meuStatusAgente = createServerFn({ method: "POST" })
       presencaStatus,
       presencaEfetiva,
       vistoEm: (pres as { visto_em?: string } | null)?.visto_em ?? null,
+      estadoManual,
+      estadoManualEm: manual?.estado_manual_em ?? null,
+      estadoManualPor: manual?.estado_manual_por ?? null,
+      estadoManualVersao: manual?.estado_manual_versao ?? 0,
+      precisaEscolherPresenca: precisaEscolherPresenca(manual?.estado_manual ?? null),
     };
   });
 
