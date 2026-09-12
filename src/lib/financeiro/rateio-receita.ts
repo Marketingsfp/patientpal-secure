@@ -927,8 +927,7 @@ export async function carregarRateio(
       }),
     );
   }
-
-
+  await enriquecerPacientes(clinicaId, linhas);
 
   // O nome da especialidade é resolvido no fim, para o rótulo já sair pronto
   // na tabela, no papel e no CSV.
