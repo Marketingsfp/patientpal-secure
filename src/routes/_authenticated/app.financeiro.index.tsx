@@ -1032,15 +1032,14 @@ function montarDetalhe(drill: Drill, dados: DadosPainel, r: ResumoPainel, visao:
     linha("Receita bruta (atendimentos)", r.receitaBruta),
     linha("(+) Outras receitas", r.outrasReceitas),
     linha("(=) Receita total", receitaTotal),
-    linha("(−) Repasse a médicos", -r.repasse),
+    linha("(−) Repasse pago no caixa", -r.repassePagoNoPeriodo),
   ];
-  if (r.terceiro > 0) linhas.push(linha("(−) Terceiros (dono do equipamento)", -r.terceiro));
   if (r.complementoMedico > 0) linhas.push(linha("(−) Complemento médico", -r.complementoMedico));
   linhas.push(linha("(−) Despesas operacionais", -r.despesasOperacionais));
   return {
     titulo: "Líquido da clínica / Saldo",
     explicacao:
-      "Demonstrativo do período. O repasse entra pelo valor devido dos atendimentos (grade), não pelo que foi pago no caixa, para cada atendimento pesar no dia em que aconteceu.",
+      "Demonstrativo do período pela régua do caixa: entra o que foi recebido e sai o que foi pago, igual ao Movimento de Caixa. O repasse devido pelos atendimentos do período aparece só no resumo, para conferência com o Rateio da Receita.",
     colunas: [
       { rotulo: "Conta", tipo: "texto" },
       { rotulo: "Valor", tipo: "moeda" },
@@ -1051,8 +1050,8 @@ function montarDetalhe(drill: Drill, dados: DadosPainel, r: ResumoPainel, visao:
     resumo: [
       { rotulo: "Líquido dos atendimentos (Rateio)", valor: r.liquidoAtendimentos },
       {
-        rotulo: "Repasse já pago no caixa no período (informativo)",
-        valor: r.repassePagoNoPeriodo,
+        rotulo: "Repasse devido pelos atendimentos (conferência)",
+        valor: r.custoPrestadores,
       },
       { rotulo: "Saldo do período", valor: r.saldo },
     ],
