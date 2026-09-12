@@ -509,7 +509,7 @@ function FinDashboard() {
               icon={Stethoscope}
               label="Cortesias e gratuidades"
               value={v((r) => r.producao.cortesias, int)}
-              accent="muted"
+              accent="primary"
               detalhe="Atendidos sem cobrança (R$ 0,00)"
             />
           )}
