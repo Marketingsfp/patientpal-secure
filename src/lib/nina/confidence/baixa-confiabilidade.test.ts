@@ -93,9 +93,10 @@ describe("baixa confiabilidade — saída controlada", () => {
     expect(s.origem).toBe("mensagem_controlada_sistema");
   });
 
-  it("homologação: aviso e encaminhamento simulado, sem atribuição", () => {
+  it("homologação: aviso simulado NÃO anuncia transferência concluída", () => {
     const s = saidaControladaBaixaConfianca({ tipo: "simulado" });
-    expect(s.aviso).toBe(AVISO_ENCAMINHAMENTO_HUMANO);
+    expect(s.aviso).not.toBe(AVISO_ENCAMINHAMENTO_HUMANO);
+    expect(s.aviso).not.toContain("Vou chamar uma pessoa");
     expect(s.encaminhamento).toBe("simulado");
     expect(s.encaminhamentoConfirmado).toBe(false);
     expect(s.registro).toBe("Encaminhamento humano simulado por baixa confiabilidade");
