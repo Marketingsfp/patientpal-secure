@@ -112,5 +112,4 @@ describe("FASE 1 — controle A/B da validação monetária", () => {
     expect(cartao!.situacao).toBe("confirmado");
     expect(valores.every((c) => c.suportado)).toBe(true);
   });
-
 });

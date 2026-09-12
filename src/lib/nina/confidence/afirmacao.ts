@@ -77,15 +77,7 @@ export const TERMOS_DE_ASSUNTO = [
  */
 const PROCEDIMENTOS_GENERICOS = new Set(["consulta", "atendimento", "exame", "procedimento"]);
 
-const DIAS_SEMANA = [
-  "domingo",
-  "segunda",
-  "terca",
-  "quarta",
-  "quinta",
-  "sexta",
-  "sabado",
-];
+const DIAS_SEMANA = ["domingo", "segunda", "terca", "quarta", "quinta", "sexta", "sabado"];
 
 const CONVENIOS = ["unimed", "amil", "bradesco", "sulamerica", "hapvida", "ipasgo", "cassi", "sus"];
 
@@ -235,7 +227,6 @@ export function chaveDaAfirmacaoMonetaria(frase: string, trecho: string): ChaveF
   return chave;
 }
 
-
 // -------------------------------------------------------------- valores
 
 /** Horas de jejum/preparo declaradas ("jejum de 6 horas", "8h de jejum"). */
@@ -300,7 +291,9 @@ export function afirmacaoEspecifica(tipo: TipoClaim, frase: string): boolean {
   if (tipo === "endereco" || tipo === "unidade")
     return /\b(rua|av|avenida|travessa|rodovia|estrada|praca|alameda)\b/.test(t);
   if (tipo === "disponibilidade" || tipo === "escala")
-    return DIAS_SEMANA.some((d) => t.includes(d)) || /\d{1,2}\s*(h|:\d{2})|\d{1,2}\/\d{1,2}/.test(t);
+    return (
+      DIAS_SEMANA.some((d) => t.includes(d)) || /\d{1,2}\s*(h|:\d{2})|\d{1,2}\/\d{1,2}/.test(t)
+    );
   if (tipo === "profissional") return /\b(dr|dra|doutor|doutora)\b/.test(t);
   return false;
 }
@@ -344,7 +337,6 @@ function mesmoQualificador(campo: keyof ChaveFato, afirmado: unknown, doFato: un
   if (campo === "condicoes") return mesmaCondicaoPagamento(afirmado, doFato);
   return mesmoTexto(afirmado, doFato);
 }
-
 
 const QUALIFICADORES: Array<keyof ChaveFato> = [
   "procedimento",
@@ -415,7 +407,12 @@ function valoresIguais(tipo: TipoClaim, afirmado: string, doFato: unknown): bool
 
 export type CorrespondenciaAfirmacao =
   | { situacao: "confirmado"; fato: FatoRecuperado; referencia: string }
-  | { situacao: "divergente"; fato: FatoRecuperado; referencia: string; valorDaFonte: string | null }
+  | {
+      situacao: "divergente";
+      fato: FatoRecuperado;
+      referencia: string;
+      valorDaFonte: string | null;
+    }
   | { situacao: "fora_do_escopo"; motivo?: string }
   | { situacao: "indeterminado"; motivo: string }
   | { situacao: "sem_fato" };
@@ -445,7 +442,8 @@ export function fatosNoEscopoDaAfirmacao(
   pedido: Omit<PedidoAfirmacao, "valor" | "tipo"> & { tipo?: TipoClaim; valor?: string | null },
 ): { doCampo: FatoRecuperado[]; noEscopo: FatoRecuperado[] } {
   const doCampo = fatos.filter(
-    (f) => pedido.entidades.includes(f.entidade) && pedido.campos.some((c) => mesmoTexto(f.campo, c)),
+    (f) =>
+      pedido.entidades.includes(f.entidade) && pedido.campos.some((c) => mesmoTexto(f.campo, c)),
   );
   if (doCampo.length === 0) return { doCampo, noEscopo: [] };
 
@@ -525,7 +523,6 @@ export function correspondenciaDaAfirmacao(
     return { situacao: "fora_do_escopo" };
   }
 
-
   if (pedido.valor === null || pedido.valor.trim() === "") {
     if (afirmacaoEspecifica(pedido.tipo, pedido.frase)) {
       return {
@@ -533,11 +530,16 @@ export function correspondenciaDaAfirmacao(
         motivo: "a afirmação cita um dado específico que não foi possível extrair para conferência",
       };
     }
-    return { situacao: "confirmado", fato: noEscopo[0]!, referencia: referenciaDoFato(noEscopo[0]!) };
+    return {
+      situacao: "confirmado",
+      fato: noEscopo[0]!,
+      referencia: referenciaDoFato(noEscopo[0]!),
+    };
   }
 
   const batendo = noEscopo.find((f) => valoresIguais(pedido.tipo, pedido.valor!, f.valor));
-  if (batendo) return { situacao: "confirmado", fato: batendo, referencia: referenciaDoFato(batendo) };
+  if (batendo)
+    return { situacao: "confirmado", fato: batendo, referencia: referenciaDoFato(batendo) };
 
   const primeiro = noEscopo[0]!;
   return {
