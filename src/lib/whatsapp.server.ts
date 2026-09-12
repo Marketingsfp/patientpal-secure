@@ -2371,14 +2371,32 @@ async function gerarRespostaNinaInterno(
       elementos: diagnosticoSaudacao.elementos,
     });
   }
-  // `greeting_completed` passa a significar APRESENTAÇÃO REALMENTE FEITA.
+  // `greeting_completed` passa a significar APRESENTAÇÃO REALMENTE ENTREGUE.
+  // Por isso a marcação fica PENDENTE aqui e só é gravada depois da decisão
+  // final de entrega: se o texto for descartado, o paciente não recebeu
+  // apresentação nenhuma e o próximo turno não pode achar que recebeu.
   // Apresentação dispensada por exceção publicada é registrada à parte
   // (`greeting_waived`), sem fingir que a Nina se apresentou.
+  let apresentacaoPendente: "dispensada" | "feita" | null = null;
   if (saudacaoObrigatoria && !saudacaoObrigatoriaEfetivaTurno) {
-    fluxoEstado.greeting_waived = true;
-    fluxoEstado.greeting_waived_by = saudacaoDispensadaPor;
-    await salvarFluxoEstado(supabaseAdmin as never, clinicaId, estadoId.conversaId, fluxoEstado);
+    apresentacaoPendente = "dispensada";
   } else if (saudacaoObrigatoriaEfetivaTurno && !diagnosticoSaudacao.saudacaoAusente) {
+    apresentacaoPendente = "feita";
+  }
+  /** Grava a marcação da apresentação só quando a resposta de fato sai. */
+  const confirmarApresentacaoEntregue = async (entregue: boolean) => {
+    if (apresentacaoPendente === null) return;
+    if (apresentacaoPendente === "dispensada") {
+      fluxoEstado.greeting_waived = true;
+      fluxoEstado.greeting_waived_by = saudacaoDispensadaPor;
+      await salvarFluxoEstado(supabaseAdmin as never, clinicaId, estadoId.conversaId, fluxoEstado);
+      apresentacaoPendente = null;
+      return;
+    }
+    if (!entregue) {
+      apresentacaoPendente = null;
+      return;
+    }
     const estadoComSaudacao = marcarSaudacaoConcluida(fluxoEstado);
     fluxoEstado.greeting_completed = true;
     await salvarFluxoEstado(
@@ -2387,7 +2405,8 @@ async function gerarRespostaNinaInterno(
       estadoId.conversaId,
       estadoComSaudacao,
     );
-  }
+    apresentacaoPendente = null;
+  };
 
   // Se a resposta pediu confirmação de identidade, marca na conversa para não repetir.
   if (
