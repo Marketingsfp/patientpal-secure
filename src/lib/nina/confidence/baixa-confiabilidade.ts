@@ -154,10 +154,12 @@ export function nivelExigeEncaminhamento(nivel: NivelConfianca | null | undefine
 export function decidirBloqueioBaixaConfianca(
   e: EntradaBloqueioBaixaConfianca,
 ): DecisaoBloqueioBaixaConfianca {
-  // Saudação (e esclarecimento sem ação) nunca encaminha por nota baixa:
-  // não há ação operacional em risco e não há bloqueador absoluto.
-  const isencaoSocial =
-    e.turnoSocialSemAcao === true && (e.bloqueadoresAbsolutos?.length ?? 0) === 0;
+  // Saudação correta nunca encaminha por nota baixa: não há ação operacional
+  // em risco, nem afirmação sem fonte, nem bloqueador absoluto.
+  const saudacao: EntradaSaudacao | undefined =
+    e.saudacao ?? (e.turnoSocialSemAcao === true ? { turnoSocial: true } : undefined);
+  const excecao = excecaoSaudacaoAplicavel(saudacao);
+  const isencaoSocial = excecao.aplica && (e.bloqueadoresAbsolutos?.length ?? 0) === 0;
   const aplicavel = nivelExigeEncaminhamento(e.nivel) && !isencaoSocial;
   const jaAplicado = e.avisoJaAplicado === true;
   const base = {
