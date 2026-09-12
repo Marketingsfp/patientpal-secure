@@ -677,20 +677,33 @@ function reparte(
       })
     : { total: params.valorPago, repasse: 0, terceiro: null };
 
-  // Cortesia e gratuidade: o paciente foi atendido e não pagou nada. A grade
-  // de repasse devolveria o valor de TABELA do serviço (R$ 60,00 num ECG, por
-  // exemplo), e era isso que fazia o Rateio e o Dashboard mostrarem R$ 120,00
-  // a mais do que entrou no caixa em 11/09/2026. Sem dinheiro não há receita
-  // nem repasse — a linha continua no relatório, valendo zero.
+  // Atendimento sem dinheiro no caixa: a grade de repasse devolveria o valor
+  // de TABELA do serviço (R$ 60,00 num ECG, por exemplo), e era isso que fazia
+  // o Rateio e o Dashboard mostrarem R$ 120,00 a mais do que entrou no caixa
+  // em 11/09/2026. Sem pagamento não há RECEITA — a linha continua no
+  // relatório, valendo zero.
   const semPagamento = num(params.valorPago) <= 0;
   const receita = semPagamento ? 0 : calc.total > 0 ? calc.total : params.valorPago;
+
+  // O REPASSE é outra pergunta, e a resposta depende do motivo do R$ 0,00
+  // (mesma regra da guia impressa, em `print-gr`):
+  //
+  //  - retorno de consulta e cortesia da diretoria: ninguém pagou nada, nem o
+  //    paciente nem mensalidade nenhuma — clínica e prestador ficam zerados;
+  //  - gratuidade do Cartão: quem remunera é a mensalidade do paciente, então
+  //    o prestador RECEBE normalmente sobre o valor de tabela;
+  //  - sem faturamento: a marcação zera só a parte da clínica; o profissional
+  //    atendeu e o repasse dele continua devido.
+  //
+  // Zerar os três de uma vez tirava do relatório repasse realmente devido.
+  const zeraRepasse = liberacaoDaLinha(ctx, params) !== null;
   const repasseCalculado = calc.repasse > 0 ? calc.repasse : num(params.repasseGravado ?? 0);
-  const repasse = semPagamento
+  const repasse = zeraRepasse
     ? 0
     : params.override !== null && params.override !== undefined && Number.isFinite(params.override)
       ? params.override
       : repasseCalculado;
-  const terceiro = semPagamento ? 0 : (calc.terceiro?.valor ?? 0);
+  const terceiro = zeraRepasse ? 0 : (calc.terceiro?.valor ?? 0);
   const liquido = round2(receita - repasse - terceiro);
   const formas = repartirPorForma(
     receita,
