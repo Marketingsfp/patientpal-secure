@@ -106,9 +106,10 @@ export async function carregarPainelFinanceiro(
 }
 
 /**
- * Quanto de repasse a médicos e prestadores saiu do caixa no período. É a
- * outra leitura do repasse — a da gaveta —, mostrada ao lado do devido para
- * o Dashboard, o Movimento de Caixa e o Rateio darem a mesma resposta.
+ * Quanto saiu do caixa para médicos e prestadores no período: repasse pago
+ * MAIS o complemento médico pago. Desde 12/09/2026 os dois andam juntos —
+ * se saiu no dia, entra na mesma soma, no Dashboard, no Movimento de Caixa
+ * e no Rateio.
  */
 export async function carregarRepassePago(
   ctx: RateioContexto,
@@ -140,7 +141,7 @@ export async function carregarRepassePago(
     })),
   );
   const total = despesas
-    .filter((d) => d.grupo === "repasse_pago")
+    .filter((d) => d.grupo === "repasse_pago" || d.grupo === "complemento_medico")
     .reduce((s, d) => s + d.valor, 0);
   return Math.round(total * 100) / 100;
 }
