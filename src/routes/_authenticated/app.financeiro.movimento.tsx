@@ -2534,6 +2534,50 @@ function Page() {
                     valor: l.valor,
                   })),
               );
+              // Resumo por tipo de moeda — a conferência de caixa do fim do
+              // dia: quanto entrou e quanto saiu em cada forma de pagamento.
+              // Mesma regra da impressão: mistos decompostos quando a opção
+              // estiver ligada, Dinheiro/PIX/Débito/Crédito sempre visíveis e
+              // sem transferência entre caixas (troca de custódia).
+              const moedas = new Map<FormaCanonica, { pagamento: number; recebimento: number }>();
+              const somaMoeda = (k: FormaCanonica, v: number, receita: boolean) => {
+                const m = moedas.get(k) ?? { pagamento: 0, recebimento: 0 };
+                if (receita) m.recebimento += v;
+                else m.pagamento += v;
+                moedas.set(k, m);
+              };
+              for (const l of displayItems) {
+                if (l.tipo === "transferencia") continue;
+                const v = Number(l.valor) || 0;
+                const receita = l.tipo === "receita";
+                const partes = decomporMisto
+                  ? partesDoPagamentoMisto(l.forma_pagamento, l.observacoes, l.composicao_pagamento)
+                  : [];
+                if (partes.length) for (const p of partes) somaMoeda(p.forma, p.valor, receita);
+                else somaMoeda(baldeDaLinha(l), v, receita);
+              }
+              const linhasMoeda = ORDEM_FORMAS.filter(
+                (k) =>
+                  moedas.has(k) ||
+                  (FORMAS_SEMPRE_VISIVEIS.includes(k) && filterForma === "todos"),
+              ).map((k) => {
+                const m = moedas.get(k) ?? { pagamento: 0, recebimento: 0 };
+                return {
+                  chave: k,
+                  label: LABEL_FORMA[k],
+                  pagamento: m.pagamento,
+                  recebimento: m.recebimento,
+                  saldo: m.recebimento - m.pagamento,
+                };
+              });
+              const totalMoeda = linhasMoeda.reduce(
+                (t, m) => ({
+                  pagamento: t.pagamento + m.pagamento,
+                  recebimento: t.recebimento + m.recebimento,
+                }),
+                { pagamento: 0, recebimento: 0 },
+              );
+
               return (
                 <>
                   <div className="px-4 py-2 text-xs text-muted-foreground bg-muted/30 border-b">
@@ -2605,6 +2649,61 @@ function Page() {
                       clínica, por isso não entram nas saídas acima.
                     </div>
                   )}
+                  <div className="border-t px-4 py-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground bg-muted/30">
+                    Resumo por tipo de moeda — conferência de caixa
+                    {decomporMisto ? " (mistos decompostos)" : ""}
+                  </div>
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Forma de pagamento</TableHead>
+                          <TableHead className="text-right">Pagamento</TableHead>
+                          <TableHead className="text-right">Recebimento</TableHead>
+                          <TableHead className="text-right">Saldo</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {linhasMoeda.map((m) => (
+                          <TableRow key={m.chave}>
+                            <TableCell className="font-medium">{m.label}</TableCell>
+                            <TableCell className="text-right tabular-nums text-red-600">
+                              {m.pagamento ? fmt(m.pagamento) : "—"}
+                            </TableCell>
+                            <TableCell className="text-right tabular-nums text-green-600">
+                              {m.recebimento ? fmt(m.recebimento) : "—"}
+                            </TableCell>
+                            <TableCell
+                              className={`text-right tabular-nums font-medium ${
+                                m.saldo >= 0 ? "text-green-600" : "text-red-600"
+                              }`}
+                            >
+                              {fmt(m.saldo)}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                        <TableRow className="bg-muted/40 font-semibold">
+                          <TableCell>TOTAL</TableCell>
+                          <TableCell className="text-right tabular-nums text-red-600">
+                            {fmt(totalMoeda.pagamento)}
+                          </TableCell>
+                          <TableCell className="text-right tabular-nums text-green-600">
+                            {fmt(totalMoeda.recebimento)}
+                          </TableCell>
+                          <TableCell
+                            className={`text-right tabular-nums ${
+                              totalMoeda.recebimento - totalMoeda.pagamento >= 0
+                                ? "text-green-600"
+                                : "text-red-600"
+                            }`}
+                          >
+                            {fmt(totalMoeda.recebimento - totalMoeda.pagamento)}
+                          </TableCell>
+                        </TableRow>
+                      </TableBody>
+                    </Table>
+                  </div>
+
 
                 </>
               );
