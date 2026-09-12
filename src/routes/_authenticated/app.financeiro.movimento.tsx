@@ -1898,6 +1898,22 @@ function Page() {
           <h1 className="text-2xl font-semibold">Movimento de Caixa</h1>
           <p className="text-sm text-muted-foreground">Receitas e despesas do período</p>
         </div>
+        {/* Atalhos de período no cabeçalho: é a troca mais frequente do dia,
+            então fica à vista sem precisar rolar até a barra de filtros. */}
+        <div className="min-w-0 flex-1">
+          <DateRangeFilter
+            value={{ from: fromDate, to: toDate }}
+            preset={presetPeriodo}
+            mostrarCampos={false}
+            onChange={(r, p) => {
+              setPresetPeriodo(p);
+              if (p !== "periodo") {
+                setFromDate(r.from);
+                setToDate(r.to);
+              }
+            }}
+          />
+        </div>
         <div className="flex gap-2">
           <Dialog open={open} onOpenChange={setOpen}>
             {podeEscrever && (
