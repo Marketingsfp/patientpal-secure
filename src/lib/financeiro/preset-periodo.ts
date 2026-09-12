@@ -89,6 +89,12 @@ export function computeRange(preset: DatePreset, ref: Date = new Date()): DateRa
   const today = new Date(ref);
   today.setHours(0, 0, 0, 0);
   if (preset === "hoje") return { from: toISO(today), to: toISO(today) };
+  if (preset === "ontem") {
+    const ontem = new Date(today);
+    ontem.setDate(today.getDate() - 1);
+    return { from: toISO(ontem), to: toISO(ontem) };
+  }
+
   if (preset === "semana") {
     const dow = today.getDay(); // 0 = dom
     const start = new Date(today);
