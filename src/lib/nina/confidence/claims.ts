@@ -731,7 +731,9 @@ export function avaliarGrounding(ctx: ContextoConfianca, texto?: string | null):
           fonte: canalDoTipo,
           valorAfirmado: valorDaFrase,
           motivo:
+            r.motivo ??
             "a fonte consultada não cobre este caso (procedimento/profissional/unidade/dia/convênio)",
+
         });
         return;
       }
