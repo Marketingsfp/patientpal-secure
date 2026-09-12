@@ -45,6 +45,7 @@ import {
 } from "@/lib/convenio/modalidade";
 import {
   classificarForma,
+  classificarLiberacao,
   LABEL_FORMA,
   partesDoPagamentoMisto,
   type ParteMisto,
