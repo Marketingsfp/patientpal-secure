@@ -547,6 +547,8 @@ export const aplicarCorrecaoComIA = createServerFn({ method: "POST" })
       passo("sistema", "Execução interrompida", motivoFinal, false);
     }
 
+    await atualizarEtapa("verificando_resultado");
+
     const status: ResumoExecucao["status"] = !aplicavel
       ? "pendente_tecnico"
       : publicado && teste.aprovado
