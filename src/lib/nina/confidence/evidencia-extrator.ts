@@ -320,6 +320,26 @@ export function extrairEvidencia(r: RetornoFerramenta): ExtracaoEvidencia {
           });
         }
       }
+
+      // O resumo `preco`/`price` não apaga as condições detalhadas: só vira
+      // evidência própria quando nenhuma condição já cobre aquele valor. Se
+      // divergir de todas, é conflito entre referências equivalentes.
+      if (preco) {
+        const centavosResumo = centavosDe(preco);
+        const coberto = centavosResumo !== null && centavosDetalhados.has(centavosResumo);
+        if (!coberto) {
+          if (centavosDetalhados.size > 0) motivo = motivo ?? "conflict";
+          fatos.push({
+            ...base,
+            entidade: "procedimento",
+            campo: "preco",
+            valor: preco,
+            ...comVersao,
+            chave: { procedimento, condicoes: qualificador(preco) },
+            registro: texto(obj(registros[0])["id"]),
+          });
+        }
+      }
       for (const p of profissionais) {
         fatos.push({
           ...base,
