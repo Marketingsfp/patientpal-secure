@@ -2514,6 +2514,8 @@ async function gerarRespostaNinaInterno(
     pacienteIdentificado: Boolean(pacienteIdEfetivo),
     esclarecimentoUsado: esclarecimentoConfiancaUsado,
     handoffSolicitado: houveHandoff,
+    // A apresentação já tinha sido entregue ANTES deste turno.
+    apresentacaoJaFeita: jaSeApresentou,
     ambiente: (opcoes?.teste === true ? "homologacao" : "producao") as
       | "producao"
       | "homologacao",
