@@ -332,7 +332,41 @@ export const aplicarCorrecaoComIA = createServerFn({ method: "POST" })
         .eq("clinica_id", data.clinicaId);
     }
 
+    /**
+     * Registro de autorização e progresso: quem clicou, quando, qual análise,
+     * pacote, proposta, ambiente e alcance. Recarregar a tela retoma daqui.
+     */
+    const assinatura = assinaturaProposta(proposta);
+    const { data: execLinha, error: eExec } = await supabase
+      .from("nina_correcao_execucoes")
+      .insert({
+        clinica_id: data.clinicaId,
+        feedback_id: data.feedbackId,
+        analise_id: analise.id,
+        pacote_hash: pacote.hash,
+        pacote_revisao: pacote.revisao,
+        proposta,
+        proposta_assinatura: assinatura,
+        ambiente: proposta.ambiente ?? pacote.identificacao.ambiente ?? null,
+        escopo: proposta.escopo,
+        autorizado_por: userId,
+        etapa: "verificando",
+        status: "em_curso",
+        passos: [],
+      })
+      .select("id")
+      .single();
+    if (eExec) throw new Error("Já existe uma aplicação em andamento para este erro.");
+    const execucaoId = execLinha?.id as string;
+
     const passos: PassoExecucao[] = [];
+    const atualizarEtapa = async (etapa: EtapaExecucao) => {
+      await supabase
+        .from("nina_correcao_execucoes")
+        .update({ etapa, passos })
+        .eq("id", execucaoId)
+        .eq("clinica_id", data.clinicaId);
+    };
     const passo = (
       ferramenta: PassoExecucao["ferramenta"],
       titulo: string,
@@ -348,6 +382,7 @@ export const aplicarCorrecaoComIA = createServerFn({ method: "POST" })
         em: new Date().toISOString(),
       });
     };
+
 
     let teste: ResultadoTeste = {
       executado: false,
