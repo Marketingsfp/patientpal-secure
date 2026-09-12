@@ -481,6 +481,23 @@ function FinDashboard() {
               accent="primary"
             />
           )}
+          {/* Mensalidade e adesão do Cartão: recebimentos sem agendamento que
+              também contam como atendimento no total. */}
+          <KpiCard
+            onClick={() => abrir("mensalidade")}
+            icon={Calendar}
+            label="Mensalidades"
+            value={v((r) => r.producao.mensalidades, int)}
+            accent="success"
+          />
+          <KpiCard
+            onClick={() => abrir("adesao")}
+            icon={Users}
+            label="Adesões"
+            value={v((r) => r.producao.adesoes, int)}
+            accent="warning"
+          />
+
           <KpiCard
             onClick={() => abrir("ticket")}
             icon={Calendar}
