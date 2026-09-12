@@ -971,26 +971,64 @@ async function gerarRespostaNinaInterno(
   // Snapshot único por execução.
   const { promptInstrucoes } = await import("@/lib/nina/instrucoes-runtime.server");
   const { PROMPT_NINA_WHATSAPP_V4 } = await import("@/lib/nina/prompt/behavior-v4");
+  // FASE 2 — IDENTIDADE EFETIVA: nome da assistente, nome e tipo do
+  // estabelecimento saem do bloco publicado NA MESMA versão que gera as
+  // instruções do turno. `clinicas.nome` continua sendo dado ADMINISTRATIVO
+  // (segue em `dadosPublicos`) e nunca substitui a identidade de apresentação.
+  const { resolverIdentidadeEfetiva, valoresIdentidade, fatosIdentidade } = await import(
+    "@/lib/nina/identidade-efetiva"
+  );
+  // Prompt de reserva também consome a identidade efetiva: sem identidade
+  // publicada ele fala de forma NEUTRA, sem fixar outra persona.
+  const valoresNeutros = valoresIdentidade(
+    resolverIdentidadeEfetiva({ template: "", origem: "codigo", versao: null, versaoId: null }),
+  );
+  const promptReserva = Object.entries(valoresNeutros).reduce(
+    (texto, [marcador, valor]) => texto.split(marcador).join(valor),
+    PROMPT_NINA_WHATSAPP_V4,
+  );
   const instrucoesNina = await promptInstrucoes(
     "whatsapp",
-    {
-      "${nomeUnidade}": nomeUnidade,
-      "${nomeCurtoUnidade}": nomeCurtoUnidade,
-    },
-    PROMPT_NINA_WHATSAPP_V4.split("${nomeUnidade}")
-      .join(nomeUnidade)
-      .split("${nomeCurtoUnidade}")
-      .join(nomeCurtoUnidade),
+    // Os valores dependem do PRÓPRIO texto da versão do turno: instruções e
+    // identidade nunca vêm de versões diferentes.
+    (template) =>
+      valoresIdentidade(
+        resolverIdentidadeEfetiva({
+          template,
+          origem: "publicada",
+          versao: null,
+          versaoId: null,
+        }),
+      ),
+    promptReserva,
     // FASE 2 — versão FIXA por turno: todas as rodadas usam este snapshot,
     // mesmo que alguém publique no meio da resposta.
     rastro?.ids.trace_id ?? null,
   );
   const behaviorPrompt = instrucoesNina.texto;
+  const identidadeEfetiva = resolverIdentidadeEfetiva({
+    template: instrucoesNina.template,
+    origem: instrucoesNina.origem,
+    versao: instrucoesNina.versao,
+    versaoId: instrucoesNina.versaoId,
+  });
+  const nomeApresentacao = identidadeEfetiva.apresentacao.estabelecimento;
+  if (!identidadeEfetiva.ok) {
+    console.warn("[NINA_IDENTIDADE]", {
+      clinica_id: clinicaId,
+      versao: identidadeEfetiva.versao,
+      origem_prompt: instrucoesNina.origem,
+      motivo: identidadeEfetiva.motivo,
+      detalhe: identidadeEfetiva.detalhe,
+    });
+  }
 
   rastro?.concluir("instructions.published", {
     versao: instrucoesNina.versao ?? null,
     origem: instrucoesNina.origem ?? null,
     publicado_em: instrucoesNina.publicadoEm ?? null,
+    motivo_origem: instrucoesNina.motivo ?? null,
+    identidade: fatosIdentidade(identidadeEfetiva),
   });
 
   // FASE 6 — rastreabilidade: guarda a REFERÊNCIA da versão usada nesta
