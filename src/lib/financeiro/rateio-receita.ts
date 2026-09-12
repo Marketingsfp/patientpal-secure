@@ -834,6 +834,38 @@ export async function carregarRateio(
       }),
     );
   }
+  // Recebimento sem agendamento. O serviço é o que está escrito depois do
+  // travessão da descrição ("FULANO — MENSALIDADE CARTÃO"); sem isso, vale a
+  // categoria financeira do lançamento.
+  const espelhosManuais = new Set(idsEspelho);
+  for (const r of avulsosRaw) {
+    const id = r.id as string;
+    if (espelhosManuais.has(id)) continue;
+    const descricao = (r.descricao as string) ?? "";
+    const depoisDoTravessao = descricao.split("—").slice(1).join("—").trim();
+    const categoria = (
+      r.categoria_id ? (ctx.categoriaNomePorId.get(r.categoria_id as string) ?? "") : ""
+    ).trim();
+    linhas.push(
+      reparte(ctx, {
+        id,
+        data: String(r.data ?? "").slice(0, 10),
+        origem: "avulso",
+        medicoId: null,
+        pacienteId: (r.paciente_id as string) ?? null,
+        procedimento: depoisDoTravessao || categoria || null,
+        valorPago: num(r.valor),
+        descricao,
+        modalidadeLancamento: (r.convenio_modalidade as string) ?? null,
+        formaPagamento: (r.forma_pagamento as string) ?? null,
+        observacoes: (r.observacoes as string) ?? null,
+        composicaoPagamento: r.composicao_pagamento,
+        categoriaId: (r.categoria_id as string) ?? null,
+      }),
+    );
+  }
+
+
 
   // O nome da especialidade é resolvido no fim, para o rótulo já sair pronto
   // na tabela, no papel e no CSV.
