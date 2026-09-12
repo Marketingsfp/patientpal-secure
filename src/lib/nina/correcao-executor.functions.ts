@@ -713,78 +713,6 @@ export const aplicarCorrecaoComIA = createServerFn({ method: "POST" })
 
     // Registro rastreável — mesmas tabelas do fluxo existente.
     const agora = new Date().toISOString();
-    const { data: acao } = await supabase
-      .from("nina_feedback_acoes")
-      .insert({
-        clinica_id: data.clinicaId,
-        feedback_id: data.feedbackId,
-        root_cause: (fb.root_cause as string | null) ?? proposta.camada,
-        camada: proposta.camada === "modelo" ? "modelo" : proposta.camada,
-        tipo: proposta.camada === "catalogo" ? "kb_update" : "reasoning_fix",
-        titulo: proposta.alvo.slice(0, 300),
-        instrucao: pendenciaTecnica ?? proposta.justificativa,
-        valor_atual: valorAnterior,
-        valor_novo: proposta.valorNovo,
-        status: status === "aplicado" ? "done" : "open",
-        evidencia: { proposta, teste, publicado, executor: MODELO_EXECUTOR },
-        execucao: {
-          status,
-          passos,
-          teste,
-          motivo: motivoFinal,
-          modelo: MODELO_EXECUTOR,
-          // Origem verificável do que fundamentou a correção.
-          pacote_hash: pacote.hash,
-          pacote_revisao: pacote.revisao,
-          analise_id: String(analise.id),
-        },
-        criado_por: userId,
-        concluido_por: status === "aplicado" ? userId : null,
-        concluido_em: status === "aplicado" ? agora : null,
-        homologado: teste.aprovado,
-      })
-      .select("id")
-      .single();
-
-    const { count } = await supabase
-      .from("nina_feedback_versoes")
-      .select("id", { count: "exact", head: true })
-      .eq("feedback_id", data.feedbackId);
-
-    await supabase.from("nina_feedback_versoes").insert({
-      clinica_id: data.clinicaId,
-      feedback_id: data.feedbackId,
-      acao_id: acao?.id ?? null,
-      versao: (count ?? 0) + 1,
-      item: proposta.alvo.slice(0, 500),
-      valor_anterior: valorAnterior,
-      valor_novo: proposta.valorNovo,
-      motivo: proposta.justificativa.slice(0, 2000) || motivoFinal,
-      camada: proposta.camada,
-      tipo: proposta.camada === "catalogo" ? "kb_update" : "reasoning_fix",
-      root_cause: (fb.root_cause as string | null) ?? proposta.camada,
-      reportado_por: (fb.reportado_por as string | null) ?? null,
-      aprovado_por: (fb.revisado_por as string | null) ?? null,
-      aplicado_por: userId,
-      evidencia: { teste, passos, publicado },
-      teste_status: teste.aprovado ? "aprovado" : teste.executado ? "reprovado" : "pendente",
-    });
-
-    if (status === "aplicado") {
-      await supabase
-        .from("nina_feedback_erros")
-        .update({
-          status: "applied",
-          aplicacao_tipo: proposta.camada === "catalogo" ? "kb_update" : "reasoning_fix",
-          aplicacao_resumo: proposta.alvo.slice(0, 300),
-          aplicacao_evidencia: { proposta, teste, passos },
-          aplicado_por: userId,
-          aplicado_em: agora,
-        })
-        .eq("id", data.feedbackId)
-        .eq("clinica_id", data.clinicaId);
-    }
-
     const resumo: ResumoExecucao = {
       status,
       camada: proposta.camada,
@@ -795,19 +723,119 @@ export const aplicarCorrecaoComIA = createServerFn({ method: "POST" })
       valorNovo: proposta.valorNovo,
       motivo: motivoFinal,
     };
+    let acao: { id: string } | null = null;
 
-    await supabase
-      .from("nina_correcao_execucoes")
-      .update({
-        etapa: "concluido",
-        status: status === "falhou" ? "falhou" : "concluida",
-        passos,
-        resumo,
-        erro: status === "falhou" ? motivoFinal : null,
+    try {
+      const { data: acaoCriada } = await supabase
+        .from("nina_feedback_acoes")
+        .insert({
+          clinica_id: data.clinicaId,
+          feedback_id: data.feedbackId,
+          root_cause: (fb.root_cause as string | null) ?? proposta.camada,
+          camada: proposta.camada === "modelo" ? "modelo" : proposta.camada,
+          tipo: proposta.camada === "catalogo" ? "kb_update" : "reasoning_fix",
+          titulo: proposta.alvo.slice(0, 300),
+          instrucao: pendenciaTecnica ?? proposta.justificativa,
+          valor_atual: valorAnterior,
+          valor_novo: proposta.valorNovo,
+          status: status === "aplicado" ? "done" : "open",
+          evidencia: { proposta, teste, publicado, executor: MODELO_EXECUTOR },
+          execucao: {
+            status,
+            resultado_final: resultadoFinal,
+            passos,
+            teste,
+            verificacao,
+            codigo: resultadoCodigo,
+            operacoes: contagem,
+            motivo: motivoFinal,
+            modelo: MODELO_EXECUTOR,
+            // Origem verificável do que fundamentou a correção.
+            pacote_hash: pacote.hash,
+            pacote_revisao: pacote.revisao,
+            analise_id: String(analise.id),
+            idempotencia_chave: chave,
+          },
+          criado_por: userId,
+          concluido_por: status === "aplicado" ? userId : null,
+          concluido_em: status === "aplicado" ? agora : null,
+          homologado: teste.aprovado,
+        })
+        .select("id")
+        .single();
+      acao = (acaoCriada as { id: string } | null) ?? null;
+
+      const { count } = await supabase
+        .from("nina_feedback_versoes")
+        .select("id", { count: "exact", head: true })
+        .eq("feedback_id", data.feedbackId);
+
+      await supabase.from("nina_feedback_versoes").insert({
+        clinica_id: data.clinicaId,
+        feedback_id: data.feedbackId,
         acao_id: acao?.id ?? null,
-      })
-      .eq("id", execucaoId)
-      .eq("clinica_id", data.clinicaId);
+        versao: (count ?? 0) + 1,
+        item: proposta.alvo.slice(0, 500),
+        valor_anterior: valorAnterior,
+        valor_novo: proposta.valorNovo,
+        motivo: proposta.justificativa.slice(0, 2000) || motivoFinal,
+        camada: proposta.camada,
+        tipo: proposta.camada === "catalogo" ? "kb_update" : "reasoning_fix",
+        root_cause: (fb.root_cause as string | null) ?? proposta.camada,
+        reportado_por: (fb.reportado_por as string | null) ?? null,
+        aprovado_por: (fb.revisado_por as string | null) ?? null,
+        aplicado_por: userId,
+        evidencia: { teste, passos, publicado, verificacao, resultado_final: resultadoFinal },
+        teste_status: teste.aprovado ? "aprovado" : teste.executado ? "reprovado" : "pendente",
+      });
 
-    return { ...resumo, acaoId: (acao?.id as string | undefined) ?? null };
+      if (status === "aplicado") {
+        await supabase
+          .from("nina_feedback_erros")
+          .update({
+            status: "applied",
+            aplicacao_tipo: proposta.camada === "catalogo" ? "kb_update" : "reasoning_fix",
+            aplicacao_resumo: proposta.alvo.slice(0, 300),
+            aplicacao_evidencia: { proposta, teste, passos, verificacao },
+            aplicado_por: userId,
+            aplicado_em: agora,
+          })
+          .eq("id", data.feedbackId)
+          .eq("clinica_id", data.clinicaId);
+      }
+
+      await supabase
+        .from("nina_correcao_execucoes")
+        .update({
+          etapa: "concluido",
+          status: status === "falhou" ? "falhou" : "concluida",
+          passos,
+          resumo,
+          verificacao,
+          resultado_final: resultadoFinal,
+          alvo_revisao: verificacao?.revisao ?? proposta.revisaoBase ?? null,
+          erro: status === "falhou" ? motivoFinal : null,
+          acao_id: acao?.id ?? null,
+        })
+        .eq("id", execucaoId)
+        .eq("clinica_id", data.clinicaId);
+    } catch (e) {
+      // Nenhuma execução fica presa em "em curso": a falha é registrada.
+      const msg = e instanceof Error ? e.message : "Falha ao registrar o resultado da correção.";
+      await supabase
+        .from("nina_correcao_execucoes")
+        .update({
+          etapa: "concluido",
+          status: "falhou",
+          passos,
+          resumo,
+          resultado_final: "falhou",
+          erro: msg,
+        })
+        .eq("id", execucaoId)
+        .eq("clinica_id", data.clinicaId);
+      throw new Error(msg);
+    }
+
+    return { ...resumo, acaoId: acao?.id ?? null };
   });
