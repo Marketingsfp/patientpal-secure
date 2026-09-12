@@ -346,6 +346,14 @@ function EditarFuncionarioPage() {
     }
     setSaving(true);
 
+    // Conferência contra cadastro repetido (inclusive o clique duplo no Salvar).
+    const achado = await procurarDuplicado();
+    if (achado && (achado.tipo === "cpf" || !ignorarNomeIgual)) {
+      setSaving(false);
+      setDuplicado(achado);
+      return;
+    }
+
     let userId: string | null = null;
     if (criandoLogin) {
       try {
