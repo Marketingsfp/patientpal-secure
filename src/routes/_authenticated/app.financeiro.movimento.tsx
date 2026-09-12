@@ -2597,6 +2597,15 @@ function Page() {
                       </TableBody>
                     </Table>
                   </div>
+                  {transf.length > 0 && (
+                    <div className="border-t bg-muted/20 px-4 py-2 text-xs text-muted-foreground">
+                      Troca de custódia fora do resultado — {transf.length} lançamento(s):
+                      sangrias (caixa → financeiro) {fmt(transfSaida)} · suprimentos (financeiro →
+                      caixa) {fmt(transfEntrada)}. Não são despesa: o dinheiro continua com a
+                      clínica, por isso não entram nas saídas acima.
+                    </div>
+                  )}
+
                 </>
               );
             })()
