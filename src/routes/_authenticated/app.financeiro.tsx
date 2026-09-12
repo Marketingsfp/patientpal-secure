@@ -16,6 +16,7 @@ import {
   Undo2,
   Stethoscope,
   HandCoins,
+  Target,
 } from "lucide-react";
 import { usePermissoes } from "@/hooks/use-permissoes";
 import { moduloDaRota, SUBMODULE_PARENT } from "@/lib/permissoes-rotas";
