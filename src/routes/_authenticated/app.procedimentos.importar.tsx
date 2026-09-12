@@ -345,7 +345,7 @@ function ImportarServicosPage() {
 
     const ok = await confirmDialog({
       title: "Confirmar importação",
-      description: `Vou cadastrar ${totalCriar} serviço(s) novo(s) e atualizar ${totalAtualizar} já existente(s) em ${clinicaAtual.clinica_nome ?? "esta clínica"}.`,
+      description: `Vou cadastrar ${totalCriar} serviço(s) novo(s) e atualizar ${totalAtualizar} já existente(s) em ${clinicaAtual.clinica.nome ?? "esta clínica"}.`,
       confirmText: "Importar",
     });
     if (!ok) return;
@@ -467,7 +467,7 @@ function ImportarServicosPage() {
         <AlertDescription className="text-sm">
           A planilha é lida aqui no seu navegador — o arquivo não é enviado para lugar nenhum. Tudo
           é gravado na clínica aberta agora:{" "}
-          <strong>{clinicaAtual?.clinica_nome ?? "nenhuma clínica selecionada"}</strong>. Esta tela
+          <strong>{clinicaAtual?.clinica.nome ?? "nenhuma clínica selecionada"}</strong>. Esta tela
           só cadastra ou atualiza serviços; nada é apagado.
         </AlertDescription>
       </Alert>
@@ -541,7 +541,7 @@ function ImportarServicosPage() {
             <div className="rounded-lg border border-primary/40 bg-primary/5 p-3">
               <p className="text-xs text-muted-foreground">Os serviços serão gravados em</p>
               <p className="text-lg font-semibold">
-                {clinicaAtual?.clinica_nome ?? "Nenhuma clínica selecionada"}
+                {clinicaAtual?.clinica.nome ?? "Nenhuma clínica selecionada"}
               </p>
             </div>
 
