@@ -1541,6 +1541,7 @@ function Pagina() {
                                   (resultadoCorrecao[it.id]?.resultadoFinal as never) ?? null
                                 }
                                 verificacao={resultadoCorrecao[it.id]?.verificacao ?? null}
+                                relatorio={relatorios[it.id] ?? null}
                               />
                             </div>
                           ) : (
