@@ -962,33 +962,20 @@ function montarDetalhe(drill: Drill, dados: DadosPainel, r: ResumoPainel, visao:
   // --- Despesas totais ------------------------------------------------------
   if (drill === "totais") {
     const resumo = [
-      { rotulo: "Repasse a médicos (grade)", valor: r.repasse },
-      ...(r.terceiro > 0 ? [{ rotulo: "Terceiros (dono do equipamento)", valor: r.terceiro }] : []),
+      { rotulo: "Repasse pago no caixa", valor: r.repassePagoNoPeriodo },
       ...(r.complementoMedico > 0
-        ? [{ rotulo: "Complemento médico", valor: r.complementoMedico }]
+        ? [{ rotulo: "Complemento médico pago", valor: r.complementoMedico }]
         : []),
-      { rotulo: "Custo total com prestadores", valor: r.custoPrestadores },
       { rotulo: "Despesas operacionais", valor: r.despesasOperacionais },
-      { rotulo: "Despesas totais", valor: r.despesasTotais },
+      { rotulo: "Despesas totais (caixa)", valor: r.despesasTotais },
+      { rotulo: "Repasse devido pelos atendimentos (conferência)", valor: r.custoPrestadores },
     ];
     const explicacao =
-      "Tudo o que o período custou: o repasse devido aos médicos (grade), a parte de terceiros, o complemento médico e as despesas operacionais.";
+      "Tudo o que saiu do caixa no período: o repasse pago aos médicos e prestadores, o complemento médico e as despesas operacionais — a mesma conta do Movimento de Caixa. O repasse devido pelos atendimentos do período aparece só no resumo, para conferência.";
     if (visao === "sintetico") {
-      const linhas: Celula[][] = [
-        [
-          "Repasse",
-          "Repasse a médicos (grade)",
-          dados.rateio.filter((l) => l.repasse > 0).length,
-          r.repasse,
-        ],
-      ];
-      if (r.terceiro > 0)
-        linhas.push([
-          "Repasse",
-          "Terceiros (dono do equipamento)",
-          dados.rateio.filter((l) => l.terceiro > 0).length,
-          r.terceiro,
-        ]);
+      const linhas: Celula[][] = [];
+      for (const g of somarPorCategoria(repassesPagos))
+        linhas.push(["Repasse", g.rotulo, g.qtd, g.valor]);
       if (r.complementoMedico > 0)
         linhas.push(["Repasse", "COMPLEMENTO MEDICO", complementos.length, r.complementoMedico]);
       for (const g of somarPorCategoria(operacionais))
