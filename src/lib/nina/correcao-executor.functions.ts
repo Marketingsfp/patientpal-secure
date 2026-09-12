@@ -260,25 +260,51 @@ export const aplicarCorrecaoComIA = createServerFn({ method: "POST" })
     if (eFb) throw new Error(eFb.message);
     if (!fb) throw new Error("Erro reportado não encontrado nesta clínica.");
 
-    const { data: analise, error: eAn } = await supabase
+    // A análise usada é a que estava na tela; sem id, a mais recente concluída.
+    let consulta = supabase
       .from("nina_feedback_analises")
       .select("id, status, resultado, conclusao, pacote, pacote_hash, pacote_revisao")
       .eq("clinica_id", data.clinicaId)
-      .eq("feedback_id", data.feedbackId)
-      .eq("status", "done")
-      .order("versao", { ascending: false })
-      .limit(1)
-      .maybeSingle();
+      .eq("feedback_id", data.feedbackId);
+    consulta = data.analiseId
+      ? consulta.eq("id", data.analiseId)
+      : consulta.eq("status", "done").order("versao", { ascending: false }).limit(1);
+    const { data: analise, error: eAn } = await consulta.maybeSingle();
     if (eAn) throw new Error(eAn.message);
     if (!analise)
       throw new Error("Analise o erro com IA antes de aplicar a correção: não há proposta na tela.");
 
     const resultado = (analise.resultado ?? {}) as Record<string, unknown>;
     const proposta =
-      (resultado["proposta"] as PropostaCorrecao | null) ??
-      normalizarProposta(resultado["proposta"]);
-    if (!proposta)
-      throw new Error("A análise não produziu proposta de mudança. Reanalise antes de aplicar.");
+      garantirProposta(resultado["proposta"]) ?? normalizarProposta(resultado["proposta"]);
+
+    /**
+     * FASE 2 — o mesmo gate da tela roda aqui: permissão, análise concluída,
+     * proposta aplicável, executor disponível e proposta idêntica à exibida.
+     */
+    const { data: emCurso } = await supabase
+      .from("nina_correcao_execucoes")
+      .select("id")
+      .eq("clinica_id", data.clinicaId)
+      .eq("feedback_id", data.feedbackId)
+      .eq("status", "em_curso")
+      .maybeSingle();
+
+    const prontidao = avaliarProntidao({
+      statusAnalise: (analise.status as "processing" | "done" | "failed") ?? null,
+      resultado: (analise.resultado as any) ?? null,
+      proposta,
+      temPermissao: true,
+      executorDisponivel: Boolean(process.env["LOVABLE_API_KEY"]),
+      execucaoEmCurso: Boolean(emCurso),
+      assinaturaExibida: data.propostaAssinatura ?? null,
+    });
+    if (!prontidao.habilitado || !proposta) throw new Error(prontidao.motivo);
+
+    if (data.pacoteHash && analise.pacote_hash && data.pacoteHash !== String(analise.pacote_hash))
+      throw new Error(
+        "As evidências desta análise mudaram desde o que foi exibido. Confira a proposta atualizada antes de aplicar.",
+      );
 
     /**
      * FASE 1 — a correção usa o MESMO pacote que fundamentou a proposta.
