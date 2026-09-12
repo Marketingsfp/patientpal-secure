@@ -286,6 +286,14 @@ export const publicarInstrucoesNina = createServerFn({ method: "POST" })
     const validacao = validarTemplateInstrucoes(data.escopo, data.conteudo);
     if (!validacao.ok) throw new Error(validacao.mensagem);
 
+    // FASE 1 — identidade do atendimento: bloco duplicado, incompleto ou fora
+    // de formato reprova ANTES de tocar na versão ativa. Bloco ausente NÃO
+    // bloqueia (versões antigas seguem sem identidade e nada é inferido).
+    if (data.escopo === "whatsapp") {
+      const identidade = validarIdentidadeParaPublicacao(data.conteudo);
+      if (!identidade.ok) throw new Error(identidade.mensagem);
+    }
+
 
     const { data: anterior } = await supabase
       .from(TAB)
