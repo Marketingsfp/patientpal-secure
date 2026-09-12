@@ -426,6 +426,16 @@ export type PropostaCorrecao = {
   valorNovo: string;
   justificativa: string;
   alcance: string;
+  /** Onde a mudança vale: só esta clínica ou todas. */
+  escopo: "local" | "global" | null;
+  /** Ambiente alvo declarado pelo avaliador (produção, homologação…). */
+  ambiente: string | null;
+  /** Arquivos/configurações atingidos pela mudança. */
+  arquivos: string[];
+  /** Patch concreto para camadas que vivem em código. Texto — não é aplicado aqui. */
+  patch: string | null;
+  /** Revisão contra a qual o patch foi preparado. */
+  revisaoBase: string | null;
   /** Definido pelo sistema, nunca pelo modelo. */
   aplicavelAutomaticamente: boolean;
 };
