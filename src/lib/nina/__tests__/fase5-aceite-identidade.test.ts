@@ -66,6 +66,10 @@ function tabela() {
       }
       return api;
     },
+    or: () => api,
+    order: () => api,
+    limit: () => api,
+    then: (r: any) => Promise.resolve({ data: [], error: null }).then(r),
     eq: (col: string, v: unknown) => {
       if (col === "clinica_id") leiturasComClinica++;
       filtros.push((l) => (l as any)[col] === v);
