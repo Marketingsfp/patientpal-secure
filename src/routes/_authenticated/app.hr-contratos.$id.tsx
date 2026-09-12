@@ -1009,6 +1009,67 @@ function EditarFuncionarioPage() {
           }}
         />
       )}
+
+      <AlertDialog open={!!duplicado} onOpenChange={(o) => !o && setDuplicado(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {duplicado?.tipo === "cpf"
+                ? "Este funcionário já está cadastrado"
+                : "Já existe um funcionário com este nome"}
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-1 text-sm">
+                <div>
+                  <strong>Nº:</strong> {duplicado?.reg.numero ?? "—"}
+                </div>
+                <div>
+                  <strong>Nome:</strong> {duplicado?.reg.funcionario_nome}
+                </div>
+                <div>
+                  <strong>Cargo:</strong>{" "}
+                  {cargos.find((c) => c.id === duplicado?.reg.cargo_id)?.nome ?? "—"}
+                </div>
+                <div>
+                  <strong>Setor:</strong>{" "}
+                  {setores.find((s) => s.id === duplicado?.reg.setor_id)?.nome ?? "—"}
+                </div>
+                <div>
+                  <strong>Admissão:</strong>{" "}
+                  {duplicado?.reg.data_admissao
+                    ? duplicado.reg.data_admissao.split("-").reverse().join("/")
+                    : "—"}
+                </div>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setDuplicado(null)}>Cancelar</AlertDialogCancel>
+            {duplicado?.tipo === "nome" && (
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setDuplicado(null);
+                  void salvar(true);
+                }}
+              >
+                É outra pessoa, cadastrar mesmo assim
+              </Button>
+            )}
+            <AlertDialogAction
+              onClick={() => {
+                const destino = duplicado?.reg.id;
+                setDuplicado(null);
+                if (destino) {
+                  void navigate({ to: "/app/hr-contratos/$id", params: { id: destino } });
+                }
+              }}
+            >
+              Abrir cadastro existente
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
