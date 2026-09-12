@@ -422,6 +422,16 @@ function Pagina() {
   const [corrigindo, setCorrigindo] = useState<Record<string, boolean>>({});
   const [correcoes, setCorrecoes] = useState<Record<string, ResumoExecucao>>({});
   const [etapaCorrecao, setEtapaCorrecao] = useState<Record<string, EtapaExecucao>>({});
+  /** Estado técnico e conferência do valor efetivo, vindos do servidor. */
+  const [resultadoCorrecao, setResultadoCorrecao] = useState<
+    Record<
+      string,
+      {
+        resultadoFinal: string | null;
+        verificacao: { conferido: boolean; alvo: string; motivo: string } | null;
+      }
+    >
+  >({});
   const aplicarComIAFn = useServerFn(aplicarCorrecaoComIA);
   const execucaoAtualFn = useServerFn(execucaoCorrecaoAtual);
 
@@ -434,6 +444,13 @@ function Pagina() {
       setEtapaCorrecao((e) => ({ ...e, [id]: linha.etapa as EtapaExecucao }));
       setCorrigindo((c) => ({ ...c, [id]: linha.status === "em_curso" }));
       if (linha.resumo) setCorrecoes((e) => ({ ...e, [id]: linha.resumo as ResumoExecucao }));
+      setResultadoCorrecao((r) => ({
+        ...r,
+        [id]: {
+          resultadoFinal: (linha.resultado_final as string | null) ?? null,
+          verificacao: (linha.verificacao as never) ?? null,
+        },
+      }));
     } catch {
       /* somente leitura: sem andamento salvo, o cartão segue normal */
     }
