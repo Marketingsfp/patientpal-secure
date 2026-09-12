@@ -216,18 +216,21 @@ export interface ResumoPainel {
   terceiro: number;
   complementoMedico: number;
   /**
-   * Repasse (grade) + terceiros + complemento médico: o número grande do card
-   * de Repasse. Até 11/09/2026 o card mostrava só a grade, e o terceiro e o
-   * complemento ficavam escondidos na linha de baixo.
+   * Repasse (grade) + terceiros + complemento médico — o DEVIDO pelos
+   * atendimentos do período. Continua aparecendo lado a lado com o pago, mas
+   * desde 12/09/2026 não é mais ele que forma a despesa e o saldo: quem manda
+   * na despesa é o caixa (veja `custoPrestadoresPago`).
    */
   custoPrestadores: number;
+  /** Repasse pago no caixa + complemento médico pago — a régua da gaveta. */
+  custoPrestadoresPago: number;
   despesasOperacionais: number;
-  /** Custo com prestadores + operacionais. */
+  /** Custo com prestadores PAGO no caixa + despesas operacionais. */
   despesasTotais: number;
   /** Líquido do Rateio (receita bruta − repasse − terceiros). */
   liquidoAtendimentos: number;
   saldo: number;
-  /** Repasse efetivamente pago no período — informativo, não entra no saldo. */
+  /** Repasse efetivamente pago no período — é ele que entra na despesa. */
   repassePagoNoPeriodo: number;
   producao: ProducaoPainel;
   ticketMedio: number;
