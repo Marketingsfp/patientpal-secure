@@ -55,6 +55,8 @@ export type VerificacaoRegra =
 
 export type CategoriaProibida =
   | "saudacao"
+  /** Repetir a APRESENTAÇÃO da assistente (diferente de cumprimentar). */
+  | "apresentacao"
   | "emoji"
   | "pergunta"
   | "despedida"
@@ -200,10 +202,10 @@ function ambienteDoTexto(plano: string): AmbienteRegra | null {
 // ------------------------------------------------------------- detectores
 
 const NORMATIVO =
-  /\b(nunca|jamais|sempre|obrigat|proibid|responda|responder|envie|enviar|escreva|escrever|retorne|use|utilize|inclua|acrescente|deve|dever[áa]|precisa|[ée] vedado|n[ãa]o pode|n[ãa]o deve)\b/i;
+  /\b(nunca|jamais|sempre|obrigat|proibid|responda|responder|envie|enviar|escreva|escrever|retorne|use|utilize|inclua|acrescente|deve|dever[áa]|precisa|[ée] vedado|n[ãa]o pode|n[ãa]o deve|sem repetir|n[ãa]o repita|evite)\b/i;
 
 const PROIBICAO =
-  /\b(n[ãa]o acrescente|n[ãa]o inclua|n[ãa]o use|n[ãa]o utilize|n[ãa]o envie|n[ãa]o responda|n[ãa]o mencione|n[ãa]o pode|n[ãa]o deve|nunca|jamais|[ée] proibido|[ée] vedado)\b/i;
+  /\b(n[ãa]o acrescente|n[ãa]o inclua|n[ãa]o use|n[ãa]o utilize|n[ãa]o envie|n[ãa]o responda|n[ãa]o mencione|n[ãa]o repita|n[ãa]o pode|n[ãa]o deve|nunca|jamais|sem repetir|evite|[ée] proibido|[ée] vedado)\b/i;
 
 const CONDICAO_ABERTA =
   /^(somente\s+|apenas\s+|s[óo]\s+)?(quando|se|caso|sempre que)\b[\s\S]*:\s*$/i;
@@ -261,7 +263,10 @@ export function operadorDoBloco(plano: string): OperadorLiteral {
 }
 
 const CATEGORIAS: Array<[CategoriaProibida, RegExp]> = [
-  ["saudacao", /\b(saudacao|cumprimento|apresentacao)\b/],
+  // "apresentação" é conferida à parte de "saudação": repetir quem você é não
+  // é a mesma coisa que dizer "bom dia".
+  ["apresentacao", /\bapresentacao\b/],
+  ["saudacao", /\b(saudacao|cumprimento)\b/],
   ["emoji", /\bemojis?\b/],
   ["pergunta", /\bperguntas?\b/],
   ["despedida", /\bdespedidas?\b/],

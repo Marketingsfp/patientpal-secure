@@ -2764,6 +2764,7 @@ async function gerarRespostaNinaInterno(
         decidirBloqueioBaixaConfianca,
         saidaControladaBaixaConfianca,
         ehAvisoControlado,
+        afirmacaoSemLastro,
       } = await import("@/lib/nina/confidence/baixa-confiabilidade");
       const ambienteSaida: "producao" | "homologacao" =
         opcoes?.ambiente === "producao" && opcoes?.teste !== true
@@ -2788,10 +2789,13 @@ async function gerarRespostaNinaInterno(
             (estadoParaRevisao.tipoTurno === "ESCLARECIMENTO" &&
               (estadoParaRevisao.acao ?? null) === null),
           acaoOperacional: (estadoParaRevisao.acao ?? null) !== null,
-          afirmacaoSemFonte: (respostaFinalAvaliada.claims?.semEvidencia.length ?? 0) > 0,
+          afirmacaoSemFonte: afirmacaoSemLastro(respostaFinalAvaliada),
           pedidoDeHumano: houveHandoff,
           conflitoDeIdentidade: diagnosticoSaudacao.saudacaoDuplicada === true,
           conformidadeBloqueante: revisao.bloqueiaEntrega === true,
+          conformidadeNaoVerificada:
+            revisao.conformidade?.estado === "nao_verificada" ||
+            revisao.conformidade?.estado === "falha_na_interpretacao",
         },
         bloqueadoresAbsolutos: respostaFinalAvaliada.hardBlockers ?? [],
         conteudoCandidatoHash: respostaFinalAvaliada.textoAvaliadoHash ?? null,
