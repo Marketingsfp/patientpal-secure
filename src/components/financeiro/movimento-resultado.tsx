@@ -588,6 +588,11 @@ function montarDetalhe(
             d.exame.total,
           ]);
       }
+      for (const g of GRUPOS_OUTRAS) {
+        const d = r.outras.porGrupo[g];
+        if (d.qtd === 0) continue;
+        linhasSint.push(["Outras receitas", LABEL_GRUPO_MOV[g], d.qtd, d.total]);
+      }
       return {
         ...base,
         colunas: [
@@ -597,9 +602,10 @@ function montarDetalhe(
           { rotulo: "Valor", tipo: "moeda" },
         ],
         linhas: linhasSint,
-        totais: ["TOTAL", "", r.atendimentos.qtd, r.atendimentos.total],
+        totais: ["TOTAL", "", r.receitaBruta.qtd, r.receitaBruta.total],
       };
     }
+
     return {
       ...base,
       colunas: [
