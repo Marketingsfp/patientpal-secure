@@ -4,17 +4,13 @@
  * Prova o problema corrigido: o cache por chave de turno devolvia um texto
  * anterior à correção, e o transporte reenviava esse texto antigo.
  */
-import { describe, it, expect, beforeEach, mock } from "bun:test";
+import { describe, it, expect, beforeEach } from "bun:test";
 import { criarResultado } from "@/lib/nina/resposta/contrato";
 import {
   finalizarResposta,
   limparFinalizacoes,
   ultimaFinalizacaoDoTurno,
 } from "@/lib/nina/resposta/finalizacao.server";
-
-mock.module("@/lib/nina/resposta/templates.server", () => ({
-  carregarTemplatesPublicados: async () => ({ textos: {}, versao: null }),
-}));
 
 const base = {
   clinicaId: "11111111-1111-1111-1111-111111111111",
