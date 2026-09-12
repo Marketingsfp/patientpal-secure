@@ -9,36 +9,42 @@ export const fmtDate = (iso: string | null | undefined) =>
 
 export type Periodo = "hoje" | "ontem" | "semana" | "mes" | "personalizado";
 
+/**
+ * Intervalo de datas puras (YYYY-MM-DD) de cada botão do filtro do Dashboard.
+ *
+ * Tudo aqui é aritmética de data pura no fuso da clínica. A versão anterior
+ * montava um `Date` com hora local (`setHours(23, 59, 59, 999)`) e depois
+ * cortava o `toISOString()`, que resolve em UTC: no Brasil, o fim do dia
+ * local cai já na madrugada do dia seguinte em UTC, e o botão "Ontem"
+ * devolvia 11/09 **até 12/09** — dois dias somados. Era por isso que "Ontem"
+ * mostrava mais dinheiro do que o mesmo dia escolhido à mão em "Período".
+ */
 export function rangeFromPeriodo(p: Periodo, custom?: { from: Date; to: Date }) {
-  const now = new Date();
-  const start = new Date(now);
-  const end = new Date(now);
-  if (p === "hoje") {
-    start.setHours(0, 0, 0, 0);
-    end.setHours(23, 59, 59, 999);
-  } else if (p === "ontem") {
+  const hoje = hojeBR();
+  if (p === "ontem") {
     // Dia anterior inteiro: a tesouraria fecha o caixa do dia que passou.
-    start.setDate(start.getDate() - 1);
-    start.setHours(0, 0, 0, 0);
-    end.setDate(end.getDate() - 1);
-    end.setHours(23, 59, 59, 999);
-  } else if (p === "semana") {
-    const d = start.getDay();
-    start.setDate(start.getDate() - d);
-    start.setHours(0, 0, 0, 0);
-    end.setDate(start.getDate() + 6);
-    end.setHours(23, 59, 59, 999);
-  } else if (p === "mes") {
-    start.setDate(1);
-    start.setHours(0, 0, 0, 0);
-    end.setMonth(end.getMonth() + 1);
-    end.setDate(0);
-    end.setHours(23, 59, 59, 999);
-  } else if (p === "personalizado" && custom) {
+    const ontem = addDias(hoje, -1);
+    return { from: ontem, to: ontem };
+  }
+  if (p === "semana") {
+    // Semana civil, de domingo a sábado. O dia da semana é lido em UTC a
+    // partir da data pura, e não do relógio do navegador.
+    const domingo = addDias(hoje, -new Date(`${hoje}T00:00:00Z`).getUTCDay());
+    return { from: domingo, to: addDias(domingo, 6) };
+  }
+  if (p === "mes") {
+    const [ano, mes] = hoje.split("-").map(Number);
+    // Dia 0 do mês seguinte = último dia deste mês.
     return {
-      from: custom.from.toISOString().slice(0, 10),
-      to: custom.to.toISOString().slice(0, 10),
+      from: `${hoje.slice(0, 7)}-01`,
+      to: new Date(Date.UTC(ano, mes, 0)).toISOString().slice(0, 10),
     };
   }
-  return { from: start.toISOString().slice(0, 10), to: end.toISOString().slice(0, 10) };
+  if (p === "personalizado" && custom) {
+    return {
+      from: dataClinicaDe(custom.from) ?? hoje,
+      to: dataClinicaDe(custom.to) ?? hoje,
+    };
+  }
+  return { from: hoje, to: hoje };
 }
