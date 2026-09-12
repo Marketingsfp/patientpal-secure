@@ -667,6 +667,8 @@ function reparte(
   return {
     id: params.id,
     data: params.data,
+    origem: params.origem ?? "atendimento",
+
     medico_id: params.medicoId,
     medico_nome: medico?.nome ?? "Sem profissional",
     especialidade_id: medico?.especialidade_id ?? null,
