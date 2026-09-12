@@ -332,6 +332,17 @@ function Page() {
     saldo: 0,
     totalRows: 0,
   });
+  /**
+   * Conferência com o Rateio do mesmo período: repasse DEVIDO pelos
+   * atendimentos e cortesias (atendidos sem cobrança). Esta tela continua
+   * fechando o caixa pelo que entrou e saiu da gaveta; estes dois números
+   * aparecem ao lado só para as três telas falarem a mesma língua.
+   */
+  const [conferencia, setConferencia] = useState<{
+    repasseDevido: number;
+    cortesias: number;
+  } | null>(null);
+  const ctxRateioRef = useRef<{ clinicaId: string; ctx: RateioContexto } | null>(null);
   const [filterStatus, setFilterStatus] = useState<"confirmado" | "todos" | "pendente">(
     "confirmado",
   );
