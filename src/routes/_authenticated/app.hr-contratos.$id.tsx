@@ -119,6 +119,10 @@ function EditarFuncionarioPage() {
   });
   const [pacienteSel, setPacienteSel] = useState<PatientOption | null>(null);
   const [quickOpen, setQuickOpen] = useState(false);
+  // Cadastro repetido encontrado antes de gravar (trava do clique duplo).
+  const [duplicado, setDuplicado] = useState<{ tipo: "cpf" | "nome"; reg: DuplicadoInfo } | null>(
+    null,
+  );
 
   useEffect(() => {
     if (!clinicaAtual) return;
