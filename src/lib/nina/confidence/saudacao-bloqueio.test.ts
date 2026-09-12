@@ -14,7 +14,7 @@
  *  3. em homologação o aviso simulado era idêntico ao de transferência
  *     concluída.
  */
-import { describe, it, expect } from "vitest";
+import { describe, it, expect } from "bun:test";
 import { extrairRegrasPublicadas } from "./regras-publicadas";
 import { InstructionComplianceValidator } from "./obrigacoes";
 import { normalizarMensagensParaProvedor } from "../adapters/gemini-adapter.server";
