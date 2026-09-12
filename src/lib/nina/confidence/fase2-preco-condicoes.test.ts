@@ -79,7 +79,9 @@ describe("normalização dos formatos de retorno", () => {
 
   it("formatos equivalentes produzem evidências equivalentes", () => {
     const a = precos({
-      records: [{ id: "r", procedimento: "ECG", preco_dinheiro: "R$ 51,00", preco_cartao: "R$ 60,00" }],
+      records: [
+        { id: "r", procedimento: "ECG", preco_dinheiro: "R$ 51,00", preco_cartao: "R$ 60,00" },
+      ],
     });
     const b = precos({
       registros: [

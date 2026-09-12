@@ -39,9 +39,10 @@ const FONTE_POR_BROKER: Record<string, TipoFonte> = {
 };
 
 function tipoFonte(r: RetornoFerramenta): TipoFonte {
-  const declarada = typeof (r.dados as Record<string, unknown>)?.["fonte"] === "string"
-    ? String((r.dados as Record<string, unknown>)["fonte"])
-    : null;
+  const declarada =
+    typeof (r.dados as Record<string, unknown>)?.["fonte"] === "string"
+      ? String((r.dados as Record<string, unknown>)["fonte"])
+      : null;
   if (declarada === "catalogo_publicado") return "catalogo_publicado";
   return FONTE_POR_BROKER[r.fonte ?? ""] ?? "desconhecida";
 }
@@ -99,7 +100,11 @@ function qualificador(v: unknown): string | null {
   return null;
 }
 
-function precoDe(valor: unknown, forma: string | null, condicao: string | null): PrecoCondicao | null {
+function precoDe(
+  valor: unknown,
+  forma: string | null,
+  condicao: string | null,
+): PrecoCondicao | null {
   const t = texto(valor);
   if (t === null) return null;
   const centavos = centavosDe(t);
@@ -128,7 +133,8 @@ export function precosDoRegistro(registro: unknown): PrecoCondicao[] {
     if (Array.isArray(fp)) {
       for (const item of fp) {
         const o = obj(item);
-        const forma = texto(o["forma"]) ?? texto(o["tipo"]) ?? texto(o["nome"]) ?? texto(o["pagamento"]);
+        const forma =
+          texto(o["forma"]) ?? texto(o["tipo"]) ?? texto(o["nome"]) ?? texto(o["pagamento"]);
         const valor = o["valor"] ?? o["preco"] ?? o["price"];
         const cond = texto(o["condicao"]) ?? texto(o["condicoes"]) ?? texto(o["observacao"]);
         const p = precoDe(valor, forma, cond);
@@ -169,9 +175,7 @@ function dedupPrecos(precos: PrecoCondicao[]): PrecoCondicao[] {
   // nenhuma condição detalhada (senão seria o mesmo fato, sem forma).
   for (const p of semForma) {
     const jaCoberto = detalhados.some((d) => d.centavos === p.centavos);
-    const repetido = detalhados.some(
-      (d) => d.forma === null && d.centavos === p.centavos,
-    );
+    const repetido = detalhados.some((d) => d.forma === null && d.centavos === p.centavos);
     if (!jaCoberto && !repetido) detalhados.push(p);
   }
   return detalhados;
@@ -267,8 +271,12 @@ export function extrairEvidencia(r: RetornoFerramenta): ExtracaoEvidencia {
       const procedimento = texto(d["procedimento"]) ?? texto(d["procedure"]);
       const preco = texto(d["preco"]) ?? texto(d["price"]);
       const registros = registrosDoRetorno(d);
-      const profissionais = Array.isArray(d["profissionais"]) ? (d["profissionais"] as unknown[]) : [];
-      const especialidades = Array.isArray(d["especialidades"]) ? (d["especialidades"] as unknown[]) : [];
+      const profissionais = Array.isArray(d["profissionais"])
+        ? (d["profissionais"] as unknown[])
+        : [];
+      const especialidades = Array.isArray(d["especialidades"])
+        ? (d["especialidades"] as unknown[])
+        : [];
       const dias = Array.isArray(d["dias"]) ? (d["dias"] as unknown[]) : [];
       const observacoes = Array.isArray(d["observacoes"]) ? (d["observacoes"] as unknown[]) : [];
       const clinica = obj(d["clinica"]);
@@ -316,7 +324,11 @@ export function extrairEvidencia(r: RetornoFerramenta): ExtracaoEvidencia {
             valor: texto(x["dia"]),
             registro: texto(x["id"]),
             ...comVersao,
-            chave: { procedimento: item, medicoNome: texto(x["medico"]), hora: texto(x["horario"]) },
+            chave: {
+              procedimento: item,
+              medicoNome: texto(x["medico"]),
+              hora: texto(x["horario"]),
+            },
           });
         }
       }
@@ -390,7 +402,13 @@ export function extrairEvidencia(r: RetornoFerramenta): ExtracaoEvidencia {
         });
       }
       if (texto(clinica["nome"])) {
-        fatos.push({ ...base, entidade: "clinica", campo: "nome", valor: texto(clinica["nome"]), ...comVersao });
+        fatos.push({
+          ...base,
+          entidade: "clinica",
+          campo: "nome",
+          valor: texto(clinica["nome"]),
+          ...comVersao,
+        });
       }
       const conhecimento = texto(d["knowledge_status"]);
       if (conhecimento === "conflict") motivo = motivo ?? "conflict";
@@ -433,7 +451,11 @@ export function extrairEvidencia(r: RetornoFerramenta): ExtracaoEvidencia {
           campo: "appointment_id",
           valor: id,
           registro: id,
-          chave: { data: texto(d["data"]), hora: texto(d["hora"]), medicoId: texto(d["medico_id"]) },
+          chave: {
+            data: texto(d["data"]),
+            hora: texto(d["hora"]),
+            medicoId: texto(d["medico_id"]),
+          },
         });
         status = "com_itens";
       } else {
