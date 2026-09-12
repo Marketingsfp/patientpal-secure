@@ -6,7 +6,15 @@ import { useClinica } from "@/hooks/use-clinica";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { projetarMes, type DiaCaixa, type ResultadoProjecao } from "@/lib/financeiro/projecao";
+import {
+  projetarMes,
+  serieTendencia,
+  simularCrescimento,
+  type DiaCaixa,
+  type EntradaProjecao,
+  type ResultadoProjecao,
+} from "@/lib/financeiro/projecao";
+import { MiniLineChart } from "@/components/charts/MiniLineChart";
 
 export const Route = createFileRoute("/_authenticated/app/financeiro/projecao")({
   component: Page,
@@ -40,11 +48,22 @@ function Page() {
   const [loading, setLoading] = useState(true);
   const [dias, setDias] = useState<DiaCaixa[]>([]);
   const [meta, setMeta] = useState<number>(0);
+  /** Receita confirmada do mês anterior fechado — base das metas de crescimento. */
+  const [baseMesAnterior, setBaseMesAnterior] = useState(0);
 
   const hoje = useMemo(() => new Date(), []);
   const inicio = useMemo(() => iso(new Date(hoje.getFullYear(), hoje.getMonth(), 1)), [hoje]);
   const fim = useMemo(() => iso(new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0)), [hoje]);
   const hojeIso = useMemo(() => iso(hoje), [hoje]);
+
+  const mesAnterior = useMemo(() => {
+    const ini = new Date(hoje.getFullYear(), hoje.getMonth() - 1, 1);
+    return {
+      de: iso(ini),
+      ate: iso(new Date(hoje.getFullYear(), hoje.getMonth(), 0)),
+      nome: ini.toLocaleDateString("pt-BR", { month: "long", year: "numeric" }),
+    };
+  }, [hoje]);
 
   const chaveMeta = clinicaAtual ? `fin-meta-${clinicaAtual.clinica_id}-${inicio}` : "";
 
@@ -119,9 +138,52 @@ function Page() {
     })();
   }, [clinicaAtual?.clinica_id, inicio, hojeIso]);
 
-  const r: ResultadoProjecao = useMemo(
-    () => projetarMes({ inicio, fim, hoje: hojeIso, dias, meta: meta || undefined }),
+  // A base de comparação sai agregada do banco (`fin_resumo_periodo`): são
+  // milhares de lançamentos no mês anterior, e aqui só interessa o total.
+  useEffect(() => {
+    (async () => {
+      if (!clinicaAtual) return;
+      const { data, error } = await supabase.rpc("fin_resumo_periodo", {
+        p_clinica: clinicaAtual.clinica_id,
+        p_ini: mesAnterior.de,
+        p_fim: mesAnterior.ate,
+      });
+      if (error) return;
+      const linhas = (data ?? []) as Array<{ tipo: string; status: string; total: number }>;
+      const receita = linhas
+        .filter((l) => l.tipo === "receita" && l.status === "confirmado")
+        .reduce((s, l) => s + (Number(l.total) || 0), 0);
+      setBaseMesAnterior(receita);
+    })();
+  }, [clinicaAtual?.clinica_id, mesAnterior.de, mesAnterior.ate]);
+
+  const entrada: EntradaProjecao = useMemo(
+    () => ({ inicio, fim, hoje: hojeIso, dias, meta: meta || undefined }),
     [inicio, fim, hojeIso, dias, meta],
+  );
+  const r: ResultadoProjecao = useMemo(() => projetarMes(entrada), [entrada]);
+
+  const metas = useMemo(
+    () => simularCrescimento(r, { baseMesAnterior, metaCustomizada: meta || undefined }),
+    [r, baseMesAnterior, meta],
+  );
+
+  const tendencia = useMemo(() => serieTendencia(entrada, r), [entrada, r]);
+  const seriesTendencia = useMemo(
+    () => [
+      {
+        name: "Realizado",
+        color: "#13b5a3",
+        values: tendencia.map((p) => p.realizado),
+      },
+      {
+        name: "Projetado",
+        color: "#3b82f6",
+        values: tendencia.map((p) => p.projetado),
+        tracejada: true,
+      },
+    ],
+    [tendencia],
   );
 
   const salvarMeta = (valor: number) => {
@@ -159,7 +221,9 @@ function Page() {
               Já realizado: <span className="font-medium text-foreground">{realizado}</span>
             </p>
           </div>
-          <div className={`h-10 w-10 shrink-0 rounded-lg flex items-center justify-center ${color}`}>
+          <div
+            className={`h-10 w-10 shrink-0 rounded-lg flex items-center justify-center ${color}`}
+          >
             <Icon className="h-5 w-5" />
           </div>
         </div>
@@ -213,6 +277,30 @@ function Page() {
       </div>
 
       <Card>
+        <CardContent className="pt-6 space-y-3">
+          <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+            <h2 className="text-lg font-semibold">Tendência do mês</h2>
+            <p className="text-xs text-muted-foreground">
+              <span className="font-medium text-foreground">Realizado</span> — o que já entrou,
+              somado dia a dia · <span className="font-medium text-foreground">Projetado</span>{" "}
+              (tracejado) — o mesmo acumulado seguindo no ritmo atual até {fim.slice(8)}/
+              {fim.slice(5, 7)}.
+            </p>
+          </div>
+          {loading ? (
+            <p className="text-sm text-muted-foreground">Carregando...</p>
+          ) : (
+            <MiniLineChart
+              labels={tendencia.map((p) => p.rotulo)}
+              series={seriesTendencia}
+              height={280}
+              formatY={(n) => fmt(n)}
+            />
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
         <CardContent className="pt-6 space-y-4">
           <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
             <div className="space-y-1">
@@ -233,8 +321,9 @@ function Page() {
             </div>
             <div className="text-sm">
               <p className="text-muted-foreground">
-                Ritmo atual: <span className="font-medium text-foreground">{fmt(r.mediaDiaria)}</span>{" "}
-                e {r.mediaAtendimentosDia} atendimento(s) por dia de movimento.
+                Ritmo atual:{" "}
+                <span className="font-medium text-foreground">{fmt(r.mediaDiaria)}</span> e{" "}
+                {r.mediaAtendimentosDia} atendimento(s) por dia de movimento.
               </p>
             </div>
           </div>
@@ -260,6 +349,73 @@ function Page() {
               Informe uma meta para ver quanto falta e quantos atendimentos por dia são necessários.
             </p>
           )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardContent className="pt-6 space-y-4">
+          <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+            <h2 className="text-lg font-semibold">Simulação de crescimento</h2>
+            {baseMesAnterior > 0 ? (
+              <p className="text-xs text-muted-foreground">
+                Base de comparação: {mesAnterior.nome} fechou em{" "}
+                <span className="font-medium text-foreground">{fmt(baseMesAnterior)}</span>.
+              </p>
+            ) : null}
+          </div>
+
+          {metas.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              Sem receita registrada em {mesAnterior.nome} para comparar. Digite uma meta acima para
+              simular.
+            </p>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+              {metas.map((m) => (
+                <div key={m.rotulo} className="rounded-lg border p-4 space-y-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-sm font-semibold">{m.rotulo}</span>
+                    <span
+                      className={
+                        m.alcancavel
+                          ? "text-[11px] font-medium uppercase tracking-wide text-green-600"
+                          : "text-[11px] font-medium uppercase tracking-wide text-amber-600"
+                      }
+                    >
+                      {m.alcancavel ? "no ritmo" : "exige mais"}
+                    </span>
+                  </div>
+                  <p className="text-xl font-semibold tabular-nums">{fmt(m.alvo)}</p>
+                  <dl className="text-xs text-muted-foreground space-y-1">
+                    <div className="flex justify-between gap-2">
+                      <dt>Falta</dt>
+                      <dd className="tabular-nums text-foreground">{fmt(m.falta)}</dd>
+                    </div>
+                    <div className="flex justify-between gap-2">
+                      <dt>Por dia de movimento</dt>
+                      <dd className="tabular-nums text-foreground">{fmt(m.porDiaRestante)}</dd>
+                    </div>
+                    <div className="flex justify-between gap-2">
+                      <dt>Atendimentos/dia</dt>
+                      <dd className="tabular-nums text-foreground">{m.atendimentosPorDia}</dd>
+                    </div>
+                    <div className="flex justify-between gap-2">
+                      <dt>Ritmo x hoje</dt>
+                      <dd className="tabular-nums text-foreground">
+                        {m.esforcoPercentual > 0
+                          ? `+${m.esforcoPercentual}%`
+                          : `${m.esforcoPercentual}%`}
+                      </dd>
+                    </div>
+                  </dl>
+                </div>
+              ))}
+            </div>
+          )}
+          <p className="text-xs text-muted-foreground">
+            "Dia de movimento" é dia com caixa aberto — a clínica atende de segunda a sábado, e o
+            domingo não entra na conta.
+          </p>
         </CardContent>
       </Card>
 
