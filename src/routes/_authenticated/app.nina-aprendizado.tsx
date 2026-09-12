@@ -1276,7 +1276,10 @@ function Pagina() {
                       aria-expanded={Boolean(abertos[it.id])}
                       onClick={() => {
                         setAbertos((a) => ({ ...a, [it.id]: !a[it.id] }));
-                        if (!abertos[it.id] && podeRevisar) void carregarAnalise(it.id);
+                        if (!abertos[it.id] && podeRevisar) {
+                          void carregarAnalise(it.id);
+                          void carregarExecucaoCorrecao(it.id);
+                        }
                       }}
                     >
                       {abertos[it.id] ? "Ocultar detalhes" : "Ver detalhes"}
