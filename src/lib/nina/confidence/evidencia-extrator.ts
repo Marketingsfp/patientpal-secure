@@ -8,6 +8,7 @@
  * Puro: recebe o objeto já lido pelo broker e devolve dados. Sem banco, sem
  * rede. É por isso que dá para testar cada formato de retorno.
  */
+import { normalizarTexto, valorMonetario } from "./evidencia";
 import type { ConsultaDoTurno, FatoRecuperado, StatusConsulta } from "./evidencia";
 import type { TipoFonte } from "./types";
 
@@ -38,9 +39,10 @@ const FONTE_POR_BROKER: Record<string, TipoFonte> = {
 };
 
 function tipoFonte(r: RetornoFerramenta): TipoFonte {
-  const declarada = typeof (r.dados as Record<string, unknown>)?.["fonte"] === "string"
-    ? String((r.dados as Record<string, unknown>)["fonte"])
-    : null;
+  const declarada =
+    typeof (r.dados as Record<string, unknown>)?.["fonte"] === "string"
+      ? String((r.dados as Record<string, unknown>)["fonte"])
+      : null;
   if (declarada === "catalogo_publicado") return "catalogo_publicado";
   return FONTE_POR_BROKER[r.fonte ?? ""] ?? "desconhecida";
 }
@@ -53,6 +55,164 @@ function texto(v: unknown): string | null {
   if (v === null || v === undefined) return null;
   const s = String(v).trim();
   return s === "" ? null : s;
+}
+
+// ------------------------------------------------- FASE 2 (preço por condição)
+
+/**
+ * Uma referência monetária concreta do retorno: valor + a condição em que
+ * aquele valor vale. `forma`/`condicao` só existem quando a ferramenta as
+ * informou — nada é suposto.
+ */
+export type PrecoCondicao = {
+  /** dinheiro, cartao, pix... exatamente como o produtor declarou. */
+  forma: string | null;
+  /** "a partir de", "3x sem juros", "à vista"... */
+  condicao: string | null;
+  /** Valor como texto, preservando o formato original. */
+  valor: string;
+  /** Valor em centavos — base de comparação e de deduplicação. */
+  centavos: number | null;
+};
+
+const FORMAS_POR_CAMPO: Record<string, string> = {
+  preco_dinheiro: "dinheiro",
+  valor_dinheiro: "dinheiro",
+  preco_cartao: "cartao",
+  valor_cartao: "cartao",
+  preco_pix: "pix",
+  valor_pix: "pix",
+};
+
+function centavosDe(v: unknown): number | null {
+  const n = valorMonetario(v);
+  return n === null ? null : Math.round(n * 100);
+}
+
+/** Qualificadores que mudam o sentido do valor e não podem ser descartados. */
+function qualificador(v: unknown): string | null {
+  const s = normalizarTexto(v);
+  if (!s) return null;
+  if (s.includes("a partir de")) return "a partir de";
+  const parcela = s.match(/(\d+)\s*x/);
+  if (parcela) return `${parcela[1]}x`;
+  if (s.includes("a vista")) return "a vista";
+  return null;
+}
+
+function precoDe(
+  valor: unknown,
+  forma: string | null,
+  condicao: string | null,
+): PrecoCondicao | null {
+  const t = texto(valor);
+  if (t === null) return null;
+  const centavos = centavosDe(t);
+  if (centavos === null) return null;
+  return { forma, condicao: condicao ?? qualificador(t), valor: t, centavos };
+}
+
+/**
+ * Lê todas as referências monetárias de um registro, em qualquer dos formatos
+ * usados pelos produtores: campos por forma (`preco_dinheiro`/`preco_cartao`),
+ * lista/mapa `formas_pagamento` (inclusive dentro de `precos`/`extras`) e o
+ * campo resumido `preco`/`price`.
+ */
+export function precosDoRegistro(registro: unknown): PrecoCondicao[] {
+  const x = obj(registro);
+  const achados: PrecoCondicao[] = [];
+
+  for (const [campo, forma] of Object.entries(FORMAS_POR_CAMPO)) {
+    const p = precoDe(x[campo], forma, null);
+    if (p) achados.push(p);
+  }
+
+  const containers = [x, obj(x["precos"]), obj(x["extras"]), obj(obj(x["extras"])["precos"])];
+  for (const c of containers) {
+    const fp = c["formas_pagamento"] ?? c["formasPagamento"] ?? c["condicoes_pagamento"];
+    if (Array.isArray(fp)) {
+      for (const item of fp) {
+        const o = obj(item);
+        const forma =
+          texto(o["forma"]) ?? texto(o["tipo"]) ?? texto(o["nome"]) ?? texto(o["pagamento"]);
+        const valor = o["valor"] ?? o["preco"] ?? o["price"];
+        const cond = texto(o["condicao"]) ?? texto(o["condicoes"]) ?? texto(o["observacao"]);
+        const p = precoDe(valor, forma, cond);
+        if (p) achados.push(p);
+      }
+    } else if (fp && typeof fp === "object") {
+      for (const [forma, valor] of Object.entries(fp as Record<string, unknown>)) {
+        const p = precoDe(valor, forma, null);
+        if (p) achados.push(p);
+      }
+    }
+  }
+
+  // Resumo do próprio registro: entra sem forma, nunca apagando as detalhadas.
+  const resumo = precoDe(x["preco"] ?? x["price"] ?? x["valor"], null, null);
+  if (resumo) achados.push(resumo);
+
+  return dedupPrecos(achados);
+}
+
+/**
+ * Mesma condição + mesmo valor = mesma referência (registros/records
+ * duplicados, resumo repetindo uma condição detalhada).
+ */
+function dedupPrecos(precos: PrecoCondicao[]): PrecoCondicao[] {
+  const vistos = new Map<string, PrecoCondicao>();
+  const semForma: PrecoCondicao[] = [];
+  for (const p of precos) {
+    const chave = `${normalizarTexto(p.forma)}|${normalizarTexto(p.condicao)}|${p.centavos}`;
+    if (p.forma === null) {
+      semForma.push(p);
+      continue;
+    }
+    if (!vistos.has(chave)) vistos.set(chave, p);
+  }
+  const detalhados = [...vistos.values()];
+  // O resumo só vira evidência própria quando o valor não é coberto por
+  // nenhuma condição detalhada (senão seria o mesmo fato, sem forma).
+  for (const p of semForma) {
+    const jaCoberto = detalhados.some((d) => d.centavos === p.centavos);
+    const repetido = detalhados.some((d) => d.forma === null && d.centavos === p.centavos);
+    if (!jaCoberto && !repetido) detalhados.push(p);
+  }
+  return detalhados;
+}
+
+/** Rótulo da condição guardado na chave do fato (`null` quando não informada). */
+export function rotuloCondicao(p: PrecoCondicao): string | null {
+  const partes = [p.forma, p.condicao].filter((v): v is string => !!v && v.trim() !== "");
+  return partes.length > 0 ? partes.join(" ") : null;
+}
+
+/** Identidade de um registro, para não duplicar `registros` × `records`. */
+function identidadeRegistro(registro: unknown): string {
+  const x = obj(registro);
+  const id = texto(x["id"]);
+  if (id) return `id:${id}`;
+  return JSON.stringify([
+    normalizarTexto(x["procedimento"]),
+    normalizarTexto(x["medico"]),
+    normalizarTexto(x["dia"]),
+    normalizarTexto(x["horario"]),
+    precosDoRegistro(x).map((p) => `${normalizarTexto(rotuloCondicao(p))}=${p.centavos}`),
+  ]);
+}
+
+/** Une `registros` e `records` sem repetir o mesmo dado. */
+export function registrosDoRetorno(d: Record<string, unknown>): unknown[] {
+  const brutos = [
+    ...(Array.isArray(d["registros"]) ? (d["registros"] as unknown[]) : []),
+    ...(Array.isArray(d["records"]) ? (d["records"] as unknown[]) : []),
+  ];
+  const porIdentidade = new Map<string, unknown>();
+  for (const r of brutos) {
+    const k = identidadeRegistro(r);
+    if (!porIdentidade.has(k)) porIdentidade.set(k, r);
+  }
+  return [...porIdentidade.values()];
 }
 
 /** Identidade da consulta: mesma ferramenta + mesmos argumentos = mesma consulta. */
@@ -110,40 +270,38 @@ export function extrairEvidencia(r: RetornoFerramenta): ExtracaoEvidencia {
     case "listCatalog": {
       const procedimento = texto(d["procedimento"]) ?? texto(d["procedure"]);
       const preco = texto(d["preco"]) ?? texto(d["price"]);
-      const registros = Array.isArray(d["registros"]) ? (d["registros"] as unknown[]) : [];
-      const profissionais = Array.isArray(d["profissionais"]) ? (d["profissionais"] as unknown[]) : [];
-      const especialidades = Array.isArray(d["especialidades"]) ? (d["especialidades"] as unknown[]) : [];
+      const registros = registrosDoRetorno(d);
+      const profissionais = Array.isArray(d["profissionais"])
+        ? (d["profissionais"] as unknown[])
+        : [];
+      const especialidades = Array.isArray(d["especialidades"])
+        ? (d["especialidades"] as unknown[])
+        : [];
       const dias = Array.isArray(d["dias"]) ? (d["dias"] as unknown[]) : [];
       const observacoes = Array.isArray(d["observacoes"]) ? (d["observacoes"] as unknown[]) : [];
       const clinica = obj(d["clinica"]);
 
-      if (preco) {
-        fatos.push({
-          ...base,
-          entidade: "procedimento",
-          campo: "preco",
-          valor: preco,
-          ...comVersao,
-          chave: { procedimento },
-          registro: texto((obj(registros[0]))["id"]),
-        });
-      }
+      // FASE 2 — cada condição de pagamento vira uma evidência própria.
+      const centavosDetalhados = new Set<number>();
       for (const reg of registros) {
         const x = obj(reg);
         const item = texto(x["procedimento"]) ?? procedimento;
-        const precoReg = texto(x["preco_dinheiro"]) ?? texto(x["preco_cartao"]);
-        if (precoReg) {
+        const unidade =
+          texto(x["unidade"]) ?? texto(obj(x["extras"])["unidade"]) ?? texto(clinica["nome"]);
+        for (const p of precosDoRegistro(x)) {
+          if (p.centavos !== null) centavosDetalhados.add(p.centavos);
           fatos.push({
             ...base,
             entidade: "procedimento",
             campo: "preco",
-            valor: precoReg,
+            valor: p.valor,
             registro: texto(x["id"]),
             ...comVersao,
             chave: {
               procedimento: item,
               medicoNome: texto(x["medico"]),
-              condicoes: texto(x["preco_dinheiro"]) ? "dinheiro" : "cartao",
+              unidadeId: unidade,
+              condicoes: rotuloCondicao(p),
             },
           });
         }
@@ -166,7 +324,31 @@ export function extrairEvidencia(r: RetornoFerramenta): ExtracaoEvidencia {
             valor: texto(x["dia"]),
             registro: texto(x["id"]),
             ...comVersao,
-            chave: { procedimento: item, medicoNome: texto(x["medico"]), hora: texto(x["horario"]) },
+            chave: {
+              procedimento: item,
+              medicoNome: texto(x["medico"]),
+              hora: texto(x["horario"]),
+            },
+          });
+        }
+      }
+
+      // O resumo `preco`/`price` não apaga as condições detalhadas: só vira
+      // evidência própria quando nenhuma condição já cobre aquele valor. Se
+      // divergir de todas, é conflito entre referências equivalentes.
+      if (preco) {
+        const centavosResumo = centavosDe(preco);
+        const coberto = centavosResumo !== null && centavosDetalhados.has(centavosResumo);
+        if (!coberto) {
+          if (centavosDetalhados.size > 0) motivo = motivo ?? "conflict";
+          fatos.push({
+            ...base,
+            entidade: "procedimento",
+            campo: "preco",
+            valor: preco,
+            ...comVersao,
+            chave: { procedimento, condicoes: qualificador(preco) },
+            registro: texto(obj(registros[0])["id"]),
           });
         }
       }
@@ -220,7 +402,13 @@ export function extrairEvidencia(r: RetornoFerramenta): ExtracaoEvidencia {
         });
       }
       if (texto(clinica["nome"])) {
-        fatos.push({ ...base, entidade: "clinica", campo: "nome", valor: texto(clinica["nome"]), ...comVersao });
+        fatos.push({
+          ...base,
+          entidade: "clinica",
+          campo: "nome",
+          valor: texto(clinica["nome"]),
+          ...comVersao,
+        });
       }
       const conhecimento = texto(d["knowledge_status"]);
       if (conhecimento === "conflict") motivo = motivo ?? "conflict";
@@ -263,7 +451,11 @@ export function extrairEvidencia(r: RetornoFerramenta): ExtracaoEvidencia {
           campo: "appointment_id",
           valor: id,
           registro: id,
-          chave: { data: texto(d["data"]), hora: texto(d["hora"]), medicoId: texto(d["medico_id"]) },
+          chave: {
+            data: texto(d["data"]),
+            hora: texto(d["hora"]),
+            medicoId: texto(d["medico_id"]),
+          },
         });
         status = "com_itens";
       } else {

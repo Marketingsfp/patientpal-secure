@@ -78,12 +78,15 @@ describe("FASE 1 — caminho dos dados do preço", () => {
     expect((dados as unknown as Record<string, unknown>)["registros"]).toBeUndefined();
   });
 
-  it("DEFEITO ATUAL: a evidência entregue ao motor perde o preço do cartão", () => {
+  it("FASE 2 — a evidência preserva dinheiro e cartão separadamente", () => {
     const { fatos } = extrairEvidencia(retornoDaFerramenta());
-    const precos = fatos.filter((f) => f.campo === "preco").map((f) => f.valor);
-    // Correção esperada: ["R$ 51,00", "R$ 60,00"], um fato por forma de pagamento.
-    expect(precos).toEqual(["R$ 51,00"]);
-    expect(precos).not.toContain("R$ 60,00");
+    const precos = fatos
+      .filter((f) => f.campo === "preco")
+      .map((f) => [f.chave?.condicoes, f.valor]);
+    expect(precos).toEqual([
+      ["dinheiro", "51"],
+      ["cartao", "60"],
+    ]);
   });
 });
 
@@ -96,7 +99,7 @@ describe("FASE 1 — controle A/B da validação monetária", () => {
     expect(valores.every((c) => c.suportado)).toBe(true);
   });
 
-  it("A) DEFEITO ATUAL: citar dinheiro 51 e cartão 60 vira divergência", () => {
+  it("A) PENDENTE DA FASE 3: o motor ainda compara o cartão com o dinheiro", () => {
     const { fatos } = extrairEvidencia(retornoDaFerramenta());
     const r = avaliarGrounding(
       contexto(fatos),
@@ -105,10 +108,10 @@ describe("FASE 1 — controle A/B da validação monetária", () => {
     const valores = r.claims.filter((c) => c.tipo === "valor");
     const cartao = valores.find((c) => /60/.test(c.trecho));
     expect(cartao).toBeDefined();
-    // Correção esperada nas próximas fases: `suportado === true`, comparando
-    // cartão com cartão em vez de cartão com dinheiro.
-    expect(cartao!.suportado).toBe(false);
+    // A evidência do cartão JÁ existe (teste da Fase 2). O que falta é a
+    // correspondência escolher o fato da mesma condição — trabalho da Fase 3.
+    expect(fatos.some((f) => f.chave?.condicoes === "cartao" && f.valor === "60")).toBe(true);
     expect(cartao!.situacao).toBe("divergente");
-    expect(cartao!.valorDaFonte).toBe("R$ 51,00");
+    expect(cartao!.valorDaFonte).toBe("51");
   });
 });
