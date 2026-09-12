@@ -204,6 +204,16 @@ function Editor({
   const [auditoriaAberta, setAuditoriaAberta] = useState(false);
   const alterado = texto !== (base?.conteudo ?? "");
   const vazio = texto.trim().length === 0;
+  // FASE 1 — bloco de identidade duplicado/incompleto reprova a publicação
+  // antes de sair da tela. Bloco ausente não bloqueia: fica como pendência.
+  const identidade = useMemo(
+    () =>
+      bloco.escopo === "whatsapp"
+        ? validarIdentidadeParaPublicacao(texto)
+        : ({ ok: true, identidade: null, pendente: false } as const),
+    [bloco.escopo, texto],
+  );
+  const identidadeInvalida = !identidade.ok;
 
 
   return (
