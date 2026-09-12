@@ -151,7 +151,8 @@ describe("resumoPainel", () => {
         r.producao.exames +
         r.producao.outros +
         r.producao.mensalidades +
-        r.producao.adesoes,
+        r.producao.adesoes +
+        r.producao.cortesias,
     ).toBe(r.producao.total);
 
     expect(r.liquidoAtendimentos).toBe(250);
