@@ -286,10 +286,8 @@ function FinDashboard() {
         )}
       </div>
 
-      {/* Fila de repasses de dias anteriores. Fica no topo, antes dos números
-          do período, porque é a primeira coisa que a tesouraria resolve de
-          manhã — e some sozinho quando não há nada pendente. */}
-      <CardPendenciasRepasse atualizacao={reload} />
+
+
 
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
         <div className="flex flex-wrap items-center gap-2">
@@ -587,6 +585,13 @@ function FinDashboard() {
           />
         </div>
       </section>
+
+      {/* Fila de repasses de dias anteriores: desceu para o fim da página a
+          pedido da tesouraria — continua sumindo sozinha quando não há nada
+          pendente. */}
+      <CardPendenciasRepasse atualizacao={reload} />
+
+
 
       <LancamentoDialog
         open={open !== null}
