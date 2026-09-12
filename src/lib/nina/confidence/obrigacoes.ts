@@ -318,12 +318,12 @@ export function derivarObrigacoesDoTurno(ctx: ContextoConfianca): Obrigacao[] {
   }
 
   // Representação verificável da publicação, quando o turno a carrega.
+  // Regra condicionada a uma situação que NÃO ocorreu neste turno fica de
+  // fora; situação desconhecida também fica de fora, mas com limitação
+  // registrada — nunca vira exigência aplicada "por via das dúvidas".
+  const sinais = sinaisDaConversa(ctx);
   const regras = regrasValidasParaPublicacao(ctx.instrucoes?.regras, ctx.instrucoes?.hash).filter(
-    (r) =>
-      regraSeAplica(r, {
-        mensagemPaciente: ctx.mensagemPaciente ?? null,
-        ambiente: ctx.businessContext?.ambiente ?? null,
-      }),
+    (r) => aplicabilidadeDaRegra(r, sinais) === "aplica",
   );
 
   // Quando o turno traz a representação estruturada, é ela que vale — mesmo
