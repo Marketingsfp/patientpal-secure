@@ -319,12 +319,19 @@ export async function anunciarHandoffAoPaciente(args: {
     return { ...vazio, informado: jaInformado, retry: jaInformado, setor };
 
   const { gerarMensagemHandoff } = await import("./mensagem-handoff.server");
+  // FASE 3 — o texto de transferência usa a MESMA identidade publicada do
+  // atendimento; sem identidade válida ele fala de forma neutra.
+  const { identidadeEfetivaAtual, identidadeParaMensagens } = await import(
+    "@/lib/nina/identidade-efetiva.server"
+  );
+  const identidade = identidadeParaMensagens(await identidadeEfetivaAtual("whatsapp"));
   const { texto, origem } = await gerarMensagemHandoff({
     protocolo: args.protocolo,
     // Mesma identidade canônica do cabeçalho da conversa (FASE 2).
     nome: nomeContato(conv),
     setor,
     motivo: await motivoDoHandoff(args.clinicaId, args.conversaId),
+    identidade,
   });
 
   const envio = await enviarTextoSistema(args.clinicaId, args.conversaId, texto);

@@ -133,13 +133,35 @@ export function resolverIdentidadeEfetiva(
  * `${nomeUnidade}`/`${nomeCurtoUnidade}` são de APRESENTAÇÃO: recebem o nome
  * publicado (ou o neutro), nunca `clinicas.nome`.
  */
+/**
+ * FASE 3 — composição previsível do nome completo, preservando a grafia
+ * configurada. Se o nome do estabelecimento JÁ começa com o tipo publicado
+ * ("Policlínica Menino Jesus" + tipo "Policlínica"), o tipo não é repetido —
+ * evita "Policlínica Policlínica Menino Jesus". O tipo nunca é inferido do
+ * cadastro administrativo.
+ */
+export function nomeCompletoEstabelecimento(apresentacao: {
+  estabelecimento: string;
+  tipoEstabelecimento: string;
+}): string {
+  const nome = (apresentacao.estabelecimento ?? "").trim();
+  const tipo = (apresentacao.tipoEstabelecimento ?? "").trim();
+  if (!tipo) return nome;
+  if (!nome) return tipo;
+  const chave = (t: string) =>
+    t
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase();
+  if (chave(nome).startsWith(`${chave(tipo)} `) || chave(nome) === chave(tipo)) return nome;
+  return `${tipo} ${nome}`;
+}
+
 export function valoresIdentidade(
   efetiva: IdentidadeEfetiva,
 ): Record<string, string> {
   const a = efetiva.apresentacao;
-  const completo = efetiva.ok
-    ? `${a.tipoEstabelecimento} ${a.estabelecimento}`.trim()
-    : a.estabelecimento;
+  const completo = efetiva.ok ? nomeCompletoEstabelecimento(a) : a.estabelecimento;
   return {
     "${nomeAssistente}": a.assistente,
     "${nomeEstabelecimento}": a.estabelecimento,

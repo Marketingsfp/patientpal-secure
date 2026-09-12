@@ -10,7 +10,7 @@ import {
   debugSessaoNina,
 } from "../saudacao-sessao";
 
-const UNIDADE = "Policlínica Menino Jesus";
+const UNIDADE = { assistente: "Nina", estabelecimento: "Policlínica Menino Jesus" };
 
 describe("Saudação obrigatória por sessão da Nina", () => {
   it("Teste 1 — conversa nova exige apresentação e cria session_id", () => {
@@ -81,7 +81,7 @@ describe("Validação semântica da apresentação", () => {
   it("recusa resposta sem apresentação", () => {
     const e = checarElementosSaudacao("Boa tarde, Jean! Como posso ajudar você hoje?", UNIDADE);
     expect(e.saudacao).toBe(true);
-    expect(e.nina).toBe(false);
+    expect(e.assistente).toBe(false);
     expect(e.assistenteVirtual).toBe(false);
     expect(saudacaoCompleta("Boa tarde, Jean! Como posso ajudar você hoje?", UNIDADE)).toBe(false);
   });

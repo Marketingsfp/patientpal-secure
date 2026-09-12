@@ -35,6 +35,13 @@ export type MotivoHandoff =
   | "pedido_do_paciente"
   | "indefinido";
 
+/** Identidade de APRESENTAÇÃO publicada na aba Arquitetura (FASE 3). */
+export interface IdentidadeHandoff {
+  assistente?: string | null;
+  estabelecimento?: string | null;
+  tipoEstabelecimento?: string | null;
+}
+
 export interface ContextoMensagemHandoff {
   protocolo: string;
   /** Nome do paciente, quando conhecido. */
@@ -44,6 +51,11 @@ export interface ContextoMensagemHandoff {
   motivo?: MotivoHandoff;
   /** Assunto em linguagem de atendimento (ex.: "a marcação do ultrassom"). */
   assunto?: string | null;
+  /**
+   * Identidade efetiva do turno. Ausente = texto neutro; nunca cai para
+   * "Nina"/nome administrativo da clínica.
+   */
+  identidade?: IdentidadeHandoff | null;
 }
 
 const TERMOS_TECNICOS = [
@@ -182,8 +194,15 @@ export function montarMensagemHandoffFallback(ctx: ContextoMensagemHandoff): str
 /** Instrução do modelo para redigir a mensagem contextual. */
 export function promptMensagemHandoff(ctx: ContextoMensagemHandoff): string {
   const destino = destinoTexto(ctx.setor);
+  // FASE 3 — a identidade vem da versão publicada em Arquitetura. Sem ela, o
+  // texto é NEUTRO: nenhuma persona fixa é reintroduzida aqui.
+  const assistente = (ctx.identidade?.assistente ?? "").trim();
+  const estabelecimento = (ctx.identidade?.estabelecimento ?? "").trim();
+  const ondeAtende = estabelecimento ? ` do estabelecimento ${estabelecimento}` : "";
   return [
-    "Você é a Nina, assistente de uma clínica, falando por mensagem com o paciente.",
+    assistente
+      ? `Você é ${assistente}, a assistente virtual${ondeAtende}, falando por mensagem com o paciente.`
+      : `Você é a assistente virtual${ondeAtende}, falando por mensagem com o paciente.`,
     "Escreva UMA mensagem curta (até 3 linhas) avisando que o atendimento será encaminhado para a equipe humana.",
     "Regras obrigatórias:",
     `- diga que vai encaminhar para ${destino};`,

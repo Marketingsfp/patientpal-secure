@@ -2349,9 +2349,19 @@ async function gerarRespostaNinaInterno(
   // publicado em Arquitetura. Aqui apenas OBSERVAMOS o resultado (telemetria):
   // nada é acrescentado ao texto, para não gerar "Sou a Nina... Sou a Nina...".
   // FASE 2 — a apresentação é conferida contra o nome PUBLICADO do turno.
-  const diagnosticoSaudacao = avaliarSaudacao(resposta, nomeApresentacao, {
-    obrigatoria: saudacaoObrigatoriaEfetivaTurno,
-  });
+  // FASE 3 — a apresentação é conferida contra a IDENTIDADE PUBLICADA do turno
+  // (nome da assistente + estabelecimento), nunca contra a palavra "Nina" nem
+  // contra o nome administrativo da clínica.
+  const diagnosticoSaudacao = avaliarSaudacao(
+    resposta,
+    identidadeEfetiva.ok
+      ? {
+          assistente: identidadeEfetiva.apresentacao.assistente,
+          estabelecimento: identidadeEfetiva.apresentacao.estabelecimento,
+        }
+      : { assistente: null, estabelecimento: nomeApresentacao },
+    { obrigatoria: saudacaoObrigatoriaEfetivaTurno },
+  );
   if (diagnosticoSaudacao.saudacaoDuplicada || diagnosticoSaudacao.saudacaoAusente) {
     console.warn("[NINA_SAUDACAO]", {
       conversa_id: estadoId.conversaId,
