@@ -586,6 +586,13 @@ function FinDashboard() {
         </div>
       </section>
 
+      {/* Fila de repasses de dias anteriores: desceu para o fim da página a
+          pedido da tesouraria — continua sumindo sozinha quando não há nada
+          pendente. */}
+      <CardPendenciasRepasse atualizacao={reload} />
+
+
+
       <LancamentoDialog
         open={open !== null}
         onOpenChange={(o) => !o && setOpen(null)}
