@@ -109,7 +109,7 @@ export function DateRangeFilter({
             </TabsList>
           </Tabs>
         </TooltipProvider>
-        {preset === "periodo" && (
+        {preset === "periodo" && mostrarCampos && (
           <div className="flex items-center gap-2">
             <Popover open={openFrom} onOpenChange={setOpenFrom}>
               <PopoverTrigger asChild>
