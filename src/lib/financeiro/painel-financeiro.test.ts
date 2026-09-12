@@ -170,9 +170,11 @@ describe("resumoPainel", () => {
     expect(soma).toBe(comPix.receitaTotal);
     expect(comPix.formasReceitaTotal.find((f) => f.forma === "pix")?.valor).toBe(80);
     expect(comPix.formasReceitaTotal.find((f) => f.forma === "dinheiro")?.valor).toBe(550);
-    // O ticket médio continua só dos atendimentos.
-    expect(comPix.ticketMedio).toBe(250);
+    // Cada recebimento também conta como atendimento: (500+50+80) / 4.
+    expect(comPix.producao.total).toBe(4);
+    expect(comPix.ticketMedio).toBe(157.5);
   });
+
 });
 
 describe("agrupamentos do detalhamento", () => {
