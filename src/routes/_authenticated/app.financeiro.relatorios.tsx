@@ -128,9 +128,11 @@ import {
 } from "@/components/sessoes/registrar-contato-dialog";
 import { useAcessoModulo } from "@/hooks/use-permissoes";
 import {
+  carregarPainelFinanceiro,
   carregarRepassePagoDetalhado,
   type RepassePagoDetalhe,
 } from "@/lib/financeiro/painel-financeiro-carregar";
+import { resumoPainel, type ResumoPainel } from "@/lib/financeiro/painel-financeiro";
 import {
   agruparRateio,
   carregarContextoRateio,
