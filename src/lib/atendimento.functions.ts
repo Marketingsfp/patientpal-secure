@@ -1049,17 +1049,14 @@ export const meuStatusAgente = createServerFn({ method: "POST" })
         .maybeSingle(),
     ]);
     const total = rows?.length ?? 0;
-    // Fonte da verdade: a presença registrada. Só cai no critério antigo
-    // (departamentos) quando ainda não existe presença gravada.
+    // FASE 2 — fonte única: a presença registrada (consequência da escolha
+    // manual). Sem presença gravada, o atendente ainda não escolheu e NÃO é
+    // considerado disponível; `queue_locked` não vira mais escolha de Offline.
     const presencaStatus = (pres?.status as string | undefined) ?? null;
-    const filaAberta = presencaStatus
-      ? presencaStatus === "ONLINE" && pres?.aceita_novas !== false
-      : (rows ?? []).some((r: any) => !r.queue_locked);
+    const filaAberta = presencaStatus === "ONLINE" && pres?.aceita_novas !== false;
 
-    // FASE 2 — status efetivo: é EXATAMENTE o que a distribuição enxerga
-    // (presença recente + aceita novas + sem pausa aberta). A tela passa a
-    // mostrar isto, e não o que ela mesma acha que enviou, para não existir
-    // "frontend Online / backend Offline".
+    // Status efetivo: exatamente o que a distribuição enxerga (escolha manual
+    // + pausa aberta). O tempo desde o último sinal de conexão não entra.
     const { data: pausaAberta } = await context.supabase
       .from("atend_pausas_log")
       .select("id")
@@ -1069,7 +1066,6 @@ export const meuStatusAgente = createServerFn({ method: "POST" })
       .maybeSingle();
     const presencaEfetiva = statusPresenca({
       status: presencaStatus,
-      vistoEm: (pres as { visto_em?: string } | null)?.visto_em ?? null,
       emPausa: !!pausaAberta,
     });
     // FASE 1 — escolha manual: fonte oficial, separada do sinal de conexão.
