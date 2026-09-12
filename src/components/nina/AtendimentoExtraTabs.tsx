@@ -2879,9 +2879,9 @@ export function AtendInbox() {
                 <PowerOff className="h-3 w-3 mr-1" /> Offline
               </Button>
             </div>
-            {false && (
-              <p className="text-[11px] text-atd-warn-ink">
-                Pausa automática por inatividade — mexa na tela para voltar a receber conversas.
+            {!estadoManual && (
+              <p className="text-[11px] text-muted-foreground">
+                Escolha o seu estado para começar a receber conversas.
               </p>
             )}
             {pausaAtiva?.atend_pause_reasons?.nome && (
