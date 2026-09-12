@@ -422,6 +422,8 @@ function Pagina() {
   const [corrigindo, setCorrigindo] = useState<Record<string, boolean>>({});
   const [correcoes, setCorrecoes] = useState<Record<string, ResumoExecucao>>({});
   const [etapaCorrecao, setEtapaCorrecao] = useState<Record<string, EtapaExecucao>>({});
+  /** FASE 5 — relatório "Resultado da correção", vindo dos fatos do executor. */
+  const [relatorios, setRelatorios] = useState<Record<string, RelatorioCorrecao>>({});
   /** Estado técnico e conferência do valor efetivo, vindos do servidor. */
   const [resultadoCorrecao, setResultadoCorrecao] = useState<
     Record<
@@ -444,6 +446,8 @@ function Pagina() {
       setEtapaCorrecao((e) => ({ ...e, [id]: linha.etapa as EtapaExecucao }));
       setCorrigindo((c) => ({ ...c, [id]: linha.status === "em_curso" }));
       if (linha.resumo) setCorrecoes((e) => ({ ...e, [id]: linha.resumo as ResumoExecucao }));
+      if (linha.relatorio)
+        setRelatorios((e) => ({ ...e, [id]: linha.relatorio as RelatorioCorrecao }));
       setResultadoCorrecao((r) => ({
         ...r,
         [id]: {
@@ -481,8 +485,9 @@ function Pagina() {
             ((analise as unknown as { pacote_hash?: string | null } | undefined)?.pacote_hash ??
               null),
         },
-      })) as unknown as ResumoExecucao;
+      })) as unknown as ResumoExecucao & { relatorio?: RelatorioCorrecao | null };
       setCorrecoes((e) => ({ ...e, [id]: r }));
+      if (r.relatorio) setRelatorios((e) => ({ ...e, [id]: r.relatorio as RelatorioCorrecao }));
       setEtapaCorrecao((e) => ({ ...e, [id]: "concluido" }));
       if (r.status === "aplicado") toast.success("Correção aplicada e comprovada em homologação.");
       else if (r.status === "pendente_tecnico")
