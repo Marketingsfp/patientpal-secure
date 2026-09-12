@@ -14480,6 +14480,13 @@ export type Database = {
               particular: number
             }[]
           }
+      fin_pacientes_primeiro_atendimento: {
+        Args: { _clinica_id: string; _ids: string[] }
+        Returns: {
+          paciente_id: string
+          primeiro: string
+        }[]
+      }
       fin_resumo_categoria: {
         Args: {
           p_clinica: string
