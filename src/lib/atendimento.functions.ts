@@ -1022,21 +1022,9 @@ export const travarMinhaFila = createServerFn({ method: "POST" })
       .eq("clinica_id", data.clinicaId)
       .eq("user_id", context.userId);
     if (error) throw new Error(error.message);
-    // A presença é a fonte da verdade da distribuição: fechar a fila precisa
-    // derrubar o "ONLINE", senão o atendente continua recebendo conversas
-    // mesmo aparecendo como offline na tela (e quem não está em nenhum
-    // departamento não tinha nenhum bloqueio aplicado).
-    const { error: eP } = await context.supabase.from("atend_agente_presenca").upsert(
-      {
-        clinica_id: data.clinicaId,
-        user_id: context.userId,
-        status: data.travada ? "OFFLINE" : "ONLINE",
-        aceita_novas: !data.travada,
-        visto_em: new Date().toISOString(),
-      },
-      { onConflict: "clinica_id,user_id" },
-    );
-    if (eP) throw new Error(eP.message);
+    // FASE 2 — travar/destravar a fila do departamento NÃO mexe mais na
+    // presença: "filaAberta = false" deixou de ser prova de que o atendente
+    // escolheu Offline. A presença só muda em `definirPresencaManual`.
     return { ok: true };
   });
 
