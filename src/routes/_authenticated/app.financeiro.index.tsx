@@ -32,6 +32,8 @@ import { COR_FORMA } from "@/lib/financeiro/receita-por-forma";
 import { classificarForma, LABEL_FORMA } from "@/lib/financeiro/formas-pagamento";
 import {
   categoriaDoAtendimento,
+  categoriaDaOutraReceita,
+
   repassePorMedico,
   resumoPainel,
   somarPorCategoria,
