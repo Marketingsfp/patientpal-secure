@@ -3,7 +3,7 @@
  * A identidade de apresentação sai da MESMA versão publicada que gerou as
  * instruções do turno, nunca do cadastro da clínica nem de literal do código.
  */
-import { describe, it, expect } from "vitest";
+import { describe, it, expect } from "bun:test";
 import {
   resolverIdentidadeEfetiva,
   valoresIdentidade,
