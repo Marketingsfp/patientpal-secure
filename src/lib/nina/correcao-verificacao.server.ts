@@ -55,9 +55,10 @@ export async function verificarItemCatalogo(
   const alvo = `catálogo · ${String((data as { nome?: string }).nome ?? "")} · ${entrada.campo}`;
   const a = normalizar(efetivo);
   const b = normalizar(entrada.valorEsperado);
-  const numeros = b.match(/\d+/g);
-  const bate = numeros?.length
-    ? numeros.every((n) => (a.match(/\d+/g) ?? []).includes(n))
+  const numeros: string[] = b.match(/\d+/g) ?? [];
+  const numerosEfetivos: string[] = a.match(/\d+/g) ?? [];
+  const bate = numeros.length
+    ? numeros.every((n) => numerosEfetivos.includes(n))
     : Boolean(b) && a.includes(b);
   return {
     conferido: bate && String((data as { status?: string }).status) === "PUBLICADO",
