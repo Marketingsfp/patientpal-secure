@@ -870,8 +870,15 @@ export function AtendInbox() {
     }
     setEstadoManual(estado);
     setControle((c) => presAoConfirmar(c, estado));
-    if (typeof r?.versao === "number") setVersaoPresenca(r.versao);
-    else setVersaoPresenca((v) => v + 1);
+    const novaVersao = typeof r?.versao === "number" ? r.versao : versaoPresenca + 1;
+    setVersaoPresenca(novaVersao);
+    // FASE 4 — a escolha confirmada vira a referência desta aba e é avisada às demais.
+    sincronia.current = {
+      estado,
+      versao: novaVersao,
+      seq: ++seqPresenca.current,
+    };
+    if (meuId) avisarOutrasAbas({ clinicaId, userId: meuId, estado, versao: novaVersao });
     return r;
   };
 
