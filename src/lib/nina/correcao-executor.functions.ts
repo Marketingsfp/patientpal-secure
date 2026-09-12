@@ -195,7 +195,48 @@ async function chamarExecutor(input: any[], ferramentas: any[]): Promise<SaidaMo
 const Entrada = z.object({
   clinicaId: z.string().uuid(),
   feedbackId: z.string().uuid(),
+  /** Análise cuja proposta o usuário viu na tela ao autorizar. */
+  analiseId: z.string().uuid().nullable().optional(),
+  /** Assinatura da proposta exibida — divergiu, nada é aplicado. */
+  propostaAssinatura: z.string().min(1).nullable().optional(),
+  pacoteHash: z.string().nullable().optional(),
 });
+
+/** Estado atual da aplicação de uma correção (para retomar após recarregar). */
+export const execucaoCorrecaoAtual = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) =>
+    z.object({ clinicaId: z.string().uuid(), feedbackId: z.string().uuid() }).parse(i),
+  )
+  .handler(async ({ data, context }) => {
+    const supabase = context.supabase as any;
+    const { data: linha, error } = await supabase
+      .from("nina_correcao_execucoes")
+      .select(
+        "id, etapa, status, passos, resumo, erro, autorizado_por, autorizado_em, analise_id, pacote_hash, proposta_assinatura, ambiente, escopo",
+      )
+      .eq("clinica_id", data.clinicaId)
+      .eq("feedback_id", data.feedbackId)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    return (linha ?? null) as null | {
+      id: string;
+      etapa: EtapaExecucao;
+      status: "em_curso" | "concluida" | "falhou";
+      passos: PassoExecucao[];
+      resumo: ResumoExecucao | null;
+      erro: string | null;
+      autorizado_por: string;
+      autorizado_em: string;
+      analise_id: string | null;
+      pacote_hash: string | null;
+      proposta_assinatura: string;
+      ambiente: string | null;
+      escopo: string | null;
+    };
+  });
 
 export const aplicarCorrecaoComIA = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
