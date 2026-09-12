@@ -1052,8 +1052,11 @@ export const meuStatusAgente = createServerFn({ method: "POST" })
     // FASE 2 — fonte única: a presença registrada (consequência da escolha
     // manual). Sem presença gravada, o atendente ainda não escolheu e NÃO é
     // considerado disponível; `queue_locked` não vira mais escolha de Offline.
-    const presencaStatus = (pres?.status as string | undefined) ?? null;
-    const filaAberta = presencaStatus === "ONLINE" && pres?.aceita_novas !== false;
+    // FASE 5 — a disponibilidade lida aqui é a MESMA que a distribuição usa:
+    // a escolha manual. `status`/`aceita_novas` são apenas reflexo técnico.
+    const presencaStatus =
+      ((pres as { estado_manual?: string | null } | null)?.estado_manual as string | null) ?? null;
+    const filaAberta = presencaStatus === "ONLINE";
 
     // Status efetivo: exatamente o que a distribuição enxerga (escolha manual
     // + pausa aberta). O tempo desde o último sinal de conexão não entra.
@@ -1746,7 +1749,7 @@ export const listarUsuariosClinica = createServerFn({ method: "POST" })
         : Promise.resolve({ data: [] as any[] }),
       context.supabase
         .from("atend_agente_presenca")
-        .select("user_id, status, visto_em")
+        .select("user_id, estado_manual")
         .eq("clinica_id", data.clinicaId),
       context.supabase
         .from("atend_pausas_log")
@@ -1763,10 +1766,9 @@ export const listarUsuariosClinica = createServerFn({ method: "POST" })
         user_id: r.user_id,
         role: r.role as string | null,
         nome: nomeMap.get(r.user_id) ?? r.user_id,
-        // Presença vem da fonte já existente (atend_agente_presenca + pausas).
+        // FASE 5 — presença exibida = escolha manual + pausa aberta.
         presenca: statusPresenca({
-          status: presMap.get(r.user_id)?.status ?? null,
-          vistoEm: presMap.get(r.user_id)?.visto_em ?? null,
+          status: presMap.get(r.user_id)?.estado_manual ?? null,
           emPausa: emPausa.has(r.user_id),
         }),
       })),
@@ -3108,9 +3110,8 @@ export const diagnosticarPoolTelefonia = createServerFn({ method: "POST" })
     type Linha = {
       user_id: string;
       permission_telefonia: boolean;
-      presence_status: string;
-      aceita_novas: boolean;
-      presenca_recente: boolean;
+      estado_manual: string | null;
+      presence_status: string | null;
       em_pausa: boolean;
       admin: boolean;
       load_at_selection: number;
@@ -3119,16 +3120,16 @@ export const diagnosticarPoolTelefonia = createServerFn({ method: "POST" })
       motivo_exclusao: string | null;
     };
 
+    // FASE 5 — a disponibilidade vem da escolha manual; nada de heartbeat.
     const candidatos = ((avaliacao ?? []) as Linha[]).map((l) => ({
       user_id: l.user_id,
       perfil: perfilPorUser.get(l.user_id) ?? "desconhecido",
       telefonia: l.permission_telefonia,
-      status: l.presence_status,
-      aceita_novas: l.aceita_novas,
-      presenca_recente: l.presenca_recente,
+      status: l.estado_manual ?? "SEM_ESCOLHA",
+      estado_manual: l.estado_manual,
       em_pausa: l.em_pausa,
       admin: l.admin,
-      online: l.presence_status === "ONLINE" && l.aceita_novas && l.presenca_recente,
+      online: l.estado_manual === "ONLINE" && !l.em_pausa,
       carga_atual: l.load_at_selection,
       capacidade: l.capacidade,
       elegivel: l.elegivel,

@@ -26,8 +26,9 @@ export type CandidatoDistribuicao = {
   nome?: string;
   /** Perfil possui a perfil "telefonia" em Cadastros › Perfis. */
   temTelefonia: boolean;
-  status: StatusPresenca;
-  /** Marcado como "aceitando novas conversas". Padrão: true quando Online. */
+  /** Escolha manual do atendente (fonte oficial). Vazio = ainda não escolheu. */
+  status: StatusPresenca | null;
+  /** @deprecated FASE 5 — não influencia mais a disponibilidade. */
   aceitaNovas?: boolean;
   /** Pausa aberta (almoço, intervalo etc.). */
   emPausa?: boolean;
@@ -35,7 +36,7 @@ export type CandidatoDistribuicao = {
   admin?: boolean;
   /** Fila travada sem nenhuma fila liberada. */
   filaTravada?: boolean;
-  /** Presença vista há menos de 5 minutos. */
+  /** @deprecated FASE 5 — heartbeat não influencia a disponibilidade. */
   presencaRecente?: boolean;
   /** Conversas ativas no momento (usado só no balanceamento). */
   cargaAtiva?: number;
@@ -62,14 +63,15 @@ export type VerificacaoElegibilidade = {
 
 /** Avalia um único usuário. */
 export function verificarElegibilidade(c: CandidatoDistribuicao): VerificacaoElegibilidade {
-  const online = c.status === "ONLINE" && (c.aceitaNovas ?? true) && (c.presencaRecente ?? true);
+  // FASE 5 — disponibilidade = ESCOLHA MANUAL do atendente. Heartbeat, foco,
+  // aba oculta e tempo sem interação não entram nesta decisão.
+  const online = c.status === "ONLINE";
   let motivo: string | null = null;
 
   if (!c.temTelefonia) motivo = "sem o perfil Telefonia";
   else if (c.admin) motivo = "administrador não recebe atribuição automática";
+  else if (!c.status) motivo = "sem escolha de presença";
   else if (c.status !== "ONLINE") motivo = `status ${c.status}`;
-  else if (!(c.aceitaNovas ?? true)) motivo = "não está aceitando novas";
-  else if (!(c.presencaRecente ?? true)) motivo = "presença desatualizada";
   else if (c.emPausa) motivo = "em pausa";
   else if (c.filaTravada) motivo = "fila travada";
   else if ((c.cargaAtiva ?? 0) >= (c.capacidadeMaxima ?? 5)) motivo = "capacidade lotada";
