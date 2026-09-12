@@ -154,11 +154,80 @@ export function qualificadoresDaAfirmacao(frase: string): ChaveFato {
   const hora = normalizarHora(frase.match(/\b\d{1,2}\s*(?:h\b|h\d{2}|:\d{2})/)?.[0]);
   if (hora) chave.hora = hora;
 
-  if (/\bpix\b|dinheiro|[àa]\s*vista/.test(t)) chave.condicoes = "dinheiro";
-  else if (/cart[ãa]o|parcelad/.test(t)) chave.condicoes = "cartao";
+  const forma = formaDePagamentoNoTexto(frase);
+  if (forma) chave.condicoes = forma;
 
   return chave;
 }
+
+// ------------------------------------------- forma/condição de pagamento
+
+/**
+ * FASE 3 — forma de pagamento citada em um texto (afirmação ou evidência).
+ *
+ * Só reconhece formas explícitas. Texto sem forma devolve `null`: ausência de
+ * forma NÃO equivale a "qualquer forma" nem autoriza usar outra condição como
+ * referência.
+ */
+export function formaDePagamentoNoTexto(texto: unknown): string | null {
+  const t = normalizarTexto(texto);
+  if (!t) return null;
+  if (/\bpix\b/.test(t)) return "pix";
+  if (/cart[ãa]o|parcelad|cr[ée]dito|d[ée]bito/.test(t)) return "cartao";
+  if (/dinheiro|esp[ée]cie|[àa]\s*vista/.test(t)) return "dinheiro";
+  if (/\bboleto\b/.test(t)) return "boleto";
+  if (/conv[êe]nio|plano\s+de\s+sa[úu]de/.test(t)) return "convenio";
+  return null;
+}
+
+/**
+ * Compara a forma afirmada com a forma da evidência. Dinheiro só confere com
+ * dinheiro, cartão só com cartão. Quando uma das duas não declara forma, não
+ * há correspondência — a referência é insuficiente, não uma contradição.
+ */
+export function mesmaCondicaoPagamento(afirmada: unknown, doFato: unknown): boolean {
+  const a = formaDePagamentoNoTexto(afirmada);
+  const b = formaDePagamentoNoTexto(doFato);
+  if (a !== null && b !== null) return a === b;
+  if (a === null && b === null) return mesmoTexto(afirmada, doFato);
+  return false;
+}
+
+/**
+ * FASE 3 — recorte local de uma afirmação monetária dentro do segmento.
+ *
+ * "custa R$ 51,00 no dinheiro e R$ 60,00 no cartão" tem duas afirmações no
+ * mesmo segmento; cada valor precisa ser lido com a SUA condição.
+ */
+export function recorteDaAfirmacao(frase: string, trecho: string): string {
+  const f = frase ?? "";
+  const alvo = (trecho ?? "").trim();
+  if (!f || !alvo) return f;
+  const pos = f.indexOf(alvo);
+  if (pos < 0) return f;
+  const re = /\s*(?:,|;|\be\b|\bou\b|\/|\||–|—)\s*/g;
+  let inicio = 0;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(f)) !== null) {
+    const fim = m.index;
+    if (pos >= inicio && pos < fim) return f.slice(inicio, fim);
+    inicio = m.index + m[0].length;
+  }
+  return f.slice(inicio);
+}
+
+/**
+ * Chave da afirmação monetária: qualificadores do segmento (procedimento,
+ * profissional, unidade…) com a CONDIÇÃO lida no recorte do próprio valor.
+ */
+export function chaveDaAfirmacaoMonetaria(frase: string, trecho: string): ChaveFato {
+  const chave = qualificadoresDaAfirmacao(frase);
+  const local = formaDePagamentoNoTexto(recorteDaAfirmacao(frase, trecho));
+  if (local) chave.condicoes = local;
+  else if (recorteDaAfirmacao(frase, trecho) !== frase) delete chave.condicoes;
+  return chave;
+}
+
 
 // -------------------------------------------------------------- valores
 
