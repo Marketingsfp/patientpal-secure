@@ -296,6 +296,68 @@ function prioridadeDe(plano: string, verificacao: VerificacaoRegra): PrioridadeR
   return "normal";
 }
 
+/**
+ * Situação da conversa declarada no próprio texto publicado. Determinístico e
+ * por forma: nenhuma situação é inferida de conteúdo específico da clínica.
+ */
+const SITUACOES: Array<[SituacaoRegra, RegExp]> = [
+  [
+    "demanda_declarada",
+    /\b(quando|se|caso|sempre que)\b[^.;!?]*\b(j[áa]\s+(explicou|disse|informou|falou|descreveu|pediu|perguntou|relatou)|j[áa]\s+fez\s+uma\s+pergunta)\b/i,
+  ],
+  [
+    "apresentacao_ja_feita",
+    /\b(nas mensagens seguintes|nas pr[óo]ximas mensagens|depois de (se )?apresentar|j[áa] (se )?apresentou|sem repetir a apresenta[çc][ãa]o|n[ãa]o repita a apresenta[çc][ãa]o)\b/i,
+  ],
+  [
+    "primeira_mensagem",
+    /\b(na primeira (mensagem|resposta)|no primeiro contato|ao iniciar (a|uma) (conversa|sess[ãa]o)|(de|em) uma nova sess[ãa]o)\b/i,
+  ],
+];
+
+/** Lê a situação de conversa que condiciona a frase, quando declarada. */
+export function situacaoDaFrase(plano: string): { situacao: SituacaoRegra; valor: string } | null {
+  for (const [situacao, re] of SITUACOES) {
+    const m = re.exec(plano);
+    if (m) return { situacao, valor: m[0].trim() };
+  }
+  return null;
+}
+
+/**
+ * Divide uma unidade em frases, preservando aspas: o texto exigido dentro de
+ * aspas ("Olá, …! Sou a … Como posso ajudar?") continua inteiro, e cada frase
+ * normativa passa a carregar a SUA condição em vez de herdar a da vizinha.
+ */
+export function frasesDaUnidade(plano: string): string[] {
+  const frases: string[] = [];
+  let atual = "";
+  let aspas = false;
+  const ABRE = /[«"“'']/;
+  for (let i = 0; i < plano.length; i++) {
+    const c = plano[i]!;
+    if (ABRE.test(c)) aspas = !aspas;
+    atual += c;
+    if (!aspas && /[.;!?]/.test(c)) {
+      const proximo = plano[i + 1];
+      if (proximo === undefined || /\s/.test(proximo)) {
+        if (atual.trim().length >= 12) {
+          frases.push(atual.trim());
+          atual = "";
+        }
+      }
+    }
+  }
+  if (atual.trim() !== "") {
+    if (frases.length > 0 && atual.trim().length < 12) {
+      frases[frases.length - 1] = `${frases[frases.length - 1]} ${atual.trim()}`.trim();
+    } else {
+      frases.push(atual.trim());
+    }
+  }
+  return frases.length > 0 ? frases : [plano.trim()];
+}
+
 // -------------------------------------------------------------- extração
 
 /**
