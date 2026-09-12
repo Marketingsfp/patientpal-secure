@@ -31,6 +31,7 @@ import {
   type FatoRecuperado,
 } from "./evidencia";
 import {
+  chaveDaAfirmacaoMonetaria,
   correspondenciaDaAfirmacao,
   fatosNoEscopoDaAfirmacao,
   qualificadoresDaAfirmacao,
@@ -39,6 +40,7 @@ import {
   valorDaAfirmacao,
   TERMOS_DE_ASSUNTO,
 } from "./afirmacao";
+
 import {
   classificarNatureza,
   modalidadeDaNatureza,
