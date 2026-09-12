@@ -594,14 +594,12 @@ export function avaliarObrigacoes(
   const restricoes = avaliacoes.filter((a) => a.obrigacao.origem === "instrucoes_publicadas");
 
   // Regras da publicação vigente cuja condição NÃO foi acionada neste turno.
+  const sinaisTurno = sinaisDaConversa(ctx);
   const validas = regrasValidasParaPublicacao(ctx.instrucoes?.regras, ctx.instrucoes?.hash);
-  const aplicaveis = validas.filter((r) => aplicabilidadeDaRegra(r, sinais) === "aplica");
-  const indeterminadasPorSituacao = validas.filter(
-    (r) => aplicabilidadeDaRegra(r, sinais) === "indeterminada",
+  const aplicaveis = validas.filter((r) => aplicabilidadeDaRegra(r, sinaisTurno) === "aplica");
+  const situacaoDesconhecida = validas.some(
+    (r) => aplicabilidadeDaRegra(r, sinaisTurno) === "indeterminada",
   );
-  if (indeterminadasPorSituacao.length > 0) {
-    limitacoes.push("SITUACAO_DA_REGRA_NAO_CONHECIDA");
-  }
   const regrasNaoAplicaveis = validas.length - aplicaveis.length;
   const falhaDeInterpretacao =
     (ctx.instrucoes?.regras?.length ?? 0) > 0 && validas.length === 0
