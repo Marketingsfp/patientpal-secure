@@ -226,7 +226,12 @@ export async function testarEmHomologacao(
   }
 
   const { resetarLeadTeste, processarMensagemTeste } = await import("./teste-console.server");
-  await resetarLeadTeste(clinicaId, leadId, userId);
+  await resetarLeadTeste(supabaseAdmin, {
+    clinicaId,
+    leadId,
+    userId,
+    origem: "correcao-assistida",
+  });
 
   const r = await processarMensagemTeste(
     {
