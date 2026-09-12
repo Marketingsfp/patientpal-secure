@@ -27,6 +27,26 @@ export const Route = createFileRoute("/_authenticated/app/financeiro/estatistica
 
 const fmt = (n: number) => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
+/**
+ * O banco devolve no máximo 1.000 linhas por consulta. Sem paginar, um mês
+ * cheio de caixa era cortado em 1.000 lançamentos e o card de Atendimentos
+ * mostrava um número muito menor que o Dashboard/Movimento/Rateio.
+ */
+const PAGINA = 1000;
+const MAX_PAGINAS = 50;
+
+async function paginado<T>(montar: () => any): Promise<T[]> {
+  const out: T[] = [];
+  for (let p = 0; p < MAX_PAGINAS; p++) {
+    const { data, error } = await montar().range(p * PAGINA, (p + 1) * PAGINA - 1);
+    if (error) throw error;
+    const lote = (data ?? []) as T[];
+    out.push(...lote);
+    if (lote.length < PAGINA) break;
+  }
+  return out;
+}
+
 function Page() {
   const { clinicaAtual } = useClinica();
   const [stats, setStats] = useState({
