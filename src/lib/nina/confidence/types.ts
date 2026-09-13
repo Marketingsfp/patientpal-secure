@@ -288,6 +288,13 @@ export type ContextoConfianca = {
   regrasNegocio?: RegraNegocio[];
   /** FASE 4 — estado real do fluxo operacional, quando o runtime o conhece. */
   operationalState?: EstadoOperacionalTurno;
+  /** Provas capturadas pelo servidor; ausência não comprova continuidade ou ausência de operações. */
+  evidenciasFluxo?: {
+    registroFerramentasCompleto: boolean;
+    historicoCompleto: boolean;
+    historico: Array<{ role: string; content: string }>;
+    sessionId: string | null;
+  };
 };
 
 /** O mesmo campo com valores diferentes em origens diferentes. */

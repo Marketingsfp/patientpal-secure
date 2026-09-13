@@ -11,6 +11,7 @@ import { montarContextoCanonicoTurno } from "./contexto-turno";
 import { extrairEvidencia } from "./evidencia-extrator";
 import { aplicarEtapa } from "./etapas";
 import { decidirHandoff } from "./handoff-decision";
+import { revisarSaida } from "./revisao-final";
 import { PROMPT_PUBLICADO_V15 } from "./fixtures/prompt-publicado-v15";
 import { decidirNoTurno, verificarRespostaFinalDoTurno, type EstadoDoTurno } from "./runtime";
 
@@ -144,16 +145,26 @@ function estado(texto: string): EstadoDoTurno {
     esclarecimentoUsado: false,
     handoffSolicitado: false,
     apresentacaoJaFeita: true,
+    evidenciasFluxo: {
+      registroFerramentasCompleto: true,
+      historicoCompleto: true,
+      sessionId: "sessao-catalogo",
+      historico: [
+        { role: "user", content: "oi bom dia" },
+        { role: "assistant", content: "Olá! Sou a Nina. Como posso ajudar?" },
+      ],
+    },
     estadoOperacional: {
       workflowState: "QUALIFICATION",
       bookingIntentConfirmed: false,
-      appointmentFlowActive: false,
+      appointmentFlowActive: true,
       appointmentToolCalled: false,
+      appointmentAttempted: false,
       appointmentCreated: false,
     },
     ferramentas: ["consultar_base_conhecimento", "buscar_medicos"].map((nome) => ({
       nome,
-      capacidade: "searchKnowledgeBase",
+      capacidade: nome === "buscar_medicos" ? "listCatalog" : "searchKnowledgeBase",
       fonte: "base_conhecimento",
       success: true,
     })),
@@ -169,6 +180,20 @@ function estado(texto: string): EstadoDoTurno {
 }
 
 describe("catálogo → intenção → evidência → motor de ação e resposta final", () => {
+  it("entrega a resposta factual correta depois da revisão completa da saída em etapa A", () => {
+    const turno = estado(resposta);
+    const avaliacao = verificarRespostaFinalDoTurno(turno, resposta);
+    const revisao = revisarSaida({
+      origem: "modelo",
+      textoFinal: resposta,
+      avaliacao,
+      etapa: "A",
+      risco: "informativo",
+    });
+    expect(revisao.bloqueiaEntrega).toBe(false);
+    expect(revisao.acaoAplicada).toBe("LIBERAR");
+  });
+
   it("não classifica como LOW nem encaminha informações publicadas de quatro médicos e cinco exames", () => {
     expect(retorno.found).toBe(true);
     const turno = estado(resposta);
@@ -177,9 +202,7 @@ describe("catálogo → intenção → evidência → motor de ação e resposta
     for (const r of [decidirNoTurno(turno), verificarRespostaFinalDoTurno(turno, resposta)]) {
       expect(r.hardBlockers ?? []).toEqual([]);
       expect(r.level).not.toBe("LOW");
-      // A publicação v15 ainda declara AMB-01 como exigência semântica aberta:
-      // eventual CLARIFY dessa limitação não é o falso bloqueio factual corrigido.
-      expect(r.decision).not.toBe("HANDOFF");
+      expect(r.decision).toBe("ALLOW");
       expect(r.validators?.find((v) => v.validator === "IntentClarityValidator")?.status).toBe(
         "PASS",
       );

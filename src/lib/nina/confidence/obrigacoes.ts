@@ -33,6 +33,8 @@ import {
 } from "./regras-publicadas";
 import { conferirIdentidadeDaResposta } from "./identidade-publicada";
 import { ehSaudacaoPura } from "./turno-tipo";
+import { avaliarObrigacaoOperacional } from "./obrigacoes-operacionais";
+import { avaliarObrigacaoContinuidade } from "./obrigacoes-continuidade";
 import type { ContextoConfianca, ResultadoValidador, StatusValidador } from "./types";
 
 /**
@@ -649,6 +651,8 @@ export function avaliarObrigacoes(
 ): ResultadoObrigacoes {
   const derivadas = derivarObrigacoesDoTurno(ctx);
   const avaliadas = derivadas.map((o) =>
+    avaliarObrigacaoOperacional(o, ctx, resposta) ??
+    avaliarObrigacaoContinuidade(o, ctx, resposta) ??
     avaliarUma(o, resposta, revisor, {
       mensagemPaciente: ctx.mensagemPaciente ?? null,
       ambiente: ctx.businessContext?.ambiente ?? null,

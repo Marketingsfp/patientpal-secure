@@ -83,6 +83,7 @@ export type EstadoDoTurno = {
    * já existente do atendimento). Ausente = desconhecido, nunca "não houve".
    */
   estadoOperacional?: ContextoConfianca["operationalState"];
+  evidenciasFluxo?: ContextoConfianca["evidenciasFluxo"];
   /**
    * FASE 1 (motor) — instruções PUBLICADAS usadas nesta execução. Conteúdo
    * confiável; a mensagem do paciente e o retorno das ferramentas continuam
@@ -132,6 +133,7 @@ export function montarContextoDoTurno(e: EstadoDoTurno): ContextoConfianca {
     ...(e.claims ? { claims: e.claims } : {}),
     ...(e.regrasNegocio ? { regrasNegocio: e.regrasNegocio } : {}),
     ...(e.estadoOperacional ? { operationalState: e.estadoOperacional } : {}),
+    ...(e.evidenciasFluxo ? { evidenciasFluxo: e.evidenciasFluxo } : {}),
     ...(e.fatos ? { fatos: e.fatos } : {}),
     ...(e.consultas ? { consultas: e.consultas } : {}),
     toolResults,

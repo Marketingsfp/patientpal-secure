@@ -9,15 +9,17 @@ type MensagemDaConversa = {
   is_teste?: boolean | null;
 };
 
+type ContextoHistorico = {
+  conversaId: string | null;
+  inicioSessao: string | null;
+  corteMemoria: number;
+  teste: boolean;
+  idsDoTurno: ReadonlySet<string>;
+};
+
 export function historicoParaConsultaAgenda(
   mensagens: ReadonlyArray<MensagemDaConversa>,
-  contexto: {
-    conversaId: string | null;
-    inicioSessao: string | null;
-    corteMemoria: number;
-    teste: boolean;
-    idsDoTurno: ReadonlySet<string>;
-  },
+  contexto: ContextoHistorico,
 ): Array<{ role: string; content: string }> {
   const inicio = Date.parse(contexto.inicioSessao ?? "");
   if (!contexto.conversaId || !Number.isFinite(inicio)) return [];
@@ -36,4 +38,25 @@ export function historicoParaConsultaAgenda(
     .slice()
     .sort((a, b) => Date.parse(a.created_at!) - Date.parse(b.created_at!))
     .map((m) => ({ role: m.direction === "out" ? "assistant" : "user", content: m.body! }));
+}
+
+/** Contagem completa não basta quando houve perda de conteúdo de mensagens entregues. */
+export function historicoDaSessaoParaVerificacao(
+  mensagens: ReadonlyArray<MensagemDaConversa>,
+  contexto: ContextoHistorico,
+  consultaCompleta: boolean,
+) {
+  const historico = historicoParaConsultaAgenda(mensagens, contexto);
+  const ids = new Set(mensagens.map((m) => m.id));
+  const completo =
+    consultaCompleta &&
+    contexto.idsDoTurno.size > 0 &&
+    [...contexto.idsDoTurno].every((id) => ids.has(id)) &&
+    mensagens.every((m) => {
+      if (m.id && contexto.idsDoTurno.has(m.id)) return true;
+      if (["system", "failed", "pending", "queued", "sending"].includes(m.status ?? ""))
+        return true;
+      return historicoParaConsultaAgenda([m], contexto).length === 1;
+    });
+  return { historico, completo };
 }

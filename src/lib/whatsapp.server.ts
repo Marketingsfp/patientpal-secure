@@ -1215,13 +1215,42 @@ async function gerarRespostaNinaInterno(
 
   const { interesseEmConsultarAgenda, FERRAMENTAS_DE_VAGAS, consultaAgendaAguardandoPaciente } =
     await import("@/lib/nina/consulta-agenda");
-  const { historicoParaConsultaAgenda } = await import("@/lib/nina/consulta-agenda-historico");
+  const { historicoParaConsultaAgenda, historicoDaSessaoParaVerificacao } = await import("@/lib/nina/consulta-agenda-historico");
   const idsDoTurno = new Set(opcoes?.mensagensEntrada ?? []);
+  // A verificação da continuidade não pode usar o resumo truncado do modelo.
+  // O count permite declarar explicitamente se o histórico da sessão veio completo.
+  let historicoFluxoCompleto = false;
+  let mensagensFluxo: Array<{
+    id: string; conversa_id: string | null; direction: string; body: string | null;
+    created_at: string; status: string | null; is_teste: boolean | null;
+  }> = [];
+  const inicioFluxo = sessaoNina.estado.session_started_at;
+  if (estadoId.conversaId && inicioFluxo && Number.isFinite(Date.parse(inicioFluxo))) {
+    const corteFluxo = new Date(Date.parse(inicioFluxo)).toISOString();
+    let consultaHistorico = supabaseAdmin.from("whatsapp_mensagens")
+      .select("id, conversa_id, direction, body, created_at, status, is_teste", { count: "exact" })
+      .eq("clinica_id", clinicaId)
+      .eq("conversa_id", estadoId.conversaId)
+      .gte("created_at", corteFluxo);
+    consultaHistorico = opcoes?.teste === true
+      ? consultaHistorico.eq("is_teste", true)
+      : consultaHistorico.or("is_teste.eq.false,is_teste.is.null");
+    const h = await consultaHistorico.order("created_at", { ascending: true }).limit(1000);
+    mensagensFluxo = h.data ?? [];
+    historicoFluxoCompleto = !h.error && h.count !== null && h.count === mensagensFluxo.length;
+  }
+  const provaHistorico = historicoDaSessaoParaVerificacao(mensagensFluxo, {
+    conversaId: estadoId.conversaId,
+    inicioSessao: inicioFluxo ?? null,
+    corteMemoria: inicioFluxo ? Date.parse(inicioFluxo) : corteMemoria,
+    teste: opcoes?.teste === true,
+    idsDoTurno,
+  }, historicoFluxoCompleto);
   // Snapshot só de mensagens já entregues da sessão. Respostas candidatas do
   // modelo e argumentos de ferramentas não podem fabricar aceite do paciente.
   const contextoConsultaAgenda = {
     mensagemAtual: mensagemPaciente,
-    historico: historicoParaConsultaAgenda(msgsMemoria, {
+    historico: historicoParaConsultaAgenda(historicoFluxoCompleto ? mensagensFluxo : msgsMemoria, {
       conversaId: estadoId.conversaId,
       inicioSessao: sessaoNina.estado.session_started_at ?? null,
       corteMemoria,
@@ -1628,6 +1657,23 @@ async function gerarRespostaNinaInterno(
     /** FASE 5 — escopo (argumentos) da consulta, para identificar retry real. */
     escopo?: string | null;
   }> = [];
+  const { descreverFerramenta } = await import("@/lib/nina/tool-broker");
+  const capturarProvaFluxo = () => ({
+    // Qualquer operação ou resultado não representado impede comprovar um turno só de leitura.
+    registroFerramentasCompleto: broker.resultados().every((r) => {
+      if (consultaAgendaAguardandoPaciente(r.resultado)) return true;
+      const descritor = descreverFerramenta(r.ferramenta);
+      const resultado = r.resultado as { success?: boolean; erro?: string };
+      return descritor?.escrita === false && evidenciasFerramentas.some((f) =>
+        f.nome === r.ferramenta && f.capacidade === descritor.capacidade &&
+        f.fonte === descritor.fonte && f.success === resultado.success &&
+        (f.erro ?? null) === (resultado.erro ?? null),
+      );
+    }),
+    historicoCompleto: provaHistorico.completo,
+    historico: provaHistorico.historico,
+    sessionId: sessaoNina.estado.session_id ?? null,
+  });
   let catalogoEncontrou = false;
   // FASE 2 — fatos concretos e consultas do turno (com retry consolidado).
   const fatosDoTurno: import("@/lib/nina/confidence/evidencia").FatoRecuperado[] = [];
@@ -1885,6 +1931,8 @@ async function gerarRespostaNinaInterno(
         intentAmbiguo: canonico.intentAmbiguo,
         messageId: canonico.messageIdEntrada,
         ferramentas: evidenciasFerramentas,
+        evidenciasFluxo: capturarProvaFluxo(),
+        apresentacaoJaFeita: jaSeApresentou,
         fatos: fatosDoTurno,
         consultas: consolidarTentativas(consultasDoTurno),
         catalogoEncontrou,
@@ -2599,7 +2647,7 @@ async function gerarRespostaNinaInterno(
   // este mesmo ponto, depois dos ajustes de conteúdo e antes da persistência e
   // do envio. Quando o turno não chegou a montar o estado do modelo, a revisão
   // roda sobre um estado mínimo VERDADEIRO: o que falta continua ausente.
-  const estadoParaRevisao = estadoTurnoFinal ?? {
+  const estadoParaRevisao: import("@/lib/nina/confidence/runtime").EstadoDoTurno = estadoTurnoFinal ?? {
     texto: resposta,
     mensagemPaciente: mensagemPaciente || null,
     intent: null,
@@ -2639,6 +2687,21 @@ async function gerarRespostaNinaInterno(
         texto: resposta,
         handoffSolicitado: houveHandoff,
         agendamentoConfirmado,
+        apresentacaoJaFeita: jaSeApresentou,
+        evidenciasFluxo: capturarProvaFluxo(),
+        estadoOperacional: {
+          ...estadoParaRevisao.estadoOperacional,
+          // Invocações recusadas antes da execução permanecem na trilha como
+          // consultas não realizadas, sem inventar tentativa de gravar a agenda.
+          appointmentAttempted: broker.resultados().some(r =>
+            r.ferramenta === "agendar" && !consultaAgendaAguardandoPaciente(r.resultado),
+          ),
+          appointmentToolCalled: broker.resultados().some(r =>
+            r.ferramenta === "agendar" && !consultaAgendaAguardandoPaciente(r.resultado),
+          ),
+          appointmentCreated: agendamentoConfirmado,
+          appointmentId: fluxoEstado.appointment.appointment_id,
+        },
       };
       const gate = garantirScoreDoTextoEnviado(
         estadoParaTextoFinal,

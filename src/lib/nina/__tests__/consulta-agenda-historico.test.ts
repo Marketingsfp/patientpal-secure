@@ -1,5 +1,8 @@
 import { describe, expect, it } from "bun:test";
-import { historicoParaConsultaAgenda } from "../consulta-agenda-historico";
+import {
+  historicoParaConsultaAgenda,
+  historicoDaSessaoParaVerificacao,
+} from "../consulta-agenda-historico";
 import { autorizarConsultaAgenda } from "../consulta-agenda";
 
 const medico = { id: "11111111-1111-4111-8111-111111111111", nome: "Alex Louza" };
@@ -21,6 +24,44 @@ const oferta = {
 };
 
 describe("Histórico para consulta de vagas", () => {
+  it("só declara completo quando a consulta, o lote e o conteúdo enviado estão representados", () => {
+    const entradaAtual = {
+      ...oferta,
+      id: "mensagem-atual",
+      direction: "in",
+      status: "received",
+      body: "sim",
+    };
+    expect(historicoDaSessaoParaVerificacao([oferta, entradaAtual], contexto, true).completo).toBe(
+      true,
+    );
+    expect(historicoDaSessaoParaVerificacao([oferta, entradaAtual], contexto, false).completo).toBe(
+      false,
+    );
+    expect(historicoDaSessaoParaVerificacao([oferta], contexto, true).completo).toBe(false);
+    expect(
+      historicoDaSessaoParaVerificacao(
+        [oferta, entradaAtual],
+        { ...contexto, idsDoTurno: new Set() },
+        true,
+      ).completo,
+    ).toBe(false);
+    for (const incompleta of [
+      { ...oferta, body: null },
+      { ...oferta, status: "desconhecido" },
+    ]) {
+      expect(
+        historicoDaSessaoParaVerificacao([incompleta, entradaAtual], contexto, true).completo,
+      ).toBe(false);
+    }
+    expect(
+      historicoDaSessaoParaVerificacao(
+        [oferta, entradaAtual, { ...oferta, id: "falhou", status: "failed", body: null }],
+        contexto,
+        true,
+      ).completo,
+    ).toBe(true);
+  });
   it("preserva oferta ao final de resposta longa, independente do resumo do modelo", () => {
     const longa = { ...oferta, body: "Informação publicada. ".repeat(100) + oferta.body };
     const historico = historicoParaConsultaAgenda([longa], contexto);
