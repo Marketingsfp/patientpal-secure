@@ -399,7 +399,55 @@ export type ResultadoValidador = {
   blocker?: Bloqueador | null;
   /** Peso descontado do score final quando o status não é PASS. */
   peso?: number;
+  /**
+   * FASE 3 (pontuação) — peso da PARCELA desta dimensão na nota ponderada.
+   * Quando presente, substitui o peso da política: é assim que o orçamento
+   * configurado de uma dimensão agregada é distribuído entre as obrigações
+   * que ela representa, sem que o agregado e as parcelas sejam somados duas
+   * vezes.
+   */
+  pesoParcela?: number;
 };
+
+/**
+ * FASE 3 (pontuação) — memória de cálculo do orçamento de instruções.
+ * Fica anexada ao resultado do motor para auditoria: mostra o peso de cada
+ * obrigação, o que entrou na nota, o que entrou só na cobertura e o que ficou
+ * na dimensão separada de linguagem.
+ */
+export type MemoriaInstrucoes = {
+  versao: string;
+  /** Peso configurado da dimensão de cumprimento de instruções. */
+  orcamento: number;
+  parcelas: Array<{
+    chave: string;
+    categoria: "ESSENCIAL" | "CONVERSACIONAL" | "LINGUAGEM";
+    identificadores: string[];
+    descricao: string;
+    peso: number;
+    status: StatusValidador;
+    nota: number | null;
+    motivo: string;
+    contaNaNota: boolean;
+    contaNaCobertura: boolean;
+  }>;
+  /** Dimensão de LINGUAGEM, separada da nota substantiva. */
+  linguagem: {
+    dimensao: string;
+    status: StatusValidador;
+    avaliadas: number;
+    indeterminadas: number;
+    nota: number | null;
+    limitacoes: string[];
+  };
+  /** Requisitos essenciais: violação ou falta de prova impede aprovação. */
+  essencial: {
+    violado: boolean;
+    semProva: boolean;
+    identificadores: string[];
+  };
+};
+
 
 /** Resultado de um validador individual (auditável). */
 export type Verificacao = {
@@ -465,4 +513,11 @@ export type ResultadoConfianca = {
   /** Resultado bruto de cada validador da Fase 2 (auditoria e painel). */
   validators?: ResultadoValidador[];
   evidence: EvidenciaConfianca;
+  /**
+   * FASE 3 (pontuação) — memória de cálculo do orçamento de instruções e da
+   * dimensão separada de linguagem. Ausente quando o turno não tem obrigações
+   * publicadas conferíveis.
+   */
+  instrucoes?: MemoriaInstrucoes;
+
 };
