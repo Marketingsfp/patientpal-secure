@@ -3165,14 +3165,56 @@ async function gerarRespostaNinaInterno(
           }
           const saidaRegra = saidaControladaBaixaConfianca(resultadoRegra);
           const antesRegra = resposta;
-          resposta = saidaRegra.aviso;
-          transformar(
-            "confianca.regras.bloqueio",
-            `${revisao.conformidade.motivoBloqueio}: conteúdo candidato descartado (${saidaRegra.encaminhamento})`,
-            antesRegra,
-            resposta,
+          const {
+            registroTurnoAtual: turnoAgora,
+            registrarEvidenciaBloqueio: evidenciaRegra,
+            registrarAvisoOperacional: avisoRegra,
+          } = await import("@/lib/nina/rastreio/turno.server");
+          const { validacaoDoEncaminhamento: validacaoRegra } = await import(
+            "@/lib/nina/rastreio/versoes-texto"
           );
-          marcarOrigem("codigo", `${saidaRegra.registro} (origem: ${saidaRegra.origem})`);
+          // CICLO DE AVISOS: se o texto atual JÁ é um aviso operacional deste
+          // turno, ele não é substituído por outro aviso. Um bloqueio não
+          // bloqueia um aviso de bloqueio.
+          const hashAtual = antesRegra ? hashTurno(antesRegra) : null;
+          const jaEraAviso = (turnoAgora()?.avisosOperacionais ?? []).some(
+            (a) => a.textoHash && a.textoHash === hashAtual,
+          );
+          if (!jaEraAviso) {
+            resposta = saidaRegra.aviso;
+            transformar(
+              "confianca.regras.bloqueio",
+              `${revisao.conformidade.motivoBloqueio}: conteúdo candidato descartado (${saidaRegra.encaminhamento})`,
+              antesRegra,
+              resposta,
+              "aviso_operacional",
+            );
+            marcarOrigem("codigo", `${saidaRegra.registro} (origem: ${saidaRegra.origem})`);
+            evidenciaRegra({
+              tipo: "regra_publicada",
+              motivo: revisao.conformidade.motivoBloqueio ?? "regra publicada descumprida",
+              avaliacao: "answer_confidence",
+              decisaoId: registro.id ?? null,
+              textoAvaliadoHash: respostaFinalAvaliada.textoAvaliadoHash ?? null,
+              score: respostaFinalAvaliada.score ?? null,
+              nivel: respostaFinalAvaliada.level ?? null,
+              etapa: cfgFinal.etapa ?? null,
+              textoSubstitutoHash: resposta ? hashTurno(resposta) : null,
+            });
+            if (resposta) {
+              avisoRegra({
+                origem: saidaRegra.origem,
+                tipo: "regra_publicada",
+                motivo: revisao.conformidade.motivoBloqueio ?? "regra publicada descumprida",
+                validacao: validacaoRegra(resultadoRegra),
+                protocolo: null,
+                mensagemId: null,
+                execucaoId: execucaoIdFinal ?? null,
+                handoffEventoId: null,
+                textoHash: hashTurno(resposta),
+              });
+            }
+          }
           rastro?.concluir("answer.rule_block", {
             motivo: revisao.conformidade.motivoBloqueio,
             estado: revisao.conformidade.estado,
