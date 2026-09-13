@@ -182,9 +182,12 @@ describe("FASE 6 — D/E/F: identidade, aplicabilidade e linguagem", () => {
       candidato: SAUDACAO_OK,
       contexto: SESSAO_NOVA,
     });
-    const naoAplicaveis = r.avaliacao!.resultados.filter((x) => x.status === "NOT_APPLICABLE");
-    expect(naoAplicaveis.length).toBeGreaterThan(0);
-    for (const x of naoAplicaveis) expect(x.aplicabilidade).toBe("falsa");
+    const condicaoFalsa = r.avaliacao!.resultados.filter((x) => x.aplicabilidade === "falsa");
+    expect(condicaoFalsa.length).toBeGreaterThan(0);
+    for (const x of condicaoFalsa) {
+      expect(x.status).toBe("NOT_APPLICABLE");
+      expect(x.nota).toBeNull();
+    }
 
     // Em produção a condição "em homologação" é comprovadamente falsa.
     const teste01 = r.avaliacao!.resultados.find((x) => x.identificador === "TESTE-01");
