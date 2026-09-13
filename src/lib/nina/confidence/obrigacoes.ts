@@ -575,6 +575,72 @@ function avaliarUma(
   return { obrigacao: o, status: "indeterminada", motivo: "LINGUAGEM_ABERTA_NAO_VERIFICAVEL" };
 }
 
+/**
+ * Confere a identidade declarada na resposta contra a identidade PUBLICADA.
+ * Devolve `null` quando não há o que conferir (publicação sem bloco de
+ * identidade ou resposta que não se apresenta) — ausência nunca é aprovação.
+ */
+function avaliarIdentidade(
+  ctx: ContextoConfianca,
+  resposta: string,
+): { obrigacao: Obrigacao; avaliacao: AvaliacaoObrigacao } | null {
+  const publicada = ctx.instrucoes?.identidade ?? null;
+  if (!publicada) return null;
+  const conferencia = conferirIdentidadeDaResposta(publicada, resposta);
+  if (conferencia.situacao === "nao_declarada") return null;
+
+  const regra: RegraPublicada = {
+    id: "identidade:publicada",
+    ordem: 0,
+    condicao: "sempre",
+    ambiente: "qualquer",
+    escopo: ctx.instrucoes?.escopo ?? "",
+    natureza: "exigencia",
+    prioridade: "critica",
+    verificacao: "deterministica",
+    literal: null,
+    operador: null,
+    proibicoes: [],
+    descricao: "A apresentação da resposta usa a identidade publicada.",
+    trecho: [
+      publicada.atendente ? `Nome da atendente virtual: ${publicada.atendente}` : null,
+      publicada.estabelecimento ? `Nome do estabelecimento: ${publicada.estabelecimento}` : null,
+    ]
+      .filter(Boolean)
+      .join("\n"),
+    linhaInicio: 0,
+    linhaFim: 0,
+    versao: ctx.instrucoes?.versao ?? null,
+    versaoId: ctx.instrucoes?.versaoId ?? null,
+    hash: ctx.instrucoes?.hash ?? null,
+    interpretada: true,
+    motivo: null,
+    identificador: "IDENTIDADE",
+    classe: "ESSENCIAL",
+  };
+
+  const obrigacao: Obrigacao = {
+    id: "instrucao:identidade",
+    tipo: "restricao_literal",
+    origem: "instrucoes_publicadas",
+    descricao: regra.descricao,
+    verificacao: "deterministica",
+    regra,
+  };
+
+  return {
+    obrigacao,
+    avaliacao: {
+      obrigacao,
+      status: conferencia.situacao === "coerente" ? "cumprida" : "descumprida",
+      motivo:
+        conferencia.situacao === "coerente"
+          ? "IDENTIDADE_CONFERE_COM_A_PUBLICACAO"
+          : `IDENTIDADE_DIVERGENTE_DA_PUBLICACAO:${conferencia.divergencias.join(",")}`,
+    },
+  };
+}
+
 export function avaliarObrigacoes(
   ctx: ContextoConfianca,
   resposta: string,
