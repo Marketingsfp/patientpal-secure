@@ -699,6 +699,9 @@ export function HomologacaoInbox() {
     setTexto("");
     composerRef.current?.focus();
     setErro(null);
+    setEncerrado(null);
+    const geracao = geracaoRef.current;
+
     setUltimoTexto(corpo);
     // 2) bolha imediata na timeline do lead de origem, já com a MESMA
     // identidade que o servidor vai gravar: quando o Realtime trouxer a
