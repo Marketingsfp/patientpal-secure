@@ -20,6 +20,19 @@
  */
 import type { AuditoriaInstrucoesRodada } from "./auditoria-instrucoes";
 import { auditoriaParaTrace } from "./auditoria-instrucoes";
+import {
+  notaAplicavelAoTextoFinal,
+  versoesParaTrace,
+  type AvisoOperacionalRegistrado,
+  type EvidenciaBloqueio,
+  type VersaoTexto,
+} from "./versoes-texto";
+
+export type {
+  AvisoOperacionalRegistrado,
+  EvidenciaBloqueio,
+  VersaoTexto,
+} from "./versoes-texto";
 
 /** De onde veio o texto realmente entregue (ou por que não houve texto). */
 export const ORIGENS_RESPOSTA = [
