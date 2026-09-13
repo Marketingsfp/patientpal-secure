@@ -554,8 +554,12 @@ export function decidirConfianca(
     blockers,
     hardBlockers,
     checks,
-    validators,
+    // A dimensão de linguagem é reportada junto, com peso zero: fica visível
+    // na auditoria sem entrar na nota nem na cobertura.
+    validators: reparticao?.linguagem ? [...validators, reparticao.linguagem] : validators,
     evidence: montarEvidencia(ctx, cats, motivos),
+    ...(reparticao ? { instrucoes: reparticao.memoria } : {}),
+
   };
 }
 
