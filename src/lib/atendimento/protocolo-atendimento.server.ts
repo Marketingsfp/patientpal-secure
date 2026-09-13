@@ -18,7 +18,7 @@
  */
 
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
-import { ambienteDoHandoff, deveInformarProtocolo, vinculoProtocolo } from "./protocolo-handoff";
+import { ambienteDoHandoff, vinculoProtocolo } from "./protocolo-handoff";
 import { classificarMotivoHandoff, type MotivoHandoff } from "./mensagem-handoff";
 import { nomeContato } from "./rotulo-conversa";
 import type { StatusEnvioHandoff, TransporteHandoff } from "./handoff-auditoria";
