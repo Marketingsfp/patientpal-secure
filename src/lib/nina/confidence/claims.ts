@@ -323,6 +323,10 @@ function capsDoTipo(tipo: TipoClaim): Set<string> {
 
 // ------------------------------------------------ extração complementar (texto)
 
+// "Atendemos na área de Cardiologia" oferece uma especialidade; não
+// declara localização. O nome extraído ainda precisa constar no catálogo.
+const PREFIXO_OFERTA_ESPECIALIDADE = String.raw`\batendemos\s+(?:(?:em|na|no)\s+)?(?:(?:[áa]rea|especialidade)\s+(?:de|da|do)\s+)?[*_]*(?:[\p{L}]+(?:logia|iatria|pedia)|cl[ií]nica\s+geral|cirurgia(?:\s+[\p{L}]+)?)\b`;
+
 const PADROES: Array<{ tipo: TipoClaim; re: RegExp }> = [
   { tipo: "valor", re: /R\$\s?\d[\d.,]*|custa\s+\d[\d.,]*|valor\s+(é|de)\s+\d[\d.,]*/gi },
   {
@@ -344,7 +348,15 @@ const PADROES: Array<{ tipo: TipoClaim; re: RegExp }> = [
   // FASE 2 — cobertura de endereço, serviço e convênio.
   {
     tipo: "endereco",
-    re: /((ficamos|estamos|atendemos|fica|funcionamos)\s+(na|no|em)\s+[^.!?\n]{6,90})|((rua|av\.?|avenida|travessa|rodovia)\s+[^.!?\n]{4,90})/gi,
+    // Rejeitar a leitura clínica antes de consumir o texto permite encontrar
+    // outra oração de localização, como "... e ficamos no bairro Centro".
+    re: new RegExp(`\\b(?!${PREFIXO_OFERTA_ESPECIALIDADE})(?:ficamos|estamos|atendemos|fica|funcionamos)\\s+(?:na|no|em)\\s+[^.!?\\n]{6,90}`, "giu"),
+  },
+  {
+    tipo: "endereco",
+    // Independente da oração anterior: uma oferta de especialidade não
+    // pode consumir e esconder o endereço real citado na mesma frase.
+    re: /\b(rua|av\.?|avenida|travessa|rodovia|bairro|cidade|munic[ií]pio|distrito)\s+[^.!?\n]{2,90}/gi,
   },
   {
     tipo: "convenio",
@@ -352,8 +364,9 @@ const PADROES: Array<{ tipo: TipoClaim; re: RegExp }> = [
   },
   {
     tipo: "servico",
-    re: /((realizamos|fazemos|oferecemos|temos)\s+(o\s+|a\s+)?(exame|procedimento|consulta|atendimento)[^.!?\n]*)|(\batendemos\s+(?:em\s+)?[\p{L}]+(?:logia|iatria|pedia)[^.!?\n]*)/giu,
+    re: /((realizamos|fazemos|oferecemos|temos)\s+(o\s+|a\s+)?(exame|procedimento|consulta|atendimento)[^.!?\n]*)/giu,
   },
+  { tipo: "servico", re: new RegExp(`${PREFIXO_OFERTA_ESPECIALIDADE}[^.!?\\n]*`, "giu") },
 ];
 
 const RE_NEGACAO =
@@ -489,7 +502,11 @@ export function extrairClaimsDoTexto(texto: string): ClaimDoTexto[] {
         }
       }
       if (tipo === "servico") {
-        const itens = itensDeOferta(String(m[0]));
+        const oferta = String(m[0])
+          .replace(/^(atendemos)\s+(?:(?:em|na|no)\s+)?(?:(?:[áa]rea|especialidade)\s+(?:de|da|do)\s+)?/iu, "$1 ")
+          .replace(/\s+(?:e\s+)?(?:ficamos|estamos|fica|funcionamos)\s+(?:na|no|em)\b.*$/iu, "")
+          .replace(/\s+(?:na|no|em)\s+(?:rua|av\.?|avenida|travessa|rodovia|bairro|cidade|munic[ií]pio|distrito)\b.*$/iu, "");
+        const itens = itensDeOferta(oferta);
         if (itens.length) {
           for (const item of itens) {
             achados.push({
