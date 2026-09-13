@@ -67,6 +67,8 @@ export type OperacaoProposta = {
   dadosPendentes: string[];
   /** Foi só consulta de disponibilidade — consultar não é reservar. */
   apenasConsulta?: boolean;
+  /** Execução simulada (homologação): registro sem efeito real. */
+  simulada?: boolean;
 };
 
 export type ContextoCanonico = {
