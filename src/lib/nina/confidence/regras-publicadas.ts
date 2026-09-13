@@ -446,7 +446,14 @@ function blocosDoTexto(texto: string): BlocoRegra[] {
 
 type CamposBloco = {
   tipo: string | null;
+  /** Texto completo do campo, inclusive as linhas de continuação. */
   aplicaSe: string | null;
+  /**
+   * Somente a LINHA em que a condição foi declarada. A condição e o ambiente
+   * são lidos daqui: um "Em homologação: …" escrito adiante no bloco descreve
+   * a conduta, não restringe a aplicação da regra.
+   */
+  aplicaSeLinha: string | null;
   /** Valor escrito na linha seguinte quando o campo termina em dois-pontos. */
   aplicaSeValor: string | null;
   conduta: string | null;
@@ -458,12 +465,13 @@ function camposDoBloco(b: BlocoRegra): CamposBloco {
   const campos: CamposBloco = {
     tipo: null,
     aplicaSe: null,
+    aplicaSeLinha: null,
     aplicaSeValor: null,
     conduta: null,
     resultado: null,
     corpo: "",
   };
-  let atual: keyof CamposBloco | null = null;
+  let atual: "tipo" | "aplicaSe" | "conduta" | "resultado" | null = null;
   const buffers: Record<string, string[]> = {};
   const corpo: string[] = [];
 
@@ -480,11 +488,15 @@ function camposDoBloco(b: BlocoRegra): CamposBloco {
             : nome === "conduta"
               ? "conduta"
               : "resultado";
-      buffers[atual] = [m[3]!.trim()];
-      // "Aplica-se … :" sem valor na mesma linha: o valor vem na linha seguinte.
-      if (atual === "aplicaSe" && m[3]!.trim() === "") {
-        const proxima = b.linhas.slice(i + 1).find((l) => l.trim() !== "");
-        campos.aplicaSeValor = proxima?.trim() ?? null;
+      const declarado = `${m[2] ?? ""} ${m[3] ?? ""}`.replace(/\s+/g, " ").trim();
+      buffers[atual] = [declarado];
+      if (atual === "aplicaSe") {
+        campos.aplicaSeLinha = declarado;
+        // "Aplica-se … :" sem valor na mesma linha: o valor vem na seguinte.
+        if ((m[3] ?? "").trim() === "") {
+          const proxima = b.linhas.slice(i + 1).find((l) => l.trim() !== "");
+          campos.aplicaSeValor = proxima?.trim() ?? null;
+        }
       }
       continue;
     }
