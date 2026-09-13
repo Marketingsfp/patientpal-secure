@@ -39,13 +39,25 @@ export type SituacaoRegra =
   /** A apresentação já foi feita antes deste turno. */
   | "apresentacao_ja_feita"
   /** É o primeiro turno respondido da sessão. */
-  | "primeira_mensagem";
+  | "primeira_mensagem"
+  /** A mensagem recebida é composta somente por saudação. */
+  | "saudacao_pura"
+  /** A mensagem recebida traz pergunta ou pedido concreto. */
+  | "pedido_concreto";
 
 export type CondicaoRegra =
   | { tipo: "sempre" }
   | { tipo: "mensagem_exata"; valor: string }
   | { tipo: "mensagem_contem"; valor: string }
-  | { tipo: "situacao"; situacao: SituacaoRegra; valor: string };
+  | { tipo: "situacao"; situacao: SituacaoRegra; valor: string }
+  /** Várias situações exigidas ao mesmo tempo pela mesma regra. */
+  | { tipo: "situacoes"; itens: SituacaoRegra[]; valor: string }
+  /**
+   * A condição publicada existe, mas o avaliador não sabe conferi-la com os
+   * sinais do servidor. NUNCA vira "aplica" nem "não se aplica": fica
+   * indeterminada e é declarada como limitação.
+   */
+  | { tipo: "nao_compreendida"; valor: string };
 
 export type VerificacaoRegra =
   | "literal"
@@ -106,7 +118,14 @@ export type RegraPublicada = {
   interpretada: boolean;
   /** Por que não foi possível interpretar (quando `interpretada` for false). */
   motivo: string | null;
+  /** Identificador publicado do bloco ("ID-01", "CONV-02"), quando existir. */
+  identificador?: string | null;
+  /** Classe declarada no bloco ("Tipo:"), quando existir. */
+  classe?: ClasseRegra | null;
 };
+
+/** Classe declarada pelo próprio texto publicado no campo "Tipo:". */
+export type ClasseRegra = "ESSENCIAL" | "CONVERSACIONAL" | "LINGUAGEM";
 
 export type ExtracaoRegras = {
   regras: RegraPublicada[];
@@ -363,6 +382,271 @@ export function frasesDaUnidade(plano: string): string[] {
   return frases.length > 0 ? frases : [plano.trim()];
 }
 
+// ------------------------------------------------ extração por bloco REGRA
+
+/**
+ * Cabeçalho do formato publicado em blocos:
+ *   `REGRA <IDENTIFICADOR> — <TÍTULO>`
+ * Determinístico por FORMA: nenhum identificador, nome de pessoa, de clínica
+ * ou conteúdo específico é usado como critério.
+ */
+const CABECALHO_BLOCO = /^\s*REGRA\s+([A-Za-zÀ-ÿ0-9]+(?:-[A-Za-zÀ-ÿ0-9]+)*)\s*[—–-]\s*(.+?)\s*$/;
+
+const CAMPO_BLOCO = /^\s*(Tipo|Aplica-se|Conduta|Resultado esperado)\b([^:]*):\s*(.*)$/i;
+
+type BlocoRegra = {
+  identificador: string;
+  titulo: string;
+  inicio: number;
+  fim: number;
+  trecho: string;
+  linhas: string[];
+};
+
+/** Recorta os blocos `REGRA … — …` preservando cada bloco inteiro. */
+function blocosDoTexto(texto: string): BlocoRegra[] {
+  const linhas = texto.replace(/\r\n/g, "\n").split("\n");
+  const blocos: BlocoRegra[] = [];
+  let atual: BlocoRegra | null = null;
+
+  const fechar = (fim: number) => {
+    if (!atual) return;
+    atual.fim = fim;
+    atual.trecho = atual.linhas.join("\n").trimEnd();
+    blocos.push(atual);
+    atual = null;
+  };
+
+  for (let i = 0; i < linhas.length; i++) {
+    const linha = linhas[i]!;
+    const cab = CABECALHO_BLOCO.exec(linha);
+    if (cab) {
+      fechar(i);
+      atual = {
+        identificador: cab[1]!,
+        titulo: cab[2]!,
+        inicio: i + 1,
+        fim: i + 1,
+        trecho: "",
+        linhas: [linha],
+      };
+      continue;
+    }
+    // Um título de seção encerra o bloco anterior: nada da seção seguinte é
+    // absorvido pela última regra.
+    if (atual && /^\s*\d+\.\s+\S/.test(linha)) {
+      fechar(i);
+      continue;
+    }
+    if (atual) atual.linhas.push(linha);
+  }
+  fechar(linhas.length);
+  return blocos;
+}
+
+type CamposBloco = {
+  tipo: string | null;
+  /** Texto completo do campo, inclusive as linhas de continuação. */
+  aplicaSe: string | null;
+  /**
+   * Somente a LINHA em que a condição foi declarada. A condição e o ambiente
+   * são lidos daqui: um "Em homologação: …" escrito adiante no bloco descreve
+   * a conduta, não restringe a aplicação da regra.
+   */
+  aplicaSeLinha: string | null;
+  /** Valor escrito na linha seguinte quando o campo termina em dois-pontos. */
+  aplicaSeValor: string | null;
+  conduta: string | null;
+  resultado: string | null;
+  corpo: string;
+};
+
+function camposDoBloco(b: BlocoRegra): CamposBloco {
+  const campos: CamposBloco = {
+    tipo: null,
+    aplicaSe: null,
+    aplicaSeLinha: null,
+    aplicaSeValor: null,
+    conduta: null,
+    resultado: null,
+    corpo: "",
+  };
+  let atual: "tipo" | "aplicaSe" | "conduta" | "resultado" | null = null;
+  const buffers: Record<string, string[]> = {};
+  const corpo: string[] = [];
+
+  for (let i = 1; i < b.linhas.length; i++) {
+    const linha = b.linhas[i]!;
+    const m = CAMPO_BLOCO.exec(linha);
+    if (m) {
+      const nome = chave(m[1]!);
+      atual =
+        nome === "tipo"
+          ? "tipo"
+          : nome === "aplica-se"
+            ? "aplicaSe"
+            : nome === "conduta"
+              ? "conduta"
+              : "resultado";
+      const declarado = `${m[2] ?? ""} ${m[3] ?? ""}`.replace(/\s+/g, " ").trim();
+      buffers[atual] = [declarado];
+      if (atual === "aplicaSe") {
+        campos.aplicaSeLinha = declarado;
+        // "Aplica-se … :" sem valor na mesma linha: o valor vem na seguinte.
+        if ((m[3] ?? "").trim() === "") {
+          const proxima = b.linhas.slice(i + 1).find((l) => l.trim() !== "");
+          campos.aplicaSeValor = proxima?.trim() ?? null;
+        }
+      }
+      continue;
+    }
+    if (atual && linha.trim() !== "") buffers[atual]!.push(linha.trim());
+    if (linha.trim() !== "") corpo.push(linha.trim());
+  }
+
+  campos.tipo = buffers["tipo"]?.join(" ").trim() || null;
+  campos.aplicaSe = buffers["aplicaSe"]?.join(" ").trim() || null;
+  campos.conduta = buffers["conduta"]?.join(" ").trim() || null;
+  campos.resultado = buffers["resultado"]?.join(" ").trim() || null;
+  campos.corpo = corpo.join(" ");
+  return campos;
+}
+
+function classeDoBloco(tipo: string | null): ClasseRegra | null {
+  const k = chave(tipo ?? "");
+  if (k.includes("essencial")) return "ESSENCIAL";
+  if (k.includes("conversacional")) return "CONVERSACIONAL";
+  if (k.includes("linguagem")) return "LINGUAGEM";
+  return null;
+}
+
+/** Situações da conversa reconhecíveis no campo "Aplica-se", por forma. */
+const SITUACOES_DO_BLOCO: Array<[SituacaoRegra, RegExp]> = [
+  ["primeira_mensagem", /\b(primeira\s+(resposta|mensagem)|apresentacao\s+ainda\s+nao\s+entregue|primeiro\s+contato)\b/],
+  ["apresentacao_ja_feita", /\b(apresentacao\s+ja\s+(entregue|feita)|sessao\s+em\s+andamento)\b/],
+  ["saudacao_pura", /\b(somente\s+por\s+saudacao|apenas\s+saudacao|so\s+saudacao)\b/],
+  ["pedido_concreto", /\b(pergunta\s+ou\s+solicitacao\s+concreta|pedido\s+concreto|solicitacao\s+concreta)\b/],
+];
+
+function condicaoDoBloco(
+  campos: CamposBloco,
+): { condicao: CondicaoRegra; ambiente: AmbienteRegra } {
+  const texto = campos.aplicaSeLinha ?? campos.aplicaSe ?? "";
+  const k = chave(texto);
+  const ambiente = ambienteDoTexto(texto) ?? "qualquer";
+
+  // Mensagem exata do paciente ("… for exatamente:" com o valor abaixo).
+  if (/\bexatamente\b/.test(k)) {
+    const valor =
+      campos.aplicaSeValor ??
+      texto.replace(/.*\bexatamente\b\s*:?\s*/i, "").trim() ??
+      "";
+    if (valor !== "") return { condicao: { tipo: "mensagem_exata", valor }, ambiente };
+  }
+
+  const itens = SITUACOES_DO_BLOCO.filter(([, re]) => re.test(k)).map(([s]) => s);
+  if (itens.length === 1) {
+    return { condicao: { tipo: "situacao", situacao: itens[0]!, valor: texto }, ambiente };
+  }
+  if (itens.length > 1) {
+    return { condicao: { tipo: "situacoes", itens, valor: texto }, ambiente };
+  }
+
+  // Só o ambiente foi declarado: a regra vale sempre DENTRO desse ambiente.
+  if (ambiente !== "qualquer" && /^\s*ambiente\b/.test(k)) {
+    return { condicao: { tipo: "sempre" }, ambiente };
+  }
+
+  // Condição publicada que o avaliador não sabe conferir com os sinais do
+  // servidor: fica indeterminada, nunca presumida cumprida nem descartada.
+  return { condicao: { tipo: "nao_compreendida", valor: texto }, ambiente };
+}
+
+/** Texto literal exigido dentro do bloco ("… deve ser exatamente:" + linha). */
+function literalDoBloco(b: BlocoRegra): { literal: string; operador: OperadorLiteral } | null {
+  for (let i = 1; i < b.linhas.length; i++) {
+    const linha = b.linhas[i]!.trim();
+    if (!/\bexatamente\s*:\s*$/i.test(linha)) continue;
+    if (/^\s*Aplica-se\b/i.test(linha)) continue;
+    const alvo = b.linhas.slice(i + 1).find((l) => l.trim() !== "");
+    if (alvo && alvo.trim().length >= 2) {
+      return { literal: alvo.trim(), operador: operadorDoBloco(linha) };
+    }
+  }
+  const conduta = b.linhas.slice(1).join(" ");
+  return exigenciaLiteral(conduta);
+}
+
+/**
+ * Leitura do formato publicado em blocos. Cada bloco `REGRA … — …` vira UMA
+ * regra: os parágrafos do mesmo bloco não viram obrigações independentes, e a
+ * condição de um bloco (inclusive ambiente) não contamina os outros.
+ * Devolve `null` quando o texto não usa esse formato.
+ */
+function extrairRegrasEmBlocos(texto: string, meta: MetaPublicacao): ExtracaoRegras | null {
+  const blocos = blocosDoTexto(texto);
+  if (blocos.length < 2) return null;
+
+  const regras: RegraPublicada[] = [];
+  const limitacoes: string[] = [];
+
+  blocos.forEach((b, ordem) => {
+    const campos = camposDoBloco(b);
+    const classe = classeDoBloco(campos.tipo);
+    const { condicao, ambiente } = condicaoDoBloco(campos);
+    const literal = literalDoBloco(b);
+    const conduta = campos.conduta ?? campos.corpo;
+    const ehProibicao = PROIBICAO.test(conduta);
+    const proibicoes = ehProibicao ? categoriasProibidas(oracaoDaProibicao(conduta)) : [];
+
+    const verificacao: VerificacaoRegra = literal
+      ? "literal"
+      : proibicoes.length > 0
+        ? "proibicao_de_conteudo"
+        : "semantica";
+
+    const prioridade: PrioridadeRegra =
+      classe === "ESSENCIAL" ? "critica" : classe === "CONVERSACIONAL" ? "alta" : "normal";
+
+    if (condicao.tipo === "nao_compreendida") {
+      limitacoes.push("CONDICAO_DA_REGRA_NAO_COMPREENDIDA");
+      if (classe === "ESSENCIAL") {
+        limitacoes.push("REGRA_ESSENCIAL_COM_CONDICAO_NAO_COMPREENDIDA");
+      }
+    }
+
+    regras.push({
+      id: `${meta.hash ?? "sem-hash"}:${ordem}`,
+      ordem,
+      escopo: meta.escopo,
+      condicao,
+      ambiente,
+      natureza: literal ? "exigencia" : ehProibicao ? "proibicao" : "exigencia",
+      prioridade,
+      verificacao,
+      literal: literal?.literal ?? null,
+      operador: literal?.operador ?? null,
+      proibicoes,
+      descricao: `REGRA ${b.identificador} — ${b.titulo}: ${conduta}`.trim(),
+      trecho: b.trecho,
+      linhaInicio: b.inicio,
+      linhaFim: b.fim,
+      versao: meta.versao ?? null,
+      versaoId: meta.versaoId ?? null,
+      hash: meta.hash ?? null,
+      interpretada: true,
+      motivo: null,
+      identificador: b.identificador,
+      classe,
+    });
+  });
+
+  if (regras.some((r) => r.verificacao === "semantica")) {
+    limitacoes.push("REGRA_DE_LINGUAGEM_ABERTA_NAO_VERIFICADA_AUTOMATICAMENTE");
+  }
+  return { regras, limitacoes: [...new Set(limitacoes)] };
+}
+
 // -------------------------------------------------------------- extração
 
 /**
@@ -375,6 +659,12 @@ export function extrairRegrasPublicadas(
   meta: MetaPublicacao,
 ): ExtracaoRegras {
   if (!texto || texto.trim() === "") return { regras: [], limitacoes: [] };
+
+  // Formato publicado em blocos tem precedência; o texto corrido continua
+  // sendo lido pelo caminho antigo.
+  const emBlocos = extrairRegrasEmBlocos(texto, meta);
+  if (emBlocos) return emBlocos;
+
 
   const unidades = unidadesDoTexto(texto);
   const regras: RegraPublicada[] = [];
@@ -630,7 +920,8 @@ export type EntradaAplicabilidade = {
 export type Aplicabilidade = "aplica" | "nao_aplica" | "indeterminada";
 
 function sinalDaSituacao(s: SituacaoRegra, e: EntradaAplicabilidade): boolean | null {
-  if (s === "demanda_declarada") return e.demandaDeclarada ?? null;
+  if (s === "demanda_declarada" || s === "pedido_concreto") return e.demandaDeclarada ?? null;
+  if (s === "saudacao_pura") return e.demandaDeclarada == null ? null : !e.demandaDeclarada;
   if (s === "apresentacao_ja_feita") return e.apresentacaoJaFeita ?? null;
   if (e.primeiraMensagem != null) return e.primeiraMensagem;
   return e.apresentacaoJaFeita == null ? null : !e.apresentacaoJaFeita;
@@ -645,11 +936,20 @@ export function aplicabilidadeDaRegra(
     return "nao_aplica";
   }
   if (regra.condicao.tipo === "sempre") return "aplica";
+  // Condição publicada que o avaliador não compreendeu: nunca vira cumprimento
+  // presumido nem exclusão silenciosa.
+  if (regra.condicao.tipo === "nao_compreendida") return "indeterminada";
   if (regra.condicao.tipo === "situacao") {
     const sinal = sinalDaSituacao(regra.condicao.situacao, e);
     if (sinal === true) return "aplica";
     if (sinal === false) return "nao_aplica";
     return "indeterminada";
+  }
+  if (regra.condicao.tipo === "situacoes") {
+    const sinais = regra.condicao.itens.map((s) => sinalDaSituacao(s, e));
+    if (sinais.some((s) => s === false)) return "nao_aplica";
+    if (sinais.some((s) => s == null)) return "indeterminada";
+    return "aplica";
   }
   const msg = (e.mensagemPaciente ?? "").trim();
   if (msg === "") return "nao_aplica";
