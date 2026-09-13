@@ -158,6 +158,43 @@ async function protocoloJaInformado(clinicaId: string, conversaId: string, proto
   });
 }
 
+/**
+ * RESPONSÁVEL ÚNICO PELO AVISO — quem já falou com o paciente sobre este
+ * encaminhamento? Devolve o anúncio vigente (protocolo + mensagem entregue)
+ * para que a finalização da Nina NÃO produza um segundo aviso no mesmo turno.
+ *
+ * Só considera anúncio de fato entregue: evento com `protocolo_informado` e
+ * `message_id`. Falha de envio não conta como aviso dado.
+ */
+export async function anuncioHandoffVigente(
+  clinicaId: string,
+  conversaId: string,
+  desde?: string | null,
+): Promise<{ protocolo: string | null; mensagemId: string | null; em: string } | null> {
+  const { data } = await supabaseAdmin
+    .from("atend_conversa_eventos")
+    .select("detalhes, created_at")
+    .eq("clinica_id", clinicaId)
+    .eq("conversa_id", conversaId)
+    .order("created_at", { ascending: false })
+    .limit(50);
+  for (const e of (data ?? []) as Array<{ detalhes: unknown; created_at: string }>) {
+    if (desde && e.created_at < desde) continue;
+    const d = e.detalhes as
+      | { protocolo_informado?: unknown; protocol_number?: unknown; message_id?: unknown }
+      | null;
+    if (!d?.protocolo_informado) continue;
+    const mensagemId = typeof d.message_id === "string" ? d.message_id : null;
+    if (!mensagemId) continue;
+    return {
+      protocolo: typeof d.protocol_number === "string" ? d.protocol_number : null,
+      mensagemId,
+      em: e.created_at,
+    };
+  }
+  return null;
+}
+
 
 /**
  * Mensagem transacional (sistema) para o paciente. Usada quando a Nina já foi
@@ -172,12 +209,19 @@ type ResultadoEnvio = {
   mensagemId: string | null;
   status: StatusEnvioHandoff;
   transporte: TransporteHandoff;
+  /** Identificador do transporte (só existe quando saiu de fato). */
+  transporteId: string | null;
 };
 
 async function enviarTextoSistema(
   clinicaId: string,
   conversaId: string,
   texto: string,
+  /**
+   * Execução da Nina que originou este encaminhamento. Sem ela a mensagem
+   * fica órfã: existe para o paciente e não existe para o turno.
+   */
+  execucaoId: string | null,
 ): Promise<ResultadoEnvio> {
   const conv = await lerConversa(clinicaId, conversaId);
   const { registrarMarcadorSistema } = await import("./handoff.server");
@@ -201,30 +245,50 @@ async function enviarTextoSistema(
         status: "sent",
         enviada_por: "nina",
         is_teste: true,
+        execucao_id: execucaoId,
       })
       .select("id")
       .maybeSingle();
     if (error) {
       console.error("[protocolo] falha ao registrar mensagem de teste", error.message);
-      return { ok: false, mensagemId: null, status: "falhou", transporte: "test-console" };
+      return {
+        ok: false,
+        mensagemId: null,
+        status: "falhou",
+        transporte: "test-console",
+        transporteId: null,
+      };
     }
     return {
       ok: true,
       mensagemId: ((data as { id?: string } | null)?.id ?? null),
       status: "sent",
       transporte: "test-console",
+      transporteId: null,
     };
   }
   if (!conv || !conv.contato_telefone) {
     await registrarMarcadorSistema({ clinicaId, conversaId, texto });
-    return { ok: true, mensagemId: null, status: "sent", transporte: "marcador_interno" };
+    return {
+      ok: true,
+      mensagemId: null,
+      status: "sent",
+      transporte: "marcador_interno",
+      transporteId: null,
+    };
   }
   try {
     const { loadWhatsAppConfig, metaSendText } = await import("@/lib/whatsapp.server");
     const cfg = await loadWhatsAppConfig(clinicaId);
     if (!cfg?.phone_number_id || !cfg.access_token) {
       await registrarMarcadorSistema({ clinicaId, conversaId, texto });
-      return { ok: false, mensagemId: null, status: "nao_enviado", transporte: "marcador_interno" };
+      return {
+        ok: false,
+        mensagemId: null,
+        status: "nao_enviado",
+        transporte: "marcador_interno",
+        transporteId: null,
+      };
     }
     const to = conv.contato_telefone.startsWith("+")
       ? conv.contato_telefone
@@ -248,6 +312,7 @@ async function enviarTextoSistema(
         tipo: "text",
         status: "sent",
         enviada_por: "sistema",
+        execucao_id: execucaoId,
       })
       .select("id")
       .maybeSingle();
@@ -256,6 +321,7 @@ async function enviarTextoSistema(
       mensagemId: ((data as { id?: string } | null)?.id ?? null),
       status: "sent",
       transporte: "whatsapp",
+      transporteId: wa_message_id ?? null,
     };
   } catch (e) {
     // Sem marcar como entregue: o registro fica apenas como aviso interno.
@@ -267,7 +333,13 @@ async function enviarTextoSistema(
     });
     // Falha de envio NÃO marca como informado: o retry reaproveita o MESMO
     // protocolo e tenta a comunicação de novo.
-    return { ok: false, mensagemId: null, status: "falhou", transporte: "whatsapp" };
+    return {
+      ok: false,
+      mensagemId: null,
+      status: "falhou",
+      transporte: "whatsapp",
+      transporteId: null,
+    };
   }
 }
 
@@ -334,7 +406,18 @@ export async function anunciarHandoffAoPaciente(args: {
     identidade,
   });
 
-  const envio = await enviarTextoSistema(args.clinicaId, args.conversaId, texto);
+  // Vínculo com a operação: esta mensagem pertence ao turno que pediu o
+  // encaminhamento. Sem o id da execução ela fica órfã na auditoria.
+  const { registroTurnoAtual } = await import("@/lib/nina/rastreio/turno.server");
+  const turno = registroTurnoAtual();
+  const execucaoId = turno?.execucaoId ?? null;
+
+  const envio = await enviarTextoSistema(
+    args.clinicaId,
+    args.conversaId,
+    texto,
+    execucaoId,
+  );
   if (!envio.ok)
     return {
       ...vazio,
@@ -344,6 +427,47 @@ export async function anunciarHandoffAoPaciente(args: {
       transporte: envio.transporte,
       setor,
     };
+
+  // FASE 6 — a mensagem do protocolo é saída CONTROLADA do sistema: entra na
+  // auditoria com hash próprio e SEM herdar a nota da resposta candidata.
+  try {
+    const { registrarEntregaSaida } = await import("@/lib/nina/confidence-engine.server");
+    const { hashDoTexto } = await import("@/lib/nina/confidence/hash");
+    const { gravarEntregaDoTurno } = await import("@/lib/nina/rastreio/turno.server");
+    const estado = envio.transporteId ? "confirmada" : "persistida";
+    await registrarEntregaSaida({
+      clinicaId: args.clinicaId,
+      decisaoId: null,
+      vincularAvaliacao: false,
+      execucaoId,
+      conversaId: args.conversaId,
+      outgoingMessageId: envio.mensagemId,
+      representacao: "texto_completo",
+      estado: envio.mensagemId ? estado : "falhou",
+      textoHash: hashDoTexto(texto),
+      transporteId: envio.transporteId,
+      detalhe: {
+        origem: "aviso_encaminhamento",
+        protocolo: args.protocolo,
+        transporte: envio.transporte,
+        avaliada: false,
+      },
+    });
+    await gravarEntregaDoTurno({
+      clinicaId: args.clinicaId,
+      turnoId: turno?.turnoId ?? null,
+      execucaoId,
+      conversaId: args.conversaId,
+      outgoingMessageId: envio.mensagemId,
+      canal: envio.transporte,
+      textoHash: hashDoTexto(texto),
+      estado: envio.mensagemId ? estado : "falhou",
+      transporteId: envio.transporteId,
+    });
+  } catch (e) {
+    // Auditoria nunca desfaz encaminhamento nem segura a fila.
+    console.error("[protocolo] falha ao vincular a mensagem de handoff", e);
+  }
 
   const { registrarEvento } = await import("./handoff.server");
   await registrarEvento({

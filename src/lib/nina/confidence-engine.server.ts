@@ -51,11 +51,18 @@ export async function registrarEntregaSaida(params: {
   /** Identificador devolvido pelo transporte (ex.: wa_message_id). */
   transporteId?: string | null;
   detalhe?: Record<string, unknown> | null;
+  /**
+   * Mensagem controlada do sistema (ex.: aviso de encaminhamento com
+   * protocolo): ela NÃO foi avaliada pelo motor, então não pode herdar o
+   * snapshot da resposta candidata da mesma execução. Com `false`, o vínculo
+   * nasce sem nota — a tela mostra "Resposta não avaliada".
+   */
+  vincularAvaliacao?: boolean;
 }): Promise<ResultadoRegistro> {
   try {
     let decisaoId = params.decisaoId ?? null;
     // Sem o id em mãos, procura o snapshot da resposta final desta execução.
-    if (!decisaoId && params.execucaoId) {
+    if (!decisaoId && params.execucaoId && params.vincularAvaliacao !== false) {
       const { data, error } = await supabaseAdmin
         .from("nina_confianca_decisoes")
         .select("id")

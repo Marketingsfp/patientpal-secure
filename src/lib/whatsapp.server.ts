@@ -2841,10 +2841,36 @@ async function gerarRespostaNinaInterno(
         }
         const saidaControlada = saidaControladaBaixaConfianca(resultadoEnc);
         const antesBloqueio = resposta;
-        resposta = saidaControlada.aviso;
+        // RESPONSÁVEL ÚNICO PELO AVISO DE ENCAMINHAMENTO.
+        // Se o módulo de atendimento já falou com o paciente neste turno
+        // (mensagem com o protocolo real, entregue), a finalização NÃO manda
+        // um segundo aviso: o candidato continua descartado e o turno sai sem
+        // texto novo. Sem esse anúncio, o aviso controlado continua valendo.
+        let anuncioDoTurno: {
+          protocolo: string | null;
+          mensagemId: string | null;
+          em: string;
+        } | null = null;
+        try {
+          if (estadoId.conversaId) {
+            const { anuncioHandoffVigente } = await import(
+              "@/lib/atendimento/protocolo-atendimento.server"
+            );
+            anuncioDoTurno = await anuncioHandoffVigente(
+              clinicaId,
+              estadoId.conversaId,
+              registroDoTurno?.iniciadoEm ?? null,
+            );
+          }
+        } catch (e) {
+          console.error("[nina-confianca] falha ao conferir anúncio do handoff", e);
+        }
+        resposta = anuncioDoTurno ? "" : saidaControlada.aviso;
         transformar(
           "confianca.baixa.encaminhamento",
-          `${bloqueio.motivo}: conteúdo candidato descartado (${saidaControlada.encaminhamento})`,
+          anuncioDoTurno
+            ? `${bloqueio.motivo}: conteúdo candidato descartado; aviso já entregue pelo encaminhamento (protocolo ${anuncioDoTurno.protocolo ?? "sem número"})`
+            : `${bloqueio.motivo}: conteúdo candidato descartado (${saidaControlada.encaminhamento})`,
           antesBloqueio,
           resposta,
         );
@@ -2870,6 +2896,10 @@ async function gerarRespostaNinaInterno(
           registro: saidaControlada.registro,
           aviso_origem: saidaControlada.origem,
           aviso_herda_nota_do_candidato: false,
+          aviso_entregue_por: anuncioDoTurno ? "atendimento_protocolo" : "finalizacao_nina",
+          aviso_mensagem_id: anuncioDoTurno?.mensagemId ?? null,
+          aviso_protocolo: anuncioDoTurno?.protocolo ?? null,
+          segundo_aviso_suprimido: Boolean(anuncioDoTurno),
           erro: saidaControlada.erro,
         });
       }

@@ -664,19 +664,29 @@ export async function processarMensagemTeste(data: EntradaMensagemTeste, userId:
         );
         const { hashDoTexto } = await import("@/lib/nina/confidence/hash");
         const idSaida = (msgOut as { id?: string } | null)?.id ?? null;
+        // VÍNCULO CORRETO — a nota pertence ao texto avaliado. Se o texto
+        // entregue for outro (aviso controlado, mensagem de sistema), a saída
+        // é registrada SEM nota: a tela mostra "Resposta não avaliada".
+        const hashEntregue = hashDoTexto(reply);
+        const mesmoTextoAvaliado =
+          Boolean(auditoriaNina.textoFinalHash) &&
+          auditoriaNina.textoFinalHash === hashEntregue;
         await registrarEntregaSaida({
           clinicaId: data.clinicaId,
-          decisaoId: auditoriaNina.decisaoId ?? null,
+          decisaoId: mesmoTextoAvaliado ? (auditoriaNina.decisaoId ?? null) : null,
+          vincularAvaliacao: mesmoTextoAvaliado,
           execucaoId: auditoriaNina.execucaoId ?? null,
           conversaId,
           outgoingMessageId: idSaida,
           representacao: "texto_completo",
           // Homologação não tem transporte real: persistida, nunca "confirmada".
           estado: idSaida ? "persistida" : "falhou",
-          textoHash: hashDoTexto(reply),
+          textoHash: hashEntregue,
           detalhe: {
             canal: CANAL_TESTE,
             hash_avaliado: auditoriaNina.textoFinalHash ?? null,
+            avaliada: mesmoTextoAvaliado,
+            ...(mesmoTextoAvaliado ? {} : { motivo: "texto_entregue_difere_do_avaliado" }),
           },
         });
         // FASE 3 — o resumo do turno é gravado ANTES da persistência (com
