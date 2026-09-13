@@ -547,6 +547,23 @@ export function resumoTurnoParaTrace(r: RegistroTurno): Record<string, unknown> 
       em: t.em,
     })),
     situacao_transformacoes: avaliarTransformacoes(r.transformacoes),
+    /**
+     * CADEIA DO TEXTO — original do modelo, versões intermediárias, avisos e
+     * mensagem entregue. Hash sempre; texto integral só com diagnóstico
+     * autorizado pela clínica (mesma regra da auditoria das instruções).
+     */
+    versoes_texto: versoesParaTrace(r.versoesTexto ?? [], r.diagnostico),
+    avisos_operacionais: r.avisosOperacionais ?? [],
+    /** Avaliações que causaram bloqueio, com o hash do texto que recebeu a nota. */
+    bloqueios: r.bloqueios ?? [],
+    /** A nota registrada vale para a mensagem entregue? Decidido por hash. */
+    nota_do_texto_entregue: notaAplicavelAoTextoFinal({
+      avaliacoes: r.avaliacoes ?? [],
+      hashFinal: r.entrega?.textoHash ?? null,
+      avisoOperacional: (r.avisosOperacionais ?? []).some(
+        (a) => a.textoHash && a.textoHash === (r.entrega?.textoHash ?? null),
+      ),
+    }),
     confianca: r.confianca,
     /** FASE 2 — cada avaliação com seu modo; shadow não vira intervenção. */
     avaliacoes: r.avaliacoes,
