@@ -1,4 +1,6 @@
 import { describe, expect, it } from "bun:test";
+import { extrairEvidencia } from "./confidence/evidencia-extrator";
+import { verificarFormaPagamento } from "./confidence/pagamento-declarado";
 import {
   avisoVigente,
   montarResultadoCatalogo,
@@ -39,6 +41,81 @@ const profissional: ProfissionalPublicado = {
 };
 
 describe("catálogo como fonte de conhecimento da Nina", () => {
+  it.each([null, undefined, "inválido", [null], []].map((formas) => ({ formas })))(
+    "preserva lista de pagamento sem confundir ausência e lista vazia: %j",
+    ({ formas }) => {
+      for (const tipo of ["servico", "profissional"]) {
+        const dados = montarResultadoCatalogo({
+          servicos:
+            tipo === "servico"
+              ? [{ ...servico, nome: "Consulta Cardiologia", formas_pagamento: formas }]
+              : [],
+          profissionais:
+            tipo === "profissional" ? [{ ...profissional, formas_pagamento: formas }] : [],
+          hojeISO: "2026-09-13",
+        });
+        const evidencia = extrairEvidencia({
+          ferramenta: "consultar_base_conhecimento",
+          capacidade: "searchKnowledgeBase",
+          fonte: "base_conhecimento",
+          success: true,
+          args: { termo: "cardiologia" },
+          dados,
+        });
+        const resultado = verificarFormaPagamento({
+          forma: "pix",
+          negacao: true,
+          chave: { procedimento: "Cardiologia" },
+          fatos: evidencia.fatos,
+          consultas: [evidencia.consulta],
+        });
+        expect(resultado.situacao === "confirmado").toBe(
+          Array.isArray(formas) && formas.length === 0,
+        );
+      }
+    },
+  );
+
+  it("não converte um preço cadastrado só em PIX para dinheiro", () => {
+    const formas = [{ forma: "PIX", valor: 100, condicao: "Consulta Cardiologia" }];
+    const s = servicoParaRegistro({ ...servico, valor: 100, formas_pagamento: formas });
+    const p = profissionalParaRegistro({ ...profissional, formas_pagamento: formas }, "2026-09-13");
+    for (const registro of [s, p]) {
+      expect(registro.preco_dinheiro).toBeNull();
+      expect(registro.extras?.formas_pagamento).toEqual(formas);
+      expect(registro.observacoes).toContain("PIX");
+    }
+  });
+
+  it("preserva valores distintos de PIX e dinheiro sem depender da ordem das formas", () => {
+    const formas = [
+      { forma: "PIX", valor: 95 },
+      { forma: "Dinheiro", valor: 100 },
+    ];
+    for (const ordem of [formas, [...formas].reverse()]) {
+      expect(servicoParaRegistro({ ...servico, formas_pagamento: ordem }).preco_dinheiro).toBe(100);
+      expect(
+        profissionalParaRegistro({ ...profissional, formas_pagamento: ordem }, "2026-09-13")
+          .preco_dinheiro,
+      ).toBe(100);
+    }
+  });
+
+  it("um valor genérico sem formas não declara aceite em dinheiro", () => {
+    const r = servicoParaRegistro({ ...servico, valor: 100, formas_pagamento: [] });
+    expect(r.preco_dinheiro).toBeNull();
+    expect(r.observacoes).toContain("forma de pagamento não informada");
+  });
+
+  it("pagamento à vista não declara dinheiro nem PIX por suposição", () => {
+    const r = servicoParaRegistro({
+      ...servico,
+      formas_pagamento: [{ forma: "À vista", valor: 100 }],
+    });
+    expect(r.preco_dinheiro).toBeNull();
+    expect(r.extras?.formas_pagamento).toEqual([{ forma: "À vista", valor: 100 }]);
+  });
+
   it("mapeia serviço preservando preços por forma de pagamento e preparo", () => {
     const r = servicoParaRegistro(servico);
     expect(r.procedimento).toBe("ECOCARDIOGRAMA");

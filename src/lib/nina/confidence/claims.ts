@@ -40,15 +40,18 @@ import {
 import {
   type ClasseDiagnostico,
   chaveDaAfirmacaoMonetaria,
+  chavesDaAfirmacaoMonetaria,
   correspondenciaDaAfirmacao,
   fatosNoEscopoDaAfirmacao,
   qualificadoresDaAfirmacao,
+  formasDePagamentoNoTexto,
   referenciaDoFato,
   segmentoNaPosicao,
   segmentosDaResposta,
   valorDaAfirmacao,
   TERMOS_DE_ASSUNTO,
 } from "./afirmacao";
+import { escopoDaFormaPagamento, verificarFormaPagamento } from "./pagamento-declarado";
 
 import {
   classificarNatureza,
@@ -412,7 +415,7 @@ export function extrairClaimsDoTexto(texto: string): ClaimDoTexto[] {
   for (const { tipo, re } of PADROES) {
     for (const m of t.matchAll(re)) {
       const trecho = String(m[0]).trim().slice(0, 160);
-      const chave = `${tipo}:${trecho.toLowerCase()}`;
+      const chave = `${tipo}:${trecho.toLowerCase()}${tipo === "valor" ? `:${m.index}` : ""}`;
       if (!trecho || vistos.has(chave)) continue;
       vistos.add(chave);
       const posicao = m.index ?? t.indexOf(trecho);
@@ -422,6 +425,32 @@ export function extrairClaimsDoTexto(texto: string): ClaimDoTexto[] {
       const natureza = classificarNatureza(
         /\?\s*$/.test(fraseDoTrecho(t, trecho)) ? `${frase}?` : oracaoNaPosicao(t, posicao),
       );
+      if (tipo === "valor") {
+        const inicioSegmento = segmentosDaResposta(t).find(
+          (s) => posicao >= s.inicio && posicao <= s.inicio + s.texto.length,
+        );
+        const deslocamento = inicioSegmento
+          ? posicao -
+            inicioSegmento.inicio -
+            (inicioSegmento.texto.length - inicioSegmento.texto.trimStart().length)
+          : undefined;
+        for (const chaveMonetaria of chavesDaAfirmacaoMonetaria(frase, trecho, deslocamento)) {
+          achados.push({
+            tipo,
+            trecho,
+            modalidade: modalidadeDaNatureza(natureza),
+            natureza,
+            frase,
+            chave: chaveMonetaria,
+          });
+        }
+        if (achados.length >= LIMITE_CLAIMS) return achados.slice(0, LIMITE_CLAIMS);
+        continue;
+      }
+      // Declarações de aceitação têm prova própria por forma. A regra genérica
+      // "não aceitamos" não deve duplicá-las como restrição sem conteúdo.
+      if (tipo === "regra" && /aceit/i.test(trecho) && formasDePagamentoNoTexto(trecho).length)
+        continue;
       if (tipo === "disponibilidade" && !afirmaDisponibilidade(frase)) {
         const horarios = horariosSemanais(frase);
         if (horarios.length) {
@@ -478,6 +507,57 @@ export function extrairClaimsDoTexto(texto: string): ClaimDoTexto[] {
     }
   }
 
+  let escopoPagamentoAnterior: ChaveFato = {};
+  for (const { texto: segmento } of segmentosDaResposta(t)) {
+    const frase = segmento.trim();
+    if (
+      !/\b(?:aceita(?:mos|m)?|aceit[oa]s?|pode\s+pagar|pagamento\s+(?:por|via|em))\b/iu.test(frase)
+    ) {
+      escopoPagamentoAnterior = {};
+      continue;
+    }
+    const escopoExplicito = qualificadoresDaAfirmacao(frase.replace(/[*_]/g, ""));
+    const temAssunto =
+      escopoExplicito.procedimento &&
+      !["consulta", "exame", "procedimento", "atendimento"].includes(escopoExplicito.procedimento);
+    const escopoPagamento = temAssunto
+      ? escopoExplicito
+      : { ...escopoPagamentoAnterior, ...escopoExplicito };
+    if (!temAssunto && escopoPagamentoAnterior.procedimento)
+      escopoPagamento.procedimento = escopoPagamentoAnterior.procedimento;
+    // Uma mudança de verbo/polaridade inicia outra afirmação, mas dinheiro/PIX
+    // e dinheiro ou PIX continuam sendo duas formas na mesma afirmação.
+    const partes = frase.split(
+      /(?:,\s*|\s+(?:mas|por[eé]m|e)\s+)(?=(?:n[ãa]o\s+)?(?:aceitamos|aceita|aceito|pode\s+pagar))/iu,
+    );
+    for (const parte of partes) {
+      if (
+        !/\b(?:aceita(?:mos|m)?|aceit[oa]s?|pode\s+pagar|pagamento\s+(?:por|via|em))\b/iu.test(
+          parte,
+        )
+      )
+        continue;
+      const natureza = classificarNatureza(
+        /\?\s*$/.test(fraseDoTrecho(t, frase)) ? `${parte}?` : parte,
+      );
+      const chave = escopoPagamento;
+      for (const forma of formasDePagamentoNoTexto(parte)) {
+        achados.push({
+          tipo: "restricao",
+          trecho: `Pagamento ${forma}: ${parte}`.slice(0, 160),
+          modalidade: modalidadeDaNatureza(natureza),
+          natureza,
+          frase,
+          chave: { ...chave, condicoes: forma },
+          valor: `forma_pagamento:${forma}`,
+        });
+      }
+    }
+    // Herança textual apenas entre declarações consecutivas de pagamento.
+    // Não escolhe serviço nem médico a partir da ordem dos registros da base.
+    escopoPagamentoAnterior = escopoPagamento;
+  }
+
   // Afirmação operacional de agendamento: gramática única, a do workflow.
   const operacional = classificarAfirmacaoOperacional(t);
   if (operacional === "sucesso_agendamento") {
@@ -526,7 +606,7 @@ export function avaliarGrounding(
     /** FASE 3 — natureza da oração; derivada da modalidade quando ausente. */
     naturezaInformada?: NaturezaAfirmacao,
   ) => {
-    const idem = `${tipo}:${normalizarTexto(trecho)}`;
+    const idem = `${tipo}:${normalizarTexto(trecho)}${tipo === "valor" ? `:${JSON.stringify(chave)}:${frase ?? ""}` : ""}`;
     if (vistos.has(idem)) return;
     vistos.add(idem);
     if (claims.length >= LIMITE_CLAIMS) {
@@ -583,6 +663,32 @@ export function avaliarGrounding(
         suportado: false,
         fonte: null,
         motivo: "afirmação apresentada como estimativa — não confirmada em fonte oficial",
+      });
+      return;
+    }
+
+    if (tipo === "restricao" && valor?.startsWith("forma_pagamento:")) {
+      const forma = valor.slice("forma_pagamento:".length);
+      const resultado = verificarFormaPagamento({
+        forma,
+        negacao: modalidade === "negacao",
+        chave: escopoDaFormaPagamento(chave ?? {}, ctx.mensagemPaciente ?? ""),
+        clinicaId: ctx.businessContext.clinicaId,
+        fatos: fatos ?? [],
+        consultas: consultasDoTurno(ctx),
+      });
+      push({
+        tipo,
+        trecho,
+        origem,
+        modalidade,
+        natureza,
+        valorAfirmado: valor,
+        situacao: resultado.situacao,
+        suportado: resultado.situacao === "confirmado",
+        fonte: resultado.fato?.fonte ?? null,
+        ...(resultado.referencia ? { referencia: resultado.referencia } : {}),
+        motivo: resultado.motivo,
       });
       return;
     }

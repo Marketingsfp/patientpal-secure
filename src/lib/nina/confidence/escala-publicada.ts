@@ -160,10 +160,18 @@ export function itensDeOferta(trecho: string): string[] {
       /^(?:(?:realizamos|fazemos|oferecemos|temos)\s+(?:o\s+|a\s+)?(?:exames?|procedimentos?|consultas?|atendimento)|atendemos)\s*(?:em|de|:)?\s*/i,
       "",
     )
-  ).replace(
-    /\s+(?:na|no|em\s+nossa|em\s+nosso)\s+(?:cl[ií]nica|policl[ií]nica|hospital|unidade)\b.*$/i,
-    "",
-  );
+  )
+    // Um cabeçalho de lista descreve a apresentação dos profissionais, não
+    // altera o nome do serviço. Só removemos esse sufixo completo; nomes,
+    // condições ou outros serviços que venham depois continuam verificáveis.
+    .replace(
+      /\s+com\s+(?:(?:os|as)\s+)?(?:seguintes\s+)?(?:profissionais|m[ée]dicos|m[ée]dicas|especialistas)\s*:?\s*$/i,
+      "",
+    )
+    .replace(
+      /\s+(?:na|no|em\s+nossa|em\s+nosso)\s+(?:cl[ií]nica|policl[ií]nica|hospital|unidade)\b.*$/i,
+      "",
+    );
   if (
     !corpo ||
     corpo === t ||

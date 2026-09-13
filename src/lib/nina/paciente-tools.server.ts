@@ -624,7 +624,7 @@ export const FERRAMENTAS_NINA_CONSULTA = [
     function: {
       name: "buscar_procedimentos",
       description:
-        "Busca exames/procedimentos cadastrados: valores de tabela (dinheiro/PIX e cartão) e preparo. Use sempre que perguntarem preço ou preparo.",
+        "Busca exames/procedimentos cadastrados: valores com suas formas de pagamento específicas e preparo. Dinheiro e PIX são formas diferentes; informe apenas as cadastradas. Use sempre que perguntarem preço ou preparo.",
       parameters: {
         type: "object",
         properties: {

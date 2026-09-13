@@ -53,6 +53,7 @@ export const TERMOS_DE_ASSUNTO = [
   "implante",
   "limpeza",
   "clareamento",
+  "cardiologia infantil",
   "cardiologia",
   "ginecologia",
   "dermatologia",
@@ -170,10 +171,26 @@ export function formaDePagamentoNoTexto(texto: unknown): string | null {
   if (!t) return null;
   if (/\bpix\b/.test(t)) return "pix";
   if (/cart[ãa]o|parcelad|cr[ée]dito|d[ée]bito/.test(t)) return "cartao";
-  if (/dinheiro|esp[ée]cie|[àa]\s*vista/.test(t)) return "dinheiro";
+  if (/dinheiro|esp[ée]cie/.test(t)) return "dinheiro";
+  if (/\ba\s+vista\b/.test(t)) return "a vista";
   if (/\bboleto\b/.test(t)) return "boleto";
+  if (/\bcheques?\b/.test(t)) return "cheque";
   if (/conv[êe]nio|plano\s+de\s+sa[úu]de/.test(t)) return "convenio";
   return null;
+}
+
+/** Cada forma citada é uma condição independente, mesmo com um preço só. */
+export function formasDePagamentoNoTexto(texto: unknown): string[] {
+  const t = normalizarTexto(texto);
+  const formas: string[] = [];
+  if (/\bpix\b/.test(t)) formas.push("pix");
+  if (/cartao|parcelad|credito|debito/.test(t)) formas.push("cartao");
+  if (/dinheiro|especie/.test(t)) formas.push("dinheiro");
+  if (/\ba\s+vista\b/.test(t)) formas.push("a vista");
+  if (/\bboleto\b/.test(t)) formas.push("boleto");
+  if (/\bcheques?\b/.test(t)) formas.push("cheque");
+  if (/convenio|plano\s+de\s+saude/.test(t)) formas.push("convenio");
+  return formas;
 }
 
 /**
@@ -182,10 +199,10 @@ export function formaDePagamentoNoTexto(texto: unknown): string | null {
  * há correspondência — a referência é insuficiente, não uma contradição.
  */
 export function mesmaCondicaoPagamento(afirmada: unknown, doFato: unknown): boolean {
-  const a = formaDePagamentoNoTexto(afirmada);
-  const b = formaDePagamentoNoTexto(doFato);
-  if (a !== null && b !== null) return a === b;
-  if (a === null && b === null) return mesmoTexto(afirmada, doFato);
+  const a = formasDePagamentoNoTexto(afirmada);
+  const b = formasDePagamentoNoTexto(doFato);
+  if (a.length && b.length) return a.every((forma) => b.includes(forma));
+  if (!a.length && !b.length) return mesmoTexto(afirmada, doFato);
   return false;
 }
 
@@ -195,24 +212,32 @@ export function mesmaCondicaoPagamento(afirmada: unknown, doFato: unknown): bool
  * "custa R$ 51,00 no dinheiro e R$ 60,00 no cartão" tem duas afirmações no
  * mesmo segmento; cada valor precisa ser lido com a SUA condição.
  */
-export function recorteDaAfirmacao(frase: string, trecho: string): string {
+export function recorteDaAfirmacao(frase: string, trecho: string, posicao?: number): string {
   const f = frase ?? "";
   const alvo = (trecho ?? "").trim();
   if (!f || !alvo) return f;
-  const pos = f.indexOf(alvo);
+  const pos = posicao ?? f.indexOf(alvo);
   if (pos < 0) return f;
-  // A vírgula só separa quando vem seguida de espaço: "R$ 1.500,00" é um
-  // único valor, não duas afirmações.
-  const re = /,\s+|\s*(?:;|\be\b|\bou\b|\/|\||–|—)\s*/g;
-
-  let inicio = 0;
-  let m: RegExpExecArray | null;
-  while ((m = re.exec(f)) !== null) {
-    const fim = m.index;
-    if (pos >= inicio && pos < fim) return f.slice(inicio, fim);
-    inicio = m.index + m[0].length;
+  const valores = [
+    ...f.matchAll(/R\$\s?\d[\d.,]*|custa\s+\d[\d.,]*|valor\s+(?:é|de)\s+\d[\d.,]*/gi),
+  ];
+  // Dinheiro/PIX ou dinheiro e PIX não encerram o preço: todas as formas
+  // precisam ser confrontadas. Só há divisão entre dois valores concretos.
+  const limites = [0];
+  for (let i = 1; i < valores.length; i++) {
+    const anterior = valores[i - 1]!;
+    const atual = valores[i]!;
+    const inicioEntre = anterior.index! + anterior[0].length;
+    const entre = f.slice(inicioEntre, atual.index);
+    const separadores = [...entre.matchAll(/,\s+|\s*(?:;|\be\b|\bou\b|\/|\||–|—)\s*/g)];
+    const ultimo = separadores.at(-1);
+    limites.push(ultimo ? inicioEntre + ultimo.index! + ultimo[0].length : atual.index!);
   }
-  return f.slice(inicio);
+  limites.push(f.length);
+  for (let i = 0; i < limites.length - 1; i++) {
+    if (pos >= limites[i]! && pos < limites[i + 1]!) return f.slice(limites[i], limites[i + 1]);
+  }
+  return f;
 }
 
 /**
@@ -225,6 +250,19 @@ export function chaveDaAfirmacaoMonetaria(frase: string, trecho: string): ChaveF
   if (local) chave.condicoes = local;
   else if (recorteDaAfirmacao(frase, trecho) !== frase) delete chave.condicoes;
   return chave;
+}
+
+export function chavesDaAfirmacaoMonetaria(
+  frase: string,
+  trecho: string,
+  posicao?: number,
+): ChaveFato[] {
+  const chave = qualificadoresDaAfirmacao(frase.replace(/[*_]/g, ""));
+  const recorte = recorteDaAfirmacao(frase, trecho, posicao);
+  const formas = formasDePagamentoNoTexto(recorte);
+  if (formas.length) return formas.map((forma) => ({ ...chave, condicoes: forma }));
+  delete chave.condicoes;
+  return [chave];
 }
 
 // -------------------------------------------------------------- valores
@@ -368,6 +406,11 @@ function noEscopoDaAfirmacao(
     if (pedido === undefined || pedido === null || String(pedido).trim() === "") continue;
     if (campo === "procedimento" && PROCEDIMENTOS_GENERICOS.has(normalizarTexto(String(pedido))))
       continue;
+    // Preço sem forma de pagamento comprova somente o valor genérico. A
+    // condição afirmada continua obrigatória mesmo se nenhuma referência do
+    // turno trouxer uma forma para usar como discriminador.
+    if (fato.campo === "preco" && campo === "condicoes" && !String(f.condicoes ?? "").trim())
+      return false;
     // Nenhum fato deste campo traz o qualificador: ele não discrimina nada
     // neste turno, então não serve nem para aprovar nem para reprovar —
     // exceto unidade e convênio, que restringem o caso afirmado e só podem
@@ -383,6 +426,13 @@ function noEscopoDaAfirmacao(
           ? (f.medicoNome ?? f.medicoId)
           : f[campo];
     if (doFato === undefined || doFato === null || String(doFato).trim() === "") return false;
+    if (campo === "procedimento" && fato.campo === "preco") {
+      // Correspondência por substring não pode usar o preço de uma consulta
+      // geral para aprovar a infantil, nem o contrário. Os preços já chegam
+      // separados por condição clínica do registro.
+      const infantil = (v: unknown) => /\b(?:infantil|pediatric[oa])\b/u.test(normalizarTexto(v));
+      if (infantil(pedido) !== infantil(doFato)) return false;
+    }
     if (!mesmoQualificador(campo, pedido, doFato)) return false;
   }
   return true;
@@ -437,7 +487,6 @@ export type CorrespondenciaAfirmacao =
   | { situacao: "fora_do_escopo"; motivo?: string; classe?: ClasseDiagnostico }
   | { situacao: "indeterminado"; motivo: string; classe?: ClasseDiagnostico }
   | { situacao: "sem_fato" };
-
 
 export type PedidoAfirmacao = {
   tipo: TipoClaim;
@@ -599,5 +648,4 @@ export function correspondenciaDaAfirmacao(
     referencia: referenciaDoFato(primeiro),
     valorDaFonte: primeiro.valor,
   };
-
 }

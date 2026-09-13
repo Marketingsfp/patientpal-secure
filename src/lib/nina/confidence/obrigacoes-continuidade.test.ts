@@ -3,6 +3,7 @@ import { montarInstrucoesDoTurno } from "./contexto-avaliacao";
 import { avaliarObrigacaoContinuidade } from "./obrigacoes-continuidade";
 import { PROMPT_PUBLICADO_V15 } from "./fixtures/prompt-publicado-v15";
 import { avaliarObrigacoes, type Obrigacao } from "./obrigacoes";
+import { extrairEvidencia } from "./evidencia-extrator";
 import type { ContextoConfianca } from "./types";
 
 const MEDICO = "22222222-2222-4222-8222-222222222222";
@@ -84,6 +85,78 @@ function preparar(prompt = PROMPT_PUBLICADO_V15) {
 }
 
 describe("continuidade comprovada para a regra publicada integral", () => {
+  function pagamento() {
+    const preparado = preparar();
+    const evidencia = extrairEvidencia({
+      ferramenta: "consultar_base_conhecimento",
+      capacidade: "searchKnowledgeBase",
+      fonte: "base_conhecimento",
+      success: true,
+      args: { termo: "cardiologia" },
+      dados: {
+        found: true,
+        knowledge_status: "found",
+        records: [
+          {
+            id: "consulta-ficticia",
+            procedimento: "Consulta Cardiologia",
+            formas_pagamento: [
+              { forma: "Dinheiro", valor: 120 },
+              { forma: "Cartão", valor: 145 },
+            ],
+          },
+        ],
+      },
+    });
+    Object.assign(preparado.ctx, {
+      mensagemPaciente: "aceita PIX?",
+      requestedAction: "informar_valor",
+      fatos: evidencia.fatos,
+      consultas: [evidencia.consulta],
+    });
+    return preparado;
+  }
+
+  it("negativa de PIX comprovada pelo catálogo responde à pergunta curta", () => {
+    const { obrigacao, ctx } = pagamento();
+    expect(
+      avaliarObrigacaoContinuidade(
+        obrigacao,
+        ctx,
+        "Para a consulta de Cardiologia, não aceitamos PIX.",
+      )?.status,
+    ).toBe("cumprida");
+  });
+
+  it("não comprova continuidade de uma recusa de PIX sem consulta vinculada", () => {
+    const { obrigacao, ctx } = pagamento();
+    ctx.consultas = [];
+    expect(
+      avaliarObrigacaoContinuidade(
+        obrigacao,
+        ctx,
+        "Para a consulta de Cardiologia, não aceitamos PIX.",
+      ),
+    ).toBeNull();
+  });
+
+  it("não comprova continuidade respondendo a uma forma diferente", () => {
+    const { obrigacao, ctx } = pagamento();
+    ctx.mensagemPaciente = "aceita cheque?";
+    expect(
+      avaliarObrigacaoContinuidade(
+        obrigacao,
+        ctx,
+        "Para a consulta de Cardiologia, não aceitamos PIX.",
+      ),
+    ).toBeNull();
+  });
+
+  it("lista do serviço não comprova recusa em nome de toda a clínica", () => {
+    const { obrigacao, ctx } = pagamento();
+    expect(avaliarObrigacaoContinuidade(obrigacao, ctx, "Não aceitamos PIX.")).toBeNull();
+  });
+
   it("responde ao assunto atual com catálogo e oferece agenda sem reiniciar", () => {
     const { obrigacao, ctx } = preparar();
     expect(avaliarObrigacaoContinuidade(obrigacao, ctx, resposta)).toMatchObject({

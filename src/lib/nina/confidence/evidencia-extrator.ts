@@ -152,8 +152,107 @@ export function precosDoRegistro(registro: unknown): PrecoCondicao[] {
   // Resumo do próprio registro: entra sem forma, nunca apagando as detalhadas.
   const resumo = precoDe(x["preco"] ?? x["price"] ?? x["valor"], null, null);
   if (resumo) achados.push(resumo);
+  const referencia = precoDe(obj(x["extras"])["valor_referencia"], null, null);
+  if (referencia) achados.push(referencia);
 
   return dedupPrecos(achados);
+}
+
+function escoposPagamentoDoRegistro(registro: unknown): string[] {
+  const x = obj(registro);
+  const extras = obj(x["extras"]);
+  const procedimento = texto(x["procedimento"]);
+  const especialidades = Array.isArray(extras["especialidades"])
+    ? extras["especialidades"].filter((v): v is string => typeof v === "string" && !!v.trim())
+    : [];
+  if (especialidades.length && (!procedimento || /^consulta\b/.test(normalizarTexto(procedimento))))
+    return especialidades.map((e) => `Consulta ${e}`);
+  return procedimento ? [procedimento] : [];
+}
+
+/** Uma condição clínica restringe o procedimento; condição operacional não é modalidade. */
+function procedimentoDaCondicao(registro: unknown, condicao: string | null): string | null {
+  if (!condicao) return null;
+  const c = normalizarTexto(condicao);
+  if (
+    /\b(?:nao|sem|somente|apenas|exceto|vista|parcelado|parcelamento|dinheiro|cartao|pix|boleto)\b/.test(
+      c,
+    )
+  )
+    return null;
+  const especialidades = obj(obj(registro)["extras"])["especialidades"];
+  const especialidadePublicada =
+    Array.isArray(especialidades) &&
+    especialidades.some((e) => typeof e === "string" && normalizarTexto(e) === c);
+  const modalidadeClinica =
+    /^(?:consulta|exame|procedimento)(?:\s+(?:de|em))?[\s—:-]+[\p{L}][\p{L}\s-]*$/u.test(c);
+  return especialidadePublicada || modalidadeClinica ? condicao : null;
+}
+
+function assuntoPagamento(procedimento: string): string {
+  return normalizarTexto(procedimento).replace(
+    /^(?:consulta|exame|procedimento)\s*(?:de|em)?\s*[—:-]?\s*/u,
+    "",
+  );
+}
+
+/**
+ * Conjunto explicitamente declarado de formas aceitas, separado por modalidade.
+ * Serve como prova de lista completa; campos de preço isolados não provam que
+ * outras formas não são aceitas. Dados parciais ou condições não compreendidas
+ * não produzem essa prova (os fatos positivos de preço continuam independentes).
+ */
+export function formasPagamentoDeclaradas(
+  registro: unknown,
+): Array<{ procedimento: string; formas: string[] }> {
+  const x = obj(registro);
+  const extras = obj(x["extras"]);
+  const declaracoes = [x["formas_pagamento"], extras["formas_pagamento"]].filter(
+    (v) => v !== undefined,
+  );
+  if (!declaracoes.length) return [];
+  const listas: Array<Array<{ procedimento: string; formas: string[] }>> = [];
+  for (const declaracao of declaracoes) {
+    if (!Array.isArray(declaracao)) return [];
+    const grupos = new Map<string, Set<string>>();
+    // [] publicado é lista explicitamente vazia, distinta de campo ausente.
+    // Pela regra da clínica, ausência nessa lista significa forma não aceita.
+    if (!declaracao.length) {
+      for (const escopo of escoposPagamentoDoRegistro(x))
+        grupos.set(normalizarTexto(escopo), new Set());
+    }
+    for (const entrada of declaracao) {
+      const f = obj(entrada);
+      if (typeof f["forma"] !== "string" || !f["forma"].trim()) return [];
+      if (/\b(?:nao|sem|exceto|somente|apenas)\b/.test(normalizarTexto(f["forma"]))) return [];
+      if (f["condicao"] != null && typeof f["condicao"] !== "string") return [];
+      if (texto(f["observacao"])) return [];
+      const condicao = texto(f["condicao"]);
+      const procedimentoCondicionado = procedimentoDaCondicao(x, condicao);
+      if (condicao && !procedimentoCondicionado) return [];
+      const escopos = procedimentoCondicionado
+        ? [procedimentoCondicionado]
+        : escoposPagamentoDoRegistro(x);
+      if (!escopos.length) return [];
+      for (const escopo of escopos) {
+        const chave = normalizarTexto(escopo);
+        const formas = grupos.get(chave) ?? new Set<string>();
+        formas.add(normalizarTexto(f["forma"]));
+        grupos.set(chave, formas);
+      }
+    }
+    listas.push(
+      [...grupos]
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([procedimentoDoGrupo, formas]) => ({
+          procedimento: procedimentoDoGrupo,
+          formas: [...formas].sort(),
+        })),
+    );
+  }
+  // Duas listas declaradas que discordam não constituem uma lista fechada.
+  if (listas.some((lista) => JSON.stringify(lista) !== JSON.stringify(listas[0]))) return [];
+  return listas[0] ?? [];
 }
 
 /**
@@ -293,12 +392,55 @@ export function extrairEvidencia(r: RetornoFerramenta): ExtracaoEvidencia {
 
       // FASE 2 — cada condição de pagamento vira uma evidência própria.
       const centavosDetalhados = new Set<number>();
+      const fatosProfissionais: FatoRecuperado[] = [];
+      const fatosFormasDeclaradas: FatoRecuperado[] = [];
       for (const reg of registros) {
         const x = obj(reg);
         const item = texto(x["procedimento"]) ?? procedimento;
         const unidade =
           texto(x["unidade"]) ?? texto(obj(x["extras"])["unidade"]) ?? texto(clinica["nome"]);
-        for (const p of precosDoRegistro(x)) {
+        // Identidade e atuação pertencem ao registro individual. `procedure`
+        // no topo resume só o PRIMEIRO item e pode ser outro exame/consulta.
+        // Não associar os demais profissionais a esse item global.
+        const procedimentoDoRegistro = texto(x["procedimento"]);
+        const especialidadesDoRegistro = obj(x["extras"])["especialidades"];
+        const escoposDoProfissional = procedimentoDoRegistro
+          ? [{ procedimento: procedimentoDoRegistro }]
+          : Array.isArray(especialidadesDoRegistro)
+            ? especialidadesDoRegistro
+                .filter((e): e is string => typeof e === "string" && !!e.trim())
+                .map((especialidade) => ({ especialidade }))
+            : [];
+        for (const medico of (texto(x["medico"]) ?? "")
+          .split(",")
+          .map((v) => v.trim())
+          .filter(Boolean)) {
+          for (const escopo of escoposDoProfissional) {
+            fatosProfissionais.push({
+              ...base,
+              entidade: "profissional",
+              campo: "nome",
+              valor: medico,
+              registro: texto(x["id"]),
+              ...comVersao,
+              chave: { ...escopo, medicoNome: medico, unidadeId: unidade },
+            });
+          }
+        }
+        const precosDoCaso = precosDoRegistro(x);
+        for (const p of precosDoCaso) {
+          const procedimentoDoPreco = procedimentoDaCondicao(x, p.condicao);
+          // Campos de resumo não podem ampliar para outras modalidades um
+          // preço já detalhado por modalidade clínica na mesma forma.
+          if (
+            !p.condicao &&
+            precosDoCaso.some(
+              (detalhe) =>
+                normalizarTexto(detalhe.forma) === normalizarTexto(p.forma) &&
+                procedimentoDaCondicao(x, detalhe.condicao),
+            )
+          )
+            continue;
           if (p.centavos !== null) centavosDetalhados.add(p.centavos);
           fatos.push({
             ...base,
@@ -308,11 +450,47 @@ export function extrairEvidencia(r: RetornoFerramenta): ExtracaoEvidencia {
             registro: texto(x["id"]),
             ...comVersao,
             chave: {
-              procedimento: item,
+              procedimento: procedimentoDoPreco ?? item,
               medicoNome: texto(x["medico"]),
               unidadeId: unidade,
               condicoes: rotuloCondicao(p),
             },
+          });
+        }
+        const formasDeclaradas = formasPagamentoDeclaradas(x);
+        for (const declaracao of formasDeclaradas) {
+          fatosFormasDeclaradas.push({
+            ...base,
+            consulta: identidadeConsulta(r.ferramenta, r.args),
+            entidade: "restricao",
+            campo: "formas_pagamento_declaradas",
+            valor: JSON.stringify(declaracao.formas),
+            registro: texto(x["id"]),
+            ...comVersao,
+            chave: {
+              procedimento: declaracao.procedimento,
+              medicoNome: texto(x["medico"]),
+              unidadeId: unidade,
+            },
+          });
+        }
+        for (const escopo of escoposPagamentoDoRegistro(x)) {
+          if (
+            formasDeclaradas.some(
+              (declaracao) =>
+                assuntoPagamento(declaracao.procedimento) === assuntoPagamento(escopo),
+            )
+          )
+            continue;
+          fatosFormasDeclaradas.push({
+            ...base,
+            consulta: identidadeConsulta(r.ferramenta, r.args),
+            entidade: "restricao",
+            campo: "formas_pagamento_indeterminadas",
+            valor: null,
+            registro: texto(x["id"]),
+            ...comVersao,
+            chave: { procedimento: escopo, medicoNome: texto(x["medico"]), unidadeId: unidade },
           });
         }
         if (item) {
@@ -439,7 +617,11 @@ export function extrairEvidencia(r: RetornoFerramenta): ExtracaoEvidencia {
           });
         }
       }
-      for (const p of profissionais) {
+      fatos.push(...fatosProfissionais);
+      fatos.push(...fatosFormasDeclaradas);
+      // Contrato legado sem registros detalhados. Com registros, só o vínculo
+      // individual comprova que um profissional atua naquele procedimento.
+      for (const p of registros.length === 0 ? profissionais : []) {
         fatos.push({
           ...base,
           entidade: "profissional",

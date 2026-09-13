@@ -1,5 +1,6 @@
 /** Prova estreita de continuidade no atendimento informativo. Sem banco ou modelo. */
 import { autorizarConsultaAgenda } from "../consulta-agenda";
+import { formasDePagamentoNoTexto } from "./afirmacao";
 import { avaliarGrounding } from "./claims";
 import { normalizarTexto } from "./evidencia";
 import type { AvaliacaoObrigacao, Obrigacao } from "./obrigacoes";
@@ -238,7 +239,21 @@ export function avaliarObrigacaoContinuidade(
     grounding.truncado
   )
     return null;
-  if (!agenda && !temAssuntoCorrespondente(msg, resposta, ctx)) return null;
+  // Uma negativa comprovada responde à forma perguntada mesmo quando ela não
+  // consta da lista publicada. A prova vem do verificador do caso consultado,
+  // nunca da frase de recusa isolada nem de uma consulta que falhou.
+  const pagamentoRespondido = formasDePagamentoNoTexto(msg).some((forma) =>
+    grounding.claims.some(
+      (claim) =>
+        claim.tipo === "restricao" &&
+        claim.valorAfirmado === `forma_pagamento:${forma}` &&
+        claim.suportado &&
+        claim.situacao === "confirmado" &&
+        claim.fonte === "catalogo_publicado" &&
+        Boolean(claim.referencia),
+    ),
+  );
+  if (!agenda && !pagamentoRespondido && !temAssuntoCorrespondente(msg, resposta, ctx)) return null;
 
   const atuais = perguntas(resposta);
   const historico = [...e.historico, { role: "user", content: ctx.mensagemPaciente ?? "" }];

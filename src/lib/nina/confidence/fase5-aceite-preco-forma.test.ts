@@ -149,14 +149,14 @@ describe("FASE 5 — cenários obrigatórios de aceite", () => {
     expect(erro[0]!.diagnostico?.profissional).toContain("Marina");
   });
 
-  it("8. condições explícitas preservadas (à vista x parcelado)", () => {
-    // "à vista" é lido como dinheiro e "parcelado" como cartão, conforme cadastro.
+  it("8. à vista permanece condição literal e não é presumido como dinheiro", () => {
+    // Dinheiro cadastrado não define todas as formas que podem ser à vista.
     const r = monetarias(
       [ECG],
       "O eletrocardiograma sai por R$ 51,00 à vista e R$ 60,00 parcelado no cartão.",
     );
-    expect(r.map((c) => c.diagnostico?.forma)).toEqual(["dinheiro", "cartao"]);
-    expect(r.every((c) => c.situacao === "confirmado")).toBe(true);
+    expect(r.map((c) => c.diagnostico?.forma)).toEqual(["a vista", "cartao"]);
+    expect(r.map((c) => c.suportado)).toEqual([false, true]);
   });
 
   it("9. formatos de retorno: records, registros e resumo com detalhes", () => {

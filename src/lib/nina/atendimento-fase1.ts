@@ -33,7 +33,7 @@ const PADROES: Array<{ intencao: IntencaoNina; termos: RegExp }> = [
   { intencao: "remarcacao", termos: /\b(remarcar|remarcacao|reagendar|mudar (o )?(dia|horario)|trocar (o )?(dia|horario)|adiar)\b/ },
   { intencao: "agendamento", termos: /\b(agendar|marcar|agendamento|quero marcar|posso marcar|marcacao)\b/ },
   { intencao: "disponibilidade", termos: /\b(tem vaga|vagas?|disponibilidade|disponivel|tem horario|encaixe|consegue (hoje|amanha|sabado))\b/ },
-  { intencao: "valor", termos: /\b(valor|valores|preco|precos|quanto custa|quanto e|quanto fica|custa|tabela)\b/ },
+  { intencao: "valor", termos: /\b(valor|valores|preco|precos|quanto custa|quanto e|quanto fica|custa|tabela|formas? de pagamento)\b|\b(?:aceitam?|posso pagar|pode pagar|pagar)\s+(?:(?:no|em|por|via|com)\s+)?(?:pix|dinheiro|cartao|boleto|cheque)\b|^(?:e\s+)?(?:no|em|por|via)\s+(?:pix|dinheiro|cartao|boleto|cheque)\s*\??$/ },
   { intencao: "preparo", termos: /\b(preparo|jejum|precisa de jejum|como me preparo|posso comer)\b/ },
   { intencao: "documentos", termos: /\b(documento|documentos|rg|carteirinha|pedido medico|encaminhamento|o que levar|preciso levar)\b/ },
   { intencao: "endereco", termos: /\b(endereco|onde fica|localizacao|como chego|rua|bairro|mapa|referencia)\b/ },
