@@ -676,7 +676,7 @@ describe("FASE 6 — R/S/T: versões, marcador literal e histórico", () => {
     });
     expect(ordemValida(r.eventos)).toBe(true);
     expect(r.eventos.map((e) => e.tipo)).toContain("operacao_fila");
-    expect(apurarEfeitoFinal(r.eventos).efeito).toBe("fila_confirmada");
+    expect(apurarEfeitoFinal(r.eventos).efeito).toBe("aviso_enviado");
 
     const enviada = r.eventos.find((e) => e.tipo === "saida_enviada");
     expect(enviada?.conteudo).toBe(AVISO_ENCAMINHAMENTO_HUMANO);
