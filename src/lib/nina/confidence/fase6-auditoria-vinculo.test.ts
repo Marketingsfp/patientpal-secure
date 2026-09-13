@@ -5,7 +5,7 @@
  */
 import { describe, expect, it } from "bun:test";
 import { extrairConflitos, sanearEvidencia } from "./auditoria";
-import { rotuloConfianca, scoreExibido, TETO_VISUAL_GERATIVO } from "../confianca-badge";
+import { rotuloConfianca, scoreExibido } from "../confianca-badge";
 import {
   calcularCalibracaoPorFaixa,
   calcularTaxaErroAltaConfianca,
@@ -81,10 +81,9 @@ describe("FASE 6 — conflito auditável", () => {
   });
 });
 
-describe("FASE 6 — score exibido", () => {
-  it("limita a exibição gerativa a 99%", () => {
-    expect(TETO_VISUAL_GERATIVO).toBe(99);
-    expect(scoreExibido(100)).toBe(99);
+describe("FASE 5 — score exibido", () => {
+  it("mostra o índice real, sem teto visual de 99", () => {
+    expect(scoreExibido(100)).toBe(100);
     expect(scoreExibido(74)).toBe(74);
   });
 

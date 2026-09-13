@@ -28,17 +28,15 @@ const CURTO: Record<string, string> = {
 };
 
 /**
- * FASE 6 — teto visual de 99% para resposta gerativa da Nina.
+ * FASE 5 — sem teto visual.
  *
- * Enquanto não houver calibração estatística suficiente, não exibimos 100%
- * como certeza absoluta. É proteção semântica de interface: o score gravado
- * no snapshot NÃO é alterado, e eventos determinísticos seguem seu próprio
- * conceito, fora desta formatação.
+ * O antigo teto transformava 100 em 99 só na tela, criando divergência entre a
+ * nota exibida e a nota gravada. A proteção correta não é mexer no número: é
+ * dizer o que ele significa. O índice é técnico (quanto pôde ser conferido e
+ * como saiu), nunca probabilidade de acerto — texto em NOTA_INDICE_TECNICO.
  */
-export const TETO_VISUAL_GERATIVO = 99;
-
 export function scoreExibido(score: number): number {
-  return Math.min(score, TETO_VISUAL_GERATIVO);
+  return Math.round(score);
 }
 
 /**
@@ -87,11 +85,14 @@ export function ehAltaConfiancaComErro(
 }
 
 /**
- * FASE 6 — a nota é ÍNDICE DE EVIDÊNCIA (0–100), não probabilidade de acerto.
- * Ela mede quanto do que importava pôde ser verificado e como esses sinais
- * foram — nunca uma chance estatística calibrada.
+ * FASE 5 — rótulo padronizado: "Índice da resposta: X/100".
+ * É índice técnico de verificação, não probabilidade de acerto.
  */
-export const ROTULO_INDICE_EVIDENCIA = "Índice de evidência (0–100)";
+export const ROTULO_INDICE_EVIDENCIA = "Índice da resposta (0–100)";
+
+export const NOTA_INDICE_TECNICO =
+  "Índice técnico de verificação (0–100). Mede quanto do que importava pôde ser " +
+  "conferido e como esses pontos saíram. Não é probabilidade de acerto.";
 
 export function textoIndiceEvidencia(score: number): string {
   return `${scoreExibido(score)}/100`;
