@@ -421,6 +421,9 @@ export const finalizarItemExecucao = createServerFn({ method: "POST" })
         handoffCliente: z.boolean().nullish(),
         interrompido: z.boolean().nullish(),
         turnosUsados: z.number().int().min(0).max(100).nullish(),
+        /** Só reinicia a sessão quando pedido explicitamente (padrão: não). */
+        reiniciarSessao: z.boolean().optional(),
+
       })
       .parse(input),
   )
