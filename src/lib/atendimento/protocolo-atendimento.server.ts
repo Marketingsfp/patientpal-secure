@@ -22,6 +22,11 @@ import { ambienteDoHandoff, deveInformarProtocolo, vinculoProtocolo } from "./pr
 import { classificarMotivoHandoff, type MotivoHandoff } from "./mensagem-handoff";
 import { nomeContato } from "./rotulo-conversa";
 import type { StatusEnvioHandoff, TransporteHandoff } from "./handoff-auditoria";
+import type {
+  AmbienteAviso,
+  OrigemAviso,
+  ResultadoAvisoEncaminhamento,
+} from "./aviso-encaminhamento";
 
 
 
