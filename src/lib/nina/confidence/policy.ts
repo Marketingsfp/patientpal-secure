@@ -116,18 +116,33 @@ export type PoliticaConfianca = {
  * dimensões de PRÉ-CONDIÇÃO DA AÇÃO (`validadoresDeAcao`) deixaram de pontuar
  * e de bloquear a avaliação da mensagem. Nenhum limite crítico foi reduzido.
  */
-export const VERSAO_POLITICA = "v5";
+/*
+ * v5 -> v6 (Fase 3 pontuação): o ORÇAMENTO de cumprimento de instruções deixou
+ * de ser uma dimensão agregada com nota média e passou a ser repartido, em
+ * partes iguais, entre as obrigações SUBSTANTIVAS aplicáveis (ESSENCIAL e
+ * CONVERSACIONAL) depois de agrupar equivalentes. O agregado e as parcelas
+ * nunca se somam. A avaliação de LINGUAGEM saiu da nota e da cobertura para
+ * uma dimensão própria, que permanece indeterminada quando não há verificador
+ * e, sozinha, não rebaixa o turno. Violação ou falta de prova de requisito
+ * ESSENCIAL passou a impedir aprovação explicitamente
+ * (`ESSENTIAL_REQUIREMENT_VIOLATED` / `ESSENTIAL_REQUIREMENT_UNPROVEN`), em vez
+ * de ser diluída na média. Nenhum limite de classificação foi alterado.
+ */
+export const VERSAO_POLITICA = "v6";
 /**
  * Versão do motor gravada junto com cada avaliação.
  * FASE 7 — "Confidence Engine v2": motor com cobertura de evidências,
  * coerência de workflow, grounding por afirmação e verificação da resposta
  * final. Snapshots gravados por versões anteriores continuam legíveis: eles
  * são apenas lidos sob a régua da época (ver `ehVersaoMotorHistorica`).
+ * FASE 3 (pontuação) — "confidence-v3": repartição do peso das instruções,
+ * linguagem em dimensão separada e guarda explícita de requisito essencial.
  */
-export const VERSAO_MOTOR = "confidence-v2";
+export const VERSAO_MOTOR = "confidence-v3";
 
 /** Versões antigas do motor que continuam válidas apenas para leitura. */
-export const VERSOES_MOTOR_HISTORICAS = ["engine-v6"] as const;
+export const VERSOES_MOTOR_HISTORICAS = ["engine-v6", "confidence-v2"] as const;
+
 
 export function ehVersaoMotorHistorica(versao: string | null | undefined): boolean {
   const v = (versao ?? "").trim();
