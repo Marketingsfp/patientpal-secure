@@ -426,6 +426,10 @@ export async function encaminharParaHumano(args: {
     mensagem: atribuida
       ? `Conversa encaminhada e atribuída a ${atribuida.nome}. A IA parou de responder.`
       : "Conversa encaminhada para a equipe. A IA parou de responder.",
+    // RESULTADO ESTRUTURADO — quem chamou não precisa inventar comunicação:
+    // aqui está o protocolo, o estado do aviso e a mensagem já entregue.
+    protocolo: protocoloHandoff,
+    aviso: avisoEncaminhamento,
   };
 
 }
