@@ -247,8 +247,12 @@ export function medirEvidencia(
   const pendentes: string[] = [];
 
   for (const v of validators) {
-    const peso = politica.pesos[v.validator] ?? 0;
+    // FASE 3 (pontuação) — quando a dimensão chega repartida em parcelas, o
+    // peso da parcela substitui o peso da política. É isso que impede somar o
+    // orçamento do agregado JUNTO com o peso das suas próprias parcelas.
+    const peso = v.pesoParcela ?? politica.pesos[v.validator] ?? 0;
     if (v.status === "NOT_APPLICABLE") {
+
       naoAplicaveis.push(v.validator);
       continue;
     }
