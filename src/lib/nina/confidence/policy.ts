@@ -430,6 +430,20 @@ export function aplicarPolitica(
     limitacoes.push("CRITICAL_DIMENSION_UNKNOWN");
   }
 
+  // (3b) FASE 3 (pontuação) — requisito ESSENCIAL publicado violado ou sem
+  // prova. A nota é apenas a média dos sinais conhecidos; um requisito
+  // essencial em falta não é compensável por peso de outras parcelas.
+  if (e.requisitoEssencialViolado === true) {
+    score = Math.min(score, politica.limites.MEDIUM - 1);
+    permitidoAllow = false;
+    limitacoes.push("ESSENTIAL_REQUIREMENT_VIOLATED");
+  } else if (e.requisitoEssencialSemProva === true) {
+    score = Math.min(score, politica.limites.HIGH - 1);
+    permitidoAllow = false;
+    limitacoes.push("ESSENTIAL_REQUIREMENT_UNPROVEN");
+  }
+
+
   // (4) Fonte obrigatória desconhecida: não se responde no escuro.
   const fontesDesconhecidas = desconhecidas.filter((d) => cfg.fontesObrigatorias.includes(d));
   if (fontesDesconhecidas.length > 0) {
