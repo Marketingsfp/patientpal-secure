@@ -2958,8 +2958,8 @@ async function gerarRespostaNinaInterno(
           // apontando para o texto que RECEBEU a nota (o candidato), não para
           // o aviso que o substituiu.
           registrarEvidenciaBloqueio({
-            tipo: "confianca_baixa",
-            motivo: bloqueio.motivo,
+            tipo: "baixa_confiabilidade",
+            motivo: bloqueio.motivo ?? "baixa confiabilidade",
             avaliacao: "answer_confidence",
             decisaoId: registro.id ?? null,
             textoAvaliadoHash:
@@ -2967,21 +2967,24 @@ async function gerarRespostaNinaInterno(
             score: bloqueio.score ?? null,
             nivel: bloqueio.nivel ?? null,
             etapa: bloqueio.etapa ?? null,
-            substituiuTexto: true,
+            textoSubstitutoHash: resposta ? hashTurno(resposta) : null,
           });
           // AVISO OPERACIONAL: origem e validação declaradas; porcentagem de
           // confiança NÃO se aplica e isso fica escrito, sem inventar nota.
           if (resposta) {
             registrarAvisoOperacional({
               origem: saidaControlada.origem,
-              tipo: "confianca_baixa",
+              tipo: "baixa_confiabilidade",
               motivo: motivoBloqueio,
-              validacao: saidaControlada.registro,
-              validacaoDoEncaminhamento: saidaControlada.encaminhamentoConfirmado
-                ? "confirmado"
-                : saidaControlada.encaminhamento,
+              validacao: validacaoDoEncaminhamento(
+                ambienteSaida === "homologacao"
+                  ? { tipo: "simulado" }
+                  : { tipo: "real", confirmado: saidaControlada.encaminhamentoConfirmado === true },
+              ),
               protocolo: anuncioDoTurno?.protocolo ?? null,
               mensagemId: anuncioDoTurno?.mensagemId ?? null,
+              execucaoId: execucaoIdFinal ?? null,
+              handoffEventoId: null,
               textoHash: hashTurno(resposta),
             });
           }
