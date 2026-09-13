@@ -9,6 +9,7 @@
  * (`../confidence-engine`) em vez de criar uma segunda gramática paralela.
  */
 import { detectarCategorias, type CategoriaConfianca } from "../confidence-engine";
+import { afirmaOuPrometeAgendamento } from "../afirmacao-agendamento";
 import { avaliarGrounding, extrairClaimsDoTexto } from "./claims";
 import { hashDoTexto } from "./hash";
 import {
@@ -134,7 +135,13 @@ function filtrarCategoriasAfirmadas(
  */
 
 function categoriasDoContexto(ctx: ContextoConfianca): CategoriaConfianca[] {
-  const doTexto = detectarCategorias(ctx.draftText ?? "");
+  // "(agendado)" pode ser a modalidade publicada de atendimento. A palavra
+  // isolada não prova que uma reserva do paciente foi executada ou prometida.
+  // Ações criar/cancelar continuam acrescentando a categoria abaixo, mesmo
+  // sem rascunho; os fatos de escala/vagas seguem na verificação individual.
+  const doTexto = detectarCategorias(ctx.draftText ?? "").filter(
+    (categoria) => categoria !== "agendamento" || afirmaOuPrometeAgendamento(ctx.draftText),
+  );
   const porAcao: Partial<Record<string, CategoriaConfianca>> = {
     informar_valor: "valor",
     informar_horario: "horario",

@@ -1699,10 +1699,9 @@ async function gerarRespostaNinaInterno(
   let disponibilidadeConfirmada = false;
   // Dados já coletados no turno — entram no resumo estruturado do handoff.
   const dadosColetados: Record<string, unknown> = {};
-  // Frases que afirmam/prometem agendamento. Se aparecerem sem gravação
-  // confirmada, a resposta é falso sucesso e não pode ir ao paciente.
-  const AFIRMA_AGENDAMENTO =
-    /(estou|vou|irei)\s+agend|agendando|agendei|agendada|agendado|marcada|marquei|reserv(ei|ada)|confirmad[oa]\s+(seu|sua)\s+(consulta|agendamento|hor[áa]rio)/i;
+  // Modalidade publicada ("atendimento agendado") não é uma reserva do
+  // paciente. Uma afirmação real de reserva continua exigindo confirmação.
+  const { afirmaOuPrometeAgendamento } = await import("@/lib/nina/afirmacao-agendamento");
   const MAX_RODADAS = podeAgendar ? 6 : 3;
   // Estado do turno para o Reasoning Router (Fase 2).
   const nomesFerramentasTurno: string[] = [];
@@ -1819,12 +1818,12 @@ async function gerarRespostaNinaInterno(
     if (chamadas.length === 0) {
       const texto = (msg?.content ?? "").trim();
       // ---------------- defesa contra falso sucesso ----------------
-      // O modelo encerrou o turno afirmando que agendou, mas nenhuma
-      // gravação foi confirmada. Damos UMA chance de chamar a ferramenta.
+      // O modelo afirmou uma reserva sem gravação confirmada. A tentativa
+      // de correção não constitui autorização para criar um agendamento.
       if (
         podeAgendar &&
         !agendamentoConfirmado &&
-        AFIRMA_AGENDAMENTO.test(texto) &&
+        afirmaOuPrometeAgendamento(texto) &&
         !correcaoFalsoSucessoUsada &&
         rodada < MAX_RODADAS - 1
       ) {
@@ -1839,11 +1838,11 @@ async function gerarRespostaNinaInterno(
         mensagens.push({
           role: "system",
           content:
-            "Nenhum agendamento foi gravado. É PROIBIDO dizer que agendou, que está agendando ou que vai agendar sem chamar a ferramenta 'agendar' e receber appointment_id. Chame agora a ferramenta 'agendar' com os campos inicio/fim exatos do horário confirmado. Se não for possível, responda apenas: 'Não consegui concluir seu agendamento neste momento. Vou verificar novamente.'",
+            "Não há confirmação de um agendamento gravado para este paciente. Corrija a afirmação de reserva ou promessa sem confirmação, preservando as informações publicadas que respondem ao pedido atual. Descrever a modalidade de atendimento agendado não significa que uma consulta foi marcada. Esta correção não autoriza consultar vagas, agendar nem coletar dados sem a solicitação e as condições exigidas pelo fluxo. Não transforme um pedido de informação em pedido de agendamento.",
         });
         continue;
       }
-      if (podeAgendar && !agendamentoConfirmado && AFIRMA_AGENDAMENTO.test(texto)) {
+      if (podeAgendar && !agendamentoConfirmado && afirmaOuPrometeAgendamento(texto)) {
         resposta = "Não consegui concluir seu agendamento neste momento. Vou verificar novamente.";
         {
           const { registrarOrigemResposta } = await import("@/lib/nina/rastreio/turno.server");
