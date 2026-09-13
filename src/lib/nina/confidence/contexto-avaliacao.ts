@@ -147,8 +147,13 @@ export function montarInstrucoesDoTurno(e: EntradaInstrucoesDoTurno): Instrucoes
     versaoId: e.versaoId ?? null,
     hash,
   });
+  // FASE 4 — identidade declarada pela PUBLICAÇÃO (bloco de identidade).
+  // Conteúdo confiável; serve de referência para conferir a apresentação da
+  // resposta. Ausente quando a publicação não declara identidade.
+  const identidade = extrairIdentidadePublicada(e.texto ?? null);
   return {
     escopo: e.escopo,
+    ...(identidade ? { identidade } : {}),
     versao: e.versao ?? null,
     versaoId: e.versaoId ?? null,
     publicadoEm: e.publicadoEm ?? null,
