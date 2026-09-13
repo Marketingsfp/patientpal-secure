@@ -125,6 +125,9 @@ export async function protocoloAoIniciarHandoff(args: {
   handoffEventoId?: string | null;
   /** FASE 3 — comunica o encaminhamento e o protocolo ao paciente. */
   anunciar?: boolean;
+  /** Turno/sessão de origem — identidade persistente da operação de aviso. */
+  turnoId?: string | null;
+  sessaoId?: string | null;
 }): Promise<
   (NonNullable<ProtocoloGerado> & { anuncio: ResultadoAnuncioHandoff | null }) | null
 > {
@@ -143,24 +146,11 @@ export async function protocoloAoIniciarHandoff(args: {
           clinicaId: args.clinicaId,
           conversaId: args.conversaId,
           protocolo: r.protocolo,
+          turnoId: args.turnoId ?? null,
+          sessaoId: args.sessaoId ?? null,
+          handoffEventoId: args.handoffEventoId ?? null,
         });
   return { ...r, anuncio };
-}
-
-
-/** O paciente já recebeu este número neste atendimento? */
-async function protocoloJaInformado(clinicaId: string, conversaId: string, protocolo: string) {
-  const { data } = await supabaseAdmin
-    .from("atend_conversa_eventos")
-    .select("id, detalhes")
-    .eq("clinica_id", clinicaId)
-    .eq("conversa_id", conversaId)
-    .order("created_at", { ascending: false })
-    .limit(50);
-  return ((data ?? []) as Array<{ detalhes: unknown }>).some((e) => {
-    const d = e.detalhes as { protocolo_informado?: unknown; protocol_number?: unknown } | null;
-    return Boolean(d?.protocolo_informado) && d?.protocol_number === protocolo;
-  });
 }
 
 /**
