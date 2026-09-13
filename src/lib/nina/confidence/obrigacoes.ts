@@ -752,17 +752,45 @@ export function InstructionComplianceValidator(
   const descumpridas = consideradas.filter((a) => a.status === "descumprida");
   const verificaveis = consideradas.filter((a) => a.status !== "indeterminada");
 
-  // Não existe mais isenção por "turno social". O que decide é a REGRA: se a
+  // Não existe isenção por "turno social". O que decide é a REGRA: se a
   // condição dela não ocorreu, ela já saiu na aplicabilidade; se ocorreu e não
   // pôde ser conferida, continua UNKNOWN, em qualquer tipo de turno.
+  //
+  // ÚNICA exceção, e ela vem do próprio texto publicado: exigência de
+  // LINGUAGEM escrita em texto aberto, isoladamente não verificável, não é
+  // prova de resposta incorreta e não pode, sozinha, rebaixar o turno. Ela
+  // fica registrada como LIMITAÇÃO declarada (evidence.limitacoes), sem virar
+  // "não sei" na cobertura. Regra não interpretada, regra literal, proibição
+  // de conteúdo e qualquer descumprimento continuam valendo integralmente.
+  const indeterminadas = consideradas.filter((a) => a.status === "indeterminada");
+  const somenteLinguagemAberta =
+    indeterminadas.length > 0 &&
+    indeterminadas.every(
+      (a) =>
+        a.motivo === "LINGUAGEM_ABERTA_NAO_VERIFICAVEL" &&
+        a.obrigacao.tipo === "restricao_aberta",
+    );
+
   let status: StatusValidador;
   let reasonCode: string;
   if (verificaveis.length === 0 && pendentes.length > 0) {
     status = "PENDING";
     reasonCode = "AMBIGUIDADE_A_RESOLVER";
+  } else if (verificaveis.length === 0 && descumpridas.length === 0 && somenteLinguagemAberta) {
+    // Nada verificável além de linguagem aberta: dimensão não aplicável a este
+    // turno, com a limitação declarada. Não entra na cobertura.
+    status = "NOT_APPLICABLE";
+    reasonCode = "SOMENTE_LINGUAGEM_ABERTA_NAO_VERIFICAVEL";
   } else if (verificaveis.length === 0) {
     status = "UNKNOWN";
     reasonCode = "OBRIGACOES_NAO_VERIFICAVEIS";
+  } else if (
+    descumpridas.length === 0 &&
+    r.estadoRestricoes === "indeterminadas" &&
+    somenteLinguagemAberta
+  ) {
+    status = "PASS";
+    reasonCode = "OBRIGACOES_CUMPRIDAS_COM_LINGUAGEM_ABERTA_NAO_VERIFICADA";
   } else if (descumpridas.length === 0 && r.estadoRestricoes === "indeterminadas") {
     // Existe regra publicada aplicável que não pôde ser conferida: não aprova.
     status = "UNKNOWN";
