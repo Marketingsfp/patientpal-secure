@@ -350,7 +350,7 @@ describe("7. HIGH/MEDIUM sem motivo de humano não são transferidos", () => {
       portas: portasReais(reg),
     });
     expect(s.desfecho).toBe("ENTREGUE");
-    expect(s.mensagemEnviada).toBe(SAUDACAO_BOA.candidato);
+    expect(s.mensagemEnviada).toBe(SAUDACAO_BOA.candidato!);
     expect(s.apresentacaoConcluida).toBe(true);
     expect(reg).toHaveLength(0);
   });
