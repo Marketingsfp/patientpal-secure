@@ -137,9 +137,9 @@ describe("FASE 3 — a proteção continua valendo dentro de uma saudação", ()
     });
 
     expect(r.nivel).toBe("LOW");
-    // A afirmação nem sequer foi reconhecida pelo extrator: sem lastro
-    // conferido, a exceção social não libera.
-    expect(r.regrasDesconhecidas.some((u) => u.startsWith("ClaimGroundingValidator"))).toBe(true);
+    // A data relativa com hora agora é reconhecida: sem evidência da agenda,
+    // a saudação continua bloqueada e não ganha uma exceção social.
+    expect(r.avaliacao.claims?.semEvidencia.some((c) => c.tipo === "disponibilidade")).toBe(true);
     expect(r.bloqueio.bloquear).toBe(true);
     expect(r.bloqueio.impedimentoSaudacao).toBe("AFIRMACAO_SEM_FONTE");
     expect(r.entregouCandidata).toBe(false);

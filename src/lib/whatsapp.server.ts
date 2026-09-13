@@ -712,7 +712,7 @@ async function gerarRespostaNinaInterno(
       telefoneRemetente
         ? supabaseAdmin
             .from("whatsapp_mensagens")
-            .select("id, direction, body, created_at")
+            .select("id, direction, body, created_at, conversa_id, status, is_teste")
             .eq("clinica_id", clinicaId)
             // Marcadores de sistema (divisores de ciclo, avisos internos) são
             // só para leitura humana: nunca entram no contexto do modelo.
@@ -1213,6 +1213,31 @@ async function gerarRespostaNinaInterno(
     }
   })();
 
+  const { interesseEmConsultarAgenda, FERRAMENTAS_DE_VAGAS, consultaAgendaAguardandoPaciente } =
+    await import("@/lib/nina/consulta-agenda");
+  const { historicoParaConsultaAgenda } = await import("@/lib/nina/consulta-agenda-historico");
+  const idsDoTurno = new Set(opcoes?.mensagensEntrada ?? []);
+  // Snapshot só de mensagens já entregues da sessão. Respostas candidatas do
+  // modelo e argumentos de ferramentas não podem fabricar aceite do paciente.
+  const contextoConsultaAgenda = {
+    mensagemAtual: mensagemPaciente,
+    historico: historicoParaConsultaAgenda(msgsMemoria, {
+      conversaId: estadoId.conversaId,
+      inicioSessao: sessaoNina.estado.session_started_at ?? null,
+      corteMemoria,
+      teste: opcoes?.teste === true,
+      idsDoTurno,
+    }),
+    medicoEscolhido: {
+      id: fluxoEstado.appointment.doctor_id,
+      nome: fluxoEstado.appointment.doctor_name,
+    },
+    disponibilidadeJaConsultada: Boolean(
+      fluxoEstado.appointment.slot_inicio && fluxoEstado.appointment.slot_fim,
+    ),
+  };
+  const interesseAgendaConfirmado = interesseEmConsultarAgenda(contextoConsultaAgenda);
+
   // ------------------------------------------------------------------
   // PRECEDÊNCIA DO TURNO — antes do modelo, e agora também no fluxo NORMAL.
   // As regras da versão publicada aplicáveis a ESTA mensagem, ambiente e
@@ -1316,6 +1341,12 @@ async function gerarRespostaNinaInterno(
     ferramentas: {
       pode_agendar: podeAgendar,
     },
+    consulta_agenda: {
+      interesse_confirmado: interesseAgendaConfirmado,
+      profissional_previamente_definido: contextoConsultaAgenda.medicoEscolhido.nome,
+      fonte_horarios_habituais: "catalogo_publicado",
+      fonte_vagas: "agenda",
+    },
     aprendizados: (aprendizados as Array<{ tipo?: string; titulo?: string; conteudo?: string }>)
       .map((a) => ({
         tipo: a.tipo ?? null,
@@ -1397,6 +1428,10 @@ async function gerarRespostaNinaInterno(
     ferramentas = podeAgendar
       ? [...mod.FERRAMENTAS_NINA_PACIENTE]
       : [...mod.FERRAMENTAS_NINA_CONSULTA];
+    ferramentas = ferramentas.filter(
+      (f) => interesseAgendaConfirmado ||
+        !FERRAMENTAS_DE_VAGAS.has(String((f as { function?: { name?: string } }).function?.name ?? "")),
+    );
     executar = mod.executarFerramentaPaciente;
     ctxFerramentas = {
       clinicaId,
@@ -1410,6 +1445,7 @@ async function gerarRespostaNinaInterno(
       podeAgendar,
       estado: fluxoEstado,
       teste: opcoes?.teste === true,
+      consultaAgenda: contextoConsultaAgenda,
     };
   }
 
@@ -2185,6 +2221,24 @@ async function gerarRespostaNinaInterno(
 
       rastro?.iniciar("tool.execute", { ferramenta: nome });
       const r = await broker.executar(nome, c.function?.arguments);
+      if (consultaAgendaAguardandoPaciente(r.dados)) {
+        // Uma consulta não autorizada não é agenda vazia nem falha técnica.
+        // Registra a tentativa, sem produzir evidência de consulta à agenda.
+        rastro?.pular("tool.execute", "consulta de vagas aguardando interesse ou escolha do médico");
+        registrarEtapa({
+          tipo: "consulta",
+          fonte: "sistema",
+          titulo: "Consulta à agenda não realizada: aguardando o paciente",
+          dados: { ferramenta: nome, ...respostaParaModelo(r) },
+          codigo: { arquivo: "src/lib/nina/consulta-agenda.ts", funcao: "autorizarConsultaAgenda" },
+        });
+        mensagens.push({
+          role: "tool",
+          tool_call_id: c.id,
+          content: JSON.stringify(respostaParaModelo(r)),
+        });
+        continue;
+      }
       if (r.success && !r.erro) rastro?.concluir("tool.execute", { ferramenta: nome });
       else rastro?.falhar("tool.execute", r.erro ?? "falha na ferramenta", { ferramenta: nome });
       const resultado = respostaParaModelo(r);

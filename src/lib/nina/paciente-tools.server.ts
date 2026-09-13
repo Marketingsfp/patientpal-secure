@@ -27,7 +27,14 @@ import { z } from "zod";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { isCPFValido, somenteDigitos } from "@/lib/cpf";
 import { normalizar, raizEspecialidade } from "@/lib/nina-especialidade";
-import { autorizarAcao, type CodigoRecusa } from "./acoes/autorizacao";
+import { autorizarAcao, type CodigoRecusa, type EntradaAutorizacao } from "./acoes/autorizacao";
+import {
+  autorizarConsultaAgenda,
+  consultaAgendaPendente,
+  FERRAMENTAS_DE_VAGAS,
+  interesseEmConsultarAgenda,
+  type ContextoConsultaAgenda,
+} from "./consulta-agenda";
 import {
   verificarResultadoAgendamento,
   type RegistroAgendamento,
@@ -100,6 +107,8 @@ export type CtxNinaPaciente = {
    * removível ao resolver a sessão.
    */
   teste?: boolean;
+  /** Pedido e histórico entregue da sessão; nunca fornecidos pelos argumentos do modelo. */
+  consultaAgenda?: ContextoConsultaAgenda;
 };
 
 
@@ -545,21 +554,16 @@ function falhaAgenda(e: unknown, ferramenta: string) {
 
 /**
  * Resolve o profissional a partir do que o modelo mandou: id real ou nome
- * ("Dr. Armando"). Com homônimos, desempata por quem tem vaga futura; se ainda
- * assim houver dúvida, devolve as opções para a Nina perguntar.
+ * ("Dr. Armando"). Homônimos exigem escolha do paciente; consultar vagas
+ * para escolher alguém já anteciparia a consulta que ele ainda não autorizou.
  */
 async function resolverMedico(
   clinicaId: string,
   termo: string,
 ): Promise<
-  | { ok: true; id: string; nome: string }
+  | { ok: true; id: string; nome: string; candidatosOficiais: Array<{ id: string; nome: string }> }
   | { ok: false; opcoes: Array<{ id: string; nome: string }> }
 > {
-  if (UUID_RE.test(termo)) {
-    const nome = await nomeMedico(termo);
-    if (nome) return { ok: true, id: termo, nome };
-    return { ok: false, opcoes: [] };
-  }
   const t = normalizar(termo).replace(/^(dr|dra|doutor|doutora)\.?\s+/, "");
   const { data } = await supabaseAdmin
     .from("medicos")
@@ -567,20 +571,19 @@ async function resolverMedico(
     .eq("clinica_id", clinicaId)
     .eq("ativo", true);
   const todos = (data ?? []) as Array<{ id: string; nome: string }>;
+  if (UUID_RE.test(termo)) {
+    const medico = todos.find(m => m.id === termo);
+    return medico ? { ok: true, ...medico, candidatosOficiais: todos } : { ok: false, opcoes: [] };
+  }
   const candidatos = todos.filter((m) => {
     const n = normalizar(m.nome);
-    return n.includes(t) || t.includes(n);
+    const termos = t.split(/\s+/).filter(Boolean);
+    return n.includes(t) || t.includes(n) || termos.length > 1 && termos.every(p => n.split(/\s+/).includes(p));
   });
   if (candidatos.length === 0) return { ok: false, opcoes: [] };
-  if (candidatos.length === 1) return { ok: true, id: candidatos[0]!.id, nome: candidatos[0]!.nome };
+  if (candidatos.length === 1) return { ok: true, id: candidatos[0]!.id, nome: candidatos[0]!.nome, candidatosOficiais: todos };
 
-  const comVaga: Array<{ id: string; nome: string }> = [];
-  for (const m of candidatos) {
-    const slots = await consultarDisponibilidadeCore({ clinicaId, medicoId: m.id, dias: 60 });
-    if (slots.length > 0) comVaga.push(m);
-  }
-  if (comVaga.length === 1) return { ok: true, id: comVaga[0]!.id, nome: comVaga[0]!.nome };
-  return { ok: false, opcoes: (comVaga.length > 0 ? comVaga : candidatos).slice(0, 5) };
+  return { ok: false, opcoes: candidatos.slice(0, 5) };
 }
 
 
@@ -606,7 +609,7 @@ export const FERRAMENTAS_NINA_CONSULTA = [
     function: {
       name: "buscar_medicos",
       description:
-        "Busca profissionais da clínica por especialidade e/ou nome, com os dias e horários de atendimento.",
+        "Busca profissionais da clínica por especialidade e/ou nome, com dias e horários habituais publicados. Esses horários são escala administrativa; não confirmam vagas na agenda.",
       parameters: {
         type: "object",
         properties: {
@@ -661,7 +664,7 @@ export const FERRAMENTAS_NINA_CONSULTA = [
     function: {
       name: "consultar_disponibilidade",
       description:
-        "Horários REALMENTE livres na agenda. É a ÚNICA fonte de horário — nunca ofereça um horário que não veio daqui.",
+        "Consulta vagas REALMENTE livres na agenda do médico escolhido, após solicitação do paciente ou aceite da oferta de verificar vagas. Horários habituais de atendimento vêm do catálogo e dispensam esta consulta. Não usar em uma pergunta geral sobre médicos ou escala.",
       parameters: {
         type: "object",
         properties: {
@@ -682,7 +685,7 @@ export const FERRAMENTAS_NINA_CONSULTA = [
     function: {
       name: "verificar_horario",
       description:
-        "Verifica UM horário específico na agenda real ('tem 15h amanhã com o Dr. João?'). Devolve se está livre e, se ocupado, alternativas próximas no mesmo dia. Nunca informa quem ocupa o horário.",
+        "Verifica UMA vaga específica solicitada pelo paciente, com o médico já escolhido ('tem 15h amanhã com o Dr. João?'). Devolve se está livre e, se ocupado, alternativas no mesmo dia. Não consulta escala habitual nem informa quem ocupa a vaga.",
       parameters: {
         type: "object",
         properties: {
@@ -702,7 +705,7 @@ export const FERRAMENTAS_NINA_CONSULTA = [
     function: {
       name: "proxima_vaga",
       description:
-        "Primeira vaga REAL disponível, em ordem cronológica, para um médico ou especialidade. Use SEMPRE que o paciente disser 'a próxima disponível', 'o próximo horário', 'a primeira vaga', 'a quinta-feira mais próxima', 'qualquer horário' — não peça uma data específica antes de chamar.",
+        "Primeira vaga REAL disponível do médico escolhido, após pedido do paciente por vagas. Aceita 'a próxima disponível', 'a primeira vaga', 'a quinta-feira mais próxima' ou 'qualquer horário', sem exigir uma data exata. Exige definir o médico; uma pergunta geral sobre a especialidade não autoriza consultar vagas.",
       parameters: {
         type: "object",
         properties: {
@@ -918,6 +921,24 @@ async function executarFerramentaInterna(
     return falha("PERMISSION_DENIED", "Agendamento pela assistente não está ativo nesta unidade.");
 
   try {
+    // Proteção comum às três entradas de agenda, antes até da resolução do
+    // profissional. Um nome ambíguo não pode disparar buscas por vagas.
+    let medicoAgenda: { ok: true; id: string; nome: string } | null = null;
+    if (FERRAMENTAS_DE_VAGAS.has(nome)) {
+      if (!interesseEmConsultarAgenda(ctx.consultaAgenda))
+        return consultaAgendaPendente("INTERESSE_NAO_CONFIRMADO");
+      const termo = typeof args.medico_id === "string" ? args.medico_id.trim() : "";
+      if (!termo) return consultaAgendaPendente("MEDICO_NAO_DEFINIDO");
+      const resolvido = await resolverMedico(ctx.clinicaId, termo);
+      if (!resolvido.ok) return {
+        ...consultaAgendaPendente("MEDICO_NAO_DEFINIDO"),
+        opcoes: resolvido.opcoes.map(o => ({ medico_id: o.id, nome: o.nome })),
+      };
+      const permissao = autorizarConsultaAgenda(ctx.consultaAgenda, resolvido, resolvido.candidatosOficiais);
+      if (!permissao.permitido) return consultaAgendaPendente(permissao.motivo);
+      medicoAgenda = resolvido;
+      args.medico_id = resolvido.id;
+    }
     switch (nome) {
       case "consultar_base_conhecimento": {
         const p = z
@@ -1093,7 +1114,7 @@ async function executarFerramentaInterna(
         let medicoId: string | null = null;
         let medicoNome: string | null = null;
         if (p.medico_id) {
-          const r = await resolverMedico(ctx.clinicaId, p.medico_id);
+          const r = medicoAgenda ?? await resolverMedico(ctx.clinicaId, p.medico_id);
           if (!r.ok)
             return falha(
               "DOCTOR_NOT_FOUND",
@@ -1192,7 +1213,7 @@ async function executarFerramentaInterna(
       case "verificar_horario": {
         const p = zVerificarHorario.parse(args);
         const hora = p.hora.padStart(5, "0");
-        const r = await resolverMedico(ctx.clinicaId, p.medico_id);
+        const r = medicoAgenda ?? await resolverMedico(ctx.clinicaId, p.medico_id);
         if (!r.ok)
           return falha(
             "DOCTOR_NOT_FOUND",
@@ -1288,7 +1309,7 @@ async function executarFerramentaInterna(
         let medicoId: string | null = null;
         let medicoNome: string | null = null;
         if (p.medico_id) {
-          const r = await resolverMedico(ctx.clinicaId, p.medico_id);
+          const r = medicoAgenda ?? await resolverMedico(ctx.clinicaId, p.medico_id);
           if (!r.ok)
             return falha(
               "DOCTOR_NOT_FOUND",
@@ -1537,12 +1558,68 @@ async function executarFerramentaInterna(
             "Preciso identificar o paciente antes de marcar (CPF, nome completo e data de nascimento).",
           );
 
+        const ofertaCorrente = ctx.estado?.appointment;
+        const consentimentoExplicito =
+          (ofertaCorrente?.slot_confirmed_by_patient === true ||
+            ofertaCorrente?.intent_confirmed === true) &&
+          Boolean(ofertaCorrente?.doctor_id && ofertaCorrente?.slot_inicio);
+        // Uma chamada do modelo não prova consentimento. Sem a oferta aceita
+        // no estado do servidor, nem idempotência nem vagas podem ler a agenda.
+        if (!consentimentoExplicito)
+          return falha(
+            "ACTION_NOT_AUTHORIZED",
+            "Aguarde a confirmação do paciente para o médico e horário oferecidos.",
+            {
+              motivos: ["CONSENTIMENTO_AUSENTE"],
+              consulta_realizada: false,
+              aguardando_paciente: true,
+            },
+          );
+
         const rMed = await resolverMedico(ctx.clinicaId, p.medico_id);
         if (!rMed.ok)
           return falha("DOCTOR_NOT_FOUND", "Não encontrei esse profissional nesta unidade.", {
             opcoes: rMed.opcoes.map((o) => ({ medico_id: o.id, nome: o.nome })),
           });
         const medicoIdReal = rMed.id;
+
+        const autorizacaoBase: EntradaAutorizacao = {
+          operacao: "criar_agendamento",
+          clinicaId: ctx.clinicaId,
+          paciente: {
+            id: ctx.pacienteId,
+            nome: ctx.pacienteNome,
+            identificado: true,
+            validado: true,
+          },
+          medicoId: medicoIdReal,
+          procedimento: p.procedimento,
+          intervalo: { inicio: p.inicio, fim: p.fim },
+          consentimento: {
+            confirmado: consentimentoExplicito,
+            medicoId: ofertaCorrente?.doctor_id,
+            inicio: ofertaCorrente?.slot_inicio,
+            fim: ofertaCorrente?.slot_fim,
+          },
+          idempotenciaBase: ctx.conversaId ?? ctx.telefone ?? null,
+        };
+        // O mesmo autorizador confere clínica, paciente, intervalo e oferta
+        // aceita ANTES da leitura. Só a disponibilidade fica pendente até a
+        // consulta real abaixo; nenhuma vaga fictícia é usada para autorizar.
+        const previa = autorizarAcao(autorizacaoBase);
+        const motivosPrevios = previa.autorizado
+          ? []
+          : previa.motivos.filter((m) => m !== "DISPONIBILIDADE_NAO_CONSULTADA");
+        if (motivosPrevios.length)
+          return falha(
+            "ACTION_NOT_AUTHORIZED",
+            "Os dados pedidos não correspondem à confirmação do paciente.",
+            {
+              motivos: motivosPrevios,
+              consulta_realizada: false,
+              aguardando_paciente: true,
+            },
+          );
 
         const origemMarca = origemAgendamentoNina(ctx);
         const ehTeste = origemMarca === "nina_homologacao";
@@ -1610,39 +1687,14 @@ async function executarFerramentaInterna(
           dias: 90,
           data: p.inicio.slice(0, 10),
         }).catch(() => [] as SlotNina[]);
-        const ofertaCorrente = ctx.estado?.appointment;
-        const consentimentoExplicito =
-          ofertaCorrente?.slot_confirmed_by_patient === true ||
-          ofertaCorrente?.intent_confirmed === true ||
-          // Sem estado estruturado (chat interno/console) o consentimento vem
-          // da própria chamada, que só ocorre após a confirmação do paciente.
-          !ctx.estado;
         const auth = autorizarAcao({
-          operacao: "criar_agendamento",
-          clinicaId: ctx.clinicaId,
-          paciente: {
-            id: ctx.pacienteId,
-            nome: ctx.pacienteNome,
-            identificado: true,
-            validado: true,
-          },
-          medicoId: medicoIdReal,
-          procedimento: p.procedimento,
-          intervalo: { inicio: p.inicio, fim: p.fim },
+          ...autorizacaoBase,
           disponibilidadeConsultada: true,
           vagasConsultadas: vagasReais.map((s) => ({
             medicoId: s.medico_id,
             inicio: s.inicio,
             fim: s.fim,
           })),
-          consentimento: {
-            confirmado: consentimentoExplicito,
-            // Sem oferta registrada, o próprio slot pedido é o resumido.
-            medicoId: ofertaCorrente?.doctor_id ?? medicoIdReal,
-            inicio: ofertaCorrente?.slot_inicio ?? p.inicio,
-            fim: ofertaCorrente?.slot_fim ?? p.fim,
-          },
-          idempotenciaBase: ctx.conversaId ?? ctx.telefone ?? null,
         });
         if (!auth.autorizado) {
           const semVagaCorrespondente = auth.motivos.some(

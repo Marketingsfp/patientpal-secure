@@ -22,6 +22,7 @@ import { detectarConflitosEntreFatos, normalizarTexto } from "./evidencia";
 import { hashDoTexto } from "./hash";
 import { extrairRegrasPublicadas } from "./regras-publicadas";
 import { extrairIdentidadePublicada } from "./identidade-publicada";
+import { perguntaGeralSobreAtendimento } from "../atendimento-fase1";
 import type { FatoRecuperado } from "./evidencia";
 import type {
   AcaoSolicitada,
@@ -71,8 +72,8 @@ const CANDIDATOS_POR_CAMPO: Array<[string, (f: FatoRecuperado) => string | null 
 ];
 
 /**
- * Candidatos observados nos fatos do turno. Dois procedimentos distintos
- * devolvidos para o mesmo pedido é ambiguidade REAL, não suposição.
+ * Candidatos observados nos fatos do turno. O validador decide se o pedido
+ * exige escolher um deles ou permite apresentar a lista publicada.
  */
 export function candidatosDeEntidade(fatos: FatoRecuperado[]): Record<string, string[]> {
   const saida: Record<string, string[]> = {};
@@ -87,6 +88,29 @@ export function candidatosDeEntidade(fatos: FatoRecuperado[]): Record<string, st
     if (vistos.size > 0) saida[campo] = [...vistos.values()];
   }
   return saida;
+}
+
+/**
+ * Campos que representam opções de uma resposta informativa geral. Os
+ * candidatos permanecem no contexto/auditoria; apenas sua aplicabilidade é
+ * diferente quando o paciente ainda não pediu uma vaga ou um item específico.
+ */
+export function camposDeOpcoesInformativas(ctx: ContextoConfianca): string[] {
+  if (!perguntaGeralSobreAtendimento(ctx.mensagemPaciente ?? "")) return [];
+  if (ctx.turnType !== "INFORMACAO") return [];
+  if (!ctx.requestedAction || !["responder_informacao", "informar_profissional", "informar_horario", "informar_valor"].includes(ctx.requestedAction)) return [];
+  const palavrasDoPedido = new Set(normalizarTexto(ctx.mensagemPaciente).match(/[a-z]+/g) ?? []);
+  const medicoNomeado = (ctx.entityCandidates?.medico ?? []).some((nome) =>
+    normalizarTexto(nome).split(/\s+/).some((parte) => parte.length >= 4 && palavrasDoPedido.has(parte)),
+  );
+  if (medicoNomeado) return [];
+  const publicados = candidatosDeEntidade((ctx.fatos ?? []).filter((f) => f.fonte === "catalogo_publicado"));
+  return Object.entries(ctx.entityCandidates ?? {})
+    .filter(([campo, candidatos]) => {
+      const comprovados = new Set((publicados[campo] ?? []).map(normalizarTexto));
+      return candidatos.length > 0 && candidatos.every((c) => comprovados.has(normalizarTexto(c)));
+    })
+    .map(([campo]) => campo);
 }
 
 // -------------------------------------------------------- campos obrigatórios

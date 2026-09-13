@@ -9,6 +9,7 @@
  * rede. É por isso que dá para testar cada formato de retorno.
  */
 import { normalizarTexto, valorMonetario } from "./evidencia";
+import { horariosSemanais, restricaoDaEscala } from "./escala-publicada";
 import type { ConsultaDoTurno, FatoRecuperado, StatusConsulta } from "./evidencia";
 import type { TipoFonte } from "./types";
 
@@ -271,13 +272,22 @@ export function extrairEvidencia(r: RetornoFerramenta): ExtracaoEvidencia {
       const procedimento = texto(d["procedimento"]) ?? texto(d["procedure"]);
       const preco = texto(d["preco"]) ?? texto(d["price"]);
       const registros = registrosDoRetorno(d);
-      const profissionais = Array.isArray(d["profissionais"])
-        ? (d["profissionais"] as unknown[])
-        : [];
+      const listaDeTextos = (...campos: string[]) => [
+        ...new Set(
+          campos.flatMap((campo) =>
+            Array.isArray(d[campo])
+              ? (d[campo] as unknown[]).filter(
+                  (v): v is string => typeof v === "string" && !!v.trim(),
+                )
+              : [],
+          ),
+        ),
+      ];
+      const profissionais = listaDeTextos("profissionais", "doctors");
       const especialidades = Array.isArray(d["especialidades"])
         ? (d["especialidades"] as unknown[])
         : [];
-      const dias = Array.isArray(d["dias"]) ? (d["dias"] as unknown[]) : [];
+      const dias = listaDeTextos("dias", "days");
       const observacoes = Array.isArray(d["observacoes"]) ? (d["observacoes"] as unknown[]) : [];
       const clinica = obj(d["clinica"]);
 
@@ -305,6 +315,17 @@ export function extrairEvidencia(r: RetornoFerramenta): ExtracaoEvidencia {
             },
           });
         }
+        if (item) {
+          fatos.push({
+            ...base,
+            entidade: "procedimento",
+            campo: "nome",
+            valor: item,
+            registro: texto(x["id"]),
+            ...comVersao,
+            chave: { procedimento: item, medicoNome: texto(x["medico"]), unidadeId: unidade },
+          });
+        }
         if (texto(x["preparo"])) {
           fatos.push({
             ...base,
@@ -330,6 +351,72 @@ export function extrairEvidencia(r: RetornoFerramenta): ExtracaoEvidencia {
               hora: texto(x["horario"]),
             },
           });
+        }
+        // Horário publicado por profissional preserva o vínculo médico-dia-hora.
+        // O resumo global de dias, sem médico, não pode comprovar essa associação.
+        const extras = obj(x["extras"]);
+        if (Array.isArray(extras["especialidades"])) {
+          for (const especialidade of extras["especialidades"] as unknown[]) {
+            if (typeof especialidade !== "string" || !especialidade.trim()) continue;
+            fatos.push({
+              ...base,
+              entidade: "servico",
+              campo: "oferecido",
+              valor: especialidade,
+              registro: texto(x["id"]),
+              ...comVersao,
+              chave: { especialidade, medicoNome: texto(x["medico"]), unidadeId: unidade },
+            });
+          }
+        }
+        const horarios = Array.isArray(extras["horarios"]) ? (extras["horarios"] as unknown[]) : [];
+        const executantes = Array.isArray(extras["executantes"])
+          ? (extras["executantes"] as unknown[])
+          : [];
+        const escalas = horarios.map((h) => {
+          const v = obj(h);
+          return {
+            medico: texto(x["medico"]),
+            horario: `${texto(v["dia"]) ?? ""} ${texto(v["inicio"]) ?? ""}`,
+            condicao:
+              restricaoDaEscala(texto(v["recorrencia"])) ??
+              restricaoDaEscala(texto(v["observacao"])),
+          };
+        });
+        for (const executante of executantes) {
+          const v = obj(executante);
+          escalas.push({
+            medico: texto(v["nome"]),
+            horario: texto(v["horarios"]) ?? "",
+            condicao: restricaoDaEscala(texto(v["horarios"])),
+          });
+        }
+        if (!escalas.length && texto(x["dia"])) {
+          escalas.push({
+            medico: texto(x["medico"]),
+            horario: `${texto(x["dia"])} ${texto(x["horario"]) ?? ""}`,
+            condicao: restricaoDaEscala(texto(x["dia"])),
+          });
+        }
+        for (const escala of escalas) {
+          for (const horario of horariosSemanais(escala.horario)) {
+            fatos.push({
+              ...base,
+              entidade: "escala",
+              campo: "dia_atendimento",
+              valor: `${horario.dia}${horario.hora ? ` ${horario.hora}` : ""}`,
+              registro: texto(x["id"]),
+              ...comVersao,
+              chave: {
+                procedimento: item,
+                medicoNome: escala.medico,
+                unidadeId: unidade,
+                data: horario.dia,
+                hora: horario.hora,
+                condicoes: escala.condicao,
+              },
+            });
+          }
         }
       }
 

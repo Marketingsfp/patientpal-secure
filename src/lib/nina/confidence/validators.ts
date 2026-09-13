@@ -12,6 +12,7 @@
 import { acaoExecutavel, acaoOuNenhuma, contaContraANota } from "./types";
 import { aplicabilidadeDoTurno } from "./turno-tipo";
 import { detectarConflitosEntreFatos } from "./evidencia";
+import { camposDeOpcoesInformativas } from "./contexto-avaliacao";
 import { ClaimGroundingValidator, somenteNegativasApoiadas } from "./claims";
 import { WorkflowConsistencyValidator } from "./workflow";
 import { InstructionComplianceValidator } from "./obrigacoes";
@@ -175,7 +176,8 @@ export function EntityResolutionValidator(ctx: ContextoConfianca): ResultadoVali
       : res(nome, "NOT_APPLICABLE", 100, "SEM_CANDIDATOS", {});
   }
 
-  const ambiguos = campos.filter((c) => (candidatos[c] ?? []).length > 1);
+  const opcoesInformativas = camposDeOpcoesInformativas(ctx);
+  const ambiguos = campos.filter((c) => (candidatos[c] ?? []).length > 1 && !opcoesInformativas.includes(c));
   const vazios = campos.filter((c) => (candidatos[c] ?? []).length === 0);
 
   if (ambiguos.length > 0) {
@@ -189,6 +191,13 @@ export function EntityResolutionValidator(ctx: ContextoConfianca): ResultadoVali
   }
   if (vazios.length > 0) {
     return res(nome, "WARNING", 50, "ENTIDADE_NAO_ENCONTRADA", { campos: vazios });
+  }
+  if (opcoesInformativas.some((c) => (candidatos[c] ?? []).length > 1)) {
+    return res(nome, "PASS", 100, "OPCOES_INFORMATIVAS_PUBLICADAS", {
+      campos,
+      opcoes: opcoesInformativas.map((campo) => ({ campo, opcoes: candidatos[campo] })),
+      motivo: "A pergunta geral permite listar opções do catálogo; nenhuma vaga foi confirmada.",
+    });
   }
   return res(nome, "PASS", 100, "ENTIDADE_RESOLVIDA", { campos });
 }

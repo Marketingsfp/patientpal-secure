@@ -8,7 +8,7 @@
  * ferramentas.
  */
 import { agoraNaClinica, FUSO_PADRAO } from "@/lib/nina-agora";
-import { normalizar } from "@/lib/nina-especialidade";
+import { normalizar, pareceCitarEspecialidade } from "@/lib/nina-especialidade";
 
 export type IntencaoNina =
   | "consulta"
@@ -38,7 +38,7 @@ const PADROES: Array<{ intencao: IntencaoNina; termos: RegExp }> = [
   { intencao: "documentos", termos: /\b(documento|documentos|rg|carteirinha|pedido medico|encaminhamento|o que levar|preciso levar)\b/ },
   { intencao: "endereco", termos: /\b(endereco|onde fica|localizacao|como chego|rua|bairro|mapa|referencia)\b/ },
   { intencao: "horario", termos: /\b(horario de funcionamento|que horas abre|que horas fecha|abre|fecha|atende ate|funciona)\b/ },
-  { intencao: "medico", termos: /\b(medico|medica|doutor|doutora|dr|dra|profissional|quem atende|quais medicos|especialista)\b|[a-z]+ologista/ },
+  { intencao: "medico", termos: /\b(medicos?|medicas?|doutor|doutora|dr|dra|profissiona(?:l|is)|quem atende|especialistas?)\b|[a-z]+ologista/ },
   { intencao: "exame", termos: /\b(exame|exames|ultrassom|ultrassonografia|raio ?x|rx|laboratorio|sangue|eletro|tomografia|resultado)\b/ },
   { intencao: "consulta", termos: /\b(consulta|consultar|avaliacao|retorno)\b/ },
   { intencao: "procedimento", termos: /\b(procedimento|cirurgia|curativo|aplicacao|injecao|vacina)\b/ },
@@ -55,6 +55,7 @@ export function detectarIntencoes(mensagem: string): IntencaoNina[] {
   for (const { intencao, termos } of PADROES) {
     if (termos.test(texto) && !achadas.includes(intencao)) achadas.push(intencao);
   }
+  if (pareceCitarEspecialidade(texto) && !achadas.includes("medico")) achadas.push("medico");
   return achadas;
 }
 
@@ -68,11 +69,28 @@ export function querAgendar(intencoes: IntencaoNina[]): boolean {
   );
 }
 
+/**
+ * Pedido de visão geral dos profissionais/especialidade, sem vaga ou médico
+ * específico. A lista de opções do catálogo é uma resposta possível aqui;
+ * isso não confirma nenhuma disponibilidade na agenda.
+ */
+export function perguntaGeralSobreAtendimento(mensagem: string): boolean {
+  const texto = normalizar(mensagem ?? "");
+  if (querAgendar(detectarIntencoes(texto))) return false;
+  // Datas, uma hora exata e um profissional nomeado delimitam outro pedido.
+  if (/\b(hoje|amanha|proxim[oa]|nesta|neste|essa semana|esta semana|semana que vem|dia \d{1,2}|as \d{1,2}|dr|dra|doutor|doutora)\b|\d{1,2}[:/]\d{2}/.test(texto)) return false;
+  const assunto = pareceCitarEspecialidade(texto) !== null || /\b(medicos?|medicas?|profissiona(?:l|is)|especialistas?|especialidades?)\b/.test(texto);
+  if (!assunto) return false;
+  // "cardiologia" ou "cardiologista?" isolados continuam sendo só o assunto.
+  return /\b(tem|possuem?|oferecem?|atendem?|quais|quem|informacoes|quero saber|gostaria de saber|me fale|me informe|pode informar)\b/.test(texto);
+}
+
 /** Mensagem sem intenção legível (ou só um nome solto de especialidade). */
 export function intencaoAmbigua(mensagem: string, intencoes: IntencaoNina[]): boolean {
   const texto = normalizar(mensagem ?? "").trim();
   if (!texto) return true;
   if (intencoes.length === 0) return true;
+  if (perguntaGeralSobreAtendimento(texto)) return false;
   // "cardiologia", "ultrassom" — só o assunto, sem dizer o que quer saber.
   const soAssunto = intencoes.every((i) => i === "consulta" || i === "exame" || i === "procedimento" || i === "medico");
   return soAssunto && texto.split(/\s+/).length <= 3;

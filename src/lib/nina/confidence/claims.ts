@@ -21,6 +21,13 @@
  */
 import { classificarAfirmacaoOperacional } from "./workflow";
 import {
+  afirmaDisponibilidade,
+  compararEscalaPublicada,
+  compararOferta,
+  horariosSemanais,
+  itensDeOferta,
+} from "./escala-publicada";
+import {
   corresponder,
   consolidarTentativas,
   houveTruncamento,
@@ -33,12 +40,12 @@ import {
 import {
   type ClasseDiagnostico,
   chaveDaAfirmacaoMonetaria,
-
   correspondenciaDaAfirmacao,
   fatosNoEscopoDaAfirmacao,
   qualificadoresDaAfirmacao,
   referenciaDoFato,
   segmentoNaPosicao,
+  segmentosDaResposta,
   valorDaAfirmacao,
   TERMOS_DE_ASSUNTO,
 } from "./afirmacao";
@@ -200,7 +207,6 @@ export type DiagnosticoAfirmacao = {
   motivo: string;
 };
 
-
 export type ResultadoGrounding = {
   claims: ClaimAvaliado[];
   total: number;
@@ -322,7 +328,7 @@ const PADROES: Array<{ tipo: TipoClaim; re: RegExp }> = [
   },
   {
     tipo: "disponibilidade",
-    re: /((temos|há|ha|tem)\s+(vaga|hor[áa]rio|disponibilidade)[^.!?\n]*)|(\b(segunda|ter[çc]a|quarta|quinta|sexta|s[áa]bado|domingo)[^.!?\n]{0,40}\b\d{1,2}\s?(h|:\d{2}))|(\b\d{1,2}\/\d{1,2}[^.!?\n]{0,30}\b\d{1,2}\s?(h|:\d{2}))/gi,
+    re: /((temos|há|ha|tem)\s+(vaga|hor[áa]rio|disponibilidade)[^.!?\n]*)|(\b(segunda|ter[çc]a|quarta|quinta|sexta|s[áa]bado|domingo)s?(?:-feiras?)?[^.!?\n]{0,90})|(\b(?:hoje|amanh[ãa]|\d{1,2}\/\d{1,2}|\d{4}-\d{2}-\d{2})[^.!?\n]{0,30}\b\d{1,2}\s?(h|:\d{2}))/gi,
   },
   {
     tipo: "preparo",
@@ -343,7 +349,7 @@ const PADROES: Array<{ tipo: TipoClaim; re: RegExp }> = [
   },
   {
     tipo: "servico",
-    re: /((realizamos|fazemos|oferecemos|temos)\s+(o\s+|a\s+)?(exame|procedimento|consulta)[^.!?\n]*)/gi,
+    re: /((realizamos|fazemos|oferecemos|temos)\s+(o\s+|a\s+)?(exame|procedimento|consulta|atendimento)[^.!?\n]*)|(\batendemos\s+(?:em\s+)?[\p{L}]+(?:logia|iatria|pedia)[^.!?\n]*)/giu,
   },
 ];
 
@@ -354,8 +360,8 @@ const RE_HIPOTESE =
 
 /** Frase que contém o trecho — a modalidade é lida na frase, não na palavra. */
 function fraseDoTrecho(texto: string, trecho: string): string {
-  const partes = texto.split(/(?<=[.!?\n])\s+/);
-  return partes.find((p) => p.includes(trecho)) ?? texto;
+  const parte = segmentosDaResposta(texto).find((p) => p.texto.includes(trecho));
+  return parte ? `${parte.texto}${texto[parte.inicio + parte.texto.length] ?? ""}` : texto;
 }
 
 export function classificarModalidade(frase: string): ModalidadeClaim {
@@ -388,6 +394,8 @@ export type ClaimDoTexto = {
    * lidos AQUI, nunca em outro ponto da resposta.
    */
   frase: string;
+  chave?: ChaveFato;
+  valor?: string;
 };
 
 /**
@@ -411,7 +419,60 @@ export function extrairClaimsDoTexto(texto: string): ClaimDoTexto[] {
       const frase = segmentoNaPosicao(t, posicao);
       // FASE 3 — a modalidade é lida na ORAÇÃO, não na frase inteira: o "não"
       // de uma oração não contamina o preço afirmado na oração seguinte.
-      const natureza = classificarNatureza(oracaoNaPosicao(t, posicao));
+      const natureza = classificarNatureza(
+        /\?\s*$/.test(fraseDoTrecho(t, trecho)) ? `${frase}?` : oracaoNaPosicao(t, posicao),
+      );
+      if (tipo === "disponibilidade" && !afirmaDisponibilidade(frase)) {
+        const horarios = horariosSemanais(frase);
+        if (horarios.length) {
+          const q = qualificadoresDaAfirmacao(frase.replace(/[*_]/g, ""));
+          for (const h of horarios) {
+            const descricao = `${q.medicoNome ? `${q.medicoNome}: ` : ""}${h.dia}${h.hora ? ` às ${h.hora}` : ""}`;
+            const id = `escala:${descricao}`;
+            if (vistos.has(id)) continue;
+            vistos.add(id);
+            achados.push({
+              tipo: "escala",
+              trecho: descricao,
+              modalidade: modalidadeDaNatureza(natureza),
+              natureza,
+              frase,
+              chave: {
+                medicoNome: q.medicoNome,
+                medicoId: q.medicoId,
+                unidadeId: q.unidadeId,
+                data: h.dia,
+                hora: h.hora,
+              },
+              valor: [h.dia, h.hora].filter(Boolean).join(" "),
+            });
+          }
+          if (achados.length >= LIMITE_CLAIMS) return achados.slice(0, LIMITE_CLAIMS);
+          continue;
+        }
+      }
+      if (tipo === "servico") {
+        const itens = itensDeOferta(String(m[0]));
+        if (itens.length) {
+          for (const item of itens) {
+            achados.push({
+              tipo,
+              trecho: `${String(m[0]).split(/\s/)[0]}: ${item}`,
+              modalidade: modalidadeDaNatureza(natureza),
+              natureza,
+              frase,
+              chave: {
+                procedimento: item,
+                unidadeId: qualificadoresDaAfirmacao(frase).unidadeId,
+                medicoNome: qualificadoresDaAfirmacao(frase).medicoNome,
+              },
+              valor: item,
+            });
+          }
+          if (achados.length >= LIMITE_CLAIMS) return achados.slice(0, LIMITE_CLAIMS);
+          continue;
+        }
+      }
       achados.push({ tipo, trecho, modalidade: modalidadeDaNatureza(natureza), natureza, frase });
       if (achados.length >= LIMITE_CLAIMS) return achados;
     }
@@ -715,14 +776,19 @@ export function avaliarGrounding(
           ? (valorDaAfirmacao(tipo, trecho) ?? valorDaAfirmacao(tipo, segmento))
           : valorDaAfirmacao(tipo, segmento));
 
-      const r = correspondenciaDaAfirmacao(fatos, {
-        tipo,
-        entidades: alvo.entidades,
-        campos: alvo.campos,
-        frase: segmento,
-        chave: chaveDaFrase,
-        valor: valorDaFrase,
-      });
+      const r =
+        tipo === "escala"
+          ? compararEscalaPublicada(fatos, chaveDaFrase, segmento)
+          : tipo === "servico" && valor
+            ? compararOferta(fatos, valor, chaveDaFrase)
+            : correspondenciaDaAfirmacao(fatos, {
+                tipo,
+                entidades: alvo.entidades,
+                campos: alvo.campos,
+                frase: segmento,
+                chave: chaveDaFrase,
+                valor: valorDaFrase,
+              });
 
       // FASE 4 — relatório da comparação: o que foi afirmado, contra qual
       // referência foi conferido e com que resultado. Só para afirmações
@@ -754,7 +820,6 @@ export function avaliarGrounding(
               },
             }
           : {};
-
 
       if (r.situacao === "confirmado") {
         const motivo = "afirmação corresponde ao registro recuperado do mesmo caso";
@@ -826,7 +891,6 @@ export function avaliarGrounding(
         });
         return;
       }
-
     }
 
     if (fatos) {
@@ -990,8 +1054,8 @@ export function avaliarGrounding(
       "texto",
       null,
       c.modalidade,
-      valorAfirmado(c.tipo, c.trecho),
-      null,
+      c.valor ?? valorAfirmado(c.tipo, c.trecho),
+      c.chave ?? null,
       c.frase,
       c.natureza,
     );

@@ -86,6 +86,11 @@ export const CASOS_GATE_V2: CasoGateV2[] = [
       catalogoEncontrou: true,
       ferramentas: [catalogoOk],
       retrievedSources: [fonteCatalogo],
+      fatos: [{
+        consulta: "buscar_procedimentos", capacidade: "searchKnowledgeBase",
+        fonte: "catalogo_publicado", entidade: "servico", campo: "oferecido", valor: "cardiologia",
+        chave: { especialidade: "cardiologia", unidadeId: "central" },
+      }],
     },
     verificar: (r) => r.level === "HIGH" && r.decision === "ALLOW",
   },
@@ -739,4 +744,3 @@ export function criteriosDeConfianca(
     detalhe: v[chave] ? ROTULOS_RUNNER[chave].ok : ROTULOS_RUNNER[chave].falha,
   }));
 }
-

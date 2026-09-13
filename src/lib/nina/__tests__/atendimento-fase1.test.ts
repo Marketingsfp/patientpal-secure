@@ -3,6 +3,7 @@ import {
   
   detectarIntencoes,
   intencaoAmbigua,
+  perguntaGeralSobreAtendimento,
   querAgendar,
   saudacaoPorHorario,
 } from "../atendimento-fase1";
@@ -43,6 +44,18 @@ describe("ambiguidade", () => {
   it("pergunta clara não é ambígua", () => {
     const m = "Quanto custa a consulta de cardiologia?";
     expect(intencaoAmbigua(m, detectarIntencoes(m))).toBe(false);
+  });
+  it.each(["Tem cardiologista?", "vcs tem cardiologista?", "Vocês têm cardiologistas e quais dias eles atendem?", "Quais os horários habituais dos médicos?"])("pergunta informativa geral é clara: %s", (m) => {
+    expect(perguntaGeralSobreAtendimento(m)).toBe(true);
+    expect(intencaoAmbigua(m, detectarIntencoes(m))).toBe(false);
+    expect(querAgendar(detectarIntencoes(m))).toBe(false);
+  });
+  it.each(["cardiologia", "cardiologista?", "ultrassom"])("assunto isolado continua ambíguo: %s", (m) => {
+    expect(perguntaGeralSobreAtendimento(m)).toBe(false);
+    expect(intencaoAmbigua(m, detectarIntencoes(m))).toBe(true);
+  });
+  it.each(["Tem vaga com cardiologista?", "Quero agendar cardiologia", "Tem cardiologista disponível amanhã?", "Vocês têm cardiologista no dia 21?", "Quais dias o Dr. Alex atende?"])("pedido delimitado não é lista geral: %s", (m) => {
+    expect(perguntaGeralSobreAtendimento(m)).toBe(false);
   });
 });
 
