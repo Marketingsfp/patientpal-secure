@@ -729,11 +729,16 @@ export function HomologacaoInbox() {
       void carregarLeads();
       if (meuLead()) {
         if (r.erro) setErro(r.erro);
+        else if (r.transferida)
+          setErro(
+            "Conversa transferida para atendimento humano (simulado). A sessão e a memória da Nina continuam como estão: clique em “Resolver / Reiniciar teste” para começar um novo teste.",
+          );
         else if (!r.reply && !agrupada)
           setErro(
             "A Nina não respondeu. Se a conversa foi transferida para atendimento humano, use “Resolver / Reiniciar teste” antes de começar um novo teste.",
           );
       }
+
       return {
         ok: agrupada ? true : !r.erro && !!r.reply,
         transferida: !!r.transferida,

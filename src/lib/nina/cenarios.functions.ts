@@ -305,7 +305,14 @@ export const criarExecucaoCenarios = createServerFn({ method: "POST" })
 export const iniciarItemExecucao = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) =>
-    z.object({ clinicaId: z.string().uuid(), itemId: z.string().uuid() }).parse(input),
+    z
+      .object({
+        clinicaId: z.string().uuid(),
+        itemId: z.string().uuid(),
+        /** Só reinicia a sessão quando pedido explicitamente (padrão: não). */
+        reiniciarSessao: z.boolean().optional(),
+      })
+      .parse(input),
   )
   .handler(async ({ data, context }: { data: any; context: Ctx }) => {
     await assertMembership(context.supabase, context.userId, data.clinicaId);
@@ -328,47 +335,20 @@ export const iniciarItemExecucao = createServerFn({ method: "POST" })
       .maybeSingle();
     if (!lead) throw new Error("Lead de teste não encontrado");
 
-    // Ciclo limpo: cada cenário começa sem memória do cenário anterior.
     const agora = new Date().toISOString();
-    if ((lead as any).conversa_id) {
-      await supabaseAdmin
-        .from("atend_conversas")
-        .update({
-          status: "finished",
-          owner_type: "NONE",
-          ai_enabled: false,
-          nina_fluxo_estado: null,
-          patient_response_deadline: null,
-          closed_at: agora,
-          resolved_at: agora,
-        })
-        .eq("clinica_id", data.clinicaId)
-        .eq("id", (lead as any).conversa_id);
+    // REGRA DA HOMOLOGAÇÃO — reiniciar a sessão é ação exclusiva do botão
+    // "Resolver / Reiniciar teste". Aqui só acontece com pedido explícito, e
+    // então usa a rotina canônica única.
+    if (data.reiniciarSessao === true && (lead as any).conversa_id) {
+      const { resetarLeadTeste } = await import("@/lib/nina/teste-console.server");
+      await resetarLeadTeste(supabaseAdmin, {
+        clinicaId: data.clinicaId,
+        leadId: (lead as any).id,
+        userId: context.userId,
+        origem: "cenario_inicio",
+      });
     }
-    if ((lead as any).ciclo_id) {
-      const { patchEncerrarCiclo } = await import("@/lib/nina/ciclo-teste");
-      await supabaseAdmin
-        .from("nina_teste_ciclos")
-        .update({
-          ...patchEncerrarCiclo("cenario_concluido", agora),
-          resolvido_por: context.userId,
-        } as never)
-        .eq("clinica_id", data.clinicaId)
-        .eq("id", (lead as any).ciclo_id);
-    }
-    const proxima = ((lead as any).sessao_seq ?? 1) + 1;
-    await supabaseAdmin
-      .from("nina_teste_leads")
-      .update({
-        sessao_seq: proxima,
-        telefone_sessao: telefoneSessao((lead as any).indice, proxima),
-        conversa_id: null,
-        ciclo_id: null,
-        ciclo_iniciado_em: null,
-        resolvido_em: agora,
-        status: "ativa",
-      })
-      .eq("id", (lead as any).id);
+
 
     // Simulação de paciente ligada a este item (mesmo motor da Fase 4).
     const cenario = (item as any).cenario_snapshot ?? {};
@@ -441,6 +421,9 @@ export const finalizarItemExecucao = createServerFn({ method: "POST" })
         handoffCliente: z.boolean().nullish(),
         interrompido: z.boolean().nullish(),
         turnosUsados: z.number().int().min(0).max(100).nullish(),
+        /** Só reinicia a sessão quando pedido explicitamente (padrão: não). */
+        reiniciarSessao: z.boolean().optional(),
+
       })
       .parse(input),
   )
@@ -695,50 +678,20 @@ export const finalizarItemExecucao = createServerFn({ method: "POST" })
       } as never)
       .eq("id", (item as any).id);
 
-    // Cleanup do ciclo deste lead: encerra (histórico preservado) e libera o
-    // lead para o próximo cenário, sem tocar em nenhum outro lead.
+    // REGRA DA HOMOLOGAÇÃO — o fim do cenário NÃO reinicia o teste: ciclo,
+    // memória ativa da Nina e telefone virtual seguem como estão. Só o botão
+    // "Resolver / Reiniciar teste" reinicia (rotina canônica única).
+    if (lead && data.reiniciarSessao === true && (lead as any).conversa_id) {
+      const { resetarLeadTeste } = await import("@/lib/nina/teste-console.server");
+      await resetarLeadTeste(supabaseAdmin, {
+        clinicaId: data.clinicaId,
+        leadId: (lead as any).id,
+        userId: context.userId,
+        origem: "cenario_fim",
+      });
+    }
     if (lead) {
-      const { patchEncerrarCiclo } = await import("@/lib/nina/ciclo-teste");
-      if ((lead as any).conversa_id) {
-        await supabaseAdmin
-          .from("atend_conversas")
-          .update({
-            status: "finished",
-            owner_type: "NONE",
-            ai_enabled: false,
-            nina_fluxo_estado: null,
-            patient_response_deadline: null,
-            closed_at: agora,
-            resolved_at: agora,
-          })
-          .eq("clinica_id", data.clinicaId)
-          .eq("id", (lead as any).conversa_id);
-      }
-      if (cicloId) {
-        await supabaseAdmin
-          .from("nina_teste_ciclos")
-          .update({
-            ...patchEncerrarCiclo(MOTIVO_CICLO_POR_DESFECHO[desfecho], agora),
-            resolvido_por: context.userId,
-          } as never)
-          .eq("clinica_id", data.clinicaId)
-          .eq("id", cicloId)
-          .eq("status", "ativo");
-      }
-      const proxima = ((lead as any).sessao_seq ?? 1) + 1;
-      await supabaseAdmin
-        .from("nina_teste_leads")
-        .update({
-          sessao_seq: proxima,
-          telefone_sessao: telefoneSessao((lead as any).indice, proxima),
-          conversa_id: null,
-          ciclo_id: null,
-          ciclo_iniciado_em: null,
-          resolvido_em: agora,
-          status: "ativa",
-        })
-        .eq("clinica_id", data.clinicaId)
-        .eq("id", (lead as any).id);
+
 
       // Nenhuma simulação de paciente pode continuar viva após o cenário.
       await supabaseAdmin
