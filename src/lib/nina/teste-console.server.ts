@@ -968,9 +968,11 @@ export async function resetarLeadTeste(
     ok: true,
     jaResolvida: false,
     sessao: proxima,
+    sessaoAnterior: lead.sessao_seq,
     cicloEncerrado: lead.ciclo_id,
     agendamentosRemovidos,
   };
+
 }
 
 export { LIMITE_MENSAGENS_LEAD, CANAL_TESTE, TOTAL_LEADS, telefoneSessao, garantirLeads, carregarLead, garantirCiclo, conversasDoLead, podarMensagensLead };
