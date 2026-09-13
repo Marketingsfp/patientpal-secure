@@ -8,6 +8,7 @@ import {
   pendenciaVazia,
   type PendenciaEsclarecimento,
 } from "./confidence/esclarecimento";
+import { normalizarConhecimentoSessao, type ConhecimentoSessao } from "./confidence/conhecimento-sessao";
 
 export type { PendenciaEsclarecimento };
 
@@ -80,6 +81,8 @@ export type EstadoFluxoNina = {
    * consumida quando o paciente responde e a dúvida continua.
    */
   clarification?: PendenciaEsclarecimento;
+  /** Referências de catálogo da sessão, reconsultadas antes de cada reutilização. */
+  knowledge_context?: ConhecimentoSessao | null;
   updated_at: string | null;
   /** Identificador da sessão operacional atual (nova sessão = novo id). */
   session_id?: string | null;
@@ -126,6 +129,7 @@ export function estadoVazio(): EstadoFluxoNina {
     },
     flow: { stage: "IDLE" },
     clarification: pendenciaVazia(),
+    knowledge_context: null,
     updated_at: null,
     session_id: null,
     session_started_at: null,
@@ -151,6 +155,7 @@ export function normalizarEstado(bruto: unknown): EstadoFluxoNina {
     appointment: { ...base.appointment, ...(o["appointment"] ?? {}) },
     flow: { stage: (o["flow"]?.stage ?? "IDLE") as EtapaFluxoNina },
     clarification: normalizarPendencia(o["clarification"]),
+    knowledge_context: normalizarConhecimentoSessao(o["knowledge_context"]),
     updated_at: o["updated_at"] ?? null,
     session_id: o["session_id"] ?? null,
     session_started_at: o["session_started_at"] ?? null,
@@ -159,4 +164,3 @@ export function normalizarEstado(bruto: unknown): EstadoFluxoNina {
     greeting_waived_by: o["greeting_waived_by"] ?? null,
   };
 }
-

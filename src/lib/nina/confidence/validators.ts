@@ -16,6 +16,7 @@ import { camposDeOpcoesInformativas } from "./contexto-avaliacao";
 import { ClaimGroundingValidator, somenteNegativasApoiadas } from "./claims";
 import { WorkflowConsistencyValidator } from "./workflow";
 import { InstructionComplianceValidator } from "./obrigacoes";
+import { fontesPresentes, requisitosDeFonte } from "./fontes-requeridas";
 import type {
   Bloqueador,
   ContextoConfianca,
@@ -81,21 +82,6 @@ export const MINIMO_POR_RISCO: Record<NivelRiscoAcao, number> = {
 };
 
 // ---------------------------------------------------------------- utilidades
-
-const CAP_CATALOGO = new Set(["searchKnowledgeBase", "listCatalog"]);
-const CAP_AGENDA = new Set(["checkAvailability", "createAppointment", "listSlots"]);
-const CAP_PROFISSIONAL = new Set(["listProfessionals", "getProfessional"]);
-
-/** Categorias que só a clínica pode responder oficialmente. */
-const CATEGORIAS_OFICIAIS = new Set([
-  "valor",
-  "horario",
-  "profissional",
-  "disponibilidade",
-  "preparo",
-  "regra",
-  "agendamento",
-]);
 
 function ferramentaOk(f: ResultadoFerramenta): boolean {
   return f.success && !f.erro;
@@ -257,8 +243,8 @@ export function OfficialSourceValidator(
   categorias: string[] = [],
 ): ResultadoValidador {
   const nome = "OfficialSourceValidator";
-  const oficiais = categorias.filter((c) => CATEGORIAS_OFICIAIS.has(c));
-  if (oficiais.length === 0) {
+  const requisitos = requisitosDeFonte(ctx, categorias);
+  if (requisitos.length === 0) {
     // FASE 1 — a matriz central decide se este tipo de turno exige fonte.
     if (!aplicabilidadeDoTurno(ctx.turnType).requiresSource) {
       return res(nome, "NOT_APPLICABLE", 100, "TURNO_NAO_EXIGE_FONTE", {
@@ -286,46 +272,29 @@ export function OfficialSourceValidator(
     );
   }
 
-  const catalogoOk =
-    ctx.toolResults.some(
-      (f) => f.capacidade !== null && CAP_CATALOGO.has(f.capacidade) && ferramentaOk(f) && f.temConteudo === true,
-    ) || ctx.retrievedSources.some((s) => s.tipo === "catalogo_publicado" && fonteUtil(s));
-  const agendaOk =
-    ctx.toolResults.some(
-      (f) =>
-        f.capacidade !== null &&
-        (CAP_AGENDA.has(f.capacidade) || CAP_PROFISSIONAL.has(f.capacidade)) &&
-        ferramentaOk(f),
-    ) || ctx.retrievedSources.some((s) => s.tipo === "agenda" && fonteUtil(s));
-
-  // FASE 2 — reserva já persistida é prova de agenda para o horário reservado.
-  const reservaPersistida =
-    ctx.operationalState?.appointmentCreated === true && Boolean(ctx.operationalState?.appointmentId);
-
-  const precisaAgenda = oficiais.some(
-    (c) => c === "horario" || c === "disponibilidade" || c === "profissional" || c === "agendamento",
-  );
-  const atendido = precisaAgenda ? catalogoOk || agendaOk || reservaPersistida : catalogoOk;
+  const presentes = fontesPresentes(ctx);
+  const faltantes = requisitos.filter((r) => !presentes[r.fonte]);
+  const atendido = faltantes.length === 0;
 
   if (!atendido && somenteNegativasApoiadas(ctx)) {
     // Consulta oficial que respondeu SEM itens sustenta a negativa.
-    return res(nome, "PASS", 100, "NEGATIVA_APOIADA_EM_CONSULTA_OFICIAL", { categorias: oficiais });
+    return res(nome, "PASS", 100, "NEGATIVA_APOIADA_EM_CONSULTA_OFICIAL", { requisitos });
   }
   if (atendido) {
     return res(nome, "PASS", 100, "FONTE_OFICIAL_PRESENTE", {
-      categorias: oficiais,
-      catalogoOk,
-      agendaOk,
-      reservaPersistida,
+      requisitos,
+      presentes,
     });
   }
 
-  const blocker: Bloqueador = oficiais.includes("valor")
-    ? "VALOR_SEM_CATALOGO"
-    : precisaAgenda
-      ? "AGENDA_SEM_CONFIRMACAO"
-      : "PREPARO_SEM_FONTE";
-  return res(nome, "BLOCK", 0, blocker, { categorias: oficiais, catalogoOk, agendaOk }, blocker);
+  const blocker: Bloqueador = faltantes.some((r) => r.fonte === "operacao_confirmada")
+    ? "AFIRMACAO_OPERACIONAL_SEM_PROVA"
+    : faltantes.some((r) => r.tipoClaim === "valor")
+      ? "VALOR_SEM_CATALOGO"
+      : faltantes.some((r) => r.tipoClaim === "preparo")
+        ? "PREPARO_SEM_FONTE"
+        : "FONTE_OFICIAL_AUSENTE";
+  return res(nome, "BLOCK", 0, blocker === "AFIRMACAO_OPERACIONAL_SEM_PROVA" ? blocker : "FONTE_OFICIAL_AUSENTE", { requisitos, presentes, faltantes }, blocker);
 }
 
 // ---------------------------------------------------------------- 5. atualidade
@@ -571,8 +540,17 @@ export function executarValidadoresDeConfianca({
   ctx,
   categorias = [],
   config = CONFIG_PADRAO_VALIDADORES,
-  agora = new Date(),
+  agora = new Date(ctx.instanteAvaliacao ?? Date.now()),
 }: EntradaValidadores): ResultadoValidador[] {
+  // Preserva getters sem executá-los aqui: uma entrada defeituosa deve ser
+  // isolada pelo try/catch de cada validador, como no contrato anterior.
+  ctx = Object.create(Object.getPrototypeOf(ctx), {
+    ...Object.getOwnPropertyDescriptors(ctx),
+    instanteAvaliacao: {
+      value: Number.isFinite(agora.getTime()) ? agora.toISOString() : "invalido",
+      enumerable: true,
+    },
+  }) as ContextoConfianca;
   const registro: { nome: string; run: () => ResultadoValidador }[] = [
     { nome: "IntentClarityValidator", run: () => IntentClarityValidator(ctx) },
     { nome: "EntityResolutionValidator", run: () => EntityResolutionValidator(ctx) },

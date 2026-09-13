@@ -128,7 +128,9 @@ export type PoliticaConfianca = {
  * (`ESSENTIAL_REQUIREMENT_VIOLATED` / `ESSENTIAL_REQUIREMENT_UNPROVEN`), em vez
  * de ser diluída na média. Nenhum limite de classificação foi alterado.
  */
-export const VERSAO_POLITICA = "v6";
+// v7: exigência por tipo de fonte e diagnóstico de ausência separado de
+// contradição de agenda. Nenhum limiar de aprovação foi reduzido.
+export const VERSAO_POLITICA = "v7";
 /**
  * Versão do motor gravada junto com cada avaliação.
  * FASE 7 — "Confidence Engine v2": motor com cobertura de evidências,
@@ -188,6 +190,7 @@ export const POLITICA_PADRAO: PoliticaConfianca = {
     REGRA_EXIGE_HUMANO: "UNSAFE_ACTION",
     VALOR_SEM_CATALOGO: "MISSING_REQUIRED_OFFICIAL_SOURCE",
     PREPARO_SEM_FONTE: "MISSING_REQUIRED_OFFICIAL_SOURCE",
+    FONTE_OFICIAL_AUSENTE: "MISSING_REQUIRED_OFFICIAL_SOURCE",
     AGENDA_SEM_CONFIRMACAO: "INCONSISTENT_SCHEDULE",
     CAMPO_OBRIGATORIO_AUSENTE: "INVALID_PATIENT_DATA",
     FONTE_NAO_VIGENTE: "STALE_OFFICIAL_SOURCE",

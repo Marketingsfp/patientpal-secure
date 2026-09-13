@@ -341,26 +341,6 @@ export function dentroHorarioAtendimento(cfg: WhatsAppConfigRow, now: Date = new
  * Extrai possíveis identificadores (CPF, telefone, nome) do texto do paciente.
  * Usado para tentar reconhecê-lo antes de pedir dados.
  */
-/**
- * O retorno de uma consulta ao catálogo/base traz conteúdo aproveitável?
- * Usado só pelo Confidence Engine: "consultei" não é o mesmo que "achei".
- */
-function temConteudoUtil(dados: unknown): boolean {
-  if (dados === null || dados === undefined) return false;
-  if (Array.isArray(dados)) return dados.length > 0;
-  if (typeof dados !== "object") return String(dados).trim().length > 0;
-  const o = dados as Record<string, unknown>;
-  for (const [k, v] of Object.entries(o)) {
-    if (k === "ok" || k === "erro" || k === "success" || k === "source" || k === "instrucao") continue;
-    if (Array.isArray(v)) {
-      if (v.length > 0) return true;
-      continue;
-    }
-    if (v !== null && v !== undefined && String(v).trim() !== "") return true;
-  }
-  return false;
-}
-
 function extrairIdentificadores(mensagem: string): {
   cpf: string | null;
   telefone: string | null;
@@ -1213,7 +1193,8 @@ async function gerarRespostaNinaInterno(
     }
   })();
 
-  const { interesseEmConsultarAgenda, FERRAMENTAS_DE_VAGAS, consultaAgendaAguardandoPaciente } =
+  const { interesseEmConsultarAgenda, atualizarInteresseConsultaAgenda, normalizarInteresseConsultaAgenda,
+    FERRAMENTAS_DE_VAGAS, consultaAgendaAguardandoPaciente } =
     await import("@/lib/nina/consulta-agenda");
   const { historicoParaConsultaAgenda, historicoDaSessaoParaVerificacao } = await import("@/lib/nina/consulta-agenda-historico");
   const idsDoTurno = new Set(opcoes?.mensagensEntrada ?? []);
@@ -1248,14 +1229,18 @@ async function gerarRespostaNinaInterno(
   }, historicoFluxoCompleto);
   // Snapshot só de mensagens já entregues da sessão. Respostas candidatas do
   // modelo e argumentos de ferramentas não podem fabricar aceite do paciente.
-  const contextoConsultaAgenda = {
+  const contextoConsultaAgenda: import("@/lib/nina/consulta-agenda").ContextoConsultaAgenda = {
     mensagemAtual: mensagemPaciente,
+    mensagemAtualId: opcoes?.mensagensEntrada?.[0] ?? null,
+    clinicaId,
+    sessaoId: fluxoEstado.session_id ?? null,
     historico: historicoParaConsultaAgenda(historicoFluxoCompleto ? mensagensFluxo : msgsMemoria, {
       conversaId: estadoId.conversaId,
       inicioSessao: sessaoNina.estado.session_started_at ?? null,
       corteMemoria,
       teste: opcoes?.teste === true,
       idsDoTurno,
+      incluirIds: true,
     }),
     medicoEscolhido: {
       id: fluxoEstado.appointment.doctor_id,
@@ -1265,7 +1250,7 @@ async function gerarRespostaNinaInterno(
       fluxoEstado.appointment.slot_inicio && fluxoEstado.appointment.slot_fim,
     ),
   };
-  const interesseAgendaConfirmado = interesseEmConsultarAgenda(contextoConsultaAgenda);
+  let interesseAgendaConfirmado = interesseEmConsultarAgenda(contextoConsultaAgenda);
 
   // ------------------------------------------------------------------
   // PRECEDÊNCIA DO TURNO — antes do modelo, e agora também no fluxo NORMAL.
@@ -1372,7 +1357,7 @@ async function gerarRespostaNinaInterno(
     },
     consulta_agenda: {
       interesse_confirmado: interesseAgendaConfirmado,
-      profissional_previamente_definido: contextoConsultaAgenda.medicoEscolhido.nome,
+      profissional_previamente_definido: contextoConsultaAgenda.medicoEscolhido?.nome ?? null,
       fonte_horarios_habituais: "catalogo_publicado",
       fonte_vagas: "agenda",
     },
@@ -1447,6 +1432,7 @@ async function gerarRespostaNinaInterno(
 
   let ctxFerramentas: import("@/lib/nina/paciente-tools.server").CtxNinaPaciente | null = null;
   let ferramentas: unknown[] | undefined;
+  let ferramentasVagas: unknown[] = [];
   let executar:
     | typeof import("@/lib/nina/paciente-tools.server").executarFerramentaPaciente
     | null = null;
@@ -1457,6 +1443,8 @@ async function gerarRespostaNinaInterno(
     ferramentas = podeAgendar
       ? [...mod.FERRAMENTAS_NINA_PACIENTE]
       : [...mod.FERRAMENTAS_NINA_CONSULTA];
+    ferramentasVagas = ferramentas.filter((f) => FERRAMENTAS_DE_VAGAS.has(
+      String((f as { function?: { name?: string } }).function?.name ?? "")));
     ferramentas = ferramentas.filter(
       (f) => interesseAgendaConfirmado ||
         !FERRAMENTAS_DE_VAGAS.has(String((f as { function?: { name?: string } }).function?.name ?? "")),
@@ -1558,7 +1546,7 @@ async function gerarRespostaNinaInterno(
   type MsgIA = {
     role: string;
     content: string | null;
-    tool_calls?: Array<{ id: string; function?: { name?: string; arguments?: string } }>;
+    tool_calls?: Array<{ id: string; type?: "function"; function?: { name?: string; arguments?: string } }>;
     tool_call_id?: string;
   };
   // FASE 4 — Context Builder: só o necessário vai ao modelo (instruções,
@@ -1595,16 +1583,16 @@ async function gerarRespostaNinaInterno(
 
   // FASE 5 — SNAPSHOT IMUTÁVEL, capturado AGORA (antes da chamada ao modelo).
   // É este conteúdo, e não o prompt atual, que audita e avalia esta mensagem.
-  {
+  async function registrarPromptEfetivo(requestEfetivo: typeof requestNina) {
     const { hashDoTexto } = await import("@/lib/nina/confidence/hash");
     const { registrarSnapshotPrompt } = await import("@/lib/nina/evidencias.server");
     registrarSnapshotPrompt({
       behaviorPromptTemplate: instrucoesNina.template ?? null,
       behaviorPromptRendered: behaviorPrompt,
       behaviorPromptHash: hashDoTexto(behaviorPrompt) ?? "",
-      envelopeTecnico: requestNina.envelope,
-      runtimeContext: requestNina.runtimeContext,
-      requestFinal: systemPromptFinal,
+      envelopeTecnico: requestEfetivo.envelope,
+      runtimeContext: JSON.parse(JSON.stringify(requestEfetivo.runtimeContext)),
+      requestFinal: requestEfetivo.systemPrompt,
       // O modelo efetivamente roteado fica em `nina_execucoes.model` da MESMA
       // execução; aqui guardamos os parâmetros decididos antes da chamada.
       model: null,
@@ -1717,8 +1705,114 @@ async function gerarRespostaNinaInterno(
     verificacoes: import("@/lib/nina/rastreio/auditoria-instrucoes").VerificacaoExigencia[];
     falhaDeInterpretacao: boolean;
   } | null = null;
+  // Conhecimento da sessão é uma referência de pesquisa, nunca prova velha.
+  // Toda continuação factual é reconsultada no catálogo e o MESMO retorno
+  // alimenta contexto, motor e auditoria antes da geração.
+  const { conhecimentoDaMesmaSessao, consultaDoNovoTurno, lembrarConsultaComprovada,
+    compararReferenciasConhecimento } = await import("@/lib/nina/confidence/conhecimento-sessao");
+  const { incorporarResultadoOficial, limitarRetornoParaModelo } = await import("@/lib/nina/confidence/evidencias-turno");
+  const { resolverSelecaoContextual, normalizarSelecaoContextual } = await import("@/lib/nina/confidence/selecao-contextual");
+  const { construirPlanoFactual, formatarPlanoFactualParaModelo } = await import("@/lib/nina/confidence/plano-factual");
+  const { montarContextoDoTurno } = await import("@/lib/nina/confidence/runtime");
+  const conhecimentoAnterior = conhecimentoDaMesmaSessao(fluxoEstado.knowledge_context, clinicaId, fluxoEstado.session_id ?? null);
+  fluxoEstado.knowledge_context = conhecimentoAnterior;
+  const consultaPlanejada = consultaDoNovoTurno({ mensagem: mensagemPaciente, anterior: conhecimentoAnterior,
+    dispensarConsulta: Boolean(saudacaoDispensadaPor) });
+  let selecaoDoTurno: import("@/lib/nina/confidence/selecao-contextual").ResultadoSelecaoContextual | null = null;
+  const selecaoAtual = () => selecaoDoTurno;
+  let recuperacaoFonteUsada = false;
+  let reconstrucaoFactualUsada = false;
+  const contextoFactualAtual = () => montarContextoDoTurno({
+    mensagemPaciente, acao: null, tipoTurno: "INFORMACAO", clinicaId,
+    conversaId: estadoId.conversaId, ferramentas: evidenciasFerramentas, fatos: fatosDoTurno,
+    consultas: consolidarTentativas(consultasDoTurno), catalogoEncontrou,
+    agendamentoConfirmado, pacienteIdentificado: Boolean(pacienteIdEfetivo),
+    esclarecimentoUsado: false, handoffSolicitado: houveHandoff,
+    ambiente: opcoes?.teste ? "homologacao" : "producao",
+  });
+  async function compartilharResultado(nome: string, args: unknown, r: import("@/lib/nina/tool-broker").ResultadoBroker) {
+    const ex = incorporarResultadoOficial({ clinicaId, nome, args, resultado: r,
+      fatos: fatosDoTurno, consultas: consultasDoTurno });
+    if (!r.reused) nomesFerramentasTurno.push(nome);
+    evidenciasFerramentas.push({ nome, capacidade: r.capacidade, fonte: r.fonte,
+      success: r.success, erro: r.erro,
+      escopo: (typeof args === "string" ? args : JSON.stringify(args ?? {})).trim().slice(0, 400) || null });
+    catalogoEncontrou = fatosDoTurno.some(f => f.fonte === "catalogo_publicado");
+    if (!r.success || r.erro) conflitoFerramenta = true;
+    const payload = respostaParaModelo(r);
+    if (r.capacidade !== "searchKnowledgeBase" && r.capacidade !== "listCatalog") return limitarRetornoParaModelo(payload);
+    let parametros: Record<string, unknown> = {};
+    try {
+      const parsed: unknown = typeof args === "string" ? JSON.parse(args) : args;
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) parametros = parsed as Record<string, unknown>;
+    } catch { /* inválido não vira referência */ }
+    if (nome === "consultar_base_conhecimento" && typeof parametros.termo === "string") {
+      const referencia = ex.consulta.status === "com_itens" ? lembrarConsultaComprovada({
+        clinicaId, sessionId: fluxoEstado.session_id ?? null, fatos: ex.fatos,
+        args: { termo: parametros.termo, ...(typeof parametros.medico === "string" ? { medico: parametros.medico } : {}) },
+        anterior: conhecimentoAnterior,
+      }) : null;
+      fluxoEstado.knowledge_context = referencia;
+      selecaoDoTurno = resolverSelecaoContextual({ mensagem: mensagemPaciente, clinicaId,
+        sessaoId: fluxoEstado.session_id ?? "", fatosOficiais: fatosDoTurno,
+        selecaoAnterior: normalizarSelecaoContextual(conhecimentoAnterior?.selecao), agora: new Date().toISOString() });
+      if (referencia) referencia.selecao = selecaoDoTurno.selecao;
+      contextoConsultaAgenda.selecaoRevalidada = selecaoDoTurno.selecao;
+      contextoConsultaAgenda.interesseAnterior = normalizarInteresseConsultaAgenda(conhecimentoAnterior?.interesseAgenda);
+      interesseAgendaConfirmado = interesseEmConsultarAgenda(contextoConsultaAgenda);
+      const interesse = atualizarInteresseConsultaAgenda(contextoConsultaAgenda);
+      if (referencia) referencia.interesseAgenda = interesse;
+      ferramentas = (ferramentas ?? []).filter((f) => !FERRAMENTAS_DE_VAGAS.has(
+        String((f as { function?: { name?: string } }).function?.name ?? "")));
+      if (interesseAgendaConfirmado) ferramentas.push(...ferramentasVagas);
+      runtimeContext.consulta_agenda.interesse_confirmado = interesseAgendaConfirmado;
+      runtimeContext.consulta_agenda.profissional_previamente_definido =
+        selecaoDoTurno.selecao?.medicoNome ?? contextoConsultaAgenda.medicoEscolhido?.nome ?? null;
+      registrarEtapa({ tipo: "consulta", fonte: "catalogo", titulo: "Fontes atuais compartilhadas com a Nina e o motor",
+        dados: { consulta: ex.consulta.id, status: ex.consulta.status, referencias: referencia?.referencias ?? [],
+          ...compararReferenciasConhecimento(conhecimentoAnterior?.referencias ?? [], referencia?.referencias ?? []),
+          selecao: selecaoDoTurno, interesse_agenda: interesse,
+          leitura_agenda_autorizada: interesseAgendaConfirmado, fatos_antigos_reutilizados: false },
+        codigo: { arquivo: "src/lib/whatsapp.server.ts", funcao: "compartilharResultado" } });
+    }
+    const plano = construirPlanoFactual(contextoFactualAtual(), { agora: new Date().toISOString(),
+      maxItens: 40, maxCaracteres: 10000 });
+    return { ...limitarRetornoParaModelo(payload) as Record<string, unknown>,
+      plano_factual: JSON.parse(formatarPlanoFactualParaModelo(plano) || "null"),
+      preferencia_do_paciente: selecaoDoTurno,
+      consulta_agenda: { interesse_confirmado: interesseAgendaConfirmado,
+        permite_reservar: false, fonte_vagas: "agenda", fonte_horarios_habituais: "catalogo_publicado" } };
+  }
+  async function consultarFonteAntesDaResposta(args: { termo: string; medico?: string; dia?: string }, recuperar = false) {
+    const nome = "consultar_base_conhecimento";
+    const id = `fonte_servidor_${rodadasDoTurno}_${recuperar ? "recuperacao" : "inicio"}`;
+    rastro?.iniciar("tool.execute", { ferramenta: nome, origem_solicitacao: "servidor", recuperacao: recuperar });
+    const r = await broker.executar(nome, JSON.stringify(args), { revalidarLeitura: recuperar });
+    const payload = await compartilharResultado(nome, args, r);
+    // A chamada existiu e foi planejada pelo servidor. Não é registrada como
+    // saída original do modelo; a origem também fica explícita na auditoria.
+    mensagens.push({ role: "assistant", content: null,
+      tool_calls: [{ id, type: "function", function: { name: nome, arguments: JSON.stringify(args) } }] });
+    mensagens.push({ role: "tool", tool_call_id: id, content: JSON.stringify(payload) });
+    registrarEtapa({ tipo: "ferramenta", fonte: "catalogo", titulo: recuperar ? "Recuperação da fonte antes de decidir" : "Consulta da base antes da resposta",
+      dados: { origem_solicitacao: "servidor", ferramenta: nome, argumentos: args, success: r.success,
+        erro: r.erro ?? null, reused: r.reused, recuperacao: recuperar, consulta: consultasDoTurno.at(-1)?.id },
+      codigo: { arquivo: "src/lib/whatsapp.server.ts", funcao: "consultarFonteAntesDaResposta" } });
+    if (r.success && !r.erro) rastro?.concluir("tool.execute", { ferramenta: nome, origem_solicitacao: "servidor" });
+    else rastro?.falhar("tool.execute", r.erro ?? "falha na consulta", { ferramenta: nome });
+  }
+  if (consultaPlanejada) await consultarFonteAntesDaResposta(consultaPlanejada.args);
   for (let rodada = 0; rodada < MAX_RODADAS; rodada++) {
     rodadasDoTurno = rodada + 1;
+    // Atualiza somente os fatos de execução no composer oficial. O texto
+    // publicado permanece idêntico e a auditoria captura a requisição usada.
+    const requestEfetivo = comporRequestNina({ behaviorPrompt, runtimeContext,
+      contratoPrecedencia: precedenciaTurno.contrato });
+    const systemMessage = mensagens.find(m => m.role === "system");
+    if (systemMessage) systemMessage.content = requestEfetivo.systemPrompt;
+    const blocoRuntime = auditoriaRegrasTurno.blocos.find(b => b.rotulo === "contexto de execução");
+    if (blocoRuntime) blocoRuntime.texto = JSON.stringify(requestEfetivo.runtimeContext);
+    await registrarPromptEfetivo(requestEfetivo);
     // Toda chamada de modelo da Nina passa pelo Nina AI Gateway.
     const { ninaAIGateway } = await import("@/lib/nina/ai-gateway.server");
     if (rastro && rodada > 0) rastro.novoCiclo();
@@ -1817,6 +1911,44 @@ async function gerarRespostaNinaInterno(
 
     if (chamadas.length === 0) {
       const texto = (msg?.content ?? "").trim();
+      // Recuperação limitada ANTES de aplicar a classificação final. A fonte
+      // é consultada pelo servidor; a frase/modelo não fornece sua própria prova.
+      const { avaliarGrounding } = await import("@/lib/nina/confidence/claims");
+      const groundingPreliminar = avaliarGrounding(contextoFactualAtual(), texto);
+      const faltaFonte = groundingPreliminar.semEvidencia.some(c => c.situacao === "sem_fonte");
+      const faltaCatalogo = groundingPreliminar.semEvidencia.some(c => c.situacao === "sem_fonte" &&
+        !["disponibilidade", "agendamento"].includes(c.tipo));
+      if (faltaCatalogo && !recuperacaoFonteUsada && rodada < MAX_RODADAS - 1 &&
+        !afirmaOuPrometeAgendamento(texto)) {
+        recuperacaoFonteUsada = true;
+        registrarEtapa({ tipo: "validacao", fonte: "sistema", titulo: "Fonte ausente: nova consulta antes de decidir",
+          dados: { motivo: "FONTE_AUSENTE_RECUPERAVEL", fatos_sem_fonte: groundingPreliminar.semEvidencia,
+            tentativa: 1, resposta_liberada: false },
+          codigo: { arquivo: "src/lib/whatsapp.server.ts", funcao: "gerarRespostaNinaInterno" } });
+        mensagens.push({ role: "assistant", content: texto });
+        await consultarFonteAntesDaResposta(consultaPlanejada?.args ?? { termo: mensagemPaciente.slice(0, 200) }, true);
+        continue;
+      }
+      const interpretacaoInconclusiva = groundingPreliminar.naoVerificados.length > 0 ||
+        groundingPreliminar.limitacoes.length > 0 ||
+        groundingPreliminar.semEvidencia.some(c => c.situacao === "fora_do_escopo");
+      const contradicaoComprovada = groundingPreliminar.semEvidencia.some(c => c.situacao === "divergente");
+      if (interpretacaoInconclusiva && !contradicaoComprovada && !faltaFonte &&
+        catalogoEncontrou && !reconstrucaoFactualUsada && rodada < MAX_RODADAS - 1 &&
+        !afirmaOuPrometeAgendamento(texto)) {
+        const plano = construirPlanoFactual(contextoFactualAtual(), { agora: new Date().toISOString() });
+        if (plano.itens.length) {
+          reconstrucaoFactualUsada = true;
+          registrarEtapa({ tipo: "validacao", fonte: "sistema", titulo: "Reconstrução limitada com dados oficiais",
+            dados: { motivo: "INTERPRETACAO_INCONCLUSIVA", tentativa: 1,
+              limitacoes: groundingPreliminar.limitacoes, claims: groundingPreliminar.semEvidencia,
+              resposta_liberada: false, referencias: plano.itens.map(i => i.referencia) },
+            codigo: { arquivo: "src/lib/whatsapp.server.ts", funcao: "gerarRespostaNinaInterno" } });
+          mensagens.push({ role: "assistant", content: texto });
+          mensagens.push({ role: "system", content: "A verificação factual desta redação ficou inconclusiva. Refaça uma única vez a resposta ao mesmo pedido, preservando as instruções publicadas. Para dados do catálogo, use as linhas factuais fornecidas pelo servidor sem acrescentar qualificadores, valores, idades ou disponibilidade. Mantenha a pergunta de escolha que estiver faltando. Esta reconstrução não autoriza consultar agenda, reservar nem transferir. Se os dados não respondem ao pedido, declare a limitação; não substitua o procedimento por outro." });
+          continue;
+        }
+      }
       // ---------------- defesa contra falso sucesso ----------------
       // O modelo afirmou uma reserva sem gravação confirmada. A tentativa
       // de correção não constitui autorização para criar um agendamento.
@@ -1876,6 +2008,7 @@ async function gerarRespostaNinaInterno(
       const canonico = montarContextoCanonicoTurno(
         {
           mensagemPaciente,
+          selecaoContextual: selecaoDoTurno,
           podeAgendar,
           // FASE 1 (refatoração) — intenção não é ação. Só o estágio real do
           // fluxo autoriza `criar_agendamento`.
@@ -1918,9 +2051,16 @@ async function gerarRespostaNinaInterno(
         hash: hashInstrucoes(behaviorPrompt),
         texto: behaviorPrompt,
       });
+      const preferenciaAtual = selecaoAtual();
       const estadoTurno = {
         texto,
         mensagemPaciente,
+        ...(preferenciaAtual?.selecao ? {
+          entityCandidates: { medico: [preferenciaAtual.selecao.medicoNome],
+            procedimento: preferenciaAtual.selecao.modalidade
+              ? [preferenciaAtual.selecao.modalidade.procedimento]
+              : preferenciaAtual.opcoesModalidades.map(m => m.procedimento) },
+        } : {}),
         instrucoes: instrucoesDoTurno,
         intent: canonico.intent,
         acao: canonico.requestedAction,
@@ -1944,7 +2084,10 @@ async function gerarRespostaNinaInterno(
           | "homologacao",
         clinicaId,
         conversaId: estadoId.conversaId ?? null,
-        entities: dadosColetados,
+        entities: { ...dadosColetados, ...(preferenciaAtual?.selecao ? {
+          medico: preferenciaAtual.selecao.medicoNome,
+          ...(preferenciaAtual.selecao.modalidade ? { procedimento: preferenciaAtual.selecao.modalidade.procedimento } : {}),
+        } : {}) },
         // FASE 4 — estado REAL do fluxo (leitura da máquina de estados que já
         // existe). O motor compara o que a Nina diz com o que o sistema tem.
         estadoOperacional: {
@@ -2288,7 +2431,6 @@ async function gerarRespostaNinaInterno(
       }
       if (r.success && !r.erro) rastro?.concluir("tool.execute", { ferramenta: nome });
       else rastro?.falhar("tool.execute", r.erro ?? "falha na ferramenta", { ferramenta: nome });
-      const resultado = respostaParaModelo(r);
       if (r.capacidade === "requestHumanHandoff" && r.success) houveHandoff = true;
       if (r.appointment_confirmed) agendamentoConfirmado = true;
       if (r.capacidade === "checkAvailability" && r.success && !r.erro) {
@@ -2305,49 +2447,11 @@ async function gerarRespostaNinaInterno(
           reused: r.reused,
         });
       }
-      nomesFerramentasTurno.push(nome);
-      // Evidência estruturada: fatos reais do retorno + status da consulta.
-      try {
-        const { extrairEvidencia } = await import("@/lib/nina/confidence/evidencia-extrator");
-        const ex = extrairEvidencia({
-          ferramenta: nome,
-          capacidade: r.capacidade,
-          fonte: r.fonte,
-          args: c.function?.arguments ?? null,
-          success: r.success,
-          erro: r.erro ?? null,
-          dados: r.dados,
-          clinicaId,
-        } as never);
-        fatosDoTurno.push(...ex.fatos);
-        consultasDoTurno.push(ex.consulta);
-      } catch {
-        // Extração é observacional: nunca interrompe o atendimento.
-      }
-      // Evidência para o Confidence Engine (não altera o que o modelo vê).
-      evidenciasFerramentas.push({
-        nome,
-        capacidade: r.capacidade,
-        fonte: r.fonte,
-        success: r.success,
-        erro: r.erro,
-        // FASE 5 — escopo da consulta: só conta como falha recuperada quando a
-        // NOVA tentativa repete exatamente a mesma pergunta.
-        escopo: String(c.function?.arguments ?? "").trim().slice(0, 400) || null,
-      });
-      if (
-        r.success &&
-        !r.erro &&
-        (r.capacidade === "searchKnowledgeBase" || r.capacidade === "listCatalog") &&
-        temConteudoUtil(r.dados)
-      ) {
-        catalogoEncontrou = true;
-      }
-      if (!r.success || r.erro) conflitoFerramenta = true;
+      const resultadoCompartilhado = await compartilharResultado(nome, c.function?.arguments ?? null, r);
       mensagens.push({
         role: "tool",
         tool_call_id: c.id,
-        content: JSON.stringify(resultado).slice(0, 8000),
+        content: JSON.stringify(resultadoCompartilhado),
       });
     }
     if (turnoObsoleto) {

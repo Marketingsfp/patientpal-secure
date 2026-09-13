@@ -52,6 +52,8 @@ import {
   TERMOS_DE_ASSUNTO,
 } from "./afirmacao";
 import { escopoDaFormaPagamento, verificarFormaPagamento } from "./pagamento-declarado";
+import { vincularTextoAosFatosAtuais } from "./plano-factual";
+import { escopoDaEnumeracaoMedica } from "./escopo-enumeracao";
 
 import {
   classificarNatureza,
@@ -412,6 +414,8 @@ export type ClaimDoTexto = {
   frase: string;
   chave?: ChaveFato;
   valor?: string;
+  /** Referência textual ambígua não pode ser preenchida com qualquer fato. */
+  escopoIndeterminado?: string;
 };
 
 /**
@@ -419,7 +423,8 @@ export type ClaimDoTexto = {
  * Nunca é usada como única fonte de verdade do significado operacional —
  * afirmações de agendamento vêm da gramática já existente do workflow.
  */
-export function extrairClaimsDoTexto(texto: string): ClaimDoTexto[] {
+export function extrairClaimsDoTexto(texto: string, contextoCompleto = texto): ClaimDoTexto[] {
+  const deslocamentoInicial = (texto ?? "").length - (texto ?? "").trimStart().length;
   const t = (texto ?? "").trim();
   if (!t) return [];
   const achados: ClaimDoTexto[] = [];
@@ -428,7 +433,7 @@ export function extrairClaimsDoTexto(texto: string): ClaimDoTexto[] {
   for (const { tipo, re } of PADROES) {
     for (const m of t.matchAll(re)) {
       const trecho = String(m[0]).trim().slice(0, 160);
-      const chave = `${tipo}:${trecho.toLowerCase()}${tipo === "valor" ? `:${m.index}` : ""}`;
+      const chave = `${tipo}:${trecho.toLowerCase()}${tipo === "valor" || tipo === "disponibilidade" ? `:${m.index}` : ""}`;
       if (!trecho || vistos.has(chave)) continue;
       vistos.add(chave);
       const posicao = m.index ?? t.indexOf(trecho);
@@ -476,6 +481,11 @@ export function extrairClaimsDoTexto(texto: string): ClaimDoTexto[] {
         const horarios = horariosSemanais(frase);
         if (horarios.length) {
           const q = qualificadoresDaAfirmacao(frase.replace(/[*_]/g, ""));
+          const linha = (texto.slice(0, deslocamentoInicial + posicao).match(/\n/g) ?? []).length;
+          const escopo = q.medicoNome
+            ? escopoDaEnumeracaoMedica(frase, 0)
+            : escopoDaEnumeracaoMedica(contextoCompleto, linha);
+          if (escopo.medicoNome) q.medicoNome = escopo.medicoNome;
           for (const h of horarios) {
             const descricao = `${q.medicoNome ? `${q.medicoNome}: ` : ""}${h.dia}${h.hora ? ` às ${h.hora}` : ""}`;
             const id = `escala:${descricao}`;
@@ -495,6 +505,7 @@ export function extrairClaimsDoTexto(texto: string): ClaimDoTexto[] {
                 hora: h.hora,
               },
               valor: [h.dia, h.hora].filter(Boolean).join(" "),
+              ...(escopo.indeterminado ? { escopoIndeterminado: escopo.indeterminado } : {}),
             });
           }
           if (achados.length >= LIMITE_CLAIMS) return achados.slice(0, LIMITE_CLAIMS);
@@ -1178,7 +1189,43 @@ export function avaliarGrounding(
     );
   }
   const textoFinal = texto ?? ctx.draftText ?? "";
-  for (const c of extrairClaimsDoTexto(textoFinal)) {
+  // Recria o vínculo a partir das fontes atuais. Um claim/JSON sugerido pelo
+  // modelo jamais entra neste caminho de comprovação direta.
+  const vinculo = vincularTextoAosFatosAtuais(
+    textoFinal,
+    ctx,
+    ctx.instanteAvaliacao ?? new Date().toISOString(),
+  );
+  for (const item of vinculo.confirmados) {
+    const c = item.claim;
+    if (claims.length >= LIMITE_CLAIMS) {
+      truncado = true;
+      break;
+    }
+    push({
+      tipo: c.tipo,
+      trecho: c.texto,
+      origem: "estruturado",
+      modalidade: "afirmacao",
+      situacao: "confirmado",
+      suportado: true,
+      fonte: c.fonte!.tipo,
+      referencia: item.referencia,
+      valorAfirmado: c.valor,
+      motivo: "linha factual integral corresponde ao plano do servidor e ao registro oficial atual",
+    });
+  }
+  const claimsComplementares = extrairClaimsDoTexto(vinculo.textoRestante, textoFinal);
+  for (const c of claimsComplementares) {
+    if (c.escopoIndeterminado && c.modalidade !== "pergunta") {
+      if (claims.length >= LIMITE_CLAIMS) { truncado = true; break; }
+      push({
+        tipo: c.tipo, trecho: c.trecho, origem: "texto", modalidade: c.modalidade,
+        situacao: "nao_verificado", suportado: false, fonte: null,
+        motivo: c.escopoIndeterminado,
+      });
+      continue;
+    }
     registrar(
       c.tipo,
       c.trecho,
@@ -1198,11 +1245,40 @@ export function avaliarGrounding(
   // FASE 3 — limitações da própria extração ficam registradas: "zero
   // afirmações reconhecidas" nunca é prova de que não havia o que verificar.
   const limitacoes: string[] = [];
+  if (vinculo.linhasNaoVinculadas.length > 0) {
+    limitacoes.push(
+      "linha factual não corresponde integralmente a um registro oficial atual — exige nova verificação",
+    );
+  }
   if (truncado) limitacoes.push("avaliação truncada — nem todas as afirmações foram avaliadas");
   if (claims.length === 0 && pareceConterDadoOperacional(textoFinal)) {
     limitacoes.push(
       "a resposta contém dado operacional que o extrator não reconheceu como afirmação",
     );
+  }
+  // Um item comprovado não cobre as outras sentenças. Preservar o sinal de
+  // pergunta apenas na própria sentença impede que uma pergunta final
+  // esconda um dado afirmado antes dela, inclusive no mesmo parágrafo.
+  if (vinculo.confirmados.length > 0) {
+    for (const segmento of segmentosDaResposta(vinculo.textoRestante)) {
+      const separador = vinculo.textoRestante.slice(segmento.inicio + segmento.texto.length).match(/^[.!?;\n]+/)?.[0] ?? "";
+      const sentenca = segmento.texto + (separador.includes("?") ? "?" : "");
+      const normalizada = normalizarTexto(sentenca);
+      const duracao = /\b(?:duracao|dura|demora|leva|tempo\s+(?:de|previsto|estimado))\b/.test(normalizada) &&
+        /\b\d+(?:[.,]\d+)?\s*(?:minutos?|min\b|horas?|h\b)/.test(normalizada);
+      const garantiaClinica = /\b(?:cura|resultado|tratamento|exame|diagnostico|cirurgia)\b/.test(normalizada) &&
+        /\bgarant\w*\b|\b\d+(?:[.,]\d+)?\s*%/.test(normalizada);
+      if (
+        !NATUREZAS_NAO_FACTUAIS.has(classificarNatureza(sentenca)) &&
+        (pareceConterDadoOperacional(sentenca) || duracao || garantiaClinica) &&
+        extrairClaimsDoTexto(sentenca).length === 0
+      ) {
+        limitacoes.push(
+          "trecho operacional adicional não reconhecido — o plano factual não comprova o restante da resposta",
+        );
+        break;
+      }
+    }
   }
 
   return {
@@ -1282,14 +1358,14 @@ export function ClaimGroundingValidator(ctx: ContextoConfianca): ResultadoValida
     return res("UNKNOWN", 0, "AVALIACAO_INCOMPLETA", { total: r.total, truncado: true });
   }
 
+  if (r.limitacoes.length > 0) {
+    return res("UNKNOWN", 0, "AFIRMACAO_NAO_RECONHECIDA_PELO_EXTRATOR", {
+      total: r.total,
+      limitacoes: r.limitacoes,
+    });
+  }
+
   if (r.total === 0) {
-    // FASE 3 — extrator não reconheceu nada, mas a resposta tem dado
-    // operacional: isso é limitação da extração, não ausência de afirmação.
-    if (r.limitacoes.length > 0) {
-      return res("UNKNOWN", 0, "AFIRMACAO_NAO_RECONHECIDA_PELO_EXTRATOR", {
-        limitacoes: r.limitacoes,
-      });
-    }
     // Zero afirmações em uma ação que depende de dado oficial não é "nada a
     // verificar": é verificação que não aconteceu.
     // Ações de escrita já são cobertas pelo validador de workflow (prova de

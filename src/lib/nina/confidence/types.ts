@@ -238,6 +238,8 @@ export type InstrucoesDoTurno = {
 
 /** Entrada estruturada do motor. */
 export type ContextoConfianca = {
+  /** Mesmo relógio para vigência da fonte, plano factual e auditoria (ISO). */
+  instanteAvaliacao?: string;
   /** FASE 5 — o que esta avaliação responde. Ausente = `action_safety`. */
   tipoAvaliacao?: TipoAvaliacao;
   /** FASE 5 — claims estruturados do turno, quando o runtime os conhece. */
@@ -326,6 +328,7 @@ export type Bloqueador =
   | "CAMPO_OBRIGATORIO_AUSENTE"
   | "CONFLITO_DE_FONTE"
   | "FONTE_NAO_VIGENTE"
+  | "FONTE_OFICIAL_AUSENTE"
   | "NOTA_INTERNA_COMO_FONTE"
   | "REGRA_EXIGE_HUMANO"
   | "REGRA_DE_NEGOCIO_NAO_ATENDIDA"

@@ -82,7 +82,7 @@ describe("motor distingue modalidade agendado de operação de reserva", () => {
       const t = { ...turno(""), acao };
       const r = decidirNoTurno(t);
       expect(r.checks.find((c) => c.id === "agendamento_confirmado")?.aprovado).toBe(false);
-      expect(r.hardBlockers).toContain("INCONSISTENT_SCHEDULE");
+      expect(r.hardBlockers).toContain("UNSUPPORTED_OPERATIONAL_CLAIM");
     },
   );
 

@@ -15,12 +15,13 @@ type ContextoHistorico = {
   corteMemoria: number;
   teste: boolean;
   idsDoTurno: ReadonlySet<string>;
+  incluirIds?: boolean;
 };
 
 export function historicoParaConsultaAgenda(
   mensagens: ReadonlyArray<MensagemDaConversa>,
   contexto: ContextoHistorico,
-): Array<{ role: string; content: string }> {
+): Array<{ role: string; content: string; id?: string | null }> {
   const inicio = Date.parse(contexto.inicioSessao ?? "");
   if (!contexto.conversaId || !Number.isFinite(inicio)) return [];
   const corte = Math.max(inicio, contexto.corteMemoria);
@@ -37,7 +38,11 @@ export function historicoParaConsultaAgenda(
     })
     .slice()
     .sort((a, b) => Date.parse(a.created_at!) - Date.parse(b.created_at!))
-    .map((m) => ({ role: m.direction === "out" ? "assistant" : "user", content: m.body! }));
+    .map((m) => ({
+      role: m.direction === "out" ? "assistant" : "user",
+      content: m.body!,
+      ...(contexto.incluirIds ? { id: m.id ?? null } : {}),
+    }));
 }
 
 /** Contagem completa não basta quando houve perda de conteúdo de mensagens entregues. */

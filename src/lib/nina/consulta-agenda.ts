@@ -1,7 +1,27 @@
 /** Autorização da consulta de vagas. Só usa mensagens entregues e estado do servidor. */
+import type { SelecaoContextual } from "./confidence/selecao-contextual";
+
+/** Referência ao pedido/aceite do paciente; não representa vaga nem reserva. */
+export type InteresseConsultaAgenda = {
+  versao: 1;
+  clinicaId: string;
+  sessaoId: string;
+  referenciaProfissional: string;
+  medicoNome: string;
+  mensagemPacienteId: string;
+  ofertaMensagemId: string | null;
+};
+
 export type ContextoConsultaAgenda = {
   mensagemAtual: string;
-  historico: Array<{ role: string; content: string | null }>;
+  historico: Array<{ role: string; content: string | null; id?: string | null }>;
+  mensagemAtualId?: string | null;
+  clinicaId?: string | null;
+  sessaoId?: string | null;
+  /** Reconstruída pelo servidor com os fatos publicados deste turno. */
+  selecaoRevalidada?: SelecaoContextual | null;
+  interesseAnterior?: InteresseConsultaAgenda | null;
+  mudancaTema?: boolean;
   medicoEscolhido?: { id: string | null; nome: string | null } | null;
   /** Existe oferta de vaga retornada pela agenda nesta sessão, não mera escala. */
   disponibilidadeJaConsultada?: boolean;
@@ -113,6 +133,9 @@ function ofertaAgenda(ctx: ContextoConsultaAgenda): string {
 export function interesseEmConsultarAgenda(ctx?: ContextoConsultaAgenda | null): boolean {
   if (!ctx) return false;
   const atual = normalizar(ctx.mensagemAtual);
+  if (ctx.mudancaTema) return false;
+  if (interesseContinuadoComprovado(ctx)) return true;
+  if (ctx.interesseAnterior && !pedidoDireto(atual) && !ofertaAgenda(ctx)) return false;
   if (!atual || RECUSA.test(atual) || /^(nao|n)(\b|[!.])/.test(atual)) return false;
   if (pedidoDireto(atual)) return true;
   if (continuaBuscaDeVagas(ctx, atual)) return true;
@@ -126,6 +149,192 @@ export function interesseEmConsultarAgenda(ctx?: ContextoConsultaAgenda | null):
     /\b(qual|que|prefere|medico|profissional|dia|data|periodo)\b/.test(pergunta) &&
     respostaDeEscolha(atual)
   );
+}
+
+export function normalizarInteresseConsultaAgenda(valor: unknown): InteresseConsultaAgenda | null {
+  if (!valor || typeof valor !== "object" || Array.isArray(valor)) return null;
+  const v = valor as Record<string, unknown>;
+  const string = (x: unknown) => (typeof x === "string" && x.trim() ? x.trim() : null);
+  const clinicaId = string(v.clinicaId),
+    sessaoId = string(v.sessaoId),
+    referenciaProfissional = string(v.referenciaProfissional),
+    medicoNome = string(v.medicoNome),
+    mensagemPacienteId = string(v.mensagemPacienteId);
+  if (
+    v.versao !== 1 ||
+    !clinicaId ||
+    !sessaoId ||
+    !referenciaProfissional ||
+    !medicoNome ||
+    !mensagemPacienteId
+  )
+    return null;
+  return {
+    versao: 1,
+    clinicaId,
+    sessaoId,
+    referenciaProfissional,
+    medicoNome,
+    mensagemPacienteId,
+    ofertaMensagemId: string(v.ofertaMensagemId),
+  };
+}
+
+function selecaoNoEscopo(ctx: ContextoConsultaAgenda): SelecaoContextual | null {
+  const s = ctx.selecaoRevalidada;
+  return s &&
+    ctx.clinicaId &&
+    ctx.sessaoId &&
+    s.clinicaId === ctx.clinicaId &&
+    s.sessaoId === ctx.sessaoId &&
+    s.raizesFonte.length
+    ? s
+    : null;
+}
+
+/** Uma negativa sobre modalidade não revoga, por si só, a leitura da agenda. */
+function recusaConsultaContextual(texto: string): boolean {
+  if (
+    /\b(?:agora nao|ainda nao|nao obrigad[oa]|deixa pra depois|outro assunto|mudar de assunto|esquece)\b/.test(
+      texto,
+    )
+  )
+    return true;
+  if (OUTRA_PERGUNTA.test(texto)) return true;
+  if (!/\b(?:nao|nem)\b/.test(texto)) return false;
+  if (
+    /\b(?:nao|nem)\b[^,.!?;\n]{0,45}\b(?:agenda|vagas?|agendar|marcar|remarcar|verificar|consultar|consulte|verifique|busque|agende|marque)\b/.test(
+      texto,
+    )
+  )
+    return true;
+  // Sem uma modalidade afirmada, a recusa genérica continua não autorizando.
+  return !/\b(?:geral|infantil|adulto|adulta)\b/.test(texto);
+}
+
+/** Complemento da pergunta de modalidade/dia: nenhuma afirmação sobre vaga. */
+function complementoDaConsulta(ctx: ContextoConsultaAgenda): boolean {
+  const selecionado = selecaoNoEscopo(ctx),
+    atual = normalizar(ctx.mensagemAtual);
+  if (!selecionado || !atual || recusaConsultaContextual(atual)) return false;
+  const pergunta = perguntaFinal(ultimaResposta(ctx));
+  if (/\b(?:nome|cpf|nascimento|documento|telefone|email)\b/.test(pergunta)) return false;
+  if (
+    !/\b(?:modalidade|tipo|geral|infantil|adulto|adulta|dia|dias|data|horario|periodo|quando)\b/.test(
+      pergunta,
+    )
+  )
+    return false;
+  const nome = normalizar(selecionado.medicoNome).replace(/^(?:dra?|doutor|doutora)\.?\s+/, "");
+  const modalidade = normalizar(selecionado.modalidade?.nome ?? "");
+  const temComplemento =
+    /\b(?:geral|infantil|adulto|adulta|segunda|terca|quarta|quinta|sexta|sabado|domingo|manha|tarde|noite|amanha|hoje)\b|\d/.test(
+      atual,
+    ) ||
+    (modalidade.length > 2 && atual.includes(modalidade));
+  if (!temComplemento) return false;
+  let resto = atual;
+  for (const termo of [...nome.split(/\s+/), ...modalidade.split(/\s+/)].filter(
+    (t) => t.length > 2,
+  ))
+    resto = resto.replace(new RegExp(`\\b${termo}\\b`, "g"), " ");
+  resto = resto.replace(
+    /\b(?:nao|nem|sim|s|isso|ok|pode|ser|quero|prefiro|vou|fazer|por|favor|a|o|as|os|de|da|do|das|dos|no|na|nas|nos|para|pra|em|com|e|mas|eh|sera|seria|dr|dra|doutor|doutora|geral|infantil|adulto|adulta|segunda|terca|quarta|quinta|sexta|sabado|domingo|manha|tarde|noite|amanha|hoje|proxima|proximo|semana|dia|feira|hora|horas|h|hs|às|se|tiver|houver|algum|alguma|horario|horarios|livre|livres|disponivel|disponiveis|parte|periodo|preferencia|preferencialmente|possivel|mais|cedo|tarde)\b/g,
+    " ",
+  );
+  return !/[a-z]/.test(resto);
+}
+
+function interesseContinuadoComprovado(ctx: ContextoConsultaAgenda): boolean {
+  const anterior = normalizarInteresseConsultaAgenda(ctx.interesseAnterior),
+    selecao = selecaoNoEscopo(ctx);
+  if (
+    !anterior ||
+    !selecao ||
+    ctx.mudancaTema ||
+    anterior.clinicaId !== ctx.clinicaId ||
+    anterior.sessaoId !== ctx.sessaoId ||
+    anterior.referenciaProfissional !== selecao.referenciaProfissional ||
+    normalizar(anterior.medicoNome) !== normalizar(selecao.medicoNome)
+  )
+    return false;
+  const historico = ctx.historico;
+  const indices = historico.flatMap((m, i) =>
+    m.id === anterior.mensagemPacienteId && m.role === "user" ? [i] : [],
+  );
+  if (indices.length !== 1) return false;
+  const indice = indices[0]!,
+    mensagem = historico[indice]!;
+  const precedentes = historico.slice(0, indice);
+  const oferta = precedentes.filter((m) => m.role === "assistant").at(-1);
+  if (anterior.ofertaMensagemId && oferta?.id !== anterior.ofertaMensagemId) return false;
+  if (!anterior.ofertaMensagemId && !pedidoDireto(normalizar(mensagem.content ?? ""))) return false;
+  // Reproduz o vínculo original, inclusive o médico escolhido. Um ID de mensagem
+  // existente que pediu outro profissional não comprova este interesse.
+  const prova = atualizarInteresseConsultaAgenda({
+    ...ctx,
+    mensagemAtual: mensagem.content ?? "",
+    mensagemAtualId: mensagem.id,
+    historico: precedentes,
+    interesseAnterior: null,
+  });
+  if (
+    !prova ||
+    prova.ofertaMensagemId !== anterior.ofertaMensagemId ||
+    prova.referenciaProfissional !== anterior.referenciaProfissional
+  )
+    return false;
+  for (let i = indice + 1; i < historico.length; i++) {
+    const entrada = historico[i]!;
+    if (entrada.role !== "user" || !entrada.content?.trim()) continue;
+    const conteudo = normalizar(entrada.content);
+    if (recusaConsultaContextual(conteudo)) return false;
+    if (
+      !complementoDaConsulta({
+        ...ctx,
+        mensagemAtual: entrada.content,
+        historico: historico.slice(0, i),
+      })
+    )
+      return false;
+  }
+  return complementoDaConsulta(ctx);
+}
+
+/** O servidor persiste o retorno; JSON antigo/sem mensagens de origem não vira aceite. */
+export function atualizarInteresseConsultaAgenda(
+  ctx: ContextoConsultaAgenda,
+): InteresseConsultaAgenda | null {
+  const selecao = selecaoNoEscopo(ctx);
+  if (!selecao || ctx.mudancaTema || !ctx.mensagemAtualId) return null;
+  if (interesseContinuadoComprovado(ctx))
+    return normalizarInteresseConsultaAgenda(ctx.interesseAnterior);
+  // Prova nova: mensagem atual com pedido direto ou resposta à oferta entregue.
+  const semAnterior = { ...ctx, interesseAnterior: null };
+  if (!interesseEmConsultarAgenda(semAnterior)) return null;
+  const atual = normalizar(ctx.mensagemAtual);
+  const oferta = ctx.historico.filter((m) => m.role === "assistant").at(-1);
+  const direta = pedidoDireto(atual);
+  if (!direta && (!oferta?.id || !ofertaAgenda(ctx))) return null;
+  const nomeCitado =
+    /\b(?:dra?|doutor|doutora)\.?\s+[a-z]+/.test(atual) ||
+    /\b(?:com|do|da)\s+(?:(?:o|a)\s+)?(?!ele\b|ela\b|esse\b|essa\b)[a-z]+/.test(atual);
+  if (nomeCitado && !mencionaMedico(selecao.medicoNome, atual)) return null;
+  if (!direta && !mencionaMedico(selecao.medicoNome, atual)) {
+    const pergunta = ofertaAgenda(ctx);
+    const pronome = /\b(?:dele|dela|com ele|com ela|desse medico|dessa medica)\b/.test(pergunta);
+    if (/\bou\b/.test(pergunta) || (!mencionaMedico(selecao.medicoNome, pergunta) && !pronome))
+      return null;
+  }
+  return {
+    versao: 1,
+    clinicaId: selecao.clinicaId,
+    sessaoId: selecao.sessaoId,
+    referenciaProfissional: selecao.referenciaProfissional,
+    medicoNome: selecao.medicoNome,
+    mensagemPacienteId: ctx.mensagemAtualId,
+    ofertaMensagemId: direta ? null : oferta!.id!,
+  };
 }
 
 function mencionaMedico(nome: string, texto: string): boolean {
@@ -187,6 +396,22 @@ export function autorizarConsultaAgenda(
     return { permitido: false, motivo: "MEDICO_NAO_DEFINIDO" };
   const atual = normalizar(ctx.mensagemAtual);
   const oferta = ofertaAgenda(ctx);
+  const selecao = selecaoNoEscopo(ctx);
+  // A preferência do catálogo não é um UUID da agenda. Ela só resolve o
+  // pronome da oferta entregue; o executor ainda precisa fornecer o médico
+  // oficial da agenda com nome completo compatível e verificar homônimos.
+  const aceiteDaOfertaContextual =
+    aceiteSemNovaEscolha(atual) &&
+    /\b(dele|dela|com ele|com ela|desse medico|dessa medica)\b/.test(oferta) &&
+    !/\b(dra?|doutor|doutora)\s+[a-z]+/.test(oferta) &&
+    atualizarInteresseConsultaAgenda(ctx) !== null;
+  if (
+    selecao &&
+    normalizar(selecao.medicoNome).replace(/^(?:dra?|doutor|doutora)\.?\s+/, "") ===
+      normalizar(medico.nome).replace(/^(?:dra?|doutor|doutora)\.?\s+/, "") &&
+    (interesseContinuadoComprovado(ctx) || aceiteDaOfertaContextual)
+  )
+    return { permitido: true, motivo: "CONSULTA_SOLICITADA" };
   if (continuaBuscaDeVagas(ctx, atual) && ctx.medicoEscolhido?.id === medico.id)
     return { permitido: true, motivo: "CONSULTA_SOLICITADA" };
   if (mencionaMedico(medico.nome, atual)) return { permitido: true, motivo: "CONSULTA_SOLICITADA" };

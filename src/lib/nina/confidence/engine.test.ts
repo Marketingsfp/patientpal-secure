@@ -96,7 +96,7 @@ describe("bloqueadores absolutos", () => {
 
   it("escrita bloqueada devolve BLOCK_ACTION, não HANDOFF", () => {
     const r = decidirConfianca(ctx({ requestedAction: "criar_agendamento" }));
-    expect(r.blockers).toContain("AGENDA_SEM_CONFIRMACAO");
+    expect(r.blockers).toContain("AFIRMACAO_OPERACIONAL_SEM_PROVA");
     expect(r.decision).toBe("BLOCK_ACTION");
   });
 

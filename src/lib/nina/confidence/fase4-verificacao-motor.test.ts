@@ -354,6 +354,6 @@ describe("FASE 4 — invariantes de política", () => {
 
   it("a versão vigente do motor e da política está declarada", () => {
     expect(VERSAO_MOTOR).toBe("confidence-v3");
-    expect(VERSAO_POLITICA).toBe("v6");
+    expect(VERSAO_POLITICA).toBe("v7");
   });
 });

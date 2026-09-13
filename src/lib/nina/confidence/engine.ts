@@ -10,7 +10,8 @@
  */
 import { detectarCategorias, type CategoriaConfianca } from "../confidence-engine";
 import { afirmaOuPrometeAgendamento } from "../afirmacao-agendamento";
-import { avaliarGrounding, extrairClaimsDoTexto } from "./claims";
+import { avaliarGrounding, extrairClaimsDoTexto, somenteNegativasApoiadas } from "./claims";
+import { fontesPresentes, requisitosDeFonte, reservaComProva } from "./fontes-requeridas";
 import { hashDoTexto } from "./hash";
 import {
   executarValidadoresDeConfianca,
@@ -48,39 +49,12 @@ import type {
 export const LIMITE_HIGH = POLITICA_PADRAO.limites.HIGH;
 export const LIMITE_MEDIUM = POLITICA_PADRAO.limites.MEDIUM;
 
-const CAP_CATALOGO = new Set(["searchKnowledgeBase", "listCatalog"]);
-const CAP_AGENDA = new Set(["checkAvailability", "createAppointment"]);
-
 function ferramentaOk(f: ResultadoFerramenta): boolean {
   return f.success && !f.erro;
 }
 
-function rodouComSucesso(tools: ResultadoFerramenta[], caps: Set<string>): boolean {
-  return tools.some((f) => f.capacidade !== null && caps.has(f.capacidade) && ferramentaOk(f));
-}
-
 function fonteUtil(f: FonteRecuperada): boolean {
   return f.temConteudo && f.publicado !== false;
-}
-
-/**
- * Catálogo publicado é a única fonte oficial: precisa ter rodado a consulta E
- * ter voltado registro publicado.
- */
-function temCatalogoPublicado(ctx: ContextoConfianca): boolean {
-  const consultou = rodouComSucesso(ctx.toolResults, CAP_CATALOGO);
-  const trouxe =
-    ctx.toolResults.some(
-      (f) => f.capacidade !== null && CAP_CATALOGO.has(f.capacidade) && ferramentaOk(f) && f.temConteudo === true,
-    ) || ctx.retrievedSources.some((s) => s.tipo === "catalogo_publicado" && fonteUtil(s));
-  return consultou && trouxe;
-}
-
-function temConfirmacaoAgenda(ctx: ContextoConfianca): boolean {
-  return (
-    rodouComSucesso(ctx.toolResults, CAP_AGENDA) ||
-    ctx.retrievedSources.some((s) => s.tipo === "agenda" && fonteUtil(s))
-  );
 }
 
 function camposFaltantes(ctx: ContextoConfianca): string[] {
@@ -185,8 +159,8 @@ function check(
  */
 export function executarValidadores(ctx: ContextoConfianca): Verificacao[] {
   const cats = categoriasDoContexto(ctx);
-  const catalogo = temCatalogoPublicado(ctx);
-  const agenda = temConfirmacaoAgenda(ctx);
+  const requisitos = requisitosDeFonte(ctx, cats);
+  const presentes = fontesPresentes(ctx);
   const faltando = camposFaltantes(ctx);
   // FASE 2 — falha REFEITA com sucesso não conta como falha vigente do turno
   // (mesma regra do ToolIntegrityValidator; antes eram duas regras diferentes).
@@ -214,52 +188,32 @@ export function executarValidadores(ctx: ContextoConfianca): Verificacao[] {
     ),
   );
 
-  if (cats.includes("valor")) {
-    checks.push(
-      check(
-        "valor_no_catalogo",
-        "Valor apoiado em registro publicado no catálogo",
-        catalogo,
-        100,
-        "VALOR_SEM_CATALOGO",
-      ),
-    );
-  }
-
-  if (cats.includes("agendamento")) {
+  if (requisitos.some((r) => r.fonte === "operacao_confirmada")) {
     checks.push(
       check(
         "agendamento_confirmado",
         "Agendamento efetivamente gravado e confirmado pelo sistema",
-        ctx.businessContext.agendamentoConfirmado,
+        reservaComProva(ctx),
         100,
-        "AGENDA_SEM_CONFIRMACAO",
+        "AFIRMACAO_OPERACIONAL_SEM_PROVA",
       ),
     );
   }
 
-  if (cats.includes("disponibilidade") || cats.includes("horario") || cats.includes("profissional")) {
-    checks.push(
-      check(
-        "agenda_ou_catalogo_confirmou",
-        "Disponibilidade, horário ou profissional confirmado pela agenda ou pelo catálogo",
-        agenda || catalogo || reservaPersistida,
-        100,
-        "AGENDA_SEM_CONFIRMACAO",
-      ),
-    );
-  }
-
-  if (cats.includes("preparo") || cats.includes("regra")) {
-    checks.push(
-      check(
-        "preparo_com_fonte",
-        "Preparo de exame ou regra clínica com fonte publicada",
-        catalogo,
-        100,
-        "PREPARO_SEM_FONTE",
-      ),
-    );
+  const semOperacao = requisitos.filter((r) => r.fonte !== "operacao_confirmada");
+  const negativaComProva = semOperacao.some((r) => !presentes[r.fonte]) && somenteNegativasApoiadas(ctx);
+  for (const fonte of new Set(semOperacao.map((r) => r.fonte))) {
+    const doTipo = semOperacao.filter((r) => r.fonte === fonte);
+    const bloqueador: Bloqueador = doTipo.some((r) => r.tipoClaim === "valor")
+      ? "VALOR_SEM_CATALOGO"
+      : doTipo.some((r) => r.tipoClaim === "preparo") ? "PREPARO_SEM_FONTE" : "FONTE_OFICIAL_AUSENTE";
+    checks.push(check(
+      `fonte_${fonte}`,
+      `Fonte exigida para ${doTipo.map((r) => r.tipoClaim).join(", ")}: ${fonte}`,
+      presentes[fonte] || negativaComProva,
+      100,
+      bloqueador,
+    ));
   }
 
   // FASE 2 — campo obrigatório só é bloqueio quando existe uma AÇÃO
@@ -339,6 +293,8 @@ export function decidirConfianca(
   ctx: ContextoConfianca,
   opcoes: { config?: ConfigValidadores; agora?: Date; politica?: PoliticaConfianca } = {},
 ): ResultadoConfianca {
+  const agora = opcoes.agora ?? new Date(ctx.instanteAvaliacao ?? Date.now());
+  ctx = { ...ctx, instanteAvaliacao: Number.isFinite(agora.getTime()) ? agora.toISOString() : "invalido" };
   const cats = categoriasDoContexto(ctx);
   const politica = opcoes.politica ?? POLITICA_PADRAO;
   const tipoAvaliacao = ctx.tipoAvaliacao ?? "action_safety";
@@ -360,7 +316,7 @@ export function decidirConfianca(
     ctx,
     categorias: cats as string[],
     ...(opcoes.config ? { config: opcoes.config } : {}),
-    ...(opcoes.agora ? { agora: opcoes.agora } : {}),
+    agora,
   });
   const checksTodos = [...checksBase];
   for (const v of validators) {

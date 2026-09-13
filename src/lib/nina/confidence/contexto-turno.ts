@@ -14,6 +14,7 @@ import type { IntencaoNina } from "../atendimento-fase1";
 import type { EtapaFluxoNina } from "../fluxo-estado-normalizar";
 import type { AcaoSolicitada } from "./types";
 import { acaoDoTipoDeTurno, classificarTipoTurno, type TipoTurno } from "./turno-tipo";
+import type { ResultadoSelecaoContextual } from "./selecao-contextual";
 
 /** Capacidades habilitadas na clínica. Nunca viram intenção. */
 export type CapacidadesDoTurno = {
@@ -138,6 +139,8 @@ export type EntradaContextoCanonico = {
   messageIdResposta?: string | null;
   /** FASE 5 — lote de mensagens que compõe este turno. */
   lote?: Partial<LoteDoTurno> | null;
+  /** Preferência reconhecida com fonte atual, sem autorização para reservar. */
+  selecaoContextual?: ResultadoSelecaoContextual | null;
 };
 
 /**
@@ -153,7 +156,8 @@ export function montarContextoCanonicoTurno(
 ): ContextoCanonicoTurno {
   const mensagem = e.mensagemPaciente ?? "";
   const intencoes = deps.detectarIntencoes(mensagem);
-  const ambiguo = deps.intencaoAmbigua(mensagem, intencoes);
+  const turnoDeSelecao = e.selecaoContextual?.turnoDeSelecao === true;
+  const ambiguo = turnoDeSelecao ? false : deps.intencaoAmbigua(mensagem, intencoes);
   const gatilhos: GatilhosExecucao = {
     stage: e.stage ?? null,
     cancelamentoEmExecucao: e.cancelamentoEmExecucao === true,
@@ -161,20 +165,30 @@ export function montarContextoCanonicoTurno(
   const acaoCalculada: AcaoSolicitada = criandoAgendamento(gatilhos)
     ? "criar_agendamento"
     : acaoDasIntencoes(intencoes, gatilhos);
-  const turnType = classificarTipoTurno({
+  const tipoCalculado = classificarTipoTurno({
     mensagem,
     intencoes,
     acao: acaoCalculada,
     intentAmbiguo: ambiguo,
   });
+  const selecaoConversacional =
+    turnoDeSelecao && tipoCalculado !== "OPERACAO" && tipoCalculado !== "HANDOFF";
+  const turnType = selecaoConversacional ? "ESCLARECIMENTO" : tipoCalculado;
   // "nenhuma ação" ≠ "ação desconhecida": a matriz de aplicabilidade depende
   // dessa distinção para não exigir fonte/ferramenta de uma saudação.
-  const requestedAction = acaoDoTipoDeTurno(turnType, acaoCalculada, mensagem);
+  const requestedAction = selecaoConversacional
+    ? null
+    : acaoDoTipoDeTurno(turnType, acaoCalculada, mensagem);
 
   return {
     intencoes,
     turnType,
-    intent: intencoes.length > 0 ? intencoes.join(", ") : null,
+    intent:
+      intencoes.length > 0
+        ? intencoes.join(", ")
+        : turnoDeSelecao
+          ? "preferencia_profissional"
+          : null,
     stage: e.stage ?? null,
     requestedAction,
     intentAmbiguo: ambiguo,

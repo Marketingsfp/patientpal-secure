@@ -957,16 +957,9 @@ async function executarFerramentaInterna(
           dia: p.dia ?? null,
           canal: "whatsapp",
         });
-        // Guarda o valor OFICIAL da planilha para ele aparecer também no
-        // resumo final antes da confirmação. Nunca estimado.
-        const preco = (resultado as { price?: string | null } | null)?.price ?? null;
-        if (preco) {
-          try {
-            mutarEstado(ctx, { appointment: { price: preco } });
-          } catch {
-            /* estado é acessório aqui: não pode derrubar a consulta */
-          }
-        }
+        // Consulta de leitura: `price` resume o primeiro resultado e pode ser
+        // de outro serviço, profissional ou forma de pagamento. Não é o preço
+        // do atendimento selecionado e não pode sobrescrever seu estado.
         return { ok: true, ...resultado };
 
       }

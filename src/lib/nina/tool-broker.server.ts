@@ -19,7 +19,7 @@ import {
 import type { CtxNinaPaciente } from "./paciente-tools.server";
 
 export type ToolBroker = {
-  executar: (nome: string, args: unknown) => Promise<ResultadoBroker>;
+  executar: (nome: string, args: unknown, opcoes?: { revalidarLeitura?: boolean }) => Promise<ResultadoBroker>;
   /** Resultados do turno, na ordem, para alimentar o contexto. */
   resultados: () => Array<{ ferramenta: string; resultado: unknown }>;
   /** Houve agendamento gravado e verificado neste turno. */
@@ -40,13 +40,14 @@ export function criarToolBroker(params: {
   let confirmou = false;
   let handoff = false;
 
-  async function executar(nome: string, args: unknown): Promise<ResultadoBroker> {
+  async function executar(nome: string, args: unknown, opcoes?: { revalidarLeitura?: boolean }): Promise<ResultadoBroker> {
     const chave = chaveIdempotencia(nome, args);
     const emCache = cache.get(chave);
     // Retry do modelo com os MESMOS argumentos não repete a operação.
-    if (emCache) return { ...emCache, reused: true };
-
     const descritor = descreverFerramenta(nome);
+    // Recuperação comandada pelo servidor pode reconsultar somente leitura.
+    // A opção não faz parte dos argumentos do modelo e nunca repete escrita.
+    if (emCache && !(opcoes?.revalidarLeitura && descritor?.escrita === false)) return { ...emCache, reused: true };
     let bruto: unknown;
     try {
       if (descritor?.capacidade === "requestHumanHandoff") {
