@@ -531,7 +531,7 @@ const SITUACOES_DO_BLOCO: Array<[SituacaoRegra, RegExp]> = [
 function condicaoDoBloco(
   campos: CamposBloco,
 ): { condicao: CondicaoRegra; ambiente: AmbienteRegra } {
-  const texto = campos.aplicaSe ?? "";
+  const texto = campos.aplicaSeLinha ?? campos.aplicaSe ?? "";
   const k = chave(texto);
   const ambiente = ambienteDoTexto(texto) ?? "qualquer";
 
