@@ -31,6 +31,7 @@ import {
   type OperadorLiteral,
   type RegraPublicada,
 } from "./regras-publicadas";
+import { conferirIdentidadeDaResposta } from "./identidade-publicada";
 import { ehSaudacaoPura } from "./turno-tipo";
 import type { ContextoConfianca, ResultadoValidador, StatusValidador } from "./types";
 
@@ -592,12 +593,12 @@ function avaliarIdentidade(
   const regra: RegraPublicada = {
     id: "identidade:publicada",
     ordem: 0,
-    condicao: "sempre",
+    condicao: { tipo: "sempre" },
     ambiente: "qualquer",
     escopo: ctx.instrucoes?.escopo ?? "",
     natureza: "exigencia",
     prioridade: "critica",
-    verificacao: "deterministica",
+    verificacao: "literal",
     literal: null,
     operador: null,
     proibicoes: [],
