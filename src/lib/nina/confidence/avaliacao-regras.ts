@@ -578,9 +578,6 @@ export function avaliarRegra(
     contaNoCandidato: !guarda,
   });
 
-  if (aplicabilidade === "falsa") {
-    return monta({ status: "NOT_APPLICABLE", motivo: "CONDICAO_COMPROVADAMENTE_FALSA", nota: null });
-  }
   if (guarda) {
     return monta({
       status: "PENDING",
@@ -588,6 +585,9 @@ export function avaliarRegra(
       nota: null,
       evidencia: ["conferida no fluxo de saída"],
     });
+  }
+  if (aplicabilidade === "falsa") {
+    return monta({ status: "NOT_APPLICABLE", motivo: "CONDICAO_COMPROVADAMENTE_FALSA", nota: null });
   }
   if (aplicabilidade === "indeterminada") {
     return monta({ status: "UNKNOWN", motivo: "CONDICAO_INDETERMINADA", nota: null });

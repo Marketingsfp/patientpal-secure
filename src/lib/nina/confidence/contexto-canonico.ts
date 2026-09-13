@@ -117,6 +117,9 @@ export type EntradaContextoCanonico = {
   posClassificacao?: boolean;
 };
 
+export const PEDIDO_DE_HUMANO =
+  /\b(atendente|humano|uma pessoa|pessoa de verdade|falar com alguem|falar com algu[ée]m|recep[çc][aã]o)\b/i;
+
 const PEDIDO_NA_MENSAGEM =
   /\?|\b(quero|queria|preciso|gostaria|marcar|agendar|remarcar|cancelar|valor|preco|pre[çc]o|quanto|hor[áa]rio|vaga|exame|consulta|endere[çc]o|conv[êe]nio|atendente|pessoa|humano)\b/i;
 
@@ -175,6 +178,11 @@ export function estadoAplicabilidadeDoContexto(c: ContextoCanonico): EstadoAplic
     operacaoIminente: c.operacao ? !c.operacao.executada : c.operacao === null ? false : null,
     resultadoOperacional: c.operacao ? c.operacao.executada : false,
     afirmacaoFactual: c.candidato === "" ? null : factuais.length > 0,
+    pedidoDeHumano:
+      c.mensagemRecebida === ""
+        ? null
+        : PEDIDO_DE_HUMANO.test(c.mensagemRecebida),
+    avaliandoCandidato: true,
     posClassificacao: c.posClassificacao,
   };
 }

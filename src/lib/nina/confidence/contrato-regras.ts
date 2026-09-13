@@ -64,6 +64,8 @@ export type TipoCondicao =
   | "ambiente"
   | "texto_exato"
   | "pos_classificacao"
+  | "pedido_de_humano"
+  | "avaliacao_do_candidato"
   | "nao_compilada";
 
 export type CondicaoContrato = {
@@ -223,6 +225,14 @@ const DETECTORES: Detector[] = [
     tipo: "pos_classificacao",
     re: /\b(apos a classificacao|depois da classificacao|apos calcular a (nota|confianca))\b/,
   },
+  {
+    tipo: "pedido_de_humano",
+    re: /\b(falar com (uma pessoa|um atendente|alguem|humano)|pedido de atendente|atendimento humano)\b/,
+  },
+  {
+    tipo: "avaliacao_do_candidato",
+    re: /\b(na avaliacao do candidato|na conferencia|ao avaliar a resposta|antes da entrega)\b/,
+  },
   { tipo: "ambiente", re: /\bhomologacao\b/, ambiente: "homologacao" },
   { tipo: "ambiente", re: /\bproducao\b/, ambiente: "producao" },
 ];
@@ -287,6 +297,10 @@ export type EstadoAplicabilidade = {
   afirmacaoFactual?: boolean | null;
   /** A classificação de confiança já foi produzida (guardas posteriores). */
   posClassificacao?: boolean | null;
+  /** A pessoa pediu explicitamente para falar com um atendente humano. */
+  pedidoDeHumano?: boolean | null;
+  /** Estamos na conferência do candidato (momento de avaliação). */
+  avaliandoCandidato?: boolean | null;
 };
 
 function sinal(tipo: TipoCondicao, e: EstadoAplicabilidade): boolean | null {
@@ -309,6 +323,10 @@ function sinal(tipo: TipoCondicao, e: EstadoAplicabilidade): boolean | null {
       return e.afirmacaoFactual ?? null;
     case "pos_classificacao":
       return e.posClassificacao ?? null;
+    case "pedido_de_humano":
+      return e.pedidoDeHumano ?? null;
+    case "avaliacao_do_candidato":
+      return e.avaliandoCandidato ?? null;
     default:
       return null;
   }
