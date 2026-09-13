@@ -220,6 +220,8 @@ export type TipoAvaliacao = "action_safety" | "answer_confidence";
  */
 export type InstrucoesDoTurno = {
   escopo: string;
+  /** FASE 4 — identidade declarada pela publicação (bloco de identidade). */
+  identidade?: import("./identidade-publicada").IdentidadePublicada | null;
   versao: string | null;
   versaoId: string | null;
   publicadoEm: string | null;

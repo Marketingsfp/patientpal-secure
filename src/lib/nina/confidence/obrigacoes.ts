@@ -31,6 +31,7 @@ import {
   type OperadorLiteral,
   type RegraPublicada,
 } from "./regras-publicadas";
+import { conferirIdentidadeDaResposta } from "./identidade-publicada";
 import { ehSaudacaoPura } from "./turno-tipo";
 import type { ContextoConfianca, ResultadoValidador, StatusValidador } from "./types";
 
@@ -575,18 +576,91 @@ function avaliarUma(
   return { obrigacao: o, status: "indeterminada", motivo: "LINGUAGEM_ABERTA_NAO_VERIFICAVEL" };
 }
 
+/**
+ * Confere a identidade declarada na resposta contra a identidade PUBLICADA.
+ * Devolve `null` quando não há o que conferir (publicação sem bloco de
+ * identidade ou resposta que não se apresenta) — ausência nunca é aprovação.
+ */
+function avaliarIdentidade(
+  ctx: ContextoConfianca,
+  resposta: string,
+): { obrigacao: Obrigacao; avaliacao: AvaliacaoObrigacao } | null {
+  const publicada = ctx.instrucoes?.identidade ?? null;
+  if (!publicada) return null;
+  const conferencia = conferirIdentidadeDaResposta(publicada, resposta);
+  if (conferencia.situacao === "nao_declarada") return null;
+
+  const regra: RegraPublicada = {
+    id: "identidade:publicada",
+    ordem: 0,
+    condicao: { tipo: "sempre" },
+    ambiente: "qualquer",
+    escopo: ctx.instrucoes?.escopo ?? "",
+    natureza: "exigencia",
+    prioridade: "critica",
+    verificacao: "literal",
+    literal: null,
+    operador: null,
+    proibicoes: [],
+    descricao: "A apresentação da resposta usa a identidade publicada.",
+    trecho: [
+      publicada.atendente ? `Nome da atendente virtual: ${publicada.atendente}` : null,
+      publicada.estabelecimento ? `Nome do estabelecimento: ${publicada.estabelecimento}` : null,
+    ]
+      .filter(Boolean)
+      .join("\n"),
+    linhaInicio: 0,
+    linhaFim: 0,
+    versao: ctx.instrucoes?.versao ?? null,
+    versaoId: ctx.instrucoes?.versaoId ?? null,
+    hash: ctx.instrucoes?.hash ?? null,
+    interpretada: true,
+    motivo: null,
+    identificador: "IDENTIDADE",
+    classe: "ESSENCIAL",
+  };
+
+  const obrigacao: Obrigacao = {
+    id: "instrucao:identidade",
+    tipo: "restricao_literal",
+    origem: "instrucoes_publicadas",
+    descricao: regra.descricao,
+    verificacao: "deterministica",
+    regra,
+  };
+
+  return {
+    obrigacao,
+    avaliacao: {
+      obrigacao,
+      status: conferencia.situacao === "coerente" ? "cumprida" : "descumprida",
+      motivo:
+        conferencia.situacao === "coerente"
+          ? "IDENTIDADE_CONFERE_COM_A_PUBLICACAO"
+          : `IDENTIDADE_DIVERGENTE_DA_PUBLICACAO:${conferencia.divergencias.join(",")}`,
+    },
+  };
+}
+
 export function avaliarObrigacoes(
   ctx: ContextoConfianca,
   resposta: string,
   revisor: RevisorSemantico | null = null,
 ): ResultadoObrigacoes {
-  const obrigacoes = derivarObrigacoesDoTurno(ctx);
-  const avaliacoes = obrigacoes.map((o) =>
+  const derivadas = derivarObrigacoesDoTurno(ctx);
+  const avaliadas = derivadas.map((o) =>
     avaliarUma(o, resposta, revisor, {
       mensagemPaciente: ctx.mensagemPaciente ?? null,
       ambiente: ctx.businessContext?.ambiente ?? null,
     }),
   );
+
+  // FASE 4 — a apresentação da resposta é conferida contra a IDENTIDADE da
+  // própria publicação. Nenhum nome é fixo: a exigência só existe quando a
+  // publicação declara identidade E a resposta se apresenta.
+  const identidade = avaliarIdentidade(ctx, resposta);
+  const obrigacoes = identidade ? [...derivadas, identidade.obrigacao] : derivadas;
+  const avaliacoes = identidade ? [...avaliadas, identidade.avaliacao] : avaliadas;
 
   const verificaveis = avaliacoes.filter((a) => a.status !== "indeterminada");
   const cumpridas = verificaveis.filter((a) => a.status === "cumprida");

@@ -79,7 +79,10 @@ describe("regressão: saudação com o prompt publicado v15", () => {
     const v = InstructionComplianceValidator({ ...ctx, draftText: RESPOSTA });
 
     expect(["NOT_APPLICABLE", "PASS"]).toContain(v.status);
-    expect(v.reasonCode).toMatch(/LINGUAGEM_ABERTA/);
+    // O código agregado pode ser OBRIGACOES_CUMPRIDAS quando há obrigação
+    // conferível cumprida no turno (identidade publicada). O que precisa
+    // continuar valendo é a limitação DECLARADA logo abaixo.
+    expect(v.reasonCode).toMatch(/LINGUAGEM_ABERTA|OBRIGACOES_CUMPRIDAS/);
     expect((v.evidence as { limitacoes?: string[] }).limitacoes).toContain(
       "OBRIGACAO_DE_LINGUAGEM_ABERTA_NAO_VERIFICADA",
     );
