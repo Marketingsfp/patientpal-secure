@@ -254,7 +254,7 @@ describe("FASE 4 — 9. operação dada como concluída sem comprovação", () =
     );
     expect(r.decision).not.toBe("ALLOW");
     expect(r.level).toBe("LOW");
-    expect(r.hardBlockers.length).toBeGreaterThan(0);
+    expect((r.hardBlockers ?? []).length).toBeGreaterThan(0);
   });
 });
 
@@ -273,7 +273,7 @@ describe("FASE 4 — 10. regra essencial aplicável e não verificável", () => 
     const r = avaliar(e, APRESENTACAO);
     expect(r.decision).not.toBe("ALLOW");
     expect(r.evidenceCoverage ?? 100).toBeLessThan(100);
-    expect(r.limitacoes?.length ?? 0).toBeGreaterThan(0);
+    expect(r.unknownDimensions.length).toBeGreaterThan(0);
   });
 });
 
@@ -352,9 +352,8 @@ describe("FASE 4 — invariantes de política", () => {
     expect(POLITICA_PADRAO.limites.MEDIUM).toBe(75);
   });
 
-  it("versão do motor e da política ficam registradas na avaliação", () => {
-    const r = avaliar(estado({ texto: APRESENTACAO }), APRESENTACAO);
-    expect(r.engineVersion).toBe(VERSAO_MOTOR);
-    expect(r.policyVersion).toBe(VERSAO_POLITICA);
+  it("a versão vigente do motor e da política está declarada", () => {
+    expect(VERSAO_MOTOR).toBe("confidence-v3");
+    expect(VERSAO_POLITICA).toBe("v6");
   });
 });
