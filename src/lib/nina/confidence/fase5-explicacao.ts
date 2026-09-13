@@ -150,7 +150,7 @@ function pesoDaRegra(p: PontuacaoContrato | null, identificador: string): number
 function explicarRegra(r: ResultadoRegra, p: PontuacaoContrato | null): LinhaRegraExplicada {
   const identificador = r.identificador ?? r.hashRegra;
   const peso = pesoDaRegra(p, identificador);
-  const aplicavel = r.aplicabilidade === "APLICAVEL";
+  const aplicavel = r.aplicabilidade === "verdadeira";
   const soma = aplicavel && r.contaNoCandidato && r.nota != null && !r.falhaTecnica;
   return {
     identificador,
