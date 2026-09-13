@@ -629,6 +629,10 @@ export function HomologacaoInbox() {
     setCarregandoConversa(true);
     setAudio(null);
     setErro(null);
+    // Trocar/reabrir lead apenas recarrega o estado persistido: não reinicia
+    // sessão, não limpa memória e não troca número virtual.
+    setEncerrado(null);
+
     marcadoRef.current = "";
     void carregarHistorico(leadId).finally(() => setCarregandoConversa(false));
   }, [leadId, carregarHistorico]);
