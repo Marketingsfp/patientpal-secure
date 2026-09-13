@@ -398,7 +398,9 @@ export const iniciarItemExecucao = createServerFn({ method: "POST" })
       leadId: (lead as any).id,
       leadIndice: (lead as any).indice,
       maxTurnos,
+      precisaResetManual,
     };
+
   });
 
 /**
