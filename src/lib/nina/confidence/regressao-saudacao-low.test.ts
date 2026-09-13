@@ -93,7 +93,7 @@ describe("regressão: saudação com o prompt publicado v15", () => {
       versaoId: "teste",
     });
     const ctx = montarContextoDoTurno(
-      estado({ mensagemPaciente: "teste 9381", instrucoes: literal }),
+      estado({ mensagemPaciente: 'o paciente disser "teste 9381"', instrucoes: literal }),
     );
     const v = InstructionComplianceValidator({ ...ctx, draftText: RESPOSTA });
 
