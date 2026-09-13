@@ -676,17 +676,12 @@ export const finalizarItemExecucao = createServerFn({ method: "POST" })
       .eq("id", (item as any).id);
 
     // REGRA DA HOMOLOGAÇÃO — o fim do cenário NÃO reinicia o teste: ciclo,
-    // memória ativa da Nina e telefone virtual seguem como estão. Só o botão
-    // "Resolver / Reiniciar teste" reinicia (rotina canônica única).
-    if (lead && data.reiniciarSessao === true && (lead as any).conversa_id) {
-      const { resetarLeadTeste } = await import("@/lib/nina/teste-console.server");
-      await resetarLeadTeste(supabaseAdmin, {
-        clinicaId: data.clinicaId,
-        leadId: (lead as any).id,
-        userId: context.userId,
-        origem: "cenario_fim",
-      });
-    }
+    // memória ativa da Nina e telefone virtual seguem como estão. Quando o
+    // próximo item precisar de sessão limpa, isso é apenas sinalizado; só o
+    // botão "Resolver / Reiniciar teste" reinicia de fato.
+    const precisaResetManual =
+      Boolean(lead) && data.reiniciarSessao === true && Boolean((lead as any).conversa_id);
+
     if (lead) {
 
 
