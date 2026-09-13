@@ -2302,17 +2302,43 @@ async function gerarRespostaNinaInterno(
 
   // FASE 1 — daqui para baixo TODA alteração do texto é registrada como
   // transformação, para responder "quem mudou a resposta do modelo".
-  const { registrarTransformacaoResposta, registrarOrigemResposta: marcarOrigem } = await import(
-    "@/lib/nina/rastreio/turno.server"
-  );
+  const {
+    registrarTransformacaoResposta,
+    registrarOrigemResposta: marcarOrigem,
+    registrarVersaoTexto,
+  } = await import("@/lib/nina/rastreio/turno.server");
   const { hashDoTexto: hashTurno } = await import("@/lib/nina/confidence/hash");
-  const transformar = (etapa: string, motivo: string, antes: string, depois: string) => {
+  // CADEIA DO TEXTO — o ponto de partida é a resposta original do modelo.
+  // Cada versão seguinte é preservada com etapa, motivo e impressão digital,
+  // para que nenhuma nota fique solta entre dois textos diferentes.
+  registrarVersaoTexto({
+    etapa: "modelo.resposta",
+    motivo: "texto original devolvido pelo modelo",
+    origem: "modelo",
+    texto: respostaDoModelo,
+    hash: respostaDoModelo ? hashTurno(respostaDoModelo) : null,
+  });
+  const transformar = (
+    etapa: string,
+    motivo: string,
+    antes: string,
+    depois: string,
+    origem: import("@/lib/nina/rastreio/versoes-texto").OrigemVersaoTexto = "sistema",
+  ) => {
     if (antes === depois) return;
     registrarTransformacaoResposta({
       etapa,
       motivo,
       antesHash: hashTurno(antes),
       depoisHash: hashTurno(depois),
+    });
+    // O MOTIVO DA SUBSTITUIÇÃO fica junto do texto que passou a valer.
+    registrarVersaoTexto({
+      etapa,
+      motivo,
+      origem,
+      texto: depois,
+      hash: depois ? hashTurno(depois) : null,
     });
   };
 
@@ -2665,6 +2691,25 @@ async function gerarRespostaNinaInterno(
               configOrigem: cfgFinal.configuracao.origem,
               etapaAtivacao: cfgFinal.etapa,
             });
+            // A avaliação do conteúdo FALADO entra no turno com o hash do
+            // texto que ela avaliou — nunca se confunde com a do texto.
+            {
+              const { registrarConfiancaDoTurno: registrarNoTurno } = await import(
+                "@/lib/nina/rastreio/turno.server"
+              );
+              registrarNoTurno({
+                avaliacao: "answer_confidence",
+                decisao: avaliacaoFala.decision ?? null,
+                etapa: cfgFinal.etapa,
+                modo: "shadow",
+                aplicada: false,
+                score: avaliacaoFala.score,
+                nivel: avaliacaoFala.level,
+                textoHash: avaliacaoFala.textoAvaliadoHash ?? null,
+                representacao,
+                decisaoId: registroFala.id ?? null,
+              });
+            }
             return {
               decisaoId: registroFala.id,
               textoHash: avaliacaoFala.textoAvaliadoHash ?? null,
@@ -2752,6 +2797,10 @@ async function gerarRespostaNinaInterno(
         aplicada: revisao.aplicada,
         score: respostaFinalAvaliada.score,
         nivel: respostaFinalAvaliada.level,
+        // QUAL TEXTO ESTA NOTA AVALIOU. Sem isso a nota fica solta no turno.
+        textoHash: respostaFinalAvaliada.textoAvaliadoHash ?? null,
+        representacao: "texto_completo",
+        decisaoId: registro.id ?? null,
       });
 
       // REGRA OBRIGATÓRIA — BAIXA CONFIABILIDADE ENCAMINHA PARA HUMANO.
@@ -2891,14 +2940,58 @@ async function gerarRespostaNinaInterno(
           console.error("[nina-confianca] falha ao conferir anúncio do handoff", e);
         }
         resposta = anuncioDoTurno ? "" : saidaControlada.aviso;
+        const motivoBloqueio = anuncioDoTurno
+          ? `${bloqueio.motivo}: conteúdo candidato descartado; aviso já entregue pelo encaminhamento (protocolo ${anuncioDoTurno.protocolo ?? "sem número"})`
+          : `${bloqueio.motivo}: conteúdo candidato descartado (${saidaControlada.encaminhamento})`;
         transformar(
           "confianca.baixa.encaminhamento",
-          anuncioDoTurno
-            ? `${bloqueio.motivo}: conteúdo candidato descartado; aviso já entregue pelo encaminhamento (protocolo ${anuncioDoTurno.protocolo ?? "sem número"})`
-            : `${bloqueio.motivo}: conteúdo candidato descartado (${saidaControlada.encaminhamento})`,
+          motivoBloqueio,
           antesBloqueio,
           resposta,
+          "aviso_operacional",
         );
+        {
+          const { registrarEvidenciaBloqueio, registrarAvisoOperacional } = await import(
+            "@/lib/nina/rastreio/turno.server"
+          );
+          const { validacaoDoEncaminhamento } = await import(
+            "@/lib/nina/rastreio/versoes-texto"
+          );
+          // EVIDÊNCIA DO BLOQUEIO: a avaliação que o causou fica preservada
+          // apontando para o texto que RECEBEU a nota (o candidato), não para
+          // o aviso que o substituiu.
+          registrarEvidenciaBloqueio({
+            tipo: "baixa_confiabilidade",
+            motivo: bloqueio.motivo ?? "baixa confiabilidade",
+            avaliacao: "answer_confidence",
+            decisaoId: registro.id ?? null,
+            textoAvaliadoHash:
+              bloqueio.conteudoCandidatoHash ?? respostaFinalAvaliada.textoAvaliadoHash ?? null,
+            score: bloqueio.score ?? null,
+            nivel: bloqueio.nivel ?? null,
+            etapa: bloqueio.etapa ?? null,
+            textoSubstitutoHash: resposta ? hashTurno(resposta) : null,
+          });
+          // AVISO OPERACIONAL: origem e validação declaradas; porcentagem de
+          // confiança NÃO se aplica e isso fica escrito, sem inventar nota.
+          if (resposta) {
+            registrarAvisoOperacional({
+              origem: saidaControlada.origem,
+              tipo: "baixa_confiabilidade",
+              motivo: motivoBloqueio,
+              validacao: validacaoDoEncaminhamento(
+                ambienteSaida === "homologacao"
+                  ? { tipo: "simulado" }
+                  : { tipo: "real", confirmado: saidaControlada.encaminhamentoConfirmado === true },
+              ),
+              protocolo: anuncioDoTurno?.protocolo ?? null,
+              mensagemId: anuncioDoTurno?.mensagemId ?? null,
+              execucaoId: execucaoIdFinal ?? null,
+              handoffEventoId: null,
+              textoHash: hashTurno(resposta),
+            });
+          }
+        }
         marcarOrigem(
           "codigo",
           `${saidaControlada.registro} (origem: ${saidaControlada.origem})`,
@@ -3072,14 +3165,56 @@ async function gerarRespostaNinaInterno(
           }
           const saidaRegra = saidaControladaBaixaConfianca(resultadoRegra);
           const antesRegra = resposta;
-          resposta = saidaRegra.aviso;
-          transformar(
-            "confianca.regras.bloqueio",
-            `${revisao.conformidade.motivoBloqueio}: conteúdo candidato descartado (${saidaRegra.encaminhamento})`,
-            antesRegra,
-            resposta,
+          const {
+            registroTurnoAtual: turnoAgora,
+            registrarEvidenciaBloqueio: evidenciaRegra,
+            registrarAvisoOperacional: avisoRegra,
+          } = await import("@/lib/nina/rastreio/turno.server");
+          const { validacaoDoEncaminhamento: validacaoRegra } = await import(
+            "@/lib/nina/rastreio/versoes-texto"
           );
-          marcarOrigem("codigo", `${saidaRegra.registro} (origem: ${saidaRegra.origem})`);
+          // CICLO DE AVISOS: se o texto atual JÁ é um aviso operacional deste
+          // turno, ele não é substituído por outro aviso. Um bloqueio não
+          // bloqueia um aviso de bloqueio.
+          const hashAtual = antesRegra ? hashTurno(antesRegra) : null;
+          const jaEraAviso = (turnoAgora()?.avisosOperacionais ?? []).some(
+            (a) => a.textoHash && a.textoHash === hashAtual,
+          );
+          if (!jaEraAviso) {
+            resposta = saidaRegra.aviso;
+            transformar(
+              "confianca.regras.bloqueio",
+              `${revisao.conformidade.motivoBloqueio}: conteúdo candidato descartado (${saidaRegra.encaminhamento})`,
+              antesRegra,
+              resposta,
+              "aviso_operacional",
+            );
+            marcarOrigem("codigo", `${saidaRegra.registro} (origem: ${saidaRegra.origem})`);
+            evidenciaRegra({
+              tipo: "regra_publicada",
+              motivo: revisao.conformidade.motivoBloqueio ?? "regra publicada descumprida",
+              avaliacao: "answer_confidence",
+              decisaoId: registro.id ?? null,
+              textoAvaliadoHash: respostaFinalAvaliada.textoAvaliadoHash ?? null,
+              score: respostaFinalAvaliada.score ?? null,
+              nivel: respostaFinalAvaliada.level ?? null,
+              etapa: cfgFinal.etapa ?? null,
+              textoSubstitutoHash: resposta ? hashTurno(resposta) : null,
+            });
+            if (resposta) {
+              avisoRegra({
+                origem: saidaRegra.origem,
+                tipo: "regra_publicada",
+                motivo: revisao.conformidade.motivoBloqueio ?? "regra publicada descumprida",
+                validacao: validacaoRegra(resultadoRegra),
+                protocolo: null,
+                mensagemId: null,
+                execucaoId: execucaoIdFinal ?? null,
+                handoffEventoId: null,
+                textoHash: hashTurno(resposta),
+              });
+            }
+          }
           rastro?.concluir("answer.rule_block", {
             motivo: revisao.conformidade.motivoBloqueio,
             estado: revisao.conformidade.estado,

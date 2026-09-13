@@ -20,6 +20,19 @@
  */
 import type { AuditoriaInstrucoesRodada } from "./auditoria-instrucoes";
 import { auditoriaParaTrace } from "./auditoria-instrucoes";
+import {
+  notaAplicavelAoTextoFinal,
+  versoesParaTrace,
+  type AvisoOperacionalRegistrado,
+  type EvidenciaBloqueio,
+  type VersaoTexto,
+} from "./versoes-texto";
+
+export type {
+  AvisoOperacionalRegistrado,
+  EvidenciaBloqueio,
+  VersaoTexto,
+} from "./versoes-texto";
 
 /** De onde veio o texto realmente entregue (ou por que não houve texto). */
 export const ORIGENS_RESPOSTA = [
@@ -154,6 +167,15 @@ export function origemComSituacao(
 export type ConfiancaDoTurno = {
   /** "action_safety" | "answer_confidence" */
   avaliacao: string;
+  /**
+   * QUAL TEXTO ESTA AVALIAÇÃO AVALIOU. Sem isso, a nota fica solta no turno e
+   * pode ser lida como nota de qualquer texto entregue depois.
+   */
+  textoHash?: string | null;
+  /** Forma avaliada (texto completo, áudio integral, resumo falado). */
+  representacao?: string | null;
+  /** Linha correspondente em `nina_confianca_decisoes`, quando gravada. */
+  decisaoId?: string | null;
   decisao: string | null;
   /** Etapa de ativação progressiva aplicada (A|B|C|D). */
   etapa: string | null;
@@ -361,6 +383,16 @@ export type RegistroTurno = {
   origemResposta: OrigemResposta | null;
   motivoOrigem: string | null;
   transformacoes: TransformacaoResposta[];
+  /**
+   * CADEIA DO TEXTO — resposta original do modelo, versões intermediárias,
+   * avisos operacionais e mensagem entregue, cada uma com etapa, motivo e
+   * impressão digital próprios.
+   */
+  versoesTexto: VersaoTexto[];
+  /** Avisos do sistema entregues no turno (sem nota do motor, por definição). */
+  avisosOperacionais: AvisoOperacionalRegistrado[];
+  /** Avaliações que CAUSARAM bloqueio, preservadas como prova do bloqueio. */
+  bloqueios: EvidenciaBloqueio[];
   confianca: ConfiancaDoTurno | null;
   /** FASE 2 — TODAS as avaliações do turno, na ordem em que ocorreram. */
   avaliacoes: ConfiancaDoTurno[];
@@ -408,6 +440,9 @@ export function criarRegistroTurno(base: BaseRegistroTurno): RegistroTurno {
     origemResposta: null,
     motivoOrigem: null,
     transformacoes: [],
+    versoesTexto: [],
+    avisosOperacionais: [],
+    bloqueios: [],
     confianca: null,
     avaliacoes: [],
     entrega: null,
@@ -512,6 +547,23 @@ export function resumoTurnoParaTrace(r: RegistroTurno): Record<string, unknown> 
       em: t.em,
     })),
     situacao_transformacoes: avaliarTransformacoes(r.transformacoes),
+    /**
+     * CADEIA DO TEXTO — original do modelo, versões intermediárias, avisos e
+     * mensagem entregue. Hash sempre; texto integral só com diagnóstico
+     * autorizado pela clínica (mesma regra da auditoria das instruções).
+     */
+    versoes_texto: versoesParaTrace(r.versoesTexto ?? [], r.diagnostico),
+    avisos_operacionais: r.avisosOperacionais ?? [],
+    /** Avaliações que causaram bloqueio, com o hash do texto que recebeu a nota. */
+    bloqueios: r.bloqueios ?? [],
+    /** A nota registrada vale para a mensagem entregue? Decidido por hash. */
+    nota_do_texto_entregue: notaAplicavelAoTextoFinal({
+      avaliacoes: r.avaliacoes ?? [],
+      hashFinal: r.entrega?.textoHash ?? null,
+      avisoOperacional: (r.avisosOperacionais ?? []).some(
+        (a) => a.textoHash && a.textoHash === (r.entrega?.textoHash ?? null),
+      ),
+    }),
     confianca: r.confianca,
     /** FASE 2 — cada avaliação com seu modo; shadow não vira intervenção. */
     avaliacoes: r.avaliacoes,

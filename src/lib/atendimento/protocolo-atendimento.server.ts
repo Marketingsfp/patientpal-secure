@@ -599,6 +599,25 @@ export async function anunciarHandoffAoPaciente(args: {
       estado: envio.mensagemId ? estado : "falhou",
       transporteId: envio.transporteId,
     });
+    // RASTREABILIDADE do aviso do protocolo: origem, validação e a declaração
+    // de que porcentagem de confiança NÃO se aplica a esta mensagem.
+    const { registrarAvisoOperacional } = await import("@/lib/nina/rastreio/turno.server");
+    registrarAvisoOperacional({
+      origem: "atendimento_protocolo",
+      tipo: "aviso_encaminhamento",
+      motivo: `Encaminhamento para atendimento humano informado ao paciente (protocolo ${args.protocolo})`,
+      validacao:
+        ambiente === "homologacao"
+          ? "encaminhamento_simulado"
+          : envio.mensagemId
+            ? "encaminhamento_confirmado"
+            : "encaminhamento_falhou",
+      protocolo: args.protocolo,
+      mensagemId: envio.mensagemId ?? null,
+      execucaoId: execucaoId ?? null,
+      handoffEventoId: args.handoffEventoId ?? null,
+      textoHash: hashDoTexto(texto),
+    });
   } catch (e) {
     // Auditoria nunca desfaz encaminhamento nem segura a fila.
     console.error("[protocolo] falha ao vincular a mensagem de handoff", e);
