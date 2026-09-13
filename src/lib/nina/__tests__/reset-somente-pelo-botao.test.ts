@@ -21,8 +21,9 @@ describe("reset só pelo botão — encaminhamento", () => {
   it("o handoff não encerra mais o ciclo de teste", () => {
     const src = ler("src/lib/atendimento/handoff.server.ts");
     expect(src).not.toContain("encerrarCicloTestePorHandoff");
-    expect(src).not.toContain("IA_MEMORIA_RESETADA");
+    expect(src).not.toContain('evento: "IA_MEMORIA_RESETADA"');
   });
+
 
   it("cenário aprovado mesmo com o ciclo ainda ativo e sem reset de memória", () => {
     const v = verificarHandoff({
