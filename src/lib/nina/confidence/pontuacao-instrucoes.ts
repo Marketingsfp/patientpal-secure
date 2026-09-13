@@ -103,9 +103,19 @@ export function categoriaDaObrigacao(o: ObrigacaoAvaliada): CategoriaObrigacao {
   // como "estilo": ela permanece substantiva e indeterminada.
   if (o.tipo === "restricao_nao_interpretada") return critica ? "ESSENCIAL" : "CONVERSACIONAL";
 
+  // Exigência de FORMA em texto aberto, sem verificador automático (tom,
+  // cortesia, estilo da saudação). Ela não é conferível por máquina, então vai
+  // para a dimensão separada: continua declarada como indeterminada, mas não
+  // entra na nota nem na cobertura e, sozinha, não rebaixa o turno.
+  // Só escapa disso o que a publicação marcou como crítico.
+  if (o.motivo.includes("LINGUAGEM_ABERTA") || o.verificacao === "linguagem_aberta") {
+    return critica ? "ESSENCIAL" : "LINGUAGEM";
+  }
+
   if (critica) return "ESSENCIAL";
   if (alta) return "CONVERSACIONAL";
   return "LINGUAGEM";
+
 }
 
 /** Estado padronizado da obrigação. */
