@@ -1213,11 +1213,23 @@ export function HomologacaoInbox() {
                     size="sm"
                     variant="outline"
                     className="border-atd-border text-atd-ink-soft hover:bg-atd-danger-bg hover:text-atd-danger-ink"
-                    disabled={!conversaId || processando}
+                    // Continua habilitado durante uma resposta em andamento:
+                    // o operador pode interromper e reiniciar quando quiser.
+                    disabled={!conversaId || resetando}
+                    aria-busy={resetando}
                     onClick={() => void resolverConversa()}
                   >
-                    <CheckCheck className="mr-1 h-3.5 w-3.5" /> Resolver / Reiniciar teste
+                    {resetando ? (
+                      <>
+                        <RefreshCw className="mr-1 h-3.5 w-3.5 animate-spin" /> Reiniciando…
+                      </>
+                    ) : (
+                      <>
+                        <CheckCheck className="mr-1 h-3.5 w-3.5" /> Resolver / Reiniciar teste
+                      </>
+                    )}
                   </Button>
+
                 </div>
               </div>
             </CardHeader>
