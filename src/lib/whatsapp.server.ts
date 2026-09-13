@@ -2691,6 +2691,25 @@ async function gerarRespostaNinaInterno(
               configOrigem: cfgFinal.configuracao.origem,
               etapaAtivacao: cfgFinal.etapa,
             });
+            // A avaliação do conteúdo FALADO entra no turno com o hash do
+            // texto que ela avaliou — nunca se confunde com a do texto.
+            {
+              const { registrarConfiancaDoTurno: registrarNoTurno } = await import(
+                "@/lib/nina/rastreio/turno.server"
+              );
+              registrarNoTurno({
+                avaliacao: "answer_confidence",
+                decisao: avaliacaoFala.decision ?? null,
+                etapa: cfgFinal.etapa,
+                modo: "shadow",
+                aplicada: false,
+                score: avaliacaoFala.score,
+                nivel: avaliacaoFala.level,
+                textoHash: avaliacaoFala.textoAvaliadoHash ?? null,
+                representacao,
+                decisaoId: registroFala.id ?? null,
+              });
+            }
             return {
               decisaoId: registroFala.id,
               textoHash: avaliacaoFala.textoAvaliadoHash ?? null,
