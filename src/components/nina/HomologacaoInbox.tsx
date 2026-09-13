@@ -734,7 +734,8 @@ export function HomologacaoInbox() {
         processamento?: "RESPONDIDA" | "AGRUPADA" | "OBSOLETA" | "ERRO";
         absorvidaPeloLote?: boolean;
       };
-      concluirOtimista(chave);
+      const mesmaSessao = geracaoRef.current === geracao;
+      if (mesmaSessao) concluirOtimista(chave);
       // Mensagem absorvida por um envio mais recente do mesmo lead: é o
       // agrupamento normal (as três viram um turno só). Não é falta de
       // resposta e não deve mostrar aviso.
@@ -750,16 +751,19 @@ export function HomologacaoInbox() {
       }
       void carregarLeads();
       if (meuLead()) {
-        if (r.erro) setErro(r.erro);
-        else if (r.transferida)
-          setErro(
-            "Conversa transferida para atendimento humano (simulado). A sessão e a memória da Nina continuam como estão: clique em “Resolver / Reiniciar teste” para começar um novo teste.",
-          );
-        else if (!r.reply && !agrupada)
-          setErro(
-            "A Nina não respondeu. Se a conversa foi transferida para atendimento humano, use “Resolver / Reiniciar teste” antes de começar um novo teste.",
-          );
+        // A conversa continua na tela em qualquer um destes casos: nada é
+        // limpo, nada troca de sessão. Só informamos o estado real.
+        if (r.erro) {
+          setErro(r.erro);
+          setEncerrado(AVISO_TESTE_ENCERRADO);
+        } else if (r.transferida) {
+          setEncerrado(AVISO_TESTE_ENCERRADO);
+        } else if (!r.reply && !agrupada) {
+          setErro("A Nina não respondeu nesta execução.");
+          setEncerrado(AVISO_TESTE_ENCERRADO);
+        }
       }
+
 
       return {
         ok: agrupada ? true : !r.erro && !!r.reply,
