@@ -184,6 +184,13 @@ export type ResultadoHandoff = {
   departamento?: string | null;
   atribuida_para?: string | null;
   mensagem: string;
+  /** Protocolo do atendimento, quando a clínica usa protocolo. */
+  protocolo?: string | null;
+  /**
+   * RESULTADO ESTRUTURADO DO AVISO — estado, protocolo, texto preparado e id
+   * da mensagem. Quem chama consulta isto em vez de produzir um segundo aviso.
+   */
+  aviso?: ResultadoAvisoEncaminhamento | null;
 };
 
 /**
