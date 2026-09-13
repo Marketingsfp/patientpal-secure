@@ -5,7 +5,7 @@
  */
 import { describe, expect, it } from "bun:test";
 import { extrairConflitos, sanearEvidencia } from "./auditoria";
-import { rotuloConfianca, scoreExibido, TETO_VISUAL_GERATIVO } from "../confianca-badge";
+import { rotuloConfianca, scoreExibido } from "../confianca-badge";
 import {
   calcularCalibracaoPorFaixa,
   calcularTaxaErroAltaConfianca,
