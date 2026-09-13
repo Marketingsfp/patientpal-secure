@@ -615,9 +615,14 @@ export function HomologacaoInbox() {
     const chave = `${conversaId}:${ultima.id}`;
     if (marcadoRef.current === chave) return;
     marcadoRef.current = chave;
+    // Mensagens ainda não gravadas no banco têm id temporário (não-UUID).
+    // Nesse caso marcamos a conversa como lida sem apontar a mensagem.
+    const UUID_RE =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    const mensagemId = UUID_RE.test(String(ultima.id)) ? String(ultima.id) : null;
     void (async () => {
       try {
-        await marcarLido({ data: { clinicaId, conversaId, mensagemId: ultima.id } });
+        await marcarLido({ data: { clinicaId, conversaId, mensagemId } });
         setLeads((ls) => ls.map((l) => (l.id === leadId ? { ...l, naoLidas: 0 } : l)));
       } catch {
         marcadoRef.current = ""; // falhou: tenta de novo na próxima visualização
