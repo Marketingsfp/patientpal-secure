@@ -46,9 +46,8 @@ import {
   simulacaoAtualTerra,
 } from "@/lib/nina/simulador-terra.functions";
 import { AvaliacaoSol } from "@/components/nina/AvaliacaoSol";
-import { descreverEventoRastreio } from "@/lib/nina/arquitetura/estado-evento";
-import { valorOuNaoRegistrado } from "@/lib/nina/evidencias-resumo";
-import { EvidenciasLimites } from "@/components/nina/EvidenciasLimites";
+import { DetalhesMensagemNina } from "@/components/nina/DetalhesMensagemNina";
+import type { LeituraDetalhesMensagem } from "@/lib/nina/detalhes-mensagem-contrato";
 
 import {
   CENARIOS_SUGERIDOS,
@@ -86,7 +85,6 @@ import {
 } from "@/components/nina/ConversationSystemEvent";
 import { NinaMessage, TypingDots } from "@/components/nina/NinaMessage";
 import { ReportarErroNinaBotao } from "@/components/nina/ReportarErroNinaDialog";
-import { RegistroTurnoResumo } from "@/components/nina/RegistroTurnoResumo";
 
 import {
   ConfiancaMensagemBadge,
@@ -245,23 +243,55 @@ export function HomologacaoInbox() {
   // FASE 3 — detalhe técnico de uma execução da Nina (prompt, versão,
   // conhecimento, ferramentas, modelo, erros e resposta).
   const carregarDetalhe = useServerFn(detalheExecucaoTeste);
-  const [detalhe, setDetalhe] = useState<any | null>(null);
+  const [detalhe, setDetalhe] = useState<{
+    leitura: LeituraDetalhesMensagem | null;
+    execucao: unknown;
+    etapas: unknown[];
+    eventos: unknown[];
+    traceId: string | null;
+    registrosComplementares?: unknown;
+  } | null>(null);
   const [detalheAberto, setDetalheAberto] = useState(false);
   const [detalheCarregando, setDetalheCarregando] = useState(false);
+  const [detalheFalhou, setDetalheFalhou] = useState(false);
+  const pedidoDetalheRef = useRef(0);
+  const mudarDetalheAberto = useCallback((aberto: boolean) => {
+    setDetalheAberto(aberto);
+    if (!aberto) {
+      pedidoDetalheRef.current++;
+      setDetalhe(null);
+      setDetalheCarregando(false);
+      setDetalheFalhou(false);
+    }
+  }, []);
+  useEffect(() => {
+    // Outra clínica/conversa ou desmontagem invalidam qualquer leitura em voo.
+    const controleDoPedido = pedidoDetalheRef;
+    mudarDetalheAberto(false);
+    return () => {
+      controleDoPedido.current++;
+    };
+  }, [clinicaId, leadId, mudarDetalheAberto]);
   const abrirDetalhe = useCallback(
-    async (execucaoId: string) => {
+    async (mensagemId: string, execucaoId: string | null) => {
       if (!clinicaId) return;
+      const pedido = ++pedidoDetalheRef.current;
       setDetalheAberto(true);
       setDetalheCarregando(true);
+      setDetalheFalhou(false);
       setDetalhe(null);
       try {
-        const r = await carregarDetalhe({ data: { clinicaId, execucaoId } });
-        setDetalhe(r);
+        const r = await carregarDetalhe({
+          data: { clinicaId, mensagemId, ...(execucaoId ? { execucaoId } : {}) },
+        });
+        if (pedido === pedidoDetalheRef.current) setDetalhe(r);
       } catch (e) {
-        mostrarErro(e);
-        setDetalheAberto(false);
+        if (pedido === pedidoDetalheRef.current) {
+          mostrarErro(e);
+          setDetalheFalhou(true);
+        }
       } finally {
-        setDetalheCarregando(false);
+        if (pedido === pedidoDetalheRef.current) setDetalheCarregando(false);
       }
     },
     [carregarDetalhe, clinicaId],
@@ -1464,11 +1494,13 @@ export function HomologacaoInbox() {
                                     confianca={confiancaPorExecucao[String(m.execucao_id)]!}
                                   />
                                 )}
-                              {m.execucao_id && (
+                              {m.id && (
                                 <button
                                   type="button"
                                   className="underline underline-offset-2 hover:opacity-80"
-                                  onClick={() => void abrirDetalhe(m.execucao_id as string)}
+                                  onClick={() =>
+                                    void abrirDetalhe(String(m.id), m.execucao_id ?? null)
+                                  }
                                 >
                                   Detalhes técnicos
                                 </button>
@@ -1885,107 +1917,39 @@ export function HomologacaoInbox() {
         )}
       </Card>
 
-      <Dialog open={detalheAberto} onOpenChange={setDetalheAberto}>
+      <Dialog open={detalheAberto} onOpenChange={mudarDetalheAberto}>
         <DialogContent className="max-h-[85vh] max-w-2xl overflow-auto">
           <DialogHeader>
-            <DialogTitle>Detalhes técnicos da resposta</DialogTitle>
+            <DialogTitle>Detalhes técnicos da mensagem</DialogTitle>
             <DialogDescription>
-              Mesma execução registrada pelo atendimento real da Nina. É o registro desta resposta —
-              não a prévia da versão atual.
+              Veja a mensagem selecionada, suas avaliações e o caminho registrado pelo sistema.
             </DialogDescription>
           </DialogHeader>
-          {detalheCarregando && <p className="text-sm text-muted-foreground">Carregando…</p>}
-          {!detalheCarregando && detalhe?.execucao && (
-            <div className="space-y-3 text-xs">
-              {/* FASE 3 — registro do turno (fase 1) desta mensagem. */}
-              <RegistroTurnoResumo eventos={(detalhe.eventos ?? []) as any[]} compacto />
-              <div className="grid grid-cols-1 gap-x-4 gap-y-1 sm:grid-cols-2">
-                {[
-                  ["Modelo", detalhe.execucao.model],
-                  ["Raciocínio", detalhe.execucao.thinking_level],
-                  ["Instruções (versão)", detalhe.execucao.prompt_versao],
-                  ["Origem das instruções", detalhe.execucao.prompt_origem],
-                  ["Publicada em", detalhe.execucao.prompt_publicado_em],
-                  ["Conhecimento", detalhe.execucao.knowledge_status],
-                  // FASE 5 — este campo é o registro da execução; o confronto
-                  // entre disponíveis e chamadas fica no bloco abaixo.
-                  ["Ferramentas chamadas (registro da execução)", detalhe.execucao.tool_calls],
-                  ["Transferência", detalhe.execucao.handoff ? "sim" : "não"],
-                  [
-                    // FASE 2 — retorno técnico da chamada; não comprova
-                    // cumprimento do prompt.
-                    "Chamada ao modelo",
-                    detalhe.execucao.success
-                      ? "concluída sem erro registrado"
-                      : "falhou (erro registrado)",
-                  ],
-                  ["Erro", detalhe.execucao.error_category],
-                  ["Tempo (ms)", detalhe.execucao.latency_ms],
-                  ["Trace", detalhe.traceId],
-                ].map(([k, v]) => (
-                  <div key={String(k)}>
-                    <span className="text-muted-foreground">{k}:</span>{" "}
-                    <span className="font-mono">
-                      {/* FASE 5 — campo sem informação é "Não registrado", nunca
-                          um traço mudo que pareça ausência de uso. */}
-                      {valorOuNaoRegistrado(v)}
-                    </span>
-                  </div>
-                ))}
-              </div>
-
-              {/* FASE 5 — entradas enviadas, ferramentas e limites da captura. */}
-              <EvidenciasLimites etapas={(detalhe.etapas ?? []) as any[]} />
-
-
-              {/* FASE 2 — o retorno técnico da chamada não é conferência de
-                  conteúdo. Nenhuma validação é inventada aqui. */}
-              <p className="text-muted-foreground">
-                Conferência de conteúdo: não há validação automática de cumprimento das instruções
-                neste registro. A chamada concluída sem erro não comprova que a resposta seguiu o
-                prompt.
-              </p>
-
-              {detalhe.eventos?.length > 0 && (
-                <div>
-                  <p className="mb-1 font-medium text-muted-foreground">Etapas do fluxo</p>
-                  <div className="space-y-0.5 font-mono text-[11px]">
-                    {detalhe.eventos.map((ev: any, i: number) => {
-                      // FASE 4 — contrato real de estados (ok/error/running/
-                      // skipped/cancelled). ✔ só para sucesso confirmado.
-                      const e = descreverEventoRastreio(ev);
-                      return (
-                        <div key={i}>
-                          <span className={e.classe}>{e.simbolo}</span> {ev.node_id}
-                          <span className="text-muted-foreground"> · {e.rotulo}</span>
-                          {ev.duration_ms != null ? ` (${ev.duration_ms}ms)` : ""}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-
-              {detalhe.etapas?.length > 0 && (
-                <div>
-                  <p className="mb-1 font-medium text-muted-foreground">Evidências registradas</p>
-                  <div className="space-y-1">
-                    {detalhe.etapas.map((et: any, i: number) => (
-                      <details key={i} className="rounded border bg-muted/30 p-1.5">
-                        <summary className="cursor-pointer">{et.titulo ?? et.tipo}</summary>
-                        <pre className="mt-1 max-h-48 overflow-auto whitespace-pre-wrap break-words text-[10px]">
-                          {JSON.stringify(et.dados ?? et, null, 2)}
-                        </pre>
-                      </details>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
+          {detalheCarregando && (
+            <p role="status" className="text-sm text-muted-foreground">
+              Carregando os registros desta mensagem…
+            </p>
           )}
-          {!detalheCarregando && detalhe && !detalhe.execucao && (
+          {!detalheCarregando && detalheFalhou && (
+            <p role="alert" className="text-sm text-destructive">
+              Não foi possível carregar os detalhes. Feche este painel e tente novamente.
+            </p>
+          )}
+          {!detalheCarregando && detalhe?.leitura && (
+            <DetalhesMensagemNina
+              leitura={detalhe.leitura}
+              registros={{
+                execucao: detalhe.execucao,
+                traceId: detalhe.traceId,
+                eventos: detalhe.eventos,
+                etapas: detalhe.etapas,
+                registrosVinculados: detalhe.registrosComplementares,
+              }}
+            />
+          )}
+          {!detalheCarregando && detalhe && !detalhe.leitura && (
             <p className="text-sm text-muted-foreground">
-              Sem registro técnico para esta mensagem.
+              Não foi possível vincular os registros técnicos à mensagem selecionada.
             </p>
           )}
         </DialogContent>

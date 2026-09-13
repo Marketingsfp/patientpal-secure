@@ -416,59 +416,30 @@ export const resolverConversaTeste = createServerFn({ method: "POST" })
 export const detalheExecucaoTeste = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) =>
-    z.object({ clinicaId: z.string().uuid(), execucaoId: z.string().uuid() }).parse(input),
+    z
+      .object({
+        clinicaId: z.string().uuid(),
+        mensagemId: z.string().uuid().optional(),
+        execucaoId: z.string().uuid().optional(),
+        conversaId: z.string().uuid().optional(),
+      })
+      .refine((v) => Boolean(v.mensagemId || v.execucaoId), "Selecione uma mensagem ou execução.")
+      .parse(input),
   )
   .handler(async ({ data, context }) => {
     await assertMembership(context.supabase, context.userId, data.clinicaId);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-
-    const { data: exec } = await supabaseAdmin
-      .from("nina_execucoes")
-      .select(
-        "id, created_at, model, thinking_level, latency_ms, knowledge_status, tool_calls, success, error_category, handoff, input_tokens, output_tokens, retries, prompt_versao, prompt_origem, prompt_publicado_em, prompt_modulos",
-      )
-      .eq("id", data.execucaoId)
-      .eq("clinica_id", data.clinicaId)
-      .maybeSingle();
-    if (!exec) return { execucao: null, etapas: [], traceId: null as string | null, eventos: [] };
-
-    const { data: evid } = await supabaseAdmin
-      .from("nina_execucao_evidencias")
-      .select("etapas")
-      .eq("execucao_id", data.execucaoId)
-      .maybeSingle();
-
-    const { data: eventos } = await supabaseAdmin
-      .from("nina_trace_eventos")
-      .select(
-        "trace_id, execution_id, conversation_id, message_id, node_id, event_type, status, duration_ms, started_at, metadata",
-      )
-      .eq("clinica_id", data.clinicaId)
-      .eq("execution_id", data.execucaoId)
-      .order("started_at", { ascending: true })
-      .limit(200);
-
-    let lista = (eventos ?? []) as any[];
-    // O trace cobre a mensagem inteira (várias rodadas de modelo). Buscando
-    // pelo trace_id trazemos TODAS as etapas, não só as da última rodada.
-    const traceId = (lista[0]?.trace_id as string | undefined) ?? null;
-    if (traceId) {
-      const { data: todos } = await supabaseAdmin
-        .from("nina_trace_eventos")
-        .select(
-          "trace_id, execution_id, conversation_id, message_id, node_id, event_type, status, duration_ms, started_at, metadata",
-        )
-        .eq("clinica_id", data.clinicaId)
-        .eq("trace_id", traceId)
-        .order("started_at", { ascending: true })
-        .limit(300);
-      if (todos?.length) lista = todos as any[];
-    }
+    const { carregarDetalhesMensagem } = await import("@/lib/nina/detalhes-mensagem.server");
+    const r = await carregarDetalhesMensagem(supabaseAdmin, data);
+    // Os campos brutos vêm das colunas JSON/escalares do banco. O contrato
+    // explícito mantém a validação de serialização do TanStack na fronteira.
+    type Json = import("@/integrations/supabase/types").Json;
     return {
-      execucao: exec as any,
-      etapas: ((evid as any)?.etapas ?? []) as any[],
-      traceId,
-      eventos: lista,
+      ...r,
+      execucao: r.execucao as Json,
+      etapas: r.etapas as Json[],
+      eventos: r.eventos as Json[],
+      registrosComplementares: r.registrosComplementares as Json,
     };
   });
 
