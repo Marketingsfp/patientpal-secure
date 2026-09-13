@@ -178,7 +178,15 @@ function nomeLead(l: Pick<Lead, "indice">): string {
   return `Paciente Teste ${String(l.indice).padStart(2, "0")}`;
 }
 
+/**
+ * Texto único do aviso de fim de teste. É apenas informativo: reiniciar é
+ * ação exclusiva do operador no botão "Resolver / Reiniciar teste".
+ */
+export const AVISO_TESTE_ENCERRADO =
+  "Teste encerrado. Clique em Resolver / Reiniciar teste para iniciar uma nova sessão.";
+
 export function HomologacaoInbox() {
+
   const { clinicaAtual } = useClinica();
   const clinicaId = clinicaAtual?.clinica_id;
   const podeEscrever = usePodeEscrever("nina");
@@ -207,7 +215,22 @@ export function HomologacaoInbox() {
   const [emProcessamento, setEmProcessamento] = useState(0);
   const processando = emProcessamento > 0;
   const [erro, setErro] = useState<string | null>(null);
+  /**
+   * REGRA DA HOMOLOGAÇÃO — aviso de fim de teste. É só informação: nada aqui
+   * reinicia sessão, memória ou número virtual. Quem reinicia é exclusivamente
+   * o botão "Resolver / Reiniciar teste".
+   */
+  const [encerrado, setEncerrado] = useState<string | null>(null);
+  /** Reset manual em andamento (só a tela; o servidor é a fonte da verdade). */
+  const [resetando, setResetando] = useState(false);
+  /**
+   * Geração da sessão exibida. O reset manual incrementa este número; qualquer
+   * resposta da IA que estava em voo e chegar depois é descartada da tela (a
+   * execução continua registrada na auditoria do servidor).
+   */
+  const geracaoRef = useRef(0);
   const [ultimoTexto, setUltimoTexto] = useState("");
+
   const [tipo, setTipo] = useState<TipoMensagem>("text");
   // FASE 3 — detalhe técnico de uma execução da Nina (prompt, versão,
   // conhecimento, ferramentas, modelo, erros e resposta).
@@ -606,6 +629,10 @@ export function HomologacaoInbox() {
     setCarregandoConversa(true);
     setAudio(null);
     setErro(null);
+    // Trocar/reabrir lead apenas recarrega o estado persistido: não reinicia
+    // sessão, não limpa memória e não troca número virtual.
+    setEncerrado(null);
+
     marcadoRef.current = "";
     void carregarHistorico(leadId).finally(() => setCarregandoConversa(false));
   }, [leadId, carregarHistorico]);
@@ -684,6 +711,9 @@ export function HomologacaoInbox() {
     setTexto("");
     composerRef.current?.focus();
     setErro(null);
+    setEncerrado(null);
+    const geracao = geracaoRef.current;
+
     setUltimoTexto(corpo);
     // 2) bolha imediata na timeline do lead de origem, já com a MESMA
     // identidade que o servidor vai gravar: quando o Realtime trouxer a
@@ -698,7 +728,11 @@ export function HomologacaoInbox() {
       wa_message_id: waIdDoEnvio(leadOrigem, chave),
       estado: "pending",
     });
-    const meuLead = () => leadSelecionadoRef.current === leadOrigem;
+    // Vale para esta tela apenas enquanto o lead continuar selecionado E a
+    // sessão não tiver sido reiniciada manualmente no meio do caminho.
+    const meuLead = () =>
+      leadSelecionadoRef.current === leadOrigem && geracaoRef.current === geracao;
+
     setEmProcessamento((n) => n + 1);
     try {
       const r = (await enviar({
@@ -712,7 +746,8 @@ export function HomologacaoInbox() {
         processamento?: "RESPONDIDA" | "AGRUPADA" | "OBSOLETA" | "ERRO";
         absorvidaPeloLote?: boolean;
       };
-      concluirOtimista(chave);
+      const mesmaSessao = geracaoRef.current === geracao;
+      if (mesmaSessao) concluirOtimista(chave);
       // Mensagem absorvida por um envio mais recente do mesmo lead: é o
       // agrupamento normal (as três viram um turno só). Não é falta de
       // resposta e não deve mostrar aviso.
@@ -728,16 +763,19 @@ export function HomologacaoInbox() {
       }
       void carregarLeads();
       if (meuLead()) {
-        if (r.erro) setErro(r.erro);
-        else if (r.transferida)
-          setErro(
-            "Conversa transferida para atendimento humano (simulado). A sessão e a memória da Nina continuam como estão: clique em “Resolver / Reiniciar teste” para começar um novo teste.",
-          );
-        else if (!r.reply && !agrupada)
-          setErro(
-            "A Nina não respondeu. Se a conversa foi transferida para atendimento humano, use “Resolver / Reiniciar teste” antes de começar um novo teste.",
-          );
+        // A conversa continua na tela em qualquer um destes casos: nada é
+        // limpo, nada troca de sessão. Só informamos o estado real.
+        if (r.erro) {
+          setErro(r.erro);
+          setEncerrado(AVISO_TESTE_ENCERRADO);
+        } else if (r.transferida) {
+          setEncerrado(AVISO_TESTE_ENCERRADO);
+        } else if (!r.reply && !agrupada) {
+          setErro("A Nina não respondeu nesta execução.");
+          setEncerrado(AVISO_TESTE_ENCERRADO);
+        }
       }
+
 
       return {
         ok: agrupada ? true : !r.erro && !!r.reply,
@@ -782,6 +820,7 @@ export function HomologacaoInbox() {
         if (r.encerrada || !r.mensagem) {
           setSimMotivo(r.motivo ?? ROTULO_MOTIVO.objetivo_concluido);
           setSim((s) => (s ? { ...s, status: "concluida" } : s));
+          setEncerrado(AVISO_TESTE_ENCERRADO);
           break;
         }
         setSim((s) => (s ? { ...s, turnos: r.turno } : s));
@@ -794,6 +833,7 @@ export function HomologacaoInbox() {
           });
           setSimMotivo(ROTULO_MOTIVO.transferencia);
           setSim((s) => (s ? { ...s, status: "concluida" } : s));
+          setEncerrado(AVISO_TESTE_ENCERRADO);
           break;
         }
         if (!env.ok) {
@@ -802,8 +842,10 @@ export function HomologacaoInbox() {
           });
           setSimMotivo(env.erro ?? ROTULO_MOTIVO.erro);
           setSim((s) => (s ? { ...s, status: "erro" } : s));
+          setEncerrado(AVISO_TESTE_ENCERRADO);
           break;
         }
+
       }
       if (controleRef.current.parar) setSim((s) => (s ? { ...s, status: "parada" } : s));
     } catch (e) {
@@ -882,15 +924,26 @@ export function HomologacaoInbox() {
     }
   };
 
+  /**
+   * ÚNICO caminho de reinício da homologação (botão do operador). A tela só
+   * muda DEPOIS que o servidor confirma; se falhar, a sessão atual continua
+   * exatamente como está.
+   */
   const resolverConversa = async () => {
     if (!clinicaId || !leadId || !conversaId) return;
-    setEmProcessamento((n) => n + 1);
+    if (resetando) return;
+    setResetando(true);
     try {
       await resolver({
         data: { clinicaId, leadId, conversaId, removerAgendamentos: limparAgenda },
       });
+      // Confirmado pelo servidor: a partir daqui qualquer resposta da IA que
+      // ainda estivesse em voo é descartada da tela (a execução permanece
+      // registrada na auditoria do servidor).
+      geracaoRef.current += 1;
       setConversaId(null);
       setErro(null);
+      setEncerrado(null);
       setAudio(null);
       setFerramentas([]);
       // Nova sessão: leitura e idempotência recomeçam; o histórico anterior
@@ -900,12 +953,18 @@ export function HomologacaoInbox() {
       setLeads((ls) => ls.map((l) => (l.id === leadId ? { ...l, naoLidas: 0 } : l)));
       await carregarHistorico(leadId);
       await carregarLeads();
+      toast.success("Nova sessão de teste iniciada.");
     } catch (e: any) {
+      // Falhou: a sessão exibida segue a mesma, sem limpar nada.
       mostrarErro(e);
+      setErro(
+        `Não foi possível reiniciar o teste: ${String(e?.message ?? e)}. A sessão atual foi preservada.`,
+      );
     } finally {
-      setEmProcessamento((n) => Math.max(0, n - 1));
+      setResetando(false);
     }
   };
+
 
   const baixarPdf = async () => {
     if (!leadAtual || msgs.length === 0) {
@@ -1158,11 +1217,23 @@ export function HomologacaoInbox() {
                     size="sm"
                     variant="outline"
                     className="border-atd-border text-atd-ink-soft hover:bg-atd-danger-bg hover:text-atd-danger-ink"
-                    disabled={!conversaId || processando}
+                    // Continua habilitado durante uma resposta em andamento:
+                    // o operador pode interromper e reiniciar quando quiser.
+                    disabled={!conversaId || resetando}
+                    aria-busy={resetando}
                     onClick={() => void resolverConversa()}
                   >
-                    <CheckCheck className="mr-1 h-3.5 w-3.5" /> Resolver / Reiniciar teste
+                    {resetando ? (
+                      <>
+                        <RefreshCw className="mr-1 h-3.5 w-3.5 animate-spin" /> Reiniciando…
+                      </>
+                    ) : (
+                      <>
+                        <CheckCheck className="mr-1 h-3.5 w-3.5" /> Resolver / Reiniciar teste
+                      </>
+                    )}
                   </Button>
+
                 </div>
               </div>
             </CardHeader>
@@ -1400,7 +1471,22 @@ export function HomologacaoInbox() {
               )}
             </div>
 
+            {/*
+              Aviso de fim de teste: informativo. A conversa, as mensagens, o
+              contexto e o número virtual continuam na tela sem alteração.
+            */}
+            {encerrado && (
+              <div
+                aria-live="polite"
+                className="flex items-center gap-2 border-t border-atd-warn bg-atd-warn-bg p-2 text-sm text-atd-warn-ink"
+              >
+                <FlaskConical className="h-4 w-4 shrink-0" aria-hidden="true" />
+                <span className="min-w-0 break-words">{encerrado}</span>
+              </div>
+            )}
+
             {erro && (
+
               <div className="flex flex-wrap items-center justify-between gap-2 border-t border-destructive/40 bg-destructive/5 p-2 text-sm text-destructive">
                 <span className="min-w-0 break-words">{erro}</span>
                 <Button
