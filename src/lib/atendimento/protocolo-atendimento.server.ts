@@ -346,8 +346,14 @@ async function enviarTextoSistema(
 
 /**
  * FASE 3 — comunica ao paciente a transferência + o protocolo real.
- * Uma única comunicação lógica por atendimento: se já foi informada, sai.
- * Se o envio falhar, nada é marcado e a próxima tentativa reusa o protocolo.
+ *
+ * A comunicação tem DUAS etapas separadas, de propósito:
+ *   1. PREPARAR — monta o texto (com o protocolo dentro) sem nada sair.
+ *   2. ENTREGAR — único responsável pelo envio, protegido pelo registro
+ *      durável de idempotência (ver `aviso-encaminhamento.server.ts`).
+ *
+ * Assim a finalização da Nina pode saber que o aviso JÁ foi preparado/entregue
+ * por este turno e não produzir uma segunda bolha para o paciente.
  */
 export type ResultadoAnuncioHandoff = {
   informado: boolean;
@@ -359,13 +365,67 @@ export type ResultadoAnuncioHandoff = {
   /** Já havia sido informado antes: esta chamada foi um retry sem reenvio. */
   retry: boolean;
   setor: string | null;
+  /** Estado estruturado da operação de aviso (chave, estado, protocolo). */
+  aviso: ResultadoAvisoEncaminhamento | null;
 };
 
+/** ETAPA 1 — o aviso pronto, ainda não entregue. */
+export type AvisoPreparado = {
+  texto: string;
+  origem: "modelo" | "contingencia";
+  setor: string | null;
+  protocolo: string;
+  ambiente: AmbienteAviso;
+};
+
+export async function prepararAvisoHandoff(args: {
+  clinicaId: string;
+  conversaId: string;
+  protocolo: string;
+}): Promise<AvisoPreparado | null> {
+  const conv = await lerConversa(args.clinicaId, args.conversaId);
+  if (!conv) return null;
+  const setor = await nomeDepartamento(args.clinicaId, conv.departamento_id);
+  const { gerarMensagemHandoff } = await import("./mensagem-handoff.server");
+  // O texto de transferência usa a MESMA identidade publicada do atendimento;
+  // sem identidade válida ele fala de forma neutra.
+  const { identidadeEfetivaAtual, identidadeParaMensagens } = await import(
+    "@/lib/nina/identidade-efetiva.server"
+  );
+  const identidade = identidadeParaMensagens(await identidadeEfetivaAtual("whatsapp"));
+  const { texto, origem } = await gerarMensagemHandoff({
+    protocolo: args.protocolo,
+    nome: nomeContato(conv),
+    setor,
+    motivo: await motivoDoHandoff(args.clinicaId, args.conversaId),
+    identidade,
+  });
+  return {
+    texto,
+    origem,
+    setor,
+    protocolo: args.protocolo,
+    ambiente: conv.is_teste ? "homologacao" : "producao",
+  };
+}
+
+/**
+ * ETAPA 2 — ÚNICO RESPONSÁVEL PELA ENTREGA.
+ *
+ * Toda a proteção contra duplicidade acontece aqui, sobre o registro durável:
+ * quem ganha a reserva envia; retry do mesmo turno reaproveita; chamada
+ * concorrente aguarda; resultado incerto confere antes de reenviar; tentativa
+ * nunca é tratada como entrega confirmada.
+ */
 export async function anunciarHandoffAoPaciente(args: {
   clinicaId: string;
   conversaId: string;
   protocolo: string;
   userId?: string | null;
+  /** Turno/sessão de origem — identidade persistente da operação. */
+  turnoId?: string | null;
+  sessaoId?: string | null;
+  handoffEventoId?: string | null;
 }): Promise<ResultadoAnuncioHandoff> {
   const vazio: ResultadoAnuncioHandoff = {
     informado: false,
@@ -376,49 +436,118 @@ export async function anunciarHandoffAoPaciente(args: {
     transporte: "nenhum",
     retry: false,
     setor: null,
+    aviso: null,
   };
-  const conv = await lerConversa(args.clinicaId, args.conversaId);
-  if (!conv) return vazio;
-
-  const setor = await nomeDepartamento(args.clinicaId, conv.departamento_id);
-  const jaInformado = await protocoloJaInformado(
-    args.clinicaId,
-    args.conversaId,
-    args.protocolo,
-  );
-  // Idempotência: o mesmo protocolo nunca é anunciado duas vezes.
-  if (!deveInformarProtocolo({ protocolo: args.protocolo, jaInformado }))
-    return { ...vazio, informado: jaInformado, retry: jaInformado, setor };
-
-  const { gerarMensagemHandoff } = await import("./mensagem-handoff.server");
-  // FASE 3 — o texto de transferência usa a MESMA identidade publicada do
-  // atendimento; sem identidade válida ele fala de forma neutra.
-  const { identidadeEfetivaAtual, identidadeParaMensagens } = await import(
-    "@/lib/nina/identidade-efetiva.server"
-  );
-  const identidade = identidadeParaMensagens(await identidadeEfetivaAtual("whatsapp"));
-  const { texto, origem } = await gerarMensagemHandoff({
-    protocolo: args.protocolo,
-    // Mesma identidade canônica do cabeçalho da conversa (FASE 2).
-    nome: nomeContato(conv),
-    setor,
-    motivo: await motivoDoHandoff(args.clinicaId, args.conversaId),
-    identidade,
-  });
+  const preparado = await prepararAvisoHandoff(args);
+  if (!preparado) return vazio;
+  const { texto, origem, setor, ambiente } = preparado;
 
   // Vínculo com a operação: esta mensagem pertence ao turno que pediu o
   // encaminhamento. Sem o id da execução ela fica órfã na auditoria.
   const { registroTurnoAtual } = await import("@/lib/nina/rastreio/turno.server");
   const turno = registroTurnoAtual();
   const execucaoId = turno?.execucaoId ?? null;
+  const turnoId = args.turnoId ?? turno?.turnoId ?? null;
 
-  const envio = await enviarTextoSistema(
-    args.clinicaId,
-    args.conversaId,
+  const origemAviso: OrigemAviso = {
+    clinicaId: args.clinicaId,
+    ambiente,
+    conversaId: args.conversaId,
+    sessaoId: args.sessaoId ?? null,
+    turnoId,
+    protocolo: args.protocolo,
+  };
+
+  const {
+    reservarEnvioAviso,
+    confirmarEnvioAviso,
+    registrarFalhaAviso,
+    marcarResultadoIncerto,
+    conferirAvisoJaEnviado,
+    lerAviso,
+    resultadoDoRegistro,
+  } = await import("./aviso-encaminhamento.server");
+  const { hashDoTexto } = await import("@/lib/nina/confidence/hash");
+
+  const reserva = await reservarEnvioAviso({
+    origem: origemAviso,
+    protocolo: args.protocolo,
     texto,
+    textoHash: hashDoTexto(texto),
     execucaoId,
-  );
-  if (!envio.ok)
+    handoffEventoId: args.handoffEventoId ?? null,
+    preparadoPor: args.userId ?? "sistema",
+  });
+
+  // Resultado incerto de uma tentativa anterior: conferir ANTES de repetir.
+  if (reserva.decisao === "verificar_antes_de_reenviar") {
+    const anterior = await conferirAvisoJaEnviado({
+      clinicaId: args.clinicaId,
+      conversaId: args.conversaId,
+      texto,
+    });
+    if (anterior) {
+      await confirmarEnvioAviso({
+        chave: reserva.chave,
+        mensagemId: anterior.mensagemId,
+        transporte: ambiente === "homologacao" ? "test-console" : "whatsapp",
+        transporteId: anterior.transporteId,
+        protocolo: args.protocolo,
+        texto,
+      });
+      const reg = resultadoDoRegistro(await lerAviso(reserva.chave), ambiente, true);
+      return {
+        ...vazio,
+        informado: true,
+        retry: true,
+        mensagemId: anterior.mensagemId,
+        mensagemTexto: texto,
+        origem,
+        setor,
+        status: "sent",
+        transporte: ambiente === "homologacao" ? "test-console" : "whatsapp",
+        aviso: reg,
+      };
+    }
+  }
+
+  // Já entregue, entrega em andamento por outro caminho, ou tentativas
+  // esgotadas: esta chamada NÃO produz mensagem nova.
+  if (!reserva.reservado) {
+    const reg = resultadoDoRegistro(reserva.registro, ambiente, true);
+    return {
+      ...vazio,
+      informado: Boolean(reg?.entregue),
+      retry: true,
+      mensagemId: reg?.mensagemId ?? null,
+      mensagemTexto: texto,
+      origem,
+      setor,
+      status: reg?.entregue ? "sent" : "nao_enviado",
+      transporte: reg?.entregue
+        ? ambiente === "homologacao"
+          ? "test-console"
+          : "whatsapp"
+        : "nenhum",
+      aviso: reg,
+    };
+  }
+
+  let envio: ResultadoEnvio;
+  try {
+    envio = await enviarTextoSistema(args.clinicaId, args.conversaId, texto, execucaoId);
+  } catch (e) {
+    // Exceção do transporte: o envio pode ter saído. Estado explícito.
+    await marcarResultadoIncerto({ chave: reserva.chave, erro: String(e) });
+    return { ...vazio, mensagemTexto: texto, origem, setor, status: "falhou" };
+  }
+
+  if (!envio.ok) {
+    await registrarFalhaAviso({
+      chave: reserva.chave,
+      erro: `envio ${envio.status}`,
+      transporte: envio.transporte,
+    });
     return {
       ...vazio,
       mensagemTexto: texto,
@@ -426,13 +555,23 @@ export async function anunciarHandoffAoPaciente(args: {
       status: envio.status,
       transporte: envio.transporte,
       setor,
+      aviso: resultadoDoRegistro(await lerAviso(reserva.chave), ambiente, false),
     };
+  }
+
+  await confirmarEnvioAviso({
+    chave: reserva.chave,
+    mensagemId: envio.mensagemId,
+    transporte: envio.transporte,
+    transporteId: envio.transporteId,
+    protocolo: args.protocolo,
+    texto,
+  });
 
   // FASE 6 — a mensagem do protocolo é saída CONTROLADA do sistema: entra na
   // auditoria com hash próprio e SEM herdar a nota da resposta candidata.
   try {
     const { registrarEntregaSaida } = await import("@/lib/nina/confidence-engine.server");
-    const { hashDoTexto } = await import("@/lib/nina/confidence/hash");
     const { gravarEntregaDoTurno } = await import("@/lib/nina/rastreio/turno.server");
     const estado = envio.transporteId ? "confirmada" : "persistida";
     await registrarEntregaSaida({
@@ -451,6 +590,7 @@ export async function anunciarHandoffAoPaciente(args: {
         protocolo: args.protocolo,
         transporte: envio.transporte,
         avaliada: false,
+        chave_aviso: reserva.chave,
       },
     });
     await gravarEntregaDoTurno({
@@ -482,6 +622,7 @@ export async function anunciarHandoffAoPaciente(args: {
       mensagem_origem: origem,
       message_id: envio.mensagemId,
       transporte: envio.transporte,
+      chave_aviso: reserva.chave,
     },
   });
   return {
@@ -493,6 +634,7 @@ export async function anunciarHandoffAoPaciente(args: {
     transporte: envio.transporte,
     retry: false,
     setor,
+    aviso: resultadoDoRegistro(await lerAviso(reserva.chave), ambiente, false),
   };
 }
 
