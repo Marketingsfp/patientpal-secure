@@ -815,7 +815,7 @@ export function InstructionComplianceValidator(
     validator: nome,
     status,
     score:
-      status === "PASS" || status === "PENDING"
+      status === "PASS" || status === "PENDING" || status === "NOT_APPLICABLE"
         ? 100
         : status === "UNKNOWN"
           ? 0
