@@ -799,6 +799,7 @@ export async function resetarLeadTeste(
       ok: true,
       jaResolvida: true,
       sessao: lead.sessao_seq,
+      sessaoAnterior: lead.sessao_seq,
       cicloEncerrado: null,
       agendamentosRemovidos: 0,
     };
@@ -808,9 +809,11 @@ export async function resetarLeadTeste(
       ok: true,
       jaResolvida: true,
       sessao: lead.sessao_seq,
+      sessaoAnterior: lead.sessao_seq,
       cicloEncerrado: null,
       agendamentosRemovidos: 0,
     };
+
 
   const conversaId = lead.conversa_id;
   const agora = new Date().toISOString();
