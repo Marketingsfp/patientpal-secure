@@ -675,50 +675,20 @@ export const finalizarItemExecucao = createServerFn({ method: "POST" })
       } as never)
       .eq("id", (item as any).id);
 
-    // Cleanup do ciclo deste lead: encerra (histórico preservado) e libera o
-    // lead para o próximo cenário, sem tocar em nenhum outro lead.
+    // REGRA DA HOMOLOGAÇÃO — o fim do cenário NÃO reinicia o teste: ciclo,
+    // memória ativa da Nina e telefone virtual seguem como estão. Só o botão
+    // "Resolver / Reiniciar teste" reinicia (rotina canônica única).
+    if (lead && data.reiniciarSessao === true && (lead as any).conversa_id) {
+      const { resetarLeadTeste } = await import("@/lib/nina/teste-console.server");
+      await resetarLeadTeste(supabaseAdmin, {
+        clinicaId: data.clinicaId,
+        leadId: (lead as any).id,
+        userId: context.userId,
+        origem: "cenario_fim",
+      });
+    }
     if (lead) {
-      const { patchEncerrarCiclo } = await import("@/lib/nina/ciclo-teste");
-      if ((lead as any).conversa_id) {
-        await supabaseAdmin
-          .from("atend_conversas")
-          .update({
-            status: "finished",
-            owner_type: "NONE",
-            ai_enabled: false,
-            nina_fluxo_estado: null,
-            patient_response_deadline: null,
-            closed_at: agora,
-            resolved_at: agora,
-          })
-          .eq("clinica_id", data.clinicaId)
-          .eq("id", (lead as any).conversa_id);
-      }
-      if (cicloId) {
-        await supabaseAdmin
-          .from("nina_teste_ciclos")
-          .update({
-            ...patchEncerrarCiclo(MOTIVO_CICLO_POR_DESFECHO[desfecho], agora),
-            resolvido_por: context.userId,
-          } as never)
-          .eq("clinica_id", data.clinicaId)
-          .eq("id", cicloId)
-          .eq("status", "ativo");
-      }
-      const proxima = ((lead as any).sessao_seq ?? 1) + 1;
-      await supabaseAdmin
-        .from("nina_teste_leads")
-        .update({
-          sessao_seq: proxima,
-          telefone_sessao: telefoneSessao((lead as any).indice, proxima),
-          conversa_id: null,
-          ciclo_id: null,
-          ciclo_iniciado_em: null,
-          resolvido_em: agora,
-          status: "ativa",
-        })
-        .eq("clinica_id", data.clinicaId)
-        .eq("id", (lead as any).id);
+
 
       // Nenhuma simulação de paciente pode continuar viva após o cenário.
       await supabaseAdmin
