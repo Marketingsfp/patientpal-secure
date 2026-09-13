@@ -513,4 +513,11 @@ export type ResultadoConfianca = {
   /** Resultado bruto de cada validador da Fase 2 (auditoria e painel). */
   validators?: ResultadoValidador[];
   evidence: EvidenciaConfianca;
+  /**
+   * FASE 3 (pontuação) — memória de cálculo do orçamento de instruções e da
+   * dimensão separada de linguagem. Ausente quando o turno não tem obrigações
+   * publicadas conferíveis.
+   */
+  instrucoes?: MemoriaInstrucoes;
+
 };
