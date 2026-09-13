@@ -349,43 +349,26 @@ export async function encaminharParaHumano(args: {
   // o restante do fluxo (fila, marcador, IA silenciada) é idêntico.
   const { data: convRow } = await supabaseAdmin
     .from("atend_conversas")
-    .select("is_teste")
+    .select("is_teste, teste_ciclo_id")
     .eq("id", args.conversaId)
     .maybeSingle();
   if ((convRow as any)?.is_teste) {
-    // FASE 2 — handoff é evento terminal do ciclo de teste: encerra o ciclo e
-    // zera a memória ativa da Nina (histórico e resumo permanecem).
-    let cicloId: string | null = null;
+    // REGRA DA HOMOLOGAÇÃO — o encaminhamento NÃO reinicia o teste. O ciclo
+    // continua aberto, a memória ativa da Nina é preservada e o telefone
+    // virtual não muda: só o botão "Resolver / Reiniciar teste" reinicia.
+    const cicloId: string | null = ((convRow as any)?.teste_ciclo_id as string | null) ?? null;
     let ninaSessionId: string | null = null;
     try {
-      const { encerrarCicloTestePorHandoff } = await import("@/lib/nina/handoff-ciclo.server");
-      const r = await encerrarCicloTestePorHandoff({
-        clinicaId: args.clinicaId,
-        conversaId: args.conversaId,
-        agoraISO: agora,
-      });
-      if (r.encerrado) {
-        cicloId = r.cicloId ?? null;
-        ninaSessionId = r.ninaSessionId ?? null;
-        await registrarEvento({
-          clinicaId: args.clinicaId,
-          conversaId: args.conversaId,
-          evento: "IA_MEMORIA_RESETADA",
-          motivo: "handoff_humano",
-          // FASE 4 — auditoria do ciclo encerrado: protocolo, motivo, ciclo e
-          // sessão da Nina ficam juntos para avaliação posterior.
-          detalhes: {
-            ciclo_id: r.cicloId,
-            nina_session_id: r.ninaSessionId ?? null,
-            protocol_number: protocoloHandoff,
-            handoff_reason: args.motivo,
-            origem: "handoff_teste",
-          },
-        });
-      }
+      const { data: cicloRow } = await supabaseAdmin
+        .from("nina_teste_ciclos")
+        .select("nina_session_id")
+        .eq("id", cicloId ?? "")
+        .maybeSingle();
+      ninaSessionId = ((cicloRow as any)?.nina_session_id as string | null) ?? null;
     } catch (e) {
-      console.error("[handoff] falha ao encerrar ciclo de teste", e);
+      console.error("[handoff] falha ao ler ciclo de teste", e);
     }
+
     // FASE 6 — registro consolidado (teste): nenhum atendente real é atribuído.
     await auditarHandoff({
       clinicaId: args.clinicaId,
