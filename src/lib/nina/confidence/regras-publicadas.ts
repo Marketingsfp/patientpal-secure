@@ -118,7 +118,14 @@ export type RegraPublicada = {
   interpretada: boolean;
   /** Por que não foi possível interpretar (quando `interpretada` for false). */
   motivo: string | null;
+  /** Identificador publicado do bloco ("ID-01", "CONV-02"), quando existir. */
+  identificador?: string | null;
+  /** Classe declarada no bloco ("Tipo:"), quando existir. */
+  classe?: ClasseRegra | null;
 };
+
+/** Classe declarada pelo próprio texto publicado no campo "Tipo:". */
+export type ClasseRegra = "ESSENCIAL" | "CONVERSACIONAL" | "LINGUAGEM";
 
 export type ExtracaoRegras = {
   regras: RegraPublicada[];
