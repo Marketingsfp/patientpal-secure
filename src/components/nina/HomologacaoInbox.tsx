@@ -207,7 +207,22 @@ export function HomologacaoInbox() {
   const [emProcessamento, setEmProcessamento] = useState(0);
   const processando = emProcessamento > 0;
   const [erro, setErro] = useState<string | null>(null);
+  /**
+   * REGRA DA HOMOLOGAÇÃO — aviso de fim de teste. É só informação: nada aqui
+   * reinicia sessão, memória ou número virtual. Quem reinicia é exclusivamente
+   * o botão "Resolver / Reiniciar teste".
+   */
+  const [encerrado, setEncerrado] = useState<string | null>(null);
+  /** Reset manual em andamento (só a tela; o servidor é a fonte da verdade). */
+  const [resetando, setResetando] = useState(false);
+  /**
+   * Geração da sessão exibida. O reset manual incrementa este número; qualquer
+   * resposta da IA que estava em voo e chegar depois é descartada da tela (a
+   * execução continua registrada na auditoria do servidor).
+   */
+  const geracaoRef = useRef(0);
   const [ultimoTexto, setUltimoTexto] = useState("");
+
   const [tipo, setTipo] = useState<TipoMensagem>("text");
   // FASE 3 — detalhe técnico de uma execução da Nina (prompt, versão,
   // conhecimento, ferramentas, modelo, erros e resposta).
