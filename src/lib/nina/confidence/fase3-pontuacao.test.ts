@@ -161,7 +161,14 @@ describe("5. prova essencial indeterminada não recebe aprovação", () => {
     ambiente: "homologacao",
     primeiraResposta: false,
     apresentacaoEntregue: true,
-    operacaoExecutada: { tipo: "criar_agendamento", resultado: "desconhecido" },
+    operacao: {
+      tipo: "criar_agendamento",
+      anunciadaNaResposta: true,
+      executada: true,
+      resultado: null,
+      comprovante: null,
+      dadosPendentes: [],
+    },
   });
 
   it("fica LOW e vai para o destino humano", () => {
