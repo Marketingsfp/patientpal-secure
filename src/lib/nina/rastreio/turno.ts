@@ -370,6 +370,16 @@ export type RegistroTurno = {
   origemResposta: OrigemResposta | null;
   motivoOrigem: string | null;
   transformacoes: TransformacaoResposta[];
+  /**
+   * CADEIA DO TEXTO — resposta original do modelo, versões intermediárias,
+   * avisos operacionais e mensagem entregue, cada uma com etapa, motivo e
+   * impressão digital próprios.
+   */
+  versoesTexto: VersaoTexto[];
+  /** Avisos do sistema entregues no turno (sem nota do motor, por definição). */
+  avisosOperacionais: AvisoOperacionalRegistrado[];
+  /** Avaliações que CAUSARAM bloqueio, preservadas como prova do bloqueio. */
+  bloqueios: EvidenciaBloqueio[];
   confianca: ConfiancaDoTurno | null;
   /** FASE 2 — TODAS as avaliações do turno, na ordem em que ocorreram. */
   avaliacoes: ConfiancaDoTurno[];
