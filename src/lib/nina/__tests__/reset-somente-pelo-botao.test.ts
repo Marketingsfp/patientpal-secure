@@ -57,10 +57,11 @@ describe("reset só pelo botão — cenários", () => {
     expect(src).not.toContain("telefone_sessao: telefoneSessao");
   });
 
-  it("quando reinicia, usa a rotina canônica única", () => {
-    expect(src).toContain("resetarLeadTeste");
-    expect(src).toContain("reiniciarSessao");
+  it("quando precisa de sessão limpa, apenas sinaliza e aguarda o operador", () => {
+    expect(src).not.toContain("resetarLeadTeste");
+    expect(src).toContain("precisaResetManual");
   });
+
 });
 
 describe("reset só pelo botão — rotina canônica", () => {
