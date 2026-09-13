@@ -103,9 +103,12 @@ describe("FASE 3 — repartição do orçamento", () => {
     const r = repartirInstrucoes(
       agregado([obrig({ id: "a", regraId: "ID-01" }), obrig({ id: "b", regraId: "ID-02" })]),
     )!;
-    // O agregado sai da lista medida; entram só as parcelas.
+    // O agregado sai da lista medida; entram só as parcelas, e cada uma leva
+    // uma fração do orçamento — nunca o orçamento inteiro outra vez.
+    expect(r.parcelas.every((p) => p.pesoParcela === 7.5)).toBe(true);
+    expect(r.parcelas.some((p) => p.validator === DIMENSAO_INSTRUCOES)).toBe(false);
     const medida = medirEvidencia(r.parcelas, POLITICA_PADRAO);
-    expect(medida.pesoRelevante).toBe(POLITICA_PADRAO.pesos[DIMENSAO_INSTRUCOES]);
+    expect(medida.cobertura).toBe(100);
   });
 
   it("agrupa obrigações equivalentes em uma parcela só", () => {
@@ -192,7 +195,8 @@ describe("FASE 3 — linguagem em dimensão separada", () => {
     expect(r.linguagem?.pesoParcela).toBe(0);
 
     const m = medirEvidencia([...r.parcelas, r.linguagem!], POLITICA_PADRAO);
-    expect(m.pesoRelevante).toBe(0);
+    expect(m.semEvidencia).toBe(true);
+    expect(m.cobertura).toBe(0);
   });
 
   it("continua declarada como indeterminada, nunca aprovada em silêncio", () => {
@@ -230,7 +234,7 @@ describe("FASE 3 — requisito essencial", () => {
         penalidade: 0,
         bloqueadores: [],
         hardBlockers: [],
-        risco: "BAIXO",
+        risco: "LOW",
         acao: "nenhuma",
         esclarecimentoUsado: false,
         ambiguidadeResolvivel: false,
@@ -255,7 +259,7 @@ describe("FASE 3 — requisito essencial", () => {
         penalidade: 0,
         bloqueadores: [],
         hardBlockers: [],
-        risco: "BAIXO",
+        risco: "LOW",
         acao: "nenhuma",
         esclarecimentoUsado: false,
         ambiguidadeResolvivel: false,
