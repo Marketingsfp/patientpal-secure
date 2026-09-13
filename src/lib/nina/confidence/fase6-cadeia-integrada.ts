@@ -227,6 +227,24 @@ export async function executarTurnoIntegrado(
   });
 
   const reg = saida.encaminhamento;
+
+  // A decisão vem antes da operação: o efeito final é da operação confirmada.
+  trilha.registrar({
+    tipo: "decisao_final",
+    conversaId: e.conversaId,
+    turnoId: e.turnoId,
+    correlacaoId,
+    modo: { observacao: false, aplicacao: true, ambiente: e.ambiente, efeito: "nenhum" },
+    conteudo: saida.desfecho,
+    hashConteudo: hashDoTexto(`${correlacaoId}|${saida.desfecho}`),
+    dados: {
+      decisaoDoMotor: pontuacao?.decisao ?? null,
+      desfecho: saida.desfecho,
+      intermediarias: saida.recomendacoesIntermediarias.join(","),
+      divergente: saida.divergenciaComRecomendacao,
+    },
+  });
+
   if (reg) {
     trilha.registrar({
       tipo: "operacao_fila",
@@ -252,22 +270,6 @@ export async function executarTurnoIntegrado(
       },
     });
   }
-
-  trilha.registrar({
-    tipo: "decisao_final",
-    conversaId: e.conversaId,
-    turnoId: e.turnoId,
-    correlacaoId,
-    modo: { observacao: false, aplicacao: true, ambiente: e.ambiente, efeito: "nenhum" },
-    conteudo: saida.desfecho,
-    hashConteudo: hashDoTexto(`${correlacaoId}|${saida.desfecho}`),
-    dados: {
-      decisaoDoMotor: pontuacao?.decisao ?? null,
-      desfecho: saida.desfecho,
-      intermediarias: saida.recomendacoesIntermediarias.join(","),
-      divergente: saida.divergenciaComRecomendacao,
-    },
-  });
 
   if (saida.mensagemEnviada != null) {
     trilha.registrar({
