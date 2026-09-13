@@ -385,8 +385,24 @@ export function decidirConfianca(
 
   const motivos = reprovados.map((c) => (c.detalhe ? `${c.descricao} — ${c.detalhe}` : c.descricao));
 
+  // FASE 3 (pontuação) — o orçamento de cumprimento de instruções é repartido
+  // entre as obrigações substantivas aplicáveis, agrupando equivalentes. O
+  // agregado sai da conta: agregado e parcelas nunca são somados juntos.
+  // Linguagem vai para dimensão separada, com peso zero.
+  const agregadoInstrucoes = validatorsParaNota.find((v) => v.validator === DIMENSAO_INSTRUCOES);
+  const reparticao = agregadoInstrucoes
+    ? repartirInstrucoes(agregadoInstrucoes, politica)
+    : null;
+  const validatorsMedidos = reparticao
+    ? [
+        ...validatorsParaNota.filter((v) => v.validator !== DIMENSAO_INSTRUCOES),
+        ...reparticao.parcelas,
+      ]
+    : validatorsParaNota;
+
   // FASE 3 — nota E cobertura, medidas na mesma passada e reportadas separadas.
-  const medida = medirEvidencia(validatorsParaNota, politica);
+  const medida = medirEvidencia(validatorsMedidos, politica);
+
 
   const risco = riscoDaAcao(ctx);
   const hardBlockers: HardBlocker[] = detectarHardBlockers(
