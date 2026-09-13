@@ -51,13 +51,17 @@ describe("gate v2 — 10 casos obrigatórios", () => {
 });
 
 describe("versão do motor", () => {
-  it("registra Confidence Engine v2 e preserva leitura de versões antigas", () => {
-    expect(VERSAO_MOTOR).toBe("confidence-v2");
+  it("registra Confidence Engine v3 e preserva leitura de versões antigas", () => {
+    // FASE 3 (pontuação): o motor passou a repartir o peso das instruções, por
+    // isso a versão subiu. Avaliações gravadas por v2 continuam legíveis.
+    expect(VERSAO_MOTOR).toBe("confidence-v3");
     expect(ehVersaoMotorHistorica("engine-v6")).toBe(true);
+    expect(ehVersaoMotorHistorica("confidence-v2")).toBe(true);
     expect(ehVersaoMotorHistorica(null)).toBe(true);
     expect(ehVersaoMotorHistorica(VERSAO_MOTOR)).toBe(false);
   });
 });
+
 
 describe("comparação shadow v1 x v2", () => {
   const snaps = [
