@@ -219,7 +219,8 @@ async function resetar(lead: Lead) {
     clinicaId: CLINICA,
     leadId: lead.id,
     userId: "u1",
-    origem: "carga_preflight",
+    origem: "console_teste",
+    manual: true as const,
   });
 }
 
