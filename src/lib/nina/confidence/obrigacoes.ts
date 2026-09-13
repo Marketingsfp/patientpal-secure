@@ -580,13 +580,20 @@ export function avaliarObrigacoes(
   resposta: string,
   revisor: RevisorSemantico | null = null,
 ): ResultadoObrigacoes {
-  const obrigacoes = derivarObrigacoesDoTurno(ctx);
-  const avaliacoes = obrigacoes.map((o) =>
+  const derivadas = derivarObrigacoesDoTurno(ctx);
+  const avaliadas = derivadas.map((o) =>
     avaliarUma(o, resposta, revisor, {
       mensagemPaciente: ctx.mensagemPaciente ?? null,
       ambiente: ctx.businessContext?.ambiente ?? null,
     }),
   );
+
+  // FASE 4 — a apresentação da resposta é conferida contra a IDENTIDADE da
+  // própria publicação. Nenhum nome é fixo: a exigência só existe quando a
+  // publicação declara identidade E a resposta se apresenta.
+  const identidade = avaliarIdentidade(ctx, resposta);
+  const obrigacoes = identidade ? [...derivadas, identidade.obrigacao] : derivadas;
+  const avaliacoes = identidade ? [...avaliadas, identidade.avaliacao] : avaliadas;
 
   const verificaveis = avaliacoes.filter((a) => a.status !== "indeterminada");
   const cumpridas = verificaveis.filter((a) => a.status === "cumprida");
