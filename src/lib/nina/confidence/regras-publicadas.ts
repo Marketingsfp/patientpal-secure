@@ -908,7 +908,8 @@ export type EntradaAplicabilidade = {
 export type Aplicabilidade = "aplica" | "nao_aplica" | "indeterminada";
 
 function sinalDaSituacao(s: SituacaoRegra, e: EntradaAplicabilidade): boolean | null {
-  if (s === "demanda_declarada") return e.demandaDeclarada ?? null;
+  if (s === "demanda_declarada" || s === "pedido_concreto") return e.demandaDeclarada ?? null;
+  if (s === "saudacao_pura") return e.demandaDeclarada == null ? null : !e.demandaDeclarada;
   if (s === "apresentacao_ja_feita") return e.apresentacaoJaFeita ?? null;
   if (e.primeiraMensagem != null) return e.primeiraMensagem;
   return e.apresentacaoJaFeita == null ? null : !e.apresentacaoJaFeita;
@@ -923,11 +924,20 @@ export function aplicabilidadeDaRegra(
     return "nao_aplica";
   }
   if (regra.condicao.tipo === "sempre") return "aplica";
+  // Condição publicada que o avaliador não compreendeu: nunca vira cumprimento
+  // presumido nem exclusão silenciosa.
+  if (regra.condicao.tipo === "nao_compreendida") return "indeterminada";
   if (regra.condicao.tipo === "situacao") {
     const sinal = sinalDaSituacao(regra.condicao.situacao, e);
     if (sinal === true) return "aplica";
     if (sinal === false) return "nao_aplica";
     return "indeterminada";
+  }
+  if (regra.condicao.tipo === "situacoes") {
+    const sinais = regra.condicao.itens.map((s) => sinalDaSituacao(s, e));
+    if (sinais.some((s) => s === false)) return "nao_aplica";
+    if (sinais.some((s) => s == null)) return "indeterminada";
+    return "aplica";
   }
   const msg = (e.mensagemPaciente ?? "").trim();
   if (msg === "") return "nao_aplica";
