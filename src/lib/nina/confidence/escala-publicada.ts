@@ -152,7 +152,16 @@ export function compararEscalaPublicada(
 
 /** Cada item enumerado é uma afirmação independente, inclusive nomes desconhecidos. */
 export function itensDeOferta(trecho: string): string[] {
-  const t = trecho.replace(/[*_]/g, "").trim();
+  // "Sim, temos ..." e "Cardiologia, sim!" confirmam a oferta; "sim"
+  // não faz parte do nome. Só removemos essa partícula isolada nas bordas,
+  // preservando o nome e qualificadores clínicos para comparação exata.
+  const semConfirmacao = (s: string) =>
+    s
+      .trim()
+      .replace(/^sim(?:[\s,!:–—-]+|$)/iu, "")
+      .replace(/(?:[\s,!:–—-]+|^)sim[\s,.!:–—-]*$/iu, "")
+      .trim();
+  const t = semConfirmacao(trecho.replace(/[*_]/g, ""));
   const exemplo = t.match(/\bcomo\s+(.+?)(?:\)|$)/i)?.[1];
   const corpo = (
     exemplo ??
@@ -178,9 +187,9 @@ export function itensDeOferta(trecho: string): string[] {
     /^(?:esse|este|esse exame|este exame|aqui|cardiologicos?|cardiológicos?)$/i.test(corpo)
   )
     return [];
-  return corpo
+  return semConfirmacao(corpo)
     .split(/,\s*|\s+(?:e|ou)\s+/i)
-    .map((p) => p.replace(/[().!?]+$/g, "").trim())
+    .map((p) => semConfirmacao(p.replace(/[().!?]+$/g, "")))
     .filter(Boolean);
 }
 
