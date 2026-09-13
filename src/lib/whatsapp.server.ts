@@ -2302,17 +2302,43 @@ async function gerarRespostaNinaInterno(
 
   // FASE 1 — daqui para baixo TODA alteração do texto é registrada como
   // transformação, para responder "quem mudou a resposta do modelo".
-  const { registrarTransformacaoResposta, registrarOrigemResposta: marcarOrigem } = await import(
-    "@/lib/nina/rastreio/turno.server"
-  );
+  const {
+    registrarTransformacaoResposta,
+    registrarOrigemResposta: marcarOrigem,
+    registrarVersaoTexto,
+  } = await import("@/lib/nina/rastreio/turno.server");
   const { hashDoTexto: hashTurno } = await import("@/lib/nina/confidence/hash");
-  const transformar = (etapa: string, motivo: string, antes: string, depois: string) => {
+  // CADEIA DO TEXTO — o ponto de partida é a resposta original do modelo.
+  // Cada versão seguinte é preservada com etapa, motivo e impressão digital,
+  // para que nenhuma nota fique solta entre dois textos diferentes.
+  registrarVersaoTexto({
+    etapa: "modelo.resposta",
+    motivo: "texto original devolvido pelo modelo",
+    origem: "modelo",
+    texto: respostaDoModelo,
+    hash: respostaDoModelo ? hashTurno(respostaDoModelo) : null,
+  });
+  const transformar = (
+    etapa: string,
+    motivo: string,
+    antes: string,
+    depois: string,
+    origem: import("@/lib/nina/rastreio/versoes-texto").OrigemVersaoTexto = "sistema",
+  ) => {
     if (antes === depois) return;
     registrarTransformacaoResposta({
       etapa,
       motivo,
       antesHash: hashTurno(antes),
       depoisHash: hashTurno(depois),
+    });
+    // O MOTIVO DA SUBSTITUIÇÃO fica junto do texto que passou a valer.
+    registrarVersaoTexto({
+      etapa,
+      motivo,
+      origem,
+      texto: depois,
+      hash: depois ? hashTurno(depois) : null,
     });
   };
 
