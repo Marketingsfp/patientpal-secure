@@ -799,9 +799,18 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
                         );
                         const { hashDoTexto } = await import("@/lib/nina/confidence/hash");
                         const hashEnviado = hashDoTexto(reply);
+                        // A nota pertence ao texto avaliado. Texto entregue
+                        // diferente (aviso controlado, mensagem de sistema) sai
+                        // SEM nota, em vez de herdar a de outro conteúdo.
+                        const mesmoTextoAvaliado =
+                          Boolean(auditoriaNina.textoFinalHash) &&
+                          auditoriaNina.textoFinalHash === hashEnviado;
                         const vinculoBase = {
                           clinicaId: params.clinicaId,
-                          decisaoId: auditoriaNina.decisaoId ?? null,
+                          decisaoId: mesmoTextoAvaliado
+                            ? (auditoriaNina.decisaoId ?? null)
+                            : null,
+                          vincularAvaliacao: mesmoTextoAvaliado,
                           execucaoId: auditoriaNina.execucaoId ?? null,
                           conversaId: convId,
                           representacao: "texto_completo" as const,
@@ -814,7 +823,8 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
                           estado: "envio_tentado",
                           detalhe: {
                             hash_avaliado: auditoriaNina.textoFinalHash ?? null,
-                            confere: (auditoriaNina.textoFinalHash ?? null) === hashEnviado,
+                            confere: mesmoTextoAvaliado,
+                            avaliada: mesmoTextoAvaliado,
                           },
                         });
                         let outId: string | null = null;
