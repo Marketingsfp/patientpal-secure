@@ -2954,6 +2954,9 @@ async function gerarRespostaNinaInterno(
           const { registrarEvidenciaBloqueio, registrarAvisoOperacional } = await import(
             "@/lib/nina/rastreio/turno.server"
           );
+          const { validacaoDoEncaminhamento } = await import(
+            "@/lib/nina/rastreio/versoes-texto"
+          );
           // EVIDÊNCIA DO BLOQUEIO: a avaliação que o causou fica preservada
           // apontando para o texto que RECEBEU a nota (o candidato), não para
           // o aviso que o substituiu.
