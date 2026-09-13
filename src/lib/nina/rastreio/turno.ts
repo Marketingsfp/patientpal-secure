@@ -154,6 +154,15 @@ export function origemComSituacao(
 export type ConfiancaDoTurno = {
   /** "action_safety" | "answer_confidence" */
   avaliacao: string;
+  /**
+   * QUAL TEXTO ESTA AVALIAÇÃO AVALIOU. Sem isso, a nota fica solta no turno e
+   * pode ser lida como nota de qualquer texto entregue depois.
+   */
+  textoHash?: string | null;
+  /** Forma avaliada (texto completo, áudio integral, resumo falado). */
+  representacao?: string | null;
+  /** Linha correspondente em `nina_confianca_decisoes`, quando gravada. */
+  decisaoId?: string | null;
   decisao: string | null;
   /** Etapa de ativação progressiva aplicada (A|B|C|D). */
   etapa: string | null;
