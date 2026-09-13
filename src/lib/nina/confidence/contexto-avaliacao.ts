@@ -21,6 +21,7 @@
 import { detectarConflitosEntreFatos, normalizarTexto } from "./evidencia";
 import { hashDoTexto } from "./hash";
 import { extrairRegrasPublicadas } from "./regras-publicadas";
+import { extrairIdentidadePublicada } from "./identidade-publicada";
 import type { FatoRecuperado } from "./evidencia";
 import type {
   AcaoSolicitada,
