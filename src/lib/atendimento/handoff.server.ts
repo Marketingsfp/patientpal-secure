@@ -11,6 +11,7 @@
  */
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { ninaResponde } from "./ciclo-responsabilidade";
+import type { ResultadoAvisoEncaminhamento } from "./aviso-encaminhamento";
 
 export type OwnerType = "AI" | "HUMAN" | "NONE";
 
