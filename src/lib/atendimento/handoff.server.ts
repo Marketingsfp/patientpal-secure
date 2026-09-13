@@ -11,6 +11,7 @@
  */
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { ninaResponde } from "./ciclo-responsabilidade";
+import type { ResultadoAvisoEncaminhamento } from "./aviso-encaminhamento";
 
 export type OwnerType = "AI" | "HUMAN" | "NONE";
 
@@ -184,6 +185,13 @@ export type ResultadoHandoff = {
   departamento?: string | null;
   atribuida_para?: string | null;
   mensagem: string;
+  /** Protocolo do atendimento, quando a clínica usa protocolo. */
+  protocolo?: string | null;
+  /**
+   * RESULTADO ESTRUTURADO DO AVISO — estado, protocolo, texto preparado e id
+   * da mensagem. Quem chama consulta isto em vez de produzir um segundo aviso.
+   */
+  aviso?: ResultadoAvisoEncaminhamento | null;
 };
 
 /**
@@ -268,6 +276,8 @@ export async function encaminharParaHumano(args: {
   });
 
   let protocoloHandoff: string | null = null;
+  // Estado estruturado do aviso, devolvido a quem pediu o encaminhamento.
+  let avisoEncaminhamento: ResultadoAvisoEncaminhamento | null = null;
   // FASE 6 — vínculo mensagem <-> protocolo para a auditoria consolidada.
   let anuncioHandoff: {
     mensagemId: string | null;
@@ -290,6 +300,7 @@ export async function encaminharParaHumano(args: {
       handoffEventoId,
     });
     protocoloHandoff = p?.protocolo ?? null;
+    avisoEncaminhamento = p?.anuncio?.aviso ?? null;
     anuncioHandoff = p?.anuncio
       ? {
           mensagemId: p.anuncio.mensagemId,
@@ -426,6 +437,10 @@ export async function encaminharParaHumano(args: {
     mensagem: atribuida
       ? `Conversa encaminhada e atribuída a ${atribuida.nome}. A IA parou de responder.`
       : "Conversa encaminhada para a equipe. A IA parou de responder.",
+    // RESULTADO ESTRUTURADO — quem chamou não precisa inventar comunicação:
+    // aqui está o protocolo, o estado do aviso e a mensagem já entregue.
+    protocolo: protocoloHandoff,
+    aviso: avisoEncaminhamento,
   };
 
 }

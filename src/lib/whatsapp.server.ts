@@ -2853,14 +2853,39 @@ async function gerarRespostaNinaInterno(
         } | null = null;
         try {
           if (estadoId.conversaId) {
-            const { anuncioHandoffVigente } = await import(
-              "@/lib/atendimento/protocolo-atendimento.server"
+            // 1) Registro durável da operação (clínica, ambiente, conversa,
+            //    sessão, turno): é ele que garante um único aviso, inclusive
+            //    quando os dois caminhos rodam ao mesmo tempo.
+            const { avisoDaOperacao } = await import(
+              "@/lib/atendimento/aviso-encaminhamento.server"
             );
-            anuncioDoTurno = await anuncioHandoffVigente(
+            const { precisaAvisoDoChamador } = await import(
+              "@/lib/atendimento/aviso-encaminhamento"
+            );
+            const operacao = await avisoDaOperacao({
               clinicaId,
-              estadoId.conversaId,
-              registroDoTurno?.iniciadoEm ?? null,
-            );
+              ambiente: registroDoTurno?.teste ? "homologacao" : "producao",
+              conversaId: estadoId.conversaId,
+              turnoId: registroDoTurno?.turnoId ?? null,
+            });
+            if (operacao && !precisaAvisoDoChamador(operacao)) {
+              anuncioDoTurno = {
+                protocolo: operacao.protocolo,
+                mensagemId: operacao.mensagemId,
+                em: "",
+              };
+            }
+            if (!anuncioDoTurno) {
+              // 2) Compatibilidade com encaminhamentos anteriores ao registro.
+              const { anuncioHandoffVigente } = await import(
+                "@/lib/atendimento/protocolo-atendimento.server"
+              );
+              anuncioDoTurno = await anuncioHandoffVigente(
+                clinicaId,
+                estadoId.conversaId,
+                registroDoTurno?.iniciadoEm ?? null,
+              );
+            }
           }
         } catch (e) {
           console.error("[nina-confianca] falha ao conferir anúncio do handoff", e);

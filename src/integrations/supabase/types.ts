@@ -635,6 +635,92 @@ export type Database = {
           },
         ]
       }
+      atend_aviso_encaminhamento: {
+        Row: {
+          ambiente: string
+          chave: string
+          clinica_id: string
+          confirmado_em: string | null
+          conversa_id: string
+          created_at: string
+          enviado_em: string | null
+          estado: string
+          execucao_id: string | null
+          handoff_evento_id: string | null
+          id: string
+          mensagem_id: string | null
+          preparado_por: string | null
+          protocolo: string | null
+          sessao_id: string | null
+          tentativas: number
+          texto: string | null
+          texto_hash: string | null
+          transporte: string | null
+          transporte_id: string | null
+          turno_id: string | null
+          ultimo_erro: string | null
+          updated_at: string
+        }
+        Insert: {
+          ambiente: string
+          chave: string
+          clinica_id: string
+          confirmado_em?: string | null
+          conversa_id: string
+          created_at?: string
+          enviado_em?: string | null
+          estado?: string
+          execucao_id?: string | null
+          handoff_evento_id?: string | null
+          id?: string
+          mensagem_id?: string | null
+          preparado_por?: string | null
+          protocolo?: string | null
+          sessao_id?: string | null
+          tentativas?: number
+          texto?: string | null
+          texto_hash?: string | null
+          transporte?: string | null
+          transporte_id?: string | null
+          turno_id?: string | null
+          ultimo_erro?: string | null
+          updated_at?: string
+        }
+        Update: {
+          ambiente?: string
+          chave?: string
+          clinica_id?: string
+          confirmado_em?: string | null
+          conversa_id?: string
+          created_at?: string
+          enviado_em?: string | null
+          estado?: string
+          execucao_id?: string | null
+          handoff_evento_id?: string | null
+          id?: string
+          mensagem_id?: string | null
+          preparado_por?: string | null
+          protocolo?: string | null
+          sessao_id?: string | null
+          tentativas?: number
+          texto?: string | null
+          texto_hash?: string | null
+          transporte?: string | null
+          transporte_id?: string | null
+          turno_id?: string | null
+          ultimo_erro?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "atend_aviso_encaminhamento_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       atend_bot_configs: {
         Row: {
           ai_model: string | null
