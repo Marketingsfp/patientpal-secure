@@ -225,17 +225,20 @@ export function decidirBloqueioBaixaConfianca(
         : `nivel=${e.nivel ?? "indisponivel"}: regra de baixa confiabilidade não se aplica`,
     };
   }
+  const porPedido = pedidoDeHumano && !nivelExigeEncaminhamento(e.nivel);
   return {
     ...base,
     bloquear: true,
     // Idempotência: aviso já aplicado ou encaminhamento já feito não repete.
     encaminhar: !jaAplicado && e.jaEncaminhado !== true,
-    motivo: MOTIVO_BLOQUEIO_BAIXA_CONFIANCA,
+    motivo: porPedido ? "PEDIDO_DE_ATENDIMENTO_HUMANO" : MOTIVO_BLOQUEIO_BAIXA_CONFIANCA,
     precedeEtapaAtivacao: true,
     precedeDecisaoMotor: e.decisaoMotor !== null && e.decisaoMotor !== "HANDOFF",
     explicacao: jaAplicado
-      ? `nivel=LOW: bloqueio já aplicado neste turno (sem repetição)`
-      : `nivel=LOW: conteúdo candidato descartado; destino obrigatório = atendimento humano (etapa=${e.etapa ?? "?"}, decisão do motor=${e.decisaoMotor ?? "?"})`,
+      ? `${porPedido ? "pedido de pessoa" : "nivel=LOW"}: bloqueio já aplicado neste turno (sem repetição)`
+      : porPedido
+        ? `pedido explícito de atendimento humano: destino obrigatório = atendimento humano (etapa=${e.etapa ?? "?"})`
+        : `nivel=LOW: conteúdo candidato descartado; destino obrigatório = atendimento humano (etapa=${e.etapa ?? "?"}, decisão do motor=${e.decisaoMotor ?? "?"})`,
   };
 }
 
