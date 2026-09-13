@@ -355,6 +355,15 @@ export type EntradaPolitica = {
   semEvidencia?: boolean;
   /** FASE 3 — dimensões relevantes que ficaram UNKNOWN. */
   dimensoesDesconhecidas?: string[];
+  /**
+   * FASE 3 (pontuação) — requisito ESSENCIAL publicado violado neste turno.
+   * Repartir o peso das instruções não pode "diluir" uma violação essencial:
+   * ela continua impedindo aprovação, independentemente da nota.
+   */
+  requisitoEssencialViolado?: boolean;
+  /** FASE 3 (pontuação) — requisito ESSENCIAL aplicável sem prova conclusiva. */
+  requisitoEssencialSemProva?: boolean;
+
 };
 
 export type SaidaPolitica = {
