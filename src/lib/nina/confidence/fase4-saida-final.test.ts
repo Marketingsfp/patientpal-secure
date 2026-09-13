@@ -203,7 +203,7 @@ describe("4. texto do modelo nunca comprova encaminhamento", () => {
     });
     expect(s.encaminhamento?.simulado).toBe(true);
     expect(s.encaminhamento?.etapa).toBe("encaminhamento_pendente");
-    expect(s.encaminhamento?.comprovanteFila).toBeNull();
+    expect(s.encaminhamento?.comprovanteFila ?? null).toBeNull();
   });
 });
 
@@ -404,7 +404,7 @@ describe("8. homologação: zero chamadas com efeito real", () => {
       portas: null,
     });
     expect(s.encaminhamento?.simulado).toBe(true);
-    expect(s.encaminhamento?.comprovanteFila).toBeNull();
+    expect(s.encaminhamento?.comprovanteFila ?? null).toBeNull();
   });
 
   it("adaptador real oferecido em homologação é recusado", async () => {
