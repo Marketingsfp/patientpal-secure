@@ -437,6 +437,11 @@ export function decidirConfianca(
       cobertura: medida.cobertura,
       semEvidencia: medida.semEvidencia,
       dimensoesDesconhecidas: medida.desconhecidas,
+      // FASE 3 (pontuação) — requisito essencial em falta não é compensável
+      // pela média das demais parcelas.
+      requisitoEssencialViolado: reparticao?.memoria.essencial.violado ?? false,
+      requisitoEssencialSemProva: reparticao?.memoria.essencial.semProva ?? false,
+
     },
     politica,
   );
