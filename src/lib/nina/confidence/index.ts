@@ -81,3 +81,21 @@ export {
   type EntradaRespostaFinal,
   type SaidaGateRespostaFinal,
 } from "./final-answer";
+// FASE 1 — contrato estruturado das regras publicadas (seleção explícita).
+export {
+  avaliarAplicabilidade,
+  avaliarCondicao,
+  compararContratos,
+  compilarCondicoes,
+  compilarContratoRegras,
+  contratoValidoParaPublicacao,
+  VERSAO_COMPILACAO_CONTRATO,
+  type CategoriaContrato,
+  type CondicaoContrato,
+  type ContratoRegras,
+  type EstadoAplicabilidade,
+  type MomentoAplicacao,
+  type RegraContrato,
+  type ResultadoCondicao,
+} from "./contrato-regras";
+export { contratoDoTurno, invalidarContratos } from "./contrato-turno";
