@@ -2778,6 +2778,10 @@ async function gerarRespostaNinaInterno(
         aplicada: revisao.aplicada,
         score: respostaFinalAvaliada.score,
         nivel: respostaFinalAvaliada.level,
+        // QUAL TEXTO ESTA NOTA AVALIOU. Sem isso a nota fica solta no turno.
+        textoHash: respostaFinalAvaliada.textoAvaliadoHash ?? null,
+        representacao: "texto_completo",
+        decisaoId: registro.id ?? null,
       });
 
       // REGRA OBRIGATÓRIA — BAIXA CONFIABILIDADE ENCAMINHA PARA HUMANO.
