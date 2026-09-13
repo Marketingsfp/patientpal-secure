@@ -178,7 +178,15 @@ function nomeLead(l: Pick<Lead, "indice">): string {
   return `Paciente Teste ${String(l.indice).padStart(2, "0")}`;
 }
 
+/**
+ * Texto único do aviso de fim de teste. É apenas informativo: reiniciar é
+ * ação exclusiva do operador no botão "Resolver / Reiniciar teste".
+ */
+export const AVISO_TESTE_ENCERRADO =
+  "Teste encerrado. Clique em Resolver / Reiniciar teste para iniciar uma nova sessão.";
+
 export function HomologacaoInbox() {
+
   const { clinicaAtual } = useClinica();
   const clinicaId = clinicaAtual?.clinica_id;
   const podeEscrever = usePodeEscrever("nina");
