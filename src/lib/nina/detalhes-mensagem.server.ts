@@ -167,17 +167,45 @@ export async function carregarDetalhesMensagem(
         ),
       ])
     : [[], []];
-  let eventos = [...eventosDiretos, ...eventosExecucao].filter(mesmaConversa);
-  const traceIds = [
+  const idsConhecidos = new Set<string>();
+  const eventosConhecidos = [...eventosDiretos, ...eventosExecucao]
+    .filter(mesmaConversa)
+    .filter((e) => {
+      const id = s(e.id);
+      if (!id) return true;
+      if (idsConhecidos.has(id)) return false;
+      idsConhecidos.add(id);
+      return true;
+    });
+  // O vínculo da mensagem tem precedência sobre traces auxiliares gravados
+  // pelo gateway com o mesmo execution_id. Só a execução é fallback legado.
+  const traceIdsDiretos = [
     ...new Set(
-      [...eventos.map((e) => s(e.trace_id)), ...avisos.map((a) => s(a.turno_id))].filter(
-        (v): v is string => v != null,
-      ),
+      [
+        ...eventosDiretos.filter(mesmaConversa).map((e) => s(e.trace_id)),
+        ...avisos.map((a) => s(a.turno_id)),
+      ].filter((v): v is string => v != null),
     ),
   ];
+  const traceIds = traceIdsDiretos.length
+    ? traceIdsDiretos
+    : [
+        ...new Set(
+          eventosExecucao
+            .filter(mesmaConversa)
+            .map((e) => s(e.trace_id))
+            .filter((v): v is string => v != null),
+        ),
+      ];
   const traceId = traceIds.length === 1 ? traceIds[0]! : null;
   if (traceIds.length > 1)
-    alertas.push("Foram encontrados rastreamentos diferentes; não foram unidos em um turno único.");
+    alertas.push(
+      traceIdsDiretos.length
+        ? "Os vínculos diretos da mensagem apontam para rastreamentos diferentes; nenhum foi escolhido como turno principal."
+        : "Foram encontrados rastreamentos diferentes; não foram unidos em um turno único.",
+    );
+  let eventos = traceId ? eventosConhecidos.filter((e) => e.trace_id === traceId) : [];
+  const eventosAuxiliares = eventosConhecidos.filter((e) => !traceId || e.trace_id !== traceId);
   if (traceId) {
     const todos = await ler(
       db
@@ -294,6 +322,6 @@ export async function carregarDetalhesMensagem(
     traceId,
     eventos,
     leitura,
-    registrosComplementares: { mensagem, decisoes, avisos, vinculos },
+    registrosComplementares: { mensagem, decisoes, avisos, vinculos, eventosAuxiliares },
   };
 }

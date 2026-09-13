@@ -71,6 +71,61 @@ function preparar() {
 }
 
 describe("carregador por mensagem — leitura isolada", () => {
+  it("MJ55: trace ligado à mensagem prevalece sobre traces auxiliares da execução", async () => {
+    const { p, tabelas, cliente } = preparar();
+    const canonico = String(p.avisos[0]!.turno_id);
+    const quantidadeCanonica = p.eventos.length;
+    tabelas.nina_trace_eventos.push(
+      ...["instructions.published", "prompt.compose"].map((node_id, i) => ({
+        id: `auxiliar-${i}`,
+        clinica_id: p.clinicaId,
+        execution_id: p.execucao!.id,
+        trace_id: p.execucao!.id,
+        conversation_id: p.mensagem!.conversa_id,
+        message_id: null,
+        node_id,
+        cycle_id: 1,
+        event_type: "completed",
+        status: "ok",
+        started_at: "2026-09-13T17:11:46.500Z",
+      })),
+    );
+    const r = await carregarDetalhesMensagem(cliente, {
+      clinicaId: p.clinicaId,
+      mensagemId: String(p.mensagem!.id),
+    });
+    expect(r.traceId).toBe(canonico);
+    expect(r.eventos).toHaveLength(quantidadeCanonica);
+    expect(r.eventos.every((e) => e.trace_id === canonico)).toBe(true);
+    expect(r.eventos.some((e) => e.id === "modelo-inicio")).toBe(true);
+    expect(r.leitura?.rodadas).toBe(2);
+    expect(r.leitura?.alertas.join(" ")).not.toContain("rastreamentos diferentes");
+    expect(r.registrosComplementares?.eventosAuxiliares.map((e) => e.id)).toEqual([
+      "auxiliar-0",
+      "auxiliar-1",
+    ]);
+  });
+
+  it("conflitos entre vínculos diretos não são resolvidos pelo trace da execução", async () => {
+    const { p, tabelas, cliente } = preparar();
+    tabelas.nina_trace_eventos.push({
+      ...p.eventos.find((e) => e.node_id === "turn.delivery")!,
+      id: "entrega-conflitante",
+      trace_id: "outro-trace-direto",
+    });
+    const r = await carregarDetalhesMensagem(cliente, {
+      clinicaId: p.clinicaId,
+      mensagemId: String(p.mensagem!.id),
+    });
+    expect(r.traceId).toBeNull();
+    expect(r.eventos).toHaveLength(0);
+    expect(r.leitura?.alertas.join(" ")).toContain("vínculos diretos da mensagem");
+    expect(
+      r.registrosComplementares?.eventosAuxiliares.some((e) => e.id === "entrega-conflitante"),
+    ).toBe(true);
+    expect(r.leitura?.mensagem?.id).toBe(p.mensagem!.id as string);
+  });
+
   it("consulta apenas a clínica autorizada e retorna a mensagem selecionada", async () => {
     const { p, cliente, consultas } = preparar();
     const r = await carregarDetalhesMensagem(cliente, {
