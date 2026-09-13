@@ -1,13 +1,108 @@
 /**
  * FASE 3 — leitura do registro do turno a partir dos eventos da execução.
- * Teste puro: sem banco, sem rede, sem render.
+ * Sem banco nem rede; inclui renderização estática do painel de confiança.
  */
 import { describe, expect, it } from "bun:test";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 import {
+  RegistroTurnoResumo,
   eventosDeSaidaDoTurno,
   resumoDoTurno,
   situacaoDasTransformacoes,
 } from "../RegistroTurnoResumo";
+
+describe("nota no painel técnico da mensagem (regressão MJ-54)", () => {
+  const bloqueada = {
+    avaliacao: "answer_confidence",
+    score: 63,
+    nivel: "LOW",
+    decisao: "HANDOFF",
+    modo: "enforce",
+    textoHash: "hash-candidato",
+    decisaoId: "decisao-bloqueio",
+  };
+  const renderizar = (metadata: Record<string, unknown>) =>
+    renderToStaticMarkup(
+      createElement(RegistroTurnoResumo, {
+        compacto: true,
+        eventos: [{ node_id: "turn.summary", metadata }],
+      }),
+    );
+
+  it("aviso operacional preserva LOW 63 como evidência do bloqueio, sem atribuí-la à saída", () => {
+    const html = renderizar({
+      confianca: bloqueada,
+      nota_do_texto_entregue: {
+        aplicavel: false,
+        motivo: "aviso_operacional_nao_avaliado",
+        avaliacao: null,
+      },
+      bloqueios: [{ ...bloqueada, textoAvaliadoHash: bloqueada.textoHash }],
+    });
+    expect(html).toContain("Mensagem operacional do sistema: não recebeu nota do motor");
+    expect(html).toContain(
+      "Avaliação do texto bloqueado (não é a nota da mensagem entregue) · nota 63",
+    );
+    expect(html).not.toContain("Confiança da mensagem final");
+  });
+
+  it("mantém o rótulo final para a avaliação do mesmo conteúdo entregue", () => {
+    const valida = { ...bloqueada, score: 89, nivel: "MEDIUM", textoHash: "hash-final" };
+    const html = renderizar({
+      avaliacoes: [valida],
+      entrega: { mensagemId: "mensagem-final", textoHash: "hash-final" },
+      nota_do_texto_entregue: { aplicavel: true, motivo: "hash_confere", avaliacao: valida },
+    });
+    expect(html).toContain("Confiança da mensagem final · nota 89");
+  });
+
+  it("distingue o candidato bloqueado da avaliação da versão corrigida no mesmo turno", () => {
+    const corrigida = {
+      ...bloqueada,
+      score: 95,
+      nivel: "HIGH",
+      decisao: "ANSWER",
+      decisaoId: "decisao-corrigida",
+      textoHash: "hash-corrigido",
+    };
+    const html = renderizar({
+      avaliacoes: [bloqueada, corrigida],
+      entrega: { mensagemId: "mensagem-corrigida", textoHash: corrigida.textoHash },
+      nota_do_texto_entregue: { aplicavel: true, motivo: "hash_confere", avaliacao: corrigida },
+      bloqueios: [{ ...bloqueada, textoAvaliadoHash: bloqueada.textoHash }],
+    });
+    expect(html).toContain(
+      "Avaliação do texto bloqueado (não é a nota da mensagem entregue) · nota 63",
+    );
+    expect(html).toContain("Confiança da mensagem final · nota 95");
+    expect(html).not.toContain("Confiança da mensagem final · nota 63");
+  });
+
+  it("registro antigo incompleto conserva a nota sem inventar o vínculo com a saída", () => {
+    const html = renderizar({ confianca: { ...bloqueada, textoHash: null, decisaoId: null } });
+    expect(html).toContain(
+      "Avaliação registrada no turno (nota não vinculada à mensagem entregue) · nota 63",
+    );
+    expect(html).not.toContain("Confiança da mensagem final");
+  });
+
+  it("não converte a avaliação de segurança da ação em confiança do texto", () => {
+    const html = renderizar({ confianca: { ...bloqueada, avaliacao: "action_safety" } });
+    expect(html).toContain("Segurança da ação (operacional) · nota 63");
+    expect(html).not.toContain("Confiança da mensagem final");
+  });
+
+  it("hash divergente impede atribuição final mesmo com identificador de avaliação igual", () => {
+    const html = renderizar({
+      avaliacoes: [bloqueada],
+      entrega: { textoHash: "outro-texto" },
+      nota_do_texto_entregue: { aplicavel: true, motivo: "hash_confere", avaliacao: bloqueada },
+    });
+    expect(html).not.toContain("Confiança da mensagem final");
+    expect(html).toContain("nota 63");
+  });
+});
 
 describe("resumoDoTurno", () => {
   it("devolve o metadata do evento turn.summary", () => {

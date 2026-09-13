@@ -44,8 +44,10 @@ export type EventoTrace = {
 export const LIMITES = {
   /** Máximo de eventos por execução; o excedente é descartado. */
   eventos: 300,
-  /** Máximo de chaves preservadas em cada metadata. */
-  chaves: 20,
+  /** O resumo do turno tem 28 campos, incluindo avaliações e entrega. */
+  chaves: 32,
+  /** Objetos internos continuam com o limite anterior. */
+  chavesAninhadas: 20,
   /** Tamanho máximo de cada texto guardado. */
   texto: 240,
   /** Máximo de itens preservados em listas. */
@@ -106,9 +108,10 @@ export function sanitizarMetadata(
 ): Record<string, unknown> {
   if (!entrada || typeof entrada !== "object") return {};
   const saida: Record<string, unknown> = {};
+  const limiteChaves = profundidade === 0 ? LIMITES.chaves : LIMITES.chavesAninhadas;
   let usadas = 0;
   for (const [chave, valor] of Object.entries(entrada)) {
-    if (usadas >= LIMITES.chaves) break;
+    if (usadas >= limiteChaves) break;
     if (CHAVES_PROIBIDAS.test(chave)) {
       saida[chave] = "[removido]";
       usadas += 1;

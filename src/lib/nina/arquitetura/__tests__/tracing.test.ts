@@ -1,5 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import { NODES_ARQUITETURA } from "../manifesto";
+import { criarRegistroTurno, resumoTurnoParaTrace } from "../../rastreio/turno";
 import {
   LIMITES,
   criarRastro,
@@ -37,6 +38,56 @@ function etapa(rastro: Rastro, node: string, metadata?: Record<string, unknown>)
 }
 
 describe("tracing — segurança dos dados", () => {
+  it("preserva avaliações e entrega do resumo real do turno ao sanitizar", () => {
+    const registro = criarRegistroTurno({
+      turnoId: "turno-MJ54",
+      ambiente: "homologacao",
+      teste: true,
+      iniciadoEm: "2026-09-13T16:57:00.000Z",
+    });
+    registro.entrega = {
+      mensagemId: "aviso-MJ54",
+      textoHash: "hash-aviso",
+      tamanho: 129,
+      canal: "test-console",
+    };
+    registro.avaliacoes = [
+      {
+        avaliacao: "answer_confidence",
+        textoHash: "hash-candidato",
+        decisao: "HANDOFF",
+        etapa: "A",
+        modo: "enforce",
+        score: 63,
+        nivel: "LOW",
+      },
+    ];
+    const resumo = resumoTurnoParaTrace(registro);
+    const limpo = sanitizarMetadata(resumo);
+    expect(limpo.entrega).toEqual(registro.entrega);
+    expect(limpo.avaliacoes).toEqual(registro.avaliacoes);
+    expect(limpo.avaliacao_operacional).toEqual(registro.avaliacoes[0]);
+    expect(limpo.nota_do_texto_entregue).toMatchObject({
+      aplicavel: false,
+      motivo: "texto_alterado_apos_avaliacao",
+    });
+    expect(limpo.lacunas).toEqual(resumo.lacunas);
+    expect(limpo.iniciado_em).toBe(registro.iniciadoEm);
+  });
+
+  it("preserva a supressão do segundo aviso depois dos 20 campos do evento", () => {
+    const metadata = Object.fromEntries(Array.from({ length: 20 }, (_, i) => [`campo${i}`, i]));
+    const limpo = sanitizarMetadata({
+      ...metadata,
+      segundo_aviso_suprimido: true,
+      token: "segredo-de-teste",
+      telefone: "5511999998888",
+    });
+    expect(limpo.segundo_aviso_suprimido).toBe(true);
+    expect(limpo.token).toBe("[removido]");
+    expect(limpo.telefone).toBe("***8888");
+  });
+
   it("nunca guarda segredos", () => {
     const limpo = sanitizarMetadata({
       token: "abc123",
@@ -79,6 +130,8 @@ describe("tracing — segurança dos dados", () => {
     const limpo = sanitizarMetadata(entrada);
     expect(limpo.fn).toBeNull();
     expect(Object.keys(limpo).length).toBeLessThanOrEqual(LIMITES.chaves);
+    const aninhado = sanitizarMetadata({ interno: entrada }).interno as Record<string, unknown>;
+    expect(Object.keys(aninhado)).toHaveLength(LIMITES.chavesAninhadas);
   });
 });
 
