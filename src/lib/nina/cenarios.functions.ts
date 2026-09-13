@@ -713,7 +713,7 @@ export const finalizarItemExecucao = createServerFn({ method: "POST" })
       })
       .eq("id", (item as any).execucao_id);
 
-    return { resultado, avaliados, mensagens, ferramentas, transferida };
+    return { resultado, avaliados, mensagens, ferramentas, transferida, precisaResetManual };
   });
 
 /** Interrompe uma execução em lote e cancela os itens que ainda não rodaram. */
