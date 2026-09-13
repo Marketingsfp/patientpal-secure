@@ -38,6 +38,12 @@ import {
   type SelecaoVersaoPrompt,
   type TransformacaoResposta,
 } from "./turno";
+import {
+  MOTIVO_SEM_NOTA_AVISO,
+  type AvisoOperacionalRegistrado,
+  type EvidenciaBloqueio,
+  type OrigemVersaoTexto,
+} from "./versoes-texto";
 
 const escopo = new AsyncLocalStorage<{ registro: RegistroTurno }>();
 
