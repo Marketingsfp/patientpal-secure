@@ -195,7 +195,11 @@ export function decidirBloqueioBaixaConfianca(
     e.saudacao ?? (e.turnoSocialSemAcao === true ? { turnoSocial: true } : undefined);
   const excecao = excecaoSaudacaoAplicavel(saudacao);
   const isencaoSocial = excecao.aplica && (e.bloqueadoresAbsolutos?.length ?? 0) === 0;
-  const aplicavel = nivelExigeEncaminhamento(e.nivel) && !isencaoSocial;
+  // Pedido explícito de pessoa é motivo PRÓPRIO de encaminhamento: não depende
+  // da nota. Antes ele só bloqueava de carona, quando a nota caía para Baixa —
+  // o que deixava o pedido sem destino assim que a nota melhorava.
+  const pedidoDeHumano = saudacao?.pedidoDeHumano === true;
+  const aplicavel = pedidoDeHumano || (nivelExigeEncaminhamento(e.nivel) && !isencaoSocial);
   const jaAplicado = e.avisoJaAplicado === true;
   const base = {
     nivel: e.nivel ?? null,
