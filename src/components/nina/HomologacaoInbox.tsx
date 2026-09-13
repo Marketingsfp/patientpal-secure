@@ -1467,7 +1467,22 @@ export function HomologacaoInbox() {
               )}
             </div>
 
+            {/*
+              Aviso de fim de teste: informativo. A conversa, as mensagens, o
+              contexto e o número virtual continuam na tela sem alteração.
+            */}
+            {encerrado && (
+              <div
+                aria-live="polite"
+                className="flex items-center gap-2 border-t border-atd-warn bg-atd-warn-bg p-2 text-sm text-atd-warn-ink"
+              >
+                <FlaskConical className="h-4 w-4 shrink-0" aria-hidden="true" />
+                <span className="min-w-0 break-words">{encerrado}</span>
+              </div>
+            )}
+
             {erro && (
+
               <div className="flex flex-wrap items-center justify-between gap-2 border-t border-destructive/40 bg-destructive/5 p-2 text-sm text-destructive">
                 <span className="min-w-0 break-words">{erro}</span>
                 <Button
