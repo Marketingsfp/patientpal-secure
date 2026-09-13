@@ -2940,14 +2940,52 @@ async function gerarRespostaNinaInterno(
           console.error("[nina-confianca] falha ao conferir anúncio do handoff", e);
         }
         resposta = anuncioDoTurno ? "" : saidaControlada.aviso;
+        const motivoBloqueio = anuncioDoTurno
+          ? `${bloqueio.motivo}: conteúdo candidato descartado; aviso já entregue pelo encaminhamento (protocolo ${anuncioDoTurno.protocolo ?? "sem número"})`
+          : `${bloqueio.motivo}: conteúdo candidato descartado (${saidaControlada.encaminhamento})`;
         transformar(
           "confianca.baixa.encaminhamento",
-          anuncioDoTurno
-            ? `${bloqueio.motivo}: conteúdo candidato descartado; aviso já entregue pelo encaminhamento (protocolo ${anuncioDoTurno.protocolo ?? "sem número"})`
-            : `${bloqueio.motivo}: conteúdo candidato descartado (${saidaControlada.encaminhamento})`,
+          motivoBloqueio,
           antesBloqueio,
           resposta,
+          "aviso_operacional",
         );
+        {
+          const { registrarEvidenciaBloqueio, registrarAvisoOperacional } = await import(
+            "@/lib/nina/rastreio/turno.server"
+          );
+          // EVIDÊNCIA DO BLOQUEIO: a avaliação que o causou fica preservada
+          // apontando para o texto que RECEBEU a nota (o candidato), não para
+          // o aviso que o substituiu.
+          registrarEvidenciaBloqueio({
+            tipo: "confianca_baixa",
+            motivo: bloqueio.motivo,
+            avaliacao: "answer_confidence",
+            decisaoId: registro.id ?? null,
+            textoAvaliadoHash:
+              bloqueio.conteudoCandidatoHash ?? respostaFinalAvaliada.textoAvaliadoHash ?? null,
+            score: bloqueio.score ?? null,
+            nivel: bloqueio.nivel ?? null,
+            etapa: bloqueio.etapa ?? null,
+            substituiuTexto: true,
+          });
+          // AVISO OPERACIONAL: origem e validação declaradas; porcentagem de
+          // confiança NÃO se aplica e isso fica escrito, sem inventar nota.
+          if (resposta) {
+            registrarAvisoOperacional({
+              origem: saidaControlada.origem,
+              tipo: "confianca_baixa",
+              motivo: motivoBloqueio,
+              validacao: saidaControlada.registro,
+              validacaoDoEncaminhamento: saidaControlada.encaminhamentoConfirmado
+                ? "confirmado"
+                : saidaControlada.encaminhamento,
+              protocolo: anuncioDoTurno?.protocolo ?? null,
+              mensagemId: anuncioDoTurno?.mensagemId ?? null,
+              textoHash: hashTurno(resposta),
+            });
+          }
+        }
         marcarOrigem(
           "codigo",
           `${saidaControlada.registro} (origem: ${saidaControlada.origem})`,
