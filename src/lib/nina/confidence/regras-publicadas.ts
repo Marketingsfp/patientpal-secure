@@ -39,13 +39,25 @@ export type SituacaoRegra =
   /** A apresentação já foi feita antes deste turno. */
   | "apresentacao_ja_feita"
   /** É o primeiro turno respondido da sessão. */
-  | "primeira_mensagem";
+  | "primeira_mensagem"
+  /** A mensagem recebida é composta somente por saudação. */
+  | "saudacao_pura"
+  /** A mensagem recebida traz pergunta ou pedido concreto. */
+  | "pedido_concreto";
 
 export type CondicaoRegra =
   | { tipo: "sempre" }
   | { tipo: "mensagem_exata"; valor: string }
   | { tipo: "mensagem_contem"; valor: string }
-  | { tipo: "situacao"; situacao: SituacaoRegra; valor: string };
+  | { tipo: "situacao"; situacao: SituacaoRegra; valor: string }
+  /** Várias situações exigidas ao mesmo tempo pela mesma regra. */
+  | { tipo: "situacoes"; itens: SituacaoRegra[]; valor: string }
+  /**
+   * A condição publicada existe, mas o avaliador não sabe conferi-la com os
+   * sinais do servidor. NUNCA vira "aplica" nem "não se aplica": fica
+   * indeterminada e é declarada como limitação.
+   */
+  | { tipo: "nao_compreendida"; valor: string };
 
 export type VerificacaoRegra =
   | "literal"
