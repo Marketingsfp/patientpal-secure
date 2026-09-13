@@ -101,6 +101,67 @@ export function registrarTransformacaoResposta(
   });
 }
 
+/**
+ * VERSÃO DO TEXTO — cada conteúdo distinto do turno é preservado com sua
+ * etapa, seu motivo e sua impressão digital. Registrar duas vezes o mesmo
+ * hash em sequência não cria versão nova: repetição não é alteração.
+ */
+export function registrarVersaoTexto(v: {
+  etapa: string;
+  motivo: string;
+  origem: OrigemVersaoTexto;
+  texto: string | null;
+  hash: string | null;
+  em?: string;
+}): void {
+  seguro((r) => {
+    if (!Array.isArray(r.versoesTexto)) r.versoesTexto = [];
+    const ultima = r.versoesTexto[r.versoesTexto.length - 1] ?? null;
+    if (ultima && ultima.hash && v.hash && ultima.hash === v.hash && ultima.etapa === v.etapa) {
+      return;
+    }
+    r.versoesTexto.push({
+      ordem: r.versoesTexto.length + 1,
+      etapa: v.etapa,
+      motivo: v.motivo,
+      origem: v.origem,
+      hash: v.hash,
+      tamanho: v.texto == null ? null : v.texto.length,
+      texto: v.texto,
+      em: v.em ?? new Date().toISOString(),
+    });
+  });
+}
+
+/**
+ * AVISO OPERACIONAL — mensagem controlada do sistema. Registra a ORIGEM e a
+ * VALIDAÇÃO correspondente e declara, explicitamente, que não existe nota do
+ * motor para ela (porcentagem não se aplica; nenhuma nota é inventada).
+ */
+export function registrarAvisoOperacional(
+  a: Omit<AvisoOperacionalRegistrado, "notaAplicavel" | "motivoSemNota" | "em"> & { em?: string },
+): void {
+  seguro((r) => {
+    if (!Array.isArray(r.avisosOperacionais)) r.avisosOperacionais = [];
+    r.avisosOperacionais.push({
+      ...a,
+      notaAplicavel: false,
+      motivoSemNota: MOTIVO_SEM_NOTA_AVISO,
+      em: a.em ?? new Date().toISOString(),
+    });
+  });
+}
+
+/** EVIDÊNCIA DO BLOQUEIO — a avaliação que o causou, com o texto avaliado. */
+export function registrarEvidenciaBloqueio(
+  b: Omit<EvidenciaBloqueio, "em"> & { em?: string },
+): void {
+  seguro((r) => {
+    if (!Array.isArray(r.bloqueios)) r.bloqueios = [];
+    r.bloqueios.push({ ...b, em: b.em ?? new Date().toISOString() });
+  });
+}
+
 export function registrarConfiancaDoTurno(c: ConfiancaDoTurno): void {
   seguro((r) => {
     if (!Array.isArray(r.avaliacoes)) r.avaliacoes = [];
