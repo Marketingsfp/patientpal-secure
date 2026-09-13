@@ -212,32 +212,52 @@ export function mesmaCondicaoPagamento(afirmada: unknown, doFato: unknown): bool
  * "custa R$ 51,00 no dinheiro e R$ 60,00 no cartão" tem duas afirmações no
  * mesmo segmento; cada valor precisa ser lido com a SUA condição.
  */
-export function recorteDaAfirmacao(frase: string, trecho: string, posicao?: number): string {
-  const f = frase ?? "";
-  const alvo = (trecho ?? "").trim();
-  if (!f || !alvo) return f;
-  const pos = posicao ?? f.indexOf(alvo);
-  if (pos < 0) return f;
+function recortesMonetarios(f: string): Array<{ inicio: number; fim: number; texto: string; iniciaCaso: boolean }> {
   const valores = [
     ...f.matchAll(/R\$\s?\d[\d.,]*|custa\s+\d[\d.,]*|valor\s+(?:é|de)\s+\d[\d.,]*/gi),
   ];
   // Dinheiro/PIX ou dinheiro e PIX não encerram o preço: todas as formas
   // precisam ser confrontadas. Só há divisão entre dois valores concretos.
   const limites = [0];
+  const iniciosDeCaso = [false];
   for (let i = 1; i < valores.length; i++) {
     const anterior = valores[i - 1]!;
     const atual = valores[i]!;
     const inicioEntre = anterior.index! + anterior[0].length;
     const entre = f.slice(inicioEntre, atual.index);
     const separadores = [...entre.matchAll(/,\s+|\s*(?:;|\be\b|\bou\b|\/|\||–|—)\s*/g)];
-    const ultimo = separadores.at(-1);
-    limites.push(ultimo ? inicioEntre + ultimo.index! + ultimo[0].length : atual.index!);
+    // "cartão (145) — para cardiologia infantil com Dr. X, os valores são
+    // 160..." começa outro caso no travessão, não na última vírgula. Manter
+    // o assunto desse novo grupo impede que ele contamine os preços anteriores.
+    const novoCaso = separadores.find((separador) => {
+      const q = qualificadoresDaAfirmacao(
+        entre.slice(separador.index! + separador[0].length).replace(/[*_]/g, ""),
+      );
+      return Boolean(
+        (q.procedimento && !PROCEDIMENTOS_GENERICOS.has(normalizarTexto(q.procedimento))) ||
+          q.medicoNome || q.unidadeId || q.convenio,
+      );
+    });
+    const separador = novoCaso ?? separadores.at(-1);
+    limites.push(separador ? inicioEntre + separador.index! + separador[0].length : atual.index!);
+    iniciosDeCaso.push(Boolean(novoCaso) || /[–—|]/.test(separador?.[0] ?? ""));
   }
   limites.push(f.length);
-  for (let i = 0; i < limites.length - 1; i++) {
-    if (pos >= limites[i]! && pos < limites[i + 1]!) return f.slice(limites[i], limites[i + 1]);
-  }
-  return f;
+  return limites.slice(0, -1).map((inicio, i) => ({
+    inicio,
+    fim: limites[i + 1]!,
+    texto: f.slice(inicio, limites[i + 1]),
+    iniciaCaso: iniciosDeCaso[i] ?? false,
+  }));
+}
+
+export function recorteDaAfirmacao(frase: string, trecho: string, posicao?: number): string {
+  const f = frase ?? "";
+  const alvo = (trecho ?? "").trim();
+  if (!f || !alvo) return f;
+  const pos = posicao ?? f.indexOf(alvo);
+  if (pos < 0) return f;
+  return recortesMonetarios(f).find((r) => pos >= r.inicio && pos < r.fim)?.texto ?? f;
 }
 
 /**
@@ -256,9 +276,40 @@ export function chavesDaAfirmacaoMonetaria(
   frase: string,
   trecho: string,
   posicao?: number,
+  escopoAnterior: ChaveFato = {},
 ): ChaveFato[] {
-  const chave = qualificadoresDaAfirmacao(frase.replace(/[*_]/g, ""));
-  const recorte = recorteDaAfirmacao(frase, trecho, posicao);
+  const pos = posicao ?? frase.indexOf(trecho);
+  let chave: ChaveFato = { ...escopoAnterior };
+  delete chave.condicoes;
+  let recorte = frase;
+  const partes = recortesMonetarios(frase);
+  for (const [indice, parte] of partes.entries()) {
+    const local = qualificadoresDaAfirmacao(parte.texto.replace(/[*_]/g, ""));
+    delete local.condicoes;
+    // Um assunto explicitamente novo não herda o médico/unidade de outro
+    // procedimento. Formas do mesmo caso continuam herdando seu assunto.
+    if (local.procedimento && PROCEDIMENTOS_GENERICOS.has(normalizarTexto(local.procedimento)) && chave.procedimento) delete local.procedimento;
+    if (local.procedimento && !PROCEDIMENTOS_GENERICOS.has(normalizarTexto(local.procedimento)) && local.procedimento !== chave.procedimento) chave = {};
+    chave = { ...chave, ...local };
+    if (pos >= parte.inicio && pos < parte.fim) {
+      recorte = parte.texto;
+      // "120 no dinheiro ou 145 no cartão para cardiologia" qualifica o
+      // grupo inteiro ao final. Só completar o assunto omitido dentro do
+      // mesmo grupo; travessão ou introdução de outro caso encerra essa busca.
+      if (!chave.procedimento || PROCEDIMENTOS_GENERICOS.has(normalizarTexto(chave.procedimento))) {
+        for (const proxima of partes.slice(indice + 1)) {
+          if (proxima.iniciaCaso) break;
+          const posterior = qualificadoresDaAfirmacao(proxima.texto.replace(/[*_]/g, ""));
+          if (posterior.procedimento && !PROCEDIMENTOS_GENERICOS.has(normalizarTexto(posterior.procedimento))) {
+            delete posterior.condicoes;
+            chave = { ...posterior, ...chave, procedimento: posterior.procedimento };
+            break;
+          }
+        }
+      }
+      break;
+    }
+  }
   const formas = formasDePagamentoNoTexto(recorte);
   if (formas.length) return formas.map((forma) => ({ ...chave, condicoes: forma }));
   delete chave.condicoes;

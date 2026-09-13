@@ -426,15 +426,23 @@ export function extrairClaimsDoTexto(texto: string): ClaimDoTexto[] {
         /\?\s*$/.test(fraseDoTrecho(t, trecho)) ? `${frase}?` : oracaoNaPosicao(t, posicao),
       );
       if (tipo === "valor") {
-        const inicioSegmento = segmentosDaResposta(t).find(
+        const segmentos = segmentosDaResposta(t);
+        const indiceSegmento = segmentos.findIndex(
           (s) => posicao >= s.inicio && posicao <= s.inicio + s.texto.length,
         );
+        const inicioSegmento = segmentos[indiceSegmento];
         const deslocamento = inicioSegmento
           ? posicao -
             inicioSegmento.inicio -
             (inicioSegmento.texto.length - inicioSegmento.texto.trimStart().length)
           : undefined;
-        for (const chaveMonetaria of chavesDaAfirmacaoMonetaria(frase, trecho, deslocamento)) {
+        const anterior = segmentos[indiceSegmento - 1];
+        // Continuação explícita de pagamento no mesmo parágrafo conserva o
+        // assunto da frase imediatamente anterior, nunca de uma frase futura.
+        const continuaPagamento = /^\s*(?:as?\s+)?(?:formas?\s+de\s+pagamento|valores?|pre[cç]os?)\b/iu.test(frase.replace(/[*_]/g, ""));
+        const mesmoParagrafo = anterior && inicioSegmento && !/\n\s*\n/.test(t.slice(anterior.inicio + anterior.texto.length, inicioSegmento.inicio));
+        const escopoAnterior = continuaPagamento && mesmoParagrafo ? qualificadoresDaAfirmacao(anterior.texto.replace(/[*_]/g, "")) : {};
+        for (const chaveMonetaria of chavesDaAfirmacaoMonetaria(frase, trecho, deslocamento, escopoAnterior)) {
           achados.push({
             tipo,
             trecho,
