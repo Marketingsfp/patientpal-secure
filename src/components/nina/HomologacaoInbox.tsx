@@ -816,6 +816,7 @@ export function HomologacaoInbox() {
         if (r.encerrada || !r.mensagem) {
           setSimMotivo(r.motivo ?? ROTULO_MOTIVO.objetivo_concluido);
           setSim((s) => (s ? { ...s, status: "concluida" } : s));
+          setEncerrado(AVISO_TESTE_ENCERRADO);
           break;
         }
         setSim((s) => (s ? { ...s, turnos: r.turno } : s));
@@ -828,6 +829,7 @@ export function HomologacaoInbox() {
           });
           setSimMotivo(ROTULO_MOTIVO.transferencia);
           setSim((s) => (s ? { ...s, status: "concluida" } : s));
+          setEncerrado(AVISO_TESTE_ENCERRADO);
           break;
         }
         if (!env.ok) {
@@ -836,8 +838,10 @@ export function HomologacaoInbox() {
           });
           setSimMotivo(env.erro ?? ROTULO_MOTIVO.erro);
           setSim((s) => (s ? { ...s, status: "erro" } : s));
+          setEncerrado(AVISO_TESTE_ENCERRADO);
           break;
         }
+
       }
       if (controleRef.current.parar) setSim((s) => (s ? { ...s, status: "parada" } : s));
     } catch (e) {
