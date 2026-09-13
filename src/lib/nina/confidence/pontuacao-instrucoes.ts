@@ -160,7 +160,7 @@ function agrupar(obrigacoes: ObrigacaoAvaliada[]): Grupo[] {
   return [...mapa.values()];
 }
 
-export type Repartic4oInstrucoes = {
+export type ReparticaoInstrucoes = {
   /** Parcelas que substituem a dimensão agregada na nota e na cobertura. */
   parcelas: ResultadoValidador[];
   /** Dimensão separada de linguagem (peso zero, fora da nota e da cobertura). */
@@ -176,7 +176,7 @@ export type Repartic4oInstrucoes = {
 export function repartirInstrucoes(
   agregado: ResultadoValidador,
   politica: PoliticaConfianca = POLITICA_PADRAO,
-): Repartic4oInstrucoes | null {
+): ReparticaoInstrucoes | null {
   const obrigacoes = obrigacoesDaEvidencia(agregado.evidence);
   if (obrigacoes.length === 0) return null;
 
