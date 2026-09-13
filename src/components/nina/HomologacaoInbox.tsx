@@ -920,15 +920,26 @@ export function HomologacaoInbox() {
     }
   };
 
+  /**
+   * ÚNICO caminho de reinício da homologação (botão do operador). A tela só
+   * muda DEPOIS que o servidor confirma; se falhar, a sessão atual continua
+   * exatamente como está.
+   */
   const resolverConversa = async () => {
     if (!clinicaId || !leadId || !conversaId) return;
-    setEmProcessamento((n) => n + 1);
+    if (resetando) return;
+    setResetando(true);
     try {
       await resolver({
         data: { clinicaId, leadId, conversaId, removerAgendamentos: limparAgenda },
       });
+      // Confirmado pelo servidor: a partir daqui qualquer resposta da IA que
+      // ainda estivesse em voo é descartada da tela (a execução permanece
+      // registrada na auditoria do servidor).
+      geracaoRef.current += 1;
       setConversaId(null);
       setErro(null);
+      setEncerrado(null);
       setAudio(null);
       setFerramentas([]);
       // Nova sessão: leitura e idempotência recomeçam; o histórico anterior
@@ -938,12 +949,18 @@ export function HomologacaoInbox() {
       setLeads((ls) => ls.map((l) => (l.id === leadId ? { ...l, naoLidas: 0 } : l)));
       await carregarHistorico(leadId);
       await carregarLeads();
+      toast.success("Nova sessão de teste iniciada.");
     } catch (e: any) {
+      // Falhou: a sessão exibida segue a mesma, sem limpar nada.
       mostrarErro(e);
+      setErro(
+        `Não foi possível reiniciar o teste: ${String(e?.message ?? e)}. A sessão atual foi preservada.`,
+      );
     } finally {
-      setEmProcessamento((n) => Math.max(0, n - 1));
+      setResetando(false);
     }
   };
+
 
   const baixarPdf = async () => {
     if (!leadAtual || msgs.length === 0) {
