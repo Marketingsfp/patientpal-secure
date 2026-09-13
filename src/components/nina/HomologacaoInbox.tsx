@@ -716,7 +716,11 @@ export function HomologacaoInbox() {
       wa_message_id: waIdDoEnvio(leadOrigem, chave),
       estado: "pending",
     });
-    const meuLead = () => leadSelecionadoRef.current === leadOrigem;
+    // Vale para esta tela apenas enquanto o lead continuar selecionado E a
+    // sessão não tiver sido reiniciada manualmente no meio do caminho.
+    const meuLead = () =>
+      leadSelecionadoRef.current === leadOrigem && geracaoRef.current === geracao;
+
     setEmProcessamento((n) => n + 1);
     try {
       const r = (await enviar({
