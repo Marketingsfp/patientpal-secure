@@ -1,7 +1,7 @@
 /**
  * FASE 5 — aceite: a tela explica a conta e os efeitos sem contradição.
  */
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 import {
   explicarResposta,
   explicarEstadoRegra,
