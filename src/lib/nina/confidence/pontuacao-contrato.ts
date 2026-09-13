@@ -237,7 +237,11 @@ export function pontuarContrato(e: EntradaPontuacao): PontuacaoContrato {
   const maxTentativas = e.maxTentativas ?? 2;
 
   const substantivas = avaliacao.resultados.filter(
-    (r) => r.categoria !== "LINGUAGEM" && r.status !== "NOT_APPLICABLE" && r.status !== "PENDING",
+    (r) =>
+      r.contaNoCandidato &&
+      r.categoria !== "LINGUAGEM" &&
+      r.status !== "NOT_APPLICABLE" &&
+      r.status !== "PENDING",
   );
   const grupos = agruparEquivalentes(substantivas);
   const peso = grupos.length === 0 ? 0 : orcamento / grupos.length;
