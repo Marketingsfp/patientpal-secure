@@ -94,6 +94,11 @@ import {
   useConfiancaMensagens,
 } from "@/components/nina/ConfiancaMensagem";
 import {
+  SaidaMensagemBadge,
+  useSaidasDasMensagens,
+  type MapaSaidas,
+} from "@/components/nina/SaidaMensagem";
+import {
   execucoesDasRespostasNina,
   montarMetadadosMensagemNina,
 } from "@/lib/nina/mensagem-meta";
@@ -184,6 +189,11 @@ function nomeLead(l: Pick<Lead, "indice">): string {
  */
 export const AVISO_TESTE_ENCERRADO =
   "Teste encerrado. Clique em Resolver / Reiniciar teste para iniciar uma nova sessão.";
+
+/** Classe da bolha, quando já carregada e sem falha de leitura. */
+function classeDaSaida(s: MapaSaidas[string] | undefined): string | null {
+  return !s || s === "falha" ? null : s.classe;
+}
 
 export function HomologacaoInbox() {
 
@@ -307,6 +317,17 @@ export function HomologacaoInbox() {
   // conversa (sem consulta por balão) e nada é recalculado na tela.
   const execucoesDaNina = useMemo(() => execucoesDasRespostasNina(msgs), [msgs]);
   const confiancaPorExecucao = useConfiancaMensagens(clinicaId, execucoesDaNina);
+  // O que cada bolha É (resposta avaliada, aviso do sistema, sem avaliação,
+  // texto alterado) vem do banco, pelo vínculo gravado de cada mensagem.
+  const idsDasMensagens = useMemo(
+    () =>
+      msgs
+        .filter((m) => m.direction === "out" && m.id)
+        .map((m) => String(m.id))
+        .filter((id) => /^[0-9a-f-]{36}$/i.test(id)),
+    [msgs],
+  );
+  const saidasPorMensagem = useSaidasDasMensagens(clinicaId, conversaId, idsDasMensagens);
 
   /** Metadados internos padronizados da mensagem (produção/homologação/teste). */
   const metadadosDaMensagem = useCallback(
@@ -1420,18 +1441,26 @@ export function HomologacaoInbox() {
                           </span>
                           {daNina && (
                             <span className="flex items-center gap-2">
-                              {clinicaId && m.execucao_id && confiancaPorExecucao[String(m.execucao_id)] ? (
-                                <ConfiancaMensagemBadge
-                                  clinicaId={clinicaId}
-                                  mensagemId={m.id ? String(m.id) : null}
-                                  conversaId={meta.test_conversation_id ?? null}
-                                  mensagem={{ texto: m.body ?? null }}
-                                  confianca={confiancaPorExecucao[String(m.execucao_id)]!}
-                                />
-
-                              ) : (
-                                <ConfiancaNaoAvaliadaBadge />
-                              )}
+                              {/* Um selo só por bolha, decidido pelo vínculo
+                                  gravado: nota apenas quando a avaliação é
+                                  deste conteúdo. Avisos do sistema e falhas de
+                                  carregamento têm selo e motivo próprios. */}
+                              <SaidaMensagemBadge
+                                saida={m.id ? saidasPorMensagem[String(m.id)] : undefined}
+                              />
+                              {clinicaId &&
+                                m.execucao_id &&
+                                confiancaPorExecucao[String(m.execucao_id)] &&
+                                classeDaSaida(saidasPorMensagem[String(m.id)]) ===
+                                  "resposta_avaliada" && (
+                                  <ConfiancaMensagemBadge
+                                    clinicaId={clinicaId}
+                                    mensagemId={m.id ? String(m.id) : null}
+                                    conversaId={meta.test_conversation_id ?? null}
+                                    mensagem={{ texto: m.body ?? null }}
+                                    confianca={confiancaPorExecucao[String(m.execucao_id)]!}
+                                  />
+                                )}
                               {m.execucao_id && (
                                 <button
                                   type="button"
