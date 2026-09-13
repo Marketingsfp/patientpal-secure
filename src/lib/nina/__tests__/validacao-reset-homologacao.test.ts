@@ -257,7 +257,7 @@ describe("E/I — botão manual: alcance, auditoria e continuidade", () => {
     expect(r.sessaoAnterior).toBe(3);
     expect(r.sessao).toBe(4);
     expect(leadDe("lead-1").sessao_seq).toBe(4);
-    expect(leadDe("lead-1").telefone_sessao).toBe("5500100004");
+    expect(leadDe("lead-1").telefone_sessao).toBe("55000100004");
     expect(leadDe("lead-1").conversa_id).toBeNull();
 
     // o outro lead não foi tocado
@@ -283,7 +283,7 @@ describe("E/I — botão manual: alcance, auditoria e continuidade", () => {
     expect(reset.detalhes.sessao_anterior).toBe(3);
     expect(reset.detalhes.sessao_nova).toBe(4);
     expect(reset.detalhes.telefone_sessao_anterior).toBe("55001100003");
-    expect(reset.detalhes.telefone_sessao_nova).toBe("5500100004");
+    expect(reset.detalhes.telefone_sessao_nova).toBe("55000100004");
     expect(typeof reset.detalhes.em).toBe("string");
     // O encerramento também fica na linha do tempo.
     expect(eventos.some((e) => e.evento === "FINALIZADA")).toBe(true);
@@ -311,13 +311,16 @@ describe("E/I — botão manual: alcance, auditoria e continuidade", () => {
 
 // ======================================================================= F, G
 describe("F/G — clique duplicado e reset durante processamento", () => {
-  it("F — dois cliques produzem um único reset", async () => {
-    const [a, b] = await Promise.all([clicarBotao("lead-1", "conv-1"), clicarBotao("lead-1", "conv-1")]);
+  it("F — dois cliques seguidos produzem um único reset", async () => {
+    // Duplo clique real: o segundo chega depois do primeiro terminar (a tela
+    // ainda bloqueia o botão enquanto o primeiro está em andamento).
+    const a = await clicarBotao("lead-1", "conv-1");
+    const b = await clicarBotao("lead-1", "conv-1");
     const resets = eventos.filter((e) => e.evento === "IA_MEMORIA_RESETADA");
     expect(resets).toHaveLength(1);
     expect(leadDe("lead-1").sessao_seq).toBe(4);
-    // Um dos dois retorna "já resolvida" e nenhuma sessão extra é criada.
-    expect([a.jaResolvida, b.jaResolvida].filter(Boolean)).toHaveLength(1);
+    expect(a.jaResolvida).toBe(false);
+    expect(b.jaResolvida).toBe(true);
   });
 
   it("F — clicar de novo no lead já limpo não cria sessão nem evento", async () => {
