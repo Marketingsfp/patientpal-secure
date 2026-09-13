@@ -362,6 +362,7 @@ export function explicarResposta(e: EntradaExplicacao): ExplicacaoResposta {
           `${p.tetos.length ? `teto ${Math.min(...p.tetos.map((t) => t.valor))} → ` : ""}final ${p.notaFinal}`
         : "sem conta registrada",
     },
+    operacao,
     regras,
     identidade: { ...identidade, correspondencia: conferirCorrespondencia(identidade) },
     avaliacaoSol: {
