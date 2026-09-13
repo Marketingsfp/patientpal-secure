@@ -111,15 +111,30 @@ const ROTULOS: Record<keyof VerificacaoHandoff, { ok: string; falha: string }> =
 /**
  * Converte as verificações em critérios avaliados, no mesmo formato usado pelo
  * restante do Test Runner. Só se aplica quando o cenário esperava handoff.
+ *
+ * REGRA DA HOMOLOGAÇÃO — o encaminhamento não reinicia o teste: o ciclo segue
+ * ativo e a memória da Nina é preservada até o operador clicar em
+ * "Resolver / Reiniciar teste". Por isso `cycle_completed` e `memory_reset`
+ * continuam sendo apurados (auditoria), mas não são critérios de aprovação.
  */
+export const CRITERIOS_HANDOFF_AVALIADOS = [
+  "handoff_occurred",
+  "protocol_created",
+  "protocol_format_valid",
+  "protocol_unique",
+  "transfer_message_created",
+  "protocol_in_message",
+] as const satisfies readonly (keyof VerificacaoHandoff)[];
+
 export function criteriosDeHandoff(v: VerificacaoHandoff): CriterioAvaliado[] {
-  return (Object.keys(ROTULOS) as (keyof VerificacaoHandoff)[]).map((chave) => ({
+  return CRITERIOS_HANDOFF_AVALIADOS.map((chave) => ({
     tipo: "transferiu",
     valor: chave,
     ok: v[chave],
     detalhe: v[chave] ? ROTULOS[chave].ok : ROTULOS[chave].falha,
   }));
 }
+
 
 /**
  * Setor: só pode ser mencionado quando existe destino estruturado. Sem
