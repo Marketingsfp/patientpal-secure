@@ -144,7 +144,11 @@ describe("Fase 4 — obrigações do turno", () => {
     const r = avaliarObrigacoes(c, c.draftText ?? "");
     expect(r.avaliacoes[0]?.status).toBe("indeterminada");
     expect(r.limitacoes).toContain("OBRIGACAO_DE_LINGUAGEM_ABERTA_NAO_VERIFICADA");
-    expect(InstructionComplianceValidator(c).status).toBe("UNKNOWN");
+    // Exigência APENAS de linguagem, escrita em texto aberto: fica declarada
+    // como limitação, sem virar "não sei" e sem rebaixar o turno sozinha.
+    const v = InstructionComplianceValidator(c);
+    expect(v.status).toBe("NOT_APPLICABLE");
+    expect(v.reasonCode).toBe("SOMENTE_LINGUAGEM_ABERTA_NAO_VERIFICAVEL");
   });
 
   it("mensagem do paciente não cria regra interna", () => {

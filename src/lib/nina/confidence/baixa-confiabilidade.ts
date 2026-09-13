@@ -195,7 +195,11 @@ export function decidirBloqueioBaixaConfianca(
     e.saudacao ?? (e.turnoSocialSemAcao === true ? { turnoSocial: true } : undefined);
   const excecao = excecaoSaudacaoAplicavel(saudacao);
   const isencaoSocial = excecao.aplica && (e.bloqueadoresAbsolutos?.length ?? 0) === 0;
-  const aplicavel = nivelExigeEncaminhamento(e.nivel) && !isencaoSocial;
+  // Pedido explícito de pessoa é motivo PRÓPRIO de encaminhamento: não depende
+  // da nota. Antes ele só bloqueava de carona, quando a nota caía para Baixa —
+  // o que deixava o pedido sem destino assim que a nota melhorava.
+  const pedidoDeHumano = saudacao?.pedidoDeHumano === true;
+  const aplicavel = pedidoDeHumano || (nivelExigeEncaminhamento(e.nivel) && !isencaoSocial);
   const jaAplicado = e.avisoJaAplicado === true;
   const base = {
     nivel: e.nivel ?? null,
@@ -221,17 +225,20 @@ export function decidirBloqueioBaixaConfianca(
         : `nivel=${e.nivel ?? "indisponivel"}: regra de baixa confiabilidade não se aplica`,
     };
   }
+  const porPedido = pedidoDeHumano && !nivelExigeEncaminhamento(e.nivel);
   return {
     ...base,
     bloquear: true,
     // Idempotência: aviso já aplicado ou encaminhamento já feito não repete.
     encaminhar: !jaAplicado && e.jaEncaminhado !== true,
-    motivo: MOTIVO_BLOQUEIO_BAIXA_CONFIANCA,
+    motivo: porPedido ? "PEDIDO_DE_ATENDIMENTO_HUMANO" : MOTIVO_BLOQUEIO_BAIXA_CONFIANCA,
     precedeEtapaAtivacao: true,
     precedeDecisaoMotor: e.decisaoMotor !== null && e.decisaoMotor !== "HANDOFF",
     explicacao: jaAplicado
-      ? `nivel=LOW: bloqueio já aplicado neste turno (sem repetição)`
-      : `nivel=LOW: conteúdo candidato descartado; destino obrigatório = atendimento humano (etapa=${e.etapa ?? "?"}, decisão do motor=${e.decisaoMotor ?? "?"})`,
+      ? `${porPedido ? "pedido de pessoa" : "nivel=LOW"}: bloqueio já aplicado neste turno (sem repetição)`
+      : porPedido
+        ? `pedido explícito de atendimento humano: destino obrigatório = atendimento humano (etapa=${e.etapa ?? "?"})`
+        : `nivel=LOW: conteúdo candidato descartado; destino obrigatório = atendimento humano (etapa=${e.etapa ?? "?"}, decisão do motor=${e.decisaoMotor ?? "?"})`,
   };
 }
 
