@@ -745,17 +745,27 @@ export async function processarMensagemTeste(data: EntradaMensagemTeste, userId:
 }
 
 /**
- * FASE 2 — RESET REAL de um lead de teste (rotina canônica única).
+ * REGRA DA HOMOLOGAÇÃO — RESET REAL de um lead de teste (rotina canônica única).
  *
- * É exatamente o que o botão "Resolver" do console de homologação faz, agora
- * extraído para poder ser reutilizado também pelo preflight do teste de carga.
- * Além de encerrar a conversa e zerar a memória da Nina, corta os resíduos que
- * poderiam alcançar o próximo ciclo: trava da conversa, lote de mensagens
- * pendente e marcador de espera do paciente.
+ * Só o botão "Resolver / Reiniciar teste" pode reiniciar uma sessão existente.
+ * Por isso esta função exige `manual: true`: nenhum fluxo automático (LOW,
+ * encaminhamento simulado, erro, timeout, fim de rodada, fim de ciclo, Terra,
+ * cenários, carga) pode chamá-la. Quem precisa de sessão limpa deve sinalizar
+ * a necessidade e aguardar o clique do operador.
  *
- * Nunca apaga histórico: conversas, mensagens, execuções e ciclos anteriores
- * continuam gravados para auditoria.
+ * É idempotente: sem conversa aberta (ou com outra conversa já iniciada) não
+ * cria sessão nova nem grava evento. Nunca apaga histórico: conversas,
+ * mensagens, execuções e ciclos anteriores continuam gravados para auditoria.
  */
+export class ResetManualObrigatorioError extends Error {
+  constructor(origem: string) {
+    super(
+      `Reinício de sessão bloqueado (origem: ${origem}). Só o botão "Resolver / Reiniciar teste" pode reiniciar um lead de homologação.`,
+    );
+    this.name = "ResetManualObrigatorioError";
+  }
+}
+
 export async function resetarLeadTeste(
   admin: any,
   entrada: {
@@ -766,14 +776,20 @@ export async function resetarLeadTeste(
     userId: string | null;
     removerAgendamentos?: boolean;
     origem?: string;
+    /** Obrigatório: confirma que veio do clique do operador no botão. */
+    manual: true;
   },
 ): Promise<{
   ok: true;
   jaResolvida: boolean;
   sessao: number;
+  sessaoAnterior: number;
   cicloEncerrado: string | null;
   agendamentosRemovidos: number;
 }> {
+  if (entrada.manual !== true)
+    throw new ResetManualObrigatorioError(entrada.origem ?? "desconhecida");
+
   const lead = await carregarLead(admin, entrada.clinicaId, entrada.leadId);
 
   // Idempotência: sem conversa aberta o lead já está limpo — nada a fazer,
@@ -783,6 +799,7 @@ export async function resetarLeadTeste(
       ok: true,
       jaResolvida: true,
       sessao: lead.sessao_seq,
+      sessaoAnterior: lead.sessao_seq,
       cicloEncerrado: null,
       agendamentosRemovidos: 0,
     };
@@ -792,9 +809,11 @@ export async function resetarLeadTeste(
       ok: true,
       jaResolvida: true,
       sessao: lead.sessao_seq,
+      sessaoAnterior: lead.sessao_seq,
       cicloEncerrado: null,
       agendamentosRemovidos: 0,
     };
+
 
   const conversaId = lead.conversa_id;
   const agora = new Date().toISOString();
@@ -872,8 +891,19 @@ export async function resetarLeadTeste(
     conversaId,
     evento: "IA_MEMORIA_RESETADA",
     userId: entrada.userId,
-    detalhes: { sessao: lead.sessao_seq },
+    // Auditoria do reset manual: operador, horário, sessão anterior e nova.
+    detalhes: {
+      sessao: lead.sessao_seq,
+      sessao_anterior: lead.sessao_seq,
+      sessao_nova: lead.sessao_seq + 1,
+      telefone_sessao_anterior: lead.telefone_sessao,
+      telefone_sessao_nova: telefoneSessao(lead.indice, lead.sessao_seq + 1),
+      operador: entrada.userId,
+      origem: entrada.origem ?? "console_teste",
+      em: agora,
+    },
   });
+
 
   // Limpeza opcional: apaga da agenda o que a Nina marcou nesta sessão de
   // teste. Só alcança registros de homologação (is_mock_data) desta conversa.
@@ -938,9 +968,11 @@ export async function resetarLeadTeste(
     ok: true,
     jaResolvida: false,
     sessao: proxima,
+    sessaoAnterior: lead.sessao_seq,
     cicloEncerrado: lead.ciclo_id,
     agendamentosRemovidos,
   };
+
 }
 
 export { LIMITE_MENSAGENS_LEAD, CANAL_TESTE, TOTAL_LEADS, telefoneSessao, garantirLeads, carregarLead, garantirCiclo, conversasDoLead, podarMensagensLead };

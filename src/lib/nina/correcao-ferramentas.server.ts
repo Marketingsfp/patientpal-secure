@@ -237,13 +237,22 @@ export async function testarEmHomologacao(
     };
   }
 
-  const { resetarLeadTeste, processarMensagemTeste } = await import("./teste-console.server");
-  await resetarLeadTeste(supabaseAdmin, {
-    clinicaId,
-    leadId,
-    userId,
-    origem: "correcao-assistida",
-  });
+  // REGRA DA HOMOLOGAÇÃO — o reteste não reinicia lead nenhum. Se a sessão
+  // estiver em andamento, sinaliza e aguarda o clique do operador no botão
+  // "Resolver / Reiniciar teste".
+  const { carregarLead, processarMensagemTeste } = await import("./teste-console.server");
+  const leadAtual = await carregarLead(supabaseAdmin, clinicaId, leadId);
+  if (leadAtual.conversa_id || leadAtual.ciclo_id) {
+    return {
+      executado: false,
+      aprovado: false,
+      pergunta,
+      resposta: null,
+      motivo:
+        'Sessão de homologação em andamento neste lead. Use "Resolver / Reiniciar teste" e execute o reteste novamente.',
+    };
+  }
+
 
   const r = await processarMensagemTeste(
     {

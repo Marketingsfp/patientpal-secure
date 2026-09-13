@@ -57,10 +57,11 @@ describe("reset só pelo botão — cenários", () => {
     expect(src).not.toContain("telefone_sessao: telefoneSessao");
   });
 
-  it("quando reinicia, usa a rotina canônica única", () => {
-    expect(src).toContain("resetarLeadTeste");
-    expect(src).toContain("reiniciarSessao");
+  it("quando precisa de sessão limpa, apenas sinaliza e aguarda o operador", () => {
+    expect(src).not.toContain("resetarLeadTeste");
+    expect(src).toContain("precisaResetManual");
   });
+
 });
 
 describe("reset só pelo botão — rotina canônica", () => {
@@ -68,8 +69,36 @@ describe("reset só pelo botão — rotina canônica", () => {
     const fns = ler("src/lib/nina/teste-console.functions.ts");
     expect(fns).toContain("resolverConversaTeste");
     expect(fns).toContain("resetarLeadTeste");
+    expect(fns).toContain("manual: true");
     const server = ler("src/lib/nina/teste-console.server.ts");
     expect(server).toContain("IA_MEMORIA_RESETADA");
     expect(server).toContain("sessao_seq: proxima");
+    // Auditoria do reset manual.
+    expect(server).toContain("sessao_anterior");
+    expect(server).toContain("sessao_nova");
+    expect(server).toContain("operador: entrada.userId");
+  });
+
+  it("recusa qualquer reset que não venha do clique do operador", async () => {
+    const { resetarLeadTeste } = await import("../teste-console.server");
+    await expect(
+      resetarLeadTeste({} as any, {
+        clinicaId: "c1",
+        leadId: "l1",
+        userId: null,
+        origem: "cenario_fim",
+        manual: false as unknown as true,
+      }),
+    ).rejects.toThrow(/Resolver \/ Reiniciar teste/);
+  });
+
+  it("carga e correção assistida apenas verificam, nunca resetam", () => {
+    const carga = ler("src/lib/nina/carga-preflight.server.ts");
+    expect(carga).not.toContain("resetarLeadTeste");
+    expect(carga).toContain("Resolver / Reiniciar teste");
+    const correcao = ler("src/lib/nina/correcao-ferramentas.server.ts");
+    expect(correcao).not.toContain("resetarLeadTeste");
+    expect(correcao).toContain("Resolver / Reiniciar teste");
   });
 });
+

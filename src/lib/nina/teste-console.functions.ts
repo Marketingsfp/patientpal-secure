@@ -392,7 +392,9 @@ export const resolverConversaTeste = createServerFn({ method: "POST" })
     await assertMembership(context.supabase, context.userId, data.clinicaId);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { resetarLeadTeste } = await import("@/lib/nina/teste-console.server");
-    // Rotina canônica única de reset (mesma usada pelo preflight do teste de carga).
+    // Único caminho autorizado a reiniciar uma sessão: o clique do operador no
+    // botão "Resolver / Reiniciar teste". Idempotente (clique duplo não cria
+    // duas sessões) e restrito ao lead selecionado.
     return await resetarLeadTeste(supabaseAdmin, {
       clinicaId: data.clinicaId,
       leadId: data.leadId,
@@ -400,7 +402,9 @@ export const resolverConversaTeste = createServerFn({ method: "POST" })
       userId: context.userId,
       removerAgendamentos: data.removerAgendamentos,
       origem: "console_teste",
+      manual: true,
     });
+
   });
 
 

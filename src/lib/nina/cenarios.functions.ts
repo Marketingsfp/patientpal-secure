@@ -337,17 +337,12 @@ export const iniciarItemExecucao = createServerFn({ method: "POST" })
 
     const agora = new Date().toISOString();
     // REGRA DA HOMOLOGAÇÃO — reiniciar a sessão é ação exclusiva do botão
-    // "Resolver / Reiniciar teste". Aqui só acontece com pedido explícito, e
-    // então usa a rotina canônica única.
-    if (data.reiniciarSessao === true && (lead as any).conversa_id) {
-      const { resetarLeadTeste } = await import("@/lib/nina/teste-console.server");
-      await resetarLeadTeste(supabaseAdmin, {
-        clinicaId: data.clinicaId,
-        leadId: (lead as any).id,
-        userId: context.userId,
-        origem: "cenario_inicio",
-      });
-    }
+    // "Resolver / Reiniciar teste". O cenário nunca reinicia o lead: quando
+    // precisa de sessão limpa, apenas sinaliza a necessidade ao operador e
+    // segue com a sessão existente.
+    const precisaResetManual =
+      data.reiniciarSessao === true && Boolean((lead as any).conversa_id);
+
 
 
     // Simulação de paciente ligada a este item (mesmo motor da Fase 4).
@@ -403,7 +398,9 @@ export const iniciarItemExecucao = createServerFn({ method: "POST" })
       leadId: (lead as any).id,
       leadIndice: (lead as any).indice,
       maxTurnos,
+      precisaResetManual,
     };
+
   });
 
 /**
@@ -679,17 +676,12 @@ export const finalizarItemExecucao = createServerFn({ method: "POST" })
       .eq("id", (item as any).id);
 
     // REGRA DA HOMOLOGAÇÃO — o fim do cenário NÃO reinicia o teste: ciclo,
-    // memória ativa da Nina e telefone virtual seguem como estão. Só o botão
-    // "Resolver / Reiniciar teste" reinicia (rotina canônica única).
-    if (lead && data.reiniciarSessao === true && (lead as any).conversa_id) {
-      const { resetarLeadTeste } = await import("@/lib/nina/teste-console.server");
-      await resetarLeadTeste(supabaseAdmin, {
-        clinicaId: data.clinicaId,
-        leadId: (lead as any).id,
-        userId: context.userId,
-        origem: "cenario_fim",
-      });
-    }
+    // memória ativa da Nina e telefone virtual seguem como estão. Quando o
+    // próximo item precisar de sessão limpa, isso é apenas sinalizado; só o
+    // botão "Resolver / Reiniciar teste" reinicia de fato.
+    const precisaResetManual =
+      Boolean(lead) && data.reiniciarSessao === true && Boolean((lead as any).conversa_id);
+
     if (lead) {
 
 
@@ -721,7 +713,7 @@ export const finalizarItemExecucao = createServerFn({ method: "POST" })
       })
       .eq("id", (item as any).execucao_id);
 
-    return { resultado, avaliados, mensagens, ferramentas, transferida };
+    return { resultado, avaliados, mensagens, ferramentas, transferida, precisaResetManual };
   });
 
 /** Interrompe uma execução em lote e cancela os itens que ainda não rodaram. */
