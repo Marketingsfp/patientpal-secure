@@ -891,8 +891,19 @@ export async function resetarLeadTeste(
     conversaId,
     evento: "IA_MEMORIA_RESETADA",
     userId: entrada.userId,
-    detalhes: { sessao: lead.sessao_seq },
+    // Auditoria do reset manual: operador, horário, sessão anterior e nova.
+    detalhes: {
+      sessao: lead.sessao_seq,
+      sessao_anterior: lead.sessao_seq,
+      sessao_nova: lead.sessao_seq + 1,
+      telefone_sessao_anterior: lead.telefone_sessao,
+      telefone_sessao_nova: telefoneSessao(lead.indice, lead.sessao_seq + 1),
+      operador: entrada.userId,
+      origem: entrada.origem ?? "console_teste",
+      em: agora,
+    },
   });
+
 
   // Limpeza opcional: apaga da agenda o que a Nina marcou nesta sessão de
   // teste. Só alcança registros de homologação (is_mock_data) desta conversa.
