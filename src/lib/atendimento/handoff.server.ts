@@ -276,6 +276,8 @@ export async function encaminharParaHumano(args: {
   });
 
   let protocoloHandoff: string | null = null;
+  // Estado estruturado do aviso, devolvido a quem pediu o encaminhamento.
+  let avisoEncaminhamento: ResultadoAvisoEncaminhamento | null = null;
   // FASE 6 — vínculo mensagem <-> protocolo para a auditoria consolidada.
   let anuncioHandoff: {
     mensagemId: string | null;
@@ -298,6 +300,7 @@ export async function encaminharParaHumano(args: {
       handoffEventoId,
     });
     protocoloHandoff = p?.protocolo ?? null;
+    avisoEncaminhamento = p?.anuncio?.aviso ?? null;
     anuncioHandoff = p?.anuncio
       ? {
           mensagemId: p.anuncio.mensagemId,
