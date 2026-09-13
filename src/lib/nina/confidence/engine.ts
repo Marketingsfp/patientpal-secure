@@ -25,6 +25,11 @@ import {
   type HardBlocker,
   type PoliticaConfianca,
 } from "./policy";
+import {
+  DIMENSAO_INSTRUCOES,
+  repartirInstrucoes,
+} from "./pontuacao-instrucoes";
+
 import { acaoExecutavel, acaoOuNenhuma, contaContraANota } from "./types";
 import type {
   AvaliacaoSegurancaAcao,
