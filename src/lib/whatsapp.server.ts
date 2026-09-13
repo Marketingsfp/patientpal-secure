@@ -541,7 +541,7 @@ export async function gerarRespostaNina(
     auditoria?: {
       execucaoId?: string | null;
       /** FASE 5 — contrato do resultado quando a resposta é determinística. */
-      resultado?: unknown;
+      resultado?: import("@/lib/nina/resposta/contrato").ResultadoRespostaNina;
     };
     /** IDs reais das mensagens de entrada que originaram esta resposta. */
     mensagensEntrada?: string[];
@@ -559,7 +559,10 @@ export async function gerarRespostaNina(
   },
 ): Promise<string> {
   const { comColetor } = await import("@/lib/nina/evidencias.server");
-  const auditoria = opcoes?.auditoria ?? { execucaoId: null as string | null };
+  const auditoria: {
+    execucaoId?: string | null;
+    resultado?: import("@/lib/nina/resposta/contrato").ResultadoRespostaNina;
+  } = opcoes?.auditoria ?? { execucaoId: null };
 
   // TRACE — mesmo núcleo, mesma instrumentação: WhatsApp real e homologação
   // produzem o mesmo rastro (Nina → Arquitetura → Execução).
@@ -614,12 +617,24 @@ export async function gerarRespostaNina(
         });
         rastro.concluir("message.inbound", { resposta_tamanho: resultado.length });
         const { hashDoTexto } = await import("@/lib/nina/confidence/hash");
-        registrarEntregaDoTurno({
-          mensagemId: null,
-          textoHash: hashDoTexto(resultado),
-          tamanho: resultado.length,
-          canal: opcoes?.teste ? "test-console" : "whatsapp",
-        });
+        const resultadoDoTurno = auditoria.resultado;
+        const avisoExistente = resultadoDoTurno?.avisoExistente;
+        if (resultadoDoTurno?.estado !== "descartar") {
+          registrarEntregaDoTurno({
+            mensagemId: null,
+            textoHash: hashDoTexto(resultado),
+            tamanho: resultado.length,
+            canal: opcoes?.teste ? "test-console" : "whatsapp",
+          });
+        } else if (avisoExistente?.estado === "confirmado" && avisoExistente.mensagemId) {
+          // A saída do turno já existe: o texto vazio é apenas controle de fluxo.
+          registrarEntregaDoTurno({
+            mensagemId: avisoExistente.mensagemId,
+            textoHash: avisoExistente.texto ? hashDoTexto(avisoExistente.texto) : null,
+            tamanho: avisoExistente.texto?.length ?? null,
+            canal: opcoes?.teste ? "test-console" : "whatsapp",
+          });
+        }
         const { gravarEvidencias } = await import("@/lib/nina/evidencias.server");
         await gravarEvidencias(auditoria.execucaoId ?? null, clinicaId, coletor);
         return { ok: true as const, resultado };
@@ -659,7 +674,10 @@ async function gerarRespostaNinaInterno(
   opcoes?: {
     teste?: boolean;
     ambiente?: import("@/lib/nina/confianca-execucao").AmbienteQA;
-    auditoria?: { execucaoId?: string | null };
+    auditoria?: {
+      execucaoId?: string | null;
+      resultado?: import("@/lib/nina/resposta/contrato").ResultadoRespostaNina;
+    };
     mensagensEntrada?: string[];
     revisao?: { telefone: string; valor: number };
     lote?: { batchId: string | null; revisao: number | null };
@@ -2900,6 +2918,7 @@ async function gerarRespostaNinaInterno(
           mensagemId: string | null;
           em: string;
         } | null = null;
+          let avisoExistente: import("@/lib/nina/resposta/contrato").AvisoExistente | null = null;
         try {
           if (estadoId.conversaId) {
             // 1) Registro durável da operação (clínica, ambiente, conversa,
@@ -2923,6 +2942,13 @@ async function gerarRespostaNinaInterno(
                 mensagemId: operacao.mensagemId,
                 em: "",
               };
+                avisoExistente = {
+                  estado: operacao.entregue ? "confirmado" : "envio_pendente",
+                  chaveOperacao: operacao.chave,
+                  mensagemId: operacao.mensagemId,
+                  protocolo: operacao.protocolo,
+                  texto: operacao.texto,
+                };
             }
             if (!anuncioDoTurno) {
               // 2) Compatibilidade com encaminhamentos anteriores ao registro.
@@ -2934,12 +2960,25 @@ async function gerarRespostaNinaInterno(
                 estadoId.conversaId,
                 registroDoTurno?.iniciadoEm ?? null,
               );
+                if (anuncioDoTurno) {
+                  avisoExistente = {
+                    estado: "confirmado",
+                    chaveOperacao: null,
+                    mensagemId: anuncioDoTurno.mensagemId,
+                    protocolo: anuncioDoTurno.protocolo,
+                    texto: null,
+                  };
+                }
             }
           }
         } catch (e) {
           console.error("[nina-confianca] falha ao conferir anúncio do handoff", e);
         }
         resposta = anuncioDoTurno ? "" : saidaControlada.aviso;
+          if (avisoExistente && opcoes?.auditoria) {
+            const { criarResultadoSemNovaMensagem } = await import("@/lib/nina/resposta/contrato");
+            opcoes.auditoria.resultado = criarResultadoSemNovaMensagem(avisoExistente);
+          }
         const motivoBloqueio = anuncioDoTurno
           ? `${bloqueio.motivo}: conteúdo candidato descartado; aviso já entregue pelo encaminhamento (protocolo ${anuncioDoTurno.protocolo ?? "sem número"})`
           : `${bloqueio.motivo}: conteúdo candidato descartado (${saidaControlada.encaminhamento})`;

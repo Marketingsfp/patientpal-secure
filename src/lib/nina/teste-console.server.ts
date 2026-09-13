@@ -494,7 +494,12 @@ export async function processarMensagemTeste(data: EntradaMensagemTeste, userId:
       reply =
         "Não consegui consultar essa informação neste momento. Posso tentar novamente ou verificar outro horário para você.";
     }
-    if (!reply.trim()) {
+    // MJ-53: texto vazio após um aviso do protocolo é silêncio deliberado,
+    // não EMPTY_MODEL_RESPONSE. O contrato precisa sobreviver até o chamador.
+    const resultadoGeracao = auditoriaNina.resultado;
+    const semNovaMensagem = resultadoGeracao?.estado === "descartar";
+    if (semNovaMensagem) reply = "";
+    if (!semNovaMensagem && !reply.trim()) {
       // O modelo terminou sem texto (ex.: encerrou logo após uma ferramenta):
       // ainda assim o paciente recebe uma resposta.
       diag.error_code = diag.error_code ?? "EMPTY_MODEL_RESPONSE";
@@ -587,6 +592,41 @@ export async function processarMensagemTeste(data: EntradaMensagemTeste, userId:
     // a conversa durante a resposta.
     const estadoDepois = await estadoConversaPorId(data.clinicaId, conversaId);
     const transferida = !ninaPodeResponder(estadoDepois);
+
+    if (semNovaMensagem) {
+      const aviso = resultadoGeracao?.avisoExistente;
+      const avisoGravado = aviso?.estado === "confirmado" && Boolean(aviso.mensagemId);
+      diag.response_saved = avisoGravado;
+      diag.duration_ms = Date.now() - t0;
+      if (diag.processing_status !== "failed") diag.processing_status = "completed";
+      console.info("[NINA_MESSAGE_PROCESSING]", {
+        ...diag,
+        sem_nova_mensagem: true,
+        aviso_mensagem_id: aviso?.mensagemId ?? null,
+        aviso_estado: aviso?.estado ?? null,
+      });
+      // A saída já foi gravada pelo protocolo. Não finaliza outro texto,
+      // não sintetiza áudio e não cria outra bolha. O finally libera o lote.
+      return {
+        duplicada: false,
+        reply: null,
+        erro: falhaTecnica ? diag.error_message : null,
+        audio: null,
+        transferida,
+        processamento: avisoGravado ? ("RESPONDIDA" as const) : ("SEM_RESPOSTA" as const),
+        absorvidaPeloLote: false,
+        batchId: loteId || null,
+        revisao: revisaoTurno || null,
+        mensagemPersistida: true,
+        mensagemId,
+        semNovaMensagem: true,
+        avisoMensagemId: aviso?.mensagemId ?? null,
+        avisoEstado: aviso?.estado ?? null,
+        turnoId: auditoriaNina.traceId ?? null,
+        execucaoId: auditoriaNina.execucaoId ?? null,
+        conversaId,
+      };
+    }
 
     // Paciente mandou áudio → Nina responde falando (mesma regra do WhatsApp).
     let audio: { base64: string; mime: string; texto: string } | null = null;

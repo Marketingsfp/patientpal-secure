@@ -56,6 +56,15 @@ export type AcaoConcluida = {
   evidencia: string | null;
 };
 
+/** O aviso deste turno pertence a outro emissor; não gerar outra mensagem. */
+export type AvisoExistente = {
+  estado: "confirmado" | "envio_pendente";
+  chaveOperacao: string | null;
+  mensagemId: string | null;
+  protocolo: string | null;
+  texto: string | null;
+};
+
 export type ResultadoRespostaNina = {
   origem: OrigemResultado;
   estado: EstadoResultado;
@@ -72,6 +81,8 @@ export type ResultadoRespostaNina = {
   camposPendentes: string[];
   /** Proibições que valem para este texto. */
   restricoes: string[];
+  /** Distingue silêncio deliberado após handoff de ausência de resposta da IA. */
+  avisoExistente?: AvisoExistente;
 };
 
 export function criarResultado(
@@ -87,6 +98,18 @@ export function criarResultado(
     restricoes: [],
     ...parcial,
   };
+}
+
+export function criarResultadoSemNovaMensagem(aviso: AvisoExistente): ResultadoRespostaNina {
+  return criarResultado({
+    origem: "handoff",
+    estado: "descartar",
+    texto: "",
+    avisoExistente: { ...aviso },
+    restricoes: [
+      aviso.estado === "confirmado" ? "aviso_ja_entregue" : "aviso_em_envio_por_outro_emissor",
+    ],
+  });
 }
 
 /** Uma consulta só pode ser dada como marcada com evidência real de gravação. */

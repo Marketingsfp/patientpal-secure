@@ -764,8 +764,11 @@ export function HomologacaoInbox() {
         erro: string | null;
         transferida?: boolean;
         audio: { base64: string; mime: string; texto: string } | null;
-        processamento?: "RESPONDIDA" | "AGRUPADA" | "OBSOLETA" | "ERRO";
+        processamento?: "RESPONDIDA" | "AGRUPADA" | "OBSOLETA" | "SEM_RESPOSTA" | "ERRO";
         absorvidaPeloLote?: boolean;
+        semNovaMensagem?: boolean;
+        avisoMensagemId?: string | null;
+        avisoEstado?: "confirmado" | "envio_pendente" | null;
       };
       const mesmaSessao = geracaoRef.current === geracao;
       if (mesmaSessao) concluirOtimista(chave);
@@ -791,7 +794,7 @@ export function HomologacaoInbox() {
           setEncerrado(AVISO_TESTE_ENCERRADO);
         } else if (r.transferida) {
           setEncerrado(AVISO_TESTE_ENCERRADO);
-        } else if (!r.reply && !agrupada) {
+        } else if (!r.reply && !agrupada && !r.semNovaMensagem) {
           setErro("A Nina não respondeu nesta execução.");
           setEncerrado(AVISO_TESTE_ENCERRADO);
         }
@@ -799,7 +802,7 @@ export function HomologacaoInbox() {
 
 
       return {
-        ok: agrupada ? true : !r.erro && !!r.reply,
+        ok: agrupada ? true : !r.erro && (!!r.reply || r.semNovaMensagem === true),
         transferida: !!r.transferida,
         erro: r.erro ?? null,
       };

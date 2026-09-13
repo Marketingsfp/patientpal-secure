@@ -576,6 +576,10 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
                       if (doGate) resultadoTurno = doGate;
                     }
 
+                    // O protocolo pode ter entregue o aviso durante a geração.
+                    // Respeitar o desfecho antes de finalizar, sintetizar ou enviar.
+                    if (resultadoTurno?.estado === "descartar") reply = "";
+
                     // Revalida o dono ANTES de enviar: um atendente pode ter
                     // assumido enquanto o modelo pensava. Nesse caso, a resposta
                     // é descartada para o paciente não receber IA e humano juntos.
