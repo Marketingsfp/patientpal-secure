@@ -33,8 +33,6 @@ const linha = (over: Partial<RateioLinha>): RateioLinha => ({
   primeira_vez: null,
   medico_id: "med-1",
   medico_nome: "DRA. ANA",
-  paciente_id: null,
-  paciente_nome: "",
   especialidade_id: "esp-1",
   especialidade_nome: "CARDIOLOGIA",
   procedimento: "CONSULTA",

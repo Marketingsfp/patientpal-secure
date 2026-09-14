@@ -62,6 +62,11 @@ import { addDias, variacao } from "@/lib/financeiro/periodos";
 const PAGINA = 1000;
 /** Guarda contra loop infinito de paginação. */
 const MAX_PAGINAS = 100;
+/**
+ * UUIDs por requisição na busca de pacientes. Menor que `PAGINA` porque o
+ * filtro `in` vai na URL, e mil UUIDs passariam do limite de tamanho dela.
+ */
+const LOTE_PACIENTES = 150;
 
 export type RateioAgruparPor =
   | "data"
@@ -167,13 +172,6 @@ export interface RateioLinha {
   primeira_vez: boolean | null;
   medico_id: string | null;
   medico_nome: string;
-  paciente_id: string | null;
-  /**
-   * Nome do paciente, para o analítico identificar de quem é cada atendimento
-   * na tela, no papel, no CSV e no Excel. Resolvido em lote no fim de
-   * `carregarRateio` (ver `resolverNomesPacientes`).
-   */
-  paciente_nome: string;
 
   especialidade_id: string | null;
   especialidade_nome: string;
@@ -741,8 +739,6 @@ function reparte(
 
     medico_id: params.medicoId,
     medico_nome: medico?.nome ?? "Sem profissional",
-    paciente_id: params.pacienteId,
-    paciente_nome: "",
     especialidade_id: medico?.especialidade_id ?? null,
     especialidade_nome: "",
     procedimento: params.procedimento,
@@ -789,11 +785,11 @@ async function enriquecerPacientes(clinicaId: string, linhas: RateioLinha[]): Pr
   if (ids.length === 0) return;
 
   const nomes = new Map<string, string>();
-  for (let i = 0; i < ids.length; i += PAGINA) {
+  for (let i = 0; i < ids.length; i += LOTE_PACIENTES) {
     const { data } = await supabase
       .from("pacientes")
       .select("id, nome")
-      .in("id", ids.slice(i, i + PAGINA));
+      .in("id", ids.slice(i, i + LOTE_PACIENTES));
     for (const p of (data ?? []) as Array<{ id: string; nome: string | null }>) {
       nomes.set(p.id, (p.nome ?? "").trim());
     }
@@ -995,18 +991,12 @@ export async function carregarRateio(
       ? (nomeEspecialidade.get(l.especialidade_id) ?? "Sem especialidade")
       : "Sem especialidade";
   }
-  await resolverNomesPacientes(linhas, [...manuaisRaw, ...agendaRaw, ...avulsosRaw]);
+  completarNomesPacientes(linhas, [...manuaisRaw, ...agendaRaw, ...avulsosRaw]);
 
   return filtrarRateio(ctx, linhas, filtros).sort(
     (a, b) => a.data.localeCompare(b.data) || a.medico_nome.localeCompare(b.medico_nome, "pt-BR"),
   );
 }
-
-/**
- * UUIDs por requisição na busca de nomes. Menor que `PAGINA` porque o filtro
- * `in` vai na URL, e mil UUIDs passariam do limite de tamanho dela.
- */
-const LOTE_PACIENTES = 150;
 
 /**
  * Nome antes do travessão da descrição ("FULANO — MENSALIDADE CARTÃO"): é o
@@ -1018,34 +1008,18 @@ export function pacienteDaDescricao(descricao: string | null | undefined): strin
 }
 
 /**
- * Preenche `paciente_nome` de todas as linhas com uma busca em lote no
- * cadastro. Sem cadastro vinculado, vale o nome escrito na descrição do
- * lançamento; sem nenhum dos dois, "Sem paciente".
+ * Completa a coluna Paciente do analítico depois de `enriquecerPacientes`:
+ * linha sem cadastro vinculado usa o nome escrito na descrição do lançamento;
+ * sem nenhum dos dois, "Sem paciente" — célula vazia parece erro de carga.
  */
-async function resolverNomesPacientes(
+function completarNomesPacientes(
   linhas: RateioLinha[],
   brutas: Array<Record<string, unknown>>,
-): Promise<void> {
+): void {
   const descricaoPorId = new Map(brutas.map((r) => [r.id as string, r.descricao as string]));
-  const ids = Array.from(
-    new Set(linhas.map((l) => l.paciente_id).filter((x): x is string => !!x)),
-  );
-  const nomes = new Map<string, string>();
-  for (let i = 0; i < ids.length; i += LOTE_PACIENTES) {
-    const { data, error } = await supabase
-      .from("pacientes")
-      .select("id, nome")
-      .in("id", ids.slice(i, i + LOTE_PACIENTES));
-    if (error) throw error;
-    for (const p of (data ?? []) as Array<{ id: string; nome: string | null }>) {
-      if (p.nome) nomes.set(p.id, p.nome);
-    }
-  }
   for (const l of linhas) {
-    l.paciente_nome =
-      (l.paciente_id ? nomes.get(l.paciente_id) : undefined) ||
-      pacienteDaDescricao(descricaoPorId.get(l.id)) ||
-      "Sem paciente";
+    if (l.paciente_nome) continue;
+    l.paciente_nome = pacienteDaDescricao(descricaoPorId.get(l.id)) || "Sem paciente";
   }
 }
 
