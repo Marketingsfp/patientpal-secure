@@ -74,6 +74,8 @@ import {
   Receipt,
   Menu as MenuIcon,
   Columns3,
+  ChevronUp,
+  Home,
 } from "lucide-react";
 import { Tooth } from "@/components/icons/tooth";
 import { toast } from "sonner";
@@ -1179,6 +1181,76 @@ function AppShellInner() {
       : "";
   const subsystemLabel = subsystem ? SUBSYSTEMS[subsystem].label : null;
 
+  // Troca rápida de ambiente (menu em grade do botão de portal). Cada destino
+  // só aparece se o perfil pode abrir pelo menos uma das telas candidatas, na
+  // ordem de preferência — assim ninguém cai em "Acesso negado" pelo atalho.
+  const ambientesRapidos = useMemo(() => {
+    const opcoes: Array<{
+      key: string;
+      label: string;
+      icon: typeof Home;
+      portal: SubsystemId | null;
+      candidatas: string[];
+    }> = [
+      { key: "portal", label: "Portal Geral", icon: Home, portal: null, candidatas: ["/app"] },
+      {
+        key: "recepcao",
+        label: "Recepção / Atendimentos",
+        icon: ConciergeBell,
+        portal: "recepcao",
+        candidatas: ["/app/recepcao", "/app/agenda"],
+      },
+      {
+        key: "financeiro",
+        label: "Financeiro",
+        icon: DollarSign,
+        portal: "recepcao",
+        candidatas: ["/app/financeiro"],
+      },
+      {
+        key: "os-zap",
+        label: "OS ZAP / Central de Atendimento",
+        icon: MessageCircle,
+        portal: "os-zap",
+        candidatas: ["/app/nina"],
+      },
+    ];
+    return opcoes
+      .map((o) => ({
+        ...o,
+        destino:
+          o.portal === null ? "/app" : o.candidatas.find((c) => leafAllowed(c, allowedModules)),
+      }))
+      .filter((o): o is typeof o & { destino: string } => Boolean(o.destino));
+  }, [allowedModules]);
+
+  const irParaAmbiente = (portal: SubsystemId | null, destino: string) => {
+    fecharSidebar();
+    if (portal) setSubsystem(portal);
+    navigate({ to: destino });
+  };
+
+  // Cabeçalho recolhido (modo foco) — só existe no OS ZAP, onde a conversa
+  // precisa de toda a altura da tela. Fica salvo neste navegador.
+  const [headerRecolhidoPref, setHeaderRecolhidoPref] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    try {
+      return window.localStorage.getItem("appshell:oszap-header-recolhido") === "1";
+    } catch {
+      return false;
+    }
+  });
+  const alternarHeaderRecolhido = (valor: boolean) => {
+    setHeaderRecolhidoPref(valor);
+    try {
+      window.localStorage.setItem("appshell:oszap-header-recolhido", valor ? "1" : "0");
+    } catch {
+      /* navegador sem armazenamento: vale só nesta sessão */
+    }
+  };
+  const podeRecolherHeader = subsystem === "os-zap";
+  const headerRecolhido = podeRecolherHeader && headerRecolhidoPref;
+
   // Sidebar sob o mouse: habilita as setas mesmo sem foco dentro do menu.
   const navHoverRef = useRef(false);
 
@@ -1331,7 +1403,32 @@ function AppShellInner() {
     >
       {/* Cabeçalho branco: ocupa 100% da largura no topo e é o único lugar do
           hambúrguer, em qualquer tamanho de tela. */}
-      {!isChooser && (
+      {/* Cabeçalho recolhido (OS ZAP): sobra só uma aba discreta no topo, com
+          o menu e o botão de reabrir a barra. */}
+      {!isChooser && headerRecolhido && (
+        <div className="fixed top-0 left-1/2 z-30 -translate-x-1/2 flex items-center gap-0.5 rounded-b-lg border border-t-0 border-slate-200 bg-white/90 px-1 py-0.5 shadow-sm opacity-70 hover:opacity-100 focus-within:opacity-100">
+          <button
+            type="button"
+            onClick={alternarSidebar}
+            className="h-6 w-7 rounded flex items-center justify-center text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+            aria-label="Abrir menu lateral"
+            title="Abrir menu (Ctrl+B)"
+          >
+            <MenuIcon className="h-3.5 w-3.5" />
+          </button>
+          <button
+            type="button"
+            onClick={() => alternarHeaderRecolhido(false)}
+            className="h-6 px-1.5 rounded flex items-center gap-1 text-[11px] font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+            aria-label="Mostrar barra superior"
+            title="Mostrar barra superior"
+          >
+            <ChevronDown className="h-3.5 w-3.5" />
+            Mostrar barra
+          </button>
+        </div>
+      )}
+      {!isChooser && !headerRecolhido && (
         <header className="shrink-0 relative z-30 h-14 w-full bg-white text-slate-700 border-b border-slate-200 flex items-center justify-between gap-2 px-4 sm:grid sm:grid-cols-[1fr_auto_1fr] sm:gap-3 sm:px-6">
           <div className="flex items-center gap-2 sm:gap-2.5 min-w-0 shrink-0">
             <button
@@ -1355,17 +1452,45 @@ function AppShellInner() {
             >
               <Activity className="h-5 w-5 shrink-0 text-slate-800" />
             </Link>
-            <button
-              type="button"
-              onClick={() => abrirSeletorPortais()}
-              className="inline-flex items-center justify-center gap-1.5 h-9 w-9 sm:w-auto sm:px-2.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-xs font-medium text-slate-800 shrink-0"
-              title="Trocar de portal"
-            >
-              <LayoutGrid className="h-4 w-4 shrink-0" />
-              <span className="hidden sm:inline truncate max-w-[140px]">
-                {subsystemLabel ?? "Portais"}
-              </span>
-            </button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  className="inline-flex items-center justify-center gap-1.5 h-9 w-9 sm:w-auto sm:px-2.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-xs font-medium text-slate-800 shrink-0"
+                  title="Trocar de ambiente"
+                >
+                  <LayoutGrid className="h-4 w-4 shrink-0" />
+                  <span className="hidden sm:inline truncate max-w-[140px]">
+                    {subsystemLabel ?? "Portais"}
+                  </span>
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-72 p-2">
+                <DropdownMenuLabel className="px-1 pb-2 text-xs text-slate-500">
+                  Ir para
+                </DropdownMenuLabel>
+                <div className="grid grid-cols-2 gap-1.5">
+                  {ambientesRapidos.map((a) => (
+                    <DropdownMenuItem
+                      key={a.key}
+                      onSelect={() => irParaAmbiente(a.portal, a.destino)}
+                      className="flex h-auto flex-col items-center justify-center gap-1.5 rounded-lg border border-slate-200 px-2 py-3 text-center text-xs font-medium leading-tight text-slate-700 cursor-pointer focus:bg-slate-100"
+                    >
+                      <a.icon className="h-5 w-5 text-slate-700" />
+                      {a.label}
+                    </DropdownMenuItem>
+                  ))}
+                </div>
+                <DropdownMenuSeparator className="my-2" />
+                <DropdownMenuItem
+                  onSelect={() => abrirSeletorPortais()}
+                  className="text-xs cursor-pointer"
+                >
+                  <LayoutGrid className="mr-2 h-3.5 w-3.5" />
+                  Ver todos os portais
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
             {/* Central de Atenção: exclusiva do portal OS ZAP, imediatamente à
                 direita do botão de portal. */}
             {subsystem === "os-zap" && <CentralAtencao />}
@@ -1451,6 +1576,18 @@ function AppShellInner() {
                 <TTSToggle />
               </span>
             </div>
+            {podeRecolherHeader && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-9 w-9 p-0 rounded-full text-slate-700 hover:bg-slate-100 hover:text-slate-900"
+                title="Recolher barra superior (modo foco)"
+                aria-label="Recolher barra superior"
+                onClick={() => alternarHeaderRecolhido(true)}
+              >
+                <ChevronUp className="h-5 w-5" />
+              </Button>
+            )}
           </div>
         </header>
       )}
@@ -1521,6 +1658,17 @@ function AppShellInner() {
                 title="Fechar menu (Esc)"
               >
                 <X className="h-5 w-5 transition-transform duration-200 ease-out group-hover:rotate-90 motion-reduce:transition-none" />
+              </button>
+            </div>
+            {/* Atalho fixo para voltar ao Portal (tela de escolha de ambiente). */}
+            <div className={cn("shrink-0 px-3 pt-3", entradaCls)} style={entradaDelay(130)}>
+              <button
+                type="button"
+                onClick={() => irParaAmbiente(null, "/app")}
+                className="w-full flex items-center gap-2 rounded-md bg-white/10 border border-white/15 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-white/20"
+              >
+                <Home className="h-3.5 w-3.5 shrink-0" />
+                Voltar ao Portal
               </button>
             </div>
             {/* Busca das telas do menu. */}
@@ -1762,7 +1910,11 @@ function AppShellInner() {
               isChooser
                 ? "p-0 w-full"
                 : cn(
-                    "px-3 pt-1 sm:px-4 sm:pt-1.5 lg:px-6 lg:pt-2",
+                    // Com a barra recolhida, reserva só a altura da aba de
+                    // reabrir, para ela não cobrir o topo da conversa.
+                    headerRecolhido
+                      ? "px-3 pt-7 sm:px-4 lg:px-6"
+                      : "px-3 pt-1 sm:px-4 sm:pt-1.5 lg:px-6 lg:pt-2",
                     // Espaço extra embaixo no mobile para o conteúdo não ficar
                     // atrás da barra inferior (que só existe abaixo de `md`).
                     "pb-28 md:pb-4 lg:pb-6",
