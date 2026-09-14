@@ -103,12 +103,13 @@ export const detalhesDaMensagemNina = createServerFn({ method: "POST" })
     if (erroConversa || !conversa)
       throw new Error("Conversa não encontrada ou sem permissão de acesso.");
     const { carregarDetalhesMensagem } = await import("./detalhes-mensagem.server");
-    const { NINA_RUNTIME_VERSION } = await import("./runtime-version");
+    const { NINA_RUNTIME_VERSION, NINA_SOURCE_FINGERPRINT } = await import("./runtime-version");
     const r = await carregarDetalhesMensagem(context.supabase, data);
     type Json = import("@/integrations/supabase/types").Json;
     return {
       ...r,
       runtimeAtual: NINA_RUNTIME_VERSION,
+      runtimeFingerprintAtual: NINA_SOURCE_FINGERPRINT,
       execucao: r.execucao as Json,
       etapas: r.etapas as Json[],
       eventos: r.eventos as Json[],

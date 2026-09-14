@@ -26,14 +26,10 @@
  */
 import { hashDoTexto } from "./hash";
 import { POLITICA_PADRAO, type PoliticaConfianca } from "./policy";
-import type {
-  MemoriaInstrucoes,
-  ResultadoValidador,
-  StatusValidador,
-} from "./types";
+import type { MemoriaInstrucoes, ResultadoValidador, StatusValidador } from "./types";
 
 /** Versão desta repartição. Sobe quando a interpretação do peso mudar. */
-export const VERSAO_PONTUACAO_INSTRUCOES = "instrucoes-parcelas-1";
+export const VERSAO_PONTUACAO_INSTRUCOES = "instrucoes-parcelas-2";
 
 /** Nome da dimensão agregada cujo orçamento é repartido. */
 export const DIMENSAO_INSTRUCOES = "InstructionComplianceValidator";
@@ -52,6 +48,8 @@ export type ObrigacaoAvaliada = {
   status: string;
   motivo: string;
   prioridade: string | null;
+  classe?: CategoriaObrigacao | null;
+  escopoVerificacao?: "conteudo" | "operacional";
   natureza: string | null;
   verificacao: string;
   regraId: string | null;
@@ -69,18 +67,27 @@ export function obrigacoesDaEvidencia(
   if (!Array.isArray(lista)) return [];
   return lista
     .filter((o): o is Record<string, unknown> => Boolean(o) && typeof o === "object")
-    .map((o) => ({
-      id: texto(o["id"]),
-      tipo: texto(o["tipo"]),
-      origem: texto(o["origem"]),
-      descricao: texto(o["descricao"]),
-      status: texto(o["status"]),
-      motivo: texto(o["motivo"]),
-      prioridade: typeof o["prioridade"] === "string" ? (o["prioridade"] as string) : null,
-      natureza: typeof o["natureza"] === "string" ? (o["natureza"] as string) : null,
-      verificacao: texto(o["verificacao"]),
-      regraId: typeof o["regraId"] === "string" ? (o["regraId"] as string) : null,
-    }));
+    .map(
+      (o): ObrigacaoAvaliada => ({
+        id: texto(o["id"]),
+        tipo: texto(o["tipo"]),
+        origem: texto(o["origem"]),
+        descricao: texto(o["descricao"]),
+        status: texto(o["status"]),
+        motivo: texto(o["motivo"]),
+        prioridade: typeof o["prioridade"] === "string" ? (o["prioridade"] as string) : null,
+        classe:
+          o["classe"] === "ESSENCIAL" ||
+          o["classe"] === "CONVERSACIONAL" ||
+          o["classe"] === "LINGUAGEM"
+            ? o["classe"]
+            : null,
+        escopoVerificacao: o["escopoVerificacao"] === "operacional" ? "operacional" : "conteudo",
+        natureza: typeof o["natureza"] === "string" ? (o["natureza"] as string) : null,
+        verificacao: texto(o["verificacao"]),
+        regraId: typeof o["regraId"] === "string" ? (o["regraId"] as string) : null,
+      }),
+    );
 }
 
 /**
@@ -91,6 +98,11 @@ export function obrigacoesDaEvidencia(
 export function categoriaDaObrigacao(o: ObrigacaoAvaliada): CategoriaObrigacao {
   // O que o paciente pediu neste turno é conversa, nunca regra interna.
   if (o.origem === "mensagem_paciente") return "CONVERSACIONAL";
+
+  // A classe declarada na publicação prevalece sobre a forma do verificador.
+  // Uma regra conversacional sem verificação continua substantiva, mesmo que
+  // o verificador antigo descreva sua limitação como "linguagem aberta".
+  if (o.classe) return o.classe;
 
   const deterministica = o.verificacao === "deterministica";
   const critica = o.prioridade === "critica";
@@ -107,15 +119,14 @@ export function categoriaDaObrigacao(o: ObrigacaoAvaliada): CategoriaObrigacao {
   // cortesia, estilo da saudação). Ela não é conferível por máquina, então vai
   // para a dimensão separada: continua declarada como indeterminada, mas não
   // entra na nota nem na cobertura e, sozinha, não rebaixa o turno.
-  // Só escapa disso o que a publicação marcou como crítico.
+  // No formato legado, prioridade alta ou crítica mantém a regra substantiva.
   if (o.motivo.includes("LINGUAGEM_ABERTA") || o.verificacao === "linguagem_aberta") {
-    return critica ? "ESSENCIAL" : "LINGUAGEM";
+    return critica ? "ESSENCIAL" : alta ? "CONVERSACIONAL" : "LINGUAGEM";
   }
 
   if (critica) return "ESSENCIAL";
   if (alta) return "CONVERSACIONAL";
   return "LINGUAGEM";
-
 }
 
 /** Estado padronizado da obrigação. */
@@ -132,7 +143,7 @@ export function statusDaObrigacao(status: string): StatusValidador {
  */
 function chaveEquivalencia(o: ObrigacaoAvaliada, categoria: CategoriaObrigacao): string {
   const conteudo = o.regraId ?? `${o.tipo}|${o.descricao.trim().toLowerCase()}`;
-  return `${categoria}|${hashDoTexto(conteudo) ?? conteudo}`;
+  return `${o.escopoVerificacao ?? "conteudo"}|${categoria}|${hashDoTexto(conteudo) ?? conteudo}`;
 }
 
 /** Pior estado prevalece no grupo: falha > indeterminado > cumprido. */
@@ -195,6 +206,9 @@ export function repartirInstrucoes(
 
   const substantivos = grupos.filter(
     (g) =>
+      // O avaliador identifica o escopo a partir do contrato que verificou,
+      // nunca do ID da regra. Prova de transporte não melhora a nota do texto.
+      !g.itens.every((i) => i.escopoVerificacao === "operacional") &&
       g.categoria !== "LINGUAGEM" &&
       g.status !== "NOT_APPLICABLE" &&
       g.status !== "PENDING",
@@ -241,13 +255,17 @@ export function repartirInstrucoes(
           validator: DIMENSAO_LINGUAGEM,
           // Sem verificador automático a linguagem permanece indeterminada —
           // declarada, jamais presumida como cumprida.
-          status:
-            lingConcluidas.some((g) => g.status === "FAIL")
-              ? "FAIL"
-              : lingIndeterminadas.length > 0
-                ? "UNKNOWN"
-                : "PASS",
-          score: lingConcluidas.length === 0 ? 0 : lingConcluidas.every((g) => g.status === "PASS") ? 100 : 0,
+          status: lingConcluidas.some((g) => g.status === "FAIL")
+            ? "FAIL"
+            : lingIndeterminadas.length > 0
+              ? "UNKNOWN"
+              : "PASS",
+          score:
+            lingConcluidas.length === 0
+              ? 0
+              : lingConcluidas.every((g) => g.status === "PASS")
+                ? 100
+                : 0,
           reasonCode:
             lingIndeterminadas.length > 0
               ? "LINGUAGEM_SEM_VERIFICADOR_AUTOMATICO"

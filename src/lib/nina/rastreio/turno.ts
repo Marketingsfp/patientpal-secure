@@ -19,7 +19,7 @@
  * continuam em código/banco. Aqui só existe registro.
  */
 import type { AuditoriaInstrucoesRodada } from "./auditoria-instrucoes";
-import { NINA_RUNTIME_VERSION } from "../runtime-version";
+import { NINA_RUNTIME_VERSION, NINA_SOURCE_FINGERPRINT } from "../runtime-version";
 import { auditoriaParaTrace } from "./auditoria-instrucoes";
 import {
   notaAplicavelAoTextoFinal,
@@ -29,11 +29,7 @@ import {
   type VersaoTexto,
 } from "./versoes-texto";
 
-export type {
-  AvisoOperacionalRegistrado,
-  EvidenciaBloqueio,
-  VersaoTexto,
-} from "./versoes-texto";
+export type { AvisoOperacionalRegistrado, EvidenciaBloqueio, VersaoTexto } from "./versoes-texto";
 
 /** De onde veio o texto realmente entregue (ou por que não houve texto). */
 export const ORIGENS_RESPOSTA = [
@@ -124,8 +120,7 @@ export const ROTULO_SITUACAO_TRANSFORMACAO: Record<SituacaoTransformacoes, strin
   sem_transformacoes: "Nenhuma — o texto saiu como o modelo devolveu",
   sem_alteracao: "Finalização executada, sem alteração do texto",
   alterado: "Texto do modelo alterado pelo sistema",
-  revertido:
-    "Houve alteração intermediária, mas o texto final é igual ao texto original do modelo",
+  revertido: "Houve alteração intermediária, mas o texto final é igual ao texto original do modelo",
   indeterminado: "Não foi possível determinar se houve alteração",
 };
 
@@ -335,7 +330,13 @@ export function evidenciaSaidaDoTurno(dados: {
   if (registrado && (ESTADOS_SAIDA as readonly string[]).includes(registrado)) {
     estado = registrado as EstadoSaida;
   } else if (ultimo) {
-    estado = mensagemId ? (ultimo.transporteId ? "confirmada" : console ? "persistida" : "enviada") : "falhou";
+    estado = mensagemId
+      ? ultimo.transporteId
+        ? "confirmada"
+        : console
+          ? "persistida"
+          : "enviada"
+      : "falhou";
   } else if (mensagemId) {
     estado = console ? "persistida" : "enviada";
   } else if (resumo) {
@@ -368,6 +369,8 @@ export function evidenciaSaidaDoTurno(dados: {
 export type RegistroTurno = {
   /** Ausente em registros antigos; nunca inferir a versão a partir do servidor atual. */
   runtimeVersao?: string;
+  /** Fingerprint dos fontes cobertos pelo build; ausente/nulo em registros sem comprovação. */
+  runtimeFingerprint?: string | null;
   /** Identificador do turno — o mesmo `trace_id` da execução. */
   turnoId: string;
   clinicaId: string | null;
@@ -428,6 +431,7 @@ export type BaseRegistroTurno = {
 export function criarRegistroTurno(base: BaseRegistroTurno): RegistroTurno {
   return {
     runtimeVersao: NINA_RUNTIME_VERSION,
+    runtimeFingerprint: NINA_SOURCE_FINGERPRINT,
     turnoId: base.turnoId,
     clinicaId: base.clinicaId ?? null,
     conversaId: base.conversaId ?? null,
@@ -517,6 +521,7 @@ export function lacunasDoTurno(r: RegistroTurno): string[] {
 export function resumoTurnoParaTrace(r: RegistroTurno): Record<string, unknown> {
   return {
     runtime_versao: r.runtimeVersao ?? null,
+    runtime_fingerprint: r.runtimeFingerprint ?? null,
     turno_id: r.turnoId,
     ambiente: r.ambiente,
     teste: r.teste,
@@ -597,7 +602,10 @@ export const NODE_ENTREGA_TURNO = "turn.delivery";
  */
 export const MARCA_TRUNCADO = "…[truncado]";
 
-export function truncarParaDiagnostico(valor: unknown, max = 4000): { texto: string; truncado: boolean } {
+export function truncarParaDiagnostico(
+  valor: unknown,
+  max = 4000,
+): { texto: string; truncado: boolean } {
   const bruto = typeof valor === "string" ? valor : JSON.stringify(valor ?? null);
   if (bruto.length <= max) return { texto: bruto, truncado: false };
   return { texto: `${bruto.slice(0, max)}${MARCA_TRUNCADO}`, truncado: true };

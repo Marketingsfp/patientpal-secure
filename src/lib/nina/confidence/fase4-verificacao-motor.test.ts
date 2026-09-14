@@ -18,11 +18,7 @@ import { montarResultadoConhecimento } from "../knowledge-contract";
 import { InstructionComplianceValidator } from "./obrigacoes";
 import { POLITICA_PADRAO, VERSAO_MOTOR, VERSAO_POLITICA } from "./policy";
 import { PROMPT_PUBLICADO_V15 } from "./fixtures/prompt-publicado-v15";
-import {
-  garantirScoreDoTextoEnviado,
-  montarContextoDoTurno,
-  type EstadoDoTurno,
-} from "./runtime";
+import { garantirScoreDoTextoEnviado, montarContextoDoTurno, type EstadoDoTurno } from "./runtime";
 
 const instrucoes = montarInstrucoesDoTurno({
   escopo: "whatsapp",
@@ -157,7 +153,23 @@ describe("FASE 4 — 2. 'oi' e 'oi boa tarde'", () => {
 describe("FASE 4 — 3. saudação em sessão já apresentada", () => {
   it("cumprimento curto sem repetir a apresentação não é penalizado", () => {
     const texto = "Oi! Como posso te ajudar?";
-    const r = avaliar(estado({ apresentacaoJaFeita: true, mensagemPaciente: "oi", texto }), texto);
+    const r = avaliar(
+      estado({
+        apresentacaoJaFeita: true,
+        mensagemPaciente: "oi",
+        texto,
+        evidenciasFluxo: {
+          sessionId: "sessao-social",
+          historicoCompleto: true,
+          registroFerramentasCompleto: true,
+          historico: [
+            { role: "user", content: "oi" },
+            { role: "assistant", content: APRESENTACAO },
+          ],
+        },
+      }),
+      texto,
+    );
     expect(r.level).not.toBe("LOW");
     expect(r.blockers).toEqual([]);
   });
@@ -222,7 +234,8 @@ describe("FASE 4 — 7. resposta com identidade incorreta", () => {
 
 describe("FASE 4 — 8. coleta pertinente de dado sem executar operação", () => {
   it("pedir o dado que falta não é erro de resposta", () => {
-    const texto = "Para seguir com o agendamento, me informe seu nome completo e a data de nascimento, por favor.";
+    const texto =
+      "Para seguir com o agendamento, me informe seu nome completo e a data de nascimento, por favor.";
     const r = avaliar(
       estado({
         mensagemPaciente: "quero agendar",
@@ -230,6 +243,16 @@ describe("FASE 4 — 8. coleta pertinente de dado sem executar operação", () =
         acao: "nenhuma",
         apresentacaoJaFeita: true,
         requiredFields: ["nome", "data_nascimento"],
+        entities: {},
+        evidenciasFluxo: {
+          sessionId: "sessao-coleta",
+          historicoCompleto: true,
+          registroFerramentasCompleto: true,
+          historico: [
+            { role: "user", content: "oi" },
+            { role: "assistant", content: APRESENTACAO },
+          ],
+        },
         texto,
       }),
       texto,
@@ -269,11 +292,10 @@ describe("FASE 4 — 10. regra essencial aplicável e não verificável", () => 
     expect(criticasAbertas.every((o) => o.status === "indeterminada")).toBe(true);
   });
 
-  it("reduz a cobertura e impede aprovação, sem inventar nota de aprovação", () => {
+  it("requisito essencial sem prova impede aprovação mesmo com conteúdo verificável", () => {
     const r = avaliar(e, APRESENTACAO);
     expect(r.decision).not.toBe("ALLOW");
-    expect(r.evidenceCoverage ?? 100).toBeLessThan(100);
-    expect(r.unknownDimensions.length).toBeGreaterThan(0);
+    expect(r.instrucoes?.essencial.semProva).toBe(true);
   });
 });
 
@@ -314,7 +336,10 @@ describe("FASE 4 — 11. teste literal exato e mensagens fora da condição", ()
       texto,
     });
     expect(literal(e, texto)).toBeUndefined();
-    expect(avaliar(e, texto).level).not.toBe("LOW");
+    // Não cobrar o marcador não prova continuidade de uma conversa cujo
+    // histórico não foi fornecido ao verificador.
+    expect(avaliar(e, texto).level).toBe("LOW");
+    expect(avaliar(e, texto).decision).not.toBe("ALLOW");
   });
 
   it("saudação comum não é cobrada pelo marcador literal", () => {
@@ -330,11 +355,7 @@ describe("FASE 4 — 12. texto alterado depois da primeira avaliação", () => {
     expect(primeira.recalculado).toBe(true);
     expect(primeira.motivo).toBe("sem_avaliacao_previa");
 
-    const reaproveitada = garantirScoreDoTextoEnviado(
-      e,
-      APRESENTACAO,
-      primeira.resultado,
-    );
+    const reaproveitada = garantirScoreDoTextoEnviado(e, APRESENTACAO, primeira.resultado);
     expect(reaproveitada.recalculado).toBe(false);
     expect(reaproveitada.motivo).toBe("avaliacao_valida");
 

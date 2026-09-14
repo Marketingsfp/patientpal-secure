@@ -34,6 +34,7 @@ import {
 import { conferirIdentidadeDaResposta } from "./identidade-publicada";
 import { ehSaudacaoPura } from "./turno-tipo";
 import { avaliarObrigacaoOperacional } from "./obrigacoes-operacionais";
+import { avaliarObrigacaoAbertura } from "./obrigacoes-abertura";
 import { avaliarObrigacaoContinuidade } from "./obrigacoes-continuidade";
 import type { ContextoConfianca, ResultadoValidador, StatusValidador } from "./types";
 
@@ -105,11 +106,7 @@ export type Obrigacao = {
  * - `indeterminada`: não foi possível conferir (linguagem aberta sem revisão,
  *   regra não interpretada). NUNCA é lida como cumprimento.
  */
-export type StatusObrigacao =
-  | "cumprida"
-  | "descumprida"
-  | "nao_aplicavel"
-  | "indeterminada";
+export type StatusObrigacao = "cumprida" | "descumprida" | "nao_aplicavel" | "indeterminada";
 
 /** Estado agregado das restrições publicadas neste turno. */
 export type EstadoRestricoes =
@@ -124,6 +121,8 @@ export type AvaliacaoObrigacao = {
   obrigacao: Obrigacao;
   status: StatusObrigacao;
   motivo: string;
+  /** Prova de operação continua auditável e bloqueante, fora da nota do texto. */
+  escopoVerificacao?: "conteudo" | "operacional";
 };
 
 export type ResultadoObrigacoes = {
@@ -166,7 +165,8 @@ const TOPICOS: Topico[] = [
   {
     id: "endereco",
     rotulo: "endereço da unidade",
-    pedido: /\b(endereco|onde fica|onde e a clinica|onde voces ficam|localizacao|como chego|como chegar)\b/,
+    pedido:
+      /\b(endereco|onde fica|onde e a clinica|onde voces ficam|localizacao|como chego|como chegar)\b/,
     resposta: /\b(rua|avenida|av|travessa|rodovia|bairro|cep|numero|n\b|endereco)\b/,
   },
   {
@@ -222,8 +222,7 @@ const SAUDACAO =
  * Repetição da APRESENTAÇÃO: a assistente dizendo de novo quem é. Só formas
  * de auto-identificação contam — "bom dia" sozinho NÃO é apresentação.
  */
-const APRESENTACAO_PESSOAL =
-  /\b(sou a |sou o |meu nome (e|eh) |aqui (e|eh) a |assistente virtual)/;
+const APRESENTACAO_PESSOAL = /\b(sou a |sou o |meu nome (e|eh) |aqui (e|eh) a |assistente virtual)/;
 
 const SAUDACAO_EM_QUALQUER_POSICAO =
   /(^|[\s.,;:!?"'()-])(oi|ola|bom dia|boa tarde|boa noite|tudo bem|como vai|seja bem[- ]vind[oa])\b/;
@@ -452,7 +451,9 @@ export function categoriasVioladas(
     literalEsperado === null
       ? false
       : operadorEsperado === "inclusao"
-        ? espacos(bruto).replace(espacos(literalEsperado), "").replace(/[\s.,;:!]/g, "") !== ""
+        ? espacos(bruto)
+            .replace(espacos(literalEsperado), "")
+            .replace(/[\s.,;:!]/g, "") !== ""
         : espacos(bruto) !== espacos(literalEsperado);
 
   const violadas: CategoriaProibida[] = [];
@@ -650,13 +651,15 @@ export function avaliarObrigacoes(
   revisor: RevisorSemantico | null = null,
 ): ResultadoObrigacoes {
   const derivadas = derivarObrigacoesDoTurno(ctx);
-  const avaliadas = derivadas.map((o) =>
-    avaliarObrigacaoOperacional(o, ctx, resposta) ??
-    avaliarObrigacaoContinuidade(o, ctx, resposta) ??
-    avaliarUma(o, resposta, revisor, {
-      mensagemPaciente: ctx.mensagemPaciente ?? null,
-      ambiente: ctx.businessContext?.ambiente ?? null,
-    }),
+  const avaliadas = derivadas.map(
+    (o) =>
+      avaliarObrigacaoOperacional(o, ctx, resposta) ??
+      avaliarObrigacaoAbertura(o, ctx, resposta) ??
+      avaliarObrigacaoContinuidade(o, ctx, resposta) ??
+      avaliarUma(o, resposta, revisor, {
+        mensagemPaciente: ctx.mensagemPaciente ?? null,
+        ambiente: ctx.businessContext?.ambiente ?? null,
+      }),
   );
 
   // FASE 4 — a apresentação da resposta é conferida contra a IDENTIDADE da
@@ -692,15 +695,17 @@ export function avaliarObrigacoes(
       ? true
       : restricoes.length > 0 && restricoes.every((a) => a.motivo === "REGRA_NAO_INTERPRETADA");
 
+  // Cada exigência mantém seu resultado: uma regra cumprida (inclusive uma
+  // proteção exclusiva da homologação) não resolve outra indeterminada.
   // Ausência de regra NUNCA é aprovação: só `cumpridas` produz `true`.
   const estadoRestricoes: EstadoRestricoes = falhaDeInterpretacao
     ? "falha_na_interpretacao"
     : restricoes.some((a) => a.status === "descumprida")
       ? "descumpridas"
-      : restricoes.some((a) => a.status === "cumprida")
-        ? "cumpridas"
-        : restricoes.length > 0
-          ? "indeterminadas"
+      : restricoes.some((a) => a.status === "indeterminada")
+        ? "indeterminadas"
+        : restricoes.some((a) => a.status === "cumprida")
+          ? "cumpridas"
           : validas.length === 0
             ? "nenhuma_regra_publicada"
             : "nenhuma_regra_aplicavel";
@@ -846,7 +851,10 @@ export function InstructionComplianceValidator(
     indeterminadas.every(
       (a) =>
         a.motivo === "LINGUAGEM_ABERTA_NAO_VERIFICAVEL" &&
-        a.obrigacao.tipo === "restricao_aberta",
+        a.obrigacao.tipo === "restricao_aberta" &&
+        (a.obrigacao.regra?.classe === "LINGUAGEM" ||
+          (a.obrigacao.regra?.classe == null &&
+            (!a.obrigacao.regra || a.obrigacao.regra.prioridade === "normal"))),
     );
 
   let status: StatusValidador;
@@ -917,6 +925,8 @@ export function InstructionComplianceValidator(
         // Prioridade e origem publicada viajam na evidência: é isso que
         // permite ao controle de envio saber se a violação é bloqueante.
         prioridade: a.obrigacao.regra?.prioridade ?? null,
+        classe: a.obrigacao.regra?.classe ?? null,
+        escopoVerificacao: a.escopoVerificacao ?? "conteudo",
         natureza: a.obrigacao.regra?.natureza ?? null,
         verificacao: a.obrigacao.verificacao,
         regraId: a.obrigacao.regra?.id ?? null,

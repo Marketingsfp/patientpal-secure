@@ -300,3 +300,158 @@ describe("continuidade comprovada para a regra publicada integral", () => {
     expect(avaliarObrigacaoContinuidade(obrigacao, ctx, final)).toBeNull();
   });
 });
+
+describe("continuidade social e coleta sem operação", () => {
+  const pedidoDados =
+    "Para seguir com o agendamento, me informe seu nome completo e a data de nascimento, por favor.";
+  function semOperacao() {
+    const p = preparar();
+    Object.assign(p.ctx, {
+      requestedAction: "nenhuma",
+      turnType: "ESCLARECIMENTO",
+      mensagemPaciente: "quero agendar",
+      toolResults: [],
+      retrievedSources: [],
+      fatos: [],
+      entities: {},
+      requiredFields: ["nome", "data_nascimento"],
+    });
+    return p;
+  }
+
+  for (const ambiente of ["producao", "homologacao"] as const) {
+    it(`${ambiente}: cumprimento social com histórico conhecido preserva continuidade`, () => {
+      const { obrigacao, ctx } = semOperacao();
+      ctx.businessContext.ambiente = ambiente;
+      ctx.mensagemPaciente = "oi";
+      ctx.turnType = "SAUDACAO";
+      expect(
+        avaliarObrigacaoContinuidade(obrigacao, ctx, "Oi! Como posso te ajudar?"),
+      ).toMatchObject({
+        status: "cumprida",
+        motivo: "CONTINUIDADE_SOCIAL_COMPROVADA_NO_HISTORICO",
+      });
+    });
+
+    it(`${ambiente}: pede somente os campos necessários ainda ausentes`, () => {
+      const { obrigacao, ctx } = semOperacao();
+      ctx.businessContext.ambiente = ambiente;
+      expect(avaliarObrigacaoContinuidade(obrigacao, ctx, pedidoDados)).toMatchObject({
+        status: "cumprida",
+        motivo: "CONTINUIDADE_COLETA_DE_DADO_PENDENTE_COMPROVADA",
+      });
+    });
+  }
+
+  it("aceita uma pergunta específica sobre o campo pendente", () => {
+    const { obrigacao, ctx } = semOperacao();
+    expect(avaliarObrigacaoContinuidade(obrigacao, ctx, "Qual seu nome completo?")?.status).toBe(
+      "cumprida",
+    );
+  });
+
+  it("saudação não reinicia a demanda já informada nem encobre fatos ou handoff", () => {
+    const { obrigacao, ctx } = semOperacao();
+    ctx.mensagemPaciente = "oi";
+    ctx.turnType = "SAUDACAO";
+    for (const texto of [
+      "Oi! A consulta custa R$ 200.",
+      "Oi! Vou chamar uma atendente.",
+      "Oi! Qual sua cor favorita?",
+    ])
+      expect(avaliarObrigacaoContinuidade(obrigacao, ctx, texto)).toBeNull();
+    ctx.evidenciasFluxo!.historico.push(
+      { role: "user", content: "Quero agendar Cardiologia" },
+      { role: "assistant", content: "Qual médico prefere?" },
+    );
+    expect(avaliarObrigacaoContinuidade(obrigacao, ctx, "Oi! Como posso te ajudar?")).toMatchObject(
+      {
+        status: "descumprida",
+        motivo: "CONTINUIDADE_PERGUNTA_JA_RESPONDIDA",
+      },
+    );
+  });
+
+  it("rótulo SAUDACAO não transforma pedido concreto em cumprimento social", () => {
+    const { obrigacao, ctx } = semOperacao();
+    ctx.turnType = "SAUDACAO";
+    expect(
+      avaliarObrigacaoContinuidade(obrigacao, ctx, "Oi! Como posso te ajudar?")?.status,
+    ).not.toBe("cumprida");
+  });
+
+  it.each(["historico", "sessao", "ferramentas", "requiredFields", "entities"])(
+    "coleta sem prova de %s permanece indeterminada",
+    (prova) => {
+      const { obrigacao, ctx } = semOperacao();
+      if (prova === "historico") ctx.evidenciasFluxo!.historicoCompleto = false;
+      if (prova === "sessao") ctx.evidenciasFluxo!.sessionId = null;
+      if (prova === "ferramentas") ctx.evidenciasFluxo!.registroFerramentasCompleto = false;
+      if (prova === "requiredFields") delete ctx.requiredFields;
+      if (prova === "entities") delete ctx.entities;
+      expect(avaliarObrigacaoContinuidade(obrigacao, ctx, pedidoDados)).toBeNull();
+    },
+  );
+
+  it("não usa a coleta para aprovar operação, ferramenta de escrita ou texto factual extra", () => {
+    const { obrigacao, ctx } = semOperacao();
+    expect(
+      avaliarObrigacaoContinuidade(
+        obrigacao,
+        ctx,
+        `${pedidoDados} Seu agendamento foi confirmado.`,
+      ),
+    ).toBeNull();
+    expect(
+      avaliarObrigacaoContinuidade(obrigacao, ctx, `${pedidoDados} A consulta custa R$ 200.`),
+    ).toBeNull();
+    ctx.toolResults.push({
+      nome: "agendar",
+      capacidade: "createAppointment",
+      fonte: "agenda",
+      success: true,
+    });
+    expect(avaliarObrigacaoContinuidade(obrigacao, ctx, pedidoDados)).toBeNull();
+    ctx.toolResults = [];
+    ctx.requestedAction = "criar_agendamento";
+    expect(avaliarObrigacaoContinuidade(obrigacao, ctx, pedidoDados)).toBeNull();
+  });
+
+  it("não aprova pedido de campo sem necessidade declarada", () => {
+    const { obrigacao, ctx } = semOperacao();
+    expect(
+      avaliarObrigacaoContinuidade(obrigacao, ctx, "Me informe seu CPF, por favor."),
+    ).toBeNull();
+  });
+
+  it("campo preenchido no estado não pode ser solicitado de novo", () => {
+    const { obrigacao, ctx } = semOperacao();
+    ctx.entities = { nome_completo: "João Silva" };
+    expect(avaliarObrigacaoContinuidade(obrigacao, ctx, pedidoDados)).toMatchObject({
+      status: "descumprida",
+      motivo: "CONTINUIDADE_DADO_JA_INFORMADO",
+    });
+  });
+
+  it("coleta imperativa reconhece respostas já fornecidas mesmo antes da reidratação do estado", () => {
+    const { obrigacao, ctx } = semOperacao();
+    ctx.evidenciasFluxo!.historico.push(
+      { role: "user", content: "quero agendar" },
+      { role: "assistant", content: pedidoDados },
+    );
+    ctx.mensagemPaciente = "João Silva, 01/02/2000";
+    expect(avaliarObrigacaoContinuidade(obrigacao, ctx, pedidoDados)).toMatchObject({
+      status: "descumprida",
+      motivo: "CONTINUIDADE_PERGUNTA_JA_RESPONDIDA",
+    });
+  });
+
+  it("dados espontâneos na mensagem atual também impedem coleta repetida", () => {
+    const { obrigacao, ctx } = semOperacao();
+    ctx.mensagemPaciente = "Meu nome é João Silva";
+    expect(avaliarObrigacaoContinuidade(obrigacao, ctx, pedidoDados)).toMatchObject({
+      status: "descumprida",
+      motivo: "CONTINUIDADE_DADO_JA_INFORMADO",
+    });
+  });
+});

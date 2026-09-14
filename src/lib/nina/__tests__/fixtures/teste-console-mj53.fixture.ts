@@ -9,9 +9,13 @@ import { hashDoTexto } from "@/lib/nina/confidence/hash";
 
 type Linha = Record<string, any>;
 const cenario = process.argv[2];
+const paridade = cenario === "paridade-cardiologia";
+const entradasGerador: Linha[] = [];
 const encaminhada = cenario.startsWith("handoff-");
 const AVISO = "Nesta simulação, o atendimento precisaria de uma pessoa da equipe. Protocolo MJ-53.";
-const RESPOSTA = "Olá! Como posso ajudar?";
+const RESPOSTA = paridade
+  ? "Temos Cardiologia. A consulta custa R$ 120,00 no dinheiro e R$ 145,00 no cartão."
+  : "Olá! Como posso ajudar?";
 const lead: Linha = {
   id: "lead-mj53",
   indice: 1,
@@ -24,7 +28,7 @@ const lead: Linha = {
   ciclo_iniciado_em: "2026-09-13T16:20:00Z",
   resolvido_em: null,
   status: "ativa",
-  clinica_id: "clinica-teste",
+  clinica_id: paridade ? "clinica" : "clinica-teste",
 };
 const bd: Record<string, Linha[]> = {
   nina_teste_leads: [{ ...lead }],
@@ -145,6 +149,14 @@ mock.module("@/lib/nina/burst.server", () => ({
 mock.module("@/lib/whatsapp.server", () => ({
   gerarRespostaNina: async (_clinica: string, _texto: string, _telefone: string, opcoes: Linha) => {
     chamadasModelo++;
+    entradasGerador.push({
+      clinicaId: _clinica,
+      texto: _texto,
+      telefone: _telefone,
+      opcoes: { ...opcoes, auditoria: undefined, validarReservaTurno: undefined },
+      temAuditoria: Boolean(opcoes.auditoria),
+      temGuardaReserva: typeof opcoes.validarReservaTurno === "function",
+    });
     Object.assign(opcoes.auditoria, { execucaoId: "execucao-mj53", traceId: "turno-mj53" });
     if (cenario === "reserva-perdida-core") {
       if (await opcoes.validarReservaTurno()) throw new Error("Reserva deveria estar perdida");
@@ -222,7 +234,7 @@ const resultado = await processarMensagemTeste(
     clinicaId: lead.clinica_id,
     leadId: lead.id,
     tipo: ["handoff-audio", "reserva-perdida-tts"].includes(cenario) ? "audio" : "text",
-    texto: "vcs tem cardiologista?",
+    texto: paridade ? "Vocês tem cardiologista?" : "vcs tem cardiologista?",
     chave: "entrada-mj53",
   },
   "operador-teste",
@@ -241,5 +253,6 @@ console.log(
       encerramentos,
       entregas,
       rastreios,
+      entradasGerador,
     }),
 );

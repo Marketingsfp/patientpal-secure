@@ -84,7 +84,17 @@ describe("regressão: saudação com o prompt publicado v15", () => {
     // continuar valendo é a limitação DECLARADA logo abaixo.
     expect(v.reasonCode).toMatch(/LINGUAGEM_ABERTA|OBRIGACOES_CUMPRIDAS/);
     expect((v.evidence as { limitacoes?: string[] }).limitacoes).toContain(
-      "OBRIGACAO_DE_LINGUAGEM_ABERTA_NAO_VERIFICADA",
+      "REGRA_DE_LINGUAGEM_ABERTA_NAO_VERIFICADA_AUTOMATICAMENTE",
+    );
+    // A abertura agora possui prova própria; a limitação das demais regras
+    // de linguagem não transforma uma obrigação conversacional em UNKNOWN.
+    expect(
+      (v.evidence as { obrigacoes: Array<{ motivo: string; status: string }> }).obrigacoes,
+    ).toContainEqual(
+      expect.objectContaining({
+        motivo: "ABERTURA_SAUDACAO_COM_IDENTIDADE_COMPROVADA",
+        status: "cumprida",
+      }),
     );
   });
 

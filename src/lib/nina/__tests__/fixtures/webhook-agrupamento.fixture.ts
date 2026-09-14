@@ -11,6 +11,10 @@ import { entradaPermiteReabertura } from "../../reabertura-entrada";
 
 type Linha = Record<string, any>;
 const cenario = process.argv[2]!;
+const paridade = cenario === "paridade-cardiologia";
+const respostaCardiologia =
+  "Temos Cardiologia. A consulta custa R$ 120,00 no dinheiro e R$ 145,00 no cartão.";
+const entradasGerador: Linha[] = [];
 const db: Record<string, Linha[]> = {
   whatsapp_mensagens: [],
   whatsapp_webhook_logs: [],
@@ -228,11 +232,19 @@ mock.module("@/lib/whatsapp.server", () => ({
   }),
   gerarRespostaNina: async (_c: string, _t: string, _p: string, opcoes: any) => {
     modelo++;
+    entradasGerador.push({
+      clinicaId: _c,
+      texto: _t,
+      telefone: _p,
+      opcoes: { ...opcoes, auditoria: undefined, validarReservaTurno: undefined },
+      temAuditoria: Boolean(opcoes.auditoria),
+      temGuardaReserva: typeof opcoes.validarReservaTurno === "function",
+    });
     opcoes.auditoria.execucaoId = "execucao";
     opcoes.auditoria.traceId = "turno";
     if (!(await opcoes.validarReservaTurno())) throw new ErroReservaTurnoPerdida();
     if (cenario === "erro-modelo") throw new Error("Falha após início do modelo");
-    return "Olá! Como posso ajudar?";
+    return paridade ? respostaCardiologia : "Olá! Como posso ajudar?";
   },
   metaSendText: async () => {
     transporte++;
@@ -282,7 +294,7 @@ const corpo = JSON.stringify({
                   ? "audio"
                   : "text",
                 audio: { id: "audio-entrada" },
-                text: { body: "Bom dia" },
+                text: { body: paridade ? "Vocês tem cardiologista?" : "Bom dia" },
               },
             ],
           },
@@ -331,6 +343,7 @@ console.log(
       revisao,
       reaberturas,
       encerramentos,
+      entradasGerador,
       entradas: db.whatsapp_mensagens!.filter((m) => m.direction === "in"),
       saidas: db.whatsapp_mensagens!.filter((m) => m.direction === "out"),
       logs: db.whatsapp_webhook_logs!.map((l) => l.resultado),

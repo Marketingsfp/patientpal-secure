@@ -103,9 +103,7 @@ function paraRegra(o: ObrigacaoEvidencia): RegraNaoConforme {
 export function conformidadeDasInstrucoes(
   avaliacao: ResultadoConfianca | null | undefined,
 ): ConformidadeInstrucoes {
-  const validador = (avaliacao?.validators ?? []).find(
-    (v) => v.validator === VALIDADOR_INSTRUCOES,
-  );
+  const validador = (avaliacao?.validators ?? []).find((v) => v.validator === VALIDADOR_INSTRUCOES);
   if (!validador) {
     return {
       estado: "sem_verificacao",
@@ -123,9 +121,7 @@ export function conformidadeDasInstrucoes(
     (o) => o.origem === "instrucoes_publicadas",
   );
   const violacoes = publicadas.filter((o) => o.status === "descumprida").map(paraRegra);
-  const naoVerificadas = publicadas
-    .filter((o) => o.status === "indeterminada")
-    .map(paraRegra);
+  const naoVerificadas = publicadas.filter((o) => o.status === "indeterminada").map(paraRegra);
 
   const evidence = (validador.evidence ?? {}) as Record<string, unknown>;
   const estadoRestricoes = String(evidence["estadoRestricoes"] ?? "");
@@ -135,10 +131,10 @@ export function conformidadeDasInstrucoes(
     estado = "falha_na_interpretacao";
   } else if (violacoes.length > 0 || estadoRestricoes === "descumpridas") {
     estado = "descumprida";
-  } else if (estadoRestricoes === "cumpridas") {
-    estado = "cumprida";
   } else if (naoVerificadas.length > 0 || estadoRestricoes === "indeterminadas") {
     estado = "nao_verificada";
+  } else if (estadoRestricoes === "cumpridas") {
+    estado = "cumprida";
   } else if (
     estadoRestricoes === "nenhuma_regra_aplicavel" ||
     estadoRestricoes === "nenhuma_regra_publicada"
@@ -159,13 +155,13 @@ export function conformidadeDasInstrucoes(
   let motivoBloqueio: ConformidadeInstrucoes["motivoBloqueio"] = null;
   let prioridades: PrioridadeRegra[] = [];
 
-  if (estado === "descumprida") {
-    bloqueante = criticasVioladas.length > 0 || violacoes.length === 0;
-    motivoBloqueio = bloqueante ? "REGRA_PUBLICADA_DESCUMPRIDA" : null;
+  if (criticasVioladas.length > 0 || (estado === "descumprida" && violacoes.length === 0)) {
+    bloqueante = true;
+    motivoBloqueio = "REGRA_PUBLICADA_DESCUMPRIDA";
     prioridades = criticasVioladas
       .map((v) => v.prioridade)
       .filter((p): p is PrioridadeRegra => p !== null);
-  } else if (estado === "nao_verificada" && criticasNaoVerificadas.length > 0) {
+  } else if (criticasNaoVerificadas.length > 0) {
     bloqueante = true;
     motivoBloqueio = "REGRA_PUBLICADA_NAO_VERIFICADA";
     prioridades = criticasNaoVerificadas
@@ -199,9 +195,7 @@ export function verificacoesDasInstrucoes(avaliacao: ResultadoConfianca | null |
   verificacoes: VerificacaoExigencia[];
   falhaDeInterpretacao: boolean;
 } {
-  const validador = (avaliacao?.validators ?? []).find(
-    (v) => v.validator === VALIDADOR_INSTRUCOES,
-  );
+  const validador = (avaliacao?.validators ?? []).find((v) => v.validator === VALIDADOR_INSTRUCOES);
   if (!validador) return { verificacoes: [], falhaDeInterpretacao: false };
   const verificacoes = lerObrigacoes(validador.evidence)
     .filter((o) => o.origem === "instrucoes_publicadas")
@@ -296,7 +290,9 @@ export function instrucaoDeCorrecaoPorRegras(c: ConformidadeInstrucoes): string 
     .join("\n");
   return [
     "CORREÇÃO OBRIGATÓRIA: sua resposta anterior não cumpriu as instruções publicadas desta clínica.",
-    itens ? `Pontos a corrigir:\n${itens}` : "Cumpra integralmente as instruções publicadas do turno.",
+    itens
+      ? `Pontos a corrigir:\n${itens}`
+      : "Cumpra integralmente as instruções publicadas do turno.",
     "Reescreva APENAS o texto da resposta, cumprindo literalmente o que a instrução publicada exige.",
     "NÃO chame nenhuma ferramenta e NÃO repita nenhuma operação (agendar, cancelar, transferir ou enviar).",
   ].join("\n");

@@ -3,6 +3,8 @@ import { autorizarConsultaAgenda } from "../consulta-agenda";
 import { formasDePagamentoNoTexto } from "./afirmacao";
 import { avaliarGrounding } from "./claims";
 import { normalizarTexto } from "./evidencia";
+import { ehSaudacaoPura } from "./turno-tipo";
+import { classificarAfirmacaoOperacional } from "./workflow";
 import type { AvaliacaoObrigacao, Obrigacao } from "./obrigacoes";
 import type { ContextoConfianca } from "./types";
 
@@ -58,7 +60,7 @@ type TopicoPergunta =
   | "interesse_agenda"
   | "vaga";
 function topicoPergunta(q: string): TopicoPergunta | null {
-  if (/\b(como|em que)\s+(?:posso|podemos)\s+ajudar\b/.test(q)) return "ajuda";
+  if (/\b(como|em que)\s+(?:posso|podemos)\s+(?:(?:te|lhe)\s+)?ajudar\b/.test(q)) return "ajuda";
   if (
     /\b(verificar|verificasse|consultar|consulte|ver|olhar|checar)\b/.test(q) &&
     /\b(vagas?|agenda|disponibilidade)\b/.test(q)
@@ -122,7 +124,11 @@ const GENERICOS = new Set([
   "procedimento",
 ]);
 
-function temAssuntoCorrespondente(msg: string, resposta: string, ctx: ContextoConfianca): boolean {
+export function temAssuntoCorrespondente(
+  msg: string,
+  resposta: string,
+  ctx: ContextoConfianca,
+): boolean {
   const normalizarAssunto = (t: string) =>
     normalizarTexto(t)
       .split(/[^a-z0-9]+/)
@@ -158,7 +164,13 @@ function respostaAoTopico(topico: TopicoPergunta, texto: string, ctx: ContextoCo
   if (topico === "vaga")
     return /\b\d{1,2}(?:h|:\d{2})\b|\b(primeir[ao]|segund[ao]|terceir[ao])\b/.test(t);
   if (topico === "nome")
-    return !t.includes("?") && /^(?:meu nome e |sou |me chamo )?[a-z]+(?: [a-z]+){1,5}$/.test(t);
+    return (
+      !t.includes("?") &&
+      !/\b(quero|preciso|gostaria|agendar|marcar|ajuda|consulta)\b/.test(t) &&
+      /^(?:meu nome e |sou (?:o |a )?|me chamo )?[a-z]+(?: [a-z]+){1,5}$/.test(
+        t.split(/[,;\n]|\b(?:cpf|data de nascimento|nasci)\b/)[0]!.trim(),
+      )
+    );
   return (ctx.fatos ?? []).some((f) => {
     const valor =
       topico === "medico"
@@ -170,6 +182,57 @@ function respostaAoTopico(topico: TopicoPergunta, texto: string, ctx: ContextoCo
       .filter((p) => p.length >= 4 && !GENERICOS.has(p))
       .some((p) => t.includes(p));
   });
+}
+
+type CampoColeta = "nome" | "cpf" | "nascimento";
+const ALIASES_COLETA: Record<CampoColeta, string[]> = {
+  nome: ["nome", "nome_completo"],
+  cpf: ["cpf"],
+  nascimento: ["data_nascimento", "data_de_nascimento", "nascimento"],
+};
+
+/** Reconhece somente uma solicitação de campos, sem frases factuais adicionais. */
+function camposDaColeta(texto: string): CampoColeta[] | null {
+  const t = normalizarTexto(texto);
+  const m =
+    /^(?:para (?:seguir|continuar) com o agendamento[, :]*)?(?:(?:me )?(?:informe|envie|diga)|(?:pode|poderia) (?:me )?(?:informar|enviar|dizer)|qual (?:e )?)(.+?)(?:,? por favor)?[?.!]*$/.exec(
+      t,
+    );
+  if (!m) return null;
+  const campos: CampoColeta[] = [];
+  const restante = m[1]!
+    .replace(/\b(nome(?: completo)?|cpf|data de nascimento)\b/g, (campo) => {
+      campos.push(campo.startsWith("nome") ? "nome" : campo === "cpf" ? "cpf" : "nascimento");
+      return "";
+    })
+    .replace(/\b(seu|sua|o|a|e)\b/g, "")
+    .replace(/[\s,]+/g, "");
+  return campos.length > 0 && !restante && new Set(campos).size === campos.length ? campos : null;
+}
+
+function semOperacaoNoTurno(ctx: ContextoConfianca, resposta: string): boolean {
+  return (
+    [null, "nenhuma", "responder_informacao"].includes(ctx.requestedAction) &&
+    ctx.evidenciasFluxo?.registroFerramentasCompleto === true &&
+    ctx.toolResults.length === 0 &&
+    ctx.businessContext.agendamentoConfirmado === false &&
+    ctx.businessContext.handoffSolicitado === false &&
+    ctx.operationalState?.appointmentAttempted !== true &&
+    ctx.operationalState?.appointmentToolCalled !== true &&
+    ctx.operationalState?.appointmentCreated !== true &&
+    classificarAfirmacaoOperacional(resposta) === "nenhuma"
+  );
+}
+
+function saudacaoSocial(ctx: ContextoConfianca, resposta: string): boolean {
+  if (ctx.turnType !== "SAUDACAO" || !ehSaudacaoPura(ctx.mensagemPaciente ?? "")) return false;
+  const somenteCumprimento = normalizarTexto(resposta)
+    .replace(
+      /\b(?:como|em que)\s+(?:posso|podemos)\s+(?:(?:te|lhe)\s+)?ajudar(?:\s+hoje)?\s*\?/g,
+      "",
+    )
+    .replace(/\bnovamente\b/g, "");
+  return ehSaudacaoPura(somenteCumprimento);
 }
 
 function agendaComprovada(ctx: ContextoConfianca): boolean {
@@ -228,10 +291,81 @@ export function avaliarObrigacaoContinuidade(
   if (!msg || PEDIDO_IDENTIDADE.test(msg)) return null;
   if (REINICIO.test(normalizarTexto(resposta)))
     return resultado("descumprida", "CONTINUIDADE_ATENDIMENTO_REINICIADO");
+
+  const coleta = camposDaColeta(resposta);
+  const atuais = perguntas(resposta);
+  const historico = [...e.historico, { role: "user", content: ctx.mensagemPaciente ?? "" }];
+  const solicitados = [
+    ...atuais.map((q) => ({ q, topico: topicoPergunta(q) })),
+    ...(coleta ?? []).map((topico) => ({ q: "", topico })),
+  ];
+  for (const { q, topico } of solicitados) {
+    for (let i = 0; i < historico.length - 1; i++) {
+      if (historico[i]!.role !== "assistant" || historico[i + 1]!.role !== "user") continue;
+      const anteriores = [
+        ...perguntas(historico[i]!.content).map((anterior) => ({
+          q: anterior,
+          topico: topicoPergunta(anterior),
+        })),
+        ...(camposDaColeta(historico[i]!.content) ?? []).map((campo) => ({ q: "", topico: campo })),
+      ];
+      for (const anterior of anteriores) {
+        if (
+          topico &&
+          topico === anterior.topico &&
+          respostaAoTopico(topico, historico[i + 1]!.content, ctx)
+        )
+          return resultado("descumprida", "CONTINUIDADE_PERGUNTA_JA_RESPONDIDA");
+        if (!topico && q === anterior.q) return null;
+      }
+    }
+  }
+
+  // São provas de continuidade de conversa, sem dispensar o grounding ou as
+  // guardas operacionais. Texto fora dessas formas estreitas continua UNKNOWN.
+  const grounding = avaliarGrounding(ctx, resposta);
+  const semAfirmacoes =
+    grounding.total === 0 &&
+    !grounding.semEvidencia.length &&
+    !grounding.naoVerificados.length &&
+    !grounding.truncado;
+  if (semAfirmacoes && semOperacaoNoTurno(ctx, resposta)) {
+    if (saudacaoSocial(ctx, resposta))
+      return resultado("cumprida", "CONTINUIDADE_SOCIAL_COMPROVADA_NO_HISTORICO");
+    if (coleta && ctx.turnType === "ESCLARECIMENTO" && ctx.entities && ctx.requiredFields?.length) {
+      if (
+        !coleta.every((campo) =>
+          ALIASES_COLETA[campo].some((alias) => ctx.requiredFields!.includes(alias)),
+        )
+      )
+        return null;
+      const informado = coleta.some(
+        (campo) =>
+          ALIASES_COLETA[campo].some(
+            (alias) => ctx.entities![alias] != null && ctx.entities![alias] !== "",
+          ) ||
+          historico.some(
+            (m) =>
+              m.role === "user" &&
+              (campo === "cpf"
+                ? respostaAoTopico(campo, m.content, ctx)
+                : campo === "nascimento"
+                  ? /\b(nasci|nascimento)\b/.test(normalizarTexto(m.content)) &&
+                    respostaAoTopico(campo, m.content, ctx)
+                  : /\b(?:meu nome e |me chamo |sou (?:o |a )?)[a-z]/.test(
+                      normalizarTexto(m.content),
+                    ) && respostaAoTopico(campo, m.content, ctx)),
+          ),
+      );
+      if (informado || ctx.businessContext.pacienteIdentificado === true)
+        return resultado("descumprida", "CONTINUIDADE_DADO_JA_INFORMADO");
+      return resultado("cumprida", "CONTINUIDADE_COLETA_DE_DADO_PENDENTE_COMPROVADA");
+    }
+  }
+
   const agenda = agendaComprovada(ctx);
   if ((!ctx.requestedAction || !ACOES_INFORMATIVAS.has(ctx.requestedAction)) && !agenda)
     return null;
-  const grounding = avaliarGrounding(ctx, resposta);
   if (
     !grounding.total ||
     grounding.semEvidencia.length ||
@@ -255,23 +389,8 @@ export function avaliarObrigacaoContinuidade(
   );
   if (!agenda && !pagamentoRespondido && !temAssuntoCorrespondente(msg, resposta, ctx)) return null;
 
-  const atuais = perguntas(resposta);
-  const historico = [...e.historico, { role: "user", content: ctx.mensagemPaciente ?? "" }];
   for (const q of atuais) {
     const topico = topicoPergunta(q);
-    for (let i = 0; i < historico.length - 1; i++) {
-      if (historico[i]!.role !== "assistant" || historico[i + 1]!.role !== "user") continue;
-      for (const anterior of perguntas(historico[i]!.content)) {
-        const topicoAnterior = topicoPergunta(anterior);
-        if (
-          topico &&
-          topico === topicoAnterior &&
-          respostaAoTopico(topico, historico[i + 1]!.content, ctx)
-        )
-          return resultado("descumprida", "CONTINUIDADE_PERGUNTA_JA_RESPONDIDA");
-        if (!topico && q === anterior) return null;
-      }
-    }
     if (
       !topico ||
       !["interesse_agenda", "medico", ...(agenda ? ["data", "periodo", "vaga"] : [])].includes(

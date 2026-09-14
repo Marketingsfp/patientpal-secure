@@ -44,6 +44,7 @@ import { Route as PainelTTokenRouteImport } from './routes/painel_.t.$token'
 import { Route as PContratoTokenRouteImport } from './routes/p.contrato.$token'
 import { Route as ApiPublicTtsVoicesRouteImport } from './routes/api/public/tts-voices'
 import { Route as ApiPublicTtsRouteImport } from './routes/api/public/tts'
+import { Route as ApiPublicNinaRuntimeRouteImport } from './routes/api/public/nina-runtime'
 import { Route as ApiPublicIntakeSfpRouteImport } from './routes/api/public/intake-sfp'
 import { Route as ApiPublicIntakeConsultaHojeRouteImport } from './routes/api/public/intake-consulta-hoje'
 import { Route as ApiPublicIntakeRouteImport } from './routes/api/public/intake'
@@ -355,6 +356,11 @@ const ApiPublicTtsVoicesRoute = ApiPublicTtsVoicesRouteImport.update({
 const ApiPublicTtsRoute = ApiPublicTtsRouteImport.update({
   id: '/api/public/tts',
   path: '/api/public/tts',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicNinaRuntimeRoute = ApiPublicNinaRuntimeRouteImport.update({
+  id: '/api/public/nina-runtime',
+  path: '/api/public/nina-runtime',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiPublicIntakeSfpRoute = ApiPublicIntakeSfpRouteImport.update({
@@ -1254,6 +1260,7 @@ export interface FileRoutesByFullPath {
   '/api/public/intake': typeof ApiPublicIntakeRoute
   '/api/public/intake-consulta-hoje': typeof ApiPublicIntakeConsultaHojeRoute
   '/api/public/intake-sfp': typeof ApiPublicIntakeSfpRoute
+  '/api/public/nina-runtime': typeof ApiPublicNinaRuntimeRoute
   '/api/public/tts': typeof ApiPublicTtsRoute
   '/api/public/tts-voices': typeof ApiPublicTtsVoicesRoute
   '/p/contrato/$token': typeof PContratoTokenRoute
@@ -1422,6 +1429,7 @@ export interface FileRoutesByTo {
   '/api/public/intake': typeof ApiPublicIntakeRoute
   '/api/public/intake-consulta-hoje': typeof ApiPublicIntakeConsultaHojeRoute
   '/api/public/intake-sfp': typeof ApiPublicIntakeSfpRoute
+  '/api/public/nina-runtime': typeof ApiPublicNinaRuntimeRoute
   '/api/public/tts': typeof ApiPublicTtsRoute
   '/api/public/tts-voices': typeof ApiPublicTtsVoicesRoute
   '/p/contrato/$token': typeof PContratoTokenRoute
@@ -1596,6 +1604,7 @@ export interface FileRoutesById {
   '/api/public/intake': typeof ApiPublicIntakeRoute
   '/api/public/intake-consulta-hoje': typeof ApiPublicIntakeConsultaHojeRoute
   '/api/public/intake-sfp': typeof ApiPublicIntakeSfpRoute
+  '/api/public/nina-runtime': typeof ApiPublicNinaRuntimeRoute
   '/api/public/tts': typeof ApiPublicTtsRoute
   '/api/public/tts-voices': typeof ApiPublicTtsVoicesRoute
   '/p/contrato/$token': typeof PContratoTokenRoute
@@ -1770,6 +1779,7 @@ export interface FileRouteTypes {
     | '/api/public/intake'
     | '/api/public/intake-consulta-hoje'
     | '/api/public/intake-sfp'
+    | '/api/public/nina-runtime'
     | '/api/public/tts'
     | '/api/public/tts-voices'
     | '/p/contrato/$token'
@@ -1938,6 +1948,7 @@ export interface FileRouteTypes {
     | '/api/public/intake'
     | '/api/public/intake-consulta-hoje'
     | '/api/public/intake-sfp'
+    | '/api/public/nina-runtime'
     | '/api/public/tts'
     | '/api/public/tts-voices'
     | '/p/contrato/$token'
@@ -2111,6 +2122,7 @@ export interface FileRouteTypes {
     | '/api/public/intake'
     | '/api/public/intake-consulta-hoje'
     | '/api/public/intake-sfp'
+    | '/api/public/nina-runtime'
     | '/api/public/tts'
     | '/api/public/tts-voices'
     | '/p/contrato/$token'
@@ -2213,6 +2225,7 @@ export interface RootRouteChildren {
   ApiPublicIntakeRoute: typeof ApiPublicIntakeRoute
   ApiPublicIntakeConsultaHojeRoute: typeof ApiPublicIntakeConsultaHojeRoute
   ApiPublicIntakeSfpRoute: typeof ApiPublicIntakeSfpRoute
+  ApiPublicNinaRuntimeRoute: typeof ApiPublicNinaRuntimeRoute
   ApiPublicTtsRoute: typeof ApiPublicTtsRoute
   ApiPublicTtsVoicesRoute: typeof ApiPublicTtsVoicesRoute
   PContratoTokenRoute: typeof PContratoTokenRoute
@@ -2471,6 +2484,13 @@ declare module '@tanstack/react-router' {
       path: '/api/public/tts'
       fullPath: '/api/public/tts'
       preLoaderRoute: typeof ApiPublicTtsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/nina-runtime': {
+      id: '/api/public/nina-runtime'
+      path: '/api/public/nina-runtime'
+      fullPath: '/api/public/nina-runtime'
+      preLoaderRoute: typeof ApiPublicNinaRuntimeRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/public/intake-sfp': {
@@ -3866,6 +3886,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicIntakeRoute: ApiPublicIntakeRoute,
   ApiPublicIntakeConsultaHojeRoute: ApiPublicIntakeConsultaHojeRoute,
   ApiPublicIntakeSfpRoute: ApiPublicIntakeSfpRoute,
+  ApiPublicNinaRuntimeRoute: ApiPublicNinaRuntimeRoute,
   ApiPublicTtsRoute: ApiPublicTtsRoute,
   ApiPublicTtsVoicesRoute: ApiPublicTtsVoicesRoute,
   PContratoTokenRoute: PContratoTokenRoute,

@@ -149,13 +149,6 @@ describe("prova operacional da regra integral de homologação", () => {
       fonte: "agenda",
       success: true,
     },
-    {
-      nome: "consultar_base_conhecimento",
-      capacidade: "searchKnowledgeBase",
-      fonte: "base_conhecimento",
-      success: false,
-      erro: "timeout",
-    },
     { nome: "agendar", capacidade: "createAppointment", fonte: "agenda", success: true },
     {
       nome: "solicitar_atendente_humano",
@@ -168,6 +161,49 @@ describe("prova operacional da regra integral de homologação", () => {
     ctx.toolResults.push(ferramenta);
     expect(avaliarObrigacaoOperacional(obrigacao, ctx, resposta)?.status).toBe("indeterminada");
   });
+  it("timeout em leitura oficial comprova ausência de escrita, sem comprovar a fonte", () => {
+    const { obrigacao, ctx } = preparar();
+    ctx.toolResults = [
+      {
+        nome: "consultar_base_conhecimento",
+        capacidade: "searchKnowledgeBase",
+        fonte: "base_conhecimento",
+        success: false,
+        erro: "timeout",
+      },
+    ];
+    expect(avaliarObrigacaoOperacional(obrigacao, ctx, resposta)?.status).toBe("cumprida");
+    expect(ctx.toolResults[0]?.success).toBe(false);
+    expect(ctx.toolResults[0]?.erro).toBe("timeout");
+  });
+  it.each(["desconhecida", "criar_agendamento", "transferir_humano"] as const)(
+    "não converte %s em ausência de ação por ser turno social",
+    (acao) => {
+      const { obrigacao, ctx } = preparar();
+      ctx.requestedAction = acao;
+      ctx.turnType = "SAUDACAO";
+      ctx.toolResults = [];
+      expect(avaliarObrigacaoOperacional(obrigacao, ctx, "Oi! Como posso ajudar?")?.status).toBe(
+        "indeterminada",
+      );
+    },
+  );
+  it.each(["real", "simulada"])(
+    "escrita %s sem prova operacional permanece indeterminada mesmo em falha",
+    (origem) => {
+      const { obrigacao, ctx } = preparar();
+      ctx.toolResults = [
+        {
+          nome: "solicitar_atendente_humano",
+          capacidade: "requestHumanHandoff",
+          fonte: "atendimento",
+          success: false,
+          erro: `operação ${origem} sem confirmação`,
+        },
+      ];
+      expect(avaliarObrigacaoOperacional(obrigacao, ctx, resposta)?.status).toBe("indeterminada");
+    },
+  );
   it.each([
     "Agendei sua consulta.",
     "Vou chamar uma pessoa da equipe para continuar.",

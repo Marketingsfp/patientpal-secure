@@ -59,7 +59,9 @@ describe("FASE 3 — categorias das obrigações", () => {
 
   it("exigência conferível e prioritária da publicação é essencial", () => {
     expect(
-      categoriaDaObrigacao(obrig({ prioridade: "critica", verificacao: "deterministica" }) as never),
+      categoriaDaObrigacao(
+        obrig({ prioridade: "critica", verificacao: "deterministica" }) as never,
+      ),
     ).toBe("ESSENCIAL");
   });
 
@@ -67,7 +69,47 @@ describe("FASE 3 — categorias das obrigações", () => {
     expect(
       categoriaDaObrigacao(
         obrig({
+          prioridade: "normal",
+          classe: "LINGUAGEM",
+          verificacao: "semantica",
+          motivo: "LINGUAGEM_ABERTA_NAO_VERIFICAVEL",
+        }) as never,
+      ),
+    ).toBe("LINGUAGEM");
+  });
+
+  it.each(["ESSENCIAL", "CONVERSACIONAL"])(
+    "a classe %s permanece substantiva sem verificador",
+    (classe) => {
+      const o = obrig({
+        classe,
+        prioridade: classe === "ESSENCIAL" ? "critica" : "alta",
+        verificacao: "semantica",
+        status: "indeterminada",
+        motivo: "LINGUAGEM_ABERTA_NAO_VERIFICAVEL",
+      });
+      expect(categoriaDaObrigacao(o as never)).toBe(classe);
+      const r = repartirInstrucoes(agregado([o]))!;
+      expect(r.parcelas).toHaveLength(1);
+      expect(r.parcelas[0]?.status).toBe("UNKNOWN");
+      expect(r.memoria.linguagem.indeterminadas).toBe(0);
+    },
+  );
+
+  it("regra legada alta sem classe também não vira linguagem", () => {
+    expect(
+      categoriaDaObrigacao(
+        obrig({
           prioridade: "alta",
+          verificacao: "semantica",
+          motivo: "LINGUAGEM_ABERTA_NAO_VERIFICAVEL",
+        }) as never,
+      ),
+    ).toBe("CONVERSACIONAL");
+    expect(
+      categoriaDaObrigacao(
+        obrig({
+          prioridade: "normal",
           verificacao: "semantica",
           motivo: "LINGUAGEM_ABERTA_NAO_VERIFICAVEL",
         }) as never,
@@ -78,7 +120,11 @@ describe("FASE 3 — categorias das obrigações", () => {
   it("regra publicada não compreendida continua substantiva", () => {
     expect(
       categoriaDaObrigacao(
-        obrig({ tipo: "restricao_nao_interpretada", prioridade: "critica", verificacao: "semantica" }) as never,
+        obrig({
+          tipo: "restricao_nao_interpretada",
+          prioridade: "critica",
+          verificacao: "semantica",
+        }) as never,
       ),
     ).toBe("ESSENCIAL");
   });
@@ -181,8 +227,9 @@ describe("FASE 3 — nota e cobertura separadas", () => {
 describe("FASE 3 — linguagem em dimensão separada", () => {
   const linguagem = obrig({
     id: "L",
-    regraId: "CONV-01",
-    prioridade: "alta",
+    regraId: "LING-01",
+    prioridade: "normal",
+    classe: "LINGUAGEM",
     verificacao: "semantica",
     status: "indeterminada",
     motivo: "LINGUAGEM_ABERTA_NAO_VERIFICAVEL",

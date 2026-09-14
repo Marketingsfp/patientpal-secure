@@ -33,10 +33,7 @@ import {
   validarMensagemHandoff,
 } from "@/lib/atendimento/mensagem-handoff";
 import { criarResultado } from "@/lib/nina/resposta/contrato";
-import {
-  finalizarResposta,
-  limparFinalizacoes,
-} from "@/lib/nina/resposta/finalizacao.server";
+import { finalizarResposta, limparFinalizacoes } from "@/lib/nina/resposta/finalizacao.server";
 
 // ------------------------------------------------ repositório de versões (isolado)
 type Linha = {
@@ -87,9 +84,7 @@ mock.module("@/integrations/supabase/client.server", () => ({
   supabaseAdmin: { from: () => tabela() },
 }));
 
-const { promptInstrucoes, _resetCacheInstrucoes } = await import(
-  "../instrucoes-runtime.server"
-);
+const { promptInstrucoes, _resetCacheInstrucoes } = await import("../instrucoes-runtime.server");
 const { identidadeEfetivaAtual } = await import("../identidade-efetiva.server");
 
 // ------------------------------------------------------------------- conteúdos
@@ -211,8 +206,7 @@ describe("B — trocar só a Arquitetura muda a apresentação, sem deploy", () 
     expect(depois.snapshot.texto).toContain("Clínica Horizonte");
     expect(depois.snapshot.texto).not.toContain("Menino Jesus");
 
-    const boa =
-      "Bom dia! Sou a Lia, assistente virtual da Clínica Horizonte. Como posso ajudar?";
+    const boa = "Bom dia! Sou a Lia, assistente virtual da Clínica Horizonte. Como posso ajudar?";
     expect(avaliarSaudacao(boa, depois.identidade.apresentacao).completa).toBe(true);
 
     // Redação diferente também vale: valida identidade, não frase literal.
@@ -258,7 +252,10 @@ describe("C — cada campo muda isolado, os outros são preservados", () => {
     }
 
     // Formulário e edição manual do bloco produzem a MESMA identidade.
-    const manual = base.replace("Nome da atendente virtual: Nina", "Nome da atendente virtual: Lia");
+    const manual = base.replace(
+      "Nome da atendente virtual: Nina",
+      "Nome da atendente virtual: Lia",
+    );
     expect(extrairIdentidade(manual).ok && extrairIdentidade(manual)).toEqual(
       extrairIdentidade(soAssistente) as any,
     );
@@ -450,17 +447,28 @@ describe("H — regra de resposta exata da homologação continua valendo", () =
     IDENT_B,
   );
 
-  it("marcador exato passa mesmo com identidade publicada nova", () => {
+  it("marcador exato é cumprido sem ocultar outras regras não verificadas", () => {
     const c = ctx(textoComIdentidade, "ARQUITETURA_CONFIRMADA_9381");
-    expect(avaliarObrigacoes(c, c.draftText!).estadoRestricoes).toBe("cumpridas");
+    const r = avaliarObrigacoes(c, c.draftText!);
+    const literal = r.avaliacoes.find((a) => a.obrigacao.tipo === "restricao_literal");
+    expect(literal?.status).toBe("cumprida");
+    expect(literal?.obrigacao.literal).toBe("ARQUITETURA_CONFIRMADA_9381");
+    // A proibição aberta legada continua sem verificador: cumprir o literal
+    // não pode fabricar cumprimento dessa outra exigência.
+    expect(r.avaliacoes.some((a) => a.status === "indeterminada")).toBe(true);
+    expect(r.estadoRestricoes).toBe("indeterminadas");
     expect(InstructionComplianceValidator(c).status).toBe("PASS");
   });
 
   it("apresentação não é forçada no turno de teste", () => {
     const c = ctx(textoComIdentidade, "ARQUITETURA_CONFIRMADA_9381");
-    const d = avaliarSaudacao(c.draftText!, { assistente: "Lia", estabelecimento: "Horizonte" }, {
-      obrigatoria: false,
-    });
+    const d = avaliarSaudacao(
+      c.draftText!,
+      { assistente: "Lia", estabelecimento: "Horizonte" },
+      {
+        obrigatoria: false,
+      },
+    );
     expect(d.saudacaoAusente).toBe(false);
     // A telemetria observa, nunca reescreve o texto entregue.
     expect(c.draftText).toBe("ARQUITETURA_CONFIRMADA_9381");

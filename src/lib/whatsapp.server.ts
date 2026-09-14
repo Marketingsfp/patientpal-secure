@@ -701,7 +701,7 @@ async function gerarRespostaNinaInterno(
       telefoneRemetente
         ? supabaseAdmin
             .from("whatsapp_mensagens")
-            .select("id, direction, body, created_at, conversa_id, status, is_teste")
+            .select("id, direction, body, created_at, conversa_id, status, is_teste, enviada_por")
             .eq("clinica_id", clinicaId)
             // Marcadores de sistema (divisores de ciclo, avisos internos) são
             // só para leitura humana: nunca entram no contexto do modelo.
@@ -922,30 +922,6 @@ async function gerarRespostaNinaInterno(
     String(nomeUnidade)
       .split(/\s+[—–-]\s+/)[0]
       ?.trim() || nomeUnidade;
-  // REGRA ESTRUTURAL: a apresentação completa da Nina é obrigatória na
-  // PRIMEIRA resposta de cada sessão operacional (conversa nova, sessão
-  // expirada por TTL ou conversa resolvida que voltou a receber mensagem).
-  // Não depende do modelo lembrar: o estado manda.
-  const { garantirSessaoAtiva, avaliarSaudacao, marcarSaudacaoConcluida } =
-    await import("@/lib/nina/saudacao-sessao");
-  const inicioSessaoTs = Date.parse(String(sessaoNina.estado.session_started_at ?? ""));
-  const jaRespondeuNestaSessao = msgsMemoria.some((m: any) => {
-    if (m.direction !== "out") return false;
-    const t = Date.parse(String(m?.created_at ?? ""));
-    if (!Number.isFinite(inicioSessaoTs)) return true;
-    return Number.isFinite(t) ? t >= inicioSessaoTs : false;
-  });
-  const sessaoSaudacao = garantirSessaoAtiva(sessaoNina.estado, { jaRespondeuNestaSessao });
-  sessaoNina.estado = sessaoSaudacao.estado;
-  const saudacaoObrigatoria = sessaoSaudacao.saudacaoObrigatoria;
-  const jaSeApresentou = !saudacaoObrigatoria;
-  console.info("[NINA_SESSION]", {
-    conversa_id: estadoId.conversaId,
-    nina_session_id: sessaoNina.estado.session_id,
-    new_session: sessaoSaudacao.novaSessao || sessaoNina.expirou,
-    greeting_required: saudacaoObrigatoria,
-    greeting_completed: sessaoNina.estado.greeting_completed === true,
-  });
   const dadosPublicos = {
     nome_oficial: nomeUnidade,
     nome_curto: nomeCurtoUnidade,
@@ -1021,6 +997,39 @@ async function gerarRespostaNinaInterno(
     versaoId: instrucoesNina.versaoId,
   });
   const nomeApresentacao = identidadeEfetiva.apresentacao.estabelecimento;
+  // A etapa usa a apresentação realmente entregue na sessão e a identidade
+  // desta publicação. Recupera sessões afetadas pelo antigo detector literal,
+  // sem considerar candidatos não enviados ou mensagens de outros atendentes.
+  const {
+    garantirSessaoAtiva,
+    avaliarSaudacao,
+    marcarSaudacaoConcluida,
+    recuperarSaudacaoEntregue,
+    contemApresentacaoPublicada,
+  } = await import("@/lib/nina/saudacao-sessao");
+  const recuperacaoSaudacao = identidadeEfetiva.ok
+    ? recuperarSaudacaoEntregue(sessaoNina.estado, msgsMemoria, identidadeEfetiva.apresentacao, {
+        conversaId: estadoId.conversaId ?? null,
+        teste: opcoes?.teste === true,
+      })
+    : null;
+  if (recuperacaoSaudacao?.recuperada) {
+    await conferirReserva();
+    sessaoNina.estado = recuperacaoSaudacao.estado;
+    await persistirEstadoSessao(clinicaId, estadoId.conversaId, sessaoNina.estado);
+  }
+  const sessaoSaudacao = garantirSessaoAtiva(sessaoNina.estado);
+  sessaoNina.estado = sessaoSaudacao.estado;
+  const saudacaoObrigatoria = sessaoSaudacao.saudacaoObrigatoria;
+  const jaSeApresentou = !saudacaoObrigatoria;
+  console.info("[NINA_SESSION]", {
+    conversa_id: estadoId.conversaId,
+    nina_session_id: sessaoNina.estado.session_id,
+    new_session: sessaoSaudacao.novaSessao || sessaoNina.expirou,
+    greeting_required: saudacaoObrigatoria,
+    greeting_completed: sessaoNina.estado.greeting_completed === true,
+    greeting_recovered_from_message_id: recuperacaoSaudacao?.mensagemId ?? null,
+  });
   if (!identidadeEfetiva.ok) {
     console.warn("[NINA_IDENTIDADE]", {
       clinica_id: clinicaId,
@@ -2079,6 +2088,13 @@ async function gerarRespostaNinaInterno(
         texto: behaviorPrompt,
       });
       const preferenciaAtual = selecaoAtual();
+      // A etapa existente já autoriza a coleta por intenção confirmada.
+      // Releia os pendentes agora: ferramentas desta rodada podem ter
+      // completado campos desde a montagem inicial do contexto.
+      const camposParaColeta =
+        fluxoEstado.flow.stage === "COLLECTING_PATIENT_DATA" && fluxoEstado.appointment.intent_confirmed
+          ? (await import("@/lib/nina/atendimento-fase3")).dadosFaltantes(fluxoEstado)
+          : undefined;
       const estadoTurno = {
         texto,
         mensagemPaciente,
@@ -2111,6 +2127,7 @@ async function gerarRespostaNinaInterno(
           | "homologacao",
         clinicaId,
         conversaId: estadoId.conversaId ?? null,
+        ...(camposParaColeta ? { requiredFields: camposParaColeta } : {}),
         entities: { ...dadosColetados, ...(preferenciaAtual?.selecao ? {
           medico: preferenciaAtual.selecao.medicoNome,
           ...(preferenciaAtual.selecao.modalidade ? { procedimento: preferenciaAtual.selecao.modalidade.procedimento } : {}),
@@ -2635,32 +2652,23 @@ async function gerarRespostaNinaInterno(
       elementos: diagnosticoSaudacao.elementos,
     });
   }
-  // `greeting_completed` passa a significar APRESENTAÇÃO REALMENTE ENTREGUE.
-  // Por isso a marcação fica PENDENTE aqui e só é gravada depois da decisão
-  // final de entrega: se o texto for descartado, o paciente não recebeu
-  // apresentação nenhuma e o próximo turno não pode achar que recebeu.
-  // Apresentação dispensada por exceção publicada é registrada à parte
-  // (`greeting_waived`), sem fingir que a Nina se apresentou.
-  let apresentacaoPendente: "dispensada" | "feita" | null = null;
-  if (saudacaoObrigatoria && !saudacaoObrigatoriaEfetivaTurno) {
-    apresentacaoPendente = "dispensada";
-  } else if (saudacaoObrigatoriaEfetivaTurno && !diagnosticoSaudacao.saudacaoAusente) {
-    apresentacaoPendente = "feita";
-  }
-  /** Grava a marcação da apresentação só quando a resposta de fato sai. */
-  const confirmarApresentacaoEntregue = async (entregue: boolean) => {
-    if (apresentacaoPendente === null) return;
-    if (apresentacaoPendente === "dispensada") {
+  // A marcação usa o texto FINAL liberado, pois uma correção pode acrescentar
+  // ou remover a apresentação. Pedido concreto não exige perguntar como ajudar.
+  // A exceção publicada continua separada de uma apresentação observada.
+  const confirmarApresentacaoEntregue = async (textoFinal: string, entregue: boolean) => {
+    if (!saudacaoObrigatoria) return;
+    if (!saudacaoObrigatoriaEfetivaTurno) {
       fluxoEstado.greeting_waived = true;
       fluxoEstado.greeting_waived_by = saudacaoDispensadaPor;
       await salvarFluxoEstado(supabaseAdmin as never, clinicaId, estadoId.conversaId, fluxoEstado);
-      apresentacaoPendente = null;
       return;
     }
-    if (!entregue) {
-      apresentacaoPendente = null;
+    if (
+      !entregue ||
+      !identidadeEfetiva.ok ||
+      !contemApresentacaoPublicada(textoFinal, identidadeEfetiva.apresentacao)
+    )
       return;
-    }
     const estadoComSaudacao = marcarSaudacaoConcluida(fluxoEstado);
     fluxoEstado.greeting_completed = true;
     await salvarFluxoEstado(
@@ -2669,7 +2677,6 @@ async function gerarRespostaNinaInterno(
       estadoId.conversaId,
       estadoComSaudacao,
     );
-    apresentacaoPendente = null;
   };
 
   // Se a resposta pediu confirmação de identidade, marca na conversa para não repetir.
@@ -3558,7 +3565,7 @@ async function gerarRespostaNinaInterno(
     const { ehAvisoControlado: avisoControlado } = await import(
       "@/lib/nina/confidence/baixa-confiabilidade"
     );
-    await confirmarApresentacaoEntregue(!avisoControlado(resposta));
+    await confirmarApresentacaoEntregue(resposta, !avisoControlado(resposta));
   } catch {
     /* marcação de apresentação nunca interrompe o atendimento */
   }

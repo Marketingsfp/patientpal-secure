@@ -54,7 +54,8 @@ const INDICA_ATENDIMENTO_HUMANO =
   /\b(transferi|transferid[oa]|transferencia|encaminhei|encaminhad[oa]|atendimento humano|fila humana|fila de atendimento|atribuid[oa])\b|\b(chamar|chamei|chamando|acionar|acionei)\b[^.!?]{0,60}\b(atendente|equipe|pessoa|humano)\b|\b(equipe|atendente|pessoa)\b[^.!?]{0,60}\b(continuar|assumir|continua|assume)\b/;
 
 /**
- * Confirma somente a ausência de operações no turno informativo observado.
+ * Confirma somente a ausência de operações no turno informativo observado ou
+ * na saudação/coleta cuja ausência de ação foi explicitamente declarada.
  * Escrita ou simulação não comprovadas ficam indeterminadas: o nome de uma
  * ferramenta não prova, por si, um efeito real nem uma simulação autorizada.
  */
@@ -68,12 +69,16 @@ export function avaliarObrigacaoOperacional(
     obrigacao: o,
     status,
     motivo,
+    escopoVerificacao: "operacional",
   });
   if (ctx.businessContext?.ambiente === "producao")
     return resultado("nao_aplicavel", "REGRA_RESTRITA_A_HOMOLOGACAO");
   if (ctx.businessContext?.ambiente !== "homologacao")
     return resultado("indeterminada", "AMBIENTE_OPERACIONAL_NAO_COMPROVADO");
-  if (!ctx.requestedAction || !ACOES_INFORMATIVAS.has(ctx.requestedAction))
+  const semAcao =
+    (ctx.requestedAction === null || ctx.requestedAction === "nenhuma") &&
+    (ctx.turnType === "SAUDACAO" || ctx.turnType === "ESCLARECIMENTO");
+  if (!semAcao && (!ctx.requestedAction || !ACOES_INFORMATIVAS.has(ctx.requestedAction)))
     return resultado("indeterminada", "TIPO_DE_TURNO_FORA_DA_VERIFICACAO_OPERACIONAL");
   if (ctx.evidenciasFluxo?.registroFerramentasCompleto !== true || !Array.isArray(ctx.toolResults))
     return resultado("indeterminada", "REGISTRO_DE_FERRAMENTAS_INCOMPLETO");
@@ -97,17 +102,22 @@ export function avaliarObrigacaoOperacional(
       !oficial ||
       oficial.escrita ||
       ferramenta.capacidade !== oficial.capacidade ||
-      ferramenta.fonte !== oficial.fonte ||
-      ferramenta.success !== true ||
-      Boolean(ferramenta.erro)
+      ferramenta.fonte !== oficial.fonte
     ) {
       return resultado("indeterminada", "FERRAMENTA_FORA_DA_LEITURA_COMPROVADA");
     }
   }
+  // Uma leitura oficial que falhou não realizou uma escrita. A falha continua
+  // nas evidências factuais e não autoriza usar informação sem fonte.
   if (
     classificarAfirmacaoOperacional(resposta) !== "nenhuma" ||
     INDICA_ATENDIMENTO_HUMANO.test(normalizar(resposta))
   )
     return resultado("indeterminada", "RESPOSTA_EXIGE_VERIFICACAO_DE_OPERACAO_OU_SIMULACAO");
-  return resultado("cumprida", "HOMOLOGACAO_TURNO_INFORMATIVO_SEM_EFEITO_OPERACIONAL");
+  return resultado(
+    "cumprida",
+    semAcao
+      ? "HOMOLOGACAO_TURNO_SEM_ACAO_SEM_EFEITO_OPERACIONAL"
+      : "HOMOLOGACAO_TURNO_INFORMATIVO_SEM_EFEITO_OPERACIONAL",
+  );
 }

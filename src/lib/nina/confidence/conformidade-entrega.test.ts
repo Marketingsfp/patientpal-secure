@@ -78,6 +78,48 @@ describe("conformidade x entrega", () => {
     expect(c.motivoBloqueio).toBe("REGRA_PUBLICADA_NAO_VERIFICADA");
   });
 
+  it.each(["critica", "alta"])(
+    "agregado cumprido não encobre exigência %s indeterminada",
+    (prioridade) => {
+      const c = conformidadeDasInstrucoes(
+        avaliacao("PASS", [
+          { ...violacaoCritica, status: "indeterminada", prioridade },
+          { ...violacaoCritica, id: "ambiente", regraId: "AMB-01", status: "cumprida" },
+        ]),
+      );
+      expect(c.estado).toBe("nao_verificada");
+      expect(c.bloqueante).toBe(true);
+      expect(c.naoVerificadas).toHaveLength(1);
+      expect(c.motivoBloqueio).toBe("REGRA_PUBLICADA_NAO_VERIFICADA");
+    },
+  );
+
+  it("violação normal não encobre exigência crítica não verificada", () => {
+    const c = conformidadeDasInstrucoes(
+      avaliacao("FAIL", [
+        { ...violacaoCritica, prioridade: "normal" },
+        { ...violacaoCritica, id: "outra", regraId: "FAT-01", status: "indeterminada" },
+      ]),
+    );
+    expect(c.estado).toBe("descumprida");
+    expect(c.violacoes).toHaveLength(1);
+    expect(c.naoVerificadas).toHaveLength(1);
+    expect(c.bloqueante).toBe(true);
+    expect(c.motivoBloqueio).toBe("REGRA_PUBLICADA_NAO_VERIFICADA");
+  });
+
+  it("linguagem normal não verificada fica visível sem bloquear", () => {
+    const c = conformidadeDasInstrucoes(
+      avaliacao("PASS", [
+        { ...violacaoCritica, status: "cumprida" },
+        { ...violacaoCritica, id: "linguagem", status: "indeterminada", prioridade: "normal" },
+      ]),
+    );
+    expect(c.estado).toBe("nao_verificada");
+    expect(c.naoVerificadas).toHaveLength(1);
+    expect(c.bloqueante).toBe(false);
+  });
+
   it("regra cumprida ou não aplicável libera a entrega", () => {
     const c = conformidadeDasInstrucoes(
       avaliacao("PASS", [{ ...violacaoCritica, status: "cumprida" }]),
