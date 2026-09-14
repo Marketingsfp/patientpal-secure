@@ -56,7 +56,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 
-export const Route = createFileRoute("/_authenticated/app/procedimentos/importar")({
+export const Route = createFileRoute("/_authenticated/app/procedimentos_/importar")({
   component: ImportarServicosPage,
   head: () => ({
     meta: [
