@@ -1,6 +1,7 @@
 /**
  * REGRA DA HOMOLOGAÇÃO — reiniciar a sessão/memória da Nina é ação exclusiva
- * do botão "Resolver / Reiniciar teste" (rotina canônica `resetarLeadTeste`).
+ * dos botões "Resolver / Reiniciar teste" e início de uma nova carga
+ * (rotina canônica `resetarLeadTeste`).
  *
  * Encaminhamento simulado, fim de cenário, erro ou timeout não podem mais
  * encerrar o ciclo, zerar a memória nem trocar o telefone virtual.
@@ -24,15 +25,12 @@ describe("reset só pelo botão — encaminhamento", () => {
     expect(src).not.toContain('evento: "IA_MEMORIA_RESETADA"');
   });
 
-
   it("cenário aprovado mesmo com o ciclo ainda ativo e sem reset de memória", () => {
     const v = verificarHandoff({
       transferida: true,
       protocolo: "MJ-14712",
       protocolosDistintos: 1,
-      mensagensSaida: [
-        "Vou encaminhar você para nossa equipe. Seu protocolo é MJ-14712.",
-      ],
+      mensagensSaida: ["Vou encaminhar você para nossa equipe. Seu protocolo é MJ-14712."],
       cicloStatus: "ativo",
       cicloEndReason: null,
       memoryResetAt: null,
@@ -61,7 +59,6 @@ describe("reset só pelo botão — cenários", () => {
     expect(src).not.toContain("resetarLeadTeste");
     expect(src).toContain("precisaResetManual");
   });
-
 });
 
 describe("reset só pelo botão — rotina canônica", () => {
@@ -92,13 +89,18 @@ describe("reset só pelo botão — rotina canônica", () => {
     ).rejects.toThrow(/Resolver \/ Reiniciar teste/);
   });
 
-  it("carga e correção assistida apenas verificam, nunca resetam", () => {
+  it("carga só autoriza reset no início explicitamente solicitado", () => {
     const carga = ler("src/lib/nina/carga-preflight.server.ts");
-    expect(carga).not.toContain("resetarLeadTeste");
+    expect(carga).toContain("if (entrada.reiniciarNoInicio)");
+    expect(carga).toContain('origem: "inicio_teste_carga_confirmado"');
+    expect(carga).toContain("manual: true");
+    expect(carga).toContain("removerAgendamentos: false");
     expect(carga).toContain("Resolver / Reiniciar teste");
+  });
+
+  it("correção assistida apenas verifica, nunca reseta", () => {
     const correcao = ler("src/lib/nina/correcao-ferramentas.server.ts");
     expect(correcao).not.toContain("resetarLeadTeste");
     expect(correcao).toContain("Resolver / Reiniciar teste");
   });
 });
-

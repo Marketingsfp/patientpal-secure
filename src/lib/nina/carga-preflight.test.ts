@@ -138,7 +138,12 @@ describe("preparação em lotes com progresso (fase 3)", () => {
   it("não repete leads já preparados no mesmo run", () => {
     const pendentes = pendentesPreflight(dez, [{ leadId: "lead-1" }, { leadId: "lead-2" }]);
     expect(pendentes.map((l) => l.indice)).toEqual([3, 4, 5, 6, 7, 8, 9, 10]);
-    expect(pendentesPreflight(dez, dez.map((l) => ({ leadId: l.id })))).toHaveLength(0);
+    expect(
+      pendentesPreflight(
+        dez,
+        dez.map((l) => ({ leadId: l.id })),
+      ),
+    ).toHaveLength(0);
   });
 
   it("prepara em lotes até completar todos os participantes", () => {
@@ -155,8 +160,8 @@ describe("preparação em lotes com progresso (fase 3)", () => {
 
   it("descreve a preparação parcial para o operador", () => {
     expect(descreverPreparacaoParcial(9, 10)).toBe(
-      "9 de 10 Leads foram preparados. O teste não foi iniciado porque 1 lead não pôde ser resetado.",
+      "9 de 10 leads estão prontos. O teste não foi iniciado porque 1 lead não está pronto. Confira os motivos abaixo; nenhuma mensagem é enviada antes de todos estarem prontos.",
     );
-    expect(descreverPreparacaoParcial(7, 10)).toContain("3 leads não puderam ser resetados");
+    expect(descreverPreparacaoParcial(7, 10)).toContain("3 leads não estão prontos");
   });
 });

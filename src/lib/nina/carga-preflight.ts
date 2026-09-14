@@ -1,12 +1,12 @@
 /**
  * FASE 2 — PREPARAÇÃO DOS LEADS (load test preflight).
  *
- * Antes da PRIMEIRA mensagem de um novo teste de carga, todos os leads que vão
- * participar daquela execução passam por um reset real e confirmado. Só quando
- * TODOS estiverem READY o teste pode começar.
+ * Antes da primeira mensagem, o início confirmado reinicia os 10 leads e
+ * verifica a memória limpa. A retomada preserva baselines já preparados.
+ * Só quando todos estiverem READY o teste começa.
  *
  * Este módulo é pura orquestração e decisão (sem banco), para poder ser testado
- * de ponta a ponta; o reset real é injetado por `carga-preflight.server.ts`.
+ * de ponta a ponta; a verificação é injetada por `carga-preflight.server.ts`.
  */
 
 export type SituacaoPreflight = "READY" | "FAILED";
@@ -55,12 +55,13 @@ type LeadMinimo = { id: string; indice: number };
 /** FASE 3 — quantos leads são preparados por chamada (progresso visual). */
 export const LOTE_PREFLIGHT = 3;
 
-/** Baseline mínimo gravado por lead depois do reset e antes do 1º disparo. */
+/** Baseline gravado após verificar a sessão limpa e antes do primeiro disparo. */
 export type BaselineLead = {
   runId: string;
   leadId: string;
   leadIndice: number;
   preparedAt: string;
+  /** Memória limpa confirmada depois do reset inicial ou verificação idempotente. */
   memoryReset: true;
   previousCycleResolved: true;
   ready: true;
@@ -99,10 +100,7 @@ export type MetricasPreflight = {
   ciclosAnterioresEncerrados: number;
 };
 
-export function metricasPreflight(
-  baselines: BaselineLead[],
-  total?: number,
-): MetricasPreflight {
+export function metricasPreflight(baselines: BaselineLead[], total?: number): MetricasPreflight {
   return {
     leadsPreparados: baselines.length,
     leadsTotal: total ?? baselines.length,
@@ -124,21 +122,21 @@ export function pendentesPreflight<T extends LeadMinimo>(
 /** Mensagem de preparação interrompida, no formato pedido pelo operador. */
 export function descreverPreparacaoParcial(prontos: number, total: number): string {
   const falharam = Math.max(0, total - prontos);
-  const plural = falharam === 1 ? "1 lead não pôde ser resetado" : `${falharam} leads não puderam ser resetados`;
-  return `${prontos} de ${total} Leads foram preparados. O teste não foi iniciado porque ${plural}.`;
+  const plural = falharam === 1 ? "1 lead não está pronto" : `${falharam} leads não estão prontos`;
+  return `${prontos} de ${total} leads estão prontos. O teste não foi iniciado porque ${plural}. Confira os motivos abaixo; nenhuma mensagem é enviada antes de todos estarem prontos.`;
 }
 
 /**
- * Executa o reset de todos os participantes com paralelismo limitado e devolve
- * o resumo. Um lead só é marcado READY DEPOIS de o reset ter terminado e sido
- * confirmado — nunca antes.
+ * Verifica os participantes com paralelismo limitado e devolve o resumo.
+ * Um lead só é marcado READY depois da verificação terminar com sucesso.
  */
 export async function prepararLeads<T extends LeadMinimo>(entrada: {
   leads: T[];
+  /** Reset inicial autorizado ou verificação de sessão, conforme o chamador. */
   resetar: (
     lead: T,
   ) => Promise<{ jaResolvida?: boolean; cicloEncerrado?: string | null; sessao?: number | null }>;
-  /** Quantos resets simultâneos (padrão 4). */
+  /** Quantas verificações simultâneas (padrão 4). */
   paralelismo?: number;
 }): Promise<ResumoPreflight> {
   const leads = entrada.leads;

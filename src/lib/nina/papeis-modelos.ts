@@ -15,7 +15,7 @@ import { MODELO_TERRA } from "@/lib/nina/simulador-terra";
 import { MODELO_LUNA } from "@/lib/nina/carga";
 import { MODELO_SOL } from "@/lib/nina/avaliador-sol";
 
-export type PapelModelo = "paciente" | "carga" | "avaliador" | "nina";
+export type PapelModelo = "paciente" | "carga" | "avaliador" | "nina" | "planejador_carga";
 
 export const PROVEDOR_IA = "lovable-ai-gateway";
 
@@ -55,6 +55,14 @@ export const PAPEIS_MODELOS: Record<PapelModelo, DefinicaoPapel> = {
     modelo: null,
     provedor: PROVEDOR_IA,
     descricao: "Modelo real da clínica; registrado em cada execução.",
+  },
+  planejador_carga: {
+    papel: "planejador_carga",
+    rotulo: "GPT Sol — planejamento de carga",
+    modelo: MODELO_SOL,
+    provedor: PROVEDOR_IA,
+    descricao:
+      "Só propõe roteiros revisáveis. Não cria nem executa o teste e não responde pela Nina.",
   },
 };
 

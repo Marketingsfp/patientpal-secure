@@ -18,19 +18,25 @@ import {
   INSTRUCOES_LUNA,
   LIMITE_ABSOLUTO,
   MODELO_LUNA,
-  intervaloEfetivoMs,
   normalizarConfig,
   planoDeMensagens,
   validarDisparo,
   variacoesFallback,
-  estourouOrcamento,
   type ConfigCarga,
 } from "@/lib/nina/carga";
 import { garantirPapel, PROVEDOR_IA } from "@/lib/nina/papeis-modelos";
+import { validarPlanoCarga } from "./carga-planejamento";
+import { estadoControleCarga, VERSAO_EXECUTOR_CARGA } from "./carga-controle";
+import {
+  carregarCargaControlada as carregarCarga,
+  recuperarCargaSemAtividade,
+  comLeaseCarga,
+  retornoCarga,
+  comLockCriacaoCarga,
+  cargasQueReservamExecutor,
+} from "./carga-controle.server";
 
 const GATEWAY = "https://ai.gateway.lovable.dev/v1/responses";
-/** Orçamento de tempo de cada chamada de lote (o restante segue no próximo). */
-const ORCAMENTO_LOTE_MS = 20_000;
 
 type Ctx = { supabase: any; userId: string };
 
@@ -56,12 +62,7 @@ const configSchema = z.object({
     .min(1)
     .max(LIMITE_ABSOLUTO.conversasSimultaneas)
     .default(5),
-  mensagensPorMinuto: z
-    .number()
-    .int()
-    .min(1)
-    .max(LIMITE_ABSOLUTO.mensagensPorMinuto)
-    .default(30),
+  mensagensPorMinuto: z.number().int().min(1).max(LIMITE_ABSOLUTO.mensagensPorMinuto).default(30),
   duracaoMaxS: z.number().int().min(30).max(LIMITE_ABSOLUTO.duracaoMaxS).default(300),
   intervaloMs: z.number().int().min(0).max(60_000).default(1000),
   timeoutS: z.number().int().min(10).max(LIMITE_ABSOLUTO.timeoutS).default(60),
@@ -70,7 +71,9 @@ const configSchema = z.object({
   maxCustoCreditos: z.number().min(0).max(LIMITE_ABSOLUTO.maxCustoCreditos).default(0),
   creditosPorMilTokens: z.number().min(0).max(LIMITE_ABSOLUTO.creditosPorMilTokens).default(0),
   distribuicao: z
-    .array(z.object({ cenario: z.string().trim().min(3).max(300), peso: z.number().min(0.1).max(10) }))
+    .array(
+      z.object({ cenario: z.string().trim().min(1).max(300), peso: z.number().min(0.1).max(10) }),
+    )
     .max(10)
     .default([]),
 });
@@ -121,7 +124,7 @@ async function gerarVariacoesLuna(cenario: string, quantidade: number): Promise<
   }
 }
 
-/** Cria o teste de carga, gera as variações e monta a fila de mensagens. */
+/** Cria a fila revisada; planejamento de IA não é autorização de execução. */
 export const criarTesteCarga = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) =>
@@ -132,89 +135,107 @@ export const criarTesteCarga = createServerFn({ method: "POST" })
         config: configSchema,
         confirmado: z.boolean().default(false),
         usarLuna: z.boolean().default(true),
+        planoIA: z.unknown().optional(),
       })
       .parse(input),
   )
   .handler(async ({ data, context }: { data: any; context: Ctx }) => {
     await assertMembership(context.supabase, context.userId, data.clinicaId);
-    const config: ConfigCarga = normalizarConfig(data.config);
+    const planoIA = data.planoIA === undefined ? null : validarPlanoCarga(data.planoIA);
+    const config: ConfigCarga = planoIA ? planoIA.config : normalizarConfig(data.config);
+    if (
+      planoIA &&
+      Object.keys(config).some(
+        (chave) =>
+          JSON.stringify(data.planoIA.config?.[chave]) !==
+          JSON.stringify(config[chave as keyof ConfigCarga]),
+      )
+    )
+      throw new Error(
+        "O plano foi ajustado pela validação. Revise e confirme a prévia antes de executar.",
+      );
     const check = validarDisparo(config, data.confirmado);
     if (!check.ok) throw new Error(check.motivo);
-
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { garantirLeads } = await import("@/lib/nina/teste-console.server");
-
-    // FASE 3 — um run por vez: duplo clique, retry da tela ou duas chamadas
-    // simultâneas não podem criar duas execuções.
-    const { data: emAndamento } = await supabaseAdmin
-      .from("nina_teste_carga")
-      .select("id, status")
-      .eq("clinica_id", data.clinicaId)
-      .in("status", ["preparando", "executando"])
-      .limit(1);
-    if ((emAndamento ?? []).length)
-      throw new Error("Já existe um teste de carga em andamento nesta clínica.");
-
-    const leads = await garantirLeads(supabaseAdmin, data.clinicaId);
-    if (!leads.length) throw new Error("Nenhum lead de teste disponível nesta clínica");
-
-
-
-
+    const mensagemAtivo =
+      "Já existe um teste ativo ou uma mensagem ainda em processamento nesta clínica. Abra o teste para acompanhar ou retomar.";
+    if ((await cargasQueReservamExecutor(supabaseAdmin, data.clinicaId)).length)
+      throw new Error(mensagemAtivo);
+    // A IA termina ANTES da trava: o trecho crítico abaixo contém apenas banco.
     const plano = planoDeMensagens(config);
-    const cenariosUnicos = [...new Set(plano.map((p) => p.cenario))];
-
-    // Variações de linguagem por cenário (Luna) ou variações fixas de apoio.
     const variacoes: Record<string, string[]> = {};
-    for (const cenario of cenariosUnicos) {
-      variacoes[cenario] = data.usarLuna
-        ? await gerarVariacoesLuna(cenario, 8)
-        : variacoesFallback(cenario);
-    }
-
-    const planoFinal = plano.map((p, i) => {
-      const opcoes = variacoes[p.cenario] ?? variacoesFallback(p.cenario);
-      const lead = leads[p.slot % Math.min(config.leadsAtivos, leads.length)]!;
-      return {
-        indice: i,
-        cenario: p.cenario,
-        mensagem: opcoes[i % opcoes.length]!,
-        leadId: lead.id,
-        leadIndice: lead.indice,
-      };
+    const mensagensLuna = planoIA
+      ? await (await import("./carga-redacao-luna.server")).gerarMensagensPlanoLuna(planoIA)
+      : null;
+    if (!planoIA)
+      for (const cenario of new Set(plano.map((p) => p.cenario)))
+        variacoes[cenario] = data.usarLuna
+          ? await gerarVariacoesLuna(cenario, 8)
+          : variacoesFallback(cenario);
+    return await comLockCriacaoCarga(supabaseAdmin, data.clinicaId, async () => {
+      const ativos = await cargasQueReservamExecutor(supabaseAdmin, data.clinicaId);
+      if (ativos.length) throw new Error(mensagemAtivo);
+      const leads = await garantirLeads(supabaseAdmin, data.clinicaId);
+      if (leads.length !== 10 || new Set(leads.map((l: any) => l.id)).size !== 10)
+        throw new Error(
+          "Os 10 leads de homologação precisam estar disponíveis antes de iniciar o teste.",
+        );
+      const fila = mensagensLuna
+        ? mensagensLuna.map((p) => ({ ...p, mensagem: p.texto }))
+        : plano.map((p, i) => {
+            const opcoes = variacoes[p.cenario] ?? variacoesFallback(p.cenario);
+            return { ...p, mensagem: opcoes[i % opcoes.length]! };
+          });
+      const planoFinal = fila.map((p, indice) => {
+        const lead = leads[p.slot % config.leadsAtivos]!;
+        return { ...p, indice, leadId: lead.id, leadIndice: lead.indice };
+      });
+      const { data: linha, error } = await supabaseAdmin
+        .from("nina_teste_carga")
+        .insert({
+          clinica_id: data.clinicaId,
+          nome: data.nome,
+          perfil: config.perfil,
+          status: "preparando",
+          config: {
+            ...config,
+            ...(planoIA ? { planoIA } : {}),
+            _inicioCarga: {
+              versao: 1,
+              resetTodosLeads: true,
+              leads: leads.map((l: any) => ({
+                id: l.id,
+                indice: l.indice,
+                sessao_seq: l.sessao_seq,
+                conversa_id: l.conversa_id,
+                ciclo_id: l.ciclo_id,
+              })),
+            },
+          },
+          variacoes,
+          plano: planoFinal,
+          preflight: [],
+          confirmado: data.confirmado,
+          total_planejado: planoFinal.length,
+          modelo_gerador: planoIA || data.usarLuna ? garantirPapel("carga", MODELO_LUNA) : null,
+          provedor_gerador: planoIA || data.usarLuna ? PROVEDOR_IA : null,
+          criado_por: context.userId,
+        })
+        .select("id, status, total_planejado")
+        .maybeSingle();
+      if (error) throw new Error(error.message);
+      if (!linha)
+        throw new Error("O teste não foi criado. Atualize a lista antes de tentar novamente.");
+      return { carga: linha, config, participantes: new Set(planoFinal.map((p) => p.leadId)).size };
     });
-
-    const participantes = [...new Set(planoFinal.map((p) => p.leadId))];
-
-    // FASE 3 — o run nasce em PREPARANDO: nenhum disparo pode acontecer antes
-    // de todos os leads participantes estarem READY.
-    const { data: linha, error } = await supabaseAdmin
-      .from("nina_teste_carga")
-      .insert({
-        clinica_id: data.clinicaId,
-        nome: data.nome,
-        perfil: config.perfil,
-        status: "preparando",
-        config,
-        variacoes,
-        plano: planoFinal,
-        preflight: [],
-        confirmado: data.confirmado,
-        total_planejado: planoFinal.length,
-        modelo_gerador: data.usarLuna ? garantirPapel("carga", MODELO_LUNA) : null,
-        provedor_gerador: data.usarLuna ? PROVEDOR_IA : null,
-        criado_por: context.userId,
-      })
-      .select("id, status, total_planejado")
-      .maybeSingle();
-    if (error) throw new Error(error.message);
-    return { carga: linha, config, participantes: participantes.length };
   });
 
 /**
  * FASE 3 — prepara os leads participantes em lotes pequenos, para a tela
  * mostrar o progresso (0/10 … 10/10). É idempotente: leads já com baseline
- * READY não são resetados de novo. Só quando TODOS ficam prontos o run passa
+ * READY não são resetados de novo. O início confirmado prepara os 10 leads.
+ * Só quando TODOS ficam prontos o run passa
  * para `executando` — que é o único status em que o disparo é liberado.
  */
 export const prepararLeadsTesteCarga = createServerFn({ method: "POST" })
@@ -233,103 +254,125 @@ export const prepararLeadsTesteCarga = createServerFn({ method: "POST" })
       descreverPreparacaoParcial,
       pendentesPreflight,
     } = await import("@/lib/nina/carga-preflight");
-
     const carga = await carregarCarga(supabaseAdmin, data.clinicaId, data.cargaId);
-    const plano = (carga.plano ?? []) as any[];
-    const participantes = [
-      ...new Map(
-        plano.map((p: any) => [p.leadId, { id: p.leadId as string, indice: p.leadIndice as number }]),
-      ).values(),
-    ];
-    const baselines = (carga.preflight ?? []) as any[];
-
-    if (carga.status !== "preparando") {
-      return {
-        status: carga.status,
-        pronto: carga.status === "executando",
-        prontos: baselines.length,
-        total: participantes.length,
-        erro: null as string | null,
-      };
-    }
-
-    const pendentes = pendentesPreflight(participantes, baselines).slice(0, LOTE_PREFLIGHT);
-    const resumo = pendentes.length
-      ? await prepararLeadsCarga({
-          admin: supabaseAdmin,
-          clinicaId: data.clinicaId,
-          leads: pendentes as any,
-          userId: context.userId,
-        })
-      : { pronto: true, total: 0, prontos: 0, falhas: [], resultados: [] };
-
-    const novos = resumo.resultados
-      .filter((r) => r.situacao === "READY")
-      .map((resultado) => baselineLead({ runId: carga.id, resultado }));
-    const acumulado = [...baselines, ...novos];
-
-    if (resumo.falhas.length) {
-      await supabaseAdmin
-        .from("nina_teste_carga")
-        .update({
-          status: "erro",
-          preflight: acumulado,
-          finalizado_em: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", carga.id);
-      return {
-        status: "erro",
-        pronto: false,
-        prontos: acumulado.length,
-        total: participantes.length,
-        erro: `${descreverPreparacaoParcial(acumulado.length, participantes.length)} ${descreverFalhaPreflight(
-          resumo as any,
-        )}`.trim(),
-      };
-    }
-
-    const todosProntos = acumulado.length >= participantes.length;
-    await supabaseAdmin
-      .from("nina_teste_carga")
-      .update({
-        preflight: acumulado,
-        ...(todosProntos
-          ? { status: "executando", iniciado_em: new Date().toISOString() }
-          : {}),
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", carga.id)
-      .eq("status", "preparando");
-
-    return {
-      status: todosProntos ? "executando" : "preparando",
-      pronto: todosProntos,
-      prontos: acumulado.length,
-      total: participantes.length,
-      erro: null as string | null,
-    };
+    const resultado =
+      carga.status === "preparando"
+        ? await comLeaseCarga({
+            admin: supabaseAdmin,
+            carga,
+            fase: "preflight",
+            executar: async (dono, atual) => {
+              const plano = Array.isArray(atual.plano) ? (atual.plano as any[]) : [];
+              const inicioConfirmado = (atual.config as any)?._inicioCarga;
+              // O snapshot é criado apenas pelo comando Iniciar; `confirmado` legado
+              // pertence à confirmação adicional de alto volume, não ao reset inicial.
+              const reiniciarNoInicio =
+                inicioConfirmado?.versao === 1 && inicioConfirmado?.resetTodosLeads === true;
+              const participantes = reiniciarNoInicio
+                ? inicioConfirmado.leads
+                : [
+                    ...new Map(
+                      plano.map((p: any) => [
+                        p.leadId,
+                        { id: p.leadId as string, indice: p.leadIndice as number },
+                      ]),
+                    ).values(),
+                  ];
+              if (
+                !Array.isArray(participantes) ||
+                !participantes.length ||
+                (reiniciarNoInicio &&
+                  (participantes.length !== 10 ||
+                    new Set(participantes.map((l: any) => l.id)).size !== 10))
+              )
+                throw new Error("O plano não possui participantes válidos.");
+              const baselines = Array.isArray(atual.preflight) ? atual.preflight : [];
+              let acumulado = [...baselines];
+              const pendentes = pendentesPreflight(participantes, baselines).slice(
+                0,
+                LOTE_PREFLIGHT,
+              );
+              if (!(await dono.aindaAtivo())) return;
+              const resumo = pendentes.length
+                ? await prepararLeadsCarga({
+                    admin: supabaseAdmin,
+                    clinicaId: data.clinicaId,
+                    leads: pendentes as any,
+                    userId: context.userId,
+                    reiniciarNoInicio,
+                    podeContinuar: dono.aindaAtivo,
+                    aposPronto: async (resultado) => {
+                      acumulado = [
+                        ...acumulado.filter((b: any) => b.leadId !== resultado.leadId),
+                        baselineLead({ runId: atual.id, resultado }),
+                      ];
+                      if (!(await dono.alterar({ preflight: acumulado })))
+                        throw new Error(
+                          "A preparação perdeu sua reserva antes de registrar o lead pronto.",
+                        );
+                    },
+                  })
+                : { pronto: true, total: 0, prontos: 0, falhas: [], resultados: [] };
+              if (resumo.falhas.length)
+                throw new Error(
+                  (
+                    descreverPreparacaoParcial(acumulado.length, participantes.length) +
+                    " " +
+                    descreverFalhaPreflight(resumo as any)
+                  ).trim(),
+                );
+              if (
+                pendentesPreflight(participantes, acumulado).length === 0 &&
+                (await dono.aindaAtivo())
+              ) {
+                // Revalida todos antes de abrir o gate: outro operador pode ter usado
+                // um lead já preparado enquanto os demais ainda eram reiniciados.
+                const { data: atuais, error } = await supabaseAdmin
+                  .from("nina_teste_leads")
+                  .select("id, sessao_seq, conversa_id, ciclo_id")
+                  .eq("clinica_id", data.clinicaId)
+                  .in(
+                    "id",
+                    participantes.map((l: any) => l.id),
+                  );
+                if (error)
+                  throw new Error(
+                    `Não foi possível confirmar as sessões preparadas: ${error.message}`,
+                  );
+                for (const participante of participantes) {
+                  const lead = atuais?.find((l: any) => l.id === participante.id);
+                  const baseline = acumulado.find((b: any) => b.leadId === participante.id);
+                  if (
+                    !lead ||
+                    !baseline ||
+                    lead.conversa_id ||
+                    lead.ciclo_id ||
+                    Number(lead.sessao_seq) !== baseline.sessao
+                  )
+                    throw new Error(
+                      `Lead ${participante.indice}: a sessão mudou durante a preparação. Nenhuma mensagem de carga foi enviada.`,
+                    );
+                }
+                await dono.alterar({ status: "executando", iniciado_em: new Date().toISOString() });
+              }
+            },
+          })
+        : { carga, ocupado: estadoControleCarga(carga).ocupado };
+    const atual = resultado.carga;
+    const snapshot = (atual.config as any)?._inicioCarga;
+    const participantes =
+      snapshot?.resetTodosLeads && Array.isArray(snapshot.leads)
+        ? snapshot.leads.length
+        : new Set((Array.isArray(atual.plano) ? atual.plano : []).map((p: any) => p.leadId)).size;
+    return retornoCarga(atual, {
+      ocupado: resultado.ocupado,
+      pronto: atual.status === "executando",
+      prontos: Array.isArray(atual.preflight) ? atual.preflight.length : 0,
+      total: participantes,
+    });
   });
 
-async function carregarCarga(admin: any, clinicaId: string, id: string) {
-  const { data, error } = await admin
-    .from("nina_teste_carga")
-    .select("*")
-    .eq("clinica_id", clinicaId)
-    .eq("id", id)
-    .maybeSingle();
-  if (error) throw new Error(error.message);
-  if (!data) throw new Error("Teste de carga não encontrado nesta clínica");
-  return data as any;
-}
-
-const espera = (ms: number) => new Promise((r) => setTimeout(r, ms));
-
-/**
- * Executa um trecho da fila dentro de um orçamento de tempo. O cliente apenas
- * repete a chamada: concorrência, ritmo, tentativas e tempo limite são
- * decididos aqui no servidor.
- */
+/** Reserva um lote no banco; duas abas não processam o mesmo índice. */
 export const executarLoteCarga = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) =>
@@ -339,198 +382,17 @@ export const executarLoteCarga = createServerFn({ method: "POST" })
     await assertMembership(context.supabase, context.userId, data.clinicaId);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { processarMensagemTeste } = await import("@/lib/nina/teste-console.server");
-
-    const carga = await carregarCarga(supabaseAdmin, data.clinicaId, data.cargaId);
-    if (carga.status !== "executando")
-      return { status: carga.status, enviadas: carga.enviadas, total: carga.total_planejado };
-
-    const config = normalizarConfig(carga.config ?? {});
-    const plano = (carga.plano ?? []) as any[];
-    const intervalo = intervaloEfetivoMs(config);
-    const inicioLote = Date.now();
-    const inicioTeste = new Date(carga.iniciado_em).getTime();
-
-    let enviadas = carga.enviadas as number;
-    const acumulado = {
-      sucesso: 0,
-      erros: 0,
-      timeouts: 0,
-      retries: 0,
-      chamadas: 0,
-      ferramentas: 0,
-      inputTokens: 0,
-      outputTokens: 0,
-    };
-    let terminou: string | null = null;
-
-    while (enviadas < plano.length) {
-      if (Date.now() - inicioLote > ORCAMENTO_LOTE_MS) break;
-      if ((Date.now() - inicioTeste) / 1000 > config.duracaoMaxS) {
-        terminou = "concluido";
-        break;
-      }
-      // Orçamento de tokens/custo estimado do teste inteiro.
-      const tokensAteAgora =
-        Number(carga.input_tokens) +
-        Number(carga.output_tokens) +
-        acumulado.inputTokens +
-        acumulado.outputTokens;
-      if (estourouOrcamento(config, tokensAteAgora).estourou) {
-        terminou = "parado";
-        break;
-      }
-      // Cancelamento: relido do banco a cada rodada.
-      const { data: flag } = await supabaseAdmin
-        .from("nina_teste_carga")
-        .select("cancelar")
-        .eq("id", carga.id)
-        .maybeSingle();
-      if ((flag as any)?.cancelar) {
-        terminou = "parado";
-        break;
-      }
-
-      const rodada = plano.slice(enviadas, enviadas + config.conversasSimultaneas);
-      const t0Rodada = Date.now();
-
-      const resultados = await Promise.all(
-        rodada.map(async (item: any) => {
-          let tentativa = 0;
-          let ultimoErro: string | null = null;
-          let status: "ok" | "erro" | "timeout" = "erro";
-          let latencia = 0;
-
-          while (tentativa <= config.retriesMax) {
-            tentativa += 1;
-            const t0 = Date.now();
-            try {
-              const resp: any = await Promise.race([
-                processarMensagemTeste(
-                  {
-                    clinicaId: data.clinicaId,
-                    leadId: item.leadId,
-                    tipo: "text",
-                    texto: item.mensagem,
-                    chave: `carga-${carga.id}-${item.indice}-${tentativa}`,
-                  },
-                  context.userId,
-                ),
-                espera(config.timeoutS * 1000).then(() => ({ __timeout: true })),
-              ]);
-              latencia = Date.now() - t0;
-              if (resp?.__timeout) {
-                status = "timeout";
-                ultimoErro = `Tempo limite de ${config.timeoutS}s excedido.`;
-              } else if (resp?.erro && !resp?.reply) {
-                status = "erro";
-                ultimoErro = String(resp.erro).slice(0, 300);
-              } else {
-                status = "ok";
-                ultimoErro = null;
-                break;
-              }
-            } catch (e) {
-              latencia = Date.now() - t0;
-              status = "erro";
-              ultimoErro = String((e as Error)?.message ?? e).slice(0, 300);
-            }
-          }
-
-          // Telemetria real da última execução do modelo nesta conversa.
-          let exec: any = null;
-          const { data: lead } = await supabaseAdmin
-            .from("nina_teste_leads")
-            .select("conversa_id")
-            .eq("id", item.leadId)
-            .maybeSingle();
-          if ((lead as any)?.conversa_id) {
-            const { data: e } = await supabaseAdmin
-              .from("nina_execucoes")
-              .select("model, tool_calls, input_tokens, output_tokens, retries")
-              .eq("conversation_id", (lead as any).conversa_id)
-              .order("created_at", { ascending: false })
-              .limit(1)
-              .maybeSingle();
-            exec = e;
-          }
-
-          return {
-            item,
-            status,
-            tentativa,
-            latencia,
-            erro: ultimoErro,
-            conversaId: (lead as any)?.conversa_id ?? null,
-            ferramentas: (exec?.tool_calls ?? []) as string[],
-            inputTokens: exec?.input_tokens ?? 0,
-            outputTokens: exec?.output_tokens ?? 0,
-          };
-        }),
-      );
-
-      const amostras = resultados.map((r) => {
-        if (r.status === "ok") acumulado.sucesso += 1;
-        else if (r.status === "timeout") acumulado.timeouts += 1;
-        else acumulado.erros += 1;
-        acumulado.retries += r.tentativa - 1;
-        acumulado.chamadas += 1;
-        acumulado.ferramentas += r.ferramentas.length;
-        acumulado.inputTokens += r.inputTokens;
-        acumulado.outputTokens += r.outputTokens;
-        return {
-          clinica_id: data.clinicaId,
-          carga_id: carga.id,
-          indice: r.item.indice,
-          lead_id: r.item.leadId,
-          lead_indice: r.item.leadIndice,
-          conversa_id: r.conversaId,
-          cenario: r.item.cenario,
-          mensagem: String(r.item.mensagem).slice(0, 300),
-          status: r.status,
-          tentativa: r.tentativa,
-          latencia_ms: r.latencia,
-          chamadas_modelo: 1,
-          ferramentas: r.ferramentas,
-          input_tokens: r.inputTokens,
-          output_tokens: r.outputTokens,
-          erro: r.erro,
-        };
-      });
-      await supabaseAdmin.from("nina_teste_carga_amostras").insert(amostras);
-
-      enviadas += rodada.length;
-      await supabaseAdmin
-        .from("nina_teste_carga")
-        .update({
-          enviadas,
-          sucesso: (carga.sucesso as number) + acumulado.sucesso,
-          erros: (carga.erros as number) + acumulado.erros,
-          timeouts: (carga.timeouts as number) + acumulado.timeouts,
-          retries: (carga.retries as number) + acumulado.retries,
-          chamadas_modelo: (carga.chamadas_modelo as number) + acumulado.chamadas,
-          ferramentas: (carga.ferramentas as number) + acumulado.ferramentas,
-          input_tokens: Number(carga.input_tokens) + acumulado.inputTokens,
-          output_tokens: Number(carga.output_tokens) + acumulado.outputTokens,
-        })
-        .eq("id", carga.id);
-
-      // Pacing: respeita mensagens/minuto e o intervalo configurado.
-      const gasto = Date.now() - t0Rodada;
-      if (enviadas < plano.length && intervalo > gasto) await espera(intervalo - gasto);
-    }
-
-    if (enviadas >= plano.length) terminou = terminou ?? "concluido";
-    if (terminou) {
-      await supabaseAdmin
-        .from("nina_teste_carga")
-        .update({ status: terminou, finalizado_em: new Date().toISOString() })
-        .eq("id", carga.id);
-    }
-
-    return { status: terminou ?? "executando", enviadas, total: plano.length };
+    const { executarCargaControlada } = await import("./carga-execucao.server");
+    return await executarCargaControlada({
+      admin: supabaseAdmin,
+      clinicaId: data.clinicaId,
+      cargaId: data.cargaId,
+      userId: context.userId,
+      processar: processarMensagemTeste,
+    });
   });
 
-/** Cancelamento: marca a bandeira; o lote em andamento para na próxima rodada. */
+/** Parar impede novas mensagens; a chamada já iniciada continua sob lease. */
 export const pararTesteCarga = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) =>
@@ -539,12 +401,15 @@ export const pararTesteCarga = createServerFn({ method: "POST" })
   .handler(async ({ data, context }: { data: any; context: Ctx }) => {
     await assertMembership(context.supabase, context.userId, data.clinicaId);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    await supabaseAdmin
+    const { error } = await supabaseAdmin
       .from("nina_teste_carga")
       .update({ cancelar: true, status: "parado", finalizado_em: new Date().toISOString() })
       .eq("clinica_id", data.clinicaId)
-      .eq("id", data.cargaId);
-    return { ok: true };
+      .eq("id", data.cargaId)
+      .in("status", ["preparando", "executando"]);
+    if (error) throw new Error(error.message);
+    const carga = await carregarCarga(supabaseAdmin, data.clinicaId, data.cargaId);
+    return { ok: true, ...retornoCarga(carga) };
   });
 
 export const listarTestesCarga = createServerFn({ method: "POST" })
@@ -553,15 +418,24 @@ export const listarTestesCarga = createServerFn({ method: "POST" })
   .handler(async ({ data, context }: { data: any; context: Ctx }) => {
     await assertMembership(context.supabase, context.userId, data.clinicaId);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data: linhas } = await supabaseAdmin
+    // Não limita a recuperação aos 20 mais recentes: um órfão antigo também bloqueava criação.
+    await cargasQueReservamExecutor(supabaseAdmin, data.clinicaId);
+    const { data: linhas, error } = await supabaseAdmin
       .from("nina_teste_carga")
-      .select(
-        "id, nome, perfil, status, total_planejado, enviadas, sucesso, erros, timeouts, retries, chamadas_modelo, ferramentas, input_tokens, output_tokens, iniciado_em, finalizado_em",
-      )
+      .select("*")
       .eq("clinica_id", data.clinicaId)
       .order("created_at", { ascending: false })
       .limit(20);
-    return { testes: (linhas ?? []) as any[] };
+    if (error) throw new Error(error.message);
+    return {
+      versaoExecutor: VERSAO_EXECUTOR_CARGA,
+      testes: (linhas ?? []).map((c: any) => ({
+        ...c,
+        plano: undefined,
+        variacoes: undefined,
+        controle: estadoControleCarga(c),
+      })),
+    };
   });
 
 /** Detalhe com métricas medidas (p50/p95/p99 só com volume suficiente). */
@@ -573,17 +447,26 @@ export const detalheTesteCarga = createServerFn({ method: "POST" })
   .handler(async ({ data, context }: { data: any; context: Ctx }) => {
     await assertMembership(context.supabase, context.userId, data.clinicaId);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const carga = await carregarCarga(supabaseAdmin, data.clinicaId, data.cargaId);
-    const { data: amostras } = await supabaseAdmin
+    const carga = await recuperarCargaSemAtividade(
+      supabaseAdmin,
+      await carregarCarga(supabaseAdmin, data.clinicaId, data.cargaId),
+    );
+    const { data: amostras, error: erroAmostras } = await supabaseAdmin
       .from("nina_teste_carga_amostras")
-      .select("indice, lead_indice, cenario, mensagem, status, tentativa, latencia_ms, ferramentas, input_tokens, output_tokens, erro, created_at")
+      .select(
+        "indice, lead_indice, cenario, mensagem, status, tentativa, latencia_ms, ferramentas, input_tokens, output_tokens, erro, created_at",
+      )
       .eq("clinica_id", data.clinicaId)
       .eq("carga_id", data.cargaId)
       .order("indice");
 
+    if (erroAmostras) throw new Error(erroAmostras.message);
     const lista = (amostras ?? []) as any[];
     const fim = carga.finalizado_em ? new Date(carga.finalizado_em).getTime() : Date.now();
-    const duracaoMs = Math.max(0, fim - new Date(carga.iniciado_em).getTime());
+    const duracaoMs = Math.max(
+      0,
+      fim - new Date(carga.iniciado_em ?? carga.created_at ?? carga.updated_at).getTime(),
+    );
     const metricas = calcularMetricas(
       lista.filter((a) => a.status === "ok").map((a) => a.latencia_ms ?? 0),
       duracaoMs,
@@ -593,13 +476,24 @@ export const detalheTesteCarga = createServerFn({ method: "POST" })
     // FASE 4 — métricas técnicas do preflight (não entram nas métricas de carga).
     const { metricasPreflight } = await import("@/lib/nina/carga-preflight");
     const planoDetalhe = (carga.plano ?? []) as any[];
-    const totalParticipantes = new Set(planoDetalhe.map((p: any) => p.leadId)).size;
+    const inicio = (carga.config as any)?._inicioCarga;
+    const totalParticipantes =
+      inicio?.resetTodosLeads && Array.isArray(inicio.leads)
+        ? inicio.leads.length
+        : new Set(planoDetalhe.map((p: any) => p.leadId)).size;
     const preflight = metricasPreflight(
-      ((carga.preflight ?? []) as any[]) as any,
+      (carga.preflight ?? []) as any[] as any,
       totalParticipantes || undefined,
     );
     return {
-      carga: { ...carga, plano: undefined, variacoes: undefined },
+      versaoExecutor: VERSAO_EXECUTOR_CARGA,
+      carga: {
+        ...carga,
+        config: carga.config as any,
+        plano: undefined,
+        variacoes: undefined,
+        controle: estadoControleCarga(carga),
+      },
       amostras: lista.slice(-200),
       metricas: { ...metricas, duracaoMs, conversasEnvolvidas: conversas },
       preflight,
