@@ -14,5 +14,5 @@ it("inspeção compartilhada: componentes React reais com APIs simuladas", async
     processo.exited,
   ]);
   expect(codigo, stdout + stderr).toBe(0);
-  expect(stdout + stderr).toContain("7 pass");
+  expect(stdout + stderr).toContain("10 pass");
 }, 30000);

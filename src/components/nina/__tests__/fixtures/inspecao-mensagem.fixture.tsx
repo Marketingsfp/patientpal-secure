@@ -46,12 +46,21 @@ const { QueryClient, QueryClientProvider } = await import("@tanstack/react-query
 const { act } = React;
 let falhar = false;
 let vinculoPendente = false;
+let historicoAtivo = false;
+let retornoHistoricoForaEscopo = false;
+let atrasoHistorico = 0;
+let leiturasAtivas = 0;
+let picoLeituras = 0;
+let conversaPorMensagemHistorica: Record<string, string> = {};
+const leiturasHistorico: unknown[] = [];
 let chamadas = 0;
 let reportes: unknown[] = [];
 let detalhes: unknown[] = [];
 const clinicaId = "11111111-1111-4111-8111-111111111111";
 const conversaId = "22222222-2222-4222-8222-222222222222";
 const mensagemId = "33333333-3333-4333-8333-333333333333";
+const conversaAntigaId = "44444444-4444-4444-8444-444444444444";
+const mensagemAntigaId = "55555555-5555-4555-8555-555555555555";
 const mensagem = {
   id: mensagemId,
   clinica_id: clinicaId,
@@ -93,9 +102,39 @@ const saida = {
 };
 mock.module("@tanstack/react-start", () => ({ useServerFn: (fn: unknown) => fn }));
 mock.module("@/lib/nina/saida-mensagem.functions", () => ({
-  saidasDasMensagens: async ({ data }: { data: { mensagemIds: string[]; clinicaId: string } }) => {
+  saidasDasMensagens: async ({
+    data,
+  }: {
+    data: { mensagemIds: string[]; clinicaId: string; conversaId?: string | null };
+  }) => {
     chamadas++;
     if (falhar) throw new Error("consulta indisponível");
+    if (historicoAtivo) {
+      leiturasHistorico.push(data);
+      leiturasAtivas++;
+      picoLeituras = Math.max(picoLeituras, leiturasAtivas);
+      if (atrasoHistorico) await new Promise((resolve) => setTimeout(resolve, atrasoHistorico));
+      leiturasAtivas--;
+      return data.mensagemIds.flatMap((id) => {
+        const conversaReal =
+          conversaPorMensagemHistorica[id] ??
+          (id === mensagemAntigaId ? conversaAntigaId : conversaId);
+        // Mesmo filtro de conversa aplicado pelo endpoint: a antiga não é da sessão atual.
+        if (data.conversaId && data.conversaId !== conversaReal) return [];
+        return [
+          {
+            ...saida,
+            mensagemId: id,
+            conversaId: conversaReal,
+            clinicaId:
+              retornoHistoricoForaEscopo && id === mensagemAntigaId
+                ? "outra-clinica"
+                : data.clinicaId,
+            execucaoId: id === mensagemAntigaId ? "execucao-antiga" : "execucao-atual",
+          },
+        ];
+      });
+    }
     return data.mensagemIds.map((id) => ({
       ...saida,
       mensagemId: id,
@@ -330,3 +369,165 @@ it("registro que permanece incompleto para após quatro consultas", async () => 
   await ui.fechar();
   vinculoPendente = false;
 }, 10000);
+
+it("histórico de dois ciclos consulta e inspeciona cada mensagem pela conversa original", async () => {
+  historicoAtivo = true;
+  leiturasHistorico.length = 0;
+  reportes = [];
+  detalhes = [];
+  const historico = [
+    {
+      ...mensagem,
+      id: mensagemAntigaId,
+      conversa_id: conversaAntigaId,
+      execucao_id: "execucao-antiga",
+    },
+    { ...mensagem, execucao_id: "execucao-atual" },
+  ];
+  function Tela() {
+    const mapa = useSaidasDasMensagens(
+      clinicaId,
+      conversaId,
+      historico.map((m) => m.id),
+      "",
+      historico,
+    );
+    return (
+      <>
+        {historico.map((m) => (
+          <div key={m.id} data-ciclo={m.id}>
+            <InspecaoMensagemNina
+              clinicaId={clinicaId}
+              conversaId={m.conversa_id}
+              mensagem={m}
+              saida={mapa[m.id]}
+              parte="reporte"
+            />
+            <InspecaoMensagemNina
+              clinicaId={clinicaId}
+              conversaId={m.conversa_id}
+              mensagem={m}
+              saida={mapa[m.id]}
+              parte="detalhes"
+            />
+          </div>
+        ))}
+      </>
+    );
+  }
+  try {
+    for (const m of historico) {
+      const ui = montar(<Tela />);
+      await ui.render();
+      await aguardar();
+      expect(ui.container.textContent).not.toContain("Falha ao carregar");
+      expect(ui.container.querySelectorAll("[data-ciclo]")).toHaveLength(2);
+      const celula = ui.container.querySelector(`[data-ciclo="${m.id}"]`)!;
+      expect(celula.textContent).toContain("Aviso do sistema");
+      await act(async () =>
+        (celula.querySelector('button[aria-label*="Reportar"]') as HTMLButtonElement).click(),
+      );
+      await act(async () =>
+        Array.from(celula.querySelectorAll("button"))
+          .find((b) => b.textContent === "Detalhes técnicos")!
+          .click(),
+      );
+      expect(reportes.at(-1)).toEqual({ clinicaId, conversaId: m.conversa_id, mensagemId: m.id });
+      expect(detalhes.at(-1)).toEqual({ clinicaId, conversaId: m.conversa_id, mensagemId: m.id });
+      await ui.fechar();
+    }
+    expect(leiturasHistorico).toEqual(
+      expect.arrayContaining([
+        { clinicaId, conversaId: conversaAntigaId, mensagemIds: [mensagemAntigaId] },
+        { clinicaId, conversaId, mensagemIds: [mensagemId] },
+      ]),
+    );
+  } finally {
+    historicoAtivo = false;
+  }
+});
+
+it("resposta fora da clínica em um ciclo não contamina a inspeção do outro ciclo", async () => {
+  historicoAtivo = true;
+  retornoHistoricoForaEscopo = true;
+  const historico = [
+    { ...mensagem, id: mensagemAntigaId, conversa_id: conversaAntigaId },
+    mensagem,
+  ];
+  function Tela() {
+    const mapa = useSaidasDasMensagens(
+      clinicaId,
+      conversaId,
+      historico.map((m) => m.id),
+      "",
+      historico,
+    );
+    return (
+      <>
+        {historico.map((m) => (
+          <div key={m.id} data-ciclo={m.id}>
+            <InspecaoMensagemNina
+              clinicaId={clinicaId}
+              conversaId={m.conversa_id}
+              mensagem={m}
+              saida={mapa[m.id]}
+              parte="detalhes"
+            />
+          </div>
+        ))}
+      </>
+    );
+  }
+  const ui = montar(<Tela />);
+  try {
+    await ui.render();
+    await aguardar();
+    expect(ui.container.querySelector(`[data-ciclo="${mensagemAntigaId}"]`)?.textContent).toContain(
+      "Falha ao carregar",
+    );
+    expect(ui.container.querySelector(`[data-ciclo="${mensagemId}"]`)?.textContent).toContain(
+      "Aviso do sistema",
+    );
+    expect(ui.container.querySelector(`[data-ciclo="${mensagemId}"]`)?.textContent).toContain(
+      "Detalhes técnicos",
+    );
+  } finally {
+    await ui.fechar();
+    historicoAtivo = false;
+    retornoHistoricoForaEscopo = false;
+  }
+});
+
+it("histórico com muitos ciclos limita a três leituras simultâneas", async () => {
+  historicoAtivo = true;
+  atrasoHistorico = 60;
+  picoLeituras = 0;
+  const historico = Array.from({ length: 12 }, (_, i) => ({
+    ...mensagem,
+    id: `33333333-3333-4333-8333-${String(i).padStart(12, "0")}`,
+    conversa_id: `22222222-2222-4222-8222-${String(i).padStart(12, "0")}`,
+  }));
+  conversaPorMensagemHistorica = Object.fromEntries(historico.map((m) => [m.id, m.conversa_id]));
+  function Tela() {
+    const mapa = useSaidasDasMensagens(
+      clinicaId,
+      conversaId,
+      historico.map((m) => m.id),
+      "",
+      historico,
+    );
+    return <span>{Object.keys(mapa).length}</span>;
+  }
+  const ui = montar(<Tela />);
+  try {
+    await ui.render();
+    await aguardar(500);
+    expect(ui.container.textContent).toBe("12");
+    expect(picoLeituras).toBe(3);
+  } finally {
+    await ui.fechar();
+    historicoAtivo = false;
+    atrasoHistorico = 0;
+    conversaPorMensagemHistorica = {};
+  }
+});

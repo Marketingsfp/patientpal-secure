@@ -277,29 +277,47 @@ export function HomologacaoInbox() {
     return itens.sort((a, b) => a.em.localeCompare(b.em));
   }, [msgs, eventosConversa]);
 
-  // FASE 1 — mesma leitura de confiança da Inbox de produção: UM lote por
-  // conversa (sem consulta por balão) e nada é recalculado na tela.
+  // Mesma leitura de confiança da Inbox real: lotes pela conversa de cada
+  // mensagem, com concorrência limitada e sem recalcular avaliações na tela.
   const idsDasMensagens = useMemo(() => idsParaInspecaoNina(msgs), [msgs]);
-  const saidasPorMensagem = useSaidasDasMensagens(clinicaId, conversaId, idsDasMensagens, revisaoInspecaoMensagens(msgs));
+  const saidasPorMensagem = useSaidasDasMensagens(
+    clinicaId,
+    conversaId,
+    idsDasMensagens,
+    revisaoInspecaoMensagens(msgs),
+    msgs,
+  );
 
   /** Metadados internos padronizados da mensagem (produção/homologação/teste). */
   const metadadosDaMensagem = useCallback(
     (m: Msg) => {
       const saida = saidasPorMensagem[m.id];
       const c = saida && saida !== "falha" && saida.classe === "resposta_avaliada" ? saida : null;
-      const cicloAtual = ciclos.length > 0 ? (ciclos[ciclos.length - 1] as any) : null;
+      const conversaMensagem =
+        m.conversa_id ??
+        (saida && saida !== "falha" && saida.mensagemId === m.id && saida.clinicaId === clinicaId
+          ? saida.conversaId
+          : null);
+      const cicloVinculado = ciclos.find(
+        (ciclo) => (ciclo as any).conversa_id === conversaMensagem,
+      ) as any;
+      const conversaAtual = Boolean(conversaMensagem) && conversaMensagem === conversaId;
       return montarMetadadosMensagemNina({
         messageId: m.id,
-        conversaTesteId: m.conversa_id ?? conversaId,
+        conversaTesteId: conversaMensagem,
         isTeste: true,
-        cicloId: cicloAtual?.cycle_id ?? leads.find((l) => l.id === leadId)?.cicloId ?? null,
-        ninaSessionId: cicloAtual?.nina_session_id ?? null,
+        cicloId:
+          cicloVinculado?.cycle_id ??
+          cicloVinculado?.id ??
+          (conversaAtual ? leads.find((l) => l.id === leadId)?.cicloId : null) ??
+          null,
+        ninaSessionId: cicloVinculado?.nina_session_id ?? null,
         criadaEm: m.created_at,
         execucaoId: m.execucao_id ?? null,
         confianca: c?.score != null && c.nivel ? { score: c.score, nivel: c.nivel } : null,
       });
     },
-    [conversaId, saidasPorMensagem, ciclos, leads, leadId],
+    [clinicaId, conversaId, saidasPorMensagem, ciclos, leads, leadId],
   );
 
 
