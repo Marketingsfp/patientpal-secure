@@ -84,7 +84,9 @@ export function CargaTeste() {
       key={clinicaId}
       clinicaId={clinicaId}
       inicial={rascunhos.current.get(clinicaId)}
-      guardar={(r) => rascunhos.current.set(clinicaId, r)}
+      guardar={(r) => {
+        rascunhos.current.set(clinicaId, r);
+      }}
     />
   );
 }
@@ -124,7 +126,9 @@ function CargaTesteClinica({
   const leituraId = useRef(0);
   const controleLocal = useRef(criarControleLocalCarga());
 
-  useEffect(() => guardar(rascunho), [guardar, rascunho]);
+  useEffect(() => {
+    guardar(rascunho);
+  }, [guardar, rascunho]);
   const abrirDetalhe = useCallback(
     async (id: string) => {
       const leitura = ++leituraId.current;
