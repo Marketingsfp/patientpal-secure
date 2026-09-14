@@ -1904,13 +1904,12 @@ function Page() {
           <DateRangeFilter
             value={{ from: fromDate, to: toDate }}
             preset={presetPeriodo}
-            mostrarCampos={false}
             onChange={(r, p) => {
               setPresetPeriodo(p);
-              if (p !== "periodo") {
-                setFromDate(r.from);
-                setToDate(r.to);
-              }
+              // Em "Período" os calendários do próprio seletor mandam as datas;
+              // continuam espelhadas nos campos De/Até da barra de filtros.
+              if (r.from) setFromDate(r.from);
+              if (r.to) setToDate(r.to);
             }}
           />
         </div>
