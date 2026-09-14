@@ -7,6 +7,7 @@
  * motor de teste de carga (Fase 6), para que exista um único caminho de
  * processamento na homologação.
  */
+import { criarGuardiaoReservaTurno } from "./reserva-turno";
 const CANAL_TESTE = "test-console";
 const TOTAL_LEADS = 10;
 
@@ -203,7 +204,7 @@ export async function processarMensagemTeste(data: EntradaMensagemTeste, userId:
     );
 
     const ehAudio = data.tipo === "audio";
-    const textoPaciente = data.tipo === "text" || ehAudio ? data.texto : "";
+    let textoPaciente = data.tipo === "text" || ehAudio ? data.texto : "";
     const audioFalhou = ehAudio && !textoPaciente;
     if (data.tipo === "text" && !textoPaciente) {
       // Nada foi gravado: o envio em si não aconteceu.
@@ -229,30 +230,11 @@ export async function processarMensagemTeste(data: EntradaMensagemTeste, userId:
         ? textoPaciente
         : `[${data.tipo}]`;
 
-    // Anti-duplo-clique: a mesma chave nunca entra duas vezes.
+    // A mesma chave física pode retomar somente um lote que ainda não iniciou.
     const waId = `test-${lead.id}-${data.chave}`;
-    const { data: jaExiste } = await supabaseAdmin
-      .from("whatsapp_mensagens")
-      .select("id")
-      .eq("clinica_id", data.clinicaId)
-      .eq("wa_message_id", waId)
-      .maybeSingle();
-    if (jaExiste)
-      return {
-        duplicada: true,
-        reply: null as string | null,
-        erro: null,
-        audio: null,
-        transferida: false,
-        processamento: "DUPLICADA" as const,
-        absorvidaPeloLote: false,
-        // A mensagem do paciente já existe: envio bem-sucedido, sem regravar.
-        mensagemPersistida: true,
-        mensagemId: ((jaExiste as { id?: string } | null)?.id ?? null) as string | null,
-      };
-
     const agora = new Date().toISOString();
-    const { data: msgEntrada } = await supabaseAdmin.from("whatsapp_mensagens").insert({
+    const { persistirEntradaNina } = await import("@/lib/nina/entrada-persistida.server");
+    const entradaPersistida = await persistirEntradaNina(supabaseAdmin, {
       clinica_id: data.clinicaId,
       conversa_id: conversaId,
       canal: CANAL_TESTE,
@@ -266,23 +248,39 @@ export async function processarMensagemTeste(data: EntradaMensagemTeste, userId:
       status: "received",
       enviada_por: "paciente",
       is_teste: true,
-    }).select("id").maybeSingle();
+    });
+    const msgEntrada = entradaPersistida.mensagem;
+    if (entradaPersistida.consumida) return {
+      duplicada: true,
+      reply: null as string | null,
+      erro: null,
+      audio: null,
+      transferida: false,
+      processamento: "DUPLICADA" as const,
+      absorvidaPeloLote: false,
+      mensagemPersistida: true,
+      mensagemId: msgEntrada.id as string,
+    };
+    if (entradaPersistida.repetida) textoPaciente = msgEntrada.tipo === "audio"
+      ? msgEntrada.transcricao ?? "" : msgEntrada.tipo === "text" ? msgEntrada.body ?? "" : "";
+    if (!entradaPersistida.repetida) {
     await supabaseAdmin
       .from("atend_conversas")
       .update({ ultima_msg_em: agora, ultima_msg_preview: body.slice(0, 160) })
       .eq("id", conversaId);
     // Teto atingido → apaga as mensagens mais antigas do lead para caber as novas.
     await podarMensagensLead(supabaseAdmin, data.clinicaId, { ...lead, conversa_id: conversaId });
+    }
 
     const mensagemId = (msgEntrada as { id?: string } | null)?.id ?? null;
     // FASE 4 (mesmo mecanismo da produção): a mensagem JÁ está gravada e já
     // apareceu na tela; só agora a conversa muda de revisão. Qualquer resposta
     // gerada antes disso passa a ser considerada obsoleta.
-    const { incrementarRevisaoConversa } = await import("@/lib/nina/revisao-conversa.server");
-    await incrementarRevisaoConversa({
+    const { registrarRevisaoEntradaNina } = await import("@/lib/nina/entrada-persistida.server");
+    await registrarRevisaoEntradaNina(supabaseAdmin, {
       clinicaId: data.clinicaId,
       telefone: lead.telefone_sessao,
-      conversaId,
+      mensagemId: msgEntrada.id,
     });
 
 
@@ -387,18 +385,41 @@ export async function processarMensagemTeste(data: EntradaMensagemTeste, userId:
     // a trava são as canônicas (`burst.server`), sem espera nova aqui.
     let loteId = "";
     let lockTurno: import("@/lib/nina/lock-conversa.server").LockConversa | null = null;
+    const conferirReservaTurno = criarGuardiaoReservaTurno(async () => {
+      if (!lockTurno) return true;
+      const { validarReservaTurnoNina } = await import("@/lib/nina/burst.server");
+      return validarReservaTurnoNina(lockTurno);
+    });
     let revisaoTurno = 0;
     let entradasTurno: string[] = mensagemId ? [mensagemId] : [];
     if (textoPaciente) {
       const { aguardarTurnoNina } = await import("@/lib/nina/burst.server");
-      const turno = await aguardarTurnoNina({
+      let turno: import("@/lib/nina/burst.server").TurnoNina | null;
+      try {
+      turno = await aguardarTurnoNina({
         clinicaId: data.clinicaId,
         telefone: lead.telefone_sessao,
         conversaId,
         mensagemId,
         textoAtual: textoPaciente,
-        mensagensFallback: entradasTurno,
+        sessaoTeste: { leadId: lead.id, cicloId },
       });
+      } catch (e) {
+        // Falha anterior ao modelo: conservar entrada pendente e não inventar resposta.
+        console.error("[NINA_TESTE] agrupamento pendente", e);
+        return {
+          duplicada: entradaPersistida.repetida,
+          reply: null as string | null,
+          erro: String((e as Error)?.message ?? e),
+          audio: null,
+          transferida: false,
+          processamento: "ERRO" as const,
+          absorvidaPeloLote: false,
+          mensagemPersistida: true,
+          mensagemId,
+          recuperavel: (e as { podeRepetirEntrada?: boolean })?.podeRepetirEntrada === true,
+        };
+      }
       if (!turno) {
         // Situação NORMAL: uma mensagem mais nova do mesmo lead ficou
         // responsável pelo turno. Esta chamada encerra sem gerar resposta —
@@ -451,6 +472,7 @@ export async function processarMensagemTeste(data: EntradaMensagemTeste, userId:
         const { gerarRespostaNina } = await import("@/lib/whatsapp.server");
         diag.model_called = true;
         reply = await gerarRespostaNina(data.clinicaId, textoDoTurno, lead.telefone_sessao, {
+          validarReservaTurno: conferirReservaTurno,
           teste: true,
           ambiente: ambienteQA,
           auditoria: auditoriaNina,
@@ -483,6 +505,15 @@ export async function processarMensagemTeste(data: EntradaMensagemTeste, userId:
         reply = respostaMidiaNaoSuportada(data.tipo);
       }
     } catch (e) {
+      if ((e as { codigo?: string })?.codigo === "NINA_RESERVA_TURNO_PERDIDA") {
+        statusFinal = "SUPERSEDED";
+        console.warn("[NINA_TESTE] reserva perdida; sem resposta ou reenvio", { loteId });
+        return {
+          duplicada: false, reply: null, erro: "Reserva do turno perdida; execução interrompida sem reenvio.",
+          audio: null, transferida: false, processamento: "OBSOLETA" as const,
+          absorvidaPeloLote: false, mensagemPersistida: true, mensagemId,
+        };
+      }
       // Falha técnica real: a mensagem NÃO pode ficar sem desfecho. Gravamos
       // um retorno seguro na própria conversa e registramos o erro.
       falhaTecnica = true;
@@ -509,6 +540,9 @@ export async function processarMensagemTeste(data: EntradaMensagemTeste, userId:
 
     // FASE 5 — a Homologação usa o MESMO serviço de finalização do WhatsApp:
     // o texto avaliado aqui é o texto que aparece na conversa de teste.
+    if (lockTurno) {
+      await conferirReservaTurno();
+    }
     if (reply.trim()) {
       try {
         const { finalizarResposta } = await import("@/lib/nina/resposta/finalizacao.server");
@@ -652,6 +686,7 @@ export async function processarMensagemTeste(data: EntradaMensagemTeste, userId:
               texto: falado,
             };
             precisaTextoCompleto = longa;
+            await conferirReservaTurno();
             await supabaseAdmin.from("whatsapp_mensagens").insert({
               clinica_id: data.clinicaId,
               conversa_id: conversaId,
@@ -672,11 +707,13 @@ export async function processarMensagemTeste(data: EntradaMensagemTeste, userId:
           }
         }
       } catch (e) {
+        if ((e as { codigo?: string })?.codigo === "NINA_RESERVA_TURNO_PERDIDA") throw e;
         console.error("Nina teste: resposta em áudio falhou (caindo para texto)", e);
       }
     }
 
     if (reply.trim() && (!audio || precisaTextoCompleto)) {
+      await conferirReservaTurno();
       const { data: msgOut, error: erroMsgOut } = await supabaseAdmin
         .from("whatsapp_mensagens")
         .insert({
@@ -788,6 +825,15 @@ export async function processarMensagemTeste(data: EntradaMensagemTeste, userId:
       execucaoId: auditoriaNina.execucaoId ?? null,
       conversaId,
     };
+    } catch (e) {
+      if ((e as { codigo?: string })?.codigo !== "NINA_RESERVA_TURNO_PERDIDA") throw e;
+      statusFinal = "SUPERSEDED";
+      console.warn("[NINA_TESTE] reserva perdida antes da entrega", { loteId });
+      return {
+        duplicada: false, reply: null, erro: "Reserva do turno perdida antes da entrega.",
+        audio: null, transferida: false, processamento: "OBSOLETA" as const,
+        absorvidaPeloLote: false, mensagemPersistida: true, mensagemId,
+      };
     } finally {
       // Garantia única: nenhum lote/lock fica preso, em qualquer desfecho.
       await encerrarTurno(statusFinal);

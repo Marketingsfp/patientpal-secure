@@ -71,6 +71,32 @@ function preparar() {
 }
 
 describe("carregador por mensagem — leitura isolada", () => {
+  it("vínculos oficiais conflitantes não escolhem execução nem atribuem nota", async () => {
+    const { p, cliente } = preparar();
+    p.mensagem!.execucao_id = "outra-execucao";
+    const r = await carregarDetalhesMensagem(cliente, { clinicaId: p.clinicaId, mensagemId: String(p.mensagem!.id) });
+    expect(r.execucao).toBeNull();
+    expect(r.leitura?.avaliacoes).toEqual([]);
+    expect(r.leitura?.alertas.some((a) => a.includes("execuções diferentes"))).toBe(true);
+  });
+  it("aviso sistema legado abre os detalhes pela ligação oficial à mesma mensagem", async () => {
+    const { p, cliente } = preparar();
+    p.mensagem!.enviada_por = "sistema";
+    p.mensagem!.execucao_id = null;
+    const r = await carregarDetalhesMensagem(cliente, {
+      clinicaId: p.clinicaId, mensagemId: String(p.mensagem!.id),
+    });
+    expect(r.leitura?.mensagem?.origem).toBe("Aviso do sistema");
+    expect(r.leitura?.avaliacoes.some((a) => a.explicacao.includes("não pertence ao aviso"))).toBe(true);
+  });
+  it("execução isolada não libera inspeção de sistema sem aviso oficial", async () => {
+    const { p, tabelas, cliente } = preparar();
+    p.mensagem!.enviada_por = "sistema";
+    tabelas.atend_aviso_encaminhamento = [];
+    await expect(carregarDetalhesMensagem(cliente, {
+      clinicaId: p.clinicaId, mensagemId: String(p.mensagem!.id),
+    })).rejects.toThrow("oficialmente vinculado");
+  });
   it("MJ55: trace ligado à mensagem prevalece sobre traces auxiliares da execução", async () => {
     const { p, tabelas, cliente } = preparar();
     const canonico = String(p.avisos[0]!.turno_id);

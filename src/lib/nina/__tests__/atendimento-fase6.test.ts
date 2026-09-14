@@ -104,6 +104,7 @@ describe("fase 6 — máquina de estados", () => {
 
   it("agendamento criado vira estado confirmado", () => {
     const estado = comEstado({ appointment: { appointment_id: "a1" } });
+    estado.flow.stage = "BOOKED";
     expect(derivarEtapa(ctx({ estado }))).toBe("APPOINTMENT_CONFIRMED");
   });
 

@@ -84,6 +84,7 @@ export function DetalhesMensagemNina({
         <dl className="grid grid-cols-1 gap-x-4 gap-y-2 text-xs sm:grid-cols-2">
           {[
             ["Modelo", leitura.modelo ?? "Não registrado"],
+            ["Versão do núcleo neste turno", leitura.versaoRuntime ?? "Não registrada"],
             [
               "Versão do prompt",
               leitura.versaoPrompt == null ? "Não registrada" : String(leitura.versaoPrompt),

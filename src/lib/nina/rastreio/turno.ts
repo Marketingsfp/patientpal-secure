@@ -19,6 +19,7 @@
  * continuam em código/banco. Aqui só existe registro.
  */
 import type { AuditoriaInstrucoesRodada } from "./auditoria-instrucoes";
+import { NINA_RUNTIME_VERSION } from "../runtime-version";
 import { auditoriaParaTrace } from "./auditoria-instrucoes";
 import {
   notaAplicavelAoTextoFinal,
@@ -365,6 +366,8 @@ export function evidenciaSaidaDoTurno(dados: {
 }
 
 export type RegistroTurno = {
+  /** Ausente em registros antigos; nunca inferir a versão a partir do servidor atual. */
+  runtimeVersao?: string;
   /** Identificador do turno — o mesmo `trace_id` da execução. */
   turnoId: string;
   clinicaId: string | null;
@@ -424,6 +427,7 @@ export type BaseRegistroTurno = {
 
 export function criarRegistroTurno(base: BaseRegistroTurno): RegistroTurno {
   return {
+    runtimeVersao: NINA_RUNTIME_VERSION,
     turnoId: base.turnoId,
     clinicaId: base.clinicaId ?? null,
     conversaId: base.conversaId ?? null,
@@ -512,6 +516,7 @@ export function lacunasDoTurno(r: RegistroTurno): string[] {
  */
 export function resumoTurnoParaTrace(r: RegistroTurno): Record<string, unknown> {
   return {
+    runtime_versao: r.runtimeVersao ?? null,
     turno_id: r.turnoId,
     ambiente: r.ambiente,
     teste: r.teste,

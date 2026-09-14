@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { createHmac, timingSafeEqual } from "crypto";
+import { criarGuardiaoReservaTurno } from "@/lib/nina/reserva-turno";
 import {
   loadWhatsAppConfig,
   metaSendText,
@@ -223,9 +224,8 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
                 // mensagem NÃO é processada de novo — nada de resposta dupla
                 // nem de reabertura repetida.
                 trace.marcar("RECV_T4_DB_INSERT_START");
-                const { data: msgInserida, error: insErr } = await supabaseAdmin
-                  .from("whatsapp_mensagens")
-                  .insert({
+                const { persistirEntradaNina } = await import("@/lib/nina/entrada-persistida.server");
+                const entradaPersistida = await persistirEntradaNina(supabaseAdmin, {
                     clinica_id: params.clinicaId,
                     wa_message_id,
                     direction: "in",
@@ -238,36 +238,30 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
                     status: "received",
                     enviada_por: "paciente",
                     raw: msg,
-                  })
-                  .select("id")
-                  .maybeSingle();
+                  });
+                const msgInserida = entradaPersistida.mensagem;
                 trace.marcar("RECV_T5_DB_INSERT_DONE");
                 trace.marcar("RECV_T6_REALTIME_AVAILABLE");
-                if (insErr) {
-                  const duplicada =
-                    (insErr as { code?: string }).code === "23505" ||
-                    /duplicate key/i.test(insErr.message ?? "");
-                  if (duplicada) {
+                if (entradaPersistida.consumida) {
                     resultado = "duplicada_ignorada";
                     continue;
-                  }
-                  console.error("whatsapp mensagem insert error", insErr.message);
+                }
+                if (entradaPersistida.repetida) {
+                  // Retry reutiliza o conteúdo imutável da entrada, não o payload reenviado.
+                  textoPaciente = msgInserida.tipo === "audio"
+                    ? msgInserida.transcricao ?? ""
+                    : msgInserida.tipo === "text" ? msgInserida.body ?? "" : "";
                 }
 
                 // FASE 4 — Stale Response Guard: cada mensagem recebida avança
                 // a revisão da conversa. Uma geração da Nina em andamento
                 // passa a ser obsoleta a partir daqui.
-                try {
-                  const { incrementarRevisaoConversa } = await import(
-                    "@/lib/nina/revisao-conversa.server"
-                  );
-                  await incrementarRevisaoConversa({
-                    clinicaId: params.clinicaId,
-                    telefone: String(from ?? "").replace(/\D/g, "") || from,
-                  });
-                } catch (e) {
-                  console.error("[nina] revisão da conversa não avançou", e);
-                }
+                const { registrarRevisaoEntradaNina } = await import("@/lib/nina/entrada-persistida.server");
+                await registrarRevisaoEntradaNina(supabaseAdmin, {
+                  clinicaId: params.clinicaId,
+                  telefone: String(from ?? "").replace(/\D/g, "") || from,
+                  mensagemId: msgInserida.id,
+                });
 
                 // ---------------------------------------------------------
                 // Verificação de paciente pelo site (API v1.2).
@@ -360,12 +354,14 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
                   await reabrirConversaPorMensagemPaciente({
                     clinicaId: params.clinicaId,
                     telefone: fromDigits,
+                    ...(entradaPersistida.repetida
+                      ? { mensagemRecebidaEm: msgInserida.created_at ?? "" } : {}),
                   });
                   // O paciente respondeu: qualquer prazo de espera cai.
                   const { limparEsperaPorTelefone } = await import(
                     "@/lib/nina/espera-paciente.server"
                   );
-                  await limparEsperaPorTelefone(params.clinicaId, fromDigits);
+                  if (!entradaPersistida.repetida) await limparEsperaPorTelefone(params.clinicaId, fromDigits);
                 }
 
 
@@ -425,6 +421,11 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
                   let execTurno: string | null = null;
                   let revisaoTurno = 0;
                   let turnoSuperseded = false;
+                  const conferirReservaTurno = criarGuardiaoReservaTurno(async () => {
+                    if (!lockTurno) return true;
+                    const { validarReservaTurnoNina } = await import("@/lib/nina/burst.server");
+                    return validarReservaTurnoNina(lockTurno);
+                  });
                   try {
                     if (!phoneNumberId) {
                       throw new Error(
@@ -460,36 +461,9 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
                     // Mensagens de entrada reais desta resposta. O paciente pode
                     // ter escrito em partes: pegamos as mensagens dele ainda sem
                     // resposta, na ordem em que chegaram.
-                    const entradasNina = await (async () => {
-                      const atual = (msgInserida as { id?: string } | null)?.id ?? null;
-                      try {
-                        const ultimaSaida = await supabaseAdmin
-                          .from("whatsapp_mensagens")
-                          .select("created_at")
-                          .eq("clinica_id", params.clinicaId)
-                          .eq("to_number", from)
-                          .eq("direction", "out")
-                          .order("created_at", { ascending: false })
-                          .limit(1)
-                          .maybeSingle();
-                        let q = supabaseAdmin
-                          .from("whatsapp_mensagens")
-                          .select("id, created_at")
-                          .eq("clinica_id", params.clinicaId)
-                          .eq("from_number", from)
-                          .eq("direction", "in")
-                          .order("created_at", { ascending: true })
-                          .limit(10);
-                        const corte = (ultimaSaida.data as { created_at?: string } | null)
-                          ?.created_at;
-                        if (corte) q = q.gt("created_at", corte);
-                        const { data } = await q;
-                        const ids = (data ?? []).map((m: { id: string }) => m.id);
-                        return ids.length ? ids : atual ? [atual] : [];
-                      } catch {
-                        return atual ? [atual] : [];
-                      }
-                    })();
+                    // O registro atômico do lote é a fonte dos IDs, não uma
+                    // consulta de mensagens antigas feita antes de aguardar a trava.
+                    const entradasNina: string[] = msgInserida.id ? [msgInserida.id] : [];
                     // FASE 2 — Burst Aggregation: mensagens seguidas do mesmo
                     // paciente viram UM turno lógico para a Nina. A mensagem já
                     // foi persistida e publicada no Realtime acima; aqui só a
@@ -503,7 +477,6 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
                         conversaId: convId,
                         mensagemId: (msgInserida as { id?: string } | null)?.id ?? null,
                         textoAtual: textoPaciente,
-                        mensagensFallback: entradasNina,
                       });
                       if (!turno) {
                         // Uma mensagem mais nova do mesmo paciente assume o
@@ -525,6 +498,7 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
                       revisaoTurno = turno.revisao;
                       if (turno.mensagens.length) entradasTurno = turno.mensagens;
                       reply = await gerarRespostaNina(params.clinicaId, turno.texto, from, {
+                        validarReservaTurno: conferirReservaTurno,
                         auditoria: auditoriaNina,
                         mensagensEntrada: entradasTurno,
                         lote: { batchId: turno.batchId || null, revisao: turno.revisao || null },
@@ -609,6 +583,9 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
                     // da avaliação final e do envio. O transporte manda o texto
                     // aprovado, sem acrescentar nada depois.
                     let encerrarConversaId: string | null = null;
+                    if (reply && lockTurno) {
+                      await conferirReservaTurno();
+                    }
                     if (reply) {
                       try {
                         const { finalizarResposta } = await import(
@@ -702,6 +679,7 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
                             if (audio) {
                               const { metaUploadMedia, metaSendAudio } =
                                 await import("@/lib/whatsapp.server");
+                              await conferirReservaTurno();
                               const mediaId = await metaUploadMedia(
                                 phoneNumberId,
                                 cfg.access_token,
@@ -746,6 +724,7 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
                                 estado: "envio_tentado",
                                 textoHash: hashFalado,
                               });
+                              await conferirReservaTurno();
                               const { wa_message_id: audioId } = await metaSendAudio(
                                 phoneNumberId,
                                 cfg.access_token,
@@ -793,6 +772,7 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
 
                           }
                         } catch (e) {
+                          if ((e as { codigo?: string })?.codigo === "NINA_RESERVA_TURNO_PERDIDA") throw e;
                           console.error("Nina resposta em áudio falhou (caindo para texto)", e);
                         }
                       }
@@ -833,6 +813,7 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
                         });
                         let outId: string | null = null;
                         try {
+                          await conferirReservaTurno();
                           ({ wa_message_id: outId } = await metaSendText(
                             phoneNumberId,
                             cfg.access_token,
@@ -953,6 +934,17 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
                       }
                     }
                   } catch (e) {
+                    const { ErroAgrupamentoNina } = await import("@/lib/nina/agrupamento-turno");
+                    if (e instanceof ErroAgrupamentoNina && e.podeRepetirEntrada) {
+                      resultado = `pendente: ${e.message}`.slice(0, 500);
+                      // Nenhum modelo/ferramenta iniciou: a Meta pode repetir o
+                      // evento, reutilizando a entrada e o lote persistidos.
+                      return new Response("Message pending safe retry", { status: 503 });
+                    }
+                    if ((e as { codigo?: string })?.codigo === "NINA_RESERVA_TURNO_PERDIDA") {
+                      turnoSuperseded = true;
+                      resultado = "reserva_perdida_sem_reenvio";
+                    }
                     console.error("Nina autoreply error", e);
                     await registrarStatusWhatsapp(
                       params.clinicaId,
@@ -1027,6 +1019,9 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
         } catch (e) {
           resultado = `erro:${String((e as Error)?.message ?? e)}`;
           console.error("whatsapp webhook error", e);
+          const { ErroAgrupamentoNina } = await import("@/lib/nina/agrupamento-turno");
+          if (e instanceof ErroAgrupamentoNina && e.podeRepetirEntrada)
+            return new Response("Message pending safe retry", { status: 503 });
           return new Response("ok", { status: 200 });
         } finally {
           await marcarResultado(logId, resultado);

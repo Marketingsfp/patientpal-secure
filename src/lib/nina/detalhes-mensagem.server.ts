@@ -5,6 +5,7 @@ import {
   textoDetalhes,
   type RegistroDetalhes,
 } from "./detalhes-mensagem";
+import { avisosOficiaisDaMensagem, mensagemNinaInspecionavel } from "./inspecao-mensagem";
 
 type Cliente = Pick<typeof import("@/integrations/supabase/client.server").supabaseAdmin, "from">;
 type ResultadoConsulta = { data: unknown; error: { message: string } | null };
@@ -53,8 +54,6 @@ export async function carregarDetalhesMensagem(
         registrosComplementares: null,
       };
     mensagem = objetoDetalhes(data);
-    if (mensagem.direction !== "out" || mensagem.enviada_por !== "nina")
-      throw new Error("Selecione uma mensagem de saída da Nina.");
     if (alvo.conversaId && mensagem.conversa_id !== alvo.conversaId)
       throw new Error("A mensagem não pertence à conversa selecionada.");
   }
@@ -102,11 +101,22 @@ export async function carregarDetalhesMensagem(
     !(r.conversa_id ?? r.conversation_id) ||
     (r.conversa_id ?? r.conversation_id) === conversaId;
   const vinculos = vinculosBrutos.filter(mesmaConversa);
-  const avisos = avisosBrutos.filter(mesmaConversa);
+  const avisos = mensagem
+    ? avisosOficiaisDaMensagem(mensagem, avisosBrutos, alvo.clinicaId) as RegistroDetalhes[]
+    : [];
+  if (mensagem && !mensagemNinaInspecionavel(mensagem, avisos, alvo.clinicaId))
+    throw new Error("Selecione uma mensagem de saída da Nina ou um aviso oficialmente vinculado a ela.");
   if (vinculos.length !== vinculosBrutos.length || avisos.length !== avisosBrutos.length)
     alertas.push("Vínculos de outra conversa foram desconsiderados.");
   let execucaoId = s(mensagem?.execucao_id);
-  if (!execucaoId && mensagem) {
+  const idsDiretos = [...new Set([execucaoId, ...avisos.map((a) => s(a.execucao_id)),
+    ...vinculos.map((v) => s(v.execucao_id))].filter((id): id is string => id != null))];
+  const execucaoConflitante = idsDiretos.length > 1;
+  if (execucaoConflitante) {
+    execucaoId = null;
+    alertas.push("Os vínculos oficiais apontam para execuções diferentes; nenhuma foi escolhida automaticamente.");
+  }
+  if (!execucaoId && mensagem && !execucaoConflitante) {
     const vinculadas = [
       ...new Set(
         [
@@ -292,7 +302,7 @@ export async function carregarDetalhesMensagem(
   ]);
   const entradas = entradasBrutas.filter(mesmaConversa);
   const idsDecisoes = new Set<string>();
-  const decisoes = [...decisoesBrutas, ...decisoesMensagem, ...decisoesVinculo]
+  const decisoes = (execucaoConflitante ? [] : [...decisoesBrutas, ...decisoesMensagem, ...decisoesVinculo])
     .filter(mesmaConversa)
     .filter((d) => {
       const id = s(d.id);

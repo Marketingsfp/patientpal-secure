@@ -140,12 +140,16 @@ export type EstadoOperacionalTurno = {
   slotSelected?: boolean;
   /** O paciente confirmou a vaga oferecida. */
   finalConfirmationReceived?: boolean;
-  /** Houve tentativa real de gravar o agendamento neste turno/conversa. */
+  /** Houve tentativa real de gravar o agendamento neste turno. */
   appointmentAttempted?: boolean;
   /** A ferramenta de agendar foi efetivamente chamada. */
   appointmentToolCalled?: boolean;
   /** O agendamento foi gravado e confirmado pelo sistema. */
   appointmentCreated?: boolean;
+  /** Reserva comprovada neste atendimento, inclusive em um turno anterior. */
+  appointmentFromCurrentSession?: boolean;
+  /** Nova gravação comprovada pela ferramenta executada neste turno. */
+  appointmentCreatedThisTurn?: boolean;
   /** Prova persistida do agendamento (appointment_id ou equivalente). */
   appointmentId?: string | null;
   /** Etapa corrente da máquina de estados existente. */

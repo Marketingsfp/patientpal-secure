@@ -4,7 +4,7 @@
  */
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { normalizarEstado, type EstadoFluxoNina } from "./fluxo-estado-normalizar";
-import { aplicarTtlSessao, ttlSessaoMinutos, type ResultadoSessao } from "./sessao";
+import { resolverEstadoDaSessao, ttlSessaoMinutos, type ResultadoSessao } from "./sessao";
 
 /** Aplica o TTL deslizante ao estado bruto vindo de `atend_conversas`. */
 export function resolverSessao(
@@ -12,7 +12,7 @@ export function resolverSessao(
   fallbackUltimaAtividade?: string | null,
   agora: Date = new Date(),
 ): ResultadoSessao {
-  return aplicarTtlSessao(
+  return resolverEstadoDaSessao(
     normalizarEstado(bruto),
     agora,
     ttlSessaoMinutos(),

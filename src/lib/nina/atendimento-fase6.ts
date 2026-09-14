@@ -13,6 +13,7 @@
 import type { EstadoFluxoNina, EtapaFluxoNina } from "./fluxo-estado.server";
 import { dadosFaltantes } from "./atendimento-fase3";
 import { faltaParaConsultarAgenda } from "./atendimento-fase4";
+import { reservaDaSessaoAtual } from "./agendamento-sessao";
 
 function normalizar(texto: string): string {
   return (texto ?? "")
@@ -66,7 +67,7 @@ export function derivarEtapa(ctx: ContextoFase6): EtapaFluxoNina {
   const a = estado.appointment;
 
   if (pediuAtendenteHumano(ctx.mensagem) || ctx.falhaSemRecuperacao) return "HANDOFF";
-  if (a.appointment_id) return "APPOINTMENT_CONFIRMED";
+  if (reservaDaSessaoAtual(estado)) return "APPOINTMENT_CONFIRMED";
 
   if (a.intent_confirmed) {
     if (dadosFaltantes(estado).length > 0) return "COLLECTING_PATIENT_DATA";

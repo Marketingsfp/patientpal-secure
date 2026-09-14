@@ -92,6 +92,7 @@ import {
 import { TZ_CLINICA } from "@/lib/date-utils";
 import { ConversaAuditoriaDialog } from "@/components/nina/ConversaAuditoriaDialog";
 import { useConfiancaMensagens } from "@/components/nina/ConfiancaMensagem";
+import { SaidaMensagemBadge, useSaidasDasMensagens } from "@/components/nina/SaidaMensagem";
 import { combinaFiltroConfianca } from "@/lib/nina/confianca-badge";
 import { SemCaixaAlta } from "@/components/ui/caixa-alta";
 
@@ -216,13 +217,6 @@ const FILTROS_AMBIENTE = [
   { valor: "automated_test", rotulo: "Teste automatizado" },
 ];
 
-
-/** Rótulo/estilo do nível de confiança registrado no momento da resposta. */
-const CONFIANCA_UI: Record<string, { curto: string; classe: string }> = {
-  HIGH: { curto: "Alta", classe: "border-emerald-500/30 text-emerald-700 dark:text-emerald-300" },
-  MEDIUM: { curto: "Média", classe: "border-amber-500/30 text-amber-700 dark:text-amber-400" },
-  LOW: { curto: "Baixa", classe: "border-destructive/30 text-destructive" },
-};
 
 const FILTROS_CONFIANCA = [
   { valor: "todas", rotulo: "Todas" },
@@ -1030,6 +1024,8 @@ function Pagina() {
     [itens],
   );
   const confianca = useConfiancaMensagens(clinicaId, idsExecucao);
+  const saidasReporte = useSaidasDasMensagens(clinicaId, null,
+    itens.map((item) => item.mensagem_id).filter((id): id is string => Boolean(id)));
 
   const itensFiltrados = useMemo(
     () =>
@@ -1037,6 +1033,7 @@ function Pagina() {
         if (fPrioridade !== "todas" && i.prioridade !== fPrioridade) return false;
         if (fCausa !== "todas" && i.root_cause !== fCausa) return false;
         const c = i.execucao_id ? confianca[i.execucao_id] : undefined;
+        if (c === "falha") return fConfianca === "todas";
         // Regra pura compartilhada com o selo da Inbox (FASE 10).
         return combinaFiltroConfianca(fConfianca, c);
       }),
@@ -1253,21 +1250,15 @@ function Pagina() {
                   {/* Confiança do momento da resposta — snapshot gravado pelo
                       motor, nunca recalculado nem estimado nesta tela. */}
                   {(() => {
-                    const c = it.execucao_id ? confianca[it.execucao_id] : undefined;
-                    const ui = c ? CONFIANCA_UI[c.nivel] : undefined;
+                    const consulta = it.execucao_id ? confianca[it.execucao_id] : undefined;
+                    const c = consulta === "falha" ? undefined : consulta;
+                    const saida = it.mensagem_id ? saidasReporte[it.mensagem_id] : undefined;
+                    const avaliada = saida && saida !== "falha" && saida.classe === "resposta_avaliada";
                     return (
                       <p className="text-[11px] text-muted-foreground">
-                        Confiança no momento da resposta:{" "}
-                        {c && ui ? (
-                          <span className={`rounded-full border px-1.5 py-0.5 ${ui.classe}`}>
-                            {c.score}% — {ui.curto}
-                          </span>
-                        ) : (
-                          <span className="rounded-full border border-border px-1.5 py-0.5">
-                            Não avaliada
-                          </span>
-                        )}
-                        {c?.alta_confianca_com_erro && (
+                        Mensagem reportada:{" "}
+                        {it.mensagem_id ? <SaidaMensagemBadge saida={saida} /> : <span>Sem vínculo com uma mensagem</span>}
+                        {avaliada && c?.alta_confianca_com_erro && c.texto_final_hash === saida.textoEntregueHash && (
                           <span
                             className="ml-1 rounded-full border border-destructive/40 bg-destructive/10 px-1.5 py-0.5 text-destructive"
                             title="Resposta de alta confiança reportada como erro — prioridade de investigação"

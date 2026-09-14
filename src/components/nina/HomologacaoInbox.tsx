@@ -36,7 +36,7 @@ import {
   resolverConversaTeste,
   ferramentasUsadasTeste,
   marcarLeadTesteLido,
-  detalheExecucaoTeste,
+
   diagnosticoCiclosLead,
 } from "@/lib/nina/teste-console.functions";
 import {
@@ -46,8 +46,8 @@ import {
   simulacaoAtualTerra,
 } from "@/lib/nina/simulador-terra.functions";
 import { AvaliacaoSol } from "@/components/nina/AvaliacaoSol";
-import { DetalhesMensagemNina } from "@/components/nina/DetalhesMensagemNina";
-import type { LeituraDetalhesMensagem } from "@/lib/nina/detalhes-mensagem-contrato";
+
+
 
 import {
   CENARIOS_SUGERIDOS,
@@ -61,13 +61,7 @@ import {
   type NivelDetalhe,
   type Persona,
 } from "@/lib/nina/simulador-terra";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-} from "@/components/ui/dialog";
+
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -84,20 +78,17 @@ import {
   type ConversaEvento,
 } from "@/components/nina/ConversationSystemEvent";
 import { NinaMessage, TypingDots } from "@/components/nina/NinaMessage";
-import { ReportarErroNinaBotao } from "@/components/nina/ReportarErroNinaDialog";
+import { InspecaoMensagemNina } from "./InspecaoMensagemNina";
+import { idsParaInspecaoNina, marcadorInternoSistema, revisaoInspecaoMensagens } from "@/lib/nina/inspecao-mensagem";
+
 
 import {
-  ConfiancaMensagemBadge,
-  ConfiancaNaoAvaliadaBadge,
-  useConfiancaMensagens,
-} from "@/components/nina/ConfiancaMensagem";
-import {
-  SaidaMensagemBadge,
+
   useSaidasDasMensagens,
-  type MapaSaidas,
+
 } from "@/components/nina/SaidaMensagem";
 import {
-  execucoesDasRespostasNina,
+
   montarMetadadosMensagemNina,
 } from "@/lib/nina/mensagem-meta";
 
@@ -151,6 +142,9 @@ type Msg = {
   direction: string;
   body: string | null;
   enviada_por: string | null;
+  status?: string | null;
+  tipo?: string | null;
+  transcricao?: string | null;
   created_at: string;
   execucao_id?: string | null;
   /** Identidade idempotente do envio — usada para reconciliar a bolha. */
@@ -188,10 +182,6 @@ function nomeLead(l: Pick<Lead, "indice">): string {
 export const AVISO_TESTE_ENCERRADO =
   "Teste encerrado. Clique em Resolver / Reiniciar teste para iniciar uma nova sessão.";
 
-/** Classe da bolha, quando já carregada e sem falha de leitura. */
-function classeDaSaida(s: MapaSaidas[string] | undefined): string | null {
-  return !s || s === "falha" ? null : s.classe;
-}
 
 export function HomologacaoInbox() {
 
@@ -240,62 +230,6 @@ export function HomologacaoInbox() {
   const [ultimoTexto, setUltimoTexto] = useState("");
 
   const [tipo, setTipo] = useState<TipoMensagem>("text");
-  // FASE 3 — detalhe técnico de uma execução da Nina (prompt, versão,
-  // conhecimento, ferramentas, modelo, erros e resposta).
-  const carregarDetalhe = useServerFn(detalheExecucaoTeste);
-  const [detalhe, setDetalhe] = useState<{
-    leitura: LeituraDetalhesMensagem | null;
-    execucao: unknown;
-    etapas: unknown[];
-    eventos: unknown[];
-    traceId: string | null;
-    registrosComplementares?: unknown;
-  } | null>(null);
-  const [detalheAberto, setDetalheAberto] = useState(false);
-  const [detalheCarregando, setDetalheCarregando] = useState(false);
-  const [detalheFalhou, setDetalheFalhou] = useState(false);
-  const pedidoDetalheRef = useRef(0);
-  const mudarDetalheAberto = useCallback((aberto: boolean) => {
-    setDetalheAberto(aberto);
-    if (!aberto) {
-      pedidoDetalheRef.current++;
-      setDetalhe(null);
-      setDetalheCarregando(false);
-      setDetalheFalhou(false);
-    }
-  }, []);
-  useEffect(() => {
-    // Outra clínica/conversa ou desmontagem invalidam qualquer leitura em voo.
-    const controleDoPedido = pedidoDetalheRef;
-    mudarDetalheAberto(false);
-    return () => {
-      controleDoPedido.current++;
-    };
-  }, [clinicaId, leadId, mudarDetalheAberto]);
-  const abrirDetalhe = useCallback(
-    async (mensagemId: string, execucaoId: string | null) => {
-      if (!clinicaId) return;
-      const pedido = ++pedidoDetalheRef.current;
-      setDetalheAberto(true);
-      setDetalheCarregando(true);
-      setDetalheFalhou(false);
-      setDetalhe(null);
-      try {
-        const r = await carregarDetalhe({
-          data: { clinicaId, mensagemId, ...(execucaoId ? { execucaoId } : {}) },
-        });
-        if (pedido === pedidoDetalheRef.current) setDetalhe(r);
-      } catch (e) {
-        if (pedido === pedidoDetalheRef.current) {
-          mostrarErro(e);
-          setDetalheFalhou(true);
-        }
-      } finally {
-        if (pedido === pedidoDetalheRef.current) setDetalheCarregando(false);
-      }
-    },
-    [carregarDetalhe, clinicaId],
-  );
   const [audio, setAudio] = useState<string | null>(null);
   const [limparAgenda, setLimparAgenda] = useState(true);
   const [ferramentas, setFerramentas] = useState<EventoFerramenta[]>([]);
@@ -345,24 +279,14 @@ export function HomologacaoInbox() {
 
   // FASE 1 — mesma leitura de confiança da Inbox de produção: UM lote por
   // conversa (sem consulta por balão) e nada é recalculado na tela.
-  const execucoesDaNina = useMemo(() => execucoesDasRespostasNina(msgs), [msgs]);
-  const confiancaPorExecucao = useConfiancaMensagens(clinicaId, execucoesDaNina);
-  // O que cada bolha É (resposta avaliada, aviso do sistema, sem avaliação,
-  // texto alterado) vem do banco, pelo vínculo gravado de cada mensagem.
-  const idsDasMensagens = useMemo(
-    () =>
-      msgs
-        .filter((m) => m.direction === "out" && m.id)
-        .map((m) => String(m.id))
-        .filter((id) => /^[0-9a-f-]{36}$/i.test(id)),
-    [msgs],
-  );
-  const saidasPorMensagem = useSaidasDasMensagens(clinicaId, conversaId, idsDasMensagens);
+  const idsDasMensagens = useMemo(() => idsParaInspecaoNina(msgs), [msgs]);
+  const saidasPorMensagem = useSaidasDasMensagens(clinicaId, conversaId, idsDasMensagens, revisaoInspecaoMensagens(msgs));
 
   /** Metadados internos padronizados da mensagem (produção/homologação/teste). */
   const metadadosDaMensagem = useCallback(
     (m: Msg) => {
-      const c = m.execucao_id ? confiancaPorExecucao[String(m.execucao_id)] : undefined;
+      const saida = saidasPorMensagem[m.id];
+      const c = saida && saida !== "falha" && saida.classe === "resposta_avaliada" ? saida : null;
       const cicloAtual = ciclos.length > 0 ? (ciclos[ciclos.length - 1] as any) : null;
       return montarMetadadosMensagemNina({
         messageId: m.id,
@@ -372,10 +296,10 @@ export function HomologacaoInbox() {
         ninaSessionId: cicloAtual?.nina_session_id ?? null,
         criadaEm: m.created_at,
         execucaoId: m.execucao_id ?? null,
-        confianca: c ? { score: c.score, nivel: c.nivel } : null,
+        confianca: c?.score != null && c.nivel ? { score: c.score, nivel: c.nivel } : null,
       });
     },
-    [conversaId, confiancaPorExecucao, ciclos, leads, leadId],
+    [conversaId, saidasPorMensagem, ciclos, leads, leadId],
   );
 
 
@@ -1417,7 +1341,7 @@ export function HomologacaoInbox() {
                   if (item.kind === "evento")
                     return <ConversationSystemEvent key={item.id} evento={item.evento} />;
                   const m = item.msg;
-                  if (m.enviada_por === "sistema") {
+                  if (marcadorInternoSistema(m)) {
                     return (
                       <div key={item.id} className="flex justify-center">
                         <div className="max-w-[85%] whitespace-pre-wrap rounded-lg border border-atd-blue/20 bg-atd-blue-tint px-3 py-2 text-center text-xs text-atd-blue-ink">
@@ -1433,7 +1357,7 @@ export function HomologacaoInbox() {
                   // FASE 3: só a resposta da própria Nina recebe indicador de
                   // confiança e botão de reporte. Envio humano no teste, não.
                   const daNina = out && m.enviada_por === "nina";
-                  const autoria = daNina ? "· Nina" : out ? "· Equipe (teste)" : "· Paciente (teste)";
+                  const autoria = daNina ? "· Nina" : m.enviada_por === "sistema" ? "· Sistema" : out ? "· Equipe (teste)" : "· Paciente (teste)";
 
                   const meta = metadadosDaMensagem(m);
                   return (
@@ -1449,14 +1373,9 @@ export function HomologacaoInbox() {
                     >
                       {/* Reporte de um clique — mesmo mecanismo do atendimento
                           real, apenas em respostas da Nina neste teste. */}
-                      {m.enviada_por === "nina" && out && clinicaId && meta.test_conversation_id && (
-                        <ReportarErroNinaBotao
-                          clinicaId={clinicaId}
-                          conversaId={meta.test_conversation_id}
-                          mensagemId={meta.message_id}
-                          execucaoId={m.execucao_id ? String(m.execucao_id) : null}
-                        />
-                      )}
+                      {clinicaId && meta.test_conversation_id && <InspecaoMensagemNina parte="reporte"
+                        clinicaId={clinicaId} conversaId={meta.test_conversation_id} mensagem={m}
+                        saida={saidasPorMensagem[String(m.id)]} />}
                       <div
 
                         className={`max-w-[68%] break-words rounded-2xl px-3 py-2 text-sm shadow-sm ${
@@ -1477,41 +1396,9 @@ export function HomologacaoInbox() {
                             {/* Falha é sempre DESTA mensagem: as outras seguem. */}
                             {m.estado === "failed" && " · ⚠ falhou"}
                           </span>
-                          {daNina && (
-                            <span className="flex items-center gap-2">
-                              {/* Um selo só por bolha, decidido pelo vínculo
-                                  gravado: nota apenas quando a avaliação é
-                                  deste conteúdo. Avisos do sistema e falhas de
-                                  carregamento têm selo e motivo próprios. */}
-                              <SaidaMensagemBadge
-                                saida={m.id ? saidasPorMensagem[String(m.id)] : undefined}
-                              />
-                              {clinicaId &&
-                                m.execucao_id &&
-                                confiancaPorExecucao[String(m.execucao_id)] &&
-                                classeDaSaida(saidasPorMensagem[String(m.id)]) ===
-                                  "resposta_avaliada" && (
-                                  <ConfiancaMensagemBadge
-                                    clinicaId={clinicaId}
-                                    mensagemId={m.id ? String(m.id) : null}
-                                    conversaId={meta.test_conversation_id ?? null}
-                                    mensagem={{ texto: m.body ?? null }}
-                                    confianca={confiancaPorExecucao[String(m.execucao_id)]!}
-                                  />
-                                )}
-                              {m.id && (
-                                <button
-                                  type="button"
-                                  className="underline underline-offset-2 hover:opacity-80"
-                                  onClick={() =>
-                                    void abrirDetalhe(String(m.id), m.execucao_id ?? null)
-                                  }
-                                >
-                                  Detalhes técnicos
-                                </button>
-                              )}
-                            </span>
-                          )}
+                          {clinicaId && meta.test_conversation_id && <InspecaoMensagemNina parte="detalhes"
+                            clinicaId={clinicaId} conversaId={meta.test_conversation_id} mensagem={m}
+                            saida={saidasPorMensagem[String(m.id)]} />}
                         </div>
 
                       </div>
@@ -1922,43 +1809,7 @@ export function HomologacaoInbox() {
         )}
       </Card>
 
-      <Dialog open={detalheAberto} onOpenChange={mudarDetalheAberto}>
-        <DialogContent className="max-h-[85vh] max-w-2xl overflow-auto">
-          <DialogHeader>
-            <DialogTitle>Detalhes técnicos da mensagem</DialogTitle>
-            <DialogDescription>
-              Veja a mensagem selecionada, suas avaliações e o caminho registrado pelo sistema.
-            </DialogDescription>
-          </DialogHeader>
-          {detalheCarregando && (
-            <p role="status" className="text-sm text-muted-foreground">
-              Carregando os registros desta mensagem…
-            </p>
-          )}
-          {!detalheCarregando && detalheFalhou && (
-            <p role="alert" className="text-sm text-destructive">
-              Não foi possível carregar os detalhes. Feche este painel e tente novamente.
-            </p>
-          )}
-          {!detalheCarregando && detalhe?.leitura && (
-            <DetalhesMensagemNina
-              leitura={detalhe.leitura}
-              registros={{
-                execucao: detalhe.execucao,
-                traceId: detalhe.traceId,
-                eventos: detalhe.eventos,
-                etapas: detalhe.etapas,
-                registrosVinculados: detalhe.registrosComplementares,
-              }}
-            />
-          )}
-          {!detalheCarregando && detalhe && !detalhe.leitura && (
-            <p className="text-sm text-muted-foreground">
-              Não foi possível vincular os registros técnicos à mensagem selecionada.
-            </p>
-          )}
-        </DialogContent>
-      </Dialog>
+
     </div>
   );
 }

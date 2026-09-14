@@ -98,7 +98,9 @@ export function execucoesDasRespostasNina(
   }>,
 ): string[] {
   const ids = mensagens
-    .filter((m) => m.direction === "out" && m.enviada_por === "nina" && m.execucao_id)
+    // Consultar o vínculo não atribui a nota à bolha: autoria/identidade do
+    // conteúdo são conferidas pelo contrato de inspeção antes da exibição.
+    .filter((m) => m.direction === "out" && (m.enviada_por === "nina" || m.enviada_por === "sistema") && m.execucao_id)
     .map((m) => String(m.execucao_id));
   return [...new Set(ids)];
 }

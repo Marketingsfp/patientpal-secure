@@ -41,6 +41,10 @@ const AFIRMA_FALHA =
 
 const AFIRMA_PROMESSA = /((estou|vou|irei)\s+agend|agendando\s+(para|seu)|j[áa]\s+vou\s+marcar)/i;
 
+/** Distingue relatar uma reserva existente de afirmar uma nova gravação. */
+const AFIRMA_NOVA_OPERACAO =
+  /\b(?:agendei|marquei|reservei|agendamos|marcamos|reservamos)\b|\bacabei\s+de\s+(?:agendar|marcar|reservar)\b|\b(?:confirmei|confirmamos)\s+(?:(?:a|o|sua|seu|uma|um)\s+){0,2}(?:consulta|agendamento|reserva|hor[áa]rio)\b|\b(?:nov[oa]|outr[oa])\s+(?:agendamento|consulta|reserva|hor[áa]rio)\b[^.!?\n]{0,80}\b(?:confirmad[oa]|agendad[oa]|marcad[oa]|reservad[oa]|criad[oa])\b|\b(?:consulta|agendamento|reserva|hor[áa]rio)\b[^.!?\n]{0,80}\b(?:confirmad[oa]|agendad[oa]|marcad[oa]|reservad[oa]|criad[oa])\s+(?:agora|neste\s+momento)\b/i;
+
 /** Etapas em que um agendamento gravado é coerente. */
 const ETAPAS_COM_AGENDAMENTO = new Set(["BOOKED", "APPOINTMENT_CONFIRMED", "COMPLETED"]);
 
@@ -114,12 +118,20 @@ function ferramentaAgendarChamada(ctx: ContextoConfianca, st: EstadoOperacionalT
  * Nunca inventa estado: sem informação devolve UNKNOWN.
  */
 export function WorkflowConsistencyValidator(ctx: ContextoConfianca): ResultadoValidador {
-  const afirmacao = classificarAfirmacaoOperacional(ctx.draftText);
+  const novaOperacao = AFIRMA_NOVA_OPERACAO.test(ctx.draftText ?? "");
+  const classificacao = classificarAfirmacaoOperacional(ctx.draftText);
+  const afirmacao =
+    classificacao === "nenhuma" && novaOperacao ? "sucesso_agendamento" : classificacao;
   const acaoEscrita = ctx.requestedAction !== null && ACOES_DE_ESCRITA.has(ctx.requestedAction);
   const st = ctx.operationalState;
 
   // Nada operacional em jogo: esta dimensão não é necessária neste turno.
-  if (afirmacao === "nenhuma" && !acaoEscrita && !st?.appointmentFlowActive) {
+  if (
+    afirmacao === "nenhuma" &&
+    !acaoEscrita &&
+    st?.appointmentAttempted !== true &&
+    !ferramentaAgendarChamada(ctx, st ?? {})
+  ) {
     return r("NOT_APPLICABLE", 100, "SEM_AFIRMACAO_OPERACIONAL", { afirmacao });
   }
 
@@ -136,6 +148,8 @@ export function WorkflowConsistencyValidator(ctx: ContextoConfianca): ResultadoV
   const criado = st.appointmentCreated === true;
   const prova = typeof st.appointmentId === "string" && st.appointmentId.trim() !== "";
   const tentou = st.appointmentAttempted === true || chamou;
+  const daSessaoAtual = st.appointmentFromCurrentSession === true;
+  const criadoNesteTurno = chamou && criado && prova && st.appointmentCreatedThisTurn === true;
   const ativo = fluxoAtivo(st);
   const base = {
     afirmacao,
@@ -146,17 +160,14 @@ export function WorkflowConsistencyValidator(ctx: ContextoConfianca): ResultadoV
     appointmentCreated: criado,
     temProva: prova,
     fluxoAtivo: ativo,
+    appointmentFromCurrentSession: st.appointmentFromCurrentSession ?? null,
+    appointmentCreatedThisTurn: st.appointmentCreatedThisTurn ?? null,
+    afirmaNovaOperacao: novaOperacao,
   };
 
   // (A) Sucesso gravado sem prova persistida: não se afirma o que não existe.
   if (criado && !prova) {
-    return r(
-      "BLOCK",
-      0,
-      "SUCESSO_SEM_PROVA_PERSISTIDA",
-      base,
-      "AFIRMACAO_OPERACIONAL_SEM_PROVA",
-    );
+    return r("BLOCK", 0, "SUCESSO_SEM_PROVA_PERSISTIDA", base, "AFIRMACAO_OPERACIONAL_SEM_PROVA");
   }
 
   // (B) Estado conflitante: sistema diz gravado, etapa diz que não.
@@ -168,20 +179,23 @@ export function WorkflowConsistencyValidator(ctx: ContextoConfianca): ResultadoV
   ) {
     return r("BLOCK", 0, "ESTADO_CONFLITANTE", base, "WORKFLOW_INCONSISTENTE");
   }
-  if (criado && !chamou) {
+  if (criado && ((!chamou && !daSessaoAtual) || st.appointmentFromCurrentSession === false)) {
     return r("BLOCK", 0, "AGENDAMENTO_SEM_FERRAMENTA", base, "WORKFLOW_INCONSISTENTE");
   }
 
   // (C) Afirmação de sucesso.
   if (afirmacao === "sucesso_agendamento") {
+    if (criado && prova && (novaOperacao || acaoEscrita) && !criadoNesteTurno) {
+      return r(
+        "BLOCK",
+        0,
+        "NOVA_OPERACAO_SEM_PROVA_DO_TURNO",
+        base,
+        "AFIRMACAO_OPERACIONAL_SEM_PROVA",
+      );
+    }
     if (criado && prova) return r("PASS", 100, "SUCESSO_COM_PROVA", base);
-    return r(
-      "BLOCK",
-      0,
-      "AFIRMA_SUCESSO_SEM_PROVA",
-      base,
-      "AFIRMACAO_OPERACIONAL_SEM_PROVA",
-    );
+    return r("BLOCK", 0, "AFIRMA_SUCESSO_SEM_PROVA", base, "AFIRMACAO_OPERACIONAL_SEM_PROVA");
   }
 
   // (D) Afirmação de falha — o caso originador do bug.
@@ -198,16 +212,16 @@ export function WorkflowConsistencyValidator(ctx: ContextoConfianca): ResultadoV
       );
     }
     if (!tentou) {
+      return r("BLOCK", 0, "AFIRMA_FALHA_SEM_TENTATIVA", base, "AFIRMACAO_OPERACIONAL_SEM_PROVA");
+    }
+    if (criado) {
       return r(
         "BLOCK",
         0,
-        "AFIRMA_FALHA_SEM_TENTATIVA",
+        "FALHA_DECLARADA_COM_AGENDAMENTO_GRAVADO",
         base,
-        "AFIRMACAO_OPERACIONAL_SEM_PROVA",
+        "WORKFLOW_INCONSISTENTE",
       );
-    }
-    if (criado) {
-      return r("BLOCK", 0, "FALHA_DECLARADA_COM_AGENDAMENTO_GRAVADO", base, "WORKFLOW_INCONSISTENTE");
     }
     return r("PASS", 100, "FALHA_COM_TENTATIVA_REAL", base);
   }

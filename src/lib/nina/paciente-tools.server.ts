@@ -79,6 +79,9 @@ function mutarEstado(
   if (!ctx.estado) return;
   if (patch.patient) Object.assign(ctx.estado.patient, patch.patient);
   if (patch.appointment) Object.assign(ctx.estado.appointment, patch.appointment);
+  if (patch.appointment?.appointment_id) {
+    ctx.estado.appointment.confirmed_in_session = ctx.estado.session_id ?? null;
+  }
   if (patch.stage) ctx.estado.flow.stage = patch.stage;
 }
 
@@ -1649,6 +1652,10 @@ async function executarFerramentaInterna(
               { divergencias: anterior.divergencias },
             );
           const reg = anterior.registro!;
+          mutarEstado(ctx, {
+            appointment: { appointment_id: anterior.agendamentoId },
+            stage: "BOOKED",
+          });
           return {
             ok: true,
             duplicado: true,

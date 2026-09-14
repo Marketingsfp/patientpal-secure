@@ -6,6 +6,8 @@
  * O item nasce `pending`, aguardando revisão humana.
  */
 
+import { mensagemNinaInspecionavel, type AvisoInspecao } from "./inspecao-mensagem";
+
 /** Origem gravada em `nina_feedback_erros.origem` para o reporte de um clique. */
 export const ORIGEM_ERRO_RAPIDO = "nina_message_quick_report" as const;
 
@@ -20,6 +22,8 @@ export type MensagemParaReporte = {
   enviada_por: string | null;
   body: string | null;
   transcricao?: string | null;
+  tipo?: string | null;
+  status?: string | null;
   /** Execução da Nina que produziu ESTA mensagem (não a última da conversa). */
   execucao_id?: string | null;
 };
@@ -100,6 +104,7 @@ export type ResultadoValidacao =
 export function validarMensagemNina(
   mensagem: MensagemParaReporte | null | undefined,
   conversaId: string,
+  prova?: { clinicaId: string; avisos: readonly AvisoInspecao[] },
 ): ResultadoValidacao {
   if (!mensagem) {
     return {
@@ -115,15 +120,17 @@ export function validarMensagemNina(
       mensagem: "A mensagem não pertence à conversa informada.",
     };
   }
-  const daNina = mensagem.direction === "out" && mensagem.enviada_por === "nina";
+  const daNina = mensagemNinaInspecionavel(mensagem, prova?.avisos, prova?.clinicaId);
   if (!daNina) {
     return {
       ok: false,
       motivo: "autor_invalido",
-      mensagem: "Só é possível reportar mensagens enviadas pela Nina.",
+      mensagem: "Só é possível reportar respostas da Nina ou avisos oficialmente vinculados a ela.",
     };
   }
-  const snapshot = mensagem.body ?? mensagem.transcricao ?? "";
+  const snapshot = mensagem.tipo === "audio" || mensagem.tipo === "voice"
+    ? mensagem.transcricao ?? ""
+    : mensagem.body ?? mensagem.transcricao ?? "";
   if (snapshot === "") {
     return { ok: false, motivo: "sem_conteudo", mensagem: "A mensagem não possui conteúdo de texto." };
   }
@@ -272,4 +279,3 @@ export function mesclarReporte<T extends { id: string; created_at?: string }>(
   }
   return [novo, ...itens];
 }
-

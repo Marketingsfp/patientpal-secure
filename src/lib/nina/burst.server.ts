@@ -1,189 +1,176 @@
-/**
- * FASE 2 — Message Burst Aggregation (estado persistente).
- *
- * O lote NÃO vive em memória: fica em `nina_message_batches` /
- * `nina_message_batch_itens`, com reserva atômica no banco. Isso mantém um
- * único turno da Nina mesmo com várias invocações, instâncias ou reinícios.
- */
+/** Agrupamento persistente comum a WhatsApp e homologação. Sem fallback que execute IA. */
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
-import { decidirEspera, montarTurnoPaciente } from "@/lib/nina/burst";
+import {
+  agruparTurnoPersistido,
+  estadoAutorizaTurno,
+  ErroAgrupamentoNina,
+  type EntradaAgrupamento,
+  type TurnoAgrupado,
+} from "./agrupamento-turno";
 import {
   adquirirLockConversa,
   liberarLockConversa,
-  recuperarLotesTravados,
+  renovarLockConversa,
+  lockConversaConfirmado,
   type LockConversa,
-} from "@/lib/nina/lock-conversa.server";
-import { revisaoAtualConversa } from "@/lib/nina/revisao-conversa.server";
+} from "./lock-conversa.server";
 
-export type TurnoNina = {
-  batchId: string;
-  /** IDs reais das mensagens do lote, em ordem de chegada. */
-  mensagens: string[];
-  /** Texto do turno lógico (uma ou várias mensagens, sempre separadas). */
-  texto: string;
-  /**
-   * FASE 3 — trava da conversa mantida durante TODO o turno (modelo,
-   * ferramentas, memória, estado, Confidence Engine, handoff e envio).
-   */
-  lock: LockConversa | null;
-  /**
-   * FASE 4 — revisão da conversa usada por esta geração. Antes de enviar,
-   * compara-se com a revisão atual: se mudou, a resposta é obsoleta.
-   */
-  revisao: number;
-};
+export type TurnoNina = TurnoAgrupado;
+export { ErroAgrupamentoNina } from "./agrupamento-turno";
 
-const dormir = (ms: number) =>
-  ms > 0 ? new Promise<void>((r) => setTimeout(r, ms)) : Promise.resolve();
+async function rpc(nome: string, parametros: Record<string, unknown>) {
+  const { data, error } = await (supabaseAdmin as any).rpc(nome, parametros);
+  if (error) throw new ErroAgrupamentoNina(`${nome}: ${error.message}`);
+  return data;
+}
 
-/**
- * Registra a mensagem no lote da conversa, aguarda a quiet window e tenta
- * assumir o turno. Retorna `null` quando outra invocação (mensagem mais nova)
- * é a responsável por processar — esta simplesmente se encerra.
- *
- * Não atrasa persistência, Realtime nem a exibição para atendentes: é chamado
- * DEPOIS de tudo isso, só antes da decisão da Nina.
- */
-export async function aguardarTurnoNina(input: {
-  clinicaId: string;
-  telefone: string;
-  conversaId?: string | null;
-  mensagemId?: string | null;
-  textoAtual: string;
-  /** Fallback quando o lote não pôde ser registrado. */
-  mensagensFallback?: string[];
-}): Promise<TurnoNina | null> {
-  const fallback = async (): Promise<TurnoNina | null> => {
-    // Mesmo sem lote, o turno só roda com a conversa travada.
-    const lock = await adquirirLockConversa({
-      clinicaId: input.clinicaId,
-      telefone: input.telefone,
-      conversaId: input.conversaId ?? null,
-    });
-    if (!lock) return null;
-    return {
-      batchId: "",
-      mensagens: input.mensagensFallback ?? (input.mensagemId ? [input.mensagemId] : []),
-      texto: input.textoAtual,
-      lock,
-      revisao: await revisaoAtualConversa(input.clinicaId, input.telefone),
-    };
-  };
-
-  if (!input.mensagemId || !input.telefone) return fallback();
-
-  // Recuperação: lote reservado por uma execução que falhou volta a ficar
-  // disponível, para a conversa não travar para sempre.
-  await recuperarLotesTravados(input.clinicaId, input.telefone);
-
-  let batchId = "";
-  let revision = 0;
-  let primeiraMs = Date.now();
-  try {
-    const { data, error } = await supabaseAdmin.rpc("nina_batch_registrar", {
-      _clinica_id: input.clinicaId,
-      _telefone: input.telefone,
-      _conversa_id: (input.conversaId ?? undefined) as string,
-      _mensagem_id: input.mensagemId,
-    });
-    if (error) throw error;
-    const linha = (Array.isArray(data) ? data[0] : data) as
-      | { batch_id?: string; revision?: number; first_message_at?: string }
-      | null;
-    if (!linha?.batch_id) return fallback();
-    batchId = linha.batch_id;
-    revision = linha.revision ?? 0;
-    primeiraMs = linha.first_message_at ? Date.parse(linha.first_message_at) : Date.now();
-  } catch (e) {
-    console.error("[nina] burst: registro do lote falhou", e);
-    return fallback();
+/** A decisão antiga, tomada antes da espera, não autoriza o novo turno. */
+async function validarConversaAposTrava(entrada: EntradaAgrupamento): Promise<boolean> {
+  let q = supabaseAdmin
+    .from("atend_conversas")
+    .select("id, status, owner_type, ai_enabled, atribuida_user_id")
+    .eq("clinica_id", entrada.clinicaId);
+  q = entrada.conversaId
+    ? q.eq("id", entrada.conversaId)
+    : q.in("contato_telefone", [entrada.telefone, `+${entrada.telefone}`]);
+  const { data: conversa, error } = await q.limit(1).maybeSingle();
+  if (error)
+    throw new ErroAgrupamentoNina(
+      `Não foi possível confirmar o responsável da conversa: ${error.message}`,
+    );
+  if (!conversa) return false;
+  const { data: flag, error: erroFlag } = await supabaseAdmin
+    .from("clinica_feature_flags")
+    .select("ativo")
+    .eq("clinica_id", entrada.clinicaId)
+    .eq("flag_key", "nina_desativada")
+    .maybeSingle();
+  if (erroFlag)
+    throw new ErroAgrupamentoNina(
+      `Não foi possível confirmar a ativação da Nina: ${erroFlag.message}`,
+    );
+  if (flag?.ativo) return false;
+  if (entrada.sessaoTeste) {
+    const { data: lead, error: erroLead } = await supabaseAdmin
+      .from("nina_teste_leads")
+      .select("conversa_id, ciclo_id, telefone_sessao")
+      .eq("clinica_id", entrada.clinicaId)
+      .eq("id", entrada.sessaoTeste.leadId)
+      .maybeSingle();
+    if (erroLead)
+      throw new ErroAgrupamentoNina(
+        `Não foi possível confirmar a sessão de homologação: ${erroLead.message}`,
+      );
+    return estadoAutorizaTurno(entrada, { conversa, ninaDesativada: Boolean(flag?.ativo), lead });
   }
+  return estadoAutorizaTurno(entrada, { conversa, ninaDesativada: Boolean(flag?.ativo) });
+}
 
-  const { esperaMs, forcar } = decidirEspera(Date.now(), primeiraMs);
-  await dormir(esperaMs);
-
-  // Serialização por conversa ANTES de qualquer decisão/ferramenta.
-  const lock = await adquirirLockConversa({
-    clinicaId: input.clinicaId,
-    telefone: input.telefone,
-    conversaId: input.conversaId ?? null,
-    batchId,
+export async function aguardarTurnoNina(entrada: EntradaAgrupamento): Promise<TurnoNina | null> {
+  return agruparTurnoPersistido(entrada, {
+    registrar: async () => {
+      await rpc("nina_batch_recuperar_travados", {
+        _clinica_id: entrada.clinicaId,
+        _telefone: entrada.telefone,
+        _idade_segundos: 120,
+      });
+      const data = await rpc("nina_batch_registrar", {
+        _clinica_id: entrada.clinicaId,
+        _telefone: entrada.telefone,
+        _conversa_id: entrada.conversaId ?? null,
+        _mensagem_id: entrada.mensagemId,
+      });
+      const linha = Array.isArray(data) ? data[0] : data;
+      return {
+        batchId: linha?.batch_id ?? "",
+        revision: linha?.revision ?? 0,
+        primeiraMs: Date.parse(linha?.first_message_at ?? "") || Date.now(),
+      };
+    },
+    adquirir: (batchId) =>
+      adquirirLockConversa({
+        clinicaId: entrada.clinicaId,
+        telefone: entrada.telefone,
+        conversaId: entrada.conversaId,
+        batchId,
+      }),
+    validarConversa: () => validarConversaAposTrava(entrada),
+    reivindicar: async (batchId, revision, forcar) => {
+      const data = await rpc("nina_batch_reivindicar", {
+        _batch_id: batchId,
+        _revision: revision,
+        _forcar: forcar,
+      });
+      const linha = Array.isArray(data) ? data[0] : data;
+      return linha?.reivindicado ? (linha.mensagens ?? []) : null;
+    },
+    lerMensagens: async (ids) => {
+      let consulta = supabaseAdmin
+        .from("whatsapp_mensagens")
+        .select("id, body, transcricao, tipo")
+        .eq("clinica_id", entrada.clinicaId)
+        .eq("direction", "in")
+        .in("id", ids)
+        .in("from_number", [entrada.telefone, `+${entrada.telefone}`]);
+      if (entrada.conversaId) consulta = consulta.eq("conversa_id", entrada.conversaId);
+      const { data, error } = await consulta;
+      if (error)
+        throw new ErroAgrupamentoNina(`Leitura das entradas do lote falhou: ${error.message}`);
+      return (data ?? []).map((m) => ({
+        id: m.id,
+        texto: m.tipo === "audio" ? (m.transcricao ?? "") : (m.body ?? ""),
+      }));
+    },
+    lerRevisao: async () =>
+      Number(
+        await rpc("nina_revisao_atual", {
+          _clinica_id: entrada.clinicaId,
+          _telefone: entrada.telefone,
+        }),
+      ),
+    iniciar: async (batchId, lock) =>
+      lockConversaConfirmado(lock) &&
+      Boolean(
+        await rpc("nina_batch_iniciar_processamento", {
+          _batch_id: batchId,
+          _chave: lock.chave,
+          _token: lock.token,
+        }),
+      ),
+    concluir: (batchId, lock, motivo) =>
+      concluirTurnoNina(batchId, null, lock, "SUPERSEDED", motivo),
+    liberar: liberarLockConversa,
   });
-  if (!lock) {
-    console.warn("[nina] lock: conversa ocupada, turno adiado", { batchId });
-    return null;
-  }
-
-  try {
-    const { data, error } = await supabaseAdmin.rpc("nina_batch_reivindicar", {
-      _batch_id: batchId,
-      _revision: revision,
-      _forcar: forcar,
-    });
-    if (error) throw error;
-    const linha = (Array.isArray(data) ? data[0] : data) as
-      | { reivindicado?: boolean; mensagens?: string[] }
-      | null;
-    if (!linha?.reivindicado) {
-      // Mensagem mais nova assume o turno: solta a trava e encerra.
-      await liberarLockConversa(lock);
-      return null;
-    }
-    const ids = linha.mensagens ?? [];
-    return {
-      batchId,
-      mensagens: ids.length ? ids : [input.mensagemId],
-      texto: await montarTextoDoLote(ids, input.textoAtual),
-      lock,
-      // Revisão congelada no momento do claim: tudo que chegar depois torna
-      // esta geração obsoleta.
-      revisao: await revisaoAtualConversa(input.clinicaId, input.telefone),
-    };
-  } catch (e) {
-    console.error("[nina] burst: reivindicação falhou", e);
-    await liberarLockConversa(lock);
-    return null;
-  }
 }
 
-async function montarTextoDoLote(ids: string[], textoAtual: string): Promise<string> {
-  if (ids.length <= 1) return textoAtual;
-  try {
-    const { data } = await supabaseAdmin
-      .from("whatsapp_mensagens")
-      .select("id, body, created_at")
-      .in("id", ids)
-      .order("created_at", { ascending: true });
-    const linhas = (data ?? []) as { id: string; body: string | null }[];
-    const porId = new Map(linhas.map((m) => [m.id, m.body ?? ""]));
-    const textos = ids.map((id) => porId.get(id) ?? "").filter((t) => t.trim().length > 0);
-    const turno = montarTurnoPaciente(textos);
-    return turno || textoAtual;
-  } catch (e) {
-    console.error("[nina] burst: leitura das mensagens do lote falhou", e);
-    return textoAtual;
-  }
+/** Reconfere o lease imediatamente antes de o transporte enviar a resposta. */
+export async function validarReservaTurnoNina(lock: LockConversa | null): Promise<boolean> {
+  return Boolean(lock && lockConversaConfirmado(lock) && (await renovarLockConversa(lock)));
 }
 
-/** Fecha o lote e solta a trava da conversa (mesmo em caso de falha). */
+/** Conclui só a reserva do chamador e sempre encerra seu heartbeat. */
 export async function concluirTurnoNina(
   batchId: string,
   execucaoId?: string | null,
   lock?: LockConversa | null,
   status: "PROCESSED" | "SUPERSEDED" = "PROCESSED",
+  erro?: string | null,
 ): Promise<void> {
-  if (!batchId) {
-    await liberarLockConversa(lock ?? null);
-    return;
-  }
   try {
-    await supabaseAdmin.rpc("nina_batch_concluir", {
-      _batch_id: batchId,
-      _execucao_id: (execucaoId ?? undefined) as string,
-      _status: status,
-    });
-  } catch (e) {
-    console.error("[nina] burst: conclusão do lote falhou", e);
+    if (batchId && lock) {
+      const confirmou = await rpc("nina_batch_concluir_seguro", {
+        _batch_id: batchId,
+        _chave: lock.chave,
+        _token: lock.token,
+        _execucao_id: execucaoId ?? null,
+        _status: status,
+        _erro: erro ?? null,
+      });
+      if (!confirmou)
+        console.warn("[nina] lote não concluído: a reserva não pertence mais ao chamador", {
+          batchId,
+        });
+    }
   } finally {
     await liberarLockConversa(lock ?? null);
   }

@@ -509,6 +509,7 @@ async function salvarEstadoIdentidade(
  * comportamento da Nina: falha de auditoria não interrompe o atendimento.
  */
 import { ehFerramentaCritica } from "@/lib/nina/revisao";
+import { criarGuardiaoReservaTurno, ErroReservaTurnoPerdida } from "@/lib/nina/reserva-turno";
 
 export async function gerarRespostaNina(
   clinicaId: string,
@@ -536,9 +537,12 @@ export async function gerarRespostaNina(
      * vínculo lógico usado por intenção, estado, Confidence e auditoria.
      */
     lote?: { batchId: string | null; revisao: number | null };
+    /** Reserva do lote ainda pertence ao chamador. Falha interrompe sem fallback. */
+    validarReservaTurno?: () => Promise<boolean>;
   },
 ): Promise<string> {
   const { comColetor } = await import("@/lib/nina/evidencias.server");
+  const conferirReserva = criarGuardiaoReservaTurno(opcoes?.validarReservaTurno);
   const auditoria: {
     execucaoId?: string | null;
     resultado?: import("@/lib/nina/resposta/contrato").ResultadoRespostaNina;
@@ -588,13 +592,16 @@ export async function gerarRespostaNina(
     async () => {
       try {
         const { resultado, coletor } = await comColetor(async (c) => {
+          await conferirReserva();
           if (opcoes?.mensagensEntrada?.length) c.mensagensEntrada(opcoes.mensagensEntrada);
           return await gerarRespostaNinaInterno(clinicaId, mensagemPaciente, telefoneRemetente, {
             ...opcoes,
             auditoria,
             rastro,
+            validarReservaTurno: conferirReserva,
           });
         });
+        await conferirReserva();
         rastro.concluir("message.inbound", { resposta_tamanho: resultado.length });
         const { hashDoTexto } = await import("@/lib/nina/confidence/hash");
         const resultadoDoTurno = auditoria.resultado;
@@ -622,7 +629,7 @@ export async function gerarRespostaNina(
         rastro.falhar("error.handle", e);
         rastro.falhar("message.inbound", e);
         registrarOrigemResposta(
-          "fallback_erro",
+          e instanceof ErroReservaTurnoPerdida ? "nenhuma" : "fallback_erro",
           e instanceof Error ? e.message.slice(0, 200) : "falha na geração",
         );
         return { ok: false as const, erro: e };
@@ -661,11 +668,13 @@ async function gerarRespostaNinaInterno(
     mensagensEntrada?: string[];
     revisao?: { telefone: string; valor: number };
     lote?: { batchId: string | null; revisao: number | null };
+    validarReservaTurno?: () => Promise<boolean>;
     rastro?: import("@/lib/nina/arquitetura/tracing").Rastro;
   },
 ): Promise<string> {
   const { registrarEtapa } = await import("@/lib/nina/evidencias.server");
   const rastro = opcoes?.rastro ?? null;
+  const conferirReserva = opcoes?.validarReservaTurno ?? (async () => true);
   const apiKey = process.env.LOVABLE_API_KEY;
   if (!apiKey) throw new Error("LOVABLE_API_KEY ausente");
 
@@ -884,7 +893,8 @@ async function gerarRespostaNinaInterno(
   const { resolverSessao, persistirEstadoSessao } = await import("@/lib/nina/sessao.server");
   const { ttlSessaoMinutos } = await import("@/lib/nina/sessao");
   const sessaoNina = resolverSessao(estadoId.fluxoEstadoBruto, estadoId.memoriaDesde);
-  if (sessaoNina.expirou) {
+  if (sessaoNina.expirou || sessaoNina.saneouEncerramento) {
+    await conferirReserva();
     await persistirEstadoSessao(clinicaId, estadoId.conversaId, sessaoNina.estado);
   }
   const corteMemoria = Date.now() - ttlSessaoMinutos() * 60_000;
@@ -1083,7 +1093,11 @@ async function gerarRespostaNinaInterno(
   // ------------------------------------------- estado estruturado do fluxo
   // Recarregado da própria conversa. É isto que faz o paciente já
   // identificado continuar identificado na mensagem seguinte.
-  const { normalizarEstado, salvarFluxoEstado } = await import("@/lib/nina/fluxo-estado.server");
+  const { normalizarEstado, salvarFluxoEstado: salvarFluxoSemGuarda } = await import("@/lib/nina/fluxo-estado.server");
+  const salvarFluxoEstado: typeof salvarFluxoSemGuarda = async (...args) => {
+    await conferirReserva();
+    return salvarFluxoSemGuarda(...args);
+  };
 
   // Estado já passado pelo TTL de sessão (ver `sessaoNina` acima).
   const fluxoEstado = sessaoNina.estado ?? normalizarEstado(estadoId.fluxoEstadoBruto);
@@ -1449,7 +1463,10 @@ async function gerarRespostaNinaInterno(
       (f) => interesseAgendaConfirmado ||
         !FERRAMENTAS_DE_VAGAS.has(String((f as { function?: { name?: string } }).function?.name ?? "")),
     );
-    executar = mod.executarFerramentaPaciente;
+    executar = async (...args) => {
+      await conferirReserva();
+      return mod.executarFerramentaPaciente(...args);
+    };
     ctxFerramentas = {
       clinicaId,
       telefone: telefoneNorm,
@@ -1530,13 +1547,20 @@ async function gerarRespostaNinaInterno(
   const ctxHandoff = { clinicaId, conversaId: estadoId.conversaId ?? null };
   // FASE 4 — Tool Broker: ponto único de execução das ferramentas reais.
   const { criarToolBroker } = await import("@/lib/nina/tool-broker.server");
-  const broker = criarToolBroker({
+  const brokerSemGuarda = criarToolBroker({
     ctxPaciente: ctxFerramentas,
     ctxHandoff,
     executarPaciente: executar
       ? (ctx, nome, args) => executar!(ctx, nome, args as never)
       : null,
   });
+  const broker = {
+    ...brokerSemGuarda,
+    executar: async (...args: Parameters<typeof brokerSemGuarda.executar>) => {
+      await conferirReserva();
+      return brokerSemGuarda.executar(...args);
+    },
+  };
   // FASE 3 — as regras de handoff vivem no prompt publicado. Aqui não se
   // concatena mais nenhum comportamento ao system prompt.
 
@@ -1628,8 +1652,10 @@ async function gerarRespostaNinaInterno(
   // appointment_id verificado no banco — ou quando a conversa JÁ tem um
   // agendamento gravado (senão a Nina não conseguiria nem falar sobre a
   // consulta já marcada nos turnos seguintes).
-  const jaTinhaAgendamento = Boolean(fluxoEstado.appointment.appointment_id);
+  const { reservaDaSessaoAtual, estadoOperacionalDaSessao, resultadoComprovaCriacaoNoTurno } = await import("@/lib/nina/agendamento-sessao");
+  const jaTinhaAgendamento = reservaDaSessaoAtual(fluxoEstado);
   let agendamentoConfirmado = jaTinhaAgendamento;
+  let agendamentoCriadoNesteTurno = false;
 
   let correcaoFalsoSucessoUsada = false;
   // ------------------- CONFIDENCE DECISION ENGINE -------------------
@@ -1815,6 +1841,7 @@ async function gerarRespostaNinaInterno(
     await registrarPromptEfetivo(requestEfetivo);
     // Toda chamada de modelo da Nina passa pelo Nina AI Gateway.
     const { ninaAIGateway } = await import("@/lib/nina/ai-gateway.server");
+    await conferirReserva();
     if (rastro && rodada > 0) rastro.novoCiclo();
     rastro?.iniciar("llm.generate", { rodada });
     const respostaIA = await ninaAIGateway({
@@ -2090,27 +2117,12 @@ async function gerarRespostaNinaInterno(
         } : {}) },
         // FASE 4 — estado REAL do fluxo (leitura da máquina de estados que já
         // existe). O motor compara o que a Nina diz com o que o sistema tem.
-        estadoOperacional: {
-          bookingIntentConfirmed: fluxoEstado.appointment.intent_confirmed === true,
-          appointmentFlowActive: fluxoEstado.flow.stage !== "IDLE",
-          patientDataComplete: Boolean(
-            fluxoEstado.patient.identified && fluxoEstado.patient.id,
-          ),
-          slotSelected: Boolean(
-            fluxoEstado.appointment.slot_inicio && fluxoEstado.appointment.slot_fim,
-          ),
-          finalConfirmationReceived:
-            fluxoEstado.appointment.slot_confirmed_by_patient === true,
-          appointmentAttempted: evidenciasFerramentas.some(
+        estadoOperacional: estadoOperacionalDaSessao(fluxoEstado, {
+          ferramentaChamada: evidenciasFerramentas.some(
             (f) => f.capacidade === "createAppointment" || /agendar/i.test(f.nome),
           ),
-          appointmentToolCalled: evidenciasFerramentas.some(
-            (f) => f.capacidade === "createAppointment" || /agendar/i.test(f.nome),
-          ),
-          appointmentCreated: agendamentoConfirmado,
-          appointmentId: fluxoEstado.appointment.appointment_id,
-          workflowState: fluxoEstado.flow.stage,
-        },
+          reservaCriada: agendamentoCriadoNesteTurno,
+        }),
         // Regras determinísticas do agendamento, derivadas do estado real.
         regrasNegocio:
           canonico.requestedAction === "criar_agendamento"
@@ -2432,7 +2444,10 @@ async function gerarRespostaNinaInterno(
       if (r.success && !r.erro) rastro?.concluir("tool.execute", { ferramenta: nome });
       else rastro?.falhar("tool.execute", r.erro ?? "falha na ferramenta", { ferramenta: nome });
       if (r.capacidade === "requestHumanHandoff" && r.success) houveHandoff = true;
-      if (r.appointment_confirmed) agendamentoConfirmado = true;
+      if (r.appointment_confirmed) {
+        agendamentoConfirmado = reservaDaSessaoAtual(fluxoEstado);
+        if (resultadoComprovaCriacaoNoTurno(fluxoEstado, r)) agendamentoCriadoNesteTurno = true;
+      }
       if (r.capacidade === "checkAvailability" && r.success && !r.erro) {
         disponibilidadeConfirmada = true;
       }
@@ -2792,19 +2807,14 @@ async function gerarRespostaNinaInterno(
         agendamentoConfirmado,
         apresentacaoJaFeita: jaSeApresentou,
         evidenciasFluxo: capturarProvaFluxo(),
-        estadoOperacional: {
-          ...estadoParaRevisao.estadoOperacional,
+        estadoOperacional: estadoOperacionalDaSessao(fluxoEstado, {
           // Invocações recusadas antes da execução permanecem na trilha como
           // consultas não realizadas, sem inventar tentativa de gravar a agenda.
-          appointmentAttempted: broker.resultados().some(r =>
+          ferramentaChamada: broker.resultados().some(r =>
             r.ferramenta === "agendar" && !consultaAgendaAguardandoPaciente(r.resultado),
           ),
-          appointmentToolCalled: broker.resultados().some(r =>
-            r.ferramenta === "agendar" && !consultaAgendaAguardandoPaciente(r.resultado),
-          ),
-          appointmentCreated: agendamentoConfirmado,
-          appointmentId: fluxoEstado.appointment.appointment_id,
-        },
+          reservaCriada: agendamentoCriadoNesteTurno,
+        }),
       };
       const gate = garantirScoreDoTextoEnviado(
         estadoParaTextoFinal,
@@ -2998,7 +3008,7 @@ async function gerarRespostaNinaInterno(
         etapa: cfgFinal.etapa,
         risco: agendamentoConfirmado || houveHandoff ? "operacional" : "informativo",
         operacaoAfirmada: agendamentoConfirmado,
-        operacaoComprovada: Boolean(fluxoEstado.appointment.appointment_id),
+        operacaoComprovada: reservaDaSessaoAtual(fluxoEstado),
       });
       {
         const { verificacoesDasInstrucoes } = await import(
@@ -3314,6 +3324,7 @@ async function gerarRespostaNinaInterno(
           // Correção TEXTUAL: o modelo reescreve. Nenhuma ferramenta é
           // oferecida, então nenhuma operação com efeito externo se repete.
           const { ninaAIGateway } = await import("@/lib/nina/ai-gateway.server");
+          await conferirReserva();
           const correcaoIA = await ninaAIGateway({
             clinicaId,
             perfil: "whatsapp",
@@ -3515,7 +3526,7 @@ async function gerarRespostaNinaInterno(
         etapa: "A",
         risco: agendamentoConfirmado || houveHandoff ? "operacional" : "informativo",
         operacaoAfirmada: agendamentoConfirmado,
-        operacaoComprovada: Boolean(fluxoEstado.appointment.appointment_id),
+        operacaoComprovada: reservaDaSessaoAtual(fluxoEstado),
       });
       rastro?.falhar("answer.review", "AVALIADOR_INDISPONIVEL", {
         origem: revisao.origem,

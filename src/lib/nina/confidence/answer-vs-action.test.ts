@@ -121,6 +121,7 @@ describe("TESTE C — criação com paciente e vaga confirmados", () => {
           appointmentToolCalled: true,
           appointmentCreated: true,
           appointmentId: "ag-1",
+          appointmentCreatedThisTurn: true,
           workflowState: "APPOINTMENT_CONFIRMED",
         },
         texto: "Agendamento confirmado.",

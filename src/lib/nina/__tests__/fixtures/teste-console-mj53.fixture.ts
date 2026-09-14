@@ -44,6 +44,7 @@ let chamadasRede = 0;
 let chamadasModelo = 0;
 let chamadasFinalizacao = 0;
 let chamadasAudio = 0;
+let reservaPerdidaDepois = false;
 const entregas: Linha[] = [];
 const rastreios: Linha[] = [];
 const encerramentos: unknown[][] = [];
@@ -107,7 +108,9 @@ function consulta(tabela: string) {
 mock.module("@/integrations/supabase/client.server", () => ({
   supabaseAdmin: {
     from: consulta,
-    rpc: () => {
+    rpc: (nome: string) => {
+      if (nome === "nina_revisao_registrar_entrada")
+        return Promise.resolve({ data: 1, error: null });
       throw new Error("RPC não simulada");
     },
   },
@@ -126,6 +129,8 @@ mock.module("@/lib/whatsapp-midia.server", () => ({
   respostaMidiaNaoSuportada: () => "Envie uma mensagem de texto.",
 }));
 mock.module("@/lib/nina/burst.server", () => ({
+  validarReservaTurnoNina: async () =>
+    !["reserva-perdida", "reserva-perdida-core"].includes(cenario) && !reservaPerdidaDepois,
   aguardarTurnoNina: async (entrada: Linha) => ({
     batchId: "lote-mj53",
     lock: { token: "trava-mj53" },
@@ -141,6 +146,11 @@ mock.module("@/lib/whatsapp.server", () => ({
   gerarRespostaNina: async (_clinica: string, _texto: string, _telefone: string, opcoes: Linha) => {
     chamadasModelo++;
     Object.assign(opcoes.auditoria, { execucaoId: "execucao-mj53", traceId: "turno-mj53" });
+    if (cenario === "reserva-perdida-core") {
+      if (await opcoes.validarReservaTurno()) throw new Error("Reserva deveria estar perdida");
+      const { ErroReservaTurnoPerdida } = await import("@/lib/nina/reserva-turno");
+      throw new ErroReservaTurnoPerdida();
+    }
     if (cenario === "erro-real") throw new Error("Falha simulada do provedor");
     if (encaminhada) {
       // Representa o aviso que o serviço de protocolo já persistiu antes de retornar.
@@ -179,6 +189,7 @@ mock.module("@/lib/whatsapp.server", () => ({
 mock.module("@/lib/nina/resposta/finalizacao.server", () => ({
   finalizarResposta: async (entrada: Linha) => {
     chamadasFinalizacao++;
+    if (cenario === "reserva-perdida-finalizacao") reservaPerdidaDepois = true;
     return entrada.resultado;
   },
 }));
@@ -190,6 +201,7 @@ mock.module("@/lib/nina-audio.server", () => ({
   LIMITE_FALA_CURTA: 500,
   sintetizarFala: async () => {
     chamadasAudio++;
+    if (cenario === "reserva-perdida-tts") reservaPerdidaDepois = true;
     return { bytes: new Uint8Array([1, 2]), mime: "audio/ogg" };
   },
 }));
@@ -209,7 +221,7 @@ const resultado = await processarMensagemTeste(
   {
     clinicaId: lead.clinica_id,
     leadId: lead.id,
-    tipo: cenario === "handoff-audio" ? "audio" : "text",
+    tipo: ["handoff-audio", "reserva-perdida-tts"].includes(cenario) ? "audio" : "text",
     texto: "vcs tem cardiologista?",
     chave: "entrada-mj53",
   },

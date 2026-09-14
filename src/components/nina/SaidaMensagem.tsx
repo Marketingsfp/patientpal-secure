@@ -8,13 +8,11 @@
  * Os detalhes usam o vínculo real gravado (execução, entrega, encaminhamento)
  * — nunca associação por horário ou por semelhança de texto.
  */
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import {
-  saidasDasMensagens,
-  type SaidaMensagemView,
-} from "@/lib/nina/saida-mensagem.functions";
+import { saidasDasMensagens, type SaidaMensagemView } from "@/lib/nina/saida-mensagem.functions";
 import {
   EXPLICACAO_CLASSE_SAIDA,
   ROTULO_CLASSE_SAIDA,
@@ -32,70 +30,53 @@ export function useSaidasDasMensagens(
   clinicaId: string | null | undefined,
   conversaId: string | null | undefined,
   mensagemIds: string[],
+  revisao = "",
 ): MapaSaidas {
   const buscar = useServerFn(saidasDasMensagens);
-  const cache = useRef<Map<string, SaidaMensagemView | "falha">>(new Map());
-  const [, forcar] = useState(0);
-  const chave = mensagemIds.slice().sort().join(",");
-
-  useEffect(() => {
-    const ids = chave ? chave.split(",") : [];
-    if (!clinicaId || ids.length === 0) return;
-    const pendentes = ids.filter((id) => !cache.current.has(id));
-    if (pendentes.length === 0) return;
-    let ativo = true;
-    void (async () => {
-      try {
+  const ids = [...new Set(mensagemIds)].sort();
+  const consulta = useQuery({
+    queryKey: ["nina-saidas-mensagens", clinicaId, conversaId ?? null, ids, revisao],
+    enabled: Boolean(clinicaId && ids.length),
+    staleTime: 10_000,
+    retry: false,
+    // A bolha pode ser gravada antes do aviso/avaliação, sem novo UPDATE na
+    // mensagem. Confere essa janela curta até 4 vezes por chave e encerra.
+    refetchInterval: (query) => {
+      const dados = query.state.data;
+      if (query.state.status === "error" || !dados || query.state.dataUpdateCount >= 4)
+        return false;
+      const linhas = Object.values(dados);
+      if (linhas.some((linha) => linha === "falha")) return false;
+      return linhas.some(
+        (linha) => linha !== "falha" && (!linha.inspecionavel || linha.classe === "sem_avaliacao"),
+      )
+        ? 1500
+        : false;
+    },
+    queryFn: async (): Promise<MapaSaidas> => {
+      const mapa: MapaSaidas = {};
+      for (let inicio = 0; inicio < ids.length; inicio += 200) {
+        const lote = ids.slice(inicio, inicio + 200);
         const linhas = await buscar({
-          data: { clinicaId, conversaId: conversaId ?? null, mensagemIds: pendentes.slice(0, 200) },
+          data: { clinicaId: clinicaId!, conversaId: conversaId ?? null, mensagemIds: lote },
         });
-        if (!ativo) return;
-        for (const l of linhas) cache.current.set(l.mensagemId, l);
-        // Sem linha devolvida não há registro: é ausência, não falha.
-        for (const id of pendentes) {
-          if (!cache.current.has(id)) {
-            cache.current.set(id, {
-              mensagemId: id,
-              execucaoId: null,
-              ambiente: "homologacao",
-              classe: "sem_avaliacao",
-              explicacao: EXPLICACAO_CLASSE_SAIDA.sem_avaliacao,
-              limitacao: null,
-              origem: null,
-              textoEntregue: null,
-              textoEntregueHash: null,
-              motivoSubstituicao: null,
-              entrega: null,
-              encaminhamento: null,
-              avaliacoes: [],
-              score: null,
-              nivel: null,
-            });
-          }
+        for (const linha of linhas) {
+          if (
+            linha.clinicaId === clinicaId &&
+            (!conversaId || linha.conversaId === conversaId) &&
+            lote.includes(linha.mensagemId)
+          )
+            mapa[linha.mensagemId] = linha;
         }
-      } catch {
-        // Falha de carregamento é declarada como tal — nunca vira "não avaliada".
-        for (const id of pendentes) cache.current.set(id, "falha");
+        // Mensagem ausente/inacessível não comprova que ela não foi avaliada.
+        for (const id of lote) if (!mapa[id]) mapa[id] = "falha";
       }
-      if (ativo) forcar((n) => n + 1);
-    })();
-    return () => {
-      ativo = false;
-    };
-  }, [buscar, chave, clinicaId, conversaId]);
-
-  return useMemo(() => {
-    const ids = chave ? chave.split(",") : [];
-    const mapa: MapaSaidas = {};
-    for (const id of ids) {
-      const v = cache.current.get(id);
-      if (v) mapa[id] = v;
-    }
-    return mapa;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [chave, cache.current.size, forcar]);
+      return mapa;
+    },
+  });
+  if (consulta.isError) return Object.fromEntries(ids.map((id) => [id, "falha" as const]));
+  return consulta.data ?? {};
 }
-
 const ESTILO_CLASSE: Record<ClasseSaida, string> = {
   resposta_avaliada: "border-border/60 text-muted-foreground",
   aviso_operacional: "border-sky-500/30 bg-sky-500/10 text-sky-700 dark:text-sky-300",

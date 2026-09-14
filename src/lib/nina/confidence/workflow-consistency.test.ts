@@ -92,6 +92,7 @@ describe("FASE 4 — oito cenários de workflow", () => {
           appointmentToolCalled: true,
           appointmentCreated: true,
           appointmentId: "apt-123",
+          appointmentCreatedThisTurn: true,
           workflowState: "APPOINTMENT_CONFIRMED",
         }),
       }),

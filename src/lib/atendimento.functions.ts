@@ -1910,7 +1910,7 @@ export const carregarJanelaMensagem = createServerFn({ method: "POST" })
       await assertAcessoConversa(context.supabase, context.userId, data.clinicaId, data.conversaId);
     }
     const COLUNAS =
-      "id, direction, from_number, to_number, body, tipo, enviada_por, recebida_em, media_url, media_mime, status, client_message_id";
+      "id, conversa_id, direction, from_number, to_number, body, tipo, transcricao, enviada_por, recebida_em, media_url, media_mime, status, execucao_id, client_message_id";
     const { data: alvo, error: eAlvo } = await context.supabase
       .from("whatsapp_mensagens")
       .select(COLUNAS)

@@ -72,6 +72,8 @@ export type EstadoFluxoNina = {
     /** Valor oficial da consulta vindo da planilha (nunca estimado). */
     price?: string | null;
     appointment_id: string | null;
+    /** Sessão operacional em que a reserva foi comprovada pelo servidor. */
+    confirmed_in_session?: string | null;
 
   };
   flow: { stage: EtapaFluxoNina };
@@ -125,6 +127,7 @@ export function estadoVazio(): EstadoFluxoNina {
       intent_confirmed: false,
       price: null,
       appointment_id: null,
+      confirmed_in_session: null,
 
     },
     flow: { stage: "IDLE" },

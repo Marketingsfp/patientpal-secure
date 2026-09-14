@@ -427,6 +427,7 @@ export function montarLeituraDetalhesMensagem(p: PacoteDetalhesMensagem): Leitur
     protocolo: s(aviso?.protocolo) ?? s(avisoRegistrado?.protocolo),
     modelo: s(p.execucao?.model),
     versaoPrompt: n(p.execucao?.prompt_versao) ?? s(p.execucao?.prompt_versao),
+    versaoRuntime: s(resumo.runtime_versao),
     rodadas: n(resumo.rodadas),
     duracaoMs: n(resumos.length === 1 ? resumos[0]?.duration_ms : null),
     avaliacoes,

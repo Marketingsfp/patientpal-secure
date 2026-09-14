@@ -40,7 +40,7 @@ import {
   TEXTO_MOTIVO_VINCULO,
 } from "@/lib/nina/confidence/identidade-saida";
 
-export type MapaConfianca = Record<string, ConfiancaDaMensagem>;
+export type MapaConfianca = Record<string, ConfiancaDaMensagem | "falha">;
 
 /**
  * Busca em UM ÚNICO lote a confiança das execuções da conversa aberta.
@@ -56,6 +56,7 @@ export function useConfiancaMensagens(
 ): MapaConfianca {
   const buscar = useServerFn(confiancaDasExecucoes);
   const cache = useRef<CacheConfianca>(new Map());
+  const [falhas, setFalhas] = useState<{ clinicaId: string; ids: string[] } | null>(null);
   const [, forcar] = useState(0);
   const chave = execucaoIds.slice().sort().join(",");
 
@@ -73,10 +74,10 @@ export function useConfiancaMensagens(
         const linhas = await buscar({ data: { clinicaId, execucaoIds: pendentes } });
         if (!ativo) return;
         gravarLote(cache.current, clinicaId, pendentes, linhas, Date.now());
+        setFalhas(null);
         forcar((n) => n + 1);
       } catch {
-        // Indicador auxiliar: falha aqui não pode atrapalhar o atendimento.
-        // Nada é gravado no cache, então a próxima rodada tenta de novo.
+        if (ativo) setFalhas({ clinicaId, ids: pendentes });
       }
     })();
     return () => {
@@ -86,9 +87,13 @@ export function useConfiancaMensagens(
   }, [buscar, chave, clinicaId, forcarVersao(cache.current)]);
 
   return useMemo(
-    () => (clinicaId ? mapaDoCache(cache.current, clinicaId, chave ? chave.split(",") : []) : {}),
+    () => {
+      const mapa: MapaConfianca = clinicaId ? mapaDoCache(cache.current, clinicaId, chave ? chave.split(",") : []) : {};
+      if (falhas && falhas.clinicaId === clinicaId) for (const id of falhas.ids) mapa[id] = "falha";
+      return mapa;
+    },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [chave, clinicaId, cache.current.size, forcarVersao(cache.current)],
+    [chave, clinicaId, cache.current.size, forcarVersao(cache.current), falhas],
   );
 }
 

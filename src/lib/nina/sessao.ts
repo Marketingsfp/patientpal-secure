@@ -68,6 +68,11 @@ export function encerrarEstadosTransacionais(estado: EstadoFluxoNina): EstadoFlu
       slot_fim: null,
       slot_confirmed_by_patient: false,
       intent_confirmed: false,
+      // O registro da agenda e as mensagens permanecem no histórico. Este
+      // vínculo só podia comprovar a operação do atendimento que terminou.
+      appointment_id: null,
+      confirmed_in_session: null,
+      price: null,
     },
     flow: { stage: "IDLE" },
   };
@@ -115,6 +120,7 @@ export function novaSessao(anterior: EstadoFluxoNina, agoraISO?: string): Estado
       slot_confirmed_by_patient: false,
       intent_confirmed: false,
       appointment_id: null,
+      confirmed_in_session: null,
     },
     flow: { stage: "GREETING" },
     updated_at: null,
@@ -167,7 +173,36 @@ export type ResultadoSessao = {
   resumoAnterior: string | null;
   /** Reabertura recente (dentro do TTL) — contexto vale, operação não. */
   continuacao: boolean;
+  /** Estado legado saneado após encerramento; persistir antes de responder. */
+  saneouEncerramento?: boolean;
 };
+
+/**
+ * Corrige também sessões já reabertas pela versão antiga, que mantinha o ID
+ * da reserva anterior. O encerramento é uma fronteira operacional, não TTL.
+ * Uma reserva comprovada na sessão nova pode continuar sendo consultada.
+ */
+export function sanearEstadoAposEncerramento(
+  estado: EstadoFluxoNina,
+  encerramentoISO?: string | null,
+  agoraISO?: string,
+): EstadoFluxoNina {
+  const fim = Date.parse(encerramentoISO ?? "");
+  const inicio = Date.parse(estado.session_started_at ?? "");
+  if (Number.isFinite(fim) && (!Number.isFinite(inicio) || inicio <= fim)) {
+    return reabrirSessao(estado, agoraISO);
+  }
+  const a = estado.appointment;
+  if (
+    a.appointment_id &&
+    ((a.confirmed_in_session && a.confirmed_in_session !== estado.session_id) ||
+      (Number.isFinite(fim) &&
+        (!estado.session_id || a.confirmed_in_session !== estado.session_id)))
+  ) {
+    return encerrarEstadosTransacionais(estado);
+  }
+  return estado;
+}
 
 /**
  * Aplica o TTL deslizante ao estado carregado da conversa.
@@ -183,7 +218,7 @@ export function aplicarTtlSessao(
   const ultima = ultimaAtividade(estado, fallbackUltimaAtividade);
   if (sessaoExpirada(ultima, agora, ttlMinutos)) {
     return {
-      estado: novaSessao(estado),
+      estado: novaSessao(estado, agora.toISOString()),
       expirou: true,
       resumoAnterior: resumoSessaoAnterior(estado),
       continuacao: false,
@@ -194,6 +229,24 @@ export function aplicarTtlSessao(
     expirou: false,
     resumoAnterior: null,
     continuacao: Boolean(ultima),
+  };
+}
+
+/** Resolução pura usada pelo servidor real e pelo console de homologação. */
+export function resolverEstadoDaSessao(
+  estado: EstadoFluxoNina,
+  agora: Date,
+  ttlMinutos: number,
+  encerramentoISO?: string | null,
+): ResultadoSessao {
+  const resultado = aplicarTtlSessao(estado, agora, ttlMinutos, encerramentoISO);
+  if (resultado.expirou) return resultado;
+  const saneado = sanearEstadoAposEncerramento(estado, encerramentoISO, agora.toISOString());
+  return {
+    ...resultado,
+    estado: saneado,
+    continuacao: resultado.continuacao && saneado.session_id === estado.session_id,
+    saneouEncerramento: saneado !== estado,
   };
 }
 

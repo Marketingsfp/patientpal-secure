@@ -21,19 +21,49 @@ function executar(cenario: string) {
   expect(registro.chamadasRede).toBe(0);
   expect(registro.chamadasModelo).toBe(1);
   expect(registro.entradas).toHaveLength(1);
-  if (cenario !== "erro-real") expect(registro.entradas[0].execucao_id).toBe("execucao-mj53");
+  if (!["erro-real", "reserva-perdida-core"].includes(cenario))
+    expect(registro.entradas[0].execucao_id).toBe("execucao-mj53");
   expect(registro.encerramentos).toEqual([
     [
       "lote-mj53",
       "execucao-mj53",
       { token: "trava-mj53" },
-      ["handoff-reset", "handoff-obsoleto"].includes(cenario) ? "SUPERSEDED" : "PROCESSED",
+      [
+        "handoff-reset",
+        "handoff-obsoleto",
+        "reserva-perdida",
+        "reserva-perdida-core",
+        "reserva-perdida-tts",
+        "reserva-perdida-finalizacao",
+      ].includes(cenario)
+        ? "SUPERSEDED"
+        : "PROCESSED",
     ],
   ]);
   return registro;
 }
 
 describe("MJ-53 — finalização real do console de homologação", () => {
+  for (const cenario of ["reserva-perdida-tts", "reserva-perdida-finalizacao"]) {
+    it(`${cenario}: conteúdo pronto não é persistido depois da perda da reserva`, () => {
+      const registro = executar(cenario);
+      expect(registro.saidas).toHaveLength(0);
+      expect(registro.resultado.processamento).toBe("OBSOLETA");
+      expect(registro.resultado.reply).toBeNull();
+      expect(registro.chamadasFinalizacao).toBe(1);
+      expect(registro.chamadasAudio).toBe(cenario === "reserva-perdida-tts" ? 1 : 0);
+    });
+  }
+  for (const cenario of ["reserva-perdida", "reserva-perdida-core"]) {
+    it(`${cenario}: nenhuma contingência é enviada sem reserva válida`, () => {
+      const registro = executar(cenario);
+      expect(registro.saidas).toHaveLength(0);
+      expect(registro.resultado.processamento).toBe("OBSOLETA");
+      expect(registro.resultado.reply).toBeNull();
+      expect(registro.chamadasFinalizacao).toBe(0);
+      expect(registro.chamadasAudio).toBe(0);
+    });
+  }
   for (const cenario of ["handoff-texto", "handoff-audio"]) {
     it(`${cenario}: aviso já entregue não vira fallback, segunda saída ou áudio`, () => {
       const registro = executar(cenario);

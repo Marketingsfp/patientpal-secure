@@ -556,13 +556,15 @@ export const STATUS_ENCERRADOS = ["closed", "finished", "resolved"];
 export async function reabrirConversaPorMensagemPaciente(args: {
   clinicaId: string;
   telefone: string;
+  /** Em retry, impede reabrir uma sessão encerrada depois daquela entrada. */
+  mensagemRecebidaEm?: string;
 }): Promise<Array<{ id: string }>> {
   const digits = normalizarTelefone(args.telefone);
   if (!digits) return [];
 
   const { data: alvos } = await supabaseAdmin
     .from("atend_conversas")
-    .select("id, nina_fluxo_estado")
+    .select("id, nina_fluxo_estado, resolved_at, closed_at")
     .eq("clinica_id", args.clinicaId)
     .in("contato_telefone", [digits, `+${digits}`])
     .in("status", STATUS_ENCERRADOS);
@@ -576,10 +578,14 @@ export async function reabrirConversaPorMensagemPaciente(args: {
   const agora = new Date().toISOString();
   const reabertas: Array<{ id: string }> = [];
 
-  for (const alvo of alvos as Array<{ id: string; nina_fluxo_estado: unknown }>) {
+  for (const alvo of alvos as Array<{ id: string; nina_fluxo_estado: unknown; resolved_at: string | null; closed_at: string | null }>) {
+    if (args.mensagemRecebidaEm !== undefined) {
+      const { entradaPermiteReabertura } = await import("@/lib/nina/reabertura-entrada");
+      if (!entradaPermiteReabertura(args.mensagemRecebidaEm, alvo)) continue;
+    }
     // Nova sessão operacional: contexto recente pode continuar, operação antiga não.
     const estado = reabrirSessao(normalizarEstado(alvo.nina_fluxo_estado), agora);
-    const { data: ok } = await supabaseAdmin
+    let atualizacao = supabaseAdmin
       .from("atend_conversas")
       .update({
         status: ninaOff ? "waiting" : "bot_attending",
@@ -608,8 +614,15 @@ export async function reabrirConversaPorMensagemPaciente(args: {
       .eq("id", alvo.id)
       .eq("clinica_id", args.clinicaId)
       // Trava de idempotência: se outra instância já reabriu, 0 linhas.
-      .in("status", STATUS_ENCERRADOS)
-      .select("id");
+      .in("status", STATUS_ENCERRADOS);
+    if (args.mensagemRecebidaEm !== undefined) {
+      // CAS das datas: um novo encerramento entre leitura e UPDATE vence o retry.
+      atualizacao = alvo.resolved_at === null ? atualizacao.is("resolved_at", null)
+        : atualizacao.eq("resolved_at", alvo.resolved_at);
+      atualizacao = alvo.closed_at === null ? atualizacao.is("closed_at", null)
+        : atualizacao.eq("closed_at", alvo.closed_at);
+    }
+    const { data: ok } = await atualizacao.select("id");
     if (!ok || ok.length === 0) continue;
 
     reabertas.push({ id: alvo.id });

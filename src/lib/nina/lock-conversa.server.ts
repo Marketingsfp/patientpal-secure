@@ -10,6 +10,7 @@
  * conversa presa e sem duplicar execução silenciosamente.
  */
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { criarRenovacaoReserva } from "./renovacao-reserva";
 
 /** Duração do lease. Deve cobrir o turno completo (modelo + ferramentas). */
 export const LOCK_LEASE_SEGUNDOS = 90;
@@ -20,6 +21,21 @@ export const LOCK_ESPERA_MAX_MS = 25_000;
 const INTERVALO_TENTATIVA_MS = 500;
 
 export type LockConversa = { chave: string; token: string };
+const renovacoes = new Map<string, { parar: () => Promise<void>; valida: () => boolean }>();
+
+/** Renova enquanto o turno realmente vive; liberar aguarda a renovação pendente. */
+export function manterLockConversa(
+  lock: LockConversa,
+  renovar: () => Promise<boolean> = () => renovarLockConversa(lock),
+  intervaloMs = 20_000,
+) {
+  if (renovacoes.has(lock.token)) return;
+  renovacoes.set(lock.token, criarRenovacaoReserva(renovar, { intervaloMs }));
+}
+
+export function lockConversaConfirmado(lock: LockConversa): boolean {
+  return renovacoes.get(lock.token)?.valida() ?? true;
+}
 
 export function chaveConversa(clinicaId: string, telefone: string): string {
   return `${clinicaId}:${telefone}`;
@@ -52,7 +68,11 @@ export async function adquirirLockConversa(input: {
       });
       if (error) throw error;
       const token = (Array.isArray(data) ? data[0] : data) as string | null;
-      if (token) return { chave, token };
+      if (token) {
+        const lock = { chave, token };
+        manterLockConversa(lock);
+        return lock;
+      }
     } catch (e) {
       console.error("[nina] lock: falha ao adquirir", e);
       return null;
@@ -64,12 +84,12 @@ export async function adquirirLockConversa(input: {
 
 export async function renovarLockConversa(lock: LockConversa): Promise<boolean> {
   try {
-    const { data } = await supabaseAdmin.rpc("nina_lock_renovar", {
+    const { data, error } = await supabaseAdmin.rpc("nina_lock_renovar", {
       _chave: lock.chave,
       _token: lock.token,
       _lease_segundos: LOCK_LEASE_SEGUNDOS,
     });
-    return Boolean(data);
+    return !error && Boolean(data);
   } catch (e) {
     console.error("[nina] lock: falha ao renovar", e);
     return false;
@@ -78,6 +98,9 @@ export async function renovarLockConversa(lock: LockConversa): Promise<boolean> 
 
 export async function liberarLockConversa(lock: LockConversa | null): Promise<void> {
   if (!lock) return;
+  const renovacao = renovacoes.get(lock.token);
+  renovacoes.delete(lock.token);
+  await renovacao?.parar();
   try {
     await supabaseAdmin.rpc("nina_lock_liberar", { _chave: lock.chave, _token: lock.token });
   } catch (e) {
@@ -86,10 +109,7 @@ export async function liberarLockConversa(lock: LockConversa | null): Promise<vo
 }
 
 /** Recupera lotes que ficaram reservados por uma execução que falhou. */
-export async function recuperarLotesTravados(
-  clinicaId: string,
-  telefone: string,
-): Promise<number> {
+export async function recuperarLotesTravados(clinicaId: string, telefone: string): Promise<number> {
   try {
     const { data } = await supabaseAdmin.rpc("nina_batch_recuperar_travados", {
       _clinica_id: clinicaId,

@@ -134,14 +134,23 @@ export const reportarErroRapidoMensagemNina = createServerFn({ method: "POST" })
     const { data: mensagem, error: erroMensagem } = await context.supabase
       .from("whatsapp_mensagens")
       .select(
-        "id, conversa_id, clinica_id, direction, enviada_por, body, transcricao, execucao_id, created_at",
+        "id, conversa_id, clinica_id, direction, enviada_por, status, tipo, body, transcricao, execucao_id, created_at",
       )
       .eq("id", data.mensagemId)
       .eq("clinica_id", data.clinicaId)
       .maybeSingle();
     if (erroMensagem) throw new Error(erroMensagem.message);
 
-    const validacao = validarMensagemNina(mensagem as never, data.conversaId);
+    const { execucaoOficialDaMensagem } = await import("./inspecao-mensagem");
+    const { data: avisos, error: erroAvisos } = await context.supabase
+      .from("atend_aviso_encaminhamento")
+      .select("clinica_id, conversa_id, mensagem_id, execucao_id, turno_id")
+      .eq("clinica_id", data.clinicaId).eq("conversa_id", data.conversaId)
+      .eq("mensagem_id", data.mensagemId);
+    if (erroAvisos) throw new Error("Não foi possível conferir o vínculo da mensagem. Tente novamente.");
+    const validacao = validarMensagemNina(mensagem as never, data.conversaId, {
+      clinicaId: data.clinicaId, avisos: avisos ?? [],
+    });
     if (!validacao.ok) throw new Error(validacao.mensagem);
 
     // Auditoria: SEMPRE pela execução gravada NESTA mensagem — nunca a última
@@ -150,7 +159,7 @@ export const reportarErroRapidoMensagemNina = createServerFn({ method: "POST" })
       execucao_id: string | null;
       created_at: string | null;
     };
-    const execucaoId = msg.execucao_id ?? null;
+    const execucaoId = execucaoOficialDaMensagem(mensagem!, avisos ?? [], data.clinicaId);
     let execucao: {
       model: string | null;
       latency_ms: number | null;
@@ -163,6 +172,8 @@ export const reportarErroRapidoMensagemNina = createServerFn({ method: "POST" })
         .from("nina_execucoes")
         .select("id, model, latency_ms, created_at, prompt_versao_id, prompt_versao")
         .eq("id", execucaoId)
+        .eq("clinica_id", data.clinicaId)
+        .eq("conversation_id", data.conversaId)
         .maybeSingle();
       execucao = (exec as typeof execucao) ?? null;
     }

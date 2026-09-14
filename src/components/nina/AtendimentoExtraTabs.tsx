@@ -231,7 +231,7 @@ import {
 } from "@/lib/atendimento/envio-otimista";
 import { criarFilaEnvio } from "@/lib/atendimento/fila-envio";
 import { ResumoHandoffCard } from "@/components/nina/ResumoHandoffCard";
-import { ReportarErroNinaBotao } from "@/components/nina/ReportarErroNinaDialog";
+
 import { BadgeEspera, RelogioEsperaProvider } from "@/components/nina/BadgeEspera";
 import { formatarDataHoraMensagem } from "@/lib/atendimento/data-hora";
 import { textoMarcadorSistema } from "@/lib/atendimento/marcador-handoff";
@@ -271,12 +271,9 @@ import {
   divergenciaIdentidade,
 } from "@/lib/atendimento/rotulo-conversa";
 import { RevisarVinculoDialog } from "@/components/nina/RevisarVinculoDialog";
-import {
-  ConfiancaMensagemBadge,
-  ConfiancaNaoAvaliadaBadge,
-  useConfiancaMensagens,
-} from "@/components/nina/ConfiancaMensagem";
-import { execucoesDasRespostasNina } from "@/lib/nina/mensagem-meta";
+import { InspecaoMensagemNina } from "./InspecaoMensagemNina";
+import { useSaidasDasMensagens } from "./SaidaMensagem";
+import { idsParaInspecaoNina, marcadorInternoSistema, revisaoInspecaoMensagens } from "@/lib/nina/inspecao-mensagem";
 
 import { devoAutoSelecionarComSelecao, escopoParaConversa } from "@/lib/atendimento/deep-link";
 import {
@@ -697,14 +694,14 @@ export function AtendInbox() {
   useEffect(() => {
     try {
       setPainelFixado(localStorage.getItem("nina.inbox.fixado") === "1");
-    } catch {}
+    } catch { /* Sem armazenamento local, mantém a preferência desta sessão. */ }
   }, []);
   const alternarFixado = () => {
     setPainelFixado((v) => {
       const nv = !v;
       try {
         localStorage.setItem("nina.inbox.fixado", nv ? "1" : "0");
-      } catch {}
+      } catch { /* A preferência visual ainda vale no estado da tela. */ }
       return nv;
     });
   };
@@ -717,14 +714,14 @@ export function AtendInbox() {
   useEffect(() => {
     try {
       setContatoFixado(localStorage.getItem("nina.contato.fixado") === "1");
-    } catch {}
+    } catch { /* Sem armazenamento local, mantém a preferência desta sessão. */ }
   }, []);
   const alternarContatoFixado = () => {
     setContatoFixado((v) => {
       const nv = !v;
       try {
         localStorage.setItem("nina.contato.fixado", nv ? "1" : "0");
-      } catch {}
+      } catch { /* A preferência visual ainda vale no estado da tela. */ }
       return nv;
     });
   };
@@ -2240,19 +2237,8 @@ export function AtendInbox() {
 
   // Confiança REAL registrada pelo motor para cada resposta da Nina desta
   // conversa. Leitura em lote; nada é calculado na tela.
-  const execucoesDaNina = useMemo(
-    () =>
-      execucoesDasRespostasNina(
-        msgs as Array<{
-          direction?: string;
-          enviada_por?: string | null;
-          execucao_id?: string | null;
-        }>,
-      ),
-    [msgs],
-  );
-
-  const confiancaPorExecucao = useConfiancaMensagens(clinicaId, execucoesDaNina);
+  const idsInspecao = useMemo(() => idsParaInspecaoNina(msgs), [msgs]);
+  const saidasPorMensagem = useSaidasDasMensagens(clinicaId, sel?.id, idsInspecao, revisaoInspecaoMensagens(msgs));
 
   // Mensagens e eventos de estado na mesma linha do tempo, em ordem cronológica.
   // FASE 3 — eventos internos do mesmo processo viram um bloco compacto único.
@@ -3571,7 +3557,7 @@ export function AtendInbox() {
                   const out = m.direction === "out";
                   // Só marcador interno vira faixa central. Mensagem real
                   // enviada ao paciente (status de envio) fica como conversa.
-                  if (m.enviada_por === "sistema" && m.status === "system") {
+                  if (marcadorInternoSistema(m)) {
                     return (
                       <div key={`m-${m.id}`} className="flex justify-center">
                         <div className="max-w-[85%] whitespace-pre-wrap rounded-lg border border-atd-blue/20 bg-atd-blue-tint px-3 py-2 text-center text-xs text-atd-blue-ink">
@@ -3584,7 +3570,7 @@ export function AtendInbox() {
                     );
                   }
                   // Autoria pelo campo do sistema, nunca pelo texto da mensagem.
-                  const daNina = out && m.enviada_por === "nina";
+
                   const destacada = msgDestacada === m.id;
                   return (
                     <div
@@ -3602,14 +3588,8 @@ export function AtendInbox() {
                         </span>
                       )}
                       {/* Botão de reporte rápido: fora do balão, sempre visível. */}
-                      {daNina && clinicaId && (
-                        <ReportarErroNinaBotao
-                          clinicaId={clinicaId}
-                          conversaId={m.conversa_id ?? sel.id}
-                          mensagemId={m.id}
-                          execucaoId={m.execucao_id ? String(m.execucao_id) : null}
-                        />
-                      )}
+                      {clinicaId && <InspecaoMensagemNina parte="reporte" clinicaId={clinicaId}
+                        conversaId={m.conversa_id ?? sel.id} mensagem={m} saida={saidasPorMensagem[String(m.id)]} />}
                       <div
                         className={`max-w-[68%] rounded-2xl px-3 py-2 text-sm shadow-sm break-words ${
                           out
@@ -3638,23 +3618,8 @@ export function AtendInbox() {
                           <span className="whitespace-nowrap">
                             {fmtHora(m.recebida_em)} {m.enviada_por === "nina" && "· Nina"}
                           </span>
-                          {daNina &&
-                            (clinicaId && m.execucao_id && confiancaPorExecucao[String(m.execucao_id)] ? (
-                              <ConfiancaMensagemBadge
-                                clinicaId={clinicaId}
-                                mensagemId={m.id ? String(m.id) : null}
-                                conversaId={m.conversa_id ?? sel.id}
-                                mensagem={{
-                                  tipo: m.tipo ?? null,
-                                  texto: m.body ?? null,
-                                  transcricao: (m as { transcricao?: string | null }).transcricao ?? null,
-                                }}
-                                confianca={confiancaPorExecucao[String(m.execucao_id)]!}
-                              />
-
-                            ) : (
-                              <ConfiancaNaoAvaliadaBadge />
-                            ))}
+                          {clinicaId && <InspecaoMensagemNina parte="detalhes" clinicaId={clinicaId}
+                            conversaId={m.conversa_id ?? sel.id} mensagem={m} saida={saidasPorMensagem[String(m.id)]} />}
                         </div>
                       </div>
                     </div>
@@ -4209,5 +4174,3 @@ export function AtendInbox() {
     </RelogioEsperaProvider>
   );
 }
-
-

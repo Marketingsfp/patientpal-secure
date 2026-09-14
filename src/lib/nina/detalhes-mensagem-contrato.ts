@@ -15,6 +15,8 @@ export type LeituraDetalhesMensagem = {
   protocolo: string | null;
   modelo: string | null;
   versaoPrompt: number | string | null;
+  /** Só existe quando o próprio turno gravou esta versão. */
+  versaoRuntime?: string | null;
   rodadas: number | null;
   duracaoMs: number | null;
   avaliacoes: Array<{
