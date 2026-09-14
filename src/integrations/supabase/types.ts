@@ -14554,6 +14554,21 @@ export type Database = {
           valor_cartao: number
         }[]
       }
+      fin_agenda_resumo_dia: {
+        Args: { p_clinica: string; p_fim: string; p_ini: string }
+        Returns: {
+          agenda_id: string
+          agenda_nome: string
+          compareceu: number
+          dia: string
+          especialidade: string
+          marcados: number
+          medico_id: string
+          medico_nome: string
+          ordem_chegada: boolean
+          vagas: number
+        }[]
+      }
       fin_atendimentos_matriz:
         | {
             Args: { _clinica: string }
