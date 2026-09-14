@@ -173,8 +173,12 @@ import {
   Eye,
   Ban,
   MessageSquareText,
+  MessageCircle,
+  UserX,
+  CalendarX2,
   UtensilsCrossed,
 } from "lucide-react";
+import { linkWhatsapp } from "@/lib/sessoes/busca-ativa-contatos";
 import {
   MOTIVOS_SEM_FATURAMENTO,
   MOTIVO_SEM_FATURAMENTO_OUTRO,
@@ -336,20 +340,23 @@ const STATUS_LABEL: Record<Status, string> = {
   confirmado: "Confirmado",
   realizado: "Realizado",
   cancelado: "Cancelado",
-  faltou: "Faltou",
+  faltou: "Não compareceu",
 };
 
-// 🔥 CORES ATUALIZADAS - Mais suaves e acessíveis
+// Cores da situação, pensadas para leitura a um metro de distância no balcão:
+// VERDE cheio = o paciente confirmou que vem; VERMELHO cheio = não vem
+// (cancelado, desistência ou não compareceu). O "realizado" fica em cinza
+// escuro — atendimento encerrado — para não disputar o verde com o confirmado.
 const STATUS_COR: Record<Status, string> = {
   agendado: "bg-blue-50 text-blue-700 border border-blue-200",
-  // Azul CHEIO (e nao o -50 claro do "agendado"): a recepcao precisa bater o
-  // olho na grade e separar num relance quem ja confirmou presenca. Dois tons
-  // claros de azul lado a lado ficariam iguais a um metro de distancia.
-  confirmado: "bg-blue-600 text-white border border-blue-700",
-  realizado: "bg-green-600 text-white border border-green-700",
-  cancelado: "bg-rose-50 text-rose-700 border border-rose-200",
-  faltou: "bg-amber-50 text-amber-700 border border-amber-200",
+  confirmado: "bg-emerald-600 text-white border border-emerald-700",
+  realizado: "bg-slate-600 text-white border border-slate-700",
+  cancelado: "bg-rose-600 text-white border border-rose-700",
+  faltou: "bg-rose-600 text-white border border-rose-700",
 };
+
+/** Cancelado e faltou são "não vem": mesma leitura vermelha na grade. */
+const statusNaoVem = (s: Status) => s === "cancelado" || s === "faltou";
 
 const DIAS_SEMANA = ["DOM", "SEG", "TER", "QUA", "QUI", "SEX", "SAB"];
 
@@ -6522,7 +6529,11 @@ function AgendaPage() {
     }
   };
 
-  const mudarStatus = async (a: Agendamento, status: Status) => {
+  const mudarStatus = async (
+    a: Agendamento,
+    status: Status,
+    opcoes: { desistencia?: boolean } = {},
+  ) => {
     if (!podeEscrever) {
       avisoSemPermissaoAgenda();
       return;
@@ -6576,10 +6587,26 @@ function AgendaPage() {
     // porquê colado no evento de cancelamento.
     let motivoCancelamento: string | null = null;
     if (status === "cancelado") {
-      motivoCancelamento = await pedirMotivo({
-        titulo: "Por que este atendimento está sendo cancelado?",
-        descricao: `${a.paciente_nome} — ${new Date(a.inicio).toLocaleString("pt-BR")}. A justificativa fica registrada no histórico.`,
-      });
+      // Desistência não é um status próprio no banco: é um cancelamento cujo
+      // motivo começa com "Desistência", e os atalhos já trazem esse texto.
+      motivoCancelamento = await pedirMotivo(
+        opcoes.desistencia
+          ? {
+              titulo: "Registrar desistência do paciente",
+              descricao: `${a.paciente_nome} — ${new Date(a.inicio).toLocaleString("pt-BR")}. Toque num motivo ou escreva o seu. Fica registrado no histórico.`,
+              sugestoes: [
+                "Desistência — paciente não quer mais o atendimento",
+                "Desistência — resolveu em outro lugar",
+                "Desistência — sem condições financeiras",
+                "Desistência — sem retorno do paciente",
+              ],
+              confirmText: "Registrar desistência",
+            }
+          : {
+              titulo: "Por que este atendimento está sendo cancelado?",
+              descricao: `${a.paciente_nome} — ${new Date(a.inicio).toLocaleString("pt-BR")}. A justificativa fica registrada no histórico.`,
+            },
+      );
       if (!motivoCancelamento) return;
     }
     // Ao cancelar, libera o vínculo com o orçamento para que ele possa ser
@@ -6635,10 +6662,159 @@ function AgendaPage() {
           if (!res.ok) toast.error(res.message);
         }
       }
+      // A cor da linha muda na hora; o `load()` abaixo só reconcilia com o banco.
+      setItems((prev) => prev.map((x) => (idsParaAtualizar.includes(x.id) ? { ...x, status } : x)));
       if (idsParaAtualizar.length > 1)
         toast.success(`${idsParaAtualizar.length} agendamentos do pacote cancelados.`);
+      else if (status === "confirmado") toast.success(`${a.paciente_nome}: presença confirmada.`);
+      else if (status === "faltou")
+        toast.success(`${a.paciente_nome}: marcado como não compareceu.`);
+      else if (status === "cancelado")
+        toast.success(
+          opcoes.desistencia
+            ? `${a.paciente_nome}: desistência registrada.`
+            : `${a.paciente_nome}: agendamento cancelado.`,
+        );
       await load();
     }
+  };
+
+  /**
+   * Lembrete de consulta pelo WhatsApp da própria recepção: abre a conversa já
+   * com o texto pronto, e a atendente só aperta enviar. Não usa a API oficial
+   * de propósito — sai do número que o paciente já conhece e responde.
+   *
+   * A mensagem leva só primeiro nome, clínica, dia e hora. Nada de médico,
+   * procedimento ou especialidade: cai num celular que qualquer um pode ler.
+   */
+  const enviarLembrete = async (a: Agendamento) => {
+    if (!a.paciente_id) {
+      toast.error("Este agendamento não tem cadastro de paciente vinculado.");
+      return;
+    }
+    // A janela precisa ser aberta ainda dentro do clique — depois de um
+    // `await` o navegador bloqueia como pop-up.
+    const janela = window.open("", "_blank");
+    const { data, error } = await supabase
+      .from("pacientes")
+      .select("telefone, telefone2")
+      .eq("id", a.paciente_id)
+      .maybeSingle();
+    if (error) {
+      janela?.close();
+      mostrarErro(error);
+      return;
+    }
+    const inicio = new Date(a.inicio);
+    const dia = inicio.toLocaleDateString("pt-BR", {
+      weekday: "long",
+      day: "2-digit",
+      month: "2-digit",
+    });
+    const primeiro = a.paciente_nome.trim().split(/\s+/)[0] ?? "";
+    const nomeClinica = clinicaAtual?.clinica.nome ?? "clínica";
+    const texto =
+      `Olá, ${primeiro}! Aqui é da ${nomeClinica}. ` +
+      `Passando para lembrar do seu atendimento ${dia}, às ${fmtHora(a.inicio)}. ` +
+      "Podemos confirmar a sua presença? Responda SIM para confirmar, ou nos avise se precisar remarcar.";
+    const link = linkWhatsapp(data?.telefone, texto) ?? linkWhatsapp(data?.telefone2, texto);
+    if (!link) {
+      janela?.close();
+      toast.error(
+        "Paciente sem celular válido no cadastro. Atualize o telefone para enviar o lembrete.",
+      );
+      return;
+    }
+    if (janela) {
+      janela.opener = null;
+      janela.location.href = link;
+    } else {
+      window.open(link, "_blank", "noopener,noreferrer");
+    }
+  };
+
+  /**
+   * Etiqueta da situação que é, ela mesma, o atalho para trocá-la: um clique
+   * abre as opções, o segundo grava. Serve igual no celular e no computador.
+   */
+  const renderStatusRapido = (a: Agendamento, className: string) => {
+    const badge = (
+      <Badge className={`${STATUS_COR[a.status]} ${className}`} title={STATUS_LABEL[a.status]}>
+        {STATUS_LABEL[a.status]}
+      </Badge>
+    );
+    if (!podeEscrever) return badge;
+    const fechado = a.status === "realizado";
+    return (
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <button
+            type="button"
+            aria-label={`Situação: ${STATUS_LABEL[a.status]}. Clique para alterar`}
+            className="inline-flex max-w-full items-center gap-0.5 rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            <Badge
+              className={`${STATUS_COR[a.status]} ${className} cursor-pointer gap-0.5`}
+              title="Clique para alterar a situação"
+            >
+              {STATUS_LABEL[a.status]}
+              <ChevronDown className="h-3 w-3 shrink-0 opacity-80" />
+            </Badge>
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="start" className="w-60">
+          {fechado ? (
+            <DropdownMenuItem disabled>Atendimento já realizado</DropdownMenuItem>
+          ) : (
+            <>
+              <DropdownMenuItem
+                onClick={() => mudarStatus(a, "confirmado")}
+                disabled={a.status === "confirmado"}
+                className="font-semibold text-emerald-700 focus:text-emerald-800"
+              >
+                <CheckCircle2 className="h-4 w-4 mr-2" /> Confirmado — paciente vem
+              </DropdownMenuItem>
+              {a.status !== "agendado" && (
+                <DropdownMenuItem onClick={() => mudarStatus(a, "agendado")}>
+                  <Undo2 className="h-4 w-4 mr-2" /> Voltar para agendado
+                </DropdownMenuItem>
+              )}
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onClick={() => mudarStatus(a, "faltou")}
+                disabled={a.status === "faltou"}
+                className="text-rose-700 focus:text-rose-800"
+              >
+                <UserX className="h-4 w-4 mr-2" /> Não compareceu
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => mudarStatus(a, "cancelado", { desistencia: true })}
+                disabled={a.status === "cancelado"}
+                className="text-rose-700 focus:text-rose-800"
+              >
+                <UserMinus className="h-4 w-4 mr-2" /> Desistência
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => mudarStatus(a, "cancelado")}
+                disabled={a.status === "cancelado"}
+                className="text-rose-700 focus:text-rose-800"
+              >
+                <CalendarX2 className="h-4 w-4 mr-2" /> Cancelado
+              </DropdownMenuItem>
+            </>
+          )}
+          {!fechado && !statusNaoVem(a.status) && (
+            <>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => enviarLembrete(a)}>
+                <MessageCircle className="h-4 w-4 mr-2 text-emerald-600" /> Enviar lembrete no
+                WhatsApp
+              </DropdownMenuItem>
+            </>
+          )}
+        </DropdownMenuContent>
+      </DropdownMenu>
+    );
   };
 
   // Confirmação da autorização do convênio (libera a execução do atendimento).
@@ -9691,11 +9867,16 @@ function AgendaPage() {
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
-                            {(Object.keys(STATUS_LABEL) as Status[]).map((s) => (
-                              <SelectItem key={s} value={s}>
-                                {STATUS_LABEL[s]}
-                              </SelectItem>
-                            ))}
+                            {/* Cancelar por aqui gravaria sem justificativa: o
+                            cancelamento sai só pela etiqueta da situação ou pelo
+                            menu da linha, que pedem o motivo obrigatório. */}
+                            {(Object.keys(STATUS_LABEL) as Status[])
+                              .filter((s) => s !== "cancelado" || editing.status === "cancelado")
+                              .map((s) => (
+                                <SelectItem key={s} value={s}>
+                                  {STATUS_LABEL[s]}
+                                </SelectItem>
+                              ))}
                           </SelectContent>
                         </Select>
                       ) : (
@@ -12121,9 +12302,15 @@ function AgendaPage() {
                   const semFaturamento = ehSemFaturamento(a);
                   let bgClass = "bg-card";
                   let borderLeft = "border-l-4 border-transparent";
+                  const naoVem = !ehLivre && statusNaoVem(a.status);
                   if (estornoPend) {
                     bgClass = "bg-rose-500/10";
                     borderLeft = "border-l-4 border-rose-500";
+                  } else if (naoVem) {
+                    // Cancelado / desistência / não compareceu: vermelho acima
+                    // de qualquer outra marcação, para ninguém contar com ele.
+                    bgClass = "bg-rose-500/15";
+                    borderLeft = "border-l-4 border-rose-600";
                   } else if (sinalizado) {
                     bgClass = "bg-amber-500/10";
                     borderLeft = "border-l-4 border-amber-500";
@@ -12131,14 +12318,14 @@ function AgendaPage() {
                     bgClass = "bg-violet-500/10";
                     borderLeft = "border-l-4 border-violet-400";
                   } else if (realizado) {
-                    bgClass = "bg-emerald-500/10";
-                    borderLeft = "border-l-4 border-emerald-500";
+                    bgClass = "bg-slate-500/10";
+                    borderLeft = "border-l-4 border-slate-500";
                   } else if (presente) {
                     bgClass = "bg-blue-500/10";
                     borderLeft = "border-l-4 border-blue-400";
                   } else if (!ehLivre && a.status === "confirmado") {
-                    bgClass = "bg-blue-500/10";
-                    borderLeft = "border-l-4 border-blue-300";
+                    bgClass = "bg-emerald-500/15";
+                    borderLeft = "border-l-4 border-emerald-500";
                   }
 
                   const etapa = etapaMap.get(a.id) ?? "aguardando_recepcao";
@@ -12186,9 +12373,7 @@ function AgendaPage() {
                               Estorno
                             </Badge>
                           ) : (
-                            <Badge className={`${STATUS_COR[a.status]} text-[11px] shrink-0`}>
-                              {STATUS_LABEL[a.status]}
-                            </Badge>
+                            renderStatusRapido(a, "text-[11px] shrink-0")
                           )}
                         </div>
 
@@ -12274,6 +12459,17 @@ function AgendaPage() {
                             })()
                           ) : (
                             <>
+                              {podeEscrever && a.status === "agendado" && (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => mudarStatus(a, "confirmado")}
+                                  className="h-8 flex-1 text-emerald-700 border-emerald-400 hover:bg-emerald-50 text-xs"
+                                  title="Paciente confirmou que vem"
+                                >
+                                  <CheckCircle2 className="h-3.5 w-3.5 mr-1" /> Confirmar
+                                </Button>
+                              )}
                               {podeCheckin && (
                                 <Button
                                   variant="outline"
@@ -12381,6 +12577,12 @@ function AgendaPage() {
                                   <DropdownMenuItem onClick={() => imprimirComprovante(a)}>
                                     <Printer className="h-4 w-4 mr-2" /> Comprovante
                                   </DropdownMenuItem>
+                                  {!realizado && !statusNaoVem(a.status) && (
+                                    <DropdownMenuItem onClick={() => enviarLembrete(a)}>
+                                      <MessageCircle className="h-4 w-4 mr-2 text-emerald-600" />
+                                      Enviar lembrete no WhatsApp
+                                    </DropdownMenuItem>
+                                  )}
                                   {podeEscrever && !ehLivre && a.status !== "realizado" && (
                                     <>
                                       <DropdownMenuSeparator />
@@ -12572,9 +12774,15 @@ function AgendaPage() {
                       const semFaturamento = ehSemFaturamento(a);
                       let bgClass = "";
                       let borderLeft = "";
+                      const naoVem = !ehLivre && statusNaoVem(a.status);
                       if (estornoPend) {
                         bgClass = "bg-rose-500/10 hover:bg-rose-500/15";
                         borderLeft = "border-l-4 border-rose-500";
+                      } else if (naoVem) {
+                        // Cancelado / desistência / não compareceu: vermelho acima
+                        // de qualquer outra marcação, para ninguém contar com ele.
+                        bgClass = "bg-rose-500/15 hover:bg-rose-500/20";
+                        borderLeft = "border-l-4 border-rose-600";
                       } else if (sinalizado) {
                         bgClass = "bg-amber-500/10 hover:bg-amber-500/15";
                         borderLeft = "border-l-4 border-amber-500";
@@ -12582,18 +12790,17 @@ function AgendaPage() {
                         bgClass = "bg-violet-500/10 hover:bg-violet-500/15";
                         borderLeft = "border-l-4 border-violet-400";
                       } else if (realizado) {
-                        bgClass = "bg-emerald-500/10 hover:bg-emerald-500/15";
-                        borderLeft = "border-l-4 border-emerald-500";
+                        bgClass = "bg-slate-500/10 hover:bg-slate-500/15";
+                        borderLeft = "border-l-4 border-slate-500";
                       } else if (presente) {
                         bgClass = "bg-blue-500/10 hover:bg-blue-500/15";
                         borderLeft = "border-l-4 border-blue-400";
                       } else if (!ehLivre && a.status === "confirmado") {
-                        // Confirmou por telefone/WhatsApp que vem: MESMO azul de quem
-                        // ja chegou, com a barra lateral mais clara. Quem fez check-in
-                        // cai no ramo `presente` acima e fica com a barra blue-400 —
-                        // presenca continua sendo so o clique manual da recepcao.
-                        bgClass = "bg-blue-500/10 hover:bg-blue-500/15";
-                        borderLeft = "border-l-4 border-blue-300";
+                        // Confirmou por telefone/WhatsApp que vem: VERDE. Quem já fez
+                        // check-in cai no ramo `presente` acima e fica azul — presença
+                        // continua sendo só o clique manual da recepção.
+                        bgClass = "bg-emerald-500/15 hover:bg-emerald-500/20";
+                        borderLeft = "border-l-4 border-emerald-500";
                       }
 
                       const ehAgora = a.id === agoraAgId;
@@ -12812,12 +13019,7 @@ function AgendaPage() {
                                   Estorno solicitado
                                 </Badge>
                               ) : (
-                                <Badge
-                                  className={`${STATUS_COR[a.status]} text-xs max-w-full truncate`}
-                                  title={STATUS_LABEL[a.status]}
-                                >
-                                  {STATUS_LABEL[a.status]}
-                                </Badge>
+                                renderStatusRapido(a, "text-xs max-w-full truncate")
                               )}
                               {/* Saldo devedor de um pagamento parcial. Fica logo
                             abaixo da situação para a recepção ver, na própria
@@ -12883,6 +13085,32 @@ function AgendaPage() {
                             <TableCell className="w-[170px] min-w-[170px] py-1.5 px-2 text-right whitespace-nowrap">
                               <TooltipProvider delayDuration={200}>
                                 <div className="flex items-center justify-end gap-1.5">
+                                  {/* Confirmar (1 clique). Ocupa o lugar do check-in:
+                                  quando o check-in já está disponível ou feito, o
+                                  paciente está no balcão e confirmar perde o sentido. */}
+                                  {!ehLivre &&
+                                    podeEscrever &&
+                                    a.status === "agendado" &&
+                                    !pagosSet.has(a.id) &&
+                                    !semFaturamento &&
+                                    ["aguardando_recepcao", "recepcao"].includes(
+                                      etapaMap.get(a.id) ?? "aguardando_recepcao",
+                                    ) && (
+                                      <Tooltip>
+                                        <TooltipTrigger asChild>
+                                          <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            aria-label="Confirmar — paciente vem"
+                                            onClick={() => mudarStatus(a, "confirmado")}
+                                            className="h-7 w-7 shrink-0 rounded-md border-2 border-emerald-400 text-emerald-600 hover:bg-emerald-50"
+                                          >
+                                            <CheckCircle2 className="h-3.5 w-3.5" />
+                                          </Button>
+                                        </TooltipTrigger>
+                                        <TooltipContent>Confirmar — paciente vem</TooltipContent>
+                                      </Tooltip>
+                                    )}
                                   {/* Check-in (✅) - aparece apenas para pacientes presentes */}
                                   {!ehLivre &&
                                     !realizado &&
@@ -13179,6 +13407,14 @@ function AgendaPage() {
                                         <Printer className="h-4 w-4 mr-2" /> Comprovante
                                       </DropdownMenuItem>
 
+                                      {/* Lembrete da consulta pelo WhatsApp */}
+                                      {!ehLivre && !realizado && !statusNaoVem(a.status) && (
+                                        <DropdownMenuItem onClick={() => enviarLembrete(a)}>
+                                          <MessageCircle className="h-4 w-4 mr-2 text-emerald-600" />
+                                          Enviar lembrete no WhatsApp
+                                        </DropdownMenuItem>
+                                      )}
+
                                       {/* Desmarcar paciente */}
                                       {podeEscrever && !ehLivre && a.status !== "realizado" && (
                                         <>
@@ -13282,17 +13518,19 @@ function AgendaPage() {
             <div className="rounded-lg border bg-muted/30 p-4">
               <h3 className="text-center font-semibold mb-3">Legenda</h3>
               <div className="grid gap-2 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+                {/* Espelha as cores reais das linhas (ramos de `bgClass` acima). */}
                 {[
-                  { cor: "#cfe3fb", borda: "#9fc3f3", label: "Confirmado pelo cliente" },
-                  { cor: "#a8c8ed", borda: "#7aa9d8", label: "Presente na clínica" },
-                  { cor: "#7fbfc2", borda: "#5a9ea1", label: "Em atendimento" },
-                  { cor: "#d1f0d6", borda: "#8fd49a", label: "Atendido com sucesso" },
-                  { cor: "#fde2c4", borda: "#f5c890", label: "Agenda de telemedicina" },
-                  { cor: "#f8d2d6", borda: "#eea1a8", label: "Cancelado pelo cliente" },
-                  { cor: "#fef3b6", borda: "#f0dc7a", label: "Atrasado para consulta" },
-                  { cor: "#e0cdf0", borda: "#bea4d8", label: "Agendamento on-line" },
-                  { cor: "#f7b6c0", borda: "#e88594", label: "Não comparecimento" },
-                  { cor: "#fee2e2", borda: "#dc2626", label: "Estorno solicitado" },
+                  { cor: "#d6f2e4", borda: "#10b981", label: "Confirmado — paciente vem" },
+                  { cor: "#dbe7fb", borda: "#60a5fa", label: "Check-in feito — na clínica" },
+                  { cor: "#e5e8ec", borda: "#64748b", label: "Atendimento realizado" },
+                  {
+                    cor: "#fbd5da",
+                    borda: "#e11d48",
+                    label: "Cancelado / desistência / não compareceu",
+                  },
+                  { cor: "#fdebc8", borda: "#f59e0b", label: "Paciente sinalizado" },
+                  { cor: "#ece3fb", borda: "#a78bfa", label: "Atendimento externo" },
+                  { cor: "#fee2e2", borda: "#f43f5e", label: "Estorno solicitado" },
                 ].map((s) => (
                   <div key={s.label} className="flex items-center gap-2 text-sm">
                     <span
