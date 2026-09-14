@@ -14559,6 +14559,7 @@ export type Database = {
         Returns: {
           agenda_id: string
           agenda_nome: string
+          cancelados: number
           compareceu: number
           dia: string
           especialidade: string
@@ -14595,6 +14596,18 @@ export type Database = {
         Returns: {
           paciente_id: string
           primeiro: string
+        }[]
+      }
+      fin_receita_resumo_dia: {
+        Args: { p_clinica: string; p_fim: string; p_ini: string }
+        Returns: {
+          cartao: boolean
+          dia: string
+          especialidade: string
+          medico_id: string
+          medico_nome: string
+          pagamentos: number
+          receita: number
         }[]
       }
       fin_resumo_categoria: {
