@@ -1032,7 +1032,7 @@ export type Database = {
           created_at: string
           departamento_id: string
           id: string
-          max_simultaneas: number
+          max_simultaneas: number | null
           queue_locked: boolean
           role: string
           user_id: string
@@ -1042,7 +1042,7 @@ export type Database = {
           created_at?: string
           departamento_id: string
           id?: string
-          max_simultaneas?: number
+          max_simultaneas?: number | null
           queue_locked?: boolean
           role?: string
           user_id: string
@@ -1052,7 +1052,7 @@ export type Database = {
           created_at?: string
           departamento_id?: string
           id?: string
-          max_simultaneas?: number
+          max_simultaneas?: number | null
           queue_locked?: boolean
           role?: string
           user_id?: string
@@ -14028,6 +14028,10 @@ export type Database = {
         Args: { _clinica_id: string; _conversa_id: string; _user_id: string }
         Returns: boolean
       }
+      atend_configurar_capacidade: {
+        Args: { _clinica_id: string; _user_id: string; _max_simultaneas: number | null }
+        Returns: Json
+      }
       atend_conversa_de_handoff: {
         Args: {
           _atribuida_user_id: string
@@ -14040,6 +14044,23 @@ export type Database = {
       atend_distribuir_fila: {
         Args: { _clinica_id: string; _max?: number }
         Returns: number
+      }
+      atend_definir_presenca_manual: {
+        Args: {
+          _clinica_id: string
+          _estado: string
+          _versao?: number | null
+          _reason_id?: string | null
+        }
+        Returns: Json
+      }
+      atend_diagnostico_distribuicao: {
+        Args: { _clinica_id: string }
+        Returns: Json
+      }
+      atend_distribuir_fila_status: {
+        Args: { _clinica_id: string; _max?: number }
+        Returns: Json
       }
       atend_distribuir_fila_interno: {
         Args: { _clinica_id: string; _max?: number }

@@ -29,10 +29,15 @@ import {
   ESTADOS_MANUAIS,
   ehEstadoManual,
   precisaEscolherPresenca,
-  tecnicoDoEstadoManual,
-  versaoAceita,
   type EstadoManualPresenca,
 } from "@/lib/atendimento/presenca-manual";
+import { capacidadeAtendenteSchema } from "@/lib/atendimento/distribuicao-contrato";
+import {
+  consultarEstadoDistribuicao,
+  executarDistribuicaoFila,
+  lerResultadoDistribuicao,
+  salvarPresencaComDistribuicao,
+} from "@/lib/atendimento/distribuicao.server";
 
 /* =========================================================
  *  Helpers
@@ -1341,114 +1346,40 @@ export const excluirPauseReason = createServerFn({ method: "POST" })
 export const iniciarPausa = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) =>
-    z.object({ clinicaId: z.string().uuid(), reasonId: z.string().uuid() }).parse(i),
+    z.object({
+      clinicaId: z.string().uuid(),
+      reasonId: z.string().uuid(),
+      versao: z.number().int().nonnegative().optional(),
+    }).parse(i),
   )
   .handler(async ({ data, context }) => {
     await assertMember(context.supabase, context.userId, data.clinicaId);
-    // `reasonId` vem do cliente: confere que o motivo é desta clínica.
-    const { data: motivo } = await context.supabase
-      .from("atend_pause_reasons")
-      .select("id")
-      .eq("id", data.reasonId)
-      .eq("clinica_id", data.clinicaId)
-      .maybeSingle();
-    if (!motivo) throw new Error("Motivo de pausa não encontrado nesta clínica");
-    // fecha pausas abertas
-    await context.supabase
-      .from("atend_pausas_log")
-      .update({ finalizada_em: new Date().toISOString() })
-      .eq("user_id", context.userId)
-      .is("finalizada_em", null);
-    const { data: ins, error } = await context.supabase
-      .from("atend_pausas_log")
-      .insert({
-        clinica_id: data.clinicaId,
-        user_id: context.userId,
-        reason_id: data.reasonId,
-      })
-      .select("id")
-      .single();
-    if (error) throw new Error(error.message);
-    // Entrar em pausa é uma escolha explícita do atendente no controle de
-    // presença: grava também o estado manual, para que nada (heartbeat,
-    // recarga, reconexão) mude isso depois.
-    await context.supabase.from("atend_agente_presenca").upsert(
-      {
-        clinica_id: data.clinicaId,
-        user_id: context.userId,
-        status: "BUSY",
-        aceita_novas: false,
-        visto_em: new Date().toISOString(),
-        estado_manual: "PAUSA",
-        estado_manual_em: new Date().toISOString(),
-        estado_manual_por: context.userId,
-      },
-      { onConflict: "clinica_id,user_id" },
-    );
-    return { id: ins!.id };
+    // Motivo, pausa e presença são confirmados juntos. Fechar uma pausa
+    // anterior nunca abre uma janela Online entre as duas escolhas.
+    const resultado = await salvarPresencaComDistribuicao(context.supabase, {
+      clinicaId: data.clinicaId,
+      estado: "PAUSA",
+      reasonId: data.reasonId,
+      versao: data.versao,
+    });
+    if (!resultado.ok) return resultado;
+    if (!resultado.pausaId) throw new Error("Não foi possível confirmar o registro da pausa.");
+    return { ...resultado, id: resultado.pausaId };
   });
-
-/**
- * FASE 3 — quem entra na distribuição automática dos handoffs da Nina é quem
- * tem o PERFIL Telefonia (Cadastros › Perfis), e não uma permissão avulsa.
- * A fonte é a mesma do banco (`atend_tem_perfil_telefonia`, que lê
- * `clinica_memberships.role`), então tela e distribuição nunca divergem.
- */
-async function temTelefonia(
-  supabase: { rpc: (fn: string, args: unknown) => Promise<{ data: unknown; error: unknown }> },
-  userId: string,
-  clinicaId: string,
-): Promise<boolean> {
-  const { data, error } = await supabase.rpc("atend_tem_perfil_telefonia", {
-    _user_id: userId,
-    _clinica_id: clinicaId,
-  });
-  if (error) return false; // fail-closed
-  return data === true;
-}
 
 export const finalizarPausa = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) => clinIdSchema.parse(i))
   .handler(async ({ data, context }) => {
     await assertMember(context.supabase, context.userId, data.clinicaId);
-    const { error } = await context.supabase
-      .from("atend_pausas_log")
-      .update({ finalizada_em: new Date().toISOString() })
-      .eq("user_id", context.userId)
-      .is("finalizada_em", null);
-    if (error) throw new Error(error.message);
-
-    // Encerrar a pausa também é escolha explícita: volta para Online e grava
-    // isso como estado manual, nunca como efeito de conexão ou atividade.
-    await context.supabase.from("atend_agente_presenca").upsert(
-      {
-        clinica_id: data.clinicaId,
-        user_id: context.userId,
-        status: "ONLINE",
-        aceita_novas: true,
-        visto_em: new Date().toISOString(),
-        estado_manual: "ONLINE",
-        estado_manual_em: new Date().toISOString(),
-        estado_manual_por: context.userId,
-      },
-      { onConflict: "clinica_id,user_id" },
-    );
-
-    // Voltar da pausa é voltar a estar disponível: reavalia a fila "Não
-    // atribuídas" na hora, com o MESMO algoritmo de distribuição usado ao
-    // ficar Online (mais antiga primeiro, para quem tem menos conversas).
-    // Sem isso, a fila só seria reavaliada no próximo heartbeat (até 60s).
-    let distribuidas = 0;
-    if (await temTelefonia(context.supabase as never, context.userId, data.clinicaId)) {
-      const { data: n, error: e2 } = await context.supabase.rpc("atend_distribuir_fila", {
-        _clinica_id: data.clinicaId,
-        _max: 20,
-      } as never);
-      if (e2) console.error("[atendimento] falha ao distribuir fila após pausa:", e2.message);
-      else distribuidas = Number(n ?? 0);
-    }
-    return { ok: true, distribuidas };
+    // Finalizar a pausa e voltar Online é uma operação atômica, restrita à
+    // clínica atual. A mesma RPC confirma a presença e o resultado da fila.
+    const resultado = await salvarPresencaComDistribuicao(context.supabase, {
+      clinicaId: data.clinicaId,
+      estado: "ONLINE",
+    });
+    if (!resultado.ok) throw new Error("A presença mudou. Atualize o controle de presença.");
+    return resultado;
   });
 
 export const pausaAtual = createServerFn({ method: "POST" })
@@ -2989,86 +2920,106 @@ export const definirPresencaManual = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     await assertMember(context.supabase, context.userId, data.clinicaId);
-
-    const { data: atual } = await context.supabase
-      .from("atend_agente_presenca")
-      .select("estado_manual_versao")
-      .eq("clinica_id", data.clinicaId)
-      .eq("user_id", context.userId)
-      .maybeSingle();
-    const versaoAtual =
-      (atual as { estado_manual_versao?: number | null } | null)?.estado_manual_versao ?? 0;
-    if (!versaoAceita(versaoAtual, data.versao)) {
-      return { ok: false as const, conflito: true as const, versao: versaoAtual };
-    }
-
-    const agora = new Date().toISOString();
-    const novaVersao = versaoAtual + 1;
-    const tecnico = tecnicoDoEstadoManual(data.estado);
-    const { error } = await context.supabase.from("atend_agente_presenca").upsert(
-      {
-        clinica_id: data.clinicaId,
-        user_id: context.userId,
-        status: tecnico.status,
-        aceita_novas: tecnico.aceitaNovas,
-        visto_em: agora,
-        estado_manual: data.estado,
-        estado_manual_em: agora,
-        estado_manual_por: context.userId,
-        estado_manual_versao: novaVersao,
-      },
-      { onConflict: "clinica_id,user_id" },
-    );
-    if (error) throw new Error(error.message);
-
-    const { error: eLog } = await context.supabase.from("atend_presenca_manual_log").insert({
-      clinica_id: data.clinicaId,
-      user_id: context.userId,
-      estado: data.estado,
-      versao: novaVersao,
-      definido_por: context.userId,
-    });
-    if (eLog) console.error("[atendimento] falha ao registrar histórico de presença:", eLog.message);
-
-    // Escolher Online devolve a pessoa ao pool e reavalia "Não atribuídas".
-    let distribuidas = 0;
-    if (
-      data.estado === "ONLINE" &&
-      (await temTelefonia(context.supabase as never, context.userId, data.clinicaId))
-    ) {
-      const { data: n, error: e2 } = await context.supabase.rpc("atend_distribuir_fila", {
-        _clinica_id: data.clinicaId,
-        _max: 20,
-      } as never);
-      if (e2) console.error("[atendimento] falha ao distribuir fila:", e2.message);
-      else distribuidas = Number(n ?? 0);
-    }
-
-    return {
-      ok: true as const,
-      conflito: false as const,
-      estado: data.estado,
-      versao: novaVersao,
-      em: agora,
-      distribuidas,
-    };
+    return salvarPresencaComDistribuicao(context.supabase, data);
   });
 
 /**
  * Distribui manualmente o que está parado na fila "Não atribuídas".
- * Usado pelo botão "Distribuir agora" e após o heartbeat de presença.
+ * A presença, a liberação de capacidade e a recuperação agendada usam o mesmo núcleo SQL.
  */
 export const distribuirFilaPendentes = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) => clinIdSchema.parse(i))
   .handler(async ({ data, context }) => {
     await assertMember(context.supabase, context.userId, data.clinicaId);
-    const { data: n, error } = await context.supabase.rpc("atend_distribuir_fila", {
+    const resultado = await executarDistribuicaoFila(context.supabase, data.clinicaId);
+    if (resultado.status === "erro") {
+      throw new Error("A distribuição falhou. A fila será reavaliada automaticamente.");
+    }
+    return resultado;
+  });
+
+/** Consulta operacional sem alterar presença, atribuição ou a fila. */
+export const consultarDistribuicaoFila = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => clinIdSchema.parse(i))
+  .handler(async ({ data, context }) => {
+    await assertMember(context.supabase, context.userId, data.clinicaId);
+    return consultarEstadoDistribuicao(context.supabase, data.clinicaId);
+  });
+
+export const listarCapacidadesAtendentes = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => clinIdSchema.parse(i))
+  .handler(async ({ data, context }) => {
+    await assertMember(context.supabase, context.userId, data.clinicaId);
+    const [gestao, pool, membros] = await Promise.all([
+      context.supabase.rpc("can_manage_clinica", {
+        _user_id: context.userId,
+        _clinica_id: data.clinicaId,
+      }),
+      context.supabase.rpc("atend_diagnostico_distribuicao", {
+        _clinica_id: data.clinicaId,
+      }),
+      context.supabase
+        .from("clinica_memberships")
+        .select("user_id")
+        .eq("clinica_id", data.clinicaId)
+        .eq("ativo", true)
+        .eq("role", "telefonia"),
+    ]);
+    if (gestao.error) throw new Error(gestao.error.message);
+    if (pool.error) throw new Error(pool.error.message);
+    if (membros.error) throw new Error(membros.error.message);
+    const ids = [...new Set((membros.data ?? []).map((m) => m.user_id))];
+    const perfis = ids.length
+      ? await context.supabase.from("profiles").select("id, nome").in("id", ids)
+      : { data: [], error: null };
+    if (perfis.error) throw new Error(perfis.error.message);
+    const nomes = new Map((perfis.data ?? []).map((p) => [p.id, p.nome]));
+    const linhas = z.array(z.object({
+      user_id: z.string(),
+      estado_manual: z.string().nullable(),
+      load_at_selection: z.number().int().nonnegative(),
+      capacidade: z.number().int().positive().nullable(),
+      motivo_exclusao: z.string().nullable(),
+    })).parse(z.object({ candidatos: z.unknown() }).parse(pool.data).candidatos);
+    const porId = new Map(linhas.map((l) => [l.user_id, l]));
+    return {
+      podeConfigurar: gestao.data === true,
+      atendentes: ids.map((userId) => {
+        const linha = porId.get(userId);
+        if (!linha) throw new Error("Não foi possível consultar a capacidade de toda a equipe.");
+        return {
+          userId,
+          nome: nomes.get(userId) || "Atendente",
+          estado: linha.estado_manual,
+          cargaAtual: linha.load_at_selection,
+          capacidade: linha.capacidade,
+          motivo: linha.motivo_exclusao,
+        };
+      }).sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR")),
+    };
+  });
+
+/** Só gestores alteram limites; o banco valida a clínica e registra antes/depois. */
+export const configurarCapacidadeAtendente = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => z.object({
+    clinicaId: z.string().uuid(),
+    userId: z.string().uuid(),
+    capacidade: capacidadeAtendenteSchema,
+  }).parse(i))
+  .handler(async ({ data, context }) => {
+    await assertManager(context.supabase, context.userId, data.clinicaId);
+    const { data: resposta, error } = await context.supabase.rpc("atend_configurar_capacidade", {
       _clinica_id: data.clinicaId,
-      _max: 50,
-    } as never);
+      _user_id: data.userId,
+      _max_simultaneas: data.capacidade,
+    });
     if (error) throw new Error(error.message);
-    return { distribuidas: Number(n ?? 0) };
+    const resultado = z.object({ ok: z.literal(true), distribuicao: z.unknown() }).parse(resposta);
+    return lerResultadoDistribuicao(resultado.distribuicao);
   });
 
 
@@ -3115,7 +3066,7 @@ export const diagnosticarPoolTelefonia = createServerFn({ method: "POST" })
       em_pausa: boolean;
       admin: boolean;
       load_at_selection: number;
-      capacidade: number;
+      capacidade: number | null;
       elegivel: boolean;
       motivo_exclusao: string | null;
     };

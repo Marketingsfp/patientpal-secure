@@ -9,7 +9,7 @@
  *
  * Regra definitiva:
  *   Cadastros › Perfis → perfil "telefonia"
- *   + Online (aceitando novas, presença recente)
+ *   + escolha manual Online
  *   + sem pausa aberta
  *   + não administrador
  *   + demais critérios operacionais (setor/fila)
@@ -46,10 +46,10 @@ export type CandidatoDistribuicao = {
   /** Conversas ativas no momento (usado só no balanceamento). */
   cargaAtiva?: number;
   /**
-   * Limite de conversas simultâneas do atendente (padrão 5). Quem já atingiu
-   * o limite sai do balanceamento — FASE 3.
+   * Limite explicitamente configurado. null/ausente = sem teto automático.
+   * A carga continua sendo usada para equilibrar a distribuição.
    */
-  capacidadeMaxima?: number;
+  capacidadeMaxima?: number | null;
   /**
    * Último recebimento (histórico completo), para desempate justo: em empate
    * de carga, recebe quem está há mais tempo sem conversa.
@@ -79,7 +79,8 @@ export function verificarElegibilidade(c: CandidatoDistribuicao): VerificacaoEle
   else if (c.status !== "ONLINE") motivo = `status ${c.status}`;
   else if (c.emPausa) motivo = "em pausa";
   else if (c.filaTravada) motivo = "fila travada";
-  else if ((c.cargaAtiva ?? 0) >= (c.capacidadeMaxima ?? 5)) motivo = "capacidade lotada";
+  else if (c.capacidadeMaxima != null && (c.cargaAtiva ?? 0) >= c.capacidadeMaxima)
+    motivo = "capacidade lotada";
 
   return {
     user_has_telefonia: c.temTelefonia,

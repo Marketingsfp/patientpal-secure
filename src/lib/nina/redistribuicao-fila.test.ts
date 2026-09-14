@@ -56,10 +56,45 @@ describe("FASE 4 — redistribuição de Não atribuídas", () => {
     expect(porUsuario).toEqual({ a: 3, b: 3, c: 3 });
   });
 
-  it("duas entrando Online juntas: nenhuma conversa é atribuída duas vezes", () => {
+  it("simulação com duas online: cada conversa tem um único destinatário", () => {
     const r = simularRedistribuicao([atendente("a"), atendente("b")], fila(6));
     const ids = r.atribuicoes.map((x) => x.conversationId);
     expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  it("sem limite configurado, cinco conversas abertas não bloqueiam as duas pendentes", () => {
+    const r = simularRedistribuicao(
+      [atendente("a", { cargaAtiva: 5, capacidadeMaxima: null })],
+      fila(2),
+    );
+    expect(r.atribuicoes).toHaveLength(2);
+    expect(r.restantes).toHaveLength(0);
+  });
+
+  it("limite explícito é respeitado e liberar uma vaga permite uma atribuição", () => {
+    const lote = fila(2);
+    const cheio = simularRedistribuicao(
+      [atendente("a", { cargaAtiva: 5, capacidadeMaxima: 5 })],
+      lote,
+    );
+    expect(cheio.atribuicoes).toHaveLength(0);
+    const comVaga = simularRedistribuicao(
+      [atendente("a", { cargaAtiva: 4, capacidadeMaxima: 5 })],
+      cheio.restantes,
+    );
+    expect(comVaga.atribuicoes).toEqual([{ conversationId: "c01", userId: "a" }]);
+    expect(comVaga.restantes).toHaveLength(1);
+  });
+
+  it("setor lotado não exclui atendente disponível do conjunto geral", () => {
+    const r = simularRedistribuicao(
+      [
+        atendente("a", { departamentos: ["exames"], cargaAtiva: 5, capacidadeMaxima: 5 }),
+        atendente("b", { departamentos: ["consultas"], capacidadeMaxima: null }),
+      ],
+      fila(2, { departamentoId: "exames" }),
+    );
+    expect(r.atribuicoes.map((a) => a.userId)).toEqual(["b", "b"]);
   });
 
   it("atendente entra em pausa no meio: a vez passa para outra", () => {

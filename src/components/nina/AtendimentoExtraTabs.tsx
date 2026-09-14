@@ -17,6 +17,16 @@ import {
 } from "@/lib/atendimento/respostas-rapidas";
 import { normalizarNomeBusca } from "@/lib/busca-texto";
 import type { EstadoManualPresenca } from "@/lib/atendimento/presenca-manual";
+import type {
+  ResultadoDistribuicaoFila,
+  ResultadoPresencaDistribuicao,
+} from "@/lib/atendimento/distribuicao-contrato";
+import { CapacidadeAtendentes } from "@/components/nina/CapacidadeAtendentes";
+import {
+  avisoPresencaConfirmada,
+  mensagemDistribuicaoFila,
+  type AvisoDistribuicao,
+} from "@/components/nina/distribuicao-fila-ui";
 import {
   CONTROLE_INICIAL,
   aoCarregar as presAoCarregar,
@@ -92,6 +102,7 @@ import {
   PinOff,
   Zap,
   Copy,
+  RefreshCw,
 } from "lucide-react";
 import { useClinica } from "@/hooks/use-clinica";
 import { useAuth } from "@/hooks/use-auth";
@@ -166,13 +177,13 @@ import {
   listarUsuariosClinica,
   travarMinhaFila,
   iniciarPausa,
-  finalizarPausa,
   pausaAtual,
   listarPauseReasons,
   meuStatusAgente,
   devolverParaNina,
   definirPresenca,
   definirPresencaManual,
+  consultarDistribuicaoFila,
   esperaConversas,
   assumirConversa,
   marcarLida,
@@ -345,12 +356,12 @@ export function AtendInbox() {
   const travarFilaFn = useServerFn(travarMinhaFila);
   const devolverFn = useServerFn(devolverParaNina);
   const iniciarPausaFn = useServerFn(iniciarPausa);
-  const finalizarPausaFn = useServerFn(finalizarPausa);
   const pausaAtualFn = useServerFn(pausaAtual);
   const listarReasonsFn = useServerFn(listarPauseReasons);
   const meuStatusFn = useServerFn(meuStatusAgente);
   const presencaFn = useServerFn(definirPresenca);
   const presencaManualFn = useServerFn(definirPresencaManual);
+  const consultarDistribuicaoFn = useServerFn(consultarDistribuicaoFila);
   const esperaFn = useServerFn(esperaConversas);
   const assumirFn = useServerFn(assumirConversa);
   const obterConversaFn = useServerFn(obterConversa);
@@ -732,9 +743,43 @@ export function AtendInbox() {
   // aba antiga nunca reescrevem uma escolha mais recente.
   const sincronia = useRef(SINCRONIA_INICIAL);
   const seqPresenca = useRef(0);
+  const [distribuicaoFila, setDistribuicaoFila] = useState<ResultadoDistribuicaoFila | null>(null);
+  const [erroDistribuicao, setErroDistribuicao] = useState<string | null>(null);
+  const [consultandoDistribuicao, setConsultandoDistribuicao] = useState(false);
+  const seqDistribuicao = useRef(0);
+  const escopoDistribuicao = useRef("");
+  escopoDistribuicao.current = `${clinicaId ?? ""}:${meuId ?? ""}`;
+
+  useEffect(() => {
+    seqDistribuicao.current += 1;
+    setDistribuicaoFila(null);
+    setErroDistribuicao(null);
+    setConsultandoDistribuicao(false);
+  }, [clinicaId, meuId]);
+
+  const carregarDistribuicao = useCallback(async () => {
+    if (!clinicaId || !meuId) return;
+    const pedido = ++seqDistribuicao.current;
+    const escopoPedido = `${clinicaId}:${meuId}`;
+    setConsultandoDistribuicao(true);
+    try {
+      const r = await consultarDistribuicaoFn({ data: { clinicaId } });
+      if (pedido !== seqDistribuicao.current || escopoPedido !== escopoDistribuicao.current) return;
+      setDistribuicaoFila(r);
+      setErroDistribuicao(null);
+    } catch {
+      if (pedido === seqDistribuicao.current && escopoPedido === escopoDistribuicao.current)
+        setErroDistribuicao("Não foi possível consultar a distribuição da fila. Atualize a consulta.");
+    } finally {
+      if (pedido === seqDistribuicao.current && escopoPedido === escopoDistribuicao.current)
+        setConsultandoDistribuicao(false);
+    }
+  }, [clinicaId, meuId, consultarDistribuicaoFn]);
 
   const carregarStatusAgente = useCallback(async () => {
     if (!clinicaId || !meuId) return;
+    // Consulta informativa: nunca atribui conversas nem muda a presença.
+    void carregarDistribuicao();
     const seq = ++seqPresenca.current;
     try {
       const [s, p, rs] = await Promise.all([
@@ -762,7 +807,7 @@ export function AtendInbox() {
     } catch {
       // Estado auxiliar da fila: se falhar, a aba segue com os valores atuais.
     }
-  }, [clinicaId, meuId, meuStatusFn, pausaAtualFn, listarReasonsFn]);
+  }, [clinicaId, meuId, meuStatusFn, pausaAtualFn, listarReasonsFn, carregarDistribuicao]);
 
   // Aviso direto entre abas do mesmo navegador (uma única assinatura).
   useEffect(() => {
@@ -853,30 +898,48 @@ export function AtendInbox() {
     }
   };
 
-  // FASE 2 — único caminho que muda a presença: a escolha explícita aqui.
-  const gravarPresencaManual = async (estado: EstadoManualPresenca) => {
-    if (!clinicaId) return null;
-    const r = (await presencaManualFn({
-      data: { clinicaId, estado, versao: versaoPresenca },
-    })) as { ok?: boolean; conflito?: boolean; versao?: number; distribuidas?: number } | null;
-    if (r?.conflito) {
+  const aplicarPresencaConfirmada = async (r: ResultadoPresencaDistribuicao) => {
+    if (`${clinicaId ?? ""}:${meuId ?? ""}` !== escopoDistribuicao.current) return null;
+    if (!r.ok) {
       await carregarStatusAgente();
       setControle((c) => presAoFalhar(c, "A presença foi alterada em outro lugar. Tente de novo."));
       toast.error("A presença foi alterada em outro lugar. Confira o controle de presença.");
       return null;
     }
-    setEstadoManual(estado);
-    setControle((c) => presAoConfirmar(c, estado));
-    const novaVersao = typeof r?.versao === "number" ? r.versao : versaoPresenca + 1;
-    setVersaoPresenca(novaVersao);
+    setEstadoManual(r.estado);
+    setControle((c) => presAoConfirmar(c, r.estado));
+    setVersaoPresenca(r.versao);
+    setFilaAberta(r.estado === "ONLINE");
+    if (r.estado !== "PAUSA") setPausaAtiva(null);
+    // Uma consulta iniciada antes da gravação não substitui seu resultado.
+    seqDistribuicao.current += 1;
+    setDistribuicaoFila(r.distribuicao);
+    setErroDistribuicao(null);
+    setConsultandoDistribuicao(false);
     // FASE 4 — a escolha confirmada vira a referência desta aba e é avisada às demais.
     sincronia.current = {
-      estado,
-      versao: novaVersao,
+      estado: r.estado,
+      versao: r.versao,
       seq: ++seqPresenca.current,
     };
-    if (meuId) avisarOutrasAbas({ clinicaId, userId: meuId, estado, versao: novaVersao });
+    if (clinicaId && meuId)
+      avisarOutrasAbas({ clinicaId, userId: meuId, estado: r.estado, versao: r.versao });
     return r;
+  };
+
+  const mostrarResultadoDistribuicao = (aviso: AvisoDistribuicao) => {
+    if (aviso.tom === "erro") toast.error(aviso.texto);
+    else if (aviso.tom === "aviso") toast.warning(aviso.texto);
+    else toast.success(aviso.texto);
+  };
+
+  // A gravação atômica também termina uma pausa, sem passagem transitória por Online.
+  const gravarPresencaManual = async (estado: EstadoManualPresenca) => {
+    if (!clinicaId) return null;
+    const r = await presencaManualFn({
+      data: { clinicaId, estado, versao: versaoPresenca },
+    });
+    return aplicarPresencaConfirmada(r);
   };
 
   const definirStatus = async (status: "online" | "pausa" | "offline") => {
@@ -887,25 +950,14 @@ export function AtendInbox() {
     setControle((c) => presAoIniciar(c, alvo));
     try {
       if (status === "online") {
-        if (pausaAtiva) await finalizarPausaFn({ data: { clinicaId } });
-        setPausaAtiva(null);
         const r = await gravarPresencaManual("ONLINE");
         if (!r) return;
-        setFilaAberta(true);
-        const n = r.distribuidas ?? 0;
-        toast.success(
-          n > 0
-            ? `Você está online — ${n} conversa(s) da fila vieram para os atendentes`
-            : "Você está online",
-        );
+        mostrarResultadoDistribuicao(avisoPresencaConfirmada(r.estado, r.distribuicao));
         await carregarConvs();
       } else if (status === "offline") {
-        if (pausaAtiva) await finalizarPausaFn({ data: { clinicaId } });
-        setPausaAtiva(null);
         const r = await gravarPresencaManual("OFFLINE");
         if (!r) return;
-        setFilaAberta(false);
-        toast.success("Você está offline");
+        mostrarResultadoDistribuicao(avisoPresencaConfirmada(r.estado, r.distribuicao));
       } else {
         if (!pauseReasons.length) {
           setControle((c) => presAoFalhar(c, "Nenhum motivo de pausa configurado"));
@@ -927,11 +979,13 @@ export function AtendInbox() {
     if (!clinicaId || !pausaReasonSel) return;
     setControle((c) => presAoIniciar(c, "PAUSA"));
     try {
-      await iniciarPausaFn({ data: { clinicaId, reasonId: pausaReasonSel } });
+      const r = await iniciarPausaFn({ data: { clinicaId, reasonId: pausaReasonSel, versao: versaoPresenca } });
+      const confirmada = await aplicarPresencaConfirmada(r);
+      if (!confirmada) return;
       setPausaDialogOpen(false);
-      setEstadoManual("PAUSA");
+      setPausaAtiva({ id: r.ok ? r.id : null });
+      mostrarResultadoDistribuicao(avisoPresencaConfirmada(confirmada.estado, confirmada.distribuicao));
       await carregarStatusAgente();
-      toast.success("Em pausa");
     } catch (e: any) {
       setControle((c) => presAoFalhar(c, e?.message ?? "Não foi possível entrar em pausa."));
       mostrarErro(e);
@@ -1116,10 +1170,11 @@ export function AtendInbox() {
         abrirConversa((rows[0] as any)?.id ?? null);
       // Os números de cada filtro acompanham a movimentação em tempo real.
       void carregarContadores();
+      void carregarDistribuicao();
     } catch (e: any) {
       mostrarErro(e);
     }
-  }, [clinicaId, filtroStatus, buscaTexto, buscaInterp.exigeNumero, escopo, atendenteSelecionadoId, visualizacao, listarConvs, carregarContadores, meuId, souGestor, abrirConversa]);
+  }, [clinicaId, filtroStatus, buscaTexto, buscaInterp.exigeNumero, escopo, atendenteSelecionadoId, visualizacao, listarConvs, carregarContadores, carregarDistribuicao, meuId, souGestor, abrirConversa]);
 
   // FASE 2 — busca pelo número permanente (#1342). Consulta exata no backend,
   // fora do filtro atual e sem baixar a lista inteira. Só leitura: encontrar
@@ -2985,6 +3040,43 @@ export function AtendInbox() {
             >
               {presTexto(controle)}
             </p>
+            <div className="rounded-md border bg-muted/30 px-2 py-1.5 text-[11px]">
+              <div className="flex items-center gap-1">
+                <span className="font-medium">Distribuição da fila</span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="ml-auto h-6 w-6 p-0"
+                  aria-label="Atualizar consulta da distribuição"
+                  disabled={consultandoDistribuicao || !!controle.salvando}
+                  onClick={() => void carregarDistribuicao()}
+                >
+                  <RefreshCw className={`h-3 w-3 ${consultandoDistribuicao ? "animate-spin" : ""}`} />
+                </Button>
+              </div>
+              {erroDistribuicao ? (
+                <p role="alert" className="text-destructive">{erroDistribuicao}</p>
+              ) : distribuicaoFila ? (
+                <p role="status" className={distribuicaoFila.status === "erro" ? "text-destructive" : "text-muted-foreground"}>
+                  {mensagemDistribuicaoFila(distribuicaoFila).texto}
+                </p>
+              ) : (
+                <p className="text-muted-foreground">Consultando carga e capacidade…</p>
+              )}
+            </div>
+            {souGestor && clinicaId && (
+              <CapacidadeAtendentes
+                key={`${clinicaId}:${meuId}`}
+                clinicaId={clinicaId}
+                onAlterada={(r) => {
+                  seqDistribuicao.current += 1;
+                  setDistribuicaoFila(r);
+                  setErroDistribuicao(null);
+                  setConsultandoDistribuicao(false);
+                  void carregarConvs();
+                }}
+              />
+            )}
             {presPrecisaEscolher(controle) && (
               <p className="text-[11px] text-muted-foreground">
                 Escolha Online, Em pausa ou Offline para definir se você recebe novas conversas.
@@ -3008,12 +3100,8 @@ export function AtendInbox() {
                   size="sm"
                   variant="ghost"
                   className="h-6 px-1.5 text-[11px]"
-                  onClick={async () => {
-                    if (!clinicaId) return;
-                    await finalizarPausaFn({ data: { clinicaId } });
-                    await carregarStatusAgente();
-                    toast.success("Pausa finalizada");
-                  }}
+                  disabled={presDesabilitada(controle)}
+                  onClick={() => definirStatus("online")}
                 >
                   Encerrar
                 </Button>
