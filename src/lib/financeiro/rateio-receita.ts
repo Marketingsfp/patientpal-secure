@@ -257,6 +257,18 @@ export const ehProcedimentoDeLaudo = (procedimento: unknown): boolean =>
     .toUpperCase()
     .startsWith("[LAUDO]");
 
+/**
+ * Nome exibido da linha de laudo: "REPASSE DO MÉDICO — ELETROCARDIOGRAMA (ECG)".
+ * Na clínica, "laudo" é o serviço avulso pago (INSS, concurso); com o prefixo
+ * "[LAUDO]" o caixa confundia a remuneração da leitura do exame com ele.
+ */
+export const rotuloDoLaudo = (procedimento: string | null | undefined): string => {
+  const exame = String(procedimento ?? "")
+    .trim()
+    .replace(/^\[LAUDO\]\s*/i, "");
+  return exame ? `REPASSE DO MÉDICO — ${exame}` : "REPASSE DO MÉDICO";
+};
+
 /** Uma linha do relatório sintético (um agrupador). */
 export interface RateioGrupo {
   chave: string;
@@ -764,7 +776,9 @@ function reparte(
     especialidade_id: medico?.especialidade_id ?? null,
     especialidade_nome: "",
     procedimento: params.procedimento,
-    servico_nome: chaveServico
+    servico_nome: params.laudo
+      ? rotuloDoLaudo(params.procedimento)
+      : chaveServico
       ? (ctx.nomeServicoPorChave.get(chaveServico) ?? params.procedimento ?? SEM_SERVICO)
       : // Serviço que não está (mais) no cadastro continua aparecendo com o
         // texto que a agenda gravou; some do relatório seria pior.
