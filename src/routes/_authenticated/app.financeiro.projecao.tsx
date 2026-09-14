@@ -1,6 +1,16 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { Target, TrendingUp, TrendingDown, Wallet, Stethoscope, AlertTriangle } from "lucide-react";
+import {
+  Target,
+  TrendingUp,
+  TrendingDown,
+  Wallet,
+  Stethoscope,
+  AlertTriangle,
+  Info,
+} from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { ProjecaoInteligencia } from "@/components/financeiro/projecao-inteligencia";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
 import { Card, CardContent } from "@/components/ui/card";
@@ -204,22 +214,43 @@ function Page() {
     projetado,
     icon: Icon,
     color,
+    explicacao,
+    nota,
   }: {
     label: string;
     realizado: string;
     projetado: string;
     icon: typeof Wallet;
     color: string;
+    /** Texto da dica do "i" ao lado do título. */
+    explicacao?: string;
+    /** Linha extra, sempre visível, abaixo do realizado. */
+    nota?: string;
   }) => (
     <Card>
       <CardContent className="pt-6">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <p className="text-sm text-muted-foreground">{label}</p>
+            <p className="text-sm text-muted-foreground flex items-center gap-1.5">
+              {label}
+              {explicacao && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button type="button" aria-label={`O que é ${label}`}>
+                      <Info className="h-3.5 w-3.5" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" className="max-w-72 px-3 py-2 text-xs">
+                    {explicacao}
+                  </TooltipContent>
+                </Tooltip>
+              )}
+            </p>
             <p className="text-2xl font-semibold mt-1">{loading ? "..." : projetado}</p>
             <p className="text-xs text-muted-foreground mt-2">
               Já realizado: <span className="font-medium text-foreground">{realizado}</span>
             </p>
+            {nota && !loading && <p className="text-xs text-muted-foreground mt-1">{nota}</p>}
           </div>
           <div
             className={`h-10 w-10 shrink-0 rounded-lg flex items-center justify-center ${color}`}
@@ -231,227 +262,243 @@ function Page() {
     </Card>
   );
 
+  const atendimentosFaltantes = Math.max(r.projetado.atendimentos - r.realizado.atendimentos, 0);
+
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold flex items-center gap-2">
-          <Target className="h-6 w-6 text-primary" />
-          Projeção do mês
-        </h1>
-        <p className="text-sm text-muted-foreground">
-          Fechamento estimado de {inicio.slice(8)}/{inicio.slice(5, 7)} a {fim.slice(8)}/
-          {fim.slice(5, 7)} · {r.diasCorridos} dia(s) corridos, {r.diasRestantes} pela frente ·{" "}
-          {confiancaTexto}
-        </p>
-      </div>
+    <TooltipProvider delayDuration={150}>
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-2xl font-semibold flex items-center gap-2">
+            <Target className="h-6 w-6 text-primary" />
+            Projeção do mês
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            Fechamento estimado de {inicio.slice(8)}/{inicio.slice(5, 7)} a {fim.slice(8)}/
+            {fim.slice(5, 7)} · {r.diasCorridos} dia(s) corridos, {r.diasRestantes} pela frente ·{" "}
+            {confiancaTexto}
+          </p>
+        </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Bloco
-          label="Receita projetada"
-          projetado={fmt(r.projetado.receita)}
-          realizado={fmt(r.realizado.receita)}
-          icon={TrendingUp}
-          color="bg-green-500/10 text-green-600"
-        />
-        <Bloco
-          label="Despesa projetada"
-          projetado={fmt(r.projetado.despesa)}
-          realizado={fmt(r.realizado.despesa)}
-          icon={TrendingDown}
-          color="bg-red-500/10 text-red-600"
-        />
-        <Bloco
-          label="Saldo projetado"
-          projetado={fmt(r.projetado.saldo)}
-          realizado={fmt(r.realizado.saldo)}
-          icon={Wallet}
-          color="bg-primary/10 text-primary"
-        />
-        <Bloco
-          label="Atendimentos projetados"
-          projetado={String(r.projetado.atendimentos)}
-          realizado={String(r.realizado.atendimentos)}
-          icon={Stethoscope}
-          color="bg-blue-500/10 text-blue-600"
-        />
-      </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <Bloco
+            label="Receita projetada"
+            projetado={fmt(r.projetado.receita)}
+            realizado={fmt(r.realizado.receita)}
+            icon={TrendingUp}
+            color="bg-green-500/10 text-green-600"
+          />
+          <Bloco
+            label="Despesa projetada"
+            projetado={fmt(r.projetado.despesa)}
+            realizado={fmt(r.realizado.despesa)}
+            icon={TrendingDown}
+            color="bg-red-500/10 text-red-600"
+          />
+          <Bloco
+            label="Saldo projetado"
+            projetado={fmt(r.projetado.saldo)}
+            realizado={fmt(r.realizado.saldo)}
+            icon={Wallet}
+            color="bg-primary/10 text-primary"
+          />
+          <Bloco
+            label="Atendimentos projetados"
+            projetado={String(r.projetado.atendimentos)}
+            realizado={String(r.realizado.atendimentos)}
+            icon={Stethoscope}
+            color="bg-blue-500/10 text-blue-600"
+            explicacao={`É uma estimativa do total do mês inteiro, não de atendimentos já concluídos: soma o que já foi atendido de 01/${inicio.slice(5, 7)} até hoje com uma previsão para os dias que faltam até ${fim.slice(8)}/${fim.slice(5, 7)}, no ritmo médio dos dias de movimento deste mês.`}
+            nota={`Estimativa do mês: ${r.realizado.atendimentos} já atendidos + ~${atendimentosFaltantes} previstos em ${r.diasRestantes} dia(s) restantes.`}
+          />
+        </div>
 
-      <Card>
-        <CardContent className="pt-6 space-y-3">
-          <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-            <h2 className="text-lg font-semibold">Tendência do mês</h2>
-            <p className="text-xs text-muted-foreground">
-              <span className="font-medium text-foreground">Realizado</span> — o que já entrou,
-              somado dia a dia · <span className="font-medium text-foreground">Projetado</span>{" "}
-              (tracejado) — o mesmo acumulado seguindo no ritmo atual até {fim.slice(8)}/
-              {fim.slice(5, 7)}.
-            </p>
-          </div>
-          {loading ? (
-            <p className="text-sm text-muted-foreground">Carregando...</p>
-          ) : (
-            <MiniLineChart
-              labels={tendencia.map((p) => p.rotulo)}
-              series={seriesTendencia}
-              height={280}
-              formatY={(n) => fmt(n)}
-            />
-          )}
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardContent className="pt-6 space-y-4">
-          <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-            <div className="space-y-1">
-              <Label htmlFor="meta">Meta de receita do mês</Label>
-              <Input
-                id="meta"
-                type="number"
-                min={0}
-                step={1000}
-                className="w-56"
-                value={meta || ""}
-                placeholder="Ex.: 500000"
-                onChange={(ev) => salvarMeta(Number(ev.target.value) || 0)}
+        <Card>
+          <CardContent className="pt-6 space-y-3">
+            <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+              <h2 className="text-lg font-semibold">Tendência do mês</h2>
+              <p className="text-xs text-muted-foreground">
+                <span className="font-medium text-foreground">Realizado</span> — o que já entrou,
+                somado dia a dia · <span className="font-medium text-foreground">Projetado</span>{" "}
+                (tracejado) — o mesmo acumulado seguindo no ritmo atual até {fim.slice(8)}/
+                {fim.slice(5, 7)}.
+              </p>
+            </div>
+            {loading ? (
+              <p className="text-sm text-muted-foreground">Carregando...</p>
+            ) : (
+              <MiniLineChart
+                labels={tendencia.map((p) => p.rotulo)}
+                series={seriesTendencia}
+                height={280}
+                formatY={(n) => fmt(n)}
               />
-              <p className="text-xs text-muted-foreground">
-                Fica guardada neste navegador, por clínica e por mês.
-              </p>
-            </div>
-            <div className="text-sm">
-              <p className="text-muted-foreground">
-                Ritmo atual:{" "}
-                <span className="font-medium text-foreground">{fmt(r.mediaDiaria)}</span> e{" "}
-                {r.mediaAtendimentosDia} atendimento(s) por dia de movimento.
-              </p>
-            </div>
-          </div>
+            )}
+          </CardContent>
+        </Card>
 
-          {r.meta ? (
-            <div className="rounded-lg border p-4 text-sm space-y-1">
-              <p className="font-medium">
-                {r.meta.alcancavel
-                  ? "No ritmo de hoje, a meta é alcançada."
-                  : "No ritmo de hoje, a meta não é alcançada."}
-              </p>
-              <p className="text-muted-foreground">
-                Faltam {fmt(r.meta.falta)} para a meta de {fmt(r.meta.meta)}.
-              </p>
-              <p className="text-muted-foreground">
-                Precisa entrar {fmt(r.meta.porDiaRestante)} por dia de movimento restante — cerca de{" "}
-                {r.meta.atendimentosPorDia} atendimento(s) por dia no ticket atual de{" "}
-                {fmt(r.realizado.ticket)}.
-              </p>
+        <Card>
+          <CardContent className="pt-6 space-y-4">
+            <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+              <div className="space-y-1">
+                <Label htmlFor="meta">Meta de receita do mês</Label>
+                <Input
+                  id="meta"
+                  type="number"
+                  min={0}
+                  step={1000}
+                  className="w-56"
+                  value={meta || ""}
+                  placeholder="Ex.: 500000"
+                  onChange={(ev) => salvarMeta(Number(ev.target.value) || 0)}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Fica guardada neste navegador, por clínica e por mês.
+                </p>
+              </div>
+              <div className="text-sm">
+                <p className="text-muted-foreground">
+                  Ritmo atual:{" "}
+                  <span className="font-medium text-foreground">{fmt(r.mediaDiaria)}</span> e{" "}
+                  {r.mediaAtendimentosDia} atendimento(s) por dia de movimento.
+                </p>
+              </div>
             </div>
-          ) : (
-            <p className="text-sm text-muted-foreground">
-              Informe uma meta para ver quanto falta e quantos atendimentos por dia são necessários.
+
+            {r.meta ? (
+              <div className="rounded-lg border p-4 text-sm space-y-1">
+                <p className="font-medium">
+                  {r.meta.alcancavel
+                    ? "No ritmo de hoje, a meta é alcançada."
+                    : "No ritmo de hoje, a meta não é alcançada."}
+                </p>
+                <p className="text-muted-foreground">
+                  Faltam {fmt(r.meta.falta)} para a meta de {fmt(r.meta.meta)}.
+                </p>
+                <p className="text-muted-foreground">
+                  Precisa entrar {fmt(r.meta.porDiaRestante)} por dia de movimento restante — cerca
+                  de {r.meta.atendimentosPorDia} atendimento(s) por dia no ticket atual de{" "}
+                  {fmt(r.realizado.ticket)}.
+                </p>
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                Informe uma meta para ver quanto falta e quantos atendimentos por dia são
+                necessários.
+              </p>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="pt-6 space-y-4">
+            <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+              <h2 className="text-lg font-semibold">Simulação de crescimento</h2>
+              {baseMesAnterior > 0 ? (
+                <p className="text-xs text-muted-foreground">
+                  Base de comparação: {mesAnterior.nome} fechou em{" "}
+                  <span className="font-medium text-foreground">{fmt(baseMesAnterior)}</span>.
+                </p>
+              ) : null}
+            </div>
+
+            {metas.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                Sem receita registrada em {mesAnterior.nome} para comparar. Digite uma meta acima
+                para simular.
+              </p>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+                {metas.map((m) => (
+                  <div key={m.rotulo} className="rounded-lg border p-4 space-y-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-sm font-semibold">{m.rotulo}</span>
+                      <span
+                        className={
+                          m.alcancavel
+                            ? "text-[11px] font-medium uppercase tracking-wide text-green-600"
+                            : "text-[11px] font-medium uppercase tracking-wide text-amber-600"
+                        }
+                      >
+                        {m.alcancavel ? "no ritmo" : "exige mais"}
+                      </span>
+                    </div>
+                    <p className="text-xl font-semibold tabular-nums">{fmt(m.alvo)}</p>
+                    <dl className="text-xs text-muted-foreground space-y-1">
+                      <div className="flex justify-between gap-2">
+                        <dt>Falta</dt>
+                        <dd className="tabular-nums text-foreground">{fmt(m.falta)}</dd>
+                      </div>
+                      <div className="flex justify-between gap-2">
+                        <dt>Por dia de movimento</dt>
+                        <dd className="tabular-nums text-foreground">{fmt(m.porDiaRestante)}</dd>
+                      </div>
+                      <div className="flex justify-between gap-2">
+                        <dt>Atendimentos/dia</dt>
+                        <dd className="tabular-nums text-foreground">{m.atendimentosPorDia}</dd>
+                      </div>
+                      <div className="flex justify-between gap-2">
+                        <dt>Ritmo x hoje</dt>
+                        <dd className="tabular-nums text-foreground">
+                          {m.esforcoPercentual > 0
+                            ? `+${m.esforcoPercentual}%`
+                            : `${m.esforcoPercentual}%`}
+                        </dd>
+                      </div>
+                    </dl>
+                  </div>
+                ))}
+              </div>
+            )}
+            <p className="text-xs text-muted-foreground">
+              "Dia de movimento" é dia com caixa aberto — a clínica atende de segunda a sábado, e o
+              domingo não entra na conta.
             </p>
-          )}
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
 
-      <Card>
-        <CardContent className="pt-6 space-y-4">
-          <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-            <h2 className="text-lg font-semibold">Simulação de crescimento</h2>
-            {baseMesAnterior > 0 ? (
-              <p className="text-xs text-muted-foreground">
-                Base de comparação: {mesAnterior.nome} fechou em{" "}
-                <span className="font-medium text-foreground">{fmt(baseMesAnterior)}</span>.
+        <Card>
+          <CardContent className="pt-6">
+            <h2 className="text-lg font-semibold flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-amber-500" />O que dá para melhorar
+            </h2>
+            {loading ? (
+              <p className="text-sm text-muted-foreground mt-3">Carregando...</p>
+            ) : r.pontos.length === 0 ? (
+              <p className="text-sm text-muted-foreground mt-3">
+                Nenhum ponto de atenção no ritmo deste mês.
               </p>
-            ) : null}
-          </div>
-
-          {metas.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              Sem receita registrada em {mesAnterior.nome} para comparar. Digite uma meta acima para
-              simular.
-            </p>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
-              {metas.map((m) => (
-                <div key={m.rotulo} className="rounded-lg border p-4 space-y-2">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-sm font-semibold">{m.rotulo}</span>
-                    <span
+            ) : (
+              <ul className="mt-3 space-y-3">
+                {r.pontos.map((p) => (
+                  <li key={p.id} className="rounded-lg border p-3">
+                    <p
                       className={
-                        m.alcancavel
-                          ? "text-[11px] font-medium uppercase tracking-wide text-green-600"
-                          : "text-[11px] font-medium uppercase tracking-wide text-amber-600"
+                        p.gravidade === "alta"
+                          ? "font-medium text-red-600"
+                          : p.gravidade === "media"
+                            ? "font-medium text-amber-600"
+                            : "font-medium"
                       }
                     >
-                      {m.alcancavel ? "no ritmo" : "exige mais"}
-                    </span>
-                  </div>
-                  <p className="text-xl font-semibold tabular-nums">{fmt(m.alvo)}</p>
-                  <dl className="text-xs text-muted-foreground space-y-1">
-                    <div className="flex justify-between gap-2">
-                      <dt>Falta</dt>
-                      <dd className="tabular-nums text-foreground">{fmt(m.falta)}</dd>
-                    </div>
-                    <div className="flex justify-between gap-2">
-                      <dt>Por dia de movimento</dt>
-                      <dd className="tabular-nums text-foreground">{fmt(m.porDiaRestante)}</dd>
-                    </div>
-                    <div className="flex justify-between gap-2">
-                      <dt>Atendimentos/dia</dt>
-                      <dd className="tabular-nums text-foreground">{m.atendimentosPorDia}</dd>
-                    </div>
-                    <div className="flex justify-between gap-2">
-                      <dt>Ritmo x hoje</dt>
-                      <dd className="tabular-nums text-foreground">
-                        {m.esforcoPercentual > 0
-                          ? `+${m.esforcoPercentual}%`
-                          : `${m.esforcoPercentual}%`}
-                      </dd>
-                    </div>
-                  </dl>
-                </div>
-              ))}
-            </div>
-          )}
-          <p className="text-xs text-muted-foreground">
-            "Dia de movimento" é dia com caixa aberto — a clínica atende de segunda a sábado, e o
-            domingo não entra na conta.
-          </p>
-        </CardContent>
-      </Card>
+                      {p.titulo}
+                    </p>
+                    <p className="text-sm text-muted-foreground mt-0.5">{p.detalhe}</p>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </CardContent>
+        </Card>
 
-      <Card>
-        <CardContent className="pt-6">
-          <h2 className="text-lg font-semibold flex items-center gap-2">
-            <AlertTriangle className="h-5 w-5 text-amber-500" />O que dá para melhorar
-          </h2>
-          {loading ? (
-            <p className="text-sm text-muted-foreground mt-3">Carregando...</p>
-          ) : r.pontos.length === 0 ? (
-            <p className="text-sm text-muted-foreground mt-3">
-              Nenhum ponto de atenção no ritmo deste mês.
-            </p>
-          ) : (
-            <ul className="mt-3 space-y-3">
-              {r.pontos.map((p) => (
-                <li key={p.id} className="rounded-lg border p-3">
-                  <p
-                    className={
-                      p.gravidade === "alta"
-                        ? "font-medium text-red-600"
-                        : p.gravidade === "media"
-                          ? "font-medium text-amber-600"
-                          : "font-medium"
-                    }
-                  >
-                    {p.titulo}
-                  </p>
-                  <p className="text-sm text-muted-foreground mt-0.5">{p.detalhe}</p>
-                </li>
-              ))}
-            </ul>
-          )}
-        </CardContent>
-      </Card>
-    </div>
+        {clinicaAtual && (
+          <ProjecaoInteligencia
+            clinicaId={clinicaAtual.clinica_id}
+            inicioMes={inicio}
+            fimMes={fim}
+            hoje={hojeIso}
+          />
+        )}
+      </div>
+    </TooltipProvider>
   );
 }

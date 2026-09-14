@@ -22,12 +22,14 @@ describe("rangeFromPeriodo", () => {
     expect(rangeFromPeriodo("hoje")).toEqual({ from: hoje, to: hoje });
   });
 
-  it("Semana vai de domingo a sábado e contém hoje", () => {
+  it("Semana vai de segunda a sábado e contém hoje (ou acabou ontem, no domingo)", () => {
     const hoje = hojeBR();
     const { from, to } = rangeFromPeriodo("semana");
-    expect(new Date(`${from}T00:00:00Z`).getUTCDay()).toBe(0);
+    expect(new Date(`${from}T00:00:00Z`).getUTCDay()).toBe(1);
     expect(new Date(`${to}T00:00:00Z`).getUTCDay()).toBe(6);
-    expect(from <= hoje && hoje <= to).toBe(true);
+    const domingo = new Date(`${hoje}T00:00:00Z`).getUTCDay() === 0;
+    if (domingo) expect(to).toBe(addDias(hoje, -1));
+    else expect(from <= hoje && hoje <= to).toBe(true);
   });
 
   it("Mês começa no dia 1 e termina no último dia do mês corrente", () => {

@@ -27,10 +27,13 @@ export function rangeFromPeriodo(p: Periodo, custom?: { from: Date; to: Date }) 
     return { from: ontem, to: ontem };
   }
   if (p === "semana") {
-    // Semana civil, de domingo a sábado. O dia da semana é lido em UTC a
-    // partir da data pura, e não do relógio do navegador.
-    const domingo = addDias(hoje, -new Date(`${hoje}T00:00:00Z`).getUTCDay());
-    return { from: domingo, to: addDias(domingo, 6) };
+    // Semana de funcionamento, de segunda a sábado — mesma regra das pílulas
+    // de `@/lib/financeiro/preset-periodo`. No domingo vale a semana que
+    // acabou de fechar. O dia da semana é lido em UTC a partir da data pura,
+    // e não do relógio do navegador.
+    const dow = new Date(`${hoje}T00:00:00Z`).getUTCDay();
+    const segunda = addDias(hoje, -(dow === 0 ? 6 : dow - 1));
+    return { from: segunda, to: addDias(segunda, 5) };
   }
   if (p === "mes") {
     const [ano, mes] = hoje.split("-").map(Number);

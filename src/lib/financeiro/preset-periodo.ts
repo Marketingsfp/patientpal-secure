@@ -56,12 +56,13 @@ const TITULO_PRESET: Record<DatePreset, string> = {
 const REGRA_PRESET: Record<DatePreset, string> = {
   hoje: "Somente o dia de hoje.",
   ontem: "Somente o dia anterior a hoje.",
-  semana: "Da semana em que hoje está: de domingo a sábado.",
-  quinzena: "A quinzena em que hoje está: do dia 1 ao 15, ou do 16 ao fim do mês.",
+  semana:
+    "Da semana em que hoje está: de segunda a sábado. O domingo não entra — a clínica não abre.",
+  quinzena:
+    "A quinzena em que hoje está: do dia 1 ao 15, ou do 16 ao fim do mês. Domingo não conta como dia de funcionamento.",
   mes: "Do primeiro ao último dia do mês em que hoje está.",
   periodo: "Datas escolhidas à mão nos campos ao lado.",
 };
-
 
 const toISO = (d: Date) => {
   const x = new Date(d);
@@ -95,23 +96,35 @@ export function computeRange(preset: DatePreset, ref: Date = new Date()): DateRa
     return { from: toISO(ontem), to: toISO(ontem) };
   }
 
+  // Semana e Quinzena seguem o funcionamento da clínica, de segunda a sábado.
+  // Antes a semana ia de domingo a sábado e, numa segunda-feira, o atalho
+  // abria no domingo anterior (ex.: 13/09/2026), dia sem nenhum movimento.
   if (preset === "semana") {
     const dow = today.getDay(); // 0 = dom
+    // Domingo: a semana de funcionamento que acabou de fechar no sábado.
+    const recuo = dow === 0 ? 6 : dow - 1;
     const start = new Date(today);
-    start.setDate(today.getDate() - dow);
+    start.setDate(today.getDate() - recuo);
     const end = new Date(start);
-    end.setDate(start.getDate() + 6);
+    end.setDate(start.getDate() + 5);
     return { from: toISO(start), to: toISO(end) };
   }
   if (preset === "quinzena") {
     const d = today.getDate();
-    if (d <= 15) {
-      const start = new Date(today.getFullYear(), today.getMonth(), 1);
-      const end = new Date(today.getFullYear(), today.getMonth(), 15);
-      return { from: toISO(start), to: toISO(end) };
-    }
-    const start = new Date(today.getFullYear(), today.getMonth(), 16);
-    const end = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+    const [start, end] =
+      d <= 15
+        ? [
+            new Date(today.getFullYear(), today.getMonth(), 1),
+            new Date(today.getFullYear(), today.getMonth(), 15),
+          ]
+        : [
+            new Date(today.getFullYear(), today.getMonth(), 16),
+            new Date(today.getFullYear(), today.getMonth() + 1, 0),
+          ];
+    // A quinzena nunca começa nem termina num domingo. Os domingos do meio
+    // ficam dentro do intervalo, mas não contam como dia de funcionamento.
+    if (start.getDay() === 0) start.setDate(start.getDate() + 1);
+    if (end.getDay() === 0) end.setDate(end.getDate() - 1);
     return { from: toISO(start), to: toISO(end) };
   }
   // mes
@@ -127,6 +140,24 @@ export function diasDoIntervalo(r: DateRange): number {
   return Math.round(ms / 86400000) + 1;
 }
 
+/** 0 = domingo … 6 = sábado, lido da data pura (sem fuso). */
+export function diaDaSemana(iso: string): number {
+  return new Date(`${iso}T00:00:00Z`).getUTCDay();
+}
+
+/**
+ * Dias de funcionamento (segunda a sábado) do intervalo, contando as duas
+ * pontas. Feriado não é descontado: não há calendário de feriados confiável.
+ */
+export function diasDeFuncionamento(r: DateRange): number {
+  const total = diasDoIntervalo(r);
+  if (total <= 0) return 0;
+  const inicio = diaDaSemana(r.from);
+  let domingos = 0;
+  for (let i = 0; i < total; i++) if ((inicio + i) % 7 === 0) domingos++;
+  return total - domingos;
+}
+
 /** O que a dica de uma pílula mostra. */
 export interface DescricaoPreset {
   /** Ex.: "Semana atual". */
@@ -135,9 +166,9 @@ export interface DescricaoPreset {
   intervalo: string;
   /** Ex.: "Semana atual: 24/08/2026 a 30/08/2026". Uma linha, pronta. */
   resumo: string;
-  /** Quantos dias o intervalo cobre. */
+  /** Quantos dias o intervalo cobre — em Semana e Quinzena, só de segunda a sábado. */
   dias: number;
-  /** Ex.: "7 dias". */
+  /** Ex.: "6 dias de funcionamento". */
   duracao: string;
   /** A regra do recorte, em linguagem comum. */
   regra: string;
@@ -163,12 +194,17 @@ export function descricaoDoPreset(
   const dias = diasDoIntervalo(r);
   const intervalo = r.from === r.to ? dataBR(r.from) : `${dataBR(r.from)} a ${dataBR(r.to)}`;
   const titulo = TITULO_PRESET[preset];
+  // Semana e Quinzena anunciam dias de funcionamento: "15 dias" numa quinzena
+  // com dois domingos fazia parecer que o domingo estava sendo somado.
+  const uteis = preset === "semana" || preset === "quinzena";
+  const n = uteis ? diasDeFuncionamento(r) : dias;
+  const sufixo = uteis ? " de funcionamento" : "";
   return {
     titulo,
     intervalo,
     resumo: `${titulo}: ${intervalo}`,
-    dias,
-    duracao: dias === 1 ? "1 dia" : `${dias} dias`,
+    dias: n,
+    duracao: n === 1 ? `1 dia${sufixo}` : `${n} dias${sufixo}`,
     regra: REGRA_PRESET[preset],
   };
 }

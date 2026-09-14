@@ -152,6 +152,50 @@ async function fetchRecentes(lat: number, lon: number, diasAtras: number): Promi
 }
 
 // --------------------------------------------------------------------------
+// Previsão — hoje e os próximos dias (a Open-Meteo prevê até 16 dias).
+// Não vai para o cache: previsão muda a cada rodada do modelo.
+// --------------------------------------------------------------------------
+export type PrevisaoDia = {
+  data: string; // YYYY-MM-DD
+  precipitacao_mm: number | null;
+  /** Chance máxima de chuva no dia, 0–100. */
+  probabilidade_chuva: number | null;
+  temp_max: number | null;
+  temp_min: number | null;
+  weather_code: number | null;
+};
+
+export async function getPrevisaoClima(
+  clinicaId: string,
+  dias = 16,
+): Promise<PrevisaoDia[] | null> {
+  const coords = await resolverCoordenadas(clinicaId);
+  if (!coords) return null;
+  try {
+    const url =
+      `https://api.open-meteo.com/v1/forecast?latitude=${coords.lat}&longitude=${coords.lon}` +
+      `&daily=precipitation_sum,precipitation_probability_max,weather_code,temperature_2m_max,temperature_2m_min` +
+      `&forecast_days=${Math.min(Math.max(dias, 1), 16)}&timezone=America%2FSao_Paulo`;
+    const res = await fetch(url);
+    if (!res.ok) return null;
+    const d = (await res.json())?.daily;
+    if (!d?.time?.length) return null;
+    const num = (v: unknown) => (v == null || !Number.isFinite(Number(v)) ? null : Number(v));
+    return (d.time as string[]).map((data, i) => ({
+      data,
+      precipitacao_mm: num(d.precipitation_sum?.[i]),
+      probabilidade_chuva: num(d.precipitation_probability_max?.[i]),
+      temp_max: num(d.temperature_2m_max?.[i]),
+      temp_min: num(d.temperature_2m_min?.[i]),
+      weather_code: num(d.weather_code?.[i]),
+    }));
+  } catch (e) {
+    console.error("clima: falha ao buscar previsão na Open-Meteo", e);
+    return null;
+  }
+}
+
+// --------------------------------------------------------------------------
 // API principal — retorna Map data(YYYY-MM-DD) → ClimaDia para o período.
 // --------------------------------------------------------------------------
 export async function getClimaPeriodo(
