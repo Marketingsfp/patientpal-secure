@@ -10163,10 +10163,12 @@ export type Database = {
           clinica_id: string
           conversa_id: string | null
           created_at: string
+          erro_tecnico: string | null
           execucao_id: string | null
           first_message_at: string
           id: string
           last_message_at: string
+          processamento_iniciado_em: string | null
           processed_at: string | null
           revision: number
           status: string
@@ -10177,10 +10179,12 @@ export type Database = {
           clinica_id: string
           conversa_id?: string | null
           created_at?: string
+          erro_tecnico?: string | null
           execucao_id?: string | null
           first_message_at?: string
           id?: string
           last_message_at?: string
+          processamento_iniciado_em?: string | null
           processed_at?: string | null
           revision?: number
           status?: string
@@ -10191,10 +10195,12 @@ export type Database = {
           clinica_id?: string
           conversa_id?: string | null
           created_at?: string
+          erro_tecnico?: string | null
           execucao_id?: string | null
           first_message_at?: string
           id?: string
           last_message_at?: string
+          processamento_iniciado_em?: string | null
           processed_at?: string | null
           revision?: number
           status?: string
@@ -13681,6 +13687,7 @@ export type Database = {
           is_teste: boolean
           media_mime: string | null
           media_url: string | null
+          nina_revisao_conversa: number | null
           quoted_message_id: string | null
           raw: Json | null
           read_at: string | null
@@ -13707,6 +13714,7 @@ export type Database = {
           is_teste?: boolean
           media_mime?: string | null
           media_url?: string | null
+          nina_revisao_conversa?: number | null
           quoted_message_id?: string | null
           raw?: Json | null
           read_at?: string | null
@@ -13733,6 +13741,7 @@ export type Database = {
           is_teste?: boolean
           media_mime?: string | null
           media_url?: string | null
+          nina_revisao_conversa?: number | null
           quoted_message_id?: string | null
           raw?: Json | null
           read_at?: string | null
@@ -15126,6 +15135,21 @@ export type Database = {
         Args: { _batch_id: string; _execucao_id?: string; _status?: string }
         Returns: undefined
       }
+      nina_batch_concluir_seguro: {
+        Args: {
+          _batch_id: string
+          _chave: string
+          _erro?: string
+          _execucao_id?: string
+          _status?: string
+          _token: string
+        }
+        Returns: boolean
+      }
+      nina_batch_iniciar_processamento: {
+        Args: { _batch_id: string; _chave: string; _token: string }
+        Returns: boolean
+      }
       nina_batch_recuperar_travados: {
         Args: {
           _clinica_id: string
@@ -15306,6 +15330,10 @@ export type Database = {
       }
       nina_revisao_incrementar: {
         Args: { _clinica_id: string; _conversa_id?: string; _telefone: string }
+        Returns: number
+      }
+      nina_revisao_registrar_entrada: {
+        Args: { _clinica_id: string; _mensagem_id: string; _telefone: string }
         Returns: number
       }
       nina_teste_garantir_ciclo: {
