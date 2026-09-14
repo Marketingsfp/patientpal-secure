@@ -463,7 +463,7 @@ function Page() {
         let cortesias = 0;
         for (const l of linhas) {
           repasseDevido += l.repasse + l.terceiro;
-          if (l.origem === "atendimento" && l.receita <= 0) cortesias++;
+          if (l.origem === "atendimento" && !l.laudo && l.receita <= 0) cortesias++;
         }
         setConferencia({ repasseDevido: Math.round(repasseDevido * 100) / 100, cortesias });
       } catch {

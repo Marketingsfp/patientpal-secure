@@ -779,7 +779,7 @@ function montarPacientesDaLinha(
       l.liquido,
     ]),
     totais: [
-      `${int(alvo.length)} atendimento(s)`,
+      `${int(alvo.filter((l) => !l.laudo).length)} atendimento(s)`,
       "",
       "",
       "",
@@ -795,8 +795,11 @@ function montarPacientesDaLinha(
 }
 
 
+// O laudo tem receita zero, mas mostra como o paciente pagou o exame.
 const formasDaLinha = (l: RateioLinha) =>
-  l.formas
+  l.laudo
+    ? l.forma_pagamento
+    : l.formas
     .filter((f) => f.valor !== 0)
     .map((f) => LABEL_FORMA[f.forma])
     .join(" + ") || "—";

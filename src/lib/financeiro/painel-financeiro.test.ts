@@ -228,3 +228,30 @@ describe("agrupamentos do detalhamento", () => {
     ]);
   });
 });
+
+describe("linha de laudo", () => {
+  const exame = linha({ tipo_servico: "EXAME", receita: 51, repasse: 0, liquido: 51 });
+  const laudo = linha({
+    procedimento: "[LAUDO] ELETROCARDIOGRAMA (ECG)",
+    tipo_servico: "(SEM TIPO)",
+    receita: 0,
+    repasse: 18,
+    liquido: -18,
+    laudo: true,
+  });
+
+  it("não conta como atendimento nem como cortesia", () => {
+    const p = producaoDoRateio([exame, laudo]);
+    expect(p.total).toBe(1);
+    expect(p.exames).toBe(1);
+    expect(p.cortesias).toBe(0);
+  });
+
+  it("não soma receita, mas o repasse do laudador sai do líquido", () => {
+    const r = resumoPainel({ rateio: [exame, laudo], despesas: [], outrasReceitas: [] });
+    expect(r.receitaBruta).toBe(51);
+    expect(r.repasse).toBe(18);
+    expect(r.liquidoAtendimentos).toBe(33);
+    expect(r.producao.total).toBe(1);
+  });
+});

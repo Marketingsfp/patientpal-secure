@@ -172,12 +172,19 @@ export function categoriaDoAtendimento(
   return "outro";
 }
 
-/** Atendimento feito sem cobrança (cortesia da casa ou gratuidade do Cartão). */
-export const ehCortesia = (l: Pick<RateioLinha, "receita">): boolean => Number(l.receita ?? 0) <= 0;
+/**
+ * Atendimento feito sem cobrança (cortesia da casa ou gratuidade do Cartão).
+ * A linha de laudo também vale R$ 0,00, mas é repasse sobre um exame já
+ * contado — não é cortesia.
+ */
+export const ehCortesia = (l: Pick<RateioLinha, "receita" | "laudo">): boolean =>
+  !l.laudo && Number(l.receita ?? 0) <= 0;
 
 export function producaoDoRateio(
-  linhas: Array<Pick<RateioLinha, "tipo_servico" | "condicao" | "receita">>,
+  todas: Array<Pick<RateioLinha, "tipo_servico" | "condicao" | "receita" | "laudo">>,
 ): ProducaoPainel {
+  // Cada pagamento recebido é um atendimento; o laudo não é pagamento.
+  const linhas = todas.filter((l) => !l.laudo);
   const p: ProducaoPainel = {
     total: linhas.length,
     consultasCartao: 0,

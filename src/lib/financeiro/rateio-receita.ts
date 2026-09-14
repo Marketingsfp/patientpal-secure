@@ -240,7 +240,22 @@ export interface RateioLinha {
   formas: ParteMisto[];
   /** `formas` em texto, para a coluna do analítico (ver `rotuloFormasDaLinha`). */
   forma_pagamento: string;
+  /**
+   * Linha "[LAUDO]": repasse do médico que laudou um exame, criado pelo banco
+   * quando o laudo é emitido. NÃO é dinheiro novo — o pagamento do exame já
+   * está no relatório na linha do próprio exame. Por isso a receita dela é
+   * zero, o repasse é o valor do laudo, e ela não conta como atendimento nem
+   * como cortesia. Paciente, condição e forma vêm do pagamento do exame.
+   */
+  laudo?: boolean;
 }
+
+/** Procedimento das linhas de repasse de laudo geradas pelo banco. */
+export const ehProcedimentoDeLaudo = (procedimento: unknown): boolean =>
+  String(procedimento ?? "")
+    .trim()
+    .toUpperCase()
+    .startsWith("[LAUDO]");
 
 /** Uma linha do relatório sintético (um agrupador). */
 export interface RateioGrupo {
@@ -670,6 +685,13 @@ function reparte(
     override?: number | null;
     /** Repasse já gravado na linha (atendimentos manuais antigos). */
     repasseGravado?: number | null;
+    /** Linha de repasse de laudo (ver `RateioLinha.laudo`). */
+    laudo?: boolean;
+    /**
+     * Valor sobre o qual a composição do pagamento foi gravada, quando não é
+     * `valorPago` — no laudo, o valor pago pelo exame de origem.
+     */
+    valorDasFormas?: number;
   },
 ): RateioLinha {
   const medico = params.medicoId ? (ctx.medicosById.get(params.medicoId) ?? null) : null;
@@ -722,7 +744,7 @@ function reparte(
   const liquido = round2(receita - repasse - terceiro);
   const formas = repartirPorForma(
     receita,
-    params.valorPago,
+    params.valorDasFormas ?? params.valorPago,
     params.formaPagamento ?? null,
     params.observacoes ?? null,
     params.composicaoPagamento,
@@ -767,7 +789,70 @@ function reparte(
     margem: margemClinica(receita, liquido),
     formas,
     forma_pagamento: rotuloFormasDaLinha(formas),
+    ...(params.laudo ? { laudo: true } : {}),
   };
+}
+
+/** Pagamento do exame de onde saiu uma linha "[LAUDO]". */
+interface OrigemDoLaudo {
+  pacienteId: string | null;
+  formaPagamento: string | null;
+  observacoes: string | null;
+  composicaoPagamento: unknown;
+  modalidadeLancamento: string | null;
+  valor: number;
+}
+
+/**
+ * Acha, para cada linha "[LAUDO]", o pagamento do exame que a gerou.
+ *
+ * O gatilho do banco copia só o `paciente_id` do lançamento — que fica vazio
+ * nos pagamentos da agenda, onde o paciente mora no agendamento — e grava a
+ * forma como "laudo". Era isso que fazia a lista do médico laudador mostrar
+ * paciente "—" e forma "Outros". O vínculo confiável é o `laudo_lancamento_id`
+ * gravado no lançamento (ou atendimento manual) de origem.
+ */
+async function carregarOrigensDosLaudos(ids: string[]): Promise<Map<string, OrigemDoLaudo>> {
+  const origens = new Map<string, OrigemDoLaudo>();
+  for (let i = 0; i < ids.length; i += LOTE_PACIENTES) {
+    const lote = ids.slice(i, i + LOTE_PACIENTES);
+    const [lancs, manuais] = await Promise.all([
+      supabase
+        .from("fin_lancamentos")
+        .select(
+          "laudo_lancamento_id, paciente_id, forma_pagamento, observacoes, composicao_pagamento, convenio_modalidade, valor, agendamento:agendamentos(paciente_id)",
+        )
+        .in("laudo_lancamento_id", lote),
+      supabase
+        .from("fin_atendimentos")
+        .select("laudo_lancamento_id, paciente_id, forma_pagamento, observacoes, valor_total")
+        .in("laudo_lancamento_id", lote),
+    ]);
+    if (lancs.error) throw lancs.error;
+    if (manuais.error) throw manuais.error;
+    for (const r of (lancs.data ?? []) as Array<Record<string, any>>) {
+      origens.set(r.laudo_lancamento_id, {
+        pacienteId: r.paciente_id ?? r.agendamento?.paciente_id ?? null,
+        formaPagamento: r.forma_pagamento ?? null,
+        observacoes: r.observacoes ?? null,
+        composicaoPagamento: r.composicao_pagamento,
+        modalidadeLancamento: r.convenio_modalidade ?? null,
+        valor: num(r.valor),
+      });
+    }
+    for (const r of (manuais.data ?? []) as Array<Record<string, any>>) {
+      if (origens.has(r.laudo_lancamento_id)) continue;
+      origens.set(r.laudo_lancamento_id, {
+        pacienteId: r.paciente_id ?? null,
+        formaPagamento: r.forma_pagamento ?? null,
+        observacoes: r.observacoes ?? null,
+        composicaoPagamento: undefined,
+        modalidadeLancamento: null,
+        valor: num(r.valor_total),
+      });
+    }
+  }
+  return origens;
 }
 
 /**
@@ -901,10 +986,37 @@ export async function carregarRateio(
     for (const e of (data ?? []) as Array<{ id: string }>) espelhosDaAgenda.add(e.id);
   }
 
+  const origensDosLaudos = await carregarOrigensDosLaudos(
+    manuaisRaw.filter((r) => ehProcedimentoDeLaudo(r.procedimento)).map((r) => r.id as string),
+  );
+
   const linhas: RateioLinha[] = [];
   for (const r of manuaisRaw) {
     const lancId = (r.lancamento_id as string | null) ?? null;
     if (lancId && (lancIds.has(lancId) || espelhosDaAgenda.has(lancId))) continue;
+    if (ehProcedimentoDeLaudo(r.procedimento)) {
+      // Repasse do laudador: a receita é do exame (já contada na linha dele);
+      // aqui entra só o repasse, com paciente e pagamento herdados do exame.
+      const origem = origensDosLaudos.get(r.id as string);
+      linhas.push(
+        reparte(ctx, {
+          id: r.id as string,
+          data: String(r.data ?? "").slice(0, 10),
+          medicoId: (r.medico_id as string) ?? null,
+          pacienteId: (r.paciente_id as string) ?? origem?.pacienteId ?? null,
+          procedimento: (r.procedimento as string) ?? null,
+          valorPago: 0,
+          modalidadeLancamento: origem?.modalidadeLancamento ?? null,
+          formaPagamento: origem?.formaPagamento ?? null,
+          observacoes: origem?.observacoes ?? null,
+          composicaoPagamento: origem?.composicaoPagamento,
+          valorDasFormas: origem?.valor ?? 0,
+          override: num(r.valor_medico),
+          laudo: true,
+        }),
+      );
+      continue;
+    }
     linhas.push(
       reparte(ctx, {
         id: r.id as string,
@@ -1115,7 +1227,8 @@ export function agruparRateio(linhas: RateioLinha[], agruparPor: RateioAgruparPo
     const vistas = especialidades.get(chave) ?? new Set<string>();
     vistas.add(l.especialidade_nome);
     especialidades.set(chave, vistas);
-    atual.qtd += 1;
+    // O laudo é repasse sobre um exame já contado; não é outro atendimento.
+    if (!l.laudo) atual.qtd += 1;
     atual.receita = round2(atual.receita + l.receita);
     atual.repasse = round2(atual.repasse + l.repasse);
     // O líquido já vem descontado da parte do terceiro, quando existe.
@@ -1213,7 +1326,9 @@ export function totaisRateio(linhas: RateioLinha[]): RateioTotais {
   let receita = 0;
   let repasse = 0;
   let liquido = 0;
+  let qtd = 0;
   for (const l of linhas) {
+    if (!l.laudo) qtd++;
     receita += l.receita;
     repasse += l.repasse;
     liquido += l.liquido;
@@ -1221,5 +1336,5 @@ export function totaisRateio(linhas: RateioLinha[]): RateioTotais {
   receita = round2(receita);
   repasse = round2(repasse);
   liquido = round2(liquido);
-  return { qtd: linhas.length, receita, repasse, liquido, margem: margemClinica(receita, liquido) };
+  return { qtd, receita, repasse, liquido, margem: margemClinica(receita, liquido) };
 }
