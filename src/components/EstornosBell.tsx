@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
 import { Bell, Check, X, ExternalLink, Undo2 } from "lucide-react";
-import { Link } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { supabase } from "@/integrations/supabase/client";
@@ -85,6 +85,7 @@ function gravarLidas(userId: string | undefined, ids: Set<string>) {
 export function EstornosBell() {
   const { clinicaAtual } = useClinica();
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [items, setItems] = useState<Solic[]>([]);
   const [respostas, setRespostas] = useState<Resposta[]>([]);
   const [lidas, setLidas] = useState<Set<string>>(new Set());
@@ -177,9 +178,46 @@ export function EstornosBell() {
             (payload.new as { solicitado_por?: string } | null)?.solicitado_por !== user?.id
           ) {
             const n = payload.new as { paciente_nome?: string | null; valor?: number | null };
-            toast.warning("Nova solicitação de estorno", {
-              description: `${n.paciente_nome ?? "—"} • ${n.valor != null ? fmt(Number(n.valor)) : ""}`,
-            });
+            // Card próprio (em vez de toast.warning) para ter o X de fechar e
+            // levar direto à tela de Estorno ao clicar no corpo do aviso.
+            toast.custom((id) => (
+              <div
+                role="button"
+                tabIndex={0}
+                onClick={() => {
+                  toast.dismiss(id);
+                  void navigate({ to: "/app/financeiro/estorno" });
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    toast.dismiss(id);
+                    void navigate({ to: "/app/financeiro/estorno" });
+                  }
+                }}
+                className="relative flex w-89 max-w-full cursor-pointer items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 p-4 pr-9 text-amber-900 shadow-lg hover:bg-amber-100"
+              >
+                <Undo2 className="mt-0.5 h-4 w-4 shrink-0" />
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold">Nova solicitação de estorno</p>
+                  <p className="truncate text-sm">
+                    {`${n.paciente_nome ?? "—"} • ${n.valor != null ? fmt(Number(n.valor)) : ""}`}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  aria-label="Fechar aviso"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    toast.dismiss(id);
+                  }}
+                  onKeyDown={(e) => e.stopPropagation()}
+                  className="absolute right-2 top-2 rounded p-1 text-amber-800 hover:bg-amber-200"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            ));
           }
           // Toast para QUEM PEDIU quando o financeiro decide. A tabela está com
           // REPLICA IDENTITY FULL, então `payload.old` traz o status anterior e
@@ -216,7 +254,7 @@ export function EstornosBell() {
     return () => {
       void supabase.removeChannel(ch);
     };
-  }, [clinicaAtual, load, loadRespostas, podeAprovar, podeVerFila, user]);
+  }, [clinicaAtual, load, loadRespostas, navigate, podeAprovar, podeVerFila, user]);
 
   const naoLidas = respostas.filter((r) => !lidas.has(r.id));
   const count = items.length + naoLidas.length;
