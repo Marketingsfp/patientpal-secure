@@ -197,20 +197,11 @@ export function pontosDeAtencao(
     });
   }
 
-  const fracos = comMovimento
-    .filter((d) => mediaDiaria > 0 && d.receita < mediaDiaria * 0.6)
-    .sort((a, b) => a.receita - b.receita);
-  if (fracos.length > 0) {
-    pontos.push({
-      id: "dias-fracos",
-      titulo: `${fracos.length} dia(s) bem abaixo da média de ${fmtBRL(mediaDiaria)}`,
-      detalhe: fracos
-        .slice(0, 4)
-        .map((d) => `${fmtDia(d.data)} ${fmtBRL(d.receita)}`)
-        .join(" · "),
-      gravidade: fracos.length >= 3 ? "media" : "info",
-    });
-  }
+  // "Dia bem abaixo da média" saiu daqui: comparado com a média de todos os
+  // dias, todo sábado (meio expediente) aparecia como dia fraco — 05/09/2026
+  // fez R$ 23 mil contra ~R$ 46 mil de média, mas estava no normal dos
+  // sábados. A comparação com o mesmo dia da semana, com os motivos da queda,
+  // vive em `./projecao-melhorias`.
 
   if (realizado.receita > 0 && realizado.despesa / realizado.receita > 0.7) {
     pontos.push({

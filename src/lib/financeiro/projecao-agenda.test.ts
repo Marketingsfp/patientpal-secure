@@ -12,6 +12,7 @@ import {
   rankingEspecialidades,
   type LinhaAgendaDia,
 } from "./projecao-agenda";
+import { ociosidadeEOportunidade } from "./projecao-melhorias";
 
 const linha = (p: Partial<LinhaAgendaDia> & { dia: string }): LinhaAgendaDia => ({
   agenda_id: "a1",
@@ -224,17 +225,23 @@ describe("especialidades e agendas (cenário de produção: sistema parado no co
     expect(pedi.variacao).toBeNull();
   });
 
-  it("aponta queda, ociosidade, faltas e agenda lotada", () => {
+  it("aponta queda de procura e faltas altas", () => {
     const d = diagnosticoEspecialidades(rankingEspecialidades(linhas, periodo), "agosto");
     const ids = d.map((x) => x.id);
     expect(ids).toContain("queda-CARDIOLOGIA");
-    expect(ids).toContain("ociosa-CARDIOLOGIA");
     expect(ids).toContain("faltas-CARDIOLOGIA");
-    expect(ids).toContain("lotada-PEDIATRIA");
+    // Sem base em agosto, Pediatria não "cresce".
     expect(ids).not.toContain("alta-PEDIATRIA");
     expect(d.find((x) => x.id === "queda-CARDIOLOGIA")!.acao).toContain("agosto");
-    // Alertas vêm antes das boas notícias.
-    expect(d[d.length - 1].gravidade).toBe("positiva");
+  });
+
+  it("ociosidade e oportunidade de expansão pela ocupação da grade", () => {
+    const r = ociosidadeEOportunidade(linhas, periodo, diasValidos(linhas, periodo.hoje));
+    expect(r.ociosas.map((o) => o.especialidade)).toContain("CARDIOLOGIA");
+    const pedi = r.oportunidades.find((o) => o.especialidade === "PEDIATRIA")!;
+    expect(pedi.ocupacao).toBe(95);
+    // A agenda por ordem de chegada (500 vagas) não diluiu a ocupação.
+    expect(pedi.vagas).toBe(200);
   });
 
   it("agendas ordenadas por volume e faixas", () => {

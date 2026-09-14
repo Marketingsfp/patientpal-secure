@@ -18,7 +18,6 @@ import {
   CloudRain,
   CloudSun,
   Info,
-  Lightbulb,
   Sun,
   ThermometerSun,
   TrendingDown,
@@ -56,6 +55,13 @@ import {
   type ContextoComparacao,
   type LinhaAgendaDia,
 } from "@/lib/financeiro/projecao-agenda";
+import {
+  diagnosticarQuedas,
+  ociosidadeEOportunidade,
+  type LinhaReceitaDia,
+} from "@/lib/financeiro/projecao-melhorias";
+import type { PontoAtencao } from "@/lib/financeiro/projecao";
+import { CardMelhorias } from "@/components/financeiro/projecao-melhorias-card";
 
 const PAGINA = 1000;
 /** Janela do histórico: cobre o mês anterior inteiro e dá amostra ao clima. */
@@ -84,11 +90,34 @@ interface Props {
   inicioMes: string;
   fimMes: string;
   hoje: string;
+  /** Pontos de atenção do caixa (`projetarMes`): dias parados, despesa alta… */
+  pontosCaixa: PontoAtencao[];
 }
 
-export function ProjecaoInteligencia({ clinicaId, inicioMes, fimMes, hoje }: Props) {
+/** Receita: 9 semanas bastam para ter ao menos dois dias iguais da semana de referência. */
+const DIAS_HISTORICO_RECEITA = 63;
+
+/** Lê uma função do banco em páginas de 1.000 linhas (limite do Supabase). */
+async function lerPaginado<T>(funcao: string, args: Record<string, unknown>): Promise<T[]> {
+  const out: T[] = [];
+  for (let p = 0; p < 30; p++) {
+    // Funções novas, ainda fora dos tipos gerados do Supabase.
+    const { data, error } = await (supabase as any)
+      .rpc(funcao, args)
+      .range(p * PAGINA, (p + 1) * PAGINA - 1);
+    if (error) throw error;
+    const lote = (data ?? []) as T[];
+    out.push(...lote);
+    if (lote.length < PAGINA) break;
+  }
+  return out;
+}
+
+export function ProjecaoInteligencia({ clinicaId, inicioMes, fimMes, hoje, pontosCaixa }: Props) {
   const [linhas, setLinhas] = useState<LinhaAgendaDia[] | null>(null);
   const [erroAgenda, setErroAgenda] = useState(false);
+  const [receitas, setReceitas] = useState<LinhaReceitaDia[] | null>(null);
+  const [erroReceita, setErroReceita] = useState(false);
   const [clima, setClima] = useState<Map<string, ClimaMinimo> | null>(null);
   const [previsao, setPrevisao] = useState<PrevisaoDia[] | null>(null);
   const [climaCarregado, setClimaCarregado] = useState(false);
@@ -101,23 +130,19 @@ export function ProjecaoInteligencia({ clinicaId, inicioMes, fimMes, hoje }: Pro
     setErroAgenda(false);
     (async () => {
       try {
-        const out: LinhaAgendaDia[] = [];
-        for (let p = 0; p < 30; p++) {
-          // Função nova, ainda fora dos tipos gerados do Supabase.
-          const { data, error } = await (supabase as any)
-            .rpc("fin_agenda_resumo_dia", { p_clinica: clinicaId, p_ini: historicoDe, p_fim: hoje })
-            .range(p * PAGINA, (p + 1) * PAGINA - 1);
-          if (error) throw error;
-          const lote = ((data ?? []) as any[]).map((r) => ({
-            ...r,
-            dia: String(r.dia).slice(0, 10),
-            vagas: Number(r.vagas) || 0,
-            marcados: Number(r.marcados) || 0,
-            compareceu: Number(r.compareceu) || 0,
-          })) as LinhaAgendaDia[];
-          out.push(...lote);
-          if (lote.length < PAGINA) break;
-        }
+        const brutas = await lerPaginado<any>("fin_agenda_resumo_dia", {
+          p_clinica: clinicaId,
+          p_ini: historicoDe,
+          p_fim: hoje,
+        });
+        const out = brutas.map((r) => ({
+          ...r,
+          dia: String(r.dia).slice(0, 10),
+          vagas: Number(r.vagas) || 0,
+          marcados: Number(r.marcados) || 0,
+          compareceu: Number(r.compareceu) || 0,
+          cancelados: r.cancelados == null ? undefined : Number(r.cancelados) || 0,
+        })) as LinhaAgendaDia[];
         if (!cancelado) setLinhas(out);
       } catch (e) {
         console.error("projeção: falha ao ler resumo da agenda", e);
@@ -128,6 +153,35 @@ export function ProjecaoInteligencia({ clinicaId, inicioMes, fimMes, hoje }: Pro
       cancelado = true;
     };
   }, [clinicaId, historicoDe, hoje]);
+
+  useEffect(() => {
+    let cancelado = false;
+    setReceitas(null);
+    setErroReceita(false);
+    (async () => {
+      try {
+        const brutas = await lerPaginado<any>("fin_receita_resumo_dia", {
+          p_clinica: clinicaId,
+          p_ini: addDias(hoje, -DIAS_HISTORICO_RECEITA),
+          p_fim: addDias(hoje, -1),
+        });
+        const out = brutas.map((r) => ({
+          ...r,
+          dia: String(r.dia).slice(0, 10),
+          cartao: !!r.cartao,
+          pagamentos: Number(r.pagamentos) || 0,
+          receita: Number(r.receita) || 0,
+        })) as LinhaReceitaDia[];
+        if (!cancelado) setReceitas(out);
+      } catch (e) {
+        console.error("projeção: falha ao ler receita por dia", e);
+        if (!cancelado) setErroReceita(true);
+      }
+    })();
+    return () => {
+      cancelado = true;
+    };
+  }, [clinicaId, hoje]);
 
   useEffect(() => {
     let cancelado = false;
@@ -201,8 +255,27 @@ export function ProjecaoInteligencia({ clinicaId, inicioMes, fimMes, hoje }: Pro
   );
   const dias = useMemo(() => diasDoMes(periodo), [periodo]);
 
+  const quedas = useMemo(
+    () =>
+      receitas && linhas ? diagnosticarQuedas(receitas, linhas, clima, { inicioMes, hoje }) : null,
+    [receitas, linhas, clima, inicioMes, hoje],
+  );
+  const ocupacao = useMemo(
+    () =>
+      linhas && validos ? ociosidadeEOportunidade(linhas, { inicioMes, hoje }, validos) : null,
+    [linhas, validos, inicioMes, hoje],
+  );
+
   return (
     <TooltipProvider delayDuration={150}>
+      <CardMelhorias
+        carregando={(linhas === null && !erroAgenda) || (receitas === null && !erroReceita)}
+        erro={erroAgenda || erroReceita}
+        quedas={quedas}
+        ocupacao={ocupacao}
+        especialidades={diagnostico}
+        pontosCaixa={pontosCaixa}
+      />
       <BlocoClima
         carregado={climaCarregado && (linhas !== null || erroAgenda)}
         previsao={previsao}
@@ -216,7 +289,6 @@ export function ProjecaoInteligencia({ clinicaId, inicioMes, fimMes, hoje }: Pro
         linhasCarregadas={linhas !== null}
         erro={erroAgenda}
         ranking={ranking}
-        diagnostico={diagnostico}
         nomeMesAnterior={periodo.nomeMesAnterior}
         dias={dias}
         contexto={contexto}
@@ -475,7 +547,6 @@ function BlocoEspecialidades({
   linhasCarregadas,
   erro,
   ranking,
-  diagnostico,
   nomeMesAnterior,
   dias,
   contexto,
@@ -483,7 +554,6 @@ function BlocoEspecialidades({
   linhasCarregadas: boolean;
   erro: boolean;
   ranking: ReturnType<typeof rankingEspecialidades>;
-  diagnostico: ReturnType<typeof diagnosticoEspecialidades>;
   nomeMesAnterior: string;
   dias: ReturnType<typeof diasDoMes>;
   contexto: ContextoComparacao | null;
@@ -625,54 +695,6 @@ function BlocoEspecialidades({
                 </button>
               )}
             </>
-          )}
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardContent className="pt-6">
-          <h2 className="text-lg font-semibold flex items-center gap-2">
-            <Lightbulb className="h-5 w-5 text-amber-500" />
-            Diagnóstico: onde focar
-          </h2>
-          {erro ? null : !linhasCarregadas ? (
-            <div className="mt-3">
-              <Carregando />
-            </div>
-          ) : diagnostico.length === 0 ? (
-            <p className="text-sm text-muted-foreground mt-3">
-              Nenhuma especialidade com queda, ociosidade ou faltas fora do normal neste mês.
-            </p>
-          ) : (
-            <ul className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3">
-              {diagnostico.map((d) => (
-                <li
-                  key={d.id}
-                  className={
-                    "rounded-lg border p-3 " +
-                    (d.gravidade === "alta"
-                      ? "border-red-200"
-                      : d.gravidade === "positiva"
-                        ? "border-green-200"
-                        : "border-amber-200")
-                  }
-                >
-                  <p
-                    className={
-                      "font-medium " +
-                      (d.gravidade === "alta"
-                        ? "text-red-600"
-                        : d.gravidade === "positiva"
-                          ? "text-green-700"
-                          : "text-amber-700")
-                    }
-                  >
-                    {d.titulo}
-                  </p>
-                  <p className="text-sm text-muted-foreground mt-0.5">{d.acao}</p>
-                </li>
-              ))}
-            </ul>
           )}
         </CardContent>
       </Card>

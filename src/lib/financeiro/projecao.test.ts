@@ -79,7 +79,7 @@ describe("projetarMes", () => {
     expect(r.meta?.alcancavel).toBe(false);
   });
 
-  it("aponta dias parados, dias fracos e despesa alta", () => {
+  it("aponta dias parados e despesa alta", () => {
     const r = projetarMes({
       inicio: "2026-09-01",
       fim: "2026-09-30",
@@ -95,7 +95,8 @@ describe("projetarMes", () => {
     });
     const ids = r.pontos.map((p) => p.id);
     expect(ids).toContain("dias-parados");
-    expect(ids).toContain("dias-fracos");
+    // Dia fraco agora é medido contra o mesmo dia da semana (projecao-melhorias).
+    expect(ids).not.toContain("dias-fracos");
     expect(ids).toContain("despesa-alta");
   });
 

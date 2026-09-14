@@ -34,6 +34,8 @@ export interface LinhaAgendaDia {
   marcados: number;
   /** Pacientes marcados que vieram. */
   compareceu: number;
+  /** Marcações com paciente canceladas. Ausente antes da migração 20260914210000. */
+  cancelados?: number;
 }
 
 /** O mínimo de clima que a análise usa — compatível com `ClimaDia`. */
@@ -525,24 +527,8 @@ export function diagnosticoEspecialidades(
         gravidade: e.variacao <= -30 ? "alta" : "media",
       });
     }
-    if (e.ocupacao != null && e.ocupacao < 30 && e.vagasLivres >= 100) {
-      out.push({
-        id: `ociosa-${e.especialidade}`,
-        especialidade: e.especialidade,
-        titulo: `${e.especialidade}: só ${dia(e.ocupacao)}% da agenda ocupada`,
-        acao: `${dia(e.vagasLivres)} vagas sobraram no mês até agora. Ou divulgar a especialidade, ou reduzir a grade oferecida.`,
-        gravidade: e.ocupacao < 15 ? "alta" : "media",
-      });
-    }
-    if (e.ocupacao != null && e.ocupacao >= 85 && e.atendidos >= 20) {
-      out.push({
-        id: `lotada-${e.especialidade}`,
-        especialidade: e.especialidade,
-        titulo: `${e.especialidade}: agenda quase lotada (${dia(e.ocupacao)}%)`,
-        acao: "Há demanda maior que a oferta — avaliar abrir mais horários ou outro profissional.",
-        gravidade: "positiva",
-      });
-    }
+    // Ociosidade e agenda lotada ficam em `./projecao-melhorias`, que mede
+    // também os dias em que a grade encheu por completo.
     if (e.faltas >= 15 && e.taxaFalta >= 20) {
       out.push({
         id: `faltas-${e.especialidade}`,

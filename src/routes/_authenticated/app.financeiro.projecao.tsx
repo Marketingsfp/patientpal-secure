@@ -1,14 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import {
-  Target,
-  TrendingUp,
-  TrendingDown,
-  Wallet,
-  Stethoscope,
-  AlertTriangle,
-  Info,
-} from "lucide-react";
+import { Target, TrendingUp, TrendingDown, Wallet, Stethoscope, Info } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { ProjecaoInteligencia } from "@/components/financeiro/projecao-inteligencia";
 import { supabase } from "@/integrations/supabase/client";
@@ -456,46 +448,13 @@ function Page() {
           </CardContent>
         </Card>
 
-        <Card>
-          <CardContent className="pt-6">
-            <h2 className="text-lg font-semibold flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5 text-amber-500" />O que dá para melhorar
-            </h2>
-            {loading ? (
-              <p className="text-sm text-muted-foreground mt-3">Carregando...</p>
-            ) : r.pontos.length === 0 ? (
-              <p className="text-sm text-muted-foreground mt-3">
-                Nenhum ponto de atenção no ritmo deste mês.
-              </p>
-            ) : (
-              <ul className="mt-3 space-y-3">
-                {r.pontos.map((p) => (
-                  <li key={p.id} className="rounded-lg border p-3">
-                    <p
-                      className={
-                        p.gravidade === "alta"
-                          ? "font-medium text-red-600"
-                          : p.gravidade === "media"
-                            ? "font-medium text-amber-600"
-                            : "font-medium"
-                      }
-                    >
-                      {p.titulo}
-                    </p>
-                    <p className="text-sm text-muted-foreground mt-0.5">{p.detalhe}</p>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </CardContent>
-        </Card>
-
         {clinicaAtual && (
           <ProjecaoInteligencia
             clinicaId={clinicaAtual.clinica_id}
             inicioMes={inicio}
             fimMes={fim}
             hoje={hojeIso}
+            pontosCaixa={loading ? [] : r.pontos}
           />
         )}
       </div>
