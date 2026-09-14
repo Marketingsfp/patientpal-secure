@@ -1228,6 +1228,7 @@ function Page() {
     new Date().toISOString().slice(0, 10),
   );
   const [saving, setSaving] = useState(false);
+  const lancandoMovRef = useRef(false);
   // Conferência por forma de pagamento no fechamento do próprio caixa.
   const [conferidoOwn, setConferidoOwn] = useState<Record<string, string>>({});
 
@@ -3151,6 +3152,20 @@ function Page() {
     void load();
   };
 
+  // Fecha o modal de movimento e zera o formulário — tanto após lançar quanto
+  // ao cancelar, para que a próxima abertura nunca traga o valor anterior
+  // preenchido (reabrir e clicar "Lançar" de novo duplicaria a sangria).
+  const fecharModalMov = () => {
+    setOpenMov(null);
+    setMovDescTouched(false);
+    setMovValor("");
+    setMovDesc("");
+    setMovForma("dinheiro");
+    setMovBandeira("");
+    setMovParcelas("1");
+    setMovDestinoUserId("");
+  };
+
   const lancarMov = async (e: FormEvent) => {
     e.preventDefault();
     if (!clinicaAtual || !user || !minhaSessao || !openMov) return;
@@ -3215,6 +3230,11 @@ function Page() {
         ? ` — ${openMov.tipo === "sangria" ? "Entregue a" : "Recebido de"}: ${destinoNome}`
         : "";
     const sufixoCartao = ehPagto ? montarSufixoCartao(movForma, movBandeira, movParcelas) : "";
+    // `saving` só desabilita o botão no próximo render; dois cliques rápidos
+    // (ou Enter + clique) chegariam aqui antes disso e gravariam a sangria
+    // duas vezes. O ref barra o segundo envio na hora.
+    if (lancandoMovRef.current) return;
+    lancandoMovRef.current = true;
     setSaving(true);
     const { data: movRow, error } = await supabase
       .from("caixa_movimentos")
@@ -3232,6 +3252,7 @@ function Page() {
       .select("id")
       .single();
     if (error || !movRow) {
+      lancandoMovRef.current = false;
       setSaving(false);
       mostrarErro(error);
       return;
@@ -3265,17 +3286,11 @@ function Page() {
           .eq("id", movRow.id);
       }
     }
+    lancandoMovRef.current = false;
     setSaving(false);
-    setOpenMov(null);
-    setMovDescTouched(false);
     const tipoLancado = openMov.tipo;
     const descLancada = (movDesc || "") + sufixoCartao + sufixoDestino;
-    setMovValor("");
-    setMovDesc("");
-    setMovForma("dinheiro");
-    setMovBandeira("");
-    setMovParcelas("1");
-    setMovDestinoUserId("");
+    fecharModalMov();
     toast.success(`${TIPO_LABEL[tipoLancado]} registrada`);
     if (tipoLancado === "sangria" || tipoLancado === "suprimento" || tipoLancado === "estorno") {
       printComprovanteCaixa({
@@ -5148,10 +5163,7 @@ function Page() {
       <Dialog
         open={!!openMov}
         onOpenChange={(o) => {
-          if (!o) {
-            setOpenMov(null);
-            setMovDescTouched(false);
-          }
+          if (!o && !saving) fecharModalMov();
         }}
       >
         <DialogContent>
@@ -5307,14 +5319,7 @@ function Page() {
                 </div>
               )}
             <DialogFooter>
-              <Button
-                type="button"
-                variant="ghost"
-                onClick={() => {
-                  setOpenMov(null);
-                  setMovDescTouched(false);
-                }}
-              >
+              <Button type="button" variant="ghost" disabled={saving} onClick={fecharModalMov}>
                 Cancelar
               </Button>
               <Button
@@ -5327,7 +5332,7 @@ function Page() {
                 }
                 data-primary
               >
-                Lançar
+                {saving ? "Lançando..." : "Lançar"}
               </Button>
             </DialogFooter>
           </form>

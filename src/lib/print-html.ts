@@ -5,7 +5,15 @@
  * gravam antes de imprimir: depois do `await`, o navegador já perdeu o gesto
  * do usuário e o pop-up seria bloqueado. O iframe é removido assim que o
  * diálogo de impressão fecha (ou após 60s, se o evento não chegar).
+ *
+ * A impressão espera `ESPERA_FECHAR_MODAL_MS` antes de disparar. Quase toda
+ * chamada vem logo depois de fechar um modal, que leva 200ms animando a saída.
+ * `print()` congela a página; se isso acontece no meio da animação, o evento
+ * de fim de animação se perde e o modal fica na tela, vazio e sem responder,
+ * até dar F5 — foi o que aconteceu na sangria do caixa em 14/09/2026.
  */
+const ESPERA_FECHAR_MODAL_MS = 400;
+
 export function printHtmlViaIframe(html: string) {
   const iframe = document.createElement("iframe");
   iframe.setAttribute("aria-hidden", "true");
@@ -54,8 +62,10 @@ export function printHtmlViaIframe(html: string) {
   };
 
   if (doc.readyState === "complete") {
-    setTimeout(triggerPrint, 100);
+    setTimeout(triggerPrint, ESPERA_FECHAR_MODAL_MS);
   } else {
-    iframe.addEventListener("load", () => setTimeout(triggerPrint, 100), { once: true });
+    iframe.addEventListener("load", () => setTimeout(triggerPrint, ESPERA_FECHAR_MODAL_MS), {
+      once: true,
+    });
   }
 }
