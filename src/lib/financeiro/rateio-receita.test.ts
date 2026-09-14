@@ -6,12 +6,23 @@ import {
   filtrarRateio,
   liberacaoDaLinha,
   margemClinica,
+  pacienteDaDescricao,
   rotuloFormasDaLinha,
   totaisRateio,
   type RateioContexto,
   type RateioGrupo,
   type RateioLinha,
 } from "./rateio-receita";
+
+describe("pacienteDaDescricao", () => {
+  it("pega o nome antes do travessão", () => {
+    expect(pacienteDaDescricao("MARIA SILVA — MENSALIDADE CARTÃO")).toBe("MARIA SILVA");
+  });
+  it("devolve vazio quando não há travessão", () => {
+    expect(pacienteDaDescricao("RECEBIMENTO DIVERSO")).toBe("");
+    expect(pacienteDaDescricao(null)).toBe("");
+  });
+});
 
 const linha = (over: Partial<RateioLinha>): RateioLinha => ({
   id: over.id ?? "x",
@@ -22,6 +33,8 @@ const linha = (over: Partial<RateioLinha>): RateioLinha => ({
   primeira_vez: null,
   medico_id: "med-1",
   medico_nome: "DRA. ANA",
+  paciente_id: null,
+  paciente_nome: "",
   especialidade_id: "esp-1",
   especialidade_nome: "CARDIOLOGIA",
   procedimento: "CONSULTA",

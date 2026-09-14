@@ -167,6 +167,13 @@ export interface RateioLinha {
   primeira_vez: boolean | null;
   medico_id: string | null;
   medico_nome: string;
+  paciente_id: string | null;
+  /**
+   * Nome do paciente, para o analítico identificar de quem é cada atendimento
+   * na tela, no papel, no CSV e no Excel. Resolvido em lote no fim de
+   * `carregarRateio` (ver `resolverNomesPacientes`).
+   */
+  paciente_nome: string;
 
   especialidade_id: string | null;
   especialidade_nome: string;
@@ -734,6 +741,8 @@ function reparte(
 
     medico_id: params.medicoId,
     medico_nome: medico?.nome ?? "Sem profissional",
+    paciente_id: params.pacienteId,
+    paciente_nome: "",
     especialidade_id: medico?.especialidade_id ?? null,
     especialidade_nome: "",
     procedimento: params.procedimento,
@@ -986,10 +995,58 @@ export async function carregarRateio(
       ? (nomeEspecialidade.get(l.especialidade_id) ?? "Sem especialidade")
       : "Sem especialidade";
   }
+  await resolverNomesPacientes(linhas, [...manuaisRaw, ...agendaRaw, ...avulsosRaw]);
 
   return filtrarRateio(ctx, linhas, filtros).sort(
     (a, b) => a.data.localeCompare(b.data) || a.medico_nome.localeCompare(b.medico_nome, "pt-BR"),
   );
+}
+
+/**
+ * UUIDs por requisição na busca de nomes. Menor que `PAGINA` porque o filtro
+ * `in` vai na URL, e mil UUIDs passariam do limite de tamanho dela.
+ */
+const LOTE_PACIENTES = 150;
+
+/**
+ * Nome antes do travessão da descrição ("FULANO — MENSALIDADE CARTÃO"): é o
+ * paciente quando o recebimento foi lançado sem `paciente_id`.
+ */
+export function pacienteDaDescricao(descricao: string | null | undefined): string {
+  const partes = String(descricao ?? "").split("—");
+  return partes.length < 2 ? "" : partes[0].trim();
+}
+
+/**
+ * Preenche `paciente_nome` de todas as linhas com uma busca em lote no
+ * cadastro. Sem cadastro vinculado, vale o nome escrito na descrição do
+ * lançamento; sem nenhum dos dois, "Sem paciente".
+ */
+async function resolverNomesPacientes(
+  linhas: RateioLinha[],
+  brutas: Array<Record<string, unknown>>,
+): Promise<void> {
+  const descricaoPorId = new Map(brutas.map((r) => [r.id as string, r.descricao as string]));
+  const ids = Array.from(
+    new Set(linhas.map((l) => l.paciente_id).filter((x): x is string => !!x)),
+  );
+  const nomes = new Map<string, string>();
+  for (let i = 0; i < ids.length; i += LOTE_PACIENTES) {
+    const { data, error } = await supabase
+      .from("pacientes")
+      .select("id, nome")
+      .in("id", ids.slice(i, i + LOTE_PACIENTES));
+    if (error) throw error;
+    for (const p of (data ?? []) as Array<{ id: string; nome: string | null }>) {
+      if (p.nome) nomes.set(p.id, p.nome);
+    }
+  }
+  for (const l of linhas) {
+    l.paciente_nome =
+      (l.paciente_id ? nomes.get(l.paciente_id) : undefined) ||
+      pacienteDaDescricao(descricaoPorId.get(l.id)) ||
+      "Sem paciente";
+  }
 }
 
 /** Aplica os filtros que não dá para mandar ao banco (serviço é texto livre). */

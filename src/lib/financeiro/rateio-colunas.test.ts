@@ -11,6 +11,8 @@ const linha: RateioLinha = {
   primeira_vez: null,
   medico_id: "med-1",
   medico_nome: "DRA. ANA",
+  paciente_id: "pac-1",
+  paciente_nome: "MARIA SILVA",
   especialidade_id: "esp-1",
   especialidade_nome: "CARDIOLOGIA",
   procedimento: "CONSULTA (CARDIOLOGIA)",
@@ -218,6 +220,14 @@ describe("colunas do analitico", () => {
     const rotulos = colunasRateio("analitico", "data", false).map((c) => c.rotulo);
     expect(rotulos).toContain("Tipo de serviço");
     expect(rotulos.indexOf("Tipo de serviço")).toBe(rotulos.indexOf("Serviço") + 1);
+  });
+
+  it("identifica o paciente logo depois da data", () => {
+    const rotulos = colunasRateio("analitico", "data", false).map((c) => c.rotulo);
+    expect(rotulos.indexOf("Paciente")).toBe(rotulos.indexOf("Data") + 1);
+    expect(colunasRateio("sintetico", "data", false).map((c) => c.rotulo)).not.toContain(
+      "Paciente",
+    );
   });
 
   it("traz a modalidade e, logo depois, a forma de pagamento", () => {

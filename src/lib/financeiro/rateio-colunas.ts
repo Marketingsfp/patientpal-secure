@@ -98,6 +98,8 @@ export function colunasRateio(
   }
   return [
     { chave: "data", rotulo: "Data", formato: "data" },
+    // Identifica de quem é cada atendimento na conferência do financeiro.
+    { chave: "paciente_nome", rotulo: "Paciente", formato: "texto" },
     { chave: "medico_nome", rotulo: "Profissional", formato: "texto" },
     { chave: "especialidade_nome", rotulo: "Especialidade", formato: "texto" },
     // `servico_nome`, e não o texto cru da agenda: o cru sai como
