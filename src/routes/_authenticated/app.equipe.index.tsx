@@ -13,6 +13,7 @@ import {
   Filter,
   Check,
   Search,
+  Upload,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useClinica } from "@/hooks/use-clinica";
@@ -327,6 +328,11 @@ function EquipePage() {
             <Button variant="outline" onClick={handleExport}>
               <Download className="h-4 w-4 mr-2" /> Exportar Excel
             </Button>
+            {podeEscrever && (
+              <Button variant="outline" onClick={() => navigate({ to: "/app/equipe/importar" })}>
+                <Upload className="h-4 w-4 mr-2" /> Importar planilha
+              </Button>
+            )}
             {podeEscrever && (
               <Button onClick={novoMedico}>
                 <Plus className="h-4 w-4 mr-2" /> Novo médico

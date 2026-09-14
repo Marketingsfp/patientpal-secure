@@ -159,6 +159,7 @@ import { Route as AuthenticatedAppFinanceiroAtendimentosExternosRouteImport } fr
 import { Route as AuthenticatedAppFinanceiroAtendimentosRouteImport } from './routes/_authenticated/app.financeiro.atendimentos'
 import { Route as AuthenticatedAppFinanceiroAnaliticoRouteImport } from './routes/_authenticated/app.financeiro.analitico'
 import { Route as AuthenticatedAppFinanceiroAlertasRouteImport } from './routes/_authenticated/app.financeiro.alertas'
+import { Route as AuthenticatedAppEquipeImportarRouteImport } from './routes/_authenticated/app.equipe.importar'
 import { Route as AuthenticatedAppConfiguracoesVozRouteImport } from './routes/_authenticated/app.configuracoes.voz'
 import { Route as AuthenticatedAppConfiguracoesRespostasRapidasRouteImport } from './routes/_authenticated/app.configuracoes.respostas-rapidas'
 import { Route as AuthenticatedAppConfiguracoesProntuarioRouteImport } from './routes/_authenticated/app.configuracoes.prontuario'
@@ -1022,6 +1023,12 @@ const AuthenticatedAppFinanceiroAlertasRoute =
     path: '/alertas',
     getParentRoute: () => AuthenticatedAppFinanceiroRoute,
   } as any)
+const AuthenticatedAppEquipeImportarRoute =
+  AuthenticatedAppEquipeImportarRouteImport.update({
+    id: '/importar',
+    path: '/importar',
+    getParentRoute: () => AuthenticatedAppEquipeRoute,
+  } as any)
 const AuthenticatedAppConfiguracoesVozRoute =
   AuthenticatedAppConfiguracoesVozRouteImport.update({
     id: '/configuracoes/voz',
@@ -1269,6 +1276,7 @@ export interface FileRoutesByFullPath {
   '/app/configuracoes/prontuario': typeof AuthenticatedAppConfiguracoesProntuarioRoute
   '/app/configuracoes/respostas-rapidas': typeof AuthenticatedAppConfiguracoesRespostasRapidasRoute
   '/app/configuracoes/voz': typeof AuthenticatedAppConfiguracoesVozRoute
+  '/app/equipe/importar': typeof AuthenticatedAppEquipeImportarRoute
   '/app/financeiro/alertas': typeof AuthenticatedAppFinanceiroAlertasRoute
   '/app/financeiro/analitico': typeof AuthenticatedAppFinanceiroAnaliticoRoute
   '/app/financeiro/atendimentos': typeof AuthenticatedAppFinanceiroAtendimentosRoute
@@ -1436,6 +1444,7 @@ export interface FileRoutesByTo {
   '/app/configuracoes/prontuario': typeof AuthenticatedAppConfiguracoesProntuarioRoute
   '/app/configuracoes/respostas-rapidas': typeof AuthenticatedAppConfiguracoesRespostasRapidasRoute
   '/app/configuracoes/voz': typeof AuthenticatedAppConfiguracoesVozRoute
+  '/app/equipe/importar': typeof AuthenticatedAppEquipeImportarRoute
   '/app/financeiro/alertas': typeof AuthenticatedAppFinanceiroAlertasRoute
   '/app/financeiro/analitico': typeof AuthenticatedAppFinanceiroAnaliticoRoute
   '/app/financeiro/atendimentos': typeof AuthenticatedAppFinanceiroAtendimentosRoute
@@ -1609,6 +1618,7 @@ export interface FileRoutesById {
   '/_authenticated/app/configuracoes/prontuario': typeof AuthenticatedAppConfiguracoesProntuarioRoute
   '/_authenticated/app/configuracoes/respostas-rapidas': typeof AuthenticatedAppConfiguracoesRespostasRapidasRoute
   '/_authenticated/app/configuracoes/voz': typeof AuthenticatedAppConfiguracoesVozRoute
+  '/_authenticated/app/equipe/importar': typeof AuthenticatedAppEquipeImportarRoute
   '/_authenticated/app/financeiro/alertas': typeof AuthenticatedAppFinanceiroAlertasRoute
   '/_authenticated/app/financeiro/analitico': typeof AuthenticatedAppFinanceiroAnaliticoRoute
   '/_authenticated/app/financeiro/atendimentos': typeof AuthenticatedAppFinanceiroAtendimentosRoute
@@ -1782,6 +1792,7 @@ export interface FileRouteTypes {
     | '/app/configuracoes/prontuario'
     | '/app/configuracoes/respostas-rapidas'
     | '/app/configuracoes/voz'
+    | '/app/equipe/importar'
     | '/app/financeiro/alertas'
     | '/app/financeiro/analitico'
     | '/app/financeiro/atendimentos'
@@ -1949,6 +1960,7 @@ export interface FileRouteTypes {
     | '/app/configuracoes/prontuario'
     | '/app/configuracoes/respostas-rapidas'
     | '/app/configuracoes/voz'
+    | '/app/equipe/importar'
     | '/app/financeiro/alertas'
     | '/app/financeiro/analitico'
     | '/app/financeiro/atendimentos'
@@ -2121,6 +2133,7 @@ export interface FileRouteTypes {
     | '/_authenticated/app/configuracoes/prontuario'
     | '/_authenticated/app/configuracoes/respostas-rapidas'
     | '/_authenticated/app/configuracoes/voz'
+    | '/_authenticated/app/equipe/importar'
     | '/_authenticated/app/financeiro/alertas'
     | '/_authenticated/app/financeiro/analitico'
     | '/_authenticated/app/financeiro/atendimentos'
@@ -3265,6 +3278,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAppFinanceiroAlertasRouteImport
       parentRoute: typeof AuthenticatedAppFinanceiroRoute
     }
+    '/_authenticated/app/equipe/importar': {
+      id: '/_authenticated/app/equipe/importar'
+      path: '/importar'
+      fullPath: '/app/equipe/importar'
+      preLoaderRoute: typeof AuthenticatedAppEquipeImportarRouteImport
+      parentRoute: typeof AuthenticatedAppEquipeRoute
+    }
     '/_authenticated/app/configuracoes/voz': {
       id: '/_authenticated/app/configuracoes/voz'
       path: '/configuracoes/voz'
@@ -3463,12 +3483,14 @@ const AuthenticatedAppCartaoBeneficiosRouteWithChildren =
   )
 
 interface AuthenticatedAppEquipeRouteChildren {
+  AuthenticatedAppEquipeImportarRoute: typeof AuthenticatedAppEquipeImportarRoute
   AuthenticatedAppEquipeIndexRoute: typeof AuthenticatedAppEquipeIndexRoute
   AuthenticatedAppEquipeMedicoMedicoIdEditarRoute: typeof AuthenticatedAppEquipeMedicoMedicoIdEditarRoute
 }
 
 const AuthenticatedAppEquipeRouteChildren: AuthenticatedAppEquipeRouteChildren =
   {
+    AuthenticatedAppEquipeImportarRoute: AuthenticatedAppEquipeImportarRoute,
     AuthenticatedAppEquipeIndexRoute: AuthenticatedAppEquipeIndexRoute,
     AuthenticatedAppEquipeMedicoMedicoIdEditarRoute:
       AuthenticatedAppEquipeMedicoMedicoIdEditarRoute,
@@ -3859,13 +3881,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}
