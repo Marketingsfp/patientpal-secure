@@ -3012,11 +3012,20 @@ export const configurarCapacidadeAtendente = createServerFn({ method: "POST" })
   }).parse(i))
   .handler(async ({ data, context }) => {
     await assertManager(context.supabase, context.userId, data.clinicaId);
-    const { data: resposta, error } = await context.supabase.rpc("atend_configurar_capacidade", {
+    // O SQL aceita NULL em _max_simultaneas (remove o limite); os tipos gerados
+    // declaram apenas integer, então o argumento é montado e convertido aqui.
+    const argumentosCapacidade = {
       _clinica_id: data.clinicaId,
       _user_id: data.userId,
       _max_simultaneas: data.capacidade,
-    });
+    } satisfies Omit<
+      Database["public"]["Functions"]["atend_configurar_capacidade"]["Args"],
+      "_max_simultaneas"
+    > & { _max_simultaneas: number | null };
+    const { data: resposta, error } = await context.supabase.rpc(
+      "atend_configurar_capacidade",
+      argumentosCapacidade as Database["public"]["Functions"]["atend_configurar_capacidade"]["Args"],
+    );
     if (error) throw new Error(error.message);
     const resultado = z.object({ ok: z.literal(true), distribuicao: z.unknown() }).parse(resposta);
     return lerResultadoDistribuicao(resultado.distribuicao);
