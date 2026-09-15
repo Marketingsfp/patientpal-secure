@@ -7,8 +7,12 @@
  * "Exportar Excel" gera (UTF-8 com BOM e ponto-e-vírgula).
  */
 import { describe, expect, it } from "bun:test";
+import * as XLSX from "xlsx";
 
 import {
+  deduzirCategoria,
+  repasseDaLinha,
+  unidadeConfere,
   lerPlanilhaServicos,
   normalizarAtivo,
   normalizarCategoria,
@@ -87,7 +91,8 @@ describe("leitura do CSV com ponto-e-vírgula e BOM", () => {
     expect(l.duracaoMinutos).toBe(20);
     expect(l.preparo).toBe("Trazer exames anteriores");
     expect(l.ativo).toBe(true);
-    expect(l.repasse).toBe(70);
+    expect(l.repasse).toEqual({ tipo: "valor", valor: 70 });
+    expect(l.categoriaDeduzida).toBe(false);
     expect(r.especialidadesNovas).toEqual(["CARDIOLOGIA"]);
   });
 
@@ -125,5 +130,151 @@ describe("problemas apontados linha a linha", () => {
 
     expect(r.recusadas[2].linhaExcel).toBe(5);
     expect(r.recusadas[2].motivo).toContain("linha 2");
+  });
+});
+
+describe("planilha da São Francisco (ITEM, CLASSE, UNIDADE, VALOR DO MÉDICO)", () => {
+  const CLINICA = "POLICLINICA SAO FRANCISCO DE PAULA";
+
+  function xlsx(linhas: (string | number | null)[][]): ArrayBuffer {
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(linhas), "Plan1");
+    return XLSX.write(wb, { type: "array", bookType: "xlsx" }) as ArrayBuffer;
+  }
+
+  const CAB = [
+    "UNIDADE",
+    "ITEM",
+    "GRUPO",
+    "SUBGRUPO",
+    "CLASSE",
+    "VALOR",
+    "VALOR DO MÉDICO",
+    "VALOR DO SERVIÇO",
+    "TERCEIRIZADO",
+    "% MÉDICO",
+    "% SERVIÇO",
+  ];
+
+  it("lê as colunas, filtra a unidade e aplica cartão = valor", async () => {
+    const r = await lerPlanilhaServicos(
+      xlsx([
+        ["TABELA DE ITENS"],
+        CAB,
+        [
+          "SÃO FRANCISCO DE PAULA",
+          "Consulta urologia",
+          "CONSULTAS",
+          "",
+          "Urologia",
+          150,
+          60,
+          90,
+          0,
+          "",
+          "",
+        ],
+        [
+          "SÃO FRANCISCO DE PAULA",
+          "USG pélvica",
+          "EXAMES",
+          "IMAGEM",
+          "Ginecologia",
+          "120,00",
+          "",
+          "",
+          "",
+          0.4,
+          0.6,
+        ],
+        ["MENINO JESUS", "Consulta urologia", "CONSULTAS", "", "Urologia", 130, 55, 75, 0, "", ""],
+        [
+          "SÃO FRANCISCO DE PAULA",
+          "Restauração",
+          "PROCEDIMENTOS",
+          "",
+          "Odonto",
+          200,
+          0,
+          150,
+          50,
+          0,
+          0,
+        ],
+      ]),
+      { nomeArquivo: "sfp.xlsx", nomeClinica: CLINICA },
+    );
+
+    expect(r.recusadas).toEqual([]);
+    expect(r.outrasUnidades).toEqual({ linhas: 1, nomes: ["MENINO JESUS"] });
+    expect(r.linhas.map((l) => l.nome)).toEqual([
+      "CONSULTA UROLOGIA",
+      "USG PÉLVICA",
+      "RESTAURAÇÃO",
+    ]);
+
+    const [consulta, usg, restauracao] = r.linhas;
+    expect(consulta.especialidade).toBe("UROLOGIA");
+    expect(consulta.categoria).toBe("consulta");
+    expect(consulta.categoriaDeduzida).toBe(true);
+    expect(consulta.valorDinheiro).toBe(150);
+    expect(consulta.valorCartao).toBe(150);
+    expect(consulta.repasse).toEqual({ tipo: "valor", valor: 60 });
+
+    // % com formato de porcentagem no Excel chega como fração.
+    expect(usg.repasse).toEqual({ tipo: "percentual", valor: 40 });
+    expect(usg.categoria).toBe("exame");
+
+    // Zero nos dois campos não zera comissão: fica sem regra da planilha.
+    expect(restauracao.repasse).toBeNull();
+    expect(restauracao.categoria).toBe("procedimento");
+    expect(restauracao.valorTerceirizado).toBe(50);
+  });
+
+  it("planilha de outra unidade não grava nada na clínica aberta", async () => {
+    const r = await lerPlanilhaServicos(
+      xlsx([
+        CAB,
+        [
+          "SÃO FRANCISCO DE PAULA",
+          "Consulta",
+          "CONSULTAS",
+          "",
+          "Clinico geral",
+          100,
+          50,
+          50,
+          0,
+          "",
+          "",
+        ],
+      ]),
+      { nomeArquivo: "sfp.xlsx", nomeClinica: "POLICLINICA MENINO JESUS" },
+    );
+    expect(r.linhas).toEqual([]);
+    expect(r.outrasUnidades.linhas).toBe(1);
+  });
+
+  it("unidade: nome parcial confere, palavra genérica não", () => {
+    expect(unidadeConfere("SÃO FRANCISCO DE PAULA", CLINICA)).toBe(true);
+    expect(unidadeConfere("Policlínica São Francisco", CLINICA)).toBe(true);
+    expect(unidadeConfere("", CLINICA)).toBe(true);
+    expect(unidadeConfere("POLICLINICA", CLINICA)).toBe(false);
+    expect(unidadeConfere("MENINO JESUS", CLINICA)).toBe(false);
+  });
+
+  it("repasse: valor fixo vence percentual; zero e vazio não definem regra", () => {
+    expect(repasseDaLinha("60,00", "40%")).toEqual({ tipo: "valor", valor: 60 });
+    expect(repasseDaLinha("", "40%")).toEqual({ tipo: "percentual", valor: 40 });
+    expect(repasseDaLinha(0, 0)).toBeNull();
+    expect(repasseDaLinha("", "")).toBeNull();
+    expect(repasseDaLinha("", "150")).toBeNull();
+  });
+
+  it("categoria deduzida do grupo, subgrupo e nome", () => {
+    expect(deduzirCategoria("CONSULTAS", null, "X")).toBe("consulta");
+    expect(deduzirCategoria("", "PROCEDIMENTOS CIRURGICOS", "X")).toBe("procedimento");
+    expect(deduzirCategoria("LABORATORIO", "", "CONSULTA RETORNO")).toBe("consulta");
+    expect(deduzirCategoria("LABORATORIO", "", "HEMOGRAMA")).toBe("exame");
   });
 });

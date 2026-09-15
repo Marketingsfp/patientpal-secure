@@ -7,8 +7,13 @@
  *
  * A gravação usa exatamente o mesmo mapeamento de colunas do formulário de
  * serviço, para o serviço importado ficar idêntico a um cadastrado à mão.
- * A clínica é sempre a clínica aberta na tela — nunca vem da planilha.
+ * A clínica é sempre a clínica aberta na tela — nunca vem da planilha. Se a
+ * planilha tiver coluna Unidade, só entram as linhas da clínica aberta.
  * Esta tela só cria ou atualiza; nunca apaga nada.
+ *
+ * Repasse: o sistema paga pela grade de cada médico, não pelo serviço. O
+ * repasse da planilha é aplicado num passo separado ("Repasse aos médicos"),
+ * nos médicos que já atendem cada serviço, sem sobrescrever acordo existente.
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -37,8 +42,17 @@ import {
   lerPlanilhaServicos,
   type LinhaRecusada,
   type LinhaServico,
+  type RepasseDoServico,
   type ResultadoLeituraServicos,
 } from "@/lib/importar-servicos";
+import {
+  camposDaGrade,
+  planejarRepasseServicos,
+  type LinhaGradeExistente,
+  type PlanoRepasse,
+  type RegraDoServico,
+  type VinculoMedicoServico,
+} from "@/lib/repasse-por-servico";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -92,6 +106,23 @@ type Resultado = {
 
 const fmtBRL = (n: number) =>
   Number(n || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+
+const fmtRepasse = (r: RepasseDoServico | null) =>
+  !r ? "—" : r.tipo === "valor" ? fmtBRL(r.valor) : `${String(r.valor).replace(".", ",")}%`;
+
+async function buscarPaginado<T>(
+  consulta: (de: number, ate: number) => PromiseLike<{ data: unknown; error: unknown }>,
+): Promise<T[]> {
+  const todos: T[] = [];
+  for (let de = 0; ; de += 1000) {
+    const { data, error } = await consulta(de, de + 999);
+    if (error) throw error;
+    const lote = (data as T[]) ?? [];
+    todos.push(...lote);
+    if (lote.length < 1000) break;
+  }
+  return todos;
+}
 
 function pedacos<T>(itens: T[], tamanho: number): T[][] {
   const saida: T[][] = [];
@@ -154,6 +185,15 @@ function ImportarServicosPage() {
 
   const [importando, setImportando] = useState(false);
   const [resultado, setResultado] = useState<Resultado | null>(null);
+  const [versaoCatalogo, setVersaoCatalogo] = useState(0);
+
+  const [plano, setPlano] = useState<PlanoRepasse | null>(null);
+  const [conferindoRepasse, setConferindoRepasse] = useState(false);
+  const [aplicandoRepasse, setAplicandoRepasse] = useState(false);
+  const [repasseAplicado, setRepasseAplicado] = useState<{
+    gravados: number;
+    falhas: number;
+  } | null>(null);
 
   // --- catálogo atual da clínica -------------------------------------------
   useEffect(() => {
@@ -188,7 +228,7 @@ function ImportarServicosPage() {
     return () => {
       cancelado = true;
     };
-  }, [clinicaId]);
+  }, [clinicaId, versaoCatalogo]);
 
   const mapaExistentes = useMemo(() => {
     const m = new Map<string, ServicoExistente>();
@@ -215,9 +255,29 @@ function ImportarServicosPage() {
   }, [leitura, especialidades]);
 
   const comRepasse = useMemo(
-    () => (leitura?.linhas ?? []).filter((l) => (l.repasse ?? 0) > 0),
+    () => (leitura?.linhas ?? []).filter((l) => l.repasse !== null),
     [leitura],
   );
+  const comTerceirizado = useMemo(
+    () => (leitura?.linhas ?? []).filter((l) => l.valorTerceirizado !== null),
+    [leitura],
+  );
+
+  /** Regras de repasse ligadas ao serviço do catálogo (só as que já existem nele). */
+  const regrasDoCatalogo = useMemo(() => {
+    const regras: RegraDoServico[] = [];
+    for (const l of comRepasse) {
+      const alvo = mapaExistentes.get(chaveNomeServico(l.nome));
+      if (!alvo || !l.repasse) continue;
+      regras.push({ procedimentoId: alvo.id, procedimentoNome: alvo.nome, repasse: l.repasse });
+    }
+    return regras;
+  }, [comRepasse, mapaExistentes]);
+
+  // O plano vale para a planilha e o catálogo em que foi calculado.
+  useEffect(() => {
+    setPlano(null);
+  }, [leitura, clinicaId, regrasDoCatalogo]);
 
   // --- arquivo --------------------------------------------------------------
   const receberArquivo = useCallback(
@@ -238,10 +298,13 @@ function ImportarServicosPage() {
         const lida = await lerPlanilhaServicos(buffer, {
           nomeArquivo: arquivo.name,
           especialidadesExistentes: especialidades,
+          nomeClinica: clinicaAtual?.clinica.nome ?? undefined,
         });
         if (!lida.linhas.length && !lida.recusadas.length) {
           toast.error(
-            "Não consegui achar a tabela nesta planilha. Confira se existe uma linha de cabeçalho com a coluna Nome.",
+            lida.outrasUnidades.linhas
+              ? `Nenhuma linha desta planilha é de ${clinicaAtual?.clinica.nome ?? "esta clínica"}. Unidades encontradas: ${lida.outrasUnidades.nomes.join(", ")}.`
+              : "Não consegui achar a tabela nesta planilha. Confira se existe uma linha de cabeçalho com a coluna Nome (ou Item).",
           );
         }
         setLeitura(lida);
@@ -252,7 +315,7 @@ function ImportarServicosPage() {
         setLendo(false);
       }
     },
-    [especialidades],
+    [especialidades, clinicaAtual],
   );
 
   const baixarModelo = () => {
@@ -305,16 +368,142 @@ function ImportarServicosPage() {
     );
   };
 
-  const baixarRepasses = () => {
+  const baixarTerceirizados = () => {
     exportToExcel(
-      comRepasse.map((l) => ({ nome: l.nome, repasse: String(l.repasse ?? "").replace(".", ",") })),
-      "repasses-para-lancar",
+      comTerceirizado.map((l) => ({
+        nome: l.nome,
+        valor: fmtBRL(l.valorDinheiro),
+        terceirizado: fmtBRL(l.valorTerceirizado ?? 0),
+        repasse: fmtRepasse(l.repasse),
+      })),
+      "servicos-com-terceirizado",
       [
-        { key: "nome", label: "Nome do Serviço" },
-        { key: "repasse", label: "Repasse" },
+        { key: "nome", label: "Serviço" },
+        { key: "valor", label: "Valor" },
+        { key: "terceirizado", label: "Terceirizado" },
+        { key: "repasse", label: "Repasse do médico" },
       ],
     );
   };
+
+  const baixarMantidos = (p: PlanoRepasse) => {
+    exportToExcel(
+      p.mantidos.map((m) => ({
+        medico: m.medicoNome,
+        servico: m.procedimentoNome,
+        atual: m.atual,
+        planilha: fmtRepasse(m.repasse),
+      })),
+      "repasses-mantidos",
+      [
+        { key: "medico", label: "Médico" },
+        { key: "servico", label: "Serviço" },
+        { key: "atual", label: "Acordo atual (mantido)" },
+        { key: "planilha", label: "Valor da planilha (não aplicado)" },
+      ],
+    );
+  };
+
+  // --- repasse aos médicos --------------------------------------------------
+  const conferirRepasse = useCallback(async () => {
+    if (!clinicaId) return;
+    setConferindoRepasse(true);
+    setRepasseAplicado(null);
+    try {
+      const vinculosBrutos = await buscarPaginado<{
+        medico_id: string;
+        procedimento_id: string;
+        medicos: { nome: string } | null;
+      }>((de, ate) =>
+        supabase
+          .from("medico_procedimentos")
+          .select("medico_id, procedimento_id, medicos!inner(nome, clinica_id)")
+          .eq("medicos.clinica_id", clinicaId)
+          .order("id")
+          .range(de, ate),
+      );
+      const gradeBruta = await buscarPaginado<
+        Omit<LinhaGradeExistente, "medicoId"> & { medico_id: string }
+      >((de, ate) =>
+        supabase
+          .from("medico_convenios")
+          .select(
+            "id, medico_id, nome, percentual, valor, convenio_percentual, convenio_valor, cartao_consulta_valor, cartao_desconto_valor, medicos!inner(clinica_id)",
+          )
+          .eq("medicos.clinica_id", clinicaId)
+          .order("id")
+          .range(de, ate),
+      );
+      const vinculos: VinculoMedicoServico[] = vinculosBrutos.map((v) => ({
+        medicoId: v.medico_id,
+        medicoNome: v.medicos?.nome ?? "",
+        procedimentoId: v.procedimento_id,
+      }));
+      const grade: LinhaGradeExistente[] = gradeBruta.map((g) => ({ ...g, medicoId: g.medico_id }));
+      setPlano(planejarRepasseServicos(regrasDoCatalogo, vinculos, grade));
+    } catch (e) {
+      mostrarErro(e, "conferir os médicos de cada serviço");
+    } finally {
+      setConferindoRepasse(false);
+    }
+  }, [clinicaId, regrasDoCatalogo]);
+
+  const aplicarRepasse = useCallback(async () => {
+    if (!plano || !clinicaAtual) return;
+    const total = plano.inserir.length + plano.atualizar.length;
+    if (!total) return;
+    const ok = await confirmDialog({
+      title: "Aplicar repasse aos médicos",
+      description: `Vou gravar ${total} repasse(s) na grade dos médicos de ${clinicaAtual.clinica.nome ?? "esta clínica"}. ${plano.mantidos.length} acordo(s) que os médicos já têm continuam como estão.`,
+      confirmText: "Aplicar",
+    });
+    if (!ok) return;
+
+    setAplicandoRepasse(true);
+    let gravados = 0;
+    let falhas = 0;
+    try {
+      for (const lote of pedacos(plano.inserir, LOTE)) {
+        const { error } = await supabase.from("medico_convenios").insert(
+          lote.map((i) => ({
+            medico_id: i.medicoId,
+            nome: i.procedimentoNome,
+            ...camposDaGrade(i.repasse),
+            // Convênio e cartões em branco: seguem o repasse padrão do médico.
+            convenio_tipo_repasse: null,
+            convenio_percentual: null,
+            convenio_valor: null,
+            cartao_consulta_valor: null,
+            cartao_desconto_valor: null,
+            terceiro_id: null,
+            tipo_repasse_terceiro: "percentual",
+            percentual_terceiro: null,
+            valor_terceiro: null,
+            ativo: true,
+          })),
+        );
+        if (error) falhas += lote.length;
+        else gravados += lote.length;
+      }
+      for (const a of plano.atualizar) {
+        const { error } = await supabase
+          .from("medico_convenios")
+          .update(camposDaGrade(a.repasse))
+          .eq("id", a.linhaId);
+        if (error) falhas += 1;
+        else gravados += 1;
+      }
+      invalidateAgendaRefs(clinicaAtual.clinica_id);
+      setRepasseAplicado({ gravados, falhas });
+      if (falhas) toast.error(`${falhas} repasse(s) não foram gravados.`);
+      else toast.success("Repasse aplicado aos médicos.");
+    } catch (e) {
+      mostrarErro(e, "aplicar o repasse aos médicos");
+    } finally {
+      setAplicandoRepasse(false);
+      setPlano(null);
+    }
+  }, [plano, clinicaAtual]);
 
   const baixarProblemas = (linhas: LinhaRecusada[]) => {
     exportToExcel(
@@ -407,6 +596,9 @@ function ImportarServicosPage() {
       }
 
       invalidateAgendaRefs(clinicaId);
+      // Recarrega o catálogo: os serviços recém-criados passam a existir para
+      // o passo "Repasse aos médicos" e para uma segunda importação.
+      setVersaoCatalogo((v) => v + 1);
       setResultado({
         criados,
         atualizados,
@@ -559,6 +751,36 @@ function ImportarServicosPage() {
               )}
             </div>
 
+            {leitura.outrasUnidades.linhas > 0 && (
+              <Alert>
+                <Info className="h-4 w-4" />
+                <AlertTitle>Linhas de outras unidades ficaram de fora</AlertTitle>
+                <AlertDescription className="text-sm">
+                  {leitura.outrasUnidades.linhas} linha(s) são de{" "}
+                  {leitura.outrasUnidades.nomes.join(", ") || "outra unidade"} e não serão gravadas
+                  em {clinicaAtual?.clinica.nome ?? "esta clínica"}. Para importar outra unidade,
+                  abra o sistema nela e suba a mesma planilha.
+                </AlertDescription>
+              </Alert>
+            )}
+
+            {comTerceirizado.length > 0 && (
+              <Alert>
+                <AlertTriangle className="h-4 w-4" />
+                <AlertTitle>Serviços com valor de terceirizado</AlertTitle>
+                <AlertDescription className="space-y-2 text-sm">
+                  <p>
+                    {comTerceirizado.length} serviço(s) têm parte de terceirizado na planilha. O
+                    serviço e o repasse do médico entram normalmente, mas a parte do terceirizado
+                    não é lançada automaticamente — confira a lista com o financeiro.
+                  </p>
+                  <Button variant="outline" size="sm" onClick={baixarTerceirizados}>
+                    <Download className="h-4 w-4 mr-2" /> Baixar lista
+                  </Button>
+                </AlertDescription>
+              </Alert>
+            )}
+
             {faltamEspecialidades.length > 0 && (
               <Alert>
                 <AlertTriangle className="h-4 w-4" />
@@ -607,6 +829,7 @@ function ImportarServicosPage() {
                     <TableHead className="text-right">Dinheiro</TableHead>
                     <TableHead className="text-right">Cartão</TableHead>
                     <TableHead className="text-right">Duração</TableHead>
+                    <TableHead className="text-right">Repasse médico</TableHead>
                     <TableHead>Situação</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -615,7 +838,7 @@ function ImportarServicosPage() {
                     <TableRow key={`erro-${r.linhaExcel}`} className="bg-destructive/5">
                       <TableCell>{r.linhaExcel}</TableCell>
                       <TableCell className="text-destructive">{r.nome || "(sem nome)"}</TableCell>
-                      <TableCell colSpan={6} className="text-destructive">
+                      <TableCell colSpan={7} className="text-destructive">
                         {r.motivo}
                       </TableCell>
                     </TableRow>
@@ -627,10 +850,23 @@ function ImportarServicosPage() {
                         <TableCell>{l.linhaExcel}</TableCell>
                         <TableCell className="font-medium">{l.nome}</TableCell>
                         <TableCell>{l.especialidade ?? "—"}</TableCell>
-                        <TableCell>{l.categoria}</TableCell>
+                        <TableCell>
+                          {l.categoria}
+                          {l.categoriaDeduzida && (
+                            <span
+                              className="ml-1 text-xs text-muted-foreground"
+                              title="A planilha não tem coluna Categoria: deduzida pelo grupo ou pelo nome."
+                            >
+                              (deduzida)
+                            </span>
+                          )}
+                        </TableCell>
                         <TableCell className="text-right">{fmtBRL(l.valorDinheiro)}</TableCell>
                         <TableCell className="text-right">{fmtBRL(l.valorCartao)}</TableCell>
                         <TableCell className="text-right">{l.duracaoMinutos} min</TableCell>
+                        <TableCell className="text-right whitespace-nowrap">
+                          {fmtRepasse(l.repasse)}
+                        </TableCell>
                         <TableCell>
                           {existe ? (
                             <Badge variant="outline">já existe</Badge>
@@ -694,23 +930,6 @@ function ImportarServicosPage() {
               )}
             </div>
 
-            {comRepasse.length > 0 && (
-              <Alert>
-                <AlertTriangle className="h-4 w-4" />
-                <AlertTitle>Repasse não foi aplicado</AlertTitle>
-                <AlertDescription className="space-y-2 text-sm">
-                  <p>
-                    {comRepasse.length} serviços vieram com repasse na planilha. O repasse é
-                    cadastrado por médico, em Equipe → Médico → Repasses — ele não foi aplicado
-                    aqui.
-                  </p>
-                  <Button variant="outline" size="sm" onClick={baixarRepasses}>
-                    <Download className="h-4 w-4 mr-2" /> Baixar lista de repasses
-                  </Button>
-                </AlertDescription>
-              </Alert>
-            )}
-
             {resultado.problemas.length > 0 && (
               <div className="space-y-2">
                 <ul className="max-h-60 space-y-1 overflow-auto text-sm text-destructive">
@@ -729,6 +948,121 @@ function ImportarServicosPage() {
             <Button onClick={() => navigate({ to: "/app/procedimentos" })}>
               Voltar ao catálogo
             </Button>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* 4. Repasse aos médicos */}
+      {leitura && comRepasse.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">4. Repasse aos médicos</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              A planilha define o repasse de {comRepasse.length} serviço(s). O sistema paga o
+              repasse pela grade de cada médico, então este passo copia o valor de cada serviço para
+              os médicos que atendem aquele serviço. Acordo que o médico já tem{" "}
+              <strong>nunca é substituído</strong>. Convênio e cartões continuam no repasse padrão
+              do médico.
+            </p>
+
+            {regrasDoCatalogo.length < comRepasse.length && (
+              <Alert>
+                <Info className="h-4 w-4" />
+                <AlertDescription className="text-sm">
+                  {comRepasse.length - regrasDoCatalogo.length} serviço(s) com repasse ainda não
+                  estão no catálogo. Importe os serviços primeiro (passo 2).
+                </AlertDescription>
+              </Alert>
+            )}
+
+            <Button
+              variant="outline"
+              onClick={() => void conferirRepasse()}
+              disabled={conferindoRepasse || carregandoCatalogo || !regrasDoCatalogo.length}
+            >
+              {conferindoRepasse && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Conferir médicos de cada serviço
+            </Button>
+
+            {plano && (
+              <div className="space-y-3">
+                <div className="flex flex-wrap gap-2">
+                  <Badge variant="secondary">
+                    {plano.inserir.length + plano.atualizar.length} repasse(s) a gravar
+                  </Badge>
+                  <Badge variant="outline">
+                    {plano.mantidos.length} acordo(s) existente(s) mantido(s)
+                  </Badge>
+                  <Badge variant="outline">{plano.semMedico.length} serviço(s) sem médico</Badge>
+                </div>
+
+                {plano.semMedico.length > 0 && (
+                  <Alert>
+                    <AlertTriangle className="h-4 w-4" />
+                    <AlertTitle>Serviços que ainda não têm médico</AlertTitle>
+                    <AlertDescription className="text-sm">
+                      Nenhum médico desta clínica atende {plano.semMedico.length} serviço(s) com
+                      repasse. Depois de importar os médicos (Equipe → Médicos → Importar planilha),
+                      volte aqui, suba esta mesma planilha e confira de novo.
+                    </AlertDescription>
+                  </Alert>
+                )}
+
+                {plano.inserir.length + plano.atualizar.length > 0 && (
+                  <div className="max-h-[360px] overflow-auto rounded-md border">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Médico</TableHead>
+                          <TableHead>Serviço</TableHead>
+                          <TableHead className="text-right">Repasse (particular)</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {[...plano.inserir, ...plano.atualizar].map((i) => (
+                          <TableRow key={`${i.medicoId}-${i.procedimentoNome}`}>
+                            <TableCell>{i.medicoNome}</TableCell>
+                            <TableCell className="font-medium">{i.procedimentoNome}</TableCell>
+                            <TableCell className="text-right whitespace-nowrap">
+                              {fmtRepasse(i.repasse)}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    onClick={() => void aplicarRepasse()}
+                    disabled={
+                      aplicandoRepasse || plano.inserir.length + plano.atualizar.length === 0
+                    }
+                  >
+                    {aplicandoRepasse && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                    Aplicar repasse aos médicos
+                  </Button>
+                  {plano.mantidos.length > 0 && (
+                    <Button variant="outline" onClick={() => baixarMantidos(plano)}>
+                      <Download className="h-4 w-4 mr-2" /> Baixar acordos mantidos
+                    </Button>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {repasseAplicado && (
+              <Alert>
+                <CheckCircle2 className="h-4 w-4" />
+                <AlertDescription className="text-sm">
+                  {repasseAplicado.gravados} repasse(s) gravado(s) na grade dos médicos
+                  {repasseAplicado.falhas > 0 && `; ${repasseAplicado.falhas} falharam`}.
+                </AlertDescription>
+              </Alert>
+            )}
           </CardContent>
         </Card>
       )}

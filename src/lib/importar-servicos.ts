@@ -19,12 +19,25 @@ const MAX_LINHAS_PROCURA_CABECALHO = 25;
 export const CATEGORIAS_VALIDAS = ["consulta", "exame", "procedimento"] as const;
 export type CategoriaServico = (typeof CATEGORIAS_VALIDAS)[number];
 
+/**
+ * Repasse do médico definido na PLANILHA para o serviço. O sistema paga
+ * repasse pela grade de cada médico (`medico_convenios`), então isto não é
+ * gravado no serviço: vira linha na grade dos médicos que atendem o serviço
+ * (ver `repasse-por-servico.ts`).
+ */
+export interface RepasseDoServico {
+  tipo: "valor" | "percentual";
+  valor: number;
+}
+
 export interface LinhaServico {
   /** Número da linha como aparece no Excel, para a funcionária conferir. */
   linhaExcel: number;
   nome: string;
   especialidade: string | null;
   categoria: CategoriaServico;
+  /** A planilha não tinha coluna de categoria e ela foi deduzida do grupo/nome. */
+  categoriaDeduzida: boolean;
   codigo: string | null;
   valorDinheiro: number;
   valorCartao: number;
@@ -33,8 +46,10 @@ export interface LinhaServico {
   duracaoMinutos: number;
   preparo: string | null;
   ativo: boolean;
-  /** Lida só para avisar: repasse é cadastrado por médico, não no serviço. */
-  repasse: number | null;
+  /** `null` = a planilha não define repasse (ou só traz zero) para o serviço. */
+  repasse: RepasseDoServico | null;
+  /** Parte de terceirizado informada na planilha — não é aplicada automaticamente. */
+  valorTerceirizado: number | null;
 }
 
 export interface LinhaRecusada {
@@ -54,6 +69,11 @@ export interface ResultadoLeituraServicos {
   linhaCabecalho: number | null;
   /** Rótulo reconhecido -> nome real da coluna encontrada na planilha. */
   colunas: Record<string, string | null>;
+  /**
+   * Linhas de OUTRA unidade (coluna Unidade diferente da clínica aberta).
+   * Ficam de fora sem virar "problema": a planilha pode trazer várias unidades.
+   */
+  outrasUnidades: { linhas: number; nomes: string[] };
 }
 
 /** Tira acentos, deixa minúsculo e troca pontuação por espaço. */
@@ -178,12 +198,20 @@ export function detectarLinhaCabecalho(matriz: unknown[][]): number | null {
     if (!celulas.length) continue;
 
     const temNome = celulas.some(
-      (c) => c === "nome" || c.startsWith("nome ") || c === "servico" || c === "procedimento",
+      (c) =>
+        c === "nome" ||
+        c.startsWith("nome ") ||
+        c === "servico" ||
+        c === "procedimento" ||
+        c === "item",
     );
     if (!temNome) continue;
 
     let pontuacao = 1;
-    if (celulas.some((c) => c.startsWith("especialidade") || c === "grupo")) pontuacao++;
+    if (celulas.some((c) => c.startsWith("especialidade") || c === "grupo" || c === "classe")) {
+      pontuacao++;
+    }
+    if (celulas.some((c) => c === "unidade" || c.startsWith("valor do medico"))) pontuacao++;
     if (celulas.some((c) => c.startsWith("categoria") || c === "tipo")) pontuacao++;
     if (celulas.some((c) => c.startsWith("dinheiro") || c.startsWith("valor"))) pontuacao++;
     if (celulas.some((c) => c.startsWith("cartao"))) pontuacao++;
@@ -213,9 +241,15 @@ function pareceCsv(nomeArquivo: string | undefined, bytes: Uint8Array): boolean 
 }
 
 const COLUNAS = {
-  nome: ["Nome", "Nome do Serviço", "Servico", "Serviço", "Procedimento"],
-  especialidade: ["Especialidade", "Grupo"],
+  // "Item" é como a planilha da São Francisco chama o serviço.
+  nome: ["Nome", "Nome do Serviço", "Item", "Servico", "Serviço", "Procedimento"],
+  // "Classe" (planilha da São Francisco) é a especialidade; lá "Grupo" é outra
+  // coisa, então Classe vem antes. Nas planilhas antigas Grupo = especialidade.
+  especialidade: ["Especialidade", "Classe", "Grupo"],
   categoria: ["Categoria", "Tipo"],
+  grupo: ["Grupo"],
+  subgrupo: ["Subgrupo", "Sub Grupo", "Sub-grupo"],
+  unidade: ["Unidade", "Clínica", "Clinica"],
   codigo: ["Código", "Codigo"],
   dinheiro: ["Dinheiro (R$)", "Valor Dinheiro", "Dinheiro", "Valor"],
   cartao: [
@@ -232,7 +266,8 @@ const COLUNAS = {
   duracao: ["Duração (min)", "Duracao", "Duração", "Tempo"],
   preparo: ["Preparo"],
   ativo: ["Ativo", "Situação", "Situacao", "Status"],
-  repasse: ["Repasse", "Repasse Médico", "% Repasse"],
+  repasse: ["Valor do Médico", "Valor Médico", "Repasse Médico", "Repasse"],
+  terceirizado: ["Valor Terceirizado", "Valor do Terceirizado", "Terceirizado"],
 };
 
 export interface OpcoesLeituraServicos {
@@ -240,6 +275,86 @@ export interface OpcoesLeituraServicos {
   nomeArquivo?: string;
   /** Especialidades já cadastradas, para apontar as que faltam. */
   especialidadesExistentes?: string[];
+  /**
+   * Nome da clínica aberta. Quando a planilha tem coluna Unidade, só entram as
+   * linhas desta unidade — uma planilha com várias unidades nunca grava o
+   * catálogo de uma clínica na outra.
+   */
+  nomeClinica?: string;
+}
+
+/** Valor em reais que distingue célula vazia (`null`) de zero. */
+export function valorOuNulo(valor: unknown): number | null {
+  if (valor == null || String(valor).trim() === "") return null;
+  return normalizarValor(valor);
+}
+
+/**
+ * Percentual do médico. Célula com formato de % no Excel chega como fração
+ * (0,6 = 60%); texto "60" ou "60%" chega inteiro.
+ */
+export function normalizarPercentual(valor: unknown): number | null {
+  if (valor == null || String(valor).trim() === "") return null;
+  if (typeof valor === "number") {
+    if (!Number.isFinite(valor) || valor <= 0) return 0;
+    return valor <= 1 ? +(valor * 100).toFixed(4) : valor;
+  }
+  return normalizarValor(String(valor).replace("%", ""));
+}
+
+/**
+ * Repasse que a planilha define: valor fixo tem prioridade; sem valor, vale o
+ * percentual. Zero ou vazio nos dois = a planilha não define repasse — o
+ * médico segue o repasse padrão dele. Um zero vindo de exportação de sistema
+ * antigo quase sempre é "não preenchido", e zerar comissão por engano é pior
+ * do que deixar o padrão.
+ */
+export function repasseDaLinha(
+  valorMedico: unknown,
+  percentualMedico: unknown,
+): RepasseDoServico | null {
+  const valor = valorOuNulo(valorMedico);
+  if (valor != null && valor > 0) return { tipo: "valor", valor };
+  const pct = normalizarPercentual(percentualMedico);
+  if (pct != null && pct > 0 && pct <= 100) return { tipo: "percentual", valor: pct };
+  return null;
+}
+
+/**
+ * Categoria deduzida quando a planilha não tem a coluna: primeiro pelo grupo
+ * e subgrupo ("CONSULTAS", "EXAMES DE IMAGEM"), depois pelo nome do serviço.
+ */
+export function deduzirCategoria(
+  grupo: unknown,
+  subgrupo: unknown,
+  nome: string,
+): CategoriaServico {
+  for (const texto of [grupo, subgrupo]) {
+    const k = chaveTexto(texto);
+    if (!k) continue;
+    if (k.includes("consult")) return "consulta";
+    if (k.includes("proced")) return "procedimento";
+    if (k.includes("exame")) return "exame";
+  }
+  const n = chaveTexto(nome);
+  if (n.startsWith("consulta")) return "consulta";
+  return "exame";
+}
+
+/** A unidade da linha é a clínica aberta? Célula vazia conta como sim. */
+export function unidadeConfere(unidade: unknown, nomeClinica: string | undefined): boolean {
+  // "Policlínica" sozinho não identifica unidade nenhuma: sem tirar essas
+  // palavras, uma linha "POLICLINICA" entraria em qualquer clínica.
+  const semGenericos = (v: unknown) =>
+    ` ${chaveTexto(v)} `
+      .replace(/\s(policlinica|clinica|unidade|de|da|do)(?=\s)/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+  const u = semGenericos(unidade);
+  const c = semGenericos(nomeClinica);
+  if (!chaveTexto(unidade) || !c) return true;
+  if (!u) return false;
+  return c.includes(u) || u.includes(c);
 }
 
 /**
@@ -277,6 +392,7 @@ export async function lerPlanilhaServicos(
     especialidadesNovas: [],
     linhaCabecalho: null,
     colunas: {},
+    outrasUnidades: { linhas: 0, nomes: [] },
   };
 
   const nomeAba = wb.SheetNames[0];
@@ -297,11 +413,18 @@ export async function lerPlanilhaServicos(
     blankrows: false,
   });
 
-  const cabecalhos = brutas.length ? Object.keys(brutas[0]) : [];
+  const todosCabecalhos = brutas.length ? Object.keys(brutas[0]) : [];
+  // Cabeçalho com "%" ("% MÉDICO", "% SERVIÇO") só vale para percentual: sem
+  // o símbolo, "% SERVIÇO" viraria a coluna do nome e "% MÉDICO" a do repasse.
+  const cabecalhos = todosCabecalhos.filter((h) => !h.includes("%"));
+  const percentuais = todosCabecalhos.filter((h) => h.includes("%"));
   const col = {
     nome: acharColuna(cabecalhos, COLUNAS.nome),
     especialidade: acharColuna(cabecalhos, COLUNAS.especialidade),
     categoria: acharColuna(cabecalhos, COLUNAS.categoria),
+    grupo: acharColuna(cabecalhos, COLUNAS.grupo),
+    subgrupo: acharColuna(cabecalhos, COLUNAS.subgrupo),
+    unidade: acharColuna(cabecalhos, COLUNAS.unidade),
     codigo: acharColuna(cabecalhos, COLUNAS.codigo),
     dinheiro: acharColuna(cabecalhos, COLUNAS.dinheiro),
     cartaoConsulta: acharColuna(cabecalhos, COLUNAS.cartaoConsulta),
@@ -310,6 +433,11 @@ export async function lerPlanilhaServicos(
     preparo: acharColuna(cabecalhos, COLUNAS.preparo),
     ativo: acharColuna(cabecalhos, COLUNAS.ativo),
     repasse: acharColuna(cabecalhos, COLUNAS.repasse),
+    terceirizado: acharColuna(cabecalhos, COLUNAS.terceirizado),
+    percentualMedico:
+      percentuais.find((h) => chaveTexto(h).includes("medic")) ??
+      percentuais.find((h) => chaveTexto(h).includes("repasse")) ??
+      null,
   };
   // "Cartão" é procurado depois das outras três para não roubar a coluna delas.
   const usadas = new Set(
@@ -333,12 +461,16 @@ export async function lerPlanilhaServicos(
     "Duração (min)": col.duracao,
     Preparo: col.preparo,
     Ativo: col.ativo,
-    Repasse: col.repasse,
+    Unidade: col.unidade,
+    "Repasse do médico (R$)": col.repasse,
+    "% do médico": col.percentualMedico,
+    Terceirizado: col.terceirizado,
   };
 
   const linhas: LinhaServico[] = [];
   const recusadas: LinhaRecusada[] = [];
   const vistos = new Map<string, number>();
+  const outrasUnidades = { linhas: 0, nomes: new Set<string>() };
 
   if (!col.nome) {
     return { ...vazio, linhaCabecalho: indiceCabecalho + 1, colunas };
@@ -351,6 +483,12 @@ export async function lerPlanilhaServicos(
     const vaziaDeVerdade = Object.values(bruta).every((v) => v == null || String(v).trim() === "");
     if (vaziaDeVerdade) return;
 
+    if (col.unidade && !unidadeConfere(bruta[col.unidade], opcoes.nomeClinica)) {
+      outrasUnidades.linhas += 1;
+      outrasUnidades.nomes.add(normalizarMaiusculas(bruta[col.unidade], 80));
+      return;
+    }
+
     if (!nome) {
       recusadas.push({
         linhaExcel,
@@ -360,7 +498,14 @@ export async function lerPlanilhaServicos(
       return;
     }
 
-    const categoria = col.categoria ? normalizarCategoria(bruta[col.categoria]) : "exame";
+    const categoriaDeduzida = !col.categoria;
+    const categoria = col.categoria
+      ? normalizarCategoria(bruta[col.categoria])
+      : deduzirCategoria(
+          col.grupo && col.grupo !== col.especialidade ? bruta[col.grupo] : null,
+          col.subgrupo ? bruta[col.subgrupo] : null,
+          nome,
+        );
     if (!categoria) {
       recusadas.push({
         linhaExcel,
@@ -382,11 +527,12 @@ export async function lerPlanilhaServicos(
     }
     vistos.set(chave, linhaExcel);
 
-    const repasseBruto = col.repasse ? bruta[col.repasse] : null;
-    const repasse =
-      repasseBruto == null || String(repasseBruto).trim() === ""
-        ? null
-        : normalizarValor(repasseBruto);
+    const repasse = repasseDaLinha(
+      col.repasse ? bruta[col.repasse] : null,
+      col.percentualMedico ? bruta[col.percentualMedico] : null,
+    );
+    const terceirizado = col.terceirizado ? valorOuNulo(bruta[col.terceirizado]) : null;
+    const valorDinheiro = col.dinheiro ? normalizarValor(bruta[col.dinheiro]) : 0;
 
     linhas.push({
       linhaExcel,
@@ -395,15 +541,19 @@ export async function lerPlanilhaServicos(
         ? normalizarMaiusculas(bruta[col.especialidade], 120) || null
         : null,
       categoria,
+      categoriaDeduzida,
       codigo: col.codigo ? normalizarMaiusculas(bruta[col.codigo], 60) || null : null,
-      valorDinheiro: col.dinheiro ? normalizarValor(bruta[col.dinheiro]) : 0,
-      valorCartao: colCartao ? normalizarValor(bruta[colCartao]) : 0,
+      valorDinheiro,
+      // Planilha com um preço só (a da São Francisco traz só "VALOR"): o cartão
+      // cobra o mesmo. Sem isso o serviço entraria custando R$ 0,00 no cartão.
+      valorCartao: colCartao ? normalizarValor(bruta[colCartao]) : valorDinheiro,
       valorCartaoConsulta: col.cartaoConsulta ? normalizarValor(bruta[col.cartaoConsulta]) : 0,
       valorCartaoDesconto: col.cartaoDesconto ? normalizarValor(bruta[col.cartaoDesconto]) : 0,
       duracaoMinutos: col.duracao ? normalizarDuracao(bruta[col.duracao]) : 30,
       preparo: col.preparo ? normalizarTexto(bruta[col.preparo]) || null : null,
       ativo: col.ativo ? normalizarAtivo(bruta[col.ativo]) : true,
       repasse,
+      valorTerceirizado: terceirizado != null && terceirizado > 0 ? terceirizado : null,
     });
   });
 
@@ -422,5 +572,9 @@ export async function lerPlanilhaServicos(
     especialidadesNovas: [...novas.values()].sort((a, b) => a.localeCompare(b, "pt-BR")),
     linhaCabecalho: indiceCabecalho + 1,
     colunas,
+    outrasUnidades: {
+      linhas: outrasUnidades.linhas,
+      nomes: [...outrasUnidades.nomes].filter(Boolean).sort((a, b) => a.localeCompare(b, "pt-BR")),
+    },
   };
 }
