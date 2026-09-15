@@ -679,7 +679,8 @@ export function AtendInbox() {
   const [transferOpen, setTransferOpen] = useState(false);
   const [agendaOpen, setAgendaOpen] = useState(false);
   const [buscaAgente, setBuscaAgente] = useState("");
-  const [fecharOpen, setFecharOpen] = useState(false);
+  const [fechando, setFechando] = useState(false);
+  const fechandoRef = useRef(false);
   // Começa fechada: só entra em "online" depois de ler o status real gravado,
   // senão a tela avisaria "ONLINE" ao abrir e receberia conversas sem querer.
   const [filaAberta, setFilaAberta] = useState<boolean>(false);
@@ -1957,7 +1958,6 @@ export function AtendInbox() {
   useEffect(() => {
     setErroMsgs(false);
     setTransferOpen(false);
-    setFecharOpen(false);
     setAgendaOpen(false);
     setNovaNota("");
   }, [sel?.id]);
@@ -2843,9 +2843,8 @@ export function AtendInbox() {
     }
   };
 
-  const fechar = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    if (!sel || !clinicaId) return;
+  const fechar = async () => {
+    if (!sel || !clinicaId || fechandoRef.current) return;
     if (
       !acaoPermitida({
         alvo: sel.id,
@@ -2857,24 +2856,25 @@ export function AtendInbox() {
       toast.error("Carregando a conversa. Tente novamente em instantes.");
       return;
     }
-    const fd = new FormData(e.currentTarget);
     const origem = sel.id;
+    fechandoRef.current = true;
+    setFechando(true);
     try {
       await fecharFn({
         data: {
           clinicaId,
           conversaId: origem,
-          motivo: String(fd.get("motivo") || "") || undefined,
-          resumo: String(fd.get("resumo") || "") || undefined,
         },
       });
       cacheConversas.current.invalidar(origem);
       prefetchMsgs.current.invalidar(origem);
-      setFecharOpen(false);
       await carregarConvs();
       if (selIdRef.current === origem) await carregarConversa();
     } catch (e: any) {
       mostrarErro(e);
+    } finally {
+      fechandoRef.current = false;
+      setFechando(false);
     }
   };
 
@@ -3529,11 +3529,17 @@ export function AtendInbox() {
                       <Button
                         size="sm"
                         variant="outline"
-                        disabled={!souResponsavel || carregandoConversa}
+                        disabled={!souResponsavel || carregandoConversa || fechando}
+                        aria-busy={fechando}
                         className="border-atd-border text-atd-ink-soft hover:bg-atd-danger-bg hover:text-atd-danger-ink"
-                        onClick={() => setFecharOpen(true)}
+                        onClick={() => void fechar()}
                       >
-                        <CheckCircle2 className="h-3.5 w-3.5 mr-1" /> Encerrar
+                        {fechando ? (
+                          <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />
+                        ) : (
+                          <CheckCircle2 className="h-3.5 w-3.5 mr-1" />
+                        )}
+                        {fechando ? "Encerrando…" : "Encerrar"}
                       </Button>
                     )}
                   </div>
@@ -4200,30 +4206,6 @@ export function AtendInbox() {
                   Cancelar
                 </Button>
                 <Button type="submit">Transferir</Button>
-              </DialogFooter>
-            </form>
-          </DialogContent>
-        </Dialog>
-
-        <Dialog open={fecharOpen} onOpenChange={setFecharOpen}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Encerrar conversa</DialogTitle>
-            </DialogHeader>
-            <form onSubmit={fechar} className="space-y-3">
-              <div>
-                <Label>Motivo</Label>
-                <Input name="motivo" maxLength={120} placeholder="Resolvido, sem resposta, etc." />
-              </div>
-              <div>
-                <Label>Resumo do atendimento</Label>
-                <Textarea name="resumo" rows={4} maxLength={2000} />
-              </div>
-              <DialogFooter>
-                <Button type="button" variant="outline" onClick={() => setFecharOpen(false)}>
-                  Cancelar
-                </Button>
-                <Button type="submit">Encerrar</Button>
               </DialogFooter>
             </form>
           </DialogContent>
