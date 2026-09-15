@@ -14,6 +14,171 @@ export type Database = {
   }
   public: {
     Tables: {
+      agendamento_confirmacao_config: {
+        Row: {
+          ativo: boolean
+          clinica_id: string
+          etapas: string[]
+          hora_fim: string
+          hora_inicio: string
+          max_por_rodada: number
+          medico_ids: string[] | null
+          template_erro: string | null
+          template_idioma: string
+          template_nome: string
+          template_status: string | null
+          template_verificado_em: string | null
+          ultima_rodada_em: string | null
+          ultima_rodada_resumo: Json | null
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          clinica_id: string
+          etapas?: string[]
+          hora_fim?: string
+          hora_inicio?: string
+          max_por_rodada?: number
+          medico_ids?: string[] | null
+          template_erro?: string | null
+          template_idioma?: string
+          template_nome?: string
+          template_status?: string | null
+          template_verificado_em?: string | null
+          ultima_rodada_em?: string | null
+          ultima_rodada_resumo?: Json | null
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          clinica_id?: string
+          etapas?: string[]
+          hora_fim?: string
+          hora_inicio?: string
+          max_por_rodada?: number
+          medico_ids?: string[] | null
+          template_erro?: string | null
+          template_idioma?: string
+          template_nome?: string
+          template_status?: string | null
+          template_verificado_em?: string | null
+          ultima_rodada_em?: string | null
+          ultima_rodada_resumo?: Json | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agendamento_confirmacao_config_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: true
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      agendamento_confirmacoes: {
+        Row: {
+          agendamento_id: string
+          agendamento_inicio: string
+          clinica_id: string
+          created_at: string
+          entregue_em: string | null
+          enviado_em: string | null
+          erro: string | null
+          etapa: string
+          fechamento_wa_message_id: string | null
+          id: string
+          lido_em: string | null
+          medico_id: string | null
+          observacao: string | null
+          paciente_id: string | null
+          respondido_em: string | null
+          resposta_acao: string | null
+          resposta_texto: string | null
+          resposta_wa_message_id: string | null
+          status: string
+          telefone: string | null
+          telefone_chave: string | null
+          template_nome: string | null
+          updated_at: string
+          wa_message_id: string | null
+        }
+        Insert: {
+          agendamento_id: string
+          agendamento_inicio: string
+          clinica_id: string
+          created_at?: string
+          entregue_em?: string | null
+          enviado_em?: string | null
+          erro?: string | null
+          etapa: string
+          fechamento_wa_message_id?: string | null
+          id?: string
+          lido_em?: string | null
+          medico_id?: string | null
+          observacao?: string | null
+          paciente_id?: string | null
+          respondido_em?: string | null
+          resposta_acao?: string | null
+          resposta_texto?: string | null
+          resposta_wa_message_id?: string | null
+          status?: string
+          telefone?: string | null
+          telefone_chave?: string | null
+          template_nome?: string | null
+          updated_at?: string
+          wa_message_id?: string | null
+        }
+        Update: {
+          agendamento_id?: string
+          agendamento_inicio?: string
+          clinica_id?: string
+          created_at?: string
+          entregue_em?: string | null
+          enviado_em?: string | null
+          erro?: string | null
+          etapa?: string
+          fechamento_wa_message_id?: string | null
+          id?: string
+          lido_em?: string | null
+          medico_id?: string | null
+          observacao?: string | null
+          paciente_id?: string | null
+          respondido_em?: string | null
+          resposta_acao?: string | null
+          resposta_texto?: string | null
+          resposta_wa_message_id?: string | null
+          status?: string
+          telefone?: string | null
+          telefone_chave?: string | null
+          template_nome?: string | null
+          updated_at?: string
+          wa_message_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agendamento_confirmacoes_agendamento_id_fkey"
+            columns: ["agendamento_id"]
+            isOneToOne: false
+            referencedRelation: "agendamentos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agendamento_confirmacoes_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agendamento_confirmacoes_paciente_id_fkey"
+            columns: ["paciente_id"]
+            isOneToOne: false
+            referencedRelation: "pacientes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       agendamento_historico_notas: {
         Row: {
           agendamento_id: string
@@ -794,6 +959,71 @@ export type Database = {
           },
         ]
       }
+      atend_capacidade_atendentes: {
+        Row: {
+          atualizado_em: string
+          atualizado_por: string
+          clinica_id: string
+          criado_em: string
+          max_simultaneas: number | null
+          user_id: string
+        }
+        Insert: {
+          atualizado_em?: string
+          atualizado_por: string
+          clinica_id: string
+          criado_em?: string
+          max_simultaneas?: number | null
+          user_id: string
+        }
+        Update: {
+          atualizado_em?: string
+          atualizado_por?: string
+          clinica_id?: string
+          criado_em?: string
+          max_simultaneas?: number | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "atend_capacidade_atendentes_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      atend_capacidade_auditoria: {
+        Row: {
+          alterado_por: string
+          antes: Json
+          clinica_id: string
+          criado_em: string
+          depois: Json
+          id: string
+          user_id: string
+        }
+        Insert: {
+          alterado_por: string
+          antes: Json
+          clinica_id: string
+          criado_em?: string
+          depois: Json
+          id?: string
+          user_id: string
+        }
+        Update: {
+          alterado_por?: string
+          antes?: Json
+          clinica_id?: string
+          criado_em?: string
+          depois?: Json
+          id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       atend_conversa_eventos: {
         Row: {
           clinica_id: string
@@ -1117,6 +1347,48 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      atend_distribuicao_execucoes: {
+        Row: {
+          clinica_id: string
+          criado_em: string
+          distribuidas: number
+          erro_codigo: string | null
+          erro_detalhe: string | null
+          id: string
+          motivo: string | null
+          origem: string
+          pendentes: number
+          solicitado_por: string | null
+          status: string
+        }
+        Insert: {
+          clinica_id: string
+          criado_em?: string
+          distribuidas?: number
+          erro_codigo?: string | null
+          erro_detalhe?: string | null
+          id?: string
+          motivo?: string | null
+          origem: string
+          pendentes?: number
+          solicitado_por?: string | null
+          status: string
+        }
+        Update: {
+          clinica_id?: string
+          criado_em?: string
+          distribuidas?: number
+          erro_codigo?: string | null
+          erro_detalhe?: string | null
+          id?: string
+          motivo?: string | null
+          origem?: string
+          pendentes?: number
+          solicitado_por?: string | null
+          status?: string
+        }
+        Relationships: []
       }
       atend_handoff_resumos: {
         Row: {
@@ -13284,6 +13556,24 @@ export type Database = {
           },
         ]
       }
+      sistema_job_tokens: {
+        Row: {
+          created_at: string
+          nome: string
+          token: string
+        }
+        Insert: {
+          created_at?: string
+          nome: string
+          token: string
+        }
+        Update: {
+          created_at?: string
+          nome?: string
+          token?: string
+        }
+        Relationships: []
+      }
       sistema_planos: {
         Row: {
           ativo: boolean
@@ -14024,12 +14314,25 @@ export type Database = {
         }
         Returns: string
       }
+      atend_auto_assign_conversa_interno: {
+        Args: {
+          _clinica_id: string
+          _conversa_id: string
+          _departamento_id?: string
+          _origem?: string
+        }
+        Returns: string
+      }
       atend_claim_conversa: {
         Args: { _clinica_id: string; _conversa_id: string; _user_id: string }
         Returns: boolean
       }
       atend_configurar_capacidade: {
-        Args: { _clinica_id: string; _user_id: string; _max_simultaneas: number | null }
+        Args: {
+          _clinica_id: string
+          _max_simultaneas: number
+          _user_id: string
+        }
         Returns: Json
       }
       atend_conversa_de_handoff: {
@@ -14041,16 +14344,22 @@ export type Database = {
         }
         Returns: boolean
       }
-      atend_distribuir_fila: {
-        Args: { _clinica_id: string; _max?: number }
-        Returns: number
+      atend_conversa_na_fila: {
+        Args: {
+          _ai_enabled: boolean
+          _atribuida_user_id: string
+          _is_teste: boolean
+          _owner_type: string
+          _status: string
+        }
+        Returns: boolean
       }
       atend_definir_presenca_manual: {
         Args: {
           _clinica_id: string
           _estado: string
-          _versao?: number | null
-          _reason_id?: string | null
+          _reason_id?: string
+          _versao?: number
         }
         Returns: Json
       }
@@ -14058,13 +14367,36 @@ export type Database = {
         Args: { _clinica_id: string }
         Returns: Json
       }
-      atend_distribuir_fila_status: {
-        Args: { _clinica_id: string; _max?: number }
+      atend_distribuicao_snapshot: {
+        Args: {
+          _clinica_id: string
+          _distribuidas?: number
+          _motivo?: string
+          _status?: string
+          _user_id: string
+        }
         Returns: Json
+      }
+      atend_distribuir_fila: {
+        Args: { _clinica_id: string; _max?: number }
+        Returns: number
       }
       atend_distribuir_fila_interno: {
         Args: { _clinica_id: string; _max?: number }
         Returns: number
+      }
+      atend_distribuir_fila_seguro: {
+        Args: {
+          _clinica_id: string
+          _max?: number
+          _origem?: string
+          _user_id?: string
+        }
+        Returns: Json
+      }
+      atend_distribuir_fila_status: {
+        Args: { _clinica_id: string; _max?: number }
+        Returns: Json
       }
       atend_espera_por_conversa: {
         Args: { _clinica_id: string; _is_teste?: boolean }
@@ -14092,10 +14424,31 @@ export type Database = {
           nao_lidas: number
         }[]
       }
+      atend_pool_canonico: {
+        Args: { _clinica_id: string; _departamento_id?: string }
+        Returns: {
+          admin: boolean
+          capacidade: number
+          capacidade_origem: string
+          do_setor: boolean
+          elegivel: boolean
+          em_pausa: boolean
+          estado_manual: string
+          fila_travada: boolean
+          load_at_selection: number
+          motivo_exclusao: string
+          perfil: string
+          perfil_telefonia: boolean
+          presence_status: string
+          ultima_atribuicao: string
+          user_id: string
+        }[]
+      }
       atend_pool_telefonia_avaliacao: {
         Args: { _clinica_id: string; _departamento_id?: string }
         Returns: Json
       }
+      atend_recuperar_distribuicao: { Args: never; Returns: number }
       atend_registrar_leitura: {
         Args: {
           _clinica_id: string
