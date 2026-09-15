@@ -12,6 +12,14 @@ import type { RateioLinha } from "@/lib/financeiro/rateio-receita";
 
 const cent = (v: number) => Math.round(v * 100) / 100;
 
+/**
+ * Linha "[LAUDO]" é o repasse do médico que laudou um exame, não um atendimento
+ * com paciente: o exame já foi contado na linha dele. Contá-la aqui inflava o
+ * volume com atendimentos de R$ 0,00, baixava o ticket médio e distorcia a
+ * fatia de cada modalidade.
+ */
+const semLaudo = (linhas: RateioLinha[]) => linhas.filter((l) => !l.laudo);
+
 /** Uma posição do ranking, já com participação e acumulado de Pareto. */
 export interface LinhaRanking {
   nome: string;
@@ -56,7 +64,8 @@ function nomeDaLinha(l: RateioLinha, chave: ChaveRanking): string {
  */
 export function rankingPorChave(linhas: RateioLinha[], chave: ChaveRanking): LinhaRanking[] {
   const somenteAtendimento = chave === "especialidade" || chave === "medico";
-  const base = somenteAtendimento ? linhas.filter((l) => l.origem === "atendimento") : linhas;
+  const reais = semLaudo(linhas);
+  const base = somenteAtendimento ? reais.filter((l) => l.origem === "atendimento") : reais;
 
   const mapa = new Map<string, { receita: number; atendimentos: number }>();
   for (const l of base) {
@@ -119,7 +128,7 @@ const MODALIDADES: Modalidade[] = ["Particular", "Cartão Consulta", "Cartão De
  * Modalidades sem nenhum atendimento no período ficam de fora do resultado.
  */
 export function distribuicaoPorModalidade(linhas: RateioLinha[]): FatiaModalidade[] {
-  const base = linhas.filter((l) => l.origem === "atendimento");
+  const base = semLaudo(linhas).filter((l) => l.origem === "atendimento");
   const mapa = new Map<Modalidade, { atendimentos: number; receita: number }>();
   for (const l of base) {
     const c = (l.condicao ?? "").toUpperCase();
@@ -183,7 +192,7 @@ const somaDias = (iso: string, n: number) =>
  */
 export function evolucao(linhas: RateioLinha[], por: Agrupamento = "dia"): PontoEvolucao[] {
   const mapa = new Map<string, { atendimentos: number; receita: number }>();
-  for (const l of linhas) {
+  for (const l of semLaudo(linhas)) {
     const dia = String(l.data ?? "").slice(0, 10);
     if (!dia) continue;
     const chave = por === "semana" ? domingoDa(dia) : dia;

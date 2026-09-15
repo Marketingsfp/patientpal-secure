@@ -122,6 +122,31 @@ describe("distribuicaoPorModalidade", () => {
   });
 });
 
+describe("repasse de laudo não é atendimento", () => {
+  const linhas = [
+    linha({ receita: 200 }),
+    linha({ receita: 0, repasse: 30, laudo: true, condicao: "PARTICULAR" }),
+    linha({ condicao: "CARTÃO CONSULTA", receita: 100 }),
+  ];
+
+  it("fica fora do volume e do ticket da evolução", () => {
+    const r = evolucao(linhas, "dia");
+    expect(r[0].atendimentos).toBe(2);
+    expect(r[0].ticket).toBe(150);
+  });
+
+  it("não distorce a fatia de cada modalidade", () => {
+    const r = distribuicaoPorModalidade(linhas);
+    expect(r.map((f) => f.atendimentos)).toEqual([1, 1]);
+    expect(r[0].participacao).toBe(50);
+  });
+
+  it("não soma atendimento no ranking do médico", () => {
+    const r = rankingPorChave(linhas, "medico");
+    expect(r[0].atendimentos).toBe(2);
+  });
+});
+
 describe("evolucao", () => {
   const linhas = [
     linha({ data: "2026-09-01", receita: 100 }),

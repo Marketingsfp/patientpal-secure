@@ -25,6 +25,7 @@ import { MiniPieChart } from "@/components/charts/MiniPieChart";
 import {
   carregarContextoRateio,
   carregarRateio,
+  ehProcedimentoDeLaudo,
   type RateioLinha,
 } from "@/lib/financeiro/rateio-receita";
 import {
@@ -345,7 +346,10 @@ function Page() {
         pagos += 1;
         totA += Number(l.valor) || 0;
       }
-      for (const a of atendRows) {
+      // O repasse de laudo ("[LAUDO]") também tem valor zero, mas não é
+      // atendimento: é a remuneração da leitura de um exame já contado.
+      const atendReais = atendRows.filter((a) => !ehProcedimentoDeLaudo(a.procedimento));
+      for (const a of atendReais) {
         if (a.status === "cancelado") continue;
         if ((Number(a.valor_total) || 0) > 0) continue; // já contado pelo pagamento no caixa
         cortesias += 1;
@@ -362,7 +366,7 @@ function Page() {
         pendentes: p,
         ticket: cntA > 0 ? totA / cntA : 0,
       });
-      setAtends(atendRows as typeof atends);
+      setAtends(atendReais as typeof atends);
       setLancs(lancRows as typeof lancs);
       setNotasList((notasFull.data ?? []) as typeof notasList);
       setLoading(false);
