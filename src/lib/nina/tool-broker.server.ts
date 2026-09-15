@@ -1,3 +1,4 @@
+import { processamentoWatchdogAtual } from "./watchdog-contexto.server";
 /**
  * FASE 4 — TOOL BROKER (execução server-side).
  *
@@ -19,7 +20,11 @@ import {
 import type { CtxNinaPaciente } from "./paciente-tools.server";
 
 export type ToolBroker = {
-  executar: (nome: string, args: unknown, opcoes?: { revalidarLeitura?: boolean }) => Promise<ResultadoBroker>;
+  executar: (
+    nome: string,
+    args: unknown,
+    opcoes?: { revalidarLeitura?: boolean },
+  ) => Promise<ResultadoBroker>;
   /** Resultados do turno, na ordem, para alimentar o contexto. */
   resultados: () => Array<{ ferramenta: string; resultado: unknown }>;
   /** Houve agendamento gravado e verificado neste turno. */
@@ -40,14 +45,25 @@ export function criarToolBroker(params: {
   let confirmou = false;
   let handoff = false;
 
-  async function executar(nome: string, args: unknown, opcoes?: { revalidarLeitura?: boolean }): Promise<ResultadoBroker> {
+  async function executar(
+    nome: string,
+    args: unknown,
+    opcoes?: { revalidarLeitura?: boolean },
+  ): Promise<ResultadoBroker> {
     const chave = chaveIdempotencia(nome, args);
     const emCache = cache.get(chave);
+    const controle = processamentoWatchdogAtual();
     // Retry do modelo com os MESMOS argumentos não repete a operação.
     const descritor = descreverFerramenta(nome);
     // Recuperação comandada pelo servidor pode reconsultar somente leitura.
     // A opção não faz parte dos argumentos do modelo e nunca repete escrita.
-    if (emCache && !(opcoes?.revalidarLeitura && descritor?.escrita === false)) return { ...emCache, reused: true };
+    if (emCache && !(opcoes?.revalidarLeitura && descritor?.escrita === false)) {
+      await controle?.evento("DUPLICATE_PREVENTED", { ferramenta: nome });
+      return { ...emCache, reused: true };
+    }
+    // Fencing antes de qualquer ferramenta; perda da reserva não vira fallback.
+    await controle?.checkpoint("generating");
+    await controle?.evento("TOOL_STARTED", { ferramenta: nome });
     let bruto: unknown;
     try {
       if (descritor?.capacidade === "requestHumanHandoff") {
@@ -67,7 +83,12 @@ export function criarToolBroker(params: {
       bruto = { ok: false, erro: "INTERNAL_ERROR", mensagem: "Falha ao consultar o sistema." };
     }
 
+    await controle?.checkpoint("generating");
     const validado = validarResultado(nome, bruto);
+    await controle?.evento(validado.success ? "TOOL_FINISHED" : "TOOL_FAILED", {
+      ferramenta: nome,
+      sucesso: validado.success,
+    });
     if (validado.appointment_confirmed) confirmou = true;
     cache.set(chave, validado);
     const paraModelo = respostaParaModelo(validado);

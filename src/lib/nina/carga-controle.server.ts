@@ -259,13 +259,20 @@ export async function comLeaseCarga<T>(entrada: {
       const controle = controleExecucaoCarga(atual.config);
       carga = atual;
       if (controle.lease?.token !== token) break;
+      const falhasExecutor = falha ? Number(controle.falhasExecutor ?? 0) + 1 : 0;
+      const podeReconciliar =
+        (atual.config as any)?.executor === "carga-v3-item" &&
+        fase === "lote" &&
+        falhasExecutor < 3 &&
+        !falha?.startsWith("Lead ");
       const final = await atualizarCargaCAS(admin, atual, {
-        ...(falha && ["preparando", "executando"].includes(atual.status)
+        ...(falha && !podeReconciliar && ["preparando", "executando"].includes(atual.status)
           ? { status: "erro", cancelar: true, finalizado_em: new Date(agora()).toISOString() }
           : {}),
         config: configComControle(atual.config, {
           ...controle,
           lease: null,
+          falhasExecutor,
           ...(falha
             ? { motivo: "FALHA_EXECUTOR", erro: falha, indicesIncertos: controle.lease.indices }
             : {}),

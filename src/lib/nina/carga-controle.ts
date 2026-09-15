@@ -3,7 +3,7 @@ export const LEASE_CARGA_MS = 120_000;
 export const HEARTBEAT_CARGA_MS = 20_000;
 export const QUARENTENA_CARGA_MS = 300_000;
 export const OCIOSIDADE_CARGA_MS = 300_000;
-export const VERSAO_EXECUTOR_CARGA = "carga-v2-sol-lease";
+export const VERSAO_EXECUTOR_CARGA = "carga-v3-item";
 export const STATUS_ATIVOS_CARGA = ["preparando", "executando"] as const;
 
 export type LeaseCarga = {
@@ -21,6 +21,7 @@ export type ControleExecucaoCarga = {
   recuperada: boolean;
   indicesIncertos: number[];
   proximoDisparoEm: string | null;
+  falhasExecutor?: number;
 };
 export type CargaPersistida = {
   id: string;
@@ -70,6 +71,7 @@ export function controleExecucaoCarga(config: unknown): ControleExecucaoCarga {
     recuperada: c.recuperada === true,
     indicesIncertos: indices(c.indicesIncertos),
     proximoDisparoEm: texto(c.proximoDisparoEm),
+    falhasExecutor: Math.max(0, Number(c.falhasExecutor) || 0),
   };
 }
 
@@ -115,6 +117,24 @@ export function patchRecuperarCarga(carga: CargaPersistida, agora = Date.now()) 
   const estado = estadoControleCarga(carga, agora);
   if (!estado.orfa) return null;
   const c = controleExecucaoCarga(carga.config);
+  // Só as filas criadas com o executor por item têm retomada automática.
+  // Cada item será conciliado com sua entrada/saída antes de iniciar qualquer geração.
+  if (
+    objeto(carga.config).executor === VERSAO_EXECUTOR_CARGA &&
+    carga.status === "executando" &&
+    !carga.cancelar
+  ) {
+    return {
+      config: configComControle(carga.config, {
+        ...c,
+        lease: null,
+        recuperada: true,
+        motivo: "RETOMADA_POR_ITEM",
+        erro: null,
+        indicesIncertos: [...new Set([...c.indicesIncertos, ...(c.lease?.indices ?? [])])],
+      }),
+    };
+  }
   const erro = c.lease
     ? "O executor perdeu atividade e o prazo de segurança expirou. As mensagens em andamento não serão reenviadas automaticamente."
     : "O teste ficou sem atividade do executor. Foi encerrado para liberar um novo teste.";

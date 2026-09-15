@@ -1,3 +1,5 @@
+import { POLITICA_WATCHDOG, esperaRetryWatchdog } from "./watchdog";
+import { processamentoWatchdogAtual } from "./watchdog-contexto.server";
 /**
  * NINA AI GATEWAY — camada única de acesso ao modelo.
  *
@@ -91,10 +93,13 @@ export async function ninaAIGateway(pedido: PedidoNina): Promise<RespostaNina> {
     ? selectThinkingLevel(pedido.raciocinio)
     : { nivel: "low" as NivelRaciocinio, motivo: "sem contexto: padrão LOW" };
   const nivel =
-    pedido.nivelForcado ??
-    nivelNaoRegride(decisao.nivel, pedido.raciocinio?.nivelAnterior);
+    pedido.nivelForcado ?? nivelNaoRegride(decisao.nivel, pedido.raciocinio?.nivelAnterior);
 
   const opcoes: OpcoesChamada = {
+    timeoutMs:
+      pedido.perfil === "whatsapp" && processamentoWatchdogAtual()
+        ? POLITICA_WATCHDOG.modeloTimeoutMs
+        : undefined,
     modelo: resolucao.modelo,
     messages: pedido.messages,
     tools: pedido.tools,
@@ -115,17 +120,55 @@ export async function ninaAIGateway(pedido: PedidoNina): Promise<RespostaNina> {
   // ---- Chamada com política única de timeout/retry (Fase 5).
   const inicio = Date.now();
   let tentativa = 0;
-  let resposta = await chamarModeloGemini(opcoes);
+  const controle = processamentoWatchdogAtual();
+  const chamar = async () => {
+    await controle?.checkpoint("generating");
+    await controle?.evento("MODEL_STARTED", { modelo: opcoes.modelo, tentativa: tentativa + 1 });
+    // Mede pressão sem copiar/serializar o contexto inteiro nem registrar seu conteúdo.
+    let heapBytes: number | null = null;
+    try {
+      heapBytes = process.memoryUsage().heapUsed;
+    } catch {
+      /* runtime sem medição de heap */
+    }
+    console.info("[NINA_RESOURCE_USAGE]", {
+      batch_id: controle?.batchId ?? null,
+      mensagens: opcoes.messages.length,
+      contexto_caracteres: opcoes.messages.reduce((n, m) => n + (m.content?.length ?? 0), 0),
+      ferramentas: opcoes.tools?.length ?? 0,
+      heap_bytes: heapBytes,
+    });
+    const r = await chamarModeloGemini(opcoes);
+    await controle?.evento(r.ok ? "MODEL_FINISHED" : "MODEL_FAILED", {
+      modelo: opcoes.modelo,
+      tentativa: tentativa + 1,
+      status: r.status ?? null,
+      categoria: r.ok
+        ? null
+        : classificarErro({ status: r.status, erro: r.erro, origem: "modelo" }),
+    });
+    return r;
+  };
+  let resposta = await chamar();
   let categoria: CategoriaErro | null = null;
   tentativa = 1;
 
   while (!resposta.ok) {
-    categoria = classificarErro({ status: resposta.status ?? null, erro: resposta.erro, origem: "modelo" });
-    const decisaoRetry = decidirRetry(categoria, tentativa);
+    categoria = classificarErro({
+      status: resposta.status ?? null,
+      erro: resposta.erro,
+      origem: "modelo",
+    });
+    const decisaoRetry = decidirRetry(categoria, tentativa, {
+      maxTentativas: controle?.maxTentativas,
+    });
     console.warn("[nina-ai-gateway] falha", categoria, "|", decisaoRetry.motivo);
     if (!decisaoRetry.repetir) break;
-    await new Promise((r) => setTimeout(r, decisaoRetry.esperaMs));
-    resposta = await chamarModeloGemini(opcoes);
+    await controle?.evento("MODEL_RETRY");
+    await new Promise((r) =>
+      setTimeout(r, controle ? esperaRetryWatchdog(tentativa) : decisaoRetry.esperaMs),
+    );
+    resposta = await chamar();
     tentativa += 1;
     if (resposta.ok) categoria = null;
   }
@@ -147,11 +190,15 @@ export async function ninaAIGateway(pedido: PedidoNina): Promise<RespostaNina> {
       titulo: "Conteúdo efetivamente enviado ao modelo",
       dados: {
         mensagens: (pedido.messages as readonly { role?: string; content?: unknown }[]).map(
-          (m) => ({ role: m.role ?? null, content: typeof m.content === "string" ? m.content : JSON.stringify(m.content ?? null) }),
+          (m) => ({
+            role: m.role ?? null,
+            content: typeof m.content === "string" ? m.content : JSON.stringify(m.content ?? null),
+          }),
         ),
-        ferramentas_disponiveis: (pedido.tools as readonly { function?: { name?: string } }[] | undefined)?.map(
-          (t) => t?.function?.name ?? null,
-        ) ?? [],
+        ferramentas_disponiveis:
+          (pedido.tools as readonly { function?: { name?: string } }[] | undefined)?.map(
+            (t) => t?.function?.name ?? null,
+          ) ?? [],
       },
       codigo,
     });
@@ -181,9 +228,15 @@ export async function ninaAIGateway(pedido: PedidoNina): Promise<RespostaNina> {
       dados: {
         texto: resposta.ok ? (resposta.conteudo ?? "") : null,
         erro: resposta.ok ? null : (resposta.erro ?? null),
-        tool_calls: (resposta.toolCalls as readonly { function?: { name?: string; arguments?: unknown } }[] | undefined)?.map(
-          (t) => ({ nome: t?.function?.name ?? null, argumentos: t?.function?.arguments ?? null }),
-        ) ?? [],
+        tool_calls:
+          (
+            resposta.toolCalls as
+              | readonly { function?: { name?: string; arguments?: unknown } }[]
+              | undefined
+          )?.map((t) => ({
+            nome: t?.function?.name ?? null,
+            argumentos: t?.function?.arguments ?? null,
+          })) ?? [],
       },
       codigo,
     });

@@ -129,6 +129,7 @@ import { Route as AuthenticatedAppEquipeIndexRouteImport } from './routes/_authe
 import { Route as AuthenticatedAppClientesIndexRouteImport } from './routes/_authenticated/app.clientes.index'
 import { Route as AuthenticatedAppAtendimentoIaIndexRouteImport } from './routes/_authenticated/app.atendimento-ia.index'
 import { Route as ApiPublicWhatsappClinicaIdRouteImport } from './routes/api/public/whatsapp.$clinicaId'
+import { Route as ApiPublicNinaWatchdogRouteImport } from './routes/api/public/nina.watchdog'
 import { Route as ApiPublicNinaEsperaTimeoutRouteImport } from './routes/api/public/nina.espera-timeout'
 import { Route as ApiPublicHooksConfirmacaoConsultasRouteImport } from './routes/api/public/hooks/confirmacao-consultas'
 import { Route as ApiPublicHooksBackupDiarioRouteImport } from './routes/api/public/hooks/backup-diario'
@@ -845,6 +846,11 @@ const ApiPublicWhatsappClinicaIdRoute =
     path: '/api/public/whatsapp/$clinicaId',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicNinaWatchdogRoute = ApiPublicNinaWatchdogRouteImport.update({
+  id: '/api/public/nina/watchdog',
+  path: '/api/public/nina/watchdog',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPublicNinaEsperaTimeoutRoute =
   ApiPublicNinaEsperaTimeoutRouteImport.update({
     id: '/api/public/nina/espera-timeout',
@@ -1323,6 +1329,7 @@ export interface FileRoutesByFullPath {
   '/api/public/hooks/backup-diario': typeof ApiPublicHooksBackupDiarioRoute
   '/api/public/hooks/confirmacao-consultas': typeof ApiPublicHooksConfirmacaoConsultasRoute
   '/api/public/nina/espera-timeout': typeof ApiPublicNinaEsperaTimeoutRoute
+  '/api/public/nina/watchdog': typeof ApiPublicNinaWatchdogRoute
   '/api/public/whatsapp/$clinicaId': typeof ApiPublicWhatsappClinicaIdRoute
   '/app/atendimento-ia/': typeof AuthenticatedAppAtendimentoIaIndexRoute
   '/app/clientes/': typeof AuthenticatedAppClientesIndexRoute
@@ -1493,6 +1500,7 @@ export interface FileRoutesByTo {
   '/api/public/hooks/backup-diario': typeof ApiPublicHooksBackupDiarioRoute
   '/api/public/hooks/confirmacao-consultas': typeof ApiPublicHooksConfirmacaoConsultasRoute
   '/api/public/nina/espera-timeout': typeof ApiPublicNinaEsperaTimeoutRoute
+  '/api/public/nina/watchdog': typeof ApiPublicNinaWatchdogRoute
   '/api/public/whatsapp/$clinicaId': typeof ApiPublicWhatsappClinicaIdRoute
   '/app/atendimento-ia': typeof AuthenticatedAppAtendimentoIaIndexRoute
   '/app/clientes': typeof AuthenticatedAppClientesIndexRoute
@@ -1669,6 +1677,7 @@ export interface FileRoutesById {
   '/api/public/hooks/backup-diario': typeof ApiPublicHooksBackupDiarioRoute
   '/api/public/hooks/confirmacao-consultas': typeof ApiPublicHooksConfirmacaoConsultasRoute
   '/api/public/nina/espera-timeout': typeof ApiPublicNinaEsperaTimeoutRoute
+  '/api/public/nina/watchdog': typeof ApiPublicNinaWatchdogRoute
   '/api/public/whatsapp/$clinicaId': typeof ApiPublicWhatsappClinicaIdRoute
   '/_authenticated/app/atendimento-ia/': typeof AuthenticatedAppAtendimentoIaIndexRoute
   '/_authenticated/app/clientes/': typeof AuthenticatedAppClientesIndexRoute
@@ -1845,6 +1854,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/backup-diario'
     | '/api/public/hooks/confirmacao-consultas'
     | '/api/public/nina/espera-timeout'
+    | '/api/public/nina/watchdog'
     | '/api/public/whatsapp/$clinicaId'
     | '/app/atendimento-ia/'
     | '/app/clientes/'
@@ -2015,6 +2025,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/backup-diario'
     | '/api/public/hooks/confirmacao-consultas'
     | '/api/public/nina/espera-timeout'
+    | '/api/public/nina/watchdog'
     | '/api/public/whatsapp/$clinicaId'
     | '/app/atendimento-ia'
     | '/app/clientes'
@@ -2190,6 +2201,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/backup-diario'
     | '/api/public/hooks/confirmacao-consultas'
     | '/api/public/nina/espera-timeout'
+    | '/api/public/nina/watchdog'
     | '/api/public/whatsapp/$clinicaId'
     | '/_authenticated/app/atendimento-ia/'
     | '/_authenticated/app/clientes/'
@@ -2249,6 +2261,7 @@ export interface RootRouteChildren {
   ApiPublicHooksBackupDiarioRoute: typeof ApiPublicHooksBackupDiarioRoute
   ApiPublicHooksConfirmacaoConsultasRoute: typeof ApiPublicHooksConfirmacaoConsultasRoute
   ApiPublicNinaEsperaTimeoutRoute: typeof ApiPublicNinaEsperaTimeoutRoute
+  ApiPublicNinaWatchdogRoute: typeof ApiPublicNinaWatchdogRoute
   ApiPublicWhatsappClinicaIdRoute: typeof ApiPublicWhatsappClinicaIdRoute
   ApiPublicIntegrationsV1SplatRoute: typeof ApiPublicIntegrationsV1SplatRoute
 }
@@ -3095,6 +3108,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicWhatsappClinicaIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/nina/watchdog': {
+      id: '/api/public/nina/watchdog'
+      path: '/api/public/nina/watchdog'
+      fullPath: '/api/public/nina/watchdog'
+      preLoaderRoute: typeof ApiPublicNinaWatchdogRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/nina/espera-timeout': {
       id: '/api/public/nina/espera-timeout'
       path: '/api/public/nina/espera-timeout'
@@ -3906,6 +3926,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicHooksConfirmacaoConsultasRoute:
     ApiPublicHooksConfirmacaoConsultasRoute,
   ApiPublicNinaEsperaTimeoutRoute: ApiPublicNinaEsperaTimeoutRoute,
+  ApiPublicNinaWatchdogRoute: ApiPublicNinaWatchdogRoute,
   ApiPublicWhatsappClinicaIdRoute: ApiPublicWhatsappClinicaIdRoute,
   ApiPublicIntegrationsV1SplatRoute: ApiPublicIntegrationsV1SplatRoute,
 }

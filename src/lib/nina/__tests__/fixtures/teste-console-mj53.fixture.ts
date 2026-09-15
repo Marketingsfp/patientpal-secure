@@ -40,6 +40,7 @@ const bd: Record<string, Linha[]> = {
       contato_telefone: lead.telefone_sessao,
     },
   ],
+  nina_message_batches: [],
   whatsapp_mensagens: [],
   nina_teste_simulacoes: [],
 };

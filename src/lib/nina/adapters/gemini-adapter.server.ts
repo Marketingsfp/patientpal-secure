@@ -26,6 +26,8 @@ export type OpcoesChamada = {
   /** Fase 2: esforço de raciocínio decidido pelo Reasoning Router. */
   reasoning?: "none" | "low" | "medium" | "high";
   stream?: boolean;
+  /** Prazo da requisição completa, incluindo leitura do corpo. */
+  timeoutMs?: number;
 };
 
 export type RespostaChat = {
@@ -76,8 +78,7 @@ export function normalizarMensagensParaProvedor(mensagens: ChatMensagem[]): {
 }
 
 /**
- * Chamada não-streaming. Sem timeout artificial de propósito: abortar a
- * geração não devolve o crédito e ainda perde a resposta.
+ * Chamada não-streaming com prazo explícito quando solicitado pelo processamento.
  */
 export async function chamarModeloGemini(opcoes: OpcoesChamada): Promise<RespostaChat> {
   const key = process.env["LOVABLE_API_KEY"];
@@ -96,48 +97,74 @@ export async function chamarModeloGemini(opcoes: OpcoesChamada): Promise<Respost
     };
   }
 
-  const res = await fetch(ENDPOINT, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-    body: JSON.stringify({
-      model: opcoes.modelo,
-      // Fase 2: nível LOW/MEDIUM/HIGH escolhido pelo Reasoning Router.
-      ...(opcoes.reasoning && opcoes.reasoning !== "none"
-        ? { reasoning_effort: opcoes.reasoning }
-        : {}),
-      ...(opcoes.tools ? { tools: opcoes.tools } : {}),
-      ...(opcoes.maxTokens ? { max_tokens: opcoes.maxTokens } : {}),
-      messages: envio.mensagens,
-    }),
-  });
+  const controller = opcoes.timeoutMs ? new AbortController() : null;
+  const timer = controller
+    ? setTimeout(
+        () => controller.abort(new DOMException("Model request timed out", "TimeoutError")),
+        opcoes.timeoutMs,
+      )
+    : null;
+  try {
+    const res = await fetch(ENDPOINT, {
+      signal: controller?.signal,
+      method: "POST",
+      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: opcoes.modelo,
+        // Fase 2: nível LOW/MEDIUM/HIGH escolhido pelo Reasoning Router.
+        ...(opcoes.reasoning && opcoes.reasoning !== "none"
+          ? { reasoning_effort: opcoes.reasoning }
+          : {}),
+        ...(opcoes.tools ? { tools: opcoes.tools } : {}),
+        ...(opcoes.maxTokens ? { max_tokens: opcoes.maxTokens } : {}),
+        messages: envio.mensagens,
+      }),
+    });
 
-  if (!res.ok) {
-    const corpo = await res.text().catch(() => "");
-    console.error("[nina-ai-gateway] erro do provedor", opcoes.modelo, res.status, corpo.slice(0, 500));
+    if (!res.ok) {
+      const corpo = await res.text().catch(() => "");
+      console.error(
+        "[nina-ai-gateway] erro do provedor",
+        opcoes.modelo,
+        res.status,
+        corpo.slice(0, 500),
+      );
+      return {
+        ok: false,
+        conteudo: "",
+        toolCalls: [],
+        status: res.status,
+        erro: mensagemErroGateway(res.status),
+      };
+    }
+
+    const json = (await res.json()) as {
+      choices?: Array<{ message?: { content?: string; tool_calls?: ChatMensagem["tool_calls"] } }>;
+      usage?: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number };
+    };
+    const msg = json.choices?.[0]?.message;
+    return {
+      ok: true,
+      conteudo: (msg?.content ?? "").trim(),
+      toolCalls: msg?.tool_calls ?? [],
+      uso: {
+        entrada: json.usage?.prompt_tokens,
+        saida: json.usage?.completion_tokens,
+        total: json.usage?.total_tokens,
+      },
+    };
+  } catch (erro) {
+    // O contrato de retry novo é opt-in no contexto rastreado.
+    if (!opcoes.timeoutMs) throw erro;
     return {
       ok: false,
       conteudo: "",
       toolCalls: [],
-      status: res.status,
-      erro: mensagemErroGateway(res.status),
+      erro: erro instanceof Error ? erro.message : "Network error",
     };
+  } finally {
+    if (timer) clearTimeout(timer);
   }
-
-  const json = (await res.json()) as {
-    choices?: Array<{ message?: { content?: string; tool_calls?: ChatMensagem["tool_calls"] } }>;
-    usage?: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number };
-  };
-  const msg = json.choices?.[0]?.message;
-  return {
-    ok: true,
-    conteudo: (msg?.content ?? "").trim(),
-    toolCalls: msg?.tool_calls ?? [],
-    uso: {
-      entrada: json.usage?.prompt_tokens,
-      saida: json.usage?.completion_tokens,
-      total: json.usage?.total_tokens,
-    },
-  };
 }
 
 /**

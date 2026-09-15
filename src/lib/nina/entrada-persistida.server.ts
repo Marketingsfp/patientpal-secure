@@ -31,8 +31,7 @@ export async function persistirEntradaNina(
   entrada: Record<string, unknown> & { clinica_id: string; wa_message_id: string },
 ) {
   try {
-    const campos =
-      "id, conversa_id, execucao_id, direction, body, transcricao, tipo, from_number, tratada_internamente, created_at";
+    const campos = "*";
     const { data, error } = await admin
       .from("whatsapp_mensagens")
       .insert(entrada)
@@ -62,11 +61,22 @@ export async function persistirEntradaNina(
         "A chave de entrada pertence a outra sessão; a mensagem anterior foi preservada.",
         false,
       );
+    // Mídia sem texto não entra no lote de inferência. Só a primeira inserção pode
+    // emitir o retorno automático; abandono fica explícito no watchdog, sem replay.
+    const midiaSemLote =
+      Boolean(m.nina_status) &&
+      m.tipo !== "text" &&
+      (m.tipo !== "audio" || !String(m.transcricao ?? "").trim());
     // A execução já começou: nunca repetir efeitos em busca de uma resposta ausente.
     return {
       mensagem: m,
       repetida: true,
-      consumida: Boolean(m.execucao_id || m.tratada_internamente),
+      consumida: Boolean(
+        m.execucao_id ||
+        m.tratada_internamente ||
+        midiaSemLote ||
+        ["completed", "failed", "handoff"].includes(m.nina_status),
+      ),
     };
   } catch (e) {
     if (e instanceof ErroAgrupamentoNina) throw e;

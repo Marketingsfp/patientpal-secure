@@ -324,6 +324,17 @@ describe("persistência idempotente comum aos adaptadores", () => {
     expect(b.repetida).toBe(true);
     expect(b.consumida).toBe(false);
   });
+  it("mídia rastreada sem lote não repete seu retorno automático em redelivery concorrente", async () => {
+    const db = bancoEntrada();
+    const midia = { ...fisica, tipo: "image", body: "[image]", nina_status: "received" };
+    const [a, b] = await Promise.all([
+      persistirEntradaNina(db.admin, midia),
+      persistirEntradaNina(db.admin, midia),
+    ]);
+    expect(a.consumida).toBe(false);
+    expect(b.consumida).toBe(true);
+    expect(db.linhas).toHaveLength(1);
+  });
   it("retry depois de execução iniciada é consumido, sem reexecutar para procurar saída", async () => {
     const db = bancoEntrada();
     await persistirEntradaNina(db.admin, fisica);

@@ -50,6 +50,9 @@ import {
 } from "./carga-teste-ui";
 
 type DetalheCarga = {
+  processamento?: Awaited<
+    ReturnType<typeof import("@/lib/nina/watchdog-metricas.server").metricasWatchdogCarga>
+  >;
   carga: CargaPersistida & {
     erros?: number;
     timeouts?: number;
@@ -579,8 +582,8 @@ function CargaTesteClinica({
               Disparar teste de carga
             </Button>
             <span className="text-xs text-muted-foreground">
-              {cfgPrevia.totalMensagens} mensagens · {cfgPrevia.conversasSimultaneas} simultâneas ·{" "}
-              {cfgPrevia.mensagensPorMinuto} msg/min
+              {cfgPrevia.totalMensagens} mensagens · {cfgPrevia.conversasSimultaneas} simultâneas
+              solicitadas · {cfgPrevia.mensagensPorMinuto} msg/min
             </span>
           </div>
         </div>
@@ -589,6 +592,10 @@ function CargaTesteClinica({
             Luna está preparando as mensagens do roteiro. A preparação dos leads começa em seguida.
           </p>
         )}
+        <p className="text-sm text-muted-foreground">
+          Limite atual: uma mensagem por vez, em requisições separadas. Os demais itens aguardam na
+          fila. Continuar com a página fechada exige o job do watchdog ativo.
+        </p>
         {preparo?.prontos !== undefined && (
           <p className="rounded-lg border p-3 text-sm">
             Verificação dos leads: {preparo.prontos}/{preparo.total ?? "—"} prontos.{" "}
@@ -609,13 +616,14 @@ function CargaTesteClinica({
               <Badge variant="secondary">{detalhe.carga.status}</Badge>
               <span className="text-sm">
                 {detalhe.carga.nome} · {detalhe.carga.enviadas}/{detalhe.carga.total_planejado}{" "}
-                mensagens processadas
+                resultados registrados
               </span>
             </div>
             {detalhe.carga.controle?.recuperada && (
               <p className="text-sm">
-                Este teste foi interrompido após perder a execução. O servidor encerrou o registro
-                pendente.
+                {detalhe.carga.controle.motivo === "RETOMADA_POR_ITEM"
+                  ? "O executor foi interrompido. A fila retoma a partir dos resultados comprovados, sem reenviar entradas já aceitas."
+                  : "Este teste foi interrompido após perder a execução. O servidor encerrou o registro pendente."}
               </p>
             )}
             {detalhe.carga.controle?.erro && (
@@ -631,6 +639,7 @@ function CargaTesteClinica({
               </div>
             )}
             <div className="grid gap-2 text-sm md:grid-cols-4">
+              <div>Limite efetivo: uma mensagem por requisição</div>
               <div>Latência média: {ms(m?.media)}</div>
               <div>p50: {ms(m?.p50)}</div>
               <div>p95: {m?.p95 == null ? "volume insuficiente" : ms(m.p95)}</div>
@@ -638,15 +647,71 @@ function CargaTesteClinica({
               <div>Msg/min medidas: {m?.mensagensPorMinutoReal?.toFixed(1) ?? "—"}</div>
               <div>Erros: {detalhe.carga.erros ?? 0}</div>
               <div>Tempos esgotados: {detalhe.carga.timeouts ?? 0}</div>
-              <div>Novas tentativas do modelo da Nina: {detalhe.carga.retries ?? 0}</div>
-              <div>Chamadas do modelo: {detalhe.carga.chamadas_modelo ?? 0}</div>
-              <div>Ferramentas usadas: {detalhe.carga.ferramentas ?? 0}</div>
+              <div>Novas tentativas registradas: {detalhe.carga.retries ?? 0}</div>
+              <div>Registros do modelo vinculados: {detalhe.carga.chamadas_modelo ?? 0}</div>
+              <div>Ferramentas registradas: {detalhe.carga.ferramentas ?? 0}</div>
               <div>
-                Tokens: {detalhe.carga.input_tokens ?? 0} entrada /{" "}
+                Tokens registrados: {detalhe.carga.input_tokens ?? 0} entrada /{" "}
                 {detalhe.carga.output_tokens ?? 0} saída
               </div>
               <div>Conversas envolvidas: {m?.conversasEnvolvidas ?? "—"}</div>
             </div>
+            <p className="text-xs text-muted-foreground">
+              A telemetria acima usa a última chamada do modelo vinculada a cada resultado. Pode
+              faltar após uma interrupção e não representa o consumo total nem todas as rodadas.
+            </p>
+            {detalhe.processamento && (
+              <div className="rounded-md border p-3 space-y-2" role="status">
+                <p className="font-medium">
+                  Conciliação das mensagens:{" "}
+                  {detalhe.processamento.testeFalhou
+                    ? "FALHOU"
+                    : !detalhe.processamento.recebidas
+                      ? "nenhuma entrada recebida"
+                      : detalhe.processamento.integridade
+                        ? "todas finalizadas"
+                        : "aguardando desfecho"}
+                </p>
+                <p>
+                  Entradas esperadas: {detalhe.processamento.esperadas} · Recebidas:{" "}
+                  {detalhe.processamento.recebidas} · Não localizadas:{" "}
+                  {detalhe.processamento.naoLocalizadas} · Concluídas:{" "}
+                  {detalhe.processamento.completed} · Falhas: {detalhe.processamento.failed} ·
+                  Encaminhadas: {detalhe.processamento.handoff}
+                </p>
+                <p>
+                  Na fila: {detalhe.processamento.queued} · Processando:{" "}
+                  {detalhe.processamento.processing} · Em nova tentativa:{" "}
+                  {detalhe.processamento.retrying} · Sem estado terminal:{" "}
+                  {detalhe.processamento.pendentes} · Sem rastreamento:{" "}
+                  {detalhe.processamento.semRastreamento}
+                </p>
+                <p>
+                  Recuperadas: {detalhe.processamento.watchdog_jobs_recovered} · Repetições
+                  impedidas: {detalhe.processamento.duplicate_prevented} · Prazo excedido:{" "}
+                  {detalhe.processamento.stale}
+                </p>
+                <p>
+                  Travamentos detectados: {detalhe.processamento.watchdog_stale_jobs_detected} ·
+                  Locks órfãos liberados: {detalhe.processamento.watchdog_orphan_locks_released} ·
+                  Novas tentativas: {detalhe.processamento.watchdog_retries} · Recuperações que
+                  falharam: {detalhe.processamento.watchdog_failed_recoveries} · Timeouts:{" "}
+                  {detalhe.processamento.processing_timeout_count}
+                </p>
+                <p>
+                  Fila média: {ms(detalhe.processamento.tempo_medio_fila_ms)} · Processamento médio:{" "}
+                  {ms(detalhe.processamento.tempo_medio_processamento_ms)} · p95:{" "}
+                  {ms(detalhe.processamento.processamento_p95_ms)} · p99:{" "}
+                  {ms(detalhe.processamento.processamento_p99_ms)}
+                </p>
+                {detalhe.processamento.erroCritico && (
+                  <p className="text-destructive">
+                    Erro crítico: há mensagens aceitas sem desfecho após o encerramento ou prazo do
+                    teste.
+                  </p>
+                )}
+              </div>
+            )}
             {detalhe.preflight && (
               <p className="text-xs text-muted-foreground">
                 Leads prontos: {detalhe.preflight.leadsPreparados}/{detalhe.preflight.leadsTotal} ·

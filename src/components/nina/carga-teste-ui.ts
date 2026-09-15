@@ -115,6 +115,7 @@ export type ProgressoCarga = {
   erro?: string | null;
   aguardarMs?: number;
   aguardandoRitmo?: boolean;
+  aguardandoDesfecho?: boolean;
   controle?: ControleCarga;
 };
 

@@ -16,6 +16,7 @@ const respostaCardiologia =
   "Temos Cardiologia. A consulta custa R$ 120,00 no dinheiro e R$ 145,00 no cartão.";
 const entradasGerador: Linha[] = [];
 const db: Record<string, Linha[]> = {
+  nina_message_batches: [],
   whatsapp_mensagens: [],
   whatsapp_webhook_logs: [],
   whatsapp_configs: [],

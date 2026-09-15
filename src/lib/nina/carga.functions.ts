@@ -28,6 +28,11 @@ import { garantirPapel, PROVEDOR_IA } from "@/lib/nina/papeis-modelos";
 import { validarPlanoCarga } from "./carga-planejamento";
 import { estadoControleCarga, VERSAO_EXECUTOR_CARGA } from "./carga-controle";
 import {
+  CONCORRENCIA_CARGA_EFETIVA,
+  lerAmostrasCarga,
+  totaisAmostrasCarga,
+} from "./carga-itens.server";
+import {
   carregarCargaControlada as carregarCarga,
   recuperarCargaSemAtividade,
   comLeaseCarga,
@@ -200,6 +205,8 @@ export const criarTesteCarga = createServerFn({ method: "POST" })
           status: "preparando",
           config: {
             ...config,
+            executor: VERSAO_EXECUTOR_CARGA,
+            concorrenciaEfetiva: CONCORRENCIA_CARGA_EFETIVA,
             ...(planoIA ? { planoIA } : {}),
             _inicioCarga: {
               versao: 1,
@@ -462,6 +469,10 @@ export const detalheTesteCarga = createServerFn({ method: "POST" })
 
     if (erroAmostras) throw new Error(erroAmostras.message);
     const lista = (amostras ?? []) as any[];
+    // Reconstrói os totais mesmo se a última requisição caiu após salvar um item.
+    const totais = totaisAmostrasCarga(await lerAmostrasCarga(supabaseAdmin, carga));
+    const { metricasWatchdogCarga } = await import("./watchdog-metricas.server");
+    const processamento = await metricasWatchdogCarga(supabaseAdmin, carga);
     const fim = carga.finalizado_em ? new Date(carga.finalizado_em).getTime() : Date.now();
     const duracaoMs = Math.max(
       0,
@@ -489,15 +500,18 @@ export const detalheTesteCarga = createServerFn({ method: "POST" })
       versaoExecutor: VERSAO_EXECUTOR_CARGA,
       carga: {
         ...carga,
+        ...totais,
         config: carga.config as any,
         plano: undefined,
         variacoes: undefined,
         controle: estadoControleCarga(carga),
       },
       amostras: lista.slice(-200),
+      processamento,
       metricas: { ...metricas, duracaoMs, conversasEnvolvidas: conversas },
       preflight,
       // Custo monetário não é medido: o provedor não devolve preço por chamada.
       custoMedido: false,
+      concorrenciaEfetiva: CONCORRENCIA_CARGA_EFETIVA,
     };
   });

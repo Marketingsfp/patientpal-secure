@@ -166,9 +166,9 @@ describe("handlers reais de carga com fronteiras simuladas", () => {
     const segunda = await chamar(f.executarLoteCarga, args);
     expect(segunda.ocupado).toBe(true);
     gate.resolver({ reply: "simulado", processamento: "PROCESSADA" });
-    expect((await primeira).status).toBe("concluido");
-    expect(chamadas).toHaveLength(2);
-    expect(new Set(chamadas.map((c) => c.chave)).size).toBe(2);
+    expect((await primeira).status).toBe("executando");
+    expect(chamadas).toHaveLength(1);
+    expect(new Set(chamadas.map((c) => c.chave)).size).toBe(1);
   });
   it("parar no meio da chamada não permite outro teste nem conclusão tardia", async () => {
     db.tabelas.nina_teste_carga!.push(cargaFicticia());
@@ -188,16 +188,19 @@ describe("handlers reais de carga com fronteiras simuladas", () => {
     gate.resolver({ reply: "simulado", processamento: "PROCESSADA" });
     expect((await emVoo).status).toBe("parado");
   });
-  it("catch encerra o teste e preserva motivo para reload", async () => {
+  it("falha antes da entrada é registrada por item, sem reenviar o índice", async () => {
     db.tabelas.nina_teste_carga!.push(cargaFicticia());
     processador = async () => {
       throw new Error("falha simulada do processador");
     };
     const args = { clinicaId: CLINICA_CARGA, cargaId: RUN_CARGA };
-    expect((await chamar(f.executarLoteCarga, args)).status).toBe("erro");
+    expect((await chamar(f.executarLoteCarga, args)).status).toBe("executando");
     const lista = await chamar(f.listarTestesCarga, { clinicaId: CLINICA_CARGA });
-    expect(lista.testes[0].controle.erro).toContain("falha simulada");
-    expect(lista.versaoExecutor).toBe("carga-v2-sol-lease");
+    expect(lista.testes[0].erros).toBe(1);
+    expect(db.tabelas.nina_teste_carga_amostras![0].erro).toBe(
+      "PROCESSADOR_FALHOU_ANTES_DA_ENTRADA",
+    );
+    expect(lista.versaoExecutor).toBe("carga-v3-item");
   });
   it("falha de reset persiste identificação do lead, mantém gate fechado e não envia", async () => {
     db.tabelas.nina_teste_leads![0].conversa_id = "conversa-ativa";

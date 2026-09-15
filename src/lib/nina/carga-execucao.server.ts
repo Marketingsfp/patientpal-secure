@@ -1,17 +1,15 @@
-/** Executa somente a fila persistida. Processador injetado para testes sem IA/DB real. */
+/** Uma unidade por requisição limita o acúmulo de contexto/modelo/auditoria. */
 import { normalizarConfig, estourouOrcamento } from "./carga";
-import { chaveMensagemCarga, proximaRodadaCarga, estadoControleCarga } from "./carga-controle";
+import { chaveMensagemCarga, estadoControleCarga } from "./carga-controle";
 import { carregarCargaControlada, comLeaseCarga, retornoCarga } from "./carga-controle.server";
-
-const ORCAMENTO_LOTE_MS = 20_000;
-const dormir = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
-type ItemCarga = {
-  indice: number;
-  leadId: string;
-  leadIndice: number;
-  cenario: string;
-  mensagem: string;
-};
+import {
+  desfechoItemCarga,
+  gravarAmostraCarga,
+  lerAmostrasCarga,
+  totaisAmostrasCarga,
+  type ItemCarga,
+  type DesfechoItemCarga,
+} from "./carga-itens.server";
 
 export async function executarCargaControlada(e: {
   admin: any;
@@ -23,15 +21,19 @@ export async function executarCargaControlada(e: {
     userId: string,
   ) => Promise<any>;
   agora?: () => number;
-  esperar?: (ms: number) => Promise<void>;
   heartbeatMs?: number;
 }) {
   const agora = e.agora ?? Date.now;
   const carga = await carregarCargaControlada(e.admin, e.clinicaId, e.cargaId);
-  if (carga.status !== "executando") return retornoCarga(carga);
+  if (carga.status !== "executando") return retornoCarga(carga, { aguardandoDesfecho: false });
   const ritmo = estadoControleCarga(carga, agora());
   if (ritmo.aguardarMs > 0)
-    return retornoCarga(carga, { aguardandoRitmo: true, aguardarMs: ritmo.aguardarMs });
+    return retornoCarga(carga, {
+      aguardandoRitmo: true,
+      aguardarMs: ritmo.aguardarMs,
+      aguardandoDesfecho: false,
+    });
+  let aguardandoDesfecho = false;
   const resultado = await comLeaseCarga({
     admin: e.admin,
     carga,
@@ -40,254 +42,173 @@ export async function executarCargaControlada(e: {
     heartbeatMs: e.heartbeatMs,
     executar: async (dono, inicial) => {
       const config = normalizarConfig(inicial.config ?? {});
-      const plano = Array.isArray(inicial.plano) ? (inicial.plano as ItemCarga[]) : [];
-      const inicioLote = agora();
-      const inicioTeste = Date.parse(inicial.iniciado_em ?? "");
-      if (!Number.isFinite(inicioTeste))
-        throw new Error("O teste não possui início de execução válido.");
-      let enviadas = Number(inicial.enviadas ?? 0);
-      let atual = inicial;
-      while (enviadas < plano.length) {
-        if (agora() - inicioLote >= ORCAMENTO_LOTE_MS) break;
-        if (!(await dono.aindaAtivo())) break;
-        if (
-          agora() - inicioTeste >= config.duracaoMaxS * 1000 ||
+      const plano: ItemCarga[] = Array.isArray(inicial.plano) ? inicial.plano : [];
+      let amostras = await lerAmostrasCarga(e.admin, inicial);
+      const concluidos = new Set(amostras.map((a) => a.indice));
+      // O cursor é reconstruído dos resultados, inclusive se a queda ocorreu após o INSERT.
+      if (!(await dono.alterar(totaisAmostrasCarga(amostras)))) return;
+      if (plano.every((p) => concluidos.has(p.indice))) {
+        await dono.alterar(
+          { status: "concluido", finalizado_em: new Date(agora()).toISOString() },
+          [],
+        );
+        return;
+      }
+      const inicio = Date.parse(inicial.iniciado_em ?? "");
+      if (!Number.isFinite(inicio)) throw new Error("Início da carga inválido.");
+      let item: ItemCarga | undefined;
+      let existente: DesfechoItemCarga = { tipo: "novo" };
+      const aguardandoLead = new Set<string>();
+      for (const candidato of plano) {
+        if (concluidos.has(candidato.indice) || aguardandoLead.has(candidato.leadId)) continue;
+        const desfecho = await desfechoItemCarga(e.admin, inicial, candidato);
+        if (desfecho.tipo === "pendente") {
+          aguardandoLead.add(candidato.leadId);
+          continue;
+        }
+        item = candidato;
+        existente = desfecho;
+        break;
+      }
+      if (
+        existente.tipo !== "terminal" &&
+        (agora() - inicio >= config.duracaoMaxS * 1000 ||
           estourouOrcamento(
             config,
-            Number(atual.input_tokens ?? 0) + Number(atual.output_tokens ?? 0),
-          ).estourou
-        ) {
-          await dono.alterar({
-            status: "parado",
-            cancelar: true,
-            finalizado_em: new Date(agora()).toISOString(),
-          });
-          break;
-        }
-        const rodada = proximaRodadaCarga(
-          plano,
-          enviadas,
-          Math.min(config.conversasSimultaneas, config.mensagensPorMinuto),
-        );
-        if (!rodada.length)
-          throw new Error("Fila do teste inválida: nenhum item pode ser reservado.");
-        const intervaloRodada = Math.max(
-          config.intervaloMs,
-          Math.ceil((60_000 * rodada.length) / config.mensagensPorMinuto),
-        );
-        if (
-          !(await dono.alterar(
-            {},
-            rodada.map((item) => item.indice),
-          ))
-        )
-          break;
-        const t0Rodada = agora();
-        const encerradas = await Promise.allSettled(
-          rodada.map(async (item) => {
-            const t0 = agora();
-            let resp: any = null;
-            let erro: string | null = null;
-            let status: "ok" | "erro" | "timeout" | "cancelado" = "erro";
-            if (!(await dono.aindaAtivo()))
-              return {
-                item,
-                status: "cancelado" as const,
-                erro: "Teste interrompido antes do envio.",
-                latencia: 0,
-                conversaId: null,
-                ferramentas: [],
-                inputTokens: 0,
-                outputTokens: 0,
-                chamadas: 0,
-                retries: 0,
-              };
-            const baseline = (Array.isArray(inicial.preflight) ? inicial.preflight : []).find(
-              (b: any) => b.leadId === item.leadId,
-            );
-            const { data: leadAtual, error: erroLead } = await e.admin
-              .from("nina_teste_leads")
-              .select("id, sessao_seq")
-              .eq("clinica_id", e.clinicaId)
-              .eq("id", item.leadId)
-              .maybeSingle();
-            if (erroLead)
-              throw new Error(`Não foi possível confirmar a sessão do lead: ${erroLead.message}`);
-            if (
-              !baseline ||
-              baseline.runId !== inicial.id ||
-              !Number.isInteger(baseline.sessao) ||
-              !leadAtual ||
-              Number(leadAtual.sessao_seq) !== baseline.sessao
-            )
-              throw new Error(
-                `Lead ${item.leadIndice}: a sessão mudou ou não possui baseline. O roteiro foi encerrado; prepare um novo teste.`,
-              );
-            try {
-              // Não usa Promise.race: timeout de espera não cancela a Nina.
-              // O lease continua sendo renovado até o processador realmente terminar.
-              resp = await e.processar(
-                {
-                  clinicaId: e.clinicaId,
-                  leadId: item.leadId,
-                  tipo: "text",
-                  texto: item.mensagem,
-                  chave: chaveMensagemCarga(inicial.id, item.indice),
-                },
-                e.userId,
-              );
-              if (resp?.erro) {
-                erro = String(resp.erro).slice(0, 500);
-                status = "erro";
-              } else if (resp?.processamento === "ERRO" || resp?.mensagemPersistida === false) {
-                erro = "O processador não confirmou a mensagem de teste.";
-                status = "erro";
-              } else if (
-                resp?.duplicada ||
-                ["DUPLICADA", "AGRUPADA", "SEM_RESPOSTA"].includes(String(resp?.processamento)) ||
-                !resp?.reply
-              ) {
-                status = "cancelado";
-                erro = `Processamento ${String(resp?.processamento ?? "sem resposta")}: nenhuma nova resposta foi comprovada; a mensagem não será reenviada.`;
-              } else status = "ok";
-            } catch (err) {
-              throw new Error(
-                `Falha técnica do processador: ${String(err instanceof Error ? err.message : err).slice(0, 450)}`,
-              );
-            }
-            const latencia = agora() - t0;
-            if (latencia > config.timeoutS * 1000) {
-              status = "timeout";
-              erro = `A execução terminou após o limite de ${config.timeoutS}s. A mensagem não foi reenviada.`;
-            }
-            // Vínculo exato com a execução devolvida. Nunca usa a última execução do lead.
-            let exec: any = null;
-            const semChamada =
-              resp?.duplicada ||
-              ["DUPLICADA", "AGRUPADA", "SEM_RESPOSTA"].includes(String(resp?.processamento));
-            if (resp?.execucaoId && !semChamada) {
-              const { data, error } = await e.admin
-                .from("nina_execucoes")
-                .select(
-                  "id, conversation_id, model, tool_calls, input_tokens, output_tokens, retries",
-                )
-                .eq("clinica_id", e.clinicaId)
-                .eq("id", resp.execucaoId)
-                .maybeSingle();
-              if (error) throw new Error(`Falha ao ler a execução vinculada: ${error.message}`);
-              if (!data || (resp.conversaId && data.conversation_id !== resp.conversaId))
-                throw new Error(
-                  "A execução devolvida não tem vínculo confirmado com a conversa da mensagem.",
-                );
-              exec = data;
-            }
-            return {
-              item,
-              status,
-              erro,
-              latencia,
-              conversaId: resp?.conversaId ?? null,
-              ferramentas: Array.isArray(exec?.tool_calls) ? (exec.tool_calls as string[]) : [],
-              inputTokens: Number(exec?.input_tokens ?? 0),
-              outputTokens: Number(exec?.output_tokens ?? 0),
-              chamadas: exec ? 1 : 0,
-              retries: Number(exec?.retries ?? 0),
-            };
-          }),
-        );
-        // Uma falha em telemetria/sessão não solta o lease enquanto outro lead continua.
-        const falhasTecnicas = encerradas.flatMap((r, i) =>
-          r.status === "rejected"
-            ? [
-                {
-                  item: rodada[i]!,
-                  erro: String(r.reason instanceof Error ? r.reason.message : r.reason).slice(
-                    0,
-                    500,
-                  ),
-                },
-              ]
-            : [],
-        );
-        // Preserva os resultados comprovados dos outros leads mesmo se uma leitura falhar.
-        // Sem execução vinculada, nenhuma chamada/token é presumido para o item afetado.
-        const resultados = encerradas.map((r, i) =>
-          r.status === "fulfilled"
-            ? r.value
-            : {
-                item: rodada[i]!,
-                status: "erro" as const,
-                erro: String(r.reason instanceof Error ? r.reason.message : r.reason).slice(0, 500),
-                latencia: Math.max(0, agora() - t0Rodada),
-                conversaId: null,
-                ferramentas: [] as string[],
-                inputTokens: 0,
-                outputTokens: 0,
-                chamadas: 0,
-                retries: 0,
-              },
-        );
-        const amostras = resultados.map((r) => ({
-          clinica_id: e.clinicaId,
-          carga_id: inicial.id,
-          indice: r.item.indice,
-          lead_id: r.item.leadId,
-          lead_indice: r.item.leadIndice,
-          conversa_id: r.conversaId,
-          cenario: r.item.cenario,
-          mensagem: String(r.item.mensagem).slice(0, 300),
-          status: r.status,
-          tentativa: 1,
-          latencia_ms: r.latencia,
-          chamadas_modelo: r.chamadas,
-          ferramentas: r.ferramentas,
-          input_tokens: r.inputTokens,
-          output_tokens: r.outputTokens,
-          erro: r.erro,
-        }));
-        const { error } = await e.admin.from("nina_teste_carga_amostras").insert(amostras);
-        if (error)
-          throw new Error(`Não foi possível registrar o resultado do lote: ${error.message}`);
-        enviadas += rodada.length;
-        const somar = (campo: "inputTokens" | "outputTokens" | "chamadas" | "retries") =>
-          resultados.reduce((n, r) => n + r[campo], 0);
-        const salvo = await dono.alterar(
-          {
-            enviadas,
-            sucesso:
-              Number(atual.sucesso ?? 0) + resultados.filter((r) => r.status === "ok").length,
-            erros: Number(atual.erros ?? 0) + resultados.filter((r) => r.status === "erro").length,
-            timeouts:
-              Number(atual.timeouts ?? 0) + resultados.filter((r) => r.status === "timeout").length,
-            retries: Number(atual.retries ?? 0) + somar("retries"),
-            chamadas_modelo: Number(atual.chamadas_modelo ?? 0) + somar("chamadas"),
-            ferramentas:
-              Number(atual.ferramentas ?? 0) +
-              resultados.reduce((n, r) => n + r.ferramentas.length, 0),
-            input_tokens: Number(atual.input_tokens ?? 0) + somar("inputTokens"),
-            output_tokens: Number(atual.output_tokens ?? 0) + somar("outputTokens"),
-          },
-          falhasTecnicas.map((r) => r.item.indice),
-          new Date(t0Rodada + intervaloRodada).toISOString(),
-        );
-        if (!salvo) break;
-        atual = salvo;
-        if (falhasTecnicas.length) throw new Error(falhasTecnicas[0]!.erro);
-        if (!(await dono.aindaAtivo())) break;
-        if (enviadas >= plano.length) {
-          await dono.alterar({
-            status: "concluido",
-            finalizado_em: new Date(agora()).toISOString(),
-          });
-          break;
-        }
-        const pausa = Math.max(0, intervaloRodada - (agora() - t0Rodada));
-        if (pausa && agora() - inicioLote + pausa >= ORCAMENTO_LOTE_MS) break;
-        if (pausa) await (e.esperar ?? dormir)(pausa);
+            amostras.reduce(
+              (n, a) => n + Number(a.input_tokens ?? 0) + Number(a.output_tokens ?? 0),
+              0,
+            ),
+          ).estourou)
+      ) {
+        await dono.alterar({
+          status: "parado",
+          cancelar: true,
+          finalizado_em: new Date(agora()).toISOString(),
+        });
+        return;
       }
-      if (enviadas >= plano.length && (await dono.aindaAtivo()))
+      if (!item) {
+        aguardandoDesfecho = true;
+        return;
+      }
+      if (!(await dono.aindaAtivo()) || !(await dono.alterar({}, [item.indice]))) return;
+      const t0 = agora();
+      let amostra: Record<string, unknown> | undefined;
+      if (existente.tipo === "terminal") {
+        amostra = existente.resultado;
+      } else {
+        const baseline = (Array.isArray(inicial.preflight) ? inicial.preflight : []).find(
+          (b: any) => b.leadId === item.leadId,
+        );
+        const { data: lead, error } = await e.admin
+          .from("nina_teste_leads")
+          .select("id,sessao_seq")
+          .eq("clinica_id", e.clinicaId)
+          .eq("id", item.leadId)
+          .maybeSingle();
+        if (error) throw new Error("Não foi possível confirmar a sessão do lead.");
+        if (
+          !baseline ||
+          baseline.runId !== inicial.id ||
+          !Number.isInteger(baseline.sessao) ||
+          !lead ||
+          Number(lead.sessao_seq) !== baseline.sessao
+        )
+          throw new Error(
+            `Lead ${item.leadIndice}: a sessão mudou ou não possui baseline. Prepare um novo teste.`,
+          );
+        if (!(await dono.aindaAtivo())) return;
+        let resp: any;
+        try {
+          resp = await e.processar(
+            {
+              clinicaId: e.clinicaId,
+              leadId: item.leadId,
+              tipo: "text",
+              texto: item.mensagem,
+              chave: chaveMensagemCarga(inicial.id, item.indice),
+            },
+            e.userId,
+          );
+        } catch {
+          const aposFalha = await desfechoItemCarga(e.admin, inicial, item);
+          if (aposFalha.tipo === "pendente") {
+            aguardandoDesfecho = true;
+            return;
+          }
+          amostra =
+            aposFalha.tipo === "terminal"
+              ? aposFalha.resultado
+              : {
+                  status: "erro",
+                  erro: "PROCESSADOR_FALHOU_ANTES_DA_ENTRADA",
+                  conversa_id: null,
+                };
+        }
+        if (resp) {
+          const persistido = await desfechoItemCarga(e.admin, inicial, item);
+          if (persistido.tipo === "pendente") {
+            aguardandoDesfecho = true;
+            return;
+          }
+          // Texto em memória e success do modelo não comprovam entrega.
+          amostra =
+            persistido.tipo === "terminal"
+              ? persistido.resultado
+              : {
+                  status: "erro",
+                  erro: "ENTRADA_NAO_CONFIRMADA",
+                  conversa_id: resp.conversaId ?? null,
+                };
+          if (resp.execucaoId) {
+            const { data: exec, error: erroExec } = await e.admin
+              .from("nina_execucoes")
+              .select("id,conversation_id,tool_calls,input_tokens,output_tokens,retries")
+              .eq("clinica_id", e.clinicaId)
+              .eq("id", resp.execucaoId)
+              .maybeSingle();
+            // Telemetria indisponível não apaga uma entrega comprovada.
+            if (!erroExec && exec && exec.conversation_id === amostra.conversa_id) {
+              Object.assign(amostra, {
+                chamadas_modelo: 1,
+                ferramentas: exec.tool_calls ?? [],
+                input_tokens: exec.input_tokens ?? 0,
+                output_tokens: exec.output_tokens ?? 0,
+              });
+              await dono.alterar({
+                retries: Number(inicial.retries ?? 0) + Number(exec.retries ?? 0),
+              });
+            }
+          }
+        }
+      }
+      amostra ??= { status: "erro", erro: "PROCESSADOR_SEM_RESULTADO" };
+      const latencia = existente.tipo === "novo" ? agora() - t0 : null;
+      if (latencia !== null && latencia > config.timeoutS * 1000 && amostra.status === "ok") {
+        amostra.status = "timeout";
+        amostra.erro = `Resposta persistida após o limite de ${config.timeoutS}s. Não reenviada.`;
+      }
+      // Cancelamento preserva o resultado já concluído, sem iniciar outra mensagem.
+      await gravarAmostraCarga(e.admin, inicial, item, { ...amostra, latencia_ms: latencia });
+      amostras = await lerAmostrasCarga(e.admin, inicial);
+      await dono.alterar(
+        totaisAmostrasCarga(amostras),
+        [],
+        new Date(
+          t0 + Math.max(config.intervaloMs, Math.ceil(60_000 / config.mensagensPorMinuto)),
+        ).toISOString(),
+      );
+      if (
+        plano.every((p) => amostras.some((a) => a.indice === p.indice)) &&
+        (await dono.aindaAtivo())
+      )
         await dono.alterar({ status: "concluido", finalizado_em: new Date(agora()).toISOString() });
     },
   });
-  return retornoCarga(resultado.carga, { ocupado: resultado.ocupado });
+  return retornoCarga(resultado.carga, {
+    ocupado: resultado.ocupado,
+    aguardandoDesfecho,
+    ...(aguardandoDesfecho ? { aguardarMs: 5000, aguardandoRitmo: true } : {}),
+  });
 }

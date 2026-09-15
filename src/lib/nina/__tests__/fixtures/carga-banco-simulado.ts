@@ -82,7 +82,8 @@ export function criarBancoCargaSimulado(cargas: CargaPersistida[] = [cargaFictic
         patch: any = null,
         inserts: any[] = [],
         limite = Infinity,
-        unico = false;
+        unico = false,
+        ignorarDuplicadas = false;
       let ordenar: { campo: string; asc: boolean } | null = null;
       const query: any = {
         select() {
@@ -96,6 +97,10 @@ export function criarBancoCargaSimulado(cargas: CargaPersistida[] = [cargaFictic
         in(c: string, v: unknown[]) {
           filtros.push((r) => v.includes(campo(r, c)));
           descricoes.push([c, v]);
+          return query;
+        },
+        gte(c: string, v: any) {
+          filtros.push((r) => campo(r, c) >= v);
           return query;
         },
         not(c: string, _op: string, v: unknown) {
@@ -124,6 +129,12 @@ export function criarBancoCargaSimulado(cargas: CargaPersistida[] = [cargaFictic
           inserts = clone(Array.isArray(p) ? p : [p]);
           return query;
         },
+        upsert(p: any, opts: any) {
+          operacao = "insert";
+          inserts = clone(Array.isArray(p) ? p : [p]);
+          ignorarDuplicadas = opts?.ignoreDuplicates === true;
+          return query;
+        },
         then(resolve: (v: unknown) => unknown, reject: (v: unknown) => unknown) {
           return Promise.resolve()
             .then(() => {
@@ -141,14 +152,16 @@ export function criarBancoCargaSimulado(cargas: CargaPersistida[] = [cargaFictic
               }
               let resultado = linhas.filter((r) => filtros.every((f) => f(r)));
               if (operacao === "insert") {
-                resultado = inserts.map((p) => ({
-                  id: `00000000-0000-4000-8000-${String(++contador).padStart(12, "0")}`,
-                  created_at: new Date().toISOString(),
-                  updated_at: new Date().toISOString(),
-                  cancelar: false,
-                  enviadas: 0,
-                  ...p,
-                }));
+                resultado = inserts
+                  .filter((p) => !ignorarDuplicadas || !linhas.some((l) => l.id === p.id))
+                  .map((p) => ({
+                    id: `00000000-0000-4000-8000-${String(++contador).padStart(12, "0")}`,
+                    created_at: new Date().toISOString(),
+                    updated_at: new Date().toISOString(),
+                    cancelar: false,
+                    enviadas: 0,
+                    ...p,
+                  }));
                 linhas.push(...resultado);
               } else if (operacao === "update") {
                 for (const linha of resultado) {

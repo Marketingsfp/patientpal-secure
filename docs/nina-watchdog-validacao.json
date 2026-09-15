@@ -1,0 +1,58 @@
+{
+  "data": "2026-09-15T17:47:11.372Z",
+  "baseCommit": "da7f37225de9254c405064cbfe34f3b814b78fee",
+  "ambiente": "PostgreSQL 18.3 local isolado; modelos e transportes simulados",
+  "producaoAlterada": false,
+  "jobRemotoAtivado": false,
+  "testes": {
+    "aprovados": 132,
+    "reprovados": 0,
+    "arquivos": 13,
+    "expectativas": 497
+  },
+  "concorrencia": {
+    "conversasDistintas": {
+      "recebidas": 10,
+      "completed": 10,
+      "pendentes": 0,
+      "saidasDuplicadas": 0
+    },
+    "mesmaConversa": {
+      "recebidas": 10,
+      "completed": 10,
+      "lotes": 1,
+      "saidas": 1,
+      "ordemPreservada": true
+    }
+  },
+  "retryEntrega": {
+    "chamadasGerador": 1,
+    "tentativasTransporte": 2,
+    "entregas": 1,
+    "finalizacoesTexto": 1
+  },
+  "conciliacaoSuite": {
+    "recebidas": 43,
+    "completed": 37,
+    "failed": 5,
+    "handoff": 1,
+    "pendentes": 0,
+    "duplicadas": 0
+  },
+  "migracao": {
+    "arquivo": "supabase/migrations/20260915170000_nina_watchdog_processamento.sql",
+    "sha256": "68f8d4fec731e7151b8c2bcd3653f068c1faab9660c4fbc2bb62e14a82159222"
+  },
+  "verificacoes": {
+    "build": "Bloqueado pela validação de caminhos Windows no plugin @lovable.dev/mcp-js antes de compilar",
+    "typecheck": "Executado: dois erros preexistentes em atendimento.functions.ts:3018 e atendimento/distribuicao.server.ts:28; nenhum erro nos arquivos novos do watchdog.",
+    "lint": "Lint global reprovado. Comparação ao HEAD sem novos erros nos arquivos alterados; arquivos novos sem erros.",
+    "deploy": "Não executado"
+  },
+  "limites": [
+    "Não é simulação de atendimento clínico real.",
+    "Completed WhatsApp representa aceite pela API Meta, não recibo no aparelho.",
+    "Resultado externo incerto não autoriza reenvio automático.",
+    "A suíte SQL usa esquema mínimo com migrations reais, não cópia completa de Supabase."
+  ]
+}

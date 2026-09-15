@@ -366,7 +366,8 @@ export const ferramentasUsadasTeste = createServerFn({ method: "POST" })
           input_tokens: exec.input_tokens,
           output_tokens: exec.output_tokens,
           retries: exec.retries,
-          success: exec.success,
+          sucesso_ultima_chamada_modelo: exec.success,
+          entrega: "Sucesso do modelo não confirma entrega; confira a mensagem e a conciliação do teste.",
           error_category: exec.error_category,
           handoff: exec.handoff,
         }

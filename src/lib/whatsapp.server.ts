@@ -222,8 +222,10 @@ export async function metaSendText(
   accessToken: string,
   to: string,
   text: string,
+  opcoes?: { timeoutMs?: number },
 ): Promise<{ wa_message_id: string | null }> {
   const res = await fetch(`https://graph.facebook.com/${META_VERSION}/${phoneNumberId}/messages`, {
+    signal: opcoes?.timeoutMs ? AbortSignal.timeout(opcoes.timeoutMs) : undefined,
     method: "POST",
     headers: {
       Authorization: `Bearer ${accessToken}`,
@@ -260,7 +262,7 @@ export async function metaSendText(
         "Este número de destino não está autorizado no ambiente de testes do WhatsApp. Adicione-o à lista de destinatários permitidos na Meta ou use um número de produção.",
       );
     }
-    throw new Error(`WhatsApp: ${msg}`);
+    throw Object.assign(new Error(`WhatsApp: ${msg}`), { status: res.status });
   }
   const wa_message_id = (json as any)?.messages?.[0]?.id ?? null;
   return { wa_message_id };
@@ -3698,10 +3700,12 @@ export async function metaSendAudio(
   accessToken: string,
   to: string,
   mediaId: string,
+  opcoes?: { timeoutMs?: number },
 ): Promise<{ wa_message_id: string | null }> {
   const res = await fetch(
     `https://graph.facebook.com/${META_VERSION_AUDIO}/${phoneNumberId}/messages`,
     {
+      signal: opcoes?.timeoutMs ? AbortSignal.timeout(opcoes.timeoutMs) : undefined,
       method: "POST",
       headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -3714,6 +3718,12 @@ export async function metaSendAudio(
     },
   );
   const json: any = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(json?.error?.message ?? `Falha ao enviar áudio (${res.status})`);
+  if (!res.ok)
+    throw Object.assign(
+      new Error(json?.error?.message ?? `Falha ao enviar áudio (${res.status})`),
+      {
+        status: res.status,
+      },
+    );
   return { wa_message_id: json?.messages?.[0]?.id ?? null };
 }
