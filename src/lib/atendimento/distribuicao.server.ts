@@ -25,7 +25,8 @@ export async function salvarPresencaComDistribuicao(
   const { data, error } = await db.rpc("atend_definir_presenca_manual", {
     _clinica_id: args.clinicaId,
     _estado: args.estado,
-    _versao: args.versao ?? null,
+    // Omitir equivale ao DEFAULT NULL do SQL: sem versão, não há checagem otimista.
+    ...(args.versao === undefined ? {} : { _versao: args.versao }),
     ...(args.reasonId ? { _reason_id: args.reasonId } : {}),
   });
   if (error) throw new Error(error.message);
