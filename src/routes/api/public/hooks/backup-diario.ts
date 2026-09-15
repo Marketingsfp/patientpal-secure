@@ -292,6 +292,8 @@ async function limparAntigos(admin: Admin, bucket: string, diasRetencao: number)
 // Whitelist de tabelas do schema public com coluna clinica_id.
 // Gerada a partir do schema atual. Adicione novas tabelas aqui quando criar.
 const TABELAS_COM_CLINICA_ARR = [
+  "agendamento_confirmacao_config",
+  "agendamento_confirmacoes",
   "agendamento_orcamento_itens",
   "agendamentos",
   "alertas_enfermagem",

@@ -229,6 +229,7 @@ import { avisarCepDoTomadorInvalido } from "@/lib/nfse-aviso-cep";
 import { montarDiscriminacaoNfse } from "@/lib/nfse-descricao";
 import { criarAgendamento } from "@/lib/agenda/criar-agendamento.functions";
 import { numerarFichasFormatadas } from "@/lib/agenda/ficha-numero";
+import { descricaoParaEquipe } from "@/lib/agenda/confirmacao-whatsapp";
 import {
   obterEtapaSinal,
   registrarPagamentoEtapaSinal,
@@ -252,6 +253,14 @@ export const Route = createFileRoute("/_authenticated/app/agenda")({
 });
 
 type Status = "agendado" | "confirmado" | "realizado" | "cancelado" | "faltou";
+/** Situação do lembrete automático de consulta pelo WhatsApp oficial. */
+type ConfirmacaoWa = {
+  status: string;
+  resposta_acao: string | null;
+  observacao: string | null;
+  respondido_em: string | null;
+  updated_at: string;
+};
 type TipoAtendimento = "convenio" | "particular";
 type Agendamento = {
   id: string;
@@ -1111,6 +1120,7 @@ function AgendaPage() {
   const [items, setItems] = useState<Agendamento[]>([]);
   const [fichaBaseItems, setFichaBaseItems] = useState<Agendamento[]>([]);
   const [pagosSet, setPagosSet] = useState<Set<string>>(new Set());
+  const [confirmacaoWaMap, setConfirmacaoWaMap] = useState<Map<string, ConfirmacaoWa>>(new Map());
   const [pagoInfoMap, setPagoInfoMap] = useState<
     Map<string, { valor: number; forma: string | null }>
   >(new Map());
@@ -3052,6 +3062,30 @@ function AgendaPage() {
       }
       setPagosSet(new Set(pagosIds.filter((x) => idsComPaciente.has(x))));
       setPagoInfoMap(infoMap);
+      // Lembrete automático pelo WhatsApp: a última situação de cada ficha.
+      // Falha aqui só esconde o aviso — a Agenda continua funcionando.
+      try {
+        const cMap = new Map<string, ConfirmacaoWa>();
+        for (let i = 0; i < idsParaPagamento.length; i += CHUNK) {
+          const slice = idsParaPagamento.slice(i, i + CHUNK);
+          const { data: cs, error: cErr } = await supabase
+            .from("agendamento_confirmacoes" as never)
+            .select("agendamento_id, status, resposta_acao, observacao, respondido_em, updated_at")
+            .in("agendamento_id", slice);
+          if (cErr) break;
+          for (const c of (cs ?? []) as unknown as Array<ConfirmacaoWa & { agendamento_id: string }>) {
+            const prev = cMap.get(c.agendamento_id);
+            // Resposta do paciente vale mais que o simples envio.
+            const peso = (x: ConfirmacaoWa) => (x.respondido_em ? 2 : 1);
+            if (!prev || peso(c) > peso(prev) || (peso(c) === peso(prev) && c.updated_at > prev.updated_at)) {
+              cMap.set(c.agendamento_id, c);
+            }
+          }
+        }
+        setConfirmacaoWaMap(cMap);
+      } catch {
+        setConfirmacaoWaMap(new Map());
+      }
       // Carrega NFS-e existentes para os agendamentos do dia (uma por agendamento, a mais recente).
       try {
         const nMap = new Map<
@@ -6738,14 +6772,36 @@ function AgendaPage() {
    * abre as opções, o segundo grava. Serve igual no celular e no computador.
    */
   const renderStatusRapido = (a: Agendamento, className: string) => {
+    // Resposta ao lembrete automático do WhatsApp: ícone pequeno ao lado da
+    // situação, com a frase completa no título e dentro do menu.
+    const confWa = confirmacaoWaMap.get(a.id);
+    const infoWa = confWa ? descricaoParaEquipe(confWa) : null;
+    const iconeWa = infoWa ? (
+      <MessageCircle
+        aria-label={infoWa.texto}
+        className={`h-3.5 w-3.5 shrink-0 ${
+          infoWa.tom === "ok"
+            ? "text-emerald-600"
+            : infoWa.tom === "alerta"
+              ? "text-rose-600"
+              : "text-muted-foreground"
+        }`}
+      >
+        <title>{infoWa.texto}</title>
+      </MessageCircle>
+    ) : null;
     const badge = (
-      <Badge className={`${STATUS_COR[a.status]} ${className}`} title={STATUS_LABEL[a.status]}>
-        {STATUS_LABEL[a.status]}
-      </Badge>
+      <span className="inline-flex max-w-full items-center gap-1" title={infoWa?.texto}>
+        <Badge className={`${STATUS_COR[a.status]} ${className}`} title={STATUS_LABEL[a.status]}>
+          {STATUS_LABEL[a.status]}
+        </Badge>
+        {iconeWa}
+      </span>
     );
     if (!podeEscrever) return badge;
     const fechado = a.status === "realizado";
     return (
+      <span className="inline-flex max-w-full items-center gap-1" title={infoWa?.texto}>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <button
@@ -6763,6 +6819,14 @@ function AgendaPage() {
           </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start" className="w-60">
+          {infoWa && (
+            <>
+              <DropdownMenuItem disabled className="text-xs opacity-100">
+                <MessageCircle className="h-4 w-4 mr-2 shrink-0" /> {infoWa.texto}
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+            </>
+          )}
           {fechado ? (
             <DropdownMenuItem disabled>Atendimento já realizado</DropdownMenuItem>
           ) : (
@@ -6814,6 +6878,8 @@ function AgendaPage() {
           )}
         </DropdownMenuContent>
       </DropdownMenu>
+      {iconeWa}
+      </span>
     );
   };
 

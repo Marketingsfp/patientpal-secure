@@ -178,6 +178,19 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
                 textoLimpo(value?.metadata?.display_phone_number) ?? cfg.display_phone_number;
               const phoneNumberId = webhookPhoneNumberId ?? textoLimpo(cfg.phone_number_id);
               const messages: any[] = value?.messages ?? [];
+              // Recibos de entrega dos lembretes automáticos de consulta.
+              // Nunca interrompe o processamento das mensagens.
+              const statuses: any[] = value?.statuses ?? [];
+              if (statuses.length > 0) {
+                try {
+                  const { registrarStatusEntregaConfirmacao } = await import(
+                    "@/lib/agenda/confirmacao-whatsapp.server"
+                  );
+                  await registrarStatusEntregaConfirmacao(params.clinicaId, statuses);
+                } catch (e) {
+                  console.error("[confirmacao] recibo de entrega falhou", e);
+                }
+              }
               for (const msg of messages) {
                 processou = true;
                 const from = String(msg.from ?? "");
@@ -262,6 +275,65 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
                   telefone: String(from ?? "").replace(/\D/g, "") || from,
                   mensagemId: msgInserida.id,
                 });
+
+                // ---------------------------------------------------------
+                // Resposta ao lembrete automático de consulta ("1"/"2" ou
+                // botão). Mesmo padrão da verificação abaixo: vem ANTES de
+                // reabrir conversa e da Nina. Quando reconhecida, a agenda é
+                // atualizada (respeitando mudanças da recepção), o paciente
+                // recebe uma linha de fechamento e nada vai para a fila.
+                try {
+                  const { processarRespostaConfirmacao, enviarFechamentoConfirmacao } =
+                    await import("@/lib/agenda/confirmacao-whatsapp.server");
+                  const rc = await processarRespostaConfirmacao({
+                    clinicaId: params.clinicaId,
+                    from,
+                    waMessageId: wa_message_id,
+                    msg,
+                    textoPaciente,
+                  });
+                  if (rc.tratada) {
+                    const idMsg = (msgInserida as { id?: string } | null)?.id ?? null;
+                    if (idMsg) {
+                      await supabaseAdmin
+                        .from("whatsapp_mensagens")
+                        .update({ tratada_internamente: true } as never)
+                        .eq("id", idMsg);
+                    }
+                    if (rc.resposta && phoneNumberId && cfg.access_token) {
+                      await enviarFechamentoConfirmacao({
+                        clinicaId: params.clinicaId,
+                        confirmacaoId: rc.confirmacaoId,
+                        phoneNumberId,
+                        accessToken: cfg.access_token,
+                        displayPhoneNumber: displayPhoneNumber ?? null,
+                        to: from,
+                        texto: rc.resposta,
+                      }).catch((e) =>
+                        console.error("[confirmacao] fechamento ao paciente falhou", e),
+                      );
+                    }
+                    resultado = `confirmacao_consulta:${rc.resultado ?? "tratada"}`;
+                    try {
+                      const { registrarTurnoSemModelo } = await import(
+                        "@/lib/nina/rastreio/turno.server"
+                      );
+                      await registrarTurnoSemModelo({
+                        clinicaId: params.clinicaId,
+                        conversaId: null,
+                        ...(idMsg ? { mensagensEntrada: [idMsg] } : {}),
+                        origem: rc.resposta ? "gate" : "nenhuma",
+                        motivo: "resposta ao lembrete de consulta reconhecida antes da Nina",
+                      });
+                    } catch {
+                      /* rastreabilidade nunca interrompe o atendimento */
+                    }
+                    continue;
+                  }
+                } catch (e) {
+                  // Falha aqui não pode engolir a mensagem do paciente.
+                  console.error("[confirmacao] reconhecimento falhou", e);
+                }
 
                 // ---------------------------------------------------------
                 // Verificação de paciente pelo site (API v1.2).

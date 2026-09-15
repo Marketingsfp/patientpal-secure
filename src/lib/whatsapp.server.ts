@@ -15,7 +15,8 @@ const META_VERSION_AUDIO = "v26.0";
 export type WaTemplateComponent =
   | { type: "HEADER"; format: "TEXT"; text: string; example?: { header_text?: string[] } }
   | { type: "BODY"; text: string; example?: { body_text?: string[][] } }
-  | { type: "FOOTER"; text: string };
+  | { type: "FOOTER"; text: string }
+  | { type: "BUTTONS"; buttons: Array<{ type: "QUICK_REPLY"; text: string }> };
 
 export interface WaTemplatePayload {
   name: string;
@@ -275,16 +276,25 @@ export async function metaSendTemplate(
   templateName: string,
   language: string,
   bodyParams: string[] = [],
+  /** Payload de cada botão de resposta rápida, na ordem dos botões do template. */
+  quickReplyPayloads: string[] = [],
 ): Promise<{ wa_message_id: string | null }> {
-  const components =
-    bodyParams.length > 0
-      ? [
-          {
-            type: "body",
-            parameters: bodyParams.map((t) => ({ type: "text", text: t.slice(0, 400) })),
-          },
-        ]
-      : undefined;
+  const lista: unknown[] = [];
+  if (bodyParams.length > 0) {
+    lista.push({
+      type: "body",
+      parameters: bodyParams.map((t) => ({ type: "text", text: t.slice(0, 400) })),
+    });
+  }
+  quickReplyPayloads.forEach((payload, index) => {
+    lista.push({
+      type: "button",
+      sub_type: "quick_reply",
+      index: String(index),
+      parameters: [{ type: "payload", payload }],
+    });
+  });
+  const components = lista.length > 0 ? lista : undefined;
   const res = await fetch(`https://graph.facebook.com/${META_VERSION}/${phoneNumberId}/messages`, {
     method: "POST",
     headers: {

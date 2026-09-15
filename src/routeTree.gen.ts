@@ -130,6 +130,7 @@ import { Route as AuthenticatedAppClientesIndexRouteImport } from './routes/_aut
 import { Route as AuthenticatedAppAtendimentoIaIndexRouteImport } from './routes/_authenticated/app.atendimento-ia.index'
 import { Route as ApiPublicWhatsappClinicaIdRouteImport } from './routes/api/public/whatsapp.$clinicaId'
 import { Route as ApiPublicNinaEsperaTimeoutRouteImport } from './routes/api/public/nina.espera-timeout'
+import { Route as ApiPublicHooksConfirmacaoConsultasRouteImport } from './routes/api/public/hooks/confirmacao-consultas'
 import { Route as ApiPublicHooksBackupDiarioRouteImport } from './routes/api/public/hooks/backup-diario'
 import { Route as ApiPublicFocusnfeWebhookRouteImport } from './routes/api/public/focusnfe.webhook'
 import { Route as ApiIntegrationsV1SplatRouteImport } from './routes/api/integrations/v1/$'
@@ -850,6 +851,12 @@ const ApiPublicNinaEsperaTimeoutRoute =
     path: '/api/public/nina/espera-timeout',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicHooksConfirmacaoConsultasRoute =
+  ApiPublicHooksConfirmacaoConsultasRouteImport.update({
+    id: '/api/public/hooks/confirmacao-consultas',
+    path: '/api/public/hooks/confirmacao-consultas',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicHooksBackupDiarioRoute =
   ApiPublicHooksBackupDiarioRouteImport.update({
     id: '/api/public/hooks/backup-diario',
@@ -1314,6 +1321,7 @@ export interface FileRoutesByFullPath {
   '/api/integrations/v1/$': typeof ApiIntegrationsV1SplatRoute
   '/api/public/focusnfe/webhook': typeof ApiPublicFocusnfeWebhookRoute
   '/api/public/hooks/backup-diario': typeof ApiPublicHooksBackupDiarioRoute
+  '/api/public/hooks/confirmacao-consultas': typeof ApiPublicHooksConfirmacaoConsultasRoute
   '/api/public/nina/espera-timeout': typeof ApiPublicNinaEsperaTimeoutRoute
   '/api/public/whatsapp/$clinicaId': typeof ApiPublicWhatsappClinicaIdRoute
   '/app/atendimento-ia/': typeof AuthenticatedAppAtendimentoIaIndexRoute
@@ -1483,6 +1491,7 @@ export interface FileRoutesByTo {
   '/api/integrations/v1/$': typeof ApiIntegrationsV1SplatRoute
   '/api/public/focusnfe/webhook': typeof ApiPublicFocusnfeWebhookRoute
   '/api/public/hooks/backup-diario': typeof ApiPublicHooksBackupDiarioRoute
+  '/api/public/hooks/confirmacao-consultas': typeof ApiPublicHooksConfirmacaoConsultasRoute
   '/api/public/nina/espera-timeout': typeof ApiPublicNinaEsperaTimeoutRoute
   '/api/public/whatsapp/$clinicaId': typeof ApiPublicWhatsappClinicaIdRoute
   '/app/atendimento-ia': typeof AuthenticatedAppAtendimentoIaIndexRoute
@@ -1658,6 +1667,7 @@ export interface FileRoutesById {
   '/api/integrations/v1/$': typeof ApiIntegrationsV1SplatRoute
   '/api/public/focusnfe/webhook': typeof ApiPublicFocusnfeWebhookRoute
   '/api/public/hooks/backup-diario': typeof ApiPublicHooksBackupDiarioRoute
+  '/api/public/hooks/confirmacao-consultas': typeof ApiPublicHooksConfirmacaoConsultasRoute
   '/api/public/nina/espera-timeout': typeof ApiPublicNinaEsperaTimeoutRoute
   '/api/public/whatsapp/$clinicaId': typeof ApiPublicWhatsappClinicaIdRoute
   '/_authenticated/app/atendimento-ia/': typeof AuthenticatedAppAtendimentoIaIndexRoute
@@ -1833,6 +1843,7 @@ export interface FileRouteTypes {
     | '/api/integrations/v1/$'
     | '/api/public/focusnfe/webhook'
     | '/api/public/hooks/backup-diario'
+    | '/api/public/hooks/confirmacao-consultas'
     | '/api/public/nina/espera-timeout'
     | '/api/public/whatsapp/$clinicaId'
     | '/app/atendimento-ia/'
@@ -2002,6 +2013,7 @@ export interface FileRouteTypes {
     | '/api/integrations/v1/$'
     | '/api/public/focusnfe/webhook'
     | '/api/public/hooks/backup-diario'
+    | '/api/public/hooks/confirmacao-consultas'
     | '/api/public/nina/espera-timeout'
     | '/api/public/whatsapp/$clinicaId'
     | '/app/atendimento-ia'
@@ -2176,6 +2188,7 @@ export interface FileRouteTypes {
     | '/api/integrations/v1/$'
     | '/api/public/focusnfe/webhook'
     | '/api/public/hooks/backup-diario'
+    | '/api/public/hooks/confirmacao-consultas'
     | '/api/public/nina/espera-timeout'
     | '/api/public/whatsapp/$clinicaId'
     | '/_authenticated/app/atendimento-ia/'
@@ -2234,6 +2247,7 @@ export interface RootRouteChildren {
   ApiIntegrationsV1SplatRoute: typeof ApiIntegrationsV1SplatRoute
   ApiPublicFocusnfeWebhookRoute: typeof ApiPublicFocusnfeWebhookRoute
   ApiPublicHooksBackupDiarioRoute: typeof ApiPublicHooksBackupDiarioRoute
+  ApiPublicHooksConfirmacaoConsultasRoute: typeof ApiPublicHooksConfirmacaoConsultasRoute
   ApiPublicNinaEsperaTimeoutRoute: typeof ApiPublicNinaEsperaTimeoutRoute
   ApiPublicWhatsappClinicaIdRoute: typeof ApiPublicWhatsappClinicaIdRoute
   ApiPublicIntegrationsV1SplatRoute: typeof ApiPublicIntegrationsV1SplatRoute
@@ -3088,6 +3102,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicNinaEsperaTimeoutRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/hooks/confirmacao-consultas': {
+      id: '/api/public/hooks/confirmacao-consultas'
+      path: '/api/public/hooks/confirmacao-consultas'
+      fullPath: '/api/public/hooks/confirmacao-consultas'
+      preLoaderRoute: typeof ApiPublicHooksConfirmacaoConsultasRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/hooks/backup-diario': {
       id: '/api/public/hooks/backup-diario'
       path: '/api/public/hooks/backup-diario'
@@ -3882,6 +3903,8 @@ const rootRouteChildren: RootRouteChildren = {
   ApiIntegrationsV1SplatRoute: ApiIntegrationsV1SplatRoute,
   ApiPublicFocusnfeWebhookRoute: ApiPublicFocusnfeWebhookRoute,
   ApiPublicHooksBackupDiarioRoute: ApiPublicHooksBackupDiarioRoute,
+  ApiPublicHooksConfirmacaoConsultasRoute:
+    ApiPublicHooksConfirmacaoConsultasRoute,
   ApiPublicNinaEsperaTimeoutRoute: ApiPublicNinaEsperaTimeoutRoute,
   ApiPublicWhatsappClinicaIdRoute: ApiPublicWhatsappClinicaIdRoute,
   ApiPublicIntegrationsV1SplatRoute: ApiPublicIntegrationsV1SplatRoute,
@@ -3889,6 +3912,7 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
 
 import type { getRouter } from './router.tsx'
 import type { startInstance } from './start.ts'
