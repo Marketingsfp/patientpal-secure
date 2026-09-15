@@ -8430,6 +8430,59 @@ export type Database = {
           },
         ]
       }
+      nina_batch_entregas: {
+        Row: {
+          attempt_count: number
+          batch_id: string
+          clinica_id: string
+          created_at: string
+          estado: string
+          last_error: string | null
+          mensagem_id: string
+          next_retry_at: string | null
+          parte: string
+          payload: Json
+          transporte_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          attempt_count?: number
+          batch_id: string
+          clinica_id: string
+          created_at?: string
+          estado?: string
+          last_error?: string | null
+          mensagem_id: string
+          next_retry_at?: string | null
+          parte: string
+          payload: Json
+          transporte_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          attempt_count?: number
+          batch_id?: string
+          clinica_id?: string
+          created_at?: string
+          estado?: string
+          last_error?: string | null
+          mensagem_id?: string
+          next_retry_at?: string | null
+          parte?: string
+          payload?: Json
+          transporte_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nina_batch_entregas_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "nina_message_batches"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       nina_calendario_atendimento: {
         Row: {
           ativo: boolean
@@ -10431,6 +10484,7 @@ export type Database = {
       }
       nina_message_batches: {
         Row: {
+          attempt_count: number
           claimed_at: string | null
           clinica_id: string
           conversa_id: string | null
@@ -10440,13 +10494,23 @@ export type Database = {
           first_message_at: string
           id: string
           last_message_at: string
+          next_retry_at: string | null
           processamento_iniciado_em: string | null
           processed_at: string | null
+          processing_deadline: string | null
+          processing_id: string | null
+          recovered_count: number
+          response_snapshot: Json | null
           revision: number
           status: string
           telefone: string
+          watchdog_revision: number | null
+          watchdog_stage: string
+          watchdog_state: string | null
+          watchdog_token: string | null
         }
         Insert: {
+          attempt_count?: number
           claimed_at?: string | null
           clinica_id: string
           conversa_id?: string | null
@@ -10456,13 +10520,23 @@ export type Database = {
           first_message_at?: string
           id?: string
           last_message_at?: string
+          next_retry_at?: string | null
           processamento_iniciado_em?: string | null
           processed_at?: string | null
+          processing_deadline?: string | null
+          processing_id?: string | null
+          recovered_count?: number
+          response_snapshot?: Json | null
           revision?: number
           status?: string
           telefone: string
+          watchdog_revision?: number | null
+          watchdog_stage?: string
+          watchdog_state?: string | null
+          watchdog_token?: string | null
         }
         Update: {
+          attempt_count?: number
           claimed_at?: string | null
           clinica_id?: string
           conversa_id?: string | null
@@ -10472,11 +10546,20 @@ export type Database = {
           first_message_at?: string
           id?: string
           last_message_at?: string
+          next_retry_at?: string | null
           processamento_iniciado_em?: string | null
           processed_at?: string | null
+          processing_deadline?: string | null
+          processing_id?: string | null
+          recovered_count?: number
+          response_snapshot?: Json | null
           revision?: number
           status?: string
           telefone?: string
+          watchdog_revision?: number | null
+          watchdog_stage?: string
+          watchdog_state?: string | null
+          watchdog_token?: string | null
         }
         Relationships: []
       }
@@ -10712,6 +10795,7 @@ export type Database = {
           total_planejado: number
           updated_at: string
           variacoes: Json
+          watchdog_ativo: boolean
         }
         Insert: {
           cancelar?: boolean
@@ -10744,6 +10828,7 @@ export type Database = {
           total_planejado?: number
           updated_at?: string
           variacoes?: Json
+          watchdog_ativo?: boolean
         }
         Update: {
           cancelar?: boolean
@@ -10776,6 +10861,7 @@ export type Database = {
           total_planejado?: number
           updated_at?: string
           variacoes?: Json
+          watchdog_ativo?: boolean
         }
         Relationships: [
           {
@@ -11585,6 +11671,45 @@ export type Database = {
           atualizado_por?: string | null
           clinica_id?: string
           dias?: number
+        }
+        Relationships: []
+      }
+      nina_watchdog_config: {
+        Row: {
+          heartbeat_stale_seconds: number
+          homologacao_ativa: boolean
+          id: boolean
+          job_url: string | null
+          lease_seconds: number
+          max_attempts: number
+          processing_timeout_seconds: number
+          producao_ativa: boolean
+          queued_timeout_seconds: number
+          updated_at: string
+        }
+        Insert: {
+          heartbeat_stale_seconds?: number
+          homologacao_ativa?: boolean
+          id?: boolean
+          job_url?: string | null
+          lease_seconds?: number
+          max_attempts?: number
+          processing_timeout_seconds?: number
+          producao_ativa?: boolean
+          queued_timeout_seconds?: number
+          updated_at?: string
+        }
+        Update: {
+          heartbeat_stale_seconds?: number
+          homologacao_ativa?: boolean
+          id?: boolean
+          job_url?: string | null
+          lease_seconds?: number
+          max_attempts?: number
+          processing_timeout_seconds?: number
+          producao_ativa?: boolean
+          queued_timeout_seconds?: number
+          updated_at?: string
         }
         Relationships: []
       }
@@ -13977,7 +14102,11 @@ export type Database = {
           is_teste: boolean
           media_mime: string | null
           media_url: string | null
+          nina_batch_id: string | null
+          nina_error: string | null
+          nina_finished_at: string | null
           nina_revisao_conversa: number | null
+          nina_status: string | null
           quoted_message_id: string | null
           raw: Json | null
           read_at: string | null
@@ -14004,7 +14133,11 @@ export type Database = {
           is_teste?: boolean
           media_mime?: string | null
           media_url?: string | null
+          nina_batch_id?: string | null
+          nina_error?: string | null
+          nina_finished_at?: string | null
           nina_revisao_conversa?: number | null
+          nina_status?: string | null
           quoted_message_id?: string | null
           raw?: Json | null
           read_at?: string | null
@@ -14031,7 +14164,11 @@ export type Database = {
           is_teste?: boolean
           media_mime?: string | null
           media_url?: string | null
+          nina_batch_id?: string | null
+          nina_error?: string | null
+          nina_finished_at?: string | null
           nina_revisao_conversa?: number | null
+          nina_status?: string | null
           quoted_message_id?: string | null
           raw?: Json | null
           read_at?: string | null
@@ -15767,6 +15904,138 @@ export type Database = {
         }[]
       }
       nina_trace_purgar: { Args: { _clinica_id?: string }; Returns: number }
+      nina_watchdog_checkpoint: {
+        Args: {
+          _batch: string
+          _etapa: string
+          _snapshot?: Json
+          _token: string
+        }
+        Returns: boolean
+      }
+      nina_watchdog_configurar_job: {
+        Args: { _ativo?: boolean; _url: string }
+        Returns: undefined
+      }
+      nina_watchdog_entrega_claim: {
+        Args: { _batch: string; _parte: string; _token: string }
+        Returns: {
+          attempt_count: number
+          batch_id: string
+          clinica_id: string
+          created_at: string
+          estado: string
+          last_error: string | null
+          mensagem_id: string
+          next_retry_at: string | null
+          parte: string
+          payload: Json
+          transporte_id: string | null
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "nina_batch_entregas"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      nina_watchdog_entrega_preparar: {
+        Args: { _batch: string; _parte: string; _payload: Json; _token: string }
+        Returns: {
+          attempt_count: number
+          batch_id: string
+          clinica_id: string
+          created_at: string
+          estado: string
+          last_error: string | null
+          mensagem_id: string
+          next_retry_at: string | null
+          parte: string
+          payload: Json
+          transporte_id: string | null
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "nina_batch_entregas"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      nina_watchdog_entrega_resultado: {
+        Args: {
+          _batch: string
+          _erro?: string
+          _estado: string
+          _parte: string
+          _retry_ms?: number
+          _token: string
+          _transporte_id?: string
+        }
+        Returns: boolean
+      }
+      nina_watchdog_evento: {
+        Args: { _batch: string; _dados?: Json; _evento: string }
+        Returns: undefined
+      }
+      nina_watchdog_finalizar: {
+        Args: {
+          _batch: string
+          _erro?: string
+          _estado: string
+          _token: string
+        }
+        Returns: boolean
+      }
+      nina_watchdog_iniciar: {
+        Args: { _batch: string; _token: string }
+        Returns: Json
+      }
+      nina_watchdog_reivindicar: {
+        Args: { _limite?: number }
+        Returns: {
+          attempt_count: number
+          claimed_at: string | null
+          clinica_id: string
+          conversa_id: string | null
+          created_at: string
+          erro_tecnico: string | null
+          execucao_id: string | null
+          first_message_at: string
+          id: string
+          last_message_at: string
+          next_retry_at: string | null
+          processamento_iniciado_em: string | null
+          processed_at: string | null
+          processing_deadline: string | null
+          processing_id: string | null
+          recovered_count: number
+          response_snapshot: Json | null
+          revision: number
+          status: string
+          telefone: string
+          watchdog_revision: number | null
+          watchdog_stage: string
+          watchdog_state: string | null
+          watchdog_token: string | null
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "nina_message_batches"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      nina_watchdog_vincular_saida: {
+        Args: {
+          _batch?: string
+          _entrada: string
+          _saida: string
+          _token?: string
+        }
+        Returns: boolean
+      }
       normalizar_telefone: { Args: { _tel: string }; Returns: string }
       normalizar_termo_busca: { Args: { _termo: string }; Returns: string }
       paciente_cartao_inadimplente: {
