@@ -14330,7 +14330,7 @@ export type Database = {
       atend_configurar_capacidade: {
         Args: {
           _clinica_id: string
-          _max_simultaneas: number | null
+          _max_simultaneas: number
           _user_id: string
         }
         Returns: Json
@@ -14359,7 +14359,7 @@ export type Database = {
           _clinica_id: string
           _estado: string
           _reason_id?: string
-          _versao?: number | null
+          _versao?: number
         }
         Returns: Json
       }
