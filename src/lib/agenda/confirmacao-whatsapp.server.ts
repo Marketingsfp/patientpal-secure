@@ -259,6 +259,11 @@ async function rodadaDaClinica(
     resumo.pulado = "WhatsApp da clínica inativo ou sem credenciais";
     return;
   }
+  const credenciais = {
+    phone_number_id: cfg.phone_number_id,
+    access_token: cfg.access_token,
+    display_phone_number: cfg.display_phone_number,
+  };
 
   const hoje = hojeBR();
   const inicioJanela = janelaDiaClinica(somarDias(hoje, 1)).inicio;
@@ -371,44 +376,173 @@ async function rodadaDaClinica(
       inicio: ag.inicio,
       ordemChegada: ag.agenda_id ? ordemChegada.has(ag.agenda_id) : false,
     });
-    try {
-      const { wa_message_id } = await metaSendTemplate(
-        cfg.phone_number_id,
-        cfg.access_token,
-        telefone,
-        conf.template_nome,
-        conf.template_idioma,
-        params,
-        [payloadBotao(reservaId, "confirmar"), payloadBotao(reservaId, "cancelar")],
-      );
-      const enviadoEm = new Date().toISOString();
-      await db
-        .from("agendamento_confirmacoes")
-        .update({ status: "enviado", wa_message_id, enviado_em: enviadoEm, updated_at: enviadoEm })
-        .eq("id", reservaId);
-      await db.from("whatsapp_mensagens").insert({
-        clinica_id: conf.clinica_id,
-        wa_message_id,
-        direction: "out",
-        from_number: cfg.display_phone_number,
-        to_number: telefone,
-        body: TEMPLATE_CONFIRMACAO.corpo
-          .replace("{{1}}", params[0])
-          .replace("{{2}}", params[1])
-          .replace("{{3}}", params[2]),
-        tipo: "template",
-        status: "sent",
-        enviada_por: "sistema",
-      });
-      resumo.enviados++;
-    } catch (e) {
-      resumo.falhas++;
-      await db
-        .from("agendamento_confirmacoes")
-        .update({ status: "falha", erro: erroTexto(e), updated_at: new Date().toISOString() })
-        .eq("id", reservaId);
-    }
+    const r = await enviarTemplateReservado(db, conf, credenciais, reservaId, telefone, params);
+    if (r.ok) resumo.enviados++;
+    else resumo.falhas++;
   }
+}
+
+/** Envia o template de uma reserva já gravada e registra o resultado. */
+async function enviarTemplateReservado(
+  db: Db,
+  conf: Pick<ConfigConfirmacao, "clinica_id" | "template_nome" | "template_idioma">,
+  cfg: { phone_number_id: string; access_token: string; display_phone_number: string | null },
+  reservaId: string,
+  telefone: string,
+  params: [string, string, string],
+): Promise<{ ok: true; wa_message_id: string | null } | { ok: false; erro: string }> {
+  try {
+    const { wa_message_id } = await metaSendTemplate(
+      cfg.phone_number_id,
+      cfg.access_token,
+      telefone,
+      conf.template_nome,
+      conf.template_idioma,
+      params,
+      [payloadBotao(reservaId, "confirmar"), payloadBotao(reservaId, "cancelar")],
+    );
+    const enviadoEm = new Date().toISOString();
+    await db
+      .from("agendamento_confirmacoes")
+      .update({ status: "enviado", wa_message_id, enviado_em: enviadoEm, updated_at: enviadoEm })
+      .eq("id", reservaId);
+    await db.from("whatsapp_mensagens").insert({
+      clinica_id: conf.clinica_id,
+      wa_message_id,
+      direction: "out",
+      from_number: cfg.display_phone_number,
+      to_number: telefone,
+      body: TEMPLATE_CONFIRMACAO.corpo
+        .replace("{{1}}", params[0])
+        .replace("{{2}}", params[1])
+        .replace("{{3}}", params[2]),
+      tipo: "template",
+      status: "sent",
+      enviada_por: "sistema",
+    });
+    return { ok: true, wa_message_id };
+  } catch (e) {
+    const erro = erroTexto(e);
+    await db
+      .from("agendamento_confirmacoes")
+      .update({ status: "falha", erro, updated_at: new Date().toISOString() })
+      .eq("id", reservaId);
+    return { ok: false, erro };
+  }
+}
+
+/* =========================================================================
+ * Disparo de TESTE (homologação com o número do dono)
+ * ========================================================================= */
+
+/** Prefixo obrigatório do nome no agendamento de teste. */
+export const PREFIXO_AGENDAMENTO_TESTE = "TESTE CONFIRMACAO WHATSAPP";
+
+/**
+ * Manda o lembrete na hora para um agendamento de TESTE, ignorando dia,
+ * horário de envio, piloto e o interruptor `ativo` — mas nunca a aprovação do
+ * template, que a própria Meta exige.
+ *
+ * Trava que impede mandar mensagem a paciente real: o agendamento precisa não
+ * ter cadastro de paciente vinculado E ter o nome começando com o prefixo de
+ * teste. O telefone vem de quem chama, não do cadastro.
+ */
+export async function enviarLembreteTeste(params: {
+  agendamentoId: string;
+  telefone: string;
+}): Promise<{ ok: boolean; etapa?: string; erro?: string; wa_message_id?: string | null }> {
+  const db = await admin();
+  const telefone = celularParaEnvio(params.telefone);
+  if (!telefone) return { ok: false, erro: "Telefone inválido (use DDD + celular)." };
+
+  const { data: agRaw } = await db
+    .from("agendamentos")
+    .select("id, clinica_id, paciente_id, paciente_nome, medico_id, agenda_id, inicio, status")
+    .eq("id", params.agendamentoId)
+    .maybeSingle();
+  const ag = agRaw as {
+    id: string;
+    clinica_id: string;
+    paciente_id: string | null;
+    paciente_nome: string;
+    medico_id: string | null;
+    agenda_id: string | null;
+    inicio: string;
+    status: string;
+  } | null;
+  if (!ag) return { ok: false, erro: "Agendamento não encontrado." };
+  if (ag.paciente_id || !ag.paciente_nome.toUpperCase().startsWith(PREFIXO_AGENDAMENTO_TESTE)) {
+    return { ok: false, erro: "Só é permitido em agendamento de teste sem paciente vinculado." };
+  }
+  if (new Date(ag.inicio).getTime() <= Date.now()) {
+    return { ok: false, erro: "O agendamento de teste precisa estar no futuro." };
+  }
+
+  const { data: confRaw } = await db
+    .from("agendamento_confirmacao_config")
+    .select("clinica_id, template_nome, template_idioma")
+    .eq("clinica_id", ag.clinica_id)
+    .maybeSingle();
+  const conf = confRaw as Pick<
+    ConfigConfirmacao,
+    "clinica_id" | "template_nome" | "template_idioma"
+  > | null;
+  if (!conf) return { ok: false, erro: "Clínica sem configuração de confirmação." };
+
+  const tpl = await garantirTemplateConfirmacao(ag.clinica_id, { criarSeFaltar: false });
+  if (tpl.status !== "APPROVED") {
+    return { ok: false, erro: `Template ainda não aprovado pela Meta (status: ${tpl.status}).` };
+  }
+  const cfg = await loadWhatsAppConfig(ag.clinica_id);
+  if (!cfg?.phone_number_id || !cfg.access_token) {
+    return { ok: false, erro: "WhatsApp da clínica sem credenciais." };
+  }
+
+  // Cada teste recomeça do zero: apaga só as linhas deste agendamento de teste.
+  await db.from("agendamento_confirmacoes").delete().eq("agendamento_id", ag.id);
+  const etapa: EtapaConfirmacao = "24h";
+  const { data: reserva, error } = await db
+    .from("agendamento_confirmacoes")
+    .insert({
+      clinica_id: ag.clinica_id,
+      agendamento_id: ag.id,
+      paciente_id: null,
+      medico_id: ag.medico_id,
+      etapa,
+      agendamento_inicio: ag.inicio,
+      telefone,
+      telefone_chave: chaveTelefone(telefone),
+      status: "reservado",
+      template_nome: conf.template_nome,
+      observacao: "teste",
+    })
+    .select("id")
+    .single();
+  if (error || !reserva) return { ok: false, erro: error?.message ?? "Falha ao reservar." };
+
+  let ordemChegada = false;
+  if (ag.agenda_id) {
+    const { data: agenda } = await db
+      .from("medico_agendas")
+      .select("ordem_chegada")
+      .eq("id", ag.agenda_id)
+      .maybeSingle();
+    ordemChegada = Boolean((agenda as { ordem_chegada?: boolean } | null)?.ordem_chegada);
+  }
+  const r = await enviarTemplateReservado(
+    db,
+    conf,
+    {
+      phone_number_id: cfg.phone_number_id,
+      access_token: cfg.access_token,
+      display_phone_number: cfg.display_phone_number,
+    },
+    (reserva as { id: string }).id,
+    telefone,
+    // "TESTE CONFIRMACAO WHATSAPP" vira "Teste" na saudação.
+    parametrosTemplate({ pacienteNome: ag.paciente_nome, inicio: ag.inicio, ordemChegada }),
+  );
+  return r.ok ? { ok: true, etapa, wa_message_id: r.wa_message_id } : { ok: false, erro: r.erro };
 }
 
 /* =========================================================================

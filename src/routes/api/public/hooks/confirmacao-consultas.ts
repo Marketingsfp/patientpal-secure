@@ -29,7 +29,10 @@ function json(body: unknown, status: number) {
  *   Lovable Cloud.
  * - Corpo `{ "acao": "rodada" }` (padrão) envia os lembretes;
  *   `{ "acao": "template", "clinica_id": "..." }` submete/atualiza o template
- *   na Meta.
+ *   na Meta;
+ *   `{ "acao": "teste", "agendamento_id": "...", "telefone": "..." }` manda o
+ *   lembrete na hora para um agendamento de TESTE (sem paciente e com nome
+ *   iniciado por "TESTE CONFIRMACAO WHATSAPP").
  */
 export const Route = createFileRoute("/api/public/hooks/confirmacao-consultas")({
   server: {
@@ -47,7 +50,12 @@ export const Route = createFileRoute("/api/public/hooks/confirmacao-consultas")(
           return json({ error: "unauthorized" }, 401);
         }
 
-        let corpo: { acao?: string; clinica_id?: string } = {};
+        let corpo: {
+          acao?: string;
+          clinica_id?: string;
+          agendamento_id?: string;
+          telefone?: string;
+        } = {};
         try {
           corpo = (await request.json()) as typeof corpo;
         } catch {
@@ -62,6 +70,16 @@ export const Route = createFileRoute("/api/public/hooks/confirmacao-consultas")(
               criarSeFaltar: true,
             });
             return json({ ok: true, template: r }, 200);
+          }
+          if (corpo.acao === "teste") {
+            if (!corpo.agendamento_id || !corpo.telefone) {
+              return json({ error: "agendamento_id e telefone obrigatórios" }, 400);
+            }
+            const r = await srv.enviarLembreteTeste({
+              agendamentoId: corpo.agendamento_id,
+              telefone: corpo.telefone,
+            });
+            return json(r, r.ok ? 200 : 422);
           }
           const resumo = await srv.executarRodadaConfirmacao();
           return json({ ok: true, resumo }, 200);
