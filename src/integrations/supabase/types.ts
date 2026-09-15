@@ -14,6 +14,171 @@ export type Database = {
   }
   public: {
     Tables: {
+      agendamento_confirmacao_config: {
+        Row: {
+          ativo: boolean
+          clinica_id: string
+          etapas: string[]
+          hora_fim: string
+          hora_inicio: string
+          max_por_rodada: number
+          medico_ids: string[] | null
+          template_erro: string | null
+          template_idioma: string
+          template_nome: string
+          template_status: string | null
+          template_verificado_em: string | null
+          ultima_rodada_em: string | null
+          ultima_rodada_resumo: Json | null
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          clinica_id: string
+          etapas?: string[]
+          hora_fim?: string
+          hora_inicio?: string
+          max_por_rodada?: number
+          medico_ids?: string[] | null
+          template_erro?: string | null
+          template_idioma?: string
+          template_nome?: string
+          template_status?: string | null
+          template_verificado_em?: string | null
+          ultima_rodada_em?: string | null
+          ultima_rodada_resumo?: Json | null
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          clinica_id?: string
+          etapas?: string[]
+          hora_fim?: string
+          hora_inicio?: string
+          max_por_rodada?: number
+          medico_ids?: string[] | null
+          template_erro?: string | null
+          template_idioma?: string
+          template_nome?: string
+          template_status?: string | null
+          template_verificado_em?: string | null
+          ultima_rodada_em?: string | null
+          ultima_rodada_resumo?: Json | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agendamento_confirmacao_config_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: true
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      agendamento_confirmacoes: {
+        Row: {
+          agendamento_id: string
+          agendamento_inicio: string
+          clinica_id: string
+          created_at: string
+          entregue_em: string | null
+          enviado_em: string | null
+          erro: string | null
+          etapa: string
+          fechamento_wa_message_id: string | null
+          id: string
+          lido_em: string | null
+          medico_id: string | null
+          observacao: string | null
+          paciente_id: string | null
+          respondido_em: string | null
+          resposta_acao: string | null
+          resposta_texto: string | null
+          resposta_wa_message_id: string | null
+          status: string
+          telefone: string | null
+          telefone_chave: string | null
+          template_nome: string | null
+          updated_at: string
+          wa_message_id: string | null
+        }
+        Insert: {
+          agendamento_id: string
+          agendamento_inicio: string
+          clinica_id: string
+          created_at?: string
+          entregue_em?: string | null
+          enviado_em?: string | null
+          erro?: string | null
+          etapa: string
+          fechamento_wa_message_id?: string | null
+          id?: string
+          lido_em?: string | null
+          medico_id?: string | null
+          observacao?: string | null
+          paciente_id?: string | null
+          respondido_em?: string | null
+          resposta_acao?: string | null
+          resposta_texto?: string | null
+          resposta_wa_message_id?: string | null
+          status?: string
+          telefone?: string | null
+          telefone_chave?: string | null
+          template_nome?: string | null
+          updated_at?: string
+          wa_message_id?: string | null
+        }
+        Update: {
+          agendamento_id?: string
+          agendamento_inicio?: string
+          clinica_id?: string
+          created_at?: string
+          entregue_em?: string | null
+          enviado_em?: string | null
+          erro?: string | null
+          etapa?: string
+          fechamento_wa_message_id?: string | null
+          id?: string
+          lido_em?: string | null
+          medico_id?: string | null
+          observacao?: string | null
+          paciente_id?: string | null
+          respondido_em?: string | null
+          resposta_acao?: string | null
+          resposta_texto?: string | null
+          resposta_wa_message_id?: string | null
+          status?: string
+          telefone?: string | null
+          telefone_chave?: string | null
+          template_nome?: string | null
+          updated_at?: string
+          wa_message_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agendamento_confirmacoes_agendamento_id_fkey"
+            columns: ["agendamento_id"]
+            isOneToOne: false
+            referencedRelation: "agendamentos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agendamento_confirmacoes_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agendamento_confirmacoes_paciente_id_fkey"
+            columns: ["paciente_id"]
+            isOneToOne: false
+            referencedRelation: "pacientes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       agendamento_historico_notas: {
         Row: {
           agendamento_id: string
@@ -13390,6 +13555,24 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      sistema_job_tokens: {
+        Row: {
+          created_at: string
+          nome: string
+          token: string
+        }
+        Insert: {
+          created_at?: string
+          nome: string
+          token: string
+        }
+        Update: {
+          created_at?: string
+          nome?: string
+          token?: string
+        }
+        Relationships: []
       }
       sistema_planos: {
         Row: {
