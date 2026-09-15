@@ -5,6 +5,7 @@
  */
 import { describe, expect, it, beforeEach } from "bun:test";
 import { PROMPT_CANDIDATO_23_REGRAS } from "./fixtures/prompt-23-regras";
+import { PROMPT_PUBLICADO_V19 } from "./fixtures/prompt-publicado-v19";
 import { hashDoTexto } from "./hash";
 import {
   avaliarAplicabilidade,
@@ -207,6 +208,20 @@ describe("mudança de texto, regra nova e invalidação de versão", () => {
     expect(contratosEmMemoria().length).toBe(2);
     invalidarContratos("homologacao");
     expect(contratosEmMemoria()).toEqual([]);
+  });
+});
+
+describe("cabeçalho no formato publicado", () => {
+  it("aceita o prefixo REGRA usado pela publicação da Arquitetura", () => {
+    const publicado = compilarContratoRegras(PROMPT_PUBLICADO_V19, {
+      escopo: "whatsapp",
+      versao: "19",
+    });
+    expect(publicado.limitacoes).not.toContain("NENHUMA_REGRA_IDENTIFICADA");
+    expect(publicado.regras).toHaveLength(24);
+    const ids = publicado.regras.map((r) => r.identificador);
+    for (const id of ["ID-01", "CONV-06", "AMB-01", "TESTE-01"]) expect(ids).toContain(id);
+    expect(regra("ID-01").identificador).toBe("ID-01");
   });
 });
 

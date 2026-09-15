@@ -6,8 +6,10 @@ import {
   AVISO_ENCAMINHAMENTO_FALHOU,
   AVISO_ENCAMINHAMENTO_HUMANO,
   MOTIVO_BLOQUEIO_BAIXA_CONFIANCA,
+  MOTIVO_ISENCAO_INCERTEZA_ETAPA_A,
   decidirBloqueioBaixaConfianca,
   ehAvisoControlado,
+  isencaoIncertezaAplicavel,
   nivelExigeEncaminhamento,
   saidaControladaBaixaConfianca,
 } from "./baixa-confiabilidade";
@@ -147,5 +149,109 @@ describe("baixa confiabilidade — saída controlada", () => {
     // conteúdo reprovado.
     expect(ehAvisoControlado(s.aviso)).toBe(true);
     expect(ehAvisoControlado(candidato)).toBe(false);
+  });
+});
+
+describe("baixa confiabilidade — incerteza pura na etapa A", () => {
+  const incertezaPura = { coberturaInsuficiente: true, falhaComprovada: false };
+  const semRisco = {
+    turnoSocial: false,
+    acaoOperacional: false,
+    afirmacaoSemFonte: false,
+    pedidoDeHumano: false,
+    conflitoDeIdentidade: false,
+    conformidadeBloqueante: false,
+    conformidadeNaoVerificada: true,
+  };
+
+  it("LOW por cobertura insuficiente, sem falha comprovada, na etapa A: registra e não encaminha", () => {
+    const d = decidirBloqueioBaixaConfianca({
+      nivel: "LOW",
+      score: 74,
+      decisaoMotor: "CLARIFY",
+      etapa: "A",
+      ambiente: "producao",
+      incerteza: incertezaPura,
+      saudacao: semRisco,
+      bloqueadoresAbsolutos: [],
+    });
+    expect(d.bloquear).toBe(false);
+    expect(d.encaminhar).toBe(false);
+    expect(d.isencaoIncertezaEtapaA).toBe(true);
+    expect(d.impedimentoIncerteza).toBeNull();
+    expect(d.motivo).toBe(MOTIVO_ISENCAO_INCERTEZA_ETAPA_A);
+    expect(d.precedeEtapaAtivacao).toBe(false);
+  });
+
+  it("a mesma incerteza na etapa B volta a encaminhar", () => {
+    const d = decidirBloqueioBaixaConfianca({
+      nivel: "LOW",
+      score: 74,
+      decisaoMotor: "CLARIFY",
+      etapa: "B",
+      ambiente: "producao",
+      incerteza: incertezaPura,
+      saudacao: semRisco,
+    });
+    expect(d.bloquear).toBe(true);
+    expect(d.isencaoIncertezaEtapaA).toBe(false);
+    expect(d.impedimentoIncerteza).toBe("ETAPA_ALEM_DE_A");
+  });
+
+  it("incerteza não observada não isenta (comportamento anterior preservado)", () => {
+    const d = decidirBloqueioBaixaConfianca({
+      ...CASO_REFERENCIA,
+      etapa: "A",
+      ambiente: "producao",
+    });
+    expect(d.bloquear).toBe(true);
+    expect(d.impedimentoIncerteza).toBe("INCERTEZA_NAO_OBSERVADA");
+  });
+
+  it("LOW que não vem da cobertura (nota baixa com cobertura completa) encaminha na etapa A", () => {
+    const d = decidirBloqueioBaixaConfianca({
+      nivel: "LOW",
+      score: 60,
+      decisaoMotor: "HANDOFF",
+      etapa: "A",
+      ambiente: "producao",
+      incerteza: { coberturaInsuficiente: false, falhaComprovada: false },
+      saudacao: semRisco,
+    });
+    expect(d.bloquear).toBe(true);
+    expect(d.impedimentoIncerteza).toBe("LOW_NAO_VEM_DA_COBERTURA");
+  });
+
+  it.each([
+    [{ ...incertezaPura, falhaComprovada: true }, [] as string[], semRisco, "FALHA_COMPROVADA"],
+    [incertezaPura, ["CLAIM_CONTRADICTS_SOURCE"], semRisco, "BLOQUEADOR_ABSOLUTO"],
+    [incertezaPura, [] as string[], { ...semRisco, afirmacaoSemFonte: true }, "AFIRMACAO_SEM_FONTE"],
+    [incertezaPura, [] as string[], { ...semRisco, pedidoDeHumano: true }, "PEDIDO_DE_ATENDIMENTO_HUMANO"],
+    [incertezaPura, [] as string[], { ...semRisco, conflitoDeIdentidade: true }, "CONFLITO_DE_IDENTIDADE"],
+    [incertezaPura, [] as string[], { ...semRisco, conformidadeBloqueante: true }, "CONFORMIDADE_BLOQUEANTE"],
+  ])("qualquer sinal de risco devolve a decisão à regra obrigatória (%#)", (incerteza, bloqueadores, saudacao, impedimento) => {
+    const d = decidirBloqueioBaixaConfianca({
+      nivel: "LOW",
+      score: 70,
+      decisaoMotor: "CLARIFY",
+      etapa: "A",
+      ambiente: "homologacao",
+      incerteza,
+      bloqueadoresAbsolutos: bloqueadores,
+      saudacao,
+    });
+    expect(d.bloquear).toBe(true);
+    expect(d.isencaoIncertezaEtapaA).toBe(false);
+    expect(d.impedimentoIncerteza).toBe(impedimento);
+  });
+
+  it("regra publicada aplicável não verificada NÃO impede a isenção (é incerteza, não falha)", () => {
+    const r = isencaoIncertezaAplicavel({
+      etapa: "A",
+      incerteza: incertezaPura,
+      saudacao: { ...semRisco, conformidadeNaoVerificada: true },
+    });
+    expect(r.aplica).toBe(true);
+    expect(r.impedimento).toBeNull();
   });
 });

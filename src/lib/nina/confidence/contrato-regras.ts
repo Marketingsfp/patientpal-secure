@@ -171,7 +171,9 @@ function chave(t: string): string {
   return semAcento(t).toLowerCase().replace(/\s+/g, " ").trim();
 }
 
-const CABECALHO_REGRA = /^([A-Z]{2,8}-\d{1,3})\s*(?:[—–\-:]\s*(.*))?$/;
+// A publicação da Arquitetura escreve o cabeçalho como "REGRA ID-01 — Título".
+// O prefixo é opcional: "ID-01 — Título" continua aceito.
+const CABECALHO_REGRA = /^(?:REGRA\s+)?([A-Z]{2,8}-\d{1,3})\s*(?:[—–\-:]\s*(.*))?$/;
 const CAMPO = /^(tipo|aplica-se|aplica se|conduta|resultado esperado)\s*:\s*(.*)$/i;
 
 const CATEGORIAS_CONHECIDAS: CategoriaContrato[] = ["ESSENCIAL", "CONVERSACIONAL", "LINGUAGEM"];

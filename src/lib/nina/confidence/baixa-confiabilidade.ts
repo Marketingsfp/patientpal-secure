@@ -12,6 +12,12 @@
  *    (`limites` da política efetiva). Nenhum número novo é criado aqui;
  *  - a regra vale inclusive na etapa de ativação A (que só observa) — ela é
  *    proteção obrigatória, e a precedência fica registrada;
+ *  - EXCEÇÃO DE INCERTEZA (etapa A): quando o nível LOW nasce SOMENTE da
+ *    cobertura insuficiente (o motor não conseguiu olhar o bastante) e nenhuma
+ *    dimensão avaliada FALHOU, não há bloqueador absoluto, não há afirmação sem
+ *    fonte, não há conformidade bloqueante e a pessoa não pediu humano, a etapa
+ *    A faz o que promete: registra e não encaminha. A partir da etapa B a
+ *    incerteza volta a encaminhar. Falha comprovada encaminha em qualquer etapa;
  *  - vale mesmo quando a decisão recomendada pelo motor for CLARIFY: para uma
  *    resposta LOW o destino definido pelo produto é atendimento humano;
  *  - produção encaminha de verdade; homologação apenas simula o desfecho, sem
@@ -81,7 +87,54 @@ export type EntradaBloqueioBaixaConfianca = {
   turnoSocialSemAcao?: boolean;
   /** Bloqueadores absolutos observados no turno. */
   bloqueadoresAbsolutos?: string[];
+  /**
+   * Medida de incerteza do turno, informada pelo runtime a partir do resultado
+   * do motor. Campo ausente = não observado, e "não observado" nunca isenta.
+   */
+  incerteza?: EntradaIncerteza;
 };
+
+/**
+ * De onde veio o LOW: de incerteza (cobertura insuficiente) ou de falha
+ * comprovada (alguma dimensão avaliada reprovou). Só a incerteza pura, na
+ * etapa A, deixa de encaminhar.
+ */
+export type EntradaIncerteza = {
+  /** A cobertura de evidências ficou abaixo do mínimo da política. */
+  coberturaInsuficiente: boolean;
+  /** Alguma dimensão com peso na nota terminou em FAIL ou BLOCK. */
+  falhaComprovada: boolean;
+};
+
+export const MOTIVO_ISENCAO_INCERTEZA_ETAPA_A = "INCERTEZA_SEM_FALHA_ETAPA_A_OBSERVA";
+
+/**
+ * A isenção de incerteza vale? Só na etapa A, só com LOW nascido da cobertura
+ * e só quando NENHUM sinal de risco foi observado. Qualquer sinal devolve a
+ * decisão à regra obrigatória.
+ */
+export function isencaoIncertezaAplicavel(e: {
+  etapa: EtapaAtivacao | null | undefined;
+  incerteza?: EntradaIncerteza;
+  bloqueadoresAbsolutos?: string[];
+  saudacao?: EntradaSaudacao;
+}): { aplica: boolean; impedimento: string | null } {
+  if (e.etapa !== "A") return { aplica: false, impedimento: "ETAPA_ALEM_DE_A" };
+  if (!e.incerteza) return { aplica: false, impedimento: "INCERTEZA_NAO_OBSERVADA" };
+  if (!e.incerteza.coberturaInsuficiente) {
+    return { aplica: false, impedimento: "LOW_NAO_VEM_DA_COBERTURA" };
+  }
+  const impedimentos: Array<[boolean | undefined, string]> = [
+    [e.incerteza.falhaComprovada, "FALHA_COMPROVADA"],
+    [(e.bloqueadoresAbsolutos?.length ?? 0) > 0, "BLOQUEADOR_ABSOLUTO"],
+    [e.saudacao?.afirmacaoSemFonte, "AFIRMACAO_SEM_FONTE"],
+    [e.saudacao?.pedidoDeHumano, "PEDIDO_DE_ATENDIMENTO_HUMANO"],
+    [e.saudacao?.conflitoDeIdentidade, "CONFLITO_DE_IDENTIDADE"],
+    [e.saudacao?.conformidadeBloqueante, "CONFORMIDADE_BLOQUEANTE"],
+  ];
+  const achado = impedimentos.find(([v]) => v === true);
+  return achado ? { aplica: false, impedimento: achado[1] } : { aplica: true, impedimento: null };
+}
 
 /**
  * Condições OBSERVADAS do turno de saudação. Nenhuma delas é suposta: o
@@ -178,6 +231,10 @@ export type DecisaoBloqueioBaixaConfianca = {
   jaAplicado: boolean;
   /** Por que a exceção de saudação não valeu (auditoria). */
   impedimentoSaudacao: string | null;
+  /** Etapa A observou um LOW de incerteza pura e não encaminhou. */
+  isencaoIncertezaEtapaA: boolean;
+  /** Por que a isenção de incerteza não valeu (auditoria). */
+  impedimentoIncerteza: string | null;
   explicacao: string;
 };
 
@@ -199,7 +256,20 @@ export function decidirBloqueioBaixaConfianca(
   // da nota. Antes ele só bloqueava de carona, quando a nota caía para Baixa —
   // o que deixava o pedido sem destino assim que a nota melhorava.
   const pedidoDeHumano = saudacao?.pedidoDeHumano === true;
-  const aplicavel = pedidoDeHumano || (nivelExigeEncaminhamento(e.nivel) && !isencaoSocial);
+  // Incerteza pura na etapa A: o motor registra o LOW, mas a etapa que "só
+  // observa" não tira a resposta do paciente. Pedido de humano e falha
+  // comprovada continuam encaminhando.
+  const incerteza = isencaoIncertezaAplicavel({
+    etapa: e.etapa,
+    ...(e.incerteza ? { incerteza: e.incerteza } : {}),
+    ...(e.bloqueadoresAbsolutos ? { bloqueadoresAbsolutos: e.bloqueadoresAbsolutos } : {}),
+    ...(saudacao ? { saudacao } : {}),
+  });
+  const isencaoIncerteza =
+    !pedidoDeHumano && nivelExigeEncaminhamento(e.nivel) && incerteza.aplica;
+  const aplicavel =
+    pedidoDeHumano ||
+    (nivelExigeEncaminhamento(e.nivel) && !isencaoSocial && !isencaoIncerteza);
   const jaAplicado = e.avisoJaAplicado === true;
   const base = {
     nivel: e.nivel ?? null,
@@ -211,18 +281,22 @@ export function decidirBloqueioBaixaConfianca(
     conteudoCandidatoHash: e.conteudoCandidatoHash ?? null,
     jaAplicado,
     impedimentoSaudacao: excecao.impedimento,
+    isencaoIncertezaEtapaA: isencaoIncerteza,
+    impedimentoIncerteza: incerteza.impedimento,
   };
   if (!aplicavel) {
     return {
       ...base,
       bloquear: false,
       encaminhar: false,
-      motivo: null,
+      motivo: isencaoIncerteza ? MOTIVO_ISENCAO_INCERTEZA_ETAPA_A : null,
       precedeEtapaAtivacao: false,
       precedeDecisaoMotor: false,
       explicacao: isencaoSocial
         ? "saudação sem ação operacional, sem afirmação sem fonte e sem pedido de humano: não encaminha"
-        : `nivel=${e.nivel ?? "indisponivel"}: regra de baixa confiabilidade não se aplica`,
+        : isencaoIncerteza
+          ? `nivel=LOW por cobertura insuficiente, sem falha comprovada: etapa A registra e não encaminha (score=${e.score ?? "?"})`
+          : `nivel=${e.nivel ?? "indisponivel"}: regra de baixa confiabilidade não se aplica`,
     };
   }
   const porPedido = pedidoDeHumano && !nivelExigeEncaminhamento(e.nivel);
