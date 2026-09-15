@@ -701,7 +701,7 @@ function AtendimentoEditorPage() {
       const linhaGravada = (gravado ?? [])[0] as { id: string } | undefined;
       if (!linhaGravada) {
         throw new Error(
-          "O prontuário não foi gravado. Verifique se o seu usuário tem permissão de médico ou admin nesta clínica e tente de novo.",
+          "O prontuário não foi gravado. Só o médico responsável por este atendimento (logado com a própria conta) ou a supervisão autorizada podem gravar o prontuário.",
         );
       }
       setProntuarioId(linhaGravada.id);

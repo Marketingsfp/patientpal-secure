@@ -31,22 +31,41 @@ function resolverProjectRef(): string {
   );
 }
 
+const DIA_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+/**
+ * Isolamento por clínica: o backup é lido com a chave de serviço (que ignora
+ * as regras do banco), então esta checagem é a única barreira entre um
+ * usuário e os CSVs de outra clínica. O vínculo é buscado pelo id do token
+ * verificado — nunca por algo que venha do navegador — e precisa ser de admin
+ * ATIVO exatamente na clínica pedida.
+ */
+async function exigirAdminAtivoDaClinica(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  context: { supabase: any; userId: string },
+  clinicaId: string,
+  acao: string,
+) {
+  const { data: mem, error } = await context.supabase
+    .from("clinica_memberships")
+    .select("role, ativo, clinica_id")
+    .eq("user_id", context.userId)
+    .eq("clinica_id", clinicaId)
+    .eq("ativo", true)
+    .maybeSingle();
+  const m = mem as { role?: string; ativo?: boolean; clinica_id?: string } | null;
+  if (error || !m || m.ativo !== true || m.clinica_id !== clinicaId || m.role !== "admin") {
+    console.warn("[BACKUP] acesso negado", { userId: context.userId, clinicaId, acao });
+    throw new Error("Somente administradores desta clínica podem acessar os backups dela");
+  }
+}
+
 /** Lista os dias com backup salvo para a clínica do usuário. */
 export const listarBackups = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) => z.object({ clinica_id: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
-    // Garante que o usuário é admin da clínica
-    const { data: mem } = await context.supabase
-      .from("clinica_memberships")
-      .select("role")
-      .eq("user_id", context.userId)
-      .eq("clinica_id", data.clinica_id)
-      .eq("ativo", true)
-      .maybeSingle();
-    if ((mem as { role?: string } | null)?.role !== "admin") {
-      throw new Error("Somente administradores podem acessar backups");
-    }
+    await exigirAdminAtivoDaClinica(context, data.clinica_id, "listar");
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
@@ -57,7 +76,7 @@ export const listarBackups = createServerFn({ method: "POST" })
 
     const out: Array<{ data: string; arquivos: number; bytes: number }> = [];
     for (const d of (dias ?? []) as Array<{ name: string }>) {
-      if (!d.name) continue;
+      if (!d.name || !DIA_RE.test(d.name)) continue;
       const { data: files } = await supabaseAdmin.storage
         .from(BUCKET)
         .list(`${data.clinica_id}/${d.name}`, { limit: 1000 });
@@ -75,21 +94,12 @@ export const baixarBackupDoDia = createServerFn({ method: "POST" })
     z
       .object({
         clinica_id: z.string().uuid(),
-        data: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+        data: z.string().regex(DIA_RE),
       })
       .parse(input),
   )
   .handler(async ({ data, context }) => {
-    const { data: mem } = await context.supabase
-      .from("clinica_memberships")
-      .select("role")
-      .eq("user_id", context.userId)
-      .eq("clinica_id", data.clinica_id)
-      .eq("ativo", true)
-      .maybeSingle();
-    if ((mem as { role?: string } | null)?.role !== "admin") {
-      throw new Error("Somente administradores podem baixar backups");
-    }
+    await exigirAdminAtivoDaClinica(context, data.clinica_id, "baixar");
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const prefix = `${data.clinica_id}/${data.data}`;
@@ -98,17 +108,30 @@ export const baixarBackupDoDia = createServerFn({ method: "POST" })
       .list(prefix, { limit: 1000 });
     if (error) throw new Error(error.message);
 
+    // Só nomes simples de arquivo: nada de "/" ou ".." que escape da pasta
+    // da clínica autorizada.
     const arr = (files ?? []) as Array<{ name: string }>;
-    const paths = arr.map((f) => `${prefix}/${f.name}`);
+    const paths = arr
+      .filter((f) => f.name && !f.name.includes("/") && !f.name.includes(".."))
+      .map((f) => `${prefix}/${f.name}`);
     if (!paths.length) return { urls: [] as Array<{ nome: string; url: string }> };
 
     const { data: signed, error: sErr } = await supabaseAdmin.storage
       .from(BUCKET)
-      .createSignedUrls(paths, 60 * 10);
+      .createSignedUrls(paths, 60 * 5);
     if (sErr) throw new Error(sErr.message);
 
+    console.info("[BACKUP] download autorizado", {
+      userId: context.userId,
+      clinicaId: data.clinica_id,
+      dia: data.data,
+      arquivos: paths.length,
+    });
+
     return {
-      urls: (signed ?? []).map((s) => ({
+      urls: (signed ?? [])
+        .filter((s) => s.path?.startsWith(`${prefix}/`))
+        .map((s) => ({
         nome: s.path?.split("/").pop() ?? "arquivo.csv",
         url: s.signedUrl,
       })),
