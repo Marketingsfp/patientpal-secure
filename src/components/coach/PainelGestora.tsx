@@ -27,6 +27,7 @@ import {
   TopStat,
   type HistoryItem,
 } from "@/components/coach/painel-views";
+import { HistoricoSemUsuario } from "@/components/coach/HistoricoSemUsuario";
 
 type Aba = "progresso" | "conversas" | "perfis" | "vozes" | "analise";
 
@@ -219,7 +220,8 @@ export function PainelGestora({ ctx }: { ctx: CoachContexto }) {
               <HistoricoGestor clinicaId={clinicaId} />
             </TabsContent>
 
-            <TabsContent value="perfis" className="mt-5">
+            <TabsContent value="perfis" className="mt-5 space-y-5">
+              <HistoricoSemUsuario clinicaId={clinicaId} onVinculado={() => void loadHistory()} />
               <ProfilesView
                 history={history}
                 selected={selectedAtendente}
