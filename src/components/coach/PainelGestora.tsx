@@ -27,6 +27,7 @@ import {
   TopStat,
   type HistoryItem,
 } from "@/components/coach/painel-views";
+import { HistoricoSemUsuario } from "@/components/coach/HistoricoSemUsuario";
 
 type Aba = "progresso" | "conversas" | "perfis" | "vozes" | "analise";
 
