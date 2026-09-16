@@ -38,7 +38,7 @@ function etapa(rastro: Rastro, node: string, metadata?: Record<string, unknown>)
 }
 
 describe("tracing — segurança dos dados", () => {
-  it("preserva avaliações e entrega do resumo real do turno ao sanitizar", () => {
+  it("preserva entrega e modo direto sem avaliações ao sanitizar", () => {
     const registro = criarRegistroTurno({
       turnoId: "turno-MJ54",
       ambiente: "homologacao",
@@ -65,12 +65,10 @@ describe("tracing — segurança dos dados", () => {
     const resumo = resumoTurnoParaTrace(registro);
     const limpo = sanitizarMetadata(resumo);
     expect(limpo.entrega).toEqual(registro.entrega);
-    expect(limpo.avaliacoes).toEqual(registro.avaliacoes);
-    expect(limpo.avaliacao_operacional).toEqual(registro.avaliacoes[0]);
-    expect(limpo.nota_do_texto_entregue).toMatchObject({
-      aplicavel: false,
-      motivo: "texto_alterado_apos_avaliacao",
-    });
+    expect(limpo.avaliacoes).toBeUndefined();
+    expect(limpo.avaliacao_operacional).toBeUndefined();
+    expect(limpo.nota_do_texto_entregue).toBeUndefined();
+    expect(limpo.modo_resposta).toBe("direta");
     expect(limpo.lacunas).toEqual(resumo.lacunas);
     expect(limpo.iniciado_em).toBe(registro.iniciadoEm);
   });

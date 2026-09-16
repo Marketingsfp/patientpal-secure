@@ -1,15 +1,4 @@
-/**
- * O QUE É CADA BOLHA DA NINA (leitura para a tela de homologação e a Inbox).
- *
- * Responde, por mensagem entregue e sem adivinhar: é resposta avaliada, aviso
- * operacional do sistema, mensagem sem avaliação, ou texto alterado depois da
- * avaliação? E devolve o vínculo REAL (execução, entrega, encaminhamento) para
- * os detalhes técnicos.
- *
- * Nada é associado por horário próximo nem por semelhança de texto: só por
- * identificadores gravados (mensagem, execução, conversa) e por impressão
- * digital do conteúdo. Registro antigo e incompleto é declarado como tal.
- */
+/** Leitura autenticada de mensagem, origem e entrega nos dois ambientes. */
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";

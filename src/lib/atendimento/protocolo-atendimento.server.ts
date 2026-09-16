@@ -566,7 +566,7 @@ export async function anunciarHandoffAoPaciente(args: {
   // FASE 6 — a mensagem do protocolo é saída CONTROLADA do sistema: entra na
   // auditoria com hash próprio e SEM herdar a nota da resposta candidata.
   try {
-    const { registrarEntregaSaida } = await import("@/lib/nina/confidence-engine.server");
+    const { registrarEntregaSaida } = await import("@/lib/nina/entrega-saida.server");
     const { gravarEntregaDoTurno } = await import("@/lib/nina/rastreio/turno.server");
     const estado = envio.transporteId ? "confirmada" : "persistida";
     await registrarEntregaSaida({

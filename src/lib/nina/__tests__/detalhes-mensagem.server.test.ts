@@ -1,3 +1,4 @@
+import { eventoDoMotor } from "../fluxo-direto";
 import { describe, expect, it } from "bun:test";
 import { carregarDetalhesMensagem } from "../detalhes-mensagem.server";
 import type { RegistroDetalhes } from "../detalhes-mensagem";
@@ -87,7 +88,7 @@ describe("carregador por mensagem — leitura isolada", () => {
       clinicaId: p.clinicaId, mensagemId: String(p.mensagem!.id),
     });
     expect(r.leitura?.mensagem?.origem).toBe("Aviso do sistema");
-    expect(r.leitura?.avaliacoes.some((a) => a.explicacao.includes("não pertence ao aviso"))).toBe(true);
+    expect(r.leitura?.avaliacoes).toEqual([]);
   });
   it("execução isolada não libera inspeção de sistema sem aviso oficial", async () => {
     const { p, tabelas, cliente } = preparar();
@@ -100,7 +101,7 @@ describe("carregador por mensagem — leitura isolada", () => {
   it("MJ55: trace ligado à mensagem prevalece sobre traces auxiliares da execução", async () => {
     const { p, tabelas, cliente } = preparar();
     const canonico = String(p.avisos[0]!.turno_id);
-    const quantidadeCanonica = p.eventos.length;
+    const quantidadeCanonica = p.eventos.filter((e) => !eventoDoMotor(e)).length;
     tabelas.nina_trace_eventos.push(
       ...["instructions.published", "prompt.compose"].map((node_id, i) => ({
         id: `auxiliar-${i}`,
@@ -197,7 +198,7 @@ describe("carregador por mensagem — leitura isolada", () => {
     ).rejects.toThrow("saída da Nina");
   });
 
-  it("preserva avaliação diretamente ligada à mensagem mesmo sem execução", async () => {
+  it("preserva mensagem sem execução, omitindo avaliações legadas", async () => {
     const { p, tabelas, cliente } = preparar();
     p.mensagem!.execucao_id = null;
     tabelas.nina_trace_eventos = [];
@@ -218,8 +219,7 @@ describe("carregador por mensagem — leitura isolada", () => {
     });
     expect(r.execucao).toBeNull();
     expect(r.leitura?.mensagem?.id).toBe(p.mensagem!.id as string);
-    expect(r.leitura?.avaliacoes[0]?.titulo).toBe("Confiança desta mensagem");
-    expect(r.leitura?.avaliacoes[0]?.nota).toBe(89);
+    expect(r.leitura?.avaliacoes).toEqual([]);
   });
 
   it("consulta legada por execução não escolhe a última bolha", async () => {

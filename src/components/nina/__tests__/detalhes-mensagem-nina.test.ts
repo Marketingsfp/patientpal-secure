@@ -35,7 +35,7 @@ function renderizar(dados: LeituraDetalhesMensagem, registros?: unknown) {
 }
 
 describe("Detalhes técnicos da mensagem — apresentação fiel", () => {
-  it("MJ-55 mostra aviso persistido e notas de bloqueio sem promover registros antigos a mensagem final", () => {
+  it("MJ-55 preserva aviso e entrega sem exibir notas antigas", () => {
     const aviso = "Aviso simbólico: a equipe continuaria este atendimento. Protocolo MJ-55.";
     const dados = leitura({
       resultado: "Aviso de encaminhamento simulado registrado.",
@@ -114,20 +114,20 @@ describe("Detalhes técnicos da mensagem — apresentação fiel", () => {
     expect(principal).toContain(aviso);
     expect(principal).toContain('data-mensagem-id="mensagem-mj55"');
     expect(principal).toContain("Homologação");
-    expect(principal).toContain("Avaliação do texto bloqueado");
-    expect(principal).toContain("Nota 63/100");
+    expect(principal).not.toContain("Avaliação do texto bloqueado");
+    expect(principal).not.toContain("Nota 63/100");
     expect(principal).not.toContain("Confiança da mensagem registrada");
     expect(principal).not.toContain("HANDOFF_CONFIRMADO");
     expect(principal).not.toContain("Mensagem final enviada");
     expect(principal).not.toContain("não há validação automática");
     expect(html).toContain("Ver registros técnicos");
-    expect(html).toContain("Registros originais — podem conter inconsistências históricas.");
+    expect(html).toContain("Registros da geração e da entrega desta mensagem.");
     expect(html).toContain("HANDOFF_CONFIRMADO");
     expect(html).not.toMatch(/<details[^>]*\bopen(?:=|\s|>)/);
     expect(html).toMatch(/<summary[^>]*>Última resposta do modelo registrada<\/summary>/);
   });
 
-  it("resposta normal mostra a avaliação vinculada à mensagem selecionada", () => {
+  it("resposta normal mostra o modelo e a duração sem exibir avaliação", () => {
     const html = renderizar(
       leitura({
         avaliacoes: [
@@ -142,14 +142,14 @@ describe("Detalhes técnicos da mensagem — apresentação fiel", () => {
         ],
       }),
     );
-    expect(html).toContain("Confiança da mensagem registrada");
-    expect(html).toContain("Nota 90/100");
-    expect(html).toContain("O conteúdo avaliado corresponde à mensagem registrada.");
+    expect(html).not.toContain("Confiança da mensagem registrada");
+    expect(html).not.toContain("Nota 90/100");
+    expect(html).not.toContain("O conteúdo avaliado corresponde à mensagem registrada.");
     expect(html).toContain("1,3 s");
     expect(html).not.toContain("texto bloqueado");
   });
 
-  it("mensagem sem execução mantém seu texto e declara a falta de avaliação", () => {
+  it("mensagem sem execução mantém seu texto e declara a falta de vínculo técnico", () => {
     const html = renderizar(
       leitura({
         modelo: null,
@@ -169,7 +169,7 @@ describe("Detalhes técnicos da mensagem — apresentação fiel", () => {
       }),
     );
     expect(html).toContain("Protocolo recebido.");
-    expect(html).toContain("Nenhuma avaliação foi localizada para esta mensagem.");
+    expect(html).not.toContain("Nenhuma avaliação foi localizada para esta mensagem.");
     expect(html).toContain("Nenhuma resposta do modelo foi localizada nos registros.");
     expect(html).toContain("Não foi localizada uma execução vinculada a esta mensagem.");
     expect(html).not.toContain("Nota ");

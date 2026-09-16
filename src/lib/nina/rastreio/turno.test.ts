@@ -243,17 +243,17 @@ describe("FASE 2 — avaliações de confiança", () => {
     );
   });
 
-  it("o resumo do turno leva todas as avaliações e a operacional", () => {
+  it("o novo resumo omite avaliações sem alterar o registro histórico", () => {
     const r = criarRegistroTurno({ turnoId: "t1" });
     r.avaliacoes = [
       { ...base, avaliacao: "action_safety", decisao: "ALLOW", modo: "enforce", score: 90, aplicada: true },
       { ...base, avaliacao: "answer_confidence", decisao: "CLARIFY", modo: "shadow", score: 65, aplicada: false },
     ];
     const resumo = resumoTurnoParaTrace(r) as Record<string, unknown>;
-    expect((resumo["avaliacoes"] as unknown[]).length).toBe(2);
-    expect((resumo["avaliacao_operacional"] as Record<string, unknown>)["avaliacao"]).toBe(
-      "action_safety",
-    );
+    expect(resumo["modo_resposta"]).toBe("direta");
+    expect(resumo["avaliacoes"]).toBeUndefined();
+    expect(resumo["avaliacao_operacional"]).toBeUndefined();
+    expect(r.avaliacoes).toHaveLength(2);
   });
 });
 

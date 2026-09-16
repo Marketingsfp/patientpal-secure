@@ -91,9 +91,6 @@ import {
 } from "@/lib/nina/feedback-revisao.functions";
 import { TZ_CLINICA } from "@/lib/date-utils";
 import { ConversaAuditoriaDialog } from "@/components/nina/ConversaAuditoriaDialog";
-import { useConfiancaMensagens } from "@/components/nina/ConfiancaMensagem";
-import { SaidaMensagemBadge, useSaidasDasMensagens } from "@/components/nina/SaidaMensagem";
-import { combinaFiltroConfianca } from "@/lib/nina/confianca-badge";
 import { SemCaixaAlta } from "@/components/ui/caixa-alta";
 
 
@@ -218,16 +215,7 @@ const FILTROS_AMBIENTE = [
 ];
 
 
-const FILTROS_CONFIANCA = [
-  { valor: "todas", rotulo: "Todas" },
-  { valor: "HIGH", rotulo: "Alta" },
-  { valor: "MEDIUM", rotulo: "Média" },
-  { valor: "LOW", rotulo: "Baixa" },
-  { valor: "sem", rotulo: "Não avaliada" },
-  { valor: "alta_erro", rotulo: "Alta confiança + erro" },
-  { valor: "90", rotulo: "90% ou mais" },
-  { valor: "95", rotulo: "95% ou mais" },
-];
+
 
 type Comparacao = {
   knowledge_status: "found" | "not_found" | "conflict";
@@ -385,7 +373,6 @@ function Pagina() {
   const [ocorrencias, setOcorrencias] = useState<Record<string, number>>({});
   const [fPrioridade, setFPrioridade] = useState("todas");
   const [fCausa, setFCausa] = useState("todas");
-  const [fConfianca, setFConfianca] = useState("todas");
   const [fAmbiente, setFAmbiente] = useState("todos");
 
   const [diagnosticando, setDiagnosticando] = useState<Item | null>(null);
@@ -1014,30 +1001,14 @@ function Pagina() {
     }
   };
 
-  // Confiança REAL registrada quando a resposta foi produzida. Nada é
-  // recalculado aqui: leitura em lote do snapshot, casado pela execução.
-  const idsExecucao = useMemo(
-    () =>
-      Array.from(
-        new Set(itens.map((i) => i.execucao_id).filter((v): v is string => Boolean(v))),
-      ).slice(0, 300),
-    [itens],
-  );
-  const confianca = useConfiancaMensagens(clinicaId, idsExecucao);
-  const saidasReporte = useSaidasDasMensagens(clinicaId, null,
-    itens.map((item) => item.mensagem_id).filter((id): id is string => Boolean(id)));
-
   const itensFiltrados = useMemo(
     () =>
       itens.filter((i) => {
         if (fPrioridade !== "todas" && i.prioridade !== fPrioridade) return false;
         if (fCausa !== "todas" && i.root_cause !== fCausa) return false;
-        const c = i.execucao_id ? confianca[i.execucao_id] : undefined;
-        if (c === "falha") return fConfianca === "todas";
-        // Regra pura compartilhada com o selo da Inbox (FASE 10).
-        return combinaFiltroConfianca(fConfianca, c);
+        return true;
       }),
-    [itens, fPrioridade, fCausa, fConfianca, confianca],
+    [itens, fPrioridade, fCausa],
   );
 
   const cabecalho = useMemo(
@@ -1128,21 +1099,6 @@ function Pagina() {
               <SelectContent>
                 <SelectItem value="todas">Todas</SelectItem>
                 {CAUSAS_RAIZ_NINA.map((c) => (
-                  <SelectItem key={c.valor} value={c.valor}>
-                    {c.rotulo}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div>
-            <Label htmlFor="f-conf">Confiança</Label>
-            <Select value={fConfianca} onValueChange={setFConfianca}>
-              <SelectTrigger id="f-conf" className="mt-1">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {FILTROS_CONFIANCA.map((c) => (
                   <SelectItem key={c.valor} value={c.valor}>
                     {c.rotulo}
                   </SelectItem>
@@ -1247,28 +1203,6 @@ function Pagina() {
                       ? fmtDataSegundos(mensagens[it.mensagem_id]!.enviada_em!)
                       : "Data/hora da mensagem indisponível"}
                   </p>
-                  {/* Confiança do momento da resposta — snapshot gravado pelo
-                      motor, nunca recalculado nem estimado nesta tela. */}
-                  {(() => {
-                    const consulta = it.execucao_id ? confianca[it.execucao_id] : undefined;
-                    const c = consulta === "falha" ? undefined : consulta;
-                    const saida = it.mensagem_id ? saidasReporte[it.mensagem_id] : undefined;
-                    const avaliada = saida && saida !== "falha" && saida.classe === "resposta_avaliada";
-                    return (
-                      <p className="text-[11px] text-muted-foreground">
-                        Mensagem reportada:{" "}
-                        {it.mensagem_id ? <SaidaMensagemBadge saida={saida} /> : <span>Sem vínculo com uma mensagem</span>}
-                        {avaliada && c?.alta_confianca_com_erro && c.texto_final_hash === saida.textoEntregueHash && (
-                          <span
-                            className="ml-1 rounded-full border border-destructive/40 bg-destructive/10 px-1.5 py-0.5 text-destructive"
-                            title="Resposta de alta confiança reportada como erro — prioridade de investigação"
-                          >
-                            Alta confiança + erro
-                          </span>
-                        )}
-                      </p>
-                    );
-                  })()}
                   <p className="text-[11px] text-muted-foreground">
                     Erro reportado: {fmtData(it.created_at)} · {pessoas[it.reportado_por] ?? "—"}
                   </p>

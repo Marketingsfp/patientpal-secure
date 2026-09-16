@@ -218,7 +218,7 @@ mock.module("@/lib/nina-audio.server", () => ({
     return { bytes: new Uint8Array([1, 2]), mime: "audio/ogg" };
   },
 }));
-mock.module("@/lib/nina/confidence-engine.server", () => ({
+mock.module("@/lib/nina/entrega-saida.server", () => ({
   registrarEntregaSaida: async (entrada: Linha) => {
     entregas.push(entrada);
   },

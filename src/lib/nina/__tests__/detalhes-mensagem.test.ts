@@ -101,7 +101,7 @@ describe("leitura da mensagem persistida — MJ55", () => {
 });
 
 describe("consolidação histórica de etapas", () => {
-  it("não descreve aviso como registrado quando a etapa falhou", () => {
+  it("omite etapas do motor retirado da visualização atual", () => {
     const passos = consolidarPassosDetalhes(
       [
         {
@@ -117,9 +117,7 @@ describe("consolidação histórica de etapas", () => {
       ],
       "mensagem",
     );
-    expect(passos[0]?.estado).toBe("falhou");
-    expect(passos[0]?.descricao).toBe("Falha ao finalizar");
-    expect(passos[0]?.descricao).not.toContain("já estava registrado");
+    expect(passos).toEqual([]);
   });
 
   it("não une ferramentas diferentes que começaram no mesmo instante", () => {

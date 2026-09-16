@@ -1,5 +1,5 @@
 /** Versão do núcleo compartilhado do atendimento Nina, registrada ao iniciar o turno. */
-export const NINA_RUNTIME_VERSION = "nina-paridade-20260914-v3";
+export const NINA_RUNTIME_VERSION = "nina-resposta-direta-20260916-v1";
 
 /** Injetado pelo Vite a partir dos fontes Nina e manifests; não depende de .git no Lovable. */
 declare const __NINA_SOURCE_FINGERPRINT__: string;

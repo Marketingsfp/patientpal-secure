@@ -1,3 +1,4 @@
+import { registrosSemMotor } from "./fluxo-direto";
 /** Leitura autenticada pelo chamador. Nenhum registro de auditoria é reescrito. */
 import {
   montarLeituraDetalhesMensagem,
@@ -13,8 +14,6 @@ const EVENTOS =
   "id, clinica_id, trace_id, execution_id, conversation_id, message_id, cycle_id, node_id, event_type, status, duration_ms, started_at, finished_at, metadata";
 const EXECUCAO =
   "id, clinica_id, conversation_id, mensagens_entrada, created_at, model, thinking_level, latency_ms, knowledge_status, tool_calls, success, error_category, handoff, input_tokens, output_tokens, retries, prompt_versao, prompt_origem, prompt_publicado_em, prompt_modulos";
-const DECISAO =
-  "id, clinica_id, execucao_id, conversation_id, outgoing_message_id, representacao, texto_final_hash, score, nivel, created_at, avaliacao, modo, decisao, motivos, reason_codes, bloqueadores";
 const s = textoDetalhes;
 
 export async function carregarDetalhesMensagem(
@@ -245,75 +244,22 @@ export async function carregarDetalhesMensagem(
   const entradasIds = Array.isArray(execucao?.mensagens_entrada)
     ? execucao.mensagens_entrada.filter((v): v is string => typeof v === "string")
     : [];
-  const decisoesIds = [
-    ...new Set(vinculos.map((v) => s(v.decisao_id)).filter((v): v is string => v != null)),
-  ];
-  const [entradasBrutas, decisoesBrutas, decisoesMensagem, decisoesVinculo] = await Promise.all([
-    entradasIds.length
-      ? ler(
-          db
-            .from("whatsapp_mensagens")
-            .select(
-              "id, clinica_id, conversa_id, execucao_id, direction, body, transcricao, created_at",
-            )
-            .eq("clinica_id", alvo.clinicaId)
-            .in("id", entradasIds)
-            .eq("direction", "in")
-            .order("created_at", { ascending: true }),
-          "as mensagens de entrada vinculadas",
-        )
-      : Promise.resolve([]),
-    execucao
-      ? ler(
-          db
-            .from("nina_confianca_decisoes")
-            .select(DECISAO)
-            .eq("clinica_id", alvo.clinicaId)
-            .eq("execucao_id", String(execucao.id))
-            .order("created_at", { ascending: false })
-            .limit(200),
-          "as avaliações do motor",
-        )
-      : Promise.resolve([]),
-    mensagemId
-      ? ler(
-          db
-            .from("nina_confianca_decisoes")
-            .select(DECISAO)
-            .eq("clinica_id", alvo.clinicaId)
-            .eq("outgoing_message_id", mensagemId)
-            .order("created_at", { ascending: false })
-            .limit(200),
-          "as avaliações da mensagem",
-        )
-      : Promise.resolve([]),
-    decisoesIds.length
-      ? ler(
-          db
-            .from("nina_confianca_decisoes")
-            .select(DECISAO)
-            .eq("clinica_id", alvo.clinicaId)
-            .in("id", decisoesIds)
-            .order("created_at", { ascending: false })
-            .limit(200),
-          "as avaliações ligadas à entrega",
-        )
-      : Promise.resolve([]),
-  ]);
+  const entradasBrutas = entradasIds.length
+    ? await ler(
+        db.from("whatsapp_mensagens")
+          .select("id, clinica_id, conversa_id, execucao_id, direction, body, transcricao, created_at")
+          .eq("clinica_id", alvo.clinicaId).in("id", entradasIds).eq("direction", "in")
+          .order("created_at", { ascending: true }),
+        "as mensagens de entrada vinculadas",
+      )
+    : [];
   const entradas = entradasBrutas.filter(mesmaConversa);
-  const idsDecisoes = new Set<string>();
-  const decisoes = (execucaoConflitante ? [] : [...decisoesBrutas, ...decisoesMensagem, ...decisoesVinculo])
-    .filter(mesmaConversa)
-    .filter((d) => {
-      const id = s(d.id);
-      if (!id || idsDecisoes.has(id)) return false;
-      idsDecisoes.add(id);
-      return true;
-    })
-    .sort((a, b) => Date.parse(String(b.created_at)) - Date.parse(String(a.created_at)));
-  const etapas = Array.isArray(evidencias[0]?.etapas)
+  const decisoes: RegistroDetalhes[] = [];
+  const etapasBrutas = Array.isArray(evidencias[0]?.etapas)
     ? evidencias[0].etapas.map(objetoDetalhes)
     : [];
+  const etapas = registrosSemMotor(etapasBrutas);
+  eventos = registrosSemMotor(eventos);
   const leitura = montarLeituraDetalhesMensagem({
     clinicaId: alvo.clinicaId,
     mensagem,
@@ -332,6 +278,6 @@ export async function carregarDetalhesMensagem(
     traceId,
     eventos,
     leitura,
-    registrosComplementares: { mensagem, decisoes, avisos, vinculos, eventosAuxiliares },
+    registrosComplementares: { mensagem, avisos, vinculos: registrosSemMotor(vinculos), eventosAuxiliares: registrosSemMotor(eventosAuxiliares) },
   };
 }

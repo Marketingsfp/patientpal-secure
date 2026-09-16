@@ -1,0 +1,105 @@
+/** Núcleo real; apenas banco, modelo e catálogo externos são simulados. */
+import { mock } from "bun:test";
+
+process.env.LOVABLE_API_KEY = "chave-ficticia-sem-rede";
+const teste = process.argv[2] === "homologacao";
+const pergunta = "quais são as informações do eletrocardiograma?";
+const respostaModelo = "Eletrocardiograma: R$ 80,00 no dinheiro e R$ 95,00 no cartão. Profissional: Enfermagem. Segunda a sexta, das 8h às 12h. Sem jejum. Leve o pedido médico.";
+const prompt = "Você é Nina. Consulte a base e informe preço, profissional, horário e preparo solicitados. Não acrescente saudação à resposta sobre exames.";
+const consultas: string[] = [];
+const gravacoes: Array<{ tabela: string; valor: any }> = [];
+const requests: any[] = [];
+const ferramentas: string[] = [];
+let motorChamado = 0;
+let rede = 0;
+const proibido = () => { motorChamado++; throw new Error("Motor não pode ser executado"); };
+mock.module("@/lib/nina/confidence/runtime", () => ({
+  decidirNoTurno: proibido, garantirScoreDoTextoEnviado: proibido,
+  validarAgendamentoAntesDoCommit: proibido, montarContextoDoTurno: proibido,
+}));
+mock.module("@/lib/nina/confidence/claims", () => ({ avaliarGrounding: proibido }));
+mock.module("@/lib/nina/confidence/configuracao-turno.server", () => ({ configuracaoDoTurno: proibido }));
+globalThis.fetch = Object.assign(async () => {
+  rede++; throw new Error("Rede proibida na simulação");
+}, { preconnect: () => {} });
+
+mock.module("@/integrations/supabase/client.server", () => ({
+  supabaseAdmin: {
+    from(tabela: string) {
+      consultas.push(tabela);
+      if (tabela.startsWith("nina_confianca") && tabela !== "nina_confianca_vinculos") return proibido();
+      let unica = false;
+      const q: any = {
+        select: () => q, eq: () => q, in: () => q, neq: () => q, or: () => q,
+        order: () => q, limit: () => q, gte: () => q, is: () => q,
+        maybeSingle: () => { unica = true; return q; },
+        insert: (valor: any) => { gravacoes.push({ tabela, valor }); return q; },
+        upsert: (valor: any) => { gravacoes.push({ tabela, valor }); return q; },
+        update: (valor: any) => { gravacoes.push({ tabela, valor }); return q; },
+        then: (resolve: any) => Promise.resolve(resolve({
+          data: tabela === "clinicas" ? { nome: "Clínica simulada", base_importada: false }
+            : unica ? null : [], error: null, count: 0,
+        })),
+      };
+      return q;
+    },
+    rpc: async () => ({ data: [], error: null }),
+  },
+}));
+mock.module("@/lib/nina/agenda-flag.server", () => ({ ferramentasAgendaAtivas: async () => false }));
+mock.module("@/lib/nina/atendimento-fase1.server", () => ({ flagFluxoFase1Ativa: async () => false }));
+mock.module("@/lib/nina/atendimento-fase3.server", () => ({ flagFluxoFase3Ativa: async () => false }));
+mock.module("@/lib/nina/atendimento-fase6.server", () => ({ flagFluxoFase6Ativa: async () => false }));
+mock.module("@/lib/nina/aprendizado.server", () => ({ recuperarAprendizados: async () => [] }));
+mock.module("@/lib/nina/instrucoes-runtime.server", () => ({ promptInstrucoes: async () => ({
+  texto: prompt, template: prompt, origem: "publicada", versao: 42,
+  versaoId: "prompt-42", publicadoEm: "2026-09-16T12:00:00Z", fallbackPorErro: false,
+}) }));
+mock.module("@/lib/nina/catalogo-prompt.server", () => ({ contarCatalogoPublicado: async () => ({ servicos: 1, profissionais: 1 }) }));
+mock.module("@/lib/nina/paciente-tools.server", () => ({
+  FERRAMENTAS_NINA_CONSULTA: [{ type: "function", function: { name: "consultar_base_conhecimento" } }],
+  FERRAMENTAS_NINA_PACIENTE: [], executarFerramentaPaciente: async () => { throw new Error("Usar broker simulado"); },
+}));
+mock.module("@/lib/nina/handoff-tool.server", () => ({
+  FERRAMENTA_HANDOFF: { type: "function", function: { name: "solicitar_atendente_humano" } },
+}));
+const resultados: any[] = [];
+mock.module("@/lib/nina/tool-broker.server", () => ({ criarToolBroker: () => ({
+  resultados: () => resultados,
+  executar: async (nome: string) => {
+    ferramentas.push(nome);
+    if (nome !== "consultar_base_conhecimento") throw new Error(`Ferramenta inesperada: ${nome}`);
+    const r = { ferramenta: nome, capacidade: "searchKnowledgeBase", fonte: "catalogo_publicado",
+      success: true, reused: false, dados: { itens: [{ id: "ecg", procedimento: "ELETROCARDIOGRAMA",
+        valor: "R$ 80,00 dinheiro / R$ 95,00 cartão", medico: "Enfermagem",
+        dias_horarios: "Segunda a sexta, 8h às 12h", preparo: "Sem jejum", restricoes: "Levar pedido médico" }] },
+    };
+    resultados.push(r);
+    return r;
+  },
+}) }));
+mock.module("@/lib/nina/ai-gateway.server", () => ({ ninaAIGateway: async (req: any) => {
+  requests.push(structuredClone(req));
+  return { ok: true, conteudo: respostaModelo, toolCalls: [], modelo: "modelo-simulado", execucaoId: "execucao-direta", nivel: "low" };
+} }));
+mock.module("@/lib/nina/resposta/templates.server", () => ({
+  carregarTemplatesPublicados: async () => ({ textos: {}, versaoInstrucoes: null, recusadas: [] }),
+}));
+
+const { gerarRespostaNina } = await import("@/lib/whatsapp.server");
+const auditoria: any = {};
+const resposta = await gerarRespostaNina("clinica-simulada", pergunta, null, {
+  teste, ambiente: teste ? "homologacao" : "producao", auditoria,
+  mensagensEntrada: ["entrada-simulada"],
+});
+const { registrarEntregaSaida } = await import("@/lib/nina/entrega-saida.server");
+await registrarEntregaSaida({
+  clinicaId: "clinica-simulada", execucaoId: "execucao-direta", conversaId: "conversa-direta",
+  outgoingMessageId: "saida-direta", representacao: "texto_completo", estado: "persistida",
+  // Mesmo um chamador legado não pode associar nota ao novo fluxo.
+  decisaoId: "decisao-antiga", textoHash: "hash-direto",
+});
+console.log("DIRETA_RESULTADO=" + JSON.stringify({
+  resposta, respostaModelo, prompt, motorChamado, rede, requests, ferramentas, consultas,
+  temNota: auditoria.decisaoId != null, gravacoes,
+}));

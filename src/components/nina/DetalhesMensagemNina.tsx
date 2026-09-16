@@ -1,5 +1,6 @@
 import { Badge } from "@/components/ui/badge";
 import type { LeituraDetalhesMensagem } from "@/lib/nina/detalhes-mensagem-contrato";
+import { registrosSemMotor } from "@/lib/nina/fluxo-direto";
 
 const AMBIENTES = {
   homologacao: "Homologação",
@@ -7,7 +8,6 @@ const AMBIENTES = {
   nao_registrado: "Ambiente não registrado",
 } as const;
 
-const NIVEIS: Record<string, string> = { LOW: "Baixa", MEDIUM: "Média", HIGH: "Alta" };
 
 const ESTADOS_PASSO = {
   concluido: { texto: "Concluído", classe: "text-emerald-700 dark:text-emerald-400" },
@@ -142,39 +142,6 @@ export function DetalhesMensagemNina({
         </p>
       </details>
 
-      <section aria-label="Avaliações registradas" className="space-y-2">
-        <h3 className="font-semibold">Avaliações registradas</h3>
-        {leitura.avaliacoes.length ? (
-          leitura.avaliacoes.map((avaliacao) => (
-            <div key={avaliacao.id} className="space-y-2 rounded-lg border p-3">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <h4 className="font-medium">{avaliacao.titulo}</h4>
-                {avaliacao.nota != null && Number.isFinite(avaliacao.nota) && (
-                  <Badge variant="outline">
-                    Nota {avaliacao.nota}/100
-                    {avaliacao.nivel && NIVEIS[avaliacao.nivel]
-                      ? ` · ${NIVEIS[avaliacao.nivel]}`
-                      : ""}
-                  </Badge>
-                )}
-              </div>
-              <p className="text-muted-foreground">{avaliacao.explicacao}</p>
-              {avaliacao.motivos.length > 0 && (
-                <ul className="list-disc space-y-1 pl-4 text-xs text-muted-foreground">
-                  {avaliacao.motivos.map((motivo, indice) => (
-                    <li key={indice}>{motivo}</li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          ))
-        ) : (
-          <p className="text-muted-foreground">
-            Nenhuma avaliação foi localizada para esta mensagem.
-          </p>
-        )}
-      </section>
-
       <section aria-label="O que aconteceu" className="space-y-3">
         <h3 className="font-semibold">O que aconteceu</h3>
         {leitura.passos.length ? (
@@ -214,10 +181,10 @@ export function DetalhesMensagemNina({
         <details className="rounded-lg border p-3" data-testid="registros-tecnicos">
           <summary className="cursor-pointer font-medium">Ver registros técnicos</summary>
           <p className="mt-3 text-xs text-muted-foreground">
-            Registros originais — podem conter inconsistências históricas.
+            Registros da geração e da entrega desta mensagem.
           </p>
           <pre className="mt-2 max-h-80 overflow-auto whitespace-pre-wrap break-words rounded bg-muted/30 p-2 text-[11px]">
-            {JSON.stringify(registros, null, 2)}
+            {JSON.stringify(registrosSemMotor([registros as Record<string, unknown>])[0], null, 2)}
           </pre>
         </details>
       )}

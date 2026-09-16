@@ -1,10 +1,8 @@
 import { hashDoTexto } from "./confidence/hash";
-import { selecionarAvaliacaoDaSaida, representacaoDaMensagem } from "./confidence/identidade-saida";
+import { representacaoDaMensagem } from "./confidence/identidade-saida";
 import {
-  classificarSaida,
   ROTULO_ESTADO_AVISO,
   ROTULO_ESTADO_ENTREGA,
-  type ClasseSaida,
 } from "./confidence/classificacao-saida";
 
 import type { SaidaMensagemView } from "./saida-mensagem.functions";
@@ -69,48 +67,6 @@ export async function carregarSaidasDasMensagens(
     .in("mensagem_id", ids);
   if (erroAvisos) throw new Error("Não foi possível carregar os avisos operacionais.");
   const avisos = (avisoRows ?? []) as unknown as Array<Record<string, unknown>>;
-  const execucoes = [
-    ...new Set(
-      linhas
-        .filter((m) => mensagemNinaInspecionavel(m, avisos, data.clinicaId))
-        .map((m) => execucaoOficialDaMensagem(m, avisos, data.clinicaId))
-        .filter((id): id is string => id != null),
-    ),
-  ];
-
-  // Avaliações do motor no escopo destes atendimentos.
-  let decisoes: Array<Record<string, unknown>> = [];
-  if (execucoes.length > 0) {
-    const { data: decRows, error: erroDecisoes } = await db
-      .from("nina_confianca_decisoes")
-      .select(
-        "id, clinica_id, execucao_id, conversation_id, outgoing_message_id, representacao, texto_final_hash, score, nivel, created_at",
-      )
-      .eq("clinica_id", data.clinicaId)
-      .eq("avaliacao", "answer_confidence")
-      .in("execucao_id", execucoes)
-      .order("created_at", { ascending: false })
-      .limit(2001);
-    if (erroDecisoes) throw new Error("Não foi possível carregar as avaliações do motor.");
-    decisoes = (decRows ?? []) as unknown as Array<Record<string, unknown>>;
-    if (decisoes.length >= 2001)
-      throw new Error("As avaliações excederam o limite de leitura. A inspeção está incompleta.");
-  }
-  const { data: diretas, error: erroDiretas } = await db
-    .from("nina_confianca_decisoes")
-    .select(
-      "id, clinica_id, execucao_id, conversation_id, outgoing_message_id, representacao, texto_final_hash, score, nivel, created_at",
-    )
-    .eq("clinica_id", data.clinicaId)
-    .eq("avaliacao", "answer_confidence")
-    .in("outgoing_message_id", ids)
-    .order("created_at", { ascending: false })
-    .limit(2001);
-  if (erroDiretas) throw new Error("Não foi possível carregar as avaliações da mensagem.");
-  if ((diretas ?? []).length >= 2001)
-    throw new Error("As avaliações excederam o limite de leitura. A inspeção está incompleta.");
-  decisoes = [...new Map([...decisoes, ...(diretas ?? [])].map((d) => [d.id, d])).values()];
-
   return linhas.map((m): SaidaMensagemView => {
     const mensagemId = String(m["id"]);
     const inspecionavel = mensagemNinaInspecionavel(m, avisos, data.clinicaId);
@@ -146,48 +102,6 @@ export async function carregarSaidasDasMensagens(
       origemBruta === "aviso_encaminhamento" ||
       detalhe?.["avaliada"] === false;
 
-    // Candidatas do MESMO escopo. Sem mensagem/execução gravadas, nenhuma
-    // avaliação é puxada por proximidade.
-    const candidatas = decisoes
-      .filter(
-        (d) =>
-          inspecionavel &&
-          !execucaoConflitante &&
-          d.clinica_id === data.clinicaId &&
-          d.conversation_id === m.conversa_id &&
-          (execucaoId
-            ? String(d["execucao_id"]) === execucaoId
-            : d.outgoing_message_id === mensagemId),
-      )
-      .map((d) => ({
-        clinicaId: data.clinicaId,
-        conversaId: txt(d["conversation_id"]),
-        execucaoId: txt(d["execucao_id"]),
-        outgoingMessageId: txt(d["outgoing_message_id"]),
-        representacao: txt(d["representacao"]),
-        textoHash: txt(d["texto_final_hash"]),
-        linha: d,
-      }));
-
-    const escolha = selecionarAvaliacaoDaSaida(candidatas, {
-      clinicaId: data.clinicaId,
-      conversaId: txt(m["conversa_id"]) ?? data.conversaId ?? null,
-      execucaoId,
-      outgoingMessageId: mensagemId,
-      representacao: identidade.representacao,
-      conteudo: textoEntregue,
-    });
-
-    const classificacao = classificarSaida({
-      carregou: true,
-      avisoOperacional,
-      temAvaliacao: candidatas.length > 0,
-      avaliacaoAplicavel: escolha.suficiente && escolha.conteudoConferido && !avisoOperacional,
-      motivoVinculo:
-        escolha.motivo === "registro_antigo_sem_hash" ? "vinculo_incompleto" : escolha.motivo,
-    });
-
-    const aplicada = classificacao.classe === "resposta_avaliada" ? escolha.avaliacao : null;
     const estadoAviso = txt(aviso?.["estado"]);
 
     return {
@@ -197,9 +111,9 @@ export async function carregarSaidasDasMensagens(
       inspecionavel,
       execucaoId,
       ambiente: m["is_teste"] === true ? "homologacao" : "producao",
-      classe: classificacao.classe,
-      explicacao: classificacao.explicacao,
-      limitacao: classificacao.limitacao,
+      classe: avisoOperacional ? "aviso_operacional" : "sem_avaliacao",
+      explicacao: avisoOperacional ? "Aviso operacional registrado." : "Resposta da Nina registrada.",
+      limitacao: execucaoConflitante ? "Vínculos de execução divergentes." : null,
       origem:
         (origemBruta ? (ORIGEM_ROTULO[origemBruta] ?? origemBruta) : null) ??
         (aviso ? ORIGEM_ROTULO["aviso_encaminhamento"]! : null),
@@ -225,17 +139,9 @@ export async function carregarSaidasDasMensagens(
               : "Estado não registrado",
           }
         : null,
-      avaliacoes: candidatas.map((c) => ({
-        decisaoId: txt(c.linha["id"]),
-        score: c.linha["score"] == null ? null : Math.round(Number(c.linha["score"])),
-        nivel: txt(c.linha["nivel"]),
-        representacao: c.representacao,
-        textoHash: c.textoHash,
-        criadoEm: txt(c.linha["created_at"]),
-        desteTexto: Boolean(!avisoOperacional && aplicada && aplicada.linha.id === c.linha.id),
-      })),
-      score: aplicada ? Math.round(Number(aplicada.linha["score"]) || 0) : null,
-      nivel: aplicada ? txt(aplicada.linha["nivel"]) : null,
+      avaliacoes: [],
+      score: null,
+      nivel: null,
     };
   });
 }

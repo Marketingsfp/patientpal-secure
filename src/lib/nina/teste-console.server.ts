@@ -827,7 +827,7 @@ export async function processarMensagemTeste(
       diag.response_saved = true;
       // FASE 5 — mesmos estados da produção, no canal isolado de homologação.
       try {
-        const { registrarEntregaSaida } = await import("@/lib/nina/confidence-engine.server");
+        const { registrarEntregaSaida } = await import("@/lib/nina/entrega-saida.server");
         const { hashDoTexto } = await import("@/lib/nina/confidence/hash");
         const idSaida = (msgOut as { id?: string } | null)?.id ?? null;
         // VÍNCULO CORRETO — a nota pertence ao texto avaliado. Se o texto

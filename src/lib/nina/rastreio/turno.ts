@@ -501,7 +501,6 @@ export function lacunasDoTurno(r: RegistroTurno): string[] {
     faltas.push("chamada_modelo");
   }
   if (r.modeloChamado && !r.execucaoId) faltas.push("execucao_modelo");
-  if (r.modeloChamado && !r.confianca) faltas.push("confianca");
   if (r.origemResposta && r.origemResposta !== "nenhuma" && !r.entrega?.mensagemId) {
     faltas.push("mensagem_entregue");
   }
@@ -520,6 +519,7 @@ export function lacunasDoTurno(r: RegistroTurno): string[] {
  */
 export function resumoTurnoParaTrace(r: RegistroTurno): Record<string, unknown> {
   return {
+    modo_resposta: "direta",
     runtime_versao: r.runtimeVersao ?? null,
     runtime_fingerprint: r.runtimeFingerprint ?? null,
     turno_id: r.turnoId,
@@ -564,20 +564,6 @@ export function resumoTurnoParaTrace(r: RegistroTurno): Record<string, unknown> 
      */
     versoes_texto: versoesParaTrace(r.versoesTexto ?? [], r.diagnostico),
     avisos_operacionais: r.avisosOperacionais ?? [],
-    /** Avaliações que causaram bloqueio, com o hash do texto que recebeu a nota. */
-    bloqueios: r.bloqueios ?? [],
-    /** A nota registrada vale para a mensagem entregue? Decidido por hash. */
-    nota_do_texto_entregue: notaAplicavelAoTextoFinal({
-      avaliacoes: r.avaliacoes ?? [],
-      hashFinal: r.entrega?.textoHash ?? null,
-      avisoOperacional: (r.avisosOperacionais ?? []).some(
-        (a) => a.textoHash && a.textoHash === (r.entrega?.textoHash ?? null),
-      ),
-    }),
-    confianca: r.confianca,
-    /** FASE 2 — cada avaliação com seu modo; shadow não vira intervenção. */
-    avaliacoes: r.avaliacoes,
-    avaliacao_operacional: avaliacaoOperacional(r.avaliacoes ?? []),
     entrega: r.entrega,
     auditoria_instrucoes: (r.auditoriaInstrucoes ?? []).map(auditoriaParaTrace),
     diagnostico_autorizado: r.diagnostico,

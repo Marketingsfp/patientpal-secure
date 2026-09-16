@@ -1,6 +1,5 @@
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { normalizarTelefone } from "@/lib/atendimento/telefone";
-import { consolidarTentativas } from "@/lib/nina/confidence/evidencia";
 import { agoraNaClinica } from "@/lib/nina-agora";
 
 import { normalizar } from "@/lib/nina-especialidade";
@@ -546,7 +545,7 @@ export async function gerarRespostaNina(
     /**
      * FASE 5 — lote (Message Burst) tratado como UM turno do paciente.
      * `mensagensEntrada` continua sendo o histórico físico; aqui viaja o
-     * vínculo lógico usado por intenção, estado, Confidence e auditoria.
+     * vínculo lógico usado por intenção, estado e auditoria.
      */
     lote?: { batchId: string | null; revisao: number | null };
     /** Reserva do lote ainda pertence ao chamador. Falha interrompe sem fallback. */
@@ -580,7 +579,7 @@ export async function gerarRespostaNina(
   });
 
   // FASE 1 (Rastreabilidade) — registro do turno: versão usada, se o modelo foi
-  // chamado, origem do texto, transformações, confiança e lacunas.
+  // chamado, origem do texto, transformações e lacunas.
   const {
     comRegistroTurno,
     gravarResumoTurno,
@@ -1231,7 +1230,7 @@ async function gerarRespostaNinaInterno(
   const { interesseEmConsultarAgenda, atualizarInteresseConsultaAgenda, normalizarInteresseConsultaAgenda,
     FERRAMENTAS_DE_VAGAS, consultaAgendaAguardandoPaciente } =
     await import("@/lib/nina/consulta-agenda");
-  const { historicoParaConsultaAgenda, historicoDaSessaoParaVerificacao } = await import("@/lib/nina/consulta-agenda-historico");
+  const { historicoParaConsultaAgenda } = await import("@/lib/nina/consulta-agenda-historico");
   const idsDoTurno = new Set(opcoes?.mensagensEntrada ?? []);
   // A verificação da continuidade não pode usar o resumo truncado do modelo.
   // O count permite declarar explicitamente se o histórico da sessão veio completo.
@@ -1255,13 +1254,6 @@ async function gerarRespostaNinaInterno(
     mensagensFluxo = h.data ?? [];
     historicoFluxoCompleto = !h.error && h.count !== null && h.count === mensagensFluxo.length;
   }
-  const provaHistorico = historicoDaSessaoParaVerificacao(mensagensFluxo, {
-    conversaId: estadoId.conversaId,
-    inicioSessao: inicioFluxo ?? null,
-    corteMemoria: inicioFluxo ? Date.parse(inicioFluxo) : corteMemoria,
-    teste: opcoes?.teste === true,
-    idsDoTurno,
-  }, historicoFluxoCompleto);
   // Snapshot só de mensagens já entregues da sessão. Respostas candidatas do
   // modelo e argumentos de ferramentas não podem fabricar aceite do paciente.
   const contextoConsultaAgenda: import("@/lib/nina/consulta-agenda").ContextoConsultaAgenda = {
@@ -1303,20 +1295,8 @@ async function gerarRespostaNinaInterno(
     motivo: string;
     texto: string;
   }> = [];
-  {
-    const { blocoContratoEsclarecimento, normalizarPendencia: normPend } = await import(
-      "@/lib/nina/confidence/esclarecimento"
-    );
-    const bloco = blocoContratoEsclarecimento(normPend(fluxoEstado.clarification));
-    if (bloco) {
-      instrucoesAdicionaisTurno.push({
-        codigo: "ESCLARECIMENTO_PENDENTE",
-        origem: "motor de confiabilidade (estado do fluxo)",
-        motivo: "há pendência de esclarecimento aberta nesta conversa",
-        texto: bloco,
-      });
-    }
-  }
+  // O motor antigo não impõe pendências aos novos turnos.
+  fluxoEstado.clarification = undefined;
   const precedenciaTurno = resolverPrecedenciaDoTurno({
     instrucoesAdicionais: instrucoesAdicionaisTurno,
     textoPublicado: behaviorPrompt,
@@ -1657,15 +1637,6 @@ async function gerarRespostaNinaInterno(
 
 
   let resposta = "";
-  // FASE 5 — guardados para a verificação da RESPOSTA FINAL (answer_confidence),
-  // que roda depois de todo o pós-processamento, sobre o texto realmente enviado.
-  let estadoTurnoFinal:
-    | import("@/lib/nina/confidence/runtime").EstadoDoTurno
-    | null = null;
-  let avaliacaoAcao:
-    | import("@/lib/nina/confidence/types").ResultadoConfianca
-    | null = null;
-  let execucaoIdFinal: string | null = null;
   let houveHandoff = false;
   // FASE 4 — vira true quando a conversa avançou durante a geração.
   let turnoObsoleto = false;
@@ -1673,67 +1644,17 @@ async function gerarRespostaNinaInterno(
   // appointment_id verificado no banco — ou quando a conversa JÁ tem um
   // agendamento gravado (senão a Nina não conseguiria nem falar sobre a
   // consulta já marcada nos turnos seguintes).
-  const { reservaDaSessaoAtual, estadoOperacionalDaSessao, resultadoComprovaCriacaoNoTurno } = await import("@/lib/nina/agendamento-sessao");
+  const { reservaDaSessaoAtual } = await import("@/lib/nina/agendamento-sessao");
   const jaTinhaAgendamento = reservaDaSessaoAtual(fluxoEstado);
   let agendamentoConfirmado = jaTinhaAgendamento;
-  let agendamentoCriadoNesteTurno = false;
 
   let correcaoFalsoSucessoUsada = false;
-  // ------------------- CONFIDENCE DECISION ENGINE -------------------
-  // Evidências reais do turno: o que rodou, se deu certo e se o catálogo
-  // publicado devolveu registro. É isso — e não o "achismo" do modelo —
-  // que autoriza afirmar valor, horário, profissional, preparo ou regra.
-  const evidenciasFerramentas: Array<{
-    nome: string;
-    capacidade: string | null;
-    fonte: string | null;
-    success: boolean;
-    erro?: string | undefined;
-    /** FASE 5 — escopo (argumentos) da consulta, para identificar retry real. */
-    escopo?: string | null;
-  }> = [];
-  const { descreverFerramenta } = await import("@/lib/nina/tool-broker");
-  const capturarProvaFluxo = () => ({
-    // Qualquer operação ou resultado não representado impede comprovar um turno só de leitura.
-    registroFerramentasCompleto: broker.resultados().every((r) => {
-      if (consultaAgendaAguardandoPaciente(r.resultado)) return true;
-      const descritor = descreverFerramenta(r.ferramenta);
-      const resultado = r.resultado as { success?: boolean; erro?: string };
-      return descritor?.escrita === false && evidenciasFerramentas.some((f) =>
-        f.nome === r.ferramenta && f.capacidade === descritor.capacidade &&
-        f.fonte === descritor.fonte && f.success === resultado.success &&
-        (f.erro ?? null) === (resultado.erro ?? null),
-      );
-    }),
-    historicoCompleto: provaHistorico.completo,
-    historico: provaHistorico.historico,
-    sessionId: sessaoNina.estado.session_id ?? null,
-  });
-  let catalogoEncontrou = false;
+  // Retornos oficiais alimentam o modelo sem avaliação de confiança.
   // FASE 2 — fatos concretos e consultas do turno (com retry consolidado).
   const fatosDoTurno: import("@/lib/nina/confidence/evidencia").FatoRecuperado[] = [];
   const consultasDoTurno: import("@/lib/nina/confidence/evidencia").ConsultaDoTurno[] = [];
-  let esclarecimentoConfiancaUsado = false;
-  // FASE 4 — esclarecimento é ESTADO da conversa, não rodada interna do
-  // modelo. A pendência persistida sobrevive a reinício, lote agrupado e
-  // retomada; a tentativa só é consumida quando o paciente responde e a
-  // dúvida continua. O limite vive na política central.
-  const {
-    abrirPendencia,
-    fecharPendencia,
-    normalizarPendencia,
-    perguntaParaPaciente,
-    reavaliarPendencia,
-  } = await import("@/lib/nina/confidence/esclarecimento");
-  const pendenciaAnterior = normalizarPendencia(fluxoEstado.clarification);
-  let pendenciaAvaliada = false;
-  let tentativasEsclarecimentoConfianca = 0;
-  // FASE 4 — desfecho explícito quando o laço termina sem resposta aprovada.
+  // FASE 4 — desfecho explícito quando o laço termina sem resposta textual.
   let limiteRodadasAtingido = false;
-  // Disponibilidade confirmada em tempo real nesta conversa (pré-commit).
-  let disponibilidadeConfirmada = false;
-  // Dados já coletados no turno — entram no resumo estruturado do handoff.
-  const dadosColetados: Record<string, unknown> = {};
   // Modalidade publicada ("atendimento agendado") não é uma reserva do
   // paciente. Uma afirmação real de reserva continua exigindo confirmação.
   const { afirmaOuPrometeAgendamento } = await import("@/lib/nina/afirmacao-agendamento");
@@ -1745,46 +1666,22 @@ async function gerarRespostaNinaInterno(
   // FASE 5 — quantas rodadas de modelo o turno consumiu. Caminho sem modelo
   // termina com 0 e é registrado como tal, sem inventar execução de LLM.
   let rodadasDoTurno = 0;
-  // AUDITORIA — resultado da verificação de cada exigência publicada, lido da
-  // avaliação final. Fica vazio quando o validador não rodou; ausência de
-  // verificação nunca vira "restrições cumpridas".
-  let verificacoesInstrucoesTurno: {
-    verificacoes: import("@/lib/nina/rastreio/auditoria-instrucoes").VerificacaoExigencia[];
-    falhaDeInterpretacao: boolean;
-  } | null = null;
   // Conhecimento da sessão é uma referência de pesquisa, nunca prova velha.
   // Toda continuação factual é reconsultada no catálogo e o MESMO retorno
-  // alimenta contexto, motor e auditoria antes da geração.
+  // alimenta o contexto do modelo e a auditoria antes da geração.
   const { conhecimentoDaMesmaSessao, consultaDoNovoTurno, lembrarConsultaComprovada,
     compararReferenciasConhecimento } = await import("@/lib/nina/confidence/conhecimento-sessao");
   const { incorporarResultadoOficial, limitarRetornoParaModelo } = await import("@/lib/nina/confidence/evidencias-turno");
   const { resolverSelecaoContextual, normalizarSelecaoContextual } = await import("@/lib/nina/confidence/selecao-contextual");
-  const { construirPlanoFactual, formatarPlanoFactualParaModelo } = await import("@/lib/nina/confidence/plano-factual");
-  const { montarContextoDoTurno } = await import("@/lib/nina/confidence/runtime");
   const conhecimentoAnterior = conhecimentoDaMesmaSessao(fluxoEstado.knowledge_context, clinicaId, fluxoEstado.session_id ?? null);
   fluxoEstado.knowledge_context = conhecimentoAnterior;
   const consultaPlanejada = consultaDoNovoTurno({ mensagem: mensagemPaciente, anterior: conhecimentoAnterior,
     dispensarConsulta: Boolean(saudacaoDispensadaPor) });
   let selecaoDoTurno: import("@/lib/nina/confidence/selecao-contextual").ResultadoSelecaoContextual | null = null;
-  const selecaoAtual = () => selecaoDoTurno;
-  let recuperacaoFonteUsada = false;
-  let reconstrucaoFactualUsada = false;
-  const contextoFactualAtual = () => montarContextoDoTurno({
-    mensagemPaciente, acao: null, tipoTurno: "INFORMACAO", clinicaId,
-    conversaId: estadoId.conversaId, ferramentas: evidenciasFerramentas, fatos: fatosDoTurno,
-    consultas: consolidarTentativas(consultasDoTurno), catalogoEncontrou,
-    agendamentoConfirmado, pacienteIdentificado: Boolean(pacienteIdEfetivo),
-    esclarecimentoUsado: false, handoffSolicitado: houveHandoff,
-    ambiente: opcoes?.teste ? "homologacao" : "producao",
-  });
   async function compartilharResultado(nome: string, args: unknown, r: import("@/lib/nina/tool-broker").ResultadoBroker) {
     const ex = incorporarResultadoOficial({ clinicaId, nome, args, resultado: r,
       fatos: fatosDoTurno, consultas: consultasDoTurno });
     if (!r.reused) nomesFerramentasTurno.push(nome);
-    evidenciasFerramentas.push({ nome, capacidade: r.capacidade, fonte: r.fonte,
-      success: r.success, erro: r.erro,
-      escopo: (typeof args === "string" ? args : JSON.stringify(args ?? {})).trim().slice(0, 400) || null });
-    catalogoEncontrou = fatosDoTurno.some(f => f.fonte === "catalogo_publicado");
     if (!r.success || r.erro) conflitoFerramenta = true;
     const payload = respostaParaModelo(r);
     if (r.capacidade !== "searchKnowledgeBase" && r.capacidade !== "listCatalog") return limitarRetornoParaModelo(payload);
@@ -1815,17 +1712,14 @@ async function gerarRespostaNinaInterno(
       runtimeContext.consulta_agenda.interesse_confirmado = interesseAgendaConfirmado;
       runtimeContext.consulta_agenda.profissional_previamente_definido =
         selecaoDoTurno.selecao?.medicoNome ?? contextoConsultaAgenda.medicoEscolhido?.nome ?? null;
-      registrarEtapa({ tipo: "consulta", fonte: "catalogo", titulo: "Fontes atuais compartilhadas com a Nina e o motor",
+      registrarEtapa({ tipo: "consulta", fonte: "catalogo", titulo: "Dados atuais da base compartilhados com a Nina",
         dados: { consulta: ex.consulta.id, status: ex.consulta.status, referencias: referencia?.referencias ?? [],
           ...compararReferenciasConhecimento(conhecimentoAnterior?.referencias ?? [], referencia?.referencias ?? []),
           selecao: selecaoDoTurno, interesse_agenda: interesse,
           leitura_agenda_autorizada: interesseAgendaConfirmado, fatos_antigos_reutilizados: false },
         codigo: { arquivo: "src/lib/whatsapp.server.ts", funcao: "compartilharResultado" } });
     }
-    const plano = construirPlanoFactual(contextoFactualAtual(), { agora: new Date().toISOString(),
-      maxItens: 40, maxCaracteres: 10000 });
     return { ...limitarRetornoParaModelo(payload) as Record<string, unknown>,
-      plano_factual: JSON.parse(formatarPlanoFactualParaModelo(plano) || "null"),
       preferencia_do_paciente: selecaoDoTurno,
       consulta_agenda: { interesse_confirmado: interesseAgendaConfirmado,
         permite_reservar: false, fonte_vagas: "agenda", fonte_horarios_habituais: "catalogo_publicado" } };
@@ -1959,44 +1853,6 @@ async function gerarRespostaNinaInterno(
 
     if (chamadas.length === 0) {
       const texto = (msg?.content ?? "").trim();
-      // Recuperação limitada ANTES de aplicar a classificação final. A fonte
-      // é consultada pelo servidor; a frase/modelo não fornece sua própria prova.
-      const { avaliarGrounding } = await import("@/lib/nina/confidence/claims");
-      const groundingPreliminar = avaliarGrounding(contextoFactualAtual(), texto);
-      const faltaFonte = groundingPreliminar.semEvidencia.some(c => c.situacao === "sem_fonte");
-      const faltaCatalogo = groundingPreliminar.semEvidencia.some(c => c.situacao === "sem_fonte" &&
-        !["disponibilidade", "agendamento"].includes(c.tipo));
-      if (faltaCatalogo && !recuperacaoFonteUsada && rodada < MAX_RODADAS - 1 &&
-        !afirmaOuPrometeAgendamento(texto)) {
-        recuperacaoFonteUsada = true;
-        registrarEtapa({ tipo: "validacao", fonte: "sistema", titulo: "Fonte ausente: nova consulta antes de decidir",
-          dados: { motivo: "FONTE_AUSENTE_RECUPERAVEL", fatos_sem_fonte: groundingPreliminar.semEvidencia,
-            tentativa: 1, resposta_liberada: false },
-          codigo: { arquivo: "src/lib/whatsapp.server.ts", funcao: "gerarRespostaNinaInterno" } });
-        mensagens.push({ role: "assistant", content: texto });
-        await consultarFonteAntesDaResposta(consultaPlanejada?.args ?? { termo: mensagemPaciente.slice(0, 200) }, true);
-        continue;
-      }
-      const interpretacaoInconclusiva = groundingPreliminar.naoVerificados.length > 0 ||
-        groundingPreliminar.limitacoes.length > 0 ||
-        groundingPreliminar.semEvidencia.some(c => c.situacao === "fora_do_escopo");
-      const contradicaoComprovada = groundingPreliminar.semEvidencia.some(c => c.situacao === "divergente");
-      if (interpretacaoInconclusiva && !contradicaoComprovada && !faltaFonte &&
-        catalogoEncontrou && !reconstrucaoFactualUsada && rodada < MAX_RODADAS - 1 &&
-        !afirmaOuPrometeAgendamento(texto)) {
-        const plano = construirPlanoFactual(contextoFactualAtual(), { agora: new Date().toISOString() });
-        if (plano.itens.length) {
-          reconstrucaoFactualUsada = true;
-          registrarEtapa({ tipo: "validacao", fonte: "sistema", titulo: "Reconstrução limitada com dados oficiais",
-            dados: { motivo: "INTERPRETACAO_INCONCLUSIVA", tentativa: 1,
-              limitacoes: groundingPreliminar.limitacoes, claims: groundingPreliminar.semEvidencia,
-              resposta_liberada: false, referencias: plano.itens.map(i => i.referencia) },
-            codigo: { arquivo: "src/lib/whatsapp.server.ts", funcao: "gerarRespostaNinaInterno" } });
-          mensagens.push({ role: "assistant", content: texto });
-          mensagens.push({ role: "system", content: "A verificação factual desta redação ficou inconclusiva. Refaça uma única vez a resposta ao mesmo pedido, preservando as instruções publicadas. Para dados do catálogo, use as linhas factuais fornecidas pelo servidor sem acrescentar qualificadores, valores, idades ou disponibilidade. Mantenha a pergunta de escolha que estiver faltando. Esta reconstrução não autoriza consultar agenda, reservar nem transferir. Se os dados não respondem ao pedido, declare a limitação; não substitua o procedimento por outro." });
-          continue;
-        }
-      }
       // ---------------- defesa contra falso sucesso ----------------
       // O modelo afirmou uma reserva sem gravação confirmada. A tentativa
       // de correção não constitui autorização para criar um agendamento.
@@ -2033,333 +1889,7 @@ async function gerarRespostaNinaInterno(
         }
         break;
       }
-      // --------- CONFIDENCE DECISION ENGINE: antes de a resposta sair ---------
-      // Mesmo motor central da Fase 1-3 (validadores + política de pesos e
-      // bloqueadores). Vale igual para atendimento real e homologação.
-      const {
-        decidirNoTurno,
-        motivoHandoff,
-        paraDecisaoLegado,
-        resumoHandoffEstruturado,
-      } = await import("@/lib/nina/confidence/runtime");
-      const [
-        { montarRegistroAuditoria },
-        { detectarIntencoes, intencaoAmbigua },
-        { montarContextoCanonicoTurno },
-      ] = await Promise.all([
-        import("@/lib/nina/confidence/auditoria"),
-        import("@/lib/nina/atendimento-fase1"),
-        import("@/lib/nina/confidence/contexto-turno"),
-      ]);
-      // FASE 2 — UMA ÚNICA VERDADE: motor e auditoria leem o mesmo objeto.
-      // `podeAgendar` fica em `capacidades` e NÃO define a ação do paciente.
-      const canonico = montarContextoCanonicoTurno(
-        {
-          mensagemPaciente,
-          selecaoContextual: selecaoDoTurno,
-          podeAgendar,
-          // FASE 1 (refatoração) — intenção não é ação. Só o estágio real do
-          // fluxo autoriza `criar_agendamento`.
-          stage: fluxoEstado.flow.stage,
-          messageIdEntrada: opcoes?.mensagensEntrada?.[0] ?? null,
-          // FASE 5 — a intenção e o estágio são lidos do TURNO COMPLETO
-          // (`mensagemPaciente` já é o lote inteiro), não de cada fragmento.
-          lote: {
-            batchId: opcoes?.lote?.batchId ?? null,
-            messageIds: opcoes?.mensagensEntrada ?? [],
-            conversationRevision: opcoes?.lote?.revisao ?? null,
-          },
-        },
-        { detectarIntencoes, intencaoAmbigua },
-      );
-      if (!pendenciaAvaliada) {
-        const rev = reavaliarPendencia({
-          anterior: pendenciaAnterior,
-          intentAtual: canonico.intent ?? null,
-          messageIdAtual: canonico.messageIdEntrada ?? null,
-        });
-        tentativasEsclarecimentoConfianca = rev.tentativas;
-        fluxoEstado.clarification = rev.pendencia;
-        pendenciaAvaliada = true;
-      }
-      // FASE 1 (motor) — instruções PUBLICADAS desta execução entram no
-      // contexto avaliado como conteúdo confiável, na versão do turno.
-      const { montarInstrucoesDoTurno } = await import(
-        "@/lib/nina/confidence/contexto-avaliacao"
-      );
-      const { hashDoTexto: hashInstrucoes } = await import("@/lib/nina/confidence/hash");
-      const instrucoesDoTurno = montarInstrucoesDoTurno({
-        escopo: "whatsapp",
-        versao: instrucoesNina.versao === null || instrucoesNina.versao === undefined
-          ? null
-          : String(instrucoesNina.versao),
-        versaoId: instrucoesNina.versaoId ?? null,
-        publicadoEm: instrucoesNina.publicadoEm ?? null,
-        origem: instrucoesNina.origem ?? null,
-        hash: hashInstrucoes(behaviorPrompt),
-        texto: behaviorPrompt,
-      });
-      const preferenciaAtual = selecaoAtual();
-      // A etapa existente já autoriza a coleta por intenção confirmada.
-      // Releia os pendentes agora: ferramentas desta rodada podem ter
-      // completado campos desde a montagem inicial do contexto.
-      const camposParaColeta =
-        fluxoEstado.flow.stage === "COLLECTING_PATIENT_DATA" && fluxoEstado.appointment.intent_confirmed
-          ? (await import("@/lib/nina/atendimento-fase3")).dadosFaltantes(fluxoEstado)
-          : undefined;
-      const estadoTurno = {
-        texto,
-        mensagemPaciente,
-        ...(preferenciaAtual?.selecao ? {
-          entityCandidates: { medico: [preferenciaAtual.selecao.medicoNome],
-            procedimento: preferenciaAtual.selecao.modalidade
-              ? [preferenciaAtual.selecao.modalidade.procedimento]
-              : preferenciaAtual.opcoesModalidades.map(m => m.procedimento) },
-        } : {}),
-        instrucoes: instrucoesDoTurno,
-        intent: canonico.intent,
-        acao: canonico.requestedAction,
-        // FASE 1 — natureza do turno: uma saudação não exige fonte, ferramenta
-        // nem avaliação de segurança de ação.
-        tipoTurno: canonico.turnType,
-        intentAmbiguo: canonico.intentAmbiguo,
-        messageId: canonico.messageIdEntrada,
-        ferramentas: evidenciasFerramentas,
-        evidenciasFluxo: capturarProvaFluxo(),
-        apresentacaoJaFeita: jaSeApresentou,
-        fatos: fatosDoTurno,
-        consultas: consolidarTentativas(consultasDoTurno),
-        catalogoEncontrou,
-        agendamentoConfirmado,
-        pacienteIdentificado: Boolean(pacienteIdEfetivo),
-        esclarecimentoUsado: esclarecimentoConfiancaUsado,
-        handoffSolicitado: houveHandoff,
-        ambiente: (opcoes?.teste === true ? "homologacao" : "producao") as
-          | "producao"
-          | "homologacao",
-        clinicaId,
-        conversaId: estadoId.conversaId ?? null,
-        ...(camposParaColeta ? { requiredFields: camposParaColeta } : {}),
-        entities: { ...dadosColetados, ...(preferenciaAtual?.selecao ? {
-          medico: preferenciaAtual.selecao.medicoNome,
-          ...(preferenciaAtual.selecao.modalidade ? { procedimento: preferenciaAtual.selecao.modalidade.procedimento } : {}),
-        } : {}) },
-        // FASE 4 — estado REAL do fluxo (leitura da máquina de estados que já
-        // existe). O motor compara o que a Nina diz com o que o sistema tem.
-        estadoOperacional: estadoOperacionalDaSessao(fluxoEstado, {
-          ferramentaChamada: evidenciasFerramentas.some(
-            (f) => f.capacidade === "createAppointment" || /agendar/i.test(f.nome),
-          ),
-          reservaCriada: agendamentoCriadoNesteTurno,
-        }),
-        // Regras determinísticas do agendamento, derivadas do estado real.
-        regrasNegocio:
-          canonico.requestedAction === "criar_agendamento"
-            ? ([
-                {
-                  id: "agendamento_exige_paciente_identificado",
-                  descricao: "Agendar exige paciente identificado",
-                  satisfeita: Boolean(pacienteIdEfetivo),
-                },
-                {
-                  id: "agendamento_exige_vaga_confirmada",
-                  descricao: "Agendar exige vaga escolhida e confirmada",
-                  satisfeita: Boolean(
-                    fluxoEstado.appointment.slot_inicio &&
-                      fluxoEstado.appointment.slot_fim,
-                  ),
-                },
-              ])
-            : [],
-      };
-      // FASE 9 — a política só difere da padrão se um ajuste tiver sido
-      // aprovado E aplicado por uma pessoa. A Nina nunca altera pesos sozinha.
-      // FASE 6 — configuração efetiva e etapa carregadas UMA VEZ por turno:
-      // mudança publicada no meio da resposta só vale no próximo turno.
-      const { configuracaoDoTurno } = await import(
-        "@/lib/nina/confidence/configuracao-turno.server"
-      );
-      const cfgTurno = await configuracaoDoTurno(clinicaId);
-      // FASE 5 — esta avaliação é de SEGURANÇA DA AÇÃO (action_safety):
-      // decide esclarecer, transferir ou bloquear ANTES de agir. Ela não é a
-      // nota da mensagem: essa é medida no fim, sobre o texto final.
-      const decisao = decidirNoTurno(estadoTurno, cfgTurno.configuracao.parametros);
-      estadoTurnoFinal = estadoTurno;
-      avaliacaoAcao = decisao;
-      execucaoIdFinal = respostaIA.execucaoId ?? null;
-
-      // FASE 8 — ATIVAÇÃO PROGRESSIVA: etapa A só observa; B aplica handoff e
-      // bloqueio; C acrescenta esclarecimento; D endurece o agendamento.
-      const { aplicarEtapa } = await import("@/lib/nina/confidence/etapas");
-      const etapa = cfgTurno.etapa;
-      const modo = cfgTurno.modo;
-      const aplicado = aplicarEtapa(decisao, etapa);
-
-      // FASE 4 — confiança baixa, sozinha, NÃO transfere. O destino do turno
-      // combina motivo da incerteza, tipo do turno, recuperabilidade,
-      // segurança da ação e política operacional.
-      const { decidirHandoff } = await import("@/lib/nina/confidence/handoff-decision");
-      const plano = decidirHandoff({
-        avaliacaoAcao: decisao,
-        decisaoEfetiva: aplicado.decisaoEfetiva,
-        tipoTurno: canonico.turnType,
-        pedidoHumanoExplicito: canonico.turnType === "HANDOFF",
-        tentativasEsclarecimento: tentativasEsclarecimentoConfianca,
-      });
-      rastro?.concluir("confidence.decision", {
-        handoff_decision: plano.decision,
-        handoff_reason: plano.reason,
-        handoff_recuperavel: plano.recuperavel,
-        score: decisao.score,
-        nivel: decisao.level,
-        acao: decisao.decision,
-        modo,
-        etapa,
-        decisao_efetiva: aplicado.decisaoEfetiva,
-        teria_permitido: aplicado.teriaPermitido,
-        motivo_etapa: aplicado.motivoEtapa ?? null,
-        bloqueios: decisao.hardBlockers ?? [],
-        categorias: decisao.evidence.categorias,
-      });
-
-      {
-        const { registrarDecisaoConfianca } = await import(
-          "@/lib/nina/confidence-engine.server"
-        );
-        void registrarDecisaoConfianca({
-          clinicaId,
-          conversaId: estadoId.conversaId ?? null,
-          execucaoId: respostaIA.execucaoId ?? null,
-          traceId: rastro?.ids.trace_id ?? null,
-          teste: opcoes?.teste === true,
-          // FASE 4 — separa produção, homologação e teste automatizado.
-          ambiente:
-            opcoes?.ambiente ?? (opcoes?.teste === true ? "homologacao" : "producao"),
-          decisao: paraDecisaoLegado(decisao),
-          modo,
-          teriaPermitido: aplicado.teriaPermitido,
-          // FASE 6 — configuração histórica realmente usada neste turno.
-          configId: cfgTurno.configuracao.configId,
-          configOrigem: cfgTurno.configuracao.origem,
-          etapaAtivacao: etapa,
-          // FASE 5 — telemetria da política de handoff, sem dado do paciente.
-          handoffDecision: plano.decision,
-          handoffReason: plano.reason,
-          handoffOcorreu: plano.decision === "HANDOFF",
-          // Evidência observável apenas: validadores, motivos, fontes,
-          // ferramentas e bloqueios. Nunca o rascunho ou o raciocínio interno.
-          auditoria: montarRegistroAuditoria(decisao, {
-            conversationId: estadoId.conversaId ?? null,
-            messageId: canonico.messageIdEntrada,
-            batchId: canonico.lote.batchId,
-            batchMessageIds: canonico.lote.messageIds,
-            conversationRevision: canonico.lote.conversationRevision,
-            executionId: respostaIA.execucaoId ?? null,
-            intencao: canonico.intent,
-            // Mesma ação vista pelo motor. Capacidade de agenda não entra aqui.
-            acaoSolicitada: canonico.requestedAction,
-            turnType: canonico.turnType ?? null,
-            ferramentas: evidenciasFerramentas,
-          }),
-        });
-        // FASE 1 — política/etapa de confiança aplicada neste turno.
-        const { registrarConfiancaDoTurno } = await import("@/lib/nina/rastreio/turno.server");
-        registrarConfiancaDoTurno({
-          avaliacao: "action_safety",
-          decisao: plano.decision,
-          etapa,
-          modo,
-          // FASE 2 — decisão operacional: fora do modo shadow ela foi aplicada.
-          aplicada: modo !== "shadow",
-          score: decisao.score,
-          nivel: decisao.level,
-        });
-      }
-
-      // FASE 4 — confiança intermediária: UMA pergunta curta ao paciente, a
-      // pendência é persistida e o TURNO TERMINA. A reavaliação depende de
-      // nova entrada do paciente — reavaliar a mesma mensagem não consome
-      // tentativa nem justifica transferência.
-      if (plano.decision === "CLARIFY" || (plano.decision === "BLOCK_ACTION" && plano.clarify)) {
-        esclarecimentoConfiancaUsado = true;
-        fluxoEstado.clarification = abrirPendencia({
-          resultado: decisao,
-          intent: canonico.intent ?? null,
-          messageId: canonico.messageIdEntrada ?? null,
-          tentativasConsumidas: tentativasEsclarecimentoConfianca,
-        });
-        resposta = perguntaParaPaciente(decisao, canonico.turnType);
-        {
-          const { registrarOrigemResposta } = await import("@/lib/nina/rastreio/turno.server");
-          registrarOrigemResposta(
-            "codigo",
-            `pergunta de esclarecimento emitida (${plano.reason}); turno encerrado aguardando o paciente`,
-          );
-        }
-        break;
-      }
-
-      // Confiança baixa ou bloqueio absoluto: transfere pelo mesmo caminho já
-      // existente (evento, fila, protocolo e aviso ao paciente), levando o
-      // resumo estruturado para a atendente.
-      // Só chega aqui quando a Nina não tem como resolver sozinha: bloqueio
-      // sem recuperação, fonte oficial ausente, pedido explícito por pessoa
-      // ou esclarecimento repetido sem avanço.
-      if (plano.decision === "HANDOFF" || plano.decision === "BLOCK_ACTION") {
-        const rh = await broker.executar(
-          "solicitar_atendente_humano",
-          JSON.stringify({
-            motivo: `${plano.reason}: ${plano.explicacao} — ${motivoHandoff(decisao)}`.slice(0, 500),
-            resumo: resumoHandoffEstruturado(estadoTurno, decisao),
-            urgencia: "normal",
-          }),
-        );
-        // FASE 4 — só se anuncia transferência DEPOIS da confirmação do
-        // serviço. Em falha, o paciente recebe a verdade sobre a limitação;
-        // o rascunho reprovado nunca é enviado.
-        const { desfechoDeHandoff } = await import("@/lib/nina/confidence/desfecho");
-        const desfecho = desfechoDeHandoff({
-          confirmado: rh.success === true,
-          motivo: `${plano.decision}/${plano.reason}`,
-          erro: rh.erro ?? null,
-        });
-        if (desfecho.handoffConfirmado) houveHandoff = true;
-        if (!desfecho.handoffConfirmado) {
-          console.error("[NINA_HANDOFF] transferência não confirmada", {
-            conversa_id: estadoId.conversaId,
-            motivo: plano.reason,
-            erro: rh.erro ?? null,
-          });
-        }
-        // Estado recuperável: a pendência fica registrada para a retomada.
-        fluxoEstado.clarification = fecharPendencia();
-        resposta = desfecho.resposta;
-        {
-          const { registrarOrigemResposta } = await import("@/lib/nina/rastreio/turno.server");
-          registrarOrigemResposta("codigo", `${desfecho.estado}: ${desfecho.explicacao}`);
-        }
-        registrarEtapa({
-          tipo: "resposta_original",
-          fonte: "sistema",
-          titulo: `Desfecho do turno: ${desfecho.estado}`,
-          dados: {
-            estado: desfecho.estado,
-            handoff_confirmado: desfecho.handoffConfirmado,
-            requer_retomada_humana: desfecho.requerRetomadaHumana,
-            decisao_recomendada: decisao.decision,
-            decisao_aplicada: aplicado.decisaoEfetiva,
-            plano: plano.decision,
-            motivo: plano.reason,
-            erro: desfecho.erro,
-          },
-          codigo: { arquivo: "src/lib/whatsapp.server.ts", funcao: "gerarRespostaNinaInterno" },
-        });
-        break;
-      }
-
       resposta = texto;
-      // A dúvida foi resolvida neste turno: a pendência deixa de existir.
-      fluxoEstado.clarification = fecharPendencia();
       {
         const { registrarOrigemResposta } = await import("@/lib/nina/rastreio/turno.server");
         registrarOrigemResposta("modelo", "texto devolvido pelo modelo, sem substituição");
@@ -2373,58 +1903,6 @@ async function gerarRespostaNinaInterno(
       const nome = String(c.function?.name ?? "");
       // Toda execução passa pelo broker: ele valida o retorno, aplica
       // idempotência de turno e nunca transforma erro em sucesso.
-      // ---- validação final imediatamente antes de gravar o agendamento ----
-      let argsObj: Record<string, unknown> = {};
-      try {
-        const parsed = JSON.parse(String(c.function?.arguments ?? "{}"));
-        if (parsed && typeof parsed === "object") argsObj = parsed as Record<string, unknown>;
-      } catch {
-        argsObj = {};
-      }
-      for (const [k, v] of Object.entries(argsObj)) {
-        if (v !== null && v !== undefined && String(v).trim() !== "") dadosColetados[k] = v;
-      }
-      if (nome === "agendar") {
-        const [{ validarAgendamentoAntesDoCommit }, { configuracaoDoTurno }] = await Promise.all([
-          import("@/lib/nina/confidence/runtime"),
-          import("@/lib/nina/confidence/configuracao-turno.server"),
-        ]);
-        const gate = validarAgendamentoAntesDoCommit({
-          args: argsObj,
-          ferramentas: evidenciasFerramentas,
-          pacienteIdentificado: Boolean(pacienteIdEfetivo),
-          disponibilidadeConfirmada,
-        });
-        // FASE 8 — a trava só vale nas clínicas que já avançaram para a etapa D
-        // (rigor no agendamento). Nas demais o motor apenas observa e registra,
-        // exatamente como nas decisões ALLOW/CLARIFY/HANDOFF.
-        const etapaAtual = (await configuracaoDoTurno(clinicaId)).etapa;
-        const aplicaTrava = etapaAtual === "D";
-        if (!gate.liberado) {
-          console.warn("[NINA_APPOINTMENT] pré-commit reprovado pelo Confidence Engine", {
-            conversa_id: estadoId.conversaId,
-            faltas: gate.faltas,
-            etapa: etapaAtual,
-            aplicado: aplicaTrava,
-          });
-        }
-        if (!gate.liberado && aplicaTrava) {
-          rastro?.falhar("tool.execute", gate.motivo, { ferramenta: nome });
-          mensagens.push({
-            role: "tool",
-            tool_call_id: c.id,
-            content: JSON.stringify({
-              ok: false,
-              erro: "PRECOMMIT_VALIDATION_FAILED",
-              detalhe: gate.motivo,
-              instrucao:
-                "NÃO diga que agendou nem que está agendando. Resolva o que falta (confirmar horário disponível, dados do paciente ou o procedimento) antes de chamar 'agendar' novamente.",
-            }),
-          });
-          continue;
-        }
-      }
-
       // FASE 4 — ação crítica NUNCA roda sobre estado obsoleto: se chegou
       // mensagem nova durante a geração, o turno é abortado antes de gravar.
       if (opcoes?.revisao?.valor && ehFerramentaCritica(nome)) {
@@ -2475,10 +1953,6 @@ async function gerarRespostaNinaInterno(
       if (r.capacidade === "requestHumanHandoff" && r.success) houveHandoff = true;
       if (r.appointment_confirmed) {
         agendamentoConfirmado = reservaDaSessaoAtual(fluxoEstado);
-        if (resultadoComprovaCriacaoNoTurno(fluxoEstado, r)) agendamentoCriadoNesteTurno = true;
-      }
-      if (r.capacidade === "checkAvailability" && r.success && !r.erro) {
-        disponibilidadeConfirmada = true;
       }
       if (r.capacidade === "createAppointment") {
         console.info("[NINA_APPOINTMENT]", {
@@ -2511,14 +1985,14 @@ async function gerarRespostaNinaInterno(
   }
 
   // FASE 4 — LIMITE DE RODADAS: desfecho explícito. O último rascunho NÃO
-  // vira resposta aprovada; tenta-se a transferência e o paciente recebe a
+  // vira resposta entregue; tenta-se a transferência e o paciente recebe a
   // verdade sobre o que aconteceu.
   if (limiteRodadasAtingido && !turnoObsoleto && resposta.trim() === "") {
     const rhLimite = await broker
       .executar(
         "solicitar_atendente_humano",
         JSON.stringify({
-          motivo: `LIMITE_RODADAS: ${MAX_RODADAS} rodadas sem resposta aprovada`,
+          motivo: `LIMITE_RODADAS: ${MAX_RODADAS} rodadas sem resposta textual`,
           urgencia: "normal",
         }),
       )
@@ -2703,32 +2177,17 @@ async function gerarRespostaNinaInterno(
       identidade_tentativas: estadoId.tentativas + 1,
     });
   }
-  // ---------------- FASE 5: FINALIZAÇÃO ANTES DA AVALIAÇÃO ----------------
+  // ---------------- FINALIZAÇÃO E ENTREGA DIRETA ----------------
   // Template publicado, despedida e checagem de promessa sem prova acontecem
-  // AQUI, antes de a nota ser calculada. Assim o texto avaliado é exatamente o
-  // texto entregue: o transporte não acrescenta nada depois. Quem envia chama
+  // AQUI. O texto final é entregue sem revisão de confiança; o transporte
+  // não acrescenta nada depois. Quem envia chama
   // o mesmo serviço com a mesma chave de turno e recebe o resultado guardado,
   // sem repetir nenhum efeito.
   const chaveTurnoFinalizacaoBase =
     (opcoes?.auditoria as { traceId?: string } | undefined)?.traceId ??
     rastro?.ids.trace_id ??
     `${clinicaId}|${telefoneNorm ?? "-"}|${estadoId.conversaId ?? "-"}`;
-  // CONTROLE DE ENVIO x VERIFICAÇÃO: finalização e avaliação rodam no mesmo
-  // laço. Quando uma regra publicada bloqueante é descumprida, o modelo
-  // reescreve o texto e TUDO é conferido de novo — inclusive templates e
-  // demais intervenções —, respeitando o limite de tentativas.
-  let correcoesPorRegras = 0;
-  let podeCorrigirPorRegras = true;
-  let repetirVerificacaoRegras = true;
-  let passeVerificacaoRegras = 0;
-  const LIMITE_PASSES_VERIFICACAO = 4;
-  while (repetirVerificacaoRegras) {
-  repetirVerificacaoRegras = false;
-  passeVerificacaoRegras += 1;
-  const chaveTurnoFinalizacao =
-    passeVerificacaoRegras === 1
-      ? chaveTurnoFinalizacaoBase
-      : `${chaveTurnoFinalizacaoBase}#correcao-${passeVerificacaoRegras}`;
+  const chaveTurnoFinalizacao = chaveTurnoFinalizacaoBase;
   try {
     if (resposta) {
       const [{ finalizarResposta }, { criarResultado }] = await Promise.all([
@@ -2760,7 +2219,6 @@ async function gerarRespostaNinaInterno(
         // Encerramento automático só no caminho real de atendimento e SÓ no
         // primeiro passe: correção de texto não repete efeito externo.
         avaliarEncerramento:
-          passeVerificacaoRegras === 1 &&
           opcoes?.teste !== true &&
           Boolean(mensagemPaciente),
       });
@@ -2770,816 +2228,13 @@ async function gerarRespostaNinaInterno(
       }
     }
   } catch (e) {
-    console.error("[nina] finalização antes da avaliação falhou", e);
+    console.error("[nina] finalização da resposta falhou", e);
   }
-  // ---------------- FASE 5: FINAL ANSWER VERIFICATION ----------------
-
-  // A partir daqui o texto não muda mais. É ESTE texto — com saudação
-  // obrigatória, avisos internos e banner de transferência já aplicados — que
-  // é avaliado, persistido e enviado. O score de um texto anterior nunca é
-  // reaproveitado: se a mensagem mudou depois da avaliação da ação, o motor
-  // roda de novo sobre a mensagem final.
-  // FASE 5 — REVISÃO FINAL ÚNICA: toda origem de texto (modelo, template,
-  // gate, fallback, encerramento, transferência e limite de rodadas) passa por
-  // este mesmo ponto, depois dos ajustes de conteúdo e antes da persistência e
-  // do envio. Quando o turno não chegou a montar o estado do modelo, a revisão
-  // roda sobre um estado mínimo VERDADEIRO: o que falta continua ausente.
-  const estadoParaRevisao: import("@/lib/nina/confidence/runtime").EstadoDoTurno = estadoTurnoFinal ?? {
-    texto: resposta,
-    mensagemPaciente: mensagemPaciente || null,
-    intent: null,
-    acao: null,
-    tipoTurno: null,
-    messageId: null,
-    ferramentas: evidenciasFerramentas,
-    catalogoEncontrou,
-    agendamentoConfirmado,
-    pacienteIdentificado: Boolean(pacienteIdEfetivo),
-    esclarecimentoUsado: esclarecimentoConfiancaUsado,
-    handoffSolicitado: houveHandoff,
-    // A apresentação já tinha sido entregue ANTES deste turno.
-    apresentacaoJaFeita: jaSeApresentou,
-    ambiente: (opcoes?.teste === true ? "homologacao" : "producao") as
-      | "producao"
-      | "homologacao",
-    clinicaId,
-    conversaId: estadoId.conversaId ?? null,
-  };
+  // Registra a apresentação observada, sem revisão de confiança.
   try {
-    if (resposta) {
-      const [
-        { garantirScoreDoTextoEnviado, paraDecisaoLegado },
-        { montarRegistroAuditoria },
-        { configuracaoDoTurno },
-      ] = await Promise.all([
-        import("@/lib/nina/confidence/runtime"),
-        import("@/lib/nina/confidence/auditoria"),
-        import("@/lib/nina/confidence/configuracao-turno.server"),
-      ]);
-      // Mesma configuração do início do turno: publicar um ajuste durante a
-      // geração não muda a régua no meio da avaliação.
-      const cfgFinal = await configuracaoDoTurno(clinicaId);
-      const estadoParaTextoFinal = {
-        ...estadoParaRevisao,
-        texto: resposta,
-        handoffSolicitado: houveHandoff,
-        agendamentoConfirmado,
-        apresentacaoJaFeita: jaSeApresentou,
-        evidenciasFluxo: capturarProvaFluxo(),
-        estadoOperacional: estadoOperacionalDaSessao(fluxoEstado, {
-          // Invocações recusadas antes da execução permanecem na trilha como
-          // consultas não realizadas, sem inventar tentativa de gravar a agenda.
-          ferramentaChamada: broker.resultados().some(r =>
-            r.ferramenta === "agendar" && !consultaAgendaAguardandoPaciente(r.resultado),
-          ),
-          reservaCriada: agendamentoCriadoNesteTurno,
-        }),
-      };
-      const gate = garantirScoreDoTextoEnviado(
-        estadoParaTextoFinal,
-        resposta,
-        // A avaliação da ação nunca serve como nota da mensagem final: ela é
-        // action_safety, então o gate sempre a invalida e recalcula.
-        avaliacaoAcao,
-        cfgFinal.configuracao.parametros,
-      );
-      const respostaFinalAvaliada = gate.resultado;
-
-      rastro?.concluir("answer.verify", {
-        score: respostaFinalAvaliada.score,
-        nivel: respostaFinalAvaliada.level,
-        cobertura: respostaFinalAvaliada.evidenceCoverage,
-        claims_total: respostaFinalAvaliada.claims?.total ?? 0,
-        claims_sem_evidencia: respostaFinalAvaliada.claims?.semEvidencia.length ?? 0,
-        recalculado: gate.recalculado,
-        motivo_gate: gate.motivo,
-        texto_hash: respostaFinalAvaliada.textoAvaliadoHash,
-      });
-
-      const { registrarDecisaoConfianca, registrarEntregaSaida } = await import(
-        "@/lib/nina/confidence-engine.server"
-      );
-      const { identidadeEvidencias } = await import("@/lib/nina/confidence/entrega");
-      const { registroTurnoAtual } = await import("@/lib/nina/rastreio/turno.server");
-      const registroDoTurno = registroTurnoAtual();
-      const evidenciasHash = identidadeEvidencias(evidenciasFerramentas as unknown[]);
-      // FASE 5 — a gravação é AGUARDADA: o vínculo da saída depende do id
-      // desta linha, e disparar as duas em paralelo criava corrida.
-      const registro = await registrarDecisaoConfianca({
-        clinicaId,
-        conversaId: estadoId.conversaId ?? null,
-        execucaoId: execucaoIdFinal,
-        traceId: rastro?.ids.trace_id ?? null,
-        teste: opcoes?.teste === true,
-        ambiente:
-          opcoes?.ambiente ?? (opcoes?.teste === true ? "homologacao" : "producao"),
-        avaliacao: "answer_confidence",
-        textoFinalHash: respostaFinalAvaliada.textoAvaliadoHash,
-        claims: respostaFinalAvaliada.claims ?? null,
-        // FASE 6 — sessão da Nina preservada junto do snapshot.
-        ninaSessionId:
-          (fluxoEstado as { session_id?: string | null }).session_id ?? null,
-        decisao: paraDecisaoLegado(respostaFinalAvaliada),
-        modo: "shadow",
-        // FASE 5 — contexto ao qual esta nota pertence.
-        revisaoConversa: opcoes?.lote?.revisao ?? null,
-        evidenciasHash,
-        origemResposta: registroDoTurno?.origemResposta ?? null,
-        // Caminho sem modelo fica com 0 rodadas: nada de execução inventada.
-        rodadas: registroDoTurno?.rodadas ?? rodadasDoTurno,
-        representacao: "texto_completo",
-        // FASE 6 — a mesma configuração histórica do turno.
-        configId: cfgFinal.configuracao.configId,
-        configOrigem: cfgFinal.configuracao.origem,
-        etapaAtivacao: cfgFinal.etapa,
-        auditoria: montarRegistroAuditoria(respostaFinalAvaliada, {
-          conversationId: estadoId.conversaId ?? null,
-          messageId: estadoParaRevisao.messageId ?? null,
-          batchId: opcoes?.lote?.batchId ?? null,
-          batchMessageIds: opcoes?.mensagensEntrada ?? [],
-          conversationRevision: opcoes?.lote?.revisao ?? null,
-          executionId: execucaoIdFinal ?? null,
-          intencao: estadoParaRevisao.intent ?? null,
-          acaoSolicitada: estadoParaRevisao.acao ?? "desconhecida",
-          turnType: estadoParaRevisao.tipoTurno ?? null,
-          ferramentas: evidenciasFerramentas,
-        }),
-      });
-      // O snapshot da resposta final viaja para quem vai enviar: é ele que liga
-      // a nota à mensagem realmente gravada, sem violar a imutabilidade.
-      if (opcoes?.auditoria) {
-        (
-          opcoes.auditoria as {
-            decisaoId?: string | null;
-            textoFinalHash?: string | null;
-          }
-        ).decisaoId = registro.id;
-        (
-          opcoes.auditoria as { textoFinalHash?: string | null }
-        ).textoFinalHash = respostaFinalAvaliada.textoAvaliadoHash ?? null;
-        // FASE 6 — quem entrega a resposta em ÁUDIO precisa avaliar o conteúdo
-        // que vai ser falado quando ele diferir do texto. O resumo falado é
-        // outro conteúdo e nunca herda a nota do texto completo.
-        (
-          opcoes.auditoria as {
-            avaliarRepresentacao?: (
-              texto: string,
-              representacao: "audio_integral" | "audio_resumo",
-            ) => Promise<{ decisaoId: string | null; textoHash: string | null } | null>;
-          }
-        ).avaliarRepresentacao = async (textoFalado, representacao) => {
-          try {
-            const gateFala = garantirScoreDoTextoEnviado(
-              { ...estadoParaTextoFinal, texto: textoFalado },
-              textoFalado,
-              null,
-              cfgFinal.configuracao.parametros,
-            );
-            const avaliacaoFala = gateFala.resultado;
-            const registroFala = await registrarDecisaoConfianca({
-              clinicaId,
-              conversaId: estadoId.conversaId ?? null,
-              execucaoId: execucaoIdFinal,
-              traceId: rastro?.ids.trace_id ?? null,
-              teste: opcoes?.teste === true,
-              ambiente:
-                opcoes?.ambiente ?? (opcoes?.teste === true ? "homologacao" : "producao"),
-              avaliacao: "answer_confidence",
-              textoFinalHash: avaliacaoFala.textoAvaliadoHash,
-              claims: avaliacaoFala.claims ?? null,
-              decisao: paraDecisaoLegado(avaliacaoFala),
-              modo: "shadow",
-              revisaoConversa: opcoes?.lote?.revisao ?? null,
-              evidenciasHash,
-              origemResposta: registroDoTurno?.origemResposta ?? null,
-              rodadas: registroDoTurno?.rodadas ?? rodadasDoTurno,
-              representacao,
-              configId: cfgFinal.configuracao.configId,
-              configOrigem: cfgFinal.configuracao.origem,
-              etapaAtivacao: cfgFinal.etapa,
-            });
-            // A avaliação do conteúdo FALADO entra no turno com o hash do
-            // texto que ela avaliou — nunca se confunde com a do texto.
-            {
-              const { registrarConfiancaDoTurno: registrarNoTurno } = await import(
-                "@/lib/nina/rastreio/turno.server"
-              );
-              registrarNoTurno({
-                avaliacao: "answer_confidence",
-                decisao: avaliacaoFala.decision ?? null,
-                etapa: cfgFinal.etapa,
-                modo: "shadow",
-                aplicada: false,
-                score: avaliacaoFala.score,
-                nivel: avaliacaoFala.level,
-                textoHash: avaliacaoFala.textoAvaliadoHash ?? null,
-                representacao,
-                decisaoId: registroFala.id ?? null,
-              });
-            }
-            return {
-              decisaoId: registroFala.id,
-              textoHash: avaliacaoFala.textoAvaliadoHash ?? null,
-            };
-          } catch (e) {
-            console.warn(
-              "[nina-confianca] avaliação do conteúdo falado falhou:",
-              e instanceof Error ? e.message : e,
-            );
-            return null;
-          }
-        };
-      }
-      // Saída PREPARADA: avaliada e aprovada. Ainda não foi gravada nem enviada.
-      if (registro.ok) {
-        await registrarEntregaSaida({
-          clinicaId,
-          decisaoId: registro.id,
-          execucaoId: execucaoIdFinal,
-          conversaId: estadoId.conversaId ?? null,
-          representacao: "texto_completo",
-          estado: "preparada",
-          textoHash: respostaFinalAvaliada.textoAvaliadoHash ?? null,
-          detalhe: {
-            origem: registroDoTurno?.origemResposta ?? null,
-            recalculado: gate.recalculado,
-            motivo_gate: gate.motivo,
-          },
-        });
-      }
-
-      // FASE 1 — a nota da mensagem final também entra no registro do turno.
-      const { registrarConfiancaDoTurno } = await import("@/lib/nina/rastreio/turno.server");
-      // FASE 5 — REVISÃO FINAL: avaliação, decisão recomendada, decisão
-      // aplicada e resultado comprovado, cada uma no seu lugar. A etapa da
-      // clínica continua mandando (A só observa); as proteções obrigatórias
-      // são identificadas à parte porque valem em qualquer etapa.
-      const { origemDaSaida, revisarSaida, confirmarResultadoRevisao } = await import(
-        "@/lib/nina/confidence/revisao-final"
-      );
-      const revisao = revisarSaida({
-        origem: origemDaSaida(registroDoTurno?.origemResposta ?? null, {
-          handoff: houveHandoff,
-          limiteRodadas: limiteRodadasAtingido,
-        }),
-        textoFinal: resposta,
-        avaliacao: respostaFinalAvaliada,
-        etapa: cfgFinal.etapa,
-        risco: agendamentoConfirmado || houveHandoff ? "operacional" : "informativo",
-        operacaoAfirmada: agendamentoConfirmado,
-        operacaoComprovada: reservaDaSessaoAtual(fluxoEstado),
-      });
-      {
-        const { verificacoesDasInstrucoes } = await import(
-          "@/lib/nina/confidence/conformidade-entrega"
-        );
-        verificacoesInstrucoesTurno = verificacoesDasInstrucoes(respostaFinalAvaliada);
-      }
-      const comprovado = confirmarResultadoRevisao(revisao, {
-        executada: revisao.aplicada,
-        comprovacao: houveHandoff ? (estadoId.conversaId ?? null) : null,
-      });
-      rastro?.concluir("answer.review", {
-        origem: revisao.origem,
-        motivo: revisao.motivo,
-        acao_recomendada: revisao.acaoRecomendada,
-        acao_aplicada: revisao.acaoAplicada,
-        aplicada: revisao.aplicada,
-        apenas_observou: revisao.apenasObservou,
-        protecao_obrigatoria: revisao.protecaoObrigatoria,
-        etapa: revisao.etapa,
-        motivo_nao_aplicacao: revisao.motivoNaoAplicacao,
-        degradado: revisao.degradado,
-        aprovada: revisao.aprovada,
-        resultado_comprovado: comprovado.comprovado,
-      });
-
-      registrarConfiancaDoTurno({
-        avaliacao: "answer_confidence",
-        decisao: respostaFinalAvaliada.decision ?? null,
-        etapa: cfgFinal.etapa,
-        modo: revisao.aplicada ? "enforce" : "shadow",
-        // A revisão diz se ESTA avaliação alterou o atendimento. Etapa A
-        // observa; proteção obrigatória aplica e fica declarada como tal.
-        aplicada: revisao.aplicada,
-        score: respostaFinalAvaliada.score,
-        nivel: respostaFinalAvaliada.level,
-        // QUAL TEXTO ESTA NOTA AVALIOU. Sem isso a nota fica solta no turno.
-        textoHash: respostaFinalAvaliada.textoAvaliadoHash ?? null,
-        representacao: "texto_completo",
-        decisaoId: registro.id ?? null,
-      });
-
-      // REGRA OBRIGATÓRIA — BAIXA CONFIABILIDADE ENCAMINHA PARA HUMANO.
-      // Prevalece sobre a etapa de ativação (inclusive A) e sobre a decisão
-      // recomendada pelo motor (inclusive CLARIFY). O conteúdo candidato é
-      // descartado para envio em TODAS as representações (texto, áudio e
-      // resumo falado, que derivam deste texto) e o paciente recebe apenas o
-      // aviso controlado.
-      const {
-        decidirBloqueioBaixaConfianca,
-        saidaControladaBaixaConfianca,
-        ehAvisoControlado,
-        afirmacaoSemLastro,
-      } = await import("@/lib/nina/confidence/baixa-confiabilidade");
-      const ambienteSaida: "producao" | "homologacao" =
-        opcoes?.ambiente === "producao" && opcoes?.teste !== true
-          ? "producao"
-          : opcoes?.ambiente || opcoes?.teste === true
-            ? "homologacao"
-            : "producao";
-      const bloqueio = decidirBloqueioBaixaConfianca({
-        nivel: respostaFinalAvaliada.level ?? null,
-        score: respostaFinalAvaliada.score ?? null,
-        decisaoMotor: respostaFinalAvaliada.decision ?? null,
-        etapa: cfgFinal.etapa,
-        ambiente: ambienteSaida,
-        configId: cfgFinal.configuracao.configId,
-        jaEncaminhado: houveHandoff,
-        avisoJaAplicado: ehAvisoControlado(resposta),
-        // Exceção de saudação: só vale com TODAS as condições observadas.
-        // Nenhuma delas é suposta — cada uma vem de um sinal deste turno.
-        saudacao: {
-          turnoSocial:
-            estadoParaRevisao.tipoTurno === "SAUDACAO" ||
-            (estadoParaRevisao.tipoTurno === "ESCLARECIMENTO" &&
-              (estadoParaRevisao.acao ?? null) === null),
-          acaoOperacional: (estadoParaRevisao.acao ?? null) !== null,
-          afirmacaoSemFonte: afirmacaoSemLastro(respostaFinalAvaliada),
-          pedidoDeHumano: houveHandoff,
-          conflitoDeIdentidade: diagnosticoSaudacao.saudacaoDuplicada === true,
-          conformidadeBloqueante: revisao.bloqueiaEntrega === true,
-          conformidadeNaoVerificada:
-            revisao.conformidade?.estado === "nao_verificada" ||
-            revisao.conformidade?.estado === "falha_na_interpretacao",
-        },
-        bloqueadoresAbsolutos: respostaFinalAvaliada.hardBlockers ?? [],
-        conteudoCandidatoHash: respostaFinalAvaliada.textoAvaliadoHash ?? null,
-      });
-      if (bloqueio.bloquear && !bloqueio.jaAplicado) {
-        let resultadoEnc:
-          | { tipo: "real"; confirmado: boolean; comprovacao?: string | null; erro?: string | null }
-          | { tipo: "simulado" };
-        if (ambienteSaida === "homologacao") {
-          // Homologação NÃO tem atribuição real: o desfecho é simulado.
-          resultadoEnc = { tipo: "simulado" };
-        } else if (!bloqueio.encaminhar) {
-          // Idempotência: o encaminhamento deste turno já aconteceu.
-          resultadoEnc = {
-            tipo: "real",
-            confirmado: true,
-            comprovacao: estadoId.conversaId ?? null,
-          };
-        } else {
-          const rhBaixa = await broker
-            .executar(
-              "solicitar_atendente_humano",
-              JSON.stringify({
-                motivo:
-                  "BAIXA_CONFIABILIDADE: resposta reprovada na avaliação final (nível Baixa)",
-                urgencia: "normal",
-              }),
-            )
-            .catch(
-              () =>
-                ({ success: false, erro: "handoff_indisponivel" }) as {
-                  success: boolean;
-                  erro?: string;
-                },
-            );
-          if (rhBaixa.success === true) houveHandoff = true;
-          resultadoEnc = {
-            tipo: "real",
-            confirmado: rhBaixa.success === true,
-            comprovacao: rhBaixa.success === true ? (estadoId.conversaId ?? null) : null,
-            erro: rhBaixa.erro ?? null,
-          };
-        }
-        const saidaControlada = saidaControladaBaixaConfianca(resultadoEnc);
-        const antesBloqueio = resposta;
-        // RESPONSÁVEL ÚNICO PELO AVISO DE ENCAMINHAMENTO.
-        // Se o módulo de atendimento já falou com o paciente neste turno
-        // (mensagem com o protocolo real, entregue), a finalização NÃO manda
-        // um segundo aviso: o candidato continua descartado e o turno sai sem
-        // texto novo. Sem esse anúncio, o aviso controlado continua valendo.
-        let anuncioDoTurno: {
-          protocolo: string | null;
-          mensagemId: string | null;
-          em: string;
-        } | null = null;
-          let avisoExistente: import("@/lib/nina/resposta/contrato").AvisoExistente | null = null;
-        try {
-          if (estadoId.conversaId) {
-            // 1) Registro durável da operação (clínica, ambiente, conversa,
-            //    sessão, turno): é ele que garante um único aviso, inclusive
-            //    quando os dois caminhos rodam ao mesmo tempo.
-            const { avisoDaOperacao } = await import(
-              "@/lib/atendimento/aviso-encaminhamento.server"
-            );
-            const { precisaAvisoDoChamador } = await import(
-              "@/lib/atendimento/aviso-encaminhamento"
-            );
-            const operacao = await avisoDaOperacao({
-              clinicaId,
-              ambiente: registroDoTurno?.teste ? "homologacao" : "producao",
-              conversaId: estadoId.conversaId,
-              turnoId: registroDoTurno?.turnoId ?? null,
-            });
-            if (operacao && !precisaAvisoDoChamador(operacao)) {
-              anuncioDoTurno = {
-                protocolo: operacao.protocolo,
-                mensagemId: operacao.mensagemId,
-                em: "",
-              };
-                avisoExistente = {
-                  estado: operacao.entregue ? "confirmado" : "envio_pendente",
-                  chaveOperacao: operacao.chave,
-                  mensagemId: operacao.mensagemId,
-                  protocolo: operacao.protocolo,
-                  texto: operacao.texto,
-                };
-            }
-            if (!anuncioDoTurno) {
-              // 2) Compatibilidade com encaminhamentos anteriores ao registro.
-              const { anuncioHandoffVigente } = await import(
-                "@/lib/atendimento/protocolo-atendimento.server"
-              );
-              anuncioDoTurno = await anuncioHandoffVigente(
-                clinicaId,
-                estadoId.conversaId,
-                registroDoTurno?.iniciadoEm ?? null,
-              );
-                if (anuncioDoTurno) {
-                  avisoExistente = {
-                    estado: "confirmado",
-                    chaveOperacao: null,
-                    mensagemId: anuncioDoTurno.mensagemId,
-                    protocolo: anuncioDoTurno.protocolo,
-                    texto: null,
-                  };
-                }
-            }
-          }
-        } catch (e) {
-          console.error("[nina-confianca] falha ao conferir anúncio do handoff", e);
-        }
-        resposta = anuncioDoTurno ? "" : saidaControlada.aviso;
-          if (avisoExistente && opcoes?.auditoria) {
-            const { criarResultadoSemNovaMensagem } = await import("@/lib/nina/resposta/contrato");
-            opcoes.auditoria.resultado = criarResultadoSemNovaMensagem(avisoExistente);
-          }
-        const motivoBloqueio = anuncioDoTurno
-          ? `${bloqueio.motivo}: conteúdo candidato descartado; aviso já entregue pelo encaminhamento (protocolo ${anuncioDoTurno.protocolo ?? "sem número"})`
-          : `${bloqueio.motivo}: conteúdo candidato descartado (${saidaControlada.encaminhamento})`;
-        transformar(
-          "confianca.baixa.encaminhamento",
-          motivoBloqueio,
-          antesBloqueio,
-          resposta,
-          "aviso_operacional",
-        );
-        {
-          const { registrarEvidenciaBloqueio, registrarAvisoOperacional } = await import(
-            "@/lib/nina/rastreio/turno.server"
-          );
-          const { validacaoDoEncaminhamento } = await import(
-            "@/lib/nina/rastreio/versoes-texto"
-          );
-          // EVIDÊNCIA DO BLOQUEIO: a avaliação que o causou fica preservada
-          // apontando para o texto que RECEBEU a nota (o candidato), não para
-          // o aviso que o substituiu.
-          registrarEvidenciaBloqueio({
-            tipo: "baixa_confiabilidade",
-            motivo: bloqueio.motivo ?? "baixa confiabilidade",
-            avaliacao: "answer_confidence",
-            decisaoId: registro.id ?? null,
-            textoAvaliadoHash:
-              bloqueio.conteudoCandidatoHash ?? respostaFinalAvaliada.textoAvaliadoHash ?? null,
-            score: bloqueio.score ?? null,
-            nivel: bloqueio.nivel ?? null,
-            etapa: bloqueio.etapa ?? null,
-            textoSubstitutoHash: resposta ? hashTurno(resposta) : null,
-          });
-          // AVISO OPERACIONAL: origem e validação declaradas; porcentagem de
-          // confiança NÃO se aplica e isso fica escrito, sem inventar nota.
-          if (resposta) {
-            registrarAvisoOperacional({
-              origem: saidaControlada.origem,
-              tipo: "baixa_confiabilidade",
-              motivo: motivoBloqueio,
-              validacao: validacaoDoEncaminhamento(
-                ambienteSaida === "homologacao"
-                  ? { tipo: "simulado" }
-                  : { tipo: "real", confirmado: saidaControlada.encaminhamentoConfirmado === true },
-              ),
-              protocolo: anuncioDoTurno?.protocolo ?? null,
-              mensagemId: anuncioDoTurno?.mensagemId ?? null,
-              execucaoId: execucaoIdFinal ?? null,
-              handoffEventoId: null,
-              textoHash: hashTurno(resposta),
-            });
-          }
-        }
-        marcarOrigem(
-          "codigo",
-          `${saidaControlada.registro} (origem: ${saidaControlada.origem})`,
-        );
-        rastro?.concluir("answer.low_confidence_handoff", {
-          motivo: bloqueio.motivo,
-          nivel: bloqueio.nivel,
-          score: bloqueio.score,
-          decisao_motor: bloqueio.decisaoMotor,
-          etapa: bloqueio.etapa,
-          precede_etapa_ativacao: bloqueio.precedeEtapaAtivacao,
-          precede_decisao_motor: bloqueio.precedeDecisaoMotor,
-          config_id: bloqueio.configId,
-          ambiente: ambienteSaida,
-          conteudo_candidato_hash: bloqueio.conteudoCandidatoHash,
-          candidato_descartado: true,
-          encaminhamento: saidaControlada.encaminhamento,
-          encaminhamento_confirmado: saidaControlada.encaminhamentoConfirmado,
-          exige_intervencao: saidaControlada.exigeIntervencao,
-          registro: saidaControlada.registro,
-          aviso_origem: saidaControlada.origem,
-          aviso_herda_nota_do_candidato: false,
-          aviso_entregue_por: anuncioDoTurno ? "atendimento_protocolo" : "finalizacao_nina",
-          aviso_mensagem_id: anuncioDoTurno?.mensagemId ?? null,
-          aviso_protocolo: anuncioDoTurno?.protocolo ?? null,
-          segundo_aviso_suprimido: Boolean(anuncioDoTurno),
-          erro: saidaControlada.erro,
-        });
-      }
-
-      // ---- CONFORMIDADE COM AS INSTRUÇÕES PUBLICADAS x CONTROLE DE ENVIO ----
-      // Detectar a violação não basta: o candidato NÃO é entregue quando uma
-      // regra publicada bloqueante foi descumprida (ou não pôde ser
-      // conferida), mesmo com nota média ou alta e mesmo na etapa A.
-      if (!bloqueio.bloquear && revisao.bloqueiaEntrega) {
-        const { decidirEntregaPorConformidade, instrucaoDeCorrecaoPorRegras } = await import(
-          "@/lib/nina/confidence/conformidade-entrega"
-        );
-        const decisaoEntrega = decidirEntregaPorConformidade({
-          conformidade: revisao.conformidade,
-          tentativa: correcoesPorRegras,
-          limiteTentativas: revisao.limiteTentativas,
-          correcaoDisponivel: podeCorrigirPorRegras,
-        });
-        rastro?.concluir("answer.rule_compliance", {
-          estado: revisao.conformidade.estado,
-          motivo: revisao.conformidade.motivoBloqueio,
-          violacoes: revisao.conformidade.violacoes.map((v) => v.regraId ?? v.id),
-          nao_verificadas: revisao.conformidade.naoVerificadas.map((v) => v.regraId ?? v.id),
-          score: respostaFinalAvaliada.score,
-          nivel: respostaFinalAvaliada.level,
-          nota_nao_compensa: true,
-          entregar: decisaoEntrega.entregar,
-          corrigir: decisaoEntrega.corrigir,
-          desfecho_humano: decisaoEntrega.desfechoHumano,
-          tentativa: decisaoEntrega.tentativa,
-          limite: decisaoEntrega.limiteTentativas,
-        });
-
-        if (decisaoEntrega.corrigir) {
-          // Correção TEXTUAL: o modelo reescreve. Nenhuma ferramenta é
-          // oferecida, então nenhuma operação com efeito externo se repete.
-          const { ninaAIGateway } = await import("@/lib/nina/ai-gateway.server");
-          await conferirReserva();
-          const correcaoIA = await ninaAIGateway({
-            clinicaId,
-            perfil: "whatsapp",
-            conversaId: estadoId.conversaId ?? null,
-            ferramentasUsadas: nomesFerramentasTurno,
-            messages: [
-              ...mensagens,
-              { role: "assistant", content: resposta },
-              // Pedido de reescrita vai como turno de quem pede: instrução de
-              // sistema depois do turno do modelo deixava o pedido terminando
-              // no turno do modelo e o provedor recusava com HTTP 400.
-              { role: "user", content: instrucaoDeCorrecaoPorRegras(revisao.conformidade) },
-            ] as never,
-            raciocinio: {
-              mensagem: mensagemPaciente,
-              rodada: correcoesPorRegras + 1,
-              temFerramentas: false,
-              ferramentasExecutadas: nomesFerramentasTurno.length,
-              nomesFerramentas: nomesFerramentasTurno,
-              houveConflito: conflitoFerramenta,
-            },
-          }).catch((e: unknown) => ({
-            ok: false as const,
-            conteudo: "",
-            status: null,
-            erro: e instanceof Error ? e.message : String(e),
-          }));
-          const falhaCorrecao =
-            correcaoIA && correcaoIA.ok
-              ? null
-              : {
-                  status: (correcaoIA as { status?: number | null } | null)?.status ?? null,
-                  erro: (correcaoIA as { erro?: string | null } | null)?.erro ?? "sem_resposta",
-                };
-          if (falhaCorrecao) {
-            // Falha técnica do provedor não é "resposta reprovada": fica
-            // registrada como falha, sem virar prova de nada.
-            rastro?.concluir("answer.rule_correction_failed", {
-              motivo: revisao.conformidade.motivoBloqueio,
-              tentativa: correcoesPorRegras + 1,
-              status: falhaCorrecao.status,
-              erro: falhaCorrecao.erro,
-              falha_tecnica: true,
-            });
-          }
-          const textoCorrigido = (
-            correcaoIA && correcaoIA.ok ? (correcaoIA.conteudo ?? "") : ""
-          ).trim();
-          if (textoCorrigido && textoCorrigido !== resposta) {
-            const antesCorrecao = resposta;
-            resposta = textoCorrigido;
-            correcoesPorRegras += 1;
-            repetirVerificacaoRegras = true;
-            transformar(
-              "confianca.regras.correcao",
-              `${revisao.conformidade.motivoBloqueio}: nova versão pedida ao modelo (tentativa ${correcoesPorRegras}/${revisao.limiteTentativas})`,
-              antesCorrecao,
-              resposta,
-            );
-            // Origem registrada: o texto continua sendo do MODELO, corrigido
-            // após a verificação — nada é substituído por código.
-            marcarOrigem(
-              "modelo_transformado",
-              "reescrita do próprio modelo após violação de regra publicada",
-            );
-          } else {
-            // Sem nova versão utilizável: encerra a correção e vai ao desfecho.
-            podeCorrigirPorRegras = false;
-            repetirVerificacaoRegras = true;
-          }
-        } else {
-          // Exigência crítica segue descumprida ou não verificável: o
-          // candidato é bloqueado e vale o desfecho de atendimento humano.
-          let resultadoRegra:
-            | { tipo: "real"; confirmado: boolean; comprovacao?: string | null; erro?: string | null }
-            | { tipo: "simulado" };
-          if (ambienteSaida === "homologacao") {
-            resultadoRegra = { tipo: "simulado" };
-          } else if (houveHandoff) {
-            resultadoRegra = {
-              tipo: "real",
-              confirmado: true,
-              comprovacao: estadoId.conversaId ?? null,
-            };
-          } else {
-            const rhRegra = await broker
-              .executar(
-                "solicitar_atendente_humano",
-                JSON.stringify({
-                  motivo: `${revisao.conformidade.motivoBloqueio}: resposta bloqueada por instrução publicada`,
-                  urgencia: "normal",
-                }),
-              )
-              .catch(
-                () =>
-                  ({ success: false, erro: "handoff_indisponivel" }) as {
-                    success: boolean;
-                    erro?: string;
-                  },
-              );
-            if (rhRegra.success === true) houveHandoff = true;
-            resultadoRegra = {
-              tipo: "real",
-              confirmado: rhRegra.success === true,
-              comprovacao: rhRegra.success === true ? (estadoId.conversaId ?? null) : null,
-              erro: rhRegra.erro ?? null,
-            };
-          }
-          const saidaRegra = saidaControladaBaixaConfianca(resultadoRegra);
-          const antesRegra = resposta;
-          const {
-            registroTurnoAtual: turnoAgora,
-            registrarEvidenciaBloqueio: evidenciaRegra,
-            registrarAvisoOperacional: avisoRegra,
-          } = await import("@/lib/nina/rastreio/turno.server");
-          const { validacaoDoEncaminhamento: validacaoRegra } = await import(
-            "@/lib/nina/rastreio/versoes-texto"
-          );
-          // CICLO DE AVISOS: se o texto atual JÁ é um aviso operacional deste
-          // turno, ele não é substituído por outro aviso. Um bloqueio não
-          // bloqueia um aviso de bloqueio.
-          const hashAtual = antesRegra ? hashTurno(antesRegra) : null;
-          const jaEraAviso = (turnoAgora()?.avisosOperacionais ?? []).some(
-            (a) => a.textoHash && a.textoHash === hashAtual,
-          );
-          if (!jaEraAviso) {
-            resposta = saidaRegra.aviso;
-            transformar(
-              "confianca.regras.bloqueio",
-              `${revisao.conformidade.motivoBloqueio}: conteúdo candidato descartado (${saidaRegra.encaminhamento})`,
-              antesRegra,
-              resposta,
-              "aviso_operacional",
-            );
-            marcarOrigem("codigo", `${saidaRegra.registro} (origem: ${saidaRegra.origem})`);
-            evidenciaRegra({
-              tipo: "regra_publicada",
-              motivo: revisao.conformidade.motivoBloqueio ?? "regra publicada descumprida",
-              avaliacao: "answer_confidence",
-              decisaoId: registro.id ?? null,
-              textoAvaliadoHash: respostaFinalAvaliada.textoAvaliadoHash ?? null,
-              score: respostaFinalAvaliada.score ?? null,
-              nivel: respostaFinalAvaliada.level ?? null,
-              etapa: cfgFinal.etapa ?? null,
-              textoSubstitutoHash: resposta ? hashTurno(resposta) : null,
-            });
-            if (resposta) {
-              avisoRegra({
-                origem: saidaRegra.origem,
-                tipo: "regra_publicada",
-                motivo: revisao.conformidade.motivoBloqueio ?? "regra publicada descumprida",
-                validacao: validacaoRegra(resultadoRegra),
-                protocolo: null,
-                mensagemId: null,
-                execucaoId: execucaoIdFinal ?? null,
-                handoffEventoId: null,
-                textoHash: hashTurno(resposta),
-              });
-            }
-          }
-          rastro?.concluir("answer.rule_block", {
-            motivo: revisao.conformidade.motivoBloqueio,
-            estado: revisao.conformidade.estado,
-            score: respostaFinalAvaliada.score,
-            nivel: respostaFinalAvaliada.level,
-            etapa: cfgFinal.etapa,
-            ambiente: ambienteSaida,
-            candidato_descartado: true,
-            candidato_hash: respostaFinalAvaliada.textoAvaliadoHash ?? null,
-            encaminhamento: saidaRegra.encaminhamento,
-            encaminhamento_confirmado: saidaRegra.encaminhamentoConfirmado,
-            correcoes_tentadas: correcoesPorRegras,
-            limite_tentativas: revisao.limiteTentativas,
-            erro: saidaRegra.erro,
-          });
-        }
-      }
-    }
-  } catch (e) {
-    // Falha técnica do avaliador NUNCA vira aprovação: fica registrada como
-    // liberação degradada (ou desfecho explícito, conforme o risco).
-    const erro = e instanceof Error ? e.message : String(e);
-    console.warn("[nina-confianca] falha na verificação da resposta final:", erro);
-    try {
-      const { origemDaSaida, revisarSaida } = await import(
-        "@/lib/nina/confidence/revisao-final"
-      );
-      const { registroTurnoAtual, registrarConfiancaDoTurno } = await import(
-        "@/lib/nina/rastreio/turno.server"
-      );
-      const revisao = revisarSaida({
-        origem: origemDaSaida(registroTurnoAtual()?.origemResposta ?? null, {
-          handoff: houveHandoff,
-          limiteRodadas: limiteRodadasAtingido,
-        }),
-        textoFinal: resposta,
-        avaliacao: null,
-        falhaAvaliador: erro,
-        etapa: "A",
-        risco: agendamentoConfirmado || houveHandoff ? "operacional" : "informativo",
-        operacaoAfirmada: agendamentoConfirmado,
-        operacaoComprovada: reservaDaSessaoAtual(fluxoEstado),
-      });
-      rastro?.falhar("answer.review", "AVALIADOR_INDISPONIVEL", {
-        origem: revisao.origem,
-        acao_recomendada: revisao.acaoRecomendada,
-        degradado: revisao.degradado,
-        aprovada: revisao.aprovada,
-      });
-      registrarConfiancaDoTurno({
-        avaliacao: "answer_confidence",
-        decisao: null,
-        etapa: null,
-        modo: "shadow",
-        aplicada: false,
-        score: null,
-        nivel: null,
-      });
-    } catch {
-      /* registro da degradação nunca interrompe o atendimento */
-    }
-    }
-    // Limite duro do laço: nenhuma correção infinita, mesmo com erro.
-    if (passeVerificacaoRegras > LIMITE_PASSES_VERIFICACAO) repetirVerificacaoRegras = false;
-  }
-
-  // A apresentação só é dada por feita quando o texto que sai é MESMO a
-  // resposta da Nina. Se o candidato foi descartado (aviso controlado), a
-  // pessoa não recebeu apresentação: o próximo turno volta a apresentá-la.
-  try {
-    const { ehAvisoControlado: avisoControlado } = await import(
-      "@/lib/nina/confidence/baixa-confiabilidade"
-    );
-    await confirmarApresentacaoEntregue(resposta, !avisoControlado(resposta));
+    await confirmarApresentacaoEntregue(resposta, true);
   } catch {
-    /* marcação de apresentação nunca interrompe o atendimento */
+    /* telemetria nunca interrompe o atendimento */
   }
 
   // Evidências finais: estado/sessão no momento da resposta, regras aplicáveis,
@@ -3632,12 +2287,6 @@ async function gerarRespostaNinaInterno(
       );
       fecharAuditoriaInstrucoesDoTurno({
         textoEntregue: resposta,
-        ...(verificacoesInstrucoesTurno
-          ? {
-              verificacoes: verificacoesInstrucoesTurno.verificacoes,
-              estadoFalhaDeInterpretacao: verificacoesInstrucoesTurno.falhaDeInterpretacao,
-            }
-          : {}),
       });
     }
     registrarEtapa({

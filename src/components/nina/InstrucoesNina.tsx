@@ -15,7 +15,6 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
-import { RegrasPublicadasRevisao } from "@/components/nina/RegrasPublicadasRevisao";
 import { IdentidadeAtendimentoCampos } from "@/components/nina/IdentidadeAtendimentoCampos";
 import { validarIdentidadeParaPublicacao } from "@/lib/nina/identidade-atendimento";
 import { Button } from "@/components/ui/button";
@@ -282,7 +281,6 @@ function Editor({
         className="min-h-[520px] resize-y overflow-auto whitespace-pre font-mono text-xs leading-relaxed"
       />
 
-      <RegrasPublicadasRevisao texto={texto} escopo={bloco.escopo} />
 
       <Input
         value={comentario}

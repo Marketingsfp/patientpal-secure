@@ -17,6 +17,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { ArquiteturaCanvas } from "@/components/nina/ArquiteturaCanvas";
 import { RastrearExecucao } from "@/components/nina/RastrearExecucao";
 import { InstrucoesNina } from "@/components/nina/InstrucoesNina";
+import { FluxoDiretoNina } from "@/components/nina/FluxoDiretoNina";
 
 import { useClinica } from "@/hooks/use-clinica";
 import { capacidadesArquitetura } from "@/lib/nina/arquitetura/permissoes.functions";
@@ -171,6 +172,7 @@ function Pagina() {
         </TabsList>
 
         <TabsContent value="arquitetura" className="mt-4 space-y-4">
+          <FluxoDiretoNina />
           <Card>
             <CardHeader className="flex flex-row items-center justify-between gap-2">
               <CardTitle className="text-base">O que a Nina pode fazer</CardTitle>

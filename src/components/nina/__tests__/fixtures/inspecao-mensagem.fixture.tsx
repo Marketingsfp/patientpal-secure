@@ -206,7 +206,7 @@ it("real e homologação exibem o mesmo aviso, reporte e detalhes sem atribuir L
     detalhes = [];
     const ui = montar(controles({ ambiente }));
     await ui.render();
-    expect(ui.container.textContent).toContain("Aviso do sistema");
+    expect(ui.container.textContent).toContain("Detalhes técnicos");
     expect(ui.container.textContent).not.toContain("0/100");
     const botoes = Array.from(ui.container.querySelectorAll("button"));
     const reporte = botoes.find((b) => b.getAttribute("aria-label")?.includes("Reportar"));
@@ -268,7 +268,7 @@ it("falha de leitura mostra Falha e Tentar novamente, então recupera a inspeç�
   );
   await aguardar();
   expect(chamadas).toBe(2);
-  expect(ui.container.textContent).toContain("Aviso do sistema");
+  expect(ui.container.textContent).toContain("Detalhes técnicos");
   expect(ui.container.textContent).toContain("Detalhes técnicos");
   await ui.fechar();
 });
@@ -345,7 +345,7 @@ it("vínculo do aviso chega sem alterar mensagem, execução ou status e libera 
   vinculoPendente = false; // Apenas a API muda; nenhuma prop ou mensagem é alterada.
   await aguardar(1600);
   expect(chamadas).toBe(2);
-  expect(ui.container.textContent).toContain("Aviso do sistema");
+  expect(ui.container.textContent).toContain("Detalhes técnicos");
   expect(ui.container.textContent).toContain("Detalhes técnicos");
   expect(ui.container.querySelector('button[aria-label*="Reportar"]')).not.toBeNull();
   await aguardar(1600);
@@ -423,7 +423,7 @@ it("histórico de dois ciclos consulta e inspeciona cada mensagem pela conversa 
       expect(ui.container.textContent).not.toContain("Falha ao carregar");
       expect(ui.container.querySelectorAll("[data-ciclo]")).toHaveLength(2);
       const celula = ui.container.querySelector(`[data-ciclo="${m.id}"]`)!;
-      expect(celula.textContent).toContain("Aviso do sistema");
+      expect(celula.textContent).toContain("Detalhes técnicos");
       await act(async () =>
         (celula.querySelector('button[aria-label*="Reportar"]') as HTMLButtonElement).click(),
       );
@@ -486,7 +486,7 @@ it("resposta fora da clínica em um ciclo não contamina a inspeção do outro c
       "Falha ao carregar",
     );
     expect(ui.container.querySelector(`[data-ciclo="${mensagemId}"]`)?.textContent).toContain(
-      "Aviso do sistema",
+      "Detalhes técnicos",
     );
     expect(ui.container.querySelector(`[data-ciclo="${mensagemId}"]`)?.textContent).toContain(
       "Detalhes técnicos",

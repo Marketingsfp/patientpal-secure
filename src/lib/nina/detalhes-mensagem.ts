@@ -1,3 +1,4 @@
+import { eventoDoMotor } from "./fluxo-direto";
 /** Apresentação somente de fatos registrados; não decide nem altera atendimento. */
 import type { LeituraDetalhesMensagem } from "./detalhes-mensagem-contrato";
 import { hashDoTexto } from "./confidence/hash";
@@ -147,7 +148,7 @@ export function consolidarPassosDetalhes(
 ): LeituraDetalhesMensagem["passos"] {
   const grupos = new Map<string, RegistroDetalhes[]>();
   for (const [i, e] of eventos.entries()) {
-    if (e.node_id === "turn.summary") continue;
+    if (e.node_id === "turn.summary" || eventoDoMotor(e)) continue;
     const meta = o(e.metadata);
     if (
       e.node_id === "turn.delivery" &&

@@ -46,9 +46,6 @@ import {
   validarRecorte,
 } from "@/lib/nina/metricas-filtros";
 import { AnalistaMetricasIA } from "@/components/nina/AnalistaMetricasIA";
-import { ConfiancaRespostas } from "@/components/nina/ConfiancaRespostas";
-import { MetricasConfiabilidade } from "@/components/nina/MetricasConfiabilidade";
-import { CalibracaoConfianca } from "@/components/nina/CalibracaoConfianca";
 import { SemCaixaAlta } from "@/components/ui/caixa-alta";
 import {
   metricasAprendizadoNina,
@@ -500,15 +497,6 @@ function Pagina() {
           pedido. O cálculo, o horário oficial e o uso pelo Analista de
           Métricas continuam ativos no backend. Configuração do horário segue
           na Base de Conhecimentos (/app/nina#base-conhecimento). */}
-
-      {/* Confiabilidade das respostas: o que a Nina liberou, esclareceu ou
-          transferiu, e o motivo determinístico de cada decisão. */}
-      <ConfiancaRespostas clinicaId={clinicaId} />
-
-      <MetricasConfiabilidade clinicaId={clinicaId} />
-
-      {clinicaId ? <CalibracaoConfianca clinicaId={clinicaId} /> : null}
-
 
       {/* Seção da Fase 9: isolada dos cards acima — falha ou lentidão aqui não
           afeta os indicadores, a Nina nem o atendimento. */}

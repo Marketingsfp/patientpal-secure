@@ -147,11 +147,6 @@ export function VerificacoesHomologacao() {
               <div>Resultado do turno: <Badge>{completo.turno.resultado}</Badge></div>
               <div>Origem da resposta: {completo.turno.origemResposta ?? "não registrada"}</div>
               <div>
-                Depois das verificações:{" "}
-                {completo.turno.confianca?.decisao ?? "não registrada"}
-                {completo.turno.confianca?.nivel ? ` (${completo.turno.confianca.nivel})` : ""}
-              </div>
-              <div>
                 Intervenções:{" "}
                 {completo.turno.intervencoes.length === 0
                   ? "nenhuma"

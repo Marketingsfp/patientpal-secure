@@ -150,7 +150,7 @@ describe("leitura compartilhada das saídas", () => {
     return { tabelas, ...bancoInspecao(tabelas, falha) };
   }
   for (const isTeste of [false, true]) {
-    it(`MJ67 ${isTeste ? "homologação" : "real"}: aviso tem detalhes, candidata tem nota separada`, async () => {
+    it(`MJ67 ${isTeste ? "homologação" : "real"}: aviso tem detalhes e não carrega notas do motor`, async () => {
       const { cliente } = preparar(undefined, isTeste);
       const [saida] = await carregarSaidasDasMensagens(cliente, dados);
       expect(saida).toMatchObject({
@@ -160,19 +160,25 @@ describe("leitura compartilhada das saídas", () => {
         score: null,
         nivel: null,
       });
-      expect(saida!.avaliacoes[0]).toMatchObject({ score: 0, desteTexto: false });
+      expect(saida!.avaliacoes).toEqual([]);
     });
   }
   for (const tabela of [
     "whatsapp_mensagens",
     "atend_aviso_encaminhamento",
     "nina_confianca_vinculos",
-    "nina_confianca_decisoes",
   ]) {
     it(`falha em ${tabela} não vira Não avaliada`, async () => {
       await expect(carregarSaidasDasMensagens(preparar(tabela).cliente, dados)).rejects.toThrow();
     });
   }
+  it("indisponibilidade do motor não interfere na leitura de saídas", async () => {
+    const { cliente, consultas } = preparar("nina_confianca_decisoes");
+    const [saida] = await carregarSaidasDasMensagens(cliente, dados);
+    expect(saida?.inspecionavel).toBe(true);
+    expect(saida?.avaliacoes).toEqual([]);
+    expect(consultas.some((c) => c.tabela === "nina_confianca_decisoes")).toBe(false);
+  });
   it("não devolve mensagem de outra conversa/clínica solicitada pelo cliente", async () => {
     const { cliente } = preparar();
     expect(await carregarSaidasDasMensagens(cliente, { ...dados, conversaId: "v2" })).toEqual([]);
@@ -208,9 +214,9 @@ describe("leitura compartilhada das saídas", () => {
     });
     const [saida] = await carregarSaidasDasMensagens(cliente, dados);
     expect(saida?.score).toBeNull();
-    expect(saida?.avaliacoes[0]?.desteTexto).toBe(false);
+    expect(saida?.avaliacoes).toEqual([]);
   });
-  it("avaliação diretamente ligada à mensagem é preservada sem execucao_id legado", async () => {
+  it("mensagem antiga continua acessível sem importar sua avaliação", async () => {
     const { cliente } = bancoInspecao({
       whatsapp_mensagens: [{ ...mensagem, enviada_por: "nina" }],
       nina_confianca_decisoes: [
@@ -229,7 +235,7 @@ describe("leitura compartilhada das saídas", () => {
       ],
     });
     const [saida] = await carregarSaidasDasMensagens(cliente, dados);
-    expect(saida).toMatchObject({ score: 96, classe: "resposta_avaliada", execucaoId: null });
+    expect(saida).toMatchObject({ score: null, classe: "sem_avaliacao", execucaoId: null });
   });
   it("não mistura avaliações de outro atendimento quando falta execução", async () => {
     const { tabelas, cliente } = preparar();

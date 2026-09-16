@@ -331,7 +331,7 @@ export async function processarRespostaWhatsappNina(entrada: EntradaRespostaWhat
               const representacaoAudio = longa
                 ? ("audio_resumo" as const)
                 : ("audio_integral" as const);
-              const { registrarEntregaSaida } = await import("@/lib/nina/confidence-engine.server");
+              const { registrarEntregaSaida } = await import("@/lib/nina/entrega-saida.server");
               const { hashDoTexto } = await import("@/lib/nina/confidence/hash");
               const hashFalado = hashDoTexto(falado);
               // Conteúdo falado diferente do texto avaliado =>
@@ -432,7 +432,7 @@ export async function processarRespostaWhatsappNina(entrada: EntradaRespostaWhat
       }
 
       if (!audioEnviado || precisaTextoCompleto) {
-        const { registrarEntregaSaida } = await import("@/lib/nina/confidence-engine.server");
+        const { registrarEntregaSaida } = await import("@/lib/nina/entrega-saida.server");
         const { hashDoTexto } = await import("@/lib/nina/confidence/hash");
         const hashEnviado = hashDoTexto(reply);
         // A nota pertence ao texto avaliado. Texto entregue

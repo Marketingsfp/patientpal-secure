@@ -14,7 +14,6 @@ import {
 } from "@/lib/nina/saida-mensagem.functions";
 import { type MensagemInspecao, mensagemNinaInspecionavel } from "@/lib/nina/inspecao-mensagem";
 import { ReportarErroNinaBotao } from "./ReportarErroNinaDialog";
-import { SaidaMensagemBadge } from "./SaidaMensagem";
 import { DetalhesMensagemNina } from "./DetalhesMensagemNina";
 
 type Props = {
@@ -25,7 +24,7 @@ type Props = {
   parte: "reporte" | "detalhes";
 };
 
-/** Mesmo controle nos dois ambientes. A nota é sempre da mensagem entregue, nunca da candidata. */
+/** Mesmo controle de inspeção nos dois ambientes, sem selo de confiança. */
 export function InspecaoMensagemNina({ clinicaId, conversaId, mensagem, saida, parte }: Props) {
   const queryClient = useQueryClient();
   const mensagemId = String(mensagem.id ?? "");
@@ -62,8 +61,9 @@ export function InspecaoMensagemNina({ clinicaId, conversaId, mensagem, saida, p
     ) : null;
   return (
     <span className="flex items-center gap-2" data-inspecao-nina={mensagemId}>
-      <SaidaMensagemBadge saida={saida === "falha" ? "falha" : noEscopo} />
       {saida === "falha" && (
+        <>
+        <span className="text-muted-foreground">Falha ao carregar</span>
         <button
           type="button"
           className="underline underline-offset-2"
@@ -75,6 +75,7 @@ export function InspecaoMensagemNina({ clinicaId, conversaId, mensagem, saida, p
         >
           Tentar novamente
         </button>
+        </>
       )}
       {elegivel && (
         <DetalhesMensagemBotao
@@ -141,7 +142,7 @@ function DetalhesMensagemBotao(alvo: {
           <DialogHeader>
             <DialogTitle>Detalhes técnicos da mensagem</DialogTitle>
             <DialogDescription>
-              Mensagem selecionada, avaliações e etapas registradas pelo sistema.
+              Mensagem selecionada, consultas, geração e entrega registradas pelo sistema.
             </DialogDescription>
           </DialogHeader>
           {carregando && <p role="status">Carregando os registros desta mensagem…</p>}

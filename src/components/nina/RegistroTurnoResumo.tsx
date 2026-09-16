@@ -5,7 +5,7 @@
  * `turn.delivery`) e mostra em linguagem simples:
  *   - qual versão das instruções foi usada e se houve queda para o texto do
  *     código por falha;
- *   - o estado do turno (ambiente, lote, revisão da conversa, confiança);
+ *   - o estado do turno (ambiente, lote, revisão da conversa);
  *   - de onde nasceu o texto e quem mexeu nele depois do modelo;
  *   - qual mensagem foi realmente entregue;
  *   - o que NÃO ficou comprovado.
@@ -18,14 +18,11 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   alteracaoDaTransformacao,
-  avaliacaoEmObservacao,
   avaliarTransformacoes,
-  descreverAvaliacaoConfianca,
   eventoEntregaDoTurno,
   evidenciaSaidaDoTurno,
   NODE_ENTREGA_TURNO,
   type EventoEntregaTurno,
-  TEXTO_AVALIACAO_EM_OBSERVACAO,
   origemComSituacao,
   ROTULO_LACUNA_TURNO,
   ROTULO_ORIGEM,
@@ -33,7 +30,6 @@ import {
   type OrigemResposta,
   type SituacaoTransformacoes,
 } from "@/lib/nina/rastreio/turno";
-import { TEXTO_MOTIVO_NOTA } from "@/lib/nina/rastreio/versoes-texto";
 
 type EventoComMetadata = {
   node_id?: string | null;
@@ -86,41 +82,6 @@ function texto(v: unknown, vazio = "—") {
   return v === null || v === undefined || v === "" ? vazio : String(v);
 }
 
-/** A avaliação pertence a uma versão do texto; só o vínculo exato autoriza chamá-la final. */
-function rotuloAvaliacaoDoTurno(
-  avaliacao: Record<string, unknown>,
-  resumo: Record<string, unknown>,
-): string {
-  const tipo = String(avaliacao["avaliacao"] ?? "");
-  if (tipo !== "answer_confidence") return tipo;
-  const nota = resumo["nota_do_texto_entregue"] as Record<string, unknown> | null;
-  const exata = nota?.["avaliacao"] as Record<string, unknown> | null;
-  const entrega = resumo["entrega"] as Record<string, unknown> | null;
-  const hashFinal = entrega?.["textoHash"] ?? entrega?.["texto_hash"] ?? null;
-  const hashAvaliado = avaliacao["textoHash"] ?? null;
-  const hashConfere = Boolean(hashFinal && hashAvaliado && hashFinal === hashAvaliado);
-  const hashDiverge = Boolean(hashFinal && hashAvaliado && hashFinal !== hashAvaliado);
-  const decisaoConfere = Boolean(
-    nota?.["aplicavel"] === true &&
-    avaliacao["decisaoId"] &&
-    avaliacao["decisaoId"] === exata?.["decisaoId"],
-  );
-  if (nota?.["aplicavel"] !== false && !hashDiverge && (hashConfere || decisaoConfere)) {
-    return tipo;
-  }
-  const bloqueios = Array.isArray(resumo["bloqueios"])
-    ? (resumo["bloqueios"] as Array<Record<string, unknown>>)
-    : [];
-  const bloqueada = bloqueios.some(
-    (b) =>
-      b["avaliacao"] === tipo &&
-      ((avaliacao["decisaoId"] && b["decisaoId"] === avaliacao["decisaoId"]) ||
-        (hashAvaliado && b["textoAvaliadoHash"] === hashAvaliado)),
-  );
-  if (bloqueada) return "Avaliação do texto bloqueado (não é a nota da mensagem entregue)";
-  return "Avaliação registrada no turno (nota não vinculada à mensagem entregue)";
-}
-
 /**
  * Situação real das etapas pós-modelo. Prefere o que ficou gravado; registros
  * antigos (sem o campo) são reclassificados pelos próprios hashes gravados —
@@ -167,26 +128,7 @@ export function RegistroTurnoResumo({
 
   const versao = (resumo["versao_prompt"] ?? null) as Record<string, unknown> | null;
   const transformacoes = (resumo["transformacoes"] ?? []) as Array<Record<string, unknown>>;
-  const lacunas = (resumo["lacunas"] ?? []) as string[];
-  const confianca = (resumo["confianca"] ?? null) as Record<string, unknown> | null;
-  const notaEntregue = resumo["nota_do_texto_entregue"] as Record<string, unknown> | null;
-  const motivoNota = String(notaEntregue?.["motivo"] ?? "");
-  // FASE 2 — registros antigos guardam só uma avaliação; usamos como fallback.
-  const avaliacoes = (
-    Array.isArray(resumo["avaliacoes"])
-      ? (resumo["avaliacoes"] as Array<Record<string, unknown>>)
-      : confianca
-        ? [confianca]
-        : []
-  ) as Array<Record<string, unknown>>;
-  const operacional =
-    avaliacoes.find(
-      (a) =>
-        !avaliacaoEmObservacao({
-          modo: (a["modo"] ?? null) as string | null,
-          aplicada: (a["aplicada"] ?? null) as boolean | null,
-        }),
-    ) ?? null;
+  const lacunas = ((resumo["lacunas"] ?? []) as string[]).filter((l) => l !== "confianca");
   const entrega = (resumo["entrega"] ?? null) as Record<string, unknown> | null;
   // FASE 3 — o resumo nasce antes da persistência da resposta; os eventos de
   // saída posteriores completam o vínculo (nunca reescrevem o resumo).
@@ -253,48 +195,6 @@ export function RegistroTurnoResumo({
             ? ` · revisão ${texto(resumo["revisao_conversa"])}`
             : ""}
         </p>
-        <p>
-          <span className="text-muted-foreground">Ação aplicada ao atendimento: </span>
-          {operacional
-            ? `${texto(operacional["decisao"], "não registrada")}${
-                operacional["etapa"] ? ` · etapa ${texto(operacional["etapa"])}` : ""
-              }`
-            : "nenhuma intervenção de confiança registrada neste turno"}
-        </p>
-      </div>
-
-      {/* FASE 2 — cada avaliação com tipo, nota, decisão registrada e modo. */}
-      <div className="mt-2 space-y-1">
-        <p className="text-muted-foreground">Avaliações de confiança</p>
-        {notaEntregue?.["aplicavel"] === false && (
-          <p className="text-muted-foreground">
-            {TEXTO_MOTIVO_NOTA[motivoNota as keyof typeof TEXTO_MOTIVO_NOTA] ??
-              "A avaliação registrada não se aplica à mensagem entregue."}
-          </p>
-        )}
-        {avaliacoes.length === 0 ? (
-          <p>não registrada</p>
-        ) : (
-          avaliacoes.map((a, i) => {
-            const observacao = avaliacaoEmObservacao({
-              modo: (a["modo"] ?? null) as string | null,
-              aplicada: (a["aplicada"] ?? null) as boolean | null,
-            });
-            return (
-              <p key={`${texto(a["avaliacao"])}-${i}`}>
-                {descreverAvaliacaoConfianca({
-                  avaliacao: rotuloAvaliacaoDoTurno(a, resumo),
-                  decisao: (a["decisao"] ?? null) as string | null,
-                  etapa: (a["etapa"] ?? null) as string | null,
-                  modo: (a["modo"] ?? null) as string | null,
-                  score: (a["score"] ?? null) as number | null,
-                  nivel: (a["nivel"] ?? null) as string | null,
-                })}
-                {observacao ? ` — ${TEXTO_AVALIACAO_EM_OBSERVACAO}` : ""}
-              </p>
-            );
-          })
-        )}
       </div>
 
       {/* Fallback do prompt: sempre visível, nunca escondido em rodapé. */}
