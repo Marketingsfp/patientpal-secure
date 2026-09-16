@@ -3368,6 +3368,338 @@ export type Database = {
         }
         Relationships: []
       }
+      coach_analises: {
+        Row: {
+          atendente: string
+          clinica_id: string
+          created_at: string
+          id: string
+          pontuacao: number
+          preview: string
+          resultado: Json
+          sentimento: string
+          session_id: string
+          tipo_entrada: string
+          titulo: string
+          user_id: string | null
+        }
+        Insert: {
+          atendente: string
+          clinica_id: string
+          created_at?: string
+          id?: string
+          pontuacao: number
+          preview: string
+          resultado: Json
+          sentimento: string
+          session_id?: string
+          tipo_entrada: string
+          titulo: string
+          user_id?: string | null
+        }
+        Update: {
+          atendente?: string
+          clinica_id?: string
+          created_at?: string
+          id?: string
+          pontuacao?: number
+          preview?: string
+          resultado?: Json
+          sentimento?: string
+          session_id?: string
+          tipo_entrada?: string
+          titulo?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "coach_analises_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      coach_config_clinica: {
+        Row: {
+          checklist: Json
+          clinica_id: string
+          created_at: string
+          scripts: Json
+          tabela_servicos: string
+          updated_at: string
+          voz_config: Json
+        }
+        Insert: {
+          checklist?: Json
+          clinica_id: string
+          created_at?: string
+          scripts?: Json
+          tabela_servicos?: string
+          updated_at?: string
+          voz_config?: Json
+        }
+        Update: {
+          checklist?: Json
+          clinica_id?: string
+          created_at?: string
+          scripts?: Json
+          tabela_servicos?: string
+          updated_at?: string
+          voz_config?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "coach_config_clinica_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: true
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      coach_desempenho_metas: {
+        Row: {
+          atendente: string
+          autor_email: string | null
+          clinica_id: string
+          created_at: string
+          id: string
+          meta_horas: number
+          meta_nota: number
+          observacao: string
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          atendente: string
+          autor_email?: string | null
+          clinica_id: string
+          created_at?: string
+          id?: string
+          meta_horas?: number
+          meta_nota?: number
+          observacao?: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          atendente?: string
+          autor_email?: string | null
+          clinica_id?: string
+          created_at?: string
+          id?: string
+          meta_horas?: number
+          meta_nota?: number
+          observacao?: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "coach_desempenho_metas_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      coach_eventos_seguranca: {
+        Row: {
+          atendente: string
+          clinica_id: string
+          created_at: string
+          detalhe: string | null
+          id: string
+          tela: string
+          tipo: string
+          user_id: string | null
+        }
+        Insert: {
+          atendente: string
+          clinica_id: string
+          created_at?: string
+          detalhe?: string | null
+          id?: string
+          tela: string
+          tipo: string
+          user_id?: string | null
+        }
+        Update: {
+          atendente?: string
+          clinica_id?: string
+          created_at?: string
+          detalhe?: string | null
+          id?: string
+          tela?: string
+          tipo?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "coach_eventos_seguranca_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      coach_provas: {
+        Row: {
+          acertos: number
+          atendente: string
+          clinica_id: string
+          created_at: string
+          id: string
+          nota: number
+          questoes: Json
+          respostas: Json
+          total: number
+          user_id: string | null
+        }
+        Insert: {
+          acertos: number
+          atendente: string
+          clinica_id: string
+          created_at?: string
+          id?: string
+          nota: number
+          questoes?: Json
+          respostas?: Json
+          total: number
+          user_id?: string | null
+        }
+        Update: {
+          acertos?: number
+          atendente?: string
+          clinica_id?: string
+          created_at?: string
+          id?: string
+          nota?: number
+          questoes?: Json
+          respostas?: Json
+          total?: number
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "coach_provas_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      coach_roleplay_sessions: {
+        Row: {
+          acertos: Json
+          atendente: string
+          cenario: string | null
+          clinica_id: string
+          created_at: string
+          dica_pratica: string | null
+          duracao_seg: number | null
+          id: string
+          melhorias: Json
+          mensagens: Json
+          nota: number
+          perfil_cliente: string | null
+          pontos_fracos: Json
+          resumo: string
+          user_id: string | null
+        }
+        Insert: {
+          acertos?: Json
+          atendente: string
+          cenario?: string | null
+          clinica_id: string
+          created_at?: string
+          dica_pratica?: string | null
+          duracao_seg?: number | null
+          id?: string
+          melhorias?: Json
+          mensagens?: Json
+          nota: number
+          perfil_cliente?: string | null
+          pontos_fracos?: Json
+          resumo: string
+          user_id?: string | null
+        }
+        Update: {
+          acertos?: Json
+          atendente?: string
+          cenario?: string | null
+          clinica_id?: string
+          created_at?: string
+          dica_pratica?: string | null
+          duracao_seg?: number | null
+          id?: string
+          melhorias?: Json
+          mensagens?: Json
+          nota?: number
+          perfil_cliente?: string | null
+          pontos_fracos?: Json
+          resumo?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "coach_roleplay_sessions_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      coach_tempo_estudo: {
+        Row: {
+          atendente: string
+          atividade: string
+          clinica_id: string
+          created_at: string
+          dia: string
+          id: string
+          segundos: number
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          atendente: string
+          atividade: string
+          clinica_id: string
+          created_at?: string
+          dia?: string
+          id?: string
+          segundos?: number
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          atendente?: string
+          atividade?: string
+          clinica_id?: string
+          created_at?: string
+          dia?: string
+          id?: string
+          segundos?: number
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "coach_tempo_estudo_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       contrato_dependentes: {
         Row: {
           ativo: boolean
@@ -14832,6 +15164,16 @@ export type Database = {
           id: string
           nome: string
         }[]
+      }
+      coach_pode_gerir: { Args: { _clinica_id: string }; Returns: boolean }
+      coach_registrar_tempo_estudo: {
+        Args: {
+          _atendente: string
+          _atividade: string
+          _clinica_id: string
+          _segundos: number
+        }
+        Returns: undefined
       }
       consulta_publica: { Args: { _token: string }; Returns: Json }
       contar_vinculos_paciente: { Args: { _id: string }; Returns: Json }
