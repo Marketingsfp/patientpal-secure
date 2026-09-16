@@ -1,20 +1,28 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { GraduationCap } from "lucide-react";
-import { useAcessoModulo } from "@/hooks/use-permissoes";
+import { GraduationCap, Loader2 } from "lucide-react";
+import { useCoachContexto } from "@/lib/coach/contexto";
+import { PainelGestora } from "@/components/coach/PainelGestora";
 
 export const Route = createFileRoute("/_authenticated/app/coach/")({
   component: CoachHome,
 });
 
 /**
- * Etapa 1 do portal Coach WhatsApp: porta de entrada.
- * O roteamento real (gestora → painel, atendente → trilha) entra nas
- * próximas etapas; aqui já valem o isolamento por clínica e o módulo
- * de permissão "coach" (ver = atendente, editar = gestora).
+ * Porta de entrada do portal Coach WhatsApp.
+ * Gestora → painel completo. Atendente → trilha própria (Etapa 3).
  */
 function CoachHome() {
-  const acesso = useAcessoModulo("coach");
-  const gestor = acesso === "write";
+  const ctx = useCoachContexto();
+
+  if (ctx.loading) {
+    return (
+      <div className="flex h-64 items-center justify-center text-muted-foreground">
+        <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Carregando…
+      </div>
+    );
+  }
+
+  if (ctx.gestor) return <PainelGestora ctx={ctx} />;
 
   return (
     <div className="p-6">
@@ -26,16 +34,12 @@ function CoachHome() {
           <div>
             <h1 className="text-xl font-semibold tracking-tight">Coach WhatsApp</h1>
             <p className="text-sm text-muted-foreground">
-              {gestor
-                ? "Painel de treinamento e avaliação das atendentes desta clínica."
-                : "Seu espaço de treinamento: roleplay, prova e evolução."}
+              Seu espaço de treinamento: simulações, prova e evolução.
             </p>
           </div>
         </div>
         <p className="mt-6 text-sm text-muted-foreground">
-          Estrutura do portal criada. As telas de{" "}
-          {gestor ? "análise de conversas, metas e evolução" : "treinamento, roleplay e prova"}{" "}
-          entram nas próximas etapas.
+          Sua trilha de treinamento entra na próxima etapa da migração.
         </p>
       </div>
     </div>
