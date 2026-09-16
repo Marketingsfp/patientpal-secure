@@ -25,8 +25,7 @@ export type EstadoConversa = {
   departamento_id: string | null;
 };
 
-const CAMPOS =
-  "id, clinica_id, owner_type, ai_enabled, status, atribuida_user_id, departamento_id";
+const CAMPOS = "id, clinica_id, owner_type, ai_enabled, status, atribuida_user_id, departamento_id";
 
 export async function estadoConversaPorId(
   clinicaId: string,
@@ -72,7 +71,11 @@ export function ninaPodeResponder(conv: EstadoConversa | null): boolean {
   return ninaResponde(conv);
 }
 
-export { derivarResponsavel, conversaResolvida, inconsistenciasCiclo } from "./ciclo-responsabilidade";
+export {
+  derivarResponsavel,
+  conversaResolvida,
+  inconsistenciasCiclo,
+} from "./ciclo-responsabilidade";
 export type { Responsavel } from "./ciclo-responsabilidade";
 
 export type EventoConversa =
@@ -90,7 +93,6 @@ export type EventoConversa =
   | "ATENDIMENTO_ENCERRADO"
   | "HANDOFF_AUDITORIA"
   | "TIMEOUT_NINA";
-
 
 export async function registrarEvento(args: {
   clinicaId: string;
@@ -120,7 +122,6 @@ export async function registrarEvento(args: {
   }
   return ((data as { id?: string } | null)?.id as string | undefined) ?? null;
 }
-
 
 /** Escolhe o departamento (fila) pelo nome informado pela IA, com fallback. */
 async function resolverDepartamento(clinicaId: string, nome?: string | null) {
@@ -207,8 +208,14 @@ export async function encaminharParaHumano(args: {
   departamentoNome?: string | null;
   dadosColetados?: Record<string, unknown> | null;
   solicitadoPor?: "IA" | "PACIENTE" | "SISTEMA";
-  /** Recuperação técnica: só transfere a versão ainda conduzida pela Nina. */
-  somenteSeNina?: { ultimaMsgEm: string; sessaoId: string | null };
+  /** Recuperação ou espera vencida: só transfere a versão ainda conduzida pela Nina. */
+  somenteSeNina?: {
+    ultimaMsgEm: string;
+    sessaoId: string | null;
+    prazoPaciente?: string;
+    /** Invalida a operação pendente na mesma mudança atômica de responsável. */
+    estadoFluxoAposHandoff?: Record<string, unknown>;
+  };
 }): Promise<ResultadoHandoff> {
   const conv = await estadoConversaPorId(args.clinicaId, args.conversaId);
   if (!conv) return { ok: false, mensagem: "Conversa não encontrada." };
@@ -242,11 +249,18 @@ export async function encaminharParaHumano(args: {
       } as never,
       handoff_em: agora,
       prioridade,
+      awaiting_patient_since: null,
+      patient_response_deadline: null,
+      ...(args.somenteSeNina?.estadoFluxoAposHandoff
+        ? { nina_fluxo_estado: args.somenteSeNina.estadoFluxoAposHandoff as never }
+        : {}),
       updated_at: agora,
     })
     .eq("id", args.conversaId)
     .eq("clinica_id", args.clinicaId);
   if (args.somenteSeNina) {
+    if (args.somenteSeNina.prazoPaciente)
+      atualizacao = atualizacao.eq("patient_response_deadline", args.somenteSeNina.prazoPaciente);
     atualizacao = atualizacao
       .eq("ultima_msg_em", args.somenteSeNina.ultimaMsgEm)
       .eq("owner_type", "AI")
@@ -260,7 +274,8 @@ export async function encaminharParaHumano(args: {
   }
   const { error, data: atualizadas } = await atualizacao.select("id");
   if (error) return { ok: false, mensagem: error.message };
-  if (!atualizadas?.length) return { ok: false, mensagem: "A conversa mudou antes do encaminhamento." };
+  if (!atualizadas?.length)
+    return { ok: false, mensagem: "A conversa mudou antes do encaminhamento." };
 
   const { count } = await supabaseAdmin
     .from("atend_conversas")
@@ -339,8 +354,6 @@ export async function encaminharParaHumano(args: {
     console.error("[handoff] falha ao gerar protocolo do handoff", e);
   }
 
-
-
   // Reserva o resumo interno desta transferência (idempotente e barato).
   // O texto em si é produzido depois, quando alguém abre a conversa: falha de
   // IA nunca pode segurar a fila nem a resposta ao paciente.
@@ -354,11 +367,9 @@ export async function encaminharParaHumano(args: {
       desfecho:
         args.motivo === "patient_response_timeout" ? "timeout_sem_resposta" : "handoff_humano",
     });
-
   } catch (e) {
     console.error("[handoff] falha ao reservar resumo", e);
   }
-
 
   await registrarMarcadorSistema({
     clinicaId: args.clinicaId,
@@ -422,7 +433,6 @@ export async function encaminharParaHumano(args: {
     };
   }
 
-
   // Online recebe em Ativas; Pausa recebe uma reserva individual até o limite.
   const atribuida = await atribuirAtendenteOnline({
     clinicaId: args.clinicaId,
@@ -462,7 +472,6 @@ export async function encaminharParaHumano(args: {
     protocolo: protocoloHandoff,
     aviso: avisoEncaminhamento,
   };
-
 }
 
 /**
@@ -529,8 +538,6 @@ export async function atribuirAtendenteOnline(args: {
 
   return { userId, nome, filaPendente: destino?.fila_pendente === true };
 }
-
-
 
 /** Devolve a conversa para a Nina (reativa a IA). */
 export async function devolverParaIA(args: {
@@ -602,7 +609,12 @@ export async function reabrirConversaPorMensagemPaciente(args: {
   const agora = new Date().toISOString();
   const reabertas: Array<{ id: string }> = [];
 
-  for (const alvo of alvos as Array<{ id: string; nina_fluxo_estado: unknown; resolved_at: string | null; closed_at: string | null }>) {
+  for (const alvo of alvos as Array<{
+    id: string;
+    nina_fluxo_estado: unknown;
+    resolved_at: string | null;
+    closed_at: string | null;
+  }>) {
     if (args.mensagemRecebidaEm !== undefined) {
       const { entradaPermiteReabertura } = await import("@/lib/nina/reabertura-entrada");
       if (!entradaPermiteReabertura(args.mensagemRecebidaEm, alvo)) continue;
@@ -641,10 +653,14 @@ export async function reabrirConversaPorMensagemPaciente(args: {
       .in("status", STATUS_ENCERRADOS);
     if (args.mensagemRecebidaEm !== undefined) {
       // CAS das datas: um novo encerramento entre leitura e UPDATE vence o retry.
-      atualizacao = alvo.resolved_at === null ? atualizacao.is("resolved_at", null)
-        : atualizacao.eq("resolved_at", alvo.resolved_at);
-      atualizacao = alvo.closed_at === null ? atualizacao.is("closed_at", null)
-        : atualizacao.eq("closed_at", alvo.closed_at);
+      atualizacao =
+        alvo.resolved_at === null
+          ? atualizacao.is("resolved_at", null)
+          : atualizacao.eq("resolved_at", alvo.resolved_at);
+      atualizacao =
+        alvo.closed_at === null
+          ? atualizacao.is("closed_at", null)
+          : atualizacao.eq("closed_at", alvo.closed_at);
     }
     const { data: ok } = await atualizacao.select("id");
     if (!ok || ok.length === 0) continue;

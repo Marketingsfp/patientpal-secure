@@ -1,223 +1,369 @@
-/**
- * FASE 5 — cenários ponta a ponta do timeout da Nina.
- *
- * Os cenários rodam contra um banco simulado em memória, com o mesmo formato
- * de chamadas que o processador usa em produção. O objetivo é provar as
- * regras: um único handoff por vencimento, transferência só quando cabe, e
- * nenhuma resposta tardia executando agendamento antigo.
- */
-import { describe, expect, it, mock, beforeEach } from "bun:test";
+import { beforeEach, expect, it, mock } from "bun:test";
 
-type Linha = {
-  id: string;
-  clinica_id: string;
-  status: string;
-  owner_type: string;
-  ai_enabled: boolean;
-  atribuida_user_id: string | null;
-  patient_response_deadline: string | null;
-  awaiting_patient_since: string | null;
-  nina_fluxo_estado: unknown;
+// Processador, registro e handoff reais; somente armazenamento/transporte simulados.
+type Linha = Record<string, any>;
+let tabelas: Record<string, Linha[]>;
+let antesDeGravar: ((patch: Linha) => void) | null;
+let falharTransferencia: boolean, online: boolean;
+let atribuicoes: number, avisos: number;
+let resumos: Linha[];
+const inicio = "2026-09-16T14:00:00.000Z",
+  prazo = "2026-09-16T14:30:00.000Z";
+const tempo = (minutos: number) => new Date(Date.parse(inicio) + minutos * 60_000);
+const conv = () => tabelas.atend_conversas![0]!;
+const campo = (l: Linha, k: string) => {
+  const [base, json] = k.split("->>");
+  return json ? (l[base!]?.[json] ?? null) : l[base!];
 };
-
-let banco: Linha[] = [];
-const handoffs: string[] = [];
-const eventos: Array<{ conversaId: string; evento: string }> = [];
-const resumos: string[] = [];
-
-function tabelaConversas() {
-  const filtros: Array<(l: Linha) => boolean> = [];
-  let patch: Partial<Linha> | null = null;
-  const api: any = {
-    select: () => api,
-    not: () => api,
-    lte: (_c: string, v: string) => {
-      filtros.push((l) => !!l.patient_response_deadline && l.patient_response_deadline <= v);
-      return api;
-    },
-    order: () => api,
-    limit: () => api,
-    maybeSingle: async () => ({ data: banco.filter((l) => filtros.every((f) => f(l)))[0] ?? null }),
-    eq: (col: string, val: unknown) => {
-      filtros.push((l) => (l as never as Record<string, unknown>)[col] === val);
-      return api;
-    },
-    update: (p: Partial<Linha>) => {
-      patch = p;
-      return api;
-    },
-    then: (res: (v: { data: Linha[]; error: null }) => unknown) =>
-      res({ data: aplicar(), error: null }),
-  };
-  function aplicar(): Linha[] {
-    const alvo = banco.filter((l) => filtros.every((f) => f(l)));
-    if (patch) for (const l of alvo) Object.assign(l, patch);
-    return alvo;
-  }
-  api.select = (_c?: string) => {
-    if (patch) {
-      const alvo = aplicar();
-      return Promise.resolve({ data: alvo.map((l) => ({ id: l.id })), error: null });
-    }
-    return api;
-  };
-  return api;
-}
-
-mock.module("@/integrations/supabase/client.server", () => ({
-  supabaseAdmin: {
-    from: (t: string) => (t === "atend_conversas" ? tabelaConversas() : tabelaVazia()),
+const admin = {
+  from(tabela: string) {
+    let patch: Linha | null = null,
+      insercao: Linha | null = null;
+    let unica = false,
+      limite = Infinity;
+    const filtros: Array<(l: Linha) => boolean> = [];
+    const ordens: Array<[string, boolean]> = [];
+    const resultado = () => {
+      if (patch && tabela === "atend_conversas") {
+        const corrida = antesDeGravar;
+        antesDeGravar = null;
+        corrida?.(patch);
+        if (patch.owner_type === "NONE" && falharTransferencia)
+          return { data: null, error: { message: "banco temporariamente indisponível" } };
+      }
+      const linhas = tabelas[tabela] ?? (tabelas[tabela] = []);
+      if (insercao) linhas.push({ id: crypto.randomUUID(), ...insercao });
+      const alvos = insercao ? [linhas.at(-1)!] : linhas.filter((l) => filtros.every((f) => f(l)));
+      alvos.sort((a, b) => {
+        for (const [k, asc] of ordens) {
+          const d = a[k] < b[k] ? -1 : a[k] > b[k] ? 1 : 0;
+          if (d) return asc ? d : -d;
+        }
+        return 0;
+      });
+      const selecionadas = alvos.slice(0, limite);
+      if (patch) selecionadas.forEach((l) => Object.assign(l, patch));
+      return {
+        data: structuredClone(unica ? (selecionadas[0] ?? null) : selecionadas),
+        count: selecionadas.length,
+        error: null,
+      };
+    };
+    const q: any = {
+      select: () => q,
+      eq: (k: string, v: any) => {
+        filtros.push((l) => campo(l, k) === v);
+        return q;
+      },
+      neq: (k: string, v: any) => {
+        filtros.push((l) => campo(l, k) !== v);
+        return q;
+      },
+      is: (k: string, v: any) => {
+        filtros.push((l) => campo(l, k) === v);
+        return q;
+      },
+      in: (k: string, vs: any[]) => {
+        filtros.push((l) => vs.includes(campo(l, k)));
+        return q;
+      },
+      not: (k: string, op: string, v: any) => {
+        filtros.push((l) =>
+          op === "is"
+            ? campo(l, k) !== v
+            : !v
+                .replace(/[()\"]/g, "")
+                .split(",")
+                .includes(campo(l, k)),
+        );
+        return q;
+      },
+      lte: (k: string, v: any) => {
+        filtros.push((l) => campo(l, k) != null && campo(l, k) <= v);
+        return q;
+      },
+      order: (k: string, o?: { ascending?: boolean }) => {
+        ordens.push([k, o?.ascending ?? true]);
+        return q;
+      },
+      limit: (n: number) => {
+        limite = n;
+        return q;
+      },
+      update: (p: Linha) => {
+        patch = p;
+        return q;
+      },
+      insert: (p: Linha) => {
+        insercao = p;
+        return q;
+      },
+      maybeSingle: () => {
+        unica = true;
+        return Promise.resolve(resultado());
+      },
+      single: () => {
+        unica = true;
+        return Promise.resolve(resultado());
+      },
+      then: (a: any, b: any) => Promise.resolve(resultado()).then(a, b),
+    };
+    return q;
   },
-}));
-
-function tabelaVazia() {
-  const api: any = {
-    select: () => api,
-    eq: () => api,
-    order: () => api,
-    limit: () => api,
-    update: () => api,
-    maybeSingle: async () => ({ data: null }),
-    then: (res: (v: { data: never[]; error: null }) => unknown) => res({ data: [], error: null }),
-  };
-  return api;
-}
-
-mock.module("@/lib/atendimento/handoff.server", () => ({
-  STATUS_ENCERRADOS: ["closed", "finished", "resolved"],
-  encaminharParaHumano: async (a: { conversaId: string }) => {
-    handoffs.push(a.conversaId);
-    const l = banco.find((x) => x.id === a.conversaId);
-    if (l) {
-      l.owner_type = "NONE";
-      l.ai_enabled = false;
-      l.status = "waiting";
-    }
-    return { ok: true };
+  async rpc(nome: string) {
+    if (nome !== "atend_auto_assign_conversa") throw Error("RPC inesperada: " + nome);
+    atribuicoes++;
+    expect(conv().is_teste).toBe(false);
+    if (!online) return { data: null, error: null };
+    Object.assign(conv(), {
+      owner_type: "HUMAN",
+      atribuida_user_id: "atendente",
+      status: "human_attending",
+    });
+    return { data: "atendente", error: null };
   },
-  registrarEvento: async (a: { conversaId: string; evento: string }) => {
-    eventos.push({ conversaId: a.conversaId, evento: a.evento });
-  },
-}));
-
+};
+mock.module("@/integrations/supabase/client.server", () => ({ supabaseAdmin: admin }));
 mock.module("@/lib/atendimento/handoff-resumo.server", () => ({
-  garantirResumoHandoff: async (a: { conversaId: string }) => {
-    resumos.push(a.conversaId);
-    return null;
+  reservarResumoHandoff: async () => {},
+  garantirResumoHandoff: async (args: Linha) => {
+    resumos.push(args);
   },
 }));
+mock.module("@/lib/atendimento/handoff-auditoria.server", () => ({
+  registrarAuditoriaHandoff: async () => {},
+}));
+mock.module("@/lib/atendimento/protocolo-atendimento.server", () => ({
+  protocoloAoIniciarHandoff: async () => {
+    avisos++;
+    return { protocolo: "TESTE-1", anuncio: null };
+  },
+  protocoloAoAtribuirHumano: async () => {},
+}));
+const { registrarEsperaAposRespostaNina, limparEsperaPaciente, limparEsperaPorTelefone } =
+  await import("../../espera-paciente.server");
+const { processarTimeoutsEsperaPaciente } = await import("../../espera-timeout.server");
 
-const { processarTimeoutsEsperaPaciente } = await import("@/lib/nina/espera-timeout.server");
-
-function conversa(over: Partial<Linha> = {}): Linha {
+function mensagem(over: Linha = {}) {
   return {
-    id: "c1",
+    id: "nina-1",
     clinica_id: "cl1",
-    status: "bot_attending",
-    owner_type: "AI",
-    ai_enabled: true,
-    atribuida_user_id: null,
-    patient_response_deadline: "2026-09-05T10:30:00.000Z",
-    awaiting_patient_since: "2026-09-05T10:00:00.000Z",
-    nina_fluxo_estado: null,
+    conversa_id: "c1",
+    created_at: inicio,
+    direction: "out",
+    enviada_por: "nina",
+    status: "sent",
+    body: "O exame custa R$ 150,00.",
     ...over,
   };
 }
-
-const AGORA = new Date("2026-09-05T10:31:00.000Z");
-
 beforeEach(() => {
-  banco = [];
-  handoffs.length = 0;
-  eventos.length = 0;
-  resumos.length = 0;
+  tabelas = {
+    atend_conversas: [
+      {
+        id: "c1",
+        clinica_id: "cl1",
+        contato_telefone: "55000100000",
+        status: "bot_attending",
+        owner_type: "AI",
+        ai_enabled: true,
+        atribuida_user_id: null,
+        is_teste: false,
+        ultima_msg_em: inicio,
+        awaiting_patient_since: inicio,
+        patient_response_deadline: prazo,
+        nina_fluxo_estado: { session_id: "sessao", session_started_at: "2026-09-16T13:50:00Z" },
+      },
+    ],
+    whatsapp_mensagens: [mensagem()],
+    profiles: [{ id: "atendente", nome: "Atendente de teste" }],
+    atend_departamentos: [],
+    nina_teste_ciclos: [],
+  };
+  antesDeGravar = null;
+  falharTransferencia = false;
+  online = true;
+  atribuicoes = 0;
+  avisos = 0;
+  resumos = [];
+});
+const executar = (minutos = 30) =>
+  processarTimeoutsEsperaPaciente({ clinicaId: "cl1", agora: tempo(minutos) });
+const registrar = (minutos = 0) =>
+  registrarEsperaAposRespostaNina({
+    clinicaId: "cl1",
+    conversaId: "c1",
+    resposta: "Informação enviada pela Nina.",
+    agora: tempo(minutos),
+  });
+
+it("Nina às 14h, silêncio até 14h30: atribui humano e registra evidência", async () => {
+  expect((await executar(29.999)).transferidas).toBe(0);
+  expect((await executar()).transferidas).toBe(1);
+  expect(conv().owner_type).toBe("HUMAN");
+  expect(conv().ai_enabled).toBe(false);
+  expect(conv().patient_response_deadline).toBeNull();
+  expect(avisos).toBe(1);
+  const evento = tabelas.atend_conversa_eventos!.find((e) => e.evento === "TIMEOUT_NINA");
+  expect(evento?.detalhes.mensagem_nina_id).toBe("nina-1");
+  expect(resumos[0]!.extras.ultimaPergunta).toBe("O exame custa R$ 150,00.");
+});
+it("sem atendente online, mantém aberta na fila humana", async () => {
+  online = false;
+  await executar();
+  expect(conv().owner_type).toBe("NONE");
+  expect(conv().status).toBe("waiting");
+});
+it("homologação encaminha sem atribuir atendente real", async () => {
+  conv().is_teste = true;
+  await executar();
+  expect(conv().owner_type).toBe("NONE");
+  expect(atribuicoes).toBe(0);
+  expect(avisos).toBe(1);
+});
+it("duas execuções concorrentes fazem só um handoff", async () => {
+  const rs = await Promise.all([executar(), executar()]);
+  expect(rs.reduce((n, r) => n + r.transferidas, 0)).toBe(1);
+  expect(avisos).toBe(1);
+  expect(resumos).toHaveLength(1);
+  await executar(40);
+  expect(avisos).toBe(1);
+});
+for (const patch of [
+  { owner_type: "HUMAN", atribuida_user_id: "pessoa" },
+  { owner_type: "NONE" },
+  { ai_enabled: false },
+  { status: "closed" },
+  { status: "resolved" },
+  { status: "encerrada" },
+]) {
+  it(`não transfere conversa fora da Nina: ${JSON.stringify(patch)}`, async () => {
+    Object.assign(conv(), patch);
+    await executar();
+    expect(avisos).toBe(0);
+  });
+}
+it("paciente responde aos 29 minutos: cancela espera", async () => {
+  await limparEsperaPaciente("cl1", "c1");
+  expect((await executar()).avaliadas).toBe(0);
+  expect(avisos).toBe(0);
+});
+it("entrada persistida cancela timeout mesmo antes de o webhook limpar prazo", async () => {
+  tabelas.whatsapp_mensagens!.push(
+    mensagem({
+      id: "paciente",
+      created_at: tempo(29).toISOString(),
+      direction: "in",
+      enviada_por: "paciente",
+      status: "received",
+    }),
+  );
+  await executar();
+  expect(avisos).toBe(0);
+  expect(conv().patient_response_deadline).toBeNull();
+});
+for (const patch of [
+  { patient_response_deadline: null },
+  { ultima_msg_em: "nova mensagem" },
+  { owner_type: "HUMAN", atribuida_user_id: "pessoa" },
+  { status: "closed" },
+  { nina_fluxo_estado: { session_id: "sessao-nova" } },
+]) {
+  it(`corrida antes do handoff não transfere: ${JSON.stringify(patch)}`, async () => {
+    antesDeGravar = () => Object.assign(conv(), patch);
+    await executar();
+    expect(avisos).toBe(0);
+  });
+}
+it("falha no UPDATE mantém prazo para próxima rodada", async () => {
+  falharTransferencia = true;
+  expect((await executar()).erros).toBe(1);
+  expect(conv().patient_response_deadline).toBe(prazo);
+  expect(avisos).toBe(0);
+  falharTransferencia = false;
+  expect((await executar(31)).transferidas).toBe(1);
+});
+it("qualquer resposta Nina inicia 30 minutos, inclusive informação sem pergunta", async () => {
+  conv().awaiting_patient_since = null;
+  conv().patient_response_deadline = null;
+  expect((await registrar()).deadline).toBe(prazo);
+});
+it("repetir registro da mesma mensagem não prolonga espera", async () => {
+  expect((await registrar(20)).deadline).toBe(prazo);
+});
+it("nova resposta Nina começa outra contagem, sem aproveitar prazo anterior", async () => {
+  const em = tempo(10).toISOString();
+  conv().ultima_msg_em = em;
+  tabelas.whatsapp_mensagens!.push(mensagem({ id: "nina-2", created_at: em }));
+  expect((await registrar(10)).deadline).toBe(tempo(40).toISOString());
+  expect((await executar()).transferidas).toBe(0);
+  expect((await executar(40)).transferidas).toBe(1);
+});
+it("novo prazo não é apagado por job que leu o prazo antigo", async () => {
+  tabelas.whatsapp_mensagens!.push(mensagem({ id: "nina-2", created_at: tempo(10).toISOString() }));
+  antesDeGravar = () => {
+    conv().patient_response_deadline = tempo(40).toISOString();
+  };
+  await executar();
+  expect(conv().patient_response_deadline).toBe(tempo(40).toISOString());
+});
+for (const patch of [
+  { direction: "in", enviada_por: "paciente" },
+  { enviada_por: "atendente" },
+  { status: "pending" },
+  { status: "failed" },
+]) {
+  it(`registro e timeout exigem saída enviada da Nina: ${JSON.stringify(patch)}`, async () => {
+    Object.assign(tabelas.whatsapp_mensagens![0]!, patch);
+    expect((await registrar()).aguardando).toBe(false);
+    await executar();
+    expect(avisos).toBe(0);
+  });
+}
+it("marcador interno não é retorno do paciente", async () => {
+  tabelas.whatsapp_mensagens!.push(
+    mensagem({
+      id: "sistema",
+      created_at: tempo(1).toISOString(),
+      status: "system",
+      enviada_por: "sistema",
+    }),
+  );
+  expect((await executar()).transferidas).toBe(1);
+});
+it("resposta concorrente impede armar prazo", async () => {
+  conv().awaiting_patient_since = null;
+  conv().patient_response_deadline = null;
+  antesDeGravar = () => {
+    conv().ultima_msg_em = "paciente respondeu";
+  };
+  expect((await registrar()).aguardando).toBe(false);
+  expect(conv().patient_response_deadline).toBeNull();
+});
+it("mensagem da sessão anterior não inicia espera em sessão nova", async () => {
+  conv().nina_fluxo_estado.session_started_at = tempo(1).toISOString();
+  expect((await registrar()).aguardando).toBe(false);
+  await executar();
+  expect(avisos).toBe(0);
+});
+it("timeout invalida confirmação pendente atomicamente", async () => {
+  Object.assign(conv().nina_fluxo_estado, {
+    appointment: { intent_confirmed: true, slot_inicio: "vaga-antiga" },
+    flow: { stage: "WAITING_FINAL_CONFIRMATION" },
+  });
+  await executar();
+  expect(conv().nina_fluxo_estado.appointment.slot_inicio).toBeNull();
+  expect(conv().nina_fluxo_estado.flow.stage).toBe("HANDOFF");
+});
+it("consulta limitada à clínica solicitada", async () => {
+  const r = await processarTimeoutsEsperaPaciente({ clinicaId: "outra", agora: tempo(30) });
+  expect(r.avaliadas).toBe(0);
+  expect(avisos).toBe(0);
 });
 
-describe("FASE 5 — cenários do timeout", () => {
-  it("B: 30 min sem resposta → transfere para humano, com evento e resumo", async () => {
-    banco = [conversa()];
-    const r = await processarTimeoutsEsperaPaciente({ clinicaId: "cl1", agora: AGORA });
-    expect(r.transferidas).toBe(1);
-    expect(handoffs).toEqual(["c1"]);
-    expect(eventos.some((e) => e.evento === "TIMEOUT_NINA")).toBe(true);
-    expect(resumos).toEqual(["c1"]);
-    // Conversa continua aberta — timeout não resolve nem fecha.
-    expect(banco[0]!.status).toBe("waiting");
-  });
-
-  it("A: paciente respondeu (prazo limpo) → nenhum handoff", async () => {
-    banco = [conversa({ patient_response_deadline: null })];
-    const r = await processarTimeoutsEsperaPaciente({ clinicaId: "cl1", agora: AGORA });
-    expect(r.transferidas).toBe(0);
-    expect(handoffs).toHaveLength(0);
-  });
-
-  it("F: conversa resolvida antes do prazo → prazo cancelado, sem transferência", async () => {
-    banco = [conversa({ status: "resolved" })];
-    const r = await processarTimeoutsEsperaPaciente({ clinicaId: "cl1", agora: AGORA });
-    expect(handoffs).toHaveLength(0);
-    expect(r.ignoradas).toBe(1);
-    expect(banco[0]!.patient_response_deadline).toBeNull();
-  });
-
-  it("D: conversa já humana → não volta para a Nina nem transfere de novo", async () => {
-    banco = [conversa({ owner_type: "HUMAN", ai_enabled: false, atribuida_user_id: "u1" })];
-    await processarTimeoutsEsperaPaciente({ clinicaId: "cl1", agora: AGORA });
-    expect(handoffs).toHaveLength(0);
-    expect(banco[0]!.owner_type).toBe("HUMAN");
-  });
-
-  it("I: dois jobs simultâneos → apenas um handoff e um resumo", async () => {
-    banco = [conversa()];
-    await Promise.all([
-      processarTimeoutsEsperaPaciente({ clinicaId: "cl1", agora: AGORA }),
-      processarTimeoutsEsperaPaciente({ clinicaId: "cl1", agora: AGORA }),
-    ]);
-    expect(handoffs).toHaveLength(1);
-    expect(resumos).toHaveLength(1);
-    expect(eventos.filter((e) => e.evento === "TIMEOUT_NINA")).toHaveLength(1);
-  });
-
-  it("repetir a execução depois não gera segundo handoff", async () => {
-    banco = [conversa()];
-    await processarTimeoutsEsperaPaciente({ clinicaId: "cl1", agora: AGORA });
-    await processarTimeoutsEsperaPaciente({ clinicaId: "cl1", agora: AGORA });
-    expect(handoffs).toHaveLength(1);
-  });
-
-  it("resposta em 5 min → prazo ainda vigente, nada é transferido", async () => {
-    banco = [conversa()];
-    const cincoMin = new Date("2026-09-05T10:05:00.000Z");
-    const r = await processarTimeoutsEsperaPaciente({ clinicaId: "cl1", agora: cincoMin });
-    expect(r.avaliadas).toBe(0);
-    expect(handoffs).toHaveLength(0);
-    expect(banco[0]!.patient_response_deadline).not.toBeNull();
-  });
-
-  it("resposta em 29 min → ainda dentro do prazo", async () => {
-    banco = [conversa()];
-    const vinteNove = new Date("2026-09-05T10:29:00.000Z");
-    await processarTimeoutsEsperaPaciente({ clinicaId: "cl1", agora: vinteNove });
-    expect(handoffs).toHaveLength(0);
-  });
-
-  it("corrida: paciente responde entre a leitura e a reserva → sem transferência", async () => {
-    banco = [conversa()];
-    // Resposta do paciente limpa o prazo; a reserva por prazo exato não casa.
-    const p = processarTimeoutsEsperaPaciente({ clinicaId: "cl1", agora: AGORA });
-    banco[0]!.patient_response_deadline = null;
-    await p;
-    expect(handoffs).toHaveLength(0);
-  });
-
-  it("após o timeout a Nina fica calada e a conversa segue ativa", async () => {
-    banco = [conversa()];
-    await processarTimeoutsEsperaPaciente({ clinicaId: "cl1", agora: AGORA });
-    const { derivarResponsavel, ninaResponde } =
-      await import("@/lib/atendimento/ciclo-responsabilidade");
-    const l = banco[0]!;
-    expect(derivarResponsavel(l)).toBe("FILA_HUMANA");
-    expect(ninaResponde(l)).toBe(false);
-    expect(l.status).toBe("waiting");
-  });
+it("webhook atrasado não cancela espera de uma resposta posterior da Nina", async () => {
+  await limparEsperaPorTelefone("cl1", "55000100000", tempo(-1).toISOString());
+  expect(conv().patient_response_deadline).toBe(prazo);
+  await limparEsperaPorTelefone("cl1", "55000100000", tempo(29).toISOString());
+  expect(conv().patient_response_deadline).toBeNull();
 });

@@ -31,6 +31,7 @@ describe("POST WhatsApp real com serviços simulados", () => {
       expect(r.modelo).toBe(1);
       expect(r.transporte).toBe(0);
       expect(r.saidas).toHaveLength(0);
+      expect(r.esperas).toHaveLength(0);
       expect(r.tts).toBe(cenario === "reserva-perdida-finalizacao" ? 0 : 1);
       expect(r.uploads).toBe(cenario === "reserva-perdida-upload" ? 1 : 0);
     });

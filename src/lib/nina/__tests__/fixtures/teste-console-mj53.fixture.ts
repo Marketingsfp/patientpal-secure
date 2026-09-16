@@ -53,6 +53,15 @@ let reservaPerdidaDepois = false;
 const entregas: Linha[] = [];
 const rastreios: Linha[] = [];
 const encerramentos: unknown[][] = [];
+const esperas: Linha[] = [];
+mock.module("@/lib/nina/espera-paciente.server", () => ({
+  registrarEsperaAposRespostaNina: async (args: Linha) => {
+    if (!bd.whatsapp_mensagens.some((m) => m.direction === "out" && m.status === "sent"))
+      throw new Error("Espera armada antes de persistir a resposta");
+    esperas.push(args);
+    return { aguardando: true, motivo: "RESPOSTA_NINA_ENVIADA", deadline: null };
+  },
+}));
 
 // Qualquer dependência nova que tente sair do isolamento faz o teste falhar.
 function bloquearRede(): never {
@@ -255,5 +264,6 @@ console.log(
       entregas,
       rastreios,
       entradasGerador,
+      esperas,
     }),
 );

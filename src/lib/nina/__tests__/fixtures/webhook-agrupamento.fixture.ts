@@ -154,8 +154,13 @@ mock.module("@/lib/nina/espera-timeout.server", () => ({
 }));
 mock.module("@/lib/nina/espera-paciente.server", () => ({
   limparEsperaPorTelefone: async () => {},
-  registrarEsperaPorTelefone: async () => {},
+  registrarEsperaPorTelefone: async (args: any) => {
+    if (!db.whatsapp_mensagens!.some((m) => m.direction === "out" && m.status === "sent"))
+      throw new Error("Espera armada antes de persistir a resposta");
+    esperas.push(args);
+  },
 }));
+const esperas: any[] = [];
 mock.module("@/lib/atendimento/handoff.server", () => ({
   reabrirConversaPorMensagemPaciente: async (args: any) => {
     if (
@@ -345,6 +350,7 @@ console.log(
       reaberturas,
       encerramentos,
       entradasGerador,
+      esperas,
       entradas: db.whatsapp_mensagens!.filter((m) => m.direction === "in"),
       saidas: db.whatsapp_mensagens!.filter((m) => m.direction === "out"),
       logs: db.whatsapp_webhook_logs!.map((l) => l.resultado),

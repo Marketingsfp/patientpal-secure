@@ -158,7 +158,7 @@ export function blocosVisiveis(r: ResumoHandoff): Array<{ titulo: string; itens:
   if (r.motivo_contato) b.push({ titulo: "Motivo do contato", itens: [r.motivo_contato] });
   if (r.situacao) b.push({ titulo: "Situação", itens: [r.situacao] });
   if (r.informacoes.length) b.push({ titulo: "Informações coletadas", itens: r.informacoes });
-  if (r.ultima_pergunta) b.push({ titulo: "Última pergunta da Nina", itens: [r.ultima_pergunta] });
+  if (r.ultima_pergunta) b.push({ titulo: "Última mensagem da Nina", itens: [r.ultima_pergunta] });
   if (r.etapa_interrompida)
     b.push({ titulo: "Etapa em que parou", itens: [r.etapa_interrompida] });
   if (r.ja_informado.length) b.push({ titulo: "Já informado pela Nina", itens: r.ja_informado });

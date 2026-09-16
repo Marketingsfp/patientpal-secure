@@ -570,9 +570,8 @@ export async function processarRespostaWhatsappNina(entrada: EntradaRespostaWhat
         }
       }
 
-      // Espera do paciente: só abre prazo quando a Nina fez
-      // uma pergunta necessária para continuar. Informação
-      // simples ou despedida não liga relógio nenhum.
+      // Qualquer resposta enviada inicia 30 minutos sem retorno do paciente.
+      // A rotina confere a mensagem persistida e se a Nina continua responsável.
       if (!encerrarConversaId) {
         try {
           const { registrarEsperaPorTelefone } = await import("@/lib/nina/espera-paciente.server");

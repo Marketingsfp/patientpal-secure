@@ -1,18 +1,16 @@
 /**
  * FASE 3 — Timeout de espera do paciente → atendimento humano.
  *
- * Quando a Nina fez uma pergunta necessária e o paciente não respondeu dentro
+ * Quando a Nina enviou uma mensagem e o paciente não respondeu dentro
  * do prazo, a conversa sai da Nina e vai para a equipe, usando EXATAMENTE a
  * transferência e a distribuição que já existem (`encaminharParaHumano`).
  *
  * Timeout não resolve nem fecha a conversa: ela continua ativa, só troca de
  * responsável.
  *
- * Concorrência: a "reserva" do vencimento é um UPDATE condicionado ao mesmo
- * prazo que foi lido (`patient_response_deadline = <lido>`). Dois jobs
- * simultâneos disputam essa linha e só um consegue — o outro não encontra
- * nada e não transfere. Se o paciente respondeu no meio do caminho, o prazo já
- * foi apagado e o UPDATE não casa.
+ * Concorrência: o próprio handoff troca o responsável e limpa o prazo em um
+ * único UPDATE condicionado ao prazo, última mensagem e sessão lidos. Falha
+ * antes dessa gravação mantém a espera para a próxima execução do job.
  */
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import {
@@ -25,6 +23,7 @@ import { MOTIVO_TIMEOUT_PACIENTE, textoInternoTimeout } from "./espera-timeout-m
 import { normalizarEstado } from "./fluxo-estado-normalizar";
 import { encerrarEstadosTransacionais } from "./sessao";
 import { informacoesEstado, pendenciasTimeout, rotuloEtapa } from "./timeout-resumo";
+import { mensagemEnviadaPelaNina, ultimaMensagemDaConversa } from "./espera-paciente.server";
 
 export { MOTIVO_TIMEOUT_PACIENTE };
 
@@ -46,6 +45,9 @@ type LinhaConversa = {
   ai_enabled: boolean | null;
   atribuida_user_id: string | null;
   patient_response_deadline: string | null;
+  awaiting_patient_since: string | null;
+  ultima_msg_em: string;
+  nina_fluxo_estado: unknown;
 };
 
 export async function processarTimeoutsEsperaPaciente(args?: {
@@ -64,7 +66,9 @@ export async function processarTimeoutsEsperaPaciente(args?: {
 
   let consulta = supabaseAdmin
     .from("atend_conversas")
-    .select("id, clinica_id, status, owner_type, ai_enabled, atribuida_user_id, patient_response_deadline")
+    .select(
+      "id,clinica_id,status,owner_type,ai_enabled,atribuida_user_id,patient_response_deadline,awaiting_patient_since,ultima_msg_em,nina_fluxo_estado",
+    )
     .not("patient_response_deadline", "is", null)
     .lte("patient_response_deadline", agora.toISOString())
     .order("patient_response_deadline", { ascending: true })
@@ -84,33 +88,35 @@ export async function processarTimeoutsEsperaPaciente(args?: {
     // Revalidação: conversa ativa, ainda com a Nina, ainda sem atendente.
     const encerrada = STATUS_ENCERRADOS.includes(String(linha.status ?? "").toLowerCase());
     const jaHumana =
-      linha.owner_type === "HUMAN" || linha.ai_enabled === false || !!linha.atribuida_user_id;
+      linha.owner_type !== "AI" || linha.ai_enabled !== true || !!linha.atribuida_user_id;
     if (encerrada || jaHumana || !linha.patient_response_deadline) {
       await liberarEspera(linha);
       resultado.ignoradas += 1;
       continue;
     }
 
-    // Reserva atômica do vencimento: só um job leva.
-    const { data: reservadas, error: eReserva } = await supabaseAdmin
-      .from("atend_conversas")
-      .update({ awaiting_patient_since: null, patient_response_deadline: null } as never)
-      .eq("id", linha.id)
-      .eq("clinica_id", linha.clinica_id)
-      .eq("patient_response_deadline", linha.patient_response_deadline)
-      .select("id");
-    if (eReserva) {
-      console.error("[nina-timeout] falha ao reservar vencimento", eReserva.message);
-      resultado.erros += 1;
-      continue;
-    }
-    if (!reservadas || reservadas.length === 0) {
-      // Paciente respondeu ou outra execução já cuidou disto.
-      resultado.ignoradas += 1;
-      continue;
-    }
-
     try {
+      const ultima = await ultimaMensagemDaConversa(linha.clinica_id, linha.id);
+      // Inclui a mensagem persistida antes de o webhook conseguir limpar o prazo.
+      // Saída nova também cancela este vencimento: ela inicia outra contagem.
+      if (
+        !mensagemEnviadaPelaNina(ultima) ||
+        !linha.awaiting_patient_since ||
+        Date.parse(ultima!.created_at) > Date.parse(linha.awaiting_patient_since)
+      ) {
+        await liberarEspera(linha);
+        resultado.ignoradas += 1;
+        continue;
+      }
+      const estado = normalizarEstado(linha.nina_fluxo_estado);
+      if (
+        estado.session_started_at &&
+        Date.parse(ultima!.created_at) < Date.parse(estado.session_started_at)
+      ) {
+        await liberarEspera(linha);
+        resultado.ignoradas += 1;
+        continue;
+      }
       const minutos = timeoutRespostaPacienteMinutos();
       const r = await encaminharParaHumano({
         clinicaId: linha.clinica_id,
@@ -119,8 +125,18 @@ export async function processarTimeoutsEsperaPaciente(args?: {
         resumo: textoInternoTimeout(minutos),
         urgencia: "normal",
         solicitadoPor: "SISTEMA",
+        somenteSeNina: {
+          ultimaMsgEm: linha.ultima_msg_em,
+          sessaoId: estado.session_id ?? null,
+          prazoPaciente: linha.patient_response_deadline,
+          estadoFluxoAposHandoff: {
+            ...encerrarEstadosTransacionais(estado),
+            flow: { stage: "HANDOFF" },
+            updated_at: agora.toISOString(),
+          },
+        },
       });
-      if (r.ok) {
+      if (r.ok && !r.ja_estava_com_humano) {
         resultado.transferidas += 1;
         // Marcação interna na linha do tempo (nunca enviada ao paciente).
         await registrarEvento({
@@ -128,9 +144,20 @@ export async function processarTimeoutsEsperaPaciente(args?: {
           conversaId: linha.id,
           evento: "TIMEOUT_NINA",
           motivo: textoInternoTimeout(minutos),
-          detalhes: { minutos, motivo: MOTIVO_TIMEOUT_PACIENTE },
+          detalhes: {
+            minutos,
+            motivo: MOTIVO_TIMEOUT_PACIENTE,
+            mensagem_nina_id: ultima!.id,
+            aguardando_desde: linha.awaiting_patient_since,
+            prazo: linha.patient_response_deadline,
+          },
         });
-        await finalizarContextoTimeout(linha);
+        await finalizarContextoTimeout(linha, ultima!.body);
+      } else if (
+        r.ja_estava_com_humano ||
+        r.mensagem === "A conversa mudou antes do encaminhamento."
+      ) {
+        resultado.ignoradas += 1;
       } else resultado.erros += 1;
     } catch (e) {
       console.error("[nina-timeout] falha no handoff automático", e);
@@ -148,71 +175,40 @@ async function liberarEspera(linha: LinhaConversa): Promise<void> {
       .from("atend_conversas")
       .update({ awaiting_patient_since: null, patient_response_deadline: null } as never)
       .eq("id", linha.id)
-      .eq("clinica_id", linha.clinica_id);
+      .eq("clinica_id", linha.clinica_id)
+      .eq("patient_response_deadline", linha.patient_response_deadline!)
+      .eq("ultima_msg_em", linha.ultima_msg_em);
   } catch (e) {
     console.error("[nina-timeout] falha ao limpar prazo obsoleto", e);
   }
 }
 
 /**
- * Depois da transferência por inatividade:
- *  1. encerra os estados transacionais (escolha de vaga, confirmação final,
- *     criação de agendamento) — um "Sim" que chegue depois NÃO pode executar
- *     o agendamento antigo; a equipe revalida a disponibilidade;
- *  2. gera o Resumo da Nina com o contexto real do fluxo.
+ * Depois da transferência, gera o resumo com o contexto anterior do fluxo.
+ * Os estados transacionais já foram invalidados no UPDATE do handoff: um
+ * "Sim" tardio não executa o agendamento antigo; a equipe revalida a vaga.
  *
  * Nada é apagado: mensagens, CRM, eventos, resumos e agendamentos já
  * confirmados permanecem. Só a operação pendente é invalidada.
  */
-async function finalizarContextoTimeout(linha: LinhaConversa): Promise<void> {
-  let ultimaPergunta: string | null = null;
+async function finalizarContextoTimeout(
+  linha: LinhaConversa,
+  ultimaResposta: string | null,
+): Promise<void> {
+  const ultimaPergunta = ultimaResposta?.trim().slice(0, 300) || null;
   let etapaInterrompida: string | null = null;
   let pendencias: string[] = [];
   let informacoes: string[] = [];
 
   try {
-    const { data } = await supabaseAdmin
-      .from("atend_conversas")
-      .select("nina_fluxo_estado")
-      .eq("id", linha.id)
-      .eq("clinica_id", linha.clinica_id)
-      .maybeSingle();
-    const estado = normalizarEstado((data as { nina_fluxo_estado?: unknown } | null)?.nina_fluxo_estado ?? null);
+    // Foto anterior ao handoff: a invalidação ocorreu atomicamente com a troca
+    // de responsável. O resumo nunca regrava o estado de uma sessão reaberta.
+    const estado = normalizarEstado(linha.nina_fluxo_estado);
     etapaInterrompida = rotuloEtapa(estado.flow?.stage ?? null);
     pendencias = pendenciasTimeout(estado);
     informacoes = informacoesEstado(estado);
-
-    const encerrado = encerrarEstadosTransacionais(estado);
-    await supabaseAdmin
-      .from("atend_conversas")
-      .update({
-        nina_fluxo_estado: {
-          ...encerrado,
-          flow: { stage: "HANDOFF" },
-          updated_at: new Date().toISOString(),
-        },
-        updated_at: new Date().toISOString(),
-      } as never)
-      .eq("id", linha.id)
-      .eq("clinica_id", linha.clinica_id);
   } catch (e) {
-    console.error("[nina-timeout] falha ao encerrar estados transacionais", e);
-  }
-
-  try {
-    const { data } = await supabaseAdmin
-      .from("whatsapp_mensagens")
-      .select("body")
-      .eq("clinica_id", linha.clinica_id)
-      .eq("conversa_id", linha.id)
-      .eq("direction", "out")
-      .order("recebida_em", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-    const corpo = String((data as { body?: string } | null)?.body ?? "").trim();
-    if (corpo) ultimaPergunta = corpo.slice(0, 300);
-  } catch (e) {
-    console.error("[nina-timeout] falha ao ler última pergunta", e);
+    console.error("[nina-timeout] falha ao preparar contexto do resumo", e);
   }
 
   try {

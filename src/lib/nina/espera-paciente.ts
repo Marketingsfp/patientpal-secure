@@ -1,31 +1,16 @@
 /**
  * FASE 1 — ESPERA DO PACIENTE (regras puras, sem banco).
  *
- * O objetivo é distinguir "a Nina falou" de "a Nina precisa de uma resposta
- * para continuar". Só o segundo caso liga o relógio.
- *
- * Não liga o relógio:
- * - informação pura ("o endereço da clínica é ...", preço, horário de funcionamento);
- * - despedida/encerramento ("qualquer coisa é só chamar");
- * - confirmação de algo já concluído ("seu agendamento está confirmado").
- *
- * Liga o relógio:
- * - pergunta necessária para seguir (dado obrigatório, escolha, esclarecimento,
- *   confirmação pendente do agendamento).
+ * Toda mensagem enviada pela Nina inicia 30 minutos de espera. O conteúdo
+ * não decide o encaminhamento: só a ausência de retorno e a responsabilidade
+ * exclusiva da Nina. Conversas encerradas ou humanas são excluídas no servidor.
  */
 
 export const TIMEOUT_RESPOSTA_PACIENTE_PADRAO_MINUTOS = 30;
 
-/** Minutos de espera antes do prazo vencer. Nunca escrever "30" solto no código. */
-export function timeoutRespostaPacienteMinutos(
-  env?: Record<string, string | undefined>,
-): number {
-  const bruto = (env ?? (typeof process !== "undefined" ? process.env : {}))?.[
-    "NINA_PATIENT_RESPONSE_TIMEOUT_MINUTES"
-  ];
-  const n = Number(bruto);
-  if (!Number.isFinite(n) || n <= 0) return TIMEOUT_RESPOSTA_PACIENTE_PADRAO_MINUTOS;
-  return Math.floor(n);
+/** Regra de atendimento: o mesmo prazo nos dois ambientes. */
+export function timeoutRespostaPacienteMinutos(): number {
+  return TIMEOUT_RESPOSTA_PACIENTE_PADRAO_MINUTOS;
 }
 
 function normalizar(texto: string): string {
@@ -35,26 +20,7 @@ function normalizar(texto: string): string {
     .toLowerCase();
 }
 
-/** Frases de despedida/encerramento — nunca abrem espera. */
-const DESPEDIDAS = [
-  "qualquer coisa e so chamar",
-  "qualquer duvida e so chamar",
-  "estou a disposicao",
-  "fico a disposicao",
-  "ate logo",
-  "ate mais",
-  "tenha um otimo dia",
-  "tenha uma otima",
-  "bom atendimento",
-  "obrigada pelo contato",
-  "obrigado pelo contato",
-  "atendimento encerrado",
-];
-
-/**
- * Perguntas de cortesia. Sozinhas não seguram o atendimento — ninguém precisa
- * responder "posso ajudar em mais alguma coisa?" para o fluxo continuar.
- */
+/** Perguntas de cortesia: também iniciam o prazo, com motivo genérico. */
 const CORTESIA = [
   "posso ajudar em mais alguma coisa",
   "posso te ajudar em mais alguma coisa",
@@ -99,13 +65,14 @@ const PEDIDOS_OBRIGATORIOS = [
 ];
 
 export type MotivoEspera =
+  | "RESPOSTA_NINA_ENVIADA"
   | "PERGUNTA_DIRETA"
   | "DADO_OBRIGATORIO"
   | "ESCOLHA_OU_CONFIRMACAO"
   | null;
 
 export type AvaliacaoEspera = {
-  /** A Nina depende de uma resposta do paciente para continuar. */
+  /** Houve uma resposta da Nina; aguarda eventual retorno do paciente. */
   aguardando: boolean;
   motivo: MotivoEspera;
 };
@@ -117,7 +84,7 @@ export function avaliarEsperaPaciente(respostaNina: string): AvaliacaoEspera {
   const texto = normalizar(String(respostaNina ?? "").trim());
   if (!texto) return { aguardando: false, motivo: null };
 
-  if (DESPEDIDAS.some((d) => texto.includes(d))) return { aguardando: false, motivo: null };
+  // Os motivos antigos continuam úteis no histórico; nunca excluem uma resposta.
 
   const temPedido = PEDIDOS_OBRIGATORIOS.some((p) => texto.includes(p));
   if (temPedido) {
@@ -138,7 +105,7 @@ export function avaliarEsperaPaciente(respostaNina: string): AvaliacaoEspera {
   const relevantes = perguntas.filter((p) => !CORTESIA.some((c) => p.includes(c)));
   if (relevantes.length > 0) return { aguardando: true, motivo: "PERGUNTA_DIRETA" };
 
-  return { aguardando: false, motivo: null };
+  return { aguardando: true, motivo: "RESPOSTA_NINA_ENVIADA" };
 }
 
 export type PrazoEspera = {

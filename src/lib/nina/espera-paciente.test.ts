@@ -8,16 +8,10 @@ import {
   timeoutRespostaPacienteMinutos,
 } from "./espera-paciente";
 
-describe("prazo configurável", () => {
+describe("prazo de 30 minutos", () => {
   it("usa 30 minutos por padrão", () => {
     expect(TIMEOUT_RESPOSTA_PACIENTE_PADRAO_MINUTOS).toBe(30);
-    expect(timeoutRespostaPacienteMinutos({})).toBe(30);
-  });
-
-  it("respeita a configuração do ambiente", () => {
-    expect(timeoutRespostaPacienteMinutos({ NINA_PATIENT_RESPONSE_TIMEOUT_MINUTES: "45" })).toBe(45);
-    expect(timeoutRespostaPacienteMinutos({ NINA_PATIENT_RESPONSE_TIMEOUT_MINUTES: "0" })).toBe(30);
-    expect(timeoutRespostaPacienteMinutos({ NINA_PATIENT_RESPONSE_TIMEOUT_MINUTES: "x" })).toBe(30);
+    expect(timeoutRespostaPacienteMinutos()).toBe(30);
   });
 
   it("calcula o deadline a partir do início da espera", () => {
@@ -34,7 +28,7 @@ describe("prazo configurável", () => {
   });
 });
 
-describe("quando a Nina realmente aguarda o paciente", () => {
+describe("toda resposta enviada pela Nina inicia a espera", () => {
   const abre = [
     "Qual sua data de nascimento?",
     "Qual exame você deseja realizar?",
@@ -50,24 +44,27 @@ describe("quando a Nina realmente aguarda o paciente", () => {
     });
   }
 
-  const naoAbre = [
+  const informacoes = [
     "O endereço da clínica é Rua das Flores, 100, Centro.",
     "O valor da consulta é R$ 150,00 no dinheiro ou pix.",
     "Funcionamos de segunda a sexta, das 7h às 18h.",
     "Seu agendamento está confirmado para quinta-feira às 10h.",
     "Qualquer coisa é só chamar. Tenha um ótimo dia!",
     "Estou à disposição, tenha uma ótima tarde!",
-    "",
   ];
-  for (const texto of naoAbre) {
-    it(`não abre espera: ${texto.slice(0, 40) || "(vazio)"}`, () => {
-      expect(avaliarEsperaPaciente(texto).aguardando).toBe(false);
+  for (const texto of informacoes) {
+    it(`abre espera também para informação: ${texto.slice(0, 40)}`, () => {
+      expect(avaliarEsperaPaciente(texto).aguardando).toBe(true);
     });
   }
 
-  it("pergunta de cortesia sozinha não segura o atendimento", () => {
-    expect(avaliarEsperaPaciente("O endereço é Rua X, 10. Posso ajudar em mais alguma coisa?")
-      .aguardando).toBe(false);
+  it("saudação e cortesia também iniciam os 30 minutos", () => {
+    expect(
+      avaliarEsperaPaciente("O endereço é Rua X, 10. Posso ajudar em mais alguma coisa?")
+        .aguardando,
+    ).toBe(true);
+    expect(avaliarEsperaPaciente("Olá! Como posso te ajudar?").aguardando).toBe(true);
+    expect(avaliarEsperaPaciente("   ").aguardando).toBe(false);
   });
 
   it("classifica o motivo da espera", () => {
@@ -138,9 +135,8 @@ describe("FASE 2 — resposta do paciente cancela o prazo", () => {
 
 describe("FASE 3 — motivo estruturado do timeout", () => {
   it("usa o motivo padronizado e o texto interno com o prazo configurado", async () => {
-    const { MOTIVO_TIMEOUT_PACIENTE, textoInternoTimeout } = await import(
-      "./espera-timeout-motivo"
-    );
+    const { MOTIVO_TIMEOUT_PACIENTE, textoInternoTimeout } =
+      await import("./espera-timeout-motivo");
     expect(MOTIVO_TIMEOUT_PACIENTE).toBe("patient_response_timeout");
     expect(textoInternoTimeout(30)).toBe(
       "Paciente sem resposta por 30 minutos — transferido automaticamente pela Nina.",
@@ -228,7 +224,7 @@ describe("FASE 4 — resumo do timeout", () => {
     expect(r.pendencias).toContain("Confirmar se o paciente ainda tem interesse");
     expect(r.informacoes).toContain("Especialidade: Cardiologia");
     const titulos = blocosVisiveis(r).map((b) => b.titulo);
-    expect(titulos).toContain("Última pergunta da Nina");
+    expect(titulos).toContain("Última mensagem da Nina");
     expect(titulos).toContain("Etapa em que parou");
   });
 

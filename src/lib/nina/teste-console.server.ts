@@ -293,7 +293,12 @@ export async function processarMensagemTeste(
   if (!entradaPersistida.repetida) {
     await supabaseAdmin
       .from("atend_conversas")
-      .update({ ultima_msg_em: agora, ultima_msg_preview: body.slice(0, 160) })
+      .update({
+        ultima_msg_em: agora,
+        ultima_msg_preview: body.slice(0, 160),
+        awaiting_patient_since: null,
+        patient_response_deadline: null,
+      })
       .eq("id", conversaId);
     // Teto atingido → apaga as mensagens mais antigas do lead para caber as novas.
     await podarMensagensLead(supabaseAdmin, data.clinicaId, { ...lead, conversa_id: conversaId });
@@ -885,6 +890,12 @@ export async function processarMensagemTeste(
           ultima_msg_preview: reply.slice(0, 160),
         })
         .eq("id", conversaId);
+      const { registrarEsperaAposRespostaNina } = await import("./espera-paciente.server");
+      await registrarEsperaAposRespostaNina({
+        clinicaId: data.clinicaId,
+        conversaId,
+        resposta: reply,
+      });
     }
 
     diag.response_saved = diag.response_saved || Boolean(audio);

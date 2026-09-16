@@ -15,6 +15,16 @@ export async function executarJobWatchdog(request: Request): Promise<Response> {
     b = Buffer.from(esperado);
   if (error || !esperado || a.length !== b.length || !timingSafeEqual(a, b))
     return new Response("Unauthorized", { status: 401 });
+  // O cron já chama esta rota a cada minuto, mesmo sem novas mensagens ou
+  // navegador aberto. A espera do paciente independe de haver lotes para recuperar.
+  let espera: unknown;
+  try {
+    const { processarTimeoutsEsperaPaciente } = await import("@/lib/nina/espera-timeout.server");
+    espera = await processarTimeoutsEsperaPaciente();
+  } catch {
+    console.error("[nina-timeout] varredura periódica falhou; será retomada no próximo ciclo");
+    espera = { erros: 1 };
+  }
   try {
     const { executarWatchdogNina } = await import("@/lib/nina/watchdog.server");
     const recuperacao = await executarWatchdogNina();
@@ -26,14 +36,14 @@ export async function executarJobWatchdog(request: Request): Promise<Response> {
       continuacao = await continuarCargaPendenteNina(supabaseAdmin, processarMensagemTeste);
     }
     return Response.json(
-      { ...recuperacao, continuacao },
+      { ...recuperacao, continuacao, espera },
       {
         headers: { "cache-control": "no-store" },
       },
     );
   } catch {
     return Response.json(
-      { erro: "WATCHDOG_FAILED" },
+      { erro: "WATCHDOG_FAILED", espera },
       { status: 503, headers: { "cache-control": "no-store" } },
     );
   }

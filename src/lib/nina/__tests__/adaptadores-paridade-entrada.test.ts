@@ -39,6 +39,8 @@ describe("paridade de entrada e saída dos adaptadores reais", () => {
       expect(r.entradasGerador).toHaveLength(1);
       expect(r.entradas).toHaveLength(1);
       expect(r.saidas).toHaveLength(1);
+      expect(r.esperas).toHaveLength(1);
+      expect(r.esperas[0].resposta).toBe(r.saidas[0].body);
       const entrada = r.entradasGerador[0];
       expect(entrada.clinicaId).toBe("clinica");
       expect(entrada.texto).toBe("Vocês tem cardiologista?");

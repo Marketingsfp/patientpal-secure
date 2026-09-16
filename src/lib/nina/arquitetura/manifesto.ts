@@ -288,7 +288,6 @@ export const NODES_ARQUITETURA: NodeArquitetura[] = [
     erros: ["prompt acima do limite do modelo"],
   },
 
-
   // ───────────────────────── IA ─────────────────────────
   {
     id: "llm.generate",
@@ -402,11 +401,7 @@ export const NODES_ARQUITETURA: NodeArquitetura[] = [
     saida: "Faixas do dia e situação de aberto/fechado",
     anteriores: ["tool.execute"],
     seguintes: ["llm.generate"],
-    tabelas: [
-      "nina_calendario_versoes",
-      "nina_calendario_atendimento",
-      "nina_calendario_excecoes",
-    ],
+    tabelas: ["nina_calendario_versoes", "nina_calendario_atendimento", "nina_calendario_excecoes"],
     erros: ["nenhuma versão publicada", "dia não configurado"],
   },
   {
@@ -622,7 +617,8 @@ export const NODES_ARQUITETURA: NodeArquitetura[] = [
     id: "wait.start",
     nome: "Espera pela resposta do paciente",
     categoria: "PROCESSAMENTO",
-    descricao: "Marca o início da espera quando a Nina fica aguardando o paciente.",
+    descricao:
+      "Após cada mensagem enviada pela Nina, inicia 30 minutos sem retorno do paciente, somente enquanto a conversa estiver exclusivamente com ela.",
     arquivo: "src/lib/nina/espera-paciente.server.ts",
     entrada: "Resposta enviada",
     saida: "Espera registrada",
@@ -635,13 +631,14 @@ export const NODES_ARQUITETURA: NodeArquitetura[] = [
     id: "wait.timeout",
     nome: "Tempo de espera esgotado",
     categoria: "PROCESSAMENTO",
-    descricao: "Processa em lote as conversas paradas além do tempo configurado.",
+    descricao:
+      "O job periódico encaminha para a equipe após 30 minutos sem retorno à última mensagem da Nina. Revalida mensagem, sessão e responsável antes de transferir.",
     arquivo: "src/lib/nina/espera-timeout.server.ts",
     funcao: "processarTimeoutsEsperaPaciente",
     entrada: "Conversas em espera",
-    saida: "Encerramento ou transferência",
+    saida: "Transferência para atendimento humano",
     anteriores: ["wait.timeout_job"],
-    seguintes: ["conversation.close", "handoff.queue"],
+    seguintes: ["handoff.queue"],
     tabelas: ["atend_conversas", "atend_conversa_eventos"],
     erros: ["conversa alterada por outro processo durante o lote"],
   },
@@ -654,7 +651,7 @@ export const NODES_ARQUITETURA: NodeArquitetura[] = [
     funcao: "avaliarEncerramentoAutomatico",
     entrada: "Conversa e última resposta",
     saida: "Conversa resolvida ou mantida aberta",
-    anteriores: ["message.persist", "wait.timeout"],
+    anteriores: ["message.persist"],
     seguintes: ["metrics.record"],
     tabelas: ["atend_conversas", "clinica_feature_flags"],
     erros: ["recurso desativado para a clínica", "conversa já assumida por humano"],
@@ -881,12 +878,12 @@ export const NODES_ARQUITETURA: NodeArquitetura[] = [
   },
   {
     id: "wait.timeout_job",
-    nome: "Disparo público do tempo de espera",
+    nome: "Verificação periódica do tempo de espera",
     categoria: "PROCESSAMENTO",
     descricao:
-      "Endpoint público chamado por agendador externo que dispara o processamento das conversas paradas.",
-    arquivo: "src/routes/api/public/nina.espera-timeout.ts",
-    funcao: "Route",
+      "O cron existente chama a rota autenticada do watchdog a cada minuto, mesmo sem mensagens novas ou navegador aberto. A rota legada de espera continua disponível.",
+    arquivo: "src/routes/api/public/nina.watchdog.ts",
+    funcao: "executarJobWatchdog",
     entrada: "Chamada do agendador",
     saida: "Lote de conversas em espera para processar",
     anteriores: ["wait.start"],

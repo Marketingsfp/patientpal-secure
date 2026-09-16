@@ -392,19 +392,6 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
                   }
                 }
 
-                // Antes de qualquer coisa, vence quem já passou do prazo —
-                // assim uma conversa parada não fica presa na Nina.
-                try {
-                  const { processarTimeoutsEsperaPaciente } =
-                    await import("@/lib/nina/espera-timeout.server");
-                  await processarTimeoutsEsperaPaciente({
-                    clinicaId: params.clinicaId,
-                    limite: 10,
-                  });
-                } catch (e) {
-                  console.error("[nina-timeout] varredura no webhook falhou", e);
-                }
-
                 // Mensagem nova do paciente reabre automaticamente a conversa
                 // encerrada e devolve o atendimento ao fluxo inicial da Nina.
                 const fromDigits = String(from ?? "").replace(/\D/g, "");
@@ -422,7 +409,24 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
                   const { limparEsperaPorTelefone } =
                     await import("@/lib/nina/espera-paciente.server");
                   if (!entradaPersistida.repetida)
-                    await limparEsperaPorTelefone(params.clinicaId, fromDigits);
+                    await limparEsperaPorTelefone(
+                      params.clinicaId,
+                      fromDigits,
+                      msgInserida.created_at,
+                    );
+                }
+
+                // O retorno já persistido cancela a espera ANTES da varredura.
+                // O cron também executa isto sem depender de mensagens novas.
+                try {
+                  const { processarTimeoutsEsperaPaciente } =
+                    await import("@/lib/nina/espera-timeout.server");
+                  await processarTimeoutsEsperaPaciente({
+                    clinicaId: params.clinicaId,
+                    limite: 10,
+                  });
+                } catch (e) {
+                  console.error("[nina-timeout] varredura no webhook falhou", e);
                 }
 
                 // Atendimento híbrido: a Nina é o 1º nível e responde sempre,
