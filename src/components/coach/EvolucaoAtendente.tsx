@@ -90,7 +90,13 @@ function Sparkline({ notas }: { notas: number[] }) {
 }
 
 /** Mini painel de evolução na home da atendente: notas recentes e erros que se repetem. */
-export function EvolucaoAtendente({ atendente }: { atendente: string }) {
+export function EvolucaoAtendente({
+  atendente,
+  clinicaId,
+}: {
+  atendente: string;
+  clinicaId: string | null;
+}) {
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -101,6 +107,7 @@ export function EvolucaoAtendente({ atendente }: { atendente: string }) {
         .from("coach_roleplay_sessions")
         .select("nota,created_at,melhorias,modo")
         .eq("atendente", atendente)
+        .eq("clinica_id", clinicaId ?? "")
         .order("created_at", { ascending: false })
         .limit(40);
       if (cancelled) return;
@@ -110,7 +117,7 @@ export function EvolucaoAtendente({ atendente }: { atendente: string }) {
     return () => {
       cancelled = true;
     };
-  }, [atendente]);
+  }, [atendente, clinicaId]);
 
   const dados = useMemo(() => {
     const ordenadas = [...rows].reverse();

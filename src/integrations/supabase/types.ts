@@ -3606,6 +3606,7 @@ export type Database = {
           id: string
           melhorias: Json
           mensagens: Json
+          modo: string
           nota: number
           perfil_cliente: string | null
           pontos_fracos: Json
@@ -3623,6 +3624,7 @@ export type Database = {
           id?: string
           melhorias?: Json
           mensagens?: Json
+          modo?: string
           nota: number
           perfil_cliente?: string | null
           pontos_fracos?: Json
@@ -3640,6 +3642,7 @@ export type Database = {
           id?: string
           melhorias?: Json
           mensagens?: Json
+          modo?: string
           nota?: number
           perfil_cliente?: string | null
           pontos_fracos?: Json
