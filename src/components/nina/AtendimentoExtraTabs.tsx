@@ -287,11 +287,7 @@ import { useSaidasDasMensagens } from "./SaidaMensagem";
 import { idsParaInspecaoNina, marcadorInternoSistema, revisaoInspecaoMensagens } from "@/lib/nina/inspecao-mensagem";
 
 import { devoAutoSelecionarComSelecao, escopoParaConversa } from "@/lib/atendimento/deep-link";
-import {
-  avisoSaidaEscopo,
-  devoAutoSelecionar,
-  type LinhaInbox,
-} from "@/lib/atendimento/inbox-realtime";
+import { devoAutoSelecionar, type LinhaInbox } from "@/lib/atendimento/inbox-realtime";
 import {
   ajustarContadorAtual,
   chaveInbox,
@@ -1126,8 +1122,8 @@ export function AtendInbox() {
         setContato(null);
         setNotas([]);
         setEventos([]);
-        toast.info(avisoSaidaEscopo(escopo));
-        // Sem conversa aberta: a tela volta a "Selecione uma conversa".
+        // Sem aviso: a conversa apenas sai da tela e volta a "Selecione uma
+        // conversa". O motivo continua visível na lista e nos eventos.
         abrirConversa(null);
       }
       setConvs((prev: any[]) => {
@@ -1265,7 +1261,8 @@ export function AtendInbox() {
         }
         const destino = escopoParaConversa(row, { escopoAtual: escopo, userId: meuId, gestor: souGestor });
         if (!destino) {
-          setErroAcesso("Você não possui permissão para visualizar esta conversa.");
+          // Fora do escopo do usuário: fecha sem aviso. O backend continua
+          // negando o acesso; a tela só não anuncia o bloqueio.
           abrirConversa(null);
           return;
         }
@@ -1285,13 +1282,14 @@ export function AtendInbox() {
       } catch (e: any) {
         if (selecaoIdRef.current !== idPedido) return;
         const msg = String(e?.message ?? "");
-        setErroAcesso(
-          msg.includes("não encontrada")
-            ? "Conversa não encontrada."
-            : msg.includes("permissão")
-              ? "Você não possui permissão para visualizar esta conversa."
+        // Acesso negado pelo backend: fecha sem aviso (mesma regra acima).
+        if (!msg.includes("permissão")) {
+          setErroAcesso(
+            msg.includes("não encontrada")
+              ? "Conversa não encontrada."
               : msg || "Não foi possível abrir esta conversa.",
-        );
+          );
+        }
         abrirConversa(null);
       }
     })();

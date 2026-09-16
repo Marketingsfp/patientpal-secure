@@ -1,5 +1,7 @@
 # Etapa A: incerteza pura não encaminha
 
+**Nota de 16/09/2026:** o commit `4167d03ae` (resposta direta) retirou o motor de confiança do atendimento e da homologação. A ligação desta regra em `src/lib/whatsapp.server.ts` deixou de existir junto com o restante da avaliação; a regra permanece implementada e testada em `baixa-confiabilidade.ts` para o caso de o motor voltar ao fluxo.
+
 Data: 15/09/2026. Arquivos: `src/lib/nina/confidence/baixa-confiabilidade.ts`, `src/lib/whatsapp.server.ts`, testes em `baixa-confiabilidade.test.ts`.
 
 ## O problema
