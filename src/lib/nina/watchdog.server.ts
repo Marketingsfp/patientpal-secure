@@ -6,6 +6,8 @@ import { manterLockConversa, liberarLockConversa, type LockConversa } from "./lo
 import { montarTurnoPaciente } from "./burst";
 import { POLITICA_WATCHDOG, esperaRetryWatchdog } from "./watchdog";
 import type { TurnoNina } from "./burst.server";
+import { causaFalhaNina, repetirPreparacaoNina } from "./watchdog-falha";
+import { conversaResolvida } from "../atendimento/ciclo-responsabilidade";
 
 async function rpc(nome: string, args: Record<string, unknown>) {
   const { data, error } = await (supabaseAdmin as any).rpc(nome, args);
@@ -107,7 +109,9 @@ export async function gerarComCheckpointNina(
     await controle.evento("GENERATION_REUSED");
     return controle.snapshot.texto;
   }
-  await controle.checkpoint("generating");
+  // Modelo e ferramentas avançam para generating ANTES de executar. Uma falha
+  // de importação/leitura anterior a eles tem resultado conhecido: nada foi enviado.
+  await controle.checkpoint("preparing");
   await controle.evento("GENERATION_STARTED");
   const texto = await contextoWatchdog.run(controle, gerar);
   // Whitelist: callbacks de avaliação, prompts e segredos nunca entram no checkpoint.
@@ -258,13 +262,23 @@ export async function entregarComCheckpointNina(
 
 export async function finalizarWatchdogNina(controle: ControleWatchdogNina | null, erro?: unknown) {
   if (!controle) return;
+  if (
+    erro instanceof ErroReservaTurnoPerdida ||
+    (erro as { codigo?: string })?.codigo === "NINA_RESERVA_TURNO_PERDIDA"
+  )
+    return;
   const { data: lote, error } = await (supabaseAdmin as any)
     .from("nina_message_batches")
-    .select("watchdog_state")
+    .select(
+      "watchdog_state,watchdog_stage,watchdog_token,watchdog_revision,attempt_count,response_snapshot,conversa_id,clinica_id,telefone,created_at",
+    )
     .eq("id", controle.batchId)
     .single();
   if (error) throw new Error("WATCHDOG_STATE_UNAVAILABLE");
   if (["completed", "failed", "handoff", "retry_pending"].includes(lote.watchdog_state)) return;
+  if (lote.watchdog_token !== controle.lock.token) throw new ErroReservaTurnoPerdida();
+  const causa = erro ? causaFalhaNina(erro) : null;
+  if (causa) await controle.evento("PROCESSING_ERROR", { erro: causa, etapa: lote.watchdog_stage });
   const aviso = controle.snapshot?.auditoria.resultado?.avisoExistente;
   if (aviso?.estado === "confirmado" && aviso.mensagemId) {
     const { data: item, error: ei } = await (supabaseAdmin as any)
@@ -293,29 +307,97 @@ export async function finalizarWatchdogNina(controle: ControleWatchdogNina | nul
   ) {
     await controle.finalizar("retry_pending", erro.message);
   } else {
-    const { data: batch, error: eb } = await (supabaseAdmin as any)
-      .from("nina_message_batches")
-      .select("conversa_id,clinica_id")
-      .eq("id", controle.batchId)
-      .single();
-    if (eb) throw new Error("WATCHDOG_STATE_UNAVAILABLE");
     const { data: conversa, error: ec } = await (supabaseAdmin as any)
       .from("atend_conversas")
-      .select("owner_type,atribuida_user_id")
-      .eq("id", batch.conversa_id)
-      .eq("clinica_id", batch.clinica_id)
+      .select("owner_type,atribuida_user_id,ai_enabled,status,ultima_msg_em,nina_fluxo_estado")
+      .eq("id", lote.conversa_id)
+      .eq("clinica_id", lote.clinica_id)
       .maybeSingle();
     if (ec) throw new Error("WATCHDOG_STATE_UNAVAILABLE");
+    // Um erro antigo não pode reabrir uma conversa resolvida ou atingir sessão nova.
     if (
-      !erro &&
-      (["HUMAN", "NONE"].includes(conversa?.owner_type) || conversa?.atribuida_user_id)
+      !conversa ||
+      conversaResolvida(conversa) ||
+      Date.parse(conversa.nina_fluxo_estado?.session_started_at ?? "") > Date.parse(lote.created_at)
     ) {
-      await controle.finalizar("handoff", "HUMAN_OWNER_CONFIRMED");
+      await controle.finalizar("failed", "CONVERSATION_CLOSED_OR_CHANGED");
       return;
+    }
+    if (["HUMAN", "NONE"].includes(conversa?.owner_type) || conversa?.atribuida_user_id) {
+      await controle.finalizar(
+        "handoff",
+        causa ? `PROCESSING_ERROR: ${causa}` : "HUMAN_OWNER_CONFIRMED",
+      );
+      return;
+    }
+    if (
+      erro &&
+      !(erro instanceof ErroEntregaWatchdog) &&
+      conversa.owner_type === "AI" &&
+      conversa.ai_enabled &&
+      conversa.ultima_msg_em
+    ) {
+      const revisao = Number(
+        await rpc("nina_revisao_atual", {
+          _clinica_id: lote.clinica_id,
+          _telefone: lote.telefone,
+        }),
+      );
+      if (!lote.watchdog_revision || revisao !== Number(lote.watchdog_revision)) {
+        await controle.finalizar("failed", "SUPERSEDED_BY_NEW_MESSAGE");
+        return;
+      }
+      if (
+        repetirPreparacaoNina({
+          erro,
+          etapa: lote.watchdog_stage,
+          snapshot: lote.response_snapshot,
+          entregas: entregas?.length ?? 0,
+          tentativa: lote.attempt_count,
+          maxTentativas: controle.maxTentativas,
+        })
+      ) {
+        await controle.evento("PREPARATION_RETRY", { erro: causa });
+        await controle.finalizar("retry_pending", `PREPARATION_FAILED: ${causa}`);
+        return;
+      }
+      // Falha definitiva ou efeitos já iniciados: não repetir operações. O handoff
+      // canônico avisa o paciente e distribui; em teste ele só simula a atribuição.
+      await controle.checkpoint(lote.watchdog_stage);
+      const { encaminharParaHumano } = await import("../atendimento/handoff.server");
+      const encaminhamento = await encaminharParaHumano({
+        clinicaId: lote.clinica_id,
+        conversaId: lote.conversa_id,
+        motivo: "NINA_PROCESSING_FAILED: falha técnica ao preparar ou gerar a resposta",
+        resumo:
+          "A Nina não conseguiu concluir este turno. A equipe deve revisar o histórico e eventuais operações registradas antes de continuar o atendimento.",
+        solicitadoPor: "SISTEMA",
+        somenteSeNina: {
+          ultimaMsgEm: conversa.ultima_msg_em,
+          sessaoId: conversa.nina_fluxo_estado?.session_id ?? null,
+        },
+      });
+      await controle.evento(
+        encaminhamento.ok ? "PROCESSING_ERROR_HANDOFF" : "PROCESSING_ERROR_HANDOFF_FAILED",
+        {
+          erro: causa,
+          encaminhado: encaminhamento.ok,
+          aviso_confirmado: encaminhamento.aviso?.entregue === true,
+          mensagem_id: encaminhamento.aviso?.mensagemId ?? null,
+        },
+      );
+      if (encaminhamento.ok) {
+        await controle.finalizar("handoff", `PROCESSING_ERROR: ${causa}`);
+        return;
+      }
     }
     await controle.finalizar(
       "failed",
-      erro instanceof ErroEntregaWatchdog ? erro.message : "RESPONSE_NOT_CONFIRMED",
+      erro instanceof ErroEntregaWatchdog
+        ? erro.message
+        : causa
+          ? `PROCESSING_ERROR: ${causa}`
+          : "RESPONSE_NOT_CONFIRMED",
     );
   }
 }
@@ -329,6 +411,7 @@ export async function executarWatchdogNina(limite = POLITICA_WATCHDOG.paralelism
     lotes.map(async (lote) => {
       const lock = { chave: `${lote.clinica_id}:${lote.telefone}`, token: lote.watchdog_token };
       manterLockConversa(lock);
+      let controleRecuperacao: ControleWatchdogNina | null = null;
       try {
         const { data: itens, error: ei } = await (supabaseAdmin as any)
           .from("nina_message_batch_itens")
@@ -365,7 +448,7 @@ export async function executarWatchdogNina(limite = POLITICA_WATCHDOG.paralelism
             entradas.map((m: any) => (m.tipo === "audio" ? m.transcricao : m.body)),
           ),
         };
-        const controleRecuperacao = await carregarControleWatchdog(turno);
+        controleRecuperacao = await carregarControleWatchdog(turno);
         const { estadoConversaPorId, ninaPodeResponder } =
           await import("../atendimento/handoff.server");
         const estado = await estadoConversaPorId(lote.clinica_id, lote.conversa_id);
@@ -423,13 +506,15 @@ export async function executarWatchdogNina(limite = POLITICA_WATCHDOG.paralelism
         // Retornos antecipados por sessão/atribuição também precisam de desfecho.
         await finalizarWatchdogNina(controleRecuperacao);
       } catch (e) {
-        // Falha de retomada não devolve o lote indefinidamente à fila.
-        await rpc("nina_watchdog_finalizar", {
-          _batch: lote.id,
-          _token: lock.token,
-          _estado: "failed",
-          _erro: "RECOVERY_FAILED",
-        });
+        // A retomada obedece ao mesmo limite e handoff do webhook/console.
+        if (controleRecuperacao) await finalizarWatchdogNina(controleRecuperacao, e);
+        else
+          await rpc("nina_watchdog_finalizar", {
+            _batch: lote.id,
+            _token: lock.token,
+            _estado: "failed",
+            _erro: `RECOVERY_FAILED: ${causaFalhaNina(e)}`,
+          });
         throw e;
       } finally {
         await liberarLockConversa(lock);

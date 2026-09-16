@@ -37,7 +37,8 @@ suite("Watchdog — RPCs reais no PostgreSQL isolado", () => {
         is_teste boolean DEFAULT false,tratada_internamente boolean DEFAULT false,execucao_id uuid,
         created_at timestamptz NOT NULL DEFAULT now());
       CREATE TABLE atend_conversas(id uuid PRIMARY KEY,clinica_id uuid,owner_type text DEFAULT 'AI',
-        atribuida_user_id uuid,status text DEFAULT 'open',is_teste boolean DEFAULT true);
+        atribuida_user_id uuid,status text DEFAULT 'open',is_teste boolean DEFAULT true,
+        ai_enabled boolean DEFAULT true,ultima_msg_em timestamptz DEFAULT now(),nina_fluxo_estado jsonb);
       CREATE TABLE sistema_job_tokens(nome text PRIMARY KEY,token text);
       CREATE TABLE nina_teste_carga(id uuid PRIMARY KEY DEFAULT gen_random_uuid());
     `);

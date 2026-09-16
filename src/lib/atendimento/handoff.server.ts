@@ -207,6 +207,8 @@ export async function encaminharParaHumano(args: {
   departamentoNome?: string | null;
   dadosColetados?: Record<string, unknown> | null;
   solicitadoPor?: "IA" | "PACIENTE" | "SISTEMA";
+  /** Recuperação técnica: só transfere a versão ainda conduzida pela Nina. */
+  somenteSeNina?: { ultimaMsgEm: string; sessaoId: string | null };
 }): Promise<ResultadoHandoff> {
   const conv = await estadoConversaPorId(args.clinicaId, args.conversaId);
   if (!conv) return { ok: false, mensagem: "Conversa não encontrada." };
@@ -223,7 +225,7 @@ export async function encaminharParaHumano(args: {
   const agora = new Date().toISOString();
   const prioridade = args.urgencia === "alta" ? 2 : args.urgencia === "baixa" ? 0 : 1;
 
-  const { error } = await supabaseAdmin
+  let atualizacao = supabaseAdmin
     .from("atend_conversas")
     .update({
       owner_type: "NONE",
@@ -244,7 +246,21 @@ export async function encaminharParaHumano(args: {
     })
     .eq("id", args.conversaId)
     .eq("clinica_id", args.clinicaId);
+  if (args.somenteSeNina) {
+    atualizacao = atualizacao
+      .eq("ultima_msg_em", args.somenteSeNina.ultimaMsgEm)
+      .eq("owner_type", "AI")
+      .eq("ai_enabled", true)
+      .is("atribuida_user_id", null)
+      .not("status", "in", '("closed","finished","resolved","resolvida","fechada","encerrada")');
+    atualizacao =
+      args.somenteSeNina.sessaoId === null
+        ? atualizacao.is("nina_fluxo_estado->>session_id", null)
+        : atualizacao.eq("nina_fluxo_estado->>session_id", args.somenteSeNina.sessaoId);
+  }
+  const { error, data: atualizadas } = await atualizacao.select("id");
   if (error) return { ok: false, mensagem: error.message };
+  if (!atualizadas?.length) return { ok: false, mensagem: "A conversa mudou antes do encaminhamento." };
 
   const { count } = await supabaseAdmin
     .from("atend_conversas")
@@ -401,6 +417,8 @@ export async function encaminharParaHumano(args: {
       departamento: depto?.nome ?? null,
       atribuida_para: null,
       mensagem: "Conversa encaminhada para a equipe. A IA parou de responder.",
+      protocolo: protocoloHandoff,
+      aviso: avisoEncaminhamento,
     };
   }
 

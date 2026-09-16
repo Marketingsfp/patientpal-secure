@@ -29,6 +29,7 @@ import { isCPFValido, somenteDigitos } from "@/lib/cpf";
 import { normalizar, raizEspecialidade } from "@/lib/nina-especialidade";
 import { cadastroAutorizado, cadastroMinimoSchema } from "./cadastro-paciente";
 import { consultarCadastroConfirmado } from "./cadastro-paciente.server";
+import { processamentoWatchdogAtual } from "./watchdog-contexto.server";
 import {
   resolverMedicoAgenda as resolverMedico,
   vincularProfissionaisCatalogo,
@@ -878,6 +879,9 @@ export async function executarFerramentaPaciente(
   nome: string,
   argsRaw: unknown,
 ): Promise<ResultadoFerramenta> {
+  // O gate de cadastro também chama este executor diretamente, sem Tool Broker.
+  // Depois deste ponto uma falha não autoriza repetir a preparação do turno.
+  await processamentoWatchdogAtual()?.checkpoint("generating");
   const inicio = Date.now();
   const resultado = await executarFerramentaInterna(ctx, nome, argsRaw);
   void auditar(

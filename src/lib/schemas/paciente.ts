@@ -7,7 +7,7 @@
  * os campos de texto.
  */
 import { z } from "zod";
-import { LIMITES, limparLinha, limparTexto, somenteDigitos } from "@/lib/seguranca/sanitizar";
+import { LIMITES, limparLinha, limparTexto, somenteDigitos } from "@/lib/seguranca/texto";
 import { validarCPF } from "@/lib/validators";
 import { maiusculoParaBanco } from "@/lib/texto-maiusculo";
 

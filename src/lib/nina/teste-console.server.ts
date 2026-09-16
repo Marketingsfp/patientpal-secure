@@ -555,6 +555,9 @@ export async function processarMensagemTeste(
           mensagemId,
         };
       }
+      // O watchdog dá o mesmo desfecho que no WhatsApp: retry seguro ou handoff.
+      // Não substituir a falha por uma resposta de teste que pareça sucesso.
+      if (controle) throw e;
       // Falha técnica real: a mensagem NÃO pode ficar sem desfecho. Gravamos
       // um retorno seguro na própria conversa e registramos o erro.
       falhaTecnica = true;
