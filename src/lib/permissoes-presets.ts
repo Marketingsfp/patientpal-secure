@@ -110,6 +110,8 @@ export const TODOS_MODULOS: ReadonlyArray<string> = [
   "integration-secrets",
   "lgpd",
   "painel-executivo",
+  // Coach WhatsApp
+  "coach",
 ];
 
 export const PRESETS: Record<PerfilKey, Partial<Record<string, Acesso>>> = {

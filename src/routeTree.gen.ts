@@ -48,6 +48,7 @@ import { Route as ApiPublicNinaRuntimeRouteImport } from './routes/api/public/ni
 import { Route as ApiPublicIntakeSfpRouteImport } from './routes/api/public/intake-sfp'
 import { Route as ApiPublicIntakeConsultaHojeRouteImport } from './routes/api/public/intake-consulta-hoje'
 import { Route as ApiPublicIntakeRouteImport } from './routes/api/public/intake'
+import { Route as ApiCoachTtsRouteImport } from './routes/api/coach/tts'
 import { Route as AuthenticatedAppUnidadesRouteImport } from './routes/_authenticated/app.unidades'
 import { Route as AuthenticatedAppTriagemEnfermagemRouteImport } from './routes/_authenticated/app.triagem-enfermagem'
 import { Route as AuthenticatedAppTreinamentosRouteImport } from './routes/_authenticated/app.treinamentos'
@@ -126,6 +127,7 @@ import { Route as AuthenticatedAppHrContratosIndexRouteImport } from './routes/_
 import { Route as AuthenticatedAppFisioterapiaIndexRouteImport } from './routes/_authenticated/app.fisioterapia.index'
 import { Route as AuthenticatedAppFinanceiroIndexRouteImport } from './routes/_authenticated/app.financeiro.index'
 import { Route as AuthenticatedAppEquipeIndexRouteImport } from './routes/_authenticated/app.equipe.index'
+import { Route as AuthenticatedAppCoachIndexRouteImport } from './routes/_authenticated/app.coach.index'
 import { Route as AuthenticatedAppClientesIndexRouteImport } from './routes/_authenticated/app.clientes.index'
 import { Route as AuthenticatedAppAtendimentoIaIndexRouteImport } from './routes/_authenticated/app.atendimento-ia.index'
 import { Route as ApiPublicWhatsappClinicaIdRouteImport } from './routes/api/public/whatsapp.$clinicaId'
@@ -180,6 +182,8 @@ import { Route as AuthenticatedAppCartaoBeneficiosContratosRouteImport } from '.
 import { Route as AuthenticatedAppCartaoBeneficiosConferenciaRouteImport } from './routes/_authenticated/app.cartao-beneficios.conferencia'
 import { Route as AuthenticatedAppAtendimentoIaAgendamentoIdRouteImport } from './routes/_authenticated/app.atendimento-ia.$agendamentoId'
 import { Route as ApiPublicIntegrationsV1SplatRouteImport } from './routes/api/public/integrations/v1/$'
+import { Route as AuthenticatedAppCoachRoleplayNomeRouteImport } from './routes/_authenticated/app.coach.roleplay.$nome'
+import { Route as AuthenticatedAppCoachProvaNomeRouteImport } from './routes/_authenticated/app.coach.prova.$nome'
 import { Route as AuthenticatedAppClientesPacienteIdVisualizarRouteImport } from './routes/_authenticated/app.clientes.$pacienteId.visualizar'
 import { Route as AuthenticatedAppClientesPacienteIdEditarRouteImport } from './routes/_authenticated/app.clientes.$pacienteId.editar'
 import { Route as AuthenticatedAppEquipeMedicoMedicoIdEditarRouteImport } from './routes/_authenticated/app.equipe.medico.$medicoId.editar'
@@ -379,6 +383,11 @@ const ApiPublicIntakeConsultaHojeRoute =
 const ApiPublicIntakeRoute = ApiPublicIntakeRouteImport.update({
   id: '/api/public/intake',
   path: '/api/public/intake',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiCoachTtsRoute = ApiCoachTtsRouteImport.update({
+  id: '/api/coach/tts',
+  path: '/api/coach/tts',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthenticatedAppUnidadesRoute =
@@ -828,6 +837,12 @@ const AuthenticatedAppEquipeIndexRoute =
     path: '/',
     getParentRoute: () => AuthenticatedAppEquipeRoute,
   } as any)
+const AuthenticatedAppCoachIndexRoute =
+  AuthenticatedAppCoachIndexRouteImport.update({
+    id: '/coach/',
+    path: '/coach/',
+    getParentRoute: () => AuthenticatedAppRoute,
+  } as any)
 const AuthenticatedAppClientesIndexRoute =
   AuthenticatedAppClientesIndexRouteImport.update({
     id: '/clientes/',
@@ -1150,6 +1165,18 @@ const ApiPublicIntegrationsV1SplatRoute =
     path: '/api/public/integrations/v1/$',
     getParentRoute: () => rootRouteImport,
   } as any)
+const AuthenticatedAppCoachRoleplayNomeRoute =
+  AuthenticatedAppCoachRoleplayNomeRouteImport.update({
+    id: '/coach/roleplay/$nome',
+    path: '/coach/roleplay/$nome',
+    getParentRoute: () => AuthenticatedAppRoute,
+  } as any)
+const AuthenticatedAppCoachProvaNomeRoute =
+  AuthenticatedAppCoachProvaNomeRouteImport.update({
+    id: '/coach/prova/$nome',
+    path: '/coach/prova/$nome',
+    getParentRoute: () => AuthenticatedAppRoute,
+  } as any)
 const AuthenticatedAppClientesPacienteIdVisualizarRoute =
   AuthenticatedAppClientesPacienteIdVisualizarRouteImport.update({
     id: '/clientes/$pacienteId/visualizar',
@@ -1270,6 +1297,7 @@ export interface FileRoutesByFullPath {
   '/app/treinamentos': typeof AuthenticatedAppTreinamentosRoute
   '/app/triagem-enfermagem': typeof AuthenticatedAppTriagemEnfermagemRoute
   '/app/unidades': typeof AuthenticatedAppUnidadesRoute
+  '/api/coach/tts': typeof ApiCoachTtsRoute
   '/api/public/intake': typeof ApiPublicIntakeRoute
   '/api/public/intake-consulta-hoje': typeof ApiPublicIntakeConsultaHojeRoute
   '/api/public/intake-sfp': typeof ApiPublicIntakeSfpRoute
@@ -1333,6 +1361,7 @@ export interface FileRoutesByFullPath {
   '/api/public/whatsapp/$clinicaId': typeof ApiPublicWhatsappClinicaIdRoute
   '/app/atendimento-ia/': typeof AuthenticatedAppAtendimentoIaIndexRoute
   '/app/clientes/': typeof AuthenticatedAppClientesIndexRoute
+  '/app/coach/': typeof AuthenticatedAppCoachIndexRoute
   '/app/equipe/': typeof AuthenticatedAppEquipeIndexRoute
   '/app/financeiro/': typeof AuthenticatedAppFinanceiroIndexRoute
   '/app/fisioterapia/': typeof AuthenticatedAppFisioterapiaIndexRoute
@@ -1341,6 +1370,8 @@ export interface FileRoutesByFullPath {
   '/app/odontologia/': typeof AuthenticatedAppOdontologiaIndexRoute
   '/app/clientes/$pacienteId/editar': typeof AuthenticatedAppClientesPacienteIdEditarRoute
   '/app/clientes/$pacienteId/visualizar': typeof AuthenticatedAppClientesPacienteIdVisualizarRoute
+  '/app/coach/prova/$nome': typeof AuthenticatedAppCoachProvaNomeRoute
+  '/app/coach/roleplay/$nome': typeof AuthenticatedAppCoachRoleplayNomeRoute
   '/api/public/integrations/v1/$': typeof ApiPublicIntegrationsV1SplatRoute
   '/app/equipe/medico/$medicoId/editar': typeof AuthenticatedAppEquipeMedicoMedicoIdEditarRoute
 }
@@ -1441,6 +1472,7 @@ export interface FileRoutesByTo {
   '/app/treinamentos': typeof AuthenticatedAppTreinamentosRoute
   '/app/triagem-enfermagem': typeof AuthenticatedAppTriagemEnfermagemRoute
   '/app/unidades': typeof AuthenticatedAppUnidadesRoute
+  '/api/coach/tts': typeof ApiCoachTtsRoute
   '/api/public/intake': typeof ApiPublicIntakeRoute
   '/api/public/intake-consulta-hoje': typeof ApiPublicIntakeConsultaHojeRoute
   '/api/public/intake-sfp': typeof ApiPublicIntakeSfpRoute
@@ -1504,6 +1536,7 @@ export interface FileRoutesByTo {
   '/api/public/whatsapp/$clinicaId': typeof ApiPublicWhatsappClinicaIdRoute
   '/app/atendimento-ia': typeof AuthenticatedAppAtendimentoIaIndexRoute
   '/app/clientes': typeof AuthenticatedAppClientesIndexRoute
+  '/app/coach': typeof AuthenticatedAppCoachIndexRoute
   '/app/equipe': typeof AuthenticatedAppEquipeIndexRoute
   '/app/financeiro': typeof AuthenticatedAppFinanceiroIndexRoute
   '/app/fisioterapia': typeof AuthenticatedAppFisioterapiaIndexRoute
@@ -1512,6 +1545,8 @@ export interface FileRoutesByTo {
   '/app/odontologia': typeof AuthenticatedAppOdontologiaIndexRoute
   '/app/clientes/$pacienteId/editar': typeof AuthenticatedAppClientesPacienteIdEditarRoute
   '/app/clientes/$pacienteId/visualizar': typeof AuthenticatedAppClientesPacienteIdVisualizarRoute
+  '/app/coach/prova/$nome': typeof AuthenticatedAppCoachProvaNomeRoute
+  '/app/coach/roleplay/$nome': typeof AuthenticatedAppCoachRoleplayNomeRoute
   '/api/public/integrations/v1/$': typeof ApiPublicIntegrationsV1SplatRoute
   '/app/equipe/medico/$medicoId/editar': typeof AuthenticatedAppEquipeMedicoMedicoIdEditarRoute
 }
@@ -1618,6 +1653,7 @@ export interface FileRoutesById {
   '/_authenticated/app/treinamentos': typeof AuthenticatedAppTreinamentosRoute
   '/_authenticated/app/triagem-enfermagem': typeof AuthenticatedAppTriagemEnfermagemRoute
   '/_authenticated/app/unidades': typeof AuthenticatedAppUnidadesRoute
+  '/api/coach/tts': typeof ApiCoachTtsRoute
   '/api/public/intake': typeof ApiPublicIntakeRoute
   '/api/public/intake-consulta-hoje': typeof ApiPublicIntakeConsultaHojeRoute
   '/api/public/intake-sfp': typeof ApiPublicIntakeSfpRoute
@@ -1681,6 +1717,7 @@ export interface FileRoutesById {
   '/api/public/whatsapp/$clinicaId': typeof ApiPublicWhatsappClinicaIdRoute
   '/_authenticated/app/atendimento-ia/': typeof AuthenticatedAppAtendimentoIaIndexRoute
   '/_authenticated/app/clientes/': typeof AuthenticatedAppClientesIndexRoute
+  '/_authenticated/app/coach/': typeof AuthenticatedAppCoachIndexRoute
   '/_authenticated/app/equipe/': typeof AuthenticatedAppEquipeIndexRoute
   '/_authenticated/app/financeiro/': typeof AuthenticatedAppFinanceiroIndexRoute
   '/_authenticated/app/fisioterapia/': typeof AuthenticatedAppFisioterapiaIndexRoute
@@ -1689,6 +1726,8 @@ export interface FileRoutesById {
   '/_authenticated/app/odontologia/': typeof AuthenticatedAppOdontologiaIndexRoute
   '/_authenticated/app/clientes/$pacienteId/editar': typeof AuthenticatedAppClientesPacienteIdEditarRoute
   '/_authenticated/app/clientes/$pacienteId/visualizar': typeof AuthenticatedAppClientesPacienteIdVisualizarRoute
+  '/_authenticated/app/coach/prova/$nome': typeof AuthenticatedAppCoachProvaNomeRoute
+  '/_authenticated/app/coach/roleplay/$nome': typeof AuthenticatedAppCoachRoleplayNomeRoute
   '/api/public/integrations/v1/$': typeof ApiPublicIntegrationsV1SplatRoute
   '/_authenticated/app/equipe/medico/$medicoId/editar': typeof AuthenticatedAppEquipeMedicoMedicoIdEditarRoute
 }
@@ -1795,6 +1834,7 @@ export interface FileRouteTypes {
     | '/app/treinamentos'
     | '/app/triagem-enfermagem'
     | '/app/unidades'
+    | '/api/coach/tts'
     | '/api/public/intake'
     | '/api/public/intake-consulta-hoje'
     | '/api/public/intake-sfp'
@@ -1858,6 +1898,7 @@ export interface FileRouteTypes {
     | '/api/public/whatsapp/$clinicaId'
     | '/app/atendimento-ia/'
     | '/app/clientes/'
+    | '/app/coach/'
     | '/app/equipe/'
     | '/app/financeiro/'
     | '/app/fisioterapia/'
@@ -1866,6 +1907,8 @@ export interface FileRouteTypes {
     | '/app/odontologia/'
     | '/app/clientes/$pacienteId/editar'
     | '/app/clientes/$pacienteId/visualizar'
+    | '/app/coach/prova/$nome'
+    | '/app/coach/roleplay/$nome'
     | '/api/public/integrations/v1/$'
     | '/app/equipe/medico/$medicoId/editar'
   fileRoutesByTo: FileRoutesByTo
@@ -1966,6 +2009,7 @@ export interface FileRouteTypes {
     | '/app/treinamentos'
     | '/app/triagem-enfermagem'
     | '/app/unidades'
+    | '/api/coach/tts'
     | '/api/public/intake'
     | '/api/public/intake-consulta-hoje'
     | '/api/public/intake-sfp'
@@ -2029,6 +2073,7 @@ export interface FileRouteTypes {
     | '/api/public/whatsapp/$clinicaId'
     | '/app/atendimento-ia'
     | '/app/clientes'
+    | '/app/coach'
     | '/app/equipe'
     | '/app/financeiro'
     | '/app/fisioterapia'
@@ -2037,6 +2082,8 @@ export interface FileRouteTypes {
     | '/app/odontologia'
     | '/app/clientes/$pacienteId/editar'
     | '/app/clientes/$pacienteId/visualizar'
+    | '/app/coach/prova/$nome'
+    | '/app/coach/roleplay/$nome'
     | '/api/public/integrations/v1/$'
     | '/app/equipe/medico/$medicoId/editar'
   id:
@@ -2142,6 +2189,7 @@ export interface FileRouteTypes {
     | '/_authenticated/app/treinamentos'
     | '/_authenticated/app/triagem-enfermagem'
     | '/_authenticated/app/unidades'
+    | '/api/coach/tts'
     | '/api/public/intake'
     | '/api/public/intake-consulta-hoje'
     | '/api/public/intake-sfp'
@@ -2205,6 +2253,7 @@ export interface FileRouteTypes {
     | '/api/public/whatsapp/$clinicaId'
     | '/_authenticated/app/atendimento-ia/'
     | '/_authenticated/app/clientes/'
+    | '/_authenticated/app/coach/'
     | '/_authenticated/app/equipe/'
     | '/_authenticated/app/financeiro/'
     | '/_authenticated/app/fisioterapia/'
@@ -2213,6 +2262,8 @@ export interface FileRouteTypes {
     | '/_authenticated/app/odontologia/'
     | '/_authenticated/app/clientes/$pacienteId/editar'
     | '/_authenticated/app/clientes/$pacienteId/visualizar'
+    | '/_authenticated/app/coach/prova/$nome'
+    | '/_authenticated/app/coach/roleplay/$nome'
     | '/api/public/integrations/v1/$'
     | '/_authenticated/app/equipe/medico/$medicoId/editar'
   fileRoutesById: FileRoutesById
@@ -2247,6 +2298,7 @@ export interface RootRouteChildren {
   PacienteIndexRoute: typeof PacienteIndexRoute
   DotlovableOauthConsentRoute: typeof DotlovableOauthConsentRoute
   Char91DotmcpChar93InvokeToolToolRoute: typeof Char91DotmcpChar93InvokeToolToolRoute
+  ApiCoachTtsRoute: typeof ApiCoachTtsRoute
   ApiPublicIntakeRoute: typeof ApiPublicIntakeRoute
   ApiPublicIntakeConsultaHojeRoute: typeof ApiPublicIntakeConsultaHojeRoute
   ApiPublicIntakeSfpRoute: typeof ApiPublicIntakeSfpRoute
@@ -2539,6 +2591,13 @@ declare module '@tanstack/react-router' {
       path: '/api/public/intake'
       fullPath: '/api/public/intake'
       preLoaderRoute: typeof ApiPublicIntakeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/coach/tts': {
+      id: '/api/coach/tts'
+      path: '/api/coach/tts'
+      fullPath: '/api/coach/tts'
+      preLoaderRoute: typeof ApiCoachTtsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_authenticated/app/unidades': {
@@ -3087,6 +3146,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAppEquipeIndexRouteImport
       parentRoute: typeof AuthenticatedAppEquipeRoute
     }
+    '/_authenticated/app/coach/': {
+      id: '/_authenticated/app/coach/'
+      path: '/coach'
+      fullPath: '/app/coach/'
+      preLoaderRoute: typeof AuthenticatedAppCoachIndexRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
+    }
     '/_authenticated/app/clientes/': {
       id: '/_authenticated/app/clientes/'
       path: '/clientes'
@@ -3465,6 +3531,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicIntegrationsV1SplatRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_authenticated/app/coach/roleplay/$nome': {
+      id: '/_authenticated/app/coach/roleplay/$nome'
+      path: '/coach/roleplay/$nome'
+      fullPath: '/app/coach/roleplay/$nome'
+      preLoaderRoute: typeof AuthenticatedAppCoachRoleplayNomeRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
+    }
+    '/_authenticated/app/coach/prova/$nome': {
+      id: '/_authenticated/app/coach/prova/$nome'
+      path: '/coach/prova/$nome'
+      fullPath: '/app/coach/prova/$nome'
+      preLoaderRoute: typeof AuthenticatedAppCoachProvaNomeRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
+    }
     '/_authenticated/app/clientes/$pacienteId/visualizar': {
       id: '/_authenticated/app/clientes/$pacienteId/visualizar'
       path: '/clientes/$pacienteId/visualizar'
@@ -3730,12 +3810,15 @@ interface AuthenticatedAppRouteChildren {
   AuthenticatedAppOdontologiaOrcamentosRoute: typeof AuthenticatedAppOdontologiaOrcamentosRoute
   AuthenticatedAppProcedimentosImportarRoute: typeof AuthenticatedAppProcedimentosImportarRoute
   AuthenticatedAppClientesIndexRoute: typeof AuthenticatedAppClientesIndexRoute
+  AuthenticatedAppCoachIndexRoute: typeof AuthenticatedAppCoachIndexRoute
   AuthenticatedAppFisioterapiaIndexRoute: typeof AuthenticatedAppFisioterapiaIndexRoute
   AuthenticatedAppHrContratosIndexRoute: typeof AuthenticatedAppHrContratosIndexRoute
   AuthenticatedAppNfseIndexRoute: typeof AuthenticatedAppNfseIndexRoute
   AuthenticatedAppOdontologiaIndexRoute: typeof AuthenticatedAppOdontologiaIndexRoute
   AuthenticatedAppClientesPacienteIdEditarRoute: typeof AuthenticatedAppClientesPacienteIdEditarRoute
   AuthenticatedAppClientesPacienteIdVisualizarRoute: typeof AuthenticatedAppClientesPacienteIdVisualizarRoute
+  AuthenticatedAppCoachProvaNomeRoute: typeof AuthenticatedAppCoachProvaNomeRoute
+  AuthenticatedAppCoachRoleplayNomeRoute: typeof AuthenticatedAppCoachRoleplayNomeRoute
 }
 
 const AuthenticatedAppRouteChildren: AuthenticatedAppRouteChildren = {
@@ -3843,6 +3926,7 @@ const AuthenticatedAppRouteChildren: AuthenticatedAppRouteChildren = {
   AuthenticatedAppProcedimentosImportarRoute:
     AuthenticatedAppProcedimentosImportarRoute,
   AuthenticatedAppClientesIndexRoute: AuthenticatedAppClientesIndexRoute,
+  AuthenticatedAppCoachIndexRoute: AuthenticatedAppCoachIndexRoute,
   AuthenticatedAppFisioterapiaIndexRoute:
     AuthenticatedAppFisioterapiaIndexRoute,
   AuthenticatedAppHrContratosIndexRoute: AuthenticatedAppHrContratosIndexRoute,
@@ -3852,6 +3936,9 @@ const AuthenticatedAppRouteChildren: AuthenticatedAppRouteChildren = {
     AuthenticatedAppClientesPacienteIdEditarRoute,
   AuthenticatedAppClientesPacienteIdVisualizarRoute:
     AuthenticatedAppClientesPacienteIdVisualizarRoute,
+  AuthenticatedAppCoachProvaNomeRoute: AuthenticatedAppCoachProvaNomeRoute,
+  AuthenticatedAppCoachRoleplayNomeRoute:
+    AuthenticatedAppCoachRoleplayNomeRoute,
 }
 
 const AuthenticatedAppRouteWithChildren =
@@ -3911,6 +3998,7 @@ const rootRouteChildren: RootRouteChildren = {
   PacienteIndexRoute: PacienteIndexRoute,
   DotlovableOauthConsentRoute: DotlovableOauthConsentRoute,
   Char91DotmcpChar93InvokeToolToolRoute: Char91DotmcpChar93InvokeToolToolRoute,
+  ApiCoachTtsRoute: ApiCoachTtsRoute,
   ApiPublicIntakeRoute: ApiPublicIntakeRoute,
   ApiPublicIntakeConsultaHojeRoute: ApiPublicIntakeConsultaHojeRoute,
   ApiPublicIntakeSfpRoute: ApiPublicIntakeSfpRoute,

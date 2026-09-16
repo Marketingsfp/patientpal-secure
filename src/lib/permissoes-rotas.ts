@@ -170,6 +170,11 @@ export const ROUTE_TO_MODULE: Record<string, string | null> = {
   // eram "livres" — qualquer perfil logado abria pela URL. Passaram para
   // ADMIN_ONLY_ROUTES abaixo.
   "/app/sem-permissao": null,
+
+  // Portal Coach WhatsApp (treinamento e avaliação de atendentes).
+  // Um módulo só: "gestor" é quem tem acesso de escrita; quem tem apenas
+  // leitura vê somente o próprio treinamento.
+  "/app/coach": "coach",
 };
 
 /**

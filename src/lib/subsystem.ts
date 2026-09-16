@@ -1,4 +1,4 @@
-export type SubsystemId = "recepcao" | "gestao-pessoas" | "os-zap";
+export type SubsystemId = "recepcao" | "gestao-pessoas" | "os-zap" | "coach";
 
 const KEY = "appshell:subsystem";
 const EVT = "subsystem-change";
@@ -26,6 +26,11 @@ export const SUBSYSTEMS: Record<SubsystemId, { label: string; home: string; grou
     label: "OS ZAP",
     home: "/app/nina",
     groups: ["Atendimento", "Nina", "Configurações do WhatsApp"],
+  },
+  coach: {
+    label: "Coach WhatsApp",
+    home: "/app/coach",
+    groups: ["Treinamento", "Avaliações", "Configurações do Coach"],
   },
 };
 

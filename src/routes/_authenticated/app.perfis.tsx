@@ -182,6 +182,11 @@ const GRUPOS_BASE: Grupo[] = [
         descricao: "Análise de caso e suporte à decisão clínica",
       },
       { key: "nina", nome: "Nina — WhatsApp", descricao: "Conversas WhatsApp" },
+      {
+        key: "coach",
+        nome: "Coach WhatsApp",
+        descricao: "Treinamento de atendentes (ver = só o próprio; editar = painel da gestora)",
+      },
       { key: "odontologia", nome: "Odontologia", descricao: "Odontograma e plano" },
       {
         key: "fisioterapia",

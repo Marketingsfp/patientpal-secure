@@ -1,4 +1,4 @@
-import { Stethoscope, Users, MessageCircle, ArrowRight } from "lucide-react";
+import { Stethoscope, Users, MessageCircle, GraduationCap, ArrowRight } from "lucide-react";
 import { useSyncExternalStore } from "react";
 import { SUBSYSTEMS, type SubsystemId } from "@/lib/subsystem";
 import { cn } from "@/lib/utils";
@@ -26,6 +26,12 @@ const PORTAIS: Array<{
     icon: MessageCircle,
     descricao: "Conversas de WhatsApp, mensagens prontas e tudo da Nina.",
     itens: ["Conversas", "Mensagens prontas", "Base de conhecimentos", "Métricas"],
+  },
+  {
+    id: "coach",
+    icon: GraduationCap,
+    descricao: "Treinamento e avaliação das atendentes com apoio de IA.",
+    itens: ["Análise de conversas", "Roleplay", "Prova", "Metas", "Evolução"],
   },
 ];
 
@@ -71,7 +77,7 @@ export function PortalLauncher({
           </p>
         </div>
 
-        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 lg:gap-8">
+        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 lg:gap-8">
           {visiveis.map((portal) => {
             const Icon = portal.icon;
             return (
