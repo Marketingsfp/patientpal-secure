@@ -15178,6 +15178,10 @@ export type Database = {
         }
         Returns: undefined
       }
+      coach_vincular_atendente: {
+        Args: { _clinica_id: string; _nome_antigo: string; _user_id: string }
+        Returns: Json
+      }
       consulta_publica: { Args: { _token: string }; Returns: Json }
       contar_vinculos_paciente: { Args: { _id: string }; Returns: Json }
       contrato_dias_tolerancia: { Args: never; Returns: number }
