@@ -605,6 +605,13 @@ const navRows: ReadonlyArray<{ label: string; items: ReadonlyArray<NavItem> }> =
       { to: "/app/nina", hash: "templates", label: "Templates aprovados (Meta)", icon: FileText },
     ],
   },
+  // ---------------------------------------------------------------------
+  // Portal "Coach WhatsApp" (treinamento e avaliação de atendentes).
+  // ---------------------------------------------------------------------
+  {
+    label: "Treinamento",
+    items: [{ to: "/app/coach", label: "Coach WhatsApp", icon: GraduationCap }],
+  },
 ];
 
 // Rota "principal" de cada portal — é para onde o hub (/app) e o seletor de
