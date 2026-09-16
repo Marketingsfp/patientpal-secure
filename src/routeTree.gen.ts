@@ -126,6 +126,7 @@ import { Route as AuthenticatedAppHrContratosIndexRouteImport } from './routes/_
 import { Route as AuthenticatedAppFisioterapiaIndexRouteImport } from './routes/_authenticated/app.fisioterapia.index'
 import { Route as AuthenticatedAppFinanceiroIndexRouteImport } from './routes/_authenticated/app.financeiro.index'
 import { Route as AuthenticatedAppEquipeIndexRouteImport } from './routes/_authenticated/app.equipe.index'
+import { Route as AuthenticatedAppCoachIndexRouteImport } from './routes/_authenticated/app.coach.index'
 import { Route as AuthenticatedAppClientesIndexRouteImport } from './routes/_authenticated/app.clientes.index'
 import { Route as AuthenticatedAppAtendimentoIaIndexRouteImport } from './routes/_authenticated/app.atendimento-ia.index'
 import { Route as ApiPublicWhatsappClinicaIdRouteImport } from './routes/api/public/whatsapp.$clinicaId'
@@ -828,6 +829,12 @@ const AuthenticatedAppEquipeIndexRoute =
     path: '/',
     getParentRoute: () => AuthenticatedAppEquipeRoute,
   } as any)
+const AuthenticatedAppCoachIndexRoute =
+  AuthenticatedAppCoachIndexRouteImport.update({
+    id: '/coach/',
+    path: '/coach/',
+    getParentRoute: () => AuthenticatedAppRoute,
+  } as any)
 const AuthenticatedAppClientesIndexRoute =
   AuthenticatedAppClientesIndexRouteImport.update({
     id: '/clientes/',
@@ -1333,6 +1340,7 @@ export interface FileRoutesByFullPath {
   '/api/public/whatsapp/$clinicaId': typeof ApiPublicWhatsappClinicaIdRoute
   '/app/atendimento-ia/': typeof AuthenticatedAppAtendimentoIaIndexRoute
   '/app/clientes/': typeof AuthenticatedAppClientesIndexRoute
+  '/app/coach/': typeof AuthenticatedAppCoachIndexRoute
   '/app/equipe/': typeof AuthenticatedAppEquipeIndexRoute
   '/app/financeiro/': typeof AuthenticatedAppFinanceiroIndexRoute
   '/app/fisioterapia/': typeof AuthenticatedAppFisioterapiaIndexRoute
@@ -1504,6 +1512,7 @@ export interface FileRoutesByTo {
   '/api/public/whatsapp/$clinicaId': typeof ApiPublicWhatsappClinicaIdRoute
   '/app/atendimento-ia': typeof AuthenticatedAppAtendimentoIaIndexRoute
   '/app/clientes': typeof AuthenticatedAppClientesIndexRoute
+  '/app/coach': typeof AuthenticatedAppCoachIndexRoute
   '/app/equipe': typeof AuthenticatedAppEquipeIndexRoute
   '/app/financeiro': typeof AuthenticatedAppFinanceiroIndexRoute
   '/app/fisioterapia': typeof AuthenticatedAppFisioterapiaIndexRoute
@@ -1681,6 +1690,7 @@ export interface FileRoutesById {
   '/api/public/whatsapp/$clinicaId': typeof ApiPublicWhatsappClinicaIdRoute
   '/_authenticated/app/atendimento-ia/': typeof AuthenticatedAppAtendimentoIaIndexRoute
   '/_authenticated/app/clientes/': typeof AuthenticatedAppClientesIndexRoute
+  '/_authenticated/app/coach/': typeof AuthenticatedAppCoachIndexRoute
   '/_authenticated/app/equipe/': typeof AuthenticatedAppEquipeIndexRoute
   '/_authenticated/app/financeiro/': typeof AuthenticatedAppFinanceiroIndexRoute
   '/_authenticated/app/fisioterapia/': typeof AuthenticatedAppFisioterapiaIndexRoute
@@ -1858,6 +1868,7 @@ export interface FileRouteTypes {
     | '/api/public/whatsapp/$clinicaId'
     | '/app/atendimento-ia/'
     | '/app/clientes/'
+    | '/app/coach/'
     | '/app/equipe/'
     | '/app/financeiro/'
     | '/app/fisioterapia/'
@@ -2029,6 +2040,7 @@ export interface FileRouteTypes {
     | '/api/public/whatsapp/$clinicaId'
     | '/app/atendimento-ia'
     | '/app/clientes'
+    | '/app/coach'
     | '/app/equipe'
     | '/app/financeiro'
     | '/app/fisioterapia'
@@ -2205,6 +2217,7 @@ export interface FileRouteTypes {
     | '/api/public/whatsapp/$clinicaId'
     | '/_authenticated/app/atendimento-ia/'
     | '/_authenticated/app/clientes/'
+    | '/_authenticated/app/coach/'
     | '/_authenticated/app/equipe/'
     | '/_authenticated/app/financeiro/'
     | '/_authenticated/app/fisioterapia/'
@@ -3087,6 +3100,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAppEquipeIndexRouteImport
       parentRoute: typeof AuthenticatedAppEquipeRoute
     }
+    '/_authenticated/app/coach/': {
+      id: '/_authenticated/app/coach/'
+      path: '/coach'
+      fullPath: '/app/coach/'
+      preLoaderRoute: typeof AuthenticatedAppCoachIndexRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
+    }
     '/_authenticated/app/clientes/': {
       id: '/_authenticated/app/clientes/'
       path: '/clientes'
@@ -3730,6 +3750,7 @@ interface AuthenticatedAppRouteChildren {
   AuthenticatedAppOdontologiaOrcamentosRoute: typeof AuthenticatedAppOdontologiaOrcamentosRoute
   AuthenticatedAppProcedimentosImportarRoute: typeof AuthenticatedAppProcedimentosImportarRoute
   AuthenticatedAppClientesIndexRoute: typeof AuthenticatedAppClientesIndexRoute
+  AuthenticatedAppCoachIndexRoute: typeof AuthenticatedAppCoachIndexRoute
   AuthenticatedAppFisioterapiaIndexRoute: typeof AuthenticatedAppFisioterapiaIndexRoute
   AuthenticatedAppHrContratosIndexRoute: typeof AuthenticatedAppHrContratosIndexRoute
   AuthenticatedAppNfseIndexRoute: typeof AuthenticatedAppNfseIndexRoute
@@ -3843,6 +3864,7 @@ const AuthenticatedAppRouteChildren: AuthenticatedAppRouteChildren = {
   AuthenticatedAppProcedimentosImportarRoute:
     AuthenticatedAppProcedimentosImportarRoute,
   AuthenticatedAppClientesIndexRoute: AuthenticatedAppClientesIndexRoute,
+  AuthenticatedAppCoachIndexRoute: AuthenticatedAppCoachIndexRoute,
   AuthenticatedAppFisioterapiaIndexRoute:
     AuthenticatedAppFisioterapiaIndexRoute,
   AuthenticatedAppHrContratosIndexRoute: AuthenticatedAppHrContratosIndexRoute,

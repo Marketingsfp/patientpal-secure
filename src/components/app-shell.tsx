@@ -62,7 +62,6 @@ import {
   Megaphone,
   KeyRound,
   FolderOpen,
-  GraduationCap,
   BadgeCheck,
   LayoutGrid,
   Zap,
