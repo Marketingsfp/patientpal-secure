@@ -27,6 +27,12 @@ import { z } from "zod";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { isCPFValido, somenteDigitos } from "@/lib/cpf";
 import { normalizar, raizEspecialidade } from "@/lib/nina-especialidade";
+import { cadastroAutorizado, cadastroMinimoSchema } from "./cadastro-paciente";
+import { consultarCadastroConfirmado } from "./cadastro-paciente.server";
+import {
+  resolverMedicoAgenda as resolverMedico,
+  vincularProfissionaisCatalogo,
+} from "./vinculo-catalogo-agenda.server";
 import { autorizarAcao, type CodigoRecusa, type EntradaAutorizacao } from "./acoes/autorizacao";
 import {
   autorizarConsultaAgenda,
@@ -45,6 +51,8 @@ export type CodigoErroNina =
   | "PATIENT_NOT_FOUND"
   | "PATIENT_NOT_VERIFIED"
   | "PATIENT_DATA_MISMATCH"
+  | "PATIENT_AMBIGUOUS"
+  | "PATIENT_DATA_REQUIRED"
   | "DOCTOR_NOT_FOUND"
   | "PROCEDURE_NOT_FOUND"
   | "NO_AVAILABILITY"
@@ -172,12 +180,19 @@ async function pacienteSinteticoDoLead(
     if (existenteId) {
       const { data: pac } = await supabaseAdmin
         .from("pacientes")
-        .select("id, nome, is_mock_data")
+        .select("id, nome, is_mock_data, data_nascimento")
         .eq("id", existenteId)
         .eq("clinica_id", ctx.clinicaId)
         .maybeSingle();
-      const p = pac as { id: string; nome: string; is_mock_data: boolean } | null;
-      if (p?.is_mock_data) return { id: p.id, nome: p.nome };
+      const p = pac as { id: string; nome: string; is_mock_data: boolean; data_nascimento: string | null } | null;
+      if (p?.is_mock_data) {
+        if (!p.data_nascimento) {
+          const { error } = await supabaseAdmin.from("pacientes").update({ data_nascimento: "2000-01-01" })
+            .eq("id", p.id).eq("clinica_id", ctx.clinicaId).eq("is_mock_data", true).is("data_nascimento", null);
+          if (error) throw new Error("Falha ao completar paciente sintético");
+        }
+        return { id: p.id, nome: p.nome };
+      }
     }
 
     // Reaproveita o paciente de teste já criado para este telefone virtual.
@@ -198,6 +213,7 @@ async function pacienteSinteticoDoLead(
           clinica_id: ctx.clinicaId,
           nome,
           telefone,
+          data_nascimento: "2000-01-01",
           is_mock_data: true,
           teste: true,
         } as never)
@@ -209,6 +225,11 @@ async function pacienteSinteticoDoLead(
       pacienteNome = (criado as { nome: string } | null)?.nome ?? nome;
     }
     if (!pacienteId) return null;
+    // Um paciente sintético reaproveitado também precisa do mínimo da Agenda.
+    const { error: erroNascimentoTeste } = await supabaseAdmin.from("pacientes")
+      .update({ data_nascimento: "2000-01-01" }).eq("id", pacienteId)
+      .eq("clinica_id", ctx.clinicaId).eq("is_mock_data", true).is("data_nascimento", null);
+    if (erroNascimentoTeste) throw new Error("Falha ao completar paciente sintético");
 
     const leadId = (lead as { id?: string } | null)?.id;
     if (leadId && existenteId !== pacienteId) {
@@ -523,8 +544,6 @@ function dataISODoSlot(iso: string) {
 
 /* ------------------------------------------------ agenda: resultado e logs */
 
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
 /** Log técnico de homologação. Nunca chega ao paciente. */
 function logAgenda(ferramenta: string, dados: Record<string, unknown>) {
   try {
@@ -555,42 +574,6 @@ function falhaAgenda(e: unknown, ferramenta: string) {
   };
 }
 
-/**
- * Resolve o profissional a partir do que o modelo mandou: id real ou nome
- * ("Dr. Armando"). Homônimos exigem escolha do paciente; consultar vagas
- * para escolher alguém já anteciparia a consulta que ele ainda não autorizou.
- */
-async function resolverMedico(
-  clinicaId: string,
-  termo: string,
-): Promise<
-  | { ok: true; id: string; nome: string; candidatosOficiais: Array<{ id: string; nome: string }> }
-  | { ok: false; opcoes: Array<{ id: string; nome: string }> }
-> {
-  const t = normalizar(termo).replace(/^(dr|dra|doutor|doutora)\.?\s+/, "");
-  const { data } = await supabaseAdmin
-    .from("medicos")
-    .select("id, nome")
-    .eq("clinica_id", clinicaId)
-    .eq("ativo", true);
-  const todos = (data ?? []) as Array<{ id: string; nome: string }>;
-  if (UUID_RE.test(termo)) {
-    const medico = todos.find(m => m.id === termo);
-    return medico ? { ok: true, ...medico, candidatosOficiais: todos } : { ok: false, opcoes: [] };
-  }
-  const candidatos = todos.filter((m) => {
-    const n = normalizar(m.nome);
-    const termos = t.split(/\s+/).filter(Boolean);
-    return n.includes(t) || t.includes(n) || termos.length > 1 && termos.every(p => n.split(/\s+/).includes(p));
-  });
-  if (candidatos.length === 0) return { ok: false, opcoes: [] };
-  if (candidatos.length === 1) return { ok: true, id: candidatos[0]!.id, nome: candidatos[0]!.nome, candidatosOficiais: todos };
-
-  return { ok: false, opcoes: candidatos.slice(0, 5) };
-}
-
-
-
 /* ------------------------------------------------------------ definições AI */
 
 /**
@@ -612,7 +595,7 @@ export const FERRAMENTAS_NINA_CONSULTA = [
     function: {
       name: "buscar_medicos",
       description:
-        "Busca profissionais da clínica por especialidade e/ou nome, com dias e horários habituais publicados. Esses horários são escala administrativa; não confirmam vagas na agenda.",
+        "Busca profissionais da clínica por especialidade e/ou nome, com dias e horários habituais publicados. Retorna vinculos_agenda com medico_id operacional, separado de catalogo_id. Use medico_id para consultar vagas do profissional escolhido. Se o vínculo for ambíguo ou ausente, não invente um identificador. Os horários publicados são escala administrativa; não confirmam vagas na agenda.",
       parameters: {
         type: "object",
         properties: {
@@ -674,7 +657,7 @@ export const FERRAMENTAS_NINA_CONSULTA = [
           especialidade: { type: "string" },
           medico_id: {
             type: "string",
-            description: "Id devolvido por buscar_medicos OU o nome do profissional",
+            description: "medico_id de vinculos_agenda devolvido por buscar_medicos OU nome do profissional escolhido. catalogo_id/id do registro de conhecimento não é o UUID operacional.",
           },
           data: { type: "string", description: "AAAA-MM-DD, quando o paciente pediu um dia" },
           periodo: { type: "string", description: "manha, tarde ou noite" },
@@ -694,7 +677,7 @@ export const FERRAMENTAS_NINA_CONSULTA = [
         properties: {
           medico_id: {
             type: "string",
-            description: "Id devolvido por buscar_medicos OU o nome do profissional",
+            description: "medico_id de vinculos_agenda devolvido por buscar_medicos OU nome do profissional escolhido. catalogo_id/id do registro de conhecimento não é o UUID operacional.",
           },
           data: { type: "string", description: "AAAA-MM-DD já resolvida (hoje/amanhã viram data)" },
           hora: { type: "string", description: "HH:MM, ex.: 15:00" },
@@ -714,7 +697,7 @@ export const FERRAMENTAS_NINA_CONSULTA = [
         properties: {
           medico_id: {
             type: "string",
-            description: "Id devolvido por buscar_medicos OU o nome do profissional",
+            description: "medico_id de vinculos_agenda devolvido por buscar_medicos OU nome do profissional escolhido. catalogo_id/id do registro de conhecimento não é o UUID operacional.",
           },
           especialidade: { type: "string" },
           a_partir_de: { type: "string", description: "AAAA-MM-DD (padrão: hoje)" },
@@ -758,17 +741,26 @@ export const FERRAMENTAS_NINA_AGENDAMENTO = [
   {
     type: "function",
     function: {
+      name: "consultar_cadastro_paciente",
+      description: "Depois de definir e confirmar procedimento, médico e vaga, verifica o cadastro já confirmado na conversa e devolve apenas os campos obrigatórios faltantes do Clínica OS. Telefone sozinho não confirma identidade. Não cria cadastro.",
+      parameters: { type: "object", properties: {}, additionalProperties: false },
+    },
+  },
+  {
+    type: "function",
+    function: {
       name: "identificar_paciente",
       description:
-        "Identifica ou cadastra o paciente com CPF, nome completo e data de nascimento. Necessário antes de consultar agendamentos ou marcar. Só peça esses dados quando houver intenção clara de agendar.",
+        "Após confirmar procedimento, profissional e vaga, confere ou cadastra o paciente no Clínica OS. Peça apenas nome, data de nascimento e telefone que estiverem faltando; aproveite o telefone do WhatsApp. CPF é opcional, nunca solicite. Cadastro confirmado é reutilizado e apenas campos vazios podem ser completados.",
       parameters: {
         type: "object",
         properties: {
           cpf: { type: "string" },
           nome: { type: "string", description: "Nome completo" },
           data_nascimento: { type: "string", description: "AAAA-MM-DD" },
+          telefone: { type: "string", description: "Só quando não houver telefone do WhatsApp ou do cadastro confirmado" },
         },
-        required: ["cpf", "nome", "data_nascimento"],
+        additionalProperties: false,
       },
     },
   },
@@ -813,7 +805,7 @@ export const FERRAMENTAS_NINA_PACIENTE = [
 /* -------------------------------------------------------------- schemas Zod */
 
 const zEspecialidade = z.object({ especialidade: z.string().max(120).optional() });
-// `medico_id` aceita o UUID devolvido por `buscar_medicos` OU o nome dito pelo
+// `medico_id` aceita o UUID operacional de `buscar_medicos` OU o nome dito pelo
 // paciente. Exigir UUID fazia o Zod recusar a chamada ("Parâmetros
 // inválidos"), e o modelo traduzia isso para "houve um problema ao consultar a
 // agenda" — erro técnico que na verdade era só um nome no lugar do id.
@@ -847,8 +839,9 @@ const zDisponibilidade = z.object({
   dias: z.coerce.number().int().min(1).max(60).optional(),
 });
 const zIdentificar = z.object({
-  cpf: z.string().min(11).max(20),
-  nome: z.string().trim().min(3).max(200),
+  cpf: z.string().max(20).optional(),
+  nome: z.string().trim().min(2).max(200).optional(),
+  telefone: z.string().max(30).optional(),
   // Aceita AAAA-MM-DD e também DD/MM/AAAA — o paciente escreve como fala e o
   // modelo às vezes repassa igual. Normaliza para ISO antes de consultar.
   data_nascimento: z
@@ -859,7 +852,7 @@ const zIdentificar = z.object({
       if (!br) return v;
       return `${br[3]}-${br[2]!.padStart(2, "0")}-${br[1]!.padStart(2, "0")}`;
     })
-    .pipe(z.string().regex(/^\d{4}-\d{2}-\d{2}$/)),
+    .pipe(z.string().regex(/^\d{4}-\d{2}-\d{2}$/)).optional(),
 });
 
 const zAgendar = z.object({
@@ -892,7 +885,7 @@ export async function executarFerramentaPaciente(
     "tool",
     {
       ferramenta: nome,
-      argumentos: argsRaw ?? null,
+      argumentos: nome === "identificar_paciente" ? "[dados pessoais omitidos]" : argsRaw ?? null,
       ms: Date.now() - inicio,
       resposta: JSON.parse(JSON.stringify(resultado)),
     },
@@ -919,7 +912,7 @@ async function executarFerramentaInterna(
 
   // Defesa: mesmo que o modelo invente uma chamada, sem a flag da clínica
   // nenhuma ferramenta que grava ou expõe paciente executa.
-  const SOMENTE_COM_FLAG = new Set(["identificar_paciente", "meus_agendamentos", "agendar"]);
+  const SOMENTE_COM_FLAG = new Set(["consultar_cadastro_paciente", "identificar_paciente", "meus_agendamentos", "agendar"]);
   if (SOMENTE_COM_FLAG.has(nome) && ctx.podeAgendar === false)
     return falha("PERMISSION_DENIED", "Agendamento pela assistente não está ativo nesta unidade.");
 
@@ -997,14 +990,22 @@ async function executarFerramentaInterna(
             knowledge_status: r.knowledge_status,
             encaminhar_para_humano: true,
           });
+        const vinculos = await vincularProfissionaisCatalogo(ctx.clinicaId, r.records);
+        const porCatalogo = new Map(vinculos.map((v) => [v.catalogo_id, v]));
         return {
           ok: true,
           fonte: "catalogo_publicado",
           knowledge_status: r.knowledge_status,
           profissionais: r.doctors,
+          vinculos_agenda: vinculos,
           dias: r.days,
           observacoes: r.notes,
-          registros: r.records,
+          registros: r.records.map((registro) => {
+            const vinculo = registro.id ? porCatalogo.get(registro.id) : undefined;
+            return vinculo
+              ? { ...registro, catalogo_id: vinculo.catalogo_id, medico_id: vinculo.medico_id }
+              : registro;
+          }),
           trace: r.trace,
           instrucao: r.instrucao,
         };
@@ -1176,6 +1177,8 @@ async function executarFerramentaInterna(
               doctor_id: s0.medico_id,
               doctor_name: s0.medico_nome,
               specialty: s0.especialidade ?? null,
+              procedure: ctx.consultaAgenda?.selecaoRevalidada?.modalidade?.procedimento ??
+                (ctx.estado?.appointment.doctor_id === s0.medico_id ? ctx.estado.appointment.procedure : null),
               date: s0.data,
               time: s0.hora,
               slot_inicio: s0.inicio,
@@ -1263,6 +1266,8 @@ async function executarFerramentaInterna(
             appointment: {
               doctor_id: r.id,
               doctor_name: nome,
+              procedure: ctx.consultaAgenda?.selecaoRevalidada?.modalidade?.procedimento ??
+                (ctx.estado?.appointment.doctor_id === r.id ? ctx.estado.appointment.procedure : null),
               date: p.data,
               time: hora,
               slot_inicio: alvo.inicio,
@@ -1365,6 +1370,8 @@ async function executarFerramentaInterna(
             doctor_id: primeira.medico_id,
             doctor_name: primeira.medico_nome,
             specialty: primeira.especialidade ?? null,
+            procedure: ctx.consultaAgenda?.selecaoRevalidada?.modalidade?.procedimento ??
+              (ctx.estado?.appointment.doctor_id === primeira.medico_id ? ctx.estado.appointment.procedure : null),
             date: primeira.data,
             time: primeira.hora,
             slot_inicio: primeira.inicio,
@@ -1400,16 +1407,34 @@ async function executarFerramentaInterna(
 
 
 
+      case "consultar_cadastro_paciente": {
+        if (!cadastroAutorizado(ctx.estado)) return falha("ACTION_NOT_AUTHORIZED", "Defina o atendimento e aguarde a confirmação da vaga antes de consultar o cadastro.");
+        const cadastro = await consultarCadastroConfirmado(ctx);
+        return { ok: true, cadastro: cadastro.confirmado ? "confirmado" : "a_identificar",
+          campos_faltantes: cadastro.camposFaltantes };
+      }
+
       case "identificar_paciente": {
-        const p = zIdentificar.parse(args);
-        const cpf = somenteDigitos(p.cpf);
-        if (!isCPFValido(cpf)) return falha("VALIDATION_ERROR", "CPF inválido.");
+        if (!cadastroAutorizado(ctx.estado)) return falha("ACTION_NOT_AUTHORIZED", "Defina o atendimento e aguarde a confirmação da vaga antes de cadastrar.");
+        const entrada = zIdentificar.parse(args);
+        const cadastro = await consultarCadastroConfirmado(ctx);
+        const p = cadastroMinimoSchema.safeParse({
+          nome: cadastro.dados.nome || entrada.nome,
+          data_nascimento: cadastro.dados.data_nascimento || entrada.data_nascimento,
+          telefone: cadastro.dados.telefone || entrada.telefone,
+        });
+        if (!p.success) return falha("PATIENT_DATA_REQUIRED", "Ainda faltam dados obrigatórios válidos.", {
+          campos_faltantes: [...new Set(p.error.issues.map(i => String(i.path[0])))],
+        });
+        const dados = p.data;
+        const cpfInformado = somenteDigitos(entrada.cpf ?? "");
+        const cpf = isCPFValido(cpfInformado) ? cpfInformado : null;
 
         // HOMOLOGAÇÃO: jamais tocar em cadastro real de paciente. A identificação
         // é amarrada a um paciente SINTÉTICO exclusivo do lead de teste — nenhum
         // CPF real é gravado, consultado ou vinculado.
         if (ctx.teste || ctx.origem === "homologacao") {
-          const sintetico = await pacienteSinteticoDoLead(ctx, p.nome);
+          const sintetico = await pacienteSinteticoDoLead(ctx, dados.nome);
           if (!sintetico) {
             await auditar(ctx, "identificar_paciente", { cpf: "***", teste: true }, {
               ok: false,
@@ -1447,15 +1472,13 @@ async function executarFerramentaInterna(
           };
         }
 
-        const { data, error } = await supabaseAdmin.rpc("integracao_resolver_paciente", {
+        const { data, error } = await supabaseAdmin.rpc("nina_resolver_cadastro", {
           _clinica_id: ctx.clinicaId,
-          _cpf_digits: cpf,
-
-          _nome: p.nome,
-          _data_nascimento: p.data_nascimento,
-          _telefone: ctx.telefone ?? "",
-          _email: null,
-          _sexo: "nao_informar",
+          _conversa_id: ctx.conversaId,
+          _cpf: cpf,
+          _nome: dados.nome,
+          _data_nascimento: dados.data_nascimento,
+          _telefone: dados.telefone,
         } as never);
         if (error) {
           await auditar(ctx, "identificar_paciente", { cpf: "***" }, {
@@ -1464,25 +1487,25 @@ async function executarFerramentaInterna(
           });
           return falha("INTERNAL_ERROR", "Não consegui concluir a identificação agora.");
         }
-        const r = (data ?? {}) as { paciente_id?: string; criado?: boolean; mismatch?: boolean };
-        if (r.mismatch || !r.paciente_id) {
+        const r = (data ?? {}) as { ok?: boolean; paciente_id?: string; criado?: boolean; erro?: string };
+        if (!r.ok || !r.paciente_id) {
           await auditar(ctx, "identificar_paciente", { cpf: "***" }, {
             ok: false,
             erro: "PATIENT_DATA_MISMATCH",
           });
           return falha(
-            "PATIENT_DATA_MISMATCH",
-            "Os dados não conferem. Confira CPF, nome completo e data de nascimento, ou procure a recepção.",
+            r.erro === "PATIENT_AMBIGUOUS" ? "PATIENT_AMBIGUOUS" : "PATIENT_DATA_MISMATCH",
+            "Não foi possível vincular o cadastro com segurança. A equipe precisa conferir os dados; não foi criado outro cadastro.",
           );
         }
         ctx.pacienteId = r.paciente_id;
-        ctx.pacienteNome = p.nome;
+        ctx.pacienteNome = dados.nome;
         // Estado estruturado: a partir daqui, esta conversa tem paciente
         // identificado e validado — nada de pedir CPF/nome/nascimento de novo.
         mutarEstado(ctx, {
           patient: {
             id: r.paciente_id,
-            first_name: p.nome.split(" ")[0] ?? null,
+            first_name: dados.nome.split(" ")[0] ?? null,
             identified: true,
             validated: true,
           },
@@ -1501,7 +1524,7 @@ async function executarFerramentaInterna(
         });
         return {
           ok: true,
-          paciente: { nome: p.nome.split(" ")[0], cadastro: r.criado ? "novo" : "existente" },
+          paciente: { nome: dados.nome.split(" ")[0], cadastro: r.criado ? "novo" : "existente" },
         };
       }
 

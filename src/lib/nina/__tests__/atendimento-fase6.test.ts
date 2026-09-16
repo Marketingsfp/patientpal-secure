@@ -60,9 +60,9 @@ describe("fase 6 — máquina de estados", () => {
     ).toBe("BOOKING_INTENT_PENDING");
   });
 
-  it("confirmado sem dados do paciente coleta dados", () => {
+  it("intenção confirmada ainda define o atendimento antes de coletar dados", () => {
     const estado = comEstado({ appointment: { intent_confirmed: true } });
-    expect(derivarEtapa(ctx({ estado }))).toBe("COLLECTING_PATIENT_DATA");
+    expect(derivarEtapa(ctx({ estado }))).toBe("COLLECTING_BOOKING_PREFERENCES");
   });
 
   it("com paciente pronto e sem preferências, coleta preferências", () => {
@@ -83,6 +83,7 @@ describe("fase 6 — máquina de estados", () => {
         date: "2026-09-08",
         time: "09:00",
         slot_inicio: "2026-09-08T09:00:00",
+        slot_fim: "2026-09-08T09:30:00",
       },
     });
     expect(derivarEtapa(ctx({ estado }))).toBe("WAITING_FINAL_CONFIRMATION");
@@ -94,9 +95,12 @@ describe("fase 6 — máquina de estados", () => {
       appointment: {
         intent_confirmed: true,
         slot_confirmed_by_patient: true,
+        doctor_id: "medico",
+        procedure: "Consulta Cardiologia",
         date: "2026-09-08",
         time: "09:00",
         slot_inicio: "2026-09-08T09:00:00",
+        slot_fim: "2026-09-08T09:30:00",
       },
     });
     expect(derivarEtapa(ctx({ estado }))).toBe("CREATING_APPOINTMENT");

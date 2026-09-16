@@ -11,6 +11,7 @@
  */
 import { detectarIntencoes, type IntencaoNina } from "./atendimento-fase1";
 import type { EstadoFluxoNina } from "./fluxo-estado.server";
+import { CAMPOS_CADASTRO, camposCadastroFaltantes, atendimentoDefinido, type CampoCadastro } from "./cadastro-paciente";
 
 function normalizar(texto: string): string {
   return (texto ?? "")
@@ -65,20 +66,20 @@ export function avaliarIntencaoAgendar(
 }
 
 /** Campos obrigatórios para identificar/criar o paciente sem duplicar cadastro. */
-export const CAMPOS_OBRIGATORIOS = ["nome", "cpf", "data_nascimento"] as const;
+export const CAMPOS_OBRIGATORIOS = CAMPOS_CADASTRO;
 export type CampoObrigatorio = (typeof CAMPOS_OBRIGATORIOS)[number];
 
 const ROTULO: Record<CampoObrigatorio, string> = {
   nome: "nome completo",
-  cpf: "CPF",
+  telefone: "telefone com DDD",
   data_nascimento: "data de nascimento",
 };
 
 /** O que ainda falta, considerando o que já foi coletado nesta conversa. */
-export function dadosFaltantes(estado: EstadoFluxoNina): CampoObrigatorio[] {
+export function dadosFaltantes(estado: EstadoFluxoNina, telefone?: string | null): CampoCadastro[] {
   if (estado.patient.identified && estado.patient.id) return [];
   const pend = estado.patient.pending;
-  return CAMPOS_OBRIGATORIOS.filter((c) => !pend[c]);
+  return camposCadastroFaltantes({ ...pend, telefone: telefone || pend.telefone });
 }
 
 export function rotulos(campos: CampoObrigatorio[]): string {
@@ -118,14 +119,16 @@ export function blocoPromptFase3({ mensagem, estado }: EntradaFase3): string {
     );
   } else {
     linhas.push("- INTENÇÃO DE AGENDAR CONFIRMADA (estado BOOKING_INTENT_CONFIRMED).");
-    if (estado.patient.identified && estado.patient.id) {
+    if (!atendimentoDefinido(estado) || !estado.appointment.slot_confirmed_by_patient) {
+      linhas.push("- Defina primeiro procedimento, profissional e vaga real; apresente o resumo e aguarde a confirmação. Ainda NÃO colete dados cadastrais.");
+    } else if (estado.patient.identified && estado.patient.id) {
       linhas.push(
-        `- O cadastro do paciente${estado.patient.first_name ? ` (${estado.patient.first_name})` : ""} JÁ existe e está vinculado a esta conversa. NÃO peça dados de novo e NÃO crie cadastro novo: siga para a vaga e o agendamento.`,
+        `- O cadastro do paciente${estado.patient.first_name ? ` (${estado.patient.first_name})` : ""} JÁ existe e está vinculado a esta conversa. Consulte sua completude; NÃO peça dados preenchidos e NÃO crie cadastro novo.`,
       );
     } else if (faltam.length === CAMPOS_OBRIGATORIOS.length) {
       linhas.push(
         `- Peça os dados obrigatórios do paciente em UMA única mensagem, começando por algo como "Perfeito! 😊 Para prosseguirmos com o agendamento, preciso de alguns dados do paciente:" e liste: ${rotulos(faltam)}.`,
-        "- Não peça nada além disso. Sem endereço, e-mail, convênio ou telefone nesta etapa.",
+        "- Só inicie a coleta depois de definir e confirmar procedimento, profissional e vaga. Aproveite o telefone do WhatsApp. CPF, endereço, e-mail e convênio são opcionais: não solicite.",
       );
     } else {
       linhas.push(

@@ -102,14 +102,20 @@ describe("FASE 3 — autorização prévia", () => {
     expect(r.autorizado).toBe(true);
   });
 
-  it("identificar_paciente exige os três dados", () => {
+  it("identificar_paciente exige nome, nascimento e telefone", () => {
     const r = autorizarAcao({
       operacao: "identificar_paciente",
       clinicaId: "cli-1",
-      dadosIdentificacao: { nome: "Ana Souza", cpf: "18947197785", data_nascimento: null },
+      dadosIdentificacao: { nome: "Ana Souza", telefone: "21999990000", data_nascimento: null },
     });
     expect(r.autorizado).toBe(false);
     if (!r.autorizado) expect(r.motivos).toContain("DADOS_IDENTIFICACAO_INCOMPLETOS");
+  });
+
+  it("identificar_paciente não exige CPF opcional", () => {
+    expect(autorizarAcao({ operacao: "identificar_paciente", clinicaId: "clinica",
+      dadosIdentificacao: { nome: "Ana Souza", telefone: "21999990000", data_nascimento: "1990-01-01" },
+    }).autorizado).toBe(true);
   });
 
   it("consultar reserva anterior não exige criar de novo", () => {

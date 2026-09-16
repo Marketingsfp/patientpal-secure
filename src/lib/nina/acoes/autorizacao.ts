@@ -87,8 +87,8 @@ export type EntradaAutorizacao = {
   revisao?: { processada?: number | null; atual?: number | null };
   /** Só para operações sobre uma reserva já existente. */
   agendamentoId?: string | null;
-  /** Dados obrigatórios da identificação (nome, cpf, nascimento). */
-  dadosIdentificacao?: { nome?: string | null; cpf?: string | null; data_nascimento?: string | null };
+  /** Dados obrigatórios do Clínica OS; CPF permanece opcional. */
+  dadosIdentificacao?: { nome?: string | null; cpf?: string | null; data_nascimento?: string | null; telefone?: string | null };
   /** Base opcional da chave de idempotência (conversa/telefone). */
   idempotenciaBase?: string | null;
 };
@@ -161,7 +161,7 @@ export function autorizarAcao(entrada: EntradaAutorizacao): Autorizacao {
 
   if (operacao === "identificar_paciente") {
     const d = entrada.dadosIdentificacao;
-    if (!d || vazio(d.nome) || vazio(d.cpf) || vazio(d.data_nascimento))
+    if (!d || vazio(d.nome) || vazio(d.telefone) || vazio(d.data_nascimento))
       motivos.push("DADOS_IDENTIFICACAO_INCOMPLETOS");
   }
 

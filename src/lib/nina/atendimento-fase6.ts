@@ -14,6 +14,7 @@ import type { EstadoFluxoNina, EtapaFluxoNina } from "./fluxo-estado.server";
 import { dadosFaltantes } from "./atendimento-fase3";
 import { faltaParaConsultarAgenda } from "./atendimento-fase4";
 import { reservaDaSessaoAtual } from "./agendamento-sessao";
+import { atendimentoDefinido } from "./cadastro-paciente";
 
 function normalizar(texto: string): string {
   return (texto ?? "")
@@ -66,13 +67,15 @@ export function derivarEtapa(ctx: ContextoFase6): EtapaFluxoNina {
   const { estado } = ctx;
   const a = estado.appointment;
 
-  if (pediuAtendenteHumano(ctx.mensagem) || ctx.falhaSemRecuperacao) return "HANDOFF";
+  if (pediuAtendenteHumano(ctx.mensagem) || ctx.falhaSemRecuperacao || estado.flow.stage === "HANDOFF") return "HANDOFF";
   if (reservaDaSessaoAtual(estado)) return "APPOINTMENT_CONFIRMED";
 
   if (a.intent_confirmed) {
-    if (dadosFaltantes(estado).length > 0) return "COLLECTING_PATIENT_DATA";
-    if (a.slot_confirmed_by_patient) return "CREATING_APPOINTMENT";
-    if (a.slot_inicio && a.date && a.time) return "WAITING_FINAL_CONFIRMATION";
+    if (atendimentoDefinido(estado)) {
+      if (!a.slot_confirmed_by_patient) return "WAITING_FINAL_CONFIRMATION";
+      if (dadosFaltantes(estado).length > 0) return "COLLECTING_PATIENT_DATA";
+      return "CREATING_APPOINTMENT";
+    }
     if (faltaParaConsultarAgenda(estado).length > 0) return "COLLECTING_BOOKING_PREFERENCES";
     return "CHECKING_AVAILABILITY";
   }

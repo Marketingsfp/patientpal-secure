@@ -83,9 +83,12 @@ export function consultaDoNovoTurno(e: {
   if (!m || /^(?:obrigad[oa]|valeu|tchau|ate mais|ok obrigado|ok obrigada)$/.test(m)) return null;
   // Só respostas curtas sem novo assunto explícito herdam a pesquisa. Um
   // procedimento diferente escrito pelo paciente inicia uma consulta própria.
+  // Cortesias não mudam o assunto: "sim, por favor" continua a oferta anterior.
+  // Isso apenas escolhe os termos da releitura; não autoriza consultar ou reservar.
   const restante = m
+    .replace(/\b(?:por favor|por gentileza|faz favor|se possivel)\b/g, " ")
     .replace(
-      /\b(?:e|o|a|os|as|um|uma|de|do|da|dos|das|no|na|nos|nas|em|para|pra|por|com|ele|ela|esse|essa|este|esta|mesmo|mesma|atendimento|consulta|consultas|tipo|modalidade|que|qual|quais|se|sim|nao|pode|podem|poderia|quero|queria|gostaria|vou|fazer|prefiro|ser|sera|seria|melhor|ver|verificar|consultar|saber|aceita|aceitam|aceito|pagamento|pagar|pix|dinheiro|cartao|credito|debito|cheque|parcelado|avista|valor|valores|preco|precos|custa|custo|quanto|horario|horarios|dia|dias|data|datas|vagas|vaga|disponibilidade|disponivel|disponiveis|agenda|manha|tarde|noite|hoje|amanha|segunda|terca|quarta|quinta|sexta|sabado|domingo|feira|semana|proxima|proximo|adulto|adulta|infantil|geral|crianca|anos|ano|mes|meses)\b/g,
+      /\b(?:e|o|a|os|as|um|uma|de|do|da|dos|das|no|na|nos|nas|em|para|pra|por|com|ele|ela|esse|essa|este|esta|mesmo|mesma|atendimento|consulta|consultas|tipo|modalidade|que|qual|quais|se|sim|isso|claro|ok|okay|certo|nao|pode|podem|poderia|quero|queria|gostaria|vou|fazer|prefiro|ser|sera|seria|melhor|ver|verificar|consultar|agendar|marcar|remarcar|saber|aceita|aceitam|aceito|pagamento|pagar|pix|dinheiro|cartao|credito|debito|cheque|parcelado|avista|valor|valores|preco|precos|custa|custo|quanto|horario|horarios|dia|dias|data|datas|vagas|vaga|disponibilidade|disponivel|disponiveis|agenda|manha|tarde|noite|hoje|amanha|segunda|terca|quarta|quinta|sexta|sabado|domingo|feira|semana|proxima|proximo|adulto|adulta|infantil|geral|crianca|anos|ano|mes|meses)\b/g,
       "",
     )
     .replace(/[\d\s/-]/g, "");

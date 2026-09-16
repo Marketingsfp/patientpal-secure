@@ -40,6 +40,13 @@ const D = (t: DefinicaoTemplate) => t;
 
 export const TEMPLATES_PADRAO: readonly DefinicaoTemplate[] = [
   D({
+    chave: "fluxo.cadastro.obrigatorios",
+    categoria: "fluxo",
+    descricao: "Pede apenas campos obrigatórios faltantes após verificar o cadastro no Clínica OS.",
+    variaveis: ["lista"],
+    padrao: "Para conferir seu cadastro e concluir o agendamento, preciso de {lista}.",
+  }),
+  D({
     chave: "fluxo.coleta.completa",
     categoria: "fluxo",
     descricao: "Pedido dos três dados após o paciente aceitar a vaga.",
@@ -76,7 +83,7 @@ export const TEMPLATES_PADRAO: readonly DefinicaoTemplate[] = [
     descricao: "Falha técnica ao consultar o cadastro durante a coleta.",
     variaveis: [],
     padrao:
-      "Tive uma instabilidade aqui ao consultar o cadastro. Pode me mandar os dados de novo em instantes?",
+      "Não consegui concluir a consulta ao cadastro neste momento. Seus dados já informados foram mantidos; por favor, tente novamente em instantes.",
   }),
   D({
     chave: "fluxo.agendamento.confirmado",

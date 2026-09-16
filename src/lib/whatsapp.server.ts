@@ -705,7 +705,7 @@ async function gerarRespostaNinaInterno(
         .select("nome, base_importada, endereco, cidade, estado, cep, telefone, email")
         .eq("id", clinicaId)
         .maybeSingle(),
-      identificarPaciente(clinicaId, mensagemPaciente, telefoneNorm),
+      opcoes?.teste ? Promise.resolve(null) : identificarPaciente(clinicaId, mensagemPaciente, telefoneNorm),
       Promise.resolve({ data: [] as any[] }),
       Promise.resolve({ data: [] as any[] }),
       carregarEstadoIdentidade(clinicaId, telefoneRemetente ? String(telefoneRemetente) : null),
@@ -1221,7 +1221,7 @@ async function gerarRespostaNinaInterno(
   const camposFaltantes = await (async () => {
     try {
       const { dadosFaltantes } = await import("@/lib/nina/atendimento-fase3");
-      return dadosFaltantes(fluxoEstado) as readonly string[];
+      return dadosFaltantes(fluxoEstado, telefoneNorm) as readonly string[];
     } catch {
       return [] as readonly string[];
     }
@@ -1536,6 +1536,7 @@ async function gerarRespostaNinaInterno(
         (opcoes.auditoria as { resultado?: unknown }).resultado = respostaGate;
       return respostaGate.texto;
     }
+    runtimeContext.etapa = fluxoEstado.flow.stage;
   }
 
 
@@ -1638,6 +1639,8 @@ async function gerarRespostaNinaInterno(
 
   let resposta = "";
   let houveHandoff = false;
+  let finalizacaoSemVagas: { texto: string; textoModelo: string; handoffConfirmado: boolean } | null = null;
+  const { encaminhamentoSemVagas, respostaSemVagas } = await import("@/lib/nina/agenda-sem-vagas");
   // FASE 4 — vira true quando a conversa avançou durante a geração.
   let turnoObsoleto = false;
   // Só vira `true` quando a ferramenta "agendar" devolve sucesso COM
@@ -1971,6 +1974,48 @@ async function gerarRespostaNinaInterno(
         tool_call_id: c.id,
         content: JSON.stringify(resultadoCompartilhado),
       });
+      const encaminhamento = encaminhamentoSemVagas(r, c.function?.arguments);
+      if (encaminhamento) {
+        // A consulta é leitura, mas o encaminhamento é escrita: conferir de
+        // novo a revisão antes de silenciar a Nina ou atribuir a conversa.
+        if (opcoes?.revisao?.valor) {
+          const { respostaObsoleta } = await import("@/lib/nina/revisao-conversa.server");
+          if (await respostaObsoleta({ clinicaId, telefone: opcoes.revisao.telefone,
+            revisaoProcessada: opcoes.revisao.valor })) {
+            turnoObsoleto = true;
+            rastro?.falhar("tool.execute", "STALE_CONVERSATION_REVISION", {
+              ferramenta: "solicitar_atendente_humano", origem_solicitacao: "agenda_sem_vagas",
+            });
+            break;
+          }
+        }
+        rastro?.iniciar("tool.execute", {
+          ferramenta: "solicitar_atendente_humano", origem_solicitacao: "agenda_sem_vagas",
+        });
+        const rh = await broker.executar("solicitar_atendente_humano", JSON.stringify(encaminhamento));
+        await compartilharResultado("solicitar_atendente_humano", encaminhamento, rh);
+        const confirmado = rh.success && !rh.erro;
+        houveHandoff ||= confirmado;
+        finalizacaoSemVagas = {
+          texto: respostaSemVagas(confirmado), textoModelo: msg.content ?? "", handoffConfirmado: confirmado,
+        };
+        registrarEtapa({
+          tipo: "ferramenta", fonte: "atendimento", titulo: "Encaminhamento por ausência de vagas",
+          dados: { origem_solicitacao: "servidor", motivo: encaminhamento.motivo,
+            ferramenta_origem: nome, consulta: r.dados, argumentos: encaminhamento,
+            handoff_confirmado: confirmado, erro: rh.erro ?? null, resultado: rh.dados },
+          codigo: { arquivo: "src/lib/whatsapp.server.ts", funcao: "gerarRespostaNina" },
+        });
+        if (confirmado) rastro?.concluir("tool.execute", {
+          ferramenta: "solicitar_atendente_humano", origem_solicitacao: "agenda_sem_vagas",
+        });
+        else rastro?.falhar("tool.execute", rh.erro ?? "handoff não confirmado", {
+          ferramenta: "solicitar_atendente_humano",
+        });
+        // Encerra também o lote: não procura outro médico, não agenda e não
+        // consome rodadas adicionais do modelo depois de decidir transferir.
+        break;
+      }
     }
     if (turnoObsoleto) {
       // Sem resposta: o próximo lote reprocessa com o contexto atualizado.
@@ -1981,6 +2026,7 @@ async function gerarRespostaNinaInterno(
       }
       break;
     }
+    if (finalizacaoSemVagas) break;
     if (rodada === MAX_RODADAS - 1) limiteRodadasAtingido = true;
   }
 
@@ -2013,7 +2059,7 @@ async function gerarRespostaNinaInterno(
 
 
   // Texto tal como saiu do modelo, antes dos ajustes obrigatórios abaixo.
-  const respostaDoModelo = resposta;
+  const respostaDoModelo = finalizacaoSemVagas?.textoModelo ?? resposta;
 
   // Persiste o estado estruturado: o que as ferramentas descobriram nesta
   // rodada (paciente identificado, horário oferecido, agendamento criado)
@@ -2082,6 +2128,15 @@ async function gerarRespostaNinaInterno(
       hash: depois ? hashTurno(depois) : null,
     });
   };
+
+  if (finalizacaoSemVagas) {
+    const antes = respostaDoModelo;
+    resposta = finalizacaoSemVagas.texto;
+    transformar("agenda.sem_vagas", "consulta sem vagas ou alternativas disponíveis", antes, resposta, "aviso_operacional");
+    marcarOrigem("codigo", finalizacaoSemVagas.handoffConfirmado
+      ? "AGENDA_SEM_VAGAS: transferência confirmada"
+      : "AGENDA_SEM_VAGAS: transferência não confirmada");
+  }
 
   if (!resposta && houveHandoff) {
     const antes = resposta;
@@ -2197,7 +2252,11 @@ async function gerarRespostaNinaInterno(
       const baseResultado =
         ((opcoes?.auditoria as { resultado?: unknown } | undefined)?.resultado as
           | import("@/lib/nina/resposta/contrato").ResultadoRespostaNina
-          | undefined) ?? criarResultado({ origem: "modelo", texto: resposta });
+          | undefined) ?? criarResultado({
+            origem: finalizacaoSemVagas ? (finalizacaoSemVagas.handoffConfirmado ? "handoff" : "erro") : "modelo",
+            texto: resposta,
+          });
+      if (finalizacaoSemVagas && opcoes?.auditoria) opcoes.auditoria.resultado = baseResultado;
       const finalizada = await finalizarResposta({
         clinicaId,
         canal: opcoes?.teste === true ? "test-console" : "whatsapp",
@@ -2216,6 +2275,7 @@ async function gerarRespostaNinaInterno(
         telefone: telefoneNorm ?? null,
         mensagemPaciente: mensagemPaciente || null,
         resultado: { ...baseResultado, texto: resposta },
+        handoffPendente: houveHandoff || finalizacaoSemVagas !== null,
         // Encerramento automático só no caminho real de atendimento e SÓ no
         // primeiro passe: correção de texto não repete efeito externo.
         avaliarEncerramento:

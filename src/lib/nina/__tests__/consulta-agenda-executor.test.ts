@@ -1,13 +1,19 @@
 import { beforeEach, describe, expect, mock, test } from "bun:test";
 import { estadoVazio } from "../fluxo-estado-normalizar";
+import { consultaDoNovoTurno, type ConhecimentoSessao } from "../confidence/conhecimento-sessao";
+import type { ResultadoConhecimento } from "../knowledge-contract";
+import { comColetor } from "../evidencias.server";
 
 const CLINICA = "11111111-1111-4111-8111-111111111111";
 const MEDICO = "22222222-2222-4222-8222-222222222222";
 const OUTRO = "33333333-3333-4333-8333-333333333333";
 const PACIENTE = "44444444-4444-4444-8444-444444444444";
 const AGENDAMENTO = "55555555-5555-4555-8555-555555555555";
+const CATALOGO = "66666666-6666-4666-8666-666666666666";
 type Linha = Record<string, unknown>;
 let banco: Record<string, Linha[]>;
+let resultadoCatalogo: ResultadoConhecimento;
+const pesquisas: unknown[] = [];
 const leituras: Array<{ tabela: string; filtros: Record<string, unknown> }> = [];
 const auditoria: Linha[] = [];
 const gravacoes: Linha[] = [];
@@ -70,6 +76,13 @@ mock.module("@/integrations/supabase/client.server", () => ({
       };
       return q;
     },
+  },
+}));
+
+mock.module("@/lib/nina/knowledge.server", () => ({
+  searchKnowledgeBase: async (pedido: unknown) => {
+    pesquisas.push(pedido);
+    return resultadoCatalogo;
   },
 }));
 
@@ -143,7 +156,42 @@ beforeEach(() => {
   leituras.length = 0;
   auditoria.length = 0;
   gravacoes.length = 0;
+  pesquisas.length = 0;
+  resultadoCatalogo = {
+    found: true,
+    knowledge_status: "found",
+    source: "nina_catalogo",
+    source_type: "catalog",
+    base_version: null,
+    base_file: null,
+    procedure: "Consulta Cardiologia",
+    price: "R$ 120,00",
+    doctors: ["Alex Louza"],
+    units: [],
+    days: ["Quarta"],
+    notes: [],
+    trace: [],
+    instrucao: "Catálogo publicado.",
+    records: [
+      {
+        id: CATALOGO,
+        tipo: "profissional",
+        medico: "Alex Louza",
+        procedimento: "Consulta Cardiologia",
+        preco_dinheiro: 120,
+      },
+    ],
+  };
   banco = {
+    nina_cat_profissionais: [
+      {
+        id: CATALOGO,
+        clinica_id: CLINICA,
+        nome: "Alex Louza",
+        medico_id: null,
+        status: "PUBLICADO",
+      },
+    ],
     medicos: [
       { id: MEDICO, clinica_id: CLINICA, nome: "Alex Louza", ativo: true, especialidade_id: null },
     ],
@@ -173,6 +221,214 @@ beforeEach(() => {
 });
 
 describe("executor real das ferramentas com banco simulado", () => {
+  test("buscar_medicos separa a identidade do catálogo e a da agenda sem consultar vagas", async () => {
+    const r = await executarFerramentaPaciente(
+      contexto("Vocês têm cardiologista?"),
+      "buscar_medicos",
+      { nome: "Alex" },
+    );
+    expect(r.ok).toBe(true);
+    expect(r.vinculos_agenda).toEqual([
+      {
+        catalogo_id: CATALOGO,
+        nome_catalogo: "Alex Louza",
+        medico_id: MEDICO,
+        origem_vinculo: "nome_unico",
+        nome_agenda: "Alex Louza",
+        situacao: "vinculado",
+        opcoes: [],
+      },
+    ]);
+    expect((r.registros as Linha[])[0]).toMatchObject({
+      id: CATALOGO,
+      catalogo_id: CATALOGO,
+      medico_id: MEDICO,
+      preco_dinheiro: 120,
+    });
+    expect(consultasAgenda()).toHaveLength(0);
+    expect(gravacoes).toHaveLength(0);
+  });
+
+  for (const origem of ["homologacao", "whatsapp"] as const) {
+    test(`${origem}: aceite mantém ortopedia e converte o UUID publicado de Jorge antes de consultar`, async () => {
+      banco.medicos![0]!.nome = "JORGE ANTONIO RIBEIRO DOS SANTOS";
+      banco.nina_cat_profissionais![0]!.nome = "Jorge Ribeiro";
+      banco.nina_cat_profissionais![0]!.medico_id = OUTRO;
+      banco.medicos!.push({ id: OUTRO, clinica_id: CLINICA, nome: "JORGE RIBEIRO", ativo: false });
+      resultadoCatalogo.doctors = ["Jorge Ribeiro"];
+      resultadoCatalogo.records = [
+        {
+          id: CATALOGO,
+          tipo: "profissional",
+          medico: "Jorge Ribeiro",
+          procedimento: "Consulta Ortopedia",
+        },
+      ];
+      const memoria: ConhecimentoSessao = {
+        versao: 1,
+        clinicaId: CLINICA,
+        sessionId: "sessao-teste",
+        consulta: { termo: "ortopedia", medico: "Jorge Ribeiro" },
+        referencias: [
+          {
+            registro: CATALOGO,
+            versao: null,
+            procedimento: "Ortopedia",
+            medicoNome: "Jorge Ribeiro",
+          },
+        ],
+      };
+      const pesquisa = consultaDoNovoTurno({ mensagem: "sim por favor", anterior: memoria });
+      const ctx = {
+        ...contexto(
+          "sim por favor",
+          "Gostaria que eu verifique os horários disponíveis na agenda do Dr. Jorge Ribeiro para a próxima segunda-feira?",
+        ),
+        origem,
+        teste: origem === "homologacao",
+      };
+      expect(pesquisa?.continuidade).toBe(true);
+      await executarFerramentaPaciente(ctx, "consultar_base_conhecimento", pesquisa!.args);
+      expect(pesquisas[0]).toMatchObject({ query: "ortopedia", medico: "Jorge Ribeiro" });
+      const { resultado: busca, coletor } = await comColetor(() =>
+        executarFerramentaPaciente(ctx, "buscar_medicos", { nome: "Jorge" }),
+      );
+      expect((busca.vinculos_agenda as Linha[])[0]!.medico_id).toBe(MEDICO);
+      expect((busca.vinculos_agenda as Linha[])[0]!.origem_vinculo).toBe(
+        "vinculo_inativo_reconciliado",
+      );
+      const vinculoAuditado = coletor.pacote().etapas.find((e) => e.dados.vinculos)?.dados
+        .vinculos[0];
+      expect(vinculoAuditado).toMatchObject({
+        catalogo_id: CATALOGO,
+        medico_id_publicado: OUTRO,
+        medico_id: MEDICO,
+        origem_vinculo: "vinculo_inativo_reconciliado",
+      });
+      // Compatibilidade com o modelo que ainda devolva o UUID antigo do catálogo.
+      const r = await executarFerramentaPaciente(ctx, "consultar_disponibilidade", {
+        medico_id: CATALOGO,
+      });
+      expect(r.ok).toBe(true);
+      expect(ctx.estado.appointment.doctor_id).toBe(MEDICO);
+      expect(
+        consultasAgenda().every(
+          (l) => JSON.stringify(l.filtros.medico_id) === JSON.stringify([MEDICO]),
+        ),
+      ).toBe(true);
+      expect(gravacoes).toHaveLength(0);
+      expect(banco.nina_cat_profissionais![0]!.medico_id).toBe(OUTRO);
+    });
+  }
+
+  test("UUID publicado com dois médicos compatíveis pede escolha sem consultar vagas", async () => {
+    banco.medicos!.push({ id: OUTRO, clinica_id: CLINICA, nome: "Alex Louza Filho", ativo: true });
+    const r = await executarFerramentaPaciente(
+      contexto("sim por favor", "Posso consultar vagas com Dr. Alex Louza?"),
+      "proxima_vaga",
+      { medico_id: CATALOGO },
+    );
+    expect(r.motivo).toBe("MEDICO_NAO_DEFINIDO");
+    expect(r.opcoes).toHaveLength(2);
+    expect(consultasAgenda()).toHaveLength(0);
+  });
+
+  test("cadastro inativo não resolve homônimos por ordem de retorno", async () => {
+    banco.nina_cat_profissionais![0]!.medico_id = PACIENTE;
+    banco.medicos!.push(
+      { id: PACIENTE, clinica_id: CLINICA, nome: "Alex Louza", ativo: false },
+      { id: OUTRO, clinica_id: CLINICA, nome: "Alex Silva Louza", ativo: true },
+    );
+    const r = await executarFerramentaPaciente(
+      contexto("sim por favor", "Posso verificar vagas do Dr. Alex Louza?"),
+      "proxima_vaga",
+      { medico_id: CATALOGO },
+    );
+    expect(r.ok).toBe(false);
+    expect(r.opcoes).toHaveLength(2);
+    expect(consultasAgenda()).toHaveLength(0);
+  });
+
+  test.each(["nome_divergente", "outra_clinica"])(
+    "vínculo inativo com %s não é substituído por coincidência do nome público",
+    async (caso) => {
+      banco.nina_cat_profissionais![0]!.medico_id = OUTRO;
+      banco.medicos!.push({
+        id: OUTRO,
+        clinica_id: caso === "outra_clinica" ? OUTRO : CLINICA,
+        nome: caso === "nome_divergente" ? "Antonio Cobucci" : "Alex Louza",
+        ativo: false,
+      });
+      const r = await executarFerramentaPaciente(
+        contexto("sim", "Posso consultar as vagas do Dr. Alex Louza?"),
+        "proxima_vaga",
+        { medico_id: CATALOGO },
+      );
+      expect(r.ok).toBe(false);
+      expect(consultasAgenda()).toHaveLength(0);
+    },
+  );
+
+  for (const situacao of [
+    "outra_clinica",
+    "rascunho",
+    "arquivado",
+    "medico_inativo",
+    "vinculo_invalido",
+  ] as const) {
+    test(`catálogo ${situacao} não autoriza um vínculo nem consulta vagas`, async () => {
+      const registro = banco.nina_cat_profissionais![0]!;
+      if (situacao === "outra_clinica") registro.clinica_id = OUTRO;
+      if (situacao === "rascunho") registro.status = "RASCUNHO";
+      if (situacao === "arquivado") registro.status = "ARQUIVADO";
+      if (situacao === "medico_inativo") banco.medicos![0]!.ativo = false;
+      if (situacao === "vinculo_invalido") registro.medico_id = OUTRO;
+      const r = await executarFerramentaPaciente(
+        contexto("sim", "Posso verificar vagas com Dr. Alex Louza?"),
+        "proxima_vaga",
+        { medico_id: CATALOGO },
+      );
+      expect(r.ok).toBe(false);
+      expect(consultasAgenda()).toHaveLength(0);
+      expect(gravacoes).toHaveLength(0);
+    });
+  }
+
+  test("vínculo explícito do catálogo é preservado ao devolver a identidade da agenda", async () => {
+    banco.nina_cat_profissionais![0]!.medico_id = OUTRO;
+    banco.medicos!.push({ id: OUTRO, clinica_id: CLINICA, nome: "Alex Silva Louza", ativo: true });
+    const r = await executarFerramentaPaciente(
+      contexto("Quais médicos atendem?"),
+      "buscar_medicos",
+      { nome: "Alex" },
+    );
+    expect((r.vinculos_agenda as Linha[])[0]!.medico_id).toBe(OUTRO);
+    expect(consultasAgenda()).toHaveLength(0);
+  });
+
+  test("UUID do catálogo de outro médico não troca a escolha feita pelo paciente", async () => {
+    banco.medicos!.push({ id: OUTRO, clinica_id: CLINICA, nome: "Antonio Cobucci", ativo: true });
+    banco.nina_cat_profissionais![0]!.nome = "Antonio Cobucci";
+    const r = await executarFerramentaPaciente(
+      contexto("sim por favor", "Posso verificar vagas do Dr. Alex Louza?"),
+      "proxima_vaga",
+      { medico_id: CATALOGO },
+    );
+    expect(r.motivo).toBe("MEDICO_DIVERGENTE");
+    expect(consultasAgenda()).toHaveLength(0);
+  });
+
+  test("vínculo resolvido não transforma uma agenda vazia em vaga ou reserva", async () => {
+    banco.agendamentos = [];
+    const ctx = contexto("sim por favor", "Posso verificar vagas com o Dr. Alex Louza?");
+    const r = await executarFerramentaPaciente(ctx, "proxima_vaga", { medico_id: CATALOGO });
+    expect(r.ok).toBe(true);
+    expect(r.reason).toBe("NO_AVAILABILITY");
+    expect(r.slots).toEqual([]);
+    expect(ctx.estado.appointment.appointment_id).toBeNull();
+    expect(gravacoes).toHaveLength(0);
+  });
+
   for (const ferramenta of ["consultar_disponibilidade", "verificar_horario", "proxima_vaga"]) {
     test(`${ferramenta}: pergunta geral não toca a agenda nem resolve o médico`, async () => {
       const r = await executarFerramentaPaciente(

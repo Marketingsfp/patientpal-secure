@@ -12,6 +12,12 @@ function estado(mod: (e: EstadoFluxoNina) => void = () => {}): EstadoFluxoNina {
   return e;
 }
 
+function confirmarAtendimento(e: EstadoFluxoNina) {
+  Object.assign(e.appointment, { procedure: "Consulta", doctor_id: "medico",
+    slot_inicio: "2030-01-01T14:00:00Z", slot_fim: "2030-01-01T14:30:00Z",
+    slot_confirmed_by_patient: true, intent_confirmed: true });
+}
+
 describe("confirmação de intenção de agendar", () => {
   it("pergunta de valor não confirma", () => {
     expect(avaliarIntencaoAgendar("Quanto custa Cardiologia?", estado()).confirmado).toBe(false);
@@ -53,17 +59,22 @@ describe("coleta de dados", () => {
     expect(p).toContain("verificasse a disponibilidade");
   });
 
-  it("confirmação pede os obrigatórios de uma vez", () => {
-    const p = blocoPromptFase3({ mensagem: "Quero agendar", estado: estado() });
+  it("atendimento definido e confirmado permite pedir os obrigatórios", () => {
+    const p = blocoPromptFase3({ mensagem: "Quero agendar", estado: estado(confirmarAtendimento) });
     expect(p).toContain("BOOKING_INTENT_CONFIRMED");
     expect(p).toContain("nome completo");
     expect(p).toContain("data de nascimento");
   });
 
+  it("intenção sem vaga definida não inicia coleta", () => {
+    expect(blocoPromptFase3({ mensagem: "Quero agendar", estado: estado() })).toContain("Ainda NÃO colete dados cadastrais");
+  });
+
   it("nome já informado → pede só o que falta", () => {
     const e = estado((s) => {
+      confirmarAtendimento(s);
       s.patient.pending.nome = "Maria Souza";
-      s.patient.pending.cpf = "12345678901";
+      s.patient.pending.telefone = "21999990000";
     });
     expect(dadosFaltantes(e)).toEqual(["data_nascimento"]);
     const p = blocoPromptFase3({ mensagem: "Quero agendar", estado: e });
@@ -73,13 +84,14 @@ describe("coleta de dados", () => {
 
   it("cadastro já existente é reaproveitado, sem pedir dados", () => {
     const e = estado((s) => {
+      confirmarAtendimento(s);
       s.patient.id = "abc";
       s.patient.identified = true;
       s.patient.first_name = "Maria";
     });
     expect(dadosFaltantes(e)).toEqual([]);
     const p = blocoPromptFase3({ mensagem: "Quero agendar", estado: e });
-    expect(p).toContain("NÃO peça dados de novo");
+    expect(p).toContain("NÃO peça dados preenchidos");
     expect(p).toContain("NÃO crie cadastro novo");
   });
 

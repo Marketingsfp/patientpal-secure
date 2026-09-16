@@ -1,8 +1,8 @@
 /**
  * Trava determinística do fluxo de agendamento da Nina (server-only).
  *
- * POR QUE EXISTE: a ordem "confirmou a vaga → pedir nome + CPF + nascimento →
- * identificar → revalidar vaga → gravar → confirmar" é REGRA DE NEGÓCIO. Deixar
+ * POR QUE EXISTE: a ordem "confirmou atendimento e vaga → consultar cadastro →
+ * coletar obrigatórios faltantes → identificar → revalidar → gravar" é regra. Deixar
  * essa ordem a cargo do modelo produzia dois defeitos reais em produção:
  * 1) ao ouvir "isso", a Nina pulava direto para a criação (ou pedia um dado
  *    isolado, tipo só a data de nascimento) e chamava a identificação com
@@ -19,12 +19,15 @@
  */
 
 import type { EstadoFluxoNina } from "./fluxo-estado.server";
-import type {
-  CtxNinaPaciente,
-  ResultadoFerramenta,
-} from "./paciente-tools.server";
+import type { CtxNinaPaciente, ResultadoFerramenta } from "./paciente-tools.server";
 import { isCPFValido, somenteDigitos } from "@/lib/cpf";
 import { autorizarAcao } from "./acoes/autorizacao";
+import {
+  atendimentoDefinido,
+  camposCadastroFaltantes,
+  ROTULOS_CADASTRO,
+  type CampoCadastro,
+} from "./cadastro-paciente";
 import { criarResultado, type ResultadoRespostaNina } from "./resposta/contrato";
 import { textoDaChave, type TextosTemplates } from "./resposta/templates";
 
@@ -64,6 +67,7 @@ export type DadosIdentificacao = {
   cpf: string | null;
   /** Sempre normalizada para AAAA-MM-DD. */
   data_nascimento: string | null;
+  telefone: string | null;
 };
 
 function normalizarData(bruto: string): string | null {
@@ -111,7 +115,7 @@ export function extrairDadosIdentificacao(texto: string): DadosIdentificacao {
     .replace(/\d/g, " ")
     .replace(/[,;:|]/g, " ")
     .replace(
-      /\b(meu|nome|completo|cpf|é|eh|sou|data|de|nascimento|nasci|em|o|a)\b/gi,
+      /^(?:(?:meu\s+)?nome(?:\s+completo)?(?:\s+(?:é|eh))?|sou|me chamo)\s*|\b(cpf|telefone|celular|whatsapp|data de nascimento|nascimento|nasci em)\b/gi,
       " ",
     )
     .replace(/\s+/g, " ")
@@ -119,13 +123,13 @@ export function extrairDadosIdentificacao(texto: string): DadosIdentificacao {
   const palavras = restante.split(" ").filter((p) => /^[A-Za-zÀ-ÿ'´`^~-]{2,}$/.test(p));
   const nome =
     palavras.length >= 2
-      ? palavras
-          .slice(0, 6)
-          .map((p) => p.charAt(0).toUpperCase() + p.slice(1).toLowerCase())
-          .join(" ")
+      ? palavras.map((p) => p.charAt(0).toUpperCase() + p.slice(1).toLowerCase()).join(" ")
       : null;
 
-  return { nome, cpf, data_nascimento: data };
+  const numeros = semData.match(/(?:\+?55\s*)?\(?\d{2}\)?[\s.-]*\d{4,5}[\s.-]*\d{4}/g) ?? [];
+  const telefone =
+    numeros.map(somenteDigitos).find((n) => n !== cpf && n.length >= 10 && n.length <= 13) ?? null;
+  return { nome, cpf, data_nascimento: data, telefone };
 }
 
 /* -------------------------------------------------------------- mensagens */
@@ -136,22 +140,14 @@ export function extrairDadosIdentificacao(texto: string): DadosIdentificacao {
  * publicado (ou do padrão do código, que é o texto que já existia aqui).
  */
 function rotularFaltantes(faltando: string[]): string {
-  const rotulos: Record<string, string> = {
-    nome: "seu *nome completo*",
-    cpf: "seu *CPF*",
-    data_nascimento: "sua *data de nascimento* (DD/MM/AAAA)",
-  };
+  const rotulos: Record<string, string> = ROTULOS_CADASTRO;
   const lista = faltando.map((f) => rotulos[f]!);
   return lista.length === 1 ? lista[0]! : `${lista.slice(0, -1).join(", ")} e ${lista.at(-1)!}`;
 }
 
 /* ------------------------------------------------------------------- gate */
 
-type Executar = (
-  ctx: CtxNinaPaciente,
-  nome: string,
-  args: unknown,
-) => Promise<ResultadoFerramenta>;
+type Executar = (ctx: CtxNinaPaciente, nome: string, args: unknown) => Promise<ResultadoFerramenta>;
 
 /** Monta o resultado determinístico do gate já com o texto do template. */
 function resultadoGate(
@@ -193,221 +189,178 @@ export async function aplicarGateIdentificacao(params: {
   const textos = params.textos ?? null;
   const a = estado.appointment;
   const p = estado.patient;
-  const temVaga = Boolean(a.slot_inicio && a.slot_fim && (a.doctor_id || a.doctor_name));
-
-  // 1) Confirmou a vaga oferecida → a próxima etapa é SEMPRE a identificação.
-  if (
-    !p.identified &&
-    temVaga &&
-    !a.intent_confirmed &&
-    (estado.flow.stage === "AWAITING_SLOT_CONFIRMATION" || estado.flow.stage === "CHOOSING_SLOT") &&
-    ehConfirmacaoDeAgendamento(mensagem)
-  ) {
+  if (!atendimentoDefinido(estado) || a.appointment_id) return null;
+  if (ehNegacao(mensagem)) {
+    a.intent_confirmed = false;
+    a.slot_confirmed_by_patient = false;
+    p.pending = { nome: null, cpf: null, data_nascimento: null };
+    estado.flow.stage = "CHOOSING_SLOT";
+    return null;
+  }
+  const confirmouAgora = !a.slot_confirmed_by_patient && ehConfirmacaoDeAgendamento(mensagem);
+  if (confirmouAgora) {
     a.intent_confirmed = true;
     a.slot_confirmed_by_patient = true;
+  }
+  if (!a.slot_confirmed_by_patient || estado.flow.stage === "HANDOFF") return null;
+  const novo = confirmouAgora ? null : extrairDadosIdentificacao(mensagem);
+  if (
+    !confirmouAgora &&
+    pareceAssuntoParalelo(mensagem) &&
+    !novo?.data_nascimento &&
+    !novo?.telefone
+  )
+    return null;
+
+  // Lê o cadastro confirmado antes de pedir dados. Telefone sozinho não
+  // confirma o paciente: nesse caso ainda faltam nome e nascimento.
+  const consulta = await executar(ctx, "consultar_cadastro_paciente", {});
+  if (!consulta.ok) return resultadoGate(textos, "fluxo.identificacao.instabilidade", {});
+  const faltantesNoCadastro = (consulta.campos_faltantes ?? []) as CampoCadastro[];
+  if (novo) {
+    for (const campo of faltantesNoCadastro) {
+      if (novo[campo] && camposCadastroFaltantes(p.pending).includes(campo))
+        p.pending[campo] = novo[campo];
+    }
+    if (novo.cpf) p.pending.cpf = novo.cpf;
+  }
+  const faltando = faltantesNoCadastro.filter((campo) =>
+    camposCadastroFaltantes(p.pending).includes(campo),
+  );
+  if (faltando.length) {
     estado.flow.stage = "AWAITING_PATIENT_DATA";
-    log("intencao_confirmada", {
-      conversa: ctx.conversaId,
-      medico: a.doctor_name,
-      data: a.date,
-      hora: a.time,
-      stage: estado.flow.stage,
-    });
-    return resultadoGate(textos, "fluxo.coleta.completa", {}, {
-      camposPendentes: ["nome", "cpf", "data_nascimento"],
-      restricoes: ["nao_afirmar_agendamento_sem_gravacao"],
-    });
+    return resultadoGate(
+      textos,
+      "fluxo.cadastro.obrigatorios",
+      {
+        lista: rotularFaltantes(faltando),
+      },
+      { camposPendentes: faltando, restricoes: ["nao_afirmar_agendamento_sem_gravacao"] },
+    );
   }
 
-  // 2) Coleta em andamento: acumula o que veio e só chama a busca com os três
-  //    campos preenchidos. Nunca identificar com dado incompleto.
-  if (!p.identified && estado.flow.stage === "AWAITING_PATIENT_DATA") {
-    if (ehNegacao(mensagem)) {
-      a.intent_confirmed = false;
-      estado.flow.stage = "CHOOSING_SLOT";
-      return null; // volta para o modelo oferecer outras opções
-    }
-    const novo = extrairDadosIdentificacao(mensagem);
-    const assuntoParalelo = pareceAssuntoParalelo(mensagem);
-    // Uma pergunta solta ("quanto custa a consulta?") não é dado de cadastro:
-    // não vira nome e não é engolida pela coleta — o modelo responde e a Nina
-    // retoma o pedido dos dados no turno seguinte.
-    if (assuntoParalelo && !novo.cpf && !novo.data_nascimento) {
-      log("assunto_paralelo_na_coleta", { conversa: ctx.conversaId });
-      return null;
-    }
-    p.pending = {
-      nome: (assuntoParalelo ? null : novo.nome) ?? p.pending.nome,
-      cpf: novo.cpf ?? p.pending.cpf,
-      data_nascimento: novo.data_nascimento ?? p.pending.data_nascimento,
-    };
-    const faltando = (["nome", "cpf", "data_nascimento"] as const).filter(
-      (k) => !p.pending[k],
-    );
-    if (faltando.length > 0) {
-      // CPF digitado mas inválido merece aviso específico — senão o paciente
-      // repete o mesmo número.
-      const digitos = somenteDigitos(mensagem);
-      const cpfInvalido =
-        faltando.includes("cpf") && digitos.length >= 11 && !isCPFValido(digitos.slice(0, 11));
-      log("dados_incompletos", { conversa: ctx.conversaId, faltando });
-      if (cpfInvalido)
-        return resultadoGate(textos, "fluxo.coleta.cpf_invalido", {}, {
-          camposPendentes: [...faltando],
-        });
-      return faltando.length === 3
-        ? resultadoGate(textos, "fluxo.coleta.completa", {}, { camposPendentes: [...faltando] })
-        : resultadoGate(
-            textos,
-            "fluxo.coleta.faltando",
-            { lista: rotularFaltantes([...faltando]) },
-            { camposPendentes: [...faltando] },
-          );
-    }
-
-    // FASE 3 — mesma porta de autorização usada pelas ferramentas: o retorno
-    // antecipado do gate não escapa da conferência de pré-condições.
-    const autorizacaoIdent = autorizarAcao({
-      operacao: "identificar_paciente",
-      clinicaId: ctx.clinicaId,
-      dadosIdentificacao: {
-        nome: p.pending.nome,
-        cpf: p.pending.cpf,
-        data_nascimento: p.pending.data_nascimento,
-      },
-      idempotenciaBase: ctx.conversaId ?? ctx.telefone ?? null,
-    });
-    if (!autorizacaoIdent.autorizado) {
-      log("identificacao_nao_autorizada", {
-        conversa: ctx.conversaId,
-        motivos: autorizacaoIdent.motivos,
-      });
-      return resultadoGate(textos, "fluxo.coleta.completa", {}, {
-        camposPendentes: ["nome", "cpf", "data_nascimento"],
-      });
-    }
-
-    estado.flow.stage = "IDENTIFYING_PATIENT";
-    const r = await executar(ctx, "identificar_paciente", {
-      nome: p.pending.nome,
-      cpf: p.pending.cpf,
-      data_nascimento: p.pending.data_nascimento,
-    });
-    if (!r.ok) {
-      const erro = (r as { erro: string }).erro;
-      log("identificacao_falhou", { conversa: ctx.conversaId, erro });
-      if (erro === "PATIENT_DATA_MISMATCH" || erro === "VALIDATION_ERROR") {
-        // Não é erro técnico e não é motivo de handoff: os dados não bateram.
-        p.pending = { nome: null, cpf: null, data_nascimento: null };
-        estado.flow.stage = "AWAITING_PATIENT_DATA";
-        return resultadoGate(
-          textos,
-          "fluxo.identificacao.divergencia",
-          { mensagem: (r as { mensagem: string }).mensagem },
-          { camposPendentes: ["nome", "cpf", "data_nascimento"] },
-        );
-      }
-      estado.flow.stage = "AWAITING_PATIENT_DATA";
-      return resultadoGate(textos, "fluxo.identificacao.instabilidade", {}, {
-        camposPendentes: ["nome", "cpf", "data_nascimento"],
-      });
-    }
-
-    // Identificado: apaga os dados pessoais do estado da conversa.
-    p.pending = { nome: null, cpf: null, data_nascimento: null };
-    p.identified = true;
-    p.validated = true;
-    if (!p.id) p.id = ctx.pacienteId;
-    log("paciente_identificado", { conversa: ctx.conversaId, paciente_id: ctx.pacienteId });
-
-    if (!temVaga) {
-      estado.flow.stage = "CHOOSING_SLOT";
-      return null; // modelo retoma a escolha do horário
-    }
-
-    // 3) Revalida a vaga e grava. `agendar` já revalida o slot e confere a
-    //    gravação no banco — é a mesma porta usada pela Agenda.
-    // FASE 3 — a identificação acabou de ser concluída NESTE turno: o estado
-    // atualizado já habilita a operação, sem exigir nova consulta só porque o
-    // turno mudou. O que a autorização confere são as pré-condições reais.
-    estado.flow.stage = "REVALIDATING_SLOT";
-    const autorizacaoAgendar = autorizarAcao({
-      operacao: "criar_agendamento",
-      clinicaId: ctx.clinicaId,
-      paciente: { id: ctx.pacienteId, identificado: true, validado: true, atualizadoNoTurno: true },
-      medicoId: a.doctor_id ?? a.doctor_name,
-      procedimento: a.procedure ?? a.specialty ?? "Consulta",
-      intervalo: { inicio: a.slot_inicio, fim: a.slot_fim },
-      disponibilidadeConsultada: true,
-      // A vaga oferecida e resumida ao paciente é a única elegível aqui; a
-      // revalidação contra a agenda acontece na ferramenta/núcleo.
-      vagasConsultadas: [
-        {
-          medicoId: String(a.doctor_id ?? a.doctor_name ?? ""),
-          inicio: String(a.slot_inicio ?? ""),
-          fim: String(a.slot_fim ?? ""),
-        },
-      ],
-      consentimento: {
-        confirmado: a.intent_confirmed === true || a.slot_confirmed_by_patient === true,
-        medicoId: a.doctor_id ?? a.doctor_name,
-        inicio: a.slot_inicio,
-        fim: a.slot_fim,
-      },
-      idempotenciaBase: ctx.conversaId ?? ctx.telefone ?? null,
-    });
-    if (!autorizacaoAgendar.autorizado) {
-      log("agendamento_nao_autorizado", {
-        conversa: ctx.conversaId,
-        motivos: autorizacaoAgendar.motivos,
-      });
-      estado.flow.stage = "CHOOSING_SLOT";
-      return null; // sem efeito: o modelo reconduz a escolha do horário
-    }
-    const ag = await executar(ctx, "agendar", {
-      medico_id: a.doctor_id ?? a.doctor_name,
-      inicio: a.slot_inicio,
-      fim: a.slot_fim,
-      procedimento: a.procedure ?? a.specialty ?? "Consulta",
-    });
-    if (ag.ok && (ag as unknown as { appointment_id?: string }).appointment_id) {
-      const d = ag as unknown as { date?: string; time?: string; medico?: string };
-      log("agendamento_criado", {
-        conversa: ctx.conversaId,
-        appointment_id: (ag as unknown as { appointment_id: string }).appointment_id,
-      });
-      const appointmentId = (ag as unknown as { appointment_id: string }).appointment_id;
+  estado.flow.stage = "IDENTIFYING_PATIENT";
+  const r = await executar(
+    ctx,
+    "identificar_paciente",
+    Object.fromEntries(
+      Object.entries(p.pending).filter(([, valor]) => valor != null && valor !== ""),
+    ),
+  );
+  if (!r.ok) {
+    estado.flow.stage = "AWAITING_PATIENT_DATA";
+    if (r.erro === "PATIENT_DATA_REQUIRED") {
+      const campos = (r.campos_faltantes ?? []) as CampoCadastro[];
       return resultadoGate(
         textos,
-        "fluxo.agendamento.confirmado",
+        "fluxo.cadastro.obrigatorios",
         {
-          profissional: String(d.medico ?? a.doctor_name ?? "-"),
-          data: String(d.date ?? a.date ?? "-"),
-          horario: String(d.time ?? a.time ?? "-"),
+          lista: rotularFaltantes(campos),
         },
-        {
-          fatosConfirmados: ["agendamento_gravado"],
-          acoesConcluidas: [
-            {
-              acao: "agendar",
-              idempotencia: `agendar|${ctx.conversaId}|${a.slot_inicio ?? ""}`,
-              confirmada: true,
-              evidencia: appointmentId,
-            },
-          ],
-        },
+        { camposPendentes: campos },
       );
     }
+    if (r.erro === "PATIENT_AMBIGUOUS" || r.erro === "PATIENT_DATA_MISMATCH") {
+      estado.flow.stage = "HANDOFF";
+      p.pending = { nome: null, cpf: null, data_nascimento: null };
+      return null;
+    }
+    return resultadoGate(textos, "fluxo.identificacao.instabilidade", {});
+  }
+  p.pending = { nome: null, cpf: null, data_nascimento: null };
+  p.identified = true;
+  p.validated = true;
+  p.id = ctx.pacienteId;
+  log("paciente_identificado", { conversa: ctx.conversaId, paciente_id: ctx.pacienteId });
 
-    const erroAg = (ag as { erro?: string }).erro;
-    log("agendamento_falhou", { conversa: ctx.conversaId, erro: erroAg });
-    // Reserva anterior encontrada pela idempotência: consultada, nunca criada
-    // de novo. A prova é o ID lido do registro existente.
-    if (ag.ok && (ag as unknown as { duplicado?: boolean }).duplicado === true) {
-      const idExistente = (ag as unknown as { appointment_id?: string | null }).appointment_id ?? null;
-      estado.flow.stage = "BOOKED";
-      if (idExistente) a.appointment_id = idExistente;
-      return resultadoGate(textos, "fluxo.agendamento.duplicado", {}, {
+  // 3) Revalida a vaga e grava. `agendar` já revalida o slot e confere a
+  //    gravação no banco — é a mesma porta usada pela Agenda.
+  // FASE 3 — a identificação acabou de ser concluída NESTE turno: o estado
+  // atualizado já habilita a operação, sem exigir nova consulta só porque o
+  // turno mudou. O que a autorização confere são as pré-condições reais.
+  estado.flow.stage = "REVALIDATING_SLOT";
+  const autorizacaoAgendar = autorizarAcao({
+    operacao: "criar_agendamento",
+    clinicaId: ctx.clinicaId,
+    paciente: { id: ctx.pacienteId, identificado: true, validado: true, atualizadoNoTurno: true },
+    medicoId: a.doctor_id ?? a.doctor_name,
+    procedimento: a.procedure ?? a.specialty ?? "Consulta",
+    intervalo: { inicio: a.slot_inicio, fim: a.slot_fim },
+    disponibilidadeConsultada: true,
+    // A vaga oferecida e resumida ao paciente é a única elegível aqui; a
+    // revalidação contra a agenda acontece na ferramenta/núcleo.
+    vagasConsultadas: [
+      {
+        medicoId: String(a.doctor_id ?? a.doctor_name ?? ""),
+        inicio: String(a.slot_inicio ?? ""),
+        fim: String(a.slot_fim ?? ""),
+      },
+    ],
+    consentimento: {
+      confirmado: a.intent_confirmed === true || a.slot_confirmed_by_patient === true,
+      medicoId: a.doctor_id ?? a.doctor_name,
+      inicio: a.slot_inicio,
+      fim: a.slot_fim,
+    },
+    idempotenciaBase: ctx.conversaId ?? ctx.telefone ?? null,
+  });
+  if (!autorizacaoAgendar.autorizado) {
+    log("agendamento_nao_autorizado", {
+      conversa: ctx.conversaId,
+      motivos: autorizacaoAgendar.motivos,
+    });
+    estado.flow.stage = "CHOOSING_SLOT";
+    return null; // sem efeito: o modelo reconduz a escolha do horário
+  }
+  const ag = await executar(ctx, "agendar", {
+    medico_id: a.doctor_id ?? a.doctor_name,
+    inicio: a.slot_inicio,
+    fim: a.slot_fim,
+    procedimento: a.procedure ?? a.specialty ?? "Consulta",
+  });
+  if (ag.ok && (ag as unknown as { appointment_id?: string }).appointment_id) {
+    const d = ag as unknown as { date?: string; time?: string; medico?: string };
+    log("agendamento_criado", {
+      conversa: ctx.conversaId,
+      appointment_id: (ag as unknown as { appointment_id: string }).appointment_id,
+    });
+    const appointmentId = (ag as unknown as { appointment_id: string }).appointment_id;
+    return resultadoGate(
+      textos,
+      "fluxo.agendamento.confirmado",
+      {
+        profissional: String(d.medico ?? a.doctor_name ?? "-"),
+        data: String(d.date ?? a.date ?? "-"),
+        horario: String(d.time ?? a.time ?? "-"),
+      },
+      {
+        fatosConfirmados: ["agendamento_gravado"],
+        acoesConcluidas: [
+          {
+            acao: "agendar",
+            idempotencia: `agendar|${ctx.conversaId}|${a.slot_inicio ?? ""}`,
+            confirmada: true,
+            evidencia: appointmentId,
+          },
+        ],
+      },
+    );
+  }
+
+  const erroAg = (ag as { erro?: string }).erro;
+  log("agendamento_falhou", { conversa: ctx.conversaId, erro: erroAg });
+  // Reserva anterior encontrada pela idempotência: consultada, nunca criada
+  // de novo. A prova é o ID lido do registro existente.
+  if (ag.ok && (ag as unknown as { duplicado?: boolean }).duplicado === true) {
+    const idExistente =
+      (ag as unknown as { appointment_id?: string | null }).appointment_id ?? null;
+    estado.flow.stage = "BOOKED";
+    if (idExistente) a.appointment_id = idExistente;
+    return resultadoGate(
+      textos,
+      "fluxo.agendamento.duplicado",
+      {},
+      {
         fatosConfirmados: ["agendamento_ja_existente"],
         acoesConcluidas: [
           {
@@ -417,11 +370,16 @@ export async function aplicarGateIdentificacao(params: {
             evidencia: idExistente ?? "duplicado",
           },
         ],
-      });
-    }
-    if (erroAg === "APPOINTMENT_ALREADY_EXISTS") {
-      estado.flow.stage = "BOOKED";
-      return resultadoGate(textos, "fluxo.agendamento.duplicado", {}, {
+      },
+    );
+  }
+  if (erroAg === "APPOINTMENT_ALREADY_EXISTS") {
+    estado.flow.stage = "BOOKED";
+    return resultadoGate(
+      textos,
+      "fluxo.agendamento.duplicado",
+      {},
+      {
         fatosConfirmados: ["agendamento_ja_existente"],
         acoesConcluidas: [
           {
@@ -431,15 +389,14 @@ export async function aplicarGateIdentificacao(params: {
             evidencia: "duplicado",
           },
         ],
-      });
-    }
-    // Vaga tomada durante a coleta: limpa e deixa o modelo oferecer outras.
-    a.slot_inicio = null;
-    a.slot_fim = null;
-    a.intent_confirmed = false;
-    estado.flow.stage = "CHOOSING_SLOT";
-    return null;
+      },
+    );
   }
-
+  // Vaga tomada durante a coleta: limpa e deixa o modelo oferecer outras.
+  a.slot_inicio = null;
+  a.slot_fim = null;
+  a.intent_confirmed = false;
+  a.slot_confirmed_by_patient = false;
+  estado.flow.stage = "CHOOSING_SLOT";
   return null;
 }

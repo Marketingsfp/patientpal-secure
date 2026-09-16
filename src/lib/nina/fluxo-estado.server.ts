@@ -104,7 +104,7 @@ export function blocoPromptEstado(estado: EstadoFluxoNina): string {
   } else {
     linhas.push(
       "- Paciente ainda NÃO identificado. Pode conversar, buscar profissional e consultar horários SEM pedir dado pessoal.",
-      "- ORDEM OBRIGATÓRIA do agendamento: oferecer vaga -> paciente confirma -> pedir NOME COMPLETO + CPF + DATA DE NASCIMENTO (os três juntos, numa única mensagem) -> identificar -> revalidar vaga -> gravar -> confirmar.",
+      "- ORDEM OBRIGATÓRIA: definir atendimento e vaga -> paciente confirma -> consultar cadastro -> pedir somente nome, nascimento e telefone faltantes -> identificar/cadastrar -> revalidar vaga -> gravar -> confirmar. Aproveite o telefone do WhatsApp; CPF é opcional e não deve ser solicitado.",
       "- NUNCA chame 'identificar_paciente' com dado faltando e NUNCA chame 'agendar' antes da identificação.",
       "- Se faltar só um dado, peça apenas o que falta. Não recomece a coleta.",
       "- Falha de identificação por dados incompletos NÃO é motivo para transferir para atendente humano.",

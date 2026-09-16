@@ -55,6 +55,7 @@ export type EstadoFluxoNina = {
       nome: string | null;
       cpf: string | null;
       data_nascimento: string | null;
+      telefone?: string | null;
     };
   };
   appointment: {

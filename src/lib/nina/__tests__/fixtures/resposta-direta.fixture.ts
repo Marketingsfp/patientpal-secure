@@ -3,13 +3,16 @@ import { mock } from "bun:test";
 
 process.env.LOVABLE_API_KEY = "chave-ficticia-sem-rede";
 const teste = process.argv[2] === "homologacao";
-const pergunta = "quais são as informações do eletrocardiograma?";
+const cenario = process.argv[3] ?? "direta";
+const agenda = cenario !== "direta";
+const pergunta = agenda ? "Tem vagas com Dr. Jorge Ribeiro?" : "quais são as informações do eletrocardiograma?";
 const respostaModelo = "Eletrocardiograma: R$ 80,00 no dinheiro e R$ 95,00 no cartão. Profissional: Enfermagem. Segunda a sexta, das 8h às 12h. Sem jejum. Leve o pedido médico.";
 const prompt = "Você é Nina. Consulte a base e informe preço, profissional, horário e preparo solicitados. Não acrescente saudação à resposta sobre exames.";
 const consultas: string[] = [];
 const gravacoes: Array<{ tabela: string; valor: any }> = [];
 const requests: any[] = [];
 const ferramentas: string[] = [];
+const encaminhamentos: unknown[] = [];
 let motorChamado = 0;
 let rede = 0;
 const proibido = () => { motorChamado++; throw new Error("Motor não pode ser executado"); };
@@ -63,11 +66,29 @@ mock.module("@/lib/nina/paciente-tools.server", () => ({
 mock.module("@/lib/nina/handoff-tool.server", () => ({
   FERRAMENTA_HANDOFF: { type: "function", function: { name: "solicitar_atendente_humano" } },
 }));
+mock.module("@/lib/nina/revisao-conversa.server", () => ({
+  respostaObsoleta: async () => cenario === "obsoleto",
+}));
 const resultados: any[] = [];
 mock.module("@/lib/nina/tool-broker.server", () => ({ criarToolBroker: () => ({
   resultados: () => resultados,
-  executar: async (nome: string) => {
+  executar: async (nome: string, args: unknown) => {
     ferramentas.push(nome);
+    if (nome === "solicitar_atendente_humano" && agenda) {
+      encaminhamentos.push(typeof args === "string" ? JSON.parse(args) : args);
+      return { ferramenta: nome, capacidade: "requestHumanHandoff", fonte: "atendimento",
+        success: cenario !== "falha_handoff", reused: false, appointment_confirmed: false,
+        dados: { ok: cenario !== "falha_handoff" },
+        ...(cenario === "falha_handoff" ? { erro: "INTERNAL_ERROR" } : {}) };
+    }
+    if (nome === "consultar_disponibilidade" && agenda) {
+      return { ferramenta: nome, capacidade: "checkAvailability", fonte: "agenda",
+        success: cenario !== "falha_consulta", reused: false, appointment_confirmed: false,
+        dados: cenario === "falha_consulta" ? { ok: false, erro: "INTERNAL_ERROR", codigo: "AGENDA_QUERY_FAILED" }
+          : { ok: true, reason: "AGENDA_CHEIA", horarios: [],
+            proximos: cenario === "alternativas" ? [{ data: "2030-01-22", hora: "14:00" }] : [] },
+        ...(cenario === "falha_consulta" ? { erro: "INTERNAL_ERROR" } : {}) };
+    }
     if (nome !== "consultar_base_conhecimento") throw new Error(`Ferramenta inesperada: ${nome}`);
     const r = { ferramenta: nome, capacidade: "searchKnowledgeBase", fonte: "catalogo_publicado",
       success: true, reused: false, dados: { itens: [{ id: "ecg", procedimento: "ELETROCARDIOGRAMA",
@@ -80,6 +101,16 @@ mock.module("@/lib/nina/tool-broker.server", () => ({ criarToolBroker: () => ({
 }) }));
 mock.module("@/lib/nina/ai-gateway.server", () => ({ ninaAIGateway: async (req: any) => {
   requests.push(structuredClone(req));
+  if (agenda && requests.length === 1) return {
+    ok: true, conteudo: "Vou verificar.", modelo: "modelo-simulado", execucaoId: "execucao-direta", nivel: "low",
+    toolCalls: [
+      { id: "consulta-agenda", type: "function", function: { name: "consultar_disponibilidade",
+        arguments: '{"medico_id":"jorge","data":"2030-01-21"}' } },
+      // Uma operação posterior no mesmo lote NÃO pode rodar após a transferência.
+      ...(cenario === "sem_vagas" || cenario === "falha_handoff" ? [{ id: "nao-executar", type: "function",
+        function: { name: "agendar", arguments: "{}" } }] : []),
+    ],
+  };
   return { ok: true, conteudo: respostaModelo, toolCalls: [], modelo: "modelo-simulado", execucaoId: "execucao-direta", nivel: "low" };
 } }));
 mock.module("@/lib/nina/resposta/templates.server", () => ({
@@ -91,6 +122,7 @@ const auditoria: any = {};
 const resposta = await gerarRespostaNina("clinica-simulada", pergunta, null, {
   teste, ambiente: teste ? "homologacao" : "producao", auditoria,
   mensagensEntrada: ["entrada-simulada"],
+  ...(cenario === "obsoleto" ? { revisao: { valor: 1, telefone: "21999990000" } } : {}),
 });
 const { registrarEntregaSaida } = await import("@/lib/nina/entrega-saida.server");
 await registrarEntregaSaida({
@@ -102,4 +134,7 @@ await registrarEntregaSaida({
 console.log("DIRETA_RESULTADO=" + JSON.stringify({
   resposta, respostaModelo, prompt, motorChamado, rede, requests, ferramentas, consultas,
   temNota: auditoria.decisaoId != null, gravacoes,
+  encaminhamentos,
+  etapas: gravacoes.find(g => g.tabela === "nina_execucao_evidencias")?.valor.etapas ?? [],
+  finalizacao: auditoria.finalizacao,
 }));

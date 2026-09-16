@@ -15427,6 +15427,17 @@ export type Database = {
         }
         Returns: Json
       }
+      nina_resolver_cadastro: {
+        Args: {
+          _clinica_id: string
+          _conversa_id: string
+          _nome: string
+          _data_nascimento: string
+          _telefone: string
+          _cpf?: string | null
+        }
+        Returns: Json
+      }
       integracao_revogar_api_key: { Args: { _id: string }; Returns: boolean }
       integracao_verificacao_pacientes_por_telefone: {
         Args: { _clinica_id: string; _limite?: number; _ultimos8: string }
