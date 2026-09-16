@@ -224,6 +224,16 @@ export function mostrarErro(err: QualquerErro, contexto?: string) {
     /* */
   }
 
+  // A Inbox pode perder acesso quando a conversa muda de responsável.
+  // Mantém o bloqueio no servidor e o log acima, sem exibir esse aviso na tela.
+  if (
+    code === "CONVERSA_SEM_PERMISSAO" ||
+    msg === "CONVERSA_SEM_PERMISSAO" ||
+    msg === "Você não possui permissão para visualizar esta conversa."
+  ) {
+    return;
+  }
+
   if (original && original !== amigavel && pareceTecnico(msg)) {
     toast.error(amigavel, {
       duration: 8000,
