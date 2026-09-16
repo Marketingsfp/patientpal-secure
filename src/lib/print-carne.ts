@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { prontuarioExibicao } from "@/lib/prontuario";
 
 /**
  * Gera um carnê interno em HTML/A4 a partir das parcelas de um contrato
@@ -59,7 +60,7 @@ export async function gerarCarnePDF(contratoId: string): Promise<void> {
       .order("numero_parcela"),
     supabase
       .from("pacientes")
-      .select("nome, cpf, telefone")
+      .select("nome, cpf, telefone, codigo_prontuario, codigo_prontuario_anterior, numero_pasta")
       .eq("id", contrato.paciente_id as string)
       .maybeSingle(),
     supabase
@@ -107,6 +108,20 @@ export async function gerarCarnePDF(contratoId: string): Promise<void> {
       ? `<span class="lab" style="margin-top:6px;">&nbsp;</span>` +
         dependentes.map((d) => `<span class="val">${esc(d.cpf ?? "—")}</span>`).join("")
       : "");
+
+  if (isSaoFranciscoDePaula(clinica?.nome)) {
+    abrirJanelaCarne(
+      htmlCarneSaoFrancisco({
+        contrato,
+        parcelas: parcelas ?? [],
+        cpf: paciente?.cpf ?? null,
+        prontuario: prontuarioExibicao(paciente) ?? "—",
+        convenioNome,
+        dependentes,
+      }),
+    );
+    return;
+  }
 
   const parcelasAbertas = (parcelas ?? []).filter((p) => p.status !== "pago");
   if (parcelasAbertas.length === 0) {
@@ -291,9 +306,261 @@ export async function gerarCarnePDF(contratoId: string): Promise<void> {
 </body>
 </html>`;
 
+  abrirJanelaCarne(html);
+}
+
+function abrirJanelaCarne(html: string) {
   const w = window.open("", "_blank", "width=900,height=1000");
   if (!w) throw new Error("Bloqueio de pop-up impediu a abertura do carnê.");
   w.document.open();
   w.document.write(html);
   w.document.close();
+}
+
+/**
+ * Layout próprio da Policlínica São Francisco de Paula (marca Policardmed),
+ * reproduzindo a capa gráfica física da unidade. A Menino Jesus continua no
+ * layout acima.
+ */
+const normalizar = (s: string | null | undefined) =>
+  String(s ?? "")
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toUpperCase();
+
+export const isSaoFranciscoDePaula = (clinicaNome: string | null | undefined) =>
+  normalizar(clinicaNome).includes("SAO FRANCISCO DE PAULA");
+
+type ParcelaCarne = {
+  numero_parcela: number;
+  vencimento: string;
+  valor: number;
+  status: string;
+  pago_em: string | null;
+};
+
+/**
+ * Parcelas impressas no carnê da São Francisco: todas as mensalidades
+ * contratadas a partir da 1/N, inclusive as já pagas (a 1ª costuma ser paga
+ * na emissão e não pode sumir do carnê). Canceladas ficam fora. Adesão (0) e
+ * taxa de inclusão de dependente (< 0) só entram enquanto estão em aberto.
+ * N é o maior número de parcela, para que 12/12 continue 12/12 mesmo quando
+ * uma parcela do meio foi cancelada.
+ */
+export function parcelasCarneSaoFrancisco(parcelas: ParcelaCarne[]) {
+  const validas = parcelas.filter((p) => p.status !== "cancelado");
+  const mensalidades = validas
+    .filter((p) => Number(p.numero_parcela) >= 1)
+    .sort((a, b) => Number(a.numero_parcela) - Number(b.numero_parcela));
+  const total = mensalidades.reduce((mx, p) => Math.max(mx, Number(p.numero_parcela)), 0);
+  const taxasAbertas = validas
+    .filter((p) => Number(p.numero_parcela) < 1 && p.status !== "pago")
+    .sort((a, b) => Number(b.numero_parcela) - Number(a.numero_parcela));
+  return [
+    ...taxasAbertas.map((p) => ({
+      ...p,
+      rotulo: Number(p.numero_parcela) === 0 ? "Adesão" : "Inclusão",
+      doc: Number(p.numero_parcela) === 0 ? "TAXA DE ADESÃO" : "TAXA DE INCLUSÃO",
+    })),
+    ...mensalidades.map((p) => ({
+      ...p,
+      rotulo: `${p.numero_parcela}/${total}`,
+      doc: "CARNÊ DE PAGAMENTO",
+    })),
+  ];
+}
+
+const SFP = {
+  marca: "POLICARDMED",
+  nome: "Policlínica São Francisco de Paula",
+  endereco: "Av. Comendador Telles 2414, Vilar dos Teles, São João de Meriti RJ",
+  whatsapp: "(21) 96736-5396",
+  rodape: "O PAGAMENTO DO CARNÊ SÓ PODE SER EFETUADO NA NOSSA UNIDADE",
+};
+
+function htmlCarneSaoFrancisco(args: {
+  contrato: {
+    numero: unknown;
+    paciente_nome: string | null;
+    valor_mensal: unknown;
+    data_inicio: string | null;
+    dia_vencimento: unknown;
+  };
+  parcelas: ParcelaCarne[];
+  cpf: string | null;
+  prontuario: string;
+  convenioNome: string;
+  dependentes: { nome: string; cpf: string | null }[];
+}): string {
+  const { contrato, cpf, prontuario, convenioNome, dependentes } = args;
+  const itens = parcelasCarneSaoFrancisco(args.parcelas);
+  if (itens.length === 0) {
+    throw new Error("Contrato sem parcelas para gerar carnê.");
+  }
+  const totalMensalidades = itens.reduce((mx, p) => Math.max(mx, Number(p.numero_parcela)), 0);
+  const pessoasConvenio = 1 + dependentes.length;
+
+  const vigencia = (() => {
+    const mens = itens.filter((p) => Number(p.numero_parcela) >= 1);
+    const ini = contrato.data_inicio ?? mens[0]?.vencimento ?? null;
+    const fim = mens[mens.length - 1]?.vencimento ?? null;
+    return ini ? `${fmtD(ini)} a ${fmtD(fim)}` : "—";
+  })();
+
+  const buildFicha = (p: (typeof itens)[number], viaLabel: string) => `
+      <div class="ficha">
+        <div class="via-label">${viaLabel}</div>
+        <div class="ficha-header">
+          <div class="ficha-titulo">
+            <div class="ficha-marca">${SFP.marca}</div>
+            <div class="ficha-clinica">${esc(SFP.nome)}</div>
+            <div class="ficha-doc">${p.doc}</div>
+          </div>
+          <div class="ficha-parcelas">
+            <div class="ficha-parcela"><div class="lab">Parcela</div><div class="val">${p.rotulo}</div></div>
+            <div class="ficha-parcela"><div class="lab">Vencimento</div><div class="val">${fmtD(p.vencimento)}</div></div>
+          </div>
+        </div>
+        <div class="ficha-grid">
+          <div><span class="lab">Contrato</span><span class="val">#${esc(contrato.numero)}</span></div>
+          <div><span class="lab">Prontuário</span><span class="val">${esc(prontuario)}</span></div>
+          <div class="span2"><span class="lab">Titular</span><span class="val">${esc(contrato.paciente_nome)}</span></div>
+          <div><span class="lab">Mês Ref.</span><span class="val">${fmtMesAno(p.vencimento)}</span></div>
+          <div><span class="lab">Valor</span><span class="val destaque">${BRL(Number(p.valor))}</span></div>
+          <div class="span2"><span class="val obs">Após o vencimento será cobrado 10% de multa e juros de 0,33% ao dia.</span></div>
+        </div>
+        <div class="ficha-rodape">
+          <div class="campo-manual">
+            ${
+              p.status === "pago"
+                ? `<span class="val pago">${fmtD(p.pago_em)}</span>`
+                : `<span class="linha-assin"></span>`
+            }
+            <span class="lab">Data de pagamento</span>
+          </div>
+          <div class="campo-manual">
+            <span class="linha-assin"></span>
+            <span class="lab">Assinatura / Carimbo do recebedor</span>
+          </div>
+        </div>
+      </div>`;
+
+  const fichas = itens.map(
+    (p) => `
+      <div class="ficha-par">
+        <div class="ficha-via">${buildFicha(p, "Via do cliente")}</div>
+        <div class="ficha-via">${buildFicha(p, "Via da clínica")}</div>
+      </div>`,
+  );
+
+  return `<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<title>Carnê — Contrato #${esc(contrato.numero)} — ${esc(contrato.paciente_nome)}</title>
+<style>
+  @page { size: A4 portrait; margin: 10mm; }
+  * { box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; color: #111; margin: 0; }
+  .lab { display: block; font-size: 8px; color: #555; text-transform: uppercase; letter-spacing: .04em; }
+  .val { display: block; font-weight: 600; }
+
+  .capa {
+    border: 1px dashed #111; border-radius: 6px; padding: 12px 14px; margin-bottom: -1px;
+    height: 88mm; display: flex; flex-direction: column; gap: 8px; page-break-inside: avoid;
+  }
+  .capa-topo { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; border-bottom: 2px solid #111; padding-bottom: 6px; }
+  .capa-marca { font-size: 22px; font-weight: 900; letter-spacing: .06em; line-height: 1; }
+  .capa-nome { font-size: 13px; font-weight: 700; margin-top: 3px; }
+  .capa-end { font-size: 10px; color: #333; margin-top: 2px; }
+  .capa-whats { font-size: 11px; font-weight: 700; margin-top: 2px; }
+  .capa-codigo { border: 2px solid #111; border-radius: 6px; padding: 6px 10px; text-align: center; min-width: 45mm; }
+  .capa-codigo .lab { font-size: 10px; color: #111; font-weight: 700; }
+  .capa-codigo .val { font-size: 20px; font-weight: 900; }
+  .capa-titulo { font-size: 13px; font-weight: 800; text-transform: uppercase; letter-spacing: .04em; }
+  .capa-grid { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 6px 14px; font-size: 11px; }
+  .capa-grid .lab { font-size: 9px; }
+  .capa-rodape {
+    margin-top: auto; background: #111; color: #fff; text-align: center; font-weight: 800;
+    font-size: 11px; letter-spacing: .04em; padding: 6px; border-radius: 4px;
+    -webkit-print-color-adjust: exact; print-color-adjust: exact;
+  }
+
+  .ficha {
+    border: 1px dashed #111; border-radius: 6px; padding: 8px 10px; page-break-inside: avoid;
+    height: 89mm; display: flex; flex-direction: column; gap: 6px;
+  }
+  .ficha-par { display: grid; grid-template-columns: 1fr 1fr; margin-bottom: -1px; page-break-inside: avoid; }
+  .ficha-via { display: flex; flex-direction: column; }
+  .ficha-via:first-child .ficha { border-right: none; border-top-right-radius: 0; border-bottom-right-radius: 0; }
+  .ficha-via:last-child .ficha { border-top-left-radius: 0; border-bottom-left-radius: 0; }
+  .via-label { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; }
+  .ficha-header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 1px solid #ddd; padding-bottom: 5px; }
+  .ficha-marca { font-size: 12px; font-weight: 900; letter-spacing: .06em; }
+  .ficha-clinica { font-weight: 700; font-size: 10px; }
+  .ficha-doc { font-size: 8px; color: #555; letter-spacing: .04em; text-transform: uppercase; }
+  .ficha-parcelas { display: flex; gap: 10px; }
+  .ficha-parcela { text-align: right; }
+  .ficha-parcela .val { font-size: 12px; font-weight: 800; }
+  .ficha-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 5px 12px; font-size: 10px; }
+  .ficha-grid .span2 { grid-column: span 2; }
+  .ficha-grid .val.destaque { font-size: 13px; font-weight: 800; }
+  .ficha-grid .val.obs { font-weight: 500; font-size: 9px; }
+  .ficha-rodape { margin-top: auto; display: grid; grid-template-columns: 1fr 1fr; gap: 14px; align-items: end; }
+  .campo-manual { display: flex; flex-direction: column; justify-content: flex-end; }
+  .campo-manual .lab { text-align: center; margin-top: 2px; }
+  .campo-manual .linha-assin { display: block; border-bottom: 1px solid #111; height: 20px; }
+  .campo-manual .val.pago { font-size: 11px; text-align: center; }
+
+  .footer-imprime { text-align: center; margin: 8px 0 0; }
+  .footer-imprime button { padding: 8px 14px; font-size: 14px; cursor: pointer; }
+  @media print { .footer-imprime { display: none; } }
+</style>
+</head>
+<body>
+  <div class="capa">
+    <div class="capa-topo">
+      <div>
+        <div class="capa-marca">${SFP.marca}</div>
+        <div class="capa-nome">${esc(SFP.nome)}</div>
+        <div class="capa-end">${esc(SFP.endereco)}</div>
+        <div class="capa-whats">WhatsApp: ${esc(SFP.whatsapp)}</div>
+      </div>
+      <div class="capa-codigo"><span class="lab">Código</span><span class="val">${esc(prontuario)}</span></div>
+    </div>
+    <div class="capa-titulo">Carnê de pagamento — Contrato #${esc(contrato.numero)}</div>
+    <div class="capa-grid">
+      <div>
+        <span class="lab">Titular</span><span class="val">${esc(contrato.paciente_nome)}</span>
+        ${
+          dependentes.length
+            ? `<span class="lab" style="margin-top:4px;">Dependentes</span>` +
+              dependentes.map((d) => `<span class="val">${esc(d.nome)}</span>`).join("")
+            : ""
+        }
+      </div>
+      <div><span class="lab">CPF</span><span class="val">${esc(cpf ?? "—")}</span></div>
+      <div>
+        <span class="lab">Convênio</span><span class="val">${esc(convenioNome)}</span>
+        <span class="lab" style="margin-top:4px;">Pessoas no convênio</span><span class="val">${pessoasConvenio}</span>
+      </div>
+      <div><span class="lab">Vigência</span><span class="val">${vigencia}</span></div>
+      <div><span class="lab">Dia de vencimento</span><span class="val">${esc(contrato.dia_vencimento ?? "—")}</span></div>
+      <div>
+        <span class="lab">Parcelas</span><span class="val">${totalMensalidades}</span>
+        <span class="lab" style="margin-top:4px;">Valor mensal</span><span class="val">${BRL(Number(contrato.valor_mensal))}</span>
+      </div>
+    </div>
+    <div class="capa-rodape">${esc(SFP.rodape)}</div>
+  </div>
+
+  ${fichas.join("\n")}
+
+  <div class="footer-imprime">
+    <button onclick="window.print()">Imprimir / Salvar PDF</button>
+  </div>
+
+  <script>window.addEventListener('load', () => setTimeout(() => window.print(), 400));</script>
+</body>
+</html>`;
 }
