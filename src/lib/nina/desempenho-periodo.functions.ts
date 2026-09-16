@@ -8,7 +8,8 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { resolverRecorte, descricaoRecorte } from "@/lib/nina/metricas-filtros";
+import { descricaoRecorte } from "@/lib/nina/metricas-filtros";
+import { resolverRecorteNoCiclo as resolverRecorte } from "./ciclo-aprendizado";
 import type { DesempenhoPeriodo } from "@/lib/nina/desempenho-periodo";
 
 const entrada = z.object({

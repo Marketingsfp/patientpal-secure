@@ -12,7 +12,8 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { VALORES_CATEGORIA_FEEDBACK } from "@/lib/nina/feedback-erros";
-import { resolverRecorte, descricaoRecorte } from "@/lib/nina/metricas-filtros";
+import { descricaoRecorte } from "@/lib/nina/metricas-filtros";
+import { resolverRecorteNoCiclo as resolverRecorte, AVISO_CICLO_APRENDIZADO } from "./ciclo-aprendizado";
 import {
   DEFINICOES_INDICADORES,
   VERSAO_REGRAS_ANALISE,
@@ -125,7 +126,7 @@ async function consultarPeriodo(
     cobertura: {
       ...cobertura,
       entradaMedidaDesde: resultado.cobertura?.entradaMedidaDesde ?? null,
-      limitacoes: resultado.cobertura?.limitacoes ?? [],
+      limitacoes: [...(resultado.cobertura?.limitacoes ?? []), AVISO_CICLO_APRENDIZADO],
     },
     medias: {
       mensagensPorDia: mediaPorDia(indicadores.mensagensTotais ?? 0, cobertura.dias),
@@ -142,7 +143,7 @@ async function consultarPeriodo(
       horaInicio: periodo.horaInicio ?? null,
       horaFim: periodo.horaFim ?? null,
       diasSemana,
-      descricao: descricaoRecorte(recorte),
+      descricao: `${descricaoRecorte(recorte)} ${AVISO_CICLO_APRENDIZADO}`,
     },
   };
 }

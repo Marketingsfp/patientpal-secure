@@ -10,6 +10,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { FUSO_OPERACAO_PADRAO } from "@/lib/nina/metricas-filtros";
+import { INICIO_CICLO_APRENDIZADO, AVISO_CICLO_APRENDIZADO, inicioNoCicloAprendizado } from "./ciclo-aprendizado";
 import {
   FERRAMENTAS_ANALISTA,
   INSTRUCOES_ANALISTA,
@@ -211,7 +212,7 @@ async function ferramentaConfiabilidade(context: Contexto, clinicaId: string, ar
   const ambiente = ["producao", "homologacao", "teste_automatizado", "todos"].includes(args?.ambiente)
     ? args.ambiente
     : "producao";
-  const desde = new Date(Date.now() - dias * 24 * 60 * 60 * 1000).toISOString();
+  const desde = inicioNoCicloAprendizado(new Date(Date.now() - dias * 24 * 60 * 60 * 1000).toISOString());
 
   let q = context.supabase
     .from("nina_confianca_decisoes")
@@ -425,6 +426,7 @@ export const listarAnalisesMetricasNina = createServerFn({ method: "POST" })
           "id, pergunta, status, erro, resposta, problemas, resultados, filtros_painel, recorte_utilizado, modelo, versao_regras, input_tokens, output_tokens, custo_estimado, custo_moeda, custo_preco_vigencia, duracao_ms, dados_atualizados_em, origem, created_at",
         )
         .eq("clinica_id", data.clinicaId)
+        .gte("created_at", INICIO_CICLO_APRENDIZADO)
         .order("created_at", { ascending: false })
         .limit(30),
       carregarLimites(ctx, data.clinicaId),
@@ -469,6 +471,7 @@ export const perguntarAnalistaMetricas = createServerFn({ method: "POST" })
     const configuracao = await ferramentaConfiguracao(ctx, data.clinicaId);
 
     const contexto = {
+      cicloAprendizado: AVISO_CICLO_APRENDIZADO,
       agoraNoFusoDaOperacao: agora.toISOString(),
       fuso,
       datasProntas: periodosNomeados(agora, fuso),

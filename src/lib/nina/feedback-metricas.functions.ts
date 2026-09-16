@@ -18,8 +18,8 @@ import {
   baldeLocal,
   dentroDoRecorte,
   descricaoRecorte,
-  resolverRecorte,
 } from "@/lib/nina/metricas-filtros";
+import { resolverRecorteNoCiclo as resolverRecorte, AVISO_CICLO_APRENDIZADO } from "./ciclo-aprendizado";
 
 const STATUS = [
   "pending",
@@ -315,7 +315,7 @@ export const metricasAprendizadoNina = createServerFn({ method: "POST" })
         fuso: recorte.fuso,
         dias: recorte.janelas.length,
         diaInteiro: recorte.diaInteiro,
-        descricao: descricaoRecorte(recorte),
+        descricao: `${descricaoRecorte(recorte)} ${AVISO_CICLO_APRENDIZADO}`,
         filtrosErroAtivos,
       },
     };

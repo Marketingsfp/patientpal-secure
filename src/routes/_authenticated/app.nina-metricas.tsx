@@ -6,6 +6,7 @@
  * feedbacks. Os números não expõem texto ou dados pessoais do paciente.
  */
 import { createFileRoute } from "@tanstack/react-router";
+import { AVISO_CICLO_APRENDIZADO } from "@/lib/nina/ciclo-aprendizado";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { BarChart3, Loader2, RefreshCw, Search } from "lucide-react";
@@ -275,6 +276,7 @@ function Pagina() {
             <BarChart3 className="h-6 w-6 text-primary" aria-hidden />
             Nina — Métricas de Aprendizado
           </h1>
+          <p className="text-sm text-muted-foreground">{AVISO_CICLO_APRENDIZADO}</p>
           <p className="text-sm text-muted-foreground">
             Painel somente leitura. Sem dados pessoais do paciente e sem alterar nada da Nina.
           </p>

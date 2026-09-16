@@ -15,6 +15,7 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { MSG_CONFLITO } from "@/lib/nina/decisoes";
 import { registrarDecisao } from "@/lib/nina/decisoes.functions";
+import { INICIO_CICLO_APRENDIZADO } from "./ciclo-aprendizado";
 
 const STATUS = [
   "pending",
@@ -81,6 +82,7 @@ export const listarRevisaoFeedbackNina = createServerFn({ method: "POST" })
       .from("nina_feedback_erros")
       .select(COLUNAS)
       .eq("clinica_id", data.clinicaId)
+      .gte("created_at", INICIO_CICLO_APRENDIZADO)
       .order("created_at", { ascending: false })
       .limit(data.limite);
 
@@ -153,6 +155,7 @@ export const listarRevisaoFeedbackNina = createServerFn({ method: "POST" })
       .from("nina_feedback_erros")
       .select("status")
       .eq("clinica_id", data.clinicaId)
+      .gte("created_at", INICIO_CICLO_APRENDIZADO)
       .limit(2000);
     if (data.categoria) qc = qc.eq("categoria", data.categoria);
     if (data.reportadoPor) qc = qc.eq("reportado_por", data.reportadoPor);
@@ -169,6 +172,7 @@ export const listarRevisaoFeedbackNina = createServerFn({ method: "POST" })
       .from("nina_feedback_erros")
       .select("grupo_chave")
       .eq("clinica_id", data.clinicaId)
+      .gte("created_at", INICIO_CICLO_APRENDIZADO)
       .not("grupo_chave", "is", null)
       .limit(5000);
     for (const g of grupos ?? []) {
@@ -219,6 +223,7 @@ export const listarAutoresFeedbackNina = createServerFn({ method: "POST" })
       .from("nina_feedback_erros")
       .select("reportado_por")
       .eq("clinica_id", data.clinicaId)
+      .gte("created_at", INICIO_CICLO_APRENDIZADO)
       .limit(2000);
     if (error) throw new Error(error.message);
     const ids = Array.from(new Set((linhas ?? []).map((l) => l.reportado_por).filter(Boolean)));
@@ -352,4 +357,3 @@ export const editarSugestaoFeedbackNina = createServerFn({ method: "POST" })
 
     return linha;
   });
-

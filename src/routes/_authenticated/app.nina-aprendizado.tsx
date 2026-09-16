@@ -7,6 +7,7 @@
  * decisão. A aplicação real virá em fase posterior.
  */
 import { EvidenciasExecucao } from "@/components/nina/EvidenciasExecucao";
+import { AVISO_CICLO_APRENDIZADO } from "@/lib/nina/ciclo-aprendizado";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
@@ -1021,6 +1022,7 @@ function Pagina() {
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-xl font-semibold">Nina — Revisão de Aprendizados</h1>
+          <p className="text-sm text-muted-foreground">{AVISO_CICLO_APRENDIZADO}</p>
           <p className="text-sm text-muted-foreground">
             Revisão dos erros reportados pela equipe. Aprovar ou rejeitar aqui{" "}
             <strong>não altera</strong> a Base de Conhecimentos — a aplicação real virá depois.

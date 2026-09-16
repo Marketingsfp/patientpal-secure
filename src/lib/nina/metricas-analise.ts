@@ -60,21 +60,22 @@ export function resumirCobertura(
   const porDiaSemana: Record<number, number> = {};
   let dias = 0;
   let diasFuturos = 0;
+  let horas = 0;
 
   for (const janela of recorte.janelas) {
     const data = dataDaJanela(janela.inicio, recorte.fuso);
     const dow = diaDaSemana(data);
     if (diasSemana && diasSemana.length > 0 && !diasSemana.includes(dow)) continue;
     dias += 1;
+    horas += (Date.parse(janela.fim) - Date.parse(janela.inicio)) / 3_600_000;
     porDiaSemana[dow] = (porDiaSemana[dow] ?? 0) + 1;
     if (data >= hoje) diasFuturos += 1;
   }
 
-  const minutosPorDia = recorte.minutoFim - recorte.minutoInicio;
   return {
     dias,
     porDiaSemana,
-    horas: Number(((dias * minutosPorDia) / 60).toFixed(2)),
+    horas: Number(horas.toFixed(2)),
     diasFuturos,
     parcial: diasFuturos > 0,
   };

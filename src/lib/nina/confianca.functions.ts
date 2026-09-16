@@ -553,6 +553,8 @@ import {
   type PeriodoOperacao,
 } from "./confidence/metricas";
 
+import { inicioNoCicloAprendizado } from "./ciclo-aprendizado";
+
 function lista(v: unknown): string[] {
   return Array.isArray(v) ? v.map((i) => String(i)).filter(Boolean) : [];
 }
@@ -569,7 +571,7 @@ export const metricasConfiabilidadeNina = createServerFn({ method: "POST" })
       .parse(i),
   )
   .handler(async ({ data, context }): Promise<MetricasConfiabilidade> => {
-    const desde = new Date(Date.now() - data.dias * 24 * 60 * 60 * 1000).toISOString();
+    const desde = inicioNoCicloAprendizado(new Date(Date.now() - data.dias * 24 * 60 * 60 * 1000).toISOString());
 
     const LIMITE = 5000;
     const { linhas: rows, truncado } = await lerPaginado<Record<string, unknown>>(
