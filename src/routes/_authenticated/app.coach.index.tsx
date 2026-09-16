@@ -1,7 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { GraduationCap, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { useCoachContexto } from "@/lib/coach/contexto";
 import { PainelGestora } from "@/components/coach/PainelGestora";
+import { TraineeHome } from "@/components/coach/TraineeHome";
 
 export const Route = createFileRoute("/_authenticated/app/coach/")({
   component: CoachHome,
@@ -25,23 +26,10 @@ function CoachHome() {
   if (ctx.gestor) return <PainelGestora ctx={ctx} />;
 
   return (
-    <div className="p-6">
-      <div className="mx-auto max-w-3xl rounded-2xl border bg-card p-8 shadow-sm">
-        <div className="flex items-center gap-3">
-          <span className="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10 text-primary">
-            <GraduationCap className="h-6 w-6" />
-          </span>
-          <div>
-            <h1 className="text-xl font-semibold tracking-tight">Coach WhatsApp</h1>
-            <p className="text-sm text-muted-foreground">
-              Seu espaço de treinamento: simulações, prova e evolução.
-            </p>
-          </div>
-        </div>
-        <p className="mt-6 text-sm text-muted-foreground">
-          Sua trilha de treinamento entra na próxima etapa da migração.
-        </p>
-      </div>
-    </div>
+    <TraineeHome
+      atendente={ctx.atendente}
+      clinicaId={ctx.clinicaId}
+      clinicaNome={ctx.clinicaNome}
+    />
   );
 }
