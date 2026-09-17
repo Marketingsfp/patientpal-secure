@@ -18,13 +18,11 @@ import {
 import { normalizarNomeBusca } from "@/lib/busca-texto";
 import type { EstadoManualPresenca } from "@/lib/atendimento/presenca-manual";
 import type {
-  ResultadoDistribuicaoFila,
   ResultadoPresencaDistribuicao,
 } from "@/lib/atendimento/distribuicao-contrato";
 import { CapacidadeAtendentes } from "@/components/nina/CapacidadeAtendentes";
 import {
   avisoPresencaConfirmada,
-  mensagemDistribuicaoFila,
   type AvisoDistribuicao,
 } from "@/components/nina/distribuicao-fila-ui";
 import {
@@ -101,7 +99,6 @@ import {
   PinOff,
   Zap,
   Copy,
-  RefreshCw,
 } from "lucide-react";
 import { useClinica } from "@/hooks/use-clinica";
 import { useAuth } from "@/hooks/use-auth";
@@ -181,7 +178,6 @@ import {
   devolverParaNina,
   definirPresenca,
   definirPresencaManual,
-  consultarDistribuicaoFila,
   esperaConversas,
   assumirConversa,
   marcarLida,
@@ -354,7 +350,6 @@ export function AtendInbox() {
   const meuStatusFn = useServerFn(meuStatusAgente);
   const presencaFn = useServerFn(definirPresenca);
   const presencaManualFn = useServerFn(definirPresencaManual);
-  const consultarDistribuicaoFn = useServerFn(consultarDistribuicaoFila);
   const esperaFn = useServerFn(esperaConversas);
   const assumirFn = useServerFn(assumirConversa);
   const obterConversaFn = useServerFn(obterConversa);
@@ -723,43 +718,11 @@ export function AtendInbox() {
   // aba antiga nunca reescrevem uma escolha mais recente.
   const sincronia = useRef(SINCRONIA_INICIAL);
   const seqPresenca = useRef(0);
-  const [distribuicaoFila, setDistribuicaoFila] = useState<ResultadoDistribuicaoFila | null>(null);
-  const [erroDistribuicao, setErroDistribuicao] = useState<string | null>(null);
-  const [consultandoDistribuicao, setConsultandoDistribuicao] = useState(false);
-  const seqDistribuicao = useRef(0);
-  const escopoDistribuicao = useRef("");
-  escopoDistribuicao.current = `${clinicaId ?? ""}:${meuId ?? ""}`;
-
-  useEffect(() => {
-    seqDistribuicao.current += 1;
-    setDistribuicaoFila(null);
-    setErroDistribuicao(null);
-    setConsultandoDistribuicao(false);
-  }, [clinicaId, meuId]);
-
-  const carregarDistribuicao = useCallback(async () => {
-    if (!clinicaId || !meuId) return;
-    const pedido = ++seqDistribuicao.current;
-    const escopoPedido = `${clinicaId}:${meuId}`;
-    setConsultandoDistribuicao(true);
-    try {
-      const r = await consultarDistribuicaoFn({ data: { clinicaId } });
-      if (pedido !== seqDistribuicao.current || escopoPedido !== escopoDistribuicao.current) return;
-      setDistribuicaoFila(r);
-      setErroDistribuicao(null);
-    } catch {
-      if (pedido === seqDistribuicao.current && escopoPedido === escopoDistribuicao.current)
-        setErroDistribuicao("Não foi possível consultar a distribuição da fila. Atualize a consulta.");
-    } finally {
-      if (pedido === seqDistribuicao.current && escopoPedido === escopoDistribuicao.current)
-        setConsultandoDistribuicao(false);
-    }
-  }, [clinicaId, meuId, consultarDistribuicaoFn]);
+  const escopoPresencaAtual = useRef("");
+  escopoPresencaAtual.current = `${clinicaId ?? ""}:${meuId ?? ""}`;
 
   const carregarStatusAgente = useCallback(async () => {
     if (!clinicaId || !meuId) return;
-    // Consulta informativa: nunca atribui conversas nem muda a presença.
-    void carregarDistribuicao();
     const seq = ++seqPresenca.current;
     try {
       const [s, p, rs] = await Promise.all([
@@ -787,7 +750,7 @@ export function AtendInbox() {
     } catch {
       // Estado auxiliar da fila: se falhar, a aba segue com os valores atuais.
     }
-  }, [clinicaId, meuId, meuStatusFn, pausaAtualFn, listarReasonsFn, carregarDistribuicao]);
+  }, [clinicaId, meuId, meuStatusFn, pausaAtualFn, listarReasonsFn]);
 
   // Aviso direto entre abas do mesmo navegador (uma única assinatura).
   useEffect(() => {
@@ -879,7 +842,7 @@ export function AtendInbox() {
   };
 
   const aplicarPresencaConfirmada = async (r: ResultadoPresencaDistribuicao) => {
-    if (`${clinicaId ?? ""}:${meuId ?? ""}` !== escopoDistribuicao.current) return null;
+    if (`${clinicaId ?? ""}:${meuId ?? ""}` !== escopoPresencaAtual.current) return null;
     if (!r.ok) {
       await carregarStatusAgente();
       setControle((c) => presAoFalhar(c, "A presença foi alterada em outro lugar. Tente de novo."));
@@ -891,11 +854,6 @@ export function AtendInbox() {
     setVersaoPresenca(r.versao);
     setFilaAberta(r.estado === "ONLINE");
     if (r.estado !== "PAUSA") setPausaAtiva(null);
-    // Uma consulta iniciada antes da gravação não substitui seu resultado.
-    seqDistribuicao.current += 1;
-    setDistribuicaoFila(r.distribuicao);
-    setErroDistribuicao(null);
-    setConsultandoDistribuicao(false);
     // FASE 4 — a escolha confirmada vira a referência desta aba e é avisada às demais.
     sincronia.current = {
       estado: r.estado,
@@ -1149,11 +1107,10 @@ export function AtendInbox() {
         abrirConversa((rows[0] as any)?.id ?? null);
       // Os números de cada filtro acompanham a movimentação em tempo real.
       void carregarContadores();
-      void carregarDistribuicao();
     } catch (e: any) {
       mostrarErro(e);
     }
-  }, [clinicaId, filtroStatus, escopo, atendenteSelecionadoId, visualizacao, listarConvs, carregarContadores, carregarDistribuicao, meuId, souGestor, abrirConversa]);
+  }, [clinicaId, filtroStatus, escopo, atendenteSelecionadoId, visualizacao, listarConvs, carregarContadores, meuId, souGestor, abrirConversa]);
 
 
 
@@ -2975,39 +2932,11 @@ export function AtendInbox() {
             >
               {presTexto(controle)}
             </p>
-            <div className="rounded-md border bg-muted/30 px-2 py-1.5 text-[11px]">
-              <div className="flex items-center gap-1">
-                <span className="font-medium">Distribuição da fila</span>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="ml-auto h-6 w-6 p-0"
-                  aria-label="Atualizar consulta da distribuição"
-                  disabled={consultandoDistribuicao || !!controle.salvando}
-                  onClick={() => void carregarDistribuicao()}
-                >
-                  <RefreshCw className={`h-3 w-3 ${consultandoDistribuicao ? "animate-spin" : ""}`} />
-                </Button>
-              </div>
-              {erroDistribuicao ? (
-                <p role="alert" className="text-destructive">{erroDistribuicao}</p>
-              ) : distribuicaoFila ? (
-                <p role="status" className={distribuicaoFila.status === "erro" ? "text-destructive" : "text-muted-foreground"}>
-                  {mensagemDistribuicaoFila(distribuicaoFila).texto}
-                </p>
-              ) : (
-                <p className="text-muted-foreground">Consultando carga e capacidade…</p>
-              )}
-            </div>
             {souGestor && clinicaId && (
               <CapacidadeAtendentes
                 key={`${clinicaId}:${meuId}`}
                 clinicaId={clinicaId}
-                onAlterada={(r) => {
-                  seqDistribuicao.current += 1;
-                  setDistribuicaoFila(r);
-                  setErroDistribuicao(null);
-                  setConsultandoDistribuicao(false);
+                onAlterada={() => {
                   void carregarConvs();
                 }}
               />
