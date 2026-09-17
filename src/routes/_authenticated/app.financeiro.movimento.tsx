@@ -499,7 +499,23 @@ function Page() {
     return expr ? q.or(expr) : q;
   };
 
+  /**
+   * Só a busca mais recente escreve na tela.
+   *
+   * Trocar o período dispara uma busca nova sem cancelar a anterior. Em
+   * 17/09/2026, escolher "De 01/09" (tela em hoje) começou a baixar 01/09 a
+   * 17/09 — cinco mil lançamentos, várias páginas —, e logo depois "Até 01/09"
+   * pediu um dia só. A busca de um dia terminava primeiro; a longa terminava
+   * depois e sobrescrevia lista e cards: "Período: 01/09/2026 (1 dia)" em cima
+   * de R$ 595 mil de receita. Cada busca guarda o seu número e, se outra
+   * começou nesse meio-tempo, para sem tocar em nada.
+   */
+  const cargaListaRef = useRef(0);
+  const cargaResumoRef = useRef(0);
+
   const load = async () => {
+    const carga = ++cargaListaRef.current;
+    const obsoleta = () => carga !== cargaListaRef.current;
     if (!clinicaAtual) {
       setItems([]);
       setLoading(false);
@@ -534,6 +550,7 @@ function Page() {
         q = applyForma(q);
         if (filterPacienteDebounced) q = q.ilike("descricao", `%${filterPacienteDebounced}%`);
         const { data, error } = await q;
+        if (obsoleta()) return;
         if (error) {
           mostrarErro(error);
           setLoading(false);
@@ -708,6 +725,7 @@ function Page() {
           .gte("created_at", iniJanela)
           .lte("created_at", fimJanela)
           .range(offMv, offMv + CHUNK_MV - 1);
+        if (obsoleta()) return;
         if (errMv) {
           mostrarErro(errMv);
           setLoading(false);
@@ -731,6 +749,7 @@ function Page() {
         .gte("aberto_em", iniJanela)
         .lte("aberto_em", fimJanela)
         .limit(5000);
+      if (obsoleta()) return;
       if (errSs) {
         mostrarErro(errSs);
         setLoading(false);
@@ -788,6 +807,7 @@ function Page() {
         }
         if (filterPacienteDebounced) qc = qc.ilike("descricao", `%${filterPacienteDebounced}%`);
         const { data: mv, error: errMv } = await qc;
+        if (obsoleta()) return;
         if (errMv) {
           mostrarErro(errMv);
           setLoading(false);
@@ -843,6 +863,9 @@ function Page() {
     // Merge ordenado por data + hora desc (mais recente primeiro)
     // Cada lote tem teto próprio na busca global; basta um encher para a
     // lista estar cortada, e o aviso na tela precisa dizer isso.
+    // Última barreira: os enriquecimentos acima (agenda, médicos, mensalidades)
+    // também esperam o banco, e a busca pode ter ficado velha durante eles.
+    if (obsoleta()) return;
     setBuscaTruncada(
       buscaGlobal &&
         (finList.length >= LIMITE_BUSCA_GLOBAL || caixaList.length >= LIMITE_BUSCA_GLOBAL),
@@ -906,6 +929,9 @@ function Page() {
     setLoading(false);
   };
   const loadResumo = async () => {
+    // Mesma trava de `load`: um total de período antigo não pode chegar depois.
+    const carga = ++cargaResumoRef.current;
+    const obsoleta = () => carga !== cargaResumoRef.current;
     if (!clinicaAtual) {
       setResumo({ r: 0, d: 0, saldo: 0, totalRows: 0 });
       return;
@@ -935,6 +961,7 @@ function Page() {
         p_ini: fromDate,
         p_fim: toDate,
       });
+      if (obsoleta()) return;
       if (error) {
         mostrarErro(error);
         return;
@@ -979,6 +1006,7 @@ function Page() {
       q = applyForma(q);
       if (filterPacienteDebounced) q = q.ilike("descricao", `%${filterPacienteDebounced}%`);
       const { data, error } = await q;
+      if (obsoleta()) return;
       if (error) {
         mostrarErro(error);
         return;
