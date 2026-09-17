@@ -2550,7 +2550,7 @@ function NovoContratoForm({
                   </div>
                   <div>
                     <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                      Mensalidade a partir do próximo mês
+                      Mensalidade — a 1ª já neste mês
                     </div>
                     <div className="text-2xl font-bold tabular-nums mt-0.5">
                       {BRL(resumoCobranca.valorParcela)}
