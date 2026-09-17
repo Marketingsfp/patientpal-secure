@@ -171,9 +171,7 @@ import {
   listarDepartamentos,
   listarUsuariosClinica,
   travarMinhaFila,
-  iniciarPausa,
   pausaAtual,
-  listarPauseReasons,
   meuStatusAgente,
   devolverParaNina,
   definirPresenca,
@@ -346,9 +344,7 @@ export function AtendInbox() {
   const listarUsuariosFn = useServerFn(listarUsuariosClinica);
   const travarFilaFn = useServerFn(travarMinhaFila);
   const devolverFn = useServerFn(devolverParaNina);
-  const iniciarPausaFn = useServerFn(iniciarPausa);
   const pausaAtualFn = useServerFn(pausaAtual);
-  const listarReasonsFn = useServerFn(listarPauseReasons);
   const meuStatusFn = useServerFn(meuStatusAgente);
   const presencaFn = useServerFn(definirPresenca);
   const presencaManualFn = useServerFn(definirPresencaManual);
@@ -672,9 +668,6 @@ export function AtendInbox() {
   const [filaAberta, setFilaAberta] = useState<boolean>(false);
   const [statusCarregado, setStatusCarregado] = useState(false);
   const [pausaAtiva, setPausaAtiva] = useState<any>(null);
-  const [pauseReasons, setPauseReasons] = useState<any[]>([]);
-  const [pausaDialogOpen, setPausaDialogOpen] = useState(false);
-  const [pausaReasonSel, setPausaReasonSel] = useState<string>("");
   // Painel esquerdo: encolhe ao tirar o mouse, expande ao passar; pode ser fixado.
   // O hover usa zona de tolerância + atraso e não recolhe durante arrasto da
   // barra de rolagem (ver use-hover-tolerante).
@@ -737,10 +730,9 @@ export function AtendInbox() {
     if (!clinicaId || !meuId) return;
     const seq = ++seqPresenca.current;
     try {
-      const [s, p, rs] = await Promise.all([
+      const [s, p] = await Promise.all([
         meuStatusFn({ data: { clinicaId } }),
         pausaAtualFn({ data: { clinicaId } }),
-        listarReasonsFn({ data: { clinicaId } }),
       ]);
       const estado = (s as { estadoManual?: EstadoManualPresenca | null }).estadoManual ?? null;
       const versao = (s as { estadoManualVersao?: number }).estadoManualVersao ?? 0;
@@ -749,7 +741,6 @@ export function AtendInbox() {
         { clinicaId, userId: meuId },
         { clinicaId, userId: meuId, estado, versao, seq },
       );
-      setPauseReasons(rs);
       setStatusCarregado(true);
       if (!r.aceita) return; // resposta fora de ordem: mantém a escolha atual
       sincronia.current = r.estado;
@@ -762,7 +753,7 @@ export function AtendInbox() {
     } catch {
       // Estado auxiliar da fila: se falhar, a aba segue com os valores atuais.
     }
-  }, [clinicaId, meuId, meuStatusFn, pausaAtualFn, listarReasonsFn]);
+  }, [clinicaId, meuId, meuStatusFn, pausaAtualFn]);
 
   // Aviso direto entre abas do mesmo navegador (uma única assinatura).
   useEffect(() => {
@@ -899,48 +890,16 @@ export function AtendInbox() {
       status === "online" ? "ONLINE" : status === "offline" ? "OFFLINE" : "PAUSA";
     setControle((c) => presAoIniciar(c, alvo));
     try {
-      if (status === "online") {
-        const r = await gravarPresencaManual("ONLINE");
-        if (!r) return;
-        mostrarResultadoDistribuicao(avisoPresencaConfirmada(r.estado, r.distribuicao));
-        await carregarConvs();
-      } else if (status === "offline") {
-        const r = await gravarPresencaManual("OFFLINE");
-        if (!r) return;
-        mostrarResultadoDistribuicao(avisoPresencaConfirmada(r.estado, r.distribuicao));
-      } else {
-        if (!pauseReasons.length) {
-          setControle((c) => presAoFalhar(c, "Nenhum motivo de pausa configurado"));
-          toast.error("Nenhum motivo de pausa configurado");
-          return;
-        }
-        setPausaReasonSel(pauseReasons[0].id);
-        setPausaDialogOpen(true);
-        setControle((c) => ({ ...c, salvando: null }));
-      }
+      const r = await gravarPresencaManual(alvo);
+      if (!r) return;
+      mostrarResultadoDistribuicao(avisoPresencaConfirmada(r.estado, r.distribuicao));
+      if (alvo === "ONLINE") await carregarConvs();
     } catch (e: any) {
       setControle((c) => presAoFalhar(c, e?.message ?? "Não foi possível salvar a presença."));
       mostrarErro(e);
     }
   };
 
-
-  const confirmarPausa = async () => {
-    if (!clinicaId || !pausaReasonSel) return;
-    setControle((c) => presAoIniciar(c, "PAUSA"));
-    try {
-      const r = await iniciarPausaFn({ data: { clinicaId, reasonId: pausaReasonSel, versao: versaoPresenca } });
-      const confirmada = await aplicarPresencaConfirmada(r);
-      if (!confirmada) return;
-      setPausaDialogOpen(false);
-      setPausaAtiva({ id: r.ok ? r.id : null });
-      mostrarResultadoDistribuicao(avisoPresencaConfirmada(confirmada.estado, confirmada.distribuicao));
-      await carregarStatusAgente();
-    } catch (e: any) {
-      setControle((c) => presAoFalhar(c, e?.message ?? "Não foi possível entrar em pausa."));
-      mostrarErro(e);
-    }
-  };
 
   // Perfil de gestor: só ele enxerga a opção "Todas da clínica".
   useEffect(() => {
@@ -2527,7 +2486,7 @@ export function AtendInbox() {
         ? `Em atendimento por ${nomeUsuario(responsavelId)}. Assuma a conversa para responder.`
         : !podeAtender
           ? "Você tem acesso somente de leitura no atendimento."
-          : pausaAtiva
+          : emPausa
       ? "Você está em pausa. Encerre a pausa para enviar mensagens."
       : !filaAberta
         ? "Você está offline. Fique online para enviar mensagens."
@@ -2967,21 +2926,6 @@ export function AtendInbox() {
               >
                 Tentar de novo
               </Button>
-            )}
-            {pausaAtiva?.atend_pause_reasons?.nome && (
-
-              <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
-                <span className="truncate flex-1">Em pausa · {pausaAtiva.atend_pause_reasons.nome}</span>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className="h-6 px-1.5 text-[11px]"
-                  disabled={presDesabilitada(controle)}
-                  onClick={() => definirStatus("online")}
-                >
-                  Encerrar
-                </Button>
-              </div>
             )}
 
           </div>
@@ -4038,34 +3982,6 @@ export function AtendInbox() {
         </Dialog>
       </div>
 
-      <Dialog open={pausaDialogOpen} onOpenChange={setPausaDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Entrar em pausa</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-2">
-            <Label>Motivo</Label>
-            <Select value={pausaReasonSel} onValueChange={setPausaReasonSel}>
-              <SelectTrigger>
-                <SelectValue placeholder="Selecione o motivo" />
-              </SelectTrigger>
-              <SelectContent>
-                {pauseReasons.map((r) => (
-                  <SelectItem key={r.id} value={r.id}>
-                    {r.nome}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setPausaDialogOpen(false)}>
-              Cancelar
-            </Button>
-            <Button onClick={confirmarPausa}>Entrar em pausa</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
     </RelogioEsperaProvider>
   );

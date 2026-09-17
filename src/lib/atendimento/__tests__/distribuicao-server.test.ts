@@ -64,6 +64,23 @@ describe("contrato de presença e distribuição do Zap OS", () => {
     expect(resultado).toEqual({ ok: false, conflito: true, versao: 4 });
   });
 
+  it("confirma pausa manual sem motivo ou registro legado de pausa", async () => {
+    const db = cliente({
+      ...confirmacao({ ...concluida, distribuidas: 0 }),
+      estado: "PAUSA",
+      pausaId: null,
+    });
+    const resultado = await salvarPresencaComDistribuicao(db, {
+      clinicaId: "clinica", estado: "PAUSA", versao: 2,
+    });
+    expect(db.chamadas).toEqual([{
+      nome: "atend_definir_presenca_manual",
+      args: { _clinica_id: "clinica", _estado: "PAUSA", _versao: 2 },
+    }]);
+    expect(resultado.ok && resultado.estado).toBe("PAUSA");
+    expect(resultado.ok && resultado.pausaId).toBeNull();
+  });
+
   it("presença salva com distribuição falha mantém a falha visível no retorno", async () => {
     const db = cliente(
       confirmacao({

@@ -1351,14 +1351,14 @@ export const iniciarPausa = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) =>
     z.object({
       clinicaId: z.string().uuid(),
-      reasonId: z.string().uuid(),
+      reasonId: z.string().uuid().optional(),
       versao: z.number().int().nonnegative().optional(),
     }).parse(i),
   )
   .handler(async ({ data, context }) => {
     await assertMember(context.supabase, context.userId, data.clinicaId);
-    // Motivo, pausa e presença são confirmados juntos. Fechar uma pausa
-    // anterior nunca abre uma janela Online entre as duas escolhas.
+    // A pausa é uma escolha livre. O motivo opcional mantém compatibilidade
+    // com clientes antigos, sem exigir um cadastro de motivos.
     const resultado = await salvarPresencaComDistribuicao(context.supabase, {
       clinicaId: data.clinicaId,
       estado: "PAUSA",
@@ -1366,8 +1366,7 @@ export const iniciarPausa = createServerFn({ method: "POST" })
       versao: data.versao,
     });
     if (!resultado.ok) return resultado;
-    if (!resultado.pausaId) throw new Error("Não foi possível confirmar o registro da pausa.");
-    return { ...resultado, id: resultado.pausaId };
+    return { ...resultado, id: resultado.pausaId ?? null };
   });
 
 export const finalizarPausa = createServerFn({ method: "POST" })
@@ -1393,6 +1392,7 @@ export const pausaAtual = createServerFn({ method: "POST" })
     const { data: row } = await context.supabase
       .from("atend_pausas_log")
       .select("*, atend_pause_reasons(nome, cor, tolerancia_minutos)")
+      .eq("clinica_id", data.clinicaId)
       .eq("user_id", context.userId)
       .is("finalizada_em", null)
       .order("iniciada_em", { ascending: false })
