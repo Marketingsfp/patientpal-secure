@@ -1,3 +1,4 @@
+import { AppSidebarLayout } from "@/components/app-sidebar-layout";
 import {
   Link,
   Navigate,
@@ -775,10 +776,8 @@ function AppShellInner() {
         .catch(() => {});
     }
   };
-  // O menu lateral é uma gaveta sobreposta (overlay drawer) em TODAS as
-  // larguras de tela: fechada, fica inteiramente fora da tela e não ocupa
-  // espaço nenhum no layout — o conteúdo usa 100% da largura. Aberta, desliza
-  // por cima de tudo, com um fundo escuro atrás.
+  // Aberto, o menu ocupa uma coluna e desloca o conteúdo; fechado, devolve
+  // toda a largura ao atendimento. AppSidebarLayout adapta as telas pequenas.
   const [sidebarAberta, setSidebarAberta] = useState(false);
   // Busca/filtro das telas dentro do menu lateral.
   const [buscaMenu, setBuscaMenu] = useState("");
@@ -798,8 +797,8 @@ function AppShellInner() {
     });
   }, []);
 
-  // Esc fecha a gaveta, como em qualquer painel sobreposto. Exceção: com o
-  // cursor na busca e algo digitado, o primeiro Esc só limpa a busca.
+  // Esc fecha o menu. Com o cursor na busca e algo digitado, o primeiro
+  // Esc só limpa a busca.
   useEffect(() => {
     if (!sidebarAberta) return;
     const aoEsc = (e: KeyboardEvent) => {
@@ -1417,8 +1416,10 @@ function AppShellInner() {
             type="button"
             onClick={alternarSidebar}
             className="h-6 w-7 rounded flex items-center justify-center text-slate-600 hover:bg-slate-100 hover:text-slate-900"
-            aria-label="Abrir menu lateral"
-            title="Abrir menu (Ctrl+B)"
+            aria-label={sidebarAberta ? "Fechar menu lateral" : "Abrir menu lateral"}
+            aria-expanded={sidebarAberta}
+            aria-controls="menu-lateral"
+            title={sidebarAberta ? "Fechar menu (Ctrl+B)" : "Abrir menu (Ctrl+B)"}
           >
             <MenuIcon className="h-3.5 w-3.5" />
           </button>
@@ -1598,50 +1599,13 @@ function AppShellInner() {
         </header>
       )}
 
-      <div className="flex flex-1 min-h-0 min-w-0">
-        {/* Fundo escuro da gaveta: cobre o sistema inteiro, cabeçalho
-            incluído. Clicar nele fecha. */}
-        {!isChooser && (
-          <div
-            aria-hidden
-            onClick={fecharSidebar}
-            className={cn(
-              "fixed inset-0 z-40 bg-black/50 backdrop-blur-[2px]",
-              "transition-opacity ease-in-out motion-reduce:transition-none",
-              // Escurece um pouco mais devagar do que clareia: entrar
-              // devagar dá profundidade, sair rápido devolve a tela ao
-              // usuário sem fazê-lo esperar.
-              sidebarAberta
-                ? "opacity-100 duration-400"
-                : "opacity-0 duration-200 pointer-events-none",
-            )}
-          />
-        )}
-        {!isChooser && (
+      <AppSidebarLayout
+        aberta={!isChooser && sidebarAberta}
+        sidebar={!isChooser && (
           <aside
             id="menu-lateral"
             aria-hidden={!sidebarAberta}
-            className={cn(
-              // Gaveta flutuante: presa à janela, fora do fluxo do layout —
-              // fechada não ocupa espaço nenhum e o conteúdo fica com 100%
-              // da largura.
-              "fixed inset-y-0 left-0 z-50 w-60 2xl:w-64 max-w-[85vw]",
-              "flex flex-col text-white overflow-hidden border-r border-white/10 shadow-2xl",
-              // `will-change` manda o navegador preparar a camada antes,
-              // evitando engasgo no primeiro quadro. `visibility` acompanha o
-              // transition para a gaveta fechada sair da ordem do Tab sem
-              // cortar a animação de saída.
-              "transform will-change-transform",
-              "transition-[transform,visibility] motion-reduce:transition-none",
-              sidebarAberta
-                ? // Curva de saída longa (mesma dos painéis do iOS): arranca
-                  // com força e passa a maior parte do tempo desacelerando,
-                  // o que dá a sensação de peso e maciez no fim.
-                  "visible translate-x-0 duration-500 ease-[cubic-bezier(0.32,0.72,0,1)]"
-                : // Ao fechar, acelera para fora: mais curto e sem a demora
-                  // do assentamento, que só faz sentido na chegada.
-                  "invisible -translate-x-full duration-300 ease-in",
-            )}
+            className="h-full w-full min-h-0 flex flex-col text-white overflow-hidden border-r border-white/10"
             style={{ backgroundColor: corSidebar }}
           >
             {/* Título da gaveta + botão de fechar. */}
@@ -1907,32 +1871,30 @@ function AppShellInner() {
             </div>
           </aside>
         )}
-
-        <div className="flex-1 flex flex-col min-w-0 min-h-0">
-          <main
-            key={uxMelhorias ? chaveAreaPrincipal(location.pathname) : "static"}
-            className={cn(
-              "flex-1 min-h-0 overflow-y-auto overflow-x-hidden min-w-0",
-              isChooser
-                ? "p-0 w-full"
-                : cn(
-                    // Com a barra recolhida, reserva só a altura da aba de
-                    // reabrir, para ela não cobrir o topo da conversa.
-                    headerRecolhido
-                      ? "px-3 pt-7 sm:px-4 lg:px-6"
-                      : "px-3 pt-1 sm:px-4 sm:pt-1.5 lg:px-6 lg:pt-2",
-                    // Espaço extra embaixo no mobile para o conteúdo não ficar
-                    // atrás da barra inferior (que só existe abaixo de `md`).
-                    "pb-28 md:pb-4 lg:pb-6",
-                  ),
-              uxMelhorias && "animate-in fade-in duration-200 motion-reduce:animate-none",
-            )}
-            style={{ background: "var(--surface-cream)" }}
-          >
-            {guardedOutlet}
-          </main>
-        </div>
-      </div>
+      >
+        <main
+          key={uxMelhorias ? chaveAreaPrincipal(location.pathname) : "static"}
+          className={cn(
+            "flex-1 min-h-0 overflow-y-auto overflow-x-hidden min-w-0",
+            isChooser
+              ? "p-0 w-full"
+              : cn(
+                  // Com a barra recolhida, reserva só a altura da aba de
+                  // reabrir, para ela não cobrir o topo da conversa.
+                  headerRecolhido
+                    ? "px-3 pt-7 sm:px-4 lg:px-6"
+                    : "px-3 pt-1 sm:px-4 sm:pt-1.5 lg:px-6 lg:pt-2",
+                  // Espaço extra embaixo no mobile para o conteúdo não ficar
+                  // atrás da barra inferior (que só existe abaixo de `md`).
+                  "pb-28 md:pb-4 lg:pb-6",
+                ),
+            uxMelhorias && "animate-in fade-in duration-200 motion-reduce:animate-none",
+          )}
+          style={{ background: "var(--surface-cream)" }}
+        >
+          {guardedOutlet}
+        </main>
+      </AppSidebarLayout>
       {pwOpen && (
         <Suspense fallback={null}>
           <ChangePasswordDialog open={pwOpen} onOpenChange={setPwOpen} />
