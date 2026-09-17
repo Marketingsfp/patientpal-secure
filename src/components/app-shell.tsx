@@ -1255,6 +1255,9 @@ function AppShellInner() {
   };
   const podeRecolherHeader = subsystem === "os-zap";
   const headerRecolhido = podeRecolherHeader && headerRecolhidoPref;
+  // Só o OS ZAP usa o menu em coluna (que desloca o conteúdo). Nos demais
+  // portais o menu volta a ser gaveta sobreposta com fundo escuro.
+  const menuEmColuna = subsystem === "os-zap";
 
   // Sidebar sob o mouse: habilita as setas mesmo sem foco dentro do menu.
   const navHoverRef = useRef(false);
@@ -1599,13 +1602,24 @@ function AppShellInner() {
         </header>
       )}
 
-      <AppSidebarLayout
-        aberta={!isChooser && sidebarAberta}
-        sidebar={!isChooser && (
+      {(() => {
+        const menuLateral = !isChooser && (
           <aside
             id="menu-lateral"
             aria-hidden={!sidebarAberta}
-            className="h-full w-full min-h-0 flex flex-col text-white overflow-hidden border-r border-white/10"
+            className={cn(
+              "flex flex-col text-white overflow-hidden border-r border-white/10",
+              menuEmColuna
+                ? "h-full w-full min-h-0"
+                : cn(
+                    // Gaveta presa à janela, do topo ao rodapé, por cima de tudo.
+                    "fixed inset-y-0 left-0 z-50 w-60 2xl:w-64 max-w-[85vw]",
+                    "transform will-change-transform transition-[transform,visibility]",
+                    sidebarAberta
+                      ? "visible translate-x-0 duration-500 ease-[cubic-bezier(0.32,0.72,0,1)]"
+                      : "invisible -translate-x-full duration-300 ease-in",
+                  ),
+            )}
             style={{ backgroundColor: corSidebar }}
           >
             {/* Título da gaveta + botão de fechar. */}
@@ -1870,31 +1884,61 @@ function AppShellInner() {
               />
             </div>
           </aside>
-        )}
-      >
-        <main
-          key={uxMelhorias ? chaveAreaPrincipal(location.pathname) : "static"}
-          className={cn(
-            "flex-1 min-h-0 overflow-y-auto overflow-x-hidden min-w-0",
-            isChooser
-              ? "p-0 w-full"
-              : cn(
-                  // Com a barra recolhida, reserva só a altura da aba de
-                  // reabrir, para ela não cobrir o topo da conversa.
-                  headerRecolhido
-                    ? "px-3 pt-7 sm:px-4 lg:px-6"
-                    : "px-3 pt-1 sm:px-4 sm:pt-1.5 lg:px-6 lg:pt-2",
-                  // Espaço extra embaixo no mobile para o conteúdo não ficar
-                  // atrás da barra inferior (que só existe abaixo de `md`).
-                  "pb-28 md:pb-4 lg:pb-6",
-                ),
-            uxMelhorias && "animate-in fade-in duration-200 motion-reduce:animate-none",
-          )}
-          style={{ background: "var(--surface-cream)" }}
-        >
-          {guardedOutlet}
-        </main>
-      </AppSidebarLayout>
+        );
+        const principal = (
+          <main
+            key={uxMelhorias ? chaveAreaPrincipal(location.pathname) : "static"}
+            className={cn(
+              "flex-1 min-h-0 overflow-y-auto overflow-x-hidden min-w-0",
+              isChooser
+                ? "p-0 w-full"
+                : cn(
+                    // Com a barra recolhida, reserva só a altura da aba de
+                    // reabrir, para ela não cobrir o topo da conversa.
+                    headerRecolhido
+                      ? "px-3 pt-7 sm:px-4 lg:px-6"
+                      : "px-3 pt-1 sm:px-4 sm:pt-1.5 lg:px-6 lg:pt-2",
+                    // Espaço extra embaixo no mobile para o conteúdo não ficar
+                    // atrás da barra inferior (que só existe abaixo de `md`).
+                    "pb-28 md:pb-4 lg:pb-6",
+                  ),
+              uxMelhorias && "animate-in fade-in duration-200 motion-reduce:animate-none",
+            )}
+            style={{ background: "var(--surface-cream)" }}
+          >
+            {guardedOutlet}
+          </main>
+        );
+        if (menuEmColuna) {
+          return (
+            <AppSidebarLayout aberta={!isChooser && sidebarAberta} sidebar={menuLateral}>
+              {principal}
+            </AppSidebarLayout>
+          );
+        }
+        return (
+          <div className="flex flex-1 min-h-0 min-w-0">
+            {/* Fundo escuro clicável: cobre a tela inteira, cabeçalho incluído. */}
+            {!isChooser && (
+              <div
+                aria-hidden
+                onClick={fecharSidebar}
+                className={cn(
+                  "fixed inset-0 z-40 bg-black/50 backdrop-blur-[2px] transition-opacity",
+                  sidebarAberta
+                    ? "opacity-100 duration-400"
+                    : "opacity-0 duration-200 pointer-events-none",
+                )}
+              />
+            )}
+            {menuLateral}
+            {/* O conteúdo mantém 100% da largura em qualquer estado. */}
+            <div className="flex flex-1 flex-col min-h-0 min-w-0 w-full overflow-hidden">
+              {principal}
+            </div>
+          </div>
+        );
+      })()}
       {pwOpen && (
         <Suspense fallback={null}>
           <ChangePasswordDialog open={pwOpen} onOpenChange={setPwOpen} />
