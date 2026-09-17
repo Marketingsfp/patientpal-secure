@@ -5,9 +5,9 @@
  * aviso de erro, confirmação de agendamento, transferência para atendente,
  * mídia não suportada e despedida.
  *
- * Os textos padrão abaixo são exatamente os que já estavam no código antes
- * desta fase. Publicações anteriores continuam valendo: quando não existe
- * template publicado para uma chave, o padrão daqui é usado.
+ * Publicações anteriores continuam valendo: quando não existe template
+ * publicado para uma chave, o padrão daqui é usado. A confirmação de
+ * agendamento recebe também o bloco próprio de aviso e despedida.
  *
  * Cada chave declara as variáveis permitidas. Um template publicado com
  * variável desconhecida é recusado na validação e o padrão assume — nunca
@@ -95,6 +95,16 @@ export const TEMPLATES_PADRAO: readonly DefinicaoTemplate[] = [
       "Prontinho! ✅ Seu agendamento foi realizado com sucesso.\n\n" +
       "*Profissional:* {profissional}\n*Data:* {data}\n*Horário:* {horario}\n\n" +
       "Chegue com 15 minutos de antecedência e traga um documento com foto.",
+  }),
+  D({
+    chave: "fluxo.agendamento.despedida",
+    categoria: "fluxo",
+    descricao:
+      "Aviso de confirmação de presença e despedida, acrescentados após o agendamento concluído.",
+    variaveis: ["unidade"],
+    padrao:
+      "Uma hora antes da sua consulta, entraremos em contato para confirmar se você poderá comparecer.\n\n" +
+      "A {unidade} agradece a sua confiança! Foi um prazer ajudar com seu agendamento. Até breve! 💚",
   }),
   D({
     chave: "fluxo.agendamento.duplicado",
@@ -213,6 +223,44 @@ export type TextosTemplates = Record<string, string>;
  * padrão do código. Nunca devolve texto com variável não substituída.
  */
 export function textoDaChave(
+  chave: string,
+  valores: Record<string, string>,
+  publicados?: TextosTemplates | null,
+): { texto: string; origemTemplate: "publicado" | "padrao"; motivo: string | null } {
+  const resultado = resolverTextoDaChave(chave, valores, publicados);
+  if (chave !== "fluxo.agendamento.confirmado" || !resultado.texto) return resultado;
+  const despedida = acrescentarDespedidaAgendamento(resultado.texto, valores.unidade, publicados);
+  return {
+    ...despedida,
+    origemTemplate:
+      resultado.origemTemplate === "publicado" || despedida.origemTemplate === "publicado"
+        ? "publicado"
+        : "padrao",
+    motivo: resultado.motivo ?? despedida.motivo,
+  };
+}
+
+export function acrescentarDespedidaAgendamento(
+  texto: string,
+  unidade?: string,
+  publicados?: TextosTemplates | null,
+): { texto: string; origemTemplate: "publicado" | "padrao"; motivo: string | null } {
+  // Bloco próprio: preserva a confirmação publicada e acompanha também a
+  // renderização final compartilhada pelo WhatsApp e pela homologação.
+  const despedida = resolverTextoDaChave(
+    "fluxo.agendamento.despedida",
+    { unidade: unidade?.trim() || "nossa clínica" },
+    publicados,
+  );
+  return {
+    ...despedida,
+    texto: texto.trim().endsWith(despedida.texto)
+      ? texto.trim()
+      : `${texto.trim()}\n\n${despedida.texto}`,
+  };
+}
+
+function resolverTextoDaChave(
   chave: string,
   valores: Record<string, string>,
   publicados?: TextosTemplates | null,

@@ -970,9 +970,12 @@ async function gerarRespostaNinaInterno(
   // estabelecimento saem do bloco publicado NA MESMA versão que gera as
   // instruções do turno. `clinicas.nome` continua sendo dado ADMINISTRATIVO
   // (segue em `dadosPublicos`) e nunca substitui a identidade de apresentação.
-  const { resolverIdentidadeEfetiva, valoresIdentidade, fatosIdentidade } = await import(
-    "@/lib/nina/identidade-efetiva"
-  );
+  const {
+    resolverIdentidadeEfetiva,
+    valoresIdentidade,
+    fatosIdentidade,
+    nomeCompletoEstabelecimento,
+  } = await import("@/lib/nina/identidade-efetiva");
   // Prompt de reserva também consome a identidade efetiva: sem identidade
   // publicada ele fala de forma NEUTRA, sem fixar outra persona.
   const valoresNeutros = valoresIdentidade(
@@ -1503,6 +1506,9 @@ async function gerarRespostaNinaInterno(
       ctx: ctxFerramentas,
       executar,
       textos: templatesGate.textos,
+      nomeUnidade: identidadeEfetiva.ok
+        ? nomeCompletoEstabelecimento(identidadeEfetiva.apresentacao)
+        : "nossa clínica",
     }).catch((e) => {
       console.error("[NINA_BOOKING_FLOW] gate falhou", e);
       return null;
@@ -2257,6 +2263,25 @@ async function gerarRespostaNinaInterno(
             texto: resposta,
           });
       if (finalizacaoSemVagas && opcoes?.auditoria) opcoes.auditoria.resultado = baseResultado;
+      // Somente uma reserva comprovada neste turno recebe o aviso de presença
+      // e a despedida; citar um agendamento antigo não dispara esse bloco.
+      if (
+        agendamentoConfirmado && !jaTinhaAgendamento && !houveHandoff &&
+        !finalizacaoSemVagas && fluxoEstado.appointment.appointment_id
+      ) {
+        baseResultado.variaveis.unidade = identidadeEfetiva.ok
+          ? nomeCompletoEstabelecimento(identidadeEfetiva.apresentacao)
+          : "nossa clínica";
+        if (!baseResultado.acoesConcluidas.some((acao) => acao.acao === "agendar")) {
+          baseResultado.acoesConcluidas.push({
+            acao: "agendar",
+            idempotencia: `agendar|${estadoId.conversaId}|${fluxoEstado.appointment.slot_inicio ?? ""}`,
+            confirmada: true,
+            evidencia: fluxoEstado.appointment.appointment_id,
+          });
+        }
+        if (opcoes?.auditoria) opcoes.auditoria.resultado = baseResultado;
+      }
       const finalizada = await finalizarResposta({
         clinicaId,
         canal: opcoes?.teste === true ? "test-console" : "whatsapp",

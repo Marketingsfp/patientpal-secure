@@ -19,10 +19,11 @@
 import { hashDoTexto } from "@/lib/nina/confidence/hash";
 import {
   criarResultado,
+  agendamentoComprovado,
   verificarResultado,
   type ResultadoRespostaNina,
 } from "./contrato";
-import { textoDaChave } from "./templates";
+import { acrescentarDespedidaAgendamento, textoDaChave } from "./templates";
 import { carregarTemplatesPublicados } from "./templates.server";
 
 export type CanalFinalizacao = "whatsapp" | "test-console";
@@ -160,6 +161,23 @@ export async function finalizarResposta(
       usouPublicado = t.origemTemplate === "publicado";
     }
     if (t.motivo) resultado.restricoes = [...resultado.restricoes, `template:${t.motivo}`];
+  }
+
+  // A criação via ferramenta do modelo recebe o mesmo encerramento do gate.
+  if (
+    resultado.origem === "modelo" &&
+    resultado.estado === "entregar" &&
+    resultado.texto &&
+    agendamentoComprovado(resultado) &&
+    resultado.chaveTemplate !== "fluxo.agendamento.confirmado"
+  ) {
+    const despedida = acrescentarDespedidaAgendamento(
+      resultado.texto,
+      resultado.variaveis.unidade,
+      publicados.textos,
+    );
+    resultado.texto = despedida.texto;
+    usouPublicado ||= despedida.origemTemplate === "publicado";
   }
 
   // 2) Encerramento automático: decidido aqui, aplicado só após o envio.

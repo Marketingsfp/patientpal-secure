@@ -184,6 +184,8 @@ export async function aplicarGateIdentificacao(params: {
   executar: Executar;
   /** Textos publicados dos templates determinísticos (FASE 5). */
   textos?: TextosTemplates | null;
+  /** Nome da clínica que concluiu o agendamento. */
+  nomeUnidade?: string;
 }): Promise<ResultadoRespostaNina | null> {
   const { mensagem, estado, ctx, executar } = params;
   const textos = params.textos ?? null;
@@ -332,6 +334,7 @@ export async function aplicarGateIdentificacao(params: {
         profissional: String(d.medico ?? a.doctor_name ?? "-"),
         data: String(d.date ?? a.date ?? "-"),
         horario: String(d.time ?? a.time ?? "-"),
+        unidade: params.nomeUnidade?.trim() || "nossa clínica",
       },
       {
         fatosConfirmados: ["agendamento_gravado"],
