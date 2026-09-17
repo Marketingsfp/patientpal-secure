@@ -290,6 +290,20 @@ export function PainelGestora({ ctx }: { ctx: CoachContexto }) {
                     </datalist>
                   </div>
 
+                  <BaseConhecimentoEditor
+                    tamanho={config.baseSistema.length}
+                    geradaEm={config.baseGeradaEm}
+                    complemento={config.complemento}
+                    gerando={gerandoBase}
+                    erro={erroBase}
+                    onAtualizar={() => {
+                      void atualizarBase();
+                    }}
+                    onComplemento={(texto) => {
+                      void salvar({ complemento: texto });
+                    }}
+                  />
+
                   <ChecklistEditor
                     items={config.checklist}
                     onChange={(next) => {
