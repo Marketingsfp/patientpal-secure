@@ -51,8 +51,28 @@ bun run typecheck
 
 O job `distribuicao-zap` no GitHub Actions executa os testes reais de banco independentemente das demais verificações do projeto.
 
+A correção da duplicidade foi validada em PostgreSQL 18.6 local: 19 cenários de fila/compatibilidade e 8 de leitura operacional aprovados. A verificação cobre repetição sem escrita, preservação de uma implementação posterior, auditoria de histórico sintético, recusa de objetos incompletos, balanceamento, permissões e concorrência. Não equivale à validação do histórico do banco remoto nem à execução de toda a cadeia do Supabase.
+
 ## Publicação e reversão
 
-A migration `20260917230000_zap_fila_individual_pausa.sql` e a versão nova do aplicativo devem entrar na mesma janela de publicação: o aplicativo antigo ainda mostraria reservas como ativas. Aplicar a migration antes de servir o novo aplicativo, conferir o registro em `supabase_migrations.schema_migrations`, os privilégios e o job de recuperação. A migration não redistribui nem reclassifica conversas antigas; a regra passa a valer nos próximos eventos operacionais. O teste antigo continua validando o contrato histórico isolado; o novo executa a sequência de migrations e a regra atual, inclusive concorrência.
+A definição canônica da fila é `20260917144041_b618961f-ac79-4d95-977a-1eac1d3541fa.sql`, registrada pelo Lovable no commit `bee18720f`. Seu SQL foi preservado. O arquivo `20260917230000_zap_fila_individual_pausa.sql` originalmente repetia essa definição; agora mantém somente uma verificação de compatibilidade, sem DDL, DML ou escrita no histórico de migrações. Os dois identificadores permanecem no repositório para não apagar o histórico de ambientes que já os registraram.
+
+Em uma instalação nova, a migração canônica cria os objetos e a entrada posterior confere coluna, índice, funções, gatilhos e política restritiva/RLS. O aplicativo só deve ser servido depois das migrações e da conferência do job de recuperação. Nenhuma conversa antiga é redistribuída pela migração. O teste de fila individual executa a sequência, repete a verificação em transação somente leitura e compara definições, privilégios, conversas, presenças e eventos antes/depois.
+
+### Reconciliação por ambiente
+
+Primeiro execute `scripts/sql/auditar-zap-fila-individual.sql` no banco correto, com acesso administrativo de leitura. O script não contém dados de pacientes e não altera o banco. A evidência observada no Lovable indica aplicação em 17/09/2026; não substitui a consulta do histórico de cada ambiente.
+
+| Histórico observado | Procedimento |
+| --- | --- |
+| Nenhum dos dois IDs | Aplicar as migrações em ordem: a canônica cria, a entrada posterior verifica. |
+| Somente `20260917144041` | A canônica já foi executada. A entrada `20260917230000` agora pode seguir normalmente, apenas verificando os objetos. |
+| Ambos os IDs | Não reaplicar SQL nem apagar/regravar entradas do histórico. A alteração do arquivo posterior não será executada novamente pelo controle de versões. |
+| Somente `20260917230000` | Histórico invertido: não executar automaticamente a canônica, pois os objetos podem já existir. Comparar as definições instaladas com a versão canônica e as migrações posteriores, executar a verificação somente leitura e só então reconciliar o ID anterior pelo procedimento oficial de repair do Supabase. Nunca marcar como aplicada uma alteração não comprovada nem remover o ID original. |
+| Coluna/objetos ausentes ou incompatíveis | Parar e diagnosticar o objeto e a versão faltante. A verificação não recria nem sobrescreve objetos para ocultar a divergência. |
+
+Esta correção foi feita nos arquivos e testada em PostgreSQL descartável. Não alterou `supabase_migrations.schema_migrations` nem executou SQL no banco real. A publicação ainda exige enviar os arquivos corrigidos e conferir o histórico do ambiente antes de aplicar as migrações pendentes.
+
+Reversão desta correção de duplicidade: não há dados a desfazer. Preserve a migração canônica e os registros aplicados. Não restaure o SQL duplicado para execução; se a verificação apontar uma divergência, corrija especificamente a causa em uma migração nova e revisada.
 
 Se for necessário reverter, primeiro suspender o job de recuperação e restaurar a versão anterior das funções e gatilhos a partir da definição capturada antes da publicação. Preservar as tabelas novas de auditoria e capacidade. Reverter o frontend isoladamente não restaura a regra antiga do banco. Atribuições legítimas já realizadas não devem ser removidas por uma reversão de código.

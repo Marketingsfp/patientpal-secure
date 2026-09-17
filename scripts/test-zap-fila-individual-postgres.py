@@ -17,7 +17,94 @@ def run(db):
       id uuid PRIMARY KEY DEFAULT gen_random_uuid(), clinica_id uuid, conversa_id uuid,
       direction text, enviada_por text, status text, recebida_em timestamptz DEFAULT now());
       GRANT ALL ON whatsapp_mensagens TO authenticated, service_role;""")
-    db.file(base.REPO / "supabase/migrations/20260917230000_zap_fila_individual_pausa.sql")
+    canonical = base.REPO / "supabase/migrations/20260917144041_b618961f-ac79-4d95-977a-1eac1d3541fa.sql"
+    compatibility = base.REPO / "supabase/migrations/20260917230000_zap_fila_individual_pausa.sql"
+    compatibility_sql = compatibility.read_text(encoding="utf-8")
+
+    def missing_canonical():
+        error = db.sql(compatibility_sql, error=True)
+        assert "Fila individual incompleta" in error
+        assert db.sql("SELECT count(*) FROM pg_attribute WHERE attrelid='atend_conversas'::regclass AND attname='fila_pendente';") == "0"
+    db.case("compatibility entry refuses missing canonical migration without creating objects", missing_canonical)
+
+    db.file(canonical)
+
+    def schema_snapshot():
+        return db.sql("""
+          SELECT jsonb_build_object(
+            'functions', (SELECT jsonb_agg(jsonb_build_array(p.oid,pg_get_functiondef(p.oid),p.proacl) ORDER BY p.oid)
+              FROM pg_proc p WHERE p.pronamespace='public'::regnamespace AND p.proname LIKE 'atend_%'),
+            'triggers', (SELECT jsonb_agg(jsonb_build_array(oid,pg_get_triggerdef(oid),tgenabled) ORDER BY oid)
+              FROM pg_trigger WHERE NOT tgisinternal),
+            'policies', (SELECT jsonb_agg(to_jsonb(p) ORDER BY oid) FROM pg_policy p),
+            'indexes', (SELECT jsonb_agg(pg_get_indexdef(indexrelid) ORDER BY indexrelid)
+              FROM pg_index WHERE indrelid='atend_conversas'::regclass),
+            'conversations', (SELECT jsonb_agg(to_jsonb(c) ORDER BY id) FROM atend_conversas c),
+            'presence', (SELECT jsonb_agg(to_jsonb(p) ORDER BY id) FROM atend_agente_presenca p),
+            'events', (SELECT jsonb_agg(to_jsonb(e) ORDER BY id) FROM atend_conversa_eventos e)
+          )::text;
+        """)
+
+    def sequential_and_repeated():
+        # An existing pending queue, including one global item, is preserved.
+        c, (a, m) = db.fixture()
+        db.presence(c, a, "PAUSA")
+        db.queue(c, 11)
+        db.rpc("atend_distribuir_fila_status", f"{L(c)},200", m)
+        before = schema_snapshot()
+        db.file(compatibility)
+        # Proves that the historical alias performs no DDL or data writes.
+        db.sql("BEGIN READ ONLY;\n" + compatibility_sql + "\nCOMMIT;")
+        assert schema_snapshot() == before
+    db.case("canonical then compatibility, including retry, preserve schema, ACLs and queues", sequential_and_repeated)
+
+    def preserve_later_function():
+        # A later compatible implementation must not be overwritten by the
+        # old CREATE OR REPLACE statements from the duplicated migration.
+        db.sql("""
+          BEGIN;
+          CREATE OR REPLACE FUNCTION public.atend_configurar_capacidade(
+            _clinica_id uuid, _user_id uuid, _max_simultaneas integer
+          ) RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path TO 'public', 'pg_temp'
+          AS $later$ BEGIN RAISE EXCEPTION 'Synthetic later version'; END; $later$;
+        """ + compatibility_sql + """
+          DO $check$ BEGIN
+            IF position('Synthetic later version' IN
+              pg_get_functiondef('atend_configurar_capacidade(uuid,uuid,integer)'::regprocedure)) = 0 THEN
+              RAISE EXCEPTION 'Compatibility migration overwrote a later function';
+            END IF;
+          END; $check$;
+          ROLLBACK;
+        """)
+    db.case("compatibility entry preserves later function versions", preserve_later_function)
+
+    def history_audit():
+        # Synthetic history only. The production audit must not write to it.
+        db.sql("""CREATE SCHEMA supabase_migrations;
+          CREATE TABLE supabase_migrations.schema_migrations(version text PRIMARY KEY);
+          INSERT INTO supabase_migrations.schema_migrations VALUES ('20260917144041');""")
+        before = schema_snapshot()
+        report = db.sql((base.REPO / "scripts/sql/auditar-zap-fila-individual.sql").read_text(encoding="utf-8"))
+        assert "20260917144041" in report and "fila_pendente" in report
+        assert db.sql("SELECT string_agg(version, ',') FROM supabase_migrations.schema_migrations;") == "20260917144041"
+        assert schema_snapshot() == before
+    db.case("read-only audit reports recorded version and schema without changing history", history_audit)
+
+    def reject_drift(sql):
+        before = schema_snapshot()
+        error = db.sql("BEGIN;\n" + sql + "\n" + compatibility_sql + "\nROLLBACK;", error=True)
+        assert "Fila individual incompleta" in error
+        assert schema_snapshot() == before
+
+    for label, sql in [
+        ("nullable column", "ALTER TABLE atend_conversas ALTER COLUMN fila_pendente DROP NOT NULL;"),
+        ("wrong default", "ALTER TABLE atend_conversas ALTER COLUMN fila_pendente SET DEFAULT true;"),
+        ("missing index", "DROP INDEX atend_fila_individual_idx;"),
+        ("disabled trigger", "ALTER TABLE atend_conversas DISABLE TRIGGER trg_atend_normalizar_fila_individual;"),
+        ("missing policy", "DROP POLICY atend_fila_individual_privada ON atend_conversas;"),
+        ("disabled RLS", "ALTER TABLE atend_conversas DISABLE ROW LEVEL SECURITY;"),
+    ]:
+        db.case("compatibility refuses " + label + " without silently repairing it", lambda sql=sql: reject_drift(sql))
 
     def pending(clinic, user=None):
         return int(db.sql(f"SELECT count(*) FROM atend_conversas WHERE clinica_id={L(clinic)} AND fila_pendente" + (f" AND atribuida_user_id={L(user)}" if user else "") + ";"))

@@ -29,6 +29,7 @@ def run(db):
         BEGIN NEW.updated_at=now(); RETURN NEW; END $$;
       CREATE PUBLICATION supabase_realtime;
     """)
+    db.file(base.REPO / "supabase/migrations/20260917144041_b618961f-ac79-4d95-977a-1eac1d3541fa.sql")
     db.file(base.REPO / "supabase/migrations/20260917230000_zap_fila_individual_pausa.sql")
     db.file(base.REPO / "supabase/migrations/20260906153037_6fa5e136-c373-45f1-9609-440a2e04e9f7.sql")
 
