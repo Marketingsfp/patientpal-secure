@@ -1070,7 +1070,6 @@ export type Database = {
       }
       atend_conversas: {
         Row: {
-          fila_pendente: boolean
           aguardando_desde: string | null
           ai_enabled: boolean
           ai_tentativas: number
@@ -1123,7 +1122,6 @@ export type Database = {
           whatsapp_profile_name_updated_at: string | null
         }
         Insert: {
-          fila_pendente?: boolean
           aguardando_desde?: string | null
           ai_enabled?: boolean
           ai_tentativas?: number
@@ -1176,7 +1174,6 @@ export type Database = {
           whatsapp_profile_name_updated_at?: string | null
         }
         Update: {
-          fila_pendente?: boolean
           aguardando_desde?: string | null
           ai_enabled?: boolean
           ai_tentativas?: number
