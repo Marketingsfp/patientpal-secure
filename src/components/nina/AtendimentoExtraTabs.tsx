@@ -3264,9 +3264,6 @@ export function AtendInbox() {
                 </SelectContent>
               </Select>
             </div>
-            <span className="text-[11px] text-muted-foreground">
-              Conversas · {convsVisiveis.length}
-            </span>
             {soNaoAtribuidas && (
               <button
                 type="button"
@@ -3650,10 +3647,12 @@ export function AtendInbox() {
                   // Só marcador interno vira faixa central. Mensagem real
                   // enviada ao paciente (status de envio) fica como conversa.
                   if (marcadorInternoSistema(m)) {
+                    const texto = textoMarcadorSistema(m.body);
+                    if (!texto) return null;
                     return (
                       <div key={`m-${m.id}`} className="flex justify-center">
                         <div className="max-w-[85%] whitespace-pre-wrap rounded-lg border border-atd-blue/20 bg-atd-blue-tint px-3 py-2 text-center text-xs text-atd-blue-ink">
-                          {textoMarcadorSistema(m.body)}
+                          {texto}
                           <div className="mt-1 text-[10px] opacity-70">
                             {fmtHora(m.recebida_em)}
                           </div>

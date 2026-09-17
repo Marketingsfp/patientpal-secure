@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { ROTULO_INTENCAO, blocosVisiveis } from "@/lib/atendimento/handoff-resumo";
 import { rotuloDesfecho } from "@/lib/atendimento/resumo-desfecho";
 import { useResumoHandoff } from "@/components/nina/use-resumo-handoff";
+import { motivoParaAtendimento } from "@/lib/atendimento/texto-interno-apresentacao";
 
 export function ResumoHandoffCard({
   clinicaId,
@@ -91,7 +92,7 @@ export function ResumoHandoffCard({
           {carregando && !r && <p>Gerando resumo da conversa…</p>}
           {linha.status === "erro" && (
             <p className="text-atd-danger-ink">
-              {linha.erro ?? "Falha ao gerar o resumo."} A transferência não foi afetada.
+              Não foi possível gerar o resumo agora. A transferência não foi afetada.
             </p>
           )}
           {r && (
@@ -125,7 +126,7 @@ export function ResumoHandoffCard({
               ))}
               {r.motivo_handoff && (
                 <p className="opacity-80">
-                  <strong>Motivo da transferência:</strong> {r.motivo_handoff}
+                  <strong>Motivo da transferência:</strong> {motivoParaAtendimento(r.motivo_handoff)}
                 </p>
               )}
             </>

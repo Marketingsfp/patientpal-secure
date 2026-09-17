@@ -10,6 +10,8 @@
  * conversa é descartado aqui.
  */
 
+import { textoOperacional } from "./texto-interno-apresentacao";
+
 export type IntencaoHandoff =
   | "agendamento"
   | "consulta"
@@ -162,7 +164,9 @@ export function blocosVisiveis(r: ResumoHandoff): Array<{ titulo: string; itens:
   if (r.ja_informado.length) b.push({ titulo: "Já informado pela Nina", itens: r.ja_informado });
   if (r.pendencias.length) b.push({ titulo: "Pendente", itens: r.pendencias });
   if (r.proxima_acao) b.push({ titulo: "Próxima ação sugerida", itens: [r.proxima_acao] });
-  return b;
+  // Só a apresentação é filtrada; o resumo original continua no diagnóstico.
+  return b.map(bloco => ({ ...bloco, itens: bloco.itens.map(i => textoOperacional(i)).filter((i): i is string => i !== null) }))
+    .filter(bloco => bloco.itens.length > 0);
 }
 
 /** Instrução do modelo — centralizada para poder ser ajustada sem tocar em código de tela. */

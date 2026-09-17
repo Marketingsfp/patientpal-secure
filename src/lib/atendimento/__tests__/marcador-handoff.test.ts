@@ -27,8 +27,8 @@ describe("marcador de handoff na timeline", () => {
     ).toBe("Transferida para atendimento humano · URGENTE");
   });
 
-  it("não altera outros marcadores de sistema", () => {
+  it("apresenta protocolo e destino sem o nome técnico handoff", () => {
     const protocolo = "🧾 Handoff realizado pela Nina · Protocolo: MJ-4 · Destino: Recepção";
-    expect(textoMarcadorSistema(protocolo)).toBe(protocolo);
+    expect(textoMarcadorSistema(protocolo)).toBe("Encaminhamento para atendimento humano · Protocolo MJ-4 · Destino: Recepção");
   });
 });

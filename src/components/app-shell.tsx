@@ -575,7 +575,6 @@ const navRows: ReadonlyArray<{ label: string; items: ReadonlyArray<NavItem> }> =
     items: [
       { to: "/app/nina", hash: "atend-inbox", label: "Conversas WhatsApp", icon: Inbox },
       { to: "/app/nina", hash: "atend-macros", label: "/ Mensagens prontas", icon: Zap },
-      { to: "/app/configuracoes/respostas-rapidas", label: "Mensagens rápidas", icon: Zap },
     ],
   },
   {

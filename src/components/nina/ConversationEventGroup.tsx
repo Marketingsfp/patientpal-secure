@@ -8,6 +8,10 @@
 
 import { formatarDataHoraMensagem } from "@/lib/atendimento/data-hora";
 import type { GrupoAtribuicao, GrupoHandoff } from "@/lib/atendimento/timeline-grupos";
+import {
+  motivoParaAtendimento,
+  textoOperacional,
+} from "@/lib/atendimento/texto-interno-apresentacao";
 
 function Card({
   titulo,
@@ -27,6 +31,7 @@ function Card({
         </div>
         <div className="mt-1 space-y-0.5">
           {linhas
+            .map((linha) => linha.filter((campo) => textoOperacional(campo.valor)))
             .filter((linha) => linha.length > 0)
             .map((linha, i) => (
               <div key={i} className="flex flex-wrap gap-x-3 gap-y-0.5">
@@ -54,15 +59,11 @@ const STATUS_HANDOFF: Record<GrupoHandoff["status"], string> = {
   SOLICITADO: "Solicitado",
   NA_FILA: "Na fila",
   PROTOCOLO_GERADO: "Protocolo gerado",
-  PROTOCOLO_INFORMADO: "Handoff concluído",
+  PROTOCOLO_INFORMADO: "Protocolo informado ao paciente",
 };
 
 export function HandoffGroupCard({ grupo }: { grupo: GrupoHandoff }) {
-  const auditoria = !grupo.auditoria.registrada
-    ? null
-    : grupo.auditoria.completa === false
-      ? `incompleta (${grupo.auditoria.faltando.join(", ")})`
-      : "OK";
+  const motivo = motivoParaAtendimento(grupo.motivo);
 
   const linha2: Array<{ rotulo?: string; valor: string }> = [];
   if (grupo.protocolo) linha2.push({ rotulo: "Protocolo", valor: grupo.protocolo });
@@ -79,13 +80,12 @@ export function HandoffGroupCard({ grupo }: { grupo: GrupoHandoff }) {
   const linha3: Array<{ rotulo?: string; valor: string }> = [];
   if (grupo.origem) linha3.push({ rotulo: "Origem", valor: ORIGEM[grupo.origem] ?? grupo.origem });
   linha3.push({ rotulo: "Status", valor: STATUS_HANDOFF[grupo.status] });
-  if (auditoria) linha3.push({ rotulo: "Auditoria", valor: auditoria });
 
   return (
     <Card
-      titulo="🤝 Handoff para atendimento humano"
+      titulo="Encaminhamento para atendimento humano"
       hora={formatarDataHoraMensagem(grupo.criadoEm)}
-      linhas={[grupo.motivo ? [{ rotulo: "Motivo", valor: grupo.motivo }] : [], linha2, linha3]}
+      linhas={[motivo ? [{ rotulo: "Motivo", valor: motivo }] : [], linha2, linha3]}
     />
   );
 }

@@ -5,6 +5,11 @@
  */
 
 import { formatarDataHoraMensagem } from "@/lib/atendimento/data-hora";
+import {
+  avisoProtocolo,
+  motivoParaAtendimento,
+  textoOperacional,
+} from "@/lib/atendimento/texto-interno-apresentacao";
 
 export interface ConversaEvento {
   id: string;
@@ -24,7 +29,7 @@ function autor(ev: ConversaEvento): string {
   return ev.user_id ? "um atendente" : "Sistema de Automação";
 }
 
-export function textoEvento(ev: ConversaEvento): string {
+export function textoEvento(ev: ConversaEvento): string | null {
   const por = autor(ev);
   const automatico = Boolean((ev.detalhes as { automatico?: boolean } | null)?.automatico);
   switch (ev.evento) {
@@ -33,13 +38,14 @@ export function textoEvento(ev: ConversaEvento): string {
         ? "Conversa resolvida automaticamente pela Nina após conclusão do atendimento"
         : `Conversa encerrada e resolvida por ${por}`;
 
-
     case "REABERTA":
       return "Conversa reaberta por nova mensagem do paciente";
     case "ATRIBUIDA_IA":
     case "DEVOLVIDA_PARA_IA":
       return "Conversa atribuída à Nina (IA)";
     case "ASSUMIDA": {
+      const protocolo = avisoProtocolo(ev);
+      if (protocolo) return protocolo;
       const det = (ev.detalhes ?? null) as { manual?: boolean } | null;
       const para = (ev.para_nome ?? "").trim();
       const de = (ev.de_nome ?? "").trim();
@@ -53,9 +59,7 @@ export function textoEvento(ev: ConversaEvento): string {
     case "DESATRIBUIDA":
       return "Conversa ficou sem responsável";
     case "TRANSFERIDA": {
-      const det = (ev.detalhes ?? null) as
-        | { setor_nome?: string | null; sorteio?: boolean }
-        | null;
+      const det = (ev.detalhes ?? null) as { setor_nome?: string | null; sorteio?: boolean } | null;
       const para = (ev.para_nome ?? "").trim();
       const de = (ev.de_nome ?? "").trim();
       const setor = (det?.setor_nome ?? "").trim();
@@ -74,9 +78,9 @@ export function textoEvento(ev: ConversaEvento): string {
     case "ATENDIMENTO_ENCERRADO":
       return "Atendimento encerrado — a Nina reassumirá caso o paciente envie uma nova mensagem";
     case "TIMEOUT_NINA":
-      return "Timeout da Nina: paciente não respondeu em 30 minutos. Conversa encaminhada para atendimento humano";
+      return "Paciente sem resposta há 30 minutos após a mensagem da Nina. Conversa encaminhada para atendimento humano";
     case "HANDOFF_SOLICITADO":
-      return "Nina solicitou atendimento humano";
+      return avisoProtocolo(ev) ?? "Nina solicitou atendimento humano";
     case "ENTROU_NA_FILA":
       return "Conversa entrou na fila de atendimento";
     case "AGENDAMENTO_CRIADO":
@@ -87,17 +91,25 @@ export function textoEvento(ev: ConversaEvento): string {
     case "IA_SILENCIADA":
       return "IA pausada nesta conversa";
     default:
-      return ev.evento.replaceAll("_", " ").toLowerCase();
+      // Novos eventos técnicos só entram na conversa quando tiverem apresentação própria.
+      return null;
   }
 }
 
 export function ConversationSystemEvent({ evento }: { evento: ConversaEvento }) {
+  const texto = textoOperacional(textoEvento(evento));
+  if (!texto) return null;
+  const motivo = avisoProtocolo(evento)
+    ? null
+    : evento.evento === "HANDOFF_SOLICITADO"
+      ? motivoParaAtendimento(evento.motivo)
+      : textoOperacional(evento.motivo);
   const hora = formatarDataHoraMensagem(evento.created_at);
   return (
     <div className="my-2 flex justify-center px-2">
       <div className="max-w-[90%] rounded-full border border-border/60 bg-muted/60 px-3 py-1 text-center text-[11px] leading-tight text-muted-foreground sm:text-xs">
-        <span>{textoEvento(evento)}</span>
-        {evento.motivo ? <span className="opacity-80"> — {evento.motivo}</span> : null}
+        <span>{texto}</span>
+        {motivo && !texto.includes(motivo) ? <span className="opacity-80"> — {motivo}</span> : null}
         {hora ? <span className="ml-1 whitespace-nowrap opacity-60">{hora}</span> : null}
       </div>
     </div>

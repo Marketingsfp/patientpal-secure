@@ -1028,6 +1028,8 @@ export function HomologacaoInbox() {
       y += 10;
 
       for (const m of msgs) {
+        const texto = marcadorInternoSistema(m) ? textoMarcadorSistema(m.body) : String(m.body ?? "");
+        if (marcadorInternoSistema(m) && !texto) continue;
         const quem =
           m.enviada_por === "sistema"
             ? "— sistema —"
@@ -1037,7 +1039,7 @@ export function HomologacaoInbox() {
         const quando = new Date(m.created_at).toLocaleString("pt-BR");
         escrever([sanear(`${quem} · ${quando}`)], margem, 9, true);
 
-        const corpo = sanear(String(m.body ?? "")).split("\n");
+        const corpo = sanear(texto).split("\n");
         const linhas: string[] = [];
         for (const par of corpo) {
           if (par.trim() === "") {
@@ -1360,10 +1362,12 @@ export function HomologacaoInbox() {
                     return <ConversationSystemEvent key={item.id} evento={item.evento} />;
                   const m = item.msg;
                   if (marcadorInternoSistema(m)) {
+                    const texto = textoMarcadorSistema(m.body);
+                    if (!texto) return null;
                     return (
                       <div key={item.id} className="flex justify-center">
                         <div className="max-w-[85%] whitespace-pre-wrap rounded-lg border border-atd-blue/20 bg-atd-blue-tint px-3 py-2 text-center text-xs text-atd-blue-ink">
-                          {textoMarcadorSistema(m.body)}
+                          {texto}
                           <div className="mt-1 text-[10px] opacity-70">
                             {formatarDataHoraMensagem(m.created_at)}
                           </div>

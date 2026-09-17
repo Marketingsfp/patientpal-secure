@@ -11,6 +11,8 @@
  * igualmente para conversas antigas.
  */
 
+import { textoOperacional } from "./texto-interno-apresentacao";
+
 const PREFIXO_HANDOFF = "🔁 Conversa transferida da Nina para atendimento humano";
 
 /** Identifica o marcador extenso de handoff gravado como mensagem de sistema. */
@@ -21,14 +23,19 @@ export function ehMarcadorHandoff(body: string | null | undefined): boolean {
 /**
  * Texto que a timeline deve mostrar para uma mensagem de sistema.
  * Para o marcador de handoff devolve a versão compacta (sem motivo, sem
- * posição na fila e sem o resumo); para as demais, o texto original.
+ * posição na fila e sem o resumo). Outros registros técnicos ficam ocultos.
  */
 export function textoMarcadorSistema(body: string | null | undefined): string {
   const texto = (body ?? "").trim();
-  if (!ehMarcadorHandoff(texto)) return texto;
+  if (/^🧾 Handoff realizado pela Nina/.test(texto)) {
+    const protocolo = textoOperacional(/·\s*Protocolo:\s*([^·\n]+)/.exec(texto)?.[1]);
+    const destino = textoOperacional(/·\s*Destino:\s*([^·\n]+)/.exec(texto)?.[1]);
+    return "Encaminhamento para atendimento humano" + (protocolo ? ` · Protocolo ${protocolo}` : "") + (destino ? ` · Destino: ${destino}` : "");
+  }
+  if (!ehMarcadorHandoff(texto)) return textoOperacional(texto) ?? "";
 
   // Setor é a única informação de roteamento que não está no card roxo.
-  const setor = /·\s*Setor:\s*([^·\n]+)/.exec(texto)?.[1]?.trim();
+  const setor = textoOperacional(/·\s*Setor:\s*([^·\n]+)/.exec(texto)?.[1]);
   const urgente = /·\s*URGENTE/.test(texto);
 
   return (

@@ -76,7 +76,6 @@ describe("FASE 3 — resumo detalhado único", () => {
 
   it("eventos operacionais da timeline continuam intactos", () => {
     const operacionais = [
-      "🧾 Handoff realizado pela Nina · Protocolo: MJ-4 · Destino: Recepção",
       "Conversa atribuída a Tuane",
       "Conversa encerrada e resolvida por Tuane",
     ];
