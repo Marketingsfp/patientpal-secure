@@ -314,12 +314,6 @@ function fmtData(s?: string | null) {
   if (!s) return "—";
   return new Date(s).toLocaleString("pt-BR");
 }
-function fmtSeg(s?: number | null) {
-  if (s == null) return "—";
-  if (s < 60) return `${s}s`;
-  if (s < 3600) return `${Math.round(s / 60)}min`;
-  return `${(s / 3600).toFixed(1)}h`;
-}
 
 /* ============================================================
  *  INBOX UNIFICADO — 3 colunas
@@ -3268,9 +3262,6 @@ export function AtendInbox() {
                             <Copy className="h-3 w-3" />
                           </button>
                         </span>
-                      )}
-                      {sel.sla_first_response_seg != null && (
-                        <> · 1ª resp: {fmtSeg(sel.sla_first_response_seg)}</>
                       )}
                     </p>
                     {espera[sel.id] && (
