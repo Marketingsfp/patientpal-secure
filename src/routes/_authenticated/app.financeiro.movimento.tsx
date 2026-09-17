@@ -116,6 +116,11 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Switch } from "@/components/ui/switch";
+import {
+  montarOpcoesProfissional,
+  rotuloProfissionalAgenda,
+  type OpcaoProfissional,
+} from "@/lib/agenda/opcoes-profissional";
 import { Pilulas } from "@/components/financeiro/pilulas";
 import { SolicitarEstornoDialog } from "@/components/financeiro/SolicitarEstornoDialog";
 import {
@@ -1123,7 +1128,7 @@ function Page() {
     void carregarCategorias(clinicaAtual.clinica_id)
       .then((todas) => setNomesCategoria(mapaDeCategorias(todas)))
       .catch(() => setNomesCategoria(new Map()));
-    const [c, b, m, meds, agendas] = await Promise.all([
+    const [c, b, m, meds, agendas, grades] = await Promise.all([
       supabase
         .from("fin_categorias")
         .select("id, nome, tipo")
@@ -2336,7 +2341,6 @@ function Page() {
       <MovimentoResultado
         linhas={classificadas}
         totaisPeriodo={totaisConferencia}
-        profissionaisComVariasAgendas={medicosVariasAgendas}
         pronto={procTipos.size > 0 && mapaConvenio !== null}
         filtro={filtroGrupo}
         onFiltro={setFiltroGrupo}
