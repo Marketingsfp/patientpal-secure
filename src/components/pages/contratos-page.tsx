@@ -2123,21 +2123,18 @@ function NovoContratoForm({
     setSaving(true);
 
     // Gerar cobrancas: taxa de adesao separada da mensalidade.
-    const base = new Date(dataInicio + "T00:00:00");
     const valorParcela = valor + (tipoCobranca === "boleto" ? TAXA_BOLETO : 0);
     // Convênio com "adesão no ato": a taxa é cobrada na emissão do cartão, em
     // linha própria (parcela 0, vencendo no dia do contrato), e as mensalidades
     // ficam limpas. No modo padrão ela continua embutida na 1ª parcela, cobrada
-    // junto com ela no mês seguinte.
+    // junto com ela no vencimento dela.
     const adesaoNoAto = Boolean(convenio.adesao_no_ato) && Number(taxa || 0) > 0;
     const parcelas = Array.from({ length: convenio.num_parcelas }, (_, i) => {
-      // Regra: 1ª mensalidade cai no MÊS SEGUINTE à data de início e as
-      // demais seguem mês a mês, cobrindo exatamente 12 meses até
-      // data_fim (data_inicio + 1 ano). Ex.: início 01/02/2026 →
-      // parcelas 01/03/2026, 01/04/2026, …, 01/02/2027.
-      const venc = new Date(base.getFullYear(), base.getMonth() + i + 1, diaVenc);
+      // Regra: 1ª mensalidade cai no PRÓPRIO MÊS da data de início e as demais
+      // seguem mês a mês. Ex.: início 17/09/2026 com vencimento no dia 25 →
+      // parcelas 25/09/2026, 25/10/2026, …, 25/08/2027.
+      const vencStr = vencimentoParcelaContrato(dataInicio, diaVenc, i);
       const jaPago = i < mensalidadesJaPagas;
-      const vencStr = venc.toISOString().slice(0, 10);
       // Taxa de adesão só na 1ª parcela. Se o operador informou parcelas
       // "já pagas" (contrato retroativo), a taxa também já foi paga e vai zero.
       // No modo "adesão no ato" ela não entra em parcela nenhuma — sai na
