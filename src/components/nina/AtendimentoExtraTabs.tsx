@@ -258,6 +258,8 @@ import {
   type VisualizacaoInbox,
 } from "@/lib/atendimento/filtros-inbox";
 import { lerFiltrosInbox, salvarFiltrosInbox } from "@/lib/atendimento/filtros-persistencia";
+import { estadoFiltroAtendente, filtroAtendenteAtual } from "@/lib/atendimento/filtros-atendente";
+import { FiltrosAtendente } from "@/components/nina/FiltrosAtendente";
 import {
   MSG_ADMIN_NAO_ATENDE,
   ROTULO_PRESENCA,
@@ -397,14 +399,9 @@ export function AtendInbox() {
   const [revisarVinculoAberto, setRevisarVinculoAberto] = useState(false);
   const [deptos, setDeptos] = useState<any[]>([]);
   const [usuarios, setUsuarios] = useState<any[]>([]);
-  // Opção "Bot" removida da lista de status a pedido da equipe: conversas sob
-  // a Nina continuam acessíveis pelo filtro de escopo "Nina".
-  // FASE 1 — a Inbox tem só DOIS controles: Escopo (de quem são as conversas)
-  // e Visualização (que tipo de conversa). Status e ordenação deixaram de ser
-  // controles próprios — cada visualização já define os dois.
+  // Supervisão mantém os dois eixos; atendentes usam três filtros operacionais.
   const [escopoBase, setEscopoBase] = useState<EscopoBaseInbox>(ESCOPO_BASE_PADRAO);
-  const [visualizacao, setVisualizacao] = useState<VisualizacaoInbox>(VISUALIZACAO_PADRAO);
-  // Fila de não atribuídas: continua existindo, acionada pela Central de Atenção.
+  const [visualizacaoEscolhida, setVisualizacao] = useState<VisualizacaoInbox>(VISUALIZACAO_PADRAO);
   const [naoAtribuidasFiltro, setNaoAtribuidasFiltro] = useState(false);
   // Atendente escolhido dentro do seletor de Escopo. `null` = todos.
   // Só visualização: não transfere, não atribui e não marca leitura de ninguém.
@@ -414,6 +411,12 @@ export function AtendInbox() {
   const [buscaAtendente, setBuscaAtendente] = useState("");
   // Administrador acompanha tudo, mas não atende: só supervisão.
   const [souAdmin, setSouAdmin] = useState(false);
+  const filtroAtendente = filtroAtendenteAtual({
+    visualizacao: visualizacaoEscolhida,
+    naoAtribuidas: naoAtribuidasFiltro,
+  });
+  const filtrosAtendente = estadoFiltroAtendente(filtroAtendente);
+  const visualizacao = souGestor ? visualizacaoEscolhida : filtrosAtendente.visualizacao;
   // Contagem própria de cada filtro (nunca reaproveita o número de outro).
   const [contadores, setContadores] = useState<Record<string, number>>({
     minhas: 0,
@@ -437,6 +440,7 @@ export function AtendInbox() {
     setEscopoBase(salvo.base);
     setVisualizacao(salvo.visualizacao);
     setAtendenteEscolhidoId(salvo.atendenteId);
+    setNaoAtribuidasFiltro(salvo.naoAtribuidas === true);
     // Restauração acontece por clínica; mudanças posteriores de equipe são
     // tratadas pelo efeito de validação abaixo.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -458,8 +462,9 @@ export function AtendInbox() {
       base: escopoBase,
       visualizacao,
       atendenteId: souGestor ? atendenteEscolhidoId : null,
+      ...(naoAtribuidasFiltro ? { naoAtribuidas: true } : {}),
     });
-  }, [clinicaId, escopoBase, visualizacao, atendenteEscolhidoId, souGestor]);
+  }, [clinicaId, escopoBase, visualizacao, atendenteEscolhidoId, souGestor, naoAtribuidasFiltro]);
 
   const atendentesFiltrados = useMemo(() => {
     const termo = normalizarNomeBusca(buscaAtendente);
@@ -477,6 +482,7 @@ export function AtendInbox() {
     atendenteId: atendenteEscolhidoId,
     visualizacao,
     naoAtribuidas: naoAtribuidasFiltro,
+    ...(!souGestor ? filtrosAtendente : {}),
     gestor: souGestor,
     meuId,
   };
@@ -486,7 +492,13 @@ export function AtendInbox() {
   const ordem = ordemVisualizacao(visualizacao);
 
   const soNaoAtribuidas = naoAtribuidasFiltro;
-  const setSoNaoAtribuidas = (v: boolean) => setNaoAtribuidasFiltro(v);
+  const setSoNaoAtribuidas = (v: boolean) => {
+    setNaoAtribuidasFiltro(v);
+    if (v) {
+      setVisualizacao("recentes");
+      setAtendenteEscolhidoId(null);
+    }
+  };
   // DECISÃO ATUAL — a conversa aberta é uma SELEÇÃO INTERNA da Inbox, pelo id
   // interno da conversa. O endereço da tela é sempre /app/nina: abrir um lead
   // não cria, altera nem lê endereço individual.
@@ -584,7 +596,7 @@ export function AtendInbox() {
   const seqEspera = useRef(0);
   const convsVisiveis: any[] = (() => {
     let base = convs;
-    if (soCriticas) {
+    if (souGestor && soCriticas) {
       base = base.filter(
         (c: any) => faixaEsperaAtd(minutosDesde(espera[c.id])) === "critico",
       );
@@ -1154,9 +1166,9 @@ export function AtendInbox() {
           return;
         }
         const destino = escopoParaConversa(row, { escopoAtual: escopo, userId: meuId, gestor: souGestor });
-        if (!destino) {
-          // Fora do escopo do usuário: fecha sem aviso. O backend continua
-          // negando o acesso; a tela só não anuncia o bloqueio.
+        if (!destino || (!souGestor && destino === "nina")) {
+          // A conversa precisa pertencer a uma opção disponível nesta sidebar.
+          // A autorização de acesso continua sendo conferida pelo backend.
           abrirConversa(null);
           return;
         }
@@ -1171,7 +1183,7 @@ export function AtendInbox() {
           const alvo = estadoDeEscopoLegado(destino);
           setEscopoBase(alvo.base);
           setNaoAtribuidasFiltro(alvo.naoAtribuidas);
-          if (alvo.visualizacao) setVisualizacao(alvo.visualizacao);
+          setVisualizacao(alvo.visualizacao ?? "recentes");
         }
       } catch (e: any) {
         if (selecaoIdRef.current !== idPedido) return;
@@ -2971,12 +2983,23 @@ export function AtendInbox() {
                 </Button>
               </div>
             )}
-            {/* FASE 2 — bloco visual de "Não atribuídas" removido da sidebar
-                para liberar espaço vertical. A fila continua existindo no
-                backend e é acompanhada pela Central de Atenção. */}
 
           </div>
           <CardHeader className="py-2 space-y-2">
+            {!souGestor ? (
+              <FiltrosAtendente
+                valor={filtroAtendente}
+                onChange={(valor) => {
+                  const alvo = estadoFiltroAtendente(valor);
+                  setEscopoBase(alvo.base);
+                  setAtendenteEscolhidoId(alvo.atendenteId);
+                  setVisualizacao(alvo.visualizacao);
+                  setNaoAtribuidasFiltro(alvo.naoAtribuidas);
+                  setSoCriticas(false);
+                }}
+              />
+            ) : (
+              <>
             {/* FASE 1 — dois eixos compactos na mesma linha:
                 [ Escopo ▾ ] [ Visualização ▾ ]. Atendentes ficam dentro do
                 Escopo (por user_id); a supervisão continua sendo decidida no
@@ -3079,7 +3102,8 @@ export function AtendInbox() {
                 Não atribuídas ({convsVisiveis.length}) ✕
               </button>
             )}
-
+              </>
+            )}
           </CardHeader>
           <div className="flex-1 overflow-auto border-t">
             {convsVisiveis.length === 0 && (

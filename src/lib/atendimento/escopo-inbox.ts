@@ -28,6 +28,8 @@ export const ESCOPO_INBOX_PADRAO: EscopoInbox = "minhas";
 
 export interface ConversaEscopo {
   atribuida_user_id?: string | null;
+  last_assigned_user_id?: string | null;
+  resolved_by?: string | null;
   owner_type?: string | null;
   status?: string | null;
 }
@@ -78,6 +80,14 @@ export function conversaEstaFechada(conversa: ConversaEscopo): boolean {
   return STATUS_FECHADOS.includes((conversa.status ?? "") as (typeof STATUS_FECHADOS)[number]);
 }
 
+/** Mesmo vínculo usado pela consulta, pelo acesso direto e pelo tempo real. */
+export function conversaResolvidaDoAtendente(conversa: ConversaEscopo, userId: string): boolean {
+  return conversa.last_assigned_user_id === userId || conversa.resolved_by === userId || (
+    conversa.last_assigned_user_id == null && conversa.resolved_by == null &&
+    conversa.atribuida_user_id === userId
+  );
+}
+
 /**
  * Filtros operacionais (Minhas, Nina, Não atribuídas) mostram apenas conversas
  * em andamento; o histórico encerrado vive no filtro "Fechadas".
@@ -111,7 +121,7 @@ export function conversaVisivelNoEscopo(
     case "fechadas":
       return (
         STATUS_FECHADOS.includes((conversa.status ?? "") as (typeof STATUS_FECHADOS)[number]) &&
-        (filtro.userId === null || conversa.atribuida_user_id === filtro.userId)
+        (filtro.userId === null || conversaResolvidaDoAtendente(conversa, filtro.userId))
       );
     default:
       return conversa.atribuida_user_id === filtro.userId;
@@ -164,6 +174,7 @@ export function conversaDoAtendente(
   atendenteId: string | null,
 ): boolean {
   if (!atendenteId) return true;
+  if (conversaEstaFechada(conversa)) return conversaResolvidaDoAtendente(conversa, atendenteId);
   return conversa.atribuida_user_id === atendenteId;
 }
 

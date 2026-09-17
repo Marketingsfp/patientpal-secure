@@ -427,6 +427,9 @@ export const contarConversasInbox = createServerFn({ method: "POST" })
         .eq("is_teste", false)
         .eq("clinica_id", data.clinicaId);
     const abertas = () => base().not("status", "in", `(${STATUS_FECHADOS.join(",")})`);
+    const filtroFechadas = filtroResponsavel(context.userId, { somenteResolvidas: true });
+    let minhasFechadas = base().in("status", [...STATUS_FECHADOS]);
+    if (filtroFechadas.tipo === "ou") minhasFechadas = minhasFechadas.or(filtroFechadas.expr);
 
     const [minhas, nina, naoAtribuidas, fechadas, todas] = await Promise.all([
       abertas().eq("atribuida_user_id", context.userId),
@@ -434,7 +437,7 @@ export const contarConversasInbox = createServerFn({ method: "POST" })
       abertas().is("atribuida_user_id", null).neq("owner_type", "AI"),
       gestor
         ? base().in("status", [...STATUS_FECHADOS])
-        : base().in("status", [...STATUS_FECHADOS]).eq("atribuida_user_id", context.userId),
+        : minhasFechadas,
       gestor ? abertas() : Promise.resolve({ count: null } as { count: number | null }),
     ]);
 

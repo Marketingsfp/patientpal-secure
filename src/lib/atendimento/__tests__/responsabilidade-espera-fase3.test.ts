@@ -18,9 +18,7 @@ describe("FASE 3 — responsabilidade da conversa resolvida", () => {
     const f = filtroResponsavel(JEAN, planoVisualizacao("resolvidas"));
     expect(f.tipo).toBe("ou");
     if (f.tipo !== "ou") throw new Error("filtro inesperado");
-    expect(f.expr).toBe(`last_assigned_user_id.eq.${JEAN},resolved_by.eq.${JEAN}`);
-    // Nunca volta a olhar a atribuição ativa, que é limpa no encerramento.
-    expect(f.expr).not.toContain("atribuida_user_id");
+    expect(f.expr).toBe(`last_assigned_user_id.eq.${JEAN},resolved_by.eq.${JEAN},and(last_assigned_user_id.is.null,resolved_by.is.null,atribuida_user_id.eq.${JEAN})`);
   });
 
   it("maior espera continua olhando o responsável atual", () => {

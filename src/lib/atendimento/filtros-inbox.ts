@@ -193,15 +193,18 @@ export function estadoDeEscopoLegado(destino: EscopoInbox): {
  *   responsável no momento da resolução (`last_assigned_user_id`)
  *   ou, na ausência dele, quem resolveu (`resolved_by`).
  *
- * Nada é inventado para conversas históricas: sem nenhum dos dois campos, a
- * conversa simplesmente não pertence ao escopo de ninguém.
+ * Para encerramentos antigos que ainda mantêm o responsável atual, esse
+ * vínculo só vale quando os dois campos de resolução estão vazios.
  */
 export function filtroResponsavel(
   userId: string,
   plano: Pick<PlanoVisualizacao, "somenteResolvidas">,
 ): { tipo: "coluna"; coluna: "atribuida_user_id"; userId: string } | { tipo: "ou"; expr: string } {
   if (plano.somenteResolvidas) {
-    return { tipo: "ou", expr: `last_assigned_user_id.eq.${userId},resolved_by.eq.${userId}` };
+    return {
+      tipo: "ou",
+      expr: `last_assigned_user_id.eq.${userId},resolved_by.eq.${userId},and(last_assigned_user_id.is.null,resolved_by.is.null,atribuida_user_id.eq.${userId})`,
+    };
   }
   return { tipo: "coluna", coluna: "atribuida_user_id", userId };
 }

@@ -23,6 +23,7 @@ export interface FiltrosSalvos {
   base: EscopoBaseInbox;
   visualizacao: VisualizacaoInbox;
   atendenteId: string | null;
+  naoAtribuidas?: boolean;
 }
 
 export const FILTROS_INBOX_PADRAO: FiltrosSalvos = {
@@ -67,7 +68,12 @@ export function sanitizarFiltrosSalvos(
 
   // "Equipe" também é supervisão: sem permissão, volta para "Minhas".
   const baseEfetiva: EscopoBaseInbox = base === "equipe" && !ctx.gestor ? "minhas" : base;
-  return { base: atendenteId ? "equipe" : baseEfetiva, visualizacao, atendenteId };
+  return {
+    base: atendenteId ? "equipe" : baseEfetiva,
+    visualizacao,
+    atendenteId,
+    ...(obj["naoAtribuidas"] === true ? { naoAtribuidas: true } : {}),
+  };
 }
 
 /** Lê a memória do navegador; qualquer erro devolve o padrão. */
