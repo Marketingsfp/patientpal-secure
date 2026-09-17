@@ -591,7 +591,13 @@ export function AtendInbox() {
   const [msgDestacada, setMsgDestacada] = useState<string | null>(null);
   const seqEspera = useRef(0);
   const convsVisiveis: any[] = (() => {
-    let base = convs;
+    // A troca de categoria vale já neste render, antes da nova consulta.
+    let base = filtrarPorEscopo(convs, {
+      escopo,
+      userId: meuId,
+      gestor: souGestor,
+      atendenteId: atendenteSelecionadoId,
+    });
     if (souGestor && soCriticas) {
       base = base.filter(
         (c: any) => faixaEsperaAtd(minutosDesde(espera[c.id])) === "critico",
@@ -955,6 +961,8 @@ export function AtendInbox() {
     atendenteId: atendenteSelecionadoId,
     visualizacao,
   });
+  const chaveAtualRef = useRef(chaveAtual);
+  chaveAtualRef.current = chaveAtual;
   useEffect(() => {
     seqConvs.current++;
     setConvs([]);
@@ -986,17 +994,7 @@ export function AtendInbox() {
       // atual — era isso que fazia o cartão mudar e "voltar" sozinho.
       if (pedido !== seqConvs.current) return;
       // Se o filtro/usuário mudou enquanto a resposta vinha, ela é descartada.
-      if (
-        chavePedido !==
-        chaveInbox({
-          clinicaId,
-          userId: meuId,
-          escopo,
-          atendenteId: atendenteSelecionadoId,
-          visualizacao,
-        })
-      )
-        return;
+      if (chavePedido !== chaveAtualRef.current) return;
       // FASE 4 — segunda conferência no navegador: só entra na lista o que
       // realmente pertence a este filtro, mesmo que um evento em tempo real
       // traga uma conversa que acabou de mudar de responsável.
