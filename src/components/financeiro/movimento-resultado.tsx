@@ -14,7 +14,6 @@
  *  - os cards menores (Consultas/Exames de cada condição, mensalidades,
  *    avulsos) filtram a lista de lançamentos logo abaixo, como já faziam.
  */
-import { useState } from "react";
 import {
   Coins,
   Handshake,
@@ -268,7 +267,6 @@ export function MovimentoResultado({
   ate,
   clinicaNome,
   conferencia,
-  profissionaisComVariasAgendas,
 }: {
   /** Linhas visíveis do período (sem os retroativos escondidos), já classificadas. */
   linhas: LinhaClassificada[];
@@ -295,7 +293,6 @@ export function MovimentoResultado({
    * Só para eles o quadro abre a quebra por agenda — para os demais a agenda
    * única não acrescenta informação nenhuma.
    */
-  profissionaisComVariasAgendas?: Set<string>;
 }) {
   const [drill, setDrill] = useState<Drill | null>(null);
   const r = resumoMovimento(linhas);
@@ -604,7 +601,6 @@ export function MovimentoResultado({
             linhas={linhas}
             filtro={filtro}
             onFiltro={onFiltro}
-            comVariasAgendas={profissionaisComVariasAgendas}
           />
 
           <Card>
