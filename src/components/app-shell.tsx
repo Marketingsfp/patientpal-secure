@@ -810,16 +810,6 @@ function AppShellInner() {
     return () => window.removeEventListener("keydown", aoEsc);
   }, [sidebarAberta, fecharSidebar, buscaMenu]);
 
-  // Entrada em cascata do conteúdo da gaveta: cada bloco surge deslizando um
-  // pouco depois do anterior, em vez de o painel inteiro aparecer pronto. É o
-  // que dá a sensação de o menu "se montar" ao abrir. Só ao abrir — fechando,
-  // tudo sai junto com o painel.
-  const entradaCls = sidebarAberta
-    ? "animate-in fade-in slide-in-from-left-4 fill-mode-both duration-500 ease-out motion-reduce:animate-none"
-    : "";
-  const entradaDelay = (ms: number) =>
-    sidebarAberta ? ({ animationDelay: `${ms}ms` } as const) : undefined;
-
   // Ctrl+B (ou ⌘B) alterna o menu, padrão da maioria dos editores. Ignorado
   // enquanto o usuário digita, para não atrapalhar campos de texto.
   useEffect(() => {
@@ -1614,13 +1604,7 @@ function AppShellInner() {
             style={{ backgroundColor: corSidebar }}
           >
             {/* Título da gaveta + botão de fechar. */}
-            <div
-              className={cn(
-                "shrink-0 flex items-center gap-2 px-4 h-14 border-b border-white/10",
-                entradaCls,
-              )}
-              style={entradaDelay(100)}
-            >
+            <div className="shrink-0 flex items-center gap-2 px-4 h-14 border-b border-white/10">
               <Activity className="h-5 w-5 shrink-0 text-white" />
               <span className="text-base font-bold tracking-tight text-white whitespace-nowrap">
                 ClinicaOS
@@ -1636,7 +1620,7 @@ function AppShellInner() {
               </button>
             </div>
             {/* Atalho fixo para voltar ao Portal (tela de escolha de ambiente). */}
-            <div className={cn("shrink-0 px-3 pt-3", entradaCls)} style={entradaDelay(130)}>
+            <div className="shrink-0 px-3 pt-3">
               <button
                 type="button"
                 onClick={() => irParaAmbiente(null, "/app")}
@@ -1647,7 +1631,7 @@ function AppShellInner() {
               </button>
             </div>
             {/* Busca das telas do menu. */}
-            <div className={cn("shrink-0 px-3 pt-3 pb-1", entradaCls)} style={entradaDelay(160)}>
+            <div className="shrink-0 px-3 pt-3 pb-1">
               <div className="relative">
                 <Search className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-white/60" />
                 <input
@@ -1676,7 +1660,7 @@ function AppShellInner() {
               {buscandoMenu && searchedNavRows.length === 0 && (
                 <p className="px-3 py-2 text-xs text-white/60">Nenhum item encontrado.</p>
               )}
-              {searchedNavRows.map((row, indiceGrupo) => {
+              {searchedNavRows.map((row) => {
                 const leafIsActive = (to: string, hash?: string) =>
                   navLeafAtivo(itemDeMenuAtivo(location.pathname, to), location.hash, hash);
                 const itemHasActive = (it: NavItem): boolean =>
@@ -1688,14 +1672,7 @@ function AppShellInner() {
                   subsystem === "gestao-pessoas" && row.label === "Recursos Humanos";
                 const open = hideLabel || buscandoMenu ? true : (openGroups[row.label] ?? true);
                 return (
-                  <div
-                    key={row.label}
-                    className={cn("space-y-1", entradaCls)}
-                    // Cada seção entra 45ms depois da anterior, criando a
-                    // cascata. O teto evita que as últimas fiquem esperando
-                    // demais quando o menu tem muitas seções.
-                    style={entradaDelay(200 + Math.min(indiceGrupo, 6) * 45)}
-                  >
+                  <div key={row.label} className="space-y-1">
                     {!hideLabel && (
                       <button
                         type="button"
@@ -1855,13 +1832,7 @@ function AppShellInner() {
                 );
               })}
             </nav>
-            <div
-              className={cn(
-                "shrink-0 px-2 py-2 border-t border-white/15 pb-[max(0.5rem,env(safe-area-inset-bottom))]",
-                entradaCls,
-              )}
-              style={entradaDelay(260)}
-            >
+            <div className="shrink-0 px-2 py-2 border-t border-white/15 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
               <SidebarUserMenu
                 userId={user?.id}
                 userName={userName}
@@ -1894,6 +1865,8 @@ function AppShellInner() {
                   "pb-28 md:pb-4 lg:pb-6",
                 ),
             // Encosta os painéis de conversas no menu quando dividem a tela.
+            areaConversas &&
+              "transition-[padding-left] duration-200 ease-out motion-reduce:transition-none",
             sidebarAberta && areaConversas && "lg:pl-0",
             uxMelhorias && "animate-in fade-in duration-200 motion-reduce:animate-none",
           )}
