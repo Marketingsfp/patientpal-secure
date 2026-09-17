@@ -69,6 +69,7 @@ import {
   type FiltroCard,
 } from "@/lib/financeiro/movimento-resultado";
 import { MovimentoResultado } from "@/components/financeiro/movimento-resultado";
+import { CaixasOperadoras } from "@/components/financeiro/caixas-operadoras";
 import {
   carregarContextoRateio,
   carregarRateio,
@@ -2231,6 +2232,17 @@ function Page() {
         clinicaNome={clinicaAtual?.clinica.nome ?? "Clínica"}
         conferencia={conferencia}
       />
+
+      {/* Fechamento das gavetas da recepção, somado por operadora: o que o
+          financeiro recolheu em sangria e o que sobrou em cada caixa. */}
+      {!buscaGlobal && (
+        <CaixasOperadoras
+          clinicaId={clinicaAtual?.clinica_id}
+          de={fromDate}
+          ate={toDate}
+          usuario={filterUsuario}
+        />
+      )}
 
       {/* Enquanto a busca ignora o período, a tela não é mais a conferência
           do caixa. Dizer isso na cara do usuário é o que impede alguém de
