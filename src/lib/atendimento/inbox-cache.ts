@@ -3,8 +3,9 @@
  *
  * O backend já entrega apenas as conversas do filtro escolhido. Este módulo
  * acrescenta a segunda camada de proteção, no navegador: nada que não pertença
- * ao filtro atual pode entrar (ou continuar) na lista, nem sobrar em cache,
- * nem aparecer numa busca.
+ * ao filtro atual pode entrar (ou continuar) na lista ou aparecer numa busca.
+ * O chat da própria atendente pode continuar aberto após sair da fila para
+ * Ativas, mediante confirmação autorizada, conservando seu cache.
  *
  * Tudo aqui é função pura, para ser testável sem tela.
  */
@@ -17,9 +18,14 @@ import {
   type EscopoInbox,
 } from "./escopo-inbox";
 
-export type LinhaCache = ConversaEscopo & { id: string };
+export type LinhaCache = ConversaEscopo & {
+  id: string;
+  clinica_id?: string | null;
+  is_teste?: boolean | null;
+};
 
 export interface ContextoEscopo {
+  clinicaId?: string | null;
   escopo: EscopoInbox;
   userId: string | null;
   gestor: boolean;
@@ -82,10 +88,39 @@ export function podeEntrarNaLista(linha: LinhaCache, ctx: ContextoEscopo): boole
   );
 }
 
-/** Ids que estavam na tela e não pertencem mais ao filtro — o cache deles cai. */
+/** Ids que saíram do filtro; o chamador preserva apenas o chat cuja continuidade confirmou. */
 export function idsQueSairam(anteriores: { id: string }[], atuais: { id: string }[]): string[] {
   const agora = new Set(atuais.map((c) => c.id));
   return anteriores.filter((c) => !agora.has(c.id)).map((c) => c.id);
+}
+
+/** A lista pode perder a conversa da própria atendente quando a primeira resposta é enviada. */
+export function podeRevalidarChatDaFila(
+  selecionada: LinhaCache | null | undefined,
+  ctx: ContextoEscopo,
+): boolean {
+  return Boolean(
+    selecionada && ctx.clinicaId && ctx.userId && !ctx.gestor &&
+    ctx.escopo === "nao_atribuidas" && selecionada.clinica_id === ctx.clinicaId &&
+    selecionada.is_teste !== true && selecionada.atribuida_user_id === ctx.userId &&
+    selecionada.owner_type === "HUMAN" && typeof selecionada.fila_pendente === "boolean" &&
+    ["waiting", "active", "in_progress"].includes(selecionada.status ?? ""),
+  );
+}
+
+/** Só mantém fora da lista com um registro atual autorizado; ausência no filtro não basta. */
+export function chatContinuaAposPrimeiraResposta(args: {
+  selecionada: LinhaCache | null | undefined;
+  confirmada: LinhaCache | null | undefined;
+  ctx: ContextoEscopo;
+}): boolean {
+  const { selecionada, confirmada, ctx } = args;
+  return Boolean(
+    podeRevalidarChatDaFila(selecionada, ctx) && confirmada &&
+    confirmada.id === selecionada?.id && podeRevalidarChatDaFila(confirmada, ctx) &&
+    confirmada.fila_pendente === false &&
+    ["active", "in_progress"].includes(confirmada.status ?? ""),
+  );
 }
 
 /**
@@ -101,11 +136,15 @@ export function selecaoDeveSair(args: {
   linhas: LinhaCache[] | null | undefined;
   buscando: boolean;
   ctx: ContextoEscopo;
+  /** Leitura autenticada atual da conversa que já passou da fila individual para Ativas. */
+  confirmadaForaLista?: LinhaCache | null;
 }): boolean {
   const { selecionada, linhas, buscando, ctx } = args;
   if (!selecionada || !linhas) return false;
   const naLista = linhas.find((l) => l.id === selecionada.id);
   if (naLista) return !podeEntrarNaLista(naLista, ctx);
+  if (chatContinuaAposPrimeiraResposta({ selecionada, confirmada: args.confirmadaForaLista, ctx }))
+    return false;
   if (buscando) return !podeEntrarNaLista(selecionada, ctx);
   return true;
 }

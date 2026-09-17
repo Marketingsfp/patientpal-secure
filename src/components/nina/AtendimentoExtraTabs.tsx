@@ -285,6 +285,8 @@ import {
   filtrarPorEscopo,
   idsQueSairam,
   selecaoDeveSair,
+  podeRevalidarChatDaFila,
+  chatContinuaAposPrimeiraResposta,
   type ContadoresInbox,
 } from "@/lib/atendimento/inbox-cache";
 
@@ -1017,15 +1019,30 @@ export function AtendInbox() {
       // realmente pertence a este filtro, mesmo que um evento em tempo real
       // traga uma conversa que acabou de mudar de responsável.
       const ctxEscopo = {
+        clinicaId,
         escopo,
         userId: meuId,
         gestor: souGestor,
         atendenteId: atendenteSelecionadoId,
       };
       const rows = filtrarPorEscopo(brutas as any[], ctxEscopo);
-      // A conversa aberta deixou de pertencer a este filtro (transferida,
-      // devolvida à fila, resolvida ou reaberta com a Nina)? Sai da tela na
-      // hora.
+      const selecionadaParaConferir = selRef.current;
+      let confirmadaForaLista: any = null;
+      if (
+        podeRevalidarChatDaFila(selecionadaParaConferir, ctxEscopo) &&
+        !rows.some((r: any) => r.id === selecionadaParaConferir.id)
+      ) {
+        // Primeira resposta pode tirar o card de Não atribuídas. A leitura
+        // autenticada distingue esse movimento de uma transferência/encerramento.
+        confirmadaForaLista = await obterConversaFn({
+          data: { clinicaId, conversaId: selecionadaParaConferir.id },
+        }).catch(() => null);
+        if (pedido !== seqConvs.current || chavePedido !== chaveAtualRef.current) return;
+        if (selIdRef.current !== selecionadaParaConferir.id ||
+            selecaoIdRef.current !== selecionadaParaConferir.id) return;
+      }
+      // Transferência, resolução ou perda de acesso continuam encerrando a
+      // seleção. A ida da própria fila para Ativas mantém o chat e o filtro.
       if (deepLinkPendente.current && selIdRef.current !== deepLinkPendente.current)
         deepLinkPendente.current = null;
       const removeu = selecaoDeveSair({
@@ -1033,7 +1050,12 @@ export function AtendInbox() {
         linhas: rows as any,
         buscando: false,
         ctx: ctxEscopo,
+        confirmadaForaLista,
       });
+      if (!removeu && confirmadaForaLista) {
+        setSel((atual: any) => atual?.id === confirmadaForaLista.id
+          ? { ...atual, ...confirmadaForaLista } : atual);
+      }
       if (deepLinkPendente.current && rows.some((r: any) => r.id === deepLinkPendente.current))
         deepLinkPendente.current = null;
       if (removeu && selIdRef.current === deepLinkPendente.current) {
@@ -1069,6 +1091,7 @@ export function AtendInbox() {
         }
         // Quem saiu deste filtro não pode continuar guardado em cache.
         for (const id of idsQueSairam(prev as any, rows as any)) {
+          if (!removeu && id === confirmadaForaLista?.id) continue;
           cacheConversas.current.invalidar(id);
           prefetchMsgs.current.invalidar(id);
         }
@@ -1097,7 +1120,7 @@ export function AtendInbox() {
     } catch (e: any) {
       mostrarErro(e);
     }
-  }, [clinicaId, filtroStatus, escopo, atendenteSelecionadoId, visualizacao, listarConvs, carregarContadores, meuId, souGestor, abrirConversa]);
+  }, [clinicaId, filtroStatus, escopo, atendenteSelecionadoId, visualizacao, listarConvs, carregarContadores, meuId, souGestor, abrirConversa, obterConversaFn]);
 
 
 
@@ -2129,6 +2152,20 @@ export function AtendInbox() {
       ) {
         // FASE 3 — transferência, handoff da Nina ou encerramento entram e
         // saem da lista na hora, respeitando o atendente e o estado escolhidos.
+        const atualizada = evento.new;
+        const contextoFila = { clinicaId, escopo, userId: meuId, gestor: souGestor };
+        if (atualizada?.id === selIdRef.current && podeRevalidarChatDaFila(selRef.current, contextoFila)) {
+          if (chatContinuaAposPrimeiraResposta({
+            selecionada: selRef.current, confirmada: atualizada as any, ctx: contextoFila,
+          })) {
+            // Atualiza o cabeçalho mesmo quando o card sai da lista; mantém
+            // seleção, mensagens, rascunho e posição de rolagem do mesmo chat.
+            setSel((atual: any) => atual?.id === atualizada.id ? { ...atual, ...atualizada } : atual);
+          } else {
+            // Confere perda de acesso/transferência mesmo se o patch já retirou o card.
+            g.lista.agendar();
+          }
+        }
         const r = patchListaPorConversa(convsRef.current, (evento as any).new, {
           escopo,
           userId: meuId ?? "",
@@ -2601,6 +2638,13 @@ export function AtendInbox() {
             quando: oficial?.recebida_em ?? new Date().toISOString(),
           }) as any[],
         );
+        if (selIdRef.current === origem && selRef.current?.fila_pendente === true &&
+            ["sent", "delivered", "read"].includes(oficial?.status)) {
+          // Primeiro envio confirmado: confere a mudança de fila mesmo se o
+          // Realtime atrasar. A recarga preserva o chat pela leitura autorizada.
+          agrupadores.current?.lista.agendar();
+          agrupadores.current?.contadores.agendar();
+        }
         registrarDiagnostico("atendimento-inbox", { sync_reason: "envio", full_reload: false });
         // Etapa final do envio: fecha o trace e alimenta p50/p95/p99.
         marcarEtapa(clientMessageId, "SEND_T12_CANONICAL_RECONCILED", "send");
