@@ -3,6 +3,7 @@ import { aplicarGateIdentificacao, extrairDadosIdentificacao } from "../identifi
 import { cadastroMinimoSchema, camposCadastroFaltantes } from "../cadastro-paciente";
 import { estadoVazio } from "../fluxo-estado-normalizar";
 import type { CtxNinaPaciente, ResultadoFerramenta } from "../paciente-tools.server";
+import { resumoEntregueFixture } from "./agendamento-fixture";
 
 function preparar(faltantes = ["nome", "data_nascimento"]) {
   const estado = estadoVazio();
@@ -16,6 +17,7 @@ function preparar(faltantes = ["nome", "data_nascimento"]) {
     slot_fim: "2030-01-21T17:30:00Z",
   });
   estado.flow.stage = "AWAITING_SLOT_CONFIRMATION";
+  const resumo = resumoEntregueFixture(estado, "clinica");
   const ctx: CtxNinaPaciente = {
     clinicaId: "clinica",
     conversaId: "conversa",
@@ -25,6 +27,7 @@ function preparar(faltantes = ["nome", "data_nascimento"]) {
     origem: "whatsapp",
     podeAgendar: true,
     estado,
+    consultaAgenda: { mensagemAtual: "", historico: [{ role: "assistant", content: resumo }] },
   };
   const chamadas: Array<{ nome: string; args: unknown }> = [];
   let falhaIdentificacao: ResultadoFerramenta | null = null;
@@ -186,6 +189,16 @@ describe("gate: definir atendimento → conferir cadastro → coletar só faltan
     t.chamadas.length = 0;
     expect(await t.turno("não quero mais")).toBeNull();
     expect(t.estado.appointment.slot_confirmed_by_patient).toBe(false);
+    expect(t.chamadas).toHaveLength(0);
+  });
+  test("troca de horário depois do aceite suspende o agendamento para tratamento humano", async () => {
+    const t = preparar();
+    await t.turno("Sim");
+    t.chamadas.length = 0;
+    expect(await t.turno("eu vou 10:20")).toBeNull();
+    expect(t.estado.appointment.time).toBe("14:00");
+    expect(t.estado.appointment.slot_confirmed_by_patient).toBe(false);
+    expect(t.estado.flow.stage).toBe("HANDOFF");
     expect(t.chamadas).toHaveLength(0);
   });
 });

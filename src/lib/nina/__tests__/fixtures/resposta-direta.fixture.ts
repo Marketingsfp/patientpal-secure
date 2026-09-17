@@ -4,6 +4,8 @@ import { mock } from "bun:test";
 process.env.LOVABLE_API_KEY = "chave-ficticia-sem-rede";
 const teste = process.argv[2] === "homologacao";
 const cenario = process.argv[3] ?? "direta";
+const escolhaHorario = cenario.startsWith("escolha_");
+const resumoEscolhido = "Confira: Consulta Cardiologia com Dr. Jorge Ribeiro, dia 21/01/2030, às 10:20. Você confirma?";
 const agenda = cenario !== "direta";
 const pergunta = agenda ? "Tem vagas com Dr. Jorge Ribeiro?" : "quais são as informações do eletrocardiograma?";
 const respostaModelo = "Eletrocardiograma: R$ 80,00 no dinheiro e R$ 95,00 no cartão. Profissional: Enfermagem. Segunda a sexta, das 8h às 12h. Sem jejum. Leve o pedido médico.";
@@ -49,7 +51,7 @@ mock.module("@/integrations/supabase/client.server", () => ({
     rpc: async () => ({ data: [], error: null }),
   },
 }));
-mock.module("@/lib/nina/agenda-flag.server", () => ({ ferramentasAgendaAtivas: async () => false }));
+mock.module("@/lib/nina/agenda-flag.server", () => ({ ferramentasAgendaAtivas: async () => escolhaHorario }));
 mock.module("@/lib/nina/atendimento-fase1.server", () => ({ flagFluxoFase1Ativa: async () => false }));
 mock.module("@/lib/nina/atendimento-fase3.server", () => ({ flagFluxoFase3Ativa: async () => false }));
 mock.module("@/lib/nina/atendimento-fase6.server", () => ({ flagFluxoFase6Ativa: async () => false }));
@@ -61,7 +63,8 @@ mock.module("@/lib/nina/instrucoes-runtime.server", () => ({ promptInstrucoes: a
 mock.module("@/lib/nina/catalogo-prompt.server", () => ({ contarCatalogoPublicado: async () => ({ servicos: 1, profissionais: 1 }) }));
 mock.module("@/lib/nina/paciente-tools.server", () => ({
   FERRAMENTAS_NINA_CONSULTA: [{ type: "function", function: { name: "consultar_base_conhecimento" } }],
-  FERRAMENTAS_NINA_PACIENTE: [], executarFerramentaPaciente: async () => { throw new Error("Usar broker simulado"); },
+  FERRAMENTAS_NINA_PACIENTE: [{ type: "function", function: { name: "selecionar_horario" } }],
+  executarFerramentaPaciente: async () => { throw new Error("Usar broker simulado"); },
 }));
 mock.module("@/lib/nina/handoff-tool.server", () => ({
   FERRAMENTA_HANDOFF: { type: "function", function: { name: "solicitar_atendente_humano" } },
@@ -74,6 +77,10 @@ mock.module("@/lib/nina/tool-broker.server", () => ({ criarToolBroker: () => ({
   resultados: () => resultados,
   executar: async (nome: string, args: unknown) => {
     ferramentas.push(nome);
+    if (nome === "selecionar_horario" && escolhaHorario) return {
+      ferramenta: nome, capacidade: "checkAvailability", fonte: "agenda", success: true,
+      reused: false, appointment_confirmed: false, dados: { ok: true, resumo_confirmacao: resumoEscolhido },
+    };
     if (nome === "solicitar_atendente_humano" && agenda) {
       encaminhamentos.push(typeof args === "string" ? JSON.parse(args) : args);
       return { ferramenta: nome, capacidade: "requestHumanHandoff", fonte: "atendimento",
@@ -101,6 +108,13 @@ mock.module("@/lib/nina/tool-broker.server", () => ({ criarToolBroker: () => ({
 }) }));
 mock.module("@/lib/nina/ai-gateway.server", () => ({ ninaAIGateway: async (req: any) => {
   requests.push(structuredClone(req));
+  if (escolhaHorario) return {
+    ok: true, conteudo: "Vou agendar às 08:00.", modelo: "modelo-simulado", execucaoId: "execucao-direta", nivel: "low",
+    toolCalls: [
+      { id: "escolha", type: "function", function: { name: "selecionar_horario", arguments: "{}" } },
+      { id: "nao-agendar-sem-novo-aceite", type: "function", function: { name: "agendar", arguments: "{}" } },
+    ],
+  };
   if (agenda && requests.length === 1) return {
     ok: true, conteudo: "Vou verificar.", modelo: "modelo-simulado", execucaoId: "execucao-direta", nivel: "low",
     toolCalls: [
@@ -120,7 +134,8 @@ mock.module("@/lib/nina/resposta/templates.server", () => ({
 const { gerarRespostaNina } = await import("@/lib/whatsapp.server");
 const auditoria: any = {};
 const resposta = await gerarRespostaNina("clinica-simulada", pergunta, null, {
-  teste, ambiente: teste ? "homologacao" : "producao", auditoria,
+  teste, ambiente: teste ? "homologacao" : "producao",
+  ...(cenario === "escolha_sem_auditoria" ? {} : { auditoria }),
   mensagensEntrada: ["entrada-simulada"],
   ...(cenario === "obsoleto" ? { revisao: { valor: 1, telefone: "21999990000" } } : {}),
 });
@@ -132,7 +147,7 @@ await registrarEntregaSaida({
   decisaoId: "decisao-antiga", textoHash: "hash-direto",
 });
 console.log("DIRETA_RESULTADO=" + JSON.stringify({
-  resposta, respostaModelo, prompt, motorChamado, rede, requests, ferramentas, consultas,
+  resposta, respostaModelo, resumoEscolhido, prompt, motorChamado, rede, requests, ferramentas, consultas,
   temNota: auditoria.decisaoId != null, gravacoes,
   encaminhamentos,
   etapas: gravacoes.find(g => g.tabela === "nina_execucao_evidencias")?.valor.etapas ?? [],

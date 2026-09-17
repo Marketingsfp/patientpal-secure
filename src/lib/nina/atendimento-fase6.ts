@@ -15,6 +15,7 @@ import { dadosFaltantes } from "./atendimento-fase3";
 import { faltaParaConsultarAgenda } from "./atendimento-fase4";
 import { reservaDaSessaoAtual } from "./agendamento-sessao";
 import { atendimentoDefinido } from "./cadastro-paciente";
+import { confirmacaoDaEscolha } from "./agendamento-escolha";
 
 function normalizar(texto: string): string {
   return (texto ?? "")
@@ -69,6 +70,7 @@ export function derivarEtapa(ctx: ContextoFase6): EtapaFluxoNina {
 
   if (pediuAtendenteHumano(ctx.mensagem) || ctx.falhaSemRecuperacao || estado.flow.stage === "HANDOFF") return "HANDOFF";
   if (reservaDaSessaoAtual(estado)) return "APPOINTMENT_CONFIRMED";
+  if (confirmacaoDaEscolha(estado) && !a.confirmation?.aceita) return "WAITING_FINAL_CONFIRMATION";
 
   if (a.intent_confirmed) {
     if (atendimentoDefinido(estado)) {
@@ -80,7 +82,7 @@ export function derivarEtapa(ctx: ContextoFase6): EtapaFluxoNina {
     return "CHECKING_AVAILABILITY";
   }
 
-  if (a.slot_inicio || (a.date && a.time)) return "WAITING_SLOT_SELECTION";
+  if (a.slot_inicio || (a.date && a.time) || a.slot_options?.vagas.length) return "WAITING_SLOT_SELECTION";
   if (ctx.intencoes.includes("agendamento")) return "BOOKING_INTENT_PENDING";
   if (ctx.primeiraMensagem) return "GREETING";
   if (ctx.intencoes.length > 0) return "INFORMATION_RESPONSE";
@@ -121,7 +123,7 @@ const REGRAS_POR_ETAPA: Record<string, string[]> = {
   ],
   CREATING_APPOINTMENT: [
     "Execute a criação agora. Só afirme sucesso depois do retorno do sistema com o registro criado.",
-    "Se o horário tiver sido ocupado, avise e ofereça novas opções reais.",
+    "Se a vaga escolhida ficar indisponível, encaminhe para atendimento humano. Nunca substitua o médico, a data ou o horário confirmados.",
   ],
   APPOINTMENT_CONFIRMED: [
     "Agendamento já criado nesta conversa. Não crie outro para o mesmo pedido. Pergunte se pode ajudar em mais alguma coisa.",

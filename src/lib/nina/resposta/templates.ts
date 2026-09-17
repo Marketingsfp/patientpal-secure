@@ -40,6 +40,19 @@ const D = (t: DefinicaoTemplate) => t;
 
 export const TEMPLATES_PADRAO: readonly DefinicaoTemplate[] = [
   D({
+    chave: "fluxo.agendamento.revisar", categoria: "fluxo",
+    descricao: "Resumo da vaga escolhida e revalidada, antes do aceite final do paciente.",
+    variaveis: ["profissional", "procedimento", "data", "horario", "unidade"],
+    padrao: "Confira os dados antes de confirmar seu agendamento:\n\n" +
+      "*Atendimento:* {procedimento}\n*Profissional:* {profissional}\n*Data:* {data}\n*Horário:* {horario}\n*Clínica:* {unidade}\n\n" +
+      "Você confirma o agendamento com esse profissional, nessa data e nesse horário?",
+  }),
+  D({
+    chave: "fluxo.agendamento.escolher", categoria: "fluxo",
+    descricao: "Pede escolha explícita quando não existe uma vaga única validada.", variaveis: [],
+    padrao: "Para confirmar a vaga correta, informe o horário e a data que você prefere entre as opções apresentadas. Se houver mais de um profissional, diga também o nome dele.",
+  }),
+  D({
     chave: "fluxo.cadastro.obrigatorios",
     categoria: "fluxo",
     descricao: "Pede apenas campos obrigatórios faltantes após verificar o cadastro no Clínica OS.",

@@ -68,4 +68,14 @@ describe("encaminhamento após consulta de agenda sem vagas", () => {
     expect(respostaSemVagas(false)).toContain("não consegui transferir");
     expect(respostaSemVagas(false)).not.toContain("Encaminhei");
   });
+  for (const nome of ["selecionar_horario", "agendar"]) {
+    test(`${nome}: vaga escolhida perdida encaminha mesmo existindo outras opções`, () => {
+      const pedido = encaminhamentoSemVagas(validarResultado(nome, {
+        ok: false, erro: "SLOT_UNAVAILABLE", alternativas: [{ hora: "08:00" }],
+      }), {});
+      expect(pedido?.motivo).toContain("VAGA_ESCOLHIDA_INDISPONIVEL");
+      expect(respostaSemVagas(true, true)).toContain("Nenhum outro horário foi agendado");
+      expect(respostaSemVagas(false, true)).not.toContain("Encaminhei");
+    });
+  }
 });

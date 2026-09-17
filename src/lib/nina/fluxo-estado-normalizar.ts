@@ -9,6 +9,7 @@ import {
   type PendenciaEsclarecimento,
 } from "./confidence/esclarecimento";
 import { normalizarConhecimentoSessao, type ConhecimentoSessao } from "./confidence/conhecimento-sessao";
+import type { OpcoesAgendamento, ConfirmacaoAgendamento } from "./agendamento-escolha";
 
 export type { PendenciaEsclarecimento };
 
@@ -75,6 +76,8 @@ export type EstadoFluxoNina = {
     appointment_id: string | null;
     /** Sessão operacional em que a reserva foi comprovada pelo servidor. */
     confirmed_in_session?: string | null;
+    slot_options?: OpcoesAgendamento | null;
+    confirmation?: ConfirmacaoAgendamento | null;
 
   };
   flow: { stage: EtapaFluxoNina };
@@ -129,7 +132,8 @@ export function estadoVazio(): EstadoFluxoNina {
       price: null,
       appointment_id: null,
       confirmed_in_session: null,
-
+      slot_options: null,
+      confirmation: null,
     },
     flow: { stage: "IDLE" },
     clarification: pendenciaVazia(),

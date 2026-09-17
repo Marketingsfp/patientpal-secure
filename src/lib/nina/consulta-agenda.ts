@@ -1,5 +1,6 @@
 /** Autorização da consulta de vagas. Só usa mensagens entregues e estado do servidor. */
 import type { SelecaoContextual } from "./confidence/selecao-contextual";
+import { lerEscolhaHorario } from "./agendamento-escolha";
 
 /** Referência ao pedido/aceite do paciente; não representa vaga nem reserva. */
 export type InteresseConsultaAgenda = {
@@ -59,9 +60,9 @@ function continuaBuscaDeVagas(ctx: ContextoConsultaAgenda, atual: string): boole
   return (
     ctx.disponibilidadeJaConsultada === true &&
     !!ctx.medicoEscolhido?.id &&
-    /^(?:e\s+)?(?:hoje|amanha|segunda|terca|quarta|quinta|sexta|sabado|domingo|de manha|a tarde|de tarde|a noite|mais cedo|mais tarde|na proxima semana|\d{1,2}\/\d{1,2})(?:-feira)?[?!.,\s]*$/.test(
+    (lerEscolhaHorario(atual) !== null || /^(?:e\s+)?(?:hoje|amanha|segunda|terca|quarta|quinta|sexta|sabado|domingo|de manha|a tarde|de tarde|a noite|mais cedo|mais tarde|na proxima semana|\d{1,2}\/\d{1,2})(?:-feira)?[?!.,\s]*$/.test(
       atual,
-    )
+    ))
   );
 }
 
@@ -134,11 +135,11 @@ export function interesseEmConsultarAgenda(ctx?: ContextoConsultaAgenda | null):
   if (!ctx) return false;
   const atual = normalizar(ctx.mensagemAtual);
   if (ctx.mudancaTema) return false;
+  if (continuaBuscaDeVagas(ctx, atual)) return true;
   if (interesseContinuadoComprovado(ctx)) return true;
   if (ctx.interesseAnterior && !pedidoDireto(atual) && !ofertaAgenda(ctx)) return false;
   if (!atual || RECUSA.test(atual) || /^(nao|n)(\b|[!.])/.test(atual)) return false;
   if (pedidoDireto(atual)) return true;
-  if (continuaBuscaDeVagas(ctx, atual)) return true;
   if (ofertaAgenda(ctx) && (respostaDeEscolha(atual) || aceiteSemNovaEscolha(atual))) return true;
   // Escolha do médico/data após pedido explícito de vagas, dentro da mesma troca.
   const anterior = ctx.historico.filter((m) => m.role === "user").at(-1)?.content ?? "";

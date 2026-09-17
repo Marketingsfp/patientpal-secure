@@ -30,6 +30,8 @@ import { normalizar, raizEspecialidade } from "@/lib/nina-especialidade";
 import { cadastroAutorizado, cadastroMinimoSchema } from "./cadastro-paciente";
 import { consultarCadastroConfirmado } from "./cadastro-paciente.server";
 import { processamentoWatchdogAtual } from "./watchdog-contexto.server";
+import { consentimentoDaEscolha, limparEscolhaAgendamento, registrarOpcoesAgendamento, selecionarVagaValidada,
+  vagasDaSessao, vagasDaEscolha, lerEscolhaHorario, type VagaAgendamento } from "./agendamento-escolha";
 import {
   resolverMedicoAgenda as resolverMedico,
   vincularProfissionaisCatalogo,
@@ -121,6 +123,9 @@ export type CtxNinaPaciente = {
   teste?: boolean;
   /** Pedido e histórico entregue da sessão; nunca fornecidos pelos argumentos do modelo. */
   consultaAgenda?: ContextoConsultaAgenda;
+  nomeUnidade?: string;
+  /** Havia opções oficiais antes de o paciente enviar esta mensagem? */
+  opcoesAgendamentoInicioTurno?: boolean;
 };
 
 
@@ -374,6 +379,17 @@ function acharEspecialidade(termo: string, lista: Array<{ id: string; nome: stri
 }
 
 /* -------------------------------------------------- disponibilidade (núcleo) */
+
+function guardarOpcoes(ctx: CtxNinaPaciente, slots: SlotNina[]) {
+  if (consentimentoDaEscolha(ctx.estado, ctx.clinicaId)) return;
+  const vagas: VagaAgendamento[] = slots.map((s) => ({
+    medico_id: s.medico_id, medico: s.medico_nome, especialidade: s.especialidade,
+    procedimento: ctx.consultaAgenda?.selecaoRevalidada?.modalidade?.procedimento ??
+      (ctx.estado?.appointment.doctor_id === s.medico_id ? ctx.estado.appointment.procedure : null),
+    data: dataISODoSlot(s.inicio), hora: s.hora, inicio: s.inicio, fim: s.fim,
+  }));
+  registrarOpcoesAgendamento(ctx.estado, ctx.clinicaId, vagas);
+}
 
 export type SlotNina = {
   medico_id: string;
@@ -742,6 +758,16 @@ export const FERRAMENTAS_NINA_AGENDAMENTO = [
   {
     type: "function",
     function: {
+      name: "selecionar_horario",
+      description: "Interprete a escolha do paciente em linguagem natural (por exemplo: eu prefiro 10:20, marca pra 10:20, eu vou 10:20, dez e vinte, o segundo horário). Use exclusivamente uma vaga retornada pela agenda. Consultar opções não é escolher. Havendo ambiguidade de médico, dia ou horário, pergunte antes. Esta ferramenta revalida a vaga e devolve o resumo final obrigatório para o paciente confirmar. Nunca cria reserva e nunca substitui uma vaga indisponível.",
+      parameters: { type: "object", properties: {
+        medico_id: { type: "string" }, inicio: { type: "string" }, fim: { type: "string" },
+      }, required: ["medico_id", "inicio", "fim"], additionalProperties: false },
+    },
+  },
+  {
+    type: "function",
+    function: {
       name: "consultar_cadastro_paciente",
       description: "Depois de definir e confirmar procedimento, médico e vaga, verifica o cadastro já confirmado na conversa e devolve apenas os campos obrigatórios faltantes do Clínica OS. Telefone sozinho não confirma identidade. Não cria cadastro.",
       parameters: { type: "object", properties: {}, additionalProperties: false },
@@ -779,7 +805,7 @@ export const FERRAMENTAS_NINA_AGENDAMENTO = [
     function: {
       name: "agendar",
       description:
-        "Cria o agendamento. Só chame DEPOIS de o paciente confirmar explicitamente médico, dia e hora. Use exatamente 'inicio' e 'fim' de um horário devolvido por consultar_disponibilidade.",
+        "Cria exclusivamente a vaga do resumo final devolvido por selecionar_horario e aceito pelo paciente em uma mensagem posterior. Use o mesmo profissional, procedimento, inicio e fim desse resumo. Não selecione a primeira opção consultada. Se a vaga ficar indisponível, encaminhe para atendimento humano, sem substituí-la.",
       parameters: {
         type: "object",
         properties: {
@@ -916,7 +942,7 @@ async function executarFerramentaInterna(
 
   // Defesa: mesmo que o modelo invente uma chamada, sem a flag da clínica
   // nenhuma ferramenta que grava ou expõe paciente executa.
-  const SOMENTE_COM_FLAG = new Set(["consultar_cadastro_paciente", "identificar_paciente", "meus_agendamentos", "agendar"]);
+  const SOMENTE_COM_FLAG = new Set(["selecionar_horario", "consultar_cadastro_paciente", "identificar_paciente", "meus_agendamentos", "agendar"]);
   if (SOMENTE_COM_FLAG.has(nome) && ctx.podeAgendar === false)
     return falha("PERMISSION_DENIED", "Agendamento pela assistente não está ativo nesta unidade.");
 
@@ -940,6 +966,46 @@ async function executarFerramentaInterna(
       args.medico_id = resolvido.id;
     }
     switch (nome) {
+      case "selecionar_horario": {
+        const p = z.object({ medico_id: z.string(), inicio: z.string(), fim: z.string() }).parse(args);
+        const estado = ctx.estado;
+        if (!estado || estado.appointment.appointment_id || estado.appointment.confirmation?.aceita)
+          return falha("ACTION_NOT_AUTHORIZED", "O horário já confirmado não pode ser alterado por esta operação.");
+        const opcoes = vagasDaSessao(estado, ctx.clinicaId);
+        const vaga = opcoes.find((v) => v.medico_id === p.medico_id && v.inicio === p.inicio && v.fim === p.fim);
+        if (!vaga?.procedimento)
+          return falha("ACTION_NOT_AUTHORIZED", "Escolha uma vaga e um procedimento consultados na agenda desta sessão.");
+        const mensagem = ctx.consultaAgenda?.mensagemAtual ?? "";
+        const escolha = lerEscolhaHorario(mensagem);
+        if (escolha) {
+          const compativeis = vagasDaEscolha(opcoes, escolha);
+          if (compativeis.length !== 1 || compativeis[0] !== vaga)
+            return falha("ACTION_NOT_AUTHORIZED", "Confirme a data e o profissional: a vaga solicitada não corresponde unicamente ao horário escrito pelo paciente.");
+        } else if (!ctx.opcoesAgendamentoInicioTurno ||
+          /^(?:sim(?:,?\s*por\s*favor)?|ok|isso(?:\s*mesmo)?|pode\s*(?:ser|marcar|agendar)|oi|ol[aá])[!.\s]*$/i.test(mensagem.trim()) ||
+          /\b(?:quais|disponibilidade|valor|preço|preco)\b/i.test(mensagem)) {
+          return falha("ACTION_NOT_AUTHORIZED", "Consultar opções ou dizer sim sem resumo não seleciona uma vaga. Aguarde a escolha do paciente.");
+        }
+        const vagasAtuais = await consultarDisponibilidadeCore({
+          clinicaId: ctx.clinicaId, medicoId: vaga.medico_id, data: vaga.data, dias: 90,
+        });
+        // Uma tentativa de nova escolha invalida qualquer resumo anterior.
+        limparEscolhaAgendamento(estado);
+        const livre = vagasAtuais.some((s) => s.medico_id === vaga.medico_id &&
+          Date.parse(s.inicio) === Date.parse(vaga.inicio) && Date.parse(s.fim) === Date.parse(vaga.fim));
+        if (!livre) return falha("SLOT_UNAVAILABLE", "A vaga escolhida não está mais disponível.", { vaga_escolhida: true });
+        const { carregarTemplatesPublicados } = await import("./resposta/templates.server");
+        const { textoDaChave } = await import("./resposta/templates");
+        const publicados = await carregarTemplatesPublicados({ clinicaId: ctx.clinicaId });
+        const resumo = textoDaChave("fluxo.agendamento.revisar", {
+          profissional: vaga.medico, procedimento: vaga.procedimento,
+          data: vaga.data.split("-").reverse().join("/"), horario: vaga.hora,
+          unidade: ctx.nomeUnidade?.trim() || "nossa clínica",
+        }, publicados.textos).texto;
+        selecionarVagaValidada(estado, ctx.clinicaId, vaga, resumo);
+        return { ok: true, resumo_confirmacao: resumo, vaga_escolhida: vaga,
+          instrucao: "Entregue o resumo final ao paciente. Apenas o próximo aceite desse resumo permite gravar a vaga exata." };
+      }
       case "consultar_base_conhecimento": {
         const p = z
           .object({
@@ -1151,6 +1217,7 @@ async function executarFerramentaInterna(
         await auditar(ctx, "consultar_disponibilidade", { ...p, slots_encontrados: slots.length }, {
           ok: true,
         });
+        guardarOpcoes(ctx, slots.slice(0, 12));
         if (slots.length === 0) {
           // Diferencia "não atende nesse dia" de "atende, mas está cheio".
           if (medicoId && p.data) {
@@ -1171,26 +1238,6 @@ async function executarFerramentaInterna(
             );
           }
           return semVaga("NO_AVAILABILITY", "Nenhum horário livre com esses critérios.");
-        }
-        // Primeiro horário listado é o que a Nina normalmente oferece: guarda
-        // como "oferta corrente" para o "sim" do paciente ter a que se referir.
-        {
-          const s0 = slots[0]!;
-          mutarEstado(ctx, {
-            appointment: {
-              doctor_id: s0.medico_id,
-              doctor_name: s0.medico_nome,
-              specialty: s0.especialidade ?? null,
-              procedure: ctx.consultaAgenda?.selecaoRevalidada?.modalidade?.procedimento ??
-                (ctx.estado?.appointment.doctor_id === s0.medico_id ? ctx.estado.appointment.procedure : null),
-              date: s0.data,
-              time: s0.hora,
-              slot_inicio: s0.inicio,
-              slot_fim: s0.fim,
-              slot_confirmed_by_patient: false,
-            },
-            stage: "AWAITING_SLOT_CONFIRMATION",
-          });
         }
         return {
 
@@ -1254,6 +1301,7 @@ async function executarFerramentaInterna(
           { ...p, atende_no_dia: atende, slots_encontrados: doDia.length },
           { ok: true },
         );
+        guardarOpcoes(ctx, atende ? (alvo ? [alvo] : doDia.slice(0, 3)) : []);
         if (!atende)
           return {
             ok: true,
@@ -1265,21 +1313,6 @@ async function executarFerramentaInterna(
             motivo: "NAO_ATENDE_NO_DIA",
             alternativas: [],
           };
-        if (alvo)
-          mutarEstado(ctx, {
-            appointment: {
-              doctor_id: r.id,
-              doctor_name: nome,
-              procedure: ctx.consultaAgenda?.selecaoRevalidada?.modalidade?.procedimento ??
-                (ctx.estado?.appointment.doctor_id === r.id ? ctx.estado.appointment.procedure : null),
-              date: p.data,
-              time: hora,
-              slot_inicio: alvo.inicio,
-              slot_fim: alvo.fim,
-              slot_confirmed_by_patient: false,
-            },
-            stage: "AWAITING_SLOT_CONFIRMATION",
-          });
         return {
 
           ok: true,
@@ -1362,6 +1395,7 @@ async function executarFerramentaInterna(
           { ...p, slots_encontrados: slots.length },
           { ok: slots.length > 0 },
         );
+        guardarOpcoes(ctx, slots.slice(0, 4));
         if (slots.length === 0)
           return semVaga(
             "NO_AVAILABILITY",
@@ -1369,21 +1403,6 @@ async function executarFerramentaInterna(
             { medico: medicoNome },
           );
         const primeira = slots[0]!;
-        mutarEstado(ctx, {
-          appointment: {
-            doctor_id: primeira.medico_id,
-            doctor_name: primeira.medico_nome,
-            specialty: primeira.especialidade ?? null,
-            procedure: ctx.consultaAgenda?.selecaoRevalidada?.modalidade?.procedimento ??
-              (ctx.estado?.appointment.doctor_id === primeira.medico_id ? ctx.estado.appointment.procedure : null),
-            date: primeira.data,
-            time: primeira.hora,
-            slot_inicio: primeira.inicio,
-            slot_fim: primeira.fim,
-            slot_confirmed_by_patient: false,
-          },
-          stage: "AWAITING_SLOT_CONFIRMATION",
-        });
         return {
 
           ok: true,
@@ -1581,11 +1600,9 @@ async function executarFerramentaInterna(
             "Preciso identificar o paciente antes de marcar (CPF, nome completo e data de nascimento).",
           );
 
-        const ofertaCorrente = ctx.estado?.appointment;
-        const consentimentoExplicito =
-          (ofertaCorrente?.slot_confirmed_by_patient === true ||
-            ofertaCorrente?.intent_confirmed === true) &&
-          Boolean(ofertaCorrente?.doctor_id && ofertaCorrente?.slot_inicio);
+        const confirmacao = consentimentoDaEscolha(ctx.estado, ctx.clinicaId);
+        const ofertaCorrente = confirmacao?.vaga;
+        const consentimentoExplicito = Boolean(confirmacao);
         // Uma chamada do modelo não prova consentimento. Sem a oferta aceita
         // no estado do servidor, nem idempotência nem vagas podem ler a agenda.
         if (!consentimentoExplicito)
@@ -1593,7 +1610,7 @@ async function executarFerramentaInterna(
             "ACTION_NOT_AUTHORIZED",
             "Aguarde a confirmação do paciente para o médico e horário oferecidos.",
             {
-              motivos: ["CONSENTIMENTO_AUSENTE"],
+              motivos: [ctx.estado?.appointment.confirmation?.aceita ? "CONSENTIMENTO_DE_OUTRO_SLOT" : "CONSENTIMENTO_AUSENTE"],
               consulta_realizada: false,
               aguardando_paciente: true,
             },
@@ -1620,9 +1637,9 @@ async function executarFerramentaInterna(
           intervalo: { inicio: p.inicio, fim: p.fim },
           consentimento: {
             confirmado: consentimentoExplicito,
-            medicoId: ofertaCorrente?.doctor_id,
-            inicio: ofertaCorrente?.slot_inicio,
-            fim: ofertaCorrente?.slot_fim,
+            medicoId: ofertaCorrente?.medico_id,
+            inicio: ofertaCorrente?.inicio,
+            fim: ofertaCorrente?.fim,
           },
           idempotenciaBase: ctx.conversaId ?? ctx.telefone ?? null,
         };
@@ -1633,6 +1650,7 @@ async function executarFerramentaInterna(
         const motivosPrevios = previa.autorizado
           ? []
           : previa.motivos.filter((m) => m !== "DISPONIBILIDADE_NAO_CONSULTADA");
+        if (p.procedimento !== ofertaCorrente?.procedimento) motivosPrevios.push("CONSENTIMENTO_DE_OUTRO_SLOT");
         if (motivosPrevios.length)
           return falha(
             "ACTION_NOT_AUTHORIZED",
@@ -1658,12 +1676,14 @@ async function executarFerramentaInterna(
           .select("id, clinica_id, paciente_id, medico_id, inicio, fim, status")
           .eq("clinica_id", ctx.clinicaId)
           .eq("paciente_id", ctx.pacienteId)
+          .eq("medico_id", medicoIdReal)
           .eq("inicio", p.inicio)
           .not("status", "in", "(cancelado)")
           .maybeSingle();
         if (jaExiste) {
           const anterior = verificarResultadoAgendamento(
-            { clinicaId: ctx.clinicaId, pacienteId: ctx.pacienteId },
+            { clinicaId: ctx.clinicaId, pacienteId: ctx.pacienteId,
+              medicoId: medicoIdReal, inicio: p.inicio, fim: p.fim },
             jaExiste as RegistroAgendamento,
             { jaExistia: true },
           );
@@ -1708,12 +1728,15 @@ async function executarFerramentaInterna(
         // agendamento NOVO nunca exige appointment_id; exige paciente validado,
         // clínica, profissional, procedimento, intervalo, VAGA correspondente
         // (revalidada agora) e consentimento amarrado ao slot resumido.
-        const vagasReais = await consultarDisponibilidadeCore({
-          clinicaId: ctx.clinicaId,
-          medicoId: medicoIdReal,
-          dias: 90,
-          data: p.inicio.slice(0, 10),
-        }).catch(() => [] as SlotNina[]);
+        let vagasReais: SlotNina[];
+        try {
+          vagasReais = await consultarDisponibilidadeCore({
+            clinicaId: ctx.clinicaId, medicoId: medicoIdReal,
+            dias: 90, data: ofertaCorrente!.data,
+          });
+        } catch (e) {
+          return falhaAgenda(e, "agendar");
+        }
         const auth = autorizarAcao({
           ...autorizacaoBase,
           disponibilidadeConsultada: true,
@@ -1759,12 +1782,14 @@ async function executarFerramentaInterna(
           .eq("clinica_id", ctx.clinicaId)
           .eq("medico_id", medicoIdReal)
           .eq("paciente_nome", "DISPONIVEL")
-          .lte("inicio", p.inicio)
-          .gte("fim", p.fim)
+          .eq("inicio", p.inicio)
+          .eq("fim", p.fim)
           .order("inicio")
           .limit(1)
           .maybeSingle();
         const slotId = (slotLivre as { id: string } | null)?.id ?? null;
+        if (!slotId)
+          return falha("SLOT_UNAVAILABLE", "A vaga confirmada não está mais disponível. Nenhum outro horário foi reservado.");
 
         // --- Núcleo compartilhado com a tela de Agenda. Ele revalida o slot no
         // momento da gravação: é isso que impede dupla reserva.

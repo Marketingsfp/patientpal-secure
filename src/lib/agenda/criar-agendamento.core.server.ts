@@ -151,7 +151,7 @@ export async function criarAgendamentoCore(
       editing_id
         ? supabase
             .from("agendamentos")
-            .select("medico_id, paciente_id, inicio, fim, agenda_id")
+            .select("medico_id, paciente_id, paciente_nome, inicio, fim, agenda_id, status")
             .eq("id", editing_id)
             .maybeSingle()
             .then((r) => r.data)
@@ -234,6 +234,20 @@ export async function criarAgendamentoCore(
   // otimista no UPDATE, fechando a janela entre "validei que está livre" e
   // "gravei o agendamento".
   let slotPacienteNomeNaValidacao: string | null = null;
+  // A Nina converte exclusivamente a vaga escolhida e confirmada. Mesmo que
+  // o intervalo não mude (edição de DISPONIVEL), revalida a ocupação e passa
+  // a condição otimista para a RPC: outro atendimento não pode ser sobrescrito.
+  if (ctx.ator.tipo === "integracao" && ctx.ator.api_key_id === "nina-ai") {
+    if (!editing_id || !atual || atual.paciente_id ||
+      normalizarLocal(atual.paciente_nome ?? "").trim() !== "disponivel" ||
+      atual.status === "cancelado" || atual.medico_id !== payload.medico_id ||
+      Date.parse(atual.inicio) !== di.getTime() || Date.parse(atual.fim) !== df.getTime()) {
+      return { ok: false, validation_error: {
+        message: "O horário confirmado não está mais disponível. Nenhum outro horário foi reservado.",
+      } };
+    }
+    slotPacienteNomeNaValidacao = atual.paciente_nome;
+  }
 
   const horarioMudou =
     !editing_id ||

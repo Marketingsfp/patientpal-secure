@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, mock, test } from "bun:test";
 import { estadoVazio } from "../fluxo-estado-normalizar";
 import type { CtxNinaPaciente } from "../paciente-tools.server";
+import { resumoEntregueFixture } from "./agendamento-fixture";
 type Linha = Record<string, unknown>;
 let banco: Record<string, Linha[]>;
 let retornoRpc: Linha;
@@ -71,6 +72,7 @@ function contexto(teste = false): CtxNinaPaciente {
     slot_fim: "2030-01-21T17:30:00Z",
     slot_confirmed_by_patient: true,
   });
+  resumoEntregueFixture(estado, "clinica", true);
   return {
     clinicaId: "clinica",
     conversaId: "conversa",

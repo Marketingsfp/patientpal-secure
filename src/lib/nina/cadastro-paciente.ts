@@ -1,5 +1,6 @@
 import { pacienteSchema } from "@/lib/schemas/paciente";
 import type { EstadoFluxoNina } from "./fluxo-estado-normalizar";
+import { consentimentoDaEscolha } from "./agendamento-escolha";
 
 /** Mesmas validações dos campos obrigatórios da tela de cadastro do Clínica OS. */
 export const cadastroMinimoSchema = pacienteSchema
@@ -33,7 +34,7 @@ export function atendimentoDefinido(estado: EstadoFluxoNina | undefined): boolea
 }
 
 export function cadastroAutorizado(estado: EstadoFluxoNina | undefined): boolean {
-  return atendimentoDefinido(estado) && estado?.appointment.slot_confirmed_by_patient === true;
+  return atendimentoDefinido(estado) && Boolean(consentimentoDaEscolha(estado));
 }
 
 export const ROTULOS_CADASTRO: Record<CampoCadastro, string> = {

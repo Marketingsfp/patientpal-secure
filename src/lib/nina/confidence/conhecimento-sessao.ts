@@ -1,6 +1,7 @@
 /** Guarda referências de pesquisa, nunca copia fatos antigos para a próxima avaliação. */
 import { ehSaudacaoPura } from "./turno-tipo";
 import { normalizarTexto, type FatoRecuperado } from "./evidencia";
+import { lerEscolhaHorario } from "../agendamento-escolha";
 
 export type ReferenciaConhecimento = {
   registro: string;
@@ -76,6 +77,10 @@ export function consultaDoNovoTurno(e: {
   dispensarConsulta?: boolean;
 }): { args: ConhecimentoSessao["consulta"]; continuidade: boolean } | null {
   if (e.dispensarConsulta || ehSaudacaoPura(e.mensagem)) return null;
+  if (e.anterior && lerEscolhaHorario(e.mensagem)) {
+    return { args: { termo: e.anterior.consulta.termo,
+      ...(e.anterior.consulta.medico ? { medico: e.anterior.consulta.medico } : {}) }, continuidade: true };
+  }
   const m = normalizarTexto(e.mensagem)
     .replace(/[?!.,;:]/g, " ")
     .replace(/\s+/g, " ")

@@ -3,6 +3,9 @@ import { estadoVazio } from "../fluxo-estado-normalizar";
 import { consultaDoNovoTurno, type ConhecimentoSessao } from "../confidence/conhecimento-sessao";
 import type { ResultadoConhecimento } from "../knowledge-contract";
 import { comColetor } from "../evidencias.server";
+import { resumoEntregueFixture } from "./agendamento-fixture";
+import { aplicarGateIdentificacao } from "../identificacao-gate.server";
+import type { CtxNinaPaciente } from "../paciente-tools.server";
 
 const CLINICA = "11111111-1111-4111-8111-111111111111";
 const MEDICO = "22222222-2222-4222-8222-222222222222";
@@ -66,8 +69,9 @@ mock.module("@/integrations/supabase/client.server", () => ({
           atualizacao = v;
           return q;
         },
-        gte: () => q,
-        lte: () => q,
+        or: () => q,
+        gte: (k: string, v: unknown) => { predicados.push((r) => String(r[k]) >= String(v)); return q; },
+        lte: (k: string, v: unknown) => { predicados.push((r) => String(r[k]) <= String(v)); return q; },
         order: () => q,
         limit: () => q,
         maybeSingle: async () => ({ data: ler()[0] ?? null, error: null }),
@@ -105,6 +109,8 @@ mock.module("@/lib/agenda/criar-agendamento.core.server", () => ({
 const { executarFerramentaPaciente } = await import("../paciente-tools.server");
 
 function contexto(mensagemAtual: string, respostaAnterior?: string) {
+  const estado = estadoVazio();
+  estado.session_id = "sessao-teste";
   return {
     clinicaId: CLINICA,
     telefone: null,
@@ -113,7 +119,7 @@ function contexto(mensagemAtual: string, respostaAnterior?: string) {
     conversaId: null,
     origem: "homologacao" as const,
     teste: true,
-    estado: estadoVazio(),
+    estado,
     consultaAgenda: {
       mensagemAtual,
       historico: respostaAnterior ? [{ role: "assistant", content: respostaAnterior }] : [],
@@ -145,10 +151,12 @@ function contextoAgendar(confirmado = false) {
     Object.assign(ctx.estado.appointment, {
       doctor_id: MEDICO,
       doctor_name: "Alex Louza",
+      procedure: "Consulta Cardiologia",
       slot_inicio: inicio.toISOString(),
       slot_fim: fim.toISOString(),
       slot_confirmed_by_patient: true,
     });
+  if (confirmado) resumoEntregueFixture(ctx.estado, CLINICA, true);
   return ctx;
 }
 
@@ -217,6 +225,7 @@ beforeEach(() => {
       },
     ],
     especialidades: [],
+    nina_mensagens_templates: [],
   };
 });
 
@@ -621,6 +630,127 @@ describe("executor real das ferramentas com banco simulado", () => {
     expect(r.ok).toBe(true);
     expect(r.estado_acao).toBe("EXISTING");
     expect(r.appointment_id).toBe(AGENDAMENTO);
+    expect(gravacoes).toHaveLength(0);
+  });
+});
+
+describe("regressão 08:00 versus 10:20 — consulta, escolha, resumo, aceite e gravação", () => {
+  async function preparar(teste = true) {
+    const data = inicio.toISOString().slice(0, 10);
+    banco.agendamentos = ["08:00", "10:20"].map((hora, i) => ({
+      id: `vaga-${i}`, clinica_id: CLINICA, medico_id: MEDICO, paciente_nome: "DISPONIVEL", status: "confirmado",
+      inicio: new Date(`${data}T${hora}:00-03:00`).toISOString(),
+      fim: new Date(Date.parse(`${data}T${hora}:00-03:00`) + 20 * 60_000).toISOString(),
+    }));
+    const ctx: CtxNinaPaciente = { ...contexto("Tem vaga com Dr. Alex Louza?"), podeAgendar: true,
+      teste, origem: teste ? "homologacao" : "whatsapp", nomeUnidade: "Clínica Teste",
+      pacienteId: PACIENTE, pacienteNome: "Paciente Fictício" };
+    const estado = ctx.estado!;
+    Object.assign(estado.appointment, { doctor_id: MEDICO, procedure: "Consulta Cardiologia" });
+    const consulta = await executarFerramentaPaciente(ctx, "consultar_disponibilidade", { medico_id: MEDICO, data });
+    expect(consulta.ok).toBe(true);
+    expect(estado.appointment.time).toBeNull();
+    expect(estado.appointment.slot_inicio).toBeNull();
+    expect(estado.appointment.slot_confirmed_by_patient).toBe(false);
+    expect(estado.appointment.slot_options?.vagas.map(v => v.hora)).toEqual(["08:00", "10:20"]);
+    ctx.opcoesAgendamentoInicioTurno = true;
+    ctx.consultaAgenda!.historico = [{ role: "assistant", content: "Há vagas às 08:00 e 10:20. Qual prefere?" }];
+    const encaminhamentos: string[] = [];
+    let handoffOk = true;
+    const executar: typeof executarFerramentaPaciente = async (c, nome, args) => {
+      if (nome === "consultar_cadastro_paciente") return { ok: true, campos_faltantes: [] };
+      if (nome === "identificar_paciente") return { ok: true };
+      return executarFerramentaPaciente(c, nome, args);
+    };
+    const turno = async (mensagem: string, entregar = true) => {
+      ctx.consultaAgenda!.mensagemAtual = mensagem;
+      const r = await aplicarGateIdentificacao({ mensagem, estado, ctx, executar,
+        encaminharVagaIndisponivel: async motivo => { encaminhamentos.push(motivo); return handoffOk; } });
+      if (entregar && r) ctx.consultaAgenda!.historico.push({ role: "user", content: mensagem }, { role: "assistant", content: r.texto });
+      return r;
+    };
+    return { ctx, estado, turno, encaminhamentos, falharHandoff: () => { handoffOk = false; } };
+  }
+  for (const teste of [false, true]) {
+    for (const frase of ["10:20 fica melhor", "eu prefiro 10:20", "marca pra 10:20", "eu vou 10:20", "pode deixar às 10h20"]) {
+      test(`${teste ? "homologação" : "real"}: ${frase} → resumo 10:20 → Sim → grava 10:20`, async () => {
+        const t = await preparar(teste);
+        const resumo = await t.turno(frase);
+        expect(resumo?.texto).toContain("*Horário:* 10:20");
+        expect(resumo?.texto).not.toContain("08:00");
+        expect(resumo?.texto).toContain("Alex Louza");
+        expect(gravacoes).toHaveLength(0);
+        expect(t.estado.appointment.slot_confirmed_by_patient).toBe(false);
+        const r = await t.turno("Sim");
+        expect(r?.acoesConcluidas[0]?.confirmada).toBe(true);
+        expect(gravacoes).toHaveLength(1);
+        expect(gravacoes[0]!.inicio).toBe(t.estado.appointment.confirmation!.vaga.inicio);
+        expect(gravacoes[0]!.medico_id).toBe(MEDICO);
+        expect(gravacoes[0]!.procedimento).toBe("Consulta Cardiologia");
+        expect(banco.agendamentos!.find(v => v.id === "vaga-0")!.paciente_nome).toBe("DISPONIVEL");
+        expect(t.encaminhamentos).toHaveLength(0);
+      });
+    }
+    for (const momento of ["antes_da_escolha", "apos_resumo"])
+      test(`${teste ? "homologação" : "real"}: vaga perdida ${momento} transfere, sem reservar 08:00`, async () => {
+        const t = await preparar(teste);
+        if (momento === "apos_resumo") await t.turno("vou 10:20");
+        banco.agendamentos!.find(v => v.id === "vaga-1")!.paciente_nome = "Outra pessoa";
+        const r = await t.turno(momento === "apos_resumo" ? "Sim" : "vou 10:20");
+        expect(r?.origem).toBe("handoff");
+        expect(r?.texto).toContain("Nenhum outro horário foi agendado");
+        expect(t.encaminhamentos).toHaveLength(1);
+        expect(gravacoes).toHaveLength(0);
+        expect(t.estado.appointment.confirmation).toBeNull();
+      });
+  }
+  test("aceite sem entrega do resumo não agenda; repete a confirmação correta", async () => {
+    const t = await preparar();
+    const resumo = await t.turno("marca pra 10:20", false);
+    const r = await t.turno("Sim");
+    expect(r?.texto).toBe(resumo?.texto);
+    expect(gravacoes).toHaveLength(0);
+    expect(t.estado.appointment.slot_confirmed_by_patient).toBe(false);
+  });
+  test("Sim diante de uma lista não autoriza a primeira vaga", async () => {
+    const t = await preparar();
+    expect((await t.turno("sim por favor"))?.chaveTemplate).toBe("fluxo.agendamento.escolher");
+    expect(gravacoes).toHaveLength(0);
+    const vaga = t.estado.appointment.slot_options!.vagas[0]!;
+    const r = await executarFerramentaPaciente(t.ctx, "selecionar_horario", vaga);
+    expect(r.ok).toBe(false);
+    expect(t.estado.appointment.confirmation).toBeNull();
+  });
+  for (const frase of ["quero dez e vinte", "o segundo horário é melhor", "vou no último horário oferecido"])
+    test(`escolha interpretada pelo modelo também é revalidada: ${frase}`, async () => {
+      const t = await preparar();
+      t.ctx.consultaAgenda!.mensagemAtual = frase;
+      const vaga = t.estado.appointment.slot_options!.vagas[1]!;
+      const r = await executarFerramentaPaciente(t.ctx, "selecionar_horario", vaga);
+      expect(r.ok).toBe(true);
+      expect(r.resumo_confirmacao).toContain("10:20");
+      expect(gravacoes).toHaveLength(0);
+    });
+  test("modelo não pode substituir 10:20 por 08:00 nem inventar vaga", async () => {
+    const t = await preparar(); t.ctx.consultaAgenda!.mensagemAtual = "marca pra 10:20";
+    const vaga = t.estado.appointment.slot_options!.vagas[0]!;
+    expect((await executarFerramentaPaciente(t.ctx, "selecionar_horario", vaga)).ok).toBe(false);
+    expect((await executarFerramentaPaciente(t.ctx, "selecionar_horario", { ...vaga, medico_id: OUTRO })).ok).toBe(false);
+    expect(gravacoes).toHaveLength(0);
+  });
+  test("horário fora da lista segue para nova consulta, sem escolher a primeira opção", async () => {
+    const t = await preparar();
+    expect(await t.turno("prefiro 16:00")).toBeNull();
+    expect(t.estado.appointment.slot_inicio).toBeNull();
+    expect(t.estado.appointment.confirmation).toBeNull();
+    expect(gravacoes).toHaveLength(0);
+  });
+  test("falha ao encaminhar informa a falha sem prometer transferência", async () => {
+    const t = await preparar(); t.falharHandoff();
+    await t.turno("vou 10:20"); banco.agendamentos = [];
+    const r = await t.turno("Sim");
+    expect(r?.origem).toBe("erro");
+    expect(r?.texto).toContain("Não consegui transferir");
     expect(gravacoes).toHaveLength(0);
   });
 });

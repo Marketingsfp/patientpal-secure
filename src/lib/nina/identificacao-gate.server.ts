@@ -30,6 +30,9 @@ import {
 } from "./cadastro-paciente";
 import { criarResultado, type ResultadoRespostaNina } from "./resposta/contrato";
 import { textoDaChave, type TextosTemplates } from "./resposta/templates";
+import { aceitarResumoEntregue, confirmacaoDaEscolha, consentimentoDaEscolha,
+  limparEscolhaAgendamento, lerEscolhaHorario, vagasDaEscolha, vagasDaSessao } from "./agendamento-escolha";
+import { respostaSemVagas } from "./agenda-sem-vagas";
 
 /* ------------------------------------------------------------ confirmações */
 
@@ -186,25 +189,76 @@ export async function aplicarGateIdentificacao(params: {
   textos?: TextosTemplates | null;
   /** Nome da clínica que concluiu o agendamento. */
   nomeUnidade?: string;
+  encaminharVagaIndisponivel?: (motivo: string) => Promise<boolean>;
 }): Promise<ResultadoRespostaNina | null> {
   const { mensagem, estado, ctx, executar } = params;
   const textos = params.textos ?? null;
   const a = estado.appointment;
   const p = estado.patient;
-  if (!atendimentoDefinido(estado) || a.appointment_id) return null;
-  if (ehNegacao(mensagem)) {
-    a.intent_confirmed = false;
+  if (a.appointment_id || estado.flow.stage === "HANDOFF") return null;
+  const encaminhar = async () => {
+    const motivo = "VAGA_ESCOLHIDA_INDISPONIVEL: a vaga escolhida pelo paciente não pôde ser reservada; não substituir médico, data ou horário.";
+    limparEscolhaAgendamento(estado);
+    a.slot_options = null;
+    estado.flow.stage = "HANDOFF";
+    const ok = await params.encaminharVagaIndisponivel?.(motivo).catch(() => false) ?? false;
+    return criarResultado({ origem: ok ? "handoff" : "erro", texto: respostaSemVagas(ok, true),
+      fatosConfirmados: ok ? ["handoff_confirmado"] : [], restricoes: ["nao_substituir_vaga_escolhida"] });
+  };
+  const escolha = lerEscolhaHorario(mensagem);
+  const opcoes = vagasDaSessao(estado, ctx.clinicaId);
+  // Uma correção/recusa após o aceite suspende a gravação. A Nina não troca
+  // a vaga no meio da coleta; a equipe humana deverá tratar a mudança.
+  if (a.confirmation?.aceita && (!consentimentoDaEscolha(estado, ctx.clinicaId) || ehNegacao(mensagem) ||
+    (escolha && vagasDaEscolha([a.confirmation.vaga], escolha).length === 0))) {
     a.slot_confirmed_by_patient = false;
+    a.intent_confirmed = false;
+    p.pending = { nome: null, cpf: null, data_nascimento: null };
+    estado.flow.stage = "HANDOFF";
+    return null;
+  }
+  if (escolha && opcoes.length && !consentimentoDaEscolha(estado, ctx.clinicaId)) {
+    const vagas = vagasDaEscolha(opcoes, escolha);
+    limparEscolhaAgendamento(estado);
+    // Um horário ainda não consultado precisa de nova leitura da agenda.
+    // Não o declare indisponível e não o substitua por uma opção da lista.
+    if (vagas.length === 0) return null;
+    if (vagas.length !== 1) return resultadoGate(textos, "fluxo.agendamento.escolher", {});
+    const vaga = vagas[0]!;
+    const r = await executar(ctx, "selecionar_horario", {
+      medico_id: vaga.medico_id, inicio: vaga.inicio, fim: vaga.fim,
+    });
+    if (!r.ok && r.erro === "SLOT_UNAVAILABLE") return encaminhar();
+    if (r.ok && typeof r.resumo_confirmacao === "string") {
+      return criarResultado({ origem: "gate", texto: r.resumo_confirmacao,
+        fatosConfirmados: ["vaga_escolhida_validada"], restricoes: ["aguardar_aceite_do_resumo"] });
+    }
+    return resultadoGate(textos, r.ok || r.erro === "ACTION_NOT_AUTHORIZED"
+      ? "fluxo.agendamento.escolher" : "fluxo.identificacao.instabilidade", {});
+  }
+  if (ehNegacao(mensagem)) {
+    limparEscolhaAgendamento(estado);
     p.pending = { nome: null, cpf: null, data_nascimento: null };
     estado.flow.stage = "CHOOSING_SLOT";
     return null;
   }
-  const confirmouAgora = !a.slot_confirmed_by_patient && ehConfirmacaoDeAgendamento(mensagem);
-  if (confirmouAgora) {
-    a.intent_confirmed = true;
-    a.slot_confirmed_by_patient = true;
+  if (!atendimentoDefinido(estado)) {
+    if (opcoes.length && ehConfirmacaoDeAgendamento(mensagem))
+      return resultadoGate(textos, "fluxo.agendamento.escolher", {});
+    return null;
   }
-  if (!a.slot_confirmed_by_patient || estado.flow.stage === "HANDOFF") return null;
+  const confirmouAgora = !consentimentoDaEscolha(estado, ctx.clinicaId) && ehConfirmacaoDeAgendamento(mensagem);
+  if (confirmouAgora) {
+    if (!aceitarResumoEntregue(estado, ctx.clinicaId, ctx.consultaAgenda?.historico ?? [])) {
+      const resumo = confirmacaoDaEscolha(estado, ctx.clinicaId);
+      if (resumo) return criarResultado({ origem: "gate", texto: resumo.resumo,
+        restricoes: ["aguardar_aceite_do_resumo"] });
+      limparEscolhaAgendamento(estado);
+      return resultadoGate(textos, "fluxo.agendamento.escolher", {});
+    }
+  }
+  const confirmacao = consentimentoDaEscolha(estado, ctx.clinicaId);
+  if (!confirmacao) return null;
   const novo = confirmouAgora ? null : extrairDadosIdentificacao(mensagem);
   if (
     !confirmouAgora &&
@@ -299,10 +353,10 @@ export async function aplicarGateIdentificacao(params: {
       },
     ],
     consentimento: {
-      confirmado: a.intent_confirmed === true || a.slot_confirmed_by_patient === true,
-      medicoId: a.doctor_id ?? a.doctor_name,
-      inicio: a.slot_inicio,
-      fim: a.slot_fim,
+      confirmado: confirmacao.aceita,
+      medicoId: confirmacao.vaga.medico_id,
+      inicio: confirmacao.vaga.inicio,
+      fim: confirmacao.vaga.fim,
     },
     idempotenciaBase: ctx.conversaId ?? ctx.telefone ?? null,
   });
@@ -395,11 +449,7 @@ export async function aplicarGateIdentificacao(params: {
       },
     );
   }
-  // Vaga tomada durante a coleta: limpa e deixa o modelo oferecer outras.
-  a.slot_inicio = null;
-  a.slot_fim = null;
-  a.intent_confirmed = false;
-  a.slot_confirmed_by_patient = false;
-  estado.flow.stage = "CHOOSING_SLOT";
-  return null;
+  if (erroAg === "SLOT_UNAVAILABLE" || erroAg === "NO_AVAILABILITY") return encaminhar();
+  // Uma falha técnica não autoriza escolher uma nova vaga nem afirmar sucesso.
+  return resultadoGate(textos, "fluxo.identificacao.instabilidade", {});
 }

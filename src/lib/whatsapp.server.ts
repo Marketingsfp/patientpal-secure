@@ -1277,7 +1277,9 @@ async function gerarRespostaNinaInterno(
       nome: fluxoEstado.appointment.doctor_name,
     },
     disponibilidadeJaConsultada: Boolean(
-      fluxoEstado.appointment.slot_inicio && fluxoEstado.appointment.slot_fim,
+      (fluxoEstado.appointment.slot_inicio && fluxoEstado.appointment.slot_fim) ||
+      (fluxoEstado.appointment.slot_options?.session_id === fluxoEstado.session_id &&
+        fluxoEstado.appointment.slot_options?.vagas.length),
     ),
   };
   let interesseAgendaConfirmado = interesseEmConsultarAgenda(contextoConsultaAgenda);
@@ -1364,6 +1366,9 @@ async function gerarRespostaNinaInterno(
       slot_inicio: fluxoEstado.appointment.slot_inicio ?? null,
       slot_fim: fluxoEstado.appointment.slot_fim ?? null,
       agendamento_id: fluxoEstado.appointment.appointment_id ?? null,
+      opcoes_consultadas: fluxoEstado.appointment.slot_options?.session_id === fluxoEstado.session_id
+        ? fluxoEstado.appointment.slot_options?.vagas ?? [] : [],
+      confirmacao_final: fluxoEstado.appointment.confirmation ?? null,
     },
     catalogo: {
       publicado: baseAtiva,
@@ -1484,6 +1489,10 @@ async function gerarRespostaNinaInterno(
       estado: fluxoEstado,
       teste: opcoes?.teste === true,
       consultaAgenda: contextoConsultaAgenda,
+      nomeUnidade: identidadeEfetiva.ok ? nomeCompletoEstabelecimento(identidadeEfetiva.apresentacao) : "nossa clínica",
+      opcoesAgendamentoInicioTurno: Boolean(
+        fluxoEstado.appointment.slot_options?.session_id === fluxoEstado.session_id &&
+        fluxoEstado.appointment.slot_options?.vagas.length),
     };
   }
 
@@ -1509,6 +1518,21 @@ async function gerarRespostaNinaInterno(
       nomeUnidade: identidadeEfetiva.ok
         ? nomeCompletoEstabelecimento(identidadeEfetiva.apresentacao)
         : "nossa clínica",
+      encaminharVagaIndisponivel: async (motivo) => {
+        await conferirReserva();
+        if (opcoes?.revisao?.valor) {
+          const { respostaObsoleta } = await import("@/lib/nina/revisao-conversa.server");
+          if (await respostaObsoleta({ clinicaId, telefone: opcoes.revisao.telefone,
+            revisaoProcessada: opcoes.revisao.valor })) return false;
+        }
+        const { executarHandoffTool } = await import("@/lib/nina/handoff-tool.server");
+        const r = await executarHandoffTool({ clinicaId, conversaId: estadoId.conversaId ?? null },
+          JSON.stringify({ motivo, resumo: "A vaga escolhida ficou indisponível. Continuar o atendimento sem substituir automaticamente médico, data ou horário.", setor: "Agendamento" }));
+        registrarEtapa({ tipo: "ferramenta", fonte: "atendimento", titulo: "Encaminhamento da vaga escolhida indisponível",
+          dados: { motivo, handoff_confirmado: r.ok, resultado: r },
+          codigo: { arquivo: "src/lib/nina/identificacao-gate.server.ts", funcao: "aplicarGateIdentificacao" } });
+        return r.ok;
+      },
     }).catch((e) => {
       console.error("[NINA_BOOKING_FLOW] gate falhou", e);
       return null;
@@ -1645,7 +1669,8 @@ async function gerarRespostaNinaInterno(
 
   let resposta = "";
   let houveHandoff = false;
-  let finalizacaoSemVagas: { texto: string; textoModelo: string; handoffConfirmado: boolean } | null = null;
+  let finalizacaoSemVagas: { texto: string; textoModelo: string; handoffConfirmado: boolean; motivo: string } | null = null;
+  let resumoEscolha: import("@/lib/nina/resposta/contrato").ResultadoRespostaNina | null = null;
   const { encaminhamentoSemVagas, respostaSemVagas } = await import("@/lib/nina/agenda-sem-vagas");
   // FASE 4 — vira true quando a conversa avançou durante a geração.
   let turnoObsoleto = false;
@@ -1754,6 +1779,12 @@ async function gerarRespostaNinaInterno(
   if (consultaPlanejada) await consultarFonteAntesDaResposta(consultaPlanejada.args);
   for (let rodada = 0; rodada < MAX_RODADAS; rodada++) {
     rodadasDoTurno = rodada + 1;
+    // Escolhas por extenso e referências ("o segundo horário") são interpretadas
+    // pelo modelo sobre as mesmas opções oficiais guardadas pelo executor.
+    runtimeContext.agendamento.opcoes_consultadas =
+      fluxoEstado.appointment.slot_options?.session_id === fluxoEstado.session_id
+        ? fluxoEstado.appointment.slot_options?.vagas ?? [] : [];
+    runtimeContext.agendamento.confirmacao_final = fluxoEstado.appointment.confirmation ?? null;
     // Atualiza somente os fatos de execução no composer oficial. O texto
     // publicado permanece idêntico e a auditoria captura a requisição usada.
     const requestEfetivo = comporRequestNina({ behaviorPrompt, runtimeContext,
@@ -1980,6 +2011,15 @@ async function gerarRespostaNinaInterno(
         tool_call_id: c.id,
         content: JSON.stringify(resultadoCompartilhado),
       });
+      if (nome === "selecionar_horario" && r.success &&
+        typeof (r.dados as { resumo_confirmacao?: unknown })?.resumo_confirmacao === "string") {
+        const { criarResultado } = await import("@/lib/nina/resposta/contrato");
+        resumoEscolha = criarResultado({ origem: "gate",
+          texto: (r.dados as { resumo_confirmacao: string }).resumo_confirmacao,
+          fatosConfirmados: ["vaga_escolhida_validada"], restricoes: ["aguardar_aceite_do_resumo"] });
+        // Nenhuma ferramenta do mesmo lote pode gravar antes do novo aceite.
+        break;
+      }
       const encaminhamento = encaminhamentoSemVagas(r, c.function?.arguments);
       if (encaminhamento) {
         // A consulta é leitura, mas o encaminhamento é escrita: conferir de
@@ -2002,8 +2042,13 @@ async function gerarRespostaNinaInterno(
         await compartilharResultado("solicitar_atendente_humano", encaminhamento, rh);
         const confirmado = rh.success && !rh.erro;
         houveHandoff ||= confirmado;
+        const { limparEscolhaAgendamento } = await import("@/lib/nina/agendamento-escolha");
+        limparEscolhaAgendamento(fluxoEstado);
+        fluxoEstado.appointment.slot_options = null;
+        fluxoEstado.flow.stage = "HANDOFF";
         finalizacaoSemVagas = {
-          texto: respostaSemVagas(confirmado), textoModelo: msg.content ?? "", handoffConfirmado: confirmado,
+          texto: respostaSemVagas(confirmado, encaminhamento.motivo.startsWith("VAGA_ESCOLHIDA_INDISPONIVEL")),
+          textoModelo: msg.content ?? "", handoffConfirmado: confirmado, motivo: encaminhamento.motivo,
         };
         registrarEtapa({
           tipo: "ferramenta", fonte: "atendimento", titulo: "Encaminhamento por ausência de vagas",
@@ -2032,7 +2077,7 @@ async function gerarRespostaNinaInterno(
       }
       break;
     }
-    if (finalizacaoSemVagas) break;
+    if (finalizacaoSemVagas || resumoEscolha) break;
     if (rodada === MAX_RODADAS - 1) limiteRodadasAtingido = true;
   }
 
@@ -2138,10 +2183,15 @@ async function gerarRespostaNinaInterno(
   if (finalizacaoSemVagas) {
     const antes = respostaDoModelo;
     resposta = finalizacaoSemVagas.texto;
-    transformar("agenda.sem_vagas", "consulta sem vagas ou alternativas disponíveis", antes, resposta, "aviso_operacional");
-    marcarOrigem("codigo", finalizacaoSemVagas.handoffConfirmado
-      ? "AGENDA_SEM_VAGAS: transferência confirmada"
-      : "AGENDA_SEM_VAGAS: transferência não confirmada");
+    transformar("agenda.sem_vagas", finalizacaoSemVagas.motivo, antes, resposta, "aviso_operacional");
+    marcarOrigem("codigo", `${finalizacaoSemVagas.motivo}; transferência ${finalizacaoSemVagas.handoffConfirmado ? "confirmada" : "não confirmada"}`);
+  }
+
+  if (resumoEscolha) {
+    transformar("agenda.resumo_escolha", "resumo da vaga escolhida e revalidada na agenda", resposta, resumoEscolha.texto);
+    resposta = resumoEscolha.texto;
+    marcarOrigem("gate", "resumo final vinculado à vaga escolhida, aguardando aceite do paciente");
+    if (opcoes?.auditoria) opcoes.auditoria.resultado = resumoEscolha;
   }
 
   if (!resposta && houveHandoff) {
@@ -2255,7 +2305,7 @@ async function gerarRespostaNinaInterno(
         import("@/lib/nina/resposta/finalizacao.server"),
         import("@/lib/nina/resposta/contrato"),
       ]);
-      const baseResultado =
+      const baseResultado = resumoEscolha ??
         ((opcoes?.auditoria as { resultado?: unknown } | undefined)?.resultado as
           | import("@/lib/nina/resposta/contrato").ResultadoRespostaNina
           | undefined) ?? criarResultado({
