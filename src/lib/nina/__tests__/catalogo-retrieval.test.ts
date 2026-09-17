@@ -7,6 +7,7 @@
  * inteiro por mensagem.
  */
 import { beforeEach, describe, expect, it, mock } from "bun:test";
+import { agoraNaClinica } from "@/lib/nina-agora";
 
 type Linha = Record<string, unknown>;
 
@@ -135,6 +136,28 @@ beforeEach(() => {
 });
 
 describe("recuperação no catálogo publicado", () => {
+  it("vigência dos avisos muda à meia-noite de São Paulo, não à meia-noite UTC", async () => {
+    banco["nina_cat_profissionais"] = [
+      profissional({
+        nome: "Dr. Silva", especialidades: [{ nome: "Cardiologia" }],
+        aviso_dia: "Aviso válido somente no dia 17",
+        aviso_valido_de: "2026-09-17", aviso_valido_ate: "2026-09-17",
+      }),
+      profissional({
+        nome: "Dra. Ana", especialidades: [{ nome: "Cardiologia" }],
+        aviso_dia: "Aviso válido somente no dia 18",
+        aviso_valido_de: "2026-09-18", aviso_valido_ate: "2026-09-18",
+      }),
+    ];
+    const pedido = { clinicaId: CLINICA, query: "cardiologia" };
+    const antes = await buscarNoCatalogo(pedido, new Date("2026-09-18T02:59:59Z"));
+    const depois = await buscarNoCatalogo(pedido, new Date("2026-09-18T03:00:00Z"));
+    expect(JSON.stringify(antes)).toContain("Aviso válido somente no dia 17");
+    expect(JSON.stringify(antes)).not.toContain("Aviso válido somente no dia 18");
+    expect(JSON.stringify(depois)).not.toContain("Aviso válido somente no dia 17");
+    expect(JSON.stringify(depois)).toContain("Aviso válido somente no dia 18");
+  });
+
   it("traz o exame certo mesmo com plural e não confunde com outro parecido", async () => {
     banco["nina_cat_servicos"] = [
       servico({ nome: "Ultrassom de tireoide", valor: 180 }),
@@ -167,7 +190,7 @@ describe("recuperação no catálogo publicado", () => {
   });
 
   it("mantém recorrência, observação do horário e aviso vigente", async () => {
-    const hoje = new Date().toISOString().slice(0, 10);
+    const hoje = agoraNaClinica().iso;
     banco["nina_cat_profissionais"] = [
       profissional({
         nome: "Dr. Silva",

@@ -6,6 +6,7 @@
  * Server-only.
  */
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { agoraNaClinica, FUSO_PADRAO } from "@/lib/nina-agora";
 
 /** Quantos registros publicados a clínica tem hoje (serviços + profissionais). */
 export async function contarCatalogoPublicado(
@@ -26,17 +27,11 @@ export async function contarCatalogoPublicado(
   return { servicos: servicos.count ?? 0, profissionais: profissionais.count ?? 0 };
 }
 
-const FUSO = "America/Sao_Paulo";
+const FUSO = FUSO_PADRAO;
 
 /** Data de hoje no fuso da clínica — o modelo nunca presume "hoje". */
 function hojeLocal(agora: Date = new Date()): string {
-  return new Intl.DateTimeFormat("pt-BR", {
-    timeZone: FUSO,
-    weekday: "long",
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  }).format(agora);
+  return agoraNaClinica(FUSO, agora).extenso;
 }
 
 /**
@@ -147,5 +142,4 @@ export async function blocoPromptCatalogo(clinicaId: string): Promise<string> {
   const { servicos, profissionais } = await contarCatalogoPublicado(clinicaId);
   return regrasCatalogo(servicos, profissionais);
 }
-
 

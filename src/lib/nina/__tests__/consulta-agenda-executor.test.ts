@@ -41,11 +41,12 @@ mock.module("@/integrations/supabase/client.server", () => ({
       const predicados: Array<(r: Linha) => boolean> = [];
       let atualizacao: Linha | null = null;
       let faixa: [number, number] | null = null;
+      let limite: number | null = null;
       const ler = () => {
         leituras.push({ tabela, filtros: { ...filtros } });
         const linhas = banco[tabela]!.filter((r) => predicados.every((p) => p(r)));
         if (atualizacao) for (const linha of linhas) Object.assign(linha, atualizacao);
-        return faixa ? linhas.slice(faixa[0], faixa[1] + 1) : linhas;
+        return faixa ? linhas.slice(faixa[0], faixa[1] + 1) : limite != null ? linhas.slice(0, limite) : linhas;
       };
       const q = {
         select: (_: string) => q,
@@ -89,7 +90,7 @@ mock.module("@/integrations/supabase/client.server", () => ({
           if (falharLeituraFicha && tabela === "agendamentos") throw new Error("Falha simulada ao ler ficha");
           faixa = [a, b]; return q;
         },
-        limit: () => q,
+        limit: (n: number) => { limite = n; return q; },
         maybeSingle: async () => ({ data: ler()[0] ?? null, error: null }),
         then: (resolve: (r: { data: Linha[]; error: null }) => unknown) =>
           Promise.resolve(resolve({ data: ler(), error: null })),
@@ -122,7 +123,7 @@ mock.module("@/lib/agenda/criar-agendamento.core.server", () => ({
   },
 }));
 
-const { executarFerramentaPaciente } = await import("../paciente-tools.server");
+const { executarFerramentaPaciente, consultarDisponibilidadeCore } = await import("../paciente-tools.server");
 
 function contexto(mensagemAtual: string, respostaAnterior?: string) {
   const estado = estadoVazio();
@@ -289,6 +290,42 @@ beforeEach(() => {
 });
 
 describe("executor real das ferramentas com banco simulado", () => {
+  test("consulta do dia local inclui a noite após a virada UTC e exclui o dia seguinte", async () => {
+    banco.agendamentos = [
+      "2026-09-17T02:59:59.000Z", // dia 16 na clínica
+      "2026-09-17T03:00:00.000Z", // início do dia 17
+      "2026-09-18T02:30:00.000Z", // dia 17, 23:30
+      "2026-09-18T03:00:00.000Z", // início do dia 18
+    ].map((inicio, i) => ({
+      id: String(i), clinica_id: CLINICA, medico_id: MEDICO,
+      inicio, fim: new Date(new Date(inicio).getTime() + 60_000).toISOString(),
+      paciente_nome: "DISPONIVEL", status: "confirmado",
+    }));
+    const slots = await consultarDisponibilidadeCore({
+      clinicaId: CLINICA, medicoId: MEDICO, data: "2026-09-17",
+    }, new Date("2026-09-16T12:00:00Z"));
+    expect(slots.map(s => [s.data, s.hora])).toEqual([
+      ["17/09/2026", "00:00"], ["17/09/2026", "23:30"],
+    ]);
+  });
+
+  test("filtra a data antes de limitar resultados e não oferece horário já passado", async () => {
+    banco.agendamentos = [
+      "2026-09-16T15:00:00.000Z",
+      "2026-09-17T15:00:00.000Z",
+      "2026-09-17T18:00:00.000Z",
+    ].map((inicio, i) => ({
+      id: String(i), clinica_id: CLINICA, medico_id: MEDICO,
+      inicio, fim: new Date(new Date(inicio).getTime() + 60_000).toISOString(),
+      paciente_nome: "DISPONIVEL", status: "confirmado",
+    }));
+    const pedido = { clinicaId: CLINICA, medicoId: MEDICO, data: "2026-09-17", limite: 1 };
+    const futuro = await consultarDisponibilidadeCore(pedido, new Date("2026-09-16T12:00:00Z"));
+    expect(futuro.map(s => s.hora)).toEqual(["12:00"]);
+    const hoje = await consultarDisponibilidadeCore(pedido, new Date("2026-09-17T16:00:00Z"));
+    expect(hoje.map(s => s.hora)).toEqual(["15:00"]);
+  });
+
   test("buscar_medicos separa a identidade do catálogo e a da agenda sem consultar vagas", async () => {
     const r = await executarFerramentaPaciente(
       contexto("Vocês têm cardiologista?"),

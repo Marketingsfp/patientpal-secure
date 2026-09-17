@@ -98,10 +98,7 @@ export function intencaoAmbigua(mensagem: string, intencoes: IntencaoNina[]): bo
 
 /** "Bom dia" / "Boa tarde" / "Boa noite" conforme o horário da clínica. */
 export function saudacaoPorHorario(fuso: string = FUSO_PADRAO, now: Date = new Date()): string {
-  const hora = Number(agoraNaClinica(fuso, now).hora.slice(0, 2));
-  if (hora >= 5 && hora < 12) return "Bom dia";
-  if (hora >= 12 && hora < 18) return "Boa tarde";
-  return "Boa noite";
+  return agoraNaClinica(fuso, now).saudacao_do_periodo;
 }
 
 /**

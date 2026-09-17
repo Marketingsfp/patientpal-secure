@@ -9,6 +9,7 @@
  * não está PUBLICADO aqui é tratado como informação desconhecida.
  */
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { agoraNaClinica } from "@/lib/nina-agora";
 import {
   montarResultadoCatalogo,
   type ProfissionalPublicado,
@@ -101,11 +102,11 @@ export async function buscarNoCatalogo(pedido: {
   medico?: string | null;
   dia?: string | null;
   limite?: number;
-}): Promise<ResultadoConhecimento> {
+}, agora: Date = new Date()): Promise<ResultadoConhecimento> {
   const limite = Math.min(Math.max(pedido.limite ?? 6, 1), 12);
   const termos = termosBusca(pedido.query);
   const expandidos = todasVariantes(termos);
-  const hojeISO = new Date().toISOString().slice(0, 10);
+  const hojeISO = agoraNaClinica(undefined, agora).iso;
   const perguntaSobreConsulta =
     PALAVRAS_CONSULTA.test(pedido.query ?? "") || Boolean(pedido.medico);
 
@@ -271,4 +272,3 @@ export async function buscarNoCatalogo(pedido: {
 
   return resultado;
 }
-

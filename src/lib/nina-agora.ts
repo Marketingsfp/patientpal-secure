@@ -4,7 +4,9 @@
  * hoje e para resolver sozinha "hoje", "amanhã", "semana que vem" etc.
  */
 
-export const FUSO_PADRAO = "America/Sao_Paulo";
+import { TZ_CLINICA } from "./date-utils";
+
+export const FUSO_PADRAO = TZ_CLINICA;
 
 export interface AgoraClinica {
   /** "2026-08-27" */
@@ -16,6 +18,17 @@ export interface AgoraClinica {
   /** 0 = domingo */
   diaSemana: number;
   fuso: string;
+  instante_utc: string;
+  periodo_do_dia: "manha" | "tarde" | "noite";
+  saudacao_do_periodo: "Bom dia" | "Boa tarde" | "Boa noite";
+  datas_referencia: {
+    hoje: string;
+    amanha: string;
+    depois_de_amanha: string;
+    semana_atual: { inicio: string; fim: string };
+    proxima_semana: { inicio: string; fim: string };
+    proximos_dias: Array<{ data: string; dia_semana: number; nome_dia: string }>;
+  };
 }
 
 export function agoraNaClinica(fuso: string = FUSO_PADRAO, now: Date = new Date()): AgoraClinica {
@@ -29,7 +42,7 @@ export function agoraNaClinica(fuso: string = FUSO_PADRAO, now: Date = new Date(
     timeZone: fuso,
     hour: "2-digit",
     minute: "2-digit",
-    hour12: false,
+    hourCycle: "h23",
   }).format(now);
   const extenso = new Intl.DateTimeFormat("pt-BR", {
     timeZone: fuso,
@@ -42,12 +55,33 @@ export function agoraNaClinica(fuso: string = FUSO_PADRAO, now: Date = new Date(
     now,
   );
   const mapa: Record<string, number> = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
+  const diaSemana = mapa[nomeDia] ?? 0;
+  const horaNumero = Number(hora.slice(0, 2));
+  const periodo = horaNumero >= 5 && horaNumero < 12 ? "manha" : horaNumero >= 12 && horaNumero < 18 ? "tarde" : "noite";
+  // Semana civil de segunda a domingo; não confundir com "daqui a 7 dias".
+  const inicioSemana = somarDiasIso(partes, -((diaSemana + 6) % 7));
+  const dias = ["domingo", "segunda-feira", "terça-feira", "quarta-feira", "quinta-feira", "sexta-feira", "sábado"];
   return {
     iso: partes,
     extenso,
     hora,
-    diaSemana: mapa[nomeDia] ?? 0,
+    diaSemana,
     fuso,
+    instante_utc: now.toISOString(),
+    periodo_do_dia: periodo,
+    saudacao_do_periodo: periodo === "manha" ? "Bom dia" : periodo === "tarde" ? "Boa tarde" : "Boa noite",
+    datas_referencia: {
+      hoje: partes,
+      amanha: somarDiasIso(partes, 1),
+      depois_de_amanha: somarDiasIso(partes, 2),
+      semana_atual: { inicio: inicioSemana, fim: somarDiasIso(inicioSemana, 6) },
+      proxima_semana: { inicio: somarDiasIso(inicioSemana, 7), fim: somarDiasIso(inicioSemana, 13) },
+      proximos_dias: Array.from({ length: 14 }, (_, i) => ({
+        data: somarDiasIso(partes, i),
+        dia_semana: (diaSemana + i) % 7,
+        nome_dia: dias[(diaSemana + i) % 7]!,
+      })),
+    },
   };
 }
 

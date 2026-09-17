@@ -24,6 +24,9 @@
  */
 
 import { z } from "zod";
+import { agoraNaClinica, FUSO_PADRAO } from "@/lib/nina-agora";
+import { janelaDiaClinica } from "@/lib/date-utils";
+import { diaDaSemanaISO } from "./horario-oficial";
 import { atendimentoExigeHumano } from "./regras-catalogo.server";
 import { MOTIVO_SFP } from "./regras-catalogo";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
@@ -304,7 +307,7 @@ async function auditar(
 
 /* --------------------------------------------------------------- utilitários */
 
-const HORA_LOCAL = "America/Sao_Paulo";
+const HORA_LOCAL = FUSO_PADRAO;
 
 function formatarData(iso: string) {
   const d = new Date(iso);
@@ -322,6 +325,7 @@ function formatarHora(iso: string) {
     timeZone: HORA_LOCAL,
     hour: "2-digit",
     minute: "2-digit",
+    hourCycle: "h23",
   }).format(d);
 }
 
@@ -425,7 +429,7 @@ export async function consultarDisponibilidadeCore(params: {
   limite?: number;
   periodo?: "manha" | "tarde" | "noite" | null;
   data?: string | null;
-}): Promise<SlotNina[]> {
+}, agora: Date = new Date()): Promise<SlotNina[]> {
   // Fonte de verdade: as linhas "DISPONÍVEL" da própria agenda — exatamente o
   // que o núcleo de criação exige que exista para deixar marcar (regra 3 de
   // `criar-agendamento.core.server`). Oferecer qualquer outra coisa criaria a
@@ -433,8 +437,8 @@ export async function consultarDisponibilidadeCore(params: {
   // hora de gravar. A RPC `get_horarios_disponiveis` não serve aqui porque
   // depende de `auth.uid()`, que não existe num atendimento de WhatsApp.
   const dias = Math.min(Math.max(params.dias ?? 14, 1), 30);
-  const agora = new Date();
   const ate = new Date(agora.getTime() + dias * 86_400_000);
+  const diaPedido = params.data ? janelaDiaClinica(params.data, HORA_LOCAL) : null;
 
   let medicosFiltro: string[] | null = params.medicoId ? [params.medicoId] : null;
   if (params.especialidadeId) {
@@ -461,6 +465,9 @@ export async function consultarDisponibilidadeCore(params: {
     .order("inicio")
     .limit(Math.min(Math.max(params.limite ?? 400, 1), 800));
   if (medicosFiltro) q = q.in("medico_id", medicosFiltro);
+  // Recorta o dia civil ANTES do limite de linhas. A data UTC do slot pode
+  // ser o dia seguinte; o paciente sempre escolhe uma data em São Paulo.
+  if (diaPedido) q = q.gte("inicio", diaPedido.inicio).lt("inicio", diaPedido.fimExclusivo);
 
   const { data, error } = await q;
   if (error) throw new Error(error.message);
@@ -530,8 +537,8 @@ const SEM_RESULTADO = "00000000-0000-0000-0000-000000000000";
 /* ------------------------------------------------- escala × disponibilidade */
 
 /** AAAA-MM-DD -> dia da semana (0=Dom) no fuso da clínica. */
-function diaSemanaDe(dataISO: string): number {
-  return new Date(`${dataISO}T12:00:00-03:00`).getDay();
+function diaSemanaDe(dataISO: string): number | null {
+  return diaDaSemanaISO(dataISO);
 }
 
 /**
@@ -1198,7 +1205,7 @@ async function executarFerramentaInterna(
         const { carregarCalendariosPublicadosCache } = await import("./classificador-periodo.functions");
         const { horarioOficialDoDia, semanaOficial, nomeDia } = await import("./horario-oficial");
         const calendarios = await carregarCalendariosPublicadosCache(supabaseAdmin, ctx.clinicaId);
-        const hoje = new Intl.DateTimeFormat("en-CA", { timeZone: HORA_LOCAL }).format(new Date());
+        const hoje = agoraNaClinica(HORA_LOCAL).iso;
         const alvo = typeof (args as any)?.data === "string" && (args as any).data ? String((args as any).data) : hoje;
         // Unidade histórica não é inferida: sem unidade no contexto, só calendário geral.
         const escopo = { clinica_id: ctx.clinicaId, unidade_id: null };
