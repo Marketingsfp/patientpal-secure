@@ -15,6 +15,10 @@
  */
 
 export const ESCOPO_TEMPLATES = "whatsapp" as const;
+export const CHAVES_CONFIRMACAO_AGENDAMENTO = new Set([
+  "fluxo.agendamento.confirmado", "fluxo.agendamento.confirmado_pre_agendamento",
+  "fluxo.agendamento.confirmado_ficha", "fluxo.agendamento.confirmado_ficha_pendente",
+]);
 
 export type CategoriaTemplate =
   /** Coleta de dados e confirmação do agendamento (regra técnica protegida). */
@@ -39,6 +43,48 @@ export type DefinicaoTemplate = {
 const D = (t: DefinicaoTemplate) => t;
 
 export const TEMPLATES_PADRAO: readonly DefinicaoTemplate[] = [
+  D({
+    chave: "fluxo.agendamento.revisar_pre_agendamento", categoria: "fluxo",
+    descricao: "Resumo antes do aceite de horário em ordem de chegada com pré-agendamento.",
+    variaveis: ["profissional", "procedimento", "data", "horario", "unidade"],
+    padrao: "Confira os dados do pré-agendamento:\n\n*Atendimento:* {procedimento}\n*Profissional:* {profissional}\n*Data:* {data}\n*Horário do pré-agendamento:* {horario}\n*Clínica:* {unidade}\n\nO atendimento é por ordem de chegada: quem chegar primeiro será atendido primeiro. O horário do pré-agendamento não garante o horário exato da consulta.\n\nVocê confirma esse pré-agendamento?",
+  }),
+  D({
+    chave: "fluxo.agendamento.revisar_ficha", categoria: "fluxo",
+    descricao: "Resumo do atendimento por ficha, sem prometer hora da consulta.",
+    variaveis: ["profissional", "procedimento", "data", "horario", "unidade"],
+    padrao: "Confira os dados do atendimento por ficha:\n\n*Atendimento:* {procedimento}\n*Profissional:* {profissional}\n*Data:* {data}\n*Horário de comparecimento:* {horario}\n*Clínica:* {unidade}\n\nO atendimento segue a numeração das fichas. Chegue com 15 minutos de antecedência para realizar o check-in na Recepção Principal. O horário informado não é garantia da hora da consulta.\n\nVocê confirma esse agendamento?",
+  }),
+  D({
+    chave: "fluxo.agendamento.sem_pre_agendamento", categoria: "fluxo",
+    descricao: "Orientação sem reserva, sem horário individual e sem antecedência obrigatória.",
+    variaveis: ["profissional", "unidade"],
+    padrao: "O atendimento com {profissional} é por ordem de chegada, sem pré-agendamento. Não é necessário marcar horário: basta comparecer à {unidade} nos dias e períodos de atendimento desse profissional. Quem chegar primeiro será atendido primeiro.",
+  }),
+  D({
+    chave: "fluxo.agendamento.confirmado_pre_agendamento", categoria: "fluxo",
+    descricao: "Confirmação da reserva por ordem de chegada, sem exigir 15 minutos.",
+    variaveis: ["profissional", "data", "horario"],
+    padrao: "Seu pré-agendamento foi realizado!\n\n*Profissional:* {profissional}\n*Data:* {data}\n*Horário pré-agendado:* {horario}\n\nO atendimento é por ordem de chegada: quem chegar primeiro será atendido primeiro. O horário pré-agendado não garante o horário exato da consulta.",
+  }),
+  D({
+    chave: "fluxo.agendamento.confirmado_ficha", categoria: "fluxo",
+    descricao: "Confirmação por ficha calculada pela mesma fonte da Agenda.",
+    variaveis: ["profissional", "data", "horario", "ficha"],
+    padrao: "Seu agendamento foi realizado!\n\n*Profissional:* {profissional}\n*Data:* {data}\n*Sua ficha:* {ficha}\n*Horário de comparecimento:* {horario}\n\nO atendimento é por numeração, seguindo a ordem das fichas. Chegue com 15 minutos de antecedência para realizar o check-in na Recepção Principal. O horário informado não é garantia da hora da consulta.",
+  }),
+  D({
+    chave: "fluxo.agendamento.confirmado_ficha_pendente", categoria: "fluxo",
+    descricao: "Reserva comprovada por ficha, quando a leitura da numeração falhou.",
+    variaveis: ["profissional", "data", "horario"],
+    padrao: "Seu agendamento foi realizado!\n\n*Profissional:* {profissional}\n*Data:* {data}\n*Horário de comparecimento:* {horario}\n\nO atendimento é por numeração de ficha. Não consegui consultar seu número neste momento; a recepção poderá informá-lo. Chegue com 15 minutos de antecedência para realizar o check-in na Recepção Principal. O horário informado não é garantia da hora da consulta.",
+  }),
+  ...(["pre_agendamento", "ficha"] as const).map((tipo) => D({
+    chave: `fluxo.agendamento.despedida_${tipo}`, categoria: "fluxo",
+    descricao: "Aviso de presença e despedida com referência ao horário de chegada, sem prometer hora da consulta.",
+    variaveis: ["unidade"],
+    padrao: `Uma hora antes do horário ${tipo === "ficha" ? "de comparecimento" : "pré-agendado"}, entraremos em contato para confirmar se você poderá comparecer.\n\nA {unidade} agradece a sua confiança! Será um prazer receber você! 💚`,
+  })),
   D({
     chave: "fluxo.agendamento.revisar", categoria: "fluxo",
     descricao: "Resumo da vaga escolhida e revalidada, antes do aceite final do paciente.",
@@ -107,7 +153,7 @@ export const TEMPLATES_PADRAO: readonly DefinicaoTemplate[] = [
     padrao:
       "Prontinho! ✅ Seu agendamento foi realizado com sucesso.\n\n" +
       "*Profissional:* {profissional}\n*Data:* {data}\n*Horário:* {horario}\n\n" +
-      "Chegue com 15 minutos de antecedência e traga um documento com foto.",
+      "O atendimento será no horário marcado. Chegue com 15 minutos de antecedência para realizar o check-in na Recepção Principal e traga um documento com foto.",
   }),
   D({
     chave: "fluxo.agendamento.despedida",
@@ -241,8 +287,10 @@ export function textoDaChave(
   publicados?: TextosTemplates | null,
 ): { texto: string; origemTemplate: "publicado" | "padrao"; motivo: string | null } {
   const resultado = resolverTextoDaChave(chave, valores, publicados);
-  if (chave !== "fluxo.agendamento.confirmado" || !resultado.texto) return resultado;
-  const despedida = acrescentarDespedidaAgendamento(resultado.texto, valores.unidade, publicados);
+  if (!CHAVES_CONFIRMACAO_AGENDAMENTO.has(chave) || !resultado.texto) return resultado;
+  const modalidade = chave.includes("pre_agendamento") ? "chegada_com_pre_agendamento"
+    : chave.includes("ficha") ? "ficha" : "hora_marcada";
+  const despedida = acrescentarDespedidaAgendamento(resultado.texto, valores.unidade, publicados, modalidade);
   return {
     ...despedida,
     origemTemplate:
@@ -257,11 +305,13 @@ export function acrescentarDespedidaAgendamento(
   texto: string,
   unidade?: string,
   publicados?: TextosTemplates | null,
+  modalidade?: string | null,
 ): { texto: string; origemTemplate: "publicado" | "padrao"; motivo: string | null } {
   // Bloco próprio: preserva a confirmação publicada e acompanha também a
   // renderização final compartilhada pelo WhatsApp e pela homologação.
   const despedida = resolverTextoDaChave(
-    "fluxo.agendamento.despedida",
+    modalidade === "chegada_com_pre_agendamento" ? "fluxo.agendamento.despedida_pre_agendamento"
+      : modalidade === "ficha" ? "fluxo.agendamento.despedida_ficha" : "fluxo.agendamento.despedida",
     { unidade: unidade?.trim() || "nossa clínica" },
     publicados,
   );

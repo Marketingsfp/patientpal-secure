@@ -23,7 +23,7 @@ import {
   verificarResultado,
   type ResultadoRespostaNina,
 } from "./contrato";
-import { acrescentarDespedidaAgendamento, textoDaChave } from "./templates";
+import { acrescentarDespedidaAgendamento, textoDaChave, CHAVES_CONFIRMACAO_AGENDAMENTO } from "./templates";
 import { carregarTemplatesPublicados } from "./templates.server";
 
 export type CanalFinalizacao = "whatsapp" | "test-console";
@@ -169,12 +169,13 @@ export async function finalizarResposta(
     resultado.estado === "entregar" &&
     resultado.texto &&
     agendamentoComprovado(resultado) &&
-    resultado.chaveTemplate !== "fluxo.agendamento.confirmado"
+    !CHAVES_CONFIRMACAO_AGENDAMENTO.has(resultado.chaveTemplate ?? "")
   ) {
     const despedida = acrescentarDespedidaAgendamento(
       resultado.texto,
       resultado.variaveis.unidade,
       publicados.textos,
+      resultado.variaveis.modalidade,
     );
     resultado.texto = despedida.texto;
     usouPublicado ||= despedida.origemTemplate === "publicado";

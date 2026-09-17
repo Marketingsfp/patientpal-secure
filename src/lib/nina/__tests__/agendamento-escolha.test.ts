@@ -12,6 +12,8 @@ import {
 } from "../agendamento-escolha";
 
 const vaga: VagaAgendamento = {
+  modalidade: "hora_marcada",
+  agenda_id: null,
   medico_id: "medico",
   medico: "Dra. Ana",
   procedimento: "Consulta",
@@ -116,10 +118,18 @@ describe("escolha de horário e consentimento do resumo entregue", () => {
       { role: "assistant", content: e.appointment.confirmation!.resumo },
     ]);
     registrarOpcoesAgendamento(e, "clinica", []);
-    expect(e.appointment.time).toBe("10:20");
-    expect(() =>
-      selecionarVagaValidada(e, "clinica", { ...vaga, hora: "08:00" }, "08:00?"),
-    ).toThrow();
     expect(consentimentoDaEscolha(e)?.vaga.hora).toBe("10:20");
+    expect(() => selecionarVagaValidada(e, "clinica", { ...vaga, hora: "08:00" }, "Outro resumo")).toThrow();
+  });
+  test("modalidade e agenda também ficam vinculadas ao consentimento", () => {
+    const e = preparar();
+    aceitarResumoEntregue(e, "clinica", [
+      { role: "assistant", content: e.appointment.confirmation!.resumo },
+    ]);
+    e.appointment.modalidade_atendimento = "ficha";
+    expect(consentimentoDaEscolha(e)).toBeNull();
+    e.appointment.modalidade_atendimento = "hora_marcada";
+    e.appointment.agenda_id = "outra-agenda";
+    expect(consentimentoDaEscolha(e)).toBeNull();
   });
 });

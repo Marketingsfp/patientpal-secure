@@ -32,9 +32,12 @@ import { consultarCadastroConfirmado } from "./cadastro-paciente.server";
 import { processamentoWatchdogAtual } from "./watchdog-contexto.server";
 import { consentimentoDaEscolha, limparEscolhaAgendamento, registrarOpcoesAgendamento, selecionarVagaValidada,
   vagasDaSessao, vagasDaEscolha, lerEscolhaHorario, type VagaAgendamento } from "./agendamento-escolha";
+import { chaveResumoModalidade, permiteReserva, orientacaoModalidade, type ModalidadeResolvida } from "./modalidade-atendimento";
+import { enriquecerModalidades, fichaDoAgendamento, modalidadeAtualDaAgenda } from "./modalidade-atendimento.server";
 import {
   resolverMedicoAgenda as resolverMedico,
   vincularProfissionaisCatalogo,
+  modalidadePublicadaDoMedico,
 } from "./vinculo-catalogo-agenda.server";
 import { autorizarAcao, type CodigoRecusa, type EntradaAutorizacao } from "./acoes/autorizacao";
 import {
@@ -64,6 +67,8 @@ export type CodigoErroNina =
   | "APPOINTMENT_CREATION_FAILED"
   | "APPOINTMENT_UNCERTAIN"
   | "ACTION_NOT_AUTHORIZED"
+  | "MODALIDADE_NAO_DEFINIDA"
+  | "MODALIDADE_ALTERADA"
   | "VALIDATION_ERROR"
   | "PERMISSION_DENIED"
   | "INTERNAL_ERROR";
@@ -382,12 +387,13 @@ function acharEspecialidade(termo: string, lista: Array<{ id: string; nome: stri
 
 function guardarOpcoes(ctx: CtxNinaPaciente, slots: SlotNina[]) {
   if (consentimentoDaEscolha(ctx.estado, ctx.clinicaId)) return;
-  const vagas: VagaAgendamento[] = slots.map((s) => ({
+  const vagas: VagaAgendamento[] = slots.flatMap((s) => !permiteReserva(s.modalidade) ? [] : [{
     medico_id: s.medico_id, medico: s.medico_nome, especialidade: s.especialidade,
     procedimento: ctx.consultaAgenda?.selecaoRevalidada?.modalidade?.procedimento ??
       (ctx.estado?.appointment.doctor_id === s.medico_id ? ctx.estado.appointment.procedure : null),
     data: dataISODoSlot(s.inicio), hora: s.hora, inicio: s.inicio, fim: s.fim,
-  }));
+    modalidade: s.modalidade, agenda_id: s.agenda,
+  }]);
   registrarOpcoesAgendamento(ctx.estado, ctx.clinicaId, vagas);
 }
 
@@ -396,6 +402,7 @@ export type SlotNina = {
   medico_nome: string;
   especialidade: string | null;
   agenda: string | null;
+  modalidade?: ModalidadeResolvida;
   data: string;
   hora: string;
   inicio: string;
@@ -443,7 +450,7 @@ export async function consultarDisponibilidadeCore(params: {
 
   let q = supabaseAdmin
     .from("agendamentos")
-    .select("id, medico_id, inicio, fim, paciente_nome, status")
+    .select("id, medico_id, inicio, fim, paciente_nome, status, agenda_id")
     .eq("clinica_id", params.clinicaId)
     .gte("inicio", agora.toISOString())
     .lte("inicio", ate.toISOString())
@@ -460,6 +467,7 @@ export async function consultarDisponibilidadeCore(params: {
     inicio: string;
     fim: string;
     paciente_nome: string | null;
+    agenda_id?: string | null;
   }>;
   const livres = linhas.filter((l) => {
     const n = normalizar(l.paciente_nome ?? "");
@@ -501,7 +509,7 @@ export async function consultarDisponibilidadeCore(params: {
         medico_id: String(l.medico_id ?? ""),
         medico_nome: info?.nome ?? "",
         especialidade: info?.especialidade_id ? (nomeEsp.get(info.especialidade_id) ?? null) : null,
-        agenda: null,
+        agenda: l.agenda_id ?? null,
         data: formatarData(l.inicio),
         hora: formatarHora(l.inicio),
         inicio: l.inicio,
@@ -894,6 +902,29 @@ const zAgendar = z.object({
 
 /* ------------------------------------------------------------------ executor */
 
+async function orientarSemPreAgendamento(ctx: CtxNinaPaciente, profissional: string): Promise<ResultadoFerramenta> {
+  if (ctx.estado?.appointment.confirmation?.aceita)
+    return falha("MODALIDADE_ALTERADA", "A modalidade mudou após o aceite. A equipe precisa conferir o atendimento.");
+  const [{ carregarTemplatesPublicados }, { textoDaChave }] = await Promise.all([
+    import("./resposta/templates.server"), import("./resposta/templates"),
+  ]);
+  const publicados = await carregarTemplatesPublicados({ clinicaId: ctx.clinicaId });
+  const texto = textoDaChave("fluxo.agendamento.sem_pre_agendamento", {
+    profissional, unidade: ctx.nomeUnidade?.trim() || "nossa clínica",
+  }, publicados.textos).texto;
+  if (ctx.estado && !ctx.estado.appointment.appointment_id) {
+    limparEscolhaAgendamento(ctx.estado);
+    ctx.estado.appointment.slot_options = null;
+    ctx.estado.flow.stage = "INFORMATION_RESPONSE";
+  }
+  return { ok: true, modalidade_atendimento: "chegada_sem_pre_agendamento",
+    consulta_realizada: false, sem_agendamento: true, orientacao_atendimento: texto,
+    instrucao: "Não selecione horário, não colete cadastro para reserva e não agende. Não peça 15 minutos de antecedência. Oriente o comparecimento nos dias e períodos publicados desse profissional." };
+}
+
+const modalidadePendente = () => falha("MODALIDADE_NAO_DEFINIDA",
+  "A modalidade precisa ser conferida pela equipe. Ordem de chegada sem indicação de pré-agendamento não permite presumir uma reserva.");
+
 /**
  * Executor público. Toda chamada — inclusive as que já auditam por dentro —
  * passa por aqui, e o painel de Homologação lê exatamente esse rastro
@@ -964,6 +995,9 @@ async function executarFerramentaInterna(
       if (!permissao.permitido) return consultaAgendaPendente(permissao.motivo);
       medicoAgenda = resolvido;
       args.medico_id = resolvido.id;
+      const modalidade = await modalidadePublicadaDoMedico(ctx.clinicaId, resolvido.id);
+      if (modalidade === "chegada_sem_pre_agendamento") return orientarSemPreAgendamento(ctx, resolvido.nome);
+      if (modalidade === "nao_definida") return modalidadePendente();
     }
     switch (nome) {
       case "selecionar_horario": {
@@ -975,6 +1009,9 @@ async function executarFerramentaInterna(
         const vaga = opcoes.find((v) => v.medico_id === p.medico_id && v.inicio === p.inicio && v.fim === p.fim);
         if (!vaga?.procedimento)
           return falha("ACTION_NOT_AUTHORIZED", "Escolha uma vaga e um procedimento consultados na agenda desta sessão.");
+        const publicada = await modalidadePublicadaDoMedico(ctx.clinicaId, vaga.medico_id);
+        if (publicada === "chegada_sem_pre_agendamento") return orientarSemPreAgendamento(ctx, vaga.medico);
+        if (publicada === "nao_definida") return modalidadePendente();
         const mensagem = ctx.consultaAgenda?.mensagemAtual ?? "";
         const escolha = lerEscolhaHorario(mensagem);
         if (escolha) {
@@ -986,18 +1023,21 @@ async function executarFerramentaInterna(
           /\b(?:quais|disponibilidade|valor|preço|preco)\b/i.test(mensagem)) {
           return falha("ACTION_NOT_AUTHORIZED", "Consultar opções ou dizer sim sem resumo não seleciona uma vaga. Aguarde a escolha do paciente.");
         }
-        const vagasAtuais = await consultarDisponibilidadeCore({
+        const vagasAtuais = await enriquecerModalidades(ctx.clinicaId, await consultarDisponibilidadeCore({
           clinicaId: ctx.clinicaId, medicoId: vaga.medico_id, data: vaga.data, dias: 90,
-        });
+        }));
         // Uma tentativa de nova escolha invalida qualquer resumo anterior.
         limparEscolhaAgendamento(estado);
-        const livre = vagasAtuais.some((s) => s.medico_id === vaga.medico_id &&
+        const livre = vagasAtuais.find((s) => s.medico_id === vaga.medico_id &&
           Date.parse(s.inicio) === Date.parse(vaga.inicio) && Date.parse(s.fim) === Date.parse(vaga.fim));
         if (!livre) return falha("SLOT_UNAVAILABLE", "A vaga escolhida não está mais disponível.", { vaga_escolhida: true });
+        if (!permiteReserva(livre.modalidade)) return modalidadePendente();
+        if (livre.modalidade !== vaga.modalidade || livre.agenda !== vaga.agenda_id)
+          return falha("MODALIDADE_ALTERADA", "A modalidade ou a agenda da vaga mudou. Encaminhe para a equipe conferir.");
         const { carregarTemplatesPublicados } = await import("./resposta/templates.server");
         const { textoDaChave } = await import("./resposta/templates");
         const publicados = await carregarTemplatesPublicados({ clinicaId: ctx.clinicaId });
-        const resumo = textoDaChave("fluxo.agendamento.revisar", {
+        const resumo = textoDaChave(chaveResumoModalidade(vaga.modalidade), {
           profissional: vaga.medico, procedimento: vaga.procedimento,
           data: vaga.data.split("-").reverse().join("/"), horario: vaga.hora,
           unidade: ctx.nomeUnidade?.trim() || "nossa clínica",
@@ -1203,6 +1243,8 @@ async function executarFerramentaInterna(
             periodo: p.periodo ?? null,
             data: p.data ?? null,
           });
+          slots = await enriquecerModalidades(ctx.clinicaId, slots);
+          if (slots.some(s => !permiteReserva(s.modalidade))) return modalidadePendente();
         } catch (e) {
           return falhaAgenda(e, "consultar_disponibilidade");
         }
@@ -1223,12 +1265,16 @@ async function executarFerramentaInterna(
           if (medicoId && p.data) {
             const { atende } = await medicoAtendeNoDia(ctx.clinicaId, medicoId, p.data);
             const nome = medicoNome ?? "O profissional";
-            const proximos = await consultarDisponibilidadeCore({
+            const proximos = await enriquecerModalidades(ctx.clinicaId, await consultarDisponibilidadeCore({
               clinicaId: ctx.clinicaId,
               medicoId,
               dias: 60,
-            }).catch(() => [] as SlotNina[]);
-            const sugestoes = proximos.slice(0, 3).map((s) => ({ data: s.data, hora: s.hora }));
+            }));
+            if (proximos.some(s => !permiteReserva(s.modalidade))) return modalidadePendente();
+            guardarOpcoes(ctx, proximos.slice(0, 3));
+            const sugestoes = proximos.slice(0, 3).map((s) => ({ data: s.data, hora: s.hora,
+              medico_id: s.medico_id, inicio: s.inicio, fim: s.fim,
+              modalidade_atendimento: s.modalidade, orientacao: orientacaoModalidade(s.modalidade!) }));
             return semVaga(
               atende ? "AGENDA_CHEIA" : "NAO_ATENDE_NO_DIA",
               atende
@@ -1250,6 +1296,8 @@ async function executarFerramentaInterna(
             hora: s.hora,
             inicio: s.inicio,
             fim: s.fim,
+            modalidade_atendimento: s.modalidade,
+            orientacao: orientacaoModalidade(s.modalidade ?? "nao_definida"),
           })),
           total: slots.length,
           // Estes são os ÚNICOS horários realmente livres. A escala da planilha
@@ -1282,6 +1330,8 @@ async function executarFerramentaInterna(
             dias: 60,
             data: p.data,
           });
+          doDia = await enriquecerModalidades(ctx.clinicaId, doDia);
+          if (doDia.some(s => !permiteReserva(s.modalidade))) return modalidadePendente();
         } catch (e) {
           return falhaAgenda(e, "verificar_horario");
         }
@@ -1301,7 +1351,8 @@ async function executarFerramentaInterna(
           { ...p, atende_no_dia: atende, slots_encontrados: doDia.length },
           { ok: true },
         );
-        guardarOpcoes(ctx, atende ? (alvo ? [alvo] : doDia.slice(0, 3)) : []);
+        const alternativas = doDia.filter(s => s.hora !== hora).slice(0, 4);
+        guardarOpcoes(ctx, atende ? [...(alvo ? [alvo] : []), ...alternativas] : []);
         if (!atende)
           return {
             ok: true,
@@ -1323,11 +1374,10 @@ async function executarFerramentaInterna(
           disponivel: Boolean(alvo),
           motivo: alvo ? null : doDia.length === 0 ? "AGENDA_CHEIA" : "HORARIO_OCUPADO",
           // Só horário — nunca quem ocupa a vaga.
-          ...(alvo ? { inicio: alvo.inicio, fim: alvo.fim } : {}),
-          alternativas: doDia
-            .filter((s) => s.hora !== hora)
-            .slice(0, 4)
-            .map((s) => ({ hora: s.hora, inicio: s.inicio, fim: s.fim })),
+          ...(alvo ? { inicio: alvo.inicio, fim: alvo.fim, modalidade_atendimento: alvo.modalidade,
+            orientacao: orientacaoModalidade(alvo.modalidade ?? "nao_definida") } : {}),
+          alternativas: alternativas.map((s) => ({ hora: s.hora, inicio: s.inicio, fim: s.fim, modalidade_atendimento: s.modalidade,
+              orientacao: orientacaoModalidade(s.modalidade ?? "nao_definida") })),
         };
       }
 
@@ -1372,6 +1422,8 @@ async function executarFerramentaInterna(
             limite: 800,
             periodo: p.periodo ?? null,
           });
+          todos = await enriquecerModalidades(ctx.clinicaId, todos);
+          if (todos.some(s => !permiteReserva(s.modalidade))) return modalidadePendente();
         } catch (e) {
           return falhaAgenda(e, "proxima_vaga");
         }
@@ -1407,6 +1459,8 @@ async function executarFerramentaInterna(
 
           ok: true,
           proxima: {
+            modalidade_atendimento: primeira.modalidade,
+            orientacao: orientacaoModalidade(primeira.modalidade!),
             medico_id: primeira.medico_id,
             medico: primeira.medico_nome,
             especialidade: primeira.especialidade,
@@ -1416,6 +1470,8 @@ async function executarFerramentaInterna(
             fim: primeira.fim,
           },
           seguintes: slots.slice(1, 4).map((s) => ({
+            modalidade_atendimento: s.modalidade,
+            orientacao: orientacaoModalidade(s.modalidade!),
             medico: s.medico_nome,
             medico_id: s.medico_id,
             data: s.data,
@@ -1663,6 +1719,12 @@ async function executarFerramentaInterna(
           );
 
         const origemMarca = origemAgendamentoNina(ctx);
+        const modalidade = await modalidadeAtualDaAgenda(ctx.clinicaId, medicoIdReal, ofertaCorrente!.agenda_id);
+        if (!permiteReserva(modalidade) || modalidade !== ofertaCorrente!.modalidade)
+          return falha("MODALIDADE_ALTERADA", "A modalidade difere do resumo confirmado. A equipe precisa conferir antes de reservar.");
+        const lerFicha = (id: string, inicio: string) => modalidade === "ficha"
+          ? fichaDoAgendamento(ctx.clinicaId, medicoIdReal, inicio, id).catch(() => null)
+          : Promise.resolve(null);
         const ehTeste = origemMarca === "nina_homologacao";
         // Chave de idempotência: mesma conversa + mesmo profissional + mesmo
         // horário nunca gera dois registros (índice único no banco).
@@ -1673,7 +1735,7 @@ async function executarFerramentaInterna(
         // registro existente, com os dados REAIS dele (nunca os do pedido).
         const { data: jaExiste } = await supabaseAdmin
           .from("agendamentos")
-          .select("id, clinica_id, paciente_id, medico_id, inicio, fim, status")
+          .select("id, clinica_id, paciente_id, medico_id, inicio, fim, status, agenda_id")
           .eq("clinica_id", ctx.clinicaId)
           .eq("paciente_id", ctx.pacienteId)
           .eq("medico_id", medicoIdReal)
@@ -1681,6 +1743,8 @@ async function executarFerramentaInterna(
           .not("status", "in", "(cancelado)")
           .maybeSingle();
         if (jaExiste) {
+          if ((jaExiste.agenda_id ?? null) !== ofertaCorrente!.agenda_id)
+            return falha("APPOINTMENT_UNCERTAIN", "O registro existente pertence a outra agenda. A equipe precisa conferir antes de confirmar.");
           const anterior = verificarResultadoAgendamento(
             { clinicaId: ctx.clinicaId, pacienteId: ctx.pacienteId,
               medicoId: medicoIdReal, inicio: p.inicio, fim: p.fim },
@@ -1706,6 +1770,11 @@ async function executarFerramentaInterna(
           return {
             ok: true,
             duplicado: true,
+            modalidade_atendimento: modalidade,
+            ficha_numero: await lerFicha(anterior.agendamentoId!, String(reg.inicio)),
+            date: formatarData(String(reg.inicio)),
+            time: formatarHora(String(reg.inicio)),
+            medico: rMed.nome,
             estado_acao: "EXISTING",
             appointment_id: anterior.agendamentoId,
             agendamento_id: anterior.agendamentoId,
@@ -1734,13 +1803,14 @@ async function executarFerramentaInterna(
             clinicaId: ctx.clinicaId, medicoId: medicoIdReal,
             dias: 90, data: ofertaCorrente!.data,
           });
+          vagasReais = await enriquecerModalidades(ctx.clinicaId, vagasReais);
         } catch (e) {
           return falhaAgenda(e, "agendar");
         }
         const auth = autorizarAcao({
           ...autorizacaoBase,
           disponibilidadeConsultada: true,
-          vagasConsultadas: vagasReais.map((s) => ({
+          vagasConsultadas: vagasReais.filter(s => s.modalidade === modalidade && s.agenda === ofertaCorrente!.agenda_id).map((s) => ({
             medicoId: s.medico_id,
             inicio: s.inicio,
             fim: s.fim,
@@ -1776,14 +1846,17 @@ async function executarFerramentaInterna(
         // "DISPONIVEL" que cobre o intervalo, e não inserir uma linha nova ao
         // lado dele. Sem isso o horário continuava aparecendo como livre e a
         // grade podia receber outra marcação na mesma vaga.
-        const { data: slotLivre } = await supabaseAdmin
+        let consultaSlotLivre = supabaseAdmin
           .from("agendamentos")
           .select("id")
           .eq("clinica_id", ctx.clinicaId)
           .eq("medico_id", medicoIdReal)
           .eq("paciente_nome", "DISPONIVEL")
           .eq("inicio", p.inicio)
-          .eq("fim", p.fim)
+          .eq("fim", p.fim);
+        if (ofertaCorrente!.agenda_id) consultaSlotLivre = consultaSlotLivre.eq("agenda_id", ofertaCorrente!.agenda_id);
+        else consultaSlotLivre = consultaSlotLivre.is("agenda_id", null);
+        const { data: slotLivre } = await consultaSlotLivre
           .order("inicio")
           .limit(1)
           .maybeSingle();
@@ -1882,7 +1955,7 @@ async function executarFerramentaInterna(
         // INCERTO — a Nina jamais confirma o que não está comprovado.
         const { data: conferido } = await supabaseAdmin
           .from("agendamentos")
-          .select("id, clinica_id, paciente_id, medico_id, inicio, fim, status")
+          .select("id, clinica_id, paciente_id, medico_id, inicio, fim, status, agenda_id")
           .eq("id", r.id)
           .eq("clinica_id", ctx.clinicaId)
           .maybeSingle();
@@ -1896,7 +1969,7 @@ async function executarFerramentaInterna(
           },
           (conferido ?? null) as RegistroAgendamento | null,
         );
-        if (desfecho.estado !== "CREATED") {
+        if (desfecho.estado !== "CREATED" || (conferido?.agenda_id ?? null) !== ofertaCorrente!.agenda_id) {
           logAgenda("agendar", {
             medico: rMed.nome,
             medico_id: medicoIdReal,
@@ -1946,6 +2019,8 @@ async function executarFerramentaInterna(
           // `appointment_id`.
           success: true,
           estado_acao: "CREATED",
+          modalidade_atendimento: modalidade,
+          ficha_numero: await lerFicha(r.id, p.inicio),
           appointment_id: r.id,
           // Gerado no banco só depois da gravação conferida.
           protocolo: await protocoloDoAgendamento(ctx),

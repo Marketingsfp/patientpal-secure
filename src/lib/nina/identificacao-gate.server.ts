@@ -22,6 +22,7 @@ import type { EstadoFluxoNina } from "./fluxo-estado.server";
 import type { CtxNinaPaciente, ResultadoFerramenta } from "./paciente-tools.server";
 import { isCPFValido, somenteDigitos } from "@/lib/cpf";
 import { autorizarAcao } from "./acoes/autorizacao";
+import { resultadoAgendamentoConfirmado } from "./resposta/agendamento";
 import {
   atendimentoDefinido,
   camposCadastroFaltantes,
@@ -196,13 +197,14 @@ export async function aplicarGateIdentificacao(params: {
   const a = estado.appointment;
   const p = estado.patient;
   if (a.appointment_id || estado.flow.stage === "HANDOFF") return null;
-  const encaminhar = async () => {
-    const motivo = "VAGA_ESCOLHIDA_INDISPONIVEL: a vaga escolhida pelo paciente não pôde ser reservada; não substituir médico, data ou horário.";
+  const encaminhar = async (modalidadePendente = false) => {
+    const motivo = modalidadePendente ? "MODALIDADE_ALTERADA: conferir a modalidade de atendimento antes de reservar."
+      : "VAGA_ESCOLHIDA_INDISPONIVEL: a vaga escolhida pelo paciente não pôde ser reservada; não substituir médico, data ou horário.";
     limparEscolhaAgendamento(estado);
     a.slot_options = null;
     estado.flow.stage = "HANDOFF";
     const ok = await params.encaminharVagaIndisponivel?.(motivo).catch(() => false) ?? false;
-    return criarResultado({ origem: ok ? "handoff" : "erro", texto: respostaSemVagas(ok, true),
+    return criarResultado({ origem: ok ? "handoff" : "erro", texto: respostaSemVagas(ok, true, modalidadePendente),
       fatosConfirmados: ok ? ["handoff_confirmado"] : [], restricoes: ["nao_substituir_vaga_escolhida"] });
   };
   const escolha = lerEscolhaHorario(mensagem);
@@ -229,6 +231,10 @@ export async function aplicarGateIdentificacao(params: {
       medico_id: vaga.medico_id, inicio: vaga.inicio, fim: vaga.fim,
     });
     if (!r.ok && r.erro === "SLOT_UNAVAILABLE") return encaminhar();
+    if (!r.ok && ["MODALIDADE_NAO_DEFINIDA", "MODALIDADE_ALTERADA"].includes(r.erro)) return encaminhar(true);
+    if (r.ok && typeof r.orientacao_atendimento === "string")
+      return criarResultado({ origem: "gate", texto: r.orientacao_atendimento,
+        fatosConfirmados: ["modalidade:chegada_sem_pre_agendamento"] });
     if (r.ok && typeof r.resumo_confirmacao === "string") {
       return criarResultado({ origem: "gate", texto: r.resumo_confirmacao,
         fatosConfirmados: ["vaga_escolhida_validada"], restricoes: ["aguardar_aceite_do_resumo"] });
@@ -375,36 +381,15 @@ export async function aplicarGateIdentificacao(params: {
     procedimento: a.procedure ?? a.specialty ?? "Consulta",
   });
   if (ag.ok && (ag as unknown as { appointment_id?: string }).appointment_id) {
-    const d = ag as unknown as { date?: string; time?: string; medico?: string };
     log("agendamento_criado", {
       conversa: ctx.conversaId,
       appointment_id: (ag as unknown as { appointment_id: string }).appointment_id,
     });
-    const appointmentId = (ag as unknown as { appointment_id: string }).appointment_id;
-    return resultadoGate(
-      textos,
-      "fluxo.agendamento.confirmado",
-      {
-        profissional: String(d.medico ?? a.doctor_name ?? "-"),
-        data: String(d.date ?? a.date ?? "-"),
-        horario: String(d.time ?? a.time ?? "-"),
-        unidade: params.nomeUnidade?.trim() || "nossa clínica",
-      },
-      {
-        fatosConfirmados: ["agendamento_gravado"],
-        acoesConcluidas: [
-          {
-            acao: "agendar",
-            idempotencia: `agendar|${ctx.conversaId}|${a.slot_inicio ?? ""}`,
-            confirmada: true,
-            evidencia: appointmentId,
-          },
-        ],
-      },
-    );
+    return resultadoAgendamentoConfirmado(ag, estado, params.nomeUnidade || "nossa clínica", textos, ctx.conversaId);
   }
 
   const erroAg = (ag as { erro?: string }).erro;
+  if (["MODALIDADE_NAO_DEFINIDA", "MODALIDADE_ALTERADA"].includes(erroAg ?? "")) return encaminhar(true);
   log("agendamento_falhou", { conversa: ctx.conversaId, erro: erroAg });
   // Reserva anterior encontrada pela idempotência: consultada, nunca criada
   // de novo. A prova é o ID lido do registro existente.

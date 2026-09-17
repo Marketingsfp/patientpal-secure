@@ -6,6 +6,7 @@ import { comColetor } from "../evidencias.server";
 import { resumoEntregueFixture } from "./agendamento-fixture";
 import { aplicarGateIdentificacao } from "../identificacao-gate.server";
 import type { CtxNinaPaciente } from "../paciente-tools.server";
+import { resultadoAgendamentoConfirmado } from "../resposta/agendamento";
 
 const CLINICA = "11111111-1111-4111-8111-111111111111";
 const MEDICO = "22222222-2222-4222-8222-222222222222";
@@ -15,6 +16,7 @@ const AGENDAMENTO = "55555555-5555-4555-8555-555555555555";
 const CATALOGO = "66666666-6666-4666-8666-666666666666";
 type Linha = Record<string, unknown>;
 let banco: Record<string, Linha[]>;
+let falharLeituraFicha = false;
 let resultadoCatalogo: ResultadoConhecimento;
 const pesquisas: unknown[] = [];
 const leituras: Array<{ tabela: string; filtros: Record<string, unknown> }> = [];
@@ -38,11 +40,12 @@ mock.module("@/integrations/supabase/client.server", () => ({
       const filtros: Record<string, unknown> = {};
       const predicados: Array<(r: Linha) => boolean> = [];
       let atualizacao: Linha | null = null;
+      let faixa: [number, number] | null = null;
       const ler = () => {
         leituras.push({ tabela, filtros: { ...filtros } });
         const linhas = banco[tabela]!.filter((r) => predicados.every((p) => p(r)));
         if (atualizacao) for (const linha of linhas) Object.assign(linha, atualizacao);
-        return linhas;
+        return faixa ? linhas.slice(faixa[0], faixa[1] + 1) : linhas;
       };
       const q = {
         select: (_: string) => q,
@@ -70,9 +73,15 @@ mock.module("@/integrations/supabase/client.server", () => ({
           return q;
         },
         or: () => q,
+        is: (k: string, v: unknown) => { predicados.push(r => (r[k] ?? null) === v); return q; },
+        lt: (k: string, v: unknown) => { predicados.push(r => String(r[k]) < String(v)); return q; },
         gte: (k: string, v: unknown) => { predicados.push((r) => String(r[k]) >= String(v)); return q; },
         lte: (k: string, v: unknown) => { predicados.push((r) => String(r[k]) <= String(v)); return q; },
         order: () => q,
+        range: (a: number, b: number) => {
+          if (falharLeituraFicha && tabela === "agendamentos") throw new Error("Falha simulada ao ler ficha");
+          faixa = [a, b]; return q;
+        },
         limit: () => q,
         maybeSingle: async () => ({ data: ler()[0] ?? null, error: null }),
         then: (resolve: (r: { data: Linha[]; error: null }) => unknown) =>
@@ -98,8 +107,8 @@ mock.module("@/lib/agenda/criar-agendamento.core.server", () => ({
     entrada: { payload: Linha; editing_id?: string | null },
   ) => {
     gravacoes.push(entrada.payload);
-    const linha = { ...entrada.payload, id: AGENDAMENTO };
     const index = banco.agendamentos!.findIndex((r) => r.id === entrada.editing_id);
+    const linha = { ...banco.agendamentos![index], ...entrada.payload, id: AGENDAMENTO };
     if (index >= 0) banco.agendamentos![index] = linha;
     else banco.agendamentos!.push(linha);
     return { ok: true, id: AGENDAMENTO };
@@ -161,6 +170,7 @@ function contextoAgendar(confirmado = false) {
 }
 
 beforeEach(() => {
+  falharLeituraFicha = false;
   leituras.length = 0;
   auditoria.length = 0;
   gravacoes.length = 0;
@@ -198,6 +208,7 @@ beforeEach(() => {
         nome: "Alex Louza",
         medico_id: null,
         status: "PUBLICADO",
+        tipo_atendimento: "Hora marcada",
       },
     ],
     medicos: [
@@ -225,6 +236,7 @@ beforeEach(() => {
       },
     ],
     especialidades: [],
+    medico_agendas: [],
     nina_mensagens_templates: [],
   };
 });
@@ -634,6 +646,104 @@ describe("executor real das ferramentas com banco simulado", () => {
   });
 });
 
+describe("modalidades na consulta operacional", () => {
+  test("todas as alternativas apresentadas podem ser escolhidas, inclusive a quarta", async () => {
+    const base = banco.agendamentos![0]!;
+    for (let i = 1; i <= 4; i++) banco.agendamentos!.push({ ...base, id: `vaga-${i}`,
+      inicio: new Date(inicio.getTime() + i * 3_600_000).toISOString(),
+      fim: new Date(fim.getTime() + i * 3_600_000).toISOString() });
+    const ctx = contexto("Tem vaga com Dr. Alex Louza?");
+    ctx.estado.appointment.doctor_id = MEDICO;
+    ctx.estado.appointment.procedure = "Consulta Cardiologia";
+    const r = await executarFerramentaPaciente(ctx, "verificar_horario", argumentos);
+    expect(r.ok).toBe(true);
+    expect(r.alternativas).toHaveLength(4);
+    const ultima = ctx.estado.appointment.slot_options!.vagas.at(-1)!;
+    expect(ultima.hora).toBe("18:00");
+    ctx.consultaAgenda.mensagemAtual = "prefiro 18:00";
+    const escolha = await executarFerramentaPaciente(ctx, "selecionar_horario", {
+      medico_id: MEDICO, inicio: ultima.inicio, fim: ultima.fim,
+    });
+    expect(escolha.ok).toBe(true);
+    expect(escolha.resumo_confirmacao).toContain("18:00");
+  });
+  for (const origem of ["whatsapp", "homologacao"] as const)
+    for (const ferramenta of ["consultar_disponibilidade", "verificar_horario", "proxima_vaga"])
+      test(`${origem}: ${ferramenta} sem pré-agendamento não consulta vagas nem solicita cadastro`, async () => {
+        banco.nina_cat_profissionais![0]!.tipo_atendimento = "Ordem de chegada sem pré-agendamento";
+        const ctx = { ...contexto("Tem vaga com Dr. Alex Louza?"), origem, teste: origem === "homologacao" };
+        const r = await executarFerramentaPaciente(ctx, ferramenta, argumentos);
+        expect(r.ok).toBe(true);
+        expect(r.sem_agendamento).toBe(true);
+        expect(r.orientacao_atendimento).toContain("Não é necessário marcar horário");
+        expect(r.orientacao_atendimento).not.toMatch(/15|antecedência/);
+        expect(consultasAgenda()).toHaveLength(0);
+        expect(gravacoes).toHaveLength(0);
+        expect(ctx.estado.appointment.slot_options).toBeNull();
+        expect((await executarFerramentaPaciente(ctx, "consultar_cadastro_paciente", {})).erro).toBe("ACTION_NOT_AUTHORIZED");
+      });
+  test("ordem de chegada ambígua não produz opções de horário", async () => {
+    banco.nina_cat_profissionais![0]!.tipo_atendimento = "Ordem de chegada";
+    const r = await executarFerramentaPaciente(contexto("Tem vaga com Dr. Alex Louza?"), "consultar_disponibilidade", argumentos);
+    expect(r.erro).toBe("MODALIDADE_NAO_DEFINIDA");
+    expect(consultasAgenda()).toHaveLength(0);
+  });
+  test("fallback usa a agenda da vaga, sem generalizar o booleano de outra agenda", async () => {
+    banco.nina_cat_profissionais![0]!.tipo_atendimento = null;
+    banco.agendamentos![0]!.agenda_id = "agenda-correta";
+    banco.medico_agendas = [
+      { id: "outra", clinica_id: CLINICA, medico_id: MEDICO, ordem_chegada: true },
+      { id: "agenda-correta", clinica_id: CLINICA, medico_id: MEDICO, ordem_chegada: false },
+    ];
+    const ctx = contexto("Tem vaga com Dr. Alex Louza?");
+    const r = await executarFerramentaPaciente(ctx, "consultar_disponibilidade", argumentos);
+    expect(r.ok).toBe(true);
+    expect(ctx.estado.appointment.slot_options?.vagas[0]?.modalidade).toBe("hora_marcada");
+    banco.medico_agendas![1]!.ordem_chegada = true;
+    expect((await executarFerramentaPaciente(ctx, "consultar_disponibilidade", argumentos)).erro).toBe("MODALIDADE_NAO_DEFINIDA");
+  });
+  test("ficha inclui cancelados e vagas, separa agendas e ignora outras clínicas", async () => {
+    banco.nina_cat_profissionais![0]!.tipo_atendimento = "Por ficha";
+    const ctx = contextoAgendar(true);
+    ctx.estado.appointment.modalidade_atendimento = "ficha";
+    resumoEntregueFixture(ctx.estado, CLINICA, true);
+    const base = banco.agendamentos![0]!;
+    banco.agendamentos!.push(
+      { ...base, id: "cancelado", inicio: new Date(inicio.getTime() - 3_600_000).toISOString(), status: "cancelado", paciente_nome: "Cancelado" },
+      { ...base, id: "outra-agenda", agenda_id: "outra", inicio: new Date(inicio.getTime() - 7_200_000).toISOString() },
+      { ...base, id: "outra-clinica", clinica_id: OUTRO, inicio: new Date(inicio.getTime() - 10_800_000).toISOString() },
+    );
+    const r = await executarFerramentaPaciente(ctx, "agendar", argumentosAgendar);
+    expect(r.ok).toBe(true);
+    expect(r.ficha_numero).toBe("002");
+    expect(resultadoAgendamentoConfirmado(r, ctx.estado, "Clínica")?.texto).toContain("*Sua ficha:* 002");
+  });
+  test("leitura de ficha percorre todas as páginas do dia", async () => {
+    banco.nina_cat_profissionais![0]!.tipo_atendimento = "Por ficha";
+    const ctx = contextoAgendar(true);
+    ctx.estado.appointment.modalidade_atendimento = "ficha";
+    resumoEntregueFixture(ctx.estado, CLINICA, true);
+    const base = banco.agendamentos![0]!;
+    for (let i = 1; i <= 1002; i++) banco.agendamentos!.push({ ...base, id: `cancelado-${i}`,
+      inicio: new Date(inicio.getTime() - i * 6000).toISOString(), status: "cancelado", paciente_nome: "Cancelado" });
+    const r = await executarFerramentaPaciente(ctx, "agendar", argumentosAgendar);
+    expect(r.ok).toBe(true);
+    expect(r.ficha_numero).toBe("1003");
+  });
+  test("falha ao ler ficha preserva sucesso comprovado e não inventa número", async () => {
+    banco.nina_cat_profissionais![0]!.tipo_atendimento = "Por ficha";
+    const ctx = contextoAgendar(true);
+    ctx.estado.appointment.modalidade_atendimento = "ficha";
+    resumoEntregueFixture(ctx.estado, CLINICA, true);
+    falharLeituraFicha = true;
+    const r = await executarFerramentaPaciente(ctx, "agendar", argumentosAgendar);
+    expect(r.ok).toBe(true);
+    expect(r.ficha_numero).toBeNull();
+    expect(gravacoes).toHaveLength(1);
+    expect(resultadoAgendamentoConfirmado(r, ctx.estado, "Clínica")?.texto).toContain("Não consegui consultar seu número");
+  });
+});
+
 describe("regressão 08:00 versus 10:20 — consulta, escolha, resumo, aceite e gravação", () => {
   async function preparar(teste = true) {
     const data = inicio.toISOString().slice(0, 10);
@@ -672,6 +782,38 @@ describe("regressão 08:00 versus 10:20 — consulta, escolha, resumo, aceite e 
     return { ctx, estado, turno, encaminhamentos, falharHandoff: () => { handoffOk = false; } };
   }
   for (const teste of [false, true]) {
+    for (const [rotulo, modo, antecedencia] of [
+      ["Hora marcada", "hora_marcada", true],
+      ["Ordem de chegada com pré-agendamento", "chegada_com_pre_agendamento", false],
+      ["Por numeração (ficha)", "ficha", true],
+    ] as const) test(`${teste ? "homologação" : "real"}: reserva e confirmação respeitam ${rotulo}`, async () => {
+      banco.nina_cat_profissionais![0]!.tipo_atendimento = rotulo;
+      const t = await preparar(teste);
+      const resumo = await t.turno("eu prefiro 10:20");
+      expect(resumo?.texto).toContain("10:20");
+      expect(t.estado.appointment.modalidade_atendimento).toBe(modo);
+      if (modo === "chegada_com_pre_agendamento") {
+        expect(resumo?.texto).toContain("quem chegar primeiro");
+        expect(resumo?.texto).not.toContain("15 minutos");
+      }
+      const r = await t.turno("Sim");
+      expect(r?.texto).toContain("10:20");
+      expect(r?.texto.includes("15 minutos")).toBe(antecedencia);
+      if (modo === "ficha") expect(r?.texto).toContain("*Sua ficha:* 002");
+      expect(gravacoes).toHaveLength(1);
+      expect(new Date(String(gravacoes[0]!.inicio)).getUTCHours()).toBe(13);
+      expect(t.encaminhamentos).toHaveLength(0);
+    });
+    test(`${teste ? "homologação" : "real"}: modalidade alterada após resumo transfere sem reservar`, async () => {
+      const t = await preparar(teste);
+      await t.turno("vou 10:20");
+      banco.nina_cat_profissionais![0]!.tipo_atendimento = "Ordem de chegada sem pré-agendamento";
+      const r = await t.turno("Sim");
+      expect(r?.origem).toBe("handoff");
+      expect(r?.texto).toContain("forma de atendimento");
+      expect(gravacoes).toHaveLength(0);
+      expect(t.encaminhamentos[0]).toContain("MODALIDADE_ALTERADA");
+    });
     for (const frase of ["10:20 fica melhor", "eu prefiro 10:20", "marca pra 10:20", "eu vou 10:20", "pode deixar às 10h20"]) {
       test(`${teste ? "homologação" : "real"}: ${frase} → resumo 10:20 → Sim → grava 10:20`, async () => {
         const t = await preparar(teste);
@@ -698,7 +840,7 @@ describe("regressão 08:00 versus 10:20 — consulta, escolha, resumo, aceite e 
         banco.agendamentos!.find(v => v.id === "vaga-1")!.paciente_nome = "Outra pessoa";
         const r = await t.turno(momento === "apos_resumo" ? "Sim" : "vou 10:20");
         expect(r?.origem).toBe("handoff");
-        expect(r?.texto).toContain("Nenhum outro horário foi agendado");
+        expect(r?.texto).toContain("Não fiz nenhuma reserva alternativa");
         expect(t.encaminhamentos).toHaveLength(1);
         expect(gravacoes).toHaveLength(0);
         expect(t.estado.appointment.confirmation).toBeNull();

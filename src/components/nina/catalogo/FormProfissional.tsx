@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/accordion";
 import { Plus, Trash2 } from "lucide-react";
 import { DIAS_SEMANA, RECORRENCIAS, profissionalSchema } from "@/lib/nina/catalogo";
+import { MODALIDADES_ATENDIMENTO } from "@/lib/nina/modalidade-atendimento";
 import { FormasPagamentoEditor, type LinhaPagamento } from "./FormasPagamentoEditor";
 import type { OpcoesCatalogo } from "./FormServico";
 
@@ -218,13 +219,18 @@ export function FormProfissional({
           </Select>
         </div>
         <div className="space-y-1">
-          <Label>Tipo de atendimento</Label>
+          <Label>Modalidade de atendimento</Label>
           <Input
+            list="modalidades-atendimento-profissional"
             value={estado.tipo_atendimento}
             disabled={somenteLeitura}
-            placeholder="Ex.: consulta, retorno, encaixe"
+            placeholder="Selecione a modalidade de agendamento"
             onChange={(e) => set({ tipo_atendimento: e.target.value })}
           />
+          <datalist id="modalidades-atendimento-profissional">
+            {Object.values(MODALIDADES_ATENDIMENTO).map(m => <option key={m} value={m} />)}
+          </datalist>
+          <p className="text-xs text-muted-foreground">Define como a Nina orienta e confirma o atendimento. Publique o cadastro para aplicar a modalidade.</p>
         </div>
       </div>
 

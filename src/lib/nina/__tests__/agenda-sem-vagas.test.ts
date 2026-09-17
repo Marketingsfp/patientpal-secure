@@ -74,7 +74,7 @@ describe("encaminhamento após consulta de agenda sem vagas", () => {
         ok: false, erro: "SLOT_UNAVAILABLE", alternativas: [{ hora: "08:00" }],
       }), {});
       expect(pedido?.motivo).toContain("VAGA_ESCOLHIDA_INDISPONIVEL");
-      expect(respostaSemVagas(true, true)).toContain("Nenhum outro horário foi agendado");
+      expect(respostaSemVagas(true, true)).toContain("Não fiz nenhuma reserva alternativa");
       expect(respostaSemVagas(false, true)).not.toContain("Encaminhei");
     });
   }

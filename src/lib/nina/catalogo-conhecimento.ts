@@ -13,6 +13,7 @@
  *  - Horário cadastrado é escala habitual, não vaga: disponibilidade real
  *    continua vindo da Agenda.
  */
+import { interpretarModalidade, orientacaoModalidade } from "./modalidade-atendimento";
 import {
   detectarConflitos,
   resumoDePrecos,
@@ -223,6 +224,9 @@ export function profissionalParaRegistro(
     aba_origem: "Catálogo — consultas e profissionais",
     extras: {
       catalogo_tipo: "profissional",
+      modalidade_atendimento: interpretarModalidade(p.tipo_atendimento),
+      orientacao_atendimento: interpretarModalidade(p.tipo_atendimento)
+        ? orientacaoModalidade(interpretarModalidade(p.tipo_atendimento)!) : null,
       especialidades,
       unidade: unidadeDoProfissional(p),
       convenios,

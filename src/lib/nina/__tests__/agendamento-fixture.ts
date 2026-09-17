@@ -4,6 +4,8 @@ import type { EstadoFluxoNina } from "../fluxo-estado-normalizar";
 export function resumoEntregueFixture(estado: EstadoFluxoNina, clinicaId: string, aceita = false) {
   estado.session_id ??= "sessao-teste";
   const a = estado.appointment;
+  a.modalidade_atendimento ??= "hora_marcada";
+  a.agenda_id ??= null;
   a.date ??= a.slot_inicio!.slice(0, 10);
   a.time ??= new Intl.DateTimeFormat("pt-BR", {
     timeZone: "America/Sao_Paulo",
@@ -17,6 +19,8 @@ export function resumoEntregueFixture(estado: EstadoFluxoNina, clinicaId: string
     resumo,
     aceita,
     vaga: {
+      modalidade: a.modalidade_atendimento,
+      agenda_id: a.agenda_id,
       medico_id: a.doctor_id!,
       medico: a.doctor_name!,
       procedimento: a.procedure,

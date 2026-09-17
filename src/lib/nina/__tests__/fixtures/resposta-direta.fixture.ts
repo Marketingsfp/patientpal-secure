@@ -1,11 +1,16 @@
 /** Núcleo real; apenas banco, modelo e catálogo externos são simulados. */
 import { mock } from "bun:test";
+import { textoDaChave } from "../../resposta/templates";
 
 process.env.LOVABLE_API_KEY = "chave-ficticia-sem-rede";
 const teste = process.argv[2] === "homologacao";
 const cenario = process.argv[3] ?? "direta";
 const escolhaHorario = cenario.startsWith("escolha_");
-const resumoEscolhido = "Confira: Consulta Cardiologia com Dr. Jorge Ribeiro, dia 21/01/2030, às 10:20. Você confirma?";
+const modoConfirmacao = cenario.startsWith("confirmado_") ? cenario.slice("confirmado_".length) : null;
+const resumoEscolhido = ["escolha_pre", "escolha_ficha"].includes(cenario)
+  ? textoDaChave(cenario === "escolha_pre" ? "fluxo.agendamento.revisar_pre_agendamento" : "fluxo.agendamento.revisar_ficha",
+    { profissional: "Dr. Jorge Ribeiro", procedimento: "Consulta", data: "21/01/2030", horario: "10:20", unidade: "Clínica simulada" }).texto
+  : "Confira: Consulta Cardiologia com Dr. Jorge Ribeiro, dia 21/01/2030, às 10:20. Você confirma?";
 const agenda = cenario !== "direta";
 const pergunta = agenda ? "Tem vagas com Dr. Jorge Ribeiro?" : "quais são as informações do eletrocardiograma?";
 const respostaModelo = "Eletrocardiograma: R$ 80,00 no dinheiro e R$ 95,00 no cartão. Profissional: Enfermagem. Segunda a sexta, das 8h às 12h. Sem jejum. Leve o pedido médico.";
@@ -88,6 +93,22 @@ mock.module("@/lib/nina/tool-broker.server", () => ({ criarToolBroker: () => ({
         dados: { ok: cenario !== "falha_handoff" },
         ...(cenario === "falha_handoff" ? { erro: "INTERNAL_ERROR" } : {}) };
     }
+    if (nome === "agendar" && modoConfirmacao) return {
+      ferramenta: nome, capacidade: "createAppointment", fonte: "agenda", success: true,
+      reused: false, appointment_confirmed: true, dados: {
+        ok: true, verificado_no_banco: true, appointment_id: "ag-simulada", modalidade_atendimento: modoConfirmacao,
+        date: "21/01/2030", time: "10:20", medico: "Dr. Jorge Ribeiro", ficha_numero: "007",
+      },
+    };
+    if (nome === "consultar_disponibilidade" && cenario === "sem_pre") return {
+      ferramenta: nome, capacidade: "checkAvailability", fonte: "agenda", success: true,
+      reused: false, appointment_confirmed: false, dados: { ok: true, sem_agendamento: true, modalidade_atendimento: "chegada_sem_pre_agendamento",
+        orientacao_atendimento: "Atendimento por ordem de chegada, sem pré-agendamento. Basta ir à clínica nos períodos publicados." },
+    };
+    if (nome === "consultar_disponibilidade" && cenario === "modalidade_indefinida") return {
+      ferramenta: nome, capacidade: "checkAvailability", fonte: "agenda", success: false,
+      reused: false, appointment_confirmed: false, erro: "MODALIDADE_NAO_DEFINIDA", dados: { ok: false },
+    };
     if (nome === "consultar_disponibilidade" && agenda) {
       return { ferramenta: nome, capacidade: "checkAvailability", fonte: "agenda",
         success: cenario !== "falha_consulta", reused: false, appointment_confirmed: false,
@@ -108,6 +129,11 @@ mock.module("@/lib/nina/tool-broker.server", () => ({ criarToolBroker: () => ({
 }) }));
 mock.module("@/lib/nina/ai-gateway.server", () => ({ ninaAIGateway: async (req: any) => {
   requests.push(structuredClone(req));
+  if (modoConfirmacao) return {
+    ok: true, conteudo: "Atendimento às 08:00. Chegue 15 minutos antes.", modelo: "modelo-simulado", execucaoId: "execucao-direta", nivel: "low",
+    toolCalls: [{ id: "gravar", type: "function", function: { name: "agendar", arguments: "{}" } },
+      { id: "nao-repetir", type: "function", function: { name: "agendar", arguments: "{}" } }],
+  };
   if (escolhaHorario) return {
     ok: true, conteudo: "Vou agendar às 08:00.", modelo: "modelo-simulado", execucaoId: "execucao-direta", nivel: "low",
     toolCalls: [
@@ -121,7 +147,7 @@ mock.module("@/lib/nina/ai-gateway.server", () => ({ ninaAIGateway: async (req: 
       { id: "consulta-agenda", type: "function", function: { name: "consultar_disponibilidade",
         arguments: '{"medico_id":"jorge","data":"2030-01-21"}' } },
       // Uma operação posterior no mesmo lote NÃO pode rodar após a transferência.
-      ...(cenario === "sem_vagas" || cenario === "falha_handoff" ? [{ id: "nao-executar", type: "function",
+      ...(["sem_vagas", "falha_handoff", "sem_pre", "modalidade_indefinida"].includes(cenario) ? [{ id: "nao-executar", type: "function",
         function: { name: "agendar", arguments: "{}" } }] : []),
     ],
   };

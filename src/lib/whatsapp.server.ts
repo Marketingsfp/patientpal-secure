@@ -1357,6 +1357,8 @@ async function gerarRespostaNinaInterno(
     campos_faltantes: camposFaltantes,
     etapa: fluxoEstado.flow.stage,
     agendamento: {
+      modalidade_atendimento: fluxoEstado.appointment.modalidade_atendimento ?? null,
+      agenda_id: fluxoEstado.appointment.agenda_id ?? null,
       intencao_confirmada: Boolean(fluxoEstado.appointment.intent_confirmed),
       procedimento: fluxoEstado.appointment.procedure ?? null,
       especialidade: fluxoEstado.appointment.specialty ?? null,
@@ -1527,8 +1529,8 @@ async function gerarRespostaNinaInterno(
         }
         const { executarHandoffTool } = await import("@/lib/nina/handoff-tool.server");
         const r = await executarHandoffTool({ clinicaId, conversaId: estadoId.conversaId ?? null },
-          JSON.stringify({ motivo, resumo: "A vaga escolhida ficou indisponível. Continuar o atendimento sem substituir automaticamente médico, data ou horário.", setor: "Agendamento" }));
-        registrarEtapa({ tipo: "ferramenta", fonte: "atendimento", titulo: "Encaminhamento da vaga escolhida indisponível",
+          JSON.stringify({ motivo, resumo: motivo, setor: "Agendamento" }));
+        registrarEtapa({ tipo: "ferramenta", fonte: "atendimento", titulo: "Encaminhamento para conferir o agendamento",
           dados: { motivo, handoff_confirmado: r.ok, resultado: r },
           codigo: { arquivo: "src/lib/nina/identificacao-gate.server.ts", funcao: "aplicarGateIdentificacao" } });
         return r.ok;
@@ -2011,6 +2013,21 @@ async function gerarRespostaNinaInterno(
         tool_call_id: c.id,
         content: JSON.stringify(resultadoCompartilhado),
       });
+      const dadosAgendamento = r.dados as Record<string, unknown> | null;
+      if (r.success && dadosAgendamento?.sem_agendamento === true &&
+        dadosAgendamento.modalidade_atendimento === "chegada_sem_pre_agendamento" &&
+        typeof dadosAgendamento.orientacao_atendimento === "string") {
+        const { criarResultado } = await import("@/lib/nina/resposta/contrato");
+        resumoEscolha = criarResultado({ origem: "gate", texto: dadosAgendamento.orientacao_atendimento,
+          fatosConfirmados: ["modalidade:chegada_sem_pre_agendamento"], restricoes: ["sem_reserva_individual"] });
+        break;
+      }
+      if (nome === "agendar" && r.success && dadosAgendamento?.verificado_no_banco === true && dadosAgendamento.appointment_id) {
+        const { resultadoAgendamentoConfirmado } = await import("@/lib/nina/resposta/agendamento");
+        resumoEscolha = resultadoAgendamentoConfirmado(dadosAgendamento, fluxoEstado,
+          ctxFerramentas?.nomeUnidade || "nossa clínica", null, estadoId.conversaId);
+        if (resumoEscolha) break;
+      }
       if (nome === "selecionar_horario" && r.success &&
         typeof (r.dados as { resumo_confirmacao?: unknown })?.resumo_confirmacao === "string") {
         const { criarResultado } = await import("@/lib/nina/resposta/contrato");
@@ -2047,11 +2064,12 @@ async function gerarRespostaNinaInterno(
         fluxoEstado.appointment.slot_options = null;
         fluxoEstado.flow.stage = "HANDOFF";
         finalizacaoSemVagas = {
-          texto: respostaSemVagas(confirmado, encaminhamento.motivo.startsWith("VAGA_ESCOLHIDA_INDISPONIVEL")),
+          texto: respostaSemVagas(confirmado, encaminhamento.motivo.startsWith("VAGA_ESCOLHIDA_INDISPONIVEL"), encaminhamento.motivo.startsWith("MODALIDADE_")),
           textoModelo: msg.content ?? "", handoffConfirmado: confirmado, motivo: encaminhamento.motivo,
         };
         registrarEtapa({
-          tipo: "ferramenta", fonte: "atendimento", titulo: "Encaminhamento por ausência de vagas",
+          tipo: "ferramenta", fonte: "atendimento", titulo: encaminhamento.motivo.startsWith("MODALIDADE_")
+            ? "Encaminhamento para conferir a modalidade" : "Encaminhamento por ausência de vagas",
           dados: { origem_solicitacao: "servidor", motivo: encaminhamento.motivo,
             ferramenta_origem: nome, consulta: r.dados, argumentos: encaminhamento,
             handoff_confirmado: confirmado, erro: rh.erro ?? null, resultado: rh.dados },
@@ -2188,9 +2206,12 @@ async function gerarRespostaNinaInterno(
   }
 
   if (resumoEscolha) {
-    transformar("agenda.resumo_escolha", "resumo da vaga escolhida e revalidada na agenda", resposta, resumoEscolha.texto);
+    transformar("agenda.resposta_modalidade", "orientação, resumo ou confirmação com a modalidade oficial do atendimento", resposta, resumoEscolha.texto);
     resposta = resumoEscolha.texto;
-    marcarOrigem("gate", "resumo final vinculado à vaga escolhida, aguardando aceite do paciente");
+    marcarOrigem("gate", resumoEscolha.restricoes.includes("aguardar_aceite_do_resumo")
+      ? "resumo final vinculado à vaga escolhida, aguardando aceite do paciente"
+      : resumoEscolha.acoesConcluidas.length ? "confirmação da reserva comprovada com a modalidade oficial"
+      : "orientação da modalidade sem reserva individual");
     if (opcoes?.auditoria) opcoes.auditoria.resultado = resumoEscolha;
   }
 

@@ -1,5 +1,6 @@
 /** Opções consultadas, escolha validada e aceite são evidências distintas. */
 import type { EstadoFluxoNina } from "./fluxo-estado-normalizar";
+import { permiteReserva, type ModalidadeAtendimento } from "./modalidade-atendimento";
 
 export type VagaAgendamento = {
   medico_id: string;
@@ -10,6 +11,8 @@ export type VagaAgendamento = {
   hora: string;
   inicio: string;
   fim: string;
+  modalidade: ModalidadeAtendimento;
+  agenda_id: string | null;
 };
 export type OpcoesAgendamento = {
   clinica_id: string;
@@ -34,6 +37,8 @@ export function limparEscolhaAgendamento(estado: EstadoFluxoNina) {
     slot_confirmed_by_patient: false,
     intent_confirmed: false,
     confirmation: null,
+    modalidade_atendimento: null,
+    agenda_id: null,
   });
 }
 
@@ -132,6 +137,8 @@ export function selecionarVagaValidada(
     time: vaga.hora,
     slot_inicio: vaga.inicio,
     slot_fim: vaga.fim,
+    modalidade_atendimento: vaga.modalidade,
+    agenda_id: vaga.agenda_id,
     confirmation: {
       clinica_id: clinicaId,
       session_id: estado.session_id ?? "",
@@ -163,6 +170,7 @@ export function confirmacaoDaEscolha(
   )
     return null;
   const v = c.vaga;
+  if (!permiteReserva(v.modalidade) || a.modalidade_atendimento !== v.modalidade || a.agenda_id !== v.agenda_id) return null;
   return a.doctor_id === v.medico_id &&
     a.procedure === v.procedimento &&
     a.date === v.data &&

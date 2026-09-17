@@ -4,6 +4,11 @@ const MOTIVOS_SEM_VAGAS = new Set(["NO_AVAILABILITY", "AGENDA_CHEIA", "NAO_ATEND
 
 /** Só uma consulta concluída da agenda pode comprovar ausência de vagas. */
 export function encaminhamentoSemVagas(resultado: ResultadoBroker, argumentos: unknown) {
+  if (["MODALIDADE_NAO_DEFINIDA", "MODALIDADE_ALTERADA"].includes(resultado.erro ?? "")) {
+    return { motivo: `${resultado.erro}: conferir a modalidade antes de agendar`,
+      resumo: "A modalidade de atendimento está indefinida ou mudou depois do resumo. Nenhuma reserva foi feita. A equipe deve conferir o catálogo e a agenda.",
+      urgencia: "normal" as const, setor: "Agendamento" };
+  }
   if (["selecionar_horario", "agendar"].includes(resultado.ferramenta) && resultado.erro === "SLOT_UNAVAILABLE") {
     return { motivo: "VAGA_ESCOLHIDA_INDISPONIVEL: não substituir o horário escolhido pelo paciente",
       resumo: "A vaga escolhida não está mais disponível. Nenhuma alternativa foi reservada. A equipe deve continuar o atendimento.",
@@ -44,10 +49,13 @@ export function encaminhamentoSemVagas(resultado: ResultadoBroker, argumentos: u
   };
 }
 
-export function respostaSemVagas(handoffConfirmado: boolean, vagaEscolhida = false): string {
+export function respostaSemVagas(handoffConfirmado: boolean, vagaEscolhida = false, modalidadePendente = false): string {
+  if (modalidadePendente) return handoffConfirmado
+    ? "Preciso que nossa equipe confira a forma de atendimento desse profissional antes de continuar. Encaminhei sua conversa para a equipe. Não fiz nenhuma reserva."
+    : "Preciso que nossa equipe confira a forma de atendimento desse profissional. Não consegui transferir sua conversa neste momento; por favor, entre em contato com a recepção. Não fiz nenhuma reserva.";
   if (vagaEscolhida) return handoffConfirmado
-    ? "O horário que você escolheu não está mais disponível. Encaminhei sua conversa para nossa equipe, que continuará o atendimento por aqui. Nenhum outro horário foi agendado."
-    : "O horário que você escolheu não está mais disponível. Não consegui transferir sua conversa neste momento. Nenhum outro horário foi agendado; por favor, entre em contato com a recepção.";
+    ? "O horário que você escolheu não está mais disponível. Encaminhei sua conversa para nossa equipe, que continuará o atendimento por aqui. Não fiz nenhuma reserva alternativa."
+    : "O horário que você escolheu não está mais disponível. Não consegui transferir sua conversa neste momento. Não fiz nenhuma reserva alternativa; por favor, entre em contato com a recepção.";
   return handoffConfirmado
     ? "Não encontrei vagas disponíveis para o atendimento solicitado. Encaminhei sua conversa para nossa equipe, que vai continuar o atendimento por aqui."
     : "Não encontrei vagas disponíveis para o atendimento solicitado e não consegui transferir sua conversa neste momento. Por favor, entre em contato com a recepção para continuar o atendimento.";

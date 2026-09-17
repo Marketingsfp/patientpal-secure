@@ -4,6 +4,7 @@ import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { normalizar } from "@/lib/nina-especialidade";
 import { registrarEtapa } from "./evidencias.server";
 import type { RegistroConhecimento } from "./knowledge-contract";
+import { modalidadeDoCatalogo } from "./modalidade-atendimento";
 
 type MedicoAgenda = { id: string; nome: string };
 type CadastroMedico = MedicoAgenda & { ativo: boolean };
@@ -98,6 +99,22 @@ function origemVinculo(profissional: ProfissionalCatalogo, resolucao: ResolucaoM
   return profissional.medico_id === resolucao.id
     ? "vinculo_cadastrado"
     : "vinculo_inativo_reconciliado";
+}
+
+/** A mesma resolução de identidade do catálogo é usada para ler a modalidade. */
+export async function modalidadePublicadaDoMedico(clinicaId: string, medicoId: string) {
+  const [ativos, publicados] = await Promise.all([
+    medicosDaClinica(clinicaId),
+    supabaseAdmin.from("nina_cat_profissionais").select("id, nome, medico_id, tipo_atendimento")
+      .eq("clinica_id", clinicaId).eq("status", "PUBLICADO"),
+  ]);
+  if (publicados.error) throw new Error(publicados.error.message);
+  const catalogo = publicados.data ?? [];
+  const cadastros = await incluirCadastrosVinculados(clinicaId, ativos, catalogo);
+  return modalidadeDoCatalogo(catalogo.filter(p => {
+    const r = resolverPublicado(p, cadastros);
+    return r.ok && r.id === medicoId;
+  }).map(p => p.tipo_atendimento));
 }
 
 /** Aceita o UUID operacional, nome ou um UUID de profissional publicado.

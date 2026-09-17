@@ -75,6 +75,8 @@ export function encerrarEstadosTransacionais(estado: EstadoFluxoNina): EstadoFlu
       price: null,
       slot_options: null,
       confirmation: null,
+      modalidade_atendimento: null,
+      agenda_id: null,
     },
     flow: { stage: "IDLE" },
   };
