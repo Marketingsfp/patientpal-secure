@@ -1,10 +1,14 @@
 /** Núcleo real; apenas banco, modelo e catálogo externos são simulados. */
 import { mock } from "bun:test";
 import { textoDaChave } from "../../resposta/templates";
+import { CONTINUIDADE_CONSULTA_AGENDA } from "../../prompt/consulta-agenda";
+import { estadoVazio } from "../../fluxo-estado-normalizar";
+import { cenariosContextuais } from "./consulta-contextual-cenarios";
 
 process.env.LOVABLE_API_KEY = "chave-ficticia-sem-rede";
 const teste = process.argv[2] === "homologacao";
 const cenario = process.argv[3] ?? "direta";
+const contextual = cenariosContextuais[cenario];
 const regraCatalogo = cenario.startsWith("catalogo_");
 const sfp = cenario.startsWith("catalogo_sfp");
 const ausente = cenario.startsWith("catalogo_ausente");
@@ -18,7 +22,7 @@ const resumoEscolhido = ["escolha_pre", "escolha_ficha"].includes(cenario)
     { profissional: "Dr. Jorge Ribeiro", procedimento: "Consulta", data: "21/01/2030", horario: "10:20", unidade: "Clínica simulada" }).texto
   : "Confira: Consulta Cardiologia com Dr. Jorge Ribeiro, dia 21/01/2030, às 10:20. Você confirma?";
 const agenda = cenario !== "direta" && !regraCatalogo;
-const pergunta = cenario === "catalogo_sfp_modelo" || (ausente && cenario.includes("modelo")) ? "oi"
+const pergunta = contextual ? contextual.pergunta : cenario === "catalogo_sfp_modelo" || (ausente && cenario.includes("modelo")) ? "oi"
   : ausente ? cenario.endsWith("dado_pessoal") ? "Meu nome é João Silva"
     : cenario.endsWith("misto") ? "Qual o valor do eletrocardiograma e da consulta de pneumologia?"
     : cenario.endsWith("generico") ? "Quero marcar uma consulta"
@@ -27,7 +31,27 @@ const pergunta = cenario === "catalogo_sfp_modelo" || (ausente && cenario.includ
     : "Gostaria de marca a pneumologista"
   : agenda ? "Tem vagas com Dr. Jorge Ribeiro?" : "quais são as informações do eletrocardiograma?";
 const respostaModelo = "Eletrocardiograma: R$ 80,00 no dinheiro e R$ 95,00 no cartão. Profissional: " + (regraCatalogo ? "Técnica" : "Enfermagem") + ". Segunda a sexta, das 8h às 12h. Sem jejum. Leve o pedido médico.";
-const prompt = "Você é Nina. Consulte a base e informe preço, profissional, horário e preparo solicitados. Não acrescente saudação à resposta sobre exames.";
+const prompt = "Você é Nina. Consulte a base e informe preço, profissional, horário e preparo solicitados. Não acrescente saudação à resposta sobre exames."
+  + (contextual ? `\n\n${CONTINUIDADE_CONSULTA_AGENDA}` : "");
+const agora = Date.now();
+const estadoContextual = { ...estadoVazio(), session_id: "sessao-contextual",
+  session_started_at: new Date(agora - 30 * 60_000).toISOString(), updated_at: new Date(agora).toISOString() };
+const registroMensagem = (body: string, indice: number, direction = "out", status = "sent") => ({
+  id: `historico-${indice}`, conversa_id: "conversa-contextual", direction, body, status,
+  created_at: new Date(agora - (20 - indice) * 60_000).toISOString(), is_teste: teste,
+});
+const mensagensContextuais = contextual ? [
+  registroMensagem("Gostaria de marcar oftalmologista", 0, "in", "received"),
+  registroMensagem("Temos João Hélio (joao-helio) e Marina (marina) para Oftalmologia.", 1),
+  registroMensagem("com o joao helio", 2, "in", "received"),
+  ...Array.from({ length: 10 }, (_, i) => registroMensagem(`Informação anterior ${i + 1}.`, i + 3)),
+  registroMensagem(contextual.oferta, 13),
+  registroMensagem("RESPOSTA_FALHOU não entregue", 14, "out", "failed"),
+  { ...registroMensagem("OUTRA_SESSAO não deve entrar", 15), created_at: new Date(agora - 60 * 60_000).toISOString() },
+  { ...registroMensagem("OUTRO_AMBIENTE não deve entrar", 16), is_teste: !teste },
+  { ...registroMensagem("OUTRA_CONVERSA não deve entrar", 17), conversa_id: "outra-conversa" },
+  { ...registroMensagem(pergunta, 18, "in", "received"), id: "entrada-simulada" },
+] : [];
 const consultas: string[] = [];
 const gravacoes: Array<{ tabela: string; valor: any }> = [];
 const requests: any[] = [];
@@ -61,7 +85,10 @@ mock.module("@/integrations/supabase/client.server", () => ({
         update: (valor: any) => { gravacoes.push({ tabela, valor }); return q; },
         then: (resolve: any) => Promise.resolve(resolve({
           data: tabela === "clinicas" ? { nome: "Clínica simulada", base_importada: false }
-            : unica ? null : [], error: null, count: 0,
+            : contextual && tabela === "atend_conversas" ? { id: "conversa-contextual", nina_fluxo_estado: estadoContextual }
+            : contextual && tabela === "whatsapp_mensagens" ? mensagensContextuais
+            : unica ? null : [], error: null,
+          count: contextual && tabela === "whatsapp_mensagens" ? mensagensContextuais.length : 0,
         })),
       };
       return q;
@@ -80,8 +107,10 @@ mock.module("@/lib/nina/instrucoes-runtime.server", () => ({ promptInstrucoes: a
 }) }));
 mock.module("@/lib/nina/catalogo-prompt.server", () => ({ contarCatalogoPublicado: async () => ({ servicos: 1, profissionais: 1 }) }));
 mock.module("@/lib/nina/paciente-tools.server", () => ({
-  FERRAMENTAS_NINA_CONSULTA: [{ type: "function", function: { name: "consultar_base_conhecimento" } }],
-  FERRAMENTAS_NINA_PACIENTE: [{ type: "function", function: { name: "selecionar_horario" } }],
+  FERRAMENTAS_NINA_CONSULTA: ["consultar_base_conhecimento", "consultar_disponibilidade", "verificar_horario", "proxima_vaga", "consultar_primeiro_disponivel"]
+    .map(name => ({ type: "function", function: { name } })),
+  FERRAMENTAS_NINA_PACIENTE: ["selecionar_horario", "consultar_disponibilidade", "verificar_horario", "proxima_vaga", "consultar_primeiro_disponivel"]
+    .map(name => ({ type: "function", function: { name } })),
   executarFerramentaPaciente: async () => { throw new Error("Usar broker simulado"); },
 }));
 mock.module("@/lib/nina/handoff-tool.server", () => ({
@@ -95,6 +124,11 @@ mock.module("@/lib/nina/tool-broker.server", () => ({ criarToolBroker: () => ({
   resultados: () => resultados,
   executar: async (nome: string, args: unknown) => {
     ferramentas.push(nome);
+    if (contextual && nome === contextual.ferramenta) return {
+      ferramenta: nome, capacidade: "checkAvailability", fonte: "agenda", success: true,
+      reused: false, appointment_confirmed: false,
+      dados: { ok: true, slots: [{ medico: "João Hélio", data: "2030-01-21", hora: "10:20" }] },
+    };
     if (nome === "selecionar_horario" && escolhaHorario) return {
       ferramenta: nome, capacidade: "checkAvailability", fonte: "agenda", success: true,
       reused: false, appointment_confirmed: false, dados: { ok: true, resumo_confirmacao: resumoEscolhido },
@@ -153,6 +187,12 @@ mock.module("@/lib/nina/tool-broker.server", () => ({ criarToolBroker: () => ({
 }) }));
 mock.module("@/lib/nina/ai-gateway.server", () => ({ ninaAIGateway: async (req: any) => {
   requests.push(structuredClone(req));
+  if (contextual) return {
+    ok: true, conteudo: contextual.ferramenta ? "Opções encontradas na agenda." : "Tudo bem, esclareça sua preferência quando desejar.",
+    modelo: "modelo-simulado", execucaoId: "execucao-direta", nivel: "low",
+    toolCalls: requests.length === 1 && contextual.ferramenta ? [{ id: "consulta-contextual", type: "function",
+      function: { name: contextual.ferramenta, arguments: JSON.stringify(contextual.argumentos) } }] : [],
+  };
   if (ausente && (cenario.includes("modelo") || cenario.endsWith("misto"))) return {
     ok: true, conteudo: "A clínica não oferece esse serviço.", modelo: "modelo-simulado", execucaoId: "execucao-direta", nivel: "low",
     toolCalls: [
@@ -197,7 +237,7 @@ mock.module("@/lib/nina/resposta/templates.server", () => ({
 
 const { gerarRespostaNina } = await import("@/lib/whatsapp.server");
 const auditoria: any = {};
-const resposta = await gerarRespostaNina("clinica-simulada", pergunta, null, {
+const resposta = await gerarRespostaNina("clinica-simulada", pergunta, contextual ? "55000100999" : null, {
   teste, ambiente: teste ? "homologacao" : "producao",
   ...(cenario === "escolha_sem_auditoria" ? {} : { auditoria }),
   mensagensEntrada: ["entrada-simulada"],

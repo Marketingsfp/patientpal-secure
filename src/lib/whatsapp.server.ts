@@ -917,20 +917,6 @@ async function gerarRespostaNinaInterno(
     return !Number.isFinite(t) || t >= corteMemoria;
   });
 
-  const historico = msgsMemoria
-
-    .slice()
-    .reverse()
-    .map((m: any) => ({
-      role: m.direction === "out" ? "assistant" : "user",
-      content: String(m.body ?? "").slice(0, 1500),
-      // O ID físico viaja com a mensagem: é ele que permite tirar do histórico
-      // a mensagem atual do turno sem apagar repetições legítimas.
-      id: m.id ? String(m.id) : null,
-    }))
-    .filter((m: any) => m.content);
-
-
   // Nome curto para a apresentação (o cadastro costuma trazer a unidade após um travessão).
   const nomeCurtoUnidade =
     String(nomeUnidade)
@@ -1233,8 +1219,7 @@ async function gerarRespostaNinaInterno(
     }
   })();
 
-  const { interesseEmConsultarAgenda, atualizarInteresseConsultaAgenda, normalizarInteresseConsultaAgenda,
-    FERRAMENTAS_DE_VAGAS, consultaAgendaAguardandoPaciente } =
+  const { consultaAgendaAguardandoPaciente } =
     await import("@/lib/nina/consulta-agenda");
   const { historicoParaConsultaAgenda } = await import("@/lib/nina/consulta-agenda-historico");
   const idsDoTurno = new Set(opcoes?.mensagensEntrada ?? []);
@@ -1285,7 +1270,6 @@ async function gerarRespostaNinaInterno(
         fluxoEstado.appointment.slot_options?.vagas.length),
     ),
   };
-  let interesseAgendaConfirmado = interesseEmConsultarAgenda(contextoConsultaAgenda);
 
   // ------------------------------------------------------------------
   // PRECEDÊNCIA DO TURNO — antes do modelo, e agora também no fluxo NORMAL.
@@ -1384,8 +1368,10 @@ async function gerarRespostaNinaInterno(
       pode_agendar: podeAgendar,
     },
     consulta_agenda: {
-      interesse_confirmado: interesseAgendaConfirmado,
-      profissional_previamente_definido: contextoConsultaAgenda.medicoEscolhido?.nome ?? null,
+      ferramentas_de_consulta_disponiveis: true,
+      interpretacao_intencao: "modelo_com_historico_da_sessao",
+      permite_reservar: false,
+      referencia_anterior_profissional: contextoConsultaAgenda.medicoEscolhido?.nome ?? null,
       fonte_horarios_habituais: "catalogo_publicado",
       fonte_vagas: "agenda",
     },
@@ -1460,7 +1446,6 @@ async function gerarRespostaNinaInterno(
 
   let ctxFerramentas: import("@/lib/nina/paciente-tools.server").CtxNinaPaciente | null = null;
   let ferramentas: unknown[] | undefined;
-  let ferramentasVagas: unknown[] = [];
   let executar:
     | typeof import("@/lib/nina/paciente-tools.server").executarFerramentaPaciente
     | null = null;
@@ -1471,12 +1456,8 @@ async function gerarRespostaNinaInterno(
     ferramentas = podeAgendar
       ? [...mod.FERRAMENTAS_NINA_PACIENTE]
       : [...mod.FERRAMENTAS_NINA_CONSULTA];
-    ferramentasVagas = ferramentas.filter((f) => FERRAMENTAS_DE_VAGAS.has(
-      String((f as { function?: { name?: string } }).function?.name ?? "")));
-    ferramentas = ferramentas.filter(
-      (f) => interesseAgendaConfirmado ||
-        !FERRAMENTAS_DE_VAGAS.has(String((f as { function?: { name?: string } }).function?.name ?? "")),
-    );
+    // As leituras ficam acessíveis em todos os turnos. A escolha de consultar
+    // vem da interpretação do modelo; expressões literais não removem tools.
     executar = async (...args) => {
       await conferirReserva();
       return mod.executarFerramentaPaciente(...args);
@@ -1616,7 +1597,9 @@ async function gerarRespostaNinaInterno(
   const { montarContexto } = await import("@/lib/nina/context-builder");
   const contexto = montarContexto({
     systemBlocos: [systemPromptFinal],
-    historico: historico as MsgIA[],
+    // Mesma sessão, em ordem, somente mensagens recebidas/entregues. O builder
+    // aplica a janela e o limite de conteúdo uma única vez, sem corte prévio.
+    historico: contextoConsultaAgenda.historico as MsgIA[],
     mensagemAtual: mensagemPaciente,
     // Deduplicação por ID: a mensagem atual já está gravada no histórico.
     idsMensagemAtual: opcoes?.mensagensEntrada ?? null,
@@ -1776,21 +1759,13 @@ async function gerarRespostaNinaInterno(
         selecaoAnterior: normalizarSelecaoContextual(conhecimentoAnterior?.selecao), agora: new Date().toISOString() });
       if (referencia) referencia.selecao = selecaoDoTurno.selecao;
       contextoConsultaAgenda.selecaoRevalidada = selecaoDoTurno.selecao;
-      contextoConsultaAgenda.interesseAnterior = normalizarInteresseConsultaAgenda(conhecimentoAnterior?.interesseAgenda);
-      interesseAgendaConfirmado = interesseEmConsultarAgenda(contextoConsultaAgenda);
-      const interesse = atualizarInteresseConsultaAgenda(contextoConsultaAgenda);
-      if (referencia) referencia.interesseAgenda = interesse;
-      ferramentas = (ferramentas ?? []).filter((f) => !FERRAMENTAS_DE_VAGAS.has(
-        String((f as { function?: { name?: string } }).function?.name ?? "")));
-      if (interesseAgendaConfirmado) ferramentas.push(...ferramentasVagas);
-      runtimeContext.consulta_agenda.interesse_confirmado = interesseAgendaConfirmado;
-      runtimeContext.consulta_agenda.profissional_previamente_definido =
+      runtimeContext.consulta_agenda.referencia_anterior_profissional =
         selecaoDoTurno.selecao?.medicoNome ?? contextoConsultaAgenda.medicoEscolhido?.nome ?? null;
       registrarEtapa({ tipo: "consulta", fonte: "catalogo", titulo: "Dados atuais da base compartilhados com a Nina",
         dados: { consulta: ex.consulta.id, status: ex.consulta.status, referencias: referencia?.referencias ?? [],
           ...compararReferenciasConhecimento(conhecimentoAnterior?.referencias ?? [], referencia?.referencias ?? []),
-          selecao: selecaoDoTurno, interesse_agenda: interesse,
-          leitura_agenda_autorizada: interesseAgendaConfirmado, fatos_antigos_reutilizados: false },
+          selecao: selecaoDoTurno, interpretacao_intencao: "modelo_com_historico_da_sessao",
+          ferramentas_de_consulta_disponiveis: true, fatos_antigos_reutilizados: false },
         codigo: { arquivo: "src/lib/whatsapp.server.ts", funcao: "compartilharResultado" } });
     }
     const ausencia = encaminhamentoSemRegistro(r, args, consultaAutomatica);
@@ -1798,8 +1773,10 @@ async function gerarRespostaNinaInterno(
     else if (r.success && resultadoExigeHumano(r.dados, selecaoDoTurno?.selecao?.raizesFonte.map(r => r.registro)))
       await encaminharRegraCatalogo(nome);
     return { ...limitarRetornoParaModelo(payload) as Record<string, unknown>,
-      preferencia_do_paciente: dadosPublicosCatalogo(selecaoDoTurno),
-      consulta_agenda: { interesse_confirmado: interesseAgendaConfirmado,
+      // A seleção legada auxilia referências internas; não é uma declaração
+      // de intenção do paciente. Essa interpretação cabe ao modelo no histórico.
+      consulta_agenda: { ferramentas_de_consulta_disponiveis: true,
+        interpretacao_intencao: "modelo_com_historico_da_sessao",
         permite_reservar: false, fonte_vagas: "agenda", fonte_horarios_habituais: "catalogo_publicado" } };
   }
   async function consultarFonteAntesDaResposta(args: { termo: string; medico?: string; dia?: string }, recuperar = false) {
@@ -2017,15 +1994,15 @@ async function gerarRespostaNinaInterno(
       rastro?.iniciar("tool.execute", { ferramenta: nome });
       const r = await broker.executar(nome, c.function?.arguments);
       if (consultaAgendaAguardandoPaciente(r.dados)) {
-        // Uma consulta não autorizada não é agenda vazia nem falha técnica.
+        // Médico ausente/ambíguo não é agenda vazia nem falha técnica.
         // Registra a tentativa, sem produzir evidência de consulta à agenda.
-        rastro?.pular("tool.execute", "consulta de vagas aguardando interesse ou escolha do médico");
+        rastro?.pular("tool.execute", "consulta de vagas aguardando identificação inequívoca do médico");
         registrarEtapa({
           tipo: "consulta",
           fonte: "sistema",
           titulo: "Consulta à agenda não realizada: aguardando o paciente",
           dados: { ferramenta: nome, ...respostaParaModelo(r) },
-          codigo: { arquivo: "src/lib/nina/consulta-agenda.ts", funcao: "autorizarConsultaAgenda" },
+          codigo: { arquivo: "src/lib/nina/consulta-agenda.ts", funcao: "consultaAgendaPendente" },
         });
         mensagens.push({
           role: "tool",

@@ -1,4 +1,9 @@
-/** Autorização da consulta de vagas. Só usa mensagens entregues e estado do servidor. */
+/**
+ * Contratos da consulta e heurísticas preservadas para compatibilidade com o
+ * avaliador legado. O fluxo ativo (whatsapp.server/paciente-tools) NÃO usa
+ * interesseEmConsultarAgenda, preferePrimeiroDisponivel ou autorizarConsultaAgenda
+ * para liberar leituras: a Nina interpreta a intenção com o histórico da sessão.
+ */
 import type { SelecaoContextual } from "./confidence/selecao-contextual";
 import { lerEscolhaHorario } from "./agendamento-escolha";
 
@@ -505,7 +510,7 @@ export function consultaAgendaPendente(motivo: DecisaoConsultaAgenda["motivo"]) 
     mensagem:
       motivo === "INTERESSE_NAO_CONFIRMADO"
         ? "Consulta à agenda não realizada: o paciente ainda não solicitou verificar vagas. Horários habituais são informações do catálogo publicado."
-        : "Consulta à agenda não realizada: falta definir com o paciente qual médico terá as vagas consultadas.",
+        : "Consulta à agenda não realizada: o profissional informado está ausente ou ambíguo. Use o vínculo oficial do médico escolhido no contexto. Se o paciente preferiu o primeiro disponível, use consultar_primeiro_disponivel com o atendimento publicado; se a preferência não estiver clara, esclareça as duas possibilidades.",
   };
 }
 

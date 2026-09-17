@@ -406,10 +406,15 @@ describe("primeiro disponível entre todos os profissionais publicados", () => {
     expect(r.proxima).toMatchObject({ modalidade_atendimento: "ficha" });
     expect((r.proxima as Linha).orientacao).toContain("15 minutos");
   });
-  test("sim à escolha de duas opções não decide primeiro disponível", async () => {
-    const r = await chamar("sim").resultado;
-    expect(r).toMatchObject({ ok: false, aguardando_paciente: true });
-    expect(consultasAgenda()).toHaveLength(0);
+  test.each(["preciso de quem consiga me atender antes da viagem", "tanto faz a pessoa, quanto antes melhor"])(
+    "decisão contextual do modelo chega à comparação sem filtro literal: %s", async (mensagem) => {
+    const { ctx, resultado } = chamar(mensagem);
+    const r = await resultado;
+    expect(r.ok).toBe(true);
+    expect(r.proxima).toMatchObject({ medico_id: OUTRO });
+    expect(ctx.estado.appointment.confirmation).toBeNull();
+    expect(ctx.estado.appointment.slot_inicio).toBeNull();
+    expect(gravacoes).toHaveLength(0);
   });
   test("preço de outra especialidade do mesmo médico não entra na proposta", async () => {
     banco.nina_cat_profissionais![1]!.especialidades = [{ nome: "Cardiologia" }, { nome: "Dermatologia" }];
@@ -683,16 +688,18 @@ describe("executor real das ferramentas com banco simulado", () => {
     expect(consultasAgenda()).toHaveLength(0);
   });
 
-  test("UUID do catálogo de outro médico não troca a escolha feita pelo paciente", async () => {
+  test("modelo pode interpretar mudança contextual de médico e consultar seu vínculo oficial", async () => {
     banco.medicos!.push({ id: OUTRO, clinica_id: CLINICA, nome: "Antonio Cobucci", ativo: true });
     banco.nina_cat_profissionais![0]!.nome = "Antonio Cobucci";
     const r = await executarFerramentaPaciente(
-      contexto("sim por favor", "Posso verificar vagas do Dr. Alex Louza?"),
+      contexto("pensando melhor, veja o outro profissional", "Temos Alex Louza e Antonio Cobucci. Posso verificar vagas do Dr. Alex Louza?"),
       "proxima_vaga",
       { medico_id: CATALOGO },
     );
-    expect(r.motivo).toBe("MEDICO_DIVERGENTE");
-    expect(consultasAgenda()).toHaveLength(0);
+    expect(r.ok).toBe(true);
+    expect(consultasAgenda().length).toBeGreaterThan(0);
+    expect(consultasAgenda().every(l => JSON.stringify(l.filtros.medico_id) === JSON.stringify([OUTRO]))).toBe(true);
+    expect(gravacoes).toHaveLength(0);
   });
 
   test("vínculo resolvido não transforma uma agenda vazia em vaga ou reserva", async () => {
@@ -707,18 +714,18 @@ describe("executor real das ferramentas com banco simulado", () => {
   });
 
   for (const ferramenta of ["consultar_disponibilidade", "verificar_horario", "proxima_vaga"]) {
-    test(`${ferramenta}: pergunta geral não toca a agenda nem resolve o médico`, async () => {
-      const r = await executarFerramentaPaciente(
-        contexto("vcs tem cardiologista?"),
-        ferramenta,
-        argumentos,
-      );
-      expect(r.ok).toBe(false);
-      expect(r.consulta_realizada).toBe(false);
-      expect(r.aguardando_paciente).toBe(true);
-      expect(leituras).toHaveLength(0);
+    test.each(["sim, pra hoje", "nesse dia consigo", "pode olhar pra mim", "se tiver depois do almoço é melhor"])(
+      `${ferramenta}: intenção interpretada pelo modelo não é vetada pela redação: %s`, async (mensagem) => {
+      const ctx = contexto(mensagem, "Qual dia ou turno prefere? Assim já verifico as vagas certinho para você!");
+      ctx.consultaAgenda.historico.unshift({ role: "user", content: "com o Alex Louza" });
+      const r = await executarFerramentaPaciente(ctx, ferramenta, argumentos);
+      expect(r.ok).toBe(true);
+      expect(consultasAgenda().length).toBeGreaterThan(0);
+      expect(consultasAgenda().every(l => JSON.stringify([l.filtros.medico_id].flat()) === JSON.stringify([MEDICO]))).toBe(true);
       expect(auditoria.some((r) => r.action === "NINA_TOOL")).toBe(true);
-      expect("horarios" in r).toBe(false);
+      expect(ctx.estado.appointment.confirmation).toBeNull();
+      expect(ctx.estado.appointment.slot_inicio).toBeNull();
+      expect(gravacoes).toHaveLength(0);
     });
     test(`${ferramenta}: aceite da oferta consulta apenas o médico definido`, async () => {
       const ctx = contexto("sim", "Gostaria que eu verificasse as vagas do Dr. Alex Louza?");
@@ -782,41 +789,47 @@ describe("executor real das ferramentas com banco simulado", () => {
     expect(consultasAgenda()).toHaveLength(0);
   });
   test("argumentos do modelo não criam aceite do paciente", async () => {
+    const ctx = contexto("Quais dias o Dr. Alex atende?");
     const r = await executarFerramentaPaciente(
-      contexto("Quais dias o Dr. Alex atende?"),
+      ctx,
       "consultar_disponibilidade",
       { ...argumentos, autorizado: true, paciente_confirmou: true },
     );
-    expect(r.ok).toBe(false);
-    expect(leituras).toHaveLength(0);
+    expect(r.ok).toBe(true);
+    expect(ctx.estado.appointment.confirmation).toBeNull();
+    expect(ctx.estado.appointment.slot_confirmed_by_patient).toBe(false);
+    expect(ctx.estado.appointment.intent_confirmed).toBe(false);
+    expect(gravacoes).toHaveLength(0);
   });
-  test("médico divergente da oferta aceita não tem agenda consultada", async () => {
-    banco.medicos!.push({ id: OUTRO, clinica_id: CLINICA, nome: "Antonio Cobucci", ativo: true });
+  test("médico inativo não tem agenda consultada mesmo por chamada explícita do modelo", async () => {
+    banco.medicos!.push({ id: OUTRO, clinica_id: CLINICA, nome: "Antonio Cobucci", ativo: false });
     const r = await executarFerramentaPaciente(
       contexto("sim", "Posso consultar as vagas do Dr. Alex Louza?"),
       "proxima_vaga",
       { medico_id: OUTRO },
     );
-    expect(r.motivo).toBe("MEDICO_DIVERGENTE");
+    expect(r.ok).toBe(false);
     expect(consultasAgenda()).toHaveLength(0);
   });
-  test("nome completo do paciente prevalece sobre UUID de homônimo enviado pelo modelo", async () => {
+  test("nome ambíguo na chamada exige esclarecimento mesmo com UUID prévio na sessão", async () => {
     banco.medicos!.push({ id: OUTRO, clinica_id: CLINICA, nome: "Alex Silva", ativo: true });
+    const ctx = contexto("veja com o Alex");
+    ctx.estado.appointment.doctor_id = MEDICO;
     const r = await executarFerramentaPaciente(
-      contexto("Tem vagas com Dr. Alex Louza?"),
+      ctx,
       "consultar_disponibilidade",
-      { medico_id: OUTRO },
+      { medico_id: "Alex" },
     );
     expect(r.ok).toBe(false);
-    expect(r.motivo).toBe("MEDICO_DIVERGENTE");
+    expect(r.motivo).toBe("MEDICO_NAO_DEFINIDO");
     expect(consultasAgenda()).toHaveLength(0);
   });
-  test("UUID sugerido pelo modelo não resolve nome curto compartilhado por dois médicos", async () => {
+  test("UUID inexistente do modelo não seleciona o primeiro dos homônimos", async () => {
     banco.medicos!.push({ id: OUTRO, clinica_id: CLINICA, nome: "Alex Silva", ativo: true });
     const r = await executarFerramentaPaciente(
       contexto("Tem vagas com Dr. Alex?"),
       "consultar_disponibilidade",
-      { medico_id: MEDICO },
+      { medico_id: PACIENTE },
     );
     expect(r.ok).toBe(false);
     expect(consultasAgenda()).toHaveLength(0);

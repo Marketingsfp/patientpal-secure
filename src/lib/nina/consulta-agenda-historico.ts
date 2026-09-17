@@ -1,4 +1,4 @@
-/** Histórico confiável para interpretar aceite de consulta, separado do resumo enviado ao modelo. */
+/** Histórico recebido/entregue da sessão, compartilhado pela Nina e pelas validações de confirmação. */
 type MensagemDaConversa = {
   id?: string | null;
   conversa_id?: string | null;

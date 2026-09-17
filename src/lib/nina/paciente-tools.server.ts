@@ -46,11 +46,8 @@ import {
 } from "./vinculo-catalogo-agenda.server";
 import { autorizarAcao, type CodigoRecusa, type EntradaAutorizacao } from "./acoes/autorizacao";
 import {
-  autorizarConsultaAgenda,
   consultaAgendaPendente,
   FERRAMENTAS_DE_VAGAS,
-  interesseEmConsultarAgenda,
-  preferePrimeiroDisponivel,
   type ContextoConsultaAgenda,
 } from "./consulta-agenda";
 import {
@@ -1012,8 +1009,9 @@ async function executarFerramentaInterna(
     return falha("PERMISSION_DENIED", "Agendamento pela assistente não está ativo nesta unidade.");
 
   try {
-    // Proteção comum às três entradas de agenda, antes até da resolução do
-    // profissional. Um nome ambíguo não pode disparar buscas por vagas.
+    // A Nina interpreta a intenção com o histórico e escolhe a ferramenta.
+    // O executor valida fatos e permissões; não reinterpreta a fala por regex.
+    // Consultar disponibilidade nunca equivale a consentir uma reserva.
     async function conferirRegraCatalogo(procedimentoEscolhido?: string | null) {
       const selecao = ctx.consultaAgenda?.selecaoRevalidada;
       const medico = String(args.medico_id ?? ctx.estado?.appointment.doctor_id ?? selecao?.medicoId ?? selecao?.medicoNome ?? "");
@@ -1032,8 +1030,6 @@ async function executarFerramentaInterna(
     }
     let medicoAgenda: { ok: true; id: string; nome: string } | null = null;
     if (FERRAMENTAS_DE_VAGAS.has(nome) && nome !== "consultar_primeiro_disponivel") {
-      if (!interesseEmConsultarAgenda(ctx.consultaAgenda))
-        return consultaAgendaPendente("INTERESSE_NAO_CONFIRMADO");
       const termo = typeof args.medico_id === "string" ? args.medico_id.trim() : "";
       if (!termo) return consultaAgendaPendente("MEDICO_NAO_DEFINIDO");
       const bloqueio = await conferirRegraCatalogo();
@@ -1043,8 +1039,6 @@ async function executarFerramentaInterna(
         ...consultaAgendaPendente("MEDICO_NAO_DEFINIDO"),
         opcoes: resolvido.opcoes.map(o => ({ medico_id: o.id, nome: o.nome })),
       };
-      const permissao = autorizarConsultaAgenda(ctx.consultaAgenda, resolvido, resolvido.candidatosOficiais);
-      if (!permissao.permitido) return consultaAgendaPendente(permissao.motivo);
       medicoAgenda = resolvido;
       args.medico_id = resolvido.id;
       const modalidade = await modalidadePublicadaDoMedico(ctx.clinicaId, resolvido.id);
@@ -1053,8 +1047,6 @@ async function executarFerramentaInterna(
     }
     switch (nome) {
       case "consultar_primeiro_disponivel": {
-        if (!preferePrimeiroDisponivel(ctx.consultaAgenda))
-          return consultaAgendaPendente("INTERESSE_NAO_CONFIRMADO");
         const p = zProximaVaga.omit({ medico_id: true, especialidade: true }).extend({
           tipo: z.enum(["consulta", "procedimento"]), atendimento: z.string().trim().min(3).max(160),
           data: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
