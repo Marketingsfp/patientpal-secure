@@ -1540,6 +1540,48 @@ export type Database = {
           },
         ]
       }
+      atend_leitura_operacional: {
+        Row: {
+          clinica_id: string
+          conversa_id: string
+          read_at: string
+          ultima_msg_lida_em: string
+          ultima_msg_lida_id: string
+          user_id: string
+        }
+        Insert: {
+          clinica_id: string
+          conversa_id: string
+          read_at?: string
+          ultima_msg_lida_em: string
+          ultima_msg_lida_id: string
+          user_id: string
+        }
+        Update: {
+          clinica_id?: string
+          conversa_id?: string
+          read_at?: string
+          ultima_msg_lida_em?: string
+          ultima_msg_lida_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "atend_leitura_operacional_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "atend_leitura_operacional_conversa_id_fkey"
+            columns: ["conversa_id"]
+            isOneToOne: true
+            referencedRelation: "atend_conversas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       atend_leituras: {
         Row: {
           clinica_id: string
@@ -14907,6 +14949,10 @@ export type Database = {
       }
       atend_permite_leitura_operacional: {
         Args: { _clinica_id: string }
+        Returns: boolean
+      }
+      atend_pode_ver_leitura: {
+        Args: { _clinica_id: string; _conversa_id: string }
         Returns: boolean
       }
       atend_pool_canonico: {

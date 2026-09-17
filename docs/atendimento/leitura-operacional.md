@@ -26,11 +26,39 @@ um administrador podia continuar vendo 238 mensagens após uma atendente ler.
 
 ## Banco e publicação
 
-Aplicar `20260917233000_zap_leitura_operacional.sql`, depois da migration da
-fila individual em Pausa, antes de publicar a aplicação. A migration cria
+O SQL foi aplicado pelo Lovable em 17/09/2026 com o identificador
+`20260917170404`, depois da migration da fila individual em Pausa.
+A definição canônica é `20260917170404_d758959e-1e5c-43ac-9994-9f30c52f6720.sql`. Ela cria
 `atend_leitura_operacional`, suas permissões e assinatura Realtime, e atualiza
 as rotinas de registro e contagem. A permissão de leitura operacional é
 consultada pela tela antes de qualquer registro.
+
+O arquivo `20260917233000_zap_leitura_operacional.sql` agora apenas verifica os
+objetos, funções, índice, RLS e Realtime da canônica. Isso preserva os dois
+identificadores sem executar duas vezes o mesmo `CREATE TABLE`. O histórico
+consultado no projeto conectado não continha `20260917233000`; não houve
+edição manual de `supabase_migrations`. Não reaplicar a canônica no banco em
+que já está registrada. Para instalações que tenham aplicado somente o ID
+antigo, conferir equivalência e reconciliar o histórico antes de executar a
+canônica, pois ela não é idempotente.
+
+### Correção dos quatro erros de compilação
+
+O commit `122fd6837` regenerou os tipos enquanto a migration ainda estava
+pendente e removeu `atend_permite_leitura_operacional`. Isso produziu dois
+TS2345 (RPC desconhecida) nas linhas 472 e 780 de `atendimento.functions.ts`
+e dois TS2367 nas linhas 476 e 787 (retorno sem tipo booleano reconhecido).
+A tela também falhava com função ausente no schema cache.
+
+Após aplicação, os tipos foram regenerados a partir do banco: tabela e duas
+funções novas voltaram ao contrato, sem `any` ou supressão de erros. O Lovable
+registrou `tsc --noEmit` com saída 0 e 23 chamadas autenticadas sem o erro.
+O código gerado está nos commits `538ce0d1f` e `dcb3fdcf0`. A lista de conversas
+também carregou na verificação independente no Chrome. Não houve publicação
+do frontend ou alteração do prompt da Nina nesta correção.
+
+A verificação local independente reproduziu os quatro erros em `38db8ebb6`
+e terminou sem erros depois de sincronizar os tipos gerados em `dcb3fdcf0`.
 
 Não há limpeza ou preenchimento retrospectivo: mensagens, registros
 individuais em `atend_leituras` e `atend_conversas.unread_count` permanecem.
@@ -52,5 +80,9 @@ migration deixa a permissão operacional indisponível e não ativa a correção
 O teste SQL usa apenas dados sintéticos e PostgreSQL local por socket, sem
 conectar ao Supabase ou enviar mensagens. Cobre perfis, histórico, isolamento
 entre clínicas, fila em Pausa, mensagens concorrentes e o console de testes.
-Após publicação, validar visualmente com Telefonia e supervisão abertas na
-mesma conversa. Essa validação autenticada não foi executada em produção.
+Na correção de 17/09/2026, os 536 testes do atendimento passaram e o PostgreSQL
+local validou os oito cenários operacionais, mais a repetição da migration de
+compatibilidade e detecção de RLS ausente. A abertura da Inbox foi validada
+com a sessão administrativa autenticada. O teste simultâneo com Telefonia e
+supervisão permanece uma validação operacional posterior; não foram enviadas
+mensagens nem criadas reservas para testar esta correção.
