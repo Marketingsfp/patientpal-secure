@@ -2646,12 +2646,16 @@ function Page() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="todos">Todos os médicos</SelectItem>
-                  {medicosOpts.map((mo) => (
-                    <SelectItem key={mo.id} value={mo.id}>
-                      {mo.nome}
+                  {/* Mesma lista do seletor PROFISSIONAL da Agenda: uma
+                      entrada por agenda ativa (`NOME — AGENDA`) para quem tem
+                      mais de uma. */}
+                  {opcoesProf.opcoes.map((o) => (
+                    <SelectItem key={o.key} value={o.rotulo}>
+                      {o.rotulo}
                     </SelectItem>
                   ))}
                 </SelectContent>
+
               </Select>
             </div>
             <div className="space-y-1">
