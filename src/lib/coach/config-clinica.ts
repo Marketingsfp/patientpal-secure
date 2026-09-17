@@ -13,7 +13,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { gerarBaseDoSistema } from "@/lib/coach/base-conhecimento.dados";
 import { selecionarParaIA } from "@/lib/coach/base-conhecimento";
-import { VOZ_CONFIG_PADRAO, type VozConfig } from "@/lib/coach/voz-config";
+import { VOZ_CONFIG_PADRAO, parseVozConfig, type VozConfig } from "@/lib/coach/voz-sistema";
 
 export type ScriptItem = { titulo: string; conteudo: string };
 
@@ -72,7 +72,7 @@ export function useCoachConfig(clinicaId: string | null, nomeClinica?: string | 
       baseGeradaEm: data?.base_gerada_em ? new Date(data.base_gerada_em) : null,
       vozConfig:
         data?.voz_config && Object.keys(data.voz_config as object).length > 0
-          ? (data.voz_config as unknown as VozConfig)
+          ? parseVozConfig(data.voz_config)
           : VOZ_CONFIG_PADRAO,
     });
     setLoading(false);
