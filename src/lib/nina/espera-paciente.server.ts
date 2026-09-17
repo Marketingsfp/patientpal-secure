@@ -67,9 +67,9 @@ export async function registrarEsperaAposRespostaNina(args: {
     )
       return semEspera;
     const estado = normalizarEstado(conversa.nina_fluxo_estado);
-    // A conclusão comprovada dispensa retorno do paciente, inclusive após
-    // despedidas/cortesias. Texto de confirmação sozinho não comprova reserva.
-    if (reservaDaSessaoAtual(estado)) {
+    // Agendamento comprovado e transferência encerram a espera da Nina.
+    // Texto de confirmação sozinho não comprova reserva nem encaminhamento.
+    if (reservaDaSessaoAtual(estado) || estado.flow.stage === "HANDOFF") {
       await limparEsperaPaciente(args.clinicaId, args.conversaId, {
         ultimaMsgEm: conversa.ultima_msg_em,
         estadoFluxo: conversa.nina_fluxo_estado,
@@ -133,6 +133,7 @@ export async function registrarEsperaAposRespostaNina(args: {
 
 export type MensagemEspera = {
   id: string;
+  wa_message_id?: string | null;
   direction: string;
   enviada_por: string | null;
   status: string | null;
@@ -147,7 +148,7 @@ export async function ultimaMensagemDaConversa(
 ): Promise<MensagemEspera | null> {
   const { data, error } = await supabaseAdmin
     .from("whatsapp_mensagens")
-    .select("id,direction,enviada_por,status,created_at,body")
+    .select("id,wa_message_id,direction,enviada_por,status,created_at,body")
     .eq("clinica_id", clinicaId)
     .eq("conversa_id", conversaId)
     .neq("status", "system")
@@ -164,6 +165,9 @@ export function mensagemEnviadaPelaNina(m: MensagemEspera | null): boolean {
     !!m &&
     m.direction === "out" &&
     m.enviada_por === "nina" &&
+    // Na homologação o aviso aparece como Nina, mas é uma saída transacional.
+    // A identificação persistida também cobre os avisos históricos sem alterar o texto.
+    !m.wa_message_id?.startsWith("handoff-") &&
     ["sent", "delivered", "read"].includes(m.status ?? "")
   );
 }
@@ -275,7 +279,8 @@ export async function timeoutPendenteConfirmado(args: {
   const encerrada = ["resolvida", "fechada", "closed", "resolved"].includes(
     String(linha.status ?? "").toLowerCase(),
   );
-  if (encerrada || reservaDaSessaoAtual(normalizarEstado(linha.nina_fluxo_estado))) return false;
+  const estado = normalizarEstado(linha.nina_fluxo_estado);
+  if (encerrada || reservaDaSessaoAtual(estado) || estado.flow.stage === "HANDOFF") return false;
   return timeoutAindaValido({
     deadlineAtual: linha.patient_response_deadline ?? null,
     deadlineEsperado: args.deadlineEsperado ?? null,

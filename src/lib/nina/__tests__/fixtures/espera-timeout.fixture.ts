@@ -136,6 +136,17 @@ mock.module("@/lib/atendimento/handoff-auditoria.server", () => ({
 mock.module("@/lib/atendimento/protocolo-atendimento.server", () => ({
   protocoloAoIniciarHandoff: async () => {
     avisos++;
+    const em = tempo(30).toISOString();
+    tabelas.whatsapp_mensagens!.push(
+      mensagem({
+        id: `aviso-${avisos}`,
+        wa_message_id: `handoff-c1-${avisos}`,
+        created_at: em,
+        enviada_por: conv().is_teste ? "nina" : "sistema",
+        body: "Vou encaminhar seu atendimento para nossa equipe. Protocolo TESTE-1.",
+      }),
+    );
+    conv().ultima_msg_em = em;
     return { protocolo: "TESTE-1", anuncio: null };
   },
   protocoloAoAtribuirHumano: async () => {},
@@ -153,6 +164,7 @@ const { encaminharParaHumano } = await import("../../../atendimento/handoff.serv
 function mensagem(over: Linha = {}) {
   return {
     id: "nina-1",
+    wa_message_id: "resposta-nina-1",
     clinica_id: "cl1",
     conversa_id: "c1",
     created_at: inicio,
@@ -526,4 +538,123 @@ it("exceção ao timeout preserva encaminhamento solicitado pelo paciente", asyn
   expect(r.ok).toBe(true);
   expect(conv().owner_type).toBe("HUMAN");
   expect(avisos).toBe(1);
+});
+
+for (const teste of [false, true]) {
+  it(`aviso de transferência não rearma prazo nem repete handoff (${teste ? "homologação" : "produção"})`, async () => {
+    conv().is_teste = teste;
+    online = false;
+    expect((await executar()).transferidas).toBe(1);
+    expect((await registrar(30)).aguardando).toBe(false);
+    for (const minuto of [60, 90, 120]) {
+      expect((await executar(minuto)).transferidas).toBe(0);
+    }
+    expect(avisos).toBe(1);
+    expect(conv().owner_type).toBe("NONE");
+    expect(conv().patient_response_deadline).toBeNull();
+    expect(tabelas.atend_conversa_eventos!.filter((e) => e.evento === "TIMEOUT_NINA")).toHaveLength(
+      1,
+    );
+    expect(
+      tabelas.atend_conversa_eventos!.filter((e) => e.evento === "ENTROU_NA_FILA"),
+    ).toHaveLength(1);
+  });
+}
+
+it("fila humana sem atendente também impede uma segunda transferência direta", async () => {
+  online = false;
+  await executar();
+  const r = await encaminharParaHumano({
+    clinicaId: "cl1",
+    conversaId: "c1",
+    motivo: "patient_response_timeout",
+    solicitadoPor: "SISTEMA",
+  });
+  expect(r.ok).toBe(true);
+  expect(r.ja_estava_com_humano).toBe(true);
+  expect(avisos).toBe(1);
+  expect(tabelas.atend_conversa_eventos!.filter((e) => e.evento === "ENTROU_NA_FILA")).toHaveLength(
+    1,
+  );
+});
+
+it("chamadas diretas concorrentes criam apenas uma transferência na fila", async () => {
+  online = false;
+  const args = { clinicaId: "cl1", conversaId: "c1", motivo: "paciente pediu humano" };
+  const resultados = await Promise.all([encaminharParaHumano(args), encaminharParaHumano(args)]);
+  expect(resultados.every((r) => r.ok)).toBe(true);
+  expect(resultados.filter((r) => r.ja_estava_com_humano)).toHaveLength(1);
+  expect(avisos).toBe(1);
+  expect(tabelas.atend_conversa_eventos!.filter((e) => e.evento === "ENTROU_NA_FILA")).toHaveLength(
+    1,
+  );
+});
+
+it("atribuição concorrente preserva a atendente e não reencaminha", async () => {
+  antesDeGravar = () =>
+    Object.assign(conv(), {
+      owner_type: "HUMAN",
+      ai_enabled: false,
+      atribuida_user_id: "atendente",
+    });
+  await encaminharParaHumano({
+    clinicaId: "cl1",
+    conversaId: "c1",
+    motivo: "paciente pediu humano",
+  });
+  expect(avisos).toBe(0);
+  expect(conv().owner_type).toBe("HUMAN");
+  expect(conv().atribuida_user_id).toBe("atendente");
+});
+
+it("aviso legado de homologação nunca inicia espera, mesmo após reativar a IA", async () => {
+  conv().is_teste = true;
+  await executar();
+  Object.assign(conv(), { owner_type: "AI", ai_enabled: true, status: "bot_attending" });
+  conv().nina_fluxo_estado.flow = { stage: "IDLE" };
+  expect((await registrar(30)).aguardando).toBe(false);
+  expect(conv().patient_response_deadline).toBeNull();
+  expect(avisos).toBe(1);
+});
+
+it("job descarta temporizador antigo armado sobre o aviso de transferência", async () => {
+  conv().is_teste = true;
+  await executar();
+  Object.assign(conv(), {
+    owner_type: "AI",
+    ai_enabled: true,
+    status: "bot_attending",
+    awaiting_patient_since: tempo(30).toISOString(),
+    patient_response_deadline: tempo(60).toISOString(),
+  });
+  conv().nina_fluxo_estado.flow = { stage: "IDLE" };
+  expect((await executar(60)).transferidas).toBe(0);
+  expect(conv().patient_response_deadline).toBeNull();
+  expect(avisos).toBe(1);
+});
+
+it("estado HANDOFF impede nova espera e timeout mesmo com responsabilidade inconsistente", async () => {
+  Object.assign(conv().nina_fluxo_estado, { flow: { stage: "HANDOFF" } });
+  expect((await registrar()).aguardando).toBe(false);
+  expect((await executar()).transferidas).toBe(0);
+  expect(conv().patient_response_deadline).toBeNull();
+  expect(avisos).toBe(0);
+});
+
+it("nova sessão com mensagem comum volta a permitir um único timeout", async () => {
+  conv().is_teste = true;
+  await executar();
+  Object.assign(conv(), {
+    owner_type: "AI",
+    ai_enabled: true,
+    status: "bot_attending",
+    nina_fluxo_estado: { session_id: "nova", session_started_at: tempo(40).toISOString() },
+    ultima_msg_em: tempo(41).toISOString(),
+  });
+  tabelas.whatsapp_mensagens!.push(
+    mensagem({ id: "nina-nova", created_at: tempo(41).toISOString() }),
+  );
+  expect((await registrar(41)).deadline).toBe(tempo(71).toISOString());
+  expect((await executar(71)).transferidas).toBe(1);
+  expect(avisos).toBe(2);
 });

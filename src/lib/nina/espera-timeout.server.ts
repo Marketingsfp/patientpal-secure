@@ -95,7 +95,13 @@ export async function processarTimeoutsEsperaPaciente(args?: {
     const encerrada = STATUS_ENCERRADOS.includes(String(linha.status ?? "").toLowerCase());
     const jaHumana =
       linha.owner_type !== "AI" || linha.ai_enabled !== true || !!linha.atribuida_user_id;
-    if (encerrada || jaHumana || !linha.patient_response_deadline || reservaDaSessaoAtual(estado)) {
+    if (
+      encerrada ||
+      jaHumana ||
+      !linha.patient_response_deadline ||
+      reservaDaSessaoAtual(estado) ||
+      estado.flow.stage === "HANDOFF"
+    ) {
       await liberarEspera(linha);
       resultado.ignoradas += 1;
       continue;

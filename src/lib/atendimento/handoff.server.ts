@@ -223,11 +223,12 @@ export async function encaminharParaHumano(args: {
   const conv = await estadoConversaPorId(args.clinicaId, args.conversaId);
   if (!conv) return { ok: false, mensagem: "Conversa não encontrada." };
 
-  if (conv.owner_type === "HUMAN") {
+  // A fila já pertence ao atendimento humano, mesmo sem atendente atribuída.
+  if (conv.owner_type === "HUMAN" || conv.owner_type === "NONE" || conv.atribuida_user_id) {
     return {
       ok: true,
       ja_estava_com_humano: true,
-      mensagem: "Esta conversa já está com um atendente humano.",
+      mensagem: "Esta conversa já foi encaminhada para atendimento humano.",
     };
   }
 
@@ -260,7 +261,13 @@ export async function encaminharParaHumano(args: {
       updated_at: agora,
     })
     .eq("id", args.conversaId)
-    .eq("clinica_id", args.clinicaId);
+    .eq("clinica_id", args.clinicaId)
+    // Vale para todo encaminhamento, não apenas para o job de timeout.
+    // Duas chamadas podem ler AI, mas só uma pode fazer a transição para NONE.
+    .eq("owner_type", "AI")
+    .eq("ai_enabled", conv.ai_enabled)
+    .is("atribuida_user_id", null)
+    .not("status", "in", '("closed","finished","resolved","resolvida","fechada","encerrada")');
   if (args.somenteSeNina) {
     if (args.somenteSeNina.prazoPaciente)
       atualizacao = atualizacao.eq("patient_response_deadline", args.somenteSeNina.prazoPaciente);
@@ -282,8 +289,20 @@ export async function encaminharParaHumano(args: {
   }
   const { error, data: atualizadas } = await atualizacao.select("id");
   if (error) return { ok: false, mensagem: error.message };
-  if (!atualizadas?.length)
+  if (!atualizadas?.length) {
+    const atual = await estadoConversaPorId(args.clinicaId, args.conversaId);
+    if (
+      atual &&
+      (atual.owner_type === "HUMAN" || atual.owner_type === "NONE" || atual.atribuida_user_id)
+    ) {
+      return {
+        ok: true,
+        ja_estava_com_humano: true,
+        mensagem: "Esta conversa já foi encaminhada para atendimento humano.",
+      };
+    }
     return { ok: false, mensagem: "A conversa mudou antes do encaminhamento." };
+  }
 
   const { count } = await supabaseAdmin
     .from("atend_conversas")

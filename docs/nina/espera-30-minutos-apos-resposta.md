@@ -6,6 +6,8 @@ Exemplo: resposta da Nina às 14h abre prazo até 14h30. Uma mensagem do pacient
 
 **Exceção de agendamento concluído (17/09/2026):** se a Nina concluiu o agendamento na sessão atual, a falta de resposta à confirmação/despedida não encaminha para atendimento humano. A exceção usa o ID de agendamento comprovado no estado do servidor e a sessão em que foi confirmado (`reservaDaSessaoAtual`), nunca palavras da mensagem. Também vale para pré-agendamento/ficha gravados pelo fluxo e para cortesias posteriores na mesma sessão. Selecionar vaga, dar aceite ou a Nina dizer “confirmado” sem registro não basta. Nova sessão/reset volta a seguir a regra normal; reserva de sessão anterior não dispensa o prazo. Encaminhamento solicitado pelo paciente continua disponível.
 
+**Transferência única:** o aviso de encaminhamento não é uma nova resposta conversacional da Nina e não inicia outra contagem. Na homologação, mesmo aparecendo com autoria Nina, o aviso tem identificador persistido `handoff-*` e é excluído da espera; em produção a autoria é sistema. Prazos antigos sobre esses avisos são descartados pelo job. Estado `HANDOFF` também impede registro/vencimento de espera. Uma conversa já na fila humana (`NONE`) ou com atendente (`HUMAN`) não pode ser encaminhada novamente; chamadas concorrentes só conseguem uma transição de responsabilidade, sem duplicar eventos, distribuição ou aviso. Um novo atendimento após reset/mensagem em sessão nova segue a regra normal.
+
 ## Implementação
 
 - Reutiliza `atend_conversas.awaiting_patient_since` e `patient_response_deadline`. Prazo fixo de 30 minutos nos dois ambientes. A antiga variável `NINA_PATIENT_RESPONSE_TIMEOUT_MINUTES` deixa de alterar essa regra.
@@ -21,6 +23,8 @@ Exemplo: resposta da Nina às 14h abre prazo até 14h30. Uma mensagem do pacient
 Testes com relógio, armazenamento e transporte simulados exercitam os serviços reais de espera/handoff: limite exato de 30 minutos, retorno do paciente, mensagem informativa, nova resposta, registro repetido, transferência humana, homologação, ausência de atendente, falha de banco, dupla execução, sessão nova e corridas de encerramento/atribuição/entrada. Testes dos adaptadores conferem registro após persistência nos dois canais. O job testa autenticação e independência de falhas da recuperação.
 
 A regressão da exceção reproduziu 9 falhas antes da correção. Os 50 cenários do fixture passaram depois, incluindo conclusão comprovada em produção/homologação, limpeza de prazo antigo, ID legado em etapa confirmada, reserva de outra sessão, confirmação apenas textual, reserva incompleta/falha, cortesia, reset e conclusão concorrente ao job. O teste usa os serviços reais com relógio e armazenamento simulados; não aguarda 30 minutos em produção nem cria reservas reais.
+
+A regressão de transferência única adicionou 9 cenários (59 no fixture), com 6 falhas reproduzidas antes da proteção. Inclui aviso persistido de produção/homologação, verificações aos 60/90/120 minutos sem novo handoff, fila sem atendente, chamadas diretas concorrentes, atribuição concorrente, aviso legado com IA reativada, prazo obsoleto sobre aviso, estado HANDOFF inconsistente e sessão nova.
 
 Não há migration nova. O cron existente precisa estar ativo e apontar para a aplicação atualizada. A transferência ocorre na primeira varredura após vencer o prazo; em funcionamento normal há até cerca de um minuto adicional, além do tempo de processamento/fila. Falhas de infraestrutura ou lotes acima da capacidade podem atrasar a execução. O lote processa até 25 conversas por chamada.
 

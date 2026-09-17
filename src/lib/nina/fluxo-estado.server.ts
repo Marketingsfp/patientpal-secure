@@ -61,9 +61,9 @@ export async function salvarFluxoEstado(
       .from("atend_conversas")
       .update({
         nina_fluxo_estado: { ...estado, updated_at: new Date().toISOString() },
-        // A reserva comprovada encerra a espera no mesmo UPDATE. A despedida
-        // enviada depois não deve criar um encaminhamento por falta de resposta.
-        ...(reservaDaSessaoAtual(estado)
+        // Reserva comprovada ou handoff encerram a espera no mesmo UPDATE.
+        // Despedida/aviso posterior não podem iniciar outro encaminhamento.
+        ...(reservaDaSessaoAtual(estado) || estado.flow.stage === "HANDOFF"
           ? { awaiting_patient_since: null, patient_response_deadline: null }
           : {}),
       } as never)
