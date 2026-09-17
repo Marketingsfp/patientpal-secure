@@ -36,4 +36,4 @@ O mesmo bloco fica em `src/lib/nina/prompt/consulta-agenda.ts`, usado somente no
 
 `bun run typecheck` e `git diff --check` passaram. Os testes usam banco e transporte simulados; nenhum paciente, agendamento, fila ou catálogo real foi alterado. Não houve teste do modelo real com a nova publicação.
 
-O prompt v30 está ativo para as próximas execuções. A correção de código depende do envio ao GitHub e da implantação do site. O teste da captura é anterior à publicação; as mensagens antigas permanecem intactas.
+Naquela validação, o prompt v30 estava ativo para as próximas execuções. A correção de código faz parte da entrega ao GitHub de 17/09/2026 e depende da implantação do site. O teste da captura é anterior à publicação; as mensagens antigas permanecem intactas. O rascunho posterior v31 reúne esta orientação e a interpretação contextual, conforme `agenda-contextual-2026-09-17.md`.

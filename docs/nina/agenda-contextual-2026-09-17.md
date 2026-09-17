@@ -28,6 +28,6 @@ As heurísticas antigas em `consulta-agenda.ts` permanecem para compatibilidade 
 
 ## Ativação
 
-Rascunho v31 atualizado e salvo na Arquitetura, com 36.425 caracteres, preservando o restante das instruções. A versão em uso permanece v30, publicada às 16:19 de 17/09/2026. O código desta correção ainda não foi enviado ao GitHub/Lovable. A CONV-07 também contém a ferramenta `consultar_primeiro_disponivel`, cuja implantação está pendente.
+Rascunho v31 atualizado e salvo na Arquitetura, com 36.425 caracteres, preservando o restante das instruções. Na última conferência, a versão em uso era v30, publicada às 16:19 de 17/09/2026. Esta entrega ao GitHub inclui o código da correção e a ferramenta `consultar_primeiro_disponivel`, integrados aos commits dos colaboradores. A implantação do site e a publicação do rascunho são etapas posteriores.
 
 Implantar o código e publicar o rascunho na mesma entrega. Depois, validar no ambiente de homologação com o modelo real: escolha de médico → respostas curtas e variadas sobre o dia → consulta efetiva registrada na execução → horários, modalidade e valores → escolha → resumo final → aceite da opção exata. Incluir desistência e resposta realmente ambígua para conferir que o modelo esclarece sem efetuar reserva.

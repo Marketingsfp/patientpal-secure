@@ -24,4 +24,4 @@ Em Arquitetura, a v27 foi preservada integralmente e recebeu apenas a nova LING-
 
 A prévia é ilustrativa e não reproduz todos os aparelhos ou ajustes de fonte do WhatsApp. Não é uma resposta gerada pelo modelo. Os testes locais verificam os dados e a montagem da resposta; não foi realizado um teste de aderência do modelo real à v29. Nenhuma mensagem foi enviada a pacientes e nenhum agendamento ou catálogo foi alterado nesta mudança.
 
-O prompt publicado vale nas próximas execuções sem depender da publicação do site. O fallback e a documentação precisam seguir o fluxo normal de envio ao GitHub e implantação do código. Respostas antigas não são reformatadas retroativamente.
+O prompt publicado vale nas próximas execuções sem depender da publicação do site. O fallback e a documentação fazem parte da entrega ao GitHub de 17/09/2026; a implantação do código segue pelo Lovable. Respostas antigas não são reformatadas retroativamente.

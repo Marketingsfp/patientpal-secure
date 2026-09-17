@@ -27,7 +27,7 @@ Resultado: 281 testes passaram (59 de autorização/escolha, 112 do executor e 1
 
 É necessário implantar o código antes de publicar a nova CONV-07. A ferramenta nova ainda não existe no servidor que usou o prompt v30. Na aba Arquitetura, o novo texto foi preparado como rascunho; preserva o restante do prompt, incluindo formatação para celular e regras de confirmação.
 
-Rascunho v31 salvo e conferido na interface, com 35.313 caracteres. A versão em uso permanece v30 (publicada em 17/09/2026 às 16:19). O comentário do rascunho informa a dependência de implantação da ferramenta. O código desta alteração ainda não foi enviado ao GitHub/Lovable.
+Rascunho v31 inicialmente salvo e conferido na interface, com 35.313 caracteres. Naquela validação, a versão em uso era v30 (publicada em 17/09/2026 às 16:19). O comentário do rascunho informa a dependência de implantação da ferramenta. O código desta alteração faz parte da entrega ao GitHub de 17/09/2026, preservando os commits dos colaboradores; a ativação depende da implantação e publicação do rascunho.
 
 Atualização posterior no mesmo dia: o rascunho v31 passou a 36.425 caracteres com a interpretação contextual. O filtro literal de “primeiro disponível” foi retirado do fluxo ativo; a estratégia passa a ser interpretada pelo modelo com o histórico. Detalhes e validação em [Consulta da agenda pela intenção contextual](agenda-contextual-2026-09-17.md).
 
