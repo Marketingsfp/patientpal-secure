@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { assinarAtualizacao } from "@/lib/webmcp/atualizacao";
@@ -6,6 +6,9 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { normalizarNomeBusca } from "@/lib/busca-texto";
 import {
   Dialog,
   DialogContent,
@@ -13,7 +16,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Plus, Loader2, Pencil, Trash2, Archive, Send, Sparkles } from "lucide-react";
+import { Plus, Loader2, Pencil, Trash2, Archive, Send, Sparkles, Search, X } from "lucide-react";
 import {
   listarCatalogoNina,
   opcoesCatalogoNina,
@@ -94,6 +97,21 @@ export function CatalogoNina({
   const [carregando, setCarregando] = useState(false);
   const [salvando, setSalvando] = useState(false);
   const [itens, setItens] = useState<any[]>([]);
+  const [busca, setBusca] = useState("");
+  const buscaId = useId();
+  const buscaRef = useRef<HTMLInputElement>(null);
+  const itensFiltrados = useMemo(() => {
+    const termos = normalizarNomeBusca(busca).split(" ").filter(Boolean);
+    if (!termos.length) return itens;
+    return itens.filter((item) => {
+      const nomes = [item.nome];
+      if (tipo === "profissional") {
+        nomes.push(...(item.especialidades ?? []).map((e: { nome?: string }) => e?.nome));
+      }
+      const texto = normalizarNomeBusca(nomes.filter(Boolean).join(" "));
+      return termos.every((termo) => texto.includes(termo));
+    });
+  }, [busca, itens, tipo]);
   const [opcoes, setOpcoes] = useState<OpcoesCatalogo>(OPCOES_VAZIAS);
   const [aberto, setAberto] = useState(false);
   const [servico, setServico] = useState<EstadoServico>(servicoVazio);
@@ -125,6 +143,10 @@ export function CatalogoNina({
   useEffect(() => {
     void carregar();
   }, [carregar]);
+
+  useEffect(() => {
+    setBusca("");
+  }, [clinicaId, tipo]);
 
   // Recarga incremental após uma operação feita pela automação (WebMCP).
   useEffect(() => assinarAtualizacao("catalogo", () => void carregar()), [carregar]);
@@ -313,6 +335,41 @@ export function CatalogoNina({
         )}
       </div>
 
+      <div className="space-y-2">
+        <Label htmlFor={buscaId}>Pesquisar {titulo.toLowerCase()}</Label>
+        <div className="relative">
+          <Search aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            id={buscaId}
+            ref={buscaRef}
+            type="search"
+            uppercase={false}
+            autoComplete="off"
+            value={busca}
+            onChange={(e) => setBusca(e.target.value)}
+            placeholder={tipo === "servico" ? "Digite o nome do exame ou procedimento…" : "Digite o nome do profissional ou a especialidade…"}
+            className="pl-9 pr-11 [&::-webkit-search-cancel-button]:hidden"
+          />
+          {busca && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="absolute right-1 top-1/2 h-7 w-7 -translate-y-1/2"
+              aria-label="Limpar pesquisa"
+              onClick={() => { setBusca(""); buscaRef.current?.focus(); }}
+            >
+              <X aria-hidden="true" className="h-4 w-4" />
+            </Button>
+          )}
+        </div>
+        {!carregando && (
+          <p role="status" className="text-xs text-muted-foreground">
+            {itensFiltrados.length} de {itens.length} registros
+          </p>
+        )}
+      </div>
+
       <Dialog open={iaAberta} onOpenChange={(v) => !iaProcessando && setIaAberta(v)}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
@@ -361,9 +418,13 @@ export function CatalogoNina({
         </div>
       ) : itens.length === 0 ? (
         <p className="text-sm text-muted-foreground">Nenhum item cadastrado ainda.</p>
+      ) : itensFiltrados.length === 0 ? (
+        <p className="text-sm text-muted-foreground">
+          Nenhum resultado para “{busca.trim()}”. Tente outro nome ou limpe a pesquisa.
+        </p>
       ) : (
         <div className="grid gap-3">
-          {itens.map((item) => (
+          {itensFiltrados.map((item) => (
             <Card key={item.id}>
               <CardHeader className="pb-2">
                 <div className="flex flex-wrap items-center justify-between gap-2">
