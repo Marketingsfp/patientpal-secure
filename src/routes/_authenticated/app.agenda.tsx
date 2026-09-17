@@ -47,6 +47,12 @@ import {
 } from "@/lib/prontuario";
 import { ConfirmarProntuarioDistante } from "@/components/pacientes/confirmar-prontuario-distante";
 import { normalizarNomeBusca, normalizarTermoBusca } from "@/lib/busca-texto";
+import {
+  chaveNomeAgenda,
+  montarOpcoesProfissional,
+  type OpcaoProfissional,
+} from "@/lib/agenda/opcoes-profissional";
+
 import { useBuscaDebounced } from "@/hooks/use-debounced-value";
 import { LIMITES } from "@/lib/seguranca/sanitizar";
 import { InputCPF, InputTelefone } from "@/components/ui/masked-input";
