@@ -14,12 +14,13 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
+import { profissionalSchema, servicoSchema, valorResumo, STATUS_CATALOGO } from "./catalogo";
 import {
-  profissionalSchema,
-  servicoSchema,
-  valorResumo,
-  STATUS_CATALOGO,
-} from "./catalogo";
+  aplicarEdicaoCatalogoIA,
+  dadosEditaveisCatalogo,
+  CONFLITO_EDICAO_CATALOGO,
+  type PreviaEdicaoCatalogo,
+} from "./catalogo-edicao-ia";
 
 const TABELA = {
   servico: "nina_cat_servicos",
@@ -137,32 +138,40 @@ async function salvar(
   id: string | null,
   dados: Record<string, unknown>,
   publicar: boolean,
+  esperadoUpdatedAt?: string,
 ) {
   await exigirAdmin(context.supabase, context.userId, clinicaId);
   const sb = context.supabase;
   const tabela = TABELA[tipo];
 
-  let atual: { status: string } | null = null;
+  if (esperadoUpdatedAt && !id) throw new Error("Selecione um cadastro existente para editar.");
+  let atual: { status: string; updated_at: string } | null = null;
   if (id) {
     const { data, error } = await sb
       .from(tabela)
-      .select("id, status")
+      .select("id, status, updated_at")
       .eq("id", id)
       .eq("clinica_id", clinicaId)
       .maybeSingle();
     if (error) throw new Error(error.message);
     if (!data) throw new Error("Registro não encontrado nesta clínica.");
-    atual = data as { status: string };
+    atual = data as { status: string; updated_at: string };
+    if (esperadoUpdatedAt && atual.updated_at !== esperadoUpdatedAt)
+      throw new Error(CONFLITO_EDICAO_CATALOGO);
+  }
+
+  // O filtro também protege contra uma edição que ocorra entre a leitura e o update.
+  async function atualizar(registro: Record<string, unknown>) {
+    let query = sb.from(tabela).update(registro).eq("id", id!).eq("clinica_id", clinicaId);
+    if (esperadoUpdatedAt) query = query.eq("updated_at", esperadoUpdatedAt);
+    const { data: alterado, error } = await query.select("id").maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!alterado) throw new Error(CONFLITO_EDICAO_CATALOGO);
   }
 
   // Edição de item PUBLICADO sem publicar: fica em revisão, sem expor a mudança.
   if (atual?.status === "PUBLICADO" && !publicar) {
-    const { error } = await sb
-      .from(tabela)
-      .update({ rascunho: dados })
-      .eq("id", id!)
-      .eq("clinica_id", clinicaId);
-    if (error) throw new Error(error.message);
+    await atualizar({ rascunho: dados });
     return { id: id!, status: "PUBLICADO", emRevisao: true };
   }
 
@@ -177,12 +186,11 @@ async function salvar(
   };
 
   if (id) {
-    const { error } = await sb.from(tabela).update(registro).eq("id", id).eq("clinica_id", clinicaId);
-    if (error) throw new Error(error.message);
+    await atualizar(registro);
     return { id, status, emRevisao: false };
   }
 
-  registro['criado_por'] = context.userId;
+  registro["criado_por"] = context.userId;
   const { data: criado, error } = await sb.from(tabela).insert(registro).select("id").single();
   if (error) throw new Error(error.message);
   return { id: String(criado.id), status, emRevisao: false };
@@ -197,6 +205,7 @@ export const salvarServicoCatalogo = createServerFn({ method: "POST" })
         id: z.string().uuid().nullable().optional().default(null),
         publicar: z.boolean().optional().default(false),
         dados: servicoSchema,
+        esperadoUpdatedAt: z.string().datetime({ offset: true }).optional(),
       })
       .parse(i),
   )
@@ -204,7 +213,15 @@ export const salvarServicoCatalogo = createServerFn({ method: "POST" })
     const d = data.dados;
     // Fonte única de preço: com formas de pagamento valoradas, o resumo vem delas.
     const dados = { ...d, valor: valorResumo(d) };
-    return await salvar(context, "servico", data.clinicaId, data.id ?? null, dados, data.publicar);
+    return await salvar(
+      context,
+      "servico",
+      data.clinicaId,
+      data.id ?? null,
+      dados,
+      data.publicar,
+      data.esperadoUpdatedAt,
+    );
   });
 
 export const salvarProfissionalCatalogo = createServerFn({ method: "POST" })
@@ -216,11 +233,20 @@ export const salvarProfissionalCatalogo = createServerFn({ method: "POST" })
         id: z.string().uuid().nullable().optional().default(null),
         publicar: z.boolean().optional().default(false),
         dados: profissionalSchema,
+        esperadoUpdatedAt: z.string().datetime({ offset: true }).optional(),
       })
       .parse(i),
   )
   .handler(async ({ data, context }) =>
-    salvar(context, "profissional", data.clinicaId, data.id ?? null, data.dados, data.publicar),
+    salvar(
+      context,
+      "profissional",
+      data.clinicaId,
+      data.id ?? null,
+      data.dados,
+      data.publicar,
+      data.esperadoUpdatedAt,
+    ),
   );
 
 export const alterarStatusCatalogo = createServerFn({ method: "POST" })
@@ -315,4 +341,45 @@ export const organizarTextoCatalogoIA = createServerFn({ method: "POST" })
     await exigirAdmin(context.supabase, context.userId, data.clinicaId);
     const { organizarTextoComIA } = await import("./catalogo-ia.server");
     return await organizarTextoComIA(data.tipo, data.texto);
+  });
+
+/** Lê o cadastro da clínica e gera uma prévia. Não grava nem publica. */
+export const preverEdicaoCatalogoIA = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) =>
+    z
+      .object({
+        clinicaId: z.string().uuid(),
+        tipo: z.enum(["servico", "profissional"]),
+        id: z.string().uuid(),
+        texto: z.string().trim().min(10, "Descreva a alteração desejada.").max(20000),
+      })
+      .parse(i),
+  )
+  .handler(async ({ data, context }): Promise<PreviaEdicaoCatalogo> => {
+    await exigirAdmin(context.supabase, context.userId, data.clinicaId);
+    const sb: any = context.supabase;
+    const { data: registro, error } = await sb
+      .from(TABELA[data.tipo])
+      .select(data.tipo === "servico" ? COLUNAS_SERVICO : COLUNAS_PROFISSIONAL)
+      .eq("clinica_id", data.clinicaId)
+      .eq("id", data.id)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!registro) throw new Error("Registro não encontrado nesta clínica.");
+    const { editarTextoComIA } = await import("./catalogo-ia.server");
+    const proposta = await editarTextoComIA(
+      data.tipo,
+      data.texto,
+      dadosEditaveisCatalogo(data.tipo, registro),
+    );
+    const previa = aplicarEdicaoCatalogoIA(data.tipo, registro, proposta);
+    return {
+      ...previa,
+      id: data.id,
+      nome: registro.nome,
+      tipo: data.tipo,
+      esperadoUpdatedAt: registro.updated_at,
+      incluiRascunho: !!registro.rascunho,
+    };
   });

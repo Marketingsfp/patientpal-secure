@@ -1,5 +1,5 @@
 /**
- * "Criar com IA" do catálogo — chamada ao modelo, somente no servidor.
+ * "Criar ou editar com IA" do catálogo — chamada ao modelo, somente no servidor.
  *
  * Usa a Responses API do gateway de IA da Lovable com saída estruturada
  * estrita, em streaming (modelos de raciocínio podem demorar; sem streaming a
@@ -15,6 +15,7 @@ import {
   schemaSaida,
   type TipoCatalogo,
 } from "./catalogo-ia";
+import { instrucoesEdicaoCatalogoIA, schemaSaidaEdicao } from "./catalogo-edicao-ia";
 
 export type ResultadoIA = {
   servicos: any[];
@@ -30,8 +31,7 @@ function erroAmigavel(status: number, corpo: string): string {
     return "A IA está bloqueada por configuração do espaço de trabalho. O cadastro manual continua funcionando.";
   if (status === 429)
     return "Muitas solicitações de IA agora. Tente novamente em alguns instantes.";
-  if (status === 400)
-    return `O texto não pôde ser processado pela IA (${corpo.slice(0, 200)}).`;
+  if (status === 400) return `O texto não pôde ser processado pela IA (${corpo.slice(0, 200)}).`;
   return "A IA não respondeu agora. Seu texto foi preservado — tente novamente.";
 }
 
@@ -73,10 +73,11 @@ async function lerTextoDoStream(res: Response): Promise<string> {
   return texto.trim();
 }
 
-export async function organizarTextoComIA(
-  tipo: TipoCatalogo,
+async function gerarJsonCatalogo(
+  instructions: string,
   texto: string,
-): Promise<ResultadoIA> {
+  schema: object,
+): Promise<any> {
   const chave = process.env["LOVABLE_API_KEY"];
   if (!chave)
     throw new Error(
@@ -94,15 +95,14 @@ export async function organizarTextoComIA(
       model: MODELO_CATALOGO_IA,
       stream: true,
       store: false,
-      instructions: instrucoesCatalogoIA(tipo),
+      instructions,
       input: [
         {
           role: "user",
           content: [
             {
               type: "input_text",
-              // Delimitado para deixar explícito que é conteúdo, não instrução.
-              text: `Organize o conteúdo entre as marcas abaixo.\n<<<TEXTO_DA_CLINICA\n${texto}\nTEXTO_DA_CLINICA>>>`,
+              text: texto,
             },
           ],
         },
@@ -112,7 +112,7 @@ export async function organizarTextoComIA(
           type: "json_schema",
           name: "catalogo_nina",
           strict: true,
-          schema: schemaSaida(),
+          schema,
         },
       },
     }),
@@ -134,10 +134,31 @@ export async function organizarTextoComIA(
     throw new Error("A resposta da IA veio fora do formato esperado. Tente novamente.");
   }
 
+  return json;
+}
+
+export async function organizarTextoComIA(tipo: TipoCatalogo, texto: string): Promise<ResultadoIA> {
+  const json = await gerarJsonCatalogo(
+    instrucoesCatalogoIA(tipo),
+    `Organize o conteúdo entre as marcas abaixo.\n<<<TEXTO_DA_CLINICA\n${texto}\nTEXTO_DA_CLINICA>>>`,
+    schemaSaida(),
+  );
   return {
     servicos: Array.isArray(json?.servicos) ? json.servicos : [],
     profissionais: Array.isArray(json?.profissionais) ? json.profissionais : [],
     pendencias: Array.isArray(json?.pendencias) ? json.pendencias.map(String) : [],
     ambiguidades: Array.isArray(json?.ambiguidades) ? json.ambiguidades.map(String) : [],
   };
+}
+
+export async function editarTextoComIA(
+  tipo: TipoCatalogo,
+  texto: string,
+  cadastro: Record<string, unknown>,
+): Promise<unknown> {
+  return gerarJsonCatalogo(
+    instrucoesEdicaoCatalogoIA(tipo),
+    JSON.stringify({ cadastro_atual: cadastro, pedido_do_operador: texto }),
+    schemaSaidaEdicao(),
+  );
 }

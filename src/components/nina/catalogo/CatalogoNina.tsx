@@ -8,6 +8,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { SearchableSelect } from "@/components/ui/searchable-select";
+import type { PreviaEdicaoCatalogo } from "@/lib/nina/catalogo-edicao-ia";
 import { normalizarNomeBusca } from "@/lib/busca-texto";
 import {
   Dialog,
@@ -25,6 +27,7 @@ import {
   alterarStatusCatalogo,
   excluirItemCatalogo,
   organizarTextoCatalogoIA,
+  preverEdicaoCatalogoIA,
 } from "@/lib/nina/catalogo.functions";
 import {
   MODELO_CATALOGO_IA,
@@ -35,6 +38,8 @@ import {
   ROTULO_STATUS,
   formatarBRL,
   resumoHorarios,
+  servicoSchema,
+  profissionalSchema,
   type StatusCatalogo,
 } from "@/lib/nina/catalogo";
 import {
@@ -93,6 +98,7 @@ export function CatalogoNina({
   const statusFn = useServerFn(alterarStatusCatalogo);
   const excluirFn = useServerFn(excluirItemCatalogo);
   const iaFn = useServerFn(organizarTextoCatalogoIA);
+  const previaFn = useServerFn(preverEdicaoCatalogoIA);
 
   const [carregando, setCarregando] = useState(false);
   const [salvando, setSalvando] = useState(false);
@@ -117,10 +123,16 @@ export function CatalogoNina({
   const [servico, setServico] = useState<EstadoServico>(servicoVazio);
   const [profissional, setProfissional] = useState<EstadoProfissional>(profissionalVazio);
 
-  // "Criar com IA": texto livre → rascunho de formulário para revisão humana.
+  // A IA propõe; somente a confirmação humana grava e publica.
   const [iaAberta, setIaAberta] = useState(false);
   const [iaTexto, setIaTexto] = useState("");
   const [iaProcessando, setIaProcessando] = useState(false);
+  const [iaModo, setIaModo] = useState<"criar" | "editar">("criar");
+  const [iaRegistroId, setIaRegistroId] = useState("");
+  const [iaPrevia, setIaPrevia] = useState<PreviaEdicaoCatalogo | null>(null);
+  const [iaErro, setIaErro] = useState("");
+  const iaTextoId = useId();
+  const publicandoIA = useRef(false);
   const [avisos, setAvisos] = useState<string[]>([]);
   const [fila, setFila] = useState<any[]>([]);
   const [posicao, setPosicao] = useState(0);
@@ -147,6 +159,19 @@ export function CatalogoNina({
   useEffect(() => {
     setBusca("");
   }, [clinicaId, tipo]);
+
+  useEffect(() => {
+    setIaAberta(false);
+    setIaPrevia(null);
+    setIaRegistroId("");
+    setIaTexto("");
+    setIaErro("");
+    setIaProcessando(false);
+    // Trocar clínica/aba ou desmontar invalida respostas ainda em processamento.
+    return () => {
+      pedidoRef.current++;
+    };
+  }, [clinicaId, tipo, podeEditar]);
 
   // Recarga incremental após uma operação feita pela automação (WebMCP).
   useEffect(() => assinarAtualizacao("catalogo", () => void carregar()), [carregar]);
@@ -200,13 +225,27 @@ export function CatalogoNina({
 
   /** Só roda no clique. Nada é salvo nem publicado automaticamente. */
   async function organizarComIA() {
-    if (!clinicaId || iaTexto.trim().length < 10) {
-      toast.error("Escreva ou cole as informações a organizar.");
+    if (!podeEditar || iaProcessando) return;
+    if (!clinicaId || iaTexto.trim().length < 10 || (iaModo === "editar" && !iaRegistroId)) {
+      setIaErro(
+        iaModo === "editar"
+          ? "Selecione o cadastro e descreva a alteração com pelo menos 10 caracteres."
+          : "Escreva as informações com pelo menos 10 caracteres.",
+      );
       return;
     }
     const meu = ++pedidoRef.current;
     setIaProcessando(true);
+    setIaErro("");
     try {
+      if (iaModo === "editar") {
+        const previa = await previaFn({
+          data: { clinicaId, tipo, id: iaRegistroId, texto: iaTexto.trim() },
+        });
+        if (meu !== pedidoRef.current) return;
+        setIaPrevia(previa);
+        return;
+      }
       const r = (await iaFn({ data: { clinicaId, tipo, texto: iaTexto.trim() } })) as any;
       if (meu !== pedidoRef.current) return; // resposta atrasada: descartar
       const lista: any[] = tipo === "servico" ? r.servicos : r.profissionais;
@@ -228,9 +267,50 @@ export function CatalogoNina({
     } catch (e: any) {
       if (meu !== pedidoRef.current) return;
       // O texto digitado é preservado: a janela continua aberta.
-      toast.error(e?.message ?? "A IA não respondeu agora. Seu texto foi preservado.");
+      setIaErro(e?.message ?? "A IA não respondeu agora. Seu texto foi preservado.");
     } finally {
       if (meu === pedidoRef.current) setIaProcessando(false);
+    }
+  }
+
+  function fecharIA() {
+    if (publicandoIA.current) return;
+    pedidoRef.current++;
+    setIaProcessando(false);
+    setIaPrevia(null);
+    setIaErro("");
+    setIaAberta(false);
+  }
+
+  async function publicarEdicaoIA() {
+    if (!clinicaId || !podeEditar || !iaPrevia || publicandoIA.current) return;
+    publicandoIA.current = true;
+    setSalvando(true);
+    setIaErro("");
+    const meu = pedidoRef.current;
+    try {
+      const comum = {
+        clinicaId,
+        id: iaPrevia.id,
+        publicar: true,
+        esperadoUpdatedAt: iaPrevia.esperadoUpdatedAt,
+      };
+      if (iaPrevia.tipo === "servico") {
+        await salvarServicoFn({ data: { ...comum, dados: servicoSchema.parse(iaPrevia.dados) } });
+      } else {
+        await salvarProfFn({ data: { ...comum, dados: profissionalSchema.parse(iaPrevia.dados) } });
+      }
+      if (meu !== pedidoRef.current) return;
+      toast.success("Alterações confirmadas e publicadas no cadastro existente.");
+      setIaAberta(false);
+      setIaPrevia(null);
+      setIaTexto("");
+      await carregar();
+    } catch (e: any) {
+      if (meu === pedidoRef.current) setIaErro(e?.message ?? "Não foi possível publicar a edição.");
+    } finally {
+      publicandoIA.current = false;
+      setSalvando(false);
     }
   }
 
@@ -309,12 +389,12 @@ export function CatalogoNina({
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h3 className="text-base font-semibold">{titulo}</h3>
           <p className="text-sm text-muted-foreground">
-            Cadastro manual ou com IA. A Nina responde aos pacientes usando apenas os
-            registros publicados.
+            Cadastro manual ou com IA. A Nina responde aos pacientes usando apenas os registros
+            publicados.
           </p>
         </div>
         {podeEditar && (
@@ -326,7 +406,7 @@ export function CatalogoNina({
               size="sm"
               variant="outline"
             >
-              <Sparkles className="mr-2 h-4 w-4" /> Criar com IA
+              <Sparkles className="mr-2 h-4 w-4" /> Criar ou editar com IA
             </Button>
             <Button onClick={abrirNovo} size="sm">
               <Plus className="mr-2 h-4 w-4" /> Novo
@@ -338,7 +418,10 @@ export function CatalogoNina({
       <div className="space-y-2">
         <Label htmlFor={buscaId}>Pesquisar {titulo.toLowerCase()}</Label>
         <div className="relative">
-          <Search aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Search
+            aria-hidden="true"
+            className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
+          />
           <Input
             id={buscaId}
             ref={buscaRef}
@@ -347,7 +430,11 @@ export function CatalogoNina({
             autoComplete="off"
             value={busca}
             onChange={(e) => setBusca(e.target.value)}
-            placeholder={tipo === "servico" ? "Digite o nome do exame ou procedimento…" : "Digite o nome do profissional ou a especialidade…"}
+            placeholder={
+              tipo === "servico"
+                ? "Digite o nome do exame ou procedimento…"
+                : "Digite o nome do profissional ou a especialidade…"
+            }
             className="pl-9 pr-11 [&::-webkit-search-cancel-button]:hidden"
           />
           {busca && (
@@ -357,7 +444,10 @@ export function CatalogoNina({
               size="icon"
               className="absolute right-1 top-1/2 h-7 w-7 -translate-y-1/2"
               aria-label="Limpar pesquisa"
-              onClick={() => { setBusca(""); buscaRef.current?.focus(); }}
+              onClick={() => {
+                setBusca("");
+                buscaRef.current?.focus();
+              }}
             >
               <X aria-hidden="true" className="h-4 w-4" />
             </Button>
@@ -370,44 +460,189 @@ export function CatalogoNina({
         )}
       </div>
 
-      <Dialog open={iaAberta} onOpenChange={(v) => !iaProcessando && setIaAberta(v)}>
-        <DialogContent className="max-w-2xl">
+      <Dialog
+        open={iaAberta}
+        onOpenChange={(v) => {
+          if (!v) fecharIA();
+        }}
+      >
+        <DialogContent
+          className="max-w-3xl max-h-[85vh] overflow-y-auto"
+          aria-describedby={undefined}
+        >
           <DialogHeader>
-            <DialogTitle>Criar com IA — {titulo.toLowerCase()}</DialogTitle>
+            <DialogTitle>
+              {iaPrevia ? "Prévia da edição" : "Criar ou editar com IA"} — {titulo.toLowerCase()}
+            </DialogTitle>
           </DialogHeader>
-          <div className="space-y-3">
-            <p className="text-sm text-muted-foreground">
-              Escreva ou cole as informações do jeito que você tem. A IA organiza nos campos do
-              formulário e você revisa antes de salvar. Nada é salvo nem publicado
-              automaticamente.
+          {iaPrevia ? (
+            <div className="space-y-4">
+              <p className="text-sm">
+                Cadastro: <strong>{iaPrevia.nome}</strong>
+              </p>
+              <p className="text-sm text-muted-foreground whitespace-pre-wrap">
+                Seu pedido: {iaTexto}
+              </p>
+              <p className="text-sm text-muted-foreground">
+                Confira as diferenças. Ao confirmar, este cadastro será atualizado e publicado para
+                uso da Nina.
+              </p>
+              {iaPrevia.incluiRascunho && (
+                <p className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm">
+                  Esta prévia inclui também as alterações que já estavam salvas em revisão.
+                </p>
+              )}
+              {iaPrevia.mudancas.length === 0 && (
+                <p className="text-sm">
+                  A proposta descarta as alterações em revisão e mantém o conteúdo publicado.
+                </p>
+              )}
+              {iaPrevia.mudancas.map((mudanca) => (
+                <section key={mudanca.campo} className="rounded-md border p-3 space-y-2">
+                  <h4 className="font-medium text-sm">{mudanca.campo}</h4>
+                  <div className="grid gap-3 sm:grid-cols-2 text-sm">
+                    <div className="min-w-0">
+                      <p className="font-medium text-muted-foreground">Antes</p>
+                      <p className="whitespace-pre-wrap break-words">{mudanca.antes}</p>
+                    </div>
+                    <div className="min-w-0">
+                      <p className="font-medium text-primary">Depois</p>
+                      <p className="whitespace-pre-wrap break-words">{mudanca.depois}</p>
+                    </div>
+                  </div>
+                </section>
+              ))}
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <div className="flex flex-wrap gap-2" role="group" aria-label="Operação da IA">
+                <Button
+                  variant={iaModo === "criar" ? "default" : "outline"}
+                  aria-pressed={iaModo === "criar"}
+                  disabled={iaProcessando}
+                  onClick={() => {
+                    setIaModo("criar");
+                    setIaErro("");
+                  }}
+                >
+                  Criar cadastro
+                </Button>
+                <Button
+                  variant={iaModo === "editar" ? "default" : "outline"}
+                  aria-pressed={iaModo === "editar"}
+                  disabled={iaProcessando}
+                  onClick={() => {
+                    setIaModo("editar");
+                    setIaErro("");
+                  }}
+                >
+                  Editar cadastro existente
+                </Button>
+              </div>
+              {iaModo === "editar" && (
+                <div className="space-y-2">
+                  <p className="text-sm font-medium">Qual cadastro deseja editar?</p>
+                  <SearchableSelect
+                    options={itens.map((item) => ({
+                      value: item.id,
+                      label: `${item.nome} · ${ROTULO_STATUS[item.status as StatusCatalogo] ?? item.status}${tipo === "profissional" && item.especialidades?.length ? ` · ${item.especialidades.map((e: { nome: string }) => e.nome).join(", ")}` : ""}`,
+                    }))}
+                    value={iaRegistroId}
+                    onChange={(id) => {
+                      setIaRegistroId(id);
+                      setIaErro("");
+                    }}
+                    placeholder="Pesquisar e selecionar cadastro"
+                    searchPlaceholder={
+                      tipo === "servico"
+                        ? "Buscar exame ou procedimento…"
+                        : "Buscar profissional ou especialidade…"
+                    }
+                    emptyText="Nenhum cadastro encontrado."
+                    disabled={iaProcessando || carregando}
+                  />
+                </div>
+              )}
+              <p className="text-sm text-muted-foreground">
+                {iaModo === "editar"
+                  ? "Descreva o que deseja alterar no cadastro selecionado. Você verá o antes e depois para confirmar e publicar."
+                  : "Escreva ou cole as informações. A IA organiza os campos e você revisa antes de salvar."}{" "}
+                Nada é salvo nem publicado automaticamente.
+              </p>
+              <Label htmlFor={iaTextoId}>
+                {iaModo === "editar" ? "O que deseja mudar?" : "Informações para o novo cadastro"}
+              </Label>
+              <Textarea
+                id={iaTextoId}
+                value={iaTexto}
+                onChange={(e) => setIaTexto(e.target.value)}
+                disabled={iaProcessando}
+                rows={7}
+                maxLength={20000}
+                placeholder={
+                  iaModo === "editar"
+                    ? tipo === "servico"
+                      ? "Ex.: Altere o valor no dinheiro da mamografia para R$ 180. Mantenha o cartão e as demais informações."
+                      : "Ex.: Altere o horário de início de quinta-feira para 14:30. Mantenha os demais dias."
+                    : tipo === "servico"
+                      ? "Ex.: Ultrassom de tireoide 130 no pix, 150 no cartão em 3x. Precisa de pedido médico..."
+                      : "Ex.: Dra. Ana Paula, cardiologista, atende quinzenal às quintas das 14h às 18h..."
+                }
+              />
+              <p className="text-xs text-muted-foreground">
+                Modelo utilizado: {MODELO_CATALOGO_IA}.
+              </p>
+            </div>
+          )}
+          {iaErro && (
+            <p
+              role="alert"
+              className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm"
+            >
+              {iaErro}
             </p>
-            <Textarea
-              value={iaTexto}
-              onChange={(e) => setIaTexto(e.target.value)}
-              rows={10}
-              placeholder={
-                tipo === "servico"
-                  ? "Ex.: Ultrassom de tireoide 130 no pix, 150 no cartão em 3x. Precisa de pedido médico..."
-                  : "Ex.: Dra. Ana Paula, cardiologista, atende quinzenal às quintas das 14h às 18h..."
-              }
-            />
-            <p className="text-xs text-muted-foreground">
-              Modelo utilizado: {MODELO_CATALOGO_IA}. O texto é usado apenas para preencher este
-              formulário.
-            </p>
-          </div>
+          )}
           <DialogFooter>
-            <Button variant="ghost" onClick={() => setIaAberta(false)} disabled={iaProcessando}>
+            <Button variant="ghost" onClick={fecharIA} disabled={salvando}>
               Cancelar
             </Button>
-            <Button onClick={() => void organizarComIA()} disabled={iaProcessando}>
-              {iaProcessando ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
-                <Sparkles className="mr-2 h-4 w-4" />
-              )}
-              Organizar e preencher campos com IA
-            </Button>
+            {iaPrevia ? (
+              <>
+                <Button
+                  variant="outline"
+                  disabled={salvando}
+                  onClick={() => {
+                    setIaPrevia(null);
+                    setIaErro("");
+                  }}
+                >
+                  Ajustar pedido
+                </Button>
+                <Button disabled={salvando || !podeEditar} onClick={() => void publicarEdicaoIA()}>
+                  {salvando && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Confirmar e
+                  publicar
+                </Button>
+              </>
+            ) : (
+              <Button
+                onClick={() => void organizarComIA()}
+                disabled={
+                  iaProcessando ||
+                  !podeEditar ||
+                  iaTexto.trim().length < 10 ||
+                  (iaModo === "editar" && !iaRegistroId)
+                }
+              >
+                {iaProcessando ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Sparkles className="mr-2 h-4 w-4" />
+                )}
+                {iaModo === "editar"
+                  ? "Gerar prévia da edição"
+                  : "Organizar e preencher campos com IA"}
+              </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -435,8 +670,8 @@ export function CatalogoNina({
               <CardContent className="space-y-2 text-sm text-muted-foreground">
                 {tipo === "servico" ? (
                   <p>
-                    Valor: {formatarBRL(item.valor)} ·{" "}
-                    {(item.formas_pagamento?.length ?? 0)} forma(s) de pagamento
+                    Valor: {formatarBRL(item.valor)} · {item.formas_pagamento?.length ?? 0} forma(s)
+                    de pagamento
                   </p>
                 ) : (
                   <p>{resumoHorarios(item.horarios ?? [])}</p>
