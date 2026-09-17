@@ -1147,13 +1147,22 @@ function Page() {
         .eq("clinica_id", clinicaAtual.clinica_id)
         .eq("ativo", true)
         .order("nome"),
-      // Quem tem mais de uma agenda ativa: só para esses o quadro "Por
-      // profissional" abre a quebra por agenda.
+      // Agendas ativas e agendas que realmente geram horário: mesma base que a
+      // tela de Agenda usa para desdobrar o profissional em `NOME — AGENDA`.
       supabase
         .from("medico_agendas")
-        .select("id, medico_id")
+        .select("id, nome, medico_id")
         .eq("clinica_id", clinicaAtual.clinica_id)
-        .eq("ativo", true),
+        .eq("ativo", true)
+        .order("ordem", { ascending: true })
+        .order("nome", { ascending: true }),
+      supabase
+        .from("medico_disponibilidades")
+        .select("agenda_id")
+        .eq("clinica_id", clinicaAtual.clinica_id)
+        .eq("ativo", true)
+        .not("agenda_id", "is", null)
+        .limit(20000),
     ]);
     setCats((c.data ?? []) as Opt[]);
     setContas((b.data ?? []) as Opt[]);
@@ -1163,24 +1172,33 @@ function Page() {
         nome: x.nome || "(sem nome)",
       })),
     );
-    const nomePorMedico = new Map(
-      ((meds.data ?? []) as Array<{ id: string; nome: string | null }>).map((x) => [
-        x.id,
-        (x.nome || "").trim(),
-      ]),
-    );
-    const qtdAgendas = new Map<string, number>();
-    for (const a of (agendas.data ?? []) as Array<{ medico_id: string | null }>) {
-      if (a.medico_id) qtdAgendas.set(a.medico_id, (qtdAgendas.get(a.medico_id) ?? 0) + 1);
+    const agendasPorMedico = new Map<string, { id: string; nome: string }[]>();
+    for (const a of (agendas.data ?? []) as Array<{
+      id: string;
+      nome: string | null;
+      medico_id: string | null;
+    }>) {
+      if (!a.medico_id) continue;
+      const arr = agendasPorMedico.get(a.medico_id) ?? [];
+      arr.push({ id: a.id, nome: a.nome ?? "" });
+      agendasPorMedico.set(a.medico_id, arr);
     }
-    setMedicosVariasAgendas(
-      new Set(
-        Array.from(qtdAgendas)
-          .filter(([, n]) => n > 1)
-          .map(([id]) => nomePorMedico.get(id) ?? "")
-          .filter(Boolean),
-      ),
+    const agendasComGrade = new Set(
+      ((grades.data ?? []) as Array<{ agenda_id: string | null }>)
+        .map((g) => g.agenda_id)
+        .filter((id): id is string => !!id),
     );
+    setOpcoesProf(
+      montarOpcoesProfissional({
+        medicos: ((meds.data ?? []) as Array<{ id: string; nome: string | null }>).map((x) => ({
+          id: x.id,
+          nome: x.nome || "(sem nome)",
+        })),
+        agendasPorMedico,
+        agendasComGrade,
+      }),
+    );
+
     const mems = (m.data ?? []) as Array<{ user_id: string; role: string }>;
     const userIds = mems.map((r) => r.user_id);
     if (userIds.length) {
