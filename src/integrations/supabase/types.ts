@@ -3423,8 +3423,10 @@ export type Database = {
       }
       coach_config_clinica: {
         Row: {
+          base_gerada_em: string | null
           checklist: Json
           clinica_id: string
+          complemento: string
           created_at: string
           scripts: Json
           tabela_servicos: string
@@ -3432,8 +3434,10 @@ export type Database = {
           voz_config: Json
         }
         Insert: {
+          base_gerada_em?: string | null
           checklist?: Json
           clinica_id: string
+          complemento?: string
           created_at?: string
           scripts?: Json
           tabela_servicos?: string
@@ -3441,8 +3445,10 @@ export type Database = {
           voz_config?: Json
         }
         Update: {
+          base_gerada_em?: string | null
           checklist?: Json
           clinica_id?: string
+          complemento?: string
           created_at?: string
           scripts?: Json
           tabela_servicos?: string
