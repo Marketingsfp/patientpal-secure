@@ -91,6 +91,30 @@ export function vaosDaGrade(
 }
 
 /**
+ * O vão está todo preenchido pelas fichas do dia? Acontece quando a clínica
+ * abre vagas avulsas no almoço de uma data específica sem mudar a grade —
+ * aí naquele dia não existe almoço e a faixa não deve aparecer. Uma ficha
+ * solta dentro do almoço não basta: sobrando qualquer buraco, a faixa fica.
+ */
+export function vaoCobertoPelasFichas(
+  vao: VaoDaGrade,
+  pedacos: Array<{ inicio: string; fim: string }>,
+): boolean {
+  let cobertoAte = emMinutos(vao.inicio);
+  const fimVao = emMinutos(vao.fim);
+  const ordenados = pedacos
+    .map((p) => ({ ini: emMinutos(p.inicio), fim: emMinutos(p.fim) }))
+    .filter((p) => p.ini < p.fim)
+    .sort((a, b) => a.ini - b.ini);
+  for (const p of ordenados) {
+    if (p.ini > cobertoAte) break;
+    if (p.fim > cobertoAte) cobertoAte = p.fim;
+    if (cobertoAte >= fimVao) return true;
+  }
+  return cobertoAte >= fimVao;
+}
+
+/**
  * Como o vão é chamado na tela. Um buraco no meio do dia é almoço; qualquer
  * outro é só um intervalo, e chamar de almoço confundiria a recepção.
  */
