@@ -191,6 +191,7 @@ import {
 } from "@/lib/agenda/sem-faturamento";
 import {
   vaosEntreHorarios,
+  vaoCobertoPelasFichas,
   vaosDaGrade,
   rotuloDoVao,
   type FaixaGrade,
@@ -4326,7 +4327,9 @@ function AgendaPage() {
       const daGrade = grade
         ? vaosDaGrade(grade, ctx.diaIso, new Date(`${ctx.diaIso}T12:00:00`).getDay())
         : [];
-      const vaos = daGrade.length > 0 ? daGrade : vaosEntreHorarios(pedacos);
+      const vaos = (daGrade.length > 0 ? daGrade : vaosEntreHorarios(pedacos)).filter(
+        (v) => !vaoCobertoPelasFichas(v, pedacos),
+      );
       if (vaos.length > 0) out.set(chave, vaos);
     }
     return out;

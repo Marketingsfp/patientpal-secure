@@ -1070,7 +1070,6 @@ export type Database = {
       }
       atend_conversas: {
         Row: {
-          fila_pendente: boolean
           aguardando_desde: string | null
           ai_enabled: boolean
           ai_tentativas: number
@@ -1087,6 +1086,7 @@ export type Database = {
           contato_telefone_norm: string | null
           created_at: string
           departamento_id: string | null
+          fila_pendente: boolean
           fila_posicao: number | null
           handoff_em: string | null
           handoff_motivo: string | null
@@ -1123,7 +1123,6 @@ export type Database = {
           whatsapp_profile_name_updated_at: string | null
         }
         Insert: {
-          fila_pendente?: boolean
           aguardando_desde?: string | null
           ai_enabled?: boolean
           ai_tentativas?: number
@@ -1140,6 +1139,7 @@ export type Database = {
           contato_telefone_norm?: string | null
           created_at?: string
           departamento_id?: string | null
+          fila_pendente?: boolean
           fila_posicao?: number | null
           handoff_em?: string | null
           handoff_motivo?: string | null
@@ -1176,7 +1176,6 @@ export type Database = {
           whatsapp_profile_name_updated_at?: string | null
         }
         Update: {
-          fila_pendente?: boolean
           aguardando_desde?: string | null
           ai_enabled?: boolean
           ai_tentativas?: number
@@ -1193,6 +1192,7 @@ export type Database = {
           contato_telefone_norm?: string | null
           created_at?: string
           departamento_id?: string | null
+          fila_pendente?: boolean
           fila_posicao?: number | null
           handoff_em?: string | null
           handoff_motivo?: string | null
