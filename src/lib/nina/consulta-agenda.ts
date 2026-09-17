@@ -123,11 +123,18 @@ function perguntaFinal(texto: string): string {
 }
 
 function ofertaAgenda(ctx: ContextoConsultaAgenda): string {
-  const p = perguntaFinal(ultimaResposta(ctx));
-  return ASSUNTO_AGENDA.test(p) &&
-    /\b(ver|verific|consult|checar|olhar|buscar|prefere|qual|quer|gostaria|posso|podemos)/.test(p)
-    ? p
-    : "";
+  const resposta = ultimaResposta(ctx);
+  const p = perguntaFinal(resposta);
+  const eOferta = (pergunta: string) => ASSUNTO_AGENDA.test(pergunta) &&
+    /\b(ver|verific|consult|checar|olhar|buscar|prefere|qual|quer|gostaria|posso|podemos)/.test(pergunta);
+  if (eOferta(p)) return p;
+  // "Quer verificar vagas? Qual profissional prefere?" é uma única oferta
+  // seguida da escolha necessária. Só admite perguntas consecutivas no final
+  // da mesma mensagem; outra pergunta ou instrução não herda essa autorização.
+  if (!/\b(qual|quais|quem)\b/.test(p) ||
+    !/\b(medicos?|medicas?|profissional|profissionais|doutores?|doutoras?)\b/.test(p)) return "";
+  const anterior = perguntaFinal(resposta.slice(0, resposta.lastIndexOf(p)).trim());
+  return eOferta(anterior) ? `${anterior} ${p}` : "";
 }
 
 /** Interesse em consultar é diferente de confirmação para gravar um agendamento. */

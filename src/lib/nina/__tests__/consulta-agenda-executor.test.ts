@@ -731,6 +731,33 @@ describe("executor real das ferramentas com banco simulado", () => {
 });
 
 describe("modalidades na consulta operacional", () => {
+  for (const origem of ["whatsapp", "homologacao"] as const) {
+    for (const [publicada, esperada, antecedencia] of [
+      ["Hora marcada", "hora_marcada", true],
+      ["Ordem de chegada com pré-agendamento", "chegada_com_pre_agendamento", false],
+      ["Por numeração (ficha)", "ficha", true],
+    ] as const) {
+      test(`${origem}: escolha após oferta composta e sim consultam sem exigir data (${esperada})`, async () => {
+        banco.nina_cat_profissionais![0]!.tipo_atendimento = publicada;
+        const ctx: CtxNinaPaciente = { ...contexto("com o Alex Louza",
+          "Quer verificar vagas na agenda? Se sim, qual profissional prefere?"), origem, teste: origem === "homologacao" };
+        const escolhido = await executarFerramentaPaciente(ctx, "proxima_vaga", { medico_id: "Alex Louza" });
+        expect(escolhido.ok).toBe(true);
+        ctx.consultaAgenda = { mensagemAtual: "sim", medicoEscolhido: { id: MEDICO, nome: "Alex Louza" },
+          historico: [{ role: "assistant", content: "Gostaria que eu consulte vagas e horários disponíveis na agenda para a sua consulta com ele?" }] };
+        const r = await executarFerramentaPaciente(ctx, "proxima_vaga", { medico_id: "Alex Louza" });
+        expect(r.ok).toBe(true);
+        expect(r.proxima).toMatchObject({ medico_id: MEDICO, modalidade_atendimento: esperada,
+          inicio: inicio.toISOString(), fim: fim.toISOString() });
+        expect(String((r.proxima as Record<string, unknown>).orientacao).includes("15 minutos")).toBe(antecedencia);
+        expect(consultasAgenda().length).toBeGreaterThan(0);
+        expect(gravacoes).toHaveLength(0);
+        expect(ctx.estado?.appointment.slot_inicio).toBeNull();
+        expect(ctx.estado?.appointment.confirmation).toBeNull();
+        expect(ctx.estado?.appointment.appointment_id).toBeNull();
+      });
+    }
+  }
   test("todas as alternativas apresentadas podem ser escolhidas, inclusive a quarta", async () => {
     const base = banco.agendamentos![0]!;
     for (let i = 1; i <= 4; i++) banco.agendamentos!.push({ ...base, id: `vaga-${i}`,

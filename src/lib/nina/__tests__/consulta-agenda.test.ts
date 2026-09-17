@@ -24,6 +24,32 @@ const ofertaAlex =
 const ofertaGeral =
   "O Dr. Alex Louza atende às quartas às 13h e o Dr. Antonio Cobucci às quintas às 13:30. Qual médico prefere para verificar vagas?";
 
+describe("oferta de agenda seguida da pergunta de escolha do profissional", () => {
+  const joao = { id: "8cd0109d-7d28-46c4-895f-f120ea0cd333", nome: "João Hélio" };
+  const composta = "Você gostaria de verificar as vagas disponíveis na agenda? Se sim, qual dos profissionais você prefere?";
+  it.each(["com o joao helio", "prefiro João Hélio", "com Dr. João Hélio"])(
+    "a escolha responde à oferta e permite consultar somente o médico indicado: %s", mensagem => {
+      const ctx = contexto(mensagem, composta);
+      expect(interesseEmConsultarAgenda(ctx)).toBe(true);
+      expect(autorizarConsultaAgenda(ctx, joao, [joao, alex]).permitido).toBe(true);
+      expect(autorizarConsultaAgenda(ctx, alex, [joao, alex]).permitido).toBe(false);
+    });
+  it("sim após a oferta específica permite consultar sem data e não cria reserva", () => {
+    const ctx = contexto("sim", "Ótimo! O Dr. João Hélio atende às terças, quintas e sextas-feiras (por agendamento).\nGostaria que eu consulte vagas e horários disponíveis na agenda para a sua consulta com ele?", {
+      medicoEscolhido: joao,
+    });
+    expect(autorizarConsultaAgenda(ctx, joao, [joao, alex]).permitido).toBe(true);
+    expect(autorizarConsultaAgenda(ctx, alex, [joao, alex]).permitido).toBe(false);
+  });
+  it("sim à oferta geral não escolhe médico; assunto novo não herda a oferta", () => {
+    expect(autorizarConsultaAgenda(contexto("sim", composta), joao).permitido).toBe(false);
+    for (const final of ["Qual é seu nome?", "Qual forma de pagamento prefere?", "Informe seu nome. Qual profissional prefere?"]) {
+      expect(interesseEmConsultarAgenda(contexto("João Hélio", `${composta} ${final}`))).toBe(false);
+    }
+    expect(interesseEmConsultarAgenda(contexto("não quero consultar vagas", composta))).toBe(false);
+  });
+});
+
 describe("consulta de agenda depende do pedido e do médico definido", () => {
   it.each([
     "vcs tem cardiologista?",

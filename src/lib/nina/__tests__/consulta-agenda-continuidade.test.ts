@@ -82,6 +82,21 @@ function contexto(
 }
 
 describe("continuidade da autorização de leitura da agenda", () => {
+  it("registra a escolha após oferta composta e revalida o sim ao médico escolhido", () => {
+    const composta = { ...oferta, content: "Gostaria de verificar vagas na agenda? Se sim, qual profissional prefere?" };
+    const prova = atualizarInteresseConsultaAgenda({ ...inicio, historico: [composta] });
+    expect(prova).toMatchObject({ mensagemPacienteId: escolha.id, ofertaMensagemId: composta.id,
+      referenciaProfissional: preferencia.referenciaProfissional });
+    const ctx = contexto("sim", {
+      historico: [composta, escolha, { id: "confirmacao-consulta", role: "assistant",
+        content: "Gostaria que eu consulte vagas e horários disponíveis na agenda para a sua consulta com ele?" }],
+      interesseAnterior: prova,
+    });
+    expect(autorizarConsultaAgenda(ctx, ALEX, [ALEX, BRUNO]).permitido).toBe(true);
+    expect(autorizarConsultaAgenda(ctx, BRUNO, [ALEX, BRUNO]).permitido).toBe(false);
+    expect(atualizarInteresseConsultaAgenda(ctx)).toMatchObject({ mensagemPacienteId: "paciente-4",
+      ofertaMensagemId: "confirmacao-consulta", referenciaProfissional: preferencia.referenciaProfissional });
+  });
   it("registra o aceite da oferta pela mensagem paciente e pelo ID da oferta", () => {
     expect(interesse).toMatchObject({
       versao: 1,
