@@ -100,6 +100,10 @@ export interface LinhaMovimento {
   empresa_id?: string | null;
   agendamento_id?: string | null;
   medico_nome?: string | null;
+  /** Cadastro do profissional do lançamento (direto ou pelo agendamento). */
+  medico_id?: string | null;
+  /** Nome da agenda do agendamento (`medico_agendas.nome`), só detalhamento. */
+  agenda_nome?: string | null;
   ficha_numero?: number | null;
   /** Usuário que fez o lançamento. */
   criado_por?: string | null;
@@ -228,22 +232,60 @@ export function classificarMovimento(
   });
 }
 
-/** Card da composição em que o usuário clicou para filtrar a lista. */
+/** Linha do quadro sem profissional identificado no lançamento. */
+export const SEM_PROFISSIONAL = "(sem profissional)";
+/** Agendamento sem agenda gravada (0,2% dos casos em ago/set de 2026). */
+export const SEM_AGENDA = "(sem agenda)";
+
+/** Nome do profissional de uma linha, para agrupar e filtrar. */
+export const profissionalDaLinha = (l: Pick<LinhaClassificada, "medico_nome">): string =>
+  l.medico_nome?.trim() || SEM_PROFISSIONAL;
+
+/** Agenda de uma linha, para o detalhamento dentro do profissional. */
+export const agendaDaLinha = (l: Pick<LinhaClassificada, "agenda_nome">): string =>
+  l.agenda_nome?.trim() || SEM_AGENDA;
+
+/**
+ * Card ou linha de quadro em que o usuário clicou para filtrar a lista.
+ * `grupo`/`condicao` vêm dos cards de composição; `profissional`/`agenda` vêm
+ * do quadro "Por profissional". Combináveis: uma linha do quadro é
+ * profissional (+ agenda) sem grupo, e filtra só receita de atendimento.
+ */
 export interface FiltroCard {
-  grupo: GrupoMovimento;
+  grupo?: GrupoMovimento;
   condicao?: CondicaoAtendimento;
+  profissional?: string;
+  agenda?: string;
 }
 
-export const linhaCasaComFiltro = (l: LinhaClassificada, f: FiltroCard): boolean =>
-  l.tipo === "receita" && l.grupo === f.grupo && (!f.condicao || l.condicao === f.condicao);
+export const linhaCasaComFiltro = (l: LinhaClassificada, f: FiltroCard): boolean => {
+  if (l.tipo !== "receita") return false;
+  if (f.grupo) {
+    if (l.grupo !== f.grupo) return false;
+  } else if (f.profissional && !ehAtendimento(l.grupo)) return false;
+  if (f.condicao && l.condicao !== f.condicao) return false;
+  if (f.profissional && profissionalDaLinha(l) !== f.profissional) return false;
+  if (f.agenda && agendaDaLinha(l) !== f.agenda) return false;
+  return true;
+};
 
 export const mesmoFiltro = (a: FiltroCard | null, b: FiltroCard | null): boolean =>
-  !!a && !!b && a.grupo === b.grupo && a.condicao === b.condicao;
+  !!a &&
+  !!b &&
+  a.grupo === b.grupo &&
+  a.condicao === b.condicao &&
+  a.profissional === b.profissional &&
+  a.agenda === b.agenda;
 
 export const rotuloFiltro = (f: FiltroCard): string =>
-  f.condicao
-    ? `${LABEL_GRUPO_MOV[f.grupo]} · ${LABEL_CONDICAO[f.condicao]}`
-    : LABEL_GRUPO_MOV[f.grupo];
+  [
+    f.grupo ? LABEL_GRUPO_MOV[f.grupo] : null,
+    f.condicao ? LABEL_CONDICAO[f.condicao] : null,
+    f.profissional ?? null,
+    f.agenda ?? null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
 
 export interface TotalQtd {
   total: number;
@@ -400,4 +442,71 @@ export function favorecidoDoRepasse(l: Pick<LinhaMovimento, "medico_nome" | "des
   if (l.medico_nome?.trim()) return l.medico_nome.trim();
   const m = l.descricao.match(/REPASSE\s+M[EÉ]DICO\s*—\s*(.+?)\s*(\(\d+\s*ATEND\.?\))?\s*$/i);
   return (m?.[1] ?? l.descricao).trim();
+}
+
+// ============================================================================
+// Quadro "Por profissional": Consulta × Exames de cada profissional
+// ============================================================================
+
+/**
+ * Leitura por profissional das MESMAS linhas que alimentam os cards
+ * "Consultas" e "Exames": só receita de atendimento, com a classificação
+ * vinda do tipo do serviço (cadastro de `procedimentos`).
+ *
+ * A agenda é só um detalhamento: a maioria dos médicos lança tudo numa agenda
+ * única chamada "CONSULTAS", que carrega centenas de milhares de reais em
+ * exames. Por isso o nome da agenda NUNCA entra na decisão Consulta × Exame.
+ */
+export interface LinhaAgendaProf {
+  agenda: string;
+  consulta: TotalQtd;
+  exame: TotalQtd;
+  total: TotalQtd;
+}
+
+export interface LinhaProfissional extends LinhaAgendaProf {
+  profissional: string;
+  agendas: LinhaAgendaProf[];
+}
+
+const soma = (linhas: LinhaClassificada[], agenda: string): LinhaAgendaProf => ({
+  agenda,
+  consulta: contar(linhas.filter((l) => l.grupo === "consulta")),
+  exame: contar(linhas.filter((l) => l.grupo === "exame_procedimento")),
+  total: contar(linhas),
+});
+
+/**
+ * Uma linha por profissional, em ordem decrescente de total, com
+ * "(sem profissional)" sempre no fim. Nenhuma linha de atendimento fica de
+ * fora: a soma das colunas fecha com os cards Consultas e Exames.
+ */
+export function resumoPorProfissional(linhas: LinhaClassificada[]): LinhaProfissional[] {
+  const atend = linhas.filter((l) => l.tipo === "receita" && ehAtendimento(l.grupo));
+  const porProf = new Map<string, LinhaClassificada[]>();
+  for (const l of atend) {
+    const p = profissionalDaLinha(l);
+    const lista = porProf.get(p);
+    if (lista) lista.push(l);
+    else porProf.set(p, [l]);
+  }
+  const out: LinhaProfissional[] = [];
+  for (const [profissional, doProf] of porProf) {
+    const porAgenda = new Map<string, LinhaClassificada[]>();
+    for (const l of doProf) {
+      const a = agendaDaLinha(l);
+      const lista = porAgenda.get(a);
+      if (lista) lista.push(l);
+      else porAgenda.set(a, [l]);
+    }
+    const agendas = Array.from(porAgenda, ([a, ls]) => soma(ls, a)).sort(
+      (x, y) => y.total.total - x.total.total,
+    );
+    out.push({ profissional, ...soma(doProf, profissional), agendas });
+  }
+  return out.sort((a, b) => {
+    if (a.profissional === SEM_PROFISSIONAL) return 1;
+    if (b.profissional === SEM_PROFISSIONAL) return -1;
+    return b.total.total - a.total.total;
+  });
 }

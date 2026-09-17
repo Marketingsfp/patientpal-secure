@@ -56,7 +56,14 @@ import {
   totaisRetroativos,
   TIPOS_QUE_PESAM_NA_GAVETA,
 } from "@/lib/financeiro/retroativos";
-import { resumoSintetico } from "@/lib/financeiro/composicao-receita";
+import { resumoSintetico, tipoDoProcedimento } from "@/lib/financeiro/composicao-receita";
+
+/** Rótulo do tipo do serviço na planilha exportada. */
+const LABEL_TIPO_SERVICO: Record<string, string> = {
+  consulta: "Consulta",
+  exame: "Exame",
+  procedimento: "Procedimento",
+};
 import { carregarCategorias, mapaDeCategorias } from "@/lib/financeiro/categorias-carregar";
 import {
   carregarMapaConvenioPacientes,
@@ -162,6 +169,10 @@ interface Lanc {
   hora?: string | null;
   /** Nome do médico do lançamento (linhas de fin_lancamentos com medico_id). */
   medico_nome?: string | null;
+  /** Cadastro do profissional: do próprio lançamento ou do agendamento. */
+  medico_id?: string | null;
+  /** Nome da agenda do agendamento (`medico_agendas.nome`), só detalhamento. */
+  agenda_nome?: string | null;
   /** Nº da ficha do agendamento vinculado. */
   ficha_numero?: number | null;
   /** true → linha sintética criada pela decomposição de um pagamento "misto"
@@ -315,6 +326,8 @@ function Page() {
   const [contas, setContas] = useState<Opt[]>([]);
   const [usuarios, setUsuarios] = useState<Opt[]>([]);
   const [medicosOpts, setMedicosOpts] = useState<Opt[]>([]);
+  /** Nomes dos profissionais com mais de uma agenda ativa em `medico_agendas`. */
+  const [medicosVariasAgendas, setMedicosVariasAgendas] = useState<Set<string>>(() => new Set());
   const [funcionariosOpts, setFuncionariosOpts] = useState<Opt[]>([]);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
@@ -354,6 +367,14 @@ function Page() {
     "confirmado",
   );
   const [filterUsuario, setFilterUsuario] = useState<string>("todos");
+  /**
+   * Filtro por profissional. Estreita lista, cards e quadro juntos, e é
+   * aplicado aqui na tela (e não no banco) porque o profissional de um
+   * lançamento pode vir do próprio `fin_lancamentos.medico_id` OU do
+   * agendamento vinculado — filtrar só pela coluna deixaria de fora os
+   * pagamentos que resolvem o médico pela ficha.
+   */
+  const [filterMedico, setFilterMedico] = useState<string>("todos");
   const [filterForma, setFilterForma] = useState<string>("todos");
   const [filterPaciente, setFilterPaciente] = useState<string>("");
   const [filterPacienteDebounced, setFilterPacienteDebounced] = useState<string>("");
@@ -625,13 +646,26 @@ function Page() {
         procedimento: string | null;
         medico_id: string | null;
         paciente_id: string | null;
+        agenda_id: string | null;
       }>(agIds, (lote) =>
         supabase
           .from("agendamentos")
-          .select("id, ficha_numero, procedimento, medico_id, paciente_id")
+          .select("id, ficha_numero, procedimento, medico_id, paciente_id, agenda_id")
           .in("id", lote),
       );
       const agMap = new Map(ags.map((a) => [a.id, a]));
+      // Nome da agenda do atendimento — só detalhamento dentro do
+      // profissional. A separação Consulta × Exame continua vindo do tipo do
+      // serviço: a agenda "CONSULTAS" carrega exames o mês inteiro.
+      const agendaIds = Array.from(
+        new Set(ags.map((a) => a.agenda_id).filter((x): x is string => !!x)),
+      );
+      const agendaMap = new Map<string, string>();
+      for (const a of await emLotes<{ id: string; nome: string | null }>(agendaIds, (lote) =>
+        supabase.from("medico_agendas").select("id, nome").in("id", lote),
+      )) {
+        agendaMap.set(a.id, a.nome ?? "");
+      }
       const medIds = Array.from(
         new Set(
           [
@@ -657,6 +691,8 @@ function Page() {
         return {
           ...l,
           medico_nome: medicoId ? (medMap.get(medicoId) ?? null) : null,
+          medico_id: medicoId,
+          agenda_nome: ag?.agenda_id ? (agendaMap.get(ag.agenda_id) ?? null) : null,
           ficha_numero: ag?.ficha_numero ?? null,
           procedimento: ag?.procedimento ?? null,
           paciente_id: raw.paciente_id ?? ag?.paciente_id ?? null,
@@ -1079,7 +1115,7 @@ function Page() {
     void carregarCategorias(clinicaAtual.clinica_id)
       .then((todas) => setNomesCategoria(mapaDeCategorias(todas)))
       .catch(() => setNomesCategoria(new Map()));
-    const [c, b, m, meds] = await Promise.all([
+    const [c, b, m, meds, agendas] = await Promise.all([
       supabase
         .from("fin_categorias")
         .select("id, nome, tipo")
@@ -1103,6 +1139,13 @@ function Page() {
         .eq("clinica_id", clinicaAtual.clinica_id)
         .eq("ativo", true)
         .order("nome"),
+      // Quem tem mais de uma agenda ativa: só para esses o quadro "Por
+      // profissional" abre a quebra por agenda.
+      supabase
+        .from("medico_agendas")
+        .select("id, medico_id")
+        .eq("clinica_id", clinicaAtual.clinica_id)
+        .eq("ativo", true),
     ]);
     setCats((c.data ?? []) as Opt[]);
     setContas((b.data ?? []) as Opt[]);
@@ -1111,6 +1154,24 @@ function Page() {
         id: x.id,
         nome: x.nome || "(sem nome)",
       })),
+    );
+    const nomePorMedico = new Map(
+      ((meds.data ?? []) as Array<{ id: string; nome: string | null }>).map((x) => [
+        x.id,
+        (x.nome || "").trim(),
+      ]),
+    );
+    const qtdAgendas = new Map<string, number>();
+    for (const a of (agendas.data ?? []) as Array<{ medico_id: string | null }>) {
+      if (a.medico_id) qtdAgendas.set(a.medico_id, (qtdAgendas.get(a.medico_id) ?? 0) + 1);
+    }
+    setMedicosVariasAgendas(
+      new Set(
+        Array.from(qtdAgendas)
+          .filter(([, n]) => n > 1)
+          .map(([id]) => nomePorMedico.get(id) ?? "")
+          .filter(Boolean),
+      ),
     );
     const mems = (m.data ?? []) as Array<{ user_id: string; role: string }>;
     const userIds = mems.map((r) => r.user_id);
@@ -1179,6 +1240,7 @@ function Page() {
     filterValorDebounced,
     filterFichaDebounced,
     buscarTodasDatas,
+    filterMedico,
     // Mostrar/ocultar retroativos muda o tamanho da lista: sem isto a tela
     // podia ficar numa página que deixou de existir.
     ocultarRetroativos,
@@ -1619,9 +1681,13 @@ function Page() {
   // `cancelado` sai em qualquer opção: as três escolhas do filtro são
   // "confirmados", "pendentes" e "confirmados + pendentes". Estorno é assunto
   // da aba Estorno, não do movimento do caixa.
-  const linhasDoPeriodo = linhasVisiveis(items, filterForma as FiltroForma, decomporMisto).filter(
-    (l) => l.status !== "cancelado" && (filterStatus === "todos" || l.status === filterStatus),
-  );
+  const linhasDoPeriodo = linhasVisiveis(items, filterForma as FiltroForma, decomporMisto)
+    .filter(
+      (l) => l.status !== "cancelado" && (filterStatus === "todos" || l.status === filterStatus),
+    )
+    // Filtro por profissional: estreita a lista, os cards e o quadro juntos,
+    // como qualquer outro filtro da barra.
+    .filter((l) => filterMedico === "todos" || (l.medico_id ?? null) === filterMedico);
   // O que é ajuste de outro dia dentro deste recorte. As partes de um
   // pagamento misto herdam a marca do pai e somam exatamente o valor dele, por
   // isso a conta fecha igual com a decomposição ligada ou desligada.
@@ -1687,6 +1753,22 @@ function Page() {
         totalRows: Math.max(0, resumo.totalRows - retro.quantidade - importadas.quantidade),
       }
     : resumo;
+  // Com o filtro de profissional ligado, o agregado do banco (que soma o
+  // período inteiro, de todos) deixa de ser comparável com os cards. A
+  // conferência passa a ser a soma das próprias linhas filtradas — senão a
+  // tela acusaria "lista cortada" só por causa do filtro.
+  const somaVisivel = (tipo: string) =>
+    Number(
+      classificadas
+        .filter((l) => l.tipo === tipo)
+        .reduce((s, l) => s + (Number(l.valor) || 0), 0)
+        .toFixed(2),
+    );
+  const totaisConferencia =
+    filterMedico === "todos"
+      ? { r: totais.r, d: totais.d }
+      : { r: somaVisivel("receita"), d: somaVisivel("despesa") };
+
 
   const imprimirRelatorio = () => {
     const source = displayItems;
@@ -1899,6 +1981,10 @@ function Page() {
         tipo: l.tipo,
         descricao: l.descricao,
         medico: l.medico_nome ?? "",
+        // Tipo do serviço do cadastro de procedimentos (Consulta / Exame /
+        // Procedimento). Vazio quando a linha não tem atendimento vinculado.
+        tipo_servico: LABEL_TIPO_SERVICO[tipoDoProcedimento(l.procedimento, procTipos) ?? ""] ?? "",
+        agenda: l.agenda_nome ?? "",
         ficha: typeof l.ficha_numero === "number" ? String(l.ficha_numero).padStart(3, "0") : "",
         categoria: l.categoria_id ? (catMap.get(l.categoria_id) ?? "") : "",
         conta: l.conta_id ? (contaMap.get(l.conta_id) ?? "") : "",
@@ -1921,6 +2007,8 @@ function Page() {
         { key: "tipo", label: "Tipo" },
         { key: "descricao", label: "Descrição" },
         { key: "medico", label: "Médico" },
+        { key: "tipo_servico", label: "Tipo de serviço" },
+        { key: "agenda", label: "Agenda" },
         { key: "ficha", label: "Ficha" },
         { key: "categoria", label: "Categoria" },
         { key: "conta", label: "Conta" },
@@ -2221,7 +2309,8 @@ function Page() {
           detalhamento em nova aba; os menores filtram a lista abaixo. */}
       <MovimentoResultado
         linhas={classificadas}
-        totaisPeriodo={{ r: totais.r, d: totais.d }}
+        totaisPeriodo={totaisConferencia}
+        profissionaisComVariasAgendas={medicosVariasAgendas}
         pronto={procTipos.size > 0 && mapaConvenio !== null}
         filtro={filtroGrupo}
         onFiltro={setFiltroGrupo}
@@ -2500,6 +2589,22 @@ function Page() {
                   {usuarios.map((u) => (
                     <SelectItem key={u.id} value={u.id}>
                       {u.nome}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Médico</Label>
+              <Select value={filterMedico} onValueChange={setFilterMedico}>
+                <SelectTrigger className="w-52">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="todos">Todos os médicos</SelectItem>
+                  {medicosOpts.map((mo) => (
+                    <SelectItem key={mo.id} value={mo.id}>
+                      {mo.nome}
                     </SelectItem>
                   ))}
                 </SelectContent>
