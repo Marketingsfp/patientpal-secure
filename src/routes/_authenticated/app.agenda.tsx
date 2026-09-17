@@ -440,11 +440,10 @@ const normalizar = (s: string) =>
     .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase();
 
-const chaveNomeAgenda = (s: string) =>
-  normalizar(s)
-    .replace(/[\u200B-\u200D\uFEFF]/g, "")
-    .replace(/\s+/g, " ")
-    .trim();
+// `chaveNomeAgenda` vem de @/lib/agenda/opcoes-profissional (mesma regra usada
+// pelo Financeiro).
+
+
 
 /**
  * Chave de comparação de procedimento, usada pela trava de agendamento
