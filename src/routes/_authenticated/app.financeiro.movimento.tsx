@@ -116,6 +116,11 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Switch } from "@/components/ui/switch";
+import {
+  montarOpcoesProfissional,
+  rotuloProfissionalAgenda,
+  type OpcaoProfissional,
+} from "@/lib/agenda/opcoes-profissional";
 import { Pilulas } from "@/components/financeiro/pilulas";
 import { SolicitarEstornoDialog } from "@/components/financeiro/SolicitarEstornoDialog";
 import {
@@ -326,8 +331,16 @@ function Page() {
   const [contas, setContas] = useState<Opt[]>([]);
   const [usuarios, setUsuarios] = useState<Opt[]>([]);
   const [medicosOpts, setMedicosOpts] = useState<Opt[]>([]);
-  /** Nomes dos profissionais com mais de uma agenda ativa em `medico_agendas`. */
-  const [medicosVariasAgendas, setMedicosVariasAgendas] = useState<Set<string>>(() => new Set());
+  /**
+   * Opções de profissional EXATAMENTE como a tela de Agenda monta: uma entrada
+   * por agenda ativa (`NOME — AGENDA`) para quem tem mais de uma, nome limpo
+   * para quem tem uma só. Vem do módulo compartilhado.
+   */
+  const [opcoesProf, setOpcoesProf] = useState<{
+    opcoes: OpcaoProfissional[];
+    rotuloMedico: Map<string, string>;
+  }>(() => ({ opcoes: [], rotuloMedico: new Map() }));
+
   const [funcionariosOpts, setFuncionariosOpts] = useState<Opt[]>([]);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
@@ -1115,7 +1128,7 @@ function Page() {
     void carregarCategorias(clinicaAtual.clinica_id)
       .then((todas) => setNomesCategoria(mapaDeCategorias(todas)))
       .catch(() => setNomesCategoria(new Map()));
-    const [c, b, m, meds, agendas] = await Promise.all([
+    const [c, b, m, meds, agendas, grades] = await Promise.all([
       supabase
         .from("fin_categorias")
         .select("id, nome, tipo")
@@ -1139,13 +1152,22 @@ function Page() {
         .eq("clinica_id", clinicaAtual.clinica_id)
         .eq("ativo", true)
         .order("nome"),
-      // Quem tem mais de uma agenda ativa: só para esses o quadro "Por
-      // profissional" abre a quebra por agenda.
+      // Agendas ativas e agendas que realmente geram horário: mesma base que a
+      // tela de Agenda usa para desdobrar o profissional em `NOME — AGENDA`.
       supabase
         .from("medico_agendas")
-        .select("id, medico_id")
+        .select("id, nome, medico_id")
         .eq("clinica_id", clinicaAtual.clinica_id)
-        .eq("ativo", true),
+        .eq("ativo", true)
+        .order("ordem", { ascending: true })
+        .order("nome", { ascending: true }),
+      supabase
+        .from("medico_disponibilidades")
+        .select("agenda_id")
+        .eq("clinica_id", clinicaAtual.clinica_id)
+        .eq("ativo", true)
+        .not("agenda_id", "is", null)
+        .limit(20000),
     ]);
     setCats((c.data ?? []) as Opt[]);
     setContas((b.data ?? []) as Opt[]);
@@ -1155,24 +1177,33 @@ function Page() {
         nome: x.nome || "(sem nome)",
       })),
     );
-    const nomePorMedico = new Map(
-      ((meds.data ?? []) as Array<{ id: string; nome: string | null }>).map((x) => [
-        x.id,
-        (x.nome || "").trim(),
-      ]),
-    );
-    const qtdAgendas = new Map<string, number>();
-    for (const a of (agendas.data ?? []) as Array<{ medico_id: string | null }>) {
-      if (a.medico_id) qtdAgendas.set(a.medico_id, (qtdAgendas.get(a.medico_id) ?? 0) + 1);
+    const agendasPorMedico = new Map<string, { id: string; nome: string }[]>();
+    for (const a of (agendas.data ?? []) as Array<{
+      id: string;
+      nome: string | null;
+      medico_id: string | null;
+    }>) {
+      if (!a.medico_id) continue;
+      const arr = agendasPorMedico.get(a.medico_id) ?? [];
+      arr.push({ id: a.id, nome: a.nome ?? "" });
+      agendasPorMedico.set(a.medico_id, arr);
     }
-    setMedicosVariasAgendas(
-      new Set(
-        Array.from(qtdAgendas)
-          .filter(([, n]) => n > 1)
-          .map(([id]) => nomePorMedico.get(id) ?? "")
-          .filter(Boolean),
-      ),
+    const agendasComGrade = new Set(
+      ((grades.data ?? []) as Array<{ agenda_id: string | null }>)
+        .map((g) => g.agenda_id)
+        .filter((id): id is string => !!id),
     );
+    setOpcoesProf(
+      montarOpcoesProfissional({
+        medicos: ((meds.data ?? []) as Array<{ id: string; nome: string | null }>).map((x) => ({
+          id: x.id,
+          nome: x.nome || "(sem nome)",
+        })),
+        agendasPorMedico,
+        agendasComGrade,
+      }),
+    );
+
     const mems = (m.data ?? []) as Array<{ user_id: string; role: string }>;
     const userIds = mems.map((r) => r.user_id);
     if (userIds.length) {
@@ -1685,9 +1716,23 @@ function Page() {
     .filter(
       (l) => l.status !== "cancelado" && (filterStatus === "todos" || l.status === filterStatus),
     )
-    // Filtro por profissional: estreita a lista, os cards e o quadro juntos,
-    // como qualquer outro filtro da barra.
-    .filter((l) => filterMedico === "todos" || (l.medico_id ?? null) === filterMedico);
+    // Rótulo do profissional no MESMO formato do seletor da Agenda: quem tem
+    // mais de uma agenda ativa aparece como `NOME — AGENDA`. É só o nome
+    // exibido/agrupado — a separação Consulta × Exame continua vindo do tipo
+    // do serviço cadastrado, nunca do nome da agenda.
+    .map((l) => {
+      const rotulo = rotuloProfissionalAgenda(
+        opcoesProf.opcoes,
+        opcoesProf.rotuloMedico,
+        l.medico_id ?? null,
+        l.agenda_nome ?? null,
+      );
+      return rotulo ? { ...l, medico_nome: rotulo } : l;
+    })
+    // Filtro por profissional (uma entrada por agenda): estreita lista, cards
+    // e quadro juntos, como qualquer outro filtro da barra.
+    .filter((l) => filterMedico === "todos" || (l.medico_nome ?? "") === filterMedico);
+
   // O que é ajuste de outro dia dentro deste recorte. As partes de um
   // pagamento misto herdam a marca do pai e somam exatamente o valor dele, por
   // isso a conta fecha igual com a decomposição ligada ou desligada.
@@ -2310,7 +2355,6 @@ function Page() {
       <MovimentoResultado
         linhas={classificadas}
         totaisPeriodo={totaisConferencia}
-        profissionaisComVariasAgendas={medicosVariasAgendas}
         pronto={procTipos.size > 0 && mapaConvenio !== null}
         filtro={filtroGrupo}
         onFiltro={setFiltroGrupo}
@@ -2602,12 +2646,16 @@ function Page() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="todos">Todos os médicos</SelectItem>
-                  {medicosOpts.map((mo) => (
-                    <SelectItem key={mo.id} value={mo.id}>
-                      {mo.nome}
+                  {/* Mesma lista do seletor PROFISSIONAL da Agenda: uma
+                      entrada por agenda ativa (`NOME — AGENDA`) para quem tem
+                      mais de uma. */}
+                  {opcoesProf.opcoes.map((o) => (
+                    <SelectItem key={o.key} value={o.rotulo}>
+                      {o.rotulo}
                     </SelectItem>
                   ))}
                 </SelectContent>
+
               </Select>
             </div>
             <div className="space-y-1">
