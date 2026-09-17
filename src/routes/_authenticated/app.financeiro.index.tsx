@@ -335,9 +335,30 @@ function FinDashboard() {
         <p className="text-xs text-muted-foreground">
           {fmtDate(de)}
           {de !== ate && ` a ${fmtDate(ate)}`} · tudo que entrou no caixa, pelo dia do pagamento —
-          mesma conta do Movimento de Caixa e do Rateio da Receita (Relatórios). Clique em um card
-          para ver o detalhamento em tela cheia.
+          mesma conta do Movimento de Caixa. Clique em um card para ver o detalhamento em tela
+          cheia.
         </p>
+        {/* Sem este aviso, quem compara com o Rateio da Receita (que segue a
+            competência) veria a diferença sem saber de onde ela vem. */}
+        {dados &&
+          (dados.foraDoCaixa.retroativos.quantidade > 0 ||
+            dados.foraDoCaixa.importadas.quantidade > 0) && (
+            <p className="text-xs text-sky-900 bg-sky-50 border border-sky-300 rounded-md px-3 py-2">
+              Fora destes números, como no Movimento de Caixa:{" "}
+              {[
+                dados.foraDoCaixa.retroativos.quantidade > 0 &&
+                  `${dados.foraDoCaixa.retroativos.quantidade} lançamento(s) retroativo(s)` +
+                    ` (${brl(dados.foraDoCaixa.retroativos.receitas)} em receitas e` +
+                    ` ${brl(dados.foraDoCaixa.retroativos.despesas)} em despesas, digitados depois do dia)`,
+                dados.foraDoCaixa.importadas.quantidade > 0 &&
+                  `${dados.foraDoCaixa.importadas.quantidade} parcela(s) de cartão importada(s) do` +
+                    ` sistema antigo (${brl(dados.foraDoCaixa.importadas.receitas)})`,
+              ]
+                .filter(Boolean)
+                .join("; ")}
+              . Eles continuam no Rateio da Receita e no Painel Executivo, pela data de competência.
+            </p>
+          )}
 
       </div>
 

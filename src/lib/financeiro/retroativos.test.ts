@@ -1,6 +1,8 @@
 import { describe, expect, it } from "bun:test";
 import {
+  avisoParcelasImportadas,
   avisoRetroativos,
+  ehParcelaImportada,
   ehLancamentoRetroativo,
   mapaDaGaveta,
   totaisRetroativos,
@@ -261,5 +263,25 @@ describe("avisoRetroativos", () => {
       false,
     )!;
     expect(a.titulo).toContain("e mais 2 dia(s)");
+  });
+});
+
+describe("parcelas de cartão importadas do sistema antigo", () => {
+  it("bandeira antiga em receita é parcela importada; forma do sistema atual não é", () => {
+    expect(ehParcelaImportada({ tipo: "receita", forma_pagamento: "MASTER" })).toBe(true);
+    expect(ehParcelaImportada({ tipo: "receita", forma_pagamento: "VISA" })).toBe(true);
+    expect(ehParcelaImportada({ tipo: "receita", forma_pagamento: "cartao_credito" })).toBe(false);
+    expect(ehParcelaImportada({ tipo: "receita", forma_pagamento: "dinheiro" })).toBe(false);
+    expect(ehParcelaImportada({ tipo: "despesa", forma_pagamento: "MASTER" })).toBe(false);
+  });
+
+  it("avisa quanto ficou fora do caixa (01/09/2026: R$ 80,00)", () => {
+    const t = totaisRetroativos([{ tipo: "receita", valor: 80, data: "2026-09-01" }]);
+    const aviso = avisoParcelasImportadas(t, (n) => `R$ ${n.toFixed(2)}`, true);
+    expect(aviso?.tom).toBe("informativo");
+    expect(aviso?.titulo).toContain("1 parcela de cartão importada");
+    expect(aviso?.titulo).toContain("fora");
+    expect(aviso?.titulo).toContain("R$ 80.00");
+    expect(avisoParcelasImportadas(totaisRetroativos([]), String, true)).toBeNull();
   });
 });
