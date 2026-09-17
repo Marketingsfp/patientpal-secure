@@ -1086,6 +1086,7 @@ export type Database = {
           contato_telefone_norm: string | null
           created_at: string
           departamento_id: string | null
+          fila_pendente: boolean
           fila_posicao: number | null
           handoff_em: string | null
           handoff_motivo: string | null
@@ -1138,6 +1139,7 @@ export type Database = {
           contato_telefone_norm?: string | null
           created_at?: string
           departamento_id?: string | null
+          fila_pendente?: boolean
           fila_posicao?: number | null
           handoff_em?: string | null
           handoff_motivo?: string | null
@@ -1190,6 +1192,7 @@ export type Database = {
           contato_telefone_norm?: string | null
           created_at?: string
           departamento_id?: string | null
+          fila_pendente?: boolean
           fila_posicao?: number | null
           handoff_em?: string | null
           handoff_motivo?: string | null
