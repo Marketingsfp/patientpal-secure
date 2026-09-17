@@ -350,7 +350,15 @@ export function montarBase(dados: DadosBase): string {
     { timeZone: "America/Sao_Paulo" },
   )})`;
 
-  return [cabecalho, ...blocos].join("\n\n");
+  // O cadastro tem serviços repetidos (importações antigas). A linha repetida
+  // não acrescenta informação e só consome espaço do prompt, então cada linha
+  // idêntica aparece uma vez por seção. Nenhum valor é alterado.
+  const semRepeticao = blocos.map((bloco) => {
+    const [titulo, ...linhas] = bloco.split("\n");
+    return [titulo, ...new Set(linhas)].join("\n");
+  });
+
+  return [cabecalho, ...semRepeticao].join("\n\n");
 }
 
 // ————————————————————————————————————————— seleção por assunto
