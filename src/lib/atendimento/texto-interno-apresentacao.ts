@@ -23,6 +23,10 @@ export function motivoParaAtendimento(valor: unknown): string | null {
   if (typeof valor !== "string" || !valor.trim()) return null;
   const motivos: Array<[RegExp, string]> = [
     [
+      /\bCATALOGO_SEM_REGISTRO\b/i,
+      "A Nina não encontrou a consulta ou o procedimento solicitado na base de conhecimentos.",
+    ],
+    [
       /\b(?:MISSING_REQUIRED_SOURCE|MSSING_REQUIRED_SOURCE|UNGROUNDED_CLAIM|informacao_indisponivel)\b/i,
       "A equipe precisa conferir as informações solicitadas pelo paciente.",
     ],
