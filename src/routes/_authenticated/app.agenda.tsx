@@ -14253,16 +14253,10 @@ function Paginacao({
  * sendo o mesmo cadastro de médico, então repasse, prontuário e login do
  * médico não enxergam diferença nenhuma.
  */
-type OpcaoProfissional = {
-  key: string;
-  medicoId: string;
-  /** Valor correspondente no filtro "Tipo de agenda". */
-  agendaFiltro: string;
-  /** Rótulo exibido na lista e escrito no campo ao escolher. */
-  rotulo: string;
-  /** Texto normalizado usado na busca por digitação. */
-  busca: string;
-};
+// Tipo e montagem das opções vivem em `@/lib/agenda/opcoes-profissional`,
+// compartilhados com o Financeiro (Movimento de Caixa), para que as duas telas
+// mostrem exatamente a mesma lista de profissionais.
+
 
 function MedicoFiltroInput({
   medicos,
