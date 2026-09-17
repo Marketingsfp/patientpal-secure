@@ -29,11 +29,13 @@ import {
   type RateioLinha,
 } from "@/lib/financeiro/rateio-receita";
 import { COR_FORMA } from "@/lib/financeiro/receita-por-forma";
-import { classificarForma, LABEL_FORMA } from "@/lib/financeiro/formas-pagamento";
+import { LABEL_FORMA } from "@/lib/financeiro/formas-pagamento";
 import {
   categoriaDoAtendimento,
   categoriaDaOutraReceita,
   ehCortesia,
+  formasDoLancamento,
+  type LancamentoPainel,
 
   repassePorMedico,
   resumoPainel,
@@ -795,6 +797,12 @@ function montarPacientesDaLinha(
 }
 
 
+// Pagamento misto aparece com as partes: "Dinheiro + Cartão de Crédito".
+const rotuloFormas = (i: LancamentoPainel) =>
+  formasDoLancamento(i)
+    .map((f) => LABEL_FORMA[f.forma])
+    .join(" + ");
+
 // O laudo tem receita zero, mas mostra como o paciente pagou o exame.
 const formasDaLinha = (l: RateioLinha) =>
   l.laudo
@@ -944,7 +952,7 @@ function montarDetalhe(drill: Drill, dados: DadosPainel, r: ResumoPainel, visao:
         OUTRAS,
         i.descricao,
         i.categoria_nome,
-        LABEL_FORMA[classificarForma(i.forma_pagamento)],
+        rotuloFormas(i),
         i.valor,
         0,
         i.valor,
@@ -1105,7 +1113,7 @@ function montarDetalhe(drill: Drill, dados: DadosPainel, r: ResumoPainel, visao:
         i.data,
         i.categoria_nome,
         i.descricao,
-        LABEL_FORMA[classificarForma(i.forma_pagamento)],
+        rotuloFormas(i),
         i.valor,
       ]),
       totais: [`${int(itens.length)} lançamento(s)`, "", "", "", total],

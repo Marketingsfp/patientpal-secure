@@ -200,6 +200,37 @@ describe("resumoPainel", () => {
     expect(comPix.ticketMedio).toBe(157.5);
   });
 
+  it("mensalidade paga em misto entra em cada forma, não inteira na primeira (01/09/2026)", () => {
+    const r = resumoPainel({
+      rateio: [],
+      despesas: [],
+      outrasReceitas: [
+        lanc({
+          valor: 175,
+          forma_pagamento: "dinheiro",
+          formas: [
+            { forma: "dinheiro", valor: 100 },
+            { forma: "credito", valor: 75 },
+          ],
+        }),
+        lanc({
+          valor: 245,
+          forma_pagamento: "dinheiro",
+          formas: [
+            { forma: "dinheiro", valor: 150 },
+            { forma: "pix", valor: 95 },
+          ],
+        }),
+      ],
+    });
+    const valor = (f: string) => r.formasReceitaTotal.find((x) => x.forma === f)?.valor;
+    expect(valor("dinheiro")).toBe(250);
+    expect(valor("pix")).toBe(95);
+    expect(valor("credito")).toBe(75);
+    expect(r.saldoMeios.especie.entradas).toBe(250);
+    expect(r.saldoMeios.banco.entradas).toBe(170);
+  });
+
 });
 
 describe("agrupamentos do detalhamento", () => {

@@ -101,6 +101,8 @@ export async function carregarPainelFinanceiro(
         valor: l.receita,
         categoria_nome: l.categoria_nome,
         forma_pagamento: l.formas[0]?.forma ?? null,
+        // Todas as partes: com só a primeira, o misto caía inteiro nela.
+        formas: l.formas,
       })),
   };
 }

@@ -40,7 +40,7 @@
  */
 import type { RateioLinha } from "@/lib/financeiro/rateio-receita";
 import { receitaPorForma, type FatiaDaReceita } from "@/lib/financeiro/receita-por-forma";
-import { classificarForma } from "@/lib/financeiro/formas-pagamento";
+import { classificarForma, type ParteMisto } from "@/lib/financeiro/formas-pagamento";
 import { SEM_CATEGORIA } from "@/lib/financeiro/filtro-categoria";
 import {
   fecharSaldoPorMeio,
@@ -94,6 +94,28 @@ export interface LancamentoPainel {
   /** Nome da categoria em caixa alta; `SEM_CATEGORIA` quando não tem. */
   categoria_nome: string;
   forma_pagamento: string | null;
+  /**
+   * A receita já repartida por forma — as partes reais de um pagamento misto.
+   * Quando falta (despesa), vale a forma única de `forma_pagamento`.
+   */
+  formas?: ParteMisto[];
+}
+
+/**
+ * As formas de pagamento de um lançamento, com o misto decomposto.
+ *
+ * Até 17/09/2026 a mensalidade paga "R$ 100,00 em dinheiro + R$ 75,00 no
+ * crédito" entrava inteira no Dinheiro do Dashboard, porque só a primeira
+ * parte era lida. O total batia com o Movimento de Caixa, mas as formas não
+ * (01/09/2026: Dinheiro +R$ 170,00, PIX −R$ 95,00, Crédito −R$ 75,00). Agora
+ * todas as partes entram, como no Movimento de Caixa.
+ */
+export function formasDoLancamento(
+  l: Pick<LancamentoPainel, "formas" | "forma_pagamento" | "valor">,
+): ParteMisto[] {
+  return l.formas?.length
+    ? l.formas
+    : [{ forma: classificarForma(l.forma_pagamento), valor: l.valor }];
 }
 
 /** Despesa já com o grupo resolvido. */
@@ -311,19 +333,17 @@ export function resumoPainel(params: {
   };
 
 
-  // O lançamento avulso tem uma forma só; entra na mesma soma por balde que
-  // os atendimentos, para as fatias fecharem com o total do card.
-  const outrasComFormas = params.outrasReceitas.map((r) => ({
-    formas: [{ forma: classificarForma(r.forma_pagamento), valor: r.valor }],
-  }));
+  // O lançamento avulso entra na mesma soma por balde que os atendimentos,
+  // com o misto já decomposto, para as fatias fecharem com o Movimento de Caixa.
+  const outrasComFormas = params.outrasReceitas.map((r) => ({ formas: formasDoLancamento(r) }));
   // Saldo por meio: as entradas vêm já repartidas por forma (inclusive nos
   // pagamentos mistos) e as saídas pela forma do lançamento de despesa — as
   // mesmas despesas que formam `despesasTotais`.
   const saldoMeios = zeroSaldoPorMeio();
   for (const l of params.rateio)
     for (const f of l.formas ?? []) somarNoMeio(saldoMeios, f.forma, f.valor, "receita");
-  for (const o of params.outrasReceitas)
-    somarNoMeio(saldoMeios, classificarForma(o.forma_pagamento), o.valor, "receita");
+  for (const o of outrasComFormas)
+    for (const f of o.formas) somarNoMeio(saldoMeios, f.forma, f.valor, "receita");
   for (const d of params.despesas)
     somarNoMeio(saldoMeios, classificarForma(d.forma_pagamento), d.valor, "despesa");
   fecharSaldoPorMeio(saldoMeios);
