@@ -50,7 +50,10 @@ def run(db):
     m1 = message(c, conv)
     read(c, conv, admin, m1)
     old = db.sql("SELECT row_to_json(l)::text FROM atend_leituras l;")
-    db.file(base.REPO / "supabase/migrations/20260917233000_zap_leitura_operacional.sql")
+    canonica = base.REPO / "supabase/migrations/20260917170404_d758959e-1e5c-43ac-9994-9f30c52f6720.sql"
+    compatibilidade = base.REPO / "supabase/migrations/20260917233000_zap_leitura_operacional.sql"
+    db.file(canonica)
+    db.file(compatibilidade)
 
     def history():
         assert db.sql("SELECT row_to_json(l)::text FROM atend_leituras l;") == old
@@ -80,6 +83,20 @@ def run(db):
         read(c, conv, a, None, error=True)
         assert unread(c, conv, a) == "1"
     db.case("Telefonia read clears team badge, preserves status and legacy 238; next message counts", shared)
+
+    def compatibility():
+        antes = db.sql("SELECT row_to_json(l)::text FROM atend_leitura_operacional l ORDER BY conversa_id;")
+        individuais = db.sql("SELECT row_to_json(l)::text FROM atend_leituras l ORDER BY conversa_id, user_id;")
+        db.file(compatibilidade)
+        db.file(compatibilidade)
+        assert db.sql("SELECT row_to_json(l)::text FROM atend_leitura_operacional l ORDER BY conversa_id;") == antes
+        assert db.sql("SELECT row_to_json(l)::text FROM atend_leituras l ORDER BY conversa_id, user_id;") == individuais
+        assert unread(c, conv, admin) == "1"
+        sql = compatibilidade.read_text()
+        erro = db.sql("BEGIN; ALTER TABLE atend_leitura_operacional DISABLE ROW LEVEL SECURITY;\n" + sql, error=True)
+        assert "RLS ausente" in erro
+        db.file(compatibilidade)  # A transação abortada preservou o RLS original.
+    db.case("compatibility migration can repeat without changing reads and detects missing RLS", compatibility)
 
     def access():
         c2, (other, _) = db.fixture()
