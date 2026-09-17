@@ -326,8 +326,16 @@ function Page() {
   const [contas, setContas] = useState<Opt[]>([]);
   const [usuarios, setUsuarios] = useState<Opt[]>([]);
   const [medicosOpts, setMedicosOpts] = useState<Opt[]>([]);
-  /** Nomes dos profissionais com mais de uma agenda ativa em `medico_agendas`. */
-  const [medicosVariasAgendas, setMedicosVariasAgendas] = useState<Set<string>>(() => new Set());
+  /**
+   * Opções de profissional EXATAMENTE como a tela de Agenda monta: uma entrada
+   * por agenda ativa (`NOME — AGENDA`) para quem tem mais de uma, nome limpo
+   * para quem tem uma só. Vem do módulo compartilhado.
+   */
+  const [opcoesProf, setOpcoesProf] = useState<{
+    opcoes: OpcaoProfissional[];
+    rotuloMedico: Map<string, string>;
+  }>(() => ({ opcoes: [], rotuloMedico: new Map() }));
+
   const [funcionariosOpts, setFuncionariosOpts] = useState<Opt[]>([]);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
