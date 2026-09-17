@@ -14905,10 +14905,6 @@ export type Database = {
           nao_lidas: number
         }[]
       }
-      atend_permite_leitura_operacional: {
-        Args: { _clinica_id: string }
-        Returns: boolean
-      }
       atend_pool_canonico: {
         Args: { _clinica_id: string; _departamento_id?: string }
         Returns: {

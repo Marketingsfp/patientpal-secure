@@ -6,7 +6,10 @@ import {
   favorecidoDoRepasse,
   linhaCasaComFiltro,
   resumoMovimento,
+  resumoPorProfissional,
   rotuloFiltro,
+  SEM_AGENDA,
+  SEM_PROFISSIONAL,
   servicoDaDescricao,
   type ContextoClassificacao,
   type LinhaMovimento,
@@ -240,5 +243,89 @@ describe("favorecidoDoRepasse", () => {
       "SAMUEL JOSE",
     );
     expect(favorecidoDoRepasse({ descricao: "REPASSE TERCEIRO X" })).toBe("REPASSE TERCEIRO X");
+  });
+});
+
+describe("resumoPorProfissional", () => {
+  // Consulta × Exames por profissional tem que fechar com os cards da mesma
+  // tela: é a única razão de o quadro existir.
+  const base = classificarMovimento(
+    [
+      l({
+        descricao: "PAC A — CONSULTA",
+        procedimento: "CONSULTA",
+        valor: 100,
+        agendamento_id: "a1",
+        medico_nome: "DR JOAO",
+        agenda_nome: "CONSULTAS",
+      }),
+      l({
+        descricao: "PAC B — ULTRASSONOGRAFIA",
+        procedimento: "ULTRASSONOGRAFIA",
+        valor: 200,
+        agendamento_id: "a2",
+        medico_nome: "DR JOAO",
+        agenda_nome: "EXAMES",
+      }),
+      l({
+        descricao: "PAC C — INFILTRACAO",
+        procedimento: "INFILTRACAO",
+        valor: 300,
+        agendamento_id: "a3",
+        medico_nome: "DRA MARINA",
+      }),
+      l({
+        descricao: "PAC D — CONSULTA",
+        procedimento: "CONSULTA",
+        valor: 50,
+        agendamento_id: "a4",
+      }),
+      // Mensalidade não é atendimento: fica fora do quadro, como nos cards.
+      l({ descricao: "MENSALIDADE", categoria_id: "mens", valor: 60 }),
+    ],
+    ctx,
+  );
+  const quadro = resumoPorProfissional(base);
+
+  it("uma linha por profissional, maior total primeiro e sem profissional no fim", () => {
+    expect(quadro.map((x) => x.profissional)).toEqual([
+      "DR JOAO",
+      "DRA MARINA",
+      SEM_PROFISSIONAL,
+    ]);
+  });
+
+  it("a coluna vem do tipo do serviço, nunca do nome da agenda", () => {
+    const joao = quadro[0];
+    expect(joao.consulta).toEqual({ total: 100, qtd: 1 });
+    // O exame está numa agenda chamada "EXAMES" e a consulta numa "CONSULTAS",
+    // mas o que decide é o cadastro do procedimento.
+    expect(joao.exame).toEqual({ total: 200, qtd: 1 });
+    expect(joao.agendas.map((a) => a.agenda)).toEqual(["EXAMES", "CONSULTAS"]);
+    expect(quadro[2].agendas[0].agenda).toBe(SEM_AGENDA);
+  });
+
+  it("os totais das colunas fecham com os cards Consultas e Exames", () => {
+    const r = resumoMovimento(base);
+    const soma = (f: (x: (typeof quadro)[number]) => number) => quadro.reduce((s, x) => s + f(x), 0);
+    expect(soma((x) => x.consulta.total)).toBe(
+      r.atendimentos.porCondicao.particular.consulta.total +
+        r.atendimentos.porCondicao.cartao.consulta.total +
+        r.atendimentos.porCondicao.convenio.consulta.total,
+    );
+    expect(soma((x) => x.exame.total)).toBe(
+      r.atendimentos.porCondicao.particular.exame.total +
+        r.atendimentos.porCondicao.cartao.exame.total +
+        r.atendimentos.porCondicao.convenio.exame.total,
+    );
+    expect(soma((x) => x.total.total)).toBe(r.atendimentos.total);
+  });
+
+  it("clicar na linha filtra a lista pelo profissional e pela agenda", () => {
+    const f = { profissional: "DR JOAO", agenda: "EXAMES" };
+    expect(base.filter((x) => linhaCasaComFiltro(x, f)).map((x) => x.procedimento)).toEqual([
+      "ULTRASSONOGRAFIA",
+    ]);
+    expect(rotuloFiltro(f)).toBe("DR JOAO · EXAMES");
   });
 });
