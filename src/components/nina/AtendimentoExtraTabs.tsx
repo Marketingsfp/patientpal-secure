@@ -85,7 +85,6 @@ import {
 } from "@/components/ui/select";
 import {
   Send,
-  Search,
   Loader2,
   UserCheck,
   ArrowRightLeft,
@@ -161,7 +160,6 @@ import {
 import {
   listarConversas,
   obterConversa,
-  buscarConversaPorNumero,
   souGestorAtendimento,
   contarConversasInbox,
   listarMensagensConversa,
@@ -272,7 +270,6 @@ import {
 
 import {
   formatarNumeroConversa,
-  interpretarBuscaConversa,
 } from "@/lib/atendimento/numero-conversa";
 import {
   SEM_NOME,
@@ -361,7 +358,6 @@ export function AtendInbox() {
   const esperaFn = useServerFn(esperaConversas);
   const assumirFn = useServerFn(assumirConversa);
   const obterConversaFn = useServerFn(obterConversa);
-  const buscarPorNumeroFn = useServerFn(buscarConversaPorNumero);
   const { user, session } = useAuth();
   const meuId = user?.id ?? null;
   const podeAtender = usePodeEscrever("nina");
@@ -406,14 +402,6 @@ export function AtendInbox() {
   const [revisarVinculoAberto, setRevisarVinculoAberto] = useState(false);
   const [deptos, setDeptos] = useState<any[]>([]);
   const [usuarios, setUsuarios] = useState<any[]>([]);
-  const [busca, setBusca] = useState("");
-  // FASE 2 — o que foi digitado: texto (nome/telefone/protocolo) e/ou número
-  // permanente da conversa. Uma coisa nunca é confundida com a outra.
-  const buscaInterp = useMemo(() => interpretarBuscaConversa(busca), [busca]);
-  const buscaTexto = buscaInterp.texto;
-  const [resultadoNumero, setResultadoNumero] = useState<
-    { estado: "carregando" } | { estado: "vazio" } | { estado: "ok"; conversa: any } | null
-  >(null);
   // Opção "Bot" removida da lista de status a pedido da equipe: conversas sob
   // a Nina continuam acessíveis pelo filtro de escopo "Nina".
   // FASE 1 — a Inbox tem só DOIS controles: Escopo (de quem são as conversas)
@@ -601,11 +589,6 @@ export function AtendInbox() {
   const seqEspera = useRef(0);
   const convsVisiveis: any[] = (() => {
     let base = convs;
-    // "#1342" é busca exata: a lista mostra só essa conversa (o resultado
-    // do backend aparece destacado logo acima).
-    if (buscaInterp.exigeNumero) {
-      base = base.filter((c: any) => Number(c.numero_conversa) === buscaInterp.numero);
-    }
     if (soCriticas) {
       base = base.filter(
         (c: any) => faixaEsperaAtd(minutosDesde(espera[c.id])) === "critico",
@@ -1063,7 +1046,6 @@ export function AtendInbox() {
         data: {
           clinicaId,
           status: filtroStatus,
-          busca: buscaTexto || undefined,
           canal: "todos",
           escopo,
           atendenteId: atendenteSelecionadoId,
@@ -1098,13 +1080,13 @@ export function AtendInbox() {
       const rows = filtrarPorEscopo(brutas as any[], ctxEscopo);
       // A conversa aberta deixou de pertencer a este filtro (transferida,
       // devolvida à fila, resolvida ou reaberta com a Nina)? Sai da tela na
-      // hora — inclusive durante uma busca, onde a lista vem reduzida.
+      // hora.
       if (deepLinkPendente.current && selIdRef.current !== deepLinkPendente.current)
         deepLinkPendente.current = null;
       const removeu = selecaoDeveSair({
         selecionada: (selRef.current as any) ?? null,
         linhas: rows as any,
-        buscando: !!buscaTexto || buscaInterp.exigeNumero,
+        buscando: false,
         ctx: ctxEscopo,
       });
       if (deepLinkPendente.current && rows.some((r: any) => r.id === deepLinkPendente.current))
@@ -1171,52 +1153,7 @@ export function AtendInbox() {
     } catch (e: any) {
       mostrarErro(e);
     }
-  }, [clinicaId, filtroStatus, buscaTexto, buscaInterp.exigeNumero, escopo, atendenteSelecionadoId, visualizacao, listarConvs, carregarContadores, carregarDistribuicao, meuId, souGestor, abrirConversa]);
-
-  // FASE 2 — busca pelo número permanente (#1342). Consulta exata no backend,
-  // fora do filtro atual e sem baixar a lista inteira. Só leitura: encontrar
-  // uma conversa não muda responsável, fila nem status.
-  useEffect(() => {
-    const numero = buscaInterp.numero;
-    if (!clinicaId || numero === null) {
-      setResultadoNumero(null);
-      return;
-    }
-    let valido = true;
-    setResultadoNumero({ estado: "carregando" });
-    const t = window.setTimeout(() => {
-      void (async () => {
-        try {
-          const row: any = await buscarPorNumeroFn({ data: { clinicaId, numero } });
-          if (!valido) return;
-          setResultadoNumero(row ? { estado: "ok", conversa: row } : { estado: "vazio" });
-        } catch {
-          // Resposta neutra também em caso de falha: nada é revelado.
-          if (valido) setResultadoNumero({ estado: "vazio" });
-        }
-      })();
-    }, 250);
-    return () => {
-      valido = false;
-      window.clearTimeout(t);
-    };
-  }, [clinicaId, buscaInterp.numero, buscarPorNumeroFn]);
-
-  /**
-   * Abre um resultado da busca por número usando o MESMO caminho de abertura
-   * da Inbox (nada de endpoint paralelo pelo número visível). A conversa entra
-   * na lista para não ser fechada por uma resposta do filtro antigo.
-   */
-  const abrirResultadoNumero = useCallback(
-    (row: any) => {
-      if (!row?.id) return;
-      setConvs((prev: any[]) => (prev.some((x: any) => x.id === row.id) ? prev : [row, ...prev]));
-      deepLinkPendente.current = row.id;
-      iniciarTroca(row.id, "clique");
-      abrirConversa(row.id);
-    },
-    [abrirConversa],
-  );
+  }, [clinicaId, filtroStatus, escopo, atendenteSelecionadoId, visualizacao, listarConvs, carregarContadores, carregarDistribuicao, meuId, souGestor, abrirConversa]);
 
 
 
@@ -1830,12 +1767,12 @@ export function AtendInbox() {
   }, [conversaCarregadaId]);
 
   // A lista só é recarregada quando algo dela muda de verdade (clínica,
-  // filtro, busca, usuário). Abrir uma conversa não recarrega a lista.
+  // filtro, usuário). Abrir uma conversa não recarrega a lista.
   const carregarConvsRef = useRef(carregarConvs);
   carregarConvsRef.current = carregarConvs;
   useEffect(() => {
     void carregarConvsRef.current();
-  }, [clinicaId, filtroStatus, buscaTexto, escopo, atendenteSelecionadoId, visualizacao, meuId, souGestor]);
+  }, [clinicaId, filtroStatus, escopo, atendenteSelecionadoId, visualizacao, meuId, souGestor]);
   // O responsável pode mudar a qualquer momento (transferência, distribuição
   // automática, tomada por outra pessoa). A lista chega por Realtime, então a
   // conversa aberta sempre acompanha o que está gravado no banco.
@@ -2245,7 +2182,7 @@ export function AtendInbox() {
           gestor: souGestor,
           atendenteId: atendenteSelecionadoId,
           status: filtroStatus,
-          buscando: !!buscaTexto || buscaInterp.exigeNumero,
+          buscando: false,
           visualizacao,
           espera: esperaRef.current,
         });
@@ -3111,67 +3048,6 @@ export function AtendInbox() {
 
           </div>
           <CardHeader className="py-2 space-y-2">
-            <div className="flex items-center gap-2">
-              <MessageSquare className="h-4 w-4" />
-              <CardTitle className="text-base">Inbox</CardTitle>
-              <Badge variant="outline" className="ml-auto">
-                {convsVisiveis.length}
-              </Badge>
-            </div>
-            <div className="relative">
-              <Search className="h-3.5 w-3.5 absolute left-2 top-2.5 text-muted-foreground" />
-              <Input
-                value={busca}
-                onChange={(e) => setBusca(e.target.value)}
-                className="pl-7 h-8 text-sm"
-                placeholder="Buscar nome, telefone ou # da conversa…"
-              />
-            </div>
-            {/* Sem "#" (ex.: telefone), só aparece quando REALMENTE achou o
-                número: nada de avisar "não encontrei" em busca de texto. */}
-            {resultadoNumero &&
-              (buscaInterp.exigeNumero || resultadoNumero.estado === "ok") && (
-              <div className="rounded-md border border-atd-border bg-atd-blue-tint/40 p-2 text-xs">
-                {resultadoNumero.estado === "carregando" && (
-                  <span className="text-muted-foreground">Procurando pelo número…</span>
-                )}
-                {resultadoNumero.estado === "vazio" && (
-                  <span className="text-muted-foreground">
-                    Nenhuma conversa disponível para este número.
-                  </span>
-                )}
-                {resultadoNumero.estado === "ok" && (
-                  <div className="flex items-center gap-2">
-                    <div className="min-w-0 flex-1">
-                      <p
-                        className="truncate font-medium"
-                        title={tituloConversa(resultadoNumero.conversa)}
-                      >
-                        {tituloConversa(resultadoNumero.conversa)}
-                      </p>
-                      <p className="text-[11px] text-muted-foreground">
-                        {resultadoNumero.conversa.contato_telefone
-                          ? `${resultadoNumero.conversa.contato_telefone} · `
-                          : ""}
-                        Encontrada pelo número{" "}
-                        {formatarNumeroConversa(resultadoNumero.conversa.numero_conversa)}
-                        {!convsVisiveis.some(
-                          (c: any) => c.id === resultadoNumero.conversa.id,
-                        ) && " · fora do filtro atual"}
-                      </p>
-                    </div>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="h-7 text-[11px]"
-                      onClick={() => abrirResultadoNumero(resultadoNumero.conversa)}
-                    >
-                      Abrir conversa
-                    </Button>
-                  </div>
-                )}
-              </div>
-            )}
             {/* FASE 1 — dois eixos compactos na mesma linha:
                 [ Escopo ▾ ] [ Visualização ▾ ]. Atendentes ficam dentro do
                 Escopo (por user_id); a supervisão continua sendo decidida no
