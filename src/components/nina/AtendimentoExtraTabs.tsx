@@ -2835,12 +2835,24 @@ export function AtendInbox() {
           )}
           <div className={`${painelAberto ? "flex" : "hidden"} w-[300px] flex-1 flex-col overflow-hidden`}>
           <div className="shrink-0 border-b p-2 space-y-1.5">
-            <div className="flex items-center gap-1">
-              <span className="block text-[11px] font-medium text-muted-foreground">Meu status</span>
+            <div className="flex items-center gap-2">
+              <span className="shrink-0 text-[11px] font-medium text-muted-foreground">Meu status</span>
+              <p
+                aria-live="polite"
+                className={`min-w-0 flex-1 break-words text-[11px] ${
+                  controle.erro
+                    ? "text-destructive"
+                    : presPrecisaEscolher(controle)
+                      ? "font-medium text-atd-warn-ink"
+                      : "text-muted-foreground"
+                }`}
+              >
+                {presTexto(controle)}
+              </p>
               <Button
                 size="sm"
                 variant="ghost"
-                className="ml-auto h-6 w-6 p-0"
+                className="ml-auto h-6 w-6 shrink-0 p-0"
                 title={painelFixado ? "Desafixar painel" : "Fixar painel aberto"}
                 onClick={alternarFixado}
               >
@@ -2923,18 +2935,6 @@ export function AtendInbox() {
               </Button>
             </div>
             {inicioCronometroPausa && <CronometroPausa inicio={inicioCronometroPausa} />}
-            <p
-              aria-live="polite"
-              className={`text-[11px] ${
-                controle.erro
-                  ? "text-destructive"
-                  : presPrecisaEscolher(controle)
-                    ? "font-medium text-atd-warn-ink"
-                    : "text-muted-foreground"
-              }`}
-            >
-              {presTexto(controle)}
-            </p>
             {presPrecisaEscolher(controle) && (
               <p className="text-[11px] text-muted-foreground">
                 Escolha Online, Em pausa ou Offline para definir se você recebe novas conversas.
