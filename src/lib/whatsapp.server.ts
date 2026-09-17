@@ -1,6 +1,7 @@
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { normalizarTelefone } from "@/lib/atendimento/telefone";
 import { agoraNaClinica } from "@/lib/nina-agora";
+import { encaminhamentoSemRegistro, MOTIVO_SEM_REGISTRO, respostaSemRegistro } from "@/lib/nina/catalogo-sem-registro";
 import { dadosPublicosCatalogo, resultadoExigeHumano, MOTIVO_SFP,
   respostaEncaminhamentoSfp, omitirNomeGenerico } from "@/lib/nina/regras-catalogo";
 
@@ -1717,7 +1718,7 @@ async function gerarRespostaNinaInterno(
   const consultaPlanejada = consultaDoNovoTurno({ mensagem: mensagemPaciente, anterior: conhecimentoAnterior,
     dispensarConsulta: Boolean(saudacaoDispensadaPor) });
   let selecaoDoTurno: import("@/lib/nina/confidence/selecao-contextual").ResultadoSelecaoContextual | null = null;
-  async function encaminharItemSfp(ferramentaOrigem: string) {
+  async function encaminharRegraCatalogo(ferramentaOrigem: string, ausencia?: NonNullable<ReturnType<typeof encaminhamentoSemRegistro>>) {
     if (finalizacaoHandoff || turnoObsoleto) return;
     if (opcoes?.revisao?.valor) {
       const { respostaObsoleta } = await import("@/lib/nina/revisao-conversa.server");
@@ -1727,8 +1728,9 @@ async function gerarRespostaNinaInterno(
         return;
       }
     }
-    const argumentos = { motivo: MOTIVO_SFP, resumo: "O atendimento solicitado está publicado com profissional SFP. A equipe humana deve continuar o atendimento.", urgencia: "normal" };
-    rastro?.iniciar("tool.execute", { ferramenta: "solicitar_atendente_humano", origem_solicitacao: "regra_catalogo_sfp" });
+    const argumentos = ausencia ?? { motivo: MOTIVO_SFP, resumo: "O atendimento solicitado está publicado com profissional SFP. A equipe humana deve continuar o atendimento.", urgencia: "normal" };
+    const origem = ausencia ? "regra_catalogo_sem_registro" : "regra_catalogo_sfp";
+    rastro?.iniciar("tool.execute", { ferramenta: "solicitar_atendente_humano", origem_solicitacao: origem });
     const rh = await broker.executar("solicitar_atendente_humano", JSON.stringify(argumentos));
     await compartilharResultado("solicitar_atendente_humano", argumentos, rh);
     const confirmado = rh.success && !rh.erro;
@@ -1737,24 +1739,24 @@ async function gerarRespostaNinaInterno(
     limparEscolhaAgendamento(fluxoEstado);
     fluxoEstado.appointment.slot_options = null;
     fluxoEstado.flow.stage = "HANDOFF";
-    finalizacaoHandoff = { texto: respostaEncaminhamentoSfp(confirmado), textoModelo: textoModeloAtual,
-      handoffConfirmado: confirmado, motivo: MOTIVO_SFP };
+    finalizacaoHandoff = { texto: ausencia ? respostaSemRegistro(confirmado, opcoes?.teste === true) : respostaEncaminhamentoSfp(confirmado), textoModelo: textoModeloAtual,
+      handoffConfirmado: confirmado, motivo: argumentos.motivo };
     registrarEtapa({ tipo: "ferramenta", fonte: "atendimento", titulo: "Encaminhamento obrigatório pelo catálogo",
-      dados: { origem_solicitacao: "servidor", motivo: MOTIVO_SFP, ferramenta_origem: ferramentaOrigem,
+      dados: { origem_solicitacao: "servidor", motivo: argumentos.motivo, ferramenta_origem: ferramentaOrigem,
         handoff_confirmado: confirmado, erro: rh.erro ?? null, resultado: rh.dados },
-      codigo: { arquivo: "src/lib/whatsapp.server.ts", funcao: "encaminharItemSfp" } });
-    if (confirmado) rastro?.concluir("tool.execute", { ferramenta: "solicitar_atendente_humano", origem_solicitacao: "regra_catalogo_sfp" });
+      codigo: { arquivo: "src/lib/whatsapp.server.ts", funcao: "encaminharRegraCatalogo" } });
+    if (confirmado) rastro?.concluir("tool.execute", { ferramenta: "solicitar_atendente_humano", origem_solicitacao: origem });
     else rastro?.falhar("tool.execute", rh.erro ?? "handoff não confirmado", { ferramenta: "solicitar_atendente_humano" });
-    if (!rodadasDoTurno) rastro?.pular("llm.generate", "regra de catálogo SFP encaminhou antes do modelo");
+    if (!rodadasDoTurno) rastro?.pular("llm.generate", `${origem} encaminhou antes do modelo`);
   }
-  async function compartilharResultado(nome: string, args: unknown, r: import("@/lib/nina/tool-broker").ResultadoBroker) {
+  async function compartilharResultado(nome: string, args: unknown, r: import("@/lib/nina/tool-broker").ResultadoBroker, consultaAutomatica = false) {
     const ex = incorporarResultadoOficial({ clinicaId, nome, args, resultado: r,
       fatos: fatosDoTurno, consultas: consultasDoTurno });
     if (!r.reused) nomesFerramentasTurno.push(nome);
     if (!r.success || r.erro) conflitoFerramenta = true;
     const payload = dadosPublicosCatalogo(respostaParaModelo(r));
     if (r.capacidade !== "searchKnowledgeBase" && r.capacidade !== "listCatalog") {
-      if (r.erro === "PROFISSIONAL_SFP") await encaminharItemSfp(nome);
+      if (r.erro === "PROFISSIONAL_SFP") await encaminharRegraCatalogo(nome);
       return limitarRetornoParaModelo(payload);
     }
     let parametros: Record<string, unknown> = {};
@@ -1791,8 +1793,10 @@ async function gerarRespostaNinaInterno(
           leitura_agenda_autorizada: interesseAgendaConfirmado, fatos_antigos_reutilizados: false },
         codigo: { arquivo: "src/lib/whatsapp.server.ts", funcao: "compartilharResultado" } });
     }
-    if (r.success && resultadoExigeHumano(r.dados, selecaoDoTurno?.selecao?.raizesFonte.map(r => r.registro)))
-      await encaminharItemSfp(nome);
+    const ausencia = encaminhamentoSemRegistro(r, args, consultaAutomatica);
+    if (ausencia) await encaminharRegraCatalogo(nome, ausencia);
+    else if (r.success && resultadoExigeHumano(r.dados, selecaoDoTurno?.selecao?.raizesFonte.map(r => r.registro)))
+      await encaminharRegraCatalogo(nome);
     return { ...limitarRetornoParaModelo(payload) as Record<string, unknown>,
       preferencia_do_paciente: dadosPublicosCatalogo(selecaoDoTurno),
       consulta_agenda: { interesse_confirmado: interesseAgendaConfirmado,
@@ -1803,7 +1807,7 @@ async function gerarRespostaNinaInterno(
     const id = `fonte_servidor_${rodadasDoTurno}_${recuperar ? "recuperacao" : "inicio"}`;
     rastro?.iniciar("tool.execute", { ferramenta: nome, origem_solicitacao: "servidor", recuperacao: recuperar });
     const r = await broker.executar(nome, JSON.stringify(args), { revalidarLeitura: recuperar });
-    const payload = await compartilharResultado(nome, args, r);
+    const payload = await compartilharResultado(nome, args, r, true);
     // A chamada existiu e foi planejada pelo servidor. Não é registrada como
     // saída original do modelo; a origem também fica explícita na auditoria.
     mensagens.push({ role: "assistant", content: null,
@@ -2247,7 +2251,7 @@ async function gerarRespostaNinaInterno(
   if (finalizacaoHandoff) {
     const antes = respostaDoModelo;
     resposta = finalizacaoHandoff.texto;
-    transformar(finalizacaoHandoff.motivo === MOTIVO_SFP ? "catalogo.sfp" : "agenda.sem_vagas", finalizacaoHandoff.motivo, antes, resposta, "aviso_operacional");
+    transformar(finalizacaoHandoff.motivo === MOTIVO_SFP ? "catalogo.sfp" : finalizacaoHandoff.motivo === MOTIVO_SEM_REGISTRO ? "catalogo.sem_registro" : "agenda.sem_vagas", finalizacaoHandoff.motivo, antes, resposta, "aviso_operacional");
     marcarOrigem("codigo", `${finalizacaoHandoff.motivo}; transferência ${finalizacaoHandoff.handoffConfirmado ? "confirmada" : "não confirmada"}`);
   }
 
@@ -2278,7 +2282,7 @@ async function gerarRespostaNinaInterno(
 
   // Aviso explícito ao paciente: ele precisa saber que saiu da IA e foi para
   // uma pessoa. A frase é fixa para nunca depender do humor do modelo.
-  if (houveHandoff) {
+  if (houveHandoff && !(opcoes?.teste && finalizacaoHandoff?.motivo === MOTIVO_SEM_REGISTRO)) {
     const AVISO_TRANSFERENCIA =
       "🔁 *Transferido para atendimento humano.* Você não está mais falando com a Nina — uma atendente da equipe assume esta conversa e responde por aqui mesmo.";
     if (!resposta.includes("Transferido para atendimento humano")) {

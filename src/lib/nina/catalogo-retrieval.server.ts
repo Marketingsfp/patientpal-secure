@@ -10,6 +10,7 @@
  */
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { agoraNaClinica } from "@/lib/nina-agora";
+import { termosItemCatalogo } from "./catalogo-sem-registro";
 import {
   montarResultadoCatalogo,
   type ProfissionalPublicado,
@@ -35,6 +36,8 @@ function semAcento(v: unknown): string {
 }
 
 function termosBusca(query: string): string[] {
+  const especificos = termosItemCatalogo(query);
+  if (especificos.length) return especificos.slice(0, 6);
   return semAcento(query)
     .split(/[^a-z0-9]+/)
     .filter((t) => t.length >= 3)

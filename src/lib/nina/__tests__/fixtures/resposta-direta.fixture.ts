@@ -7,6 +7,10 @@ const teste = process.argv[2] === "homologacao";
 const cenario = process.argv[3] ?? "direta";
 const regraCatalogo = cenario.startsWith("catalogo_");
 const sfp = cenario.startsWith("catalogo_sfp");
+const ausente = cenario.startsWith("catalogo_ausente");
+const ferramentaAusente = cenario.includes("medicos_modelo") ? "buscar_medicos"
+  : cenario.includes("procedimentos_modelo") ? "buscar_procedimentos"
+  : cenario.includes("especialidades_modelo") ? "listar_especialidades" : "consultar_base_conhecimento";
 const escolhaHorario = cenario.startsWith("escolha_");
 const modoConfirmacao = cenario.startsWith("confirmado_") ? cenario.slice("confirmado_".length) : null;
 const resumoEscolhido = ["escolha_pre", "escolha_ficha"].includes(cenario)
@@ -14,7 +18,14 @@ const resumoEscolhido = ["escolha_pre", "escolha_ficha"].includes(cenario)
     { profissional: "Dr. Jorge Ribeiro", procedimento: "Consulta", data: "21/01/2030", horario: "10:20", unidade: "Clínica simulada" }).texto
   : "Confira: Consulta Cardiologia com Dr. Jorge Ribeiro, dia 21/01/2030, às 10:20. Você confirma?";
 const agenda = cenario !== "direta" && !regraCatalogo;
-const pergunta = cenario === "catalogo_sfp_modelo" ? "oi" : agenda ? "Tem vagas com Dr. Jorge Ribeiro?" : "quais são as informações do eletrocardiograma?";
+const pergunta = cenario === "catalogo_sfp_modelo" || (ausente && cenario.includes("modelo")) ? "oi"
+  : ausente ? cenario.endsWith("dado_pessoal") ? "Meu nome é João Silva"
+    : cenario.endsWith("misto") ? "Qual o valor do eletrocardiograma e da consulta de pneumologia?"
+    : cenario.endsWith("generico") ? "Quero marcar uma consulta"
+    : cenario.endsWith("exame") ? "Quanto custa o exame PET-CT?"
+    : cenario.endsWith("procedimento") ? "Vocês fazem o procedimento crioablação?"
+    : "Gostaria de marca a pneumologista"
+  : agenda ? "Tem vagas com Dr. Jorge Ribeiro?" : "quais são as informações do eletrocardiograma?";
 const respostaModelo = "Eletrocardiograma: R$ 80,00 no dinheiro e R$ 95,00 no cartão. Profissional: " + (regraCatalogo ? "Técnica" : "Enfermagem") + ". Segunda a sexta, das 8h às 12h. Sem jejum. Leve o pedido médico.";
 const prompt = "Você é Nina. Consulte a base e informe preço, profissional, horário e preparo solicitados. Não acrescente saudação à resposta sobre exames.";
 const consultas: string[] = [];
@@ -88,7 +99,7 @@ mock.module("@/lib/nina/tool-broker.server", () => ({ criarToolBroker: () => ({
       ferramenta: nome, capacidade: "checkAvailability", fonte: "agenda", success: true,
       reused: false, appointment_confirmed: false, dados: { ok: true, resumo_confirmacao: resumoEscolhido },
     };
-    if (nome === "solicitar_atendente_humano" && (agenda || sfp)) {
+    if (nome === "solicitar_atendente_humano" && (agenda || sfp || ausente)) {
       encaminhamentos.push(typeof args === "string" ? JSON.parse(args) : args);
       return { ferramenta: nome, capacidade: "requestHumanHandoff", fonte: "atendimento",
         success: !cenario.endsWith("falha_handoff"), reused: false, appointment_confirmed: false,
@@ -119,6 +130,17 @@ mock.module("@/lib/nina/tool-broker.server", () => ({ criarToolBroker: () => ({
             proximos: cenario === "alternativas" ? [{ data: "2030-01-22", hora: "14:00" }] : [] },
         ...(cenario === "falha_consulta" ? { erro: "INTERNAL_ERROR" } : {}) };
     }
+    if (ausente && nome === ferramentaAusente && !(cenario.endsWith("misto") && ferramentas.length === 1)) {
+      const tipada = nome !== "consultar_base_conhecimento";
+      const r = { ferramenta: nome, capacidade: tipada ? "listCatalog" : "searchKnowledgeBase", fonte: "base_conhecimento",
+        success: !tipada, reused: false, appointment_confirmed: false,
+        ...(tipada ? { erro: nome === "buscar_medicos" ? "DOCTOR_NOT_FOUND" : "PROCEDURE_NOT_FOUND" } : {}),
+        dados: { ok: !tipada, source: "nina_catalogo", fonte: "catalogo_publicado", encaminhar_para_humano: true,
+          found: false, knowledge_status: "not_found", records: [] },
+      };
+      resultados.push(r);
+      return r;
+    }
     if (nome !== "consultar_base_conhecimento") throw new Error(`Ferramenta inesperada: ${nome}`);
     const r = { ferramenta: nome, capacidade: "searchKnowledgeBase", fonte: "catalogo_publicado",
       success: true, reused: false, dados: { itens: [{ id: "ecg", procedimento: "ELETROCARDIOGRAMA",
@@ -131,6 +153,13 @@ mock.module("@/lib/nina/tool-broker.server", () => ({ criarToolBroker: () => ({
 }) }));
 mock.module("@/lib/nina/ai-gateway.server", () => ({ ninaAIGateway: async (req: any) => {
   requests.push(structuredClone(req));
+  if (ausente && (cenario.includes("modelo") || cenario.endsWith("misto"))) return {
+    ok: true, conteudo: "A clínica não oferece esse serviço.", modelo: "modelo-simulado", execucaoId: "execucao-direta", nivel: "low",
+    toolCalls: [
+      { id: "catalogo-ausente", type: "function", function: { name: ferramentaAusente, arguments: '{"termo":"pneumologia","especialidade":"pneumologia"}' } },
+      { id: "nao-agendar-ausente", type: "function", function: { name: "agendar", arguments: "{}" } },
+    ],
+  };
   if (cenario === "catalogo_sfp_modelo") return {
     ok: true, conteudo: "Vou consultar e marcar.", modelo: "modelo-simulado", execucaoId: "execucao-direta", nivel: "low",
     toolCalls: [

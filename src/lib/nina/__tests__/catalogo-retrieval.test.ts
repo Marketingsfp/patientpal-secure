@@ -136,6 +136,28 @@ beforeEach(() => {
 });
 
 describe("recuperação no catálogo publicado", () => {
+  it.each([
+    "Gostaria de marca a pneumologista",
+    "Bom dia gostaria por favor de saber o valor de uma consulta de pneumologia",
+    "Quanto custa o exame PET-CT?",
+    "Vocês realizam o procedimento crioablação?",
+  ])("serviço diferente não comprova o pedido ausente: %s", async (query) => {
+    banco["nina_cat_servicos"] = [
+      servico({ nome: "Consulta Cardiologia", descricao_publica: "Exame realizado na clínica" }),
+      servico({ nome: "Procedimento Dermatológico" }),
+    ];
+    banco["nina_cat_profissionais"] = [profissional({ especialidades: [{ nome: "Cardiologia" }] })];
+    const r = await buscarNoCatalogo({ clinicaId: CLINICA, query });
+    expect(r.knowledge_status).toBe("not_found");
+    expect(r.records).toEqual([]);
+    expect(r.instrucao).toContain("Encaminhe obrigatoriamente");
+  });
+  it("pedido com frase longa encontra a especialidade publicada", async () => {
+    banco["nina_cat_profissionais"] = [profissional({ especialidades: [{ nome: "Pneumologia" }] })];
+    const r = await buscarNoCatalogo({ clinicaId: CLINICA, query: "Bom dia gostaria por favor de saber o valor de uma consulta com pneumologista" });
+    expect(r.knowledge_status).toBe("found");
+    expect(r.records).toHaveLength(1);
+  });
   it("vigência dos avisos muda à meia-noite de São Paulo, não à meia-noite UTC", async () => {
     banco["nina_cat_profissionais"] = [
       profissional({

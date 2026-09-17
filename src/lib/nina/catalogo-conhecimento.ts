@@ -260,9 +260,10 @@ const INSTRUCAO_FOUND =
 
 
 const INSTRUCAO_NOT_FOUND =
-  "O catálogo publicado NÃO tem essa informação. É proibido deduzir, estimar ou usar conhecimento " +
-  "pré-treinado. Peça o esclarecimento necessário quando fizer sentido, ou diga que vai verificar " +
-  "com a equipe e siga o fluxo de atendimento humano.";
+  "Nenhum registro publicado foi encontrado para o atendimento pesquisado. Isso NÃO comprova " +
+  "que a clínica não oferece esse serviço. É proibido deduzir, estimar ou usar conhecimento pré-treinado. Não negue a oferta, não invente informações nem " +
+  "substitua por outro atendimento. Encaminhe obrigatoriamente para a equipe com " +
+  "solicitar_atendente_humano; só confirme a transferência se ela tiver sucesso.";
 
 const INSTRUCAO_CONFLICT =
   "O catálogo publicado tem informações incompatíveis para este item. NÃO escolha nenhuma delas e " +
