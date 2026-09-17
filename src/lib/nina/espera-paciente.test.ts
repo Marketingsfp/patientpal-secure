@@ -28,7 +28,7 @@ describe("prazo de 30 minutos", () => {
   });
 });
 
-describe("toda resposta enviada pela Nina inicia a espera", () => {
+describe("texto não dispensa espera: a exceção depende da reserva comprovada no servidor", () => {
   const abre = [
     "Qual sua data de nascimento?",
     "Qual exame você deseja realizar?",

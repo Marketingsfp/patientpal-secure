@@ -12,6 +12,7 @@
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { ninaResponde } from "./ciclo-responsabilidade";
 import type { ResultadoAvisoEncaminhamento } from "./aviso-encaminhamento";
+import { filtrosVersaoFluxo } from "@/lib/nina/fluxo-estado-versao";
 
 export type OwnerType = "AI" | "HUMAN" | "NONE";
 
@@ -213,6 +214,8 @@ export async function encaminharParaHumano(args: {
     ultimaMsgEm: string;
     sessaoId: string | null;
     prazoPaciente?: string;
+    /** Evita transferir se a reserva foi concluída depois da leitura do job. */
+    estadoFluxoEsperado?: unknown;
     /** Invalida a operação pendente na mesma mudança atômica de responsável. */
     estadoFluxoAposHandoff?: Record<string, unknown>;
   };
@@ -261,6 +264,11 @@ export async function encaminharParaHumano(args: {
   if (args.somenteSeNina) {
     if (args.somenteSeNina.prazoPaciente)
       atualizacao = atualizacao.eq("patient_response_deadline", args.somenteSeNina.prazoPaciente);
+    if ("estadoFluxoEsperado" in args.somenteSeNina) {
+      for (const [campo, valor] of filtrosVersaoFluxo(args.somenteSeNina.estadoFluxoEsperado)) {
+        atualizacao = valor === null ? atualizacao.is(campo, null) : atualizacao.eq(campo, valor);
+      }
+    }
     atualizacao = atualizacao
       .eq("ultima_msg_em", args.somenteSeNina.ultimaMsgEm)
       .eq("owner_type", "AI")

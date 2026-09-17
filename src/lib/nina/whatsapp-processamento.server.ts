@@ -570,8 +570,8 @@ export async function processarRespostaWhatsappNina(entrada: EntradaRespostaWhat
         }
       }
 
-      // Qualquer resposta enviada inicia 30 minutos sem retorno do paciente.
-      // A rotina confere a mensagem persistida e se a Nina continua responsável.
+      // Resposta enviada inicia 30 minutos, exceto após agendamento concluído.
+      // A rotina confere mensagem, reserva na sessão e responsabilidade da Nina.
       if (!encerrarConversaId) {
         try {
           const { registrarEsperaPorTelefone } = await import("@/lib/nina/espera-paciente.server");

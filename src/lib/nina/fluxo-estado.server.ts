@@ -30,6 +30,7 @@ export { estadoVazio, normalizarEstado } from "./fluxo-estado-normalizar";
 
 import type { EstadoFluxoNina } from "./fluxo-estado-normalizar";
 import { normalizarEstado, estadoVazio } from "./fluxo-estado-normalizar";
+import { reservaDaSessaoAtual } from "./agendamento-sessao";
 
 type Db = SupabaseClient<any, any, any>;
 
@@ -58,7 +59,14 @@ export async function salvarFluxoEstado(
   try {
     await db
       .from("atend_conversas")
-      .update({ nina_fluxo_estado: { ...estado, updated_at: new Date().toISOString() } } as never)
+      .update({
+        nina_fluxo_estado: { ...estado, updated_at: new Date().toISOString() },
+        // A reserva comprovada encerra a espera no mesmo UPDATE. A despedida
+        // enviada depois não deve criar um encaminhamento por falta de resposta.
+        ...(reservaDaSessaoAtual(estado)
+          ? { awaiting_patient_since: null, patient_response_deadline: null }
+          : {}),
+      } as never)
       .eq("id", conversaId)
       .eq("clinica_id", clinicaId);
   } catch (e) {

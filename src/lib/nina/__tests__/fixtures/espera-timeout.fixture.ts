@@ -12,8 +12,8 @@ const inicio = "2026-09-16T14:00:00.000Z",
 const tempo = (minutos: number) => new Date(Date.parse(inicio) + minutos * 60_000);
 const conv = () => tabelas.atend_conversas![0]!;
 const campo = (l: Linha, k: string) => {
-  const [base, json] = k.split("->>");
-  return json ? (l[base!]?.[json] ?? null) : l[base!];
+  if (!k.includes("->")) return l[k];
+  return k.split(/->>?/).reduce((valor, parte) => valor?.[parte], l) ?? null;
 };
 const admin = {
   from(tabela: string) {
@@ -140,9 +140,15 @@ mock.module("@/lib/atendimento/protocolo-atendimento.server", () => ({
   },
   protocoloAoAtribuirHumano: async () => {},
 }));
-const { registrarEsperaAposRespostaNina, limparEsperaPaciente, limparEsperaPorTelefone } =
-  await import("../../espera-paciente.server");
+const {
+  registrarEsperaAposRespostaNina,
+  limparEsperaPaciente,
+  limparEsperaPorTelefone,
+  timeoutPendenteConfirmado,
+} = await import("../../espera-paciente.server");
 const { processarTimeoutsEsperaPaciente } = await import("../../espera-timeout.server");
+const { salvarFluxoEstado, normalizarEstado } = await import("../../fluxo-estado.server");
+const { encaminharParaHumano } = await import("../../../atendimento/handoff.server");
 
 function mensagem(over: Linha = {}) {
   return {
@@ -366,4 +372,158 @@ it("webhook atrasado não cancela espera de uma resposta posterior da Nina", asy
   expect(conv().patient_response_deadline).toBe(prazo);
   await limparEsperaPorTelefone("cl1", "55000100000", tempo(29).toISOString());
   expect(conv().patient_response_deadline).toBeNull();
+});
+
+function concluirAgendamento() {
+  Object.assign(conv().nina_fluxo_estado, {
+    appointment: { appointment_id: "agendamento-1", confirmed_in_session: "sessao" },
+    flow: { stage: "APPOINTMENT_CONFIRMED" },
+  });
+}
+
+for (const teste of [false, true]) {
+  it(`agendamento concluído dispensa espera em ${teste ? "homologação" : "produção"}`, async () => {
+    conv().is_teste = teste;
+    concluirAgendamento();
+    const estadoConcluido = structuredClone(conv().nina_fluxo_estado);
+    expect((await registrar()).aguardando).toBe(false);
+    expect(conv().patient_response_deadline).toBeNull();
+    expect(conv().awaiting_patient_since).toBeNull();
+    await executar(31);
+    expect(avisos).toBe(0);
+    expect(atribuicoes).toBe(0);
+    expect(conv().owner_type).toBe("AI");
+    expect(conv().nina_fluxo_estado).toEqual(estadoConcluido);
+  });
+
+  it(`job descarta prazo antigo após agendamento concluído (${teste ? "teste" : "real"})`, async () => {
+    conv().is_teste = teste;
+    concluirAgendamento();
+    expect(
+      await timeoutPendenteConfirmado({
+        clinicaId: "cl1",
+        conversaId: "c1",
+        agora: tempo(31),
+      }),
+    ).toBe(false);
+    const resultado = await executar(31);
+    expect(resultado.ignoradas).toBe(1);
+    expect(resultado.transferidas).toBe(0);
+    expect(conv().patient_response_deadline).toBeNull();
+    expect(avisos).toBe(0);
+    expect(resumos).toHaveLength(0);
+    expect(conv().nina_fluxo_estado.appointment.appointment_id).toBe("agendamento-1");
+  });
+}
+
+it("persistir a conclusão cancela o prazo na mesma gravação do estado", async () => {
+  concluirAgendamento();
+  const concluido = normalizarEstado(conv().nina_fluxo_estado);
+  conv().nina_fluxo_estado.appointment = {};
+  await salvarFluxoEstado(admin as never, "cl1", "c1", concluido);
+  expect(conv().nina_fluxo_estado.appointment.appointment_id).toBe("agendamento-1");
+  expect(conv().patient_response_deadline).toBeNull();
+  expect(conv().awaiting_patient_since).toBeNull();
+});
+
+for (const estado of [
+  {
+    appointment: { slot_confirmed_by_patient: true },
+    flow: { stage: "WAITING_FINAL_CONFIRMATION" },
+  },
+  { appointment: {}, flow: { stage: "APPOINTMENT_CONFIRMED" } },
+  { appointment: {}, flow: { stage: "APPOINTMENT_FAILED" } },
+  {
+    appointment: { appointment_id: "antigo", confirmed_in_session: "sessao-anterior" },
+    flow: { stage: "BOOKED" },
+  },
+  { appointment: { appointment_id: "antigo" }, flow: { stage: "GREETING" } },
+]) {
+  it(`sem reserva comprovada na sessão mantém timeout: ${JSON.stringify(estado)}`, async () => {
+    Object.assign(conv().nina_fluxo_estado, estado);
+    expect((await registrar()).aguardando).toBe(true);
+    expect((await executar()).transferidas).toBe(1);
+  });
+}
+
+it("frase de confirmação sem registro real não dispensa o prazo", async () => {
+  tabelas.whatsapp_mensagens![0]!.body = "Seu agendamento está confirmado. Até breve!";
+  expect((await registrar()).aguardando).toBe(true);
+  expect((await executar()).transferidas).toBe(1);
+});
+
+it("conclusão legada com ID e etapa BOOKED também dispensa timeout", async () => {
+  Object.assign(conv().nina_fluxo_estado, {
+    appointment: { appointment_id: "agendamento-legado" },
+    flow: { stage: "BOOKED" },
+  });
+  expect((await executar()).transferidas).toBe(0);
+  expect(conv().patient_response_deadline).toBeNull();
+});
+
+it("cortesia posterior ao agendamento não reabre o temporizador", async () => {
+  concluirAgendamento();
+  conv().ultima_msg_em = tempo(10).toISOString();
+  tabelas.whatsapp_mensagens!.push(
+    mensagem({
+      id: "nina-2",
+      created_at: tempo(10).toISOString(),
+      body: "De nada, até breve!",
+    }),
+  );
+  expect((await registrar(10)).aguardando).toBe(false);
+  expect((await executar(45)).transferidas).toBe(0);
+});
+
+it("novo atendimento após reset volta a ter prazo normal", async () => {
+  concluirAgendamento();
+  await registrar();
+  conv().nina_fluxo_estado = {
+    session_id: "nova-sessao",
+    session_started_at: tempo(5).toISOString(),
+  };
+  conv().ultima_msg_em = tempo(10).toISOString();
+  tabelas.whatsapp_mensagens!.push(mensagem({ id: "nina-2", created_at: tempo(10).toISOString() }));
+  expect((await registrar(10)).deadline).toBe(tempo(40).toISOString());
+  expect((await executar(40)).transferidas).toBe(1);
+});
+
+it("conclusão concorrente impede que um job antigo transfira a conversa", async () => {
+  antesDeGravar = concluirAgendamento;
+  expect((await executar()).transferidas).toBe(0);
+  expect(avisos).toBe(0);
+  expect(conv().nina_fluxo_estado.appointment.appointment_id).toBe("agendamento-1");
+  await executar(31);
+  expect(conv().patient_response_deadline).toBeNull();
+});
+
+it("conclusão concorrente impede rearmar um prazo já cancelado", async () => {
+  conv().awaiting_patient_since = null;
+  conv().patient_response_deadline = null;
+  antesDeGravar = concluirAgendamento;
+  expect((await registrar()).aguardando).toBe(false);
+  expect(conv().patient_response_deadline).toBeNull();
+});
+
+it("limpeza da exceção não apaga espera de outro estado concorrente", async () => {
+  concluirAgendamento();
+  antesDeGravar = () => {
+    conv().nina_fluxo_estado = { session_id: "nova-sessao" };
+  };
+  await executar();
+  expect(conv().patient_response_deadline).toBe(prazo);
+  expect(avisos).toBe(0);
+});
+
+it("exceção ao timeout preserva encaminhamento solicitado pelo paciente", async () => {
+  concluirAgendamento();
+  const r = await encaminharParaHumano({
+    clinicaId: "cl1",
+    conversaId: "c1",
+    motivo: "paciente pediu atendente humano",
+    solicitadoPor: "PACIENTE",
+  });
+  expect(r.ok).toBe(true);
+  expect(conv().owner_type).toBe("HUMAN");
+  expect(avisos).toBe(1);
 });
