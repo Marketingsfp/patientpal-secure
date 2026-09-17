@@ -14280,96 +14280,20 @@ function MedicoFiltroInput({
   compact?: boolean;
 }) {
   const norm = (s: string) => normalizar(s);
-  const lista = useMemo(() => {
-    const arr = medicos.filter((m) => !onlyMedicoId || m.id === onlyMedicoId);
-    // Recursos de enfermagem (prefixados com "🩺 ") aparecem primeiro
-    const isRec = (n: string) => n.startsWith("🩺");
-    return [...arr].sort((a, b) => {
-      const ra = isRec(a.nome) ? 0 : 1;
-      const rb = isRec(b.nome) ? 0 : 1;
-      if (ra !== rb) return ra - rb;
-      return a.nome.localeCompare(b.nome, "pt-BR");
-    });
-  }, [medicos, onlyMedicoId]);
+  // Lista, numeração de homônimos e desdobramento por agenda vêm do módulo
+  // compartilhado — o Financeiro consome exatamente a mesma montagem.
+  const { opcoes, rotuloMedico } = useMemo(
+    () =>
+      montarOpcoesProfissional({
+        medicos: medicos.map((m) => ({ id: m.id, nome: m.nome })),
+        agendasPorMedico,
+        agendasComGrade,
+        incluirTodos: true,
+        onlyMedicoId,
+      }),
+    [medicos, agendasPorMedico, agendasComGrade, onlyMedicoId],
+  );
 
-  // Quando dois cadastros ativos têm o mesmo nome, o dropdown mostrava duas
-  // linhas idênticas e não dava para saber qual escolher. Em vez de esconder
-  // uma delas (o que tornaria um cadastro inalcançável, inclusive homônimos
-  // legítimos), numeramos as repetidas para que a diferença fique visível.
-  const rotuloMedico = useMemo(() => {
-    const contagem = new Map<string, number>();
-    for (const m of lista) contagem.set(norm(m.nome), (contagem.get(norm(m.nome)) ?? 0) + 1);
-    const vistos = new Map<string, number>();
-    const map = new Map<string, string>();
-    for (const m of lista) {
-      const k = norm(m.nome);
-      if ((contagem.get(k) ?? 0) < 2) {
-        map.set(m.id, m.nome);
-        continue;
-      }
-      const n = (vistos.get(k) ?? 0) + 1;
-      vistos.set(k, n);
-      map.set(m.id, `${m.nome} (cadastro ${n})`);
-    }
-    return map;
-  }, [lista]);
-
-  const opcoes = useMemo(() => {
-    const out: OpcaoProfissional[] = [];
-    // Primeira linha da lista: volta a agenda para todos os profissionais e
-    // destrava o filtro "Tipo de agenda". Sem ela, a única forma de limpar era
-    // o "x" ao lado do campo, que a recepção nem sempre percebe.
-    if (!onlyMedicoId) {
-      out.push({
-        key: "todos",
-        medicoId: "todos",
-        agendaFiltro: "todos",
-        rotulo: "TODOS OS PROFISSIONAIS",
-        busca: norm("TODOS OS PROFISSIONAIS"),
-      });
-    }
-    for (const m of lista) {
-      const base = rotuloMedico.get(m.id) ?? m.nome;
-      // Só entram agendas que geram horário. Sem esse corte, sobras de
-      // importação (várias "CONSULTAS (IMPORTADA)" na base, sem nenhum
-      // agendamento) desdobrariam seis profissionais em duas linhas quase
-      // idênticas, e o balcão teria que adivinhar qual das duas usar.
-      //
-      // Agendas de mesmo nome viram uma linha só: o filtro "Tipo de agenda"
-      // trabalha por nome, então duas linhas iguais fariam exatamente a mesma
-      // coisa e só confundiriam quem está no balcão.
-      const agendas: { chave: string; nome: string }[] = [];
-      const vistas = new Set<string>();
-      for (const a of agendasPorMedico.get(m.id) ?? []) {
-        if (!agendasComGrade.has(a.id)) continue;
-        const chave = chaveNomeAgenda(a.nome ?? "");
-        if (!chave || vistas.has(chave)) continue;
-        vistas.add(chave);
-        agendas.push({ chave, nome: (a.nome ?? "").trim() });
-      }
-      // Uma agenda só (ou nenhuma): nome limpo, sem sufixo.
-      if (agendas.length < 2) {
-        out.push({
-          key: m.id,
-          medicoId: m.id,
-          agendaFiltro: "todos",
-          rotulo: base,
-          busca: norm(base),
-        });
-        continue;
-      }
-      for (const a of agendas) {
-        out.push({
-          key: `${m.id}|${a.chave}`,
-          medicoId: m.id,
-          agendaFiltro: `nome:${a.chave}`,
-          rotulo: `${base} — ${a.nome}`,
-          busca: norm(`${base} ${a.nome}`),
-        });
-      }
-    }
-    return out;
-  }, [lista, rotuloMedico, agendasPorMedico, agendasComGrade, onlyMedicoId]);
 
   // O texto do campo sai da COMBINAÇÃO profissional + tipo de agenda. Assim,
   // se a recepção mexer no filtro secundário depois de escolher uma linha
