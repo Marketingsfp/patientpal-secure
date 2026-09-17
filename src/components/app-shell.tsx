@@ -1366,6 +1366,11 @@ function AppShellInner() {
     location.pathname.length > 1 && location.pathname.endsWith("/")
       ? location.pathname.slice(0, -1)
       : location.pathname;
+  const areaConversas =
+    pathAtual === "/app/nina" &&
+    ["", "chat", "atend-inbox", "homologacao"].includes(
+      (location.hash ?? "").replace(/^#/, ""),
+    );
   const destinoPortal =
     !permsLoading && !rotaPermitida && ROTAS_HOME_PORTAL.has(pathAtual)
       ? primeiraRotaVisivel(visibleNavRows)
@@ -1888,6 +1893,8 @@ function AppShellInner() {
                   // atrás da barra inferior (que só existe abaixo de `md`).
                   "pb-28 md:pb-4 lg:pb-6",
                 ),
+            // Encosta os painéis de conversas no menu quando dividem a tela.
+            sidebarAberta && areaConversas && "lg:pl-0",
             uxMelhorias && "animate-in fade-in duration-200 motion-reduce:animate-none",
           )}
           style={{ background: "var(--surface-cream)" }}
