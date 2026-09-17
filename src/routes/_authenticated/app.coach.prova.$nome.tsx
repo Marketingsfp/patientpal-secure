@@ -96,7 +96,7 @@ function ProvaPage({ ctx }: { ctx: CoachContexto }) {
   useStudyTimer(atendente, "prova", clinicaId);
   const generate = useServerFn(gerarProva);
   const gerarFeedback = useServerFn(gerarFeedbackProva);
-  const { config, loading: clinicaLoading, tabelaParaIA } = useCoachConfig(
+  const { config, loading: clinicaLoading, baseParaIA } = useCoachConfig(
     clinicaId,
     ctx.clinicaNome,
   );
@@ -223,7 +223,7 @@ function ProvaPage({ ctx }: { ctx: CoachContexto }) {
           quantidade: 8,
           exemplos,
           scripts: scripts || undefined,
-          tabela: tabelaParaIA,
+          tabela: baseParaIA(),
         },
       });
       setProva(result);
@@ -333,7 +333,7 @@ function ProvaPage({ ctx }: { ctx: CoachContexto }) {
           })),
           respostas: resp.map((r) => (typeof r === "number" ? r : -1)),
           scripts: scripts || undefined,
-          tabela: tabelaParaIA,
+          tabela: baseParaIA(),
         },
       });
       setFeedback(fb);
