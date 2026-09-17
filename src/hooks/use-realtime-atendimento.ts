@@ -28,6 +28,7 @@ export const TABELAS_ATENDIMENTO = [
   "atend_conversa_eventos",
   "atend_notas_internas",
   "atend_handoff_resumos",
+  "atend_leitura_operacional",
 ] as const;
 
 export function useRealtimeAtendimento(params: {

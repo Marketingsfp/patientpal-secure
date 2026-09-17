@@ -292,21 +292,17 @@ export const listarConversas = createServerFn({ method: "POST" })
     marcar("consulta");
     if (error) throw new Error(error.message);
 
-    // Não lidas DESTE usuário: mensagens recebidas do paciente depois do
-    // marcador de leitura dele. O contador antigo da conversa continua na
-    // linha, apenas como referência histórica.
+    // Não lidas pela equipe operacional; supervisão acompanha o mesmo número.
+    // O contador legado permanece apenas como referência histórica.
     let naoLidas = new Map<string, number>();
     const ids = (rows ?? []).map((r: any) => r.id);
     if (ids.length) {
-      try {
-        const { data: cont } = await context.supabase.rpc("atend_nao_lidas", {
-          _clinica_id: data.clinicaId,
-          _conversa_ids: ids,
-        });
-        naoLidas = new Map((cont ?? []).map((c: any) => [c.conversa_id, Number(c.nao_lidas) || 0]));
-      } catch (e) {
-        console.error("[atendimento] contagem de nao lidas falhou", e);
-      }
+      const { data: cont, error: erroLeitura } = await context.supabase.rpc("atend_nao_lidas", {
+        _clinica_id: data.clinicaId,
+        _conversa_ids: ids,
+      });
+      if (erroLeitura) throw new Error(erroLeitura.message);
+      naoLidas = new Map((cont ?? []).map((c: any) => [c.conversa_id, Number(c.nao_lidas) || 0]));
       marcar("nao_lidas");
     }
 
@@ -473,7 +469,11 @@ export const souGestorAtendimento = createServerFn({ method: "POST" })
     // `admin` = supervisão total, sem atender: a Inbox usa isto para abrir na
     // visão da equipe e esconder as ações de atendimento.
     const admin = await ehAdminClinica(context.supabase, context.userId, data.clinicaId);
-    return { gestor: !!podeGerir, admin };
+    const { data: leituraOperacional, error } = await context.supabase.rpc("atend_permite_leitura_operacional", {
+      _clinica_id: data.clinicaId,
+    });
+    if (error) throw new Error(error.message);
+    return { gestor: !!podeGerir, admin, leituraOperacional: leituraOperacional === true };
   });
 
 /**
@@ -725,16 +725,17 @@ export const fecharConversa = createServerFn({ method: "POST" })
 
   });
 
-/** Contagem individual real (marcador de leitura deste usuário) de uma conversa. */
+/** Contagem após a última leitura operacional confirmada no banco. */
 async function contarNaoLidasConversa(
   supabase: any,
   clinicaId: string,
   conversaId: string,
 ): Promise<number> {
-  const { data } = await supabase.rpc("atend_nao_lidas", {
+  const { data, error } = await supabase.rpc("atend_nao_lidas", {
     _clinica_id: clinicaId,
     _conversa_ids: [conversaId],
   });
+  if (error) throw new Error(error.message);
   const linha = (data ?? [])[0];
   return Number(linha?.nao_lidas ?? 0) || 0;
 }
@@ -743,10 +744,9 @@ async function contarNaoLidasConversa(
 
  * Registra a leitura DESTE usuário até uma mensagem real da timeline.
  *
- * A leitura é individual (`atend_leituras`): o que Maria leu não interfere no
- * que Jean leu. O usuário vem da autenticação — a tela não pode informar outra
- * pessoa. Fase 1 preservada: quem tem perfil administrativo/gestor apenas
- * acompanha e não registra leitura automática ao abrir.
+ * A leitura operacional atualiza o indicador da equipe e preserva o histórico
+ * individual. O usuário vem da autenticação. Admin, gestão e supervisão não
+ * consomem mensagens, inclusive em chamadas explícitas.
  *
  * O contador antigo da conversa (`unread_count`) NÃO é zerado: fica como
  * referência histórica.
@@ -758,17 +758,16 @@ export const marcarLida = createServerFn({ method: "POST" })
       .object({
         clinicaId: z.string().uuid(),
         conversaId: z.string().uuid(),
-        // Última mensagem realmente vista. Sem ela, usa a última existente no
-        // momento da chamada (nunca "agora", para não engolir o que chegar).
-        mensagemId: z.string().uuid().optional().nullable(),
-        // Leitura por abertura da conversa (padrão) x ação explícita.
+        // Limite realmente carregado: obrigatório para não consumir mensagens futuras.
+        mensagemId: z.string().uuid(),
+        // Compatibilidade de chamada; nenhum modo pode ignorar o perfil.
         automatico: z.boolean().default(true),
       })
       .parse(i),
   )
   .handler(async ({ data, context }) => {
     await assertMember(context.supabase, context.userId, data.clinicaId);
-    const { assertAcessoConversa, usuarioEhGestor } = await import(
+    const { assertAcessoConversa } = await import(
       "./atendimento/acesso-conversa.server"
     );
     const { avaliarLeituraAutomatica } = await import("./atendimento/leitura-inbox");
@@ -778,14 +777,17 @@ export const marcarLida = createServerFn({ method: "POST" })
       data.clinicaId,
       data.conversaId,
     );
-    const ehGestor = await usuarioEhGestor(context.supabase, context.userId, data.clinicaId);
-    const admin = await ehAdminClinica(context.supabase, context.userId, data.clinicaId);
+    const { data: leituraOperacional, error: erroPerfil } = await context.supabase.rpc("atend_permite_leitura_operacional", {
+      _clinica_id: data.clinicaId,
+    });
+    if (erroPerfil) throw new Error(erroPerfil.message);
     const { pode, motivo } = avaliarLeituraAutomatica({
       userId: context.userId,
       atribuidaUserId: conv.atribuida_user_id ?? null,
-      ehGestor: ehGestor || admin,
+      ehGestor: leituraOperacional !== true,
+      acessoPermitido: true,
     });
-    if (data.automatico && !pode) {
+    if (!pode) {
       const naoLidas = await contarNaoLidasConversa(context.supabase, data.clinicaId, data.conversaId);
       return { ok: true, marcada: false, motivo, lidaAte: null, naoLidas };
     }
@@ -1824,6 +1826,7 @@ export const listarMensagensConversa = createServerFn({ method: "POST" })
     if (data.depoisDe) q = q.gt("recebida_em", data.depoisDe);
     const { data: rows, error } = await q
       .order("recebida_em", { ascending: false })
+      .order("id", { ascending: false })
       .limit(data.limit);
     if (error) throw new Error(error.message);
     return (rows ?? []).slice().reverse();

@@ -53,6 +53,9 @@ export function classificarEvento(ev: EventoRealtime, ctx: ContextoTela): AlvoAt
   const aberta = ctx.conversaAberta;
 
   switch (ev.table) {
+    case "atend_leitura_operacional":
+      // A leitura da equipe atualiza também o contador de quem supervisiona.
+      return ["lista"];
     case "whatsapp_mensagens": {
       // FASE 4 — mensagem comum não recalcula a fila de espera: a espera muda
       // quando a própria conversa muda (transferência, atribuição, desfecho),

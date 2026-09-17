@@ -23,7 +23,7 @@ export function mesclarAnteriores(atuais: any[], antigas: any[]): any[] {
   const mapa = new Map<string, any>();
   for (const m of antigas ?? []) if (m?.id) mapa.set(m.id, m);
   for (const m of atuais ?? []) if (m?.id) mapa.set(m.id, m);
-  return [...mapa.values()].sort((a, b) => instante(a) - instante(b));
+  return [...mapa.values()].sort((a, b) => instante(a) - instante(b) || a.id.localeCompare(b.id));
 }
 
 /**

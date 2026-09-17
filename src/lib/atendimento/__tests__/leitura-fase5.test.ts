@@ -13,7 +13,7 @@ const src = (p: string) => readFileSync(resolve(process.cwd(), p), "utf8");
  * FASE 5 — a leitura é só leitura.
  *
  * Estes testes travam as garantias combinadas: abrir/visualizar registra
- * apenas o marcador individual e não mexe em resposta, atribuição, status,
+ * apenas os marcadores de leitura e não mexe em resposta, atribuição, status,
  * tempo de espera nem no contador histórico da conversa.
  */
 describe("Fase 5 — leitura não é resposta", () => {
@@ -37,7 +37,7 @@ describe("Fase 5 — leitura não é resposta", () => {
     }
   });
 
-  it("marcarLida só usa as rotinas de leitura individual", () => {
+  it("marcarLida só usa as rotinas de leitura", () => {
     expect(marcarLida).toMatch(/atend_registrar_leitura/);
     expect(marcarLida).toMatch(/contarNaoLidasConversa/);
     expect(fns).toMatch(/atend_nao_lidas/);
@@ -100,9 +100,8 @@ describe("Fase 5 — cenários obrigatórios", () => {
     expect(deveRegistrarLeituraDeNovas({ ...base, seguindoFim: false })).toBe(false);
   });
 
-  it("conversa transferida: nova responsável não herda a leitura da anterior", () => {
-    // Maria era responsável; após transferir para Jean, o contexto é de Jean,
-    // que ainda não tem marcador — a leitura só é registrada quando ele abre.
+  it("transferência muda quem pode registrar a próxima leitura autorizada", () => {
+    // A ex-responsável perde o acesso; a próxima pode avançar o limite da equipe.
     expect(
       deveRegistrarLeituraAoAbrir({ ...base, userId: "jean", atribuidaUserId: "maria" }),
     ).toBe(false);

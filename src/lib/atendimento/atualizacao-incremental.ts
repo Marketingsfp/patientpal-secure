@@ -43,7 +43,7 @@ export function mesclarNovas(atuais: any[], novas: any[]): any[] {
     // estado em vez de sumir e reaparecer.
     mapa.set(chave, anterior ? { ...anterior, ...m, optimistic: !!m.optimistic } : m);
   }
-  return [...mapa.values()].sort((a, b) => instante(a) - instante(b));
+  return [...mapa.values()].sort((a, b) => instante(a) - instante(b) || a.id.localeCompare(b.id));
 }
 
 /** Junta eventos internos novos, também sem duplicar. */

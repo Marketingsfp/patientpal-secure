@@ -44,7 +44,7 @@ describe("FASE 4 — Inbox fora do caminho crítico da mensagem", () => {
     expect(r.lista[0]!.nao_lidas).toBe(1);
   });
 
-  it("mensagem da conversa aberta não incrementa não lidas", () => {
+  it("mensagem da conversa aberta conta até a leitura operacional ser confirmada", () => {
     const r = patchListaPorMensagem(
       lista,
       {
@@ -55,7 +55,7 @@ describe("FASE 4 — Inbox fora do caminho crítico da mensagem", () => {
       },
       { conversaAberta: "A" },
     );
-    expect(r.lista[0]!.nao_lidas).toBe(0);
+    expect(r.lista[0]!.nao_lidas).toBe(1);
   });
 
   it("conversa fora da lista atual pede reconciliação em vez de palpite", () => {

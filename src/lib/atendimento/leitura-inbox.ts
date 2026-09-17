@@ -1,20 +1,17 @@
 /**
  * Quem pode zerar o contador de mensagens não lidas de uma conversa da Inbox.
  *
- * Hoje o contador (`atend_conversas.unread_count`) é ÚNICO por conversa: ele é
- * somado pelo gatilho de mensagem recebida e é o mesmo número visto por todo
- * mundo. Por isso, uma supervisão que marcasse "lido" apagaria o aviso da
- * atendente responsável.
- *
- * Regra conservadora desta fase: só a atendente responsável pela conversa
- * marca leitura automaticamente. Quem tem perfil administrativo/gestor apenas
- * acompanha — mesmo que também atenda, mesmo que a conversa seja dele. Nada
- * aqui altera responsável, status, fila ou os recibos enviados ao WhatsApp.
+ * O indicador reflete a leitura operacional da equipe. Admin, gestão e
+ * supervisão acompanham sem consumir mensagens. Um perfil operacional pode
+ * registrar leitura se já possui acesso à conversa, mesmo sem ser responsável
+ * atual (Nina ou histórico próprio). A autorização definitiva cabe ao banco.
+ * Nada aqui altera responsável, status, fila ou recibos do WhatsApp.
  */
 
 export const MOTIVO_LEITURA = {
   /** Pode marcar: é a atendente responsável e não está supervisionando. */
   responsavel: "responsavel",
+  operacional: "operacional",
   /** Perfil administrativo/gestor: acompanha sem alterar a leitura alheia. */
   supervisao: "supervisao",
   /** Conversa de outra pessoa (ou sem responsável): não é leitura dele. */
@@ -30,6 +27,8 @@ export type ContextoLeitura = {
   atribuidaUserId: string | null | undefined;
   /** Perfil administrativo/gestor/supervisor na clínica da conversa. */
   ehGestor: boolean;
+  /** Acesso à conversa já verificado; não amplia o escopo de visualização. */
+  acessoPermitido?: boolean;
 };
 
 export function avaliarLeituraAutomatica(ctx: ContextoLeitura): {
@@ -39,6 +38,9 @@ export function avaliarLeituraAutomatica(ctx: ContextoLeitura): {
   // Acumulou perfil administrativo e de atendente? Regra conservadora:
   // a abertura não marca nada como lido.
   if (ctx.ehGestor) return { pode: false, motivo: MOTIVO_LEITURA.supervisao };
+  if (ctx.userId && ctx.acessoPermitido === true) {
+    return { pode: true, motivo: MOTIVO_LEITURA.operacional };
+  }
   if (!ctx.atribuidaUserId || ctx.atribuidaUserId !== ctx.userId) {
     return { pode: false, motivo: MOTIVO_LEITURA.nao_responsavel };
   }
@@ -107,6 +109,14 @@ export function deveRegistrarLeituraDeNovas(ctx: ContextoNovasMensagens): boolea
   // Marcador já está nesta mensagem: nada de repetir requisição por render.
   if (ctx.ultimaRegistradaId === ctx.ultimaMensagemId) return false;
   return podeMarcarLidaAutomaticamente(ctx);
+}
+
+/** Uma abertura já lida passa a exigir acompanhar o fim para ler novas mensagens. */
+export function deveRegistrarLeituraVisivel(ctx: ContextoAbertura & { seguindoFim: boolean }): boolean {
+  if (ctx.aberturaPorAlvo) return false;
+  return ctx.ultimaRegistradaId
+    ? deveRegistrarLeituraDeNovas(ctx)
+    : deveRegistrarLeituraAoAbrir(ctx);
 }
 
 /**

@@ -181,8 +181,7 @@ import {
 } from "@/lib/atendimento.functions";
 import {
   aplicarReconciliacao,
-  deveRegistrarLeituraAoAbrir,
-  deveRegistrarLeituraDeNovas,
+  deveRegistrarLeituraVisivel,
 } from "@/lib/atendimento/leitura-inbox";
 
 
@@ -408,6 +407,7 @@ export function AtendInbox() {
   const [buscaAtendente, setBuscaAtendente] = useState("");
   // Administrador acompanha tudo, mas não atende: só supervisão.
   const [souAdmin, setSouAdmin] = useState(false);
+  const [perfilLeitura, setPerfilLeitura] = useState<{ chave: string; permitida: boolean } | null>(null);
   const filtroAtendente = filtroAtendenteAtual({
     visualizacao: visualizacaoEscolhida,
     naoAtribuidas: naoAtribuidasFiltro,
@@ -935,12 +935,14 @@ export function AtendInbox() {
   // Perfil de gestor: só ele enxerga a opção "Todas da clínica".
   useEffect(() => {
     let vivo = true;
-    if (!clinicaId) return;
+    setPerfilLeitura(null);
+    if (!clinicaId || !meuId) return;
     souGestorFn({ data: { clinicaId } })
       .then((r: any) => {
         if (!vivo) return;
         setSouGestor(!!r?.gestor);
         setSouAdmin(!!r?.admin);
+        setPerfilLeitura({ chave: `${clinicaId}:${meuId}`, permitida: r?.leituraOperacional === true });
         // Administrador não tem conversas próprias: abre já na visão da equipe.
         if (r?.admin) setEscopoBase((b) => (b === ESCOPO_BASE_PADRAO ? "equipe" : b));
       })
@@ -952,7 +954,7 @@ export function AtendInbox() {
     return () => {
       vivo = false;
     };
-  }, [clinicaId, souGestorFn]);
+  }, [clinicaId, meuId, souGestorFn]);
 
   const carregarContadores = useCallback(async () => {
     if (!clinicaId) return;
@@ -1562,8 +1564,8 @@ export function AtendInbox() {
     }
   }, [clinicaId, listarMsgs, listarEventosFn, carregarConversa]);
 
-  /* ---- Leitura individual (Fases 2 e 3) --------------------------------
-   * Registra a leitura da própria atendente até a ÚLTIMA mensagem realmente
+  /* ---- Leitura operacional da equipe ----------------------------------
+   * Registra a leitura por um perfil operacional até a ÚLTIMA mensagem realmente
    * exibida na tela — nunca "agora" e nunca por prefetch, cache, hover ou
    * carregamento em segundo plano. Só conta quando a conversa certa está
    * aberta, as mensagens já apareceram e a aba está visível.
@@ -1585,46 +1587,39 @@ export function AtendInbox() {
   useEffect(() => {
     const conversa = sel;
     const alvo = conversa?.id as string | undefined;
-    if (!clinicaId || !alvo || carregandoConversa) return;
-    const ultima = msgs.length ? (msgs[msgs.length - 1] as any) : null;
+    const chavePerfil = `${clinicaId}:${meuId}`;
+    if (!clinicaId || !alvo || carregandoConversa || perfilLeitura?.chave !== chavePerfil || !perfilLeitura.permitida) return;
+    const chaveLeitura = `${chavePerfil}:${alvo}`;
+    // Mensagens otimistas ainda não existem no banco e não comprovam leitura.
+    const ultima = msgs.filter((m: any) => !m.optimistic && /^[0-9a-f]{8}-[0-9a-f-]{27}$/i.test(m.id ?? "")).at(-1);
     const mensagemId = (ultima?.id as string | undefined) ?? null;
     const base = {
       userId: meuId ?? "",
       atribuidaUserId: conversa?.atribuida_user_id ?? null,
-      ehGestor: souGestor,
+      ehGestor: souGestor || souAdmin || !perfilLeitura.permitida,
+      acessoPermitido: true,
       conversaId: alvo,
       conversaCarregadaId,
       abaVisivel,
       ultimaMensagemId: mensagemId,
-      ultimaRegistradaId: ultimaLidaRef.current.get(alvo) ?? null,
+      ultimaRegistradaId: ultimaLidaRef.current.get(chaveLeitura) ?? null,
     };
     const aberturaPorAlvo =
       aberturaPorAlvoRef.current.has(alvo) || buscandoAlvo || !!alvoMensagem;
-    const liberado =
-      deveRegistrarLeituraAoAbrir({ ...base, aberturaPorAlvo }) ||
-      // Mensagem nova (ou volta ao fim depois de ler o histórico).
-      deveRegistrarLeituraDeNovas({ ...base, seguindoFim });
+    const liberado = deveRegistrarLeituraVisivel({ ...base, aberturaPorAlvo, seguindoFim });
     if (!liberado || !mensagemId) return;
 
     // Agrupa rajadas (várias mensagens seguidas, re-renders): uma requisição só.
     if (timerLeituraRef.current) clearTimeout(timerLeituraRef.current);
     timerLeituraRef.current = setTimeout(() => {
       timerLeituraRef.current = null;
-      if (ultimaLidaRef.current.get(alvo) === mensagemId) return;
-      ultimaLidaRef.current.set(alvo, mensagemId);
+      if (ultimaLidaRef.current.get(chaveLeitura) === mensagemId) return;
+      ultimaLidaRef.current.set(chaveLeitura, mensagemId);
       const seq = (seqLeituraRef.current.get(alvo) ?? 0) + 1;
       seqLeituraRef.current.set(alvo, seq);
 
-      // Otimista: a bolinha some na hora; o número anterior fica guardado e o
-      // valor verdadeiro vem da resposta do backend (reconciliação).
-      let anterior = 0;
-      setConvs((prev) =>
-        prev.map((c: any) => {
-          if (c.id !== alvo) return c;
-          anterior = Number(c.nao_lidas ?? 0);
-          return { ...c, nao_lidas: 0 };
-        }),
-      );
+      // O badge só baixa após a confirmação persistida, nunca apenas no visual.
+      const anterior = Number(convsRef.current.find((c: any) => c.id === alvo)?.nao_lidas ?? 0);
       const reconciliar = (naoLidasBackend: number | null | undefined) => {
         const r = aplicarReconciliacao({
           sequenciaResposta: seq,
@@ -1632,21 +1627,26 @@ export function AtendInbox() {
           naoLidasBackend,
           naoLidasAnterior: anterior,
         });
-        if (!r.aplicar) return; // resposta atrasada: não sobrescreve estado novo
+        if (!r.aplicar) {
+          // Um inbound ou outra leitura chegou durante a chamada: buscar o
+          // número atual impede uma resposta antiga de apagar esse aviso.
+          agrupadores.current?.lista.agendar();
+          return;
+        }
         setConvs((prev) =>
           prev.map((c: any) => (c.id === alvo ? { ...c, nao_lidas: r.valor } : c)),
         );
       };
       void marcarLidaFn({ data: { clinicaId, conversaId: alvo, mensagemId } })
         .then((r: any) => {
-          if (r?.marcada === false) ultimaLidaRef.current.delete(alvo);
+          if (r?.marcada === false) ultimaLidaRef.current.delete(chaveLeitura);
           reconciliar(r?.naoLidas);
         })
         .catch(() => {
-          // Falhou a gravação: devolve o número verdadeiro conhecido e libera
-          // nova tentativa — nada de esconder a bolinha só no visual.
-          reconciliar(anterior);
-          ultimaLidaRef.current.delete(alvo);
+          // Preserva o badge e libera nova tentativa. A gravação pode ter
+          // concluído antes de uma falha de rede, então também reconcilia.
+          agrupadores.current?.lista.agendar();
+          ultimaLidaRef.current.delete(chaveLeitura);
         });
     }, 350);
     return () => {
@@ -1663,6 +1663,8 @@ export function AtendInbox() {
     msgs,
     meuId,
     souGestor,
+    souAdmin,
+    perfilLeitura,
     abaVisivel,
     seguindoFim,
     buscandoAlvo,
@@ -2076,6 +2078,13 @@ export function AtendInbox() {
       const g = agrupadores.current;
       if (!g) return;
       watchdog.current.aoEvento();
+      if (evento.table === "atend_leitura_operacional" ||
+          (evento.table === "whatsapp_mensagens" && evento.eventType === "INSERT" && evento.new?.direction === "in")) {
+        const conversaLida = String(evento.new?.conversa_id ?? "");
+        if (conversaLida) {
+          seqLeituraRef.current.set(conversaLida, (seqLeituraRef.current.get(conversaLida) ?? 0) + 1);
+        }
+      }
       // Chegada de mensagem por tempo real: abre/atualiza o trace de recebimento.
       if (evento.table === "whatsapp_mensagens") {
         const linha: any = (evento as any).new ?? {};

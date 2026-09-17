@@ -22,6 +22,9 @@ jobs:
       - name: Testar fila individual em Pausa e excedente global
         run: python3 scripts/test-zap-fila-individual-postgres.py --pg-bin "$(pg_config --bindir)"
 
+      - name: Testar leitura operacional e contadores por perfil
+        run: python3 scripts/test-zap-leitura-postgres.py --pg-bin "$(pg_config --bindir)"
+
   verificar:
     runs-on: ubuntu-latest
     steps:

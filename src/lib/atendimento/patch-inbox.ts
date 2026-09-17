@@ -93,7 +93,7 @@ export function patchListaPorMensagem(
   },
 ): ResultadoPatch {
   const conversaId = String(linha?.["conversa_id"] ?? "");
-  const quando = linha?.["created_at"] ?? linha?.["criado_em"] ?? null;
+  const quando = linha?.["recebida_em"] ?? linha?.["created_at"] ?? linha?.["criado_em"] ?? null;
   if (!conversaId || !quando || !Array.isArray(lista)) {
     return { lista: lista ?? [], aplicado: false, reconciliar: true };
   }
@@ -111,7 +111,9 @@ export function patchListaPorMensagem(
   const entrada = linha?.["direction"] === "in";
   const previa = textoPrevia(linha ?? {}) ?? alvo.ultima_msg_preview ?? null;
   const maisNova = instante(quando) >= instante(alvo.ultima_msg_em);
-  const contaNaoLida = entrada && ctx.conversaAberta !== conversaId;
+  // Estar aberta não comprova leitura: pode ser supervisão ou aba oculta.
+  // O registro confirmado pelo banco reconcilia o contador em seguida.
+  const contaNaoLida = entrada;
 
   if (!maisNova && !contaNaoLida) return { lista, aplicado: true, reconciliar: false };
 
