@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="pt-BR">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nina — prévia de mensagens para celular</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#edf2f0;color:#172e29;font:16px/1.5 system-ui,sans-serif}main{max-width:1100px;margin:auto;padding:28px 16px}
+h1{font-size:26px;margin:0 0 8px}p{margin:0 0 14px}.intro{max-width:700px}.controls{display:flex;flex-wrap:wrap;gap:14px;margin:22px 0}label{display:grid;gap:5px;font-size:14px;font-weight:600}select{padding:10px;border:1px solid #bacdc6;border-radius:8px;background:white;color:#172e29;font:inherit}
+.phone{width:min(var(--width,390px),100%);border:1px solid #bdd0c7;border-radius:22px;overflow:hidden;box-shadow:0 12px 36px #193d2520;background:#efeae2}.top{background:#075e54;color:white;padding:15px 18px}.top strong{display:block}.top small{opacity:.85}
+.thread{padding:14px 10px 24px}.bubble{width:94%;margin-left:auto;background:#d9fdd3;border-radius:10px;padding:12px;white-space:pre-wrap;overflow-wrap:anywhere;font:16px/1.48 Arial,sans-serif;color:#111b21}.bubble b{font-weight:700}
+footer{margin-top:20px;font-size:14px;max-width:660px;color:#4a6259}.hint{font-size:14px;color:#53665d}.layout{display:flex;gap:32px;align-items:flex-start;flex-wrap:wrap}.notes{max-width:330px;padding:20px;background:white;border:1px solid #d6e4dd;border-radius:12px}.notes h2{font-size:18px;margin:0 0 12px}.notes li{margin:9px 0}.notes ul{padding-left:18px;margin:0}
+</style>
+<main>
+<h1>Mensagens da Nina no celular</h1>
+<p class="intro">Um bloco por profissional. Dias, horários, valores e critérios aparecem juntos para facilitar a leitura.</p>
+<p class="hint">Exemplos fictícios de apresentação. Não são respostas geradas pela Nina nem informações reais da clínica. Prévia aproximada; o WhatsApp pode variar conforme aparelho e tamanho da fonte.</p>
+<div class="controls">
+<label>Cenário<select id="scenario"><option value="consulta">Consulta com dois médicos</option><option value="agenda">Vagas da agenda</option><option value="procedimento">Procedimento com valor comum</option></select></label>
+<label>Largura de referência<select id="width"><option value="360">360 px</option><option value="390" selected>390 px</option><option value="430">430 px</option></select></label>
+</div>
+<div class="layout">
+<section class="phone" aria-label="Prévia aproximada de celular">
+<div class="top"><strong>Nina</strong><small>Prévia de formatação · dados fictícios</small></div>
+<div class="thread"><div class="bubble" id="message"></div></div>
+</section>
+<aside class="notes"><h2>Como ler</h2><ul><li>O nome inicia o bloco de cada médico.</li><li>Cada dia vem com seu horário e sua recorrência.</li><li>Os valores indicam a forma de pagamento.</li><li>Critérios e exceções ficam no bloco correspondente.</li><li>Escala habitual e vagas de agenda têm títulos diferentes.</li></ul></aside>
+</div>
+<footer>A altura da mensagem não é limitada a uma tela: condições importantes são mantidas. Não há envio ao WhatsApp nem alteração de catálogo ou agendamento nesta prévia.</footer>
+</main>
+<script>
+const messages = {
+consulta: `Temos estas opções para a consulta:
+
+*Dra. Ana Martins*
+*Dias e horários habituais*
+• Segunda-feira: 08:00 às 11:00
+• Quinta-feira: 14:00 às 17:00
+
+*Valores*
+• Dinheiro: R$ 120,00
+• Cartão: R$ 145,00
+
+*Atendimento:* hora marcada.
+*Idade:* a partir de 18 anos.
+
+*Dr. Bruno Alves*
+*Dias e horários habituais*
+• Terça-feira: 09:00 às 12:00
+• 1º e 3º sábado do mês: 08:00 às 10:00
+
+*Valores*
+• Dinheiro: R$ 140,00
+• Cartão: R$ 160,00
+
+*Atendimento:* ordem de chegada com pré-agendamento.
+O horário pré-agendado não garante a hora exata da consulta.
+*Idade:* a partir de 12 anos.
+
+Esses são os horários habituais de atendimento. Com qual profissional você gostaria de verificar vagas?`,
+agenda: `Consultei a agenda e encontrei estas opções:
+
+*Dra. Ana Martins*
+*Horários disponíveis*
+• Segunda-feira, 21/09/2026: 08:20 ou 10:20
+
+*Valores*
+• Dinheiro: R$ 120,00
+• Cartão: R$ 145,00
+
+*Atendimento:* hora marcada.
+*Idade:* a partir de 18 anos.
+
+*Dr. Bruno Alves*
+*Horários disponíveis*
+• Terça-feira, 22/09/2026: 09:40
+
+*Valores*
+• Dinheiro: R$ 140,00
+• Cartão: R$ 160,00
+
+*Atendimento:* ordem de chegada com pré-agendamento.
+O horário pré-agendado não garante a hora exata da consulta.
+*Idade:* a partir de 12 anos.
+
+Qual profissional, data e horário você prefere?`,
+procedimento: `*Procedimento demonstrativo*
+
+*Dra. Ana Martins*
+*Dias e horários habituais*
+• Segunda-feira: 08:00 às 11:00
+
+*Dr. Bruno Alves*
+*Dias e horários habituais*
+• Quinta-feira: 14:00 às 17:00
+
+*Valores do procedimento*
+Os valores abaixo valem para os dois profissionais:
+• Dinheiro: R$ 180,00 por sessão
+• Cartão: R$ 210,00 por sessão
+
+*Orientações para este procedimento*
+Para os dois profissionais:
+• Idade: a partir de 18 anos.
+• Levar documento com foto.
+
+Com qual profissional você gostaria de verificar vagas?`
+};
+function render(){
+ const text=messages[document.querySelector('#scenario').value];
+ const bubble=document.querySelector('#message');bubble.replaceChildren();
+ for(const [i,part] of text.split('*').entries()){
+  if(i%2){const b=document.createElement('b');b.textContent=part;bubble.append(b)}
+  else bubble.append(document.createTextNode(part));
+ }
+ document.querySelector('.phone').style.setProperty('--width',document.querySelector('#width').value+'px');
+}
+document.querySelector('#scenario').addEventListener('change',render);
+document.querySelector('#width').addEventListener('change',render);render();
+</script>
+</html>
