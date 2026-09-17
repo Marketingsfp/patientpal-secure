@@ -20,6 +20,7 @@ import {
   type DespesaPainel,
   type LancamentoPainel,
 } from "@/lib/financeiro/painel-financeiro";
+import { carregarForaDoCaixa, type ForaDoCaixa } from "@/lib/financeiro/fora-do-caixa-carregar";
 
 /** O PostgREST devolve no máximo 1.000 linhas por requisição. */
 const PAGINA = 1000;
@@ -54,6 +55,12 @@ export interface DadosPainel {
   despesas: DespesaPainel[];
   /** Mensalidades, adesões e avulsos — as linhas `avulso` do mesmo rateio. */
   outrasReceitas: LancamentoPainel[];
+  /**
+   * O que ficou fora dos números, pela regra do Movimento de Caixa:
+   * lançamentos retroativos e parcelas de cartão importadas. Serve ao aviso
+   * da tela — esconder sem dizer quanto seria pior que somar.
+   */
+  foraDoCaixa: ForaDoCaixa;
 }
 
 export async function carregarPainelFinanceiro(
@@ -62,7 +69,7 @@ export async function carregarPainelFinanceiro(
   de: string,
   ate: string,
 ): Promise<DadosPainel> {
-  const [todasAsLinhas, despesasRaw] = await Promise.all([
+  const [todasAsLinhasBrutas, despesasBrutas, foraDoCaixa] = await Promise.all([
     carregarRateio(ctx, { clinicaId, de, ate }),
     paginado(() =>
       supabase
@@ -76,7 +83,13 @@ export async function carregarPainelFinanceiro(
         .order("data", { ascending: false })
         .order("id"),
     ),
+    carregarForaDoCaixa(clinicaId, de, ate),
   ]);
+  // Mesma conta do Movimento de Caixa: sai o que ele deixa fora do caixa do
+  // período (retroativos e parcelas importadas). Em 04/09/2026 eram R$ 495,00
+  // de receita e R$ 5.880,12 de despesas digitadas dias depois.
+  const todasAsLinhas = todasAsLinhasBrutas.filter((l) => !foraDoCaixa.ids.has(l.id));
+  const despesasRaw = despesasBrutas.filter((d) => !foraDoCaixa.ids.has(d.id));
 
   const paraPainel = (r: LancRaw): LancamentoPainel => ({
     id: r.id,
@@ -104,6 +117,7 @@ export async function carregarPainelFinanceiro(
         // Todas as partes: com só a primeira, o misto caía inteiro nela.
         formas: l.formas,
       })),
+    foraDoCaixa,
   };
 }
 
