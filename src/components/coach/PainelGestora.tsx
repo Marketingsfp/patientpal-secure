@@ -28,6 +28,7 @@ import {
   type HistoryItem,
 } from "@/components/coach/painel-views";
 import { HistoricoSemUsuario } from "@/components/coach/HistoricoSemUsuario";
+import { BaseConhecimentoEditor } from "@/components/coach/BaseConhecimentoEditor";
 
 type Aba = "progresso" | "conversas" | "perfis" | "vozes" | "analise";
 
