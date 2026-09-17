@@ -20,10 +20,7 @@ import type { EstadoManualPresenca } from "@/lib/atendimento/presenca-manual";
 import type {
   ResultadoPresencaDistribuicao,
 } from "@/lib/atendimento/distribuicao-contrato";
-import {
-  avisoPresencaConfirmada,
-  type AvisoDistribuicao,
-} from "@/components/nina/distribuicao-fila-ui";
+import { avisoPresencaConfirmada } from "@/components/nina/distribuicao-fila-ui";
 import {
   CONTROLE_INICIAL,
   aoCarregar as presAoCarregar,
@@ -896,12 +893,6 @@ export function AtendInbox() {
     return r;
   };
 
-  const mostrarResultadoDistribuicao = (aviso: AvisoDistribuicao) => {
-    if (aviso.tom === "erro") toast.error(aviso.texto);
-    else if (aviso.tom === "aviso") toast.warning(aviso.texto);
-    else toast.success(aviso.texto);
-  };
-
   // A gravação atômica também termina uma pausa, sem passagem transitória por Online.
   const gravarPresencaManual = async (estado: EstadoManualPresenca) => {
     if (!clinicaId) return null;
@@ -920,7 +911,10 @@ export function AtendInbox() {
     try {
       const r = await gravarPresencaManual(alvo);
       if (!r) return;
-      mostrarResultadoDistribuicao(avisoPresencaConfirmada(r.estado, r.distribuicao));
+      // A confirmação já aparece em Meu status; só uma falha real exige aviso.
+      if (r.distribuicao.status === "erro") {
+        toast.error(avisoPresencaConfirmada(r.estado, r.distribuicao).texto);
+      }
       if (alvo === "ONLINE") await carregarConvs();
     } catch (e: any) {
       setControle((c) => presAoFalhar(c, e?.message ?? "Não foi possível salvar a presença."));
