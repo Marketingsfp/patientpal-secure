@@ -50,6 +50,7 @@ import {
   consultaAgendaPendente,
   FERRAMENTAS_DE_VAGAS,
   interesseEmConsultarAgenda,
+  preferePrimeiroDisponivel,
   type ContextoConsultaAgenda,
 } from "./consulta-agenda";
 import {
@@ -392,11 +393,11 @@ function acharEspecialidade(termo: string, lista: Array<{ id: string; nome: stri
 
 /* -------------------------------------------------- disponibilidade (núcleo) */
 
-function guardarOpcoes(ctx: CtxNinaPaciente, slots: SlotNina[]) {
+function guardarOpcoes(ctx: CtxNinaPaciente, slots: SlotNina[], procedimentos?: ReadonlyMap<string, string>) {
   if (consentimentoDaEscolha(ctx.estado, ctx.clinicaId)) return;
   const vagas: VagaAgendamento[] = slots.flatMap((s) => !permiteReserva(s.modalidade) ? [] : [{
     medico_id: s.medico_id, medico: s.medico_nome, especialidade: s.especialidade,
-    procedimento: ctx.consultaAgenda?.selecaoRevalidada?.modalidade?.procedimento ??
+    procedimento: procedimentos?.get(s.medico_id) ?? ctx.consultaAgenda?.selecaoRevalidada?.modalidade?.procedimento ??
       (ctx.estado?.appointment.doctor_id === s.medico_id ? ctx.estado.appointment.procedure : null),
     data: dataISODoSlot(s.inicio), hora: s.hora, inicio: s.inicio, fim: s.fim,
     modalidade: s.modalidade, agenda_id: s.agenda,
@@ -429,6 +430,8 @@ export async function consultarDisponibilidadeCore(params: {
   limite?: number;
   periodo?: "manha" | "tarde" | "noite" | null;
   data?: string | null;
+  /** Comparação entre médicos não pode perder vagas por corte de linhas ocupadas. */
+  completa?: boolean;
 }, agora: Date = new Date()): Promise<SlotNina[]> {
   // Fonte de verdade: as linhas "DISPONÍVEL" da própria agenda — exatamente o
   // que o núcleo de criação exige que exista para deixar marcar (regra 3 de
@@ -436,7 +439,7 @@ export async function consultarDisponibilidadeCore(params: {
   // situação pior possível: a Nina propõe um horário que o sistema recusa na
   // hora de gravar. A RPC `get_horarios_disponiveis` não serve aqui porque
   // depende de `auth.uid()`, que não existe num atendimento de WhatsApp.
-  const dias = Math.min(Math.max(params.dias ?? 14, 1), 30);
+  const dias = Math.min(Math.max(params.dias ?? 14, 1), 60);
   const ate = new Date(agora.getTime() + dias * 86_400_000);
   const diaPedido = params.data ? janelaDiaClinica(params.data, HORA_LOCAL) : null;
 
@@ -462,15 +465,20 @@ export async function consultarDisponibilidadeCore(params: {
     .gte("inicio", agora.toISOString())
     .lte("inicio", ate.toISOString())
     .neq("status", "cancelado")
-    .order("inicio")
-    .limit(Math.min(Math.max(params.limite ?? 400, 1), 800));
+    .order("inicio").order("id");
+  if (!params.completa) q = q.limit(Math.min(Math.max(params.limite ?? 400, 1), 800));
   if (medicosFiltro) q = q.in("medico_id", medicosFiltro);
   // Recorta o dia civil ANTES do limite de linhas. A data UTC do slot pode
   // ser o dia seguinte; o paciente sempre escolhe uma data em São Paulo.
   if (diaPedido) q = q.gte("inicio", diaPedido.inicio).lt("inicio", diaPedido.fimExclusivo);
 
-  const { data, error } = await q;
-  if (error) throw new Error(error.message);
+  const data = [];
+  for (let pagina = 0; ; pagina++) {
+    const r = await (params.completa ? q.range(pagina * 500, pagina * 500 + 499) : q);
+    if (r.error) throw new Error(r.error.message);
+    data.push(...(r.data ?? []));
+    if (!params.completa || (r.data?.length ?? 0) < 500) break;
+  }
 
   const linhas = (data ?? []) as Array<{
     medico_id: string | null;
@@ -719,6 +727,22 @@ export const FERRAMENTAS_NINA_CONSULTA = [
         },
         required: ["medico_id", "data", "hora"],
       },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "consultar_primeiro_disponivel",
+      description: "Quando o paciente escolher o primeiro disponível/sem preferência de médico, compara as agendas de TODOS os profissionais publicados do atendimento solicitado. Não exige médico definido. Informe o nome oficial do atendimento obtido no catálogo. Retorna a disponibilidade mais próxima, modalidade, orientações e valores próprios do profissional. Não seleciona vaga nem reserva. Um sim à pergunta com duas alternativas não escolhe automaticamente este caminho.",
+      parameters: { type: "object", properties: {
+        tipo: { type: "string", enum: ["consulta", "procedimento"] },
+        atendimento: { type: "string", description: "Especialidade ou procedimento exato publicado, ex.: Otorrinolaringologia. Preserve a consulta/procedimento do paciente." },
+        data: { type: "string", description: "AAAA-MM-DD para dia exato, inclusive hoje; não substitua por outro dia." },
+        a_partir_de: { type: "string", description: "AAAA-MM-DD quando houver data mínima" },
+        periodo: { type: "string", enum: ["manha", "tarde", "noite"] },
+        dia_semana: { type: "number", description: "0=domingo até 6=sábado" },
+        dias: { type: "number", description: "Janela a partir de agora, padrão e máximo 60 dias" },
+      }, required: ["tipo", "atendimento"], additionalProperties: false },
     },
   },
   {
@@ -1007,7 +1031,7 @@ async function executarFerramentaInterna(
       if (bloqueio) return bloqueio;
     }
     let medicoAgenda: { ok: true; id: string; nome: string } | null = null;
-    if (FERRAMENTAS_DE_VAGAS.has(nome)) {
+    if (FERRAMENTAS_DE_VAGAS.has(nome) && nome !== "consultar_primeiro_disponivel") {
       if (!interesseEmConsultarAgenda(ctx.consultaAgenda))
         return consultaAgendaPendente("INTERESSE_NAO_CONFIRMADO");
       const termo = typeof args.medico_id === "string" ? args.medico_id.trim() : "";
@@ -1028,6 +1052,73 @@ async function executarFerramentaInterna(
       if (modalidade === "nao_definida") return modalidadePendente();
     }
     switch (nome) {
+      case "consultar_primeiro_disponivel": {
+        if (!preferePrimeiroDisponivel(ctx.consultaAgenda))
+          return consultaAgendaPendente("INTERESSE_NAO_CONFIRMADO");
+        const p = zProximaVaga.omit({ medico_id: true, especialidade: true }).extend({
+          tipo: z.enum(["consulta", "procedimento"]), atendimento: z.string().trim().min(3).max(160),
+          data: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+        }).parse(args);
+        const { candidatosPrimeiraVaga } = await import("./primeiro-disponivel-catalogo.server");
+        const candidatos = await candidatosPrimeiraVaga(ctx.clinicaId, p.tipo, p.atendimento);
+        if (!candidatos.length) return falha("PROCEDURE_NOT_FOUND",
+          "Não encontrei esse atendimento publicado. Encaminhe para a equipe humana.", { encaminhar_para_humano: true });
+        // SFP, vínculo ausente e consulta com erro não equivalem a agenda vazia.
+        for (const c of candidatos) {
+          if (await atendimentoExigeHumano({ clinicaId: ctx.clinicaId, medico: c.medicoId ?? c.medicoNome,
+            procedimento: c.registro.procedimento, referencias: c.registro.id ? [c.registro.id] : [] }))
+            return falha("PROFISSIONAL_SFP", MOTIVO_SFP, { atendimento_humano_obrigatorio: true });
+          if (!c.medicoId) return falha("DOCTOR_NOT_FOUND",
+            "Não foi possível resolver todos os vínculos com a agenda. A equipe deve conferir antes de afirmar qual é o primeiro disponível.",
+            { encaminhar_para_humano: true, comparacao_completa: false });
+        }
+        const porMedico = new Map(candidatos.map(c => [c.medicoId!, c]));
+        if (porMedico.size !== candidatos.length) return falha("ACTION_NOT_AUTHORIZED",
+          "Há mais de um registro publicado para o mesmo profissional e atendimento. A equipe deve conferir os dados antes da comparação.",
+          { encaminhar_para_humano: true, comparacao_completa: false });
+        const primeiras: SlotNina[] = [];
+        const semAgendamento: Record<string, unknown>[] = [];
+        const consultados: Record<string, unknown>[] = [];
+        for (const [medicoId, c] of porMedico) {
+          await processamentoWatchdogAtual()?.checkpoint("generating");
+          const modo = await modalidadePublicadaDoMedico(ctx.clinicaId, medicoId);
+          if (modo === "chegada_sem_pre_agendamento") {
+            semAgendamento.push({ medico: c.medicoNome, registro: c.registro,
+              modalidade_atendimento: modo, orientacao: orientacaoModalidade(modo), sem_agendamento: true });
+            continue;
+          }
+          if (modo === "nao_definida") return modalidadePendente();
+          let vagas: SlotNina[];
+          try {
+            vagas = await consultarDisponibilidadeCore({ clinicaId: ctx.clinicaId, medicoId,
+              data: p.data, dias: p.dias ?? 60, periodo: p.periodo, completa: true });
+            vagas = vagas.filter(s => (!p.a_partir_de || dataISODoSlot(s.inicio) >= p.a_partir_de) &&
+              (p.dia_semana === undefined || diaSemanaDe(dataISODoSlot(s.inicio)) === p.dia_semana))
+              .sort((a, b) => Date.parse(a.inicio) - Date.parse(b.inicio));
+            vagas = await enriquecerModalidades(ctx.clinicaId, vagas.slice(0, 1));
+          } catch (e) { return falhaAgenda(e, nome); }
+          if (vagas.some(s => !permiteReserva(s.modalidade))) return modalidadePendente();
+          consultados.push({ medico_id: medicoId, catalogo_id: c.registro.id, encontrou_vaga: vagas.length > 0 });
+          primeiras.push(...vagas);
+        }
+        primeiras.sort((a, b) => Date.parse(a.inicio) - Date.parse(b.inicio) || a.medico_id.localeCompare(b.medico_id));
+        await auditar(ctx, nome, { ...p, consultados, sem_pre_agendamento: semAgendamento.length }, { ok: true });
+        const melhores = primeiras.filter(s => Date.parse(s.inicio) === Date.parse(primeiras[0]!.inicio));
+        guardarOpcoes(ctx, melhores, new Map([...porMedico].map(([id, c]) => [id, c.registro.procedimento!])));
+        if (!primeiras.length && semAgendamento.length && ctx.estado && !consentimentoDaEscolha(ctx.estado, ctx.clinicaId))
+          ctx.estado.flow.stage = "INFORMATION_RESPONSE";
+        if (!primeiras.length && !semAgendamento.length)
+          return semVaga("NO_AVAILABILITY", "Nenhum profissional tem vaga no período consultado.", { consulta_realizada: true });
+        const apresentar = (s: SlotNina) => ({ medico_id: s.medico_id, medico: porMedico.get(s.medico_id)!.medicoNome,
+          atendimento: porMedico.get(s.medico_id)!.registro.procedimento, data: s.data, hora: s.hora,
+          inicio: s.inicio, fim: s.fim, modalidade_atendimento: s.modalidade,
+          orientacao: orientacaoModalidade(s.modalidade!), registro: porMedico.get(s.medico_id)!.registro });
+        return { ok: true, consulta_realizada: consultados.length > 0,
+          criterio: "menor data e horário entre os profissionais com agendamento", dias_consultados: p.dias ?? 60,
+          proxima: melhores[0] ? apresentar(melhores[0]) : null,
+          empatados: melhores.slice(1).map(apresentar), sem_pre_agendamento: semAgendamento,
+          instrucao: "Apresente médico, atendimento, dia/data, horário real, modalidade, orientações e todas as formas de pagamento do registro desse médico. Em empate, mostre as opções e peça a escolha. Não confirme reserva: a vaga ainda depende da escolha e do resumo final aceito. Se há atendimento sem pré-agendamento, informe separadamente os dias/períodos publicados e que basta comparecer; não prometa horário individual nem diga que a vaga agendada é mais cedo que o atendimento sem agendamento." };
+      }
       case "selecionar_horario": {
         const p = z.object({ medico_id: z.string(), inicio: z.string(), fim: z.string() }).parse(args);
         const estado = ctx.estado;

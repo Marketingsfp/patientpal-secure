@@ -32,6 +32,7 @@ export const FERRAMENTAS_DE_VAGAS = new Set([
   "consultar_disponibilidade",
   "verificar_horario",
   "proxima_vaga",
+  "consultar_primeiro_disponivel",
 ]);
 
 const normalizar = (t: string) =>
@@ -114,6 +115,34 @@ function ultimaResposta(ctx: ContextoConsultaAgenda): string {
   return normalizar(ctx.historico.filter((m) => m.role === "assistant").at(-1)?.content ?? "");
 }
 
+/** A escolha por disponibilidade é distinta de escolher o primeiro nome da lista. */
+export function preferePrimeiroDisponivel(ctx?: ContextoConsultaAgenda | null): boolean {
+  if (!ctx || ctx.mudancaTema) return false;
+  const atual = normalizar(ctx.mensagemAtual);
+  if (!atual || RECUSA.test(atual) || OUTRA_PERGUNTA.test(atual) ||
+    /\b(?:nao quero|nao prefiro|sem pressa|mais barato)\b/.test(atual)) return false;
+  const oferta = ultimaResposta(ctx);
+  // Mantém a estratégia quando o paciente apenas acrescenta um dia/período.
+  // Uma escolha posterior de médico ou troca de assunto encerra essa herança.
+  if (/^(?:sim[,\s]+)?(?:e\s+)?(?:(?:para|pra|de|na|no)\s+)?(?:hoje|amanha|segunda|terca|quarta|quinta|sexta|sabado|domingo|manha|tarde|noite|proxima semana|\d{1,2}\/\d{1,2}(?:\/\d{4})?)[?!.\s]*$/.test(atual) &&
+    /\b(?:dia|data|periodo|horario|disponibilidade|vagas?)\b/.test(oferta) &&
+    !OUTRA_PERGUNTA.test(perguntaFinal(oferta))) {
+    const indice = ctx.historico.reduce((ultimo, m, i) => m.role === "user" ? i : ultimo, -1);
+    if (indice >= 0) return preferePrimeiroDisponivel({ ...ctx,
+      mensagemAtual: ctx.historico[indice]!.content ?? "", historico: ctx.historico.slice(0, indice) });
+  }
+  const ofereceComparacao = /\b(?:medicos?|profissionais|profissional)\b/.test(oferta) &&
+    /\b(?:primeir[oa]|mais proxim[oa]|mais cedo|antes)\b/.test(oferta);
+  if (/\b(?:dr|dra|doutor|doutora)\.?\s+[a-z]/.test(atual) ||
+    (ctx.medicoEscolhido?.nome && mencionaMedico(ctx.medicoEscolhido.nome, atual))) return false;
+  const com = atual.match(/\bcom\s+(?:(?:o|a)\s+)?(.+)/)?.[1];
+  if (com && !/^(?:primeir[oa]\s+(?:medic[oa]\s+)?disponivel|qualquer|quem|que\s+tiver|medic[oa]\s+que|profissional\s+que)/.test(com)) return false;
+  if (ctx.medicoEscolhido?.id && !ofereceComparacao &&
+    !/\b(?:qualquer (?:medico|medica|profissional)|entre (?:os|as|todos)|sem preferencia|nao tenho preferencia)\b/.test(atual)) return false;
+  const escolha = /\b(?:primeir[oa]\s+(?:medic[oa]\s+)?disponivel|mais proxim[oa]|mais cedo|(?:quem|o que|a que)\s+(?:tiver|tem|puder|atender)[^.!?]{0,50}(?:vaga|disponibilidade|antes|primeiro)|qualquer (?:um|uma|medico|medica|profissional)|sem preferencia|nao tenho preferencia)\b/.test(atual);
+  return escolha && (ofereceComparacao || /\b(?:medic[oa]|profissional|consulta|agendar|marcar|vaga|disponivel)\b/.test(atual));
+}
+
 /** Só a pergunta final é oferta; um médico na lista informativa não é uma seleção. */
 function perguntaFinal(texto: string): string {
   const fim = texto.lastIndexOf("?");
@@ -142,6 +171,7 @@ export function interesseEmConsultarAgenda(ctx?: ContextoConsultaAgenda | null):
   if (!ctx) return false;
   const atual = normalizar(ctx.mensagemAtual);
   if (ctx.mudancaTema) return false;
+  if (preferePrimeiroDisponivel(ctx)) return true;
   if (continuaBuscaDeVagas(ctx, atual)) return true;
   if (interesseContinuadoComprovado(ctx)) return true;
   if (ctx.interesseAnterior && !pedidoDireto(atual) && !ofertaAgenda(ctx)) return false;

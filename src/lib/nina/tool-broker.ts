@@ -46,6 +46,7 @@ export const CATALOGO_FERRAMENTAS: Record<string, DescritorFerramenta> = {
   consultar_disponibilidade: { capacidade: "checkAvailability", fonte: "agenda", escrita: false },
   verificar_horario: { capacidade: "checkAvailability", fonte: "agenda", escrita: false },
   proxima_vaga: { capacidade: "checkAvailability", fonte: "agenda", escrita: false },
+  consultar_primeiro_disponivel: { capacidade: "checkAvailability", fonte: "agenda", escrita: false },
   selecionar_horario: { capacidade: "checkAvailability", fonte: "agenda", escrita: false },
   identificar_paciente: { capacidade: "getPatient", fonte: "crm", escrita: true },
   consultar_cadastro_paciente: { capacidade: "getPatient", fonte: "crm", escrita: false },

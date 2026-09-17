@@ -7,6 +7,8 @@ import { resumoEntregueFixture } from "./agendamento-fixture";
 import { aplicarGateIdentificacao } from "../identificacao-gate.server";
 import type { CtxNinaPaciente } from "../paciente-tools.server";
 import { resultadoAgendamentoConfirmado } from "../resposta/agendamento";
+import { validarResultado } from "../tool-broker";
+import { encaminhamentoSemVagas } from "../agenda-sem-vagas";
 
 const CLINICA = "11111111-1111-4111-8111-111111111111";
 const MEDICO = "22222222-2222-4222-8222-222222222222";
@@ -17,6 +19,7 @@ const CATALOGO = "66666666-6666-4666-8666-666666666666";
 type Linha = Record<string, unknown>;
 let banco: Record<string, Linha[]>;
 let falharLeituraFicha = false;
+let falharAgendaMedico: string | null = null;
 let resultadoCatalogo: ResultadoConhecimento;
 const pesquisas: unknown[] = [];
 const leituras: Array<{ tabela: string; filtros: Record<string, unknown> }> = [];
@@ -43,6 +46,9 @@ mock.module("@/integrations/supabase/client.server", () => ({
       let faixa: [number, number] | null = null;
       let limite: number | null = null;
       const ler = () => {
+        if (tabela === "agendamentos" && falharAgendaMedico &&
+          (filtros.medico_id as string[] | undefined)?.includes(falharAgendaMedico))
+          throw new Error("Falha simulada de agenda");
         leituras.push({ tabela, filtros: { ...filtros } });
         const linhas = banco[tabela]!.filter((r) => predicados.every((p) => p(r)));
         if (atualizacao) for (const linha of linhas) Object.assign(linha, atualizacao);
@@ -218,6 +224,7 @@ function contextoAgendar(confirmado = false) {
 
 beforeEach(() => {
   falharLeituraFicha = false;
+  falharAgendaMedico = null;
   leituras.length = 0;
   auditoria.length = 0;
   gravacoes.length = 0;
@@ -287,6 +294,171 @@ beforeEach(() => {
     medico_agendas: [],
     nina_mensagens_templates: [],
   };
+});
+
+describe("primeiro disponível entre todos os profissionais publicados", () => {
+  const oferta = "Você prefere escolher um desses profissionais ou quer que eu consulte quem tem a disponibilidade mais próxima?";
+  const pedido = { tipo: "consulta", atendimento: "Cardiologia" };
+  const chamar = (mensagem = "o primeiro disponível", args: Record<string, unknown> = pedido) => {
+    const ctx = contexto(mensagem, oferta);
+    return { ctx, resultado: executarFerramentaPaciente(ctx, "consultar_primeiro_disponivel", args) };
+  };
+  beforeEach(() => {
+    Object.assign(banco.nina_cat_profissionais![0]!, {
+      especialidades: [{ nome: "Cardiologia" }], atende_consultorio: true,
+      formas_pagamento: [{ forma: "Dinheiro", valor: 120 }, { forma: "Cartão", valor: 145 }],
+    });
+    banco.nina_cat_profissionais!.push({ ...banco.nina_cat_profissionais![0],
+      id: AGENDAMENTO, nome: "Maria Teste", medico_id: OUTRO,
+      formas_pagamento: [{ forma: "Dinheiro", valor: 200 }, { forma: "Cartão", valor: 230 }],
+      tipo_atendimento: "Ordem de chegada com pré-agendamento" });
+    banco.medicos!.push({ id: OUTRO, clinica_id: CLINICA, nome: "Maria Teste", ativo: true, especialidade_id: null });
+    banco.agendamentos!.push({ ...banco.agendamentos![0], id: "vaga-b", medico_id: OUTRO,
+      inicio: new Date(inicio.getTime() - 60 * 60_000).toISOString(),
+      fim: new Date(fim.getTime() - 60 * 60_000).toISOString() });
+  });
+  for (const origem of ["homologacao", "whatsapp"] as const) {
+    test(`${origem}: compara ambos e devolve a médica mais próxima com seus preços e modalidade`, async () => {
+      const ctx = { ...contexto("o primeiro disponível", oferta), origem, teste: origem === "homologacao" };
+      const r = await executarFerramentaPaciente(ctx, "consultar_primeiro_disponivel", pedido);
+      expect(r.ok).toBe(true);
+      expect(r.proxima).toMatchObject({ medico_id: OUTRO, medico: "Maria Teste",
+        modalidade_atendimento: "chegada_com_pre_agendamento", registro: { preco_dinheiro: 200, preco_cartao: 230 } });
+      expect((r.proxima as Linha).orientacao).not.toContain("15 minutos");
+      expect(leituras.filter(l => l.tabela === "agendamentos").flatMap(l => l.filtros.medico_id)).toContain(MEDICO);
+      expect(ctx.estado.appointment.slot_options?.vagas[0]).toMatchObject({ medico_id: OUTRO, procedimento: "Consulta — Cardiologia" });
+      expect(ctx.estado.appointment.confirmation).toBeNull();
+      expect(ctx.estado.appointment.slot_inicio).toBeNull();
+      expect(gravacoes).toHaveLength(0);
+    });
+  }
+  test("um médico sem vagas não impede comparar o outro", async () => {
+    banco.agendamentos = banco.agendamentos!.filter(s => s.medico_id === MEDICO);
+    const r = await chamar().resultado;
+    expect(r.proxima).toMatchObject({ medico_id: MEDICO, modalidade_atendimento: "hora_marcada" });
+    expect((r.proxima as Linha).orientacao).toContain("15 minutos");
+    expect(encaminhamentoSemVagas(validarResultado("consultar_primeiro_disponivel", r), pedido)).toBeNull();
+  });
+  test("nenhuma vaga em todas as agendas aciona a regra de encaminhamento", async () => {
+    banco.agendamentos = [];
+    const r = await chamar().resultado;
+    expect(r).toMatchObject({ ok: true, reason: "NO_AVAILABILITY" });
+    expect(encaminhamentoSemVagas(validarResultado("consultar_primeiro_disponivel", r), pedido)).not.toBeNull();
+  });
+  test("empate mostra ambos e não seleciona silenciosamente", async () => {
+    Object.assign(banco.agendamentos![1]!, { inicio: inicio.toISOString(), fim: fim.toISOString() });
+    const { ctx, resultado } = chamar();
+    const r = await resultado;
+    expect((r.empatados as Linha[])).toHaveLength(1);
+    expect(ctx.estado.appointment.slot_options?.vagas).toHaveLength(2);
+    expect(ctx.estado.appointment.confirmation).toBeNull();
+  });
+  test("respeita o dia pedido sem oferecer a próxima data", async () => {
+    const data = new Date(inicio.getTime() + 86_400_000).toISOString().slice(0, 10);
+    const r = await chamar("primeiro disponível", { ...pedido, data }).resultado;
+    expect(r).toMatchObject({ reason: "NO_AVAILABILITY" });
+  });
+  test("mantém todos os candidatos, inclusive além dos seis primeiros do catálogo", async () => {
+    for (let i = 0; i < 8; i++) {
+      const id = `77777777-7777-4777-8777-${String(i).padStart(12, "0")}`;
+      banco.nina_cat_profissionais!.unshift({ ...banco.nina_cat_profissionais![0], id, nome: `Teste ${i}`, medico_id: id });
+      banco.medicos!.push({ id, clinica_id: CLINICA, nome: `Teste ${i}`, ativo: true });
+    }
+    const r = await chamar().resultado;
+    expect(r.proxima).toMatchObject({ medico_id: OUTRO });
+  });
+  test("paginação não perde a vaga depois de 800 horários ocupados", async () => {
+    banco.agendamentos = [...Array.from({ length: 805 }, (_, i) => ({ ...banco.agendamentos![0], id: `ocupado-${i}`, paciente_nome: "PACIENTE SIMULADO" })), ...banco.agendamentos!];
+    const r = await chamar().resultado;
+    expect(r.proxima).toMatchObject({ medico_id: OUTRO });
+  });
+  test("não inclui especialidade diferente, rascunho ou outra clínica", async () => {
+    banco.nina_cat_profissionais![1]!.especialidades = [{ nome: "Dermatologia" }];
+    banco.nina_cat_profissionais!.push({ ...banco.nina_cat_profissionais![0], id: PACIENTE, medico_id: OUTRO, status: "RASCUNHO" });
+    banco.nina_cat_profissionais!.push({ ...banco.nina_cat_profissionais![0], id: OUTRO, medico_id: OUTRO, clinica_id: OUTRO });
+    const r = await chamar().resultado;
+    expect(r.proxima).toMatchObject({ medico_id: MEDICO });
+  });
+  test("SFP mantém encaminhamento obrigatório", async () => {
+    banco.nina_cat_profissionais![1]!.nome = "SFP";
+    const r = await chamar().resultado;
+    expect(r).toMatchObject({ ok: false, erro: "PROFISSIONAL_SFP" });
+    expect(consultasAgenda()).toHaveLength(0);
+  });
+  test("falha em uma agenda não permite afirmar qual é a mais próxima", async () => {
+    falharAgendaMedico = OUTRO;
+    const { ctx, resultado } = chamar();
+    const r = await resultado;
+    expect(r).toMatchObject({ ok: false, codigo: "AGENDA_QUERY_FAILED" });
+    expect(r.proxima).toBeUndefined();
+    expect(ctx.estado.appointment.slot_options).toBeNull();
+  });
+  test("sem pré-agendamento aparece como comparecimento e não como vaga para reservar", async () => {
+    banco.nina_cat_profissionais![1]!.tipo_atendimento = "Ordem de chegada sem pré-agendamento";
+    const r = await chamar().resultado;
+    expect((r.sem_pre_agendamento as Linha[])[0]).toMatchObject({ medico: "Maria Teste", sem_agendamento: true });
+    expect((r.sem_pre_agendamento as Linha[])[0]!.orientacao).not.toContain("15 minutos");
+    expect(r.proxima).toMatchObject({ medico_id: MEDICO });
+  });
+  test("ficha traz sua modalidade e orientação de antecedência", async () => {
+    banco.nina_cat_profissionais![1]!.tipo_atendimento = "Por ficha";
+    const r = await chamar().resultado;
+    expect(r.proxima).toMatchObject({ modalidade_atendimento: "ficha" });
+    expect((r.proxima as Linha).orientacao).toContain("15 minutos");
+  });
+  test("sim à escolha de duas opções não decide primeiro disponível", async () => {
+    const r = await chamar("sim").resultado;
+    expect(r).toMatchObject({ ok: false, aguardando_paciente: true });
+    expect(consultasAgenda()).toHaveLength(0);
+  });
+  test("preço de outra especialidade do mesmo médico não entra na proposta", async () => {
+    banco.nina_cat_profissionais![1]!.especialidades = [{ nome: "Cardiologia" }, { nome: "Dermatologia" }];
+    banco.nina_cat_profissionais![1]!.formas_pagamento = [
+      { forma: "Dinheiro", valor: 200, condicao: "Consulta Cardiologia" },
+      { forma: "Dinheiro", valor: 50, condicao: "Consulta Dermatologia" },
+    ];
+    const r = await chamar().resultado;
+    const registro = (r.proxima as Linha).registro as Linha;
+    expect((registro.extras as Linha).formas_pagamento).toEqual([
+      { forma: "Dinheiro", valor: 200, condicao: "Consulta Cardiologia" },
+    ]);
+    expect(registro.procedimento).toBe("Consulta — Cardiologia");
+  });
+  test("período é respeitado antes de escolher qual profissional está mais próximo", async () => {
+    const data = inicio.toISOString().slice(0, 10);
+    Object.assign(banco.agendamentos![0]!, { inicio: `${data}T09:00:00-03:00`, fim: `${data}T09:30:00-03:00` });
+    Object.assign(banco.agendamentos![1]!, { inicio: `${data}T14:00:00-03:00`, fim: `${data}T14:30:00-03:00` });
+    const r = await chamar("primeiro disponível à tarde", { ...pedido, periodo: "tarde" }).resultado;
+    expect(r.proxima).toMatchObject({ medico_id: OUTRO, hora: "14:00" });
+  });
+  test("busca cobre a janela de 60 dias declarada", async () => {
+    const distante = new Date(inicio.getTime() + 40 * 86_400_000).toISOString();
+    banco.agendamentos = [{ ...banco.agendamentos![0], inicio: distante, fim: new Date(Date.parse(distante) + 30 * 60_000).toISOString() }];
+    const r = await chamar().resultado;
+    expect(r.proxima).toMatchObject({ medico_id: MEDICO, inicio: distante });
+  });
+  test("procedimento considera somente seus executantes e guarda seu nome", async () => {
+    banco.nina_cat_servicos!.push({ id: PACIENTE, clinica_id: CLINICA, status: "PUBLICADO", nome: "Exame Teste",
+      executantes: [{ nome: "Alex Louza" }], formas_pagamento: [{ forma: "Dinheiro", valor: 80 }], valor: 80 });
+    const { ctx, resultado } = chamar("primeiro disponível", { tipo: "procedimento", atendimento: "Exame Teste" });
+    const r = await resultado;
+    expect(r.proxima).toMatchObject({ medico_id: MEDICO, registro: { procedimento: "Exame Teste", preco_dinheiro: 80 } });
+    expect(ctx.estado.appointment.slot_options?.vagas[0]?.procedimento).toBe("Exame Teste");
+  });
+  test("atendimento inexistente não consulta agendas de outra especialidade", async () => {
+    const r = await chamar("primeiro disponível", { ...pedido, atendimento: "Otorrinolaringologia" }).resultado;
+    expect(r).toMatchObject({ ok: false, encaminhar_para_humano: true });
+    expect(consultasAgenda()).toHaveLength(0);
+  });
+  test("a comparação não modifica uma vaga já confirmada", async () => {
+    const ctx = contextoAgendar(true);
+    ctx.consultaAgenda = { mensagemAtual: "primeiro disponível", historico: [{ role: "assistant", content: oferta }] };
+    const confirmacao = JSON.stringify(ctx.estado.appointment.confirmation);
+    const r = await executarFerramentaPaciente(ctx, "consultar_primeiro_disponivel", pedido);
+    expect(r.ok).toBe(true);
+    expect(JSON.stringify(ctx.estado.appointment.confirmation)).toBe(confirmacao);
+    expect(gravacoes).toHaveLength(0);
+  });
 });
 
 describe("executor real das ferramentas com banco simulado", () => {

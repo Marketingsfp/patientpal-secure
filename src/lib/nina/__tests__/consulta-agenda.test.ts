@@ -2,6 +2,7 @@ import { describe, expect, it } from "bun:test";
 import {
   autorizarConsultaAgenda,
   interesseEmConsultarAgenda,
+  preferePrimeiroDisponivel,
   type ContextoConsultaAgenda,
 } from "../consulta-agenda";
 
@@ -23,6 +24,38 @@ const ofertaAlex =
   "O Dr. Alex Louza atende às quartas às 13h. Gostaria que eu verificasse as vagas do Dr. Alex Louza?";
 const ofertaGeral =
   "O Dr. Alex Louza atende às quartas às 13h e o Dr. Antonio Cobucci às quintas às 13:30. Qual médico prefere para verificar vagas?";
+
+describe("escolha entre médico e primeiro disponível", () => {
+  const oferta = "Você prefere escolher um desses profissionais ou quer que eu consulte quem tem a disponibilidade mais próxima?";
+  it.each(["o primeiro disponível", "o mais próximo", "quem tiver antes", "qualquer um",
+    "não tenho preferência", "quero quem puder me atender mais cedo", "primeiro disponível pra hoje"])("interpreta %s", mensagem => {
+    expect(preferePrimeiroDisponivel(contexto(mensagem, oferta))).toBe(true);
+    expect(interesseEmConsultarAgenda(contexto(mensagem, oferta))).toBe(true);
+  });
+  it.each(["sim", "com Alex Louza", "não quero o primeiro disponível", "qual o valor do mais próximo?",
+    "agora não", "mais barato"])("não escolhe pela paciente: %s", mensagem => {
+    expect(preferePrimeiroDisponivel(contexto(mensagem, oferta))).toBe(false);
+  });
+  it("não reutiliza oferta de outro assunto", () => {
+    expect(preferePrimeiroDisponivel(contexto("qualquer um", "Qual pagamento prefere?"))).toBe(false);
+    expect(preferePrimeiroDisponivel(contexto("primeiro disponível", oferta, { mudancaTema: true }))).toBe(false);
+  });
+  it("aceita pedido direto pela primeira vaga sem médico escolhido", () => {
+    expect(preferePrimeiroDisponivel(contexto("Quero marcar consulta com o primeiro disponível"))).toBe(true);
+  });
+  it("preserva a busca entre médicos ao acrescentar hoje, sem herdar outra escolha", () => {
+    const historico = [{ role: "assistant", content: oferta }, { role: "user", content: "o primeiro disponível" },
+      { role: "assistant", content: "Você prefere algum dia? Assim verifico as vagas." }];
+    expect(preferePrimeiroDisponivel({ mensagemAtual: "sim, pra hoje", historico })).toBe(true);
+    expect(preferePrimeiroDisponivel({ mensagemAtual: "amanhã", historico: [...historico,
+      { role: "user", content: "prefiro Alex Louza" }, { role: "assistant", content: "Qual dia prefere?" }] })).toBe(false);
+  });
+  it("não troca uma solicitação específica pelo primeiro médico da clínica", () => {
+    expect(preferePrimeiroDisponivel(contexto("a primeira disponível com Dr. Alex", oferta))).toBe(false);
+    expect(preferePrimeiroDisponivel(contexto("a primeira disponível com Alex Louza", oferta))).toBe(false);
+    expect(preferePrimeiroDisponivel(contexto("a primeira disponível", "Posso ver a agenda dele?", { medicoEscolhido: alex }))).toBe(false);
+  });
+});
 
 describe("oferta de agenda seguida da pergunta de escolha do profissional", () => {
   const joao = { id: "8cd0109d-7d28-46c4-895f-f120ea0cd333", nome: "João Hélio" };
