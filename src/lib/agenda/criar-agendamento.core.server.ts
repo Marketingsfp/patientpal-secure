@@ -163,7 +163,7 @@ export async function criarAgendamentoCore(
       pacienteId
         ? supabase
             .from("agendamentos")
-            .select("id, inicio, medico_id")
+            .select("id, inicio, medico_id, agenda_id")
             .eq("clinica_id", clinica_id)
             .eq("paciente_id", pacienteId)
             .neq("status", "cancelado")
@@ -286,23 +286,55 @@ export async function criarAgendamentoCore(
     // que faz exame e consulta no mesmo dia, ou dois procedimentos ao mesmo
     // tempo com profissionais diferentes).
     //
-    // Agora só é bloqueio de verdade o choque na agenda do MESMO profissional
-    // (duas fichas no mesmo horário com o mesmo médico). Com profissional
-    // diferente vira aviso: a tela pergunta e, confirmando, reenvia com
+    // Agora só é bloqueio de verdade o choque na MESMA agenda do MESMO
+    // profissional (duas fichas no mesmo horário, na mesma agenda). Com
+    // profissional diferente — ou com o mesmo profissional em OUTRA agenda
+    // (2026-09-17: o Cobucci tem CONSULTAS e TESTE ERGOMETRICO no mesmo
+    // cadastro, e o paciente faz as duas coisas no mesmo comparecimento) —
+    // vira aviso: a tela pergunta e, confirmando, reenvia com
     // `confirmacoes.permitir_conflito_paciente`.
     const conflitos_ = (conflitos ?? []) as Array<{
       id: string;
       inicio: string;
       medico_id: string | null;
+      agenda_id: string | null;
     }>;
     const outros = conflitos_.filter((c) => c.id !== editing_id);
-    const mesmoProfissional = recursoId
-      ? (outros.find((c) => c.medico_id === recursoId) ?? null)
+    // Agenda efetiva do agendamento novo: a vaga livre escolhida na grade, a
+    // agenda de ordem de chegada do médico ou a agenda preferida enviada pela
+    // tela. Sem conseguir determinar, trata como agenda diferente (só avisa).
+    const slotDoNovo = recursoId
+      ? ((slotsDia ?? []) as Array<{
+          id: string;
+          paciente_nome: string;
+          inicio: string;
+          fim: string;
+          agenda_id: string | null;
+        }>).find(
+          (s) =>
+            s.id !== editing_id &&
+            isSlotLivreLocal(s.paciente_nome) &&
+            new Date(s.inicio).getTime() <= di.getTime() &&
+            new Date(s.fim).getTime() >= df.getTime(),
+        )
+      : undefined;
+    const agendaOrdemChegadaConflito =
+      (agendasDoMedico ?? []).find((a) => a.ordem_chegada && a.ativo !== false) ?? null;
+    const agendaNovaId =
+      slotDoNovo?.agenda_id ?? agendaOrdemChegadaConflito?.id ?? data.agenda_preferida_id ?? null;
+    const mesmoProfissionalMesmaAgenda = recursoId
+      ? (outros.find(
+          (c) =>
+            c.medico_id === recursoId && !!agendaNovaId && (c.agenda_id ?? null) === agendaNovaId,
+        ) ?? null)
       : null;
-    const conflito = mesmoProfissional ?? outros[0] ?? null;
+    const mesmoProfissionalOutraAgenda = recursoId
+      ? (outros.find((c) => c.medico_id === recursoId && c !== mesmoProfissionalMesmaAgenda) ?? null)
+      : null;
+    const conflito = mesmoProfissionalMesmaAgenda ?? mesmoProfissionalOutraAgenda ?? outros[0] ?? null;
     if (conflito) {
       const quando = new Date(conflito.inicio).toLocaleString("pt-BR", { timeZone: TZ_CLINICA });
-      if (mesmoProfissional) {
+      if (mesmoProfissionalMesmaAgenda) {
         return {
           ok: false,
           validation_error: {
@@ -311,6 +343,19 @@ export async function criarAgendamentoCore(
         };
       }
       if (!data.confirmacoes?.permitir_conflito_paciente) {
+        if (mesmoProfissionalOutraAgenda) {
+          const nomeAgendaConflito =
+            (agendasDoMedico ?? []).find((a) => a.id === mesmoProfissionalOutraAgenda.agenda_id)
+              ?.nome ?? null;
+          const ondeEsta = nomeAgendaConflito ? ` (${nomeAgendaConflito})` : "";
+          return {
+            ok: false,
+            validation_error: {
+              message: `Este paciente já tem outro agendamento nesse horário com o mesmo profissional, em outra agenda${ondeEsta}. Confirme se as duas marcações são do mesmo comparecimento.`,
+              confirmavel: "conflito_paciente",
+            },
+          };
+        }
         return {
           ok: false,
           validation_error: {
