@@ -247,6 +247,7 @@ import {
   estadoDeEscopoLegado,
   lerValorEscopo,
   ordemVisualizacao,
+  ordenarAtendentesNoFiltro,
   rotuloEscopo,
   statusConsulta,
   valorEscopoControle,
@@ -399,6 +400,7 @@ export function AtendInbox() {
   const [souGestor, setSouGestor] = useState(false);
   // Busca dentro do seletor de atendente (só filtra o que a lista mostra).
   const [buscaAtendente, setBuscaAtendente] = useState("");
+  const [menuAtendentesAberto, setMenuAtendentesAberto] = useState(false);
   // Administrador acompanha tudo, mas não atende: só supervisão.
   const [souAdmin, setSouAdmin] = useState(false);
   const [perfilLeitura, setPerfilLeitura] = useState<{ chave: string; permitida: boolean } | null>(null);
@@ -459,8 +461,9 @@ export function AtendInbox() {
 
   const atendentesFiltrados = useMemo(() => {
     const termo = normalizarNomeBusca(buscaAtendente);
-    if (!termo) return usuarios;
-    return usuarios.filter((u: any) => normalizarNomeBusca(String(u.nome ?? "")).includes(termo));
+    const ordenados = ordenarAtendentesNoFiltro(usuarios);
+    if (!termo) return ordenados;
+    return ordenados.filter((u: any) => normalizarNomeBusca(String(u.nome ?? "")).includes(termo));
   }, [usuarios, buscaAtendente]);
   const nomeAtendenteSelecionado = useMemo(
     () => usuarios.find((u: any) => u.user_id === atendenteEscolhidoId)?.nome ?? null,
@@ -1874,10 +1877,10 @@ export function AtendInbox() {
     })();
   }, [clinicaId, listarDeptosFn, listarUsuariosFn]);
 
-  // Ao abrir a janela de transferência, só a lista de atendentes é relida
+  // Ao abrir a transferência ou o filtro, só a lista de atendentes é relida
   // (para o status ficar atual). Não recarrega a conversa nem transfere nada.
   useEffect(() => {
-    if (!transferOpen || !clinicaId) return;
+    if ((!transferOpen && !menuAtendentesAberto) || !clinicaId) return;
     let vale = true;
     (async () => {
       try {
@@ -1890,7 +1893,7 @@ export function AtendInbox() {
     return () => {
       vale = false;
     };
-  }, [transferOpen, clinicaId, listarUsuariosFn]);
+  }, [transferOpen, menuAtendentesAberto, clinicaId, listarUsuariosFn]);
 
 
 
@@ -2983,6 +2986,7 @@ export function AtendInbox() {
                 }}
                 onOpenChange={(aberto) => {
                   setPainelMenuAberto(aberto);
+                  setMenuAtendentesAberto(aberto);
                   if (!aberto) setBuscaAtendente("");
                 }}
               >
