@@ -61,7 +61,7 @@ export function BannerNaoAtribuidas() {
     <button
       type="button"
       onClick={abrirFila}
-      title="Ver apenas as conversas sem atendente"
+      title="Ver conversas em Não atribuídas"
       aria-label={`${total} conversas não atribuídas. Abrir fila.`}
       className={cn(
         "inline-flex h-9 shrink-0 items-center gap-1.5 rounded-lg px-2.5 text-xs font-bold text-atd-on-strong",

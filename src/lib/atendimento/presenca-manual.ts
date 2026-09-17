@@ -33,9 +33,9 @@ export function ehEstadoManual(v: unknown): v is EstadoManualPresenca {
 }
 
 /**
- * Tradução da escolha manual para os campos técnicos usados pela distribuição.
- * A distribuição continua lendo `status`/`aceita_novas`; o que muda é que esses
- * campos passam a ser SEMPRE consequência da escolha, nunca da conexão.
+ * Tradução para os campos legados de presença. A distribuição consulta
+ * `estado_manual`: Online recebe ativas, Pausa recebe reservas até 10.
+ * `aceita_novas` não decide elegibilidade e permanece compatível com o legado.
  */
 export function tecnicoDoEstadoManual(estado: EstadoManualPresenca): {
   status: "ONLINE" | "BUSY" | "OFFLINE";

@@ -12,6 +12,7 @@ export const resultadoDistribuicaoFilaSchema = z.object({
   meu: z
     .object({
       carga_atual: z.number().int().nonnegative(),
+      reservadas: z.number().int().nonnegative().optional(),
       // Limites legados podem ultrapassar o máximo permitido para novas configurações.
       capacidade: z.number().int().positive().nullable(),
       elegivel: z.boolean(),

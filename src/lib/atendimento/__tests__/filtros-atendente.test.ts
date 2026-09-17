@@ -13,7 +13,9 @@ const outra = "atendente-b";
 const linhas = [
   { id: "ativa", status: "active", owner_type: "HUMAN", atribuida_user_id: eu },
   { id: "outra-ativa", status: "active", owner_type: "HUMAN", atribuida_user_id: outra },
-  { id: "fila", status: "waiting", owner_type: "NONE", atribuida_user_id: null },
+  { id: "fila", status: "waiting", owner_type: "HUMAN", atribuida_user_id: eu, fila_pendente: true },
+  { id: "global", status: "waiting", owner_type: "NONE", atribuida_user_id: null },
+  { id: "outra-fila", status: "waiting", owner_type: "HUMAN", atribuida_user_id: outra, fila_pendente: true },
   { id: "nina", status: "bot_attending", owner_type: "AI", atribuida_user_id: null },
   { id: "fechada", status: "closed", owner_type: "NONE", atribuida_user_id: null, last_assigned_user_id: eu, resolved_by: eu },
   { id: "finalizada", status: "finished", owner_type: "NONE", atribuida_user_id: null, resolved_by: eu },
@@ -56,9 +58,9 @@ describe("três filtros operacionais das atendentes", () => {
     expect(lerFiltrosInbox(storage, "clinica-b", { gestor: false }).naoAtribuidas).not.toBe(true);
   });
 
-  test("atribuição tira da fila e coloca em Ativas; encerramento move para Fechadas", () => {
-    const fila = { id: "movimento", status: "waiting", owner_type: "NONE", atribuida_user_id: null };
-    const assumida = { ...fila, status: "active", owner_type: "HUMAN", atribuida_user_id: eu };
+  test("primeira resposta tira da fila e coloca em Ativas; encerramento move para Fechadas", () => {
+    const fila = { id: "movimento", status: "waiting", owner_type: "HUMAN", atribuida_user_id: eu, fila_pendente: true };
+    const assumida = { ...fila, fila_pendente: false, status: "active", owner_type: "HUMAN", atribuida_user_id: eu };
     expect(patchListaPorConversa([fila], assumida, contexto("nao_atribuidas")).lista).toHaveLength(0);
     expect(patchListaPorConversa([], assumida, contexto("ativas")).lista).toHaveLength(1);
     const fechada = { ...assumida, status: "closed", atribuida_user_id: null, last_assigned_user_id: eu, resolved_by: eu };

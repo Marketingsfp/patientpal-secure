@@ -96,7 +96,7 @@ export function textoSituacao(estado: ControlePresenca): string {
   return `Você está ${ROTULO_ESTADO_MANUAL[estado.confirmado]}`;
 }
 
-/** Recebimento de novas conversas segue apenas a escolha salva. */
-export function recebeNovasConversas(estado: ControlePresenca): boolean {
-  return estado.carregado && estado.confirmado === "ONLINE";
+/** Disponibilidade por presença; a elegibilidade completa é revalidada no banco. */
+export function recebeNovasConversas(estado: ControlePresenca, reservas = 0): boolean {
+  return estado.carregado && (estado.confirmado === "ONLINE" || (estado.confirmado === "PAUSA" && reservas < 10));
 }

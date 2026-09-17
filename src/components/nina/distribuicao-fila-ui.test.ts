@@ -16,6 +16,10 @@ const resultado = (extra: Partial<ResultadoDistribuicaoFila> = {}): ResultadoDis
 });
 
 describe("resultado da distribuição no controle de presença", () => {
+  test("separa a carga ativa do limite de reservas em Pausa", () => {
+    expect(textoCargaAtendente(22, 10, 10)).toBe("12 conversa(s) ativa(s), sem limite. 10/10 em Não atribuídas.");
+    expect(textoCargaAtendente(22, null, 10)).toBe("12 conversa(s) ativa(s), sem limite. 10 em Não atribuídas.");
+  });
   test("Online com capacidade atingida informa carga, limite e fila pendente", () => {
     const aviso = avisoPresencaConfirmada(
       "ONLINE",

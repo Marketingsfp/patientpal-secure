@@ -30,7 +30,7 @@ export function avisoSaidaEscopo(escopo: EscopoInbox): string {
     case "nina":
       return "Esta conversa não está mais com a Nina.";
     case "nao_atribuidas":
-      return "Esta conversa já tem responsável.";
+      return "Esta conversa saiu de Não atribuídas.";
     case "fechadas":
       return "Esta conversa foi reaberta.";
     default:

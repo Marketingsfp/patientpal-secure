@@ -9,8 +9,7 @@
  *
  * Regra definitiva:
  *   Cadastros › Perfis → perfil "telefonia"
- *   + escolha manual Online
- *   + sem pausa aberta
+ *   + escolha manual Online ou Pausa
  *   + não administrador
  *   + demais critérios operacionais (setor/fila)
  *
@@ -21,7 +20,7 @@
 /**
  * FASE 5/6 — a escolha manual é ONLINE, PAUSA ou OFFLINE. Os rótulos técnicos
  * antigos (BUSY/AWAY) permanecem aceitos apenas para registros históricos e,
- * como qualquer valor diferente de ONLINE, não recebem conversas novas.
+ * assim como OFFLINE, não recebem conversas novas. PAUSA recebe reservas.
  */
 export type StatusPresenca = "ONLINE" | "PAUSA" | "BUSY" | "AWAY" | "OFFLINE";
 
@@ -45,8 +44,10 @@ export type CandidatoDistribuicao = {
   presencaRecente?: boolean;
   /** Conversas ativas no momento (usado só no balanceamento). */
   cargaAtiva?: number;
+  /** Reservas individuais ainda sem primeira resposta. */
+  cargaNaoAtribuida?: number;
   /**
-   * Limite explicitamente configurado. null/ausente = sem teto automático.
+   * @deprecated Limite legado ignorado. Online ilimitado; Pausa até 10 reservas.
    * A carga continua sendo usada para equilibrar a distribuição.
    */
   capacidadeMaxima?: number | null;
@@ -76,10 +77,9 @@ export function verificarElegibilidade(c: CandidatoDistribuicao): VerificacaoEle
   if (!c.temTelefonia) motivo = "sem o perfil Telefonia";
   else if (c.admin) motivo = "administrador não recebe atribuição automática";
   else if (!c.status) motivo = "sem escolha de presença";
-  else if (c.status !== "ONLINE") motivo = `status ${c.status}`;
-  else if (c.emPausa) motivo = "em pausa";
+  else if (c.status !== "ONLINE" && c.status !== "PAUSA") motivo = `status ${c.status}`;
   else if (c.filaTravada) motivo = "fila travada";
-  else if (c.capacidadeMaxima != null && (c.cargaAtiva ?? 0) >= c.capacidadeMaxima)
+  else if (c.status === "PAUSA" && (c.cargaNaoAtribuida ?? 0) >= 10)
     motivo = "capacidade lotada";
 
   return {
@@ -106,7 +106,7 @@ export function poolElegivel(
 
   return [...pool].sort(
     (a, b) =>
-      (a.cargaAtiva ?? 0) - (b.cargaAtiva ?? 0) ||
+      (a.cargaAtiva ?? 0) + (a.cargaNaoAtribuida ?? 0) - (b.cargaAtiva ?? 0) - (b.cargaNaoAtribuida ?? 0) ||
       String(a.ultimaAtribuicaoEm ?? "").localeCompare(String(b.ultimaAtribuicaoEm ?? "")) ||
       a.userId.localeCompare(b.userId),
   );
@@ -134,7 +134,7 @@ export function escolherComRevalidacao(
       descartados.push(c.userId);
       continue;
     }
-    return { escolhido: c, descartados };
+    return { escolhido: agora, descartados };
   }
   return { escolhido: null, descartados };
 }
@@ -144,7 +144,7 @@ export type ResultadoDistribuicao = {
   /** Quem receberia a conversa; `null` significa fila "Não atribuídas". */
   atribuido_a: string | null;
   /** Motivo estruturado para auditoria/relatório. */
-  destino: "atribuida" | "nao_atribuidas";
+  destino: "atribuida" | "fila_individual" | "nao_atribuidas";
 };
 
 /** Simula a atribuição de UMA conversa (sem tocar em banco algum). */
@@ -159,7 +159,7 @@ export function simularAtribuicao(
   return {
     assignment_occurred: Boolean(escolhido),
     atribuido_a: escolhido?.userId ?? null,
-    destino: escolhido ? "atribuida" : "nao_atribuidas",
+    destino: escolhido ? (escolhido.status === "PAUSA" ? "fila_individual" : "atribuida") : "nao_atribuidas",
   };
 }
 
@@ -187,7 +187,8 @@ export function simularFila(
     else {
       const alvo = estado.find((c) => c.userId === r.atribuido_a);
       if (alvo) {
-        alvo.cargaAtiva = (alvo.cargaAtiva ?? 0) + 1;
+        if (r.destino === "fila_individual") alvo.cargaNaoAtribuida = (alvo.cargaNaoAtribuida ?? 0) + 1;
+        else alvo.cargaAtiva = (alvo.cargaAtiva ?? 0) + 1;
         alvo.ultimaAtribuicaoEm = new Date(2000, 0, 1, 0, 0, i).toISOString();
       }
     }
@@ -264,7 +265,8 @@ export function simularRedistribuicao(
     atribuicoes.push({ conversationId: item.conversationId, userId: r.atribuido_a });
     const alvo = estado.find((c) => c.userId === r.atribuido_a);
     if (alvo) {
-      alvo.cargaAtiva = (alvo.cargaAtiva ?? 0) + 1;
+      if (r.destino === "fila_individual") alvo.cargaNaoAtribuida = (alvo.cargaNaoAtribuida ?? 0) + 1;
+      else alvo.cargaAtiva = (alvo.cargaAtiva ?? 0) + 1;
       alvo.ultimaAtribuicaoEm = new Date(2000, 0, 1, 0, 0, i).toISOString();
     }
     i++;

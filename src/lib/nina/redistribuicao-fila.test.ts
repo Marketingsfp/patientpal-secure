@@ -71,15 +71,15 @@ describe("FASE 4 — redistribuição de Não atribuídas", () => {
     expect(r.restantes).toHaveLength(0);
   });
 
-  it("limite explícito é respeitado e liberar uma vaga permite uma atribuição", () => {
+  it("limite de 10 reservas em Pausa é respeitado e uma vaga permite nova reserva", () => {
     const lote = fila(2);
     const cheio = simularRedistribuicao(
-      [atendente("a", { cargaAtiva: 5, capacidadeMaxima: 5 })],
+      [atendente("a", { status: "PAUSA", cargaNaoAtribuida: 10 })],
       lote,
     );
     expect(cheio.atribuicoes).toHaveLength(0);
     const comVaga = simularRedistribuicao(
-      [atendente("a", { cargaAtiva: 4, capacidadeMaxima: 5 })],
+      [atendente("a", { status: "PAUSA", cargaNaoAtribuida: 9 })],
       cheio.restantes,
     );
     expect(comVaga.atribuicoes).toEqual([{ conversationId: "c01", userId: "a" }]);
@@ -89,7 +89,7 @@ describe("FASE 4 — redistribuição de Não atribuídas", () => {
   it("setor lotado não exclui atendente disponível do conjunto geral", () => {
     const r = simularRedistribuicao(
       [
-        atendente("a", { departamentos: ["exames"], cargaAtiva: 5, capacidadeMaxima: 5 }),
+        atendente("a", { departamentos: ["exames"], status: "PAUSA", cargaNaoAtribuida: 10 }),
         atendente("b", { departamentos: ["consultas"], capacidadeMaxima: null }),
       ],
       fila(2, { departamentoId: "exames" }),
@@ -97,12 +97,12 @@ describe("FASE 4 — redistribuição de Não atribuídas", () => {
     expect(r.atribuicoes.map((a) => a.userId)).toEqual(["b", "b"]);
   });
 
-  it("atendente entra em pausa no meio: a vez passa para outra", () => {
+  it("atendente fica Offline no meio: a vez passa para outra", () => {
     let chamadas = 0;
     const r = simularRedistribuicao([atendente("a"), atendente("b")], fila(4), {
       revalidar: (userId) => {
         chamadas++;
-        if (userId === "a" && chamadas > 2) return atendente("a", { emPausa: true });
+        if (userId === "a" && chamadas > 2) return atendente("a", { status: "OFFLINE" });
         return null;
       },
     });

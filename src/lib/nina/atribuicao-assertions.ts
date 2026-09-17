@@ -14,6 +14,7 @@ export type CandidatoAvaliado = {
   /** Nome antigo do mesmo campo, mantido para eventos já gravados. */
   permission_telefonia?: boolean;
   presence_status: string;
+  estado_manual?: string;
   aceita_novas?: boolean;
   presenca_recente?: boolean;
   em_pausa?: boolean;
@@ -31,6 +32,8 @@ export type AuditoriaAtribuicao = {
   perfil_telefonia?: boolean;
   permission_telefonia?: boolean;
   presence_status?: string | null;
+  estado_manual?: string | null;
+  destino?: string | null;
   load_at_selection?: number | null;
   unit_queue?: string | null;
   assignment_method?: string | null;
@@ -41,6 +44,7 @@ export type AuditoriaAtribuicao = {
 export type VerificacaoAtribuicao = {
   assigned_user_has_telefonia: boolean;
   assigned_user_online: boolean;
+  assigned_user_eligible: boolean;
   assigned_user_admin: boolean;
   duplicate_assignment: boolean;
   audit_complete: boolean;
@@ -79,6 +83,11 @@ export function verificarAtribuicao(
       escolhido.aceita_novas !== false &&
       escolhido.em_pausa !== true
     : auditoria.presence_status === "ONLINE";
+  const estado = escolhido?.estado_manual ?? auditoria.estado_manual;
+  const elegivel = escolhido?.elegivel !== false && (
+    (estado ? estado === "ONLINE" : online) ||
+    (estado === "PAUSA" && auditoria.destino === "fila_individual")
+  );
   const admin = escolhido ? escolhido.admin : false;
 
   const atribuicoes = eventosDaConversa.filter((e) => e.selected_user_id);
@@ -91,14 +100,15 @@ export function verificarAtribuicao(
   const falhas: string[] = [];
   if (!auditoria.selected_user_id) falhas.push("nenhum atendente foi atribuído");
   if (!temTelefonia) falhas.push("atendente atribuído sem o perfil Telefonia");
-  if (!online) falhas.push("atendente atribuído não estava Online");
+  if (!elegivel) falhas.push("atendente atribuído não estava elegível para este destino");
   if (admin) falhas.push("atendente atribuído é administrador");
   if (duplicada) falhas.push("conversa recebeu mais de uma atribuição automática");
   if (!auditCompleta) falhas.push("auditoria da atribuição incompleta");
 
   return {
     assigned_user_has_telefonia: temTelefonia,
-    assigned_user_online: online,
+    assigned_user_online: estado ? estado === "ONLINE" : online,
+    assigned_user_eligible: elegivel,
     assigned_user_admin: admin,
     duplicate_assignment: duplicada,
     audit_complete: auditCompleta,
@@ -118,7 +128,7 @@ export function criteriosDeAtribuicao(v: VerificacaoAtribuicao): CriterioAtribui
   });
   return [
     linha("assigned_user_has_telefonia", true, v.assigned_user_has_telefonia),
-    linha("assigned_user_online", true, v.assigned_user_online),
+    linha("assigned_user_eligible", true, v.assigned_user_eligible),
     linha("assigned_user_admin", false, v.assigned_user_admin),
     linha("duplicate_assignment", false, v.duplicate_assignment),
     linha("audit_complete", true, v.audit_complete),

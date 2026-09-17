@@ -33,10 +33,11 @@ describe("FASE 3 — movimentação entre Inboxes", () => {
     expect(visivel("minhas", depois, jean)).toBe(true);
   });
 
-  it("Nina/humano → Não atribuídas quando o responsável é removido", () => {
+  it("Nina/humano → fila global quando o responsável é removido", () => {
     const conv = { id: "c1", atribuida_user_id: null, owner_type: "NONE", status: "waiting" };
     expect(visivel("minhas", conv, jean)).toBe(false);
-    expect(visivel("nao_atribuidas", conv, jean)).toBe(true);
+    expect(visivel("nao_atribuidas", conv, jean)).toBe(false);
+    expect(visivel("nao_atribuidas", conv, jean, true)).toBe(true);
   });
 
   it("resolver: sai das ativas e aparece em Fechadas", () => {
@@ -61,7 +62,7 @@ describe("FASE 3 — movimentação entre Inboxes", () => {
   it("cada filtro tem seu próprio aviso e nada é escolhido sozinho depois da saída", () => {
     expect(avisoSaidaEscopo("minhas")).toMatch(/não está mais com você/i);
     expect(avisoSaidaEscopo("nina")).toMatch(/Nina/);
-    expect(avisoSaidaEscopo("nao_atribuidas")).toMatch(/responsável/i);
+    expect(avisoSaidaEscopo("nao_atribuidas")).toMatch(/saiu de Não atribuídas/i);
     expect(avisoSaidaEscopo("fechadas")).toMatch(/reaberta/i);
     expect(
       devoAutoSelecionar({ temSelecao: false, removeuAgora: true, primeiraLinha: { id: "c2" } }),

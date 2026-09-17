@@ -65,7 +65,7 @@ export async function assertAcessoConversa(
 ): Promise<ConversaEscopo & { id: string; is_teste?: boolean | null }> {
   const { data: conv, error } = await supabase
     .from("atend_conversas")
-    .select("id, atribuida_user_id, last_assigned_user_id, resolved_by, owner_type, status, is_teste")
+    .select("id, atribuida_user_id, last_assigned_user_id, resolved_by, fila_pendente, owner_type, status, is_teste")
     .eq("id", conversaId)
     .eq("clinica_id", clinicaId)
     .maybeSingle();

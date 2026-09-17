@@ -34,8 +34,8 @@ function espera(desde?: string | null) {
 
 /**
  * Fila de conversas que a Nina encaminhou para atendimento humano.
- * Não há ação manual: assim que alguém fica online, o sistema distribui
- * automaticamente as conversas para quem tem menos conversas ativas.
+ * Atendentes veem reservas próprias; supervisão vê o excedente global.
+ * Online e Pausa com espaço participam da distribuição pela menor carga.
  */
 export function FilaHumana(_props: { onAssumida?: (conversaId: string) => void } = {}) {
   const { clinicaAtual } = useClinica();
@@ -69,7 +69,7 @@ export function FilaHumana(_props: { onAssumida?: (conversaId: string) => void }
     return (
       <div className="flex items-center gap-2 rounded-lg border border-atd-border bg-atd-surface px-3 py-1.5 text-xs text-atd-ink-soft">
         <Inbox className="h-3.5 w-3.5" />
-        <span>Não atribuídas: 0 — tudo distribuído entre os atendentes online.</span>
+        <span>Nenhuma conversa em Não atribuídas.</span>
         <Button
           size="sm"
           variant="ghost"

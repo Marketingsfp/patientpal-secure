@@ -237,8 +237,11 @@ export const listarConversas = createServerFn({ method: "POST" })
     };
 
     if (atendenteFiltro) q = porResponsavel(q, atendenteFiltro, plano.somenteResolvidas);
-    if (filtroEscopo.tipo === "atribuida")
+    if (filtroEscopo.tipo === "atribuida") {
       q = porResponsavel(q, filtroEscopo.userId, plano.somenteResolvidas);
+      if (!plano.somenteResolvidas) q = q.eq("fila_pendente", false);
+    } else if (filtroEscopo.tipo === "fila_individual")
+      q = q.eq("atribuida_user_id", filtroEscopo.userId).eq("fila_pendente", true).neq("owner_type", "AI");
     else if (filtroEscopo.tipo === "sem_responsavel")
       q = q.is("atribuida_user_id", null).neq("owner_type", "AI");
     else if (filtroEscopo.tipo === "nina") q = q.eq("owner_type", "AI");
@@ -433,9 +436,11 @@ export const contarConversasInbox = createServerFn({ method: "POST" })
     if (filtroFechadas.tipo === "ou") minhasFechadas = minhasFechadas.or(filtroFechadas.expr);
 
     const [minhas, nina, naoAtribuidas, fechadas, todas] = await Promise.all([
-      abertas().eq("atribuida_user_id", context.userId),
+      abertas().eq("atribuida_user_id", context.userId).eq("fila_pendente", false),
       abertas().eq("owner_type", "AI"),
-      abertas().is("atribuida_user_id", null).neq("owner_type", "AI"),
+      gestor
+        ? abertas().is("atribuida_user_id", null).neq("owner_type", "AI")
+        : abertas().eq("atribuida_user_id", context.userId).eq("fila_pendente", true).neq("owner_type", "AI"),
       gestor
         ? base().in("status", [...STATUS_FECHADOS])
         : minhasFechadas,
@@ -2565,20 +2570,23 @@ export const listarFilaHumana = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     await assertMember(context.supabase, context.userId, data.clinicaId);
+    const { usuarioEhGestor } = await import("./atendimento/acesso-conversa.server");
+    const gestor = await usuarioEhGestor(context.supabase, context.userId, data.clinicaId);
     let q = context.supabase
       .from("atend_conversas")
       .select(
         "id, contato_nome, whatsapp_profile_name, contato_telefone, canal, status, departamento_id, prioridade, aguardando_desde, handoff_motivo, handoff_resumo, ultima_msg_preview, ultima_msg_em, unread_count, pacientes:contato_paciente_id(nome)",
       )
       .eq("clinica_id", data.clinicaId)
-      // Fila global "Não atribuídas": tudo que aguarda uma pessoa e ainda não
-      // tem responsável, independente de já ter sido aberta antes.
+      // Mesma fila da Inbox: global para supervisão, reservas próprias para atendentes.
       .in("status", ["waiting", "active", "in_progress"])
-      .is("atribuida_user_id", null)
+      .neq("owner_type", "AI")
       .eq("is_teste", false)
       .order("prioridade", { ascending: false })
       .order("aguardando_desde", { ascending: true })
       .limit(data.limit);
+    q = gestor ? q.is("atribuida_user_id", null)
+      : q.eq("atribuida_user_id", context.userId).eq("fila_pendente", true);
     if (data.departamentoId) q = q.eq("departamento_id", data.departamentoId);
     const { data: rows, error } = await q;
     if (error) throw new Error(error.message);
@@ -3108,7 +3116,7 @@ export const diagnosticarPoolTelefonia = createServerFn({ method: "POST" })
       estado_manual: l.estado_manual,
       em_pausa: l.em_pausa,
       admin: l.admin,
-      online: l.estado_manual === "ONLINE" && !l.em_pausa,
+      online: l.estado_manual === "ONLINE",
       carga_atual: l.load_at_selection,
       capacidade: l.capacidade,
       elegivel: l.elegivel,

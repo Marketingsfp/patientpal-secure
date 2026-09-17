@@ -55,7 +55,8 @@ describe("FASE 5 — RBAC e cenário completo da Inbox individual", () => {
   it("Nina e Não atribuídas ficam em visões separadas", () => {
     const l = cenario();
     expect(conta(l, "nina", JEAN)).toBe(10);
-    expect(conta(l, "nao_atribuidas", JEAN)).toBe(3);
+    expect(conta(l, "nao_atribuidas", JEAN)).toBe(0);
+    expect(conta(l, "nao_atribuidas", JEAN, true)).toBe(3);
     // Nenhuma conversa da Nina aparece na Inbox pessoal.
     expect(conta(l, "minhas", JEAN)).toBe(5);
   });

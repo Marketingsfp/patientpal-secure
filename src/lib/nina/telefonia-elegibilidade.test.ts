@@ -50,11 +50,11 @@ describe("elegibilidade do perfil Telefonia", () => {
     expect(v.falhas).toEqual([]);
   });
 
-  it("B — Telefonia em pausa não recebe distribuição automática", () => {
+  it("B — auditoria legada inelegível continua sendo reconhecida", () => {
     const c = cand("u1", { em_pausa: true, elegivel: false, motivo_exclusao: "em_pausa" });
     expect(resumoExclusoes([c], { u1: "Maria" })).toEqual(["Maria → excluído: Pausa"]);
     expect(verificarAtribuicao(auditoria("u1", [c])).falhas).toContain(
-      "atendente atribuído não estava Online",
+      "atendente atribuído não estava elegível para este destino",
     );
   });
 

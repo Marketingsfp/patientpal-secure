@@ -20,7 +20,6 @@ import type { EstadoManualPresenca } from "@/lib/atendimento/presenca-manual";
 import type {
   ResultadoPresencaDistribuicao,
 } from "@/lib/atendimento/distribuicao-contrato";
-import { CapacidadeAtendentes } from "@/components/nina/CapacidadeAtendentes";
 import {
   avisoPresencaConfirmada,
   type AvisoDistribuicao,
@@ -1734,6 +1733,7 @@ export function AtendInbox() {
     if (!atual) return;
     if (
       atual.atribuida_user_id !== sel.atribuida_user_id ||
+      atual.fila_pendente !== sel.fila_pendente ||
       atual.status !== sel.status ||
       atual.owner_type !== sel.owner_type ||
       // FASE 5 — o nome do perfil no WhatsApp pode mudar a qualquer momento e o
@@ -1748,6 +1748,7 @@ export function AtendInbox() {
     convs,
     sel?.id,
     sel?.atribuida_user_id,
+    sel?.fila_pendente,
     sel?.status,
     sel?.owner_type,
     sel?.whatsapp_profile_name,
@@ -2928,15 +2929,6 @@ export function AtendInbox() {
             >
               {presTexto(controle)}
             </p>
-            {souGestor && clinicaId && (
-              <CapacidadeAtendentes
-                key={`${clinicaId}:${meuId}`}
-                clinicaId={clinicaId}
-                onAlterada={() => {
-                  void carregarConvs();
-                }}
-              />
-            )}
             {presPrecisaEscolher(controle) && (
               <p className="text-[11px] text-muted-foreground">
                 Escolha Online, Em pausa ou Offline para definir se você recebe novas conversas.
@@ -2975,8 +2967,12 @@ export function AtendInbox() {
                 backend, o menu só reflete a permissão que já existe. */}
             <div className="flex flex-wrap items-center gap-1.5">
               <Select
-                value={valorEscopoControle(escopoBase, atendenteEscolhidoId)}
+                value={soNaoAtribuidas ? "fila_global" : valorEscopoControle(escopoBase, atendenteEscolhidoId)}
                 onValueChange={(v) => {
+                  if (v === "fila_global") {
+                    setSoNaoAtribuidas(true);
+                    return;
+                  }
                   const alvo = lerValorEscopo(v);
                   setEscopoBase(alvo.base);
                   setAtendenteEscolhidoId(alvo.atendenteId);
@@ -2990,10 +2986,10 @@ export function AtendInbox() {
                 <SelectTrigger
                   className="h-8 min-w-0 flex-1 basis-[7.5rem] text-xs"
                   aria-label="Escopo das conversas"
-                  title={rotuloEscopo(escopoBase, nomeAtendenteSelecionado)}
+                  title={soNaoAtribuidas ? "Não atribuídas global" : rotuloEscopo(escopoBase, nomeAtendenteSelecionado)}
                 >
                   <span className="truncate">
-                    {rotuloEscopo(escopoBase, nomeAtendenteSelecionado)}
+                    {soNaoAtribuidas ? "Não atribuídas global" : rotuloEscopo(escopoBase, nomeAtendenteSelecionado)}
                   </span>
                 </SelectTrigger>
                 <SelectContent className="z-50 min-w-[--radix-select-trigger-width]">
@@ -3002,8 +2998,7 @@ export function AtendInbox() {
                     <SelectItem value="equipe">Todas as conversas ({contadores.equipe})</SelectItem>
                   )}
                   <SelectItem value="nina">Nina ({contadores.nina})</SelectItem>
-                  {/* FASE 2 — "Não atribuídas" continua fora do menu comum:
-                      a fila é acionada pela Central de Atenção. */}
+                  <SelectItem value="fila_global">Não atribuídas global ({contadores.nao_atribuidas})</SelectItem>
                   {souGestor && (
                     <>
                       <div className="mt-1 border-t px-2 pb-1 pt-2 text-[10px] uppercase tracking-wide text-muted-foreground">
@@ -3068,7 +3063,7 @@ export function AtendInbox() {
                 className="inline-flex items-center gap-1.5 rounded-md bg-atd-danger px-2 py-1 text-[11px] font-bold text-atd-on-strong"
                 title="Mostrar todas as conversas"
               >
-                Não atribuídas ({convsVisiveis.length}) ✕
+                Não atribuídas global ({convsVisiveis.length}) ✕
               </button>
             )}
               </>

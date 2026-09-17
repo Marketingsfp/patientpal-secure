@@ -16,7 +16,8 @@ const conversas = [
   { id: "m1", atribuida_user_id: maria, owner_type: "HUMAN" },
   { id: "r1", atribuida_user_id: rodrigo, owner_type: "HUMAN" },
   { id: "nina1", atribuida_user_id: null, owner_type: "AI" },
-  { id: "sem1", atribuida_user_id: null, owner_type: "NONE" },
+  { id: "sem1", atribuida_user_id: jean, owner_type: "HUMAN", fila_pendente: true },
+  { id: "global", atribuida_user_id: null, owner_type: "NONE" },
 ];
 
 function visiveis(userId: string, escopo = ESCOPO_INBOX_PADRAO, gestor = false) {
@@ -85,7 +86,7 @@ describe("escopo da Inbox", () => {
       userId: jean,
     });
     expect(filtroEscopoInbox({ escopo: "nao_atribuidas", userId: jean, gestor: false })).toEqual({
-      tipo: "sem_responsavel",
+      tipo: "fila_individual", userId: jean,
     });
     expect(filtroEscopoInbox({ escopo: "nina", userId: jean, gestor: false })).toEqual({
       tipo: "nina",
@@ -114,7 +115,7 @@ const fase2 = [
     status: "bot_attending",
     nome: "Maria Silva",
   },
-  { id: "sem", atribuida_user_id: null, owner_type: "NONE", status: "waiting", nome: "Bruno" },
+  { id: "sem", atribuida_user_id: jean, fila_pendente: true, owner_type: "HUMAN", status: "waiting", nome: "Bruno" },
   { id: "j-fechada", atribuida_user_id: jean, owner_type: "HUMAN", status: "closed", nome: "Ana" },
   {
     id: "m-fechada",
@@ -147,7 +148,7 @@ describe("filtros operacionais da Inbox", () => {
     expect(lista("nina")).toEqual(["nina-maria"]);
   });
 
-  it("Não atribuídas mostra somente sem responsável", () => {
+  it("Não atribuídas mostra somente reservas individuais", () => {
     expect(lista("nao_atribuidas")).toEqual(["sem"]);
   });
 

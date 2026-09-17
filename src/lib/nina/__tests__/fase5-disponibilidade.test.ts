@@ -18,10 +18,10 @@ describe("FASE 5 — disponibilidade para receber conversas", () => {
     expect(r.motivo).toBe("status OFFLINE");
   });
 
-  test("Em pausa não recebe novas conversas", () => {
-    const r = verificarElegibilidade({ ...base, emPausa: true });
-    expect(r.eligible_for_nina_handoff).toBe(false);
-    expect(r.motivo).toBe("em pausa");
+  test("Pausa recebe reservas quando ainda não tem 10", () => {
+    const r = verificarElegibilidade({ ...base, status: "PAUSA", emPausa: true });
+    expect(r.eligible_for_nina_handoff).toBe(true);
+    expect(r.user_online).toBe(false);
   });
 
   test("sem escolha manual registrada, não recebe", () => {
@@ -36,7 +36,7 @@ describe("FASE 5 — disponibilidade para receber conversas", () => {
     expect(r.user_online).toBe(true);
   });
 
-  test("Online não dispensa permissão, vínculo de setor e capacidade", () => {
+  test("Online não dispensa permissão e vínculo de setor; limite legado não restringe", () => {
     expect(verificarElegibilidade({ ...base, temTelefonia: false }).motivo).toBe(
       "sem o perfil Telefonia",
     );
@@ -45,7 +45,7 @@ describe("FASE 5 — disponibilidade para receber conversas", () => {
     );
     expect(
       verificarElegibilidade({ ...base, cargaAtiva: 5, capacidadeMaxima: 5 }).motivo,
-    ).toBe("capacidade lotada");
+    ).toBeNull();
     const pool = poolElegivel(
       [
         { ...base, userId: "do-setor", departamentos: ["setor-1"] },
@@ -56,13 +56,13 @@ describe("FASE 5 — disponibilidade para receber conversas", () => {
     expect(pool.map((c) => c.userId)).toEqual(["do-setor"]);
   });
 
-  test("pool só considera quem escolheu Online", () => {
+  test("pool considera Online e Pausa com espaço", () => {
     const pool = poolElegivel([
       { ...base, userId: "online" },
       { ...base, userId: "offline", status: "OFFLINE" },
-      { ...base, userId: "pausa", emPausa: true },
+      { ...base, userId: "pausa", status: "PAUSA", emPausa: true },
       { ...base, userId: "sem-escolha", status: null },
     ]);
-    expect(pool.map((c) => c.userId)).toEqual(["online"]);
+    expect(pool.map((c) => c.userId)).toEqual(["online", "pausa"]);
   });
 });

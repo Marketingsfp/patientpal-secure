@@ -32,7 +32,7 @@ describe("FASE 3 — acesso direto por URL", () => {
     ).toBe(true);
   });
 
-  it("conversa da Nina e não atribuídas ficam visíveis para o atendente", () => {
+  it("conversa da Nina e reserva própria ficam visíveis para o atendente", () => {
     expect(
       usuarioPodeVerConversa(
         { atribuida_user_id: null, owner_type: "AI", status: "open" },
@@ -41,7 +41,7 @@ describe("FASE 3 — acesso direto por URL", () => {
     ).toBe(true);
     expect(
       usuarioPodeVerConversa(
-        { atribuida_user_id: null, owner_type: "HUMAN", status: "open" },
+        { atribuida_user_id: JEAN, fila_pendente: true, owner_type: "HUMAN", status: "waiting" },
         { userId: JEAN, gestor: false },
       ),
     ).toBe(true);

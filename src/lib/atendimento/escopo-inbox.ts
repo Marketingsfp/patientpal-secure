@@ -27,6 +27,7 @@ export const STATUS_FECHADOS = ["closed", "finished"] as const;
 export const ESCOPO_INBOX_PADRAO: EscopoInbox = "minhas";
 
 export interface ConversaEscopo {
+  fila_pendente?: boolean;
   atribuida_user_id?: string | null;
   last_assigned_user_id?: string | null;
   resolved_by?: string | null;
@@ -38,6 +39,7 @@ export type FiltroEscopo =
   | { tipo: "equipe" }
   | { tipo: "atribuida"; userId: string }
   | { tipo: "sem_responsavel" }
+  | { tipo: "fila_individual"; userId: string }
   | { tipo: "nina" }
   | { tipo: "fechadas"; userId: string | null };
 
@@ -63,7 +65,7 @@ export function filtroEscopoInbox(args: {
     case "equipe":
       return { tipo: "equipe" };
     case "nao_atribuidas":
-      return { tipo: "sem_responsavel" };
+      return args.gestor ? { tipo: "sem_responsavel" } : { tipo: "fila_individual", userId: args.userId };
     case "nina":
       return { tipo: "nina" };
     case "fechadas":
@@ -114,6 +116,8 @@ export function conversaVisivelNoEscopo(
   switch (filtro.tipo) {
     case "equipe":
       return true;
+    case "fila_individual":
+      return conversa.fila_pendente === true && conversa.atribuida_user_id === filtro.userId && conversa.owner_type !== "AI";
     case "sem_responsavel":
       return !conversa.atribuida_user_id && conversa.owner_type !== "AI";
     case "nina":
@@ -124,7 +128,7 @@ export function conversaVisivelNoEscopo(
         (filtro.userId === null || conversaResolvidaDoAtendente(conversa, filtro.userId))
       );
     default:
-      return conversa.atribuida_user_id === filtro.userId;
+      return conversa.atribuida_user_id === filtro.userId && conversa.fila_pendente !== true;
   }
 }
 

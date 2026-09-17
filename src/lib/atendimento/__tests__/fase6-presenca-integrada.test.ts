@@ -116,7 +116,7 @@ class ServidorPresenca {
     this.dados.set(this.chave(clinicaId, userId), { ...atual, vistoEm: Date.now() });
   }
 
-  /** Distribuição: só entra quem escolheu Online e cumpre os demais requisitos. */
+  /** Distribuição: Online e Pausa com capacidade são elegíveis. */
   atribuir(clinicaId: string, conversaId: string, candidatos: string[]): string | null {
     const elegiveis = candidatos.filter(
       (u) =>
@@ -286,7 +286,7 @@ describe("FASE 6 — cenários integrados de presença manual", () => {
     aba.heartbeat();
     expect(srv.ler(CLINICA, ANA).estadoManual).toBe("PAUSA");
     expect(textoSituacao(aba.controle)).toBe("Você está Em pausa");
-    expect(srv.atribuir(CLINICA, "c1", [ANA])).toBeNull();
+    expect(srv.atribuir(CLINICA, "c1", [ANA])).toBe(ANA);
   });
 
   test("6) Recarregar em cada um dos três estados preserva a escolha", () => {
@@ -325,7 +325,8 @@ describe("FASE 6 — cenários integrados de presença manual", () => {
     const r = a1.escolher("PAUSA");
     a2.receber({ clinicaId: CLINICA, userId: ANA, estado: "PAUSA", versao: r.ok ? r.versao : 0 });
     expect(a2.controle.confirmado).toBe("PAUSA");
-    expect(recebeNovasConversas(a2.controle)).toBe(false);
+    expect(recebeNovasConversas(a2.controle)).toBe(true);
+    expect(recebeNovasConversas(a2.controle, 10)).toBe(false);
   });
 
   test("9) Heartbeat e resposta de consulta atrasados não restauram Online", () => {
@@ -366,7 +367,7 @@ describe("FASE 6 — cenários integrados de presença manual", () => {
     expect(srv.ler(CLINICA, BRUNO).por).toBe(BRUNO);
   });
 
-  test("12) Distribuição: Online recebe; Offline e Pausa não", () => {
+  test("12) Distribuição: Online e Pausa recebem; Offline não", () => {
     const ana = new Aba(srv, CLINICA, ANA);
     const bruno = new Aba(srv, CLINICA, BRUNO);
     ana.carregar();
@@ -374,8 +375,9 @@ describe("FASE 6 — cenários integrados de presença manual", () => {
     ana.escolher("ONLINE");
     bruno.escolher("PAUSA");
     srv.conversas = [{ id: "c1", responsavel: null }];
-    expect(srv.atribuir(CLINICA, "c1", [BRUNO, ANA])).toBe(ANA);
+    expect(srv.atribuir(CLINICA, "c1", [BRUNO, ANA])).toBe(BRUNO);
     ana.escolher("OFFLINE");
+    bruno.escolher("OFFLINE");
     srv.conversas.push({ id: "c2", responsavel: null });
     expect(srv.atribuir(CLINICA, "c2", [ANA, BRUNO])).toBeNull();
     expect(srv.conversas.find((c) => c.id === "c2")?.responsavel).toBeNull();
@@ -387,7 +389,7 @@ describe("FASE 6 — cenários integrados de presença manual", () => {
     aba.escolher("ONLINE");
     srv.conversas = [{ id: "c1", responsavel: null }];
     // a presença muda ANTES da atribuição efetivar (a atribuição revalida)
-    aba.escolher("PAUSA");
+    aba.escolher("OFFLINE");
     expect(srv.atribuir(CLINICA, "c1", [ANA])).toBeNull();
     // e o caminho inverso: voltar a Online torna elegível de novo
     aba.escolher("ONLINE");
@@ -448,7 +450,7 @@ describe("FASE 6 — cenários integrados de presença manual", () => {
       ]).length;
       expect(aba.controle.confirmado).toBe(estado);
       expect(persistido).toBe(estado);
-      expect(elegivel === 1).toBe(estado === "ONLINE");
+      expect(elegivel === 1).toBe(estado !== "OFFLINE");
     }
   });
 });

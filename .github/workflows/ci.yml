@@ -19,6 +19,9 @@ jobs:
       - name: Testar funções, gatilhos, permissões e concorrência da fila
         run: python3 scripts/test-zap-distribuicao-postgres.py --pg-bin "$(pg_config --bindir)"
 
+      - name: Testar fila individual em Pausa e excedente global
+        run: python3 scripts/test-zap-fila-individual-postgres.py --pg-bin "$(pg_config --bindir)"
+
   verificar:
     runs-on: ubuntu-latest
     steps:

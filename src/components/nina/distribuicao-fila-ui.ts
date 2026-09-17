@@ -25,7 +25,10 @@ export function textoMotivoDistribuicao(motivo: string | null): string | null {
   return motivo ? (MOTIVOS[motivo] ?? "O recebimento de novas conversas está indisponível.") : null;
 }
 
-export function textoCargaAtendente(carga: number, capacidade: number | null): string {
+export function textoCargaAtendente(carga: number, capacidade: number | null, reservadas?: number): string {
+  if (reservadas !== undefined) {
+    return `${Math.max(0, carga - reservadas)} conversa(s) ativa(s), sem limite. ${reservadas}${capacidade === 10 ? "/10" : ""} em Não atribuídas.`;
+  }
   return capacidade === null
     ? `${carga} conversa(s) ativa(s), sem limite.`
     : `${carga}/${capacidade} conversas ativas.`;
@@ -34,7 +37,7 @@ export function textoCargaAtendente(carga: number, capacidade: number | null): s
 export function mensagemDistribuicaoFila(r: ResultadoDistribuicaoFila): AvisoDistribuicao {
   const partes: string[] = [];
   if (r.meu) {
-    partes.push(textoCargaAtendente(r.meu.carga_atual, r.meu.capacidade));
+    partes.push(textoCargaAtendente(r.meu.carga_atual, r.meu.capacidade, r.meu.reservadas));
     const motivo = textoMotivoDistribuicao(r.meu.motivo);
     if (motivo) partes.push(motivo);
   }
