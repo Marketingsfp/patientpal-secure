@@ -1990,7 +1990,7 @@ function NovoContratoForm({
       pagarAgora: noAto ? adesao : 0,
       /** 1ª mensalidade: sozinha no modo "no ato", somada à taxa no modo embutido. */
       primeiraParcela: noAto ? valorParcela : valorParcela + adesao,
-      primeiroVenc: baseOk ? fmt(new Date(base.getFullYear(), base.getMonth() + 1, diaVenc)) : "—",
+      primeiroVenc: baseOk ? fmtD(vencimentoParcelaContrato(dataInicio, diaVenc, 0)) : "—",
       dataEmissao: baseOk ? fmt(base) : "—",
       total: adesao + valorParcela * parcelas,
     };
