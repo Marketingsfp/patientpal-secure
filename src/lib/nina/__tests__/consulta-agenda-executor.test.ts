@@ -59,6 +59,13 @@ mock.module("@/integrations/supabase/client.server", () => ({
           predicados.push((r) => v.includes(r[k]));
           return q;
         },
+        ilike: (k: string, v: string) => {
+          filtros[k] = v;
+          const partes = v.split("%").map(s => s.replace(/\\([%_\\])/g, "$1").replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+          const re = new RegExp(`^${partes.join(".*")}$`, "i");
+          predicados.push(r => re.test(String(r[k] ?? "")));
+          return q;
+        },
         neq: (k: string, v: unknown) => {
           predicados.push((r) => r[k] !== v);
           return q;
@@ -140,6 +147,45 @@ const argumentos = {
   data: inicio.toISOString().slice(0, 10),
   hora: "14:00",
 };
+describe("SFP bloqueia ações na publicação vigente, preservando outros profissionais", () => {
+  for (const teste of [false, true]) {
+    test(`${teste ? "homologação" : "real"}: SFP vinculado a um médico real não agenda`, async () => {
+      banco.nina_cat_profissionais![0]!.nome = " SFP ";
+      banco.nina_cat_profissionais![0]!.medico_id = MEDICO;
+      const ctx = { ...contextoAgendar(true), teste,
+        origem: (teste ? "homologacao" : "whatsapp") as CtxNinaPaciente["origem"] };
+      const r = await executarFerramentaPaciente(ctx, "agendar", argumentosAgendar);
+      expect(r.erro).toBe("PROFISSIONAL_SFP");
+      expect(consultasAgenda()).toHaveLength(0);
+      expect(gravacoes).toHaveLength(0);
+    });
+    test(`${teste ? "homologação" : "real"}: serviço SFP impede coleta automática após o aceite`, async () => {
+      banco.nina_cat_servicos!.push({ id: CATALOGO, clinica_id: CLINICA, status: "PUBLICADO",
+        nome: "Consulta Cardiologia", executantes: [{ nome: "sfp" }] });
+      const ctx = { ...contextoAgendar(true), teste,
+        origem: (teste ? "homologacao" : "whatsapp") as CtxNinaPaciente["origem"] };
+      const motivos: string[] = [];
+      const r = await aplicarGateIdentificacao({ mensagem: "Sim", estado: ctx.estado, ctx,
+        executar: executarFerramentaPaciente,
+        encaminharVagaIndisponivel: async motivo => { motivos.push(motivo); return true; } });
+      expect(r?.texto).toContain("Encaminhei");
+      expect(motivos).toHaveLength(1);
+      expect(motivos[0]).toContain("PROFISSIONAL_SFP");
+      expect(consultasAgenda()).toHaveLength(0);
+      expect(gravacoes).toHaveLength(0);
+      expect(ctx.estado.appointment.confirmation).toBeNull();
+    });
+  }
+  test("SFP arquivado ou de outra clínica não bloqueia o médico publicado atual", async () => {
+    banco.nina_cat_profissionais!.push(
+      { id: "externo", clinica_id: OUTRO, status: "PUBLICADO", nome: "SFP", medico_id: MEDICO },
+      { id: "antigo", clinica_id: CLINICA, status: "ARQUIVADO", nome: "SFP", medico_id: MEDICO });
+    const r = await executarFerramentaPaciente(contextoAgendar(true), "agendar", argumentosAgendar);
+    expect(r.ok).toBe(true);
+    expect(gravacoes).toHaveLength(1);
+  });
+});
+
 const consultasAgenda = () =>
   leituras.filter((l) => ["agendamentos", "medico_disponibilidades"].includes(l.tabela));
 const argumentosAgendar = {
@@ -201,6 +247,7 @@ beforeEach(() => {
     ],
   };
   banco = {
+    nina_cat_servicos: [],
     nina_cat_profissionais: [
       {
         id: CATALOGO,

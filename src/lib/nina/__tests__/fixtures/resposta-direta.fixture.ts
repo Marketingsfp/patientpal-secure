@@ -5,15 +5,17 @@ import { textoDaChave } from "../../resposta/templates";
 process.env.LOVABLE_API_KEY = "chave-ficticia-sem-rede";
 const teste = process.argv[2] === "homologacao";
 const cenario = process.argv[3] ?? "direta";
+const regraCatalogo = cenario.startsWith("catalogo_");
+const sfp = cenario.startsWith("catalogo_sfp");
 const escolhaHorario = cenario.startsWith("escolha_");
 const modoConfirmacao = cenario.startsWith("confirmado_") ? cenario.slice("confirmado_".length) : null;
 const resumoEscolhido = ["escolha_pre", "escolha_ficha"].includes(cenario)
   ? textoDaChave(cenario === "escolha_pre" ? "fluxo.agendamento.revisar_pre_agendamento" : "fluxo.agendamento.revisar_ficha",
     { profissional: "Dr. Jorge Ribeiro", procedimento: "Consulta", data: "21/01/2030", horario: "10:20", unidade: "Clínica simulada" }).texto
   : "Confira: Consulta Cardiologia com Dr. Jorge Ribeiro, dia 21/01/2030, às 10:20. Você confirma?";
-const agenda = cenario !== "direta";
-const pergunta = agenda ? "Tem vagas com Dr. Jorge Ribeiro?" : "quais são as informações do eletrocardiograma?";
-const respostaModelo = "Eletrocardiograma: R$ 80,00 no dinheiro e R$ 95,00 no cartão. Profissional: Enfermagem. Segunda a sexta, das 8h às 12h. Sem jejum. Leve o pedido médico.";
+const agenda = cenario !== "direta" && !regraCatalogo;
+const pergunta = cenario === "catalogo_sfp_modelo" ? "oi" : agenda ? "Tem vagas com Dr. Jorge Ribeiro?" : "quais são as informações do eletrocardiograma?";
+const respostaModelo = "Eletrocardiograma: R$ 80,00 no dinheiro e R$ 95,00 no cartão. Profissional: " + (regraCatalogo ? "Técnica" : "Enfermagem") + ". Segunda a sexta, das 8h às 12h. Sem jejum. Leve o pedido médico.";
 const prompt = "Você é Nina. Consulte a base e informe preço, profissional, horário e preparo solicitados. Não acrescente saudação à resposta sobre exames.";
 const consultas: string[] = [];
 const gravacoes: Array<{ tabela: string; valor: any }> = [];
@@ -75,7 +77,7 @@ mock.module("@/lib/nina/handoff-tool.server", () => ({
   FERRAMENTA_HANDOFF: { type: "function", function: { name: "solicitar_atendente_humano" } },
 }));
 mock.module("@/lib/nina/revisao-conversa.server", () => ({
-  respostaObsoleta: async () => cenario === "obsoleto",
+  respostaObsoleta: async () => cenario.endsWith("obsoleto"),
 }));
 const resultados: any[] = [];
 mock.module("@/lib/nina/tool-broker.server", () => ({ criarToolBroker: () => ({
@@ -86,12 +88,12 @@ mock.module("@/lib/nina/tool-broker.server", () => ({ criarToolBroker: () => ({
       ferramenta: nome, capacidade: "checkAvailability", fonte: "agenda", success: true,
       reused: false, appointment_confirmed: false, dados: { ok: true, resumo_confirmacao: resumoEscolhido },
     };
-    if (nome === "solicitar_atendente_humano" && agenda) {
+    if (nome === "solicitar_atendente_humano" && (agenda || sfp)) {
       encaminhamentos.push(typeof args === "string" ? JSON.parse(args) : args);
       return { ferramenta: nome, capacidade: "requestHumanHandoff", fonte: "atendimento",
-        success: cenario !== "falha_handoff", reused: false, appointment_confirmed: false,
-        dados: { ok: cenario !== "falha_handoff" },
-        ...(cenario === "falha_handoff" ? { erro: "INTERNAL_ERROR" } : {}) };
+        success: !cenario.endsWith("falha_handoff"), reused: false, appointment_confirmed: false,
+        dados: { ok: !cenario.endsWith("falha_handoff") },
+        ...(cenario.endsWith("falha_handoff") ? { erro: "INTERNAL_ERROR" } : {}) };
     }
     if (nome === "agendar" && modoConfirmacao) return {
       ferramenta: nome, capacidade: "createAppointment", fonte: "agenda", success: true,
@@ -120,7 +122,7 @@ mock.module("@/lib/nina/tool-broker.server", () => ({ criarToolBroker: () => ({
     if (nome !== "consultar_base_conhecimento") throw new Error(`Ferramenta inesperada: ${nome}`);
     const r = { ferramenta: nome, capacidade: "searchKnowledgeBase", fonte: "catalogo_publicado",
       success: true, reused: false, dados: { itens: [{ id: "ecg", procedimento: "ELETROCARDIOGRAMA",
-        valor: "R$ 80,00 dinheiro / R$ 95,00 cartão", medico: "Enfermagem",
+        valor: "R$ 80,00 dinheiro / R$ 95,00 cartão", medico: sfp ? "SFP" : regraCatalogo ? "TÉCNICA" : "Enfermagem",
         dias_horarios: "Segunda a sexta, 8h às 12h", preparo: "Sem jejum", restricoes: "Levar pedido médico" }] },
     };
     resultados.push(r);
@@ -129,6 +131,13 @@ mock.module("@/lib/nina/tool-broker.server", () => ({ criarToolBroker: () => ({
 }) }));
 mock.module("@/lib/nina/ai-gateway.server", () => ({ ninaAIGateway: async (req: any) => {
   requests.push(structuredClone(req));
+  if (cenario === "catalogo_sfp_modelo") return {
+    ok: true, conteudo: "Vou consultar e marcar.", modelo: "modelo-simulado", execucaoId: "execucao-direta", nivel: "low",
+    toolCalls: [
+      { id: "catalogo", type: "function", function: { name: "consultar_base_conhecimento", arguments: '{"termo":"eletrocardiograma"}' } },
+      { id: "nao-agendar-sfp", type: "function", function: { name: "agendar", arguments: "{}" } },
+    ],
+  };
   if (modoConfirmacao) return {
     ok: true, conteudo: "Atendimento às 08:00. Chegue 15 minutos antes.", modelo: "modelo-simulado", execucaoId: "execucao-direta", nivel: "low",
     toolCalls: [{ id: "gravar", type: "function", function: { name: "agendar", arguments: "{}" } },
@@ -163,7 +172,7 @@ const resposta = await gerarRespostaNina("clinica-simulada", pergunta, null, {
   teste, ambiente: teste ? "homologacao" : "producao",
   ...(cenario === "escolha_sem_auditoria" ? {} : { auditoria }),
   mensagensEntrada: ["entrada-simulada"],
-  ...(cenario === "obsoleto" ? { revisao: { valor: 1, telefone: "21999990000" } } : {}),
+  ...(cenario.endsWith("obsoleto") ? { revisao: { valor: 1, telefone: "21999990000" } } : {}),
 });
 const { registrarEntregaSaida } = await import("@/lib/nina/entrega-saida.server");
 await registrarEntregaSaida({

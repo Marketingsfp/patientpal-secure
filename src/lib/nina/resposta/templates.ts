@@ -14,6 +14,8 @@
  * enviamos texto com `{algo}` cru para o paciente.
  */
 
+import { omitirNomeGenerico } from "../regras-catalogo";
+
 export const ESCOPO_TEMPLATES = "whatsapp" as const;
 export const CHAVES_CONFIRMACAO_AGENDAMENTO = new Set([
   "fluxo.agendamento.confirmado", "fluxo.agendamento.confirmado_pre_agendamento",
@@ -287,6 +289,7 @@ export function textoDaChave(
   publicados?: TextosTemplates | null,
 ): { texto: string; origemTemplate: "publicado" | "padrao"; motivo: string | null } {
   const resultado = resolverTextoDaChave(chave, valores, publicados);
+  resultado.texto = omitirNomeGenerico(resultado.texto);
   if (!CHAVES_CONFIRMACAO_AGENDAMENTO.has(chave) || !resultado.texto) return resultado;
   const modalidade = chave.includes("pre_agendamento") ? "chegada_com_pre_agendamento"
     : chave.includes("ficha") ? "ficha" : "hora_marcada";

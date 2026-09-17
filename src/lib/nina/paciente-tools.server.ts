@@ -24,6 +24,8 @@
  */
 
 import { z } from "zod";
+import { atendimentoExigeHumano } from "./regras-catalogo.server";
+import { MOTIVO_SFP } from "./regras-catalogo";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { isCPFValido, somenteDigitos } from "@/lib/cpf";
 import { normalizar, raizEspecialidade } from "@/lib/nina-especialidade";
@@ -54,6 +56,7 @@ import {
 
 /** Códigos de erro estáveis — a Nina usa para decidir como continuar a conversa. */
 export type CodigoErroNina =
+  | "PROFISSIONAL_SFP"
   | "PATIENT_NOT_FOUND"
   | "PATIENT_NOT_VERIFIED"
   | "PATIENT_DATA_MISMATCH"
@@ -980,12 +983,30 @@ async function executarFerramentaInterna(
   try {
     // Proteção comum às três entradas de agenda, antes até da resolução do
     // profissional. Um nome ambíguo não pode disparar buscas por vagas.
+    async function conferirRegraCatalogo(procedimentoEscolhido?: string | null) {
+      const selecao = ctx.consultaAgenda?.selecaoRevalidada;
+      const medico = String(args.medico_id ?? ctx.estado?.appointment.doctor_id ?? selecao?.medicoId ?? selecao?.medicoNome ?? "");
+      const procedimento = String(procedimentoEscolhido ?? args.procedimento ?? ctx.estado?.appointment.procedure ?? selecao?.modalidade?.procedimento ?? "");
+      if ((medico || procedimento) && await atendimentoExigeHumano({ clinicaId: ctx.clinicaId,
+        medico, procedimento, referencias: selecao?.raizesFonte.map(r => r.registro) })) {
+        return falha("PROFISSIONAL_SFP", MOTIVO_SFP, {
+          codigo: "PROFISSIONAL_SFP", consulta_realizada: false, atendimento_humano_obrigatorio: true,
+        });
+      }
+      return null;
+    }
+    if (["consultar_cadastro_paciente", "identificar_paciente"].includes(nome)) {
+      const bloqueio = await conferirRegraCatalogo();
+      if (bloqueio) return bloqueio;
+    }
     let medicoAgenda: { ok: true; id: string; nome: string } | null = null;
     if (FERRAMENTAS_DE_VAGAS.has(nome)) {
       if (!interesseEmConsultarAgenda(ctx.consultaAgenda))
         return consultaAgendaPendente("INTERESSE_NAO_CONFIRMADO");
       const termo = typeof args.medico_id === "string" ? args.medico_id.trim() : "";
       if (!termo) return consultaAgendaPendente("MEDICO_NAO_DEFINIDO");
+      const bloqueio = await conferirRegraCatalogo();
+      if (bloqueio) return bloqueio;
       const resolvido = await resolverMedico(ctx.clinicaId, termo);
       if (!resolvido.ok) return {
         ...consultaAgendaPendente("MEDICO_NAO_DEFINIDO"),
@@ -1009,6 +1030,8 @@ async function executarFerramentaInterna(
         const vaga = opcoes.find((v) => v.medico_id === p.medico_id && v.inicio === p.inicio && v.fim === p.fim);
         if (!vaga?.procedimento)
           return falha("ACTION_NOT_AUTHORIZED", "Escolha uma vaga e um procedimento consultados na agenda desta sessão.");
+        const bloqueio = await conferirRegraCatalogo(vaga.procedimento);
+        if (bloqueio) return bloqueio;
         const publicada = await modalidadePublicadaDoMedico(ctx.clinicaId, vaga.medico_id);
         if (publicada === "chegada_sem_pre_agendamento") return orientarSemPreAgendamento(ctx, vaga.medico);
         if (publicada === "nao_definida") return modalidadePendente();
@@ -1672,6 +1695,8 @@ async function executarFerramentaInterna(
             },
           );
 
+        const bloqueio = await conferirRegraCatalogo();
+        if (bloqueio) return bloqueio;
         const rMed = await resolverMedico(ctx.clinicaId, p.medico_id);
         if (!rMed.ok)
           return falha("DOCTOR_NOT_FOUND", "Não encontrei esse profissional nesta unidade.", {

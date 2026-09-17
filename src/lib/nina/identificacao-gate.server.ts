@@ -19,6 +19,7 @@
  */
 
 import type { EstadoFluxoNina } from "./fluxo-estado.server";
+import { MOTIVO_SFP, respostaEncaminhamentoSfp } from "./regras-catalogo";
 import type { CtxNinaPaciente, ResultadoFerramenta } from "./paciente-tools.server";
 import { isCPFValido, somenteDigitos } from "@/lib/cpf";
 import { autorizarAcao } from "./acoes/autorizacao";
@@ -197,6 +198,15 @@ export async function aplicarGateIdentificacao(params: {
   const a = estado.appointment;
   const p = estado.patient;
   if (a.appointment_id || estado.flow.stage === "HANDOFF") return null;
+  const encaminharSfp = async () => {
+    limparEscolhaAgendamento(estado);
+    a.slot_options = null;
+    p.pending = { nome: null, cpf: null, data_nascimento: null };
+    estado.flow.stage = "HANDOFF";
+    const ok = await params.encaminharVagaIndisponivel?.(MOTIVO_SFP).catch(() => false) ?? false;
+    return criarResultado({ origem: ok ? "handoff" : "erro", texto: respostaEncaminhamentoSfp(ok),
+      fatosConfirmados: ok ? ["handoff_confirmado"] : [], restricoes: ["atendimento_humano_obrigatorio_sfp"] });
+  };
   const encaminhar = async (modalidadePendente = false) => {
     const motivo = modalidadePendente ? "MODALIDADE_ALTERADA: conferir a modalidade de atendimento antes de reservar."
       : "VAGA_ESCOLHIDA_INDISPONIVEL: a vaga escolhida pelo paciente não pôde ser reservada; não substituir médico, data ou horário.";
@@ -230,6 +240,7 @@ export async function aplicarGateIdentificacao(params: {
     const r = await executar(ctx, "selecionar_horario", {
       medico_id: vaga.medico_id, inicio: vaga.inicio, fim: vaga.fim,
     });
+    if (!r.ok && r.erro === "PROFISSIONAL_SFP") return encaminharSfp();
     if (!r.ok && r.erro === "SLOT_UNAVAILABLE") return encaminhar();
     if (!r.ok && ["MODALIDADE_NAO_DEFINIDA", "MODALIDADE_ALTERADA"].includes(r.erro)) return encaminhar(true);
     if (r.ok && typeof r.orientacao_atendimento === "string")
@@ -277,6 +288,7 @@ export async function aplicarGateIdentificacao(params: {
   // Lê o cadastro confirmado antes de pedir dados. Telefone sozinho não
   // confirma o paciente: nesse caso ainda faltam nome e nascimento.
   const consulta = await executar(ctx, "consultar_cadastro_paciente", {});
+  if (!consulta.ok && consulta.erro === "PROFISSIONAL_SFP") return encaminharSfp();
   if (!consulta.ok) return resultadoGate(textos, "fluxo.identificacao.instabilidade", {});
   const faltantesNoCadastro = (consulta.campos_faltantes ?? []) as CampoCadastro[];
   if (novo) {
@@ -310,6 +322,7 @@ export async function aplicarGateIdentificacao(params: {
     ),
   );
   if (!r.ok) {
+    if (r.erro === "PROFISSIONAL_SFP") return encaminharSfp();
     estado.flow.stage = "AWAITING_PATIENT_DATA";
     if (r.erro === "PATIENT_DATA_REQUIRED") {
       const campos = (r.campos_faltantes ?? []) as CampoCadastro[];
@@ -389,6 +402,7 @@ export async function aplicarGateIdentificacao(params: {
   }
 
   const erroAg = (ag as { erro?: string }).erro;
+  if (erroAg === "PROFISSIONAL_SFP") return encaminharSfp();
   if (["MODALIDADE_NAO_DEFINIDA", "MODALIDADE_ALTERADA"].includes(erroAg ?? "")) return encaminhar(true);
   log("agendamento_falhou", { conversa: ctx.conversaId, erro: erroAg });
   // Reserva anterior encontrada pela idempotência: consultada, nunca criada
