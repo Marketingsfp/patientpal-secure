@@ -28,13 +28,17 @@ import {
   type HistoryItem,
 } from "@/components/coach/painel-views";
 import { HistoricoSemUsuario } from "@/components/coach/HistoricoSemUsuario";
+import { BaseConhecimentoEditor } from "@/components/coach/BaseConhecimentoEditor";
 
 type Aba = "progresso" | "conversas" | "perfis" | "vozes" | "analise";
 
 export function PainelGestora({ ctx }: { ctx: CoachContexto }) {
   const { clinicaId, clinicaNome, clinicas, userId, atendente: nomeUsuario } = ctx;
   const analyze = useServerFn(analyzeConversation);
-  const { config, salvar, tabelaParaIA } = useCoachConfig(clinicaId, clinicaNome);
+  const { config, salvar, atualizarBase, gerandoBase, erroBase, baseParaIA } = useCoachConfig(
+    clinicaId,
+    clinicaNome,
+  );
   const { atendentes } = useAtendentesCoach(clinicaId);
 
   const [aba, setAba] = useState<Aba>("progresso");
@@ -145,7 +149,13 @@ export function PainelGestora({ ctx }: { ctx: CoachContexto }) {
           throw new Error("Cole uma conversa com pelo menos 20 caracteres.");
         }
         const r = await analyze({
-          data: { text, checklist: config.checklist, scripts: config.scripts, tabela: tabelaParaIA },
+          data: {
+            text,
+            checklist: config.checklist,
+            scripts: config.scripts,
+            // A seleção usa a própria conversa: só entram os exames citados nela.
+            tabela: baseParaIA(text),
+          },
         });
         setResult(r);
         await saveToHistory(r, "texto", text, nome);
@@ -158,7 +168,9 @@ export function PainelGestora({ ctx }: { ctx: CoachContexto }) {
             audio: { base64, mimeType: audioFile.type || "audio/mpeg" },
             checklist: config.checklist,
             scripts: config.scripts,
-            tabela: tabelaParaIA,
+            // Ligação: o conteúdo só é conhecido após a transcrição, então vai
+            // o recorte geral (consultas, profissionais, mais procurados).
+            tabela: baseParaIA(),
           },
         });
         setResult(r);
@@ -278,6 +290,20 @@ export function PainelGestora({ ctx }: { ctx: CoachContexto }) {
                       ))}
                     </datalist>
                   </div>
+
+                  <BaseConhecimentoEditor
+                    tamanho={config.baseSistema.length}
+                    geradaEm={config.baseGeradaEm}
+                    complemento={config.complemento}
+                    gerando={gerandoBase}
+                    erro={erroBase}
+                    onAtualizar={() => {
+                      void atualizarBase();
+                    }}
+                    onComplemento={(texto) => {
+                      void salvar({ complemento: texto });
+                    }}
+                  />
 
                   <ChecklistEditor
                     items={config.checklist}

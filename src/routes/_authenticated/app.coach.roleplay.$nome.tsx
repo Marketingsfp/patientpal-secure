@@ -55,7 +55,6 @@ import { formatScripts } from "@/lib/coach/scripts";
 import { escolhaDaVoz, type VozProvedor } from "@/lib/coach/voz-config";
 import { useCoachConfig } from "@/lib/coach/config-clinica";
 import type { CoachContexto } from "@/lib/coach/contexto";
-import { CATALOGO_RESUMO, CATALOGO_SERVICOS } from "@/lib/coach/servicos-catalogo";
 import {
   COTA_ATIVIDADE_MS,
   LIMITE_TOTAL_MS,
@@ -212,17 +211,23 @@ function RoleplayPage({ ctx }: { ctx: CoachContexto }) {
   const start = useServerFn(startRoleplay);
   const reply = useServerFn(roleplayReply);
   const scriptsRef = useRef<string>("");
-  const tabelaRef = useRef<string>(CATALOGO_SERVICOS);
-  const { config, loading: clinicaLoading, tabelaParaIA } = useCoachConfig(
+  const { config, loading: clinicaLoading, baseParaIA } = useCoachConfig(
     clinicaId,
     ctx.clinicaNome,
   );
+  // A base inteira não cabe no prompt: a cada chamada recortamos pelo assunto
+  // do momento (cenário + últimas falas). Quando o "cliente" muda de assunto
+  // no meio da conversa, a seleção muda junto.
+  const baseParaIARef = useRef(baseParaIA);
+  baseParaIARef.current = baseParaIA;
+  function baseDoAssunto(...trechos: Array<string | null | undefined>): string {
+    return baseParaIARef.current(trechos.filter(Boolean).join(" "));
+  }
   const vozConfigRef = useRef(config.vozConfig);
   useEffect(() => {
     vozConfigRef.current = config.vozConfig;
     scriptsRef.current = formatScripts(config.scripts);
-    tabelaRef.current = tabelaParaIA;
-  }, [config, tabelaParaIA]);
+  }, [config]);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -290,7 +295,7 @@ function RoleplayPage({ ctx }: { ctx: CoachContexto }) {
           pontos_fracos: args.fracos,
           exemplos: args.exemplos as never,
           scripts: scriptsRef.current || undefined,
-          tabela: tabelaRef.current,
+          tabela: baseDoAssunto(contextoTreino(i)),
           contexto: contextoTreino(i),
           evitar: itensEvitar(atendente),
           seed: `${Date.now().toString(36)}-${i}-${Math.random().toString(36).slice(2, 8)}`,
@@ -1188,7 +1193,10 @@ function RoleplayPage({ ctx }: { ctx: CoachContexto }) {
           atendente,
           pontos_fracos: pontosFracos,
           scripts: scriptsRef.current || undefined,
-          tabela: CATALOGO_RESUMO,
+          tabela: baseDoAssunto(
+            scenario.cenario,
+            ...nextHistory.slice(-6).map((m) => m.content),
+          ),
           cenario: scenario.cenario,
           perfil_cliente: scenario.perfil_cliente,
           history: nextHistory.slice(-60),
@@ -1341,7 +1349,7 @@ function RoleplayPage({ ctx }: { ctx: CoachContexto }) {
             pontos_fracos: fracos,
             exemplos,
             scripts: scriptsRef.current || undefined,
-            tabela: tabelaRef.current,
+            tabela: baseDoAssunto(contextoTreino(idxInicial)),
             contexto: contextoTreino(idxInicial),
             evitar: itensEvitar(atendente),
             seed: `${Date.now().toString(36)}-${idxInicial}-${Math.random().toString(36).slice(2, 8)}`,
@@ -1420,7 +1428,10 @@ function RoleplayPage({ ctx }: { ctx: CoachContexto }) {
           atendente,
           pontos_fracos: pontosFracos,
           scripts: scriptsRef.current || undefined,
-          tabela: CATALOGO_RESUMO,
+          tabela: baseDoAssunto(
+            scenario.cenario,
+            ...nextHistory.slice(-6).map((m) => m.content),
+          ),
           cenario: scenario.cenario,
           perfil_cliente: scenario.perfil_cliente,
           history: nextHistory.slice(-60),
