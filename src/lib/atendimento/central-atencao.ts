@@ -90,6 +90,12 @@ export interface FilaIndividualAtencao {
   total: number;
 }
 
+export interface PausaAtencao {
+  atendenteId: string;
+  nome: string;
+  inicio: string | null;
+}
+
 export interface ResumoAtencao {
   /** Conversas únicas que precisam de ação (não atribuídas ∪ espera crítica). */
   total: number;

@@ -2566,7 +2566,8 @@ export const consultarCentralAtencao = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     await assertMember(context.supabase, context.userId, data.clinicaId);
     const { carregarDadosCentralAtencao } = await import("./atendimento/central-atencao.server");
-    return carregarDadosCentralAtencao(context.supabase, data.clinicaId, context.userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    return carregarDadosCentralAtencao(context.supabase, data.clinicaId, context.userId, supabaseAdmin);
   });
 
 /** Fila de conversas aguardando um atendente humano (handoff da Nina). */
