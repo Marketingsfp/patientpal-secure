@@ -2,8 +2,8 @@ import { temaClinica } from "@/lib/coach/clinica-tema";
 import { cn } from "@/lib/utils";
 
 /**
- * Selo da clínica: mostra a logo oficial quando a unidade tem uma
- * (Menino Jesus), com fallback para o monograma colorido.
+ * Selo da clínica: mostra a logo oficial quando a unidade tem uma cadastrada,
+ * com fallback para o monograma colorido derivado do nome.
  */
 export function MarcaClinica({
   nome,
