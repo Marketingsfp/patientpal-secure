@@ -473,6 +473,21 @@ const TIPO_CLASS_SUAVE: Record<MovTipo, string> = {
 
 const SESSAO_FIELDS =
   "id, clinica_id, user_id, user_nome, aberto_em, valor_abertura, fechado_em, valor_fechamento_informado, valor_fechamento_calculado, diferenca, status, observacoes";
+/**
+ * Sangria/suprimento com destinatário grava o nome também no fim da descrição
+ * (" — Entregue a: NOME"). Na reimpressão o nome volta para o campo próprio do
+ * comprovante (com a linha de assinatura), sem sair repetido na descrição.
+ */
+function separarDestinoDaDescricao(desc: string | null): {
+  descricao: string | null;
+  destinoNome: string | null;
+} {
+  if (!desc) return { descricao: null, destinoNome: null };
+  const m = desc.match(/^([\s\S]*?)\s*—\s*(?:Entregue a|Recebido de):\s*(.+)$/);
+  if (!m) return { descricao: desc, destinoNome: null };
+  return { descricao: m[1].trim() || null, destinoNome: m[2].trim() };
+}
+
 const MOV_FIELDS =
   "id, sessao_id, user_id, tipo, valor, descricao, forma_pagamento, created_at, lancamento_id";
 
@@ -1175,6 +1190,41 @@ function Page() {
         onClick={() => setEstornoFor(m)}
       >
         <Undo2 className="h-3 w-3 mr-1" /> Solicitar estorno
+      </Button>
+    );
+  }
+
+  /**
+   * Reimpressão do comprovante de uma sangria já lançada. O comprovante sai
+   * sozinho no momento do lançamento, mas se a impressora falhou ou a folha se
+   * perdeu não havia como tirar outra via — em nenhum caixa. Usa a data/hora e
+   * a operadora originais do movimento, não as de quem está reimprimindo.
+   */
+  function imprimirSangria(m: Mov) {
+    const { descricao, destinoNome } = separarDestinoDaDescricao(m.descricao);
+    printComprovanteCaixa({
+      tipo: "sangria",
+      clinicaNome: clinicaAtual?.clinica?.nome ?? "Clínica",
+      operadorNome: userNamesById.get(m.user_id) || "Atendente",
+      valor: Number(m.valor || 0),
+      descricao,
+      destinoNome,
+      quando: new Date(m.created_at),
+    });
+  }
+
+  function BotaoImprimirSangria({ m }: { m: Mov }) {
+    if (m.tipo !== "sangria") return null;
+    return (
+      <Button
+        type="button"
+        size="sm"
+        variant="outline"
+        className="h-7 text-xs"
+        title="Imprimir o comprovante desta sangria"
+        onClick={() => imprimirSangria(m)}
+      >
+        <Printer className="h-3 w-3 mr-1" /> Imprimir
       </Button>
     );
   }
@@ -4178,6 +4228,10 @@ function Page() {
                     {/* Linha do tempo de sangrias e suprimentos do turno */}
                     <TimelineGaveta
                       movimentos={movsGaveta}
+                      onImprimirSangria={(id) => {
+                        const mov = movsSessaoAtual.find((x) => x.id === id);
+                        if (mov) imprimirSangria(mov);
+                      }}
                       onNovaSangria={
                         modoConferencia ? undefined : () => setOpenMov({ tipo: "sangria" })
                       }
@@ -4552,7 +4606,10 @@ function Page() {
                               <span className="text-xs text-muted-foreground">
                                 {formatarFormaPagamento(m, mistoObs)} · {usuarioNomeFor(m)}
                               </span>
-                              <AcaoEstornoMov m={m} />
+                              <div className="flex flex-wrap items-center gap-1.5">
+                                <BotaoImprimirSangria m={m} />
+                                <AcaoEstornoMov m={m} />
+                              </div>
                             </div>
                           </div>
                         );
@@ -4729,7 +4786,10 @@ function Page() {
                                   {fmt(m.valor)}
                                 </TableCell>
                                 <TableCell className="text-right sticky right-0 z-10 bg-card border-l">
-                                  <AcaoEstornoMov m={m} />
+                                  <div className="flex items-center justify-end gap-1.5">
+                                    <BotaoImprimirSangria m={m} />
+                                    <AcaoEstornoMov m={m} />
+                                  </div>
                                 </TableCell>
                               </TableRow>,
                             ];
@@ -6481,9 +6541,12 @@ function Page() {
                           })}
                         </TableCell>
                         <TableCell>
-                          <Badge variant="outline" className={TIPO_CLASS_SUAVE[m.tipo]}>
-                            {TIPO_LABEL[m.tipo]}
-                          </Badge>
+                          <div className="flex items-center gap-1.5 whitespace-nowrap">
+                            <Badge variant="outline" className={TIPO_CLASS_SUAVE[m.tipo]}>
+                              {TIPO_LABEL[m.tipo]}
+                            </Badge>
+                            <BotaoImprimirSangria m={m} />
+                          </div>
                         </TableCell>
                         <TableCell>{m.descricao || "—"}</TableCell>
                         <TableCell>

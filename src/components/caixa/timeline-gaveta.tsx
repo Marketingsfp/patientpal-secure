@@ -1,4 +1,4 @@
-import { ArrowDownToLine, ArrowUpFromLine } from "lucide-react";
+import { ArrowDownToLine, ArrowUpFromLine, Printer } from "lucide-react";
 
 const fmt = (n: number | null | undefined) =>
   (Number(n) || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -15,6 +15,8 @@ export interface TimelineGavetaProps {
   movimentos: MovGaveta[];
   onNovaSangria?: () => void;
   onNovoSuprimento?: () => void;
+  /** Reimprime o comprovante de uma sangria já lançada (recebe o id). */
+  onImprimirSangria?: (id: string) => void;
 }
 
 /** Linha do tempo compacta das entradas e retiradas de dinheiro do turno. */
@@ -22,6 +24,7 @@ export function TimelineGaveta({
   movimentos,
   onNovaSangria,
   onNovoSuprimento,
+  onImprimirSangria,
 }: TimelineGavetaProps) {
   const totalSup = movimentos
     .filter((m) => m.tipo === "suprimento")
@@ -104,6 +107,16 @@ export function TimelineGaveta({
                 >
                   {sup ? "+" : "−"} {fmt(m.valor)}
                 </div>
+                {!sup && onImprimirSangria && (
+                  <button
+                    type="button"
+                    onClick={() => onImprimirSangria(m.id)}
+                    title="Imprimir o comprovante desta sangria"
+                    className="inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-50 cursor-pointer"
+                  >
+                    <Printer className="h-3.5 w-3.5" /> Imprimir
+                  </button>
+                )}
               </li>
             );
           })}
