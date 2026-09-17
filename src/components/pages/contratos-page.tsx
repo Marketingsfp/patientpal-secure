@@ -285,6 +285,35 @@ const addUmAno = (s?: string | null): string | null => {
   const pad = (n: number) => String(n).padStart(2, "0");
   return `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())}`;
 };
+// Vencimento da parcela `i` (0 = primeira) de um contrato novo.
+//
+// A 1ª mensalidade vence no PRÓPRIO MÊS da adesão, e não no mês seguinte: quem
+// assina em 17/09 tem a parcela 1/12 vencendo ainda em setembro, e as demais
+// seguem mês a mês (outubro, novembro...). O gerador antigo somava +1 mês, o
+// contrato nascia com o mês da assinatura em branco e a recepção reclamou que o
+// sistema "pulava" o mês corrente. A regeneração retroativa de parcelas já
+// contava a partir do mês da data de início — agora a criação usa a mesma régua.
+//
+// Dois ajustes de borda:
+// - o dia escolhido é limitado ao último dia do mês; sem isso, dia 30 em
+//   fevereiro escorregava para março (`new Date(ano, 1, 30)` vira 02/03);
+// - a 1ª parcela nunca vence antes da data de início. Numa adesão no dia 17 com
+//   vencimento escolhido no dia 10, a 1ª passa a vencer na própria data da
+//   adesão (cobrança no ato) em vez de nascer atrasada — uma parcela vencida há
+//   mais de 5 dias faz o paciente ser atendido como Particular no balcão, e o
+//   cartão recém-emitido já sairia bloqueado.
+const vencimentoParcelaContrato = (dataInicioIso: string, diaVenc: number, i: number): string => {
+  const inicio = (dataInicioIso ?? "").slice(0, 10);
+  const base = new Date(inicio + "T00:00:00");
+  if (Number.isNaN(base.getTime())) return inicio;
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const ref = new Date(base.getFullYear(), base.getMonth() + i, 1);
+  const ultimoDia = new Date(ref.getFullYear(), ref.getMonth() + 1, 0).getDate();
+  const dia = Math.min(Math.max(1, Number(diaVenc) || 1), ultimoDia);
+  const venc = new Date(ref.getFullYear(), ref.getMonth(), dia);
+  const iso = `${venc.getFullYear()}-${pad(venc.getMonth() + 1)}-${pad(venc.getDate())}`;
+  return i === 0 && iso < inicio ? inicio : iso;
+};
 const TAXA_BOLETO = 3.5;
 
 // Parcela só é "Atrasado" a partir do dia seguinte ao vencimento (comparação em data local).
