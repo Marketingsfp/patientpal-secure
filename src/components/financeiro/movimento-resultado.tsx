@@ -14,7 +14,6 @@
  *  - os cards menores (Consultas/Exames de cada condição, mensalidades,
  *    avulsos) filtram a lista de lançamentos logo abaixo, como já faziam.
  */
-import { useState } from "react";
 import {
   Coins,
   Handshake,
@@ -24,9 +23,8 @@ import {
   Wallet,
   X,
   AlertTriangle,
-  ChevronDown,
-  ChevronRight,
 } from "lucide-react";
+import { useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { abrirDetalheEmNovaAba } from "@/lib/financeiro/detalhe-aba";
@@ -156,21 +154,19 @@ function BotaoFiltro({
  * Consulta × Exames de cada profissional, pelas MESMAS linhas dos cards de
  * atendimento — a soma das colunas fecha com "Consultas" e "Exames".
  *
- * Clicar numa linha (profissional, ou profissional + agenda) filtra a lista de
- * lançamentos abaixo, pelo mesmo mecanismo dos cards menores.
+ * Cada agenda é uma LINHA PRÓPRIA, no mesmo formato do seletor PROFISSIONAL da
+ * Agenda (`NOME — AGENDA` para quem tem mais de uma agenda ativa). Clicar na
+ * linha filtra a lista de lançamentos abaixo.
  */
 function QuadroProfissionais({
   linhas,
   filtro,
   onFiltro,
-  comVariasAgendas,
 }: {
   linhas: LinhaClassificada[];
   filtro: FiltroCard | null;
   onFiltro: (f: FiltroCard | null) => void;
-  comVariasAgendas?: Set<string>;
 }) {
-  const [abertos, setAbertos] = useState<Set<string>>(() => new Set());
   const dados = resumoPorProfissional(linhas);
   if (dados.length === 0) return null;
   const totalGeral = {
@@ -211,10 +207,7 @@ function QuadroProfissionais({
               {dados.map((d) => {
                 const f: FiltroCard = { profissional: d.profissional };
                 const ativo = mesmoFiltro(filtro, f);
-                const mostraAgendas =
-                  d.agendas.length > 1 && (comVariasAgendas?.has(d.profissional) ?? false);
-                const aberto = abertos.has(d.profissional);
-                return [
+                return (
                   <tr
                     key={d.profissional}
                     className={`border-t border-border/60 cursor-pointer hover:bg-muted/40 ${
@@ -224,63 +217,16 @@ function QuadroProfissionais({
                     onClick={() => alternar(f)}
                   >
                     <td className="py-1.5 pr-2">
-                      <span className="flex items-center gap-1">
-                        {mostraAgendas ? (
-                          <button
-                            type="button"
-                            aria-label={aberto ? "Recolher agendas" : "Ver agendas"}
-                            aria-expanded={aberto}
-                            className="text-muted-foreground hover:text-foreground"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setAbertos((s) => {
-                                const n = new Set(s);
-                                if (n.has(d.profissional)) n.delete(d.profissional);
-                                else n.add(d.profissional);
-                                return n;
-                              });
-                            }}
-                          >
-                            {aberto ? (
-                              <ChevronDown className="h-3.5 w-3.5" />
-                            ) : (
-                              <ChevronRight className="h-3.5 w-3.5" />
-                            )}
-                          </button>
-                        ) : (
-                          <span className="inline-block w-3.5" />
-                        )}
-                        <span className="truncate">{d.profissional}</span>
-                      </span>
+                      <span className="truncate">{d.profissional}</span>
                     </td>
                     <td className="py-1.5 px-2 text-right">{celula(d.consulta)}</td>
                     <td className="py-1.5 px-2 text-right">{celula(d.exame)}</td>
                     <td className="py-1.5 pl-2 text-right font-medium">{celula(d.total)}</td>
-                  </tr>,
-                  ...(mostraAgendas && aberto
-                    ? d.agendas.map((a) => {
-                        const fa: FiltroCard = { profissional: d.profissional, agenda: a.agenda };
-                        return (
-                          <tr
-                            key={`${d.profissional}::${a.agenda}`}
-                            className={`border-t border-border/40 cursor-pointer text-xs hover:bg-muted/40 ${
-                              mesmoFiltro(filtro, fa) ? "bg-primary/5" : ""
-                            }`}
-                            onClick={() => alternar(fa)}
-                          >
-                            <td className="py-1 pr-2 pl-6 text-muted-foreground truncate">
-                              {a.agenda}
-                            </td>
-                            <td className="py-1 px-2 text-right">{celula(a.consulta)}</td>
-                            <td className="py-1 px-2 text-right">{celula(a.exame)}</td>
-                            <td className="py-1 pl-2 text-right">{celula(a.total)}</td>
-                          </tr>
-                        );
-                      })
-                    : []),
-                ];
+                  </tr>
+                );
               })}
             </tbody>
+
             <tfoot>
               <tr className="border-t border-border font-medium">
                 <td className="py-1.5 pr-2">Total</td>
@@ -320,7 +266,6 @@ export function MovimentoResultado({
   ate,
   clinicaNome,
   conferencia,
-  profissionaisComVariasAgendas,
 }: {
   /** Linhas visíveis do período (sem os retroativos escondidos), já classificadas. */
   linhas: LinhaClassificada[];
@@ -347,7 +292,6 @@ export function MovimentoResultado({
    * Só para eles o quadro abre a quebra por agenda — para os demais a agenda
    * única não acrescenta informação nenhuma.
    */
-  profissionaisComVariasAgendas?: Set<string>;
 }) {
   const [drill, setDrill] = useState<Drill | null>(null);
   const r = resumoMovimento(linhas);
@@ -656,7 +600,6 @@ export function MovimentoResultado({
             linhas={linhas}
             filtro={filtro}
             onFiltro={onFiltro}
-            comVariasAgendas={profissionaisComVariasAgendas}
           />
 
           <Card>
