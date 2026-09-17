@@ -38,6 +38,7 @@ export const resultadoPresencaDistribuicaoSchema = z.discriminatedUnion("ok", [
     distribuidas: z.number().int().nonnegative(),
     distribuicao: resultadoDistribuicaoFilaSchema,
     pausaId: z.string().uuid().nullable().optional(),
+    cronometroPausaInicio: z.string().nullable().optional(),
   }),
 ]);
 

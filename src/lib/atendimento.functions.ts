@@ -1,4 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
+import { lerInicioCronometroPausa } from "@/lib/atendimento/cronometro-pausa.server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import type { Database } from "@/integrations/supabase/types";
@@ -1089,6 +1090,12 @@ export const meuStatusAgente = createServerFn({ method: "POST" })
     const estadoManual = ehEstadoManual(manual?.estado_manual)
       ? (manual!.estado_manual as EstadoManualPresenca)
       : null;
+    const cronometroPausaInicio = await lerInicioCronometroPausa(context.supabase, {
+      clinicaId: data.clinicaId,
+      userId: context.userId,
+      estado: estadoManual,
+      versao: manual?.estado_manual_versao ?? 0,
+    });
     return {
       isMember: total > 0,
       filaAberta: presencaEfetiva === "ONLINE" && filaAberta,
@@ -1098,6 +1105,7 @@ export const meuStatusAgente = createServerFn({ method: "POST" })
       vistoEm: (pres as { visto_em?: string } | null)?.visto_em ?? null,
       estadoManual,
       estadoManualEm: manual?.estado_manual_em ?? null,
+      cronometroPausaInicio,
       estadoManualPor: manual?.estado_manual_por ?? null,
       estadoManualVersao: manual?.estado_manual_versao ?? 0,
       precisaEscolherPresenca: precisaEscolherPresenca(manual?.estado_manual ?? null),
@@ -2923,7 +2931,15 @@ export const definirPresencaManual = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     await assertMember(context.supabase, context.userId, data.clinicaId);
-    return salvarPresencaComDistribuicao(context.supabase, data);
+    const resultado = await salvarPresencaComDistribuicao(context.supabase, data);
+    if (!resultado.ok) return resultado;
+    const cronometroPausaInicio = await lerInicioCronometroPausa(context.supabase, {
+      clinicaId: data.clinicaId,
+      userId: context.userId,
+      estado: resultado.estado,
+      versao: resultado.versao,
+    });
+    return { ...resultado, cronometroPausaInicio };
   });
 
 /**

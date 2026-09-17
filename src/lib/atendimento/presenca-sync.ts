@@ -28,6 +28,8 @@ export type AtualizacaoPresenca = {
   versao: number;
   /** Ordem local do pedido que originou esta resposta (opcional). */
   seq?: number;
+  em?: string | null;
+  cronometroPausaInicio?: string | null;
 };
 
 export type EstadoSincronizado = {

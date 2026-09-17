@@ -258,6 +258,8 @@ import {
 import { lerFiltrosInbox, salvarFiltrosInbox } from "@/lib/atendimento/filtros-persistencia";
 import { estadoFiltroAtendente, filtroAtendenteAtual } from "@/lib/atendimento/filtros-atendente";
 import { FiltrosAtendente } from "@/components/nina/FiltrosAtendente";
+import { CronometroPausa } from "@/components/nina/CronometroPausa";
+import { atualizarCronometroPausa, type CronometroPausa as EstadoCronometroPausa } from "@/lib/atendimento/cronometro-pausa";
 import {
   MSG_ADMIN_NAO_ATENDE,
   ROTULO_PRESENCA,
@@ -674,6 +676,9 @@ export function AtendInbox() {
   const [filaAberta, setFilaAberta] = useState<boolean>(false);
   const [statusCarregado, setStatusCarregado] = useState(false);
   const [pausaAtiva, setPausaAtiva] = useState<any>(null);
+  const [cronometroPausa, setCronometroPausa] = useState<EstadoCronometroPausa | null>(null);
+  const inicioCronometroPausa = cronometroPausa?.clinicaId === clinicaId && cronometroPausa?.userId === meuId
+    ? cronometroPausa.inicio : null;
   // Painel esquerdo: encolhe ao tirar o mouse, expande ao passar; pode ser fixado.
   // O hover usa zona de tolerância + atraso e não recolhe durante arrasto da
   // barra de rolagem (ver use-hover-tolerante).
@@ -731,6 +736,10 @@ export function AtendInbox() {
   const seqPresenca = useRef(0);
   const escopoPresencaAtual = useRef("");
   escopoPresencaAtual.current = `${clinicaId ?? ""}:${meuId ?? ""}`;
+  useEffect(() => {
+    sincronia.current = SINCRONIA_INICIAL;
+    seqPresenca.current += 1;
+  }, [clinicaId, meuId]);
 
   const carregarStatusAgente = useCallback(async () => {
     if (!clinicaId || !meuId) return;
@@ -740,6 +749,7 @@ export function AtendInbox() {
         meuStatusFn({ data: { clinicaId } }),
         pausaAtualFn({ data: { clinicaId } }),
       ]);
+      if (`${clinicaId}:${meuId}` !== escopoPresencaAtual.current) return;
       const estado = (s as { estadoManual?: EstadoManualPresenca | null }).estadoManual ?? null;
       const versao = (s as { estadoManualVersao?: number }).estadoManualVersao ?? 0;
       const r = aplicarAtualizacao(
@@ -750,6 +760,11 @@ export function AtendInbox() {
       setStatusCarregado(true);
       if (!r.aceita) return; // resposta fora de ordem: mantém a escolha atual
       sincronia.current = r.estado;
+      setCronometroPausa((atual) => atualizarCronometroPausa(atual, {
+        clinicaId, userId: meuId, estado, versao,
+        em: s.estadoManualEm,
+        cronometroPausaInicio: s.cronometroPausaInicio,
+      }));
       setFilaAberta(s.filaAberta);
       setEstadoManual(estado);
       setVersaoPresenca(versao);
@@ -768,6 +783,7 @@ export function AtendInbox() {
       const r = aplicarAtualizacao(sincronia.current, { clinicaId, userId: meuId }, a);
       if (!r.aceita) return;
       sincronia.current = r.estado;
+      setCronometroPausa((atual) => atualizarCronometroPausa(atual, a));
       setEstadoManual(r.estado.estado);
       setVersaoPresenca(r.estado.versao);
       if (r.estado.estado !== "PAUSA") setPausaAtiva(null);
@@ -858,6 +874,13 @@ export function AtendInbox() {
       toast.error("A presença foi alterada em outro lugar. Confira o controle de presença.");
       return null;
     }
+    if (r.versao < sincronia.current.versao) return null;
+    if (clinicaId && meuId) {
+      setCronometroPausa((atual) => atualizarCronometroPausa(atual, {
+        clinicaId, userId: meuId, estado: r.estado, versao: r.versao,
+        em: r.em, cronometroPausaInicio: r.cronometroPausaInicio,
+      }));
+    }
     setEstadoManual(r.estado);
     setControle((c) => presAoConfirmar(c, r.estado));
     setVersaoPresenca(r.versao);
@@ -870,7 +893,10 @@ export function AtendInbox() {
       seq: ++seqPresenca.current,
     };
     if (clinicaId && meuId)
-      avisarOutrasAbas({ clinicaId, userId: meuId, estado: r.estado, versao: r.versao });
+      avisarOutrasAbas({
+        clinicaId, userId: meuId, estado: r.estado, versao: r.versao,
+        em: r.em, cronometroPausaInicio: r.cronometroPausaInicio,
+      });
     return r;
   };
 
@@ -2889,6 +2915,7 @@ export function AtendInbox() {
                 {presSelecionada(controle, "OFFLINE") && <span className="sr-only"> (selecionado)</span>}
               </Button>
             </div>
+            {inicioCronometroPausa && <CronometroPausa inicio={inicioCronometroPausa} />}
             <p
               aria-live="polite"
               className={`text-[11px] ${
