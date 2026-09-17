@@ -2559,6 +2559,16 @@ export const relatorioAtendimento = createServerFn({ method: "POST" })
  *  ATENDIMENTO HÍBRIDO — fila, claim, devolução e presença
  * ======================================================= */
 
+/** Central de Atenção: filas individuais e global, sem alterar a distribuição. */
+export const consultarCentralAtencao = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => clinIdSchema.parse(i))
+  .handler(async ({ data, context }) => {
+    await assertMember(context.supabase, context.userId, data.clinicaId);
+    const { carregarDadosCentralAtencao } = await import("./atendimento/central-atencao.server");
+    return carregarDadosCentralAtencao(context.supabase, data.clinicaId, context.userId);
+  });
+
 /** Fila de conversas aguardando um atendente humano (handoff da Nina). */
 export const listarFilaHumana = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])

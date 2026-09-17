@@ -1,4 +1,3 @@
-import { nomeContato } from "@/lib/atendimento/rotulo-conversa";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
@@ -7,7 +6,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { useAuth } from "@/hooks/use-auth";
 import { useClinica } from "@/hooks/use-clinica";
 import { useRealtimeRefresh } from "@/hooks/use-realtime-refresh";
-import { esperaConversas, listarConversas, listarFilaHumana } from "@/lib/atendimento.functions";
+import { consultarCentralAtencao } from "@/lib/atendimento.functions";
 import {
   calcularAtencao,
   itensDaCategoria,
@@ -15,15 +14,18 @@ import {
   rotuloCentral,
   type CategoriaAtencao,
   type ItemAtencao,
+  type LinhaFila,
   type ResumoAtencao,
 } from "@/lib/atendimento/central-atencao";
 import { formatarEspera } from "@/lib/atendimento/espera";
+import { criarAgrupador } from "@/lib/atendimento/realtime-roteador";
 import { cn } from "@/lib/utils";
-
 
 const VAZIO: ResumoAtencao = {
   total: 0,
   naoAtribuidas: 0,
+  naoAtribuidasGlobal: 0,
+  filasIndividuais: [],
   criticas: 0,
   aguardando: 0,
   itens: [],
@@ -34,8 +36,8 @@ const VAZIO: ResumoAtencao = {
  * Central de Atenção do cabeçalho global.
  *
  * Fica imediatamente à direita do botão de portal ("Clínica Médica"). Usa as
- * mesmas fontes de verdade da Inbox: `listarFilaHumana` (não atribuídas) e
- * `esperaConversas` (RPC do tempo de espera). Um único relógio de 30s
+ * mesmas fontes de verdade da Inbox: filas em `atend_conversas` e a RPC do
+ * tempo de espera. Um único relógio de 30s
  * reclassifica as faixas — sem timer por conversa e sem polling por segundo.
  */
 export function CentralAtencao() {
@@ -44,63 +46,40 @@ export function CentralAtencao() {
   // Sem sessão (tela de login, sessão expirada) não há token para as server
   // functions protegidas: a clínica em cache não basta.
   const clinicaId = session ? clinicaAtual?.clinica_id : undefined;
-  const filaFn = useServerFn(listarFilaHumana);
-  const esperaFn = useServerFn(esperaConversas);
-  const convsFn = useServerFn(listarConversas);
+  const centralFn = useServerFn(consultarCentralAtencao);
+  const chaveContexto = `${clinicaId ?? ""}:${session?.user.id ?? ""}`;
   const navigate = useNavigate();
 
-  const [fila, setFila] = useState<
-    Array<{
-      id: string;
-      contato_nome?: string | null;
-      whatsapp_profile_name?: string | null;
-      contato_telefone?: string | null;
-      handoff_motivo?: string | null;
-      handoff_resumo?: string | null;
-    }>
-  >([]);
-  const [espera, setEspera] = useState<Record<string, string>>({});
-  const [nomes, setNomes] = useState<Record<string, string | null>>({});
+  const [dados, setDados] = useState<{
+    chave: string;
+    filas: LinhaFila[];
+    espera: Record<string, string>;
+    nomes: Record<string, string | null>;
+    globalSemDetalhes: number;
+  } | null>(null);
+  const sequenciaCarga = useRef(0);
   const [agora, setAgora] = useState(() => Date.now());
   const [aberto, setAberto] = useState(false);
   /** Categoria em foco dentro da própria Central (não filtra a Inbox). */
   const [categoria, setCategoria] = useState<CategoriaAtencao | null>(null);
-
+  const [atendenteSelecionada, setAtendenteSelecionada] = useState<{
+    id: string;
+    nome: string;
+  } | null>(null);
 
   const carregar = useCallback(async () => {
+    const sequencia = ++sequenciaCarga.current;
     if (!clinicaId) {
-      setFila([]);
-      setEspera({});
+      setDados(null);
       return;
     }
     try {
-      const [f, e] = await Promise.all([
-        filaFn({ data: { clinicaId, limit: 200 } }) as unknown as Promise<any[]>,
-        esperaFn({ data: { clinicaId, isTeste: false } }) as unknown as Promise<
-          Record<string, string>
-        >,
-      ]);
-      setFila(Array.isArray(f) ? f : []);
-      setEspera(e ?? {});
+      const retorno = await centralFn({ data: { clinicaId } });
+      if (sequencia === sequenciaCarga.current) setDados({ ...retorno, chave: chaveContexto });
     } catch {
       /* indicador: nunca pode derrubar o cabeçalho */
     }
-  }, [clinicaId, filaFn, esperaFn]);
-
-  // Nomes das conversas (para o painel). Leitura leve e espaçada.
-  const carregarNomes = useCallback(async () => {
-    if (!clinicaId) return;
-    try {
-      const rows = (await convsFn({
-        data: { clinicaId, status: "all", canal: "todos", limit: 200 },
-      })) as unknown as any[];
-      const m: Record<string, string | null> = {};
-      for (const r of rows ?? []) m[r.id] = nomeContato(r);
-      setNomes(m);
-    } catch {
-      /* sem nomes o painel ainda funciona */
-    }
-  }, [clinicaId, convsFn]);
+  }, [clinicaId, chaveContexto, centralFn]);
 
   useEffect(() => {
     void carregar();
@@ -109,8 +88,9 @@ export function CentralAtencao() {
   }, [carregar]);
 
   useEffect(() => {
-    void carregarNomes();
-  }, [carregarNomes]);
+    setCategoria(null);
+    setAtendenteSelecionada(null);
+  }, [chaveContexto]);
 
   // Relógio único: reclassifica as faixas de espera sem consultar o banco.
   useEffect(() => {
@@ -118,28 +98,41 @@ export function CentralAtencao() {
     return () => clearInterval(t);
   }, []);
 
+  const atualizarEmTempoReal = useMemo(
+    () => criarAgrupador({ executar: () => void carregar(), atrasoMs: 400, tetoMs: 1500 }),
+    [carregar],
+  );
+  useEffect(() => () => atualizarEmTempoReal.cancelar(), [atualizarEmTempoReal]);
+
   useRealtimeRefresh(
     ["atend_conversas", "whatsapp_mensagens", "atend_conversa_eventos"],
     () => {
-      void carregar();
+      atualizarEmTempoReal.agendar();
     },
     Boolean(clinicaId),
+    { filtro: `clinica_id=eq.${clinicaId}`, interessa: (linha) => linha.is_teste !== true },
   );
 
   const resumo = useMemo(
     () =>
-      clinicaId
-        ? calcularAtencao({ naoAtribuidas: fila, espera, nomes, agora, limiteItens: 200 })
+      clinicaId && dados?.chave === chaveContexto
+        ? calcularAtencao({
+            naoAtribuidas: dados.filas,
+            espera: dados.espera,
+            nomes: dados.nomes,
+            globalSemDetalhes: dados.globalSemDetalhes,
+            agora,
+            limiteItens: Number.MAX_SAFE_INTEGER,
+          })
         : VAZIO,
-    [clinicaId, fila, espera, nomes, agora],
+    [clinicaId, chaveContexto, dados, agora],
   );
 
   // Lista mostrada: prioridades gerais (8 primeiras) ou a categoria escolhida.
   const lista = useMemo(() => {
-    const base = itensDaCategoria(resumo.itens, categoria);
+    const base = itensDaCategoria(resumo.itens, categoria, atendenteSelecionada?.id);
     return categoria ? base : base.slice(0, 8);
-  }, [resumo.itens, categoria]);
-
+  }, [resumo.itens, categoria, atendenteSelecionada?.id]);
 
   // Animação de entrada mais perceptível só quando SURGE algo crítico novo.
   const [novo, setNovo] = useState(false);
@@ -160,15 +153,16 @@ export function CentralAtencao() {
 
   // FASE 3 — as categorias filtram DENTRO da própria Central. A sidebar não é
   // mais usada para alertas operacionais.
-  const alternarCategoria = (c: CategoriaAtencao) =>
+  const alternarCategoria = (c: CategoriaAtencao) => {
+    setAtendenteSelecionada(null);
     setCategoria((atual) => (atual === c ? null : c));
+  };
 
   const abrirConversa = (id: string) => {
     pedirAbrirConversa({ conversaId: id });
     setAberto(false);
     irParaInbox();
   };
-
 
   if (!clinicaId) return null;
 
@@ -233,13 +227,44 @@ export function CentralAtencao() {
         </div>
 
         <div className="p-2">
+          {resumo.filasIndividuais.length > 0 && (
+            <div className="mb-1">
+              <p className="px-2 py-1 text-[11px] font-semibold text-muted-foreground">
+                Não atribuídas individuais
+              </p>
+              <div className="max-h-48 overflow-y-auto">
+                {resumo.filasIndividuais.map((fila) => (
+                  <LinhaCategoria
+                    key={fila.atendenteId}
+                    cor="ambar"
+                    icone={<UserX className="h-3.5 w-3.5" aria-hidden />}
+                    titulo={fila.nome}
+                    valor={fila.total}
+                    ativo={
+                      categoria === "nao_atribuida_individual" &&
+                      atendenteSelecionada?.id === fila.atendenteId
+                    }
+                    onClick={() => {
+                      const limpar =
+                        categoria === "nao_atribuida_individual" &&
+                        atendenteSelecionada?.id === fila.atendenteId;
+                      setCategoria(limpar ? null : "nao_atribuida_individual");
+                      setAtendenteSelecionada(
+                        limpar ? null : { id: fila.atendenteId, nome: fila.nome },
+                      );
+                    }}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
           <LinhaCategoria
             cor="vermelho"
             icone={<UserX className="h-3.5 w-3.5" aria-hidden />}
-            titulo="Não atribuídas"
-            valor={resumo.naoAtribuidas}
-            ativo={categoria === "nao_atribuida"}
-            onClick={() => alternarCategoria("nao_atribuida")}
+            titulo="Não atribuídas global"
+            valor={resumo.naoAtribuidasGlobal}
+            ativo={categoria === "nao_atribuida_global"}
+            onClick={() => alternarCategoria("nao_atribuida_global")}
           />
           <LinhaCategoria
             cor="vermelho"
@@ -259,11 +284,14 @@ export function CentralAtencao() {
           />
         </div>
 
-
         <div className="border-t border-border px-3 py-2">
           <div className="mb-1 flex items-center gap-2">
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-              {categoria ? tituloCategoria(categoria) : "Prioridades agora"}
+            <p className="min-w-0 truncate text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+              {categoria === "nao_atribuida_individual"
+                ? `Não atribuídas · ${atendenteSelecionada?.nome ?? "Atendente"}`
+                : categoria
+                  ? tituloCategoria(categoria)
+                  : "Prioridades agora"}
             </p>
             {categoria && (
               <button
@@ -276,7 +304,11 @@ export function CentralAtencao() {
             )}
           </div>
           {lista.length === 0 ? (
-            <p className="py-2 text-xs text-muted-foreground">Nenhuma pendência.</p>
+            <p className="py-2 text-xs text-muted-foreground">
+              {categoria === "nao_atribuida_global" && resumo.naoAtribuidasGlobal > 0
+                ? "Conversas aguardando atribuição global. Os detalhes são acompanhados pela gestão."
+                : "Nenhuma pendência."}
+            </p>
           ) : (
             <ul className="max-h-64 space-y-0.5 overflow-y-auto">
               {lista.map((i) => (
@@ -287,13 +319,13 @@ export function CentralAtencao() {
             </ul>
           )}
         </div>
-
       </PopoverContent>
     </Popover>
   );
 }
 
 function tituloCategoria(c: CategoriaAtencao) {
+  if (c === "nao_atribuida_global") return "Não atribuídas global";
   return c === "nao_atribuida"
     ? "Não atribuídas"
     : c === "critica"
@@ -326,7 +358,6 @@ function LinhaCategoria({
         ativo && "bg-muted",
       )}
     >
-
       <span
         className={cn(
           "grid h-6 w-6 shrink-0 place-items-center rounded-md",
@@ -337,7 +368,9 @@ function LinhaCategoria({
       >
         {icone}
       </span>
-      <span className="min-w-0 flex-1 truncate font-medium">{titulo}</span>
+      <span className="min-w-0 flex-1 truncate font-medium" title={titulo}>
+        {titulo}
+      </span>
       <span className="shrink-0 tabular-nums font-semibold">{valor}</span>
     </button>
   );
@@ -347,7 +380,9 @@ function ItemLinha({ item, onClick }: { item: ItemAtencao; onClick: () => void }
   const critico = item.categoria !== "aguardando";
   const marca =
     item.categoria === "nao_atribuida"
-      ? "Não atribuída"
+      ? item.atendenteId
+        ? `Não atribuída · ${item.atendenteNome ?? "Atendente"}`
+        : "Não atribuída global"
       : item.categoria === "critica"
         ? "Espera crítica"
         : "Aguardando resposta";
@@ -359,10 +394,7 @@ function ItemLinha({ item, onClick }: { item: ItemAtencao; onClick: () => void }
     >
       <span
         aria-hidden
-        className={cn(
-          "h-2 w-2 shrink-0 rounded-full",
-          critico ? "bg-destructive" : "bg-amber-500",
-        )}
+        className={cn("h-2 w-2 shrink-0 rounded-full", critico ? "bg-destructive" : "bg-amber-500")}
       />
       <span className="min-w-0 flex-1">
         <span className="block truncate text-xs font-medium">{item.nome}</span>

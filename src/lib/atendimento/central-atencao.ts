@@ -2,10 +2,8 @@ import { nomeContato } from "./rotulo-conversa";
 /**
  * Central de Atenção — regras puras.
  *
- * Não cria contagem nova: recebe a MESMA fila de "Não atribuídas"
- * (`listarFilaHumana`) e o MESMO mapa de espera (`esperaConversas`, RPC
- * `atend_espera_por_conversa`) já usados na Inbox. Aqui só se combina,
- * classifica e ordena.
+ * Combina as filas global e individuais pelo estado real das conversas com
+ * o mapa de espera da Inbox. Não altera atribuição, presença ou capacidade.
  */
 import { faixaEsperaAtd, minutosDesde } from "./espera";
 
@@ -43,10 +41,14 @@ export function pedirAbrirConversa(pedido: { conversaId: string; mensagemId?: st
   );
 }
 
+export type CategoriaAtencao =
+  | "nao_atribuida"
+  | "nao_atribuida_global"
+  | "nao_atribuida_individual"
+  | "critica"
+  | "aguardando";
 
-export type CategoriaAtencao = "nao_atribuida" | "critica" | "aguardando";
-
-/** Linha da fila, como vem de `listarFilaHumana`. */
+/** Estado da conversa usado para distinguir fila individual e global. */
 export interface LinhaFila {
   id: string;
   contato_nome?: string | null;
@@ -54,16 +56,17 @@ export interface LinhaFila {
   contato_telefone?: string | null;
   handoff_motivo?: string | null;
   handoff_resumo?: string | null;
+  atribuida_user_id?: string | null;
+  atendente_nome?: string | null;
+  fila_pendente?: boolean;
+  owner_type?: string | null;
+  status?: string | null;
 }
 
-/**
- * "Não atribuída" tem definição própria: a Nina precisou de atendimento humano
- * e não havia atendente elegível online. Conversa sem responsável que NÃO veio
- * desse fluxo (ex.: aberta manualmente e ainda não assumida) não entra.
- * A marca do fluxo é o registro do handoff na própria conversa.
- */
-export function veioDoHandoff(c: LinhaFila): boolean {
-  return Boolean((c.handoff_motivo ?? "").trim() || (c.handoff_resumo ?? "").trim());
+export function tipoFilaAtencao(c: LinhaFila): "individual" | "global" | null {
+  if (c.status === "closed" || c.status === "finished" || c.owner_type === "AI") return null;
+  if (!c.atribuida_user_id) return "global";
+  return c.fila_pendente === true ? "individual" : null;
 }
 
 export interface ItemAtencao {
@@ -77,12 +80,22 @@ export interface ItemAtencao {
   critica: boolean;
   /** Paciente falou por último e a clínica ainda não respondeu. */
   aguardandoResposta: boolean;
+  atendenteId?: string | null;
+  atendenteNome?: string | null;
+}
+
+export interface FilaIndividualAtencao {
+  atendenteId: string;
+  nome: string;
+  total: number;
 }
 
 export interface ResumoAtencao {
   /** Conversas únicas que precisam de ação (não atribuídas ∪ espera crítica). */
   total: number;
   naoAtribuidas: number;
+  naoAtribuidasGlobal: number;
+  filasIndividuais: FilaIndividualAtencao[];
   criticas: number;
   /** Todo paciente aguardando resposta da clínica (inclui os críticos). */
   aguardando: number;
@@ -98,8 +111,10 @@ export function nivelAtencao(total: number): 0 | 1 | 2 | 3 {
 }
 
 export function calcularAtencao(args: {
-  /** Conversas sem responsável (fonte única: listarFilaHumana). */
+  /** Filas visíveis ao perfil: global sem responsável e individuais pendentes. */
   naoAtribuidas: LinhaFila[];
+  /** Para atendentes: só o total global, sem expor detalhes de conversas alheias. */
+  globalSemDetalhes?: number;
   /** conversaId -> instante da 1ª mensagem do paciente ainda sem resposta. */
   espera: Record<string, string>;
   /** Nomes conhecidos das conversas (Inbox). */
@@ -109,7 +124,28 @@ export function calcularAtencao(args: {
 }): ResumoAtencao {
   const agora = args.agora ?? Date.now();
   const nomes = { ...(args.nomes ?? {}) };
-  const fila = args.naoAtribuidas.filter(veioDoHandoff);
+  const fila = [
+    ...new Map(
+      args.naoAtribuidas.filter((c) => tipoFilaAtencao(c) !== null).map((c) => [c.id, c]),
+    ).values(),
+  ];
+  const porConversa = new Map(fila.map((c) => [c.id, c]));
+  const individuais = new Map<string, FilaIndividualAtencao>();
+  const globalSemDetalhes = Math.max(0, args.globalSemDetalhes ?? 0);
+  let naoAtribuidasGlobal = globalSemDetalhes;
+  for (const c of fila) {
+    if (tipoFilaAtencao(c) === "global") {
+      naoAtribuidasGlobal += 1;
+    } else if (c.atribuida_user_id) {
+      const grupo = individuais.get(c.atribuida_user_id) ?? {
+        atendenteId: c.atribuida_user_id,
+        nome: c.atendente_nome?.trim() || "Atendente sem nome",
+        total: 0,
+      };
+      grupo.total += 1;
+      individuais.set(c.atribuida_user_id, grupo);
+    }
+  }
   // Identidade do contato WhatsApp — nunca o cadastro de paciente.
   for (const c of fila) {
     const n = nomeContato(c);
@@ -149,19 +185,31 @@ export function calcularAtencao(args: {
       naoAtribuida,
       critica,
       aguardandoResposta: Boolean(desde),
+      atendenteId: naoAtribuida ? (porConversa.get(id)?.atribuida_user_id ?? null) : null,
+      atendenteNome: naoAtribuida ? (porConversa.get(id)?.atendente_nome ?? null) : null,
     });
   }
 
-  const peso: Record<CategoriaAtencao, number> = { nao_atribuida: 0, critica: 1, aguardando: 2 };
+  const peso: Record<CategoriaAtencao, number> = {
+    nao_atribuida: 0,
+    nao_atribuida_global: 0,
+    nao_atribuida_individual: 0,
+    critica: 1,
+    aguardando: 2,
+  };
   itens.sort((a, b) => peso[a.categoria] - peso[b.categoria] || b.minutos - a.minutos);
 
   return {
-    total: unicas.size,
-    naoAtribuidas: idsNaoAtribuidas.size,
+    total: unicas.size + globalSemDetalhes,
+    naoAtribuidas: idsNaoAtribuidas.size + globalSemDetalhes,
+    naoAtribuidasGlobal,
+    filasIndividuais: [...individuais.values()].sort(
+      (a, b) => a.nome.localeCompare(b.nome, "pt-BR") || a.atendenteId.localeCompare(b.atendenteId),
+    ),
     criticas: idsCriticas.size,
     aguardando,
     itens: itens.slice(0, args.limiteItens ?? 8),
-    nivel: nivelAtencao(unicas.size),
+    nivel: nivelAtencao(unicas.size + globalSemDetalhes),
   };
 }
 
@@ -169,13 +217,20 @@ export function calcularAtencao(args: {
  * Lista de uma categoria dentro da própria Central (não filtra a Inbox).
  * A ordem já vem por gravidade e tempo de espera.
  */
-export function itensDaCategoria(itens: ItemAtencao[], categoria: CategoriaAtencao | null) {
+export function itensDaCategoria(
+  itens: ItemAtencao[],
+  categoria: CategoriaAtencao | null,
+  atendenteId?: string | null,
+) {
   if (!categoria) return itens;
   if (categoria === "nao_atribuida") return itens.filter((i) => i.naoAtribuida);
+  if (categoria === "nao_atribuida_global")
+    return itens.filter((i) => i.naoAtribuida && !i.atendenteId);
+  if (categoria === "nao_atribuida_individual")
+    return itens.filter((i) => i.naoAtribuida && i.atendenteId === atendenteId);
   if (categoria === "critica") return itens.filter((i) => i.critica);
   return itens.filter((i) => i.aguardandoResposta);
 }
-
 
 /** Texto lido por leitores de tela no indicador do cabeçalho. */
 export function rotuloCentral(r: ResumoAtencao): string {

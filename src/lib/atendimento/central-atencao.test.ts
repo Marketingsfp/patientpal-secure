@@ -13,7 +13,9 @@ describe("Central de Atenção", () => {
 
   it("Caso 2 — conversa não atribuída ativa o alerta", () => {
     const r = calcularAtencao({
-      naoAtribuidas: [{ id: "a", contato_nome: "João Silva", handoff_motivo: "sem atendente online" }],
+      naoAtribuidas: [
+        { id: "a", contato_nome: "João Silva", handoff_motivo: "sem atendente online" },
+      ],
       espera: {},
       agora: AGORA,
     });
@@ -70,7 +72,9 @@ describe("Central de Atenção", () => {
 
   it("prioriza não atribuídas e maiores esperas na lista", () => {
     const r = calcularAtencao({
-      naoAtribuidas: [{ id: "n", contato_nome: "Sem dono", handoff_motivo: "sem atendente online" }],
+      naoAtribuidas: [
+        { id: "n", contato_nome: "Sem dono", handoff_motivo: "sem atendente online" },
+      ],
       espera: { k: haMin(20), j: haMin(6) },
       agora: AGORA,
     });
@@ -93,14 +97,15 @@ describe("Central de Atenção", () => {
     );
   });
 
-  it("FASE 3 — sem handoff registrado não é 'Não atribuída'", () => {
+  it("conversa aberta sem responsável entra na global mesmo sem motivo de handoff", () => {
     const r = calcularAtencao({
       naoAtribuidas: [{ id: "z", contato_nome: "Aberta manualmente" }],
       espera: {},
       agora: AGORA,
     });
-    expect(r.naoAtribuidas).toBe(0);
-    expect(r.total).toBe(0);
+    expect(r.naoAtribuidas).toBe(1);
+    expect(r.naoAtribuidasGlobal).toBe(1);
+    expect(r.total).toBe(1);
   });
 
   it("FASE 3 — lista por categoria dentro da própria Central", () => {
@@ -114,5 +119,95 @@ describe("Central de Atenção", () => {
     expect(itensDaCategoria(r.itens, "critica").map((i) => i.id)).toEqual(["k"]);
     expect(itensDaCategoria(r.itens, "aguardando").map((i) => i.id)).toEqual(["k", "j"]);
     expect(itensDaCategoria(r.itens, null).length).toBe(3);
+  });
+
+  it("agrupa pendências por atendente, com 1 e 10 conversas, e separa a global", () => {
+    const filas = [
+      ...Array.from({ length: 10 }, (_, i) => ({
+        id: `a${i}`,
+        atribuida_user_id: "ana",
+        atendente_nome: "Ana",
+        fila_pendente: true,
+      })),
+      { id: "b", atribuida_user_id: "bia", atendente_nome: "Bia", fila_pendente: true },
+      { id: "global1" },
+      { id: "global2" },
+    ];
+    const r = calcularAtencao({
+      naoAtribuidas: filas,
+      espera: { a0: haMin(30), global1: haMin(20) },
+      agora: AGORA,
+    });
+    expect(r.filasIndividuais).toEqual([
+      { atendenteId: "ana", nome: "Ana", total: 10 },
+      { atendenteId: "bia", nome: "Bia", total: 1 },
+    ]);
+    expect(r.naoAtribuidasGlobal).toBe(2);
+    expect(r.naoAtribuidas).toBe(13);
+    expect(r.total).toBe(13); // críticas sobrepostas não duplicam o total
+  });
+
+  it("contagem usa IDs e não mistura duas atendentes de mesmo nome", () => {
+    const a = { id: "c1", atribuida_user_id: "a", atendente_nome: "Maria", fila_pendente: true };
+    const b = { id: "c2", atribuida_user_id: "b", atendente_nome: "Maria", fila_pendente: true };
+    const r = calcularAtencao({ naoAtribuidas: [a, a, b], espera: {} });
+    expect(r.filasIndividuais.map((f) => [f.atendenteId, f.total])).toEqual([
+      ["a", 1],
+      ["b", 1],
+    ]);
+    expect(r.total).toBe(2);
+  });
+
+  it("resposta ou encerramento tira da fila; Nina e conversas já ativas não entram", () => {
+    const r = calcularAtencao({
+      naoAtribuidas: [
+        { id: "ativa", atribuida_user_id: "a", fila_pendente: false },
+        { id: "fechada", status: "closed" },
+        { id: "finalizada", status: "finished", fila_pendente: true },
+        { id: "nina", owner_type: "AI" },
+      ],
+      espera: {},
+    });
+    expect(r.total).toBe(0);
+    expect(r.filasIndividuais).toEqual([]);
+    expect(r.naoAtribuidasGlobal).toBe(0);
+  });
+
+  it("clicar em uma atendente ou na global isola a lista daquela fila", () => {
+    const r = calcularAtencao({
+      naoAtribuidas: [
+        { id: "a1", atribuida_user_id: "a", fila_pendente: true },
+        { id: "b1", atribuida_user_id: "b", fila_pendente: true },
+        { id: "g1" },
+      ],
+      espera: {},
+    });
+    expect(itensDaCategoria(r.itens, "nao_atribuida_individual", "a").map((i) => i.id)).toEqual([
+      "a1",
+    ]);
+    expect(itensDaCategoria(r.itens, "nao_atribuida_global").map((i) => i.id)).toEqual(["g1"]);
+  });
+
+  it("total global pode superar 200 e independe do limite de detalhes exibidos", () => {
+    const r = calcularAtencao({
+      naoAtribuidas: Array.from({ length: 501 }, (_, i) => ({ id: String(i) })),
+      espera: {},
+      limiteItens: 8,
+    });
+    expect(r.naoAtribuidasGlobal).toBe(501);
+    expect(r.total).toBe(501);
+    expect(r.itens).toHaveLength(8);
+  });
+
+  it("perfil operacional acompanha o total global sem detalhes de outros pacientes", () => {
+    const r = calcularAtencao({
+      naoAtribuidas: [{ id: "propria", atribuida_user_id: "a", fila_pendente: true }],
+      espera: {},
+      globalSemDetalhes: 250,
+    });
+    expect(r.naoAtribuidasGlobal).toBe(250);
+    expect(r.total).toBe(251);
+    expect(r.itens).toHaveLength(1);
+    expect(itensDaCategoria(r.itens, "nao_atribuida_global")).toEqual([]);
   });
 });
