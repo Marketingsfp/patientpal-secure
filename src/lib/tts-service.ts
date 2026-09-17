@@ -486,8 +486,8 @@ export function stopSpeaking() {
   }
 }
 
-async function fetchAudioUrl(text: string): Promise<string> {
-  const voice = getPiperVoice();
+async function fetchAudioUrl(text: string, vozOverride?: string): Promise<string> {
+  const voice = (vozOverride ?? "").trim() || getPiperVoice();
   const key = `${voice}|${text.trim()}`;
   const cached = cache.get(key);
   if (cached) return cached;
@@ -562,6 +562,56 @@ export async function speak(text: string, opts: SpeakOptions = {}): Promise<void
     await audio.play();
   } catch (err) {
     console.warn("[tts] falha ao reproduzir:", err);
+    onError?.(err);
+  }
+}
+
+/**
+ * Fala `text` com uma voz específica do catálogo do servidor (ex.: a voz do
+ * paciente simulado no treinamento do Coach), reaproveitando exatamente o
+ * mesmo caminho de `speak()`: proxy do sistema, cache de áudio, velocidade
+ * configurada na tela Voz & Áudio e mesmo plano B do servidor.
+ *
+ * Diferenças em relação a `speak()`:
+ *  - a voz vem por parâmetro em vez da preferência salva no navegador;
+ *  - não depende do interruptor global de leitura em voz alta, porque a tela
+ *    que chama (o treino) já tem o próprio botão de ligar/desligar a voz.
+ */
+export async function speakComVoz(
+  text: string,
+  voz: string,
+  opts: SpeakOptions = {},
+): Promise<void> {
+  const t = (text ?? "").trim();
+  if (!t) return;
+  if (typeof window === "undefined") return;
+
+  if (usuarioPrefereVozDoNavegador()) {
+    return speakNative(t, opts);
+  }
+
+  const { interrupt = true, onEnd, onError } = opts;
+  if (interrupt) stopSpeaking();
+
+  try {
+    const url = await fetchAudioUrl(t, voz);
+    const audio = new Audio(url);
+    audio.preload = "auto";
+    audio.playbackRate = getUserTtsRate();
+    (audio as HTMLAudioElement & { preservesPitch?: boolean }).preservesPitch = true;
+    currentAudio = audio;
+    currentUrl = url;
+    audio.onended = () => {
+      if (currentAudio === audio) currentAudio = null;
+      onEnd?.();
+    };
+    audio.onerror = (e) => {
+      if (currentAudio === audio) currentAudio = null;
+      onError?.(e);
+    };
+    await audio.play();
+  } catch (err) {
+    console.warn("[tts] falha ao reproduzir (voz do Coach):", err);
     onError?.(err);
   }
 }

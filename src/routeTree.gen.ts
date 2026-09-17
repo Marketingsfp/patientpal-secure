@@ -48,7 +48,6 @@ import { Route as ApiPublicNinaRuntimeRouteImport } from './routes/api/public/ni
 import { Route as ApiPublicIntakeSfpRouteImport } from './routes/api/public/intake-sfp'
 import { Route as ApiPublicIntakeConsultaHojeRouteImport } from './routes/api/public/intake-consulta-hoje'
 import { Route as ApiPublicIntakeRouteImport } from './routes/api/public/intake'
-import { Route as ApiCoachTtsRouteImport } from './routes/api/coach/tts'
 import { Route as AuthenticatedAppUnidadesRouteImport } from './routes/_authenticated/app.unidades'
 import { Route as AuthenticatedAppTriagemEnfermagemRouteImport } from './routes/_authenticated/app.triagem-enfermagem'
 import { Route as AuthenticatedAppTreinamentosRouteImport } from './routes/_authenticated/app.treinamentos'
@@ -383,11 +382,6 @@ const ApiPublicIntakeConsultaHojeRoute =
 const ApiPublicIntakeRoute = ApiPublicIntakeRouteImport.update({
   id: '/api/public/intake',
   path: '/api/public/intake',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiCoachTtsRoute = ApiCoachTtsRouteImport.update({
-  id: '/api/coach/tts',
-  path: '/api/coach/tts',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthenticatedAppUnidadesRoute =
@@ -1297,7 +1291,6 @@ export interface FileRoutesByFullPath {
   '/app/treinamentos': typeof AuthenticatedAppTreinamentosRoute
   '/app/triagem-enfermagem': typeof AuthenticatedAppTriagemEnfermagemRoute
   '/app/unidades': typeof AuthenticatedAppUnidadesRoute
-  '/api/coach/tts': typeof ApiCoachTtsRoute
   '/api/public/intake': typeof ApiPublicIntakeRoute
   '/api/public/intake-consulta-hoje': typeof ApiPublicIntakeConsultaHojeRoute
   '/api/public/intake-sfp': typeof ApiPublicIntakeSfpRoute
@@ -1472,7 +1465,6 @@ export interface FileRoutesByTo {
   '/app/treinamentos': typeof AuthenticatedAppTreinamentosRoute
   '/app/triagem-enfermagem': typeof AuthenticatedAppTriagemEnfermagemRoute
   '/app/unidades': typeof AuthenticatedAppUnidadesRoute
-  '/api/coach/tts': typeof ApiCoachTtsRoute
   '/api/public/intake': typeof ApiPublicIntakeRoute
   '/api/public/intake-consulta-hoje': typeof ApiPublicIntakeConsultaHojeRoute
   '/api/public/intake-sfp': typeof ApiPublicIntakeSfpRoute
@@ -1653,7 +1645,6 @@ export interface FileRoutesById {
   '/_authenticated/app/treinamentos': typeof AuthenticatedAppTreinamentosRoute
   '/_authenticated/app/triagem-enfermagem': typeof AuthenticatedAppTriagemEnfermagemRoute
   '/_authenticated/app/unidades': typeof AuthenticatedAppUnidadesRoute
-  '/api/coach/tts': typeof ApiCoachTtsRoute
   '/api/public/intake': typeof ApiPublicIntakeRoute
   '/api/public/intake-consulta-hoje': typeof ApiPublicIntakeConsultaHojeRoute
   '/api/public/intake-sfp': typeof ApiPublicIntakeSfpRoute
@@ -1834,7 +1825,6 @@ export interface FileRouteTypes {
     | '/app/treinamentos'
     | '/app/triagem-enfermagem'
     | '/app/unidades'
-    | '/api/coach/tts'
     | '/api/public/intake'
     | '/api/public/intake-consulta-hoje'
     | '/api/public/intake-sfp'
@@ -2009,7 +1999,6 @@ export interface FileRouteTypes {
     | '/app/treinamentos'
     | '/app/triagem-enfermagem'
     | '/app/unidades'
-    | '/api/coach/tts'
     | '/api/public/intake'
     | '/api/public/intake-consulta-hoje'
     | '/api/public/intake-sfp'
@@ -2189,7 +2178,6 @@ export interface FileRouteTypes {
     | '/_authenticated/app/treinamentos'
     | '/_authenticated/app/triagem-enfermagem'
     | '/_authenticated/app/unidades'
-    | '/api/coach/tts'
     | '/api/public/intake'
     | '/api/public/intake-consulta-hoje'
     | '/api/public/intake-sfp'
@@ -2298,7 +2286,6 @@ export interface RootRouteChildren {
   PacienteIndexRoute: typeof PacienteIndexRoute
   DotlovableOauthConsentRoute: typeof DotlovableOauthConsentRoute
   Char91DotmcpChar93InvokeToolToolRoute: typeof Char91DotmcpChar93InvokeToolToolRoute
-  ApiCoachTtsRoute: typeof ApiCoachTtsRoute
   ApiPublicIntakeRoute: typeof ApiPublicIntakeRoute
   ApiPublicIntakeConsultaHojeRoute: typeof ApiPublicIntakeConsultaHojeRoute
   ApiPublicIntakeSfpRoute: typeof ApiPublicIntakeSfpRoute
@@ -2591,13 +2578,6 @@ declare module '@tanstack/react-router' {
       path: '/api/public/intake'
       fullPath: '/api/public/intake'
       preLoaderRoute: typeof ApiPublicIntakeRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/coach/tts': {
-      id: '/api/coach/tts'
-      path: '/api/coach/tts'
-      fullPath: '/api/coach/tts'
-      preLoaderRoute: typeof ApiCoachTtsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_authenticated/app/unidades': {
@@ -3998,7 +3978,6 @@ const rootRouteChildren: RootRouteChildren = {
   PacienteIndexRoute: PacienteIndexRoute,
   DotlovableOauthConsentRoute: DotlovableOauthConsentRoute,
   Char91DotmcpChar93InvokeToolToolRoute: Char91DotmcpChar93InvokeToolToolRoute,
-  ApiCoachTtsRoute: ApiCoachTtsRoute,
   ApiPublicIntakeRoute: ApiPublicIntakeRoute,
   ApiPublicIntakeConsultaHojeRoute: ApiPublicIntakeConsultaHojeRoute,
   ApiPublicIntakeSfpRoute: ApiPublicIntakeSfpRoute,

@@ -29,17 +29,6 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import {
-  loadLocalTts,
-  pingLocalTts,
-  saveLocalTts,
-  fetchLocalTtsAudio,
-  buildLocalTtsUrl,
-  vozPorNome,
-  VOZ_MASCULINA,
-  TTS_PLAYBACK_RATE,
-  type LocalTtsConfig,
-} from "@/lib/coach/local-tts";
-import {
   startRoleplay,
   roleplayReply,
   type RoleplayScenario,
@@ -52,7 +41,8 @@ import { useStudyTimer } from "@/lib/coach/study-time";
 import { AtendenteGuard } from "@/components/coach/AtendenteGuard";
 import { ProtecaoTela } from "@/components/coach/ProtecaoTela";
 import { formatScripts } from "@/lib/coach/scripts";
-import { escolhaDaVoz, type VozProvedor } from "@/lib/coach/voz-config";
+import { personagemPorNome, vozEscolhida } from "@/lib/coach/voz-sistema";
+import { speakComVoz, stopSpeaking as pararVozSistema } from "@/lib/tts-service";
 import { useCoachConfig } from "@/lib/coach/config-clinica";
 import type { CoachContexto } from "@/lib/coach/contexto";
 import {
@@ -326,26 +316,7 @@ function RoleplayPage({ ctx }: { ctx: CoachContexto }) {
     dificuldadeRef.current = dificuldade;
     localStorage.setItem("roleplay:dificuldade", dificuldade);
   }, [dificuldade]);
-  const [ttsStatus, setTtsStatus] = useState<"checando" | "online" | "offline">("checando");
-  const [localTts, setLocalTts] = useState<LocalTtsConfig>(() => loadLocalTts());
-  // Mede a saúde do servidor de voz local para mostrar o status antes da ligação.
-  useEffect(() => {
-    if (!localTts.enabled || !localTts.url.trim()) {
-      setTtsStatus("offline");
-      return;
-    }
-    let cancelado = false;
-    setTtsStatus("checando");
-    pingLocalTts(localTts).then((ok) => {
-      if (!cancelado) setTtsStatus(ok ? "online" : "offline");
-    });
-    return () => {
-      cancelado = true;
-    };
-  }, [localTts.enabled, localTts.url, localTts.voice]);
-  const [showTtsCfg, setShowTtsCfg] = useState(false);
   const [ttsWarn, setTtsWarn] = useState<string | null>(null);
-  const localTtsRef = useRef<LocalTtsConfig>(localTts);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const audioUrlRef = useRef<string | null>(null);
   const ttsAbortRef = useRef<AbortController | null>(null);
@@ -491,11 +462,6 @@ function RoleplayPage({ ctx }: { ctx: CoachContexto }) {
       });
   }, [feedback, scenario, atendente, clinicaId, ctx.userId, pontosFracos]);
 
-  useEffect(() => {
-    localTtsRef.current = localTts;
-    saveLocalTts(localTts);
-  }, [localTts]);
-
   useEffect(() => { modeRef.current = mode; }, [mode]);
   useEffect(() => { speakEnabledRef.current = speakEnabled; }, [speakEnabled]);
   useEffect(() => { thinkingRef.current = thinking; }, [thinking]);
@@ -617,6 +583,12 @@ function RoleplayPage({ ctx }: { ctx: CoachContexto }) {
       // ignore
     }
     ttsAbortRef.current = null;
+    // Interrompe também a fala em andamento no serviço de voz do sistema.
+    try {
+      pararVozSistema();
+    } catch {
+      // ignore
+    }
     if (audioRef.current) {
       try {
         audioRef.current.pause();
@@ -648,6 +620,12 @@ function RoleplayPage({ ctx }: { ctx: CoachContexto }) {
     return id;
   }
 
+  /**
+   * Fala do paciente simulado. Usa o mesmo serviço de voz do sistema
+   * (Voz & Áudio / TTS) que a Nina e o painel já usam: mesma velocidade,
+   * mesmo cache de áudio e mesmo plano B quando o servidor não responde.
+   * A voz por personagem é a escolhida pela gestora no painel do Coach.
+   */
   function speak(text: string, onDone?: () => void) {
     if (!speakEnabled || typeof window === "undefined") {
       onDone?.();
@@ -657,159 +635,33 @@ function RoleplayPage({ ctx }: { ctx: CoachContexto }) {
     speakingRef.current = true;
     setFalando(true);
     const epoch = speechEpochRef.current;
+    let finalizado = false;
     const guarded = () => {
+      if (finalizado) return;
+      finalizado = true;
       if (epoch !== speechEpochRef.current) return;
       speakingRef.current = false;
       setFalando(false);
       onDone?.();
     };
-    const cfg = localTtsRef.current;
     const nome = NOMES_PACIENTES[convAtivaRef.current % NOMES_PACIENTES.length] ?? "";
-    const voz = vozPorNome(nome);
-    // Voz definida pela gestora no painel admin (por atividade e personagem).
-    const escolha = escolhaDaVoz(
+    const personagem = personagemPorNome(nome);
+    const voz = vozEscolhida(
       vozConfigRef.current,
       modeRef.current === "texto" ? "whatsapp" : "ligacao",
-      voz === VOZ_MASCULINA ? "masculino" : "feminino",
+      personagem,
     );
-    const provedor = escolha.provedor;
-    const temPiper = cfg.enabled && Boolean(cfg.url.trim());
-    if (provedor === "piper" && !temPiper) {
-      speakBrowser(text, guarded);
-      return;
-    }
-    if (provedor !== "auto" || temPiper) {
-      speakLocal(text, { ...cfg, voice: escolha.piper || voz }, guarded, provedor, escolha.gemini);
-      return;
-    }
-    speakBrowser(text, guarded);
-  }
-
-  // TTS local (Piper / Coqui): o áudio vem pelo backend (evita CORS no navegador).
-  // Se o proxy falhar, tenta direto do navegador e por último a voz nativa.
-  function speakLocal(
-    text: string,
-    cfg: LocalTtsConfig,
-    onDone?: () => void,
-    provedor: VozProvedor = "auto",
-    vozGemini?: string,
-  ) {
-    const controller = new AbortController();
-    ttsAbortRef.current = controller;
-
-    const playBlob = (blob: Blob) => {
-      if (controller.signal.aborted) return;
-      setTtsWarn(null);
-      const url = URL.createObjectURL(blob);
-      audioUrlRef.current = url;
-      const audio = new Audio(url);
-      audioRef.current = audio;
-      audio.playbackRate = TTS_PLAYBACK_RATE;
-      audio.preservesPitch = true;
-      let done = false;
-      const finish = () => {
-        if (done) return;
-        done = true;
-        onDone?.();
-      };
-      audio.onended = finish;
-      audio.onerror = () => {
-        setTtsWarn("Não foi possível tocar o áudio do TTS local.");
-        finish();
-      };
-      audio.play().catch(() => {
-        setTtsWarn("O navegador bloqueou o áudio. Interaja com a página e tente de novo.");
-        finish();
-      });
-    };
-
-    // Rota de streaming própria: o backend busca o WAV no seu servidor e
-    // entrega aqui, então o <audio> toca sem CORS e sem base64.
-    const viaProxy = async () => {
-      const usaPiper = provedor === "auto" || provedor === "piper";
-      const qs = new URLSearchParams({ text, provedor });
-      if (usaPiper && cfg.url.trim()) qs.set("url", cfg.url);
-      if (cfg.voice.trim()) qs.set("voice", cfg.voice.trim());
-      if (vozGemini) qs.set("vozgemini", vozGemini);
-      const { data: sess } = await supabase.auth.getSession();
-      const res = await fetch(`/api/coach/tts?${qs.toString()}`, {
-        signal: controller.signal,
-        headers: { Authorization: `Bearer ${sess.session?.access_token}` },
-      });
-      if (res.status === 204) {
-        throw new Error(res.headers.get("X-Tts-Error") || "servidor local inacessível");
-      }
-      if (!res.ok) throw new Error((await res.text()) || `HTTP ${res.status}`);
-      const blob = await res.blob();
-      if (blob.size < 256) throw new Error("áudio vazio");
-      return blob.type.startsWith("audio") ? blob : new Blob([blob], { type: "audio/wav" });
-    };
-
-    viaProxy()
-      .catch(async (proxyErr) => {
-        if (controller.signal.aborted) throw proxyErr;
-        console.warn("TTS proxy falhou, tentando direto", proxyErr);
-        if (provedor === "gemini" || provedor === "openai") throw proxyErr;
-        return fetchLocalTtsAudio(text, cfg, controller.signal);
-      })
-      .then((blob) => playBlob(blob))
-      .catch((e) => {
-        if (controller.signal.aborted) return;
-        console.error("TTS local", e);
-        if (provedor === "gemini" || provedor === "openai") {
-          setTtsWarn("A voz da plataforma não respondeu — usando a voz do navegador.");
-          speakBrowser(text, onDone);
-          return;
-        }
-        // Último recurso antes da voz nativa: tocar a URL direta no <audio>.
-        // O elemento de mídia não exige CORS, então funciona quando o fetch é bloqueado.
-        playDirectUrl(
-          text,
-          cfg,
-          controller,
-          onDone,
-          e instanceof Error ? e.message : "Falha no TTS local",
-        );
-      });
-  }
-
-  function playDirectUrl(
-    text: string,
-    cfg: LocalTtsConfig,
-    controller: AbortController,
-    onDone: (() => void) | undefined,
-    prevError: string,
-  ) {
-    if (controller.signal.aborted) return;
-    try {
-      const audio = new Audio(buildLocalTtsUrl(text, cfg));
-      audioRef.current = audio;
-      audio.playbackRate = TTS_PLAYBACK_RATE;
-      audio.preservesPitch = true;
-      let done = false;
-      const finish = () => {
-        if (done) return;
-        done = true;
-        onDone?.();
-      };
-      audio.oncanplay = () => setTtsWarn(null);
-      audio.onended = finish;
-      audio.onerror = () => {
-        if (done || controller.signal.aborted) return;
-        done = true;
-        setTtsWarn(`${prevError} — usando a voz do navegador.`);
-        speakBrowser(text, onDone);
-      };
-      audio.play().catch(() => {
-        if (done || controller.signal.aborted) return;
-        done = true;
-        setTtsWarn(`${prevError} — usando a voz do navegador.`);
-        speakBrowser(text, onDone);
-      });
-    } catch {
-      setTtsWarn(`${prevError} — usando a voz do navegador.`);
-      speakBrowser(text, onDone);
-    }
+    void speakComVoz(text, voz, {
+      onEnd: () => {
+        setTtsWarn(null);
+        guarded();
+      },
+      onError: () => {
+        if (epoch !== speechEpochRef.current) return;
+        setTtsWarn("A voz do sistema não respondeu — usando a voz do navegador.");
+        speakBrowser(text, guarded);
+      },
+    });
   }
 
   function speakBrowser(text: string, onDone?: () => void) {
@@ -1761,112 +1613,16 @@ function RoleplayPage({ ctx }: { ctx: CoachContexto }) {
                       </>
                     )}
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => setShowTtsCfg((v) => !v)}
-                    className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground"
-                    title="Configurar TTS local"
-                  >
+                  <span className="inline-flex items-center gap-1.5 text-[10px] text-muted-foreground">
                     <Settings2 className="h-3.5 w-3.5" />
-                    {localTts.enabled ? "TTS local" : "Voz navegador"}
-                  </button>
-                  {localTts.enabled && (
-                    <span
-                      className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium ${
-                        ttsStatus === "online"
-                          ? "bg-[color:var(--success)]/15 text-[color:var(--success)]"
-                          : ttsStatus === "offline"
-                            ? "bg-destructive/10 text-destructive"
-                            : "bg-secondary text-muted-foreground"
-                      }`}
-                      title={
-                        ttsStatus === "offline"
-                          ? "Seu servidor de voz não respondeu — a voz do navegador assume automaticamente."
-                          : "Servidor de voz local"
-                      }
-                    >
-                      <span className="h-1.5 w-1.5 rounded-full bg-current" />
-                      {ttsStatus === "online"
-                        ? "voz local ok"
-                        : ttsStatus === "offline"
-                          ? "voz local off"
-                          : "verificando"}
-                    </span>
-                  )}
+                    Voz do sistema
+                  </span>
                   </div>
                 )}
               </div>
-              {mode === "voz" && showTtsCfg && (
-                <div className="border-b bg-secondary/20 px-4 py-3 space-y-2">
-                  <label className="flex items-center gap-2 text-xs font-medium">
-                    <input
-                      type="checkbox"
-                      checked={localTts.enabled}
-                      onChange={(e) =>
-                        setLocalTts((c) => ({ ...c, enabled: e.target.checked }))
-                      }
-                    />
-                    Usar meu TTS local (Piper / Coqui)
-                  </label>
-                  <div className="grid gap-2 sm:grid-cols-2">
-                    <Input
-                      value={localTts.url}
-                      onChange={(e) => setLocalTts((c) => ({ ...c, url: e.target.value }))}
-                      placeholder="https://meu-servidor/api/tts"
-                      className="text-xs"
-                    />
-                    <Input
-                      value={localTts.voice}
-                      onChange={(e) => setLocalTts((c) => ({ ...c, voice: e.target.value }))}
-                      placeholder="Voz (ex.: Miro)"
-                      className="text-xs"
-                    />
-                  </div>
-                  <p className="text-[11px] text-muted-foreground">
-                    O áudio é gerado pelo seu servidor, entregue pelo nosso backend (sem precisar de
-                    CORS) e tocado aqui. Se falhar, caímos na voz do navegador.
-                  </p>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    onClick={() => speak("Alô, bom dia. Estou testando a minha voz.")}
-                  >
-                    Testar voz
-                  </Button>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="ghost"
-                    className="ml-2"
-                    onClick={async () => {
-                      setTtsWarn("Testando conexão com o seu servidor...");
-                      try {
-                        const qs = new URLSearchParams({
-                          probe: "1",
-                          url: localTts.url,
-                          voice: localTts.voice,
-                        });
-                        const { data: sess } = await supabase.auth.getSession();
-                        const r = await fetch(`/api/coach/tts?${qs.toString()}`, {
-                          headers: {
-                            Authorization: `Bearer ${sess.session?.access_token}`,
-                          },
-                        });
-                        const j = (await r.json()) as { ok: boolean; motivo?: string };
-                        setTtsWarn(
-                          j.ok
-                            ? "Servidor de voz local acessível."
-                            : `Servidor de voz local indisponível: ${j.motivo ?? "sem resposta"}`,
-                        );
-                      } catch {
-                        setTtsWarn("Não foi possível testar a conexão.");
-                      }
-                    }}
-                  >
-                    Diagnosticar servidor
-                  </Button>
-                  {ttsWarn && <p className="text-[11px] text-destructive">{ttsWarn}</p>}
+              {ttsWarn && (
+                <div className="border-b bg-secondary/20 px-4 py-2">
+                  <p className="text-[11px] text-destructive">{ttsWarn}</p>
                 </div>
               )}
               <div
