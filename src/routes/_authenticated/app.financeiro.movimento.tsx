@@ -1716,9 +1716,23 @@ function Page() {
     .filter(
       (l) => l.status !== "cancelado" && (filterStatus === "todos" || l.status === filterStatus),
     )
-    // Filtro por profissional: estreita a lista, os cards e o quadro juntos,
-    // como qualquer outro filtro da barra.
-    .filter((l) => filterMedico === "todos" || (l.medico_id ?? null) === filterMedico);
+    // Rótulo do profissional no MESMO formato do seletor da Agenda: quem tem
+    // mais de uma agenda ativa aparece como `NOME — AGENDA`. É só o nome
+    // exibido/agrupado — a separação Consulta × Exame continua vindo do tipo
+    // do serviço cadastrado, nunca do nome da agenda.
+    .map((l) => {
+      const rotulo = rotuloProfissionalAgenda(
+        opcoesProf.opcoes,
+        opcoesProf.rotuloMedico,
+        l.medico_id ?? null,
+        l.agenda_nome ?? null,
+      );
+      return rotulo ? { ...l, medico_nome: rotulo } : l;
+    })
+    // Filtro por profissional (uma entrada por agenda): estreita lista, cards
+    // e quadro juntos, como qualquer outro filtro da barra.
+    .filter((l) => filterMedico === "todos" || (l.medico_nome ?? "") === filterMedico);
+
   // O que é ajuste de outro dia dentro deste recorte. As partes de um
   // pagamento misto herdam a marca do pai e somam exatamente o valor dele, por
   // isso a conta fecha igual com a decomposição ligada ou desligada.
