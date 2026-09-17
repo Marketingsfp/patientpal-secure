@@ -30,6 +30,26 @@
  * mostrar separado como ajuste gerencial.
  */
 import { dataClinicaDe } from "@/lib/date-utils";
+import { classificarForma } from "@/lib/financeiro/formas-pagamento";
+
+/**
+ * Parcela de cartão importada do sistema antigo (Clínica Total).
+ *
+ * A importação de junho/2026 gravou em `data` o dia em que cada PARCELA de
+ * uma venda antiga cai — há parcelas até dezembro/2026 —, com a bandeira no
+ * lugar da forma (MASTER, VISA, ELO…). Esse dinheiro não passou no balcão
+ * naquele dia: não tem movimento de caixa, não está no cupom e o relatório
+ * diário do sistema antigo também não o conta. Em 01/09/2026 era uma parcela
+ * de R$ 80,00, e a diretoria confirmou, conferindo contra o relatório impresso
+ * do sistema antigo, que ela sai do caixa diário do balcão.
+ *
+ * Todo texto de cartão por bandeira vem da importação (o sistema atual grava
+ * `cartao_debito`/`cartao_credito`), por isso a forma sozinha já identifica a
+ * linha — é o balde "Parcelas do sistema antigo" de `classificarForma`.
+ */
+export function ehParcelaImportada(l: { tipo?: string | null; forma_pagamento?: string | null }) {
+  return l.tipo === "receita" && classificarForma(l.forma_pagamento) === "legado_cartao";
+}
 
 /**
  * Tipos de movimento de caixa que efetivamente colocam (ou tiram) dinheiro da
@@ -275,5 +295,34 @@ export function avisoRetroativos(
         ? " As despesas da lista não afetam o cupom em nenhum caso: elas são pagas pela " +
           "tesouraria, não saem da gaveta da recepção."
         : ""),
+  };
+}
+
+/**
+ * Aviso das parcelas importadas do sistema antigo (ver `ehParcelaImportada`).
+ *
+ * Sempre em azul: não há nada a conferir na gaveta. Existe só para a linha não
+ * sumir sem explicação — quem compara com outro relatório precisa ver quanto
+ * ficou de fora e por quê.
+ */
+export function avisoParcelasImportadas(
+  t: TotaisRetroativos,
+  fmt: (n: number) => string,
+  escondendo: boolean,
+): AvisoRetroativos | null {
+  if (t.quantidade === 0) return null;
+  return {
+    tom: "informativo",
+    titulo:
+      `${plural(t.quantidade, "parcela de cartão importada", "parcelas de cartão importadas")} ` +
+      `do sistema antigo ${escondendo ? "fora" : "dentro"} do caixa deste período — ` +
+      `${fmt(t.receitas)}.`,
+    detalhe:
+      "São parcelas de vendas antigas, trazidas da Clínica Total com a data em que cada " +
+      "parcela cai. Não passaram no balcão nesses dias, não estão no cupom impresso e o " +
+      "relatório diário do sistema antigo também não as conta. " +
+      (escondendo
+        ? "Continuam no Dashboard e nos relatórios por competência."
+        : "Incluídas aqui, o total acima deixa de bater com o cupom impresso da recepção."),
   };
 }

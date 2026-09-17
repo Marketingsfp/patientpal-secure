@@ -48,7 +48,9 @@ import {
   TERMO_MINIMO,
 } from "@/lib/financeiro/busca-movimento";
 import {
+  avisoParcelasImportadas,
   avisoRetroativos,
+  ehParcelaImportada,
   ehLancamentoRetroativo,
   mapaDaGaveta,
   totaisRetroativos,
@@ -170,6 +172,10 @@ interface Lanc {
    *  gaveta daquele dia: é ajuste gerencial, não caixa físico da recepção.
    *  Ver `@/lib/financeiro/retroativos`. */
   _retroativo?: boolean;
+  /** true → parcela de cartão importada do sistema antigo, com a data em que a
+   *  parcela cai: não passou no balcão. Sai do caixa junto com os retroativos.
+   *  Ver `ehParcelaImportada`. */
+  _parcelaImportada?: boolean;
   /** Nome do procedimento do atendimento vinculado, como está gravado em
    *  `agendamentos.procedimento` (com a especialidade colada no fim). Separa
    *  Consultas de Exames/Procedimentos na composição da receita. */
@@ -567,6 +573,7 @@ function Page() {
           ...rows.map((l) => ({
             ...l,
             origem: "fin" as const,
+            _parcelaImportada: ehParcelaImportada(l),
             hora: l.created_at
               ? (() => {
                   const d = new Date(l.created_at as string);
@@ -1627,6 +1634,13 @@ function Page() {
   // Texto e tom do aviso de retroativos. Fica fora do JSX porque a regra de
   // "isto assusta ou só informa?" é de negócio, não de layout — e é testada.
   const avisoRetro = avisoRetroativos(retro, fmt, escondendoRetroativos);
+  // Parcelas de cartão importadas do sistema antigo: fora do caixa do balcão
+  // pela mesma chave dos retroativos (decisão da diretoria em 17/09/2026,
+  // conferindo 01/09/2026 contra o relatório impresso do sistema antigo).
+  const importadas = totaisRetroativos(
+    linhasDoPeriodo.filter((l) => l._parcelaImportada && !l._retroativo),
+  );
+  const avisoImportadas = avisoParcelasImportadas(importadas, fmt, escondendoRetroativos);
   // Aviso obrigatório enquanto a busca ignora as datas: sem ele, os cards de
   // Receita/Despesa/Saldo somando várias datas passariam por fechamento do dia.
   const avisoBusca = avisoDaBuscaGlobal({
@@ -1635,7 +1649,7 @@ function Page() {
     truncado: buscaTruncada,
   });
   const itensVisiveis = escondendoRetroativos
-    ? linhasDoPeriodo.filter((l) => !l._retroativo)
+    ? linhasDoPeriodo.filter((l) => !l._retroativo && !l._parcelaImportada)
     : linhasDoPeriodo;
 
   // Classificação de cada linha para os cards: atendimento por condição
@@ -1666,10 +1680,10 @@ function Page() {
   // que faz um fechamento acusar diferença que não existe.
   const totais = escondendoRetroativos
     ? {
-        r: Number((resumo.r - retro.receitas).toFixed(2)),
+        r: Number((resumo.r - retro.receitas - importadas.receitas).toFixed(2)),
         d: Number((resumo.d - retro.despesas).toFixed(2)),
-        saldo: Number((resumo.saldo - retro.saldo).toFixed(2)),
-        totalRows: Math.max(0, resumo.totalRows - retro.quantidade),
+        saldo: Number((resumo.saldo - retro.saldo - importadas.receitas).toFixed(2)),
+        totalRows: Math.max(0, resumo.totalRows - retro.quantidade - importadas.quantidade),
       }
     : resumo;
 
@@ -2283,6 +2297,30 @@ function Page() {
               onClick={() => setOcultarRetroativos(!ocultarRetroativos)}
             >
               {ocultarRetroativos ? "Incluir ajustes retroativos" : "Ocultar retroativos"}
+            </Button>
+          )}
+        </div>
+      )}
+
+      {avisoImportadas && (
+        <div className="rounded-md border border-sky-300 bg-sky-50 px-4 py-3 flex flex-wrap items-start gap-x-3 gap-y-2">
+          <Info className="h-4 w-4 text-sky-600 shrink-0 mt-0.5" />
+          <div className="flex-1 min-w-[16rem] text-sm space-y-1 text-sky-900">
+            <p>
+              <strong>{avisoImportadas.titulo}</strong>
+            </p>
+            <p className="text-xs">{avisoImportadas.detalhe}</p>
+          </div>
+          {/* Mesma chave dos retroativos: sem o aviso deles na tela, este é o
+              único lugar para voltar ao caixa do balcão. */}
+          {!buscaGlobal && !avisoRetro && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="shrink-0 bg-white border-sky-400 hover:bg-sky-100"
+              onClick={() => setOcultarRetroativos(!ocultarRetroativos)}
+            >
+              {ocultarRetroativos ? "Incluir ajustes" : "Ocultar ajustes"}
             </Button>
           )}
         </div>
