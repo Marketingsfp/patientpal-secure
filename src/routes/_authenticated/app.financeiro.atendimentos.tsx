@@ -3358,6 +3358,22 @@ function AtendimentosPage() {
             </CardContent>
           </Card>
 
+          {fAgenda !== "todos" && semAgendaOcultos > 0 && (
+            <div className="flex flex-wrap items-center gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+              <span>
+                {semAgendaOcultos} atendimento(s) deste profissional não têm agenda (lançamento
+                manual) e estão fora deste filtro.
+              </span>
+              <button
+                type="button"
+                className="font-medium underline underline-offset-2"
+                onClick={() => setFAgenda("todos")}
+              >
+                Ver todos deste profissional
+              </button>
+            </div>
+          )}
+
           <div className="rounded-xl bg-card">
             <div className="p-0">
               {loading ? (
