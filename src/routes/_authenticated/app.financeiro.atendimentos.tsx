@@ -38,6 +38,11 @@ import { useClinica } from "@/hooks/use-clinica";
 import { montarDiscriminacaoNfse } from "@/lib/nfse-descricao";
 import { usePodeEscrever } from "@/hooks/use-permissoes";
 import { useMedicoContext } from "@/hooks/use-medico-context";
+import {
+  montarOpcoesProfissional,
+  chaveNomeAgenda,
+  type OpcaoProfissional,
+} from "@/lib/agenda/opcoes-profissional";
 import { useServerFn } from "@tanstack/react-start";
 import { emitirNfse, consultarNfse } from "@/lib/nfse.functions";
 import { avisarCepDoTomadorInvalido } from "@/lib/nfse-aviso-cep";
