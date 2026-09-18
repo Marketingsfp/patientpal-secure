@@ -1970,6 +1970,17 @@ function AtendimentosPage() {
     setOptsReady(false);
     void loadOpts();
   }, [clinicaAtual?.clinica_id]);
+  // Mesma lista e mesmos rótulos do seletor PROFISSIONAL da Agenda.
+  const opcoesProf = useMemo(
+    () =>
+      montarOpcoesProfissional({
+        medicos: medicos.map((m) => ({ id: m.id, nome: m.nome })),
+        agendasPorMedico,
+        agendasComGrade,
+        onlyMedicoId: isMedicoOnly ? medicoLogadoId : null,
+      }),
+    [medicos, agendasPorMedico, agendasComGrade, isMedicoOnly, medicoLogadoId],
+  );
   useEffect(
     () => {
       void load(); /* refaz ao mudar filtros ou opções de repasse */
@@ -1978,6 +1989,7 @@ function AtendimentosPage() {
     [
       clinicaAtual?.clinica_id,
       fMedico,
+      fAgenda,
       fIni,
       fFim,
       fStatus,
