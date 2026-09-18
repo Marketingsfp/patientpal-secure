@@ -1,6 +1,15 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { Stethoscope, AlertTriangle, Users, Check, X, DollarSign, Eye } from "lucide-react";
+import {
+  Stethoscope,
+  AlertTriangle,
+  Users,
+  Check,
+  X,
+  DollarSign,
+  Eye,
+  FileText,
+} from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
 import { useAuth } from "@/hooks/use-auth";
@@ -22,6 +31,7 @@ import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/h
 import { toast } from "sonner";
 import { agendamentosStatusPagamento, type StatusPagamento } from "@/lib/pagamento-status";
 import { cadastroMedicoDoUsuario, isMedicoOnlyUser } from "@/lib/medico-only";
+import { HistoricoProntuarioDrawer } from "@/components/prontuario/historico-prontuario-drawer";
 
 export const Route = createFileRoute("/_authenticated/app/atendimento-ia/")({
   component: AtendimentoIaPage,
@@ -42,6 +52,10 @@ type FilaItem = {
   paciente_id: string | null;
   paciente_nome: string;
   inicio: string;
+  // Momento em que a ficha foi marcada. Serve de desempate quando dois
+  // pacientes têm o mesmo horário (encaixe): quem foi marcado antes é
+  // chamado antes.
+  created_at: string | null;
   procedimento: string | null;
   fluxo_etapa: string;
   prioridade: "normal" | "prioritario" | "urgente";
@@ -106,6 +120,8 @@ function AtendimentoIaPage() {
   const [triagensTick, setTriagensTick] = useState(0);
   const [pagamentos, setPagamentos] = useState<Record<string, StatusPagamento>>({});
   const [pagamentosTick, setPagamentosTick] = useState(0);
+  // Paciente cujo histórico de prontuário está aberto na gaveta lateral.
+  const [historico, setHistorico] = useState<FilaItem | null>(null);
   // Usuário com perfil só de médico cujo login ainda não foi ligado ao
   // cadastro do profissional na clínica.
   const [semVinculo, setSemVinculo] = useState(false);
@@ -255,7 +271,9 @@ function AtendimentoIaPage() {
     const hoje = dia;
     const { data } = await supabase
       .from("agendamentos")
-      .select("id, paciente_id, paciente_nome, inicio, procedimento, fluxo_etapa, prioridade")
+      .select(
+        "id, paciente_id, paciente_nome, inicio, created_at, procedimento, fluxo_etapa, prioridade",
+      )
       .eq("clinica_id", clinicaAtual.clinica_id)
       .eq("medico_id", medId)
       .gte("inicio", `${hoje}T00:00:00`)
@@ -366,32 +384,38 @@ function AtendimentoIaPage() {
     };
   }, [medicoId, clinicaAtual?.clinica_id, dia]);
 
-  const filaOrdenada = useMemo(() => {
-    const peso = { urgente: 0, prioritario: 1, normal: 2 } as const;
-    return [...fila].sort((a, b) => {
-      const pa = peso[a.prioridade] ?? 2;
-      const pb = peso[b.prioridade] ?? 2;
-      if (pa !== pb) return pa - pb;
-      return a.inicio.localeCompare(b.inicio);
-    });
-  }, [fila]);
+  /**
+   * Ordem de chamada do dia: estritamente o horário marcado.
+   *
+   * Antes a lista era reordenada por prioridade — um caso marcado como urgente
+   * subia para o topo e a coluna "#" aparecia fora de ordem (1, 5, 2…), como se
+   * a numeração estivesse se recalculando sozinha. A prioridade continua
+   * sinalizada na coluna própria, mas não muda mais o lugar do paciente na fila.
+   *
+   * Empate de horário (encaixe) é desempatado pela ordem em que a ficha foi
+   * marcada, e o `id` fecha o critério para a ordem nunca oscilar entre uma
+   * atualização e outra.
+   */
+  const ordemDeChamada = (a: FilaItem, b: FilaItem) =>
+    a.inicio.localeCompare(b.inicio) ||
+    (a.created_at ?? "").localeCompare(b.created_at ?? "") ||
+    a.id.localeCompare(b.id);
+
+  const filaOrdenada = useMemo(() => [...fila].sort(ordemDeChamada), [fila]);
 
   /**
    * Número fixo de cada paciente no dia.
    *
-   * Antes a coluna "#" era só a posição na lista que estava sendo exibida: bastava
-   * um paciente ser atendido ou mudar de etapa para o seguinte virar o nº 1, e a
-   * médica perdia a conta de onde estava. Agora o número vem da ordem do horário
-   * marcado, é calculado uma vez sobre o dia inteiro e não muda mais — nem quando
-   * um caso prioritário sobe para o topo da tela, nem quando alguém é atendido.
+   * A coluna "#" é calculada uma vez sobre o dia inteiro, na mesma ordem em que
+   * a lista é exibida, e não muda mais: ser atendido, mudar de etapa ou entrar
+   * como prioritário não renumera ninguém. Quem já passou continua na grade com
+   * o mesmo número, marcado como ATENDIDO.
    */
   const numeroNoDia = useMemo(() => {
     const mapa = new Map<string, number>();
-    [...fila]
-      .sort((a, b) => a.inicio.localeCompare(b.inicio) || a.id.localeCompare(b.id))
-      .forEach((item, i) => mapa.set(item.id, i + 1));
+    filaOrdenada.forEach((item, i) => mapa.set(item.id, i + 1));
     return mapa;
-  }, [fila]);
+  }, [filaOrdenada]);
 
   // Contagens do cabeçalho. A lista em si é UMA só: quem foi atendido continua
   // na tabela, marcado de verde. Antes havia duas abas, e o paciente sumia da
@@ -533,7 +557,7 @@ function AtendimentoIaPage() {
                     <TableHead className="w-32">Pagamento</TableHead>
                     <TableHead className="w-24 text-center">Triagem</TableHead>
                     <TableHead className="w-28">Prioridade</TableHead>
-                    <TableHead className="w-48 text-right">Ação</TableHead>
+                    <TableHead className="w-64 text-right">Ação</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -741,34 +765,49 @@ function AtendimentoIaPage() {
                           </HoverCard>
                         </TableCell>
                         <TableCell className="text-right">
-                          {atendido ? (
-                            // Reabrir o prontuário já finalizado é o caminho da
-                            // segunda via: o paciente volta no balcão pedindo o
-                            // atestado ou a receita que perdeu.
+                          <div className="flex items-center justify-end gap-1">
+                            {/* Histórico clínico do paciente sem sair da fila:
+                                abre a gaveta com as consultas anteriores. */}
                             <Button
                               size="sm"
-                              variant="ghost"
-                              className="text-xs text-green-800 hover:bg-green-100 hover:text-green-900 dark:text-green-300 dark:hover:bg-green-900/40"
-                              onClick={() => atender(it)}
-                              title="Reabrir o prontuário para conferir ou imprimir segunda via"
+                              variant="outline"
+                              className="h-8 px-2 text-xs"
+                              onClick={() => setHistorico(it)}
+                              title="Ver o histórico de prontuários anteriores deste paciente"
+                              aria-label={`Histórico do prontuário de ${it.paciente_nome}`}
                             >
-                              <Eye className="h-3.5 w-3.5 mr-1.5" />
-                              Reabrir / Ver Atendimento
+                              <FileText className="h-3.5 w-3.5" />
+                              <span className="hidden lg:inline ml-1.5">Histórico</span>
                             </Button>
-                          ) : (
-                            <Button
-                              size="sm"
-                              onClick={() => atender(it)}
-                              disabled={Boolean(pag && !pag.pago)}
-                              title={
-                                pag && !pag.pago
-                                  ? "Pagamento pendente — envie ao caixa antes do atendimento"
-                                  : undefined
-                              }
-                            >
-                              <Stethoscope className="h-4 w-4" /> Atender
-                            </Button>
-                          )}
+                            {atendido ? (
+                              // Reabrir o prontuário já finalizado é o caminho da
+                              // segunda via: o paciente volta no balcão pedindo o
+                              // atestado ou a receita que perdeu.
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="text-xs text-green-800 hover:bg-green-100 hover:text-green-900 dark:text-green-300 dark:hover:bg-green-900/40"
+                                onClick={() => atender(it)}
+                                title="Reabrir o prontuário para conferir ou imprimir segunda via"
+                              >
+                                <Eye className="h-3.5 w-3.5 mr-1.5" />
+                                Reabrir / Ver Atendimento
+                              </Button>
+                            ) : (
+                              <Button
+                                size="sm"
+                                onClick={() => atender(it)}
+                                disabled={Boolean(pag && !pag.pago)}
+                                title={
+                                  pag && !pag.pago
+                                    ? "Pagamento pendente — envie ao caixa antes do atendimento"
+                                    : undefined
+                                }
+                              >
+                                <Stethoscope className="h-4 w-4" /> Atender
+                              </Button>
+                            )}
+                          </div>
                         </TableCell>
                       </TableRow>
                     );
@@ -779,6 +818,17 @@ function AtendimentoIaPage() {
           )}
         </div>
       </Card>
+
+      <HistoricoProntuarioDrawer
+        aberto={Boolean(historico)}
+        onOpenChange={(v) => {
+          if (!v) setHistorico(null);
+        }}
+        pacienteId={historico?.paciente_id ?? null}
+        pacienteNome={historico?.paciente_nome ?? ""}
+        clinicaId={clinicaAtual?.clinica_id ?? null}
+        agendamentoAtualId={historico?.id ?? null}
+      />
     </div>
   );
 }
