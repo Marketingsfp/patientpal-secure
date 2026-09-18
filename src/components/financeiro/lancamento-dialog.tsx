@@ -29,6 +29,7 @@ import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { SupervisorSenhaDialog } from "@/components/supervisor-senha-dialog";
 import { podeAutorizar } from "@/lib/autorizacao-supervisor";
+import { useAlcadasNominais } from "@/hooks/use-alcadas";
 import {
   categoriaEhRetorno,
   categoriaEhSemCobranca,
@@ -194,7 +195,13 @@ export function LancamentoDialog({
   // Quando o próprio usuário já é supervisor, dispensamos o segundo login.
   // Alçada lida da tabela única (`@/lib/autorizacao-supervisor`), a mesma que
   // a server function confere ao validar a senha.
-  const ehSupervisor = podeAutorizar("desconto", role, clinicaAtual?.pode_autorizar);
+  const { alcadas: alcadasNominais } = useAlcadasNominais();
+  const ehSupervisor = podeAutorizar(
+    "desconto",
+    role,
+    clinicaAtual?.pode_autorizar,
+    alcadasNominais,
+  );
   const [descricao, setDescricao] = useState("");
   const [valor, setValor] = useState("");
   /** Sessão de pacote já paga na venda; `null` quando não há cobertura. */

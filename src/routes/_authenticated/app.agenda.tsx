@@ -195,6 +195,7 @@ import {
   podeAutorizarSemFaturamento,
   rotuloSemFaturamento,
 } from "@/lib/agenda/sem-faturamento";
+import { useAlcadasNominais } from "@/hooks/use-alcadas";
 import {
   vaosEntreHorarios,
   vaoCobertoPelasFichas,
@@ -442,8 +443,6 @@ const normalizar = (s: string) =>
 
 // `chaveNomeAgenda` vem de @/lib/agenda/opcoes-profissional (mesma regra usada
 // pelo Financeiro).
-
-
 
 /**
  * Chave de comparação de procedimento, usada pela trava de agendamento
@@ -1939,10 +1938,13 @@ function AgendaPage() {
   // Lê a alçada da tabela única (`@/lib/autorizacao-supervisor`) em vez de
   // repetir a lista aqui: uma cópia solta acabaria divergindo do que a server
   // function e o diálogo de senha aceitam.
+  // Liberações dadas a ESTA pessoa pelo ID dela, que somam à alçada do cargo.
+  const { alcadas: alcadasNominais } = useAlcadasNominais();
   const ehSupervisorDesc = podeAutorizar(
     "desconto",
     clinicaAtual?.role,
     clinicaAtual?.pode_autorizar,
+    alcadasNominais,
   );
 
   // --- Sem faturamento: motivo obrigatório + autorização da supervisão ------
@@ -1955,6 +1957,7 @@ function AgendaPage() {
   const podeAutorizarSemFat = podeAutorizarSemFaturamento(
     clinicaAtual?.role,
     clinicaAtual?.pode_autorizar,
+    alcadasNominais,
   );
   const [semFatDlgOpen, setSemFatDlgOpen] = useState(false);
   const [semFatSupOpen, setSemFatSupOpen] = useState(false);
@@ -3079,11 +3082,17 @@ function AgendaPage() {
             .select("agendamento_id, status, resposta_acao, observacao, respondido_em, updated_at")
             .in("agendamento_id", slice);
           if (cErr) break;
-          for (const c of (cs ?? []) as unknown as Array<ConfirmacaoWa & { agendamento_id: string }>) {
+          for (const c of (cs ?? []) as unknown as Array<
+            ConfirmacaoWa & { agendamento_id: string }
+          >) {
             const prev = cMap.get(c.agendamento_id);
             // Resposta do paciente vale mais que o simples envio.
             const peso = (x: ConfirmacaoWa) => (x.respondido_em ? 2 : 1);
-            if (!prev || peso(c) > peso(prev) || (peso(c) === peso(prev) && c.updated_at > prev.updated_at)) {
+            if (
+              !prev ||
+              peso(c) > peso(prev) ||
+              (peso(c) === peso(prev) && c.updated_at > prev.updated_at)
+            ) {
               cMap.set(c.agendamento_id, c);
             }
           }
@@ -6810,83 +6819,83 @@ function AgendaPage() {
     const fechado = a.status === "realizado";
     return (
       <span className="inline-flex max-w-full items-center gap-1" title={infoWa?.texto}>
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <button
-            type="button"
-            aria-label={`Situação: ${STATUS_LABEL[a.status]}. Clique para alterar`}
-            className="inline-flex max-w-full items-center gap-0.5 rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          >
-            <Badge
-              className={`${STATUS_COR[a.status]} ${className} cursor-pointer gap-0.5`}
-              title="Clique para alterar a situação"
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button
+              type="button"
+              aria-label={`Situação: ${STATUS_LABEL[a.status]}. Clique para alterar`}
+              className="inline-flex max-w-full items-center gap-0.5 rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
-              {STATUS_LABEL[a.status]}
-              <ChevronDown className="h-3 w-3 shrink-0 opacity-80" />
-            </Badge>
-          </button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="start" className="w-60">
-          {infoWa && (
-            <>
-              <DropdownMenuItem disabled className="text-xs opacity-100">
-                <MessageCircle className="h-4 w-4 mr-2 shrink-0" /> {infoWa.texto}
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-            </>
-          )}
-          {fechado ? (
-            <DropdownMenuItem disabled>Atendimento já realizado</DropdownMenuItem>
-          ) : (
-            <>
-              <DropdownMenuItem
-                onClick={() => mudarStatus(a, "confirmado")}
-                disabled={a.status === "confirmado"}
-                className="font-semibold text-emerald-700 focus:text-emerald-800"
+              <Badge
+                className={`${STATUS_COR[a.status]} ${className} cursor-pointer gap-0.5`}
+                title="Clique para alterar a situação"
               >
-                <CheckCircle2 className="h-4 w-4 mr-2" /> Confirmado — paciente vem
-              </DropdownMenuItem>
-              {a.status !== "agendado" && (
-                <DropdownMenuItem onClick={() => mudarStatus(a, "agendado")}>
-                  <Undo2 className="h-4 w-4 mr-2" /> Voltar para agendado
+                {STATUS_LABEL[a.status]}
+                <ChevronDown className="h-3 w-3 shrink-0 opacity-80" />
+              </Badge>
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" className="w-60">
+            {infoWa && (
+              <>
+                <DropdownMenuItem disabled className="text-xs opacity-100">
+                  <MessageCircle className="h-4 w-4 mr-2 shrink-0" /> {infoWa.texto}
                 </DropdownMenuItem>
-              )}
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                onClick={() => mudarStatus(a, "faltou")}
-                disabled={a.status === "faltou"}
-                className="text-rose-700 focus:text-rose-800"
-              >
-                <UserX className="h-4 w-4 mr-2" /> Não compareceu
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() => mudarStatus(a, "cancelado", { desistencia: true })}
-                disabled={a.status === "cancelado"}
-                className="text-rose-700 focus:text-rose-800"
-              >
-                <UserMinus className="h-4 w-4 mr-2" /> Desistência
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() => mudarStatus(a, "cancelado")}
-                disabled={a.status === "cancelado"}
-                className="text-rose-700 focus:text-rose-800"
-              >
-                <CalendarX2 className="h-4 w-4 mr-2" /> Cancelado
-              </DropdownMenuItem>
-            </>
-          )}
-          {!fechado && !statusNaoVem(a.status) && (
-            <>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => enviarLembrete(a)}>
-                <MessageCircle className="h-4 w-4 mr-2 text-emerald-600" /> Enviar lembrete no
-                WhatsApp
-              </DropdownMenuItem>
-            </>
-          )}
-        </DropdownMenuContent>
-      </DropdownMenu>
-      {iconeWa}
+                <DropdownMenuSeparator />
+              </>
+            )}
+            {fechado ? (
+              <DropdownMenuItem disabled>Atendimento já realizado</DropdownMenuItem>
+            ) : (
+              <>
+                <DropdownMenuItem
+                  onClick={() => mudarStatus(a, "confirmado")}
+                  disabled={a.status === "confirmado"}
+                  className="font-semibold text-emerald-700 focus:text-emerald-800"
+                >
+                  <CheckCircle2 className="h-4 w-4 mr-2" /> Confirmado — paciente vem
+                </DropdownMenuItem>
+                {a.status !== "agendado" && (
+                  <DropdownMenuItem onClick={() => mudarStatus(a, "agendado")}>
+                    <Undo2 className="h-4 w-4 mr-2" /> Voltar para agendado
+                  </DropdownMenuItem>
+                )}
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onClick={() => mudarStatus(a, "faltou")}
+                  disabled={a.status === "faltou"}
+                  className="text-rose-700 focus:text-rose-800"
+                >
+                  <UserX className="h-4 w-4 mr-2" /> Não compareceu
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => mudarStatus(a, "cancelado", { desistencia: true })}
+                  disabled={a.status === "cancelado"}
+                  className="text-rose-700 focus:text-rose-800"
+                >
+                  <UserMinus className="h-4 w-4 mr-2" /> Desistência
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => mudarStatus(a, "cancelado")}
+                  disabled={a.status === "cancelado"}
+                  className="text-rose-700 focus:text-rose-800"
+                >
+                  <CalendarX2 className="h-4 w-4 mr-2" /> Cancelado
+                </DropdownMenuItem>
+              </>
+            )}
+            {!fechado && !statusNaoVem(a.status) && (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => enviarLembrete(a)}>
+                  <MessageCircle className="h-4 w-4 mr-2 text-emerald-600" /> Enviar lembrete no
+                  WhatsApp
+                </DropdownMenuItem>
+              </>
+            )}
+          </DropdownMenuContent>
+        </DropdownMenu>
+        {iconeWa}
       </span>
     );
   };
@@ -14262,7 +14271,6 @@ function Paginacao({
 // compartilhados com o Financeiro (Movimento de Caixa), para que as duas telas
 // mostrem exatamente a mesma lista de profissionais.
 
-
 function MedicoFiltroInput({
   medicos,
   agendasPorMedico,
@@ -14298,7 +14306,6 @@ function MedicoFiltroInput({
       }),
     [medicos, agendasPorMedico, agendasComGrade, onlyMedicoId],
   );
-
 
   // O texto do campo sai da COMBINAÇÃO profissional + tipo de agenda. Assim,
   // se a recepção mexer no filtro secundário depois de escolher uma linha

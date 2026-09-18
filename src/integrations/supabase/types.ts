@@ -14365,6 +14365,47 @@ export type Database = {
           },
         ]
       }
+      usuario_alcadas: {
+        Row: {
+          clinica_id: string
+          concedido_por: string | null
+          created_at: string
+          escopo: string
+          id: string
+          observacao: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          clinica_id: string
+          concedido_por?: string | null
+          created_at?: string
+          escopo: string
+          id?: string
+          observacao?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          clinica_id?: string
+          concedido_por?: string | null
+          created_at?: string
+          escopo?: string
+          id?: string
+          observacao?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "usuario_alcadas_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       usuario_medicos: {
         Row: {
           clinica_id: string

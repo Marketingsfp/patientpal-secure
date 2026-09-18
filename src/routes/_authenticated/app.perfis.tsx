@@ -45,6 +45,8 @@ import {
 } from "lucide-react";
 import { perfilCanonico, PRESETS, type Acesso, type PerfilKey } from "@/lib/permissoes-presets";
 import { diffDaPessoa } from "@/lib/permissoes-pessoa";
+import { ESCOPOS_AUTORIZACAO, type EscopoAutorizacao } from "@/lib/autorizacao-supervisor";
+import { Switch } from "@/components/ui/switch";
 import { SUBMODULE_PARENT } from "@/lib/permissoes-rotas";
 import { useClinicFeatureFlag } from "@/hooks/use-clinic-feature-flag";
 
@@ -710,6 +712,39 @@ function buildInitialState(todosModulos: string[]): Record<PerfilKey, Record<str
   return out;
 }
 
+/**
+ * Poderes de autorizar que podem ser dados a UMA pessoa pelo ID dela.
+ *
+ * É diferente do resto desta tela: os módulos adiante dizem quais TELAS a
+ * pessoa abre; aqui é o direito de liberar uma ação que normalmente exige a
+ * senha de um supervisor. Por isso só existe na aba "Por pessoa" — conceder
+ * por cargo é justamente o que a diretoria não quer, porque um colega marcado
+ * como gestão meses depois herdaria o poder sem ninguém perceber.
+ */
+const ALCADAS: ReadonlyArray<{ escopo: EscopoAutorizacao; nome: string; descricao: string }> = [
+  {
+    escopo: "sem_faturamento",
+    nome: "Isentar cobrança (sem faturamento)",
+    descricao:
+      "Marcar e desmarcar atendimento que o paciente paga direto ao parceiro (ex.: toxicológico), sem pedir senha de supervisor. O motivo escrito continua obrigatório.",
+  },
+  {
+    escopo: "desconto",
+    nome: "Desconto e cortesia",
+    descricao: "Abater valor ou lançar cortesia na Agenda e no Financeiro.",
+  },
+  {
+    escopo: "liberar_debito",
+    nome: "Liberar paciente em débito",
+    descricao: "Atender apesar de mensalidade ou dívida vencida.",
+  },
+  {
+    escopo: "alerta_critico",
+    nome: "Alerta crítico do paciente",
+    descricao: "Marcar ou retirar aviso jurídico no cadastro do paciente.",
+  },
+];
+
 const ROTULO_ACESSO: Record<Acesso, string> = {
   none: "Sem",
   read: "Leitura",
@@ -778,6 +813,9 @@ function PerfisPage() {
   // linhas precisam ser APAGADAS ao voltarem para o padrão do cargo.
   const [overridesSalvos, setOverridesSalvos] = useState<string[]>([]);
   const [carregandoPessoa, setCarregandoPessoa] = useState(false);
+  // Alçadas nominais da pessoa escolhida (tabela usuario_alcadas).
+  const [alcadasPessoa, setAlcadasPessoa] = useState<Set<string>>(() => new Set());
+  const [salvandoAlcada, setSalvandoAlcada] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const loadedClinicRef = useRef<string | null>(null);
@@ -907,6 +945,7 @@ function PerfisPage() {
     if (!clinicaId || !pessoaSel) {
       setOverridesPessoa({});
       setOverridesSalvos([]);
+      setAlcadasPessoa(new Set());
       return;
     }
     let cancelado = false;
@@ -926,6 +965,15 @@ function PerfisPage() {
         }
         setOverridesPessoa(mapa);
         setOverridesSalvos(Object.keys(mapa));
+
+        const { data: alc, error: alcErro } = await supabase
+          .from("usuario_alcadas")
+          .select("escopo")
+          .eq("clinica_id", clinicaId)
+          .eq("user_id", pessoaSel);
+        if (alcErro) throw alcErro;
+        if (cancelado) return;
+        setAlcadasPessoa(new Set((alc ?? []).map((r) => r.escopo)));
       } catch (e) {
         console.error("[perfis] erro carregando exceções da pessoa", e);
         toast.error("Falha ao carregar as exceções desta pessoa", {
@@ -1069,6 +1117,55 @@ function PerfisPage() {
       ...prev,
       [perfilSel]: Object.fromEntries(TODOS_MODULOS.map((k) => [k, valor])),
     }));
+  };
+
+  /**
+   * Liga ou desliga um poder de autorizar para ESTA pessoa.
+   *
+   * Grava na hora, e não junto do botão Salvar dos módulos: são coisas de
+   * naturezas diferentes (tela x poder sobre dinheiro), e misturar as duas num
+   * salvamento só faria um clique distraído conceder alçada sem querer.
+   */
+  const alternarAlcada = async (escopo: EscopoAutorizacao, ligar: boolean) => {
+    if (!podeAdministrar || !clinicaId || !pessoaSel) return;
+    setSalvandoAlcada(escopo);
+    try {
+      if (ligar) {
+        const { error } = await supabase
+          .from("usuario_alcadas")
+          .upsert(
+            { clinica_id: clinicaId, user_id: pessoaSel, escopo },
+            { onConflict: "clinica_id,user_id,escopo" },
+          );
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .from("usuario_alcadas")
+          .delete()
+          .eq("clinica_id", clinicaId)
+          .eq("user_id", pessoaSel)
+          .eq("escopo", escopo);
+        if (error) throw error;
+      }
+      setAlcadasPessoa((prev) => {
+        const proximo = new Set(prev);
+        if (ligar) proximo.add(escopo);
+        else proximo.delete(escopo);
+        return proximo;
+      });
+      toast.success(
+        ligar
+          ? (pessoa?.nome ?? "A pessoa") + " passou a autorizar esta ação sozinha."
+          : (pessoa?.nome ?? "A pessoa") + " volta a precisar da senha de um supervisor.",
+      );
+    } catch (e) {
+      console.error("[perfis] falha ao mudar alçada", e);
+      toast.error("Falha ao mudar a alçada", {
+        description: e instanceof Error ? e.message : String(e),
+      });
+    } finally {
+      setSalvandoAlcada(null);
+    }
   };
 
   /** Apaga todas as exceções: a pessoa volta a ser igual ao cargo dela. */
@@ -1341,6 +1438,56 @@ function PerfisPage() {
               )}
             </CardHeader>
           </Card>
+
+          {editandoPessoa && pessoaSel && (
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base">Pode autorizar sozinha</CardTitle>
+                <p className="text-sm text-muted-foreground">
+                  Liberações dadas só a esta pessoa. Nenhum colega do mesmo cargo herda nada daqui,
+                  nem agora nem depois — vale para o cadastro dela e para mais ninguém. Cada troca é
+                  salva na hora.
+                </p>
+              </CardHeader>
+              <CardContent className="space-y-3 pt-0">
+                {ALCADAS.map((a) => {
+                  const ligada = alcadasPessoa.has(a.escopo);
+                  // Quem já autoriza pelo cargo não precisa da liberação nominal.
+                  const jaPeloCargo =
+                    !!pessoa?.role &&
+                    (ESCOPOS_AUTORIZACAO[a.escopo] as readonly string[]).includes(pessoa.role);
+                  return (
+                    <div
+                      key={a.escopo}
+                      className="flex items-start justify-between gap-4 rounded-md border p-3"
+                    >
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium">{a.nome}</p>
+                        <p className="text-xs text-muted-foreground">{a.descricao}</p>
+                        {jaPeloCargo && (
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            Esta pessoa já autoriza pelo cargo dela, desde que esteja marcada como
+                            gestão em Cadastros › Equipe e acessos.
+                          </p>
+                        )}
+                      </div>
+                      <div className="flex shrink-0 items-center gap-2">
+                        {salvandoAlcada === a.escopo && (
+                          <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                        )}
+                        <Switch
+                          checked={ligada}
+                          disabled={!podeAdministrar || salvandoAlcada !== null}
+                          onCheckedChange={(v) => void alternarAlcada(a.escopo, v)}
+                          aria-label={a.nome}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+              </CardContent>
+            </Card>
+          )}
 
           {(editandoPessoa && !pessoaSel ? [] : GRUPOS).map((grupo) => {
             const open = openGroups[grupo.label] ?? true;

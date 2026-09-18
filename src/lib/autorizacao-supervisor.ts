@@ -49,7 +49,14 @@ export function rolesDoEscopo(escopo: EscopoAutorizacao): readonly string[] {
 /**
  * true → esta pessoa autoriza sozinha, sem precisar da senha de outra.
  *
- * São DUAS condições, e a segunda é a que importa no dia a dia desta clínica.
+ * Há DOIS caminhos. O primeiro é a liberação NOMINAL: uma linha em
+ * `usuario_alcadas` que aponta para o ID daquela pessoa e vale só para ela.
+ * Serve para quem precisa de um poder que o cargo não dá, sem ser promovida
+ * de cargo (o que arrastaria acesso a dinheiro e administração) e sem que o
+ * cargo inteiro passe a ter o poder — um colega marcado como gestão meses
+ * depois NÃO herda nada.
+ *
+ * O segundo caminho é o de sempre, por cargo, e são DUAS condições.
  * O perfil de acesso não serve como alçada aqui: são 30 pessoas com perfil de
  * administrador, porque é o perfil que dá acesso às telas administrativas.
  * Quem autoriza é decidido pessoa a pessoa, na marcação `pode_autorizar` do
@@ -63,8 +70,20 @@ export function podeAutorizar(
   escopo: EscopoAutorizacao,
   role: string | null | undefined,
   podeAutorizarMarcado: boolean | null | undefined,
+  alcadasNominais?: Iterable<string> | null,
 ): boolean {
+  if (temAlcadaNominal(escopo, alcadasNominais)) return true;
   return Boolean(podeAutorizarMarcado) && rolesDoEscopo(escopo).includes(role ?? "");
+}
+
+/** true → existe liberação nominal desta pessoa para este escopo. */
+export function temAlcadaNominal(
+  escopo: EscopoAutorizacao,
+  alcadasNominais?: Iterable<string> | null,
+): boolean {
+  if (!alcadasNominais) return false;
+  for (const e of alcadasNominais) if (e === escopo) return true;
+  return false;
 }
 
 /**

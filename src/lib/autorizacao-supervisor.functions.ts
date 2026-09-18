@@ -88,7 +88,38 @@ export const listarAutorizadores = createServerFn({ method: "POST" })
       // O cast só reconcilia o tipo: a tabela de escopos é escrita à mão com
       // os mesmos valores do enum `app_role` do banco.
       .in("role", [...rolesDoEscopo(data.escopo)] as Database["public"]["Enums"]["app_role"][]);
-    const ids = (mems ?? []).map((m: { user_id: string }) => m.user_id);
+
+    // Quem recebeu a alçada NOMINAL (tabela `usuario_alcadas`) entra na lista
+    // mesmo sem o cargo e sem a marcação de gestão: foi liberada pelo ID, uma
+    // a uma, justamente para não depender do cargo.
+    const { data: nominais } = await supabaseAdmin
+      .from("usuario_alcadas")
+      .select("user_id")
+      .eq("clinica_id", data.clinicaId)
+      .eq("escopo", data.escopo);
+    const porId = new Map<string, { user_id: string; role: string }>();
+    for (const m of (mems ?? []) as Array<{ user_id: string; role: string }>) {
+      porId.set(m.user_id, m);
+    }
+    const faltando = ((nominais ?? []) as Array<{ user_id: string }>)
+      .map((n) => n.user_id)
+      .filter((id) => !porId.has(id));
+    if (faltando.length > 0) {
+      // Só entra quem tem vínculo ATIVO: alçada de quem saiu da clínica não
+      // pode continuar aparecendo no balcão.
+      const { data: extras } = await supabaseAdmin
+        .from("clinica_memberships")
+        .select("user_id, role")
+        .eq("clinica_id", data.clinicaId)
+        .eq("ativo", true)
+        .in("user_id", faltando);
+      for (const m of (extras ?? []) as Array<{ user_id: string; role: string }>) {
+        porId.set(m.user_id, m);
+      }
+    }
+
+    const candidatos = [...porId.values()];
+    const ids = candidatos.map((m) => m.user_id);
     if (ids.length === 0) return [];
 
     const { data: profs } = await supabaseAdmin.from("profiles").select("id, nome").in("id", ids);
@@ -97,7 +128,7 @@ export const listarAutorizadores = createServerFn({ method: "POST" })
     );
 
     return (
-      (mems ?? [])
+      candidatos
         .map((m: { user_id: string; role: string }) => ({
           id: m.user_id,
           nome: (nomePorId.get(m.user_id) ?? "").trim(),
@@ -144,9 +175,18 @@ export const autorizarComSenha = createServerFn({ method: "POST" })
       .maybeSingle();
     const vinculo = mem as { role?: string; pode_autorizar?: boolean } | null;
     const role = vinculo?.role ?? null;
+    // Liberações nominais desta pessoa (tabela `usuario_alcadas`): quem
+    // recebeu a alçada pelo ID também pode ser quem autoriza a colega, e não
+    // só quem age sozinha. Falha de leitura NÃO concede — cai no cargo.
+    const { data: linhasAlcada } = await supabaseAdmin
+      .from("usuario_alcadas")
+      .select("escopo")
+      .eq("clinica_id", data.clinicaId)
+      .eq("user_id", data.supervisorId);
+    const alcadasNominais = (linhasAlcada ?? []).map((l) => (l as { escopo: string }).escopo);
     // A mesma regra da tela, conferida de novo aqui: a lista de nomes vem do
     // servidor, mas nada impede alguém de mandar outro id na chamada.
-    if (!podeAutorizar(data.escopo, role, vinculo?.pode_autorizar)) {
+    if (!podeAutorizar(data.escopo, role, vinculo?.pode_autorizar, alcadasNominais)) {
       return {
         ok: false,
         message: "Esta pessoa não tem permissão para autorizar esta ação nesta clínica.",
