@@ -1596,6 +1596,8 @@ function AppShellInner() {
 
       <AppSidebarLayout
         aberta={!isChooser && sidebarAberta}
+        modo={subsystem === "os-zap" ? "coluna" : "gaveta"}
+        onFechar={fecharSidebar}
         sidebar={!isChooser && (
           <aside
             id="menu-lateral"
