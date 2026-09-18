@@ -1864,10 +1864,10 @@ function AppShellInner() {
                   // atrás da barra inferior (que só existe abaixo de `md`).
                   "pb-28 md:pb-4 lg:pb-6",
                 ),
-            // Encosta os painéis de conversas no menu quando dividem a tela.
+            // Mantém 5 px entre o menu e os painéis de conversas quando dividem a tela.
             areaConversas &&
               "transition-[padding-left] duration-200 ease-out motion-reduce:transition-none",
-            sidebarAberta && areaConversas && "lg:pl-0",
+            sidebarAberta && areaConversas && "lg:pl-[5px]",
             uxMelhorias && "animate-in fade-in duration-200 motion-reduce:animate-none",
           )}
           style={{ background: "var(--surface-cream)" }}
