@@ -37,10 +37,14 @@ import {
   ChevronDown,
   ChevronRight,
   CornerDownRight,
+  RotateCcw,
+  UserCog,
+  Users,
   Save,
   Loader2,
 } from "lucide-react";
-import { PRESETS, type Acesso, type PerfilKey } from "@/lib/permissoes-presets";
+import { perfilCanonico, PRESETS, type Acesso, type PerfilKey } from "@/lib/permissoes-presets";
+import { diffDaPessoa } from "@/lib/permissoes-pessoa";
 import { SUBMODULE_PARENT } from "@/lib/permissoes-rotas";
 import { useClinicFeatureFlag } from "@/hooks/use-clinic-feature-flag";
 
@@ -706,6 +710,15 @@ function buildInitialState(todosModulos: string[]): Record<PerfilKey, Record<str
   return out;
 }
 
+const ROTULO_ACESSO: Record<Acesso, string> = {
+  none: "Sem",
+  read: "Leitura",
+  write: "Edição",
+};
+
+/** Uma pessoa com vínculo na clínica, para a aba "Por pessoa". */
+type Pessoa = { userId: string; nome: string; role: PerfilKey | null; roleBruto: string };
+
 function PerfisPage() {
   const { clinicaAtual } = useClinica();
   const clinicaId = clinicaAtual?.clinica_id ?? null;
@@ -751,6 +764,20 @@ function PerfisPage() {
   const [perfilIds, setPerfilIds] = useState<Record<PerfilKey, string>>(
     {} as Record<PerfilKey, string>,
   );
+  // --- Aba "Por pessoa" -------------------------------------------------
+  // `modo` escolhe o que a grade está editando: a regra do cargo (que vale
+  // para todo mundo daquele perfil) ou a exceção de UMA pessoa.
+  const [modo, setModo] = useState<"perfil" | "pessoa">("perfil");
+  const [pessoas, setPessoas] = useState<Pessoa[]>([]);
+  const [pessoaSel, setPessoaSel] = useState<string>("");
+  // Só o que está DIFERENTE do cargo. Módulo que segue o cargo não aparece
+  // aqui — é assim que mudar o perfil depois continua alcançando quem nunca
+  // foi personalizado naquele módulo.
+  const [overridesPessoa, setOverridesPessoa] = useState<Record<string, Acesso>>({});
+  // O que estava gravado quando a pessoa foi carregada, para saber quais
+  // linhas precisam ser APAGADAS ao voltarem para o padrão do cargo.
+  const [overridesSalvos, setOverridesSalvos] = useState<string[]>([]);
+  const [carregandoPessoa, setCarregandoPessoa] = useState(false);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const loadedClinicRef = useRef<string | null>(null);
@@ -831,6 +858,88 @@ function PerfisPage() {
     })();
   }, [clinicaId]);
 
+  // Lista de quem tem vínculo com a clínica. Mesmo caminho da tela "Equipe e
+  // acessos": o vínculo vem de `clinica_memberships` e o nome de `profiles`.
+  useEffect(() => {
+    if (!clinicaId || !podeAdministrar) return;
+    let cancelado = false;
+    void (async () => {
+      try {
+        const { data: mems, error } = await supabase
+          .from("clinica_memberships")
+          .select("user_id, role, ativo")
+          .eq("clinica_id", clinicaId)
+          .eq("ativo", true);
+        if (error) throw error;
+        const linhas = (mems ?? []) as Array<{ user_id: string; role: string }>;
+        const ids = [...new Set(linhas.map((l) => l.user_id))];
+        const nomes = new Map<string, string>();
+        if (ids.length > 0) {
+          const { data: profs } = await supabase.from("profiles").select("id, nome").in("id", ids);
+          for (const p of (profs ?? []) as Array<{ id: string; nome: string | null }>) {
+            if (p.nome) nomes.set(p.id, p.nome);
+          }
+        }
+        if (cancelado) return;
+        setPessoas(
+          linhas
+            .map((l) => ({
+              userId: l.user_id,
+              // Vínculo sem nome preenchido continua na lista: sumir com a
+              // pessoa esconderia justamente o cadastro que precisa de conserto.
+              nome: nomes.get(l.user_id) ?? "(sem nome cadastrado)",
+              role: perfilCanonico(l.role),
+              roleBruto: l.role,
+            }))
+            .sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR")),
+        );
+      } catch (e) {
+        console.error("[perfis] erro carregando pessoas", e);
+      }
+    })();
+    return () => {
+      cancelado = true;
+    };
+  }, [clinicaId, podeAdministrar]);
+
+  // Exceções já gravadas da pessoa escolhida.
+  useEffect(() => {
+    if (!clinicaId || !pessoaSel) {
+      setOverridesPessoa({});
+      setOverridesSalvos([]);
+      return;
+    }
+    let cancelado = false;
+    setCarregandoPessoa(true);
+    void (async () => {
+      try {
+        const { data, error } = await supabase
+          .from("usuario_permissoes")
+          .select("modulo, acesso")
+          .eq("clinica_id", clinicaId)
+          .eq("user_id", pessoaSel);
+        if (error) throw error;
+        if (cancelado) return;
+        const mapa: Record<string, Acesso> = {};
+        for (const row of (data ?? []) as Array<{ modulo: string; acesso: Acesso }>) {
+          mapa[row.modulo] = row.acesso;
+        }
+        setOverridesPessoa(mapa);
+        setOverridesSalvos(Object.keys(mapa));
+      } catch (e) {
+        console.error("[perfis] erro carregando exceções da pessoa", e);
+        toast.error("Falha ao carregar as exceções desta pessoa", {
+          description: e instanceof Error ? e.message : String(e),
+        });
+      } finally {
+        if (!cancelado) setCarregandoPessoa(false);
+      }
+    })();
+    return () => {
+      cancelado = true;
+    };
+  }, [clinicaId, pessoaSel]);
+
   const salvar = async () => {
     if (!podeAdministrar) {
       toast.error("Somente administradores podem alterar permissões.");
@@ -891,20 +1000,132 @@ function PerfisPage() {
   }, [matriz]);
 
   const totalModulos = TODOS_MODULOS.length;
-  const acessosPerfil = contagens[perfilSel];
+
+  const pessoa = useMemo(
+    () => pessoas.find((p) => p.userId === pessoaSel) ?? null,
+    [pessoas, pessoaSel],
+  );
+
+  // O que a pessoa herda do cargo dela — exatamente a mesma grade que a aba
+  // "Por cargo" mostra para aquele perfil.
+  const basePessoa = useMemo<Record<string, Acesso>>(() => {
+    if (!pessoa?.role) return Object.fromEntries(TODOS_MODULOS.map((k) => [k, "none" as Acesso]));
+    return matriz[pessoa.role] ?? {};
+  }, [pessoa, matriz, TODOS_MODULOS]);
+
+  // O que a pessoa realmente enxerga: o cargo, com as exceções por cima.
+  const efetivoPessoa = useMemo<Record<string, Acesso>>(
+    () => ({ ...basePessoa, ...overridesPessoa }),
+    [basePessoa, overridesPessoa],
+  );
+
+  const editandoPessoa = modo === "pessoa";
+  const bloqueado =
+    !podeAdministrar || loading || saving || carregandoPessoa || (modo === "pessoa" && !pessoaSel);
+  const valores = editandoPessoa ? efetivoPessoa : matriz[perfilSel];
+  const acessosMostrados = TODOS_MODULOS.filter((k) => valores[k] && valores[k] !== "none").length;
+  const totalPersonalizado = Object.keys(overridesPessoa).length;
+  // Admin não passa pela matriz em lugar nenhum do sistema (o app libera tudo
+  // para ele antes de consultar permissão). Personalizar um admin não teria
+  // efeito, e o aviso na tela evita alguém achar que fechou um acesso.
+  const pessoaEhAdmin = pessoa?.role === "admin";
 
   const setAcesso = (modulo: string, valor: Acesso) => {
+    if (editandoPessoa) {
+      setOverridesPessoa((prev) => {
+        const proximo = { ...prev };
+        // Voltou a valer o mesmo que o cargo: deixa de ser exceção.
+        if (valor === (basePessoa[modulo] ?? "none")) delete proximo[modulo];
+        else proximo[modulo] = valor;
+        return proximo;
+      });
+      return;
+    }
     setMatriz((prev) => ({
       ...prev,
       [perfilSel]: { ...prev[perfilSel], [modulo]: valor },
     }));
   };
 
+  /** Devolve um módulo ao que o cargo da pessoa manda. */
+  const voltarAoPadrao = (modulo: string) => {
+    setOverridesPessoa((prev) => {
+      const proximo = { ...prev };
+      delete proximo[modulo];
+      return proximo;
+    });
+  };
+
   const aplicarTodos = (valor: Acesso) => {
+    if (editandoPessoa) {
+      setOverridesPessoa(
+        Object.fromEntries(
+          TODOS_MODULOS.filter((k) => valor !== (basePessoa[k] ?? "none")).map((k) => [k, valor]),
+        ),
+      );
+      return;
+    }
     setMatriz((prev) => ({
       ...prev,
       [perfilSel]: Object.fromEntries(TODOS_MODULOS.map((k) => [k, valor])),
     }));
+  };
+
+  /** Apaga todas as exceções: a pessoa volta a ser igual ao cargo dela. */
+  const limparPersonalizacao = () => setOverridesPessoa({});
+
+  const salvarPessoa = async () => {
+    if (!podeAdministrar) {
+      toast.error("Somente administradores podem alterar permissões.");
+      return;
+    }
+    if (!clinicaId || !pessoaSel) return;
+    setSaving(true);
+    try {
+      // O que grava e o que apaga sai de `diffDaPessoa` (testada): vira linha
+      // no banco só o módulo diferente do cargo, e o que voltou ao padrão é
+      // APAGADO — gravar o valor igual congelaria a pessoa se o cargo mudasse.
+      const { gravar, apagar: paraApagar } = diffDaPessoa(
+        TODOS_MODULOS,
+        basePessoa,
+        efetivoPessoa,
+        overridesSalvos,
+      );
+      const paraGravar = gravar.map(({ modulo, acesso }) => ({
+        clinica_id: clinicaId,
+        user_id: pessoaSel,
+        modulo,
+        acesso,
+      }));
+      if (paraGravar.length > 0) {
+        const { error } = await supabase
+          .from("usuario_permissoes")
+          .upsert(paraGravar, { onConflict: "clinica_id,user_id,modulo" });
+        if (error) throw error;
+      }
+      if (paraApagar.length > 0) {
+        const { error } = await supabase
+          .from("usuario_permissoes")
+          .delete()
+          .eq("clinica_id", clinicaId)
+          .eq("user_id", pessoaSel)
+          .in("modulo", paraApagar);
+        if (error) throw error;
+      }
+      setOverridesSalvos(Object.keys(overridesPessoa));
+      toast.success(
+        paraGravar.length === 0
+          ? "Exceções removidas: esta pessoa voltou a seguir o cargo."
+          : `Permissões de ${pessoa?.nome ?? "pessoa"} salvas (${paraGravar.length} exceção(ões)).`,
+      );
+    } catch (e) {
+      console.error("[perfis] erro salvando exceções da pessoa", e);
+      toast.error("Falha ao salvar", {
+        description: e instanceof Error ? e.message : String(e),
+      });
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -974,35 +1195,92 @@ function PerfisPage() {
 
         <TabsContent value="permissoes" className="mt-4 space-y-4">
           <Card>
-            <CardHeader className="pb-3">
+            <CardHeader className="pb-3 space-y-3">
+              {/* Nível da configuração: a regra do cargo ou a exceção de uma
+                  pessoa. Fica antes de tudo porque muda o significado da
+                  grade inteira que vem abaixo. */}
+              <div className="space-y-1.5">
+                <Label className="text-xs uppercase tracking-wide text-muted-foreground">
+                  Configurar acesso
+                </Label>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={modo === "perfil" ? "default" : "outline"}
+                    onClick={() => setModo("perfil")}
+                  >
+                    <Users className="h-4 w-4 mr-2" />
+                    Por cargo (vale para todos)
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={modo === "pessoa" ? "default" : "outline"}
+                    onClick={() => setModo("pessoa")}
+                  >
+                    <UserCog className="h-4 w-4 mr-2" />
+                    Por pessoa (exceção)
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {editandoPessoa
+                    ? "Vale só para a pessoa escolhida. Cada módulo começa igual ao cargo dela; o que você mudar aqui passa na frente do cargo."
+                    : "Vale para todo mundo que tem este cargo, menos quem tiver exceção própria na aba Por pessoa."}
+                </p>
+              </div>
+
               <div className="flex flex-wrap items-end justify-between gap-3">
                 <div className="space-y-1.5">
                   <Label className="text-xs uppercase tracking-wide text-muted-foreground">
-                    Perfil
+                    {editandoPessoa ? "Pessoa" : "Perfil"}
                   </Label>
-                  <Select value={perfilSel} onValueChange={(v) => setPerfilSel(v as PerfilKey)}>
-                    <SelectTrigger className="w-64">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {PERFIS.map((p) => (
-                        <SelectItem key={p.key} value={p.key}>
-                          {p.nome}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  {editandoPessoa ? (
+                    <Select value={pessoaSel} onValueChange={setPessoaSel}>
+                      <SelectTrigger className="w-80">
+                        <SelectValue placeholder="Escolha o funcionário ou médico" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {pessoas.map((p) => (
+                          <SelectItem key={p.userId} value={p.userId}>
+                            {p.nome} — {PERFIS.find((x) => x.key === p.role)?.nome ?? p.roleBruto}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  ) : (
+                    <Select value={perfilSel} onValueChange={(v) => setPerfilSel(v as PerfilKey)}>
+                      <SelectTrigger className="w-64">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {PERFIS.map((p) => (
+                          <SelectItem key={p.key} value={p.key}>
+                            {p.nome}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
                 </div>
                 <div className="flex items-center gap-2">
                   <Badge variant="outline" className="text-sm">
-                    Acessos: <span className="ml-1 font-semibold">{acessosPerfil}</span> /{" "}
+                    Acessos: <span className="ml-1 font-semibold">{acessosMostrados}</span> /{" "}
                     {totalModulos}
                   </Badge>
+                  {editandoPessoa && (
+                    <Badge
+                      variant={totalPersonalizado > 0 ? "default" : "secondary"}
+                      className="text-sm"
+                    >
+                      Personalizados: {totalPersonalizado}
+                    </Badge>
+                  )}
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={() => aplicarTodos("read")}
-                    disabled={!podeAdministrar || loading || saving}
+                    disabled={bloqueado}
                   >
                     Tudo Leitura
                   </Button>
@@ -1010,7 +1288,7 @@ function PerfisPage() {
                     variant="outline"
                     size="sm"
                     onClick={() => aplicarTodos("write")}
-                    disabled={!podeAdministrar || loading || saving}
+                    disabled={bloqueado}
                   >
                     Tudo Edição
                   </Button>
@@ -1018,14 +1296,26 @@ function PerfisPage() {
                     variant="outline"
                     size="sm"
                     onClick={() => aplicarTodos("none")}
-                    disabled={!podeAdministrar || loading || saving}
+                    disabled={bloqueado}
                   >
                     Limpar
                   </Button>
+                  {editandoPessoa && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={limparPersonalizacao}
+                      disabled={bloqueado || totalPersonalizado === 0}
+                      title="Apaga todas as exceções: a pessoa volta a seguir o cargo dela"
+                    >
+                      <RotateCcw className="h-4 w-4 mr-2" />
+                      Voltar tudo ao cargo
+                    </Button>
+                  )}
                   <Button
                     size="sm"
-                    onClick={salvar}
-                    disabled={!podeAdministrar || loading || saving || !perfilIds[perfilSel]}
+                    onClick={editandoPessoa ? salvarPessoa : salvar}
+                    disabled={bloqueado || (editandoPessoa ? false : !perfilIds[perfilSel])}
                   >
                     {saving ? (
                       <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -1036,12 +1326,25 @@ function PerfisPage() {
                   </Button>
                 </div>
               </div>
+
+              {editandoPessoa && !pessoaSel && (
+                <p className="text-xs text-muted-foreground">
+                  Escolha a pessoa acima para ver e mudar o acesso dela.
+                </p>
+              )}
+              {editandoPessoa && pessoaEhAdmin && (
+                <p className="text-xs font-medium text-amber-600 dark:text-amber-500">
+                  Atenção: quem tem o cargo ADMINISTRADOR enxerga o sistema inteiro, e exceção
+                  nenhuma o limita. Para fechar um acesso desta pessoa, troque o cargo dela em
+                  Cadastros › Equipe e acessos.
+                </p>
+              )}
             </CardHeader>
           </Card>
 
-          {GRUPOS.map((grupo) => {
+          {(editandoPessoa && !pessoaSel ? [] : GRUPOS).map((grupo) => {
             const open = openGroups[grupo.label] ?? true;
-            const ativos = grupo.modulos.filter((m) => matriz[perfilSel][m.key] !== "none").length;
+            const ativos = grupo.modulos.filter((m) => valores[m.key] !== "none").length;
             return (
               <Card key={grupo.label} className="overflow-hidden">
                 <Collapsible
@@ -1077,9 +1380,13 @@ function PerfisPage() {
                       </TableHeader>
                       <TableBody>
                         {grupo.modulos.map((m) => {
-                          const val = matriz[perfilSel][m.key];
+                          const val = valores[m.key];
+                          const personalizado = editandoPessoa && m.key in overridesPessoa;
                           return (
-                            <TableRow key={m.key}>
+                            <TableRow
+                              key={m.key}
+                              className={personalizado ? "bg-primary/5" : undefined}
+                            >
                               <TableCell className={m.sub ? "pl-8 font-medium" : "font-medium"}>
                                 <span className="flex items-center gap-2">
                                   {m.sub && (
@@ -1108,12 +1415,32 @@ function PerfisPage() {
                                     automaticamente.
                                   </span>
                                 )}
+                                {personalizado && (
+                                  <span className="mt-1 flex flex-wrap items-center gap-2 text-xs">
+                                    <Badge variant="default" className="text-[10px]">
+                                      Personalizado
+                                    </Badge>
+                                    <span className="text-muted-foreground">
+                                      no cargo é &ldquo;{ROTULO_ACESSO[basePessoa[m.key] ?? "none"]}
+                                      &rdquo;
+                                    </span>
+                                    <button
+                                      type="button"
+                                      onClick={() => voltarAoPadrao(m.key)}
+                                      disabled={!podeAdministrar}
+                                      className="inline-flex items-center gap-1 underline underline-offset-2 hover:text-foreground disabled:opacity-50"
+                                    >
+                                      <RotateCcw className="h-3 w-3" />
+                                      voltar ao cargo
+                                    </button>
+                                  </span>
+                                )}
                               </TableCell>
                               <TableCell>
                                 <RadioGroup
                                   value={val}
                                   onValueChange={(v) => setAcesso(m.key, v as Acesso)}
-                                  disabled={!podeAdministrar}
+                                  disabled={!podeAdministrar || carregandoPessoa}
                                   className="flex items-center justify-end gap-4"
                                 >
                                   <label className="flex items-center gap-1.5 text-sm cursor-pointer">
@@ -1141,7 +1468,7 @@ function PerfisPage() {
             );
           })}
 
-          {loading && (
+          {(loading || carregandoPessoa) && (
             <p className="text-xs text-muted-foreground flex items-center gap-2">
               <Loader2 className="h-3 w-3 animate-spin" /> Carregando permissões…
             </p>

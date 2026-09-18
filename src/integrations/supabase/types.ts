@@ -14404,6 +14404,44 @@ export type Database = {
           },
         ]
       }
+      usuario_permissoes: {
+        Row: {
+          acesso: Database["public"]["Enums"]["modulo_acesso"]
+          clinica_id: string
+          created_at: string
+          id: string
+          modulo: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          acesso: Database["public"]["Enums"]["modulo_acesso"]
+          clinica_id: string
+          created_at?: string
+          id?: string
+          modulo: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          acesso?: Database["public"]["Enums"]["modulo_acesso"]
+          clinica_id?: string
+          created_at?: string
+          id?: string
+          modulo?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "usuario_permissoes_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       whatsapp_configs: {
         Row: {
           access_token: string | null
