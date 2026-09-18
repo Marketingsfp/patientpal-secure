@@ -32,3 +32,17 @@ Rascunho v31 inicialmente salvo e conferido na interface, com 35.313 caracteres.
 Atualização posterior no mesmo dia: o rascunho v31 passou a 36.425 caracteres com a interpretação contextual. O filtro literal de “primeiro disponível” foi retirado do fluxo ativo; a estratégia passa a ser interpretada pelo modelo com o histórico. Detalhes e validação em [Consulta da agenda pela intenção contextual](agenda-contextual-2026-09-17.md).
 
 Após implantação, publicar o rascunho e validar na homologação: pedido de consulta → escolha entre médico e primeiro disponível → resultado completo → escolha da vaga → resumo final. O envio de mensagens e a reserva continuam sujeitos ao ambiente e às regras já existentes.
+
+## Ativação e reforço da regra — 17/09, 18:22
+
+A investigação do caso “Boa tarde tem atendimento com oftalmologista?” confirmou que o atendimento ainda usava a v30. A oferta das duas alternativas existia no rascunho v31, sem efeito no runtime. A prévia do servidor já disponibilizava `consultar_primeiro_disponivel` no mesmo registro de ferramentas do atendimento.
+
+A CONV-07 foi reforçada como regra essencial: depois de confirmar o atendimento e apresentar os profissionais, a Nina oferece escolher um profissional OU consultar o primeiro disponível. A regra também vale para perguntas iniciais sobre existir atendimento, sem exigir a expressão “quero agendar”. Perguntar apenas “Qual profissional você prefere?” não cumpre a regra. Preferências já informadas são respeitadas; encaminhamentos obrigatórios do catálogo continuam prevalecendo.
+
+O texto foi salvo e publicado pela Arquitetura como **v32, às 18:22, para todas as clínicas**, preservando o restante das instruções e o histórico. O conteúdo persistido foi conferido após recarregar a página. A cópia usada como fallback no código recebeu o mesmo ajuste.
+
+Validação com o modelo real em novo ciclo do Paciente Teste 10: a pergunta da imagem recebeu os dois blocos de profissionais e terminou com “Você prefere escolher um dos profissionais ou quer que eu consulte o primeiro disponível, com a data e o horário mais próximos?”. Os detalhes técnicos registraram prompt 32, consulta à base e geração pelo modelo. O teste ficou na homologação, sem envio ao WhatsApp.
+
+Na continuação “O primeiro disponível, por favor.”, a execução registrou `consultar_primeiro_disponivel` concluída e a resposta apresentou médico, dia/data, horário, modalidade com antecedência e valores por forma de pagamento. Não houve confirmação nem gravação de agendamento. O ciclo de teste foi encerrado ao final, mantendo o histórico para auditoria.
+
+Passaram também 170 testes automatizados: montagem e precedência do prompt, contexto e executor de agenda, publicação e atualização do cache. Esses testes usam dependências simuladas; a confirmação da redação acima veio da homologação com o modelo real.

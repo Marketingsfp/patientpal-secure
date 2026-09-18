@@ -55,7 +55,8 @@ export function statusPresenca(p: {
   vistoEm?: string | null | undefined;
   emPausa: boolean;
 }): PresencaAtendente {
-  if (p.emPausa) return "PAUSA";
+  // Pausa livre não cria o registro legado com motivo; a escolha manual basta.
+  if (p.emPausa || (p.status ?? "").toUpperCase() === "PAUSA") return "PAUSA";
   if ((p.status ?? "").toUpperCase() === "ONLINE") return "ONLINE";
   return "OFFLINE";
 }

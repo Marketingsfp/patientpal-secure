@@ -15,10 +15,13 @@ import {
   type CategoriaAtencao,
   type ItemAtencao,
   type LinhaFila,
+  type PausaAtencao,
   type ResumoAtencao,
 } from "@/lib/atendimento/central-atencao";
 import { formatarEspera } from "@/lib/atendimento/espera";
 import { criarAgrupador } from "@/lib/atendimento/realtime-roteador";
+import { ouvirOutrasAbas } from "@/lib/atendimento/presenca-sync";
+import { AtendentesEmPausa } from "./AtendentesEmPausa";
 import { cn } from "@/lib/utils";
 
 const VAZIO: ResumoAtencao = {
@@ -56,6 +59,7 @@ export function CentralAtencao() {
     espera: Record<string, string>;
     nomes: Record<string, string | null>;
     globalSemDetalhes: number;
+    pausas: PausaAtencao[];
   } | null>(null);
   const sequenciaCarga = useRef(0);
   const [agora, setAgora] = useState(() => Date.now());
@@ -84,7 +88,16 @@ export function CentralAtencao() {
   useEffect(() => {
     void carregar();
     const t = setInterval(() => void carregar(), 30_000);
-    return () => clearInterval(t);
+    const reconferir = () => {
+      if (document.visibilityState === "visible") void carregar();
+    };
+    window.addEventListener("online", reconferir);
+    document.addEventListener("visibilitychange", reconferir);
+    return () => {
+      clearInterval(t);
+      window.removeEventListener("online", reconferir);
+      document.removeEventListener("visibilitychange", reconferir);
+    };
   }, [carregar]);
 
   useEffect(() => {
@@ -103,9 +116,16 @@ export function CentralAtencao() {
     [carregar],
   );
   useEffect(() => () => atualizarEmTempoReal.cancelar(), [atualizarEmTempoReal]);
+  useEffect(
+    () =>
+      ouvirOutrasAbas((presenca) => {
+        if (presenca.clinicaId === clinicaId) atualizarEmTempoReal.agendar();
+      }),
+    [clinicaId, atualizarEmTempoReal],
+  );
 
   useRealtimeRefresh(
-    ["atend_conversas", "whatsapp_mensagens", "atend_conversa_eventos"],
+    ["atend_conversas", "whatsapp_mensagens", "atend_conversa_eventos", "atend_agente_presenca"],
     () => {
       atualizarEmTempoReal.agendar();
     },
@@ -127,6 +147,10 @@ export function CentralAtencao() {
         : VAZIO,
     [clinicaId, chaveContexto, dados, agora],
   );
+
+  const pausas = dados?.chave === chaveContexto ? (dados.pausas ?? []) : [];
+  const idsEmPausa = new Set(pausas.map((pausa) => pausa.atendenteId));
+  const filasSemPausa = resumo.filasIndividuais.filter((fila) => !idsEmPausa.has(fila.atendenteId));
 
   // Lista mostrada: prioridades gerais (8 primeiras) ou a categoria escolhida.
   const lista = useMemo(() => {
@@ -158,6 +182,13 @@ export function CentralAtencao() {
     setCategoria((atual) => (atual === c ? null : c));
   };
 
+  const alternarAtendente = (atendente: { id: string; nome: string }) => {
+    const limpar =
+      categoria === "nao_atribuida_individual" && atendenteSelecionada?.id === atendente.id;
+    setCategoria(limpar ? null : "nao_atribuida_individual");
+    setAtendenteSelecionada(limpar ? null : atendente);
+  };
+
   const abrirConversa = (id: string) => {
     pedirAbrirConversa({ conversaId: id });
     setAberto(false);
@@ -170,7 +201,13 @@ export function CentralAtencao() {
   const rotulo = rotuloCentral(resumo);
 
   return (
-    <Popover open={aberto} onOpenChange={setAberto}>
+    <Popover
+      open={aberto}
+      onOpenChange={(abrir) => {
+        setAberto(abrir);
+        if (abrir) void carregar();
+      }}
+    >
       <PopoverTrigger asChild>
         <button
           type="button"
@@ -216,7 +253,10 @@ export function CentralAtencao() {
         </button>
       </PopoverTrigger>
 
-      <PopoverContent align="start" className="w-[340px] p-0">
+      <PopoverContent
+        align="start"
+        className="max-h-[var(--radix-popover-content-available-height)] w-[340px] max-w-[calc(100vw-1rem)] overflow-y-auto p-0"
+      >
         <div className="border-b border-border px-3 py-2">
           <p className="text-sm font-semibold">Central de Atenção</p>
           <p className="text-[11px] text-muted-foreground" aria-live="polite">
@@ -227,13 +267,21 @@ export function CentralAtencao() {
         </div>
 
         <div className="p-2">
-          {resumo.filasIndividuais.length > 0 && (
+          <AtendentesEmPausa
+            pausas={pausas}
+            filas={resumo.filasIndividuais}
+            selecionada={
+              categoria === "nao_atribuida_individual" ? atendenteSelecionada?.id : undefined
+            }
+            onSelecionar={alternarAtendente}
+          />
+          {filasSemPausa.length > 0 && (
             <div className="mb-1">
               <p className="px-2 py-1 text-[11px] font-semibold text-muted-foreground">
                 Não atribuídas individuais
               </p>
               <div className="max-h-48 overflow-y-auto">
-                {resumo.filasIndividuais.map((fila) => (
+                {filasSemPausa.map((fila) => (
                   <LinhaCategoria
                     key={fila.atendenteId}
                     cor="ambar"
@@ -244,15 +292,7 @@ export function CentralAtencao() {
                       categoria === "nao_atribuida_individual" &&
                       atendenteSelecionada?.id === fila.atendenteId
                     }
-                    onClick={() => {
-                      const limpar =
-                        categoria === "nao_atribuida_individual" &&
-                        atendenteSelecionada?.id === fila.atendenteId;
-                      setCategoria(limpar ? null : "nao_atribuida_individual");
-                      setAtendenteSelecionada(
-                        limpar ? null : { id: fila.atendenteId, nome: fila.nome },
-                      );
-                    }}
+                    onClick={() => alternarAtendente({ id: fila.atendenteId, nome: fila.nome })}
                   />
                 ))}
               </div>

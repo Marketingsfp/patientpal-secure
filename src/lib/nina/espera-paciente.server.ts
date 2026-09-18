@@ -8,6 +8,9 @@
  */
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { conversaResolvida } from "@/lib/atendimento/ciclo-responsabilidade";
+import { reservaDaSessaoAtual } from "./agendamento-sessao";
+import { normalizarEstado } from "./fluxo-estado-normalizar";
+import { filtrosVersaoFluxo } from "./fluxo-estado-versao";
 import {
   avaliarEsperaPaciente,
   calcularPrazoEspera,
@@ -63,12 +66,19 @@ export async function registrarEsperaAposRespostaNina(args: {
       conversaResolvida(conversa)
     )
       return semEspera;
+    const estado = normalizarEstado(conversa.nina_fluxo_estado);
+    // Agendamento comprovado e transferência encerram a espera da Nina.
+    // Texto de confirmação sozinho não comprova reserva nem encaminhamento.
+    if (reservaDaSessaoAtual(estado) || estado.flow.stage === "HANDOFF") {
+      await limparEsperaPaciente(args.clinicaId, args.conversaId, {
+        ultimaMsgEm: conversa.ultima_msg_em,
+        estadoFluxo: conversa.nina_fluxo_estado,
+        deadline: conversa.patient_response_deadline,
+      });
+      return semEspera;
+    }
     const ultima = await ultimaMensagemDaConversa(args.clinicaId, args.conversaId);
     if (!mensagemEnviadaPelaNina(ultima)) return semEspera;
-    const estado = conversa.nina_fluxo_estado as {
-      session_id?: string;
-      session_started_at?: string;
-    } | null;
     if (
       estado?.session_started_at &&
       Date.parse(ultima!.created_at) < Date.parse(estado.session_started_at)
@@ -100,9 +110,10 @@ export async function registrarEsperaAposRespostaNina(args: {
       .is("atribuida_user_id", null)
       .eq("ultima_msg_em", conversa.ultima_msg_em)
       .not("status", "in", '("closed","finished","resolved","resolvida","fechada","encerrada")');
-    atualizacao = estado?.session_id
-      ? atualizacao.eq("nina_fluxo_estado->>session_id", estado.session_id)
-      : atualizacao.is("nina_fluxo_estado->>session_id", null);
+    // A reserva pode terminar entre a leitura e este UPDATE, na mesma sessão.
+    for (const [campo, valor] of filtrosVersaoFluxo(conversa.nina_fluxo_estado)) {
+      atualizacao = valor === null ? atualizacao.is(campo, null) : atualizacao.eq(campo, valor);
+    }
     atualizacao = conversa.patient_response_deadline
       ? atualizacao.eq("patient_response_deadline", conversa.patient_response_deadline)
       : atualizacao.is("patient_response_deadline", null);
@@ -122,6 +133,7 @@ export async function registrarEsperaAposRespostaNina(args: {
 
 export type MensagemEspera = {
   id: string;
+  wa_message_id?: string | null;
   direction: string;
   enviada_por: string | null;
   status: string | null;
@@ -136,7 +148,7 @@ export async function ultimaMensagemDaConversa(
 ): Promise<MensagemEspera | null> {
   const { data, error } = await supabaseAdmin
     .from("whatsapp_mensagens")
-    .select("id,direction,enviada_por,status,created_at,body")
+    .select("id,wa_message_id,direction,enviada_por,status,created_at,body")
     .eq("clinica_id", clinicaId)
     .eq("conversa_id", conversaId)
     .neq("status", "system")
@@ -153,18 +165,22 @@ export function mensagemEnviadaPelaNina(m: MensagemEspera | null): boolean {
     !!m &&
     m.direction === "out" &&
     m.enviada_por === "nina" &&
+    // Na homologação o aviso aparece como Nina, mas é uma saída transacional.
+    // A identificação persistida também cobre os avisos históricos sem alterar o texto.
+    !m.wa_message_id?.startsWith("handoff-") &&
     ["sent", "delivered", "read"].includes(m.status ?? "")
   );
 }
 
-/** Paciente respondeu, conversa foi resolvida ou assumida: prazo cai. */
+/** Paciente respondeu, concluiu agendamento, resolveu ou assumiu: prazo cai. */
 export async function limparEsperaPaciente(
   clinicaId: string,
   conversaId: string | null,
+  versao?: { ultimaMsgEm: string; estadoFluxo: unknown; deadline: string | null },
 ): Promise<void> {
   if (!conversaId) return;
   try {
-    await supabaseAdmin
+    let atualizacao = supabaseAdmin
       .from("atend_conversas")
       .update({
         awaiting_patient_since: null,
@@ -172,6 +188,19 @@ export async function limparEsperaPaciente(
       } as never)
       .eq("id", conversaId)
       .eq("clinica_id", clinicaId);
+    // Limpezas baseadas em uma leitura antiga não podem cancelar outra espera.
+    if (versao) {
+      atualizacao = atualizacao.eq("ultima_msg_em", versao.ultimaMsgEm);
+      atualizacao =
+        versao.deadline == null
+          ? atualizacao.is("patient_response_deadline", null)
+          : atualizacao.eq("patient_response_deadline", versao.deadline);
+      for (const [campo, valor] of filtrosVersaoFluxo(versao.estadoFluxo)) {
+        atualizacao = valor === null ? atualizacao.is(campo, null) : atualizacao.eq(campo, valor);
+      }
+    }
+    const { error } = await atualizacao;
+    if (error) throw error;
   } catch (e) {
     console.error("[nina-espera] falha ao limpar prazo", e);
   }
@@ -241,16 +270,17 @@ export async function timeoutPendenteConfirmado(args: {
 }): Promise<boolean> {
   const { data, error } = await supabaseAdmin
     .from("atend_conversas")
-    .select("patient_response_deadline, status")
+    .select("patient_response_deadline, status, nina_fluxo_estado")
     .eq("id", args.conversaId)
     .eq("clinica_id", args.clinicaId)
     .maybeSingle();
   if (error || !data) return false;
-  const linha = data as { patient_response_deadline?: string | null; status?: string | null };
+  const linha = data;
   const encerrada = ["resolvida", "fechada", "closed", "resolved"].includes(
     String(linha.status ?? "").toLowerCase(),
   );
-  if (encerrada) return false;
+  const estado = normalizarEstado(linha.nina_fluxo_estado);
+  if (encerrada || reservaDaSessaoAtual(estado) || estado.flow.stage === "HANDOFF") return false;
   return timeoutAindaValido({
     deadlineAtual: linha.patient_response_deadline ?? null,
     deadlineEsperado: args.deadlineEsperado ?? null,

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import { carregarDadosCentralAtencao } from "./central-atencao.server";
 import { calcularAtencao } from "./central-atencao";
+import { consultarInicioCronometroPausa } from "./cronometro-pausa.server";
 
 /** Cliente de consulta em memória: executa os filtros, paginação e head/count. */
 function bancoTeste(gestor: boolean) {
@@ -10,8 +11,20 @@ function bancoTeste(gestor: boolean) {
     { id: "bia", nome: "Bia" },
   ];
   const esperas: { conversa_id: string; aguardando_desde: string }[] = [];
+  const presencas: Record<string, any>[] = [];
+  const membros: Record<string, any>[] = [];
+  const historico: Record<string, any>[] = [];
+  const tabelas: Record<string, Record<string, any>[]> = {
+    profiles: perfis,
+    atend_conversas: conversas,
+    atend_agente_presenca: presencas,
+    clinica_memberships: membros,
+    atend_presenca_manual_log: historico,
+  };
   const paginas: string[] = [];
+  const leiturasGestao: string[] = [];
   let falharDepoisDe: string | null = null;
+  let erroGestao = false;
   function condicao(expressao: string) {
     const [campo, op, ...resto] = expressao.split(".");
     const valor = resto.join(".");
@@ -25,12 +38,15 @@ function bancoTeste(gestor: boolean) {
   const client = {
     rpc: async (nome: string) => ({
       data: nome === "can_manage_clinica" ? gestor : esperas,
-      error: null,
+      error:
+        nome === "can_manage_clinica" && erroGestao ? { message: "permissão indisponível" } : null,
     }),
     from: (tabela: string) => {
       const filtro: ((r: Record<string, any>) => boolean)[] = [];
       let limite = Infinity;
       let ordenar = "";
+      let ascendente = true;
+      let unica = false;
       let head = false;
       let cursor = "";
       const query = {
@@ -60,13 +76,22 @@ function bancoTeste(gestor: boolean) {
           filtro.push((r) => valores.includes(r[campo]));
           return query;
         },
-        gt(campo: string, valor: string) {
-          cursor = valor;
+        gt(campo: string, valor: string | number) {
+          if (campo === "id") cursor = String(valor);
           filtro.push((r) => r[campo] > valor);
           return query;
         },
-        order(campo: string) {
+        lte(campo: string, valor: number) {
+          filtro.push((r) => r[campo] <= valor);
+          return query;
+        },
+        order(campo: string, options?: { ascending: boolean }) {
           ordenar = campo;
+          ascendente = options?.ascending !== false;
+          return query;
+        },
+        maybeSingle() {
+          unica = true;
           return query;
         },
         limit(n: number) {
@@ -79,11 +104,19 @@ function bancoTeste(gestor: boolean) {
             return Promise.resolve(
               resolve({ data: null, error: { message: "consulta indisponível" } }),
             );
-          const rows = (tabela === "profiles" ? perfis : conversas)
+          const rows = (tabelas[tabela] ?? [])
             .filter((r) => filtro.every((f) => f(r)))
-            .sort((a, b) => String(a[ordenar]).localeCompare(String(b[ordenar])));
+            .sort(
+              (a, b) =>
+                (a[ordenar] < b[ordenar] ? -1 : a[ordenar] > b[ordenar] ? 1 : 0) *
+                (ascendente ? 1 : -1),
+            );
           return Promise.resolve(
-            resolve({ data: head ? null : rows.slice(0, limite), count: rows.length, error: null }),
+            resolve({
+              data: head ? null : unica ? (rows[0] ?? null) : rows.slice(0, limite),
+              count: rows.length,
+              error: null,
+            }),
           );
         },
       };
@@ -106,11 +139,40 @@ function bancoTeste(gestor: boolean) {
     conversas,
     esperas,
     paginas,
+    presencas,
+    membros,
+    historico,
+    leiturasGestao,
+    presenca: (userId: string, estado: string, versao = 2, clinica = "clinica", ativo = true) => {
+      membros.push({ clinica_id: clinica, user_id: userId, ativo });
+      presencas.push({
+        clinica_id: clinica,
+        user_id: userId,
+        estado_manual: estado,
+        estado_manual_versao: versao,
+      });
+    },
+    inicioSidebar: (userId: string, versao: number) =>
+      consultarInicioCronometroPausa(client as never, {
+        clinicaId: "clinica",
+        userId,
+        estado: "PAUSA",
+        versao,
+      }),
     add,
     falharPagina: (id: string) => {
       falharDepoisDe = id;
     },
-    carregar: () => carregarDadosCentralAtencao(client as never, "clinica", "ana"),
+    falharGestao: () => {
+      erroGestao = true;
+    },
+    carregar: () =>
+      carregarDadosCentralAtencao(client as never, "clinica", "ana", {
+        from(tabela: string) {
+          leiturasGestao.push(tabela);
+          return client.from(tabela);
+        },
+      } as never),
   };
 }
 
@@ -170,5 +232,73 @@ describe("consulta da Central de Atenção", () => {
     for (let i = 0; i < 501; i++) db.add(String(i).padStart(4, "0"));
     db.falharPagina("0499");
     await expect(db.carregar()).rejects.toThrow("consulta indisponível");
+  });
+
+  it("inclui pausadas com zero e dez pendências, sem misturar ativas, Nina e fechadas", async () => {
+    const db = bancoTeste(true);
+    db.presenca("bia", "PAUSA");
+    db.presenca("ana", "PAUSA");
+    db.presenca("online", "ONLINE");
+    db.presenca("offline", "OFFLINE");
+    db.presenca("outra", "PAUSA", 2, "outra-clinica");
+    db.presenca("inativa", "PAUSA", 2, "clinica", false);
+    for (let i = 0; i < 10; i++) db.add(`a${i}`, { atribuida_user_id: "ana", fila_pendente: true });
+    db.add("ativa", { atribuida_user_id: "ana", fila_pendente: false });
+    db.add("fechada", { atribuida_user_id: "ana", fila_pendente: true, status: "closed" });
+    db.add("nina", { atribuida_user_id: "ana", fila_pendente: true, owner_type: "AI" });
+    const dados = await db.carregar();
+    expect(dados.pausas.map((p) => p.nome)).toEqual(["Ana", "Bia"]);
+    const resumo = calcularAtencao({ ...dados, naoAtribuidas: dados.filas });
+    expect(
+      dados.pausas.map(
+        (p) => resumo.filasIndividuais.find((f) => f.atendenteId === p.atendenteId)?.total ?? 0,
+      ),
+    ).toEqual([10, 0]);
+    expect(resumo.total).toBe(10); // Pessoas em pausa não inflam o contador de conversas.
+  });
+
+  it("atendente recebe só a própria pausa, mesmo sem conversas; gestão vê a equipe", async () => {
+    const db = bancoTeste(false);
+    db.presenca("ana", "PAUSA");
+    db.presenca("bia", "PAUSA");
+    const dados = await db.carregar();
+    expect(dados.pausas).toEqual([{ atendenteId: "ana", nome: "Ana", inicio: null }]);
+    expect(dados.filas).toEqual([]);
+    expect(db.leiturasGestao).toEqual([]);
+  });
+
+  it("não consulta histórico privilegiado quando a verificação de gestão falha", async () => {
+    const db = bancoTeste(true);
+    db.presenca("bia", "PAUSA");
+    db.falharGestao();
+    await expect(db.carregar()).rejects.toThrow("permissão indisponível");
+    expect(db.leiturasGestao).toEqual([]);
+    expect(db.paginas).toEqual([]);
+  });
+
+  it("usa exatamente o início da sidebar, conserva pausa por Offline e reinicia só após Online", async () => {
+    const db = bancoTeste(true);
+    db.presenca("ana", "PAUSA", 5);
+    const estados = ["ONLINE", "PAUSA", "PAUSA", "OFFLINE", "PAUSA", "ONLINE", "PAUSA"];
+    estados.forEach((estado, i) =>
+      db.historico.push({
+        clinica_id: "clinica",
+        user_id: "ana",
+        estado,
+        versao: i + 1,
+        created_at: `2026-09-17T10:0${i}:00Z`,
+      }),
+    );
+    const antes = (await db.carregar()).pausas[0];
+    expect(antes.inicio).toBe("2026-09-17T10:01:00Z");
+    expect(antes.inicio).toBe(await db.inicioSidebar("ana", 5));
+    expect(db.leiturasGestao).toEqual(["atend_presenca_manual_log", "atend_presenca_manual_log"]);
+    db.presencas[0].estado_manual = "ONLINE";
+    db.presencas[0].estado_manual_versao = 6;
+    expect((await db.carregar()).pausas).toEqual([]);
+    db.presencas[0].estado_manual = "PAUSA";
+    db.presencas[0].estado_manual_versao = 7;
+    expect((await db.carregar()).pausas[0].inicio).toBe(await db.inicioSidebar("ana", 7));
+    expect((await db.carregar()).pausas[0].inicio).toBe("2026-09-17T10:06:00Z");
   });
 });

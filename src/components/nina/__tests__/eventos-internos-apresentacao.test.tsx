@@ -10,6 +10,7 @@ import { textoMarcadorSistema } from "@/lib/atendimento/marcador-handoff";
 import { marcadorInternoSistema } from "@/lib/nina/inspecao-mensagem";
 import { agruparTimeline, type GrupoHandoff } from "@/lib/atendimento/timeline-grupos";
 import { blocosVisiveis, normalizarResumo } from "@/lib/atendimento/handoff-resumo";
+import { MOTIVO_SEM_REGISTRO } from "@/lib/nina/catalogo-sem-registro";
 
 const erroOriginal =
   'MISSING_REQUIRED_SOURCE: informação exige fonte oficial — Confiabilidade insuficiente (bloqueio UNGROUNDED_CLAIM): ENTIDADE_AMBIGUA — {"ambiguos":[{"campo":"procedimento","opcoes":["Consulta Clínico Geral"]}]}';
@@ -27,6 +28,26 @@ const renderizar = (ev: ConversaEvento) =>
   renderToStaticMarkup(<ConversationSystemEvent evento={ev} />);
 
 describe("Apresentação dos registros internos para atendimento real e homologação", () => {
+  test("consulta ausente na base informa a causa no banner e no grupo, preservando o diagnóstico", () => {
+    const ev = evento({ motivo: MOTIVO_SEM_REGISTRO });
+    const antes = structuredClone(ev);
+    const motivo =
+      "A Nina não encontrou a consulta ou o procedimento solicitado na base de conhecimentos.";
+    const html = renderizar(ev);
+    expect(html).toContain(motivo);
+    expect(html).not.toContain("CATALOGO_SEM_REGISTRO");
+    const grupo = agruparTimeline({ eventos: [ev] }).itens[0] as GrupoHandoff;
+    expect(renderToStaticMarkup(<HandoffGroupCard grupo={grupo} />)).toContain(motivo);
+    expect(ev).toEqual(antes);
+    expect(grupo.motivo).toBe(MOTIVO_SEM_REGISTRO);
+  });
+  test("ausência registrada prevalece sobre código genérico, sem inventar ausência em falhas técnicas", () => {
+    expect(motivoParaAtendimento(`TOOL_ERROR: ${MOTIVO_SEM_REGISTRO}`)).toContain("não encontrou");
+    expect(motivoParaAtendimento("LLM_ERROR: consulta indisponível")).not.toContain(
+      "não encontrou",
+    );
+    expect(motivoParaAtendimento("MISSING_REQUIRED_SOURCE")).not.toContain("não encontrou");
+  });
   test("caso da imagem: mantém encaminhamento, oculta códigos e JSON sem mudar registro", () => {
     const ev = evento();
     const antes = structuredClone(ev);

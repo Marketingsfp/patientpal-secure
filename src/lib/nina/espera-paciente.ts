@@ -1,9 +1,10 @@
 /**
  * FASE 1 — ESPERA DO PACIENTE (regras puras, sem banco).
  *
- * Toda mensagem enviada pela Nina inicia 30 minutos de espera. O conteúdo
+ * Sem agendamento concluído na sessão, mensagens da Nina iniciam 30 minutos. O conteúdo
  * não decide o encaminhamento: só a ausência de retorno e a responsabilidade
- * exclusiva da Nina. Conversas encerradas ou humanas são excluídas no servidor.
+ * exclusiva da Nina. Conversas encerradas, humanas ou com reserva comprovada
+ * na sessão são excluídas no servidor, independentemente do texto enviado.
  */
 
 export const TIMEOUT_RESPOSTA_PACIENTE_PADRAO_MINUTOS = 30;

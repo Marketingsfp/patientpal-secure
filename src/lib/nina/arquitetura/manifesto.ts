@@ -618,7 +618,7 @@ export const NODES_ARQUITETURA: NodeArquitetura[] = [
     nome: "Espera pela resposta do paciente",
     categoria: "PROCESSAMENTO",
     descricao:
-      "Após cada mensagem enviada pela Nina, inicia 30 minutos sem retorno do paciente, somente enquanto a conversa estiver exclusivamente com ela.",
+      "Após cada mensagem enviada pela Nina, inicia 30 minutos sem retorno do paciente enquanto a conversa estiver exclusivamente com ela, exceto se houver agendamento comprovado na sessão atual.",
     arquivo: "src/lib/nina/espera-paciente.server.ts",
     entrada: "Resposta enviada",
     saida: "Espera registrada",
@@ -632,7 +632,7 @@ export const NODES_ARQUITETURA: NodeArquitetura[] = [
     nome: "Tempo de espera esgotado",
     categoria: "PROCESSAMENTO",
     descricao:
-      "O job periódico encaminha para a equipe após 30 minutos sem retorno à última mensagem da Nina. Revalida mensagem, sessão e responsável antes de transferir.",
+      "O job periódico encaminha para a equipe após 30 minutos sem retorno à última mensagem da Nina. Agendamento comprovado na sessão dispensa a transferência e cancela o prazo. Revalida mensagem, sessão, estado e responsável antes de transferir.",
     arquivo: "src/lib/nina/espera-timeout.server.ts",
     funcao: "processarTimeoutsEsperaPaciente",
     entrada: "Conversas em espera",

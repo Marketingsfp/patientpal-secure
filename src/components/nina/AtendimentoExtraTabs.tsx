@@ -20,10 +20,7 @@ import type { EstadoManualPresenca } from "@/lib/atendimento/presenca-manual";
 import type {
   ResultadoPresencaDistribuicao,
 } from "@/lib/atendimento/distribuicao-contrato";
-import {
-  avisoPresencaConfirmada,
-  type AvisoDistribuicao,
-} from "@/components/nina/distribuicao-fila-ui";
+import { avisoPresencaConfirmada } from "@/components/nina/distribuicao-fila-ui";
 import {
   CONTROLE_INICIAL,
   aoCarregar as presAoCarregar,
@@ -247,6 +244,7 @@ import {
   estadoDeEscopoLegado,
   lerValorEscopo,
   ordemVisualizacao,
+  ordenarAtendentesNoFiltro,
   rotuloEscopo,
   statusConsulta,
   valorEscopoControle,
@@ -287,6 +285,8 @@ import {
   filtrarPorEscopo,
   idsQueSairam,
   selecaoDeveSair,
+  podeRevalidarChatDaFila,
+  chatContinuaAposPrimeiraResposta,
   type ContadoresInbox,
 } from "@/lib/atendimento/inbox-cache";
 
@@ -399,6 +399,7 @@ export function AtendInbox() {
   const [souGestor, setSouGestor] = useState(false);
   // Busca dentro do seletor de atendente (só filtra o que a lista mostra).
   const [buscaAtendente, setBuscaAtendente] = useState("");
+  const [menuAtendentesAberto, setMenuAtendentesAberto] = useState(false);
   // Administrador acompanha tudo, mas não atende: só supervisão.
   const [souAdmin, setSouAdmin] = useState(false);
   const [perfilLeitura, setPerfilLeitura] = useState<{ chave: string; permitida: boolean } | null>(null);
@@ -459,8 +460,9 @@ export function AtendInbox() {
 
   const atendentesFiltrados = useMemo(() => {
     const termo = normalizarNomeBusca(buscaAtendente);
-    if (!termo) return usuarios;
-    return usuarios.filter((u: any) => normalizarNomeBusca(String(u.nome ?? "")).includes(termo));
+    const ordenados = ordenarAtendentesNoFiltro(usuarios);
+    if (!termo) return ordenados;
+    return ordenados.filter((u: any) => normalizarNomeBusca(String(u.nome ?? "")).includes(termo));
   }, [usuarios, buscaAtendente]);
   const nomeAtendenteSelecionado = useMemo(
     () => usuarios.find((u: any) => u.user_id === atendenteEscolhidoId)?.nome ?? null,
@@ -893,12 +895,6 @@ export function AtendInbox() {
     return r;
   };
 
-  const mostrarResultadoDistribuicao = (aviso: AvisoDistribuicao) => {
-    if (aviso.tom === "erro") toast.error(aviso.texto);
-    else if (aviso.tom === "aviso") toast.warning(aviso.texto);
-    else toast.success(aviso.texto);
-  };
-
   // A gravação atômica também termina uma pausa, sem passagem transitória por Online.
   const gravarPresencaManual = async (estado: EstadoManualPresenca) => {
     if (!clinicaId) return null;
@@ -917,7 +913,10 @@ export function AtendInbox() {
     try {
       const r = await gravarPresencaManual(alvo);
       if (!r) return;
-      mostrarResultadoDistribuicao(avisoPresencaConfirmada(r.estado, r.distribuicao));
+      // A confirmação já aparece em Meu status; só uma falha real exige aviso.
+      if (r.distribuicao.status === "erro") {
+        toast.error(avisoPresencaConfirmada(r.estado, r.distribuicao).texto);
+      }
       if (alvo === "ONLINE") await carregarConvs();
     } catch (e: any) {
       setControle((c) => presAoFalhar(c, e?.message ?? "Não foi possível salvar a presença."));
@@ -1020,15 +1019,30 @@ export function AtendInbox() {
       // realmente pertence a este filtro, mesmo que um evento em tempo real
       // traga uma conversa que acabou de mudar de responsável.
       const ctxEscopo = {
+        clinicaId,
         escopo,
         userId: meuId,
         gestor: souGestor,
         atendenteId: atendenteSelecionadoId,
       };
       const rows = filtrarPorEscopo(brutas as any[], ctxEscopo);
-      // A conversa aberta deixou de pertencer a este filtro (transferida,
-      // devolvida à fila, resolvida ou reaberta com a Nina)? Sai da tela na
-      // hora.
+      const selecionadaParaConferir = selRef.current;
+      let confirmadaForaLista: any = null;
+      if (
+        podeRevalidarChatDaFila(selecionadaParaConferir, ctxEscopo) &&
+        !rows.some((r: any) => r.id === selecionadaParaConferir.id)
+      ) {
+        // Primeira resposta pode tirar o card de Não atribuídas. A leitura
+        // autenticada distingue esse movimento de uma transferência/encerramento.
+        confirmadaForaLista = await obterConversaFn({
+          data: { clinicaId, conversaId: selecionadaParaConferir.id },
+        }).catch(() => null);
+        if (pedido !== seqConvs.current || chavePedido !== chaveAtualRef.current) return;
+        if (selIdRef.current !== selecionadaParaConferir.id ||
+            selecaoIdRef.current !== selecionadaParaConferir.id) return;
+      }
+      // Transferência, resolução ou perda de acesso continuam encerrando a
+      // seleção. A ida da própria fila para Ativas mantém o chat e o filtro.
       if (deepLinkPendente.current && selIdRef.current !== deepLinkPendente.current)
         deepLinkPendente.current = null;
       const removeu = selecaoDeveSair({
@@ -1036,7 +1050,12 @@ export function AtendInbox() {
         linhas: rows as any,
         buscando: false,
         ctx: ctxEscopo,
+        confirmadaForaLista,
       });
+      if (!removeu && confirmadaForaLista) {
+        setSel((atual: any) => atual?.id === confirmadaForaLista.id
+          ? { ...atual, ...confirmadaForaLista } : atual);
+      }
       if (deepLinkPendente.current && rows.some((r: any) => r.id === deepLinkPendente.current))
         deepLinkPendente.current = null;
       if (removeu && selIdRef.current === deepLinkPendente.current) {
@@ -1072,6 +1091,7 @@ export function AtendInbox() {
         }
         // Quem saiu deste filtro não pode continuar guardado em cache.
         for (const id of idsQueSairam(prev as any, rows as any)) {
+          if (!removeu && id === confirmadaForaLista?.id) continue;
           cacheConversas.current.invalidar(id);
           prefetchMsgs.current.invalidar(id);
         }
@@ -1100,7 +1120,7 @@ export function AtendInbox() {
     } catch (e: any) {
       mostrarErro(e);
     }
-  }, [clinicaId, filtroStatus, escopo, atendenteSelecionadoId, visualizacao, listarConvs, carregarContadores, meuId, souGestor, abrirConversa]);
+  }, [clinicaId, filtroStatus, escopo, atendenteSelecionadoId, visualizacao, listarConvs, carregarContadores, meuId, souGestor, abrirConversa, obterConversaFn]);
 
 
 
@@ -1874,10 +1894,10 @@ export function AtendInbox() {
     })();
   }, [clinicaId, listarDeptosFn, listarUsuariosFn]);
 
-  // Ao abrir a janela de transferência, só a lista de atendentes é relida
+  // Ao abrir a transferência ou o filtro, só a lista de atendentes é relida
   // (para o status ficar atual). Não recarrega a conversa nem transfere nada.
   useEffect(() => {
-    if (!transferOpen || !clinicaId) return;
+    if ((!transferOpen && !menuAtendentesAberto) || !clinicaId) return;
     let vale = true;
     (async () => {
       try {
@@ -1890,7 +1910,7 @@ export function AtendInbox() {
     return () => {
       vale = false;
     };
-  }, [transferOpen, clinicaId, listarUsuariosFn]);
+  }, [transferOpen, menuAtendentesAberto, clinicaId, listarUsuariosFn]);
 
 
 
@@ -2132,6 +2152,20 @@ export function AtendInbox() {
       ) {
         // FASE 3 — transferência, handoff da Nina ou encerramento entram e
         // saem da lista na hora, respeitando o atendente e o estado escolhidos.
+        const atualizada = evento.new;
+        const contextoFila = { clinicaId, escopo, userId: meuId, gestor: souGestor };
+        if (atualizada?.id === selIdRef.current && podeRevalidarChatDaFila(selRef.current, contextoFila)) {
+          if (chatContinuaAposPrimeiraResposta({
+            selecionada: selRef.current, confirmada: atualizada as any, ctx: contextoFila,
+          })) {
+            // Atualiza o cabeçalho mesmo quando o card sai da lista; mantém
+            // seleção, mensagens, rascunho e posição de rolagem do mesmo chat.
+            setSel((atual: any) => atual?.id === atualizada.id ? { ...atual, ...atualizada } : atual);
+          } else {
+            // Confere perda de acesso/transferência mesmo se o patch já retirou o card.
+            g.lista.agendar();
+          }
+        }
         const r = patchListaPorConversa(convsRef.current, (evento as any).new, {
           escopo,
           userId: meuId ?? "",
@@ -2604,6 +2638,13 @@ export function AtendInbox() {
             quando: oficial?.recebida_em ?? new Date().toISOString(),
           }) as any[],
         );
+        if (selIdRef.current === origem && selRef.current?.fila_pendente === true &&
+            ["sent", "delivered", "read"].includes(oficial?.status)) {
+          // Primeiro envio confirmado: confere a mudança de fila mesmo se o
+          // Realtime atrasar. A recarga preserva o chat pela leitura autorizada.
+          agrupadores.current?.lista.agendar();
+          agrupadores.current?.contadores.agendar();
+        }
         registrarDiagnostico("atendimento-inbox", { sync_reason: "envio", full_reload: false });
         // Etapa final do envio: fecha o trace e alimenta p50/p95/p99.
         marcarEtapa(clientMessageId, "SEND_T12_CANONICAL_RECONCILED", "send");
@@ -2832,12 +2873,24 @@ export function AtendInbox() {
           )}
           <div className={`${painelAberto ? "flex" : "hidden"} w-[300px] flex-1 flex-col overflow-hidden`}>
           <div className="shrink-0 border-b p-2 space-y-1.5">
-            <div className="flex items-center gap-1">
-              <span className="block text-[11px] font-medium text-muted-foreground">Meu status</span>
+            <div className="flex items-center gap-2">
+              <span className="shrink-0 text-[11px] font-medium text-muted-foreground">Meu status</span>
+              <p
+                aria-live="polite"
+                className={`min-w-0 flex-1 break-words text-[11px] ${
+                  controle.erro
+                    ? "text-destructive"
+                    : presPrecisaEscolher(controle)
+                      ? "font-medium text-atd-warn-ink"
+                      : "text-muted-foreground"
+                }`}
+              >
+                {presTexto(controle)}
+              </p>
               <Button
                 size="sm"
                 variant="ghost"
-                className="ml-auto h-6 w-6 p-0"
+                className="ml-auto h-6 w-6 shrink-0 p-0"
                 title={painelFixado ? "Desafixar painel" : "Fixar painel aberto"}
                 onClick={alternarFixado}
               >
@@ -2920,18 +2973,6 @@ export function AtendInbox() {
               </Button>
             </div>
             {inicioCronometroPausa && <CronometroPausa inicio={inicioCronometroPausa} />}
-            <p
-              aria-live="polite"
-              className={`text-[11px] ${
-                controle.erro
-                  ? "text-destructive"
-                  : presPrecisaEscolher(controle)
-                    ? "font-medium text-atd-warn-ink"
-                    : "text-muted-foreground"
-              }`}
-            >
-              {presTexto(controle)}
-            </p>
             {presPrecisaEscolher(controle) && (
               <p className="text-[11px] text-muted-foreground">
                 Escolha Online, Em pausa ou Offline para definir se você recebe novas conversas.
@@ -2983,6 +3024,7 @@ export function AtendInbox() {
                 }}
                 onOpenChange={(aberto) => {
                   setPainelMenuAberto(aberto);
+                  setMenuAtendentesAberto(aberto);
                   if (!aberto) setBuscaAtendente("");
                 }}
               >

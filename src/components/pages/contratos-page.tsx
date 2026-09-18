@@ -285,6 +285,35 @@ const addUmAno = (s?: string | null): string | null => {
   const pad = (n: number) => String(n).padStart(2, "0");
   return `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())}`;
 };
+// Vencimento da parcela `i` (0 = primeira) de um contrato novo.
+//
+// A 1ª mensalidade vence no PRÓPRIO MÊS da adesão, e não no mês seguinte: quem
+// assina em 17/09 tem a parcela 1/12 vencendo ainda em setembro, e as demais
+// seguem mês a mês (outubro, novembro...). O gerador antigo somava +1 mês, o
+// contrato nascia com o mês da assinatura em branco e a recepção reclamou que o
+// sistema "pulava" o mês corrente. A regeneração retroativa de parcelas já
+// contava a partir do mês da data de início — agora a criação usa a mesma régua.
+//
+// Dois ajustes de borda:
+// - o dia escolhido é limitado ao último dia do mês; sem isso, dia 30 em
+//   fevereiro escorregava para março (`new Date(ano, 1, 30)` vira 02/03);
+// - a 1ª parcela nunca vence antes da data de início. Numa adesão no dia 17 com
+//   vencimento escolhido no dia 10, a 1ª passa a vencer na própria data da
+//   adesão (cobrança no ato) em vez de nascer atrasada — uma parcela vencida há
+//   mais de 5 dias faz o paciente ser atendido como Particular no balcão, e o
+//   cartão recém-emitido já sairia bloqueado.
+const vencimentoParcelaContrato = (dataInicioIso: string, diaVenc: number, i: number): string => {
+  const inicio = (dataInicioIso ?? "").slice(0, 10);
+  const base = new Date(inicio + "T00:00:00");
+  if (Number.isNaN(base.getTime())) return inicio;
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const ref = new Date(base.getFullYear(), base.getMonth() + i, 1);
+  const ultimoDia = new Date(ref.getFullYear(), ref.getMonth() + 1, 0).getDate();
+  const dia = Math.min(Math.max(1, Number(diaVenc) || 1), ultimoDia);
+  const venc = new Date(ref.getFullYear(), ref.getMonth(), dia);
+  const iso = `${venc.getFullYear()}-${pad(venc.getMonth() + 1)}-${pad(venc.getDate())}`;
+  return i === 0 && iso < inicio ? inicio : iso;
+};
 const TAXA_BOLETO = 3.5;
 
 // Parcela só é "Atrasado" a partir do dia seguinte ao vencimento (comparação em data local).
@@ -1961,7 +1990,7 @@ function NovoContratoForm({
       pagarAgora: noAto ? adesao : 0,
       /** 1ª mensalidade: sozinha no modo "no ato", somada à taxa no modo embutido. */
       primeiraParcela: noAto ? valorParcela : valorParcela + adesao,
-      primeiroVenc: baseOk ? fmt(new Date(base.getFullYear(), base.getMonth() + 1, diaVenc)) : "—",
+      primeiroVenc: baseOk ? fmtD(vencimentoParcelaContrato(dataInicio, diaVenc, 0)) : "—",
       dataEmissao: baseOk ? fmt(base) : "—",
       total: adesao + valorParcela * parcelas,
     };
@@ -2094,21 +2123,18 @@ function NovoContratoForm({
     setSaving(true);
 
     // Gerar cobrancas: taxa de adesao separada da mensalidade.
-    const base = new Date(dataInicio + "T00:00:00");
     const valorParcela = valor + (tipoCobranca === "boleto" ? TAXA_BOLETO : 0);
     // Convênio com "adesão no ato": a taxa é cobrada na emissão do cartão, em
     // linha própria (parcela 0, vencendo no dia do contrato), e as mensalidades
     // ficam limpas. No modo padrão ela continua embutida na 1ª parcela, cobrada
-    // junto com ela no mês seguinte.
+    // junto com ela no vencimento dela.
     const adesaoNoAto = Boolean(convenio.adesao_no_ato) && Number(taxa || 0) > 0;
     const parcelas = Array.from({ length: convenio.num_parcelas }, (_, i) => {
-      // Regra: 1ª mensalidade cai no MÊS SEGUINTE à data de início e as
-      // demais seguem mês a mês, cobrindo exatamente 12 meses até
-      // data_fim (data_inicio + 1 ano). Ex.: início 01/02/2026 →
-      // parcelas 01/03/2026, 01/04/2026, …, 01/02/2027.
-      const venc = new Date(base.getFullYear(), base.getMonth() + i + 1, diaVenc);
+      // Regra: 1ª mensalidade cai no PRÓPRIO MÊS da data de início e as demais
+      // seguem mês a mês. Ex.: início 17/09/2026 com vencimento no dia 25 →
+      // parcelas 25/09/2026, 25/10/2026, …, 25/08/2027.
+      const vencStr = vencimentoParcelaContrato(dataInicio, diaVenc, i);
       const jaPago = i < mensalidadesJaPagas;
-      const vencStr = venc.toISOString().slice(0, 10);
       // Taxa de adesão só na 1ª parcela. Se o operador informou parcelas
       // "já pagas" (contrato retroativo), a taxa também já foi paga e vai zero.
       // No modo "adesão no ato" ela não entra em parcela nenhuma — sai na
@@ -2521,7 +2547,7 @@ function NovoContratoForm({
                   </div>
                   <div>
                     <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                      Mensalidade a partir do próximo mês
+                      Mensalidade — a 1ª já neste mês
                     </div>
                     <div className="text-2xl font-bold tabular-nums mt-0.5">
                       {BRL(resumoCobranca.valorParcela)}

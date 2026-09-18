@@ -21,9 +21,14 @@ import {
 import { timeoutRespostaPacienteMinutos } from "./espera-paciente";
 import { MOTIVO_TIMEOUT_PACIENTE, textoInternoTimeout } from "./espera-timeout-motivo";
 import { normalizarEstado } from "./fluxo-estado-normalizar";
+import { reservaDaSessaoAtual } from "./agendamento-sessao";
 import { encerrarEstadosTransacionais } from "./sessao";
 import { informacoesEstado, pendenciasTimeout, rotuloEtapa } from "./timeout-resumo";
-import { mensagemEnviadaPelaNina, ultimaMensagemDaConversa } from "./espera-paciente.server";
+import {
+  limparEsperaPaciente,
+  mensagemEnviadaPelaNina,
+  ultimaMensagemDaConversa,
+} from "./espera-paciente.server";
 
 export { MOTIVO_TIMEOUT_PACIENTE };
 
@@ -85,11 +90,18 @@ export async function processarTimeoutsEsperaPaciente(args?: {
   resultado.avaliadas = linhas.length;
 
   for (const linha of linhas) {
+    const estado = normalizarEstado(linha.nina_fluxo_estado);
     // Revalidação: conversa ativa, ainda com a Nina, ainda sem atendente.
     const encerrada = STATUS_ENCERRADOS.includes(String(linha.status ?? "").toLowerCase());
     const jaHumana =
       linha.owner_type !== "AI" || linha.ai_enabled !== true || !!linha.atribuida_user_id;
-    if (encerrada || jaHumana || !linha.patient_response_deadline) {
+    if (
+      encerrada ||
+      jaHumana ||
+      !linha.patient_response_deadline ||
+      reservaDaSessaoAtual(estado) ||
+      estado.flow.stage === "HANDOFF"
+    ) {
       await liberarEspera(linha);
       resultado.ignoradas += 1;
       continue;
@@ -108,7 +120,6 @@ export async function processarTimeoutsEsperaPaciente(args?: {
         resultado.ignoradas += 1;
         continue;
       }
-      const estado = normalizarEstado(linha.nina_fluxo_estado);
       if (
         estado.session_started_at &&
         Date.parse(ultima!.created_at) < Date.parse(estado.session_started_at)
@@ -129,6 +140,7 @@ export async function processarTimeoutsEsperaPaciente(args?: {
           ultimaMsgEm: linha.ultima_msg_em,
           sessaoId: estado.session_id ?? null,
           prazoPaciente: linha.patient_response_deadline,
+          estadoFluxoEsperado: linha.nina_fluxo_estado,
           estadoFluxoAposHandoff: {
             ...encerrarEstadosTransacionais(estado),
             flow: { stage: "HANDOFF" },
@@ -170,17 +182,11 @@ export async function processarTimeoutsEsperaPaciente(args?: {
 
 /** Conversa que não deveria mais ter prazo: apenas limpa, sem transferir. */
 async function liberarEspera(linha: LinhaConversa): Promise<void> {
-  try {
-    await supabaseAdmin
-      .from("atend_conversas")
-      .update({ awaiting_patient_since: null, patient_response_deadline: null } as never)
-      .eq("id", linha.id)
-      .eq("clinica_id", linha.clinica_id)
-      .eq("patient_response_deadline", linha.patient_response_deadline!)
-      .eq("ultima_msg_em", linha.ultima_msg_em);
-  } catch (e) {
-    console.error("[nina-timeout] falha ao limpar prazo obsoleto", e);
-  }
+  await limparEsperaPaciente(linha.clinica_id, linha.id, {
+    ultimaMsgEm: linha.ultima_msg_em,
+    estadoFluxo: linha.nina_fluxo_estado,
+    deadline: linha.patient_response_deadline,
+  });
 }
 
 /**

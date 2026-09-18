@@ -5,6 +5,7 @@ import { validarResultado } from "../tool-broker";
 const vazio = { ok: true, source: "nina_catalogo", knowledge_status: "not_found", found: false, records: [] };
 describe("ausência de atendimento no catálogo", () => {
   it.each([
+    "Gostaria de saber os dias que tem urologista",
     "Gostaria de marca a pneumologista", "Quero consulta de pneumologia",
     "Quanto custa o exame PET-CT?", "Vocês realizam o procedimento crioablação?",
     "Qual o preparo da biópsia?", "Quero agendar com Dr. Exemplo",
