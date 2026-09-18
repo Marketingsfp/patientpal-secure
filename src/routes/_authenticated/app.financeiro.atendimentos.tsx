@@ -1870,14 +1870,53 @@ function AtendimentosPage() {
       return acc;
     });
 
-    const [m, p, c, { data: rep }, procs, convenios] = await Promise.all([
+    const [m, p, c, { data: rep }, procs, convenios, ag, disp] = await Promise.all([
       medicosReq,
       pacientesReq,
       contasReq,
       repReq,
       procsReq,
       conveniosReq,
+      supabase
+        .from("medico_agendas")
+        .select("id, nome, medico_id")
+        .eq("clinica_id", clinicaId)
+        .eq("ativo", true)
+        .order("ordem", { ascending: true })
+        .order("nome", { ascending: true }),
+      supabase
+        .from("medico_disponibilidades")
+        .select("agenda_id")
+        .eq("clinica_id", clinicaId)
+        .eq("ativo", true)
+        .not("agenda_id", "is", null)
+        .limit(20000),
     ]);
+
+    // Agendas ativas por profissional + quais delas geram horário na grade —
+    // é o que decide se o nome aparece limpo ou desdobrado em `NOME — AGENDA`.
+    const porMedico = new Map<string, { id: string; nome: string }[]>();
+    const nomePorId = new Map<string, string>();
+    for (const a of (ag.data ?? []) as Array<{
+      id: string;
+      nome: string | null;
+      medico_id: string | null;
+    }>) {
+      if (!a.medico_id) continue;
+      const lista = porMedico.get(a.medico_id) ?? [];
+      lista.push({ id: a.id, nome: a.nome ?? "" });
+      porMedico.set(a.medico_id, lista);
+      nomePorId.set(a.id, a.nome ?? "");
+    }
+    setAgendasPorMedico(porMedico);
+    setAgendaNomePorId(nomePorId);
+    setAgendasComGrade(
+      new Set(
+        ((disp.data ?? []) as Array<{ agenda_id: string | null }>)
+          .map((d) => d.agenda_id)
+          .filter((x): x is string => !!x),
+      ),
+    );
 
     const repMap = new Map<
       string,
