@@ -38,6 +38,11 @@ import { useClinica } from "@/hooks/use-clinica";
 import { montarDiscriminacaoNfse } from "@/lib/nfse-descricao";
 import { usePodeEscrever } from "@/hooks/use-permissoes";
 import { useMedicoContext } from "@/hooks/use-medico-context";
+import {
+  montarOpcoesProfissional,
+  chaveNomeAgenda,
+  type OpcaoProfissional,
+} from "@/lib/agenda/opcoes-profissional";
 import { useServerFn } from "@tanstack/react-start";
 import { emitirNfse, consultarNfse } from "@/lib/nfse.functions";
 import { avisarCepDoTomadorInvalido } from "@/lib/nfse-aviso-cep";
@@ -136,6 +141,8 @@ interface Atend {
   medico_id: string | null;
   paciente_id: string | null;
   origem?: "manual" | "agenda";
+  /** Nome da agenda do agendamento — só rótulo/recorte de lista, nunca classifica o serviço. */
+  agenda_nome?: string | null;
   agendamento_id?: string | null;
   repasse_pago?: boolean;
   repasse_pago_em?: string | null;
@@ -303,6 +310,14 @@ function AtendimentosPage() {
   const hoje = new Date().toISOString().slice(0, 10);
   const buscaUrl = Route.useSearch();
   const [fMedico, setFMedico] = useState<string>("todos");
+  // "todos" | "nome:<chave>" — recorte por agenda do profissional escolhido.
+  const [fAgenda, setFAgenda] = useState<string>("todos");
+  const [semAgendaOcultos, setSemAgendaOcultos] = useState(0);
+  const [agendasPorMedico, setAgendasPorMedico] = useState<
+    Map<string, { id: string; nome: string }[]>
+  >(new Map());
+  const [agendasComGrade, setAgendasComGrade] = useState<Set<string>>(new Set());
+  const [agendaNomePorId, setAgendaNomePorId] = useState<Map<string, string>>(new Map());
   // `?de=&ate=` só semeia o estado inicial: a partir daí o filtro é da pessoa,
   // e mexer nele não reescreve a URL nem volta sozinho para a data do link.
   const [fIni, setFIni] = useState<string>(buscaUrl.de ?? hoje);
@@ -1429,7 +1444,7 @@ function AtendimentosPage() {
       supabase
         .from("fin_lancamentos")
         .select(
-          "id, data, descricao, valor, valor_medico_override, forma_pagamento, medico_id, paciente_id, agendamento_id, repasse_pago, repasse_pago_em, repasse_pago_at, repasse_forma_pagamento, repasse_conta_id, repasse_lancamento_id, laudo_status, medico_laudador_id, valor_laudo, paciente:pacientes(nome), agendamento:agendamentos!inner(procedimento, paciente_nome, paciente_id, medico_id, inicio, status)",
+          "id, data, descricao, valor, valor_medico_override, forma_pagamento, medico_id, paciente_id, agendamento_id, repasse_pago, repasse_pago_em, repasse_pago_at, repasse_forma_pagamento, repasse_conta_id, repasse_lancamento_id, laudo_status, medico_laudador_id, valor_laudo, paciente:pacientes(nome), agendamento:agendamentos!inner(procedimento, paciente_nome, paciente_id, medico_id, inicio, status, agenda_id)",
         )
         .eq("clinica_id", clinicaAtual.clinica_id)
         .eq("tipo", "receita")
@@ -1441,7 +1456,7 @@ function AtendimentosPage() {
       supabase
         .from("fin_lancamentos")
         .select(
-          "id, data, descricao, valor, valor_medico_override, forma_pagamento, medico_id, paciente_id, agendamento_id, repasse_pago, repasse_pago_em, repasse_pago_at, repasse_forma_pagamento, repasse_conta_id, repasse_lancamento_id, laudo_status, medico_laudador_id, valor_laudo, paciente:pacientes(nome), agendamento:agendamentos(procedimento, paciente_nome, paciente_id, medico_id, inicio, status)",
+          "id, data, descricao, valor, valor_medico_override, forma_pagamento, medico_id, paciente_id, agendamento_id, repasse_pago, repasse_pago_em, repasse_pago_at, repasse_forma_pagamento, repasse_conta_id, repasse_lancamento_id, laudo_status, medico_laudador_id, valor_laudo, paciente:pacientes(nome), agendamento:agendamentos(procedimento, paciente_nome, paciente_id, medico_id, inicio, status, agenda_id)",
         )
         .eq("clinica_id", clinicaAtual.clinica_id)
         .eq("tipo", "receita")
@@ -1681,6 +1696,7 @@ function AtendimentosPage() {
         medico_id: string | null;
         inicio: string | null;
         status: string | null;
+        agenda_id: string | null;
       } | null;
       // Procedimento: só usamos o do agendamento. Quando não há agendamento
       // vinculado, a "cauda" da descrição costuma ser tipo de contrato/forma
@@ -1740,6 +1756,7 @@ function AtendimentosPage() {
         repasse_conta_id: (r as any).repasse_conta_id ?? null,
         agendamento_inicio: ag?.inicio ?? null,
         agendamento_status: ag?.status ?? null,
+        agenda_nome: ag?.agenda_id ? (agendaNomePorId.get(ag.agenda_id) ?? null) : null,
         ...marcaTerceiro("agenda", r.id, terceiro),
         laudo_status: (r as any).laudo_status ?? null,
         medico_laudador_id: (r as any).medico_laudador_id ?? null,
@@ -1753,7 +1770,16 @@ function AtendimentosPage() {
     let unif = [...manuais, ...agendFiltered].sort((a, b) => (a.data < b.data ? 1 : -1));
     if (fStatus === "aberto") unif = unif.filter((x) => !x.repasse_pago);
     else if (fStatus === "pago") unif = unif.filter((x) => x.repasse_pago);
-    setItems(unif);
+    // Recorte por agenda escolhida no filtro (aplicado por último).
+    let visiveis = unif;
+    let ocultosSemAgenda = 0;
+    if (fAgenda.startsWith("nome:")) {
+      const alvo = fAgenda.slice(5);
+      ocultosSemAgenda = unif.filter((x) => !x.agenda_nome).length;
+      visiveis = unif.filter((x) => chaveNomeAgenda(x.agenda_nome ?? "") === alvo);
+    }
+    setItems(visiveis);
+    setSemAgendaOcultos(ocultosSemAgenda);
     setSel(new Set());
     setLoading(false);
   };
@@ -1855,14 +1881,53 @@ function AtendimentosPage() {
       return acc;
     });
 
-    const [m, p, c, { data: rep }, procs, convenios] = await Promise.all([
+    const [m, p, c, { data: rep }, procs, convenios, ag, disp] = await Promise.all([
       medicosReq,
       pacientesReq,
       contasReq,
       repReq,
       procsReq,
       conveniosReq,
+      supabase
+        .from("medico_agendas")
+        .select("id, nome, medico_id")
+        .eq("clinica_id", clinicaId)
+        .eq("ativo", true)
+        .order("ordem", { ascending: true })
+        .order("nome", { ascending: true }),
+      supabase
+        .from("medico_disponibilidades")
+        .select("agenda_id")
+        .eq("clinica_id", clinicaId)
+        .eq("ativo", true)
+        .not("agenda_id", "is", null)
+        .limit(20000),
     ]);
+
+    // Agendas ativas por profissional + quais delas geram horário na grade —
+    // é o que decide se o nome aparece limpo ou desdobrado em `NOME — AGENDA`.
+    const porMedico = new Map<string, { id: string; nome: string }[]>();
+    const nomePorId = new Map<string, string>();
+    for (const a of (ag.data ?? []) as Array<{
+      id: string;
+      nome: string | null;
+      medico_id: string | null;
+    }>) {
+      if (!a.medico_id) continue;
+      const lista = porMedico.get(a.medico_id) ?? [];
+      lista.push({ id: a.id, nome: a.nome ?? "" });
+      porMedico.set(a.medico_id, lista);
+      nomePorId.set(a.id, a.nome ?? "");
+    }
+    setAgendasPorMedico(porMedico);
+    setAgendaNomePorId(nomePorId);
+    setAgendasComGrade(
+      new Set(
+        ((disp.data ?? []) as Array<{ agenda_id: string | null }>)
+          .map((d) => d.agenda_id)
+          .filter((x): x is string => !!x),
+      ),
+    );
 
     const repMap = new Map<
       string,
@@ -1916,6 +1981,17 @@ function AtendimentosPage() {
     setOptsReady(false);
     void loadOpts();
   }, [clinicaAtual?.clinica_id]);
+  // Mesma lista e mesmos rótulos do seletor PROFISSIONAL da Agenda.
+  const opcoesProf = useMemo(
+    () =>
+      montarOpcoesProfissional({
+        medicos: medicos.map((m) => ({ id: m.id, nome: m.nome })),
+        agendasPorMedico,
+        agendasComGrade,
+        onlyMedicoId: isMedicoOnly ? medicoLogadoId : null,
+      }),
+    [medicos, agendasPorMedico, agendasComGrade, isMedicoOnly, medicoLogadoId],
+  );
   useEffect(
     () => {
       void load(); /* refaz ao mudar filtros ou opções de repasse */
@@ -1924,6 +2000,7 @@ function AtendimentosPage() {
     [
       clinicaAtual?.clinica_id,
       fMedico,
+      fAgenda,
       fIni,
       fFim,
       fStatus,
@@ -3109,12 +3186,14 @@ function AtendimentosPage() {
                   </Label>
                   <MedicoCombobox
                     value={fMedico}
-                    onChange={(v) => {
-                      if (!isMedicoOnly) setFMedico(v);
+                    agendaValue={fAgenda}
+                    opcoes={opcoesProf.opcoes}
+                    rotuloMedico={opcoesProf.rotuloMedico}
+                    onChange={(medicoId, agendaFiltro) => {
+                      if (isMedicoOnly) return;
+                      setFMedico(medicoId);
+                      setFAgenda(agendaFiltro);
                     }}
-                    medicos={
-                      isMedicoOnly ? medicos.filter((m) => m.id === medicoLogadoId) : medicos
-                    }
                   />
                 </div>
                 <div className="space-y-1.5">
@@ -3278,6 +3357,22 @@ function AtendimentosPage() {
               </div>
             </CardContent>
           </Card>
+
+          {fAgenda !== "todos" && semAgendaOcultos > 0 && (
+            <div className="flex flex-wrap items-center gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+              <span>
+                {semAgendaOcultos} atendimento(s) deste profissional não têm agenda (lançamento
+                manual) e estão fora deste filtro.
+              </span>
+              <button
+                type="button"
+                className="font-medium underline underline-offset-2"
+                onClick={() => setFAgenda("todos")}
+              >
+                Ver todos deste profissional
+              </button>
+            </div>
+          )}
 
           <div className="rounded-xl bg-card">
             <div className="p-0">
@@ -4659,16 +4754,36 @@ function AtendimentosPage() {
 
 function MedicoCombobox({
   value,
+  agendaValue,
+  opcoes,
+  rotuloMedico,
   onChange,
-  medicos,
 }: {
   value: string;
-  onChange: (v: string) => void;
-  medicos: Array<{ id: string; nome: string }>;
+  agendaValue: string;
+  opcoes: OpcaoProfissional[];
+  rotuloMedico: Map<string, string>;
+  onChange: (medicoId: string, agendaFiltro: string) => void;
 }) {
   const [open, setOpen] = useState(false);
-  const selected = medicos.find((m) => m.id === value);
-  const label = value === "todos" || !selected ? "Todos os médicos" : selected.nome;
+  const [busca, setBusca] = useState("");
+  const label =
+    value === "todos"
+      ? "Todos os médicos"
+      : (opcoes.find((o) => o.medicoId === value && o.agendaFiltro === agendaValue)?.rotulo ??
+        rotuloMedico.get(value) ??
+        "Todos os médicos");
+  // Busca por palavras soltas, igual à Agenda: "joao exames" acha
+  // "JOAO HELIO VALENTIM — EXAMES".
+  const termos = busca
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .split(/\s+/)
+    .filter(Boolean);
+  const filtradas = termos.length
+    ? opcoes.filter((o) => termos.every((t) => o.busca.includes(t)))
+    : opcoes;
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
@@ -4684,15 +4799,15 @@ function MedicoCombobox({
         </button>
       </PopoverTrigger>
       <PopoverContent className="p-0 w-[--radix-popover-trigger-width]" align="start">
-        <Command>
-          <CommandInput placeholder="Buscar médico..." />
+        <Command shouldFilter={false}>
+          <CommandInput placeholder="Buscar médico..." value={busca} onValueChange={setBusca} />
           <CommandList>
             <CommandEmpty>Nenhum médico encontrado.</CommandEmpty>
             <CommandGroup>
               <CommandItem
                 value="todos os médicos"
                 onSelect={() => {
-                  onChange("todos");
+                  onChange("todos", "todos");
                   setOpen(false);
                 }}
               >
@@ -4701,20 +4816,25 @@ function MedicoCombobox({
                 />
                 Todos os médicos
               </CommandItem>
-              {medicos.map((m) => (
+              {filtradas.map((o) => (
                 <CommandItem
-                  key={m.id}
-                  value={m.nome}
+                  key={o.key}
+                  value={o.key}
                   onSelect={() => {
-                    onChange(m.id);
+                    onChange(o.medicoId, o.agendaFiltro);
                     setOpen(false);
                   }}
                   className="uppercase"
                 >
                   <Check
-                    className={cn("mr-2 h-4 w-4", value === m.id ? "opacity-100" : "opacity-0")}
+                    className={cn(
+                      "mr-2 h-4 w-4",
+                      value === o.medicoId && agendaValue === o.agendaFiltro
+                        ? "opacity-100"
+                        : "opacity-0",
+                    )}
                   />
-                  {m.nome}
+                  {o.rotulo}
                 </CommandItem>
               ))}
             </CommandGroup>
