@@ -310,6 +310,14 @@ function AtendimentosPage() {
   const hoje = new Date().toISOString().slice(0, 10);
   const buscaUrl = Route.useSearch();
   const [fMedico, setFMedico] = useState<string>("todos");
+  // "todos" | "nome:<chave>" — recorte por agenda do profissional escolhido.
+  const [fAgenda, setFAgenda] = useState<string>("todos");
+  const [semAgendaOcultos, setSemAgendaOcultos] = useState(0);
+  const [agendasPorMedico, setAgendasPorMedico] = useState<
+    Map<string, { id: string; nome: string }[]>
+  >(new Map());
+  const [agendasComGrade, setAgendasComGrade] = useState<Set<string>>(new Set());
+  const [agendaNomePorId, setAgendaNomePorId] = useState<Map<string, string>>(new Map());
   // `?de=&ate=` só semeia o estado inicial: a partir daí o filtro é da pessoa,
   // e mexer nele não reescreve a URL nem volta sozinho para a data do link.
   const [fIni, setFIni] = useState<string>(buscaUrl.de ?? hoje);
