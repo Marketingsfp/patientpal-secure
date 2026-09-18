@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
+import { useAuth } from "@/hooks/use-auth";
 import { presetAllowedSet, PRESETS } from "@/lib/permissoes-presets";
+import { aplicarExcecoesDaPessoa as aplicarExcecoes } from "@/lib/permissoes-pessoa";
 
 export type Acesso = "none" | "read" | "write";
 
@@ -24,6 +26,14 @@ function nivelDoPreset(role: string): Map<string, "read" | "write"> {
  * existe ainda para o perfil, caímos no preset definido em
  * `src/lib/permissoes-presets.ts` para que o sistema não fique vazio antes
  * do gestor salvar a primeira configuração.
+ *
+ * HIERARQUIA (a ordem importa)
+ * 1. exceção da PESSOA em `usuario_permissoes` — vale sobre tudo;
+ * 2. regra do CARGO em `perfil_permissoes`;
+ * 3. preset do cargo, para módulo que nunca foi salvo.
+ *
+ * Só entra no passo 1 o módulo que o gestor personalizou para aquela pessoa;
+ * quem não tem exceção nenhuma continua valendo exatamente o cargo.
  */
 export function usePermissoes(): {
   allowed: Set<string> | null;
@@ -32,8 +42,10 @@ export function usePermissoes(): {
   loading: boolean;
 } {
   const { clinicaAtual, loading: clinicaCarregando } = useClinica();
+  const { user } = useAuth();
   const clinicaId = clinicaAtual?.clinica_id ?? null;
   const role = clinicaAtual?.role ?? null;
+  const userId = user?.id ?? null;
   // Começa fechado. `null` é reservado exclusivamente ao admin já identificado.
   const [allowed, setAllowed] = useState<Set<string> | null>(() => new Set());
   const [nivel, setNivel] = useState<Map<string, "read" | "write"> | null>(() => new Map());
@@ -73,6 +85,35 @@ export function usePermissoes(): {
     setConfigured(new Set());
     setLoading(true);
     void (async () => {
+      /**
+       * Exceções desta pessoa, aplicadas por cima do que o cargo concede.
+       *
+       * Falha aqui NÃO fecha o sistema: se a consulta der erro (tabela ainda
+       * não criada, rede caindo, RLS), a pessoa continua com o acesso do
+       * cargo dela. Fechar tudo deixaria a clínica sem atendimento por causa
+       * de uma tabela acessória.
+       */
+      const aplicarExcecoesDaPessoa = async (
+        set: Set<string>,
+        nvl: Map<string, "read" | "write">,
+        cfg: Set<string>,
+      ) => {
+        if (!userId) return;
+        try {
+          const { data, error } = await supabase
+            .from("usuario_permissoes")
+            .select("modulo, acesso")
+            .eq("clinica_id", clinicaId)
+            .eq("user_id", userId);
+          if (error) throw error;
+          // A regra (e o porquê de a exceção contar como "configurado") vive
+          // em src/lib/permissoes-pessoa.ts, com teste.
+          aplicarExcecoes({ allowed: set, nivel: nvl, configured: cfg }, data);
+        } catch (e) {
+          console.error("[usePermissoes] exceções por pessoa ignoradas", e);
+        }
+      };
+
       try {
         const { data: perfil } = await supabase
           .from("perfis_acesso")
@@ -84,9 +125,14 @@ export function usePermissoes(): {
         if (cancelled) return;
 
         if (!perfil) {
-          setAllowed(presetAllowedSet(role));
-          setNivel(nivelDoPreset(role));
-          setConfigured(new Set());
+          const set = presetAllowedSet(role);
+          const nvl = nivelDoPreset(role);
+          const cfg = new Set<string>();
+          await aplicarExcecoesDaPessoa(set, nvl, cfg);
+          if (cancelled) return;
+          setAllowed(set);
+          setNivel(nvl);
+          setConfigured(cfg);
           return;
         }
 
@@ -98,9 +144,14 @@ export function usePermissoes(): {
         if (cancelled) return;
 
         if (!perms || perms.length === 0) {
-          setAllowed(presetAllowedSet(role));
-          setNivel(nivelDoPreset(role));
-          setConfigured(new Set());
+          const set = presetAllowedSet(role);
+          const nvl = nivelDoPreset(role);
+          const cfg = new Set<string>();
+          await aplicarExcecoesDaPessoa(set, nvl, cfg);
+          if (cancelled) return;
+          setAllowed(set);
+          setNivel(nvl);
+          setConfigured(cfg);
           return;
         }
 
@@ -127,6 +178,9 @@ export function usePermissoes(): {
           set.add(modulo);
           nvl.set(modulo, acesso);
         }
+        // Por último, e por cima de tudo, as exceções desta pessoa.
+        await aplicarExcecoesDaPessoa(set, nvl, cfg);
+        if (cancelled) return;
         setAllowed(set);
         setNivel(nvl);
         setConfigured(cfg);
@@ -146,7 +200,7 @@ export function usePermissoes(): {
     return () => {
       cancelled = true;
     };
-  }, [clinicaId, role, clinicaCarregando]);
+  }, [clinicaId, role, userId, clinicaCarregando]);
 
   return { allowed, nivel, configured, loading: loading || clinicaCarregando };
 }

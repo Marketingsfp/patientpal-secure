@@ -15,7 +15,11 @@ export const ROUTE_TO_MODULE: Record<string, string | null> = {
   "/app": null,
   "/app/agenda": "agenda",
   "/app/agenda-v2": "agenda",
-  "/app/agenda-medicos": "agenda",
+  // Chave própria (antes "agenda"): a Escala e Horários é um item de menu
+  // separado, e a clínica precisa poder deixar a Agenda liberada e esconder a
+  // escala. Enquanto ninguém configurar a chave nova, ela herda "agenda"
+  // (SUBMODULE_PARENT), então nada muda para quem já usa o sistema.
+  "/app/agenda-medicos": "agenda-escala",
   "/app/atendimento-multiplo": "atendimento-multiplo",
   "/app/checkin": "checkin",
   "/app/caixa": "caixa",
@@ -61,23 +65,27 @@ export const ROUTE_TO_MODULE: Record<string, string | null> = {
   "/app/crm": "crm",
   "/app/alertas-enfermagem": "alertas-enfermagem",
   "/app/consulta-rapida": "consulta-rapida",
-  // Consulta de preços do balcão. Só leitura, e o mesmo conteúdo já visível
-  // em "Informações rápidas" — por isso reaproveita aquele módulo em vez de
-  // criar uma permissão nova que precisaria ser liberada perfil por perfil.
-  "/app/tabela-valores": "consulta-rapida",
+  // Consulta de preços do balcão. Item de menu próprio, então tem chave
+  // própria — mas nasce herdando "Informações rápidas" (SUBMODULE_PARENT),
+  // que é como ela sempre funcionou, e só se separa quando alguém mexer.
+  "/app/tabela-valores": "consulta-rapida-valores",
   "/app/nina": "nina",
   // Telas de aprendizado/métricas da Nina. Sem estas entradas exatas o mapa
   // devolvia `undefined` (a rota "/app/nina" não casa por prefixo com
   // "/app/nina-..."), escondendo o menu e mostrando "Acesso negado" para
   // gestor/supervisor — justamente quem revisa e aprova os erros reportados.
-  "/app/nina-aprendizado": "nina",
-  "/app/nina-metricas": "nina",
-  "/app/nina-arquitetura": "nina",
+  // Cada uma é um item de menu do portal OS ZAP e ganhou chave própria, para
+  // a clínica poder deixar as conversas liberadas e guardar a revisão de
+  // aprendizados, as métricas e a arquitetura com a gestão. Todas herdam
+  // "nina" enquanto não forem configuradas.
+  "/app/nina-aprendizado": "nina-aprendizado",
+  "/app/nina-metricas": "nina-metricas",
+  "/app/nina-arquitetura": "nina-arquitetura",
   "/app/configuracoes/respostas-rapidas": "nina",
   "/app/odontologia": "odontologia",
-  "/app/odontologia/orcamentos": "odontologia",
+  "/app/odontologia/orcamentos": "odontologia-orcamentos",
   "/app/fisioterapia": "fisioterapia",
-  "/app/fisioterapia/pacotes": "fisioterapia",
+  "/app/fisioterapia/pacotes": "fisioterapia-pacotes",
   "/app/prontuarios": "prontuarios",
   "/app/anamneses": "anamneses",
   "/app/hiperdia": "hiperdia",
@@ -93,10 +101,12 @@ export const ROUTE_TO_MODULE: Record<string, string | null> = {
 
   // Cadastros
   "/app/equipe": "equipe",
-  // Acompanha o módulo "equipe": quem já administra o cadastro da equipe é
-  // quem marca a gestão. A tela ainda checa por conta própria se quem abriu é
-  // admin/gestor, e a gravação passa por `editarMembro`, no servidor.
-  "/app/equipe-acessos": "equipe",
+  // Chave própria que herda "equipe" enquanto não for configurada: é um item
+  // de menu à parte e marca, pessoa a pessoa, quem é da gestão — então a
+  // clínica precisa poder liberar o cadastro da equipe sem liberar a alçada.
+  // A tela ainda checa por conta própria se quem abriu é admin/gestor, e a
+  // gravação passa por `editarMembro`, no servidor.
+  "/app/equipe-acessos": "equipe-acessos",
   "/app/medico": "medicos",
   "/app/especialidades": "especialidades",
   "/app/procedimentos": "procedimentos",
@@ -143,15 +153,17 @@ export const ROUTE_TO_MODULE: Record<string, string | null> = {
   "/app/financeiro/pendencias": "financeiro-atendimentos",
   "/app/financeiro/regras-ia": "financeiro",
   "/app/financeiro/relatorios": "financeiro",
-  "/app/configuracoes/nfse": "nfse",
+  // Item de menu próprio ("Configuração NFS-e"): chave própria herdando
+  // "nfse", para separar quem emite a nota de quem configura a emissão.
+  "/app/configuracoes/nfse": "nfse-config",
   // Antes usava a chave "clinicas": quem podia ver o cadastro de clínicas
   // enxergava também a configuração do painel/totem, sem como separar.
   "/app/configuracoes/painel-totem": "painel-totem",
-  // Numeração de prontuário acompanha o módulo de clientes, e não uma chave
-  // própria: quem acerta o ponteiro da estante é a mesma recepção que cadastra
-  // o paciente. Uma chave nova deixaria a tela invisível até o gestor
-  // configurar permissão, justo no dia em que ela é necessária.
-  "/app/configuracoes/prontuario": "clientes",
+  // Numeração de prontuário nasce herdando "clientes" — quem acerta o
+  // ponteiro da estante é a mesma recepção que cadastra o paciente, e a tela
+  // não pode ficar invisível até alguém configurar permissão. Como é um item
+  // de menu à parte, ganhou chave própria para poder ser fechada depois.
+  "/app/configuracoes/prontuario": "clientes-numeracao",
   "/app/nfse": "nfse",
   "/app/relatorios": "relatorios",
   "/app/auditoria": "auditoria",
@@ -212,7 +224,70 @@ export const SUBMODULE_PARENT: Record<string, string> = {
   "financeiro-estorno": "financeiro",
   "financeiro-atendimentos": "financeiro",
   "financeiro-movcaixa": "financeiro",
+  // Itens de menu que antes dividiam a chave do irmão e por isso não tinham
+  // como ser liberados ou escondidos sozinhos na tela de Perfis de Acesso.
+  // Todos herdam o pai enquanto ninguém configurar a chave nova, então ligar
+  // esta separação não tira acesso de ninguém.
+  "agenda-escala": "agenda",
+  "clientes-numeracao": "clientes",
+  "consulta-rapida-valores": "consulta-rapida",
+  "equipe-acessos": "equipe",
+  "nfse-config": "nfse",
+  "odontologia-orcamentos": "odontologia",
+  "fisioterapia-pacotes": "fisioterapia",
+  "nina-aprendizado": "nina",
+  "nina-metricas": "nina",
+  "nina-arquitetura": "nina",
 };
+
+/**
+ * Módulos-pai cuja tela é só uma casca de abas (hoje só o Financeiro): quem
+ * tem acesso a um submódulo precisa entrar na rota do pai, porque ela apenas
+ * redireciona para a primeira aba visível.
+ *
+ * Os demais pais NÃO entram aqui de propósito: "Agenda" é uma tela de
+ * verdade, então ter "Escala e Horários" liberada não pode destrancar a
+ * Agenda — seria o contrário do que o gestor configurou.
+ */
+export const PARENTS_COM_ABAS: ReadonlySet<string> = new Set(["financeiro"]);
+
+/**
+ * Regra única de "este módulo está liberado para este usuário", usada tanto
+ * pelo filtro do menu lateral quanto pela guarda de rota — se as duas
+ * divergirem, o item some do menu mas a URL continua abrindo (ou o contrário).
+ *
+ * - `allowed === null` é admin: libera tudo.
+ * - submódulo sem linha salva em `perfil_permissoes` herda o pai;
+ * - submódulo COM linha salva vale pelo que está salvo, inclusive "none";
+ * - a casca de abas (Financeiro) abre quando pelo menos uma aba está liberada.
+ */
+export function moduloPermitido(
+  modulo: string | null | undefined,
+  allowed: Set<string> | null,
+  configured?: Set<string> | null,
+  opcoes?: {
+    /**
+     * Liberar a casca de abas (Financeiro) para quem só tem uma aba. Vale
+     * para o item do MENU e para a guarda da rota-pai, que redireciona.
+     * As próprias abas do submenu usam `false`: lá a aba "Dashboard" só
+     * aparece para quem tem o módulo "financeiro" de verdade.
+     */
+    abrirCascaDeAbas?: boolean;
+  },
+): boolean {
+  if (allowed === null) return true; // admin
+  if (modulo === null) return true; // rota livre/sistema
+  if (typeof modulo !== "string") return false; // rota não mapeada → bloqueia
+  if (allowed.has(modulo)) return true;
+  const pai = SUBMODULE_PARENT[modulo];
+  if (pai && !configured?.has(modulo) && allowed.has(pai)) return true;
+  if ((opcoes?.abrirCascaDeAbas ?? true) && PARENTS_COM_ABAS.has(modulo)) {
+    return Object.entries(SUBMODULE_PARENT).some(
+      ([sub, parent]) => parent === modulo && allowed.has(sub),
+    );
+  }
+  return false;
+}
 
 /**
  * Lista de prefixos ordenada do mais específico para o mais genérico.

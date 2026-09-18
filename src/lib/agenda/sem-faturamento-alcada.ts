@@ -19,10 +19,16 @@ export const ROLES_AUTORIZAM_SEM_FATURAMENTO = rolesDoEscopo("sem_faturamento");
  *
  * Depende da permissão individual `pode_autorizar` do vínculo com a clínica,
  * e não só do perfil: quase toda a equipe tem perfil de administrador.
+ *
+ * `alcadasNominais` são os escopos liberados para AQUELA pessoa pelo ID dela
+ * (tabela `usuario_alcadas`, hook `useAlcadasNominais`). É o caminho de quem
+ * continua sendo da Recepção, sem acesso a dinheiro, mas recebeu da diretoria
+ * o direito de isentar sozinha.
  */
 export function podeAutorizarSemFaturamento(
   role: string | null | undefined,
   podeAutorizarMarcado: boolean | null | undefined,
+  alcadasNominais?: Iterable<string> | null,
 ): boolean {
-  return podeAutorizar("sem_faturamento", role, podeAutorizarMarcado);
+  return podeAutorizar("sem_faturamento", role, podeAutorizarMarcado, alcadasNominais);
 }

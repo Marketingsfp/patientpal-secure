@@ -36,10 +36,18 @@ import {
   PhoneCall,
   ChevronDown,
   ChevronRight,
+  CornerDownRight,
+  RotateCcw,
+  UserCog,
+  Users,
   Save,
   Loader2,
 } from "lucide-react";
-import { PRESETS, type Acesso, type PerfilKey } from "@/lib/permissoes-presets";
+import { perfilCanonico, PRESETS, type Acesso, type PerfilKey } from "@/lib/permissoes-presets";
+import { diffDaPessoa } from "@/lib/permissoes-pessoa";
+import { ESCOPOS_AUTORIZACAO, type EscopoAutorizacao } from "@/lib/autorizacao-supervisor";
+import { Switch } from "@/components/ui/switch";
+import { SUBMODULE_PARENT } from "@/lib/permissoes-rotas";
 import { useClinicFeatureFlag } from "@/hooks/use-clinic-feature-flag";
 
 export const Route = createFileRoute("/_authenticated/app/perfis")({
@@ -109,7 +117,20 @@ const PERFIS: Array<{
   },
 ];
 
-type Modulo = { key: string; nome: string; descricao: string };
+type Modulo = {
+  key: string;
+  nome: string;
+  descricao: string;
+  /** Onde este módulo aparece no menu lateral (seção › item). */
+  menu?: string;
+  /**
+   * Linha filha de outro módulo: enquanto ninguém mexer nela, ela vale o
+   * mesmo que o módulo pai (ver SUBMODULE_PARENT em permissoes-rotas.ts).
+   * Serve para telas que são um item de menu à parte, mas que sempre
+   * andaram junto com a tela principal.
+   */
+  sub?: boolean;
+};
 type Grupo = { label: string; modulos: Modulo[] };
 
 const SUBMODULOS_FINANCEIRO: Modulo[] = [
@@ -117,48 +138,400 @@ const SUBMODULOS_FINANCEIRO: Modulo[] = [
     key: "financeiro-movcaixa",
     nome: "Financeiro › Mov. Caixa",
     descricao: "Aba Movimento de Caixa dentro do Financeiro",
+    menu: "Gestão › Financeiro",
+    sub: true,
   },
   {
     key: "financeiro-atendimentos",
     nome: "Financeiro › Atendimentos",
     descricao: "Aba Atendimentos/Repasse dentro do Financeiro",
+    menu: "Gestão › Financeiro",
+    sub: true,
   },
   {
     key: "financeiro-estorno",
     nome: "Financeiro › Estorno",
     descricao: "Aba Estorno dentro do Financeiro",
+    menu: "Gestão › Financeiro",
+    sub: true,
   },
 ];
 
+// Os grupos abaixo seguem a mesma ordem e os mesmos nomes das seções do menu
+// lateral (src/components/app-shell.tsx → navRows), para que quem procura um
+// item do menu encontre a permissão dele no mesmo lugar. Toda linha com
+// `menu` preenchido corresponde a um item que aparece no menu lateral; linha
+// sem `menu` é tela aberta por dentro de outra.
+//
+// Linha marcada com `sub: true` herda o módulo logo acima enquanto ninguém a
+// configurar — ela existe para que um item de menu que sempre andou junto de
+// outro possa, quando a clínica quiser, ser fechado sozinho.
 const GRUPOS_BASE: Grupo[] = [
   {
     label: "Operação",
     modulos: [
-      { key: "agenda", nome: "Agenda", descricao: "Calendário e agendamentos" },
+      {
+        key: "dashboard",
+        nome: "Dashboard",
+        descricao: "Indicadores do dia da clínica",
+        menu: "Operação › Dashboard",
+      },
+      {
+        key: "agenda",
+        nome: "Agenda",
+        descricao: "Calendário e agendamentos",
+        menu: "Operação › Agenda",
+      },
+      {
+        key: "agenda-escala",
+        nome: "Agenda › Escala e Horários",
+        descricao: "Quadro de escala dos profissionais por dia",
+        menu: "Operação › Escala e Horários",
+        sub: true,
+      },
       {
         key: "atendimento-multiplo",
         nome: "Atendimento Múltiplo",
         descricao: "Atendimentos e pagamentos agrupados",
+        menu: "Operação › Atendimento Múltiplo",
       },
-      { key: "checkin", nome: "Check-in", descricao: "Check-in de pacientes" },
-      { key: "caixa", nome: "Caixa", descricao: "Operação de caixa diário" },
-      { key: "chat", nome: "Chat interno", descricao: "Mensagens entre equipe" },
-      { key: "clientes", nome: "Clientes", descricao: "Cadastro de pacientes" },
-      { key: "dashboard", nome: "Dashboard", descricao: "Indicadores da clínica" },
-      { key: "fluxo", nome: "Fluxo do paciente", descricao: "Kanban de atendimento" },
-      { key: "orcamentos", nome: "Orçamentos", descricao: "Propostas e orçamentos" },
-      { key: "recepcao", nome: "Recepção / Filas", descricao: "Check-in e filas" },
-      { key: "triagem-enfermagem", nome: "Triagem - Enfermagem", descricao: "Triagem inicial" },
-      { key: "cartao-beneficios", nome: "Cartão Benefícios", descricao: "Planos e contratos" },
+      {
+        key: "checkin",
+        nome: "Check-in",
+        descricao: "Check-in de pacientes",
+        menu: "Operação › Check-in",
+      },
+      {
+        key: "caixa",
+        nome: "Caixa",
+        descricao: "Operação de caixa diário",
+        menu: "Operação › Caixa",
+      },
+      {
+        key: "chat",
+        nome: "Chat interno",
+        descricao: "Mensagens entre equipe",
+        menu: "Operação › Chat interno",
+      },
+      {
+        key: "clientes",
+        nome: "Clientes",
+        descricao: "Cadastro de pacientes",
+        menu: "Operação › Clientes",
+      },
+      {
+        key: "clientes-numeracao",
+        nome: "Clientes › Numeração de Prontuário",
+        descricao: "Ponteiro da numeração do arquivo físico de prontuários",
+        menu: "Configurações › Numeração de Prontuário",
+        sub: true,
+      },
+      {
+        key: "painel-executivo",
+        nome: "Painel Executivo",
+        descricao: "Indicadores executivos da clínica",
+        menu: "Operação › Painel Executivo",
+      },
+      {
+        key: "fluxo",
+        nome: "Fluxo do paciente",
+        descricao: "Kanban de atendimento",
+        menu: "Operação › Fluxo do paciente",
+      },
+      {
+        key: "orcamentos",
+        nome: "Orçamentos",
+        descricao: "Propostas e orçamentos",
+        menu: "Operação › Orçamentos",
+      },
+      {
+        key: "recepcao",
+        nome: "Recepção / Filas",
+        descricao: "Check-in e filas",
+        menu: "Operação › Recepção / Filas",
+      },
+      {
+        key: "triagem-enfermagem",
+        nome: "Triagem - Enfermagem",
+        descricao: "Triagem inicial",
+        menu: "Operação › Triagem - Enfermagem",
+      },
+      {
+        key: "cartao-beneficios",
+        nome: "Cartão Benefícios",
+        descricao: "Planos, contratos, dependentes e conferência",
+        menu: "Operação › Cartão Benefícios",
+      },
       {
         key: "documentos",
         nome: "Documentos do paciente",
         descricao: "Anexos e arquivos clínicos",
+        menu: "Operação › Documentos do paciente",
+      },
+      {
+        key: "anamneses",
+        nome: "Anamneses",
+        descricao: "Modelos e respostas de anamnese",
+        menu: "Operação › Anamneses",
+      },
+      {
+        key: "hiperdia",
+        nome: "Hiperdia",
+        descricao: "Acompanhamento de hipertensos e diabéticos",
+        menu: "Operação › Hiperdia",
+      },
+      {
+        key: "consulta-ia",
+        nome: "Apoio Clínico",
+        descricao: "Análise de caso e suporte à decisão clínica",
+        menu: "Operação › Apoio Clínico",
       },
       // "painel" saiu daqui: o Painel de Senhas é a rota pública /painel
       // (TV da recepção, fora da área logada), então ligar/desligar a chave
       // nunca teve efeito. A configuração dele está em Configurações ›
       // Painel & Totem, governada pela chave "painel-totem".
+    ],
+  },
+  {
+    label: "Gestão",
+    modulos: [
+      { key: "cargos", nome: "Cargos", descricao: "Cargos e funções", menu: "Gestão › Cargos" },
+      {
+        key: "financeiro",
+        nome: "Financeiro",
+        descricao: "Financeiro completo (BI, contas, lembretes, regras-IA)",
+        menu: "Gestão › Financeiro",
+      },
+      // Os submódulos do Financeiro entram logo aqui quando a clínica liga a
+      // flag `permissoes_financeiro_granular` (ver aplicaGranularidade).
+      //
+      // "funcionarios" foi removido daqui: era uma chave sem rota nenhuma no
+      // ROUTE_TO_MODULE, então ligar/desligar não mudava nada. A listagem de
+      // funcionários é governada por "hr-contratos" (grupo Recursos Humanos).
+      // Linhas antigas dessa chave em `perfil_permissoes` são inertes.
+      {
+        key: "nfse",
+        nome: "NFS-e",
+        descricao: "Emissão e gestão de notas fiscais de serviço",
+        menu: "Gestão › NFS-e",
+      },
+      {
+        key: "nfse-config",
+        nome: "NFS-e › Configuração",
+        descricao: "Certificado, empresas emitentes e parâmetros da NFS-e",
+        menu: "Gestão › Configuração NFS-e",
+        sub: true,
+      },
+      {
+        key: "relatorios",
+        nome: "Relatórios",
+        descricao: "Relatórios e BI",
+        menu: "Gestão › Relatórios",
+      },
+      {
+        key: "auditoria",
+        nome: "Segurança & Compliance",
+        descricao: "Auditoria e logs de acesso",
+        menu: "Gestão › Segurança & Compliance",
+      },
+      {
+        key: "setores",
+        nome: "Setores",
+        descricao: "Setores da clínica",
+        menu: "Gestão › Setores",
+      },
+      {
+        key: "boletos",
+        nome: "Boletos",
+        descricao: "Emissão e gestão de boletos",
+        menu: "Gestão › Boletos",
+      },
+      {
+        key: "contratos",
+        nome: "Contratos de assinatura",
+        descricao: "Cartão Benefícios e mensalidades",
+        menu: "Gestão › Contratos de assinatura",
+      },
+      {
+        key: "integration-secrets",
+        nome: "Integrações",
+        descricao: "Chaves e integrações externas",
+        menu: "Gestão › Integrações",
+      },
+      {
+        key: "lgpd",
+        nome: "LGPD",
+        descricao: "Gestão de privacidade",
+        menu: "Gestão › LGPD",
+      },
+    ],
+  },
+  {
+    label: "Cadastros",
+    modulos: [
+      {
+        key: "equipe",
+        nome: "Equipe",
+        descricao: "Usuários do sistema",
+        menu: "Cadastros › Médicos",
+      },
+      {
+        key: "equipe-acessos",
+        nome: "Equipe › Equipe e acessos",
+        descricao: "Marca, pessoa a pessoa, quem é da gestão e quem autoriza",
+        menu: "Cadastros › Equipe e acessos",
+        sub: true,
+      },
+      {
+        key: "perfis",
+        nome: "Perfis de acesso",
+        descricao: "Perfis e permissões (salvar continua restrito a administradores)",
+        menu: "Cadastros › Perfis",
+      },
+      {
+        key: "especialidades",
+        nome: "Serviços",
+        descricao: "Especialidades, tipos de serviço, procedimentos e recursos de enfermagem",
+        menu: "Cadastros › Serviços",
+      },
+      {
+        key: "tipos-servico",
+        nome: "Tipos de serviço",
+        descricao: "Classificação de serviços (aba de Serviços)",
+      },
+      {
+        key: "procedimentos",
+        nome: "Procedimentos",
+        descricao: "Tabela de procedimentos (aba de Serviços)",
+      },
+      {
+        key: "disponibilidades",
+        nome: "Horários médicos",
+        descricao: "Agenda dos médicos",
+        menu: "Cadastros › Horários médicos",
+      },
+      {
+        key: "prontuario-modelos",
+        nome: "Modelos de Prontuário",
+        descricao: "Templates clínicos",
+        menu: "Cadastros › Modelos de Prontuário",
+      },
+      {
+        key: "unidades",
+        nome: "Unidades",
+        descricao: "Clínicas / unidades",
+        menu: "Cadastros › Unidades",
+      },
+      {
+        key: "modelos-documentos",
+        nome: "Modelos de Documentos",
+        descricao: "Templates de documentos",
+        menu: "Cadastros › Modelos de Documentos",
+      },
+      {
+        key: "estoque",
+        nome: "Estoque",
+        descricao: "Produtos e movimentos",
+        menu: "Cadastros › Estoque",
+      },
+      {
+        key: "clientes-duplicados",
+        nome: "Duplicados / Merge",
+        descricao:
+          "Conferência de cadastros duplicados (mesclar continua restrito a administradores)",
+        menu: "Cadastros › Duplicados / Merge",
+      },
+      {
+        key: "revisao-convenio",
+        nome: "Revisão de convênio",
+        descricao:
+          "Corrige atendimentos antigos marcados como Particular apesar do cartão ativo e vincula convênio a contratos incompletos",
+        menu: "Cadastros › Revisão de convênio",
+      },
+      {
+        key: "medicos",
+        nome: "Médicos (ficha)",
+        descricao: "Ficha do profissional, aberta por dentro de outras telas",
+      },
+      // "planos" saiu daqui: a tela /app/planos só redireciona para
+      // Cartão Benefícios › Convênios, que é governada pela chave
+      // "cartao-beneficios". A linha antiga em `perfil_permissoes` é inerte.
+    ],
+  },
+  {
+    label: "Marketing",
+    modulos: [
+      {
+        key: "mkt-leads",
+        nome: "Leads",
+        descricao: "Base de leads (entrada do menu Marketing)",
+        menu: "Marketing › Marketing",
+      },
+      {
+        key: "campanhas",
+        nome: "Campanhas",
+        descricao: "Campanhas de marketing",
+        menu: "Marketing › Campanhas",
+      },
+      {
+        key: "mkt-envios",
+        nome: "Envios",
+        descricao: "Disparos em massa",
+        menu: "Marketing › Envios",
+      },
+      {
+        key: "mkt-landing",
+        nome: "Landing Pages",
+        descricao: "Páginas de captura",
+        menu: "Marketing › Landing Pages",
+      },
+      {
+        key: "mkt-segmentos",
+        nome: "Segmentos",
+        descricao: "Segmentação de público",
+        menu: "Marketing › Segmentos",
+      },
+    ],
+  },
+  {
+    label: "Recursos Humanos",
+    modulos: [
+      {
+        key: "hr-ponto",
+        nome: "Bater ponto",
+        descricao: "Registro de ponto",
+        menu: "Recursos Humanos › Marcação de ponto",
+      },
+      {
+        key: "hr-contratos",
+        nome: "Funcionários / Contratos",
+        descricao: "Cadastro e contratos dos funcionários",
+        menu: "Recursos Humanos › Funcionários",
+      },
+      {
+        key: "hr-ferias",
+        nome: "Férias",
+        descricao: "Gestão de férias",
+        menu: "Recursos Humanos › Férias",
+      },
+      {
+        key: "hr-holerites",
+        nome: "Holerites",
+        descricao: "Holerites e folha",
+        menu: "Recursos Humanos › Holerites",
+      },
+      {
+        key: "treinamentos",
+        nome: "Treinamentos",
+        descricao: "Trilhas de aprendizado",
+        menu: "Recursos Humanos › Treinamentos",
+      },
+      {
+        key: "lms-admin",
+        nome: "Cursos (admin)",
+        descricao: "Administração de cursos",
+        menu: "Recursos Humanos › Cursos (admin)",
+      },
     ],
   },
   {
@@ -168,134 +541,107 @@ const GRUPOS_BASE: Grupo[] = [
         key: "atendimento-ia",
         nome: "Atendimento médico",
         descricao: "Fila do médico e prontuário",
+        menu: "Inteligência › Meus Pacientes — Atendimento",
       },
-      { key: "crm", nome: "CRM", descricao: "Oportunidades e leads" },
+      {
+        key: "prontuarios",
+        nome: "Prontuários — Histórico",
+        descricao: "Histórico clínico de todos os pacientes",
+        menu: "Inteligência › Prontuários — Histórico",
+      },
+      { key: "crm", nome: "CRM", descricao: "Oportunidades e leads", menu: "Inteligência › CRM" },
       {
         key: "alertas-enfermagem",
         nome: "Enfermeira IA — Alertas",
         descricao: "Alertas automáticos",
+        menu: "Inteligência › Enfermeira IA — Alertas",
       },
-      { key: "consulta-rapida", nome: "Informações rápidas", descricao: "Consulta a tabelas" },
       {
-        key: "consulta-ia",
-        nome: "Apoio Clínico",
-        descricao: "Análise de caso e suporte à decisão clínica",
+        key: "consulta-rapida",
+        nome: "Informações rápidas",
+        descricao: "Consulta a tabelas",
+        menu: "Inteligência › Informações rápidas",
       },
-      { key: "nina", nome: "Nina — WhatsApp", descricao: "Conversas WhatsApp" },
+      {
+        key: "consulta-rapida-valores",
+        nome: "Informações rápidas › Tabela de valores",
+        descricao: "Consulta de preços do balcão",
+        menu: "Operação › Tabela de valores",
+        sub: true,
+      },
+      {
+        key: "odontologia",
+        nome: "Odontologia",
+        descricao: "Odontograma e prontuário odontológico",
+        menu: "Inteligência › Odontologia › Odontograma & Prontuário",
+      },
+      {
+        key: "odontologia-orcamentos",
+        nome: "Odontologia › Orçamentos",
+        descricao: "Orçamentos do plano odontológico",
+        menu: "Inteligência › Odontologia › Orçamentos de Odonto",
+        sub: true,
+      },
+      {
+        key: "fisioterapia",
+        nome: "Fisioterapia",
+        descricao: "Mapa corporal e avaliação",
+        menu: "Inteligência › Fisioterapia › Mapa Corporal & Avaliação",
+      },
+      {
+        key: "fisioterapia-pacotes",
+        nome: "Fisioterapia › Pacotes de Sessões",
+        descricao: "Pacotes e controle de sessões",
+        menu: "Inteligência › Fisioterapia › Pacotes de Sessões",
+        sub: true,
+      },
+      {
+        key: "exames-resultados",
+        nome: "Resultados de Exames",
+        descricao: "Laudos e resultados",
+        menu: "Inteligência › Resultados de Exames",
+      },
+    ],
+  },
+  {
+    // Portal OS ZAP (atendimento por WhatsApp) e portal Coach. No menu lateral
+    // essas telas ficam nas seções Atendimento, Nina, Configurações do
+    // WhatsApp e Treinamento, que só aparecem dentro desses portais.
+    label: "WhatsApp — OS ZAP e Coach",
+    modulos: [
+      {
+        key: "nina",
+        nome: "Nina — WhatsApp",
+        descricao:
+          "Conversas, mensagens prontas, base de conhecimentos, homologação e configuração do WhatsApp",
+        menu: "OS ZAP › Atendimento, Nina e Configurações do WhatsApp",
+      },
+      {
+        key: "nina-aprendizado",
+        nome: "Nina › Revisão de Aprendizados",
+        descricao: "Fila de aprendizados reportados, para aprovar ou recusar",
+        menu: "OS ZAP › Nina › Revisão de Aprendizados",
+        sub: true,
+      },
+      {
+        key: "nina-metricas",
+        nome: "Nina › Métricas de Aprendizado",
+        descricao: "Indicadores de acerto e evolução da Nina",
+        menu: "OS ZAP › Nina › Métricas de Aprendizado",
+        sub: true,
+      },
+      {
+        key: "nina-arquitetura",
+        nome: "Nina › Arquitetura",
+        descricao: "Mapa interno das funções e instruções da Nina",
+        menu: "OS ZAP › Nina › Arquitetura",
+        sub: true,
+      },
       {
         key: "coach",
         nome: "Coach WhatsApp",
         descricao: "Treinamento de atendentes (ver = só o próprio; editar = painel da gestora)",
-      },
-      { key: "odontologia", nome: "Odontologia", descricao: "Odontograma e plano" },
-      {
-        key: "fisioterapia",
-        nome: "Fisioterapia",
-        descricao: "Mapa corporal, avaliação e pacotes de sessões",
-      },
-      {
-        key: "hiperdia",
-        nome: "Hiperdia",
-        descricao: "Acompanhamento de hipertensos e diabéticos",
-      },
-      { key: "exames-resultados", nome: "Resultados de Exames", descricao: "Laudos e resultados" },
-      { key: "prontuarios", nome: "Prontuários", descricao: "Prontuários clínicos" },
-      { key: "anamneses", nome: "Anamneses", descricao: "Modelos e respostas de anamnese" },
-    ],
-  },
-  {
-    label: "Marketing",
-    modulos: [
-      { key: "mkt-leads", nome: "Leads", descricao: "Base de leads (entrada do menu Marketing)" },
-      { key: "campanhas", nome: "Campanhas", descricao: "Campanhas de marketing" },
-      { key: "mkt-envios", nome: "Envios", descricao: "Disparos em massa" },
-      { key: "mkt-landing", nome: "Landing Pages", descricao: "Páginas de captura" },
-      { key: "mkt-segmentos", nome: "Segmentos", descricao: "Segmentação de público" },
-    ],
-  },
-  {
-    label: "Cadastros",
-    modulos: [
-      { key: "equipe", nome: "Equipe", descricao: "Usuários do sistema" },
-      {
-        key: "clientes-duplicados",
-        nome: "Duplicados / Merge",
-        descricao:
-          "Conferência de cadastros duplicados (mesclar continua restrito a administradores)",
-      },
-      {
-        key: "revisao-convenio",
-        nome: "Revisão de convênio",
-        descricao:
-          "Corrige atendimentos antigos marcados como Particular apesar do cartão ativo e vincula convênio a contratos incompletos",
-      },
-      { key: "perfis", nome: "Perfis de acesso", descricao: "Perfis e permissões" },
-      {
-        key: "especialidades",
-        nome: "Serviços",
-        descricao: "Especialidades, tipos de serviço, procedimentos e recursos de enfermagem",
-      },
-      { key: "disponibilidades", nome: "Horários médicos", descricao: "Agenda dos médicos" },
-      { key: "prontuario-modelos", nome: "Modelos de Prontuário", descricao: "Templates clínicos" },
-      { key: "unidades", nome: "Unidades", descricao: "Clínicas / unidades" },
-      // "planos" saiu daqui: a tela /app/planos só redireciona para
-      // Cartão Benefícios › Convênios, que é governada pela chave
-      // "cartao-beneficios". A linha antiga em `perfil_permissoes` é inerte.
-      {
-        key: "modelos-documentos",
-        nome: "Modelos de Documentos",
-        descricao: "Templates de documentos",
-      },
-      { key: "medicos", nome: "Médicos", descricao: "Cadastro de médicos" },
-      { key: "estoque", nome: "Estoque", descricao: "Produtos e movimentos" },
-      { key: "procedimentos", nome: "Procedimentos", descricao: "Tabela de procedimentos" },
-      { key: "tipos-servico", nome: "Tipos de serviço", descricao: "Classificação de serviços" },
-    ],
-  },
-  {
-    label: "RH",
-    modulos: [
-      { key: "hr-ponto", nome: "Bater ponto", descricao: "Registro de ponto" },
-      { key: "hr-contratos", nome: "Contratos de RH", descricao: "Contratos dos funcionários" },
-      { key: "hr-ferias", nome: "Férias", descricao: "Gestão de férias" },
-      { key: "hr-holerites", nome: "Holerites", descricao: "Holerites e folha" },
-      { key: "treinamentos", nome: "Treinamentos", descricao: "Trilhas de aprendizado" },
-      { key: "lms-admin", nome: "Cursos (admin)", descricao: "Administração de cursos" },
-    ],
-  },
-  {
-    label: "Gestão",
-    modulos: [
-      { key: "cargos", nome: "Cargos", descricao: "Cargos e funções" },
-      {
-        key: "financeiro",
-        nome: "Financeiro",
-        descricao: "Financeiro completo (BI, contas, lembretes, regras-IA)",
-      },
-      // "funcionarios" foi removido daqui: era uma chave sem rota nenhuma no
-      // ROUTE_TO_MODULE, então ligar/desligar não mudava nada. A listagem de
-      // funcionários é governada por "hr-contratos" (grupo RH). Linhas antigas
-      // dessa chave em `perfil_permissoes` são inertes e podem ficar.
-      { key: "nfse", nome: "NFS-e", descricao: "Notas fiscais de serviço" },
-      { key: "relatorios", nome: "Relatórios", descricao: "Relatórios e BI" },
-      { key: "auditoria", nome: "Segurança & Compliance", descricao: "Auditoria, logs e LGPD" },
-      { key: "setores", nome: "Setores", descricao: "Setores da clínica" },
-      { key: "boletos", nome: "Boletos", descricao: "Emissão e gestão de boletos" },
-      {
-        key: "contratos",
-        nome: "Contratos de assinatura",
-        descricao: "Cartão Benefícios e mensalidades",
-      },
-      {
-        key: "integration-secrets",
-        nome: "Integrações",
-        descricao: "Chaves e integrações externas",
-      },
-      { key: "lgpd", nome: "LGPD", descricao: "Gestão de privacidade" },
-      {
-        key: "painel-executivo",
-        nome: "Painel Executivo",
-        descricao: "Indicadores executivos da clínica",
+        menu: "Treinamento › Coach WhatsApp",
       },
     ],
   },
@@ -310,16 +656,40 @@ const GRUPOS_BASE: Grupo[] = [
         key: "painel-totem",
         nome: "Painel & Totem",
         descricao: "Configuração do painel de senhas e do totem de autoatendimento",
+        menu: "Configurações › Painel & Totem",
       },
-      { key: "clinicas", nome: "Clínicas", descricao: "Cadastro de clínicas (multi-empresa)" },
+      {
+        key: "clinicas",
+        nome: "Clínicas",
+        descricao: "Cadastro de clínicas (multi-empresa)",
+        menu: "Configurações › Clínicas",
+      },
       {
         key: "backups",
         nome: "Backups",
         descricao: "Geração e download de cópias de segurança do banco",
+        menu: "Configurações › Backups",
       },
     ],
   },
 ];
+
+/**
+ * Acesso que um módulo tem "de fábrica" para um perfil.
+ *
+ * Um submódulo sem valor próprio no preset vale o mesmo que o pai — é a
+ * mesma regra que o sistema aplica em tempo de execução (moduloPermitido em
+ * permissoes-rotas.ts). Sem isso, a tela mostraria "Sem" para uma tela que
+ * o perfil na verdade abre, e o gestor salvaria esse "Sem" sem querer,
+ * tirando um acesso que ninguém pediu para tirar.
+ */
+function acessoPadrao(preset: Partial<Record<string, Acesso>>, modulo: string): Acesso {
+  const proprio = preset[modulo];
+  if (proprio) return proprio;
+  const pai = SUBMODULE_PARENT[modulo];
+  if (pai) return (preset[pai] ?? "none") as Acesso;
+  return "none";
+}
 
 function aplicaGranularidade(grupos: Grupo[], granular: boolean): Grupo[] {
   if (!granular) return grupos;
@@ -337,19 +707,52 @@ function buildInitialState(todosModulos: string[]): Record<PerfilKey, Record<str
   const out = {} as Record<PerfilKey, Record<string, Acesso>>;
   for (const p of PERFIS) {
     const preset = PRESETS[p.key];
-    const financeiroDefault = (preset["financeiro"] ?? "none") as Acesso;
-    out[p.key] = Object.fromEntries(
-      todosModulos.map((k) => {
-        // Submódulos do financeiro herdam do acesso do pai por padrão,
-        // para que ativar a granularidade não retire acesso de perfis
-        // que já tinham "financeiro" liberado.
-        if (k.startsWith("financeiro-")) return [k, (preset[k] ?? financeiroDefault) as Acesso];
-        return [k, (preset[k] ?? "none") as Acesso];
-      }),
-    );
+    out[p.key] = Object.fromEntries(todosModulos.map((k) => [k, acessoPadrao(preset, k)]));
   }
   return out;
 }
+
+/**
+ * Poderes de autorizar que podem ser dados a UMA pessoa pelo ID dela.
+ *
+ * É diferente do resto desta tela: os módulos adiante dizem quais TELAS a
+ * pessoa abre; aqui é o direito de liberar uma ação que normalmente exige a
+ * senha de um supervisor. Por isso só existe na aba "Por pessoa" — conceder
+ * por cargo é justamente o que a diretoria não quer, porque um colega marcado
+ * como gestão meses depois herdaria o poder sem ninguém perceber.
+ */
+const ALCADAS: ReadonlyArray<{ escopo: EscopoAutorizacao; nome: string; descricao: string }> = [
+  {
+    escopo: "sem_faturamento",
+    nome: "Isentar cobrança (sem faturamento)",
+    descricao:
+      "Marcar e desmarcar atendimento que o paciente paga direto ao parceiro (ex.: toxicológico), sem pedir senha de supervisor. O motivo escrito continua obrigatório.",
+  },
+  {
+    escopo: "desconto",
+    nome: "Desconto e cortesia",
+    descricao: "Abater valor ou lançar cortesia na Agenda e no Financeiro.",
+  },
+  {
+    escopo: "liberar_debito",
+    nome: "Liberar paciente em débito",
+    descricao: "Atender apesar de mensalidade ou dívida vencida.",
+  },
+  {
+    escopo: "alerta_critico",
+    nome: "Alerta crítico do paciente",
+    descricao: "Marcar ou retirar aviso jurídico no cadastro do paciente.",
+  },
+];
+
+const ROTULO_ACESSO: Record<Acesso, string> = {
+  none: "Sem",
+  read: "Leitura",
+  write: "Edição",
+};
+
+/** Uma pessoa com vínculo na clínica, para a aba "Por pessoa". */
+type Pessoa = { userId: string; nome: string; role: PerfilKey | null; roleBruto: string };
 
 function PerfisPage() {
   const { clinicaAtual } = useClinica();
@@ -380,14 +783,10 @@ function PerfisPage() {
       const next = { ...prev } as Record<PerfilKey, Record<string, Acesso>>;
       for (const p of PERFIS) {
         const preset = PRESETS[p.key];
-        const parentDefault = (preset["financeiro"] ?? "none") as Acesso;
         const atual = next[p.key] ?? {};
         const novo: Record<string, Acesso> = { ...atual };
         for (const k of TODOS_MODULOS) {
-          if (!(k in novo)) {
-            if (k.startsWith("financeiro-")) novo[k] = (preset[k] ?? parentDefault) as Acesso;
-            else novo[k] = (preset[k] ?? "none") as Acesso;
-          }
+          if (!(k in novo)) novo[k] = acessoPadrao(preset, k);
         }
         next[p.key] = novo;
       }
@@ -400,6 +799,23 @@ function PerfisPage() {
   const [perfilIds, setPerfilIds] = useState<Record<PerfilKey, string>>(
     {} as Record<PerfilKey, string>,
   );
+  // --- Aba "Por pessoa" -------------------------------------------------
+  // `modo` escolhe o que a grade está editando: a regra do cargo (que vale
+  // para todo mundo daquele perfil) ou a exceção de UMA pessoa.
+  const [modo, setModo] = useState<"perfil" | "pessoa">("perfil");
+  const [pessoas, setPessoas] = useState<Pessoa[]>([]);
+  const [pessoaSel, setPessoaSel] = useState<string>("");
+  // Só o que está DIFERENTE do cargo. Módulo que segue o cargo não aparece
+  // aqui — é assim que mudar o perfil depois continua alcançando quem nunca
+  // foi personalizado naquele módulo.
+  const [overridesPessoa, setOverridesPessoa] = useState<Record<string, Acesso>>({});
+  // O que estava gravado quando a pessoa foi carregada, para saber quais
+  // linhas precisam ser APAGADAS ao voltarem para o padrão do cargo.
+  const [overridesSalvos, setOverridesSalvos] = useState<string[]>([]);
+  const [carregandoPessoa, setCarregandoPessoa] = useState(false);
+  // Alçadas nominais da pessoa escolhida (tabela usuario_alcadas).
+  const [alcadasPessoa, setAlcadasPessoa] = useState<Set<string>>(() => new Set());
+  const [salvandoAlcada, setSalvandoAlcada] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const loadedClinicRef = useRef<string | null>(null);
@@ -457,17 +873,10 @@ function PerfisPage() {
                 // `usePermissoes` concede em tempo de execução. Antes esta
                 // base era "none", então um módulo novo (ex.: Hiperdia)
                 // aparecia como "Sem" aqui mesmo estando liberado no padrão.
-                // Submódulos do financeiro seguem herdando do pai para que
-                // ativar a granularidade não retire acesso já concedido.
+                // Submódulo sem valor próprio herda o pai, pela mesma razão.
                 const preset = PRESETS[chave];
-                const parentFin = (preset["financeiro"] ?? "none") as Acesso;
                 next[chave] = Object.fromEntries(
-                  TODOS_MODULOS.map((k) => [
-                    k,
-                    k.startsWith("financeiro-")
-                      ? ((preset[k] ?? parentFin) as Acesso)
-                      : ((preset[k] ?? "none") as Acesso),
-                  ]),
+                  TODOS_MODULOS.map((k) => [k, acessoPadrao(preset, k)]),
                 );
                 seen[chave] = true;
               }
@@ -486,6 +895,98 @@ function PerfisPage() {
       }
     })();
   }, [clinicaId]);
+
+  // Lista de quem tem vínculo com a clínica. Mesmo caminho da tela "Equipe e
+  // acessos": o vínculo vem de `clinica_memberships` e o nome de `profiles`.
+  useEffect(() => {
+    if (!clinicaId || !podeAdministrar) return;
+    let cancelado = false;
+    void (async () => {
+      try {
+        const { data: mems, error } = await supabase
+          .from("clinica_memberships")
+          .select("user_id, role, ativo")
+          .eq("clinica_id", clinicaId)
+          .eq("ativo", true);
+        if (error) throw error;
+        const linhas = (mems ?? []) as Array<{ user_id: string; role: string }>;
+        const ids = [...new Set(linhas.map((l) => l.user_id))];
+        const nomes = new Map<string, string>();
+        if (ids.length > 0) {
+          const { data: profs } = await supabase.from("profiles").select("id, nome").in("id", ids);
+          for (const p of (profs ?? []) as Array<{ id: string; nome: string | null }>) {
+            if (p.nome) nomes.set(p.id, p.nome);
+          }
+        }
+        if (cancelado) return;
+        setPessoas(
+          linhas
+            .map((l) => ({
+              userId: l.user_id,
+              // Vínculo sem nome preenchido continua na lista: sumir com a
+              // pessoa esconderia justamente o cadastro que precisa de conserto.
+              nome: nomes.get(l.user_id) ?? "(sem nome cadastrado)",
+              role: perfilCanonico(l.role),
+              roleBruto: l.role,
+            }))
+            .sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR")),
+        );
+      } catch (e) {
+        console.error("[perfis] erro carregando pessoas", e);
+      }
+    })();
+    return () => {
+      cancelado = true;
+    };
+  }, [clinicaId, podeAdministrar]);
+
+  // Exceções já gravadas da pessoa escolhida.
+  useEffect(() => {
+    if (!clinicaId || !pessoaSel) {
+      setOverridesPessoa({});
+      setOverridesSalvos([]);
+      setAlcadasPessoa(new Set());
+      return;
+    }
+    let cancelado = false;
+    setCarregandoPessoa(true);
+    void (async () => {
+      try {
+        const { data, error } = await supabase
+          .from("usuario_permissoes")
+          .select("modulo, acesso")
+          .eq("clinica_id", clinicaId)
+          .eq("user_id", pessoaSel);
+        if (error) throw error;
+        if (cancelado) return;
+        const mapa: Record<string, Acesso> = {};
+        for (const row of (data ?? []) as Array<{ modulo: string; acesso: Acesso }>) {
+          mapa[row.modulo] = row.acesso;
+        }
+        setOverridesPessoa(mapa);
+        setOverridesSalvos(Object.keys(mapa));
+
+        const { data: alc, error: alcErro } = await supabase
+          .from("usuario_alcadas")
+          .select("escopo")
+          .eq("clinica_id", clinicaId)
+          .eq("user_id", pessoaSel);
+        if (alcErro) throw alcErro;
+        if (cancelado) return;
+        setAlcadasPessoa(new Set((alc ?? []).map((r) => r.escopo)));
+      } catch (e) {
+        console.error("[perfis] erro carregando exceções da pessoa", e);
+        toast.error("Falha ao carregar as exceções desta pessoa", {
+          description: e instanceof Error ? e.message : String(e),
+        });
+      } finally {
+        if (!cancelado) setCarregandoPessoa(false);
+      }
+    })();
+    return () => {
+      cancelado = true;
+    };
+  }, [clinicaId, pessoaSel]);
 
   const salvar = async () => {
     if (!podeAdministrar) {
@@ -547,20 +1048,181 @@ function PerfisPage() {
   }, [matriz]);
 
   const totalModulos = TODOS_MODULOS.length;
-  const acessosPerfil = contagens[perfilSel];
+
+  const pessoa = useMemo(
+    () => pessoas.find((p) => p.userId === pessoaSel) ?? null,
+    [pessoas, pessoaSel],
+  );
+
+  // O que a pessoa herda do cargo dela — exatamente a mesma grade que a aba
+  // "Por cargo" mostra para aquele perfil.
+  const basePessoa = useMemo<Record<string, Acesso>>(() => {
+    if (!pessoa?.role) return Object.fromEntries(TODOS_MODULOS.map((k) => [k, "none" as Acesso]));
+    return matriz[pessoa.role] ?? {};
+  }, [pessoa, matriz, TODOS_MODULOS]);
+
+  // O que a pessoa realmente enxerga: o cargo, com as exceções por cima.
+  const efetivoPessoa = useMemo<Record<string, Acesso>>(
+    () => ({ ...basePessoa, ...overridesPessoa }),
+    [basePessoa, overridesPessoa],
+  );
+
+  const editandoPessoa = modo === "pessoa";
+  const bloqueado =
+    !podeAdministrar || loading || saving || carregandoPessoa || (modo === "pessoa" && !pessoaSel);
+  const valores = editandoPessoa ? efetivoPessoa : matriz[perfilSel];
+  const acessosMostrados = TODOS_MODULOS.filter((k) => valores[k] && valores[k] !== "none").length;
+  const totalPersonalizado = Object.keys(overridesPessoa).length;
+  // Admin não passa pela matriz em lugar nenhum do sistema (o app libera tudo
+  // para ele antes de consultar permissão). Personalizar um admin não teria
+  // efeito, e o aviso na tela evita alguém achar que fechou um acesso.
+  const pessoaEhAdmin = pessoa?.role === "admin";
 
   const setAcesso = (modulo: string, valor: Acesso) => {
+    if (editandoPessoa) {
+      setOverridesPessoa((prev) => {
+        const proximo = { ...prev };
+        // Voltou a valer o mesmo que o cargo: deixa de ser exceção.
+        if (valor === (basePessoa[modulo] ?? "none")) delete proximo[modulo];
+        else proximo[modulo] = valor;
+        return proximo;
+      });
+      return;
+    }
     setMatriz((prev) => ({
       ...prev,
       [perfilSel]: { ...prev[perfilSel], [modulo]: valor },
     }));
   };
 
+  /** Devolve um módulo ao que o cargo da pessoa manda. */
+  const voltarAoPadrao = (modulo: string) => {
+    setOverridesPessoa((prev) => {
+      const proximo = { ...prev };
+      delete proximo[modulo];
+      return proximo;
+    });
+  };
+
   const aplicarTodos = (valor: Acesso) => {
+    if (editandoPessoa) {
+      setOverridesPessoa(
+        Object.fromEntries(
+          TODOS_MODULOS.filter((k) => valor !== (basePessoa[k] ?? "none")).map((k) => [k, valor]),
+        ),
+      );
+      return;
+    }
     setMatriz((prev) => ({
       ...prev,
       [perfilSel]: Object.fromEntries(TODOS_MODULOS.map((k) => [k, valor])),
     }));
+  };
+
+  /**
+   * Liga ou desliga um poder de autorizar para ESTA pessoa.
+   *
+   * Grava na hora, e não junto do botão Salvar dos módulos: são coisas de
+   * naturezas diferentes (tela x poder sobre dinheiro), e misturar as duas num
+   * salvamento só faria um clique distraído conceder alçada sem querer.
+   */
+  const alternarAlcada = async (escopo: EscopoAutorizacao, ligar: boolean) => {
+    if (!podeAdministrar || !clinicaId || !pessoaSel) return;
+    setSalvandoAlcada(escopo);
+    try {
+      if (ligar) {
+        const { error } = await supabase
+          .from("usuario_alcadas")
+          .upsert(
+            { clinica_id: clinicaId, user_id: pessoaSel, escopo },
+            { onConflict: "clinica_id,user_id,escopo" },
+          );
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .from("usuario_alcadas")
+          .delete()
+          .eq("clinica_id", clinicaId)
+          .eq("user_id", pessoaSel)
+          .eq("escopo", escopo);
+        if (error) throw error;
+      }
+      setAlcadasPessoa((prev) => {
+        const proximo = new Set(prev);
+        if (ligar) proximo.add(escopo);
+        else proximo.delete(escopo);
+        return proximo;
+      });
+      toast.success(
+        ligar
+          ? (pessoa?.nome ?? "A pessoa") + " passou a autorizar esta ação sozinha."
+          : (pessoa?.nome ?? "A pessoa") + " volta a precisar da senha de um supervisor.",
+      );
+    } catch (e) {
+      console.error("[perfis] falha ao mudar alçada", e);
+      toast.error("Falha ao mudar a alçada", {
+        description: e instanceof Error ? e.message : String(e),
+      });
+    } finally {
+      setSalvandoAlcada(null);
+    }
+  };
+
+  /** Apaga todas as exceções: a pessoa volta a ser igual ao cargo dela. */
+  const limparPersonalizacao = () => setOverridesPessoa({});
+
+  const salvarPessoa = async () => {
+    if (!podeAdministrar) {
+      toast.error("Somente administradores podem alterar permissões.");
+      return;
+    }
+    if (!clinicaId || !pessoaSel) return;
+    setSaving(true);
+    try {
+      // O que grava e o que apaga sai de `diffDaPessoa` (testada): vira linha
+      // no banco só o módulo diferente do cargo, e o que voltou ao padrão é
+      // APAGADO — gravar o valor igual congelaria a pessoa se o cargo mudasse.
+      const { gravar, apagar: paraApagar } = diffDaPessoa(
+        TODOS_MODULOS,
+        basePessoa,
+        efetivoPessoa,
+        overridesSalvos,
+      );
+      const paraGravar = gravar.map(({ modulo, acesso }) => ({
+        clinica_id: clinicaId,
+        user_id: pessoaSel,
+        modulo,
+        acesso,
+      }));
+      if (paraGravar.length > 0) {
+        const { error } = await supabase
+          .from("usuario_permissoes")
+          .upsert(paraGravar, { onConflict: "clinica_id,user_id,modulo" });
+        if (error) throw error;
+      }
+      if (paraApagar.length > 0) {
+        const { error } = await supabase
+          .from("usuario_permissoes")
+          .delete()
+          .eq("clinica_id", clinicaId)
+          .eq("user_id", pessoaSel)
+          .in("modulo", paraApagar);
+        if (error) throw error;
+      }
+      setOverridesSalvos(Object.keys(overridesPessoa));
+      toast.success(
+        paraGravar.length === 0
+          ? "Exceções removidas: esta pessoa voltou a seguir o cargo."
+          : `Permissões de ${pessoa?.nome ?? "pessoa"} salvas (${paraGravar.length} exceção(ões)).`,
+      );
+    } catch (e) {
+      console.error("[perfis] erro salvando exceções da pessoa", e);
+      toast.error("Falha ao salvar", {
+        description: e instanceof Error ? e.message : String(e),
+      });
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -630,35 +1292,92 @@ function PerfisPage() {
 
         <TabsContent value="permissoes" className="mt-4 space-y-4">
           <Card>
-            <CardHeader className="pb-3">
+            <CardHeader className="pb-3 space-y-3">
+              {/* Nível da configuração: a regra do cargo ou a exceção de uma
+                  pessoa. Fica antes de tudo porque muda o significado da
+                  grade inteira que vem abaixo. */}
+              <div className="space-y-1.5">
+                <Label className="text-xs uppercase tracking-wide text-muted-foreground">
+                  Configurar acesso
+                </Label>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={modo === "perfil" ? "default" : "outline"}
+                    onClick={() => setModo("perfil")}
+                  >
+                    <Users className="h-4 w-4 mr-2" />
+                    Por cargo (vale para todos)
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={modo === "pessoa" ? "default" : "outline"}
+                    onClick={() => setModo("pessoa")}
+                  >
+                    <UserCog className="h-4 w-4 mr-2" />
+                    Por pessoa (exceção)
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {editandoPessoa
+                    ? "Vale só para a pessoa escolhida. Cada módulo começa igual ao cargo dela; o que você mudar aqui passa na frente do cargo."
+                    : "Vale para todo mundo que tem este cargo, menos quem tiver exceção própria na aba Por pessoa."}
+                </p>
+              </div>
+
               <div className="flex flex-wrap items-end justify-between gap-3">
                 <div className="space-y-1.5">
                   <Label className="text-xs uppercase tracking-wide text-muted-foreground">
-                    Perfil
+                    {editandoPessoa ? "Pessoa" : "Perfil"}
                   </Label>
-                  <Select value={perfilSel} onValueChange={(v) => setPerfilSel(v as PerfilKey)}>
-                    <SelectTrigger className="w-64">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {PERFIS.map((p) => (
-                        <SelectItem key={p.key} value={p.key}>
-                          {p.nome}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  {editandoPessoa ? (
+                    <Select value={pessoaSel} onValueChange={setPessoaSel}>
+                      <SelectTrigger className="w-80">
+                        <SelectValue placeholder="Escolha o funcionário ou médico" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {pessoas.map((p) => (
+                          <SelectItem key={p.userId} value={p.userId}>
+                            {p.nome} — {PERFIS.find((x) => x.key === p.role)?.nome ?? p.roleBruto}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  ) : (
+                    <Select value={perfilSel} onValueChange={(v) => setPerfilSel(v as PerfilKey)}>
+                      <SelectTrigger className="w-64">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {PERFIS.map((p) => (
+                          <SelectItem key={p.key} value={p.key}>
+                            {p.nome}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
                 </div>
                 <div className="flex items-center gap-2">
                   <Badge variant="outline" className="text-sm">
-                    Acessos: <span className="ml-1 font-semibold">{acessosPerfil}</span> /{" "}
+                    Acessos: <span className="ml-1 font-semibold">{acessosMostrados}</span> /{" "}
                     {totalModulos}
                   </Badge>
+                  {editandoPessoa && (
+                    <Badge
+                      variant={totalPersonalizado > 0 ? "default" : "secondary"}
+                      className="text-sm"
+                    >
+                      Personalizados: {totalPersonalizado}
+                    </Badge>
+                  )}
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={() => aplicarTodos("read")}
-                    disabled={!podeAdministrar || loading || saving}
+                    disabled={bloqueado}
                   >
                     Tudo Leitura
                   </Button>
@@ -666,7 +1385,7 @@ function PerfisPage() {
                     variant="outline"
                     size="sm"
                     onClick={() => aplicarTodos("write")}
-                    disabled={!podeAdministrar || loading || saving}
+                    disabled={bloqueado}
                   >
                     Tudo Edição
                   </Button>
@@ -674,14 +1393,26 @@ function PerfisPage() {
                     variant="outline"
                     size="sm"
                     onClick={() => aplicarTodos("none")}
-                    disabled={!podeAdministrar || loading || saving}
+                    disabled={bloqueado}
                   >
                     Limpar
                   </Button>
+                  {editandoPessoa && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={limparPersonalizacao}
+                      disabled={bloqueado || totalPersonalizado === 0}
+                      title="Apaga todas as exceções: a pessoa volta a seguir o cargo dela"
+                    >
+                      <RotateCcw className="h-4 w-4 mr-2" />
+                      Voltar tudo ao cargo
+                    </Button>
+                  )}
                   <Button
                     size="sm"
-                    onClick={salvar}
-                    disabled={!podeAdministrar || loading || saving || !perfilIds[perfilSel]}
+                    onClick={editandoPessoa ? salvarPessoa : salvar}
+                    disabled={bloqueado || (editandoPessoa ? false : !perfilIds[perfilSel])}
                   >
                     {saving ? (
                       <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -692,12 +1423,75 @@ function PerfisPage() {
                   </Button>
                 </div>
               </div>
+
+              {editandoPessoa && !pessoaSel && (
+                <p className="text-xs text-muted-foreground">
+                  Escolha a pessoa acima para ver e mudar o acesso dela.
+                </p>
+              )}
+              {editandoPessoa && pessoaEhAdmin && (
+                <p className="text-xs font-medium text-amber-600 dark:text-amber-500">
+                  Atenção: quem tem o cargo ADMINISTRADOR enxerga o sistema inteiro, e exceção
+                  nenhuma o limita. Para fechar um acesso desta pessoa, troque o cargo dela em
+                  Cadastros › Equipe e acessos.
+                </p>
+              )}
             </CardHeader>
           </Card>
 
-          {GRUPOS.map((grupo) => {
+          {editandoPessoa && pessoaSel && (
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base">Pode autorizar sozinha</CardTitle>
+                <p className="text-sm text-muted-foreground">
+                  Liberações dadas só a esta pessoa. Nenhum colega do mesmo cargo herda nada daqui,
+                  nem agora nem depois — vale para o cadastro dela e para mais ninguém. Cada troca é
+                  salva na hora.
+                </p>
+              </CardHeader>
+              <CardContent className="space-y-3 pt-0">
+                {ALCADAS.map((a) => {
+                  const ligada = alcadasPessoa.has(a.escopo);
+                  // Quem já autoriza pelo cargo não precisa da liberação nominal.
+                  const jaPeloCargo =
+                    !!pessoa?.role &&
+                    (ESCOPOS_AUTORIZACAO[a.escopo] as readonly string[]).includes(pessoa.role);
+                  return (
+                    <div
+                      key={a.escopo}
+                      className="flex items-start justify-between gap-4 rounded-md border p-3"
+                    >
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium">{a.nome}</p>
+                        <p className="text-xs text-muted-foreground">{a.descricao}</p>
+                        {jaPeloCargo && (
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            Esta pessoa já autoriza pelo cargo dela, desde que esteja marcada como
+                            gestão em Cadastros › Equipe e acessos.
+                          </p>
+                        )}
+                      </div>
+                      <div className="flex shrink-0 items-center gap-2">
+                        {salvandoAlcada === a.escopo && (
+                          <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                        )}
+                        <Switch
+                          checked={ligada}
+                          disabled={!podeAdministrar || salvandoAlcada !== null}
+                          onCheckedChange={(v) => void alternarAlcada(a.escopo, v)}
+                          aria-label={a.nome}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+              </CardContent>
+            </Card>
+          )}
+
+          {(editandoPessoa && !pessoaSel ? [] : GRUPOS).map((grupo) => {
             const open = openGroups[grupo.label] ?? true;
-            const ativos = grupo.modulos.filter((m) => matriz[perfilSel][m.key] !== "none").length;
+            const ativos = grupo.modulos.filter((m) => valores[m.key] !== "none").length;
             return (
               <Card key={grupo.label} className="overflow-hidden">
                 <Collapsible
@@ -733,18 +1527,67 @@ function PerfisPage() {
                       </TableHeader>
                       <TableBody>
                         {grupo.modulos.map((m) => {
-                          const val = matriz[perfilSel][m.key];
+                          const val = valores[m.key];
+                          const personalizado = editandoPessoa && m.key in overridesPessoa;
                           return (
-                            <TableRow key={m.key}>
-                              <TableCell className="font-medium">{m.nome}</TableCell>
+                            <TableRow
+                              key={m.key}
+                              className={personalizado ? "bg-primary/5" : undefined}
+                            >
+                              <TableCell className={m.sub ? "pl-8 font-medium" : "font-medium"}>
+                                <span className="flex items-center gap-2">
+                                  {m.sub && (
+                                    <CornerDownRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                                  )}
+                                  {m.nome}
+                                </span>
+                                {/* Onde a tela aparece no menu lateral: é assim
+                                    que o gestor liga uma linha desta matriz ao
+                                    item que ele vê (ou deixa de ver) no menu. */}
+                                {m.menu ? (
+                                  <span className="mt-0.5 block text-xs font-normal text-muted-foreground">
+                                    Menu: {m.menu}
+                                  </span>
+                                ) : (
+                                  <span className="mt-0.5 block text-xs font-normal text-muted-foreground">
+                                    Sem item no menu lateral
+                                  </span>
+                                )}
+                              </TableCell>
                               <TableCell className="text-sm text-muted-foreground">
                                 {m.descricao}
+                                {m.sub && (
+                                  <span className="mt-0.5 block text-xs">
+                                    Enquanto ficar igual à linha de cima, acompanha ela
+                                    automaticamente.
+                                  </span>
+                                )}
+                                {personalizado && (
+                                  <span className="mt-1 flex flex-wrap items-center gap-2 text-xs">
+                                    <Badge variant="default" className="text-[10px]">
+                                      Personalizado
+                                    </Badge>
+                                    <span className="text-muted-foreground">
+                                      no cargo é &ldquo;{ROTULO_ACESSO[basePessoa[m.key] ?? "none"]}
+                                      &rdquo;
+                                    </span>
+                                    <button
+                                      type="button"
+                                      onClick={() => voltarAoPadrao(m.key)}
+                                      disabled={!podeAdministrar}
+                                      className="inline-flex items-center gap-1 underline underline-offset-2 hover:text-foreground disabled:opacity-50"
+                                    >
+                                      <RotateCcw className="h-3 w-3" />
+                                      voltar ao cargo
+                                    </button>
+                                  </span>
+                                )}
                               </TableCell>
                               <TableCell>
                                 <RadioGroup
                                   value={val}
                                   onValueChange={(v) => setAcesso(m.key, v as Acesso)}
-                                  disabled={!podeAdministrar}
+                                  disabled={!podeAdministrar || carregandoPessoa}
                                   className="flex items-center justify-end gap-4"
                                 >
                                   <label className="flex items-center gap-1.5 text-sm cursor-pointer">
@@ -772,7 +1615,7 @@ function PerfisPage() {
             );
           })}
 
-          {loading && (
+          {(loading || carregandoPessoa) && (
             <p className="text-xs text-muted-foreground flex items-center gap-2">
               <Loader2 className="h-3 w-3 animate-spin" /> Carregando permissões…
             </p>

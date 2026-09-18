@@ -1,5 +1,10 @@
 import { describe, expect, it } from "bun:test";
-import { listaDePapeis, podeAutorizar, rolesDoEscopo } from "./autorizacao-supervisor";
+import {
+  listaDePapeis,
+  podeAutorizar,
+  rolesDoEscopo,
+  temAlcadaNominal,
+} from "./autorizacao-supervisor";
 
 /** Atalho: pessoa com a permissão individual concedida pela diretoria. */
 const marcado = true;
@@ -77,5 +82,60 @@ describe("listaDePapeis", () => {
     // mandava chamar exatamente quem o sistema ia recusar no sem faturamento.
     expect(listaDePapeis("sem_faturamento")).toBe("administrador, gestor ou supervisor");
     expect(listaDePapeis("desconto")).toBe("administrador, gestor ou financeiro");
+  });
+});
+
+// A liberação NOMINAL existe para quem precisa de um poder que o cargo não dá,
+// sem ser promovida de cargo (o que arrastaria acesso a dinheiro) e sem que o
+// cargo inteiro passe a ter o poder. O caso real: uma recepcionista autorizada
+// pela diretoria a isentar toxicológico sozinha, em 18/09/2026.
+describe("alçada nominal (liberação por pessoa)", () => {
+  it("libera a pessoa mesmo quando o cargo dela não autoriza", () => {
+    expect(podeAutorizar("sem_faturamento", "recepcao", false)).toBe(false);
+    expect(podeAutorizar("sem_faturamento", "recepcao", false, ["sem_faturamento"])).toBe(true);
+  });
+
+  it("não precisa da marcação de gestão para valer", () => {
+    // É o ponto do desenho: a marcação de gestão é dada por outras pessoas,
+    // depois, e não pode ser condição para uma liberação nominal já concedida.
+    expect(podeAutorizar("sem_faturamento", "recepcao", null, ["sem_faturamento"])).toBe(true);
+  });
+
+  it("vale só para o escopo liberado, e não para os outros", () => {
+    const so = ["sem_faturamento"];
+    expect(podeAutorizar("desconto", "recepcao", false, so)).toBe(false);
+    expect(podeAutorizar("liberar_debito", "recepcao", false, so)).toBe(false);
+    expect(podeAutorizar("alerta_critico", "recepcao", false, so)).toBe(false);
+  });
+
+  it("não muda nada para quem não tem liberação nominal", () => {
+    // A colega de mesmo cargo, inclusive marcada como gestão, continua fora.
+    expect(podeAutorizar("sem_faturamento", "recepcao", true, [])).toBe(false);
+    expect(podeAutorizar("sem_faturamento", "recepcao", true, null)).toBe(false);
+    expect(podeAutorizar("sem_faturamento", "recepcao", true)).toBe(false);
+  });
+
+  it("quem já autoriza pelo cargo continua autorizando", () => {
+    expect(podeAutorizar("sem_faturamento", "admin", true)).toBe(true);
+    expect(podeAutorizar("sem_faturamento", "gestor", true, [])).toBe(true);
+  });
+
+  it("temAlcadaNominal responde só pelo escopo pedido", () => {
+    expect(temAlcadaNominal("sem_faturamento", ["sem_faturamento"])).toBe(true);
+    expect(temAlcadaNominal("desconto", ["sem_faturamento"])).toBe(false);
+    expect(temAlcadaNominal("desconto", undefined)).toBe(false);
+  });
+
+  it("o mesmo poder de sempre continua fora do alcance da recepção sem liberação", () => {
+    // Trava do pedido de 18/09/2026: nenhuma outra recepcionista pode herdar
+    // o poder automaticamente, nem ganhando a marcação de gestão depois.
+    for (const escopo of [
+      "sem_faturamento",
+      "desconto",
+      "liberar_debito",
+      "alerta_critico",
+    ] as const) {
+      expect(podeAutorizar(escopo, "recepcao", true)).toBe(false);
+    }
   });
 });

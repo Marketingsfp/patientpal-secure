@@ -14365,6 +14365,47 @@ export type Database = {
           },
         ]
       }
+      usuario_alcadas: {
+        Row: {
+          clinica_id: string
+          concedido_por: string | null
+          created_at: string
+          escopo: string
+          id: string
+          observacao: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          clinica_id: string
+          concedido_por?: string | null
+          created_at?: string
+          escopo: string
+          id?: string
+          observacao?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          clinica_id?: string
+          concedido_por?: string | null
+          created_at?: string
+          escopo?: string
+          id?: string
+          observacao?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "usuario_alcadas_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       usuario_medicos: {
         Row: {
           clinica_id: string
@@ -14400,6 +14441,44 @@ export type Database = {
             columns: ["medico_id"]
             isOneToOne: false
             referencedRelation: "medicos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      usuario_permissoes: {
+        Row: {
+          acesso: Database["public"]["Enums"]["modulo_acesso"]
+          clinica_id: string
+          created_at: string
+          id: string
+          modulo: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          acesso: Database["public"]["Enums"]["modulo_acesso"]
+          clinica_id: string
+          created_at?: string
+          id?: string
+          modulo: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          acesso?: Database["public"]["Enums"]["modulo_acesso"]
+          clinica_id?: string
+          created_at?: string
+          id?: string
+          modulo?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "usuario_permissoes_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
             referencedColumns: ["id"]
           },
         ]

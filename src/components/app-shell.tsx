@@ -87,8 +87,8 @@ import { usePermissoes } from "@/hooks/use-permissoes";
 import {
   ROUTE_TO_MODULE as SHARED_ROUTE_TO_MODULE,
   moduloDaRota,
+  moduloPermitido,
   rotaSomenteAdmin,
-  SUBMODULE_PARENT,
 } from "@/lib/permissoes-rotas";
 import { SemPermissao } from "@/components/sem-permissao";
 import { supabase } from "@/integrations/supabase/client";
@@ -370,21 +370,28 @@ function LiquidBottomNav({
 // de rota) — aqui apenas reexportamos para uso local.
 const ROUTE_TO_MODULE = SHARED_ROUTE_TO_MODULE;
 
-function leafAllowed(to: string, allowed: Set<string> | null): boolean {
+/**
+ * O item de menu desta rota aparece para o usuário atual?
+ *
+ * Usa exatamente a mesma regra da guarda de rota (`moduloPermitido`): item
+ * escondido no menu é item que também não abre pela URL, e item liberado na
+ * URL é item que também aparece no menu. Antes eram dois trechos de código
+ * parecidos, mas não iguais — e um submódulo novo sumia do menu apesar de a
+ * tela abrir normalmente.
+ *
+ * A rota do menu é consultada por chave EXATA em ROUTE_TO_MODULE (sem casar
+ * por prefixo), para que um item novo sem cadastro no mapa apareça como
+ * ausente no teste de regressão em vez de herdar a permissão do vizinho.
+ */
+function leafAllowed(
+  to: string,
+  allowed: Set<string> | null,
+  configured?: Set<string> | null,
+): boolean {
   if (!allowed) return true;
   const mod = ROUTE_TO_MODULE[to];
-  if (mod === null) return true; // rota livre/sistema
   if (mod === undefined) return false; // rota não mapeada → ocultar
-  if (allowed.has(mod)) return true;
-  // Item de menu do módulo-pai (ex.: "Financeiro") permanece visível quando
-  // o usuário tem acesso a pelo menos um submódulo (mov. caixa, estorno,
-  // atendimentos), mesmo sem acesso ao pai. O submenu do Financeiro já
-  // filtra as abas individuais e a rota-pai redireciona para a primeira
-  // aba visível.
-  const temSub = Object.entries(SUBMODULE_PARENT).some(
-    ([sub, parent]) => parent === mod && allowed.has(sub),
-  );
-  return temSub;
+  return moduloPermitido(mod, allowed, configured);
 }
 
 const navRows: ReadonlyArray<{ label: string; items: ReadonlyArray<NavItem> }> = [
@@ -1033,15 +1040,20 @@ function AppShellInner() {
   const permissionFilteredRows = scopedNavRows
     .map((row) => {
       const items = row.items
-        .map((item) => {
+        .map((item): NavItem | null => {
           if (isParent(item)) {
-            // Para itens pai (ex.: Nina), verifica a chave do próprio "to" base
-            // dos filhos. Atualmente Nina compartilha o módulo "nina".
-            const baseTo = item.children[0]?.to;
-            if (baseTo && !leafAllowed(baseTo, allowedModules)) return null;
-            return item;
+            // Grupo expansível (Odontologia, Fisioterapia): cada filho tem o
+            // módulo dele, então o grupo aparece quando pelo menos um filho
+            // está liberado — e mostra só os filhos liberados. Antes olhava
+            // apenas o primeiro filho, e fechar a tela principal escondia
+            // junto a tela de orçamentos/pacotes que continuava liberada.
+            const filhos = item.children.filter((c) =>
+              leafAllowed(c.to, allowedModules, configuredModules),
+            );
+            if (filhos.length === 0) return null;
+            return { ...item, children: filhos };
           }
-          return leafAllowed(item.to, allowedModules) ? item : null;
+          return leafAllowed(item.to, allowedModules, configuredModules) ? item : null;
         })
         .filter((it): it is NavItem => it !== null);
       return { ...row, items };
@@ -1090,15 +1102,15 @@ function AppShellInner() {
   // abrir. Sem esse filtro uma recepcionista veria "Início" e "Caixa" fixos no
   // rodapé e tocaria neles para cair em "Acesso negado".
   const bottomNavItens = useMemo(
-    () => BOTTOM_NAV_ITENS.filter((i) => leafAllowed(i.to, allowedModules)),
-    [allowedModules],
+    () => BOTTOM_NAV_ITENS.filter((i) => leafAllowed(i.to, allowedModules, configuredModules)),
+    [allowedModules, configuredModules],
   );
 
   // Portal sem nenhuma tela liberada não aparece no hub nem no seletor.
   // O OS ZAP depende do módulo "nina", o mesmo de sempre — nenhum módulo novo.
   const portaisOcultos = useMemo<SubsystemId[]>(
-    () => (leafAllowed("/app/nina", allowedModules) ? [] : ["os-zap"]),
-    [allowedModules],
+    () => (leafAllowed("/app/nina", allowedModules, configuredModules) ? [] : ["os-zap"]),
+    [allowedModules, configuredModules],
   );
 
   // Resultado da busca do menu lateral (sem acento, case-insensitive).
@@ -1214,10 +1226,12 @@ function AppShellInner() {
       .map((o) => ({
         ...o,
         destino:
-          o.portal === null ? "/app" : o.candidatas.find((c) => leafAllowed(c, allowedModules)),
+          o.portal === null
+            ? "/app"
+            : o.candidatas.find((c) => leafAllowed(c, allowedModules, configuredModules)),
       }))
       .filter((o): o is typeof o & { destino: string } => Boolean(o.destino));
-  }, [allowedModules]);
+  }, [allowedModules, configuredModules]);
 
   const irParaAmbiente = (portal: SubsystemId | null, destino: string) => {
     fecharSidebar();
@@ -1322,27 +1336,10 @@ function AppShellInner() {
   const rotaPermitida = (() => {
     // Rotas administrativas: só o admin da clínica entra, mesmo digitando a URL.
     if (rotaSomenteAdmin(location.pathname)) return allowedModules === null;
-    if (allowedModules === null) return true;
-    if (currentModulo === null) return true;
-    if (typeof currentModulo !== "string") return false;
-    if (allowedModules.has(currentModulo)) return true;
-    // Submódulos (ex.: financeiro-estorno) herdam do pai quando não têm
-    // configuração explícita salva no perfil. Se a linha existir no banco
-    // (configuredModules contém a chave), respeitamos o valor — mesmo que
-    // seja "none" — para permitir bloqueio granular.
-    const pai = SUBMODULE_PARENT[currentModulo];
-    if (pai && !configuredModules?.has(currentModulo) && allowedModules.has(pai)) {
-      return true;
-    }
-    // Caminho inverso: usuário está na rota-pai (ex.: /app/financeiro) e
-    // não tem acesso ao módulo pai, mas TEM acesso a pelo menos um
-    // submódulo dele. Liberamos a entrada no layout pai — o submenu já
-    // esconde as abas às quais ele não tem acesso.
-    const temSubPermitido = Object.entries(SUBMODULE_PARENT).some(
-      ([sub, parent]) => parent === currentModulo && allowedModules.has(sub),
-    );
-    if (temSubPermitido) return true;
-    return false;
+    // Mesma regra do menu lateral (`leafAllowed`): submódulo sem linha salva
+    // herda o pai, submódulo com linha salva vale pelo que está salvo, e a
+    // casca de abas do Financeiro abre quando uma aba está liberada.
+    return moduloPermitido(currentModulo, allowedModules, configuredModules);
   })();
   // Entrar num portal não pode terminar em "Acesso negado". A rota principal
   // da Clínica Médica é o Dashboard (/app/painel), que perfis operacionais
@@ -1358,9 +1355,7 @@ function AppShellInner() {
       : location.pathname;
   const areaConversas =
     pathAtual === "/app/nina" &&
-    ["", "chat", "atend-inbox", "homologacao"].includes(
-      (location.hash ?? "").replace(/^#/, ""),
-    );
+    ["", "chat", "atend-inbox", "homologacao"].includes((location.hash ?? "").replace(/^#/, ""));
   const destinoPortal =
     !permsLoading && !rotaPermitida && ROTAS_HOME_PORTAL.has(pathAtual)
       ? primeiraRotaVisivel(visibleNavRows)
@@ -1596,151 +1591,188 @@ function AppShellInner() {
 
       <AppSidebarLayout
         aberta={!isChooser && sidebarAberta}
-        sidebar={!isChooser && (
-          <aside
-            id="menu-lateral"
-            aria-hidden={!sidebarAberta}
-            className="h-full w-full min-h-0 flex flex-col text-white overflow-hidden border-r border-white/10"
-            style={{ backgroundColor: corSidebar }}
-          >
-            {/* Título da gaveta + botão de fechar. */}
-            <div className="shrink-0 flex items-center gap-2 px-4 h-14 border-b border-white/10">
-              <Activity className="h-5 w-5 shrink-0 text-white" />
-              <span className="text-base font-bold tracking-tight text-white whitespace-nowrap">
-                ClinicaOS
-              </span>
-              <button
-                type="button"
-                onClick={fecharSidebar}
-                className="ml-auto shrink-0 p-1 rounded-lg flex items-center justify-center text-white/80 hover:bg-white/10 hover:text-white transition-colors duration-200 cursor-pointer group"
-                aria-label="Fechar menu lateral"
-                title="Fechar menu (Esc)"
-              >
-                <X className="h-5 w-5 transition-transform duration-200 ease-out group-hover:rotate-90 motion-reduce:transition-none" />
-              </button>
-            </div>
-            {/* Atalho fixo para voltar ao Portal (tela de escolha de ambiente). */}
-            <div className="shrink-0 px-3 pt-3">
-              <button
-                type="button"
-                onClick={() => irParaAmbiente(null, "/app")}
-                className="w-full flex items-center gap-2 rounded-md bg-white/10 border border-white/15 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-white/20"
-              >
-                <Home className="h-3.5 w-3.5 shrink-0" />
-                Voltar ao Portal
-              </button>
-            </div>
-            {/* Busca das telas do menu. */}
-            <div className="shrink-0 px-3 pt-3 pb-1">
-              <div className="relative">
-                <Search className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-white/60" />
-                <input
-                  ref={buscaMenuInputRef}
-                  value={buscaMenu}
-                  onChange={(e) => setBuscaMenu(aplicarCaixaAlta(e.currentTarget))}
-                  onKeyDown={(e) => {
-                    if (e.key === "Escape") setBuscaMenu("");
-                  }}
-                  placeholder="Buscar no menu..."
-                  aria-label="Buscar no menu"
-                  className="w-full rounded-md bg-white/10 border border-white/15 pl-7 pr-2 py-1.5 text-xs text-white uppercase placeholder:normal-case placeholder:text-white/50 outline-none focus:border-white/40 focus:bg-white/15"
-                />
-              </div>
-            </div>
-            <nav
-              ref={navScrollRef}
-              onMouseEnter={() => {
-                navHoverRef.current = true;
-              }}
-              onMouseLeave={() => {
-                navHoverRef.current = false;
-              }}
-              className="flex-1 px-2 py-3 space-y-5 overflow-y-auto sidebar-scroll sidebar-mono"
+        modo={subsystem === "os-zap" ? "coluna" : "gaveta"}
+        onFechar={fecharSidebar}
+        sidebar={
+          !isChooser && (
+            <aside
+              id="menu-lateral"
+              aria-hidden={!sidebarAberta}
+              className="h-full w-full min-h-0 flex flex-col text-white overflow-hidden border-r border-white/10"
+              style={{ backgroundColor: corSidebar }}
             >
-              {buscandoMenu && searchedNavRows.length === 0 && (
-                <p className="px-3 py-2 text-xs text-white/60">Nenhum item encontrado.</p>
-              )}
-              {searchedNavRows.map((row) => {
-                const leafIsActive = (to: string, hash?: string) =>
-                  navLeafAtivo(itemDeMenuAtivo(location.pathname, to), location.hash, hash);
-                const itemHasActive = (it: NavItem): boolean =>
-                  isParent(it)
-                    ? it.children.some((c) => leafIsActive(c.to, c.hash))
-                    : leafIsActive(it.to, it.hash);
-                const groupHasActive = row.items.some(itemHasActive);
-                const hideLabel =
-                  subsystem === "gestao-pessoas" && row.label === "Recursos Humanos";
-                const open = hideLabel || buscandoMenu ? true : (openGroups[row.label] ?? true);
-                return (
-                  <div key={row.label} className="space-y-1">
-                    {!hideLabel && (
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          setOpenGroups((prev) => ({
-                            ...prev,
-                            [row.label]: !(prev[row.label] ?? true),
-                          }));
-                        }}
-                        className="w-full flex items-center justify-between px-3 py-1 text-[12px] font-bold uppercase tracking-[0.1em] text-indigo-200 hover:text-white transition-colors rounded-md"
-                        aria-expanded={open}
-                      >
-                        <span>{row.label}</span>
-                        <ChevronDown
-                          className={`h-3 w-3 transition-transform ${open ? "rotate-0" : "-rotate-90"}`}
-                        />
-                      </button>
-                    )}
-                    {open &&
-                      row.items.map((item) => {
-                        if (isParent(item)) {
-                          const subActive = item.children.some((c) => leafIsActive(c.to, c.hash));
-                          const subKey = `${row.label}::${item.label}`;
-                          const subOpen = buscandoMenu ? true : (openGroups[subKey] ?? false);
-                          return (
-                            <div
-                              key={subKey}
-                              className={cn("space-y-1 rounded-md", dragCls(navItemKey(item)))}
-                              {...dragProps(row.label, navItemKey(item))}
-                            >
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.preventDefault();
-                                  e.stopPropagation();
-                                  setOpenGroups((prev) => ({
-                                    ...prev,
-                                    [subKey]: !(prev[subKey] ?? false),
-                                  }));
-                                }}
-                                className={`w-full flex items-center gap-2.5 rounded-lg px-3 py-2 text-[14px] font-medium tracking-tight transition-all ${subActive ? "bg-white/10 text-white" : "text-white hover:bg-white/10 hover:text-white"}${hoverScaleCls}`}
-                                aria-expanded={subOpen}
+              {/* Título da gaveta + botão de fechar. */}
+              <div className="shrink-0 flex items-center gap-2 px-4 h-14 border-b border-white/10">
+                <Activity className="h-5 w-5 shrink-0 text-white" />
+                <span className="text-base font-bold tracking-tight text-white whitespace-nowrap">
+                  ClinicaOS
+                </span>
+                <button
+                  type="button"
+                  onClick={fecharSidebar}
+                  className="ml-auto shrink-0 p-1 rounded-lg flex items-center justify-center text-white/80 hover:bg-white/10 hover:text-white transition-colors duration-200 cursor-pointer group"
+                  aria-label="Fechar menu lateral"
+                  title="Fechar menu (Esc)"
+                >
+                  <X className="h-5 w-5 transition-transform duration-200 ease-out group-hover:rotate-90 motion-reduce:transition-none" />
+                </button>
+              </div>
+              {/* Atalho fixo para voltar ao Portal (tela de escolha de ambiente). */}
+              <div className="shrink-0 px-3 pt-3">
+                <button
+                  type="button"
+                  onClick={() => irParaAmbiente(null, "/app")}
+                  className="w-full flex items-center gap-2 rounded-md bg-white/10 border border-white/15 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-white/20"
+                >
+                  <Home className="h-3.5 w-3.5 shrink-0" />
+                  Voltar ao Portal
+                </button>
+              </div>
+              {/* Busca das telas do menu. */}
+              <div className="shrink-0 px-3 pt-3 pb-1">
+                <div className="relative">
+                  <Search className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-white/60" />
+                  <input
+                    ref={buscaMenuInputRef}
+                    value={buscaMenu}
+                    onChange={(e) => setBuscaMenu(aplicarCaixaAlta(e.currentTarget))}
+                    onKeyDown={(e) => {
+                      if (e.key === "Escape") setBuscaMenu("");
+                    }}
+                    placeholder="Buscar no menu..."
+                    aria-label="Buscar no menu"
+                    className="w-full rounded-md bg-white/10 border border-white/15 pl-7 pr-2 py-1.5 text-xs text-white uppercase placeholder:normal-case placeholder:text-white/50 outline-none focus:border-white/40 focus:bg-white/15"
+                  />
+                </div>
+              </div>
+              <nav
+                ref={navScrollRef}
+                onMouseEnter={() => {
+                  navHoverRef.current = true;
+                }}
+                onMouseLeave={() => {
+                  navHoverRef.current = false;
+                }}
+                className="flex-1 px-2 py-3 space-y-5 overflow-y-auto sidebar-scroll sidebar-mono"
+              >
+                {buscandoMenu && searchedNavRows.length === 0 && (
+                  <p className="px-3 py-2 text-xs text-white/60">Nenhum item encontrado.</p>
+                )}
+                {searchedNavRows.map((row) => {
+                  const leafIsActive = (to: string, hash?: string) =>
+                    navLeafAtivo(itemDeMenuAtivo(location.pathname, to), location.hash, hash);
+                  const itemHasActive = (it: NavItem): boolean =>
+                    isParent(it)
+                      ? it.children.some((c) => leafIsActive(c.to, c.hash))
+                      : leafIsActive(it.to, it.hash);
+                  const groupHasActive = row.items.some(itemHasActive);
+                  const hideLabel =
+                    subsystem === "gestao-pessoas" && row.label === "Recursos Humanos";
+                  const open = hideLabel || buscandoMenu ? true : (openGroups[row.label] ?? true);
+                  return (
+                    <div key={row.label} className="space-y-1">
+                      {!hideLabel && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            setOpenGroups((prev) => ({
+                              ...prev,
+                              [row.label]: !(prev[row.label] ?? true),
+                            }));
+                          }}
+                          className="w-full flex items-center justify-between px-3 py-1 text-[12px] font-bold uppercase tracking-[0.1em] text-indigo-200 hover:text-white transition-colors rounded-md"
+                          aria-expanded={open}
+                        >
+                          <span>{row.label}</span>
+                          <ChevronDown
+                            className={`h-3 w-3 transition-transform ${open ? "rotate-0" : "-rotate-90"}`}
+                          />
+                        </button>
+                      )}
+                      {open &&
+                        row.items.map((item) => {
+                          if (isParent(item)) {
+                            const subActive = item.children.some((c) => leafIsActive(c.to, c.hash));
+                            const subKey = `${row.label}::${item.label}`;
+                            const subOpen = buscandoMenu ? true : (openGroups[subKey] ?? false);
+                            return (
+                              <div
+                                key={subKey}
+                                className={cn("space-y-1 rounded-md", dragCls(navItemKey(item)))}
+                                {...dragProps(row.label, navItemKey(item))}
                               >
-                                <item.icon className="h-[18px] w-[18px] shrink-0" />
-                                <span className="flex-1 text-left leading-snug break-words">
-                                  {item.label}
-                                </span>
-                                <ChevronDown
-                                  className={`h-3 w-3 transition-transform ${subOpen ? "rotate-0" : "-rotate-90"}`}
-                                />
-                              </button>
-                              {subOpen &&
-                                item.children.map((child) => {
-                                  const active = leafIsActive(child.to, child.hash);
-                                  const linkKey = `${child.to}#${child.hash ?? ""}`;
-                                  const openInNewTab = false;
-                                  const href = `${child.to}${child.hash ? `#${child.hash}` : ""}`;
-                                  if (openInNewTab) {
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    setOpenGroups((prev) => ({
+                                      ...prev,
+                                      [subKey]: !(prev[subKey] ?? false),
+                                    }));
+                                  }}
+                                  className={`w-full flex items-center gap-2.5 rounded-lg px-3 py-2 text-[14px] font-medium tracking-tight transition-all ${subActive ? "bg-white/10 text-white" : "text-white hover:bg-white/10 hover:text-white"}${hoverScaleCls}`}
+                                  aria-expanded={subOpen}
+                                >
+                                  <item.icon className="h-[18px] w-[18px] shrink-0" />
+                                  <span className="flex-1 text-left leading-snug break-words">
+                                    {item.label}
+                                  </span>
+                                  <ChevronDown
+                                    className={`h-3 w-3 transition-transform ${subOpen ? "rotate-0" : "-rotate-90"}`}
+                                  />
+                                </button>
+                                {subOpen &&
+                                  item.children.map((child) => {
+                                    const active = leafIsActive(child.to, child.hash);
+                                    const linkKey = `${child.to}#${child.hash ?? ""}`;
+                                    const openInNewTab = false;
+                                    const href = `${child.to}${child.hash ? `#${child.hash}` : ""}`;
+                                    if (openInNewTab) {
+                                      return (
+                                        <a
+                                          key={linkKey}
+                                          href={href}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          data-nav-to={child.to}
+                                          className={`relative flex items-center gap-2.5 rounded-lg pl-8 pr-3 py-2 text-[14px] font-medium tracking-tight transition-all text-white hover:bg-white/10 hover:text-white${hoverScaleCls}`}
+                                        >
+                                          <child.icon className="h-[18px] w-[18px] shrink-0" />
+                                          <span className="leading-snug break-words">
+                                            {child.label}
+                                          </span>
+                                        </a>
+                                      );
+                                    }
                                     return (
                                       <a
                                         key={linkKey}
                                         href={href}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
                                         data-nav-to={child.to}
-                                        className={`relative flex items-center gap-2.5 rounded-lg pl-8 pr-3 py-2 text-[14px] font-medium tracking-tight transition-all text-white hover:bg-white/10 hover:text-white${hoverScaleCls}`}
+                                        data-nav-active={active ? "true" : undefined}
+                                        aria-current={uxMelhorias && active ? "page" : undefined}
+                                        onMouseEnter={() => preCarregar(child.to)}
+                                        onClick={(event) => {
+                                          if (
+                                            event.metaKey ||
+                                            event.ctrlKey ||
+                                            event.shiftKey ||
+                                            event.altKey ||
+                                            event.button !== 0
+                                          )
+                                            return;
+                                          event.preventDefault();
+                                          fecharSidebar();
+                                          irPara(href);
+                                        }}
+                                        className={`relative flex items-center gap-2.5 rounded-lg pl-8 pr-3 py-2 text-[14px] font-medium tracking-tight transition-all ${
+                                          active
+                                            ? "bg-white text-slate-900 shadow-sm"
+                                            : "text-white hover:bg-white/10 hover:text-white"
+                                        }${hoverScaleCls}`}
                                       >
                                         <child.icon className="h-[18px] w-[18px] shrink-0" />
                                         <span className="leading-snug break-words">
@@ -1748,105 +1780,72 @@ function AppShellInner() {
                                         </span>
                                       </a>
                                     );
-                                  }
-                                  return (
-                                    <a
-                                      key={linkKey}
-                                      href={href}
-                                      data-nav-to={child.to}
-                                      data-nav-active={active ? "true" : undefined}
-                                      aria-current={uxMelhorias && active ? "page" : undefined}
-                                      onMouseEnter={() => preCarregar(child.to)}
-                                      onClick={(event) => {
-                                        if (
-                                          event.metaKey ||
-                                          event.ctrlKey ||
-                                          event.shiftKey ||
-                                          event.altKey ||
-                                          event.button !== 0
-                                        )
-                                          return;
-                                        event.preventDefault();
-                                        fecharSidebar();
-                                        irPara(href);
-                                      }}
-                                      className={`relative flex items-center gap-2.5 rounded-lg pl-8 pr-3 py-2 text-[14px] font-medium tracking-tight transition-all ${
-                                        active
-                                          ? "bg-white text-slate-900 shadow-sm"
-                                          : "text-white hover:bg-white/10 hover:text-white"
-                                      }${hoverScaleCls}`}
-                                    >
-                                      <child.icon className="h-[18px] w-[18px] shrink-0" />
-                                      <span className="leading-snug break-words">
-                                        {child.label}
-                                      </span>
-                                    </a>
-                                  );
-                                })}
-                            </div>
+                                  })}
+                              </div>
+                            );
+                          }
+                          const aliases: string[] = (item as { aliases?: string[] }).aliases ?? [];
+                          const active =
+                            leafIsActive(item.to, item.hash) ||
+                            (!item.hash &&
+                              aliases.some((a) => itemDeMenuAtivo(location.pathname, a)));
+                          const href = hrefDoNavLeaf(item);
+                          return (
+                            <a
+                              key={navItemKey(item)}
+                              href={href}
+                              data-nav-to={item.to}
+                              data-nav-active={active ? "true" : undefined}
+                              aria-current={uxMelhorias && active ? "page" : undefined}
+                              onMouseEnter={() => preCarregar(item.to)}
+                              onClick={(event) => {
+                                if (
+                                  event.metaKey ||
+                                  event.ctrlKey ||
+                                  event.shiftKey ||
+                                  event.altKey ||
+                                  event.button !== 0
+                                )
+                                  return;
+                                event.preventDefault();
+                                fecharSidebar();
+                                irPara(href);
+                              }}
+                              {...dragProps(row.label, navItemKey(item))}
+                              className={cn(
+                                `relative flex items-center gap-2.5 rounded-lg px-3 py-2 text-[14px] font-medium tracking-tight transition-all ${
+                                  active
+                                    ? "bg-white text-slate-900 shadow-sm"
+                                    : "text-white hover:bg-white/10 hover:text-white"
+                                }${hoverScaleCls}`,
+                                dragCls(navItemKey(item)),
+                              )}
+                            >
+                              <item.icon className="h-[18px] w-[18px] shrink-0" />
+                              <span className="leading-snug break-words">{item.label}</span>
+                            </a>
                           );
-                        }
-                        const aliases: string[] = (item as { aliases?: string[] }).aliases ?? [];
-                        const active =
-                          leafIsActive(item.to, item.hash) ||
-                          (!item.hash &&
-                            aliases.some((a) => itemDeMenuAtivo(location.pathname, a)));
-                        const href = hrefDoNavLeaf(item);
-                        return (
-                          <a
-                            key={navItemKey(item)}
-                            href={href}
-                            data-nav-to={item.to}
-                            data-nav-active={active ? "true" : undefined}
-                            aria-current={uxMelhorias && active ? "page" : undefined}
-                            onMouseEnter={() => preCarregar(item.to)}
-                            onClick={(event) => {
-                              if (
-                                event.metaKey ||
-                                event.ctrlKey ||
-                                event.shiftKey ||
-                                event.altKey ||
-                                event.button !== 0
-                              )
-                                return;
-                              event.preventDefault();
-                              fecharSidebar();
-                              irPara(href);
-                            }}
-                            {...dragProps(row.label, navItemKey(item))}
-                            className={cn(
-                              `relative flex items-center gap-2.5 rounded-lg px-3 py-2 text-[14px] font-medium tracking-tight transition-all ${
-                                active
-                                  ? "bg-white text-slate-900 shadow-sm"
-                                  : "text-white hover:bg-white/10 hover:text-white"
-                              }${hoverScaleCls}`,
-                              dragCls(navItemKey(item)),
-                            )}
-                          >
-                            <item.icon className="h-[18px] w-[18px] shrink-0" />
-                            <span className="leading-snug break-words">{item.label}</span>
-                          </a>
-                        );
-                      })}
-                  </div>
-                );
-              })}
-            </nav>
-            <div className="shrink-0 px-2 py-2 border-t border-white/15 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
-              <SidebarUserMenu
-                userId={user?.id}
-                userName={userName}
-                email={user?.email}
-                initial={initial}
-                color={clinicColor}
-                showName
-                onChangePassword={() => setPwOpen(true)}
-                onSignOut={() => void handleSignOut()}
-                onSwitchPortal={() => abrirSeletorPortais()}
-              />
-            </div>
-          </aside>
-        )}
+                        })}
+                    </div>
+                  );
+                })}
+              </nav>
+              <div className="shrink-0 px-2 py-2 border-t border-white/15 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
+                <SidebarUserMenu
+                  userId={user?.id}
+                  userName={userName}
+                  email={user?.email}
+                  initial={initial}
+                  color={clinicColor}
+                  showName
+                  onChangePassword={() => setPwOpen(true)}
+                  onSignOut={() => void handleSignOut()}
+                  onSwitchPortal={() => abrirSeletorPortais()}
+                />
+              </div>
+            </aside>
+          )
+        }
       >
         <main
           key={uxMelhorias ? chaveAreaPrincipal(location.pathname) : "static"}

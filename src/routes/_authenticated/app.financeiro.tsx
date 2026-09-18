@@ -19,7 +19,7 @@ import {
   Target,
 } from "lucide-react";
 import { usePermissoes } from "@/hooks/use-permissoes";
-import { moduloDaRota, SUBMODULE_PARENT } from "@/lib/permissoes-rotas";
+import { moduloDaRota, moduloPermitido } from "@/lib/permissoes-rotas";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/_authenticated/app/financeiro")({
@@ -57,15 +57,13 @@ function FinLayout() {
   //   se não houver linha explícita, herdam de "financeiro".
   // - Demais abas caem em "financeiro" e só aparecem se o perfil tiver
   //   acesso a esse módulo.
-  const visibleSubnav = subnav.filter((item) => {
-    if (allowed === null) return true;
-    const mod = moduloDaRota(item.to);
-    if (!mod) return true;
-    if (allowed.has(mod)) return true;
-    const pai = SUBMODULE_PARENT[mod];
-    if (pai && !configured?.has(mod) && allowed.has(pai)) return true;
-    return false;
-  });
+  // `abrirCascaDeAbas: false`: aqui estamos DENTRO do Financeiro, então ter
+  // uma aba liberada não pode fazer aparecer a aba "Dashboard" (módulo
+  // "financeiro"). Fora daqui a regra é a contrária — o item "Financeiro" do
+  // menu aparece para quem tem só uma aba, senão ele não chegaria nela.
+  const visibleSubnav = subnav.filter((item) =>
+    moduloPermitido(moduloDaRota(item.to), allowed, configured, { abrirCascaDeAbas: false }),
+  );
 
   // Se o usuário não tem acesso ao módulo "financeiro" em si (apenas a
   // submódulos), redireciona a entrada raiz /app/financeiro para a
