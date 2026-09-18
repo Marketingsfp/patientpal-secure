@@ -64,7 +64,7 @@ import { CargaTeste } from "@/components/nina/CargaTeste";
 import { RelatorioHomologacao } from "@/components/nina/RelatorioHomologacao";
 import { DashboardHomologacao } from "@/components/nina/DashboardHomologacao";
 
-import { AtendMacros } from "@/components/nina/AtendimentoTabs";
+import { RespostasRapidasManager } from "@/components/nina/RespostasRapidasManager";
 import { AtendInbox } from "@/components/nina/AtendimentoExtraTabs";
 import { SemCaixaAlta } from "@/components/ui/caixa-alta";
 
@@ -154,7 +154,7 @@ function NinaPage() {
 
         {/* ============ ATENDIMENTO — Dashboard ============ */}
         <TabsContent value="atend-macros">
-          <AtendMacros />
+          <RespostasRapidasManager />
         </TabsContent>
         <TabsContent value="atend-inbox" className="mt-0 h-full">
           <AtendInbox />
