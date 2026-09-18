@@ -3186,12 +3186,14 @@ function AtendimentosPage() {
                   </Label>
                   <MedicoCombobox
                     value={fMedico}
-                    onChange={(v) => {
-                      if (!isMedicoOnly) setFMedico(v);
+                    agendaValue={fAgenda}
+                    opcoes={opcoesProf.opcoes}
+                    rotuloMedico={opcoesProf.rotuloMedico}
+                    onChange={(medicoId, agendaFiltro) => {
+                      if (isMedicoOnly) return;
+                      setFMedico(medicoId);
+                      setFAgenda(agendaFiltro);
                     }}
-                    medicos={
-                      isMedicoOnly ? medicos.filter((m) => m.id === medicoLogadoId) : medicos
-                    }
                   />
                 </div>
                 <div className="space-y-1.5">
@@ -4736,16 +4738,36 @@ function AtendimentosPage() {
 
 function MedicoCombobox({
   value,
+  agendaValue,
+  opcoes,
+  rotuloMedico,
   onChange,
-  medicos,
 }: {
   value: string;
-  onChange: (v: string) => void;
-  medicos: Array<{ id: string; nome: string }>;
+  agendaValue: string;
+  opcoes: OpcaoProfissional[];
+  rotuloMedico: Map<string, string>;
+  onChange: (medicoId: string, agendaFiltro: string) => void;
 }) {
   const [open, setOpen] = useState(false);
-  const selected = medicos.find((m) => m.id === value);
-  const label = value === "todos" || !selected ? "Todos os médicos" : selected.nome;
+  const [busca, setBusca] = useState("");
+  const label =
+    value === "todos"
+      ? "Todos os médicos"
+      : (opcoes.find((o) => o.medicoId === value && o.agendaFiltro === agendaValue)?.rotulo ??
+        rotuloMedico.get(value) ??
+        "Todos os médicos");
+  // Busca por palavras soltas, igual à Agenda: "joao exames" acha
+  // "JOAO HELIO VALENTIM — EXAMES".
+  const termos = busca
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .split(/\s+/)
+    .filter(Boolean);
+  const filtradas = termos.length
+    ? opcoes.filter((o) => termos.every((t) => o.busca.includes(t)))
+    : opcoes;
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
@@ -4761,15 +4783,15 @@ function MedicoCombobox({
         </button>
       </PopoverTrigger>
       <PopoverContent className="p-0 w-[--radix-popover-trigger-width]" align="start">
-        <Command>
-          <CommandInput placeholder="Buscar médico..." />
+        <Command shouldFilter={false}>
+          <CommandInput placeholder="Buscar médico..." value={busca} onValueChange={setBusca} />
           <CommandList>
             <CommandEmpty>Nenhum médico encontrado.</CommandEmpty>
             <CommandGroup>
               <CommandItem
                 value="todos os médicos"
                 onSelect={() => {
-                  onChange("todos");
+                  onChange("todos", "todos");
                   setOpen(false);
                 }}
               >
@@ -4778,20 +4800,25 @@ function MedicoCombobox({
                 />
                 Todos os médicos
               </CommandItem>
-              {medicos.map((m) => (
+              {filtradas.map((o) => (
                 <CommandItem
-                  key={m.id}
-                  value={m.nome}
+                  key={o.key}
+                  value={o.key}
                   onSelect={() => {
-                    onChange(m.id);
+                    onChange(o.medicoId, o.agendaFiltro);
                     setOpen(false);
                   }}
                   className="uppercase"
                 >
                   <Check
-                    className={cn("mr-2 h-4 w-4", value === m.id ? "opacity-100" : "opacity-0")}
+                    className={cn(
+                      "mr-2 h-4 w-4",
+                      value === o.medicoId && agendaValue === o.agendaFiltro
+                        ? "opacity-100"
+                        : "opacity-0",
+                    )}
                   />
-                  {m.nome}
+                  {o.rotulo}
                 </CommandItem>
               ))}
             </CommandGroup>
