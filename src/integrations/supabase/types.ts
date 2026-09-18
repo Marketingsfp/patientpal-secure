@@ -17178,6 +17178,10 @@ export type Database = {
       show_limit: { Args: never; Returns: number }
       show_trgm: { Args: { "": string }; Returns: string[] }
       strip_accents: { Args: { _text: string }; Returns: string }
+      tem_alcada_nominal: {
+        Args: { _clinica_id: string; _escopo: string; _user_id: string }
+        Returns: boolean
+      }
       tipo_atendimento_padrao: {
         Args: { p_clinica_id: string; p_paciente_id: string }
         Returns: string
