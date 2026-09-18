@@ -741,34 +741,49 @@ function AtendimentoIaPage() {
                           </HoverCard>
                         </TableCell>
                         <TableCell className="text-right">
-                          {atendido ? (
-                            // Reabrir o prontuário já finalizado é o caminho da
-                            // segunda via: o paciente volta no balcão pedindo o
-                            // atestado ou a receita que perdeu.
+                          <div className="flex items-center justify-end gap-1">
+                            {/* Histórico clínico do paciente sem sair da fila:
+                                abre a gaveta com as consultas anteriores. */}
                             <Button
                               size="sm"
-                              variant="ghost"
-                              className="text-xs text-green-800 hover:bg-green-100 hover:text-green-900 dark:text-green-300 dark:hover:bg-green-900/40"
-                              onClick={() => atender(it)}
-                              title="Reabrir o prontuário para conferir ou imprimir segunda via"
+                              variant="outline"
+                              className="h-8 px-2 text-xs"
+                              onClick={() => setHistorico(it)}
+                              title="Ver o histórico de prontuários anteriores deste paciente"
+                              aria-label={`Histórico do prontuário de ${it.paciente_nome}`}
                             >
-                              <Eye className="h-3.5 w-3.5 mr-1.5" />
-                              Reabrir / Ver Atendimento
+                              <FileText className="h-3.5 w-3.5" />
+                              <span className="hidden lg:inline ml-1.5">Histórico</span>
                             </Button>
-                          ) : (
-                            <Button
-                              size="sm"
-                              onClick={() => atender(it)}
-                              disabled={Boolean(pag && !pag.pago)}
-                              title={
-                                pag && !pag.pago
-                                  ? "Pagamento pendente — envie ao caixa antes do atendimento"
-                                  : undefined
-                              }
-                            >
-                              <Stethoscope className="h-4 w-4" /> Atender
-                            </Button>
-                          )}
+                            {atendido ? (
+                              // Reabrir o prontuário já finalizado é o caminho da
+                              // segunda via: o paciente volta no balcão pedindo o
+                              // atestado ou a receita que perdeu.
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="text-xs text-green-800 hover:bg-green-100 hover:text-green-900 dark:text-green-300 dark:hover:bg-green-900/40"
+                                onClick={() => atender(it)}
+                                title="Reabrir o prontuário para conferir ou imprimir segunda via"
+                              >
+                                <Eye className="h-3.5 w-3.5 mr-1.5" />
+                                Reabrir / Ver Atendimento
+                              </Button>
+                            ) : (
+                              <Button
+                                size="sm"
+                                onClick={() => atender(it)}
+                                disabled={Boolean(pag && !pag.pago)}
+                                title={
+                                  pag && !pag.pago
+                                    ? "Pagamento pendente — envie ao caixa antes do atendimento"
+                                    : undefined
+                                }
+                              >
+                                <Stethoscope className="h-4 w-4" /> Atender
+                              </Button>
+                            )}
+                          </div>
                         </TableCell>
                       </TableRow>
                     );
@@ -779,6 +794,17 @@ function AtendimentoIaPage() {
           )}
         </div>
       </Card>
+
+      <HistoricoProntuarioDrawer
+        aberto={Boolean(historico)}
+        onOpenChange={(v) => {
+          if (!v) setHistorico(null);
+        }}
+        pacienteId={historico?.paciente_id ?? null}
+        pacienteNome={historico?.paciente_nome ?? ""}
+        clinicaId={clinicaAtual?.clinica_id ?? null}
+        agendamentoAtualId={historico?.id ?? null}
+      />
     </div>
   );
 }
