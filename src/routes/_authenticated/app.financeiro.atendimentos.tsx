@@ -1444,7 +1444,7 @@ function AtendimentosPage() {
       supabase
         .from("fin_lancamentos")
         .select(
-          "id, data, descricao, valor, valor_medico_override, forma_pagamento, medico_id, paciente_id, agendamento_id, repasse_pago, repasse_pago_em, repasse_pago_at, repasse_forma_pagamento, repasse_conta_id, repasse_lancamento_id, laudo_status, medico_laudador_id, valor_laudo, paciente:pacientes(nome), agendamento:agendamentos!inner(procedimento, paciente_nome, paciente_id, medico_id, inicio, status)",
+          "id, data, descricao, valor, valor_medico_override, forma_pagamento, medico_id, paciente_id, agendamento_id, repasse_pago, repasse_pago_em, repasse_pago_at, repasse_forma_pagamento, repasse_conta_id, repasse_lancamento_id, laudo_status, medico_laudador_id, valor_laudo, paciente:pacientes(nome), agendamento:agendamentos!inner(procedimento, paciente_nome, paciente_id, medico_id, inicio, status, agenda_id)",
         )
         .eq("clinica_id", clinicaAtual.clinica_id)
         .eq("tipo", "receita")
@@ -1456,7 +1456,7 @@ function AtendimentosPage() {
       supabase
         .from("fin_lancamentos")
         .select(
-          "id, data, descricao, valor, valor_medico_override, forma_pagamento, medico_id, paciente_id, agendamento_id, repasse_pago, repasse_pago_em, repasse_pago_at, repasse_forma_pagamento, repasse_conta_id, repasse_lancamento_id, laudo_status, medico_laudador_id, valor_laudo, paciente:pacientes(nome), agendamento:agendamentos(procedimento, paciente_nome, paciente_id, medico_id, inicio, status)",
+          "id, data, descricao, valor, valor_medico_override, forma_pagamento, medico_id, paciente_id, agendamento_id, repasse_pago, repasse_pago_em, repasse_pago_at, repasse_forma_pagamento, repasse_conta_id, repasse_lancamento_id, laudo_status, medico_laudador_id, valor_laudo, paciente:pacientes(nome), agendamento:agendamentos(procedimento, paciente_nome, paciente_id, medico_id, inicio, status, agenda_id)",
         )
         .eq("clinica_id", clinicaAtual.clinica_id)
         .eq("tipo", "receita")
@@ -1696,6 +1696,7 @@ function AtendimentosPage() {
         medico_id: string | null;
         inicio: string | null;
         status: string | null;
+        agenda_id: string | null;
       } | null;
       // Procedimento: só usamos o do agendamento. Quando não há agendamento
       // vinculado, a "cauda" da descrição costuma ser tipo de contrato/forma
@@ -1755,6 +1756,7 @@ function AtendimentosPage() {
         repasse_conta_id: (r as any).repasse_conta_id ?? null,
         agendamento_inicio: ag?.inicio ?? null,
         agendamento_status: ag?.status ?? null,
+        agenda_nome: ag?.agenda_id ? (agendaNomePorId.get(ag.agenda_id) ?? null) : null,
         ...marcaTerceiro("agenda", r.id, terceiro),
         laudo_status: (r as any).laudo_status ?? null,
         medico_laudador_id: (r as any).medico_laudador_id ?? null,
@@ -1768,7 +1770,16 @@ function AtendimentosPage() {
     let unif = [...manuais, ...agendFiltered].sort((a, b) => (a.data < b.data ? 1 : -1));
     if (fStatus === "aberto") unif = unif.filter((x) => !x.repasse_pago);
     else if (fStatus === "pago") unif = unif.filter((x) => x.repasse_pago);
-    setItems(unif);
+    // Recorte por agenda escolhida no filtro (aplicado por último).
+    let visiveis = unif;
+    let ocultosSemAgenda = 0;
+    if (fAgenda.startsWith("nome:")) {
+      const alvo = fAgenda.slice(5);
+      ocultosSemAgenda = unif.filter((x) => !x.agenda_nome).length;
+      visiveis = unif.filter((x) => chaveNomeAgenda(x.agenda_nome ?? "") === alvo);
+    }
+    setItems(visiveis);
+    setSemAgendaOcultos(ocultosSemAgenda);
     setSel(new Set());
     setLoading(false);
   };
