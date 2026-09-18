@@ -112,6 +112,23 @@ export const TODOS_MODULOS: ReadonlyArray<string> = [
   "painel-executivo",
   // Coach WhatsApp
   "coach",
+  // Submódulos: itens de menu que nasceram colados a outro módulo e agora
+  // têm chave própria na tela de Perfis de Acesso. Enquanto ninguém os
+  // configura, valem o mesmo que o pai (SUBMODULE_PARENT em
+  // permissoes-rotas.ts) — entram aqui para o perfil ADMIN já contá-los.
+  "agenda-escala",
+  "clientes-numeracao",
+  "consulta-rapida-valores",
+  "equipe-acessos",
+  "nfse-config",
+  "odontologia-orcamentos",
+  "fisioterapia-pacotes",
+  "nina-aprendizado",
+  "nina-metricas",
+  "nina-arquitetura",
+  "financeiro-movcaixa",
+  "financeiro-atendimentos",
+  "financeiro-estorno",
 ];
 
 export const PRESETS: Record<PerfilKey, Partial<Record<string, Acesso>>> = {

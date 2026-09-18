@@ -36,10 +36,12 @@ import {
   PhoneCall,
   ChevronDown,
   ChevronRight,
+  CornerDownRight,
   Save,
   Loader2,
 } from "lucide-react";
 import { PRESETS, type Acesso, type PerfilKey } from "@/lib/permissoes-presets";
+import { SUBMODULE_PARENT } from "@/lib/permissoes-rotas";
 import { useClinicFeatureFlag } from "@/hooks/use-clinic-feature-flag";
 
 export const Route = createFileRoute("/_authenticated/app/perfis")({
@@ -109,7 +111,20 @@ const PERFIS: Array<{
   },
 ];
 
-type Modulo = { key: string; nome: string; descricao: string };
+type Modulo = {
+  key: string;
+  nome: string;
+  descricao: string;
+  /** Onde este módulo aparece no menu lateral (seção › item). */
+  menu?: string;
+  /**
+   * Linha filha de outro módulo: enquanto ninguém mexer nela, ela vale o
+   * mesmo que o módulo pai (ver SUBMODULE_PARENT em permissoes-rotas.ts).
+   * Serve para telas que são um item de menu à parte, mas que sempre
+   * andaram junto com a tela principal.
+   */
+  sub?: boolean;
+};
 type Grupo = { label: string; modulos: Modulo[] };
 
 const SUBMODULOS_FINANCEIRO: Modulo[] = [
@@ -117,48 +132,400 @@ const SUBMODULOS_FINANCEIRO: Modulo[] = [
     key: "financeiro-movcaixa",
     nome: "Financeiro › Mov. Caixa",
     descricao: "Aba Movimento de Caixa dentro do Financeiro",
+    menu: "Gestão › Financeiro",
+    sub: true,
   },
   {
     key: "financeiro-atendimentos",
     nome: "Financeiro › Atendimentos",
     descricao: "Aba Atendimentos/Repasse dentro do Financeiro",
+    menu: "Gestão › Financeiro",
+    sub: true,
   },
   {
     key: "financeiro-estorno",
     nome: "Financeiro › Estorno",
     descricao: "Aba Estorno dentro do Financeiro",
+    menu: "Gestão › Financeiro",
+    sub: true,
   },
 ];
 
+// Os grupos abaixo seguem a mesma ordem e os mesmos nomes das seções do menu
+// lateral (src/components/app-shell.tsx → navRows), para que quem procura um
+// item do menu encontre a permissão dele no mesmo lugar. Toda linha com
+// `menu` preenchido corresponde a um item que aparece no menu lateral; linha
+// sem `menu` é tela aberta por dentro de outra.
+//
+// Linha marcada com `sub: true` herda o módulo logo acima enquanto ninguém a
+// configurar — ela existe para que um item de menu que sempre andou junto de
+// outro possa, quando a clínica quiser, ser fechado sozinho.
 const GRUPOS_BASE: Grupo[] = [
   {
     label: "Operação",
     modulos: [
-      { key: "agenda", nome: "Agenda", descricao: "Calendário e agendamentos" },
+      {
+        key: "dashboard",
+        nome: "Dashboard",
+        descricao: "Indicadores do dia da clínica",
+        menu: "Operação › Dashboard",
+      },
+      {
+        key: "agenda",
+        nome: "Agenda",
+        descricao: "Calendário e agendamentos",
+        menu: "Operação › Agenda",
+      },
+      {
+        key: "agenda-escala",
+        nome: "Agenda › Escala e Horários",
+        descricao: "Quadro de escala dos profissionais por dia",
+        menu: "Operação › Escala e Horários",
+        sub: true,
+      },
       {
         key: "atendimento-multiplo",
         nome: "Atendimento Múltiplo",
         descricao: "Atendimentos e pagamentos agrupados",
+        menu: "Operação › Atendimento Múltiplo",
       },
-      { key: "checkin", nome: "Check-in", descricao: "Check-in de pacientes" },
-      { key: "caixa", nome: "Caixa", descricao: "Operação de caixa diário" },
-      { key: "chat", nome: "Chat interno", descricao: "Mensagens entre equipe" },
-      { key: "clientes", nome: "Clientes", descricao: "Cadastro de pacientes" },
-      { key: "dashboard", nome: "Dashboard", descricao: "Indicadores da clínica" },
-      { key: "fluxo", nome: "Fluxo do paciente", descricao: "Kanban de atendimento" },
-      { key: "orcamentos", nome: "Orçamentos", descricao: "Propostas e orçamentos" },
-      { key: "recepcao", nome: "Recepção / Filas", descricao: "Check-in e filas" },
-      { key: "triagem-enfermagem", nome: "Triagem - Enfermagem", descricao: "Triagem inicial" },
-      { key: "cartao-beneficios", nome: "Cartão Benefícios", descricao: "Planos e contratos" },
+      {
+        key: "checkin",
+        nome: "Check-in",
+        descricao: "Check-in de pacientes",
+        menu: "Operação › Check-in",
+      },
+      {
+        key: "caixa",
+        nome: "Caixa",
+        descricao: "Operação de caixa diário",
+        menu: "Operação › Caixa",
+      },
+      {
+        key: "chat",
+        nome: "Chat interno",
+        descricao: "Mensagens entre equipe",
+        menu: "Operação › Chat interno",
+      },
+      {
+        key: "clientes",
+        nome: "Clientes",
+        descricao: "Cadastro de pacientes",
+        menu: "Operação › Clientes",
+      },
+      {
+        key: "clientes-numeracao",
+        nome: "Clientes › Numeração de Prontuário",
+        descricao: "Ponteiro da numeração do arquivo físico de prontuários",
+        menu: "Configurações › Numeração de Prontuário",
+        sub: true,
+      },
+      {
+        key: "painel-executivo",
+        nome: "Painel Executivo",
+        descricao: "Indicadores executivos da clínica",
+        menu: "Operação › Painel Executivo",
+      },
+      {
+        key: "fluxo",
+        nome: "Fluxo do paciente",
+        descricao: "Kanban de atendimento",
+        menu: "Operação › Fluxo do paciente",
+      },
+      {
+        key: "orcamentos",
+        nome: "Orçamentos",
+        descricao: "Propostas e orçamentos",
+        menu: "Operação › Orçamentos",
+      },
+      {
+        key: "recepcao",
+        nome: "Recepção / Filas",
+        descricao: "Check-in e filas",
+        menu: "Operação › Recepção / Filas",
+      },
+      {
+        key: "triagem-enfermagem",
+        nome: "Triagem - Enfermagem",
+        descricao: "Triagem inicial",
+        menu: "Operação › Triagem - Enfermagem",
+      },
+      {
+        key: "cartao-beneficios",
+        nome: "Cartão Benefícios",
+        descricao: "Planos, contratos, dependentes e conferência",
+        menu: "Operação › Cartão Benefícios",
+      },
       {
         key: "documentos",
         nome: "Documentos do paciente",
         descricao: "Anexos e arquivos clínicos",
+        menu: "Operação › Documentos do paciente",
+      },
+      {
+        key: "anamneses",
+        nome: "Anamneses",
+        descricao: "Modelos e respostas de anamnese",
+        menu: "Operação › Anamneses",
+      },
+      {
+        key: "hiperdia",
+        nome: "Hiperdia",
+        descricao: "Acompanhamento de hipertensos e diabéticos",
+        menu: "Operação › Hiperdia",
+      },
+      {
+        key: "consulta-ia",
+        nome: "Apoio Clínico",
+        descricao: "Análise de caso e suporte à decisão clínica",
+        menu: "Operação › Apoio Clínico",
       },
       // "painel" saiu daqui: o Painel de Senhas é a rota pública /painel
       // (TV da recepção, fora da área logada), então ligar/desligar a chave
       // nunca teve efeito. A configuração dele está em Configurações ›
       // Painel & Totem, governada pela chave "painel-totem".
+    ],
+  },
+  {
+    label: "Gestão",
+    modulos: [
+      { key: "cargos", nome: "Cargos", descricao: "Cargos e funções", menu: "Gestão › Cargos" },
+      {
+        key: "financeiro",
+        nome: "Financeiro",
+        descricao: "Financeiro completo (BI, contas, lembretes, regras-IA)",
+        menu: "Gestão › Financeiro",
+      },
+      // Os submódulos do Financeiro entram logo aqui quando a clínica liga a
+      // flag `permissoes_financeiro_granular` (ver aplicaGranularidade).
+      //
+      // "funcionarios" foi removido daqui: era uma chave sem rota nenhuma no
+      // ROUTE_TO_MODULE, então ligar/desligar não mudava nada. A listagem de
+      // funcionários é governada por "hr-contratos" (grupo Recursos Humanos).
+      // Linhas antigas dessa chave em `perfil_permissoes` são inertes.
+      {
+        key: "nfse",
+        nome: "NFS-e",
+        descricao: "Emissão e gestão de notas fiscais de serviço",
+        menu: "Gestão › NFS-e",
+      },
+      {
+        key: "nfse-config",
+        nome: "NFS-e › Configuração",
+        descricao: "Certificado, empresas emitentes e parâmetros da NFS-e",
+        menu: "Gestão › Configuração NFS-e",
+        sub: true,
+      },
+      {
+        key: "relatorios",
+        nome: "Relatórios",
+        descricao: "Relatórios e BI",
+        menu: "Gestão › Relatórios",
+      },
+      {
+        key: "auditoria",
+        nome: "Segurança & Compliance",
+        descricao: "Auditoria e logs de acesso",
+        menu: "Gestão › Segurança & Compliance",
+      },
+      {
+        key: "setores",
+        nome: "Setores",
+        descricao: "Setores da clínica",
+        menu: "Gestão › Setores",
+      },
+      {
+        key: "boletos",
+        nome: "Boletos",
+        descricao: "Emissão e gestão de boletos",
+        menu: "Gestão › Boletos",
+      },
+      {
+        key: "contratos",
+        nome: "Contratos de assinatura",
+        descricao: "Cartão Benefícios e mensalidades",
+        menu: "Gestão › Contratos de assinatura",
+      },
+      {
+        key: "integration-secrets",
+        nome: "Integrações",
+        descricao: "Chaves e integrações externas",
+        menu: "Gestão › Integrações",
+      },
+      {
+        key: "lgpd",
+        nome: "LGPD",
+        descricao: "Gestão de privacidade",
+        menu: "Gestão › LGPD",
+      },
+    ],
+  },
+  {
+    label: "Cadastros",
+    modulos: [
+      {
+        key: "equipe",
+        nome: "Equipe",
+        descricao: "Usuários do sistema",
+        menu: "Cadastros › Médicos",
+      },
+      {
+        key: "equipe-acessos",
+        nome: "Equipe › Equipe e acessos",
+        descricao: "Marca, pessoa a pessoa, quem é da gestão e quem autoriza",
+        menu: "Cadastros › Equipe e acessos",
+        sub: true,
+      },
+      {
+        key: "perfis",
+        nome: "Perfis de acesso",
+        descricao: "Perfis e permissões (salvar continua restrito a administradores)",
+        menu: "Cadastros › Perfis",
+      },
+      {
+        key: "especialidades",
+        nome: "Serviços",
+        descricao: "Especialidades, tipos de serviço, procedimentos e recursos de enfermagem",
+        menu: "Cadastros › Serviços",
+      },
+      {
+        key: "tipos-servico",
+        nome: "Tipos de serviço",
+        descricao: "Classificação de serviços (aba de Serviços)",
+      },
+      {
+        key: "procedimentos",
+        nome: "Procedimentos",
+        descricao: "Tabela de procedimentos (aba de Serviços)",
+      },
+      {
+        key: "disponibilidades",
+        nome: "Horários médicos",
+        descricao: "Agenda dos médicos",
+        menu: "Cadastros › Horários médicos",
+      },
+      {
+        key: "prontuario-modelos",
+        nome: "Modelos de Prontuário",
+        descricao: "Templates clínicos",
+        menu: "Cadastros › Modelos de Prontuário",
+      },
+      {
+        key: "unidades",
+        nome: "Unidades",
+        descricao: "Clínicas / unidades",
+        menu: "Cadastros › Unidades",
+      },
+      {
+        key: "modelos-documentos",
+        nome: "Modelos de Documentos",
+        descricao: "Templates de documentos",
+        menu: "Cadastros › Modelos de Documentos",
+      },
+      {
+        key: "estoque",
+        nome: "Estoque",
+        descricao: "Produtos e movimentos",
+        menu: "Cadastros › Estoque",
+      },
+      {
+        key: "clientes-duplicados",
+        nome: "Duplicados / Merge",
+        descricao:
+          "Conferência de cadastros duplicados (mesclar continua restrito a administradores)",
+        menu: "Cadastros › Duplicados / Merge",
+      },
+      {
+        key: "revisao-convenio",
+        nome: "Revisão de convênio",
+        descricao:
+          "Corrige atendimentos antigos marcados como Particular apesar do cartão ativo e vincula convênio a contratos incompletos",
+        menu: "Cadastros › Revisão de convênio",
+      },
+      {
+        key: "medicos",
+        nome: "Médicos (ficha)",
+        descricao: "Ficha do profissional, aberta por dentro de outras telas",
+      },
+      // "planos" saiu daqui: a tela /app/planos só redireciona para
+      // Cartão Benefícios › Convênios, que é governada pela chave
+      // "cartao-beneficios". A linha antiga em `perfil_permissoes` é inerte.
+    ],
+  },
+  {
+    label: "Marketing",
+    modulos: [
+      {
+        key: "mkt-leads",
+        nome: "Leads",
+        descricao: "Base de leads (entrada do menu Marketing)",
+        menu: "Marketing › Marketing",
+      },
+      {
+        key: "campanhas",
+        nome: "Campanhas",
+        descricao: "Campanhas de marketing",
+        menu: "Marketing › Campanhas",
+      },
+      {
+        key: "mkt-envios",
+        nome: "Envios",
+        descricao: "Disparos em massa",
+        menu: "Marketing › Envios",
+      },
+      {
+        key: "mkt-landing",
+        nome: "Landing Pages",
+        descricao: "Páginas de captura",
+        menu: "Marketing › Landing Pages",
+      },
+      {
+        key: "mkt-segmentos",
+        nome: "Segmentos",
+        descricao: "Segmentação de público",
+        menu: "Marketing › Segmentos",
+      },
+    ],
+  },
+  {
+    label: "Recursos Humanos",
+    modulos: [
+      {
+        key: "hr-ponto",
+        nome: "Bater ponto",
+        descricao: "Registro de ponto",
+        menu: "Recursos Humanos › Marcação de ponto",
+      },
+      {
+        key: "hr-contratos",
+        nome: "Funcionários / Contratos",
+        descricao: "Cadastro e contratos dos funcionários",
+        menu: "Recursos Humanos › Funcionários",
+      },
+      {
+        key: "hr-ferias",
+        nome: "Férias",
+        descricao: "Gestão de férias",
+        menu: "Recursos Humanos › Férias",
+      },
+      {
+        key: "hr-holerites",
+        nome: "Holerites",
+        descricao: "Holerites e folha",
+        menu: "Recursos Humanos › Holerites",
+      },
+      {
+        key: "treinamentos",
+        nome: "Treinamentos",
+        descricao: "Trilhas de aprendizado",
+        menu: "Recursos Humanos › Treinamentos",
+      },
+      {
+        key: "lms-admin",
+        nome: "Cursos (admin)",
+        descricao: "Administração de cursos",
+        menu: "Recursos Humanos › Cursos (admin)",
+      },
     ],
   },
   {
@@ -168,134 +535,107 @@ const GRUPOS_BASE: Grupo[] = [
         key: "atendimento-ia",
         nome: "Atendimento médico",
         descricao: "Fila do médico e prontuário",
+        menu: "Inteligência › Meus Pacientes — Atendimento",
       },
-      { key: "crm", nome: "CRM", descricao: "Oportunidades e leads" },
+      {
+        key: "prontuarios",
+        nome: "Prontuários — Histórico",
+        descricao: "Histórico clínico de todos os pacientes",
+        menu: "Inteligência › Prontuários — Histórico",
+      },
+      { key: "crm", nome: "CRM", descricao: "Oportunidades e leads", menu: "Inteligência › CRM" },
       {
         key: "alertas-enfermagem",
         nome: "Enfermeira IA — Alertas",
         descricao: "Alertas automáticos",
+        menu: "Inteligência › Enfermeira IA — Alertas",
       },
-      { key: "consulta-rapida", nome: "Informações rápidas", descricao: "Consulta a tabelas" },
       {
-        key: "consulta-ia",
-        nome: "Apoio Clínico",
-        descricao: "Análise de caso e suporte à decisão clínica",
+        key: "consulta-rapida",
+        nome: "Informações rápidas",
+        descricao: "Consulta a tabelas",
+        menu: "Inteligência › Informações rápidas",
       },
-      { key: "nina", nome: "Nina — WhatsApp", descricao: "Conversas WhatsApp" },
+      {
+        key: "consulta-rapida-valores",
+        nome: "Informações rápidas › Tabela de valores",
+        descricao: "Consulta de preços do balcão",
+        menu: "Operação › Tabela de valores",
+        sub: true,
+      },
+      {
+        key: "odontologia",
+        nome: "Odontologia",
+        descricao: "Odontograma e prontuário odontológico",
+        menu: "Inteligência › Odontologia › Odontograma & Prontuário",
+      },
+      {
+        key: "odontologia-orcamentos",
+        nome: "Odontologia › Orçamentos",
+        descricao: "Orçamentos do plano odontológico",
+        menu: "Inteligência › Odontologia › Orçamentos de Odonto",
+        sub: true,
+      },
+      {
+        key: "fisioterapia",
+        nome: "Fisioterapia",
+        descricao: "Mapa corporal e avaliação",
+        menu: "Inteligência › Fisioterapia › Mapa Corporal & Avaliação",
+      },
+      {
+        key: "fisioterapia-pacotes",
+        nome: "Fisioterapia › Pacotes de Sessões",
+        descricao: "Pacotes e controle de sessões",
+        menu: "Inteligência › Fisioterapia › Pacotes de Sessões",
+        sub: true,
+      },
+      {
+        key: "exames-resultados",
+        nome: "Resultados de Exames",
+        descricao: "Laudos e resultados",
+        menu: "Inteligência › Resultados de Exames",
+      },
+    ],
+  },
+  {
+    // Portal OS ZAP (atendimento por WhatsApp) e portal Coach. No menu lateral
+    // essas telas ficam nas seções Atendimento, Nina, Configurações do
+    // WhatsApp e Treinamento, que só aparecem dentro desses portais.
+    label: "WhatsApp — OS ZAP e Coach",
+    modulos: [
+      {
+        key: "nina",
+        nome: "Nina — WhatsApp",
+        descricao:
+          "Conversas, mensagens prontas, base de conhecimentos, homologação e configuração do WhatsApp",
+        menu: "OS ZAP › Atendimento, Nina e Configurações do WhatsApp",
+      },
+      {
+        key: "nina-aprendizado",
+        nome: "Nina › Revisão de Aprendizados",
+        descricao: "Fila de aprendizados reportados, para aprovar ou recusar",
+        menu: "OS ZAP › Nina › Revisão de Aprendizados",
+        sub: true,
+      },
+      {
+        key: "nina-metricas",
+        nome: "Nina › Métricas de Aprendizado",
+        descricao: "Indicadores de acerto e evolução da Nina",
+        menu: "OS ZAP › Nina › Métricas de Aprendizado",
+        sub: true,
+      },
+      {
+        key: "nina-arquitetura",
+        nome: "Nina › Arquitetura",
+        descricao: "Mapa interno das funções e instruções da Nina",
+        menu: "OS ZAP › Nina › Arquitetura",
+        sub: true,
+      },
       {
         key: "coach",
         nome: "Coach WhatsApp",
         descricao: "Treinamento de atendentes (ver = só o próprio; editar = painel da gestora)",
-      },
-      { key: "odontologia", nome: "Odontologia", descricao: "Odontograma e plano" },
-      {
-        key: "fisioterapia",
-        nome: "Fisioterapia",
-        descricao: "Mapa corporal, avaliação e pacotes de sessões",
-      },
-      {
-        key: "hiperdia",
-        nome: "Hiperdia",
-        descricao: "Acompanhamento de hipertensos e diabéticos",
-      },
-      { key: "exames-resultados", nome: "Resultados de Exames", descricao: "Laudos e resultados" },
-      { key: "prontuarios", nome: "Prontuários", descricao: "Prontuários clínicos" },
-      { key: "anamneses", nome: "Anamneses", descricao: "Modelos e respostas de anamnese" },
-    ],
-  },
-  {
-    label: "Marketing",
-    modulos: [
-      { key: "mkt-leads", nome: "Leads", descricao: "Base de leads (entrada do menu Marketing)" },
-      { key: "campanhas", nome: "Campanhas", descricao: "Campanhas de marketing" },
-      { key: "mkt-envios", nome: "Envios", descricao: "Disparos em massa" },
-      { key: "mkt-landing", nome: "Landing Pages", descricao: "Páginas de captura" },
-      { key: "mkt-segmentos", nome: "Segmentos", descricao: "Segmentação de público" },
-    ],
-  },
-  {
-    label: "Cadastros",
-    modulos: [
-      { key: "equipe", nome: "Equipe", descricao: "Usuários do sistema" },
-      {
-        key: "clientes-duplicados",
-        nome: "Duplicados / Merge",
-        descricao:
-          "Conferência de cadastros duplicados (mesclar continua restrito a administradores)",
-      },
-      {
-        key: "revisao-convenio",
-        nome: "Revisão de convênio",
-        descricao:
-          "Corrige atendimentos antigos marcados como Particular apesar do cartão ativo e vincula convênio a contratos incompletos",
-      },
-      { key: "perfis", nome: "Perfis de acesso", descricao: "Perfis e permissões" },
-      {
-        key: "especialidades",
-        nome: "Serviços",
-        descricao: "Especialidades, tipos de serviço, procedimentos e recursos de enfermagem",
-      },
-      { key: "disponibilidades", nome: "Horários médicos", descricao: "Agenda dos médicos" },
-      { key: "prontuario-modelos", nome: "Modelos de Prontuário", descricao: "Templates clínicos" },
-      { key: "unidades", nome: "Unidades", descricao: "Clínicas / unidades" },
-      // "planos" saiu daqui: a tela /app/planos só redireciona para
-      // Cartão Benefícios › Convênios, que é governada pela chave
-      // "cartao-beneficios". A linha antiga em `perfil_permissoes` é inerte.
-      {
-        key: "modelos-documentos",
-        nome: "Modelos de Documentos",
-        descricao: "Templates de documentos",
-      },
-      { key: "medicos", nome: "Médicos", descricao: "Cadastro de médicos" },
-      { key: "estoque", nome: "Estoque", descricao: "Produtos e movimentos" },
-      { key: "procedimentos", nome: "Procedimentos", descricao: "Tabela de procedimentos" },
-      { key: "tipos-servico", nome: "Tipos de serviço", descricao: "Classificação de serviços" },
-    ],
-  },
-  {
-    label: "RH",
-    modulos: [
-      { key: "hr-ponto", nome: "Bater ponto", descricao: "Registro de ponto" },
-      { key: "hr-contratos", nome: "Contratos de RH", descricao: "Contratos dos funcionários" },
-      { key: "hr-ferias", nome: "Férias", descricao: "Gestão de férias" },
-      { key: "hr-holerites", nome: "Holerites", descricao: "Holerites e folha" },
-      { key: "treinamentos", nome: "Treinamentos", descricao: "Trilhas de aprendizado" },
-      { key: "lms-admin", nome: "Cursos (admin)", descricao: "Administração de cursos" },
-    ],
-  },
-  {
-    label: "Gestão",
-    modulos: [
-      { key: "cargos", nome: "Cargos", descricao: "Cargos e funções" },
-      {
-        key: "financeiro",
-        nome: "Financeiro",
-        descricao: "Financeiro completo (BI, contas, lembretes, regras-IA)",
-      },
-      // "funcionarios" foi removido daqui: era uma chave sem rota nenhuma no
-      // ROUTE_TO_MODULE, então ligar/desligar não mudava nada. A listagem de
-      // funcionários é governada por "hr-contratos" (grupo RH). Linhas antigas
-      // dessa chave em `perfil_permissoes` são inertes e podem ficar.
-      { key: "nfse", nome: "NFS-e", descricao: "Notas fiscais de serviço" },
-      { key: "relatorios", nome: "Relatórios", descricao: "Relatórios e BI" },
-      { key: "auditoria", nome: "Segurança & Compliance", descricao: "Auditoria, logs e LGPD" },
-      { key: "setores", nome: "Setores", descricao: "Setores da clínica" },
-      { key: "boletos", nome: "Boletos", descricao: "Emissão e gestão de boletos" },
-      {
-        key: "contratos",
-        nome: "Contratos de assinatura",
-        descricao: "Cartão Benefícios e mensalidades",
-      },
-      {
-        key: "integration-secrets",
-        nome: "Integrações",
-        descricao: "Chaves e integrações externas",
-      },
-      { key: "lgpd", nome: "LGPD", descricao: "Gestão de privacidade" },
-      {
-        key: "painel-executivo",
-        nome: "Painel Executivo",
-        descricao: "Indicadores executivos da clínica",
+        menu: "Treinamento › Coach WhatsApp",
       },
     ],
   },
@@ -310,16 +650,40 @@ const GRUPOS_BASE: Grupo[] = [
         key: "painel-totem",
         nome: "Painel & Totem",
         descricao: "Configuração do painel de senhas e do totem de autoatendimento",
+        menu: "Configurações › Painel & Totem",
       },
-      { key: "clinicas", nome: "Clínicas", descricao: "Cadastro de clínicas (multi-empresa)" },
+      {
+        key: "clinicas",
+        nome: "Clínicas",
+        descricao: "Cadastro de clínicas (multi-empresa)",
+        menu: "Configurações › Clínicas",
+      },
       {
         key: "backups",
         nome: "Backups",
         descricao: "Geração e download de cópias de segurança do banco",
+        menu: "Configurações › Backups",
       },
     ],
   },
 ];
+
+/**
+ * Acesso que um módulo tem "de fábrica" para um perfil.
+ *
+ * Um submódulo sem valor próprio no preset vale o mesmo que o pai — é a
+ * mesma regra que o sistema aplica em tempo de execução (moduloPermitido em
+ * permissoes-rotas.ts). Sem isso, a tela mostraria "Sem" para uma tela que
+ * o perfil na verdade abre, e o gestor salvaria esse "Sem" sem querer,
+ * tirando um acesso que ninguém pediu para tirar.
+ */
+function acessoPadrao(preset: Partial<Record<string, Acesso>>, modulo: string): Acesso {
+  const proprio = preset[modulo];
+  if (proprio) return proprio;
+  const pai = SUBMODULE_PARENT[modulo];
+  if (pai) return (preset[pai] ?? "none") as Acesso;
+  return "none";
+}
 
 function aplicaGranularidade(grupos: Grupo[], granular: boolean): Grupo[] {
   if (!granular) return grupos;
@@ -337,16 +701,7 @@ function buildInitialState(todosModulos: string[]): Record<PerfilKey, Record<str
   const out = {} as Record<PerfilKey, Record<string, Acesso>>;
   for (const p of PERFIS) {
     const preset = PRESETS[p.key];
-    const financeiroDefault = (preset["financeiro"] ?? "none") as Acesso;
-    out[p.key] = Object.fromEntries(
-      todosModulos.map((k) => {
-        // Submódulos do financeiro herdam do acesso do pai por padrão,
-        // para que ativar a granularidade não retire acesso de perfis
-        // que já tinham "financeiro" liberado.
-        if (k.startsWith("financeiro-")) return [k, (preset[k] ?? financeiroDefault) as Acesso];
-        return [k, (preset[k] ?? "none") as Acesso];
-      }),
-    );
+    out[p.key] = Object.fromEntries(todosModulos.map((k) => [k, acessoPadrao(preset, k)]));
   }
   return out;
 }
@@ -380,14 +735,10 @@ function PerfisPage() {
       const next = { ...prev } as Record<PerfilKey, Record<string, Acesso>>;
       for (const p of PERFIS) {
         const preset = PRESETS[p.key];
-        const parentDefault = (preset["financeiro"] ?? "none") as Acesso;
         const atual = next[p.key] ?? {};
         const novo: Record<string, Acesso> = { ...atual };
         for (const k of TODOS_MODULOS) {
-          if (!(k in novo)) {
-            if (k.startsWith("financeiro-")) novo[k] = (preset[k] ?? parentDefault) as Acesso;
-            else novo[k] = (preset[k] ?? "none") as Acesso;
-          }
+          if (!(k in novo)) novo[k] = acessoPadrao(preset, k);
         }
         next[p.key] = novo;
       }
@@ -457,17 +808,10 @@ function PerfisPage() {
                 // `usePermissoes` concede em tempo de execução. Antes esta
                 // base era "none", então um módulo novo (ex.: Hiperdia)
                 // aparecia como "Sem" aqui mesmo estando liberado no padrão.
-                // Submódulos do financeiro seguem herdando do pai para que
-                // ativar a granularidade não retire acesso já concedido.
+                // Submódulo sem valor próprio herda o pai, pela mesma razão.
                 const preset = PRESETS[chave];
-                const parentFin = (preset["financeiro"] ?? "none") as Acesso;
                 next[chave] = Object.fromEntries(
-                  TODOS_MODULOS.map((k) => [
-                    k,
-                    k.startsWith("financeiro-")
-                      ? ((preset[k] ?? parentFin) as Acesso)
-                      : ((preset[k] ?? "none") as Acesso),
-                  ]),
+                  TODOS_MODULOS.map((k) => [k, acessoPadrao(preset, k)]),
                 );
                 seen[chave] = true;
               }
@@ -736,9 +1080,34 @@ function PerfisPage() {
                           const val = matriz[perfilSel][m.key];
                           return (
                             <TableRow key={m.key}>
-                              <TableCell className="font-medium">{m.nome}</TableCell>
+                              <TableCell className={m.sub ? "pl-8 font-medium" : "font-medium"}>
+                                <span className="flex items-center gap-2">
+                                  {m.sub && (
+                                    <CornerDownRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                                  )}
+                                  {m.nome}
+                                </span>
+                                {/* Onde a tela aparece no menu lateral: é assim
+                                    que o gestor liga uma linha desta matriz ao
+                                    item que ele vê (ou deixa de ver) no menu. */}
+                                {m.menu ? (
+                                  <span className="mt-0.5 block text-xs font-normal text-muted-foreground">
+                                    Menu: {m.menu}
+                                  </span>
+                                ) : (
+                                  <span className="mt-0.5 block text-xs font-normal text-muted-foreground">
+                                    Sem item no menu lateral
+                                  </span>
+                                )}
+                              </TableCell>
                               <TableCell className="text-sm text-muted-foreground">
                                 {m.descricao}
+                                {m.sub && (
+                                  <span className="mt-0.5 block text-xs">
+                                    Enquanto ficar igual à linha de cima, acompanha ela
+                                    automaticamente.
+                                  </span>
+                                )}
                               </TableCell>
                               <TableCell>
                                 <RadioGroup

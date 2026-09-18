@@ -3,6 +3,8 @@ import { readdirSync, readFileSync } from "node:fs";
 import {
   ADMIN_ONLY_ROUTES,
   moduloDaRota,
+  moduloPermitido,
+  PARENTS_COM_ABAS,
   rotaSomenteAdmin,
   ROUTE_TO_MODULE,
   SUBMODULE_PARENT,
@@ -125,5 +127,84 @@ describe("menu lateral está coberto pela matriz de permissões", () => {
       .map(([rota]) => rota);
     expect(devLivres).toEqual([]);
     expect(ADMIN_ONLY_ROUTES.filter((r) => r.startsWith("/app/dev-")).length).toBeGreaterThan(0);
+  });
+});
+
+// Quarta trava: cada ITEM do menu lateral precisa de uma chave SÓ dele na
+// tela de Perfis de Acesso. Quando dois itens diferentes dividem a mesma
+// chave (era o caso de "Agenda" com "Escala e Horários", "Clientes" com
+// "Numeração de Prontuário", "NFS-e" com "Configuração NFS-e"…), o gestor
+// não tem como esconder um sem esconder o outro — foi exatamente a falha
+// relatada. Itens que apontam para a MESMA rota com âncoras diferentes
+// (ex.: as abas da Nina) continuam podendo dividir a chave, porque são a
+// mesma tela.
+describe("cada item do menu tem uma permissão própria", () => {
+  it("nenhum módulo governa dois itens de menu diferentes", () => {
+    const porModulo = new Map<string, string[]>();
+    for (const to of ROTAS_DO_MENU) {
+      if (rotaSomenteAdmin(to)) continue;
+      const mod = ROUTE_TO_MODULE[to];
+      if (typeof mod !== "string") continue;
+      porModulo.set(mod, [...(porModulo.get(mod) ?? []), to]);
+    }
+    const compartilhados = [...porModulo.entries()]
+      .filter(([, rotas]) => rotas.length > 1)
+      .map(([mod, rotas]) => `${mod}: ${rotas.join(", ")}`);
+    expect(compartilhados).toEqual([]);
+  });
+
+  it("todo submódulo declarado existe na tela e tem pai existente", () => {
+    const invalidos = Object.entries(SUBMODULE_PARENT)
+      .filter(([sub, pai]) => !MODULOS_DA_TELA.has(sub) || !MODULOS_DA_TELA.has(pai))
+      .map(([sub, pai]) => `${sub} → ${pai}`);
+    expect(invalidos).toEqual([]);
+  });
+});
+
+// Quinta trava: a regra de visibilidade é uma só. O menu lateral e a guarda
+// de rota chamam `moduloPermitido`; se a herança ou o bloqueio mudarem de
+// comportamento, o item some do menu mas a URL continua abrindo (ou o
+// contrário) — que é o tipo de furo que ninguém percebe até vazar dado.
+describe("moduloPermitido", () => {
+  it("admin passa em tudo", () => {
+    expect(moduloPermitido("financeiro", null)).toBe(true);
+    expect(moduloPermitido(undefined, null)).toBe(true);
+  });
+
+  it("rota livre passa e rota não mapeada bloqueia", () => {
+    expect(moduloPermitido(null, new Set())).toBe(true);
+    expect(moduloPermitido(undefined, new Set())).toBe(false);
+  });
+
+  it("submódulo sem linha salva herda o pai", () => {
+    expect(moduloPermitido("agenda-escala", new Set(["agenda"]), new Set())).toBe(true);
+  });
+
+  it("submódulo COM linha salva vale pelo que está salvo, mesmo desligado", () => {
+    // Linha salva como "none": está em `configured`, mas não em `allowed`.
+    expect(moduloPermitido("agenda-escala", new Set(["agenda"]), new Set(["agenda-escala"]))).toBe(
+      false,
+    );
+  });
+
+  it("liberar só o filho NÃO destranca a tela do pai", () => {
+    // "Escala e Horários" liberada não pode abrir a Agenda: são telas
+    // diferentes, e o gestor fechou a Agenda de propósito.
+    expect(moduloPermitido("agenda", new Set(["agenda-escala"]), new Set())).toBe(false);
+  });
+
+  it("a casca de abas do Financeiro abre com uma aba liberada", () => {
+    expect(PARENTS_COM_ABAS.has("financeiro")).toBe(true);
+    expect(moduloPermitido("financeiro", new Set(["financeiro-movcaixa"]), new Set())).toBe(true);
+  });
+
+  it("dentro do Financeiro, ter uma aba não mostra a aba do módulo pai", () => {
+    // Submenu do Financeiro: quem só tem Mov. Caixa não pode ver a aba
+    // "Dashboard", que é o próprio módulo "financeiro".
+    expect(
+      moduloPermitido("financeiro", new Set(["financeiro-movcaixa"]), new Set(), {
+        abrirCascaDeAbas: false,
+      }),
+    ).toBe(false);
   });
 });
