@@ -32,6 +32,7 @@ import {
   ClipboardList,
   ClipboardCheck,
   MessageCircle,
+  Mic,
   Network,
   Target,
   Clock,
