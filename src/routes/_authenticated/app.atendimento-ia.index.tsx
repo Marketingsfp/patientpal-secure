@@ -32,6 +32,7 @@ import { toast } from "sonner";
 import { agendamentosStatusPagamento, type StatusPagamento } from "@/lib/pagamento-status";
 import { cadastroMedicoDoUsuario, isMedicoOnlyUser } from "@/lib/medico-only";
 import { HistoricoProntuarioDrawer } from "@/components/prontuario/historico-prontuario-drawer";
+import { numerarFichas, type LinhaParaFicha } from "@/lib/agenda/ficha-numero";
 
 export const Route = createFileRoute("/_authenticated/app/atendimento-ia/")({
   component: AtendimentoIaPage,
@@ -119,6 +120,7 @@ function AtendimentoIaPage() {
 
   const [medicos, setMedicos] = useState<Medico[]>([]);
   const [fila, setFila] = useState<FilaItem[]>([]);
+  const [linhasDoDia, setLinhasDoDia] = useState<LinhaParaFicha[]>([]);
   const [medicoId, setMedicoId] = useState("");
   const [triagens, setTriagens] = useState<Record<string, TriagemResumo>>({});
   const [triagensTick, setTriagensTick] = useState(0);
@@ -299,6 +301,21 @@ function AtendimentoIaPage() {
         (item) => item.paciente_id && item.paciente_nome !== "DISPONÍVEL",
       ),
     );
+
+    // Consulta SÓ para numerar a ficha. A ficha da Agenda é POSICIONAL dentro
+    // de (dia, profissional, agenda), então precisa de TODAS as linhas do dia
+    // do médico — inclusive vagas livres ("DISPONIVEL") e canceladas. A
+    // consulta da fila acima não serve: ela filtra status, fluxo_etapa e
+    // linhas sem paciente, o que desloca a numeração.
+    const { data: todasDoDia } = await supabase
+      .from("agendamentos")
+      .select("id, inicio, paciente_nome, medico_id, agenda_id")
+      .eq("clinica_id", clinicaAtual.clinica_id)
+      .eq("medico_id", medId)
+      .gte("inicio", `${hoje}T00:00:00`)
+      .lte("inicio", `${hoje}T23:59:59`)
+      .order("inicio");
+    setLinhasDoDia((todasDoDia ?? []) as unknown as LinhaParaFicha[]);
   };
 
   useEffect(() => {
@@ -406,103 +423,30 @@ function AtendimentoIaPage() {
     a.id.localeCompare(b.id);
 
   /**
-   * Quem já conta como fila de verdade: o pagamento está confirmado (caixa ou
-   * orçamento) ou o atendimento já foi feito. Paciente com pagamento pendente
-   * não entra na contagem — ele espera no fim da listagem até o caixa receber.
+   * A Agenda é a referência única. A tela do médico é UMA tabela só, em ordem
+   * estrita do horário do agendamento. Pagamento não muda ordem nem número:
+   * quem está com o caixa pendente fica na posição dele, com o número dele, e
+   * só recebe o selo "$ PENDENTE" na coluna de pagamento.
    */
-  const naFilaEfetiva = (it: FilaItem) =>
-    Boolean(pagamentos[it.id]?.pago) || it.fluxo_etapa === "finalizado";
+  const listaVisivel = useMemo(() => [...fila].sort(ordemDeChamada), [fila]);
 
   /**
-   * Hora em que o paciente entrou na fila: o instante em que o caixa confirmou
-   * o pagamento. É esse carimbo que define a senha — quem pagou antes é chamado
-   * antes, independentemente do horário marcado na agenda.
-   *
-   * Duas exceções, conferidas nos dados de produção:
-   *
-   * 1. Pagamento adiantado, feito num dia anterior ao da consulta (cerca de 5%
-   *    dos casos). Ele NÃO vale como chegada: um paciente que pagou há três
-   *    dias apareceu como senha 1 na frente de quem estava na clínica desde as
-   *    sete da manhã. Nesse caso vale o horário marcado da consulta, que é a
-   *    única referência do dia que esse paciente tem.
-   * 2. Atendimento antigo finalizado sem nenhum lançamento vinculado: também
-   *    cai no horário marcado, só para não ficar sem lugar na lista.
+   * A coluna "#" é a FICHA DA AGENDA — o mesmo número da guia impressa. Não é
+   * contagem de linhas da tela: vem de `numerarFichas`, a fonte única usada
+   * pela Agenda, alimentada com todas as linhas do dia daquele médico.
    */
-  const confirmadoEm = (it: FilaItem) => {
-    const em = pagamentos[it.id]?.em ?? null;
-    if (!em) return it.inicio;
-    return diaLocal(new Date(em)) < dia ? it.inicio : em;
-  };
+  const numeroNoDia = useMemo(() => numerarFichas(linhasDoDia), [linhasDoDia]);
 
-  /**
-   * A fila numerada, montada em dois blocos:
-   *
-   * 1. Quem JÁ FOI ATENDIDO, na ordem em que a médica concluiu cada
-   *    atendimento. Esse é o retrato do que aconteceu de verdade no dia: o
-   *    primeiro que entrou no consultório é a senha 1, o segundo é a 2, e
-   *    assim por diante. Uma vez concluído, o atendimento não muda mais de
-   *    lugar — o carimbo já está gravado.
-   * 2. Quem ESTÁ ESPERANDO e já pagou, na ordem cronológica do pagamento.
-   *    Quando um paciente pendente paga agora, o carimbo dele é o mais
-   *    recente de todos e ele entra no fim desse bloco, recebendo a próxima
-   *    senha livre sem mexer no número de quem já estava na frente.
-   */
-  const atendidosEmOrdem = useMemo(
-    () =>
-      fila
-        .filter((it) => it.fluxo_etapa === "finalizado")
-        .sort(
-          (a, b) =>
-            (a.fluxo_atualizado_em ?? "").localeCompare(b.fluxo_atualizado_em ?? "") ||
-            confirmadoEm(a).localeCompare(confirmadoEm(b)) ||
-            ordemDeChamada(a, b),
-        ),
-    [fila, pagamentos, dia],
+  // Contagens do cabeçalho, só informativas: a tabela é uma só e ninguém é
+  // separado por pagamento.
+  const atendidos = useMemo(() => fila.filter((it) => it.fluxo_etapa === "finalizado"), [fila]);
+  const emEspera = useMemo(
+    () => fila.filter((it) => it.fluxo_etapa !== "finalizado"),
+    [fila],
   );
-
-  const esperandoPagos = useMemo(
-    () =>
-      fila
-        .filter((it) => it.fluxo_etapa !== "finalizado" && naFilaEfetiva(it))
-        .sort((a, b) => confirmadoEm(a).localeCompare(confirmadoEm(b)) || ordemDeChamada(a, b)),
-    [fila, pagamentos, dia],
-  );
-
-  const chamados = useMemo(
-    () => [...atendidosEmOrdem, ...esperandoPagos],
-    [atendidosEmOrdem, esperandoPagos],
-  );
-
-  /** Pagamento pendente: aguardam no fim da listagem, ainda sem número. */
   const aguardandoPagamento = useMemo(
-    () => fila.filter((it) => !naFilaEfetiva(it)).sort(ordemDeChamada),
+    () => fila.filter((it) => it.fluxo_etapa !== "finalizado" && !pagamentos[it.id]?.pago),
     [fila, pagamentos],
-  );
-
-  /**
-   * A senha de cada paciente no dia.
-   *
-   * É a posição na lista acima: primeiro quem já foi atendido, na ordem em que
-   * passou pelo consultório, depois quem espera, na ordem do pagamento. Quem
-   * está com pagamento pendente não recebe número nenhum enquanto o caixa não
-   * confirmar. A linha de quem já passou continua na grade, com o mesmo
-   * número, marcada como ATENDIDO.
-   */
-  const numeroNoDia = useMemo(() => {
-    const mapa = new Map<string, number>();
-    chamados.forEach((item, i) => mapa.set(item.id, i + 1));
-    return mapa;
-  }, [chamados]);
-
-  // Contagens do cabeçalho. A lista em si é UMA só: quem foi atendido continua
-  // na tabela, marcado de verde. Antes havia duas abas, e o paciente sumia da
-  // tela no instante em que o prontuário era finalizado — a médica não
-  // conseguia bater o olho e conferir quem já tinha passado no dia.
-  const emEspera = esperandoPagos;
-  const atendidos = atendidosEmOrdem;
-  const listaVisivel = useMemo(
-    () => [...chamados, ...aguardandoPagamento],
-    [chamados, aguardandoPagamento],
   );
 
   function atender(item: FilaItem) {
@@ -643,12 +587,7 @@ function AtendimentoIaPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {listaVisivel.map((it, idx) => {
-                    // Linha de corte entre a fila de verdade e quem ainda não
-                    // pagou. É o aviso visual de por que aquele paciente está
-                    // no fim da lista e sem número.
-                    const abreBlocoPendente =
-                      aguardandoPagamento.length > 0 && idx === chamados.length;
+                  {listaVisivel.map((it) => {
                     const hora = new Date(it.inicio).toLocaleTimeString("pt-BR", {
                       hour: "2-digit",
                       minute: "2-digit",
@@ -667,20 +606,6 @@ function AtendimentoIaPage() {
                     const numero = numeroNoDia.get(it.id);
                     return (
                       <Fragment key={it.id}>
-                        {abreBlocoPendente && (
-                          <TableRow className="hover:bg-transparent">
-                            <TableCell
-                              colSpan={9}
-                              className="bg-amber-50 py-1.5 text-[11px] font-medium uppercase tracking-wide text-amber-800 dark:bg-amber-950/30 dark:text-amber-200"
-                            >
-                              <span className="inline-flex items-center gap-1.5">
-                                <DollarSign className="h-3.5 w-3.5" />
-                                Aguardando pagamento — entram na fila e recebem o número assim que o
-                                caixa confirmar
-                              </span>
-                            </TableCell>
-                          </TableRow>
-                        )}
                         <TableRow
                           // Atendido = linha verde da esquerda a direita, com
                           // tarja lateral grossa. E o sinal que a medica procura
@@ -692,18 +617,14 @@ function AtendimentoIaPage() {
                           } ${!atendido && !pago && pag ? "border-l-4 border-l-amber-400" : ""}`.trim()}
                         >
                           <TableCell
-                            className={
-                              numero
-                                ? "tabular-nums text-sm font-semibold"
-                                : "tabular-nums text-xs text-muted-foreground"
-                            }
+                            className="tabular-nums text-sm font-semibold"
                             title={
                               numero
-                                ? `Senha ${numero} do dia — o número não muda mais`
-                                : "Sem número: o paciente entra na fila quando o caixa confirmar o pagamento"
+                                ? `Ficha ${numero} da agenda — o mesmo número que aparece na Agenda`
+                                : "Ficha da agenda"
                             }
                           >
-                            {numero ?? "—"}
+                            {numero ?? ""}
                           </TableCell>
                           <TableCell className="tabular-nums text-xs">{hora}</TableCell>
                           <TableCell className="font-medium uppercase">
