@@ -276,9 +276,9 @@ describe("consulta da Central de Atenção", () => {
     expect(db.paginas).toEqual([]);
   });
 
-  it("usa exatamente o início da sidebar, conserva pausa por Offline e reinicia só após Online", async () => {
+  it("sincroniza com a sidebar, encerra em Offline/Online e reinicia na próxima pausa", async () => {
     const db = bancoTeste(true);
-    db.presenca("ana", "PAUSA", 5);
+    db.presenca("ana", "PAUSA", 3);
     const estados = ["ONLINE", "PAUSA", "PAUSA", "OFFLINE", "PAUSA", "ONLINE", "PAUSA"];
     estados.forEach((estado, i) =>
       db.historico.push({
@@ -291,8 +291,16 @@ describe("consulta da Central de Atenção", () => {
     );
     const antes = (await db.carregar()).pausas[0];
     expect(antes.inicio).toBe("2026-09-17T10:01:00Z");
-    expect(antes.inicio).toBe(await db.inicioSidebar("ana", 5));
+    expect(antes.inicio).toBe(await db.inicioSidebar("ana", 3));
     expect(db.leiturasGestao).toEqual(["atend_presenca_manual_log", "atend_presenca_manual_log"]);
+    db.presencas[0].estado_manual = "OFFLINE";
+    db.presencas[0].estado_manual_versao = 4;
+    expect((await db.carregar()).pausas).toEqual([]);
+    db.presencas[0].estado_manual = "PAUSA";
+    db.presencas[0].estado_manual_versao = 5;
+    const depoisOffline = (await db.carregar()).pausas[0];
+    expect(depoisOffline.inicio).toBe(await db.inicioSidebar("ana", 5));
+    expect(depoisOffline.inicio).toBe("2026-09-17T10:04:00Z");
     db.presencas[0].estado_manual = "ONLINE";
     db.presencas[0].estado_manual_versao = 6;
     expect((await db.carregar()).pausas).toEqual([]);

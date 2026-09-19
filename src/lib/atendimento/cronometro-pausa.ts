@@ -24,7 +24,7 @@ export function atualizarCronometroPausa(
   const mesmoEscopo = atual?.clinicaId === entrada.clinicaId && atual?.userId === entrada.userId;
   if (mesmoEscopo && entrada.versao < atual.versao) return atual;
   let inicio = mesmoEscopo ? atual.inicio : null;
-  if (entrada.estado === "ONLINE") inicio = null;
+  if (entrada.estado === "ONLINE" || entrada.estado === "OFFLINE") inicio = null;
   else if (entrada.cronometroPausaInicio !== undefined) inicio = entrada.cronometroPausaInicio;
   else if (entrada.estado === "PAUSA" && !inicio) inicio = entrada.em ?? null;
   return { clinicaId: entrada.clinicaId, userId: entrada.userId, versao: entrada.versao, inicio };

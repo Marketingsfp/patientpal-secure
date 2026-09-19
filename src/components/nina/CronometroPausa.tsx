@@ -18,7 +18,7 @@ export function TempoPausa({
       role="timer"
       aria-label={atendente ? `Tempo de pausa de ${atendente}` : "Tempo desde o início da pausa"}
       aria-live="off"
-      title={disponivel ? "A contagem termina ao clicar em Online" : "Tempo de pausa indisponível"}
+      title={disponivel ? "A contagem termina ao clicar em Online ou Offline" : "Tempo de pausa indisponível"}
       className={cn(
         "inline-flex h-7 shrink-0 items-center justify-center rounded-md border border-atd-warn/40 bg-background px-1 text-[11px] font-medium tabular-nums text-atd-warn-ink",
         className,

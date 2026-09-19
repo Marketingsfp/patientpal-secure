@@ -1,6 +1,6 @@
 # Pausas na Central de Atenção
 
-Alteração de interface e leitura de dados, em 17/09/2026.
+Alteração de interface e leitura de dados, em 17/09/2026. Regra de encerramento da pausa atualizada em 19/09/2026.
 
 ## Comportamento
 
@@ -8,13 +8,14 @@ Alteração de interface e leitura de dados, em 17/09/2026.
 - A fila da mesma atendente aparece uma vez: junto da pausa. Filas individuais das demais atendentes e a fila global continuam disponíveis.
 - Clicar na atendente filtra suas conversas pendentes dentro da Central.
 - Pessoas em pausa não aumentam o contador de conversas que precisam de atenção.
-- Ao voltar para Online, a atendente sai da seção de pausas. Conversas ainda pendentes continuam na seção de filas individuais.
+- Ao mudar para Online ou Offline, a atendente sai da seção de pausas e o cronômetro some e zera. Uma nova pausa inicia outra contagem. Conversas ainda pendentes continuam na seção de filas individuais.
+- Offline não recebe novas conversas na distribuição automática, mesmo com vagas na fila individual. A distribuição continua restrita a Online e Pausa; se não houver atendente elegível, as novas conversas ficam na fila global.
 
 ## Fontes e sincronização
 
 Presença vem de `atend_agente_presenca.estado_manual`, limitada à clínica e aos membros ativos. Pendências seguem o cálculo existente de `fila_pendente`, excluindo conversas encerradas e da IA.
 
-O início usa `consultarInicioCronometroPausa`, a mesma leitura histórica da sidebar: primeira Pausa posterior ao último Online, considerando a versão da presença. Offline e cliques repetidos em Pausa não reiniciam o período. Ausência ou falha na leitura do início aparece como tempo indisponível, sem inventar um horário.
+O início usa `consultarInicioCronometroPausa`, a mesma leitura histórica da sidebar: primeira Pausa posterior ao último Online ou Offline, considerando a versão da presença. Cliques repetidos em Pausa não reiniciam o período. O estado Offline descarta o início antigo também no recarregamento e na sincronização entre abas. Ausência ou falha na leitura do início aparece como tempo indisponível, sem inventar um horário.
 
 `TempoPausa` compartilha um relógio local de um segundo entre a sidebar e a Central. Cada atualização usa um único instante; voltar de uma aba suspensa recalcula o tempo decorrido. O intervalo termina quando o último cronômetro desmonta. Nenhuma consulta de rede é feita por segundo.
 
@@ -30,7 +31,7 @@ Não há migration, alteração de distribuição, gravação de presença ou mo
 
 ## Validação local
 
-Testes cobrem filas individuais/globais, zero/dez pendências, exclusões, privacidade, autorização, início idêntico ao da sidebar, retorno Online e relógio compartilhado.
+Testes cobrem filas individuais/globais, zero/dez pendências, exclusões, privacidade, autorização, início idêntico ao da sidebar, encerramento em Online/Offline, reinício após Offline, respostas antigas e relógio compartilhado.
 
 Prévia no Chrome com componentes reais e dados fictícios: tempos iguais em ambos os locais, seleção da atendente, atualização de dez para nove pendências, saída da lista ao ficar Online e largura de 320 pixels sem rolagem horizontal. Essa prévia não testa transporte Realtime nem dados de produção.
 

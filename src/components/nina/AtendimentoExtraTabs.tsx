@@ -2972,7 +2972,7 @@ export function AtendInbox() {
                 {presSelecionada(controle, "OFFLINE") && <span className="sr-only"> (selecionado)</span>}
               </Button>
             </div>
-            {inicioCronometroPausa && <CronometroPausa inicio={inicioCronometroPausa} />}
+            {estadoManual === "PAUSA" && inicioCronometroPausa && <CronometroPausa inicio={inicioCronometroPausa} />}
             {presPrecisaEscolher(controle) && (
               <p className="text-[11px] text-muted-foreground">
                 Escolha Online, Em pausa ou Offline para definir se você recebe novas conversas.

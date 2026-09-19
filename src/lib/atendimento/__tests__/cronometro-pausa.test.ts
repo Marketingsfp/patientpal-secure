@@ -20,6 +20,7 @@ function banco(linhas: Linha[]) {
       const query = {
         select: (_campos: string) => query,
         eq: (campo: keyof Linha, valor: unknown) => { dados = dados.filter(l => l[campo] === valor); return query; },
+        in: (campo: keyof Linha, valores: unknown[]) => { dados = dados.filter(l => valores.includes(l[campo])); return query; },
         lte: (_campo: string, valor: number) => { dados = dados.filter(l => l.versao <= valor); return query; },
         gt: (_campo: string, valor: number) => { dados = dados.filter(l => l.versao > valor); return query; },
         order: (_campo: string, op: { ascending: boolean }) => { dados.sort((a, b) => op.ascending ? a.versao - b.versao : b.versao - a.versao); return query; },
@@ -39,28 +40,29 @@ const historico = [
   linha("PAUSA", 5, t1), linha("ONLINE", 6, t2), linha("PAUSA", 7, t2),
 ];
 
-describe("cronômetro: somente Online encerra o período", () => {
-  test("primeiro clique inicia; Pausa repetida e Offline conservam o início", () => {
+describe("cronômetro: Online e Offline encerram o período", () => {
+  test("Pausa repetida conserva o início; Offline zera e a próxima pausa começa do zero", () => {
     const inicial = atualizarCronometroPausa(null, { ...escopo, estado: "PAUSA", versao: 2, em: t0 });
     const repetida = atualizarCronometroPausa(inicial, { ...escopo, estado: "PAUSA", versao: 3, em: t1 });
     const offline = atualizarCronometroPausa(repetida, { ...escopo, estado: "OFFLINE", versao: 4, em: t1 });
     expect(repetida.inicio).toBe(t0);
-    expect(offline.inicio).toBe(t0);
-    const online = atualizarCronometroPausa(offline, { ...escopo, estado: "ONLINE", versao: 5, em: t1 });
-    expect(online.inicio).toBeNull();
-    expect(atualizarCronometroPausa(online, { ...escopo, estado: "PAUSA", versao: 6, em: t2 }).inicio).toBe(t2);
+    expect(offline.inicio).toBeNull();
+    expect(atualizarCronometroPausa(offline, { ...escopo, estado: "PAUSA", versao: 5, em: t2 }).inicio).toBe(t2);
   });
 
-  test("reload e outra aba recebem o mesmo horário oficial, inclusive Offline", () => {
+  test("reload e outra aba em Offline descartam até um início de pausa antigo", () => {
     const entrada = { ...escopo, estado: "OFFLINE" as const, versao: 4, em: t1, cronometroPausaInicio: t0 };
     const sincronia = aplicarAtualizacao(SINCRONIA_INICIAL, escopo, entrada);
     expect(sincronia.aceita).toBe(true);
-    expect(atualizarCronometroPausa(null, entrada).inicio).toBe(t0);
+    expect(atualizarCronometroPausa(null, entrada).inicio).toBeNull();
   });
 
-  test("resposta atrasada não reabre contador depois do Online", () => {
-    const online = atualizarCronometroPausa(null, { ...escopo, estado: "ONLINE", versao: 6, em: t2 });
-    expect(atualizarCronometroPausa(online, { ...escopo, estado: "PAUSA", versao: 3, em: t0 }).inicio).toBeNull();
+  test.each(["ONLINE", "OFFLINE"] as const)("resposta atrasada não reabre contador depois de %s", (estado) => {
+    const anterior = atualizarCronometroPausa(null, { ...escopo, estado: "PAUSA", versao: 2, em: t0 });
+    const encerrado = atualizarCronometroPausa(anterior, { ...escopo, estado, versao: 6, em: t1 });
+    expect(encerrado.inicio).toBeNull();
+    expect(atualizarCronometroPausa(encerrado, { ...escopo, estado: "PAUSA", versao: 3, em: t0 }).inicio).toBeNull();
+    expect(atualizarCronometroPausa(encerrado, { ...escopo, estado: "PAUSA", versao: 7, em: t2 }).inicio).toBe(t2);
   });
 
   test("trocar clínica ou usuário não reaproveita o relógio anterior", () => {
@@ -78,10 +80,20 @@ describe("cronômetro: somente Online encerra o período", () => {
 });
 
 describe("início persistido no histórico do servidor", () => {
-  test("snapshot anterior ignora Online futuro; offline não encerra a contagem", async () => {
-    for (const [versao, estado] of [[2, "PAUSA"], [3, "PAUSA"], [4, "OFFLINE"], [5, "PAUSA"]] as const) {
+  test("snapshot anterior ignora encerramentos futuros e cliques repetidos em Pausa", async () => {
+    for (const [versao, estado] of [[2, "PAUSA"], [3, "PAUSA"]] as const) {
       expect(await consultarInicioCronometroPausa(banco(historico) as any, { ...escopo, estado, versao })).toBe(t0);
     }
+  });
+
+  test("Offline encerra sem consultar histórico; pausa seguinte tem novo início oficial", async () => {
+    const db = banco(historico);
+    expect(await consultarInicioCronometroPausa(db as any, { ...escopo, estado: "OFFLINE", versao: 4 })).toBeNull();
+    expect(db.leituras).toBe(0);
+    const inicio = await consultarInicioCronometroPausa(db as any, { ...escopo, estado: "PAUSA", versao: 5 });
+    expect(inicio).toBe(t1);
+    const recarregado = atualizarCronometroPausa(null, { ...escopo, estado: "PAUSA", versao: 5, cronometroPausaInicio: inicio });
+    expect(formatarTempoPausa(recarregado.inicio!, Date.parse(t1))).toBe("00:00:00");
   });
 
   test("Online zera e uma pausa seguinte cria um novo período", async () => {
@@ -98,22 +110,24 @@ describe("início persistido no histórico do servidor", () => {
 
   test("leitura fica restrita à clínica e ao usuário autenticado", async () => {
     const linhas = [...historico,
-      { ...linha("ONLINE", 4, t1), clinica_id: "clinica-b" },
-      { ...linha("ONLINE", 4, t1), user_id: "outra" },
+      { ...linha("OFFLINE", 3, t1), clinica_id: "clinica-b" },
+      { ...linha("ONLINE", 3, t1), user_id: "outra" },
     ];
-    expect(await consultarInicioCronometroPausa(banco(linhas) as any, { ...escopo, estado: "PAUSA", versao: 5 })).toBe(t0);
+    expect(await consultarInicioCronometroPausa(banco(linhas) as any, { ...escopo, estado: "PAUSA", versao: 3 })).toBe(t0);
   });
 
   test("muitos cliques não truncam o início do período", async () => {
-    const longo = [linha("PAUSA", 1, t0), ...Array.from({ length: 1100 }, (_, i) => linha("OFFLINE", i + 2, t1))];
-    expect(await consultarInicioCronometroPausa(banco(longo) as any, { ...escopo, estado: "OFFLINE", versao: 1101 })).toBe(t0);
+    const longo = [linha("PAUSA", 1, t0), ...Array.from({ length: 1100 }, (_, i) => linha("PAUSA", i + 2, t1))];
+    expect(await consultarInicioCronometroPausa(banco(longo) as any, { ...escopo, estado: "PAUSA", versao: 1101 })).toBe(t0);
   });
 
   test("falha na leitura não apaga a contagem nem transforma pausa salva em falha", async () => {
     const db = { from: () => { throw new Error("Sem conexão"); } };
-    const inicio = await lerInicioCronometroPausa(db as any, { ...escopo, estado: "OFFLINE", versao: 4 });
+    const inicio = await lerInicioCronometroPausa(db as any, { ...escopo, estado: "PAUSA", versao: 3 });
     expect(inicio).toBeUndefined();
     const anterior = atualizarCronometroPausa(null, { ...escopo, estado: "PAUSA", versao: 2, em: t0 });
-    expect(atualizarCronometroPausa(anterior, { ...escopo, estado: "OFFLINE", versao: 4, cronometroPausaInicio: inicio }).inicio).toBe(t0);
+    expect(atualizarCronometroPausa(anterior, { ...escopo, estado: "PAUSA", versao: 3, cronometroPausaInicio: inicio }).inicio).toBe(t0);
+    expect(atualizarCronometroPausa(anterior, { ...escopo, estado: "OFFLINE", versao: 4, cronometroPausaInicio: inicio }).inicio).toBeNull();
+    expect(await lerInicioCronometroPausa(db as any, { ...escopo, estado: "OFFLINE", versao: 4 })).toBeNull();
   });
 });
