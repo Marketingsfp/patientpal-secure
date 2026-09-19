@@ -9,6 +9,7 @@
  */
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { garantirAcessoCoach } from "@/lib/coach/guard.server";
 import { gerarBaseDoSistema, type ClienteBase } from "@/lib/coach/base-conhecimento.dados";
 
 export type BaseConhecimentoGerada = {
@@ -52,7 +53,7 @@ export const gerarBaseConhecimento = createServerFn({ method: "POST" })
       },
       { onConflict: "clinica_id" },
     );
-    if (error) throw new Error(error.message);
+    if (error) throw new Error("Não foi possível salvar a base gerada.");
 
     return { texto, geradoEm: geradoEm.toISOString(), tamanho };
   });
