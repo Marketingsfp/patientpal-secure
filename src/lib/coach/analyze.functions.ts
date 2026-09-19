@@ -280,11 +280,9 @@ function buildUserMessage(input: AnalysisInput) {
           type: "input_audio" as const,
           input_audio: {
             data: input.audio.base64,
-            format: input.audio.mimeType.includes("wav")
-              ? "wav"
-              : input.audio.mimeType.includes("mp3") || input.audio.mimeType.includes("mpeg")
-                ? "mp3"
-                : "webm",
+            // Gravação de celular costuma vir em m4a/ogg; antes tudo isso ia
+            // como "webm" e a transcrição podia falhar.
+            format: formatoAudio(input.audio.mimeType),
           },
         },
       ],
@@ -321,7 +319,7 @@ export const analyzeConversation = createServerFn({ method: "POST" })
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: data.audio ? "google/gemini-3.8-flash" : "google/gemini-3.8-flash",
+        model: "google/gemini-3.8-flash",
         messages: [
           { role: "system", content: `${contextoDataAtual()}\n\n${SYSTEM_PROMPT}` },
           buildUserMessage(data),
@@ -355,3 +353,13 @@ export const analyzeConversation = createServerFn({ method: "POST" })
     const parsed = JSON.parse(toolCall.function.arguments) as AnalysisResult;
     return parsed;
   });
+/** Formato do áudio para a IA, a partir do tipo do arquivo enviado. */
+function formatoAudio(mime: string): string {
+  const m = (mime || "").toLowerCase();
+  if (m.includes("wav")) return "wav";
+  if (m.includes("mp3") || m.includes("mpeg")) return "mp3";
+  if (m.includes("m4a") || m.includes("mp4") || m.includes("aac")) return "m4a";
+  if (m.includes("ogg") || m.includes("opus")) return "ogg";
+  if (m.includes("flac")) return "flac";
+  return "webm";
+}
