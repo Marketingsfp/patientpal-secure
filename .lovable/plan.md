@@ -1,71 +1,88 @@
-# Unificar a voz do Coach com a Voz & Áudio (TTS) do sistema
+# Coach WhatsApp — Etapa 1: correções funcionais
 
-## O que muda, em linguagem simples
+Escopo: somente o módulo Coach (`src/components/coach`, `src/lib/coach`, rotas
+`app.coach.*`), mais dois pontos pedidos no menu (`app-shell.tsx`) e uma migração
+de banco restrita a objetos `coach_*`. Nada de agenda, financeiro, Nina ou OS ZAP.
 
-Hoje o Coach tem um motor de voz só dele (servidor local próprio + voz da
-plataforma), configurado dentro do painel da gestora e também dentro da tela de
-treino. O ClinicaOS já tem a tela **Voz & Áudio (TTS)**, com o servidor de voz
-da clínica, catálogo de vozes, velocidade e plano B automático — é o que a Nina
-e o painel usam.
+Aviso de volume: são 7 frentes grandes num pedido só. Vou executar na ordem
+abaixo, que agrupa o que depende de banco primeiro. Se preferir, dá para parar
+depois do bloco A e conferir antes de seguir.
 
-Depois da mudança, o Coach passa a falar pelo mesmo caminho do resto do sistema.
-No Coach sobra apenas uma escolha: **qual voz do catálogo é o paciente
-feminino e qual é o masculino**, na ligação e no WhatsApp.
+## Bloco A — Banco (migração)
 
-## Classificação do pedido
+- `coach_pode_gerir(_clinica_id)` passa a ser
+  `has_module_access(auth.uid(), _clinica_id, 'coach', 'write')`; recriada com
+  `CREATE OR REPLACE` para as policies existentes continuarem valendo.
+- `coach_registrar_tempo_estudo` vira `SECURITY DEFINER` com
+  `SET search_path = public`, validando que `_atendente` é o nome do perfil de
+  `auth.uid()` ou que quem chama é gestor. Passa a gravar `user_id`.
+- Policy de insert de `coach_eventos_seguranca`: só o próprio usuário.
+- Coluna nova `simulacao_gestor boolean not null default false` em
+  `coach_roleplay_sessions` e `coach_provas`.
+- Tabela nova `coach_variedade` (clinica_id, user_id, tipo, valor, criado_em)
+  para os últimos temas/nomes por atendente, com GRANT + RLS por clínica.
+- Nada é apagado; o histórico migrado com `user_id` nulo permanece.
 
-Ajuste técnico de integração (remoção de caminho duplicado) + pequeno ajuste de
-tela no painel da gestora. Sem regra de negócio nova.
+## Bloco B — Identidade por usuário (item 1)
 
-## Arquivos
+- `PainelGestora`: campo "atendente" vira `Select` obrigatório de
+  `useAtendentesCoach`; grava `user_id` da atendente escolhida e `atendente` com
+  o nome do perfil.
+- Todas as gravações `coach_*` novas passam `user_id` da pessoa avaliada.
+- `AtendenteGuard` compara `ctx.userId` quando o registro tem `user_id`; nome só
+  como fallback do histórico antigo.
+- Helper único de filtro (`filtroDoAtendente`) aplicado em roleplay boot, prova
+  `carregar`, `HistoricoAtendente`, `EvolucaoAtendente`, `MinhaMeta`:
+  `user_id = ctx.userId` OU (`user_id is null` E `atendente = nome`).
 
-**Remover**
-- `src/routes/api/coach/tts.ts` (endereço de voz exclusivo do Coach)
-- `src/lib/coach/local-tts.ts` (servidor local próprio do Coach)
-- `src/lib/coach/voz-config.ts` (substituído, ver abaixo)
+## Bloco C — Uma só regra de progresso (item 2)
 
-**Criar**
-- `src/lib/coach/voz-sistema.ts` — novo formato da configuração de voz:
-  `{ ligacao: { feminino, masculino }, whatsapp: { feminino, masculino } }`,
-  cada valor é um id de voz do catálogo do sistema (vazio = padrão da tela
-  Voz & Áudio). Inclui a leitura tolerante do formato antigo.
+- `calcularProgresso(sessoes, provas, tempos, regras)` em `treinamento-plano.ts`,
+  devolvendo bloco **diário** (X ligações + Y WhatsApp com nota ≥ 6 + 1h) e
+  bloco **acumulado** (trilha/certificado: sessões válidas + prova aprovada).
+- Consumido por TraineeHome, roleplay, prova, CourseView, GestaoDesempenho,
+  PainelAcoes e Certificado. Constantes ficam só em `treinamento-plano.ts`
+  (saem as cópias de `TraineeHome`).
+- Certificado passa a depender do acumulado, então não reaparece a cada dia.
 
-**Alterar**
-- `src/lib/tts-service.ts` — expor `speakComVoz(texto, voz, opts)`: mesma
-  função de fala já usada pela Nina/painel, aceitando a voz do personagem.
-  Reaproveita cache de áudio, velocidade configurada e o plano B existente.
-  Nenhuma mudança de comportamento para quem já usa `speak()`.
-- `src/components/coach/VozEditor.tsx` — vira um seletor simples: 4 escolhas
-  (ligação/WhatsApp × feminino/masculino) alimentadas pelo catálogo do sistema,
-  botão "Ouvir amostra" e link para **Voz & Áudio (TTS)**.
-- `src/routes/_authenticated/app.coach.roleplay.$nome.tsx` — a fala do paciente
-  passa a usar o serviço do sistema; sai o painel de configuração de servidor
-  local dentro do treino e o teste próprio. Sequência de falas, cronômetro,
-  escuta da atendente e encadeamento ficam iguais.
-- `src/lib/coach/config-clinica.ts` — passa a usar o novo formato de
-  `voz_config`.
+## Bloco D — Gestor não é aluno (item 4)
 
-## Banco
+- `PainelGestora` deixa de cronometrar quando `ctx.gestor`.
+- Roleplay/prova de outra pessoa abertos por gestor gravam
+  `simulacao_gestor = true`; essas linhas saem de metas, ranking e histórico da
+  atendente.
 
-Nenhuma migração. O campo `coach_config_clinica.voz_config` continua o mesmo
-(JSON); só o conteúdo muda de formato, e valores antigos são convertidos na
-leitura: quando a voz antiga do servidor local existir no catálogo do sistema
-(ex.: `dii_pt-BR`, `pt_BR-faber-medium`) ela é mantida; senão, cai no padrão da
-tela Voz & Áudio. Nada é apagado.
+## Bloco E — Cenários da base real (item 5)
 
-## Riscos
+- Saem `TEMAS_SERVICO` e `NOMES_PACIENTES`.
+- Tema sorteado da base gerada (consultas, mais procurados, exames); variedade
+  passa a viver em `coach_variedade` no lugar do `localStorage`.
+- UI e escolha de voz usam o `nome_paciente` vindo da IA; `baseDoAssunto` recorta
+  a base pelo tema sorteado.
 
-- Se o servidor de voz da clínica estiver fora, o Coach cai no mesmo plano B da
-  Nina (voz da plataforma) — antes ele tinha caminhos próprios de reserva.
-- As vozes antigas do Coach que não existirem no catálogo do servidor deixam de
-  ser oferecidas; a clínica passa a usar a voz padrão até escolher outra.
+## Bloco F — Base gerada no servidor (item 6)
 
-## Fora do escopo
+- Server function `gerarBaseConhecimento(clinicaId)` (gestor autenticado) faz a
+  leitura pesada e grava o cache.
+- Botão "Atualizar do sistema" e a regeneração automática por vencimento só
+  disparam para quem tem permissão de gestor; atendente apenas lê.
 
-Nina, painel, totem, OS ZAP, agenda, financeiro, base de conhecimento do Coach,
-prova e análise de atendimento (texto, sem voz).
+## Bloco G — Pequenos (item 7)
+
+- `salvar()` do `config-clinica` com debounce e patch parcial sobre a última
+  versão (sem closure velha).
+- `send()` do roleplay unificado com `sendWithText` (envia `dificuldade`).
+- Spinner no boot do roleplay.
+- m4a/ogg corretos em `analyze.functions.ts`; remoção do ternário morto de
+  `model`.
+- Confirmação antes de excluir análise via `lib/confirm.tsx`.
+- Hub: cartão "Coach WhatsApp" oculto para quem não tem o módulo
+  (`portaisOcultos`) e Coach incluído em `ambientesRapidos`.
+- `SUBSYSTEMS.coach.groups` só com seções existentes no menu.
+- `localStorage` do Coach com chave `${clinicaId}:${userId}`.
 
 ## Validação
 
-`bunx tsgo --noEmit`, suíte `permissoes-rotas`, `bun run build`, e resumo
-antes/depois.
+`bunx tsgo --noEmit`, testes do Coach (novos testes de `calcularProgresso`) e
+`bun run build`. Ao final: resumo antes/depois e a lista do que eu não fizer,
+com o motivo.
