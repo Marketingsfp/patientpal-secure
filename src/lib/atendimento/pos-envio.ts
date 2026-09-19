@@ -61,7 +61,7 @@ function instante(v: any): number {
 
 /**
  * Mostra o texto recém-enviado na linha da conversa, sem recarregar a Inbox
- * inteira. A ordem por mais recente é preservada; o servidor confirma depois.
+ * inteira e sem mover o card. O servidor confirma a prévia depois.
  *
  * Conversa que não está na lista atual (outro filtro) não é inserida aqui.
  */
@@ -80,10 +80,7 @@ export function aplicarPreviaLocalEnvio(
     return { ...c, ultima_msg_preview: texto, ultima_msg_em: quando };
   });
   if (!mudou) return lista;
-  return [...atualizada].sort((a, b) => {
-    const d = instante(b.ultima_msg_em) - instante(a.ultima_msg_em);
-    return d !== 0 ? d : a.id.localeCompare(b.id);
-  });
+  return atualizada;
 }
 
 /**

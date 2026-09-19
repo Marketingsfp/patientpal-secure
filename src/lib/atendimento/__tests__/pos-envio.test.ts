@@ -63,7 +63,7 @@ describe("FASE 3 — pós-envio incremental", () => {
     expect(cache.obter("A")!.notas.length).toBe(1);
   });
 
-  it("mostra a prévia na lista e sobe a conversa para o topo", () => {
+  it("mostra a prévia na lista sem mover a conversa após a resposta humana", () => {
     const lista = [
       { id: "B", ultima_msg_preview: "b", ultima_msg_em: "2026-09-09T12:00:01.000Z" },
       { id: "A", ultima_msg_preview: "a", ultima_msg_em: "2026-09-09T11:00:00.000Z" },
@@ -73,8 +73,8 @@ describe("FASE 3 — pós-envio incremental", () => {
       texto: "Oi",
       quando: "2026-09-09T12:00:05.000Z",
     });
-    expect(nova[0].id).toBe("A");
-    expect(nova[0].ultima_msg_preview).toBe("Oi");
+    expect(nova.map((c) => c.id)).toEqual(["B", "A"]);
+    expect(nova[1].ultima_msg_preview).toBe("Oi");
   });
 
   it("não sobrescreve uma confirmação mais nova do servidor", () => {

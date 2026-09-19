@@ -106,9 +106,17 @@ describe("FASE 3 — realtime do filtro por atendente", () => {
     expect(r.lista).toEqual([]);
   });
 
-  it("ordem por última mensagem é mantida ao inserir", () => {
-    const antiga = conversa({ id: "c0", ultima_msg_em: "2026-01-01T09:00:00.000Z" });
-    const r = patchListaPorConversa([antiga], conversa(), ctx());
+  it("nova atribuição entra antes das anteriores, independentemente da última mensagem", () => {
+    const antiga = conversa({
+      id: "c0",
+      inbox_entrada_em: "2026-01-01T09:00:00.000Z",
+      ultima_msg_em: "2026-01-01T12:00:00.000Z",
+    });
+    const r = patchListaPorConversa(
+      [antiga],
+      conversa({ inbox_entrada_em: "2026-01-01T10:00:00.000Z" }),
+      ctx(),
+    );
     expect(r.lista.map((c) => c.id)).toEqual(["c1", "c0"]);
   });
 

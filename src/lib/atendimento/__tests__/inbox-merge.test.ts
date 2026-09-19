@@ -54,10 +54,10 @@ describe("inbox-merge", () => {
     expect(dois).toBe(um);
   });
 
-  it("ordena por mais recentes com desempate estável", () => {
-    const a = { ...base, id: "a", ultima_msg_em: "2026-09-05T10:00:00Z" };
-    const b = { ...base, id: "b", ultima_msg_em: "2026-09-05T11:00:00Z" };
-    const c = { ...base, id: "c", ultima_msg_em: "2026-09-05T10:00:00Z" };
+  it("ordena pela entrada do atendimento com desempate estável", () => {
+    const a = { ...base, id: "a", inbox_entrada_em: "2026-09-05T10:00:00Z" };
+    const b = { ...base, id: "b", inbox_entrada_em: "2026-09-05T11:00:00Z" };
+    const c = { ...base, id: "c", inbox_entrada_em: "2026-09-05T10:00:00Z" };
     expect(ordenarPorRecentes([a, b, c]).map((x) => x.id)).toEqual(["b", "a", "c"]);
     expect(ordenarPorRecentes([c, b, a]).map((x) => x.id)).toEqual(["b", "a", "c"]);
   });

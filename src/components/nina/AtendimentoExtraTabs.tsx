@@ -131,11 +131,7 @@ import {
 import { useChatScroll } from "@/hooks/use-chat-scroll";
 import { rotuloNovasMensagens } from "@/lib/atendimento/scroll-chat";
 
-import {
-  mesclarEspera,
-  mesclarListaConversas,
-  ordenarPorRecentes,
-} from "@/lib/atendimento/inbox-merge";
+import { mesclarEspera, mesclarListaConversas } from "@/lib/atendimento/inbox-merge";
 import {
   ConversationSystemEvent,
   type ConversaEvento,
@@ -1095,7 +1091,9 @@ export function AtendInbox() {
           cacheConversas.current.invalidar(id);
           prefetchMsgs.current.invalidar(id);
         }
-        return ordenarPorRecentes(mesclarListaConversas(prev as any, rows as any)) as any[];
+        // O servidor já ordena a visualização antes do LIMIT, inclusive espera
+        // e resolvidas. Mesclar a prévia não deve aplicar uma segunda ordem.
+        return mesclarListaConversas(prev as any, rows as any) as any[];
       });
       // O número do filtro atual muda na hora; o servidor confirma em seguida.
       setContadores((c) => ajustarContadorAtual(c as ContadoresInbox, escopo, rows.length));

@@ -20,6 +20,7 @@ import {
   type EscopoInbox,
   type ConversaEscopo,
 } from "./escopo-inbox";
+import { ordenarInbox } from "./ordem-inbox";
 
 export type LinhaLista = {
   id: string;
@@ -45,29 +46,10 @@ function instante(v: any): number {
 
 /**
  * FASE 4 — a ordem do card segue o eixo de Visualização ativo, igual à do
- * servidor: Recentes por última mensagem, Resolvidas por data de resolução,
+ * servidor: Recentes por entrada do atendimento, Resolvidas por data de resolução,
  * Maior espera pela métrica canônica de paciente aguardando.
  */
 export type VisualizacaoPatch = "recentes" | "resolvidas" | "espera";
-
-function ordenar(
-  lista: LinhaLista[],
-  visualizacao: VisualizacaoPatch = "recentes",
-  espera: Record<string, string> = {},
-): LinhaLista[] {
-  return [...lista].sort((a, b) => {
-    let d = 0;
-    if (visualizacao === "resolvidas") {
-      d = instante(b["resolved_at"] ?? b["closed_at"]) - instante(a["resolved_at"] ?? a["closed_at"]);
-    } else if (visualizacao === "espera") {
-      const ta = espera[a.id] ? instante(espera[a.id]) : Number.POSITIVE_INFINITY;
-      const tb = espera[b.id] ? instante(espera[b.id]) : Number.POSITIVE_INFINITY;
-      d = ta - tb;
-    }
-    if (d === 0) d = instante(b.ultima_msg_em) - instante(a.ultima_msg_em);
-    return d !== 0 ? d : a.id.localeCompare(b.id);
-  });
-}
 
 function textoPrevia(linha: Record<string, any>): string | null {
   const bruto = linha["body"] ?? linha["content"] ?? linha["texto"] ?? null;
@@ -127,7 +109,7 @@ export function patchListaPorMensagem(
     };
   });
   return {
-    lista: ordenar(atualizada, ctx.visualizacao ?? "recentes", ctx.espera ?? {}),
+    lista: ordenarInbox(atualizada, ctx.visualizacao ?? "recentes", ctx.espera ?? {}),
     aplicado: true,
     reconciliar: false,
   };
@@ -213,14 +195,14 @@ export function patchListaPorConversa(
   }
 
   // Entrou no filtro (transferência, handoff da Nina, atribuição automática):
-  // aparece na hora, na posição correta pela última mensagem.
+  // aparece na hora, pela entrada persistida do atendimento.
   if (!existente && visivel) {
     // Durante uma busca a lista é um recorte do servidor: não dá para saber
     // localmente se a conversa pertence ao resultado.
     if (ctx.buscando) return { lista, aplicado: false, reconciliar: true };
     if (linha?.["is_teste"] === true) return { lista, aplicado: true, reconciliar: false };
     return {
-      lista: ordenar([...lista, { ...(linha as LinhaLista) }], visualizacao, espera),
+      lista: ordenarInbox([...lista, { ...(linha as LinhaLista) }], visualizacao, espera),
       aplicado: true,
       reconciliar: false,
     };
@@ -232,7 +214,11 @@ export function patchListaPorConversa(
   const mudou = Object.keys(mesclada).some((k) => mesclada[k] !== existente[k]);
   if (!mudou) return { lista, aplicado: true, reconciliar: false };
   return {
-    lista: ordenar(lista.map((c) => (c.id === id ? mesclada : c)), visualizacao, espera),
+    lista: ordenarInbox(
+      lista.map((c) => (c.id === id ? mesclada : c)),
+      visualizacao,
+      espera,
+    ),
     aplicado: true,
     reconciliar: false,
   };

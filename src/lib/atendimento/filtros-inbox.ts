@@ -119,7 +119,7 @@ export interface PlanoVisualizacao {
   /** Só conversas em que o paciente está aguardando (métrica canônica). */
   exigeEsperaPaciente: boolean;
   /** Coluna de ordenação aplicada no banco. */
-  ordenarPor: "ultima_msg_em" | "resolved_at" | "aguardando_desde";
+  ordenarPor: "inbox_entrada_em" | "resolved_at" | "aguardando_desde";
   /** Ascendente = mais antigo primeiro (maior espera). */
   ascendente: boolean;
 }
@@ -144,7 +144,7 @@ export function planoVisualizacao(v: VisualizacaoInbox): PlanoVisualizacao {
   return {
     somenteResolvidas: false,
     exigeEsperaPaciente: false,
-    ordenarPor: "ultima_msg_em",
+    ordenarPor: "inbox_entrada_em",
     ascendente: false,
   };
 }

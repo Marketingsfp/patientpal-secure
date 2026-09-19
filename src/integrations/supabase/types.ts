@@ -1092,6 +1092,7 @@ export type Database = {
           handoff_motivo: string | null
           handoff_resumo: Json | null
           id: string
+          inbox_entrada_em: string
           identidade_confirmada: boolean
           identidade_perguntada_em: string | null
           identidade_tentativas: number
@@ -1145,6 +1146,7 @@ export type Database = {
           handoff_motivo?: string | null
           handoff_resumo?: Json | null
           id?: string
+          inbox_entrada_em?: string
           identidade_confirmada?: boolean
           identidade_perguntada_em?: string | null
           identidade_tentativas?: number
@@ -1198,6 +1200,7 @@ export type Database = {
           handoff_motivo?: string | null
           handoff_resumo?: Json | null
           id?: string
+          inbox_entrada_em?: string
           identidade_confirmada?: boolean
           identidade_perguntada_em?: string | null
           identidade_tentativas?: number

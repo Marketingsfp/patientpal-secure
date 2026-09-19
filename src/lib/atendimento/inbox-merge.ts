@@ -11,9 +11,10 @@
  *  - campo ausente/nulo no payload novo nunca apaga o valor já exibido;
  *  - quando nada muda, o objeto anterior é devolvido (mesma referência), então
  *    o React não re-renderiza o cartão à toa;
- *  - a ordenação "mais recentes" usa uma única fonte (`ultima_msg_em`), com
- *    desempate estável pelo id, evitando o vai-e-volta de posição.
+ *  - a ordem usa a entrada persistida do atendimento, nunca a última mensagem.
  */
+
+import { ordenarInbox } from "./ordem-inbox";
 
 export interface ConversaInbox {
   id: string;
@@ -55,20 +56,9 @@ export function mesclarListaConversas<T extends ConversaInbox>(anteriores: T[], 
   return mudou ? saida : anteriores;
 }
 
-function instante(valor: unknown): number {
-  if (!valor) return 0;
-  const t = new Date(String(valor)).getTime();
-  return Number.isNaN(t) ? 0 : t;
-}
-
-/** Ordenação única e estável de "mais recentes" (fonte: `ultima_msg_em`). */
+/** "Recentes" significa novos atendimentos, não novas mensagens. */
 export function ordenarPorRecentes<T extends ConversaInbox>(lista: T[]): T[] {
-  const ordenada = [...lista].sort((a, b) => {
-    const d = instante(b["ultima_msg_em"]) - instante(a["ultima_msg_em"]);
-    return d !== 0 ? d : a.id.localeCompare(b.id);
-  });
-  const igual = ordenada.every((c, i) => c === lista[i]);
-  return igual ? lista : ordenada;
+  return ordenarInbox(lista);
 }
 
 /** Mescla o mapa de espera preservando a referência quando nada muda. */

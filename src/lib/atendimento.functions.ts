@@ -283,10 +283,10 @@ export const listarConversas = createServerFn({ method: "POST" })
     // --- Ordenação e limite (sempre por último) ----------------------------
     q = q.order(plano.ordenarPor, { ascending: plano.ascendente, nullsFirst: false });
     // Desempate estável: conversa sem a coluna da visualização não embaralha.
-    if (plano.ordenarPor !== "ultima_msg_em") {
-      q = q.order("ultima_msg_em", { ascending: false });
+    if (plano.ordenarPor !== "inbox_entrada_em") {
+      q = q.order("inbox_entrada_em", { ascending: false });
     }
-    q = q.limit(data.limit);
+    q = q.order("id", { ascending: true }).limit(data.limit);
 
     const { data: rows, error } = await q;
     marcar("consulta");
