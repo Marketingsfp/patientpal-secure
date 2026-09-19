@@ -52,6 +52,8 @@ import type { AnalysisResult } from "@/lib/coach/analyze.functions";
 import type { ScriptItem } from "@/lib/coach/config-clinica";
 import {
   proximaAtividade,
+  META_LIGACOES,
+  META_WHATSAPP,
   calcularProgresso,
   diaSaoPaulo,
   regrasPadrao,
