@@ -111,6 +111,9 @@ function ProvaPage({ ctx, alvo }: { ctx: CoachContexto; alvo: AlvoAtendente }) {
   const [respostas, setRespostas] = useState<number[]>([]);
   const [reveladas, setReveladas] = useState<boolean[]>([]);
   const [feedback, setFeedback] = useState<FeedbackProva | null>(null);
+  const feedbackRef = useRef<FeedbackProva | null>(null);
+  /** Id da prova gravada: usado para anexar o feedback à mesma linha. */
+  const provaIdRef = useRef<string | null>(null);
   const [feedbackLoading, setFeedbackLoading] = useState(false);
   const [feedbackError, setFeedbackError] = useState<string | null>(null);
   const [enviado, setEnviado] = useState(false);
