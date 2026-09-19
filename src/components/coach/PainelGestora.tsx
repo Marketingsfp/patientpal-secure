@@ -5,6 +5,7 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
+import { useLocation } from "@tanstack/react-router";
 import { AlertCircle, Loader2, MessageCircle, Mic, Sparkles, Upload, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
