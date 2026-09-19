@@ -21,7 +21,7 @@ export type ExemploTreino = {
 };
 
 export const GATEWAY = "https://ai.gateway.lovable.dev/v1/chat/completions";
-const MODEL = "google/gemini-3.8-flash";
+export const MODEL = "google/gemini-3.8-flash";
 
 export function authHeaders() {
   const apiKey = process.env.LOVABLE_API_KEY;
@@ -29,7 +29,7 @@ export function authHeaders() {
   return { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" };
 }
 
-const START_TOOL = {
+export const START_TOOL = {
   type: "function" as const,
   function: {
     name: "iniciar_roleplay",
