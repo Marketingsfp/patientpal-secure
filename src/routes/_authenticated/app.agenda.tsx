@@ -5683,7 +5683,8 @@ function AgendaPage() {
           sp.delete("orc");
           sp.delete("orcmed");
           const novo = `${window.location.pathname}${sp.toString() ? `?${sp.toString()}` : ""}${window.location.hash}`;
-          window.history.replaceState(null, "", novo);
+          // Mantém o estado do histórico (ver comentário acima).
+          window.history.replaceState(window.history.state, "", novo);
         }
       }
     } catch {
