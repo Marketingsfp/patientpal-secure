@@ -1,43 +1,56 @@
 /**
  * Controle de variedade das simulações: evita repetir pacientes, serviços e
  * perguntas de abertura entre as conversas/ligações da mesma atendente.
+ *
+ * Antes isso vivia no `localStorage` do aparelho — trocar de computador ou
+ * limpar o navegador fazia a IA repetir tudo. Agora fica em
+ * `coach_variedade`, por clínica e por usuário.
  */
-import { diaRio } from "./data-atual";
+import { supabase } from "@/integrations/supabase/client";
 
-const KEY_USADOS = "roleplay:usados";
+const LIMITE_LEITURA = 60;
+const LIMITE_GRAVACAO = 12;
 
-type Registro = { dia: string; itens: string[] };
+export type EscopoVariedade = {
+  clinicaId: string | null;
+  userId: string | null;
+  atendente: string;
+};
 
-function ler(atendente: string): Registro {
-  if (typeof window === "undefined") return { dia: diaRio(), itens: [] };
-  try {
-    const raw = localStorage.getItem(`${KEY_USADOS}:${atendente}`);
-    const r = raw ? (JSON.parse(raw) as Registro) : null;
-    if (r && r.dia === diaRio()) return r;
-  } catch {
-    /* ignora storage inválido */
-  }
-  return { dia: diaRio(), itens: [] };
-}
-
-/** Itens (nomes, serviços, aberturas) que a IA não pode repetir hoje. */
-export function itensEvitar(atendente: string): string[] {
-  return ler(atendente).itens.slice(-60);
+/** Itens (nomes, serviços, aberturas) que a IA não deve repetir. */
+export async function itensEvitar(escopo: EscopoVariedade): Promise<string[]> {
+  if (!escopo.clinicaId || !escopo.userId) return [];
+  const { data } = await supabase
+    .from("coach_variedade")
+    .select("valor")
+    .eq("clinica_id", escopo.clinicaId)
+    .eq("user_id", escopo.userId)
+    .order("created_at", { ascending: false })
+    .limit(LIMITE_LEITURA);
+  return (data ?? []).map((r) => r.valor).filter((v): v is string => Boolean(v));
 }
 
 /** Registra o que foi usado numa simulação recém-criada. */
-export function registrarUsados(atendente: string, itens: (string | undefined)[]) {
-  const r = ler(atendente);
-  const novos = itens
+export async function registrarUsados(
+  escopo: EscopoVariedade,
+  itens: (string | undefined | null)[],
+  tipo: "nome" | "tema" | "abertura" = "tema",
+): Promise<void> {
+  if (!escopo.clinicaId || !escopo.userId) return;
+  const valores = itens
     .map((i) => (i ?? "").trim())
-    .filter((i) => i.length > 1 && !r.itens.includes(i));
-  if (!novos.length) return;
-  const atualizado: Registro = { dia: r.dia, itens: [...r.itens, ...novos].slice(-80) };
-  try {
-    localStorage.setItem(`${KEY_USADOS}:${atendente}`, JSON.stringify(atualizado));
-  } catch {
-    /* storage cheio */
-  }
+    .filter((i) => i.length > 1)
+    .slice(0, LIMITE_GRAVACAO);
+  if (!valores.length) return;
+  await supabase.from("coach_variedade").insert(
+    valores.map((valor) => ({
+      clinica_id: escopo.clinicaId as string,
+      user_id: escopo.userId as string,
+      atendente: escopo.atendente,
+      tipo,
+      valor: valor.slice(0, 240),
+    })),
+  );
 }
 
 /** Embaralha uma cópia da lista (Fisher-Yates). */

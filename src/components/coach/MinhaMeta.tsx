@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Target } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { NOTA_MINIMA } from "@/lib/coach/treinamento-plano";
+import { filtroDoAtendente } from "@/lib/coach/identidade";
 
 type Meta = { meta_nota: number; meta_horas: number; observacao: string };
 
@@ -9,9 +10,11 @@ type Meta = { meta_nota: number; meta_horas: number; observacao: string };
 export function MinhaMeta({
   atendente,
   clinicaId,
+  userId,
 }: {
   atendente: string;
   clinicaId: string | null;
+  userId: string | null;
 }) {
   const [meta, setMeta] = useState<Meta | null>(null);
 
@@ -23,7 +26,8 @@ export function MinhaMeta({
         .from("coach_desempenho_metas")
         .select("meta_nota,meta_horas,observacao")
         .eq("clinica_id", clinicaId)
-        .eq("atendente", atendente)
+        .or(filtroDoAtendente(userId, atendente))
+        .limit(1)
         .maybeSingle();
       if (cancelled || !data) return;
       setMeta({
@@ -35,7 +39,7 @@ export function MinhaMeta({
     return () => {
       cancelled = true;
     };
-  }, [atendente, clinicaId]);
+  }, [atendente, clinicaId, userId]);
 
   if (!meta) return null;
 

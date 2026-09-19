@@ -8,7 +8,13 @@ import { useServerFn } from "@tanstack/react-start";
 import { useLocation } from "@tanstack/react-router";
 import { AlertCircle, Loader2, MessageCircle, Mic, Sparkles, Upload, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { supabase } from "@/integrations/supabase/client";
@@ -16,6 +22,7 @@ import { analyzeConversation, type AnalysisResult } from "@/lib/coach/analyze.fu
 import { useCoachConfig } from "@/lib/coach/config-clinica";
 import { useAtendentesCoach, type CoachContexto } from "@/lib/coach/contexto";
 import { useStudyTimer } from "@/lib/coach/study-time";
+import { confirmDialog } from "@/lib/confirm";
 import { HistoricoGestor } from "@/components/coach/HistoricoGestor";
 import { VozEditor } from "@/components/coach/VozEditor";
 import {
@@ -34,11 +41,12 @@ import { BaseConhecimentoEditor } from "@/components/coach/BaseConhecimentoEdito
 type Aba = "progresso" | "conversas" | "perfis" | "vozes" | "analise";
 
 export function PainelGestora({ ctx }: { ctx: CoachContexto }) {
-  const { clinicaId, clinicaNome, clinicas, userId, atendente: nomeUsuario } = ctx;
+  const { clinicaId, clinicaNome, clinicas, atendente: nomeUsuario } = ctx;
   const analyze = useServerFn(analyzeConversation);
   const { config, salvar, atualizarBase, gerandoBase, erroBase, baseParaIA } = useCoachConfig(
     clinicaId,
     clinicaNome,
+    ctx.gestor,
   );
   const { atendentes } = useAtendentesCoach(clinicaId);
 
@@ -60,11 +68,22 @@ export function PainelGestora({ ctx }: { ctx: CoachContexto }) {
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [history, setHistory] = useState<HistoryItem[]>([]);
-  const [atendente, setAtendente] = useState("");
+  // A atendente avaliada é escolhida na lista de usuários da clínica com o
+  // módulo Coach: a análise precisa ficar gravada no `user_id` DELA, e não no
+  // de quem está avaliando.
+  const [atendenteId, setAtendenteId] = useState("");
   const [selectedAtendente, setSelectedAtendente] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  useStudyTimer(nomeUsuario, "plataforma", clinicaId);
+  // Gestor não é aluno: não entra no cronômetro, no ranking nem no
+  // "o que fazer hoje". Só a atendente acumula tempo de estudo.
+  useStudyTimer(ctx.gestor ? "" : nomeUsuario, "plataforma", ctx.gestor ? null : clinicaId);
+
+  const atendenteSelecionada = useMemo(
+    () => atendentes.find((a) => a.userId === atendenteId) ?? null,
+    [atendentes, atendenteId],
+  );
+  const atendente = atendenteSelecionada?.nome ?? "";
 
   const loadHistory = useCallback(async () => {
     if (!clinicaId) return;
@@ -101,6 +120,7 @@ export function PainelGestora({ ctx }: { ctx: CoachContexto }) {
     tipo: "texto" | "audio",
     sourceText: string,
     nomeAtendente: string,
+    atendenteUserId: string,
   ) {
     if (!clinicaId) return;
     const preview = sourceText.replace(/\s+/g, " ").trim().slice(0, 160);
@@ -109,7 +129,8 @@ export function PainelGestora({ ctx }: { ctx: CoachContexto }) {
       (tipo === "audio" ? "Ligação analisada" : "Conversa analisada");
     const { error: insErr } = await supabase.from("coach_analises").insert({
       clinica_id: clinicaId,
-      user_id: userId,
+      // Identidade da pessoa AVALIADA (antes gravava a gestora logada).
+      user_id: atendenteUserId,
       atendente: nomeAtendente,
       tipo_entrada: tipo,
       titulo,
@@ -122,6 +143,13 @@ export function PainelGestora({ ctx }: { ctx: CoachContexto }) {
   }
 
   async function deleteHistoryItem(id: string) {
+    const ok = await confirmDialog({
+      title: "Excluir análise?",
+      description: "A análise sai do histórico da atendente e não dá para desfazer.",
+      confirmText: "Excluir",
+      tone: "danger",
+    });
+    if (!ok) return;
     await supabase.from("coach_analises").delete().eq("id", id);
     setHistory((h) => h.filter((x) => x.id !== id));
   }
@@ -129,7 +157,10 @@ export function PainelGestora({ ctx }: { ctx: CoachContexto }) {
   function openHistoryItem(item: HistoryItem) {
     setResult(item.resultado);
     setError(null);
-    setAtendente(item.atendente);
+    const daLista = atendentes.find(
+      (a) => a.nome.trim().toLowerCase() === (item.atendente ?? "").trim().toLowerCase(),
+    );
+    setAtendenteId(daLista?.userId ?? "");
     setAba("analise");
     if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" });
   }
@@ -149,7 +180,7 @@ export function PainelGestora({ ctx }: { ctx: CoachContexto }) {
     setError(null);
     setResult(null);
     const nome = atendente.trim();
-    if (!nome) {
+    if (!atendenteSelecionada || !nome) {
       setError("Escolha a atendente antes de analisar.");
       return;
     }
@@ -169,7 +200,7 @@ export function PainelGestora({ ctx }: { ctx: CoachContexto }) {
           },
         });
         setResult(r);
-        await saveToHistory(r, "texto", text, nome);
+        await saveToHistory(r, "texto", text, nome, atendenteSelecionada.userId);
       } else {
         if (!audioFile) throw new Error("Selecione um arquivo de áudio.");
         if (audioFile.size > 18 * 1024 * 1024) throw new Error("Arquivo muito grande. Máximo 18MB.");
@@ -185,7 +216,7 @@ export function PainelGestora({ ctx }: { ctx: CoachContexto }) {
           },
         });
         setResult(r);
-        await saveToHistory(r, "audio", audioFile.name, nome);
+        await saveToHistory(r, "audio", audioFile.name, nome, atendenteSelecionada.userId);
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Erro inesperado.");
@@ -193,12 +224,6 @@ export function PainelGestora({ ctx }: { ctx: CoachContexto }) {
       setLoading(false);
     }
   }
-
-  const nomesConhecidos = useMemo(() => {
-    const set = new Set<string>(atendentes.map((a) => a.nome));
-    history.forEach((h) => set.add(h.atendente));
-    return Array.from(set).filter(Boolean).sort((a, b) => a.localeCompare(b, "pt-BR"));
-  }, [atendentes, history]);
 
   return (
     <div className="min-w-0">
@@ -283,18 +308,18 @@ export function PainelGestora({ ctx }: { ctx: CoachContexto }) {
                     <label className="mb-1.5 flex items-center gap-1.5 text-xs font-medium uppercase tracking-wider text-muted-foreground">
                       <User className="h-3.5 w-3.5" /> Atendente avaliada
                     </label>
-                    <Input
-                      value={atendente}
-                      onChange={(e) => setAtendente(e.target.value)}
-                      placeholder="Ex: Maria Silva"
-                      list="coach-atendentes"
-                      className="bg-background"
-                    />
-                    <datalist id="coach-atendentes">
-                      {nomesConhecidos.map((n) => (
-                        <option key={n} value={n} />
-                      ))}
-                    </datalist>
+                    <Select value={atendenteId} onValueChange={setAtendenteId}>
+                      <SelectTrigger className="bg-background">
+                        <SelectValue placeholder="Escolha a atendente" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {atendentes.map((a) => (
+                          <SelectItem key={a.userId} value={a.userId}>
+                            {a.nome}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
 
                   <BaseConhecimentoEditor

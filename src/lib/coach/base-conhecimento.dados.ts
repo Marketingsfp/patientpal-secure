@@ -1,13 +1,17 @@
 /**
  * Leitura das tabelas do sistema para montar a base do Coach.
  *
+ * A geração roda no SERVIDOR (ver `base.functions.ts`): é uma leitura pesada
+ * (milhares de procedimentos) e o resultado é gravado no cache da clínica.
+ * Por isso o cliente do banco vem por parâmetro.
+ *
  * Tudo aqui passa pelo cliente normal do navegador: as políticas de acesso já
  * liberam `procedimentos`, `nina_cat_servicos`, `nina_cat_profissionais`,
  * `medicos`, `especialidades` e `unidades` para qualquer pessoa ATIVA da
  * clínica. Nenhuma chave administrativa é usada — a atendente lê exatamente o
  * que ela já poderia ler nas outras telas.
  */
-import { supabase } from "@/integrations/supabase/client";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   montarBase,
   type CatProfissionalBase,
@@ -24,10 +28,13 @@ const COLUNAS_PROC =
   "nome,tipo,grupo,valor_padrao,valor_dinheiro,valor_pix,valor_dinheiro_pix,valor_cartao,valor_cartao_credito,valor_cartao_debito,valor_cartao_consulta,valor_cartao_desconto,preparo,observacoes,duracao_minutos,requer_laudo,requer_medico";
 
 /** Lê os procedimentos ativos em páginas — a MJ passa de 4.600 linhas. */
-async function lerProcedimentos(clinicaId: string): Promise<ProcedimentoBase[]> {
+async function lerProcedimentos(
+  db: ClienteBase,
+  clinicaId: string,
+): Promise<ProcedimentoBase[]> {
   const todos: ProcedimentoBase[] = [];
   for (let inicio = 0; inicio < TETO_PROCEDIMENTOS; inicio += PAGINA) {
-    const { data, error } = await supabase
+    const { data, error } = await db
       .from("procedimentos")
       .select(COLUNAS_PROC)
       .eq("clinica_id", clinicaId)
@@ -43,22 +50,26 @@ async function lerProcedimentos(clinicaId: string): Promise<ProcedimentoBase[]> 
   return todos;
 }
 
+/** Qualquer cliente Supabase (navegador, servidor autenticado ou publicável). */
+export type ClienteBase = SupabaseClient<any, any, any>;
+
 export type BaseGerada = { texto: string; geradoEm: Date; tamanho: number };
 
 /** Monta a base atual da clínica a partir das tabelas do sistema. */
 export async function gerarBaseDoSistema(
+  db: ClienteBase,
   clinicaId: string,
   clinicaNome?: string | null,
 ): Promise<BaseGerada> {
   const [procedimentos, servicos, profissionais, medicos, unidades, clinica] = await Promise.all([
-    lerProcedimentos(clinicaId),
-    supabase
+    lerProcedimentos(db, clinicaId),
+    db
       .from("nina_cat_servicos")
       .select("nome,valor,valor_observacao,descricao_publica,preparo,restricoes,executantes,formas_pagamento")
       .eq("clinica_id", clinicaId)
       .eq("status", "PUBLICADO")
       .limit(1000),
-    supabase
+    db
       .from("nina_cat_profissionais")
       .select(
         "nome,especialidades,horarios,tipo_atendimento,convenios,formas_pagamento,observacao_publica,aviso_dia,atende_consultorio",
@@ -66,20 +77,20 @@ export async function gerarBaseDoSistema(
       .eq("clinica_id", clinicaId)
       .eq("status", "PUBLICADO")
       .limit(500),
-    supabase
+    db
       .from("medicos")
       .select("nome,especialidades:especialidade_id(nome)")
       .eq("clinica_id", clinicaId)
       .eq("ativo", true)
       .order("nome")
       .limit(500),
-    supabase
+    db
       .from("unidades")
       .select("nome,endereco,cidade,estado,telefone")
       .eq("clinica_id", clinicaId)
       .eq("ativo", true)
       .limit(50),
-    supabase.from("clinicas").select("nome,endereco,cidade,estado,telefone").eq("id", clinicaId).maybeSingle(),
+    db.from("clinicas").select("nome,endereco,cidade,estado,telefone").eq("id", clinicaId).maybeSingle(),
   ]);
 
   const listaUnidades = ((unidades.data ?? []) as unknown as UnidadeBase[]).slice();

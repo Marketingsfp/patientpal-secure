@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { AlertTriangle, Loader2, TrendingDown, TrendingUp, LineChart } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { filtroDoAtendente } from "@/lib/coach/identidade";
 
 type Row = { nota: number; created_at: string; melhorias: string[] | null; modo: string | null };
 
@@ -93,9 +94,11 @@ function Sparkline({ notas }: { notas: number[] }) {
 export function EvolucaoAtendente({
   atendente,
   clinicaId,
+  userId,
 }: {
   atendente: string;
   clinicaId: string | null;
+  userId: string | null;
 }) {
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
@@ -106,8 +109,9 @@ export function EvolucaoAtendente({
       const { data } = await supabase
         .from("coach_roleplay_sessions")
         .select("nota,created_at,melhorias,modo")
-        .eq("atendente", atendente)
         .eq("clinica_id", clinicaId ?? "")
+        .eq("simulacao_gestor", false)
+        .or(filtroDoAtendente(userId, atendente))
         .order("created_at", { ascending: false })
         .limit(40);
       if (cancelled) return;
@@ -117,7 +121,7 @@ export function EvolucaoAtendente({
     return () => {
       cancelled = true;
     };
-  }, [atendente, clinicaId]);
+  }, [atendente, clinicaId, userId]);
 
   const dados = useMemo(() => {
     const ordenadas = [...rows].reverse();

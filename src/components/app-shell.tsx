@@ -1139,10 +1139,13 @@ function AppShellInner() {
 
   // Portal sem nenhuma tela liberada não aparece no hub nem no seletor.
   // O OS ZAP depende do módulo "nina", o mesmo de sempre — nenhum módulo novo.
-  const portaisOcultos = useMemo<SubsystemId[]>(
-    () => (leafAllowed("/app/nina", allowedModules, configuredModules) ? [] : ["os-zap"]),
-    [allowedModules, configuredModules],
-  );
+  const portaisOcultos = useMemo<SubsystemId[]>(() => {
+    const ocultos: SubsystemId[] = [];
+    if (!leafAllowed("/app/nina", allowedModules, configuredModules)) ocultos.push("os-zap");
+    // Coach WhatsApp: some para quem não tem o módulo, como já era com o OS ZAP.
+    if (!leafAllowed("/app/coach", allowedModules, configuredModules)) ocultos.push("coach");
+    return ocultos;
+  }, [allowedModules, configuredModules]);
 
   // Resultado da busca do menu lateral (sem acento, case-insensitive).
   const termoMenu = buscaMenu.trim();
@@ -1251,6 +1254,13 @@ function AppShellInner() {
         icon: MessageCircle,
         portal: "os-zap",
         candidatas: ["/app/nina"],
+      },
+      {
+        key: "coach",
+        label: "Coach WhatsApp",
+        icon: GraduationCap,
+        portal: "coach",
+        candidatas: ["/app/coach"],
       },
     ];
     return opcoes

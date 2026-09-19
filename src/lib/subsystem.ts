@@ -30,7 +30,8 @@ export const SUBSYSTEMS: Record<SubsystemId, { label: string; home: string; grou
   coach: {
     label: "Coach WhatsApp",
     home: "/app/coach",
-    groups: ["Treinamento", "Avaliações", "Configurações do Coach"],
+    // Só grupos que existem de fato no menu lateral.
+    groups: ["Treinamento"],
   },
 };
 

@@ -28,7 +28,18 @@ import { MinhaMeta } from "@/components/coach/MinhaMeta";
 import { BotaoCertificado } from "@/components/coach/Certificado";
 import { EvolucaoAtendente } from "@/components/coach/EvolucaoAtendente";
 import { temaClinica } from "@/lib/coach/clinica-tema";
-import { ehDeHoje } from "@/lib/coach/data-atual";
+import { filtroDoAtendente } from "@/lib/coach/identidade";
+import {
+  META_DIAS_CONSTANCIA,
+  META_LIGACOES,
+  META_SEGUNDOS_DIA,
+  META_WHATSAPP,
+  calcularProgresso,
+  diaSaoPaulo,
+  regrasPadrao,
+  type ProvaProgresso,
+  type SessaoProgresso,
+} from "@/lib/coach/treinamento-plano";
 import { supabase } from "@/integrations/supabase/client";
 import {
   fetchTempoEstudo,
@@ -37,27 +48,25 @@ import {
   type TempoRow,
 } from "@/lib/coach/study-time";
 
-type NotaRow = { nota: number; created_at: string };
-type RoleplayNotaRow = NotaRow & { modo?: string | null };
-
-/** Metas obrigatórias do curso. */
-const META_LIGACOES = 5;
-const META_WHATSAPP = 5;
+// As metas moram em `treinamento-plano.ts`: antes havia uma cópia aqui e as
+// telas discordavam entre si.
 
 export function TraineeHome({
   atendente,
   clinicaId,
   clinicaNome,
+  userId,
 }: {
   atendente: string;
   clinicaId: string | null;
   clinicaNome: string | null;
+  userId: string | null;
 }) {
   useStudyTimer(atendente, "plataforma", clinicaId);
 
   const [tempos, setTempos] = useState<TempoRow[]>([]);
-  const [provas, setProvas] = useState<NotaRow[]>([]);
-  const [roleplays, setRoleplays] = useState<RoleplayNotaRow[]>([]);
+  const [provas, setProvas] = useState<ProvaProgresso[]>([]);
+  const [roleplays, setRoleplays] = useState<SessaoProgresso[]>([]);
   const [loading, setLoading] = useState(true);
   const nomeClinica = clinicaNome ?? "sua clínica";
 
@@ -68,69 +77,63 @@ export function TraineeHome({
         setLoading(false);
         return;
       }
+      const meu = filtroDoAtendente(userId, atendente);
       const [t, p, r] = await Promise.all([
         fetchTempoEstudo(clinicaId),
         supabase
           .from("coach_provas")
-          .select("nota,created_at")
+          .select("nota,created_at,simulacao_gestor")
           .eq("clinica_id", clinicaId)
-          .eq("atendente", atendente)
+          .eq("simulacao_gestor", false)
+          .or(meu)
           .limit(500),
         supabase
           .from("coach_roleplay_sessions")
-          .select("nota,created_at,modo")
+          .select("nota,created_at,modo,simulacao_gestor")
           .eq("clinica_id", clinicaId)
-          .eq("atendente", atendente)
+          .eq("simulacao_gestor", false)
+          .or(meu)
           .limit(500),
       ]);
       if (cancelled) return;
-      setTempos(t.filter((x) => x.atendente === atendente));
-      setProvas((p.data ?? []) as unknown as NotaRow[]);
-      setRoleplays((r.data ?? []) as unknown as RoleplayNotaRow[]);
+      setTempos(
+        t.filter((x) =>
+          x.user_id ? x.user_id === userId : x.atendente.trim() === atendente.trim(),
+        ),
+      );
+      setProvas((p.data ?? []) as unknown as ProvaProgresso[]);
+      setRoleplays((r.data ?? []) as unknown as SessaoProgresso[]);
       setLoading(false);
     })();
     return () => {
       cancelled = true;
     };
-  }, [atendente, clinicaId]);
+  }, [atendente, clinicaId, userId]);
 
-  const hoje = new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
+  const hoje = diaSaoPaulo();
 
-  const resumo = useMemo(() => {
-    const segundosTotal = tempos.reduce((s, x) => s + (Number(x.segundos) || 0), 0);
-    const segundosHoje = tempos
-      .filter((x) => x.dia === hoje)
-      .reduce((s, x) => s + (Number(x.segundos) || 0), 0);
-    const dias = new Set(
-      tempos.filter((x) => (Number(x.segundos) || 0) > 0).map((x) => x.dia),
-    ).size;
-    const media = (arr: NotaRow[]) =>
-      arr.length ? arr.reduce((s, x) => s + (Number(x.nota) || 0), 0) / arr.length : 0;
-    // A trilha zera todos os dias: contam apenas as atividades feitas hoje.
-    const roleplaysHoje = roleplays.filter((r) => ehDeHoje(r.created_at));
-    const provasHoje = provas.filter((x) => ehDeHoje(x.created_at));
-    const ligacoes = roleplaysHoje.filter((r) => (r.modo ?? "voz") === "voz").length;
-    const whatsapp = roleplaysHoje.filter((r) => r.modo === "texto").length;
-    const feitos = [
-      segundosHoje >= 3600,
-      provasHoje.length > 0,
-      ligacoes >= META_LIGACOES,
-      whatsapp >= META_WHATSAPP,
-    ];
-    return {
-      segundosTotal,
-      segundosHoje,
-      dias,
-      ligacoes,
-      whatsapp,
-      provasHoje: provasHoje.length,
-      mediaProva: media(provas),
-      mediaRoleplay: media(roleplays),
-      progresso: Math.round((feitos.filter(Boolean).length / feitos.length) * 100),
-    };
-  }, [tempos, provas, roleplays, hoje]);
+  // Regra única do Coach (`calcularProgresso`): o bloco `hoje` é a meta do dia
+  // e o bloco `trilha` é o acumulado que vale para o certificado.
+  const progresso = useMemo(
+    () => calcularProgresso(roleplays, provas, tempos, regrasPadrao(hoje)),
+    [tempos, provas, roleplays, hoje],
+  );
 
-  const completo = resumo.progresso === 100;
+  const resumo = {
+    segundosTotal: progresso.totais.segundos,
+    segundosHoje: progresso.hoje.segundos,
+    dias: progresso.totais.dias,
+    ligacoes: progresso.hoje.ligacoes,
+    whatsapp: progresso.hoje.whatsapp,
+    provasHoje: progresso.hoje.provaFeita ? 1 : 0,
+    mediaProva: progresso.totais.mediaProva,
+    mediaRoleplay: progresso.totais.mediaRoleplay,
+    progresso: progresso.hoje.percentual,
+  };
+
+  // "Hoje" fechado é o que zera todo dia; o certificado olha o acumulado.
+  const completo = progresso.hoje.completo;
+  const trilhaConcluida = progresso.trilha.concluida;
   const tema = temaClinica(nomeClinica);
 
   /** Próximo passo da trilha: WhatsApp → ligações → prova. */
@@ -243,7 +246,7 @@ export function TraineeHome({
                 <ClipboardCheck className="h-4 w-4 mr-2" /> Fazer a prova
               </Button>
             </Link>
-            {completo && (
+            {trilhaConcluida && (
               <Badge className="bg-success/15 text-success border-0">
                 <Award className="h-3 w-3 mr-1" /> Trilha concluída
               </Badge>
@@ -309,42 +312,42 @@ export function TraineeHome({
                 }
               />
               <Modulo
-                done={resumo.segundosHoje >= 3600}
+                done={resumo.segundosHoje >= META_SEGUNDOS_DIA}
                 titulo="1 hora de plataforma hoje"
                 detalhe={`${formatDuracao(resumo.segundosHoje)} de 1h`}
               />
               <Modulo
-                done={resumo.dias >= 3}
+                done={resumo.dias >= META_DIAS_CONSTANCIA}
                 titulo="Constância de estudo"
-                detalhe={`${resumo.dias} de 3 dias`}
+                detalhe={`${resumo.dias} de ${META_DIAS_CONSTANCIA} dias`}
               />
             </div>
           )}
         </Bloco>
 
-        {completo && (
+        {trilhaConcluida && (
           <BotaoCertificado
             dados={{
               atendente,
               clinica: nomeClinica,
               segundosTotal: resumo.segundosTotal,
               dias: resumo.dias,
-              conversas: resumo.whatsapp,
-              ligacoes: resumo.ligacoes,
+              conversas: progresso.trilha.whatsapp,
+              ligacoes: progresso.trilha.ligacoes,
               mediaProva: resumo.mediaProva,
               mediaRoleplay: resumo.mediaRoleplay,
             }}
           />
         )}
 
-        <MinhaMeta atendente={atendente} clinicaId={clinicaId} />
+        <MinhaMeta atendente={atendente} clinicaId={clinicaId} userId={userId} />
 
         <Bloco titulo="Minha evolução" icone={Flame} detalhe="notas e erros recorrentes">
-          <EvolucaoAtendente atendente={atendente} clinicaId={clinicaId} />
+          <EvolucaoAtendente atendente={atendente} clinicaId={clinicaId} userId={userId} />
         </Bloco>
 
         <Bloco titulo="Histórico e feedbacks" icone={ClipboardCheck} detalhe="tudo que já fiz">
-          <HistoricoAtendente atendente={atendente} clinicaId={clinicaId} />
+          <HistoricoAtendente atendente={atendente} clinicaId={clinicaId} userId={userId} />
         </Bloco>
 
         <div className="rounded-2xl border bg-secondary/40 p-5 text-sm text-muted-foreground flex gap-3">
