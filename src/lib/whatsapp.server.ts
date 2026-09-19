@@ -3,7 +3,7 @@ import { normalizarTelefone } from "@/lib/atendimento/telefone";
 import { agoraNaClinica } from "@/lib/nina-agora";
 import { encaminhamentoSemRegistro, MOTIVO_SEM_REGISTRO, respostaSemRegistro } from "@/lib/nina/catalogo-sem-registro";
 import { dadosPublicosCatalogo, resultadoExigeHumano, MOTIVO_SFP,
-  respostaEncaminhamentoSfp, omitirNomeGenerico } from "@/lib/nina/regras-catalogo";
+  respostaEncaminhamentoSfp, resultadoEncaminhamentoSfp, omitirNomeGenerico } from "@/lib/nina/regras-catalogo";
 
 import { normalizar } from "@/lib/nina-especialidade";
 
@@ -1738,6 +1738,16 @@ async function gerarRespostaNinaInterno(
     if (!r.reused) nomesFerramentasTurno.push(nome);
     if (!r.success || r.erro) conflitoFerramenta = true;
     const payload = dadosPublicosCatalogo(respostaParaModelo(r));
+    if (r.capacidade === "requestHumanHandoff" && r.success &&
+      (r.dados as { sem_mensagem_paciente?: boolean } | null)?.sem_mensagem_paciente === true) {
+      houveHandoff = true;
+      const { limparEscolhaAgendamento } = await import("@/lib/nina/agendamento-escolha");
+      limparEscolhaAgendamento(fluxoEstado);
+      fluxoEstado.appointment.slot_options = null;
+      fluxoEstado.flow.stage = "HANDOFF";
+      finalizacaoHandoff = { texto: "", textoModelo: textoModeloAtual,
+        handoffConfirmado: true, motivo: MOTIVO_SFP };
+    }
     if (r.capacidade !== "searchKnowledgeBase" && r.capacidade !== "listCatalog") {
       if (r.erro === "PROFISSIONAL_SFP") await encaminharRegraCatalogo(nome);
       return limitarRetornoParaModelo(payload);
@@ -2230,6 +2240,21 @@ async function gerarRespostaNinaInterno(
     resposta = finalizacaoHandoff.texto;
     transformar(finalizacaoHandoff.motivo === MOTIVO_SFP ? "catalogo.sfp" : finalizacaoHandoff.motivo === MOTIVO_SEM_REGISTRO ? "catalogo.sem_registro" : "agenda.sem_vagas", finalizacaoHandoff.motivo, antes, resposta, "aviso_operacional");
     marcarOrigem("codigo", `${finalizacaoHandoff.motivo}; transferência ${finalizacaoHandoff.handoffConfirmado ? "confirmada" : "não confirmada"}`);
+    if (finalizacaoHandoff.motivo === MOTIVO_SFP && finalizacaoHandoff.handoffConfirmado) {
+      // Não deixar o fallback de texto vazio, o rodapé ou o transporte recriar
+      // uma mensagem depois da atribuição silenciosa solicitada pela clínica.
+      if (opcoes?.auditoria) opcoes.auditoria.resultado = resultadoEncaminhamentoSfp(true);
+      marcarOrigem("nenhuma", "profissional SFP: encaminhamento silencioso confirmado");
+      registrarEtapa({ tipo: "mensagem_final", fonte: "sistema",
+        titulo: "Encaminhamento SFP sem mensagem ao paciente",
+        dados: { texto: "", handoff_confirmado: true, sem_mensagem_paciente: true },
+        codigo: { arquivo: "src/lib/whatsapp.server.ts", funcao: "gerarRespostaNina" } });
+      const { fecharAuditoriaInstrucoesDoTurno } = await import("@/lib/nina/rastreio/turno.server");
+      fecharAuditoriaInstrucoesDoTurno({ textoEntregue: "" });
+      rastro?.concluir("response.validate", { handoff: true, sem_mensagem_paciente: true });
+      rastro?.pular("message.outbound", "profissional SFP: apenas encaminhar para a equipe");
+      return "";
+    }
   }
 
   if (resumoEscolha) {

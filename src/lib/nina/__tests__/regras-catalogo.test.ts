@@ -7,6 +7,7 @@ import {
   resultadoExigeHumano,
   omitirNomeGenerico,
   REGRAS_CATALOGO_PROMPT,
+  motivoProfissionalSfp,
 } from "../regras-catalogo";
 import {
   servicoParaRegistro,
@@ -18,6 +19,12 @@ import { textoDaChave } from "../resposta/templates";
 import { comporRequestNina } from "../prompt-composer";
 
 describe("Regras administrativas do catálogo", () => {
+  it("distingue o encaminhamento SFP do pedido comum de atendente", () => {
+    for (const motivo of ["PROFISSIONAL_SFP: exclusivo da equipe", "Profissional SFP exige atendimento humano", "O profissional é sfp"])
+      expect(motivoProfissionalSfp(motivo)).toBe(true);
+    for (const motivo of ["Paciente pediu atendente", "CATALOGO_SEM_REGISTRO", "Profissional Dra. Ana", "Paciente João SFP", "Procedimento SFP"])
+      expect(motivoProfissionalSfp(motivo)).toBe(false);
+  });
   it("reconhece apenas nomes marcadores completos, sem atingir nomes reais ou descrições", () => {
     expect(profissionalSfp(" sfp ")).toBe(true);
     expect(profissionalSfp("Dr. José SFP Junior")).toBe(false);

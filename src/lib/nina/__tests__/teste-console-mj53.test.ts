@@ -44,6 +44,21 @@ function executar(cenario: string) {
 }
 
 describe("MJ-53 — finalização real do console de homologação", () => {
+  for (const cenario of ["handoff-sfp-texto", "handoff-sfp-audio"]) {
+    it(`${cenario}: transferência silenciosa não vira fallback, aviso, áudio ou nova espera`, () => {
+      const registro = executar(cenario);
+      expect(registro.saidas).toHaveLength(0);
+      expect(registro.resultado.reply).toBeNull();
+      expect(registro.resultado.erro).toBeNull();
+      expect(registro.resultado.transferida).toBe(true);
+      expect(registro.resultado.semNovaMensagem).toBe(true);
+      expect(registro.resultado.avisoMensagemId).toBeNull();
+      expect(registro.chamadasFinalizacao).toBe(0);
+      expect(registro.chamadasAudio).toBe(0);
+      expect(registro.entregas).toHaveLength(0);
+      expect(registro.esperas).toHaveLength(0);
+    });
+  }
   for (const cenario of ["reserva-perdida-tts", "reserva-perdida-finalizacao"]) {
     it(`${cenario}: conteúdo pronto não é persistido depois da perda da reserva`, () => {
       const registro = executar(cenario);

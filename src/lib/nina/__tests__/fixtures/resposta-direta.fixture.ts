@@ -22,7 +22,7 @@ const resumoEscolhido = ["escolha_pre", "escolha_ficha"].includes(cenario)
     { profissional: "Dr. Jorge Ribeiro", procedimento: "Consulta", data: "21/01/2030", horario: "10:20", unidade: "Clínica simulada" }).texto
   : "Confira: Consulta Cardiologia com Dr. Jorge Ribeiro, dia 21/01/2030, às 10:20. Você confirma?";
 const agenda = cenario !== "direta" && !regraCatalogo;
-const pergunta = contextual ? contextual.pergunta : cenario === "catalogo_sfp_modelo" || (ausente && cenario.includes("modelo")) ? "oi"
+const pergunta = contextual ? contextual.pergunta : (sfp && cenario.endsWith("modelo")) || (ausente && cenario.includes("modelo")) ? "oi"
   : ausente ? cenario.endsWith("dado_pessoal") ? "Meu nome é João Silva"
     : cenario.endsWith("misto") ? "Qual o valor do eletrocardiograma e da consulta de pneumologia?"
     : cenario.endsWith("generico") ? "Quero marcar uma consulta"
@@ -137,9 +137,14 @@ mock.module("@/lib/nina/tool-broker.server", () => ({ criarToolBroker: () => ({
       encaminhamentos.push(typeof args === "string" ? JSON.parse(args) : args);
       return { ferramenta: nome, capacidade: "requestHumanHandoff", fonte: "atendimento",
         success: !cenario.endsWith("falha_handoff"), reused: false, appointment_confirmed: false,
-        dados: { ok: !cenario.endsWith("falha_handoff") },
+        dados: { ok: !cenario.endsWith("falha_handoff"), sem_mensagem_paciente: sfp && !cenario.endsWith("falha_handoff") },
         ...(cenario.endsWith("falha_handoff") ? { erro: "INTERNAL_ERROR" } : {}) };
     }
+    if (nome === "consultar_disponibilidade" && cenario === "catalogo_sfp_recusa_agenda_modelo") return {
+      ferramenta: nome, capacidade: "checkAvailability", fonte: "agenda", success: false,
+      reused: false, appointment_confirmed: false, erro: "PROFISSIONAL_SFP",
+      dados: { ok: false, erro: "PROFISSIONAL_SFP", atendimento_humano_obrigatorio: true },
+    };
     if (nome === "agendar" && modoConfirmacao) return {
       ferramenta: nome, capacidade: "createAppointment", fonte: "agenda", success: true,
       reused: false, appointment_confirmed: true, dados: {
@@ -200,6 +205,17 @@ mock.module("@/lib/nina/ai-gateway.server", () => ({ ninaAIGateway: async (req: 
       { id: "nao-agendar-ausente", type: "function", function: { name: "agendar", arguments: "{}" } },
     ],
   };
+  if (cenario === "catalogo_sfp_handoff_modelo" || cenario === "catalogo_sfp_recusa_agenda_modelo") return {
+    ok: true, conteudo: "Boa noite! Anestesia da Videohisteroscopia: R$ 1.100,00. Nesta simulação, nenhuma transferência real foi realizada.",
+    modelo: "modelo-simulado", execucaoId: "execucao-direta", nivel: "low",
+    toolCalls: [
+      { id: "encaminhar-sfp", type: "function", function: {
+        name: cenario === "catalogo_sfp_handoff_modelo" ? "solicitar_atendente_humano" : "consultar_disponibilidade",
+        arguments: JSON.stringify({ motivo: "Profissional SFP exige atendimento humano para o procedimento de Anestesia da Videohisteroscopia", resumo: "Paciente pediu informações sobre a anestesia." }),
+      } },
+      { id: "nao-agendar-sfp", type: "function", function: { name: "agendar", arguments: "{}" } },
+    ],
+  };
   if (cenario === "catalogo_sfp_modelo") return {
     ok: true, conteudo: "Vou consultar e marcar.", modelo: "modelo-simulado", execucaoId: "execucao-direta", nivel: "low",
     toolCalls: [
@@ -256,4 +272,5 @@ console.log("DIRETA_RESULTADO=" + JSON.stringify({
   encaminhamentos,
   etapas: gravacoes.find(g => g.tabela === "nina_execucao_evidencias")?.valor.etapas ?? [],
   finalizacao: auditoria.finalizacao,
+  resultado: auditoria.resultado,
 }));

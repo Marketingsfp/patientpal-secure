@@ -5,6 +5,7 @@
  */
 import { mock } from "bun:test";
 import { criarResultadoSemNovaMensagem } from "@/lib/nina/resposta/contrato";
+import { resultadoEncaminhamentoSfp } from "@/lib/nina/regras-catalogo";
 import { hashDoTexto } from "@/lib/nina/confidence/hash";
 
 type Linha = Record<string, any>;
@@ -50,6 +51,7 @@ let chamadasModelo = 0;
 let chamadasFinalizacao = 0;
 let chamadasAudio = 0;
 let reservaPerdidaDepois = false;
+let transferidaSfp = false;
 const entregas: Linha[] = [];
 const rastreios: Linha[] = [];
 const encerramentos: unknown[][] = [];
@@ -136,7 +138,7 @@ mock.module("@/lib/nina/revisao-conversa.server", () => ({
 }));
 mock.module("@/lib/atendimento/handoff.server", () => ({
   estadoConversaPorId: async () => ({ status: "aberta", owner_type: "nina" }),
-  ninaPodeResponder: () => true,
+  ninaPodeResponder: () => !transferidaSfp,
 }));
 mock.module("@/lib/whatsapp-midia.server", () => ({
   RESPOSTA_AUDIO_FALHOU: "Não consegui ouvir esse áudio.",
@@ -174,6 +176,11 @@ mock.module("@/lib/whatsapp.server", () => ({
       throw new ErroReservaTurnoPerdida();
     }
     if (cenario === "erro-real") throw new Error("Falha simulada do provedor");
+    if (cenario.startsWith("handoff-sfp-")) {
+      transferidaSfp = true;
+      opcoes.auditoria.resultado = resultadoEncaminhamentoSfp(true);
+      return "";
+    }
     if (encaminhada) {
       // Representa o aviso que o serviço de protocolo já persistiu antes de retornar.
       const pendente = cenario === "handoff-pendente";
@@ -243,7 +250,7 @@ const resultado = await processarMensagemTeste(
   {
     clinicaId: lead.clinica_id,
     leadId: lead.id,
-    tipo: ["handoff-audio", "reserva-perdida-tts"].includes(cenario) ? "audio" : "text",
+    tipo: ["handoff-audio", "handoff-sfp-audio", "reserva-perdida-tts"].includes(cenario) ? "audio" : "text",
     texto: paridade ? "Vocês tem cardiologista?" : "vcs tem cardiologista?",
     chave: "entrada-mj53",
   },

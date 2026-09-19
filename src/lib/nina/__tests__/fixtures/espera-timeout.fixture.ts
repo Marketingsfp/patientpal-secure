@@ -7,6 +7,7 @@ let antesDeGravar: ((patch: Linha) => void) | null;
 let falharTransferencia: boolean, online: boolean;
 let atribuicoes: number, avisos: number;
 let resumos: Linha[];
+let protocolos: Linha[];
 const inicio = "2026-09-16T14:00:00.000Z",
   prazo = "2026-09-16T14:30:00.000Z";
 const tempo = (minutos: number) => new Date(Date.parse(inicio) + minutos * 60_000);
@@ -134,7 +135,9 @@ mock.module("@/lib/atendimento/handoff-auditoria.server", () => ({
   registrarAuditoriaHandoff: async () => {},
 }));
 mock.module("@/lib/atendimento/protocolo-atendimento.server", () => ({
-  protocoloAoIniciarHandoff: async () => {
+  protocoloAoIniciarHandoff: async (args: Linha) => {
+    protocolos.push(args);
+    if (args.anunciar === false) return { protocolo: "TESTE-1", anuncio: null };
     avisos++;
     const em = tempo(30).toISOString();
     tabelas.whatsapp_mensagens!.push(
@@ -160,6 +163,7 @@ const {
 const { processarTimeoutsEsperaPaciente } = await import("../../espera-timeout.server");
 const { salvarFluxoEstado, normalizarEstado } = await import("../../fluxo-estado.server");
 const { encaminharParaHumano } = await import("../../../atendimento/handoff.server");
+const { executarHandoffTool } = await import("../../handoff-tool.server");
 
 function mensagem(over: Linha = {}) {
   return {
@@ -204,7 +208,37 @@ beforeEach(() => {
   atribuicoes = 0;
   avisos = 0;
   resumos = [];
+  protocolos = [];
 });
+
+for (const teste of [false, true]) {
+  for (const disponivel of [false, true]) {
+    it(`SFP atribui sem aviso nem mensagem (${teste ? "homologação" : "produção"}; online=${disponivel})`, async () => {
+      conv().is_teste = teste;
+      online = disponivel;
+      const antes = tabelas.whatsapp_mensagens!.length;
+      const r = await executarHandoffTool({ clinicaId: "cl1", conversaId: "c1" }, JSON.stringify({
+        motivo: "Profissional SFP exige atendimento humano para Anestesia da Videohisteroscopia",
+        resumo: "Paciente pediu informações sobre a anestesia.",
+      }));
+      expect(r.ok).toBe(true);
+      expect(r).toMatchObject({ sem_mensagem_paciente: true });
+      expect(protocolos).toHaveLength(1);
+      expect(protocolos[0]!.anunciar).toBe(false);
+      expect(avisos).toBe(0);
+      expect(tabelas.whatsapp_mensagens!.filter(m => m.direction === "out" && m.status !== "system")).toHaveLength(antes);
+      expect(tabelas.whatsapp_mensagens!.some(m => m.status === "system" && m.body.includes("Motivo: Profissional SFP"))).toBe(true);
+      expect(conv().ai_enabled).toBe(false);
+      expect(conv().owner_type).toBe(!teste && disponivel ? "HUMAN" : "NONE");
+      expect(atribuicoes).toBe(teste ? 0 : 1);
+      expect(conv().patient_response_deadline).toBeNull();
+      expect(conv().handoff_motivo).toContain("Profissional SFP");
+      await executarHandoffTool({ clinicaId: "cl1", conversaId: "c1" }, '{"motivo":"PROFISSIONAL_SFP"}');
+      expect(protocolos).toHaveLength(1);
+      expect(avisos).toBe(0);
+    });
+  }
+}
 const executar = (minutos = 30) =>
   processarTimeoutsEsperaPaciente({ clinicaId: "cl1", agora: tempo(minutos) });
 const registrar = (minutos = 0) =>

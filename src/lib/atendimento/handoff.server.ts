@@ -13,6 +13,7 @@ import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { ninaResponde } from "./ciclo-responsabilidade";
 import type { ResultadoAvisoEncaminhamento } from "./aviso-encaminhamento";
 import { filtrosVersaoFluxo } from "@/lib/nina/fluxo-estado-versao";
+import { motivoProfissionalSfp } from "@/lib/nina/regras-catalogo";
 
 export type OwnerType = "AI" | "HUMAN" | "NONE";
 
@@ -356,6 +357,8 @@ export async function encaminharParaHumano(args: {
       clinicaId: args.clinicaId,
       conversaId: args.conversaId,
       handoffEventoId,
+      // SFP: protocolo e motivo ficam internos; nenhuma mensagem ao paciente.
+      anunciar: !motivoProfissionalSfp(args.motivo),
     });
     protocoloHandoff = p?.protocolo ?? null;
     avisoEncaminhamento = p?.anuncio?.aviso ?? null;

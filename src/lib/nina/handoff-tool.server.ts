@@ -6,6 +6,7 @@
  * server-side e escopada por clínica.
  */
 import { encaminharParaHumano } from "@/lib/atendimento/handoff.server";
+import { motivoProfissionalSfp } from "./regras-catalogo";
 
 export const NOME_FERRAMENTA_HANDOFF = "solicitar_atendente_humano";
 
@@ -14,7 +15,7 @@ export const FERRAMENTA_HANDOFF = {
   function: {
     name: NOME_FERRAMENTA_HANDOFF,
     description:
-      "Transfere a conversa para um atendente humano. Use quando o paciente pedir uma pessoa, quando houver reclamação/urgência clínica, cobrança, cancelamento com conflito, ou quando você não conseguir resolver após tentar. Depois de chamar, apenas avise o paciente que a equipe vai continuar o atendimento.",
+      "Transfere a conversa para um atendente humano. Use quando o paciente pedir uma pessoa, quando houver reclamação/urgência clínica, cobrança, cancelamento com conflito, ou quando você não conseguir resolver após tentar. Depois de chamar, apenas avise o paciente que a equipe vai continuar o atendimento. Exceção: profissional SFP exige motivo PROFISSIONAL_SFP e transferência silenciosa, sem nenhuma mensagem ao paciente.",
     parameters: {
       type: "object",
       properties: {
@@ -73,13 +74,16 @@ export async function executarHandoffTool(
     departamentoNome: setor,
     solicitadoPor: "IA",
   });
+  const silencioso = r.ok && motivoProfissionalSfp(motivo);
 
   return {
     ok: r.ok,
+    sem_mensagem_paciente: silencioso,
     ja_com_humano: r.ja_estava_com_humano ?? false,
     posicao_fila: r.posicao_fila ?? null,
     setor: r.departamento ?? null,
-    instrucao_para_voce:
-      "Avise o paciente, em uma frase curta e acolhedora, que uma atendente da equipe vai continuar daqui. Não prometa prazo exato e não faça mais perguntas.",
+    instrucao_para_voce: silencioso
+      ? "Encerre o turno sem mensagem ao paciente. A transferência por profissional SFP é silenciosa."
+      : "Avise o paciente, em uma frase curta e acolhedora, que uma atendente da equipe vai continuar daqui. Não prometa prazo exato e não faça mais perguntas.",
   };
 }

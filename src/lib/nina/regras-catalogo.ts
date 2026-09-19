@@ -1,9 +1,11 @@
+import { criarResultado } from "./resposta/contrato";
+
 /** Regras administrativas da clínica. Não calcula confiança nem altera o cadastro. */
 export const MARCADOR_REGRAS_CATALOGO =
   "REGRAS DO CATÁLOGO — SFP, PROFISSIONAL GENÉRICO E IDADE MÍNIMA (2026-09-17)";
 export const REGRAS_CATALOGO_PROMPT = `${MARCADOR_REGRAS_CATALOGO}
 Estas regras substituem orientações anteriores sobre SFP, técnico/técnica e interpretação de idades, tanto no WhatsApp real quanto na homologação.
-- Se o procedimento ou a consulta solicitada tiver o nome do profissional SFP, encaminhe para atendimento humano usando solicitar_atendente_humano. Não prossiga com informações ou agendamento automático desse item. Só confirme a transferência quando a ferramenta confirmar; em caso de falha, informe a dificuldade sem afirmar que transferiu. Uma opção SFP em uma lista ampla não torna as outras opções exclusivas da equipe: identifique o atendimento solicitado.
+- Se o procedimento ou a consulta solicitada tiver o nome do profissional SFP, encaminhe para atendimento humano usando solicitar_atendente_humano com motivo iniciado por PROFISSIONAL_SFP. Esse encaminhamento é silencioso: apenas atribua à equipe, sem mensagem ao paciente, aviso de transferência, protocolo, saudação ou informações do item. Encerre o turno quando a ferramenta confirmar; em caso de falha, informe a dificuldade sem afirmar que transferiu. Uma opção SFP em uma lista ampla não torna as outras opções exclusivas da equipe: identifique o atendimento solicitado.
 - Se o nome do profissional for técnico ou técnica (com ou sem acento, independentemente de maiúsculas), não informe esse nome nem invente outro. Omita a identificação do profissional e forneça normalmente as demais informações publicadas, inclusive valores, preparo, horários, modalidade e restrições. A regra também vale para resumos e confirmações.
 - As idades informadas no catálogo são idades mínimas. Apresente como “a partir de X anos” ou “a partir de X meses”, conservando o número e a unidade. Exemplos: 18 anos → a partir de 18 anos; 3 anos → a partir de 3 anos; 0 anos → a partir de 0 anos. Uma idade isolada em “Idade/critério informado” também é mínima. Não transforme idade mínima em idade exata, máxima ou faixa. Campo sem idade continua desconhecido. Não interprete preços, horários, duração do preparo ou periodicidade como idade.`;
 
@@ -64,10 +66,25 @@ export function resultadoExigeHumano(
 }
 
 export const MOTIVO_SFP = "PROFISSIONAL_SFP: atendimento solicitado exclusivo da equipe humana";
+/** Aceita o código oficial e o motivo legado "Profissional SFP exige atendimento humano". */
+export function motivoProfissionalSfp(motivo: string): boolean {
+  return /\bprofissional[_\s]+(?:e\s+)?sfp\b/.test(nomeNormalizado(motivo));
+}
 export function respostaEncaminhamentoSfp(confirmado: boolean): string {
   return confirmado
-    ? "Esse atendimento é realizado com o apoio da nossa equipe. Encaminhei sua conversa para um atendente, que continuará por aqui."
+    ? ""
     : "Esse atendimento precisa do apoio da nossa equipe. Não consegui transferir sua conversa neste momento; por favor, entre em contato com a recepção.";
+}
+
+/** Silêncio deliberado: o transporte não deve criar fallback, áudio ou outra bolha. */
+export function resultadoEncaminhamentoSfp(confirmado: boolean) {
+  return criarResultado({
+    origem: confirmado ? "handoff" : "erro",
+    estado: confirmado ? "descartar" : "entregar",
+    texto: respostaEncaminhamentoSfp(confirmado),
+    fatosConfirmados: confirmado ? ["handoff_confirmado"] : [],
+    restricoes: ["atendimento_humano_obrigatorio_sfp", ...(confirmado ? ["handoff_sfp_silencioso"] : [])],
+  });
 }
 
 /** Projeção pública apenas. IDs e nomes usados internamente na agenda não mudam. */

@@ -19,7 +19,7 @@
  */
 
 import type { EstadoFluxoNina } from "./fluxo-estado.server";
-import { MOTIVO_SFP, respostaEncaminhamentoSfp } from "./regras-catalogo";
+import { MOTIVO_SFP, resultadoEncaminhamentoSfp } from "./regras-catalogo";
 import type { CtxNinaPaciente, ResultadoFerramenta } from "./paciente-tools.server";
 import { isCPFValido, somenteDigitos } from "@/lib/cpf";
 import { autorizarAcao } from "./acoes/autorizacao";
@@ -204,8 +204,7 @@ export async function aplicarGateIdentificacao(params: {
     p.pending = { nome: null, cpf: null, data_nascimento: null };
     estado.flow.stage = "HANDOFF";
     const ok = await params.encaminharVagaIndisponivel?.(MOTIVO_SFP).catch(() => false) ?? false;
-    return criarResultado({ origem: ok ? "handoff" : "erro", texto: respostaEncaminhamentoSfp(ok),
-      fatosConfirmados: ok ? ["handoff_confirmado"] : [], restricoes: ["atendimento_humano_obrigatorio_sfp"] });
+    return resultadoEncaminhamentoSfp(ok);
   };
   const encaminhar = async (modalidadePendente = false) => {
     const motivo = modalidadePendente ? "MODALIDADE_ALTERADA: conferir a modalidade de atendimento antes de reservar."
