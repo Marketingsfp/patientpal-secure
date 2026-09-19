@@ -1054,7 +1054,7 @@ function AtendimentoEditorPage() {
         {/* b) Campo único */}
         <Card className="p-4 space-y-3">
           <div className="flex items-center justify-between gap-2 flex-wrap">
-            <Label className="text-base">Evolução / Anotações do Atendimento</Label>
+            <Label className="text-base">Anotações do Atendimento</Label>
             <span className="text-[12px] text-muted-foreground flex items-center gap-1">
               {rascunhoEm ? (
                 <>
@@ -1075,7 +1075,6 @@ function AtendimentoEditorPage() {
             rows={16}
             value={evolucao}
             onChange={(e) => setEvolucao(e.target.value)}
-            placeholder="Escreva aqui o atendimento: o que o paciente relatou, o que foi examinado, o que foi orientado e o que foi prescrito."
             className="text-base leading-relaxed"
           />
         </Card>
