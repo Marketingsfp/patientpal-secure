@@ -20,7 +20,7 @@ export function normalizarBuscaCatalogo(texto: string): string {
 // com a palavra "consulta" de outro serviço. Mantém qualificadores do item.
 const GENERICOS = new Set(("gostaria quero queria preciso saber poderia pode podem voces voce favor gentileza " +
   "bom boa dia tarde noite ola por uma umas uns para pra com que qual quais quanto custa custam preco precos valor valores " +
-  "informacao informacoes sobre consulta consultas exame exames procedimento procedimentos medico medica medicos medicas " +
+  "informacao informacoes sobre como funciona funcionam funcionamento consulta consultas exame exames procedimento procedimentos medico medica medicos medicas " +
   "doutor doutora profissional profissionais especialista especialistas especialidade especialidades " +
   "marcar marca agendar fazer realiza realizam fazem tem temos atende atendem atendimento atendimento horario horarios " +
   "preparo preparos dias hoje amanha segunda terca quarta quinta sexta sabado domingo feira").split(/\s+/));

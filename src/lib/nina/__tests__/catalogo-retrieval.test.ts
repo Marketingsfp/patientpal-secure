@@ -3,8 +3,8 @@
  *
  * Banco simulado em memória com o mesmo formato de chamadas usado em produção.
  * O objetivo é provar a RECUPERAÇÃO: registro certo, condições vinculadas,
- * nada de rascunho/arquivado/nota interna e nenhuma leitura do catálogo
- * inteiro por mensagem.
+ * nada de rascunho/arquivado/nota interna e somente detalhes relevantes
+ * enviados ao modelo após pesquisar todas as páginas do índice público.
  */
 import { beforeEach, describe, expect, it, mock } from "bun:test";
 import { agoraNaClinica } from "@/lib/nina-agora";
@@ -15,7 +15,9 @@ const banco: Record<string, Linha[]> = {
   nina_cat_servicos: [],
   nina_cat_profissionais: [],
 };
-const chamadas: Array<{ tabela: string; colunas: string; filtros: Record<string, string>; limite: number | null }> = [];
+const chamadas: Array<{ tabela: string; colunas: string; filtros: Record<string, string>; limite: number | null; cursor: string | null; ids: string[] | null }> = [];
+let tetoServidor = Infinity;
+let falharAposPrimeiraPagina = false;
 
 function tabela(nome: string) {
   const filtros: Record<string, string> = {};
@@ -23,6 +25,9 @@ function tabela(nome: string) {
   let limite: number | null = null;
   let orExpr: string | null = null;
   let ilikeNome: string | null = null;
+  let cursor: string | null = null;
+  let ids: string[] | null = null;
+  let ordenacao: string | null = null;
 
   const api: any = {
     select: (c: string) => {
@@ -45,11 +50,22 @@ function tabela(nome: string) {
       limite = n;
       return api;
     },
-    then: (resolve: (r: { data: Linha[]; error: null }) => void) => {
-      chamadas.push({ tabela: nome, colunas, filtros, limite });
+    order: (col: string) => { ordenacao = col; return api; },
+    gt: (_col: string, valor: string) => { cursor = valor; return api; },
+    in: (_col: string, valores: string[]) => { ids = valores; return api; },
+    then: (resolve: (r: { data: Linha[] | null; error: { message: string } | null }) => void) => {
+      chamadas.push({ tabela: nome, colunas, filtros, limite, cursor, ids });
+      if (falharAposPrimeiraPagina && cursor) {
+        const erro = { data: null, error: { message: "Falha ao ler a próxima página" } };
+        resolve(erro);
+        return Promise.resolve(erro);
+      }
       let linhas = (banco[nome] ?? []).filter((l) =>
         Object.entries(filtros).every(([k, v]) => l[k] === v),
       );
+      if (cursor) linhas = linhas.filter((l) => String(l.id) > cursor!);
+      if (ids) linhas = linhas.filter((l) => ids!.includes(String(l.id)));
+      if (ordenacao) linhas.sort((a, b) => String(a[ordenacao!]).localeCompare(String(b[ordenacao!])));
       if (orExpr) {
         const termos = [...String(orExpr).matchAll(/ilike\.%([^%]+)%/g)].map((m) => m[1]!);
         linhas = linhas.filter((l) =>
@@ -68,7 +84,7 @@ function tabela(nome: string) {
         .replace(/unidades\(nome\)/, "unidades")
         .split(",")
         .map((c) => c.trim());
-      const projetadas = linhas.slice(0, limite ?? linhas.length).map((l) => {
+      const projetadas = linhas.slice(0, Math.min(limite ?? linhas.length, tetoServidor)).map((l) => {
         const out: Linha = {};
         for (const c of campos) if (c in l) out[c] = l[c];
         return out;
@@ -133,6 +149,106 @@ beforeEach(() => {
   banco["nina_cat_servicos"] = [];
   banco["nina_cat_profissionais"] = [];
   chamadas.length = 0;
+  tetoServidor = Infinity;
+  falharAposPrimeiraPagina = false;
+});
+
+const idSequencial = (n: number) => `00000000-0000-0000-0000-${String(n).padStart(12, "0")}`;
+
+describe("busca completa com e sem acentos", () => {
+  it.each([
+    "nebulização",
+    "nebulizacao",
+    "NEBULIZAÇÃO",
+    "nebulizac\u0327a\u0303o",
+    "Olá, gostaria de saber como funciona o atendimento para nebulização.",
+  ])("encontra %s após 1.100 serviços sem mudar a grafia exibida", async (query) => {
+    banco.nina_cat_servicos = Array.from({ length: 1100 }, (_, i) =>
+      servico({ id: idSequencial(i + 1), nome: `Outro procedimento ${i}`, preparo: "Detalhe não relevante" }),
+    );
+    banco.nina_cat_servicos.push(servico({ id: idSequencial(1101), nome: "NEBULIZAÇÃO", valor: 20 }));
+    const r = await buscarNoCatalogo({ clinicaId: CLINICA, query });
+    expect(r.found).toBe(true);
+    expect(r.procedure).toBe("NEBULIZAÇÃO");
+    expect(r.records).toHaveLength(1);
+    expect(JSON.stringify(r)).not.toContain("Detalhe não relevante");
+    const detalhes = chamadas.filter((c) => c.tabela === "nina_cat_servicos" && c.colunas.includes("preparo"));
+    expect(detalhes).toHaveLength(1);
+    expect(detalhes[0]!.ids).toEqual([idSequencial(1101)]);
+    expect(chamadas.filter((c) => c.tabela === "nina_cat_servicos" && !c.ids).length).toBeGreaterThan(4);
+  });
+
+  it("normaliza também quando o cadastro está sem acento e a pergunta tem acento", async () => {
+    banco.nina_cat_servicos = [servico({ nome: "NEBULIZACAO" })];
+    const r = await buscarNoCatalogo({ clinicaId: CLINICA, query: "nebulização" });
+    expect(r.procedure).toBe("NEBULIZACAO");
+  });
+
+  it("não deixa um resultado secundário sem acento ocultar o nome correto acentuado", async () => {
+    banco.nina_cat_servicos = [
+      servico({ id: idSequencial(1), nome: "Outro procedimento", descricao_publica: "Orientação após nebulizacao" }),
+      servico({ id: idSequencial(2), nome: "NEBULIZAÇÃO" }),
+    ];
+    const r = await buscarNoCatalogo({ clinicaId: CLINICA, query: "nebulizacao", limite: 1 });
+    expect(r.procedure).toBe("NEBULIZAÇÃO");
+  });
+
+  it("continua páginas reduzidas pelo servidor e mantém a ordem de relevância nos detalhes", async () => {
+    tetoServidor = 3;
+    banco.nina_cat_servicos = Array.from({ length: 20 }, (_, i) => servico({
+      id: idSequencial(i + 1), nome: `Exame ${i}`, descricao_publica: "Após nebulização",
+    }));
+    banco.nina_cat_servicos.push(servico({ id: idSequencial(21), nome: "NEBULIZAÇÃO" }));
+    const r = await buscarNoCatalogo({ clinicaId: CLINICA, query: "nebulizacao", limite: 5 });
+    expect(r.records).toHaveLength(5);
+    expect(r.records[0]!.procedimento).toBe("NEBULIZAÇÃO");
+    expect(chamadas.every((c) => c.filtros.status === "PUBLICADO" && c.filtros.clinica_id === CLINICA)).toBe(true);
+  });
+
+  it("busca a especialidade e o dia antes de limitar, inclusive após o 60º profissional", async () => {
+    banco.nina_cat_profissionais = Array.from({ length: 260 }, (_, i) => profissional({
+      id: idSequencial(i + 1), nome: `Dr. Outro ${i}`, especialidades: [{ nome: "Clínico geral" }],
+      horarios: [{ dia: "Segunda-feira", inicio: "08:00" }],
+    }));
+    banco.nina_cat_profissionais.push(profissional({
+      id: idSequencial(261), nome: "Dr. João Hélio", especialidades: [{ nome: "Clínico geral" }],
+      horarios: [{ dia: "Terça-feira", inicio: "08:00" }],
+    }));
+    const r = await buscarNoCatalogo({ clinicaId: CLINICA, query: "clinico geral", dia: "terca", limite: 1 });
+    expect(r.doctors).toEqual(["Dr. João Hélio"]);
+    const porNome = await buscarNoCatalogo({ clinicaId: CLINICA, query: "consulta", medico: "joao helio" });
+    expect(porNome.doctors).toEqual(["Dr. João Hélio"]);
+  });
+
+  it("exclui registros privados, arquivados e de outra clínica em todas as páginas", async () => {
+    tetoServidor = 1;
+    banco.nina_cat_servicos = [
+      servico({ id: idSequencial(1), nome: "Exame qualquer" }),
+      servico({ id: idSequencial(2), nome: "NEBULIZAÇÃO rascunho", status: "RASCUNHO" }),
+      servico({ id: idSequencial(3), nome: "NEBULIZAÇÃO arquivada", status: "ARQUIVADO" }),
+      servico({ id: idSequencial(4), nome: "NEBULIZAÇÃO outra clínica", clinica_id: "outra" }),
+      servico({ id: idSequencial(5), nome: "NEBULIZAÇÃO" }),
+    ];
+    const r = await buscarNoCatalogo({ clinicaId: CLINICA, query: "nebulizacao" });
+    expect(r.records).toHaveLength(1);
+    expect(r.procedure).toBe("NEBULIZAÇÃO");
+    expect(chamadas.every((c) => !c.colunas.includes("nota_interna") && !c.colunas.includes("rascunho"))).toBe(true);
+  });
+
+  it("não transforma falha numa página posterior em ausência confirmada", async () => {
+    tetoServidor = 1;
+    falharAposPrimeiraPagina = true;
+    banco.nina_cat_servicos = [servico({ id: idSequencial(1), nome: "Outro exame" }),
+      servico({ id: idSequencial(2), nome: "NEBULIZAÇÃO" })];
+    await expect(buscarNoCatalogo({ clinicaId: CLINICA, query: "nebulizacao" }))
+      .rejects.toThrow("Falha ao ler a próxima página");
+  });
+
+  it("não encontra um procedimento ausente só pelas palavras como funciona", async () => {
+    banco.nina_cat_servicos = [servico({ nome: "Ecocardiograma", descricao_publica: "Como funciona o exame" })];
+    const r = await buscarNoCatalogo({ clinicaId: CLINICA, query: "Como funciona a crioablação?" });
+    expect(r.knowledge_status).toBe("not_found");
+  });
 });
 
 describe("recuperação no catálogo publicado", () => {

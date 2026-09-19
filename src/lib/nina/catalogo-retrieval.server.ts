@@ -10,7 +10,7 @@
  */
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { agoraNaClinica } from "@/lib/nina-agora";
-import { termosItemCatalogo } from "./catalogo-sem-registro";
+import { normalizarBuscaCatalogo, termosItemCatalogo } from "./catalogo-sem-registro";
 import {
   montarResultadoCatalogo,
   type ProfissionalPublicado,
@@ -24,15 +24,46 @@ const COLUNAS_SERVICO =
 const COLUNAS_PROFISSIONAL =
   "id, nome, especialidades, atende_consultorio, formas_pagamento, convenios, horarios, tipo_atendimento, observacao_publica, aviso_dia, aviso_valido_de, aviso_valido_ate, unidades(nome), status, updated_at";
 
-/** Tetos de leitura por clínica — nunca o catálogo inteiro sem limite. */
-const TETO_PROFISSIONAIS = 60;
-const TETO_SERVICOS = 40;
+/** A busca percorre um índice público leve; os detalhes só são lidos após a seleção. */
+const INDICE_SERVICO = "id, nome, descricao_publica, status, updated_at";
+const INDICE_PROFISSIONAL = "id, nome, especialidades, horarios, status, updated_at";
+const TAMANHO_PAGINA = 250;
+type IndiceServico = Pick<ServicoPublicado, "id" | "nome" | "descricao_publica">;
+type IndiceProfissional = Pick<ProfissionalPublicado, "id" | "nome" | "especialidades" | "horarios">;
+
+async function lerPublicados<T extends { id: string }>(
+  tabela: "nina_cat_servicos" | "nina_cat_profissionais",
+  colunas: string,
+  clinicaId: string,
+  ids?: string[],
+): Promise<T[]> {
+  if (ids && !ids.length) return [];
+  const linhas: T[] = [];
+  let cursor: string | null = null;
+  for (;;) {
+    let consulta = supabaseAdmin.from(tabela).select(colunas)
+      .eq("clinica_id", clinicaId).eq("status", "PUBLICADO")
+      .order("id", { ascending: true }).limit(Math.min(TAMANHO_PAGINA, ids?.length ?? TAMANHO_PAGINA));
+    if (cursor) consulta = consulta.gt("id", cursor);
+    if (ids) consulta = consulta.in("id", ids);
+    const resposta = await consulta;
+    if (resposta.error) throw new Error(resposta.error.message);
+    const pagina = (resposta.data ?? []) as unknown as T[];
+    if (!pagina.length) return linhas;
+    const proximo = pagina[pagina.length - 1]?.id;
+    if (!proximo || (cursor && proximo <= cursor)) {
+      throw new Error("A paginação do catálogo não avançou; não foi possível concluir a busca.");
+    }
+    linhas.push(...pagina);
+    if (ids && linhas.length >= ids.length) return linhas;
+    cursor = proximo;
+    // Só a página vazia encerra a busca: o servidor pode impor um limite
+    // menor que o solicitado. Cursor por ID evita saltar registros nesse caso.
+  }
+}
 
 function semAcento(v: unknown): string {
-  return String(v ?? "")
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase();
+  return normalizarBuscaCatalogo(String(v ?? ""));
 }
 
 function termosBusca(query: string): string[] {
@@ -78,7 +109,7 @@ function pontuar(alvoNome: string, alvoSecundario: string, termos: string[]): nu
   return score;
 }
 
-function especialidadesTexto(p: ProfissionalPublicado): string {
+function especialidadesTexto(p: IndiceProfissional): string {
   return Array.isArray(p.especialidades)
     ? (p.especialidades as Array<Record<string, unknown>>)
         .map((e) => semAcento(e?.["nome"]))
@@ -87,7 +118,7 @@ function especialidadesTexto(p: ProfissionalPublicado): string {
 }
 
 /** O profissional atende no dia pedido? Sem horário cadastrado, não exclui. */
-function atendeNoDia(p: ProfissionalPublicado, dia: string | null): boolean {
+function atendeNoDia(p: IndiceProfissional, dia: string | null): boolean {
   if (!dia) return true;
   const horarios = Array.isArray(p.horarios) ? (p.horarios as Array<Record<string, unknown>>) : [];
   if (!horarios.length) return true;
@@ -96,8 +127,8 @@ function atendeNoDia(p: ProfissionalPublicado, dia: string | null): boolean {
 }
 
 /**
- * Busca só o necessário: filtra por termos, pontua por relevância e limita o
- * retorno. Nunca devolve o catálogo inteiro.
+ * Compara pergunta e índice completo sem acentos, pontua e só então limita.
+ * O modelo recebe apenas os detalhes públicos dos registros selecionados.
  */
 export async function buscarNoCatalogo(pedido: {
   clinicaId: string;
@@ -113,73 +144,34 @@ export async function buscarNoCatalogo(pedido: {
   const perguntaSobreConsulta =
     PALAVRAS_CONSULTA.test(pedido.query ?? "") || Boolean(pedido.medico);
 
-  // Serviços: lê um conjunto maior de candidatos e só depois corta pelos mais
-  // relevantes — cortar antes de pontuar descartava o registro certo.
-  let qServicos = supabaseAdmin
-    .from("nina_cat_servicos")
-    .select(COLUNAS_SERVICO)
-    .eq("clinica_id", pedido.clinicaId)
-    .eq("status", "PUBLICADO")
-    .limit(TETO_SERVICOS);
-  if (expandidos.length) {
-    qServicos = qServicos.or(
-      expandidos
-        .flatMap((t) => [`nome.ilike.%${t}%`, `descricao_publica.ilike.%${t}%`])
-        .join(","),
-    );
-  }
-
-  // Profissionais: a especialidade fica em JSONB, onde o filtro exato do
-  // PostgREST não casa com o termo digitado (acento/caixa). Lemos apenas os
-  // publicados da clínica, com teto, e casamos nome/especialidade aqui.
-  let qProfissionais = supabaseAdmin
-    .from("nina_cat_profissionais")
-    .select(COLUNAS_PROFISSIONAL)
-    .eq("clinica_id", pedido.clinicaId)
-    .eq("status", "PUBLICADO")
-    .limit(TETO_PROFISSIONAIS);
-  if (pedido.medico) {
-    qProfissionais = qProfissionais.ilike("nome", `%${pedido.medico}%`);
-  }
-
-  const [servicos, profissionais] = await Promise.all([
-    qServicos,
-    perguntaSobreConsulta || termos.length ? qProfissionais : Promise.resolve({ data: [], error: null }),
+  // Não usar ILIKE como pré-filtro: ele exclui nomes acentuados antes da
+  // normalização. Não cortar em 40/60: qualquer publicado pode ser o correto.
+  const [brutosServicos, brutosProfissionais] = await Promise.all([
+    lerPublicados<IndiceServico>("nina_cat_servicos", INDICE_SERVICO, pedido.clinicaId),
+    perguntaSobreConsulta || termos.length
+      ? lerPublicados<IndiceProfissional>("nina_cat_profissionais", INDICE_PROFISSIONAL, pedido.clinicaId)
+      : Promise.resolve([] as IndiceProfissional[]),
   ]);
-
-  if (servicos.error) throw new Error(servicos.error.message);
-  if (profissionais.error) throw new Error(profissionais.error.message);
-
-  let brutosServicos = (servicos.data ?? []) as unknown as ServicoPublicado[];
-  // O `ilike` do banco é sensível a acento: "ressonancia" não casa com
-  // "Ressonância". Quando o filtro não trouxe nada, relemos os publicados da
-  // clínica (com teto) e comparamos sem acento aqui. Uma consulta extra só no
-  // caso de erro de escrita — nunca por mensagem.
-  if (termos.length && !brutosServicos.length) {
-    const semFiltro = await supabaseAdmin
-      .from("nina_cat_servicos")
-      .select(COLUNAS_SERVICO)
-      .eq("clinica_id", pedido.clinicaId)
-      .eq("status", "PUBLICADO")
-      .limit(TETO_SERVICOS);
-    if (semFiltro.error) throw new Error(semFiltro.error.message);
-    brutosServicos = (semFiltro.data ?? []) as unknown as ServicoPublicado[];
-  }
   const pontuados = brutosServicos
     .map((s) => ({ s, score: pontuar(s.nome, String(s.descricao_publica ?? ""), termos) }))
     .filter((x) => (termos.length ? x.score > 0 : true))
     .sort((a, b) => b.score - a.score);
-  const listaServicos = pontuados.slice(0, limite).map((x) => x.s);
-
-
-  const brutosProfissionais = (profissionais.data ?? []) as unknown as ProfissionalPublicado[];
-  const listaProfissionais = (
-    pedido.medico
-      ? brutosProfissionais
-      : brutosProfissionais.filter((p) => pontuar(p.nome, especialidadesTexto(p), termos) > 0)
-  )
-    .filter((p) => atendeNoDia(p, pedido.dia ?? null))
-    .slice(0, limite);
+  const idsServicos = pontuados.slice(0, limite).map((x) => x.s.id);
+  const medico = semAcento(pedido.medico).trim();
+  const profissionaisRelevantes = brutosProfissionais
+    .map((p) => ({ p, score: pontuar(p.nome, especialidadesTexto(p), termos) }))
+    .filter(({ p, score }) => medico ? semAcento(p.nome).includes(medico) : score > 0)
+    .sort((a, b) => b.score - a.score)
+    .map(({ p }) => p)
+    .filter((p) => atendeNoDia(p, pedido.dia ?? null));
+  const idsProfissionais = profissionaisRelevantes.slice(0, limite).map((p) => p.id);
+  const [detalhesServicos, detalhesProfissionais] = await Promise.all([
+    lerPublicados<ServicoPublicado>("nina_cat_servicos", COLUNAS_SERVICO, pedido.clinicaId, idsServicos),
+    lerPublicados<ProfissionalPublicado>("nina_cat_profissionais", COLUNAS_PROFISSIONAL, pedido.clinicaId, idsProfissionais),
+  ]);
+  // O banco ordena por ID para paginar; a resposta mantém a relevância da busca.
+  const listaServicos = idsServicos.flatMap((id) => detalhesServicos.filter((s) => s.id === id));
+  const listaProfissionais = idsProfissionais.flatMap((id) => detalhesProfissionais.filter((p) => p.id === id));
 
   // Ambiguidade REAL: dois exames/procedimentos diferentes disputam a mesma
   // pergunta. Vários profissionais da mesma especialidade não é ambiguidade —
@@ -235,11 +227,14 @@ export async function buscarNoCatalogo(pedido: {
           status: "PUBLICADO",
           termos,
           termos_expandidos: expandidos,
-          teto: TETO_SERVICOS,
+          tamanho_pagina: TAMANHO_PAGINA,
+          busca_completa: true,
+          comparacao: "sem acentos e sem distinção de maiúsculas/minúsculas",
           limite,
         },
         cache: false,
-        encontrados: snapshot(brutosServicos as never, camposServico),
+        total_examinado: brutosServicos.length,
+        encontrados: snapshot(pontuados.map(({ s }) => s) as never, INDICE_SERVICO.split(", ")),
         selecionados: listaServicos.map((s) => String(s.id ?? "")),
         camposEnviados: camposServico.filter((c) => c !== "id"),
         knowledgeStatus: resultado.knowledge_status,
@@ -258,11 +253,14 @@ export async function buscarNoCatalogo(pedido: {
           medico: pedido.medico ?? null,
           dia: pedido.dia ?? null,
           termos,
-          teto: TETO_PROFISSIONAIS,
+          tamanho_pagina: TAMANHO_PAGINA,
+          busca_completa: true,
+          comparacao: "sem acentos e sem distinção de maiúsculas/minúsculas",
           limite,
         },
         cache: false,
-        encontrados: snapshot(brutosProfissionais as never, camposProf),
+        total_examinado: brutosProfissionais.length,
+        encontrados: snapshot(profissionaisRelevantes as never, INDICE_PROFISSIONAL.split(", ")),
         selecionados: listaProfissionais.map((p) => String(p.id ?? "")),
         camposEnviados: camposProf.filter((c) => c !== "id"),
         knowledgeStatus: resultado.knowledge_status,
