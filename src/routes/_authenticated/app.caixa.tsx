@@ -1898,7 +1898,13 @@ function Page() {
     const item = filaCaixa.find((f) => f.id === rid);
     // limpa o parâmetro para não reabrir em refresh
     url.searchParams.delete("receber");
-    window.history.replaceState({}, "", url.pathname + (url.search || "") + url.hash);
+    // Mantém o estado do histórico do roteador: substituí-lo por `{}` apagava
+    // as marcas internas do TanStack Router e travava a navegação do menu.
+    window.history.replaceState(
+      window.history.state,
+      "",
+      url.pathname + (url.search || "") + url.hash,
+    );
     if (!item) {
       toast.info("Paciente não está mais na fila do caixa.");
       return;

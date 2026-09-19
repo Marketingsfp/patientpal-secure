@@ -1809,7 +1809,15 @@ function AgendaPage() {
     ["novo", "novoPacId", "novoPacNome", "novoTelefone", "novoData", "novoProc"].forEach((k) =>
       url.searchParams.delete(k),
     );
-    window.history.replaceState({}, "", url.pathname + (url.search ? `?${url.searchParams}` : ""));
+    // Preserva o estado do histórico do roteador (`window.history.state`).
+    // Trocá-lo por `{}` apagava as marcas internas do TanStack Router e, a
+    // partir daí, a navegação do menu lateral podia parar de funcionar nesta
+    // aba até recarregar a página.
+    window.history.replaceState(
+      window.history.state,
+      "",
+      url.pathname + (url.search ? `?${url.searchParams}` : ""),
+    );
   }, [clinicaAtual?.clinica_id, dataRef]);
   // Reagendamento
   const [reagendandoAg, setReagendandoAg] = useState<Agendamento | null>(null);
@@ -5675,7 +5683,8 @@ function AgendaPage() {
           sp.delete("orc");
           sp.delete("orcmed");
           const novo = `${window.location.pathname}${sp.toString() ? `?${sp.toString()}` : ""}${window.location.hash}`;
-          window.history.replaceState(null, "", novo);
+          // Mantém o estado do histórico (ver comentário acima).
+          window.history.replaceState(window.history.state, "", novo);
         }
       }
     } catch {
