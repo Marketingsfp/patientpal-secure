@@ -735,12 +735,35 @@ function AppShellInner() {
   const navScrollRef = useRef<HTMLElement | null>(null);
   // Navegação do menu: com `ux_melhorias` ligada, troca de tela via SPA (sem
   // recarregar a página). Nas demais clínicas mantém o reload completo atual.
+  // Guarda o último destino pedido: se o usuário clicar em dois itens
+  // seguidos, a rede de segurança abaixo não pode puxar a tela de volta para o
+  // primeiro.
+  const ultimoDestinoRef = useRef<string | null>(null);
   const irPara = (href: string) => {
-    if (uxMelhorias) {
-      router.history.push(href);
+    if (!uxMelhorias) {
+      window.location.assign(href);
       return;
     }
-    window.location.assign(href);
+    // Navegação SPA pela API oficial do roteador. Antes aqui havia
+    // `router.history.push(href)`, que empurra o endereço direto no histórico
+    // sem passar pelo roteador: quando o histórico saía de sincronia, o clique
+    // no menu não abria nada — a gaveta fechava e a tela continuava a mesma.
+    const [destino, ancora] = href.split("#");
+    const origem = `${window.location.pathname}${window.location.hash}`;
+    ultimoDestinoRef.current = href;
+    void Promise.resolve(navigate({ to: destino, hash: ancora || undefined })).catch(() => {});
+    // Rede de segurança: um clique no menu NUNCA pode terminar em "não
+    // aconteceu nada" no balcão da clínica. Se em 1,2s o endereço continuar
+    // exatamente onde estava, abrimos a tela recarregando a página — mais
+    // lento, porém infalível. Quando a navegação funciona, o endereço muda na
+    // hora (mesmo com a tela ainda carregando) e nada disso roda.
+    window.setTimeout(() => {
+      const alvo = ultimoDestinoRef.current;
+      if (!alvo || alvo !== href) return;
+      const atual = `${window.location.pathname}${window.location.hash}`;
+      if (atual !== origem || atual === alvo) return;
+      window.location.assign(alvo);
+    }, 1200);
   };
   const queryClient = useQueryClient();
   // Pré-carrega o código da rota ao passar o mouse no item do menu — quando o
