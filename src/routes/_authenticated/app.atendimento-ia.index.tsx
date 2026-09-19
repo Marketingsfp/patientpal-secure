@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import {
   Stethoscope,
   AlertTriangle,
@@ -385,7 +385,7 @@ function AtendimentoIaPage() {
   }, [medicoId, clinicaAtual?.clinica_id, dia]);
 
   /**
-   * Ordem de chamada do dia: estritamente o horário marcado.
+   * Ordem de espera dentro de um mesmo grupo: estritamente o horário marcado.
    *
    * Antes a lista era reordenada por prioridade — um caso marcado como urgente
    * subia para o topo e a coluna "#" aparecia fora de ordem (1, 5, 2…), como se
@@ -401,35 +401,89 @@ function AtendimentoIaPage() {
     (a.created_at ?? "").localeCompare(b.created_at ?? "") ||
     a.id.localeCompare(b.id);
 
-  const filaOrdenada = useMemo(() => [...fila].sort(ordemDeChamada), [fila]);
+  /**
+   * Quem já conta como fila de verdade: o pagamento está confirmado (caixa ou
+   * orçamento) ou o atendimento já foi feito. Paciente com pagamento pendente
+   * não entra na contagem — ele espera no fim da listagem até o caixa receber.
+   */
+  const naFilaEfetiva = (it: FilaItem) =>
+    Boolean(pagamentos[it.id]?.pago) || it.fluxo_etapa === "finalizado";
+
+  /**
+   * Hora em que o paciente entrou na fila: o instante em que o caixa confirmou
+   * o pagamento. É esse carimbo que define a senha — quem pagou antes é chamado
+   * antes, independentemente do horário marcado na agenda.
+   *
+   * Duas exceções, conferidas nos dados de produção:
+   *
+   * 1. Pagamento adiantado, feito num dia anterior ao da consulta (cerca de 5%
+   *    dos casos). O paciente chega já quitado, então abre a lista; entre eles
+   *    o desempate é o horário marcado, e não a data em que pagou — senão uma
+   *    conta paga há duas semanas viraria a senha 1 na frente de outra paga
+   *    ontem, sem nenhum significado para a recepção.
+   * 2. Atendimento antigo finalizado sem nenhum lançamento vinculado: cai no
+   *    horário marcado, só para não ficar sem lugar na lista.
+   */
+  const confirmadoEm = (it: FilaItem) => {
+    const em = pagamentos[it.id]?.em ?? null;
+    if (!em) return it.inicio;
+    // String vazia ordena antes de qualquer data: é o lugar de quem já chegou
+    // pago do dia anterior.
+    return diaLocal(new Date(em)) < dia ? "" : em;
+  };
+
+  /**
+   * A fila numerada: só quem pagou, na ordem cronológica do pagamento.
+   *
+   * Como a chave é a hora da confirmação, que nunca muda depois de gravada,
+   * ninguém é renumerado. Quando um paciente pendente paga agora, o carimbo
+   * dele é o mais recente de todos e ele entra no fim — recebendo a próxima
+   * senha livre, sem mexer no número de quem já estava na fila.
+   */
+  const chamados = useMemo(
+    () =>
+      fila
+        .filter(naFilaEfetiva)
+        .sort((a, b) => confirmadoEm(a).localeCompare(confirmadoEm(b)) || ordemDeChamada(a, b)),
+    [fila, pagamentos, dia],
+  );
+
+  /** Pagamento pendente: aguardam no fim da listagem, ainda sem número. */
+  const aguardandoPagamento = useMemo(
+    () => fila.filter((it) => !naFilaEfetiva(it)).sort(ordemDeChamada),
+    [fila, pagamentos],
+  );
 
   /**
    * Número fixo de cada paciente no dia.
    *
-   * A coluna "#" é calculada uma vez sobre o dia inteiro, na mesma ordem em que
+   * A coluna "#" é calculada sobre a fila de quem pagou, na mesma ordem em que
    * a lista é exibida, e não muda mais: ser atendido, mudar de etapa ou entrar
    * como prioritário não renumera ninguém. Quem já passou continua na grade com
    * o mesmo número, marcado como ATENDIDO.
    */
   const numeroNoDia = useMemo(() => {
     const mapa = new Map<string, number>();
-    filaOrdenada.forEach((item, i) => mapa.set(item.id, i + 1));
+    chamados.forEach((item, i) => mapa.set(item.id, i + 1));
     return mapa;
-  }, [filaOrdenada]);
+  }, [chamados]);
 
   // Contagens do cabeçalho. A lista em si é UMA só: quem foi atendido continua
   // na tabela, marcado de verde. Antes havia duas abas, e o paciente sumia da
   // tela no instante em que o prontuário era finalizado — a médica não
   // conseguia bater o olho e conferir quem já tinha passado no dia.
   const emEspera = useMemo(
-    () => filaOrdenada.filter((f) => f.fluxo_etapa !== "finalizado"),
-    [filaOrdenada],
+    () => chamados.filter((f) => f.fluxo_etapa !== "finalizado"),
+    [chamados],
   );
   const atendidos = useMemo(
-    () => filaOrdenada.filter((f) => f.fluxo_etapa === "finalizado"),
-    [filaOrdenada],
+    () => chamados.filter((f) => f.fluxo_etapa === "finalizado"),
+    [chamados],
   );
-  const listaVisivel = filaOrdenada;
+  const listaVisivel = useMemo(
+    () => [...chamados, ...aguardandoPagamento],
+    [chamados, aguardandoPagamento],
+  );
 
   function atender(item: FilaItem) {
     navigate({ to: "/app/atendimento-ia/$agendamentoId", params: { agendamentoId: item.id } });
@@ -533,11 +587,19 @@ function AtendimentoIaPage() {
           {/* Lista única do dia: quem já foi atendido continua aqui, de verde.
               O contador em cima resume o dia sem esconder ninguém. */}
           <div className="flex items-center gap-3 border-b pb-2 text-sm">
-            <span className="font-medium">{emEspera.length} em espera</span>
+            <span className="font-medium">{emEspera.length} na fila</span>
             <span className="text-muted-foreground">·</span>
             <span className="text-emerald-700 dark:text-emerald-400 font-medium">
               {atendidos.length} atendidos
             </span>
+            {aguardandoPagamento.length > 0 && (
+              <>
+                <span className="text-muted-foreground">·</span>
+                <span className="text-amber-700 dark:text-amber-400 font-medium">
+                  {aguardandoPagamento.length} aguardando pagamento
+                </span>
+              </>
+            )}
           </div>
 
           {listaVisivel.length === 0 ? (
@@ -561,7 +623,12 @@ function AtendimentoIaPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {listaVisivel.map((it) => {
+                  {listaVisivel.map((it, idx) => {
+                    // Linha de corte entre a fila de verdade e quem ainda não
+                    // pagou. É o aviso visual de por que aquele paciente está
+                    // no fim da lista e sem número.
+                    const abreBlocoPendente =
+                      aguardandoPagamento.length > 0 && idx === chamados.length;
                     const hora = new Date(it.inicio).toLocaleTimeString("pt-BR", {
                       hour: "2-digit",
                       minute: "2-digit",
@@ -577,239 +644,274 @@ function AtendimentoIaPage() {
                     const pag = pagamentos[it.id];
                     const pago = Boolean(pag?.pago);
                     const atendido = it.fluxo_etapa === "finalizado";
+                    const numero = numeroNoDia.get(it.id);
                     return (
-                      <TableRow
-                        key={it.id}
-                        // Atendido = linha verde da esquerda a direita, com
-                        // tarja lateral grossa. E o sinal que a medica procura
-                        // de longe, sem ler nada: o que esta verde ja passou.
-                        className={`${
-                          atendido
-                            ? "border-l-4 border-l-green-600 bg-green-50 hover:bg-green-100/80 dark:border-l-green-500 dark:bg-green-950/30"
-                            : ""
-                        } ${!atendido && !pago && pag ? "border-l-4 border-l-amber-400" : ""}`.trim()}
-                      >
-                        <TableCell className="tabular-nums text-xs text-muted-foreground">
-                          {numeroNoDia.get(it.id) ?? "—"}
-                        </TableCell>
-                        <TableCell className="tabular-nums text-xs">{hora}</TableCell>
-                        <TableCell className="font-medium uppercase">{it.paciente_nome}</TableCell>
-                        <TableCell className="hidden md:table-cell text-xs text-muted-foreground">
-                          {it.procedimento ?? "—"} · {it.fluxo_etapa.replace("_", " ")}
-                        </TableCell>
-                        <TableCell>
-                          {atendido ? (
-                            <Badge className="border-0 bg-green-600 text-white font-bold tracking-wide text-[11px] gap-1 hover:bg-green-600">
-                              ✅ ATENDIDO
-                            </Badge>
-                          ) : (
-                            <span className="text-xs text-muted-foreground">Em espera</span>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          {!pag ? (
-                            <span className="text-xs text-muted-foreground">—</span>
-                          ) : pag.pago ? (
-                            <Badge
-                              className={
-                                pag.motivo === "orcamento"
-                                  ? "border-0 bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-200 text-[11px] gap-1"
-                                  : "border-0 bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-200 text-[11px] gap-1"
-                              }
-                              title={
-                                pag.motivo === "orcamento" ? "Pago via orçamento" : "Pago no caixa"
-                              }
+                      <Fragment key={it.id}>
+                        {abreBlocoPendente && (
+                          <TableRow className="hover:bg-transparent">
+                            <TableCell
+                              colSpan={9}
+                              className="bg-amber-50 py-1.5 text-[11px] font-medium uppercase tracking-wide text-amber-800 dark:bg-amber-950/30 dark:text-amber-200"
                             >
-                              <Check className="h-3 w-3" />
-                              {pag.motivo === "orcamento" ? "PAGO (ORÇAMENTO)" : "PAGO"}
-                            </Badge>
-                          ) : (
-                            <Badge
-                              className="border-0 bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200 text-[11px] gap-1"
-                              title="Pagamento pendente — envie ao caixa antes do atendimento"
-                            >
-                              <DollarSign className="h-3 w-3" />
-                              PENDENTE
-                            </Badge>
-                          )}
-                        </TableCell>
-                        <TableCell className="text-center">
-                          {triagemFeita ? (
-                            <span
-                              className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300"
-                              title={
-                                temRegistroTriagem
-                                  ? "Triagem realizada"
-                                  : "Paciente avançou no fluxo (sem registro formal de triagem)"
-                              }
-                            >
-                              <Check className="h-3.5 w-3.5" />
-                            </span>
-                          ) : (
-                            <span
-                              className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300"
-                              title="Triagem pendente"
-                            >
-                              <X className="h-3.5 w-3.5" />
-                            </span>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          <HoverCard openDelay={120} closeDelay={80}>
-                            <HoverCardTrigger asChild>
-                              <span className="cursor-help inline-flex">
-                                {it.prioridade !== "normal" ? (
-                                  <Badge className={`${prioCls} border-0 text-[11px] gap-1`}>
-                                    <AlertTriangle className="h-3 w-3" />
-                                    {it.prioridade === "urgente" ? "URGENTE" : "PRIORITÁRIO"}
-                                  </Badge>
-                                ) : (
-                                  <span className="text-xs text-muted-foreground">—</span>
-                                )}
+                              <span className="inline-flex items-center gap-1.5">
+                                <DollarSign className="h-3.5 w-3.5" />
+                                Aguardando pagamento — entram na fila e recebem o número assim que o
+                                caixa confirmar
                               </span>
-                            </HoverCardTrigger>
-                            <HoverCardContent align="start" className="w-80 text-xs space-y-2">
-                              {(() => {
-                                const t = triagens[it.id];
-                                if (!t) {
-                                  return (
-                                    <div className="text-muted-foreground">
-                                      {it.fluxo_etapa === "atendimento"
-                                        ? "Paciente avançou no fluxo sem registro formal de triagem no sistema."
-                                        : "Paciente ainda não passou pela triagem."}
-                                    </div>
-                                  );
+                            </TableCell>
+                          </TableRow>
+                        )}
+                        <TableRow
+                          // Atendido = linha verde da esquerda a direita, com
+                          // tarja lateral grossa. E o sinal que a medica procura
+                          // de longe, sem ler nada: o que esta verde ja passou.
+                          className={`${
+                            atendido
+                              ? "border-l-4 border-l-green-600 bg-green-50 hover:bg-green-100/80 dark:border-l-green-500 dark:bg-green-950/30"
+                              : ""
+                          } ${!atendido && !pago && pag ? "border-l-4 border-l-amber-400" : ""}`.trim()}
+                        >
+                          <TableCell
+                            className={
+                              numero
+                                ? "tabular-nums text-sm font-semibold"
+                                : "tabular-nums text-xs text-muted-foreground"
+                            }
+                            title={
+                              numero
+                                ? `Senha ${numero} do dia — o número não muda mais`
+                                : "Sem número: o paciente entra na fila quando o caixa confirmar o pagamento"
+                            }
+                          >
+                            {numero ?? "—"}
+                          </TableCell>
+                          <TableCell className="tabular-nums text-xs">{hora}</TableCell>
+                          <TableCell className="font-medium uppercase">
+                            {it.paciente_nome}
+                          </TableCell>
+                          <TableCell className="hidden md:table-cell text-xs text-muted-foreground">
+                            {it.procedimento ?? "—"} · {it.fluxo_etapa.replace("_", " ")}
+                          </TableCell>
+                          <TableCell>
+                            {atendido ? (
+                              <Badge className="border-0 bg-green-600 text-white font-bold tracking-wide text-[11px] gap-1 hover:bg-green-600">
+                                ✅ ATENDIDO
+                              </Badge>
+                            ) : pago ? (
+                              <span className="text-xs text-muted-foreground">Em espera</span>
+                            ) : (
+                              <span className="text-xs text-amber-700 dark:text-amber-400">
+                                Aguardando caixa
+                              </span>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            {!pag ? (
+                              <span className="text-xs text-muted-foreground">—</span>
+                            ) : pag.pago ? (
+                              <Badge
+                                className={
+                                  pag.motivo === "orcamento"
+                                    ? "border-0 bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-200 text-[11px] gap-1"
+                                    : "border-0 bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-200 text-[11px] gap-1"
                                 }
-                                const sv: string[] = [];
-                                if (t.pa_sistolica && t.pa_diastolica)
-                                  sv.push(`PA ${t.pa_sistolica}/${t.pa_diastolica}`);
-                                if (t.freq_cardiaca) sv.push(`FC ${t.freq_cardiaca}`);
-                                if (t.temperatura) sv.push(`T ${t.temperatura}°`);
-                                if (t.saturacao) sv.push(`SatO₂ ${t.saturacao}%`);
-                                if (t.glicemia) sv.push(`Glic ${t.glicemia}`);
-                                if (t.peso_kg) sv.push(`${t.peso_kg}kg`);
-                                if (t.altura_cm) sv.push(`${t.altura_cm}cm`);
-                                if (t.imc) sv.push(`IMC ${t.imc}`);
-                                return (
-                                  <>
-                                    <div className="flex items-center justify-between gap-2 pb-1 border-b">
-                                      <div className="font-semibold">Triagem da enfermagem</div>
-                                      <div className="text-[11px] text-muted-foreground">
-                                        {new Date(t.created_at).toLocaleString("pt-BR")}
+                                title={
+                                  pag.motivo === "orcamento"
+                                    ? "Pago via orçamento"
+                                    : "Pago no caixa"
+                                }
+                              >
+                                <Check className="h-3 w-3" />
+                                {pag.motivo === "orcamento" ? "PAGO (ORÇAMENTO)" : "PAGO"}
+                              </Badge>
+                            ) : (
+                              <Badge
+                                className="border-0 bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200 text-[11px] gap-1"
+                                title="Pagamento pendente — envie ao caixa antes do atendimento"
+                              >
+                                <DollarSign className="h-3 w-3" />
+                                PENDENTE
+                              </Badge>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-center">
+                            {triagemFeita ? (
+                              <span
+                                className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300"
+                                title={
+                                  temRegistroTriagem
+                                    ? "Triagem realizada"
+                                    : "Paciente avançou no fluxo (sem registro formal de triagem)"
+                                }
+                              >
+                                <Check className="h-3.5 w-3.5" />
+                              </span>
+                            ) : (
+                              <span
+                                className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300"
+                                title="Triagem pendente"
+                              >
+                                <X className="h-3.5 w-3.5" />
+                              </span>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            <HoverCard openDelay={120} closeDelay={80}>
+                              <HoverCardTrigger asChild>
+                                <span className="cursor-help inline-flex">
+                                  {it.prioridade !== "normal" ? (
+                                    <Badge className={`${prioCls} border-0 text-[11px] gap-1`}>
+                                      <AlertTriangle className="h-3 w-3" />
+                                      {it.prioridade === "urgente" ? "URGENTE" : "PRIORITÁRIO"}
+                                    </Badge>
+                                  ) : (
+                                    <span className="text-xs text-muted-foreground">—</span>
+                                  )}
+                                </span>
+                              </HoverCardTrigger>
+                              <HoverCardContent align="start" className="w-80 text-xs space-y-2">
+                                {(() => {
+                                  const t = triagens[it.id];
+                                  if (!t) {
+                                    return (
+                                      <div className="text-muted-foreground">
+                                        {it.fluxo_etapa === "atendimento"
+                                          ? "Paciente avançou no fluxo sem registro formal de triagem no sistema."
+                                          : "Paciente ainda não passou pela triagem."}
                                       </div>
-                                    </div>
-                                    {t.enfermeira_nome && (
-                                      <div className="text-[12px] text-muted-foreground">
-                                        Por {t.enfermeira_nome}
-                                      </div>
-                                    )}
-                                    {sv.length > 0 && (
-                                      <div className="rounded-md bg-muted/50 px-2 py-1.5 text-[12px] leading-relaxed">
-                                        {sv.join(" · ")}
-                                      </div>
-                                    )}
-                                    {t.queixa_principal && (
-                                      <div>
-                                        <span className="text-[11px] uppercase text-muted-foreground">
-                                          Queixa
-                                        </span>
-                                        <div>{t.queixa_principal}</div>
-                                      </div>
-                                    )}
-                                    {t.doencas && t.doencas.length > 0 && (
-                                      <div>
-                                        <span className="text-[11px] uppercase text-muted-foreground">
-                                          Doenças
-                                        </span>
-                                        <div className="flex flex-wrap gap-1 mt-0.5">
-                                          {t.doencas.map((d, i) => (
-                                            <Badge
-                                              key={i}
-                                              variant="outline"
-                                              className="text-[11px]"
-                                            >
-                                              {d}
-                                            </Badge>
-                                          ))}
+                                    );
+                                  }
+                                  const sv: string[] = [];
+                                  if (t.pa_sistolica && t.pa_diastolica)
+                                    sv.push(`PA ${t.pa_sistolica}/${t.pa_diastolica}`);
+                                  if (t.freq_cardiaca) sv.push(`FC ${t.freq_cardiaca}`);
+                                  if (t.temperatura) sv.push(`T ${t.temperatura}°`);
+                                  if (t.saturacao) sv.push(`SatO₂ ${t.saturacao}%`);
+                                  if (t.glicemia) sv.push(`Glic ${t.glicemia}`);
+                                  if (t.peso_kg) sv.push(`${t.peso_kg}kg`);
+                                  if (t.altura_cm) sv.push(`${t.altura_cm}cm`);
+                                  if (t.imc) sv.push(`IMC ${t.imc}`);
+                                  return (
+                                    <>
+                                      <div className="flex items-center justify-between gap-2 pb-1 border-b">
+                                        <div className="font-semibold">Triagem da enfermagem</div>
+                                        <div className="text-[11px] text-muted-foreground">
+                                          {new Date(t.created_at).toLocaleString("pt-BR")}
                                         </div>
                                       </div>
-                                    )}
-                                    {t.medicamentos && (
-                                      <div>
-                                        <span className="text-[11px] uppercase text-muted-foreground">
-                                          Medicamentos
-                                        </span>
-                                        <div>{t.medicamentos}</div>
-                                      </div>
-                                    )}
-                                    {t.alergias && (
-                                      <div>
-                                        <span className="text-[11px] uppercase text-muted-foreground">
-                                          Alergias
-                                        </span>
-                                        <div>{t.alergias}</div>
-                                      </div>
-                                    )}
-                                    {t.observacoes && (
-                                      <div>
-                                        <span className="text-[11px] uppercase text-muted-foreground">
-                                          Observações
-                                        </span>
-                                        <div className="whitespace-pre-wrap">{t.observacoes}</div>
-                                      </div>
-                                    )}
-                                  </>
-                                );
-                              })()}
-                            </HoverCardContent>
-                          </HoverCard>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex items-center justify-end gap-1">
-                            {/* Histórico clínico do paciente sem sair da fila:
+                                      {t.enfermeira_nome && (
+                                        <div className="text-[12px] text-muted-foreground">
+                                          Por {t.enfermeira_nome}
+                                        </div>
+                                      )}
+                                      {sv.length > 0 && (
+                                        <div className="rounded-md bg-muted/50 px-2 py-1.5 text-[12px] leading-relaxed">
+                                          {sv.join(" · ")}
+                                        </div>
+                                      )}
+                                      {t.queixa_principal && (
+                                        <div>
+                                          <span className="text-[11px] uppercase text-muted-foreground">
+                                            Queixa
+                                          </span>
+                                          <div>{t.queixa_principal}</div>
+                                        </div>
+                                      )}
+                                      {t.doencas && t.doencas.length > 0 && (
+                                        <div>
+                                          <span className="text-[11px] uppercase text-muted-foreground">
+                                            Doenças
+                                          </span>
+                                          <div className="flex flex-wrap gap-1 mt-0.5">
+                                            {t.doencas.map((d, i) => (
+                                              <Badge
+                                                key={i}
+                                                variant="outline"
+                                                className="text-[11px]"
+                                              >
+                                                {d}
+                                              </Badge>
+                                            ))}
+                                          </div>
+                                        </div>
+                                      )}
+                                      {t.medicamentos && (
+                                        <div>
+                                          <span className="text-[11px] uppercase text-muted-foreground">
+                                            Medicamentos
+                                          </span>
+                                          <div>{t.medicamentos}</div>
+                                        </div>
+                                      )}
+                                      {t.alergias && (
+                                        <div>
+                                          <span className="text-[11px] uppercase text-muted-foreground">
+                                            Alergias
+                                          </span>
+                                          <div>{t.alergias}</div>
+                                        </div>
+                                      )}
+                                      {t.observacoes && (
+                                        <div>
+                                          <span className="text-[11px] uppercase text-muted-foreground">
+                                            Observações
+                                          </span>
+                                          <div className="whitespace-pre-wrap">{t.observacoes}</div>
+                                        </div>
+                                      )}
+                                    </>
+                                  );
+                                })()}
+                              </HoverCardContent>
+                            </HoverCard>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex items-center justify-end gap-1">
+                              {/* Histórico clínico do paciente sem sair da fila:
                                 abre a gaveta com as consultas anteriores. */}
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="h-8 px-2 text-xs"
-                              onClick={() => setHistorico(it)}
-                              title="Ver o histórico de prontuários anteriores deste paciente"
-                              aria-label={`Histórico do prontuário de ${it.paciente_nome}`}
-                            >
-                              <FileText className="h-3.5 w-3.5" />
-                              <span className="hidden lg:inline ml-1.5">Histórico</span>
-                            </Button>
-                            {atendido ? (
-                              // Reabrir o prontuário já finalizado é o caminho da
-                              // segunda via: o paciente volta no balcão pedindo o
-                              // atestado ou a receita que perdeu.
                               <Button
                                 size="sm"
-                                variant="ghost"
-                                className="text-xs text-green-800 hover:bg-green-100 hover:text-green-900 dark:text-green-300 dark:hover:bg-green-900/40"
-                                onClick={() => atender(it)}
-                                title="Reabrir o prontuário para conferir ou imprimir segunda via"
+                                variant="outline"
+                                className="h-8 px-2 text-xs"
+                                onClick={() => setHistorico(it)}
+                                title="Ver o histórico de prontuários anteriores deste paciente"
+                                aria-label={`Histórico do prontuário de ${it.paciente_nome}`}
                               >
-                                <Eye className="h-3.5 w-3.5 mr-1.5" />
-                                Reabrir / Ver Atendimento
+                                <FileText className="h-3.5 w-3.5" />
+                                <span className="hidden lg:inline ml-1.5">Histórico</span>
                               </Button>
-                            ) : (
-                              <Button
-                                size="sm"
-                                onClick={() => atender(it)}
-                                disabled={Boolean(pag && !pag.pago)}
-                                title={
-                                  pag && !pag.pago
-                                    ? "Pagamento pendente — envie ao caixa antes do atendimento"
-                                    : undefined
-                                }
-                              >
-                                <Stethoscope className="h-4 w-4" /> Atender
-                              </Button>
-                            )}
-                          </div>
-                        </TableCell>
-                      </TableRow>
+                              {atendido ? (
+                                // Reabrir o prontuário já finalizado é o caminho da
+                                // segunda via: o paciente volta no balcão pedindo o
+                                // atestado ou a receita que perdeu.
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="text-xs text-green-800 hover:bg-green-100 hover:text-green-900 dark:text-green-300 dark:hover:bg-green-900/40"
+                                  onClick={() => atender(it)}
+                                  title="Reabrir o prontuário para conferir ou imprimir segunda via"
+                                >
+                                  <Eye className="h-3.5 w-3.5 mr-1.5" />
+                                  Reabrir / Ver Atendimento
+                                </Button>
+                              ) : (
+                                <Button
+                                  size="sm"
+                                  onClick={() => atender(it)}
+                                  disabled={Boolean(pag && !pag.pago)}
+                                  title={
+                                    pag && !pag.pago
+                                      ? "Pagamento pendente — envie ao caixa antes do atendimento"
+                                      : undefined
+                                  }
+                                >
+                                  <Stethoscope className="h-4 w-4" /> Atender
+                                </Button>
+                              )}
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      </Fragment>
                     );
                   })}
                 </TableBody>
