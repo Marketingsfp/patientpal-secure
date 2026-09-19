@@ -380,17 +380,20 @@ export function extrairRespostaPlanejamento(entrada: unknown): string {
   return saida;
 }
 
-/** Orquestração testável: a única dependência externa é planejar após autorização. */
+/** Autoriza, guarda o pedido validado e só então solicita o plano à IA. */
 export async function produzirPlanoCarga(
   entrada: { pedido: string; config: ConfigCarga },
   dependencias: {
     autorizar: () => Promise<void>;
+    guardarPedido?: (pedido: string) => Promise<void>;
     solicitar: (body: ReturnType<typeof montarRequisicaoPlanejamento>) => Promise<unknown>;
   },
 ): Promise<{ plano: PlanoCarga }> {
   await dependencias.autorizar();
   const pedido = texto(LIMITES_PLANEJAMENTO.pedidoCaracteres).parse(entrada.pedido);
   const config = configPlanejamentoSchema.parse(entrada.config);
+  // Mesmo se o provedor falhar, o comando fica disponível para reutilização.
+  await dependencias.guardarPedido?.(pedido);
   const resposta = await dependencias.solicitar(montarRequisicaoPlanejamento(pedido, config));
   const plano = validarPlanoCarga(extrairRespostaPlanejamento(resposta), { pedido, config });
   return { plano };

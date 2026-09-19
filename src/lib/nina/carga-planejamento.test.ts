@@ -222,6 +222,77 @@ describe("fronteira com o provedor e autorização", () => {
     ).rejects.toThrow("Limite de uso");
   });
 
+  it("guarda o texto completo antes da IA, mesmo quando o provedor falha", async () => {
+    const passos: string[] = [];
+    const pedido =
+      "Quero uma simulação com mamografia e ortopedista.\nPerguntar preço e primeira data.";
+    await expect(
+      produzirPlanoCarga(
+        { ...bruto(), pedido: `  ${pedido}  ` },
+        {
+          autorizar: async () => {
+            passos.push("autorizado");
+          },
+          guardarPedido: async (texto) => {
+            passos.push(texto);
+          },
+          solicitar: async () => {
+            passos.push("IA");
+            throw new Error("Provedor indisponível");
+          },
+        },
+      ),
+    ).rejects.toThrow("Provedor indisponível");
+    expect(passos).toEqual(["autorizado", pedido, "IA"]);
+  });
+
+  it("falha ao salvar não consome uma geração nem perde silenciosamente o prompt", async () => {
+    let chamadasIA = 0;
+    await expect(
+      produzirPlanoCarga(bruto(), {
+        autorizar: async () => {},
+        guardarPedido: async () => {
+          throw new Error("Não foi possível salvar seu prompt");
+        },
+        solicitar: async () => {
+          chamadasIA++;
+          return resposta();
+        },
+      }),
+    ).rejects.toThrow("salvar seu prompt");
+    expect(chamadasIA).toBe(0);
+  });
+
+  it("sem autorização ou com texto inválido não escreve no histórico", async () => {
+    let escritas = 0;
+    const dependencias = {
+      guardarPedido: async () => {
+        escritas++;
+      },
+      solicitar: async () => {
+        throw new Error("Não deve gerar");
+      },
+    };
+    await expect(
+      produzirPlanoCarga(bruto(), {
+        ...dependencias,
+        autorizar: async () => {
+          throw new Error("Sem acesso");
+        },
+      }),
+    ).rejects.toThrow("Sem acesso");
+    await expect(
+      produzirPlanoCarga(
+        { ...bruto(), pedido: "   " },
+        {
+          ...dependencias,
+          autorizar: async () => {},
+        },
+      ),
+    ).rejects.toThrow();
+    expect(escritas).toBe(0);
+  });
+
   it("rejeita recusa, resposta incompleta, tokens acima do orçamento e texto vazio", () => {
     expect(() => extrairRespostaPlanejamento({ ...resposta(), status: "incomplete" })).toThrow(
       "não concluiu",

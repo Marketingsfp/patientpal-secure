@@ -1,4 +1,4 @@
-/** Gera uma proposta em memória. Não cria carga, leads ou mensagens. */
+/** Salva o pedido pessoal e gera uma proposta. Não cria carga, leads ou mensagens. */
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
@@ -94,6 +94,10 @@ export const planejarTesteCarga = createServerFn({ method: "POST" })
           .maybeSingle();
         if (error) throw new Error(error.message);
         if (!membership) throw new Error("Sem acesso a esta clínica");
+      },
+      guardarPedido: async (pedido) => {
+        const { guardarPromptCarga } = await import("./carga-prompts.server");
+        await guardarPromptCarga(context.supabase, context.userId, data.clinicaId, pedido);
       },
       solicitar,
     }),

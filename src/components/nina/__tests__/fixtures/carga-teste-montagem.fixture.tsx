@@ -18,6 +18,10 @@ for (const nome of [
   "HTMLElement",
   "HTMLInputElement",
   "HTMLTextAreaElement",
+  "HTMLButtonElement",
+  "NodeFilter",
+  "KeyboardEvent",
+  "FocusEvent",
   "Event",
   "MouseEvent",
   "MutationObserver",
@@ -40,12 +44,32 @@ Object.defineProperty(globalThis, "cancelAnimationFrame", {
 });
 
 let clinica = "clinica-a";
+let usuario = "usuario-a";
 const chamadas: { nome: string; clinicaId?: string }[] = [];
 const proibida = async () => {
   throw new Error("Montagem não pode disparar mensagens, IA ou reset.");
 };
 mock.module("@/hooks/use-clinica", () => ({
   useClinica: () => ({ clinicaAtual: { clinica_id: clinica } }),
+}));
+mock.module("@/hooks/use-auth", () => ({ useAuth: () => ({ user: { id: usuario } }) }));
+const pedidoSalvo =
+  "Quero uma simulação com mamografia e ortopedista.\nPerguntar preço e primeira data.";
+mock.module("@/lib/nina/carga-prompts.functions", () => ({
+  listarPromptsCarga: async ({ data }: { data: { clinicaId: string } }) => {
+    chamadas.push({ nome: "prompts", clinicaId: data.clinicaId });
+    return {
+      prompts: [
+        {
+          id: "prompt-a",
+          pedido: pedidoSalvo,
+          created_at: "2026-09-19T10:00:00Z",
+          ultimo_usado_em: "2026-09-19T10:00:00Z",
+        },
+      ],
+      temMais: false,
+    };
+  },
 }));
 mock.module("@tanstack/react-start", () => ({ useServerFn: (fn: unknown) => fn }));
 mock.module("@/lib/nina/carga.functions", () => ({
@@ -176,6 +200,66 @@ it("o mesmo harness realmente detecta quando um efeito devolve Map como cleanup"
       /* cleanup inválido do controle negativo */
     }
     console.error = erroConsole;
+    elemento.remove();
+  }
+});
+
+it("seleciona um prompt salvo completo sem gerar IA e sem herdar o rascunho de outro usuário", async () => {
+  clinica = "clinica-a";
+  usuario = "usuario-a";
+  const elemento = document.createElement("div");
+  document.body.append(elemento);
+  const raiz = createRoot(elemento);
+  const botao = (nome: string) =>
+    [...document.querySelectorAll("button")].find((b) => b.textContent?.trim() === nome)!;
+  try {
+    await act(async () => {
+      raiz.render(<CargaTeste />);
+    });
+    await act(async () => {
+      botao("Meus prompts").click();
+    });
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 20));
+    });
+    expect(document.body.textContent).toContain("Meus prompts de simulação");
+    expect(document.body.textContent).toContain(pedidoSalvo);
+    await act(async () => {
+      botao("Usar prompt").click();
+    });
+    expect(elemento.querySelector<HTMLTextAreaElement>("#carga-pedido")!.value).toBe(pedidoSalvo);
+    expect(chamadas.some((c) => c.nome === "prompts" && c.clinicaId === "clinica-a")).toBe(true);
+
+    usuario = "usuario-b";
+    await act(async () => {
+      raiz.render(<CargaTeste />);
+    });
+    expect(elemento.querySelector<HTMLTextAreaElement>("#carga-pedido")!.value).toBe("");
+    // Fechar e reabrir a página carrega de novo a biblioteca persistida.
+    await act(async () => {
+      raiz.unmount();
+    });
+    const novaRaiz = createRoot(elemento);
+    try {
+      await act(async () => {
+        novaRaiz.render(<CargaTeste />);
+      });
+      await act(async () => {
+        botao("Meus prompts").click();
+      });
+      await act(async () => {
+        await new Promise((r) => setTimeout(r, 20));
+      });
+      expect(document.body.textContent).toContain(pedidoSalvo);
+    } finally {
+      await act(async () => {
+        novaRaiz.unmount();
+      });
+    }
+  } finally {
+    await act(async () => {
+      raiz.unmount();
+    });
     elemento.remove();
   }
 });

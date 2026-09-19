@@ -11267,6 +11267,44 @@ export type Database = {
           },
         ]
       }
+      nina_carga_prompts: {
+        Row: {
+          id: string
+          clinica_id: string
+          user_id: string
+          pedido: string
+          pedido_hash: string
+          created_at: string
+          ultimo_usado_em: string
+        }
+        Insert: {
+          id?: string
+          clinica_id: string
+          user_id: string
+          pedido: string
+          pedido_hash?: never
+          created_at?: string
+          ultimo_usado_em?: string
+        }
+        Update: {
+          id?: string
+          clinica_id?: string
+          user_id?: string
+          pedido?: string
+          pedido_hash?: never
+          created_at?: string
+          ultimo_usado_em?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nina_carga_prompts_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       nina_teste_carga: {
         Row: {
           cancelar: boolean

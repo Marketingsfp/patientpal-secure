@@ -4,6 +4,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { Gauge, Loader2, Play, RefreshCw, Sparkles, Square } from "lucide-react";
 import { useClinica } from "@/hooks/use-clinica";
+import { useAuth } from "@/hooks/use-auth";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -35,6 +36,7 @@ import {
 } from "@/lib/nina/carga-planejamento";
 import { CargaPlano } from "./CargaPlano";
 import { CargaConfiguracao } from "./CargaConfiguracao";
+import { PromptsSalvosCarga } from "./PromptsSalvosCarga";
 import {
   alterarPedidoCarga,
   cargaAtiva,
@@ -78,17 +80,19 @@ const ms = (v: number | null | undefined) => (v == null ? "—" : `${Math.round(
 
 export function CargaTeste() {
   const { clinicaAtual } = useClinica();
+  const { user } = useAuth();
   const clinicaId = clinicaAtual?.clinica_id;
-  // Preserva edições de cada clínica sem permitir disparo de plano antigo.
+  // Preserva edições por usuário/clínica sem permitir disparo de plano antigo.
   const rascunhos = useRef(new Map<string, RascunhoCarga>());
-  if (!clinicaId) return null;
+  if (!clinicaId || !user) return null;
+  const escopo = `${user.id}:${clinicaId}`;
   return (
     <CargaTesteClinica
-      key={clinicaId}
+      key={escopo}
       clinicaId={clinicaId}
-      inicial={rascunhos.current.get(clinicaId)}
+      inicial={rascunhos.current.get(escopo)}
       guardar={(r) => {
-        rascunhos.current.set(clinicaId, r);
+        rascunhos.current.set(escopo, r);
       }}
     />
   );
@@ -457,7 +461,14 @@ function CargaTesteClinica({
         </div>
         {rascunho.modo === "ia" && (
           <div className="space-y-3">
-            <Label htmlFor="carga-pedido">Descreva como deseja testar</Label>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <Label htmlFor="carga-pedido">Descreva como deseja testar</Label>
+              <PromptsSalvosCarga
+                clinicaId={clinicaId}
+                disabled={edicaoBloqueada}
+                onUsar={(pedido) => setRascunho((r) => alterarPedidoCarga(r, pedido))}
+              />
+            </div>
             <Textarea
               id="carga-pedido"
               rows={4}
@@ -467,6 +478,9 @@ function CargaTesteClinica({
               placeholder="Ex.: simule pacientes perguntando sobre cardiologia, preços, PIX e a escolha de um médico. Verifique a continuidade entre as mensagens."
               onChange={(e) => setRascunho((r) => alterarPedidoCarga(r, e.target.value))}
             />
+            <p className="text-xs text-muted-foreground">
+              Ao gerar com Sol, seu prompt é salvo automaticamente em “Meus prompts”.
+            </p>
             <Button
               variant="secondary"
               disabled={edicaoBloqueada || !rascunho.pedido.trim()}
