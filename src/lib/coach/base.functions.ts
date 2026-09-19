@@ -9,6 +9,7 @@
  */
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { garantirAcessoCoach } from "@/lib/coach/guard.server";
 import { gerarBaseDoSistema, type ClienteBase } from "@/lib/coach/base-conhecimento.dados";
 
 export type BaseConhecimentoGerada = {
@@ -20,20 +21,23 @@ export type BaseConhecimentoGerada = {
 export const gerarBaseConhecimento = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: { clinicaId: string; clinicaNome?: string | null }) => {
-    if (!input?.clinicaId) throw new Error("Selecione uma clínica.");
-    return input;
+    const clinicaId = String(input?.clinicaId ?? "").trim();
+    if (!/^[0-9a-f-]{36}$/i.test(clinicaId)) throw new Error("Selecione uma clínica.");
+    const nome = input?.clinicaNome ? String(input.clinicaNome).slice(0, 200) : null;
+    return { clinicaId, clinicaNome: nome };
   })
   .handler(async ({ data, context }): Promise<BaseConhecimentoGerada> => {
     const db = context.supabase as unknown as ClienteBase;
 
-    // Só gestor do Coach gera/atualiza a base (mesma regra das telas e das
-    // políticas do banco).
+    // Acesso ao módulo Coach com permissão de escrita, além da regra de gestão.
+    await garantirAcessoCoach(context.supabase, data.clinicaId, "write");
     const { data: podeGerir, error: erroPermissao } = await context.supabase.rpc(
       "coach_pode_gerir",
       { _clinica_id: data.clinicaId },
     );
-    if (erroPermissao) throw new Error(erroPermissao.message);
+    if (erroPermissao) throw new Error("Não foi possível validar a permissão.");
     if (!podeGerir) throw new Error("Só a gestão do Coach pode atualizar a base da clínica.");
+
 
     const { texto, geradoEm, tamanho } = await gerarBaseDoSistema(
       db,
@@ -49,7 +53,7 @@ export const gerarBaseConhecimento = createServerFn({ method: "POST" })
       },
       { onConflict: "clinica_id" },
     );
-    if (error) throw new Error(error.message);
+    if (error) throw new Error("Não foi possível salvar a base gerada.");
 
     return { texto, geradoEm: geradoEm.toISOString(), tamanho };
   });

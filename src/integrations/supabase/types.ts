@@ -3473,6 +3473,9 @@ export type Database = {
           clinica_id: string
           complemento: string
           created_at: string
+          limite_ia_clinica: number
+          limite_ia_usuario: number
+          reter_audio_dias: number
           scripts: Json
           tabela_servicos: string
           updated_at: string
@@ -3484,6 +3487,9 @@ export type Database = {
           clinica_id: string
           complemento?: string
           created_at?: string
+          limite_ia_clinica?: number
+          limite_ia_usuario?: number
+          reter_audio_dias?: number
           scripts?: Json
           tabela_servicos?: string
           updated_at?: string
@@ -3495,6 +3501,9 @@ export type Database = {
           clinica_id?: string
           complemento?: string
           created_at?: string
+          limite_ia_clinica?: number
+          limite_ia_usuario?: number
+          reter_audio_dias?: number
           scripts?: Json
           tabela_servicos?: string
           updated_at?: string
@@ -3604,6 +3613,7 @@ export type Database = {
           atendente: string
           clinica_id: string
           created_at: string
+          feedback: Json | null
           id: string
           nota: number
           questoes: Json
@@ -3617,6 +3627,7 @@ export type Database = {
           atendente: string
           clinica_id: string
           created_at?: string
+          feedback?: Json | null
           id?: string
           nota: number
           questoes?: Json
@@ -3630,6 +3641,7 @@ export type Database = {
           atendente?: string
           clinica_id?: string
           created_at?: string
+          feedback?: Json | null
           id?: string
           nota?: number
           questoes?: Json
@@ -3753,6 +3765,50 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "coach_tempo_estudo_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      coach_uso_ia: {
+        Row: {
+          atendente: string | null
+          clinica_id: string
+          created_at: string
+          custo_estimado: number
+          funcao: string
+          id: string
+          tokens_in: number
+          tokens_out: number
+          user_id: string
+        }
+        Insert: {
+          atendente?: string | null
+          clinica_id: string
+          created_at?: string
+          custo_estimado?: number
+          funcao: string
+          id?: string
+          tokens_in?: number
+          tokens_out?: number
+          user_id: string
+        }
+        Update: {
+          atendente?: string | null
+          clinica_id?: string
+          created_at?: string
+          custo_estimado?: number
+          funcao?: string
+          id?: string
+          tokens_in?: number
+          tokens_out?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "coach_uso_ia_clinica_id_fkey"
             columns: ["clinica_id"]
             isOneToOne: false
             referencedRelation: "clinicas"
@@ -15353,6 +15409,26 @@ export type Database = {
           nome: string
         }[]
       }
+      coach_fechar_uso_ia: {
+        Args: {
+          _custo: number
+          _id: string
+          _tokens_in: number
+          _tokens_out: number
+        }
+        Returns: undefined
+      }
+      coach_limpar_eventos_antigos: { Args: never; Returns: number }
+      coach_nomes_orfaos: {
+        Args: { _clinica_id: string }
+        Returns: {
+          analises: number
+          atendente: string
+          provas: number
+          total: number
+          treinos: number
+        }[]
+      }
       coach_pode_gerir: { Args: { _clinica_id: string }; Returns: boolean }
       coach_registrar_tempo_estudo: {
         Args: {
@@ -15362,6 +15438,30 @@ export type Database = {
           _segundos: number
         }
         Returns: undefined
+      }
+      coach_registrar_uso_ia: {
+        Args: {
+          _atendente?: string
+          _clinica_id: string
+          _custo?: number
+          _funcao: string
+          _tokens_in?: number
+          _tokens_out?: number
+        }
+        Returns: string
+      }
+      coach_resumo_atendentes: {
+        Args: { _clinica_id: string; _desde?: string }
+        Returns: {
+          atendente: string
+          media_prova: number
+          media_roleplay: number
+          provas: number
+          roleplays: number
+          segundos: number
+          ultimo: string
+          user_id: string
+        }[]
       }
       coach_vincular_atendente: {
         Args: { _clinica_id: string; _nome_antigo: string; _user_id: string }

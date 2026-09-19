@@ -7,9 +7,8 @@ import type { FeedbackProva, ProvaGerada } from "./prova.server";
 export type { ProvaGerada, ProvaQuestao, FeedbackProva, FeedbackItem } from "./prova.server";
 
 const FeedbackSchema = z.object({
+  clinicaId: z.string().uuid(),
   atendente: z.string().min(1).max(120),
-  scripts: z.string().max(12000).optional(),
-  tabela: z.string().max(60000).optional(),
   respostas: z.array(z.number().int().min(-1).max(10)).min(1).max(20),
   questoes: z
     .array(
@@ -26,10 +25,9 @@ const FeedbackSchema = z.object({
 });
 
 const GenerateSchema = z.object({
+  clinicaId: z.string().uuid(),
   atendente: z.string().min(1).max(120),
   quantidade: z.number().int().min(3).max(15).optional(),
-  scripts: z.string().max(12000).optional(),
-  tabela: z.string().max(60000).optional(),
   exemplos: z
     .array(
       z.object({
@@ -61,7 +59,18 @@ const GenerateSchema = z.object({
 export const gerarProva = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((data: unknown) => GenerateSchema.parse(data))
-  .handler(async ({ data }): Promise<ProvaGerada> => {
+  .handler(async ({ data, context }): Promise<ProvaGerada> => {
+    const guard = await import("./guard.server");
+    const db = context.supabase as unknown as import("./guard.server").ClienteCoach;
+    await guard.garantirAcessoCoach(db, data.clinicaId, "read");
+    const usoId = await guard.registrarUsoIA(db, {
+      clinicaId: data.clinicaId,
+      funcao: "prova-gerar",
+      atendente: data.atendente,
+    });
+    const config = await guard.configDaClinica(db, data.clinicaId);
+    const scriptsTexto = guard.scriptsEmTexto(config.scripts);
+    const tabelaTexto = guard.baseParaPrompt(config, "", 20_000);
     const {
       GATEWAY,
       MODEL,
@@ -87,8 +96,8 @@ export const gerarProva = createServerFn({ method: "POST" })
               data.atendente,
               quantidade,
               data.exemplos,
-              data.scripts,
-              data.tabela,
+              scriptsTexto,
+              tabelaTexto,
             ),
           },
         ],
@@ -97,25 +106,30 @@ export const gerarProva = createServerFn({ method: "POST" })
       }),
     });
 
-    if (!res.ok) {
-      if (res.status === 429)
-        throw new Error("Limite de requisições atingido. Aguarde alguns segundos.");
-      if (res.status === 402)
-        throw new Error("Créditos da IA esgotados. Adicione créditos em Settings > Workspace > Usage.");
-      console.error("AI gateway error", res.status, await res.text());
-      throw new Error("Falha ao gerar a prova.");
-    }
+    if (!res.ok) await guard.erroGenericoIA(res, "prova-gerar");
 
     const json = await res.json();
+    await guard.fecharUsoIA(db, usoId, json);
     const args = json.choices?.[0]?.message?.tool_calls?.[0]?.function?.arguments;
-    if (!args) throw new Error("A IA não retornou a prova. Tente novamente.");
+    if (!args) throw new Error("Não foi possível montar a prova agora. Tente novamente.");
     return normalize(JSON.parse(args), quantidade);
   });
 
 export const gerarFeedbackProva = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((data: unknown) => FeedbackSchema.parse(data))
-  .handler(async ({ data }): Promise<FeedbackProva> => {
+  .handler(async ({ data, context }): Promise<FeedbackProva> => {
+    const guard = await import("./guard.server");
+    const db = context.supabase as unknown as import("./guard.server").ClienteCoach;
+    await guard.garantirAcessoCoach(db, data.clinicaId, "read");
+    const usoId = await guard.registrarUsoIA(db, {
+      clinicaId: data.clinicaId,
+      funcao: "prova-feedback",
+      atendente: data.atendente,
+    });
+    const config = await guard.configDaClinica(db, data.clinicaId);
+    const scriptsTexto = guard.scriptsEmTexto(config.scripts);
+    const tabelaTexto = guard.baseParaPrompt(config, "", 20_000);
     const {
       GATEWAY,
       MODEL,
@@ -139,8 +153,8 @@ export const gerarFeedbackProva = createServerFn({ method: "POST" })
               data.atendente,
               data.questoes,
               data.respostas,
-              data.tabela,
-              data.scripts,
+              tabelaTexto,
+              scriptsTexto,
             ),
           },
         ],
@@ -149,17 +163,11 @@ export const gerarFeedbackProva = createServerFn({ method: "POST" })
       }),
     });
 
-    if (!res.ok) {
-      if (res.status === 429)
-        throw new Error("Limite de requisições atingido. Aguarde alguns segundos.");
-      if (res.status === 402)
-        throw new Error("Créditos da IA esgotados. Adicione créditos em Settings > Workspace > Usage.");
-      console.error("AI gateway error", res.status, await res.text());
-      throw new Error("Falha ao gerar o feedback da prova.");
-    }
+    if (!res.ok) await guard.erroGenericoIA(res, "prova-feedback");
 
     const json = await res.json();
+    await guard.fecharUsoIA(db, usoId, json);
     const args = json.choices?.[0]?.message?.tool_calls?.[0]?.function?.arguments;
-    if (!args) throw new Error("A IA não retornou o feedback. Tente novamente.");
+    if (!args) throw new Error("Não foi possível montar o resultado agora. Tente novamente.");
     return normalizeFeedback(JSON.parse(args), data.questoes.length);
   });

@@ -30,14 +30,17 @@ export function EventosSeguranca({ clinicaId }: { clinicaId?: string | null }) {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const { data } = await supabase
+      // O recorte por clínica é feito no banco: antes vinham 200 linhas de
+      // todas as clínicas e a tela filtrava depois, escondendo as da clínica.
+      let q = supabase
         .from("coach_eventos_seguranca")
         .select("id,atendente,clinica_id,tela,tipo,created_at")
         .order("created_at", { ascending: false })
         .limit(200);
+      if (clinicaId) q = q.eq("clinica_id", clinicaId);
+      const { data } = await q;
       if (cancelled) return;
-      const lista = (data ?? []) as Evento[];
-      setEventos(clinicaId ? lista.filter((e) => e.clinica_id === clinicaId) : lista);
+      setEventos((data ?? []) as Evento[]);
     })();
     return () => {
       cancelled = true;

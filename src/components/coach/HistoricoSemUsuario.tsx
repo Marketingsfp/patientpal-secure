@@ -25,8 +25,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
-type Linha = { atendente: string | null; user_id: string | null };
-
 type NomeOrfao = {
   nome: string;
   analises: number;
@@ -37,52 +35,28 @@ type NomeOrfao = {
 
 type UsuarioClinica = { id: string; nome: string };
 
-const TABELAS = [
-  "coach_analises",
-  "coach_roleplay_sessions",
-  "coach_provas",
-  "coach_tempo_estudo",
-  "coach_eventos_seguranca",
-  "coach_desempenho_metas",
-] as const;
-
+/**
+ * Nomes órfãos vêm de um resumo pronto no banco (`coach_nomes_orfaos`). Antes a
+ * tela baixava até 5.000 linhas de seis tabelas para contar na memória.
+ */
 async function carregarOrfaos(clinicaId: string): Promise<NomeOrfao[]> {
-  const resultados = await Promise.all(
-    TABELAS.map(async (tabela) => {
-      const { data } = await supabase
-        .from(tabela)
-        .select("atendente,user_id")
-        .eq("clinica_id", clinicaId)
-        .limit(5000);
-      return { tabela, linhas: (data ?? []) as unknown as Linha[] };
-    }),
-  );
-
-  // Um nome só é considerado órfão quando NENHUM registro dele tem usuário.
-  const comUsuario = new Set<string>();
-  const contagens = new Map<string, NomeOrfao>();
-
-  for (const { tabela, linhas } of resultados) {
-    for (const linha of linhas) {
-      const nome = (linha.atendente ?? "").trim();
-      if (!nome) continue;
-      if (linha.user_id) {
-        comUsuario.add(nome);
-        continue;
-      }
-      const atual =
-        contagens.get(nome) ?? { nome, analises: 0, treinos: 0, provas: 0, total: 0 };
-      if (tabela === "coach_analises") atual.analises += 1;
-      if (tabela === "coach_roleplay_sessions") atual.treinos += 1;
-      if (tabela === "coach_provas") atual.provas += 1;
-      atual.total += 1;
-      contagens.set(nome, atual);
-    }
-  }
-
-  return Array.from(contagens.values())
-    .filter((n) => !comUsuario.has(n.nome))
-    .sort((a, b) => b.total - a.total || a.nome.localeCompare(b.nome, "pt-BR"));
+  const { data, error } = await supabase.rpc("coach_nomes_orfaos", {
+    _clinica_id: clinicaId,
+  });
+  if (error) return [];
+  return ((data ?? []) as {
+    atendente: string;
+    analises: number;
+    treinos: number;
+    provas: number;
+    total: number;
+  }[]).map((r) => ({
+    nome: r.atendente,
+    analises: Number(r.analises) || 0,
+    treinos: Number(r.treinos) || 0,
+    provas: Number(r.provas) || 0,
+    total: Number(r.total) || 0,
+  }));
 }
 
 async function carregarUsuarios(clinicaId: string): Promise<UsuarioClinica[]> {

@@ -4,10 +4,9 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { contextoDataAtual } from "./data-atual";
 
 const StartSchema = z.object({
+  clinicaId: z.string().uuid(),
   atendente: z.string().min(1).max(120),
   pontos_fracos: z.array(z.string().min(1).max(500)).min(1).max(10),
-  scripts: z.string().max(12000).optional(),
-  tabela: z.string().max(60000).optional(),
   contexto: z.string().max(600).optional(),
   /** Nomes de pacientes, temas e perguntas já usados nesta trilha — nunca repetir. */
   evitar: z.array(z.string().max(200)).max(60).optional(),
@@ -33,12 +32,11 @@ const MessageSchema = z.object({
 });
 
 const ReplySchema = z.object({
+  clinicaId: z.string().uuid(),
   atendente: z.string().min(1).max(120),
   pontos_fracos: z.array(z.string().min(1).max(500)).min(1).max(10),
   cenario: z.string().min(1).max(4000),
   perfil_cliente: z.string().min(1).max(2000),
-  scripts: z.string().max(12000).optional(),
-  tabela: z.string().max(60000).optional(),
   history: z.array(MessageSchema).min(1).max(400),
   dificuldade: z.enum(["facil", "medio", "dificil"]).optional(),
   encerrar: z.boolean().optional(),
@@ -85,25 +83,6 @@ function authHeaders() {
   return { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" };
 }
 
-async function handleHttpError(res: Response, fallback: string): Promise<never> {
-  const raw = await res.text().catch(() => "");
-  if (res.status === 429)
-    throw new Error("Limite de requisições atingido. Aguarde alguns segundos e tente novamente.");
-  if (res.status === 402 || res.status === 403)
-    throw new Error(
-      "Limite de créditos da IA atingido neste workspace. Aumente o limite em Settings > Workspace > Usage e tente novamente.",
-    );
-  let detalhe = raw.slice(0, 300);
-  try {
-    const j = JSON.parse(raw) as { message?: string; error?: { message?: string } };
-    detalhe = j.error?.message ?? j.message ?? detalhe;
-  } catch {
-    /* texto puro */
-  }
-  console.error(`[roleplay] IA ${res.status}: ${raw}`);
-  throw new Error(`${fallback} (${res.status}) ${detalhe}`.trim());
-}
-
 const START_TOOL = {
   type: "function" as const,
   function: {
@@ -145,7 +124,20 @@ function instrucaoDificuldade(nivel?: "facil" | "medio" | "dificil") {
 export const startRoleplay = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((data: unknown) => StartSchema.parse(data))
-  .handler(async ({ data }): Promise<RoleplayScenario> => {
+  .handler(async ({ data, context }): Promise<RoleplayScenario> => {
+    const guard = await import("./guard.server");
+    const db = context.supabase as unknown as import("./guard.server").ClienteCoach;
+    await guard.garantirAcessoCoach(db, data.clinicaId, "read");
+    const usoId = await guard.registrarUsoIA(db, {
+      clinicaId: data.clinicaId,
+      funcao: "roleplay-inicio",
+      atendente: data.atendente,
+    });
+    const config = await guard.configDaClinica(db, data.clinicaId);
+    // Conteúdo da clínica vem do banco, nunca do navegador.
+    const scriptsTexto = guard.scriptsEmTexto(config.scripts);
+    const tabelaTexto = guard.baseParaPrompt(config, data.contexto ?? "", 12_000);
+
     const system = `${contextoDataAtual()}
 
 Você é um treinador de CONVERSÃO DE AGENDAMENTOS de uma clínica. Sua tarefa é criar uma simulação realista de atendimento (WhatsApp/ligação) para treinar uma atendente a converter o contato em AGENDAMENTO, focando exatamente nos pontos fracos dela.
@@ -178,16 +170,16 @@ O perfil_cliente e a primeira mensagem devem refletir esse nível de dificuldade
       .join("\n\n---\n\n");
 
     const user = `Atendente: ${data.atendente}\n\nPontos fracos recorrentes que precisamos treinar:\n- ${data.pontos_fracos.join("\n- ")}\n\n${
-      data.scripts
-        ? `Scripts padrão de agendamento da clínica (o treino deve exigir esses passos):\n\n${data.scripts}\n\n`
+      scriptsTexto
+        ? `Scripts padrão de agendamento da clínica (o treino deve exigir esses passos):\n\n${scriptsTexto}\n\n`
         : ""
     }${
       exemplosTxt
         ? `Atendimentos anteriores REAIS dela (use como base do cenário):\n\n${exemplosTxt}\n\n`
         : ""
     }${
-      data.tabela?.trim()
-        ? `Serviços, valores, dias, médicos e horários da clínica — o cenário deve pedir um serviço que exista aqui, com dados reais. Nunca mencione tabela, planilha ou "TAP":\n\n${data.tabela.trim()}\n\n`
+      tabelaTexto.trim()
+        ? `Serviços, valores, dias, médicos e horários da clínica — o cenário deve pedir um serviço que exista aqui, com dados reais. Nunca mencione tabela, planilha ou "TAP":\n\n${tabelaTexto.trim()}\n\n`
         : ""
     }Crie o cenário e a primeira mensagem do cliente, inspirando-se nos atendimentos reais acima.`;
 
@@ -224,8 +216,9 @@ REGRAS DE UNICIDADE (obrigatórias):
         tool_choice: { type: "function", function: { name: "iniciar_roleplay" } },
       }),
     });
-    if (!res.ok) await handleHttpError(res, "Falha ao iniciar o roleplay.");
+    if (!res.ok) await guard.erroGenericoIA(res, "roleplay-inicio");
     const json = await res.json();
+    await guard.fecharUsoIA(db, usoId, json);
     const args = json.choices?.[0]?.message?.tool_calls?.[0]?.function?.arguments;
     if (!args) throw new Error("A IA não retornou um cenário válido.");
     return JSON.parse(args) as RoleplayScenario;
@@ -323,7 +316,22 @@ const REPLY_TOOL = {
 export const roleplayReply = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((data: unknown) => ReplySchema.parse(data))
-  .handler(async ({ data }): Promise<RoleplayTurn> => {
+  .handler(async ({ data, context }): Promise<RoleplayTurn> => {
+    const guard = await import("./guard.server");
+    const db = context.supabase as unknown as import("./guard.server").ClienteCoach;
+    await guard.garantirAcessoCoach(db, data.clinicaId, "read");
+    const usoId = await guard.registrarUsoIA(db, {
+      clinicaId: data.clinicaId,
+      funcao: "roleplay-turno",
+      atendente: data.atendente,
+    });
+    const config = await guard.configDaClinica(db, data.clinicaId);
+    const scriptsTexto = guard.scriptsEmTexto(config.scripts);
+    // A base vai em TODO turno: aqui o teto é bem menor e o recorte usa o
+    // cenário mais as últimas falas, não a base inteira.
+    const assunto = [data.cenario, ...data.history.slice(-6).map((m) => m.content)].join(" ");
+    const tabelaTexto = guard.baseParaPrompt(config, assunto, 10_000);
+
     const system = `${contextoDataAtual()}
 
 Você está conduzindo uma simulação de treinamento de CONVERSÃO DE AGENDAMENTO de uma clínica.
@@ -335,8 +343,8 @@ Perfil do cliente que você interpreta: ${data.perfil_cliente}
 
 Pontos fracos da atendente que esta simulação precisa estressar:
 - ${data.pontos_fracos.join("\n- ")}
-${data.scripts ? `\nScripts padrão de agendamento que a atendente deveria seguir (use-os para avaliar no feedback, nunca os cite durante a conversa):\n\n${data.scripts}\n` : ""}
-${data.tabela?.trim() ? `\nServiços, valores em dinheiro/cartão, dias, médicos, horários e preparos da clínica. Como paciente, pergunte sobre esses itens e cobre coerência; no feedback, penalize preço/dia/preparo informados errados. NUNCA mencione tabela, planilha, "TAP" ou qualquer fonte fornecida — trate como conhecimento normal da clínica:\n\n${data.tabela.trim()}\n` : ""}
+${scriptsTexto ? `\nScripts padrão de agendamento que a atendente deveria seguir (use-os para avaliar no feedback, nunca os cite durante a conversa):\n\n${scriptsTexto}\n` : ""}
+${tabelaTexto.trim() ? `\nServiços, valores em dinheiro/cartão, dias, médicos, horários e preparos da clínica. Como paciente, pergunte sobre esses itens e cobre coerência; no feedback, penalize preço/dia/preparo informados errados. NUNCA mencione tabela, planilha, "TAP" ou qualquer fonte fornecida — trate como conhecimento normal da clínica:\n\n${tabelaTexto.trim()}\n` : ""}
 Regras de interpretação:
 - Responda SEMPRE em português do Brasil, curto e natural, como mensagem real de WhatsApp.
 - Mantenha consistência com o perfil do cliente. Pressione os pontos fracos sem exagero teatral.
@@ -357,7 +365,21 @@ ${instrucaoDificuldade(data.dificuldade)}`;
     const messages: Array<{ role: "system" | "user" | "assistant"; content: string }> = [
       { role: "system", content: system },
     ];
-    for (const m of data.history) {
+    // Só os últimos 20 turnos vão na íntegra; o começo da conversa entra como
+    // resumo curto, para o custo do turno não crescer sem limite.
+    const historico = data.history;
+    const recentes = historico.slice(-20);
+    const anteriores = historico.slice(0, Math.max(0, historico.length - 20));
+    if (anteriores.length) {
+      messages.push({
+        role: "user",
+        content: `[RESUMO DO INÍCIO DA CONVERSA (${anteriores.length} mensagens): ${anteriores
+          .map((m) => `${m.role === "cliente" ? "Paciente" : "Atendente"}: ${m.content.slice(0, 160)}`)
+          .join(" | ")
+          .slice(0, 3000)}]`,
+      });
+    }
+    for (const m of recentes) {
       messages.push({
         role: m.role === "cliente" ? "assistant" : "user",
         content: m.content,
@@ -381,8 +403,9 @@ ${instrucaoDificuldade(data.dificuldade)}`;
         tool_choice: { type: "function", function: { name: "responder_cliente" } },
       }),
     });
-    if (!res.ok) await handleHttpError(res, "Falha ao gerar a resposta do cliente.");
+    if (!res.ok) await guard.erroGenericoIA(res, "roleplay-turno");
     const json = await res.json();
+    await guard.fecharUsoIA(db, usoId, json);
     const args = json.choices?.[0]?.message?.tool_calls?.[0]?.function?.arguments;
     if (!args) throw new Error("A IA não retornou uma resposta válida.");
     return JSON.parse(args) as RoleplayTurn;

@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import {
   ArrowLeft,
@@ -19,7 +19,6 @@ import {
   type FeedbackProva,
   type ProvaGerada,
 } from "@/lib/coach/prova.functions";
-import { formatScripts } from "@/lib/coach/scripts";
 import { useCoachConfig } from "@/lib/coach/config-clinica";
 import type { CoachContexto } from "@/lib/coach/contexto";
 
@@ -100,7 +99,7 @@ function ProvaPage({ ctx, alvo }: { ctx: CoachContexto; alvo: AlvoAtendente }) {
   const escopoLocal = escopoLocalCoach(clinicaId, ctx.userId, atendente);
   const generate = useServerFn(gerarProva);
   const gerarFeedback = useServerFn(gerarFeedbackProva);
-  const { config, loading: clinicaLoading, baseParaIA } = useCoachConfig(
+  const { config, loading: clinicaLoading } = useCoachConfig(
     clinicaId,
     ctx.clinicaNome,
     ctx.gestor,
@@ -112,6 +111,9 @@ function ProvaPage({ ctx, alvo }: { ctx: CoachContexto; alvo: AlvoAtendente }) {
   const [respostas, setRespostas] = useState<number[]>([]);
   const [reveladas, setReveladas] = useState<boolean[]>([]);
   const [feedback, setFeedback] = useState<FeedbackProva | null>(null);
+  const feedbackRef = useRef<FeedbackProva | null>(null);
+  /** Id da prova gravada: usado para anexar o feedback à mesma linha. */
+  const provaIdRef = useRef<string | null>(null);
   const [feedbackLoading, setFeedbackLoading] = useState(false);
   const [feedbackError, setFeedbackError] = useState<string | null>(null);
   const [enviado, setEnviado] = useState(false);
@@ -222,15 +224,8 @@ function ProvaPage({ ctx, alvo }: { ctx: CoachContexto; alvo: AlvoAtendente }) {
         ];
       }
 
-      const scripts = formatScripts(config.scripts);
       const result = await generate({
-        data: {
-          atendente,
-          quantidade: 8,
-          exemplos,
-          scripts: scripts || undefined,
-          tabela: baseParaIA(),
-        },
+        data: { clinicaId: clinicaId ?? "", atendente, quantidade: 8, exemplos },
       });
       setProva(result);
       setRespostas(new Array(result.questoes.length).fill(-1));
@@ -301,19 +296,26 @@ function ProvaPage({ ctx, alvo }: { ctx: CoachContexto; alvo: AlvoAtendente }) {
     const total = prova.questoes.length;
     const certos = prova.questoes.reduce((n, q, i) => (respostas[i] === q.correta ? n + 1 : n), 0);
     try {
-      const { error: insertError } = await supabase.from("coach_provas").insert({
-        clinica_id: clinicaId ?? "",
-        // Sempre o usuário de quem fez a prova.
-        user_id: alvo.userId,
-        atendente,
-        simulacao_gestor: simulacaoGestor,
-        nota: Number(((certos / total) * 10).toFixed(1)),
-        acertos: certos,
-        total,
-        questoes: prova.questoes as unknown as never,
-        respostas: respostas as unknown as never,
-      });
+      const { data: inserida, error: insertError } = await supabase
+        .from("coach_provas")
+        .insert({
+          clinica_id: clinicaId ?? "",
+          // Sempre o usuário de quem fez a prova.
+          user_id: alvo.userId,
+          atendente,
+          simulacao_gestor: simulacaoGestor,
+          nota: Number(((certos / total) * 10).toFixed(1)),
+          acertos: certos,
+          total,
+          questoes: prova.questoes as unknown as never,
+          respostas: respostas as unknown as never,
+        })
+        .select("id")
+        .maybeSingle();
       if (insertError) throw insertError;
+      provaIdRef.current = inserida?.id ?? null;
+      // Se o feedback já chegou, grava junto.
+      if (feedbackRef.current) void guardarFeedback(feedbackRef.current);
       setSaved(true);
     } catch (e) {
       setSaveError(
@@ -324,13 +326,26 @@ function ProvaPage({ ctx, alvo }: { ctx: CoachContexto; alvo: AlvoAtendente }) {
     }
   }
 
+  /**
+   * Guarda o feedback junto com a prova, para não pedir de novo à IA toda vez
+   * que a atendente reabrir o resultado.
+   */
+  async function guardarFeedback(fb: unknown) {
+    const id = provaIdRef.current;
+    if (!id) return;
+    await supabase
+      .from("coach_provas")
+      .update({ feedback: fb as never })
+      .eq("id", id);
+  }
+
   async function carregarFeedback(p: ProvaGerada, resp: number[]) {
     setFeedbackLoading(true);
     setFeedbackError(null);
     try {
-      const scripts = formatScripts(config.scripts);
       const fb = await gerarFeedback({
         data: {
+          clinicaId: clinicaId ?? "",
           atendente,
           questoes: p.questoes.map((q) => ({
             pergunta: q.pergunta,
@@ -340,11 +355,11 @@ function ProvaPage({ ctx, alvo }: { ctx: CoachContexto; alvo: AlvoAtendente }) {
             origem: q.origem,
           })),
           respostas: resp.map((r) => (typeof r === "number" ? r : -1)),
-          scripts: scripts || undefined,
-          tabela: baseParaIA(),
         },
       });
       setFeedback(fb);
+      feedbackRef.current = fb;
+      void guardarFeedback(fb);
     } catch (e) {
       setFeedbackError(
         e instanceof Error ? e.message : "Não foi possível gerar o feedback da IA.",
@@ -392,6 +407,12 @@ function ProvaPage({ ctx, alvo }: { ctx: CoachContexto; alvo: AlvoAtendente }) {
               </p>
             </div>
           </div>
+
+          {/* Aviso claro: a prova registra saída de aba e cópia. */}
+          <p className="mt-4 rounded-xl border border-amber-300/60 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200">
+            Esta prova registra quando você sai da aba e quando tenta copiar ou imprimir o
+            conteúdo. Faça sozinha, sem consultar outra janela.
+          </p>
 
           {!loading && prova && !enviado && (
             <div className="mt-6 flex items-center gap-3 text-sm text-muted-foreground">
