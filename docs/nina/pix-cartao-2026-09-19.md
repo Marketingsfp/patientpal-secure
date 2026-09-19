@@ -5,6 +5,13 @@ A Nina deve apresentar ambos juntos, como `Pix/cartão: R$ X,XX`, também quando
 pergunta menciona apenas um deles. Dinheiro permanece separado. Parcelamento
 publicado é uma condição do cartão; não implica parcelamento de Pix.
 
+Quando o paciente perguntar sobre pagamento por Pix, desconto ou diferença entre
+as formas de pagamento, a Nina explica que Pix é aceito somente antecipadamente
+pelo WhatsApp e que dinheiro tem desconto. O preço cadastrado em dinheiro já
+inclui esse desconto, sem desconto adicional ou percentual inventado. A condição
+de antecipação do Pix não é estendida ao cartão. Essa explicação não precisa
+acompanhar toda listagem de preços quando o paciente não pergunta sobre o assunto.
+
 ## Base e prompt publicados
 
 - Clínica revisada: Policlínica Menino Jesus, São João de Meriti.
@@ -14,7 +21,7 @@ publicado é uma condição do cartão; não implica parcelamento de Pix.
 - Os valores e as condições de cada linha foram preservados. Cada formulário
   foi comparado antes da publicação: somente os rótulos previstos mudaram.
   Campos sem valor continuaram sem valor.
-- Prompt v38 publicado em 19/09/2026 às 12:06, com alcance de todas as clínicas.
+- Prompt v39 publicado em 19/09/2026 às 12:14, com alcance de todas as clínicas.
   FAT-02 e LING-02 agora determinam Pix/cartão juntos nas informações, opções
   de agenda, frases de abertura, resumos e confirmações. As versões anteriores
   foram preservadas.
@@ -43,6 +50,12 @@ publicado é uma condição do cartão; não implica parcelamento de Pix.
   Louza às 12:08 recebeu `Pix/cartão: R$ 145,00`, com dinheiro a R$ 120,00.
   Não houve mensagem ao WhatsApp ou agendamento real; o teste foi resolvido e
   reiniciado ao final, preservando o histórico.
+- Complemento v39: 25 testes de catálogo/pagamento, lint e verificação de tipos
+  passaram. Na homologação, Paciente Teste 10, sessão 24, às 12:14, a pergunta
+  sobre pagar Pix na recepção no dia do exame e desconto em dinheiro recebeu:
+  Pix somente antecipado pelo WhatsApp; dinheiro com desconto já incluído no
+  preço cadastrado; dinheiro R$ 51,00 e Pix/cartão R$ 60,00 para eletrocardiograma.
+  O teste foi encerrado pelo fluxo Resolver / Reiniciar, mantendo o histórico.
 
 As publicações da base e do prompt têm efeito imediato. A normalização adicional
 no código depende da publicação da versão correspondente do aplicativo.
