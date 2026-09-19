@@ -52,7 +52,16 @@ export const Route = createFileRoute("/_authenticated")({
     let soMedico = false;
     if (raizDoApp && uid) {
       try {
-        soMedico = await isMedicoOnlyUser(uid);
+        // Mesmo cuidado do `getSession()` acima: esta consulta decide só um
+        // atalho, então nunca pode segurar a tela. Sem resposta em 2s, segue.
+        soMedico = Boolean(
+          await Promise.race([
+            isMedicoOnlyUser(uid),
+            new Promise<false>((resolve) => {
+              setTimeout(() => resolve(false), 2000);
+            }),
+          ]),
+        );
       } catch {
         // Falhar essa consulta só significa não saber o atalho do médico. Não
         // pode virar tela branca: sem ela o usuário cai no seletor de portais,
