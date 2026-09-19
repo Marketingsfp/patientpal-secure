@@ -5,6 +5,7 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
+import { useLocation } from "@tanstack/react-router";
 import { AlertCircle, Loader2, MessageCircle, Mic, Sparkles, Upload, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -41,7 +42,17 @@ export function PainelGestora({ ctx }: { ctx: CoachContexto }) {
   );
   const { atendentes } = useAtendentesCoach(clinicaId);
 
-  const [aba, setAba] = useState<Aba>("progresso");
+  // A aba visível é escolhida pelo menu lateral, via hash da URL.
+  const hash = useLocation({ select: (l) => l.hash });
+  const abaDaUrl = (["progresso", "conversas", "perfis", "vozes", "analise"] as const).includes(
+    (hash ?? "") as Aba,
+  )
+    ? ((hash ?? "") as Aba)
+    : "progresso";
+  const [aba, setAba] = useState<Aba>(abaDaUrl);
+  useEffect(() => {
+    setAba(abaDaUrl);
+  }, [abaDaUrl]);
   const [tab, setTab] = useState<"texto" | "audio">("texto");
   const [text, setText] = useState("");
   const [audioFile, setAudioFile] = useState<File | null>(null);
@@ -209,14 +220,9 @@ export function PainelGestora({ ctx }: { ctx: CoachContexto }) {
         }`}
       >
         <div className="min-w-0 space-y-5">
+          {/* As abas agora vivem no menu lateral (/app/coach#progresso etc.). */}
           <Tabs value={aba} onValueChange={(v) => setAba(v as Aba)}>
-            <TabsList className="bg-secondary">
-              <TabsTrigger value="progresso">Progresso do curso</TabsTrigger>
-              <TabsTrigger value="conversas">Conversas &amp; ligações</TabsTrigger>
-              <TabsTrigger value="perfis">Perfis &amp; evolução</TabsTrigger>
-              <TabsTrigger value="vozes">Vozes</TabsTrigger>
-              <TabsTrigger value="analise">Analisar atendimento</TabsTrigger>
-            </TabsList>
+
 
             <TabsContent value="progresso" className="mt-5">
               <CourseView
