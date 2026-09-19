@@ -453,3 +453,31 @@ export function selecionarParaIA(
 
   return partes.join("\n\n") + rodape;
 }
+
+/**
+ * Temas de simulação tirados da PRÓPRIA base da clínica.
+ *
+ * Antes o roleplay sorteava de uma lista fixa herdada do projeto antigo, que
+ * citava serviços que a clínica pode nem oferecer. Agora o tema sai das
+ * consultas, dos mais procurados e dos exames/procedimentos cadastrados.
+ */
+export function temasDaBase(base: string, limite = 120): string[] {
+  const secoes = seccionar(base ?? "");
+  const ordem = [SECOES.consultas, SECOES.comuns, SECOES.exames, SECOES.procedimentos];
+  const vistos = new Set<string>();
+  const temas: string[] = [];
+  for (const titulo of ordem) {
+    const s = secoes.find((x) => x.titulo === titulo);
+    if (!s) continue;
+    for (const linha of s.linhas) {
+      const nome = (linha.split("|")[0] ?? "").replace(/^[-•\s]+/, "").trim();
+      if (nome.length < 4 || nome.length > 90) continue;
+      const k = chave(nome);
+      if (vistos.has(k)) continue;
+      vistos.add(k);
+      temas.push(nome.toLowerCase());
+      if (temas.length >= limite) return temas;
+    }
+  }
+  return temas;
+}

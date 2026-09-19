@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import {
   ArrowLeft,
@@ -36,9 +36,11 @@ import {
   type TurnoAvaliacao,
 } from "@/lib/coach/roleplay.functions";
 import { embaralhar, itensEvitar, registrarUsados } from "@/lib/coach/variedade";
+import { temasDaBase } from "@/lib/coach/base-conhecimento";
+import { filtroDoAtendente, escopoLocalCoach } from "@/lib/coach/identidade";
 import { supabase } from "@/integrations/supabase/client";
 import { useStudyTimer } from "@/lib/coach/study-time";
-import { AtendenteGuard } from "@/components/coach/AtendenteGuard";
+import { AtendenteGuard, type AlvoAtendente } from "@/components/coach/AtendenteGuard";
 import { ProtecaoTela } from "@/components/coach/ProtecaoTela";
 import { formatScripts } from "@/lib/coach/scripts";
 import { personagemPorNome, vozEscolhida } from "@/lib/coach/voz-sistema";
@@ -101,45 +103,15 @@ const CONTEXTOS_TREINO = [
 ];
 
 /**
- * Serviços variados da clínica: evita que a IA escolha sempre o mesmo tema
- * (ex.: pacote de acupuntura) em todas as ligações.
+ * Rotação aleatória, sem repetir, dos temas de serviço desta sessão.
+ * Os temas vêm da base da própria clínica (consultas, mais procurados, exames
+ * e procedimentos cadastrados) — não existe mais lista fixa no código.
  */
-const TEMAS_SERVICO = [
-  "consulta de cardiologia (adulto)",
-  "consulta de cardiologia infantil",
-  "consulta de ginecologia com preventivo",
-  "consulta de pediatria",
-  "consulta de ortopedia",
-  "consulta de dermatologia",
-  "consulta de otorrinolaringologia com lavagem otológica",
-  "consulta de endocrinologia",
-  "consulta oftalmológica",
-  "consulta de neurologia",
-  "consulta de urologia",
-  "consulta de nutrição",
-  "consulta de psicologia",
-  "ultrassonografia obstétrica",
-  "ultrassonografia de tireoide",
-  "ultrassonografia transvaginal",
-  "ultrassonografia de abdome superior",
-  "exame de endoscopia",
-  "ecocardiograma",
-  "teste ergométrico",
-  "audiometria / teste da orelhinha",
-  "sessões de fisioterapia",
-  "sessões de acupuntura",
-  "aplicação de vitamina B12 ou vitamina D",
-  "consulta de mastologia",
-  "consulta de angiologia (aplicação de varizes)",
-  "avaliação odontológica",
-  "consulta de obstetrícia",
-];
-
-/** Rotação aleatória, porém sem repetir, dos temas de serviço nesta sessão. */
 let filaTemas: string[] = [];
-function proximoTema(): string {
-  if (filaTemas.length === 0) filaTemas = embaralhar(TEMAS_SERVICO);
-  return filaTemas.shift() as string;
+function proximoTema(disponiveis: string[]): string | null {
+  if (!disponiveis.length) return null;
+  if (filaTemas.length === 0) filaTemas = embaralhar(disponiveis);
+  return filaTemas.shift() ?? null;
 }
 
 /** Situações sorteadas sem repetição: texto (0-4) e voz (5-9) em ordem variável. */
@@ -174,8 +146,12 @@ function proximoAngulo(): string {
 }
 
 /** Contexto completo do cenário: situação + serviço + ângulo de abertura sorteados. */
-function contextoTreino(i: number): string {
-  return `${proximaSituacao(i)} O serviço procurado nesta simulação DEVE ser: ${proximoTema()}. Use os dados reais da clínica para esse serviço (valor, dia, horário, idade mínima e preparo) e não troque por outro serviço. Forma de abertura obrigatória: o paciente ${proximoAngulo()}.`;
+function contextoTreino(i: number, temas: string[]): string {
+  const tema = proximoTema(temas);
+  const servico = tema
+    ? ` O serviço procurado nesta simulação DEVE ser: ${tema}. Use os dados reais da clínica para esse serviço (valor, dia, horário, idade mínima e preparo) e não troque por outro serviço.`
+    : " Escolha um serviço que exista na base da clínica e use os dados reais dele.";
+  return `${proximaSituacao(i)}${servico} Forma de abertura obrigatória: o paciente ${proximoAngulo()}.`;
 }
 
 function RoleplayRoute() {
@@ -183,20 +159,28 @@ function RoleplayRoute() {
   const atendente = decodeURIComponent(nome);
   return (
     <AtendenteGuard nome={atendente}>
-      {(ctx) => (
+      {(ctx, alvo) => (
         <ProtecaoTela atendente={atendente} clinicaId={ctx.clinicaId} tela="roleplay">
-          <RoleplayPage ctx={ctx} />
+          <RoleplayPage ctx={ctx} alvo={alvo} />
         </ProtecaoTela>
       )}
     </AtendenteGuard>
   );
 }
 
-function RoleplayPage({ ctx }: { ctx: CoachContexto }) {
+function RoleplayPage({ ctx, alvo }: { ctx: CoachContexto; alvo: AlvoAtendente }) {
   const { nome } = Route.useParams();
   const atendente = decodeURIComponent(nome);
   const clinicaId = ctx.clinicaId;
-  useStudyTimer(atendente, "roleplay", clinicaId);
+  // Gestor simulando a tela de outra pessoa: nada conta como treino dela.
+  const simulacaoGestor = alvo.simulacaoGestor;
+  useStudyTimer(simulacaoGestor ? "" : atendente, "roleplay", simulacaoGestor ? null : clinicaId);
+  const escopoVariedade = {
+    clinicaId,
+    userId: ctx.userId,
+    atendente,
+  };
+  const escopoLocal = escopoLocalCoach(clinicaId, ctx.userId, atendente);
   const navigate = useNavigate();
   const start = useServerFn(startRoleplay);
   const reply = useServerFn(roleplayReply);
@@ -204,7 +188,13 @@ function RoleplayPage({ ctx }: { ctx: CoachContexto }) {
   const { config, loading: clinicaLoading, baseParaIA } = useCoachConfig(
     clinicaId,
     ctx.clinicaNome,
+    // Atendente nunca regenera a base: ela só lê o cache gerado pela gestão.
+    ctx.gestor,
   );
+  // Temas sorteados da base real da clínica.
+  const temas = useMemo(() => temasDaBase(config.baseSistema), [config.baseSistema]);
+  const temasRef = useRef<string[]>([]);
+  temasRef.current = temas;
   // A base inteira não cabe no prompt: a cada chamada recortamos pelo assunto
   // do momento (cenário + últimas falas). Quando o "cliente" muda de assunto
   // no meio da conversa, a seleção muda junto.
@@ -278,6 +268,9 @@ function RoleplayPage({ ctx }: { ctx: CoachContexto }) {
     const args = bootArgsRef.current;
     if (!args) return null;
     setGerandoCenario(true);
+    // Mesmo contexto para o recorte da base e para o cenário: antes eram dois
+    // sorteios diferentes e a base não correspondia ao tema pedido.
+    const ctxTreino = contextoTreino(i, temasRef.current);
     try {
       const sc = await start({
         data: {
@@ -285,15 +278,15 @@ function RoleplayPage({ ctx }: { ctx: CoachContexto }) {
           pontos_fracos: args.fracos,
           exemplos: args.exemplos as never,
           scripts: scriptsRef.current || undefined,
-          tabela: baseDoAssunto(contextoTreino(i)),
-          contexto: contextoTreino(i),
-          evitar: itensEvitar(atendente),
+          tabela: baseDoAssunto(ctxTreino),
+          contexto: ctxTreino,
+          evitar: await itensEvitar(escopoVariedade),
           seed: `${Date.now().toString(36)}-${i}-${Math.random().toString(36).slice(2, 8)}`,
           dificuldade: dificuldadeRef.current,
         },
       });
       cenariosRef.current[i] = sc;
-      registrarUsados(atendente, [
+      void registrarUsados(escopoVariedade, [
         sc.nome_paciente,
         sc.primeira_mensagem?.slice(0, 90),
         sc.cenario?.slice(0, 90),
@@ -308,14 +301,17 @@ function RoleplayPage({ ctx }: { ctx: CoachContexto }) {
     }
   }
   const [dificuldade, setDificuldade] = useState<Dificuldade>(() => {
-    const v = typeof window !== "undefined" ? localStorage.getItem("roleplay:dificuldade") : null;
+    const v =
+      typeof window !== "undefined"
+        ? localStorage.getItem(`roleplay:dificuldade:${escopoLocal}`)
+        : null;
     return v === "facil" || v === "dificil" ? v : "medio";
   });
   const dificuldadeRef = useRef<Dificuldade>(dificuldade);
   useEffect(() => {
     dificuldadeRef.current = dificuldade;
-    localStorage.setItem("roleplay:dificuldade", dificuldade);
-  }, [dificuldade]);
+    localStorage.setItem(`roleplay:dificuldade:${escopoLocal}`, dificuldade);
+  }, [dificuldade, escopoLocal]);
   const [ttsWarn, setTtsWarn] = useState<string | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const audioUrlRef = useRef<string | null>(null);
@@ -339,7 +335,7 @@ function RoleplayPage({ ctx }: { ctx: CoachContexto }) {
     if (!atendente.trim()) return;
     const convs: Record<number, unknown[]> = { ...convStoreRef.current };
     convs[convAtivaRef.current] = messagesRef.current;
-    saveEstadoRoleplay(atendente, {
+    saveEstadoRoleplay(escopoLocal, {
       convAtiva: convAtivaRef.current,
       cenarios: cenariosRef.current as unknown as Record<number, unknown>,
       convs,
@@ -443,8 +439,10 @@ function RoleplayPage({ ctx }: { ctx: CoachContexto }) {
       .from("coach_roleplay_sessions")
       .insert({
         clinica_id: clinicaId ?? "",
-        user_id: ctx.userId,
+        // Sempre o usuário da pessoa TREINADA.
+        user_id: alvo.userId,
         atendente,
+        simulacao_gestor: simulacaoGestor,
         nota: Number(feedback.nota) || 0,
         resumo: feedback.resumo,
         acertos: (feedback.acertos ?? []) as never,
@@ -460,7 +458,7 @@ function RoleplayPage({ ctx }: { ctx: CoachContexto }) {
       .then(({ error: insErr }) => {
         if (insErr) console.error("Falha ao salvar sessão de roleplay:", insErr);
       });
-  }, [feedback, scenario, atendente, clinicaId, ctx.userId, pontosFracos]);
+  }, [feedback, scenario, atendente, clinicaId, alvo.userId, simulacaoGestor, pontosFracos]);
 
   useEffect(() => { modeRef.current = mode; }, [mode]);
   useEffect(() => { speakEnabledRef.current = speakEnabled; }, [speakEnabled]);
@@ -644,7 +642,8 @@ function RoleplayPage({ ctx }: { ctx: CoachContexto }) {
       setFalando(false);
       onDone?.();
     };
-    const nome = NOMES_PACIENTES[convAtivaRef.current % NOMES_PACIENTES.length] ?? "";
+    // A voz segue o paciente que a IA criou (nome gerado), não uma lista fixa.
+    const nome = cenariosRef.current[convAtivaRef.current]?.nome_paciente ?? "";
     const personagem = personagemPorNome(nome);
     const voz = vozEscolhida(
       vozConfigRef.current,
@@ -1023,20 +1022,29 @@ function RoleplayPage({ ctx }: { ctx: CoachContexto }) {
     });
   }
 
-  async function sendWithText(text: string) {
+  /**
+   * Única rotina de envio (texto digitado, voz transcrita e encerramento).
+   * Antes existia um `send()` paralelo que esquecia de mandar a `dificuldade`,
+   * e a simulação ficava mais fácil do que a atendente escolheu.
+   */
+  async function sendWithText(texto: string, encerrar = false) {
     if (!scenario || thinkingRef.current || feedbackRef.current) return;
     if (TRAVA_TEMPO_ATIVA && LIMITE_MS - usadoMsRef.current <= 0) return;
-    const t = text.trim();
-    if (!t) return;
+    const t = texto.trim();
+    if (!encerrar && !t) return;
     setError(null);
-    if (!callStartRef.current) {
+    if (!encerrar && !callStartRef.current) {
       callStartRef.current = Date.now();
       setCallStart(callStartRef.current);
       setCallElapsed(0);
     }
-    const nextHistory: Msg[] = [...messages, { role: "atendente", content: t }];
-    setMessages(nextHistory);
-    setInput("");
+    const nextHistory: Msg[] = t
+      ? [...messagesRef.current, { role: "atendente" as const, content: t }]
+      : messagesRef.current;
+    if (t) {
+      setMessages(nextHistory);
+      setInput("");
+    }
     thinkingRef.current = true;
     setThinking(true);
     try {
@@ -1053,7 +1061,7 @@ function RoleplayPage({ ctx }: { ctx: CoachContexto }) {
           perfil_cliente: scenario.perfil_cliente,
           history: nextHistory.slice(-60),
           dificuldade: dificuldadeRef.current,
-          encerrar: false,
+          encerrar,
         },
       });
       if (r.avaliacao_turno) aplicarAvaliacaoTurno(r.avaliacao_turno);
@@ -1079,13 +1087,14 @@ function RoleplayPage({ ctx }: { ctx: CoachContexto }) {
     }
   }
 
+
   useEffect(() => {
     let cancelled = false;
     async function boot() {
       try {
         // Restaura primeiro o que já está no aparelho. Não bloqueia a retomada em
         // nenhuma consulta online, inclusive a configuração da clínica.
-        const salvo = loadEstadoRoleplay(atendente);
+        const salvo = loadEstadoRoleplay(escopoLocal);
         let salvoRestaurado = false;
         if (salvo && salvo.cenarios && Object.keys(salvo.cenarios).length) {
           cenariosRef.current = salvo.cenarios as Record<number, RoleplayScenario>;
@@ -1111,6 +1120,8 @@ function RoleplayPage({ ctx }: { ctx: CoachContexto }) {
 
         // Só um treinamento novo precisa aguardar scripts e serviços da clínica.
         // Um treinamento restaurado já pode ser usado enquanto isso carrega.
+        // Ainda carregando scripts/base da clínica: mantém o girador na tela.
+        // Antes o `finally` desligava o "carregando" e a tela ficava em branco.
         if (clinicaLoading) return;
 
         // Soma o tempo já consumido em treinamentos anteriores (orçamento geral de 20 min)
@@ -1118,7 +1129,8 @@ function RoleplayPage({ ctx }: { ctx: CoachContexto }) {
           .from("coach_roleplay_sessions")
           .select("duracao_seg,modo,nota")
           .eq("clinica_id", clinicaId ?? "")
-          .eq("atendente", atendente)
+          .eq("simulacao_gestor", false)
+          .or(filtroDoAtendente(alvo.userId, atendente))
           // Orçamento de tempo e metas reiniciam a cada dia.
           .gte("created_at", inicioDoDiaRio())
           .limit(1000);
@@ -1141,7 +1153,7 @@ function RoleplayPage({ ctx }: { ctx: CoachContexto }) {
           .from("coach_analises")
           .select("resultado,pontuacao")
           .eq("clinica_id", clinicaId ?? "")
-          .eq("atendente", atendente)
+          .or(filtroDoAtendente(alvo.userId, atendente))
           .order("created_at", { ascending: false })
           .limit(20);
         if (qErr) throw qErr;
@@ -1195,22 +1207,23 @@ function RoleplayPage({ ctx }: { ctx: CoachContexto }) {
             ? META_WHATSAPP + Math.min(feitasVozRef.current, META_LIGACOES - 1)
             : Math.min(feitasTextoRef.current, META_WHATSAPP - 1);
 
+        const ctxInicial = contextoTreino(idxInicial, temasRef.current);
         const sc = await start({
           data: {
             atendente,
             pontos_fracos: fracos,
             exemplos,
             scripts: scriptsRef.current || undefined,
-            tabela: baseDoAssunto(contextoTreino(idxInicial)),
-            contexto: contextoTreino(idxInicial),
-            evitar: itensEvitar(atendente),
+            tabela: baseDoAssunto(ctxInicial),
+            contexto: ctxInicial,
+            evitar: await itensEvitar(escopoVariedade),
             seed: `${Date.now().toString(36)}-${idxInicial}-${Math.random().toString(36).slice(2, 8)}`,
             dificuldade: dificuldadeRef.current,
           },
         });
         if (cancelled) return;
         cenariosRef.current[idxInicial] = sc;
-        registrarUsados(atendente, [
+        void registrarUsados(escopoVariedade, [
           sc.nome_paciente,
           sc.primeira_mensagem?.slice(0, 90),
           sc.cenario?.slice(0, 90),
@@ -1223,7 +1236,7 @@ function RoleplayPage({ ctx }: { ctx: CoachContexto }) {
       } catch (e) {
         if (!cancelled) setError(e instanceof Error ? e.message : "Erro ao iniciar treinamento.");
       } finally {
-        if (!cancelled) setLoading(false);
+        if (!cancelled && !clinicaLoading) setLoading(false);
       }
     }
     boot();
@@ -1255,57 +1268,9 @@ function RoleplayPage({ ctx }: { ctx: CoachContexto }) {
   }, [loading, scenario, voiceSupported]);
 
   async function send(encerrar = false) {
-    if (!scenario || thinkingRef.current || feedbackRef.current) return;
-    const text = input.trim();
-    if (!encerrar && !text) return;
-    setError(null);
-    if (!encerrar && !callStartRef.current) {
-      callStartRef.current = Date.now();
-      setCallStart(callStartRef.current);
-      setCallElapsed(0);
-    }
-
-    const nextHistory: Msg[] = encerrar && !text
-      ? messages
-      : [...messages, { role: "atendente", content: text }];
-    if (!encerrar || text) {
-      setMessages(nextHistory);
-      setInput("");
-    }
-    thinkingRef.current = true;
-    setThinking(true);
-    try {
-      const r = await reply({
-        data: {
-          atendente,
-          pontos_fracos: pontosFracos,
-          scripts: scriptsRef.current || undefined,
-          tabela: baseDoAssunto(
-            scenario.cenario,
-            ...nextHistory.slice(-6).map((m) => m.content),
-          ),
-          cenario: scenario.cenario,
-          perfil_cliente: scenario.perfil_cliente,
-          history: nextHistory.slice(-60),
-          encerrar,
-        },
-      });
-      if (r.avaliacao_turno) aplicarAvaliacaoTurno(r.avaliacao_turno);
-      if (r.finalizar && r.feedback) {
-        feedbackRef.current = r.feedback;
-        setFeedback(r.feedback);
-        callActiveRef.current = false;
-        shouldListenRef.current = false;
-      } else if (r.resposta_cliente) {
-        setMessages((m) => [...m, { role: "cliente", content: r.resposta_cliente! }]);
-      }
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Erro ao enviar mensagem.");
-    } finally {
-      thinkingRef.current = false;
-      setThinking(false);
-    }
+    await sendWithText(input, encerrar);
   }
+
 
   return (
     <div className="bg-gradient-to-b from-secondary/40 to-background">
@@ -1519,6 +1484,7 @@ function RoleplayPage({ ctx }: { ctx: CoachContexto }) {
                 atualIndex={convAtiva}
                 onSelect={trocarConversa}
                 bloqueado={thinking}
+                nomePorIndice={(i) => cenariosRef.current[i]?.nome_paciente ?? null}
                 ultima={
                   [...messages].reverse().find((m) => m.role === "cliente")?.content ??
                   "Aguardando você iniciar…"
@@ -1535,7 +1501,7 @@ function RoleplayPage({ ctx }: { ctx: CoachContexto }) {
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="truncate text-sm font-semibold leading-tight">
-                    {NOMES_PACIENTES[convAtiva % NOMES_PACIENTES.length]} (simulação)
+                    {scenario?.nome_paciente ?? "Paciente"} (simulação)
                   </div>
                   <div className="truncate text-[11px] text-white/75 leading-tight">
                     {gerandoCenario
@@ -1830,14 +1796,6 @@ function RoleplayPage({ ctx }: { ctx: CoachContexto }) {
   );
 }
 
-const NOMES_PACIENTES = [
-  "Paciente · Maria Souza",
-  "Paciente · João Batista",
-  "Paciente · Cláudia Lima",
-  "Paciente · Rafael Nunes",
-  "Paciente · Sônia Alves",
-];
-
 /** Lista de conversas estilo WhatsApp: mostra as 5 conversas aguardando resposta. */
 function ChatList({
   feitas,
@@ -1848,6 +1806,7 @@ function ChatList({
   atualIndex,
   onSelect,
   bloqueado,
+  nomePorIndice,
 }: {
   feitas: number;
   total: number;
@@ -1857,6 +1816,8 @@ function ChatList({
   atualIndex: number;
   onSelect: (i: number) => void;
   bloqueado: boolean;
+  /** Nome do paciente gerado pela IA em cada conversa (vazio: ainda não aberta). */
+  nomePorIndice: (i: number) => string | null;
 }) {
   const hora = new Date().toLocaleTimeString("pt-BR", {
     hour: "2-digit",
@@ -1900,7 +1861,7 @@ function ChatList({
               <div className="min-w-0 flex-1">
                 <div className="flex items-center justify-between gap-2">
                   <span className="truncate text-sm font-semibold">
-                    {NOMES_PACIENTES[i % NOMES_PACIENTES.length]}
+                    {nomePorIndice(i) ?? `Paciente ${i + 1}`}
                   </span>
                   <span className="shrink-0 text-[10px] text-muted-foreground">{hora}</span>
                 </div>

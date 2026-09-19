@@ -9,6 +9,7 @@ export type TempoRow = {
   dia: string;
   segundos: number;
   clinica_id?: string | null;
+  user_id?: string | null;
 };
 
 export function formatDuracao(segundos: number) {
@@ -95,7 +96,7 @@ export async function fetchTempoEstudo(clinicaId: string | null): Promise<TempoR
   if (!clinicaId) return [];
   const { data } = await supabase
     .from("coach_tempo_estudo")
-    .select("atendente,atividade,dia,segundos,clinica_id")
+    .select("atendente,atividade,dia,segundos,clinica_id,user_id")
     .eq("clinica_id", clinicaId)
     .order("dia", { ascending: false })
     .limit(2000);

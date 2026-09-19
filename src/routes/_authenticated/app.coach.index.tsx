@@ -30,6 +30,7 @@ function CoachHome() {
       atendente={ctx.atendente}
       clinicaId={ctx.clinicaId}
       clinicaNome={ctx.clinicaNome}
+      userId={ctx.userId}
     />
   );
 }

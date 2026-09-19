@@ -3608,6 +3608,7 @@ export type Database = {
           nota: number
           questoes: Json
           respostas: Json
+          simulacao_gestor: boolean
           total: number
           user_id: string | null
         }
@@ -3620,6 +3621,7 @@ export type Database = {
           nota: number
           questoes?: Json
           respostas?: Json
+          simulacao_gestor?: boolean
           total: number
           user_id?: string | null
         }
@@ -3632,6 +3634,7 @@ export type Database = {
           nota?: number
           questoes?: Json
           respostas?: Json
+          simulacao_gestor?: boolean
           total?: number
           user_id?: string | null
         }
@@ -3662,6 +3665,7 @@ export type Database = {
           perfil_cliente: string | null
           pontos_fracos: Json
           resumo: string
+          simulacao_gestor: boolean
           user_id: string | null
         }
         Insert: {
@@ -3680,6 +3684,7 @@ export type Database = {
           perfil_cliente?: string | null
           pontos_fracos?: Json
           resumo: string
+          simulacao_gestor?: boolean
           user_id?: string | null
         }
         Update: {
@@ -3698,6 +3703,7 @@ export type Database = {
           perfil_cliente?: string | null
           pontos_fracos?: Json
           resumo?: string
+          simulacao_gestor?: boolean
           user_id?: string | null
         }
         Relationships: [
@@ -3747,6 +3753,47 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "coach_tempo_estudo_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      coach_variedade: {
+        Row: {
+          atendente: string
+          clinica_id: string
+          created_at: string
+          id: string
+          tipo: string
+          updated_at: string
+          user_id: string
+          valor: string
+        }
+        Insert: {
+          atendente?: string
+          clinica_id: string
+          created_at?: string
+          id?: string
+          tipo: string
+          updated_at?: string
+          user_id: string
+          valor: string
+        }
+        Update: {
+          atendente?: string
+          clinica_id?: string
+          created_at?: string
+          id?: string
+          tipo?: string
+          updated_at?: string
+          user_id?: string
+          valor?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "coach_variedade_clinica_id_fkey"
             columns: ["clinica_id"]
             isOneToOne: false
             referencedRelation: "clinicas"

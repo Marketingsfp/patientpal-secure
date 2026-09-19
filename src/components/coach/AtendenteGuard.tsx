@@ -2,22 +2,37 @@ import type { ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
 import { Loader2, ShieldAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useCoachContexto, type CoachContexto } from "@/lib/coach/contexto";
+import { useAtendentesCoach, useCoachContexto, type CoachContexto } from "@/lib/coach/contexto";
+
+/** Quem está sendo treinado/avaliado nesta tela. */
+export type AlvoAtendente = {
+  /** Nome que veio da URL (pode ser histórico antigo, sem usuário). */
+  nome: string;
+  /** Usuário da pessoa treinada, quando ela existe no cadastro da clínica. */
+  userId: string | null;
+  /** Gestor abrindo a tela de outra pessoa: nada disso conta para a atendente. */
+  simulacaoGestor: boolean;
+};
 
 /**
  * Garante que uma atendente só acesse treino e prova do próprio nome.
  * A gestora do Coach (e o administrador) abrem o de qualquer atendente da clínica.
+ *
+ * A comparação é feita por USUÁRIO quando a pessoa da URL existe no cadastro da
+ * clínica; o nome continua valendo só como reserva para o histórico antigo,
+ * migrado sem `user_id`.
  */
 export function AtendenteGuard({
   nome,
   children,
 }: {
   nome: string;
-  children: (ctx: CoachContexto) => ReactNode;
+  children: (ctx: CoachContexto, alvo: AlvoAtendente) => ReactNode;
 }) {
   const ctx = useCoachContexto();
+  const { atendentes, loading: carregandoAtendentes } = useAtendentesCoach(ctx.clinicaId);
 
-  if (ctx.loading) {
+  if (ctx.loading || carregandoAtendentes) {
     return (
       <div className="flex min-h-[60vh] items-center justify-center">
         <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -25,8 +40,14 @@ export function AtendenteGuard({
     );
   }
 
-  const liberado =
-    ctx.gestor || ctx.atendente.trim().toLowerCase() === nome.trim().toLowerCase();
+  const alvoCadastrado =
+    atendentes.find((a) => a.nome.trim().toLowerCase() === nome.trim().toLowerCase()) ?? null;
+  const mesmoUsuario = Boolean(
+    alvoCadastrado && ctx.userId && alvoCadastrado.userId === ctx.userId,
+  );
+  const mesmoNome = ctx.atendente.trim().toLowerCase() === nome.trim().toLowerCase();
+  const souEu = alvoCadastrado ? mesmoUsuario : mesmoNome;
+  const liberado = ctx.gestor || souEu;
 
   if (!liberado) {
     return (
@@ -47,5 +68,11 @@ export function AtendenteGuard({
     );
   }
 
-  return <>{children(ctx)}</>;
+  const alvo: AlvoAtendente = {
+    nome,
+    userId: alvoCadastrado?.userId ?? (souEu ? ctx.userId : null),
+    simulacaoGestor: !souEu,
+  };
+
+  return <>{children(ctx, alvo)}</>;
 }
