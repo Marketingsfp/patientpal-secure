@@ -121,11 +121,24 @@ describe("Apresentação dos registros internos para atendimento real e homologa
     expect(html).toContain("Protocolo MJ-92 informado ao paciente");
     expect(html).not.toMatch(/atribuída|Sistema de Automação|message_id/);
   });
-  test("paciente sem retorno tem motivo operacional sem o termo timeout", () => {
-    expect(motivoParaAtendimento("patient_response_timeout")).toContain("30 minutos");
-    expect(
-      renderizar(evento({ evento: "TIMEOUT_NINA", motivo: "patient_response_timeout" })),
-    ).not.toMatch(/timeout/i);
+  test("timeout tem um único aviso de transferência na conversa, preservando a evidência", () => {
+    const pedido = evento({ motivo: "patient_response_timeout" });
+    const evidencia = evento({
+      id: "timeout-1",
+      evento: "TIMEOUT_NINA",
+      motivo: "Paciente sem resposta por 30 minutos — transferido automaticamente pela Nina.",
+      detalhes: { mensagem_nina_id: "nina-1", minutos: 30 },
+    });
+    const antes = structuredClone(evidencia);
+    const html = renderizar(pedido) + renderizar(evidencia);
+    expect(html.match(/Nina solicitou atendimento humano/g)).toHaveLength(1);
+    expect(html.match(/30 minutos/g)).toHaveLength(1);
+    expect(html).not.toMatch(/timeout/i);
+    expect(renderizar(evidencia)).toBe("");
+    expect(evidencia).toEqual(antes);
+    // A apresentação compacta do atendimento real mantém o mesmo motivo.
+    const grupo = agruparTimeline({ eventos: [pedido, evidencia] }).itens[0] as GrupoHandoff;
+    expect(renderToStaticMarkup(<HandoffGroupCard grupo={grupo} />)).toContain("30 minutos");
   });
   test("marcadores antigos com erro são ocultos, texto real enviado não é filtrado", () => {
     const interno = {

@@ -78,7 +78,10 @@ export function textoEvento(ev: ConversaEvento): string | null {
     case "ATENDIMENTO_ENCERRADO":
       return "Atendimento encerrado — a Nina reassumirá caso o paciente envie uma nova mensagem";
     case "TIMEOUT_NINA":
-      return "Paciente sem resposta há 30 minutos após a mensagem da Nina. Conversa encaminhada para atendimento humano";
+      // Evidência técnica da mesma transferência já apresentada por
+      // HANDOFF_SOLICITADO, cujo motivo informa os 30 minutos sem resposta.
+      // Preserva o evento no diagnóstico sem criar um segundo aviso no chat.
+      return null;
     case "HANDOFF_SOLICITADO":
       return avisoProtocolo(ev) ?? "Nina solicitou atendimento humano";
     case "ENTROU_NA_FILA":

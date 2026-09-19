@@ -8,6 +8,8 @@ Exemplo: resposta da Nina às 14h abre prazo até 14h30. Uma mensagem do pacient
 
 **Transferência única:** o aviso de encaminhamento não é uma nova resposta conversacional da Nina e não inicia outra contagem. Na homologação, mesmo aparecendo com autoria Nina, o aviso tem identificador persistido `handoff-*` e é excluído da espera; em produção a autoria é sistema. Prazos antigos sobre esses avisos são descartados pelo job. Estado `HANDOFF` também impede registro/vencimento de espera. Uma conversa já na fila humana (`NONE`) ou com atendente (`HUMAN`) não pode ser encaminhada novamente; chamadas concorrentes só conseguem uma transição de responsabilidade, sem duplicar eventos, distribuição ou aviso. Um novo atendimento após reset/mensagem em sessão nova segue a regra normal.
 
+**Aviso interno único (19/09/2026):** no Lead Teste 02, sessão 33, o encaminhamento das 22:01 de 18/09 (MJ-101) aparecia duas vezes na linha do tempo: o pedido de handoff com o motivo dos 30 minutos e o evento técnico `TIMEOUT_NINA` da mesma operação. O componente compartilhado deixa de exibir o segundo banner. A causa continua no primeiro aviso; os eventos originais, detalhes e horários permanecem no banco para diagnóstico. Mensagens enviadas ao paciente, distribuição e contagem do prazo não são alteradas. No histórico verificado havia um encaminhamento nessa sessão, seguido da entrada do paciente às 22:26.
+
 ## Implementação
 
 - Reutiliza `atend_conversas.awaiting_patient_since` e `patient_response_deadline`. Prazo fixo de 30 minutos nos dois ambientes. A antiga variável `NINA_PATIENT_RESPONSE_TIMEOUT_MINUTES` deixa de alterar essa regra.
