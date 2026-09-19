@@ -30,7 +30,10 @@ const pergunta = contextual ? contextual.pergunta : (sfp && cenario.endsWith("mo
     : cenario.endsWith("procedimento") ? "Vocês fazem o procedimento crioablação?"
     : "Gostaria de marca a pneumologista"
   : agenda ? "Tem vagas com Dr. Jorge Ribeiro?" : "quais são as informações do eletrocardiograma?";
-const respostaModelo = "Eletrocardiograma: R$ 80,00 no dinheiro e R$ 95,00 no cartão. Profissional: " + (regraCatalogo ? "Técnica" : "Enfermagem") + ". Segunda a sexta, das 8h às 12h. Sem jejum. Leve o pedido médico.";
+const nomeProfissional = cenario === "catalogo_enfermagem" ? "Enfermagem"
+  : cenario === "catalogo_equipe_enfermagem" ? "Equipe de Enfermagem"
+  : regraCatalogo ? "Técnica" : "Dra. Ana Souza";
+const respostaModelo = "Eletrocardiograma: R$ 80,00 no dinheiro e R$ 95,00 no cartão. Profissional: " + nomeProfissional + ". Segunda a sexta, das 8h às 12h. Sem jejum. Leve o pedido médico.";
 const prompt = "Você é Nina. Consulte a base e informe preço, profissional, horário e preparo solicitados. Não acrescente saudação à resposta sobre exames."
   + (contextual ? `\n\n${CONTINUIDADE_CONSULTA_AGENDA}` : "");
 const agora = Date.now();
@@ -183,7 +186,7 @@ mock.module("@/lib/nina/tool-broker.server", () => ({ criarToolBroker: () => ({
     if (nome !== "consultar_base_conhecimento") throw new Error(`Ferramenta inesperada: ${nome}`);
     const r = { ferramenta: nome, capacidade: "searchKnowledgeBase", fonte: "catalogo_publicado",
       success: true, reused: false, dados: { itens: [{ id: "ecg", procedimento: "ELETROCARDIOGRAMA",
-        valor: "R$ 80,00 dinheiro / R$ 95,00 cartão", medico: sfp ? "SFP" : regraCatalogo ? "TÉCNICA" : "Enfermagem",
+        valor: "R$ 80,00 dinheiro / R$ 95,00 cartão", medico: sfp ? "SFP" : nomeProfissional.toUpperCase(),
         dias_horarios: "Segunda a sexta, 8h às 12h", preparo: "Sem jejum", restricoes: "Levar pedido médico" }] },
     };
     resultados.push(r);

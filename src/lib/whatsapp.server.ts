@@ -2269,7 +2269,7 @@ async function gerarRespostaNinaInterno(
 
   const semNomeGenerico = omitirNomeGenerico(resposta);
   if (semNomeGenerico !== resposta) {
-    transformar("catalogo.nome_profissional", "omitir o nome genérico técnico/técnica", resposta, semNomeGenerico);
+    transformar("catalogo.nome_profissional", "omitir cargo, equipe ou setor usado como nome do profissional", resposta, semNomeGenerico);
     resposta = semNomeGenerico;
     if (resumoEscolha) resumoEscolha.texto = resposta;
   }

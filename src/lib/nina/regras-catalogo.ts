@@ -4,21 +4,25 @@ import { criarResultado } from "./resposta/contrato";
 export const MARCADOR_REGRAS_CATALOGO =
   "REGRAS DO CATÁLOGO — SFP, PROFISSIONAL GENÉRICO E IDADE MÍNIMA (2026-09-17)";
 export const REGRAS_CATALOGO_PROMPT = `${MARCADOR_REGRAS_CATALOGO}
-Estas regras substituem orientações anteriores sobre SFP, técnico/técnica e interpretação de idades, tanto no WhatsApp real quanto na homologação.
+Estas regras substituem orientações anteriores sobre SFP, nomes genéricos de profissionais e interpretação de idades, tanto no WhatsApp real quanto na homologação.
 - Se o procedimento ou a consulta solicitada tiver o nome do profissional SFP, encaminhe para atendimento humano usando solicitar_atendente_humano com motivo iniciado por PROFISSIONAL_SFP. Esse encaminhamento é silencioso: apenas atribua à equipe, sem mensagem ao paciente, aviso de transferência, protocolo, saudação ou informações do item. Encerre o turno quando a ferramenta confirmar; em caso de falha, informe a dificuldade sem afirmar que transferiu. Uma opção SFP em uma lista ampla não torna as outras opções exclusivas da equipe: identifique o atendimento solicitado.
-- Se o nome do profissional for técnico ou técnica (com ou sem acento, independentemente de maiúsculas), não informe esse nome nem invente outro. Omita a identificação do profissional e forneça normalmente as demais informações publicadas, inclusive valores, preparo, horários, modalidade e restrições. A regra também vale para resumos e confirmações.
+- Na identificação do profissional, apresente somente nomes próprios publicados. Cargos, equipes e setores como técnico, técnica, enfermagem, enfermeiro, enfermeira ou equipe de enfermagem não são nomes próprios: omita essa identificação, sem inventar ou substituir por outro profissional. Use o nome do exame/procedimento como título e forneça normalmente as demais informações publicadas, inclusive valores, preparo, horários, modalidade e restrições. Não deixe uma linha "Profissional:" vazia nem pergunte se o paciente prefere "enfermagem" ou "técnica". Preserve nomes próprios em listas que também contenham nomes genéricos. A regra vale com ou sem acento, em qualquer capitalização, também em resumos e confirmações. SFP continua exigindo encaminhamento humano silencioso; não o trate apenas como nome a ocultar.
 - As idades informadas no catálogo são idades mínimas. Apresente como “a partir de X anos” ou “a partir de X meses”, conservando o número e a unidade. Exemplos: 18 anos → a partir de 18 anos; 3 anos → a partir de 3 anos; 0 anos → a partir de 0 anos. Uma idade isolada em “Idade/critério informado” também é mínima. Não transforme idade mínima em idade exata, máxima ou faixa. Campo sem idade continua desconhecido. Não interprete preços, horários, duração do preparo ou periodicidade como idade.`;
 
 function nomeNormalizado(nome: unknown): string {
   return String(nome ?? "")
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, " ")
     .trim()
     .toLowerCase();
 }
 export const profissionalSfp = (nome: unknown) => nomeNormalizado(nome) === "sfp";
+// Marcadores completos de cargo/equipe. Não busca essas palavras dentro de nomes próprios.
+const NOME_GENERICO = String.raw`(?:t[eé]cnic[oa]s?(?:\s+(?:de|em)\s+(?:enfermagem|radiologia|laborat[oó]rio))?|enfermagem|enfermeir[oa]s?|auxiliar(?:es)?\s+de\s+enfermagem|equipe(?:\s+(?:de\s+enfermagem|t[eé]cnica|m[eé]dica))?)`;
+const NOME_GENERICO_COMPLETO = new RegExp(`^${NOME_GENERICO}$`, "i");
 export const profissionalGenerico = (nome: unknown) =>
-  /^(tecnico|tecnica)$/.test(nomeNormalizado(nome));
+  NOME_GENERICO_COMPLETO.test(nomeNormalizado(nome));
 
 /** Só normaliza critérios de idade explícitos, não datas, preços ou periodicidade. */
 export function apresentarIdadeMinima(texto: string | null): string | null {
@@ -95,22 +99,23 @@ type DadosPublicos<T> = T extends string
     : T extends object
       ? { [K in keyof T]: DadosPublicos<T[K]> }
       : T;
-export function dadosPublicosCatalogo<T>(valor: T): DadosPublicos<T> {
+const CAMPOS_NOME = new Set([
+  "nome", "name", "medico", "medica", "profissional", "executante", "doctor",
+  "doctor_name", "medico_nome", "nome_medico", "profissional_nome", "nome_profissional",
+  "doctors", "medicos", "profissionais", "executantes",
+]);
+export function dadosPublicosCatalogo<T>(valor: T, campoNome = false): DadosPublicos<T> {
   if (typeof valor === "string")
-    return (profissionalGenerico(valor) ? null : valor) as DadosPublicos<T>;
+    return (campoNome
+      ? valor.split(",").map((n) => n.trim()).filter((n) => !profissionalGenerico(n)).join(", ") || null
+      : valor) as DadosPublicos<T>;
   if (Array.isArray(valor))
-    return valor.map(dadosPublicosCatalogo).filter((v) => v !== null) as DadosPublicos<T>;
+    return valor.map((v) => dadosPublicosCatalogo(v, campoNome)).filter((v) => v !== null) as DadosPublicos<T>;
   if (valor && typeof valor === "object")
     return Object.fromEntries(
       Object.entries(valor).map(([chave, v]) => [
         chave,
-        chave === "medico" && typeof v === "string"
-          ? v
-              .split(",")
-              .map((n) => n.trim())
-              .filter((n) => !profissionalGenerico(n))
-              .join(", ") || null
-          : dadosPublicosCatalogo(v),
+        dadosPublicosCatalogo(v, CAMPOS_NOME.has(chave)),
       ]),
     ) as DadosPublicos<T>;
   return valor as DadosPublicos<T>;
@@ -120,15 +125,30 @@ export function dadosPublicosCatalogo<T>(valor: T): DadosPublicos<T> {
 export function omitirNomeGenerico(texto: string): string {
   return texto
     .replace(
-      /^[\t ]*(?:[-•]\s*)?\*{0,2}(?:profissional|m[eé]dico|m[eé]dica|executante)\s*:?\*{0,2}\s*:?\s*(?:(?:dr|dra)\.?\s*)?t[eé]cnic[oa]\b[\t *.,]*($|\n)/gim,
+      /^([\t ]*(?:[-•][\t ]*)?\*{0,2}(?:profissional|m[eé]dico|m[eé]dica|executante)\s*:?\*{0,2}\s*:?\s*)([^\n]+)$/gim,
+      (linha, rotulo: string, nomes: string) => {
+        const partes = nomes.split(",");
+        const proprios = partes.filter((nome) => !profissionalGenerico(
+          nome.trim().replace(/^[* ]*(?:dr[a]?\.?\s+)?/i, "").replace(/[* .]+$/, ""),
+        ));
+        if (proprios.length === partes.length) return linha;
+        return proprios.length ? `${rotulo}${proprios.map((n) => n.trim()).join(", ")}` : "";
+      },
+    )
+    .replace(
+      new RegExp(String.raw`^[\t ]*(?:[-•]\s*)?\*{0,2}(?:profissional|m[eé]dico|m[eé]dica|executante)\s*:?\*{0,2}\s*:?\s*\*{0,2}(?:(?:dr|dra)\.?\s*)?${NOME_GENERICO}[\t *.,]*($|\n)`, "gim"),
       "",
     )
     .replace(
-      /\b(?:profissional|m[eé]dico|m[eé]dica|executante)\s*:\s*(?:(?:dr|dra)\.?\s*)?t[eé]cnic[oa]\b[\t .;]*/gi,
+      new RegExp(String.raw`\*{0,2}\b(?:profissional|m[eé]dico|m[eé]dica|executante)[\t ]*\*{0,2}[\t ]*:[\t ]*\*{0,2}[\t ]*(?:(?:dr|dra)\.?\s*)?${NOME_GENERICO}\*{0,2}(?=[\t ]*(?:$|[.;|\n]))[\t .;]*`, "gi"),
       "",
     )
     .replace(
-      /\s+(?:com|por|pelo|pela)\s+(?:(?:o|a|um|uma)\s+)?(?:(?:dr|dra)\.?\s*)?t[eé]cnic[oa]\b/gi,
+      new RegExp(String.raw`^[\t ]*(?:[-•]\s*)?\*{0,2}${NOME_GENERICO}\*{0,2}[\t ]*:?([\t ]*$|\n)`, "gim"),
+      "",
+    )
+    .replace(
+      new RegExp(String.raw`\s+(?:com|por|pelo|pela)\s+(?:(?:o|a|um|uma)\s+)?\*{0,2}(?:(?:dr|dra)\.?\s*)?${NOME_GENERICO}\*{0,2}(?=[\t ]*(?:$|[.,;\n]|(?:[aà]s|no|na|em|para|hoje|amanh[ãa])\b))`, "gi"),
       "",
     )
     .replace(/\n{3,}/g, "\n\n")

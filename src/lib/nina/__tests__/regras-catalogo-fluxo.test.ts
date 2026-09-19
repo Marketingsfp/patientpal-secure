@@ -18,6 +18,8 @@ describe("Regra de catálogo na geração real (modelo/banco simulados, rede pro
       "catalogo_sfp_recusa_agenda_modelo",
       "catalogo_sfp_obsoleto",
       "catalogo_tecnica",
+      "catalogo_enfermagem",
+      "catalogo_equipe_enfermagem",
     ]) {
       it(`${ambiente}: ${cenario}`, () => {
         const p = Bun.spawnSync([process.execPath, fixture, ambiente, cenario], {
@@ -59,7 +61,8 @@ describe("Regra de catálogo na geração real (modelo/banco simulados, rede pro
         } else {
           expect(r.requests).toHaveLength(1);
           expect(JSON.stringify(r.requests)).not.toContain('"TÉCNICA"');
-          expect(r.resposta).not.toMatch(/t[eé]cnic[oa]/i);
+          expect(JSON.stringify(r.requests)).not.toMatch(/"(?:ENFERMAGEM|EQUIPE DE ENFERMAGEM)"/);
+          expect(r.resposta).not.toMatch(/t[eé]cnic[oa]|enfermagem/i);
           for (const fato of ["80,00", "95,00", "Sem jejum", "8h às 12h", "pedido médico"])
             expect(r.resposta).toContain(fato);
           expect(r.encaminhamentos).toHaveLength(0);
