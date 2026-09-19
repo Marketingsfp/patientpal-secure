@@ -58,6 +58,10 @@ type FilaItem = {
   created_at: string | null;
   procedimento: string | null;
   fluxo_etapa: string;
+  // Momento da última mudança de etapa. Para quem está "finalizado", é a hora
+  // em que a médica concluiu o atendimento — o carimbo que põe em ordem quem
+  // já passou pelo consultório.
+  fluxo_atualizado_em: string | null;
   prioridade: "normal" | "prioritario" | "urgente";
 };
 type TriagemResumo = {
@@ -272,7 +276,7 @@ function AtendimentoIaPage() {
     const { data } = await supabase
       .from("agendamentos")
       .select(
-        "id, paciente_id, paciente_nome, inicio, created_at, procedimento, fluxo_etapa, prioridade",
+        "id, paciente_id, paciente_nome, inicio, created_at, procedimento, fluxo_etapa, fluxo_atualizado_em, prioridade",
       )
       .eq("clinica_id", clinicaAtual.clinica_id)
       .eq("medico_id", medId)
@@ -417,35 +421,56 @@ function AtendimentoIaPage() {
    * Duas exceções, conferidas nos dados de produção:
    *
    * 1. Pagamento adiantado, feito num dia anterior ao da consulta (cerca de 5%
-   *    dos casos). O paciente chega já quitado, então abre a lista; entre eles
-   *    o desempate é o horário marcado, e não a data em que pagou — senão uma
-   *    conta paga há duas semanas viraria a senha 1 na frente de outra paga
-   *    ontem, sem nenhum significado para a recepção.
-   * 2. Atendimento antigo finalizado sem nenhum lançamento vinculado: cai no
-   *    horário marcado, só para não ficar sem lugar na lista.
+   *    dos casos). Ele NÃO vale como chegada: um paciente que pagou há três
+   *    dias apareceu como senha 1 na frente de quem estava na clínica desde as
+   *    sete da manhã. Nesse caso vale o horário marcado da consulta, que é a
+   *    única referência do dia que esse paciente tem.
+   * 2. Atendimento antigo finalizado sem nenhum lançamento vinculado: também
+   *    cai no horário marcado, só para não ficar sem lugar na lista.
    */
   const confirmadoEm = (it: FilaItem) => {
     const em = pagamentos[it.id]?.em ?? null;
     if (!em) return it.inicio;
-    // String vazia ordena antes de qualquer data: é o lugar de quem já chegou
-    // pago do dia anterior.
-    return diaLocal(new Date(em)) < dia ? "" : em;
+    return diaLocal(new Date(em)) < dia ? it.inicio : em;
   };
 
   /**
-   * A fila numerada: só quem pagou, na ordem cronológica do pagamento.
+   * A fila numerada, montada em dois blocos:
    *
-   * Como a chave é a hora da confirmação, que nunca muda depois de gravada,
-   * ninguém é renumerado. Quando um paciente pendente paga agora, o carimbo
-   * dele é o mais recente de todos e ele entra no fim — recebendo a próxima
-   * senha livre, sem mexer no número de quem já estava na fila.
+   * 1. Quem JÁ FOI ATENDIDO, na ordem em que a médica concluiu cada
+   *    atendimento. Esse é o retrato do que aconteceu de verdade no dia: o
+   *    primeiro que entrou no consultório é a senha 1, o segundo é a 2, e
+   *    assim por diante. Uma vez concluído, o atendimento não muda mais de
+   *    lugar — o carimbo já está gravado.
+   * 2. Quem ESTÁ ESPERANDO e já pagou, na ordem cronológica do pagamento.
+   *    Quando um paciente pendente paga agora, o carimbo dele é o mais
+   *    recente de todos e ele entra no fim desse bloco, recebendo a próxima
+   *    senha livre sem mexer no número de quem já estava na frente.
    */
-  const chamados = useMemo(
+  const atendidosEmOrdem = useMemo(
     () =>
       fila
-        .filter(naFilaEfetiva)
+        .filter((it) => it.fluxo_etapa === "finalizado")
+        .sort(
+          (a, b) =>
+            (a.fluxo_atualizado_em ?? "").localeCompare(b.fluxo_atualizado_em ?? "") ||
+            confirmadoEm(a).localeCompare(confirmadoEm(b)) ||
+            ordemDeChamada(a, b),
+        ),
+    [fila, pagamentos, dia],
+  );
+
+  const esperandoPagos = useMemo(
+    () =>
+      fila
+        .filter((it) => it.fluxo_etapa !== "finalizado" && naFilaEfetiva(it))
         .sort((a, b) => confirmadoEm(a).localeCompare(confirmadoEm(b)) || ordemDeChamada(a, b)),
     [fila, pagamentos, dia],
+  );
+
+  const chamados = useMemo(
+    () => [...atendidosEmOrdem, ...esperandoPagos],
+    [atendidosEmOrdem, esperandoPagos],
   );
 
   /** Pagamento pendente: aguardam no fim da listagem, ainda sem número. */
@@ -455,12 +480,13 @@ function AtendimentoIaPage() {
   );
 
   /**
-   * Número fixo de cada paciente no dia.
+   * A senha de cada paciente no dia.
    *
-   * A coluna "#" é calculada sobre a fila de quem pagou, na mesma ordem em que
-   * a lista é exibida, e não muda mais: ser atendido, mudar de etapa ou entrar
-   * como prioritário não renumera ninguém. Quem já passou continua na grade com
-   * o mesmo número, marcado como ATENDIDO.
+   * É a posição na lista acima: primeiro quem já foi atendido, na ordem em que
+   * passou pelo consultório, depois quem espera, na ordem do pagamento. Quem
+   * está com pagamento pendente não recebe número nenhum enquanto o caixa não
+   * confirmar. A linha de quem já passou continua na grade, com o mesmo
+   * número, marcada como ATENDIDO.
    */
   const numeroNoDia = useMemo(() => {
     const mapa = new Map<string, number>();
@@ -472,14 +498,8 @@ function AtendimentoIaPage() {
   // na tabela, marcado de verde. Antes havia duas abas, e o paciente sumia da
   // tela no instante em que o prontuário era finalizado — a médica não
   // conseguia bater o olho e conferir quem já tinha passado no dia.
-  const emEspera = useMemo(
-    () => chamados.filter((f) => f.fluxo_etapa !== "finalizado"),
-    [chamados],
-  );
-  const atendidos = useMemo(
-    () => chamados.filter((f) => f.fluxo_etapa === "finalizado"),
-    [chamados],
-  );
+  const emEspera = esperandoPagos;
+  const atendidos = atendidosEmOrdem;
   const listaVisivel = useMemo(
     () => [...chamados, ...aguardandoPagamento],
     [chamados, aguardandoPagamento],
