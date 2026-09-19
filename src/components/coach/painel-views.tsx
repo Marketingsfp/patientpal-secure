@@ -50,7 +50,14 @@ import { GestaoDesempenho } from "@/components/coach/GestaoDesempenho";
 import { EventosSeguranca } from "@/components/coach/EventosSeguranca";
 import type { AnalysisResult } from "@/lib/coach/analyze.functions";
 import type { ScriptItem } from "@/lib/coach/config-clinica";
-import { proximaAtividade, META_LIGACOES, META_WHATSAPP } from "@/lib/coach/treinamento-plano";
+import {
+  proximaAtividade,
+  calcularProgresso,
+  diaSaoPaulo,
+  regrasPadrao,
+  type ProvaProgresso,
+  type SessaoProgresso,
+} from "@/lib/coach/treinamento-plano";
 import { fetchTempoEstudo, formatDuracao, type TempoRow } from "@/lib/coach/study-time";
 
 export type HistoryItem = {
@@ -1850,13 +1857,15 @@ export function CourseView({
         fetchTempoEstudo(clinicaId),
         supabase
           .from("coach_provas")
-          .select("atendente,nota,created_at,clinica_id")
+          .select("atendente,nota,created_at,clinica_id,simulacao_gestor")
           .eq("clinica_id", clinicaId ?? "")
+          .eq("simulacao_gestor", false)
           .limit(1000),
         supabase
           .from("coach_roleplay_sessions")
-          .select("atendente,nota,created_at,modo,clinica_id")
+          .select("atendente,nota,created_at,modo,clinica_id,simulacao_gestor")
           .eq("clinica_id", clinicaId ?? "")
+          .eq("simulacao_gestor", false)
           .limit(1000),
       ]);
       if (cancelled) return;
@@ -1870,7 +1879,7 @@ export function CourseView({
     };
   }, [clinicaId]);
 
-  const hoje = new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
+  const hoje = diaSaoPaulo();
 
   /** Clínica de cada atendente: vínculo de acesso primeiro, depois os registros de atividade. */
   const clinicaPorAtendente = useMemo(() => {
@@ -1898,26 +1907,24 @@ export function CourseView({
     return Array.from(nomes)
       .map((nome) => {
         const t = tempos.filter((x) => x.atendente === nome);
-        const segundosTotal = t.reduce((s, x) => s + (Number(x.segundos) || 0), 0);
-        const segundosHoje = t
-          .filter((x) => x.dia === hoje)
-          .reduce((s, x) => s + (Number(x.segundos) || 0), 0);
-        const dias = new Set(t.filter((x) => (Number(x.segundos) || 0) > 0).map((x) => x.dia)).size;
         const analises = history.filter((h) => h.atendente === nome);
         const pv = provas.filter((p) => p.atendente === nome);
         const rp = roleplays.filter((r) => r.atendente === nome);
-        const media = (arr: ProgressoRow[]) =>
-          arr.length ? arr.reduce((s, x) => s + (Number(x.nota) || 0), 0) / arr.length : 0;
-        const conversas = rp.filter((x) => x.modo === "texto").length;
-        const ligacoes = rp.filter((x) => (x.modo ?? "voz") === "voz").length;
-        const feitos = [
-          segundosTotal >= 3600,
-          conversas >= META_WHATSAPP,
-          ligacoes >= META_LIGACOES,
-          pv.length > 0,
-          dias >= 3,
-        ];
-        const progresso = Math.round((feitos.filter(Boolean).length / feitos.length) * 100);
+        // Mesma conta da tela da atendente (`calcularProgresso`): antes a
+        // gestora via 5/5 e a atendente 3/5, porque aqui nada exigia nota
+        // mínima e lá sim.
+        const prog = calcularProgresso(
+          rp as unknown as SessaoProgresso[],
+          pv as unknown as ProvaProgresso[],
+          t,
+          regrasPadrao(hoje),
+        );
+        const segundosTotal = prog.totais.segundos;
+        const segundosHoje = prog.hoje.segundos;
+        const dias = prog.totais.dias;
+        const conversas = prog.trilha.whatsapp;
+        const ligacoes = prog.trilha.ligacoes;
+        const progresso = prog.trilha.percentual;
         const ultimo = [...t.map((x) => x.dia)].sort().pop() ?? null;
         return {
           nome,
@@ -1927,9 +1934,9 @@ export function CourseView({
           dias,
           analises: analises.length,
           provas: pv.length,
-          mediaProva: media(pv),
+          mediaProva: prog.totais.mediaProva,
           roleplays: rp.length,
-          mediaRoleplay: media(rp),
+          mediaRoleplay: prog.totais.mediaRoleplay,
           conversas,
           ligacoes,
           ultimo,
