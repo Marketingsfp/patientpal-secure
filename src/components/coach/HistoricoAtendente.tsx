@@ -14,6 +14,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { formatDuracao } from "@/lib/coach/study-time";
+import { filtroDoAtendente } from "@/lib/coach/identidade";
 
 type Questao = {
   pergunta: string;
@@ -80,9 +81,12 @@ type Filtro = "tudo" | "roleplay" | "prova" | "analise";
 export function HistoricoAtendente({
   atendente,
   clinicaId,
+  userId,
 }: {
   atendente: string;
   clinicaId: string | null;
+  /** Usuário da atendente: o histórico é dela, não de quem tem o mesmo nome. */
+  userId: string | null;
 }) {
   const [roleplays, setRoleplays] = useState<RoleplayRow[]>([]);
   const [provas, setProvas] = useState<ProvaRow[]>([]);
@@ -99,6 +103,7 @@ export function HistoricoAtendente({
         return;
       }
       setLoading(true);
+      const meu = filtroDoAtendente(userId, atendente);
       const [r, p, a] = await Promise.all([
         supabase
           .from("coach_roleplay_sessions")
@@ -106,21 +111,23 @@ export function HistoricoAtendente({
             "id,created_at,nota,resumo,acertos,melhorias,dica_pratica,cenario,modo,duracao_seg",
           )
           .eq("clinica_id", clinicaId)
-          .eq("atendente", atendente)
+          .eq("simulacao_gestor", false)
+          .or(meu)
           .order("created_at", { ascending: false })
           .limit(100),
         supabase
           .from("coach_provas")
           .select("id,created_at,nota,acertos,total,questoes,respostas")
           .eq("clinica_id", clinicaId)
-          .eq("atendente", atendente)
+          .eq("simulacao_gestor", false)
+          .or(meu)
           .order("created_at", { ascending: false })
           .limit(50),
         supabase
           .from("coach_analises")
           .select("id,created_at,titulo,pontuacao,tipo_entrada,resultado")
           .eq("clinica_id", clinicaId)
-          .eq("atendente", atendente)
+          .or(meu)
           .order("created_at", { ascending: false })
           .limit(50),
       ]);
@@ -133,7 +140,7 @@ export function HistoricoAtendente({
     return () => {
       cancelled = true;
     };
-  }, [atendente, clinicaId]);
+  }, [atendente, clinicaId, userId]);
 
   const itens = useMemo<Item[]>(() => {
     const all: Item[] = [

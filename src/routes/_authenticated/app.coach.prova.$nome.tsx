@@ -25,7 +25,8 @@ import type { CoachContexto } from "@/lib/coach/contexto";
 
 import { supabase } from "@/integrations/supabase/client";
 import { useStudyTimer } from "@/lib/coach/study-time";
-import { AtendenteGuard } from "@/components/coach/AtendenteGuard";
+import { AtendenteGuard, type AlvoAtendente } from "@/components/coach/AtendenteGuard";
+import { filtroDoAtendente, escopoLocalCoach } from "@/lib/coach/identidade";
 import { ProtecaoTela } from "@/components/coach/ProtecaoTela";
 
 import {
@@ -67,9 +68,9 @@ function ProvaRoute() {
   const atendente = decodeURIComponent(nome);
   return (
     <AtendenteGuard nome={atendente}>
-      {(ctx) => (
+      {(ctx, alvo) => (
         <ProtecaoTela atendente={atendente} clinicaId={ctx.clinicaId} tela="prova">
-          <ProvaPage ctx={ctx} />
+          <ProvaPage ctx={ctx} alvo={alvo} />
         </ProtecaoTela>
       )}
     </AtendenteGuard>
@@ -89,16 +90,20 @@ type AnaliseRow = {
   };
 };
 
-function ProvaPage({ ctx }: { ctx: CoachContexto }) {
+function ProvaPage({ ctx, alvo }: { ctx: CoachContexto; alvo: AlvoAtendente }) {
   const { nome } = Route.useParams();
   const atendente = decodeURIComponent(nome);
   const clinicaId = ctx.clinicaId;
-  useStudyTimer(atendente, "prova", clinicaId);
+  // Gestor abrindo a prova de outra pessoa: é simulação, não conta para ela.
+  const simulacaoGestor = alvo.simulacaoGestor;
+  useStudyTimer(simulacaoGestor ? "" : atendente, "prova", simulacaoGestor ? null : clinicaId);
+  const escopoLocal = escopoLocalCoach(clinicaId, ctx.userId, atendente);
   const generate = useServerFn(gerarProva);
   const gerarFeedback = useServerFn(gerarFeedbackProva);
   const { config, loading: clinicaLoading, baseParaIA } = useCoachConfig(
     clinicaId,
     ctx.clinicaNome,
+    ctx.gestor,
   );
 
   const [loading, setLoading] = useState(true);
@@ -135,14 +140,14 @@ function ProvaPage({ ctx }: { ctx: CoachContexto }) {
     setReveladas([]);
     setFeedback(null);
     setFeedbackError(null);
-    clearEstadoProva(atendente);
+    clearEstadoProva(escopoLocal);
     try {
 
       const { data, error: dbError } = await supabase
         .from("coach_analises")
         .select("titulo,resultado")
         .eq("clinica_id", clinicaId ?? "")
-        .eq("atendente", atendente)
+        .or(filtroDoAtendente(alvo.userId, atendente))
         .order("created_at", { ascending: false })
         .limit(6);
       if (dbError) throw dbError;
@@ -170,7 +175,8 @@ function ProvaPage({ ctx }: { ctx: CoachContexto }) {
           .from("coach_roleplay_sessions")
           .select("cenario,resumo,acertos,melhorias,pontos_fracos,mensagens,modo")
           .eq("clinica_id", clinicaId ?? "")
-          .eq("atendente", atendente)
+          .eq("simulacao_gestor", false)
+          .or(filtroDoAtendente(alvo.userId, atendente))
           .order("created_at", { ascending: false })
           .limit(6);
         exemplos = (rp ?? []).map((r) => {
@@ -239,7 +245,7 @@ function ProvaPage({ ctx }: { ctx: CoachContexto }) {
   // Retomada automática: se houver prova em andamento hoje, continua de onde parou.
   useEffect(() => {
     if (clinicaLoading) return;
-    const salvo = loadEstadoProva(atendente);
+    const salvo = loadEstadoProva(escopoLocal);
     if (salvo) {
       const p = salvo.prova as ProvaGerada;
       const n = p.questoes.length;
@@ -264,8 +270,8 @@ function ProvaPage({ ctx }: { ctx: CoachContexto }) {
   // Salva o andamento a cada resposta, para não perder nada ao trocar de aba.
   useEffect(() => {
     if (!restaurado || !prova) return;
-    saveEstadoProva(atendente, { prova, respostas, reveladas, enviado });
-  }, [restaurado, atendente, prova, respostas, reveladas, enviado]);
+    saveEstadoProva(escopoLocal, { prova, respostas, reveladas, enviado });
+  }, [restaurado, escopoLocal, prova, respostas, reveladas, enviado]);
 
 
   // Cronômetro da prova: ao zerar, finaliza sozinha (sem perder tempo)
@@ -297,8 +303,10 @@ function ProvaPage({ ctx }: { ctx: CoachContexto }) {
     try {
       const { error: insertError } = await supabase.from("coach_provas").insert({
         clinica_id: clinicaId ?? "",
-        user_id: ctx.userId,
+        // Sempre o usuário de quem fez a prova.
+        user_id: alvo.userId,
         atendente,
+        simulacao_gestor: simulacaoGestor,
         nota: Number(((certos / total) * 10).toFixed(1)),
         acertos: certos,
         total,
