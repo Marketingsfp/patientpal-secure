@@ -139,7 +139,7 @@ export function instrucoesEdicaoCatalogoIA(tipo: TipoCatalogo) {
     "definir: altera um campo simples ou um campo de um item de lista. valor_json é o valor codificado em JSON (texto com aspas, número, booleano ou null).",
     "adicionar: caminho da lista, como /formas_pagamento; valor_json é UM objeto com os campos daquele novo item, sem ids.",
     "remover: caminho de um item existente, como /horarios/1; valor_json deve ser null. Para limpar um campo simples, use definir com valor_json igual a 'null'.",
-    "Não substitua listas inteiras. Para mudar um preço do dinheiro preserve cartão, PIX e demais condições. Para remover várias linhas, use índices decrescentes.",
+    "Não substitua listas inteiras. Para mudar um preço do dinheiro preserve Pix/cartão e demais condições. Pix sempre tem o mesmo valor do cartão: cadastre juntos como Pix/cartão, preservando parcelamento somente para cartão. Para remover várias linhas, use índices decrescentes.",
     "Não altere IDs, vínculos, clínica, status, publicação ou auditoria. Para alterar um vínculo cadastral, indique pendência para edição manual.",
     "Quando existem preços por forma de pagamento, altere os preços na lista formas_pagamento; o campo valor é um resumo calculado pelo sistema.",
     "Valores são números em reais, sem R$, sem negativos. Horas HH:mm. Datas AAAA-MM-DD, sem inventar ano. Não mude recorrência quinzenal para semanal.",

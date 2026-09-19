@@ -23,7 +23,7 @@ describe("Fonte de verdade — pergunta presente na planilha", () => {
     expect(r.source).toBe("nina_knowledge_base");
     expect(r.source_type).toBe("spreadsheet");
   });
-  it("traz o fato da planilha", () => expect(r.price).toBe("R$ 200,00"));
+  it("traz o fato da planilha", () => expect(r.price).toBe("Dinheiro: R$ 200,00"));
   it("registra rastreabilidade (aba, linha, registro)", () =>
     expect(r.trace[0]).toEqual({
       record_id: "r1",

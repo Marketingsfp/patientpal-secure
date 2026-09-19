@@ -12,6 +12,7 @@
  *    fonte: havendo formas de pagamento com valor, o resumo é derivado delas.
  */
 import { z } from "zod";
+import { rotuloPagamentoNina } from "./pagamento-catalogo";
 
 export const STATUS_CATALOGO = ["RASCUNHO", "PUBLICADO", "ARQUIVADO"] as const;
 export type StatusCatalogo = (typeof STATUS_CATALOGO)[number];
@@ -127,7 +128,7 @@ const dataOpcional = z
 /* ------------------------------------------------------------------ */
 
 export const formaPagamentoSchema = z.object({
-  forma: z.string().trim().min(1, "Informe a forma de pagamento").max(80),
+  forma: z.string().trim().min(1, "Informe a forma de pagamento").max(80).transform(rotuloPagamentoNina),
   valor: valorOpcional,
   condicao: textoCurtoOpcional,
   observacao: textoOpcional,

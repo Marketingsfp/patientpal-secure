@@ -37,6 +37,10 @@ export function FormasPagamentoEditor({
 
   return (
     <div className="space-y-3">
+      <p className="text-sm text-muted-foreground">
+        Pix e cartão têm o mesmo valor. Cadastre como Pix/cartão; mantenha dinheiro separado.
+        Parcelamento, quando informado, aplica-se somente ao cartão.
+      </p>
       {linhas.length === 0 && (
         <p className="text-sm text-muted-foreground">
           Nenhuma forma de pagamento cadastrada.
@@ -50,7 +54,7 @@ export function FormasPagamentoEditor({
               <Input
                 value={linha.forma}
                 disabled={somenteLeitura}
-                placeholder="Ex.: Dinheiro / PIX"
+                placeholder="Ex.: Dinheiro ou Pix/cartão"
                 onChange={(e) => atualizar(i, { forma: e.target.value })}
               />
             </div>

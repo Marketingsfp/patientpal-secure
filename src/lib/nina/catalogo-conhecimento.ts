@@ -23,6 +23,7 @@ import {
 
 import { paraNumero, resumoHorarios, valorResumo } from "./catalogo";
 import { apresentarIdadeMinima, profissionalSfp, profissionalGenerico } from "./regras-catalogo";
+import { formasPagamentoNina, rotularValoresCartao, REGRA_PIX_CARTAO } from "./pagamento-catalogo";
 
 /** Serviço publicado, já sem colunas internas. */
 export type ServicoPublicado = {
@@ -67,7 +68,7 @@ function lista(v: unknown): Array<Record<string, unknown>> {
 
 function texto(v: unknown): string | null {
   const t = String(v ?? "").trim();
-  return apresentarIdadeMinima(t ? t : null);
+  return apresentarIdadeMinima(t ? rotularValoresCartao(t) : null);
 }
 
 function nomesVinculos(v: unknown): string[] {
@@ -87,7 +88,7 @@ function precoPorForma(formas: unknown, alvo: RegExp): number | null {
 }
 
 function descricaoPagamentos(formas: unknown): string | null {
-  const partes = lista(formas)
+  const partes = lista(formasPagamentoNina(formas))
     .map((f) => {
       const forma = texto(f["forma"]);
       if (!forma) return null;
@@ -169,7 +170,7 @@ export function servicoParaRegistro(s: ServicoPublicado): RegistroConhecimento {
         observacao: texto(e["observacao"]),
       })),
       // Preservar ausência/erro de formato: não equivale a uma lista publicada [].
-      formas_pagamento: s.formas_pagamento,
+      formas_pagamento: formasPagamentoNina(s.formas_pagamento),
     },
   };
 }
@@ -237,7 +238,7 @@ export function profissionalParaRegistro(
       convenios,
       horarios,
       atende_consultorio: p.atende_consultorio,
-      formas_pagamento: p.formas_pagamento,
+      formas_pagamento: formasPagamentoNina(p.formas_pagamento),
     },
   };
 }
@@ -248,7 +249,7 @@ const INSTRUCAO_FOUND =
   "estimativa ou internet. " +
   "\"price\" é só um valor de referência: informe cada valor com a forma de pagamento e a condição " +
   "que vieram em \"notes\" (nunca apenas o menor). " +
-  "Dinheiro e PIX são formas distintas: use somente as formas declaradas para o atendimento em records[].extras.formas_pagamento. " +
+  REGRA_PIX_CARTAO + " " +
   "Para pergunta sobre uma forma ausente na lista cadastrada do atendimento identificado, informe que ela não é aceita, conforme a regra publicada; falha de consulta não comprova ausência. " +
   "Leia dia, recorrência, modalidade, observação pública e aviso vigente em conjunto — quinzenal " +
   "não vira semanal, e ordem de chegada não vira hora marcada. " +

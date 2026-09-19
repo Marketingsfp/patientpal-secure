@@ -72,7 +72,7 @@ describe("FASE 1 — caminho dos dados do preço", () => {
   // FASE 4 — o resumo `price` deixou de apagar o cartão: agora traz as duas formas.
   it("a ferramenta devolve os dois preços em `records` e no resumo `price`", () => {
     const dados = montarResultadoConhecimento({ registros: [REGISTRO] });
-    expect(dados.price).toBe("R$ 51,00 (dinheiro) / R$ 60,00 (cartão)");
+    expect(dados.price).toBe("Dinheiro: R$ 51,00 / Pix/cartão: R$ 60,00");
     expect(dados.records).toHaveLength(1);
     expect(dados.records[0]!.preco_cartao).toBe(60);
     // O contrato NÃO expõe a chave `registros` — só `records`.

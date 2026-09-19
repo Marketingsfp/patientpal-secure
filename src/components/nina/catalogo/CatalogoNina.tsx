@@ -585,7 +585,7 @@ export function CatalogoNina({
                       ? "Ex.: Altere o valor no dinheiro da mamografia para R$ 180. Mantenha o cartão e as demais informações."
                       : "Ex.: Altere o horário de início de quinta-feira para 14:30. Mantenha os demais dias."
                     : tipo === "servico"
-                      ? "Ex.: Ultrassom de tireoide 130 no pix, 150 no cartão em 3x. Precisa de pedido médico..."
+                      ? "Ex.: Ultrassom de tireoide 130 em dinheiro, 150 no Pix/cartão (cartão em 3x). Precisa de pedido médico..."
                       : "Ex.: Dra. Ana Paula, cardiologista, atende quinzenal às quintas das 14h às 18h..."
                 }
               />
