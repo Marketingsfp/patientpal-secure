@@ -41,7 +41,17 @@ export function PainelGestora({ ctx }: { ctx: CoachContexto }) {
   );
   const { atendentes } = useAtendentesCoach(clinicaId);
 
-  const [aba, setAba] = useState<Aba>("progresso");
+  // A aba visível é escolhida pelo menu lateral, via hash da URL.
+  const hash = useLocation({ select: (l) => l.hash });
+  const abaDaUrl = (["progresso", "conversas", "perfis", "vozes", "analise"] as const).includes(
+    (hash ?? "") as Aba,
+  )
+    ? ((hash ?? "") as Aba)
+    : "progresso";
+  const [aba, setAba] = useState<Aba>(abaDaUrl);
+  useEffect(() => {
+    setAba(abaDaUrl);
+  }, [abaDaUrl]);
   const [tab, setTab] = useState<"texto" | "audio">("texto");
   const [text, setText] = useState("");
   const [audioFile, setAudioFile] = useState<File | null>(null);
