@@ -21,7 +21,14 @@ export const LABEL_EVENTO: Record<TipoEventoSeguranca, string> = {
 
 const ultimoEnvio = new Map<string, number>();
 
-/** Registra uma tentativa suspeita, com anti-flood de 15s por tipo. */
+/**
+ * Agrupamento por sessão: o mesmo tipo de evento na mesma tela só gera um
+ * registro a cada 10 minutos. Antes um print repetido virava dezenas de linhas
+ * e o painel da gestora ficava impossível de ler.
+ */
+const JANELA_MS = 10 * 60 * 1000;
+
+/** Registra uma tentativa suspeita, agrupada por sessão. */
 export async function registrarEventoSeguranca(params: {
   atendente: string;
   clinicaId: string | null;
@@ -32,7 +39,7 @@ export async function registrarEventoSeguranca(params: {
   const chave = `${params.tela}:${params.tipo}`;
   const agora = Date.now();
   const anterior = ultimoEnvio.get(chave) ?? 0;
-  if (agora - anterior < 15_000) return;
+  if (agora - anterior < JANELA_MS) return;
   ultimoEnvio.set(chave, agora);
 
   try {

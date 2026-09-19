@@ -716,11 +716,13 @@ function parseConversa(texto: string): ConversaTurn[] {
 export function ProfilesView({
   history,
   selected,
+  clinicaId,
   onSelect,
   onOpenItem,
 }: {
   history: HistoryItem[];
   selected: string | null;
+  clinicaId?: string | null;
   onSelect: (n: string | null) => void;
   onOpenItem: (item: HistoryItem) => void;
 }) {
@@ -761,7 +763,14 @@ export function ProfilesView({
   const sel = selected ? profiles.find((p) => p.nome === selected) : null;
 
   if (sel) {
-    return <ProfileDetail profile={sel} onBack={() => onSelect(null)} onOpenItem={onOpenItem} />;
+    return (
+      <ProfileDetail
+        profile={sel}
+        clinicaId={clinicaId}
+        onBack={() => onSelect(null)}
+        onOpenItem={onOpenItem}
+      />
+    );
   }
 
   return (
@@ -863,9 +872,11 @@ function Sparkline({ scores }: { scores: number[] }) {
 
 function ProfileDetail({
   profile,
+  clinicaId,
   onBack,
   onOpenItem,
 }: {
+  clinicaId?: string | null;
   profile: {
     nome: string;
     items: HistoryItem[];
@@ -1039,8 +1050,8 @@ function ProfileDetail({
         </ul>
       </Section>
 
-      <RoleplayHistorySection atendente={profile.nome} />
-      <ProvaHistorySection atendente={profile.nome} />
+      <RoleplayHistorySection atendente={profile.nome} clinicaId={clinicaId} />
+      <ProvaHistorySection atendente={profile.nome} clinicaId={clinicaId} />
     </div>
   );
 }
@@ -1060,7 +1071,13 @@ type ProvaRow = {
   respostas?: number[] | null;
 };
 
-function ProvaHistorySection({ atendente }: { atendente: string }) {
+function ProvaHistorySection({
+  atendente,
+  clinicaId,
+}: {
+  atendente: string;
+  clinicaId?: string | null;
+}) {
   const [rows, setRows] = useState<ProvaRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [openId, setOpenId] = useState<string | null>(null);
@@ -1072,8 +1089,9 @@ function ProvaHistorySection({ atendente }: { atendente: string }) {
       .from("coach_provas")
       .select("id,nota,acertos,total,created_at,questoes,respostas")
       .eq("atendente", atendente)
+      .eq("clinica_id", clinicaId ?? "")
       .order("created_at", { ascending: false })
-      .limit(200)
+      .limit(100)
       .then(({ data }) => {
         if (cancelled) return;
         setRows((data ?? []) as unknown as ProvaRow[]);
@@ -1249,7 +1267,13 @@ type RoleplaySessionRow = {
   mensagens?: { role: "cliente" | "atendente"; content: string }[] | null;
 };
 
-function RoleplayHistorySection({ atendente }: { atendente: string }) {
+function RoleplayHistorySection({
+  atendente,
+  clinicaId,
+}: {
+  atendente: string;
+  clinicaId?: string | null;
+}) {
   const [rows, setRows] = useState<RoleplaySessionRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [openId, setOpenId] = useState<string | null>(null);
@@ -1263,8 +1287,9 @@ function RoleplayHistorySection({ atendente }: { atendente: string }) {
         "id,nota,resumo,acertos,melhorias,dica_pratica,cenario,perfil_cliente,modo,mensagens,duracao_seg,created_at",
       )
       .eq("atendente", atendente)
+      .eq("clinica_id", clinicaId ?? "")
       .order("created_at", { ascending: false })
-      .limit(200)
+      .limit(100)
       .then(({ data }) => {
         if (cancelled) return;
         setRows((data ?? []) as unknown as RoleplaySessionRow[]);
@@ -2050,6 +2075,7 @@ export function CourseView({
       />
 
       <GestaoDesempenho
+        clinicaId={clinicaFiltro === "todas" ? null : clinicaFiltro}
         alunos={visiveis.map((a) => ({
           nome: a.nome,
           clinicaId: a.clinicaId,
@@ -2334,8 +2360,8 @@ export function CourseView({
                         </ul>
                       )}
                     </Section>
-                    <RoleplayHistorySection atendente={a.nome} />
-                    <ProvaHistorySection atendente={a.nome} />
+                    <RoleplayHistorySection atendente={a.nome} clinicaId={clinicaId} />
+                    <ProvaHistorySection atendente={a.nome} clinicaId={clinicaId} />
               </div>
               </div>
               )}

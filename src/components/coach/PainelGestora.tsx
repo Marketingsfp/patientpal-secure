@@ -20,6 +20,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { supabase } from "@/integrations/supabase/client";
 import { analyzeConversation, type AnalysisResult } from "@/lib/coach/analyze.functions";
 import { useCoachConfig } from "@/lib/coach/config-clinica";
+import { UsoIA } from "@/components/coach/UsoIA";
 import { useAtendentesCoach, type CoachContexto } from "@/lib/coach/contexto";
 import { useStudyTimer } from "@/lib/coach/study-time";
 import { confirmDialog } from "@/lib/confirm";
@@ -43,7 +44,7 @@ type Aba = "progresso" | "conversas" | "perfis" | "vozes" | "analise";
 export function PainelGestora({ ctx }: { ctx: CoachContexto }) {
   const { clinicaId, clinicaNome, clinicas, atendente: nomeUsuario } = ctx;
   const analyze = useServerFn(analyzeConversation);
-  const { config, salvar, atualizarBase, gerandoBase, erroBase, baseParaIA } = useCoachConfig(
+  const { config, salvar, atualizarBase, gerandoBase, erroBase } = useCoachConfig(
     clinicaId,
     clinicaNome,
     ctx.gestor,
@@ -165,15 +166,19 @@ export function PainelGestora({ ctx }: { ctx: CoachContexto }) {
     if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
-  async function fileToBase64(file: File): Promise<string> {
-    const buf = await file.arrayBuffer();
-    let binary = "";
-    const bytes = new Uint8Array(buf);
-    const chunk = 0x8000;
-    for (let i = 0; i < bytes.length; i += chunk) {
-      binary += String.fromCharCode.apply(null, Array.from(bytes.subarray(i, i + chunk)));
-    }
-    return btoa(binary);
+  /**
+   * Envia a gravação para o armazenamento privado da clínica e devolve o
+   * caminho. Antes o arquivo inteiro ia dentro da requisição (até 18 MB), o
+   * que estourava com facilidade; agora só o caminho viaja.
+   */
+  async function enviarAudio(file: File, clinica: string): Promise<string> {
+    const ext = (file.name.split(".").pop() ?? "mp3").toLowerCase().slice(0, 5);
+    const caminho = `${clinica}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+    const { error } = await supabase.storage
+      .from("coach-audios")
+      .upload(caminho, file, { contentType: file.type || "audio/mpeg", upsert: false });
+    if (error) throw new Error("Não foi possível enviar o áudio. Tente novamente.");
+    return caminho;
   }
 
   async function handleAnalyze() {
@@ -184,6 +189,10 @@ export function PainelGestora({ ctx }: { ctx: CoachContexto }) {
       setError("Escolha a atendente antes de analisar.");
       return;
     }
+    if (!clinicaId) {
+      setError("Selecione a clínica antes de analisar.");
+      return;
+    }
     setLoading(true);
     try {
       if (tab === "texto") {
@@ -191,28 +200,20 @@ export function PainelGestora({ ctx }: { ctx: CoachContexto }) {
           throw new Error("Cole uma conversa com pelo menos 20 caracteres.");
         }
         const r = await analyze({
-          data: {
-            text,
-            checklist: config.checklist,
-            scripts: config.scripts,
-            // A seleção usa a própria conversa: só entram os exames citados nela.
-            tabela: baseParaIA(text),
-          },
+          data: { clinicaId, atendente: nome, text },
         });
         setResult(r);
         await saveToHistory(r, "texto", text, nome, atendenteSelecionada.userId);
       } else {
         if (!audioFile) throw new Error("Selecione um arquivo de áudio.");
-        if (audioFile.size > 18 * 1024 * 1024) throw new Error("Arquivo muito grande. Máximo 18MB.");
-        const base64 = await fileToBase64(audioFile);
+        if (audioFile.size > 25 * 1024 * 1024) throw new Error("Arquivo muito grande. Máximo 25MB.");
+        const caminho = await enviarAudio(audioFile, clinicaId);
         const r = await analyze({
           data: {
-            audio: { base64, mimeType: audioFile.type || "audio/mpeg" },
-            checklist: config.checklist,
-            scripts: config.scripts,
-            // Ligação: o conteúdo só é conhecido após a transcrição, então vai
-            // o recorte geral (consultas, profissionais, mais procurados).
-            tabela: baseParaIA(),
+            clinicaId,
+            atendente: nome,
+            audioPath: caminho,
+            audioMime: audioFile.type || "audio/mpeg",
           },
         });
         setResult(r);
@@ -249,7 +250,8 @@ export function PainelGestora({ ctx }: { ctx: CoachContexto }) {
           <Tabs value={aba} onValueChange={(v) => setAba(v as Aba)}>
 
 
-            <TabsContent value="progresso" className="mt-5">
+            <TabsContent value="progresso" className="mt-5 space-y-5">
+              <UsoIA clinicaId={clinicaId} />
               <CourseView
                 history={history}
                 clinicas={clinicas}
@@ -267,6 +269,7 @@ export function PainelGestora({ ctx }: { ctx: CoachContexto }) {
               <HistoricoSemUsuario clinicaId={clinicaId} onVinculado={() => void loadHistory()} />
               <ProfilesView
                 history={history}
+                clinicaId={clinicaId}
                 selected={selectedAtendente}
                 onSelect={setSelectedAtendente}
                 onOpenItem={openHistoryItem}

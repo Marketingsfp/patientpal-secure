@@ -4,22 +4,22 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { contextoDataAtual } from "./data-atual";
 
 const AnalysisSchema = z.object({
-  text: z.string().optional(),
-  audio: z
-    .object({
-      base64: z.string(),
-      mimeType: z.string(),
-    })
-    .optional(),
-  checklist: z.array(z.string().min(1).max(300)).max(30).optional(),
-  scripts: z
-    .array(z.object({ titulo: z.string().max(160), conteudo: z.string().max(4000) }))
-    .max(10)
-    .optional(),
-  tabela: z.string().max(60000).optional(),
+  clinicaId: z.string().uuid(),
+  atendente: z.string().max(120).optional(),
+  text: z.string().max(30_000).optional(),
+  /** Caminho do áudio no armazenamento privado (clinica/arquivo). */
+  audioPath: z.string().max(400).optional(),
+  audioMime: z.string().max(120).optional(),
 });
 
-type AnalysisInput = z.infer<typeof AnalysisSchema>;
+/** O que realmente vai para o prompt — montado no servidor, nunca pelo cliente. */
+type AnalysisInput = {
+  text?: string;
+  audio?: { base64: string; mimeType: string };
+  checklist?: string[];
+  scripts?: { titulo: string; conteudo: string }[];
+  tabela?: string;
+};
 
 export type AnalysisResult = {
   resumo: string;
@@ -298,7 +298,7 @@ export const analyzeConversation = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((data: unknown) => {
     const parsed = AnalysisSchema.parse(data);
-    if (!parsed.text && !parsed.audio) {
+    if (!parsed.text && !parsed.audioPath) {
       throw new Error("Envie um texto ou um áudio para análise.");
     }
     if (parsed.text && parsed.text.trim().length < 20) {
@@ -306,10 +306,38 @@ export const analyzeConversation = createServerFn({ method: "POST" })
     }
     return parsed;
   })
-  .handler(async ({ data }): Promise<AnalysisResult> => {
+  .handler(async ({ data, context }): Promise<AnalysisResult> => {
+    const guard = await import("./guard.server");
+    const { garantirAcessoCoach, configDaClinica, baseParaPrompt, registrarUsoIA, erroGenericoIA } =
+      guard;
+    const db = context.supabase as unknown as import("./guard.server").ClienteCoach;
+
+    // Analisar atendimento é ação de gestão do Coach.
+    await garantirAcessoCoach(db, data.clinicaId, "write");
+    const usoId = await registrarUsoIA(db, {
+      clinicaId: data.clinicaId,
+      funcao: "analise",
+      atendente: data.atendente ?? null,
+    });
+
+    const config = await configDaClinica(db, data.clinicaId);
+    const audio = data.audioPath
+      ? await lerAudio(db, data.clinicaId, data.audioPath, data.audioMime, config.reterAudioDias)
+      : undefined;
+
+    const entrada: AnalysisInput = {
+      text: data.text,
+      audio,
+      checklist: config.checklist,
+      scripts: config.scripts,
+      // Texto: recorta pelo assunto da própria conversa. Áudio: recorte geral,
+      // porque o conteúdo só se conhece depois da transcrição.
+      tabela: baseParaPrompt(config, data.text ?? "", 40_000),
+    };
+
     const apiKey = process.env["LOVABLE_API_KEY"];
     if (!apiKey) {
-      throw new Error("LOVABLE_API_KEY não está configurada.");
+      throw new Error("O recurso de IA está indisponível no momento. Avise a gestão da clínica.");
     }
 
     const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
@@ -322,28 +350,17 @@ export const analyzeConversation = createServerFn({ method: "POST" })
         model: "google/gemini-3.8-flash",
         messages: [
           { role: "system", content: `${contextoDataAtual()}\n\n${SYSTEM_PROMPT}` },
-          buildUserMessage(data),
+          buildUserMessage(entrada),
         ],
         tools: [TOOL],
         tool_choice: { type: "function", function: { name: "registrar_analise" } },
       }),
     });
 
-    if (!res.ok) {
-      const errText = await res.text();
-      if (res.status === 429) {
-        throw new Error("Limite de requisições atingido. Aguarde alguns segundos e tente novamente.");
-      }
-      if (res.status === 402) {
-        throw new Error(
-          "Créditos da IA esgotados. Adicione créditos em Settings > Workspace > Usage.",
-        );
-      }
-      console.error("AI gateway error", res.status, errText);
-      throw new Error("Falha ao chamar o modelo de IA.");
-    }
+    if (!res.ok) await erroGenericoIA(res, "analise");
 
     const json = await res.json();
+    await guard.fecharUsoIA(db, usoId, json);
     const toolCall = json.choices?.[0]?.message?.tool_calls?.[0];
     if (!toolCall?.function?.arguments) {
       console.error("Resposta inesperada da IA:", JSON.stringify(json).slice(0, 500));
@@ -362,4 +379,64 @@ function formatoAudio(mime: string): string {
   if (m.includes("ogg") || m.includes("opus")) return "ogg";
   if (m.includes("flac")) return "flac";
   return "webm";
+}
+
+/**
+ * Baixa o áudio do armazenamento privado e devolve em base64 para a IA.
+ *
+ * Antes a gravação inteira (até 18 MB) viajava dentro da requisição; agora a
+ * tela envia o arquivo para o armazenamento e manda só o caminho. Depois da
+ * análise o arquivo é apagado (ou mantido pelos dias configurados na clínica).
+ */
+async function lerAudio(
+  db: import("./guard.server").ClienteCoach,
+  clinicaId: string,
+  caminho: string,
+  mime: string | undefined,
+  reterDias: number,
+): Promise<{ base64: string; mimeType: string }> {
+  if (!caminho.startsWith(`${clinicaId}/`)) {
+    throw new Error("Áudio inválido para esta clínica.");
+  }
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const { data, error } = await supabaseAdmin.storage.from("coach-audios").download(caminho);
+  if (error || !data) {
+    console.error("[coach] download do áudio", error?.message);
+    throw new Error("Não foi possível ler o áudio enviado. Envie novamente.");
+  }
+  const bytes = new Uint8Array(await data.arrayBuffer());
+  if (bytes.byteLength > 25 * 1024 * 1024) {
+    throw new Error("Áudio muito grande. O limite é 25 MB.");
+  }
+  let binario = "";
+  const bloco = 0x8000;
+  for (let i = 0; i < bytes.length; i += bloco) {
+    binario += String.fromCharCode.apply(null, Array.from(bytes.subarray(i, i + bloco)));
+  }
+
+  if (reterDias <= 0) {
+    await supabaseAdmin.storage.from("coach-audios").remove([caminho]);
+  } else {
+    await limparAudiosAntigos(clinicaId, reterDias);
+  }
+
+  void db;
+  return { base64: btoa(binario), mimeType: mime || "audio/mpeg" };
+}
+
+/** Remove as gravações da clínica que passaram do prazo de retenção. */
+async function limparAudiosAntigos(clinicaId: string, reterDias: number): Promise<void> {
+  try {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data } = await supabaseAdmin.storage
+      .from("coach-audios")
+      .list(clinicaId, { limit: 200, sortBy: { column: "created_at", order: "asc" } });
+    const limite = Date.now() - reterDias * 24 * 60 * 60 * 1000;
+    const velhos = (data ?? [])
+      .filter((f) => new Date(f.created_at ?? Date.now()).getTime() < limite)
+      .map((f) => `${clinicaId}/${f.name}`);
+    if (velhos.length) await supabaseAdmin.storage.from("coach-audios").remove(velhos);
+  } catch (e) {
+    console.error("[coach] limpeza de áudios", e);
+  }
 }

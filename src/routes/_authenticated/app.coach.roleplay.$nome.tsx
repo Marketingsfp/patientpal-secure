@@ -64,8 +64,6 @@ import { inicioDoDiaRio } from "@/lib/coach/data-atual";
 
 /** Orçamento GERAL de treinamento por atendente: 20 minutos somando todas as sessões. */
 const LIMITE_MS = LIMITE_TOTAL_MS;
-/** Segundos de pausa antes de emendar automaticamente a próxima atividade. */
-const AUTO_AVANCO_SEG = 6;
 
 type Msg = {
   role: "cliente" | "atendente";
@@ -160,7 +158,12 @@ function RoleplayRoute() {
   return (
     <AtendenteGuard nome={atendente}>
       {(ctx, alvo) => (
-        <ProtecaoTela atendente={atendente} clinicaId={ctx.clinicaId} tela="roleplay">
+        <ProtecaoTela
+          atendente={atendente}
+          clinicaId={ctx.clinicaId}
+          tela="roleplay"
+          registrarSaidaDeAba={false}
+        >
           <RoleplayPage ctx={ctx} alvo={alvo} />
         </ProtecaoTela>
       )}
@@ -184,8 +187,7 @@ function RoleplayPage({ ctx, alvo }: { ctx: CoachContexto; alvo: AlvoAtendente }
   const navigate = useNavigate();
   const start = useServerFn(startRoleplay);
   const reply = useServerFn(roleplayReply);
-  const scriptsRef = useRef<string>("");
-  const { config, loading: clinicaLoading, baseParaIA } = useCoachConfig(
+  const { config, loading: clinicaLoading } = useCoachConfig(
     clinicaId,
     ctx.clinicaNome,
     // Atendente nunca regenera a base: ela só lê o cache gerado pela gestão.
@@ -195,18 +197,11 @@ function RoleplayPage({ ctx, alvo }: { ctx: CoachContexto; alvo: AlvoAtendente }
   const temas = useMemo(() => temasDaBase(config.baseSistema), [config.baseSistema]);
   const temasRef = useRef<string[]>([]);
   temasRef.current = temas;
-  // A base inteira não cabe no prompt: a cada chamada recortamos pelo assunto
-  // do momento (cenário + últimas falas). Quando o "cliente" muda de assunto
-  // no meio da conversa, a seleção muda junto.
-  const baseParaIARef = useRef(baseParaIA);
-  baseParaIARef.current = baseParaIA;
-  function baseDoAssunto(...trechos: Array<string | null | undefined>): string {
-    return baseParaIARef.current(trechos.filter(Boolean).join(" "));
-  }
+  // O recorte da base pelo assunto passou a ser feito no servidor, junto com
+  // os scripts da clínica: o navegador não envia mais conteúdo para a IA.
   const vozConfigRef = useRef(config.vozConfig);
   useEffect(() => {
     vozConfigRef.current = config.vozConfig;
-    scriptsRef.current = formatScripts(config.scripts);
   }, [config]);
 
   const [loading, setLoading] = useState(true);
@@ -274,11 +269,10 @@ function RoleplayPage({ ctx, alvo }: { ctx: CoachContexto; alvo: AlvoAtendente }
     try {
       const sc = await start({
         data: {
+          clinicaId: clinicaId ?? "",
           atendente,
           pontos_fracos: args.fracos,
           exemplos: args.exemplos as never,
-          scripts: scriptsRef.current || undefined,
-          tabela: baseDoAssunto(ctxTreino),
           contexto: ctxTreino,
           evitar: await itensEvitar(escopoVariedade),
           seed: `${Date.now().toString(36)}-${i}-${Math.random().toString(36).slice(2, 8)}`,
@@ -526,32 +520,12 @@ function RoleplayPage({ ctx, alvo }: { ctx: CoachContexto; alvo: AlvoAtendente }
     if (sc) setMessages([{ role: "cliente", content: sc.primeira_mensagem }]);
   }
 
-  // Contagem regressiva para emendar a próxima atividade do plano
+  // Nada começa sozinho depois do feedback: a atendente lê com calma e clica
+  // em "Próximo treino" quando quiser. Antes o próximo paciente entrava em 6
+  // segundos, por cima da leitura — e gastava IA sem ninguém pedir.
   useEffect(() => {
-    if (!feedback) {
-      setProximoEm(null);
-      return;
-    }
-    if (TRAVA_TEMPO_ATIVA && LIMITE_MS - usadoMsRef.current <= 0) {
-      setProximoEm(null);
-      return;
-    }
-    setProximoEm(AUTO_AVANCO_SEG);
-    const id = setInterval(() => setProximoEm((v) => (v === null ? null : v - 1)), 1000);
-    return () => clearInterval(id);
+    if (!feedback) setProximoEm(null);
   }, [feedback]);
-
-  useEffect(() => {
-    if (proximoEm === null || proximoEm > 0) return;
-    setProximoEm(null);
-    const prox = proximaAtividade(feitasVozRef.current, feitasTextoRef.current);
-    if (prox === "prova" || (TRAVA_TEMPO_ATIVA && LIMITE_MS - usadoMsRef.current <= 0)) {
-      // Trilha concluída: não abre a prova sozinha, a atendente decide pelo botão.
-      return;
-    }
-    void novaSessao(prox);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [proximoEm]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -1050,13 +1024,9 @@ function RoleplayPage({ ctx, alvo }: { ctx: CoachContexto; alvo: AlvoAtendente }
     try {
       const r = await reply({
         data: {
+          clinicaId: clinicaId ?? "",
           atendente,
           pontos_fracos: pontosFracos,
-          scripts: scriptsRef.current || undefined,
-          tabela: baseDoAssunto(
-            scenario.cenario,
-            ...nextHistory.slice(-6).map((m) => m.content),
-          ),
           cenario: scenario.cenario,
           perfil_cliente: scenario.perfil_cliente,
           history: nextHistory.slice(-60),
@@ -1210,11 +1180,10 @@ function RoleplayPage({ ctx, alvo }: { ctx: CoachContexto; alvo: AlvoAtendente }
         const ctxInicial = contextoTreino(idxInicial, temasRef.current);
         const sc = await start({
           data: {
+            clinicaId: clinicaId ?? "",
             atendente,
             pontos_fracos: fracos,
             exemplos,
-            scripts: scriptsRef.current || undefined,
-            tabela: baseDoAssunto(ctxInicial),
             contexto: ctxInicial,
             evitar: await itensEvitar(escopoVariedade),
             seed: `${Date.now().toString(36)}-${idxInicial}-${Math.random().toString(36).slice(2, 8)}`,
@@ -1754,20 +1723,11 @@ function RoleplayPage({ ctx, alvo }: { ctx: CoachContexto; alvo: AlvoAtendente }
 
               {feedback && (
                 <div className="border-t bg-card p-4 flex flex-wrap gap-2 justify-end">
-                  {proximoEm !== null && (
-                    <p className="mr-auto text-xs text-muted-foreground self-center">
-                      {proximaAtividade(feitasVoz, feitasTexto) === "prova"
-                        ? `Abrindo a prova em ${proximoEm}s…`
-                        : proximaAtividade(feitasVoz, feitasTexto) === "voz"
-                          ? `Próxima ligação começa em ${proximoEm}s…`
-                          : `Próxima conversa de WhatsApp começa em ${proximoEm}s…`}
-                    </p>
-                  )}
-                  {proximoEm !== null && (
-                    <Button variant="ghost" onClick={() => setProximoEm(null)}>
-                      Pausar
-                    </Button>
-                  )}
+                  <p className="mr-auto text-xs text-muted-foreground self-center">
+                    {proximaAtividade(feitasVoz, feitasTexto) === "prova"
+                      ? "Leia o feedback com calma. Quando quiser, abra a prova."
+                      : "Leia o feedback com calma. Quando quiser, comece o próximo treino."}
+                  </p>
                   <Link to="/app/coach">
                     <Button variant="outline">Voltar</Button>
                   </Link>
@@ -1783,7 +1743,10 @@ function RoleplayPage({ ctx, alvo }: { ctx: CoachContexto; alvo: AlvoAtendente }
                     }}
                     className="bg-primary hover:bg-primary-deep text-primary-foreground"
                   >
-                    <Sparkles className="h-4 w-4 mr-2" /> Continuar agora
+                    <Sparkles className="h-4 w-4 mr-2" />{" "}
+                    {proximaAtividade(feitasVoz, feitasTexto) === "prova"
+                      ? "Abrir a prova"
+                      : "Próximo treino"}
                   </Button>
                 </div>
               )}

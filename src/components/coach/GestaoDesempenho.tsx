@@ -60,10 +60,13 @@ function normalizarPonto(txt: string) {
 export function GestaoDesempenho({
   alunos,
   clinicas,
+  clinicaId,
   podeEditar,
 }: {
   alunos: DesempenhoAluno[];
   clinicas: { id: string; nome: string }[];
+  /** Clínica em foco: as leituras abaixo nunca cruzam clínicas. */
+  clinicaId?: string | null;
   podeEditar: boolean;
 }) {
   const [aba, setAba] = useState<Aba>("ranking");
@@ -82,17 +85,20 @@ export function GestaoDesempenho({
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const [m, r] = await Promise.all([
-        supabase
-          .from("coach_desempenho_metas")
-          .select("atendente,clinica_id,meta_nota,meta_horas,observacao")
-          .limit(500),
-        supabase
-          .from("coach_roleplay_sessions")
-          .select("atendente,pontos_fracos,melhorias")
-          .order("created_at", { ascending: false })
-          .limit(400),
-      ]);
+      let qMetas = supabase
+        .from("coach_desempenho_metas")
+        .select("atendente,clinica_id,meta_nota,meta_horas,observacao")
+        .limit(500);
+      let qRoleplay = supabase
+        .from("coach_roleplay_sessions")
+        .select("atendente,pontos_fracos,melhorias")
+        .order("created_at", { ascending: false })
+        .limit(400);
+      if (clinicaId) {
+        qMetas = qMetas.eq("clinica_id", clinicaId);
+        qRoleplay = qRoleplay.eq("clinica_id", clinicaId);
+      }
+      const [m, r] = await Promise.all([qMetas, qRoleplay]);
       if (cancelled) return;
       const mapa: Record<string, Meta> = {};
       ((m.data ?? []) as unknown as Meta[]).forEach((row) => {
@@ -125,7 +131,7 @@ export function GestaoDesempenho({
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [clinicaId]);
 
   const ranking = useMemo(
     () =>

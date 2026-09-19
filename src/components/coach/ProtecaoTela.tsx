@@ -19,11 +19,14 @@ export function ProtecaoTela({
   atendente,
   clinicaId,
   tela,
+  registrarSaidaDeAba = true,
   children,
 }: {
   atendente: string;
   clinicaId: string | null;
   tela: TelaProtegida;
+  /** No treino por voz a atendente troca de janela o tempo todo — sem sentido registrar. */
+  registrarSaidaDeAba?: boolean;
   children: ReactNode;
 }) {
   const clinicaIdRef = useRef<string | null>(null);
@@ -77,7 +80,7 @@ export function ProtecaoTela({
     };
 
     const onVisibility = () => {
-      if (document.hidden) registrar("saida_de_aba");
+      if (document.hidden && registrarSaidaDeAba) registrar("saida_de_aba");
     };
 
     document.addEventListener("contextmenu", onContextMenu);
@@ -93,7 +96,7 @@ export function ProtecaoTela({
       document.removeEventListener("keydown", onKeyDown);
       document.removeEventListener("visibilitychange", onVisibility);
     };
-  }, [registrar]);
+  }, [registrar, registrarSaidaDeAba]);
 
   return <>{children}</>;
 }

@@ -24,7 +24,6 @@ type SessaoRow = {
   cenario: string | null;
   modo: string | null;
   duracao_seg: number | null;
-  mensagens: Mensagem[] | null;
 };
 
 const dataHora = (iso: string) =>
@@ -53,6 +52,26 @@ export function HistoricoGestor({ clinicaId }: { clinicaId: string | null }) {
   const [busca, setBusca] = useState("");
   const [filtro, setFiltro] = useState<Filtro>("tudo");
   const [aberto, setAberto] = useState<string | null>(null);
+  const [conversa, setConversa] = useState<Record<string, Mensagem[]>>({});
+  const [carregandoConversa, setCarregandoConversa] = useState<string | null>(null);
+
+  /** Busca a transcrição só quando a gestora abre a sessão. */
+  const abrirSessao = async (id: string) => {
+    if (aberto === id) {
+      setAberto(null);
+      return;
+    }
+    setAberto(id);
+    if (conversa[id]) return;
+    setCarregandoConversa(id);
+    const { data } = await supabase
+      .from("coach_roleplay_sessions")
+      .select("mensagens")
+      .eq("id", id)
+      .maybeSingle();
+    setConversa((c) => ({ ...c, [id]: ((data?.mensagens ?? []) as Mensagem[]) || [] }));
+    setCarregandoConversa(null);
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -60,9 +79,11 @@ export function HistoricoGestor({ clinicaId }: { clinicaId: string | null }) {
       setLoading(true);
       let q = supabase
         .from("coach_roleplay_sessions")
-        .select("id,atendente,created_at,nota,resumo,cenario,modo,duracao_seg,mensagens")
+        // Lista leve: a transcrição (coluna pesada) só é buscada ao abrir a
+        // sessão. Antes vinham 1.000 conversas inteiras de uma vez.
+        .select("id,atendente,created_at,nota,resumo,cenario,modo,duracao_seg")
         .order("created_at", { ascending: false })
-        .limit(1000);
+        .limit(300);
       if (clinicaId) q = q.eq("clinica_id", clinicaId);
       const { data } = await q;
       if (cancelled) return;
@@ -164,7 +185,7 @@ export function HistoricoGestor({ clinicaId }: { clinicaId: string | null }) {
               return (
                 <div key={r.id} className="rounded-2xl border overflow-hidden">
                   <button
-                    onClick={() => setAberto(open ? null : r.id)}
+                    onClick={() => void abrirSessao(r.id)}
                     className="w-full text-left px-4 py-3 flex items-center gap-3 hover:bg-secondary/50 transition-colors"
                   >
                     <span className="h-9 w-9 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0">
@@ -180,8 +201,7 @@ export function HistoricoGestor({ clinicaId }: { clinicaId: string | null }) {
                       </span>
                       <span className="block text-xs text-muted-foreground">
                         {dataHora(r.created_at)} · {texto ? "WhatsApp" : "ligação"}
-                        {r.duracao_seg ? ` · ${formatDuracao(r.duracao_seg)}` : ""} ·{" "}
-                        {(r.mensagens ?? []).length} mensagens
+                        {r.duracao_seg ? ` · ${formatDuracao(r.duracao_seg)}` : ""}
                       </span>
                     </span>
                     <span
@@ -196,13 +216,15 @@ export function HistoricoGestor({ clinicaId }: { clinicaId: string | null }) {
                   {open && (
                     <div className="px-4 pb-4 pt-3 border-t bg-secondary/20 space-y-3">
                       {r.resumo && <p className="text-sm">{r.resumo}</p>}
-                      {(r.mensagens ?? []).length === 0 ? (
+                      {carregandoConversa === r.id ? (
+                        <p className="text-sm text-muted-foreground">Carregando a conversa…</p>
+                      ) : (conversa[r.id] ?? []).length === 0 ? (
                         <p className="text-sm text-muted-foreground">
                           Esta sessão foi registrada sem a transcrição.
                         </p>
                       ) : (
                         <div className="rounded-2xl border bg-background p-3 space-y-1.5 max-h-96 overflow-y-auto">
-                          {(r.mensagens ?? []).map((m, i) => (
+                          {(conversa[r.id] ?? []).map((m, i) => (
                             <div
                               key={i}
                               className={`max-w-[85%] rounded-2xl px-3 py-2 text-sm shadow-sm ${
