@@ -34,28 +34,9 @@ import {
 import { avisarCepDoTomadorInvalido } from "@/lib/nfse-aviso-cep";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { exportarRelatorioXlsx, type ColunaXlsx } from "@/lib/exportar-xlsx";
 
@@ -109,9 +90,7 @@ function dataBr(v: string): string {
 function horaBr(v: string | null | undefined): string {
   if (!v) return "";
   const d = new Date(v);
-  return Number.isNaN(d.getTime())
-    ? ""
-    : d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+  return Number.isNaN(d.getTime()) ? "" : d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
 }
 
 /** CPF/CNPJ com máscara; devolve o original quando não tem 11 nem 14 dígitos. */
@@ -130,15 +109,12 @@ function NfsePage() {
   // ocorre por outro fluxo). Identificação por nome, mesmo padrão do app-shell
   // e da agenda para esta clínica.
   const nomeClinica = (clinicaAtual?.clinica.nome ?? "").toLowerCase();
-  const ehSaoFrancisco =
-    nomeClinica.includes("são francisco") || nomeClinica.includes("sao francisco");
+  const ehSaoFrancisco = nomeClinica.includes("são francisco") || nomeClinica.includes("sao francisco");
   // Quem emitiu cada nota é informação de gestão, não de operação: só Admin,
   // Gestor e Supervisor enxergam. Para os demais a coluna some da tela, sai da
   // planilha e deixa de ser pesquisável — senão daria para descobrir o emissor
   // filtrando pelo nome mesmo sem a coluna à vista.
-  const podeVerQuemEmitiu = ["admin", "gestor", "supervisor"].includes(
-    (clinicaAtual?.role ?? "").toLowerCase(),
-  );
+  const podeVerQuemEmitiu = ["admin", "gestor", "supervisor"].includes((clinicaAtual?.role ?? "").toLowerCase());
   const consulta = useServerFn(consultarNfse);
   const reenviar = useServerFn(reenviarNfse);
   const extrair = useServerFn(extrairNfseDeImagem);
@@ -148,9 +124,7 @@ function NfsePage() {
   const [conferirOpen, setConferirOpen] = useState(false);
   const [conferirLoading, setConferirLoading] = useState(false);
   const [conferirPreview, setConferirPreview] = useState<string | null>(null);
-  const [conferirExtraido, setConferirExtraido] = useState<Awaited<
-    ReturnType<typeof extrair>
-  > | null>(null);
+  const [conferirExtraido, setConferirExtraido] = useState<Awaited<ReturnType<typeof extrair>> | null>(null);
   const [emitentes, setEmitentes] = useState<Emitente[]>([]);
   const [filtroEmitente, setFiltroEmitente] = useState<string>("todos");
   const [filtroStatus, setFiltroStatus] = useState<string>("todos");
@@ -187,31 +161,51 @@ function NfsePage() {
     // O período entra na consulta, não só na filtragem em memória: antes a tela
     // trazia as últimas 500 notas e cortava o resto, então um mês antigo
     // simplesmente não aparecia — e a exportação sairia pela metade.
-    const { data, error } = await supabase
-      .from("nfse")
-      .select(
-        "id, numero, data_emissao, valor_servicos, status, url_pdf, tomador_nome, tomador_documento, emitente_id, erro_mensagem, payload_resposta, emitida_por, created_at",
-      )
-      .eq("clinica_id", clinicaAtual.clinica_id)
-      .gte("data_emissao", periodo.inicio)
-      .lte("data_emissao", periodo.fim)
-      // Ordena por `created_at` (momento real da emissão), não por
-      // `data_emissao`. `data_emissao` é uma DATA sem hora: todas as notas do
-      // mesmo dia empatam, e o banco devolve os empates em ordem arbitrária —
-      // que muda a cada consulta, ainda mais porque o auto-polling reconsulta a
-      // cada 15s. A lista embaralhava sozinha na frente da recepção, e quem
-      // estava lendo uma linha via os dados trocarem de lugar, o que passava a
-      // impressão de nota duplicada e de nome de emissor errado.
-      // O `id` no fim garante ordem estável mesmo em empate de milissegundo.
-      .order("created_at", { ascending: false })
-      .order("id", { ascending: false })
-      .limit(5000);
-    if (error) {
+    // O PostgREST devolve no máximo 1.000 linhas por requisição (max-rows do
+    // Supabase), independentemente do `.limit()` pedido. Um mês cheio passa
+    // disso (set/2026: 1.666 notas), e a tela mostrava exatamente 1.000 —
+    // os cartões por emitente somavam 434 + 566 e a exportação saía cortada.
+    // Por isso a consulta é paginada com `.range()` em blocos de 1.000 até
+    // vir um bloco incompleto.
+    const PAGINA = 1000;
+    const LIMITE_TOTAL = 20000;
+    const acumulado: Row[] = [];
+    let erro: unknown = null;
+    for (let inicio = 0; inicio < LIMITE_TOTAL; inicio += PAGINA) {
+      const { data, error } = await supabase
+        .from("nfse")
+        .select(
+          "id, numero, data_emissao, valor_servicos, status, url_pdf, tomador_nome, tomador_documento, emitente_id, erro_mensagem, payload_resposta, emitida_por, created_at",
+        )
+        .eq("clinica_id", clinicaAtual.clinica_id)
+        .gte("data_emissao", periodo.inicio)
+        .lte("data_emissao", periodo.fim)
+        // Ordena por `created_at` (momento real da emissão), não por
+        // `data_emissao`. `data_emissao` é uma DATA sem hora: todas as notas do
+        // mesmo dia empatam, e o banco devolve os empates em ordem arbitrária —
+        // que muda a cada consulta, ainda mais porque o auto-polling reconsulta a
+        // cada 15s. A lista embaralhava sozinha na frente da recepção, e quem
+        // estava lendo uma linha via os dados trocarem de lugar, o que passava a
+        // impressão de nota duplicada e de nome de emissor errado.
+        // O `id` no fim garante ordem estável mesmo em empate de milissegundo —
+        // e é o que torna a paginação por `.range()` consistente entre blocos.
+        .order("created_at", { ascending: false })
+        .order("id", { ascending: false })
+        .range(inicio, inicio + PAGINA - 1);
+      if (error) {
+        erro = error;
+        break;
+      }
+      const bloco = (data ?? []) as unknown as Row[];
+      acumulado.push(...bloco);
+      if (bloco.length < PAGINA) break;
+    }
+    if (erro) {
       setLoading(false);
-      mostrarErro(error);
+      mostrarErro(erro);
       return;
     }
-    const brutas = (data ?? []) as unknown as Row[];
+    const brutas = acumulado;
 
     // Nome de quem emitiu: `nfse` guarda só o UUID em `emitida_por`, e não há
     // FK declarada para `profiles`, então o embed do PostgREST não funciona —
@@ -221,10 +215,7 @@ function NfsePage() {
       : [];
     const nomes = new Map<string, string>();
     if (idsUsuarios.length > 0) {
-      const { data: perfis } = await supabase
-        .from("profiles")
-        .select("id, nome")
-        .in("id", idsUsuarios);
+      const { data: perfis } = await supabase.from("profiles").select("id, nome").in("id", idsUsuarios);
       for (const p of perfis ?? []) nomes.set(p.id, p.nome ?? "");
     }
 
@@ -304,8 +295,7 @@ function NfsePage() {
           const alvo =
             `${r.numero ?? ""} ${r.tomador_nome ?? ""} ${r.tomador_documento ?? ""} ${r.emitente?.nome ?? ""} ${r.emitente?.cnpj ?? ""} ${r.emitida_por_nome ?? ""}`.toLowerCase();
           const qDigits = q.replace(/\D/g, "");
-          if (!alvo.includes(q) && !(qDigits && alvo.replace(/\D/g, "").includes(qDigits)))
-            return false;
+          if (!alvo.includes(q) && !(qDigits && alvo.replace(/\D/g, "").includes(qDigits))) return false;
         }
         return true;
       }),
@@ -441,9 +431,7 @@ function NfsePage() {
         { rotulo: "Valor", tipo: "moeda", largura: 14 },
         { rotulo: "Status", tipo: "texto", largura: 14 },
         // "Emitido por" só entra na planilha para quem enxerga a coluna na tela.
-        ...(podeVerQuemEmitiu
-          ? [{ rotulo: "Emitido por", tipo: "texto", largura: 30 } as ColunaXlsx]
-          : []),
+        ...(podeVerQuemEmitiu ? [{ rotulo: "Emitido por", tipo: "texto", largura: 30 } as ColunaXlsx] : []),
       ];
       const linhas = filtrados.map((r) => [
         r.numero ?? "",
@@ -455,9 +443,7 @@ function NfsePage() {
         documentoBr(r.tomador_documento),
         Number(r.valor_servicos) || 0,
         r.status,
-        ...(podeVerQuemEmitiu
-          ? [r.emitida_por_nome ?? (r.emitida_por ? "(usuário removido)" : "—")]
-          : []),
+        ...(podeVerQuemEmitiu ? [r.emitida_por_nome ?? (r.emitida_por ? "(usuário removido)" : "—")] : []),
       ]);
       const total = filtrados.reduce((s, r) => s + (Number(r.valor_servicos) || 0), 0);
       const nomeEmitenteFiltro =
@@ -478,18 +464,7 @@ function NfsePage() {
         ],
         colunas,
         linhas,
-        totais: [
-          "",
-          "",
-          "",
-          "",
-          "",
-          "",
-          `${filtrados.length} nota(s)`,
-          total,
-          "",
-          ...(podeVerQuemEmitiu ? [""] : []),
-        ],
+        totais: ["", "", "", "", "", "", `${filtrados.length} nota(s)`, total, "", ...(podeVerQuemEmitiu ? [""] : [])],
         resumo: {
           titulo: "Total por emitente",
           itens: totais.map((t) => ({
@@ -514,20 +489,14 @@ function NfsePage() {
           <h1 className="text-2xl font-semibold flex items-center gap-2">
             <Receipt className="h-6 w-6 text-primary" /> Notas Fiscais (NFS-e)
           </h1>
-          <p className="text-sm text-muted-foreground">
-            Emissão e controle de notas fiscais de serviço.
-          </p>
+          <p className="text-sm text-muted-foreground">Emissão e controle de notas fiscais de serviço.</p>
         </div>
         <div className="flex gap-2">
           {/* Exportar não depende de permissão de escrita nem da clínica: é
               leitura do que já está na tela, e a São Francisco também precisa
               fechar o mês. */}
           <Button variant="outline" onClick={() => void onExportar()} disabled={exportando}>
-            {exportando ? (
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-            ) : (
-              <Download className="h-4 w-4 mr-2" />
-            )}
+            {exportando ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Download className="h-4 w-4 mr-2" />}
             Exportar Excel
           </Button>
           {!ehSaoFrancisco && (
@@ -651,19 +620,13 @@ function NfsePage() {
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell
-                  colSpan={podeVerQuemEmitiu ? 8 : 7}
-                  className="text-center py-8 text-muted-foreground"
-                >
+                <TableCell colSpan={podeVerQuemEmitiu ? 8 : 7} className="text-center py-8 text-muted-foreground">
                   Carregando…
                 </TableCell>
               </TableRow>
             ) : filtrados.length === 0 ? (
               <TableRow>
-                <TableCell
-                  colSpan={podeVerQuemEmitiu ? 8 : 7}
-                  className="text-center py-8 text-muted-foreground"
-                >
+                <TableCell colSpan={podeVerQuemEmitiu ? 8 : 7} className="text-center py-8 text-muted-foreground">
                   Nenhuma nota.
                 </TableCell>
               </TableRow>
@@ -712,10 +675,7 @@ function NfsePage() {
                   {podeVerQuemEmitiu && (
                     <TableCell>
                       {r.emitida_por_nome ? (
-                        <span
-                          className="text-xs flex items-center gap-1"
-                          title={r.emitida_por_nome}
-                        >
+                        <span className="text-xs flex items-center gap-1" title={r.emitida_por_nome}>
                           <User className="h-3 w-3 text-muted-foreground shrink-0" />
                           <span className="truncate">{r.emitida_por_nome}</span>
                         </span>
@@ -830,11 +790,7 @@ function NfsePage() {
               <div className="grid md:grid-cols-2 gap-4">
                 {conferirPreview && (
                   <div className="border rounded-md overflow-hidden bg-muted/30 max-h-[400px] flex items-center justify-center">
-                    <img
-                      src={conferirPreview}
-                      alt="NFS-e"
-                      className="max-h-[400px] object-contain"
-                    />
+                    <img src={conferirPreview} alt="NFS-e" className="max-h-[400px] object-contain" />
                   </div>
                 )}
                 <div className="space-y-2 text-sm">
@@ -845,9 +801,7 @@ function NfsePage() {
                       [
                         "Data emissão",
                         conferirExtraido.data_emissao,
-                        notaMatch
-                          ? new Date(notaMatch.data_emissao).toISOString().slice(0, 10)
-                          : null,
+                        notaMatch ? new Date(notaMatch.data_emissao).toISOString().slice(0, 10) : null,
                       ],
                       [
                         "Valor",
@@ -862,11 +816,7 @@ function NfsePage() {
                         conferirExtraido.emitente_cnpj,
                         notaMatch?.emitente?.cnpj?.replace(/\D/g, "") ?? null,
                       ],
-                      [
-                        "Emitente",
-                        conferirExtraido.emitente_nome,
-                        notaMatch?.emitente?.nome ?? null,
-                      ],
+                      ["Emitente", conferirExtraido.emitente_nome, notaMatch?.emitente?.nome ?? null],
                       ["Tomador CPF/CNPJ", conferirExtraido.tomador_cpf_cnpj, null],
                       ["Tomador", conferirExtraido.tomador_nome, notaMatch?.tomador_nome ?? null],
                     ];
@@ -887,9 +837,7 @@ function NfsePage() {
                           <div className="text-xs text-muted-foreground pt-0.5">{label}</div>
                           <div>
                             <div className="break-words">{e}</div>
-                            {s != null && s !== e && (
-                              <div className="text-xs text-muted-foreground">Sistema: {s}</div>
-                            )}
+                            {s != null && s !== e && <div className="text-xs text-muted-foreground">Sistema: {s}</div>}
                           </div>
                           {match != null &&
                             (match ? (
@@ -903,13 +851,9 @@ function NfsePage() {
                   })()}
                   <div className="pt-2 text-xs">
                     {notaMatch ? (
-                      <span className="text-green-700">
-                        ✓ Nota nº {notaMatch.numero} encontrada no sistema.
-                      </span>
+                      <span className="text-green-700">✓ Nota nº {notaMatch.numero} encontrada no sistema.</span>
                     ) : (
-                      <span className="text-amber-700">
-                        Nenhuma nota com esse número foi encontrada no sistema.
-                      </span>
+                      <span className="text-amber-700">Nenhuma nota com esse número foi encontrada no sistema.</span>
                     )}
                   </div>
                 </div>
@@ -956,23 +900,16 @@ function NfsePage() {
                 <div className="space-y-3 text-sm max-h-[60vh] overflow-auto">
                   {erroDetalhe.erro_mensagem && (
                     <div className="rounded-md border border-red-200 bg-red-50 p-3 text-red-900">
-                      <div className="text-xs font-medium uppercase tracking-wide text-red-700">
-                        Mensagem
-                      </div>
-                      <div className="mt-1 whitespace-pre-wrap break-words">
-                        {erroDetalhe.erro_mensagem}
-                      </div>
+                      <div className="text-xs font-medium uppercase tracking-wide text-red-700">Mensagem</div>
+                      <div className="mt-1 whitespace-pre-wrap break-words">{erroDetalhe.erro_mensagem}</div>
                     </div>
                   )}
                   {isE0014 && erroDetalhe.emitente_id && (
                     <div className="rounded-md border border-amber-300 bg-amber-50 p-3 space-y-2 text-amber-900">
-                      <div className="text-xs font-semibold uppercase tracking-wide">
-                        Ação recomendada
-                      </div>
+                      <div className="text-xs font-semibold uppercase tracking-wide">Ação recomendada</div>
                       <p className="text-sm">
-                        A prefeitura recusou porque o nº do RPS já foi usado. Avance o
-                        <strong> Próx. nº RPS</strong> do emitente para pular a faixa já consumida e
-                        tente reenviar.
+                        A prefeitura recusou porque o nº do RPS já foi usado. Avance o<strong> Próx. nº RPS</strong> do
+                        emitente para pular a faixa já consumida e tente reenviar.
                       </p>
                       <div className="flex flex-wrap items-end gap-2">
                         <div className="space-y-1">
@@ -1033,9 +970,7 @@ function NfsePage() {
                       {body?.mensagem_sefaz && (
                         <>
                           <div className="text-xs text-muted-foreground">SEFAZ/Prefeitura</div>
-                          <div className="whitespace-pre-wrap break-words">
-                            {body.mensagem_sefaz}
-                          </div>
+                          <div className="whitespace-pre-wrap break-words">{body.mensagem_sefaz}</div>
                         </>
                       )}
                     </div>
@@ -1059,9 +994,7 @@ function NfsePage() {
                               </span>
                             )}
                           </div>
-                          {er.mensagem && (
-                            <div className="whitespace-pre-wrap break-words">{er.mensagem}</div>
-                          )}
+                          {er.mensagem && <div className="whitespace-pre-wrap break-words">{er.mensagem}</div>}
                           {er.correcao && (
                             <div className="text-xs text-muted-foreground">
                               <span className="font-medium">Correção:</span> {er.correcao}
@@ -1072,15 +1005,9 @@ function NfsePage() {
                     </div>
                   )}
                   <details className="rounded-md border bg-muted/30 p-2">
-                    <summary className="cursor-pointer text-xs text-muted-foreground">
-                      Retorno completo (JSON)
-                    </summary>
+                    <summary className="cursor-pointer text-xs text-muted-foreground">Retorno completo (JSON)</summary>
                     <pre className="mt-2 text-xs overflow-auto whitespace-pre-wrap break-words">
-                      {JSON.stringify(
-                        body ?? { erro_mensagem: erroDetalhe.erro_mensagem },
-                        null,
-                        2,
-                      )}
+                      {JSON.stringify(body ?? { erro_mensagem: erroDetalhe.erro_mensagem }, null, 2)}
                     </pre>
                   </details>
                 </div>
@@ -1091,11 +1018,7 @@ function NfsePage() {
               <Button
                 variant="outline"
                 onClick={() => {
-                  const txt = JSON.stringify(
-                    erroDetalhe.payload_resposta ?? erroDetalhe.erro_mensagem,
-                    null,
-                    2,
-                  );
+                  const txt = JSON.stringify(erroDetalhe.payload_resposta ?? erroDetalhe.erro_mensagem, null, 2);
                   void navigator.clipboard.writeText(txt).then(() => toast.success("Copiado"));
                 }}
               >
@@ -1115,9 +1038,7 @@ function NfsePage() {
             <DialogTitle className="flex items-center gap-2">
               <Eye className="h-4 w-4" /> DANFSE Nº {pdfVisualizando?.numero ?? "—"}
               {pdfVisualizando?.tomador_nome && (
-                <span className="text-sm font-normal text-muted-foreground">
-                  · {pdfVisualizando.tomador_nome}
-                </span>
+                <span className="text-sm font-normal text-muted-foreground">· {pdfVisualizando.tomador_nome}</span>
               )}
             </DialogTitle>
           </DialogHeader>
@@ -1163,12 +1084,10 @@ function NfsePage() {
             <div className="space-y-3 text-sm">
               <div className="rounded-md bg-muted p-3 space-y-1">
                 <div>
-                  <span className="text-muted-foreground">Número:</span>{" "}
-                  <b>{cancelarAlvo.numero ?? "—"}</b>
+                  <span className="text-muted-foreground">Número:</span> <b>{cancelarAlvo.numero ?? "—"}</b>
                 </div>
                 <div>
-                  <span className="text-muted-foreground">Tomador:</span>{" "}
-                  {cancelarAlvo.tomador_nome ?? "—"}
+                  <span className="text-muted-foreground">Tomador:</span> {cancelarAlvo.tomador_nome ?? "—"}
                 </div>
                 <div>
                   <span className="text-muted-foreground">Valor:</span>{" "}
@@ -1195,9 +1114,7 @@ function NfsePage() {
                         }).`
                       : ""}
                   </span>
-                  <span className="text-muted-foreground shrink-0">
-                    {cancelarJustificativa.length}/255
-                  </span>
+                  <span className="text-muted-foreground shrink-0">{cancelarJustificativa.length}/255</span>
                 </div>
               </div>
               <div className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded p-2">
@@ -1256,9 +1173,7 @@ function PdfPreview({
   title,
 }: {
   nfseId: string;
-  baixar: (args: {
-    data: { nfseId: string; tipo: "pdf" | "xml" };
-  }) => Promise<{ base64: string; mime: string }>;
+  baixar: (args: { data: { nfseId: string; tipo: "pdf" | "xml" } }) => Promise<{ base64: string; mime: string }>;
   className?: string;
   title?: string;
 }) {
@@ -1290,17 +1205,11 @@ function PdfPreview({
   }, [nfseId, baixar]);
   if (erro)
     return (
-      <div
-        className={`${className ?? ""} flex items-center justify-center text-xs text-destructive p-4`}
-      >
-        {erro}
-      </div>
+      <div className={`${className ?? ""} flex items-center justify-center text-xs text-destructive p-4`}>{erro}</div>
     );
   if (!url)
     return (
-      <div
-        className={`${className ?? ""} flex items-center justify-center text-xs text-muted-foreground`}
-      >
+      <div className={`${className ?? ""} flex items-center justify-center text-xs text-muted-foreground`}>
         <Loader2 className="h-4 w-4 animate-spin mr-2" /> Carregando PDF…
       </div>
     );
