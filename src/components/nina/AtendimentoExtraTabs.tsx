@@ -3065,10 +3065,20 @@ export function AtendInbox() {
                       )}
                       {atendentesFiltrados.map((u: any) => (
                         <SelectItem key={u.user_id} value={valorEscopoControle("equipe", u.user_id)}>
-                          {u.nome}
-                          {u.presenca
-                            ? ` · ${ROTULO_PRESENCA[u.presenca as PresencaAtendente]}`
-                            : ""}
+                          <span className="flex items-center gap-2">
+                            {u.presenca === "ONLINE" && (
+                              <span
+                                aria-hidden="true"
+                                className="h-2 w-2 shrink-0 rounded-full bg-emerald-500"
+                              />
+                            )}
+                            <span>
+                              {u.nome}
+                              {u.presenca
+                                ? ` · ${ROTULO_PRESENCA[u.presenca as PresencaAtendente]}`
+                                : ""}
+                            </span>
+                          </span>
                         </SelectItem>
                       ))}
                       {usuarios.length > 8 && atendentesFiltrados.length === 0 && (
