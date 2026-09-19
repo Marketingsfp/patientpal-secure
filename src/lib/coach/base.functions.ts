@@ -30,7 +30,7 @@ export const gerarBaseConhecimento = createServerFn({ method: "POST" })
     const db = context.supabase as unknown as ClienteBase;
 
     // Acesso ao módulo Coach com permissão de escrita, além da regra de gestão.
-    await garantirAcessoCoach(context.supabase, context.userId, data.clinicaId, "write");
+    await garantirAcessoCoach(context.supabase, data.clinicaId, "write");
     const { data: podeGerir, error: erroPermissao } = await context.supabase.rpc(
       "coach_pode_gerir",
       { _clinica_id: data.clinicaId },
