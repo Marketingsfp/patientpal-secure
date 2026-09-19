@@ -3614,11 +3614,13 @@ export type Database = {
           clinica_id: string
           created_at: string
           feedback: Json | null
+          finalizada_at: string | null
           id: string
           nota: number
           questoes: Json
           respostas: Json
           simulacao_gestor: boolean
+          status: string
           total: number
           user_id: string | null
         }
@@ -3628,11 +3630,13 @@ export type Database = {
           clinica_id: string
           created_at?: string
           feedback?: Json | null
+          finalizada_at?: string | null
           id?: string
           nota: number
           questoes?: Json
           respostas?: Json
           simulacao_gestor?: boolean
+          status?: string
           total: number
           user_id?: string | null
         }
@@ -3642,11 +3646,13 @@ export type Database = {
           clinica_id?: string
           created_at?: string
           feedback?: Json | null
+          finalizada_at?: string | null
           id?: string
           nota?: number
           questoes?: Json
           respostas?: Json
           simulacao_gestor?: boolean
+          status?: string
           total?: number
           user_id?: string | null
         }
@@ -3669,6 +3675,7 @@ export type Database = {
           created_at: string
           dica_pratica: string | null
           duracao_seg: number | null
+          finalizada_at: string | null
           id: string
           melhorias: Json
           mensagens: Json
@@ -3678,6 +3685,7 @@ export type Database = {
           pontos_fracos: Json
           resumo: string
           simulacao_gestor: boolean
+          status: string
           user_id: string | null
         }
         Insert: {
@@ -3688,6 +3696,7 @@ export type Database = {
           created_at?: string
           dica_pratica?: string | null
           duracao_seg?: number | null
+          finalizada_at?: string | null
           id?: string
           melhorias?: Json
           mensagens?: Json
@@ -3697,6 +3706,7 @@ export type Database = {
           pontos_fracos?: Json
           resumo: string
           simulacao_gestor?: boolean
+          status?: string
           user_id?: string | null
         }
         Update: {
@@ -3707,6 +3717,7 @@ export type Database = {
           created_at?: string
           dica_pratica?: string | null
           duracao_seg?: number | null
+          finalizada_at?: string | null
           id?: string
           melhorias?: Json
           mensagens?: Json
@@ -3716,6 +3727,7 @@ export type Database = {
           pontos_fracos?: Json
           resumo?: string
           simulacao_gestor?: boolean
+          status?: string
           user_id?: string | null
         }
         Relationships: [
@@ -15409,6 +15421,7 @@ export type Database = {
           nome: string
         }[]
       }
+      coach_expirar_treinos: { Args: never; Returns: number }
       coach_fechar_uso_ia: {
         Args: {
           _custo: number
