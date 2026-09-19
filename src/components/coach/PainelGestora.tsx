@@ -209,14 +209,9 @@ export function PainelGestora({ ctx }: { ctx: CoachContexto }) {
         }`}
       >
         <div className="min-w-0 space-y-5">
+          {/* As abas agora vivem no menu lateral (/app/coach#progresso etc.). */}
           <Tabs value={aba} onValueChange={(v) => setAba(v as Aba)}>
-            <TabsList className="bg-secondary">
-              <TabsTrigger value="progresso">Progresso do curso</TabsTrigger>
-              <TabsTrigger value="conversas">Conversas &amp; ligações</TabsTrigger>
-              <TabsTrigger value="perfis">Perfis &amp; evolução</TabsTrigger>
-              <TabsTrigger value="vozes">Vozes</TabsTrigger>
-              <TabsTrigger value="analise">Analisar atendimento</TabsTrigger>
-            </TabsList>
+
 
             <TabsContent value="progresso" className="mt-5">
               <CourseView
