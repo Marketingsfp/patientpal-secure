@@ -12,20 +12,19 @@ import {
   type ConfigCoachServidor,
 } from "./guard.server";
 
+function baseLonga(): string {
+  const bloco = (n: number) =>
+    `## Exame ${n}\nUltrassom ${n} — preparo, valor R$ ${100 + n},00 e orientações. ${"detalhe ".repeat(30)}`;
+  return ["CLÍNICA EXEMPLO", ...Array.from({ length: 60 }, (_, i) => bloco(i))].join("\n\n");
+}
+
 function configFake(): ConfigCoachServidor {
-  const servico = (nome: string) => ({
-    nome,
-    preco: "R$ 100,00",
-    descricao: "x".repeat(400),
-  });
   return {
-    tabela: Array.from({ length: 80 }, (_, i) => servico(`Serviço ${i}`)),
+    tabela: [],
     scripts: [],
     checklist: [],
     complemento: "Observação da clínica.",
-    base: {
-      servicos: Array.from({ length: 80 }, (_, i) => servico(`Serviço ${i}`)),
-    },
+    base: baseLonga(),
     limiteUsuario: 60,
     limiteClinica: 600,
     reterAudioDias: 30,
