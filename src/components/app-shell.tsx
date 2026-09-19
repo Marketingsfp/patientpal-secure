@@ -617,7 +617,14 @@ const navRows: ReadonlyArray<{ label: string; items: ReadonlyArray<NavItem> }> =
   // ---------------------------------------------------------------------
   {
     label: "Treinamento",
-    items: [{ to: "/app/coach", label: "Coach WhatsApp", icon: GraduationCap }],
+    items: [
+      { to: "/app/coach", label: "Coach WhatsApp", icon: GraduationCap },
+      { to: "/app/coach", hash: "progresso", label: "Progresso do curso", icon: BarChart3 },
+      { to: "/app/coach", hash: "conversas", label: "Conversas & ligações", icon: MessageCircle },
+      { to: "/app/coach", hash: "perfis", label: "Perfis & evolução", icon: Users },
+      { to: "/app/coach", hash: "vozes", label: "Vozes", icon: Mic },
+      { to: "/app/coach", hash: "analise", label: "Analisar atendimento", icon: Sparkles },
+    ],
   },
 ];
 
