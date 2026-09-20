@@ -62,7 +62,8 @@ Migration: `20260919210000_nina_carga_servidor.sql` (aditiva e reexecutável).
 
 A migration deixa a configuração **inativa**. Primeiro publicar o código e
 verificar `GET /api/public/nina/carga` retornando `carga-v5-servidor`. Depois ativar
-`nina_carga_servidor_config.ativo` e verificar `nina_carga_servidor_disponivel()`.
+`nina_carga_servidor_config.ativo`, habilitar o job `nina-carga-servidor` em
+`cron.job.active` e verificar `nina_carga_servidor_disponivel()`.
 Iniciar falha antes da redação paga se a infraestrutura estiver indisponível.
 
 Rollback operacional: desativar essa configuração e encerrar cargas ativas pela
@@ -89,3 +90,15 @@ Validação local em 19/09/2026: 131 testes de carga aprovados, 38 verificaçõe
 checagem de tipos e ESLint sem erros. Migration instalada no Cloud e comparada
 com o arquivo (MD5 `97e02c91c6bf94c3fcee2571a8c2f2ff`), seis políticas conferidas,
 zero tarefas e configuração desativada. Ativação depende da publicação da rota.
+
+Compilação: no Windows, o plugin `@lovable.dev/mcp-js` falha ao comparar caminhos.
+Na cópia Linux com dependências do lockfile, o build do cliente concluiu; o build
+do servidor com Node 24.18 e heap limitado a 4 GB esgotou a memória. Não há
+comprovação de build completo. O Lovable sinalizou build malsucedido para o commit
+`c1114b161`; o GET público da nova rota ainda retornou 404. A fila permanece
+desativada, assim como o job novo em `cron.job`, evitando varreduras enquanto a
+publicação está pendente. Não foram executadas cargas com modelos pagos nem mensagens reais.
+
+A publicação do Lovable inclui também alterações pendentes de outros
+colaboradores no Coach. A autorização para essa publicação conjunta foi solicitada;
+não ativar a fila antes de confirmar a rota publicada e a autorização.
