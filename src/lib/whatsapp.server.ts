@@ -608,12 +608,15 @@ export async function gerarRespostaNina(
         const { resultado, coletor } = await comColetor(async (c) => {
           await conferirReserva();
           if (opcoes?.mensagensEntrada?.length) c.mensagensEntrada(opcoes.mensagensEntrada);
-          return await gerarRespostaNinaInterno(clinicaId, mensagemPaciente, telefoneRemetente, {
+          const texto = await gerarRespostaNinaInterno(clinicaId, mensagemPaciente, telefoneRemetente, {
             ...opcoes,
             auditoria,
             rastro,
             validarReservaTurno: conferirReserva,
           });
+          // Inclui saídas antecipadas do gate e chamadores sem transporte.
+          const { removerEmojisNina } = await import("@/lib/nina/resposta/sem-emojis");
+          return removerEmojisNina(texto);
         });
         await conferirReserva();
         rastro.concluir("message.inbound", { resposta_tamanho: resultado.length });
@@ -2286,7 +2289,7 @@ async function gerarRespostaNinaInterno(
   // uma pessoa. A frase é fixa para nunca depender do humor do modelo.
   if (houveHandoff && !(opcoes?.teste && finalizacaoHandoff?.motivo === MOTIVO_SEM_REGISTRO)) {
     const AVISO_TRANSFERENCIA =
-      "🔁 *Transferido para atendimento humano.* Você não está mais falando com a Nina — uma atendente da equipe assume esta conversa e responde por aqui mesmo.";
+      "*Transferido para atendimento humano.* Você não está mais falando com a Nina — uma atendente da equipe assume esta conversa e responde por aqui mesmo.";
     if (!resposta.includes("Transferido para atendimento humano")) {
       const antes = resposta;
       resposta = `${resposta.trim()}\n\n${AVISO_TRANSFERENCIA}`.trim();
@@ -2437,7 +2440,10 @@ async function gerarRespostaNinaInterno(
           opcoes?.teste !== true &&
           Boolean(mensagemPaciente),
       });
-      if (finalizada.texto) resposta = finalizada.texto;
+      resposta = finalizada.texto;
+      if (finalizada.resultado.estado === "descartar" && opcoes?.auditoria) {
+        opcoes.auditoria.resultado = finalizada.resultado;
+      }
       if (opcoes?.auditoria) {
         (opcoes.auditoria as { finalizacao?: unknown }).finalizacao = finalizada;
       }

@@ -15,6 +15,7 @@
  */
 
 import { omitirNomeGenerico } from "../regras-catalogo";
+import { removerEmojisNina } from "./sem-emojis";
 
 export const ESCOPO_TEMPLATES = "whatsapp" as const;
 export const CHAVES_CONFIRMACAO_AGENDAMENTO = new Set([
@@ -85,7 +86,7 @@ export const TEMPLATES_PADRAO: readonly DefinicaoTemplate[] = [
     chave: `fluxo.agendamento.despedida_${tipo}`, categoria: "fluxo",
     descricao: "Aviso de presença e despedida com referência ao horário de chegada, sem prometer hora da consulta.",
     variaveis: ["unidade"],
-    padrao: `Uma hora antes do horário ${tipo === "ficha" ? "de comparecimento" : "pré-agendado"}, entraremos em contato para confirmar se você poderá comparecer.\n\nA {unidade} agradece a sua confiança! Será um prazer receber você! 💚`,
+    padrao: `Uma hora antes do horário ${tipo === "ficha" ? "de comparecimento" : "pré-agendado"}, entraremos em contato para confirmar se você poderá comparecer.\n\nA {unidade} agradece a sua confiança! Será um prazer receber você!`,
   })),
   D({
     chave: "fluxo.agendamento.revisar", categoria: "fluxo",
@@ -153,7 +154,7 @@ export const TEMPLATES_PADRAO: readonly DefinicaoTemplate[] = [
       "Confirmação do agendamento. Só é usada com evidência real de gravação (appointment_id).",
     variaveis: ["profissional", "data", "horario"],
     padrao:
-      "Prontinho! ✅ Seu agendamento foi realizado com sucesso.\n\n" +
+      "Prontinho! Seu agendamento foi realizado com sucesso.\n\n" +
       "*Profissional:* {profissional}\n*Data:* {data}\n*Horário:* {horario}\n\n" +
       "O atendimento será no horário marcado. Chegue com 15 minutos de antecedência para realizar o check-in na Recepção Principal e traga um documento com foto.",
   }),
@@ -165,21 +166,21 @@ export const TEMPLATES_PADRAO: readonly DefinicaoTemplate[] = [
     variaveis: ["unidade"],
     padrao:
       "Uma hora antes da sua consulta, entraremos em contato para confirmar se você poderá comparecer.\n\n" +
-      "A {unidade} agradece a sua confiança! Foi um prazer ajudar com seu agendamento. Até breve! 💚",
+      "A {unidade} agradece a sua confiança! Foi um prazer ajudar com seu agendamento. Até breve!",
   }),
   D({
     chave: "fluxo.agendamento.duplicado",
     categoria: "fluxo",
     descricao: "O mesmo horário já estava reservado para o paciente.",
     variaveis: [],
-    padrao: "Esse horário já está reservado para você — não precisa marcar de novo 💛",
+    padrao: "Esse horário já está reservado para você — não precisa marcar de novo.",
   }),
   D({
     chave: "handoff.aviso",
     categoria: "handoff",
     descricao: "Aviso de transferência para atendimento humano.",
     variaveis: [],
-    padrao: "Claro! Vou encaminhar seu atendimento para nossa equipe. 😊",
+    padrao: "Claro! Vou encaminhar seu atendimento para nossa equipe.",
   }),
   D({
     chave: "erro.tecnico",
@@ -194,7 +195,7 @@ export const TEMPLATES_PADRAO: readonly DefinicaoTemplate[] = [
     categoria: "midia",
     descricao: "Não foi possível transcrever o áudio recebido.",
     variaveis: [],
-    padrao: "Não consegui ouvir seu áudio direito 😕 Pode me escrever por texto, por favor?",
+    padrao: "Não consegui ouvir seu áudio direito. Pode me escrever por texto, por favor?",
   }),
   D({
     chave: "midia.imagem",
@@ -202,7 +203,7 @@ export const TEMPLATES_PADRAO: readonly DefinicaoTemplate[] = [
     descricao: "Imagem recebida.",
     variaveis: [],
     padrao:
-      "Recebi sua imagem 📷 No momento não consigo analisar imagens por aqui — um atendente vai olhar e responder. Se puder, me descreva por texto o que precisa.",
+      "Recebi sua imagem. No momento não consigo analisar imagens por aqui — um atendente vai olhar e responder. Se puder, me descreva por texto o que precisa.",
   }),
   D({
     chave: "midia.documento",
@@ -210,14 +211,14 @@ export const TEMPLATES_PADRAO: readonly DefinicaoTemplate[] = [
     descricao: "Documento recebido.",
     variaveis: [],
     padrao:
-      "Recebi seu documento 📄 Um atendente vai conferir e responder. Se puder, me diga por texto do que se trata.",
+      "Recebi seu documento. Um atendente vai conferir e responder. Se puder, me diga por texto do que se trata.",
   }),
   D({
     chave: "midia.figurinha",
     categoria: "midia",
     descricao: "Figurinha recebida.",
     variaveis: [],
-    padrao: "Recebi 😊 Como posso te ajudar?",
+    padrao: "Recebi. Como posso te ajudar?",
   }),
   D({
     chave: "midia.outro",
@@ -233,7 +234,7 @@ export const TEMPLATES_PADRAO: readonly DefinicaoTemplate[] = [
     descricao: "Mensagem final quando o paciente confirma que não precisa de mais nada.",
     variaveis: ["unidade"],
     padrao:
-      "Foi um prazer ajudar! 😊 A {unidade} agradece o contato. Seu atendimento foi encerrado. Se precisar de algo mais, é só nos enviar uma nova mensagem. Até breve!",
+      "Foi um prazer ajudar! A {unidade} agradece o contato. Seu atendimento foi encerrado. Se precisar de algo mais, é só nos enviar uma nova mensagem. Até breve!",
   }),
 ];
 
@@ -289,7 +290,7 @@ export function textoDaChave(
   publicados?: TextosTemplates | null,
 ): { texto: string; origemTemplate: "publicado" | "padrao"; motivo: string | null } {
   const resultado = resolverTextoDaChave(chave, valores, publicados);
-  resultado.texto = omitirNomeGenerico(resultado.texto);
+  resultado.texto = removerEmojisNina(omitirNomeGenerico(resultado.texto));
   if (!CHAVES_CONFIRMACAO_AGENDAMENTO.has(chave) || !resultado.texto) return resultado;
   const modalidade = chave.includes("pre_agendamento") ? "chegada_com_pre_agendamento"
     : chave.includes("ficha") ? "ficha" : "hora_marcada";
@@ -318,11 +319,13 @@ export function acrescentarDespedidaAgendamento(
     { unidade: unidade?.trim() || "nossa clínica" },
     publicados,
   );
+  const corpo = removerEmojisNina(texto).trim();
+  despedida.texto = removerEmojisNina(despedida.texto);
   return {
     ...despedida,
-    texto: texto.trim().endsWith(despedida.texto)
-      ? texto.trim()
-      : `${texto.trim()}\n\n${despedida.texto}`,
+    texto: corpo.endsWith(despedida.texto)
+      ? corpo
+      : `${corpo}\n\n${despedida.texto}`,
   };
 }
 

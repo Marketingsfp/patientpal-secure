@@ -14,6 +14,8 @@
  * de contingência.
  */
 
+import { removerEmojisNina } from "@/lib/nina/resposta/sem-emojis";
+
 /** Setores que podem ser citados ao paciente quando vierem estruturados. */
 export const SETORES_MENCIONAVEIS = [
   "recepção",
@@ -164,7 +166,7 @@ export function validarMensagemHandoff(
  * ser sempre a mesma frase.
  */
 export function montarMensagemHandoffFallback(ctx: ContextoMensagemHandoff): string {
-  const nome = primeiroNome(ctx.nome);
+  const nome = primeiroNome(removerEmojisNina(ctx.nome ?? ""));
   const destino = destinoTexto(ctx.setor);
   const assunto = (ctx.assunto ?? "").trim();
   const saudacao = nome ? `${nome}, ` : "";
@@ -173,22 +175,22 @@ export function montarMensagemHandoffFallback(ctx: ContextoMensagemHandoff): str
   let corpo: string;
   switch (ctx.motivo) {
     case "agendamento":
-      corpo = `Perfeito, ${saudacao}vou encaminhar seu atendimento para ${destino} continuar a marcação com você por aqui mesmo. 😊`;
+      corpo = `Perfeito, ${saudacao}vou encaminhar seu atendimento para ${destino} continuar a marcação com você por aqui mesmo.`;
       break;
     case "financeiro":
       corpo = `Certo, ${saudacao}vou encaminhar seu atendimento${sobre} para ${destino}, que segue com você por aqui.`;
       break;
     case "informacao_indisponivel":
-      corpo = `Para te passar essa informação com segurança, ${saudacao}vou encaminhar seu atendimento para ${destino} continuar por aqui. 😊`;
+      corpo = `Para te passar essa informação com segurança, ${saudacao}vou encaminhar seu atendimento para ${destino} continuar por aqui.`;
       break;
     case "pedido_do_paciente":
       corpo = `Claro, ${saudacao}já estou encaminhando seu atendimento para ${destino}. A conversa continua por aqui mesmo.`;
       break;
     default:
-      corpo = `${saudacao ? saudacao.charAt(0).toUpperCase() + saudacao.slice(1) : ""}vou encaminhar seu atendimento${sobre} para ${destino} continuar com você por aqui. 😊`;
+      corpo = `${saudacao ? saudacao.charAt(0).toUpperCase() + saudacao.slice(1) : ""}vou encaminhar seu atendimento${sobre} para ${destino} continuar com você por aqui.`;
   }
   corpo = corpo.charAt(0).toUpperCase() + corpo.slice(1);
-  return `${corpo}\n\nProtocolo do atendimento: ${ctx.protocolo}`;
+  return removerEmojisNina(`${corpo}\n\nProtocolo do atendimento: ${ctx.protocolo}`);
 }
 
 /** Instrução do modelo para redigir a mensagem contextual. */
@@ -205,6 +207,7 @@ export function promptMensagemHandoff(ctx: ContextoMensagemHandoff): string {
       : `Você é a assistente virtual${ondeAtende}, falando por mensagem com o paciente.`,
     "Escreva UMA mensagem curta (até 3 linhas) avisando que o atendimento será encaminhado para a equipe humana.",
     "Regras obrigatórias:",
+    "- emojis são proibidos em toda a mensagem; use apenas texto;",
     `- diga que vai encaminhar para ${destino};`,
     "- diga que o atendimento continua por aqui (mesmo canal);",
     `- termine com uma linha exatamente assim: Protocolo do atendimento: ${ctx.protocolo}`,

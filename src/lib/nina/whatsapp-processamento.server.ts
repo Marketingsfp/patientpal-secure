@@ -1,4 +1,5 @@
 import { POLITICA_WATCHDOG } from "./watchdog";
+import { removerEmojisNina } from "./resposta/sem-emojis";
 /** Transporte canônico da Nina, reutilizado pelo webhook e pela retomada de lotes. */
 import {
   carregarControleWatchdog,
@@ -263,6 +264,8 @@ export async function processarRespostaWhatsappNina(entrada: EntradaRespostaWhat
         console.error("[nina] finalização da resposta falhou", e);
       }
     }
+    // Também protege checkpoints de versões antigas e falha da finalização.
+    reply = removerEmojisNina(reply);
     // FASE 4 — antes de QUALQUER envio: a resposta ainda vale?
     if (reply && revisaoTurno) {
       const { respostaObsoleta } = await import("@/lib/nina/revisao-conversa.server");
@@ -361,7 +364,7 @@ export async function processarRespostaWhatsappNina(entrada: EntradaRespostaWhat
                 ? await entregarComCheckpointNina(
                     controle,
                     {
-                      texto: "🎤 " + falado,
+                      texto: falado,
                       tipo: "audio",
                       integral: !longa,
                       canal: "whatsapp",
@@ -392,7 +395,7 @@ export async function processarRespostaWhatsappNina(entrada: EntradaRespostaWhat
                       direction: "out",
                       from_number: displayPhoneNumber,
                       to_number: from,
-                      body: `🎤 ${falado}`,
+                      body: falado,
                       tipo: "audio",
                       transcricao: falado,
                       media_mime: audio.mime,

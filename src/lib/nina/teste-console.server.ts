@@ -7,6 +7,7 @@
  * motor de teste de carga (Fase 6), para que exista um único caminho de
  * processamento na homologação.
  */
+import { removerEmojisNina } from "./resposta/sem-emojis";
 import {
   carregarControleWatchdog,
   gerarComCheckpointNina,
@@ -629,6 +630,8 @@ export async function processarMensagemTeste(
       }
     }
 
+    // Mesmo formato do WhatsApp, inclusive em retomadas de checkpoints antigos.
+    reply = removerEmojisNina(reply);
     // A conversa pode ter sido resolvida enquanto a Nina pensava: descarta.
     const atual = await carregarLead(supabaseAdmin, data.clinicaId, data.leadId);
     // Resposta atrasada: se o ciclo foi encerrado (ou já é outro) enquanto a
@@ -743,7 +746,7 @@ export async function processarMensagemTeste(
               await entregarComCheckpointNina(
                 controle,
                 {
-                  texto: "🎤 " + falado,
+                  texto: falado,
                   tipo: "audio",
                   integral: !longa,
                   canal: "test-console",
@@ -765,7 +768,7 @@ export async function processarMensagemTeste(
                   direction: "out",
                   from_number: CANAL_TESTE,
                   to_number: lead.telefone_sessao,
-                  body: `🎤 ${falado}`,
+                  body: falado,
                   tipo: "audio",
                   transcricao: falado,
                   media_mime: sintetizado.mime,

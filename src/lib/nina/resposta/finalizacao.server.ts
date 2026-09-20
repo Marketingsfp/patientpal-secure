@@ -25,6 +25,7 @@ import {
 } from "./contrato";
 import { acrescentarDespedidaAgendamento, textoDaChave, CHAVES_CONFIRMACAO_AGENDAMENTO } from "./templates";
 import { carregarTemplatesPublicados } from "./templates.server";
+import { removerEmojisNina } from "./sem-emojis";
 
 export type CanalFinalizacao = "whatsapp" | "test-console";
 
@@ -238,7 +239,13 @@ export async function finalizarResposta(
     }
   }
 
-  const texto = resultado.texto ?? "";
+  // Depois de TODOS os templates e despedidas, antes do hash e da entrega.
+  resultado.texto = removerEmojisNina(resultado.texto ?? "");
+  if (!resultado.texto && resultado.estado === "entregar") {
+    resultado.estado = "descartar";
+    resultado.restricoes = [...resultado.restricoes, "sem_texto_apos_remover_emojis"];
+  }
+  const texto = resultado.texto;
   const textoOriginal = pedido.resultado.texto ?? "";
 
   // FASE 4 — identidade publicada do turno, registrada junto do texto para

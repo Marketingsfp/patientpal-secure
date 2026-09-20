@@ -224,7 +224,8 @@ export const chatNina = createServerFn({ method: "POST" })
       const chamadas = resposta.toolCalls ?? [];
 
       if (chamadas.length === 0) {
-        return { reply: resposta.conteudo, error: null as string | null };
+        const { removerEmojisNina } = await import("@/lib/nina/resposta/sem-emojis");
+        return { reply: removerEmojisNina(resposta.conteudo ?? ""), error: null as string | null };
       }
 
       historico.push({ role: "assistant", content: resposta.conteudo || null, tool_calls: chamadas });
@@ -259,4 +260,3 @@ export const chatNina = createServerFn({ method: "POST" })
       error: "A Nina não conseguiu concluir a tarefa em poucas etapas. Tente pedir de forma mais direta.",
     };
   });
-
