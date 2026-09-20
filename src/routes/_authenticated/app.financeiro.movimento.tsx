@@ -676,12 +676,6 @@ function Page() {
       const agendaIds = Array.from(
         new Set(ags.map((a) => a.agenda_id).filter((x): x is string => !!x)),
       );
-      const agendaMap = new Map<string, string>();
-      for (const a of await emLotes<{ id: string; nome: string | null }>(agendaIds, (lote) =>
-        supabase.from("medico_agendas").select("id, nome").in("id", lote),
-      )) {
-        agendaMap.set(a.id, a.nome ?? "");
-      }
       const medIds = Array.from(
         new Set(
           [
@@ -690,12 +684,19 @@ function Page() {
           ].filter((x): x is string => !!x),
         ),
       );
+      // Nomes de agenda e de profissional são buscas independentes: vão juntas.
+      const [agendasNomes, medicosNomes] = await Promise.all([
+        emLotes<{ id: string; nome: string | null }>(agendaIds, (lote) =>
+          supabase.from("medico_agendas").select("id, nome").in("id", lote),
+        ),
+        emLotes<{ id: string; nome: string | null }>(medIds, (lote) =>
+          supabase.from("medicos").select("id, nome").in("id", lote),
+        ),
+      ]);
+      const agendaMap = new Map<string, string>();
+      for (const a of agendasNomes) agendaMap.set(a.id, a.nome ?? "");
       const medMap = new Map<string, string>();
-      for (const m of await emLotes<{ id: string; nome: string | null }>(medIds, (lote) =>
-        supabase.from("medicos").select("id, nome").in("id", lote),
-      )) {
-        medMap.set(m.id, m.nome ?? "");
-      }
+      for (const m of medicosNomes) medMap.set(m.id, m.nome ?? "");
       finList = finList.map((l) => {
         const raw = l as unknown as {
           medico_id?: string | null;
