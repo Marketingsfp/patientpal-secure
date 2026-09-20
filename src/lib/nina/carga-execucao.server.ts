@@ -24,6 +24,8 @@ export async function executarCargaControlada(e: {
   ) => Promise<any>;
   agora?: () => number;
   heartbeatMs?: number;
+  /** Job persistido ainda possui autorização/reserva para iniciar novas mensagens. */
+  podeContinuar?: () => Promise<boolean>;
 }) {
   const agora = e.agora ?? Date.now;
   const carga = await carregarCargaControlada(e.admin, e.clinicaId, e.cargaId);
@@ -123,7 +125,7 @@ export async function executarCargaControlada(e: {
           throw new Error(
             `Lead ${item.leadIndice}: a sessão mudou ou não possui baseline. Prepare um novo teste.`,
           );
-        if (!(await dono.aindaAtivo())) return;
+        if (!(await dono.aindaAtivo()) || (e.podeContinuar && !(await e.podeContinuar()))) return;
         let resp: any;
         try {
           resp = await e.processar(

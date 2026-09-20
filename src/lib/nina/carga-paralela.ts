@@ -1,6 +1,10 @@
 import { normalizarConfig } from "./carga";
 
 export const EXECUTOR_CARGA_PARALELA = "carga-v4-paralela";
+export const EXECUTOR_CARGA_SERVIDOR = "carga-v5-servidor";
+export function cargaServidor(config: any): boolean {
+  return config?.executor === EXECUTOR_CARGA_SERVIDOR;
+}
 export const QUARENTENA_PARALELA_MS = 300_000;
 export const LEASE_PARALELA_MS = 120_000;
 
@@ -29,7 +33,7 @@ export type ControleParalelo = {
 };
 
 export function cargaParalela(config: any): boolean {
-  return config?.executor === EXECUTOR_CARGA_PARALELA;
+  return config?.executor === EXECUTOR_CARGA_PARALELA || cargaServidor(config);
 }
 
 export function controleParalelo(config: any): ControleParalelo {

@@ -22,6 +22,30 @@ import {
 } from "./fixtures/carga-banco-simulado";
 
 describe("controle de execução da carga (banco e processador simulados)", () => {
+  it("preparação autônoma retoma depois da quarentena conservando os baselines", async () => {
+    const agora = Date.now();
+    const carga = cargaFicticia({ status: "preparando" });
+    carga.config = configComControle(
+      { ...(carga.config as any), executor: "carga-v5-servidor" },
+      {
+        ...controleExecucaoCarga(carga.config),
+        lease: {
+          token: "antigo",
+          fase: "preflight",
+          heartbeatEm: new Date(agora - LEASE_CARGA_MS).toISOString(),
+          expiraEm: new Date(agora - 1).toISOString(),
+          indices: [],
+        },
+      },
+    );
+    const db = criarBancoCargaSimulado([carga]);
+    expect(estadoControleCarga(carga, agora).ocupado).toBe(true);
+    const retomada = await recuperarCargaSemAtividade(db.admin, carga, agora + QUARENTENA_CARGA_MS);
+    expect(retomada.status).toBe("preparando");
+    expect(retomada.cancelar).toBe(false);
+    expect(retomada.preflight).toEqual(carga.preflight);
+    expect(controleExecucaoCarga(retomada.config).lease).toBeNull();
+  });
   it("parada entre leitura e CAS final libera o próprio lease preservando a parada", async () => {
     const db = criarBancoCargaSimulado();
     const fim = await comLeaseCarga({

@@ -205,6 +205,27 @@ describe("revisão do plano de carga sem geração ou disparo", () => {
 });
 
 describe("continuidade local usa estados persistidos e chamadas simuladas, sem IA real", () => {
+  for (const status of ["preparando", "executando"])
+    it(`carga autônoma ${status} não depende de disparos ou esperas da página`, async () => {
+      let escritas = 0;
+      const executar = async () => {
+        escritas++;
+        return { status: "executando" };
+      };
+      expect(
+        await conduzirCargaLocal({
+          vigente: () => true,
+          ler: async () => carga(status, { servidor: true, paralela: true }),
+          preparar: executar,
+          executar,
+          progresso: () => {},
+          aguardar: async () => {
+            escritas++;
+          },
+        }),
+      ).toBe("servidor");
+      expect(escritas).toBe(0);
+    });
   it("prepara antes de executar e só conclui após confirmação persistida", async () => {
     const estados = [carga("preparando"), carga("executando"), carga("concluido")];
     const chamadas: string[] = [];

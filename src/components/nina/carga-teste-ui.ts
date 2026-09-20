@@ -68,6 +68,7 @@ export function revisarPlanoCarga(plano: PlanoCarga, config: ConfigCarga): Plano
 }
 
 export type ControleCarga = {
+  servidor?: boolean;
   paralela?: boolean;
   concorrencia?: number;
   ativo: boolean;
@@ -147,6 +148,8 @@ export async function conduzirCargaLocal(e: {
   if (!e.vigente()) return "interrompido";
   let carga = await e.ler();
   while (e.vigente() && cargaAtiva(carga)) {
+    // O navegador apenas observa cargas novas. A fila já foi criada na transação de Iniciar.
+    if (carga.controle?.servidor) return "servidor";
     if (carga.status === "executando" && carga.controle?.paralela)
       return conduzirCargaParalelaLocal(e, carga.controle.concorrencia ?? 1);
     // Uma página recarregada não disputa o lote vivo de outra página.

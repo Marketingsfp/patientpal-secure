@@ -12,6 +12,12 @@ import { validarPlanoCarga, planoMensagensIA } from "../../carga-planejamento";
 import { controleExecucaoCarga, estadoControleCarga } from "../../carga-controle";
 
 const db = criarBancoCargaSimulado([]);
+let servidorDisponivel = true;
+const rpcOriginal = db.admin.rpc.bind(db.admin);
+db.admin.rpc = async (nome: string, args: any) =>
+  nome === "nina_carga_servidor_disponivel"
+    ? { data: servidorDisponivel, error: null }
+    : rpcOriginal(nome, args);
 let chamadas: Array<{ chave: string; texto: string; leadId: string }> = [];
 let resets: any[] = [],
   redacoes = 0;
@@ -85,6 +91,9 @@ mock.module("@/lib/nina/teste-console.server", () => ({
   },
 }));
 const f = await import("../../carga.functions");
+const { prepararCargaControlada } = await import("../../carga-preparacao.server");
+const prepararNoServidor = ({ data }: any) =>
+  prepararCargaControlada({ ...data, admin: db.admin, userId: "user" });
 const input = () => ({
   clinicaId: CLINICA_CARGA,
   nome: "Carga simulada",
@@ -101,6 +110,7 @@ const input = () => ({
 });
 const chamar = (fn: any, data: any) => fn({ data });
 beforeEach(() => {
+  servidorDisponivel = true;
   Object.assign(db.tabelas, criarBancoCargaSimulado([]).tabelas);
   db.consultas.length = 0;
   db.locks.clear();
@@ -118,6 +128,26 @@ beforeEach(() => {
 });
 
 describe("handlers reais de carga com fronteiras simuladas", () => {
+  it("infraestrutura inativa impede criação e redação paga", async () => {
+    servidorDisponivel = false;
+    await expect(chamar(f.criarTesteCarga, { ...input(), usarLuna: true })).rejects.toThrow(
+      "ainda não está disponível",
+    );
+    expect(db.tabelas.nina_teste_carga).toHaveLength(0);
+    expect(redacoes).toBe(0);
+    expect(resets).toHaveLength(0);
+  });
+  it("endpoints da página apenas consultam cargas autônomas", async () => {
+    const criado = await chamar(f.criarTesteCarga, input());
+    const args = { clinicaId: CLINICA_CARGA, cargaId: criado.carga.id };
+    await chamar(f.prepararLeadsTesteCarga, args);
+    db.tabelas.nina_teste_carga![0].status = "executando";
+    await chamar(f.executarLoteCarga, args);
+    const atual = await chamar(f.estadoTesteCarga, args);
+    expect(atual.controle.servidor).toBe(true);
+    expect(resets).toHaveLength(0);
+    expect(chamadas).toHaveLength(0);
+  });
   it("duas criações concorrentes gravam somente um teste", async () => {
     const r = await Promise.allSettled([
       chamar(f.criarTesteCarga, input()),
@@ -132,7 +162,7 @@ describe("handlers reais de carga com fronteiras simuladas", () => {
     const criado = await chamar(f.criarTesteCarga, { ...input(), confirmado: false });
     expect(resets).toHaveLength(0);
     const args = { clinicaId: CLINICA_CARGA, cargaId: criado.carga.id };
-    const primeiro = await chamar(f.prepararLeadsTesteCarga, args);
+    const primeiro = await chamar(prepararNoServidor, args);
     expect(primeiro.status).toBe("preparando");
     expect(primeiro.prontos).toBe(3);
     expect(primeiro.total).toBe(10);
@@ -140,8 +170,8 @@ describe("handlers reais de carga com fronteiras simuladas", () => {
     expect(chamadas).toHaveLength(0);
     await chamar(f.listarTestesCarga, { clinicaId: CLINICA_CARGA });
     expect(resets).toHaveLength(3);
-    for (let i = 0; i < 3; i++) await chamar(f.prepararLeadsTesteCarga, args);
-    const final = await chamar(f.prepararLeadsTesteCarga, args);
+    for (let i = 0; i < 3; i++) await chamar(prepararNoServidor, args);
+    const final = await chamar(prepararNoServidor, args);
     expect(final.status).toBe("executando");
     expect(final.prontos).toBe(10);
     expect(resets).toHaveLength(10);
@@ -200,13 +230,13 @@ describe("handlers reais de carga com fronteiras simuladas", () => {
     expect(db.tabelas.nina_teste_carga_amostras![0].erro).toBe(
       "PROCESSADOR_FALHOU_ANTES_DA_ENTRADA",
     );
-    expect(lista.versaoExecutor).toBe("carga-v4-paralela");
+    expect(lista.versaoExecutor).toBe("carga-v5-servidor");
   });
   it("falha de reset persiste identificação do lead, mantém gate fechado e não envia", async () => {
     db.tabelas.nina_teste_leads![0].conversa_id = "conversa-ativa";
     falharReset = "lead-0";
     const criado = await chamar(f.criarTesteCarga, input());
-    const resultado = await chamar(f.prepararLeadsTesteCarga, {
+    const resultado = await chamar(prepararNoServidor, {
       clinicaId: CLINICA_CARGA,
       cargaId: criado.carga.id,
     });
@@ -271,19 +301,19 @@ describe("handlers reais de carga com fronteiras simuladas", () => {
     depoisReset = async () => {
       await chamar(f.pararTesteCarga, args);
     };
-    const resultado = await chamar(f.prepararLeadsTesteCarga, args);
+    const resultado = await chamar(prepararNoServidor, args);
     expect(resultado.status).toBe("parado");
     expect(resets).toHaveLength(1);
-    await chamar(f.prepararLeadsTesteCarga, args);
+    await chamar(prepararNoServidor, args);
     expect(resets).toHaveLength(1);
     expect(chamadas).toHaveLength(0);
   });
   it("gate revalida os 10 leads e recusa sessão usada depois do baseline", async () => {
     const criado = await chamar(f.criarTesteCarga, input());
     const args = { clinicaId: CLINICA_CARGA, cargaId: criado.carga.id };
-    await chamar(f.prepararLeadsTesteCarga, args);
+    await chamar(prepararNoServidor, args);
     db.tabelas.nina_teste_leads![0].conversa_id = "nova-conversa-operador";
-    for (let i = 0; i < 3; i++) await chamar(f.prepararLeadsTesteCarga, args);
+    for (let i = 0; i < 3; i++) await chamar(prepararNoServidor, args);
     expect(db.tabelas.nina_teste_carga![0].status).toBe("erro");
     expect(db.tabelas.nina_teste_leads![0].conversa_id).toBe("nova-conversa-operador");
     expect(resets.filter((r) => r.leadId === "lead-0")).toHaveLength(1);

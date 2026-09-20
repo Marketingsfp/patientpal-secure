@@ -2,6 +2,9 @@
 
 Data: 19/09/2026.
 
+Este documento registra o executor v4, mantido para cargas antigas. Novas cargas
+usam a [execução independente do navegador](carga-servidor.md), versão v5.
+
 ## Comportamento
 
 O executor anterior (`carga-v3-item`) processava uma mensagem por requisição e

@@ -276,6 +276,8 @@ function CargaTesteClinica({
     if (!vivo.current || !vigente()) return;
     await recarregar();
     if (status === "concluido") toast.success("Teste de carga concluído.");
+    else if (status === "servidor")
+      toast.success("Teste iniciado no servidor. Você pode fechar esta página.");
     else if (status === "ocupado")
       toast.info("Há um lote em andamento. Aguarde a atualização para retomar.");
   };
@@ -417,19 +419,24 @@ function CargaTesteClinica({
             role="status"
           >
             <p className="font-medium">
-              {ativo.controle?.ocupado
-                ? "Há um lote em processamento"
-                : rodando
-                  ? "Teste em andamento"
-                  : "Teste ativo aguardando continuidade"}
+              {ativo.controle?.servidor && ativo.controle.ativo
+                ? "Teste em execução no servidor"
+                : ativo.controle?.ocupado
+                  ? "Há um lote em processamento"
+                  : rodando
+                    ? "Teste em andamento"
+                    : "Teste ativo aguardando continuidade"}
             </p>
             <p className="text-sm">
               {ativo.nome} · {ativo.enviadas}/{ativo.total_planejado} mensagens · {ativo.status}
             </p>
             {ativo.controle?.erro && <p className="text-sm">{ativo.controle.erro}</p>}
             <p className="text-xs text-muted-foreground">
-              O estado foi recuperado do servidor. Reabrir esta tela não dispara mensagens
-              automaticamente.
+              {ativo.controle?.servidor
+                ? ativo.controle.ativo
+                  ? "Você pode fechar esta página. O teste continua no servidor e os resultados ficam salvos aqui."
+                  : "Encerramento registrado. Aguardando apenas as mensagens já em processamento."
+                : "O estado foi recuperado do servidor. Reabrir esta tela não dispara mensagens automaticamente."}
             </p>
             {ativo.controle?.ocupado && !ativo.controle.ativo && (
               <p className="text-sm">
@@ -438,18 +445,20 @@ function CargaTesteClinica({
               </p>
             )}
             <div className="flex flex-wrap gap-2">
-              <Button
-                size="sm"
-                disabled={
-                  rodando ||
-                  parando ||
-                  !ativo.controle?.podeRetomar ||
-                  (ativo.controle.ocupado && !ativo.controle.paralela)
-                }
-                onClick={() => void retomar(ativo)}
-              >
-                <Play className="mr-2 h-4 w-4" /> Retomar teste
-              </Button>
+              {!ativo.controle?.servidor && (
+                <Button
+                  size="sm"
+                  disabled={
+                    rodando ||
+                    parando ||
+                    !ativo.controle?.podeRetomar ||
+                    (ativo.controle.ocupado && !ativo.controle.paralela)
+                  }
+                  onClick={() => void retomar(ativo)}
+                >
+                  <Play className="mr-2 h-4 w-4" /> Retomar teste
+                </Button>
+              )}
               <Button
                 size="sm"
                 variant="outline"
@@ -628,9 +637,9 @@ function CargaTesteClinica({
           </p>
         )}
         <p className="text-sm text-muted-foreground">
-          Cada mensagem usa uma requisição separada. Leads diferentes avançam em paralelo; mensagens
-          do mesmo paciente mantêm a ordem. Com a página fechada, o watchdog ativo retoma um item
-          por execução do job, em ritmo reduzido.
+          Após a confirmação de início, o teste continua no servidor mesmo com esta página fechada.
+          Pacientes diferentes avançam em paralelo; as mensagens de cada paciente mantêm a ordem.
+          Você pode voltar para acompanhar os resultados ou encerrar o teste.
         </p>
         {preparo?.prontos !== undefined && (
           <p className="rounded-lg border p-3 text-sm">

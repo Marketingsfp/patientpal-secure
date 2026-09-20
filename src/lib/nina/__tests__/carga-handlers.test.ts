@@ -8,6 +8,6 @@ it("handlers de carga passam em processo isolado, sem mocks afetarem outras suí
     stderr: "pipe",
   });
   const saida = new TextDecoder().decode(p.stdout) + new TextDecoder().decode(p.stderr);
-  expect(saida).toContain("10 pass");
+  expect(saida).toContain("12 pass");
   expect(p.exitCode, saida).toBe(0);
 }, 20_000);

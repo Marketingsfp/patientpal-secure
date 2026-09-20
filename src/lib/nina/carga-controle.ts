@@ -1,5 +1,11 @@
 /** Estado persistido do executor de carga. Timeout não é prova de cancelamento. */
-import { cargaParalela, controleParalelo, limiteParalelo, reservasVivas } from "./carga-paralela";
+import {
+  cargaParalela,
+  cargaServidor,
+  controleParalelo,
+  limiteParalelo,
+  reservasVivas,
+} from "./carga-paralela";
 export const LEASE_CARGA_MS = 120_000;
 export const HEARTBEAT_CARGA_MS = 20_000;
 export const QUARENTENA_CARGA_MS = 300_000;
@@ -116,6 +122,7 @@ export function estadoControleCarga(carga: CargaPersistida, agora = Date.now()) 
       aguardarMs: Math.max(0, p.proximoDisparo - agora),
       paralela: true,
       concorrencia: limiteParalelo(carga.config),
+      servidor: cargaServidor(carga.config),
     };
   }
   return {
@@ -134,6 +141,7 @@ export function estadoControleCarga(carga: CargaPersistida, agora = Date.now()) 
     aguardarMs: Math.max(0, dataMs(c.proximoDisparoEm) - agora),
     paralela: false,
     concorrencia: 1,
+    servidor: cargaServidor(carga.config),
   };
 }
 
@@ -144,8 +152,8 @@ export function patchRecuperarCarga(carga: CargaPersistida, agora = Date.now()) 
   // Só as filas criadas com o executor por item têm retomada automática.
   // Cada item será conciliado com sua entrada/saída antes de iniciar qualquer geração.
   if (
-    objeto(carga.config).executor === VERSAO_EXECUTOR_CARGA &&
-    carga.status === "executando" &&
+    ((objeto(carga.config).executor === VERSAO_EXECUTOR_CARGA && carga.status === "executando") ||
+      (cargaServidor(carga.config) && carga.status === "preparando")) &&
     !carga.cancelar
   ) {
     return {

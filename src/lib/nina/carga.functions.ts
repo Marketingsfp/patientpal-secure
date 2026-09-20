@@ -11,7 +11,12 @@
  */
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { metricasParalelas, limiteParalelo, EXECUTOR_CARGA_PARALELA } from "./carga-paralela";
+import {
+  metricasParalelas,
+  limiteParalelo,
+  EXECUTOR_CARGA_SERVIDOR,
+  cargaServidor,
+} from "./carga-paralela";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import {
   calcularMetricas,
@@ -32,7 +37,6 @@ import { lerAmostrasCarga, totaisAmostrasCarga } from "./carga-itens.server";
 import {
   carregarCargaControlada as carregarCarga,
   recuperarCargaSemAtividade,
-  comLeaseCarga,
   retornoCarga,
   comLockCriacaoCarga,
   cargasQueReservamExecutor,
@@ -160,6 +164,8 @@ export const criarTesteCarga = createServerFn({ method: "POST" })
     const check = validarDisparo(config, data.confirmado);
     if (!check.ok) throw new Error(check.motivo);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { confirmarServidorCargaDisponivel } = await import("./carga-servidor.server");
+    await confirmarServidorCargaDisponivel(supabaseAdmin);
     const { garantirLeads } = await import("@/lib/nina/teste-console.server");
     const mensagemAtivo =
       "Já existe um teste ativo ou uma mensagem ainda em processamento nesta clínica. Abra o teste para acompanhar ou retomar.";
@@ -203,7 +209,7 @@ export const criarTesteCarga = createServerFn({ method: "POST" })
           status: "preparando",
           config: {
             ...config,
-            executor: EXECUTOR_CARGA_PARALELA,
+            executor: EXECUTOR_CARGA_SERVIDOR,
             concorrenciaEfetiva: config.conversasSimultaneas,
             ...(planoIA ? { planoIA } : {}),
             _inicioCarga: {
@@ -251,129 +257,14 @@ export const prepararLeadsTesteCarga = createServerFn({ method: "POST" })
   .handler(async ({ data, context }: { data: any; context: Ctx }) => {
     await assertMembership(context.supabase, context.userId, data.clinicaId);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { prepararLeadsCarga } = await import("@/lib/nina/carga-preflight.server");
-    const {
-      LOTE_PREFLIGHT,
-      baselineLead,
-      descreverFalhaPreflight,
-      descreverPreparacaoParcial,
-      pendentesPreflight,
-    } = await import("@/lib/nina/carga-preflight");
     const carga = await carregarCarga(supabaseAdmin, data.clinicaId, data.cargaId);
-    const resultado =
-      carga.status === "preparando"
-        ? await comLeaseCarga({
-            admin: supabaseAdmin,
-            carga,
-            fase: "preflight",
-            executar: async (dono, atual) => {
-              const plano = Array.isArray(atual.plano) ? (atual.plano as any[]) : [];
-              const inicioConfirmado = (atual.config as any)?._inicioCarga;
-              // O snapshot é criado apenas pelo comando Iniciar; `confirmado` legado
-              // pertence à confirmação adicional de alto volume, não ao reset inicial.
-              const reiniciarNoInicio =
-                inicioConfirmado?.versao === 1 && inicioConfirmado?.resetTodosLeads === true;
-              const participantes = reiniciarNoInicio
-                ? inicioConfirmado.leads
-                : [
-                    ...new Map(
-                      plano.map((p: any) => [
-                        p.leadId,
-                        { id: p.leadId as string, indice: p.leadIndice as number },
-                      ]),
-                    ).values(),
-                  ];
-              if (
-                !Array.isArray(participantes) ||
-                !participantes.length ||
-                (reiniciarNoInicio &&
-                  (participantes.length !== 10 ||
-                    new Set(participantes.map((l: any) => l.id)).size !== 10))
-              )
-                throw new Error("O plano não possui participantes válidos.");
-              const baselines = Array.isArray(atual.preflight) ? atual.preflight : [];
-              let acumulado = [...baselines];
-              const pendentes = pendentesPreflight(participantes, baselines).slice(
-                0,
-                LOTE_PREFLIGHT,
-              );
-              if (!(await dono.aindaAtivo())) return;
-              const resumo = pendentes.length
-                ? await prepararLeadsCarga({
-                    admin: supabaseAdmin,
-                    clinicaId: data.clinicaId,
-                    leads: pendentes as any,
-                    userId: context.userId,
-                    reiniciarNoInicio,
-                    podeContinuar: dono.aindaAtivo,
-                    aposPronto: async (resultado) => {
-                      acumulado = [
-                        ...acumulado.filter((b: any) => b.leadId !== resultado.leadId),
-                        baselineLead({ runId: atual.id, resultado }),
-                      ];
-                      if (!(await dono.alterar({ preflight: acumulado })))
-                        throw new Error(
-                          "A preparação perdeu sua reserva antes de registrar o lead pronto.",
-                        );
-                    },
-                  })
-                : { pronto: true, total: 0, prontos: 0, falhas: [], resultados: [] };
-              if (resumo.falhas.length)
-                throw new Error(
-                  (
-                    descreverPreparacaoParcial(acumulado.length, participantes.length) +
-                    " " +
-                    descreverFalhaPreflight(resumo as any)
-                  ).trim(),
-                );
-              if (
-                pendentesPreflight(participantes, acumulado).length === 0 &&
-                (await dono.aindaAtivo())
-              ) {
-                // Revalida todos antes de abrir o gate: outro operador pode ter usado
-                // um lead já preparado enquanto os demais ainda eram reiniciados.
-                const { data: atuais, error } = await supabaseAdmin
-                  .from("nina_teste_leads")
-                  .select("id, sessao_seq, conversa_id, ciclo_id")
-                  .eq("clinica_id", data.clinicaId)
-                  .in(
-                    "id",
-                    participantes.map((l: any) => l.id),
-                  );
-                if (error)
-                  throw new Error(
-                    `Não foi possível confirmar as sessões preparadas: ${error.message}`,
-                  );
-                for (const participante of participantes) {
-                  const lead = atuais?.find((l: any) => l.id === participante.id);
-                  const baseline = acumulado.find((b: any) => b.leadId === participante.id);
-                  if (
-                    !lead ||
-                    !baseline ||
-                    lead.conversa_id ||
-                    lead.ciclo_id ||
-                    Number(lead.sessao_seq) !== baseline.sessao
-                  )
-                    throw new Error(
-                      `Lead ${participante.indice}: a sessão mudou durante a preparação. Nenhuma mensagem de carga foi enviada.`,
-                    );
-                }
-                await dono.alterar({ status: "executando", iniciado_em: new Date().toISOString() });
-              }
-            },
-          })
-        : { carga, ocupado: estadoControleCarga(carga).ocupado };
-    const atual = resultado.carga;
-    const snapshot = (atual.config as any)?._inicioCarga;
-    const participantes =
-      snapshot?.resetTodosLeads && Array.isArray(snapshot.leads)
-        ? snapshot.leads.length
-        : new Set((Array.isArray(atual.plano) ? atual.plano : []).map((p: any) => p.leadId)).size;
-    return retornoCarga(atual, {
-      ocupado: resultado.ocupado,
-      pronto: atual.status === "executando",
-      prontos: Array.isArray(atual.preflight) ? atual.preflight.length : 0,
-      total: participantes,
+    if (cargaServidor(carga.config)) return retornoCarga(carga);
+    const { prepararCargaControlada } = await import("./carga-preparacao.server");
+    return prepararCargaControlada({
+      admin: supabaseAdmin,
+      clinicaId: data.clinicaId,
+      cargaId: data.cargaId,
+      userId: context.userId,
     });
   });
 
@@ -386,6 +277,8 @@ export const executarLoteCarga = createServerFn({ method: "POST" })
   .handler(async ({ data, context }: { data: any; context: Ctx }) => {
     await assertMembership(context.supabase, context.userId, data.clinicaId);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const carga = await carregarCarga(supabaseAdmin, data.clinicaId, data.cargaId);
+    if (cargaServidor(carga.config)) return retornoCarga(carga);
     const { processarMensagemTeste } = await import("@/lib/nina/teste-console.server");
     const { executarCargaControlada } = await import("./carga-execucao.server");
     return await executarCargaControlada({
@@ -453,7 +346,7 @@ export const listarTestesCarga = createServerFn({ method: "POST" })
       .limit(20);
     if (error) throw new Error(error.message);
     return {
-      versaoExecutor: EXECUTOR_CARGA_PARALELA,
+      versaoExecutor: EXECUTOR_CARGA_SERVIDOR,
       testes: (linhas ?? []).map((c: any) => ({
         ...c,
         plano: undefined,
