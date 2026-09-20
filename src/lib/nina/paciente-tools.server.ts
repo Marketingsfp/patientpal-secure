@@ -135,6 +135,8 @@ export type CtxNinaPaciente = {
   nomeUnidade?: string;
   /** Havia opções oficiais antes de o paciente enviar esta mensagem? */
   opcoesAgendamentoInicioTurno?: boolean;
+  /** Dúvida encontrada neste turno; só uma nova mensagem do paciente pode esclarecê-la. */
+  esclarecimentoCatalogo?: import("./knowledge-contract").ResultadoConhecimento["esclarecimento"];
 };
 
 
@@ -1008,6 +1010,11 @@ async function executarFerramentaInterna(
   if (SOMENTE_COM_FLAG.has(nome) && ctx.podeAgendar === false)
     return falha("PERMISSION_DENIED", "Agendamento pela assistente não está ativo nesta unidade.");
 
+  if (ctx.esclarecimentoCatalogo && (FERRAMENTAS_DE_VAGAS.has(nome) || ["selecionar_horario", "agendar"].includes(nome)))
+    return { ok: true, consulta_realizada: false, precisa_esclarecer: true,
+      esclarecimento: ctx.esclarecimentoCatalogo,
+      instrucao: `Antes de consultar ou reservar, aguarde a resposta do paciente: ${ctx.esclarecimentoCatalogo.pergunta}` };
+
   try {
     // A Nina interpreta a intenção com o histórico e escolhe a ferramenta.
     // O executor valida fatos e permissões; não reinterpreta a fala por regex.
@@ -1176,6 +1183,7 @@ async function executarFerramentaInterna(
           dia: p.dia ?? null,
           canal: "whatsapp",
         });
+        if (resultado.esclarecimento) ctx.esclarecimentoCatalogo = resultado.esclarecimento;
         // Consulta de leitura: `price` resume o primeiro resultado e pode ser
         // de outro serviço, profissional ou forma de pagamento. Não é o preço
         // do atendimento selecionado e não pode sobrescrever seu estado.
@@ -1207,6 +1215,10 @@ async function executarFerramentaInterna(
           medico: p.nome ?? null,
           canal: ctx.origem,
         });
+        if (r.esclarecimento) {
+          ctx.esclarecimentoCatalogo = r.esclarecimento;
+          return { ok: true, ...r };
+        }
         if (!r.found || r.records.length === 0)
           return falha("DOCTOR_NOT_FOUND", SEM_CATALOGO_INSTRUCAO, {
             fonte: "catalogo_publicado",
@@ -1243,6 +1255,10 @@ async function executarFerramentaInterna(
           query: p.termo,
           canal: ctx.origem,
         });
+        if (r.esclarecimento) {
+          ctx.esclarecimentoCatalogo = r.esclarecimento;
+          return { ok: true, ...r };
+        }
         if (!r.found || r.records.length === 0)
           return falha("PROCEDURE_NOT_FOUND", SEM_CATALOGO_INSTRUCAO, {
             fonte: "catalogo_publicado",

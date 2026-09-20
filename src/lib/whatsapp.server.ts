@@ -1700,6 +1700,7 @@ async function gerarRespostaNinaInterno(
   const { incorporarResultadoOficial, limitarRetornoParaModelo } = await import("@/lib/nina/confidence/evidencias-turno");
   const { resolverSelecaoContextual, normalizarSelecaoContextual } = await import("@/lib/nina/confidence/selecao-contextual");
   const conhecimentoAnterior = conhecimentoDaMesmaSessao(fluxoEstado.knowledge_context, clinicaId, fluxoEstado.session_id ?? null);
+  const { encaminharAposEsclarecimento, MOTIVO_IDENTIFICACAO_PENDENTE } = await import("@/lib/nina/catalogo-esclarecimento");
   fluxoEstado.knowledge_context = conhecimentoAnterior;
   const consultaPlanejada = consultaDoNovoTurno({ mensagem: mensagemPaciente, anterior: conhecimentoAnterior,
     dispensarConsulta: Boolean(saudacaoDispensadaPor) });
@@ -1715,7 +1716,7 @@ async function gerarRespostaNinaInterno(
       }
     }
     const argumentos = ausencia ?? { motivo: MOTIVO_SFP, resumo: "O atendimento solicitado está publicado com profissional SFP. A equipe humana deve continuar o atendimento.", urgencia: "normal" };
-    const origem = ausencia ? "regra_catalogo_sem_registro" : "regra_catalogo_sfp";
+    const origem = ausencia?.motivo === MOTIVO_IDENTIFICACAO_PENDENTE ? "regra_catalogo_esclarecimento_unico" : ausencia ? "regra_catalogo_sem_registro" : "regra_catalogo_sfp";
     rastro?.iniciar("tool.execute", { ferramenta: "solicitar_atendente_humano", origem_solicitacao: origem });
     const rh = await broker.executar("solicitar_atendente_humano", JSON.stringify(argumentos));
     await compartilharResultado("solicitar_atendente_humano", argumentos, rh);
@@ -1760,11 +1761,21 @@ async function gerarRespostaNinaInterno(
       const parsed: unknown = typeof args === "string" ? JSON.parse(args) : args;
       if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) parametros = parsed as Record<string, unknown>;
     } catch { /* inválido não vira referência */ }
+    const esclarecimentoAtual = (r.dados as import("@/lib/nina/knowledge-contract").ResultadoConhecimento | null)?.esclarecimento;
+    if (esclarecimentoAtual) {
+      if (ctxFerramentas) ctxFerramentas.esclarecimentoCatalogo = esclarecimentoAtual;
+      fluxoEstado.knowledge_context = lembrarConsultaComprovada({ clinicaId, sessionId: fluxoEstado.session_id ?? null,
+        fatos: ex.fatos, args: { termo: String(parametros.termo ?? parametros.especialidade ?? parametros.nome ?? mensagemPaciente).slice(0, 200),
+          ...(typeof parametros.medico === "string" ? { medico: parametros.medico } : {}) },
+        esclarecimento: esclarecimentoAtual });
+    }
     if (nome === "consultar_base_conhecimento" && typeof parametros.termo === "string") {
-      const referencia = ex.consulta.status === "com_itens" ? lembrarConsultaComprovada({
+      const esclarecimento = (r.dados as import("@/lib/nina/knowledge-contract").ResultadoConhecimento | null)?.esclarecimento;
+      const referencia = ex.consulta.status === "com_itens" || esclarecimento ? lembrarConsultaComprovada({
         clinicaId, sessionId: fluxoEstado.session_id ?? null, fatos: ex.fatos,
         args: { termo: parametros.termo, ...(typeof parametros.medico === "string" ? { medico: parametros.medico } : {}) },
         anterior: conhecimentoAnterior,
+        esclarecimento,
       }) : null;
       fluxoEstado.knowledge_context = referencia;
       selecaoDoTurno = resolverSelecaoContextual({ mensagem: mensagemPaciente, clinicaId,
@@ -1781,7 +1792,8 @@ async function gerarRespostaNinaInterno(
           ferramentas_de_consulta_disponiveis: true, fatos_antigos_reutilizados: false },
         codigo: { arquivo: "src/lib/whatsapp.server.ts", funcao: "compartilharResultado" } });
     }
-    const ausencia = encaminhamentoSemRegistro(r, args, consultaAutomatica);
+    const ausencia = encaminharAposEsclarecimento(conhecimentoAnterior, r, mensagemPaciente)
+      ?? encaminhamentoSemRegistro(r, args, consultaAutomatica);
     if (ausencia) await encaminharRegraCatalogo(nome, ausencia);
     else if (r.success && resultadoExigeHumano(r.dados, selecaoDoTurno?.selecao?.raizesFonte.map(r => r.registro)))
       await encaminharRegraCatalogo(nome);
@@ -1813,6 +1825,10 @@ async function gerarRespostaNinaInterno(
   if (consultaPlanejada) await consultarFonteAntesDaResposta(consultaPlanejada.args);
   for (let rodada = 0; rodada < MAX_RODADAS; rodada++) {
     if (finalizacaoHandoff || turnoObsoleto) break;
+    if (ctxFerramentas?.esclarecimentoCatalogo) {
+      resposta = ctxFerramentas.esclarecimentoCatalogo.pergunta;
+      break;
+    }
     rodadasDoTurno = rodada + 1;
     // Escolhas por extenso e referências ("o segundo horário") são interpretadas
     // pelo modelo sobre as mesmas opções oficiais guardadas pelo executor.
@@ -2047,6 +2063,7 @@ async function gerarRespostaNinaInterno(
         tool_call_id: c.id,
         content: JSON.stringify(resultadoCompartilhado),
       });
+      if (ctxFerramentas?.esclarecimentoCatalogo) break;
       if (finalizacaoHandoff || turnoObsoleto) break;
       const dadosAgendamento = r.dados as Record<string, unknown> | null;
       if (r.success && dadosAgendamento?.sem_agendamento === true &&
@@ -2168,7 +2185,7 @@ async function gerarRespostaNinaInterno(
 
 
   // Texto tal como saiu do modelo, antes dos ajustes obrigatórios abaixo.
-  const respostaDoModelo = finalizacaoHandoff?.textoModelo ?? resposta;
+  const respostaDoModelo = finalizacaoHandoff?.textoModelo ?? (ctxFerramentas?.esclarecimentoCatalogo ? textoModeloAtual : resposta);
 
   // Persiste o estado estruturado: o que as ferramentas descobriram nesta
   // rodada (paciente identificado, horário oferecido, agendamento criado)
@@ -2238,10 +2255,15 @@ async function gerarRespostaNinaInterno(
     });
   };
 
+  if (!finalizacaoHandoff && !houveHandoff && ctxFerramentas?.esclarecimentoCatalogo) {
+    resposta = ctxFerramentas.esclarecimentoCatalogo.pergunta;
+    transformar("catalogo.esclarecimento", "uma única pergunta para identificar o atendimento", respostaDoModelo, resposta, "aviso_operacional");
+    marcarOrigem("codigo", "identificação pendente: aguardar uma resposta do paciente");
+  }
   if (finalizacaoHandoff) {
     const antes = respostaDoModelo;
     resposta = finalizacaoHandoff.texto;
-    transformar(finalizacaoHandoff.motivo === MOTIVO_SFP ? "catalogo.sfp" : finalizacaoHandoff.motivo === MOTIVO_SEM_REGISTRO ? "catalogo.sem_registro" : "agenda.sem_vagas", finalizacaoHandoff.motivo, antes, resposta, "aviso_operacional");
+    transformar(finalizacaoHandoff.motivo === MOTIVO_SFP ? "catalogo.sfp" : finalizacaoHandoff.motivo === MOTIVO_IDENTIFICACAO_PENDENTE ? "catalogo.esclarecimento_unico" : finalizacaoHandoff.motivo === MOTIVO_SEM_REGISTRO ? "catalogo.sem_registro" : "agenda.sem_vagas", finalizacaoHandoff.motivo, antes, resposta, "aviso_operacional");
     marcarOrigem("codigo", `${finalizacaoHandoff.motivo}; transferência ${finalizacaoHandoff.handoffConfirmado ? "confirmada" : "não confirmada"}`);
     if (finalizacaoHandoff.motivo === MOTIVO_SFP && finalizacaoHandoff.handoffConfirmado) {
       // Não deixar o fallback de texto vazio, o rodapé ou o transporte recriar

@@ -60,6 +60,7 @@ export function resultadoExigeHumano(
 ): boolean {
   const r = objeto(dados);
   if (!r) return false;
+  if (r.esclarecimento) return false;
   if (r.codigo === "PROFISSIONAL_SFP" || r.erro === "PROFISSIONAL_SFP") return true;
   const registros = [r.records, r.registros, r.itens].find(Array.isArray) as unknown[] | undefined;
   if (!registros?.length) return false;

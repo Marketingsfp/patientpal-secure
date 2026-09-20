@@ -68,7 +68,7 @@ describe("interpretação do catálogo pela Nina", () => {
     const notas = r.notes.join(" | ");
     expect(notas).toContain("Dinheiro");
     expect(notas).toContain("R$ 150,00");
-    expect(notas).toContain("Cartão de crédito");
+    expect(notas).toContain("Pix/cartão de crédito");
     expect(notas).toContain("R$ 180,00");
     expect(notas).toContain("no atendimento");
     expect(notas).toContain("em até 3x");

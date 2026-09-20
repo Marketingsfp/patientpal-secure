@@ -2,6 +2,8 @@
 import { ehSaudacaoPura } from "./turno-tipo";
 import { normalizarTexto, type FatoRecuperado } from "./evidencia";
 import { lerEscolhaHorario } from "../agendamento-escolha";
+import { prepararBuscaCatalogo } from "../catalogo-busca";
+import type { ResultadoConhecimento } from "../knowledge-contract";
 
 export type ReferenciaConhecimento = {
   registro: string;
@@ -19,6 +21,8 @@ export type ConhecimentoSessao = {
   selecao?: unknown;
   /** Referência ao aceite de leitura da agenda; revalidada com mensagens entregues. */
   interesseAgenda?: unknown;
+  /** Somente opções de identificação, sem preço ou vaga; reconsultadas após a resposta. */
+  esclarecimento?: ResultadoConhecimento["esclarecimento"];
 };
 
 const texto = (v: unknown, max: number) => (typeof v === "string" ? v.trim().slice(0, max) : "");
@@ -43,7 +47,33 @@ export function normalizarConhecimentoSessao(v: unknown): ConhecimentoSessao | n
         ]
       : [];
   });
-  if (!referencias.length) return null;
+  const bruto = o.esclarecimento as Record<string, unknown> | undefined;
+  const esclarecer =
+    bruto &&
+    ["procedimento", "profissional", "sigla"].includes(String(bruto.tipo)) &&
+    Array.isArray(bruto.opcoes)
+      ? {
+          tipo: bruto.tipo as NonNullable<ResultadoConhecimento["esclarecimento"]>["tipo"],
+          pergunta: texto(bruto.pergunta, 1600),
+          opcoes: bruto.opcoes.slice(0, 12).flatMap((v: unknown) => {
+            if (!v || typeof v !== "object") return [];
+            const p = v as Record<string, unknown>,
+              id = texto(p.id, 180),
+              nome = texto(p.nome, 200);
+            return id && nome && referencias.some((r) => r.registro === id)
+              ? [
+                  {
+                    id,
+                    nome,
+                    especialidade: texto(p.especialidade, 200),
+                    unidade: texto(p.unidade, 160) || null,
+                  },
+                ]
+              : [];
+          }),
+        }
+      : undefined;
+  if (!referencias.length && !esclarecer?.pergunta) return null;
   return {
     versao: 1,
     clinicaId: texto(o.clinicaId, 80),
@@ -54,6 +84,7 @@ export function normalizarConhecimentoSessao(v: unknown): ConhecimentoSessao | n
       ...(texto(q.dia, 40) ? { dia: texto(q.dia, 40) } : {}),
     },
     referencias,
+    ...(esclarecer ? { esclarecimento: esclarecer } : {}),
     ...(o.selecao && typeof o.selecao === "object" ? { selecao: o.selecao } : {}),
     ...(o.interesseAgenda && typeof o.interesseAgenda === "object"
       ? { interesseAgenda: o.interesseAgenda }
@@ -77,15 +108,66 @@ export function consultaDoNovoTurno(e: {
   dispensarConsulta?: boolean;
 }): { args: ConhecimentoSessao["consulta"]; continuidade: boolean } | null {
   if (e.dispensarConsulta || ehSaudacaoPura(e.mensagem)) return null;
-  if (e.anterior && lerEscolhaHorario(e.mensagem)) {
-    return { args: { termo: e.anterior.consulta.termo,
-      ...(e.anterior.consulta.medico ? { medico: e.anterior.consulta.medico } : {}) }, continuidade: true };
+  if (e.anterior && !e.anterior.esclarecimento && lerEscolhaHorario(e.mensagem)) {
+    return {
+      args: {
+        termo: e.anterior.consulta.termo,
+        ...(e.anterior.consulta.medico ? { medico: e.anterior.consulta.medico } : {}),
+      },
+      continuidade: true,
+    };
   }
   const m = normalizarTexto(e.mensagem)
     .replace(/[?!.,;:]/g, " ")
     .replace(/\s+/g, " ")
     .trim();
   if (!m || /^(?:obrigad[oa]|valeu|tchau|ate mais|ok obrigado|ok obrigada)$/.test(m)) return null;
+  const pendente = e.anterior?.esclarecimento;
+  if (pendente?.opcoes.length) {
+    // Uma resposta curta só retoma uma opção que está identificada na pergunta
+    // anterior. Negação, ordinal e mudanças de assunto ficam para o modelo.
+    const nomes = pendente.opcoes.map((p) =>
+      [p.nome, p.especialidade, p.unidade].filter(Boolean).join(" "),
+    );
+    const busca = prepararBuscaCatalogo(e.mensagem, nomes);
+    const matches = pendente.opcoes.filter(
+      (p) => busca.pontuar(p.nome, [p.especialidade, p.unidade].filter(Boolean).join(" ")) > 0,
+    );
+    const confirmacao =
+      /^(?:(?:sim|s|ss|isso|esse|essa|ele|ela|e|mesmo|mesma|correto|correta|pode|ser|ok|certo|por|favor)\s*)+$/.test(
+        m,
+      );
+    const confirmacaoUnica = pendente.opcoes.length === 1 && confirmacao;
+    const ordinal =
+      /^(?:o|a)?\s*(primeir[oa]|segund[oa]|terceir[oa]|quart[oa]|quint[oa]|sext[oa]|[1-6])(?:\s+(?:opcao|profissional|exame))?$/.exec(
+        m,
+      )?.[1];
+    const posicao = ordinal
+      ? /^[1-6]$/.test(ordinal)
+        ? Number(ordinal) - 1
+        : ["primeir", "segund", "terceir", "quart", "quint", "sext"].findIndex((p) =>
+            ordinal.startsWith(p),
+          )
+      : -1;
+    const escolha =
+      posicao >= 0
+        ? pendente.opcoes[posicao]
+        : confirmacaoUnica
+          ? pendente.opcoes[0]
+          : matches.length === 1
+            ? matches[0]
+            : null;
+    if (escolha && !/\b(?:nao|nem|outro|outra|trocar|mudar)\b/.test(m) && !busca.ajustes.length)
+      return {
+        args:
+          pendente.tipo === "profissional"
+            ? { termo: escolha.especialidade || escolha.nome, medico: escolha.id }
+            : { termo: escolha.nome },
+        continuidade: true,
+      };
+    // "sim" a uma pergunta com várias opções continua sendo ambíguo.
+    if (confirmacao) return { args: e.anterior!.consulta, continuidade: true };
+  }
   // Só respostas curtas sem novo assunto explícito herdam a pesquisa. Um
   // procedimento diferente escrito pelo paciente inicia uma consulta própria.
   // Cortesias não mudam o assunto: "sim, por favor" continua a oferta anterior.
@@ -116,6 +198,7 @@ export function lembrarConsultaComprovada(e: {
   args: ConhecimentoSessao["consulta"];
   fatos: FatoRecuperado[];
   anterior?: ConhecimentoSessao | null;
+  esclarecimento?: ResultadoConhecimento["esclarecimento"];
 }): ConhecimentoSessao | null {
   if (!e.sessionId) return null;
   const porRegistro = new Map<string, ReferenciaConhecimento>();
@@ -130,13 +213,14 @@ export function lembrarConsultaComprovada(e: {
     });
   }
   const referencias = [...porRegistro.values()].slice(0, 40);
-  if (!referencias.length) return null;
+  if (!referencias.length && !e.esclarecimento) return null;
   return {
     versao: 1,
     clinicaId: e.clinicaId,
     sessionId: e.sessionId,
     consulta: e.args,
     referencias,
+    ...(e.esclarecimento ? { esclarecimento: e.esclarecimento } : {}),
     ...(e.anterior?.selecao ? { selecao: e.anterior.selecao } : {}),
     ...(e.anterior?.interesseAgenda ? { interesseAgenda: e.anterior.interesseAgenda } : {}),
   };

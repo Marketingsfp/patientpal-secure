@@ -21,7 +21,7 @@ export function normalizarBuscaCatalogo(texto: string): string {
 const GENERICOS = new Set(("gostaria quero queria preciso saber poderia pode podem voces voce favor gentileza " +
   "bom boa dia tarde noite ola por uma umas uns para pra com que qual quais quanto custa custam preco precos valor valores " +
   "informacao informacoes sobre como funciona funcionam funcionamento consulta consultas exame exames procedimento procedimentos medico medica medicos medicas " +
-  "doutor doutora profissional profissionais especialista especialistas especialidade especialidades " +
+  "dr dra doutor doutora profissional profissionais especialista especialistas especialidade especialidades unidade unidades " +
   "marcar marca agendar fazer realiza realizam fazem tem temos atende atendem atendimento atendimento horario horarios " +
   "preparo preparos dias hoje amanha segunda terca quarta quinta sexta sabado domingo feira").split(/\s+/));
 
@@ -43,6 +43,7 @@ export function encaminhamentoSemRegistro(r: ResultadoBroker, args: unknown, aut
   if (!["consultar_base_conhecimento", "buscar_medicos", "buscar_procedimentos", "listar_especialidades"].includes(r.ferramenta)) return null;
   const d = r.dados as Record<string, unknown> | null;
   if (!d || typeof d !== "object") return null;
+  if (d.esclarecimento) return null;
   const ausente = r.success && !r.erro && d.knowledge_status === "not_found" && d.found === false &&
     Array.isArray(d.records) && d.records.length === 0;
   const ausenciaTipada = ["DOCTOR_NOT_FOUND", "PROCEDURE_NOT_FOUND"].includes(r.erro ?? "") &&

@@ -368,6 +368,21 @@ export function extrairEvidencia(r: RetornoFerramenta): ExtracaoEvidencia {
     // -------------------------------------------------- catálogo publicado
     case "searchKnowledgeBase":
     case "listCatalog": {
+      if (d["esclarecimento"]) {
+        const esclarecimento = obj(d["esclarecimento"]);
+        const opcoes = Array.isArray(esclarecimento["opcoes"]) ? esclarecimento["opcoes"] as unknown[] : [];
+        for (const opcao of opcoes) {
+          const p = obj(opcao), nome = texto(p["nome"]), registro = texto(p["id"]);
+          if (!nome || !registro) continue;
+          const profissional = esclarecimento["tipo"] === "profissional";
+          fatos.push({ ...base, ...comVersao, registro,
+            entidade: profissional ? "profissional" : "procedimento", campo: "nome", valor: nome,
+            chave: profissional ? { medicoNome: nome, especialidade: texto(p["especialidade"]), unidadeNome: texto(p["unidade"]) } : { procedimento: nome } });
+        }
+        status = "parcial";
+        motivo = "identificacao_pendente";
+        break; // Preços/preparos de candidatos não viram fatos do item escolhido.
+      }
       const procedimento = texto(d["procedimento"]) ?? texto(d["procedure"]);
       const preco = texto(d["preco"]) ?? texto(d["price"]);
       const registros = registrosDoRetorno(d);
@@ -423,7 +438,7 @@ export function extrairEvidencia(r: RetornoFerramenta): ExtracaoEvidencia {
               valor: medico,
               registro: texto(x["id"]),
               ...comVersao,
-              chave: { ...escopo, medicoNome: medico, unidadeId: unidade },
+              chave: { ...escopo, medicoNome: medico, medicoId: texto(x["medico_id"]), unidadeId: unidade, unidadeNome: unidade },
             });
           }
         }

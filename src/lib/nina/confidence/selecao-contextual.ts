@@ -1,5 +1,6 @@
 /** Preferências conversacionais revalidadas no catálogo; nunca autorizam agendamento. */
 import { normalizarTexto, type FatoRecuperado } from "./evidencia";
+import { perguntaIdentificacaoProfissional } from "../catalogo-busca";
 
 export type RaizSelecaoContextual = {
   fonte: "catalogo_publicado";
@@ -28,6 +29,7 @@ export type CandidatoSelecaoContextual = {
   referenciaProfissional: string;
   raizesFonte: RaizSelecaoContextual[];
   modalidades: ModalidadeSelecaoContextual[];
+  unidades: string[];
 };
 export type ResultadoSelecaoContextual = {
   estado: "sem_selecao" | "selecionado" | "esclarecer_medico" | "esclarecer_modalidade" | "limpo";
@@ -159,7 +161,10 @@ export function candidatosDaSelecaoContextual(
       referenciaProfissional,
       raizesFonte: [],
       modalidades: [],
+      unidades: [],
     };
+    const unidade = texto(f.chave?.unidadeNome);
+    if (unidade && !candidato.unidades.includes(unidade)) candidato.unidades.push(unidade);
     candidato.raizesFonte = juntarRaizes([...candidato.raizesFonte, raiz]);
     const procedimento = texto(f.chave?.procedimento) ?? texto(f.chave?.especialidade);
     if (procedimento) {
@@ -373,7 +378,13 @@ export function resolverSelecaoContextual(e: EntradaSelecaoContextual): Resultad
         opcoesMedicos: correspondentes.length ? correspondentes : candidatos,
         opcoesModalidades: [],
         pergunta: correspondentes.length
-          ? "Qual desses profissionais você prefere?"
+          ? perguntaIdentificacaoProfissional(
+              correspondentes.map((c) => ({
+                nome: c.medicoNome,
+                especialidade: c.modalidades.map((m) => m.nome).join(", "),
+                unidade: c.unidades.join(", "),
+              })),
+            )
           : "Pode informar o nome completo do profissional?",
         motivo: correspondentes.length ? "PROFISSIONAL_AMBIGUO" : "PROFISSIONAL_NAO_CONFIRMADO",
         escolhaExplicita: true,

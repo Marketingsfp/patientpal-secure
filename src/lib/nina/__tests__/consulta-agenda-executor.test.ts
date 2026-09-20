@@ -1194,3 +1194,23 @@ describe("regressão 08:00 versus 10:20 — consulta, escolha, resumo, aceite e 
     expect(gravacoes).toHaveLength(0);
   });
 });
+
+describe("identificação pendente bloqueia avanço da agenda", () => {
+  for (const busca of ["consultar_base_conhecimento", "buscar_procedimentos", "buscar_medicos"]) {
+    test(busca + " pede esclarecimento e impede consulta ou reserva no mesmo turno", async () => {
+      resultadoCatalogo.esclarecimento = { tipo: "procedimento", pergunta: "Qual ultrassonografia?", opcoes: [] };
+      const ctx: CtxNinaPaciente = { ...contexto("Quero USG"), podeAgendar: true };
+      const r = await executarFerramentaPaciente(ctx, busca, { termo: "USG", nome: "Alex", especialidade: "Cardiologia" });
+      expect(r.ok).toBe(true);
+      expect(ctx.esclarecimentoCatalogo).toBeDefined();
+      const antes = leituras.length;
+      for (const nome of ["proxima_vaga", "consultar_disponibilidade", "verificar_horario", "consultar_primeiro_disponivel", "selecionar_horario", "agendar"]) {
+        const bloqueado = await executarFerramentaPaciente(ctx, nome, argumentos);
+        expect(bloqueado.precisa_esclarecer).toBe(true);
+        expect(bloqueado.consulta_realizada).toBe(false);
+      }
+      expect(leituras).toHaveLength(antes);
+      expect(gravacoes).toHaveLength(0);
+    });
+  }
+});

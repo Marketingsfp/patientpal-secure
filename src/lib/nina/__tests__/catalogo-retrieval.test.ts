@@ -255,7 +255,6 @@ describe("recuperação no catálogo publicado", () => {
   it.each([
     "Gostaria de marca a pneumologista",
     "Bom dia gostaria por favor de saber o valor de uma consulta de pneumologia",
-    "Quanto custa o exame PET-CT?",
     "Vocês realizam o procedimento crioablação?",
   ])("serviço diferente não comprova o pedido ausente: %s", async (query) => {
     banco["nina_cat_servicos"] = [
@@ -322,7 +321,7 @@ describe("recuperação no catálogo publicado", () => {
     const r = await buscarNoCatalogo({ clinicaId: CLINICA, query: "endoscopia" });
     const notas = r.notes.join(" | ");
     expect(notas).toContain("à vista — PIX");
-    expect(notas).toContain("em até 3x — Cartão");
+    expect(notas).toContain("em até 3x — Pix/cartão");
     expect(notas).toContain("Requisitos: Necessário pedido médico");
     expect(notas).toContain("Preparo: Jejum de 8 horas");
   });
@@ -425,5 +424,89 @@ describe("recuperação no catálogo publicado", () => {
     expect(r.knowledge_status).toBe("not_found");
     expect(r.records.length).toBe(0);
     expect(r.source).toBe("nina_catalogo");
+  });
+});
+
+describe("siglas, escrita aproximada e identidade publicadas", () => {
+  it.each(["USG de tireoide", "ultra de tireoide", "ultrassonogragia de tireoide"])("localiza %s sem confundir órgão ou outro procedimento", async (query) => {
+    banco.nina_cat_servicos = [
+      servico({ nome: "Ultrassonografia de tireoide", valor: 180 }),
+      servico({ nome: "Punção de tireoide", valor: 250 }),
+      servico({ nome: "Ultrassonografia de abdome total", valor: 220 }),
+    ];
+    const r = await buscarNoCatalogo({ clinicaId: CLINICA, query });
+    expect(r.records).toHaveLength(1);
+    expect(r.procedure).toBe("Ultrassonografia de tireoide");
+    expect(r.price).toBe("R$ 180,00");
+    expect(r.esclarecimento).toBeUndefined();
+  });
+  it.each([1, 6])("não escolhe um tipo de ultrassom por limite de %i resultados", async (limite) => {
+    banco.nina_cat_servicos = [
+      servico({ nome: "Ultrassonografia de tireoide", valor: 180 }),
+      servico({ nome: "Ultrassonografia de abdome total", valor: 220 }),
+    ];
+    const r = await buscarNoCatalogo({ clinicaId: CLINICA, query: "USG", limite });
+    expect(r.esclarecimento?.tipo).toBe("procedimento");
+    expect(r.esclarecimento?.opcoes).toHaveLength(2);
+    expect(r.procedure).toBeNull();
+    expect(r.price).toBeNull();
+  });
+  it.each(["ultra", "ultrassonogragia"])("uma única USG publicada não identifica o tipo desejado: %s", async (query) => {
+    banco.nina_cat_servicos = [servico({ nome: "Ultrassonografia de tireoide" })];
+    const r = await buscarNoCatalogo({ clinicaId: CLINICA, query });
+    expect(r.esclarecimento?.tipo).toBe("procedimento");
+    expect(r.procedure).toBeNull();
+  });
+  it.each(["xyz", "tc", "PET-CT"])("pede o nome por extenso de %s sem afirmar ausência", async (query) => {
+    banco.nina_cat_servicos = [servico({ nome: "Exame de tireoide" })];
+    const r = await buscarNoCatalogo({ clinicaId: CLINICA, query });
+    expect(r.esclarecimento?.tipo).toBe("sigla");
+    expect(r.esclarecimento?.pergunta).toContain("por extenso");
+    expect(r.records).toHaveLength(0);
+  });
+  it("não substitui urologia ausente por neurologia publicada", async () => {
+    banco.nina_cat_profissionais = [profissional({ especialidades: [{ nome: "Neurologia" }] })];
+    const r = await buscarNoCatalogo({ clinicaId: CLINICA, query: "urologista" });
+    expect(r.knowledge_status).toBe("not_found");
+    expect(r.esclarecimento).toBeUndefined();
+  });
+  it("confirma nome aproximado e diferencia homônimos com os dados do cadastro", async () => {
+    banco.nina_cat_profissionais = [
+      profissional({ id: idSequencial(1), nome: "Dr. João Hélio", especialidades: [{ nome: "Cardiologia" }], unidades: { nome: "Centro" } }),
+      profissional({ id: idSequencial(2), nome: "Dr. João Hélio", especialidades: [{ nome: "Ortopedia" }], unidades: { nome: "Norte" } }),
+    ];
+    const r = await buscarNoCatalogo({ clinicaId: CLINICA, query: "consulta", medico: "João Hleio", limite: 1 });
+    expect(r.esclarecimento?.opcoes).toHaveLength(2);
+    expect(r.esclarecimento?.pergunta).toContain("Cardiologia — Centro");
+    expect(r.esclarecimento?.pergunta).toContain("Ortopedia — Norte");
+    const escolhido = await buscarNoCatalogo({ clinicaId: CLINICA, query: "Ortopedia", medico: idSequencial(2) });
+    expect(escolhido.esclarecimento).toBeUndefined();
+    expect(escolhido.records.map((r) => r.id)).toEqual([idSequencial(2)]);
+  });
+  it("a consulta preventiva por nome também pede esclarecimento", async () => {
+    banco.nina_cat_profissionais = [profissional({ nome: "Alex Silva" }), profissional({ nome: "Alex Souza" })];
+    const r = await buscarNoCatalogo({ clinicaId: CLINICA, query: "quero com Dr. Alex" });
+    expect(r.esclarecimento?.tipo).toBe("profissional");
+    expect(r.esclarecimento?.opcoes).toHaveLength(2);
+  });
+  it("dois médicos com nome e especialidade iguais mantêm preços e identidades separados", async () => {
+    banco.nina_cat_profissionais = [
+      profissional({ nome: "João Silva", especialidades: [{ nome: "Cardiologia" }], formas_pagamento: [{ forma: "Dinheiro", valor: 100 }] }),
+      profissional({ nome: "João Silva", especialidades: [{ nome: "Cardiologia" }], formas_pagamento: [{ forma: "Dinheiro", valor: 200 }] }),
+    ];
+    const r = await buscarNoCatalogo({ clinicaId: CLINICA, query: "consulta", medico: "João Silva" });
+    expect(r.knowledge_status).not.toBe("conflict");
+    expect(r.esclarecimento?.pergunta).toContain("ainda não permitem distingui-los");
+    expect(r.price).toBeNull();
+  });
+});
+
+describe("nomes e opções em respostas curtas", () => {
+  it("busca preventiva de Dr. Jaoo sugere João para confirmação", async () => {
+    banco.nina_cat_profissionais = [profissional({ nome: "Dr. João Hélio", especialidades: [{ nome: "Cardiologia" }] })];
+    const r = await buscarNoCatalogo({ clinicaId: CLINICA, query: "Quero com Dr. Jaoo Helio" });
+    expect(r.esclarecimento?.tipo).toBe("profissional");
+    expect(r.esclarecimento?.pergunta).toContain("Dr. João Hélio");
+    expect(r.price).toBeNull();
   });
 });

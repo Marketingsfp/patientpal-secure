@@ -55,6 +55,12 @@ export type ResultadoConhecimento = {
   trace: TraceConhecimento[];
   /** Só quando knowledge_status = "conflict". */
   conflicts?: Array<{ item: string; campo: string; valores: string[]; trace: TraceConhecimento[] }>;
+  /** Candidatos não são uma escolha nem autorização para consultar/reservar agenda. */
+  esclarecimento?: {
+    tipo: "procedimento" | "profissional" | "sigla";
+    pergunta: string;
+    opcoes: Array<{ id: string; nome: string; especialidade?: string; unidade?: string | null }>;
+  };
   /** Instrução interna para o modelo. Nunca é mostrada ao paciente. */
   instrucao: string;
 };
@@ -81,7 +87,10 @@ function moeda(v: number | string | null | undefined): string | null {
   if (typeof v === "number") {
     n = v;
   } else {
-    const limpo = v.replace(/[^\d,.-]/g, "").replace(/\.(?=\d{3}\b)/g, "").replace(",", ".");
+    const limpo = v
+      .replace(/[^\d,.-]/g, "")
+      .replace(/\.(?=\d{3}\b)/g, "")
+      .replace(",", ".");
     if (limpo.trim() === "") return null;
     n = Number(limpo);
   }
@@ -107,7 +116,6 @@ export function resumoDePrecos(
   if (c) return `Pix/cartão: ${c}`;
   return d ? `Dinheiro: ${d}` : null;
 }
-
 
 function unico(lista: Array<string | null | undefined>): string[] {
   const set = new Set<string>();
@@ -140,7 +148,11 @@ export function detectarConflitos(
   for (const r of registros) {
     const item = normalizar(r.procedimento);
     if (!item) continue;
-    const chave = `${item}||${normalizar(r.medico)}`;
+    // Homônimos em cadastros distintos podem ter valores diferentes. O ID
+    // publicado preserva a identidade; fontes legadas continuam pelo nome.
+    const identidade =
+      r.tipo === "profissional" && r.id ? `profissional:${r.id}` : normalizar(r.medico);
+    const chave = `${item}||${identidade}`;
     grupos.set(chave, [...(grupos.get(chave) ?? []), r]);
   }
 

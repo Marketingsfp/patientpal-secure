@@ -23,6 +23,10 @@ export function motivoParaAtendimento(valor: unknown): string | null {
   if (typeof valor !== "string" || !valor.trim()) return null;
   const motivos: Array<[RegExp, string]> = [
     [
+      /\bCATALOGO_IDENTIFICACAO_NAO_ESCLARECIDA\b/i,
+      "A Nina pediu esclarecimento uma vez e ainda não conseguiu identificar com segurança o atendimento ou o profissional solicitado. A equipe dará continuidade.",
+    ],
+    [
       /\bCATALOGO_SEM_REGISTRO\b/i,
       "A Nina não encontrou a consulta ou o procedimento solicitado na base de conhecimentos.",
     ],

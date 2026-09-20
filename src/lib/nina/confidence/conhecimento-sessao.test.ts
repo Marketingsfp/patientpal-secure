@@ -54,3 +54,63 @@ describe("continuidade da pesquisa de conhecimento", () => {
     ).toBe(false);
   });
 });
+
+describe("continuidade de esclarecimentos do catálogo", () => {
+  const pendente: ConhecimentoSessao = {
+    ...anterior, consulta: { termo: "USG" },
+    referencias: [
+      { registro: "usg-tireoide", versao: null, procedimento: "Ultrassonografia de tireoide", medicoNome: null },
+      { registro: "usg-abdome", versao: null, procedimento: "Ultrassonografia de abdome total", medicoNome: null },
+    ],
+    esclarecimento: { tipo: "procedimento", pergunta: "Qual exame?", opcoes: [
+      { id: "usg-tireoide", nome: "Ultrassonografia de tireoide" },
+      { id: "usg-abdome", nome: "Ultrassonografia de abdome total" },
+    ] },
+  };
+  test("resposta curta conserva a família do exame e reconsulta a opção completa", () => {
+    const memoria = conhecimentoDaMesmaSessao(pendente, anterior.clinicaId, anterior.sessionId);
+    expect(consultaDoNovoTurno({ mensagem: "o de tireoide", anterior: memoria })).toEqual({
+      args: { termo: "Ultrassonografia de tireoide" }, continuidade: true,
+    });
+  });
+  test("sim não escolhe arbitrariamente entre duas opções", () => {
+    expect(consultaDoNovoTurno({ mensagem: "sim", anterior: pendente })?.args.termo).toBe("USG");
+  });
+  test("outro procedimento e negação não viram confirmação da opção anterior", () => {
+    for (const mensagem of ["quero mamografia", "não quero o de tireoide"])
+      expect(consultaDoNovoTurno({ mensagem, anterior: pendente })?.continuidade).toBe(false);
+  });
+  test("homônimos esclarecidos pela unidade usam ID distinto, não só o nome", () => {
+    const memoria: ConhecimentoSessao = { ...pendente, esclarecimento: {
+      tipo: "profissional", pergunta: "Qual profissional?", opcoes: [
+        { id: "medico-1", nome: "João Silva", especialidade: "Cardiologia", unidade: "Centro" },
+        { id: "medico-2", nome: "João Silva", especialidade: "Cardiologia", unidade: "Norte" },
+      ],
+    } };
+    expect(consultaDoNovoTurno({ mensagem: "da unidade Norte", anterior: memoria })).toEqual({
+      args: { termo: "Cardiologia", medico: "medico-2" }, continuidade: true,
+    });
+  });
+});
+
+test("ordinal responde à lista de procedimentos, sem virar escolha de horário", () => {
+  const memoria: ConhecimentoSessao = { ...anterior, esclarecimento: {
+    tipo: "procedimento", pergunta: "Qual exame?", opcoes: [
+      { id: "a", nome: "Ultrassonografia de abdome total" }, { id: "b", nome: "Ultrassonografia de tireoide" },
+    ],
+  } };
+  expect(consultaDoNovoTurno({ mensagem: "o segundo", anterior: memoria })).toEqual({
+    args: { termo: "Ultrassonografia de tireoide" }, continuidade: true,
+  });
+});
+
+test.each(["sim", "isso mesmo", "sim esse mesmo", "é esse", "pode ser", "s"])("confirmação contextual de uma única sugestão: %s", (mensagem) => {
+  const memoria: ConhecimentoSessao = { ...anterior, esclarecimento: {
+    tipo: "profissional", pergunta: "Você se refere ao Dr. Jorge Ribeiro?", opcoes: [
+      { id: "medico-jorge", nome: "Jorge Ribeiro", especialidade: "Ortopedia" },
+    ],
+  } };
+  expect(consultaDoNovoTurno({ mensagem, anterior: memoria })?.args).toEqual({
+    termo: "Ortopedia", medico: "medico-jorge",
+  });
+});

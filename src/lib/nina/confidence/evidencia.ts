@@ -48,6 +48,7 @@ export type ChaveFato = {
   data?: string | null;
   hora?: string | null;
   unidadeId?: string | null;
+  unidadeNome?: string | null;
   convenio?: string | null;
   condicoes?: string | null;
 };
