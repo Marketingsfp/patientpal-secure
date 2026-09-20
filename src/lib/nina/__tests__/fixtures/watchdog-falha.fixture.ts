@@ -56,7 +56,7 @@ const admin = {
         return q;
       },
       not: (k: string, _op: string, v: string) => {
-        const valores = v.replace(/[()\"]/g, "").split(",");
+        const valores = v.replace(/[()"]/g, "").split(",");
         filtros.push((l) => !valores.includes(l[k]));
         return q;
       },
@@ -224,7 +224,14 @@ for (const teste of [false, true]) {
     resolved_at: "2026-09-16T20:03:08Z",
     closed_at: "2026-09-16T20:03:08Z",
   });
-  await reabrirConversaPorMensagemPaciente({ clinicaId: "clinica", telefone: "55000000000" });
+  await reabrirConversaPorMensagemPaciente({
+    clinicaId: "clinica", telefone: "55000000000", mensagemOrigemId: "entrada-reabertura",
+  });
+  const reabertura = tabelas.atend_conversa_eventos.find((e) => e.evento === "REABERTA");
+  const atribuicaoNina = tabelas.atend_conversa_eventos.find((e) => e.evento === "ATRIBUIDA_IA");
+  assert.equal(reabertura?.detalhes.mensagem_origem_id, "entrada-reabertura");
+  assert.equal(atribuicaoNina?.detalhes.mensagem_origem_id, "entrada-reabertura");
+  assert.equal(atribuicaoNina?.detalhes.reabertura_evento_id, reabertura?.id);
   lote().created_at = new Date(Date.now() + 1000).toISOString();
   assert.equal(conv().status, "bot_attending");
   let chamadas = 0;

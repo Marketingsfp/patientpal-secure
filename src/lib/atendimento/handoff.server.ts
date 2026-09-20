@@ -619,6 +619,8 @@ export async function reabrirConversaPorMensagemPaciente(args: {
   telefone: string;
   /** Em retry, impede reabrir uma sessão encerrada depois daquela entrada. */
   mensagemRecebidaEm?: string;
+  /** Vincula os avisos à entrada que abriu este atendimento, sem alterar datas. */
+  mensagemOrigemId?: string;
 }): Promise<Array<{ id: string }>> {
   const digits = normalizarTelefone(args.telefone);
   if (!digits) return [];
@@ -704,11 +706,12 @@ export async function reabrirConversaPorMensagemPaciente(args: {
     } catch (e) {
       console.error("[reabertura] falha ao arquivar resumo", e);
     }
-    await registrarEvento({
+    const reaberturaId = await registrarEvento({
       clinicaId: args.clinicaId,
       conversaId: alvo.id,
       evento: "REABERTA",
       motivo: "Conversa reaberta automaticamente após nova mensagem do paciente",
+      detalhes: { mensagem_origem_id: args.mensagemOrigemId ?? null },
     });
 
     if (!ninaOff) {
@@ -717,6 +720,10 @@ export async function reabrirConversaPorMensagemPaciente(args: {
         conversaId: alvo.id,
         evento: "ATRIBUIDA_IA",
         motivo: "Reabertura: novo atendimento volta para a Nina",
+        detalhes: {
+          mensagem_origem_id: args.mensagemOrigemId ?? null,
+          reabertura_evento_id: reaberturaId,
+        },
       });
     }
   }

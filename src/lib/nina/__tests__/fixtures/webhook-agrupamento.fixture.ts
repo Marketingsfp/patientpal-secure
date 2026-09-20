@@ -163,6 +163,8 @@ mock.module("@/lib/nina/espera-paciente.server", () => ({
 const esperas: any[] = [];
 mock.module("@/lib/atendimento/handoff.server", () => ({
   reabrirConversaPorMensagemPaciente: async (args: any) => {
+    if (!db.whatsapp_mensagens!.some((m) => m.id === args.mensagemOrigemId))
+      throw new Error("Reabertura sem vínculo com a mensagem de entrada persistida");
     if (
       !args.mensagemRecebidaEm ||
       (fechada && entradaPermiteReabertura(args.mensagemRecebidaEm, { closed_at: closedAt }))

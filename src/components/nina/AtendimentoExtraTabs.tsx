@@ -131,6 +131,7 @@ import { useHistoricoAnterior } from "@/hooks/use-historico-anterior";
 import { listarPaginaHistorico } from "@/lib/atendimento/historico-paginado.functions";
 import { montarPaginaHistorico, manterNaJanelaRecente, type PaginaHistorico, type CursorHistorico } from "@/lib/atendimento/historico-paginado";
 import { rotuloNovasMensagens } from "@/lib/atendimento/scroll-chat";
+import { anteciparReabertura } from "@/lib/atendimento/timeline-reabertura";
 
 import { mesclarEspera, mesclarListaConversas } from "@/lib/atendimento/inbox-merge";
 import {
@@ -2219,7 +2220,7 @@ export function AtendInbox() {
   const idsInspecao = useMemo(() => idsParaInspecaoNina(msgs), [msgs]);
   const saidasPorMensagem = useSaidasDasMensagens(clinicaId, sel?.id, idsInspecao, revisaoInspecaoMensagens(msgs));
 
-  // Mensagens e eventos de estado na mesma linha do tempo, em ordem cronológica.
+  // Ordem cronológica, com avisos de reabertura antes da entrada que abriu o ciclo.
   // FASE 3 — eventos internos do mesmo processo viram um bloco compacto único.
   const timeline = useMemo(() => {
     const agrupado = agruparTimeline({
@@ -2255,7 +2256,7 @@ export function AtendInbox() {
     // Um mesmo registro nunca pode entrar duas vezes na lista (mensagem
     // repetida pelo tempo real, por exemplo): a chave de desenho é única.
     const vistos = new Set<string>();
-    return itens
+    const cronologicos = itens
       .filter((i) => {
         const chave = i.kind === "msg" ? `m-${String(i.msg.id)}` : `g-${i.item.chave}`;
         if (vistos.has(chave)) return false;
@@ -2263,6 +2264,18 @@ export function AtendInbox() {
         return true;
       })
       .sort((a, b) => a.at - b.at);
+    return anteciparReabertura(cronologicos, (i) => ({
+      em: i.at,
+      ...(i.kind === "msg"
+        ? {
+            mensagem: {
+              id: String(i.msg.id),
+              direction: i.msg.direction,
+              sistema: i.msg.status === "system" || i.msg.enviada_por === "sistema",
+            },
+          }
+        : i.item.tipo === "EVENTO" ? { evento: i.item.evento } : {}),
+    }));
   }, [msgs, eventos]);
 
 

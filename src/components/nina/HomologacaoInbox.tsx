@@ -95,6 +95,7 @@ import {
 import { ConversaSkeleton } from "@/components/nina/ConversaSkeleton";
 import { useChatScroll } from "@/hooks/use-chat-scroll";
 import { formatarDataHoraMensagem } from "@/lib/atendimento/data-hora";
+import { anteciparReabertura } from "@/lib/atendimento/timeline-reabertura";
 import { textoMarcadorSistema } from "@/lib/atendimento/marcador-handoff";
 import { definirSelecaoTeste } from "@/lib/webmcp/selecao-teste";
 import { leadDoRelatorio, type ConversaTesteAlvo } from "@/lib/nina/homologacao-navegacao";
@@ -264,7 +265,7 @@ export function HomologacaoInbox({ laboratorio = false, ativo = true, abrirConve
   const rodandoRef = useRef(false);
 
 
-  // Mensagens e eventos na MESMA linha do tempo, ordenados por created_at.
+  // Mesma ordem do chat real: avisos de reabertura antecedem a entrada do novo ciclo.
   const timeline = useMemo<
     ({ id: string; em: string } & (
       | { kind: "msg"; msg: Msg }
@@ -280,7 +281,18 @@ export function HomologacaoInbox({ laboratorio = false, ativo = true, abrirConve
         evento: e,
       })),
     ];
-    return itens.sort((a, b) => a.em.localeCompare(b.em));
+    return anteciparReabertura(itens.sort((a, b) => a.em.localeCompare(b.em)), (i) => ({
+      em: Date.parse(i.em),
+      ...(i.kind === "msg"
+        ? {
+            mensagem: {
+              id: i.msg.id,
+              direction: i.msg.direction,
+              sistema: i.msg.status === "system" || i.msg.enviada_por === "sistema",
+            },
+          }
+        : { evento: i.evento }),
+    }));
   }, [msgs, eventosConversa]);
 
   // Mesma leitura de confiança da Inbox real: lotes pela conversa de cada

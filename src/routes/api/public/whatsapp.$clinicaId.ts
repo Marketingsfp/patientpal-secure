@@ -401,6 +401,7 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
                   await reabrirConversaPorMensagemPaciente({
                     clinicaId: params.clinicaId,
                     telefone: fromDigits,
+                    mensagemOrigemId: msgInserida.id,
                     ...(entradaPersistida.repetida
                       ? { mensagemRecebidaEm: msgInserida.created_at ?? "" }
                       : {}),
