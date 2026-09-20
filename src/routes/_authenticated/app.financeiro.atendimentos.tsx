@@ -3548,8 +3548,15 @@ function AtendimentosPage() {
                               )}
                             </TableCell>
                           )}
-                          <TableCell className="text-xs whitespace-nowrap px-2 text-center font-mono text-muted-foreground">
-                            {String(idx + 1).padStart(3, "0")}
+                          <TableCell
+                            className="text-xs whitespace-nowrap px-2 text-center font-mono text-muted-foreground"
+                            title={
+                              fichaNumero
+                                ? undefined
+                                : "Laudo do exame — não é um novo atendimento, por isso não recebe número"
+                            }
+                          >
+                            {fichaNumero ? String(fichaNumero).padStart(3, "0") : "—"}
                           </TableCell>
                           <TableCell className="text-xs whitespace-nowrap px-2">
                             {new Date(a.data + "T00:00:00").toLocaleDateString("pt-BR", {
