@@ -1713,6 +1713,11 @@ function Page() {
   // `cancelado` sai em qualquer opção: as três escolhas do filtro são
   // "confirmados", "pendentes" e "confirmados + pendentes". Estorno é assunto
   // da aba Estorno, não do movimento do caixa.
+  // Opção escolhida no seletor PROFISSIONAL (médico + agenda), quando houver.
+  const opcaoProfSelecionada =
+    filterMedico === "todos"
+      ? null
+      : (opcoesProf.opcoes.find((o) => o.rotulo === filterMedico) ?? null);
   const linhasDoPeriodo = linhasVisiveis(items, filterForma as FiltroForma, decomporMisto)
     .filter(
       (l) => l.status !== "cancelado" && (filterStatus === "todos" || l.status === filterStatus),
