@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { ROTULO_INTENCAO, blocosVisiveis } from "@/lib/atendimento/handoff-resumo";
 import { rotuloDesfecho } from "@/lib/atendimento/resumo-desfecho";
 import { useResumoHandoff } from "@/components/nina/use-resumo-handoff";
+import { MensagensAnterioresResumo } from "./MensagensAnterioresResumo";
 import { motivoParaAtendimento } from "@/lib/atendimento/texto-interno-apresentacao";
 
 export function ResumoHandoffCard({
@@ -19,17 +20,14 @@ export function ResumoHandoffCard({
 }) {
   // FASE 4 — estado único por conversa: o card do topo e o bloco da timeline
   // compartilham a MESMA busca, então o servidor gera o resumo uma vez só.
-  const { linha, carregando, atualizado, carregar, limparAtualizado } = useResumoHandoff(
-    clinicaId,
-    conversaId,
-    { assinarRealtime: true },
-  );
+  const { linha, anteriores, erro, carregando, atualizado, carregar, limparAtualizado } =
+    useResumoHandoff(clinicaId, conversaId, { assinarRealtime: true });
   // Regra: cada conversa começa com o resumo RECOLHIDO.
   const [aberto, setAberto] = useState(false);
 
-  if (!linha) return null;
+  if (!linha && !anteriores.length && !erro) return null;
 
-  const r = linha.payload;
+  const r = linha?.payload;
   return (
     <div className="sticky top-0 z-20 rounded-lg border border-purple-300/70 bg-purple-50 text-purple-950 shadow-sm dark:border-purple-400/30 dark:bg-purple-950/95 dark:text-purple-100">
       <div className="flex items-center gap-2 px-3 py-1.5">
@@ -52,12 +50,12 @@ export function ResumoHandoffCard({
             Resumo da Nina
             {r ? ` · ${ROTULO_INTENCAO[r.intencao]}` : ""}
           </span>
-          {rotuloDesfecho(linha.desfecho) && (
+          {rotuloDesfecho(linha?.desfecho) && (
             <span
               className="shrink-0 rounded bg-purple-200/80 px-1.5 py-0.5 text-[10px] font-medium dark:bg-purple-400/25"
               title="Desfecho registrado pelo sistema para esta versão do resumo"
             >
-              {rotuloDesfecho(linha.desfecho)}
+              {rotuloDesfecho(linha?.desfecho)}
             </span>
           )}
           {atualizado && !aberto && (
@@ -68,9 +66,9 @@ export function ResumoHandoffCard({
         </button>
         <span
           className="shrink-0 rounded bg-purple-200/70 px-1.5 py-0.5 text-[10px] font-medium dark:bg-purple-400/20"
-          title={`Resumo vigente · versão ${linha.versao}`}
+          title="Resumo interno — retenção de sete dias"
         >
-          uso interno · v{linha.versao}
+          uso interno{linha ? ` · v${linha.versao}` : ""}
         </span>
 
         <Button
@@ -79,7 +77,7 @@ export function ResumoHandoffCard({
           className="h-7 w-7 shrink-0"
           title="Gerar novamente"
           aria-label="Gerar resumo novamente"
-          disabled={carregando}
+          disabled={carregando || (!linha && !erro)}
           onClick={() => void carregar(true)}
         >
           <RefreshCw className={`h-3.5 w-3.5 ${carregando ? "animate-spin" : ""}`} />
@@ -88,15 +86,15 @@ export function ResumoHandoffCard({
 
       {aberto && (
         <div className="max-h-[40vh] space-y-2 overflow-y-auto overscroll-contain border-t border-purple-200/70 px-3 py-2 text-xs dark:border-purple-400/20">
-
-          {carregando && !r && <p>Gerando resumo da conversa…</p>}
-          {linha.status === "erro" && (
+          {carregando && linha && !r && <p>Gerando resumo da conversa…</p>}
+          {(erro || linha?.status === "erro") && (
             <p className="text-atd-danger-ink">
               Não foi possível gerar o resumo agora. A transferência não foi afetada.
             </p>
           )}
           {r && (
             <>
+              <p className="font-semibold">Último atendimento</p>
               {r.agendamento_confirmado && (
                 <p className="rounded bg-purple-100 px-2 py-1 dark:bg-purple-400/15">
                   <strong>Agendamento confirmado:</strong>{" "}
@@ -126,11 +124,13 @@ export function ResumoHandoffCard({
               ))}
               {r.motivo_handoff && (
                 <p className="opacity-80">
-                  <strong>Motivo da transferência:</strong> {motivoParaAtendimento(r.motivo_handoff)}
+                  <strong>Motivo da transferência:</strong>{" "}
+                  {motivoParaAtendimento(r.motivo_handoff)}
                 </p>
               )}
             </>
           )}
+          <MensagensAnterioresResumo atendimentos={anteriores} />
         </div>
       )}
     </div>

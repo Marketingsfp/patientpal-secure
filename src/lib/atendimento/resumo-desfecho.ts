@@ -3,13 +3,13 @@
  *
  * O resumo interno é um artefato com versão e situação:
  *   - `active`      → resumo vigente, é o que o card do chat mostra;
- *   - `superseded`  → substituído por um resumo mais novo (fica na auditoria);
+ *   - `superseded`  → substituído por um resumo mais novo, até vencer o prazo;
  *   - `archived`    → conversa reaberta: o resumo do ciclo anterior não vale
- *                     mais como situação atual, mas continua no histórico.
+ *                     mais como situação atual, mas fica no histórico recente.
  *
  * Sempre que a conversa tem um desfecho relevante (agendamento concluído ou
  * falho, transferência, resolução, timeout, cancelamento, remarcação), um novo
- * resumo é gerado e passa a ser o vigente. Nada é apagado.
+ * resumo é gerado e passa a ser o vigente. A retenção é de sete dias.
  */
 import type { ResumoHandoff } from "./handoff-resumo";
 
@@ -81,17 +81,23 @@ const PENDENCIA_SUPERADA =
  * agendamento foi concluído, pendências e próxima ação que ainda pediam
  * confirmação/agendamento deixam de valer.
  */
-export function ajustarResumoPorDesfecho(
-  r: ResumoHandoff,
-  d: DesfechoConversa,
-): ResumoHandoff {
+export function ajustarResumoPorDesfecho(r: ResumoHandoff, d: DesfechoConversa): ResumoHandoff {
   const situacao = situacaoPorDesfecho(d) ?? r.situacao;
-  if (d !== "agendamento_concluido" && d !== "conversa_resolvida" && d !== "remarcacao") {
+  if (d === "conversa_resolvida") {
+    return {
+      ...r,
+      situacao,
+      pendencias: [],
+      proxima_acao: null,
+      etapa_interrompida: null,
+      ultima_pergunta: null,
+    };
+  }
+  if (d !== "agendamento_concluido" && d !== "remarcacao") {
     return { ...r, situacao };
   }
   const pendencias = r.pendencias.filter((p) => !PENDENCIA_SUPERADA.test(p));
-  const proxima =
-    r.proxima_acao && PENDENCIA_SUPERADA.test(r.proxima_acao) ? null : r.proxima_acao;
+  const proxima = r.proxima_acao && PENDENCIA_SUPERADA.test(r.proxima_acao) ? null : r.proxima_acao;
   return {
     ...r,
     situacao,

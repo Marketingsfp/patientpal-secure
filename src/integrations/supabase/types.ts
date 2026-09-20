@@ -1398,6 +1398,7 @@ export type Database = {
       }
       atend_handoff_resumos: {
         Row: {
+          atendimento_inicio: string
           clinica_id: string
           conversa_id: string
           created_at: string
@@ -1415,6 +1416,7 @@ export type Database = {
           versao: number
         }
         Insert: {
+          atendimento_inicio?: string
           clinica_id: string
           conversa_id: string
           created_at?: string
@@ -1432,6 +1434,7 @@ export type Database = {
           versao?: number
         }
         Update: {
+          atendimento_inicio?: string
           clinica_id?: string
           conversa_id?: string
           created_at?: string
@@ -15016,6 +15019,16 @@ export type Database = {
       }
     }
     Functions: {
+      atend_resumo_inicio_atendimento: {
+        Args: { _clinica_id: string; _conversa_id: string; _ate: string }
+        Returns: string | null
+      }
+      atend_reservar_resumo: {
+        Args: { _clinica_id: string; _conversa_id: string; _handoff_em: string; _motivo?: string | null; _desfecho?: string; _resolvido_por?: string | null }
+        Returns: string | null
+      }
+      atend_expurgar_resumos_vencidos: { Args: Record<PropertyKey, never>; Returns: number }
+
       __actor_set_trocar_convenio: { Args: never; Returns: undefined }
       __plpgsql_show_dependency_tb:
         | {

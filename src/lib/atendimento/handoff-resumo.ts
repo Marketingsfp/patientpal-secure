@@ -132,7 +132,10 @@ export function normalizarResumo(
     ? (intencaoBruta as IntencaoHandoff)
     : "outro";
   const real = extras?.agendamentoReal ?? null;
-  const informacoes = lista([...(extras?.informacoesExtras ?? []), ...listaBruta(o.informacoes)], 8);
+  const informacoes = lista(
+    [...(extras?.informacoesExtras ?? []), ...listaBruta(o.informacoes)],
+    8,
+  );
   const pendencias = lista([...(extras?.pendenciasExtras ?? []), ...listaBruta(o.pendencias)], 6);
   return {
     intencao,
@@ -146,8 +149,7 @@ export function normalizarResumo(
     proxima_acao: texto(o.proxima_acao, 300),
     situacao: texto(o.situacao, 300),
     motivo_handoff: texto(extras?.motivoHandoff ?? o.motivo_handoff, 240),
-    agendamento_confirmado:
-      real && (real.medico || real.servico || real.data) ? real : null,
+    agendamento_confirmado: real && (real.medico || real.servico || real.data) ? real : null,
   };
 }
 
@@ -159,14 +161,17 @@ export function blocosVisiveis(r: ResumoHandoff): Array<{ titulo: string; itens:
   if (r.situacao) b.push({ titulo: "Situação", itens: [r.situacao] });
   if (r.informacoes.length) b.push({ titulo: "Informações coletadas", itens: r.informacoes });
   if (r.ultima_pergunta) b.push({ titulo: "Última mensagem da Nina", itens: [r.ultima_pergunta] });
-  if (r.etapa_interrompida)
-    b.push({ titulo: "Etapa em que parou", itens: [r.etapa_interrompida] });
+  if (r.etapa_interrompida) b.push({ titulo: "Etapa em que parou", itens: [r.etapa_interrompida] });
   if (r.ja_informado.length) b.push({ titulo: "Já informado pela Nina", itens: r.ja_informado });
   if (r.pendencias.length) b.push({ titulo: "Pendente", itens: r.pendencias });
   if (r.proxima_acao) b.push({ titulo: "Próxima ação sugerida", itens: [r.proxima_acao] });
   // Só a apresentação é filtrada; o resumo original continua no diagnóstico.
-  return b.map(bloco => ({ ...bloco, itens: bloco.itens.map(i => textoOperacional(i)).filter((i): i is string => i !== null) }))
-    .filter(bloco => bloco.itens.length > 0);
+  return b
+    .map((bloco) => ({
+      ...bloco,
+      itens: bloco.itens.map((i) => textoOperacional(i)).filter((i): i is string => i !== null),
+    }))
+    .filter((bloco) => bloco.itens.length > 0);
 }
 
 /** Instrução do modelo — centralizada para poder ser ajustada sem tocar em código de tela. */
@@ -180,7 +185,9 @@ Regras obrigatórias:
 - "motivo_contato": UMA frase curta com o que o paciente quer.
 - "informacoes": lista curta de dados que o PACIENTE realmente forneceu (ex.: "Nome: João da Silva", "Período: manhã"). Nunca invente nome, CPF, data, médico, procedimento, unidade ou convênio.
 - "ja_informado": lista do que a NINA efetivamente disse ao paciente (valores, dias de atendimento, documentos...). Se ela não informou algo, não liste.
-- "pendencias": lista curta e concreta do que falta fazer.
+- Use exclusivamente o ÚLTIMO atendimento fornecido; não retome pendências de atendimentos anteriores.
+- "pendencias": lista curta do que AINDA falta fazer. Remova qualquer item já respondido, realizado, cancelado ou resolvido no decorrer das mensagens.
+- Se o atendimento foi resolvido, "pendencias" deve ser [] e "proxima_acao" deve ser vazia.
 - "proxima_acao": UMA frase com a próxima ação operacional sugerida ao atendente.
 - "situacao": use apenas quando a Nina NÃO conseguiu resolver (ex.: "A Nina não encontrou informação suficiente na base"). Caso contrário, string vazia.
 - NUNCA afirme que algo foi agendado, confirmado, cancelado ou pago. Intenção não é ação concluída: escreva "deseja agendar", nunca "foi agendado".

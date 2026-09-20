@@ -25,6 +25,13 @@ import {
   type SituacaoResumo,
 } from "./resumo-desfecho";
 import { registrarEvento } from "./handoff.server";
+import {
+  limiteTranscricaoResumo,
+  montarPainelResumo,
+  resumoNoPrazo,
+  RETENCAO_RESUMO_MS,
+  type PainelResumo,
+} from "./resumo-retencao";
 
 const GATEWAY = "https://ai.gateway.lovable.dev/v1/chat/completions";
 const MODEL = "google/gemini-2.5-flash";
@@ -37,6 +44,7 @@ export interface LinhaResumo {
   conversa_id: string;
   versao: number;
   handoff_em: string;
+  atendimento_inicio: string;
   motivo: string | null;
   status: StatusResumo;
   payload: ResumoHandoff | null;
@@ -48,7 +56,6 @@ export interface LinhaResumo {
   created_at: string;
   updated_at: string;
 }
-
 
 /** Marca os resumos vigentes desta conversa como superados/arquivados. */
 export async function superarResumos(
@@ -82,37 +89,16 @@ export async function reservarResumoHandoff(args: {
   desfecho?: DesfechoConversa;
   resolvidoPor?: string | null;
 }): Promise<void> {
-  const { data: existente } = await supabaseAdmin
-    .from(TABELA as never)
-    .select("id")
-    .eq("conversa_id", args.conversaId)
-    .eq("handoff_em", args.handoffEm)
-    .maybeSingle();
-  if (existente) return; // idempotente: mesma transferência não gera dois resumos
-
-  const { count } = await supabaseAdmin
-    .from(TABELA as never)
-    .select("id", { count: "exact", head: true })
-    .eq("conversa_id", args.conversaId);
-  // Só pode existir UM resumo vigente por conversa: o anterior vira histórico.
-  await superarResumos(args.clinicaId, args.conversaId);
-  const { error } = await supabaseAdmin
-    .from(TABELA as never)
-    .upsert(
-      {
-        clinica_id: args.clinicaId,
-        conversa_id: args.conversaId,
-        handoff_em: args.handoffEm,
-        motivo: args.motivo ?? null,
-        versao: (count ?? 0) + 1,
-        status: "gerando",
-        situacao: "active",
-        desfecho: args.desfecho ?? "handoff_humano",
-        ...(args.resolvidoPor ? { resolvido_por: args.resolvidoPor } : {}),
-      } as never,
-      { onConflict: "conversa_id,handoff_em", ignoreDuplicates: true },
-    );
-  if (error) console.error("[handoff-resumo] falha ao reservar", error.message);
+  if (!resumoNoPrazo(args.handoffEm)) return;
+  const { error } = await supabaseAdmin.rpc("atend_reservar_resumo", {
+    _clinica_id: args.clinicaId,
+    _conversa_id: args.conversaId,
+    _handoff_em: args.handoffEm,
+    _motivo: args.motivo ?? null,
+    _desfecho: args.desfecho ?? "handoff_humano",
+    _resolvido_por: args.resolvidoPor ?? null,
+  });
+  if (error) throw new Error(error.message);
 }
 
 /**
@@ -163,47 +149,42 @@ async function ultimaLinha(clinicaId: string, conversaId: string): Promise<Linha
     .eq("clinica_id", clinicaId)
     .eq("conversa_id", conversaId)
     .eq("situacao", "active")
+    .gt("handoff_em", new Date(Date.now() - RETENCAO_RESUMO_MS).toISOString())
     .order("versao", { ascending: false })
     .limit(1)
     .maybeSingle();
-  if (ativo) return ativo as LinhaResumo;
-  const { data } = await supabaseAdmin
-    .from(TABELA as never)
-    .select("*")
-    .eq("clinica_id", clinicaId)
-    .eq("conversa_id", conversaId)
-    .order("versao", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  return (data as LinhaResumo | null) ?? null;
+  return (ativo as LinhaResumo | null) ?? null;
 }
-
-
 
 /** Agendamento REAL do paciente ligado a esta conversa (nunca inferido pela IA). */
 async function agendamentoReal(
   clinicaId: string,
   pacienteId: string | null,
+  inicio: string,
+  agendamentoId: string | null,
 ): Promise<AgendamentoConfirmado | null> {
   if (!pacienteId) return null;
-  const { data } = await supabaseAdmin
+  let consulta = supabaseAdmin
     .from("agendamentos")
-    .select("data_hora, status, servico_nome, medico_nome")
+    .select("inicio, procedimento, tipo_atendimento, medicos(nome)")
     .eq("clinica_id", clinicaId)
     .eq("paciente_id", pacienteId)
     .in("status", ["agendado", "confirmado"])
-    .gte("data_hora", new Date(Date.now() - 3600_000).toISOString())
-    .order("data_hora", { ascending: true })
-    .limit(1)
-    .maybeSingle();
-  const row = data as
-    | { data_hora?: string; servico_nome?: string | null; medico_nome?: string | null }
-    | null;
-  if (!row?.data_hora) return null;
-  const d = new Date(row.data_hora);
+    .gte("inicio", new Date().toISOString());
+  // Uma vaga pode ter sido criada antes do atendimento e reservada agora.
+  consulta = agendamentoId ? consulta.eq("id", agendamentoId) : consulta.gte("created_at", inicio);
+  const { data } = await consulta.order("inicio", { ascending: true }).limit(1).maybeSingle();
+  const row = data as {
+    inicio?: string;
+    procedimento?: string | null;
+    tipo_atendimento?: string | null;
+    medicos?: { nome?: string } | null;
+  } | null;
+  if (!row?.inicio) return null;
+  const d = new Date(row.inicio);
   return {
-    medico: row.medico_nome ?? null,
-    servico: row.servico_nome ?? null,
+    medico: row.medicos?.nome ?? null,
+    servico: row.procedimento ?? row.tipo_atendimento ?? null,
     data: d.toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" }),
     hora: d.toLocaleTimeString("pt-BR", {
       timeZone: "America/Sao_Paulo",
@@ -213,24 +194,53 @@ async function agendamentoReal(
   };
 }
 
-async function transcricao(clinicaId: string, conversaId: string): Promise<string> {
+async function transcricao(clinicaId: string, conversaId: string, inicio: string): Promise<string> {
   const { data } = await supabaseAdmin
     .from("whatsapp_mensagens")
-    .select("body, direction, enviada_por, recebida_em, created_at, tipo")
+    .select("id, body, direction, enviada_por, recebida_em, created_at, tipo")
     .eq("clinica_id", clinicaId)
     .eq("conversa_id", conversaId)
+    .gte("created_at", limiteTranscricaoResumo(inicio))
     .order("recebida_em", { ascending: false })
     .limit(60);
-  const linhas = ((data ?? []) as Array<Record<string, unknown>>)
+  const mensagens = ((data ?? []) as Array<Record<string, unknown>>)
     .filter((m) => m.enviada_por !== "sistema")
-    .reverse()
-    .map((m) => {
-      const quem =
-        m.direction === "in" ? "Paciente" : m.enviada_por === "humano" ? "Atendente" : "Nina";
-      const txt = String(m.body ?? "").trim() || `[${String(m.tipo ?? "mídia")}]`;
-      return `${quem}: ${txt.slice(0, 700)}`;
-    });
-  return linhas.join("\n").slice(0, 12_000);
+    .reverse();
+  // A mensagem que abre o ciclo pode ter sido gravada antes de a Nina registrar
+  // session_started_at. Inclui essa entrada, sem atravessar o encerramento anterior.
+  if ((data?.length ?? 0) < 60 && mensagens[0]?.direction !== "in") {
+    const { data: encerramento } = await supabaseAdmin
+      .from("atend_conversa_eventos")
+      .select("created_at")
+      .eq("clinica_id", clinicaId)
+      .eq("conversa_id", conversaId)
+      .in("evento", ["FINALIZADA", "IA_MEMORIA_RESETADA"])
+      .lt("created_at", inicio)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    let entrada = supabaseAdmin
+      .from("whatsapp_mensagens")
+      .select("id, body, direction, enviada_por, recebida_em, created_at, tipo")
+      .eq("clinica_id", clinicaId)
+      .eq("conversa_id", conversaId)
+      .eq("direction", "in")
+      .gte("created_at", new Date(Date.now() - RETENCAO_RESUMO_MS).toISOString())
+      .lte("created_at", inicio);
+    if (encerramento) entrada = entrada.gt("created_at", encerramento.created_at);
+    const { data: primeira } = await entrada
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (primeira && !mensagens.some((m) => m.id === primeira.id)) mensagens.unshift(primeira);
+  }
+  const linhas = mensagens.map((m) => {
+    const quem =
+      m.direction === "in" ? "Paciente" : m.enviada_por === "humano" ? "Atendente" : "Nina";
+    const txt = String(m.body ?? "").trim() || `[${String(m.tipo ?? "mídia")}]`;
+    return `[${String(m.recebida_em ?? m.created_at)}] ${quem}: ${txt.slice(0, 700)}`;
+  });
+  return linhas.join("\n").slice(-12_000);
 }
 
 async function chamarModelo(prompt: string): Promise<unknown> {
@@ -284,7 +294,9 @@ export async function garantirResumoHandoff(args: {
   const { clinicaId, conversaId } = args;
   const { data: convData } = await supabaseAdmin
     .from("atend_conversas")
-    .select("handoff_em, handoff_motivo, contato_paciente_id, contato_nome, protocolo_atendimento")
+    .select(
+      "handoff_em, handoff_motivo, contato_paciente_id, contato_nome, protocolo_atendimento, nina_fluxo_estado",
+    )
     .eq("id", conversaId)
     .eq("clinica_id", clinicaId)
     .maybeSingle();
@@ -294,6 +306,7 @@ export async function garantirResumoHandoff(args: {
     contato_paciente_id?: string | null;
     contato_nome?: string | null;
     protocolo_atendimento?: string | null;
+    nina_fluxo_estado?: { appointment?: { appointment_id?: string | null } } | null;
   } | null;
   if (!conv) return null;
   if (!conv.handoff_em && !args.ignorarHandoff) return null; // nunca passou por handoff
@@ -308,7 +321,9 @@ export async function garantirResumoHandoff(args: {
   }
 
   let linha = await ultimaLinha(clinicaId, conversaId);
-  if (!linha) return null;
+  if (!linha || !resumoNoPrazo(linha.handoff_em)) return null;
+  const inicioAtual = await inicioAtendimento(clinicaId, conversaId);
+  if (!inicioAtual || Date.parse(linha.atendimento_inicio) !== Date.parse(inicioAtual)) return null;
   if (linha.status === "ok" && !args.forcar) return linha;
 
   // FASE 4 — trava de geração na ORIGEM (compare-and-swap por `updated_at`):
@@ -322,11 +337,13 @@ export async function garantirResumoHandoff(args: {
       .update({ status: "gerando", erro: null, updated_at: new Date().toISOString() } as never)
       .eq("id", linha.id)
       .eq("updated_at", linha.updated_at)
+      .eq("situacao", "active")
+      .gt("handoff_em", new Date(Date.now() - RETENCAO_RESUMO_MS).toISOString())
       .select("*")
       .maybeSingle();
     if (!reivindicada) {
       const atual = await ultimaLinha(clinicaId, conversaId);
-      return atual ?? linha;
+      return atual;
     }
     linha = reivindicada as LinhaResumo;
   }
@@ -334,8 +351,13 @@ export async function garantirResumoHandoff(args: {
   const desfecho = (linha.desfecho ?? "handoff_humano") as DesfechoConversa;
   try {
     const [texto, agendado] = await Promise.all([
-      transcricao(clinicaId, conversaId),
-      agendamentoReal(clinicaId, conv.contato_paciente_id ?? null),
+      transcricao(clinicaId, conversaId, linha.atendimento_inicio),
+      agendamentoReal(
+        clinicaId,
+        conv.contato_paciente_id ?? null,
+        limiteTranscricaoResumo(linha.atendimento_inicio),
+        conv.nina_fluxo_estado?.appointment?.appointment_id ?? null,
+      ),
     ]);
     if (!texto.trim()) throw new Error("Conversa sem mensagens para resumir");
     const bruto = await chamarModelo(
@@ -344,7 +366,7 @@ export async function garantirResumoHandoff(args: {
         `Desfecho registrado pelo sistema (fato, não inferência): ${
           ROTULO_DESFECHO[desfecho] ?? "Atualização do atendimento"
         }\n\n` +
-        `Conversa:\n${texto}`,
+        `Último atendimento iniciado em ${linha.atendimento_inicio}. Apenas mensagens dos últimos sete dias:\n${texto}`,
     );
     const payload = ajustarResumoPorDesfecho(
       normalizarResumo(bruto, {
@@ -361,9 +383,13 @@ export async function garantirResumoHandoff(args: {
       .from(TABELA as never)
       .update({ status: "ok", payload: payload as never, erro: null } as never)
       .eq("id", linha.id)
+      .eq("updated_at", linha.updated_at)
+      .eq("situacao", "active")
+      .gt("handoff_em", new Date(Date.now() - RETENCAO_RESUMO_MS).toISOString())
       .select("*")
       .maybeSingle();
-    linha = (data as LinhaResumo | null) ?? { ...linha, status: "ok", payload };
+    if (!data) return await ultimaLinha(clinicaId, conversaId);
+    linha = data as LinhaResumo;
 
     // Idempotência do evento: a mesma versão do resumo nunca gera dois avisos.
     const { data: eventoExistente } = await supabaseAdmin
@@ -390,8 +416,58 @@ export async function garantirResumoHandoff(args: {
       .from(TABELA as never)
       .update({ status: "erro", erro: msg.slice(0, 500) } as never)
       .eq("id", linha.id)
+      .eq("updated_at", linha.updated_at)
+      .eq("situacao", "active")
+      .gt("handoff_em", new Date(Date.now() - RETENCAO_RESUMO_MS).toISOString())
       .select("*")
       .maybeSingle();
-    return (data as LinhaResumo | null) ?? { ...linha, status: "erro", erro: msg };
+    return (data as LinhaResumo | null) ?? (await ultimaLinha(clinicaId, conversaId));
   }
+}
+
+/** Datas vêm dos eventos/ciclo do sistema, nunca de inferência da IA. */
+async function inicioAtendimento(clinicaId: string, conversaId: string): Promise<string | null> {
+  const { data, error } = await supabaseAdmin.rpc("atend_resumo_inicio_atendimento", {
+    _clinica_id: clinicaId,
+    _conversa_id: conversaId,
+    _ate: new Date().toISOString(),
+  });
+  if (error) throw new Error(error.message);
+  return data;
+}
+
+/** Histórico é montado na leitura, sem copiar resumos antigos para uma versão nova. */
+export async function obterPainelResumo(args: {
+  clinicaId: string;
+  conversaId: string;
+  forcar?: boolean;
+}): Promise<PainelResumo | null> {
+  const { data: conversa, error: erroConversa } = await supabaseAdmin
+    .from("atend_conversas")
+    .select("status, handoff_em")
+    .eq("clinica_id", args.clinicaId)
+    .eq("id", args.conversaId)
+    .maybeSingle();
+  if (erroConversa) throw new Error(erroConversa.message);
+  if (!conversa) return null;
+  // Compatibilidade com uma transferência recente ainda sem reserva.
+  await garantirResumoHandoff({ ...args, ignorarHandoff: !conversa.handoff_em });
+  const [inicio, resultado] = await Promise.all([
+    inicioAtendimento(args.clinicaId, args.conversaId),
+    supabaseAdmin
+      .from(TABELA)
+      .select("*")
+      .eq("clinica_id", args.clinicaId)
+      .eq("conversa_id", args.conversaId)
+      .gt("handoff_em", new Date(Date.now() - RETENCAO_RESUMO_MS).toISOString())
+      .order("handoff_em", { ascending: false }),
+  ]);
+  if (resultado.error) throw new Error(resultado.error.message);
+  if (!inicio) return null;
+  const painel = montarPainelResumo(
+    resultado.data as LinhaResumo[],
+    inicio,
+    ["closed", "finished"].includes(conversa.status),
+  );
+  return painel.atual || painel.anteriores.length ? painel : null;
 }
