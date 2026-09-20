@@ -2779,7 +2779,6 @@ export function AtendInbox() {
     const fd = new FormData(e.currentTarget);
     const userId = String(fd.get("userId") || "");
     const departamentoId = String(fd.get("departamentoId") || "") || undefined;
-    const motivo = String(fd.get("motivo") || "") || undefined;
     // O formulário foi aberto sobre esta conversa: a transferência é dela.
     const origem = sel.id;
     try {
@@ -2789,7 +2788,6 @@ export function AtendInbox() {
           conversaId: origem,
           paraUserId: userId || null,
           paraDepartamentoId: departamentoId ?? null,
-          motivo,
         },
       });
       cacheConversas.current.invalidar(origem);
@@ -4051,10 +4049,6 @@ export function AtendInbox() {
                     ))}
                   </SelectContent>
                 </Select>
-              </div>
-              <div>
-                <Label>Motivo</Label>
-                <Input name="motivo" maxLength={200} />
               </div>
               <DialogFooter>
                 <Button type="button" variant="outline" onClick={() => setTransferOpen(false)}>
