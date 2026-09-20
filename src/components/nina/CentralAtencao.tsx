@@ -225,7 +225,7 @@ export function CentralAtencao() {
             "will-change-transform focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500/60",
             alerta
               ? "text-white shadow-sm"
-              : "bg-slate-100 text-slate-700 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-200",
+              : "bg-muted text-foreground hover:bg-accent",
             // Só transform/box-shadow/background: nada no cabeçalho se desloca.
             alerta && resumo.nivel === 1 && "central-atencao-n1",
             alerta && resumo.nivel === 2 && "central-atencao-n2",

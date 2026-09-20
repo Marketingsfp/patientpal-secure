@@ -1438,16 +1438,16 @@ function AppShellInner() {
         "h-dvh",
       )}
     >
-      {/* Cabeçalho branco: ocupa 100% da largura no topo e é o único lugar do
+      {/* Cabeçalho acompanha o tema, ocupa 100% da largura e é o único lugar do
           hambúrguer, em qualquer tamanho de tela. */}
       {/* Cabeçalho recolhido (OS ZAP): sobra só uma aba discreta no topo, com
           o menu e o botão de reabrir a barra. */}
       {!isChooser && headerRecolhido && (
-        <div className="fixed top-0 left-1/2 z-30 -translate-x-1/2 flex items-center gap-0.5 rounded-b-lg border border-t-0 border-slate-200 bg-white/90 px-1 py-0.5 shadow-sm opacity-70 hover:opacity-100 focus-within:opacity-100">
+        <div className="fixed top-0 left-1/2 z-30 -translate-x-1/2 flex items-center gap-0.5 rounded-b-lg border border-t-0 border-border bg-card/95 px-1 py-0.5 shadow-sm opacity-70 hover:opacity-100 focus-within:opacity-100">
           <button
             type="button"
             onClick={alternarSidebar}
-            className="h-6 w-7 rounded flex items-center justify-center text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+            className="h-6 w-7 rounded flex items-center justify-center text-foreground hover:bg-muted"
             aria-label={sidebarAberta ? "Fechar menu lateral" : "Abrir menu lateral"}
             aria-expanded={sidebarAberta}
             aria-controls="menu-lateral"
@@ -1458,7 +1458,7 @@ function AppShellInner() {
           <button
             type="button"
             onClick={() => alternarHeaderRecolhido(false)}
-            className="h-6 px-1.5 rounded flex items-center gap-1 text-[11px] font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+            className="h-6 px-1.5 rounded flex items-center gap-1 text-[11px] font-medium text-foreground hover:bg-muted"
             aria-label="Mostrar barra superior"
             title="Mostrar barra superior"
           >
@@ -1468,12 +1468,12 @@ function AppShellInner() {
         </div>
       )}
       {!isChooser && !headerRecolhido && (
-        <header className="shrink-0 relative z-30 h-14 w-full bg-white text-slate-700 border-b border-slate-200 flex items-center justify-between gap-2 px-4 sm:grid sm:grid-cols-[1fr_auto_1fr] sm:gap-3 sm:px-6">
+        <header className="shrink-0 relative z-30 h-14 w-full bg-card text-card-foreground border-b border-border flex items-center justify-between gap-2 px-4 sm:grid sm:grid-cols-[1fr_auto_1fr] sm:gap-3 sm:px-6">
           <div className="flex items-center gap-2 sm:gap-2.5 min-w-0 shrink-0">
             <button
               type="button"
               onClick={alternarSidebar}
-              className="h-9 w-9 -ml-1 rounded-md flex items-center justify-center text-slate-700 hover:text-slate-900 hover:bg-slate-100 shrink-0 transition-colors duration-200"
+              className="h-9 w-9 -ml-1 rounded-md flex items-center justify-center text-foreground hover:bg-muted shrink-0 transition-colors duration-200"
               aria-label={sidebarAberta ? "Fechar menu lateral" : "Abrir menu lateral"}
               aria-expanded={sidebarAberta}
               aria-controls="menu-lateral"
@@ -1489,13 +1489,13 @@ function AppShellInner() {
               className="hidden sm:flex items-center gap-2 min-w-0 shrink-0"
               title="ClinicaOS"
             >
-              <Activity className="h-5 w-5 shrink-0 text-slate-800" />
+              <Activity className="h-5 w-5 shrink-0 text-foreground" />
             </Link>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button
                   type="button"
-                  className="inline-flex items-center justify-center gap-1.5 h-9 w-9 sm:w-auto sm:px-2.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-xs font-medium text-slate-800 shrink-0"
+                  className="inline-flex items-center justify-center gap-1.5 h-9 w-9 sm:w-auto sm:px-2.5 rounded-lg bg-muted hover:bg-accent text-xs font-medium text-foreground shrink-0"
                   title="Trocar de ambiente"
                 >
                   <LayoutGrid className="h-4 w-4 shrink-0" />
@@ -1505,7 +1505,7 @@ function AppShellInner() {
                 </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start" className="w-72 p-2">
-                <DropdownMenuLabel className="px-1 pb-2 text-xs text-slate-500">
+                <DropdownMenuLabel className="px-1 pb-2 text-xs text-muted-foreground">
                   Ir para
                 </DropdownMenuLabel>
                 <div className="grid grid-cols-2 gap-1.5">
@@ -1513,9 +1513,9 @@ function AppShellInner() {
                     <DropdownMenuItem
                       key={a.key}
                       onSelect={() => irParaAmbiente(a.portal, a.destino)}
-                      className="flex h-auto flex-col items-center justify-center gap-1.5 rounded-lg border border-slate-200 px-2 py-3 text-center text-xs font-medium leading-tight text-slate-700 cursor-pointer focus:bg-slate-100"
+                      className="flex h-auto flex-col items-center justify-center gap-1.5 rounded-lg border border-border px-2 py-3 text-center text-xs font-medium leading-tight text-foreground cursor-pointer focus:bg-accent"
                     >
-                      <a.icon className="h-5 w-5 text-slate-700" />
+                      <a.icon className="h-5 w-5 text-foreground" />
                       {a.label}
                     </DropdownMenuItem>
                   ))}
@@ -1540,7 +1540,7 @@ function AppShellInner() {
               <img
                 src={branding?.logo_url || logoDaClinica(clinicaAtual.clinica.nome)!}
                 alt={clinicaAtual.clinica.nome}
-                className="hidden sm:block h-8 w-auto max-w-[150px] shrink-0 object-contain"
+                className="hidden sm:block h-8 w-auto max-w-[150px] shrink-0 object-contain dark:rounded-md dark:bg-white dark:p-0.5"
               />
             )}
             {memberships.length > 0 && (
@@ -1554,7 +1554,7 @@ function AppShellInner() {
                 <SelectTrigger
                   title={clinicaAtual?.clinica.nome}
                   style={{ width: "clamp(120px, 18vw, 300px)" }}
-                  className="max-w-[180px] sm:max-w-[300px] min-w-0 h-9 px-2.5 text-xs font-semibold truncate shrink rounded-lg border-0 bg-slate-100 text-slate-800 shadow-none focus:ring-0 focus-visible:ring-0 hover:bg-slate-200 [&>svg]:w-4 [&>svg]:h-4 [&>svg]:shrink-0 [&>svg]:ml-1.5 [&>span]:truncate [&>span]:min-w-0"
+                  className="max-w-[180px] sm:max-w-[300px] min-w-0 h-9 px-2.5 text-xs font-semibold truncate shrink rounded-lg border-0 bg-muted text-foreground dark:text-foreground shadow-none focus:ring-0 focus-visible:ring-0 hover:bg-accent [&>svg]:w-4 [&>svg]:h-4 [&>svg]:shrink-0 [&>svg]:ml-1.5 [&>span]:truncate [&>span]:min-w-0"
                 >
                   <SelectValue placeholder="Selecione a clínica" />
                 </SelectTrigger>
@@ -1598,7 +1598,7 @@ function AppShellInner() {
             <Button
               variant="ghost"
               size="sm"
-              className="hidden sm:inline-flex h-9 w-9 p-0 rounded-full text-slate-700 hover:bg-slate-100 hover:text-slate-900"
+              className="hidden sm:inline-flex h-9 w-9 p-0 rounded-full text-foreground hover:bg-muted hover:text-foreground"
               title="Atalhos de teclado (?)"
               onClick={() => {
                 window.dispatchEvent(new KeyboardEvent("keydown", { key: "?" }));
@@ -1607,7 +1607,7 @@ function AppShellInner() {
               <span className="text-base font-semibold">?</span>
             </Button>
             <BotaoAcessibilidade />
-            <div className="flex items-center gap-1.5 [&_button]:text-slate-700 [&_button:hover]:bg-slate-100 [&_button:hover]:text-slate-900">
+            <div className="flex items-center gap-1.5 [&_button]:text-foreground [&_button:hover]:bg-muted [&_button:hover]:text-foreground">
               <EstornosBell />
               {/* Leitura em voz alta: recurso de mesa, escondido no celular
                   pelo mesmo motivo da tabela de valores. */}
@@ -1619,7 +1619,7 @@ function AppShellInner() {
               <Button
                 variant="ghost"
                 size="sm"
-                className="h-9 w-9 p-0 rounded-full text-slate-700 hover:bg-slate-100 hover:text-slate-900"
+                className="h-9 w-9 p-0 rounded-full text-foreground hover:bg-muted hover:text-foreground"
                 title="Recolher barra superior (modo foco)"
                 aria-label="Recolher barra superior"
                 onClick={() => alternarHeaderRecolhido(true)}

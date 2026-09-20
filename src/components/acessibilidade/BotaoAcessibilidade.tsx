@@ -92,7 +92,7 @@ export function BotaoAcessibilidade() {
         variant="ghost"
         size="sm"
         onClick={() => setAberto(true)}
-        className="h-9 w-9 p-0 rounded-full text-slate-700 hover:bg-slate-100 hover:text-slate-900"
+        className="h-9 w-9 p-0 rounded-full text-foreground hover:bg-muted hover:text-foreground"
         aria-label="Acessibilidade"
         aria-haspopup="dialog"
         title="Acessibilidade"

@@ -76,7 +76,7 @@ export function BotaoTabelaValores() {
       <Button
         variant="ghost"
         size="sm"
-        className="h-9 px-2 gap-1.5 rounded-full text-slate-700 hover:bg-slate-100 hover:text-slate-900"
+        className="h-9 px-2 gap-1.5 rounded-full text-foreground hover:bg-muted hover:text-foreground"
         title="Tabela de valores (Alt+V)"
         onClick={() => setOpen(true)}
       >
