@@ -3494,7 +3494,11 @@ function AtendimentosPage() {
                         (a.paciente_id ? pacMap.get(a.paciente_id) : null) ??
                         a.paciente_nome_extra ??
                         "—";
-                      const procedimentoNome = a.procedimento ?? "—";
+                      const linhaDeLaudo = ehLinhaDeLaudo(a);
+                      const procedimentoNome = linhaDeLaudo
+                        ? rotuloDoLaudo(a.procedimento)
+                        : (a.procedimento ?? "—");
+                      const fichaNumero = fichaPorLinha.get(`${a.origem}:${a.id}`) ?? null;
 
                       // Define as cores das linhas para o efeito zebrado acompanhar a coluna fixa
                       const isSelected = sel.has(`${a.origem}:${a.id}`);
