@@ -15,10 +15,10 @@ export function MensagensAnterioresResumo({
   if (!atendimentos.length) return null;
   return (
     <section
-      aria-label="Mensagens anteriores"
+      aria-label="Atendimentos anteriores"
       className="space-y-2 border-t border-purple-300/40 pt-2"
     >
-      <h3 className="font-semibold">Mensagens anteriores</h3>
+      <h3 className="font-semibold">Atendimentos anteriores</h3>
       {atendimentos.map((atendimento) => (
         <div
           key={atendimento.id}
@@ -29,9 +29,7 @@ export function MensagensAnterioresResumo({
               {dataAtendimento.format(new Date(atendimento.data))}
             </time>
           </p>
-          <p>{textoOperacional(atendimento.motivo)}</p>
-          {atendimento.resultado && <p>{textoOperacional(atendimento.resultado)}</p>}
-          {atendimento.informado.map((texto, i) => (
+          {atendimento.acoes.map((texto, i) => (
             <p key={i}>{textoOperacional(texto)}</p>
           ))}
         </div>

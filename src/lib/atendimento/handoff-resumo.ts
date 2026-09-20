@@ -11,6 +11,7 @@
  */
 
 import { textoOperacional } from "./texto-interno-apresentacao";
+import { normalizarAtividades, type AtividadePaciente } from "./resumo-atividades";
 
 export type IntencaoHandoff =
   | "agendamento"
@@ -60,6 +61,8 @@ export interface ResumoHandoff {
   protocolo?: string | null;
   /** 1 frase: o que o paciente quer. */
   motivo_contato: string;
+  /** Assuntos procurados pelo paciente; conclusões dependem do desfecho real. */
+  atividades_paciente?: AtividadePaciente[];
   /** Pares "Nome: João" já prontos para exibir. */
   informacoes: string[];
   /** O que a Nina efetivamente informou ao paciente. */
@@ -141,6 +144,7 @@ export function normalizarResumo(
     intencao,
     protocolo: texto(extras?.protocolo, 40),
     motivo_contato: texto(o.motivo_contato, 300) ?? "Não identificado pela conversa.",
+    atividades_paciente: normalizarAtividades(o.atividades_paciente),
     informacoes,
     ja_informado: lista(o.ja_informado),
     pendencias,
@@ -178,11 +182,12 @@ export function blocosVisiveis(r: ResumoHandoff): Array<{ titulo: string; itens:
 export const PROMPT_RESUMO_HANDOFF = `Você resume, para a equipe INTERNA de uma clínica, uma conversa de WhatsApp que a assistente virtual Nina acabou de transferir para atendimento humano.
 
 Responda APENAS um JSON com as chaves:
-{"intencao","motivo_contato","informacoes","ja_informado","pendencias","proxima_acao","situacao"}
+{"intencao","motivo_contato","atividades_paciente","informacoes","ja_informado","pendencias","proxima_acao","situacao"}
 
 Regras obrigatórias:
 - "intencao" deve ser um destes valores: ${Object.keys(ROTULO_INTENCAO).join(", ")}.
 - "motivo_contato": UMA frase curta com o que o paciente quer.
+- "atividades_paciente": lista curta de objetos {"tipo", "assunto"} para o histórico de ações do paciente. Tipos: informacao, agendamento, cancelamento, remarcacao, atendente, outro. "assunto" é apenas o procedimento, especialidade ou tema que o PACIENTE procurou, por exemplo {"tipo":"informacao","assunto":"neurologista"} ou {"tipo":"agendamento","assunto":"mamografia"}. Para atendente, use assunto vazio. Separe assuntos distintos. Não copie mensagens, respostas da Nina, catálogo de médicos, preços, horários, documentos ou critérios. Não liste serviços apenas sugeridos pela Nina que o paciente não procurou. Mesmo se o paciente disser que agendou/cancelou/pagou, não confirme execução: esses tipos representam pedidos e somente o sistema atesta o resultado. Máximo de seis atividades, sem duplicatas.
 - "informacoes": lista curta de dados que o PACIENTE realmente forneceu (ex.: "Nome: João da Silva", "Período: manhã"). Nunca invente nome, CPF, data, médico, procedimento, unidade ou convênio.
 - "ja_informado": lista do que a NINA efetivamente disse ao paciente (valores, dias de atendimento, documentos...). Se ela não informou algo, não liste.
 - Use exclusivamente o ÚLTIMO atendimento fornecido; não retome pendências de atendimentos anteriores.

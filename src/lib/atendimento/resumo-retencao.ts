@@ -1,5 +1,6 @@
 import { normalizarResumo, type ResumoHandoff } from "./handoff-resumo";
 import { ajustarResumoPorDesfecho, type DesfechoConversa } from "./resumo-desfecho";
+import { acaoConcluida, acoesSolicitadas } from "./resumo-atividades";
 
 export const RETENCAO_RESUMO_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -20,9 +21,7 @@ export interface AtendimentoAnterior {
   id: string;
   data: string;
   expira_em: string;
-  motivo: string;
-  resultado: string | null;
-  informado: string[];
+  acoes: string[];
 }
 
 export interface PainelResumo {
@@ -78,15 +77,36 @@ export function montarPainelResumo(
     )
       continue;
     ciclos.add(ciclo);
-    anteriores.push({
-      id: r.id,
-      data: r.handoff_em,
-      expira_em: new Date(Date.parse(r.handoff_em) + RETENCAO_RESUMO_MS).toISOString(),
-      motivo: r.payload.motivo_contato,
-      resultado: r.payload.situacao,
-      informado: r.payload.ja_informado ?? [],
-    });
+    // Um encerramento posterior não pode apagar um agendamento concluído antes.
+    // Cada ação preserva a data e o vencimento da versão que a registrou.
+    const concluidos = recentes
+      .filter((v) => Date.parse(v.atendimento_inicio) === ciclo && v.status === "ok" && v.payload)
+      .reverse()
+      .flatMap((v) => {
+        const acao = acaoConcluida(v.payload!, v.desfecho);
+        return acao ? [{ linha: v, resumo: v.payload!, desfecho: v.desfecho, acao }] : [];
+      });
+    const incluir = (fonte: ResumoRetido, acoes: string[]) => {
+      if (!acoes.length) return;
+      const existente = anteriores.find((a) => a.id === fonte.id);
+      if (existente) existente.acoes.push(...acoes);
+      else
+        anteriores.push({
+          id: fonte.id,
+          data: fonte.handoff_em,
+          expira_em: new Date(Date.parse(fonte.handoff_em) + RETENCAO_RESUMO_MS).toISOString(),
+          acoes,
+        });
+    };
+    incluir(r, acoesSolicitadas(r.payload, concluidos));
+    const vistas = new Set<string>();
+    for (const c of concluidos) {
+      if (vistas.has(c.acao)) continue;
+      vistas.add(c.acao);
+      incluir(c.linha, [c.acao]);
+    }
   }
+  anteriores.sort((a, b) => Date.parse(b.data) - Date.parse(a.data));
   return { atual, anteriores };
 }
 
