@@ -3293,8 +3293,17 @@ function AtendimentosPage() {
                   <Label className="text-xs font-medium">
                     Laudo
                     <span className="ml-1 font-normal text-muted-foreground">
-                      ({filteredItems.filter((a) => a.laudo_status === "emitido").length} baixados ·{" "}
-                      {filteredItems.filter((a) => a.laudo_status !== "emitido").length} pendentes)
+                      (
+                      {
+                        filteredItems.filter((a) => !ehLinhaDeLaudo(a) && a.laudo_status === "emitido")
+                          .length
+                      }{" "}
+                      baixados ·{" "}
+                      {
+                        filteredItems.filter((a) => !ehLinhaDeLaudo(a) && a.laudo_status !== "emitido")
+                          .length
+                      }{" "}
+                      pendentes)
                     </span>
                   </Label>
                   <Select
