@@ -1576,14 +1576,7 @@ function AtendimentosPage() {
       }
     >();
     {
-      const { data: pagos, error: ePagos } = await supabase
-        .from("fin_repasse_terceiro")
-        .select(
-          "origem, lancamento_id, atendimento_id, terceiro_medico_id, repasse_pago_em, repasse_pago_at, repasse_forma_pagamento, repasse_conta_id",
-        )
-        .eq("clinica_id", clinicaAtual.clinica_id)
-        .gte("data", fIni)
-        .lte("data", fFim);
+      const { data: pagos, error: ePagos } = terceirosRes;
       if (ePagos) {
         mostrarErro(ePagos);
         setLoading(false);
