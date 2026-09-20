@@ -3176,21 +3176,12 @@ export function AtendInbox() {
                 </div>
                 <div className="flex min-h-[24px] flex-wrap items-center gap-1.5 mt-1">
                   {/* Lista canônica e já deduplicada por chave semântica. */}
-                  {tiposDeBadgeDoCard(c).map((tipo) => {
+                  {tiposDeBadgeDoCard(c, meuId).map((tipo) => {
                     if (tipo === "status") return <Fragment key={tipo}>{statusBadge(c.status)}</Fragment>;
                     if (tipo === "sem-responsavel")
                       return (
                         <Badge key={tipo} className="bg-atd-danger text-atd-on-strong text-[11px]">
                           🔴 Não atribuída
-                        </Badge>
-                      );
-                    if (tipo === "humano")
-                      return (
-                        <Badge
-                          key={tipo}
-                          className="bg-atd-human-bg text-atd-human-ink text-[11px] border border-atd-human-ink/20"
-                        >
-                          👤 Humano
                         </Badge>
                       );
                     if (tipo === "nina")
@@ -3215,13 +3206,9 @@ export function AtendInbox() {
                     return (
                       <Badge
                         key={tipo}
-                        className={`text-[11px] ${
-                          c.atribuida_user_id === meuId
-                            ? "bg-atd-go/15 text-atd-ink border border-atd-go/30"
-                            : "bg-atd-warn-bg text-atd-warn-ink border border-atd-warn"
-                        }`}
+                        className="text-[11px] bg-atd-warn-bg text-atd-warn-ink border border-atd-warn"
                       >
-                        {c.atribuida_user_id === meuId ? "Você" : nomeUsuario(c.atribuida_user_id)}
+                        {nomeUsuario(c.atribuida_user_id)}
                       </Badge>
                     );
                   })}

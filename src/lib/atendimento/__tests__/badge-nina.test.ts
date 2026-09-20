@@ -50,7 +50,9 @@ describe("indicador único da Nina no card", () => {
   });
 
   it("status deixa de aparecer só quando seria uma segunda Nina", () => {
-    expect(tiposDeBadgeDoCard({ status: "bot_attending", owner_type: "AI" })).not.toContain("status");
+    expect(tiposDeBadgeDoCard({ status: "bot_attending", owner_type: "AI" })).not.toContain(
+      "status",
+    );
     expect(tiposDeBadgeDoCard({ status: "active", owner_type: "AI" })).toContain("status");
   });
 
@@ -64,15 +66,18 @@ describe("indicador único da Nina no card", () => {
     expect(tipos).toContain("responsavel");
   });
 
-  it("ordem dos badges é estável", () => {
+  it("card individual mantém status e alerta sem os antigos selos Humano e Você", () => {
     expect(
-      tiposDeBadgeDoCard({
-        status: "active",
-        owner_type: "HUMAN",
-        handoff_motivo: "patient_response_timeout",
-        atribuida_user_id: "44444444-4444-4444-4444-444444444444",
-      }),
-    ).toEqual(["status", "humano", "timeout-nina", "responsavel"]);
+      tiposDeBadgeDoCard(
+        {
+          status: "active",
+          owner_type: "HUMAN",
+          handoff_motivo: "patient_response_timeout",
+          atribuida_user_id: "44444444-4444-4444-4444-444444444444",
+        },
+        "44444444-4444-4444-4444-444444444444",
+      ),
+    ).toEqual(["status", "timeout-nina"]);
   });
 
   it("é tolerante a conversa nula ou campos ausentes", () => {

@@ -22,7 +22,6 @@ export type ConversaIndicadores = {
 export type BadgeConversaTipo =
   | "status"
   | "sem-responsavel"
-  | "humano"
   | "nina"
   | "timeout-nina"
   | "responsavel";
@@ -49,7 +48,10 @@ export function statusEhRepresentacaoDaNina(status?: string | null): boolean {
  * semântica e em ordem estável. A Nina nunca aparece duas vezes, mesmo que
  * várias marcações internas apontem para ela.
  */
-export function tiposDeBadgeDoCard(c: ConversaIndicadores | null | undefined): BadgeConversaTipo[] {
+export function tiposDeBadgeDoCard(
+  c: ConversaIndicadores | null | undefined,
+  usuarioAtualId?: string | null,
+): BadgeConversaTipo[] {
   const tipos = new Set<BadgeConversaTipo>();
   if (!c) return [];
 
@@ -57,16 +59,14 @@ export function tiposDeBadgeDoCard(c: ConversaIndicadores | null | undefined): B
   // Status só entra quando não é apenas outra forma de dizer "Nina".
   if (c.status && !(nina && statusEhRepresentacaoDaNina(c.status))) tipos.add("status");
   if (c.owner_type === "NONE") tipos.add("sem-responsavel");
-  // Nina não é responsável humano: os dois conceitos têm selos distintos.
-  if (c.owner_type === "HUMAN") tipos.add("humano");
   if (nina) tipos.add("nina");
   if (c.handoff_motivo === "patient_response_timeout") tipos.add("timeout-nina");
-  if (c.atribuida_user_id) tipos.add("responsavel");
+  // A fila individual dispensa "Você"; a supervisão ainda identifica outra atendente.
+  if (c.atribuida_user_id && c.atribuida_user_id !== usuarioAtualId) tipos.add("responsavel");
 
   const ordem: BadgeConversaTipo[] = [
     "status",
     "sem-responsavel",
-    "humano",
     "nina",
     "timeout-nina",
     "responsavel",
