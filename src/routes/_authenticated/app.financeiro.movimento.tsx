@@ -1732,7 +1732,21 @@ function Page() {
     })
     // Filtro por profissional (uma entrada por agenda): estreita lista, cards
     // e quadro juntos, como qualquer outro filtro da barra.
-    .filter((l) => filterMedico === "todos" || (l.medico_nome ?? "") === filterMedico);
+    //
+    // A comparação é pelo MÉDICO + AGENDA, e não pelo texto do rótulo. Quem tem
+    // mais de uma agenda só aparece no seletor como `NOME — AGENDA`; os
+    // lançamentos desse profissional que não têm agenda gravada ficavam com o
+    // nome limpo e sumiam ao escolher qualquer uma das opções — a tela voltava
+    // vazia e parecia "filtro que não funciona". Agora esses lançamentos
+    // continuam visíveis em qualquer agenda do mesmo profissional.
+    .filter((l) => {
+      if (filterMedico === "todos") return true;
+      if (!opcaoProfSelecionada) return (l.medico_nome ?? "") === filterMedico;
+      if ((l.medico_id ?? null) !== opcaoProfSelecionada.medicoId) return false;
+      if (opcaoProfSelecionada.agendaFiltro === "todos") return true;
+      const chave = chaveNomeAgenda(l.agenda_nome ?? "");
+      return !chave || `nome:${chave}` === opcaoProfSelecionada.agendaFiltro;
+    });
 
   // O que é ajuste de outro dia dentro deste recorte. As partes de um
   // pagamento misto herdam a marca do pai e somam exatamente o valor dele, por
