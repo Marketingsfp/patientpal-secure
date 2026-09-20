@@ -11,11 +11,14 @@
  *   são descartadas.
  */
 
+import type { PaginaHistorico } from "./historico-paginado";
+
 export type ConteudoConversa = {
   msgs: any[];
   contato: any;
   notas: any[];
   eventos: any[];
+  historico?: Pick<PaginaHistorico, "anterior" | "posterior" | "temMais">;
   /**
    * Conteúdo parcial (Fase 4): veio do prefetch e tem só as mensagens
    * recentes. Serve para o chat abrir na hora; contato/notas/eventos ainda
@@ -128,4 +131,3 @@ export function conversasDesatualizadas(params: {
   }
   return fora;
 }
-
