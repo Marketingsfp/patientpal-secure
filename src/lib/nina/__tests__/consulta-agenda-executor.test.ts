@@ -298,6 +298,26 @@ beforeEach(() => {
   };
 });
 
+describe("pesquisa com atendimento e objetivos separados", () => {
+  for (const origem of ["homologacao", "whatsapp"] as const) {
+    test(`${origem}: valor, horários e médicos não viram termos de busca nem intenção de agendar`, async () => {
+      const ctx = { ...contexto("Qual o valor de cardiologia, quais médicos atendem e em quais dias?"), origem };
+      const objetivos = ["valor", "horarios", "medicos"];
+      const r = await executarFerramentaPaciente(ctx, "consultar_base_conhecimento", {
+        termo: "cardiologia", objetivos,
+      });
+      expect(r.ok).toBe(true);
+      expect(pesquisas).toEqual([{
+        clinicaId: CLINICA, query: "cardiologia", medico: null, dia: null, canal: "whatsapp",
+      }]);
+      expect(r.pedido_interpretado).toEqual({ atendimento: "cardiologia", objetivos });
+      expect(ctx.estado.appointment.intent_confirmed).not.toBe(true);
+      expect(consultasAgenda()).toHaveLength(0);
+      expect(gravacoes).toHaveLength(0);
+    });
+  }
+});
+
 describe("primeiro disponível entre todos os profissionais publicados", () => {
   const oferta = "Você prefere escolher um desses profissionais ou quer que eu consulte quem tem a disponibilidade mais próxima?";
   const pedido = { tipo: "consulta", atendimento: "Cardiologia" };

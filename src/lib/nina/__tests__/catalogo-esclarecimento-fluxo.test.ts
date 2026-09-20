@@ -26,14 +26,16 @@ describe("Nina: pergunta única e encaminhamento na geração real", () => {
         if (etapa === "primeiro") {
           expect(r.resposta).toContain("Pode informar o nome do procedimento por extenso?");
           expect(r.resposta).not.toContain("R$");
-          expect(r.requests).toHaveLength(0);
+          expect(r.requests).toHaveLength(1);
           expect(JSON.stringify(r.gravacoes)).toContain("esclarecimento");
         } else if (etapa === "segundo") {
           expect(r.encaminhamentos[0].motivo).toContain("CATALOGO_IDENTIFICACAO_NAO_ESCLARECIDA");
           expect(r.encaminhamentos[0].resumo).toContain("Não sei explicar");
           expect(r.resposta).not.toContain("Pode informar o nome do procedimento por extenso?");
-          expect(r.requests).toHaveLength(0);
-        } else expect(r.requests).toHaveLength(1);
+          expect(r.requests).toHaveLength(1);
+        } else expect(r.requests).toHaveLength(2);
+        expect(r.ordem[0]).toBe("modelo");
+        if (etapa !== "primeiro") expect(JSON.stringify(r.requests[0].messages)).toContain("esclarecimento");
       });
     }
 });

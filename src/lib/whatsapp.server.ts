@@ -1310,6 +1310,9 @@ async function gerarRespostaNinaInterno(
   // ------------------------------------------------------------------
   // FASE 3 — RUNTIME CONTEXT: só FATOS. Nenhuma regra conversacional aqui.
   // ------------------------------------------------------------------
+  const { conhecimentoDaMesmaSessao } = await import("@/lib/nina/confidence/conhecimento-sessao");
+  const conhecimentoAnterior = conhecimentoDaMesmaSessao(fluxoEstado.knowledge_context, clinicaId, fluxoEstado.session_id ?? null);
+  fluxoEstado.knowledge_context = conhecimentoAnterior;
   const runtimeContext = {
     canal: "whatsapp",
     ambiente: opcoes?.teste ? "homologacao" : "producao",
@@ -1366,6 +1369,11 @@ async function gerarRespostaNinaInterno(
       publicado: baseAtiva,
       servicos: catalogoPublicado.servicos,
       profissionais: catalogoPublicado.profissionais,
+      // Referência do assunto/pergunta, sem preços ou outros fatos antigos.
+      referencia_da_sessao: conhecimentoAnterior ? {
+        consulta: conhecimentoAnterior.consulta,
+        esclarecimento: conhecimentoAnterior.esclarecimento ?? null,
+      } : null,
     },
     ferramentas: {
       pode_agendar: podeAgendar,
@@ -1689,21 +1697,14 @@ async function gerarRespostaNinaInterno(
   const nomesFerramentasTurno: string[] = [];
   let conflitoFerramenta = false;
   let nivelAnteriorTurno: "low" | "medium" | "high" | undefined;
-  // FASE 5 — quantas rodadas de modelo o turno consumiu. Caminho sem modelo
-  // termina com 0 e é registrado como tal, sem inventar execução de LLM.
-  let rodadasDoTurno = 0;
   // Conhecimento da sessão é uma referência de pesquisa, nunca prova velha.
-  // Toda continuação factual é reconsultada no catálogo e o MESMO retorno
-  // alimenta o contexto do modelo e a auditoria antes da geração.
-  const { conhecimentoDaMesmaSessao, consultaDoNovoTurno, lembrarConsultaComprovada,
+  // A Nina interpreta a mensagem e o histórico ANTES de escolher os termos
+  // da busca. Só resultados de consultas reais alimentam os fatos do turno.
+  const { lembrarConsultaComprovada,
     compararReferenciasConhecimento } = await import("@/lib/nina/confidence/conhecimento-sessao");
   const { incorporarResultadoOficial, limitarRetornoParaModelo } = await import("@/lib/nina/confidence/evidencias-turno");
   const { resolverSelecaoContextual, normalizarSelecaoContextual } = await import("@/lib/nina/confidence/selecao-contextual");
-  const conhecimentoAnterior = conhecimentoDaMesmaSessao(fluxoEstado.knowledge_context, clinicaId, fluxoEstado.session_id ?? null);
   const { encaminharAposEsclarecimento, MOTIVO_IDENTIFICACAO_PENDENTE } = await import("@/lib/nina/catalogo-esclarecimento");
-  fluxoEstado.knowledge_context = conhecimentoAnterior;
-  const consultaPlanejada = consultaDoNovoTurno({ mensagem: mensagemPaciente, anterior: conhecimentoAnterior,
-    dispensarConsulta: Boolean(saudacaoDispensadaPor) });
   let selecaoDoTurno: import("@/lib/nina/confidence/selecao-contextual").ResultadoSelecaoContextual | null = null;
   async function encaminharRegraCatalogo(ferramentaOrigem: string, ausencia?: NonNullable<ReturnType<typeof encaminhamentoSemRegistro>>) {
     if (finalizacaoHandoff || turnoObsoleto) return;
@@ -1734,9 +1735,8 @@ async function gerarRespostaNinaInterno(
       codigo: { arquivo: "src/lib/whatsapp.server.ts", funcao: "encaminharRegraCatalogo" } });
     if (confirmado) rastro?.concluir("tool.execute", { ferramenta: "solicitar_atendente_humano", origem_solicitacao: origem });
     else rastro?.falhar("tool.execute", rh.erro ?? "handoff não confirmado", { ferramenta: "solicitar_atendente_humano" });
-    if (!rodadasDoTurno) rastro?.pular("llm.generate", `${origem} encaminhou antes do modelo`);
   }
-  async function compartilharResultado(nome: string, args: unknown, r: import("@/lib/nina/tool-broker").ResultadoBroker, consultaAutomatica = false) {
+  async function compartilharResultado(nome: string, args: unknown, r: import("@/lib/nina/tool-broker").ResultadoBroker) {
     const ex = incorporarResultadoOficial({ clinicaId, nome, args, resultado: r,
       fatos: fatosDoTurno, consultas: consultasDoTurno });
     if (!r.reused) nomesFerramentasTurno.push(nome);
@@ -1793,7 +1793,7 @@ async function gerarRespostaNinaInterno(
         codigo: { arquivo: "src/lib/whatsapp.server.ts", funcao: "compartilharResultado" } });
     }
     const ausencia = encaminharAposEsclarecimento(conhecimentoAnterior, r, mensagemPaciente)
-      ?? encaminhamentoSemRegistro(r, args, consultaAutomatica);
+      ?? encaminhamentoSemRegistro(r, args);
     if (ausencia) await encaminharRegraCatalogo(nome, ausencia);
     else if (r.success && resultadoExigeHumano(r.dados, selecaoDoTurno?.selecao?.raizesFonte.map(r => r.registro)))
       await encaminharRegraCatalogo(nome);
@@ -1804,32 +1804,12 @@ async function gerarRespostaNinaInterno(
         interpretacao_intencao: "modelo_com_historico_da_sessao",
         permite_reservar: false, fonte_vagas: "agenda", fonte_horarios_habituais: "catalogo_publicado" } };
   }
-  async function consultarFonteAntesDaResposta(args: { termo: string; medico?: string; dia?: string }, recuperar = false) {
-    const nome = "consultar_base_conhecimento";
-    const id = `fonte_servidor_${rodadasDoTurno}_${recuperar ? "recuperacao" : "inicio"}`;
-    rastro?.iniciar("tool.execute", { ferramenta: nome, origem_solicitacao: "servidor", recuperacao: recuperar });
-    const r = await broker.executar(nome, JSON.stringify(args), { revalidarLeitura: recuperar });
-    const payload = await compartilharResultado(nome, args, r, true);
-    // A chamada existiu e foi planejada pelo servidor. Não é registrada como
-    // saída original do modelo; a origem também fica explícita na auditoria.
-    mensagens.push({ role: "assistant", content: null,
-      tool_calls: [{ id, type: "function", function: { name: nome, arguments: JSON.stringify(args) } }] });
-    mensagens.push({ role: "tool", tool_call_id: id, content: JSON.stringify(payload) });
-    registrarEtapa({ tipo: "ferramenta", fonte: "catalogo", titulo: recuperar ? "Recuperação da fonte antes de decidir" : "Consulta da base antes da resposta",
-      dados: { origem_solicitacao: "servidor", ferramenta: nome, argumentos: args, success: r.success,
-        erro: r.erro ?? null, reused: r.reused, recuperacao: recuperar, consulta: consultasDoTurno.at(-1)?.id },
-      codigo: { arquivo: "src/lib/whatsapp.server.ts", funcao: "consultarFonteAntesDaResposta" } });
-    if (r.success && !r.erro) rastro?.concluir("tool.execute", { ferramenta: nome, origem_solicitacao: "servidor" });
-    else rastro?.falhar("tool.execute", r.erro ?? "falha na consulta", { ferramenta: nome });
-  }
-  if (consultaPlanejada) await consultarFonteAntesDaResposta(consultaPlanejada.args);
   for (let rodada = 0; rodada < MAX_RODADAS; rodada++) {
     if (finalizacaoHandoff || turnoObsoleto) break;
     if (ctxFerramentas?.esclarecimentoCatalogo) {
       resposta = ctxFerramentas.esclarecimentoCatalogo.pergunta;
       break;
     }
-    rodadasDoTurno = rodada + 1;
     // Escolhas por extenso e referências ("o segundo horário") são interpretadas
     // pelo modelo sobre as mesmas opções oficiais guardadas pelo executor.
     runtimeContext.agendamento.opcoes_consultadas =
@@ -2063,6 +2043,17 @@ async function gerarRespostaNinaInterno(
         tool_call_id: c.id,
         content: JSON.stringify(resultadoCompartilhado),
       });
+      if ((r.dados as { codigo?: string } | null)?.codigo === "CATALOGO_QUERY_NAO_INTERPRETADA") {
+        // Uma pesquisa recusada não é "não encontrado". Devolve ao modelo
+        // para reformular antes de executar outras decisões do mesmo lote.
+        for (const pendente of chamadas.slice(chamadas.indexOf(c) + 1)) {
+          mensagens.push({ role: "tool", tool_call_id: pendente.id, content: JSON.stringify({
+            ok: false, erro: "PESQUISA_PENDENTE_DE_INTERPRETACAO", executada: false,
+            mensagem: "Chamada não executada: primeiro reformule a pesquisa recusada com o atendimento identificado e seus objetivos.",
+          }) });
+        }
+        break;
+      }
       if (ctxFerramentas?.esclarecimentoCatalogo) break;
       if (finalizacaoHandoff || turnoObsoleto) break;
       const dadosAgendamento = r.dados as Record<string, unknown> | null;

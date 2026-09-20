@@ -24,6 +24,7 @@
  */
 
 import { z } from "zod";
+import { OBJETIVOS_PESQUISA_CATALOGO } from "./catalogo-pesquisa";
 import { agoraNaClinica, FUSO_PADRAO } from "@/lib/nina-agora";
 import { janelaDiaClinica } from "@/lib/date-utils";
 import { diaDaSemanaISO } from "./horario-oficial";
@@ -782,12 +783,17 @@ export const FERRAMENTAS_NINA_CONSULTA = [
           termo: {
             type: "string",
             description:
-              "Assunto perguntado pelo paciente (ex.: 'ultrassom de tireoide', 'neurologista', 'consulta cardiologia').",
+              "Nome do atendimento identificado após interpretar a mensagem e o histórico da sessão (ex.: 'ultrassom de tireoide', 'neurologista', 'cardiologia'). Não copie a frase inteira: saudação, sintomas relatados e preferências de data não compõem o nome do atendimento. Exemplo: 'Boa tarde, quero cardiologista nos próximos dias, tenho palpitações' → 'cardiologia'. Preserve qualificadores do procedimento, como órgão, total/superior, infantil e com/sem contraste. Consulte separadamente cada atendimento pedido. Em continuação, reconsulte o item identificado no histórico ou na referencia_da_sessao; não reutilize seus fatos antigos nem invente equivalências para siglas desconhecidas.",
+          },
+          objetivos: {
+            type: "array", items: { type: "string", enum: OBJETIVOS_PESQUISA_CATALOGO },
+            minItems: 1, maxItems: 7,
+            description: "O que o paciente quer saber sobre ESTE atendimento, após analisar a mensagem inteira e o histórico. Pode haver vários objetivos. Use informacoes_gerais para apresentação geral; valor, horarios, medicos, preparo ou condicoes para dúvidas específicas; agendamento somente quando há intenção de marcar. Use o retorno para responder aos objetivos identificados com as condições publicadas relevantes. Perguntar preço ou horário não significa querer agendar. Estes objetivos não fazem parte do termo de busca.",
           },
           medico: { type: "string", description: "Filtrar por nome do profissional (opcional)." },
           dia: { type: "string", description: "Filtrar por dia da semana (opcional)." },
         },
-        required: ["termo"],
+        required: ["termo", "objetivos"],
       },
     },
   },
@@ -1170,6 +1176,7 @@ async function executarFerramentaInterna(
         const p = z
           .object({
             termo: z.string().trim().min(2).max(200),
+            objetivos: z.array(z.enum(OBJETIVOS_PESQUISA_CATALOGO)).min(1).max(7).optional(),
             medico: z.string().trim().max(160).optional(),
             dia: z.string().trim().max(40).optional(),
           })
@@ -1187,7 +1194,8 @@ async function executarFerramentaInterna(
         // Consulta de leitura: `price` resume o primeiro resultado e pode ser
         // de outro serviço, profissional ou forma de pagamento. Não é o preço
         // do atendimento selecionado e não pode sobrescrever seu estado.
-        return { ok: true, ...resultado };
+        return { ok: true, ...resultado,
+          pedido_interpretado: { atendimento: p.termo, objetivos: p.objetivos ?? ["informacoes_gerais"] } };
 
       }
 

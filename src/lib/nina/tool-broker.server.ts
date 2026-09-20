@@ -18,6 +18,7 @@ import {
   type ResultadoBroker,
 } from "./tool-broker";
 import type { CtxNinaPaciente } from "./paciente-tools.server";
+import { recusarFraseComoPesquisa } from "./catalogo-pesquisa";
 
 export type ToolBroker = {
   executar: (
@@ -66,7 +67,10 @@ export function criarToolBroker(params: {
     await controle?.evento("TOOL_STARTED", { ferramenta: nome });
     let bruto: unknown;
     try {
-      if (descritor?.capacidade === "requestHumanHandoff") {
+      const pesquisaRecusada = recusarFraseComoPesquisa(nome, args);
+      if (pesquisaRecusada) {
+        bruto = pesquisaRecusada;
+      } else if (descritor?.capacidade === "requestHumanHandoff") {
         const { executarHandoffTool } = await import("./handoff-tool.server");
         bruto = await executarHandoffTool(
           params.ctxHandoff,

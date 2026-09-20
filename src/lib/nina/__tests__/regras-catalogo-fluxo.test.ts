@@ -38,11 +38,11 @@ describe("Regra de catálogo na geração real (modelo/banco simulados, rede pro
         expect(r.rede).toBe(0);
         expect(r.temNota).toBe(false);
         if (cenario === "catalogo_sfp_obsoleto") {
-          expect(r.requests).toHaveLength(0);
+          expect(r.requests).toHaveLength(1);
           expect(r.encaminhamentos).toHaveLength(0);
           expect(r.resposta).toBe("");
         } else if (cenario.startsWith("catalogo_sfp")) {
-          expect(r.requests).toHaveLength(cenario.endsWith("modelo") ? 1 : 0);
+          expect(r.requests).toHaveLength(1);
           expect(r.ferramentas).toEqual(cenario === "catalogo_sfp_handoff_modelo"
             ? ["solicitar_atendente_humano"]
             : [cenario === "catalogo_sfp_recusa_agenda_modelo" ? "consultar_disponibilidade" : "consultar_base_conhecimento", "solicitar_atendente_humano"]);
@@ -59,7 +59,7 @@ describe("Regra de catálogo na geração real (modelo/banco simulados, rede pro
             expect(r.finalizacao).toBeUndefined();
           }
         } else {
-          expect(r.requests).toHaveLength(1);
+          expect(r.requests).toHaveLength(2);
           expect(JSON.stringify(r.requests)).not.toContain('"TÉCNICA"');
           expect(JSON.stringify(r.requests)).not.toMatch(/"(?:ENFERMAGEM|EQUIPE DE ENFERMAGEM)"/);
           expect(r.resposta).not.toMatch(/t[eé]cnic[oa]|enfermagem/i);

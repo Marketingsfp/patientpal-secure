@@ -18,21 +18,23 @@ describe("catálogo ausente no núcleo real, sem rede nem motor de confiança", 
         expect(r.ferramentas).not.toContain("agendar");
         if (["obsoleto", "dado_pessoal", "generico"].includes(cenario)) {
           expect(r.encaminhamentos).toHaveLength(0);
-          expect(r.requests).toHaveLength(cenario === "obsoleto" ? 0 : 1);
+          expect(r.requests).toHaveLength(1);
           if (cenario === "obsoleto") expect(r.resposta).toBe("");
           return;
         }
         expect(r.encaminhamentos).toHaveLength(1);
         expect(r.encaminhamentos[0].motivo).toContain("CATALOGO_SEM_REGISTRO");
-        expect(r.requests).toHaveLength(cenario.includes("modelo") || cenario === "misto" ? 1 : 0);
+        expect(r.requests).toHaveLength(1);
+        expect(r.ordem[0]).toBe("modelo");
+        expect(r.ordem.indexOf("solicitar_atendente_humano")).toBeGreaterThan(1);
         expect(r.resposta).not.toContain("não oferece");
         expect(r.resposta).not.toContain("R$ 80");
-        // Sem chamada ao modelo não existe nina_execucoes. A auditoria é o
-        // resumo do turno, persistido também nesses encaminhamentos diretos.
+        // A interpretação e a consulta precedem o encaminhamento e ficam
+        // associadas à execução real do modelo na auditoria.
         const eventos = r.gravacoes.filter((g: any) => g.tabela === "nina_trace_eventos").flatMap((g: any) => g.valor);
         const resumo = eventos.find((e: any) => e.node_id === "turn.summary");
         expect(resumo.metadata.motivo_origem).toContain("CATALOGO_SEM_REGISTRO");
-        expect(resumo.metadata.modelo_chamado).toBe(cenario.includes("modelo") || cenario === "misto");
+        expect(resumo.metadata.modelo_chamado).toBe(true);
         if (ambiente === "homologacao") {
           expect(r.resposta).toContain("simulação");
           expect(r.resposta).not.toContain("Transferido para atendimento humano");

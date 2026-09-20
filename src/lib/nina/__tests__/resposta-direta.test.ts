@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 const fixture = fileURLToPath(new URL("./fixtures/resposta-direta.fixture.ts", import.meta.url));
 describe("Nina sem motor — geração real com dependências externas simuladas", () => {
   for (const ambiente of ["producao", "homologacao"]) {
-    it(`${ambiente}: envia o texto do modelo com a base e o prompt, sem avaliador nem nova rodada`, () => {
+    it(`${ambiente}: interpreta, consulta a base e responde sem avaliador adicional`, () => {
       const p = Bun.spawnSync([process.execPath, fixture, ambiente], {
         cwd: fileURLToPath(new URL("../../../../../", import.meta.url)),
         stdout: "pipe", stderr: "pipe", timeout: 15_000,
@@ -15,7 +15,8 @@ describe("Nina sem motor — geração real com dependências externas simuladas
       expect(linha).toBeDefined();
       const r = JSON.parse(linha!.slice("DIRETA_RESULTADO=".length));
       expect(r.resposta).toBe(r.respostaModelo);
-      expect(r.requests).toHaveLength(1);
+      expect(r.requests).toHaveLength(2);
+      expect(r.ordem).toEqual(["modelo", "consultar_base_conhecimento", "modelo"]);
       expect(JSON.stringify(r.requests)).toContain(r.prompt);
       expect(JSON.stringify(r.requests)).toContain("95,00");
       expect(JSON.stringify(r.requests)).toContain("Sem jejum");

@@ -4,6 +4,8 @@ import { textoDaChave } from "../../resposta/templates";
 import { CONTINUIDADE_CONSULTA_AGENDA } from "../../prompt/consulta-agenda";
 import { estadoVazio } from "../../fluxo-estado-normalizar";
 import { cenariosContextuais } from "./consulta-contextual-cenarios";
+import { prepararBuscaCatalogo } from "../../catalogo-busca";
+import { recusarFraseComoPesquisa } from "../../catalogo-pesquisa";
 
 process.env.LOVABLE_API_KEY = "chave-ficticia-sem-rede";
 const teste = process.argv[2] === "homologacao";
@@ -13,6 +15,20 @@ const regraCatalogo = cenario.startsWith("catalogo_");
 const sfp = cenario.startsWith("catalogo_sfp");
 const ausente = cenario.startsWith("catalogo_ausente");
 const esclarecer = cenario.startsWith("catalogo_esclarecimento");
+const interpretacao = ({
+  catalogo_interpretado_cardiologia: {
+    mensagem: "Boa tarde, Nina. Gostaria de agendar uma consulta com cardiologista, de preferência nos próximos dias. Estou sentindo algumas palpitações ocasionais e queria fazer uma avaliação.",
+    termo: "cardiologia", objetivos: ["agendamento"], publicado: "CARDIOLOGIA", resposta: "Temos consulta de Cardiologia. Você prefere o primeiro disponível ou escolher o profissional?",
+  },
+  catalogo_interpretado_nebulizacao: {
+    mensagem: "Olá, gostaria de saber como funciona o atendimento para nebulização.",
+    termo: "nebulização", objetivos: ["informacoes_gerais"], publicado: "NEBULIZAÇÃO", resposta: "Temos Nebulização. O atendimento é por ordem de chegada.",
+  },
+  catalogo_interpretado_usg: {
+    mensagem: "Boa tarde, a médica pediu uma usg de abdome total sem doppler. Como faço para marcar para a próxima semana?",
+    termo: "usg abdome total sem doppler", objetivos: ["agendamento"], publicado: "ULTRASSONOGRAFIA ABDOME TOTAL SEM DOPPLER", resposta: "Temos Ultrassonografia de abdome total sem Doppler.",
+  },
+} as Record<string, { mensagem: string; termo: string; objetivos: string[]; publicado: string; resposta: string }>)[cenario.replace(/_recuperacao$/, "")];
 const perguntaEsclarecimento = "Pode informar o nome do procedimento por extenso?";
 const ferramentaAusente = cenario.includes("medicos_modelo") ? "buscar_medicos"
   : cenario.includes("procedimentos_modelo") ? "buscar_procedimentos"
@@ -24,7 +40,7 @@ const resumoEscolhido = ["escolha_pre", "escolha_ficha"].includes(cenario)
     { profissional: "Dr. Jorge Ribeiro", procedimento: "Consulta", data: "21/01/2030", horario: "10:20", unidade: "Clínica simulada" }).texto
   : "Confira: Consulta Cardiologia com Dr. Jorge Ribeiro, dia 21/01/2030, às 10:20. Você confirma?";
 const agenda = cenario !== "direta" && !regraCatalogo;
-const pergunta = esclarecer ? cenario.endsWith("primeiro") ? "Quero exame XYZ" : cenario.endsWith("resolvido") ? "Eletrocardiograma" : "Não sei explicar" : contextual ? contextual.pergunta : (sfp && cenario.endsWith("modelo")) || (ausente && cenario.includes("modelo")) ? "oi"
+const pergunta = interpretacao ? interpretacao.mensagem : esclarecer ? cenario.endsWith("primeiro") ? "Quero exame XYZ" : cenario.endsWith("resolvido") ? "Eletrocardiograma" : "Não sei explicar" : contextual ? contextual.pergunta : (sfp && cenario.endsWith("modelo")) || (ausente && cenario.includes("modelo")) ? "oi"
   : ausente ? cenario.endsWith("dado_pessoal") ? "Meu nome é João Silva"
     : cenario.endsWith("misto") ? "Qual o valor do eletrocardiograma e da consulta de pneumologia?"
     : cenario.endsWith("generico") ? "Quero marcar uma consulta"
@@ -66,6 +82,8 @@ const consultas: string[] = [];
 const gravacoes: Array<{ tabela: string; valor: any }> = [];
 const requests: any[] = [];
 const ferramentas: string[] = [];
+const ordem: string[] = [];
+const argumentosFerramentas: Array<{ nome: string; args: any }> = [];
 const encaminhamentos: unknown[] = [];
 let motorChamado = 0;
 let rede = 0;
@@ -133,6 +151,11 @@ const resultados: any[] = [];
 mock.module("@/lib/nina/tool-broker.server", () => ({ criarToolBroker: () => ({
   resultados: () => resultados,
   executar: async (nome: string, args: unknown) => {
+    const recusada = recusarFraseComoPesquisa(nome, args);
+    if (recusada) return { ferramenta: nome, capacidade: "searchKnowledgeBase", fonte: "base_conhecimento",
+      success: false, reused: false, appointment_confirmed: false, erro: recusada.erro, dados: recusada };
+    ordem.push(nome);
+    argumentosFerramentas.push({ nome, args: typeof args === "string" ? JSON.parse(args) : args });
     ferramentas.push(nome);
     if (contextual && nome === contextual.ferramenta) return {
       ferramenta: nome, capacidade: "checkAvailability", fonte: "agenda", success: true,
@@ -143,7 +166,7 @@ mock.module("@/lib/nina/tool-broker.server", () => ({ criarToolBroker: () => ({
       ferramenta: nome, capacidade: "checkAvailability", fonte: "agenda", success: true,
       reused: false, appointment_confirmed: false, dados: { ok: true, resumo_confirmacao: resumoEscolhido },
     };
-    if (nome === "solicitar_atendente_humano" && (agenda || sfp || ausente || esclarecer)) {
+    if (nome === "solicitar_atendente_humano" && (agenda || regraCatalogo)) {
       encaminhamentos.push(typeof args === "string" ? JSON.parse(args) : args);
       return { ferramenta: nome, capacidade: "requestHumanHandoff", fonte: "atendimento",
         success: !cenario.endsWith("falha_handoff"), reused: false, appointment_confirmed: false,
@@ -179,7 +202,7 @@ mock.module("@/lib/nina/tool-broker.server", () => ({ criarToolBroker: () => ({
             proximos: cenario === "alternativas" ? [{ data: "2030-01-22", hora: "14:00" }] : [] },
         ...(cenario === "falha_consulta" ? { erro: "INTERNAL_ERROR" } : {}) };
     }
-    if (ausente && nome === ferramentaAusente && !(cenario.endsWith("misto") && ferramentas.length === 1)) {
+    if (ausente && nome === ferramentaAusente && !(cenario.endsWith("misto") && argumentosFerramentas.at(-1)?.args.termo === "eletrocardiograma")) {
       const tipada = nome !== "consultar_base_conhecimento";
       const r = { ferramenta: nome, capacidade: tipada ? "listCatalog" : "searchKnowledgeBase", fonte: "base_conhecimento",
         success: !tipada, reused: false, appointment_confirmed: false,
@@ -191,6 +214,20 @@ mock.module("@/lib/nina/tool-broker.server", () => ({ criarToolBroker: () => ({
       return r;
     }
     if (nome !== "consultar_base_conhecimento") throw new Error(`Ferramenta inesperada: ${nome}`);
+    if (interpretacao) {
+      // O matcher de produção só encontra o registro quando recebe o assunto
+      // interpretado; a frase inteira reproduz a falha que pulava o modelo.
+      const query = argumentosFerramentas.at(-1)?.args.termo ?? "";
+      const busca = prepararBuscaCatalogo(query, [interpretacao.publicado]);
+      const found = busca.pontuar(interpretacao.publicado, "") > 0;
+      const r = { ferramenta: nome, capacidade: "searchKnowledgeBase", fonte: "catalogo_publicado",
+        success: true, reused: false, dados: { ok: true, source: "nina_catalogo", fonte: "catalogo_publicado",
+          found, knowledge_status: found ? "found" : "not_found",
+          itens: found ? [{ id: "item-interpretado", procedimento: interpretacao.publicado,
+            modalidade: "Ordem de chegada" }] : [] } };
+      resultados.push(r);
+      return r;
+    }
     if (esclarecer && !cenario.endsWith("resolvido")) {
       const r = { ferramenta: nome, capacidade: "searchKnowledgeBase", fonte: "catalogo_publicado", success: true, reused: false,
         dados: { ok: true, knowledge_status: "not_found", found: false, records: [],
@@ -208,16 +245,26 @@ mock.module("@/lib/nina/tool-broker.server", () => ({ criarToolBroker: () => ({
   },
 }) }));
 mock.module("@/lib/nina/ai-gateway.server", () => ({ ninaAIGateway: async (req: any) => {
+  ordem.push("modelo");
   requests.push(structuredClone(req));
+  if (interpretacao && cenario.endsWith("_recuperacao") && requests.length === 1) return {
+    ok: true, conteudo: "", modelo: "modelo-simulado", execucaoId: "execucao-direta", nivel: "low",
+    toolCalls: [
+      { id: "frase-inteira", type: "function", function: { name: "consultar_base_conhecimento", arguments: JSON.stringify({ termo: pergunta }) } },
+      { id: "handoff-prematuro", type: "function", function: { name: "solicitar_atendente_humano", arguments: '{"motivo":"Não encontrado"}' } },
+    ],
+  };
   if (contextual) return {
     ok: true, conteudo: contextual.ferramenta ? "Opções encontradas na agenda." : "Tudo bem, esclareça sua preferência quando desejar.",
     modelo: "modelo-simulado", execucaoId: "execucao-direta", nivel: "low",
     toolCalls: requests.length === 1 && contextual.ferramenta ? [{ id: "consulta-contextual", type: "function",
       function: { name: contextual.ferramenta, arguments: JSON.stringify(contextual.argumentos) } }] : [],
   };
-  if (ausente && (cenario.includes("modelo") || cenario.endsWith("misto"))) return {
+  if (ausente && !["catalogo_ausente_dado_pessoal", "catalogo_ausente_generico"].includes(cenario)) return {
     ok: true, conteudo: "A clínica não oferece esse serviço.", modelo: "modelo-simulado", execucaoId: "execucao-direta", nivel: "low",
     toolCalls: [
+      ...(cenario.endsWith("misto") ? [{ id: "catalogo-encontrado", type: "function",
+        function: { name: "consultar_base_conhecimento", arguments: '{"termo":"eletrocardiograma"}' } }] : []),
       { id: "catalogo-ausente", type: "function", function: { name: ferramentaAusente, arguments: '{"termo":"pneumologia","especialidade":"pneumologia"}' } },
       { id: "nao-agendar-ausente", type: "function", function: { name: "agendar", arguments: "{}" } },
     ],
@@ -262,6 +309,15 @@ mock.module("@/lib/nina/ai-gateway.server", () => ({ ninaAIGateway: async (req: 
         function: { name: "agendar", arguments: "{}" } }] : []),
     ],
   };
+  if (!agenda && !ausente && requests.length === (cenario.endsWith("_recuperacao") ? 2 : 1)) return {
+    ok: true, conteudo: "", modelo: "modelo-simulado", execucaoId: "execucao-direta", nivel: "low",
+    toolCalls: [{ id: "pesquisa-interpretada", type: "function", function: {
+      name: "consultar_base_conhecimento",
+      arguments: JSON.stringify({ termo: interpretacao?.termo ?? (esclarecer && !cenario.endsWith("resolvido") ? "XYZ" : "eletrocardiograma"),
+        ...(interpretacao ? { objetivos: interpretacao.objetivos } : {}) }),
+    } }],
+  };
+  if (interpretacao) return { ok: true, conteudo: interpretacao.resposta, toolCalls: [], modelo: "modelo-simulado", execucaoId: "execucao-direta", nivel: "low" };
   return { ok: true, conteudo: respostaModelo, toolCalls: [], modelo: "modelo-simulado", execucaoId: "execucao-direta", nivel: "low" };
 } }));
 mock.module("@/lib/nina/resposta/templates.server", () => ({
@@ -284,7 +340,7 @@ await registrarEntregaSaida({
   decisaoId: "decisao-antiga", textoHash: "hash-direto",
 });
 console.log("DIRETA_RESULTADO=" + JSON.stringify({
-  resposta, respostaModelo, resumoEscolhido, prompt, motorChamado, rede, requests, ferramentas, consultas,
+  resposta, respostaModelo, resumoEscolhido, prompt, pergunta, motorChamado, rede, requests, ferramentas, consultas, ordem, argumentosFerramentas,
   temNota: auditoria.decisaoId != null, gravacoes,
   encaminhamentos,
   etapas: gravacoes.find(g => g.tabela === "nina_execucao_evidencias")?.valor.etapas ?? [],
