@@ -117,6 +117,7 @@ import {
 } from "@/components/ui/table";
 import { Switch } from "@/components/ui/switch";
 import {
+  chaveNomeAgenda,
   montarOpcoesProfissional,
   rotuloProfissionalAgenda,
   type OpcaoProfissional,
