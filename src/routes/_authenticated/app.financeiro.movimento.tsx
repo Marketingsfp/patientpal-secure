@@ -636,16 +636,18 @@ function Page() {
       // centenas de ids de uma vez estouram o limite de tamanho — a consulta
       // volta com erro, não com menos linhas, e a tela ficava sem nada.
       const LOTE_IDS = 150;
+      // Os lotes vão TODOS juntos, não um depois do outro. Um dia cheio de
+      // caixa gera dezenas de lotes; em fila indiana cada um esperava a volta
+      // do anterior (~150 ms cada) e a tela levava vários segundos só nessa
+      // etapa. Em paralelo o tempo passa a ser o do lote mais lento.
       const emLotes = async <T,>(
         ids: string[],
         consulta: (lote: string[]) => PromiseLike<{ data: unknown }>,
       ): Promise<T[]> => {
-        const out: T[] = [];
-        for (let i = 0; i < ids.length; i += LOTE_IDS) {
-          const { data } = await consulta(ids.slice(i, i + LOTE_IDS));
-          out.push(...((data ?? []) as T[]));
-        }
-        return out;
+        const lotes: string[][] = [];
+        for (let i = 0; i < ids.length; i += LOTE_IDS) lotes.push(ids.slice(i, i + LOTE_IDS));
+        const partes = await Promise.all(lotes.map((lote) => consulta(lote)));
+        return partes.flatMap((p) => ((p.data ?? []) as T[]));
       };
       const agIds = Array.from(
         new Set(
