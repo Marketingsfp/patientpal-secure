@@ -107,6 +107,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { ComprovantesTab } from "@/components/financeiro/comprovantes-tab";
 import { HistoricoAtendimentoDialog } from "@/components/financeiro/historico-atendimento-dialog";
 import { resolverRepasse, formaDoAtendimento, type RepasseTerceiro } from "@/lib/repasse-calc";
+import { ehProcedimentoDeLaudo, rotuloDoLaudo } from "@/lib/financeiro/rateio-receita";
 
 /** "2026-09-08" — só aceita o formato exato, para não semear filtro inválido. */
 const ehDataIso = (v: unknown): v is string =>
