@@ -9316,6 +9316,7 @@ export type Database = {
       }
       nina_cat_profissionais: {
         Row: {
+          estrutura: Json | null
           atende_consultorio: boolean | null
           aviso_dia: string | null
           aviso_valido_ate: string | null
@@ -9341,6 +9342,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          estrutura?: Json | null
           atende_consultorio?: boolean | null
           aviso_dia?: string | null
           aviso_valido_ate?: string | null
@@ -9366,6 +9368,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          estrutura?: Json | null
           atende_consultorio?: boolean | null
           aviso_dia?: string | null
           aviso_valido_ate?: string | null
@@ -9416,6 +9419,7 @@ export type Database = {
       }
       nina_cat_servicos: {
         Row: {
+          estrutura: Json | null
           clinica_id: string
           created_at: string
           criado_por: string | null
@@ -9437,6 +9441,7 @@ export type Database = {
           valor_observacao: string | null
         }
         Insert: {
+          estrutura?: Json | null
           clinica_id: string
           created_at?: string
           criado_por?: string | null
@@ -9458,6 +9463,7 @@ export type Database = {
           valor_observacao?: string | null
         }
         Update: {
+          estrutura?: Json | null
           clinica_id?: string
           created_at?: string
           criado_por?: string | null

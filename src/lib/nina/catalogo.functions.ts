@@ -53,10 +53,10 @@ async function exigirAdmin(supabase: any, userId: string, clinicaId: string) {
 }
 
 const COLUNAS_SERVICO =
-  "id, procedimento_id, nome, valor, valor_observacao, descricao_publica, preparo, restricoes, nota_interna, executantes, formas_pagamento, status, rascunho, publicado_em, created_at, updated_at";
+  "id, procedimento_id, nome, valor, valor_observacao, descricao_publica, preparo, restricoes, nota_interna, executantes, formas_pagamento, estrutura, status, rascunho, publicado_em, created_at, updated_at";
 
 const COLUNAS_PROFISSIONAL =
-  "id, medico_id, unidade_id, nome, especialidades, atende_consultorio, formas_pagamento, convenios, horarios, tipo_atendimento, observacao_publica, aviso_dia, aviso_valido_de, aviso_valido_ate, nota_interna, status, rascunho, publicado_em, created_at, updated_at";
+  "id, medico_id, unidade_id, nome, especialidades, atende_consultorio, formas_pagamento, convenios, horarios, tipo_atendimento, observacao_publica, aviso_dia, aviso_valido_de, aviso_valido_ate, nota_interna, estrutura, status, rascunho, publicado_em, created_at, updated_at";
 
 /* ------------------------------------------------------------------ */
 /* Leitura                                                             */

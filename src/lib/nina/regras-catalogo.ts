@@ -17,7 +17,7 @@ function nomeNormalizado(nome: unknown): string {
     .trim()
     .toLowerCase();
 }
-export const profissionalSfp = (nome: unknown) => nomeNormalizado(nome) === "sfp";
+export const profissionalSfp = (nome: unknown) => ["sfp", "spf"].includes(nomeNormalizado(nome));
 // Marcadores completos de cargo/equipe. Não busca essas palavras dentro de nomes próprios.
 const NOME_GENERICO = String.raw`(?:t[eé]cnic[oa]s?(?:\s+(?:de|em)\s+(?:enfermagem|radiologia|laborat[oó]rio))?|enfermagem|enfermeir[oa]s?|auxiliar(?:es)?\s+de\s+enfermagem|equipe(?:\s+(?:de\s+enfermagem|t[eé]cnica|m[eé]dica))?)`;
 const NOME_GENERICO_COMPLETO = new RegExp(`^${NOME_GENERICO}$`, "i");

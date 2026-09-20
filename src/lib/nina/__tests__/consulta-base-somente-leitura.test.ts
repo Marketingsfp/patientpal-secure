@@ -95,7 +95,7 @@ describe("consulta da base da Nina preserva o atendimento selecionado", () => {
     });
     expect(r.depois).toEqual(r.antes);
     expect(r.depois.appointment.price).toBe("R$ 160,00");
-    expect(r.resultado).toEqual({ ok: true, ...fonteGeral });
+    expect(r.resultado).toEqual({ ok: true, ...fonteGeral, pedido_interpretado: { atendimento: "cardiologia", objetivos: ["informacoes_gerais"], tipo_atendimento: "nao_identificado" } });
     expect(r.resumo).toContain("Valor: R$ 160,00");
     expect(r.auditoria).toHaveLength(1);
     expect(r.auditoria[0]?.dados_depois.entrada.resposta).toEqual(r.resultado);

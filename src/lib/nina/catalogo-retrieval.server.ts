@@ -27,19 +27,19 @@ import {
 
 /** Colunas públicas — `nota_interna` e `rascunho` ficam de fora de propósito. */
 const COLUNAS_SERVICO =
-  "id, nome, valor, valor_observacao, descricao_publica, preparo, restricoes, executantes, formas_pagamento, status, updated_at";
+  "id, nome, valor, valor_observacao, descricao_publica, preparo, restricoes, executantes, formas_pagamento, estrutura, status, updated_at";
 const COLUNAS_PROFISSIONAL =
-  "id, nome, especialidades, atende_consultorio, formas_pagamento, convenios, horarios, tipo_atendimento, observacao_publica, aviso_dia, aviso_valido_de, aviso_valido_ate, unidades(nome), status, updated_at";
+  "id, nome, especialidades, atende_consultorio, formas_pagamento, convenios, horarios, tipo_atendimento, observacao_publica, aviso_dia, aviso_valido_de, aviso_valido_ate, unidades(nome), estrutura, status, updated_at";
 
 /** A busca percorre um índice público leve; os detalhes só são lidos após a seleção. */
-const INDICE_SERVICO = "id, nome, descricao_publica, status, updated_at";
-const INDICE_PROFISSIONAL = "id, nome, especialidades, horarios, status, updated_at";
+const INDICE_SERVICO = "id, nome, descricao_publica, aliases:estrutura->aliases, status, updated_at";
+const INDICE_PROFISSIONAL = "id, nome, especialidades, horarios, aliases:estrutura->aliases, status, updated_at";
 const TAMANHO_PAGINA = 250;
-type IndiceServico = Pick<ServicoPublicado, "id" | "nome" | "descricao_publica">;
+type IndiceServico = Pick<ServicoPublicado, "id" | "nome" | "descricao_publica"> & { aliases?: unknown };
 type IndiceProfissional = Pick<
   ProfissionalPublicado,
   "id" | "nome" | "especialidades" | "horarios"
->;
+> & { aliases?: unknown };
 
 async function lerPublicados<T extends { id: string }>(
   tabela: "nina_cat_servicos" | "nina_cat_profissionais",
@@ -74,6 +74,10 @@ async function lerPublicados<T extends { id: string }>(
     // Só a página vazia encerra a busca: o servidor pode impor um limite
     // menor que o solicitado. Cursor por ID evita saltar registros nesse caso.
   }
+}
+
+function aliasesDoIndice(i: { aliases?: unknown }): string[] {
+  return Array.isArray(i.aliases) ? i.aliases.filter((v): v is string => typeof v === "string") : [];
 }
 
 function semAcento(v: unknown): string {
@@ -137,28 +141,28 @@ export async function buscarNoCatalogo(
     ),
   ]);
   const busca = prepararBuscaCatalogo(pedido.query, [
-    ...brutosServicos.flatMap((s) => [s.nome, String(s.descricao_publica ?? "")]),
-    ...brutosProfissionais.flatMap((p) => [p.nome, especialidadesTexto(p)]),
+    ...brutosServicos.flatMap((s) => [s.nome, ...aliasesDoIndice(s), String(s.descricao_publica ?? "")]),
+    ...brutosProfissionais.flatMap((p) => [p.nome, ...aliasesDoIndice(p), especialidadesTexto(p)]),
   ]);
   const termos = busca.termos;
   const expandidos = busca.ajustes;
   if (tipoAtendimento === "nao_identificado") {
     // "Cardiologia" no cadastro de especialidades é uma consulta. A mera
     // menção na descrição de um exame não transforma a especialidade em exame.
-    const nomeDeServico = brutosServicos.some((s) => busca.pontuar(s.nome, "") > 0);
-    const nomeOuEspecialidade = brutosProfissionais.some((p) => busca.pontuar(p.nome, especialidadesTexto(p)) > 0);
+    const nomeDeServico = brutosServicos.some((s) => [s.nome, ...aliasesDoIndice(s)].some(n => busca.pontuar(n, "") > 0));
+    const nomeOuEspecialidade = brutosProfissionais.some((p) => [p.nome, ...aliasesDoIndice(p)].some(n => busca.pontuar(n, especialidadesTexto(p)) > 0));
     if (nomeOuEspecialidade && !nomeDeServico) tipoAtendimento = "consulta";
     else if (nomeDeServico && !nomeOuEspecialidade) tipoAtendimento = "exame_procedimento";
   }
   const perguntaSobreConsulta = tipoAtendimento === "consulta";
   const pontuados = (perguntaSobreConsulta ? [] : brutosServicos)
-    .map((s) => ({ s, score: busca.pontuar(s.nome, String(s.descricao_publica ?? "")) }))
+    .map((s) => ({ s, score: Math.max(...[s.nome, ...aliasesDoIndice(s)].map(n => busca.pontuar(n, String(s.descricao_publica ?? "")))) }))
     .filter((x) => x.score > 0)
     .sort((a, b) => b.score - a.score);
   const idsServicos = pontuados.slice(0, limite).map((x) => x.s.id);
   const medico = semAcento(pedido.medico || nomeProfissionalNaPergunta(pedido.query)).trim();
   const profissionaisRelevantes = (tipoAtendimento === "exame_procedimento" ? [] : brutosProfissionais)
-    .map((p) => ({ p, score: busca.pontuar(p.nome, especialidadesTexto(p)) }))
+    .map((p) => ({ p, score: Math.max(...[p.nome, ...aliasesDoIndice(p)].map(n => busca.pontuar(n, especialidadesTexto(p)))) }))
     .filter(({ p, score }) =>
       medico ? p.id === medico || compararNomeProfissional(medico, p.nome) !== null : score > 0,
     )

@@ -1,3 +1,4 @@
+import { atendimentosEstruturados, textoAtendimentos, pagamentosJaDescritos, lerEstrutura, modalidadeEstruturada, INSTRUCAO_ESTRUTURA_CATALOGO } from "./catalogo-estrutura";
 /**
  * FASE 5 — CATÁLOGO COMO FONTE DE CONHECIMENTO DA NINA (regras puras).
  *
@@ -27,6 +28,7 @@ import { formasPagamentoNina, rotularValoresCartao, REGRA_PIX_CARTAO } from "./p
 
 /** Serviço publicado, já sem colunas internas. */
 export type ServicoPublicado = {
+  estrutura?: unknown;
   id: string;
   nome: string;
   valor: number | string | null;
@@ -40,6 +42,7 @@ export type ServicoPublicado = {
 
 /** Profissional publicado, já sem colunas internas. */
 export type ProfissionalPublicado = {
+  estrutura?: unknown;
   id: string;
   nome: string;
   especialidades: unknown;
@@ -125,6 +128,8 @@ export function avisoVigente(
 /** Serviço publicado → registro no formato que as ferramentas já consomem. */
 export function servicoParaRegistro(s: ServicoPublicado): RegistroConhecimento {
   const executantes = lista(s.executantes);
+  const estrutura = lerEstrutura(s.estrutura);
+  const atendimentos = atendimentosEstruturados(s.descricao_publica, s.estrutura, undefined, s.nome);
   const dinheiro = precoPorForma(s.formas_pagamento, /\b(?:dinheiro|esp[eé]cie)\b/i);
   const cartao = precoPorForma(s.formas_pagamento, /cart/i);
   const resumo = valorResumo({
@@ -145,22 +150,25 @@ export function servicoParaRegistro(s: ServicoPublicado): RegistroConhecimento {
     preco_cartao: cartao,
     observacoes:
       [
-        texto(s.descricao_publica),
+        texto(atendimentos.length ? textoAtendimentos(atendimentos) : s.descricao_publica),
         texto(s.valor_observacao),
         !lista(s.formas_pagamento).length && resumo !== null
           ? `Valor de referência: R$ ${resumo.toFixed(2).replace(".", ",")} (forma de pagamento não informada)`
           : null,
         texto(s.restricoes) ? `Requisitos: ${texto(s.restricoes)}` : null,
-        descricaoPagamentos(s.formas_pagamento),
+        pagamentosJaDescritos(s.formas_pagamento, atendimentos) ? null : descricaoPagamentos(s.formas_pagamento),
       ]
         .filter(Boolean)
         .join(" | ") || null,
-    preparo: texto(s.preparo),
+    preparo: texto(s.preparo) ?? (estrutura.preparo_status === "sem_preparo" ? "A clínica confirmou que não exige preparo." : null),
     linha_origem: null,
     aba_origem: "Catálogo — exames e procedimentos",
     extras: {
       catalogo_tipo: "servico",
-      atendimento_humano_obrigatorio: executantes.some(e => profissionalSfp(e["nome"])),
+      estrutura,
+      atendimentos_publicados: atendimentos,
+      preparo_status: s.preparo ? "informado" : estrutura.preparo_status,
+      atendimento_humano_obrigatorio: estrutura.encaminhamento_humano === true || executantes.some(e => profissionalSfp(e["nome"])),
       omitir_nome_profissional: executantes.some(e => profissionalGenerico(e["nome"])),
       // Valor publicado sem modalidade continua verificável como valor genérico.
       valor_referencia: !lista(s.formas_pagamento).length ? resumo : null,
@@ -181,11 +189,14 @@ export function profissionalParaRegistro(
   hojeISO: string,
 ): RegistroConhecimento {
   const especialidades = nomesVinculos(p.especialidades);
+  const estrutura = lerEstrutura(p.estrutura);
+  const atendimentos = atendimentosEstruturados(p.observacao_publica, p.estrutura, p.nome, "Consulta");
   const convenios = nomesVinculos(p.convenios);
   const horarios = lista(p.horarios) as Array<Record<string, unknown>>;
   const dinheiro = precoPorForma(p.formas_pagamento, /\b(?:dinheiro|esp[eé]cie)\b/i);
   const cartao = precoPorForma(p.formas_pagamento, /cart/i);
   const aviso = avisoVigente(p, hojeISO);
+  const modalidade = modalidadeEstruturada(p.observacao_publica, p.estrutura, p.nome, p.tipo_atendimento);
 
   return {
     id: p.id,
@@ -209,17 +220,17 @@ export function profissionalParaRegistro(
     preco_cartao: cartao,
     observacoes:
       [
-        texto(p.tipo_atendimento) ? `Modalidade: ${texto(p.tipo_atendimento)}` : null,
+        texto(p.tipo_atendimento) ? `${interpretarModalidade(p.tipo_atendimento) ? "Modalidade" : "Classificação do cadastro (não define modalidade)"}: ${texto(p.tipo_atendimento)}` : null,
         p.atende_consultorio === null
           ? null
           : p.atende_consultorio
             ? "Atende no consultório."
             : "Não atende no consultório.",
-        convenios.length ? `Convênios: ${convenios.join(", ")}` : null,
+        convenios.length ? `Convênios: ${convenios.join(", ")}` : estrutura.convenios_status === "nao_aceita" ? "A clínica confirmou que não aceita convênios neste atendimento." : null,
         unidadeDoProfissional(p) ? `Unidade: ${unidadeDoProfissional(p)}` : null,
-        texto(p.observacao_publica),
+        texto(atendimentos.length ? textoAtendimentos(atendimentos) : p.observacao_publica),
         aviso ? `Aviso vigente: ${aviso}` : null,
-        descricaoPagamentos(p.formas_pagamento),
+        pagamentosJaDescritos(p.formas_pagamento, atendimentos) ? null : descricaoPagamentos(p.formas_pagamento),
       ]
         .filter(Boolean)
         .join(" | ") || null,
@@ -228,11 +239,13 @@ export function profissionalParaRegistro(
     aba_origem: "Catálogo — consultas e profissionais",
     extras: {
       catalogo_tipo: "profissional",
-      atendimento_humano_obrigatorio: profissionalSfp(p.nome),
+      estrutura,
+      atendimentos_publicados: atendimentos,
+      convenios_status: convenios.length ? "aceita" : estrutura.convenios_status,
+      atendimento_humano_obrigatorio: estrutura.encaminhamento_humano === true || profissionalSfp(p.nome),
       omitir_nome_profissional: profissionalGenerico(p.nome),
-      modalidade_atendimento: interpretarModalidade(p.tipo_atendimento),
-      orientacao_atendimento: interpretarModalidade(p.tipo_atendimento)
-        ? orientacaoModalidade(interpretarModalidade(p.tipo_atendimento)!) : null,
+      modalidade_atendimento: modalidade,
+      orientacao_atendimento: modalidade ? orientacaoModalidade(modalidade) : null,
       especialidades,
       unidade: unidadeDoProfissional(p),
       convenios,
@@ -244,6 +257,7 @@ export function profissionalParaRegistro(
 }
 
 const INSTRUCAO_FOUND =
+  INSTRUCAO_ESTRUTURA_CATALOGO + " " +
   "Responda usando SOMENTE os fatos deste retorno (catálogo publicado da clínica). " +
   "Campo ausente = informação desconhecida: não complete com conhecimento geral, valor médio, " +
   "estimativa ou internet. " +

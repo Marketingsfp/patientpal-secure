@@ -232,6 +232,8 @@ export function aplicarEdicaoCatalogoIA(
   const antes = dadosEditaveisCatalogo(tipo, registro);
   const publicado = dadosEditaveisCatalogo(tipo, { ...registro, rascunho: null });
   if (registro.rascunho) {
+    if (JSON.stringify(antes.estrutura) !== JSON.stringify(publicado.estrutura))
+      throw new Error("Este cadastro tem regras estruturadas em revisão. Confira e publique pela edição manual antes de usar a IA.");
     // Não esconder na prévia uma troca prévia de vínculo que exija o formulário manual.
     const vinculos = (dados: Record<string, any>) => ({
       procedimento_id: dados.procedimento_id,

@@ -12,6 +12,7 @@
  *    fonte: havendo formas de pagamento com valor, o resumo é derivado delas.
  */
 import { z } from "zod";
+import { estruturaCatalogoSchema, padronizarSfp } from "./catalogo-estrutura";
 import { rotuloPagamentoNina } from "./pagamento-catalogo";
 
 export const STATUS_CATALOGO = ["RASCUNHO", "PUBLICADO", "ARQUIVADO"] as const;
@@ -91,7 +92,7 @@ const textoOpcional = z
   .max(4000)
   .optional()
   .nullable()
-  .transform((v) => (v ? v : null));
+  .transform((v) => (v ? padronizarSfp(v) : null));
 
 const textoCurtoOpcional = z
   .string()
@@ -99,7 +100,7 @@ const textoCurtoOpcional = z
   .max(200)
   .optional()
   .nullable()
-  .transform((v) => (v ? v : null));
+  .transform((v) => (v ? padronizarSfp(v) : null));
 
 const valorOpcional = z
   .union([z.number(), z.string(), z.null()])
@@ -137,13 +138,14 @@ export type FormaPagamento = z.infer<typeof formaPagamentoSchema>;
 
 export const executanteSchema = z.object({
   medico_id: z.string().uuid().nullable().optional().default(null),
-  nome: z.string().trim().min(1, "Informe quem realiza").max(160),
+  nome: z.string().trim().min(1, "Informe quem realiza").max(160).transform(padronizarSfp),
   horarios: textoCurtoOpcional,
   observacao: textoOpcional,
 });
 export type Executante = z.infer<typeof executanteSchema>;
 
 export const servicoSchema = z.object({
+  estrutura: estruturaCatalogoSchema.nullable().optional(),
   procedimento_id: z.string().uuid().nullable().optional().default(null),
   nome: z.string().trim().min(2, "Informe o procedimento").max(200),
   valor: valorOpcional,
@@ -154,6 +156,13 @@ export const servicoSchema = z.object({
   nota_interna: textoOpcional,
   executantes: z.array(executanteSchema).max(50).default([]),
   formas_pagamento: z.array(formaPagamentoSchema).max(30).default([]),
+}).superRefine((v, ctx) => {
+  if (v.estrutura?.categoria === "consulta") ctx.addIssue({ code: "custom", path: ["estrutura", "categoria"], message: "Cadastre consultas na seção de profissionais." });
+  if (v.estrutura?.preparo_status === "sem_preparo" && v.preparo) ctx.addIssue({ code: "custom", path: ["preparo"], message: "Há orientações de preparo cadastradas. Confira antes de marcar que não exige preparo." });
+}).transform(v => {
+  if (v.estrutura && v.estrutura.preparo_status !== "sem_preparo")
+    v.estrutura.preparo_status = v.preparo ? "informado" : "nao_informado";
+  return v;
 });
 export type ServicoCatalogo = z.infer<typeof servicoSchema>;
 
@@ -199,6 +208,7 @@ export type HorarioAtendimento = z.infer<typeof horarioSchema>;
 
 export const profissionalSchema = z
   .object({
+    estrutura: estruturaCatalogoSchema.nullable().optional(),
     medico_id: z.string().uuid().nullable().optional().default(null),
     unidade_id: z.string().uuid().nullable().optional().default(null),
     nome: z.string().trim().min(2, "Informe o nome do profissional").max(200),

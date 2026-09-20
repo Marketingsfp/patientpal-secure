@@ -1,3 +1,4 @@
+import { estruturaVazia } from "./catalogo-estrutura";
 /**
  * "Criar com IA" do catálogo da Nina — regras puras (sem rede, sem banco).
  *
@@ -149,6 +150,7 @@ export function instrucoesCatalogoIA(tipo: TipoCatalogo): string {
     "- Horas no formato HH:mm (24h). Datas no formato AAAA-MM-DD; sem ano informado, use null.",
     "- Valores como número em reais (ex.: 130.5). Sem valor no texto, use null.",
     "- Vários registros no mesmo texto: um item por registro.",
+    "- Padronize o marcador SPF como SFP. Categoria Consulta não é modalidade: preencha tipo_atendimento apenas com modalidade expressamente informada. Não deduza pré-agendamento de Agendado ou Ordem de chegada.",
     "- `pendencias`: informações do texto que não couberam em nenhum campo (não descarte nada).",
     "- `ambiguidades`: pontos que precisam de confirmação humana (nome parcial, preço condicional, data sem ano).",
   ].join("\n");
@@ -185,6 +187,7 @@ export function paraEstadoServico(item: any) {
   return {
     id: null as string | null,
     procedimento_id: null as string | null,
+    estrutura: estruturaVazia(),
     nome: txt(item?.nome),
     valor: valorTexto(item?.valor),
     valor_observacao: txt(item?.valor_observacao),
@@ -198,6 +201,7 @@ export function paraEstadoServico(item: any) {
             medico_id: null as string | null,
             nome: txt(e?.nome),
             horarios: txt(e?.horarios),
+            observacao: txt(e?.observacao),
           }))
           .filter((e: { nome: string }) => e.nome)
       : [],
@@ -282,6 +286,7 @@ export function paraEstadoProfissional(
 
   return {
     estado: {
+      estrutura: estruturaVazia(),
       id: null,
       medico_id: medico.id,
       unidade_id: null,

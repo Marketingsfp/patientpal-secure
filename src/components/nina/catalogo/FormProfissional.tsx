@@ -1,3 +1,5 @@
+import { EstruturaCatalogoEditor } from "./EstruturaCatalogoEditor";
+import { estruturaVazia, lerEstrutura, type EstruturaCatalogo } from "@/lib/nina/catalogo-estrutura";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -33,6 +35,7 @@ type LinhaHorario = {
 };
 
 export type EstadoProfissional = {
+  estrutura: EstruturaCatalogo;
   id: string | null;
   medico_id: string | null;
   unidade_id: string | null;
@@ -52,6 +55,7 @@ export type EstadoProfissional = {
 };
 
 export const profissionalVazio = (): EstadoProfissional => ({
+  estrutura: estruturaVazia(),
   id: null,
   medico_id: null,
   unidade_id: null,
@@ -75,6 +79,7 @@ export function profissionalDoRegistro(r: any): EstadoProfissional {
   const esp = (f.especialidades ?? []) as Array<{ id?: string | null; nome?: string }>;
   const conv = (f.convenios ?? []) as Array<{ id?: string | null; nome?: string }>;
   return {
+    estrutura: lerEstrutura(f.estrutura),
     id: r.id,
     medico_id: f.medico_id ?? null,
     unidade_id: f.unidade_id ?? null,
@@ -110,6 +115,7 @@ export function profissionalParaEnvio(e: EstadoProfissional, opcoes: OpcoesCatal
   const nomeDe = (lista: Array<{ id: string; nome: string }>, id: string) =>
     lista.find((x) => x.id === id)?.nome ?? id;
   return profissionalSchema.parse({
+    estrutura: { ...e.estrutura, aliases: e.estrutura.aliases.map(s => s.trim()).filter(Boolean) },
     medico_id: e.medico_id,
     unidade_id: e.unidade_id,
     nome: e.nome,
@@ -148,6 +154,9 @@ export function FormProfissional({
 
   return (
     <div className="space-y-4">
+      <EstruturaCatalogoEditor valor={estado.estrutura} onChange={estrutura => set({ estrutura })}
+        tipo="profissional" atendimento={"Consulta"} conteudo={estado.observacao_publica} profissional={estado.nome}
+        somenteLeitura={somenteLeitura} onOrganizar={observacao_publica => set({ observacao_publica })} />
       <div className="grid gap-3 sm:grid-cols-2">
         <div className="space-y-1">
           <Label>Nome do profissional *</Label>
@@ -220,16 +229,11 @@ export function FormProfissional({
         </div>
         <div className="space-y-1">
           <Label>Modalidade de atendimento</Label>
-          <Input
-            list="modalidades-atendimento-profissional"
-            value={estado.tipo_atendimento}
-            disabled={somenteLeitura}
-            placeholder="Selecione a modalidade de agendamento"
-            onChange={(e) => set({ tipo_atendimento: e.target.value })}
-          />
-          <datalist id="modalidades-atendimento-profissional">
-            {Object.values(MODALIDADES_ATENDIMENTO).map(m => <option key={m} value={m} />)}
-          </datalist>
+          <select aria-label="Modalidade de atendimento" className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm" value={estado.tipo_atendimento} disabled={somenteLeitura} onChange={e => set({ tipo_atendimento: e.target.value })}>
+            <option value="">Não informado</option>
+            {!Object.values(MODALIDADES_ATENDIMENTO).includes(estado.tipo_atendimento as never) && estado.tipo_atendimento && <option value={estado.tipo_atendimento}>Ainda não confirmada — cadastro atual: {estado.tipo_atendimento}</option>}
+            {Object.values(MODALIDADES_ATENDIMENTO).map(m => <option key={m} value={m}>{m}</option>)}
+          </select>
           <p className="text-xs text-muted-foreground">Define como a Nina orienta e confirma o atendimento. Publique o cadastro para aplicar a modalidade.</p>
         </div>
       </div>
@@ -272,12 +276,14 @@ export function FormProfissional({
                 </SelectContent>
               </Select>
               <Input
+                aria-label="Início do atendimento"
                 type="time"
                 value={h.inicio}
                 disabled={somenteLeitura}
                 onChange={(e) => setHorario(i, { inicio: e.target.value })}
               />
               <Input
+                aria-label="Fim do atendimento (não é limite de chegada)"
                 type="time"
                 value={h.fim}
                 disabled={somenteLeitura}
@@ -346,7 +352,7 @@ export function FormProfissional({
       </div>
 
       <div className="space-y-1">
-        <Label>Observação pública de horário</Label>
+        <Label>Informações públicas dos atendimentos</Label>
         <Textarea
           rows={2}
           value={estado.observacao_publica}

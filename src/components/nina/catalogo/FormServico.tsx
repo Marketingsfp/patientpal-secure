@@ -1,3 +1,5 @@
+import { EstruturaCatalogoEditor } from "./EstruturaCatalogoEditor";
+import { estruturaVazia, lerEstrutura, type EstruturaCatalogo } from "@/lib/nina/catalogo-estrutura";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -26,9 +28,10 @@ export type OpcoesCatalogo = {
   convenios: Array<{ id: string; nome: string }>;
 };
 
-type Executante = { medico_id: string | null; nome: string; horarios: string };
+type Executante = { medico_id: string | null; nome: string; horarios: string; observacao: string };
 
 export type EstadoServico = {
+  estrutura: EstruturaCatalogo;
   id: string | null;
   procedimento_id: string | null;
   nome: string;
@@ -43,6 +46,7 @@ export type EstadoServico = {
 };
 
 export const servicoVazio = (): EstadoServico => ({
+  estrutura: estruturaVazia(),
   id: null,
   procedimento_id: null,
   nome: "",
@@ -59,6 +63,7 @@ export const servicoVazio = (): EstadoServico => ({
 export function servicoDoRegistro(r: any): EstadoServico {
   const fonte = { ...r, ...(r?.rascunho ?? {}) };
   return {
+    estrutura: fonte.estrutura ? lerEstrutura(fonte.estrutura) : { ...estruturaVazia(), preparo_status: fonte.preparo ? "informado" : "nao_informado" },
     id: r.id,
     procedimento_id: fonte.procedimento_id ?? null,
     nome: fonte.nome ?? "",
@@ -72,6 +77,7 @@ export function servicoDoRegistro(r: any): EstadoServico {
       medico_id: e?.medico_id ?? null,
       nome: e?.nome ?? "",
       horarios: e?.horarios ?? "",
+      observacao: e?.observacao ?? "",
     })),
     formas_pagamento: (fonte.formas_pagamento ?? []).map((f: any) => ({
       forma: f?.forma ?? "",
@@ -85,6 +91,7 @@ export function servicoDoRegistro(r: any): EstadoServico {
 /** Converte o estado da tela no formato validado enviado ao servidor. */
 export function servicoParaEnvio(e: EstadoServico) {
   return servicoSchema.parse({
+    estrutura: { ...e.estrutura, aliases: e.estrutura.aliases.map(s => s.trim()).filter(Boolean) },
     procedimento_id: e.procedimento_id,
     nome: e.nome,
     valor: e.valor,
@@ -95,7 +102,7 @@ export function servicoParaEnvio(e: EstadoServico) {
     nota_interna: e.nota_interna,
     executantes: e.executantes
       .filter((x) => x.nome.trim())
-      .map((x) => ({ medico_id: x.medico_id, nome: x.nome, horarios: x.horarios })),
+      .map((x) => ({ medico_id: x.medico_id, nome: x.nome, horarios: x.horarios, observacao: x.observacao })),
     formas_pagamento: e.formas_pagamento
       .filter((f) => f.forma.trim())
       .map((f) => ({
@@ -129,6 +136,9 @@ export function FormServico({
 
   return (
     <div className="space-y-4">
+      <EstruturaCatalogoEditor valor={estado.estrutura} onChange={estrutura => set({ estrutura })}
+        tipo="servico" atendimento={estado.nome} conteudo={estado.descricao_publica} profissional={undefined}
+        somenteLeitura={somenteLeitura} onOrganizar={descricao_publica => set({ descricao_publica })} />
       <div className="grid gap-3 sm:grid-cols-2">
         <div className="space-y-1">
           <Label>Procedimento *</Label>
@@ -157,7 +167,7 @@ export function FormServico({
       <div className="grid gap-3 sm:grid-cols-2">
         <div className="space-y-1">
           <Label className="flex items-center gap-2">
-            Valor
+            Valor de referência
             {formasComValor && <Lock className="h-3 w-3 text-muted-foreground" />}
           </Label>
           <CurrencyInput
@@ -201,7 +211,7 @@ export function FormServico({
             rows={3}
             value={estado.preparo}
             disabled={somenteLeitura}
-            placeholder="Ex.: jejum de 4 horas"
+            placeholder="Somente orientações confirmadas pela clínica"
             onChange={(e) => set({ preparo: e.target.value })}
           />
         </div>
@@ -289,7 +299,7 @@ export function FormServico({
               set({
                 executantes: [
                   ...estado.executantes,
-                  { medico_id: null, nome: "", horarios: "" },
+                  { medico_id: null, nome: "", horarios: "", observacao: "" },
                 ],
               })
             }

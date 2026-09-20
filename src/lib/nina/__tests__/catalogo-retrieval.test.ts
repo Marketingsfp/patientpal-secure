@@ -86,7 +86,10 @@ function tabela(nome: string) {
         .map((c) => c.trim());
       const projetadas = linhas.slice(0, Math.min(limite ?? linhas.length, tetoServidor)).map((l) => {
         const out: Linha = {};
-        for (const c of campos) if (c in l) out[c] = l[c];
+        for (const c of campos) {
+          if (c === "aliases:estrutura->aliases") out.aliases = (l.estrutura as any)?.aliases;
+          else if (c in l) out[c] = l[c];
+        }
         return out;
       });
       resolve({ data: projetadas, error: null });
@@ -584,5 +587,22 @@ describe("nomes e opções em respostas curtas", () => {
     expect(r.esclarecimento?.tipo).toBe("profissional");
     expect(r.esclarecimento?.pergunta).toContain("Dr. João Hélio");
     expect(r.price).toBeNull();
+  });
+});
+
+
+describe("aliases publicados por cadastro", () => {
+  it("encontra sigla aprovada sem compartilhar regras com outro exame", async () => {
+    banco.nina_cat_servicos.push(servico({nome:"Exame de exemplo",estrutura:{aliases:["XYZ"]},formas_pagamento:[{forma:"Dinheiro",valor:75}]}));
+    banco.nina_cat_servicos.push(servico({nome:"Exame diferente",estrutura:{aliases:["XYZ contraste"]}}));
+    const r = await buscarNoCatalogo({clinicaId:CLINICA,query:"XYZ",tipo_atendimento:"exame_procedimento"});
+    expect(r.found).toBe(true);
+    expect(r.records.some(r => r.procedimento === "Exame de exemplo")).toBe(true);
+    expect(r.esclarecimento?.tipo).not.toBe("sigla_desconhecida");
+  });
+  it("alias de rascunho não é usado para responder", async () => {
+    banco.nina_cat_servicos.push(servico({nome:"Exame de exemplo",estrutura:{aliases:[]},rascunho:{estrutura:{aliases:["ZZZX"]}}}));
+    const r = await buscarNoCatalogo({clinicaId:CLINICA,query:"ZZZX",tipo_atendimento:"exame_procedimento"});
+    expect(r.records).toHaveLength(0);
   });
 });

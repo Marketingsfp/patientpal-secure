@@ -4,7 +4,7 @@ import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { normalizar } from "@/lib/nina-especialidade";
 import { registrarEtapa } from "./evidencias.server";
 import type { RegistroConhecimento } from "./knowledge-contract";
-import { modalidadeDoCatalogo } from "./modalidade-atendimento";
+import { modalidadeEstruturada } from "./catalogo-estrutura";
 
 type MedicoAgenda = { id: string; nome: string };
 type CadastroMedico = MedicoAgenda & { ativo: boolean };
@@ -105,16 +105,19 @@ function origemVinculo(profissional: ProfissionalCatalogo, resolucao: ResolucaoM
 export async function modalidadePublicadaDoMedico(clinicaId: string, medicoId: string) {
   const [ativos, publicados] = await Promise.all([
     medicosDaClinica(clinicaId),
-    supabaseAdmin.from("nina_cat_profissionais").select("id, nome, medico_id, tipo_atendimento")
+    supabaseAdmin.from("nina_cat_profissionais").select("id, nome, medico_id, tipo_atendimento, estrutura, observacao_publica")
       .eq("clinica_id", clinicaId).eq("status", "PUBLICADO"),
   ]);
   if (publicados.error) throw new Error(publicados.error.message);
   const catalogo = publicados.data ?? [];
   const cadastros = await incluirCadastrosVinculados(clinicaId, ativos, catalogo);
-  return modalidadeDoCatalogo(catalogo.filter(p => {
+  const modos = catalogo.filter(p => {
     const r = resolverPublicado(p, cadastros);
     return r.ok && r.id === medicoId;
-  }).map(p => p.tipo_atendimento));
+  }).map(p => modalidadeEstruturada(p.observacao_publica, p.estrutura, p.nome, p.tipo_atendimento));
+  if (modos.includes("nao_definida")) return "nao_definida";
+  const definidos = [...new Set(modos.filter(m => m !== null))];
+  return definidos.length > 1 ? "nao_definida" : definidos[0] ?? null;
 }
 
 /** Aceita o UUID operacional, nome ou um UUID de profissional publicado.
