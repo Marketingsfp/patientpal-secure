@@ -79,7 +79,10 @@ export function CentralAtencao() {
     }
     try {
       const retorno = await centralFn({ data: { clinicaId } });
-      if (sequencia === sequenciaCarga.current) setDados({ ...retorno, chave: chaveContexto });
+      if (sequencia === sequenciaCarga.current) {
+        setDados({ ...retorno, chave: chaveContexto });
+        setAgora(Date.now());
+      }
     } catch {
       /* indicador: nunca pode derrubar o cabeçalho */
     }
@@ -152,7 +155,7 @@ export function CentralAtencao() {
   const idsEmPausa = new Set(pausas.map((pausa) => pausa.atendenteId));
   const filasSemPausa = resumo.filasIndividuais.filter((fila) => !idsEmPausa.has(fila.atendenteId));
 
-  // Lista mostrada: prioridades gerais (8 primeiras) ou a categoria escolhida.
+  // Prioridades: só esperas críticas (8 primeiras), ou a categoria escolhida.
   const lista = useMemo(() => {
     const base = itensDaCategoria(resumo.itens, categoria, atendenteSelecionada?.id);
     return categoria ? base : base.slice(0, 8);
@@ -339,7 +342,7 @@ export function CentralAtencao() {
                 onClick={() => setCategoria(null)}
                 className="ml-auto rounded px-1.5 py-0.5 text-[11px] text-muted-foreground hover:bg-muted"
               >
-                Ver tudo ✕
+                Ver prioridades ✕
               </button>
             )}
           </div>
@@ -417,7 +420,7 @@ function LinhaCategoria({
 }
 
 function ItemLinha({ item, onClick }: { item: ItemAtencao; onClick: () => void }) {
-  const critico = item.categoria !== "aguardando";
+  const critico = item.critica;
   const marca =
     item.categoria === "nao_atribuida"
       ? item.atendenteId

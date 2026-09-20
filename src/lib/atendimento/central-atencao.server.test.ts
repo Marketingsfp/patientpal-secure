@@ -192,7 +192,7 @@ describe("consulta da Central de Atenção", () => {
       ["Ana", 1],
       ["Bia", 1],
     ]);
-    expect(resumo.total).toBe(503);
+    expect(resumo.total).toBe(0);
     expect(db.paginas).toHaveLength(2);
   });
 
@@ -214,7 +214,13 @@ describe("consulta da Central de Atenção", () => {
     expect(Object.keys(dados.espera)).toEqual(["a"]);
     expect(dados.nomes).not.toHaveProperty("b");
     expect(dados.nomes).not.toHaveProperty("global");
-    expect(calcularAtencao({ ...dados, naoAtribuidas: dados.filas }).total).toBe(2);
+    expect(
+      calcularAtencao({
+        ...dados,
+        naoAtribuidas: dados.filas,
+        agora: Date.parse("2026-09-17T10:11:00Z"),
+      }).total,
+    ).toBe(1);
   });
 
   it("primeira resposta e encerramento atualizam o total sem depender da presença", async () => {
@@ -254,7 +260,7 @@ describe("consulta da Central de Atenção", () => {
         (p) => resumo.filasIndividuais.find((f) => f.atendenteId === p.atendenteId)?.total ?? 0,
       ),
     ).toEqual([10, 0]);
-    expect(resumo.total).toBe(10); // Pessoas em pausa não inflam o contador de conversas.
+    expect(resumo.total).toBe(0); // Pausas e filas recentes não acionam o alerta.
   });
 
   it("atendente recebe só a própria pausa, mesmo sem conversas; gestão vê a equipe", async () => {

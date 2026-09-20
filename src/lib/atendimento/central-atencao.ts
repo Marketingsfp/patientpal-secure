@@ -5,7 +5,7 @@ import { nomeContato } from "./rotulo-conversa";
  * Combina as filas global e individuais pelo estado real das conversas com
  * o mapa de espera da Inbox. Não altera atribuição, presença ou capacidade.
  */
-import { faixaEsperaAtd, minutosDesde } from "./espera";
+import { faixaEsperaDesde, minutosDesde } from "./espera";
 
 /** Filtros/ações que a Central dispara na Inbox (sem trocar de página). */
 export const EVENTO_FILTRAR_ESPERA_CRITICA = "nina:filtrar-espera-critica";
@@ -97,13 +97,13 @@ export interface PausaAtencao {
 }
 
 export interface ResumoAtencao {
-  /** Conversas únicas que precisam de ação (não atribuídas ∪ espera crítica). */
+  /** Apenas conversas com mais de 10 minutos sem resposta acionam o alerta. */
   total: number;
   naoAtribuidas: number;
   naoAtribuidasGlobal: number;
   filasIndividuais: FilaIndividualAtencao[];
   criticas: number;
-  /** Todo paciente aguardando resposta da clínica (inclui os críticos). */
+  /** Pacientes aguardando resposta por até 10 minutos, excluindo os críticos. */
   aguardando: number;
   itens: ItemAtencao[];
   nivel: 0 | 1 | 2 | 3;
@@ -160,28 +160,26 @@ export function calcularAtencao(args: {
 
   const idsNaoAtribuidas = new Set(fila.map((c) => c.id));
   const idsCriticas = new Set<string>();
-  let aguardando = 0;
+  const idsAguardando = new Set<string>();
 
   for (const [id, desde] of Object.entries(args.espera)) {
-    if (!desde) continue;
-    aguardando += 1;
-    if (faixaEsperaAtd(minutosDesde(desde, agora)) === "critico") idsCriticas.add(id);
+    if (!desde || !Number.isFinite(Date.parse(desde))) continue;
+    if (faixaEsperaDesde(desde, agora) === "critico") idsCriticas.add(id);
+    else idsAguardando.add(id);
   }
 
-  // Uma conversa não atribuída E crítica conta uma única vez no total.
-  const unicas = new Set<string>([...idsNaoAtribuidas, ...idsCriticas]);
-
-  const idsDetalhe = new Set<string>([...unicas, ...Object.keys(args.espera)]);
+  // As filas continuam consultáveis, mas só a espera crítica aciona prioridades.
+  const idsDetalhe = new Set<string>([...idsNaoAtribuidas, ...idsCriticas, ...idsAguardando]);
   const itens: ItemAtencao[] = [];
   for (const id of idsDetalhe) {
     const desde = args.espera[id];
     const minutos = desde ? minutosDesde(desde, agora) : 0;
     const naoAtribuida = idsNaoAtribuidas.has(id);
     const critica = idsCriticas.has(id);
-    const categoria: CategoriaAtencao = naoAtribuida
-      ? "nao_atribuida"
-      : critica
-        ? "critica"
+    const categoria: CategoriaAtencao = critica
+      ? "critica"
+      : naoAtribuida
+        ? "nao_atribuida"
         : "aguardando";
     itens.push({
       id,
@@ -190,52 +188,52 @@ export function calcularAtencao(args: {
       minutos,
       naoAtribuida,
       critica,
-      aguardandoResposta: Boolean(desde),
+      aguardandoResposta: critica || idsAguardando.has(id),
       atendenteId: naoAtribuida ? (porConversa.get(id)?.atribuida_user_id ?? null) : null,
       atendenteNome: naoAtribuida ? (porConversa.get(id)?.atendente_nome ?? null) : null,
     });
   }
 
   const peso: Record<CategoriaAtencao, number> = {
-    nao_atribuida: 0,
-    nao_atribuida_global: 0,
-    nao_atribuida_individual: 0,
-    critica: 1,
+    nao_atribuida: 1,
+    nao_atribuida_global: 1,
+    nao_atribuida_individual: 1,
+    critica: 0,
     aguardando: 2,
   };
   itens.sort((a, b) => peso[a.categoria] - peso[b.categoria] || b.minutos - a.minutos);
 
   return {
-    total: unicas.size + globalSemDetalhes,
+    total: idsCriticas.size,
     naoAtribuidas: idsNaoAtribuidas.size + globalSemDetalhes,
     naoAtribuidasGlobal,
     filasIndividuais: [...individuais.values()].sort(
       (a, b) => a.nome.localeCompare(b.nome, "pt-BR") || a.atendenteId.localeCompare(b.atendenteId),
     ),
     criticas: idsCriticas.size,
-    aguardando,
+    aguardando: idsAguardando.size,
     itens: itens.slice(0, args.limiteItens ?? 8),
-    nivel: nivelAtencao(unicas.size + globalSemDetalhes),
+    nivel: nivelAtencao(idsCriticas.size),
   };
 }
 
 /**
  * Lista de uma categoria dentro da própria Central (não filtra a Inbox).
- * A ordem já vem por gravidade e tempo de espera.
+ * Sem categoria selecionada, mostra apenas as prioridades (esperas críticas).
  */
 export function itensDaCategoria(
   itens: ItemAtencao[],
   categoria: CategoriaAtencao | null,
   atendenteId?: string | null,
 ) {
-  if (!categoria) return itens;
+  if (!categoria) return itens.filter((i) => i.critica);
   if (categoria === "nao_atribuida") return itens.filter((i) => i.naoAtribuida);
   if (categoria === "nao_atribuida_global")
     return itens.filter((i) => i.naoAtribuida && !i.atendenteId);
   if (categoria === "nao_atribuida_individual")
     return itens.filter((i) => i.naoAtribuida && i.atendenteId === atendenteId);
   if (categoria === "critica") return itens.filter((i) => i.critica);
-  return itens.filter((i) => i.aguardandoResposta);
+  return itens.filter((i) => i.aguardandoResposta && !i.critica);
 }
 
 /** Texto lido por leitores de tela no indicador do cabeçalho. */
@@ -243,5 +241,5 @@ export function rotuloCentral(r: ResumoAtencao): string {
   if (r.total <= 0) return "Central de Atenção. Nenhuma conversa precisa de atenção agora.";
   return `Central de Atenção. ${r.total} ${
     r.total === 1 ? "conversa precisa" : "conversas precisam"
-  } de atenção. ${r.naoAtribuidas} não atribuídas e ${r.criticas} com tempo de espera crítico.`;
+  } de atenção por aguardar resposta há mais de 10 minutos.`;
 }

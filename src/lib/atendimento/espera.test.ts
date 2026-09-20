@@ -1,6 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import {
   faixaEsperaAtd,
+  faixaEsperaDesde,
   formatarEspera,
   minutosDesde,
   rotuloEspera,
@@ -11,13 +12,31 @@ describe("faixaEsperaAtd", () => {
     expect(faixaEsperaAtd(0)).toBe("normal");
     expect(faixaEsperaAtd(4)).toBe("normal");
   });
-  it("5–9 min é atenção", () => {
+  it("5–10 min é atenção", () => {
     expect(faixaEsperaAtd(5)).toBe("atencao");
     expect(faixaEsperaAtd(9)).toBe("atencao");
+    expect(faixaEsperaAtd(10)).toBe("atencao");
   });
-  it("10 min ou mais é crítico", () => {
-    expect(faixaEsperaAtd(10)).toBe("critico");
+  it("mais de 10 min é crítico", () => {
+    expect(faixaEsperaAtd(10.001)).toBe("critico");
     expect(faixaEsperaAtd(120)).toBe("critico");
+  });
+});
+
+describe("faixaEsperaDesde", () => {
+  const inicio = "2026-09-20T12:00:00Z";
+  const tempo = Date.parse(inicio);
+
+  it("compara o tempo exato, sem esperar pelo arredondamento para 11 minutos", () => {
+    expect(faixaEsperaDesde(inicio, tempo + 599_999)).toBe("atencao");
+    expect(faixaEsperaDesde(inicio, tempo + 600_000)).toBe("atencao");
+    expect(faixaEsperaDesde(inicio, tempo + 600_001)).toBe("critico");
+  });
+
+  it("sem espera válida não produz alerta", () => {
+    expect(faixaEsperaDesde(null, tempo)).toBe("normal");
+    expect(faixaEsperaDesde("data-invalida", tempo)).toBe("normal");
+    expect(faixaEsperaDesde(inicio, tempo - 1)).toBe("normal");
   });
 });
 

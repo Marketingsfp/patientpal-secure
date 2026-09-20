@@ -17,9 +17,18 @@ export const LIMITES_ESPERA_ATD = {
 } as const;
 
 export function faixaEsperaAtd(minutos: number): FaixaEsperaAtd {
-  if (minutos >= LIMITES_ESPERA_ATD.critico) return "critico";
+  if (minutos > LIMITES_ESPERA_ATD.critico) return "critico";
   if (minutos >= LIMITES_ESPERA_ATD.atencao) return "atencao";
   return "normal";
+}
+
+/** Classifica pelo tempo exato; arredondar antes adiaria o alerta até 11 minutos. */
+export function faixaEsperaDesde(
+  desde: string | null | undefined,
+  agora: number = Date.now(),
+): FaixaEsperaAtd {
+  const inicio = desde ? Date.parse(desde) : NaN;
+  return faixaEsperaAtd(Number.isFinite(inicio) ? Math.max(0, (agora - inicio) / 60000) : 0);
 }
 
 /** Minutos inteiros decorridos desde `desde` (ISO). Nunca negativo. */

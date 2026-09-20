@@ -11,7 +11,7 @@ describe("Central de Atenção", () => {
     expect(r.nivel).toBe(0);
   });
 
-  it("Caso 2 — conversa não atribuída ativa o alerta", () => {
+  it("Caso 2 — não atribuída sem espera crítica mantém a Central neutra", () => {
     const r = calcularAtencao({
       naoAtribuidas: [
         { id: "a", contato_nome: "João Silva", handoff_motivo: "sem atendente online" },
@@ -19,16 +19,31 @@ describe("Central de Atenção", () => {
       espera: {},
       agora: AGORA,
     });
-    expect(r.total).toBe(1);
+    expect(r.total).toBe(0);
     expect(r.naoAtribuidas).toBe(1);
-    expect(r.nivel).toBe(1);
+    expect(r.nivel).toBe(0);
     expect(r.itens[0]?.nome).toBe("João Silva");
+    expect(itensDaCategoria(r.itens, null)).toEqual([]);
   });
 
-  it("Caso 3 — 10 min sem resposta entra como espera crítica", () => {
+  it("Caso 3 — só depois de 10 minutos a espera passa a crítica, sem nova mensagem", () => {
     const r = calcularAtencao({ naoAtribuidas: [], espera: { b: haMin(10) }, agora: AGORA });
-    expect(r.criticas).toBe(1);
-    expect(r.total).toBe(1);
+    expect(r.aguardando).toBe(1);
+    expect(r.criticas).toBe(0);
+    expect(r.total).toBe(0);
+    expect(itensDaCategoria(r.itens, null)).toEqual([]);
+
+    const depois = calcularAtencao({
+      naoAtribuidas: [],
+      espera: { b: haMin(10) },
+      agora: AGORA + 1,
+    });
+    expect(depois.aguardando).toBe(0);
+    expect(depois.criticas).toBe(1);
+    expect(depois.total).toBe(1);
+    expect(depois.nivel).toBe(1);
+    expect(itensDaCategoria(depois.itens, "aguardando")).toEqual([]);
+    expect(itensDaCategoria(depois.itens, null).map((i) => i.id)).toEqual(["b"]);
   });
 
   it("Caso 4 — clínica respondeu: some da espera", () => {
@@ -60,6 +75,7 @@ describe("Central de Atenção", () => {
     expect(r.criticas).toBe(0);
     expect(r.total).toBe(0);
     expect(r.itens[0]?.categoria).toBe("aguardando");
+    expect(itensDaCategoria(r.itens, null)).toEqual([]);
   });
 
   it("níveis progressivos", () => {
@@ -70,15 +86,16 @@ describe("Central de Atenção", () => {
     expect(nivelAtencao(14)).toBe(3);
   });
 
-  it("prioriza não atribuídas e maiores esperas na lista", () => {
+  it("prioriza maiores esperas críticas antes de filas não críticas", () => {
     const r = calcularAtencao({
       naoAtribuidas: [
         { id: "n", contato_nome: "Sem dono", handoff_motivo: "sem atendente online" },
       ],
-      espera: { k: haMin(20), j: haMin(6) },
+      espera: { k: haMin(20), j: haMin(6), l: haMin(30) },
       agora: AGORA,
     });
-    expect(r.itens.map((i) => i.id)).toEqual(["n", "k", "j"]);
+    expect(r.itens.map((i) => i.id)).toEqual(["l", "k", "n", "j"]);
+    expect(itensDaCategoria(r.itens, null).map((i) => i.id)).toEqual(["l", "k"]);
   });
 
   it("rótulo acessível descreve as categorias", () => {
@@ -91,9 +108,9 @@ describe("Central de Atenção", () => {
       espera: { d: haMin(30), e: haMin(40), f: haMin(50), g: haMin(60) },
       agora: AGORA,
     });
-    expect(r.total).toBe(7);
+    expect(r.total).toBe(4);
     expect(rotuloCentral(r)).toBe(
-      "Central de Atenção. 7 conversas precisam de atenção. 3 não atribuídas e 4 com tempo de espera crítico.",
+      "Central de Atenção. 4 conversas precisam de atenção por aguardar resposta há mais de 10 minutos.",
     );
   });
 
@@ -105,7 +122,7 @@ describe("Central de Atenção", () => {
     });
     expect(r.naoAtribuidas).toBe(1);
     expect(r.naoAtribuidasGlobal).toBe(1);
-    expect(r.total).toBe(1);
+    expect(r.total).toBe(0);
   });
 
   it("FASE 3 — lista por categoria dentro da própria Central", () => {
@@ -117,8 +134,9 @@ describe("Central de Atenção", () => {
     });
     expect(itensDaCategoria(r.itens, "nao_atribuida").map((i) => i.id)).toEqual(["n"]);
     expect(itensDaCategoria(r.itens, "critica").map((i) => i.id)).toEqual(["k"]);
-    expect(itensDaCategoria(r.itens, "aguardando").map((i) => i.id)).toEqual(["k", "j"]);
-    expect(itensDaCategoria(r.itens, null).length).toBe(3);
+    expect(r.aguardando).toBe(1);
+    expect(itensDaCategoria(r.itens, "aguardando").map((i) => i.id)).toEqual(["j"]);
+    expect(itensDaCategoria(r.itens, null).map((i) => i.id)).toEqual(["k"]);
   });
 
   it("agrupa pendências por atendente, com 1 e 10 conversas, e separa a global", () => {
@@ -144,7 +162,7 @@ describe("Central de Atenção", () => {
     ]);
     expect(r.naoAtribuidasGlobal).toBe(2);
     expect(r.naoAtribuidas).toBe(13);
-    expect(r.total).toBe(13); // críticas sobrepostas não duplicam o total
+    expect(r.total).toBe(2); // só as críticas acionam o alerta, sem duplicar filas
   });
 
   it("contagem usa IDs e não mistura duas atendentes de mesmo nome", () => {
@@ -155,7 +173,7 @@ describe("Central de Atenção", () => {
       ["a", 1],
       ["b", 1],
     ]);
-    expect(r.total).toBe(2);
+    expect(r.total).toBe(0);
   });
 
   it("resposta ou encerramento tira da fila; Nina e conversas já ativas não entram", () => {
@@ -195,7 +213,8 @@ describe("Central de Atenção", () => {
       limiteItens: 8,
     });
     expect(r.naoAtribuidasGlobal).toBe(501);
-    expect(r.total).toBe(501);
+    expect(r.total).toBe(0);
+    expect(r.nivel).toBe(0);
     expect(r.itens).toHaveLength(8);
   });
 
@@ -206,8 +225,63 @@ describe("Central de Atenção", () => {
       globalSemDetalhes: 250,
     });
     expect(r.naoAtribuidasGlobal).toBe(250);
-    expect(r.total).toBe(251);
+    expect(r.total).toBe(0);
     expect(r.itens).toHaveLength(1);
     expect(itensDaCategoria(r.itens, "nao_atribuida_global")).toEqual([]);
+  });
+
+  it("não atribuídas recentes só viram prioridade quando ultrapassam dez minutos", () => {
+    const entrada = {
+      naoAtribuidas: [
+        { id: "global" },
+        { id: "individual", atribuida_user_id: "ana", fila_pendente: true },
+      ],
+      espera: { global: haMin(9), individual: haMin(2) },
+    };
+    const antes = calcularAtencao({ ...entrada, agora: AGORA });
+    expect(antes.aguardando).toBe(2);
+    expect(antes.total).toBe(0);
+    expect(antes.nivel).toBe(0);
+    expect(itensDaCategoria(antes.itens, null)).toEqual([]);
+
+    const depois = calcularAtencao({ ...entrada, agora: AGORA + 60_001 });
+    expect(depois.total).toBe(1);
+    expect(depois.aguardando).toBe(1);
+    expect(depois.naoAtribuidas).toBe(2);
+    expect(itensDaCategoria(depois.itens, null).map((i) => [i.id, i.categoria])).toEqual([
+      ["global", "critica"],
+    ]);
+    expect(itensDaCategoria(depois.itens, "aguardando").map((i) => i.id)).toEqual(["individual"]);
+
+    const respondida = calcularAtencao({
+      ...entrada,
+      espera: { individual: entrada.espera.individual },
+      agora: AGORA + 60_001,
+    });
+    expect(respondida.total).toBe(0);
+    expect(respondida.nivel).toBe(0);
+    expect(itensDaCategoria(respondida.itens, null)).toEqual([]);
+  });
+
+  it("timestamps ausentes ou inválidos não entram nas esperas", () => {
+    const r = calcularAtencao({
+      naoAtribuidas: [],
+      espera: { vazio: "", invalido: "sem-data" },
+      agora: AGORA,
+    });
+    expect(r.total).toBe(0);
+    expect(r.aguardando).toBe(0);
+    expect(r.itens).toEqual([]);
+  });
+
+  it("o limite de detalhes não esconde críticas atrás de não atribuídas", () => {
+    const r = calcularAtencao({
+      naoAtribuidas: Array.from({ length: 20 }, (_, i) => ({ id: `n${i}` })),
+      espera: { critica: haMin(15), recente: haMin(1) },
+      agora: AGORA,
+      limiteItens: 1,
+    });
+    expect(r.total).toBe(1);
+    expect(itensDaCategoria(r.itens, null).map((i) => i.id)).toEqual(["critica"]);
   });
 });

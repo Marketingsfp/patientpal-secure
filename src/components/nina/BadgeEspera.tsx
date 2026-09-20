@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from "
 import { Clock } from "lucide-react";
 import {
   CLASSE_ESPERA_ATD,
-  faixaEsperaAtd,
+  faixaEsperaDesde,
   formatarEspera,
   minutosDesde,
   rotuloEspera,
@@ -47,7 +47,7 @@ export function BadgeEspera({
   const agora = useAgora();
   if (!desde) return null;
   const min = minutosDesde(desde, agora);
-  const faixa = faixaEsperaAtd(min);
+  const faixa = faixaEsperaDesde(desde, agora);
   return (
     <span
       role="status"

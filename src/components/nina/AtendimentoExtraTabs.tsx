@@ -60,7 +60,7 @@ import {
   EVENTO_FILTRAR_ESPERA_CRITICA,
   FILTRO_ESPERA_CRITICA_KEY,
 } from "@/lib/atendimento/central-atencao";
-import { faixaEsperaAtd, minutosDesde } from "@/lib/atendimento/espera";
+import { faixaEsperaDesde, minutosDesde } from "@/lib/atendimento/espera";
 
 
 import {
@@ -594,7 +594,7 @@ export function AtendInbox() {
     });
     if (souGestor && soCriticas) {
       base = base.filter(
-        (c: any) => faixaEsperaAtd(minutosDesde(espera[c.id])) === "critico",
+        (c: any) => faixaEsperaDesde(espera[c.id]) === "critico",
       );
     }
     // FASE 2 — o recorte de "paciente aguardando" já vem do backend. Aqui só
