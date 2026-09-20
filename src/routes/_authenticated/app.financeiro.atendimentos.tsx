@@ -107,6 +107,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { ComprovantesTab } from "@/components/financeiro/comprovantes-tab";
 import { HistoricoAtendimentoDialog } from "@/components/financeiro/historico-atendimento-dialog";
 import { resolverRepasse, formaDoAtendimento, type RepasseTerceiro } from "@/lib/repasse-calc";
+import { ehProcedimentoDeLaudo, rotuloDoLaudo } from "@/lib/financeiro/rateio-receita";
 
 /** "2026-09-08" — só aceita o formato exato, para não semear filtro inválido. */
 const ehDataIso = (v: unknown): v is string =>
@@ -244,6 +245,16 @@ const fmt = (n: number) => n.toLocaleString("pt-BR", { style: "currency", curren
  */
 const ehLinhaSemFaturamento = (forma: string | null | undefined): boolean =>
   (forma ?? "").trim().toLowerCase() === "sem_faturamento";
+
+/**
+ * Linha "[LAUDO]" que o banco cria quando um exame é laudado. Ela NÃO é um
+ * novo atendimento: é só a parte do médico que leu o exame, do mesmo dinheiro
+ * que o paciente já pagou na linha do exame. Por isso não pode consumir número
+ * de ficha/GR nem entrar na contagem de laudos pendentes — senão um único
+ * eletrocardiograma aparece contado duas vezes (exame + laudo).
+ */
+const ehLinhaDeLaudo = (a: { procedimento?: string | null }): boolean =>
+  ehProcedimentoDeLaudo(a.procedimento);
 
 /**
  * Deriva HH:mm de um timestamp de pagamento somente quando ele tem hora
@@ -2520,6 +2531,25 @@ function AtendimentosPage() {
     [filteredItems],
   );
 
+  /**
+   * Número da ficha/GR mostrado na lista. Só atendimentos de verdade recebem
+   * número: a linha "[LAUDO]" é a parte do médico que laudou o mesmo exame e
+   * não pode consumir um segundo número (era o que fazia 1 eletrocardiograma
+   * aparecer como 2 atendimentos).
+   */
+  const fichaPorLinha = useMemo(() => {
+    const m = new Map<string, number>();
+    let n = 0;
+    for (const a of filteredItems) {
+      if (ehLinhaDeLaudo(a)) continue;
+      n += 1;
+      m.set(`${a.origem}:${a.id}`, n);
+    }
+    return m;
+  }, [filteredItems]);
+
+
+
   const isAtendido = (a: Atend) =>
     a.origem === "manual" ? a.status === "realizado" : a.agendamento_status === "realizado";
   // Itens selecionáveis: qualquer atendimento com repasse > 0.
@@ -3263,8 +3293,17 @@ function AtendimentosPage() {
                   <Label className="text-xs font-medium">
                     Laudo
                     <span className="ml-1 font-normal text-muted-foreground">
-                      ({filteredItems.filter((a) => a.laudo_status === "emitido").length} baixados ·{" "}
-                      {filteredItems.filter((a) => a.laudo_status !== "emitido").length} pendentes)
+                      (
+                      {
+                        filteredItems.filter((a) => !ehLinhaDeLaudo(a) && a.laudo_status === "emitido")
+                          .length
+                      }{" "}
+                      baixados ·{" "}
+                      {
+                        filteredItems.filter((a) => !ehLinhaDeLaudo(a) && a.laudo_status !== "emitido")
+                          .length
+                      }{" "}
+                      pendentes)
                     </span>
                   </Label>
                   <Select
@@ -3455,7 +3494,11 @@ function AtendimentosPage() {
                         (a.paciente_id ? pacMap.get(a.paciente_id) : null) ??
                         a.paciente_nome_extra ??
                         "—";
-                      const procedimentoNome = a.procedimento ?? "—";
+                      const linhaDeLaudo = ehLinhaDeLaudo(a);
+                      const procedimentoNome = linhaDeLaudo
+                        ? rotuloDoLaudo(a.procedimento)
+                        : (a.procedimento ?? "—");
+                      const fichaNumero = fichaPorLinha.get(`${a.origem}:${a.id}`) ?? null;
 
                       // Define as cores das linhas para o efeito zebrado acompanhar a coluna fixa
                       const isSelected = sel.has(`${a.origem}:${a.id}`);
@@ -3505,8 +3548,15 @@ function AtendimentosPage() {
                               )}
                             </TableCell>
                           )}
-                          <TableCell className="text-xs whitespace-nowrap px-2 text-center font-mono text-muted-foreground">
-                            {String(idx + 1).padStart(3, "0")}
+                          <TableCell
+                            className="text-xs whitespace-nowrap px-2 text-center font-mono text-muted-foreground"
+                            title={
+                              fichaNumero
+                                ? undefined
+                                : "Laudo do exame — não é um novo atendimento, por isso não recebe número"
+                            }
+                          >
+                            {fichaNumero ? String(fichaNumero).padStart(3, "0") : "—"}
                           </TableCell>
                           <TableCell className="text-xs whitespace-nowrap px-2">
                             {new Date(a.data + "T00:00:00").toLocaleDateString("pt-BR", {
@@ -3534,6 +3584,14 @@ function AtendimentosPage() {
                             title={procedimentoNome}
                           >
                             {procedimentoNome}
+                            {linhaDeLaudo && (
+                              <div
+                                className="text-[10px] font-semibold text-sky-700 dark:text-sky-400"
+                                title="Parte do médico que laudou o exame. É o mesmo exame já cobrado do paciente — não conta como um novo atendimento."
+                              >
+                                LAUDO DO EXAME
+                              </div>
+                            )}
                             {ehLinhaSemFaturamento(a.forma_pagamento) && (
                               <div
                                 className="text-[10px] font-semibold text-amber-700 dark:text-amber-500"
