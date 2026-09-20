@@ -246,6 +246,16 @@ const ehLinhaSemFaturamento = (forma: string | null | undefined): boolean =>
   (forma ?? "").trim().toLowerCase() === "sem_faturamento";
 
 /**
+ * Linha "[LAUDO]" que o banco cria quando um exame é laudado. Ela NÃO é um
+ * novo atendimento: é só a parte do médico que leu o exame, do mesmo dinheiro
+ * que o paciente já pagou na linha do exame. Por isso não pode consumir número
+ * de ficha/GR nem entrar na contagem de laudos pendentes — senão um único
+ * eletrocardiograma aparece contado duas vezes (exame + laudo).
+ */
+const ehLinhaDeLaudo = (a: { procedimento?: string | null }): boolean =>
+  ehProcedimentoDeLaudo(a.procedimento);
+
+/**
  * Deriva HH:mm de um timestamp de pagamento somente quando ele tem hora
  * explícita (>00:00 UTC). Registros antigos foram backfillados de `date` para
  * timestamptz em 00:00 UTC — comparar em UTC evita falso-positivo quando o
