@@ -96,6 +96,7 @@ import { ConversaSkeleton } from "@/components/nina/ConversaSkeleton";
 import { useChatScroll } from "@/hooks/use-chat-scroll";
 import { formatarDataHoraMensagem } from "@/lib/atendimento/data-hora";
 import { anteciparReabertura } from "@/lib/atendimento/timeline-reabertura";
+import { posicionarHandoffAposAviso } from "@/lib/atendimento/timeline-handoff";
 import { textoMarcadorSistema } from "@/lib/atendimento/marcador-handoff";
 import { definirSelecaoTeste } from "@/lib/webmcp/selecao-teste";
 import { leadDoRelatorio, type ConversaTesteAlvo } from "@/lib/nina/homologacao-navegacao";
@@ -281,7 +282,7 @@ export function HomologacaoInbox({ laboratorio = false, ativo = true, abrirConve
         evento: e,
       })),
     ];
-    return anteciparReabertura(itens.sort((a, b) => a.em.localeCompare(b.em)), (i) => ({
+    const comReabertura = anteciparReabertura(itens.sort((a, b) => a.em.localeCompare(b.em)), (i) => ({
       em: Date.parse(i.em),
       ...(i.kind === "msg"
         ? {
@@ -292,6 +293,10 @@ export function HomologacaoInbox({ laboratorio = false, ativo = true, abrirConve
             },
           }
         : { evento: i.evento }),
+    }));
+    return posicionarHandoffAposAviso(comReabertura, (i) => ({
+      em: Date.parse(i.em),
+      ...(i.kind === "msg" ? { mensagem: i.msg } : { evento: i.evento }),
     }));
   }, [msgs, eventosConversa]);
 

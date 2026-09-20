@@ -58,6 +58,8 @@ export type GrupoHandoff = {
   auditoria: { registrada: boolean; completa: boolean | null; faltando: string[] };
   eventoIds: string[];
   marcadorIds: string[];
+  /** Aviso efetivamente enviado ao paciente, para ordenar a apresentação. */
+  mensagemAvisoId?: string | null;
   /** A primeira atribuição automática do mesmo encaminhamento. */
   atribuicao?: GrupoAtribuicao;
 };
@@ -319,6 +321,7 @@ export function agruparTimeline(entrada: {
       if (g) {
         g.protocolo = txt(det(e)["protocol_number"]) ?? g.protocolo;
         g.status = "PROTOCOLO_INFORMADO";
+        g.mensagemAvisoId = txt(det(e)["message_id"]) ?? g.mensagemAvisoId;
         g.eventoIds.push(e.id);
         g.fimMs = ms(e.created_at);
         eventoParaItem.set(e.id, g.chave);
@@ -331,6 +334,8 @@ export function agruparTimeline(entrada: {
       const g = grupoHandoffDe(e, true);
       if (g) {
         g.protocolo = txt(d["protocol_number"]) ?? g.protocolo;
+        if (d["send_status"] === "sent")
+          g.mensagemAvisoId = g.mensagemAvisoId ?? txt(d["message_id"]);
         g.auditoria = {
           registrada: true,
           completa: typeof d["auditoria_completa"] === "boolean" ? d["auditoria_completa"] : null,

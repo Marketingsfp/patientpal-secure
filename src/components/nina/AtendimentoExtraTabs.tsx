@@ -132,6 +132,7 @@ import { listarPaginaHistorico } from "@/lib/atendimento/historico-paginado.func
 import { montarPaginaHistorico, manterNaJanelaRecente, type PaginaHistorico, type CursorHistorico } from "@/lib/atendimento/historico-paginado";
 import { rotuloNovasMensagens } from "@/lib/atendimento/scroll-chat";
 import { anteciparReabertura } from "@/lib/atendimento/timeline-reabertura";
+import { posicionarHandoffAposAviso } from "@/lib/atendimento/timeline-handoff";
 
 import { mesclarEspera, mesclarListaConversas } from "@/lib/atendimento/inbox-merge";
 import {
@@ -2264,7 +2265,7 @@ export function AtendInbox() {
         return true;
       })
       .sort((a, b) => a.at - b.at);
-    return anteciparReabertura(cronologicos, (i) => ({
+    const comReabertura = anteciparReabertura(cronologicos, (i) => ({
       em: i.at,
       ...(i.kind === "msg"
         ? {
@@ -2275,6 +2276,10 @@ export function AtendInbox() {
             },
           }
         : i.item.tipo === "EVENTO" ? { evento: i.item.evento } : {}),
+    }));
+    return posicionarHandoffAposAviso(comReabertura, (i) => ({
+      em: i.at,
+      ...(i.kind === "msg" ? { mensagem: i.msg } : { grupo: i.item }),
     }));
   }, [msgs, eventos]);
 
