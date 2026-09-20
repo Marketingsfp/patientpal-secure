@@ -47,6 +47,10 @@ export function motivoParaAtendimento(valor: unknown): string | null {
       "O paciente pediu atendimento humano.",
     ],
     [
+      /\b(?:AGENDA_SEM_VAGAS|NO_AVAILABILITY)\b/i,
+      "A Nina consultou a agenda e não encontrou vagas disponíveis para o atendimento solicitado. A equipe dará continuidade ao agendamento.",
+    ],
+    [
       /\b(?:sem_vagas|sem_disponibilidade|slot_unavailable|no_slots_available)\b/i,
       "Não foi encontrada uma vaga disponível para o agendamento solicitado.",
     ],
