@@ -6,6 +6,7 @@ import {
   aguardarCargaLocal,
   cargaAtiva,
   conduzirCargaLocal,
+  conduzirCargaParalelaLocal,
   criarControleLocalCarga,
   novoRascunhoCarga,
   planoDaClinicaAtual,
@@ -14,6 +15,55 @@ import {
   type ProgressoCarga,
   type RascunhoCarga,
 } from "./carga-teste-ui";
+
+describe("disparo paralelo no navegador", () => {
+  it("abre requisições juntas e o trabalhador livre continua sem barreira", async () => {
+    const respostas: ((r: ProgressoCarga) => void)[] = [];
+    let chamadas = 0;
+    const execucao = conduzirCargaParalelaLocal(
+      {
+        vigente: () => true,
+        ler: async () => carga("executando"),
+        preparar: async () => {
+          throw new Error("não prepara durante envio");
+        },
+        executar: () => {
+          chamadas++;
+          return new Promise((r) => respostas.push(r));
+        },
+        progresso: () => {},
+      },
+      3,
+    );
+    expect(chamadas).toBe(3);
+    respostas[1]!({ status: "executando" });
+    await new Promise((r) => setTimeout(r, 0));
+    expect(chamadas).toBe(4);
+    respostas[3]!({ status: "concluido" });
+    respostas[0]!({ status: "concluido" });
+    respostas[2]!({ status: "concluido" });
+    expect(await execucao).toBe("concluido");
+  });
+
+  it("cancelar interrompe novos disparos, mas aguarda as respostas em voo", async () => {
+    let vigente = true;
+    const respostas: ((r: ProgressoCarga) => void)[] = [];
+    const p = conduzirCargaParalelaLocal(
+      {
+        vigente: () => vigente,
+        ler: async () => carga("executando"),
+        preparar: async () => ({ status: "executando" }),
+        executar: () => new Promise((r) => respostas.push(r)),
+        progresso: () => {},
+      },
+      2,
+    );
+    vigente = false;
+    respostas.forEach((r) => r({ status: "executando" }));
+    expect(await p).toBe("interrompido");
+    expect(respostas).toHaveLength(2);
+  });
+});
 
 function plano(): PlanoCarga {
   return {

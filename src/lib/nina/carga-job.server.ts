@@ -1,4 +1,5 @@
 import { EXECUTOR_CARGA_POR_ITEM } from "./carga-itens.server";
+import { EXECUTOR_CARGA_PARALELA } from "./carga-paralela";
 import { estadoControleCarga } from "./carga-controle";
 import { recuperarCargaSemAtividade } from "./carga-controle.server";
 import { executarCargaControlada } from "./carga-execucao.server";
@@ -20,7 +21,7 @@ export async function continuarCargaPendenteNina(
     .select("*")
     .eq("status", "executando")
     .eq("cancelar", false)
-    .eq("config->>executor", EXECUTOR_CARGA_POR_ITEM)
+    .in("config->>executor", [EXECUTOR_CARGA_POR_ITEM, EXECUTOR_CARGA_PARALELA])
     .order("updated_at")
     .limit(20);
   if (error) throw new Error("CARGA_JOB_FILA_INDISPONIVEL");

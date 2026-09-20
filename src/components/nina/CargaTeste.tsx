@@ -24,6 +24,7 @@ import {
   criarTesteCarga,
   detalheTesteCarga,
   executarLoteCarga,
+  estadoTesteCarga,
   listarTestesCarga,
   pararTesteCarga,
   prepararLeadsTesteCarga,
@@ -52,6 +53,7 @@ import {
 } from "./carga-teste-ui";
 
 type DetalheCarga = {
+  paralelismo?: ReturnType<typeof import("@/lib/nina/carga-paralela").metricasParalelas>;
   processamento?: Awaited<
     ReturnType<typeof import("@/lib/nina/watchdog-metricas.server").metricasWatchdogCarga>
   >;
@@ -111,6 +113,7 @@ function CargaTesteClinica({
   const planejar = useServerFn(planejarTesteCarga);
   const preparar = useServerFn(prepararLeadsTesteCarga);
   const executar = useServerFn(executarLoteCarga);
+  const consultarEstado = useServerFn(estadoTesteCarga);
   const parar = useServerFn(pararTesteCarga);
   const listar = useServerFn(listarTestesCarga);
   const detalhar = useServerFn(detalheTesteCarga);
@@ -169,12 +172,19 @@ function CargaTesteClinica({
         mostrarErro(e);
       }
     });
+    let atualizando = false;
     const timer = setInterval(() => {
-      if (!operando.current)
-        void recarregar().catch(() => {
-          if (vivo.current)
-            setErro("A atualização falhou. O último estado confirmado permanece visível.");
-        });
+      if (vivo.current && !atualizando) {
+        atualizando = true;
+        void recarregar()
+          .catch(() => {
+            if (vivo.current)
+              setErro("A atualização falhou. O último estado confirmado permanece visível.");
+          })
+          .finally(() => {
+            atualizando = false;
+          });
+      }
     }, 5000);
     return () => {
       vivo.current = false;
@@ -255,7 +265,7 @@ function CargaTesteClinica({
   const rodarCarga = async (id: string, vigente: () => boolean) => {
     const status = await conduzirCargaLocal({
       vigente: () => vivo.current && vigente(),
-      ler: async () => (await abrirDetalhe(id)).carga,
+      ler: async () => await consultarEstado({ data: { clinicaId, cargaId: id } }),
       preparar: async () => await preparar({ data: { clinicaId, cargaId: id } }),
       executar: async () => await executar({ data: { clinicaId, cargaId: id } }),
       progresso: (r) => {
@@ -333,7 +343,12 @@ function CargaTesteClinica({
     else void executarDisparo(snapshot, false);
   };
   const retomar = async (carga: CargaPersistida) => {
-    if (operando.current || !carga.controle?.podeRetomar || carga.controle.ocupado) return;
+    if (
+      operando.current ||
+      !carga.controle?.podeRetomar ||
+      (carga.controle.ocupado && !carga.controle.paralela)
+    )
+      return;
     operando.current = true;
     setRodando(true);
     setErro(null);
@@ -426,7 +441,10 @@ function CargaTesteClinica({
               <Button
                 size="sm"
                 disabled={
-                  rodando || parando || !ativo.controle?.podeRetomar || ativo.controle.ocupado
+                  rodando ||
+                  parando ||
+                  !ativo.controle?.podeRetomar ||
+                  (ativo.controle.ocupado && !ativo.controle.paralela)
                 }
                 onClick={() => void retomar(ativo)}
               >
@@ -597,7 +615,10 @@ function CargaTesteClinica({
             </Button>
             <span className="text-xs text-muted-foreground">
               {cfgPrevia.totalMensagens} mensagens · {cfgPrevia.conversasSimultaneas} simultâneas
-              solicitadas · {cfgPrevia.mensagensPorMinuto} msg/min
+              solicitadas ·{" "}
+              {cfgPrevia.modoEnvio === "cadenciado"
+                ? `${cfgPrevia.mensagensPorMinuto} msg/min`
+                : "envio simultâneo"}
             </span>
           </div>
         </div>
@@ -607,8 +628,9 @@ function CargaTesteClinica({
           </p>
         )}
         <p className="text-sm text-muted-foreground">
-          Limite atual: uma mensagem por vez, em requisições separadas. Os demais itens aguardam na
-          fila. Continuar com a página fechada exige o job do watchdog ativo.
+          Cada mensagem usa uma requisição separada. Leads diferentes avançam em paralelo; mensagens
+          do mesmo paciente mantêm a ordem. Com a página fechada, o watchdog ativo retoma um item
+          por execução do job, em ritmo reduzido.
         </p>
         {preparo?.prontos !== undefined && (
           <p className="rounded-lg border p-3 text-sm">
@@ -653,7 +675,13 @@ function CargaTesteClinica({
               </div>
             )}
             <div className="grid gap-2 text-sm md:grid-cols-4">
-              <div>Limite efetivo: uma mensagem por requisição</div>
+              <div>Limite de conversas simultâneas: {detalhe.paralelismo?.limite ?? 1}</div>
+              {detalhe.paralelismo && (
+                <>
+                  <div>Requisições em andamento: {detalhe.paralelismo.emAndamento}</div>
+                  <div>Pico de requisições simultâneas: {detalhe.paralelismo.pico}</div>
+                </>
+              )}
               <div>Latência média: {ms(m?.media)}</div>
               <div>p50: {ms(m?.p50)}</div>
               <div>p95: {m?.p95 == null ? "volume insuficiente" : ms(m.p95)}</div>
@@ -676,6 +704,24 @@ function CargaTesteClinica({
             </p>
             {detalhe.processamento && (
               <div className="rounded-md border p-3 space-y-2" role="status">
+                <p>
+                  Pico de processamentos medidos: {detalhe.processamento.picoProcessamento ?? "—"}
+                </p>
+                <p>
+                  Janela de chegada das primeiras mensagens:{" "}
+                  {ms(detalhe.processamento.janelaPrimeirasEntradasMs)} ·{" "}
+                  {detalhe.processamento.primeirasEntradas ?? 0} leads recebidos
+                </p>
+                {detalhe.processamento.etapas && (
+                  <p>
+                    Média por chamada ao modelo: {ms(detalhe.processamento.etapas.modeloMs)} · Média
+                    por ferramenta: {ms(detalhe.processamento.etapas.ferramentasMs)} ·{" "}
+                    {detalhe.processamento.etapas.chamadasMedidas} chamadas e{" "}
+                    {detalhe.processamento.etapas.ferramentasMedidas} ferramentas medidas.
+                    {detalhe.processamento.etapas.intervalosIncompletos > 0 &&
+                      " Há intervalos ainda sem medição completa."}
+                  </p>
+                )}
                 <p className="font-medium">
                   Conciliação das mensagens:{" "}
                   {detalhe.processamento.testeFalhou

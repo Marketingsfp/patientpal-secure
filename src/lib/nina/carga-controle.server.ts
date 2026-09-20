@@ -88,6 +88,11 @@ export async function cargasQueReservamExecutor(
       .select("*")
       .eq("clinica_id", clinicaId)
       .not("config->_execucaoCarga->lease->>token", "is", null),
+    admin
+      .from("nina_teste_carga")
+      .select("*")
+      .eq("clinica_id", clinicaId)
+      .not("config->_cargaParalela->reservas", "is", null),
   ]);
   for (const r of respostas)
     if (r.error)

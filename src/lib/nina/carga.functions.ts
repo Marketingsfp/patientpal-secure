@@ -11,6 +11,7 @@
  */
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
+import { metricasParalelas, limiteParalelo, EXECUTOR_CARGA_PARALELA } from "./carga-paralela";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import {
   calcularMetricas,
@@ -27,11 +28,7 @@ import {
 import { garantirPapel, PROVEDOR_IA } from "@/lib/nina/papeis-modelos";
 import { validarPlanoCarga } from "./carga-planejamento";
 import { estadoControleCarga, VERSAO_EXECUTOR_CARGA } from "./carga-controle";
-import {
-  CONCORRENCIA_CARGA_EFETIVA,
-  lerAmostrasCarga,
-  totaisAmostrasCarga,
-} from "./carga-itens.server";
+import { lerAmostrasCarga, totaisAmostrasCarga } from "./carga-itens.server";
 import {
   carregarCargaControlada as carregarCarga,
   recuperarCargaSemAtividade,
@@ -58,6 +55,7 @@ async function assertMembership(supabase: any, userId: string, clinicaId: string
 }
 
 const configSchema = z.object({
+  modoEnvio: z.enum(["simultaneo", "cadenciado"]).default("simultaneo"),
   perfil: z.enum(["leve", "medio", "alto", "customizado"]).default("leve"),
   leadsAtivos: z.number().int().min(1).max(LIMITE_ABSOLUTO.leadsAtivos).default(5),
   totalMensagens: z.number().int().min(1).max(LIMITE_ABSOLUTO.totalMensagens).default(20),
@@ -205,8 +203,8 @@ export const criarTesteCarga = createServerFn({ method: "POST" })
           status: "preparando",
           config: {
             ...config,
-            executor: VERSAO_EXECUTOR_CARGA,
-            concorrenciaEfetiva: CONCORRENCIA_CARGA_EFETIVA,
+            executor: EXECUTOR_CARGA_PARALELA,
+            concorrenciaEfetiva: config.conversasSimultaneas,
             ...(planoIA ? { planoIA } : {}),
             _inicioCarga: {
               versao: 1,
@@ -399,7 +397,27 @@ export const executarLoteCarga = createServerFn({ method: "POST" })
     });
   });
 
-/** Parar impede novas mensagens; a chamada já iniciada continua sob lease. */
+/** Estado leve para conduzir o envio sem consultar o relatório completo. */
+export const estadoTesteCarga = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) =>
+    z.object({ clinicaId: z.string().uuid(), cargaId: z.string().uuid() }).parse(input),
+  )
+  .handler(async ({ data, context }: { data: any; context: Ctx }) => {
+    await assertMembership(context.supabase, context.userId, data.clinicaId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const carga = await carregarCarga(supabaseAdmin, data.clinicaId, data.cargaId);
+    return {
+      id: carga.id,
+      nome: carga.nome,
+      status: carga.status,
+      enviadas: carga.enviadas,
+      total_planejado: carga.total_planejado,
+      controle: estadoControleCarga(carga),
+    };
+  });
+
+/** Parar impede novas mensagens; as chamadas já iniciadas conservam suas reservas. */
 export const pararTesteCarga = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) =>
@@ -435,7 +453,7 @@ export const listarTestesCarga = createServerFn({ method: "POST" })
       .limit(20);
     if (error) throw new Error(error.message);
     return {
-      versaoExecutor: VERSAO_EXECUTOR_CARGA,
+      versaoExecutor: EXECUTOR_CARGA_PARALELA,
       testes: (linhas ?? []).map((c: any) => ({
         ...c,
         plano: undefined,
@@ -497,7 +515,7 @@ export const detalheTesteCarga = createServerFn({ method: "POST" })
       totalParticipantes || undefined,
     );
     return {
-      versaoExecutor: VERSAO_EXECUTOR_CARGA,
+      versaoExecutor: (carga.config as any)?.executor ?? VERSAO_EXECUTOR_CARGA,
       carga: {
         ...carga,
         ...totais,
@@ -512,6 +530,7 @@ export const detalheTesteCarga = createServerFn({ method: "POST" })
       preflight,
       // Custo monetário não é medido: o provedor não devolve preço por chamada.
       custoMedido: false,
-      concorrenciaEfetiva: CONCORRENCIA_CARGA_EFETIVA,
+      concorrenciaEfetiva: limiteParalelo(carga.config),
+      paralelismo: metricasParalelas(carga.config),
     };
   });

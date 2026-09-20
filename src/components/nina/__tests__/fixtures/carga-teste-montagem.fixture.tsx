@@ -75,6 +75,7 @@ mock.module("@tanstack/react-start", () => ({ useServerFn: (fn: unknown) => fn }
 mock.module("@/lib/nina/carga.functions", () => ({
   criarTesteCarga: proibida,
   executarLoteCarga: proibida,
+  estadoTesteCarga: proibida,
   pararTesteCarga: proibida,
   prepararLeadsTesteCarga: proibida,
   listarTestesCarga: async ({ data }: { data: { clinicaId: string } }) => {

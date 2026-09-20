@@ -29,6 +29,7 @@ export const LIMITE_CONFIRMACAO = 50;
 export type Perfil = "leve" | "medio" | "alto" | "customizado";
 
 export type ConfigCarga = {
+  modoEnvio?: "simultaneo" | "cadenciado";
   perfil: Perfil;
   leadsAtivos: number;
   totalMensagens: number;
@@ -53,6 +54,7 @@ export type ConfigCarga = {
 
 export const PERFIS: Record<Exclude<Perfil, "customizado">, ConfigCarga> = {
   leve: {
+    modoEnvio: "simultaneo",
     perfil: "leve",
     leadsAtivos: 5,
     totalMensagens: 20,
@@ -68,6 +70,7 @@ export const PERFIS: Record<Exclude<Perfil, "customizado">, ConfigCarga> = {
     distribuicao: [],
   },
   medio: {
+    modoEnvio: "simultaneo",
     perfil: "medio",
     leadsAtivos: 10,
     totalMensagens: 100,
@@ -83,6 +86,7 @@ export const PERFIS: Record<Exclude<Perfil, "customizado">, ConfigCarga> = {
     distribuicao: [],
   },
   alto: {
+    modoEnvio: "simultaneo",
     perfil: "alto",
     leadsAtivos: 10,
     totalMensagens: 300,
@@ -116,6 +120,7 @@ export function normalizarConfig(entrada: Partial<ConfigCarga>): ConfigCarga {
   const base = entrada.perfil && entrada.perfil !== "customizado" ? PERFIS[entrada.perfil] : null;
   const bruto = { ...(base ?? PERFIS.leve), ...entrada } as ConfigCarga;
   return {
+    modoEnvio: bruto.modoEnvio === "simultaneo" ? "simultaneo" : "cadenciado",
     perfil: entrada.perfil ?? "customizado",
     leadsAtivos: limitar(bruto.leadsAtivos, 1, LIMITE_ABSOLUTO.leadsAtivos),
     totalMensagens: limitar(bruto.totalMensagens, 1, LIMITE_ABSOLUTO.totalMensagens),
@@ -129,7 +134,11 @@ export function normalizarConfig(entrada: Partial<ConfigCarga>): ConfigCarga {
     intervaloMs: limitar(bruto.intervaloMs, 0, 60000),
     timeoutS: limitar(bruto.timeoutS, 10, LIMITE_ABSOLUTO.timeoutS),
     retriesMax: limitar(bruto.retriesMax, 0, LIMITE_ABSOLUTO.retriesMax),
-    maxTokens: limitar(bruto.maxTokens ?? LIMITE_ABSOLUTO.maxTokens, 1000, LIMITE_ABSOLUTO.maxTokens),
+    maxTokens: limitar(
+      bruto.maxTokens ?? LIMITE_ABSOLUTO.maxTokens,
+      1000,
+      LIMITE_ABSOLUTO.maxTokens,
+    ),
     maxCustoCreditos: Math.min(
       Math.max(Number(bruto.maxCustoCreditos ?? 0) || 0, 0),
       LIMITE_ABSOLUTO.maxCustoCreditos,
@@ -152,7 +161,10 @@ export function validarDisparo(
   confirmado: boolean,
 ): { ok: boolean; motivo?: string } {
   if (config.totalMensagens > LIMITE_ABSOLUTO.totalMensagens)
-    return { ok: false, motivo: `Máximo de ${LIMITE_ABSOLUTO.totalMensagens} mensagens por teste.` };
+    return {
+      ok: false,
+      motivo: `Máximo de ${LIMITE_ABSOLUTO.totalMensagens} mensagens por teste.`,
+    };
   if (exigeConfirmacao(config) && !confirmado)
     return {
       ok: false,
@@ -201,7 +213,7 @@ export function planoDeMensagens(
   return fila.map((cenario, indice) => ({
     indice,
     cenario,
-    slot: indice % config.conversasSimultaneas,
+    slot: indice % config.leadsAtivos,
   }));
 }
 
@@ -259,7 +271,12 @@ export function extrairVariacoes(texto: string, maximo = 12): string[] {
     ...new Set(
       texto
         .split("\n")
-        .map((l) => l.replace(/^\s*[-*\d.)]+\s*/, "").replace(/^["']|["']$/g, "").trim())
+        .map((l) =>
+          l
+            .replace(/^\s*[-*\d.)]+\s*/, "")
+            .replace(/^["']|["']$/g, "")
+            .trim(),
+        )
         .filter((l) => l.length >= 3 && l.length <= 140),
     ),
   ].slice(0, maximo);

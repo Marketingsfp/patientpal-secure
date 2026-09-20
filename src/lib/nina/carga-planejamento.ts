@@ -35,6 +35,7 @@ const texto = (max: number) => z.string().trim().min(1).max(max);
 const numero = z.number().finite();
 export const configPlanejamentoSchema = z
   .object({
+    modoEnvio: z.enum(["simultaneo", "cadenciado"]).optional(),
     perfil: z.enum(["leve", "medio", "alto", "customizado"]),
     leadsAtivos: numero,
     totalMensagens: numero,
@@ -139,6 +140,7 @@ const AVISO_BASE =
 const AVISO_REVISAO =
   "As verificações são objetivos ainda não executados. Nenhuma mensagem foi enviada; revise o plano antes de iniciar.";
 const ROTULOS_CONFIG: Record<Exclude<keyof ConfigCarga, "distribuicao">, string> = {
+  modoEnvio: "modo de envio",
   perfil: "perfil",
   leadsAtivos: "leads ativos",
   totalMensagens: "total de mensagens",
@@ -181,6 +183,7 @@ export function validarPlanoCarga(
   const alertas = new Set(plano.alertas);
   if (origem) {
     plano.pedido = texto(LIMITES_PLANEJAMENTO.pedidoCaracteres).parse(origem.pedido);
+    plano.config.modoEnvio = origem.config.modoEnvio ?? "simultaneo";
   }
   const brutoConfig = { ...plano.config };
   plano.config = normalizarConfig(plano.config);
@@ -257,6 +260,7 @@ export function schemaPlanoCarga() {
     additionalProperties: false,
   });
   const config = object({
+    modoEnvio: { type: "string", enum: ["simultaneo", "cadenciado"] },
     perfil: { type: "string", enum: ["leve", "medio", "alto", "customizado"] },
     ...Object.fromEntries(
       [

@@ -1,5 +1,7 @@
 import { chaveMensagemCarga, controleExecucaoCarga } from "./carga-controle";
 import { conciliarProcessamentoNina, percentil } from "./watchdog";
+import { cargaParalela, controleParalelo } from "./carga-paralela";
+import { temposEtapasCarga, picoIntervalosCarga } from "./carga-tempos";
 
 /** Conciliação de IDs reais do plano persistido. Não gera nem reenvia mensagens. */
 export async function metricasWatchdogCarga(admin: any, carga: any, agora = Date.now()) {
@@ -65,7 +67,7 @@ export async function metricasWatchdogCarga(admin: any, carga: any, agora = Date
   const encontradas = new Set(mensagens.map((m: any) => m.wa_message_id));
   const controle = controleExecucaoCarga(carga.config);
   let indicesRegistrados = plano.slice(0, Number(carga.enviadas ?? 0)).map((p: any) => p.indice);
-  if (carga.config?.executor === "carga-v3-item") {
+  if (carga.config?.executor === "carga-v3-item" || cargaParalela(carga.config)) {
     const { data: amostras, error: erroAmostras } = await admin
       .from("nina_teste_carga_amostras")
       .select("indice")
@@ -78,6 +80,7 @@ export async function metricasWatchdogCarga(admin: any, carga: any, agora = Date
     ...indicesRegistrados,
     ...(controle.lease?.indices ?? []),
     ...controle.indicesIncertos,
+    ...Object.values(controleParalelo(carga.config).reservas).map((r) => r.indice),
   ]);
   const esperadas = chaves.filter(
     (c: string, i: number) => iniciados.has(plano[i].indice) || encontradas.has(c),
@@ -88,26 +91,34 @@ export async function metricasWatchdogCarga(admin: any, carga: any, agora = Date
   resumo.ausentes += naoLocalizadas;
   resumo.pendentes += naoLocalizadas;
   const ids = [...new Set(mensagens.map((m: any) => m.nina_batch_id).filter(Boolean))];
-  let lotes: any[] = [],
-    eventos: any[] = [];
+  let lotes: any[] = [];
+  const eventos: any[] = [];
   if (ids.length) {
-    const [b, e] = await Promise.all([
-      admin
-        .from("nina_message_batches")
-        .select(
-          "id,conversa_id,watchdog_state,first_message_at,claimed_at,processamento_iniciado_em,processed_at,processing_deadline,attempt_count,recovered_count",
-        )
-        .eq("clinica_id", carga.clinica_id)
-        .in("id", ids),
-      admin
-        .from("nina_trace_eventos")
-        .select("node_id")
-        .eq("clinica_id", carga.clinica_id)
-        .in("trace_id", ids),
-    ]);
-    if (b.error || e.error) throw new Error("WATCHDOG_METRICS_UNAVAILABLE");
+    const b = await admin
+      .from("nina_message_batches")
+      .select(
+        "id,conversa_id,watchdog_state,first_message_at,claimed_at,processamento_iniciado_em,processed_at,processing_deadline,attempt_count,recovered_count",
+      )
+      .eq("clinica_id", carga.clinica_id)
+      .in("id", ids);
+    if (b.error) throw new Error("WATCHDOG_METRICS_UNAVAILABLE");
     lotes = b.data ?? [];
-    eventos = e.data ?? [];
+    // Pagina: o limite padrão do PostgREST não pode truncar as etapas das cargas maiores.
+    for (let inicio = 0; inicio < ids.length; inicio += 30) {
+      for (let pagina = 0; ; pagina++) {
+        const e = await admin
+          .from("nina_trace_eventos")
+          .select("id,node_id,trace_id,started_at,metadata")
+          .eq("clinica_id", carga.clinica_id)
+          .in("trace_id", ids.slice(inicio, inicio + 30))
+          .order("started_at")
+          .order("id")
+          .range(pagina * 500, pagina * 500 + 499);
+        if (e.error) throw new Error("WATCHDOG_METRICS_UNAVAILABLE");
+        eventos.push(...(e.data ?? []));
+        if ((e.data?.length ?? 0) < 500) break;
+      }
+    }
   }
   const conversas = [...new Set(mensagens.map((m: any) => m.conversa_id).filter(Boolean))];
   let orfaosLiberados = 0;
@@ -149,7 +160,24 @@ export async function metricasWatchdogCarga(admin: any, carga: any, agora = Date
     Date.parse(carga.iniciado_em ?? carga.created_at) +
     Number(carga.config?.duracaoMaxS ?? 300) * 1000;
   const finalizado = Boolean(carga.finalizado_em) || agora >= prazo;
+  const primeiras = new Map<string, number>();
+  for (const m of mensagens) {
+    const em = Date.parse(m.created_at);
+    if (Number.isFinite(em))
+      primeiras.set(m.conversa_id, Math.min(primeiras.get(m.conversa_id) ?? Infinity, em));
+  }
+  const inicios = [...primeiras.values()];
   return {
+    etapas: temposEtapasCarga(eventos),
+    picoProcessamento: picoIntervalosCarga(
+      lotes.map((b) => ({
+        inicio: Date.parse(b.processamento_iniciado_em ?? b.claimed_at),
+        fim: b.processed_at ? Date.parse(b.processed_at) : agora,
+      })),
+    ),
+    primeirasEntradas: inicios.length,
+    janelaPrimeirasEntradasMs:
+      inicios.length > 1 ? Math.max(...inicios) - Math.min(...inicios) : null,
     ...resumo,
     esperadas: esperadas.length,
     semRastreamento: mensagens.filter((m: any) => !m.nina_status).length,

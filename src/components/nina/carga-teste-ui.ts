@@ -68,6 +68,8 @@ export function revisarPlanoCarga(plano: PlanoCarga, config: ConfigCarga): Plano
 }
 
 export type ControleCarga = {
+  paralela?: boolean;
+  concorrencia?: number;
   ativo: boolean;
   ocupado: boolean;
   podeRetomar: boolean;
@@ -145,6 +147,8 @@ export async function conduzirCargaLocal(e: {
   if (!e.vigente()) return "interrompido";
   let carga = await e.ler();
   while (e.vigente() && cargaAtiva(carga)) {
+    if (carga.status === "executando" && carga.controle?.paralela)
+      return conduzirCargaParalelaLocal(e, carga.controle.concorrencia ?? 1);
     // Uma página recarregada não disputa o lote vivo de outra página.
     if (carga.controle?.ocupado || carga.controle?.podeRetomar === false) return "ocupado";
     const espera = esperaDoControle(carga);
@@ -169,4 +173,41 @@ export async function conduzirCargaLocal(e: {
     }
   }
   return e.vigente() ? carga.status : "interrompido";
+}
+
+/** Cada trabalhador chama uma server function independente; não há barreira entre rodadas. */
+export async function conduzirCargaParalelaLocal(
+  e: Parameters<typeof conduzirCargaLocal>[0],
+  concorrencia: number,
+): Promise<string> {
+  let status = "executando";
+  let falha: unknown = null;
+  const vigente = () => e.vigente() && status === "executando" && !falha;
+  const trabalhador = async () => {
+    while (vigente()) {
+      try {
+        const r = await e.executar();
+        if (!e.vigente()) return;
+        e.progresso(r);
+        if (r.status !== "executando") {
+          status = r.status;
+          return;
+        }
+        if (r.erro) throw new Error(r.erro);
+        if (r.ocupado || r.aguardandoDesfecho || r.aguardandoRitmo)
+          await (e.aguardar ?? aguardarCargaLocal)(
+            Math.max(250, Math.min(60000, r.aguardarMs || 1000)),
+            vigente,
+          );
+      } catch (erro) {
+        falha = erro;
+      }
+    }
+  };
+  // Aguarda as chamadas iniciadas inclusive ao cancelar ou perder conexão.
+  await Promise.allSettled(
+    Array.from({ length: Math.max(1, Math.min(10, concorrencia)) }, trabalhador),
+  );
+  if (falha) throw falha;
+  return e.vigente() ? status : "interrompido";
 }

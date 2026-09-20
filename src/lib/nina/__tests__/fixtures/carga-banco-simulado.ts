@@ -82,10 +82,16 @@ export function criarBancoCargaSimulado(cargas: CargaPersistida[] = [cargaFictic
         patch: any = null,
         inserts: any[] = [],
         limite = Infinity,
+        deslocamento = 0,
         unico = false,
         ignorarDuplicadas = false;
       let ordenar: { campo: string; asc: boolean } | null = null;
       const query: any = {
+        range(inicio: number, fim: number) {
+          deslocamento = inicio;
+          limite = fim - inicio + 1;
+          return query;
+        },
         select() {
           return query;
         },
@@ -180,7 +186,7 @@ export function criarBancoCargaSimulado(cargas: CargaPersistida[] = [cargaFictic
                     (o.asc ? 1 : -1),
                 );
               }
-              resultado = resultado.slice(0, limite);
+              resultado = resultado.slice(deslocamento, deslocamento + limite);
               return { data: clone(unico ? (resultado[0] ?? null) : resultado), error: null };
             })
             .then(resolve, reject);

@@ -200,7 +200,7 @@ describe("handlers reais de carga com fronteiras simuladas", () => {
     expect(db.tabelas.nina_teste_carga_amostras![0].erro).toBe(
       "PROCESSADOR_FALHOU_ANTES_DA_ENTRADA",
     );
-    expect(lista.versaoExecutor).toBe("carga-v3-item");
+    expect(lista.versaoExecutor).toBe("carga-v4-paralela");
   });
   it("falha de reset persiste identificação do lead, mantém gate fechado e não envia", async () => {
     db.tabelas.nina_teste_leads![0].conversa_id = "conversa-ativa";

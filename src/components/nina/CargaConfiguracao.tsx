@@ -36,6 +36,29 @@ export function CargaConfiguracao({
   return (
     <fieldset disabled={disabled} className="space-y-3">
       <legend className="mb-3 text-sm font-medium">Configuração do teste</legend>
+      <div className="space-y-1.5">
+        <Label htmlFor="carga-modo-envio">Modo de envio</Label>
+        <Select
+          disabled={disabled}
+          value={config.modoEnvio ?? "simultaneo"}
+          onValueChange={(modoEnvio: "simultaneo" | "cadenciado") =>
+            onChange({ ...config, modoEnvio })
+          }
+        >
+          <SelectTrigger id="carga-modo-envio">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="simultaneo">Simultâneo — vários pacientes ao mesmo tempo</SelectItem>
+            <SelectItem value="cadenciado">Com intervalo — chegada gradual de pacientes</SelectItem>
+          </SelectContent>
+        </Select>
+        <p className="text-xs text-muted-foreground">
+          {config.modoEnvio !== "cadenciado"
+            ? "Os leads começam juntos, até o limite de conversas simultâneas. Cada paciente aguarda sua própria resposta antes de continuar."
+            : "O intervalo e as mensagens por minuto controlam a chegada. Conversas diferentes podem continuar em paralelo."}
+        </p>
+      </div>
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <div className="space-y-1.5">
           <Label htmlFor="carga-perfil">Perfil</Label>
@@ -47,7 +70,12 @@ export function CargaConfiguracao({
               onChange(
                 perfil === "customizado"
                   ? { ...config, perfil, retriesMax: 0 }
-                  : { ...PERFIS[perfil], retriesMax: 0, distribuicao: config.distribuicao },
+                  : {
+                      ...PERFIS[perfil],
+                      modoEnvio: config.modoEnvio,
+                      retriesMax: 0,
+                      distribuicao: config.distribuicao,
+                    },
               );
             }}
           >
@@ -74,6 +102,10 @@ export function CargaConfiguracao({
               step={step}
               value={config[campo]}
               readOnly={campo === "totalMensagens" && totalCalculado}
+              disabled={
+                config.modoEnvio !== "cadenciado" &&
+                (campo === "mensagensPorMinuto" || campo === "intervaloMs")
+              }
               onChange={(e) =>
                 onChange({ ...config, perfil: "customizado", [campo]: Number(e.target.value) })
               }

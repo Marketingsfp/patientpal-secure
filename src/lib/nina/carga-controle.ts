@@ -1,4 +1,5 @@
 /** Estado persistido do executor de carga. Timeout não é prova de cancelamento. */
+import { cargaParalela, controleParalelo, limiteParalelo, reservasVivas } from "./carga-paralela";
 export const LEASE_CARGA_MS = 120_000;
 export const HEARTBEAT_CARGA_MS = 20_000;
 export const QUARENTENA_CARGA_MS = 300_000;
@@ -96,6 +97,27 @@ export function estadoControleCarga(carga: CargaPersistida, agora = Date.now()) 
   const fimLease = dataMs(c.lease?.expiraEm);
   const ocupado = !!c.lease && agora < fimLease + QUARENTENA_CARGA_MS;
   const orfa = ativo && (c.lease ? !ocupado : agora - atividadeCarga(carga) > OCIOSIDADE_CARGA_MS);
+  if (cargaParalela(carga.config) && carga.status !== "preparando") {
+    const p = controleParalelo(carga.config);
+    const vivas = reservasVivas(p, agora);
+    return {
+      ativo,
+      ocupado: vivas.length > 0,
+      podeRetomar: ativo && !carga.cancelar,
+      orfa: false,
+      recuperada: c.recuperada,
+      motivo: c.motivo,
+      erro: p.erro ?? c.erro,
+      ultimaAtividadeEm: carga.updated_at,
+      leaseExpiraEm: null,
+      emQuarentena: false,
+      indicesIncertos: Object.values(p.reservas).map((r) => r.indice),
+      proximoDisparoEm: p.proximoDisparo ? new Date(p.proximoDisparo).toISOString() : null,
+      aguardarMs: Math.max(0, p.proximoDisparo - agora),
+      paralela: true,
+      concorrencia: limiteParalelo(carga.config),
+    };
+  }
   return {
     ativo,
     ocupado,
@@ -110,6 +132,8 @@ export function estadoControleCarga(carga: CargaPersistida, agora = Date.now()) 
     indicesIncertos: c.indicesIncertos,
     proximoDisparoEm: c.proximoDisparoEm,
     aguardarMs: Math.max(0, dataMs(c.proximoDisparoEm) - agora),
+    paralela: false,
+    concorrencia: 1,
   };
 }
 

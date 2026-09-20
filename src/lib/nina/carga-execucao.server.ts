@@ -1,5 +1,7 @@
 /** Uma unidade por requisição limita o acúmulo de contexto/modelo/auditoria. */
 import { normalizarConfig, estourouOrcamento } from "./carga";
+import { cargaParalela } from "./carga-paralela";
+import { comReservaParalela } from "./carga-paralela.server";
 import { chaveMensagemCarga, estadoControleCarga } from "./carga-controle";
 import { carregarCargaControlada, comLeaseCarga, retornoCarga } from "./carga-controle.server";
 import {
@@ -34,7 +36,9 @@ export async function executarCargaControlada(e: {
       aguardandoDesfecho: false,
     });
   let aguardandoDesfecho = false;
-  const resultado = await comLeaseCarga({
+  const paralelo = cargaParalela(carga.config);
+  const reservar = paralelo ? comReservaParalela : comLeaseCarga;
+  const resultado = await reservar({
     admin: e.admin,
     carga,
     fase: "lote",
@@ -60,6 +64,7 @@ export async function executarCargaControlada(e: {
       let existente: DesfechoItemCarga = { tipo: "novo" };
       const aguardandoLead = new Set<string>();
       for (const candidato of plano) {
+        if (paralelo && candidato.indice !== inicial.indiceReservado) continue;
         if (concluidos.has(candidato.indice) || aguardandoLead.has(candidato.leadId)) continue;
         const desfecho = await desfechoItemCarga(e.admin, inicial, candidato);
         if (desfecho.tipo === "pendente") {
@@ -176,9 +181,11 @@ export async function executarCargaControlada(e: {
                 input_tokens: exec.input_tokens ?? 0,
                 output_tokens: exec.output_tokens ?? 0,
               });
-              await dono.alterar({
-                retries: Number(inicial.retries ?? 0) + Number(exec.retries ?? 0),
-              });
+              await dono.alterar(
+                paralelo
+                  ? { retriesDoItem: Number(exec.retries ?? 0) }
+                  : { retries: Number(inicial.retries ?? 0) + Number(exec.retries ?? 0) },
+              );
             }
           }
         }
