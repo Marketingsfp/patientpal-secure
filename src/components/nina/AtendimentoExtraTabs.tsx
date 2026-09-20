@@ -250,6 +250,7 @@ import {
 import { lerFiltrosInbox, salvarFiltrosInbox } from "@/lib/atendimento/filtros-persistencia";
 import { estadoFiltroAtendente, filtroAtendenteAtual } from "@/lib/atendimento/filtros-atendente";
 import { FiltrosAtendente } from "@/components/nina/FiltrosAtendente";
+import { AgendamentosContato } from "@/components/nina/AgendamentosContato";
 import { CronometroPausa } from "@/components/nina/CronometroPausa";
 import { atualizarCronometroPausa, type CronometroPausa as EstadoCronometroPausa } from "@/lib/atendimento/cronometro-pausa";
 import {
@@ -282,6 +283,7 @@ import {
   selecaoDeveSair,
   podeRevalidarChatEntreFiltros,
   chatContinuaEntreFiltros,
+  revalidarChatSelecionado,
   type ContadoresInbox,
 } from "@/lib/atendimento/inbox-cache";
 
@@ -1022,22 +1024,22 @@ export function AtendInbox() {
       };
       const rows = filtrarPorEscopo(brutas as any[], ctxEscopo);
       const selecionadaParaConferir = selRef.current;
-      let confirmadaForaLista: any = null;
+      let confirmadaForaLista: any = undefined;
       if (
         podeRevalidarChatEntreFiltros(selecionadaParaConferir, ctxEscopo) &&
         !rows.some((r: any) => r.id === selecionadaParaConferir.id)
       ) {
         // Trocar de aba ou responder na fila pode tirar o card da lista.
         // A leitura autenticada confirma que o chat ainda pertence à atendente.
-        confirmadaForaLista = await obterConversaFn({
+        confirmadaForaLista = await revalidarChatSelecionado(() => obterConversaFn({
           data: { clinicaId, conversaId: selecionadaParaConferir.id },
-        }).catch(() => null);
+        }));
         if (pedido !== seqConvs.current || chavePedido !== chaveAtualRef.current) return;
         if (selIdRef.current !== selecionadaParaConferir.id ||
             selecaoIdRef.current !== selecionadaParaConferir.id) return;
       }
-      // Transferência, resolução ou perda de acesso continuam encerrando a
-      // seleção. Trocar entre as três abas mantém o chat e o filtro escolhido.
+      // Filtro e status não encerram a seleção. Só uma perda comprovada de
+      // acesso ou de contexto pode retirar uma conversa já aberta.
       if (deepLinkPendente.current && selIdRef.current !== deepLinkPendente.current)
         deepLinkPendente.current = null;
       const removeu = selecaoDeveSair({
@@ -1086,7 +1088,7 @@ export function AtendInbox() {
         }
         // Quem saiu deste filtro não pode continuar guardado em cache.
         for (const id of idsQueSairam(prev as any, rows as any)) {
-          if (!removeu && id === confirmadaForaLista?.id) continue;
+          if (!removeu && id === selIdRef.current) continue;
           cacheConversas.current.invalidar(id);
           prefetchMsgs.current.invalidar(id);
         }
@@ -1941,6 +1943,27 @@ export function AtendInbox() {
   // máximo dentro do teto, mesmo com tráfego contínuo.
   const carregarConvsAgrup = useRef(carregarConvs);
   carregarConvsAgrup.current = carregarConvs;
+  const perfilContatoRef = useRef("");
+  perfilContatoRef.current = `${clinicaId}:${meuId}`;
+  const seqContatoRef = useRef(0);
+  const atualizarContatoRef = useRef<() => Promise<void>>(async () => {});
+  atualizarContatoRef.current = async () => {
+    const id = selIdRef.current;
+    if (!clinicaId || !id) return;
+    const perfil = perfilContatoRef.current;
+    const pedido = ++seqContatoRef.current;
+    try {
+      const c: any = await obterContato({ data: { clinicaId, conversaId: id } });
+      if (pedido !== seqContatoRef.current || perfil !== perfilContatoRef.current || selIdRef.current !== id) return;
+      cacheContatos.current.guardar(c?.paciente?.id, c);
+      const guardado = cacheConversas.current.obter(id);
+      if (guardado) cacheConversas.current.guardar(id, { ...guardado, contato: c });
+      setContato(c);
+      setSecundariosCarregadosId(id);
+    } catch (erro) {
+      console.warn("[atendimento] atualizar agendamentos do contato:", erro);
+    }
+  };
   const carregarEsperaRef = useRef(carregarEspera);
   carregarEsperaRef.current = carregarEspera;
   const carregarContadoresRef = useRef(carregarContadores);
@@ -1952,9 +1975,11 @@ export function AtendInbox() {
     apoio: Agrupador;
     espera: Agrupador;
     contadores: Agrupador;
+    contato: Agrupador;
   } | null>(null);
   if (agrupadores.current === null) {
     agrupadores.current = {
+      contato: criarAgrupador({ executar: () => void atualizarContatoRef.current(), atrasoMs: 300, tetoMs: 1000 }),
       lista: criarAgrupador({
         executar: () => void carregarConvsAgrup.current(),
         atrasoMs: 400,
@@ -1993,6 +2018,7 @@ export function AtendInbox() {
       g.apoio.cancelar();
       g.espera.cancelar();
       g.contadores.cancelar();
+      g.contato.cancelar();
     },
     [],
   );
@@ -2008,6 +2034,7 @@ export function AtendInbox() {
     if (selIdRef.current) {
       g.conversa.agendar();
       g.apoio.agendar();
+      g.contato.agendar();
     }
   }, []);
 
@@ -2051,6 +2078,7 @@ export function AtendInbox() {
     if (!g) return;
     g.lista.agendar();
     g.espera.agendar();
+    if (selRef.current?.contato_paciente_id) g.contato.agendar();
   }, []);
   const conferirListaRef = useRef(conferirListaEEspera);
   conferirListaRef.current = conferirListaEEspera;
@@ -2066,6 +2094,8 @@ export function AtendInbox() {
   useRealtimeAtendimento({
     clinicaId: clinicaId ?? null,
     conversaAberta: sel?.id ?? null,
+    pacienteAberto: contatoAtual?.paciente?.id ?? null,
+    agendamentosAbertos: contatoAtual?.agendamentos?.map((a: { id: string }) => a.id) ?? [],
     // O canal depende do RLS: só é aberto com clínica E sessão já disponíveis.
     enabled: !!clinicaId && !!meuId,
     onEstado: (estado) => {
@@ -2206,6 +2236,7 @@ export function AtendInbox() {
       if (selIdRef.current) {
         g.conversa.agendar();
         g.apoio.agendar();
+        g.contato.agendar();
       }
     },
   });
@@ -3794,26 +3825,7 @@ export function AtendInbox() {
 
 
 
-                {contatoAtual.agendamentos?.length > 0 && (
-                  <section>
-                    <div className="text-xs font-semibold text-muted-foreground uppercase mb-1">
-                      Agendamentos
-                    </div>
-                    {contatoAtual.agendamentos.map((a: any) => (
-                      <div key={a.id} className="text-xs border rounded p-2 mb-1 space-y-0.5">
-                        <div className="font-medium">
-                          {a.procedimento || a.tipo_atendimento || "Consulta"}
-                        </div>
-                        <div className="text-muted-foreground">
-                          Médico: {a.medico_nome || "não definido"}
-                        </div>
-                        <div className="text-muted-foreground">
-                          {fmtData(a.inicio)} · {a.status}
-                        </div>
-                      </div>
-                    ))}
-                  </section>
-                )}
+                <AgendamentosContato agendamentos={contatoAtual.agendamentos ?? []} />
 
                 {contatoAtual.contratos?.length > 0 && (
                   <section>

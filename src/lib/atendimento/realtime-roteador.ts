@@ -21,6 +21,8 @@ export type AlvoAtualizacao =
   | "conversa"
   /** Painéis de apoio da conversa aberta (notas internas, resumo do handoff). */
   | "apoio"
+  /** Dados do contato e seus agendamentos, sem recarregar mensagens. */
+  | "contato"
   /** Contadores e tempo de espera. */
   | "espera";
 
@@ -34,6 +36,8 @@ export type EventoRealtime = {
 export type ContextoTela = {
   clinicaId: string | null;
   conversaAberta: string | null;
+  pacienteAberto?: string | null;
+  agendamentosAbertos?: readonly string[];
 };
 
 /** Linha útil do evento: DELETE só traz o registro antigo. */
@@ -53,6 +57,12 @@ export function classificarEvento(ev: EventoRealtime, ctx: ContextoTela): AlvoAt
   const aberta = ctx.conversaAberta;
 
   switch (ev.table) {
+    case "agendamentos": {
+      if (!aberta || !ctx.pacienteAberto) return [];
+      return linha.paciente_id === ctx.pacienteAberto || ev.old?.paciente_id === ctx.pacienteAberto ||
+        ctx.agendamentosAbertos?.includes(linha.id) || !linha.paciente_id
+        ? ["contato"] : [];
+    }
     case "atend_leitura_operacional":
       // A leitura da equipe atualiza também o contador de quem supervisiona.
       return ["lista"];

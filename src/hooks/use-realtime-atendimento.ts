@@ -29,11 +29,14 @@ export const TABELAS_ATENDIMENTO = [
   "atend_notas_internas",
   "atend_handoff_resumos",
   "atend_leitura_operacional",
+  "agendamentos",
 ] as const;
 
 export function useRealtimeAtendimento(params: {
   clinicaId: string | null;
   conversaAberta: string | null;
+  pacienteAberto?: string | null;
+  agendamentosAbertos?: readonly string[];
   onAlvos: (alvos: AlvoAtualizacao[], evento: EventoRealtime) => void;
   /**
    * Chamado quando o canal é confirmado — inclusive na PRIMEIRA vez. A lista
@@ -51,6 +54,10 @@ export function useRealtimeAtendimento(params: {
   // derrubar e recriar o canal (isso reiniciava a conexão a cada lead).
   const abertaRef = useRef(conversaAberta);
   abertaRef.current = conversaAberta;
+  const pacienteRef = useRef(params.pacienteAberto);
+  pacienteRef.current = params.pacienteAberto;
+  const agendamentosRef = useRef(params.agendamentosAbertos);
+  agendamentosRef.current = params.agendamentosAbertos;
   const onAlvosRef = useRef(onAlvos);
   onAlvosRef.current = onAlvos;
   const onReconectarRef = useRef(onReconectar);
@@ -85,6 +92,8 @@ export function useRealtimeAtendimento(params: {
           const alvos = classificarEvento(ev, {
             clinicaId,
             conversaAberta: abertaRef.current,
+            pacienteAberto: pacienteRef.current,
+            agendamentosAbertos: agendamentosRef.current,
           });
           if (alvos.length === 0) return;
           onAlvosRef.current(alvos, ev);

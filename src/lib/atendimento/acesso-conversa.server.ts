@@ -13,12 +13,14 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/integrations/supabase/types";
 import { usuarioPodeVerConversa, type ConversaEscopo } from "./escopo-inbox";
 
-export const ERRO_CONVERSA_NAO_ENCONTRADA = "CONVERSA_NAO_ENCONTRADA";
-export const ERRO_CONVERSA_SEM_PERMISSAO = "CONVERSA_SEM_PERMISSAO";
-
-export const MSG_CONVERSA_NAO_ENCONTRADA = "Conversa não encontrada.";
-export const MSG_CONVERSA_SEM_PERMISSAO =
-  "Você não possui permissão para visualizar esta conversa.";
+import {
+  ERRO_CONVERSA_NAO_ENCONTRADA, ERRO_CONVERSA_SEM_PERMISSAO,
+  MSG_CONVERSA_NAO_ENCONTRADA, MSG_CONVERSA_SEM_PERMISSAO,
+} from "./acesso-conversa-erros";
+export {
+  ERRO_CONVERSA_NAO_ENCONTRADA, ERRO_CONVERSA_SEM_PERMISSAO,
+  MSG_CONVERSA_NAO_ENCONTRADA, MSG_CONVERSA_SEM_PERMISSAO,
+} from "./acesso-conversa-erros";
 
 export type MotivoAcessoNegado =
   | typeof ERRO_CONVERSA_NAO_ENCONTRADA

@@ -2091,14 +2091,14 @@ export const obterDadosContato = createServerFn({ method: "POST" })
       const { assertAcessoConversa } = await import("./atendimento/acesso-conversa.server");
       await assertAcessoConversa(context.supabase, context.userId, data.clinicaId, data.conversaId);
     }
-    const { data: conv } = await context.supabase
+    const { data: conv, error: erroConversa } = await context.supabase
       .from("atend_conversas")
       .select("*, atend_departamentos(nome)")
       .eq("id", data.conversaId)
       .eq("clinica_id", data.clinicaId)
       .maybeSingle();
-    // A conversa pode ter sido encerrada/removida enquanto estava selecionada
-    // no inbox. Nesse caso devolvemos `null` em vez de derrubar a tela.
+    if (erroConversa) throw new Error(erroConversa.message);
+    // Apenas inexistência confirmada devolve null; falha de consulta não limpa o chat.
     if (!conv) return null;
 
     let paciente: any = null;
@@ -2141,9 +2141,11 @@ export const obterDadosContato = createServerFn({ method: "POST" })
           // O nome do médico não fica em `agendamentos`; vem do vínculo com
           // `medicos` (a coluna medico_nome nunca existiu e derrubava o drawer).
           .select("id, inicio, procedimento, tipo_atendimento, status, medicos(nome)")
-
+          .eq("clinica_id", data.clinicaId)
           .eq("paciente_id", paciente.id)
-          .order("inicio", { ascending: false })
+          .gte("inicio", janelaDiaClinica(hojeBR()).inicio)
+          .neq("status", "cancelado")
+          .order("inicio", { ascending: true })
           .limit(5),
         context.supabase
           .from("contratos_assinatura")

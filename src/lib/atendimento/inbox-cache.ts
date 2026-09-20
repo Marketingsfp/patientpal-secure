@@ -12,13 +12,13 @@
 import {
   atendenteFiltroEfetivo,
   conversaDoAtendente,
-  conversaEstaFechada,
-  conversaResolvidaDoAtendente,
+  usuarioPodeVerConversa,
   escopoComAtendente,
   conversaVisivelNoEscopo,
   type ConversaEscopo,
   type EscopoInbox,
 } from "./escopo-inbox";
+import { erroConfirmaConversaIndisponivel } from "./acesso-conversa-erros";
 
 export type LinhaCache = ConversaEscopo & {
   id: string;
@@ -96,27 +96,18 @@ export function idsQueSairam(anteriores: { id: string }[], atuais: { id: string 
   return anteriores.filter((c) => !agora.has(c.id)).map((c) => c.id);
 }
 
-/** Trocar a aba filtra os cards, sem encerrar a conversa da própria atendente. */
+/** A conversa selecionada é independente do filtro, status e ordenação dos cards. */
 export function podeRevalidarChatEntreFiltros(
   selecionada: LinhaCache | null | undefined,
   ctx: ContextoEscopo,
 ): boolean {
-  if (
-    !selecionada || !ctx.clinicaId || !ctx.userId || ctx.gestor ||
-    !["minhas", "nao_atribuidas", "fechadas"].includes(ctx.escopo) ||
-    selecionada.clinica_id !== ctx.clinicaId || selecionada.is_teste === true
-  ) return false;
-  if (conversaEstaFechada(selecionada)) {
-    return conversaResolvidaDoAtendente(selecionada, ctx.userId);
-  }
-  return (
-    selecionada.atribuida_user_id === ctx.userId &&
-    selecionada.owner_type === "HUMAN" && typeof selecionada.fila_pendente === "boolean" &&
-    ["waiting", "active", "in_progress"].includes(selecionada.status ?? "")
+  return Boolean(
+    selecionada && ctx.clinicaId && ctx.userId &&
+    selecionada.clinica_id === ctx.clinicaId && selecionada.is_teste !== true,
   );
 }
 
-/** Só mantém fora da lista com um registro atual autorizado; ausência no filtro não basta. */
+/** Aplica a autorização canônica, sem confundi-la com o filtro escolhido na sidebar. */
 export function chatContinuaEntreFiltros(args: {
   selecionada: LinhaCache | null | undefined;
   confirmada: LinhaCache | null | undefined;
@@ -126,19 +117,20 @@ export function chatContinuaEntreFiltros(args: {
   return Boolean(
     selecionada && confirmada && podeRevalidarChatEntreFiltros(selecionada, ctx) &&
     confirmada.id === selecionada.id && podeRevalidarChatEntreFiltros(confirmada, ctx) &&
-    // Encerrar ou reabrir de fato continua seguindo o fluxo de mudança de atendimento.
-    conversaEstaFechada(selecionada) === conversaEstaFechada(confirmada),
+    usuarioPodeVerConversa(confirmada, { userId: ctx.userId!, gestor: ctx.gestor }),
   );
 }
 
-/**
- * A conversa aberta deve sair da tela?
- *
- * Durante uma busca a lista fica reduzida pelo texto digitado, então "não
- * estar na lista" não prova nada. Nesse caso vale a checagem de propriedade do
- * próprio registro — é isso que impede a busca de manter na tela uma conversa
- * que já é de outro atendente.
- */
+/** null confirma indisponibilidade; undefined preserva o chat durante uma falha transitória. */
+export async function revalidarChatSelecionado<T>(ler: () => Promise<T | null>): Promise<T | null | undefined> {
+  try {
+    return await ler();
+  } catch (erro) {
+    return erroConfirmaConversaIndisponivel(erro) ? null : undefined;
+  }
+}
+
+/** Ausência na lista filtrada nunca encerra um chat. Só perda comprovada de acesso/contexto. */
 export function selecaoDeveSair(args: {
   selecionada: LinhaCache | null | undefined;
   linhas: LinhaCache[] | null | undefined;
@@ -147,14 +139,12 @@ export function selecaoDeveSair(args: {
   /** Leitura autenticada atual da conversa aberta que não pertence à aba escolhida. */
   confirmadaForaLista?: LinhaCache | null;
 }): boolean {
-  const { selecionada, linhas, buscando, ctx } = args;
-  if (!selecionada || !linhas) return false;
-  const naLista = linhas.find((l) => l.id === selecionada.id);
-  if (naLista) return !podeEntrarNaLista(naLista, ctx);
-  if (chatContinuaEntreFiltros({ selecionada, confirmada: args.confirmadaForaLista, ctx }))
-    return false;
-  if (buscando) return !podeEntrarNaLista(selecionada, ctx);
-  return true;
+  const { selecionada, linhas, ctx, confirmadaForaLista } = args;
+  if (!selecionada) return false;
+  if (!podeRevalidarChatEntreFiltros(selecionada, ctx)) return true;
+  const atual = linhas?.find(l => l.id === selecionada.id) ?? confirmadaForaLista;
+  if (atual !== undefined) return !chatContinuaEntreFiltros({ selecionada, confirmada: atual, ctx });
+  return !usuarioPodeVerConversa(selecionada, { userId: ctx.userId!, gestor: ctx.gestor });
 }
 
 export type ContadoresInbox = Record<EscopoInbox, number>;

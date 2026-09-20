@@ -12,10 +12,11 @@ import {
 
 const JEAN = "jean-1";
 const MARIA = "maria-2";
-const ctxJean = { escopo: "minhas" as const, userId: JEAN, gestor: false };
+const ctxJean = { clinicaId: "clinica", escopo: "minhas" as const, userId: JEAN, gestor: false };
 
 const conv = (over: Record<string, unknown> = {}) => ({
   id: "c1",
+  clinica_id: "clinica",
   atribuida_user_id: JEAN,
   owner_type: "HUMAN",
   status: "active",
@@ -59,7 +60,7 @@ describe("FASE 4 — cache e realtime da Inbox individual", () => {
     ).toBe(false);
     expect(
       selecaoDeveSair({ selecionada: conv(), linhas: [], buscando: false, ctx: ctxJean }),
-    ).toBe(true);
+    ).toBe(false);
   });
 
   it("contadores acompanham mudanças rápidas entre filtros", () => {
