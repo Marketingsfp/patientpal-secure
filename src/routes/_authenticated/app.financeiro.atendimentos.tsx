@@ -1509,20 +1509,33 @@ function AtendimentosPage() {
     const manualLancamentoIds = (mr.data ?? [])
       .map((r: { lancamento_id?: string | null }) => r.lancamento_id ?? null)
       .filter((x): x is string => !!x);
+    // Espelhos e repasses de terceiro são consultas independentes: disparam
+    // juntas. Em série, cada uma esperava a volta da outra e a tela ficava
+    // parada mais tempo do que o banco realmente levava.
+    const espelhosReq = manualLancamentoIds.length
+      ? supabase
+          .from("fin_lancamentos")
+          .select("id, agendamento_id")
+          .in("id", manualLancamentoIds)
+          .not("agendamento_id", "is", null)
+      : Promise.resolve({ data: [] as Array<{ id: string }>, error: null });
+    const terceirosReq = supabase
+      .from("fin_repasse_terceiro")
+      .select(
+        "origem, lancamento_id, atendimento_id, terceiro_medico_id, repasse_pago_em, repasse_pago_at, repasse_forma_pagamento, repasse_conta_id",
+      )
+      .eq("clinica_id", clinicaAtual.clinica_id)
+      .gte("data", fIni)
+      .lte("data", fFim);
+    const [espelhosRes, terceirosRes] = await Promise.all([espelhosReq, terceirosReq]);
     const lancamentosEspelhoAgenda = new Set<string>();
-    if (manualLancamentoIds.length) {
-      const { data: espelhos, error: espelhoErr } = await supabase
-        .from("fin_lancamentos")
-        .select("id, agendamento_id")
-        .in("id", manualLancamentoIds)
-        .not("agendamento_id", "is", null);
-      if (espelhoErr) {
-        mostrarErro(espelhoErr);
-        setLoading(false);
-        return;
-      }
-      for (const e of espelhos ?? []) lancamentosEspelhoAgenda.add(e.id);
+    if (espelhosRes.error) {
+      mostrarErro(espelhosRes.error);
+      setLoading(false);
+      return;
     }
+    for (const e of (espelhosRes.data ?? []) as Array<{ id: string }>)
+      lancamentosEspelhoAgenda.add(e.id);
     // IDs de fin_lancamentos já carregados — usado para descartar linhas de
     // fin_atendimentos que espelham o mesmo pagamento (duplicidade legada
     // criada pelo fluxo de atendimento IA antes da correção).
@@ -1563,14 +1576,7 @@ function AtendimentosPage() {
       }
     >();
     {
-      const { data: pagos, error: ePagos } = await supabase
-        .from("fin_repasse_terceiro")
-        .select(
-          "origem, lancamento_id, atendimento_id, terceiro_medico_id, repasse_pago_em, repasse_pago_at, repasse_forma_pagamento, repasse_conta_id",
-        )
-        .eq("clinica_id", clinicaAtual.clinica_id)
-        .gte("data", fIni)
-        .lte("data", fFim);
+      const { data: pagos, error: ePagos } = terceirosRes;
       if (ePagos) {
         mostrarErro(ePagos);
         setLoading(false);

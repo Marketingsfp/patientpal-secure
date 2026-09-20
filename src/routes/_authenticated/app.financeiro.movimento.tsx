@@ -636,16 +636,18 @@ function Page() {
       // centenas de ids de uma vez estouram o limite de tamanho — a consulta
       // volta com erro, não com menos linhas, e a tela ficava sem nada.
       const LOTE_IDS = 150;
+      // Os lotes vão TODOS juntos, não um depois do outro. Um dia cheio de
+      // caixa gera dezenas de lotes; em fila indiana cada um esperava a volta
+      // do anterior (~150 ms cada) e a tela levava vários segundos só nessa
+      // etapa. Em paralelo o tempo passa a ser o do lote mais lento.
       const emLotes = async <T,>(
         ids: string[],
         consulta: (lote: string[]) => PromiseLike<{ data: unknown }>,
       ): Promise<T[]> => {
-        const out: T[] = [];
-        for (let i = 0; i < ids.length; i += LOTE_IDS) {
-          const { data } = await consulta(ids.slice(i, i + LOTE_IDS));
-          out.push(...((data ?? []) as T[]));
-        }
-        return out;
+        const lotes: string[][] = [];
+        for (let i = 0; i < ids.length; i += LOTE_IDS) lotes.push(ids.slice(i, i + LOTE_IDS));
+        const partes = await Promise.all(lotes.map((lote) => consulta(lote)));
+        return partes.flatMap((p) => ((p.data ?? []) as T[]));
       };
       const agIds = Array.from(
         new Set(
@@ -674,12 +676,6 @@ function Page() {
       const agendaIds = Array.from(
         new Set(ags.map((a) => a.agenda_id).filter((x): x is string => !!x)),
       );
-      const agendaMap = new Map<string, string>();
-      for (const a of await emLotes<{ id: string; nome: string | null }>(agendaIds, (lote) =>
-        supabase.from("medico_agendas").select("id, nome").in("id", lote),
-      )) {
-        agendaMap.set(a.id, a.nome ?? "");
-      }
       const medIds = Array.from(
         new Set(
           [
@@ -688,12 +684,19 @@ function Page() {
           ].filter((x): x is string => !!x),
         ),
       );
+      // Nomes de agenda e de profissional são buscas independentes: vão juntas.
+      const [agendasNomes, medicosNomes] = await Promise.all([
+        emLotes<{ id: string; nome: string | null }>(agendaIds, (lote) =>
+          supabase.from("medico_agendas").select("id, nome").in("id", lote),
+        ),
+        emLotes<{ id: string; nome: string | null }>(medIds, (lote) =>
+          supabase.from("medicos").select("id, nome").in("id", lote),
+        ),
+      ]);
+      const agendaMap = new Map<string, string>();
+      for (const a of agendasNomes) agendaMap.set(a.id, a.nome ?? "");
       const medMap = new Map<string, string>();
-      for (const m of await emLotes<{ id: string; nome: string | null }>(medIds, (lote) =>
-        supabase.from("medicos").select("id, nome").in("id", lote),
-      )) {
-        medMap.set(m.id, m.nome ?? "");
-      }
+      for (const m of medicosNomes) medMap.set(m.id, m.nome ?? "");
       finList = finList.map((l) => {
         const raw = l as unknown as {
           medico_id?: string | null;
