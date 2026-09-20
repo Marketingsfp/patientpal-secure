@@ -1,6 +1,6 @@
 /** Paginação conjunta: mensagens de todos os autores e eventos internos. */
 import type { Json } from "@/integrations/supabase/types";
-export const TAMANHO_PAGINA_HISTORICO = 10;
+export const TAMANHO_PAGINA_HISTORICO = 15;
 export type CursorHistorico = { em: string; id: string; tipo: "evento" | "mensagem" };
 export type MensagemHistorico = { id: string; recebida_em: string; [campo: string]: any };
 export type EventoHistorico = {

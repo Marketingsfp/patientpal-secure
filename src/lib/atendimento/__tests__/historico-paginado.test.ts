@@ -155,30 +155,54 @@ const ids = (p: ReturnType<typeof montarPaginaHistorico>) => [
 describe("histórico conjunto paginado", () => {
   it("reabrir revalida só a janela recente e conserva mensagens recebidas durante a busca", () => {
     const pagina = montarPaginaHistorico(
-      Array.from({ length: 10 }, (_, i) => mensagem(i + 10)),
+      Array.from({ length: 15 }, (_, i) => mensagem(i + 10)),
       [],
     );
-    const cacheComRealtime = Array.from({ length: 22 }, (_, i) => mensagem(i));
+    const cacheComRealtime = Array.from({ length: 27 }, (_, i) => mensagem(i));
     const visiveis = cacheComRealtime.filter((m) =>
       manterNaJanelaRecente({ em: m.recebida_em, id: m.id, tipo: "mensagem" }, pagina),
     );
     expect(visiveis.map((m) => m.id)).toEqual(cacheComRealtime.slice(10).map((m) => m.id));
   });
-  it("abre com dez registros no total, misturando autores e avisos", async () => {
+  it("abre com quinze registros no total, misturando autores e avisos", async () => {
     const db = banco(
       Array.from({ length: 30 }, (_, i) => mensagem(i * 2)),
       Array.from({ length: 30 }, (_, i) => evento(i * 2 + 1)),
     );
     const p = await db.pagina();
-    expect(p.mensagens).toHaveLength(5);
-    expect(p.eventos).toHaveLength(5);
+    expect(p.mensagens).toHaveLength(7);
+    expect(p.eventos).toHaveLength(8);
     expect(p.eventos[0].user_nome).toBe("Ana");
     expect(p.temMais).toBe(true);
-    expect(p.anterior?.em).toBe(em(50));
+    expect(p.anterior?.em).toBe(em(45));
     expect(p.posterior?.em).toBe(em(59));
-    expect(db.leituras.filter((l) => l.tabela !== "profiles").every((l) => l.limite === 11)).toBe(
+    expect(db.leituras.filter((l) => l.tabela !== "profiles").every((l) => l.limite === 16)).toBe(
       true,
     );
+  });
+
+  it("limita as consultas de um histórico de dez mil registros antes de devolver a primeira página", async () => {
+    const db = banco(
+      Array.from({ length: 5000 }, (_, i) => mensagem(i * 2)),
+      Array.from({ length: 5000 }, (_, i) => evento(i * 2 + 1)),
+    );
+    const primeira = await db.pagina();
+    expect(ids(primeira)).toHaveLength(15);
+    expect(primeira.anterior?.em).toBe(em(9985));
+    expect(primeira.posterior?.em).toBe(em(9999));
+    expect(primeira.temMais).toBe(true);
+    // O banco entrega somente candidatos limitados por fonte, nunca o histórico
+    // completo para ser cortado no navegador. Não busca páginas antigas sozinho.
+    expect(db.leituras.filter((l) => l.tabela !== "profiles")).toEqual([
+      { tabela: "whatsapp_mensagens", limite: 16, linhas: 16 },
+      { tabela: "atend_conversa_eventos", limite: 16, linhas: 16 },
+    ]);
+
+    const anterior = await db.pagina({ antes: primeira.anterior! });
+    expect(ids(anterior)).toHaveLength(15);
+    expect(anterior.anterior?.em).toBe(em(9970));
+    expect(anterior.posterior?.em).toBe(em(9984));
+    expect(new Set([...ids(primeira), ...ids(anterior)]).size).toBe(30);
   });
 
   it("percorre todos os empates entre tabelas sem lacunas nem repetição", async () => {
@@ -194,7 +218,7 @@ describe("histórico conjunto paginado", () => {
     }
     expect(encontrados).toHaveLength(43);
     expect(new Set(encontrados).size).toBe(43);
-    expect(p.eventos).toHaveLength(3);
+    expect(p.eventos).toHaveLength(13);
   });
 
   it("recupera rajada de 35 novidades em páginas crescentes após reconexão", async () => {
@@ -214,22 +238,22 @@ describe("histórico conjunto paginado", () => {
     expect(encontrados).toEqual(ms.slice(1).map((m) => m.id));
   });
 
-  it("exatamente dez registros não exige uma consulta vazia para achar o fim", async () => {
+  it("exatamente quinze registros não exige uma consulta vazia para achar o fim", async () => {
     const p = await banco(
-      Array.from({ length: 6 }, (_, i) => mensagem(i)),
-      Array.from({ length: 4 }, (_, i) => evento(i)),
+      Array.from({ length: 9 }, (_, i) => mensagem(i)),
+      Array.from({ length: 6 }, (_, i) => evento(i)),
     ).pagina();
-    expect(ids(p)).toHaveLength(10);
+    expect(ids(p)).toHaveLength(15);
     expect(p.temMais).toBe(false);
   });
 
   it("histórico composto só por avisos também pagina", async () => {
     const p = await banco(
       [],
-      Array.from({ length: 15 }, (_, i) => evento(i)),
+      Array.from({ length: 30 }, (_, i) => evento(i)),
     ).pagina();
     expect(p.mensagens).toHaveLength(0);
-    expect(p.eventos).toHaveLength(10);
+    expect(p.eventos).toHaveLength(15);
     expect(p.temMais).toBe(true);
   });
 

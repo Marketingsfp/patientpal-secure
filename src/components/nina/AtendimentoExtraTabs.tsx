@@ -1242,7 +1242,7 @@ export function AtendInbox() {
       if (id === selIdRef.current) return;
       const chave = chavePrefetch(clinicaId, meuId);
       if (cacheConversas.current.obter(id) || prefetchMsgs.current.obter(id, chave)) return;
-      // Dez registros recentes, somando mensagens e avisos internos.
+      // Quinze registros recentes, somando mensagens e avisos internos.
       // Contato e notas só carregam quando a conversa for aberta.
       const p = listarHistorico({ data: { clinicaId, conversaId: id } });
       const entrada = prefetchMsgs.current.registrar(id, chave, p);
@@ -1519,7 +1519,7 @@ export function AtendInbox() {
     }
     const ciclo = cicloHistoricoRef.current;
     // Recupera lacunas da reconexão em páginas crescentes, sem saltar para as
-    // últimas dez quando mais mensagens chegaram durante a desconexão.
+    // últimas quinze quando mais mensagens chegaram durante a desconexão.
     const execucao = (async () => {
       try {
         let cursor: CursorHistorico = inicio;
