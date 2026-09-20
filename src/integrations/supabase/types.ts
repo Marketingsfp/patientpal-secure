@@ -1092,10 +1092,10 @@ export type Database = {
           handoff_motivo: string | null
           handoff_resumo: Json | null
           id: string
-          inbox_entrada_em: string
           identidade_confirmada: boolean
           identidade_perguntada_em: string | null
           identidade_tentativas: number
+          inbox_entrada_em: string
           is_teste: boolean
           janela_24h_em: string | null
           last_assigned_user_id: string | null
@@ -1146,10 +1146,10 @@ export type Database = {
           handoff_motivo?: string | null
           handoff_resumo?: Json | null
           id?: string
-          inbox_entrada_em?: string
           identidade_confirmada?: boolean
           identidade_perguntada_em?: string | null
           identidade_tentativas?: number
+          inbox_entrada_em?: string
           is_teste?: boolean
           janela_24h_em?: string | null
           last_assigned_user_id?: string | null
@@ -1200,10 +1200,10 @@ export type Database = {
           handoff_motivo?: string | null
           handoff_resumo?: Json | null
           id?: string
-          inbox_entrada_em?: string
           identidade_confirmada?: boolean
           identidade_perguntada_em?: string | null
           identidade_tentativas?: number
+          inbox_entrada_em?: string
           is_teste?: boolean
           janela_24h_em?: string | null
           last_assigned_user_id?: string | null
@@ -9202,6 +9202,115 @@ export type Database = {
           },
         ]
       }
+      nina_carga_prompts: {
+        Row: {
+          clinica_id: string
+          created_at: string
+          id: string
+          pedido: string
+          pedido_hash: string
+          ultimo_usado_em: string
+          user_id: string
+        }
+        Insert: {
+          clinica_id: string
+          created_at?: string
+          id?: string
+          pedido: string
+          pedido_hash?: string
+          ultimo_usado_em?: string
+          user_id: string
+        }
+        Update: {
+          clinica_id?: string
+          created_at?: string
+          id?: string
+          pedido?: string
+          pedido_hash?: string
+          ultimo_usado_em?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nina_carga_prompts_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      nina_carga_servidor_config: {
+        Row: {
+          ativo: boolean
+          id: boolean
+          job_url: string | null
+        }
+        Insert: {
+          ativo?: boolean
+          id?: boolean
+          job_url?: string | null
+        }
+        Update: {
+          ativo?: boolean
+          id?: boolean
+          job_url?: string | null
+        }
+        Relationships: []
+      }
+      nina_carga_servidor_tarefas: {
+        Row: {
+          carga_id: string
+          created_at: string
+          disponivel_em: string
+          enviado_em: string | null
+          expira_em: string | null
+          falhas: number
+          iniciado_em: string | null
+          request_id: number | null
+          slot: number
+          tentativas: number
+          token: string | null
+          ultimo_erro: string | null
+        }
+        Insert: {
+          carga_id: string
+          created_at?: string
+          disponivel_em?: string
+          enviado_em?: string | null
+          expira_em?: string | null
+          falhas?: number
+          iniciado_em?: string | null
+          request_id?: number | null
+          slot: number
+          tentativas?: number
+          token?: string | null
+          ultimo_erro?: string | null
+        }
+        Update: {
+          carga_id?: string
+          created_at?: string
+          disponivel_em?: string
+          enviado_em?: string | null
+          expira_em?: string | null
+          falhas?: number
+          iniciado_em?: string | null
+          request_id?: number | null
+          slot?: number
+          tentativas?: number
+          token?: string | null
+          ultimo_erro?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nina_carga_servidor_tarefas_carga_id_fkey"
+            columns: ["carga_id"]
+            isOneToOne: false
+            referencedRelation: "nina_teste_carga"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       nina_cat_profissionais: {
         Row: {
           atende_consultorio: boolean | null
@@ -11263,44 +11372,6 @@ export type Database = {
             columns: ["simulacao_id"]
             isOneToOne: false
             referencedRelation: "nina_teste_simulacoes"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      nina_carga_prompts: {
-        Row: {
-          id: string
-          clinica_id: string
-          user_id: string
-          pedido: string
-          pedido_hash: string
-          created_at: string
-          ultimo_usado_em: string
-        }
-        Insert: {
-          id?: string
-          clinica_id: string
-          user_id: string
-          pedido: string
-          pedido_hash?: never
-          created_at?: string
-          ultimo_usado_em?: string
-        }
-        Update: {
-          id?: string
-          clinica_id?: string
-          user_id?: string
-          pedido?: string
-          pedido_hash?: never
-          created_at?: string
-          ultimo_usado_em?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "nina_carga_prompts_clinica_id_fkey"
-            columns: ["clinica_id"]
-            isOneToOne: false
-            referencedRelation: "clinicas"
             referencedColumns: ["id"]
           },
         ]
@@ -16413,6 +16484,29 @@ export type Database = {
           p_versao_id: string
         }
         Returns: Json
+      }
+      nina_carga_servidor_assumir: {
+        Args: { _carga_id: string; _slot: number; _token: string }
+        Returns: string
+      }
+      nina_carga_servidor_despachar: {
+        Args: { _carga_id?: string }
+        Returns: number
+      }
+      nina_carga_servidor_disponivel: { Args: never; Returns: boolean }
+      nina_carga_servidor_finalizar: {
+        Args: {
+          _aguardar_ms?: number
+          _carga_id: string
+          _falhou?: boolean
+          _slot: number
+          _token: string
+        }
+        Returns: boolean
+      }
+      nina_carga_servidor_renovar: {
+        Args: { _carga_id: string; _slot: number; _token: string }
+        Returns: boolean
       }
       nina_classificar_atendimento: {
         Args: {
