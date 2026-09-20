@@ -18,6 +18,8 @@
  *    curta e delimitada pelo próximo handoff; na dúvida, fica separado.
  */
 
+import { nomeReservaIndividual } from "./marcador-handoff";
+
 export type EventoTimeline = {
   id: string;
   evento: string;
@@ -56,6 +58,8 @@ export type GrupoHandoff = {
   auditoria: { registrada: boolean; completa: boolean | null; faltando: string[] };
   eventoIds: string[];
   marcadorIds: string[];
+  /** A primeira atribuição automática do mesmo encaminhamento. */
+  atribuicao?: GrupoAtribuicao;
 };
 
 export type GrupoAtribuicao = {
@@ -143,17 +147,24 @@ export function protocoloDoTexto(texto: string | null | undefined): string | nul
 }
 
 export function ehMarcadorSistema(m: MarcadorSistemaTimeline): boolean {
-  return (m.enviada_por ?? "").toLowerCase() === "sistema" || (m.status ?? "") === "system";
+  // Mensagens enviadas ao paciente pelo sistema também têm enviada_por=sistema.
+  if (m.status) return m.status === "system";
+  return (m.enviada_por ?? "").toLowerCase() === "sistema";
 }
 
 /** Evento gerado pelo módulo de protocolo (não é o pedido de handoff em si). */
 function ehEventoProtocolo(e: EventoTimeline): boolean {
   const d = det(e);
-  return Boolean(txt(d["protocol_number"])) || /^Protocolo\s+\S+\s+(gerado|informado)/.test(e.motivo ?? "");
+  return (
+    Boolean(txt(d["protocol_number"])) ||
+    /^Protocolo\s+\S+\s+(gerado|informado)/.test(e.motivo ?? "")
+  );
 }
 
 function ehProtocoloInformado(e: EventoTimeline): boolean {
-  return e.evento === "ASSUMIDA" && (det(e)["protocolo_informado"] === true || ehEventoProtocolo(e));
+  return (
+    e.evento === "ASSUMIDA" && (det(e)["protocolo_informado"] === true || ehEventoProtocolo(e))
+  );
 }
 
 /** Pedido de handoff propriamente dito — âncora de um grupo. */
@@ -186,6 +197,25 @@ export function agruparTimeline(entrada: {
   const marcadores = (entrada.marcadores ?? [])
     .filter(ehMarcadorSistema)
     .sort((a, b) => ms(a.created_at) - ms(b.created_at) || a.id.localeCompare(b.id));
+  const posicaoEvento = new Map(eventos.map((e, i) => [e.id, i]));
+  const eventoPorId = new Map(eventos.map((e) => [e.id, e]));
+  const separaProcessos = (e: EventoTimeline) =>
+    ehAncoraHandoff(e) ||
+    (e.evento === "ASSUMIDA" && !ehProtocoloInformado(e)) ||
+    [
+      "TRANSFERIDA",
+      "DESATRIBUIDA",
+      "FINALIZADA",
+      "REABERTA",
+      "ATRIBUIDA_IA",
+      "DEVOLVIDA_PARA_IA",
+      "IA_MEMORIA_RESETADA",
+      "ATENDIMENTO_ENCERRADO",
+    ].includes(e.evento);
+  const outroProcessoEntre = (inicio: string, fim: string) =>
+    eventos
+      .slice((posicaoEvento.get(inicio) ?? -1) + 1, posicaoEvento.get(fim))
+      .some(separaProcessos);
 
   const itens: ItemTimelineAgrupado[] = [];
   const eventoParaItem = new Map<string, string>();
@@ -305,7 +335,9 @@ export function agruparTimeline(entrada: {
           registrada: true,
           completa: typeof d["auditoria_completa"] === "boolean" ? d["auditoria_completa"] : null,
           faltando: Array.isArray(d["auditoria_faltando"])
-            ? (d["auditoria_faltando"] as unknown[]).filter((v): v is string => typeof v === "string")
+            ? (d["auditoria_faltando"] as unknown[]).filter(
+                (v): v is string => typeof v === "string",
+              )
             : [],
         };
         g.eventoIds.push(e.id);
@@ -324,6 +356,9 @@ export function agruparTimeline(entrada: {
       const existente = gruposAtribuicao.find(
         (g) =>
           t - g.fimMs <= JANELA_ATRIBUICAO_MS &&
+          g.automatica === (d["manual"] !== true) &&
+          g.transferencia === (e.evento === "TRANSFERIDA") &&
+          !outroProcessoEntre(g.eventoIds[g.eventoIds.length - 1]!, e.id) &&
           ((destinoId && g.atendenteUserId === destinoId) ||
             (!destinoId &&
               !!destinoNome &&
@@ -415,22 +450,30 @@ export function agruparTimeline(entrada: {
       continue;
     }
 
-    if (corpo.startsWith(PREFIXO_ATRIBUICAO_AUTO) || corpo.startsWith(PREFIXO_ENCAMINHADA)) {
+    const reservaNome = nomeReservaIndividual(corpo);
+    if (
+      reservaNome ||
+      corpo.startsWith(PREFIXO_ATRIBUICAO_AUTO) ||
+      corpo.startsWith(PREFIXO_ENCAMINHADA)
+    ) {
       const nome = normalizarNome(
-        corpo
-          .replace(PREFIXO_ATRIBUICAO_AUTO, "")
-          .replace(PREFIXO_ENCAMINHADA, "")
-          .replace(/\(online\)\.?/i, "")
-          .replace(/\.\s*A IA parou de responder\.?/i, "")
-          .replace(/[.\s]+$/, ""),
+        reservaNome ??
+          corpo
+            .replace(PREFIXO_ATRIBUICAO_AUTO, "")
+            .replace(PREFIXO_ENCAMINHADA, "")
+            .replace(/\(online\)\.?/i, "")
+            .replace(/\.\s*A IA parou de responder\.?/i, "")
+            .replace(/[.\s]+$/, ""),
       );
       const online = /\(online\)/i.test(corpo);
-      const alvo = gruposAtribuicao.find(
-        (g) =>
-          Math.abs(t - ms(g.criadoEm)) <= JANELA_ATRIBUICAO_MS &&
-          !!nome &&
-          normalizarNome(g.atendenteNome) === nome,
-      );
+      const alvo = gruposAtribuicao
+        .filter(
+          (g) =>
+            Math.abs(t - ms(g.criadoEm)) <= JANELA_ATRIBUICAO_MS &&
+            !!nome &&
+            normalizarNome(g.atendenteNome) === nome,
+        )
+        .sort((a, b) => Math.abs(t - ms(a.criadoEm)) - Math.abs(t - ms(b.criadoEm)))[0];
       if (alvo) {
         alvo.marcadorIds.push(m.id);
         if (!alvo.statusAtendente && online) alvo.statusAtendente = "ONLINE";
@@ -441,11 +484,43 @@ export function agruparTimeline(entrada: {
     // Qualquer outro texto é mensagem real ou aviso próprio: nunca agrupado.
   }
 
-  const limpos: ItemTimelineAgrupado[] = itens.map((i) =>
-    i.tipo === "HANDOFF" || i.tipo === "ATRIBUICAO"
-      ? ({ ...i, fimMs: undefined } as unknown as ItemTimelineAgrupado)
-      : i,
-  );
+  // Une apenas a atribuição automática inicial do MESMO encaminhamento.
+  // Transferências manuais, reatribuições e outros ciclos continuam separados.
+  const absorvidos = new Set<string>();
+  for (const atribuicao of gruposAtribuicao) {
+    if (!atribuicao.automatica || atribuicao.transferencia) continue;
+    const evento = eventoPorId.get(atribuicao.chave)!;
+    const d = det(evento);
+    if (
+      d["metodo"] !== "distribuicao_automatica" &&
+      d["assignment_method"] !== "distribuicao_automatica"
+    )
+      continue;
+    const handoff = grupoHandoffDe(evento, true);
+    if (
+      !handoff ||
+      handoff.atribuicao ||
+      ms(atribuicao.criadoEm) < ms(handoff.criadoEm) ||
+      outroProcessoEntre(handoff.chave, atribuicao.chave)
+    )
+      continue;
+    const { fimMs: _fim, ...dadosAtribuicao } = atribuicao;
+    handoff.atribuicao = dadosAtribuicao;
+    handoff.eventoIds.push(...atribuicao.eventoIds);
+    handoff.eventoIds.sort((a, b) => posicaoEvento.get(a)! - posicaoEvento.get(b)!);
+    handoff.marcadorIds.push(...atribuicao.marcadorIds);
+    for (const id of atribuicao.eventoIds) eventoParaItem.set(id, handoff.chave);
+    for (const id of atribuicao.marcadorIds) marcadorParaItem.set(id, handoff.chave);
+    absorvidos.add(atribuicao.chave);
+  }
+
+  const limpos: ItemTimelineAgrupado[] = itens
+    .filter((i) => !absorvidos.has(i.chave))
+    .map((i) =>
+      i.tipo === "HANDOFF" || i.tipo === "ATRIBUICAO"
+        ? ({ ...i, fimMs: undefined } as unknown as ItemTimelineAgrupado)
+        : i,
+    );
   for (const i of limpos) delete (i as Record<string, unknown>)["fimMs"];
 
   return { itens: limpos, eventoParaItem, marcadorParaItem };
@@ -462,7 +537,7 @@ export function handoffsAguardandoAtendente(itens: ItemTimelineAgrupado[]): Set<
   for (const item of itens) {
     if (item.tipo === "HANDOFF") {
       if (ultimoHandoff) aguardando.add(ultimoHandoff.chave);
-      ultimoHandoff = item;
+      ultimoHandoff = item.atribuicao ? null : item;
       continue;
     }
     if (item.tipo === "ATRIBUICAO" && ultimoHandoff) ultimoHandoff = null;

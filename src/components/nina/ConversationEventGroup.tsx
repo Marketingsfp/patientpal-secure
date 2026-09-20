@@ -25,7 +25,7 @@ function Card({
   return (
     <div className="my-1.5 flex justify-center px-2">
       <div className="w-full max-w-[62%] min-w-[240px] rounded-lg border border-border/60 bg-muted/50 px-3 py-2 text-[11px] leading-tight text-muted-foreground sm:text-xs">
-        <div className="flex items-baseline justify-between gap-2">
+        <div className="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-1">
           <span className="font-medium text-foreground">{titulo}</span>
           {hora ? <span className="whitespace-nowrap opacity-60">{hora}</span> : null}
         </div>
@@ -81,11 +81,30 @@ export function HandoffGroupCard({ grupo }: { grupo: GrupoHandoff }) {
   if (grupo.origem) linha3.push({ rotulo: "Origem", valor: ORIGEM[grupo.origem] ?? grupo.origem });
   linha3.push({ rotulo: "Status", valor: STATUS_HANDOFF[grupo.status] });
 
+  const atribuicao = grupo.atribuicao;
+  const linha4: Array<{ rotulo?: string; valor: string }> = [];
+  if (atribuicao) {
+    linha4.push({ rotulo: "Atribuição", valor: "Automática" });
+    if (atribuicao.atendenteNome)
+      linha4.push({ rotulo: "Atendente", valor: atribuicao.atendenteNome });
+    if (atribuicao.statusAtendente)
+      linha4.push({ rotulo: "Status da atendente", valor: atribuicao.statusAtendente });
+    const horaAtribuicao = formatarDataHoraMensagem(atribuicao.criadoEm);
+    if (horaAtribuicao && horaAtribuicao !== formatarDataHoraMensagem(grupo.criadoEm))
+      linha4.push({ rotulo: "Atribuída em", valor: horaAtribuicao });
+  }
+
   return (
     <Card
       titulo="Encaminhamento para atendimento humano"
       hora={formatarDataHoraMensagem(grupo.criadoEm)}
-      linhas={[motivo ? [{ rotulo: "Motivo", valor: motivo }] : [], linha2, linha3]}
+      linhas={[
+        motivo ? [{ rotulo: "Motivo", valor: motivo }] : [],
+        linha2,
+        linha3,
+        linha4,
+        atribuicao?.criterio ? [{ rotulo: "Critério", valor: atribuicao.criterio }] : [],
+      ]}
     />
   );
 }

@@ -28,6 +28,24 @@ const renderizar = (ev: ConversaEvento) =>
   renderToStaticMarkup(<ConversationSystemEvent evento={ev} />);
 
 describe("Apresentação dos registros internos para atendimento real e homologação", () => {
+  test("um único cartão mostra encaminhamento e reserva sem aviso azul repetido", () => {
+    const reserva = { id: "reserva", created_at: "2026-09-16T14:33:02Z", enviada_por: "sistema", status: "system",
+      body: "Conversa reservada na fila individual de JEAN TELEFONE." };
+    const agrupado = agruparTimeline({ eventos: [evento({ motivo: "Paciente solicitou atendente humano" }), evento({
+      id: "atribuicao", evento: "ASSUMIDA", created_at: "2026-09-16T14:33:01Z",
+      user_id: "u-jean", user_nome: "JEAN TELEFONE", motivo: "Conversa reservada na fila individual",
+      detalhes: { metodo: "distribuicao_automatica", presence_status: "BUSY" },
+    })], marcadores: [reserva] });
+    expect(agrupado.itens).toHaveLength(1);
+    const html = renderToStaticMarkup(<HandoffGroupCard grupo={agrupado.itens[0] as GrupoHandoff} />);
+    expect(html.match(/Encaminhamento para atendimento humano/g)).toHaveLength(1);
+    expect(html).toContain("JEAN TELEFONE");
+    expect(html).toContain("BUSY");
+    expect(html).toContain("Conversa reservada na fila individual");
+    expect(html).not.toContain("Conversa reservada na fila individual de JEAN TELEFONE.");
+    expect(agrupado.marcadorParaItem.has(reserva.id)).toBe(true);
+    expect(textoMarcadorSistema(reserva.body)).toBe("");
+  });
   test("consulta ausente na base informa a causa no banner e no grupo, preservando o diagnóstico", () => {
     const ev = evento({ motivo: MOTIVO_SEM_REGISTRO });
     const antes = structuredClone(ev);

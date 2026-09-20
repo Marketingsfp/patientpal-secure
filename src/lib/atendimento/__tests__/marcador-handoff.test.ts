@@ -5,6 +5,11 @@ const MARCADOR =
   "🔁 Conversa transferida da Nina para atendimento humano · Setor: Recepção · Motivo: patient_request · Posição na fila: 3\nResumo: paciente quer remarcar consulta de cardiologia da próxima terça.";
 
 describe("marcador de handoff na timeline", () => {
+  it("oculta o aviso azul de reserva mesmo antes de carregar os eventos antigos", () => {
+    expect(textoMarcadorSistema("Conversa reservada na fila individual de JEAN TELEFONE.")).toBe("");
+    expect(textoMarcadorSistema("Conversa reservada na fila individual de Ana. A IA parou de responder.")).toBe("");
+    expect(textoMarcadorSistema("Conversa reservada na fila individual de Ana. Verificar documento.")).toContain("Verificar documento");
+  });
   it("reconhece o marcador extenso", () => {
     expect(ehMarcadorHandoff(MARCADOR)).toBe(true);
     expect(ehMarcadorHandoff("🧾 Handoff realizado pela Nina · Protocolo: MJ-4")).toBe(false);

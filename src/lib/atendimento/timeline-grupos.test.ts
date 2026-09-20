@@ -100,8 +100,8 @@ describe("agrupamento semântico da timeline", () => {
     const handoff = itens.find((i) => i.tipo === "HANDOFF");
     expect(handoff).toBeDefined();
     if (handoff?.tipo !== "HANDOFF") throw new Error("grupo ausente");
-    expect(handoff.eventoIds).toEqual(["h1", "f1", "p1", "a1", "au1"]);
-    expect(handoff.marcadorIds).toEqual(["s1", "s2"]);
+    expect(handoff.eventoIds).toEqual(["h1", "f1", "p1", "a1", "au1", "as1"]);
+    expect(handoff.marcadorIds).toEqual(["s1", "s2", "s3"]);
     expect(handoff.protocolo).toBe("MJ-5");
     expect(handoff.filaInicial).toBe(4);
     expect(handoff.origem).toBe("IA");
@@ -110,19 +110,19 @@ describe("agrupamento semântico da timeline", () => {
     expect(handoff.auditoria).toEqual({ registrada: true, completa: true, faltando: [] });
   });
 
-  it("consolida evento e marcador da mesma atribuição em um item só", () => {
+  it("reúne a atribuição e seu marcador no próprio encaminhamento", () => {
     const { itens, marcadorParaItem } = agruparTimeline(cenarioReal());
-    const atrib = itens.filter((i) => i.tipo === "ATRIBUICAO");
-    expect(atrib).toHaveLength(1);
-    if (atrib[0]?.tipo !== "ATRIBUICAO") throw new Error("grupo ausente");
-    expect(atrib[0].atendenteNome).toBe("JEAN TELEFONE");
-    expect(atrib[0].atendenteUserId).toBe("u-jean");
-    expect(atrib[0].automatica).toBe(true);
-    // FASE 5: o título do card já diz "Atribuição automática" — o critério não repete.
-    expect(atrib[0].criterio).toBe("Menor carga");
-    expect(atrib[0].statusAtendente).toBe("ONLINE");
-    expect(atrib[0].marcadorIds).toEqual(["s3"]);
-    expect(marcadorParaItem.get("s3")).toBe(atrib[0].chave);
+    expect(itens.filter((i) => i.tipo === "ATRIBUICAO")).toHaveLength(0);
+    const handoff = itens.find((i) => i.tipo === "HANDOFF");
+    if (handoff?.tipo !== "HANDOFF") throw new Error("grupo ausente");
+    expect(handoff.atribuicao?.atendenteNome).toBe("JEAN TELEFONE");
+    expect(handoff.atribuicao?.atendenteUserId).toBe("u-jean");
+    expect(handoff.atribuicao?.automatica).toBe(true);
+    expect(handoff.atribuicao?.criterio).toBe("Menor carga");
+    expect(handoff.atribuicao?.statusAtendente).toBe("ONLINE");
+    expect(handoff.atribuicao?.marcadorIds).toEqual(["s3"]);
+    expect(marcadorParaItem.get("s3")).toBe(handoff.chave);
+    expect(handoffsAguardandoAtendente(itens).size).toBe(0);
   });
 
   it("nunca agrupa mensagem real do paciente", () => {
@@ -282,7 +282,7 @@ describe("FASE 3 — espera por atendente", () => {
 });
 
 // FASE 5 — regressão sobre a sequência real de um handoff de produção:
-// sete registros internos + três marcadores devem virar dois cards.
+// sete registros internos + três marcadores devem virar um card de encaminhamento.
 describe("FASE 5 — sequência real de handoff", () => {
   const eventos = [
     { id: "e1", evento: "REABERTA", user_id: null, motivo: "Conversa reaberta", detalhes: null, created_at: "2026-09-09T18:17:02.212Z" },
@@ -300,9 +300,9 @@ describe("FASE 5 — sequência real de handoff", () => {
     { id: "m4", body: "👤 Atribuída automaticamente a JEAN TELEFONE (online).", created_at: "2026-09-09T18:17:44.220Z", enviada_por: "sistema", status: "system" },
   ];
 
-  it("gera um card de handoff e um de atribuição, sem eventos soltos redundantes", () => {
+  it("gera um card com handoff e atribuição, sem eventos soltos redundantes", () => {
     const r = agruparTimeline({ eventos: eventos as any, marcadores: marcadores as any });
-    expect(r.itens.map((i) => i.tipo)).toEqual(["EVENTO", "HANDOFF", "ATRIBUICAO"]);
+    expect(r.itens.map((i) => i.tipo)).toEqual(["EVENTO", "HANDOFF"]);
 
     const h = r.itens[1] as any;
     expect(h.protocolo).toBe("MJ-3");
@@ -310,9 +310,9 @@ describe("FASE 5 — sequência real de handoff", () => {
     expect(h.filaInicial).toBe(4);
     expect(h.status).toBe("PROTOCOLO_INFORMADO");
     expect(h.auditoria).toEqual({ registrada: true, completa: true, faltando: [] });
-    expect(h.eventoIds).toEqual(["h1", "f1", "p1", "p2", "x1"]);
+    expect(h.eventoIds).toEqual(["h1", "f1", "p1", "p2", "a1", "x1"]);
 
-    const a = r.itens[2] as any;
+    const a = h.atribuicao;
     expect(a.atendenteNome).toBe("JEAN TELEFONE");
     expect(a.criterio).toBe("Menor carga");
     expect(a.statusAtendente).toBe("ONLINE");
@@ -324,5 +324,79 @@ describe("FASE 5 — sequência real de handoff", () => {
     expect(r.marcadorParaItem.has("m1")).toBe(false);
     expect(r.marcadorParaItem.get("m2")).toBe("h1");
     expect(r.marcadorParaItem.get("m3")).toBe("h1");
+  });
+});
+
+describe("encaminhamento e reserva em um único registro interno", () => {
+  const handoff = (id = "h1", segundo = 0): EventoTimeline => ({
+    id, evento: "HANDOFF_SOLICITADO", created_at: em(segundo),
+    motivo: "Paciente solicitou atendente humano", detalhes: { solicitado_por: "IA" },
+  });
+  const atribuicao = (id = "a1", segundo = 1): EventoTimeline => ({
+    id, evento: "ASSUMIDA", created_at: em(segundo), user_id: "u-jean", user_nome: "JEAN TELEFONE",
+    motivo: "Conversa reservada na fila individual",
+    detalhes: { metodo: "distribuicao_automatica", presence_status: "BUSY" },
+  });
+  const reserva = (id = "s1", segundo = 1.1): MarcadorSistemaTimeline => ({
+    id, created_at: em(segundo), enviada_por: "sistema", status: "system",
+    body: "Conversa reservada na fila individual de JEAN TELEFONE.",
+  });
+
+  it("consolida o caso da imagem sem perder a reserva nem alterar os registros", () => {
+    const entrada = { eventos: [handoff(), atribuicao()], marcadores: [reserva()] };
+    const original = structuredClone(entrada);
+    const r = agruparTimeline(entrada);
+    expect(r.itens).toHaveLength(1);
+    const grupo = r.itens[0];
+    if (grupo?.tipo !== "HANDOFF") throw new Error("encaminhamento ausente");
+    expect(grupo.atribuicao?.statusAtendente).toBe("BUSY");
+    expect(grupo.atribuicao?.criterio).toBe("Conversa reservada na fila individual");
+    expect(r.eventoParaItem.get("a1")).toBe("h1");
+    expect(r.marcadorParaItem.get("s1")).toBe("h1");
+    expect(entrada).toEqual(original);
+  });
+
+  it("mantém atribuição legível quando o encaminhamento ainda está em outra página", () => {
+    const r = agruparTimeline({ eventos: [atribuicao()], marcadores: [reserva()] });
+    expect(r.itens[0]?.tipo).toBe("ATRIBUICAO");
+    expect(r.marcadorParaItem.get("s1")).toBe("a1");
+  });
+
+  it.each(["paciente", "ia", "humano", "sistema"])("não absorve mensagem real de %s com texto igual", (autor) => {
+    const r = agruparTimeline({ eventos: [handoff(), atribuicao()],
+      marcadores: [{ ...reserva(), enviada_por: autor, status: "sent" }] });
+    expect(r.marcadorParaItem.has("s1")).toBe(false);
+  });
+
+  it("não reúne ciclos próximos atribuídos à mesma pessoa", () => {
+    const r = agruparTimeline({ eventos: [handoff(), atribuicao(), handoff("h2", 10), atribuicao("a2", 11)],
+      marcadores: [reserva(), reserva("s2", 11.1)] });
+    expect(r.itens.map((i) => i.chave)).toEqual(["h1", "h2"]);
+    expect(r.eventoParaItem.get("a1")).toBe("h1");
+    expect(r.eventoParaItem.get("a2")).toBe("h2");
+    expect(r.marcadorParaItem.get("s1")).toBe("h1");
+    expect(r.marcadorParaItem.get("s2")).toBe("h2");
+  });
+
+  it.each(["FINALIZADA", "REABERTA", "DEVOLVIDA_PARA_IA", "IA_MEMORIA_RESETADA", "DESATRIBUIDA"])(
+    "não une atribuição depois de %s ao encaminhamento anterior", (evento) => {
+      const r = agruparTimeline({ eventos: [handoff(), { id: "barreira", evento, created_at: em(1) }, atribuicao("a1", 2)] });
+      expect(r.eventoParaItem.get("a1")).toBe("a1");
+    },
+  );
+
+  it("mantém transferência manual e reatribuição como operações distintas", () => {
+    const manual = { ...atribuicao("manual", 2), evento: "TRANSFERIDA", detalhes: { manual: true } };
+    const r = agruparTimeline({ eventos: [handoff(), atribuicao(), manual, atribuicao("a2", 3)] });
+    expect(r.itens.map((i) => i.chave)).toEqual(["h1", "manual", "a2"]);
+  });
+
+  it("atribuição tardia só é incorporada com vínculo explícito ao encaminhamento", () => {
+    const tardia = atribuicao("a1", 600);
+    expect(agruparTimeline({ eventos: [handoff(), tardia] }).itens).toHaveLength(2);
+    tardia.detalhes = { ...tardia.detalhes, handoff_event_id: "h1" };
+    expect(agruparTimeline({ eventos: [handoff(), tardia] }).itens).toHaveLength(1);
+    tardia.detalhes.handoff_event_id = "outro-handoff";
+    expect(agruparTimeline({ eventos: [handoff(), tardia] }).itens).toHaveLength(2);
   });
 });

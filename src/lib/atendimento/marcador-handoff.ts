@@ -20,6 +20,13 @@ export function ehMarcadorHandoff(body: string | null | undefined): boolean {
   return (body ?? "").trimStart().startsWith(PREFIXO_HANDOFF);
 }
 
+/** Aviso interno redundante: a reserva já tem seu evento de atribuição. */
+export function nomeReservaIndividual(body: string | null | undefined): string | null {
+  return /^Conversa reservada na fila individual de ([^.\n]+)\.(?: A IA parou de responder\.)?$/.exec(
+    (body ?? "").trim(),
+  )?.[1] ?? null;
+}
+
 /**
  * Texto que a timeline deve mostrar para uma mensagem de sistema.
  * Para o marcador de handoff devolve a versão compacta (sem motivo, sem
@@ -27,6 +34,7 @@ export function ehMarcadorHandoff(body: string | null | undefined): boolean {
  */
 export function textoMarcadorSistema(body: string | null | undefined): string {
   const texto = (body ?? "").trim();
+  if (nomeReservaIndividual(texto)) return "";
   if (/^🧾 Handoff realizado pela Nina/.test(texto)) {
     const protocolo = textoOperacional(/·\s*Protocolo:\s*([^·\n]+)/.exec(texto)?.[1]);
     const destino = textoOperacional(/·\s*Destino:\s*([^·\n]+)/.exec(texto)?.[1]);
