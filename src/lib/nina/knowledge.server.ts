@@ -13,6 +13,7 @@
  */
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import type { ResultadoConhecimento } from "./knowledge-contract";
+import type { TipoAtendimentoCatalogo } from "./catalogo-pesquisa";
 
 export type { ResultadoConhecimento };
 
@@ -20,6 +21,7 @@ export type PedidoConhecimento = {
   clinicaId: string;
   /** Pergunta/intenção do paciente já resumida em termos de busca. */
   query: string;
+  tipo_atendimento?: TipoAtendimentoCatalogo;
   medico?: string | null;
   dia?: string | null;
   limite?: number;
@@ -89,6 +91,7 @@ export async function searchKnowledgeBase(
   const resultado = await buscarNoCatalogo({
     clinicaId: pedido.clinicaId,
     query,
+    tipo_atendimento: pedido.tipo_atendimento,
     medico: pedido.medico ?? null,
     // Dia pedido pelo paciente: até aqui ele era aceito e descartado.
     dia: pedido.dia ?? null,
@@ -105,7 +108,7 @@ export async function searchKnowledgeBase(
       procedimento: r.procedimento,
       medico: r.medico,
     })),
-    resposta: `fonte=catalogo knowledge_status=${resultado.knowledge_status}`,
+    resposta: `fonte=catalogo tipo_atendimento=${resultado.tipo_atendimento} knowledge_status=${resultado.knowledge_status}`,
   });
 
   console.info("[nina-catalogo]", {

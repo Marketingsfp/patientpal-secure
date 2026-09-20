@@ -1,5 +1,12 @@
 import { normalizarBuscaCatalogo } from "./catalogo-sem-registro";
 
+export const TIPOS_ATENDIMENTO_CATALOGO = ["consulta", "exame_procedimento", "nao_identificado"] as const;
+export type TipoAtendimentoCatalogo = (typeof TIPOS_ATENDIMENTO_CATALOGO)[number];
+
+export function normalizarTipoAtendimentoCatalogo(valor: unknown): TipoAtendimentoCatalogo | undefined {
+  return TIPOS_ATENDIMENTO_CATALOGO.find((tipo) => tipo === valor);
+}
+
 export const OBJETIVOS_PESQUISA_CATALOGO = [
   "informacoes_gerais",
   "valor",

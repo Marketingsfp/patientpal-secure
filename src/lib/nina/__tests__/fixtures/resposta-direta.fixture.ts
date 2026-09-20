@@ -4,7 +4,6 @@ import { textoDaChave } from "../../resposta/templates";
 import { CONTINUIDADE_CONSULTA_AGENDA } from "../../prompt/consulta-agenda";
 import { estadoVazio } from "../../fluxo-estado-normalizar";
 import { cenariosContextuais } from "./consulta-contextual-cenarios";
-import { prepararBuscaCatalogo } from "../../catalogo-busca";
 import { recusarFraseComoPesquisa } from "../../catalogo-pesquisa";
 
 process.env.LOVABLE_API_KEY = "chave-ficticia-sem-rede";
@@ -18,17 +17,34 @@ const esclarecer = cenario.startsWith("catalogo_esclarecimento");
 const interpretacao = ({
   catalogo_interpretado_cardiologia: {
     mensagem: "Boa tarde, Nina. Gostaria de agendar uma consulta com cardiologista, de preferência nos próximos dias. Estou sentindo algumas palpitações ocasionais e queria fazer uma avaliação.",
-    termo: "cardiologia", objetivos: ["agendamento"], publicado: "CARDIOLOGIA", resposta: "Temos consulta de Cardiologia. Você prefere o primeiro disponível ou escolher o profissional?",
+    termo: "cardiologia", tipo_atendimento: "consulta", objetivos: ["agendamento"], publicado: "CARDIOLOGIA", resposta: "Temos consulta de Cardiologia. Você prefere o primeiro disponível ou escolher o profissional?",
   },
   catalogo_interpretado_nebulizacao: {
     mensagem: "Olá, gostaria de saber como funciona o atendimento para nebulização.",
-    termo: "nebulização", objetivos: ["informacoes_gerais"], publicado: "NEBULIZAÇÃO", resposta: "Temos Nebulização. O atendimento é por ordem de chegada.",
+    termo: "nebulização", tipo_atendimento: "exame_procedimento", objetivos: ["informacoes_gerais"], publicado: "NEBULIZAÇÃO", resposta: "Temos Nebulização. O atendimento é por ordem de chegada.",
   },
   catalogo_interpretado_usg: {
     mensagem: "Boa tarde, a médica pediu uma usg de abdome total sem doppler. Como faço para marcar para a próxima semana?",
-    termo: "usg abdome total sem doppler", objetivos: ["agendamento"], publicado: "ULTRASSONOGRAFIA ABDOME TOTAL SEM DOPPLER", resposta: "Temos Ultrassonografia de abdome total sem Doppler.",
+    termo: "usg abdome total sem doppler", tipo_atendimento: "exame_procedimento", objetivos: ["agendamento"], publicado: "ULTRASSONOGRAFIA ABDOME TOTAL SEM DOPPLER", resposta: "Temos Ultrassonografia de abdome total sem Doppler.",
   },
-} as Record<string, { mensagem: string; termo: string; objetivos: string[]; publicado: string; resposta: string }>)[cenario.replace(/_recuperacao$/, "")];
+  catalogo_interpretado_ecg: {
+    mensagem: "Boa tarde, quero marcar um ECG solicitado pelo cardiologista.",
+    termo: "ECG", tipo_atendimento: "exame_procedimento", objetivos: ["agendamento"], publicado: "ELETROCARDIOGRAMA", resposta: "Temos Eletrocardiograma.",
+  },
+} as Record<string, { mensagem: string; termo: string; tipo_atendimento: "consulta" | "exame_procedimento"; objetivos: string[]; publicado: string; resposta: string }>)[cenario.replace(/_recuperacao$/, "")];
+// Catálogo misto: a recuperação real precisa separar os quatro cardiologistas
+// dos exames que também mencionam cardiologia. Um único registro escondia o bug.
+const catalogoInterpretado: Record<string, any[]> = {
+  nina_cat_profissionais: ["Sandro", "Antonio", "Rosângela", "Alex"].map((nome, i) => ({
+    id: `medico-${i}`, clinica_id: "clinica-simulada", status: "PUBLICADO", nome,
+    especialidades: [{ nome: "CARDIOLOGIA" }], formas_pagamento: [], horarios: [], convenios: [],
+  })),
+  nina_cat_servicos: ["MAPA 24H", "ECOCARDIOGRAMA", "ELETROCARDIOGRAMA", "HOLTER 24H", "TESTE ERGOMETRICO", "NEBULIZAÇÃO", "ULTRASSONOGRAFIA ABDOME TOTAL SEM DOPPLER", "ULTRASSONOGRAFIA ABDOME SUPERIOR COM DOPPLER"].map((nome, i) => ({
+    id: `servico-${i}`, clinica_id: "clinica-simulada", status: "PUBLICADO", nome,
+    descricao_publica: i < 5 ? "Exame de cardiologia" : "Atendimento por ordem de chegada",
+    executantes: [], formas_pagamento: [], valor: null,
+  })),
+};
 const perguntaEsclarecimento = "Pode informar o nome do procedimento por extenso?";
 const ferramentaAusente = cenario.includes("medicos_modelo") ? "buscar_medicos"
   : cenario.includes("procedimentos_modelo") ? "buscar_procedimentos"
@@ -104,15 +120,22 @@ mock.module("@/integrations/supabase/client.server", () => ({
       consultas.push(tabela);
       if (tabela.startsWith("nina_confianca") && tabela !== "nina_confianca_vinculos") return proibido();
       let unica = false;
+      const filtrosCatalogo: Array<(linha: any) => boolean> = [];
+      let limiteCatalogo = Infinity;
       const q: any = {
-        select: () => q, eq: () => q, in: () => q, neq: () => q, or: () => q,
-        order: () => q, limit: () => q, gte: () => q, is: () => q,
+        select: () => q,
+        eq: (k: string, v: unknown) => { filtrosCatalogo.push(l => l[k] === v); return q; },
+        in: (k: string, valores: unknown[]) => { filtrosCatalogo.push(l => valores.includes(l[k])); return q; },
+        gt: (k: string, v: string) => { filtrosCatalogo.push(l => l[k] > v); return q; },
+        neq: () => q, or: () => q,
+        order: () => q, limit: (n: number) => { limiteCatalogo = n; return q; }, gte: () => q, is: () => q,
         maybeSingle: () => { unica = true; return q; },
         insert: (valor: any) => { gravacoes.push({ tabela, valor }); return q; },
         upsert: (valor: any) => { gravacoes.push({ tabela, valor }); return q; },
         update: (valor: any) => { gravacoes.push({ tabela, valor }); return q; },
         then: (resolve: any) => Promise.resolve(resolve({
-          data: tabela === "clinicas" ? { nome: "Clínica simulada", base_importada: false }
+          data: interpretacao && catalogoInterpretado[tabela] ? catalogoInterpretado[tabela]!.filter(l => filtrosCatalogo.every(f => f(l))).slice(0, limiteCatalogo)
+            : tabela === "clinicas" ? { nome: "Clínica simulada", base_importada: false }
             : (contextual || esclarecer) && tabela === "atend_conversas" ? { id: "conversa-contextual", nina_fluxo_estado: estadoContextual }
             : contextual && tabela === "whatsapp_mensagens" ? mensagensContextuais
             : unica ? null : [], error: null,
@@ -215,16 +238,12 @@ mock.module("@/lib/nina/tool-broker.server", () => ({ criarToolBroker: () => ({
     }
     if (nome !== "consultar_base_conhecimento") throw new Error(`Ferramenta inesperada: ${nome}`);
     if (interpretacao) {
-      // O matcher de produção só encontra o registro quando recebe o assunto
-      // interpretado; a frase inteira reproduz a falha que pulava o modelo.
-      const query = argumentosFerramentas.at(-1)?.args.termo ?? "";
-      const busca = prepararBuscaCatalogo(query, [interpretacao.publicado]);
-      const found = busca.pontuar(interpretacao.publicado, "") > 0;
+      const { searchKnowledgeBase } = await import("../../knowledge.server");
+      const parametros = argumentosFerramentas.at(-1)!.args;
+      const dados = await searchKnowledgeBase({ clinicaId: "clinica-simulada", query: parametros.termo,
+        tipo_atendimento: parametros.tipo_atendimento });
       const r = { ferramenta: nome, capacidade: "searchKnowledgeBase", fonte: "catalogo_publicado",
-        success: true, reused: false, dados: { ok: true, source: "nina_catalogo", fonte: "catalogo_publicado",
-          found, knowledge_status: found ? "found" : "not_found",
-          itens: found ? [{ id: "item-interpretado", procedimento: interpretacao.publicado,
-            modalidade: "Ordem de chegada" }] : [] } };
+        success: true, reused: false, dados: { ok: true, ...dados } };
       resultados.push(r);
       return r;
     }
@@ -314,7 +333,7 @@ mock.module("@/lib/nina/ai-gateway.server", () => ({ ninaAIGateway: async (req: 
     toolCalls: [{ id: "pesquisa-interpretada", type: "function", function: {
       name: "consultar_base_conhecimento",
       arguments: JSON.stringify({ termo: interpretacao?.termo ?? (esclarecer && !cenario.endsWith("resolvido") ? "XYZ" : "eletrocardiograma"),
-        ...(interpretacao ? { objetivos: interpretacao.objetivos } : {}) }),
+        ...(interpretacao ? { objetivos: interpretacao.objetivos, tipo_atendimento: interpretacao.tipo_atendimento } : {}) }),
     } }],
   };
   if (interpretacao) return { ok: true, conteudo: interpretacao.resposta, toolCalls: [], modelo: "modelo-simulado", execucaoId: "execucao-direta", nivel: "low" };
@@ -342,7 +361,7 @@ await registrarEntregaSaida({
 console.log("DIRETA_RESULTADO=" + JSON.stringify({
   resposta, respostaModelo, resumoEscolhido, prompt, pergunta, motorChamado, rede, requests, ferramentas, consultas, ordem, argumentosFerramentas,
   temNota: auditoria.decisaoId != null, gravacoes,
-  encaminhamentos,
+  encaminhamentos, resultados,
   etapas: gravacoes.find(g => g.tabela === "nina_execucao_evidencias")?.valor.etapas ?? [],
   finalizacao: auditoria.finalizacao,
   resultado: auditoria.resultado,

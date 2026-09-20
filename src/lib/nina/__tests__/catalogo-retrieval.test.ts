@@ -155,6 +155,69 @@ beforeEach(() => {
 
 const idSequencial = (n: number) => `00000000-0000-0000-0000-${String(n).padStart(12, "0")}`;
 
+describe("separação entre consultas e exames", () => {
+  beforeEach(() => {
+    banco.nina_cat_servicos = [
+      servico({ nome: "ELETROCARDIOGRAMA", descricao_publica: "Cardiologia", preparo: "Pedido médico", valor: 90 }),
+      servico({ nome: "MAPA 24H cardiologia", descricao_publica: "Cardiologia", valor: 110 }),
+    ];
+    banco.nina_cat_profissionais = ["Dr. A", "Dra. B"].map(nome => profissional({
+      nome, especialidades: [{ nome: "Cardiologia" }], formas_pagamento: [{ forma: "Cartão", valor: 145 }],
+    }));
+  });
+
+  it.each(["cardiologia", "cardiologista", "cardio", "cardiolgia"])("consulta explícita de %s exclui exames, inclusive pelo nome", async (query) => {
+    const r = await buscarNoCatalogo({ clinicaId: CLINICA, query, tipo_atendimento: "consulta" });
+    expect(r.records).toHaveLength(2);
+    expect(r.records.every(item => item.categoria === "CONSULTA")).toBe(true);
+    expect(r.price).toContain("145,00");
+    expect(r.tipo_atendimento).toBe("consulta");
+    expect(r.esclarecimento).toBeUndefined();
+    expect(chamadas.some(c => c.tabela === "nina_cat_servicos")).toBe(false);
+  });
+
+  it("consulta ausente não é substituída por exames da especialidade", async () => {
+    banco.nina_cat_profissionais = [];
+    const r = await buscarNoCatalogo({ clinicaId: CLINICA, query: "cardiologia", tipo_atendimento: "consulta" });
+    expect(r.knowledge_status).toBe("not_found");
+    expect(r.records).toHaveLength(0);
+    expect(r.esclarecimento).toBeUndefined();
+  });
+
+  it("consulta genérica não pede identificação de um exame", async () => {
+    const r = await buscarNoCatalogo({ clinicaId: CLINICA, query: "consulta", tipo_atendimento: "consulta" });
+    expect(r.records).toHaveLength(0);
+    expect(r.esclarecimento?.tipo).not.toBe("procedimento");
+  });
+
+  it("ECG continua sendo exame mesmo com filtro de médico", async () => {
+    const r = await buscarNoCatalogo({ clinicaId: CLINICA, query: "ECG", medico: "Dr. A", tipo_atendimento: "exame_procedimento" });
+    expect(r.records.map(item => item.procedimento)).toEqual(["ELETROCARDIOGRAMA"]);
+    expect(r.esclarecimento).toBeUndefined();
+    expect(chamadas.some(c => c.tabela === "nina_cat_profissionais")).toBe(false);
+  });
+
+  it("exames de cardiologia pedem escolha de exame e não devolvem consultas", async () => {
+    const r = await buscarNoCatalogo({ clinicaId: CLINICA, query: "cardiologia", tipo_atendimento: "exame_procedimento" });
+    expect(r.records.every(item => item.categoria === "EXAME_PROCEDIMENTO")).toBe(true);
+    expect(r.doctors).toEqual([]);
+    expect(r.tipo_atendimento).toBe("exame_procedimento");
+  });
+
+  it("exame ausente não é substituído pelo cadastro de profissional", async () => {
+    banco.nina_cat_servicos = [];
+    const r = await buscarNoCatalogo({ clinicaId: CLINICA, query: "cardiologia", tipo_atendimento: "exame_procedimento" });
+    expect(r.knowledge_status).toBe("not_found");
+    expect(r.records).toHaveLength(0);
+  });
+
+  it("sigla desconhecida mantém a pergunta de esclarecimento", async () => {
+    const r = await buscarNoCatalogo({ clinicaId: CLINICA, query: "XYZ", tipo_atendimento: "nao_identificado" });
+    expect(r.esclarecimento?.tipo).toBe("sigla");
+    expect(r.records).toHaveLength(0);
+  });
+});
+
 describe("busca completa com e sem acentos", () => {
   it.each([
     "nebulização",
@@ -252,6 +315,19 @@ describe("busca completa com e sem acentos", () => {
 });
 
 describe("recuperação no catálogo publicado", () => {
+  it("cardiologia com quatro médicos e cinco exames retorna somente consultas", async () => {
+    banco.nina_cat_profissionais = ["Sandro", "Antonio", "Rosângela", "Alex"].map((nome) =>
+      profissional({ nome, especialidades: [{ nome: "CARDIOLOGIA" }] }),
+    );
+    banco.nina_cat_servicos = ["MAPA 24H", "ECOCARDIOGRAMA", "ELETROCARDIOGRAMA", "HOLTER 24H", "TESTE ERGOMETRICO"].map((nome) =>
+      servico({ nome, descricao_publica: "Exame de cardiologia", valor: 90, preparo: "Levar pedido médico" }),
+    );
+    const r = await buscarNoCatalogo({ clinicaId: CLINICA, query: "cardiologia" });
+    expect(r.esclarecimento).toBeUndefined();
+    expect(r.records).toHaveLength(4);
+    expect(r.records.every((registro) => registro.categoria === "CONSULTA")).toBe(true);
+    expect(JSON.stringify(r)).not.toContain("pedido médico");
+  });
   it.each([
     "Gostaria de marca a pneumologista",
     "Bom dia gostaria por favor de saber o valor de uma consulta de pneumologia",
@@ -376,7 +452,7 @@ describe("recuperação no catálogo publicado", () => {
       servico({ nome: "Raio-x de coluna" }),
     ];
     const r = await buscarNoCatalogo({ clinicaId: CLINICA, query: "raio" });
-    expect(r.instrucao).toContain("pedido médico");
+    expect(r.instrucao).toContain("Qual exame ou procedimento você deseja?");
   });
 
   it("filtra pelo dia pedido sem excluir quem não tem horário cadastrado", async () => {

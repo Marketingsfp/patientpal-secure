@@ -10,6 +10,7 @@ describe("interpretação precede a busca no núcleo real da Nina", () => {
       ["nebulizacao", "nebulização", "Nebulização", "informacoes_gerais"],
       ["usg", "usg abdome total sem doppler", "abdome total sem Doppler", "agendamento"],
       ["cardiologia_recuperacao", "cardiologia", "Cardiologia", "agendamento"],
+      ["ecg", "ECG", "Eletrocardiograma", "agendamento"],
     ]) {
       it(`${ambiente}: ${caso}, sem buscar a frase inteira ou transferir antecipadamente`, () => {
         const p = Bun.spawnSync(
@@ -26,6 +27,7 @@ describe("interpretação precede a busca no núcleo real da Nina", () => {
         const linha = output.split(/\r?\n/).find((l) => l.startsWith("DIRETA_RESULTADO="));
         expect(linha, output).toBeDefined();
         const r = JSON.parse(linha!.slice("DIRETA_RESULTADO=".length));
+        const tipo_atendimento = caso.startsWith("cardiologia") ? "consulta" : "exame_procedimento";
         expect(r.ordem).toEqual([
           ...(caso.endsWith("_recuperacao") ? ["modelo"] : []),
           "modelo",
@@ -33,7 +35,7 @@ describe("interpretação precede a busca no núcleo real da Nina", () => {
           "modelo",
         ]);
         expect(r.argumentosFerramentas).toEqual([
-          { nome: "consultar_base_conhecimento", args: { termo, objetivos: [objetivo] } },
+          { nome: "consultar_base_conhecimento", args: { termo, objetivos: [objetivo], tipo_atendimento } },
         ]);
         expect(r.requests[0].messages.some((m: { role: string }) => m.role === "tool")).toBe(false);
         expect(
@@ -44,6 +46,13 @@ describe("interpretação precede a busca no núcleo real da Nina", () => {
         ).toBe(true);
         expect(r.requests[1].messages.some((m: { role: string }) => m.role === "tool")).toBe(true);
         expect(r.resposta).toContain(resposta);
+        expect(r.resposta).not.toContain("Qual exame");
+        const catalogo = r.resultados[0].dados;
+        expect(catalogo.tipo_atendimento).toBe(tipo_atendimento);
+        expect(catalogo.esclarecimento).toBeUndefined();
+        expect(catalogo.records).toHaveLength(tipo_atendimento === "consulta" ? 4 : 1);
+        expect(catalogo.records.every((item: { categoria: string }) => item.categoria ===
+          (tipo_atendimento === "consulta" ? "CONSULTA" : "EXAME_PROCEDIMENTO"))).toBe(true);
         expect(r.encaminhamentos).toHaveLength(0);
         expect(r.rede).toBe(0);
         expect(r.motorChamado).toBe(0);

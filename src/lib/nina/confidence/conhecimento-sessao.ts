@@ -4,6 +4,7 @@ import { normalizarTexto, type FatoRecuperado } from "./evidencia";
 import { lerEscolhaHorario } from "../agendamento-escolha";
 import { prepararBuscaCatalogo } from "../catalogo-busca";
 import type { ResultadoConhecimento } from "../knowledge-contract";
+import { normalizarTipoAtendimentoCatalogo, type TipoAtendimentoCatalogo } from "../catalogo-pesquisa";
 
 export type ReferenciaConhecimento = {
   registro: string;
@@ -15,7 +16,7 @@ export type ConhecimentoSessao = {
   versao: 1;
   clinicaId: string;
   sessionId: string;
-  consulta: { termo: string; medico?: string; dia?: string };
+  consulta: { termo: string; tipo_atendimento?: TipoAtendimentoCatalogo; medico?: string; dia?: string };
   referencias: ReferenciaConhecimento[];
   /** Preferência conversacional; sempre revalidada contra o catálogo do turno. */
   selecao?: unknown;
@@ -80,6 +81,8 @@ export function normalizarConhecimentoSessao(v: unknown): ConhecimentoSessao | n
     sessionId: texto(o.sessionId, 80),
     consulta: {
       termo: texto(q.termo, 200),
+      ...(normalizarTipoAtendimentoCatalogo(q.tipo_atendimento)
+        ? { tipo_atendimento: normalizarTipoAtendimentoCatalogo(q.tipo_atendimento) } : {}),
       ...(texto(q.medico, 160) ? { medico: texto(q.medico, 160) } : {}),
       ...(texto(q.dia, 40) ? { dia: texto(q.dia, 40) } : {}),
     },

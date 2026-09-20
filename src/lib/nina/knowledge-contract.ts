@@ -10,6 +10,8 @@
  * responder com o que veio do retrieval.
  */
 
+import type { TipoAtendimentoCatalogo } from "./catalogo-pesquisa";
+
 export type KnowledgeStatus = "found" | "not_found" | "conflict";
 
 /** Registro cru vindo da planilha (subconjunto usado aqui). */
@@ -39,6 +41,8 @@ export type TraceConhecimento = {
 };
 
 export type ResultadoConhecimento = {
+  /** Categoria da pesquisa, preservada separadamente do termo e do objetivo. */
+  tipo_atendimento?: TipoAtendimentoCatalogo;
   found: boolean;
   knowledge_status: KnowledgeStatus;
   source: "nina_knowledge_base" | "nina_catalogo";

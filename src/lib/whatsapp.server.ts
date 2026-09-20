@@ -1762,10 +1762,16 @@ async function gerarRespostaNinaInterno(
       if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) parametros = parsed as Record<string, unknown>;
     } catch { /* inválido não vira referência */ }
     const esclarecimentoAtual = (r.dados as import("@/lib/nina/knowledge-contract").ResultadoConhecimento | null)?.esclarecimento;
+    const { normalizarTipoAtendimentoCatalogo } = await import("@/lib/nina/catalogo-pesquisa");
+    const tipoAtendimento = normalizarTipoAtendimentoCatalogo(
+      (r.dados as import("@/lib/nina/knowledge-contract").ResultadoConhecimento | null)?.tipo_atendimento
+        ?? parametros.tipo_atendimento,
+    );
     if (esclarecimentoAtual) {
       if (ctxFerramentas) ctxFerramentas.esclarecimentoCatalogo = esclarecimentoAtual;
       fluxoEstado.knowledge_context = lembrarConsultaComprovada({ clinicaId, sessionId: fluxoEstado.session_id ?? null,
         fatos: ex.fatos, args: { termo: String(parametros.termo ?? parametros.especialidade ?? parametros.nome ?? mensagemPaciente).slice(0, 200),
+          ...(tipoAtendimento ? { tipo_atendimento: tipoAtendimento } : {}),
           ...(typeof parametros.medico === "string" ? { medico: parametros.medico } : {}) },
         esclarecimento: esclarecimentoAtual });
     }
@@ -1773,7 +1779,8 @@ async function gerarRespostaNinaInterno(
       const esclarecimento = (r.dados as import("@/lib/nina/knowledge-contract").ResultadoConhecimento | null)?.esclarecimento;
       const referencia = ex.consulta.status === "com_itens" || esclarecimento ? lembrarConsultaComprovada({
         clinicaId, sessionId: fluxoEstado.session_id ?? null, fatos: ex.fatos,
-        args: { termo: parametros.termo, ...(typeof parametros.medico === "string" ? { medico: parametros.medico } : {}) },
+        args: { termo: parametros.termo, ...(tipoAtendimento ? { tipo_atendimento: tipoAtendimento } : {}),
+          ...(typeof parametros.medico === "string" ? { medico: parametros.medico } : {}) },
         anterior: conhecimentoAnterior,
         esclarecimento,
       }) : null;

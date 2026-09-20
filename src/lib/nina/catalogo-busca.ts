@@ -215,6 +215,7 @@ export function perguntaIdentificacaoProfissional(
 }
 
 export const REGRA_INTERPRETACAO_CATALOGO = `INTERPRETAÇÃO DO PEDIDO E IDENTIDADE
+- Separe o tipo de atendimento do assunto e do objetivo: consulta com cardiologista = tipo consulta, termo cardiologia, objetivo agendamento quando o paciente quer marcar. Exames e procedimentos usam tipo exame_procedimento. Sintomas não mudam consulta para exame. Pesquise cada atendimento separadamente e mantenha a categoria nas continuações; não peça pedido médico nem ofereça exames para esclarecer um pedido explícito de consulta.
 - Entenda a mensagem com o histórico atual: abreviações, siglas, erros de escrita e respostas curtas podem retomar um atendimento já identificado. Consulte a base com o atendimento e os qualificadores informados; nunca invente órgão, modalidade, profissional ou equivalência para uma sigla desconhecida.
 - A busca aceita equivalências de escrita, como ultra/ultrassom/USG, e pequenos erros. Isso só localiza candidatos publicados; não autoriza escolher um exame parecido. Preserve total/superior, órgão, infantil/adulto e demais diferenças do pedido.
 - Quando o retorno trouxer esclarecimento, faça a pergunta indicada, usando as opções publicadas. Não informe preço, preparo nem consulte agenda como se o item ou profissional já estivesse escolhido. Sigla desconhecida: peça o nome por extenso ou como está no pedido. Após esclarecer, consulte novamente a base.

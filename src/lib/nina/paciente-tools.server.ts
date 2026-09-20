@@ -24,7 +24,7 @@
  */
 
 import { z } from "zod";
-import { OBJETIVOS_PESQUISA_CATALOGO } from "./catalogo-pesquisa";
+import { OBJETIVOS_PESQUISA_CATALOGO, TIPOS_ATENDIMENTO_CATALOGO } from "./catalogo-pesquisa";
 import { agoraNaClinica, FUSO_PADRAO } from "@/lib/nina-agora";
 import { janelaDiaClinica } from "@/lib/date-utils";
 import { diaDaSemanaISO } from "./horario-oficial";
@@ -790,10 +790,14 @@ export const FERRAMENTAS_NINA_CONSULTA = [
             minItems: 1, maxItems: 7,
             description: "O que o paciente quer saber sobre ESTE atendimento, após analisar a mensagem inteira e o histórico. Pode haver vários objetivos. Use informacoes_gerais para apresentação geral; valor, horarios, medicos, preparo ou condicoes para dúvidas específicas; agendamento somente quando há intenção de marcar. Use o retorno para responder aos objetivos identificados com as condições publicadas relevantes. Perguntar preço ou horário não significa querer agendar. Estes objetivos não fazem parte do termo de busca.",
           },
+          tipo_atendimento: {
+            type: "string", enum: TIPOS_ATENDIMENTO_CATALOGO,
+            description: "Categoria identificada na mensagem completa e no histórico: consulta para atendimento com médico/especialidade (ex.: consulta com cardiologista → termo cardiologia, tipo consulta); exame_procedimento para exame ou procedimento (ex.: ECG, MAPA, nebulização); nao_identificado somente se ainda não houver informação suficiente. Consulta não é exame: sintomas não autorizam substituir a consulta por exames nem pedir pedido médico. Agendamento é objetivo e pode existir nas duas categorias. Para consulta e exame na mesma mensagem, faça pesquisas separadas. Preserve a categoria nas continuações da mesma solicitação.",
+          },
           medico: { type: "string", description: "Filtrar por nome do profissional (opcional)." },
           dia: { type: "string", description: "Filtrar por dia da semana (opcional)." },
         },
-        required: ["termo", "objetivos"],
+        required: ["termo", "objetivos", "tipo_atendimento"],
       },
     },
   },
@@ -1177,6 +1181,8 @@ async function executarFerramentaInterna(
           .object({
             termo: z.string().trim().min(2).max(200),
             objetivos: z.array(z.enum(OBJETIVOS_PESQUISA_CATALOGO)).min(1).max(7).optional(),
+            // Opcional apenas para chamadores legados; o schema enviado ao modelo exige o campo.
+            tipo_atendimento: z.enum(TIPOS_ATENDIMENTO_CATALOGO).optional(),
             medico: z.string().trim().max(160).optional(),
             dia: z.string().trim().max(40).optional(),
           })
@@ -1186,6 +1192,7 @@ async function executarFerramentaInterna(
         const resultado = await searchKnowledgeBase({
           clinicaId: ctx.clinicaId,
           query: p.termo,
+          tipo_atendimento: p.tipo_atendimento,
           medico: p.medico ?? null,
           dia: p.dia ?? null,
           canal: "whatsapp",
@@ -1195,7 +1202,9 @@ async function executarFerramentaInterna(
         // de outro serviço, profissional ou forma de pagamento. Não é o preço
         // do atendimento selecionado e não pode sobrescrever seu estado.
         return { ok: true, ...resultado,
-          pedido_interpretado: { atendimento: p.termo, objetivos: p.objetivos ?? ["informacoes_gerais"] } };
+          pedido_interpretado: { atendimento: p.termo,
+            tipo_atendimento: resultado.tipo_atendimento ?? p.tipo_atendimento ?? "nao_identificado",
+            objetivos: p.objetivos ?? ["informacoes_gerais"] } };
 
       }
 
@@ -1220,6 +1229,7 @@ async function executarFerramentaInterna(
         const r = await searchKnowledgeBase({
           clinicaId: ctx.clinicaId,
           query: [p.especialidade, p.nome].filter(Boolean).join(" ") || "consulta profissional",
+          tipo_atendimento: "consulta",
           medico: p.nome ?? null,
           canal: ctx.origem,
         });
@@ -1261,6 +1271,7 @@ async function executarFerramentaInterna(
         const r = await searchKnowledgeBase({
           clinicaId: ctx.clinicaId,
           query: p.termo,
+          tipo_atendimento: "exame_procedimento",
           canal: ctx.origem,
         });
         if (r.esclarecimento) {

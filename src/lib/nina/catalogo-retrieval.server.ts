@@ -17,6 +17,7 @@ import {
   type ServicoPublicado,
 } from "./catalogo-conhecimento";
 import type { ResultadoConhecimento } from "./knowledge-contract";
+import type { TipoAtendimentoCatalogo } from "./catalogo-pesquisa";
 import {
   compararNomeProfissional,
   prepararBuscaCatalogo,
@@ -79,7 +80,8 @@ function semAcento(v: unknown): string {
   return normalizarBuscaCatalogo(String(v ?? ""));
 }
 
-const PALAVRAS_CONSULTA = /(consulta|medic|doutor|dra|dr\b|especialista|atende)/i;
+const PALAVRAS_CONSULTA = /\b(?:consultas?|especialistas?|doutor|doutora|dra?)\b/i;
+const PALAVRAS_PROCEDIMENTO = /\b(?:exames?|procedimentos?)\b/i;
 
 function especialidadesTexto(p: IndiceProfissional): string {
   return Array.isArray(p.especialidades)
@@ -108,6 +110,7 @@ export async function buscarNoCatalogo(
   pedido: {
     clinicaId: string;
     query: string;
+    tipo_atendimento?: TipoAtendimentoCatalogo;
     medico?: string | null;
     dia?: string | null;
     limite?: number;
@@ -116,14 +119,18 @@ export async function buscarNoCatalogo(
 ): Promise<ResultadoConhecimento> {
   const limite = Math.min(Math.max(pedido.limite ?? 6, 1), 12);
   const hojeISO = agoraNaClinica(undefined, agora).iso;
-  const perguntaSobreConsulta =
-    PALAVRAS_CONSULTA.test(pedido.query ?? "") || Boolean(pedido.medico);
+  let tipoAtendimento = pedido.tipo_atendimento ?? "nao_identificado";
+  // Compatibilidade com pesquisas antigas. A categoria explícita do pedido prevalece.
+  if (tipoAtendimento === "nao_identificado") {
+    if (PALAVRAS_PROCEDIMENTO.test(pedido.query)) tipoAtendimento = "exame_procedimento";
+    else if (PALAVRAS_CONSULTA.test(pedido.query) || pedido.medico) tipoAtendimento = "consulta";
+  }
 
   // Não usar ILIKE como pré-filtro: ele exclui nomes acentuados antes da
   // normalização. Não cortar em 40/60: qualquer publicado pode ser o correto.
   const [brutosServicos, brutosProfissionais] = await Promise.all([
-    lerPublicados<IndiceServico>("nina_cat_servicos", INDICE_SERVICO, pedido.clinicaId),
-    lerPublicados<IndiceProfissional>(
+    tipoAtendimento === "consulta" ? [] : lerPublicados<IndiceServico>("nina_cat_servicos", INDICE_SERVICO, pedido.clinicaId),
+    tipoAtendimento === "exame_procedimento" ? [] : lerPublicados<IndiceProfissional>(
       "nina_cat_profissionais",
       INDICE_PROFISSIONAL,
       pedido.clinicaId,
@@ -135,13 +142,22 @@ export async function buscarNoCatalogo(
   ]);
   const termos = busca.termos;
   const expandidos = busca.ajustes;
-  const pontuados = brutosServicos
+  if (tipoAtendimento === "nao_identificado") {
+    // "Cardiologia" no cadastro de especialidades é uma consulta. A mera
+    // menção na descrição de um exame não transforma a especialidade em exame.
+    const nomeDeServico = brutosServicos.some((s) => busca.pontuar(s.nome, "") > 0);
+    const nomeOuEspecialidade = brutosProfissionais.some((p) => busca.pontuar(p.nome, especialidadesTexto(p)) > 0);
+    if (nomeOuEspecialidade && !nomeDeServico) tipoAtendimento = "consulta";
+    else if (nomeDeServico && !nomeOuEspecialidade) tipoAtendimento = "exame_procedimento";
+  }
+  const perguntaSobreConsulta = tipoAtendimento === "consulta";
+  const pontuados = (perguntaSobreConsulta ? [] : brutosServicos)
     .map((s) => ({ s, score: busca.pontuar(s.nome, String(s.descricao_publica ?? "")) }))
     .filter((x) => x.score > 0)
     .sort((a, b) => b.score - a.score);
   const idsServicos = pontuados.slice(0, limite).map((x) => x.s.id);
   const medico = semAcento(pedido.medico || nomeProfissionalNaPergunta(pedido.query)).trim();
-  const profissionaisRelevantes = brutosProfissionais
+  const profissionaisRelevantes = (tipoAtendimento === "exame_procedimento" ? [] : brutosProfissionais)
     .map((p) => ({ p, score: busca.pontuar(p.nome, especialidadesTexto(p)) }))
     .filter(({ p, score }) =>
       medico ? p.id === medico || compararNomeProfissional(medico, p.nome) !== null : score > 0,
@@ -186,6 +202,7 @@ export async function buscarNoCatalogo(
     ambiguo,
     priorizar: perguntaSobreConsulta && listaProfissionais.length ? "profissional" : "servico",
   });
+  resultado.tipo_atendimento = tipoAtendimento;
 
   // Esclarecimento é um resultado próprio, não ausência nem escolha do primeiro.
   // Analisa o conjunto ANTES do limite; limite=1 não elimina a ambiguidade.
@@ -238,7 +255,7 @@ export async function buscarNoCatalogo(
       tipo === "profissional"
         ? perguntaIdentificacaoProfissional(opcoes)
         : tipo === "procedimento"
-          ? `Qual exame consta no seu pedido médico?\n${nomes.join("\n")}`
+          ? `Qual exame ou procedimento você deseja?\n${nomes.join("\n")}`
           : `Pode informar por extenso o nome do atendimento ou como está escrito no pedido? Não consegui identificar a sigla ${busca.siglasDesconhecidas.join(", ").toUpperCase()}.`;
     resultado.esclarecimento = { tipo, pergunta, opcoes };
     resultado.procedure = null;
@@ -275,6 +292,7 @@ export async function buscarNoCatalogo(
         filtros: {
           clinica_id: pedido.clinicaId,
           status: "PUBLICADO",
+          tipo_atendimento: tipoAtendimento,
           termos,
           termos_expandidos: expandidos,
           tamanho_pagina: TAMANHO_PAGINA,
@@ -300,6 +318,7 @@ export async function buscarNoCatalogo(
         filtros: {
           clinica_id: pedido.clinicaId,
           status: "PUBLICADO",
+          tipo_atendimento: tipoAtendimento,
           medico: pedido.medico ?? null,
           dia: pedido.dia ?? null,
           termos,

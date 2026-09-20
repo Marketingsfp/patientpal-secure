@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import {
   conhecimentoDaMesmaSessao,
+  lembrarConsultaComprovada,
   consultaDoNovoTurno,
   type ConhecimentoSessao,
 } from "./conhecimento-sessao";
@@ -21,6 +22,15 @@ const anterior: ConhecimentoSessao = {
 };
 
 describe("continuidade da pesquisa de conhecimento", () => {
+  test.each(["consulta", "exame_procedimento"] as const)("preserva a categoria %s na referência da sessão", (tipo_atendimento) => {
+    const memoria = lembrarConsultaComprovada({
+      clinicaId: anterior.clinicaId, sessionId: anterior.sessionId,
+      args: { termo: "cardiologia", tipo_atendimento }, fatos: [],
+      esclarecimento: { tipo: "profissional", pergunta: "Qual profissional?", opcoes: [] },
+    });
+    const normalizada = conhecimentoDaMesmaSessao(memoria, anterior.clinicaId, anterior.sessionId);
+    expect(normalizada?.consulta).toEqual({ termo: "cardiologia", tipo_atendimento });
+  });
   test.each([
     "sim",
     "sim por favor",

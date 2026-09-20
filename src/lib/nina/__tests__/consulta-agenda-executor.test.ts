@@ -299,18 +299,34 @@ beforeEach(() => {
 });
 
 describe("pesquisa com atendimento e objetivos separados", () => {
+  test("encaminha a categoria de exame até a busca, mesmo quando há intenção de agendar", async () => {
+    const r = await executarFerramentaPaciente(contexto("Quero marcar ECG"), "consultar_base_conhecimento", {
+      termo: "ECG", tipo_atendimento: "exame_procedimento", objetivos: ["agendamento"],
+    });
+    expect(r.ok).toBe(true);
+    expect(pesquisas[0]).toMatchObject({ query: "ECG", tipo_atendimento: "exame_procedimento" });
+    expect(r.pedido_interpretado).toMatchObject({ tipo_atendimento: "exame_procedimento" });
+    expect(consultasAgenda()).toHaveLength(0);
+  });
+  test.each([
+    ["buscar_medicos", { especialidade: "Cardiologia" }, "consulta"],
+    ["buscar_procedimentos", { termo: "ECG" }, "exame_procedimento"],
+  ] as const)("%s também separa as categorias na fonte", async (nome, args, tipo_atendimento) => {
+    await executarFerramentaPaciente(contexto("Informações"), nome, args);
+    expect(pesquisas[0]).toMatchObject({ tipo_atendimento });
+  });
   for (const origem of ["homologacao", "whatsapp"] as const) {
     test(`${origem}: valor, horários e médicos não viram termos de busca nem intenção de agendar`, async () => {
       const ctx = { ...contexto("Qual o valor de cardiologia, quais médicos atendem e em quais dias?"), origem };
       const objetivos = ["valor", "horarios", "medicos"];
       const r = await executarFerramentaPaciente(ctx, "consultar_base_conhecimento", {
-        termo: "cardiologia", objetivos,
+        termo: "cardiologia", objetivos, tipo_atendimento: "consulta",
       });
       expect(r.ok).toBe(true);
       expect(pesquisas).toEqual([{
-        clinicaId: CLINICA, query: "cardiologia", medico: null, dia: null, canal: "whatsapp",
+        clinicaId: CLINICA, query: "cardiologia", tipo_atendimento: "consulta", medico: null, dia: null, canal: "whatsapp",
       }]);
-      expect(r.pedido_interpretado).toEqual({ atendimento: "cardiologia", objetivos });
+      expect(r.pedido_interpretado).toEqual({ atendimento: "cardiologia", tipo_atendimento: "consulta", objetivos });
       expect(ctx.estado.appointment.intent_confirmed).not.toBe(true);
       expect(consultasAgenda()).toHaveLength(0);
       expect(gravacoes).toHaveLength(0);
