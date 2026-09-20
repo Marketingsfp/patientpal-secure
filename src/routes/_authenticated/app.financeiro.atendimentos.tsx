@@ -3584,6 +3584,14 @@ function AtendimentosPage() {
                             title={procedimentoNome}
                           >
                             {procedimentoNome}
+                            {linhaDeLaudo && (
+                              <div
+                                className="text-[10px] font-semibold text-sky-700 dark:text-sky-400"
+                                title="Parte do médico que laudou o exame. É o mesmo exame já cobrado do paciente — não conta como um novo atendimento."
+                              >
+                                LAUDO DO EXAME
+                              </div>
+                            )}
                             {ehLinhaSemFaturamento(a.forma_pagamento) && (
                               <div
                                 className="text-[10px] font-semibold text-amber-700 dark:text-amber-500"
