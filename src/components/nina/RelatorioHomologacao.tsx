@@ -96,7 +96,9 @@ function dataHora(v: string | null | undefined) {
   return new Date(v).toLocaleString("pt-BR");
 }
 
-export function RelatorioHomologacao() {
+export function RelatorioHomologacao({ onVerConversa }: {
+  onVerConversa?: (alvo: import("@/lib/nina/homologacao-navegacao").ConversaTesteAlvo) => void;
+} = {}) {
   const { clinicaAtual } = useClinica();
   const clinicaId = clinicaAtual?.clinica_id ?? null;
   const podeEscrever = usePodeEscrever("nina");
@@ -160,6 +162,10 @@ export function RelatorioHomologacao() {
   };
 
   const verConversa = (item: ItemRelatorio) => {
+    if (onVerConversa && clinicaId) {
+      onVerConversa({ clinicaId, leadIndice: item.leadIndice, conversaId: item.conversaId });
+      return;
+    }
     window.dispatchEvent(
       new CustomEvent("nina:abrir-lead-teste", {
         detail: { leadIndice: item.leadIndice, conversaId: item.conversaId },

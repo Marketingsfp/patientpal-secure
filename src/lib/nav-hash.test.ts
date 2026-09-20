@@ -6,7 +6,8 @@ const NINA = [
   { to: "/app/nina", hash: "atend-inbox", label: "Conversas WhatsApp" },
   { to: "/app/nina", hash: "atend-macros", label: "/ Mensagens prontas" },
   { to: "/app/nina", hash: "base-conhecimento", label: "Base de conhecimentos" },
-  { to: "/app/nina", hash: "homologacao", label: "Homologação (envio de testes)" },
+  { to: "/app/nina", hash: "homologacao", label: "Homologação (chat)" },
+  { to: "/app/nina", hash: "laboratorio-nina", label: "Laboratório Nina" },
   { to: "/app/nina-aprendizado", label: "Revisão de Aprendizados" },
   { to: "/app/nina-metricas", label: "Métricas de Aprendizado" },
   { to: "/app/nina-arquitetura", label: "Arquitetura" },
@@ -26,7 +27,8 @@ describe("destino dos itens do menu", () => {
     expect(destinos["Conversas WhatsApp"]).toBe("/app/nina#atend-inbox");
     expect(destinos["/ Mensagens prontas"]).toBe("/app/nina#atend-macros");
     expect(destinos["Base de conhecimentos"]).toBe("/app/nina#base-conhecimento");
-    expect(destinos["Homologação (envio de testes)"]).toBe("/app/nina#homologacao");
+    expect(destinos["Homologação (chat)"]).toBe("/app/nina#homologacao");
+    expect(destinos["Laboratório Nina"]).toBe("/app/nina#laboratorio-nina");
     expect(destinos["Configuração"]).toBe("/app/nina#config");
     expect(destinos["Templates aprovados (Meta)"]).toBe("/app/nina#templates");
   });
@@ -42,7 +44,7 @@ describe("estado ativo", () => {
     const ativos = NINA.filter(
       (i) => navLeafAtivo(i.to === "/app/nina", "#homologacao", i.hash) && i.to === "/app/nina",
     ).map((i) => i.label);
-    expect(ativos).toEqual(["Homologação (envio de testes)"]);
+    expect(ativos).toEqual(["Homologação (chat)"]);
   });
 
   it("item sem hash depende só da rota", () => {

@@ -1,6 +1,6 @@
 import { createFileRoute, Outlet, useLocation, useNavigate } from "@tanstack/react-router";
 import { confirmDialog } from "@/lib/confirm";
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { lazy, Suspense, useState, useEffect, useCallback, useMemo } from "react";
 import {
   MessageCircle,
   Send,
@@ -58,11 +58,9 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { HomologacaoInbox } from "@/components/nina/HomologacaoInbox";
-import { CenariosTeste } from "@/components/nina/CenariosTeste";
-import { VerificacoesHomologacao } from "@/components/nina/VerificacoesHomologacao";
-import { CargaTeste } from "@/components/nina/CargaTeste";
-import { RelatorioHomologacao } from "@/components/nina/RelatorioHomologacao";
-import { DashboardHomologacao } from "@/components/nina/DashboardHomologacao";
+import type { ConversaTesteAlvo } from "@/lib/nina/homologacao-navegacao";
+
+const LaboratorioNina = lazy(() => import("@/components/nina/LaboratorioNina").then((m) => ({ default: m.LaboratorioNina })));
 
 import { RespostasRapidasManager } from "@/components/nina/RespostasRapidasManager";
 import { AtendInbox } from "@/components/nina/AtendimentoExtraTabs";
@@ -90,6 +88,7 @@ function NinaPage() {
   // Sem suporte no navegador, nada acontece e a tela segue igual.
   useWebmcpContexto();
   const clinicaId = clinicaAtual?.clinica_id;
+  const [conversaTesteAlvo, setConversaTesteAlvo] = useState<ConversaTesteAlvo | null>(null);
   const location = useLocation();
   const navigate = useNavigate();
   const hashAba = (location.hash ?? "").replace(/^#/, "");
@@ -98,6 +97,7 @@ function NinaPage() {
     "config",
     "templates",
     "homologacao",
+    "laboratorio-nina",
     "atend-macros",
     "atend-inbox",
     "base-conhecimento",
@@ -109,6 +109,7 @@ function NinaPage() {
   const setAbaAtiva = (v: string) => {
     navigate({ to: "/app/nina", hash: v, replace: true });
   };
+  const areaChat = abaAtiva === "atend-inbox" || abaAtiva === "homologacao";
   useEffect(() => {
     // Só normaliza o hash enquanto o usuário ainda está na tela da Nina.
     // Sem essa guarda, ao clicar em outro item do menu a rota muda, o hash
@@ -123,11 +124,11 @@ function NinaPage() {
   }, [hashAba, navigate, location.pathname]);
 
   return (
-    <div className={abaAtiva === "atend-inbox" ? "h-full" : "space-y-6"}>
+    <div className={areaChat ? "h-full" : "space-y-6"}>
       <Tabs
         value={abaAtiva}
         onValueChange={setAbaAtiva}
-        className={abaAtiva === "atend-inbox" ? "h-full" : "space-y-4"}
+        className={areaChat ? "h-full" : "space-y-4"}
       >
         {/* ============ CONVERSAS ============ */}
 
@@ -142,13 +143,17 @@ function NinaPage() {
         </TabsContent>
 
         {/* ============ HOMOLOGAÇÃO ============ */}
-        <TabsContent value="homologacao">
-          <DashboardHomologacao />
-          <HomologacaoInbox />
-          <VerificacoesHomologacao />
-          <CenariosTeste />
-          <CargaTeste />
-          <RelatorioHomologacao />
+        <TabsContent value="homologacao" className="mt-0 h-full">
+          <HomologacaoInbox abrirConversa={conversaTesteAlvo} onConversaAberta={() => setConversaTesteAlvo(null)} />
+        </TabsContent>
+        <TabsContent value="laboratorio-nina">
+          <Suspense fallback={<p role="status" className="p-6 text-sm text-muted-foreground">Carregando Laboratório Nina…</p>}>
+            <LaboratorioNina key={clinicaId} onAbrirChat={() => setAbaAtiva("homologacao")} onVerConversa={(alvo) => {
+              if (alvo.clinicaId !== clinicaId) return;
+              setConversaTesteAlvo(alvo);
+              setAbaAtiva("homologacao");
+            }} />
+          </Suspense>
         </TabsContent>
 
 

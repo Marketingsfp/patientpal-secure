@@ -97,6 +97,7 @@ import { useChatScroll } from "@/hooks/use-chat-scroll";
 import { formatarDataHoraMensagem } from "@/lib/atendimento/data-hora";
 import { textoMarcadorSistema } from "@/lib/atendimento/marcador-handoff";
 import { definirSelecaoTeste } from "@/lib/webmcp/selecao-teste";
+import { leadDoRelatorio, type ConversaTesteAlvo } from "@/lib/nina/homologacao-navegacao";
 import { assinarAtualizacao } from "@/lib/webmcp/atualizacao";
 import {
   rotuloAutorResumo,
@@ -183,7 +184,12 @@ export const AVISO_TESTE_ENCERRADO =
   "Teste encerrado. Clique em Resolver / Reiniciar teste para iniciar uma nova sessão.";
 
 
-export function HomologacaoInbox() {
+export function HomologacaoInbox({ laboratorio = false, ativo = true, abrirConversa, onConversaAberta }: {
+  laboratorio?: boolean;
+  ativo?: boolean;
+  abrirConversa?: ConversaTesteAlvo | null;
+  onConversaAberta?: () => void;
+} = {}) {
 
   const { clinicaAtual } = useClinica();
   const clinicaId = clinicaAtual?.clinica_id;
@@ -246,7 +252,7 @@ export function HomologacaoInbox() {
   const proximaSim = useServerFn(proximaMensagemTerra);
   const controlarSim = useServerFn(controlarSimulacaoTerra);
   const simAtual = useServerFn(simulacaoAtualTerra);
-  const [modo, setModo] = useState<"manual" | "terra">("manual");
+  const [modo, setModo] = useState<"manual" | "terra">(laboratorio ? "terra" : "manual");
   const [cenario, setCenario] = useState<string>(CENARIOS_SUGERIDOS[0] ?? "");
   const [persona, setPersona] = useState<Persona>(PERSONA_PADRAO);
   const [limites, setLimites] = useState<Limites>(LIMITES_PADRAO);
@@ -348,10 +354,11 @@ export function HomologacaoInbox() {
 
   // Informa à ferramenta WebMCP de leitura qual lead está aberto.
   useEffect(() => {
+    if (!ativo) return;
     const lead = leads.find((l) => l.id === leadId) ?? null;
     definirSelecaoTeste(lead ? { leadId: lead.id, leadNome: lead.nome, conversaId } : null);
     return () => definirSelecaoTeste(null);
-  }, [leadId, conversaId, leads]);
+  }, [leadId, conversaId, leads, ativo]);
 
   const carregarLeads = useCallback(
     async (silencioso = false) => {
@@ -381,7 +388,7 @@ export function HomologacaoInbox() {
    */
   const aplicadasRef = useRef<Set<string>>(new Set());
   const leadAbertoRef = useRef<string | null>(null);
-  leadAbertoRef.current = conversaId;
+  leadAbertoRef.current = ativo ? conversaId : null;
   useEffect(() => {
     if (!clinicaId) return;
     let pendente: ReturnType<typeof setTimeout> | null = null;
@@ -521,7 +528,7 @@ export function HomologacaoInbox() {
         setMsgs(reconciliarHistorico(r.mensagens, otimistasDoLead(id)));
         setEventosConversa(r.eventos ?? []);
         setConversaId(r.conversaId);
-        if (r.conversaId) {
+        if (r.conversaId && laboratorio) {
           const f = (await ferramentasFn({
             data: { clinicaId, conversaId: r.conversaId },
           })) as { eventos: EventoFerramenta[]; debug?: Record<string, unknown> };
@@ -536,7 +543,7 @@ export function HomologacaoInbox() {
         mostrarErro(e);
       }
     },
-    [clinicaId, historico, ferramentasFn, otimistasDoLead],
+    [clinicaId, historico, ferramentasFn, otimistasDoLead, laboratorio],
   );
 
   /**
@@ -549,7 +556,7 @@ export function HomologacaoInbox() {
    */
   const marcadoRef = useRef<string>("");
   useEffect(() => {
-    if (!clinicaId || !leadId || !conversaId) return;
+    if (!ativo || !clinicaId || !leadId || !conversaId) return;
     if (carregandoConversa) return;
     if (typeof document !== "undefined" && document.visibilityState !== "visible") return;
     const ultima = msgs[msgs.length - 1];
@@ -570,7 +577,7 @@ export function HomologacaoInbox() {
         marcadoRef.current = ""; // falhou: tenta de novo na próxima visualização
       }
     })();
-  }, [clinicaId, leadId, conversaId, msgs, carregandoConversa, marcarLido]);
+  }, [clinicaId, leadId, conversaId, msgs, carregandoConversa, marcarLido, ativo]);
 
 
   /**
@@ -604,6 +611,18 @@ export function HomologacaoInbox() {
   );
 
   // FASE 8 — "Ver conversa" no Relatório da homologação seleciona o lead aqui.
+  useEffect(() => {
+    if (!ativo || !abrirConversa || carregando) return;
+    const alvo = leadDoRelatorio(leads, clinicaId, abrirConversa);
+    if (alvo) {
+      setLeadId(alvo.id);
+      onConversaAberta?.();
+    } else if (abrirConversa.clinicaId === clinicaId) {
+      toast.info("O lead deste relatório não está disponível na lista de testes.");
+      onConversaAberta?.();
+    }
+  }, [abrirConversa, ativo, carregando, clinicaId, leads, onConversaAberta]);
+
   useEffect(() => {
     function abrir(ev: Event) {
       const d = (ev as CustomEvent).detail as { leadIndice?: number | null; conversaId?: string | null };
@@ -641,7 +660,7 @@ export function HomologacaoInbox() {
     controleRef.current.parar = true;
     setSim(null);
     setSimMotivo(null);
-    if (!clinicaId || !leadId) return;
+    if (!laboratorio || !clinicaId || !leadId) return;
     let vivo = true;
     void (async () => {
       try {
@@ -671,7 +690,7 @@ export function HomologacaoInbox() {
     return () => {
       vivo = false;
     };
-  }, [clinicaId, leadId, simAtual]);
+  }, [clinicaId, leadId, simAtual, laboratorio]);
 
 
   // Recarga incremental após uma operação feita pela automação (WebMCP).
@@ -1069,7 +1088,7 @@ export function HomologacaoInbox() {
     !podeEscrever || !leadId || terraRodando || (tipo !== "text" && tipo !== "audio");
 
   return (
-    <div id="homologacao-inbox" className="flex h-[calc(100vh-11rem)] min-h-[560px] gap-3">
+    <div id="homologacao-inbox" className={`flex gap-3 ${laboratorio ? "h-[calc(100vh-14rem)] min-h-[640px]" : "h-full min-h-0"}`}>
       {/* COLUNA 1 — LEADS DE TESTE */}
       <Card className="flex w-[300px] shrink-0 flex-col overflow-hidden">
         <CardHeader className="gap-2 py-3">
@@ -1202,7 +1221,7 @@ export function HomologacaoInbox() {
                   >
                     <Download className="mr-1 h-3.5 w-3.5" /> PDF
                   </Button>
-                  <Button
+                  {laboratorio && <><Button
                     size="sm"
                     variant="outline"
                     aria-pressed={painelTecnico}
@@ -1215,6 +1234,7 @@ export function HomologacaoInbox() {
                     leadId={leadId}
                     podeAvaliar={podeEscrever}
                   />
+                  </>}
 
                   <Button
                     size="sm"
@@ -1252,7 +1272,7 @@ export function HomologacaoInbox() {
               </span>
             </div>
 
-            {painelTecnico && (
+            {laboratorio && painelTecnico && (
               <div className="max-h-56 space-y-2 overflow-auto border-b bg-muted/30 p-2">
                 <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
                   <input
@@ -1488,7 +1508,7 @@ export function HomologacaoInbox() {
             )}
 
             {/* FASE 4 — modo do lead: manual ou paciente simulado (Terra). */}
-            <div className="space-y-2 border-t bg-muted/20 p-3">
+            {laboratorio && <div className="max-h-[45vh] shrink-0 space-y-2 overflow-y-auto border-t bg-muted/20 p-3">
               <div className="flex flex-wrap items-center gap-2">
                 <span className="text-xs font-medium text-muted-foreground">Modo do teste</span>
                 <Select
@@ -1773,7 +1793,7 @@ export function HomologacaoInbox() {
                   </div>
                 </div>
               )}
-            </div>
+            </div>}
 
             <div className="space-y-2 border-t p-3">
               <div className="flex gap-2">
