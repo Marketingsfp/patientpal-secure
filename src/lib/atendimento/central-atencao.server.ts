@@ -6,7 +6,7 @@ import { lerInicioCronometroPausa } from "./cronometro-pausa.server";
 
 const TAMANHO_PAGINA = 500;
 
-/** Apenas leitura autenticada: contagem completa, sem o recorte de 200 cards. */
+/** Apenas leitura autenticada: contagem completa, sem o limite de cards da lista. */
 export async function carregarDadosCentralAtencao(
   supabase: SupabaseClient<Database>,
   clinicaId: string,

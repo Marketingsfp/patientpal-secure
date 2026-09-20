@@ -61,7 +61,7 @@ describe("abertura da conversa — janela recente", () => {
 
     expect(visiveis.length).toBe(JANELA_INICIAL + JANELA_ANTERIOR);
     expect(new Set(visiveis.map((m) => m.id)).size).toBe(visiveis.length);
-    expect(visiveis[0].id).toBe("m-421");
+    expect(visiveis[0].id).toBe("m-461");
     expect(visiveis.at(-1)?.id).toBe("m-500");
     // Muito menos do que o histórico inteiro.
     expect(visiveis.length).toBeLessThan(todas.length);
@@ -79,10 +79,14 @@ describe("abertura da conversa — janela recente", () => {
 
   it("chega ao começo do histórico quando o bloco volta incompleto", () => {
     const todas = historico(50);
-    const visiveis = buscar(todas, JANELA_INICIAL);
+    let visiveis = buscar(todas, JANELA_INICIAL);
+    const segundoBloco = buscar(todas, JANELA_ANTERIOR, cursorMaisAntigo(visiveis));
+    visiveis = mesclarAnteriores(visiveis, segundoBloco);
+    expect(podeCarregarMais(segundoBloco.length, JANELA_ANTERIOR)).toBe(true);
     const antigas = buscar(todas, JANELA_ANTERIOR, cursorMaisAntigo(visiveis));
     expect(antigas.length).toBe(10);
     expect(podeCarregarMais(antigas.length, JANELA_ANTERIOR)).toBe(false);
+    expect(mesclarAnteriores(visiveis, antigas)).toEqual(todas);
   });
 });
 

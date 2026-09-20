@@ -4,6 +4,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import type { Database } from "@/integrations/supabase/types";
 import { hojeBR, janelaDiaClinica } from "@/lib/date-utils";
+import { JANELA_INICIAL } from "@/lib/atendimento/mensagens-janela";
 import { z } from "zod";
 import {
   STATUS_FECHADOS,
@@ -137,7 +138,7 @@ export const listarConversas = createServerFn({ method: "POST" })
         // FASE 2 — segundo eixo do filtro (estado + ordenação). Aplicado no
         // banco, antes do LIMIT, para nunca esconder resultado válido.
         visualizacao: z.enum(["recentes", "resolvidas", "espera"]).default("recentes"),
-        limit: z.number().int().min(1).max(500).default(200),
+        limit: z.number().int().min(1).max(500).default(100),
       })
       .parse(i),
   )
@@ -1797,7 +1798,7 @@ export const listarMensagensConversa = createServerFn({ method: "POST" })
       .object({
         clinicaId: z.string().uuid(),
         conversaId: z.string().uuid(),
-        limit: z.number().int().min(1).max(500).default(200),
+        limit: z.number().int().min(1).max(500).default(JANELA_INICIAL),
         // Cursor da paginação: busca apenas mensagens ANTERIORES a este
         // instante (usado ao rolar para cima em conversas longas).
         antesDe: z.string().min(1).optional(),

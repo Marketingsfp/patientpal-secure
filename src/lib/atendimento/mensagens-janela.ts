@@ -7,9 +7,9 @@
  */
 
 /** Quantas mensagens são carregadas ao abrir a conversa. */
-export const JANELA_INICIAL = 40;
+export const JANELA_INICIAL = 20;
 /** Quantas mensagens antigas são buscadas a cada "carregar anteriores". */
-export const JANELA_ANTERIOR = 40;
+export const JANELA_ANTERIOR = 20;
 
 function instante(m: any): number {
   return new Date(m?.recebida_em ?? m?.created_at ?? 0).getTime();

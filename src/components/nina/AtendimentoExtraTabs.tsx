@@ -1004,7 +1004,7 @@ export function AtendInbox() {
           escopo,
           atendenteId: atendenteSelecionadoId,
           visualizacao,
-          limit: 200,
+          limit: 100,
         },
       }));
       // Resposta atrasada de uma recarga anterior não pode sobrescrever a
@@ -1096,7 +1096,7 @@ export function AtendInbox() {
         // e resolvidas. Mesclar a prévia não deve aplicar uma segunda ordem.
         return mesclarListaConversas(prev as any, rows as any) as any[];
       });
-      // Os totais vêm da contagem do servidor; esta página pode conter só 200 cards.
+      // Os totais vêm da contagem do servidor; esta página pode conter só 100 cards.
       // Com uma conversa já escolhida (ou pedida por outro módulo), a tela
       // nunca troca sozinha para outra.
       if (

@@ -12,8 +12,8 @@ const msg = (id: string, iso: string) => ({ id, recebida_em: iso, body: id });
 
 describe("janela de mensagens", () => {
   it("abre a conversa com uma janela curta", () => {
-    expect(JANELA_INICIAL).toBeLessThanOrEqual(50);
-    expect(JANELA_INICIAL).toBeGreaterThanOrEqual(30);
+    expect(JANELA_INICIAL).toBe(20);
+    expect(JANELA_ANTERIOR).toBe(20);
   });
 
   it("junta antigas antes das atuais, em ordem e sem duplicar", () => {
