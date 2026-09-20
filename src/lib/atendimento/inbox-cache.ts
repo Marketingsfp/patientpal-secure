@@ -4,14 +4,16 @@
  * O backend já entrega apenas as conversas do filtro escolhido. Este módulo
  * acrescenta a segunda camada de proteção, no navegador: nada que não pertença
  * ao filtro atual pode entrar (ou continuar) na lista ou aparecer numa busca.
- * O chat da própria atendente pode continuar aberto após sair da fila para
- * Ativas, mediante confirmação autorizada, conservando seu cache.
+ * O chat da própria atendente pode continuar aberto entre Ativas, Não
+ * atribuídas e Fechadas, mediante confirmação autorizada, conservando seu cache.
  *
  * Tudo aqui é função pura, para ser testável sem tela.
  */
 import {
   atendenteFiltroEfetivo,
   conversaDoAtendente,
+  conversaEstaFechada,
+  conversaResolvidaDoAtendente,
   escopoComAtendente,
   conversaVisivelNoEscopo,
   type ConversaEscopo,
@@ -94,32 +96,38 @@ export function idsQueSairam(anteriores: { id: string }[], atuais: { id: string 
   return anteriores.filter((c) => !agora.has(c.id)).map((c) => c.id);
 }
 
-/** A lista pode perder a conversa da própria atendente quando a primeira resposta é enviada. */
-export function podeRevalidarChatDaFila(
+/** Trocar a aba filtra os cards, sem encerrar a conversa da própria atendente. */
+export function podeRevalidarChatEntreFiltros(
   selecionada: LinhaCache | null | undefined,
   ctx: ContextoEscopo,
 ): boolean {
-  return Boolean(
-    selecionada && ctx.clinicaId && ctx.userId && !ctx.gestor &&
-    ctx.escopo === "nao_atribuidas" && selecionada.clinica_id === ctx.clinicaId &&
-    selecionada.is_teste !== true && selecionada.atribuida_user_id === ctx.userId &&
+  if (
+    !selecionada || !ctx.clinicaId || !ctx.userId || ctx.gestor ||
+    !["minhas", "nao_atribuidas", "fechadas"].includes(ctx.escopo) ||
+    selecionada.clinica_id !== ctx.clinicaId || selecionada.is_teste === true
+  ) return false;
+  if (conversaEstaFechada(selecionada)) {
+    return conversaResolvidaDoAtendente(selecionada, ctx.userId);
+  }
+  return (
+    selecionada.atribuida_user_id === ctx.userId &&
     selecionada.owner_type === "HUMAN" && typeof selecionada.fila_pendente === "boolean" &&
-    ["waiting", "active", "in_progress"].includes(selecionada.status ?? ""),
+    ["waiting", "active", "in_progress"].includes(selecionada.status ?? "")
   );
 }
 
 /** Só mantém fora da lista com um registro atual autorizado; ausência no filtro não basta. */
-export function chatContinuaAposPrimeiraResposta(args: {
+export function chatContinuaEntreFiltros(args: {
   selecionada: LinhaCache | null | undefined;
   confirmada: LinhaCache | null | undefined;
   ctx: ContextoEscopo;
 }): boolean {
   const { selecionada, confirmada, ctx } = args;
   return Boolean(
-    podeRevalidarChatDaFila(selecionada, ctx) && confirmada &&
-    confirmada.id === selecionada?.id && podeRevalidarChatDaFila(confirmada, ctx) &&
-    confirmada.fila_pendente === false &&
-    ["active", "in_progress"].includes(confirmada.status ?? ""),
+    selecionada && confirmada && podeRevalidarChatEntreFiltros(selecionada, ctx) &&
+    confirmada.id === selecionada.id && podeRevalidarChatEntreFiltros(confirmada, ctx) &&
+    // Encerrar ou reabrir de fato continua seguindo o fluxo de mudança de atendimento.
+    conversaEstaFechada(selecionada) === conversaEstaFechada(confirmada),
   );
 }
 
@@ -136,14 +144,14 @@ export function selecaoDeveSair(args: {
   linhas: LinhaCache[] | null | undefined;
   buscando: boolean;
   ctx: ContextoEscopo;
-  /** Leitura autenticada atual da conversa que já passou da fila individual para Ativas. */
+  /** Leitura autenticada atual da conversa aberta que não pertence à aba escolhida. */
   confirmadaForaLista?: LinhaCache | null;
 }): boolean {
   const { selecionada, linhas, buscando, ctx } = args;
   if (!selecionada || !linhas) return false;
   const naLista = linhas.find((l) => l.id === selecionada.id);
   if (naLista) return !podeEntrarNaLista(naLista, ctx);
-  if (chatContinuaAposPrimeiraResposta({ selecionada, confirmada: args.confirmadaForaLista, ctx }))
+  if (chatContinuaEntreFiltros({ selecionada, confirmada: args.confirmadaForaLista, ctx }))
     return false;
   if (buscando) return !podeEntrarNaLista(selecionada, ctx);
   return true;

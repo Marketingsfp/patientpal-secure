@@ -11,7 +11,7 @@ Regra reforçada em 17/09/2026:
 
 O banco já implementa essa regra na migration canônica `20260917144041_b618961f-ac79-4d95-977a-1eac1d3541fa.sql`. A promoção depende de resposta humana `sent`, `delivered` ou `read`; entrar em Online, mensagem da Nina, recebida ou com falha não inicia a conversa. Nenhuma migration ou regra de distribuição foi alterada nesta entrega.
 
-Antes, a Inbox removia a seleção quando o cartão desaparecia do filtro. Agora, no filtro individual, ela consulta o registro atual pelo endpoint autenticado `obterConversa` antes de fechar um chat ausente da lista. Mantém somente a conversa da mesma clínica, mesma atendente e mesmo id, sob atendimento humano, com fila pendente encerrada e status ativo. Transferências, encerramentos, perda de acesso e troca de contexto continuam invalidando a seleção.
+Antes, a Inbox removia a seleção quando o cartão desaparecia do filtro. Agora, nas três abas individuais (Ativas, Não atribuídas e Fechadas), ela consulta o registro atual pelo endpoint autenticado `obterConversa` antes de fechar um chat ausente da lista. Mantém somente a conversa da mesma clínica, mesma atendente e mesmo id. Conversas abertas precisam continuar sob atendimento humano da atendente; conversas já encerradas usam o vínculo histórico de responsabilidade ou resolução, igual ao acesso do backend. Transferências, encerramentos/reaberturas efetivos, perda de acesso e troca de clínica ou usuário continuam sendo conferidos. Trocar apenas de aba não limpa a seleção, mensagens, rascunho ou posição de leitura.
 
 O evento de conversa atualiza o cabeçalho mesmo após remover o cartão. A confirmação da primeira resposta também solicita a reconciliação da lista para cobrir atraso do Realtime. Respostas atrasadas da consulta são descartadas quando seleção, filtro ou contexto mudam.
 
@@ -22,3 +22,9 @@ O evento de conversa atualiza o cabeçalho mesmo após remover o cartão. A conf
 - Chrome com dados fictícios e função de recarga extraída do componente real: Online conserva duas pendências; responder uma deixa uma pendência, uma ativa e o mesmo chat aberto; outra reconciliação preserva o próximo texto digitado.
 
 O cenário de navegador usa transporte simulado. Não foram enviadas mensagens reais nem alteradas conversas de produção.
+
+### Troca entre as três abas — 20/09/2026
+
+A proteção antes limitada à primeira resposta na fila foi estendida às três abas. Os cards continuam respeitando o filtro escolhido, mesmo quando o chat selecionado pertence a outra aba. A atualização em tempo real também confere transferências quando o card do chat aberto não está na lista atual.
+
+71 testes passaram nos quatro arquivos de continuidade, cache, filtros das atendentes e ordenação estável. Cobrem as seis trocas entre abas com conversas ativas, pendentes e fechadas, lista vazia, confirmação de acesso, vínculos históricos e transferência. Essa ampliação foi validada localmente; a publicação e a conferência no aplicativo publicado continuam pendentes.

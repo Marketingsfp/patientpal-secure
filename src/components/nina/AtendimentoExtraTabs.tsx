@@ -281,8 +281,8 @@ import {
   filtrarPorEscopo,
   idsQueSairam,
   selecaoDeveSair,
-  podeRevalidarChatDaFila,
-  chatContinuaAposPrimeiraResposta,
+  podeRevalidarChatEntreFiltros,
+  chatContinuaEntreFiltros,
   type ContadoresInbox,
 } from "@/lib/atendimento/inbox-cache";
 
@@ -1025,11 +1025,11 @@ export function AtendInbox() {
       const selecionadaParaConferir = selRef.current;
       let confirmadaForaLista: any = null;
       if (
-        podeRevalidarChatDaFila(selecionadaParaConferir, ctxEscopo) &&
+        podeRevalidarChatEntreFiltros(selecionadaParaConferir, ctxEscopo) &&
         !rows.some((r: any) => r.id === selecionadaParaConferir.id)
       ) {
-        // Primeira resposta pode tirar o card de Não atribuídas. A leitura
-        // autenticada distingue esse movimento de uma transferência/encerramento.
+        // Trocar de aba ou responder na fila pode tirar o card da lista.
+        // A leitura autenticada confirma que o chat ainda pertence à atendente.
         confirmadaForaLista = await obterConversaFn({
           data: { clinicaId, conversaId: selecionadaParaConferir.id },
         }).catch(() => null);
@@ -1038,7 +1038,7 @@ export function AtendInbox() {
             selecaoIdRef.current !== selecionadaParaConferir.id) return;
       }
       // Transferência, resolução ou perda de acesso continuam encerrando a
-      // seleção. A ida da própria fila para Ativas mantém o chat e o filtro.
+      // seleção. Trocar entre as três abas mantém o chat e o filtro escolhido.
       if (deepLinkPendente.current && selIdRef.current !== deepLinkPendente.current)
         deepLinkPendente.current = null;
       const removeu = selecaoDeveSair({
@@ -2151,10 +2151,10 @@ export function AtendInbox() {
         // FASE 3 — transferência, handoff da Nina ou encerramento entram e
         // saem da lista na hora, respeitando o atendente e o estado escolhidos.
         const atualizada = evento.new;
-        const contextoFila = { clinicaId, escopo, userId: meuId, gestor: souGestor };
-        if (atualizada?.id === selIdRef.current && podeRevalidarChatDaFila(selRef.current, contextoFila)) {
-          if (chatContinuaAposPrimeiraResposta({
-            selecionada: selRef.current, confirmada: atualizada as any, ctx: contextoFila,
+        const contextoChat = { clinicaId, escopo, userId: meuId, gestor: souGestor };
+        if (atualizada?.id === selIdRef.current && podeRevalidarChatEntreFiltros(selRef.current, contextoChat)) {
+          if (chatContinuaEntreFiltros({
+            selecionada: selRef.current, confirmada: atualizada as any, ctx: contextoChat,
           })) {
             // Atualiza o cabeçalho mesmo quando o card sai da lista; mantém
             // seleção, mensagens, rascunho e posição de rolagem do mesmo chat.
