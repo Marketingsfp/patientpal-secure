@@ -276,7 +276,6 @@ import { idsParaInspecaoNina, marcadorInternoSistema, revisaoInspecaoMensagens }
 import { devoAutoSelecionarComSelecao, escopoParaConversa } from "@/lib/atendimento/deep-link";
 import { devoAutoSelecionar, type LinhaInbox } from "@/lib/atendimento/inbox-realtime";
 import {
-  ajustarContadorAtual,
   chaveInbox,
   filtrarPorEscopo,
   idsQueSairam,
@@ -406,7 +405,7 @@ export function AtendInbox() {
   const filtrosAtendente = estadoFiltroAtendente(filtroAtendente);
   const visualizacao = souGestor ? visualizacaoEscolhida : filtrosAtendente.visualizacao;
   // Contagem própria de cada filtro (nunca reaproveita o número de outro).
-  const [contadores, setContadores] = useState<Record<string, number>>({
+  const [contadores, setContadores] = useState<ContadoresInbox>({
     minhas: 0,
     nina: 0,
     nao_atribuidas: 0,
@@ -1095,8 +1094,7 @@ export function AtendInbox() {
         // e resolvidas. Mesclar a prévia não deve aplicar uma segunda ordem.
         return mesclarListaConversas(prev as any, rows as any) as any[];
       });
-      // O número do filtro atual muda na hora; o servidor confirma em seguida.
-      setContadores((c) => ajustarContadorAtual(c as ContadoresInbox, escopo, rows.length));
+      // Os totais vêm da contagem do servidor; esta página pode conter só 200 cards.
       // Com uma conversa já escolhida (ou pedida por outro módulo), a tela
       // nunca troca sozinha para outra.
       if (
@@ -2992,6 +2990,11 @@ export function AtendInbox() {
             {!souGestor ? (
               <FiltrosAtendente
                 valor={filtroAtendente}
+                contagens={{
+                  ativas: contadores.minhas,
+                  nao_atribuidas: contadores.nao_atribuidas,
+                  fechadas: contadores.fechadas,
+                }}
                 onChange={(valor) => {
                   const alvo = estadoFiltroAtendente(valor);
                   setEscopoBase(alvo.base);
