@@ -67,15 +67,6 @@ export function HandoffGroupCard({ grupo }: { grupo: GrupoHandoff }) {
 
   const linha2: Array<{ rotulo?: string; valor: string }> = [];
   if (grupo.protocolo) linha2.push({ rotulo: "Protocolo", valor: grupo.protocolo });
-  if (grupo.filaNome || grupo.filaInicial != null)
-    linha2.push({
-      rotulo: "Fila inicial",
-      valor:
-        grupo.filaNome && grupo.filaInicial != null
-          ? `${grupo.filaNome} (posição ${grupo.filaInicial})`
-          : (grupo.filaNome ?? `posição ${grupo.filaInicial}`),
-    });
-  if (grupo.urgencia) linha2.push({ rotulo: "Urgência", valor: grupo.urgencia });
 
   const linha3: Array<{ rotulo?: string; valor: string }> = [];
   if (grupo.origem) linha3.push({ rotulo: "Origem", valor: ORIGEM[grupo.origem] ?? grupo.origem });
@@ -87,24 +78,13 @@ export function HandoffGroupCard({ grupo }: { grupo: GrupoHandoff }) {
     linha4.push({ rotulo: "Atribuição", valor: "Automática" });
     if (atribuicao.atendenteNome)
       linha4.push({ rotulo: "Atendente", valor: atribuicao.atendenteNome });
-    if (atribuicao.statusAtendente)
-      linha4.push({ rotulo: "Status da atendente", valor: atribuicao.statusAtendente });
-    const horaAtribuicao = formatarDataHoraMensagem(atribuicao.criadoEm);
-    if (horaAtribuicao && horaAtribuicao !== formatarDataHoraMensagem(grupo.criadoEm))
-      linha4.push({ rotulo: "Atribuída em", valor: horaAtribuicao });
   }
 
   return (
     <Card
       titulo="Encaminhamento para atendimento humano"
       hora={formatarDataHoraMensagem(grupo.criadoEm)}
-      linhas={[
-        motivo ? [{ rotulo: "Motivo", valor: motivo }] : [],
-        linha2,
-        linha3,
-        linha4,
-        atribuicao?.criterio ? [{ rotulo: "Critério", valor: atribuicao.criterio }] : [],
-      ]}
+      linhas={[motivo ? [{ rotulo: "Motivo", valor: motivo }] : [], linha2, linha3, linha4]}
     />
   );
 }
@@ -144,13 +124,6 @@ export function AtribuicaoGroupCard({ grupo }: { grupo: GrupoAtribuicao }) {
 
   const linha1: Array<{ rotulo?: string; valor: string }> = [];
   if (grupo.atendenteNome) linha1.push({ rotulo: "Atendente", valor: grupo.atendenteNome });
-  if (grupo.statusAtendente) linha1.push({ rotulo: "Status", valor: grupo.statusAtendente });
 
-  return (
-    <Card
-      titulo="👤 Atribuição automática"
-      hora={hora}
-      linhas={[linha1, grupo.criterio ? [{ rotulo: "Critério", valor: grupo.criterio }] : []]}
-    />
-  );
+  return <Card titulo="👤 Atribuição automática" hora={hora} linhas={[linha1]} />;
 }
