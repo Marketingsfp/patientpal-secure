@@ -2531,6 +2531,25 @@ function AtendimentosPage() {
     [filteredItems],
   );
 
+  /**
+   * Número da ficha/GR mostrado na lista. Só atendimentos de verdade recebem
+   * número: a linha "[LAUDO]" é a parte do médico que laudou o mesmo exame e
+   * não pode consumir um segundo número (era o que fazia 1 eletrocardiograma
+   * aparecer como 2 atendimentos).
+   */
+  const fichaPorLinha = useMemo(() => {
+    const m = new Map<string, number>();
+    let n = 0;
+    for (const a of filteredItems) {
+      if (ehLinhaDeLaudo(a)) continue;
+      n += 1;
+      m.set(`${a.origem}:${a.id}`, n);
+    }
+    return m;
+  }, [filteredItems]);
+
+
+
   const isAtendido = (a: Atend) =>
     a.origem === "manual" ? a.status === "realizado" : a.agendamento_status === "realizado";
   // Itens selecionáveis: qualquer atendimento com repasse > 0.
