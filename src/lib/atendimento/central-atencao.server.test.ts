@@ -1,6 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import { carregarDadosCentralAtencao } from "./central-atencao.server";
-import { calcularAtencao } from "./central-atencao";
+import { calcularAtencao, itensDaCategoria } from "./central-atencao";
+import { faixaEsperaDesde } from "./espera";
 import { consultarInicioCronometroPausa } from "./cronometro-pausa.server";
 
 /** Cliente de consulta em memória: executa os filtros, paginação e head/count. */
@@ -177,6 +178,26 @@ function bancoTeste(gestor: boolean) {
 }
 
 describe("consulta da Central de Atenção", () => {
+  it("handoff às 13:02 é crítico na Central e no card às 13:26, ainda na fila individual", async () => {
+    const db = bancoTeste(false);
+    db.add("encaminhada", {
+      owner_type: "HUMAN",
+      atribuida_user_id: "ana",
+      fila_pendente: true,
+    });
+    // Instante retornado pela RPC corrigida, apesar do aviso automático posterior.
+    db.esperas.push({ conversa_id: "encaminhada", aguardando_desde: "2026-09-20T13:02:12-03:00" });
+    const dados = await db.carregar();
+    const agora = Date.parse("2026-09-20T13:26:00-03:00");
+    const resumo = calcularAtencao({ ...dados, naoAtribuidas: dados.filas, agora });
+    expect(resumo.criticas).toBe(1);
+    expect(resumo.aguardando).toBe(0);
+    expect(resumo.total).toBe(1);
+    expect(resumo.nivel).toBeGreaterThan(0);
+    expect(itensDaCategoria(resumo.itens, null).map((i) => i.id)).toEqual(["encaminhada"]);
+    expect(faixaEsperaDesde(dados.espera.encaminhada, agora)).toBe("critico");
+  });
+
   it("gestão recebe toda a global acima de 500 e pendências identificadas por atendente", async () => {
     const db = bancoTeste(true);
     for (let i = 0; i < 501; i++) db.add(`g${String(i).padStart(4, "0")}`);

@@ -1,8 +1,10 @@
 /**
  * Tempo de espera do paciente em uma conversa do atendimento.
  *
- * Regra: conta a partir da PRIMEIRA mensagem do paciente que ainda não foi
- * respondida (nem pela Nina, nem por um atendente). O cálculo do instante
+ * Regra: conta a partir da PRIMEIRA mensagem ainda não respondida. Ao passar
+ * para a equipe, conta desde o encaminhamento até uma resposta humana enviada;
+ * avisos automáticos e registros internos não encerram a espera. A resposta da
+ * Nina encerra a espera apenas enquanto ela é responsável. O cálculo do instante
  * inicial vem do banco (RPC `atend_espera_por_conversa`); aqui só ficam as
  * regras de faixa, formatação e acessibilidade — centralizadas para poderem
  * ser configuradas depois sem mexer em componente.
