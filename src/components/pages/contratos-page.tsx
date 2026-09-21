@@ -340,6 +340,7 @@ type Convenio = {
   max_dependentes: number;
   vigencia_meses: number;
   beneficios: string | null;
+  ativo?: boolean | null;
 };
 type Faixa = {
   id: string;
@@ -647,11 +648,12 @@ export function ContratosPage({
     const desatualizada = () => seq !== loadSeq.current;
     const s = termo.trim();
     const buscando = s.length >= 2;
+    // Sem filtro de "ativo": a lista completa é usada para decidir de qual
+    // produto o contrato é (convênio desativado não pode sumir da lista).
     let conveniosQuery = supabase
       .from("cb_convenios")
       .select("*")
-      .eq("clinica_id", clinicaAtual!.clinica_id)
-      .eq("ativo", true);
+      .eq("clinica_id", clinicaAtual!.clinica_id);
     // Dentro dos módulos de cartão, só os convênios do produto daquele módulo.
     if (produtoFiltro) conveniosQuery = conveniosQuery.eq("produto", produtoFiltro);
     const [res, cv] = await Promise.all([
@@ -692,7 +694,7 @@ export function ContratosPage({
     setList(lista);
     setParcAgg(agg);
     setVendedores(vend);
-    setConvenios(conveniosLista);
+    setConvenios(conveniosLista.filter((c) => c.ativo));
     // Avisa a tela quando o corte do limite pode ter escondido resultados.
     setResultadoCortado(buscando && linhas.length >= LIMITE_BUSCA);
     setLoading(false);
@@ -743,11 +745,11 @@ export function ContratosPage({
     } else {
       contratosQuery = contratosQuery.limit(LIMITE_LISTA);
     }
+    // Mesma regra da carga por RPC: lista completa para o filtro de produto.
     let conveniosQueryLegado = supabase
       .from("cb_convenios")
       .select("*")
-      .eq("clinica_id", clinicaAtual.clinica_id)
-      .eq("ativo", true);
+      .eq("clinica_id", clinicaAtual.clinica_id);
     if (produtoFiltro) conveniosQueryLegado = conveniosQueryLegado.eq("produto", produtoFiltro);
     const [cs, cv] = await Promise.all([contratosQuery, conveniosQueryLegado.order("nome")]);
     if (desatualizada()) return;
@@ -783,7 +785,7 @@ export function ContratosPage({
         codigo_prontuario: c.paciente_id ? (prontMap[c.paciente_id] ?? null) : null,
       })),
     );
-    setConvenios(conveniosLista);
+    setConvenios(conveniosLista.filter((c) => c.ativo));
     // Agregar parcelas dos contratos carregados
     const contratoIds = contratosRows.map((c) => c.id);
     if (contratoIds.length > 0) {
