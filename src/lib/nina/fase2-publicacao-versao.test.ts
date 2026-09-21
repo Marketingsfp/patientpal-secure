@@ -62,7 +62,10 @@ mock.module("@/integrations/supabase/client.server", () => ({
 const { promptInstrucoes, invalidarCacheInstrucoes, _resetCacheInstrucoes, IDADE_MAX_CACHE_MS } =
   await import("./instrucoes-runtime.server");
 
-const VALORES = { "${nomeUnidade}": "Policlínica Menino Jesus", "${nomeCurtoUnidade}": "Menino Jesus" };
+const VALORES = {
+  "${nomeUnidade}": "Policlínica Menino Jesus",
+  "${nomeCurtoUnidade}": "Menino Jesus",
+};
 const CODIGO = "PROMPT DO CÓDIGO";
 
 function publicar(versao: number, conteudo: string) {
@@ -98,7 +101,9 @@ describe("template compartilhado", () => {
       "${tipoEstabelecimento}",
     ]);
     expect(MARCADORES_PERMITIDOS.painel_interno).toEqual(["${contextoTexto}"]);
-    expect(validarTemplateInstrucoes("whatsapp", "Olá, aqui é a ${nomeCurtoUnidade}.").ok).toBe(true);
+    expect(validarTemplateInstrucoes("whatsapp", "Olá, aqui é a ${nomeCurtoUnidade}.").ok).toBe(
+      true,
+    );
   });
 
   it("reprova marcador desconhecido dizendo qual é", () => {
@@ -123,10 +128,43 @@ describe("template compartilhado", () => {
     expect(falha.ok).toBe(false);
     expect(marcadoresDoTemplate("a ${x} b ${y}")).toEqual(["${x}", "${y}"]);
   });
+
+  it("reprova prompt sem texto e painel sem contexto, inclusive o defeito publicado na v3", () => {
+    for (const texto of ["", "   ", ".", "${contextoTexto}"]) {
+      expect(validarTemplateInstrucoes("painel_interno", texto).ok).toBe(false);
+    }
+    expect(validarTemplateInstrucoes("painel_interno", ".\n\nNão use emojis.").ok).toBe(false);
+    expect(
+      validarTemplateInstrucoes("painel_interno", "Consulte os dados autorizados: ${contextoTexto}")
+        .ok,
+    ).toBe(true);
+    expect(validarTemplateInstrucoes("homologacao", "Responda TESTE_OK.").ok).toBe(true);
+  });
 });
 
 // ------------------------------------------------------------ 2/3. runtime
 describe("resolução de versão no runtime", () => {
+  it("painel publicado sem contexto cai no fallback completo, sem apagar os dados autorizados", async () => {
+    banco.push({
+      id: "painel-v3",
+      escopo: "painel_interno",
+      versao: 3,
+      conteudo: ".\n\nNão use emojis.",
+      status: "publicada",
+      publicado_em: "2026-09-19T23:00:00Z",
+    });
+    const s = await promptInstrucoes(
+      "painel_interno",
+      { "${contextoTexto}": "DADOS_AUTORIZADOS" },
+      "INSTRUCOES_COMPLETAS\nDADOS_AUTORIZADOS",
+      "turno-painel",
+    );
+    expect(s.origem).toBe("codigo");
+    expect(s.fallbackPorErro).toBe(true);
+    expect(s.texto).toContain("INSTRUCOES_COMPLETAS");
+    expect(s.texto).toContain("DADOS_AUTORIZADOS");
+    expect(s.template).not.toBe(banco[0]!.conteudo);
+  });
   it("usa a versão publicada e reporta qual foi", async () => {
     publicar(12, "Você é a Nina da ${nomeUnidade}.");
     const s = await promptInstrucoes("whatsapp", VALORES, CODIGO);

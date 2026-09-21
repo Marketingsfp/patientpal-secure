@@ -154,14 +154,14 @@ describe("cada forma associada ao preço precisa da própria evidência", () => 
   });
 });
 
-describe("aceitação e negativa verificadas na lista completa do caso", () => {
+describe("formas declaradas e ausência que exige confirmação da equipe", () => {
   it.each([
     "Não aceitamos PIX para a consulta de Cardiologia.",
     "Para a consulta de Cardiologia, PIX não é aceito.",
-  ])("confirma a forma ausente: %s", (texto) => {
+  ])("não confirma recusa só porque a forma está ausente: %s", (texto) => {
     const r = avaliarGrounding(contexto(), texto);
     expect(r.claims).toHaveLength(1);
-    expect(r.claims[0]?.suportado).toBe(true);
+    expect(r.claims[0]?.situacao).toBe("nao_verificado");
   });
 
   it("confere cada forma sem preço e preserva negativa ao lado de aceite", () => {
@@ -170,12 +170,12 @@ describe("aceitação e negativa verificadas na lista completa do caso", () => {
       "Para a consulta de Cardiologia, não aceitamos PIX, mas aceitamos dinheiro e cartão.",
     );
     expect(r.claims.filter((c) => c.tipo === "restricao")).toHaveLength(3);
-    expect(r.claims.every((c) => c.suportado)).toBe(true);
+    expect(r.claims.map((c) => c.suportado)).toEqual([false, true, true]);
   });
 
-  it("aceitar PIX sem constar na lista contradiz a política do caso", () => {
+  it("aceitar uma forma sem constar na lista exige confirmação", () => {
     const r = avaliarGrounding(contexto(), "Aceitamos PIX para a consulta de Cardiologia.");
-    expect(r.claims.find((c) => c.tipo === "restricao")?.situacao).toBe("divergente");
+    expect(r.claims.find((c) => c.tipo === "restricao")?.situacao).toBe("nao_verificado");
   });
 
   it("não permite negar dinheiro que foi declarado", () => {
@@ -188,7 +188,7 @@ describe("aceitação e negativa verificadas na lista completa do caso", () => {
 
   it("negação curta mantém o serviço da pergunta", () => {
     const r = avaliarGrounding(contexto(), "Não aceitamos PIX.");
-    expect(r.claims[0]?.suportado).toBe(true);
+    expect(r.claims[0]?.suportado).toBe(false);
     expect(r.claims[0]?.valorAfirmado).toBe("forma_pagamento:pix");
   });
 
@@ -200,7 +200,7 @@ describe("aceitação e negativa verificadas na lista completa do caso", () => {
       "Na consulta de Cardiologia, não aceitamos PIX. Aceitamos dinheiro e cartão.",
     );
     expect(r.claims).toHaveLength(3);
-    expect(r.claims.every((c) => c.suportado)).toBe(true);
+    expect(r.claims.map((c) => c.suportado)).toEqual([false, true, true]);
   });
 
   it("a troca explícita de serviço substitui o assunto anterior", () => {
@@ -209,7 +209,7 @@ describe("aceitação e negativa verificadas na lista completa do caso", () => {
       ctx,
       "Na consulta de Cardiologia, não aceitamos PIX. Aceitamos dinheiro para Pediatria.",
     );
-    expect(r.claims.map((c) => c.suportado)).toEqual([true, false]);
+    expect(r.claims.map((c) => c.suportado)).toEqual([false, false]);
   });
 
   it("perguntar a forma não é declaração de aceite", () => {
@@ -307,13 +307,15 @@ describe("aceitação e negativa verificadas na lista completa do caso", () => {
         ctx,
         "A Dra. Laura Silva não aceita PIX para a consulta de Cardiologia.",
       );
-      expect(especifico.claims.find((c) => c.tipo === "restricao")?.suportado).toBe(true);
+      expect(especifico.claims.find((c) => c.tipo === "restricao")?.situacao).toBe(
+        "nao_verificado",
+      );
     },
   );
 
-  it("lista vazia explícita permite negar e nunca inventa uma forma aceita", () => {
+  it("lista vazia não comprova recusa nem aceitação", () => {
     const ctx = contexto([{ ...registro, formas_pagamento: [] }]);
-    expect(avaliarGrounding(ctx, "Não aceitamos PIX.").claims[0]?.suportado).toBe(true);
+    expect(avaliarGrounding(ctx, "Não aceitamos PIX.").claims[0]?.suportado).toBe(false);
     expect(avaliarGrounding(ctx, "Aceitamos dinheiro.").claims[0]?.suportado).toBe(false);
   });
 
@@ -334,11 +336,11 @@ describe("aceitação e negativa verificadas na lista completa do caso", () => {
     ).toBe(true);
   });
 
-  it("nega cheque ausente sem tratar dinheiro ou cartão como cheque", () => {
+  it("cheque ausente exige confirmação sem tratar dinheiro ou cartão como cheque", () => {
     const ctx = contexto();
     ctx.mensagemPaciente = "Aceita cheque para a consulta de Cardiologia?";
     const r = avaliarGrounding(ctx, "Não aceitamos cheque para a consulta de Cardiologia.");
-    expect(r.claims[0]?.suportado).toBe(true);
+    expect(r.claims[0]?.situacao).toBe("nao_verificado");
     expect(r.claims[0]?.valorAfirmado).toBe("forma_pagamento:cheque");
   });
 });

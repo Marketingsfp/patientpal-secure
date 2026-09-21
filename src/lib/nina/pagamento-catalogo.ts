@@ -9,6 +9,19 @@ export const REGRA_PIX_CARTAO =
   "Não acrescente essa explicação a toda listagem de preços sem que o paciente pergunte sobre essas condições. " +
   "Não invente valor quando o preço do cartão não estiver informado.";
 
+/** Ausência de cadastro não prova recusa; Pix continua autorizado pelo cartão. */
+export const REGRA_FORMA_PAGAMENTO_AUSENTE =
+  "Quando uma forma de pagamento não estiver cadastrada para o atendimento, informe que precisa confirmar com a equipe e siga o fluxo de atendimento humano para essa pendência. " +
+  "Não afirme que é aceita nem que não é aceita com base apenas na ausência, em uma lista vazia ou em falha de consulta. Uma recusa exige informação explícita da fonte. " +
+  "Apresente as alternativas confirmadas, sem inventar valores. Pix já está autorizado quando houver valor de cartão, conforme a regra Pix/cartão.";
+
+export const REGRA_APRESENTACAO_VALORES =
+  "Compare todas as opções publicadas do mesmo atendimento, incluindo dinheiro, Pix/cartão, parcelamento e condições. " +
+  "Se todos os valores e condições forem iguais, informe os valores uma única vez em um bloco comum e diga a quais profissionais se aplicam. " +
+  "Se pelo menos um valor ou condição for diferente, apresente o valor de cada profissional no respectivo bloco. " +
+  "Campo ausente não comprova igualdade; nesse caso mantenha os valores conhecidos associados às respectivas opções e indique apenas a lacuna relevante. " +
+  "Nunca use só o preço do primeiro registro como preço de todos nem combine consultas ou procedimentos diferentes.";
+
 /** Idempotente; mantém qualificadores como crédito/débito e não muda valores. */
 export function rotuloPagamentoNina(forma: string): string {
   if (/\bpix\b/i.test(forma)) return forma;

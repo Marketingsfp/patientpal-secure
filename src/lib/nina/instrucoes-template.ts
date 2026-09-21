@@ -56,6 +56,15 @@ export function validarTemplateInstrucoes(
 ): ValidacaoTemplate {
   const permitidos = MARCADORES_PERMITIDOS[escopo] ?? [];
   const encontrados = marcadoresDoTemplate(template);
+  if (!/\p{L}/u.test(template.replace(/\$\{[^}\n]*\}/g, ""))) {
+    return {
+      ok: false,
+      marcador: "",
+      permitidos,
+      mensagem:
+        "As instruções precisam conter texto; pontuação ou marcadores isolados não são um prompt válido.",
+    };
+  }
   const desconhecido = encontrados.find((m) => !permitidos.includes(m));
   if (desconhecido) {
     return {
@@ -65,6 +74,15 @@ export function validarTemplateInstrucoes(
       mensagem:
         `O texto usa o marcador ${desconhecido}, que não existe. ` +
         `Marcadores disponíveis neste escopo: ${permitidos.join(", ") || "nenhum"}.`,
+    };
+  }
+  if (escopo === "painel_interno" && !encontrados.includes("${contextoTexto}")) {
+    return {
+      ok: false,
+      marcador: "${contextoTexto}",
+      permitidos,
+      mensagem:
+        "O painel interno precisa do marcador ${contextoTexto} para receber os dados autorizados da clínica. Preserve esse marcador ao editar as instruções.",
     };
   }
   return { ok: true, marcadores: encontrados };

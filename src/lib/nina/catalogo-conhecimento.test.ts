@@ -69,9 +69,7 @@ describe("catálogo como fonte de conhecimento da Nina", () => {
           fatos: evidencia.fatos,
           consultas: [evidencia.consulta],
         });
-        expect(resultado.situacao === "confirmado").toBe(
-          Array.isArray(formas) && formas.length === 0,
-        );
+        expect(resultado.situacao).not.toBe("confirmado");
       }
     },
   );

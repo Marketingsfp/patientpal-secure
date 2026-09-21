@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { interpretarModalidade } from "./modalidade-atendimento";
+import { REGRA_APRESENTACAO_VALORES } from "./pagamento-catalogo";
 
 const texto = z.string().trim().max(4000).nullable().optional();
 const hora = z
@@ -288,7 +289,7 @@ export function pendenciasEstrutura(
   return [...new Set(pendencias)];
 }
 
-export const INSTRUCAO_ESTRUTURA_CATALOGO =
+export const INSTRUCAO_DADOS_CATALOGO =
   "Cada item de atendimentos_publicados associa consulta/procedimento, profissional, valores, critérios e escala. " +
   "Nunca misture preço ou idade de atendimentos diferentes do mesmo profissional. Complementos são informações confirmadas para aquela chave; " +
   "se contradisserem o texto publicado, confirme com a equipe o aspecto conflitante, sem escolher uma versão. " +
@@ -296,5 +297,10 @@ export const INSTRUCAO_ESTRUTURA_CATALOGO =
   "Preparo não informado não significa sem preparo; convênios não informados não significam que não aceita. " +
   "'40 kg' não é idade. 'Manhã e tarde' não estabelece limite de chegada. Quinzenal sem data de referência não identifica o próximo dia. " +
   "Valor de anestesia sem condição não autoriza somar ou declarar incluído. Grupo geral e item específico não compartilham regras automaticamente. " +
-  "Responda somente aos objetivos do pedido, sem copiar os rótulos internos ou repetir fatos. Valores iguais em todas as opções podem ser apresentados uma vez; " +
-  "havendo diferença, preserve o valor de cada opção. Profissional genérico é equipe interna: omita o nome; SFP exige encaminhamento humano silencioso.";
+  "Responda somente aos objetivos do pedido, sem copiar os rótulos internos ou repetir fatos.";
+
+export const INSTRUCAO_ESTRUTURA_CATALOGO =
+  INSTRUCAO_DADOS_CATALOGO +
+  " " +
+  REGRA_APRESENTACAO_VALORES +
+  " Profissional genérico é equipe interna: omita o nome; SFP exige encaminhamento humano silencioso.";

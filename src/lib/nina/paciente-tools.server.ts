@@ -24,6 +24,7 @@
  */
 
 import { z } from "zod";
+import { REGRA_CONSULTA_CATALOGO } from "./catalogo-busca";
 import { OBJETIVOS_PESQUISA_CATALOGO, TIPOS_ATENDIMENTO_CATALOGO } from "./catalogo-pesquisa";
 import { agoraNaClinica, FUSO_PADRAO } from "@/lib/nina-agora";
 import { janelaDiaClinica } from "@/lib/date-utils";
@@ -776,7 +777,9 @@ export const FERRAMENTAS_NINA_CONSULTA = [
     function: {
       name: "consultar_base_conhecimento",
       description:
-        "FONTE DE VERDADE administrativa da clínica (catálogo publicado). Consulte SEMPRE antes de falar sobre especialidades, exames, procedimentos, médicos, dias e horários de atendimento, valores e formas de pagamento, preparos, convênios, observações e regras. Nunca responda esses assuntos sem chamar esta ferramenta. Cada valor vem com sua forma de pagamento e condição: informe todas as que vierem, nunca só a mais barata. O horário retornado é a escala do profissional, não vaga disponível.",
+        "FONTE DE VERDADE administrativa da clínica (catálogo publicado). " +
+        REGRA_CONSULTA_CATALOGO +
+        " Cada valor vem com sua forma de pagamento e condição; preserve essa associação e agrupe valores somente quando todas as opções e condições forem iguais.",
       parameters: {
         type: "object",
         properties: {

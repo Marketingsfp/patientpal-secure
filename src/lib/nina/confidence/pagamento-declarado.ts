@@ -37,9 +37,8 @@ export function escopoDaFormaPagamento(chave: ChaveFato, mensagemPaciente: strin
 }
 
 /**
- * A negativa segue a regra publicada da clínica: forma não declarada na lista
- * completa do caso consultado não é aceita. Array vazio explícito é válido;
- * campo ausente, truncamento ou falha não são listas completas.
+ * Uma lista comprova as formas declaradas, mas sua ausência não comprova recusa.
+ * A política atual exige confirmação da equipe para formas não cadastradas.
  */
 export function verificarFormaPagamento(entrada: {
   forma: string;
@@ -133,12 +132,19 @@ export function verificarFormaPagamento(entrada: {
     };
   }
   const { aceita, fato } = comparacoes[0]!;
+  if (!aceita) {
+    return {
+      situacao: "nao_verificado",
+      fato,
+      referencia: referenciaDoFato(fato),
+      motivo:
+        "a forma não está cadastrada para este atendimento; ausência não comprova aceite nem recusa — confirmar com a equipe",
+    };
+  }
   return {
     situacao: aceita !== entrada.negacao ? "confirmado" : "divergente",
     fato,
     referencia: referenciaDoFato(fato),
-    motivo: aceita
-      ? "a forma está declarada na lista completa do serviço/profissional consultado"
-      : "a forma não está declarada na lista completa do serviço/profissional e, pela regra da clínica, não é aceita",
+    motivo: "a forma está declarada na lista do serviço/profissional consultado",
   };
 }

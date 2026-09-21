@@ -15,7 +15,7 @@ export const FERRAMENTA_HANDOFF = {
   function: {
     name: NOME_FERRAMENTA_HANDOFF,
     description:
-      "Transfere a conversa para um atendente humano. Use quando o paciente pedir uma pessoa, quando houver reclamação/urgência clínica, cobrança, cancelamento com conflito, ou quando você não conseguir resolver após tentar. Depois de chamar, apenas avise o paciente que a equipe vai continuar o atendimento. Exceção: profissional SFP exige motivo PROFISSIONAL_SFP e transferência silenciosa, sem nenhuma mensagem ao paciente.",
+      "Transfere a conversa para atendimento humano. Use para pedido explícito por uma pessoa, reclamação, urgência clínica, cobrança, dependência da equipe, ausência confirmada no catálogo/agenda ou identificação ainda ambígua após um esclarecimento. Analise o pedido e consulte a fonte apropriada antes de concluir ausência; motivo e resumo devem explicar a pendência específica. Não repita uma transferência confirmada. O sistema coordena o aviso e o protocolo; não produza uma segunda mensagem após o encaminhamento. Profissional SFP exige motivo PROFISSIONAL_SFP e transferência silenciosa, sem nenhuma mensagem ao paciente.",
     parameters: {
       type: "object",
       properties: {
@@ -80,10 +80,13 @@ export async function executarHandoffTool(
     ok: r.ok,
     sem_mensagem_paciente: silencioso,
     ja_com_humano: r.ja_estava_com_humano ?? false,
+    aviso: r.aviso ?? null,
     posicao_fila: r.posicao_fila ?? null,
     setor: r.departamento ?? null,
     instrucao_para_voce: silencioso
       ? "Encerre o turno sem mensagem ao paciente. A transferência por profissional SFP é silenciosa."
-      : "Avise o paciente, em uma frase curta e acolhedora, que uma atendente da equipe vai continuar daqui. Não prometa prazo exato e não faça mais perguntas.",
+      : r.ok
+        ? "O sistema coordena o aviso e o protocolo. Encerre o turno sem produzir outro aviso ou continuar o atendimento; não repita a transferência."
+        : "O encaminhamento não foi confirmado. Informe a dificuldade sem afirmar que transferiu, seguindo o tratamento de falha disponível.",
   };
 }
