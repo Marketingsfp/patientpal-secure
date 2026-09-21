@@ -61,8 +61,9 @@ export interface LinhaMedico {
   agencia: string | null;
   conta: string | null;
   pixChave: string | null;
-  tipoRepasse: TipoRepasse;
-  repassePadrao: number;
+  /** `null` = a planilha não tem a coluna de repasse; vale o informado na tela. */
+  tipoRepasse: TipoRepasse | null;
+  repassePadrao: number | null;
   aceitaCartaoBeneficios: boolean;
   duracaoConsultaMin: number;
   ativo: boolean;
@@ -96,6 +97,13 @@ export interface ResultadoLeituraMedicos {
   /** Nome real das abas encontradas (null = não achou). */
   abaMedicos: string | null;
   abaRepasses: string | null;
+  /** A aba de médicos não tem a coluna Repasse Padrão (planilha de outro sistema). */
+  semRepasse: boolean;
+}
+
+export interface OpcoesLeituraMedicos {
+  /** UF da clínica: vale como UF do CRM quando a planilha não informa. */
+  ufPadrao?: string | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -360,6 +368,7 @@ function acharAba(
 export async function lerPlanilhaMedicos(
   arquivo: ArrayBuffer,
   nomeArquivo?: string,
+  opcoes: OpcoesLeituraMedicos = {},
 ): Promise<ResultadoLeituraMedicos> {
   const XLSX = await import("xlsx");
   const wb = abrirPlanilhaOuCsv(XLSX, arquivo, nomeArquivo, { cellDates: true });
@@ -368,16 +377,29 @@ export async function lerPlanilhaMedicos(
   const medicos: LinhaMedico[] = [];
   const repasses: LinhaRepasseServico[] = [];
 
-  // "Médico" também é coluna da aba de repasses; por isso a aba de médicos
-  // exige CRM + Repasse Padrão, que só existem nela.
-  const abaMedicos = acharAba(
-    XLSX,
-    wb,
-    [ABA_MEDICOS, "Medicos", "Cadastro"],
-    COLUNAS_MEDICO,
-    ["nome", "crm", "repassePadrao"],
-    null,
-  );
+  // "Médico" e "CRM" também são colunas da aba de repasses; por isso a aba de
+  // médicos exige, além deles, o Repasse Padrão — ou, na planilha de outro
+  // sistema que não traz repasse, as Especialidades. Nenhuma das duas existe
+  // na aba de repasses.
+  const EXIGE_MEDICOS = ["nome", "crm", "repassePadrao"];
+  const EXIGE_MEDICOS_SEM_REPASSE = ["nome", "crm", "especialidade"];
+  const nomesAbaMedicos = [ABA_MEDICOS, "Medicos", "Cadastro"];
+  let exigeMedicos = EXIGE_MEDICOS;
+  let abaMedicos = acharAba(XLSX, wb, nomesAbaMedicos, COLUNAS_MEDICO, EXIGE_MEDICOS, null);
+  if (!abaMedicos || !lerAba(XLSX, wb, abaMedicos, COLUNAS_MEDICO, EXIGE_MEDICOS)) {
+    const semRepasse = acharAba(
+      XLSX,
+      wb,
+      nomesAbaMedicos,
+      COLUNAS_MEDICO,
+      EXIGE_MEDICOS_SEM_REPASSE,
+      null,
+    );
+    if (semRepasse && lerAba(XLSX, wb, semRepasse, COLUNAS_MEDICO, EXIGE_MEDICOS_SEM_REPASSE)) {
+      abaMedicos = semRepasse;
+      exigeMedicos = EXIGE_MEDICOS_SEM_REPASSE;
+    }
+  }
   const abaRepasses = acharAba(
     XLSX,
     wb,
@@ -387,16 +409,22 @@ export async function lerPlanilhaMedicos(
     abaMedicos,
   );
 
+  let semRepasse = false;
   if (abaMedicos) {
-    const lida = lerAba(XLSX, wb, abaMedicos, COLUNAS_MEDICO, ["nome", "crm", "repassePadrao"]);
-    if (lida) lerMedicos(lida, abaMedicos, medicos, recusadas);
+    const lida = lerAba(XLSX, wb, abaMedicos, COLUNAS_MEDICO, exigeMedicos);
+    if (lida) {
+      semRepasse = !lida.col.repassePadrao;
+      lerMedicos(lida, abaMedicos, medicos, recusadas, opcoes);
+    } else {
+      abaMedicos = null;
+    }
   }
   if (abaRepasses) {
     const lida = lerAba(XLSX, wb, abaRepasses, COLUNAS_REPASSE, ["medico", "servico"]);
     if (lida) lerRepasses(lida, abaRepasses, repasses, recusadas);
   }
 
-  return { medicos, repasses, recusadas, abaMedicos, abaRepasses };
+  return { medicos, repasses, recusadas, abaMedicos, abaRepasses, semRepasse };
 }
 
 type AbaLida = NonNullable<ReturnType<typeof lerAba>>;
@@ -406,6 +434,7 @@ function lerMedicos(
   aba: string,
   medicos: LinhaMedico[],
   recusadas: LinhaRecusada[],
+  opcoes: OpcoesLeituraMedicos,
 ) {
   const get = (bruta: Record<string, unknown>, chave: string) =>
     col[chave] ? bruta[col[chave]!] : null;
@@ -425,14 +454,29 @@ function lerMedicos(
       return recusar("É a linha de exemplo do modelo. Apague antes de importar.");
 
     // CRM: aceita "52123456-7" com a UF em outra coluna, ou "52123456-7/RJ".
-    let crm = idOuNulo(get(bruta, "crm"), 40) ?? "";
+    // Planilhas de outros sistemas trazem o RQE e registros de outros estados
+    // na mesma célula ("5278651-9/RJ / RQE N.: 15256"): o RQE é aproveitado e
+    // vale o primeiro registro.
+    let crm = idOuNulo(get(bruta, "crm"), 80) ?? "";
+    const rqeNoCrm = crm.match(/\bRQE\b[\sNº°O.:]*([\w.-]+)/);
+    crm = crm
+      .replace(/\bRQE\b.*$/, "")
+      .split(/\s+\/\s+/)[0]
+      .replace(/[\s/]+$/, "");
     let uf = normalizarMaiusculas(get(bruta, "uf"), 10).replace(/[^A-Z]/g, "");
     const ufGrudada = crm.match(/^(.*?)[\s/-]+([A-Z]{2})$/);
-    if (!uf && ufGrudada) {
+    if (ufGrudada) {
       crm = ufGrudada[1].trim();
-      uf = ufGrudada[2];
+      if (!uf) uf = ufGrudada[2];
     }
-    crm = crm.replace(/^CRM[\s\-:]*/i, "").trim();
+    // "5274391-7/R": UF cortada pela metade não vale como UF.
+    crm = crm
+      .replace(/\/[A-Z]$/, "")
+      .replace(/^CRM[\s\-:]*/i, "")
+      .trim();
+    // Sem UF na planilha, vale a UF da clínica: quase todo profissional atende
+    // com o registro do próprio estado.
+    if (!uf) uf = normalizarMaiusculas(opcoes.ufPadrao, 10).replace(/[^A-Z]/g, "");
     if (!crm) return recusar("Falta o CRM (ou o número do conselho do profissional).");
     if (crm.length > 20) return recusar("O CRM tem mais de 20 caracteres.");
     if (uf.length !== 2) return recusar('Falta a UF do CRM, com duas letras (ex.: "RJ").');
@@ -440,23 +484,29 @@ function lerMedicos(
     const especialidades = separarEspecialidades(get(bruta, "especialidade"));
     if (!especialidades.length) return recusar("Falta a especialidade do médico.");
 
-    const tipoBruto = get(bruta, "tipoRepasse");
-    const repasseBruto = get(bruta, "repassePadrao");
-    const tipoRepasse = normalizarTipoRepasse(tipoBruto) ?? normalizarTipoRepasse(repasseBruto);
-    if (!tipoRepasse) {
-      return recusar('Informe o Tipo de Repasse: "Percentual" ou "Valor".');
-    }
-    const repassePadrao = numeroOuNulo(repasseBruto);
-    if (repassePadrao === null) {
-      return recusar(
-        "O Repasse Padrão está em branco. Todo médico precisa de um repasse padrão — digite 0 se ele não recebe repasse.",
-      );
-    }
-    if (Number.isNaN(repassePadrao) || repassePadrao < 0) {
-      return recusar(`O Repasse Padrão "${String(repasseBruto)}" não é um número válido.`);
-    }
-    if (tipoRepasse === "percentual" && repassePadrao > 100) {
-      return recusar("O Repasse Padrão em percentual não pode passar de 100%.");
+    // Planilha sem a coluna Repasse Padrão: o repasse fica em branco aqui e a
+    // funcionária informa um só na tela, que vale para todos (ver conferência).
+    let tipoRepasse: TipoRepasse | null = null;
+    let repassePadrao: number | null = null;
+    if (col.repassePadrao) {
+      const tipoBruto = get(bruta, "tipoRepasse");
+      const repasseBruto = get(bruta, "repassePadrao");
+      tipoRepasse = normalizarTipoRepasse(tipoBruto) ?? normalizarTipoRepasse(repasseBruto);
+      if (!tipoRepasse) {
+        return recusar('Informe o Tipo de Repasse: "Percentual" ou "Valor".');
+      }
+      repassePadrao = numeroOuNulo(repasseBruto);
+      if (repassePadrao === null) {
+        return recusar(
+          "O Repasse Padrão está em branco. Todo médico precisa de um repasse padrão — digite 0 se ele não recebe repasse.",
+        );
+      }
+      if (Number.isNaN(repassePadrao) || repassePadrao < 0) {
+        return recusar(`O Repasse Padrão "${String(repasseBruto)}" não é um número válido.`);
+      }
+      if (tipoRepasse === "percentual" && repassePadrao > 100) {
+        return recusar("O Repasse Padrão em percentual não pode passar de 100%.");
+      }
     }
 
     const cpf = normalizarCpf(get(bruta, "cpf"));
@@ -465,7 +515,10 @@ function lerMedicos(
     // O banco cria um cadastro de paciente para todo médico novo, e paciente
     // sem telefone de 10 dígitos é recusado — o médico inteiro deixaria de ser
     // gravado. Melhor avisar aqui, na conferência, do que falhar na gravação.
-    const telefone = idOuNulo(get(bruta, "telefone"), 30);
+    // "(21) 99146-6993 / (21) 97024-1174": o segundo número vai para Telefone 2.
+    const [telefone1, telefoneExtra] = String(get(bruta, "telefone") ?? "").split(/\s*\/\s*/);
+    const telefone = idOuNulo(telefone1, 30);
+    const telefone2 = idOuNulo(get(bruta, "telefone2"), 30) ?? idOuNulo(telefoneExtra, 30);
     if ((telefone ?? "").replace(/\D/g, "").length < 10) {
       return recusar(
         "Falta o telefone com DDD (mínimo 10 números). O sistema exige para cadastrar.",
@@ -503,7 +556,7 @@ function lerMedicos(
     }
     porCrm.set(chave, linhaExcel);
 
-    const rqe = idOuNulo(get(bruta, "rqe"), 50);
+    const rqe = idOuNulo(get(bruta, "rqe"), 50) ?? (rqeNoCrm ? rqeNoCrm[1].slice(0, 50) : null);
     const estado = normalizarMaiusculas(get(bruta, "estado"), 2) || null;
 
     medicos.push({
@@ -518,7 +571,7 @@ function lerMedicos(
       sexo: normalizarSexo(get(bruta, "sexo")),
       email: textoOuNulo(get(bruta, "email"))?.toLowerCase() ?? null,
       telefone,
-      telefone2: idOuNulo(get(bruta, "telefone2"), 30),
+      telefone2,
       cep: idOuNulo(get(bruta, "cep"), 12),
       logradouro: normalizarMaiusculas(get(bruta, "logradouro")) || null,
       numero: idOuNulo(get(bruta, "numero"), 20),
@@ -632,7 +685,11 @@ export interface RepasseConferido extends LinhaRepasseServico {
   tipoEfetivo: TipoRepasse;
 }
 
-export interface MedicoConferido extends LinhaMedico {
+export interface MedicoConferido extends Omit<LinhaMedico, "tipoRepasse" | "repassePadrao"> {
+  tipoRepasse: TipoRepasse;
+  repassePadrao: number;
+  /** O repasse veio do quadro da tela, não da planilha. */
+  repasseDaTela: boolean;
   /** Especialidades da planilha ligadas ao cadastro; `id` null = ainda não existe. */
   especialidadesResolvidas: Array<{ nome: string; id: string | null }>;
   repasses: RepasseConferido[];
@@ -645,6 +702,61 @@ export interface ConferenciaMedicos {
   recusadas: LinhaRecusada[];
   /** Especialidades citadas que não existem no cadastro (lista compartilhada). */
   especialidadesFaltando: string[];
+  /** Nomes da planilha trocados pela especialidade do cadastro ("PISCOLOGIA" -> "PSICOLOGIA"). */
+  especialidadesCorrigidas: Array<{ de: string; para: string }>;
+}
+
+/**
+ * Nome da profissão escrito no lugar da especialidade. Só entra aqui o que
+ * não tem outra leitura possível.
+ */
+const APELIDOS_ESPECIALIDADE: Record<string, string> = {
+  alergista: "alergologia",
+  nutricionista: "nutricao",
+  fonoaudiologa: "fonoaudiologia",
+  fonoaudiologo: "fonoaudiologia",
+  fonodiologa: "fonoaudiologia",
+  fonodiologo: "fonoaudiologia",
+  psicologa: "psicologia",
+  psicologo: "psicologia",
+  fisioterapeuta: "fisioterapia",
+  podologa: "podologia",
+  podologo: "podologia",
+  dentista: "odontologia",
+  ecocardiologia: "ecocardiograma",
+};
+
+/** Distância de edição contando troca de duas letras vizinhas como 1 erro. */
+function distanciaEdicao(a: string, b: string): number {
+  const d: number[][] = Array.from({ length: a.length + 1 }, (_, i) =>
+    Array.from({ length: b.length + 1 }, (_, j) => (i === 0 ? j : j === 0 ? i : 0)),
+  );
+  for (let i = 1; i <= a.length; i++) {
+    for (let j = 1; j <= b.length; j++) {
+      const custo = a[i - 1] === b[j - 1] ? 0 : 1;
+      d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + custo);
+      if (i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]) {
+        d[i][j] = Math.min(d[i][j], d[i - 2][j - 2] + 1);
+      }
+    }
+  }
+  return d[a.length][b.length];
+}
+
+/**
+ * Acha a especialidade do cadastro para o nome da planilha: igual (sem
+ * acento), apelido de profissão ou um único erro de digitação em nome longo
+ * ("DERMARTOLOGIA", "PISCOLOGIA"). Nome curto e empate não são corrigidos —
+ * "NEUROLOGIA" nunca pode virar "UROLOGIA".
+ */
+export function resolverEspecialidade(nome: string, cadastro: Opcao[]): Opcao | null {
+  const porChave = new Map(cadastro.map((e) => [chaveTexto(e.nome), e]));
+  const k = chaveTexto(nome);
+  const exata = porChave.get(k) ?? porChave.get(APELIDOS_ESPECIALIDADE[k] ?? "");
+  if (exata) return exata;
+  if (k.length < 8) return null;
+  const perto = cadastro.filter((e) => distanciaEdicao(k, chaveTexto(e.nome)) === 1);
+  return perto.length === 1 ? perto[0] : null;
 }
 
 export interface OpcoesConferencia {
@@ -653,6 +765,12 @@ export interface OpcoesConferencia {
   servicos: Opcao[];
   /** Se a funcionária marcou para criar as especialidades que faltam. */
   criarEspecialidades: boolean;
+  /**
+   * Repasse padrão informado na tela para a planilha que não traz repasse.
+   * Sem ele, os médicos dessa planilha não são cadastrados: repasse errado
+   * faz o financeiro pagar errado, então o sistema nunca supõe um valor.
+   */
+  repasseGeral?: { tipo: TipoRepasse; valor: number } | null;
 }
 
 /**
@@ -684,7 +802,6 @@ export function conferirImportacaoMedicos(
     if (kn && !existentesPorNome.has(kn)) existentesPorNome.set(kn, m);
   }
 
-  const especialidadePorChave = new Map(opcoes.especialidades.map((e) => [chaveTexto(e.nome), e]));
   const servicoPorChave = new Map<string, Opcao>();
   for (const s of opcoes.servicos) {
     const k = chaveTexto(s.nome);
@@ -692,6 +809,7 @@ export function conferirImportacaoMedicos(
   }
 
   const faltando = new Map<string, string>();
+  const corrigidas = new Map<string, { de: string; para: string }>();
   const jaCadastrados: ConferenciaMedicos["jaCadastrados"] = [];
   const novos: MedicoConferido[] = [];
 
@@ -710,10 +828,18 @@ export function conferirImportacaoMedicos(
       continue;
     }
 
-    const especialidadesResolvidas = linha.especialidades.map((nome) => ({
-      nome,
-      id: especialidadePorChave.get(chaveTexto(nome))?.id ?? null,
-    }));
+    const especialidadesResolvidas: MedicoConferido["especialidadesResolvidas"] = [];
+    for (const nome of linha.especialidades) {
+      const achada = resolverEspecialidade(nome, opcoes.especialidades);
+      if (achada && chaveTexto(achada.nome) !== chaveTexto(nome)) {
+        corrigidas.set(chaveTexto(nome), { de: nome, para: achada.nome });
+      }
+      const item = achada ? { nome: achada.nome, id: achada.id } : { nome, id: null };
+      // "FONOAUDIOLOGA / FONOAUDIOLOGIA" vira uma especialidade só.
+      if (!especialidadesResolvidas.some((e) => chaveTexto(e.nome) === chaveTexto(item.nome))) {
+        especialidadesResolvidas.push(item);
+      }
+    }
     const semCadastro = especialidadesResolvidas.filter((e) => !e.id);
     for (const e of semCadastro) faltando.set(chaveTexto(e.nome), e.nome);
     if (semCadastro.length && !opcoes.criarEspecialidades) {
@@ -726,7 +852,27 @@ export function conferirImportacaoMedicos(
       continue;
     }
 
-    novos.push({ ...linha, especialidadesResolvidas, repasses: [] });
+    const daTela = linha.tipoRepasse === null || linha.repassePadrao === null;
+    const tipoRepasse = daTela ? opcoes.repasseGeral?.tipo : linha.tipoRepasse;
+    const repassePadrao = daTela ? opcoes.repasseGeral?.valor : linha.repassePadrao;
+    if (tipoRepasse == null || repassePadrao == null) {
+      recusadas.push({
+        aba: abaMedicos,
+        linhaExcel: linha.linhaExcel,
+        nome: linha.nome,
+        motivo: "A planilha não traz o repasse. Informe o repasse padrão no quadro da tela.",
+      });
+      continue;
+    }
+
+    novos.push({
+      ...linha,
+      tipoRepasse,
+      repassePadrao,
+      repasseDaTela: daTela,
+      especialidadesResolvidas,
+      repasses: [],
+    });
   }
 
   // Liga cada linha de repasse ao médico novo.
@@ -807,6 +953,9 @@ export function conferirImportacaoMedicos(
     jaCadastrados,
     recusadas,
     especialidadesFaltando: [...faltando.values()].sort((a, b) => a.localeCompare(b, "pt-BR")),
+    especialidadesCorrigidas: [...corrigidas.values()].sort((a, b) =>
+      a.de.localeCompare(b.de, "pt-BR"),
+    ),
   };
 }
 

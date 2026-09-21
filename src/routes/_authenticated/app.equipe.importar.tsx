@@ -40,6 +40,7 @@ import {
   conferirImportacaoMedicos,
   lerPlanilhaMedicos,
   montarModeloMedicos,
+  numeroOuNulo,
   repasseTemExcecao,
   type LinhaRecusada,
   type MedicoConferido,
@@ -55,6 +56,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
   Table,
@@ -137,6 +139,9 @@ function ImportarMedicosPage() {
   const [versaoCadastro, setVersaoCadastro] = useState(0);
 
   const [criarEspecialidades, setCriarEspecialidades] = useState(false);
+  /** Repasse para todos, quando a planilha não traz a coluna de repasse. */
+  const [repasseGeralTipo, setRepasseGeralTipo] = useState<TipoRepasse>("percentual");
+  const [repasseGeralTexto, setRepasseGeralTexto] = useState("");
   const [importando, setImportando] = useState(false);
   const [progresso, setProgresso] = useState<{ feito: number; total: number } | null>(null);
   const [resultado, setResultado] = useState<Resultado | null>(null);
@@ -218,6 +223,22 @@ function ImportarMedicosPage() {
     };
   }, [clinicaId, versaoCadastro]);
 
+  // Só vale número digitado de propósito (0 incluído); em branco não supõe nada.
+  const repasseGeralValor = numeroOuNulo(repasseGeralTexto);
+  const repasseGeralErro =
+    repasseGeralValor === null
+      ? null
+      : Number.isNaN(repasseGeralValor) || repasseGeralValor < 0
+        ? "Digite um número válido."
+        : repasseGeralTipo === "percentual" && repasseGeralValor > 100
+          ? "O percentual não pode passar de 100%."
+          : null;
+  const repasseGeral =
+    repasseGeralValor !== null && !repasseGeralErro
+      ? { tipo: repasseGeralTipo, valor: repasseGeralValor }
+      : null;
+  const faltaRepasseGeral = !!leitura?.semRepasse && !repasseGeral;
+
   const conferencia = useMemo(() => {
     if (!leitura) return null;
     return conferirImportacaoMedicos(leitura, {
@@ -225,8 +246,18 @@ function ImportarMedicosPage() {
       especialidades,
       servicos,
       criarEspecialidades,
+      repasseGeral,
     });
-  }, [leitura, existentes, especialidades, servicos, criarEspecialidades]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    leitura,
+    existentes,
+    especialidades,
+    servicos,
+    criarEspecialidades,
+    repasseGeral?.tipo,
+    repasseGeral?.valor,
+  ]);
 
   const todosRepasses = useMemo(
     () =>
@@ -236,33 +267,38 @@ function ImportarMedicosPage() {
   const totalExcecoes = todosRepasses.filter(({ repasse }) => repasseTemExcecao(repasse)).length;
 
   // --- arquivo --------------------------------------------------------------
-  const receberArquivo = useCallback(async (arquivo: File) => {
-    setResultado(null);
-    if (arquivo.size > TAMANHO_MAXIMO) {
-      toast.error("A planilha passa de 15 MB. Divida em partes menores.");
-      return;
-    }
-    if (!/\.(xlsx|xlsm|xls|csv)$/i.test(arquivo.name)) {
-      toast.error("Envie a planilha em Excel (.xlsx) ou .csv, no formato do modelo.");
-      return;
-    }
-    setLendo(true);
-    setNomeArquivo(arquivo.name);
-    try {
-      const lida = await lerPlanilhaMedicos(await arquivo.arrayBuffer(), arquivo.name);
-      if (!lida.abaMedicos) {
-        toast.error(
-          'Não encontrei a aba "Médicos" com as colunas Nome, CRM e Repasse Padrão. Use o modelo da planilha.',
-        );
+  const receberArquivo = useCallback(
+    async (arquivo: File) => {
+      setResultado(null);
+      if (arquivo.size > TAMANHO_MAXIMO) {
+        toast.error("A planilha passa de 15 MB. Divida em partes menores.");
+        return;
       }
-      setLeitura(lida);
-    } catch (e) {
-      setLeitura(null);
-      mostrarErro(e, "ler a planilha");
-    } finally {
-      setLendo(false);
-    }
-  }, []);
+      if (!/\.(xlsx|xlsm|xls|csv)$/i.test(arquivo.name)) {
+        toast.error("Envie a planilha em Excel (.xlsx) ou .csv, no formato do modelo.");
+        return;
+      }
+      setLendo(true);
+      setNomeArquivo(arquivo.name);
+      try {
+        const lida = await lerPlanilhaMedicos(await arquivo.arrayBuffer(), arquivo.name, {
+          ufPadrao: clinicaAtual?.clinica.estado,
+        });
+        if (!lida.abaMedicos) {
+          toast.error(
+            "Não encontrei a lista de médicos: faltam as colunas Nome, CRM e Especialidades. Use o modelo da planilha.",
+          );
+        }
+        setLeitura(lida);
+      } catch (e) {
+        setLeitura(null);
+        mostrarErro(e, "ler a planilha");
+      } finally {
+        setLendo(false);
+      }
+    },
+    [clinicaAtual?.clinica.estado],
+  );
 
   const baixarModelo = async () => {
     try {
@@ -295,6 +331,10 @@ function ImportarMedicosPage() {
     if (!clinicaId || !clinicaAtual || !conferencia) return;
     if (!podeEscrever) {
       toast.error("Você não tem permissão de edição na Equipe.");
+      return;
+    }
+    if (faltaRepasseGeral) {
+      toast.error("Informe o repasse padrão dos médicos antes de importar.");
       return;
     }
     const novos = conferencia.novos;
@@ -363,6 +403,7 @@ function ImportarMedicosPage() {
         setLeitura(null);
         setNomeArquivo(null);
         setCriarEspecialidades(false);
+        setRepasseGeralTexto("");
         // Recarrega o cadastro: importar o mesmo arquivo de novo pula quem entrou agora.
         setVersaoCadastro((v) => v + 1);
       }
@@ -372,6 +413,7 @@ function ImportarMedicosPage() {
     clinicaAtual,
     conferencia,
     podeEscrever,
+    faltaRepasseGeral,
     todosRepasses.length,
     totalExcecoes,
     especialidades,
@@ -450,9 +492,7 @@ function ImportarMedicosPage() {
             <p className="text-sm font-medium">
               {nomeArquivo ?? "Arraste a planilha aqui ou clique para escolher"}
             </p>
-            <p className="text-xs text-muted-foreground">
-              Arquivo .xlsx ou .csv até 15 MB
-            </p>
+            <p className="text-xs text-muted-foreground">Arquivo .xlsx ou .csv até 15 MB</p>
           </div>
           <input
             ref={inputRef}
@@ -493,246 +533,331 @@ function ImportarMedicosPage() {
               <p className="text-lg font-semibold">{nomeClinica}</p>
             </div>
 
-            <div className="flex flex-wrap gap-2">
-              <Badge variant="secondary">{conferencia.novos.length} médico(s) novo(s)</Badge>
-              <Badge variant="secondary">{todosRepasses.length} serviço(s) vinculado(s)</Badge>
-              <Badge variant="secondary">{totalExcecoes} repasse(s) diferente(s) do padrão</Badge>
-              {conferencia.jaCadastrados.length > 0 && (
-                <Badge variant="outline">
-                  {conferencia.jaCadastrados.length} já cadastrado(s) — serão pulados
-                </Badge>
-              )}
-              {conferencia.recusadas.length > 0 && (
-                <Badge variant="outline" className="border-destructive text-destructive">
-                  {conferencia.recusadas.length} linha(s) com problema
-                </Badge>
-              )}
-              {carregando && <Badge variant="outline">conferindo o cadastro desta clínica…</Badge>}
-            </div>
-
-            {!leitura.abaRepasses && (
-              <Alert>
-                <AlertTriangle className="h-4 w-4" />
-                <AlertTitle>Aba "Repasse por serviço" não encontrada</AlertTitle>
-                <AlertDescription className="text-sm">
-                  Os médicos serão cadastrados sem serviços vinculados — eles não aparecerão com
-                  serviços na Agenda até alguém completar o cadastro.
-                </AlertDescription>
-              </Alert>
-            )}
-
-            {conferencia.especialidadesFaltando.length > 0 && (
-              <Alert>
-                <AlertTriangle className="h-4 w-4" />
-                <AlertTitle>Especialidades que ainda não existem</AlertTitle>
-                <AlertDescription className="space-y-2 text-sm">
-                  <p>{conferencia.especialidadesFaltando.join(", ")}</p>
-                  <p className="text-muted-foreground">
-                    Confira se não é só o nome escrito diferente (a lista de especialidades vem no
-                    modelo). A lista é <strong>compartilhada entre as clínicas</strong>: criar uma
-                    nova aqui faz ela aparecer também nas outras. Sem criar, os médicos com essas
-                    especialidades ficam de fora.
-                  </p>
-                  <label className="flex items-center gap-2">
-                    <Checkbox
-                      checked={criarEspecialidades}
-                      onCheckedChange={(v) => setCriarEspecialidades(v === true)}
-                    />
-                    <span>Criar as especialidades que faltam</span>
-                  </label>
-                </AlertDescription>
-              </Alert>
-            )}
-
-            {/* Médicos novos */}
-            {conferencia.novos.length > 0 && (
-              <div className="space-y-2">
-                <h3 className="text-sm font-semibold">Médicos que serão cadastrados</h3>
-                <div className="max-h-[420px] overflow-auto rounded-md border">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead className="w-16">Linha</TableHead>
-                        <TableHead>Nome</TableHead>
-                        <TableHead>CRM</TableHead>
-                        <TableHead>Especialidades</TableHead>
-                        <TableHead className="text-right">Repasse padrão</TableHead>
-                        <TableHead className="text-right">Serviços</TableHead>
-                        <TableHead>Situação</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {conferencia.novos.map((m) => (
-                        <TableRow key={`novo-${m.linhaExcel}`}>
-                          <TableCell>{m.linhaExcel}</TableCell>
-                          <TableCell className="font-medium">{m.nome}</TableCell>
-                          <TableCell className="whitespace-nowrap">
-                            {m.crm}/{m.crmUf}
-                          </TableCell>
-                          <TableCell>
-                            {m.especialidadesResolvidas.map((e, i) => (
-                              <span key={e.nome}>
-                                {i > 0 && ", "}
-                                {e.nome}
-                                {!e.id && <span className="text-amber-600"> (nova)</span>}
-                              </span>
-                            ))}
-                          </TableCell>
-                          <TableCell className="text-right whitespace-nowrap">
-                            {m.repassePadrao === 0 ? (
-                              <Badge
-                                variant="outline"
-                                className="border-destructive text-destructive"
-                              >
-                                sem repasse
-                              </Badge>
-                            ) : (
-                              fmtRepasse(m.repassePadrao, m.tipoRepasse)
-                            )}
-                          </TableCell>
-                          <TableCell className="text-right">{m.repasses.length}</TableCell>
-                          <TableCell>
-                            {m.ativo ? (
-                              <Badge variant="secondary">novo</Badge>
-                            ) : (
-                              <Badge variant="outline">novo · inativo</Badge>
-                            )}
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              </div>
-            )}
-
-            {/* Serviços e repasses */}
-            {todosRepasses.length > 0 && (
-              <div className="space-y-2">
-                <h3 className="text-sm font-semibold">Serviços de cada médico e repasse</h3>
-                <p className="text-xs text-muted-foreground">
-                  <strong>padrão</strong> = usa o repasse padrão do médico.{" "}
-                  <strong className="text-destructive">sem repasse</strong> = foi digitado 0: aquele
-                  serviço não paga nada ao médico. Confira esses com atenção.
-                </p>
-                <div className="max-h-[420px] overflow-auto rounded-md border">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead className="w-16">Linha</TableHead>
-                        <TableHead>Médico</TableHead>
-                        <TableHead>Serviço</TableHead>
-                        <TableHead className="text-right">Particular</TableHead>
-                        <TableHead className="text-right">Convênio</TableHead>
-                        <TableHead className="text-right">Cartão Consulta</TableHead>
-                        <TableHead className="text-right">Cartão Desconto</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {todosRepasses.map(({ medico, repasse: r }) => (
-                        <TableRow key={`rep-${r.linhaExcel}`}>
-                          <TableCell>{r.linhaExcel}</TableCell>
-                          <TableCell>{medico.nome}</TableCell>
-                          <TableCell className="font-medium">{r.procedimentoNome}</TableCell>
-                          <TableCell className="text-right">
-                            <CelulaRepasse valor={r.particular} tipo={r.tipoEfetivo} />
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <CelulaRepasse valor={r.convenio} tipo={r.tipoEfetivo} />
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <CelulaRepasse valor={r.cartaoConsulta} tipo="valor" />
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <CelulaRepasse valor={r.cartaoDesconto} tipo="valor" />
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              </div>
-            )}
-
-            {/* Já cadastrados */}
-            {conferencia.jaCadastrados.length > 0 && (
-              <div className="space-y-2">
-                <h3 className="text-sm font-semibold">
-                  Já cadastrados nesta clínica — serão pulados
-                </h3>
-                <div className="max-h-60 overflow-auto rounded-md border">
-                  <Table>
-                    <TableBody>
-                      {conferencia.jaCadastrados.map(({ linha, motivo }) => (
-                        <TableRow key={`existe-${linha.linhaExcel}`}>
-                          <TableCell className="w-16">{linha.linhaExcel}</TableCell>
-                          <TableCell className="font-medium">{linha.nome}</TableCell>
-                          <TableCell className="text-muted-foreground">{motivo}</TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              </div>
-            )}
-
-            {/* Problemas */}
-            {conferencia.recusadas.length > 0 && (
-              <div className="space-y-2">
-                <h3 className="text-sm font-semibold text-destructive">
-                  Linhas com problema — não serão gravadas
-                </h3>
-                <div className="max-h-60 overflow-auto rounded-md border">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Aba</TableHead>
-                        <TableHead className="w-16">Linha</TableHead>
-                        <TableHead>Nome</TableHead>
-                        <TableHead>Motivo</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {conferencia.recusadas.map((r, i) => (
-                        <TableRow
-                          key={`erro-${r.aba}-${r.linhaExcel}-${i}`}
-                          className="bg-destructive/5"
-                        >
-                          <TableCell className="whitespace-nowrap">{r.aba}</TableCell>
-                          <TableCell>{r.linhaExcel}</TableCell>
-                          <TableCell>{r.nome || "(sem nome)"}</TableCell>
-                          <TableCell className="text-destructive">{r.motivo}</TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              </div>
-            )}
-
-            <div className="flex flex-wrap items-center gap-2">
-              <Button
-                onClick={() => void importar()}
-                disabled={importando || carregando || !conferencia.novos.length}
+            {leitura.semRepasse && (
+              <Alert
+                className={
+                  faltaRepasseGeral ? "border-amber-500 bg-amber-50 dark:bg-amber-950/30" : ""
+                }
               >
-                {importando ? (
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                ) : (
-                  <Upload className="h-4 w-4 mr-2" />
+                <AlertTriangle className="h-4 w-4" />
+                <AlertTitle>A planilha não traz o repasse dos médicos</AlertTitle>
+                <AlertDescription className="space-y-3 text-sm">
+                  <p>
+                    Informe o <strong>repasse padrão</strong> que vale para todos os médicos desta
+                    planilha. Depois da importação, ajuste no cadastro de cada médico quem tem um
+                    acordo diferente. Digite <strong>0</strong> só se eles não recebem repasse.
+                  </p>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <div className="inline-flex rounded-md border">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant={repasseGeralTipo === "percentual" ? "default" : "ghost"}
+                        onClick={() => setRepasseGeralTipo("percentual")}
+                      >
+                        Percentual (%)
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant={repasseGeralTipo === "valor" ? "default" : "ghost"}
+                        onClick={() => setRepasseGeralTipo("valor")}
+                      >
+                        Valor fixo (R$)
+                      </Button>
+                    </div>
+                    <Input
+                      className="w-32"
+                      inputMode="decimal"
+                      placeholder={repasseGeralTipo === "percentual" ? "ex.: 60" : "ex.: 70,00"}
+                      value={repasseGeralTexto}
+                      onChange={(e) => setRepasseGeralTexto(e.target.value)}
+                      aria-label="Repasse padrão para todos os médicos da planilha"
+                    />
+                    {repasseGeralErro && (
+                      <span className="text-destructive">{repasseGeralErro}</span>
+                    )}
+                  </div>
+                  {faltaRepasseGeral && (
+                    <p className="font-medium">
+                      A conferência aparece assim que o repasse for informado.
+                    </p>
+                  )}
+                </AlertDescription>
+              </Alert>
+            )}
+
+            {!faltaRepasseGeral && (
+              <>
+                <div className="flex flex-wrap gap-2">
+                  <Badge variant="secondary">{conferencia.novos.length} médico(s) novo(s)</Badge>
+                  <Badge variant="secondary">{todosRepasses.length} serviço(s) vinculado(s)</Badge>
+                  <Badge variant="secondary">
+                    {totalExcecoes} repasse(s) diferente(s) do padrão
+                  </Badge>
+                  {conferencia.jaCadastrados.length > 0 && (
+                    <Badge variant="outline">
+                      {conferencia.jaCadastrados.length} já cadastrado(s) — serão pulados
+                    </Badge>
+                  )}
+                  {conferencia.recusadas.length > 0 && (
+                    <Badge variant="outline" className="border-destructive text-destructive">
+                      {conferencia.recusadas.length} linha(s) com problema
+                    </Badge>
+                  )}
+                  {carregando && (
+                    <Badge variant="outline">conferindo o cadastro desta clínica…</Badge>
+                  )}
+                </div>
+
+                {!leitura.abaRepasses && (
+                  <Alert>
+                    <AlertTriangle className="h-4 w-4" />
+                    <AlertTitle>Aba "Repasse por serviço" não encontrada</AlertTitle>
+                    <AlertDescription className="text-sm">
+                      Os médicos serão cadastrados sem serviços vinculados — eles não aparecerão com
+                      serviços na Agenda até alguém completar o cadastro.
+                    </AlertDescription>
+                  </Alert>
                 )}
-                Importar {conferencia.novos.length} médico(s)
-              </Button>
-              {conferencia.recusadas.length > 0 && (
-                <Button variant="outline" onClick={() => baixarProblemas(conferencia.recusadas)}>
-                  <Download className="h-4 w-4 mr-2" /> Baixar linhas com problema
-                </Button>
-              )}
-              {progresso && (
-                <span className="text-sm text-muted-foreground">
-                  Gravando {progresso.feito} de {progresso.total}…
-                </span>
-              )}
-            </div>
+
+                {conferencia.especialidadesCorrigidas.length > 0 && (
+                  <Alert>
+                    <Info className="h-4 w-4" />
+                    <AlertTitle>Especialidades com o nome corrigido</AlertTitle>
+                    <AlertDescription className="space-y-1 text-sm">
+                      <p className="text-muted-foreground">
+                        Estes nomes da planilha foram ligados à especialidade que já existe no
+                        cadastro:
+                      </p>
+                      <ul className="list-disc pl-5">
+                        {conferencia.especialidadesCorrigidas.map((c) => (
+                          <li key={c.de}>
+                            {c.de} → <strong>{c.para}</strong>
+                          </li>
+                        ))}
+                      </ul>
+                    </AlertDescription>
+                  </Alert>
+                )}
+
+                {conferencia.especialidadesFaltando.length > 0 && (
+                  <Alert>
+                    <AlertTriangle className="h-4 w-4" />
+                    <AlertTitle>Especialidades que ainda não existem</AlertTitle>
+                    <AlertDescription className="space-y-2 text-sm">
+                      <p>{conferencia.especialidadesFaltando.join(", ")}</p>
+                      <p className="text-muted-foreground">
+                        Confira se não é só o nome escrito diferente (a lista de especialidades vem
+                        no modelo). A lista é <strong>compartilhada entre as clínicas</strong>:
+                        criar uma nova aqui faz ela aparecer também nas outras. Sem criar, os
+                        médicos com essas especialidades ficam de fora.
+                      </p>
+                      <label className="flex items-center gap-2">
+                        <Checkbox
+                          checked={criarEspecialidades}
+                          onCheckedChange={(v) => setCriarEspecialidades(v === true)}
+                        />
+                        <span>Criar as especialidades que faltam</span>
+                      </label>
+                    </AlertDescription>
+                  </Alert>
+                )}
+
+                {/* Médicos novos */}
+                {conferencia.novos.length > 0 && (
+                  <div className="space-y-2">
+                    <h3 className="text-sm font-semibold">Médicos que serão cadastrados</h3>
+                    <div className="max-h-[420px] overflow-auto rounded-md border">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead className="w-16">Linha</TableHead>
+                            <TableHead>Nome</TableHead>
+                            <TableHead>CRM</TableHead>
+                            <TableHead>Especialidades</TableHead>
+                            <TableHead className="text-right">Repasse padrão</TableHead>
+                            <TableHead className="text-right">Serviços</TableHead>
+                            <TableHead>Situação</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {conferencia.novos.map((m) => (
+                            <TableRow key={`novo-${m.linhaExcel}`}>
+                              <TableCell>{m.linhaExcel}</TableCell>
+                              <TableCell className="font-medium">{m.nome}</TableCell>
+                              <TableCell className="whitespace-nowrap">
+                                {m.crm}/{m.crmUf}
+                              </TableCell>
+                              <TableCell>
+                                {m.especialidadesResolvidas.map((e, i) => (
+                                  <span key={e.nome}>
+                                    {i > 0 && ", "}
+                                    {e.nome}
+                                    {!e.id && <span className="text-amber-600"> (nova)</span>}
+                                  </span>
+                                ))}
+                              </TableCell>
+                              <TableCell className="text-right whitespace-nowrap">
+                                {m.repassePadrao === 0 ? (
+                                  <Badge
+                                    variant="outline"
+                                    className="border-destructive text-destructive"
+                                  >
+                                    sem repasse
+                                  </Badge>
+                                ) : (
+                                  fmtRepasse(m.repassePadrao, m.tipoRepasse)
+                                )}
+                              </TableCell>
+                              <TableCell className="text-right">{m.repasses.length}</TableCell>
+                              <TableCell>
+                                {m.ativo ? (
+                                  <Badge variant="secondary">novo</Badge>
+                                ) : (
+                                  <Badge variant="outline">novo · inativo</Badge>
+                                )}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </div>
+                )}
+
+                {/* Serviços e repasses */}
+                {todosRepasses.length > 0 && (
+                  <div className="space-y-2">
+                    <h3 className="text-sm font-semibold">Serviços de cada médico e repasse</h3>
+                    <p className="text-xs text-muted-foreground">
+                      <strong>padrão</strong> = usa o repasse padrão do médico.{" "}
+                      <strong className="text-destructive">sem repasse</strong> = foi digitado 0:
+                      aquele serviço não paga nada ao médico. Confira esses com atenção.
+                    </p>
+                    <div className="max-h-[420px] overflow-auto rounded-md border">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead className="w-16">Linha</TableHead>
+                            <TableHead>Médico</TableHead>
+                            <TableHead>Serviço</TableHead>
+                            <TableHead className="text-right">Particular</TableHead>
+                            <TableHead className="text-right">Convênio</TableHead>
+                            <TableHead className="text-right">Cartão Consulta</TableHead>
+                            <TableHead className="text-right">Cartão Desconto</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {todosRepasses.map(({ medico, repasse: r }) => (
+                            <TableRow key={`rep-${r.linhaExcel}`}>
+                              <TableCell>{r.linhaExcel}</TableCell>
+                              <TableCell>{medico.nome}</TableCell>
+                              <TableCell className="font-medium">{r.procedimentoNome}</TableCell>
+                              <TableCell className="text-right">
+                                <CelulaRepasse valor={r.particular} tipo={r.tipoEfetivo} />
+                              </TableCell>
+                              <TableCell className="text-right">
+                                <CelulaRepasse valor={r.convenio} tipo={r.tipoEfetivo} />
+                              </TableCell>
+                              <TableCell className="text-right">
+                                <CelulaRepasse valor={r.cartaoConsulta} tipo="valor" />
+                              </TableCell>
+                              <TableCell className="text-right">
+                                <CelulaRepasse valor={r.cartaoDesconto} tipo="valor" />
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </div>
+                )}
+
+                {/* Já cadastrados */}
+                {conferencia.jaCadastrados.length > 0 && (
+                  <div className="space-y-2">
+                    <h3 className="text-sm font-semibold">
+                      Já cadastrados nesta clínica — serão pulados
+                    </h3>
+                    <div className="max-h-60 overflow-auto rounded-md border">
+                      <Table>
+                        <TableBody>
+                          {conferencia.jaCadastrados.map(({ linha, motivo }) => (
+                            <TableRow key={`existe-${linha.linhaExcel}`}>
+                              <TableCell className="w-16">{linha.linhaExcel}</TableCell>
+                              <TableCell className="font-medium">{linha.nome}</TableCell>
+                              <TableCell className="text-muted-foreground">{motivo}</TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </div>
+                )}
+
+                {/* Problemas */}
+                {conferencia.recusadas.length > 0 && (
+                  <div className="space-y-2">
+                    <h3 className="text-sm font-semibold text-destructive">
+                      Linhas com problema — não serão gravadas
+                    </h3>
+                    <div className="max-h-60 overflow-auto rounded-md border">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Aba</TableHead>
+                            <TableHead className="w-16">Linha</TableHead>
+                            <TableHead>Nome</TableHead>
+                            <TableHead>Motivo</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {conferencia.recusadas.map((r, i) => (
+                            <TableRow
+                              key={`erro-${r.aba}-${r.linhaExcel}-${i}`}
+                              className="bg-destructive/5"
+                            >
+                              <TableCell className="whitespace-nowrap">{r.aba}</TableCell>
+                              <TableCell>{r.linhaExcel}</TableCell>
+                              <TableCell>{r.nome || "(sem nome)"}</TableCell>
+                              <TableCell className="text-destructive">{r.motivo}</TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button
+                    onClick={() => void importar()}
+                    disabled={importando || carregando || !conferencia.novos.length}
+                  >
+                    {importando ? (
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    ) : (
+                      <Upload className="h-4 w-4 mr-2" />
+                    )}
+                    Importar {conferencia.novos.length} médico(s)
+                  </Button>
+                  {conferencia.recusadas.length > 0 && (
+                    <Button
+                      variant="outline"
+                      onClick={() => baixarProblemas(conferencia.recusadas)}
+                    >
+                      <Download className="h-4 w-4 mr-2" /> Baixar linhas com problema
+                    </Button>
+                  )}
+                  {progresso && (
+                    <span className="text-sm text-muted-foreground">
+                      Gravando {progresso.feito} de {progresso.total}…
+                    </span>
+                  )}
+                </div>
+              </>
+            )}
           </CardContent>
         </Card>
       )}

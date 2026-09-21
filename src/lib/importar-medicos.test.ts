@@ -21,6 +21,7 @@ import {
   normalizarCpf,
   normalizarTipoRepasse,
   numeroOuNulo,
+  resolverEspecialidade,
   repasseTemExcecao,
   separarEspecialidades,
   type OpcoesConferencia,
@@ -162,6 +163,61 @@ describe("leitura da planilha", () => {
     expect(lida.medicos[0].nome).toBe("JOÃO LIMA");
     expect(lida.medicos[0].repassePadrao).toBe(60.5);
     expect(lida.medicos[0].cpf).toBe("012.345.678-90");
+  });
+
+  it("CSV de outro sistema, sem repasse nem UF: usa a UF da clínica e o repasse da tela", async () => {
+    const texto =
+      "Nome,DATA DE NASCIMENTO,CPF/CNPJ,CRM,Pasta,Especialidades,TELEFONE\n" +
+      "ANA LIMA,25/02/79,057.820.277-89,52804746,98712,PISCOLOGIA,(21) 99146-6993 / (21) 97024-1174\n" +
+      'LUCIANA MENEZES,26/04/79,,"5278651-9/RJ / RQE N.: 15256",1,DERMARTOLOGIA,21 97622-3353\n' +
+      "JOSE SOUZA,,,5274391-7/R,2,NUTRICIONISTA,21 99816-5690\n";
+    const lida = await lerPlanilhaMedicos(
+      new TextEncoder().encode(texto).buffer as ArrayBuffer,
+      "medicos.csv",
+      { ufPadrao: "RJ" },
+    );
+    expect(lida.semRepasse).toBe(true);
+    expect(lida.recusadas).toEqual([]);
+    const [ana, luciana, jose] = lida.medicos;
+    expect(ana.crmUf).toBe("RJ");
+    expect(ana.dataNascimento).toBe("1979-02-25");
+    expect(ana.telefone2).toBe("(21) 97024-1174");
+    expect(ana.repassePadrao).toBeNull();
+    expect(luciana.crm).toBe("5278651-9");
+    expect(luciana.rqe).toBe("15256");
+    expect(jose.crm).toBe("5274391-7");
+
+    const especialidades = [
+      { id: "psi", nome: "PSICOLOGIA" },
+      { id: "derm", nome: "DERMATOLOGIA" },
+      { id: "nut", nome: "NUTRICAO" },
+    ];
+    const base = { existentes: [], especialidades, servicos: [], criarEspecialidades: false };
+    // Sem o repasse da tela, ninguém é cadastrado: o sistema não supõe valor.
+    expect(conferirImportacaoMedicos(lida, base).novos).toHaveLength(0);
+
+    const c = conferirImportacaoMedicos(lida, {
+      ...base,
+      repasseGeral: { tipo: "percentual", valor: 60 },
+    });
+    expect(c.novos).toHaveLength(3);
+    expect(c.novos[0].repassePadrao).toBe(60);
+    expect(c.novos[0].repasseDaTela).toBe(true);
+    expect(c.novos.map((m) => m.especialidadesResolvidas[0].id)).toEqual(["psi", "derm", "nut"]);
+    expect(c.especialidadesFaltando).toEqual([]);
+  });
+
+  it("não troca especialidade de nome curto nem parecida com duas", () => {
+    const cadastro = [
+      { id: "uro", nome: "UROLOGIA" },
+      { id: "neuro", nome: "NEUROLOGIA" },
+    ];
+    expect(resolverEspecialidade("NEUROLOGIA", cadastro)?.id).toBe("neuro");
+    expect(resolverEspecialidade("NEROLOGIA", cadastro)?.id).toBe("neuro");
+    expect(resolverEspecialidade("NEUROLOGA", cadastro)?.id).toBe("neuro");
+    // Nome curto não é corrigido: erro de uma letra ali muda a especialidade.
+    expect(resolverEspecialidade("UROLOGA", cadastro)).toBeNull();
+    expect(resolverEspecialidade("ESTÉTICA", cadastro)).toBeNull();
   });
 
   it("lê CSV com vírgula e aspas em UTF-8", async () => {
