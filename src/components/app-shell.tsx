@@ -137,6 +137,14 @@ function corDaClinica(nome?: string): string {
   return "#0f172a";
 }
 
+/** Identificador da clínica usado no <html> para trocar a paleta de marca. */
+function slugDaClinica(nome?: string): "sao-francisco" | "menino-jesus" | null {
+  const n = (nome ?? "").toLowerCase();
+  if (n.includes("são francisco") || n.includes("sao francisco")) return "sao-francisco";
+  if (n.includes("menino jesus")) return "menino-jesus";
+  return null;
+}
+
 function corHoverDaClinica(nome?: string): string {
   const n = (nome ?? "").toLowerCase();
   if (n.includes("são francisco") || n.includes("sao francisco")) return "#004d27"; // verde escuro
@@ -1011,6 +1019,20 @@ function AppShellInner() {
       root.style.removeProperty("--primary-foreground");
     };
   }, [clinicColor]);
+
+  // Marca a clínica ativa no <html> para a paleta de marca (tela de portais).
+  const nomeClinicaAtual = clinicaAtual?.clinica.nome;
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    const root = document.documentElement;
+    const slug = modoTodas ? null : slugDaClinica(nomeClinicaAtual);
+    if (slug) root.dataset["clinica"] = slug;
+    else delete root.dataset["clinica"];
+    return () => {
+      delete root.dataset["clinica"];
+    };
+  }, [modoTodas, nomeClinicaAtual]);
+
 
   const subsystem = useSyncExternalStore(subscribeSubsystem, getSubsystem, () => null);
   const seletorPortaisAberto = useSeletorPortaisAberto();
