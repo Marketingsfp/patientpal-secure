@@ -340,6 +340,7 @@ type Convenio = {
   max_dependentes: number;
   vigencia_meses: number;
   beneficios: string | null;
+  ativo?: boolean | null;
 };
 type Faixa = {
   id: string;
