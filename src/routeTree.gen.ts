@@ -104,6 +104,7 @@ import { Route as AuthenticatedAppConsultaIaRouteImport } from './routes/_authen
 import { Route as AuthenticatedAppClinicasRouteImport } from './routes/_authenticated/app.clinicas'
 import { Route as AuthenticatedAppCheckinRouteImport } from './routes/_authenticated/app.checkin'
 import { Route as AuthenticatedAppChatRouteImport } from './routes/_authenticated/app.chat'
+import { Route as AuthenticatedAppCartaoTerapeuticoRouteImport } from './routes/_authenticated/app.cartao-terapeutico'
 import { Route as AuthenticatedAppCartaoBeneficiosRouteImport } from './routes/_authenticated/app.cartao-beneficios'
 import { Route as AuthenticatedAppCargosRouteImport } from './routes/_authenticated/app.cargos'
 import { Route as AuthenticatedAppCampanhasRouteImport } from './routes/_authenticated/app.campanhas'
@@ -172,6 +173,12 @@ import { Route as AuthenticatedAppConfiguracoesPainelTotemRouteImport } from './
 import { Route as AuthenticatedAppConfiguracoesNfseRouteImport } from './routes/_authenticated/app.configuracoes.nfse'
 import { Route as AuthenticatedAppClientesRecentesRouteImport } from './routes/_authenticated/app.clientes.recentes'
 import { Route as AuthenticatedAppClientesDuplicadosRouteImport } from './routes/_authenticated/app.clientes.duplicados'
+import { Route as AuthenticatedAppCartaoTerapeuticoRelatoriosRouteImport } from './routes/_authenticated/app.cartao-terapeutico.relatorios'
+import { Route as AuthenticatedAppCartaoTerapeuticoImportarRouteImport } from './routes/_authenticated/app.cartao-terapeutico.importar'
+import { Route as AuthenticatedAppCartaoTerapeuticoDependentesRouteImport } from './routes/_authenticated/app.cartao-terapeutico.dependentes'
+import { Route as AuthenticatedAppCartaoTerapeuticoConveniosRouteImport } from './routes/_authenticated/app.cartao-terapeutico.convenios'
+import { Route as AuthenticatedAppCartaoTerapeuticoContratosRouteImport } from './routes/_authenticated/app.cartao-terapeutico.contratos'
+import { Route as AuthenticatedAppCartaoTerapeuticoConferenciaRouteImport } from './routes/_authenticated/app.cartao-terapeutico.conferencia'
 import { Route as AuthenticatedAppCartaoBeneficiosSemConvenioRouteImport } from './routes/_authenticated/app.cartao-beneficios.sem-convenio'
 import { Route as AuthenticatedAppCartaoBeneficiosRelatoriosRouteImport } from './routes/_authenticated/app.cartao-beneficios.relatorios'
 import { Route as AuthenticatedAppCartaoBeneficiosModelosRouteImport } from './routes/_authenticated/app.cartao-beneficios.modelos'
@@ -706,6 +713,12 @@ const AuthenticatedAppChatRoute = AuthenticatedAppChatRouteImport.update({
   path: '/chat',
   getParentRoute: () => AuthenticatedAppRoute,
 } as any)
+const AuthenticatedAppCartaoTerapeuticoRoute =
+  AuthenticatedAppCartaoTerapeuticoRouteImport.update({
+    id: '/cartao-terapeutico',
+    path: '/cartao-terapeutico',
+    getParentRoute: () => AuthenticatedAppRoute,
+  } as any)
 const AuthenticatedAppCartaoBeneficiosRoute =
   AuthenticatedAppCartaoBeneficiosRouteImport.update({
     id: '/cartao-beneficios',
@@ -1105,6 +1118,42 @@ const AuthenticatedAppClientesDuplicadosRoute =
     path: '/clientes/duplicados',
     getParentRoute: () => AuthenticatedAppRoute,
   } as any)
+const AuthenticatedAppCartaoTerapeuticoRelatoriosRoute =
+  AuthenticatedAppCartaoTerapeuticoRelatoriosRouteImport.update({
+    id: '/relatorios',
+    path: '/relatorios',
+    getParentRoute: () => AuthenticatedAppCartaoTerapeuticoRoute,
+  } as any)
+const AuthenticatedAppCartaoTerapeuticoImportarRoute =
+  AuthenticatedAppCartaoTerapeuticoImportarRouteImport.update({
+    id: '/importar',
+    path: '/importar',
+    getParentRoute: () => AuthenticatedAppCartaoTerapeuticoRoute,
+  } as any)
+const AuthenticatedAppCartaoTerapeuticoDependentesRoute =
+  AuthenticatedAppCartaoTerapeuticoDependentesRouteImport.update({
+    id: '/dependentes',
+    path: '/dependentes',
+    getParentRoute: () => AuthenticatedAppCartaoTerapeuticoRoute,
+  } as any)
+const AuthenticatedAppCartaoTerapeuticoConveniosRoute =
+  AuthenticatedAppCartaoTerapeuticoConveniosRouteImport.update({
+    id: '/convenios',
+    path: '/convenios',
+    getParentRoute: () => AuthenticatedAppCartaoTerapeuticoRoute,
+  } as any)
+const AuthenticatedAppCartaoTerapeuticoContratosRoute =
+  AuthenticatedAppCartaoTerapeuticoContratosRouteImport.update({
+    id: '/contratos',
+    path: '/contratos',
+    getParentRoute: () => AuthenticatedAppCartaoTerapeuticoRoute,
+  } as any)
+const AuthenticatedAppCartaoTerapeuticoConferenciaRoute =
+  AuthenticatedAppCartaoTerapeuticoConferenciaRouteImport.update({
+    id: '/conferencia',
+    path: '/conferencia',
+    getParentRoute: () => AuthenticatedAppCartaoTerapeuticoRoute,
+  } as any)
 const AuthenticatedAppCartaoBeneficiosSemConvenioRoute =
   AuthenticatedAppCartaoBeneficiosSemConvenioRouteImport.update({
     id: '/sem-convenio',
@@ -1241,6 +1290,7 @@ export interface FileRoutesByFullPath {
   '/app/campanhas': typeof AuthenticatedAppCampanhasRoute
   '/app/cargos': typeof AuthenticatedAppCargosRoute
   '/app/cartao-beneficios': typeof AuthenticatedAppCartaoBeneficiosRouteWithChildren
+  '/app/cartao-terapeutico': typeof AuthenticatedAppCartaoTerapeuticoRouteWithChildren
   '/app/chat': typeof AuthenticatedAppChatRoute
   '/app/checkin': typeof AuthenticatedAppCheckinRoute
   '/app/clinicas': typeof AuthenticatedAppClinicasRoute
@@ -1316,6 +1366,12 @@ export interface FileRoutesByFullPath {
   '/app/cartao-beneficios/modelos': typeof AuthenticatedAppCartaoBeneficiosModelosRoute
   '/app/cartao-beneficios/relatorios': typeof AuthenticatedAppCartaoBeneficiosRelatoriosRoute
   '/app/cartao-beneficios/sem-convenio': typeof AuthenticatedAppCartaoBeneficiosSemConvenioRoute
+  '/app/cartao-terapeutico/conferencia': typeof AuthenticatedAppCartaoTerapeuticoConferenciaRoute
+  '/app/cartao-terapeutico/contratos': typeof AuthenticatedAppCartaoTerapeuticoContratosRoute
+  '/app/cartao-terapeutico/convenios': typeof AuthenticatedAppCartaoTerapeuticoConveniosRoute
+  '/app/cartao-terapeutico/dependentes': typeof AuthenticatedAppCartaoTerapeuticoDependentesRoute
+  '/app/cartao-terapeutico/importar': typeof AuthenticatedAppCartaoTerapeuticoImportarRoute
+  '/app/cartao-terapeutico/relatorios': typeof AuthenticatedAppCartaoTerapeuticoRelatoriosRoute
   '/app/clientes/duplicados': typeof AuthenticatedAppClientesDuplicadosRoute
   '/app/clientes/recentes': typeof AuthenticatedAppClientesRecentesRoute
   '/app/configuracoes/nfse': typeof AuthenticatedAppConfiguracoesNfseRoute
@@ -1418,6 +1474,7 @@ export interface FileRoutesByTo {
   '/app/campanhas': typeof AuthenticatedAppCampanhasRoute
   '/app/cargos': typeof AuthenticatedAppCargosRoute
   '/app/cartao-beneficios': typeof AuthenticatedAppCartaoBeneficiosRouteWithChildren
+  '/app/cartao-terapeutico': typeof AuthenticatedAppCartaoTerapeuticoRouteWithChildren
   '/app/chat': typeof AuthenticatedAppChatRoute
   '/app/checkin': typeof AuthenticatedAppCheckinRoute
   '/app/clinicas': typeof AuthenticatedAppClinicasRoute
@@ -1491,6 +1548,12 @@ export interface FileRoutesByTo {
   '/app/cartao-beneficios/modelos': typeof AuthenticatedAppCartaoBeneficiosModelosRoute
   '/app/cartao-beneficios/relatorios': typeof AuthenticatedAppCartaoBeneficiosRelatoriosRoute
   '/app/cartao-beneficios/sem-convenio': typeof AuthenticatedAppCartaoBeneficiosSemConvenioRoute
+  '/app/cartao-terapeutico/conferencia': typeof AuthenticatedAppCartaoTerapeuticoConferenciaRoute
+  '/app/cartao-terapeutico/contratos': typeof AuthenticatedAppCartaoTerapeuticoContratosRoute
+  '/app/cartao-terapeutico/convenios': typeof AuthenticatedAppCartaoTerapeuticoConveniosRoute
+  '/app/cartao-terapeutico/dependentes': typeof AuthenticatedAppCartaoTerapeuticoDependentesRoute
+  '/app/cartao-terapeutico/importar': typeof AuthenticatedAppCartaoTerapeuticoImportarRoute
+  '/app/cartao-terapeutico/relatorios': typeof AuthenticatedAppCartaoTerapeuticoRelatoriosRoute
   '/app/clientes/duplicados': typeof AuthenticatedAppClientesDuplicadosRoute
   '/app/clientes/recentes': typeof AuthenticatedAppClientesRecentesRoute
   '/app/configuracoes/nfse': typeof AuthenticatedAppConfiguracoesNfseRoute
@@ -1597,6 +1660,7 @@ export interface FileRoutesById {
   '/_authenticated/app/campanhas': typeof AuthenticatedAppCampanhasRoute
   '/_authenticated/app/cargos': typeof AuthenticatedAppCargosRoute
   '/_authenticated/app/cartao-beneficios': typeof AuthenticatedAppCartaoBeneficiosRouteWithChildren
+  '/_authenticated/app/cartao-terapeutico': typeof AuthenticatedAppCartaoTerapeuticoRouteWithChildren
   '/_authenticated/app/chat': typeof AuthenticatedAppChatRoute
   '/_authenticated/app/checkin': typeof AuthenticatedAppCheckinRoute
   '/_authenticated/app/clinicas': typeof AuthenticatedAppClinicasRoute
@@ -1672,6 +1736,12 @@ export interface FileRoutesById {
   '/_authenticated/app/cartao-beneficios/modelos': typeof AuthenticatedAppCartaoBeneficiosModelosRoute
   '/_authenticated/app/cartao-beneficios/relatorios': typeof AuthenticatedAppCartaoBeneficiosRelatoriosRoute
   '/_authenticated/app/cartao-beneficios/sem-convenio': typeof AuthenticatedAppCartaoBeneficiosSemConvenioRoute
+  '/_authenticated/app/cartao-terapeutico/conferencia': typeof AuthenticatedAppCartaoTerapeuticoConferenciaRoute
+  '/_authenticated/app/cartao-terapeutico/contratos': typeof AuthenticatedAppCartaoTerapeuticoContratosRoute
+  '/_authenticated/app/cartao-terapeutico/convenios': typeof AuthenticatedAppCartaoTerapeuticoConveniosRoute
+  '/_authenticated/app/cartao-terapeutico/dependentes': typeof AuthenticatedAppCartaoTerapeuticoDependentesRoute
+  '/_authenticated/app/cartao-terapeutico/importar': typeof AuthenticatedAppCartaoTerapeuticoImportarRoute
+  '/_authenticated/app/cartao-terapeutico/relatorios': typeof AuthenticatedAppCartaoTerapeuticoRelatoriosRoute
   '/_authenticated/app/clientes/duplicados': typeof AuthenticatedAppClientesDuplicadosRoute
   '/_authenticated/app/clientes/recentes': typeof AuthenticatedAppClientesRecentesRoute
   '/_authenticated/app/configuracoes/nfse': typeof AuthenticatedAppConfiguracoesNfseRoute
@@ -1778,6 +1848,7 @@ export interface FileRouteTypes {
     | '/app/campanhas'
     | '/app/cargos'
     | '/app/cartao-beneficios'
+    | '/app/cartao-terapeutico'
     | '/app/chat'
     | '/app/checkin'
     | '/app/clinicas'
@@ -1853,6 +1924,12 @@ export interface FileRouteTypes {
     | '/app/cartao-beneficios/modelos'
     | '/app/cartao-beneficios/relatorios'
     | '/app/cartao-beneficios/sem-convenio'
+    | '/app/cartao-terapeutico/conferencia'
+    | '/app/cartao-terapeutico/contratos'
+    | '/app/cartao-terapeutico/convenios'
+    | '/app/cartao-terapeutico/dependentes'
+    | '/app/cartao-terapeutico/importar'
+    | '/app/cartao-terapeutico/relatorios'
     | '/app/clientes/duplicados'
     | '/app/clientes/recentes'
     | '/app/configuracoes/nfse'
@@ -1955,6 +2032,7 @@ export interface FileRouteTypes {
     | '/app/campanhas'
     | '/app/cargos'
     | '/app/cartao-beneficios'
+    | '/app/cartao-terapeutico'
     | '/app/chat'
     | '/app/checkin'
     | '/app/clinicas'
@@ -2028,6 +2106,12 @@ export interface FileRouteTypes {
     | '/app/cartao-beneficios/modelos'
     | '/app/cartao-beneficios/relatorios'
     | '/app/cartao-beneficios/sem-convenio'
+    | '/app/cartao-terapeutico/conferencia'
+    | '/app/cartao-terapeutico/contratos'
+    | '/app/cartao-terapeutico/convenios'
+    | '/app/cartao-terapeutico/dependentes'
+    | '/app/cartao-terapeutico/importar'
+    | '/app/cartao-terapeutico/relatorios'
     | '/app/clientes/duplicados'
     | '/app/clientes/recentes'
     | '/app/configuracoes/nfse'
@@ -2133,6 +2217,7 @@ export interface FileRouteTypes {
     | '/_authenticated/app/campanhas'
     | '/_authenticated/app/cargos'
     | '/_authenticated/app/cartao-beneficios'
+    | '/_authenticated/app/cartao-terapeutico'
     | '/_authenticated/app/chat'
     | '/_authenticated/app/checkin'
     | '/_authenticated/app/clinicas'
@@ -2208,6 +2293,12 @@ export interface FileRouteTypes {
     | '/_authenticated/app/cartao-beneficios/modelos'
     | '/_authenticated/app/cartao-beneficios/relatorios'
     | '/_authenticated/app/cartao-beneficios/sem-convenio'
+    | '/_authenticated/app/cartao-terapeutico/conferencia'
+    | '/_authenticated/app/cartao-terapeutico/contratos'
+    | '/_authenticated/app/cartao-terapeutico/convenios'
+    | '/_authenticated/app/cartao-terapeutico/dependentes'
+    | '/_authenticated/app/cartao-terapeutico/importar'
+    | '/_authenticated/app/cartao-terapeutico/relatorios'
     | '/_authenticated/app/clientes/duplicados'
     | '/_authenticated/app/clientes/recentes'
     | '/_authenticated/app/configuracoes/nfse'
@@ -2985,6 +3076,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAppChatRouteImport
       parentRoute: typeof AuthenticatedAppRoute
     }
+    '/_authenticated/app/cartao-terapeutico': {
+      id: '/_authenticated/app/cartao-terapeutico'
+      path: '/cartao-terapeutico'
+      fullPath: '/app/cartao-terapeutico'
+      preLoaderRoute: typeof AuthenticatedAppCartaoTerapeuticoRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
+    }
     '/_authenticated/app/cartao-beneficios': {
       id: '/_authenticated/app/cartao-beneficios'
       path: '/cartao-beneficios'
@@ -3461,6 +3559,48 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAppClientesDuplicadosRouteImport
       parentRoute: typeof AuthenticatedAppRoute
     }
+    '/_authenticated/app/cartao-terapeutico/relatorios': {
+      id: '/_authenticated/app/cartao-terapeutico/relatorios'
+      path: '/relatorios'
+      fullPath: '/app/cartao-terapeutico/relatorios'
+      preLoaderRoute: typeof AuthenticatedAppCartaoTerapeuticoRelatoriosRouteImport
+      parentRoute: typeof AuthenticatedAppCartaoTerapeuticoRoute
+    }
+    '/_authenticated/app/cartao-terapeutico/importar': {
+      id: '/_authenticated/app/cartao-terapeutico/importar'
+      path: '/importar'
+      fullPath: '/app/cartao-terapeutico/importar'
+      preLoaderRoute: typeof AuthenticatedAppCartaoTerapeuticoImportarRouteImport
+      parentRoute: typeof AuthenticatedAppCartaoTerapeuticoRoute
+    }
+    '/_authenticated/app/cartao-terapeutico/dependentes': {
+      id: '/_authenticated/app/cartao-terapeutico/dependentes'
+      path: '/dependentes'
+      fullPath: '/app/cartao-terapeutico/dependentes'
+      preLoaderRoute: typeof AuthenticatedAppCartaoTerapeuticoDependentesRouteImport
+      parentRoute: typeof AuthenticatedAppCartaoTerapeuticoRoute
+    }
+    '/_authenticated/app/cartao-terapeutico/convenios': {
+      id: '/_authenticated/app/cartao-terapeutico/convenios'
+      path: '/convenios'
+      fullPath: '/app/cartao-terapeutico/convenios'
+      preLoaderRoute: typeof AuthenticatedAppCartaoTerapeuticoConveniosRouteImport
+      parentRoute: typeof AuthenticatedAppCartaoTerapeuticoRoute
+    }
+    '/_authenticated/app/cartao-terapeutico/contratos': {
+      id: '/_authenticated/app/cartao-terapeutico/contratos'
+      path: '/contratos'
+      fullPath: '/app/cartao-terapeutico/contratos'
+      preLoaderRoute: typeof AuthenticatedAppCartaoTerapeuticoContratosRouteImport
+      parentRoute: typeof AuthenticatedAppCartaoTerapeuticoRoute
+    }
+    '/_authenticated/app/cartao-terapeutico/conferencia': {
+      id: '/_authenticated/app/cartao-terapeutico/conferencia'
+      path: '/conferencia'
+      fullPath: '/app/cartao-terapeutico/conferencia'
+      preLoaderRoute: typeof AuthenticatedAppCartaoTerapeuticoConferenciaRouteImport
+      parentRoute: typeof AuthenticatedAppCartaoTerapeuticoRoute
+    }
     '/_authenticated/app/cartao-beneficios/sem-convenio': {
       id: '/_authenticated/app/cartao-beneficios/sem-convenio'
       path: '/sem-convenio'
@@ -3623,6 +3763,36 @@ const AuthenticatedAppCartaoBeneficiosRouteWithChildren =
     AuthenticatedAppCartaoBeneficiosRouteChildren,
   )
 
+interface AuthenticatedAppCartaoTerapeuticoRouteChildren {
+  AuthenticatedAppCartaoTerapeuticoConferenciaRoute: typeof AuthenticatedAppCartaoTerapeuticoConferenciaRoute
+  AuthenticatedAppCartaoTerapeuticoContratosRoute: typeof AuthenticatedAppCartaoTerapeuticoContratosRoute
+  AuthenticatedAppCartaoTerapeuticoConveniosRoute: typeof AuthenticatedAppCartaoTerapeuticoConveniosRoute
+  AuthenticatedAppCartaoTerapeuticoDependentesRoute: typeof AuthenticatedAppCartaoTerapeuticoDependentesRoute
+  AuthenticatedAppCartaoTerapeuticoImportarRoute: typeof AuthenticatedAppCartaoTerapeuticoImportarRoute
+  AuthenticatedAppCartaoTerapeuticoRelatoriosRoute: typeof AuthenticatedAppCartaoTerapeuticoRelatoriosRoute
+}
+
+const AuthenticatedAppCartaoTerapeuticoRouteChildren: AuthenticatedAppCartaoTerapeuticoRouteChildren =
+  {
+    AuthenticatedAppCartaoTerapeuticoConferenciaRoute:
+      AuthenticatedAppCartaoTerapeuticoConferenciaRoute,
+    AuthenticatedAppCartaoTerapeuticoContratosRoute:
+      AuthenticatedAppCartaoTerapeuticoContratosRoute,
+    AuthenticatedAppCartaoTerapeuticoConveniosRoute:
+      AuthenticatedAppCartaoTerapeuticoConveniosRoute,
+    AuthenticatedAppCartaoTerapeuticoDependentesRoute:
+      AuthenticatedAppCartaoTerapeuticoDependentesRoute,
+    AuthenticatedAppCartaoTerapeuticoImportarRoute:
+      AuthenticatedAppCartaoTerapeuticoImportarRoute,
+    AuthenticatedAppCartaoTerapeuticoRelatoriosRoute:
+      AuthenticatedAppCartaoTerapeuticoRelatoriosRoute,
+  }
+
+const AuthenticatedAppCartaoTerapeuticoRouteWithChildren =
+  AuthenticatedAppCartaoTerapeuticoRoute._addFileChildren(
+    AuthenticatedAppCartaoTerapeuticoRouteChildren,
+  )
+
 interface AuthenticatedAppEquipeRouteChildren {
   AuthenticatedAppEquipeImportarRoute: typeof AuthenticatedAppEquipeImportarRoute
   AuthenticatedAppEquipeIndexRoute: typeof AuthenticatedAppEquipeIndexRoute
@@ -3738,6 +3908,7 @@ interface AuthenticatedAppRouteChildren {
   AuthenticatedAppCampanhasRoute: typeof AuthenticatedAppCampanhasRoute
   AuthenticatedAppCargosRoute: typeof AuthenticatedAppCargosRoute
   AuthenticatedAppCartaoBeneficiosRoute: typeof AuthenticatedAppCartaoBeneficiosRouteWithChildren
+  AuthenticatedAppCartaoTerapeuticoRoute: typeof AuthenticatedAppCartaoTerapeuticoRouteWithChildren
   AuthenticatedAppChatRoute: typeof AuthenticatedAppChatRoute
   AuthenticatedAppCheckinRoute: typeof AuthenticatedAppCheckinRoute
   AuthenticatedAppClinicasRoute: typeof AuthenticatedAppClinicasRoute
@@ -3840,6 +4011,8 @@ const AuthenticatedAppRouteChildren: AuthenticatedAppRouteChildren = {
   AuthenticatedAppCargosRoute: AuthenticatedAppCargosRoute,
   AuthenticatedAppCartaoBeneficiosRoute:
     AuthenticatedAppCartaoBeneficiosRouteWithChildren,
+  AuthenticatedAppCartaoTerapeuticoRoute:
+    AuthenticatedAppCartaoTerapeuticoRouteWithChildren,
   AuthenticatedAppChatRoute: AuthenticatedAppChatRoute,
   AuthenticatedAppCheckinRoute: AuthenticatedAppCheckinRoute,
   AuthenticatedAppClinicasRoute: AuthenticatedAppClinicasRoute,
