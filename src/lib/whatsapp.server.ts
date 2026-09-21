@@ -1370,10 +1370,16 @@ async function gerarRespostaNinaInterno(
       servicos: catalogoPublicado.servicos,
       profissionais: catalogoPublicado.profissionais,
       // Referência do assunto/pergunta, sem preços ou outros fatos antigos.
-      referencia_da_sessao: conhecimentoAnterior ? {
-        consulta: conhecimentoAnterior.consulta,
-        esclarecimento: conhecimentoAnterior.esclarecimento ?? null,
-      } : null,
+      referencia_da_sessao: conhecimentoAnterior
+        ? {
+            consulta: conhecimentoAnterior.consulta,
+            esclarecimento: conhecimentoAnterior.esclarecimento ?? null,
+            esclarecimento_tentativas:
+              conhecimentoAnterior.esclarecimentoTentativas ??
+              (conhecimentoAnterior.esclarecimento ? 1 : 0),
+            esclarecimento_perguntas: conhecimentoAnterior.esclarecimentoPerguntas ?? [],
+          }
+        : null,
     },
     ferramentas: {
       pode_agendar: podeAgendar,
@@ -1700,13 +1706,21 @@ async function gerarRespostaNinaInterno(
   // Conhecimento da sessão é uma referência de pesquisa, nunca prova velha.
   // A Nina interpreta a mensagem e o histórico ANTES de escolher os termos
   // da busca. Só resultados de consultas reais alimentam os fatos do turno.
-  const { lembrarConsultaComprovada,
-    compararReferenciasConhecimento } = await import("@/lib/nina/confidence/conhecimento-sessao");
-  const { incorporarResultadoOficial, limitarRetornoParaModelo } = await import("@/lib/nina/confidence/evidencias-turno");
-  const { resolverSelecaoContextual, normalizarSelecaoContextual } = await import("@/lib/nina/confidence/selecao-contextual");
-  const { encaminharAposEsclarecimento, MOTIVO_IDENTIFICACAO_PENDENTE } = await import("@/lib/nina/catalogo-esclarecimento");
-  let selecaoDoTurno: import("@/lib/nina/confidence/selecao-contextual").ResultadoSelecaoContextual | null = null;
-  async function encaminharRegraCatalogo(ferramentaOrigem: string, ausencia?: NonNullable<ReturnType<typeof encaminhamentoSemRegistro>>) {
+  const { lembrarConsultaComprovada, compararReferenciasConhecimento } =
+    await import("@/lib/nina/confidence/conhecimento-sessao");
+  const { incorporarResultadoOficial, limitarRetornoParaModelo } =
+    await import("@/lib/nina/confidence/evidencias-turno");
+  const { resolverSelecaoContextual, normalizarSelecaoContextual } =
+    await import("@/lib/nina/confidence/selecao-contextual");
+  const { encaminharAposEsclarecimento, prepararSegundaPergunta, MOTIVO_IDENTIFICACAO_PENDENTE } =
+    await import("@/lib/nina/catalogo-esclarecimento");
+  let selecaoDoTurno:
+    | import("@/lib/nina/confidence/selecao-contextual").ResultadoSelecaoContextual
+    | null = null;
+  async function encaminharRegraCatalogo(
+    ferramentaOrigem: string,
+    ausencia?: NonNullable<ReturnType<typeof encaminhamentoSemRegistro>>,
+  ) {
     if (finalizacaoHandoff || turnoObsoleto) return;
     if (opcoes?.revisao?.valor) {
       const { respostaObsoleta } = await import("@/lib/nina/revisao-conversa.server");
@@ -1716,9 +1730,22 @@ async function gerarRespostaNinaInterno(
         return;
       }
     }
-    const argumentos = ausencia ?? { motivo: MOTIVO_SFP, resumo: "O atendimento solicitado está publicado com profissional SFP. A equipe humana deve continuar o atendimento.", urgencia: "normal" };
-    const origem = ausencia?.motivo === MOTIVO_IDENTIFICACAO_PENDENTE ? "regra_catalogo_esclarecimento_unico" : ausencia ? "regra_catalogo_sem_registro" : "regra_catalogo_sfp";
-    rastro?.iniciar("tool.execute", { ferramenta: "solicitar_atendente_humano", origem_solicitacao: origem });
+    const argumentos = ausencia ?? {
+      motivo: MOTIVO_SFP,
+      resumo:
+        "O atendimento solicitado está publicado com profissional SFP. A equipe humana deve continuar o atendimento.",
+      urgencia: "normal",
+    };
+    const origem =
+      ausencia?.motivo === MOTIVO_IDENTIFICACAO_PENDENTE
+        ? "regra_catalogo_limite_esclarecimento"
+        : ausencia
+          ? "regra_catalogo_sem_registro"
+          : "regra_catalogo_sfp";
+    rastro?.iniciar("tool.execute", {
+      ferramenta: "solicitar_atendente_humano",
+      origem_solicitacao: origem,
+    });
     const rh = await broker.executar("solicitar_atendente_humano", JSON.stringify(argumentos));
     await compartilharResultado("solicitar_atendente_humano", argumentos, rh);
     const confirmado = rh.success && !rh.erro;
@@ -1736,80 +1763,160 @@ async function gerarRespostaNinaInterno(
     if (confirmado) rastro?.concluir("tool.execute", { ferramenta: "solicitar_atendente_humano", origem_solicitacao: origem });
     else rastro?.falhar("tool.execute", rh.erro ?? "handoff não confirmado", { ferramenta: "solicitar_atendente_humano" });
   }
-  async function compartilharResultado(nome: string, args: unknown, r: import("@/lib/nina/tool-broker").ResultadoBroker) {
-    const ex = incorporarResultadoOficial({ clinicaId, nome, args, resultado: r,
-      fatos: fatosDoTurno, consultas: consultasDoTurno });
+  async function compartilharResultado(
+    nome: string,
+    args: unknown,
+    r: import("@/lib/nina/tool-broker").ResultadoBroker,
+  ) {
+    let parametros: Record<string, unknown> = {};
+    try {
+      const parsed: unknown = typeof args === "string" ? JSON.parse(args) : args;
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed))
+        parametros = parsed as Record<string, unknown>;
+    } catch {
+      /* inválido não vira referência */
+    }
+    const referenciaAnterior =
+      nome === "consultar_base_conhecimento" && parametros.nova_solicitacao === true
+        ? null
+        : conhecimentoAnterior;
+    r = prepararSegundaPergunta(referenciaAnterior, r);
+    const ex = incorporarResultadoOficial({
+      clinicaId,
+      nome,
+      args,
+      resultado: r,
+      fatos: fatosDoTurno,
+      consultas: consultasDoTurno,
+    });
     if (!r.reused) nomesFerramentasTurno.push(nome);
     if (!r.success || r.erro) conflitoFerramenta = true;
     const payload = dadosPublicosCatalogo(respostaParaModelo(r));
-    if (r.capacidade === "requestHumanHandoff" && r.success &&
-      (r.dados as { sem_mensagem_paciente?: boolean } | null)?.sem_mensagem_paciente === true) {
+    if (
+      r.capacidade === "requestHumanHandoff" &&
+      r.success &&
+      (r.dados as { sem_mensagem_paciente?: boolean } | null)?.sem_mensagem_paciente === true
+    ) {
       houveHandoff = true;
       const { limparEscolhaAgendamento } = await import("@/lib/nina/agendamento-escolha");
       limparEscolhaAgendamento(fluxoEstado);
       fluxoEstado.appointment.slot_options = null;
       fluxoEstado.flow.stage = "HANDOFF";
-      finalizacaoHandoff = { texto: "", textoModelo: textoModeloAtual,
-        handoffConfirmado: true, motivo: MOTIVO_SFP };
+      finalizacaoHandoff = {
+        texto: "",
+        textoModelo: textoModeloAtual,
+        handoffConfirmado: true,
+        motivo: MOTIVO_SFP,
+      };
     }
     if (r.capacidade !== "searchKnowledgeBase" && r.capacidade !== "listCatalog") {
       if (r.erro === "PROFISSIONAL_SFP") await encaminharRegraCatalogo(nome);
       return limitarRetornoParaModelo(payload);
     }
-    let parametros: Record<string, unknown> = {};
-    try {
-      const parsed: unknown = typeof args === "string" ? JSON.parse(args) : args;
-      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) parametros = parsed as Record<string, unknown>;
-    } catch { /* inválido não vira referência */ }
-    const esclarecimentoAtual = (r.dados as import("@/lib/nina/knowledge-contract").ResultadoConhecimento | null)?.esclarecimento;
+    const esclarecimentoAtual = (
+      r.dados as import("@/lib/nina/knowledge-contract").ResultadoConhecimento | null
+    )?.esclarecimento;
     const { normalizarTipoAtendimentoCatalogo } = await import("@/lib/nina/catalogo-pesquisa");
     const tipoAtendimento = normalizarTipoAtendimentoCatalogo(
-      (r.dados as import("@/lib/nina/knowledge-contract").ResultadoConhecimento | null)?.tipo_atendimento
-        ?? parametros.tipo_atendimento,
+      (r.dados as import("@/lib/nina/knowledge-contract").ResultadoConhecimento | null)
+        ?.tipo_atendimento ?? parametros.tipo_atendimento,
     );
     if (esclarecimentoAtual) {
       if (ctxFerramentas) ctxFerramentas.esclarecimentoCatalogo = esclarecimentoAtual;
-      fluxoEstado.knowledge_context = lembrarConsultaComprovada({ clinicaId, sessionId: fluxoEstado.session_id ?? null,
-        fatos: ex.fatos, args: { termo: String(parametros.termo ?? parametros.especialidade ?? parametros.nome ?? mensagemPaciente).slice(0, 200),
+      fluxoEstado.knowledge_context = lembrarConsultaComprovada({
+        clinicaId,
+        sessionId: fluxoEstado.session_id ?? null,
+        fatos: ex.fatos,
+        args: {
+          termo: String(
+            parametros.termo ?? parametros.especialidade ?? parametros.nome ?? mensagemPaciente,
+          ).slice(0, 200),
           ...(tipoAtendimento ? { tipo_atendimento: tipoAtendimento } : {}),
-          ...(typeof parametros.medico === "string" ? { medico: parametros.medico } : {}) },
-        esclarecimento: esclarecimentoAtual });
+          ...(typeof parametros.medico === "string" ? { medico: parametros.medico } : {}),
+        },
+        anterior: referenciaAnterior,
+        esclarecimento: esclarecimentoAtual,
+      });
     }
     if (nome === "consultar_base_conhecimento" && typeof parametros.termo === "string") {
-      const esclarecimento = (r.dados as import("@/lib/nina/knowledge-contract").ResultadoConhecimento | null)?.esclarecimento;
-      const referencia = ex.consulta.status === "com_itens" || esclarecimento ? lembrarConsultaComprovada({
-        clinicaId, sessionId: fluxoEstado.session_id ?? null, fatos: ex.fatos,
-        args: { termo: parametros.termo, ...(tipoAtendimento ? { tipo_atendimento: tipoAtendimento } : {}),
-          ...(typeof parametros.medico === "string" ? { medico: parametros.medico } : {}) },
-        anterior: conhecimentoAnterior,
-        esclarecimento,
-      }) : null;
+      const esclarecimento = (
+        r.dados as import("@/lib/nina/knowledge-contract").ResultadoConhecimento | null
+      )?.esclarecimento;
+      const referencia =
+        ex.consulta.status === "com_itens" || esclarecimento
+          ? lembrarConsultaComprovada({
+              clinicaId,
+              sessionId: fluxoEstado.session_id ?? null,
+              fatos: ex.fatos,
+              args: {
+                termo: parametros.termo,
+                ...(tipoAtendimento ? { tipo_atendimento: tipoAtendimento } : {}),
+                ...(typeof parametros.medico === "string" ? { medico: parametros.medico } : {}),
+              },
+              anterior: referenciaAnterior,
+              esclarecimento,
+            })
+          : null;
       fluxoEstado.knowledge_context = referencia;
-      selecaoDoTurno = resolverSelecaoContextual({ mensagem: mensagemPaciente, clinicaId,
-        sessaoId: fluxoEstado.session_id ?? "", fatosOficiais: fatosDoTurno,
-        selecaoAnterior: normalizarSelecaoContextual(conhecimentoAnterior?.selecao), agora: new Date().toISOString() });
+      selecaoDoTurno = resolverSelecaoContextual({
+        mensagem: mensagemPaciente,
+        clinicaId,
+        sessaoId: fluxoEstado.session_id ?? "",
+        fatosOficiais: fatosDoTurno,
+        selecaoAnterior: normalizarSelecaoContextual(conhecimentoAnterior?.selecao),
+        agora: new Date().toISOString(),
+      });
       if (referencia) referencia.selecao = selecaoDoTurno.selecao;
       contextoConsultaAgenda.selecaoRevalidada = selecaoDoTurno.selecao;
       runtimeContext.consulta_agenda.referencia_anterior_profissional =
         selecaoDoTurno.selecao?.medicoNome ?? contextoConsultaAgenda.medicoEscolhido?.nome ?? null;
-      registrarEtapa({ tipo: "consulta", fonte: "catalogo", titulo: "Dados atuais da base compartilhados com a Nina",
-        dados: { consulta: ex.consulta.id, status: ex.consulta.status, referencias: referencia?.referencias ?? [],
-          ...compararReferenciasConhecimento(conhecimentoAnterior?.referencias ?? [], referencia?.referencias ?? []),
-          selecao: selecaoDoTurno, interpretacao_intencao: "modelo_com_historico_da_sessao",
-          ferramentas_de_consulta_disponiveis: true, fatos_antigos_reutilizados: false },
-        codigo: { arquivo: "src/lib/whatsapp.server.ts", funcao: "compartilharResultado" } });
+      registrarEtapa({
+        tipo: "consulta",
+        fonte: "catalogo",
+        titulo: "Dados atuais da base compartilhados com a Nina",
+        dados: {
+          consulta: ex.consulta.id,
+          status: ex.consulta.status,
+          referencias: referencia?.referencias ?? [],
+          ...compararReferenciasConhecimento(
+            conhecimentoAnterior?.referencias ?? [],
+            referencia?.referencias ?? [],
+          ),
+          selecao: selecaoDoTurno,
+          interpretacao_intencao: "modelo_com_historico_da_sessao",
+          ferramentas_de_consulta_disponiveis: true,
+          fatos_antigos_reutilizados: false,
+        },
+        codigo: {
+          arquivo: "src/lib/whatsapp.server.ts",
+          funcao: "compartilharResultado",
+        },
+      });
     }
-    const ausencia = encaminharAposEsclarecimento(conhecimentoAnterior, r, mensagemPaciente)
-      ?? encaminhamentoSemRegistro(r, args);
+    const ausencia =
+      encaminharAposEsclarecimento(referenciaAnterior, r, mensagemPaciente) ??
+      encaminhamentoSemRegistro(r, args);
     if (ausencia) await encaminharRegraCatalogo(nome, ausencia);
-    else if (r.success && resultadoExigeHumano(r.dados, selecaoDoTurno?.selecao?.raizesFonte.map(r => r.registro)))
+    else if (
+      r.success &&
+      resultadoExigeHumano(
+        r.dados,
+        selecaoDoTurno?.selecao?.raizesFonte.map((r) => r.registro),
+      )
+    )
       await encaminharRegraCatalogo(nome);
-    return { ...limitarRetornoParaModelo(payload) as Record<string, unknown>,
+    return {
+      ...(limitarRetornoParaModelo(payload) as Record<string, unknown>),
       // A seleção legada auxilia referências internas; não é uma declaração
       // de intenção do paciente. Essa interpretação cabe ao modelo no histórico.
-      consulta_agenda: { ferramentas_de_consulta_disponiveis: true,
+      consulta_agenda: {
+        ferramentas_de_consulta_disponiveis: true,
         interpretacao_intencao: "modelo_com_historico_da_sessao",
-        permite_reservar: false, fonte_vagas: "agenda", fonte_horarios_habituais: "catalogo_publicado" } };
+        permite_reservar: false,
+        fonte_vagas: "agenda",
+        fonte_horarios_habituais: "catalogo_publicado",
+      },
+    };
   }
   for (let rodada = 0; rodada < MAX_RODADAS; rodada++) {
     if (finalizacaoHandoff || turnoObsoleto) break;
@@ -2255,14 +2362,35 @@ async function gerarRespostaNinaInterno(
 
   if (!finalizacaoHandoff && !houveHandoff && ctxFerramentas?.esclarecimentoCatalogo) {
     resposta = ctxFerramentas.esclarecimentoCatalogo.pergunta;
-    transformar("catalogo.esclarecimento", "uma única pergunta para identificar o atendimento", respostaDoModelo, resposta, "aviso_operacional");
+    transformar(
+      "catalogo.esclarecimento",
+      "até duas perguntas para identificar o atendimento",
+      respostaDoModelo,
+      resposta,
+      "aviso_operacional",
+    );
     marcarOrigem("codigo", "identificação pendente: aguardar uma resposta do paciente");
   }
   if (finalizacaoHandoff) {
     const antes = respostaDoModelo;
     resposta = finalizacaoHandoff.texto;
-    transformar(finalizacaoHandoff.motivo === MOTIVO_SFP ? "catalogo.sfp" : finalizacaoHandoff.motivo === MOTIVO_IDENTIFICACAO_PENDENTE ? "catalogo.esclarecimento_unico" : finalizacaoHandoff.motivo === MOTIVO_SEM_REGISTRO ? "catalogo.sem_registro" : "agenda.sem_vagas", finalizacaoHandoff.motivo, antes, resposta, "aviso_operacional");
-    marcarOrigem("codigo", `${finalizacaoHandoff.motivo}; transferência ${finalizacaoHandoff.handoffConfirmado ? "confirmada" : "não confirmada"}`);
+    transformar(
+      finalizacaoHandoff.motivo === MOTIVO_SFP
+        ? "catalogo.sfp"
+        : finalizacaoHandoff.motivo === MOTIVO_IDENTIFICACAO_PENDENTE
+          ? "catalogo.limite_esclarecimento"
+          : finalizacaoHandoff.motivo === MOTIVO_SEM_REGISTRO
+            ? "catalogo.sem_registro"
+            : "agenda.sem_vagas",
+      finalizacaoHandoff.motivo,
+      antes,
+      resposta,
+      "aviso_operacional",
+    );
+    marcarOrigem(
+      "codigo",
+      `${finalizacaoHandoff.motivo}; transferência ${finalizacaoHandoff.handoffConfirmado ? "confirmada" : "não confirmada"}`,
+    );
     if (finalizacaoHandoff.motivo === MOTIVO_SFP && finalizacaoHandoff.handoffConfirmado) {
       // Não deixar o fallback de texto vazio, o rodapé ou o transporte recriar
       // uma mensagem depois da atribuição silenciosa solicitada pela clínica.

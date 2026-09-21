@@ -1,9 +1,8 @@
-// Gera a publicação a partir das mesmas constantes usadas pelo fallback.
-// Não acessa banco nem publica. A migration preserva histórico e exige a base auditada.
+// Reproduz a publicação histórica de 20/09. Novas regras usam novas migrations;
+// nunca regenerar uma migration aplicada com o fallback de uma versão posterior.
 import { createHash } from "node:crypto";
+import { readFileSync } from "node:fs";
 import { writeFile } from "node:fs/promises";
-import { PROMPT_NINA_WHATSAPP_V4 } from "../../src/lib/nina/prompt/behavior-v4";
-import { PROMPT_NINA_PAINEL_INTERNO } from "../../src/lib/nina/prompt/painel-interno";
 import { validarTemplateInstrucoes } from "../../src/lib/nina/instrucoes-template";
 import anteriores from "../../src/lib/nina/__tests__/fixtures/instrucoes-antes-consolidacao.json";
 
@@ -15,20 +14,14 @@ const identidade = anteriores.whatsapp.conteudo.match(
 )?.[0];
 if (!identidade) throw new Error("A identidade da publicação auditada precisa ser preservada.");
 
-export const PUBLICACOES_CONSOLIDADAS = [
-  {
-    escopo: "whatsapp" as const,
-    anterior_id: anteriores.whatsapp.id,
-    anterior_md5: md5(anteriores.whatsapp.conteudo),
-    conteudo: `${identidade}\n\n${PROMPT_NINA_WHATSAPP_V4}`,
-  },
-  {
-    escopo: "painel_interno" as const,
-    anterior_id: anteriores.painel_interno.id,
-    anterior_md5: md5(anteriores.painel_interno.conteudo),
-    conteudo: PROMPT_NINA_PAINEL_INTERNO,
-  },
-];
+export const PUBLICACOES_CONSOLIDADAS = JSON.parse(
+  readFileSync(MIGRATION_CONSOLIDACAO, "utf8").split("$nina_dados$")[1]!,
+) as Array<{
+  escopo: "whatsapp" | "painel_interno";
+  anterior_id: string;
+  anterior_md5: string;
+  conteudo: string;
+}>;
 
 export function gerarMigrationConsolidacao() {
   for (const p of PUBLICACOES_CONSOLIDADAS) {

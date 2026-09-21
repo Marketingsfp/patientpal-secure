@@ -11,6 +11,7 @@ import { renderizarTemplateInstrucoes, validarTemplateInstrucoes } from "../inst
 import { resolverIdentidadeEfetiva, valoresIdentidade } from "../identidade-efetiva";
 import { removerEmojisNina } from "../resposta/sem-emojis";
 import anteriores from "./fixtures/instrucoes-antes-consolidacao.json";
+import { atualizarLimiteEsclarecimento } from "../prompt/limite-esclarecimento";
 
 describe("consolidação da publicação e do fallback", () => {
   it("publica exatamente as regras do fallback, preservando a identidade da versão auditada", () => {
@@ -28,9 +29,9 @@ describe("consolidação da publicação e do fallback", () => {
       versaoId: "antiga",
     });
     expect(identidade.identidade).toEqual(antiga.identidade);
-    expect(nova.conteudo.split("[/IDENTIDADE DO ATENDIMENTO]\n\n")[1]).toBe(
-      PROMPT_NINA_WHATSAPP_V4,
-    );
+    expect(
+      atualizarLimiteEsclarecimento(nova.conteudo).split("[/IDENTIDADE DO ATENDIMENTO]\n\n")[1],
+    ).toBe(PROMPT_NINA_WHATSAPP_V4);
     const render = renderizarTemplateInstrucoes(nova.conteudo, valoresIdentidade(identidade));
     expect(render.ok).toBe(true);
     if (render.ok) {
@@ -54,7 +55,7 @@ describe("consolidação da publicação e do fallback", () => {
   });
 
   it("remove as ordens conflitantes e deixa as exceções junto das decisões de atendimento", () => {
-    const p = PUBLICACOES_CONSOLIDADAS[0]!.conteudo;
+    const p = atualizarLimiteEsclarecimento(PUBLICACOES_CONSOLIDADAS[0]!.conteudo);
     for (const antiga of [
       "Não acrescente “a partir de”",
       "mesmo se forem iguais aos de outro",
@@ -67,7 +68,7 @@ describe("consolidação da publicação e do fallback", () => {
     for (const regra of [
       "tipo consulta",
       "não envie a frase inteira",
-      "UMA ÚNICA VEZ por solicitação",
+      "ATÉ DUAS VEZES por solicitação",
       "Mais de quatro profissionais",
       "Se pelo menos um valor ou condição for diferente",
       "primeira data disponível ou deseja escolher outra data",

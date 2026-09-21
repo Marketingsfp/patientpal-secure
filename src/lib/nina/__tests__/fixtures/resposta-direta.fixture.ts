@@ -72,12 +72,30 @@ const prompt = "Você é Nina. Consulte a base e informe preço, profissional, h
   + (contextual ? `\n\n${CONTINUIDADE_CONSULTA_AGENDA}` : "");
 const agora = Date.now();
 const estadoContextual = { ...estadoVazio(), session_id: "sessao-contextual",
-  session_started_at: new Date(agora - 30 * 60_000).toISOString(), updated_at: new Date(agora).toISOString() };
-if (esclarecer && !cenario.endsWith("primeiro")) estadoContextual.knowledge_context = {
-  versao: 1, clinicaId: "clinica-simulada", sessionId: "sessao-contextual",
-  consulta: { termo: "Quero exame XYZ" }, referencias: [],
-  esclarecimento: { tipo: "sigla", pergunta: perguntaEsclarecimento, opcoes: [] },
+  session_started_at: new Date(agora - 30 * 60_000).toISOString(),
+  updated_at: new Date(agora).toISOString(),
 };
+if (esclarecer && !cenario.endsWith("primeiro"))
+  estadoContextual.knowledge_context = {
+    versao: 1,
+    clinicaId: "clinica-simulada",
+    sessionId: "sessao-contextual",
+    consulta: { termo: "Quero exame XYZ" },
+    referencias: [],
+    esclarecimento: {
+      tipo: "sigla",
+      pergunta: perguntaEsclarecimento,
+      opcoes: [],
+    },
+    ...(cenario.endsWith("terceiro") ||
+    cenario.includes("apos_duas") ||
+    cenario.endsWith("novo_pedido")
+      ? {
+          esclarecimentoTentativas: 2,
+          esclarecimentoPerguntas: ["Qual exame deseja?", perguntaEsclarecimento],
+        }
+      : {}),
+  };
 const registroMensagem = (body: string, indice: number, direction = "out", status = "sent") => ({
   id: `historico-${indice}`, conversa_id: "conversa-contextual", direction, body, status,
   created_at: new Date(agora - (20 - indice) * 60_000).toISOString(), is_teste: teste,
@@ -248,9 +266,28 @@ mock.module("@/lib/nina/tool-broker.server", () => ({ criarToolBroker: () => ({
       return r;
     }
     if (esclarecer && !cenario.endsWith("resolvido")) {
-      const r = { ferramenta: nome, capacidade: "searchKnowledgeBase", fonte: "catalogo_publicado", success: true, reused: false,
-        dados: { ok: true, knowledge_status: "not_found", found: false, records: [],
-          esclarecimento: { tipo: "sigla", pergunta: perguntaEsclarecimento, opcoes: [] } } };
+      const r = {
+        ferramenta: nome,
+        capacidade: "searchKnowledgeBase",
+        fonte: "catalogo_publicado",
+        success: true,
+        reused: false,
+        dados: {
+          ok: true,
+          knowledge_status: "not_found",
+          found: false,
+          records: [],
+          ...(cenario.endsWith("segundo_sem_registro")
+            ? {}
+            : {
+                esclarecimento: {
+                  tipo: "sigla",
+                  pergunta: perguntaEsclarecimento,
+                  opcoes: [],
+                },
+              }),
+        },
+      };
       resultados.push(r);
       return r;
     }
@@ -328,16 +365,52 @@ mock.module("@/lib/nina/ai-gateway.server", () => ({ ninaAIGateway: async (req: 
         function: { name: "agendar", arguments: "{}" } }] : []),
     ],
   };
-  if (!agenda && !ausente && requests.length === (cenario.endsWith("_recuperacao") ? 2 : 1)) return {
-    ok: true, conteudo: "", modelo: "modelo-simulado", execucaoId: "execucao-direta", nivel: "low",
-    toolCalls: [{ id: "pesquisa-interpretada", type: "function", function: {
-      name: "consultar_base_conhecimento",
-      arguments: JSON.stringify({ termo: interpretacao?.termo ?? (esclarecer && !cenario.endsWith("resolvido") ? "XYZ" : "eletrocardiograma"),
-        ...(interpretacao ? { objetivos: interpretacao.objetivos, tipo_atendimento: interpretacao.tipo_atendimento } : {}) }),
-    } }],
+  if (!agenda && !ausente && requests.length === (cenario.endsWith("_recuperacao") ? 2 : 1))
+    return {
+      ok: true,
+      conteudo: "",
+      modelo: "modelo-simulado",
+      execucaoId: "execucao-direta",
+      nivel: "low",
+      toolCalls: [
+        {
+          id: "pesquisa-interpretada",
+          type: "function",
+          function: {
+            name: "consultar_base_conhecimento",
+            arguments: JSON.stringify({
+              termo:
+                interpretacao?.termo ??
+                (esclarecer && !cenario.endsWith("resolvido") ? "XYZ" : "eletrocardiograma"),
+              ...(interpretacao
+                ? {
+                    objetivos: interpretacao.objetivos,
+                    tipo_atendimento: interpretacao.tipo_atendimento,
+                  }
+                : {}),
+              ...(cenario.endsWith("novo_pedido") ? { nova_solicitacao: true } : {}),
+            }),
+          },
+        },
+      ],
+    };
+  if (interpretacao)
+    return {
+      ok: true,
+      conteudo: interpretacao.resposta,
+      toolCalls: [],
+      modelo: "modelo-simulado",
+      execucaoId: "execucao-direta",
+      nivel: "low",
+    };
+  return {
+    ok: true,
+    conteudo: respostaModelo,
+    toolCalls: [],
+    modelo: "modelo-simulado",
+    execucaoId: "execucao-direta",
+    nivel: "low",
   };
-  if (interpretacao) return { ok: true, conteudo: interpretacao.resposta, toolCalls: [], modelo: "modelo-simulado", execucaoId: "execucao-direta", nivel: "low" };
-  return { ok: true, conteudo: respostaModelo, toolCalls: [], modelo: "modelo-simulado", execucaoId: "execucao-direta", nivel: "low" };
 } }));
 mock.module("@/lib/nina/resposta/templates.server", () => ({
   carregarTemplatesPublicados: async () => ({ textos: {}, versaoInstrucoes: null, recusadas: [] }),

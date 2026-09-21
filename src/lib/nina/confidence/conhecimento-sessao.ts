@@ -4,7 +4,11 @@ import { normalizarTexto, type FatoRecuperado } from "./evidencia";
 import { lerEscolhaHorario } from "../agendamento-escolha";
 import { prepararBuscaCatalogo } from "../catalogo-busca";
 import type { ResultadoConhecimento } from "../knowledge-contract";
-import { normalizarTipoAtendimentoCatalogo, type TipoAtendimentoCatalogo } from "../catalogo-pesquisa";
+import { contarEsclarecimentos, LIMITE_ESCLARECIMENTOS } from "../catalogo-esclarecimento";
+import {
+  normalizarTipoAtendimentoCatalogo,
+  type TipoAtendimentoCatalogo,
+} from "../catalogo-pesquisa";
 
 export type ReferenciaConhecimento = {
   registro: string;
@@ -24,6 +28,8 @@ export type ConhecimentoSessao = {
   interesseAgenda?: unknown;
   /** Somente opções de identificação, sem preço ou vaga; reconsultadas após a resposta. */
   esclarecimento?: ResultadoConhecimento["esclarecimento"];
+  esclarecimentoTentativas?: number;
+  esclarecimentoPerguntas?: string[];
 };
 
 const texto = (v: unknown, max: number) => (typeof v === "string" ? v.trim().slice(0, max) : "");
@@ -87,7 +93,24 @@ export function normalizarConhecimentoSessao(v: unknown): ConhecimentoSessao | n
       ...(texto(q.dia, 40) ? { dia: texto(q.dia, 40) } : {}),
     },
     referencias,
-    ...(esclarecer ? { esclarecimento: esclarecer } : {}),
+    ...(esclarecer
+      ? {
+          esclarecimento: esclarecer,
+          esclarecimentoTentativas: contarEsclarecimentos({
+            esclarecimento: esclarecer,
+            esclarecimentoTentativas:
+              typeof o.esclarecimentoTentativas === "number"
+                ? o.esclarecimentoTentativas
+                : undefined,
+          }),
+          esclarecimentoPerguntas: Array.isArray(o.esclarecimentoPerguntas)
+            ? o.esclarecimentoPerguntas
+                .map((p) => texto(p, 1600))
+                .filter(Boolean)
+                .slice(0, LIMITE_ESCLARECIMENTOS)
+            : [esclarecer.pergunta],
+        }
+      : {}),
     ...(o.selecao && typeof o.selecao === "object" ? { selecao: o.selecao } : {}),
     ...(o.interesseAgenda && typeof o.interesseAgenda === "object"
       ? { interesseAgenda: o.interesseAgenda }
@@ -217,13 +240,34 @@ export function lembrarConsultaComprovada(e: {
   }
   const referencias = [...porRegistro.values()].slice(0, 40);
   if (!referencias.length && !e.esclarecimento) return null;
+  const anterior =
+    e.anterior?.clinicaId === e.clinicaId && e.anterior.sessionId === e.sessionId
+      ? e.anterior
+      : null;
+  const perguntas = anterior?.esclarecimento
+    ? anterior.esclarecimentoPerguntas?.length
+      ? anterior.esclarecimentoPerguntas
+      : [anterior.esclarecimento.pergunta]
+    : [];
   return {
     versao: 1,
     clinicaId: e.clinicaId,
     sessionId: e.sessionId,
     consulta: e.args,
     referencias,
-    ...(e.esclarecimento ? { esclarecimento: e.esclarecimento } : {}),
+    ...(e.esclarecimento
+      ? {
+          esclarecimento: e.esclarecimento,
+          esclarecimentoTentativas: Math.min(
+            LIMITE_ESCLARECIMENTOS,
+            contarEsclarecimentos(anterior) + 1,
+          ),
+          esclarecimentoPerguntas: [...perguntas, e.esclarecimento.pergunta].slice(
+            0,
+            LIMITE_ESCLARECIMENTOS,
+          ),
+        }
+      : {}),
     ...(e.anterior?.selecao ? { selecao: e.anterior.selecao } : {}),
     ...(e.anterior?.interesseAgenda ? { interesseAgenda: e.anterior.interesseAgenda } : {}),
   };

@@ -15,7 +15,7 @@ export const FERRAMENTA_HANDOFF = {
   function: {
     name: NOME_FERRAMENTA_HANDOFF,
     description:
-      "Transfere a conversa para atendimento humano. Use para pedido explícito por uma pessoa, reclamação, urgência clínica, cobrança, dependência da equipe, ausência confirmada no catálogo/agenda ou identificação ainda ambígua após um esclarecimento. Analise o pedido e consulte a fonte apropriada antes de concluir ausência; motivo e resumo devem explicar a pendência específica. Não repita uma transferência confirmada. O sistema coordena o aviso e o protocolo; não produza uma segunda mensagem após o encaminhamento. Profissional SFP exige motivo PROFISSIONAL_SFP e transferência silenciosa, sem nenhuma mensagem ao paciente.",
+      "Transfere a conversa para atendimento humano. Use para pedido explícito por uma pessoa, reclamação, urgência clínica, cobrança, dependência da equipe, ausência confirmada no catálogo/agenda ou identificação ainda ambígua após as respostas a duas perguntas de esclarecimento. Se a primeira resposta não esclarecer a identificação, faça a segunda pergunta antes de encaminhar por esse motivo. Analise o pedido e consulte a fonte apropriada antes de concluir ausência; motivo e resumo devem explicar a pendência específica. Não repita uma transferência confirmada. O sistema coordena o aviso e o protocolo; não produza uma segunda mensagem após o encaminhamento. Profissional SFP exige motivo PROFISSIONAL_SFP e transferência silenciosa, sem nenhuma mensagem ao paciente.",
     parameters: {
       type: "object",
       properties: {

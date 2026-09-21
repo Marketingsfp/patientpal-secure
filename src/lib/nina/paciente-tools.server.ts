@@ -783,6 +783,11 @@ export const FERRAMENTAS_NINA_CONSULTA = [
       parameters: {
         type: "object",
         properties: {
+          nova_solicitacao: {
+            type: "boolean",
+            description:
+              "Use true somente quando o paciente iniciar outra solicitação independente no histórico, para começar a contagem de esclarecimentos desse novo pedido. Ao responder à pergunta de identificação, detalhar o mesmo exame, escolher uma opção ou corrigir sua grafia, use false ou omita. Não reinicie a contagem para repetir perguntas da mesma solicitação.",
+          },
           termo: {
             type: "string",
             description:
