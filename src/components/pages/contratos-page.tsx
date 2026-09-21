@@ -693,7 +693,7 @@ export function ContratosPage({
     setList(lista);
     setParcAgg(agg);
     setVendedores(vend);
-    setConvenios(conveniosLista);
+    setConvenios(conveniosLista.filter((c) => c.ativo));
     // Avisa a tela quando o corte do limite pode ter escondido resultados.
     setResultadoCortado(buscando && linhas.length >= LIMITE_BUSCA);
     setLoading(false);
