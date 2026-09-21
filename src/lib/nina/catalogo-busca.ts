@@ -145,10 +145,26 @@ export function prepararBuscaCatalogo(query: string, textosPublicados: string[])
       !ALIASES.has(t) &&
       !vocabulario.some((p) => corresponde(t, p)),
   );
+  // Nome completo tem precedência sobre nomes que apenas contêm o pedido.
+  // Preserve números, letras e qualificadores; só as preposições abaixo são ignoradas.
+  const identidade = (texto: string) =>
+    palavras(texto).filter((t) => !["de", "da", "do", "das", "dos"].includes(t));
+  const nomePedido = identidade(pergunta).map((termo) => {
+    const candidatos = ajustes.find((ajuste) => ajuste.original === termo)?.candidatos;
+    return candidatos?.length === 1 ? candidatos[0]! : termo;
+  });
   return {
     termos,
     ajustes,
     siglasDesconhecidas,
+    correspondeNomeCompleto(nome: string): boolean {
+      const nomePublicado = identidade(nome);
+      return (
+        nomePedido.length > 0 &&
+        nomePedido.length === nomePublicado.length &&
+        nomePedido.every((termo, i) => termo === nomePublicado[i])
+      );
+    },
     pontuar(nome: string, secundario: string): number {
       if (!termos.length) return 0;
       const original = escrita(`${nome} ${secundario}`);

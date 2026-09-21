@@ -8,6 +8,9 @@
  */
 import { beforeEach, describe, expect, it, mock } from "bun:test";
 import { agoraNaClinica } from "@/lib/nina-agora";
+import { encaminharAposEsclarecimento } from "../catalogo-esclarecimento";
+import { lembrarConsultaComprovada } from "../confidence/conhecimento-sessao";
+import { validarResultado } from "../tool-broker";
 
 type Linha = Record<string, unknown>;
 
@@ -266,7 +269,7 @@ describe("busca completa com e sem acentos", () => {
     }));
     banco.nina_cat_servicos.push(servico({ id: idSequencial(21), nome: "NEBULIZAÇÃO" }));
     const r = await buscarNoCatalogo({ clinicaId: CLINICA, query: "nebulizacao", limite: 5 });
-    expect(r.records).toHaveLength(5);
+    expect(r.records).toHaveLength(1);
     expect(r.records[0]!.procedimento).toBe("NEBULIZAÇÃO");
     expect(chamadas.every((c) => c.filtros.status === "PUBLICADO" && c.filtros.clinica_id === CLINICA)).toBe(true);
   });
@@ -603,6 +606,130 @@ describe("aliases publicados por cadastro", () => {
   it("alias de rascunho não é usado para responder", async () => {
     banco.nina_cat_servicos.push(servico({nome:"Exame de exemplo",estrutura:{aliases:[]},rascunho:{estrutura:{aliases:["ZZZX"]}}}));
     const r = await buscarNoCatalogo({clinicaId:CLINICA,query:"ZZZX",tipo_atendimento:"exame_procedimento"});
+    expect(r.records).toHaveLength(0);
+  });
+});
+
+describe("escolha completa do exame após esclarecer ultrassonografia", () => {
+  beforeEach(() => {
+    banco.nina_cat_servicos = [
+      servico({
+        id: idSequencial(1),
+        nome: "USG TRANSVAGINAL COM DOPPLER",
+        valor: 200,
+        preparo: "Preparo Doppler",
+      }),
+      servico({
+        id: idSequencial(2),
+        nome: "USG TRANSVAGINAL",
+        valor: 100,
+        preparo: "Preparo transvaginal",
+      }),
+      servico({
+        id: idSequencial(3),
+        nome: "USG TRANSVAGINAL GEMELAR",
+        valor: 300,
+        preparo: "Preparo gemelar",
+      }),
+      servico({ id: idSequencial(4), nome: "ULTRASSONOGRAFIA" }),
+    ];
+  });
+
+  it.each([
+    ["Usg transvaginal", "USG TRANSVAGINAL", 100],
+    ["ultrassom transvaginal", "USG TRANSVAGINAL", 100],
+    ["ultrassonografia transavaginal", "USG TRANSVAGINAL", 100],
+    ["USG transvaginal com Doppler", "USG TRANSVAGINAL COM DOPPLER", 200],
+    ["USG transvaginal gemelar", "USG TRANSVAGINAL GEMELAR", 300],
+  ])("ultra → %s resolve sem transferir nem misturar condições", async (query, nome, valor) => {
+    const inicial = await buscarNoCatalogo({
+      clinicaId: CLINICA,
+      query: "ultra",
+      tipo_atendimento: "exame_procedimento",
+    });
+    expect(inicial.esclarecimento?.tipo).toBe("procedimento");
+    const anterior = lembrarConsultaComprovada({
+      clinicaId: CLINICA,
+      sessionId: "sessao",
+      args: { termo: "ultrassom" },
+      fatos: [],
+      esclarecimento: inicial.esclarecimento,
+    });
+    const r = await buscarNoCatalogo({
+      clinicaId: CLINICA,
+      query,
+      tipo_atendimento: "exame_procedimento",
+      limite: 1,
+    });
+    expect(r.esclarecimento).toBeUndefined();
+    expect(r.procedure).toBe(nome);
+    expect(r.price).toBe(`R$ ${valor},00`);
+    expect(r.records.map((item) => item.procedimento)).toEqual([nome]);
+    expect(
+      encaminharAposEsclarecimento(
+        anterior,
+        validarResultado("consultar_base_conhecimento", r),
+        query,
+      ),
+    ).toBeNull();
+    const detalhes = chamadas.filter((c) => c.tabela === "nina_cat_servicos" && c.ids);
+    expect(detalhes.at(-1)?.ids).toHaveLength(1);
+  });
+
+  it("o nome publicado prevalece sobre um alias genérico de outra variante", async () => {
+    banco.nina_cat_servicos[0]!.estrutura = { aliases: ["USG TRANSVAGINAL"] };
+    const r = await buscarNoCatalogo({ clinicaId: CLINICA, query: "USG transvaginal" });
+    expect(r.records.map((item) => item.procedimento)).toEqual(["USG TRANSVAGINAL"]);
+    expect(r.esclarecimento).toBeUndefined();
+  });
+
+  it("um alias completo publicado identifica o exame e não uma variante do alias", async () => {
+    banco.nina_cat_servicos = [
+      servico({ nome: "Exame pélvico A", estrutura: { aliases: ["USG TRANSVAGINAL"] } }),
+      servico({
+        nome: "Exame pélvico B",
+        estrutura: { aliases: ["USG TRANSVAGINAL COM DOPPLER"] },
+      }),
+    ];
+    const r = await buscarNoCatalogo({ clinicaId: CLINICA, query: "USG transvaginal" });
+    expect(r.records.map((item) => item.procedimento)).toEqual(["Exame pélvico A"]);
+    expect(r.esclarecimento).toBeUndefined();
+  });
+
+  it("aliases idênticos em exames diferentes mantêm a dúvida, mesmo com limite 1", async () => {
+    banco.nina_cat_servicos = ["Exame A", "Exame B"].map((nome) =>
+      servico({
+        nome,
+        estrutura: { aliases: ["USG TRANSVAGINAL"] },
+      }),
+    );
+    const r = await buscarNoCatalogo({ clinicaId: CLINICA, query: "USG transvaginal", limite: 1 });
+    expect(r.esclarecimento?.opcoes).toHaveLength(2);
+    expect(r.price).toBeNull();
+  });
+
+  it("ultra genérica continua pedindo esclarecimento mesmo com cadastro ULTRASSONOGRAFIA", async () => {
+    const r = await buscarNoCatalogo({ clinicaId: CLINICA, query: "ultra", limite: 1 });
+    expect(r.esclarecimento?.opcoes).toHaveLength(4);
+    expect(r.procedure).toBeNull();
+  });
+
+  it("sem correspondência completa preserva a dúvida entre variantes", async () => {
+    banco.nina_cat_servicos = banco.nina_cat_servicos.filter((s) => s.nome !== "USG TRANSVAGINAL");
+    const r = await buscarNoCatalogo({ clinicaId: CLINICA, query: "USG transvaginal" });
+    expect(r.esclarecimento?.opcoes.map((o) => o.nome)).toEqual([
+      "USG TRANSVAGINAL COM DOPPLER",
+      "USG TRANSVAGINAL GEMELAR",
+    ]);
+    expect(r.procedure).toBeNull();
+  });
+
+  it("Doppler solicitado e ausente não vira transvaginal comum", async () => {
+    banco.nina_cat_servicos = banco.nina_cat_servicos.filter(
+      (s) => s.nome !== "USG TRANSVAGINAL COM DOPPLER",
+    );
+    const r = await buscarNoCatalogo({ clinicaId: CLINICA, query: "USG transvaginal com Doppler" });
+    expect(r.knowledge_status).toBe("not_found");
     expect(r.records).toHaveLength(0);
   });
 });

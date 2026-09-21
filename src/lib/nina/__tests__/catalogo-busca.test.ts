@@ -56,6 +56,31 @@ describe("interpretação de escrita sem trocar o atendimento", () => {
   it("não transforma urologia em neurologia por proximidade", () => {
     expect(prepararBuscaCatalogo("urologista", ["Neurologia"]).pontuar("Neurologia", "")).toBe(0);
   });
+  it.each(["USG transvaginal", "ultra de transvaginal", "ultrassonografia transavaginal"])(
+    "identifica o nome completo de %s sem incluir variantes",
+    (query) => {
+      const nomes = [
+        "USG TRANSVAGINAL",
+        "USG TRANSVAGINAL COM DOPPLER",
+        "USG TRANSVAGINAL GEMELAR",
+      ];
+      const busca = prepararBuscaCatalogo(query, nomes);
+      expect(nomes.filter(busca.correspondeNomeCompleto)).toEqual([nomes[0]!]);
+    },
+  );
+  it("a identidade completa preserva números, com/sem e qualificadores", () => {
+    for (const [query, diferente] of [
+      ["USG transvaginal com Doppler", "USG transvaginal sem Doppler"],
+      ["USG transvaginal gemelar", "USG transvaginal"],
+      ["USG cervical infantil", "USG cervical"],
+      ["USG morfológica de 1 trimestre", "USG morfológica de 2 trimestre"],
+      ["Hepatite A", "Hepatite"],
+    ]) {
+      const busca = prepararBuscaCatalogo(query!, [query!, diferente!]);
+      expect(busca.correspondeNomeCompleto(query!)).toBe(true);
+      expect(busca.correspondeNomeCompleto(diferente!)).toBe(false);
+    }
+  });
   it("siglas desconhecidas exigem esclarecimento, sem concluir ausência", () => {
     expect(prepararBuscaCatalogo("quero xyz", []).siglasDesconhecidas).toEqual(["xyz"]);
     const dados = {

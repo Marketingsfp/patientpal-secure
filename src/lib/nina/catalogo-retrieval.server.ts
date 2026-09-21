@@ -159,7 +159,28 @@ export async function buscarNoCatalogo(
     .map((s) => ({ s, score: Math.max(...[s.nome, ...aliasesDoIndice(s)].map(n => busca.pontuar(n, String(s.descricao_publica ?? "")))) }))
     .filter((x) => x.score > 0)
     .sort((a, b) => b.score - a.score);
-  const idsServicos = pontuados.slice(0, limite).map((x) => x.s.id);
+  const termosCorrigidos =
+    busca.ajustes.find((a) => a.original === termos[0])?.candidatos ?? termos;
+  const familiaGenerica =
+    termos.length === 1 &&
+    termosCorrigidos.some((t) => ["ultrassonografia", "radiografia"].includes(t));
+  // "USG TRANSVAGINAL" seleciona esse cadastro, não suas variantes com
+  // Doppler/gemelar. Uma família genérica ("ultra") continua exigindo o tipo.
+  // O nome publicado prevalece sobre aliases; aliases compartilhados continuam ambíguos.
+  const nomesCompletos = familiaGenerica
+    ? []
+    : pontuados.filter(({ s }) => busca.correspondeNomeCompleto(s.nome));
+  const aliasesCompletos =
+    familiaGenerica || nomesCompletos.length
+      ? []
+      : pontuados.filter(({ s }) =>
+          aliasesDoIndice(s).some((alias) => busca.correspondeNomeCompleto(alias)),
+        );
+  const correspondenciasCompletas = nomesCompletos.length ? nomesCompletos : aliasesCompletos;
+  const servicosRelevantes = correspondenciasCompletas.length
+    ? correspondenciasCompletas
+    : pontuados;
+  const idsServicos = servicosRelevantes.slice(0, limite).map((x) => x.s.id);
   const medico = semAcento(pedido.medico || nomeProfissionalNaPergunta(pedido.query)).trim();
   const profissionaisRelevantes = (tipoAtendimento === "exame_procedimento" ? [] : brutosProfissionais)
     .map((p) => ({ p, score: Math.max(...[p.nome, ...aliasesDoIndice(p)].map(n => busca.pontuar(n, especialidadesTexto(p)))) }))
@@ -195,9 +216,10 @@ export async function buscarNoCatalogo(
   // Ambiguidade REAL: dois exames/procedimentos diferentes disputam a mesma
   // pergunta. Vários profissionais da mesma especialidade não é ambiguidade —
   // é a lista legítima que o paciente pediu.
-  const melhor = pontuados[0]?.score ?? 0;
+  const melhor = servicosRelevantes[0]?.score ?? 0;
   const ambiguo =
-    new Set(pontuados.filter((x) => x.score === melhor).map((x) => semAcento(x.s.nome))).size > 1;
+    new Set(servicosRelevantes.filter((x) => x.score === melhor).map((x) => semAcento(x.s.nome)))
+      .size > 1;
 
   const resultado = montarResultadoCatalogo({
     servicos: listaServicos,
@@ -219,12 +241,7 @@ export async function buscarNoCatalogo(
       profissionaisRelevantes.some(
         (p) => compararNomeProfissional(medico, p.nome) === "aproximado",
       ));
-  const termosCorrigidos =
-    busca.ajustes.find((a) => a.original === termos[0])?.candidatos ?? termos;
-  const familiaSemTipo =
-    termos.length === 1 &&
-    termosCorrigidos.some((t) => ["ultrassonografia", "radiografia"].includes(t)) &&
-    listaServicos.length > 0;
+  const familiaSemTipo = familiaGenerica && listaServicos.length > 0;
   const pedirServico =
     (ambiguo || familiaSemTipo) && !(perguntaSobreConsulta && listaProfissionais.length);
   if (
@@ -244,7 +261,7 @@ export async function buscarNoCatalogo(
           unidade: p.unidades?.nome ?? null,
         }))
       : pedirServico
-        ? pontuados
+        ? servicosRelevantes
             .filter((x) => x.score === melhor)
             .slice(0, 6)
             .map(({ s }) => ({ id: s.id, nome: s.nome }))
@@ -299,6 +316,11 @@ export async function buscarNoCatalogo(
           tipo_atendimento: tipoAtendimento,
           termos,
           termos_expandidos: expandidos,
+          correspondencia: nomesCompletos.length
+            ? "nome_completo"
+            : aliasesCompletos.length
+              ? "alias_completo"
+              : "parcial",
           tamanho_pagina: TAMANHO_PAGINA,
           busca_completa: true,
           comparacao: "sem acentos e sem distinção de maiúsculas/minúsculas",
