@@ -1863,7 +1863,7 @@ function ChatList({
   );
 }
 
-function Bubble({ msg }: { msg: Msg }) {
+function Bubble({ msg, mostrarCorrecao }: { msg: Msg; mostrarCorrecao?: boolean }) {
   const isCliente = msg.role === "cliente";
   const [hora] = useState(() =>
     new Date().toLocaleTimeString("pt-BR", {
