@@ -94,9 +94,9 @@ export async function reservarResumoHandoff(args: {
     _clinica_id: args.clinicaId,
     _conversa_id: args.conversaId,
     _handoff_em: args.handoffEm,
-    _motivo: args.motivo ?? null,
+    _motivo: args.motivo ?? undefined,
     _desfecho: args.desfecho ?? "handoff_humano",
-    _resolvido_por: args.resolvidoPor ?? null,
+    _resolvido_por: args.resolvidoPor ?? undefined,
   });
   if (error) throw new Error(error.message);
 }

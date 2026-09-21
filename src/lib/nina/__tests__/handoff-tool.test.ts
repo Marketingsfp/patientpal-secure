@@ -10,7 +10,7 @@ describe("orientação após encaminhamento", () => {
   it("propaga o aviso confirmado e não manda criar uma segunda mensagem", async () => {
     retorno = { ok: true, aviso: { estado: "confirmado", mensagemId: "aviso-1" } };
     const r = await executarHandoffTool(contexto, JSON.stringify({ motivo: "AGENDA_SEM_VAGAS" }));
-    expect(r.aviso).toEqual(retorno.aviso);
+    expect(r.aviso).toEqual(retorno.aviso as never);
     expect(r.instrucao_para_voce).toContain("sem produzir outro aviso");
   });
   it("mantém SFP silencioso e uma conversa já com humano sem nova orientação de aviso", async () => {
