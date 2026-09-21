@@ -10,11 +10,19 @@ import { resolverMedicoAgenda, vincularProfissionaisCatalogo } from "./vinculo-c
 const colunasProfissional = "id, nome, especialidades, atende_consultorio, formas_pagamento, convenios, horarios, tipo_atendimento, observacao_publica, aviso_dia, aviso_valido_de, aviso_valido_ate, unidades(nome), estrutura";
 const colunasServico = "id, nome, valor, valor_observacao, descricao_publica, preparo, restricoes, executantes, formas_pagamento, estrutura";
 const lista = (v: unknown): Record<string, unknown>[] => Array.isArray(v) ? v.filter(x => x && typeof x === "object") : [];
-const chave = (v: string) => normalizar(v).replace(/^consulta\s*[—–:-]?\s*/, "").trim();
+const chave = (v: string) => normalizar(v).replace(/^consulta\b\s*[—–:-]?\s*/, "").trim();
 
 export type CandidatoPrimeiraVaga = { registro: RegistroConhecimento; medicoId: string | null; medicoNome: string };
+type ReferenciaAtendimento = { registro: string; procedimento: string | null };
 
-export async function candidatosPrimeiraVaga(clinicaId: string, tipo: "consulta" | "procedimento", atendimento: string): Promise<CandidatoPrimeiraVaga[]> {
+export async function candidatosPrimeiraVaga(clinicaId: string, tipo: "consulta" | "procedimento",
+  atendimento: string | readonly ReferenciaAtendimento[]): Promise<CandidatoPrimeiraVaga[]> {
+  const normalizarNome = tipo === "consulta" ? chave : normalizar;
+  // Referências são pistas para reler a publicação, sempre ligadas ao seu ID.
+  // Grafias diferentes do mesmo atendimento não são modalidades diferentes.
+  const corresponde = (id: string, nome: string) => typeof atendimento === "string"
+    ? normalizarNome(nome) === normalizarNome(atendimento)
+    : atendimento.some(r => r.registro === id && !!r.procedimento && normalizarNome(r.procedimento) === normalizarNome(nome));
   const tabela = tipo === "consulta" ? "nina_cat_profissionais" : "nina_cat_servicos";
   const linhas: unknown[] = [];
   // Páginas limitadas, com ordem estável. Nunca declarar busca completa com um top-6.
@@ -29,21 +37,24 @@ export async function candidatosPrimeiraVaga(clinicaId: string, tipo: "consulta"
   const hoje = agoraNaClinica().iso;
   if (tipo === "consulta") {
     const registros = (linhas as ProfissionalPublicado[]).flatMap(p => {
-      const especialidades = lista(p.especialidades).filter(e => chave(String(e.nome ?? "")) === chave(atendimento));
-      if (!especialidades.length) return [];
-      const outras = lista(p.especialidades).map(e => chave(String(e.nome ?? "")))
-        .filter(e => e && e !== chave(atendimento));
-      const formas_pagamento = lista(p.formas_pagamento).filter(f => {
-        const condicao = chave(String(f.condicao ?? ""));
-        return !outras.some(e => condicao.includes(e)) || condicao.includes(chave(atendimento));
+      const especialidades = lista(p.especialidades).filter(e => corresponde(p.id, String(e.nome ?? "")));
+      // Um registro por especialidade: duas consultas reais do mesmo médico
+      // devem continuar ambíguas, em vez de virar um único procedimento composto.
+      return especialidades.map(especialidade => {
+        const nome = chave(String(especialidade.nome ?? ""));
+        const outras = lista(p.especialidades).map(e => chave(String(e.nome ?? ""))).filter(e => e && e !== nome);
+        const formas_pagamento = lista(p.formas_pagamento).filter(f => {
+          const condicao = chave(String(f.condicao ?? ""));
+          return !outras.some(e => condicao.includes(e)) || condicao.includes(nome);
+        });
+        return profissionalParaRegistro({ ...p, especialidades: [especialidade], formas_pagamento }, hoje);
       });
-      return [profissionalParaRegistro({ ...p, especialidades, formas_pagamento }, hoje)];
     });
     const vinculos = await vincularProfissionaisCatalogo(clinicaId, registros);
     return registros.map(registro => ({ registro, medicoNome: registro.medico!,
       medicoId: vinculos.find(v => v.catalogo_id === registro.id)?.medico_id ?? null }));
   }
-  const servicos = (linhas as ServicoPublicado[]).filter(s => normalizar(s.nome) === normalizar(atendimento));
+  const servicos = (linhas as ServicoPublicado[]).filter(s => corresponde(s.id, s.nome));
   const candidatos: CandidatoPrimeiraVaga[] = [];
   for (const servico of servicos) {
     for (const executante of lista(servico.executantes)) {

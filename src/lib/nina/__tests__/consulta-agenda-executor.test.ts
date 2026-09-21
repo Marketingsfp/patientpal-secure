@@ -563,12 +563,108 @@ describe("executor real das ferramentas com banco simulado", () => {
     expect(r.ok).toBe(true);
     expect(ctx.estado!.appointment.procedure).toBe(termo === "cardio" ? "Consulta — Cardiologia" : "Consulta — Cardiologia Infantil");
   });
+  for (const origem of ["homologacao", "whatsapp"] as const) {
+    for (const caso of [
+      { especialidade: "OBSTETRICIA", nome: "Sérgio Satoshi", agenda: "SERGIO SATOSHI OKUDA", termo: "Sérgio Satoshi",
+        referencias: ["Consulta — OBSTETRICIA", "Consulta Obstétrica", null, "consulta obstetrica", "Consulta OBSTETRICIA"],
+        modalidade: "Hora marcada", codigoModalidade: "hora_marcada" },
+      { especialidade: "OFTALMOLOGIA", nome: "Marina Almeida", agenda: "MARINA ALMEIDA DIAS", termo: "consulta",
+        referencias: ["Consulta — OFTALMOLOGIA", "Consulta Oftalmologia", null, "consulta oftalmologia"],
+        modalidade: "Ordem de chegada com pré-agendamento", codigoModalidade: "chegada_com_pre_agendamento" },
+    ]) {
+      test(`${origem}: ${caso.especialidade} mantém o vínculo com referências equivalentes até concluir`, async () => {
+        Object.assign(banco.nina_cat_profissionais![0]!, { nome: caso.nome,
+          especialidades: [{ nome: caso.especialidade }], tipo_atendimento: caso.modalidade });
+        banco.medicos![0]!.nome = caso.agenda;
+        const ctx: CtxNinaPaciente = { ...contexto("Quero a primeira data"), origem,
+          teste: origem === "homologacao", podeAgendar: true, pacienteId: PACIENTE, pacienteNome: "Paciente Fictício" };
+        ctx.estado!.knowledge_context = { versao: 1, clinicaId: CLINICA, sessionId: ctx.estado!.session_id!,
+          consulta: { termo: caso.termo, tipo_atendimento: "consulta" },
+          referencias: caso.referencias.map(procedimento => ({ registro: CATALOGO, versao: null, procedimento, medicoNome: caso.nome })) };
+        const r = await executarFerramentaPaciente(ctx, "proxima_vaga", { medico_id: MEDICO });
+        expect(r.ok).toBe(true);
+        const procedimento = `Consulta — ${caso.especialidade}`;
+        expect(ctx.estado!.appointment.slot_options?.vagas[0]).toMatchObject({ medico_id: MEDICO, procedimento,
+          modalidade: caso.codigoModalidade });
+        expect(gravacoes).toHaveLength(0);
+        ctx.estado = JSON.parse(JSON.stringify(ctx.estado));
+        ctx.opcoesAgendamentoInicioTurno = true;
+        ctx.consultaAgenda = { mensagemAtual: "Escolho 14:00", historico: [{ role: "assistant", content: "Disponível às 14:00. Qual prefere?" }] };
+        const dados = await aplicarGateIdentificacao({ mensagem: "Escolho 14:00", estado: ctx.estado!, ctx, executar: executarFerramentaPaciente });
+        expect(dados?.camposPendentes).toContain("nome");
+        ctx.consultaAgenda = { mensagemAtual: "Paciente Fictício, 02/01/1990, (21) 99999-0000",
+          historico: [{ role: "assistant", content: dados!.texto }] };
+        const executar: typeof executarFerramentaPaciente = async (c, nome, args) => {
+          if (nome === "consultar_cadastro_paciente") return { ok: true, campos_faltantes: [] };
+          if (nome === "identificar_paciente") return { ok: true };
+          return executarFerramentaPaciente(c, nome, args);
+        };
+        const resumo = await aplicarGateIdentificacao({ mensagem: ctx.consultaAgenda.mensagemAtual, estado: ctx.estado!, ctx, executar });
+        expect(resumo?.texto).toContain(caso.especialidade);
+        expect(gravacoes).toHaveLength(0);
+        ctx.estado = JSON.parse(JSON.stringify(ctx.estado));
+        ctx.consultaAgenda = { mensagemAtual: "Sim, confirmo.", historico: [{ role: "assistant", content: resumo!.texto }] };
+        const confirmado = await aplicarGateIdentificacao({ mensagem: ctx.consultaAgenda.mensagemAtual, estado: ctx.estado!, ctx, executar });
+        expect(confirmado?.acoesConcluidas[0]?.confirmada).toBe(true);
+        expect(gravacoes).toHaveLength(1);
+        expect(gravacoes[0]).toMatchObject({ procedimento, medico_id: MEDICO, inicio: inicio.toISOString() });
+      });
+    }
+  }
+  test("referências de duas especialidades reais do mesmo médico continuam ambíguas", async () => {
+    const ctx: CtxNinaPaciente = { ...contexto("Primeira data"), podeAgendar: true };
+    referenciaConsulta(ctx, "consulta");
+    ctx.estado!.knowledge_context!.referencias.push({ registro: CATALOGO, versao: null,
+      procedimento: "Consulta Cardiologia Infantil", medicoNome: "Alex Louza" });
+    const r = await executarFerramentaPaciente(ctx, "proxima_vaga", { medico_id: MEDICO });
+    expect(r.codigo).toBe("ATENDIMENTO_AGENDA_NAO_VINCULADO");
+    expect(ctx.estado!.appointment.slot_options?.vagas).toEqual([]);
+    expect(gravacoes).toHaveLength(0);
+  });
+  test.each(["registro", "clinica", "publicacao"])("referências equivalentes não contornam a revalidação de %s", async alvo => {
+    const ctx: CtxNinaPaciente = { ...contexto("Primeira data"), podeAgendar: true };
+    referenciaConsulta(ctx, "consulta");
+    ctx.estado!.knowledge_context!.referencias.push({ registro: CATALOGO, versao: null,
+      procedimento: "Consulta Cardiologia", medicoNome: "Alex Louza" });
+    if (alvo === "registro") banco.nina_cat_profissionais![0]!.id = OUTRO;
+    if (alvo === "clinica") banco.nina_cat_profissionais![0]!.clinica_id = OUTRO;
+    if (alvo === "publicacao") banco.nina_cat_profissionais![0]!.status = "ARQUIVADO";
+    const r = await executarFerramentaPaciente(ctx, "proxima_vaga", { medico_id: MEDICO });
+    expect(r.ok).toBe(false);
+    expect(ctx.estado!.appointment.slot_options?.vagas ?? []).toEqual([]);
+    expect(gravacoes).toHaveLength(0);
+  });
   test("referência antiga não reutiliza atendimento retirado da publicação", async () => {
     const ctx: CtxNinaPaciente = { ...contexto("Primeira data"), podeAgendar: true };
     referenciaConsulta(ctx);
     banco.nina_cat_profissionais![0]!.especialidades = [{ nome: "Ortopedia" }];
     const r = await executarFerramentaPaciente(ctx, "proxima_vaga", { medico_id: MEDICO });
     expect(r.ok).toBe(false);
+    expect(r.codigo).toBe("ATENDIMENTO_AGENDA_NAO_VINCULADO");
+    expect(ctx.estado!.appointment.slot_options?.vagas).toEqual([]);
+    expect(gravacoes).toHaveLength(0);
+  });
+  test("não combina o nome da especialidade de um registro com o ID de outro", async () => {
+    const ctx: CtxNinaPaciente = { ...contexto("Primeira data"), podeAgendar: true };
+    referenciaConsulta(ctx, "consulta");
+    ctx.estado!.knowledge_context!.referencias = [
+      { registro: CATALOGO, versao: null, procedimento: "Consulta Oftalmologia", medicoNome: "Alex Louza" },
+      { registro: OUTRO, versao: null, procedimento: "Consulta Cardiologia", medicoNome: "Outro Médico" },
+    ];
+    const r = await executarFerramentaPaciente(ctx, "proxima_vaga", { medico_id: MEDICO });
+    expect(r.codigo).toBe("ATENDIMENTO_AGENDA_NAO_VINCULADO");
+    expect(ctx.estado!.appointment.slot_options?.vagas).toEqual([]);
+    expect(gravacoes).toHaveLength(0);
+  });
+  test("não troca a modalidade escolhida e retirada da publicação por outra referência", async () => {
+    const ctx: CtxNinaPaciente = { ...contexto("Primeira data"), podeAgendar: true };
+    referenciaConsulta(ctx, "consulta");
+    banco.nina_cat_profissionais![0]!.especialidades = [{ nome: "Cardiologia" }];
+    const raizesFonte = [{ fonte: "catalogo_publicado" as const, registro: CATALOGO, versao: null }];
+    ctx.estado!.knowledge_context!.selecao = { versao: 1, clinicaId: CLINICA, sessaoId: ctx.estado!.session_id!,
+      medicoId: MEDICO, medicoNome: "Alex Louza", referenciaProfissional: `medico:${MEDICO}`, raizesFonte,
+      modalidade: { nome: "Cardiologia Infantil", procedimento: "Consulta Cardiologia Infantil", raizesFonte } };
+    const r = await executarFerramentaPaciente(ctx, "proxima_vaga", { medico_id: MEDICO });
     expect(r.codigo).toBe("ATENDIMENTO_AGENDA_NAO_VINCULADO");
     expect(ctx.estado!.appointment.slot_options?.vagas).toEqual([]);
     expect(gravacoes).toHaveLength(0);

@@ -412,12 +412,13 @@ async function guardarOpcoes(ctx: CtxNinaPaciente, slots: SlotNina[], procedimen
     let candidatos = tipo === "consulta" || tipo === "exame_procedimento"
       ? await candidatosPrimeiraVaga(ctx.clinicaId, tipo === "consulta" ? "consulta" : "procedimento", atendimento)
       : [];
-    // Ex.: a pesquisa salva foi "cardio", mas todas as referências indicam
-    // "Consulta — CARDIOLOGIA". Use esse nome apenas para nova leitura oficial.
-    const referencias = [...new Set(conhecimento.referencias.map(r => r.procedimento).filter((p): p is string => !!p))];
-    if (!candidatos.length && referencias.length === 1 && !referencias[0]!.includes(",") &&
+    // A pesquisa pode terminar em "consulta" ou no nome do médico. Revalide
+    // todas as referências por ID e nome publicado, sem exigir grafias iguais.
+    // Uma modalidade escolhida explicitamente nunca é trocada por esse fallback.
+    const referencias = conhecimento.referencias.filter(r => r.procedimento && !r.procedimento.includes(","));
+    if (!candidatos.length && !selecao?.modalidade && referencias.length &&
       (tipo === "consulta" || tipo === "exame_procedimento"))
-      candidatos = await candidatosPrimeiraVaga(ctx.clinicaId, tipo === "consulta" ? "consulta" : "procedimento", referencias[0]!);
+      candidatos = await candidatosPrimeiraVaga(ctx.clinicaId, tipo === "consulta" ? "consulta" : "procedimento", referencias);
     publicados = new Map(slots.flatMap(s => {
       const nomes = [...new Set(candidatos.filter(c => c.medicoId === s.medico_id)
         .map(c => c.registro.procedimento).filter((p): p is string => !!p))];
