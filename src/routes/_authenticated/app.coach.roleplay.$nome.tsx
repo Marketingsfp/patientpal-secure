@@ -1568,7 +1568,7 @@ function RoleplayPage({ ctx, alvo }: { ctx: CoachContexto; alvo: AlvoAtendente }
                   Hoje
                 </div>
                 {messages.map((m, i) => (
-                  <Bubble key={i} msg={m} />
+                  <Bubble key={i} msg={m} mostrarCorrecao={!!feedback} />
                 ))}
                 {thinking && (
                   <div className="flex justify-start">
@@ -1863,7 +1863,7 @@ function ChatList({
   );
 }
 
-function Bubble({ msg }: { msg: Msg }) {
+function Bubble({ msg, mostrarCorrecao }: { msg: Msg; mostrarCorrecao?: boolean }) {
   const isCliente = msg.role === "cliente";
   const [hora] = useState(() =>
     new Date().toLocaleTimeString("pt-BR", {
@@ -1903,7 +1903,7 @@ function Bubble({ msg }: { msg: Msg }) {
           </div>
         );
       })}
-      {!isCliente && msg.avaliacao && (
+      {!isCliente && mostrarCorrecao && msg.avaliacao && (
         <AvaliacaoTurnoCard av={msg.avaliacao} />
       )}
     </div>
