@@ -8,8 +8,11 @@
  */
 import { beforeEach, describe, expect, it, mock } from "bun:test";
 import { agoraNaClinica } from "@/lib/nina-agora";
-import { encaminharAposEsclarecimento } from "../catalogo-esclarecimento";
-import { lembrarConsultaComprovada } from "../confidence/conhecimento-sessao";
+import { encaminharAposEsclarecimento, prepararSegundaPergunta } from "../catalogo-esclarecimento";
+import { lembrarConsultaComprovada, conhecimentoDaMesmaSessao } from "../confidence/conhecimento-sessao";
+import { encaminhamentoSemRegistro } from "../catalogo-sem-registro";
+import { motivoParaAtendimento } from "@/lib/atendimento/texto-interno-apresentacao";
+import { incorporarResultadoOficial } from "../confidence/evidencias-turno";
 import { validarResultado } from "../tool-broker";
 
 type Linha = Record<string, unknown>;
@@ -551,6 +554,56 @@ describe("siglas, escrita aproximada e identidade publicadas", () => {
     const r = await buscarNoCatalogo({ clinicaId: CLINICA, query: "urologista" });
     expect(r.knowledge_status).toBe("not_found");
     expect(r.esclarecimento).toBeUndefined();
+  });
+  it("mantém a consulta, repete a lista uma vez e identifica corretamente o motivo da transferência", async () => {
+    banco.nina_cat_profissionais = [
+      profissional({ id: idSequencial(1), nome: "Dra. Shirley Martins", especialidades: [{ nome: "Dermatologia" }] }),
+      profissional({ id: idSequencial(2), nome: "Dra. Raisa Moura", especialidades: [{ nome: "Dermatologia" }] }),
+      profissional({ nome: "Dra. Suellen Silva", especialidades: [{ nome: "Cardiologia" }] }),
+      profissional({ nome: "Dra. Outra Clínica", clinica_id: "outra", especialidades: [{ nome: "Dermatologia" }] }),
+      profissional({ nome: "Dra. Rascunho", status: "RASCUNHO", especialidades: [{ nome: "Dermatologia" }] }),
+    ];
+    const args = { termo: "Dermatologia", tipo_atendimento: "consulta" as const, medico: "Suellen" };
+    const primeira = await buscarNoCatalogo({ clinicaId: CLINICA, query: args.termo, tipo_atendimento: "consulta", medico: args.medico, limite: 1 });
+    expect(primeira.esclarecimento?.motivo).toBe("medico_nao_identificado");
+    expect(primeira.esclarecimento?.pergunta).toContain("Não encontrei esse nome entre os médicos desta consulta");
+    expect(primeira.esclarecimento?.opcoes.map(o => o.nome)).toEqual(["Dra. Shirley Martins", "Dra. Raisa Moura"]);
+    expect(primeira.price).toBeNull();
+    const r = validarResultado("consultar_base_conhecimento", { ok: true, ...primeira });
+    expect(encaminhamentoSemRegistro(r, args)).toBeNull();
+    expect(encaminharAposEsclarecimento(null, r, "quero a Suellen")).toBeNull();
+    const fatos = incorporarResultadoOficial({ clinicaId: CLINICA, nome: "consultar_base_conhecimento", args, resultado: r, fatos: [], consultas: [] }).fatos;
+    const anterior = conhecimentoDaMesmaSessao(lembrarConsultaComprovada({
+      clinicaId: CLINICA, sessionId: "sessao", args, fatos, esclarecimento: primeira.esclarecimento,
+    }), CLINICA, "sessao");
+    expect(anterior?.esclarecimento?.motivo).toBe("medico_nao_identificado");
+    expect(anterior?.esclarecimento?.opcoes).toHaveLength(2);
+    expect(prepararSegundaPergunta(anterior, r)).toBe(r);
+    const handoff = encaminharAposEsclarecimento(anterior, r, "Suellen mesmo");
+    expect(handoff?.resumo).toContain("Consulta encontrada: Dermatologia");
+    expect(handoff?.resumo).toContain("Suellen mesmo");
+    expect(motivoParaAtendimento(handoff?.motivo)).toContain("encontrou a consulta");
+    expect(motivoParaAtendimento(handoff?.motivo)).toContain("identificar o médico");
+    const corrigida = await buscarNoCatalogo({ clinicaId: CLINICA, query: args.termo, medico: "Shirley" });
+    expect(corrigida.esclarecimento).toBeUndefined();
+    expect(corrigida.records.map(r => r.id)).toEqual([idSequencial(1)]);
+    expect(encaminharAposEsclarecimento(anterior, validarResultado("consultar_base_conhecimento", { ok: true, ...corrigida }), "Shirley")).toBeNull();
+    expect(encaminharAposEsclarecimento(anterior, validarResultado("consultar_base_conhecimento", { ok: false, erro: "INTERNAL_ERROR" }), "Shirley")).toBeNull();
+  });
+  it("escrita parecida pede identificação sem negar a existência do médico", async () => {
+    banco.nina_cat_profissionais = [profissional({ nome: "Dra. Shirley Martins", especialidades: [{ nome: "Dermatologia" }] })];
+    const r = await buscarNoCatalogo({ clinicaId: CLINICA, query: "Dermatologia", medico: "Shirlei" });
+    expect(r.esclarecimento?.motivo).toBe("medico_nao_identificado");
+    expect(r.esclarecimento?.pergunta).toContain("Não consegui identificar com segurança");
+    expect(r.esclarecimento?.pergunta).not.toContain("Não encontrei");
+  });
+  it("a lista corretiva não expõe nomes genéricos e não elimina opções pelo dia", async () => {
+    banco.nina_cat_profissionais = [
+      profissional({ nome: "Enfermagem", especialidades: [{ nome: "Dermatologia" }] }),
+      profissional({ nome: "Dra. Shirley Martins", especialidades: [{ nome: "Dermatologia" }], horarios: [{ dia: "Sábado" }] }),
+    ];
+    const r = await buscarNoCatalogo({ clinicaId: CLINICA, query: "Dermatologia", medico: "Suellen", dia: "segunda" });
+    expect(r.esclarecimento?.opcoes.map(o => o.nome)).toEqual(["Dra. Shirley Martins"]);
   });
   it("confirma nome aproximado e diferencia homônimos com os dados do cadastro", async () => {
     banco.nina_cat_profissionais = [

@@ -37,6 +37,10 @@ export function prepararSegundaPergunta(
   anterior: ConhecimentoSessao | null,
   resultado: ResultadoBroker,
 ): ResultadoBroker {
+  // A correção da escolha tem uma única repetição da lista, separada das
+  // duas perguntas gerais para identificar um atendimento ainda desconhecido.
+  if (anterior?.esclarecimento?.motivo === "medico_nao_identificado" ||
+    (resultado.dados as Partial<ResultadoConhecimento> | null)?.esclarecimento?.motivo === "medico_nao_identificado") return resultado;
   if (contarEsclarecimentos(anterior) !== 1) return resultado;
   const dados = identificacaoPendente(resultado);
   if (!dados) return resultado;
@@ -58,12 +62,23 @@ export function prepararSegundaPergunta(
 export const MOTIVO_IDENTIFICACAO_PENDENTE =
   "CATALOGO_IDENTIFICACAO_NAO_ESCLARECIDA: a Nina pediu esclarecimento duas vezes e ainda não conseguiu identificar o atendimento ou profissional";
 
+export const MOTIVO_MEDICO_NAO_IDENTIFICADO =
+  "CATALOGO_MEDICO_NAO_IDENTIFICADO: consulta encontrada; médico não identificado após repetir a lista e pedir nova escolha";
+
 /** A tentativa pertence à sessão anterior, não ao número de consultas deste turno. */
 export function encaminharAposEsclarecimento(
   anterior: ConhecimentoSessao | null,
   resultado: ResultadoBroker,
   respostaPaciente: string,
 ) {
+  if (anterior?.esclarecimento?.motivo === "medico_nao_identificado" && identificacaoPendente(resultado)) {
+    return {
+      motivo: MOTIVO_MEDICO_NAO_IDENTIFICADO,
+      resumo: `Consulta encontrada: ${anterior.esclarecimento.atendimento ?? anterior.consulta.termo}. Não foi possível identificar o médico após pedir uma nova escolha. Pergunta feita: ${anterior.esclarecimento.pergunta.slice(0, 1000)}. Resposta recebida: ${respostaPaciente.slice(0, 400)}. A equipe deve confirmar o profissional desejado e continuar o atendimento.`,
+      urgencia: "normal" as const,
+    };
+  }
+  if ((resultado.dados as Partial<ResultadoConhecimento> | null)?.esclarecimento?.motivo === "medico_nao_identificado") return null;
   if (
     !anterior?.esclarecimento ||
     contarEsclarecimentos(anterior) < LIMITE_ESCLARECIMENTOS ||

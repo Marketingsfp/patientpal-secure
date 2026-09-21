@@ -23,6 +23,14 @@ export function motivoParaAtendimento(valor: unknown): string | null {
   if (typeof valor !== "string" || !valor.trim()) return null;
   const motivos: Array<[RegExp, string]> = [
     [
+      /\bCATALOGO_MEDICO_NAO_IDENTIFICADO\b/i,
+      "A Nina encontrou a consulta, mas não conseguiu identificar o médico desejado após reapresentar a lista e pedir uma nova escolha. A equipe deve confirmar o profissional.",
+    ],
+    [
+      /\bCATALOGO_MEDICO_SEM_REGISTRO\b/i,
+      "A Nina não encontrou o médico informado na base de conhecimentos. A equipe deve conferir o profissional solicitado.",
+    ],
+    [
       /\bFALHA_OPERACIONAL_AGENDAMENTO\b.*\bATENDIMENTO_AGENDA_NAO_VINCULADO\b/i,
       "A Nina encontrou vagas, mas não conseguiu vinculá-las à consulta ou ao procedimento solicitado. A equipe precisa conferir a ligação entre o catálogo e a agenda.",
     ],

@@ -62,7 +62,9 @@ export function normalizarConhecimentoSessao(v: unknown): ConhecimentoSessao | n
       ? {
           tipo: bruto.tipo as NonNullable<ResultadoConhecimento["esclarecimento"]>["tipo"],
           pergunta: texto(bruto.pergunta, 1600),
-          opcoes: bruto.opcoes.slice(0, 12).flatMap((v: unknown) => {
+          ...(bruto.tipo === "profissional" && bruto.motivo === "medico_nao_identificado" && texto(bruto.atendimento, 200)
+            ? { motivo: "medico_nao_identificado" as const, atendimento: texto(bruto.atendimento, 200) } : {}),
+          opcoes: bruto.opcoes.slice(0, 40).flatMap((v: unknown) => {
             if (!v || typeof v !== "object") return [];
             const p = v as Record<string, unknown>,
               id = texto(p.id, 180),
@@ -241,7 +243,8 @@ export function lembrarConsultaComprovada(e: {
   const referencias = [...porRegistro.values()].slice(0, 40);
   if (!referencias.length && !e.esclarecimento) return null;
   const anterior =
-    e.anterior?.clinicaId === e.clinicaId && e.anterior.sessionId === e.sessionId
+    e.anterior?.clinicaId === e.clinicaId && e.anterior.sessionId === e.sessionId &&
+    !(e.esclarecimento?.motivo === "medico_nao_identificado" && e.anterior.esclarecimento?.motivo !== "medico_nao_identificado")
       ? e.anterior
       : null;
   const perguntas = anterior?.esclarecimento

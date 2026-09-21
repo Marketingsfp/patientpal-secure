@@ -1279,7 +1279,7 @@ async function executarFerramentaInterna(
         const { SEM_CATALOGO_INSTRUCAO } = await import("./catalogo-fonte.server");
         const r = await searchKnowledgeBase({
           clinicaId: ctx.clinicaId,
-          query: [p.especialidade, p.nome].filter(Boolean).join(" ") || "consulta profissional",
+          query: p.especialidade || p.nome || "consulta profissional",
           tipo_atendimento: "consulta",
           medico: p.nome ?? null,
           canal: ctx.origem,

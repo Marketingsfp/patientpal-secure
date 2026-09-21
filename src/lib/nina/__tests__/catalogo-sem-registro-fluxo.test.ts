@@ -23,7 +23,8 @@ describe("catálogo ausente no núcleo real, sem rede nem motor de confiança", 
           return;
         }
         expect(r.encaminhamentos).toHaveLength(1);
-        expect(r.encaminhamentos[0].motivo).toContain("CATALOGO_SEM_REGISTRO");
+        const motivo = cenario === "medicos_modelo" ? "CATALOGO_MEDICO_SEM_REGISTRO" : "CATALOGO_SEM_REGISTRO";
+        expect(r.encaminhamentos[0].motivo).toContain(motivo);
         expect(r.requests).toHaveLength(1);
         expect(r.ordem[0]).toBe("modelo");
         expect(r.ordem.indexOf("solicitar_atendente_humano")).toBeGreaterThan(1);
@@ -33,7 +34,7 @@ describe("catálogo ausente no núcleo real, sem rede nem motor de confiança", 
         // associadas à execução real do modelo na auditoria.
         const eventos = r.gravacoes.filter((g: any) => g.tabela === "nina_trace_eventos").flatMap((g: any) => g.valor);
         const resumo = eventos.find((e: any) => e.node_id === "turn.summary");
-        expect(resumo.metadata.motivo_origem).toContain("CATALOGO_SEM_REGISTRO");
+        expect(resumo.metadata.motivo_origem).toContain(motivo);
         expect(resumo.metadata.modelo_chamado).toBe(true);
         if (ambiente === "homologacao") {
           expect(r.resposta).toContain("simulação");

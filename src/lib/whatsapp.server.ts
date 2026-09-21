@@ -2,7 +2,7 @@ import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { normalizarTelefone } from "@/lib/atendimento/telefone";
 import { dadosPublicosClinicaGrupo } from "@/lib/nina/clinicas-grupo";
 import { agoraNaClinica } from "@/lib/nina-agora";
-import { encaminhamentoSemRegistro, MOTIVO_SEM_REGISTRO, respostaSemRegistro } from "@/lib/nina/catalogo-sem-registro";
+import { encaminhamentoSemRegistro, MOTIVO_SEM_REGISTRO, MOTIVO_MEDICO_SEM_REGISTRO, respostaSemRegistro } from "@/lib/nina/catalogo-sem-registro";
 import { dadosPublicosCatalogo, resultadoExigeHumano, MOTIVO_SFP,
   respostaEncaminhamentoSfp, resultadoEncaminhamentoSfp, omitirNomeGenerico } from "@/lib/nina/regras-catalogo";
 
@@ -1719,8 +1719,9 @@ async function gerarRespostaNinaInterno(
     await import("@/lib/nina/confidence/evidencias-turno");
   const { resolverSelecaoContextual, normalizarSelecaoContextual } =
     await import("@/lib/nina/confidence/selecao-contextual");
-  const { encaminharAposEsclarecimento, prepararSegundaPergunta, MOTIVO_IDENTIFICACAO_PENDENTE } =
+  const { encaminharAposEsclarecimento, prepararSegundaPergunta, MOTIVO_IDENTIFICACAO_PENDENTE, MOTIVO_MEDICO_NAO_IDENTIFICADO } =
     await import("@/lib/nina/catalogo-esclarecimento");
+  const { prepararPesquisaMedicoDaSessao } = await import("@/lib/nina/pesquisa-medico-sessao");
   let selecaoDoTurno:
     | import("@/lib/nina/confidence/selecao-contextual").ResultadoSelecaoContextual
     | null = null;
@@ -1744,7 +1745,7 @@ async function gerarRespostaNinaInterno(
       urgencia: "normal",
     };
     const origem =
-      ausencia?.motivo === MOTIVO_IDENTIFICACAO_PENDENTE
+      ausencia && [MOTIVO_IDENTIFICACAO_PENDENTE, MOTIVO_MEDICO_NAO_IDENTIFICADO].includes(ausencia.motivo)
         ? "regra_catalogo_limite_esclarecimento"
         : ausencia
           ? "regra_catalogo_sem_registro"
@@ -2097,6 +2098,9 @@ async function gerarRespostaNinaInterno(
     mensagens.push({ role: "assistant", content: msg?.content ?? null, tool_calls: chamadas });
     for (const c of chamadas) {
       const nome = String(c.function?.name ?? "");
+      if (c.function) c.function.arguments = prepararPesquisaMedicoDaSessao(
+        nome, c.function.arguments, conhecimentoAnterior,
+      ) ?? c.function.arguments;
       // Toda execução passa pelo broker: ele valida o retorno, aplica
       // idempotência de turno e nunca transforma erro em sucesso.
       // FASE 4 — ação crítica NUNCA roda sobre estado obsoleto: se chegou
@@ -2393,9 +2397,9 @@ async function gerarRespostaNinaInterno(
     transformar(
       finalizacaoHandoff.motivo === MOTIVO_SFP
         ? "catalogo.sfp"
-        : finalizacaoHandoff.motivo === MOTIVO_IDENTIFICACAO_PENDENTE
+        : [MOTIVO_IDENTIFICACAO_PENDENTE, MOTIVO_MEDICO_NAO_IDENTIFICADO].includes(finalizacaoHandoff.motivo)
           ? "catalogo.limite_esclarecimento"
-          : finalizacaoHandoff.motivo === MOTIVO_SEM_REGISTRO
+          : [MOTIVO_SEM_REGISTRO, MOTIVO_MEDICO_SEM_REGISTRO].includes(finalizacaoHandoff.motivo)
             ? "catalogo.sem_registro"
             : "agenda.sem_vagas",
       finalizacaoHandoff.motivo,
@@ -2451,7 +2455,7 @@ async function gerarRespostaNinaInterno(
 
   // Aviso explícito ao paciente: ele precisa saber que saiu da IA e foi para
   // uma pessoa. A frase é fixa para nunca depender do humor do modelo.
-  if (houveHandoff && !(opcoes?.teste && finalizacaoHandoff?.motivo === MOTIVO_SEM_REGISTRO)) {
+  if (houveHandoff && !(opcoes?.teste && [MOTIVO_SEM_REGISTRO, MOTIVO_MEDICO_SEM_REGISTRO, MOTIVO_MEDICO_NAO_IDENTIFICADO].includes(finalizacaoHandoff?.motivo ?? ""))) {
     const AVISO_TRANSFERENCIA =
       "*Transferido para atendimento humano.* Você não está mais falando com a Nina — uma atendente da equipe assume esta conversa e responde por aqui mesmo.";
     if (!resposta.includes("Transferido para atendimento humano")) {

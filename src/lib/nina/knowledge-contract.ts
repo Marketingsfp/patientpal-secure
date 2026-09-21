@@ -62,6 +62,9 @@ export type ResultadoConhecimento = {
   /** Candidatos não são uma escolha nem autorização para consultar/reservar agenda. */
   esclarecimento?: {
     tipo: "procedimento" | "profissional" | "sigla";
+    /** Consulta comprovada; somente a escolha do médico precisa ser corrigida. */
+    motivo?: "medico_nao_identificado";
+    atendimento?: string;
     pergunta: string;
     opcoes: Array<{ id: string; nome: string; especialidade?: string; unidade?: string | null }>;
   };

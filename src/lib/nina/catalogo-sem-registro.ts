@@ -1,6 +1,7 @@
 import type { ResultadoBroker } from "./tool-broker";
 
 export const MOTIVO_SEM_REGISTRO = "CATALOGO_SEM_REGISTRO: atendimento solicitado não encontrado na base publicada";
+export const MOTIVO_MEDICO_SEM_REGISTRO = "CATALOGO_MEDICO_SEM_REGISTRO: médico informado não encontrado na base publicada";
 export const REGRA_SEM_REGISTRO_PROMPT = `INSTRUÇÃO FAT-04 — ATENDIMENTO NÃO ENCONTRADO NA BASE DE CONHECIMENTOS
 Tipo: ESSENCIAL.
 Aplica-se: consulta, especialidade, exame ou procedimento solicitado não encontrado após busca na base publicada.
@@ -58,6 +59,11 @@ export function encaminhamentoSemRegistro(r: ResultadoBroker, args: unknown, aut
   // Uma consulta solicitada pelo modelo já identificou a intenção. A busca
   // preventiva não pode transferir só porque o paciente informou seus dados.
   if (automatica && !pedidoDeItemCatalogo(termo)) return null;
+  if (r.erro === "DOCTOR_NOT_FOUND" || typeof parametros.medico === "string" && parametros.medico.trim()) return {
+    motivo: MOTIVO_MEDICO_SEM_REGISTRO,
+    resumo: `Não foi encontrado o médico informado. Médico: ${String(parametros.medico ?? parametros.nome ?? termo).slice(0, 160)}. Consulta pesquisada: ${termo}. A equipe deve conferir a identificação do profissional; esse resultado não comprova ausência da consulta.`,
+    urgencia: "normal" as const,
+  };
   return {
     motivo: MOTIVO_SEM_REGISTRO,
     resumo: `O atendimento solicitado não foi encontrado na base publicada. Busca: ${termo || "catálogo de especialidades"}. A equipe deve conferir e continuar a conversa; a ausência no catálogo não comprova que a clínica não oferece o serviço.`,

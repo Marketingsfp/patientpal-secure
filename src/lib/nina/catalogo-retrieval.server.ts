@@ -18,6 +18,7 @@ import {
 } from "./catalogo-conhecimento";
 import type { ResultadoConhecimento } from "./knowledge-contract";
 import type { TipoAtendimentoCatalogo } from "./catalogo-pesquisa";
+import { profissionalGenerico, profissionalSfp } from "./regras-catalogo";
 import {
   compararNomeProfissional,
   prepararBuscaCatalogo,
@@ -182,16 +183,31 @@ export async function buscarNoCatalogo(
     : pontuados;
   const idsServicos = servicosRelevantes.slice(0, limite).map((x) => x.s.id);
   const medico = semAcento(pedido.medico || nomeProfissionalNaPergunta(pedido.query)).trim();
-  const profissionaisRelevantes = (tipoAtendimento === "exame_procedimento" ? [] : brutosProfissionais)
+  const profissionaisDaConsulta = brutosProfissionais.filter((p) =>
+    busca.pontuar("", especialidadesTexto(p)) > 0,
+  );
+  // Um nome não pode trocar a especialidade já localizada por outra.
+  const universoProfissionais = tipoAtendimento === "exame_procedimento" ? []
+    : medico && profissionaisDaConsulta.length ? profissionaisDaConsulta : brutosProfissionais;
+  const candidatosPorNome = universoProfissionais
     .map((p) => ({ p, score: Math.max(...[p.nome, ...aliasesDoIndice(p)].map(n => busca.pontuar(n, especialidadesTexto(p)))) }))
     .filter(({ p, score }) =>
       medico ? p.id === medico || compararNomeProfissional(medico, p.nome) !== null : score > 0,
     )
     .sort((a, b) => b.score - a.score)
-    .map(({ p }) => p)
-    .filter((p) => atendeNoDia(p, pedido.dia ?? null));
+    .map(({ p }) => p);
+  const nomesExatos = medico ? candidatosPorNome.filter(p =>
+    p.id === medico || compararNomeProfissional(medico, p.nome) === "exato") : [];
+  const profissionaisPorNome = nomesExatos.length ? nomesExatos : candidatosPorNome;
+  const escolhaMedicoPendente = Boolean(medico) && profissionaisDaConsulta.length > 0 &&
+    (profissionaisPorNome.length !== 1 || profissionaisPorNome.some((p) =>
+      p.id !== medico && compararNomeProfissional(medico, p.nome) !== "exato"));
+  // Reapresenta os nomes da consulta, sem transformar nenhum deles em seleção.
+  // O dia não filtra a correção do nome: escala não comprova identidade.
+  const profissionaisRelevantes = escolhaMedicoPendente ? profissionaisDaConsulta
+    : profissionaisPorNome.filter((p) => atendeNoDia(p, pedido.dia ?? null));
   const idsProfissionais = profissionaisRelevantes
-    .slice(0, medico ? Math.max(6, limite) : limite)
+    .slice(0, escolhaMedicoPendente ? 40 : medico ? Math.max(6, limite) : limite)
     .map((p) => p.id);
   const [detalhesServicos, detalhesProfissionais] = await Promise.all([
     lerPublicados<ServicoPublicado>(
@@ -235,7 +251,7 @@ export async function buscarNoCatalogo(
   const perguntaPorNome =
     Boolean(medico) || profissionaisRelevantes.some((p) => busca.pontuar(p.nome, "") > 0);
   const medicosAmbiguos =
-    perguntaPorNome &&
+    escolhaMedicoPendente || perguntaPorNome &&
     (profissionaisRelevantes.length > 1 ||
       busca.ajustes.length > 0 ||
       profissionaisRelevantes.some(
@@ -249,7 +265,7 @@ export async function buscarNoCatalogo(
     (medicosAmbiguos || pedirServico || busca.siglasDesconhecidas.length)
   ) {
     const opcoes = medicosAmbiguos
-      ? listaProfissionais.map((p) => ({
+      ? listaProfissionais.filter((p) => !profissionalGenerico(p.nome) && !profissionalSfp(p.nome)).map((p) => ({
           id: p.id,
           nome: p.nome,
           especialidade: Array.isArray(p.especialidades)
@@ -273,12 +289,15 @@ export async function buscarNoCatalogo(
         .join(" — "),
     );
     const pergunta =
-      tipo === "profissional"
+      escolhaMedicoPendente
+        ? `${profissionaisPorNome.length === 0 ? "Não encontrei esse nome entre os médicos desta consulta." : "Não consegui identificar com segurança qual médico você escolheu."} Pode informar novamente qual deseja?\n${nomes.join("\n")}`
+        : tipo === "profissional"
         ? perguntaIdentificacaoProfissional(opcoes)
         : tipo === "procedimento"
           ? `Qual exame ou procedimento você deseja?\n${nomes.join("\n")}`
           : `Pode informar por extenso o nome do atendimento ou como está escrito no pedido? Não consegui identificar a sigla ${busca.siglasDesconhecidas.join(", ").toUpperCase()}.`;
-    resultado.esclarecimento = { tipo, pergunta, opcoes };
+    resultado.esclarecimento = { tipo, pergunta, opcoes,
+      ...(escolhaMedicoPendente ? { motivo: "medico_nao_identificado" as const, atendimento: pedido.query } : {}) };
     resultado.procedure = null;
     resultado.price = null;
     resultado.instrucao = `O atendimento ou profissional ainda precisa ser identificado. Faça esta pergunta ao paciente: ${pergunta} Não escolha pelo primeiro resultado, não informe valores ou preparo nem consulte/reserve agenda até esclarecer. A dúvida de identificação não comprova ausência na base e não aciona transferência por item não encontrado. Depois da resposta, reconsulte a base com o contexto e os qualificadores confirmados.`;
