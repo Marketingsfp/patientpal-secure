@@ -1416,7 +1416,7 @@ export type Database = {
           versao: number
         }
         Insert: {
-          atendimento_inicio?: string
+          atendimento_inicio: string
           clinica_id: string
           conversa_id: string
           created_at?: string
@@ -9316,7 +9316,6 @@ export type Database = {
       }
       nina_cat_profissionais: {
         Row: {
-          estrutura: Json | null
           atende_consultorio: boolean | null
           aviso_dia: string | null
           aviso_valido_ate: string | null
@@ -9326,6 +9325,7 @@ export type Database = {
           created_at: string
           criado_por: string | null
           especialidades: Json
+          estrutura: Json | null
           formas_pagamento: Json
           horarios: Json
           id: string
@@ -9342,7 +9342,6 @@ export type Database = {
           updated_at: string
         }
         Insert: {
-          estrutura?: Json | null
           atende_consultorio?: boolean | null
           aviso_dia?: string | null
           aviso_valido_ate?: string | null
@@ -9352,6 +9351,7 @@ export type Database = {
           created_at?: string
           criado_por?: string | null
           especialidades?: Json
+          estrutura?: Json | null
           formas_pagamento?: Json
           horarios?: Json
           id?: string
@@ -9368,7 +9368,6 @@ export type Database = {
           updated_at?: string
         }
         Update: {
-          estrutura?: Json | null
           atende_consultorio?: boolean | null
           aviso_dia?: string | null
           aviso_valido_ate?: string | null
@@ -9378,6 +9377,7 @@ export type Database = {
           created_at?: string
           criado_por?: string | null
           especialidades?: Json
+          estrutura?: Json | null
           formas_pagamento?: Json
           horarios?: Json
           id?: string
@@ -9419,11 +9419,11 @@ export type Database = {
       }
       nina_cat_servicos: {
         Row: {
-          estrutura: Json | null
           clinica_id: string
           created_at: string
           criado_por: string | null
           descricao_publica: string | null
+          estrutura: Json | null
           executantes: Json
           formas_pagamento: Json
           id: string
@@ -9441,11 +9441,11 @@ export type Database = {
           valor_observacao: string | null
         }
         Insert: {
-          estrutura?: Json | null
           clinica_id: string
           created_at?: string
           criado_por?: string | null
           descricao_publica?: string | null
+          estrutura?: Json | null
           executantes?: Json
           formas_pagamento?: Json
           id?: string
@@ -9463,11 +9463,11 @@ export type Database = {
           valor_observacao?: string | null
         }
         Update: {
-          estrutura?: Json | null
           clinica_id?: string
           created_at?: string
           criado_por?: string | null
           descricao_publica?: string | null
+          estrutura?: Json | null
           executantes?: Json
           formas_pagamento?: Json
           id?: string
@@ -15025,16 +15025,6 @@ export type Database = {
       }
     }
     Functions: {
-      atend_resumo_inicio_atendimento: {
-        Args: { _clinica_id: string; _conversa_id: string; _ate: string }
-        Returns: string | null
-      }
-      atend_reservar_resumo: {
-        Args: { _clinica_id: string; _conversa_id: string; _handoff_em: string; _motivo?: string | null; _desfecho?: string; _resolvido_por?: string | null }
-        Returns: string | null
-      }
-      atend_expurgar_resumos_vencidos: { Args: Record<PropertyKey, never>; Returns: number }
-
       __actor_set_trocar_convenio: { Args: never; Returns: undefined }
       __plpgsql_show_dependency_tb:
         | {
@@ -15253,6 +15243,7 @@ export type Database = {
           conversa_id: string
         }[]
       }
+      atend_expurgar_resumos_vencidos: { Args: never; Returns: number }
       atend_gerar_protocolo: { Args: { _clinica_id: string }; Returns: string }
       atend_gerar_protocolo_atendimento: {
         Args: {
@@ -15311,6 +15302,21 @@ export type Database = {
           _conversa_id: string
           _mensagem_id?: string
         }
+        Returns: string
+      }
+      atend_reservar_resumo: {
+        Args: {
+          _clinica_id: string
+          _conversa_id: string
+          _desfecho?: string
+          _handoff_em: string
+          _motivo?: string
+          _resolvido_por?: string
+        }
+        Returns: string
+      }
+      atend_resumo_inicio_atendimento: {
+        Args: { _ate: string; _clinica_id: string; _conversa_id: string }
         Returns: string
       }
       atend_tem_perfil_telefonia: {
