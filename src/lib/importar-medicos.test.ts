@@ -150,6 +150,32 @@ describe("leitura da planilha", () => {
     expect(lida.repasses[0].particular).toBeNull();
   });
 
+  it("lê CSV com ponto e vírgula, decimal com vírgula e acento do Excel (Windows-1252)", async () => {
+    const texto =
+      "Nome;CRM;UF do CRM;Especialidades;Tipo de Repasse;Repasse Padrão;CPF;Telefone\r\n" +
+      "Dr. João Lima;52111111-1;RJ;Cardiologia;Percentual;60,5;01234567890;(21) 99999-0000\r\n";
+    // Windows-1252: um byte por caractere (é, ã, ç ficam abaixo de 0x100).
+    const bytes = Uint8Array.from(texto, (c) => c.charCodeAt(0));
+    const lida = await lerPlanilhaMedicos(bytes.buffer, "medicos.csv");
+    expect(lida.recusadas).toEqual([]);
+    expect(lida.medicos).toHaveLength(1);
+    expect(lida.medicos[0].nome).toBe("JOÃO LIMA");
+    expect(lida.medicos[0].repassePadrao).toBe(60.5);
+    expect(lida.medicos[0].cpf).toBe("012.345.678-90");
+  });
+
+  it("lê CSV com vírgula e aspas em UTF-8", async () => {
+    const texto =
+      "﻿Nome,CRM,UF do CRM,Especialidades,Tipo de Repasse,Repasse Padrão,Telefone\n" +
+      'Dr. Carlos Lima,52111111-1,RJ,"Cardiologia, Clínica Médica",Valor,"70,00",(21) 99999-0000\n';
+    const bytes = new TextEncoder().encode(texto);
+    const lida = await lerPlanilhaMedicos(bytes.buffer as ArrayBuffer, "medicos.csv");
+    expect(lida.recusadas).toEqual([]);
+    expect(lida.medicos).toHaveLength(1);
+    expect(lida.medicos[0].tipoRepasse).toBe("valor");
+    expect(lida.medicos[0].repassePadrao).toBe(70);
+  });
+
   it("repasse padrão em branco é recusado; 0 digitado é aceito", async () => {
     const lida = await lerPlanilhaMedicos(
       arquivo({

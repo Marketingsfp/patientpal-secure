@@ -242,14 +242,14 @@ function ImportarMedicosPage() {
       toast.error("A planilha passa de 15 MB. Divida em partes menores.");
       return;
     }
-    if (!/\.(xlsx|xlsm|xls)$/i.test(arquivo.name)) {
-      toast.error("Envie a planilha em Excel (.xlsx), no formato do modelo.");
+    if (!/\.(xlsx|xlsm|xls|csv)$/i.test(arquivo.name)) {
+      toast.error("Envie a planilha em Excel (.xlsx) ou .csv, no formato do modelo.");
       return;
     }
     setLendo(true);
     setNomeArquivo(arquivo.name);
     try {
-      const lida = await lerPlanilhaMedicos(await arquivo.arrayBuffer());
+      const lida = await lerPlanilhaMedicos(await arquivo.arrayBuffer(), arquivo.name);
       if (!lida.abaMedicos) {
         toast.error(
           'Não encontrei a aba "Médicos" com as colunas Nome, CRM e Repasse Padrão. Use o modelo da planilha.',
@@ -451,13 +451,13 @@ function ImportarMedicosPage() {
               {nomeArquivo ?? "Arraste a planilha aqui ou clique para escolher"}
             </p>
             <p className="text-xs text-muted-foreground">
-              Arquivo .xlsx até 15 MB, no formato do modelo
+              Arquivo .xlsx ou .csv até 15 MB
             </p>
           </div>
           <input
             ref={inputRef}
             type="file"
-            accept=".xlsx,.xlsm,.xls"
+            accept=".xlsx,.xlsm,.xls,.csv,text/csv"
             className="hidden"
             onChange={(e) => {
               const arquivo = e.target.files?.[0];

@@ -18,6 +18,7 @@
  */
 
 import {
+  abrirPlanilhaOuCsv,
   acharColuna,
   chaveTexto,
   normalizarMaiusculas,
@@ -351,9 +352,17 @@ function acharAba(
 // Leitura
 // ---------------------------------------------------------------------------
 
-export async function lerPlanilhaMedicos(arquivo: ArrayBuffer): Promise<ResultadoLeituraMedicos> {
+/**
+ * Lê o .xlsx do modelo ou um .csv. O CSV tem uma aba só, reconhecida pelo
+ * cabeçalho: aba de médicos (Nome, CRM, Repasse Padrão) ou de repasse por
+ * serviço (Médico, Serviço).
+ */
+export async function lerPlanilhaMedicos(
+  arquivo: ArrayBuffer,
+  nomeArquivo?: string,
+): Promise<ResultadoLeituraMedicos> {
   const XLSX = await import("xlsx");
-  const wb = XLSX.read(arquivo, { type: "array", cellDates: true });
+  const wb = abrirPlanilhaOuCsv(XLSX, arquivo, nomeArquivo, { cellDates: true });
 
   const recusadas: LinhaRecusada[] = [];
   const medicos: LinhaMedico[] = [];

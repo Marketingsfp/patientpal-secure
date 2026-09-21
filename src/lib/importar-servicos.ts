@@ -240,6 +240,54 @@ function pareceCsv(nomeArquivo: string | undefined, bytes: Uint8Array): boolean 
   return true;
 }
 
+/**
+ * Texto do CSV. O Excel em português salva "CSV (separado por vírgulas)" em
+ * Windows-1252, não em UTF-8; sem esse recuo os acentos viram "�".
+ */
+function decodificarCsv(bytes: Uint8Array): string {
+  try {
+    return semBom(new TextDecoder("utf-8", { fatal: true }).decode(bytes));
+  } catch {
+    return new TextDecoder("windows-1252").decode(bytes);
+  }
+}
+
+/**
+ * Separador do CSV: ";" (Excel em português) ou ",". Conta nas primeiras
+ * linhas, e não só na primeira, porque o cabeçalho pode vir depois de um título.
+ */
+function separadorCsv(texto: string): ";" | "," {
+  const inicio = texto
+    .split(/\r?\n/)
+    .filter((l) => l.trim())
+    .slice(0, 10)
+    .join("\n")
+    // Vírgula dentro de aspas ("Silva, João") não conta.
+    .replace(/"[^"]*"/g, "");
+  const pontoEVirgula = (inicio.match(/;/g) ?? []).length;
+  const virgula = (inicio.match(/,/g) ?? []).length;
+  return pontoEVirgula >= virgula ? ";" : ",";
+}
+
+/**
+ * Abre .xlsx/.xls ou .csv no mesmo formato de pasta de trabalho. O CSV vira
+ * uma pasta com uma aba só, com todas as células em texto (CPF e CRM não
+ * perdem o zero à esquerda; "70,50" é convertido por quem lê a coluna).
+ */
+export function abrirPlanilhaOuCsv(
+  XLSX: typeof import("xlsx"),
+  arquivo: ArrayBuffer,
+  nomeArquivo: string | undefined,
+  opcoesXlsx: import("xlsx").ParsingOptions = {},
+): import("xlsx").WorkBook {
+  const bytes = new Uint8Array(arquivo);
+  if (pareceCsv(nomeArquivo, bytes)) {
+    const texto = decodificarCsv(bytes);
+    return XLSX.read(texto, { type: "string", FS: separadorCsv(texto), raw: true });
+  }
+  return XLSX.read(arquivo, { type: "array", ...opcoesXlsx });
+}
+
 const COLUNAS = {
   // "Item" é como a planilha da São Francisco chama o serviço.
   nome: ["Nome", "Nome do Serviço", "Item", "Servico", "Serviço", "Procedimento"],
@@ -371,20 +419,7 @@ export async function lerPlanilhaServicos(
   opcoes: OpcoesLeituraServicos = {},
 ): Promise<ResultadoLeituraServicos> {
   const XLSX = await import("xlsx");
-  const bytes = new Uint8Array(arquivo);
-
-  let wb: import("xlsx").WorkBook;
-  if (pareceCsv(opcoes.nomeArquivo, bytes)) {
-    const texto = semBom(new TextDecoder("utf-8").decode(bytes));
-    const primeiraLinha = texto.split(/\r?\n/)[0] ?? "";
-    const separador =
-      (primeiraLinha.match(/;/g) ?? []).length >= (primeiraLinha.match(/,/g) ?? []).length
-        ? ";"
-        : ",";
-    wb = XLSX.read(texto, { type: "string", FS: separador, raw: true });
-  } else {
-    wb = XLSX.read(arquivo, { type: "array" });
-  }
+  const wb = abrirPlanilhaOuCsv(XLSX, arquivo, opcoes.nomeArquivo);
 
   const vazio: ResultadoLeituraServicos = {
     linhas: [],
