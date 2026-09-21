@@ -3,6 +3,7 @@ import { mock } from "bun:test";
 import { textoDaChave } from "../../resposta/templates";
 import { CONTINUIDADE_CONSULTA_AGENDA } from "../../prompt/consulta-agenda";
 import { estadoVazio } from "../../fluxo-estado-normalizar";
+import { selecionarVagaValidada } from "../../agendamento-escolha";
 import { cenariosContextuais } from "./consulta-contextual-cenarios";
 import { recusarFraseComoPesquisa } from "../../catalogo-pesquisa";
 
@@ -180,7 +181,18 @@ mock.module("@/lib/nina/paciente-tools.server", () => ({
     .map(name => ({ type: "function", function: { name } })),
   FERRAMENTAS_NINA_PACIENTE: ["selecionar_horario", "consultar_disponibilidade", "verificar_horario", "proxima_vaga", "consultar_primeiro_disponivel"]
     .map(name => ({ type: "function", function: { name } })),
-  executarFerramentaPaciente: async () => { throw new Error("Usar broker simulado"); },
+  executarFerramentaPaciente: async (ctx: any, nome: string) => {
+    if (escolhaHorario && nome === "consultar_cadastro_paciente") {
+      ferramentas.push(nome);
+      return { ok: true, campos_faltantes: cenario.endsWith("cadastro_completo") ? [] : ["nome", "data_nascimento"] };
+    }
+    if (escolhaHorario && nome === "identificar_paciente" && cenario.endsWith("cadastro_completo")) {
+      ferramentas.push(nome);
+      ctx.pacienteId = "paciente-teste";
+      return { ok: true };
+    }
+    throw new Error("Usar broker simulado");
+  },
 }));
 mock.module("@/lib/nina/handoff-tool.server", () => ({
   FERRAMENTA_HANDOFF: { type: "function", function: { name: "solicitar_atendente_humano" } },
@@ -189,7 +201,7 @@ mock.module("@/lib/nina/revisao-conversa.server", () => ({
   respostaObsoleta: async () => cenario.endsWith("obsoleto"),
 }));
 const resultados: any[] = [];
-mock.module("@/lib/nina/tool-broker.server", () => ({ criarToolBroker: () => ({
+mock.module("@/lib/nina/tool-broker.server", () => ({ criarToolBroker: (params: any) => ({
   resultados: () => resultados,
   executar: async (nome: string, args: unknown) => {
     const recusada = recusarFraseComoPesquisa(nome, args);
@@ -208,10 +220,19 @@ mock.module("@/lib/nina/tool-broker.server", () => ({ criarToolBroker: () => ({
       reused: false, appointment_confirmed: false,
       dados: { ok: true, slots: [{ medico: "João Hélio", data: "2030-01-21", hora: "10:20" }] },
     };
-    if (nome === "selecionar_horario" && escolhaHorario) return {
+    if (nome === "selecionar_horario" && escolhaHorario) {
+      const estado = params.ctxPaciente.estado;
+      estado.session_id ??= "sessao-escolha";
+      selecionarVagaValidada(estado, "clinica-simulada", {
+        medico_id: "medico", medico: "Dr. Jorge Ribeiro", procedimento: "Consulta",
+        data: "2030-01-21", hora: "10:20", inicio: "2030-01-21T13:20:00Z", fim: "2030-01-21T13:40:00Z",
+        modalidade: "hora_marcada", agenda_id: null,
+      }, resumoEscolhido);
+      return {
       ferramenta: nome, capacidade: "checkAvailability", fonte: "agenda", success: true,
       reused: false, appointment_confirmed: false, dados: { ok: true, resumo_confirmacao: resumoEscolhido },
-    };
+      };
+    }
     if (nome === "solicitar_atendente_humano" && (agenda || regraCatalogo)) {
       encaminhamentos.push(typeof args === "string" ? JSON.parse(args) : args);
       return { ferramenta: nome, capacidade: "requestHumanHandoff", fonte: "atendimento",

@@ -96,6 +96,7 @@ import { ConversaSkeleton } from "@/components/nina/ConversaSkeleton";
 import { useChatScroll } from "@/hooks/use-chat-scroll";
 import { formatarDataHoraMensagem } from "@/lib/atendimento/data-hora";
 import { anteciparReabertura } from "@/lib/atendimento/timeline-reabertura";
+import { posicionarEncerramentoAposConclusao } from "@/lib/atendimento/timeline-encerramento";
 import { posicionarHandoffAposAviso } from "@/lib/atendimento/timeline-handoff";
 import { textoMarcadorSistema } from "@/lib/atendimento/marcador-handoff";
 import { definirSelecaoTeste } from "@/lib/webmcp/selecao-teste";
@@ -294,7 +295,11 @@ export function HomologacaoInbox({ laboratorio = false, ativo = true, abrirConve
           }
         : { evento: i.evento }),
     }));
-    return posicionarHandoffAposAviso(comReabertura, (i) => ({
+    const comHandoff = posicionarHandoffAposAviso(comReabertura, (i) => ({
+      em: Date.parse(i.em),
+      ...(i.kind === "msg" ? { mensagem: i.msg } : { evento: i.evento }),
+    }));
+    return posicionarEncerramentoAposConclusao(comHandoff, (i) => ({
       em: Date.parse(i.em),
       ...(i.kind === "msg" ? { mensagem: i.msg } : { evento: i.evento }),
     }));

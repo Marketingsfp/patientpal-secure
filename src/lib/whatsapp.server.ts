@@ -1502,10 +1502,11 @@ async function gerarRespostaNinaInterno(
   }
 
   // ---------------------------------------------------------------------
-  // REGRA DE NEGÓCIO (não é prompt): confirmou a vaga -> pedir nome + CPF +
-  // nascimento -> identificar -> revalidar -> gravar -> confirmar. A ordem é
+  // REGRA DE NEGÓCIO: escolheu a vaga -> completar cadastro -> confirmar o
+  // resumo -> revalidar -> gravar -> informar a conclusão. A ordem é
   // decidida aqui, em código, antes de qualquer chamada ao modelo.
   // ---------------------------------------------------------------------
+  let continuarAgendamento: ((aposSelecao?: boolean) => Promise<import("@/lib/nina/resposta/contrato").ResultadoRespostaNina | null>) | null = null;
   if (podeAgendar && ctxFerramentas && executar !== null) {
     const { aplicarGateIdentificacao } = await import("@/lib/nina/identificacao-gate.server");
     // FASE 5 — o texto do gate sai do template publicado (ou do padrão).
@@ -1514,11 +1515,14 @@ async function gerarRespostaNinaInterno(
       clinicaId,
       inicioDeTurno: true,
     }).catch(() => ({ textos: {}, versaoInstrucoes: null, recusadas: [] }));
-    const respostaGate = await aplicarGateIdentificacao({
+    const contextoGate = ctxFerramentas;
+    const executarGate = executar;
+    continuarAgendamento = (aposSelecao = false) => aplicarGateIdentificacao({
       mensagem: mensagemPaciente,
       estado: fluxoEstado,
-      ctx: ctxFerramentas,
-      executar,
+      ctx: contextoGate,
+      executar: executarGate,
+      aposSelecao,
       textos: templatesGate.textos,
       nomeUnidade: identidadeEfetiva.ok
         ? nomeCompletoEstabelecimento(identidadeEfetiva.apresentacao)
@@ -1542,6 +1546,7 @@ async function gerarRespostaNinaInterno(
       console.error("[NINA_BOOKING_FLOW] gate falhou", e);
       return null;
     });
+    const respostaGate = await continuarAgendamento();
     if (respostaGate) {
       await salvarFluxoEstado(supabaseAdmin as never, clinicaId, estadoId.conversaId, fluxoEstado);
       // FASE 1 — caminho SEM modelo: o texto veio da regra determinística de
@@ -2191,11 +2196,13 @@ async function gerarRespostaNinaInterno(
         if (resumoEscolha) break;
       }
       if (nome === "selecionar_horario" && r.success &&
-        typeof (r.dados as { resumo_confirmacao?: unknown })?.resumo_confirmacao === "string") {
+        (typeof dadosAgendamento?.resumo_confirmacao === "string" ||
+          (dadosAgendamento?.selecao_preservada === true && dadosAgendamento.confirmacao_recebida !== true))) {
         const { criarResultado } = await import("@/lib/nina/resposta/contrato");
-        resumoEscolha = criarResultado({ origem: "gate",
-          texto: (r.dados as { resumo_confirmacao: string }).resumo_confirmacao,
-          fatosConfirmados: ["vaga_escolhida_validada"], restricoes: ["aguardar_aceite_do_resumo"] });
+        const { textoDaChave } = await import("@/lib/nina/resposta/templates");
+        resumoEscolha = await continuarAgendamento?.(true) ?? criarResultado({ origem: "erro",
+          texto: textoDaChave("fluxo.identificacao.instabilidade", {}, null).texto,
+          restricoes: ["nao_afirmar_agendamento_sem_gravacao"] });
         // Nenhuma ferramenta do mesmo lote pode gravar antes do novo aceite.
         break;
       }

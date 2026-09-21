@@ -119,8 +119,8 @@ export function blocoPromptFase3({ mensagem, estado }: EntradaFase3): string {
     );
   } else {
     linhas.push("- INTENÇÃO DE AGENDAR CONFIRMADA (estado BOOKING_INTENT_CONFIRMED).");
-    if (!atendimentoDefinido(estado) || !estado.appointment.slot_confirmed_by_patient) {
-      linhas.push("- Defina primeiro procedimento, profissional e vaga real; apresente o resumo e aguarde a confirmação. Ainda NÃO colete dados cadastrais.");
+    if (!atendimentoDefinido(estado) || !estado.appointment.confirmation) {
+      linhas.push("- Defina primeiro procedimento, profissional e a escolha de uma vaga real. Ainda NÃO colete dados cadastrais. Depois da escolha, complete o cadastro antes de apresentar o resumo final para confirmação.");
     } else if (estado.patient.identified && estado.patient.id) {
       linhas.push(
         `- O cadastro do paciente${estado.patient.first_name ? ` (${estado.patient.first_name})` : ""} JÁ existe e está vinculado a esta conversa. Consulte sua completude; NÃO peça dados preenchidos e NÃO crie cadastro novo.`,

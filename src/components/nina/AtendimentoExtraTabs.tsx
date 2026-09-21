@@ -132,6 +132,7 @@ import { listarPaginaHistorico } from "@/lib/atendimento/historico-paginado.func
 import { montarPaginaHistorico, manterNaJanelaRecente, type PaginaHistorico, type CursorHistorico } from "@/lib/atendimento/historico-paginado";
 import { rotuloNovasMensagens } from "@/lib/atendimento/scroll-chat";
 import { anteciparReabertura } from "@/lib/atendimento/timeline-reabertura";
+import { posicionarEncerramentoAposConclusao } from "@/lib/atendimento/timeline-encerramento";
 import { posicionarHandoffAposAviso } from "@/lib/atendimento/timeline-handoff";
 
 import { mesclarEspera, mesclarListaConversas } from "@/lib/atendimento/inbox-merge";
@@ -2277,7 +2278,11 @@ export function AtendInbox() {
           }
         : i.item.tipo === "EVENTO" ? { evento: i.item.evento } : {}),
     }));
-    return posicionarHandoffAposAviso(comReabertura, (i) => ({
+    const comHandoff = posicionarHandoffAposAviso(comReabertura, (i) => ({
+      em: i.at,
+      ...(i.kind === "msg" ? { mensagem: i.msg } : { grupo: i.item }),
+    }));
+    return posicionarEncerramentoAposConclusao(comHandoff, (i) => ({
       em: i.at,
       ...(i.kind === "msg" ? { mensagem: i.msg } : { grupo: i.item }),
     }));

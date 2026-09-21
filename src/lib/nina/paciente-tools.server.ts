@@ -854,7 +854,7 @@ export const FERRAMENTAS_NINA_AGENDAMENTO = [
     type: "function",
     function: {
       name: "selecionar_horario",
-      description: "Interprete a escolha do paciente em linguagem natural (por exemplo: eu prefiro 10:20, marca pra 10:20, eu vou 10:20, dez e vinte, o segundo horário). Use exclusivamente uma vaga retornada pela agenda. Consultar opções não é escolher. Havendo ambiguidade de médico, dia ou horário, pergunte antes. Esta ferramenta revalida a vaga e devolve o resumo final obrigatório para o paciente confirmar. Nunca cria reserva e nunca substitui uma vaga indisponível.",
+      description: "Interprete a escolha do paciente em linguagem natural (por exemplo: eu prefiro 10:20, marca pra 10:20, eu vou 10:20, dez e vinte, o segundo horário). Use exclusivamente uma vaga retornada pela agenda. Consultar opções não é escolher. Havendo ambiguidade de médico, dia ou horário, pergunte antes. Esta ferramenta revalida a vaga. Depois da escolha, confira o cadastro e colete os dados faltantes; somente depois apresente o resumo final para confirmação. Nunca cria reserva e nunca substitui uma vaga indisponível.",
       parameters: { type: "object", properties: {
         medico_id: { type: "string" }, inicio: { type: "string" }, fim: { type: "string" },
       }, required: ["medico_id", "inicio", "fim"], additionalProperties: false },
@@ -864,7 +864,7 @@ export const FERRAMENTAS_NINA_AGENDAMENTO = [
     type: "function",
     function: {
       name: "consultar_cadastro_paciente",
-      description: "Depois de definir e confirmar procedimento, médico e vaga, verifica o cadastro já confirmado na conversa e devolve apenas os campos obrigatórios faltantes do Clínica OS. Telefone sozinho não confirma identidade. Não cria cadastro.",
+      description: "Depois de escolher procedimento, médico e vaga, antes da confirmação final do agendamento, verifica o cadastro já confirmado na conversa e devolve apenas os campos obrigatórios faltantes do Clínica OS. Telefone sozinho não confirma identidade. Não cria cadastro.",
       parameters: { type: "object", properties: {}, additionalProperties: false },
     },
   },
@@ -873,7 +873,7 @@ export const FERRAMENTAS_NINA_AGENDAMENTO = [
     function: {
       name: "identificar_paciente",
       description:
-        "Após confirmar procedimento, profissional e vaga, confere ou cadastra o paciente no Clínica OS. Peça apenas nome, data de nascimento e telefone que estiverem faltando; aproveite o telefone do WhatsApp. CPF é opcional, nunca solicite. Cadastro confirmado é reutilizado e apenas campos vazios podem ser completados.",
+        "Após escolher procedimento, profissional e vaga, confere ou cadastra o paciente no Clínica OS antes da confirmação final do agendamento. Peça apenas nome, data de nascimento e telefone que estiverem faltando; aproveite o telefone do WhatsApp. CPF é opcional, nunca solicite. Cadastro confirmado é reutilizado e apenas campos vazios podem ser completados.",
       parameters: {
         type: "object",
         properties: {
@@ -1181,7 +1181,7 @@ async function executarFerramentaInterna(
           Date.parse(existente.vaga.inicio) === Date.parse(p.inicio) && Date.parse(existente.vaga.fim) === Date.parse(p.fim))
           return { ok: true, selecao_preservada: true, confirmacao_recebida: existente.aceita,
             instrucao: existente.aceita ? "O paciente já confirmou esta vaga. Continue com os dados faltantes e a gravação autorizada; não peça confirmação novamente."
-              : "Esta vaga já tem um resumo de confirmação. Não reinicie a escolha nem repita o resumo; esclareça somente a dúvida atual do paciente." };
+              : "A escolha desta vaga está preservada. Complete os dados cadastrais faltantes antes de pedir a confirmação final; não reinicie a escolha." };
         if (!estado || estado.appointment.appointment_id || estado.appointment.confirmation?.aceita)
           return falha("ACTION_NOT_AUTHORIZED", "O horário já confirmado não pode ser alterado por esta operação.");
         const opcoes = vagasDaSessao(estado, ctx.clinicaId);
@@ -1225,7 +1225,7 @@ async function executarFerramentaInterna(
         }, publicados.textos).texto;
         selecionarVagaValidada(estado, ctx.clinicaId, vaga, resumo);
         return { ok: true, resumo_confirmacao: resumo, vaga_escolhida: vaga,
-          instrucao: "Entregue o resumo final ao paciente. Apenas o próximo aceite desse resumo permite gravar a vaga exata." };
+          instrucao: "Confira o cadastro e colete os dados faltantes primeiro. Só depois entregue o resumo final ao paciente. Apenas o próximo aceite desse resumo permite gravar a vaga exata." };
       }
       case "consultar_base_conhecimento": {
         const p = z
@@ -1704,14 +1704,14 @@ async function executarFerramentaInterna(
 
 
       case "consultar_cadastro_paciente": {
-        if (!cadastroAutorizado(ctx.estado)) return falha("ACTION_NOT_AUTHORIZED", "Defina o atendimento e aguarde a confirmação da vaga antes de consultar o cadastro.");
+        if (!cadastroAutorizado(ctx.estado)) return falha("ACTION_NOT_AUTHORIZED", "Defina o atendimento e valide a escolha da vaga antes de consultar o cadastro.");
         const cadastro = await consultarCadastroConfirmado(ctx);
         return { ok: true, cadastro: cadastro.confirmado ? "confirmado" : "a_identificar",
           campos_faltantes: cadastro.camposFaltantes };
       }
 
       case "identificar_paciente": {
-        if (!cadastroAutorizado(ctx.estado)) return falha("ACTION_NOT_AUTHORIZED", "Defina o atendimento e aguarde a confirmação da vaga antes de cadastrar.");
+        if (!cadastroAutorizado(ctx.estado)) return falha("ACTION_NOT_AUTHORIZED", "Defina o atendimento e valide a escolha da vaga antes de cadastrar.");
         const entrada = zIdentificar.parse(args);
         const cadastro = await consultarCadastroConfirmado(ctx);
         const p = cadastroMinimoSchema.safeParse({

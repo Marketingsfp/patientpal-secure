@@ -1,5 +1,6 @@
 import { describe, it, expect } from "bun:test";
 import { estadoVazio, type EstadoFluxoNina } from "../fluxo-estado.server";
+import { resumoEntregueFixture } from "./agendamento-fixture";
 import {
   avaliarIntencaoAgendar,
   blocoPromptFase3,
@@ -16,6 +17,8 @@ function confirmarAtendimento(e: EstadoFluxoNina) {
   Object.assign(e.appointment, { procedure: "Consulta", doctor_id: "medico",
     slot_inicio: "2030-01-01T14:00:00Z", slot_fim: "2030-01-01T14:30:00Z",
     slot_confirmed_by_patient: true, intent_confirmed: true });
+  resumoEntregueFixture(e, "clinica", false);
+  e.appointment.intent_confirmed = true;
 }
 
 describe("confirmação de intenção de agendar", () => {
@@ -59,7 +62,7 @@ describe("coleta de dados", () => {
     expect(p).toContain("verificasse a disponibilidade");
   });
 
-  it("atendimento definido e confirmado permite pedir os obrigatórios", () => {
+  it("vaga escolhida permite pedir os obrigatórios antes da confirmação final", () => {
     const p = blocoPromptFase3({ mensagem: "Quero agendar", estado: estado(confirmarAtendimento) });
     expect(p).toContain("BOOKING_INTENT_CONFIRMED");
     expect(p).toContain("nome completo");

@@ -120,8 +120,9 @@ beforeEach(() => {
 });
 
 describe("executor do cadastro com banco simulado", () => {
-  test("só aceita cadastro depois de atendimento definido e vaga confirmada", async () => {
+  test("só aceita cadastro depois de atendimento definido e escolha validada", async () => {
     const ctx = contexto();
+    ctx.estado!.appointment.confirmation = null;
     ctx.estado!.appointment.slot_confirmed_by_patient = false;
     const r = await executarFerramentaPaciente(ctx, "identificar_paciente", {
       nome: "Ana Silva",
@@ -131,6 +132,15 @@ describe("executor do cadastro com banco simulado", () => {
     expect(r.erro).toBe("ACTION_NOT_AUTHORIZED");
     expect(rpcs).toHaveLength(0);
     expect(leituras.filter((l) => l.tabela === "pacientes")).toHaveLength(0);
+  });
+  test("cadastro é permitido após escolha e antes do aceite final da reserva", async () => {
+    const ctx = contexto();
+    resumoEntregueFixture(ctx.estado!, "clinica", false);
+    const r = await executarFerramentaPaciente(ctx, "identificar_paciente", {
+      nome: "Ana Silva", data_nascimento: "1990-01-02",
+    });
+    expect(r.ok).toBe(true);
+    expect(ctx.estado!.appointment.confirmation?.aceita).toBe(false);
   });
   test("contato desconhecido precisa só nome e nascimento; telefone vem do WhatsApp", async () => {
     const r = await executarFerramentaPaciente(contexto(), "consultar_cadastro_paciente", {});

@@ -106,13 +106,13 @@ export function blocoPromptEstado(estado: EstadoFluxoNina): string {
     linhas.push(
       `- Paciente JÁ IDENTIFICADO e VALIDADO${p.first_name ? ` (${p.first_name})` : ""}. O sistema já tem o cadastro interno dele.`,
       "- PROIBIDO pedir de novo nome, CPF ou data de nascimento. Também é proibido dizer que 'esqueceu' de confirmar dados.",
-      "- Para marcar, chame 'agendar' direto: o paciente já está vinculado a esta conversa no backend.",
+      "- Depois do aceite do resumo final da vaga escolhida, chame 'agendar': o paciente já está vinculado a esta conversa no backend.",
       "- Não repita CPF nem data de nascimento nas respostas.",
     );
   } else {
     linhas.push(
       "- Paciente ainda NÃO identificado. Pode conversar, buscar profissional e consultar horários SEM pedir dado pessoal.",
-      "- ORDEM OBRIGATÓRIA: definir atendimento e vaga -> paciente confirma -> consultar cadastro -> pedir somente nome, nascimento e telefone faltantes -> identificar/cadastrar -> revalidar vaga -> gravar -> confirmar. Aproveite o telefone do WhatsApp; CPF é opcional e não deve ser solicitado.",
+      "- ORDEM OBRIGATÓRIA: escolher atendimento e vaga -> consultar cadastro -> pedir somente nome, nascimento e telefone faltantes -> identificar/cadastrar -> apresentar resumo final -> paciente confirma -> revalidar vaga -> gravar -> informar conclusão. Aproveite o telefone do WhatsApp; CPF é opcional e não deve ser solicitado.",
       "- NUNCA chame 'identificar_paciente' com dado faltando e NUNCA chame 'agendar' antes da identificação.",
       "- Se faltar só um dado, peça apenas o que falta. Não recomece a coleta.",
       "- Falha de identificação por dados incompletos NÃO é motivo para transferir para atendente humano.",
@@ -135,9 +135,9 @@ export function blocoPromptEstado(estado: EstadoFluxoNina): string {
       `- Vaga em negociação: inicio=${a.slot_inicio} fim=${a.slot_fim}. Mantenha essa vaga durante toda a coleta de dados — não pergunte de novo médico, dia ou hora.`,
     );
   }
-  if (a.intent_confirmed && !p.identified) {
+  if (a.confirmation?.aceita && !p.identified) {
     linhas.push(
-      "- O paciente JÁ CONFIRMOU que quer esta vaga. A única etapa pendente é a identificação (nome completo, CPF e data de nascimento).",
+      "- O paciente JÁ CONFIRMOU esta vaga em um fluxo em andamento. Preserve o aceite e complete somente os dados cadastrais obrigatórios faltantes.",
     );
   }
 

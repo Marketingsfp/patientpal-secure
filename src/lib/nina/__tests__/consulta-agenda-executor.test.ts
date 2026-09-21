@@ -517,7 +517,7 @@ describe("executor real das ferramentas com banco simulado", () => {
     };
   }
   for (const origem of ["homologacao", "whatsapp"] as const) {
-    test(`${origem}: referência entre turnos → vaga com consulta → aceite natural → uma reserva`, async () => {
+    test(`${origem}: referência entre turnos → vaga → dados → aceite natural → uma reserva`, async () => {
       const ctx: CtxNinaPaciente = { ...contexto("Quero a primeira data com Alex Louza"), origem,
         teste: origem === "homologacao", podeAgendar: true, pacienteId: PACIENTE, pacienteNome: "Paciente Fictício" };
       referenciaConsulta(ctx);
@@ -530,16 +530,23 @@ describe("executor real das ferramentas com banco simulado", () => {
       ctx.opcoesAgendamentoInicioTurno = true;
       ctx.consultaAgenda = { mensagemAtual: "Escolho 14:00", historico: [{ role: "assistant", content: "Disponível às 14:00. Qual prefere?" }] };
       const selecionar = await aplicarGateIdentificacao({ mensagem: "Escolho 14:00", estado: ctx.estado!, ctx, executar: executarFerramentaPaciente });
-      expect(selecionar?.texto).toContain("14:00");
-      expect(selecionar?.texto).toContain("Cardiologia");
+      expect(selecionar?.camposPendentes).toContain("nome");
+      expect(gravacoes).toHaveLength(0);
       ctx.estado = JSON.parse(JSON.stringify(ctx.estado));
-      ctx.consultaAgenda = { mensagemAtual: "Sim, confirmo todos esses dados para concluir o agendamento.",
+      ctx.consultaAgenda = { mensagemAtual: "Paciente Fictício, 02/01/1990, (21) 99999-0000",
         historico: [{ role: "assistant", content: selecionar!.texto }] };
       const executar: typeof executarFerramentaPaciente = async (c, nome, args) => {
         if (nome === "consultar_cadastro_paciente") return { ok: true, campos_faltantes: [] };
         if (nome === "identificar_paciente") return { ok: true };
         return executarFerramentaPaciente(c, nome, args);
       };
+      const resumo = await aplicarGateIdentificacao({ mensagem: ctx.consultaAgenda.mensagemAtual, estado: ctx.estado!, ctx, executar });
+      expect(resumo?.texto).toContain("14:00");
+      expect(resumo?.texto).toContain("Cardiologia");
+      expect(gravacoes).toHaveLength(0);
+      ctx.estado = JSON.parse(JSON.stringify(ctx.estado));
+      ctx.consultaAgenda = { mensagemAtual: "Sim, confirmo todos esses dados para concluir o agendamento.",
+        historico: [{ role: "assistant", content: resumo!.texto }] };
       const confirmado = await aplicarGateIdentificacao({ mensagem: ctx.consultaAgenda.mensagemAtual, estado: ctx.estado!, ctx, executar });
       expect(confirmado?.acoesConcluidas[0]?.confirmada).toBe(true);
       expect(gravacoes).toHaveLength(1);

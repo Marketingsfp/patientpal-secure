@@ -152,7 +152,8 @@ export function selecionarVagaValidada(
       aceita: false,
     },
   });
-  estado.flow.stage = "WAITING_FINAL_CONFIRMATION";
+  estado.flow.stage = estado.patient.identified && estado.patient.validated && estado.patient.id
+    ? "WAITING_FINAL_CONFIRMATION" : "COLLECTING_PATIENT_DATA";
 }
 
 const mesmoInstante = (a: string | null | undefined, b: string) =>

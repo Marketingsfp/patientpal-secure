@@ -1,8 +1,8 @@
 /**
  * Trava determinística do fluxo de agendamento da Nina (server-only).
  *
- * POR QUE EXISTE: a ordem "confirmou atendimento e vaga → consultar cadastro →
- * coletar obrigatórios faltantes → identificar → revalidar → gravar" é regra. Deixar
+ * POR QUE EXISTE: a ordem "escolheu atendimento e vaga → consultar cadastro →
+ * coletar obrigatórios faltantes → identificar → confirmar → revalidar → gravar" é regra. Deixar
  * essa ordem a cargo do modelo produzia dois defeitos reais em produção:
  * 1) ao ouvir "isso", a Nina pulava direto para a criação (ou pedia um dado
  *    isolado, tipo só a data de nascimento) e chamava a identificação com
@@ -184,6 +184,8 @@ export async function aplicarGateIdentificacao(params: {
   textos?: TextosTemplates | null;
   /** Nome da clínica que concluiu o agendamento. */
   nomeUnidade?: string;
+  /** A ferramenta acabou de validar a escolha neste turno (inclusive via modelo). */
+  aposSelecao?: boolean;
   encaminharVagaIndisponivel?: (motivo: string) => Promise<boolean>;
 }): Promise<ResultadoRespostaNina | null> {
   const { mensagem, estado, ctx, executar } = params;
@@ -209,8 +211,10 @@ export async function aplicarGateIdentificacao(params: {
     return criarResultado({ origem: ok ? "handoff" : "erro", texto: respostaSemVagas(ok, true, modalidadePendente),
       fatosConfirmados: ok ? ["handoff_confirmado"] : [], restricoes: ["nao_substituir_vaga_escolhida"] });
   };
-  const aceiteDaVaga = ehConfirmacaoDeAgendamento(mensagem, confirmacaoDaEscolha(estado, ctx.clinicaId)?.vaga);
-  const escolha = aceiteDaVaga ? null : lerEscolhaHorario(mensagem);
+  let selecionouAgora = params.aposSelecao === true;
+  const cadastroProntoNoInicio = Boolean(p.identified && p.validated && p.id);
+  const aceiteDaVaga = !selecionouAgora && ehConfirmacaoDeAgendamento(mensagem, confirmacaoDaEscolha(estado, ctx.clinicaId)?.vaga);
+  const escolha = selecionouAgora || aceiteDaVaga ? null : lerEscolhaHorario(mensagem);
   const opcoes = vagasDaSessao(estado, ctx.clinicaId);
   // Uma correção/recusa após o aceite suspende a gravação. A Nina não troca
   // a vaga no meio da coleta; a equipe humana deverá tratar a mudança.
@@ -224,11 +228,16 @@ export async function aplicarGateIdentificacao(params: {
   }
   if (escolha && opcoes.length && !consentimentoDaEscolha(estado, ctx.clinicaId)) {
     const vagas = vagasDaEscolha(opcoes, escolha);
-    limparEscolhaAgendamento(estado);
     // Um horário ainda não consultado precisa de nova leitura da agenda.
     // Não o declare indisponível e não o substitua por uma opção da lista.
-    if (vagas.length === 0) return null;
-    if (vagas.length !== 1) return resultadoGate(textos, "fluxo.agendamento.escolher", {});
+    if (vagas.length === 0) {
+      limparEscolhaAgendamento(estado);
+      return null;
+    }
+    if (vagas.length !== 1) {
+      limparEscolhaAgendamento(estado);
+      return resultadoGate(textos, "fluxo.agendamento.escolher", {});
+    }
     const vaga = vagas[0]!;
     const r = await executar(ctx, "selecionar_horario", {
       medico_id: vaga.medico_id, inicio: vaga.inicio, fim: vaga.fim,
@@ -240,11 +249,13 @@ export async function aplicarGateIdentificacao(params: {
       return criarResultado({ origem: "gate", texto: r.orientacao_atendimento,
         fatosConfirmados: ["modalidade:chegada_sem_pre_agendamento"] });
     if (r.ok && typeof r.resumo_confirmacao === "string") {
-      return criarResultado({ origem: "gate", texto: r.resumo_confirmacao,
-        fatosConfirmados: ["vaga_escolhida_validada"], restricoes: ["aguardar_aceite_do_resumo"] });
+      selecionouAgora = true;
+    } else if (r.ok && r.selecao_preservada === true) {
+      selecionouAgora = true;
+    } else {
+      return resultadoGate(textos, r.ok || r.erro === "ACTION_NOT_AUTHORIZED"
+        ? "fluxo.agendamento.escolher" : "fluxo.identificacao.instabilidade", {});
     }
-    return resultadoGate(textos, r.ok || r.erro === "ACTION_NOT_AUTHORIZED"
-      ? "fluxo.agendamento.escolher" : "fluxo.identificacao.instabilidade", {});
   }
   if (ehNegacao(mensagem)) {
     limparEscolhaAgendamento(estado);
@@ -257,22 +268,16 @@ export async function aplicarGateIdentificacao(params: {
       return resultadoGate(textos, "fluxo.agendamento.escolher", {});
     return null;
   }
-  const confirmouAgora = !consentimentoDaEscolha(estado, ctx.clinicaId) && aceiteDaVaga;
-  if (confirmouAgora) {
-    if (!aceitarResumoEntregue(estado, ctx.clinicaId, ctx.consultaAgenda?.historico ?? [])) {
-      const resumo = confirmacaoDaEscolha(estado, ctx.clinicaId);
-      if (resumo) return criarResultado({ origem: "gate", texto: resumo.resumo,
-        restricoes: ["aguardar_aceite_do_resumo"] });
-      limparEscolhaAgendamento(estado);
-      return resultadoGate(textos, "fluxo.agendamento.escolher", {});
-    }
-  }
-  const confirmacao = consentimentoDaEscolha(estado, ctx.clinicaId);
-  if (!confirmacao) return null;
+  const resumoEscolhido = confirmacaoDaEscolha(estado, ctx.clinicaId);
+  if (!resumoEscolhido) return null;
   // Uma repetição do aceite durante a coleta não é nome de paciente.
-  const novo = aceiteDaVaga ? null : extrairDadosIdentificacao(mensagem);
+  // A própria escolha de horário também nunca é um dado cadastral.
+  const ultimaMensagem = ctx.consultaAgenda?.historico.at(-1);
+  const coletandoDados = ["AWAITING_PATIENT_DATA", "COLLECTING_PATIENT_DATA", "IDENTIFYING_PATIENT"].includes(estado.flow.stage) ||
+    (ultimaMensagem?.role === "assistant" && /nome completo|data de nascimento|telefone com DDD/i.test(ultimaMensagem.content ?? ""));
+  const novo = aceiteDaVaga || selecionouAgora || !coletandoDados ? null : extrairDadosIdentificacao(mensagem);
   if (
-    !confirmouAgora &&
+    !selecionouAgora && !aceiteDaVaga &&
     pareceAssuntoParalelo(mensagem) &&
     !novo?.data_nascimento &&
     !novo?.telefone
@@ -285,7 +290,7 @@ export async function aplicarGateIdentificacao(params: {
   if (!consulta.ok && consulta.erro === "PROFISSIONAL_SFP") return encaminharSfp();
   if (!consulta.ok) return resultadoGate(textos, "fluxo.identificacao.instabilidade", {});
   const faltantesNoCadastro = (consulta.campos_faltantes ?? []) as CampoCadastro[];
-  if (confirmouAgora) {
+  {
     // Dados já informados são candidatos ao cadastro, nunca prova de identidade.
     // Não extraia nomes de pedidos de consulta ou de resumos do assistente.
     const historico = ctx.consultaAgenda?.historico ?? [];
@@ -362,7 +367,22 @@ export async function aplicarGateIdentificacao(params: {
   p.id = ctx.pacienteId;
   log("paciente_identificado", { conversa: ctx.conversaId, paciente_id: ctx.pacienteId });
 
-  // 3) Revalida a vaga e grava. `agendar` já revalida o slot e confere a
+  // Dados completos vêm antes da confirmação. Um "sim" anterior à coleta
+  // não autoriza a reserva: o paciente precisa responder ao resumo entregue.
+  // Aceites de conversas já em andamento continuam preservados.
+  if (!consentimentoDaEscolha(estado, ctx.clinicaId) && cadastroProntoNoInicio &&
+    !selecionouAgora && aceiteDaVaga) {
+    aceitarResumoEntregue(estado, ctx.clinicaId, ctx.consultaAgenda?.historico ?? []);
+  }
+  const confirmacao = consentimentoDaEscolha(estado, ctx.clinicaId);
+  if (!confirmacao) {
+    estado.flow.stage = "WAITING_FINAL_CONFIRMATION";
+    return criarResultado({ origem: "gate", texto: resumoEscolhido.resumo,
+      fatosConfirmados: ["vaga_escolhida_validada", "paciente_identificado"],
+      restricoes: ["aguardar_aceite_do_resumo"] });
+  }
+
+  // Revalida a vaga e grava. `agendar` já revalida o slot e confere a
   //    gravação no banco — é a mesma porta usada pela Agenda.
   // FASE 3 — a identificação acabou de ser concluída NESTE turno: o estado
   // atualizado já habilita a operação, sem exigir nova consulta só porque o

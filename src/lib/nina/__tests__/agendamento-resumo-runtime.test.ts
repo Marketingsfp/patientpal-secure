@@ -34,8 +34,8 @@ describe("runtime entrega resumo validado e aguarda nova mensagem", () => {
         }
       });
   for (const ambiente of ["producao", "homologacao"])
-    for (const cenario of ["escolha_horario", "escolha_sem_auditoria", "escolha_pre", "escolha_ficha"])
-      test(`${ambiente}, ${cenario}: resumo de 10:20 prevalece sobre rascunho de 08:00`, () => {
+    for (const cenario of ["escolha_horario", "escolha_sem_auditoria", "escolha_pre", "escolha_ficha", "escolha_cadastro_completo"])
+      test(`${ambiente}, ${cenario}: cadastro antes do resumo, sem reservar no lote do modelo`, () => {
         const p = Bun.spawnSync([process.execPath, fixture, ambiente, cenario], {
           cwd: fileURLToPath(new URL("../../../../../", import.meta.url)),
           stdout: "pipe",
@@ -46,9 +46,15 @@ describe("runtime entrega resumo validado e aguarda nova mensagem", () => {
         expect(p.exitCode, output + p.stderr.toString()).toBe(0);
         const linha = output.split(/\r?\n/).find((l) => l.startsWith("DIRETA_RESULTADO="));
         const r = JSON.parse(linha!.slice("DIRETA_RESULTADO=".length));
-        expect(r.resposta).toBe(r.resumoEscolhido);
+        if (cenario.endsWith("cadastro_completo")) expect(r.resposta).toBe(r.resumoEscolhido);
+        else {
+          expect(r.resposta).toContain("nome completo");
+          expect(r.resposta).toContain("data de nascimento");
+          expect(r.resposta).not.toContain("Você confirma?");
+        }
         expect(r.resposta).not.toContain("08:00");
         expect(r.ferramentas).toContain("selecionar_horario");
+        expect(r.ferramentas).toContain("consultar_cadastro_paciente");
         expect(r.ferramentas).not.toContain("agendar");
         expect(r.requests).toHaveLength(1);
         expect(r.motorChamado).toBe(0);

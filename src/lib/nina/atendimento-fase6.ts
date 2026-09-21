@@ -70,7 +70,11 @@ export function derivarEtapa(ctx: ContextoFase6): EtapaFluxoNina {
 
   if (pediuAtendenteHumano(ctx.mensagem) || ctx.falhaSemRecuperacao || estado.flow.stage === "HANDOFF") return "HANDOFF";
   if (reservaDaSessaoAtual(estado)) return "APPOINTMENT_CONFIRMED";
-  if (confirmacaoDaEscolha(estado) && !a.confirmation?.aceita) return "WAITING_FINAL_CONFIRMATION";
+  if (confirmacaoDaEscolha(estado)) {
+    if (!estado.patient.identified || !estado.patient.validated || !estado.patient.id) return "COLLECTING_PATIENT_DATA";
+    if (!a.confirmation?.aceita) return "WAITING_FINAL_CONFIRMATION";
+    return "CREATING_APPOINTMENT";
+  }
 
   if (a.intent_confirmed) {
     if (atendimentoDefinido(estado)) {

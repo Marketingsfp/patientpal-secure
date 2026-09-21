@@ -1,6 +1,7 @@
 import { describe, it, expect } from "bun:test";
 import { estadoVazio, type EstadoFluxoNina } from "../fluxo-estado.server";
 import { blocoPromptFase6, derivarEtapa, pediuAtendenteHumano } from "../atendimento-fase6";
+import { resumoEntregueFixture } from "./agendamento-fixture";
 
 function comEstado(patch: {
   patient?: Partial<EstadoFluxoNina["patient"]>;
@@ -40,6 +41,16 @@ describe("fase 6 — pedido de humano", () => {
 });
 
 describe("fase 6 — máquina de estados", () => {
+  it("escolha validada coleta dados antes de aguardar confirmação", () => {
+    const estado = comEstado({ appointment: { doctor_id: "medico", procedure: "Consulta",
+      slot_inicio: "2030-01-01T14:00:00Z", slot_fim: "2030-01-01T14:30:00Z" } });
+    resumoEntregueFixture(estado, "clinica", false);
+    expect(derivarEtapa(ctx({ estado }))).toBe("COLLECTING_PATIENT_DATA");
+    Object.assign(estado.patient, identificado);
+    expect(derivarEtapa(ctx({ estado }))).toBe("WAITING_FINAL_CONFIRMATION");
+    estado.appointment.confirmation!.aceita = true;
+    expect(derivarEtapa(ctx({ estado }))).toBe("CREATING_APPOINTMENT");
+  });
   it("saudação na primeira mensagem", () => {
     expect(derivarEtapa(ctx({ primeiraMensagem: true }))).toBe("GREETING");
   });

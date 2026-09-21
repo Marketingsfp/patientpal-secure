@@ -37,6 +37,8 @@ describe("consolidação da publicação e do fallback", () => {
         REGRA_INFORMACOES_GRUPO;
     for (const [antes, depois] of JSON.parse(readFileSync(MIGRATION_REGRAS_CONFIRMADAS, "utf8").split("$trocas$")[1]!))
       atual = atual.replace(antes, depois);
+    for (const [antes, depois] of JSON.parse(readFileSync("supabase/migrations/20260921220000_nina_ordem_dados_confirmacao.sql", "utf8").split("$trocas$")[1]!))
+      atual = atual.replace(antes, depois);
     expect(atual).toBe(PROMPT_NINA_WHATSAPP_V4);
     const render = renderizarTemplateInstrucoes(nova.conteudo, valoresIdentidade(identidade));
     expect(render.ok).toBe(true);
