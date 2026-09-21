@@ -1568,7 +1568,7 @@ function RoleplayPage({ ctx, alvo }: { ctx: CoachContexto; alvo: AlvoAtendente }
                   Hoje
                 </div>
                 {messages.map((m, i) => (
-                  <Bubble key={i} msg={m} />
+                  <Bubble key={i} msg={m} mostrarCorrecao={!!feedback} />
                 ))}
                 {thinking && (
                   <div className="flex justify-start">
