@@ -263,6 +263,12 @@ const GRUPOS_BASE: Grupo[] = [
         menu: "Operação › Cartão Benefícios",
       },
       {
+        key: "cartao-terapeutico",
+        nome: "Cartão Terapêutico",
+        descricao: "Planos, contratos, dependentes e conferência",
+        menu: "Operação › Cartão Terapêutico",
+      },
+      {
         key: "documentos",
         nome: "Documentos do paciente",
         descricao: "Anexos e arquivos clínicos",

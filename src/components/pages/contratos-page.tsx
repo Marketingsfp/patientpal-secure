@@ -1,4 +1,5 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { contratoDoProduto, produtoDoModulo, type ProdutoCartao } from "@/lib/cartao/produto";
 import { CalendarRange, LayoutGrid, Rows3 } from "lucide-react";
 import { ContratosCards, type ContratoCardItem } from "@/components/contratos/contratos-cards";
 import { confirmDialog } from "@/lib/confirm";
@@ -452,6 +453,22 @@ export function ContratosPage({
   // /app/cartao-beneficios/contratos (módulo "cartao-beneficios") — cada
   // rota informa o módulo certo via prop, propagado aos componentes filhos.
   const podeEscrever = usePodeEscrever(modulo);
+  /**
+   * Cartão Benefícios × Cartão Terapêutico: dentro desses módulos a tela só
+   * mostra os convênios do produto e os contratos ligados a eles. Em
+   * /app/contratos (módulo "contratos") continua mostrando tudo.
+   */
+  const produtoFiltro: ProdutoCartao | null =
+    modulo === "cartao-beneficios" || modulo === "cartao-terapeutico"
+      ? produtoDoModulo(modulo)
+      : null;
+  const doProduto = useCallback(
+    (convenioId: string | null | undefined, lista: Array<{ id: string }>) => {
+      if (!produtoFiltro) return true;
+      return contratoDoProduto(produtoFiltro, new Set(lista.map((c) => c.id)), convenioId);
+    },
+    [produtoFiltro],
+  );
   // Isenção de carência é decisão de Admin/Gestor — mesma regra da isenção
   // individual, dentro do detalhe do contrato.
   const podeIsentarCarencia = ["admin", "gestor"].includes(
@@ -630,6 +647,13 @@ export function ContratosPage({
     const desatualizada = () => seq !== loadSeq.current;
     const s = termo.trim();
     const buscando = s.length >= 2;
+    let conveniosQuery = supabase
+      .from("cb_convenios")
+      .select("*")
+      .eq("clinica_id", clinicaAtual!.clinica_id)
+      .eq("ativo", true);
+    // Dentro dos módulos de cartão, só os convênios do produto daquele módulo.
+    if (produtoFiltro) conveniosQuery = conveniosQuery.eq("produto", produtoFiltro);
     const [res, cv] = await Promise.all([
       buscando
         ? // Busca por texto continua num lote só: o corte de 50 é proposital,
@@ -640,12 +664,7 @@ export function ContratosPage({
             _limit: LIMITE_BUSCA,
           })
         : carregarListaPaginada(clinicaAtual!.clinica_id),
-      supabase
-        .from("cb_convenios")
-        .select("*")
-        .eq("clinica_id", clinicaAtual!.clinica_id)
-        .eq("ativo", true)
-        .order("nome"),
+      conveniosQuery.order("nome"),
     ]);
     if (desatualizada()) return true;
     if (res.error) {
@@ -654,23 +673,26 @@ export function ContratosPage({
       setLoading(false);
       return true;
     }
+    const conveniosLista = (cv.data ?? []) as Convenio[];
     const linhas = (res.data ?? []) as LinhaBuscaContrato[];
     const agg: Record<string, { pagas: number; total: number; temAtrasada: boolean }> = {};
     const vend: Record<string, string> = {};
-    const lista = linhas.map((l) => {
-      const c = l.contrato as unknown as Contrato;
-      agg[c.id] = {
-        pagas: l.parcelas_pagas ?? 0,
-        total: l.parcelas_total ?? 0,
-        temAtrasada: Boolean(l.parcela_atrasada),
-      };
-      if (c.criado_por && l.vendedor_nome) vend[c.criado_por] = l.vendedor_nome;
-      return { ...c, codigo_prontuario: l.codigo_prontuario ?? null };
-    });
+    const lista = linhas
+      .map((l) => {
+        const c = l.contrato as unknown as Contrato;
+        agg[c.id] = {
+          pagas: l.parcelas_pagas ?? 0,
+          total: l.parcelas_total ?? 0,
+          temAtrasada: Boolean(l.parcela_atrasada),
+        };
+        if (c.criado_por && l.vendedor_nome) vend[c.criado_por] = l.vendedor_nome;
+        return { ...c, codigo_prontuario: l.codigo_prontuario ?? null };
+      })
+      .filter((c) => doProduto(c.convenio_id, conveniosLista));
     setList(lista);
     setParcAgg(agg);
     setVendedores(vend);
-    setConvenios((cv.data ?? []) as Convenio[]);
+    setConvenios(conveniosLista);
     // Avisa a tela quando o corte do limite pode ter escondido resultados.
     setResultadoCortado(buscando && linhas.length >= LIMITE_BUSCA);
     setLoading(false);
@@ -721,18 +743,19 @@ export function ContratosPage({
     } else {
       contratosQuery = contratosQuery.limit(LIMITE_LISTA);
     }
-    const [cs, cv] = await Promise.all([
-      contratosQuery,
-      supabase
-        .from("cb_convenios")
-        .select("*")
-        .eq("clinica_id", clinicaAtual.clinica_id)
-        .eq("ativo", true)
-        .order("nome"),
-    ]);
+    let conveniosQueryLegado = supabase
+      .from("cb_convenios")
+      .select("*")
+      .eq("clinica_id", clinicaAtual.clinica_id)
+      .eq("ativo", true);
+    if (produtoFiltro) conveniosQueryLegado = conveniosQueryLegado.eq("produto", produtoFiltro);
+    const [cs, cv] = await Promise.all([contratosQuery, conveniosQueryLegado.order("nome")]);
     if (desatualizada()) return;
     if (cs.error) mostrarErro(cs.error);
-    const contratosRows = (cs.data ?? []) as Contrato[];
+    const conveniosLista = (cv.data ?? []) as Convenio[];
+    const contratosRows = ((cs.data ?? []) as Contrato[]).filter((c) =>
+      doProduto(c.convenio_id, conveniosLista),
+    );
     // Enriquecer com codigo_prontuario do paciente titular (leitura, imutável).
     const pacIds = Array.from(
       new Set(contratosRows.map((c) => c.paciente_id).filter((x): x is string => !!x)),
@@ -760,9 +783,9 @@ export function ContratosPage({
         codigo_prontuario: c.paciente_id ? (prontMap[c.paciente_id] ?? null) : null,
       })),
     );
-    setConvenios((cv.data ?? []) as Convenio[]);
+    setConvenios(conveniosLista);
     // Agregar parcelas dos contratos carregados
-    const contratoIds = ((cs.data ?? []) as Array<{ id: string }>).map((c) => c.id);
+    const contratoIds = contratosRows.map((c) => c.id);
     if (contratoIds.length > 0) {
       // Buscar mensalidades em lotes de contratos para evitar o teto de 1000
       // linhas por request do PostgREST (ex.: 500 contratos × 12 parcelas
@@ -2973,9 +2996,9 @@ function DetalheContrato({
   // Diálogo do botão "Reverter" de uma parcela já paga: a pessoa diz o que
   // aconteceu de verdade antes de qualquer coisa mexer (ou não) na gaveta.
   const [reverterAlvo, setReverterAlvo] = useState<Mens | null>(null);
-  const [reverterOpcao, setReverterOpcao] = useState<"mover" | "sem_devolucao" | "devolucao" | null>(
-    null,
-  );
+  const [reverterOpcao, setReverterOpcao] = useState<
+    "mover" | "sem_devolucao" | "devolucao" | null
+  >(null);
   const [reverterDestino, setReverterDestino] = useState<string>("");
   const [reverterBusy, setReverterBusy] = useState(false);
   // Rascunhos de edição da tabela Mensalidades (vencimento/valor/pago_em).
@@ -4285,7 +4308,6 @@ function DetalheContrato({
       setReverterBusy(false);
     }
   };
-
 
   // Marca uma parcela pendente como "paga historicamente":
   // atualiza status/pago_em/valor_pago SEM criar lançamento no caixa.

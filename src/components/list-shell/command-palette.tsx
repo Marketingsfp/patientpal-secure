@@ -185,6 +185,8 @@ export function useDefaultScreenEntries(): CommandEntry[] {
       mk("Regras do Cartão", "/app/cartao-beneficios/convenios", "Regras de preço por convênio"),
       mk("Modelos de Cartão", "/app/cartao-beneficios/convenios"),
       mk("Contratos do Cartão", "/app/cartao-beneficios/contratos"),
+      mk("Cartão Terapêutico", "/app/cartao-terapeutico/contratos", "Contratos e convênios"),
+      mk("Convênios do Cartão Terapêutico", "/app/cartao-terapeutico/convenios"),
       mk(
         "Empresas associadas",
         "/app/cartao-beneficios/convenios",

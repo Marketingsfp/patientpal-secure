@@ -2942,6 +2942,7 @@ export type Database = {
           modelo_contrato: string | null
           nome: string
           num_parcelas: number
+          produto: string
           taxa_adesao: number
           taxa_inclusao_dependente: number
           termo_inclusao_html: string | null
@@ -2967,6 +2968,7 @@ export type Database = {
           modelo_contrato?: string | null
           nome: string
           num_parcelas?: number
+          produto?: string
           taxa_adesao?: number
           taxa_inclusao_dependente?: number
           termo_inclusao_html?: string | null
@@ -2992,6 +2994,7 @@ export type Database = {
           modelo_contrato?: string | null
           nome?: string
           num_parcelas?: number
+          produto?: string
           taxa_adesao?: number
           taxa_inclusao_dependente?: number
           termo_inclusao_html?: string | null

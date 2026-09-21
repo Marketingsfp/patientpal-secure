@@ -1,0 +1,1008 @@
+import { moduloDoProduto, type ProdutoCartao } from "@/lib/cartao/produto";
+import { useEffect, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  Plus,
+  Pencil,
+  Trash2,
+  ShieldCheck,
+  Layers,
+  Lightbulb,
+  ArrowLeft,
+  FileText,
+  Info,
+  Printer,
+  Gift,
+  FileSignature,
+  Scale,
+} from "lucide-react";
+import { toast } from "sonner";
+import { mostrarErro } from "@/lib/traduzir-erro";
+import { supabase } from "@/integrations/supabase/client";
+import { useClinica } from "@/hooks/use-clinica";
+import { usePodeEscrever } from "@/hooks/use-permissoes";
+import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { CurrencyInput } from "@/components/ui/currency-input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
+import { Badge } from "@/components/ui/badge";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { SearchableSelect } from "@/components/ui/searchable-select";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { RichEditor } from "@/components/cartao-beneficios/rich-editor";
+import { INFORMATIVO_CARTAO_CONSULTA_SEGUROS_HTML } from "@/components/cartao-beneficios/informativo-seed";
+import { RegrasConvenioTab } from "@/components/cartao-beneficios/regras-tab";
+import { z } from "zod";
+import DOMPurify from "dompurify";
+
+const NOME_MAX = 120;
+const DESCRICAO_MAX = 1000;
+const BENEFICIOS_MAX = 2000;
+
+const stripHtml = (v: string) => DOMPurify.sanitize(v, { ALLOWED_TAGS: [], ALLOWED_ATTR: [] });
+
+// Detecta o convênio interno de funcionários (nome pode variar entre clínicas:
+// "FUNCIONARIO", "CONVÊNIO FUNCIONARIO" etc.). Normaliza acentos e casing.
+const isConvenioFuncionario = (nome: string) =>
+  (nome || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toUpperCase()
+    .includes("FUNCIONARIO");
+
+const convenioSchema = z
+  .object({
+    nome: z
+      .string()
+      .trim()
+      .min(2, "Nome deve ter ao menos 2 caracteres")
+      .max(NOME_MAX, `Nome pode ter no máximo ${NOME_MAX} caracteres`),
+    descricao: z
+      .string()
+      .trim()
+      .max(DESCRICAO_MAX, `Descrição pode ter no máximo ${DESCRICAO_MAX} caracteres`)
+      .optional(),
+    beneficios: z
+      .string()
+      .trim()
+      .max(BENEFICIOS_MAX, `Benefícios pode ter no máximo ${BENEFICIOS_MAX} caracteres`)
+      .optional(),
+    taxa_adesao: z
+      .number()
+      .min(0, "Taxa não pode ser negativa")
+      .max(100000, "Taxa acima do permitido"),
+    taxa_inclusao_dependente: z
+      .number()
+      .min(0, "Taxa não pode ser negativa")
+      .max(100000, "Taxa acima do permitido"),
+    num_parcelas: z
+      .number()
+      .int()
+      .min(1, "Nº de parcelas deve ser ≥ 1")
+      .max(60, "Máximo de 60 parcelas"),
+    max_dependentes: z.number().int().min(0).max(50, "Máximo de 50 dependentes"),
+    fidelidade_meses: z.number().int().min(0).max(120),
+    vigencia_meses: z.number().int().min(1, "Vigência deve ser ≥ 1 mês").max(120),
+  })
+  .refine((d) => d.fidelidade_meses <= d.vigencia_meses, {
+    message: "Fidelidade não pode ser maior que a vigência",
+    path: ["fidelidade_meses"],
+  });
+
+const CONTRATO_VARIAVEIS: { label: string; token: string }[] = [
+  { label: "Nome da clínica", token: "CLINICA_NOME" },
+  { label: "CNPJ da clínica", token: "CLINICA_CNPJ" },
+  { label: "Endereço da clínica", token: "CLINICA_ENDERECO" },
+  { label: "Cidade", token: "CIDADE" },
+  { label: "Nome do paciente", token: "PACIENTE_NOME" },
+  { label: "CPF do paciente", token: "PACIENTE_CPF" },
+  { label: "Nascimento do paciente", token: "PACIENTE_NASCIMENTO" },
+  { label: "Endereço do paciente", token: "PACIENTE_ENDERECO" },
+  { label: "Telefone do paciente", token: "PACIENTE_TELEFONE" },
+  { label: "E-mail do paciente", token: "PACIENTE_EMAIL" },
+  { label: "Valor mensal", token: "VALOR_MENSAL" },
+  { label: "Taxa de adesão", token: "TAXA_ADESAO" },
+  { label: "Nº de parcelas", token: "NUM_PARCELAS" },
+  { label: "Vigência (meses)", token: "VIGENCIA_MESES" },
+  { label: "Fidelidade (meses)", token: "FIDELIDADE_MESES" },
+  { label: "Data de hoje (por extenso)", token: "DATA_HOJE" },
+  { label: "Dependentes (lista completa)", token: "DEPENDENTES" },
+];
+
+function buildContratoVariaveis(maxDeps: number): { label: string; token: string }[] {
+  const base = [...CONTRATO_VARIAVEIS];
+  const n = Math.max(0, Number(maxDeps) || 0);
+  for (let i = 1; i <= n; i++) {
+    base.push({ label: `Dependente ${i} — nome`, token: `DEPENDENTE_${i}` });
+    base.push({ label: `Dependente ${i} — parentesco`, token: `DEPENDENTE_${i}_PARENTESCO` });
+    base.push({ label: `Dependente ${i} — CPF`, token: `DEPENDENTE_${i}_CPF` });
+    base.push({ label: `Dependente ${i} — nascimento`, token: `DEPENDENTE_${i}_NASCIMENTO` });
+    base.push({ label: `Dependente ${i} — telefone`, token: `DEPENDENTE_${i}_TELEFONE` });
+    base.push({
+      label: `Dependente ${i} — INÍCIO do bloco condicional`,
+      token: `#DEPENDENTE_${i}`,
+    });
+    base.push({ label: `Dependente ${i} — FIM do bloco condicional`, token: `/DEPENDENTE_${i}` });
+  }
+  return base;
+}
+
+type Convenio = {
+  id: string;
+  clinica_id: string;
+  nome: string;
+  descricao: string | null;
+  ativo: boolean;
+  valor_mensal: number;
+  taxa_adesao: number;
+  adesao_no_ato: boolean;
+  taxa_inclusao_dependente: number;
+  num_parcelas: number;
+  max_dependentes: number;
+  fidelidade_meses: number;
+  vigencia_meses: number;
+  modalidade: string | null;
+  beneficios: string | null;
+  modelo_contrato: string | null;
+  informativo_html: string | null;
+  termo_inclusao_html: string | null;
+};
+
+type Faixa = {
+  vidas_de: number;
+  vidas_ate: number | null;
+  valor_mensal: number;
+};
+
+export function ConveniosPage({ produto }: { produto: ProdutoCartao }) {
+  const { clinicaAtual } = useClinica();
+  const podeEscrever = usePodeEscrever(moduloDoProduto(produto));
+  const queryClient = useQueryClient();
+  const [view, setView] = useState<"list" | "form">("list");
+  const [editing, setEditing] = useState<Convenio | null>(null);
+  const [nome, setNome] = useState("");
+  const [descricao, setDescricao] = useState("");
+  const [ativo, setAtivo] = useState(true);
+  const [taxaAdesao, setTaxaAdesao] = useState<number>(0);
+  const [adesaoNoAto, setAdesaoNoAto] = useState<boolean>(false);
+  const [taxaInclusaoDep, setTaxaInclusaoDep] = useState<number>(0);
+  const [numParcelas, setNumParcelas] = useState<number>(12);
+  const [maxDependentes, setMaxDependentes] = useState<number>(0);
+  const [fidelidadeMeses, setFidelidadeMeses] = useState<number>(0);
+  const [vigenciaMeses, setVigenciaMeses] = useState<number>(12);
+  // Modalidade do convênio: define qual repasse do médico será usado
+  // (Cartão Consulta ou Cartão Desconto) nos atendimentos do paciente.
+  const [modalidade, setModalidade] = useState<"cartao_consulta" | "cartao_desconto">(
+    "cartao_consulta",
+  );
+  const [beneficiosTxt, setBeneficiosTxt] = useState("");
+  const [modeloContrato, setModeloContrato] = useState("");
+  const [informativoHtml, setInformativoHtml] = useState("");
+  const [termoInclusaoHtml, setTermoInclusaoHtml] = useState("");
+  const [faixas, setFaixas] = useState<Faixa[]>([
+    { vidas_de: 1, vidas_ate: null, valor_mensal: 0 },
+  ]);
+  const [saving, setSaving] = useState(false);
+  const [toDelete, setToDelete] = useState<Convenio | null>(null);
+
+  const clinicaId = clinicaAtual?.clinica_id;
+  // Lista de convênios oferecidos — catálogo de baixo risco, cache de 5min.
+  // A edição/detalhe (faixas no form) continua sob demanda, sem cache — só a
+  // listagem principal se beneficia aqui.
+  const {
+    data: listData,
+    isLoading: loading,
+    error: loadError,
+  } = useQuery({
+    queryKey: ["cb-convenios", clinicaId, produto],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("cb_convenios")
+        .select("*")
+        .eq("clinica_id", clinicaId!)
+        .eq("produto", produto)
+        .order("nome");
+      if (error) throw error;
+      const list = (data ?? []) as Convenio[];
+      if (!list.length) return { rows: list, valoresMin: {} as Record<string, number> };
+      const { data: vs } = await supabase
+        .from("cb_convenio_faixas")
+        .select("convenio_id, valor_mensal")
+        .in(
+          "convenio_id",
+          list.map((c) => c.id),
+        );
+      const minMap: Record<string, number> = {};
+      (vs ?? []).forEach((v: any) => {
+        const val = Number(v.valor_mensal);
+        if (minMap[v.convenio_id] === undefined || val < minMap[v.convenio_id]) {
+          minMap[v.convenio_id] = val;
+        }
+      });
+      return { rows: list, valoresMin: minMap };
+    },
+    enabled: !!clinicaId,
+    staleTime: 5 * 60_000,
+  });
+  useEffect(() => {
+    if (loadError) mostrarErro(loadError);
+  }, [loadError]);
+  const rows = listData?.rows ?? [];
+  const valoresMin = listData?.valoresMin ?? {};
+  const load = () =>
+    queryClient.invalidateQueries({ queryKey: ["cb-convenios", clinicaId, produto] });
+
+  const openNew = () => {
+    if (!podeEscrever) {
+      toast.error("Você não tem permissão de edição neste módulo.");
+      return;
+    }
+    setEditing(null);
+    setNome("");
+    setDescricao("");
+    setAtivo(true);
+    setTaxaAdesao(0);
+    setAdesaoNoAto(false);
+    setTaxaInclusaoDep(0);
+    setNumParcelas(12);
+    setMaxDependentes(0);
+    setFidelidadeMeses(0);
+    setVigenciaMeses(12);
+    setModalidade("cartao_consulta");
+    setBeneficiosTxt("");
+    setModeloContrato("");
+    setInformativoHtml("");
+    setTermoInclusaoHtml("");
+    setFaixas([{ vidas_de: 1, vidas_ate: null, valor_mensal: 0 }]);
+    setView("form");
+  };
+
+  const openEdit = async (c: Convenio) => {
+    if (!podeEscrever) {
+      toast.error("Você não tem permissão de edição neste módulo.");
+      return;
+    }
+    setEditing(c);
+    setNome(c.nome);
+    setDescricao(c.descricao ?? "");
+    setAtivo(c.ativo);
+    setTaxaAdesao(Number(c.taxa_adesao ?? 0));
+    setAdesaoNoAto(Boolean((c as any).adesao_no_ato));
+    setTaxaInclusaoDep(
+      Number((c as unknown as { taxa_inclusao_dependente?: number }).taxa_inclusao_dependente ?? 0),
+    );
+    setNumParcelas(c.num_parcelas ?? 12);
+    setMaxDependentes(c.max_dependentes ?? 0);
+    setFidelidadeMeses(c.fidelidade_meses ?? 0);
+    setVigenciaMeses(c.vigencia_meses ?? 12);
+    setModalidade(c.modalidade === "cartao_desconto" ? "cartao_desconto" : "cartao_consulta");
+    setBeneficiosTxt(c.beneficios ?? "");
+    setModeloContrato(c.modelo_contrato ?? "");
+    const stripped = (c.informativo_html ?? "")
+      .replace(/<[^>]+>/g, "")
+      .replace(/&nbsp;/g, "")
+      .trim();
+    if (stripped) {
+      setInformativoHtml(c.informativo_html ?? "");
+    } else if (/CART[ÃA]O\s*CONSULTA.*SEGUROS/i.test(c.nome)) {
+      setInformativoHtml(INFORMATIVO_CARTAO_CONSULTA_SEGUROS_HTML);
+    } else {
+      setInformativoHtml("");
+    }
+    setTermoInclusaoHtml(c.termo_inclusao_html ?? "");
+    const { data: fs } = await supabase
+      .from("cb_convenio_faixas")
+      .select("vidas_de, vidas_ate, valor_mensal")
+      .eq("convenio_id", c.id)
+      .order("vidas_de");
+    const list = (fs ?? []).map((f: any) => ({
+      vidas_de: Number(f.vidas_de),
+      vidas_ate: f.vidas_ate === null ? null : Number(f.vidas_ate),
+      valor_mensal: Number(f.valor_mensal),
+    }));
+    setFaixas(list.length ? list : [{ vidas_de: 1, vidas_ate: null, valor_mensal: 0 }]);
+    setView("form");
+  };
+
+  const save = async () => {
+    if (!clinicaAtual) return;
+    if (!podeEscrever) {
+      toast.error("Você não tem permissão de edição neste módulo.");
+      return;
+    }
+    // 1) Sanitiza campos texto (remove HTML/scripts) antes de validar
+    const nomeClean = stripHtml(nome.trim());
+    const descClean = stripHtml(descricao.trim());
+    const benefClean = stripHtml(beneficiosTxt.trim());
+    // 2) Validação com Zod
+    const parsed = convenioSchema.safeParse({
+      nome: nomeClean,
+      descricao: descClean || undefined,
+      beneficios: benefClean || undefined,
+      taxa_adesao: taxaAdesao,
+      taxa_inclusao_dependente: taxaInclusaoDep,
+      num_parcelas: numParcelas,
+      max_dependentes: maxDependentes,
+      fidelidade_meses: fidelidadeMeses,
+      vigencia_meses: vigenciaMeses,
+    });
+    if (!parsed.success) {
+      const first = parsed.error.issues[0];
+      toast.error(first?.message ?? "Dados inválidos.");
+      return;
+    }
+    // 3) Faixas: exigir pelo menos 1, valor >= 0 e sem vidas_de duplicado
+    //    (convênio FUNCIONARIO não usa faixas — pulamos a validação e garantimos
+    //     uma faixa mínima automática de 1 vida com valor R$ 0)
+    const isFuncionario = isConvenioFuncionario(nomeClean || editing?.nome || "");
+    let faixasParaSalvar = faixas;
+    if (isFuncionario && !faixasParaSalvar.length) {
+      faixasParaSalvar = [{ vidas_de: 1, vidas_ate: 1, valor_mensal: 0 }];
+      setFaixas(faixasParaSalvar);
+    }
+    if (!isFuncionario && !faixasParaSalvar.length) {
+      toast.error("Adicione pelo menos uma faixa de preço.");
+      return;
+    }
+    const vistas = new Set<number>();
+    for (const f of faixasParaSalvar) {
+      if (isFuncionario) break;
+      if (!f.vidas_de || f.vidas_de < 1) {
+        toast.error("Campo 'De' inválido em uma faixa.");
+        return;
+      }
+      if (f.vidas_ate !== null && f.vidas_ate < f.vidas_de) {
+        toast.error("Campo 'Até' deve ser maior ou igual a 'De'.");
+        return;
+      }
+      if (!(Number(f.valor_mensal) >= 0)) {
+        toast.error(`Valor mensal da faixa de ${f.vidas_de} pessoa(s) é inválido.`);
+        return;
+      }
+      if (vistas.has(f.vidas_de)) {
+        toast.error(`Faixa duplicada para ${f.vidas_de} pessoa(s). Remova a repetição.`);
+        return;
+      }
+      vistas.add(f.vidas_de);
+    }
+    setSaving(true);
+    const valorMin = faixasParaSalvar.reduce(
+      (m, f) => Math.min(m, Number(f.valor_mensal) || 0),
+      Number(faixasParaSalvar[0].valor_mensal) || 0,
+    );
+    // "Cobrar no ato" só faz sentido com taxa de adesão cadastrada — sem taxa
+    // não há cobrança nenhuma na emissão, e a marcação ficaria mentindo na tela.
+    const cobrarAdesaoNoAto = adesaoNoAto && taxaAdesao > 0;
+    const payload = {
+      clinica_id: clinicaAtual.clinica_id,
+      // Convênio criado dentro do módulo nasce marcado com o produto dele.
+      produto,
+      nome: nomeClean,
+      descricao: descClean || null,
+      ativo,
+      valor_mensal: valorMin,
+      taxa_adesao: taxaAdesao,
+      adesao_no_ato: cobrarAdesaoNoAto,
+      taxa_inclusao_dependente: taxaInclusaoDep,
+      num_parcelas: numParcelas,
+      max_dependentes: maxDependentes,
+      fidelidade_meses: fidelidadeMeses,
+      vigencia_meses: vigenciaMeses,
+      beneficios: benefClean || null,
+      modalidade,
+      modelo_contrato: modeloContrato.trim() || null,
+      informativo_html: informativoHtml.trim() || null,
+      termo_inclusao_html: termoInclusaoHtml.trim() || null,
+    };
+    let convenioId = editing?.id;
+    if (editing) {
+      const { error } = await supabase.from("cb_convenios").update(payload).eq("id", editing.id);
+      if (error) {
+        setSaving(false);
+        mostrarErro(error);
+        return;
+      }
+    } else {
+      const { data, error } = await supabase
+        .from("cb_convenios")
+        .insert(payload)
+        .select("id")
+        .single();
+      if (error || !data) {
+        setSaving(false);
+        mostrarErro(error);
+        return;
+      }
+      convenioId = data.id;
+    }
+    // Substitui faixas de preço
+    await supabase.from("cb_convenio_faixas").delete().eq("convenio_id", convenioId!);
+    const rowsToInsert = faixasParaSalvar.map((f) => ({
+      convenio_id: convenioId!,
+      vidas_de: Number(f.vidas_de),
+      vidas_ate: f.vidas_ate === null ? null : Number(f.vidas_ate),
+      valor_mensal: Number(f.valor_mensal) || 0,
+    }));
+    if (rowsToInsert.length) {
+      const { error: fErr } = await supabase.from("cb_convenio_faixas").insert(rowsToInsert);
+      if (fErr) {
+        setSaving(false);
+        mostrarErro(fErr);
+        return;
+      }
+    }
+    setSaving(false);
+    toast.success(editing ? "Convênio atualizado." : "Convênio criado.");
+    // Se for um novo convênio, passa a editar o recém-criado para permanecer na tela.
+    if (!editing && convenioId) {
+      setEditing({ ...(payload as any), id: convenioId } as Convenio);
+    }
+    load();
+  };
+
+  const confirmDelete = async () => {
+    if (!toDelete) return;
+    if (!podeEscrever) {
+      toast.error("Você não tem permissão de edição neste módulo.");
+      return;
+    }
+    const { error } = await supabase.from("cb_convenios").delete().eq("id", toDelete.id);
+    if (error) {
+      mostrarErro(error);
+      return;
+    }
+    toast.success("Convênio excluído.");
+    setToDelete(null);
+    load();
+  };
+
+  if (!clinicaAtual) return <p className="text-sm text-muted-foreground">Selecione uma clínica.</p>;
+
+  return (
+    <div className="space-y-4">
+      {view === "list" ? (
+        <>
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-muted-foreground flex items-center gap-2">
+              <ShieldCheck className="h-4 w-4" />
+              Tipos de cartão benefícios oferecidos pela clínica.
+            </p>
+            {podeEscrever && (
+              <Button onClick={openNew}>
+                <Plus className="h-4 w-4 mr-2" />
+                Novo convênio
+              </Button>
+            )}
+          </div>
+
+          <Card>
+            <CardContent className="p-0">
+              <Table className="table-fixed w-full">
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Nome</TableHead>
+                    <TableHead className="w-[140px]">A partir de</TableHead>
+                    <TableHead className="w-[240px]">Descrição</TableHead>
+                    <TableHead className="w-[100px]">Status</TableHead>
+                    <TableHead className="w-[110px] text-right">Ações</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {loading ? (
+                    <TableRow>
+                      <TableCell colSpan={5} className="text-center text-muted-foreground py-6">
+                        Carregando…
+                      </TableCell>
+                    </TableRow>
+                  ) : rows.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={5} className="text-center text-muted-foreground py-6">
+                        Nenhum convênio cadastrado.
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    rows.map((c) => (
+                      <TableRow key={c.id}>
+                        <TableCell className="font-medium truncate" title={c.nome}>
+                          {c.nome}
+                        </TableCell>
+                        <TableCell>
+                          {valoresMin[c.id] !== undefined
+                            ? `R$ ${valoresMin[c.id].toFixed(2)}`
+                            : "—"}
+                        </TableCell>
+                        <TableCell
+                          className="text-muted-foreground truncate"
+                          title={c.descricao ?? ""}
+                        >
+                          {c.descricao ?? "—"}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={c.ativo ? "default" : "outline"}>
+                            {c.ativo ? "Ativo" : "Inativo"}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {podeEscrever && (
+                            <>
+                              <Button size="sm" variant="ghost" onClick={() => openEdit(c)}>
+                                <Pencil className="h-4 w-4" />
+                              </Button>
+                              <Button size="sm" variant="ghost" onClick={() => setToDelete(c)}>
+                                <Trash2 className="h-4 w-4 text-destructive" />
+                              </Button>
+                            </>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </>
+      ) : (
+        <Card>
+          <CardContent className="p-6 space-y-4">
+            <div className="flex items-center justify-between gap-3">
+              <Button variant="ghost" size="sm" onClick={() => setView("list")}>
+                <ArrowLeft className="h-4 w-4 mr-1" /> Voltar
+              </Button>
+              <h2 className="text-lg font-semibold">
+                {editing ? `Editar convênio: ${editing.nome}` : "Novo convênio"}
+              </h2>
+              <div />
+            </div>
+            <Tabs defaultValue="info" className="w-full">
+              <TabsList>
+                <TabsTrigger value="info">Informações</TabsTrigger>
+                {!isConvenioFuncionario(nome || editing?.nome || "") && (
+                  <TabsTrigger value="faixas">
+                    <Layers className="h-4 w-4 mr-1" />
+                    Faixas de Preço
+                  </TabsTrigger>
+                )}
+                <TabsTrigger value="regras">
+                  <Gift className="h-4 w-4 mr-1" />
+                  Benefícios
+                </TabsTrigger>
+                {!isConvenioFuncionario(nome || editing?.nome || "") && (
+                  <>
+                    <TabsTrigger value="contrato">
+                      <FileText className="h-4 w-4 mr-1" />
+                      Contrato
+                    </TabsTrigger>
+                    <TabsTrigger value="informativo">
+                      <Info className="h-4 w-4 mr-1" />
+                      Informativo
+                    </TabsTrigger>
+                    <TabsTrigger value="termo">
+                      <FileSignature className="h-4 w-4 mr-1" />
+                      Termo de Inclusão
+                    </TabsTrigger>
+                  </>
+                )}
+              </TabsList>
+              <TabsContent value="info" className="space-y-3 mt-3">
+                <div>
+                  <Label>Nome *</Label>
+                  <Input
+                    value={nome}
+                    maxLength={NOME_MAX}
+                    onChange={(e) => setNome(e.target.value)}
+                    placeholder="Ex: Convênio Família"
+                  />
+                  <p
+                    className={`text-xs mt-1 text-right ${nome.trim().length > NOME_MAX ? "text-red-600" : "text-muted-foreground"}`}
+                  >
+                    {nome.trim().length} / {NOME_MAX}
+                  </p>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                  <div>
+                    <Label>Taxa de adesão (R$)</Label>
+                    <CurrencyInput
+                      value={taxaAdesao ? taxaAdesao.toFixed(2) : ""}
+                      onChange={(v) => setTaxaAdesao(v ? parseFloat(v) : 0)}
+                    />
+                    <div className="flex items-center gap-2 mt-2">
+                      <Switch
+                        checked={adesaoNoAto}
+                        onCheckedChange={setAdesaoNoAto}
+                        disabled={taxaAdesao <= 0}
+                      />
+                      <span className="text-xs text-muted-foreground">
+                        Cobrar no ato da emissão
+                      </span>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {taxaAdesao <= 0
+                        ? "Sem taxa de adesão cadastrada."
+                        : adesaoNoAto
+                          ? "Na emissão do cartão o paciente paga só a taxa. As mensalidades vêm depois, com o valor cheio."
+                          : "A taxa é cobrada junto com a 1ª mensalidade, numa cobrança só."}
+                    </p>
+                  </div>
+                  <div>
+                    <Label>Taxa de inclusão de dependente (R$)</Label>
+                    <CurrencyInput
+                      value={taxaInclusaoDep ? taxaInclusaoDep.toFixed(2) : ""}
+                      onChange={(v) => setTaxaInclusaoDep(v ? parseFloat(v) : 0)}
+                    />
+                  </div>
+                  <div>
+                    <Label>Nº parcelas</Label>
+                    <Input
+                      type="number"
+                      min="1"
+                      value={numParcelas}
+                      onChange={(e) => setNumParcelas(parseInt(e.target.value) || 0)}
+                    />
+                  </div>
+                  <div>
+                    <Label>Máx. dependentes</Label>
+                    <Input
+                      type="number"
+                      min="0"
+                      value={maxDependentes}
+                      onChange={(e) => setMaxDependentes(parseInt(e.target.value) || 0)}
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div>
+                    <Label>Fidelidade (meses)</Label>
+                    <Input
+                      type="number"
+                      min="0"
+                      value={fidelidadeMeses}
+                      onChange={(e) => setFidelidadeMeses(parseInt(e.target.value) || 0)}
+                    />
+                  </div>
+                  <div>
+                    <Label>Vigência (meses)</Label>
+                    <Input
+                      type="number"
+                      min="0"
+                      value={vigenciaMeses}
+                      onChange={(e) => setVigenciaMeses(parseInt(e.target.value) || 0)}
+                    />
+                  </div>
+                  <div>
+                    <Label>Modalidade</Label>
+                    <Select
+                      value={modalidade}
+                      onValueChange={(v) => setModalidade(v as typeof modalidade)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="cartao_consulta">Cartão Consulta</SelectItem>
+                        <SelectItem value="cartao_desconto">Cartão Desconto</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Define qual repasse cadastrado no médico será usado para os pacientes deste
+                      convênio.
+                    </p>
+                  </div>
+                </div>
+                <div>
+                  <Label>Descrição</Label>
+                  <Textarea
+                    value={descricao}
+                    maxLength={DESCRICAO_MAX}
+                    onChange={(e) => setDescricao(e.target.value)}
+                    rows={3}
+                  />
+                  <p
+                    className={`text-xs mt-1 text-right ${descricao.trim().length > DESCRICAO_MAX ? "text-red-600" : "text-muted-foreground"}`}
+                  >
+                    {descricao.trim().length} / {DESCRICAO_MAX}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Switch checked={ativo} onCheckedChange={setAtivo} />
+                  <Label>Ativo</Label>
+                </div>
+              </TabsContent>
+              <TabsContent value="faixas" className="mt-3">
+                <div className="space-y-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <div className="flex items-center gap-2 font-medium">
+                        <Layers className="h-4 w-4" /> Faixas de Preço por Quantidade de Vidas
+                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        Configure o valor mensal conforme a quantidade de vidas (titular +
+                        dependentes).
+                      </p>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        const last = faixas[faixas.length - 1];
+                        const nextDe = last ? last.vidas_de + 1 : 1;
+                        setFaixas([
+                          ...faixas,
+                          { vidas_de: nextDe, vidas_ate: null, valor_mensal: 0 },
+                        ]);
+                      }}
+                    >
+                      <Plus className="h-4 w-4 mr-1" /> Adicionar Faixa
+                    </Button>
+                  </div>
+                  <div className="border rounded-md overflow-hidden max-w-xl">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Quantidade de pessoas</TableHead>
+                          <TableHead className="text-right">Valor Mensal (R$)</TableHead>
+                          <TableHead className="w-10"></TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {faixas.map((f, idx) => (
+                          <TableRow key={idx}>
+                            <TableCell>
+                              <Input
+                                type="number"
+                                min="1"
+                                className="border-0 rounded-none shadow-none focus-visible:ring-0 bg-transparent"
+                                value={f.vidas_de}
+                                onChange={(e) => {
+                                  const v = parseInt(e.target.value) || 1;
+                                  setFaixas(
+                                    faixas.map((x, i) =>
+                                      i === idx ? { ...x, vidas_de: v, vidas_ate: v } : x,
+                                    ),
+                                  );
+                                }}
+                              />
+                            </TableCell>
+                            <TableCell>
+                              <CurrencyInput
+                                className="text-right border-0 rounded-none shadow-none focus-visible:ring-0 bg-transparent"
+                                value={f.valor_mensal ? Number(f.valor_mensal).toFixed(2) : ""}
+                                onChange={(v) => {
+                                  const num = v ? parseFloat(v) : 0;
+                                  setFaixas(
+                                    faixas.map((x, i) =>
+                                      i === idx ? { ...x, valor_mensal: num } : x,
+                                    ),
+                                  );
+                                }}
+                              />
+                            </TableCell>
+                            <TableCell>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => setFaixas(faixas.filter((_, i) => i !== idx))}
+                                disabled={faixas.length === 1}
+                              >
+                                <Trash2 className="h-4 w-4 text-destructive" />
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                  <p className="text-xs text-muted-foreground flex items-center gap-1">
+                    <Lightbulb className="h-3.5 w-3.5" />
+                    Exemplo: 1 pessoa = R$200, 2 pessoas = R$350, 3 pessoas = R$500. Adicione uma
+                    linha para cada quantidade.
+                  </p>
+                </div>
+              </TabsContent>
+              <TabsContent value="regras" className="mt-3">
+                <RegrasConvenioTab
+                  clinicaId={clinicaAtual.clinica_id}
+                  convenioId={editing?.id ?? null}
+                  convenioNome={editing?.nome ?? nome}
+                />
+              </TabsContent>
+              <TabsContent value="contrato" className="mt-3">
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2 font-medium">
+                      <FileText className="h-4 w-4" /> Modelo do Contrato
+                    </div>
+                    <Button variant="outline" size="sm" onClick={() => window.print()}>
+                      <Printer className="h-4 w-4 mr-1" /> Imprimir
+                    </Button>
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    Este modelo será usado para gerar o contrato nas novas vendas. Use o seletor
+                    <span className="font-medium"> Inserir variável </span>
+                    na barra de ferramentas para incluir campos como{" "}
+                    <code>{"{{PACIENTE_NOME}}"}</code>, <code>{"{{VALOR_MENSAL}}"}</code>,{" "}
+                    <code>{"{{DEPENDENTE_1}}"}</code>, <code>{"{{DEPENDENTE_1_PARENTESCO}}"}</code>,{" "}
+                    <code>{"{{CLINICA_NOME}}"}</code>. Use as variáveis numeradas (
+                    <code>{"{{DEPENDENTE_1}}"}</code>… até o máximo de dependentes do convênio) para
+                    um slot por dependente; slots não preenchidos ficam vazios.
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    <span className="font-medium">Esconder slots vazios:</span> envolva o trecho de
+                    cada dependente entre <code>{"{{#DEPENDENTE_2}}"}</code> e{" "}
+                    <code>{"{{/DEPENDENTE_2}}"}</code> (idem para 3, 4 e 5). Use no seletor{" "}
+                    <em>Inserir variável</em> as opções "Dependente N — INÍCIO/FIM do bloco
+                    condicional". O bloco só será impresso se o dependente N existir no contrato.
+                  </p>
+                  <div id="convenio-contrato-print">
+                    <RichEditor
+                      value={modeloContrato}
+                      onChange={setModeloContrato}
+                      clinicaId={clinicaAtual.clinica_id}
+                      variables={buildContratoVariaveis(maxDependentes)}
+                    />
+                  </div>
+                  <style>{`
+                  @media print {
+                    @page { size: A4; margin: 0; }
+                    body * { visibility: hidden !important; }
+                    #convenio-contrato-print, #convenio-contrato-print * { visibility: visible !important; }
+                    #convenio-contrato-print { position: absolute; left: 0; top: 0; width: 100%; }
+                    #convenio-contrato-print .print\\:hidden { display: none !important; }
+                    #convenio-contrato-print .rt-shell { border: 0 !important; border-radius: 0 !important; overflow: visible !important; background: transparent !important; }
+                    #convenio-contrato-print .rt-scroll { max-height: none !important; overflow: visible !important; background: transparent !important; }
+                    #convenio-contrato-print .rt-page { width: 210mm !important; min-height: 297mm !important; margin: 0 auto !important; box-shadow: none !important; background: white !important; }
+                    #convenio-contrato-print .ProseMirror { min-height: 0 !important; }
+                    #convenio-contrato-print table { page-break-inside: auto; }
+                    #convenio-contrato-print tr { page-break-inside: avoid; page-break-after: auto; }
+                    #convenio-contrato-print img { max-width: 100% !important; height: auto !important; }
+                  }
+                `}</style>
+                </div>
+              </TabsContent>
+              <TabsContent value="informativo" className="mt-3">
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2 font-medium">
+                      <Info className="h-4 w-4" /> Informativo do Convênio
+                    </div>
+                    <Button variant="outline" size="sm" onClick={() => window.print()}>
+                      <Printer className="h-4 w-4 mr-1" /> Imprimir
+                    </Button>
+                  </div>
+                  <div id="convenio-informativo-print">
+                    <RichEditor
+                      value={informativoHtml}
+                      onChange={setInformativoHtml}
+                      clinicaId={clinicaAtual.clinica_id}
+                    />
+                  </div>
+                  <style>{`
+                  @media print {
+                    @page { size: A4; margin: 0; }
+                    body * { visibility: hidden !important; }
+                    #convenio-informativo-print, #convenio-informativo-print * { visibility: visible !important; }
+                    #convenio-informativo-print { position: absolute; left: 0; top: 0; width: 100%; }
+                    #convenio-informativo-print .print\\:hidden { display: none !important; }
+                    /* Neutralize the editor chrome (scroll wrapper + A4 mock page) for print */
+                    #convenio-informativo-print .rt-shell { border: 0 !important; border-radius: 0 !important; overflow: visible !important; background: transparent !important; }
+                    #convenio-informativo-print .rt-scroll { max-height: none !important; overflow: visible !important; background: transparent !important; }
+                    #convenio-informativo-print .rt-page { width: 210mm !important; min-height: 297mm !important; margin: 0 auto !important; box-shadow: none !important; background: white !important; }
+                    #convenio-informativo-print .ProseMirror { min-height: 0 !important; }
+                    #convenio-informativo-print table { page-break-inside: auto; }
+                    #convenio-informativo-print tr { page-break-inside: avoid; page-break-after: auto; }
+                    #convenio-informativo-print img { max-width: 100% !important; height: auto !important; }
+                  }
+                `}</style>
+                </div>
+              </TabsContent>
+              <TabsContent value="termo" className="mt-3">
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2 font-medium">
+                      <FileSignature className="h-4 w-4" /> Termo de Inclusão
+                    </div>
+                    <Button variant="outline" size="sm" onClick={() => window.print()}>
+                      <Printer className="h-4 w-4 mr-1" /> Imprimir
+                    </Button>
+                  </div>
+                  <div id="convenio-termo-print">
+                    <RichEditor
+                      value={termoInclusaoHtml}
+                      onChange={setTermoInclusaoHtml}
+                      clinicaId={clinicaAtual.clinica_id}
+                    />
+                  </div>
+                  <style>{`
+                  @media print {
+                    @page { size: A4; margin: 0; }
+                    body * { visibility: hidden !important; }
+                    #convenio-termo-print, #convenio-termo-print * { visibility: visible !important; }
+                    #convenio-termo-print { position: absolute; left: 0; top: 0; width: 100%; }
+                    #convenio-termo-print .print\\:hidden { display: none !important; }
+                    #convenio-termo-print .rt-shell { border: 0 !important; border-radius: 0 !important; overflow: visible !important; background: transparent !important; }
+                    #convenio-termo-print .rt-scroll { max-height: none !important; overflow: visible !important; background: transparent !important; }
+                    #convenio-termo-print .rt-page { width: 210mm !important; min-height: 297mm !important; margin: 0 auto !important; box-shadow: none !important; background: white !important; }
+                    #convenio-termo-print .ProseMirror { min-height: 0 !important; }
+                    #convenio-termo-print table { page-break-inside: auto; }
+                    #convenio-termo-print tr { page-break-inside: avoid; page-break-after: auto; }
+                    #convenio-termo-print img { max-width: 100% !important; height: auto !important; }
+                  }
+                `}</style>
+                </div>
+              </TabsContent>
+            </Tabs>
+            <div className="flex justify-end gap-2 border-t pt-4">
+              <Button variant="outline" onClick={() => setView("list")}>
+                Cancelar
+              </Button>
+              <Button
+                onClick={save}
+                disabled={saving || !nome.trim() || faixas.length === 0}
+                title={
+                  !nome.trim()
+                    ? "Informe o nome do convênio"
+                    : faixas.length === 0
+                      ? "Adicione pelo menos uma faixa de preço"
+                      : undefined
+                }
+              >
+                {saving ? "Salvando…" : "Salvar convênio"}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      <AlertDialog open={!!toDelete} onOpenChange={(v) => !v && setToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir convênio?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta ação não pode ser desfeita. Os benefícios vinculados a "{toDelete?.nome}" também
+              serão excluídos.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDelete}>Excluir</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
+  );
+}

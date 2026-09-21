@@ -40,6 +40,7 @@ import {
   Workflow,
   FileText,
   CreditCard,
+  HeartHandshake,
   Brain,
   FileHeart,
   FlaskConical,
@@ -414,6 +415,11 @@ const navRows: ReadonlyArray<{ label: string; items: ReadonlyArray<NavItem> }> =
       { to: "/app/tabela-valores", label: "Tabela de valores", icon: Tag },
       { to: "/app/triagem-enfermagem", label: "Triagem - Enfermagem", icon: HeartPulse },
       { to: "/app/cartao-beneficios/contratos", label: "Cartão Benefícios", icon: CreditCard },
+      {
+        to: "/app/cartao-terapeutico/contratos",
+        label: "Cartão Terapêutico",
+        icon: HeartHandshake,
+      },
       { to: "/app/documentos", label: "Documentos do paciente", icon: FileText },
       { to: "/app/anamneses", label: "Anamneses", icon: FileHeart },
       { to: "/app/hiperdia", label: "Hiperdia", icon: HeartPulse },
@@ -931,31 +937,35 @@ function AppShellInner() {
               ? "/app/procedimentos"
               : /or[çc]amento/.test(t)
                 ? "/app/orcamentos"
-                : /plano|assinatura|cart[ãa]o|benef[ií]cio|contrato/.test(t)
-                  ? "/app/cartao-beneficios/contratos"
-                  : /modelo|template/.test(t)
-                    ? "/app/cartao-beneficios/convenios"
-                    : /relat[óo]rio.*cart[ãa]o|cart[ãa]o.*relat[óo]rio/.test(t)
-                      ? "/app/cartao-beneficios/relatorios"
-                      : /financ|caixa|conta|boleto/.test(t)
-                        ? "/app/financeiro"
-                        : /cl[ií]nica/.test(t)
-                          ? "/app/unidades"
-                          : /rateio|repasse/.test(t)
-                            ? "/app/equipe"
-                            : /equipe|usu[áa]rio|m[eé]dico|profissional|funcion[áa]rio/.test(t)
+                : /terap[êe]utic/.test(t)
+                  ? "/app/cartao-terapeutico/contratos"
+                  : /plano|assinatura|cart[ãa]o|benef[ií]cio|contrato/.test(t)
+                    ? "/app/cartao-beneficios/contratos"
+                    : /modelo|template/.test(t)
+                      ? "/app/cartao-beneficios/convenios"
+                      : /relat[óo]rio.*cart[ãa]o|cart[ãa]o.*relat[óo]rio/.test(t)
+                        ? "/app/cartao-beneficios/relatorios"
+                        : /financ|caixa|conta|boleto/.test(t)
+                          ? "/app/financeiro"
+                          : /cl[ií]nica/.test(t)
+                            ? "/app/unidades"
+                            : /rateio|repasse/.test(t)
                               ? "/app/equipe"
-                              : /prontu[áa]rio/.test(t)
-                                ? "/app/prontuarios"
-                                : /crm|lead|oportunidade/.test(t)
-                                  ? "/app/crm"
-                                  : /nina|whats|whatsapp|conversa/.test(t)
-                                    ? "/app/nina"
-                                    : /consulta r[áa]pida|lembrete|valor|tabela|hor[áa]rio/.test(t)
-                                      ? "/app/consulta-rapida"
-                                      : /dashboard|in[íi]cio|home/.test(t)
-                                        ? "/app"
-                                        : null;
+                              : /equipe|usu[áa]rio|m[eé]dico|profissional|funcion[áa]rio/.test(t)
+                                ? "/app/equipe"
+                                : /prontu[áa]rio/.test(t)
+                                  ? "/app/prontuarios"
+                                  : /crm|lead|oportunidade/.test(t)
+                                    ? "/app/crm"
+                                    : /nina|whats|whatsapp|conversa/.test(t)
+                                      ? "/app/nina"
+                                      : /consulta r[áa]pida|lembrete|valor|tabela|hor[áa]rio/.test(
+                                            t,
+                                          )
+                                        ? "/app/consulta-rapida"
+                                        : /dashboard|in[íi]cio|home/.test(t)
+                                          ? "/app"
+                                          : null;
     if (route) {
       toast.success(`Abrindo: ${text}`);
       navigate({ to: route });
