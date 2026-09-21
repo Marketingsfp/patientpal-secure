@@ -957,6 +957,8 @@ describe("modalidades na consulta operacional", () => {
   for (const origem of ["whatsapp", "homologacao"] as const) {
     for (const [publicada, esperada, antecedencia] of [
       ["Hora marcada", "hora_marcada", true],
+      ["Agendado", "hora_marcada", true],
+      ["Ordem de chegada", "chegada_com_pre_agendamento", false],
       ["Ordem de chegada com pré-agendamento", "chegada_com_pre_agendamento", false],
       ["Por numeração (ficha)", "ficha", true],
     ] as const) {
@@ -1016,8 +1018,8 @@ describe("modalidades na consulta operacional", () => {
         expect(ctx.estado.appointment.slot_options).toBeNull();
         expect((await executarFerramentaPaciente(ctx, "consultar_cadastro_paciente", {})).erro).toBe("ACTION_NOT_AUTHORIZED");
       });
-  test("ordem de chegada ambígua não produz opções de horário", async () => {
-    banco.nina_cat_profissionais![0]!.tipo_atendimento = "Ordem de chegada";
+  test("modalidades conflitantes não produzem opções de horário", async () => {
+    banco.nina_cat_profissionais![0]!.tipo_atendimento = "Hora marcada / por ficha";
     const r = await executarFerramentaPaciente(contexto("Tem vaga com Dr. Alex Louza?"), "consultar_disponibilidade", argumentos);
     expect(r.erro).toBe("MODALIDADE_NAO_DEFINIDA");
     expect(consultasAgenda()).toHaveLength(0);

@@ -13,6 +13,7 @@ import { removerEmojisNina } from "../resposta/sem-emojis";
 import anteriores from "./fixtures/instrucoes-antes-consolidacao.json";
 import { atualizarLimiteEsclarecimento } from "../prompt/limite-esclarecimento";
 import { REGRA_INFORMACOES_GRUPO } from "../clinicas-grupo";
+import { MIGRATION_REGRAS_CONFIRMADAS } from "../../../../scripts/nina/gerar-regras-confirmadas";
 
 describe("consolidação da publicação e do fallback", () => {
   it("publica exatamente as regras do fallback, preservando a identidade da versão auditada", () => {
@@ -30,11 +31,13 @@ describe("consolidação da publicação e do fallback", () => {
       versaoId: "antiga",
     });
     expect(identidade.identidade).toEqual(antiga.identidade);
-    expect(
+    let atual =
       atualizarLimiteEsclarecimento(nova.conteudo).split("[/IDENTIDADE DO ATENDIMENTO]\n\n")[1] +
         "\n\n" +
-        REGRA_INFORMACOES_GRUPO,
-    ).toBe(PROMPT_NINA_WHATSAPP_V4);
+        REGRA_INFORMACOES_GRUPO;
+    for (const [antes, depois] of JSON.parse(readFileSync(MIGRATION_REGRAS_CONFIRMADAS, "utf8").split("$trocas$")[1]!))
+      atual = atual.replace(antes, depois);
+    expect(atual).toBe(PROMPT_NINA_WHATSAPP_V4);
     const render = renderizarTemplateInstrucoes(nova.conteudo, valoresIdentidade(identidade));
     expect(render.ok).toBe(true);
     if (render.ok) {

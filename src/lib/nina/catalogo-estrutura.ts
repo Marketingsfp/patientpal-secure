@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { interpretarModalidade } from "./modalidade-atendimento";
 import { REGRA_APRESENTACAO_VALORES } from "./pagamento-catalogo";
+import { REGRA_ANESTESIA_ADICIONAL, REGRA_HORARIOS_PUBLICADOS, REGRA_MODALIDADES_CONFIRMADAS } from "./regras-administrativas-confirmadas";
 
 const texto = z.string().trim().max(4000).nullable().optional();
 const hora = z
@@ -210,8 +211,11 @@ export function modalidadeEstruturada(
 ) {
   const itens = atendimentosEstruturados(conteudo, estrutura, profissional, "Consulta");
   const base = interpretarModalidade(modalidadeLegada);
-  if (!itens.some((a) => a.complemento?.modalidade)) return base;
-  const modos = itens.map((a) => a.complemento?.modalidade ?? base);
+  const modos = itens.map((a) => {
+    const fontes = [a.complemento?.modalidade, a.modalidade, base].filter(Boolean);
+    return new Set(fontes).size > 1 ? "nao_definida" : fontes[0] ?? null;
+  });
+  if (modos.every((m) => !m)) return null;
   if (modos.some((m) => !m || m === "nao_definida") || new Set(modos).size !== 1)
     return "nao_definida" as const;
   if (base && base !== modos[0]) return "nao_definida" as const;
@@ -283,8 +287,9 @@ export function pendenciasEstrutura(
       !a.complemento?.referencia_recorrencia
     )
       pendencias.push(`${a.atendimento}: recorrência sem data de referência.`);
-    if (/anestesia/i.test(a.observacoes ?? "") && !a.complemento?.acrescimos)
-      pendencias.push(`${a.atendimento}: confirmar quando o valor da anestesia se aplica.`);
+    if (/anestesia/i.test(a.observacoes ?? "") && !a.complemento?.acrescimos &&
+        !/(?:R\$\s*[\d.]+,\d{2}\s*\(anestesia\)|anestesia adicional:\s*R\$\s*[\d.]+,\d{2})/i.test(a.observacoes ?? ""))
+      pendencias.push(`${a.atendimento}: confirmar o valor adicional da anestesia.`);
   }
   return [...new Set(pendencias)];
 }
@@ -293,10 +298,11 @@ export const INSTRUCAO_DADOS_CATALOGO =
   "Cada item de atendimentos_publicados associa consulta/procedimento, profissional, valores, critérios e escala. " +
   "Nunca misture preço ou idade de atendimentos diferentes do mesmo profissional. Complementos são informações confirmadas para aquela chave; " +
   "se contradisserem o texto publicado, confirme com a equipe o aspecto conflitante, sem escolher uma versão. " +
-  "Modalidade desconhecida, 'Consulta', 'Agendado' ou só 'Ordem de chegada' não definem por si só pré-agendamento. " +
+  REGRA_MODALIDADES_CONFIRMADAS + " " +
   "Preparo não informado não significa sem preparo; convênios não informados não significam que não aceita. " +
-  "'40 kg' não é idade. 'Manhã e tarde' não estabelece limite de chegada. Quinzenal sem data de referência não identifica o próximo dia. " +
-  "Valor de anestesia sem condição não autoriza somar ou declarar incluído. Grupo geral e item específico não compartilham regras automaticamente. " +
+  "'40 kg' não é idade. 'Manhã e tarde' não estabelece um limite numérico de chegada. Quinzenal sem data de referência não identifica o próximo dia. " +
+  REGRA_HORARIOS_PUBLICADOS + " " + REGRA_ANESTESIA_ADICIONAL + " " +
+  "Grupo geral e item específico não compartilham regras automaticamente. " +
   "Responda somente aos objetivos do pedido, sem copiar os rótulos internos ou repetir fatos.";
 
 export const INSTRUCAO_ESTRUTURA_CATALOGO =

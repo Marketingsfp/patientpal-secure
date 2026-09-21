@@ -50,7 +50,7 @@ export const TEMPLATES_PADRAO: readonly DefinicaoTemplate[] = [
     chave: "fluxo.agendamento.revisar_pre_agendamento", categoria: "fluxo",
     descricao: "Resumo antes do aceite de horário em ordem de chegada com pré-agendamento.",
     variaveis: ["profissional", "procedimento", "data", "horario", "unidade"],
-    padrao: "Confira os dados do pré-agendamento:\n\n*Atendimento:* {procedimento}\n*Profissional:* {profissional}\n*Data:* {data}\n*Horário do pré-agendamento:* {horario}\n*Clínica:* {unidade}\n\nO atendimento é por ordem de chegada: quem chegar primeiro será atendido primeiro. O horário do pré-agendamento não garante o horário exato da consulta.\n\nVocê confirma esse pré-agendamento?",
+    padrao: "Confira os dados do pré-agendamento:\n\n*Atendimento:* {procedimento}\n*Profissional:* {profissional}\n*Data:* {data}\n*Horário do pré-agendamento:* {horario}\n*Clínica:* {unidade}\n\nO atendimento é por ordem de chegada entre os pacientes daquele horário: quem chegar primeiro será atendido primeiro. O horário do pré-agendamento não garante o horário exato da consulta.\n\nVocê confirma esse pré-agendamento?",
   }),
   D({
     chave: "fluxo.agendamento.revisar_ficha", categoria: "fluxo",
@@ -68,7 +68,7 @@ export const TEMPLATES_PADRAO: readonly DefinicaoTemplate[] = [
     chave: "fluxo.agendamento.confirmado_pre_agendamento", categoria: "fluxo",
     descricao: "Confirmação da reserva por ordem de chegada, sem exigir 15 minutos.",
     variaveis: ["profissional", "data", "horario"],
-    padrao: "Seu pré-agendamento foi realizado!\n\n*Profissional:* {profissional}\n*Data:* {data}\n*Horário pré-agendado:* {horario}\n\nO atendimento é por ordem de chegada: quem chegar primeiro será atendido primeiro. O horário pré-agendado não garante o horário exato da consulta.",
+    padrao: "Seu pré-agendamento foi realizado!\n\n*Profissional:* {profissional}\n*Data:* {data}\n*Horário pré-agendado:* {horario}\n\nO atendimento é por ordem de chegada entre os pacientes daquele horário: quem chegar primeiro será atendido primeiro. O horário pré-agendado não garante o horário exato da consulta.",
   }),
   D({
     chave: "fluxo.agendamento.confirmado_ficha", categoria: "fluxo",

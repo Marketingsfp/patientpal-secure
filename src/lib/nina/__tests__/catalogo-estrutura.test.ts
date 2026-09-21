@@ -27,7 +27,7 @@ describe("organização conservadora do catálogo", () => {
       unidade_idade: "anos",
       dinheiro: "R$ 120,00",
       pix_cartao: "R$ 145,00",
-      modalidade: null,
+      modalidade: "hora_marcada",
     });
     expect(itens[1]).toMatchObject({
       idade_minima: 1,
@@ -49,7 +49,7 @@ describe("organização conservadora do catálogo", () => {
       criterio_publicado: "40 kg",
       chegada_publicada: "Manhã e tarde",
     });
-    expect(pendenciasEstrutura(texto, null)).toHaveLength(4);
+    expect(pendenciasEstrutura(texto, null)).toHaveLength(3);
   });
   it("preserva campos adicionais e não descarta texto sem estrutura reconhecida", () => {
     expect(separarAtendimentos(adulto + " | Exceção: regra preservada")[0]!.outros).toEqual([
@@ -87,7 +87,7 @@ describe("organização conservadora do catálogo", () => {
         "Alex Louza",
         "Consulta",
       ),
-    ).toBe("nao_definida");
+    ).toBe("hora_marcada");
     expect(
       modalidadeEstruturada(
         adulto + "\n\n" + infantil,

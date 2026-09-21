@@ -21,7 +21,10 @@ export function interpretarModalidade(texto?: string | null): ModalidadeResolvid
   if (/hora(?:rio)?\s*marcad[ao]/.test(t)) modos.push("hora_marcada");
   if (modos.length > 1 || (modos[0] === "hora_marcada" && /chegada/.test(t))) return "nao_definida";
   if (modos.length) return modos[0]!;
-  if (/ordem\s*(?:de\s*)?chegada/.test(t)) return "nao_definida";
+  if (/ordem\s*(?:de\s*)?chegada/.test(t)) return "chegada_com_pre_agendamento";
+  // Rótulo do catálogo confirmado pela clínica; não interpretar uma frase
+  // negativa ou a mensagem do paciente como modalidade de atendimento.
+  if (/^(?:agendad[oa]|por agendamento)$/.test(t)) return "hora_marcada";
   return null;
 }
 
@@ -43,7 +46,7 @@ export function permiteReserva(m: unknown): m is Exclude<ModalidadeAtendimento, 
 export function orientacaoModalidade(m: ModalidadeResolvida): string {
   switch (m) {
     case "hora_marcada": return "Atendimento no horário marcado. Chegue com 15 minutos de antecedência para o check-in na Recepção Principal.";
-    case "chegada_com_pre_agendamento": return "É necessário marcar um horário, mas o atendimento é por ordem de chegada: quem chegar primeiro será atendido primeiro. O horário pré-agendado não garante o horário exato da consulta.";
+    case "chegada_com_pre_agendamento": return "É necessário marcar um horário. Entre os pacientes daquele horário, quem chegar primeiro será atendido primeiro. O horário pré-agendado não garante o horário exato da consulta.";
     case "chegada_sem_pre_agendamento": return "Não é necessário agendar horário. Basta ir à clínica nos dias e períodos de atendimento desse profissional. Quem chegar primeiro será atendido primeiro.";
     case "ficha": return "O atendimento é por ficha, seguindo a numeração. Chegue com 15 minutos de antecedência em relação ao horário de comparecimento informado para o check-in na Recepção Principal. Esse horário não é garantia da hora da consulta.";
     default: return "A modalidade de atendimento precisa ser conferida pela equipe. Não prometa horário, ficha ou pré-agendamento.";

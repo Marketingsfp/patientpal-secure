@@ -9,7 +9,7 @@ Antes, a confirmação usava uma mensagem genérica de agendamento, sem distingu
 | Modalidade | Reserva e comunicação |
 |---|---|
 | Hora marcada | Reserva o horário escolhido e confirmado. Informa atendimento nesse horário e chegada 15 minutos antes para check-in na Recepção Principal. |
-| Ordem de chegada com pré-agendamento | Reserva o horário escolhido. Explica que quem chega primeiro será atendido primeiro e não garante a hora exata da consulta. Não pede 15 minutos de antecedência. |
+| Ordem de chegada com pré-agendamento | Reserva o horário escolhido. Entre os pacientes daquele horário, quem chega primeiro será atendido primeiro. Não garante a hora exata da consulta e não pede 15 minutos de antecedência. |
 | Ordem de chegada sem pré-agendamento | Orienta comparecimento nos dias/períodos publicados. Não consulta vagas individuais, não oferece horário, não inicia cadastro para reserva e não grava agendamento. Não pede 15 minutos. |
 | Por numeração (ficha) | Confirma a reserva com a ficha real e horário de comparecimento, pede chegada 15 minutos antes e explica atendimento pela ordem das fichas. Não promete hora exata da consulta. |
 

@@ -10,6 +10,7 @@ import { agoraNaClinica, FUSO_PADRAO } from "@/lib/nina-agora";
 import { REGRA_PIX_CARTAO } from "./pagamento-catalogo";
 import { REGRA_INTERPRETACAO_CATALOGO } from "./catalogo-busca";
 import { REGRA_INFORMACOES_GRUPO } from "./clinicas-grupo";
+import { REGRA_ANESTESIA_ADICIONAL, REGRA_HORARIOS_PUBLICADOS, REGRA_MODALIDADES_CONFIRMADAS } from "./regras-administrativas-confirmadas";
 
 /** Quantos registros publicados a clínica tem hoje (serviços + profissionais). */
 export async function contarCatalogoPublicado(
@@ -73,12 +74,15 @@ B. VALOR, FORMA DE PAGAMENTO E CONDIÇÃO — leia sempre em conjunto
 - Havendo valores diferentes por forma de pagamento, informe TODOS com sua forma: "Dinheiro: R$ 150,00. Pix/cartão: R$ 180,00". NUNCA informe só o menor preço como se valesse para qualquer pagamento.
 - Preserve a condição escrita: "a partir de", "por sessão", "pagamento antecipado", "no atendimento", parcelamento, número de parcelas. Não reescreva a condição em algo mais forte nem mais vago.
 - ${REGRA_PIX_CARTAO}
+- ${REGRA_ANESTESIA_ADICIONAL}
 - Se o paciente perguntar por Pix ou cartão, responda primeiro o preço como Pix/cartão, sempre juntos. Para parcelamento, explique a condição específica do cartão; outras condições só como complemento.
 
 C. HORÁRIOS, MODALIDADES E RECORRÊNCIA — leia sempre em conjunto
 - Combine dia, horário, profissional, unidade, recorrência, tipo de atendimento, observação pública e aviso vigente. Um dia sem sua recorrência é informação errada.
 - "Quinzenal", "mensal" ou "data específica" NUNCA viram semanal. Se o catálogo não permitir calcular a próxima data com segurança, diga o padrão cadastrado e ofereça confirmar a data pela agenda.
 - Não invente horário de término, intervalo ou próxima data sem dado suficiente.
+- ${REGRA_HORARIOS_PUBLICADOS}
+- ${REGRA_MODALIDADES_CONFIRMADAS}
 - Diferencie e nomeie a modalidade cadastrada: hora marcada, ordem de chegada e ficha/senha são coisas distintas. Não trate ordem de chegada como horário garantido.
 - O horário do catálogo é ESCALA administrativa, não vaga. Disponibilidade real e confirmação de agendamento vêm sempre das ferramentas de agenda.
 - HORÁRIO DE FUNCIONAMENTO DA CLÍNICA (que horas abre/fecha, se abre sábado, se abre em uma data): CHAME "horario_funcionamento", indicando a clínica mencionada. A ferramenta distingue o horário habitual confirmado do diretório e o calendário com exceções publicadas. Para uma data específica, passe "data" (AAAA-MM-DD) e respeite a confirmação retornada; não extrapole rotina semanal para feriados.

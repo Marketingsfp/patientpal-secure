@@ -12,7 +12,9 @@ describe("modalidades oficiais de atendimento", () => {
     ["Ordem de chegada sem pré-agendamento", "chegada_sem_pre_agendamento"],
     ["Ordem de chegada s/ agendamento", "chegada_sem_pre_agendamento"],
     ["Por numeração (ficha)", "ficha"], ["Por ficha", "ficha"],
-    ["Ordem de chegada", "nao_definida"], ["consulta, retorno", null],
+    ["Ordem de chegada", "chegada_com_pre_agendamento"], ["consulta, retorno", null],
+    ["Agendado", "hora_marcada"], ["Por agendamento", "hora_marcada"],
+    ["Não agendado", null], ["Agendado somente após confirmação", null],
     ["Hora marcada / por ficha", "nao_definida"], ["Ordem de chegada com hora marcada", "nao_definida"],
   ] as const) test(String(texto), () => expect(interpretarModalidade(texto)).toBe(modo));
   test("booleano de chegada e conflitos não inventam modalidade", () => {
@@ -31,7 +33,10 @@ describe("modalidades oficiais de atendimento", () => {
       expect(r.texto).toContain("Uma hora antes");
       expect(r.texto).toContain("A Clínica Teste agradece");
       expect(r.texto.includes("15 minutos")).toBe(modo !== "chegada_com_pre_agendamento");
-      if (modo === "chegada_com_pre_agendamento") expect(r.texto).toContain("quem chegar primeiro");
+      if (modo === "chegada_com_pre_agendamento") {
+        expect(r.texto).toContain("quem chegar primeiro");
+        expect(r.texto).toContain("entre os pacientes daquele horário");
+      }
       if (modo === "ficha") expect(r.texto).toContain("*Sua ficha:* 007");
       expect(textoDaChave(r.chaveTemplate!, r.variaveis).texto).toBe(r.texto);
     });
