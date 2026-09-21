@@ -55,9 +55,9 @@ export function PortalLauncher({
       )}
     >
       <div aria-hidden className="pointer-events-none absolute inset-0">
-        <div className="absolute -top-32 -left-24 h-[28rem] w-[28rem] rounded-full bg-indigo-400/20 blur-[120px]" />
-        <div className="absolute -bottom-40 -right-16 h-[30rem] w-[30rem] rounded-full bg-sky-400/20 blur-[130px]" />
-        <div className="absolute top-1/3 left-1/2 h-72 w-72 -translate-x-1/2 rounded-full bg-violet-300/20 blur-[110px]" />
+        <div className="absolute -top-32 -left-24 h-[28rem] w-[28rem] rounded-full bg-brand-glow-1/20 blur-[120px]" />
+        <div className="absolute -bottom-40 -right-16 h-[30rem] w-[30rem] rounded-full bg-brand-glow-3/20 blur-[130px]" />
+        <div className="absolute top-1/3 left-1/2 h-72 w-72 -translate-x-1/2 rounded-full bg-brand-glow-2/20 blur-[110px]" />
         <div className="absolute inset-0 opacity-[0.35] [background-image:linear-gradient(to_right,rgb(15_23_42/0.04)_1px,transparent_1px),linear-gradient(to_bottom,rgb(15_23_42/0.04)_1px,transparent_1px)] [background-size:44px_44px] [mask-image:radial-gradient(ellipse_at_center,black,transparent_75%)]" />
       </div>
 
@@ -68,7 +68,7 @@ export function PortalLauncher({
           </span>
           <h1 className="mt-4 text-3xl sm:text-4xl font-bold tracking-tight text-slate-900">
             Escolha o seu{" "}
-            <span className="bg-linear-to-r from-indigo-600 via-violet-600 to-sky-600 bg-clip-text text-transparent">
+            <span className="bg-linear-to-r from-brand-1 via-brand-2 to-brand-3 bg-clip-text text-transparent">
               portal
             </span>
           </h1>
@@ -85,13 +85,13 @@ export function PortalLauncher({
                 key={portal.id}
                 type="button"
                 onClick={() => onPick(portal.id)}
-                className="group relative overflow-hidden text-left rounded-3xl border border-slate-200/80 bg-white/90 p-7 shadow-xl backdrop-blur-xl transition-all duration-500 hover:-translate-y-2 hover:shadow-2xl hover:shadow-indigo-500/15 hover:border-indigo-500/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2"
+                className="group relative overflow-hidden text-left rounded-3xl border border-slate-200/80 bg-white/90 p-7 shadow-xl backdrop-blur-xl transition-all duration-500 hover:-translate-y-2 hover:shadow-2xl hover:shadow-brand-1-soft/15 hover:border-brand-1-soft/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-1-soft focus-visible:ring-offset-2"
               >
                 <span
                   aria-hidden
-                  className="pointer-events-none absolute -top-24 -right-16 h-56 w-56 rounded-full bg-linear-to-br from-indigo-400/20 to-sky-400/10 blur-3xl opacity-0 transition-opacity duration-500 group-hover:opacity-100"
+                  className="pointer-events-none absolute -top-24 -right-16 h-56 w-56 rounded-full bg-linear-to-br from-brand-glow-1/20 to-brand-glow-3/10 blur-3xl opacity-0 transition-opacity duration-500 group-hover:opacity-100"
                 />
-                <span className="relative inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-linear-to-br from-indigo-500 via-violet-500 to-sky-500 text-white shadow-lg shadow-indigo-500/30 transition-transform duration-500 group-hover:scale-105">
+                <span className="relative inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-linear-to-br from-brand-1-soft via-brand-2-soft to-brand-3-soft text-white shadow-lg shadow-brand-1-soft/30 transition-transform duration-500 group-hover:scale-105">
                   <Icon className="h-7 w-7" strokeWidth={1.75} />
                 </span>
                 <h2 className="relative mt-5 text-xl font-semibold tracking-tight text-slate-900">
@@ -104,13 +104,13 @@ export function PortalLauncher({
                   {portal.itens.map((item) => (
                     <li
                       key={item}
-                      className="rounded-full border border-slate-200/80 bg-slate-50/80 px-3 py-1 text-[12px] font-medium tracking-wide text-slate-600 transition-colors duration-300 group-hover:border-indigo-200 group-hover:bg-indigo-50/70 group-hover:text-indigo-700"
+                      className="rounded-full border border-slate-200/80 bg-slate-50/80 px-3 py-1 text-[12px] font-medium tracking-wide text-slate-600 transition-colors duration-300 group-hover:border-brand-tint-border group-hover:bg-brand-tint/70 group-hover:text-brand-tint-text"
                     >
                       {item}
                     </li>
                   ))}
                 </ul>
-                <span className="relative mt-6 inline-flex items-center gap-2 rounded-full bg-linear-to-r from-indigo-600 to-violet-600 px-4 py-2 text-sm font-semibold text-white shadow-md shadow-indigo-500/25 transition-shadow duration-300 group-hover:shadow-lg group-hover:shadow-indigo-500/35">
+                <span className="relative mt-6 inline-flex items-center gap-2 rounded-full bg-linear-to-r from-brand-1 to-brand-2 px-4 py-2 text-sm font-semibold text-white shadow-md shadow-brand-1-soft/25 transition-shadow duration-300 group-hover:shadow-lg group-hover:shadow-brand-1-soft/35">
                   Entrar
                   <ArrowRight className="h-4 w-4 transition-transform duration-300 group-hover:translate-x-1.5" />
                 </span>
