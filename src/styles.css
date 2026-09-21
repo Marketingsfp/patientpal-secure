@@ -196,7 +196,39 @@
   --status-in-service: oklch(0.65 0.15 240);
   --status-canceled: oklch(0.60 0.20 25);
   --status-refunded: oklch(0.60 0.18 300);
+  /* Cores de marca da tela de portais. Padrão (Menino Jesus e demais
+   * clínicas): azul/roxo. A São Francisco troca para verde pelo atributo
+   * data-clinica aplicado no <html> pelo app-shell. */
+  --brand-1: #4f46e5;
+  --brand-2: #7c3aed;
+  --brand-3: #0284c7;
+  --brand-1-soft: #6366f1;
+  --brand-2-soft: #8b5cf6;
+  --brand-3-soft: #0ea5e9;
+  --brand-glow-1: #818cf8;
+  --brand-glow-2: #c4b5fd;
+  --brand-glow-3: #38bdf8;
+  --brand-tint: #eef2ff;
+  --brand-tint-border: #c7d2fe;
+  --brand-tint-text: #4338ca;
 }
+
+/* São Francisco de Paula: mesma estrutura visual, paleta verde. */
+:root[data-clinica="sao-francisco"] {
+  --brand-1: #15803d;
+  --brand-2: #059669;
+  --brand-3: #0d9488;
+  --brand-1-soft: #16a34a;
+  --brand-2-soft: #10b981;
+  --brand-3-soft: #14b8a6;
+  --brand-glow-1: #4ade80;
+  --brand-glow-2: #6ee7b7;
+  --brand-glow-3: #2dd4bf;
+  --brand-tint: #f0fdf4;
+  --brand-tint-border: #bbf7d0;
+  --brand-tint-text: #15803d;
+}
+
 
 .dark {
   /* Base escura azulada (#0F172A / #1E293B / #334155): confortável em turnos
