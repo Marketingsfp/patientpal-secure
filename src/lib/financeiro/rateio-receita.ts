@@ -248,6 +248,12 @@ export interface RateioLinha {
    * como cortesia. Paciente, condição e forma vêm do pagamento do exame.
    */
   laudo?: boolean;
+  /**
+   * Nome da agenda do agendamento (`medico_agendas.nome`), como a recepção vê
+   * na tela de Agenda. `null` no atendimento lançado à mão e no laudo, que não
+   * nascem de um agendamento.
+   */
+  agenda_nome?: string | null;
 }
 
 /** Procedimento das linhas de repasse de laudo geradas pelo banco. */
@@ -957,7 +963,7 @@ export async function carregarRateio(
       supabase
         .from("fin_lancamentos")
         .select(
-          `${COLUNAS_LANC}, agendamento:agendamentos!inner(procedimento, medico_id, paciente_id, inicio)`,
+          `${COLUNAS_LANC}, agendamento:agendamentos!inner(procedimento, medico_id, paciente_id, inicio, agenda_id)`,
         )
         .eq("clinica_id", clinicaId)
         .eq("tipo", "receita")
@@ -1005,6 +1011,8 @@ export async function carregarRateio(
   );
 
   const linhas: RateioLinha[] = [];
+  // Agenda de cada linha vinda de agendamento, resolvida em nome no fim.
+  const agendaIdPorLinha = new Map<string, string>();
   for (const r of manuaisRaw) {
     const lancId = (r.lancamento_id as string | null) ?? null;
     if (lancId && (lancIds.has(lancId) || espelhosDaAgenda.has(lancId))) continue;
@@ -1051,7 +1059,9 @@ export async function carregarRateio(
       medico_id?: string | null;
       paciente_id?: string | null;
       inicio?: string | null;
+      agenda_id?: string | null;
     } | null;
+    if (ag?.agenda_id) agendaIdPorLinha.set(r.id as string, ag.agenda_id);
     const overrideRaw = r.valor_medico_override;
     const override =
       overrideRaw !== null && overrideRaw !== undefined && overrideRaw !== ""
@@ -1118,10 +1128,29 @@ export async function carregarRateio(
       : "Sem especialidade";
   }
   completarNomesPacientes(linhas, [...manuaisRaw, ...agendaRaw, ...avulsosRaw]);
+  await completarAgendas(linhas, agendaIdPorLinha);
 
   return filtrarRateio(ctx, linhas, filtros).sort(
     (a, b) => a.data.localeCompare(b.data) || a.medico_nome.localeCompare(b.medico_nome, "pt-BR"),
   );
+}
+
+/** Preenche `agenda_nome` das linhas que vieram de um agendamento. */
+async function completarAgendas(linhas: RateioLinha[], agendaIdPorLinha: Map<string, string>) {
+  const ids = Array.from(new Set(agendaIdPorLinha.values()));
+  const nomePorId = new Map<string, string>();
+  for (let i = 0; i < ids.length; i += PAGINA) {
+    const { data } = await supabase
+      .from("medico_agendas")
+      .select("id, nome")
+      .in("id", ids.slice(i, i + PAGINA));
+    for (const a of (data ?? []) as Array<{ id: string; nome: string | null }>)
+      nomePorId.set(a.id, a.nome ?? "");
+  }
+  for (const l of linhas) {
+    const agendaId = agendaIdPorLinha.get(l.id);
+    l.agenda_nome = agendaId ? nomePorId.get(agendaId)?.trim() || null : null;
+  }
 }
 
 /**

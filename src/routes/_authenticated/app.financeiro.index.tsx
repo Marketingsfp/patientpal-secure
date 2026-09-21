@@ -732,16 +732,87 @@ function recorteAtendimentos(drill: Drill, dados: DadosPainel): RateioLinha[] {
   return dados.rateio;
 }
 
-/** Agrupamento por profissional da visão sintética, na mesma ordem da tabela. */
+const LAUDOS = "LAUDOS";
+
+/**
+ * Agenda de uma linha, para separar o profissional na visão sintética.
+ *
+ * O laudo é repasse sobre um exame já contado e fica sempre numa linha
+ * própria — somado às consultas, fazia o médico parecer ter atendido mais
+ * gente do que atendeu. O atendimento lançado à mão não tem agenda e cai na
+ * agenda do seu tipo de serviço.
+ */
+function agendaDoGrupo(l: RateioLinha): string {
+  if (l.laudo) return LAUDOS;
+  const agenda = l.agenda_nome?.trim().toUpperCase();
+  if (agenda) return agenda;
+  if (l.tipo_servico === "CONSULTA") return "CONSULTAS";
+  if (l.tipo_servico === "EXAME") return "EXAMES";
+  if (l.tipo_servico === "PROCEDIMENTO") return "PROCEDIMENTOS";
+  return "SEM AGENDA";
+}
+
+/**
+ * Agrupamento da visão sintética: uma linha por profissional e agenda, como a
+ * tela de Agenda lista. Quem tem uma agenda só aparece com o nome limpo; quem
+ * tem mais de uma — ou laudos — aparece `NOME — AGENDA`. Serve à tabela e à
+ * lista de pacientes da linha clicada, que precisam do MESMO agrupamento.
+ */
 function gruposPorMedico(recorte: RateioLinha[]) {
-  const mapa = new Map<string, { chave: string; rec: number }>();
+  const mapa = new Map<
+    string,
+    {
+      chave: string;
+      medico: string;
+      agenda: string;
+      nome: string;
+      esp: string;
+      linhas: RateioLinha[];
+      qtd: number;
+      rec: number;
+      rep: number;
+      liq: number;
+    }
+  >();
   for (const l of recorte) {
-    const k = l.medico_id ?? "sem";
-    const g = mapa.get(k) ?? { chave: k, rec: 0 };
+    const medico = l.medico_id ?? "sem";
+    const agenda = agendaDoGrupo(l);
+    const k = `${medico}|${agenda}`;
+    const g = mapa.get(k) ?? {
+      chave: k,
+      medico,
+      agenda,
+      nome: l.medico_nome,
+      esp: l.especialidade_nome,
+      linhas: [],
+      qtd: 0,
+      rec: 0,
+      rep: 0,
+      liq: 0,
+    };
+    g.linhas.push(l);
+    g.qtd += 1;
     g.rec += l.receita;
+    g.rep += l.repasse + l.terceiro;
+    g.liq += l.liquido;
     mapa.set(k, g);
   }
-  return Array.from(mapa.values()).sort((a, b) => b.rec - a.rec);
+  const grupos = Array.from(mapa.values());
+  const agendasPorMedico = new Map<string, number>();
+  for (const g of grupos) agendasPorMedico.set(g.medico, (agendasPorMedico.get(g.medico) ?? 0) + 1);
+  for (const g of grupos)
+    if (g.agenda === LAUDOS || (agendasPorMedico.get(g.medico) ?? 0) > 1)
+      g.nome = `${g.nome} — ${g.agenda}`;
+  // Mesmo profissional em linhas vizinhas, e o laudo por último.
+  const recMedico = new Map<string, number>();
+  for (const g of grupos) recMedico.set(g.medico, (recMedico.get(g.medico) ?? 0) + g.rec);
+  return grupos.sort(
+    (a, b) =>
+      (recMedico.get(b.medico) ?? 0) - (recMedico.get(a.medico) ?? 0) ||
+      a.medico.localeCompare(b.medico) ||
+      Number(a.agenda === LAUDOS) - Number(b.agenda === LAUDOS) ||
+      b.rec - a.rec,
+  );
 }
 
 /**
@@ -764,8 +835,8 @@ function montarPacientesDaLinha(
     const grupos = gruposPorMedico(recorte);
     const g = grupos[indice];
     if (!g) return null;
-    alvo = recorte.filter((l) => (l.medico_id ?? "sem") === g.chave);
-    quem = alvo[0]?.medico_nome ?? "Sem profissional";
+    alvo = g.linhas;
+    quem = g.nome || "Sem profissional";
   } else {
     const l = recorte[indice];
     if (!l) return null;
@@ -802,7 +873,9 @@ function montarPacientesDaLinha(
       l.liquido,
     ]),
     totais: [
-      `${int(alvo.filter((l) => !l.laudo).length)} atendimento(s)`,
+      alvo.every((l) => l.laudo)
+        ? `${int(alvo.length)} laudo(s)`
+        : `${int(alvo.filter((l) => !l.laudo).length)} atendimento(s)`,
       "",
       "",
       "",
@@ -883,6 +956,8 @@ function montarDetalhe(drill: Drill, dados: DadosPainel, r: ResumoPainel, visao:
             ? dados.outrasReceitas.filter((o) => categoriaDaOutraReceita(o) === "avulso")
             : [];
 
+    // O laudo é repasse sobre exame já contado: não soma como atendimento.
+    const qtdAtend = recorte.filter((l) => !l.laudo).length;
     const receitaAtend = recorte.reduce((s, l) => s + l.receita, 0);
     const receitaOutras = outras.reduce((s, i) => s + i.valor, 0);
     const receita = receitaAtend + receitaOutras;
@@ -900,7 +975,7 @@ function montarDetalhe(drill: Drill, dados: DadosPainel, r: ResumoPainel, visao:
       { rotulo: "Repasse a médicos", valor: repasse },
       ...(terceiro > 0 ? [{ rotulo: "Terceiros (dono do equipamento)", valor: terceiro }] : []),
       ...(drill === "ticket" || drill === "atendimentos"
-        ? [{ rotulo: "Ticket médio", valor: recorte.length ? receita / recorte.length : 0 }]
+        ? [{ rotulo: "Ticket médio", valor: qtdAtend ? receita / qtdAtend : 0 }]
         : []),
       { rotulo: "Líquido da clínica", valor: liquido },
     ];
@@ -915,33 +990,15 @@ function montarDetalhe(drill: Drill, dados: DadosPainel, r: ResumoPainel, visao:
     // Rótulo da linha das outras receitas na coluna de profissional.
     const OUTRAS = "MENSALIDADES, ADESÕES E AVULSOS";
     if (visao === "sintetico") {
-      const porMedico = new Map<
-        string,
-        { nome: string; esp: string; qtd: number; rec: number; rep: number; liq: number }
-      >();
-      for (const l of recorte) {
-        const k = l.medico_id ?? "sem";
-        const g = porMedico.get(k) ?? {
-          nome: l.medico_nome,
-          esp: l.especialidade_nome,
-          qtd: 0,
-          rec: 0,
-          rep: 0,
-          liq: 0,
-        };
-        g.qtd += 1;
-        g.rec += l.receita;
-        g.rep += l.repasse + l.terceiro;
-        g.liq += l.liquido;
-        porMedico.set(k, g);
-      }
-      const grupos = Array.from(porMedico.values()).sort((a, b) => b.rec - a.rec);
+      const grupos = gruposPorMedico(recorte);
       const linhas: Celula[][] = grupos.map((g) => [g.nome, g.esp, g.qtd, g.rec, g.rep, g.liq]);
       for (const g of somarPorCategoria(outras))
         linhas.push([OUTRAS, g.rotulo, g.qtd, g.valor, 0, g.valor]);
       return {
         titulo,
-        explicacao,
+        explicacao: recorte.some((l) => l.laudo)
+          ? `${explicacao} Cada profissional aparece uma vez por agenda; os laudos ficam em linha própria (NOME — LAUDOS) e não entram na quantidade de atendimentos do total.`
+          : explicacao,
         colunas: [
           { rotulo: "Profissional", tipo: "texto" },
           { rotulo: outras.length ? "Especialidade / Categoria" : "Especialidade", tipo: "texto" },
@@ -951,7 +1008,7 @@ function montarDetalhe(drill: Drill, dados: DadosPainel, r: ResumoPainel, visao:
           { rotulo: "Líquido clínica", tipo: "moeda" },
         ],
         linhas,
-        totais: ["TOTAL", "", recorte.length + outras.length, receita, repasse + terceiro, liquido],
+        totais: ["TOTAL", "", qtdAtend + outras.length, receita, repasse + terceiro, liquido],
         resumo,
         composicao,
         temSintetico: true,
@@ -994,8 +1051,8 @@ function montarDetalhe(drill: Drill, dados: DadosPainel, r: ResumoPainel, visao:
       linhas,
       totais: [
         outras.length
-          ? `${int(recorte.length)} atendimento(s) + ${int(outras.length)} lançamento(s)`
-          : `${int(recorte.length)} atendimento(s)`,
+          ? `${int(qtdAtend)} atendimento(s) + ${int(outras.length)} lançamento(s)`
+          : `${int(qtdAtend)} atendimento(s)`,
         "",
         "",
         "",
