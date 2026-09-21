@@ -1821,7 +1821,8 @@ async function gerarRespostaNinaInterno(
     const { normalizarTipoAtendimentoCatalogo } = await import("@/lib/nina/catalogo-pesquisa");
     const tipoAtendimento = normalizarTipoAtendimentoCatalogo(
       (r.dados as import("@/lib/nina/knowledge-contract").ResultadoConhecimento | null)
-        ?.tipo_atendimento ?? parametros.tipo_atendimento,
+        ?.tipo_atendimento ?? parametros.tipo_atendimento ??
+        (nome === "buscar_medicos" ? "consulta" : nome === "buscar_procedimentos" ? "exame_procedimento" : undefined),
     );
     if (esclarecimentoAtual) {
       if (ctxFerramentas) ctxFerramentas.esclarecimentoCatalogo = esclarecimentoAtual;
@@ -1840,7 +1841,9 @@ async function gerarRespostaNinaInterno(
         esclarecimento: esclarecimentoAtual,
       });
     }
-    if (nome === "consultar_base_conhecimento" && typeof parametros.termo === "string") {
+    const termoPesquisado = nome === "consultar_base_conhecimento" || nome === "buscar_procedimentos"
+      ? parametros.termo : nome === "buscar_medicos" ? parametros.especialidade ?? parametros.nome : null;
+    if (typeof termoPesquisado === "string") {
       const esclarecimento = (
         r.dados as import("@/lib/nina/knowledge-contract").ResultadoConhecimento | null
       )?.esclarecimento;
@@ -1851,7 +1854,7 @@ async function gerarRespostaNinaInterno(
               sessionId: fluxoEstado.session_id ?? null,
               fatos: ex.fatos,
               args: {
-                termo: parametros.termo,
+                termo: termoPesquisado,
                 ...(tipoAtendimento ? { tipo_atendimento: tipoAtendimento } : {}),
                 ...(typeof parametros.medico === "string" ? { medico: parametros.medico } : {}),
               },
@@ -2196,8 +2199,11 @@ async function gerarRespostaNinaInterno(
         // Nenhuma ferramenta do mesmo lote pode gravar antes do novo aceite.
         break;
       }
-      const encaminhamento = encaminhamentoSemVagas(r, c.function?.arguments);
+      const { encaminhamentoFalhaAgendamento, respostaFalhaAgendamento } = await import("@/lib/nina/falha-agendamento");
+      const falhaAgendamento = encaminhamentoFalhaAgendamento(r);
+      const encaminhamento = falhaAgendamento ?? encaminhamentoSemVagas(r, c.function?.arguments);
       if (encaminhamento) {
+        const origemEncaminhamento = falhaAgendamento ? "falha_operacional_agendamento" : "agenda_sem_vagas";
         // A consulta é leitura, mas o encaminhamento é escrita: conferir de
         // novo a revisão antes de silenciar a Nina ou atribuir a conversa.
         if (opcoes?.revisao?.valor) {
@@ -2206,13 +2212,13 @@ async function gerarRespostaNinaInterno(
             revisaoProcessada: opcoes.revisao.valor })) {
             turnoObsoleto = true;
             rastro?.falhar("tool.execute", "STALE_CONVERSATION_REVISION", {
-              ferramenta: "solicitar_atendente_humano", origem_solicitacao: "agenda_sem_vagas",
+              ferramenta: "solicitar_atendente_humano", origem_solicitacao: origemEncaminhamento,
             });
             break;
           }
         }
         rastro?.iniciar("tool.execute", {
-          ferramenta: "solicitar_atendente_humano", origem_solicitacao: "agenda_sem_vagas",
+          ferramenta: "solicitar_atendente_humano", origem_solicitacao: origemEncaminhamento,
         });
         const rh = await broker.executar("solicitar_atendente_humano", JSON.stringify(encaminhamento));
         await compartilharResultado("solicitar_atendente_humano", encaminhamento, rh);
@@ -2223,11 +2229,12 @@ async function gerarRespostaNinaInterno(
         fluxoEstado.appointment.slot_options = null;
         fluxoEstado.flow.stage = "HANDOFF";
         finalizacaoHandoff = {
-          texto: respostaSemVagas(confirmado, encaminhamento.motivo.startsWith("VAGA_ESCOLHIDA_INDISPONIVEL"), encaminhamento.motivo.startsWith("MODALIDADE_")),
+          texto: falhaAgendamento ? respostaFalhaAgendamento(confirmado)
+            : respostaSemVagas(confirmado, encaminhamento.motivo.startsWith("VAGA_ESCOLHIDA_INDISPONIVEL"), encaminhamento.motivo.startsWith("MODALIDADE_")),
           textoModelo: msg.content ?? "", handoffConfirmado: confirmado, motivo: encaminhamento.motivo,
         };
         registrarEtapa({
-          tipo: "ferramenta", fonte: "atendimento", titulo: encaminhamento.motivo.startsWith("MODALIDADE_")
+          tipo: "ferramenta", fonte: "atendimento", titulo: falhaAgendamento ? "Encaminhamento por falha operacional no agendamento" : encaminhamento.motivo.startsWith("MODALIDADE_")
             ? "Encaminhamento para conferir a modalidade" : "Encaminhamento por ausência de vagas",
           dados: { origem_solicitacao: "servidor", motivo: encaminhamento.motivo,
             ferramenta_origem: nome, consulta: r.dados, argumentos: encaminhamento,
@@ -2235,7 +2242,7 @@ async function gerarRespostaNinaInterno(
           codigo: { arquivo: "src/lib/whatsapp.server.ts", funcao: "gerarRespostaNina" },
         });
         if (confirmado) rastro?.concluir("tool.execute", {
-          ferramenta: "solicitar_atendente_humano", origem_solicitacao: "agenda_sem_vagas",
+          ferramenta: "solicitar_atendente_humano", origem_solicitacao: origemEncaminhamento,
         });
         else rastro?.falhar("tool.execute", rh.erro ?? "handoff não confirmado", {
           ferramenta: "solicitar_atendente_humano",

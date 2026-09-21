@@ -38,15 +38,8 @@ import { respostaSemVagas } from "./agenda-sem-vagas";
 
 /* ------------------------------------------------------------ confirmações */
 
-const CONFIRMACAO =
-  /^\s*(sim|isso|isso\s*mesmo|esse\s*mesmo|essa\s*mesma|é\s*isso|eh\s*isso|claro|ok|okay|okey|beleza|blz|pode\s*ser|pode\s*marcar|pode\s*agendar|pode\s*sim|quero|quero\s*sim|desejo|confirmo|confirmado|agenda(r|e)?|marca(r|e)?\s*(sim)?|vamos|bora|fechado|perfeito|por\s*favor|sim,?\s*por\s*favor|aceito)\s*[.!]*\s*$/i;
-
-/** O paciente aceitou a vaga oferecida? Comparação tolerante a acento/pontuação. */
-export function ehConfirmacaoDeAgendamento(texto: string): boolean {
-  const t = (texto ?? "").trim();
-  if (!t || t.length > 40) return false;
-  return CONFIRMACAO.test(t);
-}
+import { ehConfirmacaoDeAgendamento } from "./confirmacao-agendamento";
+export { ehConfirmacaoDeAgendamento } from "./confirmacao-agendamento";
 
 const NEGACAO =
   /^\s*(n[ãa]o\s+(quero|posso|vou|desejo|dá|da|pode|prefiro|é|eh|serve)|n[ãa]o,|nao,|outro\s+(hor[áa]rio|dia|m[ée]dico)|outra\s+(data|hora|op[cç][ãa]o)|prefiro\b|ainda\s*n[ãa]o\b|cancela\w*)\b/i;
@@ -216,7 +209,8 @@ export async function aplicarGateIdentificacao(params: {
     return criarResultado({ origem: ok ? "handoff" : "erro", texto: respostaSemVagas(ok, true, modalidadePendente),
       fatosConfirmados: ok ? ["handoff_confirmado"] : [], restricoes: ["nao_substituir_vaga_escolhida"] });
   };
-  const escolha = lerEscolhaHorario(mensagem);
+  const aceiteDaVaga = ehConfirmacaoDeAgendamento(mensagem, confirmacaoDaEscolha(estado, ctx.clinicaId)?.vaga);
+  const escolha = aceiteDaVaga ? null : lerEscolhaHorario(mensagem);
   const opcoes = vagasDaSessao(estado, ctx.clinicaId);
   // Uma correção/recusa após o aceite suspende a gravação. A Nina não troca
   // a vaga no meio da coleta; a equipe humana deverá tratar a mudança.
@@ -263,7 +257,7 @@ export async function aplicarGateIdentificacao(params: {
       return resultadoGate(textos, "fluxo.agendamento.escolher", {});
     return null;
   }
-  const confirmouAgora = !consentimentoDaEscolha(estado, ctx.clinicaId) && ehConfirmacaoDeAgendamento(mensagem);
+  const confirmouAgora = !consentimentoDaEscolha(estado, ctx.clinicaId) && aceiteDaVaga;
   if (confirmouAgora) {
     if (!aceitarResumoEntregue(estado, ctx.clinicaId, ctx.consultaAgenda?.historico ?? [])) {
       const resumo = confirmacaoDaEscolha(estado, ctx.clinicaId);
@@ -275,7 +269,8 @@ export async function aplicarGateIdentificacao(params: {
   }
   const confirmacao = consentimentoDaEscolha(estado, ctx.clinicaId);
   if (!confirmacao) return null;
-  const novo = confirmouAgora ? null : extrairDadosIdentificacao(mensagem);
+  // Uma repetição do aceite durante a coleta não é nome de paciente.
+  const novo = aceiteDaVaga ? null : extrairDadosIdentificacao(mensagem);
   if (
     !confirmouAgora &&
     pareceAssuntoParalelo(mensagem) &&
@@ -290,6 +285,26 @@ export async function aplicarGateIdentificacao(params: {
   if (!consulta.ok && consulta.erro === "PROFISSIONAL_SFP") return encaminharSfp();
   if (!consulta.ok) return resultadoGate(textos, "fluxo.identificacao.instabilidade", {});
   const faltantesNoCadastro = (consulta.campos_faltantes ?? []) as CampoCadastro[];
+  if (confirmouAgora) {
+    // Dados já informados são candidatos ao cadastro, nunca prova de identidade.
+    // Não extraia nomes de pedidos de consulta ou de resumos do assistente.
+    const historico = ctx.consultaAgenda?.historico ?? [];
+    for (let i = 0; i < historico.length; i++) {
+      const item = historico[i]!;
+      if (item.role !== "user" || !item.content) continue;
+      const declaracao = item.content.match(/\b(?:meu nome(?: completo)? (?:é|eh)|me chamo|sou)\s+.+/i)?.[0];
+      const respostaCadastro = historico[i - 1]?.role === "assistant" &&
+        /(?:nome completo|data de nascimento|telefone com DDD)/i.test(historico[i - 1]?.content ?? "");
+      if (!declaracao && !respostaCadastro) continue;
+      const trecho = declaracao ?? item.content;
+      if (/\b(?:consulta|agendar|marcar|confirmo|horário|horario|doutor|doutora)\b|\?/i.test(trecho)) continue;
+      const recebido = extrairDadosIdentificacao(trecho);
+      for (const campo of faltantesNoCadastro) {
+        if (recebido[campo] && camposCadastroFaltantes(p.pending).includes(campo) &&
+          !camposCadastroFaltantes(recebido).includes(campo)) p.pending[campo] = recebido[campo];
+      }
+    }
+  }
   if (novo) {
     for (const campo of faltantesNoCadastro) {
       if (novo[campo] && camposCadastroFaltantes(p.pending).includes(campo))

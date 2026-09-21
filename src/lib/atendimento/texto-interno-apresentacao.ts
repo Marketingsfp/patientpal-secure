@@ -23,6 +23,14 @@ export function motivoParaAtendimento(valor: unknown): string | null {
   if (typeof valor !== "string" || !valor.trim()) return null;
   const motivos: Array<[RegExp, string]> = [
     [
+      /\bFALHA_OPERACIONAL_AGENDAMENTO\b.*\bATENDIMENTO_AGENDA_NAO_VINCULADO\b/i,
+      "A Nina encontrou vagas, mas não conseguiu vinculá-las à consulta ou ao procedimento solicitado. A equipe precisa conferir a ligação entre o catálogo e a agenda.",
+    ],
+    [
+      /\bFALHA_OPERACIONAL_AGENDAMENTO\b/i,
+      "Uma falha operacional impediu a Nina de concluir o agendamento. A equipe precisa conferir os dados e a agenda antes de tentar novamente.",
+    ],
+    [
       /\bCATALOGO_IDENTIFICACAO_NAO_ESCLARECIDA\b.*\bduas\b/i,
       "A Nina pediu esclarecimento duas vezes e ainda não conseguiu identificar com segurança o atendimento ou o profissional solicitado. A equipe dará continuidade.",
     ],

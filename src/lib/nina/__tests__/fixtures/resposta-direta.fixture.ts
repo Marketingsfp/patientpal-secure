@@ -198,6 +198,11 @@ mock.module("@/lib/nina/tool-broker.server", () => ({ criarToolBroker: () => ({
     ordem.push(nome);
     argumentosFerramentas.push({ nome, args: typeof args === "string" ? JSON.parse(args) : args });
     ferramentas.push(nome);
+    if (["falha_vinculo", "falha_selecao"].includes(cenario) && nome !== "solicitar_atendente_humano") return {
+      ferramenta: nome, capacidade: "checkAvailability", fonte: "agenda", success: false,
+      reused: false, appointment_confirmed: false, erro: "ACTION_NOT_AUTHORIZED",
+      dados: { ok: false, erro: "ACTION_NOT_AUTHORIZED", codigo: cenario === "falha_vinculo" ? "ATENDIMENTO_AGENDA_NAO_VINCULADO" : "ACTION_NOT_AUTHORIZED" },
+    };
     if (contextual && nome === contextual.ferramenta) return {
       ferramenta: nome, capacidade: "checkAvailability", fonte: "agenda", success: true,
       reused: false, appointment_confirmed: false,
@@ -358,10 +363,10 @@ mock.module("@/lib/nina/ai-gateway.server", () => ({ ninaAIGateway: async (req: 
   if (agenda && requests.length === 1) return {
     ok: true, conteudo: "Vou verificar.", modelo: "modelo-simulado", execucaoId: "execucao-direta", nivel: "low",
     toolCalls: [
-      { id: "consulta-agenda", type: "function", function: { name: "consultar_disponibilidade",
+      { id: "consulta-agenda", type: "function", function: { name: cenario === "falha_selecao" ? "selecionar_horario" : "consultar_disponibilidade",
         arguments: '{"medico_id":"jorge","data":"2030-01-21"}' } },
       // Uma operação posterior no mesmo lote NÃO pode rodar após a transferência.
-      ...(["sem_vagas", "falha_handoff", "sem_pre", "modalidade_indefinida"].includes(cenario) ? [{ id: "nao-executar", type: "function",
+      ...(["sem_vagas", "falha_handoff", "sem_pre", "modalidade_indefinida", "falha_consulta", "falha_vinculo", "falha_selecao"].includes(cenario) ? [{ id: "nao-executar", type: "function",
         function: { name: "agendar", arguments: "{}" } }] : []),
     ],
   };

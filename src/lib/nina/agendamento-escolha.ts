@@ -50,10 +50,13 @@ export function registrarOpcoesAgendamento(
 ) {
   if (!estado || estado.appointment.appointment_id || estado.appointment.confirmation?.aceita)
     return;
-  limparEscolhaAgendamento(estado);
+  const escolha = confirmacaoDaEscolha(estado, clinicaId);
+  const preservar = escolha && vagas.some(v => mesmaVaga(v, escolha.vaga));
+  if (!preservar) limparEscolhaAgendamento(estado);
   estado.appointment.slot_options = estado.session_id
     ? { clinica_id: clinicaId, session_id: estado.session_id, vagas }
     : null;
+  if (preservar) return;
   const medico = vagas[0];
   if (medico && vagas.every((v) => v.medico_id === medico.medico_id)) {
     estado.appointment.doctor_id = medico.medico_id;
@@ -125,6 +128,8 @@ export function selecionarVagaValidada(
   vaga: VagaAgendamento,
   resumo: string,
 ) {
+  const anterior = confirmacaoDaEscolha(estado, clinicaId);
+  if (anterior && !estado.appointment.appointment_id && mesmaVaga(anterior.vaga, vaga)) return;
   if (estado.appointment.confirmation?.aceita || estado.appointment.appointment_id)
     throw new Error("A vaga confirmada não pode ser substituída.");
   limparEscolhaAgendamento(estado);
@@ -152,6 +157,12 @@ export function selecionarVagaValidada(
 
 const mesmoInstante = (a: string | null | undefined, b: string) =>
   Boolean(a) && Number.isFinite(Date.parse(b)) && Date.parse(a!) === Date.parse(b);
+
+function mesmaVaga(a: VagaAgendamento, b: VagaAgendamento) {
+  return a.medico_id === b.medico_id && a.procedimento === b.procedimento &&
+    a.data === b.data && a.hora === b.hora && a.modalidade === b.modalidade &&
+    a.agenda_id === b.agenda_id && mesmoInstante(a.inicio, b.inicio) && mesmoInstante(a.fim, b.fim);
+}
 
 /** A prova independente do resumo impede que um campo mutado reutilize o aceite. */
 export function confirmacaoDaEscolha(

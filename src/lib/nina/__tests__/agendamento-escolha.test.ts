@@ -30,6 +30,17 @@ function preparar() {
   return e;
 }
 describe("escolha de horário e consentimento do resumo entregue", () => {
+  test("reconsultar ou selecionar a mesma vaga preserva o resumo e o aceite", () => {
+    const e = preparar();
+    const resumo = e.appointment.confirmation!;
+    registrarOpcoesAgendamento(e, "clinica", [vaga]);
+    selecionarVagaValidada(e, "clinica", vaga, "Texto diferente não reinicia a etapa");
+    expect(e.appointment.confirmation).toBe(resumo);
+    aceitarResumoEntregue(e, "clinica", [{ role: "assistant", content: resumo.resumo }]);
+    selecionarVagaValidada(e, "clinica", vaga, "Outro texto");
+    expect(consentimentoDaEscolha(e)).toBe(resumo);
+    expect(e.appointment.confirmation?.aceita).toBe(true);
+  });
   for (const mensagem of [
     "10:20 fica melhor",
     "eu prefiro 10:20",

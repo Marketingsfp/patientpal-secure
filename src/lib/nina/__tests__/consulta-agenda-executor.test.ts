@@ -20,6 +20,7 @@ type Linha = Record<string, unknown>;
 let banco: Record<string, Linha[]>;
 let falharLeituraFicha = false;
 let falharAgendaMedico: string | null = null;
+let falharEscala = false;
 let resultadoCatalogo: ResultadoConhecimento;
 const pesquisas: unknown[] = [];
 const leituras: Array<{ tabela: string; filtros: Record<string, unknown> }> = [];
@@ -46,6 +47,7 @@ mock.module("@/integrations/supabase/client.server", () => ({
       let faixa: [number, number] | null = null;
       let limite: number | null = null;
       const ler = () => {
+        if (tabela === "medico_disponibilidades" && falharEscala) throw new Error("Falha simulada de escala");
         if (tabela === "agendamentos" && falharAgendaMedico &&
           (filtros.medico_id as string[] | undefined)?.includes(falharAgendaMedico))
           throw new Error("Falha simulada de agenda");
@@ -225,6 +227,7 @@ function contextoAgendar(confirmado = false) {
 }
 
 beforeEach(() => {
+  falharEscala = false;
   falharLeituraFicha = false;
   falharAgendaMedico = null;
   leituras.length = 0;
@@ -505,6 +508,106 @@ describe("primeiro disponível entre todos os profissionais publicados", () => {
 });
 
 describe("executor real das ferramentas com banco simulado", () => {
+  function referenciaConsulta(ctx: CtxNinaPaciente, termo = "cardiologia") {
+    banco.nina_cat_profissionais![0]!.especialidades = [{ nome: "Cardiologia" }, { nome: "Cardiologia Infantil" }];
+    ctx.estado!.knowledge_context = {
+      versao: 1, clinicaId: CLINICA, sessionId: ctx.estado!.session_id!,
+      consulta: { termo, tipo_atendimento: "consulta" },
+      referencias: [{ registro: CATALOGO, versao: "v1", procedimento: `Consulta — ${termo === "cardiologia infantil" ? "Cardiologia Infantil" : "Cardiologia"}`, medicoNome: "Alex Louza" }],
+    };
+  }
+  for (const origem of ["homologacao", "whatsapp"] as const) {
+    test(`${origem}: referência entre turnos → vaga com consulta → aceite natural → uma reserva`, async () => {
+      const ctx: CtxNinaPaciente = { ...contexto("Quero a primeira data com Alex Louza"), origem,
+        teste: origem === "homologacao", podeAgendar: true, pacienteId: PACIENTE, pacienteNome: "Paciente Fictício" };
+      referenciaConsulta(ctx);
+      const r = await executarFerramentaPaciente(ctx, "proxima_vaga", { medico_id: MEDICO });
+      expect(r.ok).toBe(true);
+      expect(ctx.estado!.appointment.procedure).toBe("Consulta — Cardiologia");
+      expect(ctx.estado!.appointment.slot_options?.vagas[0]?.procedimento).toBe("Consulta — Cardiologia");
+      expect(gravacoes).toHaveLength(0);
+      ctx.estado = JSON.parse(JSON.stringify(ctx.estado));
+      ctx.opcoesAgendamentoInicioTurno = true;
+      ctx.consultaAgenda = { mensagemAtual: "Escolho 14:00", historico: [{ role: "assistant", content: "Disponível às 14:00. Qual prefere?" }] };
+      const selecionar = await aplicarGateIdentificacao({ mensagem: "Escolho 14:00", estado: ctx.estado!, ctx, executar: executarFerramentaPaciente });
+      expect(selecionar?.texto).toContain("14:00");
+      expect(selecionar?.texto).toContain("Cardiologia");
+      ctx.estado = JSON.parse(JSON.stringify(ctx.estado));
+      ctx.consultaAgenda = { mensagemAtual: "Sim, confirmo todos esses dados para concluir o agendamento.",
+        historico: [{ role: "assistant", content: selecionar!.texto }] };
+      const executar: typeof executarFerramentaPaciente = async (c, nome, args) => {
+        if (nome === "consultar_cadastro_paciente") return { ok: true, campos_faltantes: [] };
+        if (nome === "identificar_paciente") return { ok: true };
+        return executarFerramentaPaciente(c, nome, args);
+      };
+      const confirmado = await aplicarGateIdentificacao({ mensagem: ctx.consultaAgenda.mensagemAtual, estado: ctx.estado!, ctx, executar });
+      expect(confirmado?.acoesConcluidas[0]?.confirmada).toBe(true);
+      expect(gravacoes).toHaveLength(1);
+      expect(gravacoes[0]!.procedimento).toBe("Consulta — Cardiologia");
+      expect(gravacoes[0]!.inicio).toBe(inicio.toISOString());
+      await aplicarGateIdentificacao({ mensagem: "Sim, confirmo.", estado: ctx.estado!, ctx, executar });
+      expect(gravacoes).toHaveLength(1);
+    });
+  }
+  test.each(["cardio", "cardiologia infantil"])("revalida o atendimento publicado: %s", async termo => {
+    const ctx: CtxNinaPaciente = { ...contexto("Primeira data"), podeAgendar: true };
+    referenciaConsulta(ctx, termo);
+    const r = await executarFerramentaPaciente(ctx, "proxima_vaga", { medico_id: MEDICO });
+    expect(r.ok).toBe(true);
+    expect(ctx.estado!.appointment.procedure).toBe(termo === "cardio" ? "Consulta — Cardiologia" : "Consulta — Cardiologia Infantil");
+  });
+  test("referência antiga não reutiliza atendimento retirado da publicação", async () => {
+    const ctx: CtxNinaPaciente = { ...contexto("Primeira data"), podeAgendar: true };
+    referenciaConsulta(ctx);
+    banco.nina_cat_profissionais![0]!.especialidades = [{ nome: "Ortopedia" }];
+    const r = await executarFerramentaPaciente(ctx, "proxima_vaga", { medico_id: MEDICO });
+    expect(r.ok).toBe(false);
+    expect(r.codigo).toBe("ATENDIMENTO_AGENDA_NAO_VINCULADO");
+    expect(ctx.estado!.appointment.slot_options?.vagas).toEqual([]);
+    expect(gravacoes).toHaveLength(0);
+  });
+  test.each(["sessionId", "clinicaId"])("referência de outra %s não completa a vaga", async campo => {
+    const ctx: CtxNinaPaciente = { ...contexto("Primeira data"), podeAgendar: true };
+    referenciaConsulta(ctx);
+    ctx.estado!.knowledge_context![campo] = "outro";
+    const r = await executarFerramentaPaciente(ctx, "proxima_vaga", { medico_id: MEDICO });
+    expect(r.ok).toBe(false);
+    expect(ctx.estado!.appointment.slot_options?.vagas).toEqual([]);
+  });
+  test("procedimento mantém executante e nome próprios entre turnos", async () => {
+    banco.nina_cat_servicos!.push({ id: CATALOGO, clinica_id: CLINICA, status: "PUBLICADO", nome: "USG TRANSVAGINAL", executantes: [{ nome: "Alex Louza" }] });
+    const ctx: CtxNinaPaciente = { ...contexto("Primeira data"), podeAgendar: true };
+    ctx.estado!.knowledge_context = { versao: 1, clinicaId: CLINICA, sessionId: ctx.estado!.session_id!,
+      consulta: { termo: "USG TRANSVAGINAL", tipo_atendimento: "exame_procedimento" },
+      referencias: [{ registro: CATALOGO, versao: "v1", procedimento: "USG TRANSVAGINAL", medicoNome: "Alex Louza" }] };
+    const r = await executarFerramentaPaciente(ctx, "proxima_vaga", { medico_id: MEDICO });
+    expect(r.ok).toBe(true);
+    expect(ctx.estado!.appointment.slot_options?.vagas[0]?.procedimento).toBe("USG TRANSVAGINAL");
+  });
+  for (const situacao of ["vazia", "dia_divergente", "falha_de_leitura"]) {
+    test(`vaga real permanece disponível com escala ${situacao}`, async () => {
+      if (situacao === "vazia") banco.medico_disponibilidades = [];
+      if (situacao === "dia_divergente") banco.medico_disponibilidades![0]!.dia_semana = (inicio.getUTCDay() + 1) % 7;
+      if (situacao === "falha_de_leitura") falharEscala = true;
+      const r = await executarFerramentaPaciente(contexto("Verifique 14:00"), "verificar_horario", argumentos);
+      expect(r.ok).toBe(true);
+      expect(r.disponivel).toBe(true);
+      expect(r.inicio).toBe(inicio.toISOString());
+      expect(r.motivo).toBeNull();
+      expect(encaminhamentoSemVagas(validarResultado("verificar_horario", r), argumentos)).toBeNull();
+      expect(leituras.some(l => l.tabela === "medico_disponibilidades")).toBe(false);
+    });
+  }
+  test("escala vazia preserva alternativas reais e não afirma que médico não atende", async () => {
+    banco.medico_disponibilidades = [];
+    const r = await executarFerramentaPaciente(contexto("Verifique 15:00"), "verificar_horario", { ...argumentos, hora: "15:00" });
+    expect(r.disponivel).toBe(false);
+    expect(r.motivo).toBe("HORARIO_OCUPADO");
+    expect((r.alternativas as unknown[])).toHaveLength(1);
+    banco.agendamentos = [];
+    const vazio = await executarFerramentaPaciente(contexto("Verifique 15:00"), "verificar_horario", argumentos);
+    expect(vazio.motivo).toBe("NO_AVAILABILITY");
+  });
   test("consulta do dia local inclui a noite após a virada UTC e exclui o dia seguinte", async () => {
     banco.agendamentos = [
       "2026-09-17T02:59:59.000Z", // dia 16 na clínica

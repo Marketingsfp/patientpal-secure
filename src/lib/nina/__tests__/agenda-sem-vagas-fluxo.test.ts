@@ -47,11 +47,24 @@ describe("geração real interrompe o turno após agenda sem vagas (serviços ex
       expect(r.resposta).not.toContain("Transferido para atendimento humano");
       expect(r.ferramentas).not.toContain("agendar");
     });
-    for (const cenario of ["alternativas", "falha_consulta"]) {
+    for (const cenario of ["alternativas"]) {
       test(`${ambiente}: ${cenario} não dispara transferência por agenda vazia`, () => {
         const r = simular(ambiente, cenario);
         expect(r.encaminhamentos).toHaveLength(0);
         expect(r.requests).toHaveLength(2);
+      });
+    }
+    for (const cenario of ["falha_consulta", "falha_vinculo", "falha_selecao"]) {
+      test(`${ambiente}: ${cenario} encaminha pela causa operacional, sem alegar ausência`, () => {
+        const r = simular(ambiente, cenario);
+        expect(r.encaminhamentos).toHaveLength(1);
+        expect(r.encaminhamentos[0].motivo).toContain("FALHA_OPERACIONAL_AGENDAMENTO");
+        expect(r.requests).toHaveLength(1);
+        expect(r.resposta).toContain("Não consegui concluir seu agendamento");
+        expect(r.resposta).not.toMatch(/Não encontrei|sem vagas|base de conhecimentos/);
+        expect(r.ferramentas).not.toContain("agendar");
+        expect(r.etapas.some((e: { titulo: string }) => e.titulo === "Encaminhamento por falha operacional no agendamento")).toBe(true);
+        expect(r.rede).toBe(0);
       });
     }
     test(`${ambiente}: mensagem nova durante a consulta impede transferência do turno antigo`, () => {

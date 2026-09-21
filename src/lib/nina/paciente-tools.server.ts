@@ -38,7 +38,7 @@ import { normalizar, raizEspecialidade } from "@/lib/nina-especialidade";
 import { cadastroAutorizado, cadastroMinimoSchema } from "./cadastro-paciente";
 import { consultarCadastroConfirmado } from "./cadastro-paciente.server";
 import { processamentoWatchdogAtual } from "./watchdog-contexto.server";
-import { consentimentoDaEscolha, limparEscolhaAgendamento, registrarOpcoesAgendamento, selecionarVagaValidada,
+import { confirmacaoDaEscolha, consentimentoDaEscolha, limparEscolhaAgendamento, registrarOpcoesAgendamento, selecionarVagaValidada,
   vagasDaSessao, vagasDaEscolha, lerEscolhaHorario, type VagaAgendamento } from "./agendamento-escolha";
 import { chaveResumoModalidade, permiteReserva, orientacaoModalidade, type ModalidadeResolvida } from "./modalidade-atendimento";
 import { enriquecerModalidades, fichaDoAgendamento, modalidadeAtualDaAgenda } from "./modalidade-atendimento.server";
@@ -395,16 +395,49 @@ function acharEspecialidade(termo: string, lista: Array<{ id: string; nome: stri
 
 /* -------------------------------------------------- disponibilidade (núcleo) */
 
-function guardarOpcoes(ctx: CtxNinaPaciente, slots: SlotNina[], procedimentos?: ReadonlyMap<string, string>) {
-  if (consentimentoDaEscolha(ctx.estado, ctx.clinicaId)) return;
+async function guardarOpcoes(ctx: CtxNinaPaciente, slots: SlotNina[], procedimentos?: ReadonlyMap<string, string>) {
+  if (consentimentoDaEscolha(ctx.estado, ctx.clinicaId)) return null;
+  const { conhecimentoDaMesmaSessao } = await import("./confidence/conhecimento-sessao");
+  const { normalizarSelecaoContextual } = await import("./confidence/selecao-contextual");
+  const conhecimento = conhecimentoDaMesmaSessao(ctx.estado?.knowledge_context, ctx.clinicaId, ctx.estado?.session_id ?? null);
+  let publicados = procedimentos;
+  if (!publicados && conhecimento && slots.length) {
+    // A referência persistida é uma pesquisa, não um fato antigo: releia a
+    // publicação e associe cada atendimento ao UUID operacional do executante.
+    const preferencia = ctx.consultaAgenda?.selecaoRevalidada ?? normalizarSelecaoContextual(conhecimento.selecao);
+    const selecao = preferencia?.clinicaId === ctx.clinicaId && preferencia.sessaoId === ctx.estado?.session_id ? preferencia : null;
+    const atendimento = selecao?.modalidade?.nome ?? conhecimento.consulta.termo;
+    const tipo = conhecimento.consulta.tipo_atendimento;
+    const { candidatosPrimeiraVaga } = await import("./primeiro-disponivel-catalogo.server");
+    let candidatos = tipo === "consulta" || tipo === "exame_procedimento"
+      ? await candidatosPrimeiraVaga(ctx.clinicaId, tipo === "consulta" ? "consulta" : "procedimento", atendimento)
+      : [];
+    // Ex.: a pesquisa salva foi "cardio", mas todas as referências indicam
+    // "Consulta — CARDIOLOGIA". Use esse nome apenas para nova leitura oficial.
+    const referencias = [...new Set(conhecimento.referencias.map(r => r.procedimento).filter((p): p is string => !!p))];
+    if (!candidatos.length && referencias.length === 1 && !referencias[0]!.includes(",") &&
+      (tipo === "consulta" || tipo === "exame_procedimento"))
+      candidatos = await candidatosPrimeiraVaga(ctx.clinicaId, tipo === "consulta" ? "consulta" : "procedimento", referencias[0]!);
+    publicados = new Map(slots.flatMap(s => {
+      const nomes = [...new Set(candidatos.filter(c => c.medicoId === s.medico_id)
+        .map(c => c.registro.procedimento).filter((p): p is string => !!p))];
+      return nomes.length === 1 ? [[s.medico_id, nomes[0]!] as const] : [];
+    }));
+  }
   const vagas: VagaAgendamento[] = slots.flatMap((s) => !permiteReserva(s.modalidade) ? [] : [{
     medico_id: s.medico_id, medico: s.medico_nome, especialidade: s.especialidade,
-    procedimento: procedimentos?.get(s.medico_id) ?? ctx.consultaAgenda?.selecaoRevalidada?.modalidade?.procedimento ??
+    procedimento: publicados ? publicados.get(s.medico_id) ?? null :
       (ctx.estado?.appointment.doctor_id === s.medico_id ? ctx.estado.appointment.procedure : null),
     data: dataISODoSlot(s.inicio), hora: s.hora, inicio: s.inicio, fim: s.fim,
     modalidade: s.modalidade, agenda_id: s.agenda,
   }]);
+  if (ctx.podeAgendar && vagas.some(v => !v.procedimento)) {
+    registrarOpcoesAgendamento(ctx.estado, ctx.clinicaId, []);
+    return falha("ACTION_NOT_AUTHORIZED", "Não foi possível vincular o atendimento publicado às vagas da agenda. A equipe deve conferir esse vínculo; isso não comprova ausência na base nem falta de vagas.",
+      { codigo: "ATENDIMENTO_AGENDA_NAO_VINCULADO", encaminhar_para_humano: true });
+  }
   registrarOpcoesAgendamento(ctx.estado, ctx.clinicaId, vagas);
+  return null;
 }
 
 export type SlotNina = {
@@ -557,19 +590,20 @@ function diaSemanaDe(dataISO: string): number | null {
  * usada para oferecer horário — vaga só sai de `consultarDisponibilidadeCore`.
  */
 async function escalaDoMedico(clinicaId: string, medicoId: string) {
-  const { data } = await supabaseAdmin
+  const { data, error } = await supabaseAdmin
     .from("medico_disponibilidades")
     .select("dia_semana, hora_inicio, hora_fim")
     .eq("clinica_id", clinicaId)
     .eq("medico_id", medicoId)
     .eq("ativo", true);
+  if (error) throw new Error(error.message);
   return (data ?? []) as Array<{ dia_semana: number; hora_inicio: string; hora_fim: string }>;
 }
 
 async function medicoAtendeNoDia(clinicaId: string, medicoId: string, dataISO: string) {
   const escala = await escalaDoMedico(clinicaId, medicoId);
   const dow = diaSemanaDe(dataISO);
-  return { atende: escala.some((e) => e.dia_semana === dow), escala };
+  return { atende: escala.length ? escala.some((e) => e.dia_semana === dow) : null, escala };
 }
 
 async function nomeMedico(medicoId: string): Promise<string | null> {
@@ -1123,7 +1157,8 @@ async function executarFerramentaInterna(
         primeiras.sort((a, b) => Date.parse(a.inicio) - Date.parse(b.inicio) || a.medico_id.localeCompare(b.medico_id));
         await auditar(ctx, nome, { ...p, consultados, sem_pre_agendamento: semAgendamento.length }, { ok: true });
         const melhores = primeiras.filter(s => Date.parse(s.inicio) === Date.parse(primeiras[0]!.inicio));
-        guardarOpcoes(ctx, melhores, new Map([...porMedico].map(([id, c]) => [id, c.registro.procedimento!])));
+        const pendencia = await guardarOpcoes(ctx, melhores, new Map([...porMedico].map(([id, c]) => [id, c.registro.procedimento!])));
+        if (pendencia) return pendencia;
         if (!primeiras.length && semAgendamento.length && ctx.estado && !consentimentoDaEscolha(ctx.estado, ctx.clinicaId))
           ctx.estado.flow.stage = "INFORMATION_RESPONSE";
         if (!primeiras.length && !semAgendamento.length)
@@ -1141,6 +1176,12 @@ async function executarFerramentaInterna(
       case "selecionar_horario": {
         const p = z.object({ medico_id: z.string(), inicio: z.string(), fim: z.string() }).parse(args);
         const estado = ctx.estado;
+        const existente = confirmacaoDaEscolha(estado, ctx.clinicaId);
+        if (existente && !estado?.appointment.appointment_id && existente.vaga.medico_id === p.medico_id &&
+          Date.parse(existente.vaga.inicio) === Date.parse(p.inicio) && Date.parse(existente.vaga.fim) === Date.parse(p.fim))
+          return { ok: true, selecao_preservada: true, confirmacao_recebida: existente.aceita,
+            instrucao: existente.aceita ? "O paciente já confirmou esta vaga. Continue com os dados faltantes e a gravação autorizada; não peça confirmação novamente."
+              : "Esta vaga já tem um resumo de confirmação. Não reinicie a escolha nem repita o resumo; esclareça somente a dúvida atual do paciente." };
         if (!estado || estado.appointment.appointment_id || estado.appointment.confirmation?.aceita)
           return falha("ACTION_NOT_AUTHORIZED", "O horário já confirmado não pode ser alterado por esta operação.");
         const opcoes = vagasDaSessao(estado, ctx.clinicaId);
@@ -1429,7 +1470,8 @@ async function executarFerramentaInterna(
         await auditar(ctx, "consultar_disponibilidade", { ...p, slots_encontrados: slots.length }, {
           ok: true,
         });
-        guardarOpcoes(ctx, slots.slice(0, 12));
+        const pendencia = await guardarOpcoes(ctx, slots.slice(0, 12));
+        if (pendencia) return pendencia;
         if (slots.length === 0) {
           // Diferencia "não atende nesse dia" de "atende, mas está cheio".
           if (medicoId && p.data) {
@@ -1441,16 +1483,17 @@ async function executarFerramentaInterna(
               dias: 60,
             }));
             if (proximos.some(s => !permiteReserva(s.modalidade))) return modalidadePendente();
-            guardarOpcoes(ctx, proximos.slice(0, 3));
+            const pendencia = await guardarOpcoes(ctx, proximos.slice(0, 3));
+            if (pendencia) return pendencia;
             const sugestoes = proximos.slice(0, 3).map((s) => ({ data: s.data, hora: s.hora,
               medico_id: s.medico_id, inicio: s.inicio, fim: s.fim,
               modalidade_atendimento: s.modalidade, orientacao: orientacaoModalidade(s.modalidade!) }));
             return semVaga(
-              atende ? "AGENDA_CHEIA" : "NAO_ATENDE_NO_DIA",
+              atende === null ? "NO_AVAILABILITY" : atende ? "AGENDA_CHEIA" : "NAO_ATENDE_NO_DIA",
               atende
                 ? `${nome} atende nesse dia, mas a agenda está sem horários disponíveis.`
-                : `${nome} não possui atendimento cadastrado nesse dia.`,
-              { motivo: atende ? "AGENDA_CHEIA" : "NAO_ATENDE_NO_DIA", proximos: sugestoes },
+                : `Não encontrei horários livres de ${nome} nos critérios consultados.`,
+              { motivo: atende === null ? "NO_AVAILABILITY" : atende ? "AGENDA_CHEIA" : "NAO_ATENDE_NO_DIA", proximos: sugestoes },
             );
           }
           return semVaga("NO_AVAILABILITY", "Nenhum horário livre com esses critérios.");
@@ -1491,7 +1534,6 @@ async function executarFerramentaInterna(
             { opcoes: r.opcoes.map((o) => ({ medico_id: o.id, nome: o.nome })) },
           );
         const nome = r.nome;
-        const { atende } = await medicoAtendeNoDia(ctx.clinicaId, r.id, p.data);
         let doDia: SlotNina[];
         try {
           doDia = await consultarDisponibilidadeCore({
@@ -1506,6 +1548,9 @@ async function executarFerramentaInterna(
           return falhaAgenda(e, "verificar_horario");
         }
         const alvo = doDia.find((s) => s.hora === hora);
+        // A agenda real tem precedência. Escala ausente não significa que o
+        // médico não atende e nem uma falha nessa leitura pode apagar uma vaga.
+        const atende = doDia.length > 0 ? true : (await medicoAtendeNoDia(ctx.clinicaId, r.id, p.data)).atende;
         logAgenda("verificar_horario", {
           medico: nome,
           medico_id: r.id,
@@ -1522,8 +1567,9 @@ async function executarFerramentaInterna(
           { ok: true },
         );
         const alternativas = doDia.filter(s => s.hora !== hora).slice(0, 4);
-        guardarOpcoes(ctx, atende ? [...(alvo ? [alvo] : []), ...alternativas] : []);
-        if (!atende)
+        const pendencia = await guardarOpcoes(ctx, [...(alvo ? [alvo] : []), ...alternativas]);
+        if (pendencia) return pendencia;
+        if (atende === false)
           return {
             ok: true,
             medico: nome,
@@ -1542,7 +1588,7 @@ async function executarFerramentaInterna(
           data: p.data,
           hora,
           disponivel: Boolean(alvo),
-          motivo: alvo ? null : doDia.length === 0 ? "AGENDA_CHEIA" : "HORARIO_OCUPADO",
+          motivo: alvo ? null : doDia.length === 0 ? (atende === null ? "NO_AVAILABILITY" : "AGENDA_CHEIA") : "HORARIO_OCUPADO",
           // Só horário — nunca quem ocupa a vaga.
           ...(alvo ? { inicio: alvo.inicio, fim: alvo.fim, modalidade_atendimento: alvo.modalidade,
             orientacao: orientacaoModalidade(alvo.modalidade ?? "nao_definida") } : {}),
@@ -1617,7 +1663,8 @@ async function executarFerramentaInterna(
           { ...p, slots_encontrados: slots.length },
           { ok: slots.length > 0 },
         );
-        guardarOpcoes(ctx, slots.slice(0, 4));
+        const pendencia = await guardarOpcoes(ctx, slots.slice(0, 4));
+        if (pendencia) return pendencia;
         if (slots.length === 0)
           return semVaga(
             "NO_AVAILABILITY",

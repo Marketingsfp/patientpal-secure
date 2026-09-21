@@ -92,6 +92,49 @@ describe("cadastro obrigatório compartilhado com o Clínica OS", () => {
 });
 
 describe("gate: definir atendimento → conferir cadastro → coletar só faltantes → agendar", () => {
+  for (const frase of ["Sim, confirmo.", "Sim, confirmo todos esses dados para concluir o agendamento.",
+    "Confirmo a consulta de ortopedia com Jorge Ribeiro em 21/01/2030 às 14:00."]) {
+    test(`confirmação natural não retorna à escolha: ${frase}`, async () => {
+      const t = preparar();
+      expect((await t.turno(frase))?.camposPendentes).toEqual(["nome", "data_nascimento"]);
+      expect(t.estado.appointment.confirmation?.aceita).toBe(true);
+      const resumo = t.estado.appointment.confirmation;
+      expect((await t.turno("Ana da Silva, 02/01/1990"))?.acoesConcluidas[0]?.confirmada).toBe(true);
+      expect(t.estado.appointment.confirmation).toBe(resumo);
+      expect(t.chamadas.filter(c => c.nome === "agendar")).toHaveLength(1);
+      expect(t.chamadas.some(c => c.nome === "selecionar_horario")).toBe(false);
+      await t.turno(frase);
+      expect(t.chamadas.filter(c => c.nome === "agendar")).toHaveLength(1);
+    });
+  }
+  test("aproveita nome e nascimento dados antes do aceite, sem extrair nome da consulta", async () => {
+    const t = preparar();
+    t.ctx.consultaAgenda!.historico.unshift(
+      { role: "user", content: "Quero consulta de ortopedia em 21/01/2030" },
+      { role: "assistant", content: "Qual seu nome completo e sua data de nascimento?" },
+      { role: "user", content: "Ana da Silva, 02/01/1990" });
+    const r = await t.turno("Sim, confirmo.");
+    expect(r?.acoesConcluidas[0]?.confirmada).toBe(true);
+    expect(t.chamadas.find(c => c.nome === "identificar_paciente")?.args).toEqual({ nome: "Ana Da Silva", data_nascimento: "1990-01-02" });
+  });
+  test("repetir o aceite durante o cadastro não vira nome nem reinicia a confirmação", async () => {
+    const t = preparar();
+    await t.turno("Sim, confirmo.");
+    const resumo = t.estado.appointment.confirmation;
+    const r = await t.turno("Sim, confirmo todos esses dados para concluir o agendamento.");
+    expect(r?.camposPendentes).toEqual(["nome", "data_nascimento"]);
+    expect(t.estado.patient.pending.nome).toBeNull();
+    expect(t.estado.appointment.confirmation).toBe(resumo);
+    expect(t.estado.appointment.confirmation?.aceita).toBe(true);
+    expect(t.chamadas.some(c => ["selecionar_horario", "agendar"].includes(c.nome))).toBe(false);
+  });
+  test.each(["Sim, confirmo às 15:00", "Confirmo com Paulo Guilherme", "Sim, mas qual o valor?"])(
+    "não registra aceite divergente: %s", async frase => {
+      const t = preparar();
+      await t.turno(frase);
+      expect(t.estado.appointment.confirmation?.aceita).not.toBe(true);
+      expect(t.chamadas.some(c => ["identificar_paciente", "agendar"].includes(c.nome))).toBe(false);
+    });
   for (const campo of ["slot_inicio", "doctor_id", "procedure"] as const) {
     test(`sem ${campo} não coleta nem cria paciente`, async () => {
       const t = preparar();
