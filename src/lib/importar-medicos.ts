@@ -67,6 +67,8 @@ export interface LinhaMedico {
   aceitaCartaoBeneficios: boolean;
   duracaoConsultaMin: number;
   ativo: boolean;
+  /** Dados que faltaram na planilha; o médico entra e é completado no cadastro. */
+  pendencias: string[];
 }
 
 export interface LinhaRepasseServico {
@@ -477,12 +479,26 @@ function lerMedicos(
     // Sem UF na planilha, vale a UF da clínica: quase todo profissional atende
     // com o registro do próprio estado.
     if (!uf) uf = normalizarMaiusculas(opcoes.ufPadrao, 10).replace(/[^A-Z]/g, "");
-    if (!crm) return recusar("Falta o CRM (ou o número do conselho do profissional).");
-    if (crm.length > 20) return recusar("O CRM tem mais de 20 caracteres.");
-    if (uf.length !== 2) return recusar('Falta a UF do CRM, com duas letras (ex.: "RJ").');
+    // Dado que falta não tira o profissional da importação: ele entra com a
+    // pendência anotada, para ser completado no cadastro. O banco exige CRM
+    // (único na clínica), então quem vem sem ganha um provisório com a linha
+    // da planilha — impossível de confundir com um CRM de verdade.
+    const pendencias: string[] = [];
+    if (crm.length > 20) {
+      pendencias.push(`CRM ilegível na planilha ("${crm}")`);
+      crm = "";
+    }
+    if (!crm) {
+      if (!pendencias.length) pendencias.push("sem CRM");
+      crm = `PENDENTE ${linhaExcel}`;
+    }
+    if (uf.length !== 2) {
+      pendencias.push("sem UF do CRM");
+      uf = "RJ";
+    }
 
     const especialidades = separarEspecialidades(get(bruta, "especialidade"));
-    if (!especialidades.length) return recusar("Falta a especialidade do médico.");
+    if (!especialidades.length) pendencias.push("sem especialidade");
 
     // Planilha sem a coluna Repasse Padrão: o repasse fica em branco aqui e a
     // funcionária informa um só na tela, que vale para todos (ver conferência).
@@ -509,34 +525,30 @@ function lerMedicos(
       }
     }
 
-    const cpf = normalizarCpf(get(bruta, "cpf"));
-    if (cpf === "") return recusar("O CPF não tem 11 números.");
+    let cpf = normalizarCpf(get(bruta, "cpf"));
+    if (cpf === "") {
+      pendencias.push(`CPF inválido na planilha ("${String(get(bruta, "cpf"))}")`);
+      cpf = null;
+    }
 
-    // O banco cria um cadastro de paciente para todo médico novo, e paciente
-    // sem telefone de 10 dígitos é recusado — o médico inteiro deixaria de ser
-    // gravado. Melhor avisar aqui, na conferência, do que falhar na gravação.
+    // Sem telefone com DDD o banco não cria a ficha de paciente do médico
+    // (a ficha exige telefone); o médico entra do mesmo jeito.
     // "(21) 99146-6993 / (21) 97024-1174": o segundo número vai para Telefone 2.
     const [telefone1, telefoneExtra] = String(get(bruta, "telefone") ?? "").split(/\s*\/\s*/);
     const telefone = idOuNulo(telefone1, 30);
     const telefone2 = idOuNulo(get(bruta, "telefone2"), 30) ?? idOuNulo(telefoneExtra, 30);
-    if ((telefone ?? "").replace(/\D/g, "").length < 10) {
-      return recusar(
-        "Falta o telefone com DDD (mínimo 10 números). O sistema exige para cadastrar.",
-      );
-    }
+    if ((telefone ?? "").replace(/\D/g, "").length < 10) pendencias.push("sem telefone");
 
     const nascimentoBruto = get(bruta, "nascimento");
     const dataNascimento = normalizarData(nascimentoBruto);
     if (!vazio(nascimentoBruto) && !dataNascimento) {
-      return recusar(`A data de nascimento "${String(nascimentoBruto)}" não é uma data válida.`);
+      pendencias.push(`data de nascimento inválida ("${String(nascimentoBruto)}")`);
     }
 
     const duracaoBruta = numeroOuNulo(get(bruta, "duracao"));
-    const duracaoConsultaMin =
+    const duracaoLida =
       duracaoBruta === null || Number.isNaN(duracaoBruta) ? 15 : Math.round(duracaoBruta);
-    if (duracaoConsultaMin < 1 || duracaoConsultaMin > 240) {
-      return recusar("A duração da consulta precisa ficar entre 1 e 240 minutos.");
-    }
+    const duracaoConsultaMin = duracaoLida >= 1 && duracaoLida <= 240 ? duracaoLida : 15;
 
     const chave = chaveCrm(crm, uf);
     const repetidaCrm = porCrm.get(chave);
@@ -589,6 +601,7 @@ function lerMedicos(
       aceitaCartaoBeneficios: normalizarSimNao(get(bruta, "cartaoBeneficios"), true),
       duracaoConsultaMin,
       ativo: normalizarSimNao(get(bruta, "ativo"), true),
+      pendencias,
     });
   });
 }

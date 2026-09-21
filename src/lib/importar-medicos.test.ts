@@ -249,7 +249,7 @@ describe("leitura da planilha", () => {
     expect(lida.medicos[0].repassePadrao).toBe(0);
   });
 
-  it("recusa percentual acima de 100, falta de UF, especialidade e tipo", async () => {
+  it("recusa repasse inválido; falta de UF e especialidade entra como pendência", async () => {
     const lida = await lerPlanilhaMedicos(
       arquivo({
         [ABA_MEDICOS]: [
@@ -261,11 +261,14 @@ describe("leitura da planilha", () => {
         ],
       }),
     );
-    expect(lida.medicos).toHaveLength(0);
-    expect(lida.recusadas.map((r) => r.linhaExcel)).toEqual([2, 3, 4, 5]);
+    expect(lida.recusadas.map((r) => r.linhaExcel)).toEqual([2, 5]);
+    expect(lida.medicos.map((m) => m.pendencias)).toEqual([
+      ["sem UF do CRM"],
+      ["sem especialidade"],
+    ]);
   });
 
-  it("recusa médico sem telefone com DDD — o banco não gravaria", async () => {
+  it("médico sem telefone, sem CRM ou com CPF inválido entra com pendência", async () => {
     const lida = await lerPlanilhaMedicos(
       arquivo({
         [ABA_MEDICOS]: [
@@ -273,12 +276,24 @@ describe("leitura da planilha", () => {
           linhaMedico({ ...MEDICO_OK, Telefone: "" }),
           linhaMedico({ ...MEDICO_OK, CRM: "2", Telefone: "9999-0000" }),
           linhaMedico({ ...MEDICO_OK, CRM: "3", Telefone: 21999990000 }),
+          linhaMedico({ ...MEDICO_OK, CRM: "", CPF: "123" + "45" }),
+          linhaMedico({ ...MEDICO_OK, CRM: "", CPF: "123456789012" }),
         ],
       }),
     );
-    expect(lida.recusadas.map((r) => r.linhaExcel)).toEqual([2, 3]);
-    expect(lida.recusadas[0].motivo).toContain("telefone");
-    expect(lida.medicos[0].telefone).toBe("21999990000");
+    expect(lida.recusadas).toEqual([]);
+    expect(lida.medicos.map((m) => m.pendencias)).toEqual([
+      ["sem telefone"],
+      ["sem telefone"],
+      [],
+      ["sem CRM"],
+      ["sem CRM", 'CPF inválido na planilha ("123456789012")'],
+    ]);
+    expect(lida.medicos[2].telefone).toBe("21999990000");
+    // CRM provisório único por linha: o banco não aceita dois iguais na clínica.
+    expect(lida.medicos[3].crm).toBe("PENDENTE 5");
+    expect(lida.medicos[4].crm).toBe("PENDENTE 6");
+    expect(lida.medicos[4].cpf).toBeNull();
   });
 
   it("aceita a UF grudada no CRM e deduz o tipo pelo símbolo", async () => {

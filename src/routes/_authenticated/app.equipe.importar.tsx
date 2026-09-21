@@ -138,7 +138,7 @@ function ImportarMedicosPage() {
   const [carregando, setCarregando] = useState(false);
   const [versaoCadastro, setVersaoCadastro] = useState(0);
 
-  const [criarEspecialidades, setCriarEspecialidades] = useState(false);
+  const [criarEspecialidades, setCriarEspecialidades] = useState(true);
   /** Repasse para todos, quando a planilha não traz a coluna de repasse. */
   const [repasseGeralTipo, setRepasseGeralTipo] = useState<TipoRepasse>("percentual");
   const [repasseGeralTexto, setRepasseGeralTexto] = useState("");
@@ -265,6 +265,7 @@ function ImportarMedicosPage() {
     [conferencia],
   );
   const totalExcecoes = todosRepasses.filter(({ repasse }) => repasseTemExcecao(repasse)).length;
+  const comPendencia = (conferencia?.novos ?? []).filter((m) => m.pendencias.length).length;
 
   // --- arquivo --------------------------------------------------------------
   const receberArquivo = useCallback(
@@ -402,7 +403,7 @@ function ImportarMedicosPage() {
         setResultado(res);
         setLeitura(null);
         setNomeArquivo(null);
-        setCriarEspecialidades(false);
+        setCriarEspecialidades(true);
         setRepasseGeralTexto("");
         // Recarrega o cadastro: importar o mesmo arquivo de novo pula quem entrou agora.
         setVersaoCadastro((v) => v + 1);
@@ -595,6 +596,11 @@ function ImportarMedicosPage() {
                   <Badge variant="secondary">
                     {totalExcecoes} repasse(s) diferente(s) do padrão
                   </Badge>
+                  {comPendencia > 0 && (
+                    <Badge variant="outline" className="border-amber-500 text-amber-700">
+                      {comPendencia} com dado faltando — completar no cadastro depois
+                    </Badge>
+                  )}
                   {conferencia.jaCadastrados.length > 0 && (
                     <Badge variant="outline">
                       {conferencia.jaCadastrados.length} já cadastrado(s) — serão pulados
@@ -685,7 +691,14 @@ function ImportarMedicosPage() {
                           {conferencia.novos.map((m) => (
                             <TableRow key={`novo-${m.linhaExcel}`}>
                               <TableCell>{m.linhaExcel}</TableCell>
-                              <TableCell className="font-medium">{m.nome}</TableCell>
+                              <TableCell className="font-medium">
+                                {m.nome}
+                                {m.pendencias.length > 0 && (
+                                  <span className="block text-xs font-normal text-amber-700">
+                                    Pendente: {m.pendencias.join("; ")}
+                                  </span>
+                                )}
+                              </TableCell>
                               <TableCell className="whitespace-nowrap">
                                 {m.crm}/{m.crmUf}
                               </TableCell>
@@ -1050,7 +1063,9 @@ async function gravarMedico(
     }
   }
 
-  if (pendencias.length) res.incompletos.push({ nome: m.nome, motivo: pendencias.join("; ") });
+  // O que faltou na planilha também entra no relatório, para completar no cadastro.
+  const faltas = [...m.pendencias, ...pendencias];
+  if (faltas.length) res.incompletos.push({ nome: m.nome, motivo: faltas.join("; ") });
 }
 
 /** Linha de REPASSE INDIVIDUAL: em branco grava nulo (herda o padrão), 0 grava 0. */
