@@ -745,11 +745,11 @@ export function ContratosPage({
     } else {
       contratosQuery = contratosQuery.limit(LIMITE_LISTA);
     }
+    // Mesma regra da carga por RPC: lista completa para o filtro de produto.
     let conveniosQueryLegado = supabase
       .from("cb_convenios")
       .select("*")
-      .eq("clinica_id", clinicaAtual.clinica_id)
-      .eq("ativo", true);
+      .eq("clinica_id", clinicaAtual.clinica_id);
     if (produtoFiltro) conveniosQueryLegado = conveniosQueryLegado.eq("produto", produtoFiltro);
     const [cs, cv] = await Promise.all([contratosQuery, conveniosQueryLegado.order("nome")]);
     if (desatualizada()) return;
