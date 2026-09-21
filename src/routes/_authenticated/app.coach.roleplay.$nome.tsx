@@ -1903,7 +1903,7 @@ function Bubble({ msg, mostrarCorrecao }: { msg: Msg; mostrarCorrecao?: boolean 
           </div>
         );
       })}
-      {!isCliente && msg.avaliacao && (
+      {!isCliente && mostrarCorrecao && msg.avaliacao && (
         <AvaliacaoTurnoCard av={msg.avaliacao} />
       )}
     </div>
