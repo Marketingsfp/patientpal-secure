@@ -13,6 +13,7 @@ const GRUPOS = [
   ["dermatologia", "dermato", "dermatologista"],
   ["ginecologia", "gineco", "ginecologista"],
   ["oftalmologia", "oftalmo", "oftalmologista"],
+  ["odontologia", "odonto", "dentista", "odontologista", "odontologica", "odontologico"],
   ["otorrinolaringologia", "otorrino", "otorrinolaringologista"],
   ["ortopedia", "ortopedista"],
   ["pediatria", "pediatra"],

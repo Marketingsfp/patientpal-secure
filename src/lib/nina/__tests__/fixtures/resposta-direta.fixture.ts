@@ -25,6 +25,10 @@ const interpretacao = ({
     mensagem: "Boa tarde, Nina. Gostaria de agendar uma consulta com cardiologista, de preferência nos próximos dias. Estou sentindo algumas palpitações ocasionais e queria fazer uma avaliação.",
     termo: "cardiologia", tipo_atendimento: "consulta", objetivos: ["agendamento"], publicado: "CARDIOLOGIA", resposta: "Temos consulta de Cardiologia. Você prefere o primeiro disponível ou escolher o profissional?",
   },
+  catalogo_interpretado_odontologia: {
+    mensagem: "Quero saber o valor e os profissionais para marcar uma avaliação odontológica.",
+    termo: "avaliação odontológica", tipo_atendimento: "consulta", objetivos: ["agendamento"], publicado: "ODONTOLOGIA", resposta: "Temos Avaliação odontológica. Você prefere Jean Ferreira, Raiani ou Karen?",
+  },
   catalogo_interpretado_nebulizacao: {
     mensagem: "Olá, gostaria de saber como funciona o atendimento para nebulização.",
     termo: "nebulização", tipo_atendimento: "exame_procedimento", objetivos: ["informacoes_gerais"], publicado: "NEBULIZAÇÃO", resposta: "Temos Nebulização. O atendimento é por ordem de chegada.",
@@ -51,6 +55,11 @@ const catalogoInterpretado: Record<string, any[]> = {
     executantes: [], formas_pagamento: [], valor: null,
   })),
 };
+if (interpretacao?.publicado === "ODONTOLOGIA") catalogoInterpretado.nina_cat_profissionais = ["Jean Ferreira", "Raiani", "Karen"].map((nome, i) => ({
+  id: `medico-${i}`, clinica_id: "clinica-simulada", status: "PUBLICADO", nome,
+  especialidades: [{ nome: "ODONTOLOGIA" }], tipo_atendimento: "Avaliação odontológica",
+  formas_pagamento: [], horarios: [], convenios: [],
+}));
 if (escolhaMedico) catalogoInterpretado.nina_cat_profissionais = ["Shirley Martins", "Raisa Moura"].map((nome, i) => ({
   id: `medico-${i}`, clinica_id: "clinica-simulada", status: "PUBLICADO", nome,
   especialidades: [{ nome: "DERMATOLOGIA" }], formas_pagamento: [], horarios: [], convenios: [],

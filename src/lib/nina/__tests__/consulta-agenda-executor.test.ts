@@ -571,6 +571,9 @@ describe("executor real das ferramentas com banco simulado", () => {
       { especialidade: "OFTALMOLOGIA", nome: "Marina Almeida", agenda: "MARINA ALMEIDA DIAS", termo: "consulta",
         referencias: ["Consulta — OFTALMOLOGIA", "Consulta Oftalmologia", null, "consulta oftalmologia"],
         modalidade: "Ordem de chegada com pré-agendamento", codigoModalidade: "chegada_com_pre_agendamento" },
+      { especialidade: "ODONTOLOGIA", nome: "Jean Ferreira", agenda: "JEAN FERREIRA", termo: "avaliação odontológica",
+        referencias: ["Consulta — ODONTOLOGIA", "Avaliação odontológica", null],
+        modalidade: "Hora marcada", codigoModalidade: "hora_marcada" },
     ]) {
       test(`${origem}: ${caso.especialidade} mantém o vínculo com referências equivalentes até concluir`, async () => {
         Object.assign(banco.nina_cat_profissionais![0]!, { nome: caso.nome,

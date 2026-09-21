@@ -227,6 +227,64 @@ describe("separação entre consultas e exames", () => {
   });
 });
 
+describe("avaliação odontológica publicada", () => {
+  beforeEach(() => {
+    banco.nina_cat_profissionais = ["Jean Ferreira", "Raiani", "Karen"].map((nome, i) => profissional({
+      id: idSequencial(i + 1), nome, especialidades: [{ nome: "ODONTOLOGIA" }],
+      tipo_atendimento: "Avaliação odontológica", formas_pagamento: [],
+      observacao_publica: "AVALIAÇÃO ODONTOLÓGICA\nDinheiro: Gratuito\nPix/cartão: Gratuito",
+    }));
+    banco.nina_cat_servicos = [servico({ nome: "Limpeza odontológica", valor: 180 })];
+  });
+  it.each(["avaliação odontológica", "AVALIACAO ODONTOLOGICA", "avaliaçao odontolgica", "avaliação odonto",
+    "avaliação com dentista", "consulta odontológica", "odontologia", "odonto", "dentista", "odontologista"])(
+    "%s encontra os três profissionais sem confundir com procedimento", async query => {
+      const r = await buscarNoCatalogo({ clinicaId: CLINICA, query, tipo_atendimento: "consulta" });
+      expect(r.knowledge_status).toBe("found");
+      expect(r.doctors).toEqual(["Jean Ferreira", "Raiani", "Karen"]);
+      expect(r.records).toHaveLength(3);
+      expect(r.records.every(item => item.categoria === "CONSULTA" && item.procedimento === "Consulta — ODONTOLOGIA")).toBe(true);
+      expect(r.esclarecimento).toBeUndefined();
+      expect(JSON.stringify(r)).not.toContain("180,00");
+      expect(chamadas.some(c => c.tabela === "nina_cat_servicos")).toBe(false);
+    });
+  it("infere consulta pelo atendimento publicado sem categoria explícita", async () => {
+    const r = await buscarNoCatalogo({ clinicaId: CLINICA, query: "avaliação odontológica" });
+    expect(r.tipo_atendimento).toBe("consulta");
+    expect(r.doctors).toHaveLength(3);
+    expect(r.esclarecimento).toBeUndefined();
+    expect(r.records.every(item => item.categoria === "CONSULTA")).toBe(true);
+  });
+  it("permite escolher um profissional sem perder o atendimento", async () => {
+    const r = await buscarNoCatalogo({ clinicaId: CLINICA, query: "avaliação odontológica", tipo_atendimento: "consulta", medico: "Jean Ferreira" });
+    expect(r.doctors).toEqual(["Jean Ferreira"]);
+    expect(r.esclarecimento).toBeUndefined();
+    expect(r.records[0]?.extras?.atendimentos_publicados).toBeDefined();
+  });
+  it.each(["avaliação odontológica infantil", "avaliação odontológica com sedação", "avaliação ortodôntica", "limpeza odontológica"])(
+    "não descarta qualificadores ou oferece avaliação no lugar de %s", async query => {
+      const r = await buscarNoCatalogo({ clinicaId: CLINICA, query, tipo_atendimento: "consulta" });
+      expect(r.knowledge_status).toBe("not_found");
+      expect(r.records).toHaveLength(0);
+    });
+  it("não substitui limpeza por avaliação odontológica", async () => {
+    const r = await buscarNoCatalogo({ clinicaId: CLINICA, query: "limpeza odontológica", tipo_atendimento: "exame_procedimento" });
+    expect(r.records.map(item => item.procedimento)).toEqual(["Limpeza odontológica"]);
+    expect(r.doctors).toHaveLength(0);
+  });
+  it("procura somente o atendimento público, com escopo de clínica e publicação", async () => {
+    banco.nina_cat_profissionais = [
+      profissional({ tipo_atendimento: "Avaliação odontológica", clinica_id: "outra" }),
+      profissional({ tipo_atendimento: "Avaliação odontológica", status: "ARQUIVADO" }),
+      profissional({ tipo_atendimento: "Consulta", especialidades: [{ nome: "ODONTOLOGIA" }],
+        nota_interna: "Avaliação odontológica", rascunho: { tipo_atendimento: "Avaliação odontológica" } }),
+    ];
+    const r = await buscarNoCatalogo({ clinicaId: CLINICA, query: "avaliação odontológica", tipo_atendimento: "consulta" });
+    expect(r.records).toHaveLength(0);
+    expect(chamadas.every(c => !c.colunas.includes("nota_interna") && !c.colunas.includes("rascunho"))).toBe(true);
+  });
+});
+
 describe("busca completa com e sem acentos", () => {
   it.each([
     "nebulização",

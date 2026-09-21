@@ -34,12 +34,12 @@ const COLUNAS_PROFISSIONAL =
 
 /** A busca percorre um índice público leve; os detalhes só são lidos após a seleção. */
 const INDICE_SERVICO = "id, nome, descricao_publica, aliases:estrutura->aliases, status, updated_at";
-const INDICE_PROFISSIONAL = "id, nome, especialidades, horarios, aliases:estrutura->aliases, status, updated_at";
+const INDICE_PROFISSIONAL = "id, nome, especialidades, tipo_atendimento, horarios, aliases:estrutura->aliases, status, updated_at";
 const TAMANHO_PAGINA = 250;
 type IndiceServico = Pick<ServicoPublicado, "id" | "nome" | "descricao_publica"> & { aliases?: unknown };
 type IndiceProfissional = Pick<
   ProfissionalPublicado,
-  "id" | "nome" | "especialidades" | "horarios"
+  "id" | "nome" | "especialidades" | "tipo_atendimento" | "horarios"
 > & { aliases?: unknown };
 
 async function lerPublicados<T extends { id: string }>(
@@ -88,12 +88,16 @@ function semAcento(v: unknown): string {
 const PALAVRAS_CONSULTA = /\b(?:consultas?|especialistas?|doutor|doutora|dra?)\b/i;
 const PALAVRAS_PROCEDIMENTO = /\b(?:exames?|procedimentos?)\b/i;
 
-function especialidadesTexto(p: IndiceProfissional): string {
-  return Array.isArray(p.especialidades)
+function atendimentosTexto(p: IndiceProfissional): string {
+  const especialidades = Array.isArray(p.especialidades)
     ? (p.especialidades as Array<Record<string, unknown>>)
         .map((e) => semAcento(e?.["nome"]))
         .join(" ")
     : "";
+  // O título público pode ser mais específico que a especialidade:
+  // "Avaliação odontológica" pertence a "ODONTOLOGIA". Não elimine
+  // "avaliação" do pedido nem dependa de notas internas para encontrá-la.
+  return [especialidades, semAcento(p.tipo_atendimento)].filter(Boolean).join(" ");
 }
 
 /** O profissional atende no dia pedido? Sem horário cadastrado, não exclui. */
@@ -143,7 +147,7 @@ export async function buscarNoCatalogo(
   ]);
   const busca = prepararBuscaCatalogo(pedido.query, [
     ...brutosServicos.flatMap((s) => [s.nome, ...aliasesDoIndice(s), String(s.descricao_publica ?? "")]),
-    ...brutosProfissionais.flatMap((p) => [p.nome, ...aliasesDoIndice(p), especialidadesTexto(p)]),
+    ...brutosProfissionais.flatMap((p) => [p.nome, ...aliasesDoIndice(p), atendimentosTexto(p)]),
   ]);
   const termos = busca.termos;
   const expandidos = busca.ajustes;
@@ -151,7 +155,7 @@ export async function buscarNoCatalogo(
     // "Cardiologia" no cadastro de especialidades é uma consulta. A mera
     // menção na descrição de um exame não transforma a especialidade em exame.
     const nomeDeServico = brutosServicos.some((s) => [s.nome, ...aliasesDoIndice(s)].some(n => busca.pontuar(n, "") > 0));
-    const nomeOuEspecialidade = brutosProfissionais.some((p) => [p.nome, ...aliasesDoIndice(p)].some(n => busca.pontuar(n, especialidadesTexto(p)) > 0));
+    const nomeOuEspecialidade = brutosProfissionais.some((p) => [p.nome, ...aliasesDoIndice(p)].some(n => busca.pontuar(n, atendimentosTexto(p)) > 0));
     if (nomeOuEspecialidade && !nomeDeServico) tipoAtendimento = "consulta";
     else if (nomeDeServico && !nomeOuEspecialidade) tipoAtendimento = "exame_procedimento";
   }
@@ -184,13 +188,13 @@ export async function buscarNoCatalogo(
   const idsServicos = servicosRelevantes.slice(0, limite).map((x) => x.s.id);
   const medico = semAcento(pedido.medico || nomeProfissionalNaPergunta(pedido.query)).trim();
   const profissionaisDaConsulta = brutosProfissionais.filter((p) =>
-    busca.pontuar("", especialidadesTexto(p)) > 0,
+    busca.pontuar("", atendimentosTexto(p)) > 0,
   );
   // Um nome não pode trocar a especialidade já localizada por outra.
   const universoProfissionais = tipoAtendimento === "exame_procedimento" ? []
     : medico && profissionaisDaConsulta.length ? profissionaisDaConsulta : brutosProfissionais;
   const candidatosPorNome = universoProfissionais
-    .map((p) => ({ p, score: Math.max(...[p.nome, ...aliasesDoIndice(p)].map(n => busca.pontuar(n, especialidadesTexto(p)))) }))
+    .map((p) => ({ p, score: Math.max(...[p.nome, ...aliasesDoIndice(p)].map(n => busca.pontuar(n, atendimentosTexto(p)))) }))
     .filter(({ p, score }) =>
       medico ? p.id === medico || compararNomeProfissional(medico, p.nome) !== null : score > 0,
     )
@@ -369,6 +373,7 @@ export async function buscarNoCatalogo(
           medico: pedido.medico ?? null,
           dia: pedido.dia ?? null,
           termos,
+          termos_expandidos: expandidos,
           tamanho_pagina: TAMANHO_PAGINA,
           busca_completa: true,
           comparacao: "sem acentos e sem distinção de maiúsculas/minúsculas",
