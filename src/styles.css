@@ -33,6 +33,18 @@
   --color-popover: var(--popover);
   --color-popover-foreground: var(--popover-foreground);
   --color-primary: var(--primary);
+  --color-brand-1: var(--brand-1);
+  --color-brand-2: var(--brand-2);
+  --color-brand-3: var(--brand-3);
+  --color-brand-1-soft: var(--brand-1-soft);
+  --color-brand-2-soft: var(--brand-2-soft);
+  --color-brand-3-soft: var(--brand-3-soft);
+  --color-brand-glow-1: var(--brand-glow-1);
+  --color-brand-glow-2: var(--brand-glow-2);
+  --color-brand-glow-3: var(--brand-glow-3);
+  --color-brand-tint: var(--brand-tint);
+  --color-brand-tint-border: var(--brand-tint-border);
+  --color-brand-tint-text: var(--brand-tint-text);
   --color-primary-foreground: var(--primary-foreground);
   --color-secondary: var(--secondary);
   --color-secondary-foreground: var(--secondary-foreground);
