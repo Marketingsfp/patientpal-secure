@@ -96,6 +96,7 @@ describe("escolha de horário e consentimento do resumo entregue", () => {
       [],
       [{ role: "user", content: e.appointment.confirmation!.resumo }],
       [{ role: "assistant", content: "Confirma às 08:00?" }],
+      [{ role: "assistant", content: "Você se refere a este profissional? Sandro Prinscewal" }],
     ]) {
       expect(aceitarResumoEntregue(e, "clinica", historico)).toBe(false);
       expect(consentimentoDaEscolha(e)).toBeNull();

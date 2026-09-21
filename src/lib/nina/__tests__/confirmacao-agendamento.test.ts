@@ -16,6 +16,7 @@ const vaga: VagaAgendamento = {
 describe("aceite natural vinculado ao resumo", () => {
   test.each([
     "Sim",
+    "Isso", "esse mesmo", "esse", "é esse", "ss", "simmm", "esse msm",
     "Confirmo",
     "Sim, confirmo.",
     "Sim, pode marcar.",

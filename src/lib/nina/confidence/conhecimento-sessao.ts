@@ -2,6 +2,7 @@
 import { ehSaudacaoPura } from "./turno-tipo";
 import { normalizarTexto, type FatoRecuperado } from "./evidencia";
 import { lerEscolhaHorario } from "../agendamento-escolha";
+import { ehRespostaAfirmativaCurta } from "../resposta-afirmativa";
 import { prepararBuscaCatalogo } from "../catalogo-busca";
 import type { ResultadoConhecimento } from "../knowledge-contract";
 import { contarEsclarecimentos, LIMITE_ESCLARECIMENTOS } from "../catalogo-esclarecimento";
@@ -161,10 +162,7 @@ export function consultaDoNovoTurno(e: {
     const matches = pendente.opcoes.filter(
       (p) => busca.pontuar(p.nome, [p.especialidade, p.unidade].filter(Boolean).join(" ")) > 0,
     );
-    const confirmacao =
-      /^(?:(?:sim|s|ss|isso|esse|essa|ele|ela|e|mesmo|mesma|correto|correta|pode|ser|ok|certo|por|favor)\s*)+$/.test(
-        m,
-      );
+    const confirmacao = ehRespostaAfirmativaCurta(e.mensagem);
     const confirmacaoUnica = pendente.opcoes.length === 1 && confirmacao;
     const ordinal =
       /^(?:o|a)?\s*(primeir[oa]|segund[oa]|terceir[oa]|quart[oa]|quint[oa]|sext[oa]|[1-6])(?:\s+(?:opcao|profissional|exame))?$/.exec(

@@ -1,4 +1,5 @@
 import type { VagaAgendamento } from "./agendamento-escolha";
+import { ehRespostaAfirmativaCurta } from "./resposta-afirmativa";
 
 const normalizar = (t: string) =>
   t
@@ -20,6 +21,7 @@ const VOCABULARIO = new Set(
 /** Aceite explícito; qualificadores só valem quando conferem com a vaga do resumo.
  * A entrega do resumo e o escopo da sessão são verificados separadamente. */
 export function ehConfirmacaoDeAgendamento(texto: string, vaga?: VagaAgendamento | null): boolean {
+  if (ehRespostaAfirmativaCurta(texto)) return true;
   let t = normalizar(texto ?? "");
   if (!t || t.length > 500) return false;
   t = t.replace(/\b(?:pode|podemos) (?:finalizar|concluir)\?\s*$/, "");

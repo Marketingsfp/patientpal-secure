@@ -253,7 +253,9 @@ export async function buscarNoCatalogo(
   const medicosAmbiguos =
     escolhaMedicoPendente || perguntaPorNome &&
     (profissionaisRelevantes.length > 1 ||
-      busca.ajustes.length > 0 ||
+      // Ajuste na especialidade ("clinica medica" -> "clinico") não torna
+      // ambíguo um médico identificado por nome exato ou ID confirmado.
+      (!medico && busca.ajustes.length > 0) ||
       profissionaisRelevantes.some(
         (p) => compararNomeProfissional(medico, p.nome) === "aproximado",
       ));

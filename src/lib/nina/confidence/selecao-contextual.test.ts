@@ -60,6 +60,16 @@ function alex() {
 }
 
 describe("seleção contextual com fatos oficiais reconsultados", () => {
+  it("confirmação contextual revalida ID e nome sem autorizar reserva", () => {
+    const profissionalConfirmado = { registro: "nina_cat_profissionais:bruno", nome: "Bruno Costa" };
+    const r = resolver("isso", null, { profissionalConfirmado });
+    expect(r.selecao?.medicoNome).toBe("Bruno Costa");
+    expect(r.estado).toBe("selecionado");
+    expect(r.aceiteAgendamento).toBe(false);
+    expect(resolver("isso", null, { profissionalConfirmado, fatosOficiais: [] }).selecao).toBeNull();
+    expect(resolver("isso", null, { profissionalConfirmado: { ...profissionalConfirmado, nome: "Outro nome" } }).selecao).toBeNull();
+    expect(resolver("isso", null, { profissionalConfirmado: { ...profissionalConfirmado, registro: "id-obsoleto" } }).selecao).toBeNull();
+  });
   it("escolhe Alex único, guarda raízes opacas e pede modalidade sem reservar", () => {
     const r = resolver("vou fazer com o dr alex");
     expect(r.estado).toBe("esclarecer_modalidade");

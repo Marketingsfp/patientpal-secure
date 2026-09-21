@@ -16,6 +16,10 @@ const sfp = cenario.startsWith("catalogo_sfp");
 const ausente = cenario.startsWith("catalogo_ausente");
 const esclarecer = cenario.startsWith("catalogo_esclarecimento");
 const escolhaMedico = cenario.startsWith("catalogo_medico_");
+const confirmacaoMedico = cenario.startsWith("catalogo_medico_confirmacao");
+const perguntaMedico = cenario.endsWith("segunda")
+  ? "Para identificar o profissional, pode confirmar o nome completo, a especialidade ou a unidade?\nAs opções encontradas são:\nSandro Prinscewal — CARDIOLOGIA, CLINICO GERAL"
+  : "Você se refere a este profissional?\nSandro Prinscewal — CARDIOLOGIA, CLINICO GERAL";
 const interpretacao = ({
   catalogo_interpretado_cardiologia: {
     mensagem: "Boa tarde, Nina. Gostaria de agendar uma consulta com cardiologista, de preferência nos próximos dias. Estou sentindo algumas palpitações ocasionais e queria fazer uma avaliação.",
@@ -51,6 +55,10 @@ if (escolhaMedico) catalogoInterpretado.nina_cat_profissionais = ["Shirley Marti
   id: `medico-${i}`, clinica_id: "clinica-simulada", status: "PUBLICADO", nome,
   especialidades: [{ nome: "DERMATOLOGIA" }], formas_pagamento: [], horarios: [], convenios: [],
 }));
+if (confirmacaoMedico) catalogoInterpretado.nina_cat_profissionais = [{
+  id: "medico-0", clinica_id: "clinica-simulada", status: "PUBLICADO", nome: "Sandro Prinscewal",
+  especialidades: [{ nome: "CARDIOLOGIA" }, { nome: "CLINICO GERAL" }], formas_pagamento: [], horarios: [], convenios: [],
+}];
 const perguntaEsclarecimento = "Pode informar o nome do procedimento por extenso?";
 const ferramentaAusente = cenario.includes("medicos_modelo") ? "buscar_medicos"
   : cenario.includes("procedimentos_modelo") ? "buscar_procedimentos"
@@ -62,7 +70,7 @@ const resumoEscolhido = ["escolha_pre", "escolha_ficha"].includes(cenario)
     { profissional: "Dr. Jorge Ribeiro", procedimento: "Consulta", data: "21/01/2030", horario: "10:20", unidade: "Clínica simulada" }).texto
   : "Confira: Consulta Cardiologia com Dr. Jorge Ribeiro, dia 21/01/2030, às 10:20. Você confirma?";
 const agenda = cenario !== "direta" && !regraCatalogo;
-const pergunta = escolhaMedico ? cenario.endsWith("resolvido") ? "Quero a Shirley" : "quero a Suellen" : interpretacao ? interpretacao.mensagem : esclarecer ? cenario.endsWith("primeiro") ? "Quero exame XYZ" : cenario.endsWith("resolvido") ? "Eletrocardiograma" : "Não sei explicar" : contextual ? contextual.pergunta : (sfp && cenario.endsWith("modelo")) || (ausente && cenario.includes("modelo")) ? "oi"
+const pergunta = confirmacaoMedico ? process.argv[4] ?? "Isso" : escolhaMedico ? cenario.endsWith("resolvido") ? "Quero a Shirley" : "quero a Suellen" : interpretacao ? interpretacao.mensagem : esclarecer ? cenario.endsWith("primeiro") ? "Quero exame XYZ" : cenario.endsWith("resolvido") ? "Eletrocardiograma" : "Não sei explicar" : contextual ? contextual.pergunta : (sfp && cenario.endsWith("modelo")) || (ausente && cenario.includes("modelo")) ? "oi"
   : ausente ? cenario.endsWith("dado_pessoal") ? "Meu nome é João Silva"
     : cenario.endsWith("misto") ? "Qual o valor do eletrocardiograma e da consulta de pneumologia?"
     : cenario.endsWith("generico") ? "Quero marcar uma consulta"
@@ -116,7 +124,21 @@ const registroMensagem = (body: string, indice: number, direction = "out", statu
   id: `historico-${indice}`, conversa_id: "conversa-contextual", direction, body, status,
   created_at: new Date(agora - (20 - indice) * 60_000).toISOString(), is_teste: teste,
 });
-const mensagensContextuais = contextual ? [
+if (confirmacaoMedico) estadoContextual.knowledge_context = {
+  versao: 1, clinicaId: "clinica-simulada", sessionId: "sessao-contextual",
+  consulta: { termo: "clinica medica", tipo_atendimento: "consulta" },
+  referencias: [{ registro: "medico-0", versao: null, procedimento: null, medicoNome: "Sandro Prinscewal" }],
+  esclarecimentoTentativas: cenario.endsWith("segunda") ? 2 : 1,
+  esclarecimento: { tipo: "profissional", pergunta: perguntaMedico,
+    opcoes: [{ id: "medico-0", nome: "Sandro Prinscewal", especialidade: "CARDIOLOGIA, CLINICO GERAL" }] },
+};
+const mensagensContextuais = confirmacaoMedico ? [
+  registroMensagem("Quero agendar um clínico geral", 0, "in", "received"),
+  registroMensagem("Qual profissional você prefere?", 1),
+  registroMensagem("Quero o dr Sandro por favor", 2, "in", "received"),
+  registroMensagem(perguntaMedico, 3),
+  { ...registroMensagem(pergunta, 18, "in", "received"), id: "entrada-simulada" },
+] : contextual ? [
   registroMensagem("Gostaria de marcar oftalmologista", 0, "in", "received"),
   registroMensagem("Temos João Hélio (joao-helio) e Marina (marina) para Oftalmologia.", 1),
   registroMensagem("com o joao helio", 2, "in", "received"),
@@ -171,9 +193,9 @@ mock.module("@/integrations/supabase/client.server", () => ({
           data: (interpretacao || escolhaMedico) && catalogoInterpretado[tabela] ? catalogoInterpretado[tabela]!.filter(l => filtrosCatalogo.every(f => f(l))).slice(0, limiteCatalogo)
             : tabela === "clinicas" ? { nome: "Clínica simulada", base_importada: false }
             : (contextual || esclarecer || escolhaMedico) && tabela === "atend_conversas" ? { id: "conversa-contextual", nina_fluxo_estado: estadoContextual }
-            : contextual && tabela === "whatsapp_mensagens" ? mensagensContextuais
+            : (contextual || confirmacaoMedico) && tabela === "whatsapp_mensagens" ? mensagensContextuais
             : unica ? null : [], error: null,
-          count: contextual && tabela === "whatsapp_mensagens" ? mensagensContextuais.length : 0,
+          count: (contextual || confirmacaoMedico) && tabela === "whatsapp_mensagens" ? mensagensContextuais.length : 0,
         })),
       };
       return q;
@@ -301,7 +323,7 @@ mock.module("@/lib/nina/tool-broker.server", () => ({ criarToolBroker: (params: 
       const parametros = argumentosFerramentas.at(-1)!.args;
       const dados = await searchKnowledgeBase({ clinicaId: "clinica-simulada", query: parametros.termo,
         tipo_atendimento: parametros.tipo_atendimento, medico: parametros.medico });
-      const r = { ferramenta: nome, capacidade: "searchKnowledgeBase", fonte: "catalogo_publicado",
+      const r = { ferramenta: nome, capacidade: "searchKnowledgeBase", fonte: "base_conhecimento",
         success: true, reused: false, dados: { ok: true, ...dados } };
       resultados.push(r);
       return r;
@@ -345,12 +367,12 @@ mock.module("@/lib/nina/ai-gateway.server", () => ({ ninaAIGateway: async (req: 
   ordem.push("modelo");
   requests.push(structuredClone(req));
   if (escolhaMedico) return {
-    ok: true, conteudo: "Vamos continuar com Shirley Martins.", modelo: "modelo-simulado", execucaoId: "execucao-direta", nivel: "low",
+    ok: true, conteudo: confirmacaoMedico ? "Vamos continuar com Sandro Prinscewal para Clínico Geral." : "Vamos continuar com Shirley Martins.", modelo: "modelo-simulado", execucaoId: "execucao-direta", nivel: "low",
     toolCalls: requests.length === 1 ? [
       { id: "medico", type: "function", function: { name: "consultar_base_conhecimento", arguments: JSON.stringify({
-        termo: cenario.endsWith("resolvido") ? "Shirley" : "Suellen", medico: cenario.endsWith("resolvido") ? "Shirley" : "Suellen", tipo_atendimento: "consulta",
+        termo: confirmacaoMedico ? "clinica medica" : cenario.endsWith("resolvido") ? "Shirley" : "Suellen", medico: confirmacaoMedico ? "Sandro" : cenario.endsWith("resolvido") ? "Shirley" : "Suellen", tipo_atendimento: "consulta",
       }) } },
-      ...(!cenario.endsWith("resolvido") ? [{ id: "nao-transferir-antes-de-esclarecer", type: "function", function: { name: "solicitar_atendente_humano", arguments: '{"motivo":"Não encontrado"}' } }] : []),
+      ...(!confirmacaoMedico && !cenario.endsWith("resolvido") ? [{ id: "nao-transferir-antes-de-esclarecer", type: "function", function: { name: "solicitar_atendente_humano", arguments: '{"motivo":"Não encontrado"}' } }] : []),
     ] : [],
   };
   if (interpretacao && cenario.endsWith("_recuperacao") && requests.length === 1) return {

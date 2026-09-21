@@ -637,6 +637,12 @@ describe("siglas, escrita aproximada e identidade publicadas", () => {
 });
 
 describe("nomes e opções em respostas curtas", () => {
+  it.each(["Sandro Prinscewal", "medico-sandro"])("ajuste em clínica médica não pede novamente o médico exato: %s", async medico => {
+    banco.nina_cat_profissionais = [profissional({ id: "medico-sandro", nome: "Sandro Prinscewal", especialidades: [{ nome: "CARDIOLOGIA" }, { nome: "CLINICO GERAL" }] })];
+    const r = await buscarNoCatalogo({ clinicaId: CLINICA, query: "clinica medica", medico, tipo_atendimento: "consulta" });
+    expect(r.esclarecimento).toBeUndefined();
+    expect(r.records.map(r => r.id)).toEqual(["medico-sandro"]);
+  });
   it("busca preventiva de Dr. Jaoo sugere João para confirmação", async () => {
     banco.nina_cat_profissionais = [profissional({ nome: "Dr. João Hélio", especialidades: [{ nome: "Cardiologia" }] })];
     const r = await buscarNoCatalogo({ clinicaId: CLINICA, query: "Quero com Dr. Jaoo Helio" });

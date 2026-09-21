@@ -44,6 +44,8 @@ export type ResultadoSelecaoContextual = {
   aceiteAgendamento: false;
 };
 export type EntradaSelecaoContextual = {
+  /** Aceite de uma única opção em pergunta entregue, conferido pelo servidor. */
+  profissionalConfirmado?: { registro: string; nome: string } | null;
   mensagem: string;
   clinicaId: string;
   sessaoId: string;
@@ -338,6 +340,10 @@ export function resolverSelecaoContextual(e: EntradaSelecaoContextual): Resultad
   const nomeSozinho =
     citacoes.length === 1 &&
     tokensNome(m.replace(/^(?:o|a)\s+/, "")).join(" ") === citacoes[0]!.tokens.join(" ");
+  const confirmados = e.profissionalConfirmado ? candidatos.filter(c =>
+    nomeNormalizado(c.medicoNome) === nomeNormalizado(e.profissionalConfirmado!.nome) &&
+    c.raizesFonte.some(r => r.registro === e.profissionalConfirmado!.registro)) : [];
+  const confirmado = confirmados.length === 1 ? confirmados[0]! : null;
   const escolha =
     !informacao &&
     (/\b(?:vou fazer|quero|queria|gostaria|prefiro|escolho|escolhi|pode ser|vai ser|seria com|vou com)\b/.test(
@@ -369,7 +375,7 @@ export function resolverSelecaoContextual(e: EntradaSelecaoContextual): Resultad
       turnoDeSelecao: true,
     });
   }
-  let escolhido = medicoAnterior ?? null;
+  let escolhido = confirmado ?? medicoAnterior ?? null;
   if (escolha && positivas.length) {
     if (correspondentes.length !== 1)
       return responder({
@@ -426,7 +432,7 @@ export function resolverSelecaoContextual(e: EntradaSelecaoContextual): Resultad
   if (!modalidade && escolhido.modalidades.length === 1 && !modNegativas.length)
     modalidade = escolhido.modalidades[0]!;
   const selecao = snapshot(e, escolhido, modalidade);
-  const turnoDeSelecao = (escolha && positivas.length > 0) || escolhaModalidade;
+  const turnoDeSelecao = Boolean(confirmado) || (escolha && positivas.length > 0) || escolhaModalidade;
   if (!modalidade && escolhido.modalidades.length > 1)
     return responder({
       estado: "esclarecer_modalidade",

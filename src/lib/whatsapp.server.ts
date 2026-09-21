@@ -1314,6 +1314,9 @@ async function gerarRespostaNinaInterno(
   // ------------------------------------------------------------------
   const { conhecimentoDaMesmaSessao } = await import("@/lib/nina/confidence/conhecimento-sessao");
   const conhecimentoAnterior = conhecimentoDaMesmaSessao(fluxoEstado.knowledge_context, clinicaId, fluxoEstado.session_id ?? null);
+  const { prepararPesquisaMedicoDaSessao, confirmarProfissionalDaPergunta } = await import("@/lib/nina/pesquisa-medico-sessao");
+  const contextoRespostaProfissional = { mensagem: mensagemPaciente, historico: contextoConsultaAgenda.historico };
+  const profissionalConfirmadoNaResposta = confirmarProfissionalDaPergunta(conhecimentoAnterior, contextoRespostaProfissional);
   fluxoEstado.knowledge_context = conhecimentoAnterior;
   const runtimeContext = {
     canal: "whatsapp",
@@ -1368,6 +1371,7 @@ async function gerarRespostaNinaInterno(
       confirmacao_final: fluxoEstado.appointment.confirmation ?? null,
     },
     catalogo: {
+      confirmacao_profissional_na_resposta: profissionalConfirmadoNaResposta,
       publicado: baseAtiva,
       servicos: catalogoPublicado.servicos,
       profissionais: catalogoPublicado.profissionais,
@@ -1721,7 +1725,6 @@ async function gerarRespostaNinaInterno(
     await import("@/lib/nina/confidence/selecao-contextual");
   const { encaminharAposEsclarecimento, prepararSegundaPergunta, MOTIVO_IDENTIFICACAO_PENDENTE, MOTIVO_MEDICO_NAO_IDENTIFICADO } =
     await import("@/lib/nina/catalogo-esclarecimento");
-  const { prepararPesquisaMedicoDaSessao } = await import("@/lib/nina/pesquisa-medico-sessao");
   let selecaoDoTurno:
     | import("@/lib/nina/confidence/selecao-contextual").ResultadoSelecaoContextual
     | null = null;
@@ -1870,6 +1873,7 @@ async function gerarRespostaNinaInterno(
           : null;
       fluxoEstado.knowledge_context = referencia;
       selecaoDoTurno = resolverSelecaoContextual({
+        profissionalConfirmado: profissionalConfirmadoNaResposta,
         mensagem: mensagemPaciente,
         clinicaId,
         sessaoId: fluxoEstado.session_id ?? "",
@@ -2099,7 +2103,7 @@ async function gerarRespostaNinaInterno(
     for (const c of chamadas) {
       const nome = String(c.function?.name ?? "");
       if (c.function) c.function.arguments = prepararPesquisaMedicoDaSessao(
-        nome, c.function.arguments, conhecimentoAnterior,
+        nome, c.function.arguments, conhecimentoAnterior, contextoRespostaProfissional,
       ) ?? c.function.arguments;
       // Toda execução passa pelo broker: ele valida o retorno, aplica
       // idempotência de turno e nunca transforma erro em sucesso.
