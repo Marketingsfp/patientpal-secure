@@ -1,5 +1,6 @@
 /** Guarda referências de pesquisa, nunca copia fatos antigos para a próxima avaliação. */
 import { ehSaudacaoPura } from "./turno-tipo";
+import { normalizarPreferenciaAtendimento, type PreferenciaAtendimentoConsulta } from "../atendimento-consulta";
 import { normalizarTexto, type FatoRecuperado } from "./evidencia";
 import { lerEscolhaHorario } from "../agendamento-escolha";
 import { ehRespostaAfirmativaCurta } from "../resposta-afirmativa";
@@ -23,6 +24,7 @@ export type ConhecimentoSessao = {
   sessionId: string;
   consulta: { termo: string; tipo_atendimento?: TipoAtendimentoCatalogo; medico?: string; dia?: string };
   referencias: ReferenciaConhecimento[];
+  atendimentoConsulta?: PreferenciaAtendimentoConsulta;
   /** Preferência conversacional; sempre revalidada contra o catálogo do turno. */
   selecao?: unknown;
   /** Referência ao aceite de leitura da agenda; revalidada com mensagens entregues. */
@@ -96,6 +98,8 @@ export function normalizarConhecimentoSessao(v: unknown): ConhecimentoSessao | n
       ...(texto(q.dia, 40) ? { dia: texto(q.dia, 40) } : {}),
     },
     referencias,
+    ...(normalizarPreferenciaAtendimento(o.atendimentoConsulta)
+      ? { atendimentoConsulta: normalizarPreferenciaAtendimento(o.atendimentoConsulta)! } : {}),
     ...(esclarecer
       ? {
           esclarecimento: esclarecer,
@@ -270,6 +274,7 @@ export function lembrarConsultaComprovada(e: {
         }
       : {}),
     ...(e.anterior?.selecao ? { selecao: e.anterior.selecao } : {}),
+    ...(anterior?.atendimentoConsulta ? { atendimentoConsulta: anterior.atendimentoConsulta } : {}),
     ...(e.anterior?.interesseAgenda ? { interesseAgenda: e.anterior.interesseAgenda } : {}),
   };
 }

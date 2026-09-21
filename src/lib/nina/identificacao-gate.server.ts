@@ -193,6 +193,17 @@ export async function aplicarGateIdentificacao(params: {
   const a = estado.appointment;
   const p = estado.patient;
   if (a.appointment_id || estado.flow.stage === "HANDOFF") return null;
+  const { pedidoPreventivo } = await import("./atendimento-consulta");
+  const preventivo = pedidoPreventivo(mensagem);
+  if (a.procedure && preventivo &&
+    (/\bpreventivo\b/i.test(a.procedure) && !/\bsem\s+preventivo\b/i.test(a.procedure)) !== (preventivo === "com")) {
+    // Mudança do atendimento exige releitura do catálogo e novo resumo.
+    // Não reaproveite uma vaga/aceite da variante anterior na coleta de dados.
+    limparEscolhaAgendamento(estado);
+    a.slot_options = null;
+    estado.flow.stage = "CHOOSING_SLOT";
+    return null;
+  }
   const encaminharSfp = async () => {
     limparEscolhaAgendamento(estado);
     a.slot_options = null;

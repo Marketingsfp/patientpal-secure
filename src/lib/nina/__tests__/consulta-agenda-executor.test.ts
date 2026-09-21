@@ -21,6 +21,7 @@ let banco: Record<string, Linha[]>;
 let falharLeituraFicha = false;
 let falharAgendaMedico: string | null = null;
 let falharEscala = false;
+let procedimentoGravadoDivergente = false;
 let resultadoCatalogo: ResultadoConhecimento;
 const pesquisas: unknown[] = [];
 const leituras: Array<{ tabela: string; filtros: Record<string, unknown> }> = [];
@@ -124,7 +125,8 @@ mock.module("@/lib/agenda/criar-agendamento.core.server", () => ({
   ) => {
     gravacoes.push(entrada.payload);
     const index = banco.agendamentos!.findIndex((r) => r.id === entrada.editing_id);
-    const linha = { ...banco.agendamentos![index], ...entrada.payload, id: AGENDAMENTO };
+    const linha: Linha = { ...banco.agendamentos![index], ...entrada.payload, id: AGENDAMENTO };
+    if (procedimentoGravadoDivergente) linha.procedimento = "Consulta — GINECOLOGIA";
     if (index >= 0) banco.agendamentos![index] = linha;
     else banco.agendamentos!.push(linha);
     return { ok: true, id: AGENDAMENTO };
@@ -227,6 +229,7 @@ function contextoAgendar(confirmado = false) {
 }
 
 beforeEach(() => {
+  procedimentoGravadoDivergente = false;
   falharEscala = false;
   falharLeituraFicha = false;
   falharAgendaMedico = null;
@@ -504,6 +507,118 @@ describe("primeiro disponível entre todos os profissionais publicados", () => {
     expect(r.ok).toBe(true);
     expect(JSON.stringify(ctx.estado.appointment.confirmation)).toBe(confirmacao);
     expect(gravacoes).toHaveLength(0);
+  });
+});
+
+describe("consulta com preventivo conserva o atendimento publicado", () => {
+  const comPreventivo = "CONSULTA + PREVENTIVO — GINECOLOGIA";
+  function preparar(variante: "com" | "sem", origem: "homologacao" | "whatsapp" = "homologacao") {
+    Object.assign(banco.nina_cat_profissionais![0]!, {
+      especialidades: [{ nome: "GINECOLOGIA" }, { nome: "CLÍNICO GERAL" }],
+      observacao_publica: "CONSULTA + PREVENTIVO\nEspecialidade: GINECOLOGIA\nDinheiro: R$ 172,00\nPix/cartão: R$ 205,00\nObservação: Agendado\n\n" +
+        "CONSULTA GINECOLOGIA\nEspecialidade: GINECOLOGIA\nDinheiro: R$ 120,00\nPix/cartão: R$ 145,00\nObservação: Agendado\n\n" +
+        "CONSULTA CLÍNICO GERAL\nEspecialidade: CLÍNICO GERAL\nDinheiro: R$ 100,00\nObservação: Agendado",
+      formas_pagamento: [{ forma: "Dinheiro", condicao: "Consulta + Preventivo", valor: 172 },
+        { forma: "Dinheiro", condicao: "Consulta Ginecologia", valor: 120 },
+        { forma: "Dinheiro", condicao: "Consulta Clínico Geral", valor: 100 }],
+    });
+    const ctx: CtxNinaPaciente = { ...contexto("Primeira data com Alex Louza"), origem,
+      teste: origem === "homologacao", podeAgendar: true, pacienteId: PACIENTE, pacienteNome: "Paciente Fictício" };
+    ctx.estado!.knowledge_context = { versao: 1, clinicaId: CLINICA, sessionId: ctx.estado!.session_id!,
+      consulta: { termo: "Ginecologia", tipo_atendimento: "consulta" },
+      referencias: [{ registro: CATALOGO, versao: null, procedimento: "Consulta — GINECOLOGIA", medicoNome: "Alex Louza" }],
+      atendimentoConsulta: { especialidade: "GINECOLOGIA", preventivo: variante } };
+    return ctx;
+  }
+  for (const origem of ["homologacao", "whatsapp"] as const) for (const variante of ["com", "sem"] as const) {
+    test(`${origem}: ${variante} preventivo → vaga → dados → resumo → aceite → agenda → conclusão`, async () => {
+      const ctx = preparar(variante, origem);
+      const procedimento = variante === "com" ? comPreventivo : "CONSULTA GINECOLOGIA";
+      const r = await executarFerramentaPaciente(ctx, "proxima_vaga", { medico_id: MEDICO });
+      expect(r.ok).toBe(true);
+      expect(ctx.estado!.appointment.slot_options?.vagas[0]?.procedimento).toBe(procedimento);
+      ctx.estado = JSON.parse(JSON.stringify(ctx.estado));
+      ctx.opcoesAgendamentoInicioTurno = true;
+      ctx.consultaAgenda = { mensagemAtual: "Escolho 14:00", historico: [{ role: "assistant", content: "Disponível às 14:00. Qual prefere?" }] };
+      const dados = await aplicarGateIdentificacao({ mensagem: "Escolho 14:00", estado: ctx.estado!, ctx, executar: executarFerramentaPaciente });
+      expect(dados?.camposPendentes).toContain("nome");
+      ctx.consultaAgenda = { mensagemAtual: "Paciente Fictício, 02/01/1990, (21) 99999-0000", historico: [{ role: "assistant", content: dados!.texto }] };
+      const executar: typeof executarFerramentaPaciente = async (c, nome, args) =>
+        nome === "consultar_cadastro_paciente" ? { ok: true, campos_faltantes: [] }
+          : nome === "identificar_paciente" ? { ok: true } : executarFerramentaPaciente(c, nome, args);
+      const resumo = await aplicarGateIdentificacao({ mensagem: ctx.consultaAgenda.mensagemAtual, estado: ctx.estado!, ctx, executar });
+      expect(resumo?.texto).toContain(procedimento);
+      expect(gravacoes).toHaveLength(0);
+      ctx.estado = JSON.parse(JSON.stringify(ctx.estado));
+      ctx.consultaAgenda = { mensagemAtual: "Sim, confirmo.", historico: [{ role: "assistant", content: resumo!.texto }] };
+      const confirmado = await aplicarGateIdentificacao({ mensagem: ctx.consultaAgenda.mensagemAtual, estado: ctx.estado!, ctx, executar });
+      expect(confirmado?.acoesConcluidas[0]?.confirmada).toBe(true);
+      expect(confirmado?.texto).toContain(procedimento);
+      expect(gravacoes).toHaveLength(1);
+      expect(banco.agendamentos![0]!.procedimento).toBe(procedimento);
+      expect(gravacoes[0]!.forma_pagamento_prevista).toBeNull();
+    });
+  }
+  test("primeiro disponível revalida a variante e mantém somente seus preços e condições", async () => {
+    preparar("com");
+    const { candidatosPrimeiraVaga } = await import("../primeiro-disponivel-catalogo.server");
+    const candidatos = await candidatosPrimeiraVaga(CLINICA, "consulta", "Ginecologia", { especialidade: "GINECOLOGIA", preventivo: "com" });
+    expect(candidatos).toHaveLength(1);
+    expect(candidatos[0]!.registro).toMatchObject({ procedimento: comPreventivo, preco_dinheiro: "R$ 172,00", preco_cartao: "R$ 205,00" });
+    expect(candidatos[0]!.registro.observacoes).not.toContain("120,00");
+    expect(candidatos[0]!.registro.observacoes).not.toContain("CLÍNICO GERAL");
+    const ctx = preparar("sem");
+    expect((await executarFerramentaPaciente(ctx, "consultar_primeiro_disponivel", { tipo: "consulta", atendimento: "Ginecologia" })).ok).toBe(true);
+    expect(ctx.estado!.appointment.slot_options?.vagas[0]?.procedimento).toBe("CONSULTA GINECOLOGIA");
+  });
+  test("trocar de médico não autoriza trocar o atendimento", async () => {
+    const ctx = preparar("com");
+    banco.nina_cat_profissionais![0]!.observacao_publica = "CONSULTA GINECOLOGIA\nEspecialidade: GINECOLOGIA\nObservação: Agendado";
+    expect((await executarFerramentaPaciente(ctx, "proxima_vaga", { medico_id: MEDICO })).codigo).toBe("ATENDIMENTO_AGENDA_NAO_VINCULADO");
+    expect(gravacoes).toHaveLength(0);
+  });
+  test("o título específico pode ser pesquisado diretamente sem virar duas variantes", async () => {
+    preparar("com");
+    const { candidatosPrimeiraVaga } = await import("../primeiro-disponivel-catalogo.server");
+    const candidatos = await candidatosPrimeiraVaga(CLINICA, "consulta", "Consulta + Preventivo");
+    expect(candidatos).toHaveLength(1);
+    expect(candidatos[0]!.registro.procedimento).toBe(comPreventivo);
+  });
+  test("médico com uma única consulta publicada conserva o preventivo mesmo após pesquisa genérica", async () => {
+    const ctx = preparar("com");
+    delete ctx.estado!.knowledge_context!.atendimentoConsulta;
+    banco.nina_cat_profissionais![0]!.observacao_publica = "CONSULTA + PREVENTIVO\nEspecialidade: GINECOLOGIA\nObservação: Agendado";
+    expect((await executarFerramentaPaciente(ctx, "proxima_vaga", { medico_id: MEDICO })).ok).toBe(true);
+    expect(ctx.estado!.appointment.procedure).toBe(comPreventivo);
+  });
+  test("duas variantes não são reduzidas à mesma especialidade", async () => {
+    const ctx = preparar("com");
+    delete ctx.estado!.knowledge_context!.atendimentoConsulta;
+    expect((await executarFerramentaPaciente(ctx, "proxima_vaga", { medico_id: MEDICO })).codigo).toBe("ATENDIMENTO_AGENDA_NAO_VINCULADO");
+  });
+  test("mudança para sem preventivo invalida o resumo antigo, sem reservar", async () => {
+    const ctx = contextoAgendar(true);
+    ctx.estado.appointment.procedure = comPreventivo;
+    ctx.estado.appointment.confirmation!.vaga.procedimento = comPreventivo;
+    const r = await aplicarGateIdentificacao({ mensagem: "Agora quero sem preventivo", estado: ctx.estado, ctx, executar: executarFerramentaPaciente });
+    expect(r).toBeNull();
+    expect(ctx.estado.appointment.confirmation).toBeNull();
+    expect(ctx.estado.appointment.slot_options).toBeNull();
+    expect(gravacoes).toHaveLength(0);
+  });
+  test.each([false, true])("procedimento divergente não confirma sucesso nem duplica (existente=%s)", async existente => {
+    const ctx = contextoAgendar(true);
+    procedimentoGravadoDivergente = true;
+    if (existente) banco.agendamentos = [{ ...argumentosAgendar, procedimento: "Consulta — GINECOLOGIA", id: AGENDAMENTO,
+      clinica_id: CLINICA, paciente_id: PACIENTE, status: "agendado" }];
+    const r = await executarFerramentaPaciente(ctx, "agendar", argumentosAgendar);
+    expect(r.erro).toBe("APPOINTMENT_UNCERTAIN");
+    expect(r.divergencias).toContain("procedimento");
+    expect(ctx.estado.appointment.appointment_id).toBeNull();
+    expect(gravacoes).toHaveLength(existente ? 0 : 1);
+    const repeticao = await executarFerramentaPaciente(ctx, "agendar", argumentosAgendar);
+    expect(repeticao.erro).toBe("APPOINTMENT_UNCERTAIN");
+    expect(gravacoes).toHaveLength(existente ? 0 : 1);
   });
 });
 

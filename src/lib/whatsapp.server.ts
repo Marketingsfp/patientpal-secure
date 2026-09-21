@@ -1379,6 +1379,7 @@ async function gerarRespostaNinaInterno(
       referencia_da_sessao: conhecimentoAnterior
         ? {
             consulta: conhecimentoAnterior.consulta,
+            atendimento_escolhido: conhecimentoAnterior.atendimentoConsulta ?? null,
             esclarecimento: conhecimentoAnterior.esclarecimento ?? null,
             esclarecimento_tentativas:
               conhecimentoAnterior.esclarecimentoTentativas ??
@@ -1871,6 +1872,22 @@ async function gerarRespostaNinaInterno(
               esclarecimento,
             })
           : null;
+      if (referencia && tipoAtendimento === "consulta") {
+        const { atualizarPreferenciaAtendimento } = await import("@/lib/nina/atendimento-consulta");
+        const { registrosDoRetorno } = await import("@/lib/nina/confidence/evidencia-extrator");
+        const atual = conhecimentoDaMesmaSessao(fluxoEstado.knowledge_context, clinicaId, fluxoEstado.session_id ?? null);
+        const anterior = nome === "consultar_base_conhecimento" && parametros.nova_solicitacao === true
+          ? null : atual?.atendimentoConsulta ?? referenciaAnterior?.atendimentoConsulta;
+        const preferencia = atualizarPreferenciaAtendimento({ mensagem: mensagemPaciente, anterior,
+          registros: registrosDoRetorno((r.dados ?? {}) as Record<string, unknown>) as import("@/lib/nina/knowledge-contract").RegistroConhecimento[] });
+        if (preferencia) referencia.atendimentoConsulta = preferencia;
+        else delete referencia.atendimentoConsulta;
+        if (JSON.stringify(anterior ?? null) !== JSON.stringify(preferencia) && !fluxoEstado.appointment.appointment_id) {
+          const { limparEscolhaAgendamento } = await import("@/lib/nina/agendamento-escolha");
+          limparEscolhaAgendamento(fluxoEstado);
+          fluxoEstado.appointment.slot_options = null;
+        }
+      }
       fluxoEstado.knowledge_context = referencia;
       selecaoDoTurno = resolverSelecaoContextual({
         profissionalConfirmado: profissionalConfirmadoNaResposta,
@@ -1898,6 +1915,7 @@ async function gerarRespostaNinaInterno(
             referencia?.referencias ?? [],
           ),
           selecao: selecaoDoTurno,
+          atendimento_escolhido: referencia?.atendimentoConsulta ?? null,
           interpretacao_intencao: "modelo_com_historico_da_sessao",
           ferramentas_de_consulta_disponiveis: true,
           fatos_antigos_reutilizados: false,

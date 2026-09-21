@@ -15,7 +15,9 @@ export function resultadoAgendamentoConfirmado(
   if (!id) return null;
   const ficha = typeof dados.ficha_numero === "string" ? dados.ficha_numero : null;
   const chave = chaveConfirmacaoModalidade(modalidade, ficha);
+  const agendamento = dados.agendamento as Record<string, unknown> | undefined;
   const variaveis = { profissional: String(dados.medico ?? a.doctor_name ?? "-"),
+    procedimento: String(agendamento?.procedimento ?? a.procedure ?? ""),
     data: String(dados.date ?? a.date?.split("-").reverse().join("/") ?? "-"),
     horario: String(dados.time ?? a.time ?? "-"), unidade: unidade.trim() || "nossa clínica",
     modalidade, ficha: ficha ?? "" };

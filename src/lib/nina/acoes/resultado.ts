@@ -24,6 +24,7 @@ export type RegistroAgendamento = {
   inicio?: string | null;
   fim?: string | null;
   status?: string | null;
+  procedimento?: string | null;
 };
 
 export type EsperadoAgendamento = {
@@ -32,6 +33,7 @@ export type EsperadoAgendamento = {
   medicoId?: string | null;
   inicio?: string | null;
   fim?: string | null;
+  procedimento?: string | null;
 };
 
 export type ResultadoAcaoAgendamento = {
@@ -61,6 +63,8 @@ function comparar(esperado: EsperadoAgendamento, lido: RegistroAgendamento): str
     d.push("paciente");
   if (!vazio(esperado.medicoId) && String(lido.medico_id ?? "") !== String(esperado.medicoId))
     d.push("profissional");
+  if (!vazio(esperado.procedimento) && String(lido.procedimento ?? "").trim() !== esperado.procedimento!.trim())
+    d.push("procedimento");
   if (!vazio(esperado.inicio) && !mesmoInstante(lido.inicio, esperado.inicio)) d.push("inicio");
   if (!vazio(esperado.fim) && !vazio(lido.fim) && !mesmoInstante(lido.fim, esperado.fim))
     d.push("fim");

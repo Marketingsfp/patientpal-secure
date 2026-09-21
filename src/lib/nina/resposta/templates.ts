@@ -292,6 +292,10 @@ export function textoDaChave(
   const resultado = resolverTextoDaChave(chave, valores, publicados);
   resultado.texto = removerEmojisNina(omitirNomeGenerico(resultado.texto));
   if (!CHAVES_CONFIRMACAO_AGENDAMENTO.has(chave) || !resultado.texto) return resultado;
+  // Inclui o atendimento também nos templates já publicados, preservando
+  // suas orientações e despedida. Não exige republicar textos no banco.
+  if (valores.procedimento?.trim() && !resultado.texto.includes(valores.procedimento.trim()))
+    resultado.texto = `${resultado.texto}\n\n*Atendimento:* ${valores.procedimento.trim()}`;
   const modalidade = chave.includes("pre_agendamento") ? "chegada_com_pre_agendamento"
     : chave.includes("ficha") ? "ficha" : "hora_marcada";
   const despedida = acrescentarDespedidaAgendamento(resultado.texto, valores.unidade, publicados, modalidade);

@@ -410,7 +410,7 @@ async function guardarOpcoes(ctx: CtxNinaPaciente, slots: SlotNina[], procedimen
     const tipo = conhecimento.consulta.tipo_atendimento;
     const { candidatosPrimeiraVaga } = await import("./primeiro-disponivel-catalogo.server");
     let candidatos = tipo === "consulta" || tipo === "exame_procedimento"
-      ? await candidatosPrimeiraVaga(ctx.clinicaId, tipo === "consulta" ? "consulta" : "procedimento", atendimento)
+      ? await candidatosPrimeiraVaga(ctx.clinicaId, tipo === "consulta" ? "consulta" : "procedimento", atendimento, conhecimento.atendimentoConsulta)
       : [];
     // A pesquisa pode terminar em "consulta" ou no nome do médico. Revalide
     // todas as referências por ID e nome publicado, sem exigir grafias iguais.
@@ -418,7 +418,7 @@ async function guardarOpcoes(ctx: CtxNinaPaciente, slots: SlotNina[], procedimen
     const referencias = conhecimento.referencias.filter(r => r.procedimento && !r.procedimento.includes(","));
     if (!candidatos.length && !selecao?.modalidade && referencias.length &&
       (tipo === "consulta" || tipo === "exame_procedimento"))
-      candidatos = await candidatosPrimeiraVaga(ctx.clinicaId, tipo === "consulta" ? "consulta" : "procedimento", referencias);
+      candidatos = await candidatosPrimeiraVaga(ctx.clinicaId, tipo === "consulta" ? "consulta" : "procedimento", referencias, conhecimento.atendimentoConsulta);
     publicados = new Map(slots.flatMap(s => {
       const nomes = [...new Set(candidatos.filter(c => c.medicoId === s.medico_id)
         .map(c => c.registro.procedimento).filter((p): p is string => !!p))];
@@ -1114,7 +1114,9 @@ async function executarFerramentaInterna(
           data: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
         }).parse(args);
         const { candidatosPrimeiraVaga } = await import("./primeiro-disponivel-catalogo.server");
-        const candidatos = await candidatosPrimeiraVaga(ctx.clinicaId, p.tipo, p.atendimento);
+        const { conhecimentoDaMesmaSessao } = await import("./confidence/conhecimento-sessao");
+        const conhecimento = conhecimentoDaMesmaSessao(ctx.estado?.knowledge_context, ctx.clinicaId, ctx.estado?.session_id ?? null);
+        const candidatos = await candidatosPrimeiraVaga(ctx.clinicaId, p.tipo, p.atendimento, conhecimento?.atendimentoConsulta);
         if (!candidatos.length) return falha("PROCEDURE_NOT_FOUND",
           "Não encontrei esse atendimento publicado. Encaminhe para a equipe humana.", { encaminhar_para_humano: true });
         // SFP, vínculo ausente e consulta com erro não equivalem a agenda vazia.
@@ -1955,7 +1957,7 @@ async function executarFerramentaInterna(
         // registro existente, com os dados REAIS dele (nunca os do pedido).
         const { data: jaExiste } = await supabaseAdmin
           .from("agendamentos")
-          .select("id, clinica_id, paciente_id, medico_id, inicio, fim, status, agenda_id")
+          .select("id, clinica_id, paciente_id, medico_id, inicio, fim, status, agenda_id, procedimento")
           .eq("clinica_id", ctx.clinicaId)
           .eq("paciente_id", ctx.pacienteId)
           .eq("medico_id", medicoIdReal)
@@ -1967,7 +1969,7 @@ async function executarFerramentaInterna(
             return falha("APPOINTMENT_UNCERTAIN", "O registro existente pertence a outra agenda. A equipe precisa conferir antes de confirmar.");
           const anterior = verificarResultadoAgendamento(
             { clinicaId: ctx.clinicaId, pacienteId: ctx.pacienteId,
-              medicoId: medicoIdReal, inicio: p.inicio, fim: p.fim },
+              medicoId: medicoIdReal, inicio: p.inicio, fim: p.fim, procedimento: p.procedimento },
             jaExiste as RegistroAgendamento,
             { jaExistia: true },
           );
@@ -1984,7 +1986,7 @@ async function executarFerramentaInterna(
             );
           const reg = anterior.registro!;
           mutarEstado(ctx, {
-            appointment: { appointment_id: anterior.agendamentoId },
+            appointment: { appointment_id: anterior.agendamentoId, procedure: reg.procedimento ?? null },
             stage: "BOOKED",
           });
           return {
@@ -2008,7 +2010,7 @@ async function executarFerramentaInterna(
               // Dados da reserva EXISTENTE, não do pedido novo.
               data: formatarData(String(reg.inicio ?? p.inicio)),
               hora: formatarHora(String(reg.inicio ?? p.inicio)),
-              procedimento: p.procedimento,
+              procedimento: reg.procedimento,
             },
           };
         }
@@ -2175,7 +2177,7 @@ async function executarFerramentaInterna(
         // INCERTO — a Nina jamais confirma o que não está comprovado.
         const { data: conferido } = await supabaseAdmin
           .from("agendamentos")
-          .select("id, clinica_id, paciente_id, medico_id, inicio, fim, status, agenda_id")
+          .select("id, clinica_id, paciente_id, medico_id, inicio, fim, status, agenda_id, procedimento")
           .eq("id", r.id)
           .eq("clinica_id", ctx.clinicaId)
           .maybeSingle();
@@ -2186,6 +2188,7 @@ async function executarFerramentaInterna(
             medicoId: medicoIdReal,
             inicio: p.inicio,
             fim: p.fim,
+            procedimento: p.procedimento,
           },
           (conferido ?? null) as RegistroAgendamento | null,
         );
@@ -2225,7 +2228,7 @@ async function executarFerramentaInterna(
           appointment: {
             doctor_id: medicoIdReal,
             doctor_name: rMed.nome,
-            procedure: p.procedimento,
+            procedure: conferido!.procedimento,
             slot_inicio: p.inicio,
             slot_fim: p.fim,
             slot_confirmed_by_patient: true,
@@ -2257,7 +2260,7 @@ async function executarFerramentaInterna(
           agendamento: {
             data: formatarData(p.inicio),
             hora: formatarHora(p.inicio),
-            procedimento: p.procedimento,
+            procedimento: conferido!.procedimento,
           },
         };
 

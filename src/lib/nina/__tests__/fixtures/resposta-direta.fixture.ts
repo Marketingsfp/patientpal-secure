@@ -17,10 +17,17 @@ const ausente = cenario.startsWith("catalogo_ausente");
 const esclarecer = cenario.startsWith("catalogo_esclarecimento");
 const escolhaMedico = cenario.startsWith("catalogo_medico_");
 const confirmacaoMedico = cenario.startsWith("catalogo_medico_confirmacao");
+const variantePreventivo = cenario.includes("interpretado_preventivo");
 const perguntaMedico = cenario.endsWith("segunda")
   ? "Para identificar o profissional, pode confirmar o nome completo, a especialidade ou a unidade?\nAs opções encontradas são:\nSandro Prinscewal — CARDIOLOGIA, CLINICO GERAL"
   : "Você se refere a este profissional?\nSandro Prinscewal — CARDIOLOGIA, CLINICO GERAL";
 const interpretacao = ({
+  catalogo_interpretado_preventivo_com: {
+    mensagem: "Quero marcar uma consulta de ginecologia com preventivo.", termo: "ginecologia", tipo_atendimento: "consulta", objetivos: ["agendamento"], publicado: "GINECOLOGIA", resposta: "Temos Consulta + Preventivo com Conceição Martins.",
+  },
+  catalogo_interpretado_preventivo_sem: {
+    mensagem: "Quero consulta de ginecologia sem preventivo.", termo: "ginecologia", tipo_atendimento: "consulta", objetivos: ["agendamento"], publicado: "GINECOLOGIA", resposta: "Temos Consulta Ginecologia com Marcilio Quintão.",
+  },
   catalogo_interpretado_cardiologia: {
     mensagem: "Boa tarde, Nina. Gostaria de agendar uma consulta com cardiologista, de preferência nos próximos dias. Estou sentindo algumas palpitações ocasionais e queria fazer uma avaliação.",
     termo: "cardiologia", tipo_atendimento: "consulta", objetivos: ["agendamento"], publicado: "CARDIOLOGIA", resposta: "Temos consulta de Cardiologia. Você prefere o primeiro disponível ou escolher o profissional?",
@@ -58,6 +65,11 @@ const catalogoInterpretado: Record<string, any[]> = {
 if (interpretacao?.publicado === "ODONTOLOGIA") catalogoInterpretado.nina_cat_profissionais = ["Jean Ferreira", "Raiani", "Karen"].map((nome, i) => ({
   id: `medico-${i}`, clinica_id: "clinica-simulada", status: "PUBLICADO", nome,
   especialidades: [{ nome: "ODONTOLOGIA" }], tipo_atendimento: "Avaliação odontológica",
+  formas_pagamento: [], horarios: [], convenios: [],
+}));
+if (variantePreventivo) catalogoInterpretado.nina_cat_profissionais = ["Conceição Martins", "Marcilio Quintão"].map((nome, i) => ({
+  id: `medico-${i}`, clinica_id: "clinica-simulada", status: "PUBLICADO", nome, especialidades: [{ nome: "GINECOLOGIA" }],
+  observacao_publica: `${i === 0 ? "CONSULTA + PREVENTIVO" : "CONSULTA GINECOLOGIA"}\nEspecialidade: GINECOLOGIA\nDinheiro: R$ ${i === 0 ? "172" : "120"},00\nObservação: Agendado`,
   formas_pagamento: [], horarios: [], convenios: [],
 }));
 if (escolhaMedico) catalogoInterpretado.nina_cat_profissionais = ["Shirley Martins", "Raisa Moura"].map((nome, i) => ({
@@ -201,7 +213,7 @@ mock.module("@/integrations/supabase/client.server", () => ({
         then: (resolve: any) => Promise.resolve(resolve({
           data: (interpretacao || escolhaMedico) && catalogoInterpretado[tabela] ? catalogoInterpretado[tabela]!.filter(l => filtrosCatalogo.every(f => f(l))).slice(0, limiteCatalogo)
             : tabela === "clinicas" ? { nome: "Clínica simulada", base_importada: false }
-            : (contextual || esclarecer || escolhaMedico) && tabela === "atend_conversas" ? { id: "conversa-contextual", nina_fluxo_estado: estadoContextual }
+            : (contextual || esclarecer || escolhaMedico || variantePreventivo) && tabela === "atend_conversas" ? { id: "conversa-contextual", nina_fluxo_estado: estadoContextual }
             : (contextual || confirmacaoMedico) && tabela === "whatsapp_mensagens" ? mensagensContextuais
             : unica ? null : [], error: null,
           count: (contextual || confirmacaoMedico) && tabela === "whatsapp_mensagens" ? mensagensContextuais.length : 0,
@@ -499,7 +511,7 @@ mock.module("@/lib/nina/resposta/templates.server", () => ({
 
 const { gerarRespostaNina } = await import("@/lib/whatsapp.server");
 const auditoria: any = {};
-const resposta = await gerarRespostaNina("clinica-simulada", pergunta, contextual || esclarecer || escolhaMedico ? "55000100999" : null, {
+const resposta = await gerarRespostaNina("clinica-simulada", pergunta, contextual || esclarecer || escolhaMedico || variantePreventivo ? "55000100999" : null, {
   teste, ambiente: teste ? "homologacao" : "producao",
   ...(cenario === "escolha_sem_auditoria" ? {} : { auditoria }),
   mensagensEntrada: ["entrada-simulada"],

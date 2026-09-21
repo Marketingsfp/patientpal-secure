@@ -6,6 +6,8 @@ import { profissionalParaRegistro, servicoParaRegistro,
   type ProfissionalPublicado, type ServicoPublicado } from "./catalogo-conhecimento";
 import type { RegistroConhecimento } from "./knowledge-contract";
 import { resolverMedicoAgenda, vincularProfissionaisCatalogo } from "./vinculo-catalogo-agenda.server";
+import { atendimentosEstruturados, textoAtendimentos } from "./catalogo-estrutura";
+import { atendePreferenciaConsulta, nomeCompletoConsulta, type PreferenciaAtendimentoConsulta } from "./atendimento-consulta";
 
 const colunasProfissional = "id, nome, especialidades, atende_consultorio, formas_pagamento, convenios, horarios, tipo_atendimento, observacao_publica, aviso_dia, aviso_valido_de, aviso_valido_ate, unidades(nome), estrutura";
 const colunasServico = "id, nome, valor, valor_observacao, descricao_publica, preparo, restricoes, executantes, formas_pagamento, estrutura";
@@ -16,7 +18,7 @@ export type CandidatoPrimeiraVaga = { registro: RegistroConhecimento; medicoId: 
 type ReferenciaAtendimento = { registro: string; procedimento: string | null };
 
 export async function candidatosPrimeiraVaga(clinicaId: string, tipo: "consulta" | "procedimento",
-  atendimento: string | readonly ReferenciaAtendimento[]): Promise<CandidatoPrimeiraVaga[]> {
+  atendimento: string | readonly ReferenciaAtendimento[], preferencia?: PreferenciaAtendimentoConsulta | null): Promise<CandidatoPrimeiraVaga[]> {
   const normalizarNome = tipo === "consulta" ? chave : normalizar;
   // Referências são pistas para reler a publicação, sempre ligadas ao seu ID.
   // Grafias diferentes do mesmo atendimento não são modalidades diferentes.
@@ -37,17 +39,34 @@ export async function candidatosPrimeiraVaga(clinicaId: string, tipo: "consulta"
   const hoje = agoraNaClinica().iso;
   if (tipo === "consulta") {
     const registros = (linhas as ProfissionalPublicado[]).flatMap(p => {
-      const especialidades = lista(p.especialidades).filter(e => corresponde(p.id, String(e.nome ?? "")));
+      const itens = atendimentosEstruturados(p.observacao_publica, p.estrutura, p.nome);
+      const especialidades = lista(p.especialidades).filter(e => corresponde(p.id, String(e.nome ?? "")) ||
+        itens.some(i => normalizar(i.especialidade ?? "") === normalizar(String(e.nome ?? "")) &&
+          (corresponde(p.id, i.atendimento) || corresponde(p.id, nomeCompletoConsulta(i)))));
       // Um registro por especialidade: duas consultas reais do mesmo médico
       // devem continuar ambíguas, em vez de virar um único procedimento composto.
-      return especialidades.map(especialidade => {
+      return especialidades.flatMap(especialidade => {
         const nome = chave(String(especialidade.nome ?? ""));
+        if (preferencia && nome !== chave(preferencia.especialidade)) return [];
         const outras = lista(p.especialidades).map(e => chave(String(e.nome ?? ""))).filter(e => e && e !== nome);
         const formas_pagamento = lista(p.formas_pagamento).filter(f => {
           const condicao = chave(String(f.condicao ?? ""));
           return !outras.some(e => condicao.includes(e)) || condicao.includes(nome);
         });
-        return profissionalParaRegistro({ ...p, especialidades: [especialidade], formas_pagamento }, hoje);
+        const publicados = itens.filter(i => chave(i.especialidade ?? "") === nome);
+        if (!publicados.length) return preferencia ? [] : [profissionalParaRegistro({ ...p, especialidades: [especialidade], formas_pagamento }, hoje)];
+        const nomeEspecifico = typeof atendimento === "string" && !corresponde(p.id, String(especialidade.nome ?? ""));
+        const escolhidos = publicados.filter(i => atendePreferenciaConsulta(i, preferencia) &&
+          (!nomeEspecifico || corresponde(p.id, i.atendimento) || corresponde(p.id, nomeCompletoConsulta(i))));
+        // Cada atendimento conserva seu título, preços e condições. Duas
+        // variantes continuam ambíguas; não se reduz ambas à especialidade.
+        return escolhidos.map(item => {
+          const formas = formas_pagamento.filter(f => normalizar(String(f.condicao ?? "")) === normalizar(item.atendimento));
+          const registro = profissionalParaRegistro({ ...p, especialidades: [especialidade], formas_pagamento: formas,
+            observacao_publica: textoAtendimentos([item]) }, hoje);
+          return { ...registro, procedimento: nomeCompletoConsulta(item), preco_dinheiro: item.dinheiro,
+            preco_cartao: item.pix_cartao, extras: { ...registro.extras, atendimentos_publicados: [item] } };
+        });
       });
     });
     const vinculos = await vincularProfissionaisCatalogo(clinicaId, registros);

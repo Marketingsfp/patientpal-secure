@@ -53,4 +53,14 @@ describe("modalidades oficiais de atendimento", () => {
     expect(r.texto).toContain("Não é necessário marcar horário");
     expect(r.texto).not.toMatch(/15|antecedência|confirmar se você/);
   });
+  test("template publicado recebe o atendimento completo conferido, mantendo suas orientações", () => {
+    const textos = { "fluxo.agendamento.confirmado": "Reserva confirmada com {profissional}, {data} às {horario}. Traga documento." };
+    const r = resultadoAgendamentoConfirmado({ appointment_id: "ag1", modalidade_atendimento: "hora_marcada",
+      date: "22/09/2026", time: "10:40", medico: "Conceição Martins", agendamento: { procedimento: "CONSULTA + PREVENTIVO — GINECOLOGIA" } },
+      estadoVazio(), "Clínica", textos)!;
+    expect(r.texto).toContain("Traga documento.");
+    expect(r.texto).toContain("*Atendimento:* CONSULTA + PREVENTIVO — GINECOLOGIA");
+    expect(r.texto.match(/CONSULTA \+ PREVENTIVO/g)).toHaveLength(1);
+    expect(textoDaChave(r.chaveTemplate!, r.variaveis, textos).texto).toBe(r.texto);
+  });
 });
