@@ -1020,6 +1020,20 @@ function AppShellInner() {
     };
   }, [clinicColor]);
 
+  // Marca a clínica ativa no <html> para a paleta de marca (tela de portais).
+  const nomeClinicaAtual = clinicaAtual?.clinica.nome;
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    const root = document.documentElement;
+    const slug = modoTodas ? null : slugDaClinica(nomeClinicaAtual);
+    if (slug) root.dataset["clinica"] = slug;
+    else delete root.dataset["clinica"];
+    return () => {
+      delete root.dataset["clinica"];
+    };
+  }, [modoTodas, nomeClinicaAtual]);
+
+
   const subsystem = useSyncExternalStore(subscribeSubsystem, getSubsystem, () => null);
   const seletorPortaisAberto = useSeletorPortaisAberto();
   // Trocar de portal não desmonta a tela atual: o seletor entra como camada
