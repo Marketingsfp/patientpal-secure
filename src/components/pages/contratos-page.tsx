@@ -785,7 +785,7 @@ export function ContratosPage({
         codigo_prontuario: c.paciente_id ? (prontMap[c.paciente_id] ?? null) : null,
       })),
     );
-    setConvenios(conveniosLista);
+    setConvenios(conveniosLista.filter((c) => c.ativo));
     // Agregar parcelas dos contratos carregados
     const contratoIds = contratosRows.map((c) => c.id);
     if (contratoIds.length > 0) {
