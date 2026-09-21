@@ -12,6 +12,7 @@ import { resolverIdentidadeEfetiva, valoresIdentidade } from "../identidade-efet
 import { removerEmojisNina } from "../resposta/sem-emojis";
 import anteriores from "./fixtures/instrucoes-antes-consolidacao.json";
 import { atualizarLimiteEsclarecimento } from "../prompt/limite-esclarecimento";
+import { REGRA_INFORMACOES_GRUPO } from "../clinicas-grupo";
 
 describe("consolidação da publicação e do fallback", () => {
   it("publica exatamente as regras do fallback, preservando a identidade da versão auditada", () => {
@@ -30,7 +31,9 @@ describe("consolidação da publicação e do fallback", () => {
     });
     expect(identidade.identidade).toEqual(antiga.identidade);
     expect(
-      atualizarLimiteEsclarecimento(nova.conteudo).split("[/IDENTIDADE DO ATENDIMENTO]\n\n")[1],
+      atualizarLimiteEsclarecimento(nova.conteudo).split("[/IDENTIDADE DO ATENDIMENTO]\n\n")[1] +
+        "\n\n" +
+        REGRA_INFORMACOES_GRUPO,
     ).toBe(PROMPT_NINA_WHATSAPP_V4);
     const render = renderizarTemplateInstrucoes(nova.conteudo, valoresIdentidade(identidade));
     expect(render.ok).toBe(true);

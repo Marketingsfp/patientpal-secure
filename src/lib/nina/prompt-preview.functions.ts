@@ -169,6 +169,7 @@ export const previewRequestNina = createServerFn({ method: "POST" })
     })();
 
     const { agoraNaClinica } = await import("@/lib/nina-agora");
+    const { dadosPublicosClinicaGrupo } = await import("./clinicas-grupo");
 
     // Exemplo REPRESENTATIVO do contexto dinâmico: mesma estrutura do runtime,
     // com um atendimento fictício. Nenhum dado de paciente real é lido aqui.
@@ -183,6 +184,7 @@ export const previewRequestNina = createServerFn({ method: "POST" })
         endereco: clinica?.endereco ?? null,
         telefone: clinica?.telefone ?? null,
         email: clinica?.email ?? null,
+        ...dadosPublicosClinicaGrupo(entrada.clinicaId),
       },
       data_hora_atual: agoraNaClinica(),
       intencoes: ["informacao"],

@@ -25,6 +25,7 @@
 
 import { z } from "zod";
 import { REGRA_CONSULTA_CATALOGO } from "./catalogo-busca";
+import { consultarDadosClinicasGrupo, consultarHorariosClinicasGrupo, selecionarClinicasGrupo, PARAMETRO_CLINICA_INFORMATIVA } from "./clinicas-grupo";
 import { OBJETIVOS_PESQUISA_CATALOGO, TIPOS_ATENDIMENTO_CATALOGO } from "./catalogo-pesquisa";
 import { agoraNaClinica, FUSO_PADRAO } from "@/lib/nina-agora";
 import { janelaDiaClinica } from "@/lib/date-utils";
@@ -668,8 +669,8 @@ export const FERRAMENTAS_NINA_CONSULTA = [
     type: "function",
     function: {
       name: "dados_da_clinica",
-      description: "Nome oficial, endereço, telefone e e-mail da unidade.",
-      parameters: { type: "object", properties: {} },
+      description: "Informações públicas: nome, endereço, CEP e telefone. Para clínicas do grupo, consulte Menino Jesus, São Francisco de Paula ou Consulta Hoje pelo parâmetro clinica. Telefone de contato não comprova WhatsApp. Não muda a clínica do atendimento ou do agendamento.",
+      parameters: { type: "object", properties: { clinica: PARAMETRO_CLINICA_INFORMATIVA } },
     },
   },
   {
@@ -677,10 +678,11 @@ export const FERRAMENTAS_NINA_CONSULTA = [
     function: {
       name: "horario_funcionamento",
       description:
-        "Horário de funcionamento OFICIAL publicado na Base de Conhecimentos (abertura e fechamento da clínica). NÃO é horário de profissional nem vaga disponível — para vaga use consultar_disponibilidade. Se devolver encontrado=false, diga que não tem a informação confirmada; NUNCA afirme que a clínica está fechada.",
+        "Horário de funcionamento da clínica informada (clinica): calendário publicado ou horário presencial habitual confirmado no diretório do grupo. Para uma data específica, passe data e respeite dia.encontrado; rotina semanal não comprova exceções/feriados. NÃO é horário de atendente no WhatsApp, profissional ou vaga — para vaga use consultar_disponibilidade. Ausência de confirmação nunca significa fechado.",
       parameters: {
         type: "object",
         properties: {
+          clinica: PARAMETRO_CLINICA_INFORMATIVA,
           data: {
             type: "string",
             description: "AAAA-MM-DD quando o paciente perguntou de um dia específico (aplica exceções e vigência).",
@@ -1306,6 +1308,9 @@ async function executarFerramentaInterna(
       }
 
       case "dados_da_clinica": {
+        const grupo = consultarDadosClinicasGrupo(ctx.clinicaId, args.clinica);
+        if (grupo) return grupo;
+        if (args.clinica) return { ok: true, encontrado: false, instrucao: "Não há diretório de outras clínicas confirmado para este atendimento. Peça confirmação à equipe; não forneça os dados da clínica atual como se fossem da unidade mencionada." };
         const { data } = await supabaseAdmin
           .from("clinicas")
           .select("nome, endereco, cidade, estado, cep, telefone, email")
@@ -1327,6 +1332,15 @@ async function executarFerramentaInterna(
       }
 
       case "horario_funcionamento": {
+        const grupo = selecionarClinicasGrupo(ctx.clinicaId, args.clinica);
+        if (grupo) {
+          if (!grupo.length) return consultarDadosClinicasGrupo(ctx.clinicaId, args.clinica)!;
+          // Só calendário público das unidades fixas do grupo; nenhum dado de paciente.
+          const { carregarCalendariosPublicadosCache } = await import("./classificador-periodo.functions");
+          const calendarios = (await Promise.all(grupo.map((c) => carregarCalendariosPublicadosCache(supabaseAdmin, c.id)))).flat();
+          return consultarHorariosClinicasGrupo(ctx.clinicaId, args.clinica, args.data, calendarios, agoraNaClinica(HORA_LOCAL).iso)!;
+        }
+        if (args.clinica) return { ok: true, encontrado: false, instrucao: "Horário da clínica mencionada não confirmado para este atendimento. Confirme com a equipe; não presuma abertura ou fechamento." };
         // Fonte única: calendário publicado na Base de Conhecimentos (Fases 1-3).
         const { carregarCalendariosPublicadosCache } = await import("./classificador-periodo.functions");
         const { horarioOficialDoDia, semanaOficial, nomeDia } = await import("./horario-oficial");

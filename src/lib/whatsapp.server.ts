@@ -1,5 +1,6 @@
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { normalizarTelefone } from "@/lib/atendimento/telefone";
+import { dadosPublicosClinicaGrupo } from "@/lib/nina/clinicas-grupo";
 import { agoraNaClinica } from "@/lib/nina-agora";
 import { encaminhamentoSemRegistro, MOTIVO_SEM_REGISTRO, respostaSemRegistro } from "@/lib/nina/catalogo-sem-registro";
 import { dadosPublicosCatalogo, resultadoExigeHumano, MOTIVO_SFP,
@@ -931,6 +932,7 @@ async function gerarRespostaNinaInterno(
     endereco: enderecoUnidade || null,
     telefone: clinicaRow?.telefone ?? null,
     email: clinicaRow?.email ?? null,
+    ...dadosPublicosClinicaGrupo(clinicaId),
   };
 
   // FASE 3 — leitura da intenção vira FATO no runtime context (não texto de
