@@ -137,6 +137,14 @@ function corDaClinica(nome?: string): string {
   return "#0f172a";
 }
 
+/** Identificador da clínica usado no <html> para trocar a paleta de marca. */
+function slugDaClinica(nome?: string): "sao-francisco" | "menino-jesus" | null {
+  const n = (nome ?? "").toLowerCase();
+  if (n.includes("são francisco") || n.includes("sao francisco")) return "sao-francisco";
+  if (n.includes("menino jesus")) return "menino-jesus";
+  return null;
+}
+
 function corHoverDaClinica(nome?: string): string {
   const n = (nome ?? "").toLowerCase();
   if (n.includes("são francisco") || n.includes("sao francisco")) return "#004d27"; // verde escuro
