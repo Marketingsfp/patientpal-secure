@@ -647,11 +647,12 @@ export function ContratosPage({
     const desatualizada = () => seq !== loadSeq.current;
     const s = termo.trim();
     const buscando = s.length >= 2;
+    // Sem filtro de "ativo": a lista completa é usada para decidir de qual
+    // produto o contrato é (convênio desativado não pode sumir da lista).
     let conveniosQuery = supabase
       .from("cb_convenios")
       .select("*")
-      .eq("clinica_id", clinicaAtual!.clinica_id)
-      .eq("ativo", true);
+      .eq("clinica_id", clinicaAtual!.clinica_id);
     // Dentro dos módulos de cartão, só os convênios do produto daquele módulo.
     if (produtoFiltro) conveniosQuery = conveniosQuery.eq("produto", produtoFiltro);
     const [res, cv] = await Promise.all([
