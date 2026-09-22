@@ -109,6 +109,7 @@ import { HistoricoAtendimentoDialog } from "@/components/financeiro/historico-at
 import { resolverRepasse, formaDoAtendimento, type RepasseTerceiro } from "@/lib/repasse-calc";
 import { ehProcedimentoDeLaudo, rotuloDoLaudo } from "@/lib/financeiro/rateio-receita";
 import {
+  FILTRO_MEDICO_CARTAO_TERAPEUTICO,
   ehServicoCartaoTerapeutico,
   nomeRepasseExibido,
 } from "@/lib/financeiro/cartao-terapeutico";
