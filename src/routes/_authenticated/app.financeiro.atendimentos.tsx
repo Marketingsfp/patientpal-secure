@@ -328,6 +328,7 @@ function AtendimentosPage() {
   // "todos" | "nome:<chave>" — recorte por agenda do profissional escolhido.
   const [fAgenda, setFAgenda] = useState<string>("todos");
   const [semAgendaOcultos, setSemAgendaOcultos] = useState(0);
+  const [naoAtendimentosOcultos, setNaoAtendimentosOcultos] = useState(0);
   const [agendasPorMedico, setAgendasPorMedico] = useState<
     Map<string, { id: string; nome: string }[]>
   >(new Map());
@@ -1796,10 +1797,23 @@ function AtendimentosPage() {
         valor_laudo: Number((r as any).valor_laudo ?? 0),
       };
     });
+    // Recebimento que NÃO é atendimento: lançamento de receita sem agendamento e
+    // sem profissional vinculado — mensalidade do cartão, taxa de adesão, taxa de
+    // dependente, pagamento de contrato. Não tem serviço nem médico e nunca gera
+    // repasse, então não é linha desta tela: além de poluir a lista, consumia os
+    // primeiros números de ficha do dia e desalinhava a numeração da agenda/GR.
+    // Continua aparecendo em Financeiro → Mov. Caixa e em A Receber, que é o
+    // lugar dele. Atenção: lançamento sem agendamento mas COM medico_id é
+    // atendimento pago fora da agenda e continua na lista.
+    const ehRecebimentoSemAtendimento = (x: Atend) => !x.agendamento_id && !x.medico_id;
+    const naoAtendimentos = agend.filter(ehRecebimentoSemAtendimento).length;
+    const agendSoAtendimentos = agend.filter((x) => !ehRecebimentoSemAtendimento(x));
     // Filtro client-side por médico para os registros da agenda (cobre os
     // lançamentos cujo medico_id está nulo e vem do agendamento).
     const agendFiltered =
-      fMedico === "todos" ? agend : agend.filter((x) => x.medico_id === fMedico);
+      fMedico === "todos"
+        ? agendSoAtendimentos
+        : agendSoAtendimentos.filter((x) => x.medico_id === fMedico);
     let unif = [...manuais, ...agendFiltered].sort((a, b) => (a.data < b.data ? 1 : -1));
     if (fStatus === "aberto") unif = unif.filter((x) => !x.repasse_pago);
     else if (fStatus === "pago") unif = unif.filter((x) => x.repasse_pago);
@@ -1813,6 +1827,7 @@ function AtendimentosPage() {
     }
     setItems(visiveis);
     setSemAgendaOcultos(ocultosSemAgenda);
+    setNaoAtendimentosOcultos(naoAtendimentos);
     setSel(new Set());
     setLoading(false);
   };
@@ -3443,6 +3458,14 @@ function AtendimentosPage() {
               >
                 Ver todos deste profissional
               </button>
+            </div>
+          )}
+
+          {naoAtendimentosOcultos > 0 && (
+            <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-muted-foreground dark:border-slate-800 dark:bg-slate-900/40">
+              {naoAtendimentosOcultos} recebimento(s) de mensalidade, adesão, dependente ou contrato
+              do cartão não são atendimento (não têm profissional nem serviço) e ficaram fora desta
+              lista. Eles aparecem em Financeiro → Mov. Caixa e em A Receber.
             </div>
           )}
 
