@@ -1350,6 +1350,17 @@ function Page() {
       toast.error("Selecione a forma de pagamento.");
       return;
     }
+    // Despesa confirmada sem forma some das duas contas de onde o dinheiro
+    // está: não entra em "Em espécie (gaveta)" nem em "Em banco", cai em
+    // "Outros" e faz o saldo da gaveta parecer maior do que é. Foi o caso da
+    // despesa de R$ 910,00 de 18/09/2026, que deixou a gaveta do dia
+    // aparecendo com R$ 985,80 em vez de R$ 75,80.
+    if (form.tipo === "despesa" && form.status === "confirmado" && !form.forma_pagamento) {
+      toast.error(
+        "Selecione a forma de pagamento: sem ela a despesa não entra no saldo da gaveta.",
+      );
+      return;
+    }
     // Despesa sem categoria e sem conta cega a DRE e os relatórios: não dá
     // para responder "quanto gastei com o quê" nem "saiu de qual conta". Os
     // campos existiam mas eram opcionais e quase ninguém preenchia — em

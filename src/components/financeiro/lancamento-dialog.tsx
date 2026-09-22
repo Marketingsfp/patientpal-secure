@@ -852,6 +852,15 @@ export function LancamentoDialog({
     // sem categoria e 33 sem conta. Receita não é travada aqui: ela vem do
     // atendimento, com categoria definida pelo serviço.
     if (tipo === "despesa") {
+      // Sem forma de pagamento a despesa não entra em "Em espécie (gaveta)"
+      // nem em "Em banco": cai em "Outros" e o saldo da gaveta aparece maior
+      // do que o dinheiro que está lá. Ver a mesma trava no Movimento de Caixa.
+      if (!pagamentoMisto && !formaPagamento) {
+        toast.error(
+          "Selecione a forma de pagamento: sem ela a despesa não entra no saldo da gaveta.",
+        );
+        return;
+      }
       if (!categoriaId) {
         toast.error("Selecione a categoria da despesa.");
         return;
