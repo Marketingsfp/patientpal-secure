@@ -2771,7 +2771,10 @@ function AtendimentosPage() {
           }
           continue;
         }
-        const medNome = medId !== "sem" ? (medMap.get(medId) ?? "") : "—";
+        const medNome = nomeRepasseExibido(
+          list[0]?.procedimento,
+          medId !== "sem" ? (medMap.get(medId) ?? "") : "—",
+        );
         const { data: userData } = await supabase.auth.getUser();
         const currentUserId = userData?.user?.id ?? null;
         const manualIds = list.filter((x) => x.origem === "manual").map((x) => x.id);
