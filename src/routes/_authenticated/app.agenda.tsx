@@ -1,4 +1,9 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+
+// Em agenda de ORDEM DE CHEGADA a clínica atende as 30 primeiras fichas do dia
+// em HORA MARCADA; só da ficha 31 em diante é que vale a ordem de chegada. Por
+// isso as fichas 1..30 continuam mostrando o relógio normalmente.
+export const FICHAS_HORA_MARCADA = 30;
 import { confirmDialog } from "@/lib/confirm";
 import { pedirMotivo } from "@/lib/motivo";
 import {
@@ -12475,6 +12480,12 @@ function AgendaPage() {
                     (idx === 0 ||
                       chaveDiaLocal(paginados[idx - 1].inicio) !== chaveDiaLocal(a.inicio));
                   const fichaNum = fichaPorId.get(a.id) ?? "";
+                  // Fichas 1..30 são hora marcada mesmo em agenda de fila.
+                  const nFicha = parseInt(fichaNum || "0", 10);
+                  const ehFila =
+                    !!a.agenda_id &&
+                    idsAgendaFila.has(a.agenda_id) &&
+                    nFicha > FICHAS_HORA_MARCADA;
                   const realizado = a.status === "realizado";
                   const etapaRow = etapaMap.get(a.id) ?? "aguardando_recepcao";
                   // PRESENÇA ≠ PAGAMENTO. O azul de "o paciente está aqui" sai só
@@ -12548,7 +12559,7 @@ function AgendaPage() {
                         {/* Linha 1: horário + ficha + situação */}
                         <div className="flex items-center justify-between gap-2 mb-2">
                           <div className="flex items-center gap-2 min-w-0">
-                            {a.agenda_id && idsAgendaFila.has(a.agenda_id) ? (
+                            {ehFila ? (
                               <span className="text-sm font-bold text-primary whitespace-nowrap">
                                 Ficha #{fichaNum || "—"}
                               </span>
@@ -12560,7 +12571,7 @@ function AgendaPage() {
                             <span className="text-[12px] text-muted-foreground whitespace-nowrap">
                               {fmtData(a.inicio)}
                             </span>
-                            {fichaNum && !(a.agenda_id && idsAgendaFila.has(a.agenda_id)) && (
+                            {fichaNum && !ehFila && (
                               <span className="text-[11px] font-mono px-1.5 py-0.5 rounded bg-muted text-foreground/70">
                                 #{fichaNum}
                               </span>
@@ -12953,6 +12964,12 @@ function AgendaPage() {
                         );
                       })();
                       const fichaNum = fichaPorId.get(a.id) ?? "";
+                      // Fichas 1..30 são hora marcada mesmo em agenda de fila.
+                      const nFicha = parseInt(fichaNum || "0", 10);
+                      const ehFila =
+                        !!a.agenda_id &&
+                        idsAgendaFila.has(a.agenda_id) &&
+                        nFicha > FICHAS_HORA_MARCADA;
                       const realizado = a.status === "realizado";
                       const etapaRow = etapaMap.get(a.id) ?? "aguardando_recepcao";
                       // PRESENÇA ≠ PAGAMENTO — mesma regra da visão em cartões: o
@@ -13058,7 +13075,7 @@ function AgendaPage() {
 
                             {/* Ficha */}
                             <TableCell className="py-1.5 px-1.5 align-middle text-center font-mono text-xs font-medium">
-                              {a.agenda_id && idsAgendaFila.has(a.agenda_id) ? (
+                              {ehFila ? (
                                 <span className="text-sm font-bold text-primary">
                                   #{fichaNum || "—"}
                                 </span>
@@ -13081,7 +13098,7 @@ function AgendaPage() {
                             ordem de chegada o horário não é hora marcada: a
                             coluna diz isso em vez de mostrar o relógio. */}
                             <TableCell className="py-1.5 px-1.5 align-middle text-[12px] font-semibold tabular-nums whitespace-nowrap text-emerald-600">
-                              {a.agenda_id && idsAgendaFila.has(a.agenda_id) ? (
+                              {ehFila ? (
                                 <span className="text-[11px] font-normal text-muted-foreground">
                                   Ordem de chegada
                                 </span>
