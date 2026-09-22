@@ -1292,6 +1292,11 @@ function AgendaPage() {
   const [loading, setLoading] = useState(false);
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Agendamento | null>(null);
+  // Editando uma ficha de agenda de ORDEM DE CHEGADA: o horário é só a posição
+  // na fila e NÃO pode ser reescrito. O campo de data/hora do formulário
+  // devolve só "YYYY-MM-DDTHH:MM" (perde os segundos, ex.: 23:58:02), então
+  // regravar embaralhava a ordem e a numeração de todas as fichas do dia.
+  const edicaoFichaFila = !!editing?.agenda_id && idsAgendaFila.has(editing.agenda_id);
   const [form, setForm] = useState(EMPTY);
   const [saving, setSaving] = useState(false);
   const [buscandoOrc, setBuscandoOrc] = useState(false);
@@ -6099,8 +6104,10 @@ function AgendaPage() {
     const mudouHorarioOuMedico =
       !editing ||
       editing.medico_id !== form.medico_id ||
-      new Date(editing.inicio).getTime() !== new Date(form.inicio).getTime() ||
-      new Date(editing.fim).getTime() !== new Date(form.fim).getTime();
+      // Ficha de fila: o horário nunca muda na edição (ver `edicaoFichaFila`).
+      (!edicaoFichaFila &&
+        (new Date(editing.inicio).getTime() !== new Date(form.inicio).getTime() ||
+          new Date(editing.fim).getTime() !== new Date(form.fim).getTime()));
     if (
       editing &&
       pagosSet.has(editing.id) &&
@@ -6210,8 +6217,16 @@ function AgendaPage() {
       paciente_nome: form.paciente_nome.trim(),
       paciente_id: form.paciente_id || null,
       medico_id: form.medico_id || null,
-      inicio: new Date(inicioParaSalvar).toISOString(),
-      fim: new Date(fimParaSalvar).toISOString(),
+      // Ficha de fila em EDIÇÃO: mantém o horário gravado (com segundos), que
+      // é a posição dela na fila. Encaixe novo continua entrando pelo fim.
+      inicio:
+        edicaoFichaFila && editing
+          ? new Date(editing.inicio).toISOString()
+          : new Date(inicioParaSalvar).toISOString(),
+      fim:
+        edicaoFichaFila && editing
+          ? new Date(editing.fim).toISOString()
+          : new Date(fimParaSalvar).toISOString(),
       procedimento: procedimentoTexto || null,
       status: form.status,
       observacoes: form.observacoes.trim() || null,
@@ -9940,17 +9955,39 @@ function AgendaPage() {
                           <Label className="text-xs font-semibold text-slate-700">
                             Data consulta/exame <span className="text-rose-500">*</span>
                           </Label>
-                          <DateTimeField
-                            value={form.inicio}
-                            onChange={(v) =>
-                              setForm((f) => ({
-                                ...f,
-                                inicio: v,
-                                fim: calcFimAuto(v, f.medico_id),
-                              }))
-                            }
-                            required
-                          />
+                          {edicaoFichaFila ? (
+                            <>
+                              <Input
+                                type="text"
+                                value={
+                                  editing
+                                    ? new Date(editing.inicio).toLocaleString("pt-BR", {
+                                        timeZone: "America/Sao_Paulo",
+                                      })
+                                    : "—"
+                                }
+                                readOnly
+                                disabled
+                                tabIndex={-1}
+                                className="bg-slate-50 cursor-not-allowed text-slate-500"
+                              />
+                              <p className="text-[12px] text-slate-500">
+                                Ficha da fila — o horário não muda ao editar.
+                              </p>
+                            </>
+                          ) : (
+                            <DateTimeField
+                              value={form.inicio}
+                              onChange={(v) =>
+                                setForm((f) => ({
+                                  ...f,
+                                  inicio: v,
+                                  fim: calcFimAuto(v, f.medico_id),
+                                }))
+                              }
+                              required
+                            />
+                          )}
                         </div>
                         <div className="space-y-1.5">
                           <Label className="text-xs font-semibold text-slate-700">
@@ -12944,6 +12981,11 @@ function AgendaPage() {
                       const intervalo = (() => {
                         if (!anterior || abreDia) return null;
                         if (!a.medico_id || !a.agenda_id) return null;
+                        // Agenda de ordem de chegada não tem intervalo: o
+                        // relógio é só a posição da fila, e a faixa amarela
+                        // "o médico não atende nesse período" aparecia no meio
+                        // da fila sem significado nenhum.
+                        if (idsAgendaFila.has(a.agenda_id)) return null;
                         if (anterior.medico_id !== a.medico_id) return null;
                         if (anterior.agenda_id !== a.agenda_id) return null;
                         const diaIso = chaveDiaLocal(a.inicio);
