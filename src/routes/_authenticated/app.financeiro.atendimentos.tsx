@@ -109,6 +109,7 @@ import { HistoricoAtendimentoDialog } from "@/components/financeiro/historico-at
 import { resolverRepasse, formaDoAtendimento, type RepasseTerceiro } from "@/lib/repasse-calc";
 import { ehProcedimentoDeLaudo, rotuloDoLaudo } from "@/lib/financeiro/rateio-receita";
 import {
+  FILTRO_MEDICO_CARTAO_TERAPEUTICO,
   ehServicoCartaoTerapeutico,
   nomeRepasseExibido,
 } from "@/lib/financeiro/cartao-terapeutico";
@@ -1456,6 +1457,9 @@ function AtendimentosPage() {
     // `paciente:pacientes(nome)` vem embutido via FK para resolver o nome mesmo
     // quando o paciente está fora dos 500 primeiros do combobox (`loadOpts`) —
     // evita a query extra de "nomes faltantes" que rodava depois do fetch.
+    // Filtro "Médico" = CARTÃO TERAPÊUTICO: não é um cadastro, é recorte por
+    // serviço. Vale para qualquer profissional que atenda o produto.
+    const filtroCartaoTerapeutico = fMedico === FILTRO_MEDICO_CARTAO_TERAPEUTICO;
     const buildManual = () => {
       let q = supabase
         .from("fin_atendimentos")
@@ -1465,7 +1469,7 @@ function AtendimentosPage() {
         .eq("clinica_id", clinicaAtual.clinica_id)
         .gte("data", fIni)
         .lte("data", fFim);
-      if (fMedico !== "todos") q = q.eq("medico_id", fMedico);
+      if (fMedico !== "todos" && !filtroCartaoTerapeutico) q = q.eq("medico_id", fMedico);
       return q;
     };
     const buildAgenda = () =>
@@ -1810,11 +1814,16 @@ function AtendimentosPage() {
     const agendSoAtendimentos = agend.filter((x) => !ehRecebimentoSemAtendimento(x));
     // Filtro client-side por médico para os registros da agenda (cobre os
     // lançamentos cujo medico_id está nulo e vem do agendamento).
-    const agendFiltered =
-      fMedico === "todos"
+    const agendFiltered = filtroCartaoTerapeutico
+      ? agendSoAtendimentos.filter((x) => ehServicoCartaoTerapeutico(x.procedimento))
+      : fMedico === "todos"
         ? agendSoAtendimentos
         : agendSoAtendimentos.filter((x) => x.medico_id === fMedico);
-    let unif = [...manuais, ...agendFiltered].sort((a, b) => (a.data < b.data ? 1 : -1));
+    // Os manuais deixaram de ser filtrados no banco neste recorte: filtra aqui.
+    const manuaisVis = filtroCartaoTerapeutico
+      ? manuais.filter((x) => ehServicoCartaoTerapeutico(x.procedimento))
+      : manuais;
+    let unif = [...manuaisVis, ...agendFiltered].sort((a, b) => (a.data < b.data ? 1 : -1));
     if (fStatus === "aberto") unif = unif.filter((x) => !x.repasse_pago);
     else if (fStatus === "pago") unif = unif.filter((x) => x.repasse_pago);
     // Recorte por agenda escolhida no filtro (aplicado por último).
@@ -3265,6 +3274,7 @@ function AtendimentosPage() {
                     agendaValue={fAgenda}
                     opcoes={opcoesProf.opcoes}
                     rotuloMedico={opcoesProf.rotuloMedico}
+                    mostrarCartaoTerapeutico={!isMedicoOnly}
                     onChange={(medicoId, agendaFiltro) => {
                       if (isMedicoOnly) return;
                       setFMedico(medicoId);
@@ -4875,21 +4885,25 @@ function MedicoCombobox({
   opcoes,
   rotuloMedico,
   onChange,
+  mostrarCartaoTerapeutico,
 }: {
   value: string;
   agendaValue: string;
   opcoes: OpcaoProfissional[];
   rotuloMedico: Map<string, string>;
   onChange: (medicoId: string, agendaFiltro: string) => void;
+  mostrarCartaoTerapeutico: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [busca, setBusca] = useState("");
   const label =
-    value === "todos"
-      ? "Todos os médicos"
-      : (opcoes.find((o) => o.medicoId === value && o.agendaFiltro === agendaValue)?.rotulo ??
-        rotuloMedico.get(value) ??
-        "Todos os médicos");
+    value === FILTRO_MEDICO_CARTAO_TERAPEUTICO
+      ? "CARTÃO TERAPÊUTICO"
+      : value === "todos"
+        ? "Todos os médicos"
+        : (opcoes.find((o) => o.medicoId === value && o.agendaFiltro === agendaValue)?.rotulo ??
+          rotuloMedico.get(value) ??
+          "Todos os médicos");
   // Busca por palavras soltas, igual à Agenda: "joao exames" acha
   // "JOAO HELIO VALENTIM — EXAMES".
   const termos = busca
@@ -4901,6 +4915,9 @@ function MedicoCombobox({
   const filtradas = termos.length
     ? opcoes.filter((o) => termos.every((t) => o.busca.includes(t)))
     : opcoes;
+  // Opção fixa do produto (não é cadastro de médico), respeitando a busca.
+  const mostrarCT =
+    mostrarCartaoTerapeutico && termos.every((t) => "cartao terapeutico".includes(t));
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
@@ -4933,6 +4950,24 @@ function MedicoCombobox({
                 />
                 Todos os médicos
               </CommandItem>
+              {mostrarCT && (
+                <CommandItem
+                  value="cartao terapeutico"
+                  onSelect={() => {
+                    onChange(FILTRO_MEDICO_CARTAO_TERAPEUTICO, "todos");
+                    setOpen(false);
+                  }}
+                  className="uppercase"
+                >
+                  <Check
+                    className={cn(
+                      "mr-2 h-4 w-4",
+                      value === FILTRO_MEDICO_CARTAO_TERAPEUTICO ? "opacity-100" : "opacity-0",
+                    )}
+                  />
+                  CARTÃO TERAPÊUTICO
+                </CommandItem>
+              )}
               {filtradas.map((o) => (
                 <CommandItem
                   key={o.key}

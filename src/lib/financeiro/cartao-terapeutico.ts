@@ -10,6 +10,14 @@
  */
 export const NOME_REPASSE_CARTAO_TERAPEUTICO = "CARTÃO TERAPÊUTICO";
 
+/**
+ * Valor sentinela do filtro "Médico" quando o financeiro quer ver só o Cartão
+ * Terapêutico. NÃO é um `medico_id`: nunca pode ser enviado ao banco como
+ * filtro de coluna — quem o recebe filtra pelo serviço com
+ * `ehServicoCartaoTerapeutico`.
+ */
+export const FILTRO_MEDICO_CARTAO_TERAPEUTICO = "cartao-terapeutico";
+
 const semAcento = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 
 /**
