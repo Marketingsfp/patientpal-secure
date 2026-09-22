@@ -9384,6 +9384,22 @@ function AgendaPage() {
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
+          {podeEscrever &&
+            filtroMedico !== "todos" &&
+            !!agendaDeFila(filtroMedico) &&
+            dataRef >= hojeBR() && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => void criarFichaExtra()}
+                disabled={criandoFichaExtra || !clinicaAtual}
+                title="Cria uma ficha livre no fim da fila deste médico"
+                className="h-9 lg:h-7 rounded-xl lg:rounded-md text-xs lg:text-[12px] px-3 lg:px-2 font-semibold"
+              >
+                <Plus className="h-4 w-4 lg:h-3 lg:w-3 mr-1.5" />
+                {criandoFichaExtra ? "Criando..." : "Ficha extra"}
+              </Button>
+            )}
           <Dialog
             open={open}
             onOpenChange={(o) => {
