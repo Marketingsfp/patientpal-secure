@@ -6104,8 +6104,10 @@ function AgendaPage() {
     const mudouHorarioOuMedico =
       !editing ||
       editing.medico_id !== form.medico_id ||
-      new Date(editing.inicio).getTime() !== new Date(form.inicio).getTime() ||
-      new Date(editing.fim).getTime() !== new Date(form.fim).getTime();
+      // Ficha de fila: o horário nunca muda na edição (ver `edicaoFichaFila`).
+      (!edicaoFichaFila &&
+        (new Date(editing.inicio).getTime() !== new Date(form.inicio).getTime() ||
+          new Date(editing.fim).getTime() !== new Date(form.fim).getTime()));
     if (
       editing &&
       pagosSet.has(editing.id) &&
