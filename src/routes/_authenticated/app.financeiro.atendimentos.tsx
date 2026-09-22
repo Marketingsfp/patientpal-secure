@@ -1457,6 +1457,9 @@ function AtendimentosPage() {
     // `paciente:pacientes(nome)` vem embutido via FK para resolver o nome mesmo
     // quando o paciente está fora dos 500 primeiros do combobox (`loadOpts`) —
     // evita a query extra de "nomes faltantes" que rodava depois do fetch.
+    // Filtro "Médico" = CARTÃO TERAPÊUTICO: não é um cadastro, é recorte por
+    // serviço. Vale para qualquer profissional que atenda o produto.
+    const filtroCartaoTerapeutico = fMedico === FILTRO_MEDICO_CARTAO_TERAPEUTICO;
     const buildManual = () => {
       let q = supabase
         .from("fin_atendimentos")
