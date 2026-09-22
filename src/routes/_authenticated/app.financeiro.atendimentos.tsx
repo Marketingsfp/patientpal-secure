@@ -2731,7 +2731,7 @@ function AtendimentosPage() {
       // mesma profissional. O `medico_id` gravado continua sendo o real.
       const byMed = new Map<string, Atend[]>();
       for (const a of selectedItems) {
-        const k = a.medico_id ?? "sem";
+        const k = `${a.medico_id ?? "sem"}|${ehServicoCartaoTerapeutico(a.procedimento) ? "ct" : "-"}`;
         if (!byMed.has(k)) byMed.set(k, []);
         byMed.get(k)!.push(a);
       }
