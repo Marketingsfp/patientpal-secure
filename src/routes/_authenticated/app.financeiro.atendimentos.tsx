@@ -108,6 +108,10 @@ import { ComprovantesTab } from "@/components/financeiro/comprovantes-tab";
 import { HistoricoAtendimentoDialog } from "@/components/financeiro/historico-atendimento-dialog";
 import { resolverRepasse, formaDoAtendimento, type RepasseTerceiro } from "@/lib/repasse-calc";
 import { ehProcedimentoDeLaudo, rotuloDoLaudo } from "@/lib/financeiro/rateio-receita";
+import {
+  ehServicoCartaoTerapeutico,
+  nomeRepasseExibido,
+} from "@/lib/financeiro/cartao-terapeutico";
 
 /** "2026-09-08" — só aceita o formato exato, para não semear filtro inválido. */
 const ehDataIso = (v: unknown): v is string =>
@@ -639,9 +643,16 @@ function AtendimentosPage() {
     },
   ): Comprovante => {
     if (!itens.length) return null;
-    const medicoIds = new Set(itens.map((i) => i.medico_id ?? ""));
+    // Conta NOMES DE EXIBIÇÃO (não medico_id), para um lote misto de Cartão
+    // Terapêutico + atendimento normal da mesma profissional não sair rotulado
+    // com um nome só.
+    const nomesExibidos = new Set(
+      itens.map((i) =>
+        nomeRepasseExibido(i.procedimento, (i.medico_id ? medMap.get(i.medico_id) : null) ?? "—"),
+      ),
+    );
     const medicoNome =
-      medicoIds.size === 1 ? (medMap.get([...medicoIds][0]) ?? "—") : `${medicoIds.size} médicos`;
+      nomesExibidos.size === 1 ? [...nomesExibidos][0] : `${nomesExibidos.size} médicos`;
     const contaNome = contas.find((c) => c.id === meta.conta_id)?.nome ?? "—";
     const derivarHora = derivarHoraPagamento;
     // Data/hora do pagamento do lote. Precisa ser calculada ANTES das linhas
@@ -652,7 +663,10 @@ function AtendimentosPage() {
         a.repasse_pago_em ?? (a.repasse_pago_at ? a.repasse_pago_at.slice(0, 10) : null);
       return {
         data: a.data,
-        medico: a.medico_id ? (medMap.get(a.medico_id) ?? "—") : "—",
+        medico: nomeRepasseExibido(
+          a.procedimento,
+          a.medico_id ? (medMap.get(a.medico_id) ?? "—") : "—",
+        ),
         paciente: nomePaciente(a) || "—",
         servico: a.procedimento ?? "—",
         valorMedico: Number(a.valor_medico) || 0,
@@ -818,7 +832,9 @@ function AtendimentosPage() {
     if (!itens.length) return;
     const byMed = new Map<string, Atend[]>();
     for (const a of itens) {
-      const k = a.medico_id ?? "sem";
+      // Chave composta: o Cartão Terapêutico sai em recibo próprio, separado do
+      // atendimento normal da MESMA profissional.
+      const k = `${a.medico_id ?? "sem"}|${ehServicoCartaoTerapeutico(a.procedimento) ? "ct" : "-"}`;
       if (!byMed.has(k)) byMed.set(k, []);
       byMed.get(k)!.push(a);
     }
@@ -2548,8 +2564,6 @@ function AtendimentosPage() {
     return m;
   }, [filteredItems]);
 
-
-
   const isAtendido = (a: Atend) =>
     a.origem === "manual" ? a.status === "realizado" : a.agendamento_status === "realizado";
   // Itens selecionáveis: qualquer atendimento com repasse > 0.
@@ -2708,10 +2722,14 @@ function AtendimentosPage() {
         setPayingNow(false);
         return;
       }
-      // Agrupa por médico para gerar um lançamento de despesa por médico
+      // Agrupa por médico para gerar um lançamento de despesa por médico.
+      // A chave é COMPOSTA (medico_id + marca do Cartão Terapêutico) porque o
+      // repasse do Cartão Terapêutico é pago com o nome do produto: sai uma
+      // despesa e um recibo para ele e outro para o atendimento normal da
+      // mesma profissional. O `medico_id` gravado continua sendo o real.
       const byMed = new Map<string, Atend[]>();
       for (const a of selectedItems) {
-        const k = a.medico_id ?? "sem";
+        const k = `${a.medico_id ?? "sem"}|${ehServicoCartaoTerapeutico(a.procedimento) ? "ct" : "-"}`;
         if (!byMed.has(k)) byMed.set(k, []);
         byMed.get(k)!.push(a);
       }
@@ -2733,7 +2751,8 @@ function AtendimentosPage() {
       // equipamento daqueles atendimentos também não recebeu, e não pode sair
       // recibo dele.
       const itensPagosOk: Atend[] = [];
-      for (const [medId, list] of byMed) {
+      for (const [chaveMed, list] of byMed) {
+        const medId = chaveMed.split("|")[0];
         const totalCalc = list.reduce((s, x) => s + (Number(x.valor_medico) || 0), 0);
         const total = usarValorManual ? valorManualNum : totalCalc;
         if (total <= 0) {
@@ -2750,7 +2769,10 @@ function AtendimentosPage() {
           }
           continue;
         }
-        const medNome = medId !== "sem" ? (medMap.get(medId) ?? "") : "—";
+        const medNome = nomeRepasseExibido(
+          list[0]?.procedimento,
+          medId !== "sem" ? (medMap.get(medId) ?? "") : "—",
+        );
         const { data: userData } = await supabase.auth.getUser();
         const currentUserId = userData?.user?.id ?? null;
         const manualIds = list.filter((x) => x.origem === "manual").map((x) => x.id);
@@ -2950,7 +2972,10 @@ function AtendimentosPage() {
                   exportToExcel(
                     filteredItems.map((a) => ({
                       data: new Date(a.data + "T00:00:00").toLocaleDateString("pt-BR"),
-                      medico: a.medico_id ? (medMap.get(a.medico_id) ?? "") : "",
+                      medico: nomeRepasseExibido(
+                        a.procedimento,
+                        a.medico_id ? (medMap.get(a.medico_id) ?? "") : "",
+                      ),
                       paciente: nomePaciente(a),
                       procedimento: a.procedimento ?? "",
                       valor_total: Number(a.valor_total).toFixed(2),
@@ -3295,13 +3320,15 @@ function AtendimentosPage() {
                     <span className="ml-1 font-normal text-muted-foreground">
                       (
                       {
-                        filteredItems.filter((a) => !ehLinhaDeLaudo(a) && a.laudo_status === "emitido")
-                          .length
+                        filteredItems.filter(
+                          (a) => !ehLinhaDeLaudo(a) && a.laudo_status === "emitido",
+                        ).length
                       }{" "}
                       baixados ·{" "}
                       {
-                        filteredItems.filter((a) => !ehLinhaDeLaudo(a) && a.laudo_status !== "emitido")
-                          .length
+                        filteredItems.filter(
+                          (a) => !ehLinhaDeLaudo(a) && a.laudo_status !== "emitido",
+                        ).length
                       }{" "}
                       pendentes)
                     </span>
@@ -3489,7 +3516,10 @@ function AtendimentosPage() {
                   </TableHeader>
                   <TableBody>
                     {filteredItems.map((a, idx) => {
-                      const medicoNome = a.medico_id ? (medMap.get(a.medico_id) ?? "—") : "—";
+                      const medicoNome = nomeRepasseExibido(
+                        a.procedimento,
+                        a.medico_id ? (medMap.get(a.medico_id) ?? "—") : "—",
+                      );
                       const pacienteNome =
                         (a.paciente_id ? pacMap.get(a.paciente_id) : null) ??
                         a.paciente_nome_extra ??
