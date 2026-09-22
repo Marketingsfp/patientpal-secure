@@ -12484,9 +12484,7 @@ function AgendaPage() {
                   // Fichas 1..30 são hora marcada mesmo em agenda de fila.
                   const nFicha = parseInt(fichaNum || "0", 10);
                   const ehFila =
-                    !!a.agenda_id &&
-                    idsAgendaFila.has(a.agenda_id) &&
-                    nFicha > FICHAS_HORA_MARCADA;
+                    !!a.agenda_id && idsAgendaFila.has(a.agenda_id) && nFicha > FICHAS_HORA_MARCADA;
                   const realizado = a.status === "realizado";
                   const etapaRow = etapaMap.get(a.id) ?? "aguardando_recepcao";
                   // PRESENÇA ≠ PAGAMENTO. O azul de "o paciente está aqui" sai só
