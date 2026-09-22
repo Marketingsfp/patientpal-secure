@@ -1760,6 +1760,45 @@ function AtendimentosPage() {
       };
     });
     const agend: Atend[] = agendaRows.map((r): Atend => {
+      // Mensalidade do Cartão Terapêutico: não passa por calcRepasseFull (não
+      // há profissional para consultar grade). Repasse é 50% do recebido, ou o
+      // override manual quando o financeiro já ajustou a linha.
+      if (mensalidadesCT.has(r.id)) {
+        const parcela = mensalidadesCT.get(r.id) ?? 0;
+        const recebido = Number(r.valor) || 0;
+        const overrideRaw = (r as { valor_medico_override?: number | string | null })
+          .valor_medico_override;
+        const override =
+          overrideRaw !== null && overrideRaw !== undefined && overrideRaw !== ""
+            ? Number(overrideRaw)
+            : null;
+        const valorMedico =
+          override !== null && Number.isFinite(override)
+            ? override
+            : repasseMensalidadeCartaoTerapeutico(recebido);
+        return {
+          id: r.id,
+          data: r.data,
+          procedimento: `MENSALIDADE ${parcela} — CARTÃO TERAPÊUTICO`,
+          agendamento_id: null,
+          valor_total: recebido,
+          valor_medico: valorMedico,
+          valor_clinica: +(recebido - valorMedico).toFixed(2),
+          status: "realizado",
+          forma_pagamento: r.forma_pagamento,
+          medico_id: null,
+          paciente_id: r.paciente_id ?? null,
+          paciente_nome_extra:
+            (r as any).paciente?.nome ?? ((r.descricao ?? "").split("—")[0]?.trim() || null),
+          origem: "agenda",
+          repasse_pago: !!r.repasse_pago,
+          repasse_pago_em: r.repasse_pago_em,
+          repasse_pago_at: (r as any).repasse_pago_at ?? null,
+          repasse_forma_pagamento: r.repasse_forma_pagamento,
+          repasse_conta_id: (r as any).repasse_conta_id ?? null,
+          mensalidade_ct: true,
+        };
+      }
       const ag = (r as any).agendamento as {
         procedimento: string | null;
         paciente_nome: string | null;
