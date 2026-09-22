@@ -1,9 +1,4 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-
-// Em agenda de ORDEM DE CHEGADA a clínica atende as 30 primeiras fichas do dia
-// em HORA MARCADA; só da ficha 31 em diante é que vale a ordem de chegada. Por
-// isso as fichas 1..30 continuam mostrando o relógio normalmente.
-export const FICHAS_HORA_MARCADA = 30;
 import { confirmDialog } from "@/lib/confirm";
 import { pedirMotivo } from "@/lib/motivo";
 import {
@@ -262,6 +257,12 @@ import { ClienteForm, type Paciente as PacienteFull } from "@/components/cliente
 
 import { DateInputBR } from "@/components/ui/date-input-br";
 import { AgendaEmptyState } from "@/components/agenda/agenda-empty-state";
+
+// Em agenda de ORDEM DE CHEGADA a clínica atende as 30 primeiras fichas do dia
+// em HORA MARCADA; só da ficha 31 em diante é que vale a ordem de chegada. Por
+// isso as fichas 1..30 continuam mostrando o relógio normalmente.
+export const FICHAS_HORA_MARCADA = 30;
+
 export const Route = createFileRoute("/_authenticated/app/agenda")({
   component: AgendaPage,
 });
@@ -12483,9 +12484,7 @@ function AgendaPage() {
                   // Fichas 1..30 são hora marcada mesmo em agenda de fila.
                   const nFicha = parseInt(fichaNum || "0", 10);
                   const ehFila =
-                    !!a.agenda_id &&
-                    idsAgendaFila.has(a.agenda_id) &&
-                    nFicha > FICHAS_HORA_MARCADA;
+                    !!a.agenda_id && idsAgendaFila.has(a.agenda_id) && nFicha > FICHAS_HORA_MARCADA;
                   const realizado = a.status === "realizado";
                   const etapaRow = etapaMap.get(a.id) ?? "aguardando_recepcao";
                   // PRESENÇA ≠ PAGAMENTO. O azul de "o paciente está aqui" sai só
