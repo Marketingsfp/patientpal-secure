@@ -395,13 +395,13 @@ export function MovimentoResultado({
           novaAba
           onClick={() => abrir("receita")}
           icon={ClipboardList}
-          label="Atendimentos (GR)"
-          value={int(r.atendimentos.fichas)}
+          label="N° de GR"
+          value={int(r.receitaBruta.qtd + (conferencia?.cortesias ?? 0))}
           accent="primary"
           detalhe={
             pronto
-              ? `${plural(r.atendimentos.qtd, "pagamento", "pagamentos")} · ${plural(conferencia?.cortesias ?? 0, "cortesia", "cortesias")}`
-              : "Fichas de atendimento do período"
+              ? `${plural(r.atendimentos.fichas, "ficha", "fichas")} de atendimento · ${plural(conferencia?.cortesias ?? 0, "cortesia", "cortesias")}`
+              : "Total de GR do período"
           }
         >
           {pronto && (
