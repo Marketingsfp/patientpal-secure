@@ -262,6 +262,12 @@ import { ClienteForm, type Paciente as PacienteFull } from "@/components/cliente
 
 import { DateInputBR } from "@/components/ui/date-input-br";
 import { AgendaEmptyState } from "@/components/agenda/agenda-empty-state";
+
+// Em agenda de ORDEM DE CHEGADA a clínica atende as 30 primeiras fichas do dia
+// em HORA MARCADA; só da ficha 31 em diante é que vale a ordem de chegada. Por
+// isso as fichas 1..30 continuam mostrando o relógio normalmente.
+export const FICHAS_HORA_MARCADA = 30;
+
 export const Route = createFileRoute("/_authenticated/app/agenda")({
   component: AgendaPage,
 });
