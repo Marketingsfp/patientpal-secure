@@ -3461,6 +3461,14 @@ function AtendimentosPage() {
             </div>
           )}
 
+          {naoAtendimentosOcultos > 0 && (
+            <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-muted-foreground dark:border-slate-800 dark:bg-slate-900/40">
+              {naoAtendimentosOcultos} recebimento(s) de mensalidade, adesão, dependente ou contrato
+              do cartão não são atendimento (não têm profissional nem serviço) e ficaram fora desta
+              lista. Eles aparecem em Financeiro → Mov. Caixa e em A Receber.
+            </div>
+          )}
+
           <div className="rounded-xl bg-card">
             <div className="p-0">
               {loading ? (
