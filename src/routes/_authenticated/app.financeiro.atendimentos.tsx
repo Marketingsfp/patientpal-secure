@@ -2724,7 +2724,11 @@ function AtendimentosPage() {
         setPayingNow(false);
         return;
       }
-      // Agrupa por médico para gerar um lançamento de despesa por médico
+      // Agrupa por médico para gerar um lançamento de despesa por médico.
+      // A chave é COMPOSTA (medico_id + marca do Cartão Terapêutico) porque o
+      // repasse do Cartão Terapêutico é pago com o nome do produto: sai uma
+      // despesa e um recibo para ele e outro para o atendimento normal da
+      // mesma profissional. O `medico_id` gravado continua sendo o real.
       const byMed = new Map<string, Atend[]>();
       for (const a of selectedItems) {
         const k = a.medico_id ?? "sem";
