@@ -13086,7 +13086,7 @@ function AgendaPage() {
                             ordem de chegada o horário não é hora marcada: a
                             coluna diz isso em vez de mostrar o relógio. */}
                             <TableCell className="py-1.5 px-1.5 align-middle text-[12px] font-semibold tabular-nums whitespace-nowrap text-emerald-600">
-                              {a.agenda_id && idsAgendaFila.has(a.agenda_id) ? (
+                              {ehFila ? (
                                 <span className="text-[11px] font-normal text-muted-foreground">
                                   Ordem de chegada
                                 </span>
