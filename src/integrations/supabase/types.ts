@@ -12779,6 +12779,8 @@ export type Database = {
           paciente_id: string | null
           paciente_nome: string
           paciente_telefone: string | null
+          preparo_observacoes: string | null
+          preparos: string[] | null
           serie: string
           status: string
           updated_at: string
@@ -12805,6 +12807,8 @@ export type Database = {
           paciente_id?: string | null
           paciente_nome: string
           paciente_telefone?: string | null
+          preparo_observacoes?: string | null
+          preparos?: string[] | null
           serie?: string
           status?: string
           updated_at?: string
@@ -12831,6 +12835,8 @@ export type Database = {
           paciente_id?: string | null
           paciente_nome?: string
           paciente_telefone?: string | null
+          preparo_observacoes?: string | null
+          preparos?: string[] | null
           serie?: string
           status?: string
           updated_at?: string
