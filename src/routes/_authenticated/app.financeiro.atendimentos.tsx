@@ -1881,7 +1881,10 @@ function AtendimentosPage() {
     // Continua aparecendo em Financeiro → Mov. Caixa e em A Receber, que é o
     // lugar dele. Atenção: lançamento sem agendamento mas COM medico_id é
     // atendimento pago fora da agenda e continua na lista.
-    const ehRecebimentoSemAtendimento = (x: Atend) => !x.agendamento_id && !x.medico_id;
+    // Exceção: a mensalidade do Cartão Terapêutico não tem agendamento nem
+    // profissional, mas gera repasse e precisa ficar visível para baixa.
+    const ehRecebimentoSemAtendimento = (x: Atend) =>
+      !x.agendamento_id && !x.medico_id && !x.mensalidade_ct;
     const naoAtendimentos = agend.filter(ehRecebimentoSemAtendimento).length;
     const agendSoAtendimentos = agend.filter((x) => !ehRecebimentoSemAtendimento(x));
     // Filtro client-side por médico para os registros da agenda (cobre os
