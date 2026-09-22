@@ -12553,7 +12553,7 @@ function AgendaPage() {
                         {/* Linha 1: horário + ficha + situação */}
                         <div className="flex items-center justify-between gap-2 mb-2">
                           <div className="flex items-center gap-2 min-w-0">
-                            {a.agenda_id && idsAgendaFila.has(a.agenda_id) ? (
+                            {ehFila ? (
                               <span className="text-sm font-bold text-primary whitespace-nowrap">
                                 Ficha #{fichaNum || "—"}
                               </span>
