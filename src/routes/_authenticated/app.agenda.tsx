@@ -1,4 +1,9 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+
+// Em agenda de ORDEM DE CHEGADA a clínica atende as 30 primeiras fichas do dia
+// em HORA MARCADA; só da ficha 31 em diante é que vale a ordem de chegada. Por
+// isso as fichas 1..30 continuam mostrando o relógio normalmente.
+export const FICHAS_HORA_MARCADA = 30;
 import { confirmDialog } from "@/lib/confirm";
 import { pedirMotivo } from "@/lib/motivo";
 import {
