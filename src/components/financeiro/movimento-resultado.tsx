@@ -400,7 +400,7 @@ export function MovimentoResultado({
           accent="primary"
           detalhe={
             pronto
-              ? `${plural(r.atendimentos.fichas, "ficha", "fichas")} de atendimento · ${plural(conferencia?.cortesias ?? 0, "cortesia", "cortesias")}`
+              ? `${plural(r.atendimentos.fichas, "ficha", "fichas")} de atendimento · soma detalhada abaixo`
               : "Total de GR do período"
           }
         >
@@ -412,6 +412,26 @@ export function MovimentoResultado({
                   <span className="tabular-nums">{int(r.atendimentos.porCondicao[c].qtd)}</span>
                 </li>
               ))}
+              {/* O que faltava para fechar o total: mensalidades, adesões,
+                  recebimentos avulsos e as cortesias (sem dinheiro). */}
+              {GRUPOS_OUTRAS.filter((g) => r.outras.porGrupo[g].qtd > 0).map((g) => (
+                <li key={g} className="flex items-center justify-between gap-2 text-xs">
+                  <span className="text-muted-foreground">{LABEL_GRUPO_MOV[g]}</span>
+                  <span className="tabular-nums">{int(r.outras.porGrupo[g].qtd)}</span>
+                </li>
+              ))}
+              {(conferencia?.cortesias ?? 0) > 0 && (
+                <li className="flex items-center justify-between gap-2 text-xs">
+                  <span className="text-muted-foreground">Cortesias e gratuidades</span>
+                  <span className="tabular-nums">{int(conferencia?.cortesias ?? 0)}</span>
+                </li>
+              )}
+              <li className="mt-1 flex items-center justify-between gap-2 border-t border-border/60 pt-1 text-xs font-medium">
+                <span>Total</span>
+                <span className="tabular-nums">
+                  {int(r.receitaBruta.qtd + (conferencia?.cortesias ?? 0))}
+                </span>
+              </li>
             </ul>
           )}
         </KpiCard>
