@@ -663,7 +663,10 @@ function AtendimentosPage() {
         a.repasse_pago_em ?? (a.repasse_pago_at ? a.repasse_pago_at.slice(0, 10) : null);
       return {
         data: a.data,
-        medico: a.medico_id ? (medMap.get(a.medico_id) ?? "—") : "—",
+        medico: nomeRepasseExibido(
+          a.procedimento,
+          a.medico_id ? (medMap.get(a.medico_id) ?? "—") : "—",
+        ),
         paciente: nomePaciente(a) || "—",
         servico: a.procedimento ?? "—",
         valorMedico: Number(a.valor_medico) || 0,
