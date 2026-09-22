@@ -38,6 +38,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import { PatientSearchInput, type PatientOption } from "@/components/patient-search-input";
 import { printOrcamento } from "@/lib/print-orcamento";
+import { PREPAROS_PADRAO, sugerirPreparos, type PreparoId } from "@/lib/orcamento-preparos";
 import { ConversaoOrcamentoDialog } from "@/components/orcamentos/conversao-orcamento-dialog";
 import { pickTop60 } from "@/lib/procedimento/laboratorio-top60";
 import { useOrcamentosV2Flag } from "@/hooks/use-orcamentos-v2-flag";
@@ -1009,6 +1010,9 @@ function NovoOrcamentoDialog({
   const [observacoes, setObservacoes] = useState("");
   const [itens, setItens] = useState<Item[]>([]);
   const [saving, setSaving] = useState(false);
+  // Preparo de exames (só Laboratório): sai impresso no cupom do paciente.
+  const [preparos, setPreparos] = useState<PreparoId[]>([]);
+  const [preparoObs, setPreparoObs] = useState("");
 
   // busca de procedimentos
   const [procQuery, setProcQuery] = useState("");
@@ -1241,6 +1245,10 @@ function NovoOrcamentoDialog({
         valores_formas: valores,
       },
     ]);
+    if (categoria === "laboratorio") {
+      const sugeridos = sugerirPreparos(p.nome);
+      if (sugeridos.length > 0) setPreparos((cur) => Array.from(new Set([...cur, ...sugeridos])));
+    }
     if (p.preparo && p.preparo.trim()) {
       toast.warning(`⚠ ${p.nome} exige preparo`, { description: p.preparo, duration: 6000 });
     }
@@ -1249,6 +1257,15 @@ function NovoOrcamentoDialog({
     }
     setProcQuery("");
     setProcResults([]);
+  };
+
+  const togglePreparo = (id: PreparoId) =>
+    setPreparos((cur) => (cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id]));
+
+  const escolherCategoria = (c: "laboratorio" | "demais") => {
+    setCategoria(c);
+    // O formulário de papel do laboratório vale 15 dias.
+    if (c === "laboratorio" && validade === 30) setValidade(15);
   };
 
   const adicionarManual = () => {
@@ -1313,6 +1330,18 @@ function NovoOrcamentoDialog({
     if ((observacoes ?? "").length > 1000) {
       return toast.error("Observações não podem exceder 1000 caracteres");
     }
+    if (preparoObs.length > 500) {
+      return toast.error("Outras recomendações de preparo não podem exceder 500 caracteres");
+    }
+    // Só envia os campos de preparo quando há algo a gravar: orçamento sem
+    // preparo segue idêntico ao de antes das colunas existirem.
+    const preparoCampos =
+      categoria === "laboratorio" && (preparos.length > 0 || preparoObs.trim())
+        ? {
+            preparos: preparos.length > 0 ? preparos : null,
+            preparo_observacoes: preparoObs.trim() || null,
+          }
+        : {};
     const valoresPag: Record<string, number> | null =
       formasPagamento.length > 1 ? { ...totaisPorForma } : null;
     setSaving(true);
@@ -1338,6 +1367,7 @@ function NovoOrcamentoDialog({
         desconto: Number(desconto) || 0,
         valor_total: total,
         observacoes: observacoes.trim() || null,
+        ...preparoCampos,
         criado_por: userId,
       })
       .select("id")
@@ -1398,7 +1428,7 @@ function NovoOrcamentoDialog({
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <button
                   type="button"
-                  onClick={() => setCategoria("laboratorio")}
+                  onClick={() => escolherCategoria("laboratorio")}
                   className="rounded-lg border-2 border-border hover:border-primary hover:bg-primary/5 p-6 text-left transition"
                 >
                   <div className="text-lg font-semibold">🧪 Laboratório</div>
@@ -1408,7 +1438,7 @@ function NovoOrcamentoDialog({
                 </button>
                 <button
                   type="button"
-                  onClick={() => setCategoria("demais")}
+                  onClick={() => escolherCategoria("demais")}
                   className="rounded-lg border-2 border-border hover:border-primary hover:bg-primary/5 p-6 text-left transition"
                 >
                   <div className="text-lg font-semibold">🩺 Demais Serviços</div>
@@ -1780,6 +1810,59 @@ function NovoOrcamentoDialog({
                       ))}
                     </tbody>
                   </table>
+                </div>
+              )}
+
+              {categoria === "laboratorio" && (
+                <div className="space-y-2 border-t pt-3">
+                  <div className="flex items-baseline justify-between gap-2">
+                    <Label>Preparo de exames</Label>
+                    <span className="text-[12px] text-muted-foreground">
+                      Sai impresso no orçamento do paciente
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-1 rounded-md border p-2">
+                    {PREPAROS_PADRAO.map((pp) => {
+                      const checked = preparos.includes(pp.id);
+                      return (
+                        <label
+                          key={pp.id}
+                          className={`flex items-start gap-2 px-2 py-1 rounded-md text-sm cursor-pointer ${
+                            checked ? "bg-primary/10" : "hover:bg-muted/40"
+                          }`}
+                        >
+                          <Checkbox
+                            className="mt-0.5"
+                            checked={checked}
+                            onCheckedChange={() => togglePreparo(pp.id)}
+                          />
+                          <span>{pp.label}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                  <p className="text-[12px] text-muted-foreground">
+                    EAS, cultura de urina, urina de 24h, parasitológico, MIF e PSA são marcados ao
+                    adicionar o exame. Jejum é marcado manualmente.
+                  </p>
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-xs text-muted-foreground">
+                        Outras observações / recomendações
+                      </Label>
+                      <span
+                        className={`text-[12px] ${preparoObs.length > 500 ? "text-destructive" : "text-muted-foreground"}`}
+                      >
+                        {preparoObs.length} / 500
+                      </span>
+                    </div>
+                    <Textarea
+                      rows={2}
+                      maxLength={500}
+                      value={preparoObs}
+                      onChange={(e) => setPreparoObs(e.target.value.slice(0, 500))}
+                    />
+                  </div>
                 </div>
               )}
 

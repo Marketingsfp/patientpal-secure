@@ -1,5 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import { formatNumeroOrcamento } from "@/lib/orcamento-numero";
+import { PREPAROS_PADRAO, RODAPE_LABORATORIO } from "@/lib/orcamento-preparos";
 
 const fmtBRL = (v: number) =>
   new Intl.NumberFormat("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(v);
@@ -110,6 +111,39 @@ export async function printOrcamento(
   const validade = new Date(new Date(o.created_at).getTime() + (o.validade_dias || 30) * 86400000);
   const validadeStr = `${String(validade.getDate()).padStart(2, "0")}/${String(validade.getMonth() + 1).padStart(2, "0")}/${validade.getFullYear()}`;
 
+  // Laboratório: reproduz o formulário de papel (preparos com caixinha,
+  // horário de coleta e rodapé). Os preparos marcados saem com "X".
+  const ehLab = o.categoria === "laboratorio";
+  const marcados = new Set<string>(Array.isArray(o.preparos) ? o.preparos : []);
+  const blocoLab = ehLab
+    ? `
+  <div class="lab">
+    <div class="lab-assin"><span>Data: __/__/____</span><span>Ass.: __________</span></div>
+    <div class="lab-horario"><b><u>Horário de Coleta:</u></b> ${RODAPE_LABORATORIO.horarioColeta.map(esc).join("<br/>")}</div>
+    ${PREPAROS_PADRAO.map(
+      (p) => `
+    <div class="lab-prep"><span class="lab-cx">${marcados.has(p.id) ? "X" : "&nbsp;"}</span><span>${esc(p.label)}</span></div>`,
+    ).join("")}
+    ${o.preparo_observacoes ? `<div class="lab-outras"><b>Outras recomendações:</b> ${esc(o.preparo_observacoes)}</div>` : ""}
+    <div class="lab-doc">${esc(RODAPE_LABORATORIO.documento)}</div>
+    <div class="lab-obs"><b>OBS.:</b> ${esc(RODAPE_LABORATORIO.obs)}</div>
+    <div class="lab-chegada">${esc(RODAPE_LABORATORIO.chegada)}</div>
+  </div>`
+    : "";
+  const labCss = `
+  .lab { margin-top: 8px; }
+  .lab-assin { display: flex; justify-content: space-between; gap: 6px; margin-bottom: 6px; }
+  .lab-horario { margin-bottom: 6px; }
+  .lab-prep { display: flex; align-items: flex-start; gap: 6px; margin: 2px 0; }
+  .lab-cx { flex: 0 0 auto; display: inline-block; width: 1.1em; height: 1.1em; line-height: 1.05em;
+            border: 1.5px solid #000; text-align: center; font-weight: 700; }
+  .lab-outras { margin-top: 4px; white-space: pre-wrap; }
+  .lab-doc { margin-top: 8px; border: 1.5px solid #000; border-radius: 4px; padding: 3px; text-align: center; font-weight: 700; }
+  .lab-obs { margin-top: 6px; }
+  .lab-chegada { margin-top: 6px; background: #000; color: #fff; border-radius: 10px; padding: 3px; text-align: center; font-weight: 700;
+                 -webkit-print-color-adjust: exact; print-color-adjust: exact; }`;
+  const validadeTexto = `Válido por ${o.validade_dias || 30} dias (até ${validadeStr}).`;
+
   const endereco = [
     c?.endereco,
     c?.cidade && c?.estado ? `${c.cidade} - ${c.estado}` : (c?.cidade ?? c?.estado),
@@ -147,6 +181,7 @@ export async function printOrcamento(
   .footer { margin-top: 18px; text-align: center; font-size: 9.5pt; color: #444; }
   .preparo { margin-top: 14px; border: 1px solid #111; padding: 8px 10px; }
   @media print { .noprint { display: none; } }
+  ${labCss}
 </style></head>
 <body>
   <div class="head">
@@ -262,11 +297,16 @@ export async function printOrcamento(
       : ""
   }
 
-  <div class="assin">
+  ${
+    ehLab
+      ? `${blocoLab}
+  <div class="footer bold">${validadeTexto}</div>`
+      : `<div class="assin">
     <div>Assinatura do paciente</div>
     <div>Assinatura do profissional</div>
   </div>
-  <div class="footer">Orçamento válido até ${validadeStr} — Obrigado pela preferência!</div>
+  <div class="footer">Orçamento válido até ${validadeStr} — Obrigado pela preferência!</div>`
+  }
 
   <script>
     window.addEventListener("load", function () {
@@ -298,6 +338,8 @@ export async function printOrcamento(
   @media print { .noprint { display: none; } }
   .noprint { position: fixed; top: 8px; right: 8px; }
   .noprint button { padding: 6px 12px; font-size: 12px; cursor: pointer; }
+  ${labCss}
+  .lab, .lab-prep { font-size: 9.5pt; }
 </style></head>
 <body>
   <div class="ticket">
@@ -454,8 +496,13 @@ export async function printOrcamento(
     }
 
     <div class="sep"></div>
-    <div class="center sm">VÁLIDO ATÉ ${validadeStr}</div>
-    <div class="center sm" style="margin-top:8px">Obrigado pela preferência!</div>
+    ${
+      ehLab
+        ? `${blocoLab}
+    <div class="center bold sm" style="margin-top:6px">${validadeTexto}</div>`
+        : `<div class="center sm">VÁLIDO ATÉ ${validadeStr}</div>
+    <div class="center sm" style="margin-top:8px">Obrigado pela preferência!</div>`
+    }
   </div>
   <script>
     window.addEventListener("load", function () {
