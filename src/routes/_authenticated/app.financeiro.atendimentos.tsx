@@ -2974,7 +2974,10 @@ function AtendimentosPage() {
                   exportToExcel(
                     filteredItems.map((a) => ({
                       data: new Date(a.data + "T00:00:00").toLocaleDateString("pt-BR"),
-                      medico: a.medico_id ? (medMap.get(a.medico_id) ?? "") : "",
+                      medico: nomeRepasseExibido(
+                        a.procedimento,
+                        a.medico_id ? (medMap.get(a.medico_id) ?? "") : "",
+                      ),
                       paciente: nomePaciente(a),
                       procedimento: a.procedimento ?? "",
                       valor_total: Number(a.valor_total).toFixed(2),
