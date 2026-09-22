@@ -570,6 +570,9 @@ function pacienteFromDescricao(desc: string | null): string | null {
   return null;
 }
 
+/** Teto de linhas que o banco devolve por consulta (db-max-rows do PostgREST). */
+const PAGINA_BANCO = 1000;
+
 function chunkArray<T>(items: T[], size: number): T[][] {
   const chunks: T[][] = [];
   for (let i = 0; i < items.length; i += size) chunks.push(items.slice(i, i + size));
@@ -2177,12 +2180,36 @@ function Page() {
     setTodasSessoes(sess);
 
     if (sess.length > 0) {
-      const ids = sess.map((s) => s.id);
-      const { data: movs } = await supabase
-        .from("caixa_movimentos")
-        .select(MOV_FIELDS)
-        .in("sessao_id", ids);
-      setTodosMovs((movs ?? []) as Mov[]);
+      // O banco devolve no máximo 1000 linhas por consulta. Um mês de caixas
+      // passa de 8 mil movimentos, e a consulta única (sem ordem) trazia um
+      // pedaço arbitrário — cada admin via totais diferentes. Busca em
+      // páginas, com ordem estável, até esgotar.
+      const movs: Mov[] = [];
+      let falhou = false;
+      for (const ids of chunkArray(
+        sess.map((s) => s.id),
+        200,
+      )) {
+        for (let de = 0; ; de += PAGINA_BANCO) {
+          const { data, error } = await supabase
+            .from("caixa_movimentos")
+            .select(MOV_FIELDS)
+            .in("sessao_id", ids)
+            .order("created_at", { ascending: true })
+            .order("id", { ascending: true })
+            .range(de, de + PAGINA_BANCO - 1);
+          if (error) {
+            console.warn("[caixa] falha ao buscar movimentos de todos os caixas", error);
+            falhou = true;
+            break;
+          }
+          const pagina = (data ?? []) as Mov[];
+          movs.push(...pagina);
+          if (pagina.length < PAGINA_BANCO) break;
+        }
+      }
+      if (falhou) toast.error("Não foi possível carregar todos os movimentos. Atualize a página.");
+      setTodosMovs(movs);
     } else {
       setTodosMovs([]);
     }
@@ -2205,6 +2232,50 @@ function Page() {
   useEffect(() => {
     if (tab === "todos") void loadTodos();
   }, [tab, loadTodos]);
+  // A aba "Todos" só carregava ao abrir a aba ou mudar o filtro: deixada
+  // aberta, ficava parada no valor daquele momento. Agora acompanha os
+  // lançamentos da clínica em tempo real, agrupando rajadas de eventos numa
+  // única recarga (vários caixas lançam ao mesmo tempo).
+  const loadTodosAgrupadoRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const loadTodosAgrupado = useCallback(() => {
+    if (loadTodosAgrupadoRef.current) clearTimeout(loadTodosAgrupadoRef.current);
+    loadTodosAgrupadoRef.current = setTimeout(() => {
+      loadTodosAgrupadoRef.current = null;
+      void loadTodos();
+    }, 3000);
+  }, [loadTodos]);
+  useEffect(
+    () => () => {
+      if (loadTodosAgrupadoRef.current) clearTimeout(loadTodosAgrupadoRef.current);
+    },
+    [],
+  );
+  useRealtimeRefresh(
+    ["caixa_movimentos", "caixa_sessoes"],
+    loadTodosAgrupado,
+    tab === "todos" && !!clinicaAtual,
+    clinicaAtual ? { filtro: `clinica_id=eq.${clinicaAtual.clinica_id}` } : undefined,
+  );
+  // Se o canal de tempo real cair (rede, computador suspenso), ao voltar para
+  // a aba do navegador a tela busca tudo de novo em vez de mostrar números
+  // velhos. Intervalo mínimo evita recarregar a cada troca rápida de janela.
+  const ultimaRecargaFocoRef = useRef(0);
+  useEffect(() => {
+    const onVoltar = () => {
+      if (document.visibilityState !== "visible") return;
+      const agora = Date.now();
+      if (agora - ultimaRecargaFocoRef.current < 15_000) return;
+      ultimaRecargaFocoRef.current = agora;
+      void load();
+      if (tab === "todos") void loadTodos();
+    };
+    window.addEventListener("focus", onVoltar);
+    document.addEventListener("visibilitychange", onVoltar);
+    return () => {
+      window.removeEventListener("focus", onVoltar);
+      document.removeEventListener("visibilitychange", onVoltar);
+    };
+  }, [load, loadTodos, tab]);
 
   // Membros da clínica para o seletor de destino de sangria/suprimento
   useEffect(() => {

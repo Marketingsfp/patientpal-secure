@@ -324,13 +324,32 @@ export function CaixaShellV2({
       setAggRows([]);
       return;
     }
-    let q = supabase
-      .from("caixa_movimentos")
-      .select("id, sessao_id, tipo, valor, forma_pagamento, created_at, lancamento_id, descricao");
-    q = applyFilters(q);
-    q = q.order("created_at", { ascending: false }).range(0, 9999);
-    const { data, error } = await q;
-    const rows = error ? [] : ((data ?? []) as AggRow[]);
+    // O banco devolve no máximo 1000 linhas por consulta, mesmo pedindo
+    // 10000: os totais de um período maior saíam cortados. Busca em páginas,
+    // com ordem estável, até esgotar.
+    const PAGINA = 1000;
+    const rows: AggRow[] = [];
+    for (let de = 0; ; de += PAGINA) {
+      let q = supabase
+        .from("caixa_movimentos")
+        .select(
+          "id, sessao_id, tipo, valor, forma_pagamento, created_at, lancamento_id, descricao",
+        );
+      q = applyFilters(q);
+      q = q
+        .order("created_at", { ascending: false })
+        .order("id", { ascending: false })
+        .range(de, de + PAGINA - 1);
+      const { data, error } = await q;
+      if (error) {
+        notify.error("Erro ao carregar os totais do caixa");
+        rows.length = 0;
+        break;
+      }
+      const pagina = (data ?? []) as AggRow[];
+      rows.push(...pagina);
+      if (pagina.length < PAGINA) break;
+    }
     setAggRows(rows);
 
     // Classificação Particular x Associado do período filtrado: um recebimento
@@ -361,6 +380,29 @@ export function CaixaShellV2({
   useEffect(() => {
     void loadTotais();
   }, [loadTotais]);
+
+  // Ao voltar para a aba do navegador, busca tudo de novo: sem isso a tela
+  // deixada aberta mostrava os números do momento em que foi carregada.
+  // Intervalo mínimo evita recarregar a cada troca rápida de janela.
+  const ultimaRecargaFocoRef = useRef(0);
+  useEffect(() => {
+    const onVoltar = () => {
+      if (document.visibilityState !== "visible") return;
+      const agora = Date.now();
+      if (agora - ultimaRecargaFocoRef.current < 15_000) return;
+      ultimaRecargaFocoRef.current = agora;
+      setNovosCount(0);
+      void loadSessao();
+      void loadMovs();
+      void loadTotais();
+    };
+    window.addEventListener("focus", onVoltar);
+    document.addEventListener("visibilitychange", onVoltar);
+    return () => {
+      window.removeEventListener("focus", onVoltar);
+      document.removeEventListener("visibilitychange", onVoltar);
+    };
+  }, [loadSessao, loadMovs, loadTotais]);
 
   const loadMore = useCallback(async () => {
     if (loadingMore || !hasMore || !clinicaAtual) return;
