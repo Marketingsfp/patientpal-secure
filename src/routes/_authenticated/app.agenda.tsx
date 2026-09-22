@@ -9955,17 +9955,39 @@ function AgendaPage() {
                           <Label className="text-xs font-semibold text-slate-700">
                             Data consulta/exame <span className="text-rose-500">*</span>
                           </Label>
-                          <DateTimeField
-                            value={form.inicio}
-                            onChange={(v) =>
-                              setForm((f) => ({
-                                ...f,
-                                inicio: v,
-                                fim: calcFimAuto(v, f.medico_id),
-                              }))
-                            }
-                            required
-                          />
+                          {edicaoFichaFila ? (
+                            <>
+                              <Input
+                                type="text"
+                                value={
+                                  editing
+                                    ? new Date(editing.inicio).toLocaleString("pt-BR", {
+                                        timeZone: "America/Sao_Paulo",
+                                      })
+                                    : "—"
+                                }
+                                readOnly
+                                disabled
+                                tabIndex={-1}
+                                className="bg-slate-50 cursor-not-allowed text-slate-500"
+                              />
+                              <p className="text-[12px] text-slate-500">
+                                Ficha da fila — o horário não muda ao editar.
+                              </p>
+                            </>
+                          ) : (
+                            <DateTimeField
+                              value={form.inicio}
+                              onChange={(v) =>
+                                setForm((f) => ({
+                                  ...f,
+                                  inicio: v,
+                                  fim: calcFimAuto(v, f.medico_id),
+                                }))
+                              }
+                              required
+                            />
+                          )}
                         </div>
                         <div className="space-y-1.5">
                           <Label className="text-xs font-semibold text-slate-700">
