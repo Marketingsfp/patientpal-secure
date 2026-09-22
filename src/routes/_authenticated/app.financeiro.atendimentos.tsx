@@ -832,7 +832,9 @@ function AtendimentosPage() {
     if (!itens.length) return;
     const byMed = new Map<string, Atend[]>();
     for (const a of itens) {
-      const k = a.medico_id ?? "sem";
+      // Chave composta: o Cartão Terapêutico sai em recibo próprio, separado do
+      // atendimento normal da MESMA profissional.
+      const k = `${a.medico_id ?? "sem"}|${ehServicoCartaoTerapeutico(a.procedimento) ? "ct" : "-"}`;
       if (!byMed.has(k)) byMed.set(k, []);
       byMed.get(k)!.push(a);
     }
