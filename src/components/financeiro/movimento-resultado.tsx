@@ -15,6 +15,7 @@
  *    avulsos) filtram a lista de lançamentos logo abaixo, como já faziam.
  */
 import {
+  ClipboardList,
   Coins,
   Handshake,
   Receipt,
