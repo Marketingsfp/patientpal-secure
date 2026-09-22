@@ -295,6 +295,8 @@ type MedicoOpt = {
 const FORMAS = ["Dinheiro", "PIX", "Cartão de Crédito", "Cartão de Débito", "Boleto", "Outro"];
 // Laboratório usa só as formas do balcão, para o modal caber na tela.
 const FORMAS_LAB = ["Dinheiro", "PIX", "Cartão de Crédito", "Cartão de Débito"];
+// Rótulo da opção única do Laboratório, gravado em `orcamentos.forma_pagamento`.
+const FORMA_UNICA_LAB = "Dinheiro / PIX / Cartão";
 const BRL = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
 /**
@@ -1021,6 +1023,11 @@ function NovoOrcamentoDialog({
   // em Observações, que sai impressa no cupom do paciente.
   const preparosMarcados = useMemo(() => preparosNoTexto(observacoes), [observacoes]);
   const formasDisponiveis = categoria === "laboratorio" ? FORMAS_LAB : FORMAS;
+  // No Laboratório o preço costuma ser o mesmo em qualquer forma, então o
+  // padrão é uma opção só. Se entrar um exame com valor diferente por forma,
+  // a tela abre as opções separadas (ver `adicionarProc`).
+  const [pagamentoUnificado, setPagamentoUnificado] = useState(true);
+  const pagamentoUnico = categoria === "laboratorio" && pagamentoUnificado;
 
   // busca de procedimentos
   const [procQuery, setProcQuery] = useState("");
@@ -1224,6 +1231,16 @@ function NovoOrcamentoDialog({
         valores_formas: valores,
       },
     ]);
+    if (pagamentoUnico) {
+      const valoresDasFormas = FORMAS_LAB.map((f) => valorPorForma(p, f));
+      if (valoresDasFormas.some((v) => v !== valoresDasFormas[0])) {
+        setPagamentoUnificado(false);
+        toast.warning(`${p.nome} tem valor diferente por forma de pagamento`, {
+          description: "Escolha a forma de pagamento deste orçamento.",
+          duration: 8000,
+        });
+      }
+    }
     if (categoria === "laboratorio") {
       const sugeridos = sugerirPreparos(p.nome);
       if (sugeridos.length > 0)
@@ -1293,7 +1310,7 @@ function NovoOrcamentoDialog({
       return toast.error("Nome e telefone não podem conter os caracteres < ou >");
     }
     if (itens.length === 0) return toast.error("Adicione ao menos um serviço");
-    if (formasPagamento.length === 0)
+    if (!pagamentoUnico && formasPagamento.length === 0)
       return toast.error("Selecione ao menos uma forma de pagamento");
     for (let i = 0; i < itens.length; i++) {
       const it = itens[i];
@@ -1321,7 +1338,7 @@ function NovoOrcamentoDialog({
       return toast.error("Observações não podem exceder 1000 caracteres");
     }
     const valoresPag: Record<string, number> | null =
-      formasPagamento.length > 1 ? { ...totaisPorForma } : null;
+      !pagamentoUnico && formasPagamento.length > 1 ? { ...totaisPorForma } : null;
     setSaving(true);
 
     const { data: orc, error } = await supabase
@@ -1339,7 +1356,7 @@ function NovoOrcamentoDialog({
           : medicoExterno
             ? clinicaSolicitante.trim() || null
             : null,
-        forma_pagamento: formasPagamento.join(" + "),
+        forma_pagamento: pagamentoUnico ? FORMA_UNICA_LAB : formasPagamento.join(" + "),
         valores_pagamento: valoresPag,
         validade_dias: validade,
         desconto: Number(desconto) || 0,
@@ -1524,38 +1541,64 @@ function NovoOrcamentoDialog({
                 </div>
                 <div className="space-y-1 md:col-span-2">
                   <Label>
-                    Formas de pagamento{" "}
+                    {pagamentoUnico ? "Pagamento" : "Formas de pagamento"}{" "}
                     <span className="text-xs text-muted-foreground font-normal">
-                      (selecione até 2)
+                      {pagamentoUnico ? "(mesmo valor em qualquer forma)" : "(selecione até 2)"}
                     </span>
                   </Label>
-                  <div className="flex flex-wrap gap-2 rounded-md border p-2">
-                    {formasDisponiveis.map((f) => {
-                      const checked = formasPagamento.includes(f);
-                      const disabled = !checked && formasPagamento.length >= 2;
-                      return (
-                        <label
-                          key={f}
-                          className={`flex items-center gap-2 px-2 py-1 rounded-md text-sm border ${
-                            checked
-                              ? "bg-primary/10 border-primary/40 cursor-pointer"
-                              : disabled
-                                ? "border-border opacity-40 cursor-not-allowed"
-                                : "border-border hover:bg-muted/40 cursor-pointer"
-                          }`}
-                          title={disabled ? "Máximo de 2 formas de pagamento" : undefined}
-                        >
-                          <Checkbox
-                            checked={checked}
-                            disabled={disabled}
-                            onCheckedChange={() => !disabled && toggleForma(f)}
-                          />
-                          {f}
-                        </label>
-                      );
-                    })}
-                  </div>
-                  {formasPagamento.length > 1 && (
+                  {pagamentoUnico ? (
+                    <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border p-2">
+                      <span className="text-sm font-medium">{FORMA_UNICA_LAB}</span>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        className="h-7 text-[12px]"
+                        onClick={() => setPagamentoUnificado(false)}
+                      >
+                        valor diferente por forma?
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="flex flex-wrap gap-2 rounded-md border p-2">
+                      {formasDisponiveis.map((f) => {
+                        const checked = formasPagamento.includes(f);
+                        const disabled = !checked && formasPagamento.length >= 2;
+                        return (
+                          <label
+                            key={f}
+                            className={`flex items-center gap-2 px-2 py-1 rounded-md text-sm border ${
+                              checked
+                                ? "bg-primary/10 border-primary/40 cursor-pointer"
+                                : disabled
+                                  ? "border-border opacity-40 cursor-not-allowed"
+                                  : "border-border hover:bg-muted/40 cursor-pointer"
+                            }`}
+                            title={disabled ? "Máximo de 2 formas de pagamento" : undefined}
+                          >
+                            <Checkbox
+                              checked={checked}
+                              disabled={disabled}
+                              onCheckedChange={() => !disabled && toggleForma(f)}
+                            />
+                            {f}
+                          </label>
+                        );
+                      })}
+                    </div>
+                  )}
+                  {!pagamentoUnico && categoria === "laboratorio" && (
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      className="h-7 px-0 text-[12px]"
+                      onClick={() => setPagamentoUnificado(true)}
+                    >
+                      voltar para o valor único
+                    </Button>
+                  )}
+                  {!pagamentoUnico && formasPagamento.length > 1 && (
                     <p className="text-xs text-muted-foreground">
                       Cada serviço mostra o valor por forma; o total por forma é calculado
                       automaticamente.
