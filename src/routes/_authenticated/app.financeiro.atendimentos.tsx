@@ -1469,7 +1469,7 @@ function AtendimentosPage() {
         .eq("clinica_id", clinicaAtual.clinica_id)
         .gte("data", fIni)
         .lte("data", fFim);
-      if (fMedico !== "todos") q = q.eq("medico_id", fMedico);
+      if (fMedico !== "todos" && !filtroCartaoTerapeutico) q = q.eq("medico_id", fMedico);
       return q;
     };
     const buildAgenda = () =>
@@ -1814,11 +1814,16 @@ function AtendimentosPage() {
     const agendSoAtendimentos = agend.filter((x) => !ehRecebimentoSemAtendimento(x));
     // Filtro client-side por médico para os registros da agenda (cobre os
     // lançamentos cujo medico_id está nulo e vem do agendamento).
-    const agendFiltered =
-      fMedico === "todos"
+    const agendFiltered = filtroCartaoTerapeutico
+      ? agendSoAtendimentos.filter((x) => ehServicoCartaoTerapeutico(x.procedimento))
+      : fMedico === "todos"
         ? agendSoAtendimentos
         : agendSoAtendimentos.filter((x) => x.medico_id === fMedico);
-    let unif = [...manuais, ...agendFiltered].sort((a, b) => (a.data < b.data ? 1 : -1));
+    // Os manuais deixaram de ser filtrados no banco neste recorte: filtra aqui.
+    const manuaisVis = filtroCartaoTerapeutico
+      ? manuais.filter((x) => ehServicoCartaoTerapeutico(x.procedimento))
+      : manuais;
+    let unif = [...manuaisVis, ...agendFiltered].sort((a, b) => (a.data < b.data ? 1 : -1));
     if (fStatus === "aberto") unif = unif.filter((x) => !x.repasse_pago);
     else if (fStatus === "pago") unif = unif.filter((x) => x.repasse_pago);
     // Recorte por agenda escolhida no filtro (aplicado por último).
