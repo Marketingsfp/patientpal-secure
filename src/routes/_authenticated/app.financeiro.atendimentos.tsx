@@ -328,6 +328,7 @@ function AtendimentosPage() {
   // "todos" | "nome:<chave>" — recorte por agenda do profissional escolhido.
   const [fAgenda, setFAgenda] = useState<string>("todos");
   const [semAgendaOcultos, setSemAgendaOcultos] = useState(0);
+  const [naoAtendimentosOcultos, setNaoAtendimentosOcultos] = useState(0);
   const [agendasPorMedico, setAgendasPorMedico] = useState<
     Map<string, { id: string; nome: string }[]>
   >(new Map());
