@@ -37,3 +37,14 @@ export const nomeRepasseExibido = (
   nomeMedico: string,
 ): string =>
   ehServicoCartaoTerapeutico(procedimento) ? NOME_REPASSE_CARTAO_TERAPEUTICO : nomeMedico;
+
+/**
+ * Repasse da MENSALIDADE do plano mensal do Cartão Terapêutico: metade do que
+ * entrou. É a mesma divisão do avulso (R$ 290,00 → R$ 145,00 para o
+ * profissional e R$ 145,00 para a clínica), confirmada pela clínica em
+ * 22/09/2026. Taxa de adesão não entra nesta conta.
+ */
+export const PERCENTUAL_REPASSE_MENSALIDADE_CT = 50;
+
+export const repasseMensalidadeCartaoTerapeutico = (valorRecebido: number): number =>
+  +(((Number(valorRecebido) || 0) * PERCENTUAL_REPASSE_MENSALIDADE_CT) / 100).toFixed(2);

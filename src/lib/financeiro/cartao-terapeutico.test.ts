@@ -4,6 +4,7 @@ import {
   NOME_REPASSE_CARTAO_TERAPEUTICO,
   ehServicoCartaoTerapeutico,
   nomeRepasseExibido,
+  repasseMensalidadeCartaoTerapeutico,
 } from "./cartao-terapeutico";
 
 describe("ehServicoCartaoTerapeutico", () => {
@@ -50,5 +51,19 @@ describe("nomeRepasseExibido", () => {
     expect(nomeRepasseExibido("CONSULTA (PSICOLOGIA)", "ANA PSICOLOGA")).toBe("ANA PSICOLOGA");
     expect(nomeRepasseExibido("FISIOTERAPIA", "BIA FISIO")).toBe("BIA FISIO");
     expect(nomeRepasseExibido(null, "—")).toBe("—");
+  });
+});
+
+describe("repasseMensalidadeCartaoTerapeutico", () => {
+  it("divide a mensalidade pela metade", () => {
+    expect(repasseMensalidadeCartaoTerapeutico(290)).toBe(145);
+    expect(repasseMensalidadeCartaoTerapeutico(291)).toBe(145.5);
+  });
+
+  it("não quebra com zero, negativo ou valor inválido", () => {
+    expect(repasseMensalidadeCartaoTerapeutico(0)).toBe(0);
+    expect(repasseMensalidadeCartaoTerapeutico(-100)).toBe(-50);
+    expect(repasseMensalidadeCartaoTerapeutico(Number.NaN)).toBe(0);
+    expect(repasseMensalidadeCartaoTerapeutico("abc" as unknown as number)).toBe(0);
   });
 });

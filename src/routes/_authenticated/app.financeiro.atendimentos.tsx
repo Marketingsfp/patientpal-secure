@@ -112,6 +112,7 @@ import {
   FILTRO_MEDICO_CARTAO_TERAPEUTICO,
   ehServicoCartaoTerapeutico,
   nomeRepasseExibido,
+  repasseMensalidadeCartaoTerapeutico,
 } from "@/lib/financeiro/cartao-terapeutico";
 
 /** "2026-09-08" — só aceita o formato exato, para não semear filtro inválido. */
@@ -178,6 +179,12 @@ interface Atend {
   terceiro_pago_at?: string | null;
   terceiro_forma_pagamento?: string | null;
   terceiro_conta_id?: string | null;
+  /**
+   * Mensalidade do plano mensal do Cartão Terapêutico. Não é atendimento (não
+   * tem agendamento nem profissional), mas gera repasse de 50% e por isso
+   * aparece nesta tela para o financeiro dar baixa.
+   */
+  mensalidade_ct?: boolean;
 }
 interface Medico {
   id: string;
@@ -1538,6 +1545,32 @@ function AtendimentosPage() {
       return;
     }
     const agendaRows = [...(ar.data ?? []), ...(sr.data ?? [])];
+    // Mensalidade do plano mensal do Cartão Terapêutico: recebimento sem
+    // agendamento que MESMO ASSIM gera repasse (50%), por regra confirmada
+    // pela clínica. O vínculo confiável é pelo contrato → convênio → produto;
+    // a categoria do lançamento não serve para identificar. Taxa de adesão
+    // (parcela 0) fica de fora de propósito.
+    const idsSemAgenda = (sr.data ?? []).map((r: { id: string }) => r.id);
+    const mensalidadesCT = new Map<string, number>(); // lancamento_id → nº da parcela
+    for (let i = 0; i < idsSemAgenda.length; i += PAGE_SIZE) {
+      const bloco = idsSemAgenda.slice(i, i + PAGE_SIZE);
+      const { data: mens, error: eMens } = await supabase
+        .from("contrato_mensalidades")
+        .select(
+          "lancamento_id, numero_parcela, contrato:contratos_assinatura!inner(convenio:cb_convenios!inner(produto))",
+        )
+        .in("lancamento_id", bloco)
+        .eq("status", "pago")
+        .gte("numero_parcela", 1)
+        .eq("contrato.convenio.produto", "terapeutico");
+      if (eMens) {
+        mostrarErro(eMens);
+        setLoading(false);
+        return;
+      }
+      for (const m of mens ?? [])
+        if (m.lancamento_id) mensalidadesCT.set(m.lancamento_id, Number(m.numero_parcela) || 0);
+    }
     const manualLancamentoIds = (mr.data ?? [])
       .map((r: { lancamento_id?: string | null }) => r.lancamento_id ?? null)
       .filter((x): x is string => !!x);
@@ -1727,6 +1760,45 @@ function AtendimentosPage() {
       };
     });
     const agend: Atend[] = agendaRows.map((r): Atend => {
+      // Mensalidade do Cartão Terapêutico: não passa por calcRepasseFull (não
+      // há profissional para consultar grade). Repasse é 50% do recebido, ou o
+      // override manual quando o financeiro já ajustou a linha.
+      if (mensalidadesCT.has(r.id)) {
+        const parcela = mensalidadesCT.get(r.id) ?? 0;
+        const recebido = Number(r.valor) || 0;
+        const overrideRaw = (r as { valor_medico_override?: number | string | null })
+          .valor_medico_override;
+        const override =
+          overrideRaw !== null && overrideRaw !== undefined && overrideRaw !== ""
+            ? Number(overrideRaw)
+            : null;
+        const valorMedico =
+          override !== null && Number.isFinite(override)
+            ? override
+            : repasseMensalidadeCartaoTerapeutico(recebido);
+        return {
+          id: r.id,
+          data: r.data,
+          procedimento: `MENSALIDADE ${parcela} — CARTÃO TERAPÊUTICO`,
+          agendamento_id: null,
+          valor_total: recebido,
+          valor_medico: valorMedico,
+          valor_clinica: +(recebido - valorMedico).toFixed(2),
+          status: "realizado",
+          forma_pagamento: r.forma_pagamento,
+          medico_id: null,
+          paciente_id: r.paciente_id ?? null,
+          paciente_nome_extra:
+            (r as any).paciente?.nome ?? ((r.descricao ?? "").split("—")[0]?.trim() || null),
+          origem: "agenda",
+          repasse_pago: !!r.repasse_pago,
+          repasse_pago_em: r.repasse_pago_em,
+          repasse_pago_at: (r as any).repasse_pago_at ?? null,
+          repasse_forma_pagamento: r.repasse_forma_pagamento,
+          repasse_conta_id: (r as any).repasse_conta_id ?? null,
+          mensalidade_ct: true,
+        };
+      }
       const ag = (r as any).agendamento as {
         procedimento: string | null;
         paciente_nome: string | null;
@@ -1809,7 +1881,10 @@ function AtendimentosPage() {
     // Continua aparecendo em Financeiro → Mov. Caixa e em A Receber, que é o
     // lugar dele. Atenção: lançamento sem agendamento mas COM medico_id é
     // atendimento pago fora da agenda e continua na lista.
-    const ehRecebimentoSemAtendimento = (x: Atend) => !x.agendamento_id && !x.medico_id;
+    // Exceção: a mensalidade do Cartão Terapêutico não tem agendamento nem
+    // profissional, mas gera repasse e precisa ficar visível para baixa.
+    const ehRecebimentoSemAtendimento = (x: Atend) =>
+      !x.agendamento_id && !x.medico_id && !x.mensalidade_ct;
     const naoAtendimentos = agend.filter(ehRecebimentoSemAtendimento).length;
     const agendSoAtendimentos = agend.filter((x) => !ehRecebimentoSemAtendimento(x));
     // Filtro client-side por médico para os registros da agenda (cobre os
@@ -2581,7 +2656,9 @@ function AtendimentosPage() {
     const m = new Map<string, number>();
     let n = 0;
     for (const a of filteredItems) {
-      if (ehLinhaDeLaudo(a)) continue;
+      // Mensalidade do Cartão Terapêutico também não é atendimento: não pode
+      // consumir número de ficha/GR.
+      if (ehLinhaDeLaudo(a) || a.mensalidade_ct) continue;
       n += 1;
       m.set(`${a.origem}:${a.id}`, n);
     }
@@ -2589,7 +2666,11 @@ function AtendimentosPage() {
   }, [filteredItems]);
 
   const isAtendido = (a: Atend) =>
-    a.origem === "manual" ? a.status === "realizado" : a.agendamento_status === "realizado";
+    a.mensalidade_ct
+      ? true
+      : a.origem === "manual"
+        ? a.status === "realizado"
+        : a.agendamento_status === "realizado";
   // Itens selecionáveis: qualquer atendimento com repasse > 0.
   // As ações do topo validam individualmente o que cada uma aceita
   // (baixa em lote, pagar repasse, 2ª via).
@@ -2705,7 +2786,11 @@ function AtendimentosPage() {
       // Pré-validação no cliente: só pode pagar repasse de atendimentos efetivamente
       // realizados e cuja data marcada na agenda já chegou. A mesma regra também
       // é reforçada no banco pela RPC pagar_repasse_medico.
-      const agendaIdsCheck = selectedItems.filter((x) => x.origem === "agenda").map((x) => x.id);
+      // A mensalidade do Cartão Terapêutico fica fora desta checagem: ela não
+      // tem agendamento de propósito (o banco aceita esse caso específico).
+      const agendaIdsCheck = selectedItems
+        .filter((x) => x.origem === "agenda" && !x.mensalidade_ct)
+        .map((x) => x.id);
       if (agendaIdsCheck.length) {
         const { data: lancs, error: eChk } = await supabase
           .from("fin_lancamentos")
