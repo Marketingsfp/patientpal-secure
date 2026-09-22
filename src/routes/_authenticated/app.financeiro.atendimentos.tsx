@@ -4901,9 +4901,9 @@ function MedicoCombobox({
       ? "CARTÃO TERAPÊUTICO"
       : value === "todos"
         ? "Todos os médicos"
-      : (opcoes.find((o) => o.medicoId === value && o.agendaFiltro === agendaValue)?.rotulo ??
-        rotuloMedico.get(value) ??
-        "Todos os médicos");
+        : (opcoes.find((o) => o.medicoId === value && o.agendaFiltro === agendaValue)?.rotulo ??
+          rotuloMedico.get(value) ??
+          "Todos os médicos");
   // Busca por palavras soltas, igual à Agenda: "joao exames" acha
   // "JOAO HELIO VALENTIM — EXAMES".
   const termos = busca
