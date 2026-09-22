@@ -5,6 +5,7 @@ import { Trash2, Plus, CalendarRange, Pencil, ArrowLeft, Ban, Undo2 } from "luci
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { hojeBR } from "@/lib/date-utils";
+import { posicoesDaFila } from "@/lib/agenda/fila-ordem-chegada";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
 import { usePodeEscrever } from "@/hooks/use-permissoes";
@@ -176,6 +177,8 @@ function Page() {
     hora_inicio: "",
     hora_fim: "",
     intervalo_min: "",
+    // Modo ORDEM DE CHEGADA: quantas fichas acrescentar em cada dia.
+    fichas_fila: "",
   });
   const [gerarDias, setGerarDias] = useState<number[]>([1, 2, 3, 4, 5, 6]);
   const [gerando, setGerando] = useState(false);
@@ -214,6 +217,11 @@ function Page() {
   // existente naquela data. Usado para acrescentar novos slots ABAIXO dos
   // já criados, preservando a numeração de fichas.
   const [pisos, setPisos] = useState<Map<string, string>>(new Map());
+  // Último INÍCIO (ISO) já existente por (medico|agenda|dataLocal). O `pisos`
+  // acima guarda o último FIM, que não serve para a fila de ordem de chegada:
+  // ali a ficha nova precisa nascer depois do último INÍCIO do dia, inclusive
+  // de linhas canceladas, para não renumerar ficha já impressa.
+  const [ultimosInicios, setUltimosInicios] = useState<Map<string, string>>(new Map());
   const [pisoTick, setPisoTick] = useState(0);
   const [medicoEditando, setMedicoEditando] = useState<string | null>(null);
   const [dispEditando, setDispEditando] = useState<string | null>(null);
@@ -338,6 +346,7 @@ function Page() {
     (async () => {
       if (!clinicaAtual || !gerar.data_inicio || !gerar.data_fim) {
         setPisos(new Map());
+        setUltimosInicios(new Map());
         return;
       }
       const alvoIds =
@@ -348,6 +357,7 @@ function Page() {
             : [];
       if (alvoIds.length === 0) {
         setPisos(new Map());
+        setUltimosInicios(new Map());
         return;
       }
       const iniIso = new Date(`${gerar.data_inicio}T00:00:00`).toISOString();
@@ -362,6 +372,7 @@ function Page() {
         .limit(20000);
       if (error || cancelled) return;
       const map = new Map<string, string>();
+      const mapInicio = new Map<string, string>();
       for (const r of (data ?? []) as Array<{
         medico_id: string;
         agenda_id: string | null;
@@ -373,8 +384,13 @@ function Page() {
         const key = `${r.medico_id}|${r.agenda_id ?? ""}|${dLocal}`;
         const prev = map.get(key);
         if (!prev || tFim > prev) map.set(key, tFim);
+        const prevIni = mapInicio.get(key);
+        if (!prevIni || r.inicio > prevIni) mapInicio.set(key, r.inicio);
       }
-      if (!cancelled) setPisos(map);
+      if (!cancelled) {
+        setPisos(map);
+        setUltimosInicios(mapInicio);
+      }
     })();
     return () => {
       cancelled = true;
@@ -761,18 +777,54 @@ function Page() {
     setDisps((xs) => xs.filter((x) => x.id !== id));
   };
 
+  // Agenda de ORDEM DE CHEGADA escolhida no gerador. Só existe quando UM
+  // médico está selecionado; com "todos os médicos" essas agendas ficam fora.
+  const agendaFilaAlvo = useMemo(() => {
+    if (!gerar.medico_id || gerar.medico_id === "all") return null;
+    const doMedico = agendas.filter(
+      (a) => a.medico_id === gerar.medico_id && a.ativo && (!gerar.agenda_id || a.id === gerar.agenda_id),
+    );
+    return doMedico.find((a) => a.ordem_chegada) ?? null;
+  }, [gerar.medico_id, gerar.agenda_id, agendas]);
+
+  const medicoFilaAlvo = useMemo(
+    () => (agendaFilaAlvo ? (medicos.find((m) => m.id === agendaFilaAlvo.medico_id) ?? null) : null),
+    [agendaFilaAlvo, medicos],
+  );
+
+  const modoFila = Boolean(agendaFilaAlvo && medicoFilaAlvo);
+
+  // Médicos de ordem de chegada ignorados na geração em massa — a tela avisa.
+  const medicosFilaForaDaMassa = useMemo(() => {
+    if (gerar.medico_id !== "all") return [] as string[];
+    const ids = new Set(agendas.filter((a) => a.ativo && a.ordem_chegada).map((a) => a.medico_id));
+    return medicos.filter((m) => ids.has(m.id)).map((m) => m.nome.toUpperCase());
+  }, [gerar.medico_id, agendas, medicos]);
+
   // Pré-visualização dos slots gerados.
   // Além dos horários, devolve os dias em que NADA foi gerado porque a data
   // já tinha fichas criadas depois da janela pedida (o "piso") — a tela usa
   // isso para explicar o motivo em vez de mostrar só "~0 horários".
   const geracaoPreview = useMemo(() => {
-    type Slot = { data: string; medico_id: string; agenda_id: string; inicio: string; fim: string };
+    type Slot = {
+      data: string;
+      medico_id: string;
+      agenda_id: string;
+      inicio: string;
+      fim: string;
+      // Modo ORDEM DE CHEGADA: o passo pode ser de segundos, então o horário
+      // exato vai pronto aqui (HH:MM não bastaria).
+      iniISO?: string;
+      fimISO?: string;
+    };
     type BloqueioPiso = { data: string; piso: string; janelaFim: string };
     type ForaDaGrade = { data: string; gradeIni: string; gradeFim: string };
+    type ErroFila = { data: string; erro: string };
     const vazio = {
       slots: [] as Slot[],
       bloqueiosPorPiso: [] as BloqueioPiso[],
       foraDaGrade: [] as ForaDaGrade[],
+      errosFila: [] as ErroFila[],
     };
     if (!gerar.data_inicio || !gerar.data_fim) return vazio;
     const ini = new Date(`${gerar.data_inicio}T00:00:00`);
@@ -781,6 +833,66 @@ function Page() {
     const dias = Math.floor((fimD.getTime() - ini.getTime()) / 86400000) + 1;
     const alvo =
       gerar.medico_id === "all" ? medicos : medicos.filter((m) => m.id === gerar.medico_id);
+
+    // ===== MODO ORDEM DE CHEGADA =====
+    // Um médico selecionado cuja agenda-alvo atende por ficha. Aqui o relógio
+    // só ordena a fila: a quantidade digitada manda, e o passo é comprimido
+    // pelo helper até caber no dia. Recorte de horário e duração não entram.
+    if (medicoFilaAlvo && agendaFilaAlvo) {
+      const qtd = parseInt(gerar.fichas_fila || "0", 10);
+      if (!qtd || qtd < 1) return vazio;
+      const out: Slot[] = [];
+      const errosFila: ErroFila[] = [];
+      for (let i = 0; i < dias; i++) {
+        const d = new Date(ini);
+        d.setDate(d.getDate() + i);
+        if (isFeriadoOuDomingo(d)) continue;
+        const dow = d.getDay();
+        if (!gerarDias.includes(dow)) continue;
+        const diaIso = fmtDateLocal.format(d);
+        const ds = disps
+          .filter(
+            (x) =>
+              x.medico_id === medicoFilaAlvo.id &&
+              x.agenda_id === agendaFilaAlvo.id &&
+              x.dia_semana === dow &&
+              (!x.vigencia_inicio || x.vigencia_inicio <= diaIso) &&
+              (!x.vigencia_fim || x.vigencia_fim >= diaIso),
+          )
+          .sort((a, b) => hhmm(a.hora_inicio).localeCompare(hhmm(b.hora_inicio)));
+        if (ds.length === 0) continue;
+        const ultimoBloco = ds[ds.length - 1];
+        const ultimoIso =
+          ultimosInicios.get(`${medicoFilaAlvo.id}|${agendaFilaAlvo.id}|${diaIso}`) ?? null;
+        const intervaloGrade =
+          ds.find((x) => x.intervalo_min && x.intervalo_min > 0)?.intervalo_min ?? 5;
+        const r = posicoesDaFila({
+          diaIso,
+          ultimoInicio: ultimoIso ? new Date(ultimoIso) : null,
+          inicioGrade: hhmm(ultimoBloco.hora_inicio),
+          fimTurno: hhmm(ultimoBloco.hora_fim),
+          quantidade: qtd,
+          intervaloMin: intervaloGrade,
+        });
+        if (!r.ok) {
+          errosFila.push({ data: diaIso, erro: r.erro });
+          continue;
+        }
+        for (const f of r.fichas) {
+          out.push({
+            data: diaIso,
+            medico_id: medicoFilaAlvo.id,
+            agenda_id: agendaFilaAlvo.id,
+            inicio: toLocalTime(f.inicio.toISOString()),
+            fim: toLocalTime(f.fim.toISOString()),
+            iniISO: f.inicio.toISOString(),
+            fimISO: f.fim.toISOString(),
+          });
+        }
+      }
+      return { slots: out, bloqueiosPorPiso: [], foraDaGrade: [], errosFila };
+    }
+
     const overrideIni = hhmm(gerar.hora_inicio);
     const overrideFim = hhmm(gerar.hora_fim);
     // A janela digitada na tela só vale como bloco próprio quando as duas
@@ -820,6 +932,10 @@ function Page() {
           (a) =>
             a.medico_id === m.id &&
             a.ativo &&
+            // Agenda de ordem de chegada fica FORA da geração em massa: lá a
+            // quantidade de fichas do dia é uma decisão do balcão, não da
+            // grade. A tela avisa quais médicos ficaram de fora.
+            !(gerar.medico_id === "all" && a.ordem_chegada) &&
             // Agenda escolhida na tela: gerar EXAMES não pode depender de a
             // agenda de CONSULTAS do mesmo dia estar vazia.
             (!gerar.agenda_id || a.id === gerar.agenda_id),
@@ -957,8 +1073,18 @@ function Page() {
         }
       }
     }
-    return { slots: out, bloqueiosPorPiso, foraDaGrade };
-  }, [gerar, gerarDias, medicos, disps, agendas, pisos]);
+    return { slots: out, bloqueiosPorPiso, foraDaGrade, errosFila: [] as ErroFila[] };
+  }, [
+    gerar,
+    gerarDias,
+    medicos,
+    disps,
+    agendas,
+    pisos,
+    ultimosInicios,
+    medicoFilaAlvo,
+    agendaFilaAlvo,
+  ]);
 
   const slotsPreview = geracaoPreview.slots;
 
@@ -1016,6 +1142,21 @@ function Page() {
   const motivoSemHorarios = useMemo(() => {
     if (slotsPreview.length > 0) return null;
     if (!gerar.medico_id) return "Selecione um médico para ver a estimativa.";
+    if (modoFila) {
+      const qtd = parseInt(gerar.fichas_fila || "0", 10);
+      if (!qtd || qtd < 1)
+        return "Informe quantas fichas quer acrescentar em cada dia (1 a 500).";
+      const erro = geracaoPreview.errosFila[0];
+      if (erro) {
+        const [ano, mes, dia] = erro.data.split("-");
+        const outros = geracaoPreview.errosFila.length - 1;
+        return (
+          `Em ${dia}/${mes}/${ano}: ${erro.erro}` +
+          (outros > 0 ? ` O mesmo acontece em mais ${outros} dia(s) do período.` : "")
+        );
+      }
+      return "Nenhuma data do período tem grade cadastrada nesta agenda. Cadastre a grade do médico na aba Médicos.";
+    }
     if (!gerar.data_inicio || !gerar.data_fim) return "Preencha a data inicial e a data final.";
     if (gerar.data_fim < gerar.data_inicio) return "A data final é anterior à data inicial.";
     if (gerarDias.length === 0) return "Marque pelo menos um dia da semana.";
@@ -1059,6 +1200,9 @@ function Page() {
     duracaoInvalida,
     geracaoPreview.bloqueiosPorPiso,
     geracaoPreview.foraDaGrade,
+    geracaoPreview.errosFila,
+    modoFila,
+    gerar.fichas_fila,
   ]);
 
   // Dias que a geração vai pular por já terem fichas criadas depois da janela
@@ -1242,11 +1386,11 @@ function Page() {
       toast.error(motivoSemHorarios ?? "Sem horários para gerar");
       return;
     }
-    if (duracaoInvalida) {
+    if (!modoFila && duracaoInvalida) {
       toast.error("A duração mínima deve ser de 5 minutos.");
       return;
     }
-    if (duracaoMinimaPreview !== null && duracaoMinimaPreview < 5) {
+    if (!modoFila && duracaoMinimaPreview !== null && duracaoMinimaPreview < 5) {
       toast.error(
         `Duração de ${duracaoMinimaPreview} min por horário é inválida. Use 5 min ou mais.`,
       );
@@ -1272,8 +1416,10 @@ function Page() {
       // ainda houver colisão pontual com o unique index uq_agend_slot_vazio,
       // tratamos por lote/linha abaixo.
       const rowsRaw = slotsPreview.map((s) => {
-        const inicio = new Date(`${s.data}T${s.inicio}:00`);
-        const fim = new Date(`${s.data}T${s.fim}:00`);
+        // Fila de ordem de chegada: o horário exato (com segundos) já veio
+        // calculado pelo helper — HH:MM perderia o passo comprimido.
+        const inicio = s.iniISO ? new Date(s.iniISO) : new Date(`${s.data}T${s.inicio}:00`);
+        const fim = s.fimISO ? new Date(s.fimISO) : new Date(`${s.data}T${s.fim}:00`);
         const med = medicoById.get(s.medico_id)!;
         const procedimento = med.procedimento_padrao_nome || med.especialidade_nome || null;
         return {
@@ -1624,8 +1770,34 @@ function Page() {
               {/* Grupo 2 — Horários e regras de vaga */}
               <section className="rounded-lg border bg-muted/30 p-3">
                 <p className="mb-1 text-[12px] font-semibold uppercase tracking-wide text-muted-foreground">
-                  2 · Recortar horário (opcional) e fichas
+                  {modoFila ? "2 · Fichas por ordem de chegada" : "2 · Recortar horário (opcional) e fichas"}
                 </p>
+                {modoFila ? (
+                  <>
+                    <p className="mb-2 text-xs text-muted-foreground">
+                      Este médico atende por ordem de chegada. Informe quantas fichas quer
+                      acrescentar em cada dia — elas entram numeradas no fim da fila, sem limite de
+                      horário.
+                    </p>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <div className="min-w-0">
+                        <label className="text-xs text-muted-foreground">
+                          Quantidade de fichas por dia
+                        </label>
+                        <Input
+                          type="number"
+                          min={1}
+                          max={500}
+                          placeholder="ex.: 120"
+                          className="w-full"
+                          value={gerar.fichas_fila}
+                          onChange={(e) => setGerar({ ...gerar, fichas_fila: e.target.value })}
+                        />
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                <>
                 <p className="mb-2 text-xs text-muted-foreground">
                   {gradeMedicoSel.length > 0 ? (
                     <>
@@ -1696,6 +1868,8 @@ function Page() {
                     />
                   </div>
                 </div>
+                </>
+                )}
               </section>
 
               {/* Grupo 3 — Dias da semana */}
@@ -1776,7 +1950,9 @@ function Page() {
                     <p className="text-[12px] uppercase tracking-wide text-muted-foreground">
                       Estimativa por médico
                     </p>
-                    <p className="text-sm font-semibold">~{resumoGeracao.porMedico} horários</p>
+                    <p className="text-sm font-semibold">
+                      ~{resumoGeracao.porMedico} {modoFila ? "fichas" : "horários"}
+                    </p>
                   </div>
                 </div>
                 <p className="mt-2 text-xs text-muted-foreground">
@@ -1798,6 +1974,12 @@ function Page() {
                     já têm fichas criadas depois do horário pedido.
                   </p>
                 )}
+                {medicosFilaForaDaMassa.length > 0 && (
+                  <p className="mt-2 text-xs font-medium text-amber-600">
+                    Médicos de ordem de chegada ({medicosFilaForaDaMassa.join(", ")}) não entram na
+                    geração em massa — gere as fichas deles escolhendo o médico.
+                  </p>
+                )}
                 {slotsPreview.length > 0 && diasForaDaGrade > 0 && (
                   <p className="mt-2 text-xs font-medium text-amber-600">
                     {diasForaDaGrade} dia(s) do período foram pulados porque o recorte de horário
@@ -1811,16 +1993,22 @@ function Page() {
                 <Button
                   className="w-full sm:w-auto"
                   onClick={gerarAgenda}
-                  disabled={gerando || duracaoInvalida || slotsPreview.length === 0}
+                  disabled={gerando || (!modoFila && duracaoInvalida) || slotsPreview.length === 0}
                 >
                   <CalendarRange className="h-4 w-4 mr-1" />
                   {gerando ? "Gerando..." : "Gerar Horários na Agenda"}
                 </Button>
               )}
               <p className="text-xs text-muted-foreground">
-                Se a data já tiver horários criados, os novos serão adicionados{" "}
-                <strong>após o último horário do dia</strong>, mantendo a numeração das fichas já
-                existentes.
+                {modoFila ? (
+                  "As fichas novas entram depois da última ficha do dia, mantendo a numeração das já existentes."
+                ) : (
+                  <>
+                    Se a data já tiver horários criados, os novos serão adicionados{" "}
+                    <strong>após o último horário do dia</strong>, mantendo a numeração das fichas
+                    já existentes.
+                  </>
+                )}
               </p>
             </CardContent>
           </Card>
