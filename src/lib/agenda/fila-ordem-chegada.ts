@@ -10,10 +10,11 @@
 //
 // O problema que este helper resolve: com passo fixo de N minutos, um dia que
 // precisa de 100–150 fichas estoura o fim do turno (e antes travava em 23:59
-// com "Nenhum horário cabe nessa configuração"). Aqui o passo é COMPRIMIDO
-// uniformemente até caber — primeiro em minutos dentro do turno, depois em
-// segundos até 23:59 do mesmo dia. O relógio aperta; a ordem e a numeração
-// continuam íntegras.
+// com "Nenhum horário cabe nessa configuração"). Aqui o lote inteiro usa UM
+// passo só, escolhido entre três opções fixas: o intervalo da grade, 1 minuto
+// ou 1 segundo — nunca uma fração calculada do espaço restante, que fazia cada
+// clique dividir o dia pela metade. Todos os horários têm ms = 0.
+
 
 export type PosicoesDaFilaInput = {
   /** "YYYY-MM-DD" (dia civil local). */
@@ -56,8 +57,14 @@ export function posicoesDaFila(input: PosicoesDaFilaInput): PosicoesDaFilaResult
 
   // Origem da contagem. Com fichas no dia, a primeira nova entra um passo
   // depois da última existente; sem nada no dia, ela nasce no início da grade.
+  // A origem é sempre arredondada para CIMA ao segundo inteiro: nenhum horário
+  // gerado pode ter fração de segundo (o banco grava sem ms e a numeração
+  // ordena por texto).
   const temAnterior = !!ultimoInicio;
-  const origem = temAnterior ? ultimoInicio!.getTime() : new Date(`${diaIso}T${inicioGrade}:00`).getTime();
+  const origemBruta = temAnterior
+    ? ultimoInicio!.getTime()
+    : new Date(`${diaIso}T${inicioGrade}:00`).getTime();
+  const origem = Math.ceil(origemBruta / MS_SEG) * MS_SEG;
   // Quantos passos separam a origem da ÚLTIMA ficha gerada.
   const fator = temAnterior ? n : n - 1;
 
@@ -70,37 +77,32 @@ export function posicoesDaFila(input: PosicoesDaFilaInput): PosicoesDaFilaResult
 
   const fimTurnoMs = Math.min(new Date(`${diaIso}T${fimTurno}:00`).getTime(), limiteInicio.getTime());
 
-  // Maior passo que ainda mantém a última ficha dentro do limite informado.
-  const passoMaximo = (limite: number, exclusivo: boolean) => {
-    if (fator <= 0) return Number.POSITIVE_INFINITY;
-    const disponivel = limite - origem - (exclusivo ? 1 : 0);
-    return disponivel <= 0 ? 0 : Math.floor(disponivel / fator);
-  };
+  // Um passo só para o lote inteiro, escolhido entre três opções fixas.
+  const ultimoInicioCom = (p: number) => origem + fator * p;
+  const cabeNoTurno = (p: number) => ultimoInicioCom(p) < fimTurnoMs;
+  const cabeNoDia = (p: number) => ultimoInicioCom(p) <= limiteInicio.getTime();
 
   let passo: number;
-  const noTurno = passoMaximo(fimTurnoMs, true);
   if (fator <= 0) {
     passo = dur;
-  } else if (dur <= noTurno) {
-    // 1) Cabe tudo com o passo normal, antes do fim do turno.
+  } else if (cabeNoTurno(dur)) {
+    // 1) Passo normal da grade.
     passo = dur;
-  } else if (noTurno >= MS_MIN) {
-    // 2) Comprime o passo em minutos inteiros para caber antes do fim do turno.
-    passo = Math.floor(noTurno / MS_MIN) * MS_MIN;
+  } else if (cabeNoTurno(MS_MIN)) {
+    // 2) Passo fixo de 1 minuto, ainda dentro do turno.
+    passo = MS_MIN;
+  } else if (cabeNoDia(MS_SEG)) {
+    // 3) Passo fixo de 1 segundo, até 23:59:58.
+    passo = MS_SEG;
   } else {
-    // 3) Nem com 1 minuto cabe no turno: usa o espaço até 23:59 do dia, com
-    //    passo em segundos inteiros.
-    const noDia = passoMaximo(limiteInicio.getTime(), false);
-    const emSegundos = Math.floor(noDia / MS_SEG) * MS_SEG;
-    if (emSegundos < MS_SEG) {
-      const cabem = Math.floor((limiteInicio.getTime() - origem) / MS_SEG) + (temAnterior ? 0 : 1);
-      return {
-        ok: false,
-        erro: `Não cabem ${n} fichas nesta data. O máximo que ainda cabe é ${Math.max(0, cabem)}.`,
-      };
-    }
-    passo = emSegundos;
+    const cabem =
+      Math.floor((limiteInicio.getTime() - origem) / MS_SEG) + (temAnterior ? 0 : 1);
+    return {
+      ok: false,
+      erro: `Não cabem ${n} fichas nesta data. O máximo que ainda cabe é ${Math.max(0, cabem)}.`,
+    };
   }
+
 
   const duracao = Math.min(dur, passo);
   const fichas: Array<{ inicio: Date; fim: Date }> = [];
