@@ -4915,6 +4915,9 @@ function MedicoCombobox({
   const filtradas = termos.length
     ? opcoes.filter((o) => termos.every((t) => o.busca.includes(t)))
     : opcoes;
+  // Opção fixa do produto (não é cadastro de médico), respeitando a busca.
+  const mostrarCT =
+    mostrarCartaoTerapeutico && termos.every((t) => "cartao terapeutico".includes(t));
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
