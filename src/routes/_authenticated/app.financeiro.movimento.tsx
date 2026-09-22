@@ -2107,6 +2107,10 @@ function Page() {
           <DateRangeFilter
             value={{ from: fromDate, to: toDate }}
             preset={presetPeriodo}
+            // "Mês" para em hoje, igual ao Dashboard Financeiro: ir até o dia
+            // 30 somava lançamentos com data futura e a receita do mês não
+            // batia entre as duas telas.
+            mesAteHoje
             onChange={(r, p) => {
               setPresetPeriodo(p);
               setFromDate(r.from);

@@ -50,6 +50,11 @@ export interface DateRangeFilterProps {
    * sozinhas para não duplicar a mesma data em dois lugares.
    */
   mostrarCampos?: boolean;
+  /**
+   * "Mês" vai do dia 1 até hoje, e não até o último dia do mês — o mesmo
+   * recorte do Dashboard Financeiro. Ver `OpcoesPreset.mesAteHoje`.
+   */
+  mesAteHoje?: boolean;
 }
 
 export function DateRangeFilter({
@@ -58,6 +63,7 @@ export function DateRangeFilter({
   onChange,
   className,
   mostrarCampos = true,
+  mesAteHoje = false,
 }: DateRangeFilterProps) {
 
   const [openFrom, setOpenFrom] = useState(false);
@@ -74,8 +80,12 @@ export function DateRangeFilter({
   // Uma descrição por pílula, recalculada quando as datas mudam: só a de
   // "Período" depende do que está digitado, mas todas dependem do dia de hoje.
   const descricoes = useMemo(
-    () => PRESETS.map((p) => ({ preset: p, ...descricaoDoPreset(p, value) })),
-    [value],
+    () =>
+      PRESETS.map((p) => ({
+        preset: p,
+        ...descricaoDoPreset(p, value, new Date(), { mesAteHoje }),
+      })),
+    [value, mesAteHoje],
   );
   const selecionada = descricoes.find((d) => d.preset === preset);
 
@@ -84,7 +94,7 @@ export function DateRangeFilter({
       onChange(value, "periodo");
       return;
     }
-    onChange(computeRange(p), p);
+    onChange(computeRange(p, new Date(), { mesAteHoje }), p);
   };
 
   return (

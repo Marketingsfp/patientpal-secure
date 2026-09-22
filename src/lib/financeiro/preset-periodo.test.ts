@@ -72,6 +72,14 @@ describe("computeRange", () => {
 
   it("Mês vai do dia 1 ao último dia", () => {
     expect(computeRange("mes", QUINTA)).toEqual({ from: "2026-08-01", to: "2026-08-31" });
+    // Movimento de Caixa: "Mês" para em hoje, igual ao Dashboard Financeiro.
+    expect(computeRange("mes", new Date(2026, 8, 22), { mesAteHoje: true })).toEqual({
+      from: "2026-09-01",
+      to: "2026-09-22",
+    });
+    expect(
+      descricaoDoPreset("mes", undefined, new Date(2026, 8, 22), { mesAteHoje: true }).intervalo,
+    ).toBe("01/09/2026 a 22/09/2026");
     expect(computeRange("mes", new Date(2026, 1, 5))).toEqual({
       from: "2026-02-01",
       to: "2026-02-28",

@@ -86,7 +86,20 @@ export const dataBR = (iso: string): string => {
  * cai no mês corrente, que é o que a tela já mostrava quando essa pílula era
  * escolhida sem mexer nas datas.
  */
-export function computeRange(preset: DatePreset, ref: Date = new Date()): DateRange {
+export interface OpcoesPreset {
+  /**
+   * "Mês" termina em hoje, não no último dia do mês. É o recorte do Dashboard
+   * Financeiro, que nunca passa de hoje; o Movimento de Caixa usa o mesmo para
+   * a receita do mês não somar lançamentos com data futura.
+   */
+  mesAteHoje?: boolean;
+}
+
+export function computeRange(
+  preset: DatePreset,
+  ref: Date = new Date(),
+  opcoes: OpcoesPreset = {},
+): DateRange {
   const today = new Date(ref);
   today.setHours(0, 0, 0, 0);
   if (preset === "hoje") return { from: toISO(today), to: toISO(today) };
@@ -129,7 +142,7 @@ export function computeRange(preset: DatePreset, ref: Date = new Date()): DateRa
   }
   // mes
   const start = new Date(today.getFullYear(), today.getMonth(), 1);
-  const end = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+  const end = opcoes.mesAteHoje ? today : new Date(today.getFullYear(), today.getMonth() + 1, 0);
   return { from: toISO(start), to: toISO(end) };
 }
 
@@ -186,11 +199,12 @@ export function descricaoDoPreset(
   preset: DatePreset,
   valorAtual?: DateRange,
   ref: Date = new Date(),
+  opcoes: OpcoesPreset = {},
 ): DescricaoPreset {
   const r =
     preset === "periodo" && valorAtual?.from && valorAtual?.to
       ? valorAtual
-      : computeRange(preset, ref);
+      : computeRange(preset, ref, opcoes);
   const dias = diasDoIntervalo(r);
   const intervalo = r.from === r.to ? dataBR(r.from) : `${dataBR(r.from)} a ${dataBR(r.to)}`;
   const titulo = TITULO_PRESET[preset];
@@ -205,6 +219,9 @@ export function descricaoDoPreset(
     resumo: `${titulo}: ${intervalo}`,
     dias: n,
     duracao: n === 1 ? `1 dia${sufixo}` : `${n} dias${sufixo}`,
-    regra: REGRA_PRESET[preset],
+    regra:
+      preset === "mes" && opcoes.mesAteHoje
+        ? "Do primeiro dia do mês até hoje. Lançamentos com data futura não entram."
+        : REGRA_PRESET[preset],
   };
 }
