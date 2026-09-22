@@ -12565,7 +12565,7 @@ function AgendaPage() {
                             <span className="text-[12px] text-muted-foreground whitespace-nowrap">
                               {fmtData(a.inicio)}
                             </span>
-                            {fichaNum && !(a.agenda_id && idsAgendaFila.has(a.agenda_id)) && (
+                            {fichaNum && !ehFila && (
                               <span className="text-[11px] font-mono px-1.5 py-0.5 rounded bg-muted text-foreground/70">
                                 #{fichaNum}
                               </span>
