@@ -639,9 +639,16 @@ function AtendimentosPage() {
     },
   ): Comprovante => {
     if (!itens.length) return null;
-    const medicoIds = new Set(itens.map((i) => i.medico_id ?? ""));
+    // Conta NOMES DE EXIBIÇÃO (não medico_id), para um lote misto de Cartão
+    // Terapêutico + atendimento normal da mesma profissional não sair rotulado
+    // com um nome só.
+    const nomesExibidos = new Set(
+      itens.map((i) =>
+        nomeRepasseExibido(i.procedimento, (i.medico_id ? medMap.get(i.medico_id) : null) ?? "—"),
+      ),
+    );
     const medicoNome =
-      medicoIds.size === 1 ? (medMap.get([...medicoIds][0]) ?? "—") : `${medicoIds.size} médicos`;
+      nomesExibidos.size === 1 ? [...nomesExibidos][0] : `${nomesExibidos.size} médicos`;
     const contaNome = contas.find((c) => c.id === meta.conta_id)?.nome ?? "—";
     const derivarHora = derivarHoraPagamento;
     // Data/hora do pagamento do lote. Precisa ser calculada ANTES das linhas
