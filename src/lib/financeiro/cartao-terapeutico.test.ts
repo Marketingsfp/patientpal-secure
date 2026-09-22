@@ -4,6 +4,7 @@ import {
   NOME_REPASSE_CARTAO_TERAPEUTICO,
   ehServicoCartaoTerapeutico,
   nomeRepasseExibido,
+  repasseMensalidadeCartaoTerapeutico,
 } from "./cartao-terapeutico";
 
 describe("ehServicoCartaoTerapeutico", () => {
