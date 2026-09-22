@@ -389,6 +389,32 @@ export function MovimentoResultado({
           )}
 
         </KpiCard>
+        {/* Contagem pura: quantas GR (fichas de atendimento) e quantos
+            pagamentos o período tem. Não altera nenhum cálculo de valor. */}
+        <KpiCard
+          novaAba
+          onClick={() => abrir("receita")}
+          icon={ClipboardList}
+          label="Atendimentos (GR)"
+          value={int(r.atendimentos.fichas)}
+          accent="primary"
+          detalhe={
+            pronto
+              ? `${plural(r.atendimentos.qtd, "pagamento", "pagamentos")} · ${plural(conferencia?.cortesias ?? 0, "cortesia", "cortesias")}`
+              : "Fichas de atendimento do período"
+          }
+        >
+          {pronto && (
+            <ul className="mt-2 space-y-0.5 border-t border-border/60 pt-2">
+              {condicoesVisiveis.map((c) => (
+                <li key={c} className="flex items-center justify-between gap-2 text-xs">
+                  <span className="text-muted-foreground">{LABEL_CONDICAO[c]}</span>
+                  <span className="tabular-nums">{int(r.atendimentos.porCondicao[c].qtd)}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </KpiCard>
         <KpiCard
           novaAba
           onClick={() => abrir("repasse")}
