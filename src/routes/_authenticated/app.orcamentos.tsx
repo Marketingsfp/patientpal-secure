@@ -1335,13 +1335,17 @@ function NovoOrcamentoDialog({
     }
     // Só envia os campos de preparo quando há algo a gravar: orçamento sem
     // preparo segue idêntico ao de antes das colunas existirem.
-    const preparoCampos =
+    const preparoCampos: {
+      preparos?: typeof preparos | null;
+      preparo_observacoes?: string | null;
+    } =
       categoria === "laboratorio" && (preparos.length > 0 || preparoObs.trim())
         ? {
             preparos: preparos.length > 0 ? preparos : null,
             preparo_observacoes: preparoObs.trim() || null,
           }
         : {};
+
     const valoresPag: Record<string, number> | null =
       formasPagamento.length > 1 ? { ...totaisPorForma } : null;
     setSaving(true);
