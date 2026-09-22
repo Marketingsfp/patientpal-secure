@@ -105,8 +105,8 @@ export const TEMPLATES_PADRAO: readonly DefinicaoTemplate[] = [
     chave: "fluxo.cadastro.obrigatorios",
     categoria: "fluxo",
     descricao: "Pede apenas campos obrigatórios faltantes após verificar o cadastro no Clínica OS.",
-    variaveis: ["lista"],
-    padrao: "Para conferir seu cadastro e concluir o agendamento, preciso de {lista}.",
+    variaveis: ["lista", "exemplo"],
+    padrao: "Para conferir seu cadastro e concluir o agendamento, preciso de {lista}.\n\nExemplo: {exemplo}.",
   }),
   D({
     chave: "fluxo.coleta.completa",

@@ -41,6 +41,12 @@ export function cadastroAutorizado(estado: EstadoFluxoNina | undefined): boolean
 
 export const ROTULOS_CADASTRO: Record<CampoCadastro, string> = {
   nome: "seu *nome completo*",
-  data_nascimento: "sua *data de nascimento* (DD/MM/AAAA)",
+  data_nascimento: "sua *data de nascimento*",
   telefone: "seu *telefone com DDD*",
+};
+
+export const EXEMPLOS_CADASTRO: Record<CampoCadastro, string> = {
+  nome: "João Neves",
+  data_nascimento: "21/10/1999",
+  telefone: "(21) 99999-0000",
 };

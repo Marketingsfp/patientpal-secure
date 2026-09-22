@@ -27,6 +27,7 @@ import { resultadoAgendamentoConfirmado } from "./resposta/agendamento";
 import {
   atendimentoDefinido,
   camposCadastroFaltantes,
+  EXEMPLOS_CADASTRO,
   ROTULOS_CADASTRO,
   type CampoCadastro,
 } from "./cadastro-paciente";
@@ -338,6 +339,7 @@ export async function aplicarGateIdentificacao(params: {
       "fluxo.cadastro.obrigatorios",
       {
         lista: rotularFaltantes(faltando),
+        exemplo: faltando.map((campo) => EXEMPLOS_CADASTRO[campo]).join(" "),
       },
       { camposPendentes: faltando, restricoes: ["nao_afirmar_agendamento_sem_gravacao"] },
     );
@@ -361,6 +363,7 @@ export async function aplicarGateIdentificacao(params: {
         "fluxo.cadastro.obrigatorios",
         {
           lista: rotularFaltantes(campos),
+          exemplo: campos.map((campo) => EXEMPLOS_CADASTRO[campo]).join(" "),
         },
         { camposPendentes: campos },
       );
