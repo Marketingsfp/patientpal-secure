@@ -82,6 +82,9 @@ describe("Apresentação dos registros internos para atendimento real e homologa
   });
   test("ausência registrada prevalece sobre código genérico, sem inventar ausência em falhas técnicas", () => {
     expect(motivoParaAtendimento(`TOOL_ERROR: ${MOTIVO_SEM_REGISTRO}`)).toContain("não encontrou");
+    expect(motivoParaAtendimento("MODALIDADE_NAO_DEFINIDA")).toContain("modalidade de agendamento não está definida");
+    expect(motivoParaAtendimento("MODALIDADE_ALTERADA")).toContain("mudou após a escolha");
+    expect(motivoParaAtendimento("MODALIDADE_NAO_DEFINIDA")).not.toContain("vagas");
     expect(motivoParaAtendimento("LLM_ERROR: consulta indisponível")).not.toContain(
       "não encontrou",
     );

@@ -14,6 +14,7 @@ import { encaminhamentoSemRegistro } from "../catalogo-sem-registro";
 import { motivoParaAtendimento } from "@/lib/atendimento/texto-interno-apresentacao";
 import { incorporarResultadoOficial } from "../confidence/evidencias-turno";
 import { validarResultado } from "../tool-broker";
+import { consultaPreventivo, avaliacaoOdontologica } from "./fixtures/consultas-publicadas.fixture";
 
 type Linha = Record<string, unknown>;
 
@@ -163,6 +164,63 @@ beforeEach(() => {
 });
 
 const idSequencial = (n: number) => `00000000-0000-0000-0000-${String(n).padStart(12, "0")}`;
+
+describe("consulta com preventivo no índice público", () => {
+  beforeEach(() => {
+    banco.nina_cat_profissionais = ["Carlos Alberto Varillas", "Claudia Maria", "Conceição Martins", "Elair Magalhães"]
+      .map((nome, n) => profissional({ ...consultaPreventivo, id: idSequencial(n), nome }));
+  });
+  it.each(["ginecologia preventivo", "consulta com preventivo", "consulta + preventivo"])("%s encontra os quatro publicados já na primeira pesquisa", async query => {
+    const r = await buscarNoCatalogo({ clinicaId: CLINICA, query, tipo_atendimento: "consulta" });
+    expect(r.knowledge_status).toBe("found");
+    expect(r.records).toHaveLength(4);
+    expect(r.esclarecimento).toBeUndefined();
+    expect(chamadas.some(c => c.ids?.length === 4 && c.colunas.includes("formas_pagamento"))).toBe(true);
+    expect(r.records.every(p => p.observacoes?.includes("PREVENTIVO"))).toBe(true);
+  });
+  it("conserva o atendimento e os valores ao escolher a médica", async () => {
+    const r = await buscarNoCatalogo({ clinicaId: CLINICA, query: "ginecologia preventivo", tipo_atendimento: "consulta", medico: "Conceição Martins" });
+    expect(r.records).toHaveLength(1);
+    expect(r.records[0]!.medico).toBe("Conceição Martins");
+    expect(r.records[0]!.observacoes).toContain("172,00");
+    expect(r.records[0]!.observacoes).toContain("205,00");
+  });
+  it("sem preventivo só encontra uma consulta sem o procedimento, quando publicada", async () => {
+    banco.nina_cat_profissionais!.push(profissional({ id: "sem", nome: "Dra. Exemplo", tipo_atendimento: "Consulta",
+      especialidades: [{ nome: "GINECOLOGIA" }],
+      observacao_publica: "CONSULTA GINECOLOGIA\nEspecialidade: GINECOLOGIA\nObservação: Agendado" }));
+    const r = await buscarNoCatalogo({ clinicaId: CLINICA, query: "ginecologia sem preventivo", tipo_atendimento: "consulta" });
+    expect(r.records.map(p => p.id)).toEqual(["sem"]);
+    const com = await buscarNoCatalogo({ clinicaId: CLINICA, query: "ginecologia com preventivo", tipo_atendimento: "consulta" });
+    expect(com.records.map(p => p.id)).not.toContain("sem");
+  });
+  it("não combina clínico geral de um bloco com preventivo de outro", async () => {
+    const r = await buscarNoCatalogo({ clinicaId: CLINICA, query: "clinico geral preventivo", tipo_atendimento: "consulta" });
+    expect(r.knowledge_status).toBe("not_found");
+  });
+  it("não pesquisa a palavra preventivo em observações livres ou notas internas", async () => {
+    banco.nina_cat_profissionais = [profissional({ tipo_atendimento: "Consulta", especialidades: [{ nome: "GINECOLOGIA" }],
+      observacao_publica: "CONSULTA GINECOLOGIA\nEspecialidade: GINECOLOGIA\nObservação: Não faz preventivo",
+      nota_interna: "CONSULTA + PREVENTIVO" })];
+    expect((await buscarNoCatalogo({ clinicaId: CLINICA, query: "ginecologia preventivo", tipo_atendimento: "consulta" })).knowledge_status).toBe("not_found");
+    expect((await buscarNoCatalogo({ clinicaId: CLINICA, query: "ginecologia preventivo", tipo_atendimento: "consulta", medico: "Dra. Fulana" })).knowledge_status).toBe("not_found");
+  });
+  it("mantém o escopo de clínica e publicação na pesquisa dos títulos", async () => {
+    banco.nina_cat_profissionais = [profissional({ ...consultaPreventivo, status: "RASCUNHO" }),
+      profissional({ ...consultaPreventivo, status: "ARQUIVADO" }), profissional({ ...consultaPreventivo, clinica_id: "outra" })];
+    expect((await buscarNoCatalogo({ clinicaId: CLINICA, query: "ginecologia preventivo", tipo_atendimento: "consulta" })).knowledge_status).toBe("not_found");
+    expect(chamadas.every(c => !c.colunas.includes("nota_interna") && !c.colunas.includes("rascunho"))).toBe(true);
+  });
+});
+
+it("a resposta da busca associa a modalidade à avaliação e preserva o bloco de escala de Karen", async () => {
+  banco.nina_cat_profissionais = [profissional(avaliacaoOdontologica("Karen", "Seg/ter/quinta/sab 08:00h"))];
+  const r = await buscarNoCatalogo({ clinicaId: CLINICA, query: "odontologia", tipo_atendimento: "consulta" });
+  expect(r.records[0]!.extras).toMatchObject({ modalidade_atendimento: "chegada_com_pre_agendamento",
+    atendimentos_da_modalidade: ["AVALIAÇÃO ODONTOLÓGICA — ODONTOLOGIA"] });
+  expect(r.records[0]!.observacoes).toContain("Até 17h");
+  expect(r.records[0]!.observacoes).toContain("Seg/ter/quinta/sab 08:00h");
+});
 
 describe("separação entre consultas e exames", () => {
   beforeEach(() => {

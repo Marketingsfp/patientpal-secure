@@ -9,6 +9,41 @@ export type PreferenciaAtendimentoConsulta = {
   preventivo?: "com" | "sem";
 };
 
+export type EscopoAtendimentoConsulta = {
+  atendimento: string;
+  preferencia?: PreferenciaAtendimentoConsulta | null;
+};
+
+export const chaveConsulta = (nome: string) => normalizar(nome)
+  .replace(/^consulta\b\s*[—–:-]?\s*/, "").trim();
+
+/** Seleciona blocos publicados, sem misturar regras de outros atendimentos.
+ * Um título específico prevalece sobre a especialidade genérica. A pergunta
+ * por ginecologia ainda conserva as variantes com/sem preventivo para escolha. */
+export function selecionarAtendimentosConsulta(
+  itens: AtendimentoPublicado[], escopo: EscopoAtendimentoConsulta,
+): AtendimentoPublicado[] {
+  const alvo = chaveConsulta(escopo.atendimento);
+  const permitidos = itens.filter(i => atendePreferenciaConsulta(i, escopo.preferencia));
+  const preventivo = pedidoPreventivo(alvo);
+  if (preventivo) {
+    const especialidade = alvo.replace(/\b(?:com|sem|o|preventivo)\b/g, " ")
+      .replace(/[+—–:-]/g, " ").replace(/\s+/g, " ").trim();
+    return permitidos.filter(i => (!especialidade || chaveConsulta(i.especialidade ?? "") === especialidade) &&
+      (preventivo === "com" || normalizar(i.especialidade) === "ginecologia") &&
+      atendePreferenciaConsulta(i, { especialidade: i.especialidade ?? "", preventivo }));
+  }
+  const exatos = permitidos.filter(i => [i.atendimento, nomeCompletoConsulta(i)].some(n => chaveConsulta(n) === alvo));
+  const familia = permitidos.filter(i => chaveConsulta(i.especialidade ?? "") === alvo);
+  const variantesPreventivo = familia.some(i => /\bpreventivo\b/.test(normalizar(i.atendimento)));
+  const escolhidos = exatos.length && !variantesPreventivo ? exatos : familia;
+  // O bloco genérico de escala não é uma segunda consulta. Só o omite quando
+  // existe um atendimento específico identificado na mesma publicação.
+  return escolhidos.some(i => normalizar(i.atendimento) !== "atendimento")
+    ? escolhidos.filter(i => normalizar(i.atendimento) !== "atendimento" || i.modalidade || i.complemento?.modalidade)
+    : escolhidos;
+}
+
 export function pedidoPreventivo(mensagem: string): "com" | "sem" | null {
   const m = normalizar(mensagem);
   if (!/\bpreventivo\b/.test(m) || /\bcom\b.*\b(?:ou|e)\b.*\bsem\b|\bsem\b.*\b(?:ou|e)\b.*\bcom\b/.test(m)) return null;

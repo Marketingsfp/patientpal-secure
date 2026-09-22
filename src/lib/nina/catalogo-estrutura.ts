@@ -202,14 +202,16 @@ export function atendimentosEstruturados(
   });
 }
 
-/** A agenda só recebe uma modalidade comum quando todos os atendimentos a confirmam. */
+/** Todos os blocos do atendimento selecionado precisam concordar na modalidade. */
 export function modalidadeEstruturada(
   conteudo: string | null | undefined,
   estrutura: unknown,
   profissional: string,
   modalidadeLegada: string | null | undefined,
+  selecionados?: AtendimentoPublicado[],
 ) {
-  const itens = atendimentosEstruturados(conteudo, estrutura, profissional, "Consulta");
+  const itens = selecionados ?? atendimentosEstruturados(conteudo, estrutura, profissional, "Consulta");
+  if (!itens.length) return "nao_definida" as const;
   const base = interpretarModalidade(modalidadeLegada);
   const modos = itens.map((a) => {
     const fontes = [a.complemento?.modalidade, a.modalidade, base].filter(Boolean);

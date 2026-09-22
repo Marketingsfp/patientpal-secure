@@ -4,7 +4,8 @@ import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { normalizar } from "@/lib/nina-especialidade";
 import { registrarEtapa } from "./evidencias.server";
 import type { RegistroConhecimento } from "./knowledge-contract";
-import { modalidadeEstruturada } from "./catalogo-estrutura";
+import { atendimentosEstruturados, modalidadeEstruturada } from "./catalogo-estrutura";
+import { selecionarAtendimentosConsulta, type EscopoAtendimentoConsulta } from "./atendimento-consulta";
 
 type MedicoAgenda = { id: string; nome: string };
 type CadastroMedico = MedicoAgenda & { ativo: boolean };
@@ -102,7 +103,7 @@ function origemVinculo(profissional: ProfissionalCatalogo, resolucao: ResolucaoM
 }
 
 /** A mesma resolução de identidade do catálogo é usada para ler a modalidade. */
-export async function modalidadePublicadaDoMedico(clinicaId: string, medicoId: string) {
+export async function modalidadePublicadaDoMedico(clinicaId: string, medicoId: string, escopo?: EscopoAtendimentoConsulta) {
   const [ativos, publicados] = await Promise.all([
     medicosDaClinica(clinicaId),
     supabaseAdmin.from("nina_cat_profissionais").select("id, nome, medico_id, tipo_atendimento, estrutura, observacao_publica")
@@ -111,10 +112,17 @@ export async function modalidadePublicadaDoMedico(clinicaId: string, medicoId: s
   if (publicados.error) throw new Error(publicados.error.message);
   const catalogo = publicados.data ?? [];
   const cadastros = await incluirCadastrosVinculados(clinicaId, ativos, catalogo);
-  const modos = catalogo.filter(p => {
+  const vinculados = catalogo.filter(p => {
     const r = resolverPublicado(p, cadastros);
     return r.ok && r.id === medicoId;
-  }).map(p => modalidadeEstruturada(p.observacao_publica, p.estrutura, p.nome, p.tipo_atendimento));
+  });
+  const modos = vinculados.flatMap(p => {
+    const itens = atendimentosEstruturados(p.observacao_publica, p.estrutura, p.nome);
+    const selecionados = escopo && itens.length ? selecionarAtendimentosConsulta(itens, escopo) : undefined;
+    if (selecionados && !selecionados.length) return [];
+    return [modalidadeEstruturada(p.observacao_publica, p.estrutura, p.nome, p.tipo_atendimento, selecionados)];
+  });
+  if (escopo && vinculados.length && !modos.length) return "nao_definida" as const;
   if (modos.includes("nao_definida")) return "nao_definida";
   const definidos = [...new Set(modos.filter(m => m !== null))];
   return definidos.length > 1 ? "nao_definida" : definidos[0] ?? null;

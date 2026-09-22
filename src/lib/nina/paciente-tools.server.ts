@@ -36,6 +36,9 @@ import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { isCPFValido, somenteDigitos } from "@/lib/cpf";
 import { normalizar, raizEspecialidade } from "@/lib/nina-especialidade";
 import { cadastroAutorizado, cadastroMinimoSchema } from "./cadastro-paciente";
+import { conhecimentoDaMesmaSessao } from "./confidence/conhecimento-sessao";
+import { normalizarSelecaoContextual } from "./confidence/selecao-contextual";
+import type { EscopoAtendimentoConsulta } from "./atendimento-consulta";
 import { consultarCadastroConfirmado } from "./cadastro-paciente.server";
 import { processamentoWatchdogAtual } from "./watchdog-contexto.server";
 import { confirmacaoDaEscolha, consentimentoDaEscolha, limparEscolhaAgendamento, registrarOpcoesAgendamento, selecionarVagaValidada,
@@ -395,10 +398,18 @@ function acharEspecialidade(termo: string, lista: Array<{ id: string; nome: stri
 
 /* -------------------------------------------------- disponibilidade (núcleo) */
 
+/** Só usa contexto da sessão ou o atendimento já vinculado a uma vaga real. */
+function escopoModalidade(ctx: CtxNinaPaciente, procedimento?: string | null): EscopoAtendimentoConsulta | undefined {
+  const conhecimento = conhecimentoDaMesmaSessao(ctx.estado?.knowledge_context, ctx.clinicaId, ctx.estado?.session_id ?? null);
+  if (conhecimento?.consulta.tipo_atendimento !== "consulta") return undefined;
+  const preferencia = ctx.consultaAgenda?.selecaoRevalidada ?? normalizarSelecaoContextual(conhecimento.selecao);
+  const selecao = preferencia?.clinicaId === ctx.clinicaId && preferencia.sessaoId === ctx.estado?.session_id ? preferencia : null;
+  return { atendimento: procedimento ?? selecao?.modalidade?.nome ?? conhecimento.consulta.termo,
+    preferencia: conhecimento.atendimentoConsulta };
+}
+
 async function guardarOpcoes(ctx: CtxNinaPaciente, slots: SlotNina[], procedimentos?: ReadonlyMap<string, string>) {
   if (consentimentoDaEscolha(ctx.estado, ctx.clinicaId)) return null;
-  const { conhecimentoDaMesmaSessao } = await import("./confidence/conhecimento-sessao");
-  const { normalizarSelecaoContextual } = await import("./confidence/selecao-contextual");
   const conhecimento = conhecimentoDaMesmaSessao(ctx.estado?.knowledge_context, ctx.clinicaId, ctx.estado?.session_id ?? null);
   let publicados = procedimentos;
   if (!publicados && conhecimento && slots.length) {
@@ -1103,7 +1114,7 @@ async function executarFerramentaInterna(
       };
       medicoAgenda = resolvido;
       args.medico_id = resolvido.id;
-      const modalidade = await modalidadePublicadaDoMedico(ctx.clinicaId, resolvido.id);
+      const modalidade = await modalidadePublicadaDoMedico(ctx.clinicaId, resolvido.id, escopoModalidade(ctx));
       if (modalidade === "chegada_sem_pre_agendamento") return orientarSemPreAgendamento(ctx, resolvido.nome);
       if (modalidade === "nao_definida") return modalidadePendente();
     }
@@ -1114,7 +1125,6 @@ async function executarFerramentaInterna(
           data: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
         }).parse(args);
         const { candidatosPrimeiraVaga } = await import("./primeiro-disponivel-catalogo.server");
-        const { conhecimentoDaMesmaSessao } = await import("./confidence/conhecimento-sessao");
         const conhecimento = conhecimentoDaMesmaSessao(ctx.estado?.knowledge_context, ctx.clinicaId, ctx.estado?.session_id ?? null);
         const candidatos = await candidatosPrimeiraVaga(ctx.clinicaId, p.tipo, p.atendimento, conhecimento?.atendimentoConsulta);
         if (!candidatos.length) return falha("PROCEDURE_NOT_FOUND",
@@ -1137,7 +1147,8 @@ async function executarFerramentaInterna(
         const consultados: Record<string, unknown>[] = [];
         for (const [medicoId, c] of porMedico) {
           await processamentoWatchdogAtual()?.checkpoint("generating");
-          const modo = await modalidadePublicadaDoMedico(ctx.clinicaId, medicoId);
+          const escopo = p.tipo === "consulta" ? { atendimento: c.registro.procedimento!, preferencia: conhecimento?.atendimentoConsulta } : undefined;
+          const modo = await modalidadePublicadaDoMedico(ctx.clinicaId, medicoId, escopo);
           if (modo === "chegada_sem_pre_agendamento") {
             semAgendamento.push({ medico: c.medicoNome, registro: c.registro,
               modalidade_atendimento: modo, orientacao: orientacaoModalidade(modo), sem_agendamento: true });
@@ -1151,7 +1162,7 @@ async function executarFerramentaInterna(
             vagas = vagas.filter(s => (!p.a_partir_de || dataISODoSlot(s.inicio) >= p.a_partir_de) &&
               (p.dia_semana === undefined || diaSemanaDe(dataISODoSlot(s.inicio)) === p.dia_semana))
               .sort((a, b) => Date.parse(a.inicio) - Date.parse(b.inicio));
-            vagas = await enriquecerModalidades(ctx.clinicaId, vagas.slice(0, 1));
+            vagas = await enriquecerModalidades(ctx.clinicaId, vagas.slice(0, 1), escopo);
           } catch (e) { return falhaAgenda(e, nome); }
           if (vagas.some(s => !permiteReserva(s.modalidade))) return modalidadePendente();
           consultados.push({ medico_id: medicoId, catalogo_id: c.registro.id, encontrou_vaga: vagas.length > 0 });
@@ -1193,7 +1204,7 @@ async function executarFerramentaInterna(
           return falha("ACTION_NOT_AUTHORIZED", "Escolha uma vaga e um procedimento consultados na agenda desta sessão.");
         const bloqueio = await conferirRegraCatalogo(vaga.procedimento);
         if (bloqueio) return bloqueio;
-        const publicada = await modalidadePublicadaDoMedico(ctx.clinicaId, vaga.medico_id);
+        const publicada = await modalidadePublicadaDoMedico(ctx.clinicaId, vaga.medico_id, escopoModalidade(ctx, vaga.procedimento));
         if (publicada === "chegada_sem_pre_agendamento") return orientarSemPreAgendamento(ctx, vaga.medico);
         if (publicada === "nao_definida") return modalidadePendente();
         const mensagem = ctx.consultaAgenda?.mensagemAtual ?? "";
@@ -1209,7 +1220,7 @@ async function executarFerramentaInterna(
         }
         const vagasAtuais = await enriquecerModalidades(ctx.clinicaId, await consultarDisponibilidadeCore({
           clinicaId: ctx.clinicaId, medicoId: vaga.medico_id, data: vaga.data, dias: 90,
-        }));
+        }), escopoModalidade(ctx, vaga.procedimento));
         // Uma tentativa de nova escolha invalida qualquer resumo anterior.
         limparEscolhaAgendamento(estado);
         const livre = vagasAtuais.find((s) => s.medico_id === vaga.medico_id &&
@@ -1457,7 +1468,7 @@ async function executarFerramentaInterna(
             periodo: p.periodo ?? null,
             data: p.data ?? null,
           });
-          slots = await enriquecerModalidades(ctx.clinicaId, slots);
+          slots = await enriquecerModalidades(ctx.clinicaId, slots, escopoModalidade(ctx));
           if (slots.some(s => !permiteReserva(s.modalidade))) return modalidadePendente();
         } catch (e) {
           return falhaAgenda(e, "consultar_disponibilidade");
@@ -1484,7 +1495,7 @@ async function executarFerramentaInterna(
               clinicaId: ctx.clinicaId,
               medicoId,
               dias: 60,
-            }));
+            }), escopoModalidade(ctx));
             if (proximos.some(s => !permiteReserva(s.modalidade))) return modalidadePendente();
             const pendencia = await guardarOpcoes(ctx, proximos.slice(0, 3));
             if (pendencia) return pendencia;
@@ -1545,7 +1556,7 @@ async function executarFerramentaInterna(
             dias: 60,
             data: p.data,
           });
-          doDia = await enriquecerModalidades(ctx.clinicaId, doDia);
+          doDia = await enriquecerModalidades(ctx.clinicaId, doDia, escopoModalidade(ctx));
           if (doDia.some(s => !permiteReserva(s.modalidade))) return modalidadePendente();
         } catch (e) {
           return falhaAgenda(e, "verificar_horario");
@@ -1641,7 +1652,7 @@ async function executarFerramentaInterna(
             limite: 800,
             periodo: p.periodo ?? null,
           });
-          todos = await enriquecerModalidades(ctx.clinicaId, todos);
+          todos = await enriquecerModalidades(ctx.clinicaId, todos, escopoModalidade(ctx));
           if (todos.some(s => !permiteReserva(s.modalidade))) return modalidadePendente();
         } catch (e) {
           return falhaAgenda(e, "proxima_vaga");
@@ -1941,7 +1952,7 @@ async function executarFerramentaInterna(
           );
 
         const origemMarca = origemAgendamentoNina(ctx);
-        const modalidade = await modalidadeAtualDaAgenda(ctx.clinicaId, medicoIdReal, ofertaCorrente!.agenda_id);
+        const modalidade = await modalidadeAtualDaAgenda(ctx.clinicaId, medicoIdReal, ofertaCorrente!.agenda_id, escopoModalidade(ctx, ofertaCorrente!.procedimento));
         if (!permiteReserva(modalidade) || modalidade !== ofertaCorrente!.modalidade)
           return falha("MODALIDADE_ALTERADA", "A modalidade difere do resumo confirmado. A equipe precisa conferir antes de reservar.");
         const lerFicha = (id: string, inicio: string) => modalidade === "ficha"
@@ -2025,7 +2036,7 @@ async function executarFerramentaInterna(
             clinicaId: ctx.clinicaId, medicoId: medicoIdReal,
             dias: 90, data: ofertaCorrente!.data,
           });
-          vagasReais = await enriquecerModalidades(ctx.clinicaId, vagasReais);
+          vagasReais = await enriquecerModalidades(ctx.clinicaId, vagasReais, escopoModalidade(ctx, ofertaCorrente!.procedimento));
         } catch (e) {
           return falhaAgenda(e, "agendar");
         }

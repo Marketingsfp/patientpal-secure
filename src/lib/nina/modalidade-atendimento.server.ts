@@ -4,9 +4,10 @@ import { janelaDiaClinica, dataClinicaDe } from "@/lib/date-utils";
 import { modalidadePublicadaDoMedico } from "./vinculo-catalogo-agenda.server";
 import { resolverModalidade, type ModalidadeResolvida } from "./modalidade-atendimento";
 import type { SlotNina } from "./paciente-tools.server";
+import type { EscopoAtendimentoConsulta } from "./atendimento-consulta";
 
-export async function modalidadeAtualDaAgenda(clinicaId: string, medicoId: string, agendaId: string | null) {
-  const publicada = await modalidadePublicadaDoMedico(clinicaId, medicoId);
+export async function modalidadeAtualDaAgenda(clinicaId: string, medicoId: string, agendaId: string | null, escopo?: EscopoAtendimentoConsulta) {
+  const publicada = await modalidadePublicadaDoMedico(clinicaId, medicoId, escopo);
   if (publicada) return publicada;
   if (!agendaId) return "nao_definida" as const;
   const { data, error } = await supabaseAdmin.from("medico_agendas").select("ordem_chegada")
@@ -15,11 +16,11 @@ export async function modalidadeAtualDaAgenda(clinicaId: string, medicoId: strin
   return resolverModalidade(null, data?.ordem_chegada);
 }
 
-export async function enriquecerModalidades(clinicaId: string, slots: SlotNina[]): Promise<SlotNina[]> {
+export async function enriquecerModalidades(clinicaId: string, slots: SlotNina[], escopo?: EscopoAtendimentoConsulta): Promise<SlotNina[]> {
   const modos = new Map<string, Promise<ModalidadeResolvida>>();
   for (const slot of slots) {
     const chave = `${slot.medico_id}|${slot.agenda ?? ""}`;
-    if (!modos.has(chave)) modos.set(chave, modalidadeAtualDaAgenda(clinicaId, slot.medico_id, slot.agenda));
+    if (!modos.has(chave)) modos.set(chave, modalidadeAtualDaAgenda(clinicaId, slot.medico_id, slot.agenda, escopo));
   }
   return Promise.all(slots.map(async slot => ({ ...slot,
     modalidade: await modos.get(`${slot.medico_id}|${slot.agenda ?? ""}`)!,

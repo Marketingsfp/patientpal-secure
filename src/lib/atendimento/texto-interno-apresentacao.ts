@@ -23,6 +23,14 @@ export function motivoParaAtendimento(valor: unknown): string | null {
   if (typeof valor !== "string" || !valor.trim()) return null;
   const motivos: Array<[RegExp, string]> = [
     [
+      /\bMODALIDADE_NAO_DEFINIDA\b/i,
+      "A Nina encontrou o atendimento, mas a modalidade de agendamento não está definida ou apresenta informações divergentes. A equipe precisa confirmar se é horário marcado ou ordem de chegada e se exige pré-agendamento.",
+    ],
+    [
+      /\bMODALIDADE_ALTERADA\b/i,
+      "A modalidade ou a agenda do atendimento mudou após a escolha do paciente. A equipe precisa conferir as condições atuais antes de concluir o agendamento.",
+    ],
+    [
       /\bCATALOGO_MEDICO_NAO_IDENTIFICADO\b/i,
       "A Nina encontrou a consulta, mas não conseguiu identificar o médico desejado após reapresentar a lista e pedir uma nova escolha. A equipe deve confirmar o profissional.",
     ],

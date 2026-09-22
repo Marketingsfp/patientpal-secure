@@ -1,4 +1,5 @@
 import { atendimentosEstruturados, textoAtendimentos, pagamentosJaDescritos, lerEstrutura, modalidadeEstruturada, INSTRUCAO_ESTRUTURA_CATALOGO } from "./catalogo-estrutura";
+import { selecionarAtendimentosConsulta, nomeCompletoConsulta, type EscopoAtendimentoConsulta } from "./atendimento-consulta";
 /**
  * FASE 5 — CATÁLOGO COMO FONTE DE CONHECIMENTO DA NINA (regras puras).
  *
@@ -192,6 +193,7 @@ export function servicoParaRegistro(s: ServicoPublicado): RegistroConhecimento {
 export function profissionalParaRegistro(
   p: ProfissionalPublicado,
   hojeISO: string,
+  escopo?: EscopoAtendimentoConsulta,
 ): RegistroConhecimento {
   const especialidades = nomesVinculos(p.especialidades);
   const estrutura = lerEstrutura(p.estrutura);
@@ -201,7 +203,9 @@ export function profissionalParaRegistro(
   const dinheiro = precoPorForma(p.formas_pagamento, /\b(?:dinheiro|esp[eé]cie)\b/i);
   const cartao = precoPorForma(p.formas_pagamento, /cart/i);
   const aviso = avisoVigente(p, hojeISO);
-  const modalidade = modalidadeEstruturada(p.observacao_publica, p.estrutura, p.nome, p.tipo_atendimento);
+  const selecionados = escopo ? selecionarAtendimentosConsulta(atendimentos, escopo) : [];
+  const modalidade = modalidadeEstruturada(p.observacao_publica, p.estrutura, p.nome, p.tipo_atendimento,
+    selecionados.length ? selecionados : undefined);
 
   return {
     id: p.id,
@@ -250,6 +254,7 @@ export function profissionalParaRegistro(
       atendimento_humano_obrigatorio: estrutura.encaminhamento_humano === true || profissionalSfp(p.nome),
       omitir_nome_profissional: profissionalGenerico(p.nome),
       modalidade_atendimento: modalidade,
+      ...(selecionados.length ? { atendimentos_da_modalidade: selecionados.map(nomeCompletoConsulta) } : {}),
       orientacao_atendimento: modalidade ? orientacaoModalidade(modalidade) : null,
       especialidades,
       unidade: unidadeDoProfissional(p),
@@ -303,10 +308,11 @@ export function montarResultadoCatalogo(entrada: {
    * primeiro lugar (e vice-versa).
    */
   priorizar?: "servico" | "profissional";
+  atendimentoConsultado?: EscopoAtendimentoConsulta;
 }): ResultadoConhecimento {
   const deServicos = entrada.servicos.map(servicoParaRegistro);
   const deProfissionais = entrada.profissionais.map((p) =>
-    profissionalParaRegistro(p, entrada.hojeISO),
+    profissionalParaRegistro(p, entrada.hojeISO, entrada.atendimentoConsultado),
   );
   const registros: RegistroConhecimento[] =
     entrada.priorizar === "profissional"

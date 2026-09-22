@@ -19,6 +19,8 @@ import {
 import type { ResultadoConhecimento } from "./knowledge-contract";
 import type { TipoAtendimentoCatalogo } from "./catalogo-pesquisa";
 import { profissionalGenerico, profissionalSfp } from "./regras-catalogo";
+import { separarAtendimentos } from "./catalogo-estrutura";
+import { pedidoPreventivo } from "./atendimento-consulta";
 import {
   compararNomeProfissional,
   prepararBuscaCatalogo,
@@ -34,12 +36,12 @@ const COLUNAS_PROFISSIONAL =
 
 /** A busca percorre um índice público leve; os detalhes só são lidos após a seleção. */
 const INDICE_SERVICO = "id, nome, descricao_publica, aliases:estrutura->aliases, status, updated_at";
-const INDICE_PROFISSIONAL = "id, nome, especialidades, tipo_atendimento, horarios, aliases:estrutura->aliases, status, updated_at";
+const INDICE_PROFISSIONAL = "id, nome, especialidades, tipo_atendimento, horarios, observacao_publica, aliases:estrutura->aliases, status, updated_at";
 const TAMANHO_PAGINA = 250;
 type IndiceServico = Pick<ServicoPublicado, "id" | "nome" | "descricao_publica"> & { aliases?: unknown };
 type IndiceProfissional = Pick<
   ProfissionalPublicado,
-  "id" | "nome" | "especialidades" | "tipo_atendimento" | "horarios"
+  "id" | "nome" | "especialidades" | "tipo_atendimento" | "horarios" | "observacao_publica"
 > & { aliases?: unknown };
 
 async function lerPublicados<T extends { id: string }>(
@@ -88,7 +90,7 @@ function semAcento(v: unknown): string {
 const PALAVRAS_CONSULTA = /\b(?:consultas?|especialistas?|doutor|doutora|dra?)\b/i;
 const PALAVRAS_PROCEDIMENTO = /\b(?:exames?|procedimentos?)\b/i;
 
-function atendimentosTexto(p: IndiceProfissional): string {
+function atendimentosTexto(p: IndiceProfissional, preventivo: "com" | "sem" | null): string[] {
   const especialidades = Array.isArray(p.especialidades)
     ? (p.especialidades as Array<Record<string, unknown>>)
         .map((e) => semAcento(e?.["nome"]))
@@ -97,7 +99,17 @@ function atendimentosTexto(p: IndiceProfissional): string {
   // O título público pode ser mais específico que a especialidade:
   // "Avaliação odontológica" pertence a "ODONTOLOGIA". Não elimine
   // "avaliação" do pedido nem dependa de notas internas para encontrá-la.
-  return [especialidades, semAcento(p.tipo_atendimento)].filter(Boolean).join(" ");
+  const legado = [especialidades, semAcento(p.tipo_atendimento)].filter(Boolean).join(" ");
+  // Indexa apenas título e especialidade de cada bloco público. Não combina
+  // palavras de consultas diferentes nem pesquisa preços, notas ou instruções.
+  const itens = separarAtendimentos(p.observacao_publica ?? "", p.nome);
+  const titulos = itens.filter(i => {
+    if (!preventivo) return true;
+    const nome = semAcento(i.atendimento);
+    const inclui = /\bpreventivo\b/.test(nome) && !/\bsem\s+preventivo\b/.test(nome);
+    return preventivo === "com" ? inclui : !inclui && semAcento(i.especialidade) === "ginecologia";
+  }).map(i => [i.atendimento, i.especialidade, preventivo === "sem" ? "sem preventivo" : ""].filter(Boolean).join(" "));
+  return preventivo && itens.length ? titulos : [legado, ...titulos];
 }
 
 /** O profissional atende no dia pedido? Sem horário cadastrado, não exclui. */
@@ -145,17 +157,21 @@ export async function buscarNoCatalogo(
       pedido.clinicaId,
     ),
   ]);
+  const preventivo = pedidoPreventivo(pedido.query);
+  const textosProfissionais = new Map(brutosProfissionais.map(p => [p.id, atendimentosTexto(p, preventivo)]));
   const busca = prepararBuscaCatalogo(pedido.query, [
     ...brutosServicos.flatMap((s) => [s.nome, ...aliasesDoIndice(s), String(s.descricao_publica ?? "")]),
-    ...brutosProfissionais.flatMap((p) => [p.nome, ...aliasesDoIndice(p), atendimentosTexto(p)]),
+    ...brutosProfissionais.flatMap((p) => [p.nome, ...aliasesDoIndice(p), ...textosProfissionais.get(p.id)!]),
   ]);
+  const pontuarProfissional = (p: IndiceProfissional, nome = "") =>
+    Math.max(0, ...textosProfissionais.get(p.id)!.map(texto => busca.pontuar(nome, texto)));
   const termos = busca.termos;
   const expandidos = busca.ajustes;
   if (tipoAtendimento === "nao_identificado") {
     // "Cardiologia" no cadastro de especialidades é uma consulta. A mera
     // menção na descrição de um exame não transforma a especialidade em exame.
     const nomeDeServico = brutosServicos.some((s) => [s.nome, ...aliasesDoIndice(s)].some(n => busca.pontuar(n, "") > 0));
-    const nomeOuEspecialidade = brutosProfissionais.some((p) => [p.nome, ...aliasesDoIndice(p)].some(n => busca.pontuar(n, atendimentosTexto(p)) > 0));
+    const nomeOuEspecialidade = brutosProfissionais.some((p) => [p.nome, ...aliasesDoIndice(p)].some(n => pontuarProfissional(p, n) > 0));
     if (nomeOuEspecialidade && !nomeDeServico) tipoAtendimento = "consulta";
     else if (nomeDeServico && !nomeOuEspecialidade) tipoAtendimento = "exame_procedimento";
   }
@@ -188,13 +204,13 @@ export async function buscarNoCatalogo(
   const idsServicos = servicosRelevantes.slice(0, limite).map((x) => x.s.id);
   const medico = semAcento(pedido.medico || nomeProfissionalNaPergunta(pedido.query)).trim();
   const profissionaisDaConsulta = brutosProfissionais.filter((p) =>
-    busca.pontuar("", atendimentosTexto(p)) > 0,
+    pontuarProfissional(p) > 0,
   );
   // Um nome não pode trocar a especialidade já localizada por outra.
   const universoProfissionais = tipoAtendimento === "exame_procedimento" ? []
-    : medico && profissionaisDaConsulta.length ? profissionaisDaConsulta : brutosProfissionais;
+    : medico && (profissionaisDaConsulta.length || preventivo) ? profissionaisDaConsulta : brutosProfissionais;
   const candidatosPorNome = universoProfissionais
-    .map((p) => ({ p, score: Math.max(...[p.nome, ...aliasesDoIndice(p)].map(n => busca.pontuar(n, atendimentosTexto(p)))) }))
+    .map((p) => ({ p, score: Math.max(...[p.nome, ...aliasesDoIndice(p)].map(n => pontuarProfissional(p, n))) }))
     .filter(({ p, score }) =>
       medico ? p.id === medico || compararNomeProfissional(medico, p.nome) !== null : score > 0,
     )
@@ -247,6 +263,7 @@ export async function buscarNoCatalogo(
     hojeISO,
     ambiguo,
     priorizar: perguntaSobreConsulta && listaProfissionais.length ? "profissional" : "servico",
+    atendimentoConsultado: { atendimento: pedido.query },
   });
   resultado.tipo_atendimento = tipoAtendimento;
 
