@@ -2564,8 +2564,6 @@ function AtendimentosPage() {
     return m;
   }, [filteredItems]);
 
-
-
   const isAtendido = (a: Atend) =>
     a.origem === "manual" ? a.status === "realizado" : a.agendamento_status === "realizado";
   // Itens selecionáveis: qualquer atendimento com repasse > 0.
@@ -3322,13 +3320,15 @@ function AtendimentosPage() {
                     <span className="ml-1 font-normal text-muted-foreground">
                       (
                       {
-                        filteredItems.filter((a) => !ehLinhaDeLaudo(a) && a.laudo_status === "emitido")
-                          .length
+                        filteredItems.filter(
+                          (a) => !ehLinhaDeLaudo(a) && a.laudo_status === "emitido",
+                        ).length
                       }{" "}
                       baixados ·{" "}
                       {
-                        filteredItems.filter((a) => !ehLinhaDeLaudo(a) && a.laudo_status !== "emitido")
-                          .length
+                        filteredItems.filter(
+                          (a) => !ehLinhaDeLaudo(a) && a.laudo_status !== "emitido",
+                        ).length
                       }{" "}
                       pendentes)
                     </span>
