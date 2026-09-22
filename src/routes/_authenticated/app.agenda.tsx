@@ -12981,6 +12981,11 @@ function AgendaPage() {
                       const intervalo = (() => {
                         if (!anterior || abreDia) return null;
                         if (!a.medico_id || !a.agenda_id) return null;
+                        // Agenda de ordem de chegada não tem intervalo: o
+                        // relógio é só a posição da fila, e a faixa amarela
+                        // "o médico não atende nesse período" aparecia no meio
+                        // da fila sem significado nenhum.
+                        if (idsAgendaFila.has(a.agenda_id)) return null;
                         if (anterior.medico_id !== a.medico_id) return null;
                         if (anterior.agenda_id !== a.agenda_id) return null;
                         const diaIso = chaveDiaLocal(a.inicio);
