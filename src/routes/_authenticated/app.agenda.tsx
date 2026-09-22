@@ -1292,6 +1292,11 @@ function AgendaPage() {
   const [loading, setLoading] = useState(false);
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Agendamento | null>(null);
+  // Editando uma ficha de agenda de ORDEM DE CHEGADA: o horário é só a posição
+  // na fila e NÃO pode ser reescrito. O campo de data/hora do formulário
+  // devolve só "YYYY-MM-DDTHH:MM" (perde os segundos, ex.: 23:58:02), então
+  // regravar embaralhava a ordem e a numeração de todas as fichas do dia.
+  const edicaoFichaFila = !!editing?.agenda_id && idsAgendaFila.has(editing.agenda_id);
   const [form, setForm] = useState(EMPTY);
   const [saving, setSaving] = useState(false);
   const [buscandoOrc, setBuscandoOrc] = useState(false);
