@@ -12958,6 +12958,12 @@ function AgendaPage() {
                         );
                       })();
                       const fichaNum = fichaPorId.get(a.id) ?? "";
+                      // Fichas 1..30 são hora marcada mesmo em agenda de fila.
+                      const nFicha = parseInt(fichaNum || "0", 10);
+                      const ehFila =
+                        !!a.agenda_id &&
+                        idsAgendaFila.has(a.agenda_id) &&
+                        nFicha > FICHAS_HORA_MARCADA;
                       const realizado = a.status === "realizado";
                       const etapaRow = etapaMap.get(a.id) ?? "aguardando_recepcao";
                       // PRESENÇA ≠ PAGAMENTO — mesma regra da visão em cartões: o
