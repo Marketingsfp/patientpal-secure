@@ -236,6 +236,7 @@ import { avisarEmitenteDivergente } from "@/lib/nfse-aviso-emitente";
 import { avisarCepDoTomadorInvalido } from "@/lib/nfse-aviso-cep";
 import { montarDiscriminacaoNfse } from "@/lib/nfse-descricao";
 import { criarAgendamento } from "@/lib/agenda/criar-agendamento.functions";
+import { posicoesDaFila } from "@/lib/agenda/fila-ordem-chegada";
 import { numerarFichasFormatadas } from "@/lib/agenda/ficha-numero";
 import { descricaoParaEquipe } from "@/lib/agenda/confirmacao-whatsapp";
 import {
@@ -1085,6 +1086,16 @@ function AgendaPage() {
     }
     return out;
   }, [agendasCarregadas, medicosPermitidos]);
+  // Ids das agendas de ORDEM DE CHEGADA. Nelas o relógio só ordena a fila, e
+  // a tela mostra a FICHA no lugar do horário — mostrar "23:20–23:25" fazia a
+  // recepção tratar a posição da fila como hora marcada.
+  const idsAgendaFila = useMemo(() => {
+    const ids = new Set<string>();
+    for (const arr of agendasPorMedico.values()) {
+      for (const a of arr) if (a.ordem_chegada) ids.add(a.id);
+    }
+    return ids;
+  }, [agendasPorMedico]);
   // Lookup id-da-agenda → nome, usado pelo filtro "Tipo de agenda" quando
   // agrupa por NOME (evita duplicidades quando vários médicos têm agendas
   // homônimas, ex.: "AGENDA", "CONSULTAS").
@@ -5256,6 +5267,78 @@ function AgendaPage() {
     return { inicio: apertado };
   };
 
+  // "+ Ficha extra": cria UMA vaga livre no fim da fila do dia, sem abrir o
+  // formulário. A ficha é posicional, então a linha nova nasce depois do maior
+  // `inicio` do dia (inclusive canceladas) e nenhuma ficha já impressa muda.
+  const [criandoFichaExtra, setCriandoFichaExtra] = useState(false);
+  const criarFichaExtra = async () => {
+    const medicoId = filtroMedico !== "todos" ? filtroMedico : "";
+    const fila = agendaDeFila(medicoId);
+    if (!clinicaAtual || !medicoId || !fila) return;
+    setCriandoFichaExtra(true);
+    try {
+      const iniDia = new Date(`${dataRef}T00:00:00`);
+      const fimDia = new Date(`${dataRef}T23:59:59`);
+      const { data, error } = await supabase
+        .from("agendamentos")
+        .select("inicio")
+        .eq("clinica_id", clinicaAtual.clinica_id)
+        .eq("medico_id", medicoId)
+        .eq("agenda_id", fila.id)
+        .gte("inicio", iniDia.toISOString())
+        .lte("inicio", fimDia.toISOString())
+        .order("inicio", { ascending: false })
+        .limit(1);
+      if (error) {
+        toast.error("Não foi possível ler a fila do médico. Tente de novo.");
+        return;
+      }
+      const ultimo = ((data ?? []) as Array<{ inicio: string }>)[0]?.inicio ?? null;
+      const fimTurno = await fimDoTurnoDoDia(medicoId, fila.id, dataRef);
+      const r = posicoesDaFila({
+        diaIso: dataRef,
+        ultimoInicio: ultimo ? new Date(ultimo) : null,
+        inicioGrade: "08:00",
+        fimTurno: `${String(fimTurno.getHours()).padStart(2, "0")}:${String(fimTurno.getMinutes()).padStart(2, "0")}`,
+        quantidade: 1,
+        intervaloMin: 5,
+      });
+      if (!r.ok) {
+        toast.error(r.erro, { duration: 8000 });
+        return;
+      }
+      const ficha = r.fichas[0];
+      const procedimento = procedimentoPadraoDoMedico(medicoId);
+      const { error: erroIns } = await supabase.from("agendamentos").insert({
+        clinica_id: clinicaAtual.clinica_id,
+        medico_id: medicoId,
+        agenda_id: fila.id,
+        paciente_nome: "DISPONÍVEL",
+        inicio: ficha.inicio.toISOString(),
+        fim: ficha.fim.toISOString(),
+        status: "agendado" as const,
+        observacoes: "Ficha extra gerada na Agenda",
+        ...(procedimento ? { procedimento } : {}),
+      });
+      if (erroIns) {
+        mostrarErro(erroIns);
+        return;
+      }
+      await load();
+      const { count } = await supabase
+        .from("agendamentos")
+        .select("id", { count: "exact", head: true })
+        .eq("clinica_id", clinicaAtual.clinica_id)
+        .eq("medico_id", medicoId)
+        .eq("agenda_id", fila.id)
+        .gte("inicio", iniDia.toISOString())
+        .lte("inicio", ficha.inicio.toISOString());
+      toast.success(`Ficha #${String(count ?? 0).padStart(3, "0")} criada no fim da fila.`);
+    } finally {
+      setCriandoFichaExtra(false);
+    }
+  };
+
   const openNew = async () => {
     if (!podeEscrever) {
       avisoSemPermissaoAgenda();
@@ -6106,8 +6189,13 @@ function AgendaPage() {
         new Date(form.fim).getTime() - new Date(form.inicio).getTime(),
       );
       if (pos.inicio.getTime() !== new Date(form.inicio).getTime()) {
+        // O fim nunca passa da meia-noite: já houve ficha gravada 23:51–00:01,
+        // que cai no dia seguinte e some da lista do dia.
+        const limiteFimDia = new Date(`${diaIso}T23:59:59`).getTime();
+        const fimBruto = pos.inicio.getTime() + duracaoMs;
+        const fimFinal = Math.max(pos.inicio.getTime() + 1000, Math.min(fimBruto, limiteFimDia));
         inicioParaSalvar = toLocalInput(pos.inicio.toISOString());
-        fimParaSalvar = toLocalInput(new Date(pos.inicio.getTime() + duracaoMs).toISOString());
+        fimParaSalvar = toLocalInput(new Date(fimFinal).toISOString());
       }
     }
     setSaving(true);
@@ -12444,13 +12532,19 @@ function AgendaPage() {
                         {/* Linha 1: horário + ficha + situação */}
                         <div className="flex items-center justify-between gap-2 mb-2">
                           <div className="flex items-center gap-2 min-w-0">
-                            <span className="text-sm font-semibold text-emerald-700 whitespace-nowrap">
-                              {fmtHora(a.inicio)}–{fmtHora(a.fim)}
-                            </span>
+                            {a.agenda_id && idsAgendaFila.has(a.agenda_id) ? (
+                              <span className="text-sm font-bold text-primary whitespace-nowrap">
+                                Ficha #{fichaNum || "—"}
+                              </span>
+                            ) : (
+                              <span className="text-sm font-semibold text-emerald-700 whitespace-nowrap">
+                                {fmtHora(a.inicio)}–{fmtHora(a.fim)}
+                              </span>
+                            )}
                             <span className="text-[12px] text-muted-foreground whitespace-nowrap">
                               {fmtData(a.inicio)}
                             </span>
-                            {fichaNum && (
+                            {fichaNum && !(a.agenda_id && idsAgendaFila.has(a.agenda_id)) && (
                               <span className="text-[11px] font-mono px-1.5 py-0.5 rounded bg-muted text-foreground/70">
                                 #{fichaNum}
                               </span>
@@ -12948,7 +13042,13 @@ function AgendaPage() {
 
                             {/* Ficha */}
                             <TableCell className="py-1.5 px-1.5 align-middle text-center font-mono text-xs font-medium">
-                              {fichaNum || "—"}
+                              {a.agenda_id && idsAgendaFila.has(a.agenda_id) ? (
+                                <span className="text-sm font-bold text-primary">
+                                  #{fichaNum || "—"}
+                                </span>
+                              ) : (
+                                fichaNum || "—"
+                              )}
                             </TableCell>
 
                             {/* Dia da semana */}
@@ -12961,9 +13061,19 @@ function AgendaPage() {
                               {fmtData(a.inicio)}
                             </TableCell>
 
-                            {/* Horário — uma linha só, tabular, 24h */}
+                            {/* Horário — uma linha só, tabular, 24h. Em agenda de
+                            ordem de chegada o horário não é hora marcada: a
+                            coluna diz isso em vez de mostrar o relógio. */}
                             <TableCell className="py-1.5 px-1.5 align-middle text-[12px] font-semibold tabular-nums whitespace-nowrap text-emerald-600">
-                              {fmtHora(a.inicio)}–{fmtHora(a.fim)}
+                              {a.agenda_id && idsAgendaFila.has(a.agenda_id) ? (
+                                <span className="text-[11px] font-normal text-muted-foreground">
+                                  Ordem de chegada
+                                </span>
+                              ) : (
+                                <>
+                                  {fmtHora(a.inicio)}–{fmtHora(a.fim)}
+                                </>
+                              )}
                             </TableCell>
 
                             {/* Profissional */}
