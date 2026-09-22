@@ -1827,6 +1827,7 @@ function AtendimentosPage() {
     }
     setItems(visiveis);
     setSemAgendaOcultos(ocultosSemAgenda);
+    setNaoAtendimentosOcultos(naoAtendimentos);
     setSel(new Set());
     setLoading(false);
   };
