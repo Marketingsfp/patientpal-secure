@@ -6217,8 +6217,16 @@ function AgendaPage() {
       paciente_nome: form.paciente_nome.trim(),
       paciente_id: form.paciente_id || null,
       medico_id: form.medico_id || null,
-      inicio: new Date(inicioParaSalvar).toISOString(),
-      fim: new Date(fimParaSalvar).toISOString(),
+      // Ficha de fila em EDIÇÃO: mantém o horário gravado (com segundos), que
+      // é a posição dela na fila. Encaixe novo continua entrando pelo fim.
+      inicio:
+        edicaoFichaFila && editing
+          ? new Date(editing.inicio).toISOString()
+          : new Date(inicioParaSalvar).toISOString(),
+      fim:
+        edicaoFichaFila && editing
+          ? new Date(editing.fim).toISOString()
+          : new Date(fimParaSalvar).toISOString(),
       procedimento: procedimentoTexto || null,
       status: form.status,
       observacoes: form.observacoes.trim() || null,
