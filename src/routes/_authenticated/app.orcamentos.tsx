@@ -38,9 +38,14 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import { PatientSearchInput, type PatientOption } from "@/components/patient-search-input";
 import { printOrcamento } from "@/lib/print-orcamento";
-import { PREPAROS_PADRAO, sugerirPreparos, type PreparoId } from "@/lib/orcamento-preparos";
+import {
+  PREPAROS_PADRAO,
+  alternarPreparoNoTexto,
+  preparosNoTexto,
+  sugerirPreparos,
+  type PreparoId,
+} from "@/lib/orcamento-preparos";
 import { ConversaoOrcamentoDialog } from "@/components/orcamentos/conversao-orcamento-dialog";
-import { pickTop60 } from "@/lib/procedimento/laboratorio-top60";
 import { useOrcamentosV2Flag } from "@/hooks/use-orcamentos-v2-flag";
 import { OrcamentosV2Mount } from "@/components/orcamentos-v2/orcamentos-v2-mount";
 import { VirtualList } from "@/components/list-shell";
@@ -288,6 +293,8 @@ type MedicoOpt = {
 };
 
 const FORMAS = ["Dinheiro", "PIX", "Cartão de Crédito", "Cartão de Débito", "Boleto", "Outro"];
+// Laboratório usa só as formas do balcão, para o modal caber na tela.
+const FORMAS_LAB = ["Dinheiro", "PIX", "Cartão de Crédito", "Cartão de Débito"];
 const BRL = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
 /**
@@ -1010,18 +1017,15 @@ function NovoOrcamentoDialog({
   const [observacoes, setObservacoes] = useState("");
   const [itens, setItens] = useState<Item[]>([]);
   const [saving, setSaving] = useState(false);
-  // Preparo de exames (só Laboratório): sai impresso no cupom do paciente.
-  const [preparos, setPreparos] = useState<PreparoId[]>([]);
-  const [preparoObs, setPreparoObs] = useState("");
+  // Preparo de exames (só Laboratório): cada caixinha marcada é uma linha
+  // em Observações, que sai impressa no cupom do paciente.
+  const preparosMarcados = useMemo(() => preparosNoTexto(observacoes), [observacoes]);
+  const formasDisponiveis = categoria === "laboratorio" ? FORMAS_LAB : FORMAS;
 
   // busca de procedimentos
   const [procQuery, setProcQuery] = useState("");
   const [procResults, setProcResults] = useState<Procedimento[]>([]);
   const [searchingProc, setSearchingProc] = useState(false);
-  // Bloco "Laboratório — Top 60": lista curta de acesso rápido para exames
-  // laboratoriais. Não substitui a busca — apenas destaca os mais comuns.
-  const [labProcs, setLabProcs] = useState<Procedimento[]>([]);
-  const [mostrarTop60, setMostrarTop60] = useState(true);
   // Categoria Laboratório é identificada diretamente em `procedimentos`
   // (tipo_procedimento/grupo) — mesma fonte usada pelo cadastro de Serviços.
   // Nada de prefetch de IDs: a lista completa (~4.4k) estouraria a URL do
@@ -1128,31 +1132,6 @@ function NovoOrcamentoDialog({
     };
   }, [procQuery, clinicaId, categoria]);
 
-  // Pré-carrega os procedimentos laboratoriais quando o orçamento é do
-  // tipo Laboratório, para montar o bloco Top 60 sem depender da busca.
-  useEffect(() => {
-    if (categoria !== "laboratorio" || !clinicaId) {
-      setLabProcs([]);
-      return;
-    }
-    let cancel = false;
-    (async () => {
-      const { data } = await supabase
-        .from("procedimentos")
-        .select(
-          "id, nome, valor_dinheiro_pix, valor_cartao, valor_dinheiro, valor_pix, valor_cartao_credito, valor_cartao_debito, valor_padrao, preparo, valor_variavel",
-        )
-        .eq("clinica_id", clinicaId)
-        .eq("ativo", true)
-        .or("tipo_procedimento.eq.laboratorio,grupo.ilike.%labor%")
-        .limit(2000);
-      if (!cancel) setLabProcs((data ?? []) as Procedimento[]);
-    })();
-    return () => {
-      cancel = true;
-    };
-  }, [categoria, clinicaId]);
-
   const valorPorForma = (p: Procedimento, f: string) => {
     if (f === "Dinheiro")
       return Number(p.valor_dinheiro ?? p.valor_dinheiro_pix ?? p.valor_padrao ?? 0);
@@ -1247,7 +1226,10 @@ function NovoOrcamentoDialog({
     ]);
     if (categoria === "laboratorio") {
       const sugeridos = sugerirPreparos(p.nome);
-      if (sugeridos.length > 0) setPreparos((cur) => Array.from(new Set([...cur, ...sugeridos])));
+      if (sugeridos.length > 0)
+        setObservacoes((txt) =>
+          sugeridos.reduce((t, id) => alternarPreparoNoTexto(t, id, true), txt).slice(0, 1000),
+        );
     }
     if (p.preparo && p.preparo.trim()) {
       toast.warning(`⚠ ${p.nome} exige preparo`, { description: p.preparo, duration: 6000 });
@@ -1260,12 +1242,20 @@ function NovoOrcamentoDialog({
   };
 
   const togglePreparo = (id: PreparoId) =>
-    setPreparos((cur) => (cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id]));
+    setObservacoes((txt) =>
+      alternarPreparoNoTexto(txt, id, !preparosNoTexto(txt).has(id)).slice(0, 1000),
+    );
 
   const escolherCategoria = (c: "laboratorio" | "demais") => {
     setCategoria(c);
-    // O formulário de papel do laboratório vale 15 dias.
-    if (c === "laboratorio" && validade === 30) setValidade(15);
+    if (c === "laboratorio") {
+      // O formulário de papel do laboratório vale 15 dias.
+      if (validade === 30) setValidade(15);
+      setFormasPagamento((cur) => {
+        const ok = cur.filter((f) => FORMAS_LAB.includes(f));
+        return ok.length > 0 ? ok : ["Dinheiro"];
+      });
+    }
   };
 
   const adicionarManual = () => {
@@ -1330,22 +1320,6 @@ function NovoOrcamentoDialog({
     if ((observacoes ?? "").length > 1000) {
       return toast.error("Observações não podem exceder 1000 caracteres");
     }
-    if (preparoObs.length > 500) {
-      return toast.error("Outras recomendações de preparo não podem exceder 500 caracteres");
-    }
-    // Só envia os campos de preparo quando há algo a gravar: orçamento sem
-    // preparo segue idêntico ao de antes das colunas existirem.
-    const preparoCampos: {
-      preparos?: typeof preparos | null;
-      preparo_observacoes?: string | null;
-    } =
-      categoria === "laboratorio" && (preparos.length > 0 || preparoObs.trim())
-        ? {
-            preparos: preparos.length > 0 ? preparos : null,
-            preparo_observacoes: preparoObs.trim() || null,
-          }
-        : {};
-
     const valoresPag: Record<string, number> | null =
       formasPagamento.length > 1 ? { ...totaisPorForma } : null;
     setSaving(true);
@@ -1371,7 +1345,6 @@ function NovoOrcamentoDialog({
         desconto: Number(desconto) || 0,
         valor_total: total,
         observacoes: observacoes.trim() || null,
-        ...preparoCampos,
         criado_por: userId,
       })
       .select("id")
@@ -1557,7 +1530,7 @@ function NovoOrcamentoDialog({
                     </span>
                   </Label>
                   <div className="flex flex-wrap gap-2 rounded-md border p-2">
-                    {FORMAS.map((f) => {
+                    {formasDisponiveis.map((f) => {
                       const checked = formasPagamento.includes(f);
                       const disabled = !checked && formasPagamento.length >= 2;
                       return (
@@ -1606,52 +1579,6 @@ function NovoOrcamentoDialog({
 
               <div className="space-y-2 border-t pt-3">
                 <Label>Adicionar serviço</Label>
-                {categoria === "laboratorio" &&
-                  (() => {
-                    const top60 = pickTop60(labProcs);
-                    if (top60.length === 0) return null;
-                    return (
-                      <div className="rounded-md border p-2 bg-muted/40">
-                        <div className="flex items-center justify-between mb-1">
-                          <div className="text-[12px] font-semibold uppercase text-muted-foreground">
-                            🧪 Laboratório — Top 60
-                            <span className="ml-2 text-[11px] font-normal normal-case text-muted-foreground/80">
-                              ({top60.length} disponíveis no seu cadastro)
-                            </span>
-                          </div>
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="ghost"
-                            className="h-6 text-[12px]"
-                            onClick={() => setMostrarTop60((v) => !v)}
-                          >
-                            {mostrarTop60 ? "ocultar" : "mostrar"}
-                          </Button>
-                        </div>
-                        {mostrarTop60 && (
-                          <div className="flex flex-wrap gap-1 max-h-40 overflow-auto">
-                            {top60.map(({ item, proc }) => (
-                              <Button
-                                key={proc.id}
-                                type="button"
-                                size="sm"
-                                variant="outline"
-                                className="h-7 text-xs"
-                                title={proc.nome}
-                                onClick={() => adicionarProc(proc)}
-                              >
-                                {item.label}
-                              </Button>
-                            ))}
-                          </div>
-                        )}
-                        <p className="text-[11px] text-muted-foreground mt-1">
-                          Os demais exames continuam disponíveis pela busca abaixo.
-                        </p>
-                      </div>
-                    );
-                  })()}
                 <div className="relative">
                   <Search className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
                   <Input
@@ -1822,12 +1749,12 @@ function NovoOrcamentoDialog({
                   <div className="flex items-baseline justify-between gap-2">
                     <Label>Preparo de exames</Label>
                     <span className="text-[12px] text-muted-foreground">
-                      Sai impresso no orçamento do paciente
+                      Vai para as Observações e sai impresso para o paciente
                     </span>
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-1 rounded-md border p-2">
                     {PREPAROS_PADRAO.map((pp) => {
-                      const checked = preparos.includes(pp.id);
+                      const checked = preparosMarcados.has(pp.id);
                       return (
                         <label
                           key={pp.id}
@@ -1847,26 +1774,9 @@ function NovoOrcamentoDialog({
                   </div>
                   <p className="text-[12px] text-muted-foreground">
                     EAS, cultura de urina, urina de 24h, parasitológico, MIF e PSA são marcados ao
-                    adicionar o exame. Jejum é marcado manualmente.
+                    adicionar o exame. Jejum é marcado manualmente. Outras recomendações podem ser
+                    digitadas em Observações.
                   </p>
-                  <div className="space-y-1">
-                    <div className="flex items-center justify-between">
-                      <Label className="text-xs text-muted-foreground">
-                        Outras observações / recomendações
-                      </Label>
-                      <span
-                        className={`text-[12px] ${preparoObs.length > 500 ? "text-destructive" : "text-muted-foreground"}`}
-                      >
-                        {preparoObs.length} / 500
-                      </span>
-                    </div>
-                    <Textarea
-                      rows={2}
-                      maxLength={500}
-                      value={preparoObs}
-                      onChange={(e) => setPreparoObs(e.target.value.slice(0, 500))}
-                    />
-                  </div>
                 </div>
               )}
 
@@ -1881,7 +1791,7 @@ function NovoOrcamentoDialog({
                     </span>
                   </div>
                   <Textarea
-                    rows={3}
+                    rows={categoria === "laboratorio" ? 6 : 3}
                     maxLength={1000}
                     value={observacoes}
                     onChange={(e) => setObservacoes(e.target.value.slice(0, 1000))}

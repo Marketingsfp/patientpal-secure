@@ -1,6 +1,11 @@
 import { supabase } from "@/integrations/supabase/client";
 import { formatNumeroOrcamento } from "@/lib/orcamento-numero";
-import { PREPAROS_PADRAO, RODAPE_LABORATORIO } from "@/lib/orcamento-preparos";
+import {
+  PREPAROS_PADRAO,
+  RODAPE_LABORATORIO,
+  preparosNoTexto,
+  textoSemPreparos,
+} from "@/lib/orcamento-preparos";
 
 const fmtBRL = (v: number) =>
   new Intl.NumberFormat("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(v);
@@ -114,7 +119,9 @@ export async function printOrcamento(
   // Laboratório: reproduz o formulário de papel (preparos com caixinha,
   // horário de coleta e rodapé). Os preparos marcados saem com "X".
   const ehLab = o.categoria === "laboratorio";
-  const marcados = new Set<string>(Array.isArray(o.preparos) ? o.preparos : []);
+  const marcados = preparosNoTexto(o.observacoes);
+  // No Laboratório as linhas de preparo saem nas caixinhas, não repetidas em Observações.
+  const obsImpressa: string = ehLab ? textoSemPreparos(o.observacoes) : (o.observacoes ?? "");
   const blocoLab = ehLab
     ? `
   <div class="lab">
@@ -124,7 +131,6 @@ export async function printOrcamento(
       (p) => `
     <div class="lab-prep"><span class="lab-cx">${marcados.has(p.id) ? "X" : "&nbsp;"}</span><span>${esc(p.label)}</span></div>`,
     ).join("")}
-    ${o.preparo_observacoes ? `<div class="lab-outras"><b>Outras recomendações:</b> ${esc(o.preparo_observacoes)}</div>` : ""}
     <div class="lab-doc">${esc(RODAPE_LABORATORIO.documento)}</div>
     <div class="lab-obs"><b>OBS.:</b> ${esc(RODAPE_LABORATORIO.obs)}</div>
     <div class="lab-chegada">${esc(RODAPE_LABORATORIO.chegada)}</div>
@@ -137,7 +143,6 @@ export async function printOrcamento(
   .lab-prep { display: flex; align-items: flex-start; gap: 6px; margin: 2px 0; }
   .lab-cx { flex: 0 0 auto; display: inline-block; width: 1.1em; height: 1.1em; line-height: 1.05em;
             border: 1.5px solid #000; text-align: center; font-weight: 700; }
-  .lab-outras { margin-top: 4px; white-space: pre-wrap; }
   .lab-doc { margin-top: 8px; border: 1.5px solid #000; border-radius: 4px; padding: 3px; text-align: center; font-weight: 700; }
   .lab-obs { margin-top: 6px; }
   .lab-chegada { margin-top: 6px; background: #000; color: #fff; border-radius: 10px; padding: 3px; text-align: center; font-weight: 700;
@@ -277,7 +282,7 @@ export async function printOrcamento(
       : ""
   }
 
-  ${o.observacoes ? `<div class="box"><h3>Observações</h3><div style="white-space:pre-wrap">${esc(o.observacoes)}</div></div>` : ""}
+  ${obsImpressa ? `<div class="box"><h3>Observações</h3><div style="white-space:pre-wrap">${esc(obsImpressa)}</div></div>` : ""}
 
   ${
     preparos.length > 0
@@ -474,7 +479,7 @@ export async function printOrcamento(
           })()
         : ""
     }
-    ${o.observacoes ? `<div class="sep"></div><div class="sm"><div class="bold">OBSERVAÇÕES</div>${esc(o.observacoes)}</div>` : ""}
+    ${obsImpressa ? `<div class="sep"></div><div class="sm" style="white-space:pre-wrap"><div class="bold">OBSERVAÇÕES</div>${esc(obsImpressa)}</div>` : ""}
 
     ${
       preparos.length > 0

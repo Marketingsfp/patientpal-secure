@@ -2,8 +2,10 @@
  * Preparo de exames do orçamento de Laboratório.
  *
  * A lista e o rodapé reproduzem o formulário em papel que a recepção do
- * laboratório entregava ao paciente. As chaves (`id`) ficam gravadas em
- * `orcamentos.preparos`, então não renomeie uma chave já em uso.
+ * laboratório entregava ao paciente. Marcar um preparo escreve o rótulo,
+ * uma linha só, no campo Observações do orçamento; a impressão reconhece a
+ * linha pelo rótulo. Por isso, mudar um rótulo faz orçamentos antigos
+ * deixarem de marcar aquele preparo no cupom.
  */
 export const PREPAROS_PADRAO = [
   { id: "jejum_8h", label: "Jejum de 8 horas" },
@@ -30,7 +32,44 @@ export const RODAPE_LABORATORIO = {
   chegada: "Atendimento por ordem de chegada.",
 };
 
+// O banco grava Observações em maiúsculas e sem acento
+// (uppercase_text_fields), então a comparação ignora os dois.
 const normalizar = (s: string) => s.normalize("NFD").replace(/\p{M}/gu, "").toUpperCase();
+
+const preparoDaLinha = (linha: string): PreparoId | null => {
+  const n = normalizar(linha.trim());
+  return PREPAROS_PADRAO.find((p) => normalizar(p.label) === n)?.id ?? null;
+};
+
+/** Preparos presentes (uma linha cada) no texto de Observações. */
+export function preparosNoTexto(texto: string | null | undefined): Set<PreparoId> {
+  const out = new Set<PreparoId>();
+  for (const linha of (texto ?? "").split("\n")) {
+    const id = preparoDaLinha(linha);
+    if (id) out.add(id);
+  }
+  return out;
+}
+
+/** Observações sem as linhas de preparo (o resto que a recepção digitou). */
+export function textoSemPreparos(texto: string | null | undefined): string {
+  return (texto ?? "")
+    .split("\n")
+    .filter((l) => !preparoDaLinha(l))
+    .join("\n")
+    .trim();
+}
+
+/** Liga ou desliga a linha de um preparo no texto de Observações. */
+export function alternarPreparoNoTexto(texto: string, id: PreparoId, marcar: boolean): string {
+  const linhas = texto.split("\n").filter((l) => preparoDaLinha(l) !== id);
+  if (marcar) {
+    const label = PREPAROS_PADRAO.find((p) => p.id === id)!.label;
+    while (linhas.length > 0 && !linhas[linhas.length - 1].trim()) linhas.pop();
+    linhas.push(label);
+  }
+  return linhas.join("\n").trim();
+}
 
 /**
  * Sugere os preparos pelo nome do exame. Cobre só os itens cujo rótulo já
