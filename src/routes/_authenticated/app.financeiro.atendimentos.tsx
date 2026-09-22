@@ -2753,7 +2753,8 @@ function AtendimentosPage() {
       // equipamento daqueles atendimentos também não recebeu, e não pode sair
       // recibo dele.
       const itensPagosOk: Atend[] = [];
-      for (const [medId, list] of byMed) {
+      for (const [chaveMed, list] of byMed) {
+        const medId = chaveMed.split("|")[0];
         const totalCalc = list.reduce((s, x) => s + (Number(x.valor_medico) || 0), 0);
         const total = usarValorManual ? valorManualNum : totalCalc;
         if (total <= 0) {
