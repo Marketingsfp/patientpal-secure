@@ -1545,6 +1545,32 @@ function AtendimentosPage() {
       return;
     }
     const agendaRows = [...(ar.data ?? []), ...(sr.data ?? [])];
+    // Mensalidade do plano mensal do Cartão Terapêutico: recebimento sem
+    // agendamento que MESMO ASSIM gera repasse (50%), por regra confirmada
+    // pela clínica. O vínculo confiável é pelo contrato → convênio → produto;
+    // a categoria do lançamento não serve para identificar. Taxa de adesão
+    // (parcela 0) fica de fora de propósito.
+    const idsSemAgenda = (sr.data ?? []).map((r: { id: string }) => r.id);
+    const mensalidadesCT = new Map<string, number>(); // lancamento_id → nº da parcela
+    for (let i = 0; i < idsSemAgenda.length; i += PAGE_SIZE) {
+      const bloco = idsSemAgenda.slice(i, i + PAGE_SIZE);
+      const { data: mens, error: eMens } = await supabase
+        .from("contrato_mensalidades")
+        .select(
+          "lancamento_id, numero_parcela, contrato:contratos_assinatura!inner(convenio:cb_convenios!inner(produto))",
+        )
+        .in("lancamento_id", bloco)
+        .eq("status", "pago")
+        .gte("numero_parcela", 1)
+        .eq("contrato.convenio.produto", "terapeutico");
+      if (eMens) {
+        mostrarErro(eMens);
+        setLoading(false);
+        return;
+      }
+      for (const m of mens ?? [])
+        if (m.lancamento_id) mensalidadesCT.set(m.lancamento_id, Number(m.numero_parcela) || 0);
+    }
     const manualLancamentoIds = (mr.data ?? [])
       .map((r: { lancamento_id?: string | null }) => r.lancamento_id ?? null)
       .filter((x): x is string => !!x);
