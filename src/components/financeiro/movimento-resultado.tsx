@@ -363,7 +363,7 @@ export function MovimentoResultado({
           accent="success"
           detalhe={
             pronto
-              ? `${plural(r.receitaBruta.qtd + (conferencia?.cortesias ?? 0), "atendimento", "atendimentos")} · consultas, exames, procedimentos, mensalidades e avulsos`
+              ? `${plural(r.receitaBruta.qtd + (conferencia?.cortesias ?? 0), "pagamento", "pagamentos")} · consultas, exames, procedimentos, mensalidades e avulsos`
               : "Tudo que entrou no caixa"
           }
         >
