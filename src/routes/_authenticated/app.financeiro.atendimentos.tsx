@@ -2656,7 +2656,9 @@ function AtendimentosPage() {
     const m = new Map<string, number>();
     let n = 0;
     for (const a of filteredItems) {
-      if (ehLinhaDeLaudo(a)) continue;
+      // Mensalidade do Cartão Terapêutico também não é atendimento: não pode
+      // consumir número de ficha/GR.
+      if (ehLinhaDeLaudo(a) || a.mensalidade_ct) continue;
       n += 1;
       m.set(`${a.origem}:${a.id}`, n);
     }
@@ -2664,7 +2666,11 @@ function AtendimentosPage() {
   }, [filteredItems]);
 
   const isAtendido = (a: Atend) =>
-    a.origem === "manual" ? a.status === "realizado" : a.agendamento_status === "realizado";
+    a.mensalidade_ct
+      ? true
+      : a.origem === "manual"
+        ? a.status === "realizado"
+        : a.agendamento_status === "realizado";
   // Itens selecionáveis: qualquer atendimento com repasse > 0.
   // As ações do topo validam individualmente o que cada uma aceita
   // (baixa em lote, pagar repasse, 2ª via).
@@ -2780,7 +2786,11 @@ function AtendimentosPage() {
       // Pré-validação no cliente: só pode pagar repasse de atendimentos efetivamente
       // realizados e cuja data marcada na agenda já chegou. A mesma regra também
       // é reforçada no banco pela RPC pagar_repasse_medico.
-      const agendaIdsCheck = selectedItems.filter((x) => x.origem === "agenda").map((x) => x.id);
+      // A mensalidade do Cartão Terapêutico fica fora desta checagem: ela não
+      // tem agendamento de propósito (o banco aceita esse caso específico).
+      const agendaIdsCheck = selectedItems
+        .filter((x) => x.origem === "agenda" && !x.mensalidade_ct)
+        .map((x) => x.id);
       if (agendaIdsCheck.length) {
         const { data: lancs, error: eChk } = await supabase
           .from("fin_lancamentos")
