@@ -13063,7 +13063,7 @@ function AgendaPage() {
 
                             {/* Ficha */}
                             <TableCell className="py-1.5 px-1.5 align-middle text-center font-mono text-xs font-medium">
-                              {a.agenda_id && idsAgendaFila.has(a.agenda_id) ? (
+                              {ehFila ? (
                                 <span className="text-sm font-bold text-primary">
                                   #{fichaNum || "—"}
                                 </span>
