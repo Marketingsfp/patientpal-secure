@@ -125,7 +125,7 @@ export async function printOrcamento(
   const blocoLab = ehLab
     ? `
   <div class="lab">
-    <div class="lab-assin"><span>Data: __/__/____</span><span>Ass.: __________</span></div>
+    <div class="lab-assin"><span>Ass.: ____________________</span></div>
     <div class="lab-horario"><b><u>Horário de Coleta:</u></b> ${RODAPE_LABORATORIO.horarioColeta.map(esc).join("<br/>")}</div>
     ${PREPAROS_PADRAO.map(
       (p) => `
