@@ -112,6 +112,7 @@ import {
   FILTRO_MEDICO_CARTAO_TERAPEUTICO,
   ehServicoCartaoTerapeutico,
   nomeRepasseExibido,
+  repasseMensalidadeCartaoTerapeutico,
 } from "@/lib/financeiro/cartao-terapeutico";
 
 /** "2026-09-08" — só aceita o formato exato, para não semear filtro inválido. */
@@ -178,6 +179,12 @@ interface Atend {
   terceiro_pago_at?: string | null;
   terceiro_forma_pagamento?: string | null;
   terceiro_conta_id?: string | null;
+  /**
+   * Mensalidade do plano mensal do Cartão Terapêutico. Não é atendimento (não
+   * tem agendamento nem profissional), mas gera repasse de 50% e por isso
+   * aparece nesta tela para o financeiro dar baixa.
+   */
+  mensalidade_ct?: boolean;
 }
 interface Medico {
   id: string;
