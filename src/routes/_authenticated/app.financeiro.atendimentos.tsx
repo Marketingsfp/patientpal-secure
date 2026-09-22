@@ -3516,7 +3516,10 @@ function AtendimentosPage() {
                   </TableHeader>
                   <TableBody>
                     {filteredItems.map((a, idx) => {
-                      const medicoNome = a.medico_id ? (medMap.get(a.medico_id) ?? "—") : "—";
+                      const medicoNome = nomeRepasseExibido(
+                        a.procedimento,
+                        a.medico_id ? (medMap.get(a.medico_id) ?? "—") : "—",
+                      );
                       const pacienteNome =
                         (a.paciente_id ? pacMap.get(a.paciente_id) : null) ??
                         a.paciente_nome_extra ??
