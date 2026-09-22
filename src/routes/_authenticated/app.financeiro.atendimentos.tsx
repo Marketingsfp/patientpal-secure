@@ -4950,6 +4950,24 @@ function MedicoCombobox({
                 />
                 Todos os médicos
               </CommandItem>
+              {mostrarCT && (
+                <CommandItem
+                  value="cartao terapeutico"
+                  onSelect={() => {
+                    onChange(FILTRO_MEDICO_CARTAO_TERAPEUTICO, "todos");
+                    setOpen(false);
+                  }}
+                  className="uppercase"
+                >
+                  <Check
+                    className={cn(
+                      "mr-2 h-4 w-4",
+                      value === FILTRO_MEDICO_CARTAO_TERAPEUTICO ? "opacity-100" : "opacity-0",
+                    )}
+                  />
+                  CARTÃO TERAPÊUTICO
+                </CommandItem>
+              )}
               {filtradas.map((o) => (
                 <CommandItem
                   key={o.key}
