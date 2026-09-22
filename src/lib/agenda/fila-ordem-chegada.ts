@@ -10,10 +10,11 @@
 //
 // O problema que este helper resolve: com passo fixo de N minutos, um dia que
 // precisa de 100–150 fichas estoura o fim do turno (e antes travava em 23:59
-// com "Nenhum horário cabe nessa configuração"). Aqui o passo é COMPRIMIDO
-// uniformemente até caber — primeiro em minutos dentro do turno, depois em
-// segundos até 23:59 do mesmo dia. O relógio aperta; a ordem e a numeração
-// continuam íntegras.
+// com "Nenhum horário cabe nessa configuração"). Aqui o lote inteiro usa UM
+// passo só, escolhido entre três opções fixas: o intervalo da grade, 1 minuto
+// ou 1 segundo — nunca uma fração calculada do espaço restante, que fazia cada
+// clique dividir o dia pela metade. Todos os horários têm ms = 0.
+
 
 export type PosicoesDaFilaInput = {
   /** "YYYY-MM-DD" (dia civil local). */
