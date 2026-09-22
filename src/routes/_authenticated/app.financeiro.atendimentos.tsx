@@ -3274,6 +3274,7 @@ function AtendimentosPage() {
                     agendaValue={fAgenda}
                     opcoes={opcoesProf.opcoes}
                     rotuloMedico={opcoesProf.rotuloMedico}
+                    mostrarCartaoTerapeutico={!isMedicoOnly}
                     onChange={(medicoId, agendaFiltro) => {
                       if (isMedicoOnly) return;
                       setFMedico(medicoId);
@@ -4884,18 +4885,22 @@ function MedicoCombobox({
   opcoes,
   rotuloMedico,
   onChange,
+  mostrarCartaoTerapeutico,
 }: {
   value: string;
   agendaValue: string;
   opcoes: OpcaoProfissional[];
   rotuloMedico: Map<string, string>;
   onChange: (medicoId: string, agendaFiltro: string) => void;
+  mostrarCartaoTerapeutico: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [busca, setBusca] = useState("");
   const label =
-    value === "todos"
-      ? "Todos os médicos"
+    value === FILTRO_MEDICO_CARTAO_TERAPEUTICO
+      ? "CARTÃO TERAPÊUTICO"
+      : value === "todos"
+        ? "Todos os médicos"
       : (opcoes.find((o) => o.medicoId === value && o.agendaFiltro === agendaValue)?.rotulo ??
         rotuloMedico.get(value) ??
         "Todos os médicos");
