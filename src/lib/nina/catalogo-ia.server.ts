@@ -16,6 +16,7 @@ import {
   type TipoCatalogo,
 } from "./catalogo-ia";
 import { instrucoesEdicaoCatalogoIA, schemaSaidaEdicao } from "./catalogo-edicao-ia";
+import { instrucoesSelecaoLote, schemaSelecaoLote } from "./catalogo-lote-ia";
 
 export type ResultadoIA = {
   servicos: any[];
@@ -160,5 +161,13 @@ export async function editarTextoComIA(
     instrucoesEdicaoCatalogoIA(tipo),
     JSON.stringify({ cadastro_atual: cadastro, pedido_do_operador: texto }),
     schemaSaidaEdicao(),
+  );
+}
+
+export async function selecionarCadastrosComIA(texto: string, catalogo: unknown[]) {
+  return gerarJsonCatalogo(
+    instrucoesSelecaoLote,
+    JSON.stringify({ pedido_do_operador: texto, catalogo }),
+    schemaSelecaoLote(),
   );
 }

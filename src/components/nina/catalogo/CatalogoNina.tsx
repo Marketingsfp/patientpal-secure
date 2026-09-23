@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import type { PreviaEdicaoCatalogo } from "@/lib/nina/catalogo-edicao-ia";
 import { normalizarNomeBusca } from "@/lib/busca-texto";
+import { EdicaoLoteIA } from "./EdicaoLoteIA";
 import {
   Dialog,
   DialogContent,
@@ -398,7 +399,8 @@ export function CatalogoNina({
           </p>
         </div>
         {podeEditar && (
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <EdicaoLoteIA clinicaId={clinicaId} podeEditar={podeEditar} onPublicado={carregar} />
             <Button
               onClick={() => {
                 setIaAberta(true);

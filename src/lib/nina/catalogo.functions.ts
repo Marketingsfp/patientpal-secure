@@ -15,6 +15,8 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
 import { profissionalSchema, servicoSchema, valorResumo, STATUS_CATALOGO } from "./catalogo";
+import { separarAtendimentos } from "./catalogo-estrutura";
+import { validarSelecaoLote, publicarLoteValidado, LIMITE_EDICAO_LOTE } from "./catalogo-lote-ia";
 import {
   aplicarEdicaoCatalogoIA,
   dadosEditaveisCatalogo,
@@ -382,4 +384,117 @@ export const preverEdicaoCatalogoIA = createServerFn({ method: "POST" })
       esperadoUpdatedAt: registro.updated_at,
       incluiRascunho: !!registro.rascunho,
     };
+  });
+
+/** Procura nas duas abas da mesma clínica. A seleção e a prévia não escrevem. */
+export const selecionarEdicoesCatalogoIA = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) =>
+    z
+      .object({ clinicaId: z.string().uuid(), texto: z.string().trim().min(10).max(20000) })
+      .parse(i),
+  )
+  .handler(async ({ data, context }) => {
+    await exigirAdmin(context.supabase, context.userId, data.clinicaId);
+    const sb: any = context.supabase;
+    const catalogo: Array<
+      Record<string, any> & { id: string; tipo: "servico" | "profissional"; nome: string }
+    > = [];
+    for (const tipo of ["servico", "profissional"] as const) {
+      // Paginado para não omitir alvos quando o catálogo ultrapassar o limite REST.
+      for (let inicio = 0; ; inicio += 500) {
+        const r = await sb
+          .from(TABELA[tipo])
+          .select(tipo === "servico" ? COLUNAS_SERVICO : COLUNAS_PROFISSIONAL)
+          .eq("clinica_id", data.clinicaId)
+          .neq("status", "ARQUIVADO")
+          .order("id")
+          .range(inicio, inicio + 499);
+        if (r.error) throw new Error(r.error.message);
+        for (const registro of r.data ?? []) {
+          const d = dadosEditaveisCatalogo(tipo, registro);
+          catalogo.push({
+            id: registro.id,
+            tipo,
+            nome: d.nome,
+            especialidades: d.especialidades?.map((e: any) => e.nome),
+            aliases: d.estrutura?.aliases,
+            atendimentos: separarAtendimentos(
+              tipo === "servico" ? d.descricao_publica : d.observacao_publica,
+              tipo === "profissional" ? d.nome : undefined,
+            ).map((a) => ({
+              atendimento: a.atendimento,
+              profissional: a.profissional,
+              especialidade: a.especialidade,
+            })),
+            formas_pagamento: d.formas_pagamento,
+          });
+        }
+        if ((r.data?.length ?? 0) < 500) break;
+      }
+    }
+    const { selecionarCadastrosComIA } = await import("./catalogo-ia.server");
+    return validarSelecaoLote(await selecionarCadastrosComIA(data.texto, catalogo), catalogo);
+  });
+
+const itemPublicacaoLoteSchema = z.discriminatedUnion("tipo", [
+  z.object({
+    tipo: z.literal("servico"),
+    id: z.string().uuid(),
+    esperadoUpdatedAt: z.string().datetime({ offset: true }),
+    dados: servicoSchema,
+  }),
+  z.object({
+    tipo: z.literal("profissional"),
+    id: z.string().uuid(),
+    esperadoUpdatedAt: z.string().datetime({ offset: true }),
+    dados: profissionalSchema,
+  }),
+]);
+
+export const publicarEdicoesCatalogoIA = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) =>
+    z
+      .object({
+        clinicaId: z.string().uuid(),
+        itens: z.array(itemPublicacaoLoteSchema).min(1).max(LIMITE_EDICAO_LOTE),
+      })
+      .parse(i),
+  )
+  .handler(async ({ data, context }) => {
+    await exigirAdmin(context.supabase, context.userId, data.clinicaId);
+    const itens = data.itens.map((i) => ({
+      ...i,
+      nome: i.dados.nome,
+      mudancas: [],
+      incluiRascunho: false,
+    }));
+    return publicarLoteValidado(
+      itens,
+      async (item) => {
+        const r = await context.supabase
+          .from(TABELA[item.tipo])
+          .select("id, updated_at")
+          .eq("clinica_id", data.clinicaId)
+          .eq("id", item.id)
+          .maybeSingle();
+        if (r.error) throw new Error(r.error.message);
+        if (!r.data || r.data.updated_at !== item.esperadoUpdatedAt)
+          throw new Error(`${item.nome}: ${CONFLITO_EDICAO_CATALOGO}`);
+      },
+      async (item) => {
+        const dados =
+          item.tipo === "servico" ? { ...item.dados, valor: valorResumo(item.dados) } : item.dados;
+        await salvar(
+          context,
+          item.tipo,
+          data.clinicaId,
+          item.id,
+          dados,
+          true,
+          item.esperadoUpdatedAt,
+        );
+      },
+    );
   });

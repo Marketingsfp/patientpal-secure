@@ -8,6 +8,7 @@ import {
   type ProfissionalCatalogo,
 } from "./catalogo";
 import type { TipoCatalogo } from "./catalogo-ia";
+import { sincronizarPrecosPublicados } from "./catalogo-precos-texto";
 
 export const CONFLITO_EDICAO_CATALOGO =
   "Este cadastro mudou depois da prévia. Gere uma nova prévia antes de publicar.";
@@ -142,6 +143,8 @@ export function instrucoesEdicaoCatalogoIA(tipo: TipoCatalogo) {
     "Não substitua listas inteiras. Para mudar um preço do dinheiro preserve Pix/cartão e demais condições. Pix sempre tem o mesmo valor do cartão: cadastre juntos como Pix/cartão, preservando parcelamento somente para cartão. Para remover várias linhas, use índices decrescentes.",
     "Não altere IDs, vínculos, clínica, status, publicação ou auditoria. Para alterar um vínculo cadastral, indique pendência para edição manual.",
     "Quando existem preços por forma de pagamento, altere os preços na lista formas_pagamento; o campo valor é um resumo calculado pelo sistema.",
+    "Se uma linha de preço tem condições para várias consultas e o pedido altera apenas uma, separe a condição: preserve a linha e o preço das demais e adicione a condição específica com o novo valor. Use os nomes exatos dos atendimentos existentes nos blocos da descrição. Não estenda a alteração a outra especialidade ou faixa etária.",
+    "Os preços rotulados Dinheiro e Pix/cartão nos blocos de atendimento serão sincronizados pelo sistema com formas_pagamento. Não altere texto clínico, preparo, critérios ou observações para trocar um preço.",
     "Valores são números em reais, sem R$, sem negativos. Horas HH:mm. Datas AAAA-MM-DD, sem inventar ano. Não mude recorrência quinzenal para semanal.",
     "Se o pedido for ambíguo (ex.: novo preço sem forma de pagamento), não adivinhe: retorne ambiguidades explicando o que esclarecer.",
     "Se pedir outro cadastro, exclusão do cadastro inteiro ou mudança fora dos campos permitidos, não altere: informe em pendencias.",
@@ -233,7 +236,9 @@ export function aplicarEdicaoCatalogoIA(
   const publicado = dadosEditaveisCatalogo(tipo, { ...registro, rascunho: null });
   if (registro.rascunho) {
     if (JSON.stringify(antes.estrutura) !== JSON.stringify(publicado.estrutura))
-      throw new Error("Este cadastro tem regras estruturadas em revisão. Confira e publique pela edição manual antes de usar a IA.");
+      throw new Error(
+        "Este cadastro tem regras estruturadas em revisão. Confira e publique pela edição manual antes de usar a IA.",
+      );
     // Não esconder na prévia uma troca prévia de vínculo que exija o formulário manual.
     const vinculos = (dados: Record<string, any>) => ({
       procedimento_id: dados.procedimento_id,
@@ -294,7 +299,7 @@ export function aplicarEdicaoCatalogoIA(
       } else throw new Error("Operação de edição não permitida. Descreva a mudança novamente.");
     }
   }
-  const dados = dadosEditaveisCatalogo(tipo, depois);
+  let dados = dadosEditaveisCatalogo(tipo, depois);
   if (tipo === "servico") {
     // Ao retirar o último preço por pagamento, não manter seu antigo resumo como oferta.
     if (
@@ -304,6 +309,8 @@ export function aplicarEdicaoCatalogoIA(
       dados.valor = null;
     dados.valor = valorResumo(dados);
   }
+  sincronizarPrecosPublicados(tipo, antes, dados);
+  dados = dadosEditaveisCatalogo(tipo, dados);
   if (!compararDadosCatalogo(tipo, antes, dados).length)
     throw new Error("O pedido não gerou alterações. Descreva o que deseja mudar.");
   // A confirmação publica também o rascunho já salvo: mostrar TODAS as diferenças.

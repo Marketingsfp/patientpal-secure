@@ -32,6 +32,14 @@ export const salvarServicoCatalogo = async ({data}) => {
   estado.saves.push(data); return {id,status:"PUBLICADO",emRevisao:false};
 };
 export const salvarProfissionalCatalogo = salvarServicoCatalogo;
+export const selecionarEdicoesCatalogoIA = async ({data}) => data.texto.includes("ambiguo")
+  ? {itens:[],esclarecimentos:["Cardiologia de qual médico e forma de pagamento?"]}
+  : {itens:[{id,tipo:"servico",nome:servico.nome,pedido:"Altere o dinheiro da mamografia para 180."},{id,tipo:"profissional",nome:profissional.nome,pedido:"Altere a quinta-feira para 14:30."}],esclarecimentos:[]};
+export const publicarEdicoesCatalogoIA = async ({data}) => {
+  if (estado.falhar) throw new Error("Este cadastro mudou depois da prévia. Gere uma nova prévia antes de publicar.");
+  data.itens.forEach(item => estado.saves.push(item));
+  return {publicados:data.itens.map(i=>i.tipo+":"+i.id),falha:null};
+};
 export const organizarTextoCatalogoIA = async () => ({ servicos:[{nome:"Exame criado por IA",valor:100}],profissionais:[],pendencias:[],ambiguidades:[] });
 export const alterarStatusCatalogo = async () => { throw new Error("Fora do teste"); };
 export const excluirItemCatalogo = alterarStatusCatalogo;
@@ -113,6 +121,10 @@ const server = Bun.serve({
   },
 });
 try {
+  if (process.env["CATALOGO_UI_SERVE_ONLY"] === "1") {
+    console.log(`Prévia local: ${server.url}`);
+    await new Promise(() => {});
+  }
   const teste = Bun.spawn(
     ["node", resolve(root, "scripts/fixtures/catalogo-edicao-ui.mjs"), String(server.url), saida],
     { stdout: "inherit", stderr: "inherit" },

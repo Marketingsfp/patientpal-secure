@@ -8,5 +8,5 @@ test("edição do catálogo: autorização, prévia sem escrita e confirmação 
   const p = Bun.spawnSync([process.execPath, "test", fixture], { stdout: "pipe", stderr: "pipe" });
   const saida = new TextDecoder().decode(p.stdout) + new TextDecoder().decode(p.stderr);
   expect(p.exitCode, saida).toBe(0);
-  expect(saida).toContain("9 pass");
+  expect(saida).toContain("13 pass");
 }, 20_000);

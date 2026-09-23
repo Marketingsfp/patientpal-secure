@@ -15,6 +15,15 @@ const banco = {
     let valores: any;
     const q: any = {
       select: () => q,
+      neq: () => q,
+      order: () => q,
+      range: async () => ({
+        data:
+          tabela === "nina_cat_servicos" && filtros.clinica_id === registro.clinica_id
+            ? [structuredClone(registro)]
+            : [],
+        error: null,
+      }),
       eq: (k: string, v: unknown) => {
         filtros[k] = v;
         return q;
@@ -70,6 +79,17 @@ mock.module("@tanstack/react-start", () => ({
 }));
 mock.module("@/integrations/supabase/auth-middleware", () => ({ requireSupabaseAuth: {} }));
 mock.module("@/lib/nina/catalogo-ia.server", () => ({
+  selecionarCadastrosComIA: async (_texto: string, catalogo: any[]) => {
+    chamadasIA.push(catalogo);
+    return {
+      itens: catalogo.map((c) => ({
+        id: c.id,
+        tipo: c.tipo,
+        pedido: "No preparo, acrescente trazer documento.",
+      })),
+      esclarecimentos: [],
+    };
+  },
   editarTextoComIA: async (...args: any[]) => {
     chamadasIA.push(args);
     return {
@@ -113,6 +133,61 @@ beforeEach(() => {
     updated_at: VERSION,
     rascunho: null,
   };
+});
+
+test("lote: seleção lê somente cadastros da clínica sem escrever", async () => {
+  const r = await chamar(f.selecionarEdicoesCatalogoIA, {
+    clinicaId: CLINICA,
+    texto: "Altere o preparo da mamografia.",
+  });
+  expect(r.itens.map((i: any) => i.id)).toEqual([ID]);
+  expect(chamadasIA[0][0].nome).toBe("Mamografia");
+  expect(escritas).toHaveLength(0);
+});
+
+test("lote: atendente não seleciona nem publica", async () => {
+  role = "atendente";
+  await expect(
+    chamar(f.selecionarEdicoesCatalogoIA, {
+      clinicaId: CLINICA,
+      texto: "Altere o preparo da mamografia.",
+    }),
+  ).rejects.toThrow("administradores");
+  await expect(
+    chamar(f.publicarEdicoesCatalogoIA, {
+      clinicaId: CLINICA,
+      itens: [{ id: ID, tipo: "servico", esperadoUpdatedAt: VERSION, dados: registro }],
+    }),
+  ).rejects.toThrow("administradores");
+  expect(escritas).toHaveLength(0);
+});
+
+test("lote: preflight rejeita cadastro de outra clínica antes de gravar", async () => {
+  await expect(
+    chamar(f.publicarEdicoesCatalogoIA, {
+      clinicaId: ID,
+      itens: [{ id: ID, tipo: "servico", esperadoUpdatedAt: VERSION, dados: registro }],
+    }),
+  ).rejects.toThrow("mudou depois");
+  expect(escritas).toHaveLength(0);
+});
+
+test("lote: confirmação publica somente item solicitado com versão e clínica", async () => {
+  const r = await chamar(f.publicarEdicoesCatalogoIA, {
+    clinicaId: CLINICA,
+    itens: [
+      {
+        id: ID,
+        tipo: "servico",
+        esperadoUpdatedAt: VERSION,
+        dados: { ...registro, preparo: "Trazer documento." },
+      },
+    ],
+  });
+  expect(r.publicados).toEqual([`servico:${ID}`]);
+  expect(r.falha).toBeNull();
+  expect(escritas[0].filtros).toEqual({ id: ID, clinica_id: CLINICA, updated_at: VERSION });
+  expect(registro.preparo).toBe("Trazer documento.");
 });
 test("prévia lê os dados atuais do banco, filtra clínica/id e nunca escreve", async () => {
   const r = await chamar(f.preverEdicaoCatalogoIA, {
