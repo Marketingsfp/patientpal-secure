@@ -338,7 +338,7 @@ function LiquidBottomNav({
               }}
               className={cn(
                 "flex-1 flex flex-col items-center justify-end gap-0.5 rounded-full px-2 pb-2 pt-3 text-[12px] font-medium transition-colors duration-300",
-                active ? "text-white" : "text-blue-200/70 hover:text-white",
+                active ? "text-white" : "text-white/70 hover:text-white",
               )}
             >
               <Icon className={cn("h-5 w-5 shrink-0", active && "opacity-0")} />
@@ -349,7 +349,7 @@ function LiquidBottomNav({
         <button
           type="button"
           onClick={onMais}
-          className="flex-1 flex flex-col items-center justify-end gap-0.5 rounded-full px-2 pb-2 pt-3 text-[12px] font-medium text-blue-200/70 transition-colors duration-300 hover:text-white"
+          className="flex-1 flex flex-col items-center justify-end gap-0.5 rounded-full px-2 pb-2 pt-3 text-[12px] font-medium text-white/70 transition-colors duration-300 hover:text-white"
         >
           <MenuIcon className="h-5 w-5 shrink-0" />
           <span className="leading-none">Mais</span>
@@ -1479,7 +1479,7 @@ function AppShellInner() {
           <button
             type="button"
             onClick={alternarSidebar}
-            className="h-6 w-7 rounded flex items-center justify-center text-foreground hover:bg-muted"
+            className="h-6 w-7 rounded flex items-center justify-center text-primary hover:bg-accent hover:text-accent-foreground"
             aria-label={sidebarAberta ? "Fechar menu lateral" : "Abrir menu lateral"}
             aria-expanded={sidebarAberta}
             aria-controls="menu-lateral"
@@ -1490,7 +1490,7 @@ function AppShellInner() {
           <button
             type="button"
             onClick={() => alternarHeaderRecolhido(false)}
-            className="h-6 px-1.5 rounded flex items-center gap-1 text-[11px] font-medium text-foreground hover:bg-muted"
+            className="h-6 px-1.5 rounded flex items-center gap-1 text-[11px] font-medium text-foreground hover:bg-accent hover:text-accent-foreground"
             aria-label="Mostrar barra superior"
             title="Mostrar barra superior"
           >
@@ -1505,7 +1505,7 @@ function AppShellInner() {
             <button
               type="button"
               onClick={alternarSidebar}
-              className="h-9 w-9 -ml-1 rounded-md flex items-center justify-center text-foreground hover:bg-muted shrink-0 transition-colors duration-200"
+              className="h-9 w-9 -ml-1 rounded-md flex items-center justify-center text-primary hover:bg-accent hover:text-accent-foreground shrink-0 transition-colors duration-200"
               aria-label={sidebarAberta ? "Fechar menu lateral" : "Abrir menu lateral"}
               aria-expanded={sidebarAberta}
               aria-controls="menu-lateral"
@@ -1630,7 +1630,7 @@ function AppShellInner() {
             <Button
               variant="ghost"
               size="sm"
-              className="hidden sm:inline-flex h-9 w-9 p-0 rounded-full text-foreground hover:bg-muted hover:text-foreground"
+              className="hidden sm:inline-flex h-9 w-9 p-0 rounded-full text-foreground hover:bg-accent hover:text-accent-foreground"
               title="Atalhos de teclado (?)"
               onClick={() => {
                 window.dispatchEvent(new KeyboardEvent("keydown", { key: "?" }));
@@ -1651,7 +1651,7 @@ function AppShellInner() {
               <Button
                 variant="ghost"
                 size="sm"
-                className="h-9 w-9 p-0 rounded-full text-foreground hover:bg-muted hover:text-foreground"
+                className="h-9 w-9 p-0 rounded-full text-foreground hover:bg-accent hover:text-accent-foreground"
                 title="Recolher barra superior (modo foco)"
                 aria-label="Recolher barra superior"
                 onClick={() => alternarHeaderRecolhido(true)}

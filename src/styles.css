@@ -159,6 +159,7 @@
   --success-foreground: oklch(0.99 0 0);
   --muted: oklch(0.97 0.01 250);
   --muted-foreground: oklch(0.42 0.03 250);
+  /* Base neutra. O tom da clínica entra no bloco @supports do fim do arquivo. */
   --accent: oklch(0.95 0.03 250);
   --accent-foreground: oklch(0.3 0.1 250);
   --destructive: oklch(0.577 0.245 27.325);
@@ -572,12 +573,15 @@
  * para intenção "cor da clínica" — usar `var(--clinic-accent)`.
  * ===================================================================== */
 :root {
-  /* Default = Azure (skin institucional). */
-  --clinic-accent: #0284c7;
-  --clinic-accent-strong: #0369a1;
-  --clinic-accent-soft: #e0f2fe;
-  --clinic-accent-fg: #ffffff;
-  --clinic-accent-glow: rgba(2, 132, 199, 0.18);
+  /* Padrão = a cor da clínica ativa (--primary, trocada pelo app-shell).
+   * Fora da Agenda V2 o skin não está montado; antes isso deixava o azure
+   * fixo aparecendo, por exemplo no hover dos atalhos do Dashboard. As
+   * classes html.clinic-skin-* abaixo continuam valendo dentro da Agenda V2. */
+  --clinic-accent: var(--primary);
+  --clinic-accent-strong: color-mix(in oklch, var(--primary) 82%, black);
+  --clinic-accent-soft: color-mix(in oklch, var(--primary) 14%, white);
+  --clinic-accent-fg: var(--primary-foreground);
+  --clinic-accent-glow: color-mix(in oklch, var(--primary) 20%, transparent);
 }
 html.clinic-skin-azure {
   --clinic-accent: #0284c7;
@@ -1346,4 +1350,29 @@ html.a11y-alto-contraste.dark {
 :where(input, select, textarea, button):focus-visible {
   outline: 2px solid color-mix(in oklch, var(--ring) 55%, transparent);
   outline-offset: 1px;
+}
+
+/* =====================================================================
+ * Realce de interação na cor da clínica
+ * ---------------------------------------------------------------------
+ * `--accent` é o token que o shadcn usa no hover/ativo de botão fantasma,
+ * item de menu, aba e seleção de lista — inclusive nos botões do cabeçalho
+ * (hambúrguer, seletor de clínica, ajuda, acessibilidade, notificações).
+ * O valor de base é neutro; aqui ele passa a derivar de `--primary`, que o
+ * app-shell troca por clínica, para o hover sair no verde da São Francisco,
+ * no azul-marinho da Menino Jesus e no roxo da Consulta Hoje.
+ *
+ * Fica atrás de @supports de propósito: `color-mix` é o que permite derivar
+ * o tom. Sem ele, o navegador mantém o realce neutro do bloco :root, que é
+ * legível — em vez de cair num valor de reserva onde fundo e texto ficariam
+ * na mesma cor.
+ * ===================================================================== */
+@supports (color: color-mix(in oklch, white, black)) {
+  :root {
+    --accent: color-mix(in oklch, var(--primary) 12%, var(--card));
+    --accent-foreground: var(--primary);
+  }
+  .dark {
+    --accent: color-mix(in oklch, var(--primary) 30%, var(--card));
+  }
 }
