@@ -699,10 +699,27 @@ export function CaixaShellV2({
     { value: "todos", label: "Todos" },
   ];
 
+  // ===== Trava de fechamento diário
+  const travadoPorCaixaAnterior = sessoesPendentes.length > 0;
+  const diaCaixaPendenteBR = travadoPorCaixaAnterior
+    ? new Date(`${diaSP(sessoesPendentes[0]!.aberto_em)}T00:00:00`).toLocaleDateString("pt-BR", {
+        day: "2-digit",
+        month: "2-digit",
+      })
+    : "";
+  const msgTravaCaixaAnterior = `Feche primeiro o caixa do dia ${diaCaixaPendenteBR}. Enquanto ele estiver aberto, não é possível lançar no caixa de hoje.`;
+
   // ===== Actions (delegam à tela clássica; não altera regras)
   const goCaixa = (msg?: string) => {
     if (msg) toast.info(msg);
     window.location.href = "/app/caixa?classico=1";
+  };
+
+  /** Ações de lançamento bloqueadas enquanto houver caixa de dia anterior aberto. */
+  const bloqueado = () => {
+    if (!travadoPorCaixaAnterior) return false;
+    toast.error(msgTravaCaixaAnterior);
+    return true;
   };
 
   // Ação primária "Receber" — 1 clique. Se houver único item pendente,
@@ -710,6 +727,10 @@ export function CaixaShellV2({
   // seleção lá. A gravação/regra continua no clássico.
   const receberFila = useCallback(
     (filaId?: string) => {
+      if (travadoPorCaixaAnterior) {
+        toast.error(msgTravaCaixaAnterior);
+        return;
+      }
       const id = filaId ?? filaCards[0]?.id;
       if (!id) {
         toast.info("Nenhum paciente na fila.");
@@ -717,14 +738,20 @@ export function CaixaShellV2({
       }
       window.location.href = `/app/caixa?classico=1&receber=${encodeURIComponent(id)}`;
     },
-    [filaCards],
+    [filaCards, travadoPorCaixaAnterior, msgTravaCaixaAnterior],
   );
 
   // Atalhos F2/F3/F4/Esc
   useCaixaShortcuts({
     onReceber: () => receberFila(),
-    onImprimir: () => goCaixa("Impressão de recibo abre no caixa clássico"),
-    onDespesa: () => goCaixa("Nova despesa abre no caixa clássico"),
+    onImprimir: () => {
+      if (bloqueado()) return;
+      goCaixa("Impressão de recibo abre no caixa clássico");
+    },
+    onDespesa: () => {
+      if (bloqueado()) return;
+      goCaixa("Nova despesa abre no caixa clássico");
+    },
     onEscape: () => setDrawerId(null),
   });
 
