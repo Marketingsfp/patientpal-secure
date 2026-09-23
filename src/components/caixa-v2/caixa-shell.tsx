@@ -176,6 +176,7 @@ export function CaixaShellV2({
   const isMobile = useIsMobile();
 
   const [sessao, setSessao] = useState<Sessao | null>(null);
+  const [sessoesPendentes, setSessoesPendentes] = useState<Sessao[]>([]);
   const [sessaoLoading, setSessaoLoading] = useState(true);
   const [movs, setMovs] = useState<Mov[]>([]);
   const [movsLoading, setMovsLoading] = useState(true);
@@ -197,7 +198,11 @@ export function CaixaShellV2({
 
   const compact = compactPref;
 
-  // Carrega sessão aberta do usuário
+  // Carrega as sessões abertas do usuário.
+  //
+  // "Sessão atual" é SOMENTE a sessão aberta de HOJE (fuso America/Sao_Paulo).
+  // Sessões abertas de dias anteriores vão para `sessoesPendentes`: antes elas
+  // apareciam como se fossem a de hoje (ex.: "aberta há 329h").
   const loadSessao = useCallback(async () => {
     if (!clinicaAtual || !user) return;
     setSessaoLoading(true);
@@ -207,10 +212,13 @@ export function CaixaShellV2({
       .eq("clinica_id", clinicaAtual.clinica_id)
       .eq("user_id", user.id)
       .eq("status", "aberto")
-      .order("aberto_em", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-    setSessao((data as Sessao | null) ?? null);
+      .order("aberto_em", { ascending: false });
+    const linhas = (data as Sessao[] | null) ?? [];
+    const hoje = diaSP(new Date().toISOString());
+    setSessao(linhas.find((s) => diaSP(s.aberto_em) === hoje) ?? null);
+    setSessoesPendentes(
+      linhas.filter((s) => diaSP(s.aberto_em) < hoje).sort((a, b) => (a.aberto_em < b.aberto_em ? -1 : 1)),
+    );
     setSessaoLoading(false);
   }, [clinicaAtual, user]);
 
