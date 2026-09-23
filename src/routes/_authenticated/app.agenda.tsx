@@ -6052,7 +6052,15 @@ function AgendaPage() {
       );
       return;
     }
-    if (new Date(form.fim) <= new Date(form.inicio)) {
+    // Em agenda por ORDEM DE CHEGADA o horário do formulário NÃO é o que vai
+    // ser gravado: na edição vale o `editing` original (com segundos) e na
+    // criação vale a posição devolvida por `proximaPosicaoDaFila`. Como
+    // `toLocalInput` corta os segundos, uma ficha de 1 segundo (23:58:03 →
+    // 23:58:04, gerada quando a fila do dia encosta no fim do dia) chega aqui
+    // com início e fim iguais e travava Salvar/Pagar. A comparação só faz
+    // sentido para horário digitado de verdade.
+    const horarioVemDaFila = edicaoFichaFila || (!editing && !!agendaDeFila(form.medico_id));
+    if (!horarioVemDaFila && new Date(form.fim) <= new Date(form.inicio)) {
       toast.error("O horário final deve ser após o inicial");
       return;
     }
@@ -6185,8 +6193,8 @@ function AgendaPage() {
     // `editing`), e é só aí que existe risco de empurrar a numeração: a ficha
     // é posicional, então uma linha inserida no meio do dia renumeraria todas
     // as fichas seguintes — inclusive as que a recepção já imprimiu.
-    let inicioParaSalvar = form.inicio;
-    let fimParaSalvar = form.fim;
+    let inicioIsoParaSalvar = new Date(form.inicio).toISOString();
+    let fimIsoParaSalvar = new Date(form.fim).toISOString();
     const filaNoSalvamento = !editing ? agendaDeFila(form.medico_id) : null;
     if (filaNoSalvamento && form.medico_id) {
       const diaIso = new Date(form.inicio).toLocaleDateString("en-CA", {
@@ -6201,15 +6209,17 @@ function AgendaPage() {
         60000,
         new Date(form.fim).getTime() - new Date(form.inicio).getTime(),
       );
-      if (pos.inicio.getTime() !== new Date(form.inicio).getTime()) {
-        // O fim nunca passa da meia-noite: já houve ficha gravada 23:51–00:01,
-        // que cai no dia seguinte e some da lista do dia.
-        const limiteFimDia = new Date(`${diaIso}T23:59:59`).getTime();
-        const fimBruto = pos.inicio.getTime() + duracaoMs;
-        const fimFinal = Math.max(pos.inicio.getTime() + 1000, Math.min(fimBruto, limiteFimDia));
-        inicioParaSalvar = toLocalInput(pos.inicio.toISOString());
-        fimParaSalvar = toLocalInput(new Date(fimFinal).toISOString());
-      }
+      // O fim nunca passa da meia-noite: já houve ficha gravada 23:51–00:01,
+      // que cai no dia seguinte e some da lista do dia.
+      const limiteFimDia = new Date(`${diaIso}T23:59:59`).getTime();
+      const fimBruto = pos.inicio.getTime() + duracaoMs;
+      const fimFinal = Math.max(pos.inicio.getTime() + 1000, Math.min(fimBruto, limiteFimDia));
+      // Grava o horário EXATO devolvido pela fila, com os segundos. Passar por
+      // `toLocalInput` aqui zerava os segundos e jogava várias fichas para o
+      // mesmo instante (23:58:02 e 23:58:05 viravam 23:58:00), embaralhando a
+      // numeração posicional de todas as fichas do dia.
+      inicioIsoParaSalvar = pos.inicio.toISOString();
+      fimIsoParaSalvar = new Date(fimFinal).toISOString();
     }
     setSaving(true);
     const payload = {
@@ -6222,11 +6232,11 @@ function AgendaPage() {
       inicio:
         edicaoFichaFila && editing
           ? new Date(editing.inicio).toISOString()
-          : new Date(inicioParaSalvar).toISOString(),
+          : inicioIsoParaSalvar,
       fim:
         edicaoFichaFila && editing
           ? new Date(editing.fim).toISOString()
-          : new Date(fimParaSalvar).toISOString(),
+          : fimIsoParaSalvar,
       procedimento: procedimentoTexto || null,
       status: form.status,
       observacoes: form.observacoes.trim() || null,
