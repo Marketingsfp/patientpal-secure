@@ -2609,6 +2609,26 @@ function Page() {
     () => sessoesAbertas.filter((s) => localYMD(s.aberto_em) < hojeYMD),
     [sessoesAbertas, hojeYMD],
   );
+  /**
+   * Trava de fechamento diário (regra da gestão): enquanto houver caixa de dia
+   * anterior aberto deste operador, nada pode ser lançado no caixa de hoje. O
+   * banco também barra (trigger `trg_caixa_trava_dia_anterior`); aqui a tela
+   * avisa antes, com texto em português.
+   */
+  const travadoPorCaixaAnterior = sessoesPendentes.length > 0;
+  /** Dia (YYYY-MM-DD) do caixa pendente mais antigo. */
+  const diaCaixaPendente = useMemo(() => {
+    const dias = sessoesPendentes.map((s) => localYMD(s.aberto_em)).sort();
+    return dias[0] ?? null;
+  }, [sessoesPendentes]);
+  const diaCaixaPendenteBR = diaCaixaPendente
+    ? new Date(`${diaCaixaPendente}T00:00:00`).toLocaleDateString("pt-BR", {
+        day: "2-digit",
+        month: "2-digit",
+      })
+    : "";
+  /** Texto único usado no toast, nos `title` dos botões e no banner. */
+  const msgTravaCaixaAnterior = `Feche primeiro o caixa do dia ${diaCaixaPendenteBR}. Enquanto ele estiver aberto, não é possível lançar no caixa de hoje.`;
   /** Dia (YYYY-MM-DD) da sessão que a tela está exibindo. */
   const diaSessaoAtiva = minhaSessao ? localYMD(minhaSessao.aberto_em) : null;
   /**
