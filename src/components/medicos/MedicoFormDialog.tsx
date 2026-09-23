@@ -1144,69 +1144,8 @@ export function MedicoFormDialog({
     if (activeClinicaId) invalidateAgendaRefs(activeClinicaId);
     toast.success(editId ? "Médico atualizado!" : "Médico cadastrado!");
 
-    // Auto-create paciente on new medico
-    if (!editId && nomeLimpo) {
-      try {
-        let existe: { id: string } | null = null;
-        if (form.cpf) {
-          const { data } = await supabase
-            .from("pacientes")
-            .select("id")
-            .eq("clinica_id", clinicaId)
-            .eq("cpf", form.cpf)
-            .maybeSingle();
-          existe = data;
-        }
-        if (!existe && form.email) {
-          const { data } = await supabase
-            .from("pacientes")
-            .select("id")
-            .eq("clinica_id", clinicaId)
-            .ilike("email", form.email)
-            .maybeSingle();
-          existe = data;
-        }
-        if (!existe) {
-          const { data: novoPac } = await supabase
-            .from("pacientes")
-            .insert({
-              clinica_id: clinicaId,
-              nome: nomeLimpo,
-              cpf: form.cpf || null,
-              data_nascimento: form.data_nascimento || null,
-              email: form.email || null,
-              telefone: form.telefone || null,
-              telefone2: form.telefone2 || null,
-              cep: form.cep || null,
-              logradouro: form.logradouro || null,
-              numero: form.numero || null,
-              complemento: form.complemento || null,
-              bairro: form.bairro || null,
-              cidade: form.cidade || null,
-              estado: form.estado ? form.estado.toUpperCase() : null,
-              ativo: true,
-            } as never)
-            .select("id")
-            .maybeSingle();
-          if (novoPac?.id && medicoId) {
-            await supabase
-              .from("medicos")
-              .update({ paciente_id: novoPac.id } as never)
-              .eq("id", medicoId);
-          }
-          toast.success("Cadastro de paciente criado automaticamente.");
-        } else if (existe.id && medicoId && !pacienteVinculado?.id) {
-          // Se já existe paciente com mesmo CPF/e-mail e o médico ainda não
-          // está vinculado, faz o vínculo automático.
-          await supabase
-            .from("medicos")
-            .update({ paciente_id: existe.id } as never)
-            .eq("id", medicoId);
-        }
-      } catch (err: any) {
-        toast.warning(`Médico salvo, mas paciente não foi criado: ${err?.message ?? err}`);
-      }
-    }
+    // Médico não vira paciente automaticamente. Quem precisa do Convênio
+    // Funcionário vincula o cliente à mão pelo campo de busca da aba "Dados".
 
     // Optionally create system user / add to clinic team
     if (form.criarUsuario && form.email && form.senhaUsuario.length >= 6) {
