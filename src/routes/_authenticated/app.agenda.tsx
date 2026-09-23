@@ -8926,7 +8926,7 @@ function AgendaPage() {
               // trazer os dias seguintes.
               "ml-1 inline-flex cursor-pointer items-center gap-1 rounded border px-1.5 py-0.5 text-[11px] font-normal normal-case tracking-normal",
               apenasData
-                ? "border-indigo-300 bg-indigo-50 text-indigo-700"
+                ? "border-primary/40 bg-primary/10 text-primary"
                 : "border-slate-300 bg-white text-slate-500 hover:text-slate-700",
             )}
             title={
@@ -8939,7 +8939,7 @@ function AgendaPage() {
               className={cn(
                 "flex h-3 w-3 shrink-0 items-center justify-center rounded-[3px] border",
                 apenasData
-                  ? "border-indigo-600 bg-indigo-600 text-white"
+                  ? "border-primary bg-primary text-primary-foreground"
                   : "border-slate-400 bg-white",
               )}
             >
@@ -9012,7 +9012,7 @@ function AgendaPage() {
             load();
           }}
           aria-label="Buscar"
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-indigo-50 text-indigo-700 hover:bg-indigo-100"
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary hover:bg-primary/15"
         >
           <Search className="h-4 w-4" />
         </button>
@@ -9225,7 +9225,7 @@ function AgendaPage() {
                   return `${dataRef === hojeBR() ? "Hoje, " : ""}${label}`;
                 })()}
               </span>
-              <span className="rounded-md bg-indigo-50 px-2.5 py-1 text-xs font-medium text-indigo-700">
+              <span className="rounded-md bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary">
                 Visão Geral
               </span>
               {ehHojeAgenda && agoraAgId && (
@@ -9351,7 +9351,7 @@ function AgendaPage() {
             aria-pressed={resumoAberto}
             className={`hidden lg:inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-semibold shadow-xs ${
               resumoAberto
-                ? "border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100"
+                ? "border-primary/25 bg-primary/10 text-primary hover:bg-primary/15"
                 : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
             }`}
             onClick={alternarResumo}
@@ -11406,10 +11406,7 @@ function AgendaPage() {
                   </Badge>
                 ) : null}
                 {marcacoesHist.origem_integracao ? (
-                  <Badge
-                    variant="outline"
-                    className="bg-indigo-100 text-indigo-800 border-indigo-200"
-                  >
+                  <Badge variant="outline" className="bg-primary/15 text-primary border-primary/25">
                     Origem: {marcacoesHist.origem_integracao}
                   </Badge>
                 ) : null}
@@ -12183,7 +12180,7 @@ function AgendaPage() {
                         {origemAuto ? (
                           <Badge
                             variant="outline"
-                            className="bg-indigo-100 text-indigo-700 border-indigo-200 shrink-0"
+                            className="bg-primary/15 text-primary border-primary/25 shrink-0"
                           >
                             {n.user_nome === "Totem" ? "Totem" : "Autoatendimento"}
                           </Badge>
@@ -13910,7 +13907,7 @@ function AgendaPage() {
               e.stopPropagation();
               setFotoPreviewOpen(false);
             }}
-            className="bg-violet-600 px-6 text-white hover:bg-violet-700 pointer-events-auto"
+            className="bg-primary px-6 text-primary-foreground hover:bg-primary/90 pointer-events-auto"
           >
             Fechar Pré-visualização
           </Button>

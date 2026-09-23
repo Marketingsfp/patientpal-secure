@@ -542,12 +542,12 @@ function ClientesPage() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3 min-w-0">
-          <div className="w-9 h-9 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
+          <div className="w-9 h-9 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0">
             <Users className="h-4.5 w-4.5" />
           </div>
           <h1 className="text-xl font-bold text-slate-900 tracking-tight">Clientes</h1>
           {totalPacientes !== null && (
-            <span className="bg-indigo-50 text-indigo-700 border border-indigo-100 px-3 py-1 text-xs font-semibold rounded-full whitespace-nowrap">
+            <span className="bg-primary/10 text-primary border border-primary/20 px-3 py-1 text-xs font-semibold rounded-full whitespace-nowrap">
               {totalPacientes.toLocaleString("pt-BR")}{" "}
               {totalPacientes === 1 ? "paciente" : "pacientes"}
             </span>
@@ -652,7 +652,7 @@ function ClientesPage() {
             <button
               type="button"
               onClick={() => setOpenNovo(true)}
-              className="inline-flex items-center bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs px-4 py-2 rounded-lg shadow-sm transition-colors"
+              className="inline-flex items-center bg-primary hover:bg-primary/90 text-primary-foreground font-semibold text-xs px-4 py-2 rounded-lg shadow-sm transition-colors"
             >
               <Plus className="h-4 w-4 mr-1.5" /> Novo cliente
             </button>
@@ -773,7 +773,7 @@ function ClientesPage() {
                     />
                   </TableCell>
                   <TableCell>
-                    <span className="text-xs font-semibold text-indigo-600 bg-indigo-50/60 px-2 py-0.5 rounded-md inline-block">
+                    <span className="text-xs font-semibold text-primary bg-primary/10 px-2 py-0.5 rounded-md inline-block">
                       {prontuarioExibicao(p) || p.numero_pasta || "—"}
                     </span>
                   </TableCell>
@@ -895,7 +895,7 @@ function ClientesPage() {
             ) : (
               <Link
                 to="/app/clientes/duplicados"
-                className="text-xs font-medium text-indigo-600 hover:text-indigo-700 whitespace-nowrap"
+                className="text-xs font-medium text-primary hover:text-primary/80 whitespace-nowrap"
               >
                 Cadastro repetido? Use Duplicados →
               </Link>

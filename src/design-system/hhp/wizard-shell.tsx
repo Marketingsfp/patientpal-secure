@@ -47,7 +47,7 @@ export function HhpWizardShell({
         </VisuallyHidden.Root>
 
         <div className="px-5 md:px-8 pt-6 md:pt-8 pb-4">
-          <div className="text-[11px] font-semibold uppercase tracking-widest text-indigo-500">
+          <div className="text-[11px] font-semibold uppercase tracking-widest text-primary">
             {stepLabel}
           </div>
           <h2
@@ -62,7 +62,7 @@ export function HhpWizardShell({
                 key={i}
                 className={cn(
                   "h-1.5 flex-1 rounded-full transition-colors",
-                  i <= stepIndex ? "bg-indigo-500" : "bg-slate-100",
+                  i <= stepIndex ? "bg-primary" : "bg-slate-100",
                 )}
               />
             ))}

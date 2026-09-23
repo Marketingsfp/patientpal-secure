@@ -245,7 +245,7 @@ function AgendaMedicosPage() {
       <div className="mx-auto w-full max-w-[1600px] space-y-4 overflow-x-hidden p-4 sm:p-6">
         <header>
           <div className="flex flex-wrap items-center gap-2">
-            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600">
+            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10 text-primary">
               <Columns3 className="h-5 w-5" />
             </span>
             <div className="min-w-0">
@@ -267,7 +267,7 @@ function AgendaMedicosPage() {
               </span>
               <span className="text-slate-300">|</span>
               <span className="inline-flex items-center gap-1.5">
-                <span className="h-2 w-2 rounded-full bg-indigo-600" aria-hidden />
+                <span className="h-2 w-2 rounded-full bg-primary" aria-hidden />
                 Ocupados
               </span>
             </span>

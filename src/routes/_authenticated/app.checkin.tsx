@@ -359,7 +359,7 @@ function SearchBar({
         <div className="flex gap-2">
           <Button
             onClick={onSearch}
-            className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs px-4 h-10 rounded-lg shadow-sm transition-colors whitespace-nowrap"
+            className="bg-primary hover:bg-primary/90 text-primary-foreground font-semibold text-xs px-4 h-10 rounded-lg shadow-sm transition-colors whitespace-nowrap"
           >
             <Search className="h-4 w-4 mr-2" />
             Buscar
@@ -476,7 +476,7 @@ function PatientCard({
                 onClick={() => onPagar(item)}
                 disabled={isConfirming}
                 title="Registrar o pagamento e liberar o paciente para a triagem"
-                className="bg-indigo-600 hover:bg-indigo-700 text-white w-full sm:w-auto sm:min-w-[180px] h-10"
+                className="bg-primary hover:bg-primary/90 text-primary-foreground w-full sm:w-auto sm:min-w-[180px] h-10"
               >
                 {isConfirming ? (
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -827,7 +827,7 @@ function CheckinPage() {
       {/* Cabeçalho */}
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div className="flex items-center gap-3 flex-wrap">
-          <div className="w-9 h-9 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
+          <div className="w-9 h-9 rounded-xl bg-primary/10 text-primary flex items-center justify-center">
             <ConciergeBell className="h-5 w-5" />
           </div>
           <div className="flex flex-col gap-1.5">

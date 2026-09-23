@@ -1756,7 +1756,7 @@ function AppShellInner() {
                               [row.label]: !(prev[row.label] ?? true),
                             }));
                           }}
-                          className="w-full flex items-center justify-between px-3 py-1 text-[12px] font-bold uppercase tracking-[0.1em] text-indigo-200 hover:text-white transition-colors rounded-md"
+                          className="w-full flex items-center justify-between px-3 py-1 text-[12px] font-bold uppercase tracking-[0.1em] text-white/70 hover:text-white transition-colors rounded-md"
                           aria-expanded={open}
                         >
                           <span>{row.label}</span>

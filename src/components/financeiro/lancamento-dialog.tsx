@@ -2801,7 +2801,7 @@ export function LancamentoDialog({
             <Button
               onClick={() => void handleSave(true)}
               disabled={ocupado}
-              className="gap-2 bg-indigo-600 text-white hover:bg-indigo-700"
+              className="gap-2 bg-primary text-primary-foreground hover:bg-primary/90"
             >
               {ocupado ? (
                 <Loader2 className="h-4 w-4 animate-spin" />

@@ -4018,7 +4018,7 @@ function Page() {
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
+          <div className="w-9 h-9 rounded-xl bg-primary/10 text-primary flex items-center justify-center">
             <Wallet className="h-5 w-5" />
           </div>
           <h1 className="text-xl font-bold text-slate-900 tracking-tight">Caixa</h1>
@@ -4169,7 +4169,7 @@ function Page() {
                     <TabsTrigger
                       key={t.v}
                       value={t.v}
-                      className="shrink-0 rounded-none border-b-2 border-transparent bg-transparent px-0 pb-2 pt-0 text-sm font-semibold text-slate-500 shadow-none data-[state=active]:border-indigo-600 data-[state=active]:bg-transparent data-[state=active]:text-indigo-700 data-[state=active]:shadow-none"
+                      className="shrink-0 rounded-none border-b-2 border-transparent bg-transparent px-0 pb-2 pt-0 text-sm font-semibold text-slate-500 shadow-none data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary data-[state=active]:shadow-none"
                     >
                       {t.l}
                     </TabsTrigger>
@@ -4260,7 +4260,7 @@ function Page() {
                           key: "saldo",
                           label: "Saldo atual",
                           value: saldoAtual,
-                          cls: "text-indigo-950",
+                          cls: "text-primary",
                         },
                         {
                           key: "abertura",
@@ -4362,7 +4362,7 @@ function Page() {
                                       Saídas: {fmt(d.saidas)}
                                     </span>
                                     <span
-                                      className={`text-xs font-semibold px-2.5 py-1 rounded-md ${d.saldo >= 0 ? "bg-indigo-50 text-indigo-700" : "bg-rose-50 text-rose-700"}`}
+                                      className={`text-xs font-semibold px-2.5 py-1 rounded-md ${d.saldo >= 0 ? "bg-primary/10 text-primary" : "bg-rose-50 text-rose-700"}`}
                                     >
                                       Saldo do dia: {fmt(d.saldo)}
                                     </span>

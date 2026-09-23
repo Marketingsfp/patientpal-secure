@@ -26,7 +26,7 @@ const OUTLINE_BG: Record<HhpTone, string> = {
   ok: "bg-emerald-50 text-emerald-700 border border-emerald-100",
   warn: "bg-amber-50 text-amber-700 border border-amber-200/60",
   danger: "bg-rose-50 text-rose-700 border border-rose-100",
-  focus: "bg-indigo-50 text-indigo-700 border border-indigo-100",
+  focus: "bg-primary/10 text-primary border border-primary/20",
 };
 
 export function HhpChip({
@@ -69,7 +69,7 @@ export function HhpChip({
                     ? "bg-amber-500"
                     : tone === "danger"
                       ? "bg-rose-500"
-                      : "bg-indigo-500",
+                      : "bg-primary",
           )}
         />
       )}
