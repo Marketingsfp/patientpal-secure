@@ -43,7 +43,6 @@ function diaSP(iso: string): string {
   }).format(new Date(iso));
 }
 
-
 type MovTipo =
   | "abertura"
   | "sangria"
@@ -228,7 +227,9 @@ export function CaixaShellV2({
     const hoje = diaSP(new Date().toISOString());
     setSessao(linhas.find((s) => diaSP(s.aberto_em) === hoje) ?? null);
     setSessoesPendentes(
-      linhas.filter((s) => diaSP(s.aberto_em) < hoje).sort((a, b) => (a.aberto_em < b.aberto_em ? -1 : 1)),
+      linhas
+        .filter((s) => diaSP(s.aberto_em) < hoje)
+        .sort((a, b) => (a.aberto_em < b.aberto_em ? -1 : 1)),
     );
     setSessaoLoading(false);
   }, [clinicaAtual, user]);
