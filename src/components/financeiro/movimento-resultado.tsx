@@ -15,12 +15,18 @@
  *    avulsos) filtram a lista de lançamentos logo abaixo, como já faziam.
  */
 import {
+  Activity,
+  Calendar,
   ClipboardList,
   Coins,
+  CreditCard,
+  FlaskConical,
   Handshake,
   Receipt,
+  Stethoscope,
   TrendingDown,
   TrendingUp,
+  Users,
   Wallet,
   X,
   AlertTriangle,
@@ -287,7 +293,11 @@ export function MovimentoResultado({
    * paga) e as cortesias — atendimentos sem cobrança, que contam na produção
    * mas não entram no caixa. Nulo enquanto carrega ou se a leitura falhar.
    */
-  conferencia?: { repasseDevido: number; cortesias: number } | null;
+  conferencia?: {
+    repasseDevido: number;
+    /** Atendimentos do Rateio sem lançamento no caixa — ver a tela. */
+    foraDoCaixa: { cortesias: number; pagos: number };
+  } | null;
   /**
    * Nomes dos profissionais com mais de uma agenda ativa em `medico_agendas`.
    * Só para eles o quadro abre a quebra por agenda — para os demais a agenda
@@ -298,6 +308,22 @@ export function MovimentoResultado({
   const r = resumoMovimento(linhas);
   const v = (n: number) => (pronto ? brl(n) : "…");
   const alternar = (f: FiltroCard) => onFiltro(mesmoFiltro(filtro, f) ? null : f);
+
+  /**
+   * Atendimentos do período que não passaram pelo caixa (lançados à mão).
+   * São os únicos que faltam nas linhas desta tela; tudo o mais já está em
+   * `r.producao`. Somados aqui, o total fecha com o Rateio da Receita.
+   */
+  const foraCortesias = conferencia?.foraDoCaixa.cortesias ?? 0;
+  const foraPagos = conferencia?.foraDoCaixa.pagos ?? 0;
+  /**
+   * O número único de GR / atendimentos do sistema. Até 23/09/2026 o
+   * Financeiro → Dashboard tinha a própria conta e mostrava outro número; a
+   * seção de Atendimentos saiu de lá e passou a ser esta.
+   */
+  const totalGR = r.producao.total + foraCortesias + foraPagos;
+  const cortesiasTotais = r.producao.cortesias + foraCortesias;
+  const ticketMedio = totalGR > 0 ? r.receitaBruta.total / totalGR : 0;
 
   /**
    * Abre o detalhamento do card em NOVA ABA, com as duas visões já montadas a
@@ -363,7 +389,7 @@ export function MovimentoResultado({
           accent="success"
           detalhe={
             pronto
-              ? `${plural(r.receitaBruta.qtd + (conferencia?.cortesias ?? 0), "pagamento", "pagamentos")} · consultas, exames, procedimentos, mensalidades e avulsos`
+              ? `${plural(totalGR, "pagamento", "pagamentos")} · consultas, exames, procedimentos, mensalidades e avulsos`
               : "Tudo que entrou no caixa"
           }
         >
@@ -377,10 +403,10 @@ export function MovimentoResultado({
               ))}
               {/* Cortesia e gratuidade: o atendimento aconteceu e conta na
                   produção, mas não entrou dinheiro — por isso R$ 0,00. */}
-              {(conferencia?.cortesias ?? 0) > 0 && (
+              {cortesiasTotais > 0 && (
                 <li className="flex items-center justify-between gap-2 text-xs">
                   <span className="text-muted-foreground">
-                    Cortesias e gratuidades ({int(conferencia?.cortesias ?? 0)})
+                    Cortesias e gratuidades ({int(cortesiasTotais)})
                   </span>
                   <span className="tabular-nums">{brl(0)}</span>
                 </li>
@@ -396,7 +422,7 @@ export function MovimentoResultado({
           onClick={() => abrir("receita")}
           icon={ClipboardList}
           label="N° de GR"
-          value={int(r.receitaBruta.qtd + (conferencia?.cortesias ?? 0))}
+          value={int(totalGR)}
           accent="primary"
           detalhe={
             pronto
@@ -420,17 +446,20 @@ export function MovimentoResultado({
                   <span className="tabular-nums">{int(r.outras.porGrupo[g].qtd)}</span>
                 </li>
               ))}
-              {(conferencia?.cortesias ?? 0) > 0 && (
+              {/* As linhas acima somam exatamente os pagamentos do caixa. O
+                  que falta é o atendimento lançado à mão, que não tem
+                  lançamento na gaveta — quase sempre cortesia de R$ 0,00. As
+                  cortesias que JÁ são lançamento de R$ 0,00 no caixa não
+                  entram aqui: elas já estão contadas nas condições acima. */}
+              {foraCortesias + foraPagos > 0 && (
                 <li className="flex items-center justify-between gap-2 text-xs">
-                  <span className="text-muted-foreground">Cortesias e gratuidades</span>
-                  <span className="tabular-nums">{int(conferencia?.cortesias ?? 0)}</span>
+                  <span className="text-muted-foreground">Lançados à mão (fora do caixa)</span>
+                  <span className="tabular-nums">{int(foraCortesias + foraPagos)}</span>
                 </li>
               )}
               <li className="mt-1 flex items-center justify-between gap-2 border-t border-border/60 pt-1 text-xs font-medium">
                 <span>Total</span>
-                <span className="tabular-nums">
-                  {int(r.receitaBruta.qtd + (conferencia?.cortesias ?? 0))}
-                </span>
+                <span className="tabular-nums">{int(totalGR)}</span>
               </li>
             </ul>
           )}
@@ -523,6 +552,108 @@ export function MovimentoResultado({
           )}
         </KpiCard>
       </div>
+
+      {/* Seção de Atendimentos: veio do Financeiro → Dashboard em 23/09/2026,
+          a pedido da direção, e agora só existe aqui. Os números saem das
+          MESMAS linhas do caixa que formam o card "N° de GR", e por isso a
+          soma dos cards é exatamente o total dele — era essa conta em dois
+          lugares que fazia as duas telas mostrarem números diferentes.
+          Onde existe um filtro equivalente, o card filtra a lista abaixo. */}
+      <section className="space-y-2">
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+          Atendimentos
+        </h2>
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+          <KpiCard
+            icon={Users}
+            label="Atendimentos (total)"
+            value={pronto ? int(totalGR) : "…"}
+            accent="primary"
+            detalhe="Mesmo número do card N° de GR"
+          />
+          <KpiCard
+            icon={CreditCard}
+            label="Cartão Consulta"
+            value={pronto ? int(r.producao.consultasCartao) : "…"}
+            accent="primary"
+            onClick={() => alternar({ grupo: "consulta", condicao: "cartao" })}
+          />
+          <KpiCard
+            icon={Stethoscope}
+            label="Consultas particulares"
+            value={pronto ? int(r.producao.consultasParticulares) : "…"}
+            accent="success"
+            onClick={() => alternar({ grupo: "consulta", condicao: "particular" })}
+          />
+          {/* Hoje todo convênio da clínica é da modalidade Cartão, então este
+              card costuma ficar zerado — só aparece quando tem movimento. */}
+          {pronto && r.producao.consultasConvenio > 0 && (
+            <KpiCard
+              icon={Stethoscope}
+              label="Consultas de convênio"
+              value={int(r.producao.consultasConvenio)}
+              accent="success"
+              onClick={() => alternar({ grupo: "consulta", condicao: "convenio" })}
+            />
+          )}
+          <KpiCard
+            icon={FlaskConical}
+            label="Exames e procedimentos"
+            value={pronto ? int(r.producao.exames) : "…"}
+            accent="warning"
+            onClick={() => alternar({ grupo: "exame_procedimento" })}
+          />
+          {pronto && r.producao.outros > 0 && (
+            <KpiCard
+              icon={Activity}
+              label="Recebimentos avulsos"
+              value={int(r.producao.outros)}
+              accent="primary"
+              detalhe="Sem atendimento e sem mensalidade"
+              onClick={() => alternar({ grupo: "avulso" })}
+            />
+          )}
+          <KpiCard
+            icon={Calendar}
+            label="Mensalidades"
+            value={pronto ? int(r.producao.mensalidades) : "…"}
+            accent="success"
+            detalhe="Do período, atrasadas e antecipadas"
+          />
+          <KpiCard
+            icon={Users}
+            label="Adesões"
+            value={pronto ? int(r.producao.adesoes) : "…"}
+            accent="warning"
+            onClick={() => alternar({ grupo: "adesao" })}
+          />
+          {pronto && cortesiasTotais > 0 && (
+            <KpiCard
+              icon={Stethoscope}
+              label="Cortesias e gratuidades"
+              value={int(cortesiasTotais)}
+              accent="primary"
+              detalhe="Atendidos sem cobrança (R$ 0,00)"
+            />
+          )}
+          {pronto && foraPagos > 0 && (
+            <KpiCard
+              icon={ClipboardList}
+              label="Lançados à mão"
+              value={int(foraPagos)}
+              accent="warning"
+              detalhe="Atendimento com valor que não passou pelo caixa"
+            />
+          )}
+          <KpiCard
+            icon={Calendar}
+            label="Ticket médio"
+            value={pronto ? brl(ticketMedio) : "…"}
+            accent="primary"
+            detalhe="Receita bruta ÷ atendimentos"
+          />
+        </div>
+      </section>
 
       {divergente && (
         <div className="flex items-start gap-2 rounded-md border border-amber-300 bg-amber-50 px-4 py-2.5 text-xs text-amber-900">

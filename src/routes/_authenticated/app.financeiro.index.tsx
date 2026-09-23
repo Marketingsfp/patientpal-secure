@@ -1,19 +1,13 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  Activity,
-  Calendar,
-  CreditCard,
-  FlaskConical,
   Handshake,
   Minus,
   Plus,
   Receipt,
   RefreshCw,
-  Stethoscope,
   TrendingDown,
   TrendingUp,
-  Users,
   Wallet,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -525,96 +519,15 @@ function FinDashboard() {
         </div>
       </section>
 
-      <section className="space-y-2">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-          Atendimentos
-        </h2>
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          <KpiCard
-            onClick={() => abrir("atendimentos")}
-            icon={Users}
-            label="Atendimentos (total)"
-            value={v((r) => r.producao.total, int)}
-            accent="primary"
-          />
-          <KpiCard
-            onClick={() => abrir("cartao")}
-            icon={CreditCard}
-            label="Cartão Consulta"
-            value={v((r) => r.producao.consultasCartao, int)}
-            accent="primary"
-          />
-          <KpiCard
-            onClick={() => abrir("particular")}
-            icon={Stethoscope}
-            label="Consultas Particulares"
-            value={v((r) => r.producao.consultasParticulares, int)}
-            accent="success"
-            detalhe={
-              resumo && resumo.producao.consultasConvenio > 0
-                ? `Inclui ${int(resumo.producao.consultasConvenio)} de convênio`
-                : undefined
-            }
-          />
-          <KpiCard
-            onClick={() => abrir("exame")}
-            icon={FlaskConical}
-            label="Exames"
-            value={v((r) => r.producao.exames, int)}
-            accent="warning"
-          />
-          {/* Procedimento e serviço fora do cadastro. Sem este card a soma dos
-              cards de contagem não fecharia com o total. */}
-          {resumo && resumo.producao.outros > 0 && (
-            <KpiCard
-              onClick={() => abrir("outro")}
-              icon={Activity}
-              label="Procedimentos e outros"
-              value={v((r) => r.producao.outros, int)}
-              accent="primary"
-            />
-          )}
-          {/* Mensalidade e adesão do Cartão: recebimentos sem agendamento que
-              também contam como atendimento no total. */}
-          <KpiCard
-            onClick={() => abrir("mensalidade")}
-            icon={Calendar}
-            label="Mensalidades"
-            value={v((r) => r.producao.mensalidades, int)}
-            accent="success"
-          />
-          <KpiCard
-            onClick={() => abrir("adesao")}
-            icon={Users}
-            label="Adesões"
-            value={v((r) => r.producao.adesoes, int)}
-            accent="warning"
-          />
-          {/* Atendido sem cobrança: revisão de cortesia e gratuidade do plano
-              da casa. Conta no total e vale R$ 0,00. */}
-          {resumo && resumo.producao.cortesias > 0 && (
-            <KpiCard
-              onClick={() => abrir("cortesia")}
-              icon={Stethoscope}
-              label="Cortesias e gratuidades"
-              value={v((r) => r.producao.cortesias, int)}
-              accent="primary"
-              detalhe="Atendidos sem cobrança (R$ 0,00)"
-            />
-          )}
-
-
-
-          <KpiCard
-            onClick={() => abrir("ticket")}
-            icon={Calendar}
-            label="Ticket médio"
-            value={v((r) => r.ticketMedio)}
-            accent="primary"
-            detalhe="Receita dos atendimentos ÷ atendimentos"
-          />
-        </div>
-      </section>
+      {/* A seção "Atendimentos" (total, Cartão Consulta, particulares, exames,
+          mensalidades, adesões, cortesias e ticket médio) saiu daqui em
+          23/09/2026, a pedido da direção, e passou a existir SÓ no Movimento
+          de Caixa. O motivo é que a contagem era feita em dois lugares, por
+          réguas parecidas mas não iguais, e as telas mostravam números
+          diferentes para o mesmo período (6.143 aqui contra 6.174 lá em
+          setembro de 2026). Agora o número de GR / atendimentos tem uma fonte
+          só: `producaoDoMovimento`, em `@/lib/financeiro/movimento-resultado`.
+          Não recriar cards de contagem de atendimento nesta tela. */}
 
       {/* Fila de repasses de dias anteriores: desceu para o fim da página a
           pedido da tesouraria — continua sumindo sozinha quando não há nada

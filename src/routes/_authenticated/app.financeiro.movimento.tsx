@@ -376,7 +376,16 @@ function Page() {
    */
   const [conferencia, setConferencia] = useState<{
     repasseDevido: number;
-    cortesias: number;
+    /**
+     * Atendimentos do Rateio que NÃO têm lançamento no caixa (`no_caixa`
+     * falso): atendimento lançado à mão, quase sempre cortesia de R$ 0,00.
+     * São os únicos que ainda faltam na contagem desta tela — o resto já está
+     * nas linhas do caixa. Até 23/09/2026 o card "N° de GR" somava TODAS as
+     * cortesias do Rateio, e as de R$ 0,00 que já eram lançamento do caixa
+     * entravam duas vezes: era daí a diferença para o Dashboard (6.174 contra
+     * 6.143 em setembro de 2026).
+     */
+    foraDoCaixa: { cortesias: number; pagos: number };
   } | null>(null);
   const ctxRateioRef = useRef<{ clinicaId: string; ctx: RateioContexto } | null>(null);
   const [filterStatus, setFilterStatus] = useState<"confirmado" | "todos" | "pendente">(
@@ -504,12 +513,21 @@ function Page() {
         const linhas = await carregarRateio(ctx, { clinicaId, de: fromDate, ate: toDate });
         if (cancelado) return;
         let repasseDevido = 0;
-        let cortesias = 0;
+        let cortesiasFora = 0;
+        let pagosFora = 0;
         for (const l of linhas) {
           repasseDevido += l.repasse + l.terceiro;
-          if (l.origem === "atendimento" && !l.laudo && l.receita <= 0) cortesias++;
+          // Só o atendimento SEM lançamento no caixa entra aqui. O que passou
+          // pela gaveta já está contado nas linhas da tela — somar de novo era
+          // o que inflava o "N° de GR".
+          if (l.origem !== "atendimento" || l.laudo || l.no_caixa) continue;
+          if (l.receita <= 0) cortesiasFora++;
+          else pagosFora++;
         }
-        setConferencia({ repasseDevido: Math.round(repasseDevido * 100) / 100, cortesias });
+        setConferencia({
+          repasseDevido: Math.round(repasseDevido * 100) / 100,
+          foraDoCaixa: { cortesias: cortesiasFora, pagos: pagosFora },
+        });
       } catch {
         if (!cancelado) setConferencia(null);
       }

@@ -229,6 +229,48 @@ describe("resumoMovimento", () => {
     expect(r.saldo).toBe(305);
   });
 
+  // A contagem de atendimentos saiu do Financeiro → Dashboard em 23/09/2026 e
+  // passou a viver só aqui. O que garante que as duas telas nunca mais
+  // divirjam é a soma dos cards fechar com `receitaBruta.qtd`, que é o
+  // "N° de GR".
+  it("a contagem de atendimentos fecha com o N° de GR", () => {
+    const p = r.producao;
+    expect(p.total).toBe(r.receitaBruta.qtd);
+    expect(
+      p.consultasCartao +
+        p.consultasParticulares +
+        p.consultasConvenio +
+        p.exames +
+        p.outros +
+        p.mensalidades +
+        p.adesoes +
+        p.cortesias,
+    ).toBe(p.total);
+    // Seis pagamentos: duas consultas, um exame, o misto (um só), a
+    // mensalidade e o avulso.
+    expect(p.total).toBe(5);
+    expect(p.consultasParticulares).toBe(1);
+    expect(p.consultasCartao).toBe(1);
+    expect(p.exames).toBe(1);
+    expect(p.mensalidades).toBe(1);
+    expect(p.outros).toBe(1);
+    expect(p.cortesias).toBe(0);
+  });
+
+  it("atendimento de R$ 0,00 conta como cortesia e sai de consultas", () => {
+    const comCortesia = classificarMovimento(
+      [
+        l({ agendamento_id: "c1", procedimento: "CONSULTA", valor: 100 }),
+        l({ agendamento_id: "c2", procedimento: "CONSULTA", valor: 0 }),
+      ],
+      ctx,
+    );
+    const p = resumoMovimento(comCortesia).producao;
+    expect(p.total).toBe(2);
+    expect(p.consultasParticulares).toBe(1);
+    expect(p.cortesias).toBe(1);
+  });
+
   it("o filtro do card pega só a condição e o tipo clicados", () => {
     const f = { grupo: "consulta" as const, condicao: "cartao" as const };
     expect(linhas.filter((x) => linhaCasaComFiltro(x, f)).map((x) => x.id)).toEqual(["m#0", "m#1"]);

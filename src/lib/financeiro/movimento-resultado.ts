@@ -292,6 +292,45 @@ export interface TotalQtd {
   qtd: number;
 }
 
+/**
+ * Contagem de atendimentos pela régua da GAVETA — a mesma leitura que o
+ * Financeiro → Dashboard mostrava até 23/09/2026 e que hoje vive só aqui.
+ *
+ * Um PAGAMENTO conta um: as partes de um pagamento misto somam uma vez só,
+ * pelo lançamento de origem, exatamente como `receitaBruta.qtd`. Por isso
+ * `consultasCartao + consultasParticulares + consultasConvenio + exames +
+ * outros + mensalidades + adesoes + cortesias` é sempre igual a
+ * `receitaBruta.qtd` — o card "N° de GR" e os cards de contagem fecham entre
+ * si por construção.
+ *
+ * O atendimento sem cobrança (cortesia da casa, gratuidade do Cartão) sai dos
+ * baldes de tipo e vai para `cortesias`, para não inflar consultas e exames —
+ * o mesmo critério do Dashboard antigo (`producaoDoRateio`).
+ */
+export interface ProducaoMovimento {
+  /** Igual a `receitaBruta.qtd`: todo pagamento recebido no período. */
+  total: number;
+  consultasCartao: number;
+  /**
+   * Consulta particular, SEM convênio. O Dashboard antigo somava as duas num
+   * card só; aqui elas ficam separadas, como já são na lista e no quadro de
+   * atendimentos desta tela.
+   */
+  consultasParticulares: number;
+  /** Consulta de empresa conveniada. */
+  consultasConvenio: number;
+  /** Exames e procedimentos. */
+  exames: number;
+  /** Recebimento avulso: sem atendimento e sem mensalidade. */
+  outros: number;
+  /** Mensalidades do Cartão (do período, atrasadas e antecipadas). */
+  mensalidades: number;
+  /** Taxa de adesão e inclusão de dependente. */
+  adesoes: number;
+  /** Atendido sem cobrança, com lançamento de R$ 0,00 no caixa. */
+  cortesias: number;
+}
+
 export interface ResumoMovimento {
   /** Receita de atendimento (Particular + Cartão + Convênio). */
   atendimentos: TotalQtd & {
@@ -310,6 +349,8 @@ export interface ResumoMovimento {
    * cada pagamento conta como um atendimento (12/09/2026).
    */
   receitaBruta: TotalQtd & { formas: Array<{ rotulo: string; valor: number }> };
+  /** Contagem de atendimentos do período — ver `ProducaoMovimento`. */
+  producao: ProducaoMovimento;
   repassePago: TotalQtd;
   complementoMedico: TotalQtd;
   operacionais: TotalQtd;
@@ -351,6 +392,60 @@ export function saldoPorMeio(linhas: LinhaClassificada[]): SaldoPorMeio {
 function contar(linhas: LinhaClassificada[]): TotalQtd {
   const ids = new Set(linhas.map((l) => l._mistoPaiId ?? l.id));
   return { total: round2(linhas.reduce((s, l) => s + (Number(l.valor) || 0), 0)), qtd: ids.size };
+}
+
+/**
+ * Contagem de atendimentos do período — ver `ProducaoMovimento`.
+ *
+ * Trabalha sobre os PAGAMENTOS, não sobre as linhas: as partes de um pagamento
+ * misto são juntadas pelo lançamento de origem antes de contar, que é o que
+ * faz o total bater com `receitaBruta.qtd` na casa da unidade.
+ */
+export function producaoDoMovimento(receitas: LinhaClassificada[]): ProducaoMovimento {
+  const pagamentos = new Map<
+    string,
+    { grupo: GrupoMovimento | null; condicao: CondicaoAtendimento | null; valor: number }
+  >();
+  for (const l of receitas) {
+    const chave = l._mistoPaiId ?? l.id;
+    const atual = pagamentos.get(chave);
+    if (atual) atual.valor += Number(l.valor) || 0;
+    else
+      pagamentos.set(chave, {
+        grupo: l.grupo,
+        condicao: l.condicao,
+        valor: Number(l.valor) || 0,
+      });
+  }
+  const p: ProducaoMovimento = {
+    total: pagamentos.size,
+    consultasCartao: 0,
+    consultasParticulares: 0,
+    consultasConvenio: 0,
+    exames: 0,
+    outros: 0,
+    mensalidades: 0,
+    adesoes: 0,
+    cortesias: 0,
+  };
+  for (const pg of pagamentos.values()) {
+    // Atendimento de R$ 0,00 é cortesia ou gratuidade: conta na produção, em
+    // card próprio, e não entra em consultas nem em exames.
+    if (ehAtendimento(pg.grupo) && pg.valor <= 0) {
+      p.cortesias++;
+      continue;
+    }
+    if (pg.grupo === "consulta") {
+      if (pg.condicao === "cartao") p.consultasCartao++;
+      else if (pg.condicao === "convenio") p.consultasConvenio++;
+      else p.consultasParticulares++;
+    } else if (pg.grupo === "exame_procedimento") p.exames++;
+    else if (pg.grupo === "adesao") p.adesoes++;
+    else if (pg.grupo === "avulso") p.outros++;
+    // O que sobra são as três faixas de mensalidade do Cartão.
+    else p.mensalidades++;
+  }
+  return p;
 }
 
 const CARTAO_NA_BARRA: FormaCanonica[] = ["debito", "credito", "legado_cartao"];
@@ -423,6 +518,7 @@ export function resumoMovimento(linhas: LinhaClassificada[]): ResumoMovimento {
     outras: { ...totOutras, porGrupo },
     receitas: totalReceitas,
     receitaBruta: { ...contar(receitas), formas: quebraPorForma(receitas) },
+    producao: producaoDoMovimento(receitas),
 
     repassePago,
     complementoMedico,
