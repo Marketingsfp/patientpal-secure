@@ -11,6 +11,8 @@ describe("pesquisa usa atendimento, não texto conversacional", () => {
     "Como funciona o atendimento para nebulização?",
     "Quero uma ultra de abdome total sem doppler",
     "Tem cardiologista amanhã?",
+    "Clínica Médica",
+    "consulta clinica medica",
   ])("recusa a frase antes de consultar: %s", async (termo) => {
     let consultas = 0;
     const broker = criarToolBroker({
@@ -50,6 +52,7 @@ describe("pesquisa usa atendimento, não texto conversacional", () => {
   });
   it.each([
     "cardiologia",
+    "Clínico Geral",
     "cardiologia infantil",
     "nebulização",
     "USG abdome total sem doppler",
@@ -62,6 +65,9 @@ describe("pesquisa usa atendimento, não texto conversacional", () => {
     expect(recusarFraseComoPesquisa("consultar_base_conhecimento", { termo })).toBeNull();
   });
   it("aplica a validação também aos atalhos de busca, sem bloquear o motivo de uma transferência legítima", () => {
+    expect(recusarFraseComoPesquisa("buscar_medicos", { especialidade: "Clínica Médica", nome: "Dra. Ana" }))
+      .toMatchObject({ codigo: PESQUISA_NAO_INTERPRETADA, consulta_executada: false });
+    expect(recusarFraseComoPesquisa("dados_da_clinica", { clinica: "Clínica Médica" })).toBeNull();
     expect(
       recusarFraseComoPesquisa("buscar_medicos", { especialidade: "Quero cardiologista" }),
     ).not.toBeNull();

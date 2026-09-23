@@ -147,7 +147,7 @@ const registroMensagem = (body: string, indice: number, direction = "out", statu
 });
 if (confirmacaoMedico) estadoContextual.knowledge_context = {
   versao: 1, clinicaId: "clinica-simulada", sessionId: "sessao-contextual",
-  consulta: { termo: "clinica medica", tipo_atendimento: "consulta" },
+  consulta: { termo: "clinico geral", tipo_atendimento: "consulta" },
   referencias: [{ registro: "medico-0", versao: null, procedimento: null, medicoNome: "Sandro Prinscewal" }],
   esclarecimentoTentativas: cenario.endsWith("segunda") ? 2 : 1,
   esclarecimento: { tipo: "profissional", pergunta: perguntaMedico,
@@ -391,7 +391,7 @@ mock.module("@/lib/nina/ai-gateway.server", () => ({ ninaAIGateway: async (req: 
     ok: true, conteudo: confirmacaoMedico ? "Vamos continuar com Sandro Prinscewal para Clínico Geral." : "Vamos continuar com Shirley Martins.", modelo: "modelo-simulado", execucaoId: "execucao-direta", nivel: "low",
     toolCalls: requests.length === 1 ? [
       { id: "medico", type: "function", function: { name: "consultar_base_conhecimento", arguments: JSON.stringify({
-        termo: confirmacaoMedico ? "clinica medica" : cenario.endsWith("resolvido") ? "Shirley" : "Suellen", medico: confirmacaoMedico ? "Sandro" : cenario.endsWith("resolvido") ? "Shirley" : "Suellen", tipo_atendimento: "consulta",
+        termo: confirmacaoMedico ? "clinico geral" : cenario.endsWith("resolvido") ? "Shirley" : "Suellen", medico: confirmacaoMedico ? "Sandro" : cenario.endsWith("resolvido") ? "Shirley" : "Suellen", tipo_atendimento: "consulta",
       }) } },
       ...(!confirmacaoMedico && !cenario.endsWith("resolvido") ? [{ id: "nao-transferir-antes-de-esclarecer", type: "function", function: { name: "solicitar_atendente_humano", arguments: '{"motivo":"Não encontrado"}' } }] : []),
     ] : [],

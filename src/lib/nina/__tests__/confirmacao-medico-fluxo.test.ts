@@ -29,7 +29,7 @@ describe("respostas informais no núcleo real com catálogo reconsultado", () =>
         const r = JSON.parse(linha.slice("DIRETA_RESULTADO=".length));
         expect(r.rede).toBe(0);
         expect(r.argumentosFerramentas[0].args).toMatchObject({
-          termo: "clinica medica",
+          termo: "clinico geral",
           medico: "medico-0",
           tipo_atendimento: "consulta",
         });

@@ -36,6 +36,17 @@ export function recusarFraseComoPesquisa(nome: string, args: unknown) {
   } catch {
     return null;
   } // Argumentos malformados seguem a validação do executor.
+  const campoAtendimento = nome === "buscar_medicos" ? "especialidade" : "termo";
+  const atendimento = parametros[campoAtendimento];
+  if (typeof atendimento === "string" && /\bclinicas? medicas?\b/.test(normalizarBuscaCatalogo(atendimento))) {
+    return {
+      ok: false as const,
+      erro: "VALIDATION_ERROR",
+      codigo: PESQUISA_NAO_INTERPRETADA,
+      consulta_executada: false,
+      mensagem: "A pesquisa não foi executada: clínica médica pode se referir à unidade e não é sinônimo de Clínico Geral. Releia o pedido e o histórico. Se o paciente já pediu Clínico Geral, pesquise exatamente esse atendimento. Para informações da unidade, use a ferramenta correspondente. Se a consulta desejada não estiver clara, peça esclarecimento sem presumir especialidade. Isso não comprova ausência na base e não autoriza encaminhamento automático.",
+    };
+  }
   const frase = campos.some((campo) => {
     if (typeof parametros[campo] !== "string") return false;
     const termo = normalizarBuscaCatalogo(parametros[campo]).trim();

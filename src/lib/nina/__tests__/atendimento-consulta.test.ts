@@ -1,5 +1,6 @@
 import { expect, test } from "bun:test";
-import { atualizarPreferenciaAtendimento, atendePreferenciaConsulta, pedidoPreventivo } from "../atendimento-consulta";
+import { atualizarPreferenciaAtendimento, atendePreferenciaConsulta, pedidoPreventivo, selecionarAtendimentosConsulta } from "../atendimento-consulta";
+import { prepararBuscaCatalogo, REGRA_INTERPRETACAO_CATALOGO } from "../catalogo-busca";
 import { profissionalParaRegistro } from "../catalogo-conhecimento";
 import { atendimentosEstruturados } from "../catalogo-estrutura";
 import { conhecimentoDaMesmaSessao, lembrarConsultaComprovada } from "../confidence/conhecimento-sessao";
@@ -10,6 +11,18 @@ const registro = profissionalParaRegistro({ id: "medica", nome: "Conceição Mar
   especialidades: [{ nome: "GINECOLOGIA" }], observacao_publica:
     "CONSULTA + PREVENTIVO\nEspecialidade: GINECOLOGIA\nDinheiro: R$ 172,00\nPix/cartão: R$ 205,00\nObservação: Agendado" }, "2026-09-21");
 const com = { especialidade: "GINECOLOGIA", preventivo: "com" as const };
+
+test("clínica médica não é sinônimo nem correção de escrita de clínico geral", () => {
+  const itens = atendimentosEstruturados("CONSULTA CLÍNICO GERAL\nEspecialidade: CLÍNICO GERAL\nProfissional: Dra. Ana", null);
+  expect(selecionarAtendimentosConsulta(itens, { atendimento: "Clínica Médica" })).toHaveLength(0);
+  expect(selecionarAtendimentosConsulta(itens, { atendimento: "Clínico Geral" })).toEqual(itens);
+  expect(atendePreferenciaConsulta(itens[0]!, { especialidade: "Clínica Médica" })).toBe(false);
+  const busca = prepararBuscaCatalogo("clínica médica", ["Clínico Geral"]);
+  expect(busca.pontuar("Clínico Geral", "")).toBe(0);
+  expect(busca.ajustes).not.toContainEqual({ original: "clinica", candidatos: ["clinico"] });
+  expect(REGRA_INTERPRETACAO_CATALOGO).toContain('Dra. Ana — Clínico Geral');
+  expect(REGRA_INTERPRETACAO_CATALOGO).toContain('não é sinônimo de Clínico Geral');
+});
 test.each(["Quero consulta com preventivo", "Quero consulta + preventivo"])("identifica a variante: %s", mensagem => {
   expect(atualizarPreferenciaAtendimento({ mensagem, registros: [registro] })).toEqual(com);
 });
