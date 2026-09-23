@@ -3329,6 +3329,11 @@ function Page() {
       );
       return;
     }
+    // Trava de fechamento diário.
+    if (travadoPorCaixaAnterior) {
+      toast.error(msgTravaCaixaAnterior);
+      return;
+    }
     const v = Number(movValor) || 0;
     if (v <= 0) {
       toast.error("Informe um valor");
