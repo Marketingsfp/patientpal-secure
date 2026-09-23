@@ -1026,16 +1026,48 @@ export function CaixaShellV2({
       </div>
       {/* Ações rápidas */}
       <div className="flex flex-wrap gap-1.5">
-        <Button size="sm" onClick={() => goCaixa()} data-testid="quick-receber">
+        <Button
+          size="sm"
+          onClick={() => {
+            if (bloqueado()) return;
+            goCaixa();
+          }}
+          title={travadoPorCaixaAnterior ? msgTravaCaixaAnterior : undefined}
+          data-testid="quick-receber"
+        >
           <PlusCircle className="h-4 w-4" /> Receber
         </Button>
-        <Button size="sm" variant="outline" onClick={() => goCaixa()}>
+        <Button
+          size="sm"
+          variant="outline"
+          title={travadoPorCaixaAnterior ? msgTravaCaixaAnterior : undefined}
+          onClick={() => {
+            if (bloqueado()) return;
+            goCaixa();
+          }}
+        >
           <MinusCircle className="h-4 w-4" /> Despesa
         </Button>
-        <Button size="sm" variant="outline" onClick={() => goCaixa()}>
+        <Button
+          size="sm"
+          variant="outline"
+          title={travadoPorCaixaAnterior ? msgTravaCaixaAnterior : undefined}
+          onClick={() => {
+            if (bloqueado()) return;
+            goCaixa();
+          }}
+        >
           <ArrowDownToLine className="h-4 w-4" /> Suprimento
         </Button>
-        <Button size="sm" variant="outline" onClick={() => goCaixa()}>
+        <Button
+          size="sm"
+          variant="outline"
+          title={travadoPorCaixaAnterior ? msgTravaCaixaAnterior : undefined}
+          onClick={() => {
+            if (bloqueado()) return;
+            goCaixa();
+          }}
+        >
           <ArrowUpFromLine className="h-4 w-4" /> Sangria
         </Button>
         <Button size="sm" variant="ghost" onClick={() => goCaixa()}>
