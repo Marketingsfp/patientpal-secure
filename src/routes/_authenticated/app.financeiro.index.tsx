@@ -144,7 +144,14 @@ interface DetalheAberto {
 function FinDashboard() {
   const { clinicaAtual } = useClinica();
   const podeEscrever = usePodeEscrever("financeiro");
-  const [periodo, setPeriodo] = useState<Periodo>("mes");
+  /**
+   * O Dashboard abre em "Hoje".
+   *
+   * Quem abre o Financeiro está quase sempre conferindo o movimento do dia; o
+   * mês inteiro é consulta pontual e custava a leitura mais pesada em toda
+   * abertura da tela. Trocar de botão continua funcionando igual.
+   */
+  const [periodo, setPeriodo] = useState<Periodo>("hoje");
   /** Datas do botão "Período" (intervalo escolhido pela pessoa). */
   const [custom, setCustom] = useState<{ de: string; ate: string }>(() => ({
     de: hojeBR(),
