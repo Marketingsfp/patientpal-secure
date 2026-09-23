@@ -4241,21 +4241,27 @@ function Page() {
                         <div className="flex flex-wrap items-center gap-2">
                           <button
                             type="button"
-                            className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg shadow-sm cursor-pointer transition-colors"
+                            disabled={travadoPorCaixaAnterior}
+                            title={travadoPorCaixaAnterior ? msgTravaCaixaAnterior : undefined}
+                            className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg shadow-sm cursor-pointer transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                             onClick={() => setOpenMov({ tipo: "suprimento" })}
                           >
                             <ArrowDownToLine className="h-4 w-4" /> Novo suprimento
                           </button>
                           <button
                             type="button"
-                            className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold bg-amber-500 hover:bg-amber-600 text-white rounded-lg shadow-sm cursor-pointer transition-colors"
+                            disabled={travadoPorCaixaAnterior}
+                            title={travadoPorCaixaAnterior ? msgTravaCaixaAnterior : undefined}
+                            className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold bg-amber-500 hover:bg-amber-600 text-white rounded-lg shadow-sm cursor-pointer transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                             onClick={() => setOpenMov({ tipo: "sangria" })}
                           >
                             <ArrowUpFromLine className="h-4 w-4" /> Nova sangria
                           </button>
                           <button
                             type="button"
-                            className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 shadow-xs cursor-pointer transition-colors"
+                            disabled={travadoPorCaixaAnterior}
+                            title={travadoPorCaixaAnterior ? msgTravaCaixaAnterior : undefined}
+                            className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 shadow-xs cursor-pointer transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                             onClick={() => setOpenMov({ tipo: "estorno" })}
                           >
                             <Undo2 className="h-4 w-4 text-fuchsia-600" /> Estorno
@@ -4264,14 +4270,18 @@ function Page() {
                             <>
                               <button
                                 type="button"
-                                className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 shadow-xs cursor-pointer transition-colors"
+                                disabled={travadoPorCaixaAnterior}
+                                title={travadoPorCaixaAnterior ? msgTravaCaixaAnterior : undefined}
+                                className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 shadow-xs cursor-pointer transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                                 onClick={() => setOpenMov({ tipo: "recebimento" })}
                               >
                                 <PlusCircle className="h-4 w-4 text-emerald-600" /> Recebimento
                               </button>
                               <button
                                 type="button"
-                                className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 shadow-xs cursor-pointer transition-colors"
+                                disabled={travadoPorCaixaAnterior}
+                                title={travadoPorCaixaAnterior ? msgTravaCaixaAnterior : undefined}
+                                className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 shadow-xs cursor-pointer transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                                 onClick={() => setOpenMov({ tipo: "despesa" })}
                               >
                                 <MinusCircle className="h-4 w-4 text-rose-600" /> Despesa
