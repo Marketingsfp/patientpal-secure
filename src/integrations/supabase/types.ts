@@ -15970,6 +15970,18 @@ export type Database = {
           valor_pago: number
         }[]
       }
+      fn_caixa_forma_bucket: {
+        Args: { _forma: string; _tipo?: string }
+        Returns: string
+      }
+      fn_caixa_pendente_de_dia_anterior: {
+        Args: { _clinica_id: string; _user_id: string }
+        Returns: {
+          dia: string
+          operador: string
+          sessao_id: string
+        }[]
+      }
       fn_hist_quem: {
         Args: { _clinica: string; _email: string; _user_id: string }
         Returns: Json
