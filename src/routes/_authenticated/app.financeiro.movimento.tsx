@@ -56,6 +56,8 @@ import {
   totaisRetroativos,
   TIPOS_QUE_PESAM_NA_GAVETA,
 } from "@/lib/financeiro/retroativos";
+import { buscarPaginado } from "@/lib/financeiro/paginacao";
+import { limparCacheFinanceiro } from "@/lib/financeiro/cache-periodo";
 import { resumoSintetico, tipoDoProcedimento } from "@/lib/financeiro/composicao-receita";
 
 /** Rótulo do tipo do serviço na planilha exportada. */
@@ -573,55 +575,57 @@ function Page() {
       // Busca em todas as datas para no primeiro lote: ela procura uma
       // transação, não soma um caixa. Ver `LIMITE_BUSCA_GLOBAL`.
       const MAX = buscaGlobal ? LIMITE_BUSCA_GLOBAL : 20000; // salvaguarda
-      let offset = 0;
-      for (;;) {
-        let q = supabase
-          .from("fin_lancamentos")
-          .select(
-            "id, tipo, descricao, valor, data, status, categoria_id, conta_id, forma_pagamento, composicao_pagamento, observacoes, criado_por, medico_id, agendamento_id, created_at, paciente_id, convenio_modalidade, empresa_id",
-          )
-          .eq("clinica_id", clinicaAtual.clinica_id)
-          .order("data", { ascending: false })
-          .range(offset, offset + CHUNK - 1);
-        if (!buscaGlobal) q = q.gte("data", fromDate).lte("data", toDate);
-        if (filterTipo === "receita" || filterTipo === "despesa") q = q.eq("tipo", filterTipo);
-        if (filterUsuario !== "todos") {
-          if (filterUsuario === "sem") q = q.is("criado_por", null);
-          else q = q.eq("criado_por", filterUsuario);
-        }
-        q = applyForma(q);
-        if (filterPacienteDebounced) q = q.ilike("descricao", `%${filterPacienteDebounced}%`);
-        const { data, error } = await q;
-        if (obsoleta()) return;
-        if (error) {
-          mostrarErro(error);
-          setLoading(false);
-          return;
-        }
-        const rows = (data ?? []) as Array<
-          Omit<Lanc, "origem" | "medico_nome" | "ficha_numero"> & {
-            medico_id?: string | null;
-            agendamento_id?: string | null;
-            created_at?: string | null;
-          }
-        >;
-        finList.push(
-          ...rows.map((l) => ({
-            ...l,
-            origem: "fin" as const,
-            _parcelaImportada: ehParcelaImportada(l),
-            hora: l.created_at
-              ? (() => {
-                  const d = new Date(l.created_at as string);
-                  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
-                })()
-              : null,
-          })),
+      // As páginas saem em ondas paralelas (ver `@/lib/financeiro/paginacao`):
+      // o mês de setembro/2026 são 7.003 lançamentos, que em fila indiana
+      // eram 8 idas ao banco esperando uma pela outra.
+      type LancRow = Omit<Lanc, "origem" | "medico_nome" | "ficha_numero"> & {
+        medico_id?: string | null;
+        agendamento_id?: string | null;
+        created_at?: string | null;
+      };
+      let rows: LancRow[];
+      try {
+        rows = await buscarPaginado<LancRow>(
+          () => {
+            let q = supabase
+              .from("fin_lancamentos")
+              .select(
+                "id, tipo, descricao, valor, data, status, categoria_id, conta_id, forma_pagamento, composicao_pagamento, observacoes, criado_por, medico_id, agendamento_id, created_at, paciente_id, convenio_modalidade, empresa_id",
+              )
+              .eq("clinica_id", clinicaAtual.clinica_id)
+              .order("data", { ascending: false });
+            if (!buscaGlobal) q = q.gte("data", fromDate).lte("data", toDate);
+            if (filterTipo === "receita" || filterTipo === "despesa") q = q.eq("tipo", filterTipo);
+            if (filterUsuario !== "todos") {
+              if (filterUsuario === "sem") q = q.is("criado_por", null);
+              else q = q.eq("criado_por", filterUsuario);
+            }
+            q = applyForma(q);
+            if (filterPacienteDebounced) q = q.ilike("descricao", `%${filterPacienteDebounced}%`);
+            return q as never;
+          },
+          { pagina: CHUNK, maxPaginas: Math.ceil(MAX / CHUNK) },
         );
-        if (rows.length < CHUNK) break;
-        offset += CHUNK;
-        if (offset >= MAX) break;
+      } catch (error) {
+        if (obsoleta()) return;
+        mostrarErro(error);
+        setLoading(false);
+        return;
       }
+      if (obsoleta()) return;
+      finList.push(
+        ...rows.map((l) => ({
+          ...l,
+          origem: "fin" as const,
+          _parcelaImportada: ehParcelaImportada(l),
+          hora: l.created_at
+            ? (() => {
+                const d = new Date(l.created_at as string);
+                return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+              })()
+            : null,
+        })),
+      );
       // Enriquecer com médico, paciente, serviço e nº da ficha do agendamento
       // vinculado.
       //
@@ -774,30 +778,30 @@ function Page() {
       const MAX_MV = 20000;
       const iniJanela = `${diaDeslocado(fromDate, -1)}T00:00:00`;
       const fimJanela = `${diaDeslocado(toDate, 1)}T23:59:59`;
-      let offMv = 0;
-      const movs: Array<{ lancamento_id: string | null; tipo: string; sessao_id: string }> = [];
-      for (;;) {
-        const { data: mv, error: errMv } = await supabase
-          .from("caixa_movimentos")
-          .select("lancamento_id, tipo, sessao_id")
-          .eq("clinica_id", clinicaAtual.clinica_id)
-          .in("tipo", [...TIPOS_QUE_PESAM_NA_GAVETA])
-          .not("lancamento_id", "is", null)
-          .gte("created_at", iniJanela)
-          .lte("created_at", fimJanela)
-          .range(offMv, offMv + CHUNK_MV - 1);
+      // Em ondas paralelas, pelo mesmo motivo da busca de lançamentos acima:
+      // são 6.549 movimentos de caixa num mês.
+      type MovRow = { lancamento_id: string | null; tipo: string; sessao_id: string };
+      let movs: MovRow[];
+      try {
+        movs = await buscarPaginado<MovRow>(
+          () =>
+            supabase
+              .from("caixa_movimentos")
+              .select("lancamento_id, tipo, sessao_id")
+              .eq("clinica_id", clinicaAtual.clinica_id)
+              .in("tipo", [...TIPOS_QUE_PESAM_NA_GAVETA])
+              .not("lancamento_id", "is", null)
+              .gte("created_at", iniJanela)
+              .lte("created_at", fimJanela) as never,
+          { pagina: CHUNK_MV, maxPaginas: Math.ceil(MAX_MV / CHUNK_MV) },
+        );
+      } catch (errMv) {
         if (obsoleta()) return;
-        if (errMv) {
-          mostrarErro(errMv);
-          setLoading(false);
-          return;
-        }
-        const rows = (mv ?? []) as typeof movs;
-        movs.push(...rows);
-        if (rows.length < CHUNK_MV) break;
-        offMv += CHUNK_MV;
-        if (offMv >= MAX_MV) break;
+        mostrarErro(errMv);
+        setLoading(false);
+        return;
       }
+      if (obsoleta()) return;
       // As sessões dizem duas coisas que o movimento sozinho não diz: de que
       // dia é a gaveta e a que horas ela foi fechada. A hora do fechamento é
       // indispensável — até 24/08/2026 a RPC empurrava recebimento para
@@ -1429,6 +1433,9 @@ function Page() {
       }
     }
     setOpen(false);
+    // O dinheiro mudou: o cache curto do período tem que ser esquecido, aqui
+    // e nas outras abas do financeiro.
+    limparCacheFinanceiro();
     await load();
     await loadResumo();
   };
@@ -1485,6 +1492,7 @@ function Page() {
     if (error) mostrarErro(error);
     else {
       toast.success("Removido");
+      limparCacheFinanceiro();
       await load();
       await loadResumo();
     }
@@ -1646,6 +1654,7 @@ function Page() {
           ? "Lançamento estornado — solicitação enviada para a aba Estorno (pendente)."
           : "Lançamento estornado",
       );
+      limparCacheFinanceiro();
       await load();
       await loadResumo();
     } finally {
@@ -3399,6 +3408,7 @@ function Page() {
         caixaMovimentoId={estornoSangria?.id ?? null}
         onCreated={() => {
           setEstornoSangria(null);
+          limparCacheFinanceiro();
           load();
         }}
       />

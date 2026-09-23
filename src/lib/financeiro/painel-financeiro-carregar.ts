@@ -15,6 +15,8 @@ import {
   type RateioLinha,
 } from "@/lib/financeiro/rateio-receita";
 import { SEM_CATEGORIA } from "@/lib/financeiro/filtro-categoria";
+import { comCache, TTL_PERIODO } from "@/lib/financeiro/cache-periodo";
+import { buscarPaginado } from "@/lib/financeiro/paginacao";
 import {
   classificarDespesas,
   type DespesaPainel,
@@ -37,16 +39,9 @@ type LancRaw = {
 
 const COLUNAS = "id, data, descricao, valor, categoria_id, forma_pagamento";
 
+/** Páginas em ondas paralelas — ver `@/lib/financeiro/paginacao`. */
 async function paginado(montar: () => any): Promise<LancRaw[]> {
-  const out: LancRaw[] = [];
-  for (let p = 0; p < MAX_PAGINAS; p++) {
-    const { data, error } = await montar().range(p * PAGINA, (p + 1) * PAGINA - 1);
-    if (error) throw error;
-    const lote = (data ?? []) as LancRaw[];
-    out.push(...lote);
-    if (lote.length < PAGINA) break;
-  }
-  return out;
+  return buscarPaginado<LancRaw>(montar, { pagina: PAGINA, maxPaginas: MAX_PAGINAS });
 }
 
 export interface DadosPainel {
@@ -68,22 +63,29 @@ export async function carregarPainelFinanceiro(
   clinicaId: string,
   de: string,
   ate: string,
+  forcar = false,
 ): Promise<DadosPainel> {
   const [todasAsLinhasBrutas, despesasBrutas, foraDoCaixa] = await Promise.all([
-    carregarRateio(ctx, { clinicaId, de, ate }),
-    paginado(() =>
-      supabase
-        .from("fin_lancamentos")
-        .select(COLUNAS)
-        .eq("clinica_id", clinicaId)
-        .eq("tipo", "despesa")
-        .eq("status", "confirmado")
-        .gte("data", de)
-        .lte("data", ate)
-        .order("data", { ascending: false })
-        .order("id"),
+    carregarRateio(ctx, { clinicaId, de, ate, forcar }),
+    comCache(
+      `despesas|${clinicaId}|${de}|${ate}`,
+      TTL_PERIODO,
+      () =>
+        paginado(() =>
+          supabase
+            .from("fin_lancamentos")
+            .select(COLUNAS)
+            .eq("clinica_id", clinicaId)
+            .eq("tipo", "despesa")
+            .eq("status", "confirmado")
+            .gte("data", de)
+            .lte("data", ate)
+            .order("data", { ascending: false })
+            .order("id"),
+        ),
+      forcar,
     ),
-    carregarForaDoCaixa(clinicaId, de, ate),
+    carregarForaDoCaixa(clinicaId, de, ate, forcar),
   ]);
   // Mesma conta do Movimento de Caixa: sai o que ele deixa fora do caixa do
   // período (retroativos e parcelas importadas). Em 04/09/2026 eram R$ 495,00

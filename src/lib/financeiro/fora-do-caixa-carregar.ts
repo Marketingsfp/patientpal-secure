@@ -17,6 +17,8 @@
  * Executivo NÃO usam este recorte: lá a receita continua pela competência.
  */
 import { supabase } from "@/integrations/supabase/client";
+import { comCache, TTL_PERIODO } from "@/lib/financeiro/cache-periodo";
+import { buscarPaginado } from "@/lib/financeiro/paginacao";
 import {
   ehLancamentoRetroativo,
   ehParcelaImportada,
@@ -43,16 +45,9 @@ function diaDeslocado(iso: string, dias: number): string {
   return d.toISOString().slice(0, 10);
 }
 
+/** Páginas em ondas paralelas — ver `@/lib/financeiro/paginacao`. */
 async function paginado<T>(montar: () => any): Promise<T[]> {
-  const out: T[] = [];
-  for (let p = 0; p < MAX_PAGINAS; p++) {
-    const { data, error } = await montar().range(p * PAGINA, (p + 1) * PAGINA - 1);
-    if (error) throw error;
-    const lote = (data ?? []) as T[];
-    out.push(...lote);
-    if (lote.length < PAGINA) break;
-  }
-  return out;
+  return buscarPaginado<T>(montar, { pagina: PAGINA, maxPaginas: MAX_PAGINAS });
 }
 
 type LancRaw = {
@@ -68,7 +63,17 @@ export async function carregarForaDoCaixa(
   clinicaId: string,
   de: string,
   ate: string,
+  forcar = false,
 ): Promise<ForaDoCaixa> {
+  return comCache(
+    `foraDoCaixa|${clinicaId}|${de}|${ate}`,
+    TTL_PERIODO,
+    () => lerForaDoCaixa(clinicaId, de, ate),
+    forcar,
+  );
+}
+
+async function lerForaDoCaixa(clinicaId: string, de: string, ate: string): Promise<ForaDoCaixa> {
   // Mesma janela do Movimento de Caixa: um dia a mais de cada lado, porque
   // `created_at` é timestamptz e o dia de Brasília é decidido no cliente.
   const iniJanela = `${diaDeslocado(de, -1)}T00:00:00`;

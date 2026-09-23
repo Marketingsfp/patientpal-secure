@@ -175,6 +175,8 @@ function FinDashboard() {
   const ctxRef = useRef<{ clinicaId: string; ctx: RateioContexto } | null>(null);
   /** Clínica + período dos números na tela, e quando foram lidos. */
   const ultimaCarga = useRef<{ chave: string; em: number } | null>(null);
+  /** Último `reload` já atendido, para saber quando a releitura foi pedida. */
+  const reloadAnterior = useRef(reload);
 
   const { de, ate } = periodoAteHoje(periodo, custom);
 
@@ -187,6 +189,11 @@ function FinDashboard() {
     // de clínica mostra o "…", para ninguém ler o número do período anterior
     // debaixo do botão novo.
     const silenciosa = ultimaCarga.current?.chave === chave;
+    // Releitura pedida de propósito — atualização automática, botão
+    // "Atualizar agora" ou depois de lançar receita/despesa — ignora o cache
+    // curto do período; abrir a aba de novo aproveita o que já foi lido.
+    const forcar = reloadAnterior.current !== reload;
+    reloadAnterior.current = reload;
     let cancelado = false;
     if (silenciosa) setAtualizando(true);
     else setCarregando(true);
@@ -197,7 +204,7 @@ function FinDashboard() {
           ctx = await carregarContextoRateio(clinicaId);
           ctxRef.current = { clinicaId, ctx };
         }
-        const d = await carregarPainelFinanceiro(ctx, clinicaId, de, ate);
+        const d = await carregarPainelFinanceiro(ctx, clinicaId, de, ate, forcar);
         if (!cancelado) {
           setDados(d);
           setAtualizadoEm(new Date());

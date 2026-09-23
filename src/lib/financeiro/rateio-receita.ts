@@ -56,6 +56,8 @@ import {
   type CategoriaFinanceira,
 } from "@/lib/financeiro/categorias-carregar";
 import { SEM_CATEGORIA } from "@/lib/financeiro/filtro-categoria";
+import { comCache, TTL_CATALOGO, TTL_PERIODO } from "@/lib/financeiro/cache-periodo";
+import { buscarPaginado, buscarPorLotes } from "@/lib/financeiro/paginacao";
 import { addDias, variacao } from "@/lib/financeiro/periodos";
 
 /** O PostgREST devolve no máximo 1.000 linhas por requisição. */
@@ -352,6 +354,14 @@ export interface RateioFiltros {
   tipo?: string | null;
   /** Particular ou Cartão (ver `RateioModalidade`). `null` = todas. */
   modalidade?: RateioModalidade | null;
+  /**
+   * Ignora o cache curto do período e relê do banco.
+   *
+   * É o caminho da atualização automática, do botão "Atualizar agora" e da
+   * releitura depois de lançar receita ou despesa. Sem isso, a tela mostraria
+   * o número anterior por até um minuto depois do lançamento.
+   */
+  forcar?: boolean;
 }
 
 /** Médico como aparece no seletor do relatório. */
@@ -435,20 +445,28 @@ export const chaveGrupo = (g: string | null | undefined): string | null => {
 const num = (v: unknown) => Number(v ?? 0) || 0;
 const round2 = (v: number) => +v.toFixed(2);
 
+/** Páginas em ondas paralelas — ver `@/lib/financeiro/paginacao`. */
 async function buscarTudo<T>(montar: () => any): Promise<T[]> {
-  const out: T[] = [];
-  for (let p = 0; p < MAX_PAGINAS; p++) {
-    const { data, error } = await montar().range(p * PAGINA, (p + 1) * PAGINA - 1);
-    if (error) throw error;
-    const lote = (data ?? []) as T[];
-    out.push(...lote);
-    if (lote.length < PAGINA) break;
-  }
-  return out;
+  return buscarPaginado<T>(montar, { pagina: PAGINA, maxPaginas: MAX_PAGINAS });
 }
 
 /** Carrega catálogos dos filtros + grade de repasse da clínica. */
-export async function carregarContextoRateio(clinicaId: string): Promise<RateioContexto> {
+export async function carregarContextoRateio(
+  clinicaId: string,
+  forcar = false,
+): Promise<RateioContexto> {
+  // Os catálogos são os mesmos em todas as abas do financeiro e mudam
+  // raramente: guardá-los por 5 minutos tira essa leitura inteira do caminho
+  // de quem só trocou de tela.
+  return comCache(
+    `contexto|${clinicaId}`,
+    TTL_CATALOGO,
+    () => lerContextoDoBanco(clinicaId),
+    forcar,
+  );
+}
+
+async function lerContextoDoBanco(clinicaId: string): Promise<RateioContexto> {
   const [medicosRaw, especialidadesRaw, procedimentosRaw, repasseLista, mapaConvenio, categorias] =
     await Promise.all([
       buscarTudo<Record<string, unknown>>(() =>
@@ -940,29 +958,32 @@ async function enriquecerPacientes(clinicaId: string, linhas: RateioLinha[]): Pr
   const ids = [...new Set(linhas.map((l) => l.paciente_id).filter((x): x is string => !!x))];
   if (ids.length === 0) return;
 
+  // Nomes e "primeira vez" são independentes: as duas buscas saem juntas, e
+  // os lotes de cada uma também. Eram 618 pacientes em setembro/2026, o que
+  // dava meia dúzia de consultas esperando uma pela outra.
+  const [linhasNomes, linhasPrimeiro] = await Promise.all([
+    buscarPorLotes(ids, LOTE_PACIENTES, async (lote) => {
+      const { data } = await supabase.from("pacientes").select("id, nome").in("id", lote);
+      return (data ?? []) as Array<{ id: string; nome: string | null }>;
+    }),
+    buscarPorLotes(ids, PAGINA, async (lote) => {
+      const { data } = await supabase.rpc("fin_pacientes_primeiro_atendimento", {
+        _clinica_id: clinicaId,
+        _ids: lote,
+      });
+      return ((data as unknown[] | null) ?? []) as Array<{
+        paciente_id: string;
+        primeiro: string | null;
+      }>;
+    }),
+  ]);
+
   const nomes = new Map<string, string>();
-  for (let i = 0; i < ids.length; i += LOTE_PACIENTES) {
-    const { data } = await supabase
-      .from("pacientes")
-      .select("id, nome")
-      .in("id", ids.slice(i, i + LOTE_PACIENTES));
-    for (const p of (data ?? []) as Array<{ id: string; nome: string | null }>) {
-      nomes.set(p.id, (p.nome ?? "").trim());
-    }
-  }
+  for (const p of linhasNomes) nomes.set(p.id, (p.nome ?? "").trim());
 
   const primeiro = new Map<string, string>();
-  for (let i = 0; i < ids.length; i += PAGINA) {
-    const { data } = await supabase.rpc("fin_pacientes_primeiro_atendimento", {
-      _clinica_id: clinicaId,
-      _ids: ids.slice(i, i + PAGINA),
-    });
-    for (const r of ((data as unknown[] | null) ?? []) as Array<{
-      paciente_id: string;
-      primeiro: string | null;
-    }>) {
-      if (r.primeiro) primeiro.set(r.paciente_id, String(r.primeiro).slice(0, 10));
-    }
+  for (const r of linhasPrimeiro) {
+    if (r.primeiro) primeiro.set(r.paciente_id, String(r.primeiro).slice(0, 10));
   }
 
   for (const l of linhas) {
@@ -990,6 +1011,29 @@ async function enriquecerPacientes(clinicaId: string, linhas: RateioLinha[]): Pr
  * repasse zero — cada pagamento recebido conta como um atendimento.
  */
 export async function carregarRateio(
+  ctx: RateioContexto,
+  filtros: RateioFiltros,
+): Promise<RateioLinha[]> {
+  // A leitura do banco é a mesma para todos os filtros da tela — quem recorta
+  // por médico, serviço ou modalidade é `filtrarRateio`, aqui embaixo. Por
+  // isso o que fica guardado é a lista INTEIRA do período: trocar o filtro do
+  // relatório, ou pular do Dashboard para o Movimento de Caixa, deixa de
+  // refazer as dezenas de consultas.
+  const linhas = await comCache(
+    `rateio|${filtros.clinicaId}|${filtros.de}|${filtros.ate}`,
+    TTL_PERIODO,
+    () => lerRateioDoBanco(ctx, filtros),
+    filtros.forcar,
+  );
+  // `filter` devolve lista nova e só ela é ordenada: a lista guardada no
+  // cache nunca é mexida por quem a recebe.
+  return filtrarRateio(ctx, linhas, filtros).sort(
+    (a, b) => a.data.localeCompare(b.data) || a.medico_nome.localeCompare(b.medico_nome, "pt-BR"),
+  );
+}
+
+/** A leitura de fato, sem cache e sem filtro de tela. */
+async function lerRateioDoBanco(
   ctx: RateioContexto,
   filtros: RateioFiltros,
 ): Promise<RateioLinha[]> {
@@ -1183,9 +1227,7 @@ export async function carregarRateio(
   completarNomesPacientes(linhas, [...manuaisRaw, ...agendaRaw, ...avulsosRaw]);
   await completarAgendas(linhas, agendaIdPorLinha);
 
-  return filtrarRateio(ctx, linhas, filtros).sort(
-    (a, b) => a.data.localeCompare(b.data) || a.medico_nome.localeCompare(b.medico_nome, "pt-BR"),
-  );
+  return linhas;
 }
 
 /** Preenche `agenda_nome` das linhas que vieram de um agendamento. */

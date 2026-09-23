@@ -21,6 +21,7 @@
 import { supabase } from "@/integrations/supabase/client";
 import { carregarCategorias, mapaDeCategorias } from "./categorias-carregar";
 import { classificarForma, LABEL_FORMA, type ParteMisto } from "./formas-pagamento";
+import { buscarPaginado, buscarPorLotes, type ConsultaPaginavel } from "./paginacao";
 import { repartirPorForma } from "./rateio-receita";
 import { ehLancamentoRetroativo, mapaDaGaveta, TIPOS_QUE_PESAM_NA_GAVETA } from "./retroativos";
 import type { MovimentacaoExtrato } from "./extrato-caixa";
@@ -40,19 +41,12 @@ const MAX_PAGINAS = 20;
 /** Nomes buscados em lotes: a lista de ids viaja na URL da consulta. */
 const LOTE_IDS = 300;
 
+/** Páginas em ondas paralelas — ver `@/lib/financeiro/paginacao`. */
 async function buscarTudo<T>(montar: () => { range: (de: number, ate: number) => unknown }) {
-  const out: T[] = [];
-  for (let p = 0; p < MAX_PAGINAS; p++) {
-    const { data, error } = (await montar().range(p * PAGINA, (p + 1) * PAGINA - 1)) as {
-      data: T[] | null;
-      error: { message: string } | null;
-    };
-    if (error) throw error;
-    const lote = data ?? [];
-    out.push(...lote);
-    if (lote.length < PAGINA) break;
-  }
-  return out;
+  return buscarPaginado<T>(montar as () => ConsultaPaginavel<T>, {
+    pagina: PAGINA,
+    maxPaginas: MAX_PAGINAS,
+  });
 }
 
 /**
@@ -106,16 +100,14 @@ async function nomesPorId(
 ): Promise<Map<string, string>> {
   const mapa = new Map<string, string>();
   const unicos = Array.from(new Set(ids.filter(Boolean)));
-  for (let i = 0; i < unicos.length; i += LOTE_IDS) {
-    const { data, error } = await supabase
-      .from(tabela)
-      .select("id, nome")
-      .in("id", unicos.slice(i, i + LOTE_IDS));
+  // Os lotes vão em paralelo: eram até uma dezena de consultas em fila
+  // indiana só para resolver os nomes de um mês.
+  const linhas = await buscarPorLotes(unicos, LOTE_IDS, async (lote) => {
+    const { data, error } = await supabase.from(tabela).select("id, nome").in("id", lote);
     if (error) throw error;
-    for (const r of (data ?? []) as Array<{ id: string; nome: string | null }>) {
-      if (r.nome) mapa.set(r.id, r.nome);
-    }
-  }
+    return (data ?? []) as Array<{ id: string; nome: string | null }>;
+  });
+  for (const r of linhas) if (r.nome) mapa.set(r.id, r.nome);
   return mapa;
 }
 
