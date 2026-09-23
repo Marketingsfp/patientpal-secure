@@ -1380,13 +1380,13 @@ export function AgendaV2Shell() {
                             aria-label={`Agendar em um dos ${livresPorHora.get(hora)} horários livres às ${String(hora).padStart(2, "0")}:00`}
                             title="Clique para agendar neste horário"
                           >
-                            <span className="h-1 w-1 rounded-full bg-slate-300 group-hover:bg-indigo-400" />
+                            <span className="h-1 w-1 rounded-full bg-slate-300 group-hover:bg-primary/70" />
                             <span>
                               {livresPorHora.get(hora)} horário
                               {livresPorHora.get(hora)! > 1 ? "s" : ""} livre
                               {livresPorHora.get(hora)! > 1 ? "s" : ""} nesta hora
                             </span>
-                            <span className="opacity-0 group-hover:opacity-100 text-[11px] font-semibold uppercase tracking-wider text-indigo-500 transition-opacity">
+                            <span className="opacity-0 group-hover:opacity-100 text-[11px] font-semibold uppercase tracking-wider text-primary transition-opacity">
                               agendar →
                             </span>
                           </button>

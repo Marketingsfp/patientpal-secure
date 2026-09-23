@@ -662,16 +662,16 @@ export function NovoAgendamentoWizard({
                 <button
                   type="button"
                   onClick={() => setShowQuickCreate(true)}
-                  className="mt-3 inline-flex items-center gap-1.5 text-xs font-semibold text-indigo-600 hover:text-indigo-700"
+                  className="mt-3 inline-flex items-center gap-1.5 text-xs font-semibold text-primary hover:text-primary/80"
                 >
                   <UserPlus className="h-3.5 w-3.5" />
                   Não encontrou? Cadastrar novo paciente
                 </button>
               )}
               {!paciente && showQuickCreate && (
-                <div className="mt-4 rounded-xl border border-indigo-200 bg-indigo-50/40 p-4 space-y-3">
+                <div className="mt-4 rounded-xl border border-primary/20 bg-primary/5 p-4 space-y-3">
                   <div className="flex items-center justify-between">
-                    <div className="text-xs font-semibold uppercase tracking-widest text-indigo-700">
+                    <div className="text-xs font-semibold uppercase tracking-widest text-primary">
                       Novo paciente
                     </div>
                     <button
@@ -740,7 +740,7 @@ export function NovoAgendamentoWizard({
                       "inline-flex items-center gap-1.5 h-9 px-4 rounded-lg text-xs font-semibold transition-colors",
                       qcSaving
                         ? "bg-slate-200 text-slate-600 dark:text-slate-400"
-                        : "bg-indigo-600 text-white hover:bg-indigo-700",
+                        : "bg-primary text-primary-foreground hover:bg-primary/90",
                     )}
                   >
                     {qcSaving && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
@@ -824,13 +824,15 @@ export function NovoAgendamentoWizard({
                 }}
                 className={cn(
                   "w-full flex items-center gap-3 p-3 rounded-xl text-left transition-colors",
-                  medico?.id === m.id ? "bg-indigo-50 ring-1 ring-indigo-200" : "hover:bg-slate-50",
+                  medico?.id === m.id
+                    ? "bg-primary/10 ring-1 ring-primary/25"
+                    : "hover:bg-slate-50",
                 )}
               >
                 <div className="flex-1 min-w-0">
                   <div className="text-sm font-medium text-slate-900">{m.nome}</div>
                 </div>
-                {medico?.id === m.id && <Check className="h-4 w-4 text-indigo-500" />}
+                {medico?.id === m.id && <Check className="h-4 w-4 text-primary" />}
               </button>
             ))}
           </div>
@@ -914,7 +916,7 @@ export function NovoAgendamentoWizard({
                 className={cn(
                   "h-11 rounded-xl border text-sm font-semibold tabular-nums transition-all",
                   slot?.id === s.id
-                    ? "bg-indigo-500 text-white border-indigo-500"
+                    ? "bg-primary text-primary-foreground border-primary"
                     : "border-slate-200 text-slate-700 hover:border-slate-300 hover:bg-slate-50",
                 )}
               >

@@ -153,7 +153,7 @@ export function ReagendarModal({
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-base">
-            <CalendarClock className="h-4 w-4 text-indigo-600" />
+            <CalendarClock className="h-4 w-4 text-primary" />
             Reagendar sessão
           </DialogTitle>
           <DialogDescription className="text-xs">

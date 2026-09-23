@@ -122,11 +122,11 @@ export function ResumoFormas({ porForma, gaveta }: ResumoFormasProps) {
             </div>
           ))}
           <span className="text-slate-400 font-semibold">=</span>
-          <div className="rounded-lg border border-indigo-300 bg-indigo-50 px-3 py-2">
-            <div className="text-[11px] uppercase tracking-wider font-semibold text-indigo-600">
+          <div className="rounded-lg border border-primary/40 bg-primary/10 px-3 py-2">
+            <div className="text-[11px] uppercase tracking-wider font-semibold text-primary">
               Esperado na gaveta
             </div>
-            <div className="font-bold text-indigo-900">{fmt(esperado)}</div>
+            <div className="font-bold text-primary">{fmt(esperado)}</div>
           </div>
         </div>
       </div>

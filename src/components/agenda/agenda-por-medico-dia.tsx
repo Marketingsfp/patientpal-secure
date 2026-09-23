@@ -113,7 +113,7 @@ export function AgendaPorMedicoDia({
           <span className="rounded-md bg-slate-100 px-2.5 py-1 text-xs font-semibold capitalize text-slate-700">
             {dataLabel}
           </span>
-          <span className="rounded-md bg-indigo-50 px-2.5 py-1 text-xs font-medium text-indigo-700">
+          <span className="rounded-md bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary">
             {colunas.length} profissiona{colunas.length === 1 ? "l" : "is"}
           </span>
         </div>
@@ -130,8 +130,8 @@ export function AgendaPorMedicoDia({
                 key={m.id}
                 className="flex w-full min-w-0 flex-col rounded-xl border border-slate-200/80 bg-white shadow-xs"
               >
-                <header className="flex items-center gap-2.5 rounded-t-xl border-b-2 border-b-indigo-500 bg-white p-3">
-                  <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-indigo-50 text-xs font-bold text-indigo-700">
+                <header className="flex items-center gap-2.5 rounded-t-xl border-b-2 border-b-primary bg-white p-3">
+                  <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-primary/10 text-xs font-bold text-primary">
                     {iniciais(m.nome)}
                   </span>
                   <div className="min-w-0 flex-1">
@@ -168,7 +168,7 @@ export function AgendaPorMedicoDia({
                           livre
                             ? leituraLivre
                               ? "flex w-full min-w-0 flex-col rounded-lg border border-dashed border-emerald-200 bg-emerald-50/50 p-2 text-center"
-                              : "flex w-full min-w-0 cursor-pointer flex-col rounded-lg border border-dashed border-slate-200/60 bg-slate-50/50 p-2 text-center hover:border-indigo-300 hover:bg-indigo-50/30"
+                              : "flex w-full min-w-0 cursor-pointer flex-col rounded-lg border border-dashed border-slate-200/60 bg-slate-50/50 p-2 text-center hover:border-primary/40 hover:bg-primary/5"
                             : a.status === "confirmado"
                               ? "flex w-full min-w-0 flex-col rounded-lg border border-emerald-200 border-l-4 border-l-emerald-600 bg-emerald-50 p-2.5 text-left shadow-xs hover:bg-emerald-100"
                               : a.status === "cancelado" || a.status === "faltou"

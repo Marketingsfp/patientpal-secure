@@ -597,7 +597,7 @@ function ClinicaNfseModoCard() {
   return (
     <div className="bg-card border border-border/50 rounded-2xl p-6 shadow-2xs space-y-4">
       <div className="flex items-start gap-3">
-        <div className="p-2 rounded-xl bg-indigo-500/10 text-indigo-600 border border-indigo-500/15">
+        <div className="p-2 rounded-xl bg-primary/10 text-primary border border-primary/15">
           <FileStack className="h-5 w-5" />
         </div>
         <div className="flex-1">
