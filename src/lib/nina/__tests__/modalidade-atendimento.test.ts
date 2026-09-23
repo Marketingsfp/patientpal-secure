@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { interpretarModalidade, modalidadeDoCatalogo, resolverModalidade } from "../modalidade-atendimento";
+import { interpretarModalidade, modalidadeDoCatalogo, resolverModalidade, permiteReserva } from "../modalidade-atendimento";
 import { resultadoAgendamentoConfirmado } from "../resposta/agendamento";
 import { estadoVazio } from "../fluxo-estado-normalizar";
 import { textoDaChave } from "../resposta/templates";
@@ -12,11 +12,17 @@ describe("modalidades oficiais de atendimento", () => {
     ["Ordem de chegada sem pré-agendamento", "chegada_sem_pre_agendamento"],
     ["Ordem de chegada s/ agendamento", "chegada_sem_pre_agendamento"],
     ["Por numeração (ficha)", "ficha"], ["Por ficha", "ficha"],
-    ["Ordem de chegada", "chegada_com_pre_agendamento"], ["consulta, retorno", null],
+    ["Ordem de chegada", "chegada_sem_pre_agendamento"], ["consulta, retorno", null],
     ["Agendado", "hora_marcada"], ["Por agendamento", "hora_marcada"],
     ["Não agendado", null], ["Agendado somente após confirmação", null],
     ["Hora marcada / por ficha", "nao_definida"], ["Ordem de chegada com hora marcada", "nao_definida"],
   ] as const) test(String(texto), () => expect(interpretarModalidade(texto)).toBe(modo));
+  test("chegada simples dispensa reserva; pré-agendamento explícito mantém reserva", () => {
+    expect(permiteReserva(interpretarModalidade("Ordem de chegada"))).toBe(false);
+    expect(permiteReserva(interpretarModalidade("Ordem de chegada com pré-agendamento"))).toBe(true);
+    expect(modalidadeDoCatalogo(["Ordem de chegada", "Ordem de chegada sem pré-agendamento"])).toBe("chegada_sem_pre_agendamento");
+    expect(modalidadeDoCatalogo(["Ordem de chegada", "Ordem de chegada com pré-agendamento"])).toBe("nao_definida");
+  });
   test("booleano de chegada e conflitos não inventam modalidade", () => {
     expect(resolverModalidade(null, true)).toBe("nao_definida");
     expect(resolverModalidade(null, false)).toBe("hora_marcada");

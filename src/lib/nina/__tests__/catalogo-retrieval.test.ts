@@ -216,7 +216,7 @@ describe("consulta com preventivo no índice público", () => {
 it("a resposta da busca associa a modalidade à avaliação e preserva o bloco de escala de Karen", async () => {
   banco.nina_cat_profissionais = [profissional(avaliacaoOdontologica("Karen", "Seg/ter/quinta/sab 08:00h"))];
   const r = await buscarNoCatalogo({ clinicaId: CLINICA, query: "odontologia", tipo_atendimento: "consulta" });
-  expect(r.records[0]!.extras).toMatchObject({ modalidade_atendimento: "chegada_com_pre_agendamento",
+  expect(r.records[0]!.extras).toMatchObject({ modalidade_atendimento: "chegada_sem_pre_agendamento",
     atendimentos_da_modalidade: ["AVALIAÇÃO ODONTOLÓGICA — ODONTOLOGIA"] });
   expect(r.records[0]!.observacoes).toContain("Até 17h");
   expect(r.records[0]!.observacoes).toContain("Seg/ter/quinta/sab 08:00h");

@@ -1,4 +1,5 @@
 import { estruturaVazia } from "./catalogo-estrutura";
+import { REGRA_MODALIDADES_CONFIRMADAS } from "./regras-administrativas-confirmadas";
 /**
  * "Criar com IA" do catálogo da Nina — regras puras (sem rede, sem banco).
  *
@@ -150,7 +151,7 @@ export function instrucoesCatalogoIA(tipo: TipoCatalogo): string {
     "- Horas no formato HH:mm (24h). Datas no formato AAAA-MM-DD; sem ano informado, use null.",
     "- Valores como número em reais (ex.: 130.5). Sem valor no texto, use null.",
     "- Vários registros no mesmo texto: um item por registro.",
-    "- Padronize o marcador SPF como SFP. Categoria Consulta não é modalidade. Regra confirmada: Agendado significa Hora marcada; Ordem de chegada significa com pré-agendamento, salvo indicação explícita de sem pré-agendamento. Preserve modalidades diferentes por atendimento.",
+    "- Padronize o marcador SPF como SFP. Preserve modalidades diferentes por atendimento. " + REGRA_MODALIDADES_CONFIRMADAS,
     "- Valor de anestesia separado é adicional ao procedimento. Preserve os dois valores separados; não substitua o preço-base pelo total nem invente adicional onde não foi informado.",
     "- `pendencias`: informações do texto que não couberam em nenhum campo (não descarte nada).",
     "- `ambiguidades`: pontos que precisam de confirmação humana (nome parcial, preço condicional, data sem ano).",

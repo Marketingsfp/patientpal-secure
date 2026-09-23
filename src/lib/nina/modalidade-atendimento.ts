@@ -21,7 +21,8 @@ export function interpretarModalidade(texto?: string | null): ModalidadeResolvid
   if (/hora(?:rio)?\s*marcad[ao]/.test(t)) modos.push("hora_marcada");
   if (modos.length > 1 || (modos[0] === "hora_marcada" && /chegada/.test(t))) return "nao_definida";
   if (modos.length) return modos[0]!;
-  if (/ordem\s*(?:de\s*)?chegada/.test(t)) return "chegada_com_pre_agendamento";
+  // Sem exigência explícita de pré-agendamento, basta comparecer à clínica.
+  if (/ordem\s*(?:de\s*)?chegada/.test(t)) return "chegada_sem_pre_agendamento";
   // Rótulo do catálogo confirmado pela clínica; não interpretar uma frase
   // negativa ou a mensagem do paciente como modalidade de atendimento.
   if (/^(?:agendad[oa]|por agendamento)$/.test(t)) return "hora_marcada";

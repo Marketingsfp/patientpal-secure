@@ -638,8 +638,8 @@ describe("regressões dos cadastros publicados: infantil e odontologia", () => {
   const casos = [
     { publicado: cardiologiaAlex, termo: "cardiologia infantil", procedimento: "CONSULTA CARDIOLOGIA INFANTIL", modo: "hora_marcada", valor: "R$ 160,00" },
     { publicado: cardiologiaAlex, termo: "cardiologia", procedimento: "CONSULTA CARDIOLOGIA", modo: "hora_marcada", valor: "R$ 120,00" },
-    { publicado: avaliacaoOdontologica("Karen", "Seg/ter/quinta/sab 08:00h"), termo: "odontologia", procedimento: "AVALIAÇÃO ODONTOLÓGICA — ODONTOLOGIA", modo: "chegada_com_pre_agendamento", valor: "Gratuito" },
-    { publicado: avaliacaoOdontologica("Raiani", "Quarta/sex 08:00h"), termo: "avaliação odontológica", procedimento: "AVALIAÇÃO ODONTOLÓGICA — ODONTOLOGIA", modo: "chegada_com_pre_agendamento", valor: "Gratuito" },
+    { publicado: avaliacaoOdontologica("Karen", "Seg/ter/quinta/sab 08:00h"), termo: "odontologia", procedimento: "AVALIAÇÃO ODONTOLÓGICA — ODONTOLOGIA", modo: "chegada_sem_pre_agendamento", valor: "Gratuito" },
+    { publicado: avaliacaoOdontologica("Raiani", "Quarta/sex 08:00h"), termo: "avaliação odontológica", procedimento: "AVALIAÇÃO ODONTOLÓGICA — ODONTOLOGIA", modo: "chegada_sem_pre_agendamento", valor: "Gratuito" },
   ] as const;
   function preparar(caso: typeof casos[number], origem: "homologacao" | "whatsapp" = "homologacao") {
     Object.assign(banco.nina_cat_profissionais![0]!, caso.publicado);
@@ -668,14 +668,27 @@ describe("regressões dos cadastros publicados: infantil e odontologia", () => {
         const r = await executarFerramentaPaciente(ctx, ferramenta, ferramenta === "consultar_primeiro_disponivel"
           ? { tipo: "consulta", atendimento: caso.termo } : { ...argumentos, medico_id: MEDICO });
         expect(r.ok).toBe(true);
-        expect(ctx.estado!.appointment.slot_options?.vagas[0]).toMatchObject({ procedimento: caso.procedimento, modalidade: caso.modo });
+        if (caso.modo === "chegada_sem_pre_agendamento") {
+          expect(ctx.estado!.appointment.slot_options?.vagas ?? []).toHaveLength(0);
+          expect(consultasAgenda()).toHaveLength(0);
+          if (ferramenta === "consultar_primeiro_disponivel") expect(r.sem_pre_agendamento).toHaveLength(1);
+          else expect(r.sem_agendamento).toBe(true);
+        } else {
+          expect(ctx.estado!.appointment.slot_options?.vagas[0]).toMatchObject({ procedimento: caso.procedimento, modalidade: caso.modo });
+        }
         expect(gravacoes).toHaveLength(0);
       });
     }
     for (const origem of ["homologacao", "whatsapp"] as const) {
-      test(`${origem}/${caso.publicado.nome}/${caso.termo}: agenda após dados e confirmação`, async () => {
+      test(`${origem}/${caso.publicado.nome}/${caso.termo}: respeita se a modalidade permite agendar`, async () => {
         const ctx = preparar(caso, origem);
         expect((await executarFerramentaPaciente(ctx, "proxima_vaga", { medico_id: MEDICO })).ok).toBe(true);
+        if (caso.modo === "chegada_sem_pre_agendamento") {
+          expect((await executarFerramentaPaciente(ctx, "consultar_cadastro_paciente", {})).erro).toBe("ACTION_NOT_AUTHORIZED");
+          expect(consultasAgenda()).toHaveLength(0);
+          expect(gravacoes).toHaveLength(0);
+          return;
+        }
         ctx.estado = JSON.parse(JSON.stringify(ctx.estado));
         ctx.opcoesAgendamentoInicioTurno = true;
         ctx.consultaAgenda = { mensagemAtual: "Escolho 14:00", historico: [{ role: "assistant", content: "Disponível às 14:00. Qual prefere?" }] };
@@ -714,8 +727,9 @@ describe("regressões dos cadastros publicados: infantil e odontologia", () => {
   });
   test("mudança de modalidade após oferta impede confirmar uma condição antiga", async () => {
     const ctx = preparar(casos[2]!);
+    banco.nina_cat_profissionais![0]!.observacao_publica = String(banco.nina_cat_profissionais![0]!.observacao_publica).replace("Ordem de Chegada", "Ordem de chegada com pré-agendamento");
     expect((await executarFerramentaPaciente(ctx, "proxima_vaga", { medico_id: MEDICO })).ok).toBe(true);
-    banco.nina_cat_profissionais![0]!.observacao_publica = String(banco.nina_cat_profissionais![0]!.observacao_publica).replace("Ordem de Chegada", "Agendado");
+    banco.nina_cat_profissionais![0]!.observacao_publica = String(banco.nina_cat_profissionais![0]!.observacao_publica).replace("Ordem de chegada com pré-agendamento", "Agendado");
     ctx.opcoesAgendamentoInicioTurno = true;
     ctx.consultaAgenda = { mensagemAtual: "Escolho 14:00", historico: [] };
     const r = await executarFerramentaPaciente(ctx, "selecionar_horario", { medico_id: MEDICO, inicio: inicio.toISOString(), fim: fim.toISOString() });
@@ -1384,7 +1398,6 @@ describe("modalidades na consulta operacional", () => {
     for (const [publicada, esperada, antecedencia] of [
       ["Hora marcada", "hora_marcada", true],
       ["Agendado", "hora_marcada", true],
-      ["Ordem de chegada", "chegada_com_pre_agendamento", false],
       ["Ordem de chegada com pré-agendamento", "chegada_com_pre_agendamento", false],
       ["Por numeração (ficha)", "ficha", true],
     ] as const) {
@@ -1430,9 +1443,10 @@ describe("modalidades na consulta operacional", () => {
     expect(escolha.resumo_confirmacao).toContain("18:00");
   });
   for (const origem of ["whatsapp", "homologacao"] as const)
+    for (const modalidade of ["Ordem de chegada", "Ordem de chegada sem pré-agendamento"])
     for (const ferramenta of ["consultar_disponibilidade", "verificar_horario", "proxima_vaga"])
-      test(`${origem}: ${ferramenta} sem pré-agendamento não consulta vagas nem solicita cadastro`, async () => {
-        banco.nina_cat_profissionais![0]!.tipo_atendimento = "Ordem de chegada sem pré-agendamento";
+      test(`${origem}: ${ferramenta} (${modalidade}) não consulta vagas nem solicita cadastro`, async () => {
+        banco.nina_cat_profissionais![0]!.tipo_atendimento = modalidade;
         const ctx = { ...contexto("Tem vaga com Dr. Alex Louza?"), origem, teste: origem === "homologacao" };
         const r = await executarFerramentaPaciente(ctx, ferramenta, argumentos);
         expect(r.ok).toBe(true);

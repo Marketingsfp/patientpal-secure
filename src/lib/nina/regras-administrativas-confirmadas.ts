@@ -1,4 +1,4 @@
-/** Definições confirmadas pela clínica em 21/09/2026. */
+/** Definições confirmadas pela clínica; modalidades revisadas em 23/09/2026. */
 export const REGRA_HORARIOS_PUBLICADOS =
   "Informe os dias, horários de início e limites de chegada exatamente como publicados para aquele atendimento e profissional. " +
   "Não transfira limites entre consultas do mesmo médico. Sem horário de saída/término cadastrado, omita essa informação: " +
@@ -12,7 +12,10 @@ export const REGRA_ANESTESIA_ADICIONAL =
   "Um serviço cujo próprio objeto é a anestesia não deve ter seu preço somado a ele mesmo.";
 
 export const REGRA_MODALIDADES_CONFIRMADAS =
-  "No catálogo, 'Agendado' significa hora marcada. 'Ordem de chegada', quando não houver indicação explícita de atendimento sem reserva, " +
-  "significa ordem de chegada com pré-agendamento: reserve um horário real e explique que, entre os pacientes daquele horário, " +
-  "quem chegar primeiro será atendido primeiro. O pré-agendamento não garante o minuto exato da consulta. " +
-  "Preserve a exceção explícita 'sem pré-agendamento' e a modalidade por ficha. A categoria 'Consulta' e a quantidade de vagas, sozinhas, não definem modalidade.";
+  "No catálogo, 'Agendado' significa hora marcada. 'Ordem de chegada', sem a indicação 'com pré-agendamento', " +
+  "significa comparecimento direto à clínica, sem agendamento ou reserva prévia. Informe os dias, períodos e limites de chegada publicados; " +
+  "não consulte vagas, não ofereça horário individual nem inicie coleta de dados para reservar. 'Ordem de chegada sem pré-agendamento' tem o mesmo significado. " +
+  "Somente a modalidade explícita 'Ordem de chegada com pré-agendamento' exige escolher e reservar um horário disponível na agenda, " +
+  "seguindo a coleta de dados e a confirmação do paciente. Entre os pacientes agendados para aquele horário, quem chegar primeiro será atendido primeiro; " +
+  "o pré-agendamento não garante o minuto exato da consulta. Não transforme uma modalidade na outra nem generalize a modalidade por ficha. " +
+  "A categoria 'Consulta' e a quantidade de vagas, sozinhas, não definem modalidade.";
