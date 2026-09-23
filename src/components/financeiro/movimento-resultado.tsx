@@ -193,21 +193,21 @@ function QuadroProfissionais({
   );
   return (
     <Card>
-      <CardContent className="pt-5 space-y-3">
+      <CardContent className="p-4 space-y-2">
         <div>
           <p className="text-sm font-medium">Por profissional</p>
-          <p className="text-xs text-muted-foreground">
+          <p className="text-[11px] text-muted-foreground">
             Consultas × Exames pelo tipo do serviço cadastrado — clique para filtrar a lista
           </p>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="w-full text-xs">
             <thead>
-              <tr className="text-[11px] uppercase tracking-wide text-muted-foreground">
-                <th className="py-1.5 pr-2 text-left font-medium">Profissional</th>
-                <th className="py-1.5 px-2 text-right font-medium">Consultas</th>
-                <th className="py-1.5 px-2 text-right font-medium">Exames</th>
-                <th className="py-1.5 pl-2 text-right font-medium">Total</th>
+              <tr className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                <th className="py-1 pr-2 text-left font-medium">Profissional</th>
+                <th className="py-1 px-2 text-right font-medium">Consultas</th>
+                <th className="py-1 px-2 text-right font-medium">Exames</th>
+                <th className="py-1 pl-2 text-right font-medium">Total</th>
               </tr>
             </thead>
             <tbody>
@@ -223,27 +223,27 @@ function QuadroProfissionais({
                     aria-selected={ativo}
                     onClick={() => alternar(f)}
                   >
-                    <td className="py-1.5 pr-2">
+                    <td className="py-0.5 pr-2">
                       <span className="truncate">{d.profissional}</span>
                     </td>
-                    <td className="py-1.5 px-2 text-right">{celula(d.consulta)}</td>
-                    <td className="py-1.5 px-2 text-right">{celula(d.exame)}</td>
-                    <td className="py-1.5 pl-2 text-right font-medium">{celula(d.total)}</td>
+                    <td className="py-0.5 px-2 text-right">{celula(d.consulta)}</td>
+                    <td className="py-0.5 px-2 text-right">{celula(d.exame)}</td>
+                    <td className="py-0.5 pl-2 text-right font-medium">{celula(d.total)}</td>
                   </tr>
                 );
               })}
             </tbody>
 
             <tfoot>
-              <tr className="border-t border-border font-medium">
-                <td className="py-1.5 pr-2">Total</td>
-                <td className="py-1.5 px-2 text-right">
+              <tr className="border-t-2 border-border bg-muted/40 font-semibold">
+                <td className="py-1 pr-2">Total geral</td>
+                <td className="py-1 px-2 text-right">
                   {celula({ total: totalGeral.consulta, qtd: totalGeral.consultaQtd })}
                 </td>
-                <td className="py-1.5 px-2 text-right">
+                <td className="py-1 px-2 text-right">
                   {celula({ total: totalGeral.exame, qtd: totalGeral.exameQtd })}
                 </td>
-                <td className="py-1.5 pl-2 text-right">
+                <td className="py-1 pl-2 text-right">
                   {celula({ total: totalGeral.total, qtd: totalGeral.totalQtd })}
                 </td>
               </tr>
@@ -394,9 +394,9 @@ export function MovimentoResultado({
           }
         >
           {pronto && (
-            <ul className="mt-2 space-y-0.5 border-t border-border/60 pt-2">
+            <ul className="mt-1.5 space-y-0.5 border-t border-border/60 pt-1.5">
               {r.receitaBruta.formas.map((f) => (
-                <li key={f.rotulo} className="flex items-center justify-between gap-2 text-xs">
+                <li key={f.rotulo} className="flex items-center justify-between gap-2 text-[11px] leading-snug">
                   <span className="text-muted-foreground">{f.rotulo}</span>
                   <span className="tabular-nums">{brl(f.valor)}</span>
                 </li>
@@ -404,7 +404,7 @@ export function MovimentoResultado({
               {/* Cortesia e gratuidade: o atendimento aconteceu e conta na
                   produção, mas não entrou dinheiro — por isso R$ 0,00. */}
               {cortesiasTotais > 0 && (
-                <li className="flex items-center justify-between gap-2 text-xs">
+                <li className="flex items-center justify-between gap-2 text-[11px] leading-snug">
                   <span className="text-muted-foreground">
                     Cortesias e gratuidades ({int(cortesiasTotais)})
                   </span>
@@ -431,9 +431,9 @@ export function MovimentoResultado({
           }
         >
           {pronto && (
-            <ul className="mt-2 space-y-0.5 border-t border-border/60 pt-2">
+            <ul className="mt-1.5 space-y-0.5 border-t border-border/60 pt-1.5">
               {condicoesVisiveis.map((c) => (
-                <li key={c} className="flex items-center justify-between gap-2 text-xs">
+                <li key={c} className="flex items-center justify-between gap-2 text-[11px] leading-snug">
                   <span className="text-muted-foreground">{LABEL_CONDICAO[c]}</span>
                   <span className="tabular-nums">{int(r.atendimentos.porCondicao[c].qtd)}</span>
                 </li>
@@ -441,7 +441,7 @@ export function MovimentoResultado({
               {/* O que faltava para fechar o total: mensalidades, adesões,
                   recebimentos avulsos e as cortesias (sem dinheiro). */}
               {GRUPOS_OUTRAS.filter((g) => r.outras.porGrupo[g].qtd > 0).map((g) => (
-                <li key={g} className="flex items-center justify-between gap-2 text-xs">
+                <li key={g} className="flex items-center justify-between gap-2 text-[11px] leading-snug">
                   <span className="text-muted-foreground">{LABEL_GRUPO_MOV[g]}</span>
                   <span className="tabular-nums">{int(r.outras.porGrupo[g].qtd)}</span>
                 </li>
@@ -452,7 +452,7 @@ export function MovimentoResultado({
                   cortesias que JÁ são lançamento de R$ 0,00 no caixa não
                   entram aqui: elas já estão contadas nas condições acima. */}
               {foraCortesias + foraPagos > 0 && (
-                <li className="flex items-center justify-between gap-2 text-xs">
+                <li className="flex items-center justify-between gap-2 text-[11px] leading-snug">
                   <span className="text-muted-foreground">Lançados à mão (fora do caixa)</span>
                   <span className="tabular-nums">{int(foraCortesias + foraPagos)}</span>
                 </li>
@@ -484,8 +484,8 @@ export function MovimentoResultado({
               devido pelos atendimentos do período. Despesa e saldo desta tela
               continuam sendo só o que saiu da gaveta. */}
           {conferencia && (
-            <ul className="mt-2 space-y-0.5 border-t border-border/60 pt-2">
-              <li className="flex items-center justify-between gap-2 text-xs">
+            <ul className="mt-1.5 space-y-0.5 border-t border-border/60 pt-1.5">
+              <li className="flex items-center justify-between gap-2 text-[11px] leading-snug">
                 <span className="text-muted-foreground">Devido pelos atendimentos</span>
                 <span className="tabular-nums">{brl(conferencia.repasseDevido)}</span>
               </li>
@@ -533,17 +533,17 @@ export function MovimentoResultado({
               transferência). Sem isso não dava para conferir a sobra em
               dinheiro no fechamento. */}
           {pronto && (
-            <ul className="mt-2 space-y-0.5 border-t border-border/60 pt-2">
-              <li className="flex items-center justify-between gap-2 text-xs">
+            <ul className="mt-1.5 space-y-0.5 border-t border-border/60 pt-1.5">
+              <li className="flex items-center justify-between gap-2 text-[11px] leading-snug">
                 <span className="text-muted-foreground">Em espécie (gaveta)</span>
                 <span className="tabular-nums">{brl(r.saldoMeios.especie.saldo)}</span>
               </li>
-              <li className="flex items-center justify-between gap-2 text-xs">
+              <li className="flex items-center justify-between gap-2 text-[11px] leading-snug">
                 <span className="text-muted-foreground">Em banco (PIX, cartão, boleto)</span>
                 <span className="tabular-nums">{brl(r.saldoMeios.banco.saldo)}</span>
               </li>
               {(r.saldoMeios.outros.entradas !== 0 || r.saldoMeios.outros.saidas !== 0) && (
-                <li className="flex items-center justify-between gap-2 text-xs">
+                <li className="flex items-center justify-between gap-2 text-[11px] leading-snug">
                   <span className="text-muted-foreground">Outros (convênio, sem informação)</span>
                   <span className="tabular-nums">{brl(r.saldoMeios.outros.saldo)}</span>
                 </li>

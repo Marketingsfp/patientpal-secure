@@ -508,14 +508,14 @@ export function KpiCard({
         className,
       )}
     >
-      <CardContent className="pt-6 flex items-start gap-3">
+      <CardContent className="p-4 flex items-start gap-2.5">
         <div
-          className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-lg ${colorMap[accent]}`}
+          className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${colorMap[accent]}`}
         >
-          <Icon className="h-6 w-6" />
+          <Icon className="h-5 w-5" />
         </div>
         <div className="flex-1 min-w-0">
-          <p className="flex items-start justify-between gap-2 text-[12px] uppercase tracking-wide text-muted-foreground leading-tight">
+          <p className="flex items-start justify-between gap-2 text-[11px] uppercase tracking-wide text-muted-foreground leading-tight">
             <span className="line-clamp-2">{label}</span>
             {/* Avisa o que o clique abre: outra aba ou a tela cheia. */}
             {onClick && (
@@ -526,12 +526,12 @@ export function KpiCard({
             )}
           </p>
           <p
-            className="mt-1 text-lg xl:text-xl font-semibold tabular-nums whitespace-nowrap overflow-hidden text-ellipsis leading-tight"
+            className="mt-0.5 text-base xl:text-lg font-semibold tabular-nums whitespace-nowrap overflow-hidden text-ellipsis leading-tight"
             title={value}
           >
             {value}
           </p>
-          {detalhe && <p className="mt-1 text-xs text-muted-foreground">{detalhe}</p>}
+          {detalhe && <p className="mt-0.5 text-[11px] leading-snug text-muted-foreground">{detalhe}</p>}
           {children}
         </div>
       </CardContent>
