@@ -33,6 +33,16 @@ import { detectarAlertas, type AlertaBadge } from "./alertas-fila";
 import { KpiBar, type KpiData } from "./kpi-bar";
 import { useCaixaShortcuts } from "./atalhos";
 
+/** Dia (YYYY-MM-DD) de um ISO no fuso da clínica (America/Sao_Paulo). */
+function diaSP(iso: string): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Sao_Paulo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date(iso));
+}
+
 type MovTipo =
   | "abertura"
   | "sangria"
@@ -176,6 +186,7 @@ export function CaixaShellV2({
   const isMobile = useIsMobile();
 
   const [sessao, setSessao] = useState<Sessao | null>(null);
+  const [sessoesPendentes, setSessoesPendentes] = useState<Sessao[]>([]);
   const [sessaoLoading, setSessaoLoading] = useState(true);
   const [movs, setMovs] = useState<Mov[]>([]);
   const [movsLoading, setMovsLoading] = useState(true);
@@ -197,7 +208,11 @@ export function CaixaShellV2({
 
   const compact = compactPref;
 
-  // Carrega sessão aberta do usuário
+  // Carrega as sessões abertas do usuário.
+  //
+  // "Sessão atual" é SOMENTE a sessão aberta de HOJE (fuso America/Sao_Paulo).
+  // Sessões abertas de dias anteriores vão para `sessoesPendentes`: antes elas
+  // apareciam como se fossem a de hoje (ex.: "aberta há 329h").
   const loadSessao = useCallback(async () => {
     if (!clinicaAtual || !user) return;
     setSessaoLoading(true);
@@ -207,10 +222,15 @@ export function CaixaShellV2({
       .eq("clinica_id", clinicaAtual.clinica_id)
       .eq("user_id", user.id)
       .eq("status", "aberto")
-      .order("aberto_em", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-    setSessao((data as Sessao | null) ?? null);
+      .order("aberto_em", { ascending: false });
+    const linhas = (data as Sessao[] | null) ?? [];
+    const hoje = diaSP(new Date().toISOString());
+    setSessao(linhas.find((s) => diaSP(s.aberto_em) === hoje) ?? null);
+    setSessoesPendentes(
+      linhas
+        .filter((s) => diaSP(s.aberto_em) < hoje)
+        .sort((a, b) => (a.aberto_em < b.aberto_em ? -1 : 1)),
+    );
     setSessaoLoading(false);
   }, [clinicaAtual, user]);
 
@@ -680,10 +700,27 @@ export function CaixaShellV2({
     { value: "todos", label: "Todos" },
   ];
 
+  // ===== Trava de fechamento diário
+  const travadoPorCaixaAnterior = sessoesPendentes.length > 0;
+  const diaCaixaPendenteBR = travadoPorCaixaAnterior
+    ? new Date(`${diaSP(sessoesPendentes[0]!.aberto_em)}T00:00:00`).toLocaleDateString("pt-BR", {
+        day: "2-digit",
+        month: "2-digit",
+      })
+    : "";
+  const msgTravaCaixaAnterior = `Feche primeiro o caixa do dia ${diaCaixaPendenteBR}. Enquanto ele estiver aberto, não é possível lançar no caixa de hoje.`;
+
   // ===== Actions (delegam à tela clássica; não altera regras)
   const goCaixa = (msg?: string) => {
     if (msg) toast.info(msg);
     window.location.href = "/app/caixa?classico=1";
+  };
+
+  /** Ações de lançamento bloqueadas enquanto houver caixa de dia anterior aberto. */
+  const bloqueado = () => {
+    if (!travadoPorCaixaAnterior) return false;
+    toast.error(msgTravaCaixaAnterior);
+    return true;
   };
 
   // Ação primária "Receber" — 1 clique. Se houver único item pendente,
@@ -691,6 +728,10 @@ export function CaixaShellV2({
   // seleção lá. A gravação/regra continua no clássico.
   const receberFila = useCallback(
     (filaId?: string) => {
+      if (travadoPorCaixaAnterior) {
+        toast.error(msgTravaCaixaAnterior);
+        return;
+      }
       const id = filaId ?? filaCards[0]?.id;
       if (!id) {
         toast.info("Nenhum paciente na fila.");
@@ -698,14 +739,20 @@ export function CaixaShellV2({
       }
       window.location.href = `/app/caixa?classico=1&receber=${encodeURIComponent(id)}`;
     },
-    [filaCards],
+    [filaCards, travadoPorCaixaAnterior, msgTravaCaixaAnterior],
   );
 
   // Atalhos F2/F3/F4/Esc
   useCaixaShortcuts({
     onReceber: () => receberFila(),
-    onImprimir: () => goCaixa("Impressão de recibo abre no caixa clássico"),
-    onDespesa: () => goCaixa("Nova despesa abre no caixa clássico"),
+    onImprimir: () => {
+      if (bloqueado()) return;
+      goCaixa("Impressão de recibo abre no caixa clássico");
+    },
+    onDespesa: () => {
+      if (bloqueado()) return;
+      goCaixa("Nova despesa abre no caixa clássico");
+    },
     onEscape: () => setDrawerId(null),
   });
 
@@ -980,16 +1027,48 @@ export function CaixaShellV2({
       </div>
       {/* Ações rápidas */}
       <div className="flex flex-wrap gap-1.5">
-        <Button size="sm" onClick={() => goCaixa()} data-testid="quick-receber">
+        <Button
+          size="sm"
+          onClick={() => {
+            if (bloqueado()) return;
+            goCaixa();
+          }}
+          title={travadoPorCaixaAnterior ? msgTravaCaixaAnterior : undefined}
+          data-testid="quick-receber"
+        >
           <PlusCircle className="h-4 w-4" /> Receber
         </Button>
-        <Button size="sm" variant="outline" onClick={() => goCaixa()}>
+        <Button
+          size="sm"
+          variant="outline"
+          title={travadoPorCaixaAnterior ? msgTravaCaixaAnterior : undefined}
+          onClick={() => {
+            if (bloqueado()) return;
+            goCaixa();
+          }}
+        >
           <MinusCircle className="h-4 w-4" /> Despesa
         </Button>
-        <Button size="sm" variant="outline" onClick={() => goCaixa()}>
+        <Button
+          size="sm"
+          variant="outline"
+          title={travadoPorCaixaAnterior ? msgTravaCaixaAnterior : undefined}
+          onClick={() => {
+            if (bloqueado()) return;
+            goCaixa();
+          }}
+        >
           <ArrowDownToLine className="h-4 w-4" /> Suprimento
         </Button>
-        <Button size="sm" variant="outline" onClick={() => goCaixa()}>
+        <Button
+          size="sm"
+          variant="outline"
+          title={travadoPorCaixaAnterior ? msgTravaCaixaAnterior : undefined}
+          onClick={() => {
+            if (bloqueado()) return;
+            goCaixa();
+          }}
+        >
           <ArrowUpFromLine className="h-4 w-4" /> Sangria
         </Button>
         <Button size="sm" variant="ghost" onClick={() => goCaixa()}>
@@ -1010,6 +1089,29 @@ export function CaixaShellV2({
 
   return (
     <div className="h-full flex flex-col min-h-0 bg-muted/20">
+      {travadoPorCaixaAnterior && (
+        <div className="mx-3 md:mx-4 mt-3 rounded-xl border-2 border-rose-400 bg-rose-50 p-3">
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="h-5 w-5 text-rose-600 shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <p className="text-sm font-bold text-rose-900">
+                Feche o caixa de {diaCaixaPendenteBR} para voltar a lançar
+              </p>
+              <p className="text-xs text-rose-800 mt-1">
+                Enquanto ele estiver aberto, não é possível cobrar nem pelo Caixa, nem pela Agenda,
+                nem por contrato.
+              </p>
+            </div>
+            <Button
+              size="sm"
+              className="bg-rose-600 hover:bg-rose-700 text-white"
+              onClick={() => goCaixa()}
+            >
+              <Lock className="h-4 w-4" /> Conferir e fechar
+            </Button>
+          </div>
+        </div>
+      )}
       <div className="p-3 md:p-4 pb-2">
         <PainelResumo
           data={resumoData}
