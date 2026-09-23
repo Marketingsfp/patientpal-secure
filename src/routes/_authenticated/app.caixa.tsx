@@ -4502,7 +4502,18 @@ function Page() {
                                   <Button
                                     size="sm"
                                     className="w-full h-7 text-xs"
-                                    onClick={() => void abrirCobranca(f)}
+                                    disabled={travadoPorCaixaAnterior}
+                                    title={
+                                      travadoPorCaixaAnterior ? msgTravaCaixaAnterior : undefined
+                                    }
+                                    onClick={() => {
+                                      // Trava de fechamento diário.
+                                      if (travadoPorCaixaAnterior) {
+                                        toast.error(msgTravaCaixaAnterior);
+                                        return;
+                                      }
+                                      void abrirCobranca(f);
+                                    }}
                                   >
                                     <Receipt className="h-3 w-3 mr-1" /> Cobrar{" "}
                                     <ChevronRight className="h-3 w-3 ml-auto" />
