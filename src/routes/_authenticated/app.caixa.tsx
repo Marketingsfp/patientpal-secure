@@ -1285,6 +1285,18 @@ function Page() {
   const [movBandeira, setMovBandeira] = useState("");
   const [movParcelas, setMovParcelas] = useState("1");
   const [movDestinoUserId, setMovDestinoUserId] = useState("");
+  /**
+   * Correção do valor de uma sangria do turno em aberto.
+   *
+   * `original` é o valor que está gravado hoje, guardado para o texto do
+   * rastro e para a validação; `valor` é o que a pessoa está digitando.
+   */
+  const [ajusteSangria, setAjusteSangria] = useState<{
+    id: string;
+    original: number;
+    valor: string;
+    motivo: string;
+  } | null>(null);
   const [membrosClinica, setMembrosClinica] = useState<Array<{ user_id: string; nome: string }>>(
     [],
   );
@@ -3228,6 +3240,20 @@ function Page() {
   }, [porFormaDoDiaFechamento, conferidoOwn]);
 
   /**
+   * Quanto falta de dinheiro em espécie no dia que está sendo fechado — o valor
+   * que o suprimento de devolução precisa repor para o fechamento destravar.
+   *
+   * Sai do CALCULADO, não do conferido: o calculado é a conta do sistema e é o
+   * buraco real. Se só o conferido estiver negativo, o que há é um valor
+   * digitado errado na grade de conferência, e a correção é apagar o "−", não
+   * lançar dinheiro nenhum.
+   */
+  const faltaEspecieFechamento = useMemo(() => {
+    const d = formasNegativasFechamento.find((f) => f.chave === "dinheiro");
+    return d && d.calculado < -0.005 ? Math.abs(d.calculado) : 0;
+  }, [formasNegativasFechamento]);
+
+  /**
    * Mesma trava, no fechamento feito pelo gestor sobre o caixa de outra pessoa.
    * Sem isto o bloqueio seria contornável só trocando de tela.
    */
@@ -3328,6 +3354,87 @@ function Page() {
     setMovBandeira("");
     setMovParcelas("1");
     setMovDestinoUserId("");
+  };
+
+  /**
+   * Abre o modal de suprimento já preenchido para repor o dinheiro que falta
+   * na gaveta.
+   *
+   * É a correção do caso em que o turno sangrou todo o dinheiro e depois teve
+   * de devolver em espécie a um paciente: o dinheiro voltou da sangria para a
+   * gaveta, e o suprimento é o registro dessa volta. Sem ele a gaveta fica
+   * negativa e o fechamento fica bloqueado.
+   *
+   * O "recebido de" continua sendo escolhido à mão, de propósito: é quem
+   * estava com o dinheiro da sangria, e essa informação é o que permite o
+   * outro lado conferir a própria conta depois.
+   */
+  const abrirSuprimentoDevolucao = (falta: number) => {
+    setOpenMov({ tipo: "suprimento" });
+    setMovValor(falta.toFixed(2));
+    setMovForma("dinheiro");
+    setMovDesc("Devolução ao paciente — dinheiro retirado da sangria e reposto na gaveta");
+    setMovDescTouched(false);
+    setMovBandeira("");
+    setMovParcelas("1");
+    setMovDestinoUserId("");
+  };
+
+  /**
+   * Grava a correção do valor de uma sangria do turno.
+   *
+   * Regras da correção:
+   * - só sangria, e só do caixa que está na tela (RLS deixa o operador mexer
+   *   no próprio lançamento; o gestor, em qualquer um da clínica);
+   * - o motivo é obrigatório e vai para a descrição junto com o valor antigo,
+   *   a data e o nome de quem corrigiu — a sangria não é reescrita em
+   *   silêncio;
+   * - o valor novo não pode deixar a gaveta do turno negativa, que é
+   *   exatamente o problema que esta correção existe para resolver.
+   */
+  const salvarAjusteSangria = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!clinicaAtual || !user || !ajusteSangria) return;
+    const novo = Number(ajusteSangria.valor) || 0;
+    if (novo <= 0) {
+      toast.error("Informe o valor que foi realmente entregue.");
+      return;
+    }
+    if (Math.abs(novo - ajusteSangria.original) < 0.005) {
+      toast.error("O valor informado é igual ao que já está lançado.");
+      return;
+    }
+    if (ajusteSangria.motivo.trim().length < 3) {
+      toast.error("Explique o motivo da correção (mínimo 3 caracteres).");
+      return;
+    }
+    // Aumentar a sangria tira dinheiro da gaveta; reduzir devolve. A gaveta do
+    // turno não pode terminar negativa em nenhum dos dois casos.
+    const gavetaDepois = esperadoGaveta + (ajusteSangria.original - novo);
+    if (gavetaDepois < -0.005) {
+      toast.error(
+        `Com ${fmt(novo)} a gaveta do turno ficaria em ${fmt(gavetaDepois)}. O máximo que cabe aqui é ${fmt(ajusteSangria.original + esperadoGaveta)}.`,
+      );
+      return;
+    }
+    const mov = movsSessaoAtual.find((x) => x.id === ajusteSangria.id);
+    const quem = user.user_metadata?.nome || user.email || "operador";
+    const rastro = ` [Valor ajustado de ${fmt(ajusteSangria.original)} para ${fmt(novo)} em ${new Date().toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" })} por ${quem} — ${ajusteSangria.motivo.trim()}]`;
+    setSaving(true);
+    const { error } = await supabase
+      .from("caixa_movimentos")
+      .update({ valor: novo, descricao: `${mov?.descricao ?? "Sangria"}${rastro}` })
+      .eq("id", ajusteSangria.id);
+    setSaving(false);
+    if (error) {
+      mostrarErro(error);
+      return;
+    }
+    setAjusteSangria(null);
+    toast.success(
+      `Sangria corrigida para ${fmt(novo)}. Imprima o comprovante de novo e entregue a quem recebeu o dinheiro.`,
+    );
+    void load();
   };
 
   const lancarMov = async (e: FormEvent) => {
@@ -4350,7 +4457,19 @@ function Page() {
                     </div>
 
                     {/* Quebra por forma de pagamento + memória de cálculo da gaveta */}
-                    <ResumoFormas porForma={porFormaSessaoAtual} gaveta={gavetaSessaoAtual} />
+                    <ResumoFormas
+                      porForma={porFormaSessaoAtual}
+                      gaveta={gavetaSessaoAtual}
+                      // A sugestão de suprimento só aparece onde o suprimento
+                      // pode de fato ser lançado: no caixa de hoje, sem caixa
+                      // antigo pendente. Nos outros casos o componente manda
+                      // ajustar a sangria, que é um UPDATE e não é barrado.
+                      onSuprimentoDevolucao={
+                        modoConferencia || travadoPorCaixaAnterior
+                          ? undefined
+                          : abrirSuprimentoDevolucao
+                      }
+                    />
 
                     {/* Linha do tempo de sangrias e suprimentos do turno */}
                     <TimelineGaveta
@@ -4364,6 +4483,12 @@ function Page() {
                       }
                       onNovoSuprimento={
                         modoConferencia ? undefined : () => setOpenMov({ tipo: "suprimento" })
+                      }
+                      // Disponível também em modo conferência: corrigir a
+                      // sangria é justamente o que destrava o fechamento de um
+                      // caixa de dia anterior que ficou com a gaveta negativa.
+                      onAjustarSangria={(m) =>
+                        setAjusteSangria({ id: m.id, original: m.valor, valor: "", motivo: "" })
                       }
                     />
 
@@ -5537,6 +5662,82 @@ function Page() {
         </DialogContent>
       </Dialog>
 
+      {/* === Modal Ajustar sangria ===
+          Corrige uma sangria do turno para o valor realmente entregue. A
+          sangria não é apagada nem recriada: o valor é corrigido e o histórico
+          da correção vai para a própria descrição do lançamento. */}
+      <Dialog open={!!ajusteSangria} onOpenChange={(v) => !v && setAjusteSangria(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Ajustar o valor da sangria</DialogTitle>
+            <DialogDescription>
+              Use quando a sangria foi lançada por um valor diferente do dinheiro realmente entregue
+              — inclusive quando parte dele voltou para a gaveta, por exemplo para devolver a um
+              paciente.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={salvarAjusteSangria} className="space-y-3">
+            <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
+              Valor lançado hoje:{" "}
+              <strong className="tabular-nums">{fmt(ajusteSangria?.original ?? 0)}</strong>
+              <br />
+              Gaveta do turno agora:{" "}
+              <strong className={`tabular-nums ${esperadoGaveta < 0 ? "text-rose-700" : ""}`}>
+                {fmt(esperadoGaveta)}
+              </strong>
+            </div>
+            <div>
+              <Label>Valor realmente entregue *</Label>
+              <CurrencyInput
+                value={ajusteSangria?.valor ?? ""}
+                onChange={(v) => setAjusteSangria((a) => (a ? { ...a, valor: v } : a))}
+                autoFocus
+              />
+            </div>
+            <div>
+              <Label>Motivo da correção *</Label>
+              <Textarea
+                value={ajusteSangria?.motivo ?? ""}
+                onChange={(e) =>
+                  setAjusteSangria((a) => (a ? { ...a, motivo: e.target.value } : a))
+                }
+                placeholder="Ex.: peguei R$ 130,00 de volta para devolver ao paciente"
+                rows={2}
+              />
+              <p className="text-[11px] text-slate-500 mt-1">
+                O motivo, o valor antigo, a data e o seu nome ficam gravados na descrição da
+                sangria.
+              </p>
+            </div>
+            <div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+              O comprovante desta sangria que já foi impresso deixa de bater com o sistema. Imprima
+              o comprovante de novo e entregue a quem recebeu o dinheiro.
+            </div>
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="ghost"
+                disabled={saving}
+                onClick={() => setAjusteSangria(null)}
+              >
+                Cancelar
+              </Button>
+              <Button
+                type="submit"
+                disabled={
+                  saving ||
+                  !(Number(ajusteSangria?.valor) > 0) ||
+                  (ajusteSangria?.motivo.trim().length ?? 0) < 3
+                }
+                data-primary
+              >
+                {saving ? "Salvando..." : "Salvar correção"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
       {/* === Modal Fechar === */}
       <Dialog open={openFechar} onOpenChange={setOpenFechar}>
         <DialogContent>
@@ -5607,11 +5808,45 @@ function Page() {
               </ul>
               <p className="font-normal">
                 Saldo negativo significa que saiu mais dinheiro dessa forma do que entrou — o que é
-                impossível na prática. Quase sempre é uma <strong>sangria digitada a mais</strong>{" "}
-                do que o valor realmente entregue, ou um recebimento que ainda não foi lançado.
-                Confira os lançamentos do dia na aba Movimentos, corrija o valor errado e volte a
-                fechar.
+                impossível na prática. As causas são três: uma{" "}
+                <strong>devolução em dinheiro feita depois de o turno já ter sangrado</strong> todo
+                o dinheiro, uma <strong>sangria digitada a mais</strong> do que o valor realmente
+                entregue, ou um recebimento que ainda não foi lançado.
               </p>
+              {/* Atalho para a correção do caso mais comum. Fecha este modal e
+                  abre o suprimento já preenchido com o valor que falta, para a
+                  atendente não precisar calcular nada no balcão. */}
+              {faltaEspecieFechamento > 0 && (
+                <div className="space-y-2 border-t border-destructive/30 pt-2">
+                  <p className="font-normal">
+                    Se você pegou {fmt(faltaEspecieFechamento)} de volta de uma sangria para
+                    devolver a um paciente, registre esse dinheiro voltando para a gaveta:
+                  </p>
+                  {modoConferencia || travadoPorCaixaAnterior ? (
+                    <p className="font-normal">
+                      Neste caixa não é possível lançar suprimento. Ajuste o valor da sangria na aba
+                      Saldo, na lista de sangrias do turno.
+                    </p>
+                  ) : (
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        setOpenFechar(false);
+                        abrirSuprimentoDevolucao(faltaEspecieFechamento);
+                      }}
+                    >
+                      <ArrowDownToLine className="h-3.5 w-3.5" /> Lançar suprimento de devolução de{" "}
+                      {fmt(faltaEspecieFechamento)}
+                    </Button>
+                  )}
+                  <p className="font-normal">
+                    Se o que aconteceu foi uma sangria digitada a mais, corrija o valor dela na aba
+                    Saldo, na lista de sangrias do turno.
+                  </p>
+                </div>
+              )}
               <p className="font-normal">
                 Não encerre o caixa mesmo assim: o total do dia soma cartão e PIX, que não passam
                 pela gaveta, e eles acabam escondendo o buraco do dinheiro — o fechamento sairia

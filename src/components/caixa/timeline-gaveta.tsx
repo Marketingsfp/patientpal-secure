@@ -1,4 +1,4 @@
-import { ArrowDownToLine, ArrowUpFromLine, Printer } from "lucide-react";
+import { ArrowDownToLine, ArrowUpFromLine, Printer, Pencil } from "lucide-react";
 
 const fmt = (n: number | null | undefined) =>
   (Number(n) || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -17,6 +17,15 @@ export interface TimelineGavetaProps {
   onNovoSuprimento?: () => void;
   /** Reimprime o comprovante de uma sangria já lançada (recebe o id). */
   onImprimirSangria?: (id: string) => void;
+  /**
+   * Corrige o valor de uma sangria do turno em aberto.
+   *
+   * Existe para o caso em que a sangria foi digitada por um valor maior do que
+   * o dinheiro realmente entregue — ou em que parte do dinheiro voltou para a
+   * gaveta, por exemplo para devolver a um paciente. Sem isso a gaveta fica
+   * negativa e o caixa não fecha.
+   */
+  onAjustarSangria?: (m: MovGaveta) => void;
 }
 
 /** Linha do tempo compacta das entradas e retiradas de dinheiro do turno. */
@@ -25,6 +34,7 @@ export function TimelineGaveta({
   onNovaSangria,
   onNovoSuprimento,
   onImprimirSangria,
+  onAjustarSangria,
 }: TimelineGavetaProps) {
   const totalSup = movimentos
     .filter((m) => m.tipo === "suprimento")
@@ -107,6 +117,16 @@ export function TimelineGaveta({
                 >
                   {sup ? "+" : "−"} {fmt(m.valor)}
                 </div>
+                {!sup && onAjustarSangria && (
+                  <button
+                    type="button"
+                    onClick={() => onAjustarSangria(m)}
+                    title="Corrigir o valor desta sangria para o que foi realmente entregue"
+                    className="inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-50 cursor-pointer"
+                  >
+                    <Pencil className="h-3.5 w-3.5" /> Ajustar
+                  </button>
+                )}
                 {!sup && onImprimirSangria && (
                   <button
                     type="button"
