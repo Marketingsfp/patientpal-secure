@@ -1427,16 +1427,28 @@ export function ClienteForm({
             </div>
           )}
           <Tabs value={tab} onValueChange={setTab}>
-            <TabsList className="w-full h-auto flex flex-wrap justify-start sm:grid sm:grid-cols-7">
-              <TabsTrigger value="dados">Dados</TabsTrigger>
-              <TabsTrigger value="endereco">Endereço</TabsTrigger>
-              <TabsTrigger value="responsavel">
+            <TabsList className="w-full h-auto flex flex-nowrap items-center justify-start gap-1 overflow-x-auto">
+              <TabsTrigger value="dados" className="shrink-0 px-3 py-1.5">
+                Dados
+              </TabsTrigger>
+              <TabsTrigger value="endereco" className="shrink-0 px-3 py-1.5">
+                Endereço
+              </TabsTrigger>
+              <TabsTrigger value="responsavel" className="shrink-0 px-3 py-1.5">
                 Responsável{sugerirResponsavel ? " •" : ""}
               </TabsTrigger>
-              <TabsTrigger value="biometria">Biometria</TabsTrigger>
-              <TabsTrigger value="prontuario">Prontuário</TabsTrigger>
-              <TabsTrigger value="historico">Histórico</TabsTrigger>
-              <TabsTrigger value="convenio">Convênio</TabsTrigger>
+              <TabsTrigger value="biometria" className="shrink-0 px-3 py-1.5">
+                Biometria
+              </TabsTrigger>
+              <TabsTrigger value="prontuario" className="shrink-0 px-3 py-1.5">
+                Prontuário
+              </TabsTrigger>
+              <TabsTrigger value="historico" className="shrink-0 px-3 py-1.5">
+                Histórico
+              </TabsTrigger>
+              <TabsTrigger value="convenio" className="shrink-0 px-3 py-1.5">
+                Convênio
+              </TabsTrigger>
             </TabsList>
             <fieldset disabled={readOnly} className="contents">
               <TabsContent value="dados" className="space-y-4 pt-4 pb-16">
