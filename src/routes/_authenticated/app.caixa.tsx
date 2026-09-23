@@ -1186,11 +1186,23 @@ function Page() {
         type="button"
         size="sm"
         variant="outline"
+        disabled={travadoPorCaixaAnterior}
         className="h-7 text-xs text-rose-700 border-rose-200 hover:bg-rose-50"
         title={
-          sangria ? "Solicitar estorno da sangria ao financeiro" : "Solicitar estorno ao financeiro"
+          travadoPorCaixaAnterior
+            ? msgTravaCaixaAnterior
+            : sangria
+              ? "Solicitar estorno da sangria ao financeiro"
+              : "Solicitar estorno ao financeiro"
         }
-        onClick={() => setEstornoFor(m)}
+        onClick={() => {
+          // Trava de fechamento diário.
+          if (travadoPorCaixaAnterior) {
+            toast.error(msgTravaCaixaAnterior);
+            return;
+          }
+          setEstornoFor(m);
+        }}
       >
         <Undo2 className="h-3 w-3 mr-1" /> Solicitar estorno
       </Button>
