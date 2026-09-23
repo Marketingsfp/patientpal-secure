@@ -33,6 +33,17 @@ import { detectarAlertas, type AlertaBadge } from "./alertas-fila";
 import { KpiBar, type KpiData } from "./kpi-bar";
 import { useCaixaShortcuts } from "./atalhos";
 
+/** Dia (YYYY-MM-DD) de um ISO no fuso da clínica (America/Sao_Paulo). */
+function diaSP(iso: string): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Sao_Paulo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date(iso));
+}
+
+
 type MovTipo =
   | "abertura"
   | "sangria"
