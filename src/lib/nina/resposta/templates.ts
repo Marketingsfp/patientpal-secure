@@ -14,7 +14,7 @@
  * enviamos texto com `{algo}` cru para o paciente.
  */
 
-import { omitirNomeGenerico } from "../regras-catalogo";
+import { omitirNomeGenerico, profissionalGenerico } from "../regras-catalogo";
 import { removerEmojisNina } from "./sem-emojis";
 
 export const ESCOPO_TEMPLATES = "whatsapp" as const;
@@ -280,6 +280,18 @@ export function validarTemplatePublicado(
 
 export type TextosTemplates = Record<string, string>;
 
+/** Remove o papel de profissional antes da interpolação, sem apagar o nome do exame. */
+function templateSemProfissional(texto: string, valores: Record<string, string>): string {
+  if (!profissionalGenerico(valores.profissional)) return texto;
+  return texto
+    .replace(/\*{0,2}(?:profissional|m[eé]dic[oa]|executante)\s*:?\*{0,2}\s*:?\s*\{profissional\}[\t ]*/gi, "")
+    .replace(/\s+com\s+(?:(?:o|a)\s+)?\{profissional\}/gi, "")
+    .replace(/\s+com esse profissional,?/gi, "")
+    .replace(/desse profissional/gi, "do atendimento")
+    .replace(/\{profissional\}/g, "")
+    .replace(/\n{3,}/g, "\n\n");
+}
+
 /**
  * Resolve o texto de uma chave: template publicado quando válido, senão o
  * padrão do código. Nunca devolve texto com variável não substituída.
@@ -344,7 +356,7 @@ function resolverTextoDaChave(
   if (publicado) {
     const v = validarTemplatePublicado(chave, publicado);
     if (v.ok) {
-      const r = renderizarTemplate(publicado, valores);
+      const r = renderizarTemplate(templateSemProfissional(publicado, valores), valores);
       if (r.ok) return { texto: r.texto, origemTemplate: "publicado", motivo: null };
       return {
         texto: renderizarPadrao(def, valores),
@@ -358,6 +370,6 @@ function resolverTextoDaChave(
 }
 
 function renderizarPadrao(def: DefinicaoTemplate, valores: Record<string, string>): string {
-  const r = renderizarTemplate(def.padrao, valores);
+  const r = renderizarTemplate(templateSemProfissional(def.padrao, valores), valores);
   return r.ok ? r.texto : def.padrao.replace(/\{([a-z_]+)\}/gi, "-");
 }

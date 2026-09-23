@@ -19,6 +19,44 @@ import { textoDaChave } from "../resposta/templates";
 import { comporRequestNina } from "../prompt-composer";
 
 describe("Regras administrativas do catálogo", () => {
+  it("oculta recursos de agenda como executantes e preserva o nome do exame e os IDs", () => {
+    const dados = {
+      records: [{ nome: "MAMOGRAFIA", procedimento: "MAMOGRAFIA", medico: "MAMOGRAFIA",
+        extras: { executantes: [{ nome: "MAMOGRAFIA", medico_id: "mamografia-id" }] } }],
+      slots: [{ medico_nome: "RAIO-X", medico_id: "rx-id", procedimento: "RX ABDOME SIMPLES", hora: "08:00" }],
+      procedimentos: [{ nome: "RAIO-X" }, { nome: "MAMOGRAFIA" }],
+      profissionais: [{ nome: "RAIO-X", id: "rx-id" }, { nome: "Dra. Ana" }],
+    };
+    const copia = structuredClone(dados);
+    const p = dadosPublicosCatalogo(dados);
+    expect(p.records[0]).toMatchObject({ nome: "MAMOGRAFIA", procedimento: "MAMOGRAFIA", medico: null,
+      extras: { executantes: [{ nome: null, medico_id: "mamografia-id" }] } });
+    expect(p.slots[0]).toEqual({ medico_nome: null, medico_id: "rx-id", procedimento: "RX ABDOME SIMPLES", hora: "08:00" });
+    expect(p.procedimentos).toEqual(dados.procedimentos);
+    expect(p.profissionais).toEqual([{ nome: null, id: "rx-id" }, { nome: "Dra. Ana" }]);
+    expect(dados).toEqual(copia);
+  });
+  it("mantém o nome específico do exame nos resumos e conclusões sem tratar o recurso como pessoa", () => {
+    for (const profissional of ["RAIO-X", "raio - x", "MAMOGRAFIA"])
+    for (const chave of ["revisar", "revisar_pre_agendamento", "revisar_ficha", "confirmado", "confirmado_pre_agendamento", "confirmado_ficha", "confirmado_ficha_pendente"]) {
+      const procedimento = profissional === "MAMOGRAFIA" ? "MAMOGRAFIA" : "RX ABDOME SIMPLES";
+      const texto = textoDaChave(`fluxo.agendamento.${chave}`, {
+        profissional, procedimento, data: "28/09/2026", horario: "08:00", unidade: "Clínica", ficha: "3",
+      }).texto;
+      expect(texto).toContain(procedimento);
+      expect(texto).toContain("08:00");
+      expect(texto).not.toMatch(/profissional|m[eé]dic[oa]:|executante:/i);
+      if (profissional !== "MAMOGRAFIA") expect(texto).not.toMatch(/raio\s*-?\s*x/i);
+    }
+    const publicado = "Confira: *Atendimento:* {procedimento} *Profissional:* {profissional} *Data:* {data} *Horário:* {horario} *Clínica:* {unidade}. Confirma com esse profissional?";
+    const texto = textoDaChave("fluxo.agendamento.revisar", { profissional: "MAMOGRAFIA", procedimento: "MAMOGRAFIA", data: "28/09/2026", horario: "08:00", unidade: "Clínica" }, { "fluxo.agendamento.revisar": publicado }).texto;
+    expect(texto).toContain("*Atendimento:* MAMOGRAFIA");
+    expect(texto).not.toContain("Profissional");
+    expect(texto).not.toContain("esse profissional");
+    expect(omitirNomeGenerico("*Atendimento:* MAMOGRAFIA\n*Profissional:* MAMOGRAFIA\n*Data:* 28/09/2026")).toContain("*Atendimento:* MAMOGRAFIA");
+    expect(omitirNomeGenerico("MAMOGRAFIA\nExame de raio-x" )).toBe("MAMOGRAFIA\nExame de raio-x");
+    expect(omitirNomeGenerico("Atendimento: RX ABDOME SIMPLES Profissional: RAIO-X Data: 28/09/2026")).toBe("Atendimento: RX ABDOME SIMPLES Data: 28/09/2026");
+  });
   it("distingue o encaminhamento SFP do pedido comum de atendente", () => {
     for (const motivo of ["PROFISSIONAL_SFP: exclusivo da equipe", "Profissional SFP exige atendimento humano", "O profissional é sfp"])
       expect(motivoProfissionalSfp(motivo)).toBe(true);
