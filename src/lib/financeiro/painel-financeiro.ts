@@ -12,10 +12,19 @@
  *
  * A régua de cada card
  * --------------------
- *  - Receita bruta, Repasse e Atendimentos: o MESMO cálculo do Rateio da
- *    Receita (`@/lib/financeiro/rateio-receita`). Competência = dia do
- *    atendimento; repasse = grade do médico. Os dois números batem com a aba
- *    Relatórios por construção, porque é a mesma função.
+ *  - Receita bruta: o DINHEIRO QUE ENTROU no caixa no período — a mesma régua
+ *    do Movimento de Caixa, linha a linha (`RateioLinha.valor_pago` e
+ *    `formas_pagas`). Até 23/09/2026 este card somava `RateioLinha.receita`,
+ *    que a grade de repasse recalcula, e repartia as formas em PROPORÇÃO
+ *    dessa receita: no período de 01 a 23/09/2026 isso dava R$ 797.298,11
+ *    contra R$ 798.583,75 do Movimento de Caixa, com R$ 1.945,54 a menos no
+ *    crédito e R$ 649,90 a mais no dinheiro. Fica de fora o atendimento
+ *    lançado à mão sem lançamento no caixa (ver `RateioLinha.no_caixa`): é
+ *    atendimento de verdade, com repasse devido, mas o dinheiro dele não
+ *    passou pela gaveta e o cupom não o conhece.
+ *  - Repasse e Atendimentos: o MESMO cálculo do Rateio da Receita
+ *    (`@/lib/financeiro/rateio-receita`), pela grade do médico. Esses dois
+ *    batem com a aba Relatórios por construção, porque é a mesma função.
  *  - Outras receitas: o que o Rateio deixa de fora por não ter prestador —
  *    mensalidade do Cartão, adesão, recebimento avulso. É dinheiro da clínica
  *    (em setembro de 2026, R$ 37 mil só de mensalidade em dez dias) e por isso
@@ -286,7 +295,12 @@ export function resumoPainel(params: {
   let repasse = 0;
   let terceiro = 0;
   for (const l of params.rateio) {
-    receitaBruta += l.receita;
+    // Régua do caixa: o dinheiro que entrou, e só das linhas que têm
+    // lançamento de caixa por trás. Ver o comentário de "Receita bruta" no
+    // topo deste arquivo — até 23/09/2026 aqui somava `l.receita`, que é
+    // recalculada pela grade de repasse, e o Dashboard fechava R$ 1.285,64
+    // abaixo do Movimento de Caixa no mesmo período.
+    if (l.no_caixa) receitaBruta += l.valor_pago;
     repasse += l.repasse;
     terceiro += l.terceiro;
   }
@@ -333,6 +347,12 @@ export function resumoPainel(params: {
   };
 
 
+  // O atendimento entra pelas partes REAIS do pagamento (`formas_pagas`), não
+  // pelo rateio proporcional de `formas`: é o que faz a quebra por forma do
+  // Dashboard bater com a do Movimento de Caixa e com a maquininha.
+  const atendComFormas = params.rateio
+    .filter((l) => l.no_caixa)
+    .map((l) => ({ formas: l.formas_pagas }));
   // O lançamento avulso entra na mesma soma por balde que os atendimentos,
   // com o misto já decomposto, para as fatias fecharem com o Movimento de Caixa.
   const outrasComFormas = params.outrasReceitas.map((r) => ({ formas: formasDoLancamento(r) }));
@@ -340,7 +360,7 @@ export function resumoPainel(params: {
   // pagamentos mistos) e as saídas pela forma do lançamento de despesa — as
   // mesmas despesas que formam `despesasTotais`.
   const saldoMeios = zeroSaldoPorMeio();
-  for (const l of params.rateio)
+  for (const l of atendComFormas)
     for (const f of l.formas ?? []) somarNoMeio(saldoMeios, f.forma, f.valor, "receita");
   for (const o of outrasComFormas)
     for (const f of o.formas) somarNoMeio(saldoMeios, f.forma, f.valor, "receita");
@@ -350,10 +370,10 @@ export function resumoPainel(params: {
 
   return {
     receitaBruta,
-    formas: receitaPorForma(params.rateio),
+    formas: receitaPorForma(atendComFormas),
     outrasReceitas: round2(outrasReceitas),
     receitaTotal: round2(receitaBruta + outrasReceitas),
-    formasReceitaTotal: receitaPorForma([...params.rateio, ...outrasComFormas]),
+    formasReceitaTotal: receitaPorForma([...atendComFormas, ...outrasComFormas]),
     repasse,
     terceiro,
     complementoMedico,

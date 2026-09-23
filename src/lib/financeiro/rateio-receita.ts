@@ -238,6 +238,39 @@ export interface RateioLinha {
    * demais casos é uma parte só.
    */
   formas: ParteMisto[];
+  /**
+   * O DINHEIRO QUE REALMENTE ENTROU nesta linha (`fin_lancamentos.valor`).
+   *
+   * Não confundir com `receita`: aquela é recalculada pela grade de repasse e
+   * pode ser maior que o pago (valor de tabela do Cartão, repasse fixo acima
+   * do que o paciente desembolsou). É a régua certa para o Rateio, e a errada
+   * para qualquer tela que precise bater com o cupom do caixa.
+   *
+   * Em 23/09/2026 era esta a origem da diferença entre o Financeiro →
+   * Dashboard (R$ 797.298,11) e o Movimento de Caixa (R$ 798.583,75) no mesmo
+   * período: o Dashboard somava `receita`, o Movimento somava o valor pago.
+   * Zero na linha de laudo e no atendimento sem pagamento.
+   */
+  valor_pago: number;
+  /**
+   * Como o VALOR PAGO se reparte entre as formas de pagamento — as partes
+   * reais gravadas em `composicao_pagamento`, sem rateio proporcional.
+   *
+   * A soma é sempre igual a `valor_pago`. É diferente de `formas`, que
+   * reparte `receita` em PROPORÇÃO e por isso produz centavos que a
+   * maquininha não reconhece (no mesmo período, R$ 1.945,54 a menos no
+   * crédito e R$ 649,90 a mais no dinheiro).
+   */
+  formas_pagas: ParteMisto[];
+  /**
+   * A linha tem um lançamento de caixa por trás (`fin_lancamentos`).
+   *
+   * Falso no atendimento lançado à mão em `fin_atendimentos` sem lançamento
+   * financeiro — atendimento real, com repasse devido, mas cujo dinheiro
+   * nunca passou pela gaveta (98 linhas, R$ 1.134,00 em setembro/2026). Quem
+   * fala pela régua do caixa soma só as linhas com `no_caixa`.
+   */
+  no_caixa: boolean;
   /** `formas` em texto, para a coluna do analítico (ver `rotuloFormasDaLinha`). */
   forma_pagamento: string;
   /**
@@ -705,6 +738,8 @@ function reparte(
     repasseGravado?: number | null;
     /** Linha de repasse de laudo (ver `RateioLinha.laudo`). */
     laudo?: boolean;
+    /** A linha veio de `fin_lancamentos` (ver `RateioLinha.no_caixa`). */
+    noCaixa?: boolean;
     /**
      * Valor sobre o qual a composição do pagamento foi gravada, quando não é
      * `valorPago` — no laudo, o valor pago pelo exame de origem.
@@ -767,6 +802,19 @@ function reparte(
     params.observacoes ?? null,
     params.composicaoPagamento,
   );
+
+  // A régua do caixa, ao lado da régua do Rateio. Aqui o total repartido é o
+  // que o paciente pagou, então `repartirPorForma` devolve as partes reais da
+  // composição (o rateio proporcional vira multiplicação por 1) e a soma bate
+  // com o cupom impresso, centavo a centavo.
+  const valorPago = semPagamento ? 0 : round2(num(params.valorPago));
+  const formasPagas = repartirPorForma(
+    valorPago,
+    params.valorDasFormas ?? params.valorPago,
+    params.formaPagamento ?? null,
+    params.observacoes ?? null,
+    params.composicaoPagamento,
+  );
   return {
     id: params.id,
     data: params.data,
@@ -808,6 +856,9 @@ function reparte(
     liquido,
     margem: margemClinica(receita, liquido),
     formas,
+    valor_pago: valorPago,
+    formas_pagas: formasPagas,
+    no_caixa: params.noCaixa ?? false,
     forma_pagamento: rotuloFormasDaLinha(formas),
     ...(params.laudo ? { laudo: true } : {}),
   };
@@ -1084,6 +1135,7 @@ export async function carregarRateio(
         composicaoPagamento: r.composicao_pagamento,
         categoriaId: (r.categoria_id as string) ?? null,
         override,
+        noCaixa: true,
       }),
     );
   }
@@ -1114,6 +1166,7 @@ export async function carregarRateio(
         observacoes: (r.observacoes as string) ?? null,
         composicaoPagamento: r.composicao_pagamento,
         categoriaId: (r.categoria_id as string) ?? null,
+        noCaixa: true,
       }),
     );
   }

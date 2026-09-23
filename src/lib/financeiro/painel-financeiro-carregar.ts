@@ -111,11 +111,16 @@ export async function carregarPainelFinanceiro(
         id: l.id,
         data: l.data,
         descricao: l.servico_nome,
-        valor: l.receita,
+        // Valor pago, não `receita`: mesma régua do Movimento de Caixa (ver
+        // `RateioLinha.valor_pago`). Nas linhas avulsas os dois números são
+        // iguais hoje — não há prestador para a grade de repasse inflar —,
+        // mas deixar `receita` aqui reabriria a divergência no dia em que
+        // houver.
+        valor: l.valor_pago,
         categoria_nome: l.categoria_nome,
-        forma_pagamento: l.formas[0]?.forma ?? null,
+        forma_pagamento: l.formas_pagas[0]?.forma ?? null,
         // Todas as partes: com só a primeira, o misto caía inteiro nela.
-        formas: l.formas,
+        formas: l.formas_pagas,
       })),
     foraDoCaixa,
   };

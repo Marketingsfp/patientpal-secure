@@ -906,6 +906,29 @@ const formasDaLinha = (l: RateioLinha) =>
     .map((f) => LABEL_FORMA[f.forma])
     .join(" + ") || "—";
 
+/**
+ * Converte as linhas do detalhamento da Receita bruta para a régua do caixa.
+ *
+ * A coluna "Receita" passa a valer o que entrou (`valor_pago`) e as formas
+ * passam a ser as partes reais do pagamento (`formas_pagas`), para a lista
+ * somar exatamente o que o card mostra. Sai da lista o atendimento lançado à
+ * mão sem lançamento no caixa: ele não está no cupom e não está no card.
+ *
+ * Só o recorte "receita" muda. Os outros cards do Dashboard continuam pela
+ * régua do Rateio da Receita, e cada lista continua fechando com o seu card.
+ */
+function naReguaDoCaixa(drill: Drill, linhas: RateioLinha[]): RateioLinha[] {
+  if (drill !== "receita") return linhas;
+  return linhas
+    .filter((l) => l.no_caixa)
+    .map((l) => ({
+      ...l,
+      receita: l.valor_pago,
+      formas: l.formas_pagas,
+      liquido: +(l.valor_pago - l.repasse - l.terceiro).toFixed(2),
+    }));
+}
+
 function montarDetalhe(drill: Drill, dados: DadosPainel, r: ResumoPainel, visao: Visao): Detalhe {
   const operacionais = dados.despesas.filter((d) => d.grupo === "operacional");
   const complementos = dados.despesas.filter((d) => d.grupo === "complemento_medico");
@@ -926,7 +949,12 @@ function montarDetalhe(drill: Drill, dados: DadosPainel, r: ResumoPainel, visao:
   ) {
     // A cortesia/gratuidade sai dos cards por tipo e tem lista própria — é
     // assim que a soma dos cards continua fechando com o total.
-    const recorte = recorteAtendimentos(drill, dados);
+    // O detalhamento da RECEITA BRUTA fala a régua do caixa, igual ao card que
+    // ele abre (e igual ao Movimento de Caixa): o valor que o paciente pagou,
+    // repartido nas formas reais, e só as linhas que têm lançamento de caixa.
+    // Os demais recortes continuam pela régua do Rateio — cada lista fecha com
+    // o seu próprio card.
+    const recorte = naReguaDoCaixa(drill, recorteAtendimentos(drill, dados));
     const titulo =
       drill === "receita"
         ? "Receita bruta"
@@ -981,7 +1009,7 @@ function montarDetalhe(drill: Drill, dados: DadosPainel, r: ResumoPainel, visao:
     ];
     const explicacao =
       drill === "receita"
-        ? "Atendimentos pela mesma lista do Rateio da Receita (Financeiro → Relatórios), cada um no dia em que foi atendido e com o repasse pela grade do médico, mais as receitas que não são atendimento — mensalidade do Cartão, adesão, recebimento avulso —, que não têm repasse e entram inteiras no líquido da clínica."
+        ? "O dinheiro que entrou no caixa no período, pela mesma régua do Movimento de Caixa: o valor que o paciente pagou em cada atendimento, na forma em que pagou, mais as receitas que não são atendimento — mensalidade do Cartão, adesão, recebimento avulso —, que não têm repasse e entram inteiras no líquido da clínica. O repasse ao lado continua pela grade do médico. Atendimento lançado à mão sem pagamento no caixa não entra aqui: ele aparece no Rateio da Receita (Financeiro → Relatórios)."
         : "Mesma lista do Rateio da Receita (Financeiro → Relatórios): cada atendimento no dia em que foi atendido, com o repasse pela grade do médico.";
     const composicao =
       drill === "receita"

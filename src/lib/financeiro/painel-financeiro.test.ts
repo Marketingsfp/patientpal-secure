@@ -34,6 +34,9 @@ const linha = (p: Partial<RateioLinha>): RateioLinha => ({
   liquido: 50,
   margem: 50,
   formas: [{ forma: "dinheiro", valor: p.receita ?? 100 }],
+  valor_pago: p.valor_pago ?? p.receita ?? 100,
+  formas_pagas: [{ forma: "dinheiro", valor: p.valor_pago ?? p.receita ?? 100 }],
+  no_caixa: true,
   forma_pagamento: "Dinheiro",
   ...p,
 });
@@ -138,7 +141,7 @@ describe("resumoPainel", () => {
   const outras = [lanc({ categoria_nome: "MENSALIDADE CARTAO CONSULTA", valor: 50 })];
   const r = resumoPainel({ rateio, despesas, outrasReceitas: outras });
 
-  it("receita bruta e repasse são os do Rateio; cada pagamento conta 1 atendimento", () => {
+  it("receita bruta é o valor pago e o repasse é o do Rateio; cada pagamento conta 1 atendimento", () => {
     expect(r.receitaBruta).toBe(500);
     expect(r.repasse).toBe(220);
     expect(r.terceiro).toBe(30);
@@ -284,5 +287,96 @@ describe("linha de laudo", () => {
     expect(r.repasse).toBe(18);
     expect(r.liquidoAtendimentos).toBe(33);
     expect(r.producao.total).toBe(1);
+  });
+});
+
+// Regressão de 23/09/2026: o card "Receita bruta" do Dashboard mostrava
+// R$ 797.298,11 contra R$ 798.583,75 do Movimento de Caixa no mesmo período.
+// A causa era somar `RateioLinha.receita` (recalculada pela grade de repasse)
+// e repartir as formas em proporção dela, em vez do dinheiro que entrou.
+describe("resumoPainel — receita bruta pela régua do caixa", () => {
+  it("soma o valor pago, não a receita inflada pela grade de repasse", () => {
+    // Consulta do Cartão: o paciente pagou R$ 60,00, mas a grade devolve
+    // R$ 120,00 de valor de tabela para calcular o repasse do médico.
+    const r = resumoPainel({
+      rateio: [
+        linha({
+          receita: 120,
+          valor_pago: 60,
+          repasse: 60,
+          formas: [{ forma: "dinheiro", valor: 120 }],
+          formas_pagas: [{ forma: "dinheiro", valor: 60 }],
+        }),
+      ],
+      despesas: [],
+      outrasReceitas: [],
+    });
+    expect(r.receitaBruta).toBe(60);
+    expect(r.formas.find((f) => f.forma === "dinheiro")?.valor).toBe(60);
+    // O repasse devido ao médico continua pela grade: não é o que muda aqui.
+    expect(r.repasse).toBe(60);
+  });
+
+  it("reparte o pagamento misto pelas partes reais, sem rateio proporcional", () => {
+    const r = resumoPainel({
+      rateio: [
+        linha({
+          receita: 400,
+          valor_pago: 314,
+          repasse: 0,
+          // Como era antes: as partes esticadas para caber em R$ 400,00.
+          formas: [
+            { forma: "dinheiro", valor: 127.39 },
+            { forma: "credito", valor: 272.61 },
+          ],
+          // Como o paciente pagou de verdade: R$ 100,00 + R$ 214,00.
+          formas_pagas: [
+            { forma: "dinheiro", valor: 100 },
+            { forma: "credito", valor: 214 },
+          ],
+        }),
+      ],
+      despesas: [],
+      outrasReceitas: [],
+    });
+    expect(r.receitaBruta).toBe(314);
+    expect(r.formas.find((f) => f.forma === "dinheiro")?.valor).toBe(100);
+    expect(r.formas.find((f) => f.forma === "credito")?.valor).toBe(214);
+  });
+
+  it("deixa de fora o atendimento lançado à mão que não passou pelo caixa", () => {
+    const r = resumoPainel({
+      rateio: [
+        linha({ receita: 100, valor_pago: 100, repasse: 40, no_caixa: true }),
+        // Atendimento de `fin_atendimentos` sem lançamento financeiro: o
+        // repasse continua devido, mas o dinheiro não está em cupom nenhum.
+        linha({ receita: 50, valor_pago: 50, repasse: 20, no_caixa: false }),
+      ],
+      despesas: [],
+      outrasReceitas: [],
+    });
+    expect(r.receitaBruta).toBe(100);
+    expect(r.repasse).toBe(60);
+    // Continua contando como atendimento: é atendimento de verdade.
+    expect(r.producao.total).toBe(2);
+  });
+
+  it("a quebra por forma fecha com o total exibido", () => {
+    const r = resumoPainel({
+      rateio: [
+        linha({
+          receita: 999,
+          valor_pago: 250,
+          formas_pagas: [
+            { forma: "pix", valor: 150 },
+            { forma: "debito", valor: 100 },
+          ],
+        }),
+      ],
+      despesas: [],
+      outrasReceitas: [lanc({ categoria_nome: "MENSALIDADE", valor: 290 })],
+    });
+    expect(r.receitaTotal).toBe(540);
+    expect(+r.formasReceitaTotal.reduce((s, f) => s + f.valor, 0).toFixed(2)).toBe(540);
   });
 });
