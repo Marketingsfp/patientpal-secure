@@ -1969,6 +1969,11 @@ function Page() {
       );
       return;
     }
+    // Trava de fechamento diário.
+    if (travadoPorCaixaAnterior) {
+      toast.error(msgTravaCaixaAnterior);
+      return;
+    }
     // Valida cada linha
     const linhasValidadas: Array<{
       forma: string;
