@@ -1088,6 +1088,29 @@ export function CaixaShellV2({
 
   return (
     <div className="h-full flex flex-col min-h-0 bg-muted/20">
+      {travadoPorCaixaAnterior && (
+        <div className="mx-3 md:mx-4 mt-3 rounded-xl border-2 border-rose-400 bg-rose-50 p-3">
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="h-5 w-5 text-rose-600 shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <p className="text-sm font-bold text-rose-900">
+                Feche o caixa de {diaCaixaPendenteBR} para voltar a lançar
+              </p>
+              <p className="text-xs text-rose-800 mt-1">
+                Enquanto ele estiver aberto, não é possível cobrar nem pelo Caixa, nem pela Agenda,
+                nem por contrato.
+              </p>
+            </div>
+            <Button
+              size="sm"
+              className="bg-rose-600 hover:bg-rose-700 text-white"
+              onClick={() => goCaixa()}
+            >
+              <Lock className="h-4 w-4" /> Conferir e fechar
+            </Button>
+          </div>
+        </div>
+      )}
       <div className="p-3 md:p-4 pb-2">
         <PainelResumo
           data={resumoData}
