@@ -681,7 +681,7 @@ function Page() {
         const lotes: string[][] = [];
         for (let i = 0; i < ids.length; i += LOTE_IDS) lotes.push(ids.slice(i, i + LOTE_IDS));
         const partes = await Promise.all(lotes.map((lote) => consulta(lote)));
-        return partes.flatMap((p) => ((p.data ?? []) as T[]));
+        return partes.flatMap((p) => (p.data ?? []) as T[]);
       };
       const agIds = Array.from(
         new Set(
@@ -1887,7 +1887,6 @@ function Page() {
       ? { r: totais.r, d: totais.d }
       : { r: somaVisivel("receita"), d: somaVisivel("despesa") };
 
-
   const imprimirRelatorio = () => {
     const source = displayItems;
     if (!source.length) {
@@ -2254,25 +2253,25 @@ function Page() {
                       </SelectContent>
                     </Select>
                   ) : form.referente_a === "funcionario" ? (
-                    <Select
-                      value={form.descricao || ""}
-                      onValueChange={(v) => setForm({ ...form, descricao: v })}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecione o funcionário" />
-                      </SelectTrigger>
-                      <SelectContent>
+                    // Digitação livre com as sugestões do cadastro ao lado
+                    // (`datalist`): a lista fechada obrigava a achar o nome no
+                    // menu e não deixava lançar quem ainda não está cadastrado
+                    // — diarista, prestador de um dia, funcionário novo.
+                    // Pedido de 24/09/2026.
+                    <>
+                      <Input
+                        required
+                        list="funcionarios-lancamento"
+                        value={form.descricao}
+                        onChange={(e) => setForm({ ...form, descricao: e.target.value })}
+                        placeholder="Digite o nome do funcionário"
+                      />
+                      <datalist id="funcionarios-lancamento">
                         {funcionariosOpts.map((f) => (
-                          <SelectItem key={f.id} value={f.nome}>
-                            {f.nome}
-                          </SelectItem>
+                          <option key={f.id} value={f.nome} />
                         ))}
-                        {form.descricao &&
-                          !funcionariosOpts.some((f) => f.nome === form.descricao) && (
-                            <SelectItem value={form.descricao}>{form.descricao}</SelectItem>
-                          )}
-                      </SelectContent>
-                    </Select>
+                      </datalist>
+                    </>
                   ) : (
                     <Input
                       required
@@ -2587,7 +2586,6 @@ function Page() {
                 }}
                 className="w-40"
               />
-
             </div>
             <div className="space-y-1">
               <Label className="text-xs">Visão</Label>
@@ -2747,7 +2745,6 @@ function Page() {
                     </SelectItem>
                   ))}
                 </SelectContent>
-
               </Select>
             </div>
             <div className="space-y-1">
@@ -2888,8 +2885,7 @@ function Page() {
               }
               const linhasMoeda = ORDEM_FORMAS.filter(
                 (k) =>
-                  moedas.has(k) ||
-                  (FORMAS_SEMPRE_VISIVEIS.includes(k) && filterForma === "todos"),
+                  moedas.has(k) || (FORMAS_SEMPRE_VISIVEIS.includes(k) && filterForma === "todos"),
               ).map((k) => {
                 const m = moedas.get(k) ?? { pagamento: 0, recebimento: 0 };
                 return {
@@ -2973,10 +2969,10 @@ function Page() {
                   </div>
                   {transf.length > 0 && (
                     <div className="border-t bg-muted/20 px-4 py-2 text-xs text-muted-foreground">
-                      Troca de custódia fora do resultado — {transf.length} lançamento(s):
-                      sangrias (caixa → financeiro) {fmt(transfSaida)} · suprimentos (financeiro →
-                      caixa) {fmt(transfEntrada)}. Não são despesa: o dinheiro continua com a
-                      clínica, por isso não entram nas saídas acima.
+                      Troca de custódia fora do resultado — {transf.length} lançamento(s): sangrias
+                      (caixa → financeiro) {fmt(transfSaida)} · suprimentos (financeiro → caixa){" "}
+                      {fmt(transfEntrada)}. Não são despesa: o dinheiro continua com a clínica, por
+                      isso não entram nas saídas acima.
                     </div>
                   )}
                   <div className="border-t px-4 py-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground bg-muted/30">
@@ -3033,8 +3029,6 @@ function Page() {
                       </TableBody>
                     </Table>
                   </div>
-
-
                 </>
               );
             })()
@@ -3294,7 +3288,11 @@ function Page() {
                             <TableCell className="text-sm text-muted-foreground">
                               <span
                                 className="block max-w-[9rem] truncate"
-                                title={l.criado_por ? (userMap.get(l.criado_por) ?? undefined) : undefined}
+                                title={
+                                  l.criado_por
+                                    ? (userMap.get(l.criado_por) ?? undefined)
+                                    : undefined
+                                }
                               >
                                 {l.criado_por ? (userMap.get(l.criado_por) ?? "—") : "—"}
                               </span>
