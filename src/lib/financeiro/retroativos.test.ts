@@ -279,6 +279,9 @@ describe("parcelas de cartão importadas do sistema antigo", () => {
     const t = totaisRetroativos([{ tipo: "receita", valor: 80, data: "2026-09-01" }]);
     const aviso = avisoParcelasImportadas(t, (n) => `R$ ${n.toFixed(2)}`, true);
     expect(aviso?.tom).toBe("informativo");
+    // A primeira linha tem que tranquilizar: a equipe lia este aviso como
+    // problema e perguntava à gerência se havia erro no caixa (24/09/2026).
+    expect(aviso?.titulo.startsWith("Nada a fazer")).toBe(true);
     expect(aviso?.titulo).toContain("1 parcela de cartão importada");
     expect(aviso?.titulo).toContain("fora");
     expect(aviso?.titulo).toContain("R$ 80.00");

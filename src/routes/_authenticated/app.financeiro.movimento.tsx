@@ -2524,14 +2524,23 @@ function Page() {
         </div>
       )}
 
+      {/* Discreto de propósito. Em 24/09/2026 o dono contou que a equipe
+          lia esta caixa azul como alerta e vinha perguntar se havia problema
+          no caixa. Não dá para esconder a linha (quem confere precisa saber
+          por que o total mudou), então o aviso continua — mas em cinza, em
+          letra menor, abrindo com "Nada a fazer" e com a explicação longa
+          fechada atrás de um "Por que isso aparece?". */}
       {avisoImportadas && (
-        <div className="rounded-md border border-sky-300 bg-sky-50 px-4 py-3 flex flex-wrap items-start gap-x-3 gap-y-2">
-          <Info className="h-4 w-4 text-sky-600 shrink-0 mt-0.5" />
-          <div className="flex-1 min-w-[16rem] text-sm space-y-1 text-sky-900">
-            <p>
-              <strong>{avisoImportadas.titulo}</strong>
-            </p>
-            <p className="text-xs">{avisoImportadas.detalhe}</p>
+        <div className="rounded-md border border-border bg-muted/40 px-3 py-2 flex flex-wrap items-start gap-x-3 gap-y-1">
+          <Info className="h-3.5 w-3.5 text-muted-foreground shrink-0 mt-0.5" />
+          <div className="flex-1 min-w-[16rem] text-xs text-muted-foreground">
+            <p className="font-medium text-foreground">{avisoImportadas.titulo}</p>
+            <details className="mt-0.5">
+              <summary className="cursor-pointer select-none underline underline-offset-2">
+                Por que isso aparece?
+              </summary>
+              <p className="mt-1">{avisoImportadas.detalhe}</p>
+            </details>
           </div>
           {/* Mesma chave dos retroativos: sem o aviso deles na tela, este é o
               único lugar para voltar ao caixa do balcão. */}
@@ -2539,7 +2548,7 @@ function Page() {
             <Button
               variant="outline"
               size="sm"
-              className="shrink-0 bg-white border-sky-400 hover:bg-sky-100"
+              className="shrink-0 bg-background"
               onClick={() => setOcultarRetroativos(!ocultarRetroativos)}
             >
               {ocultarRetroativos ? "Incluir ajustes" : "Ocultar ajustes"}

@@ -313,7 +313,12 @@ export function avisoParcelasImportadas(
   if (t.quantidade === 0) return null;
   return {
     tom: "informativo",
+    // O título abre dizendo que não há nada a fazer. Em 24/09/2026 o dono
+    // contou que a equipe lia este aviso como problema e vinha perguntar se
+    // tinha erro no caixa; a explicação já estava certa, mas só depois do
+    // susto. Quem bate o olho tem que sair tranquilo na primeira linha.
     titulo:
+      `Nada a fazer — ` +
       `${plural(t.quantidade, "parcela de cartão importada", "parcelas de cartão importadas")} ` +
       `do sistema antigo ${escondendo ? "fora" : "dentro"} do caixa deste período — ` +
       `${fmt(t.receitas)}.`,
@@ -322,7 +327,8 @@ export function avisoParcelasImportadas(
       "parcela cai. Não passaram no balcão nesses dias, não estão no cupom impresso e o " +
       "relatório diário do sistema antigo também não as conta. " +
       (escondendo
-        ? "Continuam no Dashboard e nos relatórios por competência."
+        ? "Continuam no Rateio da Receita e no Painel Executivo, pela competência. " +
+          "No Dashboard, só entram com o botão de retroativos ligado."
         : "Incluídas aqui, o total acima deixa de bater com o cupom impresso da recepção."),
   };
 }
