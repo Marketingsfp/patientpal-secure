@@ -526,7 +526,7 @@ export function KpiCard({
             )}
           </p>
           <p
-            className="mt-0.5 text-base xl:text-lg font-semibold tabular-nums whitespace-nowrap overflow-hidden text-ellipsis leading-tight"
+            className="mt-1 text-2xl font-bold tabular-nums whitespace-nowrap overflow-hidden text-ellipsis leading-none"
             title={value}
           >
             {value}

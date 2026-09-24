@@ -379,7 +379,7 @@ export function MovimentoResultado({
 
   return (
     <div className="space-y-3">
-      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+      <div className="grid gap-2.5 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
         <KpiCard
           novaAba
           onClick={() => abrir("receita")}
@@ -563,7 +563,7 @@ export function MovimentoResultado({
         <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
           Atendimentos
         </h2>
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+        <div className="grid gap-2.5 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
           <KpiCard
             icon={Users}
             label="Atendimentos (total)"

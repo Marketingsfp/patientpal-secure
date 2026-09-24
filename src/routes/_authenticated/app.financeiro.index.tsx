@@ -374,9 +374,11 @@ function FinDashboard() {
         <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
           Resultado do período
         </h2>
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+        <div className="grid gap-2.5 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-5">
           {/* Ocupa duas linhas: é o card mais alto (quebra por forma), e assim
-              os outros quatro fecham um quadro 2×2 ao lado dele. */}
+              os outros quatro fecham um quadro 2×2 ao lado dele. Em tela larga
+              (2xl) os cinco cabem lado a lado, e aí ele volta a ocupar uma
+              linha só — foi o pedido de 23/09/2026 de cards mais quadrados. */}
           <KpiCard
             onClick={() => abrir("receita")}
             icon={TrendingUp}
@@ -384,7 +386,7 @@ function FinDashboard() {
             value={v((r) => r.receitaTotal)}
             accent="success"
             detalhe="Atendimentos + mensalidades do Cartão, adesões e avulsos"
-            className="md:row-span-2"
+            className="md:row-span-2 2xl:row-span-1"
           >
             {resumo && !carregando && (
               <ul className="mt-1.5 space-y-0.5 border-t border-border/60 pt-1.5">
