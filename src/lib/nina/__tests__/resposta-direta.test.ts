@@ -35,10 +35,8 @@ describe("Nina sem motor — geração real com dependências externas simuladas
       expect(r.temNota).toBe(false);
       expect(r.gravacoes.some((g: any) => g.tabela === "nina_prompt_snapshots")).toBe(true);
       expect(r.gravacoes.some((g: any) => g.tabela === "nina_confianca_decisoes")).toBe(false);
-      expect(r.gravacoes.find((g: any) => g.tabela === "nina_confianca_vinculos")?.valor).toMatchObject({
-        decisao_id: null, outgoing_message_id: "saida-direta", estado: "persistida",
-        texto_hash: "hash-direto", execucao_id: "execucao-direta",
-      });
+      // Motor de confiança apagado por retenção (24/09/2026): a entrega não grava vínculo.
+      expect(r.gravacoes.some((g: any) => g.tabela === "nina_confianca_vinculos")).toBe(false);
     });
   }
 });
