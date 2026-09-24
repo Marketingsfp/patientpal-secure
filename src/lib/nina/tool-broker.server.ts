@@ -1,4 +1,5 @@
 import { processamentoWatchdogAtual } from "./watchdog-contexto.server";
+import { medirMemoriaProcesso } from "./memoria-processo";
 /**
  * FASE 4 — TOOL BROKER (execução server-side).
  *
@@ -64,7 +65,7 @@ export function criarToolBroker(params: {
     }
     // Fencing antes de qualquer ferramenta; perda da reserva não vira fallback.
     await controle?.checkpoint("generating");
-    await controle?.evento("TOOL_STARTED", { ferramenta: nome });
+    await controle?.evento("TOOL_STARTED", { ferramenta: nome, recursos: medirMemoriaProcesso() });
     let bruto: unknown;
     try {
       const pesquisaRecusada = recusarFraseComoPesquisa(nome, args);
@@ -92,6 +93,7 @@ export function criarToolBroker(params: {
     await controle?.evento(validado.success ? "TOOL_FINISHED" : "TOOL_FAILED", {
       ferramenta: nome,
       sucesso: validado.success,
+      recursos: medirMemoriaProcesso(),
     });
     if (validado.appointment_confirmed) confirmou = true;
     cache.set(chave, validado);

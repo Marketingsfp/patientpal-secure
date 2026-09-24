@@ -1,5 +1,6 @@
 import { POLITICA_WATCHDOG, esperaRetryWatchdog } from "./watchdog";
 import { processamentoWatchdogAtual } from "./watchdog-contexto.server";
+import { medirMemoriaProcesso } from "./memoria-processo";
 /**
  * NINA AI GATEWAY — camada única de acesso ao modelo.
  *
@@ -123,20 +124,25 @@ export async function ninaAIGateway(pedido: PedidoNina): Promise<RespostaNina> {
   const controle = processamentoWatchdogAtual();
   const chamar = async () => {
     await controle?.checkpoint("generating");
-    await controle?.evento("MODEL_STARTED", { modelo: opcoes.modelo, tentativa: tentativa + 1 });
     // Mede pressão sem copiar/serializar o contexto inteiro nem registrar seu conteúdo.
-    let heapBytes: number | null = null;
-    try {
-      heapBytes = process.memoryUsage().heapUsed;
-    } catch {
-      /* runtime sem medição de heap */
-    }
-    console.info("[NINA_RESOURCE_USAGE]", {
-      batch_id: controle?.batchId ?? null,
+    // Vai no evento persistido: o log do servidor expira antes da investigação.
+    const recursos = {
+      ...medirMemoriaProcesso(),
       mensagens: opcoes.messages.length,
       contexto_caracteres: opcoes.messages.reduce((n, m) => n + (m.content?.length ?? 0), 0),
       ferramentas: opcoes.tools?.length ?? 0,
-      heap_bytes: heapBytes,
+    };
+    await controle?.evento("MODEL_STARTED", {
+      modelo: opcoes.modelo,
+      tentativa: tentativa + 1,
+      recursos,
+    });
+    console.info("[NINA_RESOURCE_USAGE]", {
+      batch_id: controle?.batchId ?? null,
+      mensagens: recursos.mensagens,
+      contexto_caracteres: recursos.contexto_caracteres,
+      ferramentas: recursos.ferramentas,
+      heap_bytes: recursos.heap_usado_bytes,
     });
     const r = await chamarModeloGemini(opcoes);
     await controle?.evento(r.ok ? "MODEL_FINISHED" : "MODEL_FAILED", {
@@ -146,6 +152,7 @@ export async function ninaAIGateway(pedido: PedidoNina): Promise<RespostaNina> {
       categoria: r.ok
         ? null
         : classificarErro({ status: r.status, erro: r.erro, origem: "modelo" }),
+      recursos: medirMemoriaProcesso(),
     });
     return r;
   };
