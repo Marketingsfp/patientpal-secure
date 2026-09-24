@@ -186,10 +186,14 @@ function QuadroProfissionais({
     totalQtd: dados.reduce((s, d) => s + d.total.qtd, 0),
   };
   const alternar = (f: FiltroCard) => onFiltro(mesmoFiltro(filtro, f) ? null : f);
+  // Duas linhas por célula (valor em cima, quantidade embaixo). A altura da
+  // linha vem daqui, não do padding: por isso as duas usam entrelinha curta.
   const celula = (valor: TotalQtd) => (
     <>
-      <span className="tabular-nums">{brl(valor.total)}</span>
-      <span className="block text-[10px] text-muted-foreground tabular-nums">{int(valor.qtd)}</span>
+      <span className="block leading-tight tabular-nums">{brl(valor.total)}</span>
+      <span className="block text-[10px] leading-none text-muted-foreground tabular-nums">
+        {int(valor.qtd)}
+      </span>
     </>
   );
   return (
@@ -211,13 +215,17 @@ function QuadroProfissionais({
               tabela tinha sido encolhida para o tamanho do conteúdo; em
               24/09/2026 o dono pediu de volta a largura cheia, agora sem o
               vazio do meio, porque a coluna do nome é que se estica. */}
-          <table className="w-full text-xs">
+          {/* `max-w-4xl` para a tabela não esticar em monitor largo: sem ele,
+              a coluna do nome comia toda a sobra e jogava os valores na borda
+              direita, longe do nome (pedido de 24/09/2026). O card continua em
+              largura total. */}
+          <table className="w-full max-w-4xl text-xs">
             <thead>
               <tr className="text-[10px] uppercase tracking-wide text-muted-foreground">
-                <th className="py-1 pr-8 text-left font-medium">Profissional</th>
-                <th className="w-40 py-1 px-4 text-right font-medium">Consultas</th>
-                <th className="w-40 py-1 px-4 text-right font-medium">Exames</th>
-                <th className="w-40 py-1 px-4 text-right font-medium">Total</th>
+                <th className="py-1 pr-6 text-left font-medium">Profissional</th>
+                <th className="w-36 py-1 px-3 text-right font-medium">Consultas</th>
+                <th className="w-36 py-1 px-3 text-right font-medium">Exames</th>
+                <th className="w-36 py-1 px-3 text-right font-medium">Total</th>
               </tr>
             </thead>
             <tbody>
@@ -233,10 +241,10 @@ function QuadroProfissionais({
                     aria-selected={ativo}
                     onClick={() => alternar(f)}
                   >
-                    <td className="py-0.5 pr-8 leading-tight">{d.profissional}</td>
-                    <td className="py-0.5 px-4 text-right">{celula(d.consulta)}</td>
-                    <td className="py-0.5 px-4 text-right">{celula(d.exame)}</td>
-                    <td className="py-0.5 px-4 text-right font-medium">{celula(d.total)}</td>
+                    <td className="py-1 pr-6 leading-tight">{d.profissional}</td>
+                    <td className="py-1 px-3 text-right">{celula(d.consulta)}</td>
+                    <td className="py-1 px-3 text-right">{celula(d.exame)}</td>
+                    <td className="py-1 px-3 text-right font-medium">{celula(d.total)}</td>
                   </tr>
                 );
               })}
@@ -244,14 +252,14 @@ function QuadroProfissionais({
 
             <tfoot>
               <tr className="border-t-2 border-border bg-muted/40 font-semibold">
-                <td className="py-1 pr-8 whitespace-nowrap">Total geral</td>
-                <td className="py-1 px-4 text-right">
+                <td className="py-1 pr-6 whitespace-nowrap">Total geral</td>
+                <td className="py-1 px-3 text-right">
                   {celula({ total: totalGeral.consulta, qtd: totalGeral.consultaQtd })}
                 </td>
-                <td className="py-1 px-4 text-right">
+                <td className="py-1 px-3 text-right">
                   {celula({ total: totalGeral.exame, qtd: totalGeral.exameQtd })}
                 </td>
-                <td className="py-1 px-4 text-right">
+                <td className="py-1 px-3 text-right">
                   {celula({ total: totalGeral.total, qtd: totalGeral.totalQtd })}
                 </td>
               </tr>
