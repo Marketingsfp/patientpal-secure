@@ -1470,8 +1470,16 @@ function AtendimentosPage() {
     const buildManual = () => {
       let q = supabase
         .from("fin_atendimentos")
+        // `agendamento:agendamentos(agenda_id)` entra aqui para o atendimento
+        // manual saber de qual AGENDA ele veio. Sem isso, a ficha marcada como
+        // SEM FATURAMENTO na agenda ficava sem `agenda_nome` e sumia da lista
+        // assim que alguém filtrava por uma agenda — justamente o caso do
+        // profissional com duas agendas, que é quem sempre é filtrado
+        // (24/09/2026: o repasse de JOAO HELIO — CONSULTAS mostrava 20 fichas
+        // em vez de 22). Junção opcional: atendimento manual digitado fora da
+        // agenda não tem agendamento e continua vindo.
         .select(
-          "id, data, procedimento, valor_total, valor_medico, valor_clinica, status, forma_pagamento, medico_id, paciente_id, repasse_pago, repasse_pago_em, repasse_pago_at, repasse_forma_pagamento, repasse_conta_id, laudo_status, medico_laudador_id, valor_laudo, lancamento_id, paciente:pacientes(nome)",
+          "id, data, procedimento, valor_total, valor_medico, valor_clinica, status, forma_pagamento, medico_id, paciente_id, repasse_pago, repasse_pago_em, repasse_pago_at, repasse_forma_pagamento, repasse_conta_id, laudo_status, medico_laudador_id, valor_laudo, lancamento_id, agendamento_id, paciente:pacientes(nome), agendamento:agendamentos(agenda_id, inicio)",
         )
         .eq("clinica_id", clinicaAtual.clinica_id)
         .gte("data", fIni)
@@ -1679,6 +1687,15 @@ function AtendimentosPage() {
           })()
         : {};
 
+    /**
+     * Agenda de origem do atendimento manual, pela junção de `buildManual`.
+     * Sem ela, filtrar por uma agenda escondia todo atendimento manual — e é
+     * assim que chega a ficha marcada como SEM FATURAMENTO na agenda.
+     */
+    const agendaDoManual = (r: any): string | null => {
+      const id = r?.agendamento?.agenda_id ?? null;
+      return id ? (agendaNomePorId.get(id) ?? null) : null;
+    };
     const manuais: Atend[] = manuaisRaw.map((r) => {
       const pago = Number(r.valor_total);
       // SEM FATURAMENTO (linha criada pelo banco a partir da marcação na
@@ -1718,6 +1735,7 @@ function AtendimentosPage() {
           laudo_status: (r as any).laudo_status ?? null,
           medico_laudador_id: (r as any).medico_laudador_id ?? null,
           valor_laudo: Number((r as any).valor_laudo ?? 0),
+          agenda_nome: agendaDoManual(r),
         };
       }
       // Recalcula repasse usando convênio cadastrado por procedimento
@@ -1757,6 +1775,7 @@ function AtendimentosPage() {
         laudo_status: (r as any).laudo_status ?? null,
         medico_laudador_id: (r as any).medico_laudador_id ?? null,
         valor_laudo: Number((r as any).valor_laudo ?? 0),
+        agenda_nome: agendaDoManual(r),
       };
     });
     const agend: Atend[] = agendaRows.map((r): Atend => {
@@ -2825,8 +2844,15 @@ function AtendimentosPage() {
         (x) => x.origem === "manual" && x.status !== "realizado",
       );
       if (manualBloq.length) {
+        // A ficha SEM FATURAMENTO segue a mesma regra do atendimento normal:
+        // só libera repasse depois de realizada. Quem opera não chama isso de
+        // "atendimento manual", então a mensagem diz onde resolver.
+        const semFat = manualBloq.filter((x) => ehLinhaSemFaturamento(x.forma_pagamento)).length;
         toast.error(
-          `Não é possível pagar o repasse: ${manualBloq.length} atendimento(s) manual(is) não estão com status 'realizado'.`,
+          `Não é possível pagar o repasse: ${manualBloq.length} atendimento(s) ainda não estão com status 'realizado'.` +
+            (semFat > 0
+              ? ` ${semFat} deles vêm de ficha marcada como SEM FATURAMENTO na Agenda — marque a ficha como realizada na Agenda para liberar o repasse.`
+              : ""),
         );
         setPayingNow(false);
         return;
