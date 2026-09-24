@@ -836,13 +836,19 @@ export function MovimentoResultado({
                   </p>
                 </div>
               </div>
-              <div
-                className={`grid gap-3 ${condicoesVisiveis.length === 3 ? "lg:grid-cols-3" : "lg:grid-cols-2"}`}
-              >
+              {/* Blocos com largura própria, um ao lado do outro. Antes eram
+                  colunas de uma grade, e com só duas condições visíveis cada
+                  uma esticava até metade do card — o subtotal ia parar na
+                  borda direita, longe do rótulo, com um vazio no meio
+                  (pedido de 24/09/2026). */}
+              <div className="flex flex-wrap gap-3">
                 {condicoesVisiveis.map((c) => {
                   const dados = r.atendimentos.porCondicao[c];
                   return (
-                    <div key={c} className="rounded-lg border border-border/70 p-3 space-y-2">
+                    <div
+                      key={c}
+                      className="w-full sm:w-[22rem] rounded-lg border border-border/70 p-3 space-y-2"
+                    >
                       <div className="flex items-baseline justify-between gap-2">
                         <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
                           {LABEL_CONDICAO[c]}
