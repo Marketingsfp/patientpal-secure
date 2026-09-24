@@ -400,7 +400,10 @@ export function MovimentoResultado({
           {pronto && (
             <ul className="mt-1.5 space-y-0.5 border-t border-border/60 pt-1.5">
               {r.receitaBruta.formas.map((f) => (
-                <li key={f.rotulo} className="flex items-center justify-between gap-2 text-[11px] leading-snug">
+                <li
+                  key={f.rotulo}
+                  className="flex items-center justify-between gap-2 text-[11px] leading-snug"
+                >
                   <span className="text-muted-foreground">{f.rotulo}</span>
                   <span className="tabular-nums">{brl(f.valor)}</span>
                 </li>
@@ -417,7 +420,6 @@ export function MovimentoResultado({
               )}
             </ul>
           )}
-
         </KpiCard>
         {/* Contagem pura: quantas GR (fichas de atendimento) e quantos
             pagamentos o período tem. Não altera nenhum cálculo de valor. */}
@@ -437,7 +439,10 @@ export function MovimentoResultado({
           {pronto && (
             <ul className="mt-1.5 space-y-0.5 border-t border-border/60 pt-1.5">
               {condicoesVisiveis.map((c) => (
-                <li key={c} className="flex items-center justify-between gap-2 text-[11px] leading-snug">
+                <li
+                  key={c}
+                  className="flex items-center justify-between gap-2 text-[11px] leading-snug"
+                >
                   <span className="text-muted-foreground">{LABEL_CONDICAO[c]}</span>
                   <span className="tabular-nums">{int(r.atendimentos.porCondicao[c].qtd)}</span>
                 </li>
@@ -445,7 +450,10 @@ export function MovimentoResultado({
               {/* O que faltava para fechar o total: mensalidades, adesões,
                   recebimentos avulsos e as cortesias (sem dinheiro). */}
               {GRUPOS_OUTRAS.filter((g) => r.outras.porGrupo[g].qtd > 0).map((g) => (
-                <li key={g} className="flex items-center justify-between gap-2 text-[11px] leading-snug">
+                <li
+                  key={g}
+                  className="flex items-center justify-between gap-2 text-[11px] leading-snug"
+                >
                   <span className="text-muted-foreground">{LABEL_GRUPO_MOV[g]}</span>
                   <span className="tabular-nums">{int(r.outras.porGrupo[g].qtd)}</span>
                 </li>
@@ -785,71 +793,75 @@ export function MovimentoResultado({
             </CardContent>
           </Card>
 
-          <QuadroProfissionais
-            linhas={linhas}
-            filtro={filtro}
-            onFiltro={onFiltro}
-          />
+          {/* Lado a lado a partir do lg (pedido de 24/09/2026): a tabela por
+              profissional é alta e estreita, e sozinha em largura total
+              deixava metade da tela vazia. Ao lado dela vai o detalhamento de
+              mensalidades, que é o outro quadro de resumo do período — os
+              dois viram uma coluna só em tela pequena. `items-start` para o
+              card mais baixo não esticar até a altura do outro. */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 items-start">
+            <QuadroProfissionais linhas={linhas} filtro={filtro} onFiltro={onFiltro} />
 
-          <Card>
-            <CardContent className="p-4 space-y-2">
-              <div className="flex items-start justify-between gap-3 flex-wrap">
-                <div>
-                  <p className="text-sm font-medium">Detalhamento de mensalidades no período</p>
-                  <p className="text-xs text-muted-foreground">
-                    Quanto entrou no caixa × a qual mês cada pagamento se refere
-                  </p>
+            <Card>
+              <CardContent className="p-4 space-y-2">
+                <div className="flex items-start justify-between gap-3 flex-wrap">
+                  <div>
+                    <p className="text-sm font-medium">Detalhamento de mensalidades no período</p>
+                    <p className="text-xs text-muted-foreground">
+                      Quanto entrou no caixa × a qual mês cada pagamento se refere
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                      Total recebido
+                    </p>
+                    <p className="text-lg font-semibold tabular-nums">{brl(mensalidades.total)}</p>
+                    <p className="text-[10px] text-muted-foreground">
+                      {plural(mensalidades.qtd, "pagamento", "pagamentos")}
+                    </p>
+                  </div>
                 </div>
-                <div className="text-right">
-                  <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
-                    Total recebido
-                  </p>
-                  <p className="text-lg font-semibold tabular-nums">{brl(mensalidades.total)}</p>
-                  <p className="text-[10px] text-muted-foreground">
-                    {plural(mensalidades.qtd, "pagamento", "pagamentos")}
-                  </p>
-                </div>
-              </div>
-              <div className="grid gap-2 sm:grid-cols-2">
-                <BotaoFiltro
-                  rotulo={LABEL_GRUPO_MOV.adesao}
-                  legenda={LEGENDA.adesao}
-                  valor={r.outras.porGrupo.adesao}
-                  ativo={mesmoFiltro(filtro, { grupo: "adesao" })}
-                  onClick={() => alternar({ grupo: "adesao" })}
-                />
-                <div className="rounded-md border border-border bg-muted/30 px-3 py-2">
-                  <p className="text-[11px] uppercase tracking-wide text-muted-foreground truncate">
-                    Mensalidades (recorrentes)
-                  </p>
-                  <p className="text-lg font-semibold tabular-nums">{brl(recorrentes.total)}</p>
-                  <p className="text-[10px] text-muted-foreground">
-                    {plural(recorrentes.qtd, "pagamento", "pagamentos")} · detalhado abaixo por mês
-                    de competência
-                  </p>
-                </div>
-              </div>
-              <div className="grid gap-2 sm:grid-cols-3">
-                {(
-                  [
-                    ["mensalidade_periodo", "verde"],
-                    ["mensalidade_atrasada", "ambar"],
-                    ["mensalidade_antecipada", "azul"],
-                  ] as const
-                ).map(([g, tom]) => (
+                <div className="grid gap-2 sm:grid-cols-2">
                   <BotaoFiltro
-                    key={g}
-                    rotulo={LABEL_GRUPO_MOV[g]}
-                    legenda={LEGENDA[g]}
-                    tom={tom}
-                    valor={r.outras.porGrupo[g]}
-                    ativo={mesmoFiltro(filtro, { grupo: g })}
-                    onClick={() => alternar({ grupo: g })}
+                    rotulo={LABEL_GRUPO_MOV.adesao}
+                    legenda={LEGENDA.adesao}
+                    valor={r.outras.porGrupo.adesao}
+                    ativo={mesmoFiltro(filtro, { grupo: "adesao" })}
+                    onClick={() => alternar({ grupo: "adesao" })}
                   />
-                ))}
-              </div>
-            </CardContent>
-          </Card>
+                  <div className="rounded-md border border-border bg-muted/30 px-3 py-2">
+                    <p className="text-[11px] uppercase tracking-wide text-muted-foreground truncate">
+                      Mensalidades (recorrentes)
+                    </p>
+                    <p className="text-lg font-semibold tabular-nums">{brl(recorrentes.total)}</p>
+                    <p className="text-[10px] text-muted-foreground">
+                      {plural(recorrentes.qtd, "pagamento", "pagamentos")} · detalhado abaixo por
+                      mês de competência
+                    </p>
+                  </div>
+                </div>
+                <div className="grid gap-2 sm:grid-cols-3">
+                  {(
+                    [
+                      ["mensalidade_periodo", "verde"],
+                      ["mensalidade_atrasada", "ambar"],
+                      ["mensalidade_antecipada", "azul"],
+                    ] as const
+                  ).map(([g, tom]) => (
+                    <BotaoFiltro
+                      key={g}
+                      rotulo={LABEL_GRUPO_MOV[g]}
+                      legenda={LEGENDA[g]}
+                      tom={tom}
+                      valor={r.outras.porGrupo[g]}
+                      ativo={mesmoFiltro(filtro, { grupo: g })}
+                      onClick={() => alternar({ grupo: g })}
+                    />
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
 
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex flex-wrap items-center gap-2">
@@ -1000,7 +1012,6 @@ function montarDetalhe(
         "",
         r.receitaBruta.total,
       ],
-
     };
   }
 
