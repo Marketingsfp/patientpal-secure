@@ -524,7 +524,10 @@ function Page() {
         let cortesiasFora = 0;
         let pagosFora = 0;
         for (const l of linhas) {
-          if (fora.ids.has(l.id)) continue;
+          // Segue o botão "Ocultar lançamentos retroativos" da própria tela,
+          // como os cards já faziam: desligado, o devido passa a contar o que
+          // foi digitado depois do dia, pela competência.
+          if (ocultarRetroativos && fora.ids.has(l.id)) continue;
           repasseDevido += l.repasse + l.terceiro;
           // Só o atendimento SEM lançamento no caixa entra aqui. O que passou
           // pela gaveta já está contado nas linhas da tela — somar de novo era
@@ -544,7 +547,7 @@ function Page() {
     return () => {
       cancelado = true;
     };
-  }, [clinicaAtual?.clinica_id, fromDate, toDate]);
+  }, [clinicaAtual?.clinica_id, fromDate, toDate, ocultarRetroativos]);
 
   /**
    * true → a busca por texto vale para o histórico inteiro da clínica, sem a

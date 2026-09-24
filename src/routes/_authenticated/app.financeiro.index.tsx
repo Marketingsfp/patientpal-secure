@@ -11,6 +11,8 @@ import {
   Wallet,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 import { useClinica } from "@/hooks/use-clinica";
 import { usePodeEscrever } from "@/hooks/use-permissoes";
 import { brl, fmtDate, rangeFromPeriodo, type Periodo } from "@/lib/financeiro/format";
@@ -158,6 +160,18 @@ function FinDashboard() {
     ate: hojeBR(),
   }));
   const [open, setOpen] = useState<null | "receita" | "despesa">(null);
+  /**
+   * Somar no período o que foi digitado depois do dia (retroativos e parcelas
+   * importadas). Desligado por padrão, como no Movimento de Caixa: assim o
+   * total do dia continua batendo com o cupom impresso da recepção. Ligado, a
+   * tela passa a mostrar o dia por COMPETÊNCIA — o resultado real daquela
+   * data, incluindo a guia faturada e a conta paga depois.
+   *
+   * Decisão de 23/09/2026: o dono pediu para ver o dia fechado por
+   * competência, e a escolha foi manter as duas leituras a um clique em vez
+   * de trocar a régua e quebrar a conferência do caixa.
+   */
+  const [incluirRetroativos, setIncluirRetroativos] = useState(false);
   const [reload, setReload] = useState(0);
   const [dados, setDados] = useState<DadosPainel | null>(null);
   const [carregando, setCarregando] = useState(true);
@@ -184,7 +198,7 @@ function FinDashboard() {
   useEffect(() => {
     if (!clinicaAtual) return;
     const clinicaId = clinicaAtual.clinica_id;
-    const chave = `${clinicaId}|${de}|${ate}`;
+    const chave = `${clinicaId}|${de}|${ate}|${incluirRetroativos ? "com" : "sem"}`;
     // Atualização do mesmo período (automática ou depois de lançar receita ou
     // despesa) troca os números sem piscar "…" nos cards. Trocar de período ou
     // de clínica mostra o "…", para ninguém ler o número do período anterior
@@ -205,7 +219,14 @@ function FinDashboard() {
           ctx = await carregarContextoRateio(clinicaId);
           ctxRef.current = { clinicaId, ctx };
         }
-        const d = await carregarPainelFinanceiro(ctx, clinicaId, de, ate, forcar);
+        const d = await carregarPainelFinanceiro(
+          ctx,
+          clinicaId,
+          de,
+          ate,
+          forcar,
+          incluirRetroativos,
+        );
         if (!cancelado) {
           setDados(d);
           setAtualizadoEm(new Date());
@@ -239,7 +260,7 @@ function FinDashboard() {
     return () => {
       cancelado = true;
     };
-  }, [clinicaAtual, de, ate, reload]);
+  }, [clinicaAtual, de, ate, reload, incluirRetroativos]);
 
   // Atualização automática, na hora que o relógio da tela marca. O `reload`
   // refaz a leitura; como a data de hoje é recalculada a cada render, a tela
@@ -346,13 +367,33 @@ function FinDashboard() {
           mesma conta do Movimento de Caixa. Clique em um card para ver o detalhamento em tela
           cheia.
         </p>
+        {/* Botão das duas leituras do dia, irmão do "Ocultar lançamentos
+            retroativos" do Movimento de Caixa. Fica sempre visível, mesmo
+            quando não há retroativo no período: quem procura a opção precisa
+            achá-la sem depender de o dia ter um caso. */}
+        <div className="flex items-center gap-2">
+          <Switch
+            id="incluir-retroativos"
+            checked={incluirRetroativos}
+            onCheckedChange={setIncluirRetroativos}
+          />
+          <Label
+            htmlFor="incluir-retroativos"
+            className="text-xs cursor-pointer"
+            title="Desligado (padrão): o período soma só o que passou pela gaveta na data, para bater com o cupom impresso. Ligado: entram também os lançamentos com competência desta data que foram digitados depois — a guia faturada dias depois, a conta paga em atraso — e as parcelas de cartão importadas do sistema antigo."
+          >
+            Incluir lançamentos retroativos (ver o dia por competência)
+          </Label>
+        </div>
         {/* Sem este aviso, quem compara com o Rateio da Receita (que segue a
             competência) veria a diferença sem saber de onde ela vem. */}
         {dados &&
           (dados.foraDoCaixa.retroativos.quantidade > 0 ||
             dados.foraDoCaixa.importadas.quantidade > 0) && (
             <p className="text-xs text-sky-900 bg-sky-50 border border-sky-300 rounded-md px-3 py-2">
-              Fora destes números, como no Movimento de Caixa:{" "}
+              {incluirRetroativos
+                ? "Estes números JÁ INCLUEM (o Movimento de Caixa deixa de fora, para bater com o cupom impresso): "
+                : "Fora destes números, como no Movimento de Caixa: "}
               {[
                 dados.foraDoCaixa.retroativos.quantidade > 0 &&
                   `${dados.foraDoCaixa.retroativos.quantidade} lançamento(s) retroativo(s)` +
@@ -364,7 +405,10 @@ function FinDashboard() {
               ]
                 .filter(Boolean)
                 .join("; ")}
-              . Eles continuam no Rateio da Receita e no Painel Executivo, pela data de competência.
+              .{" "}
+              {incluirRetroativos
+                ? "Com o botão ligado, o total do dia não bate mais com o cupom impresso daquele dia."
+                : "Eles continuam no Rateio da Receita e no Painel Executivo, pela data de competência."}
             </p>
           )}
 

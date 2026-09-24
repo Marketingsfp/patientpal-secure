@@ -64,6 +64,14 @@ export async function carregarPainelFinanceiro(
   de: string,
   ate: string,
   forcar = false,
+  /**
+   * Somar também o que ficou fora do caixa do período — retroativos e
+   * parcelas importadas. É o botão "Incluir lançamentos retroativos" do
+   * Dashboard, irmão do que o Movimento de Caixa já tinha: desligado (padrão)
+   * a tela bate com o cupom impresso do dia; ligado, ela mostra o dia por
+   * competência, com o que foi digitado depois.
+   */
+  incluirForaDoCaixa = false,
 ): Promise<DadosPainel> {
   const [todasAsLinhasBrutas, despesasBrutas, foraDoCaixa] = await Promise.all([
     carregarRateio(ctx, { clinicaId, de, ate, forcar }),
@@ -90,8 +98,9 @@ export async function carregarPainelFinanceiro(
   // Mesma conta do Movimento de Caixa: sai o que ele deixa fora do caixa do
   // período (retroativos e parcelas importadas). Em 04/09/2026 eram R$ 495,00
   // de receita e R$ 5.880,12 de despesas digitadas dias depois.
-  const todasAsLinhas = todasAsLinhasBrutas.filter((l) => !foraDoCaixa.ids.has(l.id));
-  const despesasRaw = despesasBrutas.filter((d) => !foraDoCaixa.ids.has(d.id));
+  const excluir = incluirForaDoCaixa ? new Set<string>() : foraDoCaixa.ids;
+  const todasAsLinhas = todasAsLinhasBrutas.filter((l) => !excluir.has(l.id));
+  const despesasRaw = despesasBrutas.filter((d) => !excluir.has(d.id));
 
   const paraPainel = (r: LancRaw): LancamentoPainel => ({
     id: r.id,
