@@ -201,19 +201,34 @@ function QuadroProfissionais({
             Consultas × Exames pelo tipo do serviço cadastrado — clique para filtrar a lista
           </p>
         </div>
-        <div className="overflow-x-auto">
+        {/* Rolagem dentro do quadro (24/09/2026): a lista de profissionais é
+            longa e o card vizinho é curto, então a página inteira rolava e
+            deixava um vazio enorme à direita. Agora quem rola é a tabela, e o
+            card fica com altura parecida com o da direita. */}
+        <div className="overflow-auto max-h-[550px]">
           {/* Largura total do card, com as três colunas de valor em largura
               fixa (8rem) e o nome ocupando todo o resto. Em 23/09/2026 a
               tabela tinha sido encolhida para o tamanho do conteúdo; em
               24/09/2026 o dono pediu de volta a largura cheia, agora sem o
               vazio do meio, porque a coluna do nome é que se estica. */}
           <table className="w-full text-xs">
+            {/* `sticky` vai nas CÉLULAS, não no <thead>/<tfoot>: em tabela o
+                navegador não gruda a linha inteira. O fundo sólido é
+                obrigatório, senão as linhas roladas aparecem por baixo. */}
             <thead>
               <tr className="text-[10px] uppercase tracking-wide text-muted-foreground">
-                <th className="py-1 pr-6 text-left font-medium">Profissional</th>
-                <th className="w-32 py-1 px-3 text-right font-medium">Consultas</th>
-                <th className="w-32 py-1 px-3 text-right font-medium">Exames</th>
-                <th className="w-32 py-1 px-3 text-right font-medium">Total</th>
+                <th className="sticky top-0 z-10 bg-card py-1 pr-6 text-left font-medium">
+                  Profissional
+                </th>
+                <th className="sticky top-0 z-10 w-32 bg-card py-1 px-3 text-right font-medium">
+                  Consultas
+                </th>
+                <th className="sticky top-0 z-10 w-32 bg-card py-1 px-3 text-right font-medium">
+                  Exames
+                </th>
+                <th className="sticky top-0 z-10 w-32 bg-card py-1 px-3 text-right font-medium">
+                  Total
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -239,15 +254,19 @@ function QuadroProfissionais({
             </tbody>
 
             <tfoot>
-              <tr className="border-t-2 border-border bg-muted/40 font-semibold">
-                <td className="py-1 pr-6 whitespace-nowrap">Total geral</td>
-                <td className="py-1 px-3 text-right">
+              {/* O total gruda embaixo: com a rolagem interna ele sairia de
+                  vista, e é o número que a conferência procura. */}
+              <tr className="border-t-2 border-border font-semibold">
+                <td className="sticky bottom-0 z-10 border-t-2 border-border bg-muted py-1 pr-6 whitespace-nowrap">
+                  Total geral
+                </td>
+                <td className="sticky bottom-0 z-10 border-t-2 border-border bg-muted py-1 px-3 text-right">
                   {celula({ total: totalGeral.consulta, qtd: totalGeral.consultaQtd })}
                 </td>
-                <td className="py-1 px-3 text-right">
+                <td className="sticky bottom-0 z-10 border-t-2 border-border bg-muted py-1 px-3 text-right">
                   {celula({ total: totalGeral.exame, qtd: totalGeral.exameQtd })}
                 </td>
-                <td className="py-1 px-3 text-right">
+                <td className="sticky bottom-0 z-10 border-t-2 border-border bg-muted py-1 px-3 text-right">
                   {celula({ total: totalGeral.total, qtd: totalGeral.totalQtd })}
                 </td>
               </tr>
