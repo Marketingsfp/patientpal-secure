@@ -84,6 +84,7 @@ import {
   carregarRateio,
   type RateioContexto,
 } from "@/lib/financeiro/rateio-receita";
+import { carregarForaDoCaixa } from "@/lib/financeiro/fora-do-caixa-carregar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { DateInputBR } from "@/components/ui/date-input-br";
@@ -510,12 +511,20 @@ function Page() {
           ctx = await carregarContextoRateio(clinicaId);
           ctxRateioRef.current = { clinicaId, ctx };
         }
-        const linhas = await carregarRateio(ctx, { clinicaId, de: fromDate, ate: toDate });
+        // Mesmo recorte do Financeiro → Dashboard: o devido é contado sobre as
+        // linhas que ficam no caixa do período. Sem tirar os retroativos e as
+        // parcelas importadas, as duas telas mostravam um "devido" diferente
+        // para o mesmo dia (ajuste de 23/09/2026).
+        const [linhas, fora] = await Promise.all([
+          carregarRateio(ctx, { clinicaId, de: fromDate, ate: toDate }),
+          carregarForaDoCaixa(clinicaId, fromDate, toDate),
+        ]);
         if (cancelado) return;
         let repasseDevido = 0;
         let cortesiasFora = 0;
         let pagosFora = 0;
         for (const l of linhas) {
+          if (fora.ids.has(l.id)) continue;
           repasseDevido += l.repasse + l.terceiro;
           // Só o atendimento SEM lançamento no caixa entra aqui. O que passou
           // pela gaveta já está contado nas linhas da tela — somar de novo era

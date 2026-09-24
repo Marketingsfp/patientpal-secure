@@ -79,6 +79,7 @@ const ROTULO_SINTETICO: Record<Drill, string> = {
 };
 
 const margem = (valor: number, base: number) => (base === 0 ? 0 : (valor / base) * 100);
+const round2 = (v: number) => Math.round(v * 100) / 100;
 const plural = (n: number, um: string, varios: string) => `${int(n)} ${n === 1 ? um : varios}`;
 
 /**
@@ -388,7 +389,7 @@ export function MovimentoResultado({
 
   return (
     <div className="space-y-3">
-      <div className="grid gap-2.5 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+      <div className="grid gap-2.5 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-5">
         <KpiCard
           novaAba
           onClick={() => abrir("receita")}
@@ -491,12 +492,19 @@ export function MovimentoResultado({
         >
           {/* A outra leitura do repasse, a mesma do Dashboard e do Rateio: o
               devido pelos atendimentos do período. Despesa e saldo desta tela
-              continuam sendo só o que saiu da gaveta. */}
+              continuam sendo só o que saiu da gaveta.
+
+              O complemento médico entra na soma porque é assim que o
+              Dashboard monta o mesmo número (`custoPrestadores`): sem ele, as
+              duas telas mostravam valores diferentes para o mesmo dia — foi o
+              que o dono apontou em 23/09/2026. */}
           {conferencia && (
             <ul className="mt-1.5 space-y-0.5 border-t border-border/60 pt-1.5">
               <li className="flex items-center justify-between gap-2 text-[11px] leading-snug">
                 <span className="text-muted-foreground">Devido pelos atendimentos</span>
-                <span className="tabular-nums">{brl(conferencia.repasseDevido)}</span>
+                <span className="tabular-nums">
+                  {brl(round2(conferencia.repasseDevido + r.complementoMedico.total))}
+                </span>
               </li>
             </ul>
           )}
@@ -569,10 +577,10 @@ export function MovimentoResultado({
           lugares que fazia as duas telas mostrarem números diferentes.
           Onde existe um filtro equivalente, o card filtra a lista abaixo. */}
       <section className="space-y-2">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+        <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
           Atendimentos
         </h2>
-        <div className="grid gap-2.5 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+        <div className="grid gap-2.5 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-5">
           <KpiCard
             icon={Users}
             label="Atendimentos (total)"
@@ -678,7 +686,7 @@ export function MovimentoResultado({
       {receitas.length > 0 && pronto && (
         <>
           <Card>
-            <CardContent className="pt-5 space-y-2">
+            <CardContent className="p-4 space-y-2">
               <div className="flex items-baseline justify-between gap-2">
                 <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
                   Total recebido por forma de pagamento
@@ -733,7 +741,7 @@ export function MovimentoResultado({
           </Card>
 
           <Card>
-            <CardContent className="pt-5 space-y-3">
+            <CardContent className="p-4 space-y-2">
               <div className="flex items-start justify-between gap-3 flex-wrap">
                 <div>
                   <p className="text-sm font-medium">Atendimentos recebidos no caixa</p>
@@ -790,7 +798,7 @@ export function MovimentoResultado({
           />
 
           <Card>
-            <CardContent className="pt-5 space-y-3">
+            <CardContent className="p-4 space-y-2">
               <div className="flex items-start justify-between gap-3 flex-wrap">
                 <div>
                   <p className="text-sm font-medium">Detalhamento de mensalidades no período</p>

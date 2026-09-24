@@ -148,17 +148,25 @@ export async function carregarRepassePagoDetalhado(
   de: string,
   ate: string,
 ): Promise<RepassePagoDetalhe> {
-  const linhas = await paginado(() =>
-    supabase
-      .from("fin_lancamentos")
-      .select(COLUNAS)
-      .eq("clinica_id", clinicaId)
-      .eq("tipo", "despesa")
-      .eq("status", "confirmado")
-      .gte("data", de)
-      .lte("data", ate)
-      .order("id"),
-  );
+  // Mesmo recorte do Dashboard e do Movimento de Caixa: fora os retroativos e
+  // as parcelas importadas. Até 23/09/2026 esta leitura somava tudo, e por
+  // isso o repasse pago dos Relatórios podia não fechar com o das outras duas
+  // telas no mesmo período.
+  const [linhasBrutas, fora] = await Promise.all([
+    paginado(() =>
+      supabase
+        .from("fin_lancamentos")
+        .select(COLUNAS)
+        .eq("clinica_id", clinicaId)
+        .eq("tipo", "despesa")
+        .eq("status", "confirmado")
+        .gte("data", de)
+        .lte("data", ate)
+        .order("id"),
+    ),
+    carregarForaDoCaixa(clinicaId, de, ate),
+  ]);
+  const linhas = linhasBrutas.filter((r) => !fora.ids.has(r.id));
   const despesas = classificarDespesas(
     linhas.map((r) => ({
       id: r.id,
