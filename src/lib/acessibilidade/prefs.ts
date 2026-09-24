@@ -135,6 +135,13 @@ export function aplicarPrefs(p: A11yPrefs, doc: Document = document) {
   html.classList.add(...classesDe(p));
   html.style.setProperty("--a11y-font-scale", String(p.fontScale));
   html.style.fontSize = `${16 * p.fontScale}px`;
+  // `color-scheme` avisa o navegador para desenhar barra de rolagem, campos
+  // nativos e o fundo do documento já no tom certo. Quem liga isso antes da
+  // primeira pintura é o script no <head> (ver src/routes/__root.tsx); aqui
+  // o valor é mantido em dia quando a pessoa liga ou desliga o modo escuro
+  // com o sistema já aberto — sem isto, ao DESLIGAR o escuro os controles do
+  // navegador continuariam escuros dentro da tela clara.
+  html.style.colorScheme = p.modoEscuro ? "dark" : "light";
 }
 
 export function lerLocal(): A11yPrefs | null {

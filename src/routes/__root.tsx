@@ -127,6 +127,23 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       },
     ],
     scripts: [
+      // Tema escuro aplicado ANTES da primeira pintura.
+      //
+      // A preferência de modo escuro é do painel de acessibilidade e só era
+      // aplicada quando o React montava (AcessibilidadeProvider). Entre o
+      // HTML chegar e o JavaScript rodar, a tela era desenhada no tema claro
+      // e depois virava escura — o "flash branco" a cada carregamento e a
+      // cada F5. Este script é minúsculo, síncrono e roda no <head>: lê a
+      // mesma chave de localStorage que o provider usa e marca o <html>.
+      //
+      // Só cuida do escuro. As demais preferências (densidade, fonte, alto
+      // contraste) não clareiam a tela, então continuam sendo aplicadas pelo
+      // provider, que segue sendo a fonte de verdade e reescreve as classes
+      // assim que monta.
+      {
+        children:
+          '(function(){try{var r=localStorage.getItem("hhp:a11y");if(!r)return;var p=JSON.parse(r);if(p&&p.modoEscuro){var h=document.documentElement;h.classList.add("dark","a11y-escuro");h.style.colorScheme="dark";}}catch(e){}})();',
+      },
       {
         type: "application/ld+json",
         children: JSON.stringify({

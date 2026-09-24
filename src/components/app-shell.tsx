@@ -299,7 +299,9 @@ function LiquidBottomNav({
     <div className="md:hidden fixed bottom-0 left-0 right-0 w-full z-50">
       <nav
         ref={navRef}
-        className="relative w-full rounded-t-2xl text-white shadow-2xl px-2 pt-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] flex items-stretch transform-gpu will-change-transform"
+        // No escuro a barra inferior segue a mesma superfície do menu lateral
+        // em vez da cor cheia da clínica (ver comentário no <aside>).
+        className="relative w-full rounded-t-2xl text-white shadow-2xl px-2 pt-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] flex items-stretch transform-gpu will-change-transform dark:bg-sidebar!"
         aria-label="Navegação principal"
         style={
           navW > 0 && activeIdx >= 0
@@ -358,7 +360,10 @@ function LiquidBottomNav({
       {navW > 0 && activeIdx >= 0 && (
         <div
           aria-hidden
-          className="pointer-events-none absolute top-0 left-0 h-12 w-12 -mt-5 flex items-center justify-center rounded-full bg-white shadow-lg transform-gpu will-change-transform"
+          // `dark:bg-white` é intencional: a bolha do item ativo precisa
+          // continuar branca para o ícone, que é pintado com a cor da
+          // clínica, ter contraste em cima da barra escura.
+          className="pointer-events-none absolute top-0 left-0 h-12 w-12 -mt-5 flex items-center justify-center rounded-full bg-white dark:bg-white shadow-lg transform-gpu will-change-transform"
           style={{
             color: cor,
             transform: `translate3d(${cx - 24}px, 0, 0)`,
@@ -1672,7 +1677,13 @@ function AppShellInner() {
             <aside
               id="menu-lateral"
               aria-hidden={!sidebarAberta}
-              className="h-full w-full min-h-0 flex flex-col text-white overflow-hidden border-r border-white/10"
+              // `dark:bg-sidebar!` anula o `style` acima no tema escuro: a cor
+              // da clínica é forte demais em fundo escuro (vira um bloco de
+              // azul saturado ao lado do cinza-ardósia). No escuro o menu usa
+              // a superfície da paleta, um degrau acima do fundo da página —
+              // a identidade da clínica continua no resto do sistema (botões,
+              // realces, abas), que seguem `--primary`.
+              className="h-full w-full min-h-0 flex flex-col text-white dark:text-sidebar-foreground overflow-hidden border-r border-white/10 dark:border-sidebar-border dark:bg-sidebar!"
               style={{ backgroundColor: corSidebar }}
             >
               {/* Título da gaveta + botão de fechar. */}

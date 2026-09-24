@@ -213,7 +213,11 @@ export function TotemPage() {
   // Modo escuro desativado globalmente: o totem sempre usa o tema claro.
   useEffect(() => {
     if (typeof document === "undefined") return;
-    document.documentElement.classList.remove("dark");
+    document.documentElement.classList.remove("dark", "a11y-escuro");
+    // O script do <head> pode ter marcado `color-scheme: dark` a partir da
+    // preferência da recepcionista; no totem isso deixaria os campos nativos
+    // escuros dentro de uma tela clara.
+    document.documentElement.style.colorScheme = "light";
   }, []);
 
   // Telas de conclusão voltam sozinhas para o menu inicial — a senha já saiu
