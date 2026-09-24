@@ -3210,16 +3210,20 @@ function Page() {
                   <Table>
                     <TableHeader>
                       <TableRow>
+                        {/* Larguras contidas de propósito (24/09/2026): com os
+                            nomes completos de médico e de usuário sem quebra, a
+                            tabela passava da largura da tela e as colunas Data
+                            e Descrição saíam de vista pela esquerda. */}
                         <TableHead className="w-10"></TableHead>
-                        <TableHead>Data</TableHead>
-                        <TableHead>Descrição</TableHead>
+                        <TableHead className="whitespace-nowrap">Data</TableHead>
+                        <TableHead className="min-w-[12rem]">Descrição</TableHead>
                         <TableHead>Médico</TableHead>
                         <TableHead className="text-right">Ficha</TableHead>
                         <TableHead>Forma</TableHead>
                         <TableHead>Usuário</TableHead>
                         <TableHead>Status</TableHead>
                         <TableHead className="text-right">Valor</TableHead>
-                        <TableHead className="w-32 text-right">Ações</TableHead>
+                        <TableHead className="w-36 text-right">Ações</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -3260,8 +3264,13 @@ function Page() {
                                 </Badge>
                               )}
                             </TableCell>
-                            <TableCell className="text-sm whitespace-nowrap">
-                              {l.medico_nome || "—"}
+                            <TableCell className="text-sm">
+                              <span
+                                className="block max-w-[11rem] truncate"
+                                title={l.medico_nome || undefined}
+                              >
+                                {l.medico_nome || "—"}
+                              </span>
                             </TableCell>
                             <TableCell className="text-sm text-right tabular-nums">
                               {typeof l.ficha_numero === "number"
@@ -3276,8 +3285,13 @@ function Page() {
                             >
                               {LABEL_FORMA[baldeDaLinha(l)]}
                             </TableCell>
-                            <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
-                              {l.criado_por ? (userMap.get(l.criado_por) ?? "—") : "—"}
+                            <TableCell className="text-sm text-muted-foreground">
+                              <span
+                                className="block max-w-[9rem] truncate"
+                                title={l.criado_por ? (userMap.get(l.criado_por) ?? undefined) : undefined}
+                              >
+                                {l.criado_por ? (userMap.get(l.criado_por) ?? "—") : "—"}
+                              </span>
                             </TableCell>
                             <TableCell>
                               <Badge variant={l.status === "confirmado" ? "default" : "secondary"}>
@@ -3317,6 +3331,7 @@ function Page() {
                                   <Button
                                     variant="ghost"
                                     size="icon"
+                                    className="h-8 w-8"
                                     title="Estornar lançamento — mantém o registro no histórico com status 'cancelado' e desvincula o laudo (recomendado para repasses)."
                                     disabled={estornando === l.id}
                                     onClick={() => estornar(l)}
@@ -3331,6 +3346,7 @@ function Page() {
                                   <Button
                                     variant="ghost"
                                     size="icon"
+                                    className="h-8 w-8"
                                     title="Solicitar estorno da sangria — gera pedido para o Financeiro aprovar (compensação por suprimento)."
                                     onClick={() => setEstornoSangria(l)}
                                   >
@@ -3343,6 +3359,7 @@ function Page() {
                                   <Button
                                     variant="ghost"
                                     size="icon"
+                                    className="h-8 w-8"
                                     title="Reimprimir recibo — gera a segunda via do comprovante em folha A4. Não altera o lançamento."
                                     onClick={() => reimprimirRecibo(l)}
                                   >
@@ -3354,6 +3371,7 @@ function Page() {
                                     <Button
                                       variant="ghost"
                                       size="icon"
+                                      className="h-8 w-8"
                                       title="Editar lançamento — alterar descrição, valor, categoria, conta ou forma de pagamento."
                                       onClick={() => openEdit(l)}
                                     >
@@ -3362,6 +3380,7 @@ function Page() {
                                     <Button
                                       variant="ghost"
                                       size="icon"
+                                      className="h-8 w-8"
                                       title="Excluir lançamento — remove definitivamente do banco (sem histórico). Use apenas para lançamentos criados por engano; para repasses prefira Estornar."
                                       onClick={() => remove(l)}
                                     >
