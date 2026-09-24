@@ -193,9 +193,7 @@ function QuadroProfissionais({
     </>
   );
   return (
-    // O quadro tem a largura da tabela, não a da tela: em monitor largo o card
-    // esticado deixava um vazio enorme à direita. Pedido de 23/09/2026.
-    <Card className="w-fit max-w-full">
+    <Card>
       <CardContent className="p-4 space-y-2">
         <div>
           <p className="text-sm font-medium">Por profissional</p>
@@ -204,17 +202,18 @@ function QuadroProfissionais({
           </p>
         </div>
         <div className="overflow-x-auto">
-          {/* Largura pelo conteúdo (`w-auto`), não 100% da tela: com `w-full`
-              o nome ficava na borda esquerda e os valores na borda direita,
-              com um vazio no meio que obrigava a atravessar a tela com o olho
-              para ler uma linha. Ajuste pedido em 23/09/2026. */}
-          <table className="w-auto max-w-full text-xs">
+          {/* Largura total do card, com as três colunas de valor em largura
+              fixa (8rem) e o nome ocupando todo o resto. Em 23/09/2026 a
+              tabela tinha sido encolhida para o tamanho do conteúdo; em
+              24/09/2026 o dono pediu de volta a largura cheia, agora sem o
+              vazio do meio, porque a coluna do nome é que se estica. */}
+          <table className="w-full text-xs">
             <thead>
               <tr className="text-[10px] uppercase tracking-wide text-muted-foreground">
                 <th className="py-1 pr-6 text-left font-medium">Profissional</th>
-                <th className="py-1 px-3 text-right font-medium">Consultas</th>
-                <th className="py-1 px-3 text-right font-medium">Exames</th>
-                <th className="py-1 pl-3 text-right font-medium">Total</th>
+                <th className="w-32 py-1 px-3 text-right font-medium">Consultas</th>
+                <th className="w-32 py-1 px-3 text-right font-medium">Exames</th>
+                <th className="w-32 py-1 px-3 text-right font-medium">Total</th>
               </tr>
             </thead>
             <tbody>
@@ -230,15 +229,10 @@ function QuadroProfissionais({
                     aria-selected={ativo}
                     onClick={() => alternar(f)}
                   >
-                    {/* O nome quebra em duas linhas a partir de 18rem: sem o
-                        teto, um único nome comprido (NOME — AGENDA) alargava a
-                        coluna inteira e afastava os valores de todo mundo. */}
-                    <td className="py-0.5 pr-6">
-                      <span className="block max-w-[18rem] leading-tight">{d.profissional}</span>
-                    </td>
+                    <td className="py-0.5 pr-6 leading-tight">{d.profissional}</td>
                     <td className="py-0.5 px-3 text-right">{celula(d.consulta)}</td>
                     <td className="py-0.5 px-3 text-right">{celula(d.exame)}</td>
-                    <td className="py-0.5 pl-3 text-right font-medium">{celula(d.total)}</td>
+                    <td className="py-0.5 px-3 text-right font-medium">{celula(d.total)}</td>
                   </tr>
                 );
               })}
@@ -253,7 +247,7 @@ function QuadroProfissionais({
                 <td className="py-1 px-3 text-right">
                   {celula({ total: totalGeral.exame, qtd: totalGeral.exameQtd })}
                 </td>
-                <td className="py-1 pl-3 text-right">
+                <td className="py-1 px-3 text-right">
                   {celula({ total: totalGeral.total, qtd: totalGeral.totalQtd })}
                 </td>
               </tr>
