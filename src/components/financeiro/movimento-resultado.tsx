@@ -201,13 +201,17 @@ function QuadroProfissionais({
           </p>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full text-xs">
+          {/* Largura pelo conteúdo (`w-auto`), não 100% da tela: com `w-full`
+              o nome ficava na borda esquerda e os valores na borda direita,
+              com um vazio no meio que obrigava a atravessar a tela com o olho
+              para ler uma linha. Ajuste pedido em 23/09/2026. */}
+          <table className="w-auto max-w-full text-xs">
             <thead>
               <tr className="text-[10px] uppercase tracking-wide text-muted-foreground">
-                <th className="py-1 pr-2 text-left font-medium">Profissional</th>
-                <th className="py-1 px-2 text-right font-medium">Consultas</th>
-                <th className="py-1 px-2 text-right font-medium">Exames</th>
-                <th className="py-1 pl-2 text-right font-medium">Total</th>
+                <th className="py-1 pr-6 text-left font-medium">Profissional</th>
+                <th className="py-1 px-3 text-right font-medium">Consultas</th>
+                <th className="py-1 px-3 text-right font-medium">Exames</th>
+                <th className="py-1 pl-3 text-right font-medium">Total</th>
               </tr>
             </thead>
             <tbody>
@@ -223,12 +227,10 @@ function QuadroProfissionais({
                     aria-selected={ativo}
                     onClick={() => alternar(f)}
                   >
-                    <td className="py-0.5 pr-2">
-                      <span className="truncate">{d.profissional}</span>
-                    </td>
-                    <td className="py-0.5 px-2 text-right">{celula(d.consulta)}</td>
-                    <td className="py-0.5 px-2 text-right">{celula(d.exame)}</td>
-                    <td className="py-0.5 pl-2 text-right font-medium">{celula(d.total)}</td>
+                    <td className="py-0.5 pr-6 whitespace-nowrap">{d.profissional}</td>
+                    <td className="py-0.5 px-3 text-right">{celula(d.consulta)}</td>
+                    <td className="py-0.5 px-3 text-right">{celula(d.exame)}</td>
+                    <td className="py-0.5 pl-3 text-right font-medium">{celula(d.total)}</td>
                   </tr>
                 );
               })}
@@ -236,14 +238,14 @@ function QuadroProfissionais({
 
             <tfoot>
               <tr className="border-t-2 border-border bg-muted/40 font-semibold">
-                <td className="py-1 pr-2">Total geral</td>
-                <td className="py-1 px-2 text-right">
+                <td className="py-1 pr-6 whitespace-nowrap">Total geral</td>
+                <td className="py-1 px-3 text-right">
                   {celula({ total: totalGeral.consulta, qtd: totalGeral.consultaQtd })}
                 </td>
-                <td className="py-1 px-2 text-right">
+                <td className="py-1 px-3 text-right">
                   {celula({ total: totalGeral.exame, qtd: totalGeral.exameQtd })}
                 </td>
-                <td className="py-1 pl-2 text-right">
+                <td className="py-1 pl-3 text-right">
                   {celula({ total: totalGeral.total, qtd: totalGeral.totalQtd })}
                 </td>
               </tr>
