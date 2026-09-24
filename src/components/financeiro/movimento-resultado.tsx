@@ -56,6 +56,7 @@ import {
   type FiltroCard,
   type GrupoMovimento,
   type LinhaClassificada,
+  type LinhaProfissional,
   type ResumoMovimento,
   type TotalQtd,
 } from "@/lib/financeiro/movimento-resultado";
@@ -189,15 +190,40 @@ function QuadroProfissionais({
   // Os totais seguem o que está NA TELA: quem digita um nome espera a soma
   // daquele nome, não a do período inteiro. O rótulo muda junto, para ninguém
   // confundir um total filtrado com o total do dia.
-  const totalGeral = {
-    consulta: visiveis.reduce((s, d) => s + d.consulta.total, 0),
-    consultaQtd: visiveis.reduce((s, d) => s + d.consulta.qtd, 0),
-    exame: visiveis.reduce((s, d) => s + d.exame.total, 0),
-    exameQtd: visiveis.reduce((s, d) => s + d.exame.qtd, 0),
-    total: visiveis.reduce((s, d) => s + d.total.total, 0),
-    totalQtd: visiveis.reduce((s, d) => s + d.total.qtd, 0),
-  };
+  const somar = (lista: LinhaProfissional[]) => ({
+    consulta: lista.reduce((s, d) => s + d.consulta.total, 0),
+    consultaQtd: lista.reduce((s, d) => s + d.consulta.qtd, 0),
+    exame: lista.reduce((s, d) => s + d.exame.total, 0),
+    exameQtd: lista.reduce((s, d) => s + d.exame.qtd, 0),
+    total: lista.reduce((s, d) => s + d.total.total, 0),
+    totalQtd: lista.reduce((s, d) => s + d.total.qtd, 0),
+  });
+  // Rodapé da tabela: continua sendo o total de quem está listado. É o total
+  // DA TABELA, então clicar numa linha não pode encolhê-lo.
+  const totalGeral = somar(visiveis);
+  // Linha clicada na tabela. A busca é feita em `dados`, a lista inteira, e
+  // não em `visiveis`: o filtro pode ter sido ligado antes de a pessoa digitar
+  // um nome na busca, e nesse caso o selecionado sai da lista visível sem
+  // deixar de estar filtrando a tela. E o filtro também pode vir dos cards de
+  // condição lá de cima, que não trazem profissional nenhum — aí `selecionado`
+  // fica nulo e os cards continuam consolidados, como antes.
+  const selecionado = filtro?.profissional
+    ? (dados.find((d) => d.profissional === filtro.profissional) ?? null)
+    : null;
+  // Cards da direita: mostram o profissional selecionado; sem seleção, somam o
+  // que a busca deixou na tela; sem busca nenhuma, o período inteiro.
+  const totalCards = selecionado ? somar([selecionado]) : totalGeral;
   const destaque = visiveis.find((d) => d.profissional !== SEM_PROFISSIONAL) ?? null;
+  // De quem é o número que está no card. `null` = visão consolidada da
+  // clínica. Sem isso, um total já filtrado aparecia sob o título "do
+  // período", e quem batesse o olho leria como faturamento da clínica toda.
+  const deQuem = selecionado
+    ? selecionado.profissional
+    : termo
+      ? plural(visiveis.length, "profissional da busca", "profissionais da busca")
+      : null;
+  const tituloCard = (curto: string, consolidado: string) =>
+    deQuem ? `${curto} — ${deQuem}` : consolidado;
   const alternar = (f: FiltroCard) => onFiltro(mesmoFiltro(filtro, f) ? null : f);
   // Duas linhas por célula (valor em cima, quantidade embaixo). A altura da
   // linha vem daqui, não do padding: por isso as duas usam entrelinha curta.
@@ -315,32 +341,42 @@ function QuadroProfissionais({
           </div>
 
           <aside className="space-y-2">
+            {/* Os três cards dizem de quem é o número no próprio título: com
+                uma linha da tabela selecionada, eles passam a mostrar só
+                aquele profissional (pedido de 24/09/2026). Antes o título era
+                fixo e o valor mudava sozinho pela busca, o que fazia um total
+                já filtrado parecer o da clínica inteira. */}
             <div className="rounded-lg border border-border p-3">
-              <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
-                Faturamento do período
+              <p className="text-[11px] uppercase tracking-wide leading-snug text-muted-foreground">
+                {tituloCard("Faturamento", "Faturamento geral do período")}
               </p>
-              <p className="text-xl font-bold tabular-nums">{brl(totalGeral.total)}</p>
+              <p className="text-xl font-bold tabular-nums">{brl(totalCards.total)}</p>
               <p className="text-[11px] text-foreground/75">
-                Consultas {brl(totalGeral.consulta)} · Exames {brl(totalGeral.exame)}
+                Consultas {brl(totalCards.consulta)} · Exames {brl(totalCards.exame)}
               </p>
             </div>
             <div className="rounded-lg border border-border p-3">
-              <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
-                Atendimentos
+              <p className="text-[11px] uppercase tracking-wide leading-snug text-muted-foreground">
+                {tituloCard("Atendimentos", "Atendimentos de todos os profissionais")}
               </p>
-              <p className="text-xl font-bold tabular-nums">{int(totalGeral.totalQtd)}</p>
+              <p className="text-xl font-bold tabular-nums">{int(totalCards.totalQtd)}</p>
               <p className="text-[11px] text-foreground/75">
-                {int(totalGeral.consultaQtd)} consultas e {int(totalGeral.exameQtd)} exames
+                {int(totalCards.consultaQtd)} consultas e {int(totalCards.exameQtd)} exames
               </p>
             </div>
-            {destaque && (
+            {(selecionado ?? destaque) && (
               <div className="rounded-lg border border-border p-3">
-                <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
-                  Destaque do período
+                <p className="text-[11px] uppercase tracking-wide leading-snug text-muted-foreground">
+                  {selecionado
+                    ? "Profissional selecionado"
+                    : "Destaque do período · maior faturamento"}
                 </p>
-                <p className="text-sm font-semibold leading-tight">{destaque.profissional}</p>
+                <p className="text-sm font-semibold leading-tight">
+                  {(selecionado ?? destaque)!.profissional}
+                </p>
                 <p className="text-[11px] text-foreground/75 tabular-nums">
-                  {brl(destaque.total.total)} em {int(destaque.total.qtd)} atendimento(s)
+                  {brl((selecionado ?? destaque)!.total.total)} em{" "}
+                  {int((selecionado ?? destaque)!.total.qtd)} atendimento(s)
                 </p>
               </div>
             )}
