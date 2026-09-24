@@ -1434,6 +1434,16 @@ function AtendimentosPage() {
     return 0;
   };
 
+  /**
+   * Contador da leitura em curso. A tela dispara `load()` a cada mudança de
+   * filtro, e a leitura é pesada (três consultas paginadas mais as extras).
+   * Sem este controle, uma resposta ANTIGA que chega depois sobrescreve a
+   * nova: era o que fazia a lista mostrar lançamentos de fora do período
+   * escolhido — em 24/09/2026, com De/Até em 03/09, aparecia uma ficha de
+   * 24/09 que tinha vindo da leitura anterior. Mesma proteção que o Movimento
+   * de Caixa já usava.
+   */
+  const loadSeq = useRef(0);
   const load = async () => {
     if (!clinicaAtual) {
       setItems([]);
@@ -1452,6 +1462,9 @@ function AtendimentosPage() {
       return;
     }
     setLoading(true);
+    const seq = ++loadSeq.current;
+    /** Esta leitura já foi substituída por outra mais nova. */
+    const obsoleta = () => loadSeq.current !== seq;
     // Une atendimentos manuais (fin_atendimentos) com pagamentos da agenda (fin_lancamentos receita).
     // Regra de repasse da agenda: a competência é a data marcada no agendamento,
     // não a data em que o paciente pagou no caixa. Assim pagamento antecipado não
@@ -1537,6 +1550,7 @@ function AtendimentosPage() {
       fetchAllPaged<any>(buildAgenda as any),
       fetchAllPaged<any>(buildSemAgenda as any),
     ]);
+    if (obsoleta()) return;
     if (mr.error) {
       mostrarErro(mr.error);
       setLoading(false);
@@ -1576,6 +1590,7 @@ function AtendimentosPage() {
         setLoading(false);
         return;
       }
+      if (obsoleta()) return;
       for (const m of mens ?? [])
         if (m.lancamento_id) mensalidadesCT.set(m.lancamento_id, Number(m.numero_parcela) || 0);
     }
@@ -1601,6 +1616,7 @@ function AtendimentosPage() {
       .gte("data", fIni)
       .lte("data", fFim);
     const [espelhosRes, terceirosRes] = await Promise.all([espelhosReq, terceirosReq]);
+    if (obsoleta()) return;
     const lancamentosEspelhoAgenda = new Set<string>();
     if (espelhosRes.error) {
       mostrarErro(espelhosRes.error);
@@ -1928,6 +1944,7 @@ function AtendimentosPage() {
       ocultosSemAgenda = unif.filter((x) => !x.agenda_nome).length;
       visiveis = unif.filter((x) => chaveNomeAgenda(x.agenda_nome ?? "") === alvo);
     }
+    if (obsoleta()) return;
     setItems(visiveis);
     setSemAgendaOcultos(ocultosSemAgenda);
     setNaoAtendimentosOcultos(naoAtendimentos);
