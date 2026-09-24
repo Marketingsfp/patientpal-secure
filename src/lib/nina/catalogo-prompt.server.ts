@@ -6,6 +6,7 @@
  * Server-only.
  */
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { catalogoDoTurno } from "./catalogo-turno.server";
 import { agoraNaClinica, FUSO_PADRAO } from "@/lib/nina-agora";
 import { REGRA_PIX_CARTAO } from "./pagamento-catalogo";
 import { REGRA_INTERPRETACAO_CATALOGO } from "./catalogo-busca";
@@ -16,6 +17,8 @@ import { REGRA_ANESTESIA_ADICIONAL, REGRA_HORARIOS_PUBLICADOS, REGRA_MODALIDADES
 export async function contarCatalogoPublicado(
   clinicaId: string,
 ): Promise<{ servicos: number; profissionais: number }> {
+  const catalogo = await catalogoDoTurno(clinicaId);
+  if (catalogo) return { servicos: catalogo.servicos.length, profissionais: catalogo.profissionais.length };
   const [servicos, profissionais] = await Promise.all([
     supabaseAdmin
       .from("nina_cat_servicos")

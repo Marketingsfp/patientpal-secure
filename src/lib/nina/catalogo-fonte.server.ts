@@ -6,6 +6,7 @@
  * fonte de resposta ao paciente. Rascunho e arquivado não existem aqui.
  */
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { catalogoDoTurno } from "./catalogo-turno.server";
 
 /** Mensagem única de "não tenho informação oficial" → encaminhar para humano. */
 export const SEM_CATALOGO_INSTRUCAO =
@@ -13,7 +14,8 @@ export const SEM_CATALOGO_INSTRUCAO =
 
 /** Especialidades realmente publicadas no catálogo de profissionais. */
 export async function especialidadesPublicadas(clinicaId: string): Promise<string[]> {
-  const { data, error } = await supabaseAdmin
+  const catalogo = await catalogoDoTurno(clinicaId);
+  const { data, error } = catalogo ? { data: catalogo.profissionais, error: null } : await supabaseAdmin
     .from("nina_cat_profissionais")
     .select("especialidades")
     .eq("clinica_id", clinicaId)

@@ -1,6 +1,7 @@
 /** Identidade operacional do profissional; o catálogo continua sendo a fonte
  * dos preços, escala publicada e demais informações de atendimento. */
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { catalogoDoTurno } from "./catalogo-turno.server";
 import { normalizar } from "@/lib/nina-especialidade";
 import { registrarEtapa } from "./evidencias.server";
 import type { RegistroConhecimento } from "./knowledge-contract";
@@ -106,8 +107,11 @@ function origemVinculo(profissional: ProfissionalCatalogo, resolucao: ResolucaoM
 
 /** A mesma resolução de identidade do catálogo é usada para ler a modalidade. */
 export async function modalidadePublicadaDoMedico(clinicaId: string, medicoId: string, escopo?: EscopoAtendimentoConsulta) {
+  const leitura = await catalogoDoTurno(clinicaId);
   if (escopo?.procedimentoId) {
-    const { data, error } = await supabaseAdmin.from("nina_cat_servicos")
+    const { data, error } = leitura
+      ? { data: leitura.servicos.find(s => s.id === escopo.procedimentoId), error: null }
+      : await supabaseAdmin.from("nina_cat_servicos")
       .select("id, nome, descricao_publica, estrutura, executantes, formas_pagamento, valor, valor_observacao, preparo, restricoes")
       .eq("clinica_id", clinicaId).eq("status", "PUBLICADO").eq("id", escopo.procedimentoId).maybeSingle();
     if (error) throw new Error(error.message);
@@ -136,7 +140,7 @@ export async function modalidadePublicadaDoMedico(clinicaId: string, medicoId: s
   }
   const [ativos, publicados] = await Promise.all([
     medicosDaClinica(clinicaId),
-    supabaseAdmin.from("nina_cat_profissionais").select("id, nome, medico_id, tipo_atendimento, estrutura, observacao_publica")
+    leitura ? { data: leitura.profissionais, error: null } : supabaseAdmin.from("nina_cat_profissionais").select("id, nome, medico_id, tipo_atendimento, estrutura, observacao_publica")
       .eq("clinica_id", clinicaId).eq("status", "PUBLICADO"),
   ]);
   if (publicados.error) throw new Error(publicados.error.message);
@@ -170,7 +174,10 @@ export async function resolverMedicoAgenda(
   const operacional = medicos.find((m) => m.id.toLowerCase() === termo.toLowerCase());
   if (operacional) return { ok: true, ...operacional, candidatosOficiais: medicos };
 
-  const { data, error } = await supabaseAdmin
+  const leitura = await catalogoDoTurno(clinicaId);
+  const { data, error } = leitura
+    ? { data: leitura.profissionais.find(p => p.id.toLowerCase() === termo.toLowerCase()), error: null }
+    : await supabaseAdmin
     .from("nina_cat_profissionais")
     .select("id, nome, medico_id")
     .eq("id", termo)
@@ -211,9 +218,10 @@ export async function vincularProfissionaisCatalogo(
 ) {
   const profissionais = registros.filter((r) => r.tipo === "profissional" && r.id && r.medico);
   if (!profissionais.length) return [];
+  const leitura = await catalogoDoTurno(clinicaId);
   const [cadastros, catalogo] = await Promise.all([
     medicosDaClinica(clinicaId),
-    supabaseAdmin
+    leitura ? { data: leitura.profissionais.filter(p => profissionais.some(r => r.id === p.id)), error: null } : supabaseAdmin
       .from("nina_cat_profissionais")
       .select("id, nome, medico_id")
       .eq("clinica_id", clinicaId)

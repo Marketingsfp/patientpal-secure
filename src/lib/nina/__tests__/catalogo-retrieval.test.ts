@@ -15,6 +15,12 @@ import { motivoParaAtendimento } from "@/lib/atendimento/texto-interno-apresenta
 import { incorporarResultadoOficial } from "../confidence/evidencias-turno";
 import { validarResultado } from "../tool-broker";
 import { consultaPreventivo, avaliacaoOdontologica } from "./fixtures/consultas-publicadas.fixture";
+import { comCatalogoDoTurno, catalogoDoTurno } from "../catalogo-turno.server";
+import { contarCatalogoPublicado } from "../catalogo-prompt.server";
+import { especialidadesPublicadas } from "../catalogo-fonte.server";
+import { candidatosPrimeiraVaga } from "../primeiro-disponivel-catalogo.server";
+import { modalidadePublicadaDoMedico, resolverMedicoAgenda } from "../vinculo-catalogo-agenda.server";
+import { atendimentoExigeHumano } from "../regras-catalogo.server";
 
 type Linha = Record<string, unknown>;
 
@@ -158,9 +164,131 @@ function profissional(over: Linha): Linha {
 beforeEach(() => {
   banco["nina_cat_servicos"] = [];
   banco["nina_cat_profissionais"] = [];
+  banco["medicos"] = [];
   chamadas.length = 0;
   tetoServidor = Infinity;
   falharAposPrimeiraPagina = false;
+});
+
+describe("uma leitura do catálogo por resposta", () => {
+  const medicoId = "22222222-2222-4222-8222-222222222222";
+  const profissionalId = "33333333-3333-4333-8333-333333333333";
+  beforeEach(() => {
+    banco.nina_cat_servicos = [servico({ id: "mamografia", nome: "Mamografia", valor: 147,
+      executantes: [{ nome: "Maria Silva", medico_id: medicoId }] })];
+    banco.nina_cat_profissionais = [profissional({ id: profissionalId, nome: "Maria Silva",
+      medico_id: medicoId, especialidades: [{ nome: "CARDIOLOGIA" }], tipo_atendimento: "Hora marcada" })];
+    banco.medicos = [{ id: medicoId, nome: "Maria Silva", clinica_id: CLINICA, ativo: true }];
+  });
+  const leituras = () => chamadas.filter(c => c.tabela.startsWith("nina_cat_"));
+
+  it("reutiliza a leitura na contagem, pesquisas, modalidade e vínculo sem guardar a agenda", async () => {
+    await comCatalogoDoTurno(CLINICA, async () => {
+      expect(await contarCatalogoPublicado(CLINICA)).toEqual({ servicos: 1, profissionais: 1 });
+      const quantidade = leituras().length;
+      const exame = await buscarNoCatalogo({ clinicaId: CLINICA, query: "mamografia" });
+      expect(exame.records.map(r => r.id)).toEqual(["mamografia"]);
+      const consulta = await buscarNoCatalogo({ clinicaId: CLINICA, query: "cardiologia", medico: "Maria Silva" });
+      expect(consulta.records.map(r => r.id)).toEqual([profissionalId]);
+      expect(await especialidadesPublicadas(CLINICA)).toEqual(["CARDIOLOGIA"]);
+      expect(await candidatosPrimeiraVaga(CLINICA, "consulta", "CARDIOLOGIA"))
+        .toMatchObject([{ medicoId }]);
+      expect(await candidatosPrimeiraVaga(CLINICA, "procedimento", "Mamografia"))
+        .toMatchObject([{ medicoId }]);
+      expect(await modalidadePublicadaDoMedico(CLINICA, medicoId)).toBe("hora_marcada");
+      expect(await resolverMedicoAgenda(CLINICA, profissionalId)).toMatchObject({ ok: true, id: medicoId });
+      expect(await atendimentoExigeHumano({ clinicaId: CLINICA, medico: medicoId,
+        referencias: [profissionalId], procedimento: "Mamografia" })).toBe(false);
+      expect(leituras()).toHaveLength(quantidade);
+      // Uma página de dados + a página vazia de encerramento, por tabela.
+      expect(quantidade).toBe(4);
+      banco.medicos[0]!.ativo = false;
+      expect(await resolverMedicoAgenda(CLINICA, medicoId)).toMatchObject({ ok: false });
+    });
+  });
+
+  it("compartilha também chamadas concorrentes e preserva filtros e aliases", async () => {
+    banco.nina_cat_servicos[0]!.estrutura = { aliases: ["mamo"] };
+    await comCatalogoDoTurno(CLINICA, async () => {
+      const [a, b, c] = await Promise.all([
+        buscarNoCatalogo({ clinicaId: CLINICA, query: "mamo" }),
+        buscarNoCatalogo({ clinicaId: CLINICA, query: "cardiologia" }),
+        contarCatalogoPublicado(CLINICA),
+      ]);
+      expect(a.records.map(r => r.id)).toEqual(["mamografia"]);
+      expect(b.records.map(r => r.id)).toEqual([profissionalId]);
+      expect(c).toEqual({ servicos: 1, profissionais: 1 });
+      expect(leituras()).toHaveLength(4);
+    });
+  });
+
+  it("mantém a leitura durante a resposta e atualiza preço e publicação na próxima", async () => {
+    await comCatalogoDoTurno(CLINICA, async () => {
+      expect((await catalogoDoTurno(CLINICA))!.servicos[0]!.valor).toBe(147);
+      banco.nina_cat_servicos[0]!.valor = 199;
+      expect((await catalogoDoTurno(CLINICA))!.servicos[0]!.valor).toBe(147);
+    });
+    await comCatalogoDoTurno(CLINICA, async () => {
+      expect((await catalogoDoTurno(CLINICA))!.servicos[0]!.valor).toBe(199);
+    });
+    banco.nina_cat_servicos[0]!.status = "ARQUIVADO";
+    await comCatalogoDoTurno(CLINICA, async () => {
+      expect((await buscarNoCatalogo({ clinicaId: CLINICA, query: "mamografia" })).knowledge_status).toBe("not_found");
+    });
+    expect(catalogoDoTurno(CLINICA)).toBeNull();
+  });
+
+  it("isola respostas concorrentes e clínicas; nunca compartilha dados de outra clínica", async () => {
+    banco.nina_cat_servicos.push(servico({ id: "outro", nome: "Mamografia", clinica_id: "outra", valor: 555 }));
+    await Promise.all([CLINICA, "outra"].map(clinica => comCatalogoDoTurno(clinica, async () => {
+      const a = (await catalogoDoTurno(clinica))!;
+      await Promise.resolve();
+      const b = (await catalogoDoTurno(clinica))!;
+      expect(a.servicos.map(s => s.valor)).toEqual(clinica === CLINICA ? [147] : [555]);
+      expect(b).toEqual(a);
+      expect(() => catalogoDoTurno(clinica === CLINICA ? "outra" : CLINICA)).toThrow("não pertence");
+    })));
+    expect(leituras().filter(c => !c.cursor && c.tabela === "nina_cat_servicos")).toHaveLength(2);
+  });
+
+  it("exclui rascunhos/notas internas e protege a leitura contra alterações de consumidores", async () => {
+    banco.nina_cat_servicos.push(servico({ id: "rascunho", status: "RASCUNHO" }));
+    await comCatalogoDoTurno(CLINICA, async () => {
+      const primeiro = (await catalogoDoTurno(CLINICA))!;
+      expect(primeiro.servicos).toHaveLength(1);
+      expect(JSON.stringify(primeiro)).not.toMatch(/nota_interna|rascunho|repasse/);
+      primeiro.servicos[0]!.nome = "Alterado pelo consumidor";
+      primeiro.profissionais.length = 0;
+      const segundo = (await catalogoDoTurno(CLINICA))!;
+      expect(segundo.servicos[0]!.nome).toBe("Mamografia");
+      expect(segundo.profissionais).toHaveLength(1);
+      expect(leituras().every(c => c.filtros.status === "PUBLICADO" && c.filtros.clinica_id === CLINICA)).toBe(true);
+    });
+  });
+
+  it("lê todas as páginas uma vez, mesmo com limite menor imposto pelo servidor", async () => {
+    tetoServidor = 2;
+    banco.nina_cat_servicos = Array.from({ length: 5 }, (_, i) => servico({ id: String(i), nome: `Exame ${i}` }));
+    await comCatalogoDoTurno(CLINICA, async () => {
+      expect((await catalogoDoTurno(CLINICA))!.servicos).toHaveLength(5);
+      expect((await catalogoDoTurno(CLINICA))!.servicos).toHaveLength(5);
+      expect(leituras().filter(c => c.tabela === "nina_cat_servicos").map(c => c.cursor)).toEqual([null, "1", "3", "4"]);
+    });
+  });
+
+  it("falha de leitura não vira catálogo vazio nem provoca releituras no mesmo turno", async () => {
+    falharAposPrimeiraPagina = true;
+    await comCatalogoDoTurno(CLINICA, async () => {
+      await expect(catalogoDoTurno(CLINICA)!).rejects.toThrow("Falha ao ler");
+      const quantidade = leituras().length;
+      await expect(buscarNoCatalogo({ clinicaId: CLINICA, query: "mamografia" })).rejects.toThrow("Falha ao ler");
+      expect(leituras()).toHaveLength(quantidade);
+    });
+    falharAposPrimeiraPagina = false;
+    await comCatalogoDoTurno(CLINICA, async () => {
+      expect((await buscarNoCatalogo({ clinicaId: CLINICA, query: "mamografia" })).found).toBe(true);
+    });
+  });
 });
 
 describe("título genérico publicado não equivale a atendimento ausente", () => {

@@ -1,5 +1,6 @@
 /** Candidatos completos do atendimento publicado, sem o corte de relevância do chat. */
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { catalogoDoTurno } from "./catalogo-turno.server";
 import { agoraNaClinica } from "@/lib/nina-agora";
 import { normalizar } from "@/lib/nina-especialidade";
 import { profissionalParaRegistro, servicoParaRegistro,
@@ -21,15 +22,16 @@ type ReferenciaAtendimento = { registro: string; procedimento: string | null };
 export async function candidatosPrimeiraVaga(clinicaId: string, tipo: "consulta" | "procedimento",
   atendimento: string | readonly ReferenciaAtendimento[], preferencia?: PreferenciaAtendimentoConsulta | null): Promise<CandidatoPrimeiraVaga[]> {
   const normalizarNome = tipo === "consulta" ? chave : normalizar;
-  // Referências são pistas para reler a publicação, sempre ligadas ao seu ID.
+  // Referências são pistas para consultar a publicação deste turno, ligadas ao ID.
   // Grafias diferentes do mesmo atendimento não são modalidades diferentes.
   const corresponde = (id: string, nome: string) => typeof atendimento === "string"
     ? normalizarNome(nome) === normalizarNome(atendimento)
     : atendimento.some(r => r.registro === id && !!r.procedimento && normalizarNome(r.procedimento) === normalizarNome(nome));
   const tabela = tipo === "consulta" ? "nina_cat_profissionais" : "nina_cat_servicos";
-  const linhas: unknown[] = [];
+  const catalogo = await catalogoDoTurno(clinicaId);
+  const linhas: unknown[] = catalogo ? (tipo === "consulta" ? catalogo.profissionais : catalogo.servicos) : [];
   // Páginas limitadas, com ordem estável. Nunca declarar busca completa com um top-6.
-  for (let pagina = 0; ; pagina++) {
+  for (let pagina = 0; !catalogo; pagina++) {
     const r = await supabaseAdmin.from(tabela).select(tipo === "consulta" ? colunasProfissional : colunasServico)
       .eq("clinica_id", clinicaId).eq("status", "PUBLICADO").order("id")
       .range(pagina * 200, pagina * 200 + 199);

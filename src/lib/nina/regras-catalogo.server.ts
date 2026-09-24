@@ -1,7 +1,8 @@
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { catalogoDoTurno } from "./catalogo-turno.server";
 import { profissionalSfp } from "./regras-catalogo";
 
-/** Revalida a publicação antes de ações, inclusive em sessões iniciadas antes da regra. */
+/** Valida ações pela publicação lida neste turno, inclusive em sessões antigas. */
 export async function atendimentoExigeHumano(entrada: {
   clinicaId: string;
   medico?: string | null;
@@ -10,7 +11,8 @@ export async function atendimentoExigeHumano(entrada: {
 }): Promise<boolean> {
   const { clinicaId, medico, procedimento } = entrada;
   const referencias = (entrada.referencias ?? []).filter((id) => /^[0-9a-f-]{36}$/i.test(id));
-  const profissionais = await supabaseAdmin
+  const catalogo = await catalogoDoTurno(clinicaId);
+  const profissionais = catalogo ? { data: catalogo.profissionais, error: null } : await supabaseAdmin
     .from("nina_cat_profissionais")
     .select("id, nome, medico_id")
     .eq("clinica_id", clinicaId)
@@ -37,7 +39,7 @@ export async function atendimentoExigeHumano(entrada: {
     Array.isArray(executantes) &&
     executantes.some((e) => e && typeof e === "object" && profissionalSfp(e.nome));
   if (referencias.length) {
-    const r = await supabaseAdmin
+    const r = catalogo ? { data: catalogo.servicos.filter(s => referencias.includes(s.id)), error: null } : await supabaseAdmin
       .from("nina_cat_servicos")
       .select("id, executantes")
       .eq("clinica_id", clinicaId)
@@ -47,7 +49,7 @@ export async function atendimentoExigeHumano(entrada: {
     if ((r.data ?? []).some((s) => exige(s.executantes))) return true;
   }
   if (procedimento?.trim()) {
-    const r = await supabaseAdmin
+    const r = catalogo ? { data: catalogo.servicos.filter(s => s.nome.toLocaleLowerCase("pt-BR") === procedimento.trim().toLocaleLowerCase("pt-BR")), error: null } : await supabaseAdmin
       .from("nina_cat_servicos")
       .select("id, executantes")
       .eq("clinica_id", clinicaId)

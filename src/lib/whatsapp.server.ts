@@ -557,6 +557,7 @@ export async function gerarRespostaNina(
   },
 ): Promise<string> {
   const { comColetor } = await import("@/lib/nina/evidencias.server");
+  const { comCatalogoDoTurno } = await import("@/lib/nina/catalogo-turno.server");
   const conferirReserva = criarGuardiaoReservaTurno(opcoes?.validarReservaTurno);
   const auditoria: {
     execucaoId?: string | null;
@@ -609,12 +610,12 @@ export async function gerarRespostaNina(
         const { resultado, coletor } = await comColetor(async (c) => {
           await conferirReserva();
           if (opcoes?.mensagensEntrada?.length) c.mensagensEntrada(opcoes.mensagensEntrada);
-          const texto = await gerarRespostaNinaInterno(clinicaId, mensagemPaciente, telefoneRemetente, {
+          const texto = await comCatalogoDoTurno(clinicaId, () => gerarRespostaNinaInterno(clinicaId, mensagemPaciente, telefoneRemetente, {
             ...opcoes,
             auditoria,
             rastro,
             validarReservaTurno: conferirReserva,
-          });
+          }));
           // Inclui saídas antecipadas do gate e chamadores sem transporte.
           const { removerEmojisNina } = await import("@/lib/nina/resposta/sem-emojis");
           return removerEmojisNina(texto);
@@ -1292,6 +1293,13 @@ async function gerarRespostaNinaInterno(
     motivo: string;
     texto: string;
   }> = [];
+  const { REGRA_CONSULTA_CATALOGO } = await import("@/lib/nina/catalogo-busca");
+  instrucoesAdicionaisTurno.push({
+    codigo: "CATALOGO_UMA_LEITURA_POR_RESPOSTA",
+    origem: "src/lib/nina/catalogo-busca.ts",
+    motivo: "Reutilizar a leitura do catálogo entre ferramentas e revisões desta resposta.",
+    texto: REGRA_CONSULTA_CATALOGO,
+  });
   const { REGRA_IDENTIDADE_ATENDIMENTO } = await import("@/lib/nina/prompt/identidade-atendimento");
   instrucoesAdicionaisTurno.push({
     codigo: "PRESERVAR_IDENTIDADE_ATENDIMENTO",

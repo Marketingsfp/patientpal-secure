@@ -8,7 +8,7 @@
  * FASE 7: fonte única. Não há flag de seleção de fonte nem fallback — o que
  * não está PUBLICADO aqui é tratado como informação desconhecida.
  */
-import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { COLUNAS_SERVICO, COLUNAS_PROFISSIONAL, TAMANHO_PAGINA, lerPublicados, temCatalogoDoTurno } from "./catalogo-turno.server";
 import { agoraNaClinica } from "@/lib/nina-agora";
 import { normalizarBuscaCatalogo } from "./catalogo-sem-registro";
 import {
@@ -28,56 +28,15 @@ import {
   nomeProfissionalNaPergunta,
 } from "./catalogo-busca";
 
-/** Colunas públicas — `nota_interna` e `rascunho` ficam de fora de propósito. */
-const COLUNAS_SERVICO =
-  "id, nome, valor, valor_observacao, descricao_publica, preparo, restricoes, executantes, formas_pagamento, estrutura, status, updated_at";
-const COLUNAS_PROFISSIONAL =
-  "id, nome, especialidades, atende_consultorio, formas_pagamento, convenios, horarios, tipo_atendimento, observacao_publica, aviso_dia, aviso_valido_de, aviso_valido_ate, unidades(nome), estrutura, status, updated_at";
-
-/** A busca percorre um índice público leve; os detalhes só são lidos após a seleção. */
+/** Projeções para pesquisar e selecionar; no turno, vêm da leitura compartilhada.
+ * O modelo continua recebendo somente os detalhes dos registros relevantes. */
 const INDICE_SERVICO = "id, nome, descricao_publica, aliases:estrutura->aliases, status, updated_at";
 const INDICE_PROFISSIONAL = "id, nome, especialidades, tipo_atendimento, horarios, observacao_publica, aliases:estrutura->aliases, status, updated_at";
-const TAMANHO_PAGINA = 250;
 type IndiceServico = Pick<ServicoPublicado, "id" | "nome" | "descricao_publica"> & { aliases?: unknown };
 type IndiceProfissional = Pick<
   ProfissionalPublicado,
   "id" | "nome" | "especialidades" | "tipo_atendimento" | "horarios" | "observacao_publica"
 > & { aliases?: unknown };
-
-async function lerPublicados<T extends { id: string }>(
-  tabela: "nina_cat_servicos" | "nina_cat_profissionais",
-  colunas: string,
-  clinicaId: string,
-  ids?: string[],
-): Promise<T[]> {
-  if (ids && !ids.length) return [];
-  const linhas: T[] = [];
-  let cursor: string | null = null;
-  for (;;) {
-    let consulta = supabaseAdmin
-      .from(tabela)
-      .select(colunas)
-      .eq("clinica_id", clinicaId)
-      .eq("status", "PUBLICADO")
-      .order("id", { ascending: true })
-      .limit(Math.min(TAMANHO_PAGINA, ids?.length ?? TAMANHO_PAGINA));
-    if (cursor) consulta = consulta.gt("id", cursor);
-    if (ids) consulta = consulta.in("id", ids);
-    const resposta = await consulta;
-    if (resposta.error) throw new Error(resposta.error.message);
-    const pagina = (resposta.data ?? []) as unknown as T[];
-    if (!pagina.length) return linhas;
-    const proximo = pagina[pagina.length - 1]?.id;
-    if (!proximo || (cursor && proximo <= cursor)) {
-      throw new Error("A paginação do catálogo não avançou; não foi possível concluir a busca.");
-    }
-    linhas.push(...pagina);
-    if (ids && linhas.length >= ids.length) return linhas;
-    cursor = proximo;
-    // Só a página vazia encerra a busca: o servidor pode impor um limite
-    // menor que o solicitado. Cursor por ID evita saltar registros nesse caso.
-  }
-}
 
 function aliasesDoIndice(i: { aliases?: unknown }): string[] {
   return Array.isArray(i.aliases) ? i.aliases.filter((v): v is string => typeof v === "string") : [];
@@ -382,7 +341,8 @@ export async function buscarNoCatalogo(
           comparacao: "sem acentos e sem distinção de maiúsculas/minúsculas",
           limite,
         },
-        cache: false,
+        cache: temCatalogoDoTurno(),
+        escopo_cache: "resposta",
         total_examinado: brutosServicos.length,
         encontrados: snapshot(pontuados.map(({ s }) => s) as never, INDICE_SERVICO.split(", ")),
         selecionados: listaServicos.map((s) => String(s.id ?? "")),
@@ -410,7 +370,8 @@ export async function buscarNoCatalogo(
           comparacao: "sem acentos e sem distinção de maiúsculas/minúsculas",
           limite,
         },
-        cache: false,
+        cache: temCatalogoDoTurno(),
+        escopo_cache: "resposta",
         total_examinado: brutosProfissionais.length,
         encontrados: snapshot(profissionaisRelevantes as never, INDICE_PROFISSIONAL.split(", ")),
         selecionados: listaProfissionais.map((p) => String(p.id ?? "")),

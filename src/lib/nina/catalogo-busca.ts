@@ -237,8 +237,9 @@ export function perguntaIdentificacaoProfissional(
 
 export const REGRA_CONSULTA_CATALOGO =
   "Antes de responder fatos administrativos, consulte consultar_base_conhecimento para cada atendimento identificado no pedido atual. " +
-  "Reutilize um resultado somente quando ele já tiver sido obtido neste mesmo turno para o mesmo atendimento, profissional, unidade e condições, com os campos necessários. " +
-  "Não repita essa consulta nas rodadas do mesmo turno sem necessidade; uma nova pergunta do paciente exige consulta atualizada do item, usando o histórico apenas para identificar a referência. " +
+  "O catálogo é carregado uma única vez por resposta. Todas as ferramentas, filtros de atendimento/profissional e revisões dessa resposta reutilizam essa leitura. " +
+  "Não repita uma ferramenta para recuperar dados que ela já retornou neste turno. Se precisar localizar outro atendimento ou refinar um filtro, pesquise somente o que falta; o sistema usa a mesma leitura, sem buscar o catálogo de novo. " +
+  "Uma nova mensagem do paciente inicia outra leitura atualizada; nunca use os fatos de uma resposta anterior como confirmação atual. " +
   "Escala habitual não comprova vaga: disponibilidade exige consulta às ferramentas de agenda.";
 
 export const REGRA_INTERPRETACAO_CATALOGO = `INTERPRETAÇÃO DO PEDIDO E IDENTIDADE
