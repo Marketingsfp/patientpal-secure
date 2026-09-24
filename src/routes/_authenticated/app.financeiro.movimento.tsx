@@ -2622,6 +2622,29 @@ function Page() {
                 />
               </div>
             </div>
+            {/* Operador de caixa na barra principal, pela mesma razão da busca
+                logo abaixo: até 24/09/2026 este filtro existia, mas ficava
+                atrás de "Mais filtros", e o financeiro pediu um jeito de
+                conferir o caixa de cada operadora sem saber que ele estava
+                lá. Filtro escondido não é usado. Ele recorta a consulta no
+                banco, então os cards de resultado e a lista mudam juntos. */}
+            <div className="space-y-1">
+              <Label className="text-xs">Operador de caixa</Label>
+              <Select value={filterUsuario} onValueChange={setFilterUsuario}>
+                <SelectTrigger className="w-52">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="todos">Todos os usuários</SelectItem>
+                  <SelectItem value="sem">Sem usuário</SelectItem>
+                  {usuarios.map((u) => (
+                    <SelectItem key={u.id} value={u.id}>
+                      {u.nome}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
             {/* Busca por texto na barra principal, e não mais atrás de "Mais
                 filtros". É com ela que a recepção acha o pagamento de um
                 paciente sem adivinhar o dia — filtro escondido não é usado. */}
@@ -2704,23 +2727,6 @@ function Page() {
                   <SelectItem value="confirmado">Apenas confirmados</SelectItem>
                   <SelectItem value="pendente">Apenas pendentes</SelectItem>
                   <SelectItem value="todos">Confirmados + pendentes</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1">
-              <Label className="text-xs">Usuário</Label>
-              <Select value={filterUsuario} onValueChange={setFilterUsuario}>
-                <SelectTrigger className="w-52">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="todos">Todos os usuários</SelectItem>
-                  <SelectItem value="sem">Sem usuário</SelectItem>
-                  {usuarios.map((u) => (
-                    <SelectItem key={u.id} value={u.id}>
-                      {u.nome}
-                    </SelectItem>
-                  ))}
                 </SelectContent>
               </Select>
             </div>
