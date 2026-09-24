@@ -4413,9 +4413,18 @@ function AtendimentosPage() {
                     <SelectTrigger>
                       <SelectValue placeholder="Selecione..." />
                     </SelectTrigger>
+                    {/* O texto gravado aqui é o que o Movimento de Caixa e os
+                        relatórios leem depois (`classificarForma`). "Cartão de
+                        Débito" e "Cartão de Crédito" estão escritos exatamente
+                        como em LABEL_FORMA de propósito: é o que faz a saída
+                        cair no balde certo em vez de virar "Parcelas do
+                        sistema antigo", que é onde qualquer outro texto com a
+                        palavra cartão cairia. */}
                     <SelectContent>
                       <SelectItem value="Pix">Pix</SelectItem>
                       <SelectItem value="Dinheiro">Dinheiro</SelectItem>
+                      <SelectItem value="Cartão de Débito">Cartão de Débito</SelectItem>
+                      <SelectItem value="Cartão de Crédito">Cartão de Crédito</SelectItem>
                       <SelectItem value="Transferência">Transferência</SelectItem>
                     </SelectContent>
                   </Select>
