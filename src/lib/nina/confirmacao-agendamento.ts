@@ -11,10 +11,10 @@ const CURTA =
   /^(sim|isso|isso mesmo|esse mesmo|essa mesma|e isso|eh isso|claro|ok|okay|okey|beleza|blz|pode ser|pode marcar|pode agendar|pode sim|quero|quero sim|desejo|confirmo|confirmado|agendar|agende|agenda|marcar|marque|marca|vamos|bora|fechado|perfeito|por favor|sim por favor|aceito)$/;
 const VOCABULARIO = new Set(
   (
-    "sim isso mesmo mesma claro ok eu confirmo confirmado confirmada aceito autorizo pode ser marcar agendar finalizar concluir prosseguir continuar " +
+    "sim isso mesmo mesma claro ok eu confirmo confirmar confirmado confirmada aceito autorizo pode ser marcar agendar finalizar concluir prosseguir continuar " +
     "o a os as um uma de da do das dos em no na nos nas com para pra por favor gentileza e esse essa esses essas este esta estes estas " +
     "todos todas dados informacoes atendimento consulta exame procedimento agendamento pre horario data dia profissional medico medica dr dra doutor doutora " +
-    "meu minha esta estao correto correta corretos corretas certo certa certinho combinado fechado tudo pode"
+    "meu minha esta estao ta correto correta corretos corretas certo certa certinho combinado fechado tudo pode nesse nessa neste nesta"
   ).split(/\s+/),
 );
 
@@ -32,9 +32,16 @@ export function ehConfirmacaoDeAgendamento(texto: string, vaga?: VagaAgendamento
     )
   )
     return false;
+  // Complementos de cortesia/localização não mudam o aceite. Remova apenas
+  // sufixos conhecidos; uma ressalva ou outro atendimento continua inválido.
+  t = t.replace(/[,.!;]+/g, " ").replace(/\s+/g, " ").trim()
+    .replace(/\s+(?:por favor|por gentileza|pfv|pfvr|obrigad[oa])$/, "")
+    .replace(/\s+por aqui$/, "")
+    .trim();
+  t = t.replace(/^(?:ja e|formou|demorou|fechou|combinado|blz|beleza|bora|ss|s)(?=\s+(?:pode|confirmo|eu confirmo)\b)/, "sim");
   if (CURTA.test(t.replace(/[,.!]/g, " ").replace(/\s+/g, " ").trim())) return true;
   if (
-    !/^(?:(?:sim|isso|claro|ok)[,.!\s]+)?(?:eu\s+)?(?:confirmo|aceito|autorizo|pode\s+(?:sim\s+)?(?:marcar|agendar|finalizar|concluir)|(?:esta|estao|tudo)\s+(?:certo|correto|certinho))\b/.test(
+    !/^(?:(?:sim|isso(?: mesmo)?|claro|ok)[,.!\s]+)?(?:eu\s+)?(?:confirmo|aceito|autorizo|pode\s+(?:sim\s+)?(?:marcar|agendar|confirmar|finalizar|concluir)|(?:(?:esta|estao|ta)\s+(?:tudo\s+)?|tudo\s+)(?:certo|correto|certinho))\b/.test(
       t,
     )
   )

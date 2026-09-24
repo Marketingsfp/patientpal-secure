@@ -22,6 +22,10 @@ describe("Nina sem motor — geração real com dependências externas simuladas
       expect(JSON.stringify(r.requests)).toContain("Sem jejum");
       // Mesma geração de produção/homologação recebe o relógio do servidor.
       const textoRequest = JSON.stringify(r.requests);
+      expect(textoRequest).toContain("INFORMAR_PIX_ANTECIPADO");
+      expect(textoRequest).toContain("*Pix:* pagamento somente antecipado, pelo WhatsApp.");
+      expect(textoRequest).toContain("ANTECEDENCIA_CHEGADA_30_MINUTOS");
+      expect(textoRequest).toContain("chegar com 30 minutos de antecedência");
       expect(textoRequest).toContain("saudacao_do_periodo");
       expect(textoRequest).toContain("datas_referencia");
       expect(textoRequest).toContain("America/Sao_Paulo");

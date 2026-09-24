@@ -81,7 +81,7 @@ export async function candidatosPrimeiraVaga(clinicaId: string, tipo: "consulta"
     for (const executante of lista(servico.executantes)) {
       const nome = String(executante.nome ?? "").trim();
       if (!nome) continue;
-      const medico = await resolverMedicoAgenda(clinicaId, nome);
+      const medico = await resolverMedicoAgenda(clinicaId, String(executante.medico_id || nome));
       candidatos.push({ registro: servicoParaRegistro({ ...servico, executantes: [executante] }),
         medicoId: medico.ok ? medico.id : null, medicoNome: nome });
     }

@@ -1,12 +1,20 @@
+/** Condição da clínica e apresentação comum nas mensagens ao paciente. */
+export const REGRA_PIX_ANTECIPADO =
+  'Ao apresentar valores com Pix/cartão ou orientar pagamento por Pix, inclua em linha própria: "*Pix:* pagamento somente antecipado, pelo WhatsApp." ' +
+  "Informe uma vez por mensagem, após os blocos de valores e antes da pergunta final, mesmo em listas de profissionais. Não depende de pergunta: substitui a orientação anterior. " +
+  "Separe dinheiro e Pix/cartão em linhas. Use frases curtas, sem emojis, tabelas ou títulos extras. A antecipação aplica-se apenas ao Pix, não ao cartão. " +
+  "Omita o aviso em atendimento gratuito ou respostas sem valores nem assunto de pagamento. Não invente chave Pix, link ou comprovante.";
+
 /** Regra da clínica: o preço cadastrado no cartão também vale para Pix. */
 export const REGRA_PIX_CARTAO =
   "Pix tem sempre o mesmo valor do cartão. O valor cadastrado como cartão também autoriza Pix. " +
   'Informe os dois juntos, na mesma frase ou linha: "Pix/cartão: R$ X,XX", inclusive quando o paciente perguntar apenas por Pix ou apenas por cartão. ' +
   "Toda menção ao preço em Pix ou cartão, inclusive na frase de abertura, deve citar Pix/cartão. Não escreva uma frase com preço só no Pix ou só no cartão para depois agrupar os dois em uma lista. " +
   "Dinheiro permanece separado: nunca use seu preço como preço do Pix. Preserve as condições do atendimento e informe parcelamento somente para cartão. " +
+  REGRA_PIX_ANTECIPADO + " " +
   "Quando o paciente perguntar sobre pagamento por Pix, desconto ou diferença entre as formas de pagamento, explique que Pix é aceito somente de forma antecipada pelo WhatsApp e que pagamento em dinheiro tem desconto. " +
   "O valor cadastrado em dinheiro já é o valor com desconto: não aplique desconto adicional nem invente percentual. A exigência de antecipação pelo WhatsApp é exclusiva do Pix; compartilhar o preço não torna essa condição obrigatória para o cartão. " +
-  "Não acrescente essa explicação a toda listagem de preços sem que o paciente pergunte sobre essas condições. " +
+  "A explicação adicional sobre desconto em dinheiro depende da pergunta do paciente; o aviso sobre Pix antecipado acompanha a apresentação dos valores. " +
   "Não invente valor quando o preço do cartão não estiver informado.";
 
 /** Ausência de cadastro não prova recusa; Pix continua autorizado pelo cartão. */

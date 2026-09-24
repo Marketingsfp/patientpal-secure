@@ -7,6 +7,8 @@ export type VagaAgendamento = {
   medico: string;
   especialidade?: string | null;
   procedimento: string | null;
+  catalogo_id?: string | null;
+  tipo_atendimento?: "consulta" | "exame_procedimento";
   data: string;
   hora: string;
   inicio: string;
@@ -161,6 +163,7 @@ const mesmoInstante = (a: string | null | undefined, b: string) =>
 
 function mesmaVaga(a: VagaAgendamento, b: VagaAgendamento) {
   return a.medico_id === b.medico_id && a.procedimento === b.procedimento &&
+    a.catalogo_id === b.catalogo_id && a.tipo_atendimento === b.tipo_atendimento &&
     a.data === b.data && a.hora === b.hora && a.modalidade === b.modalidade &&
     a.agenda_id === b.agenda_id && mesmoInstante(a.inicio, b.inicio) && mesmoInstante(a.fim, b.fim);
 }
@@ -198,20 +201,35 @@ export function consentimentoDaEscolha(estado: EstadoFluxoNina | undefined, clin
   return c?.aceita && estado?.appointment.slot_confirmed_by_patient === true ? c : null;
 }
 
+export const LEMBRETE_CONFIRMACAO = "Você confirma os dados do resumo acima? Se estiver tudo certo, pode responder “sim, confirmo”.";
+
+/** Um lembrete não substitui a prova de entrega do resumo da mesma escolha.
+ * Outra resposta da Nina interrompe a sequência e exige novo resumo. */
+export function resumoDaEscolhaEntregue(
+  estado: EstadoFluxoNina,
+  clinicaId: string,
+  historico: Array<{ role: string; content: string | null }>,
+) {
+  const c = confirmacaoDaEscolha(estado, clinicaId);
+  const normalizarEntrega = (t: string) => t.replace(/\r\n/g, "\n").trim();
+  if (!c) return false;
+  for (let i = historico.length - 1; i >= 0; i -= 2) {
+    const item = historico[i];
+    if (item?.role !== "assistant") return false;
+    const texto = normalizarEntrega(item.content ?? "");
+    if (texto === normalizarEntrega(c.resumo)) return true;
+    if (texto !== LEMBRETE_CONFIRMACAO || historico[i - 1]?.role !== "user") return false;
+  }
+  return false;
+}
+
 export function aceitarResumoEntregue(
   estado: EstadoFluxoNina,
   clinicaId: string,
   historico: Array<{ role: string; content: string | null }>,
 ) {
   const c = confirmacaoDaEscolha(estado, clinicaId);
-  const ultima = historico.at(-1);
-  const normalizarEntrega = (t: string) => t.replace(/\r\n/g, "\n").trim();
-  if (
-    !c ||
-    ultima?.role !== "assistant" ||
-    normalizarEntrega(ultima.content ?? "") !== normalizarEntrega(c.resumo)
-  )
-    return false;
+  if (!c || !resumoDaEscolhaEntregue(estado, clinicaId, historico)) return false;
   c.aceita = true;
   estado.appointment.intent_confirmed = true;
   estado.appointment.slot_confirmed_by_patient = true;

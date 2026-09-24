@@ -37,6 +37,7 @@ import { isCPFValido, somenteDigitos } from "@/lib/cpf";
 import { normalizar, raizEspecialidade } from "@/lib/nina-especialidade";
 import { cadastroAutorizado, cadastroMinimoSchema } from "./cadastro-paciente";
 import { conhecimentoDaMesmaSessao } from "./confidence/conhecimento-sessao";
+import { procedimentoDaSessao, lembrarProcedimentoSolicitado, vagaPreservaProcedimento } from "./procedimento-sessao";
 import { normalizarSelecaoContextual } from "./confidence/selecao-contextual";
 import type { EscopoAtendimentoConsulta } from "./atendimento-consulta";
 import { consultarCadastroConfirmado } from "./cadastro-paciente.server";
@@ -400,6 +401,8 @@ function acharEspecialidade(termo: string, lista: Array<{ id: string; nome: stri
 
 /** Só usa contexto da sessão ou o atendimento já vinculado a uma vaga real. */
 function escopoModalidade(ctx: CtxNinaPaciente, procedimento?: string | null): EscopoAtendimentoConsulta | undefined {
+  const pedido = procedimentoDaSessao(ctx.estado, ctx.clinicaId);
+  if (pedido) return { atendimento: pedido.nome, procedimentoId: pedido.catalogo_id };
   const conhecimento = conhecimentoDaMesmaSessao(ctx.estado?.knowledge_context, ctx.clinicaId, ctx.estado?.session_id ?? null);
   if (conhecimento?.consulta.tipo_atendimento !== "consulta") return undefined;
   const preferencia = ctx.consultaAgenda?.selecaoRevalidada ?? normalizarSelecaoContextual(conhecimento.selecao);
@@ -408,11 +411,27 @@ function escopoModalidade(ctx: CtxNinaPaciente, procedimento?: string | null): E
     preferencia: conhecimento.atendimentoConsulta };
 }
 
+async function vinculoProcedimentoAtual(ctx: CtxNinaPaciente, medicoId: string) {
+  const pedido = procedimentoDaSessao(ctx.estado, ctx.clinicaId);
+  if (!pedido) return true;
+  const { candidatosPrimeiraVaga } = await import("./primeiro-disponivel-catalogo.server");
+  const candidatos = await candidatosPrimeiraVaga(ctx.clinicaId, "procedimento",
+    [{ registro: pedido.catalogo_id, procedimento: pedido.nome }]);
+  return candidatos.some(c => c.medicoId === medicoId && c.registro.id === pedido.catalogo_id && c.registro.procedimento === pedido.nome);
+}
+
 async function guardarOpcoes(ctx: CtxNinaPaciente, slots: SlotNina[], procedimentos?: ReadonlyMap<string, string>) {
   if (consentimentoDaEscolha(ctx.estado, ctx.clinicaId)) return null;
   const conhecimento = conhecimentoDaMesmaSessao(ctx.estado?.knowledge_context, ctx.clinicaId, ctx.estado?.session_id ?? null);
   let publicados = procedimentos;
-  if (!publicados && conhecimento && slots.length) {
+  const pedido = procedimentoDaSessao(ctx.estado, ctx.clinicaId);
+  if (pedido && slots.length) {
+    const { candidatosPrimeiraVaga } = await import("./primeiro-disponivel-catalogo.server");
+    const candidatos = await candidatosPrimeiraVaga(ctx.clinicaId, "procedimento",
+      [{ registro: pedido.catalogo_id, procedimento: pedido.nome }]);
+    publicados = new Map(candidatos.filter(c => c.medicoId && c.registro.id === pedido.catalogo_id &&
+      c.registro.procedimento === pedido.nome).map(c => [c.medicoId!, pedido.nome]));
+  } else if (!publicados && conhecimento && slots.length) {
     // A referência persistida é uma pesquisa, não um fato antigo: releia a
     // publicação e associe cada atendimento ao UUID operacional do executante.
     const preferencia = ctx.consultaAgenda?.selecaoRevalidada ?? normalizarSelecaoContextual(conhecimento.selecao);
@@ -440,6 +459,7 @@ async function guardarOpcoes(ctx: CtxNinaPaciente, slots: SlotNina[], procedimen
     medico_id: s.medico_id, medico: s.medico_nome, especialidade: s.especialidade,
     procedimento: publicados ? publicados.get(s.medico_id) ?? null :
       (ctx.estado?.appointment.doctor_id === s.medico_id ? ctx.estado.appointment.procedure : null),
+    ...(pedido ? { catalogo_id: pedido.catalogo_id, tipo_atendimento: pedido.tipo_atendimento } : {}),
     data: dataISODoSlot(s.inicio), hora: s.hora, inicio: s.inicio, fim: s.fim,
     modalidade: s.modalidade, agenda_id: s.agenda,
   }]);
@@ -686,7 +706,7 @@ export const FERRAMENTAS_NINA_CONSULTA = [
     function: {
       name: "buscar_medicos",
       description:
-        "Busca profissionais da clínica por especialidade e/ou nome, com dias e horários habituais publicados. Retorna vinculos_agenda com medico_id operacional, separado de catalogo_id. Use medico_id para consultar vagas do profissional escolhido. Se o vínculo for ambíguo ou ausente, não invente um identificador. Os horários publicados são escala administrativa; não confirmam vagas na agenda.",
+        "Busca profissionais da clínica por especialidade e/ou nome, com dias e horários habituais publicados. Com exame/procedimento escolhido, busca somente seus executantes e preserva o atendimento. Retorna vinculos_agenda com medico_id operacional, separado de catalogo_id. Use medico_id para consultar vagas do profissional escolhido. Se o vínculo for ambíguo ou ausente, não invente um identificador. Os horários publicados são escala administrativa; não confirmam vagas na agenda.",
       parameters: {
         type: "object",
         properties: {
@@ -706,6 +726,7 @@ export const FERRAMENTAS_NINA_CONSULTA = [
         type: "object",
         properties: {
           termo: { type: "string", description: "Nome ou parte do nome do exame/procedimento" },
+          nova_solicitacao: { type: "boolean", description: "True somente se o paciente pediu outro atendimento independente; uma busca auxiliar ou escolha de executante não muda o procedimento." },
         },
         required: ["termo"],
       },
@@ -961,7 +982,7 @@ const zProximaVaga = z.object({
   dias: z.coerce.number().int().min(1).max(60).optional(),
 });
 const zBuscarMedicos = zEspecialidade.extend({ nome: z.string().max(120).optional() });
-const zProcedimentos = z.object({ termo: z.string().trim().min(2).max(120) });
+const zProcedimentos = z.object({ termo: z.string().trim().min(2).max(120), nova_solicitacao: z.boolean().optional() });
 const zDisponibilidade = z.object({
   especialidade: z.string().max(120).optional(),
   medico_id: z.string().trim().min(2).max(160).optional(),
@@ -1018,11 +1039,15 @@ async function orientarSemPreAgendamento(ctx: CtxNinaPaciente, profissional: str
   }
   return { ok: true, modalidade_atendimento: "chegada_sem_pre_agendamento",
     consulta_realizada: false, sem_agendamento: true, orientacao_atendimento: texto,
-    instrucao: "Não selecione horário, não colete cadastro para reserva e não agende. Não peça 15 minutos de antecedência. Oriente o comparecimento nos dias e períodos publicados desse profissional." };
+    instrucao: "Não selecione horário, não colete cadastro para reserva e não agende. Não peça 30 minutos de antecedência. Oriente o comparecimento nos dias e períodos publicados desse profissional." };
 }
 
 const modalidadePendente = () => falha("MODALIDADE_NAO_DEFINIDA",
   "A modalidade precisa ser conferida pela equipe. Ordem de chegada sem indicação de pré-agendamento não permite presumir uma reserva.");
+
+const falhaVinculoAtendimento = () => falha("ACTION_NOT_AUTHORIZED",
+  "Não foi possível preservar o vínculo entre o procedimento solicitado e a agenda. A equipe deve conferir; não substitua por consulta nem informe falta de vagas.",
+  { codigo: "ATENDIMENTO_AGENDA_NAO_VINCULADO", encaminhar_para_humano: true });
 
 /**
  * Executor público. Toda chamada — inclusive as que já auditam por dentro —
@@ -1040,6 +1065,9 @@ export async function executarFerramentaPaciente(
   await processamentoWatchdogAtual()?.checkpoint("generating");
   const inicio = Date.now();
   const resultado = await executarFerramentaInterna(ctx, nome, argsRaw);
+  const pedido = procedimentoDaSessao(ctx.estado, ctx.clinicaId);
+  if (resultado.ok && pedido && FERRAMENTAS_DE_VAGAS.has(nome))
+    resultado.atendimento = { catalogo_id: pedido.catalogo_id, nome: pedido.nome, tipo_atendimento: pedido.tipo_atendimento };
   void auditar(
     ctx,
     "tool",
@@ -1087,10 +1115,11 @@ async function executarFerramentaInterna(
     // Consultar disponibilidade nunca equivale a consentir uma reserva.
     async function conferirRegraCatalogo(procedimentoEscolhido?: string | null) {
       const selecao = ctx.consultaAgenda?.selecaoRevalidada;
+      const pedido = procedimentoDaSessao(ctx.estado, ctx.clinicaId);
       const medico = String(args.medico_id ?? ctx.estado?.appointment.doctor_id ?? selecao?.medicoId ?? selecao?.medicoNome ?? "");
-      const procedimento = String(procedimentoEscolhido ?? args.procedimento ?? ctx.estado?.appointment.procedure ?? selecao?.modalidade?.procedimento ?? "");
+      const procedimento = String(pedido?.nome ?? procedimentoEscolhido ?? args.procedimento ?? ctx.estado?.appointment.procedure ?? selecao?.modalidade?.procedimento ?? "");
       if ((medico || procedimento) && await atendimentoExigeHumano({ clinicaId: ctx.clinicaId,
-        medico, procedimento, referencias: selecao?.raizesFonte.map(r => r.registro) })) {
+        medico, procedimento, referencias: pedido ? [pedido.catalogo_id] : selecao?.raizesFonte.map(r => r.registro) })) {
         return falha("PROFISSIONAL_SFP", MOTIVO_SFP, {
           codigo: "PROFISSIONAL_SFP", consulta_realizada: false, atendimento_humano_obrigatorio: true,
         });
@@ -1114,6 +1143,7 @@ async function executarFerramentaInterna(
       };
       medicoAgenda = resolvido;
       args.medico_id = resolvido.id;
+      if (!await vinculoProcedimentoAtual(ctx, resolvido.id)) return falhaVinculoAtendimento();
       const modalidade = await modalidadePublicadaDoMedico(ctx.clinicaId, resolvido.id, escopoModalidade(ctx));
       if (modalidade === "chegada_sem_pre_agendamento") return orientarSemPreAgendamento(ctx, resolvido.nome);
       if (modalidade === "nao_definida") return modalidadePendente();
@@ -1124,9 +1154,19 @@ async function executarFerramentaInterna(
           tipo: z.enum(["consulta", "procedimento"]), atendimento: z.string().trim().min(3).max(160),
           data: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
         }).parse(args);
+        const pedido = procedimentoDaSessao(ctx.estado, ctx.clinicaId);
+        if (pedido && (p.tipo !== "procedimento" || normalizar(p.atendimento) !== normalizar(pedido.nome)))
+          return falha("ACTION_NOT_AUTHORIZED", "A busca deve preservar o procedimento solicitado.", { codigo: "ATENDIMENTO_AGENDA_NAO_VINCULADO" });
         const { candidatosPrimeiraVaga } = await import("./primeiro-disponivel-catalogo.server");
         const conhecimento = conhecimentoDaMesmaSessao(ctx.estado?.knowledge_context, ctx.clinicaId, ctx.estado?.session_id ?? null);
-        const candidatos = await candidatosPrimeiraVaga(ctx.clinicaId, p.tipo, p.atendimento, conhecimento?.atendimentoConsulta);
+        const candidatos = await candidatosPrimeiraVaga(ctx.clinicaId, p.tipo,
+          pedido ? [{ registro: pedido.catalogo_id, procedimento: pedido.nome }] : p.atendimento, conhecimento?.atendimentoConsulta);
+        if (p.tipo === "procedimento" && new Set(candidatos.map(c => c.registro.id)).size > 1)
+          return falhaVinculoAtendimento();
+        if (p.tipo === "procedimento" && ctx.estado && !pedido && candidatos.length &&
+          candidatos.every(c => c.registro.id === candidatos[0]!.registro.id))
+          ctx.estado.appointment.procedimento_solicitado = { clinica_id: ctx.clinicaId, session_id: ctx.estado.session_id ?? "",
+            catalogo_id: candidatos[0]!.registro.id!, nome: candidatos[0]!.registro.procedimento!, tipo_atendimento: "exame_procedimento" };
         if (!candidatos.length) return falha("PROCEDURE_NOT_FOUND",
           "Não encontrei esse atendimento publicado. Encaminhe para a equipe humana.", { encaminhar_para_humano: true });
         // SFP, vínculo ausente e consulta com erro não equivalem a agenda vazia.
@@ -1134,6 +1174,7 @@ async function executarFerramentaInterna(
           if (await atendimentoExigeHumano({ clinicaId: ctx.clinicaId, medico: c.medicoId ?? c.medicoNome,
             procedimento: c.registro.procedimento, referencias: c.registro.id ? [c.registro.id] : [] }))
             return falha("PROFISSIONAL_SFP", MOTIVO_SFP, { atendimento_humano_obrigatorio: true });
+          if (!c.medicoId && p.tipo === "procedimento") return { ...falhaVinculoAtendimento(), comparacao_completa: false };
           if (!c.medicoId) return falha("DOCTOR_NOT_FOUND",
             "Não foi possível resolver todos os vínculos com a agenda. A equipe deve conferir antes de afirmar qual é o primeiro disponível.",
             { encaminhar_para_humano: true, comparacao_completa: false });
@@ -1147,7 +1188,8 @@ async function executarFerramentaInterna(
         const consultados: Record<string, unknown>[] = [];
         for (const [medicoId, c] of porMedico) {
           await processamentoWatchdogAtual()?.checkpoint("generating");
-          const escopo = p.tipo === "consulta" ? { atendimento: c.registro.procedimento!, preferencia: conhecimento?.atendimentoConsulta } : undefined;
+          const escopo = p.tipo === "consulta" ? { atendimento: c.registro.procedimento!, preferencia: conhecimento?.atendimentoConsulta }
+            : { atendimento: c.registro.procedimento!, procedimentoId: c.registro.id };
           const modo = await modalidadePublicadaDoMedico(ctx.clinicaId, medicoId, escopo);
           if (modo === "chegada_sem_pre_agendamento") {
             semAgendamento.push({ medico: c.medicoNome, registro: c.registro,
@@ -1191,6 +1233,8 @@ async function executarFerramentaInterna(
         const p = z.object({ medico_id: z.string(), inicio: z.string(), fim: z.string() }).parse(args);
         const estado = ctx.estado;
         const existente = confirmacaoDaEscolha(estado, ctx.clinicaId);
+        if (existente && !vagaPreservaProcedimento(estado, ctx.clinicaId, existente.vaga))
+          return falhaVinculoAtendimento();
         if (existente && !estado?.appointment.appointment_id && existente.vaga.medico_id === p.medico_id &&
           Date.parse(existente.vaga.inicio) === Date.parse(p.inicio) && Date.parse(existente.vaga.fim) === Date.parse(p.fim))
           return { ok: true, selecao_preservada: true, confirmacao_recebida: existente.aceita,
@@ -1202,6 +1246,8 @@ async function executarFerramentaInterna(
         const vaga = opcoes.find((v) => v.medico_id === p.medico_id && v.inicio === p.inicio && v.fim === p.fim);
         if (!vaga?.procedimento)
           return falha("ACTION_NOT_AUTHORIZED", "Escolha uma vaga e um procedimento consultados na agenda desta sessão.");
+        if (!vagaPreservaProcedimento(estado, ctx.clinicaId, vaga)) return falhaVinculoAtendimento();
+        if (!await vinculoProcedimentoAtual(ctx, vaga.medico_id)) return falhaVinculoAtendimento();
         const bloqueio = await conferirRegraCatalogo(vaga.procedimento);
         if (bloqueio) return bloqueio;
         const publicada = await modalidadePublicadaDoMedico(ctx.clinicaId, vaga.medico_id, escopoModalidade(ctx, vaga.procedimento));
@@ -1250,6 +1296,7 @@ async function executarFerramentaInterna(
             tipo_atendimento: z.enum(TIPOS_ATENDIMENTO_CATALOGO).optional(),
             medico: z.string().trim().max(160).optional(),
             dia: z.string().trim().max(40).optional(),
+            nova_solicitacao: z.boolean().optional(),
           })
           .parse(args);
         // FASE 3: mesma camada de retrieval usada pelo painel interno.
@@ -1263,6 +1310,7 @@ async function executarFerramentaInterna(
           canal: "whatsapp",
         });
         if (resultado.esclarecimento) ctx.esclarecimentoCatalogo = resultado.esclarecimento;
+        lembrarProcedimentoSolicitado(ctx.estado, ctx.clinicaId, resultado, p.nova_solicitacao);
         // Consulta de leitura: `price` resume o primeiro resultado e pode ser
         // de outro serviço, profissional ou forma de pagamento. Não é o preço
         // do atendimento selecionado e não pode sobrescrever seu estado.
@@ -1289,6 +1337,37 @@ async function executarFerramentaInterna(
 
       case "buscar_medicos": {
         const p = zBuscarMedicos.parse(args);
+        const pedido = procedimentoDaSessao(ctx.estado, ctx.clinicaId);
+        if (pedido) {
+          // Busca auxiliar relê o serviço por ID e só resolve seus executantes.
+          // Nem a especialidade informada pelo modelo pode trocar esse pedido.
+          ctx.estado!.appointment.procedimento_solicitado = pedido;
+          const { candidatosPrimeiraVaga } = await import("./primeiro-disponivel-catalogo.server");
+          const todos = await candidatosPrimeiraVaga(ctx.clinicaId, "procedimento",
+            [{ registro: pedido.catalogo_id, procedimento: pedido.nome }]);
+          if (!todos.length) return falhaVinculoAtendimento();
+          const escolhido = p.nome ? await resolverMedico(ctx.clinicaId, p.nome) : null;
+          const candidatos = p.nome ? todos.filter(c => escolhido?.ok ? c.medicoId === escolhido.id
+            : normalizar(c.medicoNome) === normalizar(p.nome!)) : todos;
+          if (!candidatos.length) {
+            const esclarecimento = { tipo: "profissional" as const, motivo: "medico_nao_identificado" as const,
+              atendimento: pedido.nome,
+              pergunta: `Não identifiquei esse profissional entre os executantes de ${pedido.nome}. Qual destes profissionais você deseja?`,
+              opcoes: todos.map(c => ({ id: pedido.catalogo_id, nome: c.medicoNome })) };
+            ctx.esclarecimentoCatalogo = esclarecimento;
+            return { ok: true, found: true, knowledge_status: "found", tipo_atendimento: "exame_procedimento",
+              procedure: pedido.nome, pedido_interpretado: { atendimento: pedido.nome },
+              registros: todos.map(c => c.registro), esclarecimento };
+          }
+          return { ok: true, found: true, knowledge_status: "found", source: "nina_catalogo", source_type: "catalog",
+            tipo_atendimento: "exame_procedimento", procedure: pedido.nome,
+            pedido_interpretado: { atendimento: pedido.nome, tipo_atendimento: "exame_procedimento" },
+            doctors: candidatos.map(c => c.medicoNome), profissionais: candidatos.map(c => c.medicoNome),
+            registros: candidatos.map(c => c.registro), records: candidatos.map(c => c.registro),
+            vinculos_agenda: candidatos.map(c => ({ catalogo_id: pedido.catalogo_id, medico_id: c.medicoId,
+              nome_catalogo: c.medicoNome, situacao: c.medicoId ? "vinculado" : "nao_resolvido" })),
+            instrucao: "Preserve este exame/procedimento ao consultar vagas. O médico é seu executante; sua especialidade não substitui o atendimento." };
+        }
         const { searchKnowledgeBase } = await import("./knowledge.server");
         const { SEM_CATALOGO_INSTRUCAO } = await import("./catalogo-fonte.server");
         const r = await searchKnowledgeBase({
@@ -1339,6 +1418,7 @@ async function executarFerramentaInterna(
           tipo_atendimento: "exame_procedimento",
           canal: ctx.origem,
         });
+        lembrarProcedimentoSolicitado(ctx.estado, ctx.clinicaId, r, p.nova_solicitacao);
         if (r.esclarecimento) {
           ctx.esclarecimentoCatalogo = r.esclarecimento;
           return { ok: true, ...r };
@@ -1530,7 +1610,7 @@ async function executarFerramentaInterna(
           // Estes são os ÚNICOS horários realmente livres. A escala da planilha
           // (ex.: 09h-18h) não é vaga.
           instrucao:
-            "Ao apresentar estes horários, inclua também o valor oficial da consulta vindo de consultar_base_conhecimento, com a forma de pagamento e a condição correspondentes (se ainda não consultou, consulte antes de responder). Se não houver valor cadastrado, não estime nem cite preço. Mostre de 3 a 5 opções, agrupadas por médico, com data, horário e unidade.",
+            "Ao apresentar estes horários, inclua também o valor oficial do atendimento solicitado vindo de consultar_base_conhecimento, com a forma de pagamento e a condição correspondentes (se ainda não consultou, consulte antes de responder). Preserve o exame/procedimento: a consulta da especialidade do executante não o substitui. Se não houver valor cadastrado, não estime nem cite preço. Mostre de 3 a 5 opções, agrupadas por médico, com data, horário e unidade.",
         };
 
       }
@@ -1889,6 +1969,7 @@ async function executarFerramentaInterna(
 
         const confirmacao = consentimentoDaEscolha(ctx.estado, ctx.clinicaId);
         const ofertaCorrente = confirmacao?.vaga;
+        if (ofertaCorrente && !vagaPreservaProcedimento(ctx.estado, ctx.clinicaId, ofertaCorrente)) return falhaVinculoAtendimento();
         const consentimentoExplicito = Boolean(confirmacao);
         // Uma chamada do modelo não prova consentimento. Sem a oferta aceita
         // no estado do servidor, nem idempotência nem vagas podem ler a agenda.
@@ -1952,6 +2033,7 @@ async function executarFerramentaInterna(
           );
 
         const origemMarca = origemAgendamentoNina(ctx);
+        if (!await vinculoProcedimentoAtual(ctx, medicoIdReal)) return falhaVinculoAtendimento();
         const modalidade = await modalidadeAtualDaAgenda(ctx.clinicaId, medicoIdReal, ofertaCorrente!.agenda_id, escopoModalidade(ctx, ofertaCorrente!.procedimento));
         if (!permiteReserva(modalidade) || modalidade !== ofertaCorrente!.modalidade)
           return falha("MODALIDADE_ALTERADA", "A modalidade difere do resumo confirmado. A equipe precisa conferir antes de reservar.");

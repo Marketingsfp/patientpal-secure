@@ -6,6 +6,8 @@ import { registrarEtapa } from "./evidencias.server";
 import type { RegistroConhecimento } from "./knowledge-contract";
 import { atendimentosEstruturados, modalidadeEstruturada } from "./catalogo-estrutura";
 import { selecionarAtendimentosConsulta, type EscopoAtendimentoConsulta } from "./atendimento-consulta";
+import { servicoParaRegistro, type ServicoPublicado } from "./catalogo-conhecimento";
+import type { AtendimentoPublicado } from "./catalogo-estrutura";
 
 type MedicoAgenda = { id: string; nome: string };
 type CadastroMedico = MedicoAgenda & { ativo: boolean };
@@ -104,6 +106,34 @@ function origemVinculo(profissional: ProfissionalCatalogo, resolucao: ResolucaoM
 
 /** A mesma resolução de identidade do catálogo é usada para ler a modalidade. */
 export async function modalidadePublicadaDoMedico(clinicaId: string, medicoId: string, escopo?: EscopoAtendimentoConsulta) {
+  if (escopo?.procedimentoId) {
+    const { data, error } = await supabaseAdmin.from("nina_cat_servicos")
+      .select("id, nome, descricao_publica, estrutura, executantes, formas_pagamento, valor, valor_observacao, preparo, restricoes")
+      .eq("clinica_id", clinicaId).eq("status", "PUBLICADO").eq("id", escopo.procedimentoId).maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!data || normalizar(data.nome) !== normalizar(escopo.atendimento)) return "nao_definida" as const;
+    const servico = data as ServicoPublicado;
+    const executantes = Array.isArray(servico.executantes) ? servico.executantes : [];
+    const nomesVinculados: string[] = [];
+    for (const e of executantes) {
+      if (!e?.nome) continue;
+      const r = await resolverMedicoAgenda(clinicaId, String(e.medico_id || e.nome));
+      if (r.ok && r.id === medicoId) nomesVinculados.push(normalizar(String(e.nome)));
+    }
+    if (!nomesVinculados.length) return "nao_definida" as const;
+    const registro = servicoParaRegistro(servico);
+    const itens = (registro.extras?.atendimentos_publicados ?? []) as AtendimentoPublicado[];
+    const selecionados: AtendimentoPublicado[] = [];
+    for (const item of itens) {
+      if (!item.profissional || nomesVinculados.includes(normalizar(item.profissional))) selecionados.push(item);
+      else {
+        const r = await resolverMedicoAgenda(clinicaId, item.profissional);
+        if (r.ok && r.id === medicoId) selecionados.push(item);
+      }
+    }
+    if (!selecionados.length) return "nao_definida" as const;
+    return modalidadeEstruturada(servico.descricao_publica, servico.estrutura, "", null, selecionados);
+  }
   const [ativos, publicados] = await Promise.all([
     medicosDaClinica(clinicaId),
     supabaseAdmin.from("nina_cat_profissionais").select("id, nome, medico_id, tipo_atendimento, estrutura, observacao_publica")

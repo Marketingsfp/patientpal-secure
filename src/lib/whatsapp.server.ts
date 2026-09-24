@@ -1292,6 +1292,27 @@ async function gerarRespostaNinaInterno(
     motivo: string;
     texto: string;
   }> = [];
+  const { REGRA_IDENTIDADE_ATENDIMENTO } = await import("@/lib/nina/prompt/identidade-atendimento");
+  instrucoesAdicionaisTurno.push({
+    codigo: "PRESERVAR_IDENTIDADE_ATENDIMENTO",
+    origem: "src/lib/nina/prompt/identidade-atendimento.ts",
+    motivo: "Preservar Clínico Geral e separar a consulta da escolha do profissional nas pesquisas.",
+    texto: REGRA_IDENTIDADE_ATENDIMENTO,
+  });
+  const { REGRA_PIX_ANTECIPADO } = await import("@/lib/nina/pagamento-catalogo");
+  instrucoesAdicionaisTurno.push({
+    codigo: "INFORMAR_PIX_ANTECIPADO",
+    origem: "src/lib/nina/pagamento-catalogo.ts",
+    motivo: "Informar a condição obrigatória do Pix junto aos valores, sem estendê-la ao cartão.",
+    texto: REGRA_PIX_ANTECIPADO,
+  });
+  const { REGRA_ANTECEDENCIA_CHEGADA } = await import("@/lib/nina/modalidade-atendimento");
+  instrucoesAdicionaisTurno.push({
+    codigo: "ANTECEDENCIA_CHEGADA_30_MINUTOS",
+    origem: "src/lib/nina/modalidade-atendimento.ts",
+    motivo: "Atualizar a antecedência de chegada para hora marcada e ficha, preservando as demais modalidades.",
+    texto: REGRA_ANTECEDENCIA_CHEGADA,
+  });
   // O motor antigo não impõe pendências aos novos turnos.
   fluxoEstado.clarification = undefined;
   const precedenciaTurno = resolverPrecedenciaDoTurno({
@@ -1314,7 +1335,8 @@ async function gerarRespostaNinaInterno(
   // ------------------------------------------------------------------
   const { conhecimentoDaMesmaSessao } = await import("@/lib/nina/confidence/conhecimento-sessao");
   const conhecimentoAnterior = conhecimentoDaMesmaSessao(fluxoEstado.knowledge_context, clinicaId, fluxoEstado.session_id ?? null);
-  const { prepararPesquisaMedicoDaSessao, confirmarProfissionalDaPergunta } = await import("@/lib/nina/pesquisa-medico-sessao");
+  const { confirmarProfissionalDaPergunta } = await import("@/lib/nina/pesquisa-medico-sessao");
+  const { prepararPesquisaAtendimentoDaSessao } = await import("@/lib/nina/pesquisa-atendimento-sessao");
   const contextoRespostaProfissional = { mensagem: mensagemPaciente, historico: contextoConsultaAgenda.historico };
   const profissionalConfirmadoNaResposta = confirmarProfissionalDaPergunta(conhecimentoAnterior, contextoRespostaProfissional);
   fluxoEstado.knowledge_context = conhecimentoAnterior;
@@ -1789,9 +1811,9 @@ async function gerarRespostaNinaInterno(
       /* inválido não vira referência */
     }
     const referenciaAnterior =
-      nome === "consultar_base_conhecimento" && parametros.nova_solicitacao === true
+      ["consultar_base_conhecimento", "buscar_procedimentos"].includes(nome) && parametros.nova_solicitacao === true
         ? null
-        : conhecimentoAnterior;
+        : conhecimentoDaMesmaSessao(fluxoEstado.knowledge_context, clinicaId, fluxoEstado.session_id ?? null);
     r = prepararSegundaPergunta(referenciaAnterior, r);
     const ex = incorporarResultadoOficial({
       clinicaId,
@@ -1804,6 +1826,10 @@ async function gerarRespostaNinaInterno(
     if (!r.reused) nomesFerramentasTurno.push(nome);
     if (!r.success || r.erro) conflitoFerramenta = true;
     const payload = dadosPublicosCatalogo(respostaParaModelo(r));
+    // Pesquisa bloqueada não apaga o atendimento já identificado. O modelo
+    // precisa dessa referência para reformular a chamada no mesmo turno.
+    if ((r.dados as { codigo?: string } | null)?.codigo === "CATALOGO_QUERY_NAO_INTERPRETADA")
+      return limitarRetornoParaModelo(payload);
     if (
       r.capacidade === "requestHumanHandoff" &&
       r.success &&
@@ -1851,8 +1877,12 @@ async function gerarRespostaNinaInterno(
         esclarecimento: esclarecimentoAtual,
       });
     }
-    const termoPesquisado = nome === "consultar_base_conhecimento" || nome === "buscar_procedimentos"
-      ? parametros.termo : nome === "buscar_medicos" ? parametros.especialidade ?? parametros.nome : null;
+    const pedidoInterpretado = (r.dados as { pedido_interpretado?: { atendimento?: string } } | null)?.pedido_interpretado;
+    const termoPesquisado = nome === "buscar_medicos" && tipoAtendimento === "exame_procedimento" && pedidoInterpretado?.atendimento
+      ? pedidoInterpretado.atendimento : nome === "consultar_base_conhecimento" || nome === "buscar_procedimentos"
+      ? parametros.termo : nome === "buscar_medicos" ? parametros.especialidade ??
+        (referenciaAnterior?.consulta.tipo_atendimento === "consulta" ? referenciaAnterior.consulta.termo : parametros.nome) : null;
+    const medicoPesquisado = nome === "buscar_medicos" ? parametros.nome : parametros.medico;
     if (typeof termoPesquisado === "string") {
       const esclarecimento = (
         r.dados as import("@/lib/nina/knowledge-contract").ResultadoConhecimento | null
@@ -1866,7 +1896,7 @@ async function gerarRespostaNinaInterno(
               args: {
                 termo: termoPesquisado,
                 ...(tipoAtendimento ? { tipo_atendimento: tipoAtendimento } : {}),
-                ...(typeof parametros.medico === "string" ? { medico: parametros.medico } : {}),
+                ...(typeof medicoPesquisado === "string" ? { medico: medicoPesquisado } : {}),
               },
               anterior: referenciaAnterior,
               esclarecimento,
@@ -2120,9 +2150,19 @@ async function gerarRespostaNinaInterno(
     mensagens.push({ role: "assistant", content: msg?.content ?? null, tool_calls: chamadas });
     for (const c of chamadas) {
       const nome = String(c.function?.name ?? "");
-      if (c.function) c.function.arguments = prepararPesquisaMedicoDaSessao(
-        nome, c.function.arguments, conhecimentoAnterior, contextoRespostaProfissional,
-      ) ?? c.function.arguments;
+      if (c.function) {
+        const originais = c.function.arguments;
+        c.function.arguments = prepararPesquisaAtendimentoDaSessao(nome, originais, {
+          clinicaId, sessionId: fluxoEstado.session_id ?? null,
+          conhecimento: fluxoEstado.knowledge_context,
+          ...contextoRespostaProfissional,
+        }) ?? originais;
+        if (c.function.arguments !== originais) registrarEtapa({
+          tipo: "consulta", fonte: "sistema", titulo: "Pesquisa preservou o atendimento identificado",
+          dados: { ferramenta: nome, argumentos_originais: originais, argumentos_efetivos: c.function.arguments },
+          codigo: { arquivo: "src/lib/nina/pesquisa-atendimento-sessao.ts", funcao: "prepararPesquisaAtendimentoDaSessao" },
+        });
+      }
       // Toda execução passa pelo broker: ele valida o retorno, aplica
       // idempotência de turno e nunca transforma erro em sucesso.
       // FASE 4 — ação crítica NUNCA roda sobre estado obsoleto: se chegou

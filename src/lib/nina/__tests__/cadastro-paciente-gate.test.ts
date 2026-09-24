@@ -4,7 +4,7 @@ import { cadastroMinimoSchema, camposCadastroFaltantes } from "../cadastro-pacie
 import { estadoVazio } from "../fluxo-estado-normalizar";
 import type { CtxNinaPaciente, ResultadoFerramenta } from "../paciente-tools.server";
 import { resumoEntregueFixture } from "./agendamento-fixture";
-import { confirmacaoDaEscolha, registrarOpcoesAgendamento, selecionarVagaValidada } from "../agendamento-escolha";
+import { confirmacaoDaEscolha, registrarOpcoesAgendamento, selecionarVagaValidada, LEMBRETE_CONFIRMACAO } from "../agendamento-escolha";
 import { derivarEtapa } from "../atendimento-fase6";
 
 function preparar(faltantes = ["nome", "data_nascimento"]) {
@@ -54,6 +54,8 @@ function preparar(faltantes = ["nome", "data_nascimento"]) {
     }
     if (nome === "agendar") {
       estado.appointment.appointment_id = "reserva";
+      estado.appointment.confirmed_in_session = estado.session_id;
+      estado.flow.stage = "BOOKED";
       return { ok: true, appointment_id: "reserva" };
     }
     throw new Error(`Ferramenta inesperada ${nome}`);
@@ -122,6 +124,9 @@ describe("gate: escolher vaga → coletar dados → confirmar → agendar", () =
     expect(confirmacaoDaEscolha(t.estado)?.aceita).toBe(false);
   });
   for (const frase of ["Sim, confirmo.", "Sim, confirmo todos esses dados para concluir o agendamento.",
+    "isso mesmo, pode confirmar", "sim, tudo certo por aqui", "confirmo sim, obrigado!",
+    "tá tudo certo, pode confirmar",
+    "já é", "formou", "demorou", "blz, pode confirmar", "ss, pode agendar pfv",
     "Confirmo a consulta de ortopedia com Jorge Ribeiro em 21/01/2030 às 14:00."]) {
     test(`confirmação natural não retorna à escolha: ${frase}`, async () => {
       const t = preparar();
@@ -134,10 +139,37 @@ describe("gate: escolher vaga → coletar dados → confirmar → agendar", () =
       expect(t.estado.appointment.confirmation).toBe(resumo);
       expect(t.chamadas.filter(c => c.nome === "agendar")).toHaveLength(1);
       expect(t.chamadas.some(c => c.nome === "selecionar_horario")).toBe(false);
-      await t.turno(frase);
+      const repeticao = await t.turno(frase);
+      expect(repeticao?.texto).toBe("Seu agendamento já foi realizado. Não é necessário confirmar novamente.");
+      expect(repeticao?.acoesConcluidas).toHaveLength(0);
       expect(t.chamadas.filter(c => c.nome === "agendar")).toHaveLength(1);
     });
   }
+  test("lembrete curto mantém a prova do resumo sem repetir a conclusão ou reservar antes do aceite", async () => {
+    const t = preparar();
+    await t.turno("Ana da Silva, 02/01/1990");
+    const chamadasAntes = t.chamadas.filter(c => c.nome === "agendar").length;
+    expect((await t.turno("entendi a mensagem"))?.texto).toBe(LEMBRETE_CONFIRMACAO);
+    expect((await t.turno("li aqui"))?.texto).toBe(LEMBRETE_CONFIRMACAO);
+    expect(t.chamadas.filter(c => c.nome === "agendar")).toHaveLength(chamadasAntes);
+    expect((await t.turno("isso mesmo, pode confirmar"))?.acoesConcluidas[0]?.confirmada).toBe(true);
+    expect(t.chamadas.filter(c => c.nome === "agendar")).toHaveLength(1);
+  });
+  test.each(["sim, mas quero outro horário", "qual o endereço?", "quero outra consulta"])(
+    "pedido após conclusão não é engolido como novo aceite: %s", async mensagem => {
+      const t = preparar();
+      await t.turno("Ana da Silva, 02/01/1990");
+      await t.turno("sim");
+      expect(await t.turno(mensagem)).toBeNull();
+      expect(t.chamadas.filter(c => c.nome === "agendar")).toHaveLength(1);
+    });
+  test("reserva de sessão antiga não produz resposta de agendamento atual", async () => {
+    const t = preparar();
+    t.estado.appointment.appointment_id = "antigo";
+    t.estado.appointment.confirmed_in_session = "sessao-antiga";
+    expect(await t.turno("sim")).toBeNull();
+    expect(t.chamadas).toHaveLength(0);
+  });
   test("aproveita nome e nascimento dados antes do aceite, sem extrair nome da consulta", async () => {
     const t = preparar();
     t.ctx.consultaAgenda!.historico.unshift(
@@ -279,6 +311,24 @@ describe("gate: escolher vaga → coletar dados → confirmar → agendar", () =
     t.chamadas.length = 0;
     expect(await t.turno("eu vou 10:20")).toBeNull();
     expect(t.estado.appointment.time).toBe("14:00");
+    expect(t.estado.appointment.slot_confirmed_by_patient).toBe(false);
+    expect(t.estado.flow.stage).toBe("HANDOFF");
+    expect(t.chamadas).toHaveLength(0);
+  });
+  test.each(["nn", "quero não", "esse não", "não quero não", "não vai rolar", "deixa pra lá"])("recusa informal impede reserva: %s", async frase => {
+    const t = preparar();
+    await t.turno("Ana da Silva, 02/01/1990");
+    t.chamadas.length = 0;
+    expect(await t.turno(frase)).toBeNull();
+    expect(t.estado.appointment.confirmation).toBeNull();
+    expect(t.estado.appointment.slot_confirmed_by_patient).toBe(false);
+    expect(t.estado.flow.stage).toBe("CHOOSING_SLOT");
+    expect(t.chamadas).toHaveLength(0);
+  });
+  test.each(["nn", "quero não", "não vai rolar"])("recusa informal revoga aceite antigo antes da gravação: %s", async frase => {
+    const t = preparar();
+    resumoEntregueFixture(t.estado, "clinica", true);
+    expect(await t.turno(frase)).toBeNull();
     expect(t.estado.appointment.slot_confirmed_by_patient).toBe(false);
     expect(t.estado.flow.stage).toBe("HANDOFF");
     expect(t.chamadas).toHaveLength(0);

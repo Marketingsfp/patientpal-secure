@@ -88,6 +88,7 @@ export function blocoPromptFase5({
   if (jaAgendado) {
     linhas.push(
       "- Este agendamento JÁ foi criado nesta conversa. Não crie outro para o mesmo pedido; se o paciente quiser mudar, encaminhe conforme as regras de remarcação.",
+      "- Se o paciente apenas repetir a confirmação, informe brevemente que o agendamento já foi realizado. Não repita o resumo completo, as orientações e a despedida, nem peça outro aceite. Perguntas e novos pedidos devem ser atendidos conforme seu conteúdo.",
     );
   }
 

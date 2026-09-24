@@ -1,6 +1,7 @@
 /** Interpretação de escrita para buscar fatos publicados; nunca cria um atendimento. */
 import { normalizarBuscaCatalogo, termosItemCatalogo } from "./catalogo-sem-registro";
 import { REGRA_ESCLARECIMENTO_DUAS } from "./prompt/limite-esclarecimento";
+import { REGRA_IDENTIDADE_ATENDIMENTO } from "./prompt/identidade-atendimento";
 
 // Equivalências de busca, não equivalências de preço, preparo ou modalidade.
 // Qualificadores (órgão, total/superior, infantil etc.) continuam obrigatórios.
@@ -241,8 +242,7 @@ export const REGRA_CONSULTA_CATALOGO =
   "Escala habitual não comprova vaga: disponibilidade exige consulta às ferramentas de agenda.";
 
 export const REGRA_INTERPRETACAO_CATALOGO = `INTERPRETAÇÃO DO PEDIDO E IDENTIDADE
-- O nome da especialidade é sempre "Clínico Geral", independentemente do gênero do profissional. Use, por exemplo, "Dra. Ana — Clínico Geral"; flexione somente Dr./Dra., nunca o nome da especialidade para "Clínica Geral" ou "Clínica Médica".
-- Para a consulta de Clínico Geral, pesquise e mantenha o termo "Clínico Geral" nas ferramentas e na continuidade. Não o substitua por "Clínica Médica". "Clínica médica" pode designar uma unidade ou o estabelecimento: não é sinônimo de Clínico Geral. Analise a frase inteira e o histórico; se a pergunta for sobre a unidade, use as ferramentas de informações da clínica. Se o paciente já identificou Clínico Geral, preserve esse atendimento sem pedir novamente. Se o atendimento não estiver claro, pergunte qual consulta ou informação ele deseja, respeitando o limite de esclarecimentos; não presuma especialidade nem interprete a ambiguidade como ausência de serviço na base.
+- ${REGRA_IDENTIDADE_ATENDIMENTO}
 - Separe o tipo de atendimento do assunto e do objetivo: consulta com cardiologista = tipo consulta, termo cardiologia, objetivo agendamento quando o paciente quer marcar. Exames e procedimentos usam tipo exame_procedimento. Sintomas não mudam consulta para exame. Pesquise cada atendimento separadamente e mantenha a categoria nas continuações; não peça pedido médico nem ofereça exames para esclarecer um pedido explícito de consulta.
 - Analise a mensagem inteira e o histórico atual antes de buscar. Extraia somente a consulta ou o procedimento e seus qualificadores para o termo; não envie a frase inteira, saudações, sintomas ou preferências de data como termo. Identifique separadamente o objetivo: informações gerais, valor, horários, médicos, preparo, condições ou intenção de agendar. Abreviações, siglas, erros de escrita e respostas curtas podem retomar um atendimento já identificado; nunca invente órgão, modalidade, profissional ou equivalência para uma sigla desconhecida.
 - A busca aceita equivalências de escrita, como ultra/ultrassom/USG, e pequenos erros. Isso só localiza candidatos publicados; não autoriza escolher um exame parecido. Preserve total/superior, órgão, infantil/adulto e demais diferenças do pedido.

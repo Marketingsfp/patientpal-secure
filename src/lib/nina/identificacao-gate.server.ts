@@ -34,18 +34,21 @@ import {
 import { criarResultado, type ResultadoRespostaNina } from "./resposta/contrato";
 import { textoDaChave, type TextosTemplates } from "./resposta/templates";
 import { aceitarResumoEntregue, confirmacaoDaEscolha, consentimentoDaEscolha,
-  limparEscolhaAgendamento, lerEscolhaHorario, vagasDaEscolha, vagasDaSessao } from "./agendamento-escolha";
+  limparEscolhaAgendamento, lerEscolhaHorario, vagasDaEscolha, vagasDaSessao,
+  resumoDaEscolhaEntregue, LEMBRETE_CONFIRMACAO } from "./agendamento-escolha";
 import { respostaSemVagas } from "./agenda-sem-vagas";
+import { reservaDaSessaoAtual } from "./agendamento-sessao";
 
 /* ------------------------------------------------------------ confirmações */
 
 import { ehConfirmacaoDeAgendamento } from "./confirmacao-agendamento";
+import { ehRespostaNegativaCurta } from "./resposta-afirmativa";
 export { ehConfirmacaoDeAgendamento } from "./confirmacao-agendamento";
 
 const NEGACAO =
   /^\s*(n[ãa]o\s+(quero|posso|vou|desejo|dá|da|pode|prefiro|é|eh|serve)|n[ãa]o,|nao,|outro\s+(hor[áa]rio|dia|m[ée]dico)|outra\s+(data|hora|op[cç][ãa]o)|prefiro\b|ainda\s*n[ãa]o\b|cancela\w*)\b/i;
 export function ehNegacao(texto: string): boolean {
-  return NEGACAO.test((texto ?? "").trim());
+  return ehRespostaNegativaCurta(texto) || NEGACAO.test((texto ?? "").trim());
 }
 
 /**
@@ -193,7 +196,17 @@ export async function aplicarGateIdentificacao(params: {
   const textos = params.textos ?? null;
   const a = estado.appointment;
   const p = estado.patient;
-  if (a.appointment_id || estado.flow.stage === "HANDOFF") return null;
+  if (estado.flow.stage === "HANDOFF") return null;
+  if (a.appointment_id) {
+    if (reservaDaSessaoAtual(estado) &&
+      ehConfirmacaoDeAgendamento(mensagem, confirmacaoDaEscolha(estado, ctx.clinicaId)?.vaga)) {
+      return criarResultado({ origem: "gate",
+        texto: "Seu agendamento já foi realizado. Não é necessário confirmar novamente.",
+        fatosConfirmados: ["agendamento_ja_existente"],
+        restricoes: ["nao_criar_nova_reserva", "nao_repetir_conclusao_completa"] });
+    }
+    return null;
+  }
   const { pedidoPreventivo } = await import("./atendimento-consulta");
   const preventivo = pedidoPreventivo(mensagem);
   if (a.procedure && preventivo &&
@@ -391,7 +404,9 @@ export async function aplicarGateIdentificacao(params: {
   const confirmacao = consentimentoDaEscolha(estado, ctx.clinicaId);
   if (!confirmacao) {
     estado.flow.stage = "WAITING_FINAL_CONFIRMATION";
-    return criarResultado({ origem: "gate", texto: resumoEscolhido.resumo,
+    const resumoJaEntregue = cadastroProntoNoInicio && !selecionouAgora &&
+      resumoDaEscolhaEntregue(estado, ctx.clinicaId, ctx.consultaAgenda?.historico ?? []);
+    return criarResultado({ origem: "gate", texto: resumoJaEntregue ? LEMBRETE_CONFIRMACAO : resumoEscolhido.resumo,
       fatosConfirmados: ["vaga_escolhida_validada", "paciente_identificado"],
       restricoes: ["aguardar_aceite_do_resumo"] });
   }

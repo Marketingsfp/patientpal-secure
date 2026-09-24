@@ -17,7 +17,7 @@ describe("runtime entrega resumo validado e aguarda nova mensagem", () => {
         expect(r.rede).toBe(0);
         if (cenario === "sem_pre") {
           expect(r.resposta).toContain("sem pré-agendamento");
-          expect(r.resposta).not.toMatch(/15|antecedência|08:00/);
+          expect(r.resposta).not.toMatch(/15|30|antecedência|08:00/);
           expect(r.ferramentas).not.toContain("agendar");
           expect(r.encaminhamentos).toHaveLength(0);
         } else if (cenario === "modalidade_indefinida") {
@@ -28,7 +28,7 @@ describe("runtime entrega resumo validado e aguarda nova mensagem", () => {
           expect(r.resposta).toContain("10:20");
           expect(r.resposta).not.toContain("08:00");
           expect(r.ferramentas.filter((f: string) => f === "agendar")).toHaveLength(1);
-          expect(r.resposta.includes("15 minutos")).toBe(cenario !== "confirmado_chegada_com_pre_agendamento");
+          expect(r.resposta.includes("30 minutos")).toBe(cenario !== "confirmado_chegada_com_pre_agendamento");
           expect(r.resposta).toContain("Uma hora antes");
           if (cenario === "confirmado_ficha") expect(r.resposta).toContain("*Sua ficha:* 007");
         }

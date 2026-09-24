@@ -167,6 +167,20 @@ export async function buscarNoCatalogo(
     Math.max(0, ...textosProfissionais.get(p.id)!.map(texto => busca.pontuar(nome, texto)));
   const termos = busca.termos;
   const expandidos = busca.ajustes;
+  // Um título genérico publicado ("PROCEDIMENTOS") perde seus termos na
+  // limpeza da pesquisa. Isso exige identificar o procedimento específico,
+  // não declarar que o atendimento não existe nem reservar o grupo inteiro.
+  if (!termos.length && tipoAtendimento === "exame_procedimento") {
+    const genericos = brutosServicos.filter(s => semAcento(s.nome) === semAcento(pedido.query));
+    if (genericos.length) {
+      const detalhes = await lerPublicados<ServicoPublicado>("nina_cat_servicos", COLUNAS_SERVICO,
+        pedido.clinicaId, genericos.map(s => s.id));
+      const resultado = montarResultadoCatalogo({ servicos: detalhes, profissionais: [], hojeISO });
+      return { ...resultado, tipo_atendimento: tipoAtendimento,
+        esclarecimento: { tipo: "procedimento", pergunta: "Qual procedimento você deseja realizar? Informe o nome do procedimento.", opcoes: [] },
+        instrucao: "O termo publicado é genérico. Esclareça qual procedimento o paciente deseja antes de consultar vagas; não substitua por consulta." };
+    }
+  }
   if (tipoAtendimento === "nao_identificado") {
     // "Cardiologia" no cadastro de especialidades é uma consulta. A mera
     // menção na descrição de um exame não transforma a especialidade em exame.

@@ -3,6 +3,7 @@ import { estadoVazio } from "../fluxo-estado-normalizar";
 import {
   aceitarResumoEntregue,
   consentimentoDaEscolha,
+  LEMBRETE_CONFIRMACAO,
   lerEscolhaHorario,
   registrarOpcoesAgendamento,
   selecionarVagaValidada,
@@ -107,6 +108,39 @@ describe("escolha de horário e consentimento do resumo entregue", () => {
       ]),
     ).toBe(true);
     expect(consentimentoDaEscolha(e)?.vaga.hora).toBe("10:20");
+  });
+  test("lembretes preservam o vínculo com o resumo entregue da escolha atual", () => {
+    const e = preparar();
+    const historico = [
+      { role: "assistant", content: e.appointment.confirmation!.resumo },
+      { role: "user", content: "entendi" },
+      { role: "assistant", content: LEMBRETE_CONFIRMACAO },
+      { role: "user", content: "li aqui" },
+      { role: "assistant", content: LEMBRETE_CONFIRMACAO },
+    ];
+    expect(aceitarResumoEntregue(e, "outra-clinica", historico)).toBe(false);
+    e.session_id = "outra-sessao";
+    expect(aceitarResumoEntregue(e, "clinica", historico)).toBe(false);
+    e.session_id = "sessao";
+    e.appointment.time = "11:00";
+    expect(aceitarResumoEntregue(e, "clinica", historico)).toBe(false);
+    e.appointment.time = vaga.hora;
+    expect(aceitarResumoEntregue(e, "clinica", historico)).toBe(true);
+  });
+  test("lembrete sem resumo ou após outra pergunta não autoriza reserva", () => {
+    const e = preparar();
+    const resumo = { role: "assistant", content: e.appointment.confirmation!.resumo };
+    const lembrete = { role: "assistant", content: LEMBRETE_CONFIRMACAO };
+    for (const historico of [
+      [lembrete],
+      [{ role: "user", content: resumo.content }, lembrete],
+      [resumo, { role: "user", content: "qual médico?" },
+        { role: "assistant", content: "Você se refere à Dra. Ana?" },
+        { role: "user", content: "entendi" }, lembrete],
+    ]) {
+      expect(aceitarResumoEntregue(e, "clinica", historico)).toBe(false);
+      expect(consentimentoDaEscolha(e)).toBeNull();
+    }
   });
   for (const campo of [
     "doctor_id",

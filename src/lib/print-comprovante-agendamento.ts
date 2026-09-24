@@ -315,7 +315,7 @@ export async function printComprovanteAgendamento({
 
     <div class="label sm">ORIENTAÇÕES</div>
     <ul class="orient sm">
-      <li>Chegar com 15 minutos de antecedência.</li>
+      <li>Chegar com 30 minutos de antecedência.</li>
       <li>Trazer documento com foto e, se aplicável, cartão do convênio.</li>
       <li>Em caso de imprevisto, avisar a clínica com antecedência.</li>
       <li>Este comprovante NÃO substitui a Guia de Recepção (GR), emitida no caixa.</li>

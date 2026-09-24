@@ -7,6 +7,12 @@ export const MODALIDADES_ATENDIMENTO = {
 } as const;
 export type ModalidadeAtendimento = keyof typeof MODALIDADES_ATENDIMENTO;
 export type ModalidadeResolvida = ModalidadeAtendimento | "nao_definida";
+export const REGRA_ANTECEDENCIA_CHEGADA =
+  "Para hora marcada e atendimento por ficha, oriente o paciente a chegar com 30 minutos de antecedência para o check-in na Recepção Principal. " +
+  "Na hora marcada, conte a antecedência em relação ao horário agendado; por ficha, ao horário de comparecimento informado, sem prometer a hora exata da consulta. " +
+  "Essa orientação substitui a regra anterior de 15 minutos, inclusive em textos antigos. Mantenha o horário agendado e a duração da consulta; a antecedência é apenas de chegada. " +
+  "Ordem de chegada, com ou sem pré-agendamento, continua sem exigência de antecedência. Preserve suas regras de comparecimento e reserva. " +
+  "Escreva a orientação no bloco do atendimento, com frases curtas e a formatação habitual da Nina.";
 const normalizar = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "")
   .toLowerCase().replace(/[_-]/g, " ").replace(/\s+/g, " ").trim();
 
@@ -46,10 +52,10 @@ export function permiteReserva(m: unknown): m is Exclude<ModalidadeAtendimento, 
 
 export function orientacaoModalidade(m: ModalidadeResolvida): string {
   switch (m) {
-    case "hora_marcada": return "Atendimento no horário marcado. Chegue com 15 minutos de antecedência para o check-in na Recepção Principal.";
+    case "hora_marcada": return "Atendimento no horário marcado. Chegue com 30 minutos de antecedência para o check-in na Recepção Principal.";
     case "chegada_com_pre_agendamento": return "É necessário marcar um horário. Entre os pacientes daquele horário, quem chegar primeiro será atendido primeiro. O horário pré-agendado não garante o horário exato da consulta.";
     case "chegada_sem_pre_agendamento": return "Não é necessário agendar horário. Basta ir à clínica nos dias e períodos de atendimento desse profissional. Quem chegar primeiro será atendido primeiro.";
-    case "ficha": return "O atendimento é por ficha, seguindo a numeração. Chegue com 15 minutos de antecedência em relação ao horário de comparecimento informado para o check-in na Recepção Principal. Esse horário não é garantia da hora da consulta.";
+    case "ficha": return "O atendimento é por ficha, seguindo a numeração. Chegue com 30 minutos de antecedência em relação ao horário de comparecimento informado para o check-in na Recepção Principal. Esse horário não é garantia da hora da consulta.";
     default: return "A modalidade de atendimento precisa ser conferida pela equipe. Não prometa horário, ficha ou pré-agendamento.";
   }
 }

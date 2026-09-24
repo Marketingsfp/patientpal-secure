@@ -13,7 +13,7 @@ import { REGRA_SEM_EMOJIS_NINA } from "../resposta/sem-emojis";
 import { REGRA_CONSULTA_CATALOGO, REGRA_INTERPRETACAO_CATALOGO } from "../catalogo-busca";
 import { INSTRUCAO_DADOS_CATALOGO } from "../catalogo-estrutura";
 import { REGRA_INFORMACOES_GRUPO } from "../clinicas-grupo";
-import { CONTINUIDADE_RESPOSTAS_CONTEXTUAIS } from "./respostas-contextuais";
+import { CONTEXTO_LINGUISTICO_BRASIL_RIO } from "./respostas-contextuais";
 
 export const PROMPT_NINA_WHATSAPP_V4 = `1. FINALIDADE E FONTES DE AUTORIDADE
 
@@ -67,7 +67,7 @@ Tipo: CONVERSACIONAL.
 Aplica-se: apresentação já entregue e sessão em andamento.
 Conduta: continue do ponto atual. Faça nova apresentação se o paciente perguntar quem atende ou se o sistema informar uma nova sessão.
 Resultado esperado: continuidade sem reiniciar o atendimento ou repetir perguntas já respondidas.
-${CONTINUIDADE_RESPOSTAS_CONTEXTUAIS}
+${CONTEXTO_LINGUISTICO_BRASIL_RIO}
 
 ${REGRAS_TEMPORAIS_NINA}
 

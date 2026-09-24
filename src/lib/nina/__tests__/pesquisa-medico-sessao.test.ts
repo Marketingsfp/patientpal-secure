@@ -38,6 +38,22 @@ const pendente: ConhecimentoSessao = {
 };
 const contexto = (mensagem: string, content = pergunta) => ({ mensagem, historico: [{ role: "assistant", content }] });
 describe("confirmação da única opção realmente apresentada", () => {
+  it("concordância com pergunta negativa exige esclarecer o sentido", () => {
+    const perguntaNegativa = "Você não quer Sandro Prinscewal?";
+    const negativa = { ...pendente, esclarecimento: { ...pendente.esclarecimento!, pergunta: perguntaNegativa } };
+    expect(confirmarProfissionalDaPergunta(negativa, contexto("sim", perguntaNegativa))).toBeNull();
+    expect(confirmarProfissionalDaPergunta(negativa, contexto("já é", perguntaNegativa))).toBeNull();
+  });
+  it.each(["já é", "formou", "demorou", "combinado", "tá ok"])("concordância informal exige um médico único e pergunta entregue: %s", mensagem => {
+    expect(confirmarProfissionalDaPergunta(pendente, contexto(mensagem))?.registro).toBe("sandro");
+    expect(confirmarProfissionalDaPergunta(pendente, { mensagem, historico: [] })).toBeNull();
+    expect(confirmarProfissionalDaPergunta({ ...pendente, esclarecimento: {
+      ...pendente.esclarecimento!, opcoes: [...pendente.esclarecimento!.opcoes, { id: "outro", nome: "Outro médico" }],
+    } }, contexto(mensagem))).toBeNull();
+  });
+  it.each(["nn", "quero não", "esse msm nn", "formou, mas outro médico", "ainda", "pdc", "valeu"])("não escolhe médico por recusa ou ciência: %s", mensagem => {
+    expect(confirmarProfissionalDaPergunta(pendente, contexto(mensagem))).toBeNull();
+  });
   it.each(["Isso", "esse mesmo", "esse", "sim", "Confirmo", "é esse", "esse msm", "ss", "s", "simmm!", "isssooo", "isso aí", "é ele", "aham", "uhum", "blz", "fechou", "Sim, por favor!"])("identifica Sandro e preserva a consulta: %s", mensagem => {
     const r = JSON.parse(prepararPesquisaMedicoDaSessao("consultar_base_conhecimento", '{"termo":"Sandro","medico":"Sandro"}', pendente, contexto(mensagem))!);
     expect(r).toMatchObject({ termo: "clinica medica", medico: "sandro", tipo_atendimento: "consulta", nova_solicitacao: false });

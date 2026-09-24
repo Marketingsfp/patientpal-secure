@@ -163,6 +163,23 @@ beforeEach(() => {
   falharAposPrimeiraPagina = false;
 });
 
+describe("título genérico publicado não equivale a atendimento ausente", () => {
+  it("esclarece PROCEDIMENTOS sem escolher uma consulta ou reservar o grupo", async () => {
+    banco.nina_cat_servicos.push(servico({ id: "grupo-procedimentos", nome: "PROCEDIMENTOS" }));
+    const r = await buscarNoCatalogo({ clinicaId: CLINICA, query: "procedimentos", tipo_atendimento: "exame_procedimento" });
+    expect(r.found).toBe(true);
+    expect(r.records.map(x => x.id)).toEqual(["grupo-procedimentos"]);
+    expect(r.esclarecimento).toMatchObject({ tipo: "procedimento", opcoes: [] });
+    expect(r.esclarecimento?.pergunta).toContain("Qual procedimento");
+  });
+  it("não cria um grupo inexistente nem usa publicação de outra clínica", async () => {
+    banco.nina_cat_servicos.push(servico({ nome: "PROCEDIMENTOS", clinica_id: "outra-clinica" }));
+    const r = await buscarNoCatalogo({ clinicaId: CLINICA, query: "procedimentos", tipo_atendimento: "exame_procedimento" });
+    expect(r.found).toBe(false);
+    expect(r.esclarecimento).toBeUndefined();
+  });
+});
+
 const idSequencial = (n: number) => `00000000-0000-0000-0000-${String(n).padStart(12, "0")}`;
 
 describe("consulta com preventivo no índice público", () => {

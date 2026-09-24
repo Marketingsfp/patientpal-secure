@@ -38,7 +38,7 @@ describe("modalidades oficiais de atendimento", () => {
       expect(r.texto).toContain("10:20");
       expect(r.texto).toContain("Uma hora antes");
       expect(r.texto).toContain("A Clínica Teste agradece");
-      expect(r.texto.includes("15 minutos")).toBe(modo !== "chegada_com_pre_agendamento");
+      expect(r.texto.includes("30 minutos")).toBe(modo !== "chegada_com_pre_agendamento");
       if (modo === "chegada_com_pre_agendamento") {
         expect(r.texto).toContain("quem chegar primeiro");
         expect(r.texto).toContain("entre os pacientes daquele horário");
@@ -57,14 +57,17 @@ describe("modalidades oficiais de atendimento", () => {
     expect(resultadoAgendamentoConfirmado({ appointment_id: "indevido", modalidade_atendimento: "chegada_sem_pre_agendamento" }, estadoVazio(), "Clínica")).toBeNull();
     const r = textoDaChave("fluxo.agendamento.sem_pre_agendamento", { profissional: "Dra. Ana", unidade: "Clínica" });
     expect(r.texto).toContain("Não é necessário marcar horário");
-    expect(r.texto).not.toMatch(/15|antecedência|confirmar se você/);
+    expect(r.texto).not.toMatch(/15|30|antecedência|confirmar se você/);
   });
   test("template publicado recebe o atendimento completo conferido, mantendo suas orientações", () => {
-    const textos = { "fluxo.agendamento.confirmado": "Reserva confirmada com {profissional}, {data} às {horario}. Traga documento." };
+    const textos = { "fluxo.agendamento.confirmado": "Reserva confirmada com {profissional}, {data} às {horario}. Traga documento. Chegue com 15 minutos de antecedência. Duração: 15 minutos." };
     const r = resultadoAgendamentoConfirmado({ appointment_id: "ag1", modalidade_atendimento: "hora_marcada",
       date: "22/09/2026", time: "10:40", medico: "Conceição Martins", agendamento: { procedimento: "CONSULTA + PREVENTIVO — GINECOLOGIA" } },
       estadoVazio(), "Clínica", textos)!;
     expect(r.texto).toContain("Traga documento.");
+    expect(r.texto).toContain("Chegue com 30 minutos de antecedência.");
+    expect(r.texto).toContain("Duração: 15 minutos.");
+    expect(r.texto).not.toContain("Chegue com 15 minutos");
     expect(r.texto).toContain("*Atendimento:* CONSULTA + PREVENTIVO — GINECOLOGIA");
     expect(r.texto.match(/CONSULTA \+ PREVENTIVO/g)).toHaveLength(1);
     expect(textoDaChave(r.chaveTemplate!, r.variaveis, textos).texto).toBe(r.texto);

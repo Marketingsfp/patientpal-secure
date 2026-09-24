@@ -2,14 +2,16 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { PGlite } from "@electric-sql/pglite";
-import { PROMPT_NINA_WHATSAPP_V4 } from "../src/lib/nina/prompt/behavior-v4";
 import { CONTINUIDADE_RESPOSTAS_ANTERIOR, CONTINUIDADE_RESPOSTAS_CONTEXTUAIS } from "../src/lib/nina/prompt/respostas-contextuais";
 import { validarTemplateInstrucoes } from "../src/lib/nina/instrucoes-template";
 import { MIGRATION_RESPOSTAS_CONTEXTUAIS, gerarMigrationRespostasContextuais } from "./nina/gerar-respostas-contextuais";
 const migration = readFileSync(MIGRATION_RESPOSTAS_CONTEXTUAIS, "utf8");
 assert.equal(migration, gerarMigrationRespostasContextuais());
 const identidade = "[IDENTIDADE DO ATENDIMENTO]\nNome da atendente virtual: Nina\nNome do estabelecimento: Menino Jesus\nTipo do estabelecimento: Policlínica\n[/IDENTIDADE DO ATENDIMENTO]\n\n";
-const anterior = identidade + PROMPT_NINA_WHATSAPP_V4.replace(CONTINUIDADE_RESPOSTAS_CONTEXTUAIS, CONTINUIDADE_RESPOSTAS_ANTERIOR);
+// Esta migration é histórica. Não dependa do prompt atual, que pode substituir
+// o bloco por instruções posteriores ou ter outro tamanho.
+const outrasRegras = "\nOUTRAS INSTRUÇÕES: preserve identidade e requisitos do agendamento.\n";
+const anterior = identidade + outrasRegras + CONTINUIDADE_RESPOSTAS_ANTERIOR;
 const db = new PGlite();
 try {
   await db.exec(`CREATE TABLE nina_instrucoes_versoes(id uuid PRIMARY KEY DEFAULT gen_random_uuid(),clinica_id uuid,
@@ -24,7 +26,7 @@ try {
     ...a, status: a.escopo === "whatsapp" ? "arquivada" : a.status,
   });
   const nova = depois.find(d => d.versao === 47)!;
-  assert.equal(nova.conteudo, identidade + PROMPT_NINA_WHATSAPP_V4);
+  assert.equal(nova.conteudo, identidade + outrasRegras + CONTINUIDADE_RESPOSTAS_CONTEXTUAIS);
   assert.equal(nova.versao_anterior_id, antes.find(a => a.escopo === "whatsapp")!.id);
   assert.ok(validarTemplateInstrucoes("whatsapp", String(nova.conteudo)).ok);
   await db.exec(migration);

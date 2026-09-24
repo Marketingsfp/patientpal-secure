@@ -65,6 +65,7 @@ export type EstadoFluxoNina = {
     doctor_name: string | null;
     specialty: string | null;
     procedure: string | null;
+    procedimento_solicitado?: import("./procedimento-sessao").ProcedimentoSolicitado | null;
     date: string | null;
     time: string | null;
     slot_inicio: string | null;

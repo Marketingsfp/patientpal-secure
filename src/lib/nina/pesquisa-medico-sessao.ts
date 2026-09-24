@@ -1,6 +1,6 @@
 import type { ConhecimentoSessao } from "./confidence/conhecimento-sessao";
 import { normalizarBuscaCatalogo, termosItemCatalogo } from "./catalogo-sem-registro";
-import { ehRespostaAfirmativaCurta } from "./resposta-afirmativa";
+import { ehRespostaAfirmativaCurta, normalizarRespostaInformal } from "./resposta-afirmativa";
 
 type ContextoResposta = {
   mensagem: string;
@@ -18,6 +18,7 @@ export function confirmarProfissionalDaPergunta(
     !anterior ||
     pendente?.tipo !== "profissional" ||
     pendente.opcoes.length !== 1 ||
+    /\b(?:nao|nem)\b/.test(normalizarRespostaInformal(pendente.pergunta)) ||
     !ehRespostaAfirmativaCurta(contexto.mensagem)
   )
     return null;

@@ -10,6 +10,9 @@ import { recusarFraseComoPesquisa } from "../../catalogo-pesquisa";
 process.env.LOVABLE_API_KEY = "chave-ficticia-sem-rede";
 const teste = process.argv[2] === "homologacao";
 const cenario = process.argv[3] ?? "direta";
+const clinicoGeral = cenario.startsWith("catalogo_clinico_geral_");
+const procedimentoExecutante = cenario === "procedimento_executante";
+const medicoClinico = cenario.endsWith("carlos") ? "Carlos Alberto Varillas" : cenario.endsWith("milton") ? "Milton Guimarães" : "Ana Souza";
 const contextual = cenariosContextuais[cenario];
 const regraCatalogo = cenario.startsWith("catalogo_");
 const sfp = cenario.startsWith("catalogo_sfp");
@@ -62,6 +65,14 @@ const catalogoInterpretado: Record<string, any[]> = {
     executantes: [], formas_pagamento: [], valor: null,
   })),
 };
+if (clinicoGeral) {
+  catalogoInterpretado.nina_cat_profissionais = [{
+    id: "catalogo-clinico", medico_id: "medico-clinico", clinica_id: "clinica-simulada", status: "PUBLICADO", nome: medicoClinico,
+    especialidades: [{ nome: "CLINICO GERAL" }], formas_pagamento: [], horarios: [], convenios: [],
+    observacao_publica: `CONSULTA CLINICO GERAL\nEspecialidade: CLINICO GERAL\nDinheiro: R$ 120,00\nObservação: ${cenario.endsWith("carlos") ? "Ficha — 15 vagas" : "Agendado"}`,
+  }];
+  catalogoInterpretado.medicos = [{ id: "medico-clinico", nome: medicoClinico, clinica_id: "clinica-simulada", ativo: true }];
+}
 if (interpretacao?.publicado === "ODONTOLOGIA") catalogoInterpretado.nina_cat_profissionais = ["Jean Ferreira", "Raiani", "Karen"].map((nome, i) => ({
   id: `medico-${i}`, clinica_id: "clinica-simulada", status: "PUBLICADO", nome,
   especialidades: [{ nome: "ODONTOLOGIA" }], tipo_atendimento: "Avaliação odontológica",
@@ -91,7 +102,7 @@ const resumoEscolhido = ["escolha_pre", "escolha_ficha"].includes(cenario)
     { profissional: "Dr. Jorge Ribeiro", procedimento: "Consulta", data: "21/01/2030", horario: "10:20", unidade: "Clínica simulada" }).texto
   : "Confira: Consulta Cardiologia com Dr. Jorge Ribeiro, dia 21/01/2030, às 10:20. Você confirma?";
 const agenda = cenario !== "direta" && !regraCatalogo;
-const pergunta = confirmacaoMedico ? process.argv[4] ?? "Isso" : escolhaMedico ? cenario.endsWith("resolvido") ? "Quero a Shirley" : "quero a Suellen" : interpretacao ? interpretacao.mensagem : esclarecer ? cenario.endsWith("primeiro") ? "Quero exame XYZ" : cenario.endsWith("resolvido") ? "Eletrocardiograma" : "Não sei explicar" : contextual ? contextual.pergunta : (sfp && cenario.endsWith("modelo")) || (ausente && cenario.includes("modelo")) ? "oi"
+const pergunta = clinicoGeral ? `Quero clínico geral com ${medicoClinico} na primeira data disponível.` : confirmacaoMedico ? process.argv[4] ?? "Isso" : escolhaMedico ? cenario.endsWith("resolvido") ? "Quero a Shirley" : "quero a Suellen" : interpretacao ? interpretacao.mensagem : esclarecer ? cenario.endsWith("primeiro") ? "Quero exame XYZ" : cenario.endsWith("resolvido") ? "Eletrocardiograma" : "Não sei explicar" : contextual ? contextual.pergunta : (sfp && cenario.endsWith("modelo")) || (ausente && cenario.includes("modelo")) ? "oi"
   : ausente ? cenario.endsWith("dado_pessoal") ? "Meu nome é João Silva"
     : cenario.endsWith("misto") ? "Qual o valor do eletrocardiograma e da consulta de pneumologia?"
     : cenario.endsWith("generico") ? "Quero marcar uma consulta"
@@ -110,6 +121,13 @@ const estadoContextual = { ...estadoVazio(), session_id: "sessao-contextual",
   session_started_at: new Date(agora - 30 * 60_000).toISOString(),
   updated_at: new Date(agora).toISOString(),
 };
+if (procedimentoExecutante) {
+  estadoContextual.appointment.procedimento_solicitado = { clinica_id: "clinica-simulada", session_id: "sessao-contextual",
+    catalogo_id: "servico-bio", nome: "Bioimpedância", tipo_atendimento: "exame_procedimento" };
+  estadoContextual.knowledge_context = { versao: 1, clinicaId: "clinica-simulada", sessionId: "sessao-contextual",
+    consulta: { termo: "Bioimpedância", tipo_atendimento: "exame_procedimento" },
+    referencias: [{ registro: "servico-bio", versao: null, procedimento: "Bioimpedância", medicoNome: "Mariana Portugal" }] };
+}
 if (esclarecer && !cenario.endsWith("primeiro"))
   estadoContextual.knowledge_context = {
     versao: 1,
@@ -211,9 +229,9 @@ mock.module("@/integrations/supabase/client.server", () => ({
         upsert: (valor: any) => { gravacoes.push({ tabela, valor }); return q; },
         update: (valor: any) => { gravacoes.push({ tabela, valor }); return q; },
         then: (resolve: any) => Promise.resolve(resolve({
-          data: (interpretacao || escolhaMedico) && catalogoInterpretado[tabela] ? catalogoInterpretado[tabela]!.filter(l => filtrosCatalogo.every(f => f(l))).slice(0, limiteCatalogo)
+          data: (interpretacao || escolhaMedico || clinicoGeral) && catalogoInterpretado[tabela] ? catalogoInterpretado[tabela]!.filter(l => filtrosCatalogo.every(f => f(l))).slice(0, limiteCatalogo)
             : tabela === "clinicas" ? { nome: "Clínica simulada", base_importada: false }
-            : (contextual || esclarecer || escolhaMedico || variantePreventivo) && tabela === "atend_conversas" ? { id: "conversa-contextual", nina_fluxo_estado: estadoContextual }
+            : (contextual || esclarecer || escolhaMedico || variantePreventivo || clinicoGeral || procedimentoExecutante) && tabela === "atend_conversas" ? { id: "conversa-contextual", nina_fluxo_estado: estadoContextual }
             : (contextual || confirmacaoMedico) && tabela === "whatsapp_mensagens" ? mensagensContextuais
             : unica ? null : [], error: null,
           count: (contextual || confirmacaoMedico) && tabela === "whatsapp_mensagens" ? mensagensContextuais.length : 0,
@@ -224,7 +242,7 @@ mock.module("@/integrations/supabase/client.server", () => ({
     rpc: async () => ({ data: [], error: null }),
   },
 }));
-mock.module("@/lib/nina/agenda-flag.server", () => ({ ferramentasAgendaAtivas: async () => escolhaHorario }));
+mock.module("@/lib/nina/agenda-flag.server", () => ({ ferramentasAgendaAtivas: async () => escolhaHorario || clinicoGeral }));
 mock.module("@/lib/nina/atendimento-fase1.server", () => ({ flagFluxoFase1Ativa: async () => false }));
 mock.module("@/lib/nina/atendimento-fase3.server", () => ({ flagFluxoFase3Ativa: async () => false }));
 mock.module("@/lib/nina/atendimento-fase6.server", () => ({ flagFluxoFase6Ativa: async () => false }));
@@ -268,6 +286,34 @@ mock.module("@/lib/nina/tool-broker.server", () => ({ criarToolBroker: (params: 
     ordem.push(nome);
     argumentosFerramentas.push({ nome, args: typeof args === "string" ? JSON.parse(args) : args });
     ferramentas.push(nome);
+    if (procedimentoExecutante) {
+      const r = { ferramenta: nome, capacidade: "listCatalog", fonte: "base_conhecimento", success: true, reused: false,
+        dados: { ok: true, found: true, knowledge_status: "found", source: "nina_catalogo", source_type: "catalog",
+          tipo_atendimento: "exame_procedimento", procedure: "Bioimpedância",
+          pedido_interpretado: { atendimento: "Bioimpedância", tipo_atendimento: "exame_procedimento" },
+          registros: [{ id: "servico-bio", tipo: "servico", procedimento: "Bioimpedância", medico: "Mariana Portugal" }],
+          vinculos_agenda: [{ catalogo_id: "servico-bio", medico_id: "medico-mariana", situacao: "vinculado" }] } };
+      resultados.push(r); return r;
+    }
+    if (clinicoGeral) {
+      const p = argumentosFerramentas.at(-1)!.args;
+      if (nome === "proxima_vaga") {
+        const { modalidadePublicadaDoMedico } = await import("../../vinculo-catalogo-agenda.server");
+        const consulta = params.ctxPaciente.estado.knowledge_context?.consulta;
+        const modalidade = await modalidadePublicadaDoMedico("clinica-simulada", "medico-clinico", { atendimento: consulta?.termo ?? "" });
+        const r = { ferramenta: nome, capacidade: "checkAvailability", fonte: "agenda", success: true, reused: false,
+          dados: { ok: true, modalidade_atendimento: modalidade, consulta_preservada: consulta, horarios: [{ data: "2030-01-21", hora: "10:20" }] } };
+        resultados.push(r);
+        return r;
+      }
+      const { searchKnowledgeBase } = await import("../../knowledge.server");
+      const dados = await searchKnowledgeBase({ clinicaId: "clinica-simulada", query: p.termo ?? p.especialidade,
+        tipo_atendimento: "consulta", medico: p.medico ?? p.nome });
+      const r = { ferramenta: nome, capacidade: nome === "buscar_medicos" ? "listCatalog" : "searchKnowledgeBase", fonte: "base_conhecimento",
+        success: true, reused: false, dados: { ok: true, ...dados } };
+      resultados.push(r);
+      return r;
+    }
     if (["falha_vinculo", "falha_selecao"].includes(cenario) && nome !== "solicitar_atendente_humano") return {
       ferramenta: nome, capacidade: "checkAvailability", fonte: "agenda", success: false,
       reused: false, appointment_confirmed: false, erro: "ACTION_NOT_AUTHORIZED",
@@ -387,6 +433,17 @@ mock.module("@/lib/nina/tool-broker.server", () => ({ criarToolBroker: (params: 
 mock.module("@/lib/nina/ai-gateway.server", () => ({ ninaAIGateway: async (req: any) => {
   ordem.push("modelo");
   requests.push(structuredClone(req));
+  if (procedimentoExecutante) return { ok: true, conteudo: requests.length === 1 ? "" : "Mariana Portugal realiza Bioimpedância.",
+    modelo: "modelo-simulado", execucaoId: "execucao-direta", nivel: "low",
+    toolCalls: requests.length === 1 ? [{ id: "executante", type: "function", function: { name: "buscar_medicos",
+      arguments: JSON.stringify({ nome: "Mariana Portugal", especialidade: "Nutrição" }) } }] : [] };
+  if (clinicoGeral) {
+    const chamada = requests.length === 1 ? { name: "consultar_base_conhecimento", arguments: JSON.stringify({ termo: "Clínica Médica", tipo_atendimento: "consulta" }) }
+      : requests.length === 2 ? { name: "buscar_medicos", arguments: JSON.stringify({ nome: medicoClinico }) }
+      : requests.length === 3 ? { name: "proxima_vaga", arguments: JSON.stringify({ medico_id: "medico-clinico", especialidade: "Clínica Geral" }) } : null;
+    return { ok: true, conteudo: chamada ? "" : "Encontrei o atendimento de Clínico Geral e consultei a agenda.", modelo: "modelo-simulado", execucaoId: "execucao-direta", nivel: "low",
+      toolCalls: chamada ? [{ id: `clinico-${requests.length}`, type: "function", function: chamada }] : [] };
+  }
   if (escolhaMedico) return {
     ok: true, conteudo: confirmacaoMedico ? "Vamos continuar com Sandro Prinscewal para Clínico Geral." : "Vamos continuar com Shirley Martins.", modelo: "modelo-simulado", execucaoId: "execucao-direta", nivel: "low",
     toolCalls: requests.length === 1 ? [
@@ -511,7 +568,7 @@ mock.module("@/lib/nina/resposta/templates.server", () => ({
 
 const { gerarRespostaNina } = await import("@/lib/whatsapp.server");
 const auditoria: any = {};
-const resposta = await gerarRespostaNina("clinica-simulada", pergunta, contextual || esclarecer || escolhaMedico || variantePreventivo ? "55000100999" : null, {
+const resposta = await gerarRespostaNina("clinica-simulada", procedimentoExecutante ? "Quero com Mariana Portugal" : pergunta, contextual || esclarecer || escolhaMedico || variantePreventivo || clinicoGeral || procedimentoExecutante ? "55000100999" : null, {
   teste, ambiente: teste ? "homologacao" : "producao",
   ...(cenario === "escolha_sem_auditoria" ? {} : { auditoria }),
   mensagensEntrada: ["entrada-simulada"],
