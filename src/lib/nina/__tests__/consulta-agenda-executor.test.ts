@@ -313,6 +313,14 @@ beforeEach(() => {
   };
 });
 
+function vincularProcedimentoTeste(servico: Linha) {
+  servico.procedimento_id = "procedimento-operacional";
+  banco.procedimentos = [{ id: "procedimento-operacional", clinica_id: CLINICA, ativo: true, tipo: "exame", nome: "Nome operacional diferente" }];
+  banco.medico_agenda_procedimentos = [{ clinica_id: CLINICA, procedimento_id: "procedimento-operacional", agenda_id: "agenda-exame" }];
+  banco.medico_agendas = [{ id: "agenda-exame", clinica_id: CLINICA, medico_id: MEDICO, ativo: true, ordem_chegada: false }];
+  banco.agendamentos![0]!.agenda_id = "agenda-exame";
+}
+
 describe("procedimentos do Lead 01 não viram consultas", () => {
   async function iniciar(nome = "Bioimpedância", medico = "Mariana Portugal") {
     banco.medicos![0]!.nome = medico;
@@ -321,6 +329,7 @@ describe("procedimentos do Lead 01 não viram consultas", () => {
     const servico = { id: PACIENTE, clinica_id: CLINICA, status: "PUBLICADO", nome,
       executantes: [{ nome: medico }], estrutura: estruturaModalidadeServico(nome),
       valor: 100, formas_pagamento: [], descricao_publica: null, valor_observacao: null, preparo: null, restricoes: null };
+    vincularProcedimentoTeste(servico);
     banco.nina_cat_servicos!.push(servico);
     resultadoCatalogo = { ...resultadoCatalogo, tipo_atendimento: "exame_procedimento", procedure: nome,
       records: [servicoParaRegistro(servico as ServicoPublicado)], doctors: [medico] };
@@ -382,6 +391,7 @@ describe("procedimentos do Lead 01 não viram consultas", () => {
   test("modalidade da consulta não supre modalidade ausente no procedimento", async () => {
     const { ctx, servico } = await iniciar();
     servico.estrutura.complementos = [];
+    banco.medico_agendas![0]!.ordem_chegada = null;
     banco.nina_cat_profissionais![0]!.tipo_atendimento = "Hora marcada";
     const r = await executarFerramentaPaciente(ctx, "proxima_vaga", { medico_id: MEDICO });
     expect(r).toMatchObject({ ok: false, erro: "MODALIDADE_NAO_DEFINIDA" });
@@ -437,6 +447,30 @@ describe("procedimentos do Lead 01 não viram consultas", () => {
     expect(r).toMatchObject({ ok: false, codigo: "ATENDIMENTO_AGENDA_NAO_VINCULADO" });
     expect(consultasAgenda()).toHaveLength(0);
   });
+  test("sigla CVC preserva ID e exclui outra agenda do mesmo executante", async () => {
+    const { ctx } = await iniciar("CVC (CAMPO VISUAL COMPUTADORIZADO)");
+    banco.agendamentos!.unshift({ ...banco.agendamentos![0], id: "outra-vaga", agenda_id: "outra-agenda",
+      inicio: new Date(inicio.getTime() - 3600000).toISOString() });
+    ctx.consultaAgenda!.mensagemAtual = "o primeiro disponível";
+    const r = await executarFerramentaPaciente(ctx, "consultar_primeiro_disponivel", { tipo: "procedimento", atendimento: "CVC" });
+    expect(r.ok, JSON.stringify(r)).toBe(true);
+    expect(r.proxima).toMatchObject({ inicio: inicio.toISOString() });
+    expect(ctx.estado!.appointment.slot_options?.vagas[0]).toMatchObject({ procedimento_id: "procedimento-operacional", agenda_id: "agenda-exame" });
+    expect(gravacoes).toHaveLength(0);
+  });
+  test.each(["sem_id", "outra_clinica", "inativo", "consulta", "sem_agenda", "agenda_inativa", "vinculo_alterado"])("%s é pendência de vínculo, não falta de vagas", async caso => {
+    const { ctx, servico } = await iniciar();
+    if (caso === "sem_id") (servico as Linha).procedimento_id = null;
+    if (caso === "outra_clinica") banco.procedimentos![0]!.clinica_id = OUTRO;
+    if (caso === "inativo") banco.procedimentos![0]!.ativo = false;
+    if (caso === "consulta") banco.procedimentos![0]!.tipo = "consulta";
+    if (caso === "sem_agenda") banco.medico_agenda_procedimentos = [];
+    if (caso === "agenda_inativa") banco.medico_agendas![0]!.ativo = false;
+    if (caso === "vinculo_alterado") ctx.estado!.appointment.procedimento_solicitado!.procedimento_id = "outro-id";
+    const r = await executarFerramentaPaciente(ctx, "proxima_vaga", { medico_id: MEDICO });
+    expect(r).toMatchObject({ ok: false, codigo: "PROCEDIMENTO_AGENDA_NAO_VINCULADO", encaminhar_para_humano: true });
+    expect(gravacoes).toHaveLength(0);
+  });
   test("primeiro disponível com executante genérico sem vínculo informa falha da agenda do procedimento", async () => {
     const { ctx, servico } = await iniciar("Mamografia");
     servico.executantes = [{ nome: "Técnica" }];
@@ -445,6 +479,25 @@ describe("procedimentos do Lead 01 não viram consultas", () => {
     expect(r.erro).not.toBe("DOCTOR_NOT_FOUND");
     expect(gravacoes).toHaveLength(0);
     expect(consultasAgenda()).toHaveLength(0);
+  });
+  test("alterar o vínculo após o aceite não grava outra identidade", async () => {
+    const { ctx, servico } = await iniciar();
+    const r = await escolher(ctx);
+    aceitarResumoEntregue(ctx.estado!, CLINICA, [{ role: "assistant", content: String(r.resumo_confirmacao) }]);
+    (servico as Linha).procedimento_id = "procedimento-substituto";
+    const gravado = await executarFerramentaPaciente(ctx, "agendar", { ...argumentosAgendar, procedimento: "Bioimpedância" });
+    expect(gravado).toMatchObject({ ok: false, codigo: "PROCEDIMENTO_AGENDA_NAO_VINCULADO" });
+    expect(gravacoes).toHaveLength(0);
+  });
+  test("renomear a publicação não quebra o vínculo operacional já selecionado", async () => {
+    const { ctx, servico } = await iniciar();
+    const r = await escolher(ctx);
+    aceitarResumoEntregue(ctx.estado!, CLINICA, [{ role: "assistant", content: String(r.resumo_confirmacao) }]);
+    servico.nome = "Bioimpedância corporal";
+    servico.estrutura = estruturaModalidadeServico(servico.nome);
+    const gravado = await executarFerramentaPaciente(ctx, "agendar", { ...argumentosAgendar, procedimento: "Bioimpedância" });
+    expect(gravado).toMatchObject({ ok: true, atendimento: { procedimento_id: "procedimento-operacional" } });
+    expect(gravacoes).toHaveLength(1);
   });
   test("releitura detecta serviço gravado divergente e não anuncia sucesso", async () => {
     const { ctx } = await iniciar();
@@ -643,6 +696,7 @@ describe("primeiro disponível entre todos os profissionais publicados", () => {
     banco.nina_cat_servicos!.push({ id: PACIENTE, clinica_id: CLINICA, status: "PUBLICADO", nome: "Exame Teste",
       estrutura: estruturaModalidadeServico("Exame Teste"),
       executantes: [{ nome: "Alex Louza" }], formas_pagamento: [{ forma: "Dinheiro", valor: 80 }], valor: 80 });
+    vincularProcedimentoTeste(banco.nina_cat_servicos![0]!);
     const { ctx, resultado } = chamar("primeiro disponível", { tipo: "procedimento", atendimento: "Exame Teste" });
     const r = await resultado;
     expect(r.proxima).toMatchObject({ medico_id: MEDICO, registro: { procedimento: "Exame Teste", preco_dinheiro: 80 } });
@@ -1067,6 +1121,7 @@ describe("executor real das ferramentas com banco simulado", () => {
   test("procedimento mantém executante e nome próprios entre turnos", async () => {
     banco.nina_cat_servicos!.push({ id: CATALOGO, clinica_id: CLINICA, status: "PUBLICADO", nome: "USG TRANSVAGINAL",
       estrutura: estruturaModalidadeServico("USG TRANSVAGINAL"), executantes: [{ nome: "Alex Louza" }] });
+    vincularProcedimentoTeste(banco.nina_cat_servicos![0]!);
     const ctx: CtxNinaPaciente = { ...contexto("Primeira data"), podeAgendar: true };
     ctx.estado!.knowledge_context = { versao: 1, clinicaId: CLINICA, sessionId: ctx.estado!.session_id!,
       consulta: { termo: "USG TRANSVAGINAL", tipo_atendimento: "exame_procedimento" },

@@ -8,6 +8,7 @@ export type VagaAgendamento = {
   especialidade?: string | null;
   procedimento: string | null;
   catalogo_id?: string | null;
+  procedimento_id?: string | null;
   tipo_atendimento?: "consulta" | "exame_procedimento";
   data: string;
   hora: string;
@@ -163,7 +164,7 @@ const mesmoInstante = (a: string | null | undefined, b: string) =>
 
 function mesmaVaga(a: VagaAgendamento, b: VagaAgendamento) {
   return a.medico_id === b.medico_id && a.procedimento === b.procedimento &&
-    a.catalogo_id === b.catalogo_id && a.tipo_atendimento === b.tipo_atendimento &&
+    a.catalogo_id === b.catalogo_id && a.procedimento_id === b.procedimento_id && a.tipo_atendimento === b.tipo_atendimento &&
     a.data === b.data && a.hora === b.hora && a.modalidade === b.modalidade &&
     a.agenda_id === b.agenda_id && mesmoInstante(a.inicio, b.inicio) && mesmoInstante(a.fim, b.fim);
 }

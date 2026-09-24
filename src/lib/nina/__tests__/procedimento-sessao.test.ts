@@ -16,6 +16,16 @@ function iniciar() {
 }
 
 describe("identidade do procedimento na sessão", () => {
+  test("ID operacional sobrevive à serialização e recusa mesmo nome com outro ID", () => {
+    const r = resultado(); r.records[0]!.extras = { procedimento_id: "proc-123" };
+    const estado = estadoVazio(); estado.session_id = "sessao-1";
+    lembrarProcedimentoSolicitado(estado, "clinica-1", r);
+    const restaurado = normalizarEstado(JSON.parse(JSON.stringify(estado)));
+    expect(procedimentoDaSessao(restaurado, "clinica-1")?.procedimento_id).toBe("proc-123");
+    const vaga = { procedimento: "Ecocardiograma", catalogo_id: "servico-1", tipo_atendimento: "exame_procedimento", procedimento_id: "proc-123" };
+    expect(vagaPreservaProcedimento(restaurado, "clinica-1", vaga)).toBe(true);
+    expect(vagaPreservaProcedimento(restaurado, "clinica-1", { ...vaga, procedimento_id: "outro" })).toBe(false);
+  });
   test("sobrevive à serialização e às pesquisas auxiliares", () => {
     const estado = normalizarEstado(JSON.parse(JSON.stringify(iniciar())));
     lembrarProcedimentoSolicitado(estado, "clinica-1", resultado("consulta-2", "Cardiologia"));

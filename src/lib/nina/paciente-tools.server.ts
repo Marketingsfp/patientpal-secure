@@ -38,6 +38,7 @@ import { normalizar, raizEspecialidade } from "@/lib/nina-especialidade";
 import { cadastroAutorizado, cadastroMinimoSchema } from "./cadastro-paciente";
 import { conhecimentoDaMesmaSessao } from "./confidence/conhecimento-sessao";
 import { procedimentoDaSessao, lembrarProcedimentoSolicitado, vagaPreservaProcedimento } from "./procedimento-sessao";
+import { agendasDoProcedimento, resolverProcedimentoOperacional, VinculoProcedimentoError } from "./procedimento-agenda.server";
 import { normalizarSelecaoContextual } from "./confidence/selecao-contextual";
 import type { EscopoAtendimentoConsulta } from "./atendimento-consulta";
 import { consultarCadastroConfirmado } from "./cadastro-paciente.server";
@@ -417,7 +418,7 @@ async function vinculoProcedimentoAtual(ctx: CtxNinaPaciente, medicoId: string) 
   const { candidatosPrimeiraVaga } = await import("./primeiro-disponivel-catalogo.server");
   const candidatos = await candidatosPrimeiraVaga(ctx.clinicaId, "procedimento",
     [{ registro: pedido.catalogo_id, procedimento: pedido.nome }]);
-  return candidatos.some(c => c.medicoId === medicoId && c.registro.id === pedido.catalogo_id && c.registro.procedimento === pedido.nome);
+  return candidatos.some(c => c.medicoId === medicoId && c.registro.id === pedido.catalogo_id);
 }
 
 async function guardarOpcoes(ctx: CtxNinaPaciente, slots: SlotNina[], procedimentos?: ReadonlyMap<string, string>) {
@@ -429,8 +430,8 @@ async function guardarOpcoes(ctx: CtxNinaPaciente, slots: SlotNina[], procedimen
     const { candidatosPrimeiraVaga } = await import("./primeiro-disponivel-catalogo.server");
     const candidatos = await candidatosPrimeiraVaga(ctx.clinicaId, "procedimento",
       [{ registro: pedido.catalogo_id, procedimento: pedido.nome }]);
-    publicados = new Map(candidatos.filter(c => c.medicoId && c.registro.id === pedido.catalogo_id &&
-      c.registro.procedimento === pedido.nome).map(c => [c.medicoId!, pedido.nome]));
+    publicados = new Map(candidatos.filter(c => c.medicoId && c.registro.id === pedido.catalogo_id)
+      .map(c => [c.medicoId!, pedido.nome]));
   } else if (!publicados && conhecimento && slots.length) {
     // A referência persistida é uma pesquisa, não um fato antigo: releia a
     // publicação e associe cada atendimento ao UUID operacional do executante.
@@ -459,7 +460,8 @@ async function guardarOpcoes(ctx: CtxNinaPaciente, slots: SlotNina[], procedimen
     medico_id: s.medico_id, medico: s.medico_nome, especialidade: s.especialidade,
     procedimento: publicados ? publicados.get(s.medico_id) ?? null :
       (ctx.estado?.appointment.doctor_id === s.medico_id ? ctx.estado.appointment.procedure : null),
-    ...(pedido ? { catalogo_id: pedido.catalogo_id, tipo_atendimento: pedido.tipo_atendimento } : {}),
+    ...(pedido ? { catalogo_id: pedido.catalogo_id, procedimento_id: pedido.procedimento_id,
+      tipo_atendimento: pedido.tipo_atendimento } : {}),
     data: dataISODoSlot(s.inicio), hora: s.hora, inicio: s.inicio, fim: s.fim,
     modalidade: s.modalidade, agenda_id: s.agenda,
   }]);
@@ -473,6 +475,7 @@ async function guardarOpcoes(ctx: CtxNinaPaciente, slots: SlotNina[], procedimen
 }
 
 export type SlotNina = {
+  procedimento_id?: string;
   medico_id: string;
   medico_nome: string;
   especialidade: string | null;
@@ -491,6 +494,7 @@ export type SlotNina = {
  */
 export async function consultarDisponibilidadeCore(params: {
   clinicaId: string;
+  procedimentoId?: string;
   especialidadeId?: string | null;
   medicoId?: string | null;
   dias?: number;
@@ -535,6 +539,7 @@ export async function consultarDisponibilidadeCore(params: {
     .order("inicio").order("id");
   if (!params.completa) q = q.limit(Math.min(Math.max(params.limite ?? 400, 1), 800));
   if (medicosFiltro) q = q.in("medico_id", medicosFiltro);
+  if (params.procedimentoId) q = q.in("agenda_id", await agendasDoProcedimento(params.clinicaId, params.procedimentoId));
   // Recorta o dia civil ANTES do limite de linhas. A data UTC do slot pode
   // ser o dia seguinte; o paciente sempre escolhe uma data em São Paulo.
   if (diaPedido) q = q.gte("inicio", diaPedido.inicio).lt("inicio", diaPedido.fimExclusivo);
@@ -591,6 +596,7 @@ export async function consultarDisponibilidadeCore(params: {
     .map((l) => {
       const info = l.medico_id ? infoMedico.get(l.medico_id) : undefined;
       return {
+        ...(params.procedimentoId ? { procedimento_id: params.procedimentoId } : {}),
         medico_id: String(l.medico_id ?? ""),
         medico_nome: info?.nome ?? "",
         especialidade: info?.especialidade_id ? (nomeEsp.get(info.especialidade_id) ?? null) : null,
@@ -608,6 +614,16 @@ export async function consultarDisponibilidadeCore(params: {
 
 /** Sentinela para `in()` vazio — nunca casa com nada. */
 const SEM_RESULTADO = "00000000-0000-0000-0000-000000000000";
+
+/** Todas as consultas e revalidações de vagas passam pela identidade resolvida
+ * no servidor. O modelo não pode trocar o procedimento ao informar um médico. */
+async function disponibilidadeDoPedido(ctx: CtxNinaPaciente, params: Parameters<typeof consultarDisponibilidadeCore>[0]) {
+  const pedido = procedimentoDaSessao(ctx.estado, ctx.clinicaId);
+  if (!pedido) return consultarDisponibilidadeCore(params);
+  const procedimento = await resolverProcedimentoOperacional(ctx.clinicaId, pedido);
+  if (ctx.estado) ctx.estado.appointment.procedimento_solicitado = { ...pedido, procedimento_id: procedimento.id };
+  return consultarDisponibilidadeCore({ ...params, procedimentoId: procedimento.id });
+}
 
 /* ------------------------------------------------- escala × disponibilidade */
 
@@ -676,6 +692,8 @@ function semVaga(motivo: string, mensagem: string, extra?: Record<string, unknow
 
 /** Falha TÉCNICA de consulta — só aqui a Nina pode dizer que não conseguiu consultar. */
 function falhaAgenda(e: unknown, ferramenta: string) {
+  if (e instanceof VinculoProcedimentoError) return falha("ACTION_NOT_AUTHORIZED", e.message,
+    { codigo: e.codigo, encaminhar_para_humano: true, consulta_realizada: false });
   console.error(`[NINA_AGENDA] AGENDA_QUERY_FAILED em ${ferramenta}`, e);
   return {
     ok: false as const,
@@ -848,6 +866,7 @@ export const FERRAMENTAS_NINA_CONSULTA = [
       description:
         "FONTE DE VERDADE administrativa da clínica (catálogo publicado). " +
         REGRA_CONSULTA_CATALOGO +
+        " Após identificar um exame/procedimento, preserve o registro da sessão. O servidor usa procedimento_id para consultar as agendas vinculadas, inclusive se o nome for abreviado. Não invente IDs nem use o ID do médico ou catalogo_id como procedimento_id. Para trocar de atendimento, primeiro identifique o novo pedido no catálogo. Falta de vínculo por ID é pendência de cadastro, não ausência de vagas. Os IDs são internos e não devem aparecer na mensagem ao paciente." +
         " Cada valor vem com sua forma de pagamento e condição; preserve essa associação e agrupe valores somente quando todas as opções e condições forem iguais.",
       parameters: {
         type: "object",
@@ -1066,8 +1085,9 @@ export async function executarFerramentaPaciente(
   const inicio = Date.now();
   const resultado = await executarFerramentaInterna(ctx, nome, argsRaw);
   const pedido = procedimentoDaSessao(ctx.estado, ctx.clinicaId);
-  if (resultado.ok && pedido && FERRAMENTAS_DE_VAGAS.has(nome))
-    resultado.atendimento = { catalogo_id: pedido.catalogo_id, nome: pedido.nome, tipo_atendimento: pedido.tipo_atendimento };
+  if (resultado.ok && pedido && (FERRAMENTAS_DE_VAGAS.has(nome) || nome === "agendar"))
+    resultado.atendimento = { catalogo_id: pedido.catalogo_id, procedimento_id: pedido.procedimento_id,
+      nome: pedido.nome, tipo_atendimento: pedido.tipo_atendimento };
   void auditar(
     ctx,
     "tool",
@@ -1155,7 +1175,7 @@ async function executarFerramentaInterna(
           data: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
         }).parse(args);
         const pedido = procedimentoDaSessao(ctx.estado, ctx.clinicaId);
-        if (pedido && (p.tipo !== "procedimento" || normalizar(p.atendimento) !== normalizar(pedido.nome)))
+        if (pedido && p.tipo !== "procedimento")
           return falha("ACTION_NOT_AUTHORIZED", "A busca deve preservar o procedimento solicitado.", { codigo: "ATENDIMENTO_AGENDA_NAO_VINCULADO" });
         const { candidatosPrimeiraVaga } = await import("./primeiro-disponivel-catalogo.server");
         const conhecimento = conhecimentoDaMesmaSessao(ctx.estado?.knowledge_context, ctx.clinicaId, ctx.estado?.session_id ?? null);
@@ -1199,7 +1219,7 @@ async function executarFerramentaInterna(
           if (modo === "nao_definida") return modalidadePendente();
           let vagas: SlotNina[];
           try {
-            vagas = await consultarDisponibilidadeCore({ clinicaId: ctx.clinicaId, medicoId,
+            vagas = await disponibilidadeDoPedido(ctx, { clinicaId: ctx.clinicaId, medicoId,
               data: p.data, dias: p.dias ?? 60, periodo: p.periodo, completa: true });
             vagas = vagas.filter(s => (!p.a_partir_de || dataISODoSlot(s.inicio) >= p.a_partir_de) &&
               (p.dia_semana === undefined || diaSemanaDe(dataISODoSlot(s.inicio)) === p.dia_semana))
@@ -1264,7 +1284,7 @@ async function executarFerramentaInterna(
           /\b(?:quais|disponibilidade|valor|preço|preco)\b/i.test(mensagem)) {
           return falha("ACTION_NOT_AUTHORIZED", "Consultar opções ou dizer sim sem resumo não seleciona uma vaga. Aguarde a escolha do paciente.");
         }
-        const vagasAtuais = await enriquecerModalidades(ctx.clinicaId, await consultarDisponibilidadeCore({
+        const vagasAtuais = await enriquecerModalidades(ctx.clinicaId, await disponibilidadeDoPedido(ctx, {
           clinicaId: ctx.clinicaId, medicoId: vaga.medico_id, data: vaga.data, dias: 90,
         }), escopoModalidade(ctx, vaga.procedimento));
         // Uma tentativa de nova escolha invalida qualquer resumo anterior.
@@ -1540,7 +1560,7 @@ async function executarFerramentaInterna(
         }
         let slots: SlotNina[];
         try {
-          slots = await consultarDisponibilidadeCore({
+          slots = await disponibilidadeDoPedido(ctx, {
             clinicaId: ctx.clinicaId,
             especialidadeId,
             medicoId,
@@ -1571,7 +1591,7 @@ async function executarFerramentaInterna(
           if (medicoId && p.data) {
             const { atende } = await medicoAtendeNoDia(ctx.clinicaId, medicoId, p.data);
             const nome = medicoNome ?? "O profissional";
-            const proximos = await enriquecerModalidades(ctx.clinicaId, await consultarDisponibilidadeCore({
+            const proximos = await enriquecerModalidades(ctx.clinicaId, await disponibilidadeDoPedido(ctx, {
               clinicaId: ctx.clinicaId,
               medicoId,
               dias: 60,
@@ -1630,7 +1650,7 @@ async function executarFerramentaInterna(
         const nome = r.nome;
         let doDia: SlotNina[];
         try {
-          doDia = await consultarDisponibilidadeCore({
+          doDia = await disponibilidadeDoPedido(ctx, {
             clinicaId: ctx.clinicaId,
             medicoId: r.id,
             dias: 60,
@@ -1721,7 +1741,7 @@ async function executarFerramentaInterna(
         }
         let todos: SlotNina[];
         try {
-          todos = await consultarDisponibilidadeCore({
+          todos = await disponibilidadeDoPedido(ctx, {
             clinicaId: ctx.clinicaId,
             especialidadeId,
             medicoId,
@@ -2114,7 +2134,7 @@ async function executarFerramentaInterna(
         // (revalidada agora) e consentimento amarrado ao slot resumido.
         let vagasReais: SlotNina[];
         try {
-          vagasReais = await consultarDisponibilidadeCore({
+          vagasReais = await disponibilidadeDoPedido(ctx, {
             clinicaId: ctx.clinicaId, medicoId: medicoIdReal,
             dias: 90, data: ofertaCorrente!.data,
           });
@@ -2363,6 +2383,7 @@ async function executarFerramentaInterna(
         return falha("VALIDATION_ERROR", `Ferramenta desconhecida: ${nome}`);
     }
   } catch (e) {
+    if (e instanceof VinculoProcedimentoError) return falhaAgenda(e, nome);
     if (e instanceof z.ZodError) return falha("VALIDATION_ERROR", "Parâmetros inválidos.");
     console.error("[nina-tools]", nome, e);
     return falha("INTERNAL_ERROR", "Falha interna ao consultar o sistema.");

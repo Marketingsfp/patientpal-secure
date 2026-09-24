@@ -6,6 +6,7 @@ import { limparEscolhaAgendamento } from "./agendamento-escolha";
 /** Identidade do pedido, independente da última busca auxiliar e da especialidade. */
 export type ProcedimentoSolicitado = {
   clinica_id: string; session_id: string; catalogo_id: string; nome: string;
+  procedimento_id?: string | null;
   tipo_atendimento: "exame_procedimento";
 };
 
@@ -42,12 +43,14 @@ export function lembrarProcedimentoSolicitado(estado: EstadoFluxoNina | undefine
   const r = registros[0];
   if (!r?.id || !r.procedimento || registros.some(item => item.tipo !== "servico" || item.id !== r.id || item.procedimento !== r.procedimento)) return;
   estado.appointment.procedimento_solicitado = { clinica_id: clinicaId, session_id: estado.session_id,
-    catalogo_id: r.id, nome: r.procedimento, tipo_atendimento: "exame_procedimento" };
+    catalogo_id: r.id, nome: r.procedimento, tipo_atendimento: "exame_procedimento",
+    procedimento_id: typeof r.extras?.procedimento_id === "string" ? r.extras.procedimento_id : null };
 }
 
 export function vagaPreservaProcedimento(estado: EstadoFluxoNina | undefined, clinicaId: string,
-  vaga: { procedimento: string | null; catalogo_id?: string | null; tipo_atendimento?: string } | undefined) {
+  vaga: { procedimento: string | null; catalogo_id?: string | null; procedimento_id?: string | null; tipo_atendimento?: string } | undefined) {
   const pedido = procedimentoDaSessao(estado, clinicaId);
   return !pedido || !!vaga && vaga.catalogo_id === pedido.catalogo_id &&
-    vaga.tipo_atendimento === pedido.tipo_atendimento && vaga.procedimento === pedido.nome;
+    vaga.tipo_atendimento === pedido.tipo_atendimento && vaga.procedimento === pedido.nome &&
+    (!pedido.procedimento_id || vaga.procedimento_id === pedido.procedimento_id);
 }

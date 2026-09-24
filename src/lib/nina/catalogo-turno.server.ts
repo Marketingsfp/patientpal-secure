@@ -7,7 +7,7 @@ import { registrarEtapa } from "./evidencias.server";
 
 /** Apenas campos publicados; nunca carregar nota interna ou rascunho. */
 export const COLUNAS_SERVICO =
-  "id, nome, valor, valor_observacao, descricao_publica, preparo, restricoes, executantes, formas_pagamento, estrutura, status, updated_at";
+  "id, procedimento_id, nome, valor, valor_observacao, descricao_publica, preparo, restricoes, executantes, formas_pagamento, estrutura, status, updated_at";
 export const COLUNAS_PROFISSIONAL =
   "id, nome, especialidades, atende_consultorio, formas_pagamento, convenios, horarios, tipo_atendimento, observacao_publica, aviso_dia, aviso_valido_de, aviso_valido_ate, unidades(nome), estrutura, status, updated_at";
 export const TAMANHO_PAGINA = 250;

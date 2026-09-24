@@ -115,7 +115,8 @@ export async function modalidadePublicadaDoMedico(clinicaId: string, medicoId: s
       .select("id, nome, descricao_publica, estrutura, executantes, formas_pagamento, valor, valor_observacao, preparo, restricoes")
       .eq("clinica_id", clinicaId).eq("status", "PUBLICADO").eq("id", escopo.procedimentoId).maybeSingle();
     if (error) throw new Error(error.message);
-    if (!data || normalizar(data.nome) !== normalizar(escopo.atendimento)) return "nao_definida" as const;
+    // O ID da publicação preserva a identidade mesmo após renomear o serviço.
+    if (!data) return "nao_definida" as const;
     const servico = data as ServicoPublicado;
     const executantes = Array.isArray(servico.executantes) ? servico.executantes : [];
     const nomesVinculados: string[] = [];

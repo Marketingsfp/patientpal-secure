@@ -155,12 +155,13 @@ export function FormServico({
             options={opcoes.procedimentos.map((p) => ({ value: p.id, label: p.nome }))}
             value={estado.procedimento_id ?? ""}
             disabled={somenteLeitura}
-            placeholder="Opcional — usa o procedimento já cadastrado"
+            placeholder="Selecione o procedimento correspondente na agenda"
             onChange={(v) => {
               const p = opcoes.procedimentos.find((x) => x.id === v);
               set({ procedimento_id: v || null, nome: estado.nome || (p?.nome ?? "") });
             }}
           />
+          <p className="text-xs text-muted-foreground">Necessário para a Nina consultar vagas e agendar este exame ou procedimento. O vínculo usa o cadastro selecionado, mesmo que os nomes sejam diferentes.</p>
         </div>
       </div>
 

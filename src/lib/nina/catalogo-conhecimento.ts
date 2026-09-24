@@ -34,6 +34,7 @@ import {
 
 /** Serviço publicado, já sem colunas internas. */
 export type ServicoPublicado = {
+  procedimento_id?: string | null;
   estrutura?: unknown;
   id: string;
   nome: string;
@@ -171,6 +172,7 @@ export function servicoParaRegistro(s: ServicoPublicado): RegistroConhecimento {
     aba_origem: "Catálogo — exames e procedimentos",
     extras: {
       catalogo_tipo: "servico",
+      procedimento_id: s.procedimento_id ?? null,
       estrutura,
       atendimentos_publicados: atendimentos,
       preparo_status: s.preparo ? "informado" : estrutura.preparo_status,
