@@ -223,22 +223,31 @@ describe("executor do cadastro com banco simulado", () => {
     expect(r.erro).toBe("PATIENT_DATA_REQUIRED");
     expect(rpcs).toHaveLength(0);
   });
-  test("homologação cria apenas paciente sintético, sem RPC real e sem CPF", async () => {
+  test("homologação usa a mesma RPC com nome, nascimento e número virtual", async () => {
     const ctx = contexto(true);
+    ctx.telefone = "55000100391";
     const r = await executarFerramentaPaciente(ctx, "identificar_paciente", {
-      nome: "Ana Silva",
-      data_nascimento: "1990-01-02",
+      nome: "Ana Silva", data_nascimento: "1990-01-02", telefone: "21900000000",
     });
     expect(r.ok).toBe(true);
-    expect(rpcs).toHaveLength(0);
-    const criado = escritos.find((e) => e.tabela === "pacientes")?.valor;
-    expect(criado).toMatchObject({
-      is_mock_data: true,
-      teste: true,
-      data_nascimento: "2000-01-01",
+    expect(rpcs).toHaveLength(1);
+    expect(rpcs[0]).toMatchObject({ nome: "nina_resolver_cadastro", args: {
+      _nome: "ANA SILVA", _data_nascimento: "1990-01-02", _telefone: "55000100391", _cpf: null,
+    } });
+    expect(ctx.pacienteId).toBe("paciente");
+    expect(escritos.filter(e => e.tabela === "pacientes")).toHaveLength(0);
+  });
+  test.each([false, true])("cadastro existente usa o ID devolvido para agendar (teste=%s)", async teste => {
+    retornoRpc = { ok: true, paciente_id: "homonimo-correto", criado: false };
+    const ctx = contexto(teste);
+    const r = await executarFerramentaPaciente(ctx, "identificar_paciente", {
+      nome: "Ana Silva", data_nascimento: "1990-01-02", telefone: "21900000000",
     });
-    expect(criado?.nome).toContain("[TESTE NINA]");
-    expect(criado).not.toHaveProperty("cpf");
+    expect(r).toMatchObject({ ok: true, paciente: { cadastro: "existente" } });
+    expect(rpcs[0]?.args._telefone).toBe("21999990000");
+    expect(ctx.pacienteId).toBe("homonimo-correto");
+    expect(ctx.estado!.patient).toMatchObject({ id: "homonimo-correto", validated: true });
+    expect(escritos.find(e => e.tabela === "atend_conversas")?.valor.contato_paciente_id).toBe("homonimo-correto");
   });
   test("homologação não lê nem reutiliza paciente real vinculado por engano", async () => {
     const ctx = contexto(true);

@@ -28,6 +28,7 @@ await db.exec(
     "utf8",
   ),
 );
+await db.exec(await readFile(new URL("../supabase/migrations/20260924233000_nina_cadastro_identidade_tripla.sql", import.meta.url), "utf8"));
 const clinica = randomUUID();
 const sql = "select nina_resolver_cadastro($1,$2,$3,$4,$5,$6) r";
 async function conversa(extra = {}) {
@@ -108,11 +109,12 @@ await caso("pessoas com mesmo telefone não são confundidas", async () => {
   assert.equal(r.ok, true);
   assert.equal(r.criado, true);
 });
-await caso("homônimos com mesmo nascimento exigem conferência humana", async () => {
-  await paciente("JOAO SOUZA", "1985-05-10", "21977770000");
+await caso("homônimos com mesmo nascimento são distinguidos pelo telefone", async () => {
+  const id = await paciente("JOAO SOUZA", "1985-05-10", "21977770000");
   await paciente("JOAO SOUZA", "1985-05-10", "21966660000");
   const r = await resolver(await conversa(), "Joao Souza", "1985-05-10", "21977770000");
-  assert.equal(r.erro, "PATIENT_AMBIGUOUS");
+  assert.equal(r.paciente_id, id);
+  assert.equal(r.criado, false);
 });
 await caso("telefone divergente não vincula nem cria duplicata", async () => {
   const antes = (await db.query("select count(*)::int n from pacientes")).rows[0].n;
@@ -134,12 +136,12 @@ await caso("nascimento divergente de vínculo confirmado não é sobrescrito", a
   const r = await resolver(await conversa({ paciente: id }), "Paulo Silva", "1981-01-01");
   assert.equal(r.erro, "PATIENT_DATA_MISMATCH");
 });
-await caso("conversa de outra clínica e homologação não gravam cadastro real", async () => {
+await caso("conversa de outra clínica não grava cadastro", async () => {
   assert.equal(
     (await resolver(await conversa({ clinica: randomUUID() }))).erro,
     "PERMISSION_DENIED",
   );
-  assert.equal((await resolver(await conversa({ teste: true }))).erro, "PERMISSION_DENIED");
+
 });
 await caso("cadastro inativo e vínculo com outra clínica não são reutilizados", async () => {
   const id = await paciente("CARLOS SILVA", "1980-01-01", "21933330000", { ativo: false });
@@ -164,6 +166,69 @@ await caso("telefone obrigatório e data futura são recusados", async () => {
     (await resolver(await conversa(), "Ana Silva", "2990-01-01")).erro,
     "VALIDATION_ERROR",
   );
+});
+await caso("três dados iguais continuam ambíguos; nenhum paciente é escolhido", async () => {
+  await paciente("LUIZA LIMA", "1986-01-01", "21944445555");
+  await paciente("LUIZA LIMA", "1986-01-01", "21944445555");
+  const conv = await conversa();
+  const n = (await db.query("select count(*)::int n from pacientes")).rows[0].n;
+  assert.equal((await resolver(conv, "Luiza Lima", "1986-01-01", "5521944445555")).erro, "PATIENT_AMBIGUOUS");
+  assert.equal((await db.query("select contato_paciente_id from atend_conversas where id=$1", [conv])).rows[0].contato_paciente_id, null);
+  assert.equal((await db.query("select count(*)::int n from pacientes")).rows[0].n, n);
+});
+await caso("telefone secundário distingue homônimos sem alterar o cadastro", async () => {
+  const id = await paciente("LUCIA REIS", "1980-04-03", "21911112222");
+  await paciente("LUCIA REIS", "1980-04-03", "21933334444");
+  await db.query("update pacientes set telefone2=$1 where id=$2", ["(21) 95555-6666", id]);
+  const r = await resolver(await conversa(), "Lucia Reis", "1980-04-03", "5521955556666");
+  assert.equal(r.paciente_id, id);
+  const p = (await db.query("select * from pacientes where id=$1", [id])).rows[0];
+  assert.equal(p.telefone, "21911112222");
+  assert.equal(p.codigo_prontuario, "LEGADO-123");
+});
+await caso("mesmo nome e telefone com nascimentos diferentes não confundem pacientes", async () => {
+  await paciente("MARIO REIS", "1980-04-03", "21911112222");
+  const id = await paciente("MARIO REIS", "1981-04-03", "21911112222");
+  assert.equal((await resolver(await conversa(), "Mario Reis", "1981-04-03", "21911112222")).paciente_id, id);
+});
+await caso("cadastro incompleto único com nome e telefone recebe nascimento", async () => {
+  const id = await paciente("ROSA REIS", null, "21911112222");
+  const r = await resolver(await conversa(), "Rosa Reis", "1980-04-03", "21911112222");
+  assert.equal(r.paciente_id, id);
+  assert.deepEqual(r.campos_completados, ["data_nascimento"]);
+});
+await caso("homologação cria no cadastro do Clínica OS com dados informados e telefone virtual", async () => {
+  const conv = await conversa({ teste: true });
+  const r = await resolver(conv, "Paciente Teste Completo", "1997-03-12", "55000100391");
+  assert.equal(r.ok, true);
+  assert.equal(r.criado, true);
+  const p = (await db.query("select * from pacientes where id=$1", [r.paciente_id])).rows[0];
+  assert.equal(p.nome, "PACIENTE TESTE COMPLETO");
+  assert.equal(p.data_nascimento.toISOString().slice(0,10), "1997-03-12");
+  assert.equal(p.telefone, "55000100391");
+  assert.equal(p.is_mock_data, true);
+  assert.equal(p.teste, true);
+  assert.equal((await resolver(conv, "Paciente Teste Completo", "1997-03-12", "55000100391")).paciente_id, p.id);
+  const outra = await resolver(await conversa({ teste: true }), "Paciente Teste Completo", "1997-03-12", "55000100391");
+  assert.equal(outra.paciente_id, p.id);
+  assert.equal(outra.criado, false);
+});
+await caso("produção e homologação não compartilham pacientes mesmo com os três dados iguais", async () => {
+  const prod = await resolver(await conversa(), "Escopo Teste Silva", "1995-01-01");
+  const teste = await resolver(await conversa({ teste: true }), "Escopo Teste Silva", "1995-01-01");
+  assert.equal(prod.ok, true);
+  assert.equal(teste.ok, true);
+  assert.notEqual(prod.paciente_id, teste.paciente_id);
+  assert.equal((await resolver(await conversa(), "Escopo Teste Silva", "1995-01-01")).paciente_id, prod.paciente_id);
+  assert.equal((await resolver(await conversa({ teste: true, paciente: prod.paciente_id }), "Escopo Teste Silva", "1995-01-01")).erro, "PATIENT_DATA_MISMATCH");
+  assert.equal((await resolver(await conversa({ paciente: teste.paciente_id }), "Escopo Teste Silva", "1995-01-01")).erro, "PATIENT_DATA_MISMATCH");
+});
+await caso("homologação também distingue homônimos pelo telefone", async () => {
+  await paciente("HOMONIMO TESTE", "1990-01-01", "55000100001", { teste: true });
+  const id = await paciente("HOMONIMO TESTE", "1990-01-01", "55000100002", { teste: true });
+  const r = await resolver(await conversa({ teste: true }), "Homonimo Teste", "1990-01-01", "55000100002");
+  assert.equal(r.paciente_id, id);
+  assert.equal(r.criado, false);
 });
 await caso("função é restrita ao servidor e mantém auditoria", async () => {
   const permissoes = (

@@ -28,6 +28,7 @@ let falharAgendaMedico: string | null = null;
 let falharEscala = false;
 let procedimentoGravadoDivergente = false;
 let resultadoCatalogo: ResultadoConhecimento;
+let cadastroResolvido: { id: string; criado: boolean } | null = null;
 const pesquisas: unknown[] = [];
 const leituras: Array<{ tabela: string; filtros: Record<string, unknown> }> = [];
 const auditoria: Linha[] = [];
@@ -42,6 +43,13 @@ function estruturaModalidadeServico(nome: string, modalidade = "hora_marcada") {
 
 mock.module("@/integrations/supabase/client.server", () => ({
   supabaseAdmin: {
+    async rpc(nome: string, args: Linha) {
+      if (nome !== "nina_resolver_cadastro" || !cadastroResolvido) throw new Error("RPC inesperada");
+      expect(args._telefone).toBe("55000100391");
+      expect(args._nome).toBe("PACIENTE HOMONIMO");
+      expect(args._data_nascimento).toBe("1990-01-02");
+      return { data: { ok: true, paciente_id: cadastroResolvido.id, criado: cadastroResolvido.criado }, error: null };
+    },
     from(tabela: string) {
       if (tabela === "audit_log")
         return {
@@ -238,6 +246,7 @@ function contextoAgendar(confirmado = false) {
 }
 
 beforeEach(() => {
+  cadastroResolvido = null;
   procedimentoGravadoDivergente = false;
   falharEscala = false;
   falharLeituraFicha = false;
@@ -346,6 +355,26 @@ describe("procedimentos do Lead 01 não viram consultas", () => {
     expect(selecionada.ok, JSON.stringify(selecionada)).toBe(true);
     return selecionada;
   }
+  test.each([true, false])("cadastro %s: identificação e reserva usam o mesmo ID do Clínica OS", async criado => {
+    const { ctx } = await iniciar();
+    const escolha = await escolher(ctx);
+    ctx.pacienteId = null;
+    ctx.pacienteNome = null;
+    Object.assign(ctx.estado!.patient, { id: null, identified: false, validated: false });
+    ctx.telefone = "55000100391";
+    cadastroResolvido = { id: "77777777-7777-4777-8777-777777777777", criado };
+    const cadastro = await executarFerramentaPaciente(ctx, "identificar_paciente", {
+      nome: "Paciente Homonimo", data_nascimento: "02/01/1990", telefone: "21911112222",
+    });
+    expect(cadastro).toMatchObject({ ok: true, paciente: { cadastro: criado ? "novo" : "existente" } });
+    expect(gravacoes).toHaveLength(0);
+    expect(aceitarResumoEntregue(ctx.estado!, CLINICA, [{ role: "assistant", content: String(escolha.resumo_confirmacao) }])).toBe(true);
+    const r = await executarFerramentaPaciente(ctx, "agendar", { ...argumentosAgendar, procedimento: "Bioimpedância" });
+    expect(r).toMatchObject({ ok: true, verificado_no_banco: true });
+    expect(gravacoes).toHaveLength(1);
+    expect(gravacoes[0]!.paciente_id).toBe(cadastroResolvido.id);
+    expect(banco.agendamentos!.find(row => row.id === AGENDAMENTO)?.paciente_id).toBe(cadastroResolvido.id);
+  });
   test.each([
     ["Aplicação de varizes", "André Luis", "Angiologia"],
     ["Curva tensional", "João Hélio", "Oftalmologia"],

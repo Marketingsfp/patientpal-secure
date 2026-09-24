@@ -19,7 +19,7 @@ export async function consultarCadastroConfirmado(ctx: CtxNinaPaciente): Promise
       .eq("clinica_id", ctx.clinicaId)
       .eq("id", ctx.pacienteId)
       .eq("is_mock_data", Boolean(teste));
-    if (!teste) consulta = consulta.eq("teste", false);
+    consulta = consulta.eq("teste", Boolean(teste));
     const { data, error } = await consulta.maybeSingle();
     if (error) throw new Error("Falha ao consultar cadastro do paciente");
     if (!data || !data.ativo || Boolean(data.is_mock_data || data.teste) !== Boolean(teste))
@@ -27,7 +27,7 @@ export async function consultarCadastroConfirmado(ctx: CtxNinaPaciente): Promise
     dados = {
       nome: data.nome,
       data_nascimento: data.data_nascimento,
-      telefone: data.telefone || normalizarTelefone(ctx.telefone),
+      telefone: normalizarTelefone(ctx.telefone) || data.telefone,
     };
     confirmado = true;
   }

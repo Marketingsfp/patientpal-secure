@@ -14,8 +14,8 @@
  *     continua exclusivo da Nina interna, que roda com o token do funcionário.
  *  2. Escopo de clínica em toda consulta (`clinica_id` obrigatório no ctx).
  *  3. Escopo de paciente: dados pessoais e agendamentos só saem quando há um
- *     `paciente_id` já resolvido pelo telefone da conversa ou por CPF + nome +
- *     nascimento conferidos. Nome sozinho nunca identifica ninguém.
+ *     `paciente_id` já resolvido por nome completo, nascimento e telefone
+ *     conferidos em conjunto. Telefone sozinho nunca identifica ninguém.
  *  4. Agendamento passa pelo MESMO núcleo da tela de Agenda
  *     (`criar-agendamento.core.server`), que revalida slot no momento da
  *     gravação — é o que impede dupla reserva.
@@ -134,7 +134,7 @@ export type CtxNinaPaciente = {
   estado?: import("./fluxo-estado.server").EstadoFluxoNina;
   /**
    * Conversa do console de Homologação. Tudo que for gravado nasce marcado
-   * como teste (`is_mock_data`), com o nome prefixado por [TESTE NINA] e
+   * como teste (`is_mock_data`), com os dados informados na simulação e
    * removível ao resolver a sessão.
    */
   teste?: boolean;
@@ -176,100 +176,6 @@ export function origemAgendamentoNina(ctx: CtxNinaPaciente): string {
   if (ctx.teste || ctx.origem === "homologacao") return "nina_homologacao";
   return ctx.origem === "whatsapp" ? "nina_whatsapp" : "nina_chat_interno";
 }
-
-/**
- * Paciente SINTÉTICO do lead de homologação.
- *
- * Na homologação nenhum cadastro real é lido, criado ou vinculado: cada lead de
- * teste tem um paciente próprio, marcado como dado de teste (`is_mock_data` e
- * `teste`), reaproveitado a cada ciclo do mesmo lead. Isso garante que agenda,
- * "meus agendamentos" e qualquer ferramenta que dependa do paciente enxerguem
- * apenas registros de teste — e nunca os dados de um paciente real.
- */
-async function pacienteSinteticoDoLead(
-  ctx: CtxNinaPaciente,
-  nomeInformado: string,
-): Promise<{ id: string; nome: string } | null> {
-  try {
-    const telefone = ctx.telefone ?? "";
-    const { data: lead } = await supabaseAdmin
-      .from("nina_teste_leads")
-      .select("id, indice, paciente_teste_id")
-      .eq("clinica_id", ctx.clinicaId)
-      .eq("telefone_sessao", telefone)
-      .maybeSingle();
-    const indice = (lead as { indice?: number } | null)?.indice ?? 0;
-    const nome = `[TESTE NINA] Paciente Teste ${String(indice || 0).padStart(2, "0")}`;
-
-    const existenteId = (lead as { paciente_teste_id?: string | null } | null)?.paciente_teste_id;
-    if (existenteId) {
-      const { data: pac } = await supabaseAdmin
-        .from("pacientes")
-        .select("id, nome, is_mock_data, data_nascimento")
-        .eq("id", existenteId)
-        .eq("clinica_id", ctx.clinicaId)
-        .maybeSingle();
-      const p = pac as { id: string; nome: string; is_mock_data: boolean; data_nascimento: string | null } | null;
-      if (p?.is_mock_data) {
-        if (!p.data_nascimento) {
-          const { error } = await supabaseAdmin.from("pacientes").update({ data_nascimento: "2000-01-01" })
-            .eq("id", p.id).eq("clinica_id", ctx.clinicaId).eq("is_mock_data", true).is("data_nascimento", null);
-          if (error) throw new Error("Falha ao completar paciente sintético");
-        }
-        return { id: p.id, nome: p.nome };
-      }
-    }
-
-    // Reaproveita o paciente de teste já criado para este telefone virtual.
-    const { data: achado } = await supabaseAdmin
-      .from("pacientes")
-      .select("id, nome")
-      .eq("clinica_id", ctx.clinicaId)
-      .eq("is_mock_data", true)
-      .eq("telefone", telefone)
-      .maybeSingle();
-    let pacienteId = (achado as { id: string } | null)?.id ?? null;
-    let pacienteNome = (achado as { nome: string } | null)?.nome ?? nome;
-
-    if (!pacienteId) {
-      const { data: criado, error } = await supabaseAdmin
-        .from("pacientes")
-        .insert({
-          clinica_id: ctx.clinicaId,
-          nome,
-          telefone,
-          data_nascimento: "2000-01-01",
-          is_mock_data: true,
-          teste: true,
-        } as never)
-
-        .select("id, nome")
-        .maybeSingle();
-      if (error) throw new Error(error.message);
-      pacienteId = (criado as { id: string } | null)?.id ?? null;
-      pacienteNome = (criado as { nome: string } | null)?.nome ?? nome;
-    }
-    if (!pacienteId) return null;
-    // Um paciente sintético reaproveitado também precisa do mínimo da Agenda.
-    const { error: erroNascimentoTeste } = await supabaseAdmin.from("pacientes")
-      .update({ data_nascimento: "2000-01-01" }).eq("id", pacienteId)
-      .eq("clinica_id", ctx.clinicaId).eq("is_mock_data", true).is("data_nascimento", null);
-    if (erroNascimentoTeste) throw new Error("Falha ao completar paciente sintético");
-
-    const leadId = (lead as { id?: string } | null)?.id;
-    if (leadId && existenteId !== pacienteId) {
-      await supabaseAdmin
-        .from("nina_teste_leads")
-        .update({ paciente_teste_id: pacienteId } as never)
-        .eq("id", leadId);
-    }
-    return { id: pacienteId, nome: pacienteNome };
-  } catch (e) {
-    console.error("[nina-tools] paciente sintético de homologação", e);
-    return null;
-  }
-}
-
 
 /* ------------------------------------------------------------------ auditoria */
 
@@ -925,7 +831,7 @@ export const FERRAMENTAS_NINA_AGENDAMENTO = [
     function: {
       name: "identificar_paciente",
       description:
-        "Após escolher procedimento, profissional e vaga, confere ou cadastra o paciente no Clínica OS antes da confirmação final do agendamento. Peça apenas nome, data de nascimento e telefone que estiverem faltando; aproveite o telefone do WhatsApp. CPF é opcional, nunca solicite. Cadastro confirmado é reutilizado e apenas campos vazios podem ser completados.",
+        "Após escolher procedimento, profissional e vaga, confere ou cadastra o paciente no Clínica OS antes da confirmação final do agendamento. Peça apenas nome, data de nascimento e telefone que estiverem faltando; aproveite o telefone do WhatsApp. CPF é opcional, nunca solicite. Cruza nome completo, nascimento e telefone do WhatsApp para distinguir homônimos. Reutiliza o ID correspondente; só cria cadastro se não houver candidato compatível. Ambiguidade ou divergência exige conferência humana, sem duplicar. Cadastro confirmado é reutilizado e apenas campos vazios podem ser completados.",
       parameters: {
         type: "object",
         properties: {
@@ -1813,10 +1719,6 @@ async function executarFerramentaInterna(
         };
       }
 
-
-
-
-
       case "consultar_cadastro_paciente": {
         if (!cadastroAutorizado(ctx.estado)) return falha("ACTION_NOT_AUTHORIZED", "Defina o atendimento e valide a escolha da vaga antes de consultar o cadastro.");
         const cadastro = await consultarCadastroConfirmado(ctx);
@@ -1840,52 +1742,13 @@ async function executarFerramentaInterna(
         const cpfInformado = somenteDigitos(entrada.cpf ?? "");
         const cpf = isCPFValido(cpfInformado) ? cpfInformado : null;
 
-        // HOMOLOGAÇÃO: jamais tocar em cadastro real de paciente. A identificação
-        // é amarrada a um paciente SINTÉTICO exclusivo do lead de teste — nenhum
-        // CPF real é gravado, consultado ou vinculado.
-        if (ctx.teste || ctx.origem === "homologacao") {
-          const sintetico = await pacienteSinteticoDoLead(ctx, dados.nome);
-          if (!sintetico) {
-            await auditar(ctx, "identificar_paciente", { cpf: "***", teste: true }, {
-              ok: false,
-              erro: "TEST_PATIENT_UNAVAILABLE",
-            });
-            return falha(
-              "INTERNAL_ERROR",
-              "Não consegui concluir a identificação no ambiente de homologação.",
-            );
-          }
-          ctx.pacienteId = sintetico.id;
-          ctx.pacienteNome = sintetico.nome;
-          mutarEstado(ctx, {
-            patient: {
-              id: sintetico.id,
-              first_name: sintetico.nome.split(" ")[0] ?? null,
-              identified: true,
-              validated: true,
-            },
-            stage: "CHOOSING_SLOT",
-          });
-          if (ctx.conversaId) {
-            await supabaseAdmin
-              .from("atend_conversas")
-              .update({ contato_paciente_id: sintetico.id, identidade_confirmada: true })
-              .eq("id", ctx.conversaId);
-          }
-          await auditar(ctx, "identificar_paciente", { cpf: "***", teste: true }, {
-            ok: true,
-            id: sintetico.id,
-          });
-          return {
-            ok: true,
-            paciente: { nome: sintetico.nome.split(" ")[0], cadastro: "teste" },
-          };
-        }
-
+        // A mesma RPC resolve ambos os ambientes. A conversa persistida
+        // determina o escopo de teste; nome, nascimento e telefone são reais
+        // dentro da simulação, sem substituir por um paciente fixo do lead.
         const { data, error } = await supabaseAdmin.rpc("nina_resolver_cadastro", {
           _clinica_id: ctx.clinicaId,
           _conversa_id: ctx.conversaId,
-          _cpf: cpf,
+          _cpf: ctx.teste || ctx.origem === "homologacao" ? null : cpf,
           _nome: dados.nome,
           _data_nascimento: dados.data_nascimento,
           _telefone: dados.telefone,
@@ -1942,7 +1805,7 @@ async function executarFerramentaInterna(
         if (!ctx.pacienteId)
           return falha(
             "PATIENT_NOT_VERIFIED",
-            "Preciso identificar o paciente antes (CPF, nome completo e data de nascimento).",
+            "Preciso identificar o paciente antes (nome completo, data de nascimento e telefone do WhatsApp).",
           );
         const { data } = await supabaseAdmin
           .from("agendamentos")
@@ -1984,7 +1847,7 @@ async function executarFerramentaInterna(
         if (!ctx.pacienteId || !ctx.pacienteNome)
           return falha(
             "PATIENT_NOT_VERIFIED",
-            "Preciso identificar o paciente antes de marcar (CPF, nome completo e data de nascimento).",
+            "Preciso identificar o paciente antes de marcar (nome completo, data de nascimento e telefone do WhatsApp).",
           );
 
         const confirmacao = consentimentoDaEscolha(ctx.estado, ctx.clinicaId);
