@@ -260,11 +260,32 @@ function Page() {
     if (!s.lancamento_id) {
       return { executado: false, resposta: "Aprovado manualmente (sem lançamento vinculado)" };
     }
-    const resultado = await estornarLancamentoReceita(
+    let resultado = await estornarLancamentoReceita(
       s.lancamento_id,
       clinicaAtual?.clinica_id,
       s.tipo === "devolucao",
     );
+    // Caixa do pagamento fechado E ninguém com caixa aberto para a saída:
+    // até 24/09/2026 isso era um beco sem saída em vermelho, e a recepção
+    // ficava travada no balcão. Agora a tela oferece o caminho que o banco já
+    // aceita — registrar o estorno sem mexer em gaveta nenhuma — e o dinheiro
+    // é entregue depois, por quem estiver com o caixa aberto. O caixa fechado
+    // continua intocável: nada é reaberto nem reescrito.
+    if (
+      !resultado.ok &&
+      resultado.motivo === "bloqueado" &&
+      resultado.codigo === "sem_sessao_aberta"
+    ) {
+      const seguir = await confirmDialog(
+        `${resultado.mensagem}
+
+Posso registrar o estorno agora SEM mexer em gaveta nenhuma? ` +
+          "O lançamento é cancelado e o horário volta a ficar livre na hora. " +
+          "A entrega do dinheiro ao paciente tem que ser feita depois, por quem estiver com o caixa aberto.",
+      );
+      if (!seguir) return null;
+      resultado = await estornarLancamentoReceita(s.lancamento_id, clinicaAtual?.clinica_id, false);
+    }
     if (!resultado.ok) {
       if (resultado.motivo === "bloqueado") {
         toast.error(resultado.mensagem);
@@ -281,7 +302,7 @@ function Page() {
         resultado.aviso === "lancado_no_caixa_de_quem_devolveu"
           ? "Estorno executado — o caixa do pagamento já estava fechado; a devolução saiu do caixa aberto de quem pediu o estorno."
           : resultado.aviso === "registrado_sem_mexer_na_gaveta"
-            ? "Estorno executado — o caixa do pagamento já estava fechado e não houve devolução ao paciente; ficou só o registro, sem mexer em nenhuma gaveta."
+            ? "Estorno executado — o caixa do pagamento já estava fechado e nenhuma gaveta foi movimentada. Se o paciente tem dinheiro a receber, a entrega precisa ser lançada depois, com o caixa aberto."
             : "Estorno executado",
     };
   };

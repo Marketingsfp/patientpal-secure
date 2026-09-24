@@ -14,15 +14,19 @@ import { logAction } from "@/hooks/use-crud";
  */
 export type EstornoAviso = "lancado_no_caixa_de_quem_devolveu" | "registrado_sem_mexer_na_gaveta";
 
-
 export type EstornoLancamentoResultado =
   | { ok: true; aviso?: EstornoAviso | string | null }
   /**
    * Recusa prevista pela regra de negócio — a mensagem já vem pronta do banco e
    * deve ser mostrada como aviso, não como erro técnico. Hoje: repasse já pago
    * e caixa de origem fechado sem nenhum caixa aberto para receber a saída.
+   *
+   * `codigo` é o motivo cru do banco (`sem_sessao_aberta`, `repasse_pago`,
+   * `caixa_dia_anterior_aberto`). A tela usa ele para oferecer a saída certa
+   * em vez de só mostrar o erro — no caso de `sem_sessao_aberta`, registrar o
+   * estorno sem mexer em gaveta nenhuma.
    */
-  | { ok: false; motivo: "bloqueado"; mensagem: string }
+  | { ok: false; motivo: "bloqueado"; mensagem: string; codigo?: string }
   | { ok: false; motivo: "erro"; mensagem: string; error: unknown };
 
 /**
@@ -70,6 +74,7 @@ export async function estornarLancamentoReceita(
       ok: false,
       motivo: "bloqueado",
       mensagem: resultado.mensagem ?? "Não foi possível estornar este lançamento.",
+      codigo: resultado.motivo,
     };
   }
 
