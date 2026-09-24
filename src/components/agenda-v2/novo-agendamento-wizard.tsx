@@ -688,13 +688,13 @@ export function NovoAgendamentoWizard({
                       value={qcNome}
                       onChange={(e) => setQcNome(aplicarCaixaAlta(e.currentTarget))}
                       placeholder="Nome completo *"
-                      className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm uppercase placeholder:normal-case"
+                      className="h-10 rounded-lg border border-slate-200 bg-card px-3 text-sm uppercase placeholder:normal-case"
                     />
                     <div className="grid grid-cols-2 gap-2">
                       <select
                         value={qcSexo}
                         onChange={(e) => setQcSexo(e.target.value as "M" | "F")}
-                        className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm"
+                        className="h-10 rounded-lg border border-slate-200 bg-card px-3 text-sm"
                       >
                         <option value="F">Feminino</option>
                         <option value="M">Masculino</option>
@@ -702,7 +702,7 @@ export function NovoAgendamentoWizard({
                       <DateInputBR
                         value={qcNasc}
                         onChange={(e) => setQcNasc(e.target.value)}
-                        className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm"
+                        className="h-10 rounded-lg border border-slate-200 bg-card px-3 text-sm"
                       />
                     </div>
                     <input
@@ -710,21 +710,21 @@ export function NovoAgendamentoWizard({
                       onChange={(e) => setQcTel(e.target.value)}
                       placeholder="Telefone com DDD *"
                       inputMode="tel"
-                      className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm"
+                      className="h-10 rounded-lg border border-slate-200 bg-card px-3 text-sm"
                     />
                     <input
                       value={qcCpf}
                       onChange={(e) => setQcCpf(e.target.value)}
                       placeholder="CPF (opcional)"
                       inputMode="numeric"
-                      className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm"
+                      className="h-10 rounded-lg border border-slate-200 bg-card px-3 text-sm"
                     />
                     <input
                       value={qcProntuario}
                       onChange={(e) => setQcProntuario(e.target.value)}
                       placeholder={PLACEHOLDER_PRONTUARIO}
                       maxLength={LIMITES.codigo}
-                      className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm"
+                      className="h-10 rounded-lg border border-slate-200 bg-card px-3 text-sm"
                     />
                   </div>
                   <div className="text-[12px] text-slate-500">
@@ -859,7 +859,7 @@ export function NovoAgendamentoWizard({
                   <select
                     value={especialidadeId ?? ""}
                     onChange={(e) => setEspecialidadeId(e.target.value || null)}
-                    className="w-full h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm"
+                    className="w-full h-10 rounded-lg border border-slate-200 bg-card px-3 text-sm"
                   >
                     {(especialidadesQuery.data ?? []).map((e) => (
                       <option key={e.id} value={e.id}>
@@ -1040,7 +1040,7 @@ export function NovoAgendamentoWizard({
                     <select
                       value={externoConvenioId}
                       onChange={(e) => setExternoConvenioId(e.target.value)}
-                      className="mt-1 w-full h-9 rounded-md border border-slate-200 px-2 text-sm bg-white"
+                      className="mt-1 w-full h-9 rounded-md border border-slate-200 px-2 text-sm bg-card"
                     >
                       <option value="">Selecione o convênio</option>
                       {externoConvenios.map((c) => (
@@ -1055,7 +1055,7 @@ export function NovoAgendamentoWizard({
                   <label className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
                     Repasse do médico
                   </label>
-                  <div className="mt-1 rounded-md border border-slate-200 bg-white px-3 py-2 text-base font-semibold tabular-nums">
+                  <div className="mt-1 rounded-md border border-slate-200 bg-card px-3 py-2 text-base font-semibold tabular-nums">
                     {externoBuscando ? (
                       <span className="text-xs font-normal text-slate-500">Calculando…</span>
                     ) : externoTemConvenio && !externoConvenioId ? (

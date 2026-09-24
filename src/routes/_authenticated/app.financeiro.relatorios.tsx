@@ -2344,7 +2344,7 @@ function Page() {
                     <div className="space-y-1.5">
                       <Label className={ROTULO}>Tipo</Label>
                       <Select value={rTipo} onValueChange={(v) => setRTipo(v as RateioTipo)}>
-                        <SelectTrigger className={cn(CAMPO, "bg-white")}>
+                        <SelectTrigger className={cn(CAMPO, "bg-card")}>
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -2359,7 +2359,7 @@ function Page() {
                         value={rAgrupar}
                         onValueChange={(v) => setRAgrupar(v as RateioAgruparPor)}
                       >
-                        <SelectTrigger className={cn(CAMPO, "bg-white")}>
+                        <SelectTrigger className={cn(CAMPO, "bg-card")}>
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -2379,7 +2379,7 @@ function Page() {
                     <div className="flex flex-wrap items-center gap-2">
                       <Label
                         htmlFor="rateio-comparar"
-                        className="flex h-10 cursor-pointer items-center gap-2 rounded-md border border-slate-200 bg-white px-3"
+                        className="flex h-10 cursor-pointer items-center gap-2 rounded-md border border-slate-200 bg-card px-3"
                       >
                         <Switch
                           id="rateio-comparar"
@@ -2393,7 +2393,7 @@ function Page() {
                         onValueChange={(v) => setModoComparacao(v as ModoComparacao)}
                         disabled={!comparar}
                       >
-                        <SelectTrigger className={cn(CAMPO, "w-full bg-white sm:w-72")}>
+                        <SelectTrigger className={cn(CAMPO, "w-full bg-card sm:w-72")}>
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -2410,13 +2410,13 @@ function Page() {
                         <div className="flex flex-wrap items-center gap-2">
                           <span className="text-sm text-muted-foreground">De</span>
                           <DateInputBR
-                            className={cn(CAMPO, "w-40 bg-white")}
+                            className={cn(CAMPO, "w-40 bg-card")}
                             value={compDe || from}
                             onChange={(e) => setCompDe(e.target.value)}
                           />
                           <span className="text-sm text-muted-foreground">até</span>
                           <DateInputBR
-                            className={cn(CAMPO, "w-40 bg-white")}
+                            className={cn(CAMPO, "w-40 bg-card")}
                             value={compAte || to}
                             onChange={(e) => setCompAte(e.target.value)}
                           />
@@ -2444,7 +2444,7 @@ function Page() {
                 <div className="space-y-1.5 sm:w-48">
                   <Label className={ROTULO}>Tipo</Label>
                   <Select value={rTipo} onValueChange={(v) => setRTipo(v as RateioTipo)}>
-                    <SelectTrigger className={cn(CAMPO, "bg-white")}>
+                    <SelectTrigger className={cn(CAMPO, "bg-card")}>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -2474,7 +2474,7 @@ function Page() {
                 <div className="space-y-1.5 sm:w-72">
                   <Label className={ROTULO}>Mostrar</Label>
                   <Select value={sFiltro} onValueChange={(v) => setSFiltro(v as FiltroSessoes)}>
-                    <SelectTrigger className={cn(CAMPO, "bg-white")}>
+                    <SelectTrigger className={cn(CAMPO, "bg-card")}>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>

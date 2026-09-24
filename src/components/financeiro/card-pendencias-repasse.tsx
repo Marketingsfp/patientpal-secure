@@ -170,7 +170,7 @@ export function CardPendenciasRepasse({
               <Link
                 to="/app/financeiro/atendimentos"
                 search={{ de: d.dia, ate: d.dia }}
-                className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-md border border-sky-200 bg-white px-3 py-2 hover:bg-sky-100/70 transition-colors"
+                className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-md border border-sky-200 bg-card px-3 py-2 hover:bg-sky-100/70 transition-colors"
               >
                 <span className="font-semibold tabular-nums text-sm">{diaCurto(d.dia)}</span>
                 <span className="text-xs text-muted-foreground capitalize">
@@ -198,7 +198,7 @@ export function CardPendenciasRepasse({
               ate: fila.dias[0].dia,
             }}
           >
-            <Button size="sm" variant="outline" className="border-sky-400 bg-white">
+            <Button size="sm" variant="outline" className="border-sky-400 bg-card">
               Ver todos os dias juntos
             </Button>
           </Link>

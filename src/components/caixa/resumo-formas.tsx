@@ -81,7 +81,7 @@ export function ResumoFormas({ porForma, gaveta, onSuprimentoDevolucao }: Resumo
         {cards.map(({ key, label, value, Icon, cls, bg }) => (
           <div
             key={key}
-            className="bg-white border border-slate-200/80 rounded-xl p-3.5 shadow-xs space-y-2"
+            className="bg-card border border-slate-200/80 rounded-xl p-3.5 shadow-xs space-y-2"
           >
             <div className="flex items-center gap-2">
               <span className={`inline-flex h-6 w-6 items-center justify-center rounded-md ${bg}`}>
@@ -111,7 +111,7 @@ export function ResumoFormas({ porForma, gaveta, onSuprimentoDevolucao }: Resumo
         </div>
       </div>
 
-      <div className="bg-white border border-slate-200/80 rounded-xl p-4 shadow-xs">
+      <div className="bg-card border border-slate-200/80 rounded-xl p-4 shadow-xs">
         <div className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">
           Saldo esperado na gaveta (somente espécie)
         </div>

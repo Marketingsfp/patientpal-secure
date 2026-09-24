@@ -35,7 +35,7 @@ export function HhpDrawer({
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent
         side={side}
-        className="w-full overflow-y-auto p-0 bg-white transition-transform duration-150"
+        className="w-full overflow-y-auto p-0 bg-card transition-transform duration-150"
         style={{ maxWidth: `min(100vw, ${maxWidth})` }}
       >
         {hiddenTitle ? (

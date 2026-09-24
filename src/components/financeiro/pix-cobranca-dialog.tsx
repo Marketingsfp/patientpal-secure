@@ -188,7 +188,7 @@ export function PixCobrancaDialog({
                 <img
                   src={qr}
                   alt="QR Code do PIX para pagamento da mensalidade"
-                  className="h-[240px] w-[240px] rounded-md border bg-white p-2"
+                  className="h-[240px] w-[240px] rounded-md border bg-card p-2"
                 />
               ) : null}
             </div>

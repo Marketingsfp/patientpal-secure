@@ -139,7 +139,7 @@ function ApoioClinicoPage() {
 
         <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-2">
           {/* Coluna esquerda — anamnese */}
-          <section className="rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+          <section className="rounded-2xl border border-slate-200 bg-card shadow-sm dark:border-slate-800 dark:bg-slate-900">
             <div className="flex items-center gap-2 border-b border-slate-100 px-5 py-4 dark:border-slate-800">
               <Stethoscope className="h-4 w-4 shrink-0 text-blue-600 dark:text-blue-400" />
               <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
@@ -177,7 +177,7 @@ function ApoioClinicoPage() {
                       type="button"
                       disabled={loading}
                       onClick={() => void enviar(s)}
-                      className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 transition hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
+                      className="rounded-full border border-slate-200 bg-card px-3 py-1.5 text-xs font-medium text-slate-600 transition hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
                     >
                       {s}
                     </button>
@@ -188,7 +188,7 @@ function ApoioClinicoPage() {
           </section>
 
           {/* Coluna direita — análise do caso */}
-          <section className="flex flex-col rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900 lg:sticky lg:top-4">
+          <section className="flex flex-col rounded-2xl border border-slate-200 bg-card shadow-sm dark:border-slate-800 dark:bg-slate-900 lg:sticky lg:top-4">
             <div className="flex items-center gap-2 border-b border-slate-100 px-5 py-4 dark:border-slate-800">
               <MessagesSquare className="h-4 w-4 shrink-0 text-blue-600 dark:text-blue-400" />
               <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">

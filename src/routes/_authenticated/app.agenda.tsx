@@ -8812,7 +8812,7 @@ function AgendaPage() {
       className={
         variante === "sheet"
           ? "grid grid-cols-1 gap-3"
-          : "mt-3 flex w-full items-end gap-2.5 rounded-xl border border-slate-200/80 bg-white p-3.5 shadow-xs"
+          : "mt-3 flex w-full items-end gap-2.5 rounded-xl border border-slate-200/80 bg-card p-3.5 shadow-xs"
       }
     >
       {/* Profissional */}
@@ -8857,7 +8857,7 @@ function AgendaPage() {
           </div>
         ) : (
           <Select value={filtroAgenda} onValueChange={setFiltroAgenda}>
-            <SelectTrigger className="h-9 w-full truncate rounded-lg border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-800">
+            <SelectTrigger className="h-9 w-full truncate rounded-lg border-slate-200 bg-card px-2.5 text-xs font-semibold text-slate-800">
               <SelectValue placeholder="TODAS" />
             </SelectTrigger>
             <SelectContent>
@@ -8897,7 +8897,7 @@ function AgendaPage() {
           Situação
         </Label>
         <Select value={filtroStatus} onValueChange={setFiltroStatus}>
-          <SelectTrigger className="h-9 w-full truncate rounded-lg border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-800">
+          <SelectTrigger className="h-9 w-full truncate rounded-lg border-slate-200 bg-card px-2.5 text-xs font-semibold text-slate-800">
             <SelectValue placeholder="TODOS" />
           </SelectTrigger>
           <SelectContent>
@@ -8937,7 +8937,7 @@ function AgendaPage() {
               "ml-1 inline-flex cursor-pointer items-center gap-1 rounded border px-1.5 py-0.5 text-[11px] font-normal normal-case tracking-normal",
               apenasData
                 ? "border-primary/40 bg-primary/10 text-primary"
-                : "border-slate-300 bg-white text-slate-500 hover:text-slate-700",
+                : "border-slate-300 bg-card text-slate-500 hover:text-slate-700",
             )}
             title={
               apenasData
@@ -8950,7 +8950,7 @@ function AgendaPage() {
                 "flex h-3 w-3 shrink-0 items-center justify-center rounded-[3px] border",
                 apenasData
                   ? "border-primary bg-primary text-primary-foreground"
-                  : "border-slate-400 bg-white",
+                  : "border-slate-400 bg-card",
               )}
             >
               {apenasData && <Check className="h-2.5 w-2.5" strokeWidth={3} />}
@@ -8981,7 +8981,7 @@ function AgendaPage() {
           Especialidade
         </Label>
         <Select value={filtroEspecialidade} onValueChange={setFiltroEspecialidade}>
-          <SelectTrigger className="h-9 w-full truncate rounded-lg border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-800">
+          <SelectTrigger className="h-9 w-full truncate rounded-lg border-slate-200 bg-card px-2.5 text-xs font-semibold text-slate-800">
             <SelectValue placeholder="TODOS" />
           </SelectTrigger>
           <SelectContent>
@@ -9008,7 +9008,7 @@ function AgendaPage() {
             aplicarBuscaCliente();
           }}
           placeholder="Nome ou CPF..."
-          className="h-9 w-full truncate rounded-lg border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-800"
+          className="h-9 w-full truncate rounded-lg border-slate-200 bg-card px-2.5 text-xs font-semibold text-slate-800"
         />
       </div>
 
@@ -9125,7 +9125,7 @@ function AgendaPage() {
           const total = selAgs.reduce((s, a) => s + Number(pagoInfoMap.get(a.id)?.valor ?? 0), 0);
           const pacNome = selAgs[0]?.paciente_nome ?? "";
           return (
-            <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 bg-white shadow-lg border-2 border-sky-400 rounded-lg px-4 py-3 flex items-center gap-4 max-w-[95vw]">
+            <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 bg-card shadow-lg border-2 border-sky-400 rounded-lg px-4 py-3 flex items-center gap-4 max-w-[95vw]">
               <div className="text-sm">
                 <div className="font-semibold text-sky-700">
                   {nfseSel.size} atendimento{nfseSel.size > 1 ? "s" : ""} selecionado
@@ -9261,14 +9261,14 @@ function AgendaPage() {
             <button
               type="button"
               onClick={() => setViewMode("dia")}
-              className={`rounded-md px-3 py-1.5 ${viewMode === "dia" ? "bg-white text-slate-900 shadow-sm" : "hover:text-slate-900"}`}
+              className={`rounded-md px-3 py-1.5 ${viewMode === "dia" ? "bg-card text-slate-900 shadow-sm" : "hover:text-slate-900"}`}
             >
               Lista
             </button>
             <button
               type="button"
               onClick={() => setViewMode("medico")}
-              className={`rounded-md px-3 py-1.5 ${viewMode === "medico" ? "bg-white text-slate-900 shadow-sm" : "hover:text-slate-900"}`}
+              className={`rounded-md px-3 py-1.5 ${viewMode === "medico" ? "bg-card text-slate-900 shadow-sm" : "hover:text-slate-900"}`}
             >
               Por médico
             </button>
@@ -9296,7 +9296,7 @@ function AgendaPage() {
                 <Button
                   variant="outline"
                   size="sm"
-                  className="hidden lg:inline-flex h-8 rounded-lg border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 shadow-xs hover:bg-slate-50"
+                  className="hidden lg:inline-flex h-8 rounded-lg border-slate-200 bg-card px-3 text-xs font-semibold text-slate-700 shadow-xs hover:bg-slate-50"
                   disabled={selecionados.size === 0}
                 >
                   Opções ({selecionados.size})
@@ -9351,7 +9351,7 @@ function AgendaPage() {
           <Link
             to="/app/disponibilidades"
             title="Cadastrar horários semanais e gerar slots da agenda"
-            className="hidden lg:inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-xs hover:bg-slate-50"
+            className="hidden lg:inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-card px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-xs hover:bg-slate-50"
           >
             <Clock className="h-3.5 w-3.5" /> Criar horário médico
           </Link>
@@ -9362,7 +9362,7 @@ function AgendaPage() {
             className={`hidden lg:inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-semibold shadow-xs ${
               resumoAberto
                 ? "border-primary/25 bg-primary/10 text-primary hover:bg-primary/15"
-                : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+                : "border-slate-200 bg-card text-slate-700 hover:bg-slate-50"
             }`}
             onClick={alternarResumo}
           >
@@ -9372,7 +9372,7 @@ function AgendaPage() {
             <button
               type="button"
               title="Quantas fichas cada atendente marcou — mesmo relatório da tela Relatórios"
-              className="hidden lg:inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-xs hover:bg-slate-50"
+              className="hidden lg:inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-card px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-xs hover:bg-slate-50"
               onClick={() => setMarcacoesAberto(true)}
             >
               <Users className="h-3.5 w-3.5" /> Marcações por atendente
@@ -9380,7 +9380,7 @@ function AgendaPage() {
           )}
           <button
             type="button"
-            className="hidden lg:inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-xs hover:bg-slate-50"
+            className="hidden lg:inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-card px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-xs hover:bg-slate-50"
             onClick={exportarAgendaExcel}
           >
             <Download className="h-3.5 w-3.5" /> Exportar Excel
@@ -9638,7 +9638,7 @@ function AgendaPage() {
                               return (
                                 <li
                                   key={d.id}
-                                  className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-white px-2.5 py-2"
+                                  className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-card px-2.5 py-2"
                                 >
                                   <span className="min-w-0 text-xs text-amber-900">
                                     Às <strong>{fmtHora(d.inicio)}</strong> com{" "}
@@ -9670,7 +9670,7 @@ function AgendaPage() {
                               type="button"
                               variant="outline"
                               size="sm"
-                              className="h-7 shrink-0 border-amber-300 bg-white text-xs text-amber-900 hover:bg-amber-100"
+                              className="h-7 shrink-0 border-amber-300 bg-card text-xs text-amber-900 hover:bg-amber-100"
                               onClick={() => setDupDispensado(true)}
                             >
                               É outro atendimento — continuar
@@ -12266,7 +12266,7 @@ function AgendaPage() {
             type="button"
             variant="outline"
             onClick={() => setFiltrosMobileOpen(true)}
-            className="h-10 w-full justify-between rounded-xl border-slate-200 bg-white text-sm font-medium text-slate-700"
+            className="h-10 w-full justify-between rounded-xl border-slate-200 bg-card text-sm font-medium text-slate-700"
           >
             <span className="flex items-center gap-2">
               <SlidersHorizontal className="h-4 w-4 text-slate-500" />
@@ -12390,7 +12390,7 @@ function AgendaPage() {
               <button
                 type="button"
                 onClick={() => setMostrarEncerrados((v) => !v)}
-                className="shrink-0 rounded-md border border-amber-300 bg-white px-2 py-1 text-[12px] font-semibold text-amber-800 hover:bg-amber-100"
+                className="shrink-0 rounded-md border border-amber-300 bg-card px-2 py-1 text-[12px] font-semibold text-amber-800 hover:bg-amber-100"
               >
                 {mostrarEncerrados ? "Ocultar novamente" : "Mostrar mesmo assim"}
               </button>
@@ -12423,7 +12423,7 @@ function AgendaPage() {
               <button
                 type="button"
                 onClick={() => setFiltroStatus(filtroStatus === "parcial" ? "todos" : "parcial")}
-                className="shrink-0 rounded-md border border-amber-300 bg-white px-2 py-1 text-[12px] font-semibold text-amber-800 hover:bg-amber-100"
+                className="shrink-0 rounded-md border border-amber-300 bg-card px-2 py-1 text-[12px] font-semibold text-amber-800 hover:bg-amber-100"
               >
                 {filtroStatus === "parcial" ? "Mostrar todos" : "Ver só as pendências"}
               </button>
@@ -14551,7 +14551,7 @@ function MedicoFiltroInput({
         <Input
           className={
             compact
-              ? "h-9 w-full truncate rounded-lg border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-800"
+              ? "h-9 w-full truncate rounded-lg border-slate-200 bg-card px-2.5 text-xs font-semibold text-slate-800"
               : undefined
           }
           data-agenda-filtro-prof
@@ -14987,7 +14987,7 @@ function DataRefField({
         <PopoverTrigger asChild>
           <button
             type="button"
-            className="flex h-9 w-full min-w-0 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-800 hover:bg-slate-50"
+            className="flex h-9 w-full min-w-0 items-center gap-1.5 rounded-lg border border-slate-200 bg-card px-2.5 text-xs font-semibold text-slate-800 hover:bg-slate-50"
           >
             <CalendarDays className="h-3.5 w-3.5 shrink-0 text-slate-400" />
             <span className="truncate">{label}</span>

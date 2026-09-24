@@ -76,6 +76,18 @@ export function PainelPage() {
     return () => clearInterval(id);
   }, []);
 
+  // O painel de senhas tem tema próprio (claro de dia, escuro de noite) e não
+  // segue o modo escuro do sistema. Como a tela roda em tela cheia numa TV,
+  // a classe `dark` do <html> é acertada aqui: sem isso, se a máquina tiver a
+  // preferência de modo escuro gravada, o painel claro herdaria as cores
+  // escuras do app e o texto ficaria ilegível sobre o fundo claro dele.
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    const html = document.documentElement;
+    html.classList.toggle("dark", !isLight);
+    html.style.colorScheme = isLight ? "light" : "dark";
+  }, [isLight]);
+
   // Destrava o áudio automaticamente no primeiro gesto do usuário em
   // QUALQUER lugar da página (política de autoplay dos navegadores).
   useEffect(() => {
@@ -162,7 +174,7 @@ export function PainelPage() {
         heading: "text-slate-900",
         clock: "text-slate-500",
         headerBorder: "border-slate-200",
-        heroCard: "bg-white border border-slate-200 shadow-xl",
+        heroCard: "bg-card border border-slate-200 shadow-xl",
         heroGlow: "bg-blue-500/10",
         badgeActive: "bg-blue-600 text-white",
         badgeIdle: "bg-slate-100 border border-slate-200 text-slate-500",
@@ -170,7 +182,7 @@ export function PainelPage() {
         patient: "text-slate-700",
         guicheLabel: "text-slate-500",
         guicheValue: "text-blue-600",
-        aside: "bg-white border border-slate-200",
+        aside: "bg-card border border-slate-200",
         asideTitle: "text-slate-500",
         asideEmpty: "text-slate-400",
         itemFirst: "bg-blue-50 border border-blue-100",
@@ -185,7 +197,7 @@ export function PainelPage() {
         footerBorder: "border-slate-200",
         footerText: "text-slate-400",
         idleText: "text-slate-400",
-        toggle: "bg-white border border-slate-200 text-slate-600 hover:bg-slate-50",
+        toggle: "bg-card border border-slate-200 text-slate-600 hover:bg-slate-50",
       }
     : {
         root: "bg-[#0a0b10] text-white",

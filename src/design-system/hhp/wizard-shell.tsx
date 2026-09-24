@@ -38,7 +38,7 @@ export function HhpWizardShell({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        className="w-[calc(100vw-1.5rem)] max-h-[90vh] overflow-y-auto p-0 gap-0 rounded-3xl border-slate-200 bg-white"
+        className="w-[calc(100vw-1.5rem)] max-h-[90vh] overflow-y-auto p-0 gap-0 rounded-3xl border-slate-200 bg-card"
         style={{ maxWidth }}
       >
         <VisuallyHidden.Root>

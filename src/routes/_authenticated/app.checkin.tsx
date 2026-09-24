@@ -213,7 +213,7 @@ function DateSelector({
           variant="outline"
           size="icon"
           onClick={() => navegarDia(-1)}
-          className="h-10 w-10 flex-shrink-0 rounded-lg border-slate-200 bg-white"
+          className="h-10 w-10 flex-shrink-0 rounded-lg border-slate-200 bg-card"
           title="Dia anterior"
         >
           <ChevronLeft className="h-4 w-4" />
@@ -222,7 +222,7 @@ function DateSelector({
         <div className="relative w-full max-w-[200px]">
           <Button
             variant="outline"
-            className={`w-full max-w-[200px] truncate justify-center h-10 rounded-lg border-slate-200 bg-white text-sm font-semibold px-3 ${corData}`}
+            className={`w-full max-w-[200px] truncate justify-center h-10 rounded-lg border-slate-200 bg-card text-sm font-semibold px-3 ${corData}`}
             onClick={() => setIsOpen(!isOpen)}
           >
             <CalendarDays className="h-4 w-4 shrink-0 mr-2" />
@@ -299,7 +299,7 @@ function DateSelector({
           variant="outline"
           size="icon"
           onClick={() => navegarDia(1)}
-          className="h-10 w-10 flex-shrink-0 rounded-lg border-slate-200 bg-white"
+          className="h-10 w-10 flex-shrink-0 rounded-lg border-slate-200 bg-card"
           title="Próximo dia"
         >
           <ChevronRight className="h-4 w-4" />
@@ -327,7 +327,7 @@ function SearchBar({
   buscaAplicada: string;
 }) {
   return (
-    <div className="bg-white border border-slate-200/80 p-4 rounded-xl shadow-xs">
+    <div className="bg-card border border-slate-200/80 p-4 rounded-xl shadow-xs">
       <div className="grid grid-cols-1 md:grid-cols-[320px_1fr_auto] gap-4 items-end">
         <DateSelector data={data} onDataChange={onDataChange} />
 
@@ -342,7 +342,7 @@ function SearchBar({
             <Search className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
             <Input
               id="busca-paciente"
-              className="pl-9 h-10 w-full bg-white border border-slate-200 rounded-lg text-sm"
+              className="pl-9 h-10 w-full bg-card border border-slate-200 rounded-lg text-sm"
               value={busca}
               onChange={(e) => onBuscaChange(e.target.value)}
               onKeyDown={(e) => {
@@ -500,7 +500,7 @@ function PatientCard({
 // 4. EmptyState - Componente de estado vazio
 function EmptyState() {
   return (
-    <div className="bg-white border border-slate-200/80 rounded-xl p-12 text-center shadow-xs">
+    <div className="bg-card border border-slate-200/80 rounded-xl p-12 text-center shadow-xs">
       <div className="w-12 h-12 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center mx-auto mb-3">
         <UserCheck className="h-6 w-6" />
       </div>

@@ -159,7 +159,7 @@ function AssinarContrato() {
               ref={canvasRef}
               width={600}
               height={200}
-              className="border-2 border-dashed rounded-md w-full bg-white touch-none"
+              className="border-2 border-dashed rounded-md w-full bg-card touch-none"
               onPointerDown={start}
               onPointerMove={move}
               onPointerUp={end}

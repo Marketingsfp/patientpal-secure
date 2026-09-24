@@ -914,14 +914,14 @@ function NfsePage() {
                       <div className="flex flex-wrap items-end gap-2">
                         <div className="space-y-1">
                           <label className="text-xs text-muted-foreground">Atual</label>
-                          <div className="h-9 px-2 rounded-md border bg-white text-sm flex items-center min-w-[80px]">
+                          <div className="h-9 px-2 rounded-md border bg-card text-sm flex items-center min-w-[80px]">
                             {rpsAtual ?? "…"}
                           </div>
                         </div>
                         <div className="space-y-1">
                           <label className="text-xs text-muted-foreground">Novo</label>
                           <Input
-                            className="h-9 w-28 bg-white"
+                            className="h-9 w-28 bg-card"
                             value={rpsNovoInput}
                             onChange={(e) => setRpsNovoInput(e.target.value.replace(/\D/g, ""))}
                             inputMode="numeric"
@@ -1046,7 +1046,7 @@ function NfsePage() {
             <PdfPreview
               nfseId={pdfVisualizando.id}
               baixar={baixarArquivo}
-              className="w-full h-[75vh] bg-white border rounded"
+              className="w-full h-[75vh] bg-card border rounded"
               title={`DANFSE ${pdfVisualizando.numero ?? ""}`}
             />
           )}

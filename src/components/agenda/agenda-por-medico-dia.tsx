@@ -100,7 +100,7 @@ export function AgendaPorMedicoDia({
 
   if (colunas.length === 0) {
     return (
-      <div className="rounded-2xl border border-slate-200 bg-white p-10 text-center text-sm text-slate-500">
+      <div className="rounded-2xl border border-slate-200 bg-card p-10 text-center text-sm text-slate-500">
         Nenhum profissional com agenda nesta data.
       </div>
     );
@@ -128,9 +128,9 @@ export function AgendaPorMedicoDia({
             return (
               <section
                 key={m.id}
-                className="flex w-full min-w-0 flex-col rounded-xl border border-slate-200/80 bg-white shadow-xs"
+                className="flex w-full min-w-0 flex-col rounded-xl border border-slate-200/80 bg-card shadow-xs"
               >
-                <header className="flex items-center gap-2.5 rounded-t-xl border-b-2 border-b-primary bg-white p-3">
+                <header className="flex items-center gap-2.5 rounded-t-xl border-b-2 border-b-primary bg-card p-3">
                   <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-primary/10 text-xs font-bold text-primary">
                     {iniciais(m.nome)}
                   </span>
@@ -173,7 +173,7 @@ export function AgendaPorMedicoDia({
                               ? "flex w-full min-w-0 flex-col rounded-lg border border-emerald-200 border-l-4 border-l-emerald-600 bg-emerald-50 p-2.5 text-left shadow-xs hover:bg-emerald-100"
                               : a.status === "cancelado" || a.status === "faltou"
                                 ? "flex w-full min-w-0 flex-col rounded-lg border border-rose-200 border-l-4 border-l-rose-600 bg-rose-50 p-2.5 text-left shadow-xs hover:bg-rose-100"
-                                : "flex w-full min-w-0 flex-col rounded-lg border border-slate-200/80 border-l-4 border-l-indigo-600 bg-white p-2.5 text-left shadow-xs hover:bg-slate-50"
+                                : "flex w-full min-w-0 flex-col rounded-lg border border-slate-200/80 border-l-4 border-l-indigo-600 bg-card p-2.5 text-left shadow-xs hover:bg-slate-50"
                         }
                       >
                         {livre ? (

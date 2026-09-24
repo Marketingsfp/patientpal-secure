@@ -83,7 +83,7 @@ export function ResumoDoDiaBar({ clinicaId, dataRef, filtroMedico, medicoNome, o
   const quem = filtroMedico === "todos" ? "Todos os profissionais" : (medicoNome ?? "Profissional");
 
   return (
-    <div className="mb-3 rounded-xl border border-slate-200 bg-white px-3 py-2.5 shadow-xs">
+    <div className="mb-3 rounded-xl border border-slate-200 bg-card px-3 py-2.5 shadow-xs">
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
         <div className="min-w-0 text-[13px]">
           <span className="font-semibold text-slate-900">Resumo do dia</span>
@@ -132,7 +132,7 @@ export function ResumoDoDiaBar({ clinicaId, dataRef, filtroMedico, medicoNome, o
             <Contador
               rotulo="Livres"
               valor={r.livres}
-              cor="border-slate-200 bg-white text-slate-700"
+              cor="border-slate-200 bg-card text-slate-700"
               titulo="Horários da grade ainda sem paciente."
             />
             <Contador

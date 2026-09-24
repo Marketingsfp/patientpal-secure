@@ -301,7 +301,7 @@ export function PatientDrawer({
                   className={cn(
                     "flex-1 h-8 rounded-lg text-[12px] font-medium transition-all",
                     tab === t.key
-                      ? "bg-white text-slate-900 shadow-sm"
+                      ? "bg-card text-slate-900 shadow-sm"
                       : "text-slate-500 hover:text-slate-700",
                   )}
                 >
@@ -424,7 +424,7 @@ function JourneyLine({ currentIdx }: { currentIdx: number }) {
                   current && "bg-indigo-500 text-white ring-4 ring-indigo-100",
                   !past &&
                     !current &&
-                    "bg-white text-slate-600 dark:text-slate-400 border border-slate-200",
+                    "bg-card text-slate-600 dark:text-slate-400 border border-slate-200",
                 )}
               >
                 {past ? <Check className="h-3 w-3" /> : i + 1}
@@ -469,7 +469,7 @@ function QuickAction({
               "Ação será integrada nas próximas fases sem alterar as regras dos módulos existentes.",
           }))
       }
-      className="flex flex-col items-center justify-center gap-1 h-14 rounded-xl border border-slate-200/70 bg-white hover:bg-slate-50 hover:border-slate-300 transition-colors text-slate-600 hover:text-slate-900"
+      className="flex flex-col items-center justify-center gap-1 h-14 rounded-xl border border-slate-200/70 bg-card hover:bg-slate-50 hover:border-slate-300 transition-colors text-slate-600 hover:text-slate-900"
     >
       <span className="text-slate-500">{icon}</span>
       <span className="text-[11px] font-medium">{label}</span>
@@ -490,7 +490,7 @@ function ProntuarioPanel({
   onOpen: () => void;
 }) {
   return (
-    <div className="rounded-xl border border-slate-100 bg-white p-4 space-y-3">
+    <div className="rounded-xl border border-slate-100 bg-card p-4 space-y-3">
       <div className="flex items-start gap-2">
         <Stethoscope className="h-4 w-4 text-primary mt-0.5" />
         <div className="min-w-0 flex-1">
@@ -638,7 +638,7 @@ function StatusActions({
             onClick={() => onChange(a.key)}
             className={cn(
               "inline-flex items-center gap-1.5 h-8 px-3 rounded-xl text-[12px] font-medium",
-              "border border-slate-200 bg-white hover:bg-slate-50 hover:border-slate-300 transition-colors",
+              "border border-slate-200 bg-card hover:bg-slate-50 hover:border-slate-300 transition-colors",
               a.cls,
             )}
           >
@@ -700,7 +700,7 @@ function PanelCard({
     <div
       className={cn(
         "rounded-xl border p-3 space-y-1",
-        tone === "danger" ? "border-rose-100 bg-rose-50/30" : "border-slate-100 bg-white",
+        tone === "danger" ? "border-rose-100 bg-rose-50/30" : "border-slate-100 bg-card",
       )}
     >
       <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-widest text-slate-600 dark:text-slate-400">

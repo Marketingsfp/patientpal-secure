@@ -623,7 +623,7 @@ function FluxoPage() {
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           {/* Navegação de data unificada */}
-          <div className="inline-flex items-center rounded-lg border border-slate-200 bg-white p-1 shadow-xs">
+          <div className="inline-flex items-center rounded-lg border border-slate-200 bg-card p-1 shadow-xs">
             <button
               type="button"
               className="cursor-pointer rounded-md p-1.5 text-slate-600 transition-colors hover:bg-slate-100"
@@ -669,7 +669,7 @@ function FluxoPage() {
             <PopoverTrigger asChild>
               <button
                 type="button"
-                className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-xs transition-colors hover:bg-slate-50"
+                className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 bg-card px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-xs transition-colors hover:bg-slate-50"
               >
                 <SlidersHorizontal className="h-3.5 w-3.5 text-slate-500" /> Sala{" "}
                 {consultorio || "?"}
@@ -702,7 +702,7 @@ function FluxoPage() {
             type="button"
             onClick={carregar}
             disabled={loading}
-            className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-xs transition-colors hover:bg-slate-50 disabled:opacity-60"
+            className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-slate-200 bg-card px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-xs transition-colors hover:bg-slate-50 disabled:opacity-60"
           >
             <RefreshCw className={cn("h-3.5 w-3.5 text-slate-500", loading && "animate-spin")} />{" "}
             Atualizar
@@ -724,7 +724,7 @@ function FluxoPage() {
         <select
           value={filtroMedico}
           onChange={(e) => setFiltroMedico(e.target.value)}
-          className="h-9 cursor-pointer rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-medium text-slate-700 shadow-xs"
+          className="h-9 cursor-pointer rounded-lg border border-slate-200 bg-card px-2.5 text-xs font-medium text-slate-700 shadow-xs"
         >
           <option value="">Todos os médicos</option>
           {opcoesMedico.map((m) => (
@@ -736,7 +736,7 @@ function FluxoPage() {
         <select
           value={filtroEspec}
           onChange={(e) => setFiltroEspec(e.target.value)}
-          className="h-9 cursor-pointer rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-medium text-slate-700 shadow-xs"
+          className="h-9 cursor-pointer rounded-lg border border-slate-200 bg-card px-2.5 text-xs font-medium text-slate-700 shadow-xs"
         >
           <option value="">Todas as especialidades</option>
           {opcoesEspec.map((p) => (
@@ -753,7 +753,7 @@ function FluxoPage() {
               setFiltroMedico("");
               setFiltroEspec("");
             }}
-            className="h-9 cursor-pointer rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-600 hover:bg-slate-50"
+            className="h-9 cursor-pointer rounded-lg border border-slate-200 bg-card px-3 text-xs font-semibold text-slate-600 hover:bg-slate-50"
           >
             Limpar
           </button>
@@ -812,7 +812,7 @@ function FluxoPage() {
                     )}
                   </div>
                 </div>
-                <span className="flex-shrink-0 rounded-full bg-white px-2 py-0.5 text-xs font-bold text-slate-600 shadow-xs">
+                <span className="flex-shrink-0 rounded-full bg-card px-2 py-0.5 text-xs font-bold text-slate-600 shadow-xs">
                   {items.length}
                 </span>
               </div>
@@ -862,7 +862,7 @@ function FluxoPage() {
                         setAlvoColuna(null);
                       }}
                       className={cn(
-                        "gap-0 rounded-xl border border-slate-200/70 bg-white p-3.5 shadow-xs transition-all duration-200 hover:shadow-md cursor-pointer",
+                        "gap-0 rounded-xl border border-slate-200/70 bg-card p-3.5 shadow-xs transition-all duration-200 hover:shadow-md cursor-pointer",
                         prioridadeInfo.border,
                         arrastando === a.id && "opacity-50",
                       )}

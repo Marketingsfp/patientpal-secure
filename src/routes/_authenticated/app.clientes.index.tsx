@@ -566,7 +566,7 @@ function ClientesPage() {
           </button>
           <button
             type="button"
-            className="inline-flex items-center border border-slate-200 text-slate-700 bg-white hover:bg-slate-50 rounded-lg text-xs font-semibold px-3.5 py-2 shadow-xs transition-colors"
+            className="inline-flex items-center border border-slate-200 text-slate-700 bg-card hover:bg-slate-50 rounded-lg text-xs font-semibold px-3.5 py-2 shadow-xs transition-colors"
             onClick={async () => {
               if (!clinicaAtual) return;
               const PAGE = 1000;
@@ -644,7 +644,7 @@ function ClientesPage() {
               porque quem confere é a mesma recepção que trabalha nesta lista. */}
           <Link
             to="/app/clientes/recentes"
-            className="inline-flex items-center bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 font-semibold text-xs px-4 py-2 rounded-lg shadow-sm transition-colors"
+            className="inline-flex items-center bg-card hover:bg-slate-50 border border-slate-200 text-slate-700 font-semibold text-xs px-4 py-2 rounded-lg shadow-sm transition-colors"
           >
             <ClipboardList className="h-4 w-4 mr-1.5" /> Cadastros recentes
           </Link>
@@ -660,7 +660,7 @@ function ClientesPage() {
         </div>
       </div>
 
-      <div className="bg-white border border-slate-200/80 p-3.5 rounded-xl shadow-xs mt-4 flex items-center justify-between gap-3">
+      <div className="bg-card border border-slate-200/80 p-3.5 rounded-xl shadow-xs mt-4 flex items-center justify-between gap-3">
         <div className="relative w-full max-w-xl">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
           <Input
@@ -670,7 +670,7 @@ function ClientesPage() {
               colouRef.current = true;
             }}
             placeholder="Buscar por nº serviço, nome, CPF, telefone, e-mail ou nascimento (dd/mm/aaaa)…"
-            className="pl-9 bg-white border border-slate-200 rounded-lg text-xs font-medium text-slate-800 placeholder:text-slate-400 h-10 w-full focus-visible:ring-1 focus-visible:ring-ring"
+            className="pl-9 bg-card border border-slate-200 rounded-lg text-xs font-medium text-slate-800 placeholder:text-slate-400 h-10 w-full focus-visible:ring-1 focus-visible:ring-ring"
           />
         </div>
       </div>
@@ -681,7 +681,7 @@ function ClientesPage() {
           (nome completo, CPF ou telefone) para ver mais.
         </div>
       )}
-      <div className="bg-white border border-slate-200/80 rounded-xl shadow-xs overflow-hidden mt-4">
+      <div className="bg-card border border-slate-200/80 rounded-xl shadow-xs overflow-hidden mt-4">
         <Table containerClassName="max-h-[70vh]" className="max-lg:table max-lg:overflow-visible">
           <TableHeader className="sticky top-0 z-20">
             <TableRow className="bg-slate-50/80 border-b border-slate-200/80 [&>th]:text-[12px] [&>th]:font-bold [&>th]:text-slate-500 [&>th]:uppercase [&>th]:tracking-wider">

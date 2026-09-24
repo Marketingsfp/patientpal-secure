@@ -4455,7 +4455,7 @@ function AtendimentosPage() {
               {comprovantes.length > 0 && (
                 <div
                   ref={printAreaRef}
-                  className="print-area bg-white text-black text-sm max-h-[70vh] overflow-y-auto print:max-h-none print:overflow-visible"
+                  className="print-area bg-card text-foreground text-sm max-h-[70vh] overflow-y-auto print:max-h-none print:overflow-visible"
                 >
                   {comprovantes.map((comprovante, blocoIdx) => (
                     <div

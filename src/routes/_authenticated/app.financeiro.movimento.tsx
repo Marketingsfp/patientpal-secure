@@ -2463,7 +2463,7 @@ function Page() {
           <Button
             variant="outline"
             size="sm"
-            className="shrink-0 border-sky-400 bg-white hover:bg-sky-100"
+            className="shrink-0 border-sky-400 bg-card hover:bg-sky-100"
             onClick={() => setBuscarTodasDatas(false)}
           >
             Voltar ao período
@@ -2510,7 +2510,7 @@ function Page() {
             <Button
               variant="outline"
               size="sm"
-              className={`shrink-0 bg-white ${
+              className={`shrink-0 bg-card ${
                 avisoRetro.tom === "atencao"
                   ? "border-amber-400 hover:bg-amber-100"
                   : "border-sky-400 hover:bg-sky-100"

@@ -46,7 +46,7 @@ export function ThemeSwitcher() {
   return (
     <div className="fixed bottom-4 right-4 z-[60]">
       {open && (
-        <div className="mb-2 w-60 rounded-xl border border-slate-200 bg-white shadow-lg overflow-hidden">
+        <div className="mb-2 w-60 rounded-xl border border-slate-200 bg-card shadow-lg overflow-hidden">
           <div className="px-3 py-2 text-[12px] font-semibold uppercase tracking-widest text-slate-500 border-b border-slate-100">
             Tema
           </div>
@@ -78,7 +78,7 @@ export function ThemeSwitcher() {
         onClick={() => setOpen((v) => !v)}
         aria-label="Trocar tema"
         title={`Tema: ${current.label}`}
-        className="relative h-10 w-10 rounded-full bg-white border border-slate-300 shadow-md flex items-center justify-center hover:bg-slate-50 transition-colors"
+        className="relative h-10 w-10 rounded-full bg-card border border-slate-300 shadow-md flex items-center justify-center hover:bg-slate-50 transition-colors"
       >
         <Palette className="h-4 w-4 text-slate-600" />
         <span

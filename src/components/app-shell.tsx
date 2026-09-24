@@ -363,7 +363,7 @@ function LiquidBottomNav({
           // `dark:bg-white` é intencional: a bolha do item ativo precisa
           // continuar branca para o ícone, que é pintado com a cor da
           // clínica, ter contraste em cima da barra escura.
-          className="pointer-events-none absolute top-0 left-0 h-12 w-12 -mt-5 flex items-center justify-center rounded-full bg-white dark:bg-white shadow-lg transform-gpu will-change-transform"
+          className="pointer-events-none absolute top-0 left-0 h-12 w-12 -mt-5 flex items-center justify-center rounded-full bg-card dark:bg-white shadow-lg transform-gpu will-change-transform"
           style={{
             color: cor,
             transform: `translate3d(${cx - 24}px, 0, 0)`,
@@ -1013,15 +1013,18 @@ function AppShellInner() {
   useEffect(() => {
     if (typeof document === "undefined") return;
     const root = document.documentElement;
-    root.style.setProperty("--primary", clinicColor);
-    root.style.setProperty("--ring", clinicColor);
-    root.style.setProperty("--sidebar-primary", clinicColor);
-    root.style.setProperty("--primary-foreground", "#ffffff");
+    // A cor da clínica é gravada em `--clinic-color`, e o CSS deriva dela o
+    // `--primary`, o `--ring` e o realce (ver styles.css).
+    //
+    // Antes o `--primary` era escrito aqui direto. Como `style` no elemento
+    // vence qualquer regra de folha de estilo, o tema escuro não conseguia
+    // ajustar a cor — e as cores das clínicas são escuras (o azul da Menino
+    // Jesus é #00008B), então no fundo escuro todo `text-primary` e
+    // `border-primary` ficava ilegível. Passando pela variável intermediária,
+    // o tema claro usa a cor como está e o escuro usa a mesma cor clareada.
+    root.style.setProperty("--clinic-color", clinicColor);
     return () => {
-      root.style.removeProperty("--primary");
-      root.style.removeProperty("--ring");
-      root.style.removeProperty("--sidebar-primary");
-      root.style.removeProperty("--primary-foreground");
+      root.style.removeProperty("--clinic-color");
     };
   }, [clinicColor]);
 
@@ -1855,7 +1858,7 @@ function AppShellInner() {
                                         }}
                                         className={`relative flex items-center gap-2.5 rounded-lg pl-8 pr-3 py-2 text-[14px] font-medium tracking-tight transition-all ${
                                           active
-                                            ? "bg-white text-slate-900 shadow-sm"
+                                            ? "bg-card text-slate-900 shadow-sm"
                                             : "text-white hover:bg-white/10 hover:text-white"
                                         }${hoverScaleCls}`}
                                       >
@@ -1900,7 +1903,7 @@ function AppShellInner() {
                               className={cn(
                                 `relative flex items-center gap-2.5 rounded-lg px-3 py-2 text-[14px] font-medium tracking-tight transition-all ${
                                   active
-                                    ? "bg-white text-slate-900 shadow-sm"
+                                    ? "bg-card text-slate-900 shadow-sm"
                                     : "text-white hover:bg-white/10 hover:text-white"
                                 }${hoverScaleCls}`,
                                 dragCls(navItemKey(item)),
@@ -1989,7 +1992,7 @@ function AppShellInner() {
           <button
             type="button"
             onClick={() => fecharSeletorPortais()}
-            className="absolute top-4 right-4 z-10 h-9 w-9 rounded-full bg-white/80 text-slate-600 shadow-md ring-1 ring-slate-200 flex items-center justify-center hover:bg-white"
+            className="absolute top-4 right-4 z-10 h-9 w-9 rounded-full bg-white/80 text-slate-600 shadow-md ring-1 ring-slate-200 flex items-center justify-center hover:bg-card"
             aria-label="Fechar seleção de portais"
             title="Voltar"
           >

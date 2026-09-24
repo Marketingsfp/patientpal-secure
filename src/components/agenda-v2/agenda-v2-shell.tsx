@@ -1014,7 +1014,7 @@ export function AgendaV2Shell() {
       {/* Sidebar operacional — visível em md+, vira Sheet no mobile (botão Painel no header) */}
       {!foco && !isMobile && (
         <Suspense
-          fallback={<div className="hidden md:block w-64 border-r border-slate-100 bg-white" />}
+          fallback={<div className="hidden md:block w-64 border-r border-slate-100 bg-card" />}
         >
           <div className="hidden md:flex">
             <AgendaV2Sidebar
@@ -1036,7 +1036,7 @@ export function AgendaV2Shell() {
                 Resumo do turno, sessões por tipo, recursos e equipe.
               </SheetDescription>
             </VisuallyHidden.Root>
-            <Suspense fallback={<div className="w-full h-40 bg-white" />}>
+            <Suspense fallback={<div className="w-full h-40 bg-card" />}>
               <AgendaV2Sidebar
                 clinicaNome={clinicaNome}
                 dia={dia}
@@ -1092,21 +1092,21 @@ export function AgendaV2Shell() {
                   <ToggleGroupItem
                     value="confortavel"
                     aria-label="Confortável"
-                    className="h-8 w-8 rounded-xl data-[state=on]:bg-white data-[state=on]:shadow-sm data-[state=on]:text-[color:var(--clinic-accent-strong)]"
+                    className="h-8 w-8 rounded-xl data-[state=on]:bg-card data-[state=on]:shadow-sm data-[state=on]:text-[color:var(--clinic-accent-strong)]"
                   >
                     <Rows3 className="h-3.5 w-3.5" />
                   </ToggleGroupItem>
                   <ToggleGroupItem
                     value="compacto"
                     aria-label="Compacto"
-                    className="h-8 w-8 rounded-xl data-[state=on]:bg-white data-[state=on]:shadow-sm data-[state=on]:text-[color:var(--clinic-accent-strong)]"
+                    className="h-8 w-8 rounded-xl data-[state=on]:bg-card data-[state=on]:shadow-sm data-[state=on]:text-[color:var(--clinic-accent-strong)]"
                   >
                     <Rows2 className="h-3.5 w-3.5" />
                   </ToggleGroupItem>
                   <ToggleGroupItem
                     value="foco"
                     aria-label="Foco"
-                    className="h-8 w-8 rounded-xl data-[state=on]:bg-white data-[state=on]:shadow-sm data-[state=on]:text-[color:var(--clinic-accent-strong)]"
+                    className="h-8 w-8 rounded-xl data-[state=on]:bg-card data-[state=on]:shadow-sm data-[state=on]:text-[color:var(--clinic-accent-strong)]"
                   >
                     <Focus className="h-3.5 w-3.5" />
                   </ToggleGroupItem>
@@ -1122,7 +1122,7 @@ export function AgendaV2Shell() {
                   <ToggleGroupItem
                     value="timeline"
                     aria-label="Timeline"
-                    className="h-8 px-3 gap-1.5 rounded-xl data-[state=on]:bg-white data-[state=on]:shadow-sm data-[state=on]:text-[color:var(--clinic-accent-strong)]"
+                    className="h-8 px-3 gap-1.5 rounded-xl data-[state=on]:bg-card data-[state=on]:shadow-sm data-[state=on]:text-[color:var(--clinic-accent-strong)]"
                   >
                     <GanttChartSquare className="h-3.5 w-3.5" />{" "}
                     <span className="hidden sm:inline text-xs">Timeline</span>
@@ -1130,7 +1130,7 @@ export function AgendaV2Shell() {
                   <ToggleGroupItem
                     value="list"
                     aria-label="Lista"
-                    className="h-8 px-3 gap-1.5 rounded-xl data-[state=on]:bg-white data-[state=on]:shadow-sm data-[state=on]:text-[color:var(--clinic-accent-strong)]"
+                    className="h-8 px-3 gap-1.5 rounded-xl data-[state=on]:bg-card data-[state=on]:shadow-sm data-[state=on]:text-[color:var(--clinic-accent-strong)]"
                   >
                     <LayoutList className="h-3.5 w-3.5" />{" "}
                     <span className="hidden sm:inline text-xs">Lista</span>
@@ -1191,7 +1191,7 @@ export function AgendaV2Shell() {
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
                 ref={searchInputRef}
-                className="pl-10 h-10 rounded-2xl bg-slate-100 border-transparent focus-visible:bg-white focus-visible:ring-2 focus-visible:ring-slate-200 text-sm placeholder:text-slate-600 dark:text-slate-400 transition-colors duration-150"
+                className="pl-10 h-10 rounded-2xl bg-slate-100 border-transparent focus-visible:bg-card focus-visible:ring-2 focus-visible:ring-slate-200 text-sm placeholder:text-slate-600 dark:text-slate-400 transition-colors duration-150"
                 aria-label="Busca"
               />
             </div>

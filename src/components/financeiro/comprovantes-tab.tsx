@@ -737,7 +737,7 @@ body.resumo-only .rows-full { display: none !important; }
           {grupoVisualizado && (
             <div
               ref={printAreaRef}
-              className="bg-white text-black text-sm max-h-[70vh] overflow-y-auto p-4 rounded-md border"
+              className="bg-card text-foreground text-sm max-h-[70vh] overflow-y-auto p-4 rounded-md border"
               dangerouslySetInnerHTML={{
                 __html: renderComprovanteHtml(grupoVisualizado, clinicaNome),
               }}

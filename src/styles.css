@@ -271,8 +271,13 @@
   --foreground: oklch(0.984 0.003 247.9);        /* #F8FAFC */
   --card: oklch(0.279 0.037 260.0);              /* #1E293B */
   --card-foreground: oklch(0.984 0.003 247.9);
-  --popover: oklch(0.372 0.039 257.3);           /* #334155 — elevado */
+  --popover: oklch(0.279 0.037 260.0);           /* #1E293B */
   --popover-foreground: oklch(0.984 0.003 247.9);
+  /* --primary é a cor da clínica. No escuro ela NÃO pode entrar crua: o azul
+   * da Menino Jesus (#00008B) sobre o fundo #0F172A tem contraste 1,17 — na
+   * prática, invisível. O valor final é clareado no bloco @supports do fim
+   * do arquivo; o que fica aqui é só a reserva para quando não há clínica
+   * ativa (login, portais). */
   --primary: oklch(0.714 0.143 254.6);
   --primary-foreground: oklch(0.208 0.040 265.8);
   --secondary: oklch(0.322 0.042 258.3);
@@ -295,12 +300,14 @@
   --chart-3: oklch(0.769 0.188 70.08);
   --chart-4: oklch(0.627 0.265 303.9);
   --chart-5: oklch(0.645 0.246 16.439);
-  /* Menu lateral: superfície da paleta, um degrau acima do fundo. */
-  --sidebar: oklch(0.279 0.037 260.0);           /* #1E293B */
+  /* Menu lateral: o tom mais escuro da escala (#0B0F17), um degrau ABAIXO do
+   * fundo da página. Sem saturação: a cor da clínica sai do bloco grande do
+   * menu e fica no item ativo e nos realces. */
+  --sidebar: oklch(0.175 0.020 265.0);           /* #0B0F17 */
   --sidebar-foreground: oklch(0.984 0.003 247.9);
   --sidebar-primary: oklch(0.714 0.143 254.6);
   --sidebar-primary-foreground: oklch(0.208 0.040 265.8);
-  --sidebar-accent: oklch(0.372 0.039 257.3);    /* #334155 */
+  --sidebar-accent: oklch(0.372 0.039 257.3);    /* #334155 — item ativo */
   --sidebar-accent-foreground: oklch(0.984 0.003 247.9);
   --sidebar-border: oklch(0.372 0.039 257.3);
   --sidebar-ring: oklch(0.714 0.039 257.3);
@@ -1425,9 +1432,32 @@ html.a11y-alto-contraste.dark {
   :root {
     --accent: color-mix(in oklch, var(--primary) 12%, var(--card));
     --accent-foreground: var(--primary);
+    /* A cor da clínica chega em `--clinic-color`, gravada no <html> pelo
+     * app-shell. No tema claro ela é usada como está — é o comportamento de
+     * sempre. A reserva é a cor neutra do app para as telas que ficam fora
+     * do app-shell (login, portais, totem). */
+    --primary: var(--clinic-color, oklch(0.72 0.13 178));
+    --ring: var(--primary);
+    --sidebar-primary: var(--clinic-color, oklch(0.86 0.10 240));
   }
   .dark {
+    /* No escuro a cor da clínica entra CLAREADA. Crua ela é ilegível: o azul
+     * da Menino Jesus (#00008B) tem contraste 1,17 contra o fundo #0F172A, o
+     * verde da São Francisco 2,51 e o neutro do modo "todas as clínicas"
+     * 1,00 — ou seja, todo `text-primary`, `border-primary` e anel de foco
+     * sumia. Misturada com 60% de #F8FAFC, a mesma cor passa a 5,6 (Menino
+     * Jesus), 7,2 (São Francisco), 7,3 (Consulta Hoje) e 4,9 (todas) contra
+     * o card — todas acima do mínimo de 4,5 da WCAG AA.
+     *
+     * A identidade continua reconhecível: é o mesmo tom, mais claro. E como
+     * o fundo do botão fica claro, `--primary-foreground` vira o texto
+     * escuro. */
+    --primary: color-mix(in oklab, var(--clinic-color, oklch(0.714 0.143 254.6)) 40%, #F8FAFC);
+    --primary-foreground: oklch(0.208 0.040 265.8);
+    --ring: var(--primary);
+    --sidebar-primary: var(--primary);
     --accent: color-mix(in oklch, var(--primary) 30%, var(--card));
+    --accent-foreground: var(--primary);
   }
 }
 
@@ -1465,7 +1495,7 @@ html.dark.agenda-v2-active {
   --background: oklch(0.208 0.040 265.8);        /* #0F172A */
   --muted: oklch(0.322 0.042 258.3);
   --accent: color-mix(in oklch, var(--primary) 30%, var(--card));
-  --sidebar: oklch(0.279 0.037 260.0);           /* #1E293B */
+  --sidebar: oklch(0.175 0.020 265.0);           /* #0B0F17 */
   --sidebar-foreground: oklch(0.984 0.003 247.9);
   --sidebar-accent: oklch(0.372 0.039 257.3);
   --sidebar-border: oklch(0.372 0.039 257.3);
@@ -1587,6 +1617,157 @@ html.dark.agenda-v2-active .agenda-v2-scope header {
   .dark :where(.divide-slate-100, .divide-slate-200, .divide-gray-100) > :not(:last-child) {
     border-color: var(--border);
   }
+
+
+  /* -------------------------------------------------------------------
+   * Cores de significado (aviso, sucesso, erro, informação)
+   * -------------------------------------------------------------------
+   * Cerca de 1.200 classes pelo sistema pintam avisos e etiquetas de status
+   * com a paleta clara do Tailwind: fundo `bg-amber-50` com texto
+   * `text-amber-700`, borda `border-amber-200`. No tema escuro isso dava os
+   * dois defeitos relatados ao mesmo tempo — a caixa ficava clara no meio da
+   * tela escura, e o mesmo `text-amber-700` usado solto, sem caixa, virava
+   * texto escuro sobre card escuro.
+   *
+   * A tradução mantém o significado da cor e troca só o peso:
+   *   fundo  -50/-100/-200  ->  o mesmo tom a 16%/20%/28%, translúcido
+   *   texto  -600 a -950    ->  o tom -300 do mesmo matiz
+   *   borda  -100/-200/-300 ->  o mesmo tom a 22%/30%/38%, translúcido
+   *
+   * Translúcido de propósito: a etiqueta se compõe com a superfície onde
+   * está (card, modal, linha de tabela) em vez de virar um bloco chapado.
+   *
+   * Conferido: nenhum desses textos escuros fica sobre fundo colorido forte
+   * no sistema (varredura em src/**), então clarear o texto é seguro em
+   * todos os casos. O contraste resultante do texto sobre a etiqueta fica
+   * entre 6,1 e 7,8 — o mínimo da WCAG AA é 4,5.
+   * ------------------------------------------------------------------- */
+  /* blue */
+  .dark :where(.bg-blue-50, .bg-blue-50\/40) { background-color: color-mix(in oklab, #3b82f6 16%, transparent); }
+  .dark :where(.hover\:bg-blue-50):hover { background-color: color-mix(in oklab, #3b82f6 16%, transparent); }
+  .dark :where(.bg-blue-100) { background-color: color-mix(in oklab, #3b82f6 20%, transparent); }
+  .dark :where(.hover\:bg-blue-100):hover { background-color: color-mix(in oklab, #3b82f6 20%, transparent); }
+  .dark :where(.text-blue-600, .text-blue-700, .text-blue-800, .text-blue-900) { color: #93c5fd; }
+  .dark :where(.hover\:text-blue-700, .hover\:text-blue-800):hover { color: #93c5fd; }
+  .dark :where(.border-blue-100) { border-color: color-mix(in oklab, #3b82f6 22%, transparent); }
+  .dark :where(.border-blue-200) { border-color: color-mix(in oklab, #3b82f6 30%, transparent); }
+  .dark :where(.border-blue-300) { border-color: color-mix(in oklab, #3b82f6 38%, transparent); }
+  .dark :where(.hover\:border-blue-300):hover { border-color: color-mix(in oklab, #3b82f6 38%, transparent); }
+
+  /* indigo */
+  .dark :where(.bg-indigo-50, .bg-indigo-50\/70) { background-color: color-mix(in oklab, #6366f1 16%, transparent); }
+  .dark :where(.bg-indigo-100) { background-color: color-mix(in oklab, #6366f1 20%, transparent); }
+  .dark :where(.text-indigo-600, .text-indigo-700, .text-indigo-800) { color: #a5b4fc; }
+  .dark :where(.border-indigo-200, .border-indigo-200\/70) { border-color: color-mix(in oklab, #6366f1 30%, transparent); }
+  .dark :where(.border-indigo-300) { border-color: color-mix(in oklab, #6366f1 38%, transparent); }
+
+  /* sky */
+  .dark :where(.bg-sky-50, .bg-sky-50\/40, .bg-sky-50\/60, .bg-sky-50\/70) { background-color: color-mix(in oklab, #0ea5e9 16%, transparent); }
+  .dark :where(.hover\:bg-sky-50):hover { background-color: color-mix(in oklab, #0ea5e9 16%, transparent); }
+  .dark :where(.bg-sky-100) { background-color: color-mix(in oklab, #0ea5e9 20%, transparent); }
+  .dark :where(.hover\:bg-sky-100, .hover\:bg-sky-100\/70):hover { background-color: color-mix(in oklab, #0ea5e9 20%, transparent); }
+  .dark :where(.text-sky-600, .text-sky-700, .text-sky-800, .text-sky-900, .text-sky-900\/80) { color: #7dd3fc; }
+  .dark :where(.border-sky-200) { border-color: color-mix(in oklab, #0ea5e9 30%, transparent); }
+  .dark :where(.border-sky-300) { border-color: color-mix(in oklab, #0ea5e9 38%, transparent); }
+
+  /* teal */
+  .dark :where(.bg-teal-50) { background-color: color-mix(in oklab, #14b8a6 16%, transparent); }
+  .dark :where(.text-teal-600, .text-teal-700) { color: #5eead4; }
+
+  /* emerald */
+  .dark :where(.bg-emerald-50, .bg-emerald-50\/40, .bg-emerald-50\/50, .bg-emerald-50\/60, .bg-emerald-50\/70) { background-color: color-mix(in oklab, #10b981 16%, transparent); }
+  .dark :where(.hover\:bg-emerald-50):hover { background-color: color-mix(in oklab, #10b981 16%, transparent); }
+  .dark :where(.bg-emerald-100) { background-color: color-mix(in oklab, #10b981 20%, transparent); }
+  .dark :where(.hover\:bg-emerald-100):hover { background-color: color-mix(in oklab, #10b981 20%, transparent); }
+  .dark :where(.text-emerald-600, .text-emerald-700, .text-emerald-700\/70, .text-emerald-800, .text-emerald-900) { color: #6ee7b7; }
+  .dark :where(.hover\:text-emerald-600, .hover\:text-emerald-700):hover { color: #6ee7b7; }
+  .dark :where(.focus\:text-emerald-800):focus { color: #6ee7b7; }
+  .dark :where(.border-emerald-100) { border-color: color-mix(in oklab, #10b981 22%, transparent); }
+  .dark :where(.border-emerald-200, .border-emerald-200\/60, .border-emerald-200\/70) { border-color: color-mix(in oklab, #10b981 30%, transparent); }
+  .dark :where(.border-emerald-300) { border-color: color-mix(in oklab, #10b981 38%, transparent); }
+
+  /* green */
+  .dark :where(.bg-green-50) { background-color: color-mix(in oklab, #22c55e 16%, transparent); }
+  .dark :where(.bg-green-100) { background-color: color-mix(in oklab, #22c55e 20%, transparent); }
+  .dark :where(.hover\:bg-green-100, .hover\:bg-green-100\/80):hover { background-color: color-mix(in oklab, #22c55e 20%, transparent); }
+  .dark :where(.text-green-600, .text-green-700, .text-green-800) { color: #86efac; }
+  .dark :where(.hover\:text-green-900):hover { color: #86efac; }
+  .dark :where(.border-green-200) { border-color: color-mix(in oklab, #22c55e 30%, transparent); }
+  .dark :where(.border-green-300) { border-color: color-mix(in oklab, #22c55e 38%, transparent); }
+
+  /* amber */
+  .dark :where(.bg-amber-50, .bg-amber-50\/40, .bg-amber-50\/60, .bg-amber-50\/70) { background-color: color-mix(in oklab, #f59e0b 16%, transparent); }
+  .dark :where(.hover\:bg-amber-50):hover { background-color: color-mix(in oklab, #f59e0b 16%, transparent); }
+  .dark :where(.bg-amber-100) { background-color: color-mix(in oklab, #f59e0b 20%, transparent); }
+  .dark :where(.hover\:bg-amber-100):hover { background-color: color-mix(in oklab, #f59e0b 20%, transparent); }
+  .dark :where(.hover\:bg-amber-200):hover { background-color: color-mix(in oklab, #f59e0b 28%, transparent); }
+  .dark :where(.text-amber-600, .text-amber-700, .text-amber-700\/80, .text-amber-700\/90, .text-amber-800, .text-amber-800\/80, .text-amber-900, .text-amber-900\/70, .text-amber-900\/80, .text-amber-900\/90) { color: #fcd34d; }
+  .dark :where(.hover\:text-amber-600, .hover\:text-amber-700):hover { color: #fcd34d; }
+  .dark :where(.border-amber-100) { border-color: color-mix(in oklab, #f59e0b 22%, transparent); }
+  .dark :where(.border-amber-200, .border-amber-200\/60, .border-amber-200\/70, .border-amber-200\/80) { border-color: color-mix(in oklab, #f59e0b 30%, transparent); }
+  .dark :where(.border-amber-300, .border-amber-300\/60) { border-color: color-mix(in oklab, #f59e0b 38%, transparent); }
+
+  /* yellow */
+  .dark :where(.bg-yellow-50, .bg-yellow-50\/50) { background-color: color-mix(in oklab, #eab308 16%, transparent); }
+  .dark :where(.bg-yellow-100) { background-color: color-mix(in oklab, #eab308 20%, transparent); }
+  .dark :where(.text-yellow-600, .text-yellow-800) { color: #fde047; }
+
+  /* orange */
+  .dark :where(.bg-orange-50\/60) { background-color: color-mix(in oklab, #f97316 16%, transparent); }
+  .dark :where(.bg-orange-100) { background-color: color-mix(in oklab, #f97316 20%, transparent); }
+  .dark :where(.hover\:bg-orange-100):hover { background-color: color-mix(in oklab, #f97316 20%, transparent); }
+  .dark :where(.text-orange-600, .text-orange-700, .text-orange-800, .text-orange-900) { color: #fdba74; }
+  .dark :where(.border-orange-200) { border-color: color-mix(in oklab, #f97316 30%, transparent); }
+
+  /* red */
+  .dark :where(.bg-red-50, .bg-red-50\/40, .bg-red-50\/50, .bg-red-50\/60) { background-color: color-mix(in oklab, #ef4444 16%, transparent); }
+  .dark :where(.bg-red-100) { background-color: color-mix(in oklab, #ef4444 20%, transparent); }
+  .dark :where(.hover\:bg-red-100):hover { background-color: color-mix(in oklab, #ef4444 20%, transparent); }
+  .dark :where(.text-red-600, .text-red-700, .text-red-800, .text-red-900) { color: #fca5a5; }
+  .dark :where(.hover\:text-red-600):hover { color: #fca5a5; }
+  .dark :where(.border-red-100) { border-color: color-mix(in oklab, #ef4444 22%, transparent); }
+  .dark :where(.border-red-200) { border-color: color-mix(in oklab, #ef4444 30%, transparent); }
+  .dark :where(.border-red-300) { border-color: color-mix(in oklab, #ef4444 38%, transparent); }
+
+  /* rose */
+  .dark :where(.bg-rose-50, .bg-rose-50\/30, .bg-rose-50\/40, .bg-rose-50\/60, .bg-rose-50\/70) { background-color: color-mix(in oklab, #f43f5e 16%, transparent); }
+  .dark :where(.hover\:bg-rose-50):hover { background-color: color-mix(in oklab, #f43f5e 16%, transparent); }
+  .dark :where(.bg-rose-100) { background-color: color-mix(in oklab, #f43f5e 20%, transparent); }
+  .dark :where(.hover\:bg-rose-100):hover { background-color: color-mix(in oklab, #f43f5e 20%, transparent); }
+  .dark :where(.text-rose-600, .text-rose-700, .text-rose-800, .text-rose-900) { color: #fda4af; }
+  .dark :where(.hover\:text-rose-600):hover { color: #fda4af; }
+  .dark :where(.focus\:text-rose-700, .focus\:text-rose-800):focus { color: #fda4af; }
+  .dark :where(.border-rose-100) { border-color: color-mix(in oklab, #f43f5e 22%, transparent); }
+  .dark :where(.border-rose-200, .border-rose-200\/60) { border-color: color-mix(in oklab, #f43f5e 30%, transparent); }
+  .dark :where(.border-rose-300) { border-color: color-mix(in oklab, #f43f5e 38%, transparent); }
+
+  /* pink */
+  .dark :where(.text-pink-600) { color: #f9a8d4; }
+
+  /* fuchsia */
+  .dark :where(.bg-fuchsia-50) { background-color: color-mix(in oklab, #d946ef 16%, transparent); }
+  .dark :where(.bg-fuchsia-100) { background-color: color-mix(in oklab, #d946ef 20%, transparent); }
+  .dark :where(.text-fuchsia-600, .text-fuchsia-700) { color: #f0abfc; }
+  .dark :where(.border-fuchsia-200) { border-color: color-mix(in oklab, #d946ef 30%, transparent); }
+  .dark :where(.border-fuchsia-300) { border-color: color-mix(in oklab, #d946ef 38%, transparent); }
+
+  /* purple */
+  .dark :where(.bg-purple-50) { background-color: color-mix(in oklab, #a855f7 16%, transparent); }
+  .dark :where(.bg-purple-100, .bg-purple-100\/60) { background-color: color-mix(in oklab, #a855f7 20%, transparent); }
+  .dark :where(.bg-purple-200\/70, .bg-purple-200\/80) { background-color: color-mix(in oklab, #a855f7 28%, transparent); }
+  .dark :where(.text-purple-600, .text-purple-950) { color: #d8b4fe; }
+  .dark :where(.border-purple-200\/70) { border-color: color-mix(in oklab, #a855f7 30%, transparent); }
+  .dark :where(.border-purple-300\/40, .border-purple-300\/70) { border-color: color-mix(in oklab, #a855f7 38%, transparent); }
+
+  /* violet */
+  .dark :where(.bg-violet-50, .bg-violet-50\/40) { background-color: color-mix(in oklab, #8b5cf6 16%, transparent); }
+  .dark :where(.hover\:bg-violet-50):hover { background-color: color-mix(in oklab, #8b5cf6 16%, transparent); }
+  .dark :where(.bg-violet-100) { background-color: color-mix(in oklab, #8b5cf6 20%, transparent); }
+  .dark :where(.hover\:bg-violet-100):hover { background-color: color-mix(in oklab, #8b5cf6 20%, transparent); }
+  .dark :where(.text-violet-600, .text-violet-700, .text-violet-800, .text-violet-900) { color: #c4b5fd; }
+  .dark :where(.border-violet-100) { border-color: color-mix(in oklab, #8b5cf6 22%, transparent); }
+  .dark :where(.border-violet-200) { border-color: color-mix(in oklab, #8b5cf6 30%, transparent); }
+  .dark :where(.border-violet-300) { border-color: color-mix(in oklab, #8b5cf6 38%, transparent); }
 
   /* Linhas internas das tabelas acompanham a borda da paleta. */
   .dark :where(table) :where(th, td) {

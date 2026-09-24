@@ -14,7 +14,7 @@ export function CriteriosSbd2025() {
   const [aberto, setAberto] = useState(false);
 
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white overflow-hidden">
+    <div className="rounded-2xl border border-slate-200 bg-card overflow-hidden">
       <button
         type="button"
         onClick={() => setAberto((v) => !v)}
@@ -68,10 +68,10 @@ export function CriteriosSbd2025() {
                     <td className="px-4 py-2.5 text-center tabular-nums text-slate-700">
                       {l.normal}
                     </td>
-                    <td className="px-4 py-2.5 text-center tabular-nums text-slate-800 dark:text-slate-900 bg-yellow-50">
+                    <td className="px-4 py-2.5 text-center tabular-nums text-slate-800 bg-yellow-50">
                       {l.pre}
                     </td>
-                    <td className="px-4 py-2.5 text-center tabular-nums font-medium text-slate-800 dark:text-slate-900 bg-red-50">
+                    <td className="px-4 py-2.5 text-center tabular-nums font-medium text-slate-800 bg-red-50">
                       {l.dm}
                     </td>
                   </tr>

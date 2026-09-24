@@ -260,7 +260,7 @@ function AgendaMedicosPage() {
             <span className="rounded-md bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
               {medicosFiltrados.length} profissiona{medicosFiltrados.length === 1 ? "l" : "is"}
             </span>
-            <span className="inline-flex items-center gap-3 rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-600 shadow-xs">
+            <span className="inline-flex items-center gap-3 rounded-full border border-slate-200 bg-card px-3 py-1 text-xs font-medium text-slate-600 shadow-xs">
               <span className="inline-flex items-center gap-1.5">
                 <span className="h-2 w-2 rounded-full bg-emerald-500" aria-hidden />
                 Horários livres
@@ -273,19 +273,19 @@ function AgendaMedicosPage() {
             </span>
           </div>
 
-          <div className="mt-3 flex w-full flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200/80 bg-white p-3 shadow-xs">
+          <div className="mt-3 flex w-full flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200/80 bg-card p-3 shadow-xs">
             <div className="flex h-9 items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 px-2 text-xs font-semibold">
               <button
                 type="button"
                 aria-label="Dia anterior"
-                className="grid h-7 w-7 place-items-center rounded-md text-slate-600 hover:bg-white"
+                className="grid h-7 w-7 place-items-center rounded-md text-slate-600 hover:bg-card"
                 onClick={() => setDataRef((d) => somaDias(d, -1))}
               >
                 <ChevronLeft className="h-4 w-4" />
               </button>
               <button
                 type="button"
-                className="rounded-md px-2 py-1 text-xs font-semibold text-slate-700 hover:bg-white"
+                className="rounded-md px-2 py-1 text-xs font-semibold text-slate-700 hover:bg-card"
                 onClick={() => setDataRef(hojeBR())}
               >
                 Hoje
@@ -293,7 +293,7 @@ function AgendaMedicosPage() {
               <button
                 type="button"
                 aria-label="Próximo dia"
-                className="grid h-7 w-7 place-items-center rounded-md text-slate-600 hover:bg-white"
+                className="grid h-7 w-7 place-items-center rounded-md text-slate-600 hover:bg-card"
                 onClick={() => setDataRef((d) => somaDias(d, 1))}
               >
                 <ChevronRight className="h-4 w-4" />
@@ -309,7 +309,7 @@ function AgendaMedicosPage() {
             </div>
 
             <Select value={medicoFiltro} onValueChange={setMedicoFiltro}>
-              <SelectTrigger className="h-9 w-[200px] rounded-lg border-slate-200 bg-white text-xs">
+              <SelectTrigger className="h-9 w-[200px] rounded-lg border-slate-200 bg-card text-xs">
                 <SelectValue placeholder="Todos os médicos" />
               </SelectTrigger>
               <SelectContent className="max-h-72">
@@ -323,7 +323,7 @@ function AgendaMedicosPage() {
             </Select>
 
             <Select value={espFiltro} onValueChange={setEspFiltro}>
-              <SelectTrigger className="h-9 w-[200px] rounded-lg border-slate-200 bg-white text-xs">
+              <SelectTrigger className="h-9 w-[200px] rounded-lg border-slate-200 bg-card text-xs">
                 <SelectValue placeholder="Todas as especialidades" />
               </SelectTrigger>
               <SelectContent className="max-h-72">
@@ -337,7 +337,7 @@ function AgendaMedicosPage() {
             </Select>
 
             <Select value={tipoFiltro} onValueChange={(v) => setTipoFiltro(v as typeof tipoFiltro)}>
-              <SelectTrigger className="h-9 w-[180px] rounded-lg border-slate-200 bg-white text-xs">
+              <SelectTrigger className="h-9 w-[180px] rounded-lg border-slate-200 bg-card text-xs">
                 <SelectValue placeholder="Salas" />
               </SelectTrigger>
               <SelectContent>
@@ -353,7 +353,7 @@ function AgendaMedicosPage() {
                 value={busca}
                 onChange={(e) => setBusca(e.target.value)}
                 placeholder="Buscar médico, exame ou especialidade…"
-                className="h-9 w-full rounded-lg border-slate-200 bg-white pl-9 text-xs"
+                className="h-9 w-full rounded-lg border-slate-200 bg-card pl-9 text-xs"
               />
             </div>
 
@@ -361,7 +361,7 @@ function AgendaMedicosPage() {
               type="button"
               onClick={() => void carregar()}
               disabled={loading}
-              className="flex h-9 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 shadow-xs hover:bg-slate-50 disabled:opacity-60"
+              className="flex h-9 items-center gap-1.5 rounded-lg border border-slate-200 bg-card px-3 text-xs font-semibold text-slate-700 shadow-xs hover:bg-slate-50 disabled:opacity-60"
             >
               {loading ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -374,7 +374,7 @@ function AgendaMedicosPage() {
         </header>
 
         {loading ? (
-          <div className="rounded-2xl border border-slate-200/80 bg-white p-12 text-center text-sm text-slate-500">
+          <div className="rounded-2xl border border-slate-200/80 bg-card p-12 text-center text-sm text-slate-500">
             Carregando agenda…
           </div>
         ) : (

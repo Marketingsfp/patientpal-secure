@@ -161,7 +161,7 @@ function AgendaV2Page() {
 function ShellFallback() {
   return (
     <div className="h-full flex bg-[color:var(--hhp-surface-page)]">
-      <div className="hidden md:block w-64 border-r border-slate-100 bg-white p-4 space-y-3">
+      <div className="hidden md:block w-64 border-r border-slate-100 bg-card p-4 space-y-3">
         <Skeleton className="h-6 w-32" />
         <Skeleton className="h-4 w-40" />
         <Skeleton className="h-24 w-full rounded-2xl" />

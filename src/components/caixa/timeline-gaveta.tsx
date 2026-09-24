@@ -44,7 +44,7 @@ export function TimelineGaveta({
     .reduce((a, m) => a + Number(m.valor || 0), 0);
 
   return (
-    <div className="bg-white border border-slate-200/80 rounded-xl shadow-xs">
+    <div className="bg-card border border-slate-200/80 rounded-xl shadow-xs">
       <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 border-b border-slate-200/70">
         <div className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
           Sangrias e suprimentos do turno

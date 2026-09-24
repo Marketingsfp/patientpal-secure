@@ -74,7 +74,7 @@ export function InformacoesRapidasCard({ className }: { className?: string }) {
   const { desativada: ninaOff } = useNinaDesativada();
 
   return (
-    <section className={cn("rounded-2xl border border-slate-100 bg-white p-4", className)}>
+    <section className={cn("rounded-2xl border border-slate-100 bg-card p-4", className)}>
       <div className="flex items-start gap-3">
         <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-600">
           <BookOpen className="h-4 w-4" />

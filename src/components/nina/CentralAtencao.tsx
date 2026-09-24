@@ -237,7 +237,7 @@ export function CentralAtencao() {
             <>
               <span
                 aria-hidden
-                className="central-atencao-ponto inline-block h-2 w-2 shrink-0 rounded-full bg-white"
+                className="central-atencao-ponto inline-block h-2 w-2 shrink-0 rounded-full bg-card"
               />
               <AlertTriangle className="h-4 w-4 shrink-0 lg:hidden" aria-hidden />
               <span className="hidden xl:inline">Central de Atenção</span>

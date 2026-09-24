@@ -70,7 +70,7 @@ function PrintPage() {
         </Button>
       </div>
       <div className="flex justify-center py-6">
-        <div className="receipt bg-white p-2 shadow">
+        <div className="receipt bg-card p-2 shadow">
           <h1>{clin?.nome ?? "Comprovante"}</h1>
           <div className="divider" />
           <div className="row">

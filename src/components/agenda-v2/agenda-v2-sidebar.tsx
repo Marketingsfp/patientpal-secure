@@ -196,7 +196,7 @@ export function AgendaV2Sidebar({ clinicaNome, dia, sessoes, recursos, equipeOnl
             {equipeOnline.slice(0, 8).map((m) => (
               <div
                 key={m.id}
-                className="relative h-7 w-7 rounded-full bg-white border border-slate-200 flex items-center justify-center text-[11px] font-semibold text-slate-600 shadow-sm"
+                className="relative h-7 w-7 rounded-full bg-card border border-slate-200 flex items-center justify-center text-[11px] font-semibold text-slate-600 shadow-sm"
                 title={m.nome}
               >
                 {initials(m.nome)}
