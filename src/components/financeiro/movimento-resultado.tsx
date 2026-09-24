@@ -34,6 +34,7 @@ import {
 import { useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { abrirDetalheEmNovaAba } from "@/lib/financeiro/detalhe-aba";
 import { Card, CardContent } from "@/components/ui/card";
 import { brl } from "@/lib/financeiro/format";
@@ -51,6 +52,7 @@ import {
   resumoMovimento,
   resumoPorProfissional,
   rotuloFiltro,
+  SEM_PROFISSIONAL,
   type FiltroCard,
   type GrupoMovimento,
   type LinhaClassificada,
@@ -175,16 +177,27 @@ function QuadroProfissionais({
   filtro: FiltroCard | null;
   onFiltro: (f: FiltroCard | null) => void;
 }) {
+  /** Busca por nome, só deste quadro — não mexe na lista de lançamentos. */
+  const [busca, setBusca] = useState("");
   const dados = resumoPorProfissional(linhas);
+  // O hook acima fica ANTES desta saída: hook depois de `return` quebra a
+  // regra do React e derruba a tela quando o período não tem atendimento.
   if (dados.length === 0) return null;
+  const chave = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toUpperCase();
+  const termo = chave(busca.trim());
+  const visiveis = termo ? dados.filter((d) => chave(d.profissional).includes(termo)) : dados;
+  // Os totais seguem o que está NA TELA: quem digita um nome espera a soma
+  // daquele nome, não a do período inteiro. O rótulo muda junto, para ninguém
+  // confundir um total filtrado com o total do dia.
   const totalGeral = {
-    consulta: dados.reduce((s, d) => s + d.consulta.total, 0),
-    consultaQtd: dados.reduce((s, d) => s + d.consulta.qtd, 0),
-    exame: dados.reduce((s, d) => s + d.exame.total, 0),
-    exameQtd: dados.reduce((s, d) => s + d.exame.qtd, 0),
-    total: dados.reduce((s, d) => s + d.total.total, 0),
-    totalQtd: dados.reduce((s, d) => s + d.total.qtd, 0),
+    consulta: visiveis.reduce((s, d) => s + d.consulta.total, 0),
+    consultaQtd: visiveis.reduce((s, d) => s + d.consulta.qtd, 0),
+    exame: visiveis.reduce((s, d) => s + d.exame.total, 0),
+    exameQtd: visiveis.reduce((s, d) => s + d.exame.qtd, 0),
+    total: visiveis.reduce((s, d) => s + d.total.total, 0),
+    totalQtd: visiveis.reduce((s, d) => s + d.total.qtd, 0),
   };
+  const destaque = visiveis.find((d) => d.profissional !== SEM_PROFISSIONAL) ?? null;
   const alternar = (f: FiltroCard) => onFiltro(mesmoFiltro(filtro, f) ? null : f);
   // Duas linhas por célula (valor em cima, quantidade embaixo). A altura da
   // linha vem daqui, não do padding: por isso as duas usam entrelinha curta.
@@ -205,75 +218,134 @@ function QuadroProfissionais({
             Consultas × Exames pelo tipo do serviço cadastrado — clique para filtrar a lista
           </p>
         </div>
-        {/* Sem rolagem interna: a tabela mostra a lista inteira e quem rola é
-            a página. A rolagem dentro do quadro chegou a existir nesta mesma
-            data, junto com o layout de duas colunas, e saiu junto com ele —
-            com o quadro em largura total não há mais vazio a tapar. */}
-        <div className="overflow-x-auto">
-          {/* Largura total do card, com as três colunas de valor em largura
-              fixa (8rem) e o nome ocupando todo o resto. Em 23/09/2026 a
-              tabela tinha sido encolhida para o tamanho do conteúdo; em
-              24/09/2026 o dono pediu de volta a largura cheia, agora sem o
-              vazio do meio, porque a coluna do nome é que se estica. */}
-          {/* `max-w-4xl` para a tabela não esticar em monitor largo: sem ele,
-              a coluna do nome comia toda a sobra e jogava os valores na borda
-              direita, longe do nome (pedido de 24/09/2026). O card continua em
-              largura total, e a tabela fica CENTRALIZADA nele (`mx-auto`) —
-              assim a sobra se divide igual dos dois lados e parece proposital,
-              em vez do vazio só à direita que incomodava. */}
-          <table className="mx-auto w-full max-w-4xl text-xs">
-            <thead>
-              <tr className="text-[10px] uppercase tracking-wide text-muted-foreground">
-                <th className="py-1 pr-6 text-left font-medium">Profissional</th>
-                <th className="w-36 py-1 px-3 text-right font-medium">Consultas</th>
-                <th className="w-36 py-1 px-3 text-right font-medium">Exames</th>
-                <th className="w-36 py-1 px-3 text-right font-medium">Total</th>
-              </tr>
-            </thead>
-            <tbody>
-              {dados.map((d) => {
-                const f: FiltroCard = { profissional: d.profissional };
-                const ativo = mesmoFiltro(filtro, f);
-                return (
-                  <tr
-                    key={d.profissional}
-                    className={`border-t border-border/60 cursor-pointer hover:bg-muted/40 ${
-                      ativo ? "bg-primary/5" : ""
-                    }`}
-                    aria-selected={ativo}
-                    onClick={() => alternar(f)}
-                  >
-                    <td className="py-1 pr-6 leading-tight">{d.profissional}</td>
-                    <td className="py-1 px-3 text-right">{celula(d.consulta)}</td>
-                    <td className="py-1 px-3 text-right">{celula(d.exame)}</td>
-                    <td className="py-1 px-3 text-right font-medium">{celula(d.total)}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
+        {/* Três colunas ocupando a largura inteira (pedido de 24/09/2026):
+            busca à esquerda, tabela no meio, resumo à direita. Antes a tabela
+            sozinha no card deixava as laterais vazias — quatro tentativas de
+            layout esbarraram nisso. Abaixo de xl vira uma coluna só, na ordem
+            busca, tabela e resumo. */}
+        <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,2.75fr)_minmax(0,1.25fr)]">
+          <aside className="space-y-3">
+            <div className="space-y-1">
+              <label
+                htmlFor="busca-profissional"
+                className="text-[11px] uppercase tracking-wide text-muted-foreground"
+              >
+                Buscar profissional
+              </label>
+              <Input
+                id="busca-profissional"
+                type="search"
+                value={busca}
+                onChange={(e) => setBusca(e.target.value)}
+                placeholder="Nome do profissional..."
+                className="h-9 text-xs"
+              />
+            </div>
+            {termo && (
+              <p className="text-[11px] text-muted-foreground">
+                {visiveis.length} de {dados.length} profissionais
+              </p>
+            )}
+            {filtro?.profissional && (
+              <Button variant="outline" size="sm" className="w-full" onClick={() => onFiltro(null)}>
+                <X className="h-3.5 w-3.5 mr-1" />
+                Limpar filtro
+              </Button>
+            )}
+            <p className="text-[11px] leading-snug text-muted-foreground">
+              O período é o mesmo escolhido no topo da tela, em De / Até.
+            </p>
+          </aside>
 
-            <tfoot>
-              <tr className="border-t-2 border-border bg-muted/40 font-semibold">
-                <td className="py-1 pr-6 whitespace-nowrap">Total geral</td>
-                <td className="py-1 px-3 text-right">
-                  {celula({ total: totalGeral.consulta, qtd: totalGeral.consultaQtd })}
-                </td>
-                <td className="py-1 px-3 text-right">
-                  {celula({ total: totalGeral.exame, qtd: totalGeral.exameQtd })}
-                </td>
-                <td className="py-1 px-3 text-right">
-                  {celula({ total: totalGeral.total, qtd: totalGeral.totalQtd })}
-                </td>
-              </tr>
-            </tfoot>
-          </table>
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                  <th className="py-1 pr-4 text-left font-medium">Profissional</th>
+                  <th className="w-32 py-1 px-2 text-right font-medium">Consultas</th>
+                  <th className="w-32 py-1 px-2 text-right font-medium">Exames</th>
+                  <th className="w-32 py-1 px-2 text-right font-medium">Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                {visiveis.map((d) => {
+                  const f: FiltroCard = { profissional: d.profissional };
+                  const ativo = mesmoFiltro(filtro, f);
+                  return (
+                    <tr
+                      key={d.profissional}
+                      className={`border-t border-border/60 cursor-pointer hover:bg-muted/40 ${
+                        ativo ? "bg-primary/5" : ""
+                      }`}
+                      aria-selected={ativo}
+                      onClick={() => alternar(f)}
+                    >
+                      <td className="py-1 pr-4 leading-tight">{d.profissional}</td>
+                      <td className="py-1 px-2 text-right">{celula(d.consulta)}</td>
+                      <td className="py-1 px-2 text-right">{celula(d.exame)}</td>
+                      <td className="py-1 px-2 text-right font-medium">{celula(d.total)}</td>
+                    </tr>
+                  );
+                })}
+                {visiveis.length === 0 && (
+                  <tr className="border-t border-border/60">
+                    <td colSpan={4} className="py-3 text-center text-muted-foreground">
+                      Nenhum profissional com esse nome no período.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+              <tfoot>
+                <tr className="border-t-2 border-border bg-muted/40 font-semibold">
+                  <td className="py-1 pr-4 whitespace-nowrap">
+                    {termo ? "Total filtrado" : "Total geral"}
+                  </td>
+                  <td className="py-1 px-2 text-right">
+                    {celula({ total: totalGeral.consulta, qtd: totalGeral.consultaQtd })}
+                  </td>
+                  <td className="py-1 px-2 text-right">
+                    {celula({ total: totalGeral.exame, qtd: totalGeral.exameQtd })}
+                  </td>
+                  <td className="py-1 px-2 text-right">
+                    {celula({ total: totalGeral.total, qtd: totalGeral.totalQtd })}
+                  </td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+
+          <aside className="space-y-2">
+            <div className="rounded-lg border border-border p-3">
+              <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                Faturamento do período
+              </p>
+              <p className="text-xl font-bold tabular-nums">{brl(totalGeral.total)}</p>
+              <p className="text-[11px] text-foreground/75">
+                Consultas {brl(totalGeral.consulta)} · Exames {brl(totalGeral.exame)}
+              </p>
+            </div>
+            <div className="rounded-lg border border-border p-3">
+              <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                Atendimentos
+              </p>
+              <p className="text-xl font-bold tabular-nums">{int(totalGeral.totalQtd)}</p>
+              <p className="text-[11px] text-foreground/75">
+                {int(totalGeral.consultaQtd)} consultas e {int(totalGeral.exameQtd)} exames
+              </p>
+            </div>
+            {destaque && (
+              <div className="rounded-lg border border-border p-3">
+                <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                  Destaque do período
+                </p>
+                <p className="text-sm font-semibold leading-tight">{destaque.profissional}</p>
+                <p className="text-[11px] text-foreground/75 tabular-nums">
+                  {brl(destaque.total.total)} em {int(destaque.total.qtd)} atendimento(s)
+                </p>
+              </div>
+            )}
+          </aside>
         </div>
-        {filtro?.profissional && (
-          <Button variant="outline" size="sm" onClick={() => onFiltro(null)}>
-            <X className="h-3.5 w-3.5 mr-1" />
-            Limpar filtro · {rotuloFiltro(filtro)}
-          </Button>
-        )}
       </CardContent>
     </Card>
   );
