@@ -218,8 +218,10 @@ function QuadroProfissionais({
           {/* `max-w-4xl` para a tabela não esticar em monitor largo: sem ele,
               a coluna do nome comia toda a sobra e jogava os valores na borda
               direita, longe do nome (pedido de 24/09/2026). O card continua em
-              largura total. */}
-          <table className="w-full max-w-4xl text-xs">
+              largura total, e a tabela fica CENTRALIZADA nele (`mx-auto`) —
+              assim a sobra se divide igual dos dois lados e parece proposital,
+              em vez do vazio só à direita que incomodava. */}
+          <table className="mx-auto w-full max-w-4xl text-xs">
             <thead>
               <tr className="text-[10px] uppercase tracking-wide text-muted-foreground">
                 <th className="py-1 pr-6 text-left font-medium">Profissional</th>
