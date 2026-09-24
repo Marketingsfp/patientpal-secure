@@ -201,34 +201,23 @@ function QuadroProfissionais({
             Consultas × Exames pelo tipo do serviço cadastrado — clique para filtrar a lista
           </p>
         </div>
-        {/* Rolagem dentro do quadro (24/09/2026): a lista de profissionais é
-            longa e o card vizinho é curto, então a página inteira rolava e
-            deixava um vazio enorme à direita. Agora quem rola é a tabela, e o
-            card fica com altura parecida com o da direita. */}
-        <div className="overflow-auto max-h-[550px]">
+        {/* Sem rolagem interna: a tabela mostra a lista inteira e quem rola é
+            a página. A rolagem dentro do quadro chegou a existir nesta mesma
+            data, junto com o layout de duas colunas, e saiu junto com ele —
+            com o quadro em largura total não há mais vazio a tapar. */}
+        <div className="overflow-x-auto">
           {/* Largura total do card, com as três colunas de valor em largura
               fixa (8rem) e o nome ocupando todo o resto. Em 23/09/2026 a
               tabela tinha sido encolhida para o tamanho do conteúdo; em
               24/09/2026 o dono pediu de volta a largura cheia, agora sem o
               vazio do meio, porque a coluna do nome é que se estica. */}
           <table className="w-full text-xs">
-            {/* `sticky` vai nas CÉLULAS, não no <thead>/<tfoot>: em tabela o
-                navegador não gruda a linha inteira. O fundo sólido é
-                obrigatório, senão as linhas roladas aparecem por baixo. */}
             <thead>
               <tr className="text-[10px] uppercase tracking-wide text-muted-foreground">
-                <th className="sticky top-0 z-10 bg-card py-1 pr-6 text-left font-medium">
-                  Profissional
-                </th>
-                <th className="sticky top-0 z-10 w-32 bg-card py-1 px-3 text-right font-medium">
-                  Consultas
-                </th>
-                <th className="sticky top-0 z-10 w-32 bg-card py-1 px-3 text-right font-medium">
-                  Exames
-                </th>
-                <th className="sticky top-0 z-10 w-32 bg-card py-1 px-3 text-right font-medium">
-                  Total
-                </th>
+                <th className="py-1 pr-8 text-left font-medium">Profissional</th>
+                <th className="w-40 py-1 px-4 text-right font-medium">Consultas</th>
+                <th className="w-40 py-1 px-4 text-right font-medium">Exames</th>
+                <th className="w-40 py-1 px-4 text-right font-medium">Total</th>
               </tr>
             </thead>
             <tbody>
@@ -244,29 +233,25 @@ function QuadroProfissionais({
                     aria-selected={ativo}
                     onClick={() => alternar(f)}
                   >
-                    <td className="py-0.5 pr-6 leading-tight">{d.profissional}</td>
-                    <td className="py-0.5 px-3 text-right">{celula(d.consulta)}</td>
-                    <td className="py-0.5 px-3 text-right">{celula(d.exame)}</td>
-                    <td className="py-0.5 px-3 text-right font-medium">{celula(d.total)}</td>
+                    <td className="py-0.5 pr-8 leading-tight">{d.profissional}</td>
+                    <td className="py-0.5 px-4 text-right">{celula(d.consulta)}</td>
+                    <td className="py-0.5 px-4 text-right">{celula(d.exame)}</td>
+                    <td className="py-0.5 px-4 text-right font-medium">{celula(d.total)}</td>
                   </tr>
                 );
               })}
             </tbody>
 
             <tfoot>
-              {/* O total gruda embaixo: com a rolagem interna ele sairia de
-                  vista, e é o número que a conferência procura. */}
-              <tr className="border-t-2 border-border font-semibold">
-                <td className="sticky bottom-0 z-10 border-t-2 border-border bg-muted py-1 pr-6 whitespace-nowrap">
-                  Total geral
-                </td>
-                <td className="sticky bottom-0 z-10 border-t-2 border-border bg-muted py-1 px-3 text-right">
+              <tr className="border-t-2 border-border bg-muted/40 font-semibold">
+                <td className="py-1 pr-8 whitespace-nowrap">Total geral</td>
+                <td className="py-1 px-4 text-right">
                   {celula({ total: totalGeral.consulta, qtd: totalGeral.consultaQtd })}
                 </td>
-                <td className="sticky bottom-0 z-10 border-t-2 border-border bg-muted py-1 px-3 text-right">
+                <td className="py-1 px-4 text-right">
                   {celula({ total: totalGeral.exame, qtd: totalGeral.exameQtd })}
                 </td>
-                <td className="sticky bottom-0 z-10 border-t-2 border-border bg-muted py-1 px-3 text-right">
+                <td className="py-1 px-4 text-right">
                   {celula({ total: totalGeral.total, qtd: totalGeral.totalQtd })}
                 </td>
               </tr>
@@ -803,75 +788,72 @@ export function MovimentoResultado({
             </CardContent>
           </Card>
 
-          {/* Lado a lado a partir do lg (pedido de 24/09/2026): a tabela por
-              profissional é alta e estreita, e sozinha em largura total
-              deixava metade da tela vazia. Ao lado dela vai o detalhamento de
-              mensalidades, que é o outro quadro de resumo do período — os
-              dois viram uma coluna só em tela pequena. `items-start` para o
-              card mais baixo não esticar até a altura do outro. */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 items-start">
-            <QuadroProfissionais linhas={linhas} filtro={filtro} onFiltro={onFiltro} />
-
-            <Card>
-              <CardContent className="p-4 space-y-2">
-                <div className="flex items-start justify-between gap-3 flex-wrap">
-                  <div>
-                    <p className="text-sm font-medium">Detalhamento de mensalidades no período</p>
-                    <p className="text-xs text-muted-foreground">
-                      Quanto entrou no caixa × a qual mês cada pagamento se refere
-                    </p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
-                      Total recebido
-                    </p>
-                    <p className="text-lg font-semibold tabular-nums">{brl(mensalidades.total)}</p>
-                    <p className="text-[10px] text-muted-foreground">
-                      {plural(mensalidades.qtd, "pagamento", "pagamentos")}
-                    </p>
-                  </div>
+          {/* Um embaixo do outro, cada um em largura total. Chegou-se a
+              colocá-los lado a lado nesta mesma data, para tapar o vazio à
+              direita, mas meia tela apertou demais a tabela por profissional:
+              o dono preferiu a largura inteira para os dois, mensalidades em
+              cima e profissionais embaixo. */}
+          <Card>
+            <CardContent className="p-4 space-y-2">
+              <div className="flex items-start justify-between gap-3 flex-wrap">
+                <div>
+                  <p className="text-sm font-medium">Detalhamento de mensalidades no período</p>
+                  <p className="text-xs text-muted-foreground">
+                    Quanto entrou no caixa × a qual mês cada pagamento se refere
+                  </p>
                 </div>
-                <div className="grid gap-2 sm:grid-cols-2">
+                <div className="text-right">
+                  <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                    Total recebido
+                  </p>
+                  <p className="text-lg font-semibold tabular-nums">{brl(mensalidades.total)}</p>
+                  <p className="text-[10px] text-muted-foreground">
+                    {plural(mensalidades.qtd, "pagamento", "pagamentos")}
+                  </p>
+                </div>
+              </div>
+              <div className="grid gap-2 sm:grid-cols-2">
+                <BotaoFiltro
+                  rotulo={LABEL_GRUPO_MOV.adesao}
+                  legenda={LEGENDA.adesao}
+                  valor={r.outras.porGrupo.adesao}
+                  ativo={mesmoFiltro(filtro, { grupo: "adesao" })}
+                  onClick={() => alternar({ grupo: "adesao" })}
+                />
+                <div className="rounded-md border border-border bg-muted/30 px-3 py-2">
+                  <p className="text-[11px] uppercase tracking-wide text-muted-foreground truncate">
+                    Mensalidades (recorrentes)
+                  </p>
+                  <p className="text-lg font-semibold tabular-nums">{brl(recorrentes.total)}</p>
+                  <p className="text-[10px] text-muted-foreground">
+                    {plural(recorrentes.qtd, "pagamento", "pagamentos")} · detalhado abaixo por mês
+                    de competência
+                  </p>
+                </div>
+              </div>
+              <div className="grid gap-2 sm:grid-cols-3">
+                {(
+                  [
+                    ["mensalidade_periodo", "verde"],
+                    ["mensalidade_atrasada", "ambar"],
+                    ["mensalidade_antecipada", "azul"],
+                  ] as const
+                ).map(([g, tom]) => (
                   <BotaoFiltro
-                    rotulo={LABEL_GRUPO_MOV.adesao}
-                    legenda={LEGENDA.adesao}
-                    valor={r.outras.porGrupo.adesao}
-                    ativo={mesmoFiltro(filtro, { grupo: "adesao" })}
-                    onClick={() => alternar({ grupo: "adesao" })}
+                    key={g}
+                    rotulo={LABEL_GRUPO_MOV[g]}
+                    legenda={LEGENDA[g]}
+                    tom={tom}
+                    valor={r.outras.porGrupo[g]}
+                    ativo={mesmoFiltro(filtro, { grupo: g })}
+                    onClick={() => alternar({ grupo: g })}
                   />
-                  <div className="rounded-md border border-border bg-muted/30 px-3 py-2">
-                    <p className="text-[11px] uppercase tracking-wide text-muted-foreground truncate">
-                      Mensalidades (recorrentes)
-                    </p>
-                    <p className="text-lg font-semibold tabular-nums">{brl(recorrentes.total)}</p>
-                    <p className="text-[10px] text-muted-foreground">
-                      {plural(recorrentes.qtd, "pagamento", "pagamentos")} · detalhado abaixo por
-                      mês de competência
-                    </p>
-                  </div>
-                </div>
-                <div className="grid gap-2 sm:grid-cols-3">
-                  {(
-                    [
-                      ["mensalidade_periodo", "verde"],
-                      ["mensalidade_atrasada", "ambar"],
-                      ["mensalidade_antecipada", "azul"],
-                    ] as const
-                  ).map(([g, tom]) => (
-                    <BotaoFiltro
-                      key={g}
-                      rotulo={LABEL_GRUPO_MOV[g]}
-                      legenda={LEGENDA[g]}
-                      tom={tom}
-                      valor={r.outras.porGrupo[g]}
-                      ativo={mesmoFiltro(filtro, { grupo: g })}
-                      onClick={() => alternar({ grupo: g })}
-                    />
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+
+          <QuadroProfissionais linhas={linhas} filtro={filtro} onFiltro={onFiltro} />
 
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex flex-wrap items-center gap-2">
