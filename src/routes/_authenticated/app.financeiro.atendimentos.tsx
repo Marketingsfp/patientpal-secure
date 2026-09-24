@@ -2819,11 +2819,21 @@ function AtendimentosPage() {
     }
     setPayingNow(true);
     try {
-      // Pré-validação no cliente: só pode pagar repasse de atendimentos efetivamente
-      // realizados e cuja data marcada na agenda já chegou. A mesma regra também
-      // é reforçada no banco pela RPC pagar_repasse_medico.
+      // Pré-validação no cliente: o dia marcado do atendimento já tem que ter
+      // chegado, e a ficha não pode estar cancelada nem marcada como falta.
+      //
+      // Até 24/09/2026 a regra exigia a ficha marcada como "realizado" na
+      // Agenda. Na prática quase ninguém marca: das fichas pagas entre 01 e
+      // 23/09/2026 com repasse em aberto, 551 estavam como "agendado" e 224
+      // como "confirmado", contra 207 "realizado" — 775 fichas com o repasse
+      // travado por uma marcação de rotina que a equipe não faz. O dono trocou
+      // a regra nessa data. Os dois riscos que a trava evita continuam de pé:
+      // pagar adiantado e pagar para quem faltou.
+      //
+      // A mesma regra é reforçada no banco pela RPC pagar_repasse_medico.
       // A mensalidade do Cartão Terapêutico fica fora desta checagem: ela não
       // tem agendamento de propósito (o banco aceita esse caso específico).
+      const hojeIso = new Date().toISOString().slice(0, 10);
       const agendaIdsCheck = selectedItems
         .filter((x) => x.origem === "agenda" && !x.mensalidade_ct)
         .map((x) => x.id);
@@ -2833,7 +2843,6 @@ function AtendimentosPage() {
           .select("id, status, agendamento_id, agendamento:agendamentos(status, inicio)")
           .in("id", agendaIdsCheck);
         if (eChk) throw eChk;
-        const hojeIso = new Date().toISOString().slice(0, 10);
         const bloq: string[] = [];
         for (const l of (lancs ?? []) as Array<{
           id: string;
@@ -2844,32 +2853,33 @@ function AtendimentosPage() {
           const lancOk = l.status === "confirmado";
           const agStatus = l.agendamento?.status ?? null;
           const dataAgenda = l.agendamento?.inicio?.slice(0, 10) ?? null;
-          const agOk = agStatus === "realizado";
+          const agOk = agStatus != null && agStatus !== "cancelado" && agStatus !== "faltou";
           const dataOk = !!dataAgenda && dataAgenda <= hojeIso && dataAgenda <= payForm.data;
           if (!lancOk || !agOk || !dataOk) bloq.push(l.id);
         }
         if (bloq.length) {
           toast.error(
-            `Não é possível pagar o repasse: ${bloq.length} atendimento(s) ainda não estão liberados. O repasse só pode ser pago no dia marcado do atendimento ou depois, com o atendimento realizado.`,
+            `Não é possível pagar o repasse: ${bloq.length} atendimento(s) ainda não estão liberados. O repasse só pode ser pago no dia marcado do atendimento ou depois, e a ficha não pode estar cancelada nem marcada como falta.`,
           );
           setPayingNow(false);
           return;
         }
       }
       // Mesma validação para atendimentos manuais (fin_atendimentos)
+      // Mesma régua do lado da agenda: cancelado não paga, data futura não
+      // paga, e a data do pagamento não pode ser anterior ao atendimento.
       const manualBloq = selectedItems.filter(
-        (x) => x.origem === "manual" && x.status !== "realizado",
+        (x) =>
+          x.origem === "manual" &&
+          (x.status === "cancelado" || !x.data || x.data > hojeIso || x.data > payForm.data),
       );
       if (manualBloq.length) {
-        // A ficha SEM FATURAMENTO segue a mesma regra do atendimento normal:
-        // só libera repasse depois de realizada. Quem opera não chama isso de
-        // "atendimento manual", então a mensagem diz onde resolver.
-        const semFat = manualBloq.filter((x) => ehLinhaSemFaturamento(x.forma_pagamento)).length;
+        const futuras = manualBloq.filter((x) => !!x.data && x.data > hojeIso).length;
         toast.error(
-          `Não é possível pagar o repasse: ${manualBloq.length} atendimento(s) ainda não estão com status 'realizado'.` +
-            (semFat > 0
-              ? ` ${semFat} deles vêm de ficha marcada como SEM FATURAMENTO na Agenda — marque a ficha como realizada na Agenda para liberar o repasse.`
-              : ""),
+          `Não é possível pagar o repasse: ${manualBloq.length} atendimento(s) não estão liberados.` +
+            (futuras > 0
+              ? ` ${futuras} ainda não chegaram na data do atendimento.`
+              : " Verifique se não estão cancelados ou se a data do pagamento é anterior ao atendimento."),
         );
         setPayingNow(false);
         return;
