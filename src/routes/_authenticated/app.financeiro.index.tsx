@@ -32,7 +32,6 @@ import {
   ehCortesia,
   formasDoLancamento,
   type LancamentoPainel,
-
   repassePorMedico,
   resumoPainel,
   somarPorCategoria,
@@ -120,7 +119,6 @@ type Drill =
   | "adesao"
   | "cortesia"
   | CategoriaAtendimento;
-
 
 /**
  * O detalhamento guarda os números do momento em que foi aberto: a
@@ -317,9 +315,6 @@ function FinDashboard() {
         )}
       </div>
 
-
-
-
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
         <div className="flex flex-wrap items-center gap-2">
           {(["hoje", "ontem", "semana", "mes", "personalizado"] as Periodo[]).map((p) => (
@@ -411,7 +406,6 @@ function FinDashboard() {
                 : "Eles continuam no Rateio da Receita e no Painel Executivo, pela data de competência."}
             </p>
           )}
-
       </div>
 
       <section className="space-y-1.5">
@@ -433,21 +427,21 @@ function FinDashboard() {
             className="md:row-span-2 2xl:row-span-1"
           >
             {resumo && !carregando && (
-              <ul className="mt-1.5 space-y-0.5 border-t border-border/60 pt-1.5">
-                <li className="flex items-center justify-between gap-2 text-[11px] leading-snug">
-                  <span className="text-muted-foreground">Atendimentos</span>
+              <ul className="mt-2 space-y-1 border-t border-border/60 pt-2">
+                <li className="flex items-center justify-between gap-2 text-[13px]">
+                  <span className="text-foreground/75">Atendimentos</span>
                   <span className="shrink-0 tabular-nums">{brl(resumo.receitaBruta)}</span>
                 </li>
-                <li className="flex items-center justify-between gap-2 text-[11px] leading-snug">
-                  <span className="text-muted-foreground">Mensalidades, adesões e avulsos</span>
+                <li className="flex items-center justify-between gap-2 text-[13px]">
+                  <span className="text-foreground/75">Mensalidades, adesões e avulsos</span>
                   <span className="shrink-0 tabular-nums">{brl(resumo.outrasReceitas)}</span>
                 </li>
               </ul>
             )}
             {resumo && !carregando && (
-              <ul className="mt-1.5 space-y-0.5 border-t border-border/60 pt-1.5">
+              <ul className="mt-2 space-y-1 border-t border-border/60 pt-2">
                 {resumo.formasReceitaTotal.map((f) => (
-                  <li key={f.forma} className="flex items-center justify-between gap-2 text-[11px] leading-snug">
+                  <li key={f.forma} className="flex items-center justify-between gap-2 text-[13px]">
                     <span className="flex min-w-0 items-center gap-1.5 text-muted-foreground">
                       <span
                         aria-hidden
@@ -473,20 +467,20 @@ function FinDashboard() {
             detalhe="Pago no caixa no período — repasse + complemento"
           >
             {resumo && !carregando && (
-              <ul className="mt-1.5 space-y-0.5 border-t border-border/60 pt-1.5">
-                <li className="flex items-center justify-between gap-2 text-[11px] leading-snug">
-                  <span className="text-muted-foreground">
+              <ul className="mt-2 space-y-1 border-t border-border/60 pt-2">
+                <li className="flex items-center justify-between gap-2 text-[13px]">
+                  <span className="text-foreground/75">
                     Repasse {brl(resumo.repassePagoNoPeriodo)}
                     {resumo.complementoMedico > 0 &&
                       ` · complemento ${brl(resumo.complementoMedico)}`}
                   </span>
                 </li>
-                <li className="flex items-center justify-between gap-2 text-[11px] leading-snug">
-                  <span className="text-muted-foreground">Devido pelos atendimentos</span>
+                <li className="flex items-center justify-between gap-2 text-[13px]">
+                  <span className="text-foreground/75">Devido pelos atendimentos</span>
                   <span className="shrink-0 tabular-nums">{brl(resumo.custoPrestadores)}</span>
                 </li>
-                <li className="flex items-center justify-between gap-2 text-[11px] leading-snug">
-                  <span className="text-muted-foreground">
+                <li className="flex items-center justify-between gap-2 text-[13px]">
+                  <span className="text-foreground/75">
                     Grade {brl(resumo.repasse)}
                     {resumo.terceiro > 0 && ` · terceiros ${brl(resumo.terceiro)}`}
                     {resumo.complementoMedico > 0 &&
@@ -515,19 +509,19 @@ function FinDashboard() {
             {/* A conta aberta evita a dúvida de 12/09/2026: o complemento
                 médico pago no caixa também entra aqui, além do repasse. */}
             {resumo && !carregando && (
-              <ul className="mt-1.5 space-y-0.5 border-t border-border/60 pt-1.5">
-                <li className="flex items-center justify-between gap-2 text-[11px] leading-snug">
-                  <span className="text-muted-foreground">Repasse pago no caixa</span>
+              <ul className="mt-2 space-y-1 border-t border-border/60 pt-2">
+                <li className="flex items-center justify-between gap-2 text-[13px]">
+                  <span className="text-foreground/75">Repasse pago no caixa</span>
                   <span className="shrink-0 tabular-nums">{brl(resumo.repassePagoNoPeriodo)}</span>
                 </li>
                 {resumo.complementoMedico > 0 && (
-                  <li className="flex items-center justify-between gap-2 text-[11px] leading-snug">
-                    <span className="text-muted-foreground">Complemento médico pago</span>
+                  <li className="flex items-center justify-between gap-2 text-[13px]">
+                    <span className="text-foreground/75">Complemento médico pago</span>
                     <span className="shrink-0 tabular-nums">{brl(resumo.complementoMedico)}</span>
                   </li>
                 )}
-                <li className="flex items-center justify-between gap-2 text-[11px] leading-snug">
-                  <span className="text-muted-foreground">Despesas operacionais</span>
+                <li className="flex items-center justify-between gap-2 text-[13px]">
+                  <span className="text-foreground/75">Despesas operacionais</span>
                   <span className="shrink-0 tabular-nums">{brl(resumo.despesasOperacionais)}</span>
                 </li>
               </ul>
@@ -547,19 +541,23 @@ function FinDashboard() {
           >
             {/* A mesma quebra do Movimento de Caixa: onde o dinheiro está. */}
             {resumo && !carregando && (
-              <ul className="mt-1.5 space-y-0.5 border-t border-border/60 pt-1.5">
-                <li className="flex items-center justify-between gap-2 text-[11px] leading-snug">
-                  <span className="text-muted-foreground">Em espécie (gaveta)</span>
-                  <span className="shrink-0 tabular-nums">{brl(resumo.saldoMeios.especie.saldo)}</span>
+              <ul className="mt-2 space-y-1 border-t border-border/60 pt-2">
+                <li className="flex items-center justify-between gap-2 text-[13px]">
+                  <span className="text-foreground/75">Em espécie (gaveta)</span>
+                  <span className="shrink-0 tabular-nums">
+                    {brl(resumo.saldoMeios.especie.saldo)}
+                  </span>
                 </li>
-                <li className="flex items-center justify-between gap-2 text-[11px] leading-snug">
-                  <span className="text-muted-foreground">Em banco (PIX, cartão, boleto)</span>
-                  <span className="shrink-0 tabular-nums">{brl(resumo.saldoMeios.banco.saldo)}</span>
+                <li className="flex items-center justify-between gap-2 text-[13px]">
+                  <span className="text-foreground/75">Em banco (PIX, cartão, boleto)</span>
+                  <span className="shrink-0 tabular-nums">
+                    {brl(resumo.saldoMeios.banco.saldo)}
+                  </span>
                 </li>
                 {(resumo.saldoMeios.outros.entradas !== 0 ||
                   resumo.saldoMeios.outros.saidas !== 0) && (
-                  <li className="flex items-center justify-between gap-2 text-[11px] leading-snug">
-                    <span className="text-muted-foreground">Outros (convênio, sem informação)</span>
+                  <li className="flex items-center justify-between gap-2 text-[13px]">
+                    <span className="text-foreground/75">Outros (convênio, sem informação)</span>
                     <span className="shrink-0 tabular-nums">
                       {brl(resumo.saldoMeios.outros.saldo)}
                     </span>
@@ -568,7 +566,6 @@ function FinDashboard() {
               </ul>
             )}
           </KpiCard>
-
         </div>
       </section>
 
@@ -586,8 +583,6 @@ function FinDashboard() {
           pedido da tesouraria — continua sumindo sozinha quando não há nada
           pendente. */}
       <CardPendenciasRepasse atualizacao={reload} />
-
-
 
       <LancamentoDialog
         open={open !== null}
@@ -671,7 +666,6 @@ function ContagemAtualizacao({
     </button>
   );
 }
-
 
 /** Nome do botão da visão agrupada de cada detalhamento. */
 const rotuloSinteticoDe = (d: Drill) =>
@@ -863,7 +857,6 @@ function montarPacientesDaLinha(
   };
 }
 
-
 // Pagamento misto aparece com as partes: "Dinheiro + Cartão de Crédito".
 const rotuloFormas = (i: LancamentoPainel) =>
   formasDoLancamento(i)
@@ -875,9 +868,9 @@ const formasDaLinha = (l: RateioLinha) =>
   l.laudo
     ? l.forma_pagamento
     : l.formas
-    .filter((f) => f.valor !== 0)
-    .map((f) => LABEL_FORMA[f.forma])
-    .join(" + ") || "—";
+        .filter((f) => f.valor !== 0)
+        .map((f) => LABEL_FORMA[f.forma])
+        .join(" + ") || "—";
 
 /**
  * Converte as linhas do detalhamento da Receita bruta para a régua do caixa.
@@ -1188,13 +1181,7 @@ function montarDetalhe(drill: Drill, dados: DadosPainel, r: ResumoPainel, visao:
         { rotulo: "Forma", tipo: "texto" },
         { rotulo: "Valor", tipo: "moeda" },
       ],
-      linhas: itens.map((i) => [
-        i.data,
-        i.categoria_nome,
-        i.descricao,
-        rotuloFormas(i),
-        i.valor,
-      ]),
+      linhas: itens.map((i) => [i.data, i.categoria_nome, i.descricao, rotuloFormas(i), i.valor]),
       totais: [`${int(itens.length)} lançamento(s)`, "", "", "", total],
       resumo: [{ rotulo: titulo, valor: total }],
       temSintetico: true,
