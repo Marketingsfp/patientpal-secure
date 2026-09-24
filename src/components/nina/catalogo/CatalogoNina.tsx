@@ -671,10 +671,34 @@ export function CatalogoNina({
               </CardHeader>
               <CardContent className="space-y-2 text-sm text-muted-foreground">
                 {tipo === "servico" ? (
-                  <p>
-                    Valor: {formatarBRL(item.valor)} · {item.formas_pagamento?.length ?? 0} forma(s)
-                    de pagamento
-                  </p>
+                  item.formas_pagamento?.length ? (
+                    <dl className="space-y-1">
+                      {item.formas_pagamento.map(
+                        (
+                          pagamento: {
+                            forma: string;
+                            valor?: number | null;
+                            condicao?: string | null;
+                          },
+                          index: number,
+                        ) => (
+                          <div key={index} className="flex flex-wrap gap-x-1">
+                            <dt>
+                              {pagamento.forma}
+                              {pagamento.condicao ? ` (${pagamento.condicao})` : ""}:
+                            </dt>
+                            <dd className="font-medium text-foreground">
+                              {pagamento.valor == null
+                                ? "Não informado"
+                                : formatarBRL(pagamento.valor)}
+                            </dd>
+                          </div>
+                        ),
+                      )}
+                    </dl>
+                  ) : (
+                    <p>Valor: {formatarBRL(item.valor)}</p>
+                  )
                 ) : (
                   <p>{resumoHorarios(item.horarios ?? [])}</p>
                 )}
