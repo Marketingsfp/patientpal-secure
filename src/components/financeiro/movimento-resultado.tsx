@@ -192,7 +192,9 @@ function QuadroProfissionais({
     </>
   );
   return (
-    <Card>
+    // O quadro tem a largura da tabela, não a da tela: em monitor largo o card
+    // esticado deixava um vazio enorme à direita. Pedido de 23/09/2026.
+    <Card className="w-fit max-w-full">
       <CardContent className="p-4 space-y-2">
         <div>
           <p className="text-sm font-medium">Por profissional</p>
@@ -227,7 +229,12 @@ function QuadroProfissionais({
                     aria-selected={ativo}
                     onClick={() => alternar(f)}
                   >
-                    <td className="py-0.5 pr-6 whitespace-nowrap">{d.profissional}</td>
+                    {/* O nome quebra em duas linhas a partir de 18rem: sem o
+                        teto, um único nome comprido (NOME — AGENDA) alargava a
+                        coluna inteira e afastava os valores de todo mundo. */}
+                    <td className="py-0.5 pr-6">
+                      <span className="block max-w-[18rem] leading-tight">{d.profissional}</span>
+                    </td>
                     <td className="py-0.5 px-3 text-right">{celula(d.consulta)}</td>
                     <td className="py-0.5 px-3 text-right">{celula(d.exame)}</td>
                     <td className="py-0.5 pl-3 text-right font-medium">{celula(d.total)}</td>
