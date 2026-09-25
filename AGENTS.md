@@ -175,3 +175,4 @@ complementam este arquivo. Em caso de conflito, prevalece a interpretação
 ## 3. Decisões técnicas
 
 - Recursos internos da Nina que usam Claude chamam `chamarClaudeComoResponses` (`src/lib/nina/claude-messages.server.ts`), que traduz o corpo Responses para `/v1/messages` — por quê: Opus 5.5 só é servido em Messages e assim os chamadores existentes não precisam ser reescritos.
+- Decisões do Jev na Nina passam por `perguntarJev` (`src/lib/nina/jev.server.ts`), só em homologação com flag `nina_jev_faseN` e registro em `nina_jev_decisoes` — por quê: erro ou demora vira "sem decisão" e a produção fica intocada.
