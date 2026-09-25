@@ -19,6 +19,7 @@ import {
   type ControleWatchdogNina,
 } from "./watchdog.server";
 import { criarGuardiaoReservaTurno } from "./reserva-turno";
+import { comSessaoTesteExclusiva } from "./sessao-teste-exclusiva.server";
 const CANAL_TESTE = "test-console";
 const TOTAL_LEADS = 10;
 
@@ -213,16 +214,6 @@ export async function processarMensagemTeste(
   retomada?: { turno: import("./burst.server").TurnoNina; mensagem: any; cicloId: string },
 ) {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-  const lead = await carregarLead(supabaseAdmin, data.clinicaId, data.leadId);
-  if (
-    retomada &&
-    (lead.ciclo_id !== retomada.cicloId || lead.conversa_id !== retomada.mensagem.conversa_id)
-  )
-    throw new Error("TEST_SESSION_CHANGED");
-  const { conversaId, cicloId } = retomada
-    ? { conversaId: lead.conversa_id!, cicloId: retomada.cicloId }
-    : await garantirCiclo(supabaseAdmin, data.clinicaId, lead, userId);
-
   const ehAudio = data.tipo === "audio";
   let textoPaciente = data.tipo === "text" || ehAudio ? data.texto : "";
   const audioFalhou = ehAudio && !textoPaciente;
@@ -250,27 +241,38 @@ export async function processarMensagemTeste(
       ? textoPaciente
       : `[${data.tipo}]`;
 
-  // A mesma chave física pode retomar somente um lote que ainda não iniciou.
-  const waId = retomada?.mensagem.wa_message_id ?? `test-${lead.id}-${data.chave}`;
-  const agora = new Date().toISOString();
   const { persistirEntradaNina } = await import("@/lib/nina/entrada-persistida.server");
-  const entradaPersistida = retomada
-    ? { mensagem: retomada.mensagem, repetida: true, consumida: false }
-    : await persistirEntradaNina(supabaseAdmin, {
-        clinica_id: data.clinicaId,
-        conversa_id: conversaId,
-        canal: CANAL_TESTE,
-        wa_message_id: waId,
-        direction: "in",
-        from_number: lead.telefone_sessao,
-        to_number: CANAL_TESTE,
-        body,
-        tipo: data.tipo,
-        transcricao: ehAudio && textoPaciente ? textoPaciente : null,
-        status: "received",
-        enviada_por: "paciente",
-        is_teste: true,
-      });
+  // Releia o lead SOMENTE depois de obter a mesma trava usada pelo reset.
+  // Assim nenhum envio encontra o telefone/ciclo anterior durante o reinício.
+  const { lead, conversaId, cicloId, waId, agora, entradaPersistida } =
+    await comSessaoTesteExclusiva(data, async () => {
+      const lead = await carregarLead(supabaseAdmin, data.clinicaId, data.leadId);
+      if (retomada && (lead.ciclo_id !== retomada.cicloId || lead.conversa_id !== retomada.mensagem.conversa_id))
+        throw new Error("TEST_SESSION_CHANGED");
+      const { conversaId, cicloId } = retomada
+        ? { conversaId: lead.conversa_id!, cicloId: retomada.cicloId }
+        : await garantirCiclo(supabaseAdmin, data.clinicaId, lead, userId);
+      const waId = retomada?.mensagem.wa_message_id ?? `test-${lead.id}-${data.chave}`;
+      const agora = new Date().toISOString();
+      const entradaPersistida = retomada
+        ? { mensagem: retomada.mensagem, repetida: true, consumida: false }
+        : await persistirEntradaNina(supabaseAdmin, {
+            clinica_id: data.clinicaId,
+            conversa_id: conversaId,
+            canal: CANAL_TESTE,
+            wa_message_id: waId,
+            direction: "in",
+            from_number: lead.telefone_sessao,
+            to_number: CANAL_TESTE,
+            body,
+            tipo: data.tipo,
+            transcricao: ehAudio && textoPaciente ? textoPaciente : null,
+            status: "received",
+            enviada_por: "paciente",
+            is_teste: true,
+          });
+      return { lead, conversaId, cicloId, waId, agora, entradaPersistida };
+    });
   const msgEntrada = entradaPersistida.mensagem;
   if (entradaPersistida.consumida)
     return {
@@ -978,7 +980,7 @@ export class ResetManualObrigatorioError extends Error {
   }
 }
 
-export async function resetarLeadTeste(
+async function executarResetLeadTeste(
   admin: any,
   entrada: {
     clinicaId: string;
@@ -1181,6 +1183,12 @@ export async function resetarLeadTeste(
     cicloEncerrado: lead.ciclo_id,
     agendamentosRemovidos,
   };
+}
+
+export async function resetarLeadTeste(...args: Parameters<typeof executarResetLeadTeste>) {
+  if (args[1].manual !== true)
+    throw new ResetManualObrigatorioError(args[1].origem ?? "desconhecida");
+  return comSessaoTesteExclusiva(args[1], () => executarResetLeadTeste(...args));
 }
 
 export {

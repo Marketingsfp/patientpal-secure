@@ -10,6 +10,9 @@ import { hashDoTexto } from "@/lib/nina/confidence/hash";
 
 type Linha = Record<string, any>;
 const cenario = process.argv[2];
+mock.module("@/lib/nina/sessao-teste-exclusiva.server", () => ({
+  comSessaoTesteExclusiva: async (_alvo: unknown, executar: () => Promise<unknown>) => executar(),
+}));
 const paridade = cenario === "paridade-cardiologia";
 const entradasGerador: Linha[] = [];
 const encaminhada = cenario.startsWith("handoff-");

@@ -50,6 +50,10 @@ let eventos: Array<{ conversaId: string; evento: string; userId: string | null; 
 let revisoes: Record<string, number> = {};
 let ordem: string[] = [];
 
+mock.module("@/lib/nina/sessao-teste-exclusiva.server", () => ({
+  comSessaoTesteExclusiva: async (_alvo: unknown, executar: () => Promise<unknown>) => executar(),
+}));
+
 mock.module("@/lib/nina/revisao-conversa.server", () => ({
   incrementarRevisaoConversa: async ({ conversaId }: any) => {
     ordem.push(`revisao:${conversaId}`);

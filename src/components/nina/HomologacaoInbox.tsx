@@ -232,6 +232,7 @@ export function HomologacaoInbox({ laboratorio = false, ativo = true, abrirConve
   const [encerrado, setEncerrado] = useState<string | null>(null);
   /** Reset manual em andamento (só a tela; o servidor é a fonte da verdade). */
   const [resetando, setResetando] = useState(false);
+  const resetandoRef = useRef(false);
   /**
    * Geração da sessão exibida. O reset manual incrementa este número; qualquer
    * resposta da IA que estava em voo e chegar depois é descartada da tela (a
@@ -762,6 +763,11 @@ export function HomologacaoInbox({ laboratorio = false, ativo = true, abrirConve
     const leadOrigem = leadId;
     const conversaOrigem = conversaId;
     if (!clinicaId || !leadOrigem) return { ok: false, transferida: false, erro: null };
+    if (resetandoRef.current) {
+      const aviso = "Aguarde o reinício da sessão terminar para enviar a mensagem.";
+      toast.info(aviso);
+      return { ok: false, transferida: false, erro: aviso };
+    }
     const tipoEnvio = tipoForcado ?? tipo;
     const corpo = conteudo.trim();
     // Só texto exige conteúdo: áudio sem transcrição e mídias simulam o webhook real.
@@ -809,7 +815,16 @@ export function HomologacaoInbox({ laboratorio = false, ativo = true, abrirConve
         semNovaMensagem?: boolean;
         avisoMensagemId?: string | null;
         avisoEstado?: "confirmado" | "envio_pendente" | null;
+        mensagemPersistida?: boolean;
       };
+      if (r.mensagemPersistida === false) {
+        falharOtimista(chave);
+        if (meuLead()) {
+          setTexto((atual) => atual || corpo);
+          setErro(r.erro ?? "Mensagem não enviada. Tente novamente.");
+        }
+        return { ok: false, transferida: false, erro: r.erro };
+      }
       // Mensagem absorvida por um envio mais recente do mesmo lead: é o
       // agrupamento normal (as três viram um turno só). Não é falta de
       // resposta e não deve mostrar aviso.
@@ -993,7 +1008,8 @@ export function HomologacaoInbox({ laboratorio = false, ativo = true, abrirConve
    */
   const resolverConversa = async () => {
     if (!clinicaId || !leadId || !conversaId) return;
-    if (resetando) return;
+    if (resetandoRef.current) return;
+    resetandoRef.current = true;
     setResetando(true);
     try {
       await resolver({
@@ -1023,6 +1039,7 @@ export function HomologacaoInbox({ laboratorio = false, ativo = true, abrirConve
         `Não foi possível reiniciar o teste: ${String(e?.message ?? e)}. A sessão atual foi preservada.`,
       );
     } finally {
+      resetandoRef.current = false;
       setResetando(false);
     }
   };
@@ -1127,7 +1144,7 @@ export function HomologacaoInbox({ laboratorio = false, ativo = true, abrirConve
   // O processamento da Nina NÃO entra aqui: ele acontece em segundo plano e o
   // testador continua escrevendo e enviando normalmente, como num chat real.
   const composerBloqueado =
-    !podeEscrever || !leadId || terraRodando || (tipo !== "text" && tipo !== "audio");
+    resetando || !podeEscrever || !leadId || terraRodando || (tipo !== "text" && tipo !== "audio");
 
   return (
     <div id="homologacao-inbox" className={`flex gap-3 ${laboratorio ? "h-[calc(100vh-14rem)] min-h-[640px]" : "h-full min-h-0"}`}>

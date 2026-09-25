@@ -266,7 +266,17 @@ export const enviarMensagemTeste = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     await assertMembership(context.supabase, context.userId, data.clinicaId);
     // Mesmo núcleo usado pelo simulador e pelo teste de carga.
-    return await processarMensagemTeste(data, context.userId);
+    try {
+      return await processarMensagemTeste(data, context.userId);
+    } catch (e) {
+      const { ErroSessaoTesteOcupada } = await import("./sessao-teste-exclusiva.server");
+      if (!(e instanceof ErroSessaoTesteOcupada)) throw e;
+      return {
+        duplicada: false, reply: null, erro: e.message, audio: null,
+        transferida: false, processamento: "ERRO" as const,
+        mensagemPersistida: false, mensagemId: null,
+      };
+    }
   });
 
 
