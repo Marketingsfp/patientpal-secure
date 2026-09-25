@@ -1,0 +1,1 @@
+revoke all on public.lumen_tv_config from authenticated;

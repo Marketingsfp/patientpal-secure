@@ -7423,6 +7423,74 @@ export type Database = {
           },
         ]
       }
+      lumen_tv_config: {
+        Row: {
+          ativo: boolean
+          clinica_id: string
+          created_at: string
+          enviar_nome: boolean
+          id: string
+          pair_codes: string[] | null
+          token: string
+          url: string
+        }
+        Insert: {
+          ativo?: boolean
+          clinica_id: string
+          created_at?: string
+          enviar_nome?: boolean
+          id?: string
+          pair_codes?: string[] | null
+          token: string
+          url?: string
+        }
+        Update: {
+          ativo?: boolean
+          clinica_id?: string
+          created_at?: string
+          enviar_nome?: boolean
+          id?: string
+          pair_codes?: string[] | null
+          token?: string
+          url?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lumen_tv_config_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      lumen_tv_envios: {
+        Row: {
+          clinica_id: string
+          codigo: string | null
+          enviado_em: string
+          id: string
+          request_id: number | null
+          senha_id: string | null
+        }
+        Insert: {
+          clinica_id: string
+          codigo?: string | null
+          enviado_em?: string
+          id?: string
+          request_id?: number | null
+          senha_id?: string | null
+        }
+        Update: {
+          clinica_id?: string
+          codigo?: string | null
+          enviado_em?: string
+          id?: string
+          request_id?: number | null
+          senha_id?: string | null
+        }
+        Relationships: []
+      }
       medico_agenda_procedimentos: {
         Row: {
           agenda_id: string
@@ -16402,6 +16470,14 @@ export type Database = {
           _table_name: string
         }
         Returns: undefined
+      }
+      lumen_tv_respostas: {
+        Args: { _ids: number[] }
+        Returns: {
+          error_msg: string
+          id: number
+          status_code: number
+        }[]
       }
       marcar_item_nao_aplicavel: {
         Args: { p_item_id: string; p_motivo: string }
