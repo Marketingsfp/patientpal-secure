@@ -1227,7 +1227,7 @@ async function executarFerramentaInterna(
           .parse(args);
         // FASE 3: mesma camada de retrieval usada pelo painel interno.
         const { searchKnowledgeBase } = await import("@/lib/nina/knowledge.server");
-        const resultado = await searchKnowledgeBase({
+        let resultado = await searchKnowledgeBase({
           clinicaId: ctx.clinicaId,
           query: p.termo,
           tipo_atendimento: p.tipo_atendimento,
@@ -1235,6 +1235,40 @@ async function executarFerramentaInterna(
           dia: p.dia ?? null,
           canal: "whatsapp",
         });
+        // JEV — Fase 3 (só homologação, flag `nina_jev_fase3`): a busca normal
+        // não achou nada → o Jev escolhe na lista publicada. Erro/dúvida = como hoje.
+        if (resultado.knowledge_status === "not_found" && !p.medico && (ctx.teste || ctx.origem === "homologacao")) {
+          try {
+            const jev = await import("@/lib/nina/jev.server");
+            if (await jev.jevAtivo(ctx.clinicaId, "fase3_especialidade", true)) {
+              const { lerPublicados } = await import("@/lib/nina/catalogo-turno.server");
+              const esp = await import("@/lib/nina/jev-especialidade");
+              const [servicos, profissionais] = await Promise.all([
+                lerPublicados<{ id: string; nome: string }>("nina_cat_servicos", "id, nome", ctx.clinicaId),
+                lerPublicados<{ id: string; especialidades: unknown }>("nina_cat_profissionais", "id, especialidades", ctx.clinicaId),
+              ]);
+              const opcoes = esp.opcoesCatalogo(servicos, profissionais);
+              if (opcoes.length) {
+                const perguntas = esp.perguntaEspecialidade(opcoes);
+                const r = await jev.perguntarJev({ pedido: p.termo }, perguntas);
+                const escolhida = r.ok ? esp.especialidadeAplicavel(r.respostas["especialidade"], opcoes) : null;
+                let aplicada = false;
+                if (escolhida) {
+                  const novo = await searchKnowledgeBase({
+                    clinicaId: ctx.clinicaId, query: escolhida, medico: null, dia: p.dia ?? null, canal: "whatsapp",
+                  });
+                  if (novo.knowledge_status !== "not_found") { resultado = novo; aplicada = true; }
+                }
+                void jev.registrarDecisaoJev({
+                  clinicaId: ctx.clinicaId, conversationId: ctx.conversaId, fase: "fase3_especialidade",
+                  teste: true, perguntas: { termo: p.termo, opcoes: opcoes.length } as never, resultado: r, aplicada,
+                });
+              }
+            }
+          } catch (e) {
+            console.warn("[nina-jev] fase 3 ignorada:", e instanceof Error ? e.message : e);
+          }
+        }
         if (resultado.esclarecimento) ctx.esclarecimentoCatalogo = resultado.esclarecimento;
         lembrarProcedimentoSolicitado(ctx.estado, ctx.clinicaId, resultado, p.nova_solicitacao);
         // Consulta de leitura: `price` resume o primeiro resultado e pode ser
