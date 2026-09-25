@@ -22,3 +22,4 @@ await supabaseAdmin.rpc("nina_lock_renovar", {
   _lease_segundos: 90,
 } as never);
 console.log("PRAZO_SUPABASE=" + JSON.stringify(requisicoes));
+export {};
