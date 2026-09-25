@@ -14,7 +14,7 @@ const ESTADOS_PASSO = {
   falhou: { texto: "Falhou", classe: "text-destructive" },
   em_andamento: { texto: "Em andamento", classe: "text-amber-700 dark:text-amber-400" },
   nao_confirmado: { texto: "Não confirmado", classe: "text-muted-foreground" },
-  ignorado: { texto: "Sem conclusão registrada", classe: "text-muted-foreground" },
+  ignorado: { texto: "Não executada", classe: "text-muted-foreground" },
 } as const;
 
 function duracao(ms: number | null): string {
@@ -58,6 +58,147 @@ function Passos({
         );
       })}
     </ol>
+  );
+}
+
+const ESTADOS_FERRAMENTA = {
+  ...ESTADOS_PASSO,
+  nao_registrado: { texto: "Execução não registrada", classe: "text-muted-foreground" },
+} as const;
+
+function Bloco({ rotulo, texto }: { rotulo: string; texto: string }) {
+  return (
+    <div>
+      <p className="text-xs text-muted-foreground">{rotulo}</p>
+      <pre className="mt-1 max-h-60 overflow-auto whitespace-pre-wrap break-words rounded bg-muted/30 p-2 text-[11px]">
+        {texto}
+      </pre>
+    </div>
+  );
+}
+
+function Lista({ rotulo, itens }: { rotulo: string; itens: string[] }) {
+  if (!itens.length) return null;
+  return (
+    <div>
+      <p className="text-xs text-muted-foreground">{rotulo}</p>
+      <ul className="mt-1 list-disc space-y-0.5 pl-4 text-xs">
+        {itens.map((item, i) => (
+          <li key={i}>{item}</li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function numero(v: number | null): string {
+  return v == null ? "—" : v.toLocaleString("pt-BR");
+}
+
+/** Rodada a rodada: o que o modelo escreveu, o que pediu e o que recebeu de volta. */
+function LinhaDoTempo({ linha }: { linha: NonNullable<LeituraDetalhesMensagem["linhaDoTempo"]> }) {
+  return (
+    <section aria-label="Como a Nina chegou à resposta" className="space-y-3">
+      <h3 className="font-semibold">Como a Nina chegou à resposta</h3>
+      {!linha.rodadas.length && (
+        <p className="text-muted-foreground">
+          {linha.semModelo
+            ? `Resposta produzida sem chamar o modelo: ${linha.semModelo}.`
+            : "Não há rodadas do modelo registradas para esta mensagem."}
+        </p>
+      )}
+      <Lista rotulo="Antes de chamar o modelo, o sistema registrou:" itens={linha.antesDoModelo} />
+      <ol className="space-y-3">
+        {linha.rodadas.map((r) => (
+          <li key={r.numero} className="space-y-3 rounded-lg border p-3" data-rodada={r.numero}>
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+              <p className="font-medium">Rodada {r.numero}</p>
+              <span className="text-xs text-muted-foreground">
+                {r.modelo ?? "Modelo não registrado"} · {duracao(r.latenciaMs)} · tokens{" "}
+                {numero(r.tokensEntrada)} → {numero(r.tokensSaida)}
+                {r.tentativas != null && r.tentativas > 1 ? ` · ${r.tentativas} tentativas` : ""}
+              </span>
+            </div>
+            {r.orientacoesAntes.map((t, i) => (
+              <Bloco key={i} rotulo="Orientação interna do sistema antes desta rodada" texto={t} />
+            ))}
+            {r.erro ? (
+              <p className="text-destructive">Falha na chamada ao modelo: {r.erro}</p>
+            ) : r.texto ? (
+              <Bloco rotulo="O modelo escreveu" texto={r.texto} />
+            ) : (
+              <p className="text-xs text-muted-foreground">
+                O modelo não escreveu texto nesta rodada
+                {r.ferramentas.length ? "; apenas pediu ferramentas." : "."}
+              </p>
+            )}
+            {r.ferramentas.length > 0 && (
+              <div className="space-y-2">
+                <p className="text-xs text-muted-foreground">Ferramentas</p>
+                <ul className="space-y-2">
+                  {r.ferramentas.map((f, i) => {
+                    const estado = ESTADOS_FERRAMENTA[f.estado];
+                    return (
+                      <li key={i} className="space-y-2 rounded border bg-muted/10 p-2">
+                        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                          <p className="font-medium break-all">{f.nome}</p>
+                          <span className={`text-xs ${estado.classe}`}>{estado.texto}</span>
+                          {f.pedidaPeloSistema && (
+                            <Badge variant="outline">Acionada pelo sistema</Badge>
+                          )}
+                        </div>
+                        {f.detalhe && <p className="text-xs text-muted-foreground">{f.detalhe}</p>}
+                        {f.argumentos && <Bloco rotulo="Pediu" texto={f.argumentos} />}
+                        {f.resultado ? (
+                          <details>
+                            <summary className="cursor-pointer text-xs">
+                              Recebeu de volta
+                            </summary>
+                            <div className="mt-1">
+                              <Bloco rotulo="Como a Nina recebeu o resultado" texto={f.resultado} />
+                            </div>
+                          </details>
+                        ) : (
+                          f.estado === "concluido" &&
+                          !f.pedidaPeloSistema && (
+                            <p className="text-xs text-muted-foreground">
+                              Resultado não registrado: não houve rodada seguinte do modelo (a
+                              resposta foi montada logo após esta ferramenta) ou o resultado não pôde
+                              ser ligado a ela com segurança.
+                            </p>
+                          )
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            )}
+            {r.resultadosSemVinculo.length > 0 && (
+              <details>
+                <summary className="cursor-pointer text-xs">
+                  Resultados recebidos sem vínculo seguro com cada ferramenta (
+                  {r.resultadosSemVinculo.length})
+                </summary>
+                <div className="mt-1 space-y-2">
+                  {r.resultadosSemVinculo.map((t, i) => (
+                    <Bloco key={i} rotulo={`Resultado ${i + 1}`} texto={t} />
+                  ))}
+                </div>
+              </details>
+            )}
+            <Lista rotulo="Registros do sistema após esta rodada" itens={r.registrosSistema} />
+          </li>
+        ))}
+      </ol>
+      {linha.ajusteFinal && (
+        <div className="space-y-2 rounded-lg border p-3">
+          <p className="font-medium">Ajuste feito pelo sistema depois do modelo</p>
+          <Bloco rotulo="Texto do modelo" texto={linha.ajusteFinal.antes || "(vazio)"} />
+          <Bloco rotulo="Texto final" texto={linha.ajusteFinal.depois || "(vazio)"} />
+        </div>
+      )}
+    </section>
   );
 }
 
@@ -141,6 +282,8 @@ export function DetalhesMensagemNina({
           {leitura.respostaOriginal ?? "Nenhuma resposta do modelo foi localizada nos registros."}
         </p>
       </details>
+
+      {leitura.linhaDoTempo && <LinhaDoTempo linha={leitura.linhaDoTempo} />}
 
       <section aria-label="O que aconteceu" className="space-y-3">
         <h3 className="font-semibold">O que aconteceu</h3>

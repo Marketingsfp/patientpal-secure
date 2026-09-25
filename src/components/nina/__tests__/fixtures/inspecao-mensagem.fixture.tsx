@@ -215,7 +215,7 @@ it("real e homologação exibem o mesmo aviso, reporte e detalhes sem atribuir L
     expect(reportes).toEqual([{ clinicaId, conversaId, mensagemId }]);
     await act(async () => botoes.find((b) => b.textContent === "Detalhes técnicos")!.click());
     expect(detalhes).toEqual([{ clinicaId, conversaId, mensagemId }]);
-    expect(document.body.textContent).toContain("Núcleo atual do servidor: fixture-servidor-atual");
+    expect(document.body.textContent).toContain("Versão atual do servidor: fixture-servidor-atual");
     await ui.fechar();
   }
 });

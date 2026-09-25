@@ -159,7 +159,8 @@ function DetalhesMensagemBotao(alvo: {
           )}
           {!carregando && dados?.runtimeAtual && (
             <p className="border-t pt-2 text-xs text-muted-foreground">
-              Núcleo atual do servidor: {dados.runtimeAtual}
+              Versão atual do servidor: {dados.runtimeAtual}. A versão que gerou esta mensagem
+              aparece em “Versão do núcleo neste turno”.
             </p>
           )}
         </DialogContent>

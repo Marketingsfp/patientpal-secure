@@ -171,3 +171,58 @@ describe("consolidação histórica de etapas", () => {
     expect(consolidarPassosDetalhes([ev, ev], null)[0]?.estado).toBe("nao_confirmado");
   });
 });
+
+describe("leitura depois da retirada do motor de confiança", () => {
+  const semAviso = () => {
+    const p = structuredClone(pacoteMJ55);
+    p.avisos = [];
+    p.eventos = [];
+    p.decisoes = [];
+    return p;
+  };
+
+  it("resposta com execução vinculada aparece como gerada pela Nina", () => {
+    expect(montarLeituraDetalhesMensagem(semAviso()).mensagem?.origem).toBe(
+      "Resposta gerada pela Nina",
+    );
+  });
+
+  it("depois de 7 dias explica que a retenção apagou os registros", () => {
+    const p = { ...semAviso(), execucao: null };
+    const criada = Date.parse(String(p.mensagem!.created_at));
+    const antiga = montarLeituraDetalhesMensagem({ ...p, agora: criada + 8 * 86_400_000 });
+    expect(antiga.mensagem?.origem).toBe("Resposta da Nina sem registro técnico disponível");
+    expect(antiga.alertas.join(" ")).toContain("apagados pela limpeza automática");
+    expect(antiga.alertas.join(" ")).not.toContain("não vinculada");
+    const recente = montarLeituraDetalhesMensagem({ ...p, agora: criada + 86_400_000 });
+    expect(recente.alertas.join(" ")).toContain("não vinculada a esta mensagem");
+  });
+
+  it("ferramenta pulada fica numa linha só, com nome e motivo", () => {
+    const base = {
+      trace_id: "t1",
+      node_id: "tool.execute",
+      cycle_id: 1,
+      started_at: "2026-09-25T10:00:00.000Z",
+    };
+    const passos = consolidarPassosDetalhes(
+      [
+        { ...base, event_type: "started", status: "running", metadata: { ferramenta: "consultar_vagas" } },
+        {
+          ...base,
+          event_type: "skipped",
+          status: "skipped",
+          finished_at: "2026-09-25T10:00:00.050Z",
+          metadata: { motivo: "consulta de vagas aguardando identificação inequívoca do médico" },
+        },
+      ],
+      null,
+    );
+    expect(passos).toHaveLength(1);
+    expect(passos[0]?.titulo).toBe("Ferramenta: consultar_vagas");
+    expect(passos[0]?.estado).toBe("ignorado");
+    expect(passos[0]?.descricao).toBe(
+      "Etapa não executada: consulta de vagas aguardando identificação inequívoca do médico.",
+    );
+  });
+});

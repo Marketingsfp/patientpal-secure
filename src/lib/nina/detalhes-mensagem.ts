@@ -1,6 +1,9 @@
 import { eventoDoMotor } from "./fluxo-direto";
 /** Apresentação somente de fatos registrados; não decide nem altera atendimento. */
-import type { LeituraDetalhesMensagem } from "./detalhes-mensagem-contrato";
+import type {
+  EstadoFerramentaRodada,
+  LeituraDetalhesMensagem,
+} from "./detalhes-mensagem-contrato";
 import { hashDoTexto } from "./confidence/hash";
 import { representacaoDaMensagem, selecionarAvaliacaoDaSaida } from "./confidence/identidade-saida";
 
@@ -16,7 +19,12 @@ export type PacoteDetalhesMensagem = {
   vinculos: RegistroDetalhes[];
   avisos: RegistroDetalhes[];
   alertas?: string[];
+  /** Relógio injetável (milissegundos) — usado nos testes. */
+  agora?: number;
 };
+
+/** Registros técnicos da Nina são apagados após 7 dias (migration 20260924230000_nina_zap_retencao_dados). */
+export const DIAS_RETENCAO_REGISTROS = 7;
 
 export function objetoDetalhes(v: unknown): RegistroDetalhes {
   return v && typeof v === "object" && !Array.isArray(v) ? (v as RegistroDetalhes) : {};
@@ -147,6 +155,9 @@ export function consolidarPassosDetalhes(
   mensagemId: string | null,
 ): LeituraDetalhesMensagem["passos"] {
   const grupos = new Map<string, RegistroDetalhes[]>();
+  // Chave sem a ferramenta -> grupos que a usam. O registro de "pulado" não traz
+  // o nome da ferramenta; ele se junta ao início da mesma chamada quando só há um.
+  const porBase = new Map<string, string[]>();
   for (const [i, e] of eventos.entries()) {
     if (e.node_id === "turn.summary" || eventoDoMotor(e)) continue;
     const meta = o(e.metadata);
@@ -157,13 +168,19 @@ export function consolidarPassosDetalhes(
     )
       continue;
     const inicio = s(e.started_at);
-    const chave = JSON.stringify([
+    const base = [
       e.trace_id ?? null,
       e.node_id,
       e.cycle_id ?? null,
       inicio ? instante(inicio) : `ausente-${i}`,
-      meta.ferramenta ?? null,
-    ]);
+    ];
+    const baseChave = JSON.stringify(base);
+    const irmaos = porBase.get(baseChave) ?? [];
+    const chave =
+      meta.ferramenta == null && irmaos.length === 1
+        ? irmaos[0]!
+        : JSON.stringify([...base, meta.ferramenta ?? null]);
+    if (!grupos.has(chave)) porBase.set(baseChave, [...irmaos, chave]);
     grupos.set(chave, [...(grupos.get(chave) ?? []), e]);
   }
   return [...grupos.entries()]
@@ -173,6 +190,8 @@ export function consolidarPassosDetalhes(
       const ambiguo = finais.length > 1 || inicios.length > 1;
       const e = finais[0] ?? inicios[0]!;
       const meta = o(e.metadata);
+      const ferramenta =
+        grupo.map((g) => s(o(g.metadata).ferramenta)).find((v) => v != null) ?? null;
       const estado: LeituraDetalhesMensagem["passos"][number]["estado"] = ambiguo
         ? "nao_confirmado"
         : e.event_type === "failed" || e.status === "error"
@@ -192,12 +211,16 @@ export function consolidarPassosDetalhes(
               ? (s(meta.erro) ?? "Falha registrada nesta etapa.")
               : estado === "concluido"
                 ? descreverConclusao(e.node_id, meta, mensagemId)
-                : "Estado registrado sem confirmação de conclusão.";
+                : estado === "ignorado"
+                  ? s(meta.motivo)
+                    ? `Etapa não executada: ${s(meta.motivo)}.`
+                    : "Etapa não executada; o motivo não foi registrado."
+                  : "Estado registrado sem confirmação de conclusão.";
       return {
         id,
         titulo:
           e.node_id === "tool.execute"
-            ? `Ferramenta: ${s(meta.ferramenta) ?? "nome não registrado"}`
+            ? `Ferramenta: ${ferramenta ?? "nome não registrado"}`
             : (NOMES_PASSOS[String(e.node_id)] ?? String(e.node_id ?? "Etapa sem nome")),
         descricao,
         estado,
@@ -206,6 +229,190 @@ export function consolidarPassosDetalhes(
       };
     })
     .sort((a, b) => instante(a.em) - instante(b.em));
+}
+
+function curto(v: string, max: number): string {
+  return v.length > max ? `${v.slice(0, max)}…` : v;
+}
+
+/** Argumentos em linhas "campo: valor", como o modelo pediu. */
+function formatarArgumentos(v: unknown): string | null {
+  if (v == null) return null;
+  let valor: unknown = v;
+  if (typeof v === "string") {
+    try {
+      valor = JSON.parse(v);
+    } catch {
+      return curto(v, 600);
+    }
+  }
+  if (valor && typeof valor === "object" && !Array.isArray(valor)) {
+    const linhas = Object.entries(valor)
+      .filter(([, x]) => x != null && x !== "")
+      .map(([k, x]) => `${k}: ${typeof x === "object" ? JSON.stringify(x) : String(x)}`);
+    return linhas.length ? curto(linhas.join("\n"), 600) : "sem parâmetros";
+  }
+  return curto(JSON.stringify(valor), 600);
+}
+
+function formatarResultado(v: unknown): string | null {
+  if (v == null) return null;
+  let valor: unknown = v;
+  if (typeof v === "string") {
+    try {
+      valor = JSON.parse(v);
+    } catch {
+      return curto(v, 2000);
+    }
+  }
+  return curto(JSON.stringify(valor, null, 2), 2000);
+}
+
+const ORDEM_GATEWAY: Record<string, number> = {
+  contexto_modelo: 0,
+  modelo_parametros: 1,
+  resposta_original: 2,
+};
+const TIPOS_REGISTRO_SISTEMA = new Set(["consulta", "ferramenta", "validacao"]);
+
+/**
+ * Rodadas do modelo a partir das evidências e do rastreio do turno.
+ * - texto e ferramentas pedidas: `resposta_original` gravada pelo gateway;
+ * - resultado de cada ferramenta: mensagens `tool` do conteúdo enviado ao
+ *   modelo na rodada seguinte (exatamente o que a Nina recebeu);
+ * - situação da execução: eventos `tool.execute` do mesmo ciclo.
+ * Sem vínculo seguro, o dado fica sem atribuição em vez de ser adivinhado.
+ */
+export function montarLinhaDoTempo(
+  etapas: RegistroDetalhes[],
+  eventos: RegistroDetalhes[],
+): NonNullable<LeituraDetalhesMensagem["linhaDoTempo"]> {
+  type Bruta = {
+    ordem: number;
+    mensagens: RegistroDetalhes[] | null;
+    params: RegistroDetalhes | null;
+    resposta: RegistroDetalhes | null;
+    registros: string[];
+  };
+  const brutas: Bruta[] = [];
+  const antesDoModelo: string[] = [];
+  let ajusteFinal: { antes: string; depois: string } | null = null;
+  let semModelo: string | null = null;
+  for (const e of etapas) {
+    const dados = o(e.dados);
+    const ordem = ORDEM_GATEWAY[String(e.tipo)];
+    if (o(e.codigo).funcao === "ninaAIGateway" && ordem != null) {
+      let atual = brutas.at(-1);
+      if (!atual || ordem <= atual.ordem) {
+        atual = { ordem, mensagens: null, params: null, resposta: null, registros: [] };
+        brutas.push(atual);
+      }
+      atual.ordem = ordem;
+      if (ordem === 0) atual.mensagens = lista(dados.mensagens);
+      else if (ordem === 1) atual.params = dados;
+      else atual.resposta = dados;
+      continue;
+    }
+    if (e.tipo === "alteracao_posterior") {
+      const antes = s(dados.antes) ?? "";
+      const depois = s(dados.depois) ?? "";
+      ajusteFinal = antes !== depois ? { antes, depois } : null;
+      continue;
+    }
+    if (e.tipo === "resposta_original" && !semModelo) semModelo = s(e.titulo);
+    if (TIPOS_REGISTRO_SISTEMA.has(String(e.tipo)) && s(e.titulo)) {
+      const destino = brutas.at(-1)?.registros ?? antesDoModelo;
+      destino.push(String(e.titulo));
+    }
+  }
+
+  const rodadas = brutas.map((b, i) => {
+    const numero = i + 1;
+    const resposta = b.resposta ?? {};
+    const params = b.params ?? {};
+    // Conteúdo da rodada seguinte: tudo depois da última fala do modelo.
+    const seguinte = brutas[i + 1]?.mensagens ?? null;
+    const ultimaFala = seguinte ? seguinte.map((m) => m.role).lastIndexOf("assistant") : -1;
+    const posteriores = seguinte && ultimaFala >= 0 ? seguinte.slice(ultimaFala + 1) : [];
+    const resultados = posteriores.filter((m) => m.role === "tool").map((m) => m.content);
+    // Na 1ª rodada, o que vem depois da última fala é o histórico do paciente.
+    const minhasMsgs = i > 0 ? (b.mensagens ?? []) : [];
+    const minhaUltimaFala = minhasMsgs.map((m) => m.role).lastIndexOf("assistant");
+    const orientacoesAntes =
+      minhaUltimaFala >= 0
+        ? minhasMsgs
+            .slice(minhaUltimaFala + 1)
+            .filter((m) => m.role === "system")
+            .map((m) => curto(s(m.content) ?? "", 800))
+            .filter(Boolean)
+        : [];
+
+    const pedidas = lista(resposta.tool_calls);
+    const alinhado = resultados.length === pedidas.length;
+    const passos = consolidarPassosDetalhes(
+      eventos.filter((e) => e.node_id === "tool.execute" && n(e.cycle_id) === numero),
+      null,
+    ).map((p) => ({
+      ...p,
+      nome: p.titulo.replace(/^Ferramenta: /, ""),
+      estado: (p.estado === "em_andamento" ? "nao_confirmado" : p.estado) as EstadoFerramentaRodada,
+    }));
+    const usados = new Set<number>();
+    type Ferramenta = NonNullable<
+      LeituraDetalhesMensagem["linhaDoTempo"]
+    >["rodadas"][number]["ferramentas"][number];
+    const ferramentas = pedidas.map((c, j): Ferramenta => {
+      const nome = s(c.nome) ?? "nome não registrado";
+      const k = passos.findIndex((p, idx) => !usados.has(idx) && p.nome === nome);
+      if (k >= 0) usados.add(k);
+      const passo = k >= 0 ? passos[k] : null;
+      return {
+        nome,
+        argumentos: formatarArgumentos(c.argumentos),
+        estado: passo ? passo.estado : "nao_registrado",
+        detalhe: passo
+          ? passo.estado === "concluido"
+            ? null
+            : passo.descricao
+          : "A execução desta ferramenta não aparece no rastreio do turno.",
+        resultado: alinhado ? formatarResultado(resultados[j]) : null,
+        pedidaPeloSistema: false,
+      };
+    });
+    for (const [idx, p] of passos.entries()) {
+      if (usados.has(idx)) continue;
+      ferramentas.push({
+        nome: p.nome,
+        argumentos: null,
+        estado: p.estado,
+        detalhe: p.estado === "concluido" ? null : p.descricao,
+        resultado: null,
+        pedidaPeloSistema: true,
+      });
+    }
+    return {
+      numero,
+      modelo: s(params.model),
+      latenciaMs: n(params.latency_ms),
+      tokensEntrada: n(o(params.tokens).entrada),
+      tokensSaida: n(o(params.tokens).saida),
+      tentativas: n(params.tentativas),
+      orientacoesAntes,
+      texto: s(resposta.texto),
+      erro: s(resposta.erro),
+      ferramentas,
+      resultadosSemVinculo: alinhado
+        ? []
+        : resultados.map(formatarResultado).filter((v): v is string => v != null),
+      registrosSistema: b.registros,
+    };
+  });
+  return {
+    rodadas,
+    antesDoModelo,
+    ajusteFinal,
+    semModelo: rodadas.length ? null : semModelo,
+  };
 }
 
 export function montarLeituraDetalhesMensagem(p: PacoteDetalhesMensagem): LeituraDetalhesMensagem {
@@ -347,7 +554,16 @@ export function montarLeituraDetalhesMensagem(p: PacoteDetalhesMensagem): Leitur
     alertas.push(
       "Mensagem não selecionada ou não localizada; nenhum texto interno foi apresentado como mensagem entregue.",
     );
-  if (!p.execucao) alertas.push("Execução da Nina não vinculada a esta mensagem.");
+  const registradaEm = instante(mensagem?.created_at);
+  const alemDaRetencao =
+    registradaEm > 0 &&
+    (p.agora ?? Date.now()) - registradaEm > DIAS_RETENCAO_REGISTROS * 86_400_000;
+  if (!p.execucao)
+    alertas.push(
+      alemDaRetencao
+        ? `Os registros técnicos desta mensagem foram apagados pela limpeza automática (são guardados por ${DIAS_RETENCAO_REGISTROS} dias). O texto da conversa continua preservado.`
+        : "Execução da Nina não vinculada a esta mensagem.",
+    );
   if (!respostaOriginal && p.execucao)
     alertas.push("Texto original do modelo não encontrado na captura do gateway.");
   if (hashEntregue && vinculo?.texto_hash && vinculo.texto_hash !== hashEntregue)
@@ -398,6 +614,16 @@ export function montarLeituraDetalhesMensagem(p: PacoteDetalhesMensagem): Leitur
           ? "Aviso operacional registrado na conversa."
           : "Mensagem localizada no histórico da conversa.";
   const passos = consolidarPassosDetalhes(p.eventos, mensagemId);
+  const linhaDoTempo = montarLinhaDoTempo(p.etapas, p.eventos);
+  const rodadasResumo = n(resumo.rodadas);
+  if (
+    linhaDoTempo.rodadas.length &&
+    rodadasResumo != null &&
+    rodadasResumo !== linhaDoTempo.rodadas.length
+  )
+    alertas.push(
+      `As evidências registram ${linhaDoTempo.rodadas.length} rodada(s) do modelo, mas o resumo do turno indica ${rodadasResumo}. A linha do tempo mostra apenas as rodadas com evidência.`,
+    );
   const horarios = passos.map((passo) => passo.em).filter((em): em is string => em != null);
   if (new Set(horarios.map(instante)).size < horarios.length)
     alertas.push(
@@ -413,11 +639,12 @@ export function montarLeituraDetalhesMensagem(p: PacoteDetalhesMensagem): Leitur
           registradaEm: s(mensagem?.created_at),
           canal: s(mensagem?.canal),
           entrega,
+          // O motor de confiança saiu em 16/09: a origem vem do vínculo com a execução.
           origem: operacional
             ? "Aviso do sistema"
-            : finalId
-              ? "Resposta avaliada da Nina"
-              : "Origem não comprovada pelo vínculo de conteúdo",
+            : p.execucao
+              ? "Resposta gerada pela Nina"
+              : "Resposta da Nina sem registro técnico disponível",
         }
       : null,
     entradas: p.entradas
@@ -433,6 +660,7 @@ export function montarLeituraDetalhesMensagem(p: PacoteDetalhesMensagem): Leitur
     duracaoMs: n(resumos.length === 1 ? resumos[0]?.duration_ms : null),
     avaliacoes,
     passos,
+    linhaDoTempo,
     alertas: [...new Set(alertas)],
   };
 }

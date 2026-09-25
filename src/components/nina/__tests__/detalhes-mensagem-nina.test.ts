@@ -212,3 +212,50 @@ describe("Detalhes técnicos da mensagem — apresentação fiel", () => {
     expect(html).not.toMatch(/<details[^>]*\bopen(?:=|\s|>)/);
   });
 });
+
+describe("Detalhes técnicos — linha do tempo por rodada", () => {
+  it("mostra rodada, ferramenta pedida, resultado e ajuste final", () => {
+    const html = renderizar(
+      leitura({
+        linhaDoTempo: {
+          antesDoModelo: [],
+          semModelo: null,
+          ajusteFinal: { antes: "Oi 😊", depois: "Oi" },
+          rodadas: [
+            {
+              numero: 1,
+              modelo: "google/gemini-3.8-flash",
+              latenciaMs: 1200,
+              tokensEntrada: 5000,
+              tokensSaida: 40,
+              tentativas: 1,
+              orientacoesAntes: [],
+              texto: null,
+              erro: null,
+              ferramentas: [
+                {
+                  nome: "consultar_disponibilidade",
+                  argumentos: "medico: Dr. Alex",
+                  estado: "concluido",
+                  detalhe: null,
+                  resultado: '{ "vagas": ["26/09 08:00"] }',
+                  pedidaPeloSistema: false,
+                },
+              ],
+              resultadosSemVinculo: [],
+              registrosSistema: [],
+            },
+          ],
+        },
+      }),
+    );
+    expect(html).toContain("Como a Nina chegou à resposta");
+    expect(html).toContain("Rodada 1");
+    expect(html).toContain("consultar_disponibilidade");
+    expect(html).toContain("medico: Dr. Alex");
+    expect(html).toContain("Recebeu de volta");
+    expect(html).toContain("26/09 08:00");
+    expect(html).toContain("Ajuste feito pelo sistema depois do modelo");
+    expect(html).not.toMatch(/<details[^>]*\bopen(?:=|\s|>)/);
+  });
+});
