@@ -8,6 +8,7 @@ describe("Jev Fase 1 — intenção", () => {
   test("ignora confiança baixa, 'outro', opção desconhecida ou sem confiança", () => {
     expect(intencaoAplicavel({ choice: "agendamento", confidence: 0.5 })).toBeNull();
     expect(intencaoAplicavel({ choice: "outro", confidence: 1 })).toBeNull();
+    expect(intencaoAplicavel({ choice: "continuacao", confidence: 1 })).toBeNull();
     expect(intencaoAplicavel({ choice: "xyz", confidence: 1 })).toBeNull();
     expect(intencaoAplicavel({ choice: "valor" })).toBeNull();
     expect(intencaoAplicavel(undefined)).toBeNull();

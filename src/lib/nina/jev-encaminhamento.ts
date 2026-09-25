@@ -4,12 +4,28 @@
  * Possível regra de negócio — validar com a equipe da clínica.
  */
 import type { PerguntaJev, RespostaJev } from "./jev";
-import { CONFIANCA_MINIMA_INTENCAO } from "./jev-intencao";
 
 export const LIMITES_ENCAMINHAMENTO = { urgencia: 0.5, pedido_atendente: 0.7, irritacao: 0.8 } as const;
 
+/**
+ * Abaixo desta probabilidade de "dá para entender", a mensagem conta como falha
+ * de entendimento. É a pergunta própria de entendimento (25/09/2026), e não a
+ * confiança da escolha de intenção, que fica baixa sempre que as categorias se
+ * sobrepõem, mesmo quando a mensagem é clara.
+ */
+export const LIMITE_ENTENDIMENTO = 0.5;
+
 export function perguntasEncaminhamento(): Record<string, PerguntaJev> {
   return {
+    entendimento: {
+      type: "noul",
+      instructions:
+        "Considerando `mensagens_anteriores` e `contexto_atendimento` (etapa atual e opções já oferecidas), dá para entender com segurança o que o paciente quer dizer na `mensagem_atual`, seja um pedido novo, seja a resposta ou a continuação da última pergunta ou oferta da atendente?",
+      criteria: {
+        true: "Dá para entender: é um pedido compreensível ou responde/continua a conversa (inclusive respostas curtas como uma especialidade, um nome de médico, um dia ou um sim).",
+        false: "Não dá para entender o que o paciente quer: a mensagem é incompreensível ou não tem relação com a conversa.",
+      },
+    },
     urgencia: {
       type: "noul",
       instructions: "A `mensagem_atual` descreve um possível sinal de urgência clínica (dor forte, falta de ar, sangramento, desmaio, piora rápida, risco à vida)?",
@@ -30,14 +46,14 @@ export function perguntasEncaminhamento(): Record<string, PerguntaJev> {
 
 export type Encaminhamento = { motivo: string; urgencia: "normal" | "alta" };
 
-/** Dúvida = o Jev respondeu, mas sem confiança suficiente sobre o pedido. */
-export function houveDuvida(intencao: RespostaJev | undefined): boolean {
-  return typeof intencao?.confidence === "number" && intencao.confidence < CONFIANCA_MINIMA_INTENCAO;
+/** O Jev respondeu que NÃO dá para entender a mensagem (sem resposta não é falha). */
+export function naoEntendeu(entendimento: RespostaJev | undefined): boolean {
+  return typeof entendimento?.noul === "number" && entendimento.noul < LIMITE_ENTENDIMENTO;
 }
 
 /**
  * Falhas reais de entendimento, contadas entre turnos (decisão de 25/09/2026,
- * sessão 470): baixa confiança isolada não encaminha; escolher uma opção já
+ * sessão 470): uma falha isolada não encaminha; escolher uma opção já
  * oferecida não é falha; e a contagem zera quando o atendimento avança.
  */
 export type ContagemDuvida = {
@@ -45,7 +61,10 @@ export type ContagemDuvida = {
   falhas: number;
   /** Marco do andamento no turno (ver `marcoAtendimento`). */
   marco: string;
-  /** Confianças das falhas contadas, da mais antiga para a mais recente. */
+  /**
+   * Probabilidades de "dá para entender" das falhas contadas, da mais antiga
+   * para a mais recente. (Nome mantido pelos registros já gravados.)
+   */
   confiancas: number[];
 };
 
@@ -53,14 +72,15 @@ export type ContagemDuvida = {
 export const FALHAS_PARA_ENCAMINHAR = 3;
 
 export function contarDuvida(a: {
-  intencao: RespostaJev | undefined;
+  /** Resposta à pergunta `entendimento` (Fase 2). */
+  entendimento: RespostaJev | undefined;
   /** A mensagem escolhe uma das opções já oferecidas. */
   selecaoValida: boolean;
   marco: string;
   anterior: ContagemDuvida | null;
 }): ContagemDuvida {
-  if (!houveDuvida(a.intencao) || a.selecaoValida) return { falhas: 0, marco: a.marco, confiancas: [] };
-  const confianca = a.intencao!.confidence!;
+  if (!naoEntendeu(a.entendimento) || a.selecaoValida) return { falhas: 0, marco: a.marco, confiancas: [] };
+  const confianca = a.entendimento!.noul!;
   const continua = a.anterior !== null && a.anterior.falhas > 0 && a.anterior.marco === a.marco;
   return {
     falhas: continua ? a.anterior!.falhas + 1 : 1,
@@ -87,7 +107,7 @@ export function decidirEncaminhamento(
     return { motivo: `JEV_IRRITACAO: paciente insatisfeito (pontuação ${numero(i)})`, urgencia: "normal" };
   if (contagem && contagem.falhas >= FALHAS_PARA_ENCAMINHAR)
     return {
-      motivo: `JEV_DUVIDA_REPETIDA: pedido não compreendido em ${contagem.falhas} mensagens seguidas, sem avanço do atendimento (confiança ${contagem.confiancas.map(numero).join(" e ")})`,
+      motivo: `JEV_DUVIDA_REPETIDA: pedido não compreendido em ${contagem.falhas} mensagens seguidas, sem avanço do atendimento (entendimento ${contagem.confiancas.map(numero).join(" e ")})`,
       urgencia: "normal",
     };
   return null;

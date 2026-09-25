@@ -2,7 +2,8 @@ import { describe, expect, test } from "bun:test";
 import {
   contarDuvida,
   decidirEncaminhamento,
-  houveDuvida,
+  naoEntendeu,
+  perguntasEncaminhamento,
   motivoLegivel,
   type ContagemDuvida,
 } from "../jev-encaminhamento";
@@ -31,49 +32,54 @@ describe("Jev Fase 2 — encaminhamento", () => {
     const e = decidirEncaminhamento(base, falhas(3, [0.39, 0.37, 0.3]));
     expect(e?.motivo).toContain("JEV_DUVIDA_REPETIDA");
     expect(e?.motivo).toContain("em 3 mensagens seguidas");
-    expect(e?.motivo).toContain("confiança 0,39 e 0,37 e 0,30");
+    expect(e?.motivo).toContain("entendimento 0,39 e 0,37 e 0,30");
     expect(motivoLegivel(e!.motivo)).not.toContain("JEV_");
   });
-  test("dúvida = confiança abaixo de 0,8; sem resposta não é dúvida", () => {
-    expect(houveDuvida({ choice: "outro", confidence: 0.7 })).toBe(true);
-    expect(houveDuvida({ choice: "outro", confidence: 0.95 })).toBe(false);
-    expect(houveDuvida(undefined)).toBe(false);
+  test("falha de entendimento = pergunta própria de entendimento abaixo de 0,5; sem resposta não é falha", () => {
+    expect(naoEntendeu({ noul: 0.2 })).toBe(true);
+    expect(naoEntendeu({ noul: 0.9 })).toBe(false);
+    expect(naoEntendeu(undefined)).toBe(false);
+    // A confiança da intenção não conta mais como falha de entendimento.
+    expect(naoEntendeu({ choice: "outro", confidence: 0.39 })).toBe(false);
+  });
+  test("a pergunta de entendimento vai na mesma chamada da Fase 2", () => {
+    expect(Object.keys(perguntasEncaminhamento())).toContain("entendimento");
   });
 });
 
 describe("Jev Fase 2 — contagem de falhas reais", () => {
-  const baixa = { choice: "outro", confidence: 0.39 };
-  test("baixa confiança isolada conta 1 e não encaminha", () => {
-    const c = contarDuvida({ intencao: baixa, selecaoValida: false, marco: "a", anterior: null });
+  const baixa = { noul: 0.2 };
+  test("uma falha de entendimento isolada conta 1 e não encaminha", () => {
+    const c = contarDuvida({ entendimento: baixa, selecaoValida: false, marco: "a", anterior: null });
     expect(c.falhas).toBe(1);
     expect(decidirEncaminhamento(base, c)).toBeNull();
   });
   test("falhas sem avanço somam; a segunda ainda não encaminha, a terceira sim", () => {
-    const c1 = contarDuvida({ intencao: baixa, selecaoValida: false, marco: "a", anterior: null });
-    const c2 = contarDuvida({ intencao: { choice: "outro", confidence: 0.3 }, selecaoValida: false, marco: "a", anterior: c1 });
+    const c1 = contarDuvida({ entendimento: baixa, selecaoValida: false, marco: "a", anterior: null });
+    const c2 = contarDuvida({ entendimento: { noul: 0.3 }, selecaoValida: false, marco: "a", anterior: c1 });
     expect(c2.falhas).toBe(2);
     expect(decidirEncaminhamento(base, c2)).toBeNull();
-    const c3 = contarDuvida({ intencao: { choice: "outro", confidence: 0.2 }, selecaoValida: false, marco: "a", anterior: c2 });
+    const c3 = contarDuvida({ entendimento: { noul: 0.15 }, selecaoValida: false, marco: "a", anterior: c2 });
     expect(c3.falhas).toBe(3);
     expect(decidirEncaminhamento(base, c3)?.motivo).toContain("DUVIDA");
   });
   test("atendimento avançou: a contagem recomeça", () => {
-    const c1 = contarDuvida({ intencao: baixa, selecaoValida: false, marco: "a", anterior: null });
-    const c2 = contarDuvida({ intencao: baixa, selecaoValida: false, marco: "b", anterior: c1 });
+    const c1 = contarDuvida({ entendimento: baixa, selecaoValida: false, marco: "a", anterior: null });
+    const c2 = contarDuvida({ entendimento: baixa, selecaoValida: false, marco: "b", anterior: c1 });
     expect(c2.falhas).toBe(1);
   });
   test("escolher uma opção oferecida nunca é falha e zera a contagem", () => {
-    const c1 = contarDuvida({ intencao: baixa, selecaoValida: false, marco: "a", anterior: null });
-    const c2 = contarDuvida({ intencao: { choice: "medico", confidence: 0.37 }, selecaoValida: true, marco: "a", anterior: c1 });
+    const c1 = contarDuvida({ entendimento: baixa, selecaoValida: false, marco: "a", anterior: null });
+    const c2 = contarDuvida({ entendimento: { noul: 0.3 }, selecaoValida: true, marco: "a", anterior: c1 });
     expect(c2.falhas).toBe(0);
     expect(decidirEncaminhamento(base, c2)).toBeNull();
   });
   test("entendimento claro zera a contagem", () => {
-    const c1 = contarDuvida({ intencao: baixa, selecaoValida: false, marco: "a", anterior: null });
-    expect(contarDuvida({ intencao: { choice: "agendamento", confidence: 1 }, selecaoValida: false, marco: "a", anterior: c1 }).falhas).toBe(0);
+    const c1 = contarDuvida({ entendimento: baixa, selecaoValida: false, marco: "a", anterior: null });
+    expect(contarDuvida({ entendimento: { noul: 0.95 }, selecaoValida: false, marco: "a", anterior: c1 }).falhas).toBe(0);
   });
   test("registro antigo sem marco não soma com a falha atual", () => {
     const legado: ContagemDuvida = { falhas: 1, marco: "", confiancas: [0.5] };
-    expect(contarDuvida({ intencao: baixa, selecaoValida: false, marco: "a", anterior: legado }).falhas).toBe(1);
+    expect(contarDuvida({ entendimento: baixa, selecaoValida: false, marco: "a", anterior: legado }).falhas).toBe(1);
   });
 });

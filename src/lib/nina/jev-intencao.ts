@@ -7,7 +7,7 @@ import type { PerguntaJev, RespostaJev } from "./jev";
 
 export const CONFIANCA_MINIMA_INTENCAO = 0.8;
 
-const OPCOES: Record<IntencaoNina | "outro", string> = {
+const OPCOES: Record<IntencaoNina | "continuacao" | "outro", string> = {
   agendamento: "Quer marcar uma consulta, exame ou procedimento.",
   disponibilidade: "Pergunta se há vaga ou horário livre, sem pedir para marcar ainda.",
   remarcacao: "Quer mudar o dia ou horário de algo já marcado.",
@@ -24,7 +24,12 @@ const OPCOES: Record<IntencaoNina | "outro", string> = {
   financeiro: "Boleto, segunda via, nota fiscal, reembolso ou pagamento já feito.",
   falar_humano: "Pede explicitamente para falar com um atendente humano.",
   administrativo: "Convênio, cadastro, contrato, currículo ou reclamação.",
-  outro: "Saudação, agradecimento, resposta curta a uma pergunta da atendente ou nada acima.",
+  // 25/09/2026: "continuação" separada de "outro". Antes, uma resposta curta no
+  // meio do atendimento ("neuro", "carlos eduardo") se dividia entre outro,
+  // agendamento e médico e parecia incompreensão.
+  continuacao:
+    "Responde ou continua a última pergunta ou oferta da atendente, sem trazer um pedido novo (ex.: escolhe uma das opções, informa especialidade, médico, data ou período, confirma ou recusa).",
+  outro: "Saudação, agradecimento ou nada acima.",
 };
 
 export function perguntaIntencao(): Record<string, PerguntaJev> {
@@ -53,7 +58,8 @@ export function estadoIntencao(
 /** Devolve a intenção a aplicar, ou null (segue a leitura atual). */
 export function intencaoAplicavel(r: RespostaJev | undefined): IntencaoNina | null {
   if (!r || typeof r.choice !== "string" || typeof r.confidence !== "number") return null;
-  if (r.choice === "outro" || !(r.choice in OPCOES)) return null;
+  // "continuação" e "outro" não trocam a intenção: a Nina segue a etapa atual.
+  if (r.choice === "outro" || r.choice === "continuacao" || !(r.choice in OPCOES)) return null;
   if (r.confidence < CONFIANCA_MINIMA_INTENCAO) return null;
   return r.choice as IntencaoNina;
 }

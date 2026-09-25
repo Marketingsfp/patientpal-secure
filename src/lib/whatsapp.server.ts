@@ -929,7 +929,8 @@ async function gerarRespostaNinaInterno(
       }
       const contagem = respostas
         ? enc.contarDuvida({
-            intencao: respostas["intencao"],
+            // Pergunta própria de entendimento (Fase 2), não a confiança da intenção.
+            entendimento: respostas["entendimento"],
             selecaoValida: ctxJev.opcaoEscolhidaJev(mensagemPaciente, contextoJev.opcoes_oferecidas) !== null,
             marco: ctxJev.marcoAtendimento(sessaoNina.estado),
             anterior,
@@ -939,6 +940,7 @@ async function gerarRespostaNinaInterno(
         jevEncaminhamento = enc.decidirEncaminhamento(respostas, contagem);
         jevPontuacoes = {
           confianca_intencao: respostas["intencao"]?.confidence ?? null,
+          entendimento: respostas["entendimento"]?.noul ?? null,
           urgencia: respostas["urgencia"]?.noul ?? null,
           pedido_atendente: respostas["pedido_atendente"]?.noul ?? null,
           irritacao: respostas["irritacao"]?.noul ?? null,

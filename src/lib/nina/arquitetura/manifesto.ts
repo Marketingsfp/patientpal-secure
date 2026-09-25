@@ -428,7 +428,7 @@ export const NODES_ARQUITETURA: NodeArquitetura[] = [
     nome: "Filtro de decisão (Jev)",
     categoria: "IA",
     descricao:
-      "Igual em produção e homologação, ligado por fase na clínica. Fase 1 confirma a intenção da mensagem, com o histórico em ordem e as opções já oferecidas. Fase 2 encaminha para a equipe em urgência, pedido de atendente, irritação ou três falhas seguidas de entendimento sem avanço do atendimento, igual à CONV-04: até duas perguntas de esclarecimento antes de encaminhar (escolher uma opção oferecida não conta). Fase 3 escolhe a especialidade quando a busca não acha; fase 4 deixa sugestão de cadastro para a recepção. Erro ou demora mantém o fluxo normal.",
+      "Igual em produção e homologação, ligado por fase na clínica. Fase 1 confirma a intenção da mensagem (com a opção “continuação” para respostas à última pergunta), com o histórico em ordem e as opções já oferecidas. Fase 2 encaminha para a equipe em urgência, pedido de atendente, irritação ou três mensagens seguidas que ele não consegue entender (pergunta própria de entendimento, não a confiança da intenção), sem avanço do atendimento, igual à CONV-04: até duas perguntas de esclarecimento antes de encaminhar (escolher uma opção oferecida não conta). Fase 3 escolhe a especialidade quando a busca não acha; fase 4 deixa sugestão de cadastro para a recepção. Erro ou demora mantém o fluxo normal.",
     arquivo: "src/lib/nina/jev.server.ts",
     funcao: "perguntarJev",
     servico: "Lovable AI Gateway (typesafe/jev-latest)",

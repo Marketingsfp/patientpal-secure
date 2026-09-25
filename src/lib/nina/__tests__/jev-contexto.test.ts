@@ -124,17 +124,19 @@ describe("regressão da sessão 470", () => {
     const semOferta = estadoVazio();
     semOferta.session_id = "s1";
     // "quero marcar uma consulta": entendido (1,00).
-    const c1 = contarDuvida({ intencao: { choice: "agendamento", confidence: 1 }, selecaoValida: false, marco: marcoAtendimento(semOferta), anterior: null });
+    const c1 = contarDuvida({ entendimento: { noul: 0.98 }, selecaoValida: false, marco: marcoAtendimento(semOferta), anterior: null });
     expect(decidirEncaminhamento(base, c1)).toBeNull();
-    // "neuro": confiança 0,39, sem opções oferecidas ainda → 1 falha.
-    const c2 = contarDuvida({ intencao: { choice: "outro", confidence: 0.39 }, selecaoValida: false, marco: marcoAtendimento(semOferta), anterior: c1 });
-    expect(c2.falhas).toBe(1);
+    // "neuro" responde "qual especialidade?": a intenção se divide (0,39), mas dá para entender.
+    const c2 = contarDuvida({ entendimento: { noul: 0.9 }, selecaoValida: false, marco: marcoAtendimento(semOferta), anterior: c1 });
+    expect(c2.falhas).toBe(0);
+    // Mesmo que o Jev achasse "neuro" incompreensível, seria só 1 falha.
+    expect(contarDuvida({ entendimento: { noul: 0.3 }, selecaoValida: false, marco: marcoAtendimento(semOferta), anterior: c1 }).falhas).toBe(1);
     expect(decidirEncaminhamento(base, c2)).toBeNull();
     // A Nina ofereceu Neurologia; "carlos eduardo" (0,37) escolhe uma opção.
     const comOferta = estadoComOferta();
     const escolha = opcaoEscolhidaJev("carlos eduardo", opcoesOferecidasJev(comOferta));
     const c3 = contarDuvida({
-      intencao: { choice: "medico", confidence: 0.37 },
+      entendimento: { noul: 0.9 },
       selecaoValida: escolha !== null,
       marco: marcoAtendimento(comOferta),
       anterior: c2,
@@ -148,15 +150,15 @@ describe("regressão da sessão 470", () => {
     const base = { urgencia: { noul: 0.05 }, pedido_atendente: { noul: 0.05 }, irritacao: { noul: 0.05 } };
     const e = estadoComOferta();
     const marco = marcoAtendimento(e);
-    const c1 = contarDuvida({ intencao: { choice: "outro", confidence: 0.2 }, selecaoValida: opcaoEscolhidaJev("asdkj qwe", opcoesOferecidasJev(e)) !== null, marco, anterior: null });
-    const c2 = contarDuvida({ intencao: { choice: "outro", confidence: 0.25 }, selecaoValida: opcaoEscolhidaJev("zzz ???", opcoesOferecidasJev(e)) !== null, marco, anterior: c1 });
+    const c1 = contarDuvida({ entendimento: { noul: 0.1 }, selecaoValida: opcaoEscolhidaJev("asdkj qwe", opcoesOferecidasJev(e)) !== null, marco, anterior: null });
+    const c2 = contarDuvida({ entendimento: { noul: 0.12 }, selecaoValida: opcaoEscolhidaJev("zzz ???", opcoesOferecidasJev(e)) !== null, marco, anterior: c1 });
     expect(decidirEncaminhamento(base, c2)).toBeNull();
-    const c3 = contarDuvida({ intencao: { choice: "outro", confidence: 0.22 }, selecaoValida: opcaoEscolhidaJev("??", opcoesOferecidasJev(e)) !== null, marco, anterior: c2 });
+    const c3 = contarDuvida({ entendimento: { noul: 0.08 }, selecaoValida: opcaoEscolhidaJev("??", opcoesOferecidasJev(e)) !== null, marco, anterior: c2 });
     expect(decidirEncaminhamento(base, c3)?.motivo).toContain("JEV_DUVIDA_REPETIDA");
   });
 
-  test("confirmação curta ('sim') com boa confiança não conta como falha", () => {
-    const c = contarDuvida({ intencao: { choice: "agendamento", confidence: 0.92 }, selecaoValida: false, marco: "m", anterior: { falhas: 1, marco: "m", confiancas: [0.4] } });
+  test("confirmação curta ('sim') entendida não conta como falha", () => {
+    const c = contarDuvida({ entendimento: { noul: 0.92 }, selecaoValida: false, marco: "m", anterior: { falhas: 1, marco: "m", confiancas: [0.4] } });
     expect(c.falhas).toBe(0);
   });
 });
