@@ -229,6 +229,26 @@ export function FormServico({
       </div>
 
       <div className="space-y-1">
+        <Label htmlFor="catalogo-pedido-medico">Precisa de pedido médico?</Label>
+        <select
+          id="catalogo-pedido-medico"
+          className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-50"
+          value={estado.estrutura.pedido_medico}
+          disabled={somenteLeitura}
+          onChange={(e) => set({ estrutura: { ...estado.estrutura,
+            pedido_medico: e.target.value as EstruturaCatalogo["pedido_medico"],
+          } })}
+        >
+          <option value="nao_informado">Não informado</option>
+          <option value="obrigatorio">Sim, precisa de pedido médico</option>
+          <option value="dispensado">Não precisa de pedido médico</option>
+        </select>
+        <p className="text-xs text-muted-foreground">
+          A Nina usará esta informação para orientar o paciente. Se ainda não foi confirmado pela clínica, mantenha “Não informado”.
+        </p>
+      </div>
+
+      <div className="space-y-1">
         <Label>Nota interna (somente equipe)</Label>
         <Textarea
           rows={6}

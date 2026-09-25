@@ -163,6 +163,8 @@ export function servicoParaRegistro(s: ServicoPublicado): RegistroConhecimento {
           ? `Valor de referência: R$ ${resumo.toFixed(2).replace(".", ",")} (forma de pagamento não informada)`
           : null,
         texto(s.restricoes) ? `Requisitos: ${texto(s.restricoes)}` : null,
+        estrutura.pedido_medico === "obrigatorio" ? "Pedido médico: obrigatório para realizar este exame/procedimento."
+          : estrutura.pedido_medico === "dispensado" ? "Pedido médico: dispensado para este exame/procedimento." : null,
         pagamentosJaDescritos(s.formas_pagamento, atendimentos) ? null : descricaoPagamentos(s.formas_pagamento),
       ]
         .filter(Boolean)
@@ -176,6 +178,7 @@ export function servicoParaRegistro(s: ServicoPublicado): RegistroConhecimento {
       estrutura,
       atendimentos_publicados: atendimentos,
       preparo_status: s.preparo ? "informado" : estrutura.preparo_status,
+      pedido_medico: estrutura.pedido_medico,
       atendimento_humano_obrigatorio: estrutura.encaminhamento_humano === true || executantes.some(e => profissionalSfp(e["nome"])),
       omitir_nome_profissional: executantes.some(e => profissionalGenerico(e["nome"])),
       // Valor publicado sem modalidade continua verificável como valor genérico.

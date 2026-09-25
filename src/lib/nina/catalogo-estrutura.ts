@@ -54,6 +54,7 @@ export const estruturaCatalogoSchema = z
     grupo: z.string().trim().max(200).nullable().optional(),
     encaminhamento_humano: z.boolean().nullable().optional(),
     preparo_status: z.enum(["nao_informado", "informado", "sem_preparo"]).default("nao_informado"),
+    pedido_medico: z.enum(["nao_informado", "obrigatorio", "dispensado"]).default("nao_informado"),
     convenios_status: z.enum(["nao_informado", "aceita", "nao_aceita"]).default("nao_informado"),
     complementos: z.array(complementoAtendimentoSchema).max(100).default([]),
   })
@@ -302,6 +303,11 @@ export const INSTRUCAO_DADOS_CATALOGO =
   "se contradisserem o texto publicado, confirme com a equipe o aspecto conflitante, sem escolher uma versão. " +
   REGRA_MODALIDADES_CONFIRMADAS + " " +
   "Preparo não informado não significa sem preparo; convênios não informados não significam que não aceita. " +
+  "Pedido médico: quando obrigatório, avise ao apresentar o exame que é necessário levar o pedido médico para realizá-lo; " +
+  "quando dispensado, informe que não precisa se o paciente perguntar. Não informado não significa dispensado: " +
+  "não presuma a exigência ou a dispensa. Se perguntarem e não houver regra publicada explícita, confirme com a equipe. " +
+  "Não peça envio de foto do pedido nem bloqueie o agendamento por esse campo: ele orienta a realização do exame. " +
+  "Se a opção de pedido médico contradisser requisitos em texto, confirme com a equipe antes de orientar. " +
   "'40 kg' não é idade. 'Manhã e tarde' não estabelece um limite numérico de chegada. Quinzenal sem data de referência não identifica o próximo dia. " +
   REGRA_HORARIOS_PUBLICADOS + " " + REGRA_ANESTESIA_ADICIONAL + " " +
   "Grupo geral e item específico não compartilham regras automaticamente. " +
