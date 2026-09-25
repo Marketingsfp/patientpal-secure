@@ -16,6 +16,6 @@ it("CargaTeste monta, atualiza e desmonta com efeitos React reais em processo is
     processo.exited,
   ]);
   const saida = stdout + stderr;
-  expect(saida).toContain("3 pass");
+  expect(saida).toContain("4 pass");
   expect(codigo, saida).toBe(0);
 }, 30000);

@@ -972,7 +972,7 @@ export const NODES_ARQUITETURA: NodeArquitetura[] = [
     nome: "Teste de carga (GPT Luna)",
     categoria: "HOMOLOGACAO",
     descricao:
-      "Controlador determinístico de volume: define ritmo, concorrência e tentativas; o Luna apenas gera variações de texto sintético.",
+      "Controlador determinístico de volume: define ritmo, concorrência e tentativas; o Luna gera variações de texto sintético e, na bateria por profissional, escreve o paciente conforme a resposta da Nina. Cada cenário da bateria termina com verificação e devolução da vaga de teste.",
     arquivo: "src/lib/nina/carga.functions.ts",
     funcao: "executarLoteCarga",
     servico: "Lovable AI Gateway (openai/gpt-5.6-luna)",
@@ -980,7 +980,7 @@ export const NODES_ARQUITETURA: NodeArquitetura[] = [
     saida: "Lote de mensagens sintéticas enviadas ao ambiente de teste",
     anteriores: [],
     seguintes: ["test.inbound"],
-    tabelas: ["nina_teste_carga", "nina_teste_carga_amostras"],
+    tabelas: ["nina_teste_carga", "nina_teste_carga_amostras", "agendamentos"],
     erros: ["limite do perfil excedido", "teste cancelado", "falha ao gerar variação"],
   },
   {

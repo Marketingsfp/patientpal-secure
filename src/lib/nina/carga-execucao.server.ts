@@ -1,5 +1,13 @@
 /** Uma unidade por requisição limita o acúmulo de contexto/modelo/auditoria. */
 import { normalizarConfig, estourouOrcamento } from "./carga";
+import { configBateria, itemBateria } from "./carga-bateria";
+import {
+  decidirTurnoBateria,
+  devolverCenarioBateria,
+  devolverVagasBateria,
+  verificarCenarioBateria,
+  type PacienteLuna,
+} from "./carga-bateria.server";
 import { cargaParalela } from "./carga-paralela";
 import { comReservaParalela } from "./carga-paralela.server";
 import { chaveMensagemCarga, estadoControleCarga } from "./carga-controle";
@@ -8,10 +16,14 @@ import {
   desfechoItemCarga,
   gravarAmostraCarga,
   lerAmostrasCarga,
+  tokensAmostrasCarga,
   totaisAmostrasCarga,
   type ItemCarga,
   type DesfechoItemCarga,
 } from "./carga-itens.server";
+
+const pacienteLunaPadrao: PacienteLuna = async (cenario, historico) =>
+  (await import("./carga-redacao-luna.server")).proximaMensagemPacienteLuna(cenario, historico);
 
 export async function executarCargaControlada(e: {
   admin: any;
@@ -26,6 +38,8 @@ export async function executarCargaControlada(e: {
   heartbeatMs?: number;
   /** Job persistido ainda possui autorização/reserva para iniciar novas mensagens. */
   podeContinuar?: () => Promise<boolean>;
+  /** Bateria por profissional: a Luna escreve a próxima mensagem do paciente. */
+  paciente?: PacienteLuna;
 }) {
   const agora = e.agora ?? Date.now;
   const carga = await carregarCargaControlada(e.admin, e.clinicaId, e.cargaId);
@@ -40,6 +54,13 @@ export async function executarCargaControlada(e: {
   let aguardandoDesfecho = false;
   const paralelo = cargaParalela(carga.config);
   const reservar = paralelo ? comReservaParalela : comLeaseCarga;
+  // Bateria encerrada antes do fim (erro, prazo, orçamento): nenhuma vaga de teste fica ocupada.
+  const devolverSeEncerrou = async () => {
+    if (!configBateria(carga.config)) return;
+    const atual = await carregarCargaControlada(e.admin, e.clinicaId, e.cargaId).catch(() => null);
+    if (atual && ["erro", "parado"].includes(atual.status))
+      await devolverVagasBateria(e.admin, atual).catch(() => undefined);
+  };
   const resultado = await reservar({
     admin: e.admin,
     carga,
@@ -48,6 +69,7 @@ export async function executarCargaControlada(e: {
     heartbeatMs: e.heartbeatMs,
     executar: async (dono, inicial) => {
       const config = normalizarConfig(inicial.config ?? {});
+      const bateria = configBateria(inicial.config);
       const plano: ItemCarga[] = Array.isArray(inicial.plano) ? inicial.plano : [];
       let amostras = await lerAmostrasCarga(e.admin, inicial);
       const concluidos = new Set(amostras.map((a) => a.indice));
@@ -79,14 +101,8 @@ export async function executarCargaControlada(e: {
       }
       if (
         existente.tipo !== "terminal" &&
-        (agora() - inicio >= config.duracaoMaxS * 1000 ||
-          estourouOrcamento(
-            config,
-            amostras.reduce(
-              (n, a) => n + Number(a.input_tokens ?? 0) + Number(a.output_tokens ?? 0),
-              0,
-            ),
-          ).estourou)
+        (agora() - inicio >= (bateria?.duracaoMaxS ?? config.duracaoMaxS) * 1000 ||
+          estourouOrcamento(config, tokensAmostrasCarga(amostras)).estourou)
       ) {
         await dono.alterar({
           status: "parado",
@@ -100,17 +116,30 @@ export async function executarCargaControlada(e: {
         return;
       }
       if (!(await dono.aindaAtivo()) || !(await dono.alterar({}, [item.indice]))) return;
-      const t0 = agora();
+      let t0 = agora();
       let amostra: Record<string, unknown> | undefined;
+      let enviou = false;
+      const passo = bateria ? itemBateria(item) : null;
       if (existente.tipo === "terminal") {
-        amostra = existente.resultado;
+        amostra = passo
+          ? {
+              ...existente.resultado,
+              resultado: { tipo: "turno", cenarioId: passo.cenarioId, recuperado: true },
+            }
+          : existente.resultado;
+      } else if (bateria && passo && passo.tipo !== "turno") {
+        const entrada = { admin: e.admin, carga: inicial, bateria, item: passo, amostras };
+        amostra =
+          passo.tipo === "verificar"
+            ? await verificarCenarioBateria(entrada)
+            : await devolverCenarioBateria(entrada);
       } else {
         const baseline = (Array.isArray(inicial.preflight) ? inicial.preflight : []).find(
           (b: any) => b.leadId === item.leadId,
         );
         const { data: lead, error } = await e.admin
           .from("nina_teste_leads")
-          .select("id,sessao_seq")
+          .select("id,sessao_seq,conversa_id,resolvido_em")
           .eq("clinica_id", e.clinicaId)
           .eq("id", item.leadId)
           .maybeSingle();
@@ -126,33 +155,67 @@ export async function executarCargaControlada(e: {
             `Lead ${item.leadIndice}: a sessão mudou ou não possui baseline. Prepare um novo teste.`,
           );
         if (!(await dono.aindaAtivo()) || (e.podeContinuar && !(await e.podeContinuar()))) return;
-        let resp: any;
-        try {
-          resp = await e.processar(
-            {
-              clinicaId: e.clinicaId,
-              leadId: item.leadId,
-              tipo: "text",
-              texto: item.mensagem,
-              chave: chaveMensagemCarga(inicial.id, item.indice),
-            },
-            e.userId,
-          );
-        } catch {
-          const aposFalha = await desfechoItemCarga(e.admin, inicial, item);
-          if (aposFalha.tipo === "pendente") {
-            aguardandoDesfecho = true;
-            return;
+        let texto = item.mensagem;
+        let resultadoBateria: Record<string, unknown> | null = null;
+        if (bateria && passo) {
+          const decisao = await decidirTurnoBateria({
+            admin: e.admin,
+            carga: inicial,
+            bateria,
+            item: passo,
+            amostras,
+            lead,
+            agora: agora(),
+            paciente: e.paciente ?? pacienteLunaPadrao,
+          });
+          // Liberar sem resultado agenda uma nova tentativa deste mesmo passo.
+          if (decisao.tipo === "aguardar") return;
+          if (decisao.tipo === "dispensar")
+            amostra = {
+              status: "dispensado",
+              conversa_id: lead.conversa_id ?? null,
+              erro: null,
+              mensagem: "",
+              resultado: decisao.resultado,
+            };
+          else {
+            // A escrita da Luna leva segundos: encerrar nesse meio-tempo não envia mais nada.
+            if (!(await dono.aindaAtivo())) return;
+            texto = decisao.texto;
+            resultadoBateria = decisao.resultado;
+            // A latência medida é a da Nina, sem o tempo de escrita da Luna.
+            t0 = agora();
           }
-          amostra =
-            aposFalha.tipo === "terminal"
-              ? aposFalha.resultado
-              : {
-                  status: "erro",
-                  erro: "PROCESSADOR_FALHOU_ANTES_DA_ENTRADA",
-                  conversa_id: null,
-                };
         }
+        let resp: any;
+        if (!amostra)
+          try {
+            enviou = true;
+            resp = await e.processar(
+              {
+                clinicaId: e.clinicaId,
+                leadId: item.leadId,
+                tipo: "text",
+                texto,
+                chave: chaveMensagemCarga(inicial.id, item.indice),
+              },
+              e.userId,
+            );
+          } catch {
+            const aposFalha = await desfechoItemCarga(e.admin, inicial, item);
+            if (aposFalha.tipo === "pendente") {
+              aguardandoDesfecho = true;
+              return;
+            }
+            amostra =
+              aposFalha.tipo === "terminal"
+                ? aposFalha.resultado
+                : {
+                    status: "erro",
+                    erro: "PROCESSADOR_FALHOU_ANTES_DA_ENTRADA",
+                    conversa_id: null,
+                  };
+          }
         if (resp) {
           const persistido = await desfechoItemCarga(e.admin, inicial, item);
           if (persistido.tipo === "pendente") {
@@ -191,9 +254,16 @@ export async function executarCargaControlada(e: {
             }
           }
         }
+        if (resultadoBateria && amostra)
+          amostra = {
+            ...amostra,
+            mensagem: texto.slice(0, 300),
+            resultado: { ...resultadoBateria, transferida: resp?.transferida === true },
+          };
       }
       amostra ??= { status: "erro", erro: "PROCESSADOR_SEM_RESULTADO" };
-      const latencia = existente.tipo === "novo" ? agora() - t0 : null;
+      // Verificação, devolução e passos dispensados não enviam mensagem: sem latência.
+      const latencia = existente.tipo === "novo" && (enviou || !passo) ? agora() - t0 : null;
       if (latencia !== null && latencia > config.timeoutS * 1000 && amostra.status === "ok") {
         amostra.status = "timeout";
         amostra.erro = `Resposta persistida após o limite de ${config.timeoutS}s. Não reenviada.`;
@@ -214,7 +284,11 @@ export async function executarCargaControlada(e: {
       )
         await dono.alterar({ status: "concluido", finalizado_em: new Date(agora()).toISOString() });
     },
+  }).catch(async (erro: unknown) => {
+    await devolverSeEncerrou();
+    throw erro;
   });
+  if (["erro", "parado"].includes(resultado.carga.status)) await devolverSeEncerrou();
   return retornoCarga(resultado.carga, {
     ocupado: resultado.ocupado,
     aguardandoDesfecho,

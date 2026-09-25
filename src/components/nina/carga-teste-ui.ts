@@ -2,7 +2,7 @@ import { normalizarConfig, PERFIS, type ConfigCarga } from "@/lib/nina/carga";
 import { validarPlanoCarga, type PlanoCarga } from "@/lib/nina/carga-planejamento";
 
 export type RascunhoCarga = {
-  modo: "ia" | "manual";
+  modo: "ia" | "manual" | "profissional";
   pedido: string;
   config: ConfigCarga;
   cenariosManuais: string;
@@ -53,6 +53,51 @@ export function configuracaoManual(r: RascunhoCarga): ConfigCarga {
   });
 }
 
+export type ProfissionalBateriaUI = {
+  id: string;
+  nome: string;
+  vagas: number | null;
+  vinculadoAgenda: boolean;
+  ultimoTeste: { em: string; resultado: string } | null;
+  consultas: {
+    consulta: string;
+    especialidade: string | null;
+    dinheiro: string | null;
+    pixCartao: string | null;
+    modalidade: string;
+    esperado: string;
+    esperadoRotulo: string;
+  }[];
+};
+
+/** Cenários que a seleção gera: cada consulta publicada × variações de paciente. */
+export function cenariosDaSelecao(
+  profissionais: ProfissionalBateriaUI[],
+  selecionados: ReadonlySet<string>,
+  variacoes: number,
+): number {
+  return profissionais
+    .filter((p) => selecionados.has(p.id))
+    .reduce((n, p) => n + p.consultas.length * variacoes, 0);
+}
+
+/** Próximo lote: profissionais ainda não testados, na ordem, sem passar do limite de cenários. */
+export function proximoLoteBateria(
+  profissionais: ProfissionalBateriaUI[],
+  variacoes: number,
+  limite: number,
+): string[] {
+  const lote: string[] = [];
+  let cenarios = 0;
+  for (const p of profissionais) {
+    const custo = p.consultas.length * variacoes;
+    if (p.ultimoTeste || !custo || cenarios + custo > limite) continue;
+    lote.push(p.id);
+    cenarios += custo;
+  }
+  return lote;
+}
+
 /** A prévia limpa linhas vazias sem modificar o texto que está sendo digitado. */
 export function revisarPlanoCarga(plano: PlanoCarga, config: ConfigCarga): PlanoCarga {
   const linhas = (valores: string[]) => valores.map((v) => v.trim()).filter(Boolean);
@@ -89,6 +134,7 @@ export type CargaPersistida = {
   enviadas: number;
   total_planejado: number;
   controle?: ControleCarga;
+  config?: unknown;
 };
 export const cargaAtiva = (c: CargaPersistida) =>
   Boolean(

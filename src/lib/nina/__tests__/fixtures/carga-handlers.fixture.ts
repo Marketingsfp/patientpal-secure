@@ -109,6 +109,9 @@ const input = () => ({
   }),
 });
 const chamar = (fn: any, data: any) => fn({ data });
+const P1 = "aaaaaaaa-aaaa-4aaa-8aaa-000000000001";
+const P2 = "aaaaaaaa-aaaa-4aaa-8aaa-000000000002";
+const P9 = "aaaaaaaa-aaaa-4aaa-8aaa-000000000009";
 beforeEach(() => {
   servidorDisponivel = true;
   Object.assign(db.tabelas, criarBancoCargaSimulado([]).tabelas);
@@ -308,6 +311,121 @@ describe("handlers reais de carga com fronteiras simuladas", () => {
     expect(resets).toHaveLength(1);
     expect(chamadas).toHaveLength(0);
   });
+  it("bateria por profissional: cenários vêm do catálogo do servidor, um lead por cenário", async () => {
+    db.tabelas.nina_cat_profissionais = [
+      {
+        id: P1,
+        clinica_id: CLINICA_CARGA,
+        status: "PUBLICADO",
+        nome: "Iarmila Ruzena",
+        medico_id: "m-1",
+        observacao_publica:
+          "CONSULTA ENDOCRINOLOGIA\nEspecialidade: ENDOCRINOLOGIA\nDinheiro: R$ 120,00\nObservação: Agendado",
+      },
+      {
+        id: P2,
+        clinica_id: CLINICA_CARGA,
+        status: "RASCUNHO",
+        nome: "Rascunho Não Publicado",
+        medico_id: "m-2",
+        observacao_publica: "CONSULTA X\nEspecialidade: X\nObservação: Agendado",
+      },
+    ];
+    db.tabelas.agendamentos = [
+      {
+        id: "vaga-1",
+        clinica_id: CLINICA_CARGA,
+        medico_id: "m-1",
+        paciente_nome: "DISPONÍVEL",
+        inicio: new Date(Date.now() + 86_400_000).toISOString(),
+      },
+    ];
+    const bateria = {
+      profissionalIds: [P1, P2],
+      variacoesPorConsulta: 2,
+      turnos: 6,
+      simultaneas: 3,
+    };
+    await expect(
+      chamar(f.criarTesteCarga, { ...input(), confirmado: false, bateria }),
+    ).rejects.toThrow("confirmação explícita");
+    const previa = await chamar(f.previsualizarBateriaCarga, { clinicaId: CLINICA_CARGA });
+    expect(previa.profissionais.map((p: any) => p.nome)).toEqual(["Iarmila Ruzena"]);
+    expect(previa.profissionais[0].consultas[0]).toMatchObject({
+      consulta: "CONSULTA ENDOCRINOLOGIA",
+      esperado: "agendar",
+    });
+    expect(previa.profissionais[0].vagas).toBe(1);
+    const criado = await chamar(f.criarTesteCarga, { ...input(), bateria });
+    const run = db.tabelas.nina_teste_carga!.find((c) => c.id === criado.carga.id)!;
+    expect(run.config._bateria.cenarios).toHaveLength(2);
+    expect(run.config._bateria.cenarios.map((c: any) => c.esperado)).toEqual([
+      "agendar",
+      "agendar",
+    ]);
+    expect(run.config.conversasSimultaneas).toBe(2);
+    expect(run.config.executor).toBe("carga-v5-servidor");
+    expect(run.plano).toHaveLength(2 * (6 + 2));
+    expect(new Set(run.plano.map((p: any) => p.leadId)).size).toBe(2);
+    expect(run.modelo_gerador).toBe(MODELO_LUNA);
+    expect(run.config._inicioCarga.resetTodosLeads).toBe(true);
+    expect(redacoes).toBe(0);
+    expect(chamadas).toHaveLength(0);
+    expect(resets).toHaveLength(0);
+  });
+
+  it("bateria recusa mistura com plano do Sol e seleção sem consulta publicada", async () => {
+    db.tabelas.nina_cat_profissionais = [];
+    await expect(
+      chamar(f.criarTesteCarga, {
+        ...input(),
+        planoIA: {},
+        bateria: { profissionalIds: [P9] },
+      }),
+    ).rejects.toThrow("não os dois");
+    await expect(
+      chamar(f.criarTesteCarga, { ...input(), bateria: { profissionalIds: [P9] } }),
+    ).rejects.toThrow("Nenhuma consulta publicada");
+    expect(db.tabelas.nina_teste_carga).toHaveLength(0);
+  });
+
+  it("encerrar a bateria devolve as vagas de teste; o botão só age com o teste encerrado", async () => {
+    const carga = cargaFicticia({
+      config: { ...(cargaFicticia().config as any), _bateria: { versao: 1, cenarios: [] } },
+    });
+    db.tabelas.nina_teste_carga!.push(carga);
+    db.tabelas.nina_teste_carga_amostras!.push({
+      id: "amostra-1",
+      clinica_id: CLINICA_CARGA,
+      carga_id: RUN_CARGA,
+      indice: 0,
+      conversa_id: "conversa-a",
+      status: "ok",
+    });
+    db.tabelas.agendamentos = [
+      {
+        id: "vaga-teste",
+        clinica_id: CLINICA_CARGA,
+        paciente_nome: "[TESTE NINA] Simulação Teste 01",
+        paciente_id: "paciente-teste",
+        is_mock_data: true,
+        origem_integracao: "nina_homologacao",
+        id_externo: "conversa-a|m-1|2026-10-01T11:00:00Z",
+      },
+    ];
+    const args = { clinicaId: CLINICA_CARGA, cargaId: RUN_CARGA };
+    await expect(chamar(f.devolverVagasTesteCarga, args)).rejects.toThrow("Encerre o teste");
+    const parada = await chamar(f.pararTesteCarga, args);
+    expect(parada.vagas).toMatchObject({ devolvidas: 1, pendentes: 0 });
+    expect(db.tabelas.agendamentos[0]).toMatchObject({
+      paciente_nome: "DISPONÍVEL",
+      paciente_id: null,
+      is_mock_data: false,
+      id_externo: null,
+    });
+    expect(await chamar(f.devolverVagasTesteCarga, args)).toMatchObject({ devolvidas: 0 });
+  });
+
   it("gate revalida os 10 leads e recusa sessão usada depois do baseline", async () => {
     const criado = await chamar(f.criarTesteCarga, input());
     const args = { clinicaId: CLINICA_CARGA, cargaId: criado.carga.id };

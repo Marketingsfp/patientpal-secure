@@ -6,7 +6,8 @@
  * que falha alto se o modelo não for o do papel declarado.
  *
  * - paciente  (GPT Terra) → escreve como paciente simulado;
- * - carga     (GPT Luna)  → gera variações de texto para volume;
+ * - carga     (GPT Luna)  → gera variações de texto para volume e, na bateria
+ *                           por profissional, escreve o paciente dos testes de carga;
  * - avaliador (Claude Opus 5.5)   → avalia execuções já concluídas;
  * - nina                  → o sistema sob teste; o modelo vem da configuração
  *                           real da clínica e é registrado por execução.
@@ -40,7 +41,8 @@ export const PAPEIS_MODELOS: Record<PapelModelo, DefinicaoPapel> = {
     rotulo: "GPT Luna — geração de volume",
     modelo: MODELO_LUNA,
     provedor: PROVEDOR_IA,
-    descricao: "Só gera variações de texto. Não controla concorrência nem conversa.",
+    descricao:
+      "Gera variações de texto e, na bateria por profissional, escreve a próxima mensagem do paciente conforme a resposta da Nina. Não controla concorrência, ritmo nem avaliação.",
   },
   avaliador: {
     papel: "avaliador",

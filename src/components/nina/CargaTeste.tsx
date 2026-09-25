@@ -35,8 +35,11 @@ import {
   validarPlanoCarga,
   type PlanoCarga,
 } from "@/lib/nina/carga-planejamento";
+import { configBateria, type relatorioBateria } from "@/lib/nina/carga-bateria";
 import { CargaPlano } from "./CargaPlano";
 import { CargaConfiguracao } from "./CargaConfiguracao";
+import { CargaBateria, type SelecaoBateria } from "./CargaBateria";
+import { CargaBateriaResultado } from "./CargaBateriaResultado";
 import { PromptsSalvosCarga } from "./PromptsSalvosCarga";
 import {
   alterarPedidoCarga,
@@ -76,8 +79,15 @@ type DetalheCarga = {
   };
   preflight?: { leadsPreparados: number; leadsTotal: number; falhas: number };
   versaoExecutor?: string;
+  bateria?: ReturnType<typeof relatorioBateria> | null;
 };
-type DisparoRevisado = { config: ConfigCarga; planoIA?: PlanoCarga; usarLuna: boolean };
+type DisparoRevisado = {
+  config: ConfigCarga;
+  planoIA?: PlanoCarga;
+  usarLuna: boolean;
+  bateria?: SelecaoBateria;
+  cenarios?: number;
+};
 const ms = (v: number | null | undefined) => (v == null ? "—" : `${Math.round(v)} ms`);
 
 export function CargaTeste() {
@@ -292,11 +302,14 @@ function CargaTesteClinica({
       const criada = await criar({
         data: {
           clinicaId,
-          nome: `Carga ${revisado.planoIA ? "Luna · plano Sol" : "manual"} · ${revisado.config.totalMensagens} mensagens`,
+          nome: revisado.bateria
+            ? "Bateria por profissional"
+            : `Carga ${revisado.planoIA ? "Luna · plano Sol" : "manual"} · ${revisado.config.totalMensagens} mensagens`,
           config: revisado.config,
           confirmado,
           usarLuna: revisado.usarLuna,
           ...(revisado.planoIA ? { planoIA: revisado.planoIA } : {}),
+          ...(revisado.bateria ? { bateria: revisado.bateria } : {}),
         },
       });
       if (!vivo.current || !vigente()) return;
@@ -428,7 +441,8 @@ function CargaTesteClinica({
                     : "Teste ativo aguardando continuidade"}
             </p>
             <p className="text-sm">
-              {ativo.nome} · {ativo.enviadas}/{ativo.total_planejado} mensagens · {ativo.status}
+              {ativo.nome} · {ativo.enviadas}/{ativo.total_planejado}{" "}
+              {configBateria(ativo.config) ? "passos" : "mensagens"} · {ativo.status}
             </p>
             {ativo.controle?.erro && <p className="text-sm">{ativo.controle.erro}</p>}
             <p className="text-xs text-muted-foreground">
@@ -485,7 +499,24 @@ function CargaTesteClinica({
           >
             Manual
           </Button>
+          <Button
+            variant={rascunho.modo === "profissional" ? "default" : "outline"}
+            disabled={edicaoBloqueada}
+            onClick={() => setRascunho((r) => ({ ...r, modo: "profissional" }))}
+          >
+            Por profissional
+          </Button>
         </div>
+        {rascunho.modo === "profissional" && (
+          <CargaBateria
+            clinicaId={clinicaId}
+            disabled={!carregado || ocupado || Boolean(confirmacao)}
+            disparando={rodando}
+            onDisparar={(bateria, cenarios) =>
+              setConfirmacao({ config: cfgPrevia, usarLuna: true, bateria, cenarios })
+            }
+          />
+        )}
         {rascunho.modo === "ia" && (
           <div className="space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
@@ -532,12 +563,14 @@ function CargaTesteClinica({
             )}
           </div>
         )}
-        <CargaConfiguracao
-          config={cfgPrevia}
-          onChange={(config) => setRascunho((r) => ({ ...r, config }))}
-          disabled={edicaoBloqueada}
-          totalCalculado={rascunho.modo === "ia" && Boolean(rascunho.plano)}
-        />
+        {rascunho.modo !== "profissional" && (
+          <CargaConfiguracao
+            config={cfgPrevia}
+            onChange={(config) => setRascunho((r) => ({ ...r, config }))}
+            disabled={edicaoBloqueada}
+            totalCalculado={rascunho.modo === "ia" && Boolean(rascunho.plano)}
+          />
+        )}
         {rascunho.modo === "ia" && rascunho.plano && (
           <>
             <CargaPlano
@@ -598,39 +631,41 @@ function CargaTesteClinica({
             </label>
           </fieldset>
         )}
-        <div className="space-y-2">
-          <p className="text-xs text-muted-foreground">
-            Ao disparar, o sistema reinicia a memória e a sessão dos 10 leads de teste antes da
-            primeira mensagem. Gerar ou revisar o plano não reinicia nada. Retomar um teste preserva
-            suas conversas.
-          </p>
-          <div className="flex flex-wrap items-center gap-3">
-            <Button
-              onClick={solicitarDisparo}
-              disabled={
-                !carregado ||
-                ocupado ||
-                gerando ||
-                Boolean(confirmacao) ||
-                (rascunho.modo === "ia" && (!planoVigente || !planoRevisto.plano))
-              }
-            >
-              {rodando ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
-                <Play className="mr-2 h-4 w-4" />
-              )}{" "}
-              Disparar teste de carga
-            </Button>
-            <span className="text-xs text-muted-foreground">
-              {cfgPrevia.totalMensagens} mensagens · {cfgPrevia.conversasSimultaneas} simultâneas
-              solicitadas ·{" "}
-              {cfgPrevia.modoEnvio === "cadenciado"
-                ? `${cfgPrevia.mensagensPorMinuto} msg/min`
-                : "envio simultâneo"}
-            </span>
+        {rascunho.modo !== "profissional" && (
+          <div className="space-y-2">
+            <p className="text-xs text-muted-foreground">
+              Ao disparar, o sistema reinicia a memória e a sessão dos 10 leads de teste antes da
+              primeira mensagem. Gerar ou revisar o plano não reinicia nada. Retomar um teste
+              preserva suas conversas.
+            </p>
+            <div className="flex flex-wrap items-center gap-3">
+              <Button
+                onClick={solicitarDisparo}
+                disabled={
+                  !carregado ||
+                  ocupado ||
+                  gerando ||
+                  Boolean(confirmacao) ||
+                  (rascunho.modo === "ia" && (!planoVigente || !planoRevisto.plano))
+                }
+              >
+                {rodando ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Play className="mr-2 h-4 w-4" />
+                )}{" "}
+                Disparar teste de carga
+              </Button>
+              <span className="text-xs text-muted-foreground">
+                {cfgPrevia.totalMensagens} mensagens · {cfgPrevia.conversasSimultaneas} simultâneas
+                solicitadas ·{" "}
+                {cfgPrevia.modoEnvio === "cadenciado"
+                  ? `${cfgPrevia.mensagensPorMinuto} msg/min`
+                  : "envio simultâneo"}
+              </span>
+            </div>
           </div>
-        </div>
+        )}
         {rodando && !ativo && rascunho.modo === "ia" && (
           <p role="status" className="text-sm text-muted-foreground">
             Luna está preparando as mensagens do roteiro. A preparação dos leads começa em seguida.
@@ -682,6 +717,15 @@ function CargaTesteClinica({
                     </p>
                   )}
               </div>
+            )}
+            {detalhe.bateria && (
+              <CargaBateriaResultado
+                clinicaId={clinicaId}
+                cargaId={detalhe.carga.id}
+                relatorio={detalhe.bateria}
+                encerrado={!["preparando", "executando"].includes(detalhe.carga.status)}
+                onAtualizar={() => abrirDetalhe(detalhe.carga.id)}
+              />
             )}
             <div className="grid gap-2 text-sm md:grid-cols-4">
               <div>Limite de conversas simultâneas: {detalhe.paralelismo?.limite ?? 1}</div>
@@ -830,14 +874,28 @@ function CargaTesteClinica({
         }}
       >
         <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Confirmar teste de alto volume</DialogTitle>
-            <DialogDescription>
-              O plano revisado enviará {confirmacao?.config.totalMensagens} mensagens na
-              homologação, acima do limite de {LIMITE_CONFIRMACAO}. O processamento consome o modelo
-              de IA.
-            </DialogDescription>
-          </DialogHeader>
+          {confirmacao?.bateria ? (
+            <DialogHeader>
+              <DialogTitle>Confirmar bateria por profissional</DialogTitle>
+              <DialogDescription>
+                A Luna vai conversar com a Nina como paciente em {confirmacao.cenarios} cenário(s),
+                com até {confirmacao.bateria.turnos} mensagens cada e{" "}
+                {Math.min(confirmacao.bateria.simultaneas, confirmacao.cenarios ?? 1)} conversa(s)
+                ao mesmo tempo. Os 10 leads de teste são reiniciados antes da primeira mensagem. A
+                Nina vai agendar de verdade na agenda real, com a marca [TESTE NINA]; no fim de cada
+                cenário a vaga volta a ficar livre. O processamento consome o modelo de IA.
+              </DialogDescription>
+            </DialogHeader>
+          ) : (
+            <DialogHeader>
+              <DialogTitle>Confirmar teste de alto volume</DialogTitle>
+              <DialogDescription>
+                O plano revisado enviará {confirmacao?.config.totalMensagens} mensagens na
+                homologação, acima do limite de {LIMITE_CONFIRMACAO}. O processamento consome o
+                modelo de IA.
+              </DialogDescription>
+            </DialogHeader>
+          )}
           <DialogFooter>
             <Button variant="outline" onClick={() => setConfirmacao(null)}>
               Cancelar

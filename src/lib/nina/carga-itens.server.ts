@@ -22,6 +22,19 @@ export async function lerAmostrasCarga(admin: any, carga: CargaPersistida): Prom
   return [...new Map((data ?? []).map((a: any) => [a.indice, a])).values()];
 }
 
+/** Orçamento do teste: tokens da Nina e, na bateria, também os da Luna como paciente. */
+export function tokensAmostrasCarga(amostras: any[]) {
+  return amostras.reduce(
+    (n, a) =>
+      n +
+      Number(a.input_tokens ?? 0) +
+      Number(a.output_tokens ?? 0) +
+      Number(a.resultado?.luna?.entrada ?? 0) +
+      Number(a.resultado?.luna?.saida ?? 0),
+    0,
+  );
+}
+
 export function totaisAmostrasCarga(amostras: any[]) {
   const soma = (campo: string) => amostras.reduce((n, a) => n + Number(a[campo] ?? 0), 0);
   return {

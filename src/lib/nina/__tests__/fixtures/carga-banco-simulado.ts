@@ -84,7 +84,9 @@ export function criarBancoCargaSimulado(cargas: CargaPersistida[] = [cargaFictic
         limite = Infinity,
         deslocamento = 0,
         unico = false,
-        ignorarDuplicadas = false;
+        ignorarDuplicadas = false,
+        contar = false,
+        soContagem = false;
       let ordenar: { campo: string; asc: boolean } | null = null;
       const query: any = {
         range(inicio: number, fim: number) {
@@ -92,7 +94,28 @@ export function criarBancoCargaSimulado(cargas: CargaPersistida[] = [cargaFictic
           limite = fim - inicio + 1;
           return query;
         },
-        select() {
+        select(_colunas?: string, opcoes?: { count?: string; head?: boolean }) {
+          contar ||= opcoes?.count === "exact";
+          soContagem ||= opcoes?.head === true;
+          return query;
+        },
+        like(c: string, padrao: string) {
+          const re = new RegExp(
+            `^${padrao
+              .split("%")
+              .map((s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
+              .join(".*")}$`,
+          );
+          filtros.push((r) => re.test(String(campo(r, c) ?? "")));
+          descricoes.push([c, padrao]);
+          return query;
+        },
+        gt(c: string, v: any) {
+          filtros.push((r) => campo(r, c) > v);
+          return query;
+        },
+        lt(c: string, v: any) {
+          filtros.push((r) => campo(r, c) < v);
           return query;
         },
         eq(c: string, v: unknown) {
@@ -186,8 +209,13 @@ export function criarBancoCargaSimulado(cargas: CargaPersistida[] = [cargaFictic
                     (o.asc ? 1 : -1),
                 );
               }
+              const total = resultado.length;
               resultado = resultado.slice(deslocamento, deslocamento + limite);
-              return { data: clone(unico ? (resultado[0] ?? null) : resultado), error: null };
+              return {
+                data: soContagem ? null : clone(unico ? (resultado[0] ?? null) : resultado),
+                error: null,
+                ...(contar ? { count: total } : {}),
+              };
             })
             .then(resolve, reject);
         },

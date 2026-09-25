@@ -83,6 +83,41 @@ mock.module("@/lib/nina/carga.functions", () => ({
     return { testes: [], versaoExecutor: "fixture-sem-rede" };
   },
   detalheTesteCarga: proibida,
+  devolverVagasTesteCarga: proibida,
+  previsualizarBateriaCarga: async ({ data }: { data: { clinicaId: string } }) => {
+    chamadas.push({ nome: "previa-bateria", clinicaId: data.clinicaId });
+    const consulta = (nome: string, esperadoRotulo: string) => ({
+      consulta: nome,
+      especialidade: null,
+      dinheiro: "R$ 120,00",
+      pixCartao: null,
+      modalidade: "Hora marcada",
+      esperado: "agendar",
+      esperadoRotulo,
+    });
+    return {
+      profissionais: [
+        {
+          id: "p-iarmila",
+          nome: "Iarmila Ruzena",
+          vagas: 4,
+          vinculadoAgenda: true,
+          ultimoTeste: null,
+          consultas: [consulta("CONSULTA ENDOCRINOLOGIA", "Agendar com o profissional")],
+        },
+        {
+          id: "p-alex",
+          nome: "Alex Louza",
+          vagas: 0,
+          vinculadoAgenda: true,
+          ultimoTeste: { em: "2026-09-24T12:00:00Z", resultado: "reprovado" },
+          consultas: [consulta("CONSULTA CARDIOLOGIA", "Informar falta de vaga ou encaminhar")],
+        },
+      ],
+      variacoes: [],
+      limites: {},
+    };
+  },
 }));
 mock.module("@/lib/nina/carga-planejamento.functions", () => ({ planejarTesteCarga: proibida }));
 mock.module("@/lib/traduzir-erro", () => ({
@@ -257,6 +292,60 @@ it("seleciona um prompt salvo completo sem gerar IA e sem herdar o rascunho de o
         novaRaiz.unmount();
       });
     }
+  } finally {
+    await act(async () => {
+      raiz.unmount();
+    });
+    elemento.remove();
+  }
+});
+
+it("modo por profissional: carrega o catálogo, sugere o próximo lote e só dispara com confirmação", async () => {
+  clinica = "clinica-a";
+  usuario = "usuario-bateria";
+  const elemento = document.createElement("div");
+  document.body.append(elemento);
+  const raiz = createRoot(elemento);
+  const botao = (nome: string) =>
+    [...document.querySelectorAll("button")].find((b) => b.textContent?.trim() === nome)!;
+  try {
+    await act(async () => {
+      raiz.render(<CargaTeste />);
+    });
+    await act(async () => {
+      botao("Por profissional").click();
+    });
+    // A configuração genérica e o disparo de roteiros não aparecem nesse modo.
+    expect(elemento.textContent).not.toContain("Configuração do teste");
+    expect(elemento.textContent).not.toContain("Disparar teste de carga");
+    expect(elemento.textContent).toContain("A Luna faz o papel do paciente");
+    await act(async () => {
+      botao("Carregar profissionais publicados").click();
+    });
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 20));
+    });
+    expect(chamadas.some((c) => c.nome === "previa-bateria")).toBe(true);
+    expect(elemento.textContent).toContain("Iarmila Ruzena");
+    expect(elemento.textContent).toContain("Testado em");
+    expect(botao("Disparar bateria").disabled).toBe(true);
+    await act(async () => {
+      botao("Próximo lote não testado").click();
+    });
+    // Alex já foi testado: o próximo lote traz só a Dra. Iarmila.
+    const marcados = [
+      ...elemento.querySelectorAll<HTMLInputElement>("input[type=checkbox]"),
+    ].filter((c) => c.checked);
+    expect(marcados).toHaveLength(1);
+    expect(elemento.textContent).toContain("1 de 10 cenários");
+    await act(async () => {
+      botao("Disparar bateria").click();
+    });
+    expect(document.body.textContent).toContain("Confirmar bateria por profissional");
+    expect(document.body.textContent).toContain("agenda real");
+    await act(async () => {
+      botao("Cancelar").click();
+    });
   } finally {
     await act(async () => {
       raiz.unmount();
