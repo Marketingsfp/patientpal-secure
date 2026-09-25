@@ -499,25 +499,70 @@ async function handleCriar(
  * Catálogo para os seletores do site institucional. Devolve apenas id e nome —
  * nada de CRM, contato ou qualquer dado além do necessário para montar a tela.
  */
+/** v1.3 — `com_horario=true|1` liga o filtro de cadastro (sem calcular slot). */
+function querComHorario(url: URL): boolean {
+  const v = (url.searchParams.get("com_horario") ?? "").trim().toLowerCase();
+  return v === "true" || v === "1";
+}
+
+/** Médicos da clínica com ao menos uma disponibilidade ativa — uma consulta só. */
+async function medicosComDisponibilidade(
+  db: SupabaseClient<Database>,
+  clinicaId: string,
+): Promise<Set<string>> {
+  const { data, error } = await db
+    .from("medico_disponibilidades")
+    .select("medico_id")
+    .eq("clinica_id", clinicaId)
+    .eq("ativo", true);
+  if (error) {
+    throw new ApiError({
+      status: 500,
+      code: "read_failed",
+      message: "Falha ao ler disponibilidades.",
+    });
+  }
+  return new Set(
+    ((data ?? []) as Array<{ medico_id: string | null }>)
+      .map((d) => d.medico_id)
+      .filter((x): x is string => !!x),
+  );
+}
+
 async function handleEspecialidades(
   db: SupabaseClient<Database>,
   ctx: ApiKeyContexto,
+  url: URL,
 ): Promise<{ status: number; body: unknown }> {
   exigirEscopo(ctx, "availability:read");
+  const comHorario = querComHorario(url);
   // Especialidades são globais; o recorte por clínica vem dos médicos dela.
   const { data: vinculos } = await db
     .from("medicos")
-    .select("id")
+    .select("id, especialidade_id")
     .eq("clinica_id", ctx.clinica_id)
     .eq("ativo", true);
-  const medicoIds = (vinculos ?? []).map((m) => m.id);
+  let medicosAtivos = (vinculos ?? []) as Array<{ id: string; especialidade_id: string | null }>;
+  if (comHorario) {
+    const comDisp = await medicosComDisponibilidade(db, ctx.clinica_id);
+    medicosAtivos = medicosAtivos.filter((m) => comDisp.has(m.id));
+  }
+  const medicoIds = medicosAtivos.map((m) => m.id);
   if (medicoIds.length === 0) return { status: 200, body: { data: [] } };
 
   const { data: rel } = await db
     .from("medico_especialidades")
     .select("especialidade_id")
     .in("medico_id", medicoIds);
-  const espIds = [...new Set((rel ?? []).map((r) => r.especialidade_id).filter(Boolean))];
+  const espIds = [
+    ...new Set(
+      [
+        ...(rel ?? []).map((r) => r.especialidade_id),
+        // Com o filtro, vale também a especialidade principal do médico.
+        ...(comHorario ? medicosAtivos.map((m) => m.especialidade_id) : []),
+      ].filter(Boolean),
+    ),
+  ];
   if (espIds.length === 0) return { status: 200, body: { data: [] } };
 
   const { data, error } = await db
@@ -559,7 +604,11 @@ async function handleMedicos(
   if (error) {
     throw new ApiError({ status: 500, code: "read_failed", message: "Falha ao ler médicos." });
   }
-  const lista = medicos ?? [];
+  let lista = medicos ?? [];
+  if (querComHorario(url) && lista.length > 0) {
+    const comDisp = await medicosComDisponibilidade(db, ctx.clinica_id);
+    lista = lista.filter((m) => comDisp.has(m.id));
+  }
   if (lista.length === 0) return { status: 200, body: { data: [] } };
 
   const { data: rel } = await db
@@ -814,7 +863,7 @@ export async function handleIntegracoesV1(request: Request, splat: string): Prom
     } else if (request.method === "GET" && partes[0] === "availability" && partes.length === 1) {
       resultado = await handleAvailability(db, ctx, url);
     } else if (request.method === "GET" && partes[0] === "specialties" && partes.length === 1) {
-      resultado = await handleEspecialidades(db, ctx);
+      resultado = await handleEspecialidades(db, ctx, url);
     } else if (request.method === "GET" && partes[0] === "doctors" && partes.length === 1) {
       resultado = await handleMedicos(db, ctx, url);
     } else if (request.method === "GET" && partes[0] === "appointments" && partes.length === 1) {
