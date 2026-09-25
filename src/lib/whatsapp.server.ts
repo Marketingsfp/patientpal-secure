@@ -2047,6 +2047,30 @@ async function gerarRespostaNinaInterno(
       },
     };
   }
+  // JEV — Fase 2: encaminhamento decidido pelo Jev, pelo fluxo de handoff
+  // existente (em homologação, o broker só simula a transferência).
+  if (jevEncaminhamento && !finalizacaoHandoff && !turnoObsoleto) {
+    const argumentos = {
+      motivo: jevEncaminhamento.motivo,
+      resumo: `Encaminhado pelo filtro de decisão (Jev). Última mensagem: ${mensagemPaciente.slice(0, 500)}`,
+      urgencia: jevEncaminhamento.urgencia,
+    };
+    const rh = await broker
+      .executar("solicitar_atendente_humano", JSON.stringify(argumentos))
+      .catch(() => ({ success: false, erro: "handoff_indisponivel" }) as { success: boolean; erro?: string; dados?: unknown });
+    const confirmado = rh.success && !rh.erro;
+    houveHandoff ||= confirmado;
+    fluxoEstado.flow.stage = "HANDOFF";
+    finalizacaoHandoff = {
+      texto: respostaSemRegistro(confirmado, opcoes?.teste === true),
+      textoModelo: "",
+      handoffConfirmado: confirmado,
+      motivo: argumentos.motivo,
+    };
+    registrarEtapa({ tipo: "ferramenta", fonte: "atendimento", titulo: "Encaminhamento pelo Jev (Fase 2)",
+      dados: { motivo: argumentos.motivo, urgencia: argumentos.urgencia, handoff_confirmado: confirmado, erro: rh.erro ?? null },
+      codigo: { arquivo: "src/lib/whatsapp.server.ts", funcao: "jevFase2" } });
+  }
   for (let rodada = 0; rodada < MAX_RODADAS; rodada++) {
     if (finalizacaoHandoff || turnoObsoleto) break;
     if (ctxFerramentas?.esclarecimentoCatalogo) {
