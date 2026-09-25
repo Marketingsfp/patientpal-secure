@@ -1842,9 +1842,12 @@ function Page() {
     );
   }, [clinicaAtual]);
 
+  // Depende só do id da sessão: o objeto da sessão é recarregado ao abrir a
+  // tela e, com ele como dependência, a fila (busca pesada) era pedida 2 vezes.
+  const minhaSessaoId = minhaSessao?.id ?? null;
   useEffect(() => {
-    if (minhaSessao) void loadFilaCaixa();
-  }, [minhaSessao, loadFilaCaixa]);
+    if (minhaSessaoId) void loadFilaCaixa();
+  }, [minhaSessaoId, loadFilaCaixa]);
 
   /**
    * Abre a cobrança de um paciente da fila recalculando o preço pelo motor de
