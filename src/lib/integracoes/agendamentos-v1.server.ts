@@ -119,9 +119,30 @@ async function handleAvailability(
     });
   }
 
-  const slots = ((data ?? []) as Array<Record<string, unknown>>)
-    .filter((s) => Number(s["ocupados"] ?? 0) < Number(s["capacidade"] ?? 0))
-    .map((s) => ({
+  const livres = ((data ?? []) as Array<Record<string, unknown>>).filter(
+    (s) => Number(s["ocupados"] ?? 0) < Number(s["capacidade"] ?? 0),
+  );
+
+  // v1.3 — procedimento de cada horário, resolvido UMA vez por par
+  // médico+especialidade (poucos pares, muitos horários).
+  const chave = (s: Record<string, unknown>) =>
+    `${(s["medico_id"] as string | null) ?? ""}|${(s["especialidade_id"] as string | null) ?? ""}`;
+  const porPar = new Map<string, ProcedimentoResolvido | null>();
+  await Promise.all(
+    [...new Set(livres.map(chave))].map(async (k) => {
+      const [med, esp] = k.split("|");
+      try {
+        const r = await resolverProcedimentoPadrao(db, ctx.clinica_id, med || null, esp || null);
+        porPar.set(k, r.procedimento);
+      } catch {
+        porPar.set(k, null); // leitura: sem procedimento não é erro
+      }
+    }),
+  );
+
+  const slots = livres.map((s) => {
+    const p = porPar.get(chave(s)) ?? null;
+    return {
       medico_id: s["medico_id"],
       medico_nome: s["medico_nome"],
       especialidade_id: s["especialidade_id"],
@@ -131,9 +152,91 @@ async function handleAvailability(
       inicio: s["inicio"],
       fim: s["fim"],
       vagas: Number(s["capacidade"] ?? 0) - Number(s["ocupados"] ?? 0),
-    }));
+      procedimento_id: p?.id ?? null,
+      procedimento_nome: p?.nome ?? null,
+      procedimento_tipo: p?.tipo ?? null,
+    };
+  });
 
   return ok(200, { slots, total: slots.length });
+}
+
+type ProcedimentoResolvido = { id: string; nome: string; tipo: string | null };
+
+/**
+ * v1.3 — procedimento padrão de um médico/especialidade, usado pelo
+ * `POST /appointments` (dedução) e pelo `GET /availability` (informação).
+ * Ordem: `medicos.procedimento_padrao_id` → catálogo da especialidade
+ * (informada, senão a do médico), ativos da clínica, preferindo consulta e
+ * desempatando por nome. Devolve `procedimento: null` quando não resolve.
+ */
+async function resolverProcedimentoPadrao(
+  db: SupabaseClient<Database>,
+  clinicaId: string,
+  medicoId: string | null,
+  especialidadeId: string | null,
+): Promise<{
+  procedimento: ProcedimentoResolvido | null;
+  nomeMedico: string | null;
+  especialidadeId: string | null;
+}> {
+  let espMedico: string | null = null;
+  let nomeMedico: string | null = null;
+  if (medicoId) {
+    const { data: med } = await db
+      .from("medicos")
+      .select("nome, procedimento_padrao_id, especialidade_id")
+      .eq("id", medicoId)
+      .eq("clinica_id", clinicaId)
+      .maybeSingle();
+    const m = med as {
+      nome: string | null;
+      procedimento_padrao_id: string | null;
+      especialidade_id: string | null;
+    } | null;
+    nomeMedico = m?.nome ?? null;
+    espMedico = m?.especialidade_id ?? null;
+    if (m?.procedimento_padrao_id) {
+      const { data: proc } = await db
+        .from("procedimentos")
+        .select("id, nome, tipo")
+        .eq("id", m.procedimento_padrao_id)
+        .maybeSingle();
+      const p = proc as ProcedimentoResolvido | null;
+      if (p?.nome) {
+        return { procedimento: p, nomeMedico, especialidadeId: especialidadeId ?? espMedico };
+      }
+    }
+  }
+  const espAlvo = especialidadeId ?? espMedico;
+  if (espAlvo) {
+    const { data: procs } = await db
+      .from("procedimento_especialidades")
+      .select("procedimento:procedimentos!inner(id, nome, tipo, ativo, clinica_id)")
+      .eq("especialidade_id", espAlvo)
+      .eq("clinica_id", clinicaId)
+      .eq("procedimento.ativo", true)
+      .eq("procedimento.clinica_id", clinicaId);
+    const lista = (
+      (procs ?? []) as unknown as Array<{ procedimento: ProcedimentoResolvido | null }>
+    )
+      .map((p) => p.procedimento)
+      .filter((p): p is ProcedimentoResolvido => !!p?.nome)
+      .sort(
+        (a, b) =>
+          Number(b.tipo === "consulta") - Number(a.tipo === "consulta") ||
+          a.nome.localeCompare(b.nome, "pt-BR"),
+      );
+    const p = lista[0];
+    if (p) {
+      return {
+        procedimento: { id: p.id, nome: p.nome, tipo: p.tipo },
+        nomeMedico,
+        especialidadeId: espAlvo,
+      };
+    }
+  }
+  return { procedimento: null, nomeMedico, especialidadeId: espAlvo };
 }
 
 async function buscarAgendamento(db: SupabaseClient<Database>, ctx: ApiKeyContexto, ref: string) {
@@ -299,56 +402,17 @@ async function handleCriar(
   // especialidade (preferindo consulta). O explícito no corpo sempre ganha.
   let procedimentoDeduzido: string | null = null;
   if (!body.procedimento && !(body.procedimentos && body.procedimentos.length)) {
-    let espMedico: string | null = null;
-    let nomeMedico: string | null = null;
-    if (body.medico_id) {
-      const { data: med } = await db
-        .from("medicos")
-        .select("nome, procedimento_padrao_id, especialidade_id")
-        .eq("id", body.medico_id)
-        .eq("clinica_id", ctx.clinica_id)
-        .maybeSingle();
-      const m = med as {
-        nome: string | null;
-        procedimento_padrao_id: string | null;
-        especialidade_id: string | null;
-      } | null;
-      nomeMedico = m?.nome ?? null;
-      espMedico = m?.especialidade_id ?? null;
-      if (m?.procedimento_padrao_id) {
-        const { data: proc } = await db
-          .from("procedimentos")
-          .select("nome")
-          .eq("id", m.procedimento_padrao_id)
-          .maybeSingle();
-        procedimentoDeduzido = (proc as { nome: string | null } | null)?.nome ?? null;
-      }
-    }
-    const espAlvo = body.especialidade_id ?? espMedico;
-    if (!procedimentoDeduzido && espAlvo) {
-      const { data: procs } = await db
-        .from("procedimento_especialidades")
-        .select("procedimento:procedimentos!inner(nome, tipo, ativo, clinica_id)")
-        .eq("especialidade_id", espAlvo)
-        .eq("clinica_id", ctx.clinica_id)
-        .eq("procedimento.ativo", true)
-        .eq("procedimento.clinica_id", ctx.clinica_id);
-      const lista = (
-        (procs ?? []) as unknown as Array<{ procedimento: { nome: string; tipo: string | null } | null }>
-      )
-        .map((p) => p.procedimento)
-        .filter((p): p is { nome: string; tipo: string | null } => !!p?.nome)
-        .sort(
-          (a, b) =>
-            Number(b.tipo === "consulta") - Number(a.tipo === "consulta") ||
-            a.nome.localeCompare(b.nome, "pt-BR"),
-        );
-      procedimentoDeduzido = lista[0]?.nome ?? null;
-    }
+    const r = await resolverProcedimentoPadrao(
+      db,
+      ctx.clinica_id,
+      body.medico_id ?? null,
+      body.especialidade_id ?? null,
+    );
+    procedimentoDeduzido = r.procedimento?.nome ?? null;
     if (!procedimentoDeduzido) {
       const quem = [
-        body.medico_id ? `médico ${nomeMedico ?? body.medico_id}` : null,
-        espAlvo ? `especialidade ${espAlvo}` : null,
+        body.medico_id ? `médico ${r.nomeMedico ?? body.medico_id}` : null,
+        r.especialidadeId ? `especialidade ${r.especialidadeId}` : null,
       ]
         .filter(Boolean)
         .join(" / ");
