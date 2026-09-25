@@ -13290,7 +13290,14 @@ function AgendaPage() {
                                       onClick={() => openSlot(a)}
                                       disabled={!podeEscrever}
                                       title={podeEscrever ? undefined : SEM_PERMISSAO_MSG}
-                                      className="h-7 px-3 text-emerald-600 border-emerald-300 hover:bg-emerald-50 hover:text-emerald-700 font-medium text-xs w-full"
+                                      // `w-fit` no lugar de `w-full`: o botão
+                                      // esticava na largura inteira da coluna e
+                                      // ficava desproporcional ao lado das
+                                      // etiquetas de situação ("Agendado"), que
+                                      // ocupam só o tamanho do texto. Agora ele
+                                      // acompanha o próprio conteúdo, com o
+                                      // mesmo respiro lateral das etiquetas.
+                                      className="h-7 w-fit px-2.5 text-emerald-600 border-emerald-300 hover:bg-emerald-50 hover:text-emerald-700 font-medium text-xs"
                                     >
                                       <UserPlus className="h-3 w-3 mr-1.5" />
                                       Agendar
