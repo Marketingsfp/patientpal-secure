@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Health Hub Pro — API de Agendamentos v1
-  version: "1.2.0"
+  version: "1.3.0"
   description: |
     API REST genérica de agenda do Health Hub Pro, autenticada por chave de API.
     A v1.1 é compatível com a v1: mesma base, nada removido nem alterado.
@@ -41,7 +41,12 @@ paths:
     get:
       tags: [Disponibilidade]
       summary: Horários livres da clínica
-      description: "Escopo exigido: `availability:read`."
+      description: >-
+        Escopo exigido: `availability:read`. Desde a v1.3 cada slot é uma vaga real da
+        agenda gerada (ficha DISPONIVEL), sem atendimento sobreposto e com agenda
+        compatível com o procedimento resolvido. Contrato: todo slot devolvido é aceito
+        por `POST /appointments` enviando exatamente o `inicio` e o `fim` do slot,
+        salvo corrida real entre dois pacientes pelo mesmo horário.
       parameters:
         - { name: medico_id, in: query, schema: { type: string, format: uuid } }
         - { name: especialidade_id, in: query, schema: { type: string, format: uuid } }
@@ -80,6 +85,11 @@ paths:
       tags: [Catálogo]
       summary: Especialidades atendidas na clínica da chave
       description: "Escopo exigido: `availability:read`. Devolve apenas id e nome."
+      parameters:
+        - name: com_horario
+          in: query
+          description: "v1.3 — `true`/`1`: só especialidades com ao menos um médico ativo com disponibilidade ativa (filtro de cadastro, não calcula vaga)."
+          schema: { type: string, enum: ["true", "1"] }
       responses:
         "200":
           description: Lista de especialidades
@@ -107,6 +117,10 @@ paths:
       description: "Escopo exigido: `availability:read`. Devolve apenas id, nome e especialidade."
       parameters:
         - { name: especialidade_id, in: query, schema: { type: string, format: uuid } }
+        - name: com_horario
+          in: query
+          description: "v1.3 — `true`/`1`: só médicos ativos com ao menos uma disponibilidade ativa."
+          schema: { type: string, enum: ["true", "1"] }
       responses:
         "200":
           description: Lista de médicos
@@ -485,6 +499,12 @@ components:
         inicio: { type: string, format: date-time }
         fim: { type: string, format: date-time }
         vagas: { type: integer }
+        procedimento_id: { type: [string, "null"], format: uuid, description: "v1.3" }
+        procedimento_nome: { type: [string, "null"], description: "v1.3" }
+        procedimento_tipo:
+          type: [string, "null"]
+          enum: [consulta, exame, procedimento, null]
+          description: "v1.3 — null quando o médico/especialidade não tem procedimento configurado."
 
     Agendamento:
       type: object
@@ -592,6 +612,7 @@ components:
                 - invalid_period
                 - patient_not_found
                 - business_rule_violation
+                - procedure_not_resolved
                 - appointment_rejected
                 - rate_limit_exceeded
                 - auth_lookup_failed
@@ -619,7 +640,7 @@ components:
       description: "409 — `idempotency_key_reuse`, `request_in_progress`"
       content: { application/json: { schema: { $ref: "#/components/schemas/Erro" } } }
     Unprocessable:
-      description: "422 — `invalid_body`, `invalid_query`, `invalid_period`, `patient_not_found`, `business_rule_violation`, `appointment_rejected`"
+      description: "422 — `invalid_body`, `invalid_query`, `invalid_period`, `patient_not_found`, `business_rule_violation`, `procedure_not_resolved`, `appointment_rejected`"
       content: { application/json: { schema: { $ref: "#/components/schemas/Erro" } } }
     RateLimited:
       description: "429 — `rate_limit_exceeded`"

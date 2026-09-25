@@ -1,4 +1,4 @@
-# API de Agendamentos — Health Hub Pro (v1.2)
+# API de Agendamentos — Health Hub Pro (v1.3)
 
 API REST genérica de agenda, autenticada por **chave de API**. Não é uma
 integração com nenhum sistema específico: é a agenda do Health Hub Pro exposta
@@ -580,3 +580,73 @@ Qualquer outra mensagem segue o fluxo de sempre.
 - **v1.2 (2026-09):** verificação do paciente pelo WhatsApp; escopo
   `patients:verify`; `verificacao_token` no `POST /appointments`; marcação
   `tratada_internamente` nas mensagens de código.
+
+## 11. v1.3 — coerência entre oferta e gravação
+
+### 11.1 Dedução do procedimento no `POST /appointments`
+
+Quando o corpo não traz `procedimento` nem `procedimentos`, o procedimento é
+deduzido nesta ordem:
+
+1. `medicos.procedimento_padrao_id` do `medico_id` enviado;
+2. catálogo da especialidade (`especialidade_id` do corpo, senão a do médico):
+   `procedimento_especialidades` → `procedimentos` ativos da clínica da chave,
+   preferindo `tipo = 'consulta'` e desempatando por nome;
+3. senão, **422 `procedure_not_resolved`**, com a mensagem dizendo qual
+   médico/especialidade está sem procedimento configurado.
+
+`procedimento` explícito no corpo sempre ganha da dedução. A dedução acontece
+antes da chamada ao núcleo de agenda, que não mudou.
+
+### 11.2 Campos novos em cada slot de `GET /availability`
+
+| Campo | Valor |
+| --- | --- |
+| `procedimento_id` | uuid ou `null` |
+| `procedimento_nome` | ex.: `"CONSULTA"` ou `null` |
+| `procedimento_tipo` | `consulta`, `exame`, `procedimento` ou `null` |
+
+Resolvidos pela mesma regra do 11.1, uma vez por par médico+especialidade.
+`null` não é erro: o horário continua valendo; quem recusa é o `POST`, com
+`procedure_not_resolved`, se o cliente também não mandar `procedimento`.
+
+### 11.3 `com_horario` em `/specialties` e `/doctors`
+
+Parâmetro opcional (`true` ou `1`). Com ele:
+
+- `/doctors` devolve só médicos ativos com ao menos uma linha ativa em
+  `medico_disponibilidades` na clínica da chave;
+- `/specialties` devolve só especialidades ligadas a esses médicos (pelo
+  vínculo `medico_especialidades` ou por `medicos.especialidade_id`).
+
+É filtro de cadastro — não calcula vaga. Especialidade com grade e sem vaga nos
+próximos dias continua aparecendo. Sem o parâmetro, a resposta é a de sempre.
+
+### 11.4 Contrato de coerência
+
+**Todo slot devolvido por `GET /availability` é aceito por
+`POST /appointments`** enviando exatamente o `inicio` e o `fim` do slot,
+salvo corrida real entre dois pacientes pelo mesmo horário.
+
+Para isso, `horarios_disponiveis_publico` passou a espelhar a regra de
+gravação do núcleo (`criar-agendamento.core.server.ts`), só do lado da leitura:
+
+- a vaga é a **ficha `DISPONIVEL` já gerada** na agenda — é nela que o núcleo
+  grava. Dia não gerado não tem ficha e não aparece (o núcleo recusaria com
+  "não tem agenda aberta nessa data");
+- `inicio`/`fim` do slot são os da própria ficha, para o pedido caber nela;
+- ficha com outro atendimento não cancelado sobreposto é descartada;
+- ficha em agenda só de consulta não é oferecida quando o procedimento
+  resolvido não é consulta, e ficha em agenda só de exame/procedimento não é
+  oferecida quando ele é consulta (mesma trava 4b do núcleo);
+- fichas `BLOQUEIO` não são oferecidas.
+
+A regra é conservadora de propósito: esconder um horário que daria certo é
+aceitável; oferecer um que seria recusado, não. `vagas` vale sempre 1.
+
+### 11.5 Changelog
+
+- **v1.3 (2026-09):** dedução de procedimento e `procedure_not_resolved`;
+  `procedimento_id`/`procedimento_nome`/`procedimento_tipo` nos slots;
+  `com_horario` em `/specialties` e `/doctors`; `/availability` montado a
+  partir das fichas `DISPONIVEL` (contrato de coerência com o `POST`).
