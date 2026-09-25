@@ -794,6 +794,16 @@ function Page() {
 
   const modoFila = Boolean(agendaFilaAlvo && medicoFilaAlvo);
 
+  // "TODAS AS AGENDAS" de um médico que tem agenda por ordem de chegada E outra
+  // agenda: gerar só as fichas deixava a outra agenda (ex.: EXAMES) sem horário,
+  // sem aviso. Até a equipe definir a regra, a geração pede uma agenda por vez.
+  const agendasMistasSemEscolha = useMemo(() => {
+    if (!agendaFilaAlvo || gerar.agenda_id) return false;
+    return agendas.some(
+      (a) => a.medico_id === agendaFilaAlvo.medico_id && a.ativo && a.id !== agendaFilaAlvo.id,
+    );
+  }, [agendaFilaAlvo, gerar.agenda_id, agendas]);
+
   // Médicos de ordem de chegada ignorados na geração em massa — a tela avisa.
   const medicosFilaForaDaMassa = useMemo(() => {
     if (gerar.medico_id !== "all") return [] as string[];
@@ -839,6 +849,7 @@ function Page() {
     // só ordena a fila: a quantidade digitada manda, e o passo é comprimido
     // pelo helper até caber no dia. Recorte de horário e duração não entram.
     if (medicoFilaAlvo && agendaFilaAlvo) {
+      if (agendasMistasSemEscolha) return vazio;
       const qtd = parseInt(gerar.fichas_fila || "0", 10);
       if (!qtd || qtd < 1) return vazio;
       const out: Slot[] = [];
@@ -1084,6 +1095,7 @@ function Page() {
     ultimosInicios,
     medicoFilaAlvo,
     agendaFilaAlvo,
+    agendasMistasSemEscolha,
   ]);
 
   const slotsPreview = geracaoPreview.slots;
@@ -1143,6 +1155,8 @@ function Page() {
     if (slotsPreview.length > 0) return null;
     if (!gerar.medico_id) return "Selecione um médico para ver a estimativa.";
     if (modoFila) {
+      if (agendasMistasSemEscolha)
+        return "Este médico tem agenda por ordem de chegada e outras agendas. Escolha uma agenda por vez para gerar os horários — com \"todas as agendas\" as outras ficariam sem horário.";
       const qtd = parseInt(gerar.fichas_fila || "0", 10);
       if (!qtd || qtd < 1)
         return "Informe quantas fichas quer acrescentar em cada dia (1 a 500).";
@@ -1189,6 +1203,7 @@ function Page() {
     }
     return "Nenhum horário cabe nessa configuração. Confira o recorte de horário e a duração de cada atendimento.";
   }, [
+    agendasMistasSemEscolha,
     slotsPreview.length,
     gerar.medico_id,
     gerar.data_inicio,
@@ -1203,7 +1218,7 @@ function Page() {
     geracaoPreview.errosFila,
     modoFila,
     gerar.fichas_fila,
-  ]);
+  , agendasMistasSemEscolha]);
 
   // Dias que a geração vai pular por já terem fichas criadas depois da janela
   // pedida — avisados na tela mesmo quando o restante do período gera normal.

@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
+import { salvarProvaConcluida, salvarFeedbackProva } from "@/lib/coach/salvar.functions";
 import {
   ArrowLeft,
   Loader2,
@@ -99,6 +100,8 @@ function ProvaPage({ ctx, alvo }: { ctx: CoachContexto; alvo: AlvoAtendente }) {
   const escopoLocal = escopoLocalCoach(clinicaId, ctx.userId, atendente);
   const generate = useServerFn(gerarProva);
   const gerarFeedback = useServerFn(gerarFeedbackProva);
+  const salvarProva = useServerFn(salvarProvaConcluida);
+  const salvarFeedback = useServerFn(salvarFeedbackProva);
   const { config, loading: clinicaLoading } = useCoachConfig(
     clinicaId,
     ctx.clinicaNome,
@@ -296,23 +299,23 @@ function ProvaPage({ ctx, alvo }: { ctx: CoachContexto; alvo: AlvoAtendente }) {
     const total = prova.questoes.length;
     const certos = prova.questoes.reduce((n, q, i) => (respostas[i] === q.correta ? n + 1 : n), 0);
     try {
-      const { data: inserida, error: insertError } = await supabase
-        .from("coach_provas")
-        .insert({
-          clinica_id: clinicaId ?? "",
+      const inserida = await salvarProva({
+        data: {
+          clinicaId: clinicaId ?? "",
           // Sempre o usuário de quem fez a prova.
-          user_id: alvo.userId,
+          alvoUserId: alvo.userId,
           atendente,
-          simulacao_gestor: simulacaoGestor,
-          nota: Number(((certos / total) * 10).toFixed(1)),
-          acertos: certos,
-          total,
-          questoes: prova.questoes as unknown as never,
-          respostas: respostas as unknown as never,
-        })
-        .select("id")
-        .maybeSingle();
-      if (insertError) throw insertError;
+          simulacaoGestor,
+          questoes: prova.questoes.map((q) => ({
+            pergunta: q.pergunta,
+            alternativas: q.alternativas,
+            correta: q.correta,
+            explicacao: q.explicacao,
+            origem: q.origem,
+          })),
+          respostas: respostas.map((r) => (typeof r === "number" ? r : -1)),
+        },
+      });
       provaIdRef.current = inserida?.id ?? null;
       // Se o feedback já chegou, grava junto.
       if (feedbackRef.current) void guardarFeedback(feedbackRef.current);
@@ -333,10 +336,9 @@ function ProvaPage({ ctx, alvo }: { ctx: CoachContexto; alvo: AlvoAtendente }) {
   async function guardarFeedback(fb: unknown) {
     const id = provaIdRef.current;
     if (!id) return;
-    await supabase
-      .from("coach_provas")
-      .update({ feedback: fb as never })
-      .eq("id", id);
+    await salvarFeedback({ data: { clinicaId: clinicaId ?? "", provaId: id, feedback: fb } }).catch(
+      (e) => console.error("Falha ao guardar feedback da prova:", e),
+    );
   }
 
   async function carregarFeedback(p: ProvaGerada, resp: number[]) {
