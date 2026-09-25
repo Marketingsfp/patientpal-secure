@@ -4,6 +4,9 @@
  * Serve para ligar o modelo novo primeiro em homologação/uma clínica e voltar
  * atrás na hora, sem deploy: basta desligar a linha em `clinica_feature_flags`.
  *
+ * ATUALIZAÇÃO (25/09/2026): alvo trocado para `google/gemini-3.8-flash`, agora publicado
+ * e validado por chamada real com reasoning_effort. Chave da flag mantida.
+ *
  * ATUALIZAÇÃO (05/09/2026): o provedor de IA do Lovable NÃO publicou
  * `gemini-3.8-flash`. Por decisão do time, o alvo passou a ser
  * `google/gemini-3.7-flash`, que EXISTE na plataforma e aceita
@@ -18,7 +21,7 @@ export const FLAG_NINA_GEMINI = "nina_gemini_37_enabled";
 export const FLAG_NINA_GEMINI_LEGADA = "nina_gemini_38_enabled";
 
 /** Model id real da plataforma. Não inventar id nem trocar em silêncio. */
-export const MODELO_NINA_ALVO = "google/gemini-3.7-flash";
+export const MODELO_NINA_ALVO = "google/gemini-3.8-flash";
 export const MODELO_ALVO_DISPONIVEL = true;
 
 /** Modelos em uso hoje, preservados como estão (rollback imediato). */

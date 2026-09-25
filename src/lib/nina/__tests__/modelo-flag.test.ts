@@ -13,7 +13,7 @@ describe("Nina AI Gateway — modelo e flag", () => {
   });
 
   it("não inventa model id: usa exatamente o pedido", () => {
-    expect(MODELO_NINA_ALVO).toBe("google/gemini-3.7-flash");
+    expect(MODELO_NINA_ALVO).toBe("google/gemini-3.8-flash");
   });
 
   it("registra que o modelo alvo está publicado pelo provedor", () => {
