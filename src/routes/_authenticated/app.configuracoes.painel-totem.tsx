@@ -10,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { LumenTvConfig } from "@/components/lumen-tv-config";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -189,12 +190,16 @@ function ClinicaCard({
             <TabsList>
               <TabsTrigger value="painel">Painel</TabsTrigger>
               <TabsTrigger value="totem">Totem</TabsTrigger>
+              <TabsTrigger value="lumen">TVs (LUMEN)</TabsTrigger>
             </TabsList>
             <TabsContent value="painel">
               <LinkBlock url={painelUrl} />
             </TabsContent>
             <TabsContent value="totem">
               <LinkBlock url={totemUrl} />
+            </TabsContent>
+            <TabsContent value="lumen">
+              <LumenTvConfig clinicaId={row.id} />
             </TabsContent>
           </Tabs>
         )}
