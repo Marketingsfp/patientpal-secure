@@ -1,4 +1,25 @@
 /**
+ * (Fase 2) `duvidaAnteriorFase1`: a mensagem anterior desta conversa também
+ * ficou sem entendimento (confiança da intenção abaixo de 0,8)?
+ */
+export async function duvidaAnteriorFase1(clinicaId: string | null, conversationId: string | null): Promise<boolean> {
+  if (!clinicaId || !conversationId) return false;
+  const { supabaseAdmin: db } = await import("@/integrations/supabase/client.server");
+  const { data, error } = await db
+    .from("nina_jev_decisoes" as never)
+    .select("respostas")
+    .eq("clinica_id", clinicaId)
+    .eq("conversation_id", conversationId)
+    .eq("fase", "fase1_intencao")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error || !data) return false;
+  const conf = (data as { respostas?: { intencao?: { confidence?: unknown } } | null }).respostas?.intencao?.confidence;
+  return typeof conf === "number" && conf < 0.8;
+}
+
+/**
  * Chamada única ao Jev pelo AI Gateway (server-only). Qualquer erro, recusa
  * ou demora vira "sem decisão" — nunca derruba nem trava o atendimento.
  * Sem nova tentativa automática (regras do gateway).

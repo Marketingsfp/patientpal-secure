@@ -950,36 +950,61 @@ async function gerarRespostaNinaInterno(
   let intencoesTurno = detectarIntencoes(mensagemPaciente);
   let intencaoAmbiguaTurno = intencaoAmbigua(mensagemPaciente, intencoesTurno);
 
-  // JEV — Fase 1 (somente homologação, com flag `nina_jev_fase1`): com
-  // confiança alta a intenção do Jev prevalece; erro/demora/dúvida = leitura atual.
+  // JEV — Fases 1 e 2 (somente homologação, flags `nina_jev_fase1/2`), numa
+  // única chamada. Fase 1: com confiança alta a intenção do Jev prevalece.
+  // Fase 2: sinais acima do limite, ou dúvida em 2 mensagens seguidas,
+  // encaminham para a recepção. Erro/demora = fluxo atual.
+  let jevEncaminhamento: import("@/lib/nina/jev-encaminhamento").Encaminhamento | null = null;
   if (opcoes?.teste === true) {
     try {
       const jev = await import("@/lib/nina/jev.server");
-      if (await jev.jevAtivo(clinicaId, "fase1_intencao", true)) {
+      const [f1, f2] = await Promise.all([
+        jev.jevAtivo(clinicaId, "fase1_intencao", true),
+        jev.jevAtivo(clinicaId, "fase2_encaminhamento", true),
+      ]);
+      if (f1 || f2) {
         const { perguntaIntencao, estadoIntencao, intencaoAplicavel } = await import("@/lib/nina/jev-intencao");
-        const perguntas = perguntaIntencao();
+        const enc = await import("@/lib/nina/jev-encaminhamento");
+        const perguntas = {
+          ...perguntaIntencao(),
+          ...(f2 ? enc.perguntasEncaminhamento() : {}),
+        };
         const anteriores = msgsMemoria.slice(-7, -1).map((m: any) => ({
           de: m?.direction === "inbound" ? "paciente" : "atendente",
           texto: String(m?.body ?? "").slice(0, 500),
         }));
-        const resultado = await jev.perguntarJev(estadoIntencao(mensagemPaciente, anteriores), perguntas);
-        const escolhida = resultado.ok ? intencaoAplicavel(resultado.respostas["intencao"]) : null;
+        const conversaJev = estadoId.conversaId ?? null;
+        const [resultado, duvidaAnterior] = await Promise.all([
+          jev.perguntarJev(estadoIntencao(mensagemPaciente, anteriores), perguntas),
+          f2 ? jev.duvidaAnteriorFase1(clinicaId, conversaJev) : Promise.resolve(false),
+        ]);
+        const respostas = resultado.ok ? resultado.respostas : null;
+        const escolhida = f1 && respostas ? intencaoAplicavel(respostas["intencao"]) : null;
         if (escolhida) {
           intencoesTurno = [escolhida];
           intencaoAmbiguaTurno = false;
         }
+        if (f2 && respostas) {
+          jevEncaminhamento = enc.decidirEncaminhamento(
+            respostas,
+            enc.houveDuvida(respostas["intencao"]),
+            duvidaAnterior,
+          );
+        }
+        // A Fase 1 é sempre registrada (a dúvida da mensagem seguinte depende dela).
         void jev.registrarDecisaoJev({
-          clinicaId,
-          conversationId: estadoId.conversaId ?? null,
-          fase: "fase1_intencao",
-          teste: true,
-          perguntas,
-          resultado,
-          aplicada: escolhida !== null,
+          clinicaId, conversationId: conversaJev, fase: "fase1_intencao", teste: true,
+          perguntas, resultado, aplicada: escolhida !== null,
         });
+        if (f2) {
+          void jev.registrarDecisaoJev({
+            clinicaId, conversationId: conversaJev, fase: "fase2_encaminhamento", teste: true,
+            perguntas, resultado, aplicada: jevEncaminhamento !== null,
+          });
+        }
       }
     } catch (e) {
-      console.warn("[nina-jev] fase 1 ignorada:", e instanceof Error ? e.message : e);
+      console.warn("[nina-jev] fases 1/2 ignoradas:", e instanceof Error ? e.message : e);
     }
   }
 
