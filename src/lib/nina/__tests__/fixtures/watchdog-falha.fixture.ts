@@ -225,7 +225,9 @@ for (const teste of [false, true]) {
     closed_at: "2026-09-16T20:03:08Z",
   });
   await reabrirConversaPorMensagemPaciente({
-    clinicaId: "clinica", telefone: "55000000000", mensagemOrigemId: "entrada-reabertura",
+    clinicaId: "clinica",
+    telefone: "55000000000",
+    mensagemOrigemId: "entrada-reabertura",
   });
   const reabertura = tabelas.atend_conversa_eventos.find((e) => e.evento === "REABERTA");
   const atribuicaoNina = tabelas.atend_conversa_eventos.find((e) => e.evento === "ATRIBUIDA_IA");
@@ -347,11 +349,17 @@ antesDeTransferir = () => Object.assign(conv(), { updated_at: "leitura da Inbox"
 await finalizarWatchdogNina(controle, erroBind);
 assert.equal(lote().watchdog_state, "handoff", "leitura da Inbox não impede encaminhamento");
 
-// Entrega incerta não permite novo envio, nem passa por retry de preparação.
+// Entrega incerta não reenvia a resposta nem passa por retry de preparação; pela regra da
+// clínica (25/09/2026) encaminha com a frase padrão, uma única vez.
 controle = await preparar();
 tabelas.nina_batch_entregas!.push({ batch_id: "lote", estado: "uncertain", parte: "texto" });
 await finalizarWatchdogNina(controle, new ErroEntregaWatchdog(false, true));
-assert.equal(lote().watchdog_state, "failed");
-assert.equal(lote().erro_tecnico, "DELIVERY_OUTCOME_UNKNOWN");
-assert.equal(avisos, 0);
+assert.equal(lote().watchdog_state, "handoff");
+assert.equal(lote().erro_tecnico, "PROCESSING_ERROR: DELIVERY_OUTCOME_UNKNOWN");
+assert.equal(avisos, 1);
+assert.equal(
+  tabelas.nina_batch_entregas!.filter((e: any) => e.parte === "texto").length,
+  1,
+  "a resposta não é reenviada",
+);
 console.log("WATCHDOG_FALHA_OK");

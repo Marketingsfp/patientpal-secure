@@ -49,6 +49,7 @@ suite("Watchdog — RPCs reais no PostgreSQL isolado", () => {
       "20260909214029_9d465871-e4f1-43ed-a08f-b8b65e121f8e.sql",
       "20260914024011_nina_agrupamento_persistente_sem_fallback.sql",
       "20260915170000_nina_watchdog_processamento.sql",
+      "20260925180000_nina_watchdog_encaminhar_desistencia.sql",
     ])
       await db.unsafe(await migration(nome));
     await db.unsafe("UPDATE nina_watchdog_config SET homologacao_ativa=true");
@@ -231,7 +232,7 @@ suite("Watchdog — RPCs reais no PostgreSQL isolado", () => {
     await db`SELECT nina_lock_renovar(${e.chave},${token},90)`;
     await entregar(e, token);
   });
-  test("3 tentativas abandonadas: failed explícito e fim do retry", async () => {
+  test("3 tentativas abandonadas: fim do retry e encaminhamento padrão", async () => {
     const e = await entrada();
     await assumir(e);
     for (let i = 0; i < 3; i++) {
@@ -239,11 +240,13 @@ suite("Watchdog — RPCs reais no PostgreSQL isolado", () => {
       await db`SELECT * FROM nina_watchdog_reivindicar(10)`;
     }
     const [b] =
-      await db`SELECT watchdog_state,attempt_count FROM nina_message_batches WHERE id=${e.batchId}`;
-    expect(b.watchdog_state).toBe("failed");
-    expect(b.attempt_count).toBe(3);
-    const [m] = await db`SELECT nina_status FROM whatsapp_mensagens WHERE id=${e.id}`;
-    expect(m.nina_status).toBe("failed");
+      await db`SELECT watchdog_state,attempt_count,erro_tecnico FROM nina_message_batches WHERE id=${e.batchId}`;
+    // Regra de 25/09/2026: a desistência não é silenciosa; o servidor só encaminha, sem nova geração.
+    expect(b).toMatchObject({
+      watchdog_state: "processing",
+      attempt_count: 3,
+      erro_tecnico: "HANDOFF_REQUIRED: MAX_ATTEMPTS",
+    });
   });
   test("envio incerto após POST: nunca reenvia automaticamente", async () => {
     const e = await entrada();
@@ -252,10 +255,13 @@ suite("Watchdog — RPCs reais no PostgreSQL isolado", () => {
     await db`SELECT nina_watchdog_entrega_claim(${e.batchId},${token},'texto')`;
     await expirar(e);
     const r = await db`SELECT * FROM nina_watchdog_reivindicar(10)`;
-    expect(r.some((b: any) => b.id === e.batchId)).toBe(false);
-    const [b] =
-      await db`SELECT watchdog_state,erro_tecnico FROM nina_message_batches WHERE id=${e.batchId}`;
-    expect(b).toMatchObject({ watchdog_state: "failed", erro_tecnico: "DELIVERY_OUTCOME_UNKNOWN" });
+    // Volta ao servidor só para o encaminhamento padrão; a resposta não é reenviada.
+    expect(r.find((b: any) => b.id === e.batchId)?.erro_tecnico).toBe(
+      "HANDOFF_REQUIRED: DELIVERY_OUTCOME_UNKNOWN",
+    );
+    const [entrega] =
+      await db`SELECT estado FROM nina_batch_entregas WHERE batch_id=${e.batchId} AND parte='texto'`;
+    expect(entrega.estado).not.toBe("confirmed");
   });
   test("produção permanece desativada e RPC não é executável por authenticated", async () => {
     const [m] =
@@ -376,18 +382,19 @@ suite("Watchdog — RPCs reais no PostgreSQL isolado", () => {
       await db`UPDATE nina_watchdog_config SET homologacao_ativa=true`;
     }
   });
-  test("geração abandonada sem snapshot falha sem repetir ferramentas potencialmente executadas", async () => {
+  test("geração abandonada sem snapshot encaminha sem repetir ferramentas potencialmente executadas", async () => {
     const e = await entrada(),
       token = await assumir(e);
     await db`SELECT nina_watchdog_checkpoint(${e.batchId},${token},'generating',NULL)`;
     await expirar(e);
     const r = await db`SELECT * FROM nina_watchdog_reivindicar(10)`;
-    expect(r.some((b: any) => b.id === e.batchId)).toBe(false);
+    expect(r.some((b: any) => b.id === e.batchId)).toBe(true);
     const [b] =
       await db`SELECT watchdog_state,erro_tecnico,attempt_count FROM nina_message_batches WHERE id=${e.batchId}`;
+    // attempt_count não sobe: encaminhar não é nova geração.
     expect(b).toMatchObject({
-      watchdog_state: "failed",
-      erro_tecnico: "GENERATION_OUTCOME_UNKNOWN",
+      watchdog_state: "processing",
+      erro_tecnico: "HANDOFF_REQUIRED: GENERATION_OUTCOME_UNKNOWN",
       attempt_count: 1,
     });
   });

@@ -26,7 +26,8 @@ const renovacoes = new Map<string, { parar: () => Promise<void>; valida: () => b
 /** Renova enquanto o turno realmente vive; liberar aguarda a renovação pendente. */
 export function manterLockConversa(
   lock: LockConversa,
-  renovar: () => Promise<boolean> = () => renovarLockConversa(lock),
+  renovar: (signal: AbortSignal) => Promise<boolean> = (signal) =>
+    renovarLockConversa(lock, signal),
   intervaloMs = 20_000,
 ) {
   if (renovacoes.has(lock.token)) return;
@@ -82,13 +83,17 @@ export async function adquirirLockConversa(input: {
   }
 }
 
-export async function renovarLockConversa(lock: LockConversa): Promise<boolean> {
+export async function renovarLockConversa(
+  lock: LockConversa,
+  signal?: AbortSignal,
+): Promise<boolean> {
   try {
-    const { data, error } = await supabaseAdmin.rpc("nina_lock_renovar", {
+    const chamada = supabaseAdmin.rpc("nina_lock_renovar", {
       _chave: lock.chave,
       _token: lock.token,
       _lease_segundos: LOCK_LEASE_SEGUNDOS,
     });
+    const { data, error } = await (signal ? chamada.abortSignal(signal) : chamada);
     return !error && Boolean(data);
   } catch (e) {
     console.error("[nina] lock: falha ao renovar", e);

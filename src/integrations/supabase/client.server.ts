@@ -5,6 +5,7 @@
 import { createClient } from "@supabase/supabase-js";
 import type { Database } from "./types";
 import { getSupabaseUrl } from "./env";
+import { criarFetchComPrazo } from "./fetch-com-prazo";
 
 function createSupabaseAdminClient() {
   // A URL aceita os dois padrões de nome (VITE_SUPABASE_URL / SUPABASE_URL).
@@ -23,6 +24,8 @@ function createSupabaseAdminClient() {
   }
 
   return createClient<Database>(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
+    // Nenhuma consulta do servidor espera para sempre (ver fetch-com-prazo.ts).
+    global: { fetch: criarFetchComPrazo() },
     auth: {
       storage: undefined,
       persistSession: false,

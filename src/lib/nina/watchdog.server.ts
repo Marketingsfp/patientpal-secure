@@ -330,9 +330,11 @@ export async function finalizarWatchdogNina(controle: ControleWatchdogNina | nul
       );
       return;
     }
+    // Entrega incerta também encaminha (regra da clínica, 25/09/2026): melhor o paciente receber a
+    // frase de encaminhamento em dobro do que ficar sem retorno. Entrega recusada não entra aqui.
     if (
       erro &&
-      !(erro instanceof ErroEntregaWatchdog) &&
+      (!(erro instanceof ErroEntregaWatchdog) || erro.incerta) &&
       conversa.owner_type === "AI" &&
       conversa.ai_enabled &&
       conversa.ultima_msg_em
@@ -449,6 +451,13 @@ export async function executarWatchdogNina(limite = POLITICA_WATCHDOG.paralelism
           ),
         };
         controleRecuperacao = await carregarControleWatchdog(turno);
+        // Desistência da varredura (Erro Crítico 01): nada é gerado de novo; o encaminhamento
+        // canônico avisa o paciente com a mesma frase de sempre e coloca a conversa na fila humana.
+        const desistencia = /^HANDOFF_REQUIRED: (.+)$/.exec(String(lote.erro_tecnico ?? ""))?.[1];
+        if (desistencia) {
+          await finalizarWatchdogNina(controleRecuperacao, new Error(`WATCHDOG_${desistencia}`));
+          return;
+        }
         const { estadoConversaPorId, ninaPodeResponder } =
           await import("../atendimento/handoff.server");
         const estado = await estadoConversaPorId(lote.clinica_id, lote.conversa_id);
