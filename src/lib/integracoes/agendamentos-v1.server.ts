@@ -140,7 +140,48 @@ async function handleAvailability(
     }),
   );
 
-  const slots = livres.map((s) => {
+  // v1.3 — mesma trava "tipo da agenda × tipo do procedimento" do núcleo (4b):
+  // agenda só de consulta recusa não-consulta; agenda só de exame/procedimento
+  // recusa consulta. Horário que seria recusado no POST não é oferecido.
+  const agendaIds = [
+    ...new Set(livres.map((s) => s["agenda_id"] as string | null).filter((x): x is string => !!x)),
+  ];
+  const tiposPorAgenda = new Map<string, Set<string>>();
+  if (agendaIds.length > 0) {
+    const { data: links } = await db
+      .from("medico_agenda_procedimentos")
+      .select("agenda_id, procedimentos!inner(tipo)")
+      .in("agenda_id", agendaIds);
+    for (const l of (links ?? []) as unknown as Array<{
+      agenda_id: string;
+      procedimentos: { tipo: string | null } | null;
+    }>) {
+      const t = l.procedimentos?.tipo;
+      if (!t) continue;
+      if (!tiposPorAgenda.has(l.agenda_id)) tiposPorAgenda.set(l.agenda_id, new Set());
+      tiposPorAgenda.get(l.agenda_id)!.add(t);
+    }
+  }
+  const tipoIncompativel = (agendaId: string | null, tipoProc: string | null) => {
+    if (!agendaId || !tipoProc) return false;
+    const tipos = tiposPorAgenda.get(agendaId);
+    if (!tipos || tipos.size === 0) return false;
+    const soConsulta = tipos.size === 1 && tipos.has("consulta");
+    const soExame = [...tipos].every((t) => t === "exame" || t === "procedimento");
+    if (soConsulta) return tipoProc !== "consulta";
+    if (soExame) return tipoProc === "consulta";
+    return false;
+  };
+
+  const compativeis = livres.filter(
+    (s) =>
+      !tipoIncompativel(
+        (s["agenda_id"] as string | null) ?? null,
+        porPar.get(chave(s))?.tipo ?? null,
+      ),
+  );
+
+  const slots = compativeis.map((s) => {
     const p = porPar.get(chave(s)) ?? null;
     return {
       medico_id: s["medico_id"],
