@@ -9,6 +9,9 @@ import {
   paraMensagemTimeline,
   reconciliarHistorico,
   waIdDoEnvio,
+  criarControleHistorico,
+  revisaoHistoricoLead,
+  reconciliarCargaHistorico,
   type MensagemTimeline,
 } from "../homologacao-realtime";
 
@@ -26,6 +29,95 @@ const linha = (extra: Record<string, unknown> = {}) => ({
   created_at: "2026-09-10T03:00:01.000Z",
   is_teste: true,
   ...extra,
+});
+
+describe("chat aberto acompanha o card sem trocar de lead", () => {
+  const lead = {
+    conversaId: "conv", cicloId: "ciclo", sessao: 38, mensagens: 1,
+    ultimaMensagemId: "m1", ultimaMensagemTexto: "oi",
+  };
+
+  it("atualizações do paciente e da Nina invalidam o histórico do mesmo lead", () => {
+    const r1 = revisaoHistoricoLead(lead);
+    const paciente = { ...lead, mensagens: 2, ultimaMensagemId: "m2", ultimaMensagemTexto: "Quero marcar" };
+    const nina = { ...paciente, mensagens: 3, ultimaMensagemId: "m3", ultimaMensagemTexto: "Qual consulta?" };
+    expect(revisaoHistoricoLead(paciente)).not.toBe(r1);
+    expect(revisaoHistoricoLead(nina)).not.toBe(revisaoHistoricoLead(paciente));
+  });
+
+  it("recupera conversa criada após reset mesmo sem evento Realtime aceito", () => {
+    const reiniciado = { ...lead, conversaId: null, mensagens: 0, ultimaMensagemId: null };
+    const novaConversa = { ...reiniciado, conversaId: "nova", mensagens: 1 };
+    expect(aceitaMensagemRealtime(linha({ conversa_id: "nova" }), { ...alvo, conversaId: null })).toBe(false);
+    expect(revisaoHistoricoLead(novaConversa)).not.toBe(revisaoHistoricoLead(reiniciado));
+  });
+
+  it("leitura do card não dispara um ciclo infinito de recargas", () => {
+    expect(revisaoHistoricoLead({ ...lead, ...{ naoLidas: 0 } }))
+      .toBe(revisaoHistoricoLead({ ...lead, ...{ naoLidas: 2 } }));
+  });
+
+  it("edição de texto, sessão e ciclo também atualizam a revisão", () => {
+    for (const alteracao of [{ ultimaMensagemTexto: "corrigido" }, { sessao: 39 }, { cicloId: "novo" }]) {
+      expect(revisaoHistoricoLead({ ...lead, ...alteracao })).not.toBe(revisaoHistoricoLead(lead));
+    }
+  });
+});
+
+describe("respostas de histórico fora de ordem", () => {
+  it("carga antiga não sobrescreve a carga mais recente", () => {
+    const controle = criarControleHistorico();
+    controle.selecionar("cli:lead:0");
+    const antiga = controle.iniciar();
+    const nova = controle.iniciar();
+    expect(controle.aceita(nova)).toBe(true);
+    expect(controle.aceita(antiga)).toBe(false);
+    controle.selecionar("cli:lead:0");
+    expect(controle.aceita(nova)).toBe(true);
+  });
+
+  it("trocar A → B → A não permite resposta da primeira visita", () => {
+    const controle = criarControleHistorico();
+    controle.selecionar("cli:A:0");
+    const antiga = controle.iniciar();
+    controle.selecionar("cli:B:0");
+    controle.selecionar("cli:A:0");
+    expect(controle.aceita(antiga)).toBe(false);
+  });
+
+  it("reiniciar ou trocar de clínica invalida requisição em voo", () => {
+    for (const novo of ["cli:A:1", "outra:A:0"]) {
+      const controle = criarControleHistorico();
+      controle.selecionar("cli:A:0");
+      const antiga = controle.iniciar();
+      controle.selecionar(novo);
+      expect(controle.aceita(antiga)).toBe(false);
+    }
+  });
+
+  it("histórico iniciado antes da resposta não apaga a nova bolha da Nina", () => {
+    const paciente = paraMensagemTimeline(linha());
+    const nina = paraMensagemTimeline(linha({ id: "nina", wa_message_id: "reply", direction: "out" }));
+    const resultado = reconciliarCargaHistorico([paciente], [], [paciente], [paciente, nina]);
+    expect(resultado.map((m) => m.id)).toEqual(["m1", "nina"]);
+  });
+
+  it("UPDATE recebido em voo prevalece sobre o snapshot antigo", () => {
+    const antiga = paraMensagemTimeline(linha());
+    const atualizada = paraMensagemTimeline(linha({ body: "texto atualizado" }));
+    const resultado = reconciliarCargaHistorico([antiga], [], [antiga], [atualizada]);
+    expect(resultado).toHaveLength(1);
+    expect(resultado[0].body).toBe("texto atualizado");
+  });
+
+  it("mantém os envios pendentes e não duplica quando histórico e Realtime chegam juntos", () => {
+    const pendente = otimista("k1", "Olá");
+    const oficial = paraMensagemTimeline(linha());
+    expect(reconciliarCargaHistorico([], [pendente], [], [pendente])[0].estado).toBe("pending");
+    const resultado = reconciliarCargaHistorico([oficial], [pendente], [pendente], [oficial]);
+    expect(resultado).toHaveLength(1);
+    expect(resultado[0].id).toBe("m1");
+  });
 });
 
 const otimista = (chave: string, texto: string): MensagemTimeline => ({

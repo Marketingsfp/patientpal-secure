@@ -112,7 +112,9 @@ import {
   aceitaMensagemRealtime,
   mesclarMensagemTimeline,
   paraMensagemTimeline,
-  reconciliarHistorico,
+  reconciliarCargaHistorico,
+  criarControleHistorico,
+  revisaoHistoricoLead,
   waIdDoEnvio,
   type LinhaMensagemRealtime,
 } from "@/lib/nina/homologacao-realtime";
@@ -410,7 +412,7 @@ export function HomologacaoInbox({ laboratorio = false, ativo = true, abrirConve
    */
   const aplicadasRef = useRef<Set<string>>(new Set());
   const leadAbertoRef = useRef<string | null>(null);
-  leadAbertoRef.current = ativo ? conversaId : null;
+  leadAbertoRef.current = ativo ? (leadAtual?.conversaId ?? null) : null;
   useEffect(() => {
     if (!clinicaId) return;
     let pendente: ReturnType<typeof setTimeout> | null = null;
@@ -491,6 +493,11 @@ export function HomologacaoInbox({ laboratorio = false, ativo = true, abrirConve
    * que nenhum card receba mensagens, horário ou contador de outro.
    */
   const leadSelecionadoRef = useRef<string | null>(null);
+  leadSelecionadoRef.current = leadId;
+  const controleHistoricoRef = useRef(criarControleHistorico());
+  controleHistoricoRef.current.selecionar(`${clinicaId}:${leadId}:${geracaoRef.current}`);
+  const msgsRef = useRef(msgs);
+  msgsRef.current = msgs;
 
   /**
    * Bolhas otimistas: a mensagem do testador aparece na hora e continua na
@@ -536,33 +543,47 @@ export function HomologacaoInbox({ laboratorio = false, ativo = true, abrirConve
 
   const carregarHistorico = useCallback(
     async (id: string) => {
-      if (!clinicaId) return;
-      leadSelecionadoRef.current = id;
+      if (!clinicaId || leadSelecionadoRef.current !== id) return false;
+      controleHistoricoRef.current.selecionar(`${clinicaId}:${id}:${geracaoRef.current}`);
+      const solicitacao = controleHistoricoRef.current.iniciar();
+      const geracao = geracaoRef.current;
+      const inicio = msgsRef.current;
+      const atual = () => leadSelecionadoRef.current === id &&
+        geracaoRef.current === geracao && controleHistoricoRef.current.aceita(solicitacao);
       try {
         const r = (await historico({ data: { clinicaId, leadId: id } })) as {
           mensagens: Msg[];
           eventos?: ConversaEvento[];
           conversaId: string | null;
         };
-        if (leadSelecionadoRef.current !== id) return; // resposta atrasada
-        // As mensagens ainda em envio continuam visíveis: uma carga do
-        // servidor não pode apagar o que o testador acabou de mandar.
-        setMsgs(reconciliarHistorico(r.mensagens, otimistasDoLead(id)));
+        if (!atual()) return false;
+        setMsgs((atuais) => atual()
+          ? reconciliarCargaHistorico(r.mensagens, otimistasDoLead(id), inicio, atuais)
+          : atuais);
+        // Só retire a bolha local quando a mensagem oficial estiver na carga.
+        const confirmadas = new Set(r.mensagens.map((m) => m.wa_message_id).filter(Boolean));
+        for (const [chave, o] of otimistasRef.current) {
+          if (o.leadId === id && o.msg.wa_message_id && confirmadas.has(o.msg.wa_message_id)) {
+            otimistasRef.current.delete(chave);
+          }
+        }
         setEventosConversa(r.eventos ?? []);
         setConversaId(r.conversaId);
         if (r.conversaId && laboratorio) {
           const f = (await ferramentasFn({
             data: { clinicaId, conversaId: r.conversaId },
           })) as { eventos: EventoFerramenta[]; debug?: Record<string, unknown> };
-          if (leadSelecionadoRef.current !== id) return; // resposta atrasada
+          if (!atual()) return false;
           setFerramentas(f.eventos);
           setDebugEstado(f.debug ?? null);
         } else {
           setFerramentas([]);
           setDebugEstado(null);
         }
+        return r.mensagens.at(-1)?.direction === "out";
       } catch (e: any) {
-        mostrarErro(e);
+        if (atual()) mostrarErro(e);
+        return false;
       }
     },
     [clinicaId, historico, ferramentasFn, otimistasDoLead, laboratorio],
@@ -610,27 +631,19 @@ export function HomologacaoInbox({ laboratorio = false, ativo = true, abrirConve
   const aguardarResposta = useCallback(
     async (id: string, tentativas = 8) => {
       if (!clinicaId) return false;
+      const geracao = geracaoRef.current;
       for (let i = 0; i < tentativas; i++) {
-        try {
-          const r = (await historico({ data: { clinicaId, leadId: id } })) as {
-            mensagens: Msg[];
-            eventos?: ConversaEvento[];
-            conversaId: string | null;
-          };
-          setMsgs(reconciliarHistorico(r.mensagens, otimistasDoLead(id)));
-          setEventosConversa(r.eventos ?? []);
-          setConversaId(r.conversaId);
-          const ultima = r.mensagens[r.mensagens.length - 1];
-          if (ultima && ultima.direction === "out") return true;
-        } catch {
-          /* tenta de novo */
-        }
+        if (leadSelecionadoRef.current !== id || geracaoRef.current !== geracao) return false;
+        if (await carregarHistorico(id)) return true;
         await new Promise((res) => setTimeout(res, 2500));
       }
       return false;
     },
-    [clinicaId, historico, otimistasDoLead],
+    [clinicaId, carregarHistorico],
   );
+
+  const revisaoLeadAberto = revisaoHistoricoLead(leadAtual);
+  const historicoExibidoRef = useRef<string | null>(null);
 
   // FASE 8 — "Ver conversa" no Relatório da homologação seleciona o lead aqui.
   useEffect(() => {
@@ -665,16 +678,25 @@ export function HomologacaoInbox({ laboratorio = false, ativo = true, abrirConve
       setAudio(null);
       return;
     }
-    setCarregandoConversa(true);
-    setAudio(null);
-    setErro(null);
-    // Trocar/reabrir lead apenas recarrega o estado persistido: não reinicia
-    // sessão, não limpa memória e não troca número virtual.
-    setEncerrado(null);
-
-    marcadoRef.current = "";
-    void carregarHistorico(leadId).finally(() => setCarregandoConversa(false));
-  }, [leadId, carregarHistorico]);
+    const selecao = `${clinicaId}:${leadId}`;
+    if (historicoExibidoRef.current !== selecao) {
+      historicoExibidoRef.current = selecao;
+      setCarregandoConversa(true);
+      setMsgs([]);
+      setEventosConversa([]);
+      setConversaId(null);
+      setAudio(null);
+      setErro(null);
+      setEncerrado(null);
+      marcadoRef.current = "";
+    }
+    let cancelada = false;
+    // A revisão do card recupera também o chat se um evento Realtime se perdeu.
+    void carregarHistorico(leadId).finally(() => {
+      if (!cancelada) setCarregandoConversa(false);
+    });
+    return () => { cancelada = true; };
+  }, [clinicaId, leadId, revisaoLeadAberto, carregarHistorico]);
 
   // Trocar de lead interrompe o loop automático do lead anterior e carrega a
   // situação da última simulação daquele lead (cada lead é independente).
@@ -788,8 +810,6 @@ export function HomologacaoInbox({ laboratorio = false, ativo = true, abrirConve
         avisoMensagemId?: string | null;
         avisoEstado?: "confirmado" | "envio_pendente" | null;
       };
-      const mesmaSessao = geracaoRef.current === geracao;
-      if (mesmaSessao) concluirOtimista(chave);
       // Mensagem absorvida por um envio mais recente do mesmo lead: é o
       // agrupamento normal (as três viram um turno só). Não é falta de
       // resposta e não deve mostrar aviso.

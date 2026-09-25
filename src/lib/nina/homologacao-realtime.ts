@@ -141,3 +141,50 @@ export function reconciliarHistorico(
   );
   return [...oficiais, ...sobrando];
 }
+
+/** Só a carga mais recente da seleção atual pode alterar o chat. */
+export function criarControleHistorico() {
+  let alvo = "";
+  let versao = 0;
+  return {
+    selecionar(proximo: string) {
+      if (proximo !== alvo) {
+        alvo = proximo;
+        versao++;
+      }
+    },
+    iniciar: () => ++versao,
+    aceita: (solicitacao: number) => solicitacao === versao,
+  };
+}
+
+/** A prévia atualizada é também um sinal para recuperar o chat aberto. */
+export function revisaoHistoricoLead(lead?: {
+  conversaId: string | null;
+  cicloId?: string | null;
+  sessao: number;
+  mensagens: number;
+  ultimaMensagemId?: string | null;
+  ultimaMensagemEm?: string | null;
+  ultimaMensagemTexto?: string | null;
+} | null) {
+  if (!lead) return "";
+  return JSON.stringify([
+    lead.conversaId, lead.cicloId, lead.sessao, lead.mensagens,
+    lead.ultimaMensagemId, lead.ultimaMensagemEm, lead.ultimaMensagemTexto,
+  ]);
+}
+
+/** Preserva INSERTs/UPDATEs recebidos enquanto a consulta estava em voo. */
+export function reconciliarCargaHistorico<T extends MensagemTimeline>(
+  servidor: T[], pendentes: T[], inicio: T[], atuais: T[],
+): T[] {
+  const anteriores = new Map(inicio.map((m) => [m.id, m]));
+  let resultado = reconciliarHistorico(servidor, pendentes) as T[];
+  for (const msg of atuais) {
+    if (anteriores.get(msg.id) !== msg && msg.estado !== "pending" && msg.estado !== "failed") {
+      resultado = mesclarMensagemTimeline(resultado, msg) as T[];
+    }
+  }
+  return resultado;
+}
