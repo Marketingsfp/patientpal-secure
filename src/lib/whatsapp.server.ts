@@ -947,8 +947,41 @@ async function gerarRespostaNinaInterno(
     }
   })();
   const { detectarIntencoes, intencaoAmbigua } = await import("@/lib/nina/atendimento-fase1");
-  const intencoesTurno = detectarIntencoes(mensagemPaciente);
-  const intencaoAmbiguaTurno = intencaoAmbigua(mensagemPaciente, intencoesTurno);
+  let intencoesTurno = detectarIntencoes(mensagemPaciente);
+  let intencaoAmbiguaTurno = intencaoAmbigua(mensagemPaciente, intencoesTurno);
+
+  // JEV — Fase 1 (somente homologação, com flag `nina_jev_fase1`): com
+  // confiança alta a intenção do Jev prevalece; erro/demora/dúvida = leitura atual.
+  if (opcoes?.teste === true) {
+    try {
+      const jev = await import("@/lib/nina/jev.server");
+      if (await jev.jevAtivo(clinicaId, "fase1_intencao", true)) {
+        const { perguntaIntencao, estadoIntencao, intencaoAplicavel } = await import("@/lib/nina/jev-intencao");
+        const perguntas = perguntaIntencao();
+        const anteriores = msgsMemoria.slice(-7, -1).map((m: any) => ({
+          de: m?.direction === "inbound" ? "paciente" : "atendente",
+          texto: String(m?.body ?? "").slice(0, 500),
+        }));
+        const resultado = await jev.perguntarJev(estadoIntencao(mensagemPaciente, anteriores), perguntas);
+        const escolhida = resultado.ok ? intencaoAplicavel(resultado.respostas["intencao"]) : null;
+        if (escolhida) {
+          intencoesTurno = [escolhida];
+          intencaoAmbiguaTurno = false;
+        }
+        void jev.registrarDecisaoJev({
+          clinicaId,
+          conversationId: estadoId.conversaId ?? null,
+          fase: "fase1_intencao",
+          teste: true,
+          perguntas,
+          resultado,
+          aplicada: escolhida !== null,
+        });
+      }
+    } catch (e) {
+      console.warn("[nina-jev] fase 1 ignorada:", e instanceof Error ? e.message : e);
+    }
+  }
 
   // Fatos de identificação do remetente. Nome/convênio/benefício só entram
   // quando a identidade está CONFIRMADA (FASE 4).
