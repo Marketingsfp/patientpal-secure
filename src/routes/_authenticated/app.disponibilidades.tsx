@@ -1095,6 +1095,7 @@ function Page() {
     ultimosInicios,
     medicoFilaAlvo,
     agendaFilaAlvo,
+    agendasMistasSemEscolha,
   ]);
 
   const slotsPreview = geracaoPreview.slots;
@@ -1216,7 +1217,7 @@ function Page() {
     geracaoPreview.errosFila,
     modoFila,
     gerar.fichas_fila,
-  ]);
+  , agendasMistasSemEscolha]);
 
   // Dias que a geração vai pular por já terem fichas criadas depois da janela
   // pedida — avisados na tela mesmo quando o restante do período gera normal.
