@@ -1,6 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
+import { salvarSessaoRoleplay } from "@/lib/coach/salvar.functions";
 import {
   ArrowLeft,
   Send,
@@ -187,6 +188,7 @@ function RoleplayPage({ ctx, alvo }: { ctx: CoachContexto; alvo: AlvoAtendente }
   const navigate = useNavigate();
   const start = useServerFn(startRoleplay);
   const reply = useServerFn(roleplayReply);
+  const salvarSessao = useServerFn(salvarSessaoRoleplay);
   const { config, loading: clinicaLoading } = useCoachConfig(
     clinicaId,
     ctx.clinicaNome,
@@ -429,30 +431,31 @@ function RoleplayPage({ ctx, alvo }: { ctx: CoachContexto; alvo: AlvoAtendente }
       if (modeRef.current === "voz") setFeitasVoz((n) => n + 1);
       else setFeitasTexto((n) => n + 1);
     }
-    supabase
-      .from("coach_roleplay_sessions")
-      .insert({
-        clinica_id: clinicaId ?? "",
+    if (!clinicaId) return;
+    salvarSessao({
+      data: {
+        clinicaId,
         // Sempre o usuário da pessoa TREINADA.
-        user_id: alvo.userId,
+        alvoUserId: alvo.userId,
         atendente,
-        simulacao_gestor: simulacaoGestor,
-        nota: Number(feedback.nota) || 0,
+        simulacaoGestor,
+        nota: Math.min(10, Math.max(0, Number(feedback.nota) || 0)),
         resumo: feedback.resumo,
-        acertos: (feedback.acertos ?? []) as never,
-        melhorias: (feedback.melhorias ?? []) as never,
-        dica_pratica: feedback.dica_pratica,
+        acertos: feedback.acertos ?? [],
+        melhorias: feedback.melhorias ?? [],
+        dicaPratica: feedback.dica_pratica,
         cenario: scenario.cenario,
-        perfil_cliente: scenario.perfil_cliente,
-        pontos_fracos: pontosFracos as never,
-        mensagens: messagesRef.current as never,
-        duracao_seg: duracao,
-        modo: modeRef.current,
-      })
-      .then(({ error: insErr }) => {
-        if (insErr) console.error("Falha ao salvar sessão de roleplay:", insErr);
-      });
-  }, [feedback, scenario, atendente, clinicaId, alvo.userId, simulacaoGestor, pontosFracos]);
+        perfilCliente: scenario.perfil_cliente,
+        pontosFracos,
+        mensagens: messagesRef.current,
+        duracaoSeg: duracao,
+        modo: modeRef.current === "voz" ? "voz" : "texto",
+      },
+    }).catch((insErr) => {
+      console.error("Falha ao salvar sessão de roleplay:", insErr);
+      toast.error("Não foi possível salvar este treino no histórico.");
+    });
+  }, [feedback, scenario, atendente, clinicaId, alvo.userId, simulacaoGestor, pontosFracos, salvarSessao]);
 
   useEffect(() => { modeRef.current = mode; }, [mode]);
   useEffect(() => { speakEnabledRef.current = speakEnabled; }, [speakEnabled]);
