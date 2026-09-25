@@ -10857,6 +10857,48 @@ export type Database = {
           },
         ]
       }
+      nina_jev_decisoes: {
+        Row: {
+          aplicada: boolean
+          clinica_id: string | null
+          conversation_id: string | null
+          created_at: string
+          erro: string | null
+          fase: string
+          id: string
+          latency_ms: number | null
+          perguntas: Json
+          respostas: Json | null
+          teste: boolean
+        }
+        Insert: {
+          aplicada?: boolean
+          clinica_id?: string | null
+          conversation_id?: string | null
+          created_at?: string
+          erro?: string | null
+          fase: string
+          id?: string
+          latency_ms?: number | null
+          perguntas?: Json
+          respostas?: Json | null
+          teste?: boolean
+        }
+        Update: {
+          aplicada?: boolean
+          clinica_id?: string | null
+          conversation_id?: string | null
+          created_at?: string
+          erro?: string | null
+          fase?: string
+          id?: string
+          latency_ms?: number | null
+          perguntas?: Json
+          respostas?: Json | null
+          teste?: boolean
+        }
+        Relationships: []
+      }
       nina_kb_bases: {
         Row: {
           arquivo_hash: string | null
