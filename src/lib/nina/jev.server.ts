@@ -113,6 +113,12 @@ export async function registrarDecisaoJev(r: {
   aplicada: boolean;
   /** Fase 1: contagem de falhas de entendimento deste turno (lida no próximo). */
   contagem?: import("./jev-encaminhamento").ContagemDuvida | null;
+  /**
+   * Dados da consulta que ajudam a auditar a decisão (ex.: Fase 3 — termo
+   * pesquisado, tipo de atendimento, quantidade de opções). Gravados junto das
+   * perguntas, também quando o Jev falha.
+   */
+  contexto?: Record<string, unknown>;
 }): Promise<void> {
   try {
     await supabaseAdmin.from("nina_jev_decisoes" as never).insert({
@@ -120,7 +126,7 @@ export async function registrarDecisaoJev(r: {
       conversation_id: r.conversationId,
       fase: r.fase,
       teste: r.teste,
-      perguntas: Object.keys(r.perguntas),
+      perguntas: r.contexto ? { chaves: Object.keys(r.perguntas), ...r.contexto } : Object.keys(r.perguntas),
       respostas: r.resultado.ok
         ? { ...r.resultado.respostas, ...(r.contagem ? { _nina: r.contagem } : {}) }
         : null,

@@ -1242,25 +1242,37 @@ async function executarFerramentaInterna(
             if (await jev.jevAtivo(ctx.clinicaId, "fase3_especialidade", ctx.teste === true)) {
               const { lerPublicados } = await import("@/lib/nina/catalogo-turno.server");
               const esp = await import("@/lib/nina/jev-especialidade");
+              // Mesmo recorte da busca normal: consulta = especialidades dos
+              // profissionais; exame/procedimento = serviços; sem tipo = os dois.
+              const tipo = p.tipo_atendimento ?? "nao_identificado";
               const [servicos, profissionais] = await Promise.all([
-                lerPublicados<{ id: string; nome: string }>("nina_cat_servicos", "id, nome", ctx.clinicaId),
-                lerPublicados<{ id: string; especialidades: unknown }>("nina_cat_profissionais", "id, especialidades", ctx.clinicaId),
+                tipo === "consulta"
+                  ? Promise.resolve([] as Array<{ id: string; nome: string }>)
+                  : lerPublicados<{ id: string; nome: string }>("nina_cat_servicos", "id, nome", ctx.clinicaId),
+                tipo === "exame_procedimento"
+                  ? Promise.resolve([] as Array<{ id: string; especialidades: unknown }>)
+                  : lerPublicados<{ id: string; especialidades: unknown }>("nina_cat_profissionais", "id, especialidades", ctx.clinicaId),
               ]);
-              const opcoes = esp.opcoesCatalogo(servicos, profissionais);
+              const opcoes = esp.opcoesCatalogo(servicos, profissionais, tipo);
               if (opcoes.length) {
                 const perguntas = esp.perguntaEspecialidade(opcoes);
-                const r = await jev.perguntarJev({ pedido: p.termo }, perguntas);
+                const r = await jev.perguntarJev(
+                  esp.estadoEspecialidade(p.termo, ctx.consultaAgenda?.mensagemAtual ?? null, tipo),
+                  perguntas,
+                );
                 const escolhida = r.ok ? esp.especialidadeAplicavel(r.respostas["especialidade"], opcoes) : null;
                 let aplicada = false;
                 if (escolhida) {
                   const novo = await searchKnowledgeBase({
-                    clinicaId: ctx.clinicaId, query: escolhida, medico: null, dia: p.dia ?? null, canal: "whatsapp",
+                    clinicaId: ctx.clinicaId, query: escolhida, tipo_atendimento: p.tipo_atendimento,
+                    medico: null, dia: p.dia ?? null, canal: "whatsapp",
                   });
                   if (novo.knowledge_status !== "not_found") { resultado = novo; aplicada = true; }
                 }
-                void jev.registrarDecisaoJev({
+                await jev.registrarDecisaoJev({
                   clinicaId: ctx.clinicaId, conversationId: ctx.conversaId, fase: "fase3_especialidade",
-                  teste: ctx.teste === true || ctx.origem === "homologacao", perguntas: { termo: p.termo, opcoes: opcoes.length } as never, resultado: r, aplicada,
+                  teste: ctx.teste === true || ctx.origem === "homologacao", perguntas, resultado: r, aplicada,
+                  contexto: { termo: p.termo, tipo_atendimento: tipo, opcoes: opcoes.length, escolhida, refez_busca: aplicada },
                 });
               }
             }
