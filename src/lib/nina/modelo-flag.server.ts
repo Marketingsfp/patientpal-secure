@@ -1,74 +1,28 @@
 /**
- * Feature flag do modelo da Nina — NINA_GEMINI_37_ENABLED.
+ * Modelo da Nina.
  *
- * Serve para ligar o modelo novo primeiro em homologação/uma clínica e voltar
- * atrás na hora, sem deploy: basta desligar a linha em `clinica_feature_flags`.
- *
- * ATUALIZAÇÃO (25/09/2026): alvo trocado para `google/gemini-3.8-flash`, agora publicado
- * e validado por chamada real com reasoning_effort. Chave da flag mantida.
- *
- * ATUALIZAÇÃO (05/09/2026): o provedor de IA do Lovable NÃO publicou
- * `gemini-3.8-flash`. Por decisão do time, o alvo passou a ser
- * `google/gemini-3.7-flash`, que EXISTE na plataforma e aceita
- * `reasoning_effort` low/medium/high (validado por chamada real). Nada mais da
- * arquitetura mudou: gateway, reasoning router, context builder, tool broker,
- * Base de Conhecimentos, agenda, CRM e handoff seguem iguais.
+ * DECISÃO (25/09/2026): a Nina usa somente `google/gemini-3.8-flash`, em todas as
+ * clínicas e em todos os perfis. A flag por clínica (`nina_gemini_37_enabled`) e o
+ * modelo legado `gemini-2.5-flash` foram retirados: nenhuma clínica sem a linha,
+ * flag desligada ou falha de leitura do banco devolve mais o modelo antigo.
+ * As linhas antigas da flag em `clinica_feature_flags` ficam sem efeito.
  */
-import { supabaseAdmin } from "@/integrations/supabase/client.server";
-
-/** Chave atual da flag. A antiga (…_38_…) continua aceita para não quebrar linhas já cadastradas. */
-export const FLAG_NINA_GEMINI = "nina_gemini_37_enabled";
-export const FLAG_NINA_GEMINI_LEGADA = "nina_gemini_38_enabled";
 
 /** Model id real da plataforma. Não inventar id nem trocar em silêncio. */
 export const MODELO_NINA_ALVO = "google/gemini-3.8-flash";
-export const MODELO_ALVO_DISPONIVEL = true;
 
-/** Modelos em uso hoje, preservados como estão (rollback imediato). */
-export const MODELO_ATUAL = {
-  texto: "google/gemini-2.5-flash",
-  voz: "google/gemini-3.1-flash-lite",
-  whatsapp: "google/gemini-2.5-flash",
-} as const;
-
-export type PerfilModelo = keyof typeof MODELO_ATUAL;
+export type PerfilModelo = "texto" | "voz" | "whatsapp";
 
 export type ResolucaoModelo = {
   modelo: string;
-  /** `flag` = modelo novo; `atual` = modelo legado; `bloqueado` = flag ligada mas modelo indisponível. */
-  origem: "atual" | "flag" | "bloqueado" | "forcado";
+  /** `fixo` = modelo único da Nina; `forcado` = escolhido pelo chamador (testes). */
+  origem: "fixo" | "forcado";
   flagAtiva: boolean;
 };
 
-/** Lê a flag por clínica. Sem linha = desligado. Falha de leitura = desligado. */
-export async function flagGeminiNovaAtiva(clinicaId: string | null): Promise<boolean> {
-  if (
-    process.env["NINA_GEMINI_37_ENABLED"] === "true" ||
-    process.env["NINA_GEMINI_38_ENABLED"] === "true"
-  ) {
-    return true;
-  }
-  if (!clinicaId) return false;
-  const { data, error } = await supabaseAdmin
-    .from("clinica_feature_flags")
-    .select("ativo")
-    .eq("clinica_id", clinicaId)
-    .in("flag_key", [FLAG_NINA_GEMINI, FLAG_NINA_GEMINI_LEGADA]);
-  if (error || !data) return false;
-  return data.some((linha) => Boolean((linha as { ativo?: boolean }).ativo));
-}
-
 export async function modeloNinaParaClinica(
-  clinicaId: string | null,
-  perfil: PerfilModelo,
+  _clinicaId: string | null,
+  _perfil: PerfilModelo,
 ): Promise<ResolucaoModelo> {
-  const flagAtiva = await flagGeminiNovaAtiva(clinicaId);
-  if (!flagAtiva) return { modelo: MODELO_ATUAL[perfil], origem: "atual", flagAtiva: false };
-  if (!MODELO_ALVO_DISPONIVEL) {
-    console.warn(
-      `[nina-ai-gateway] ${FLAG_NINA_GEMINI} ligada, mas ${MODELO_NINA_ALVO} não existe no provedor. Mantendo ${MODELO_ATUAL[perfil]}.`,
-    );
-    return { modelo: MODELO_ATUAL[perfil], origem: "bloqueado", flagAtiva: true };
-  }
-  return { modelo: MODELO_NINA_ALVO, origem: "flag", flagAtiva: true };
+  return { modelo: MODELO_NINA_ALVO, origem: "fixo", flagAtiva: true };
 }
