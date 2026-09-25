@@ -1,38 +1,13 @@
 /**
- * FASE 1 — ARCHITECTURE SYNC (comparação backend ↔ manifesto ↔ canvas).
- *
- * Módulo PURO de auditoria: guarda a foto da versão anterior do manifesto e
- * calcula o diff estrutural contra a versão atual. Não executa nada do fluxo
- * da Nina, não lê banco e não é importado pelo atendimento.
+ * Foto estrutural CONGELADA da versão 5 do manifesto, gerada do manifesto como
+ * estava antes da revisão de 25/09/2026 (inclui os ajustes pontuais de 16/09,
+ * 17/09 e 25/09 feitos sem mudar o número da versão). Serve de base para o
+ * histórico das versões 2 a 5 e para a comparação v5 → v6 na aba Alterações.
+ * Não editar à mão: é registro histórico.
  */
-import { NODES_ARQUITETURA, type NodeArquitetura } from "./manifesto";
+import type { AssinaturaNode } from "./sync";
 
-export type AssinaturaNode = {
-  id: string;
-  categoria: string;
-  arquivo: string | null;
-  funcao: string | null;
-  anteriores: string[];
-  seguintes: string[];
-};
-
-export type MudancaNode = {
-  id: string;
-  campos: string[];
-  de: Partial<AssinaturaNode>;
-  para: Partial<AssinaturaNode>;
-};
-
-export type DiffArquitetura = {
-  adicionados: string[];
-  alterados: MudancaNode[];
-  removidos: string[];
-  inalterados: string[];
-  resumo: string;
-};
-
-/** Foto do manifesto na versão 1 (antes desta sincronização). */
-export const SNAPSHOT_ANTERIOR: AssinaturaNode[] = [
+export const SNAPSHOT_V5: AssinaturaNode[] = [
   {
     "id": "message.inbound",
     "categoria": "ENTRADA",
@@ -138,7 +113,9 @@ export const SNAPSHOT_ANTERIOR: AssinaturaNode[] = [
       "routing.decide"
     ],
     "seguintes": [
-      "context.load"
+      "context.load",
+      "flow.state",
+      "instructions.greeting"
     ]
   },
   {
@@ -147,12 +124,18 @@ export const SNAPSHOT_ANTERIOR: AssinaturaNode[] = [
     "arquivo": "src/lib/nina-contexto.server.ts",
     "funcao": "contextoClinicaTexto",
     "anteriores": [
-      "session.resolve"
+      "flow.state",
+      "session.resolve",
+      "test.inbound"
     ],
     "seguintes": [
+      "identity.gate",
       "instructions.catalog",
       "instructions.learnings",
-      "prompt.compose"
+      "instructions.phases",
+      "instructions.published",
+      "prompt.compose",
+      "response.templates"
     ]
   },
   {
@@ -180,14 +163,30 @@ export const SNAPSHOT_ANTERIOR: AssinaturaNode[] = [
     ]
   },
   {
+    "id": "instructions.published",
+    "categoria": "INSTRUCOES",
+    "arquivo": "src/lib/nina/instrucoes-runtime.server.ts",
+    "funcao": "promptInstrucoes",
+    "anteriores": [
+      "context.load"
+    ],
+    "seguintes": [
+      "prompt.compose"
+    ]
+  },
+  {
     "id": "prompt.compose",
     "categoria": "INSTRUCOES",
-    "arquivo": "src/lib/nina-contexto.server.ts",
-    "funcao": "systemPromptNina",
+    "arquivo": "src/lib/whatsapp.server.ts",
+    "funcao": "gerarRespostaNinaInterno",
     "anteriores": [
       "context.load",
+      "identity.gate",
       "instructions.catalog",
-      "instructions.learnings"
+      "instructions.greeting",
+      "instructions.learnings",
+      "instructions.phases",
+      "instructions.published"
     ],
     "seguintes": [
       "llm.generate",
@@ -201,18 +200,24 @@ export const SNAPSHOT_ANTERIOR: AssinaturaNode[] = [
     "funcao": "ninaAIGateway",
     "anteriores": [
       "llm.model_flag",
+      "offer.complete",
+      "patient.link",
       "prompt.compose",
       "tool.business_hours",
+      "tool.catalog.list",
       "tool.catalog.lookup",
+      "tool.doctor_schedule",
       "tool.execute",
       "tool.knowledge.lookup",
-      "tool.patient.lookup",
+      "tool.my_appointments",
       "tool.schedule.availability",
-      "tool.schedule.book"
+      "tool.schedule.book",
+      "voice.reasoning"
     ],
     "seguintes": [
       "error.handle",
-      "response.validate",
+      "metrics.record",
+      "response.finalize",
       "tool.execute"
     ]
   },
@@ -239,9 +244,12 @@ export const SNAPSHOT_ANTERIOR: AssinaturaNode[] = [
     "seguintes": [
       "llm.generate",
       "tool.business_hours",
+      "tool.catalog.list",
       "tool.catalog.lookup",
+      "tool.doctor_schedule",
       "tool.handoff",
       "tool.knowledge.lookup",
+      "tool.my_appointments",
       "tool.patient.lookup",
       "tool.schedule.availability",
       "tool.schedule.book"
@@ -253,7 +261,8 @@ export const SNAPSHOT_ANTERIOR: AssinaturaNode[] = [
     "arquivo": "src/lib/nina/catalogo-retrieval.server.ts",
     "funcao": "buscarNoCatalogo",
     "anteriores": [
-      "tool.execute"
+      "tool.execute",
+      "tool.knowledge.lookup"
     ],
     "seguintes": [
       "llm.generate"
@@ -268,7 +277,8 @@ export const SNAPSHOT_ANTERIOR: AssinaturaNode[] = [
       "tool.execute"
     ],
     "seguintes": [
-      "llm.generate"
+      "llm.generate",
+      "tool.catalog.lookup"
     ]
   },
   {
@@ -292,7 +302,8 @@ export const SNAPSHOT_ANTERIOR: AssinaturaNode[] = [
       "tool.execute"
     ],
     "seguintes": [
-      "llm.generate"
+      "llm.generate",
+      "offer.complete"
     ]
   },
   {
@@ -316,7 +327,7 @@ export const SNAPSHOT_ANTERIOR: AssinaturaNode[] = [
       "tool.execute"
     ],
     "seguintes": [
-      "llm.generate"
+      "patient.link"
     ]
   },
   {
@@ -379,12 +390,37 @@ export const SNAPSHOT_ANTERIOR: AssinaturaNode[] = [
     "seguintes": []
   },
   {
+    "id": "response.templates",
+    "categoria": "INSTRUCOES",
+    "arquivo": "src/lib/nina/resposta/templates.server.ts",
+    "funcao": "carregarTemplatesPublicados",
+    "anteriores": [
+      "context.load"
+    ],
+    "seguintes": [
+      "response.finalize"
+    ]
+  },
+  {
+    "id": "response.finalize",
+    "categoria": "SAIDA",
+    "arquivo": "src/lib/nina/resposta/finalizacao.server.ts",
+    "funcao": "finalizarResposta",
+    "anteriores": [
+      "llm.generate",
+      "response.templates"
+    ],
+    "seguintes": [
+      "response.validate"
+    ]
+  },
+  {
     "id": "response.validate",
-    "categoria": "VALIDACAO",
+    "categoria": "SAIDA",
     "arquivo": "src/lib/whatsapp.server.ts",
     "funcao": "gerarRespostaNinaInterno",
     "anteriores": [
-      "llm.generate"
+      "response.finalize"
     ],
     "seguintes": [
       "message.outbound"
@@ -400,7 +436,8 @@ export const SNAPSHOT_ANTERIOR: AssinaturaNode[] = [
     ],
     "seguintes": [
       "audio.fallback",
-      "message.persist"
+      "message.persist",
+      "test.evaluate.sol"
     ]
   },
   {
@@ -439,7 +476,7 @@ export const SNAPSHOT_ANTERIOR: AssinaturaNode[] = [
       "message.persist"
     ],
     "seguintes": [
-      "wait.timeout"
+      "wait.timeout_job"
     ]
   },
   {
@@ -448,10 +485,9 @@ export const SNAPSHOT_ANTERIOR: AssinaturaNode[] = [
     "arquivo": "src/lib/nina/espera-timeout.server.ts",
     "funcao": "processarTimeoutsEsperaPaciente",
     "anteriores": [
-      "wait.start"
+      "wait.timeout_job"
     ],
     "seguintes": [
-      "conversation.close",
       "handoff.queue"
     ]
   },
@@ -461,8 +497,7 @@ export const SNAPSHOT_ANTERIOR: AssinaturaNode[] = [
     "arquivo": "src/lib/nina/encerramento-automatico.server.ts",
     "funcao": "avaliarEncerramentoAutomatico",
     "anteriores": [
-      "message.persist",
-      "wait.timeout"
+      "message.persist"
     ],
     "seguintes": [
       "metrics.record"
@@ -475,6 +510,7 @@ export const SNAPSHOT_ANTERIOR: AssinaturaNode[] = [
     "funcao": "registrarExecucao",
     "anteriores": [
       "conversation.close",
+      "llm.generate",
       "message.persist"
     ],
     "seguintes": [
@@ -490,7 +526,8 @@ export const SNAPSHOT_ANTERIOR: AssinaturaNode[] = [
       "metrics.record"
     ],
     "seguintes": [
-      "metrics.period"
+      "metrics.period",
+      "trace.record"
     ]
   },
   {
@@ -512,108 +549,265 @@ export const SNAPSHOT_ANTERIOR: AssinaturaNode[] = [
       "llm.generate"
     ],
     "seguintes": []
+  },
+  {
+    "id": "flow.state",
+    "categoria": "MEMORIA",
+    "arquivo": "src/lib/nina/fluxo-estado.server.ts",
+    "funcao": "carregarFluxoEstado",
+    "anteriores": [
+      "session.resolve"
+    ],
+    "seguintes": [
+      "context.load"
+    ]
+  },
+  {
+    "id": "instructions.greeting",
+    "categoria": "INSTRUCOES",
+    "arquivo": "src/lib/nina/saudacao-sessao.ts",
+    "funcao": "avaliarSaudacao",
+    "anteriores": [
+      "session.resolve"
+    ],
+    "seguintes": [
+      "prompt.compose"
+    ]
+  },
+  {
+    "id": "instructions.phases",
+    "categoria": "INSTRUCOES",
+    "arquivo": "src/lib/nina/atendimento-fase1.ts",
+    "funcao": "detectarIntencoes",
+    "anteriores": [
+      "context.load"
+    ],
+    "seguintes": [
+      "prompt.compose"
+    ]
+  },
+  {
+    "id": "identity.gate",
+    "categoria": "VALIDACAO",
+    "arquivo": "src/lib/nina/identificacao-gate.server.ts",
+    "funcao": "aplicarGateIdentificacao",
+    "anteriores": [
+      "context.load"
+    ],
+    "seguintes": [
+      "prompt.compose"
+    ]
+  },
+  {
+    "id": "patient.link",
+    "categoria": "PROCESSAMENTO",
+    "arquivo": "src/lib/atendimento/vinculo-contato.server.ts",
+    "funcao": "vincularPacienteConversa",
+    "anteriores": [
+      "tool.patient.lookup"
+    ],
+    "seguintes": [
+      "llm.generate"
+    ]
+  },
+  {
+    "id": "offer.complete",
+    "categoria": "PROCESSAMENTO",
+    "arquivo": "src/lib/nina/oferta-completa.ts",
+    "funcao": "montarOferta",
+    "anteriores": [
+      "tool.schedule.availability"
+    ],
+    "seguintes": [
+      "llm.generate"
+    ]
+  },
+  {
+    "id": "tool.catalog.list",
+    "categoria": "TOOLS",
+    "arquivo": "src/lib/nina/paciente-tools.server.ts",
+    "funcao": "listarEspecialidades",
+    "anteriores": [
+      "tool.execute"
+    ],
+    "seguintes": [
+      "llm.generate"
+    ]
+  },
+  {
+    "id": "tool.doctor_schedule",
+    "categoria": "TOOLS",
+    "arquivo": "src/lib/nina/paciente-tools.server.ts",
+    "funcao": "escalaDoMedico",
+    "anteriores": [
+      "tool.execute"
+    ],
+    "seguintes": [
+      "llm.generate"
+    ]
+  },
+  {
+    "id": "tool.my_appointments",
+    "categoria": "TOOLS",
+    "arquivo": "src/lib/nina/paciente-tools.server.ts",
+    "funcao": "executarFerramentaPaciente",
+    "anteriores": [
+      "tool.execute"
+    ],
+    "seguintes": [
+      "llm.generate"
+    ]
+  },
+  {
+    "id": "voice.inbound",
+    "categoria": "ENTRADA",
+    "arquivo": "src/routes/api/nina-fala.ts",
+    "funcao": "Route",
+    "anteriores": [],
+    "seguintes": [
+      "voice.reasoning"
+    ]
+  },
+  {
+    "id": "voice.reasoning",
+    "categoria": "IA",
+    "arquivo": "src/lib/nina/reasoning-router.ts",
+    "funcao": "selectThinkingLevel",
+    "anteriores": [
+      "voice.inbound"
+    ],
+    "seguintes": [
+      "llm.generate"
+    ]
+  },
+  {
+    "id": "wait.timeout_job",
+    "categoria": "PROCESSAMENTO",
+    "arquivo": "src/routes/api/public/nina.watchdog.ts",
+    "funcao": "executarJobWatchdog",
+    "anteriores": [
+      "wait.start"
+    ],
+    "seguintes": [
+      "wait.timeout"
+    ]
+  },
+  {
+    "id": "trace.record",
+    "categoria": "OBSERVABILIDADE",
+    "arquivo": "src/lib/nina/arquitetura/tracing.server.ts",
+    "funcao": "gravarEventosTrace",
+    "anteriores": [
+      "evidence.record"
+    ],
+    "seguintes": [
+      "test.evaluate.sol"
+    ]
+  },
+  {
+    "id": "test.cycle",
+    "categoria": "HOMOLOGACAO",
+    "arquivo": "src/lib/nina/teste-console.server.ts",
+    "funcao": "garantirCiclo",
+    "anteriores": [],
+    "seguintes": [
+      "test.inbound"
+    ]
+  },
+  {
+    "id": "test.inbound",
+    "categoria": "HOMOLOGACAO",
+    "arquivo": "src/lib/nina/teste-console.server.ts",
+    "funcao": "processarMensagemTeste",
+    "anteriores": [
+      "test.cycle",
+      "test.load.luna",
+      "test.patient.terra",
+      "test.scenario.run"
+    ],
+    "seguintes": [
+      "context.load"
+    ]
+  },
+  {
+    "id": "test.patient.terra",
+    "categoria": "HOMOLOGACAO",
+    "arquivo": "src/lib/nina/simulador-terra.functions.ts",
+    "funcao": "proximaMensagemTerra",
+    "anteriores": [],
+    "seguintes": [
+      "test.inbound"
+    ]
+  },
+  {
+    "id": "test.scenario.run",
+    "categoria": "HOMOLOGACAO",
+    "arquivo": "src/lib/nina/cenarios.functions.ts",
+    "funcao": "iniciarItemExecucao",
+    "anteriores": [
+      "test.regression"
+    ],
+    "seguintes": [
+      "test.inbound"
+    ]
+  },
+  {
+    "id": "test.load.luna",
+    "categoria": "HOMOLOGACAO",
+    "arquivo": "src/lib/nina/carga.functions.ts",
+    "funcao": "executarLoteCarga",
+    "anteriores": [],
+    "seguintes": [
+      "test.inbound"
+    ]
+  },
+  {
+    "id": "test.evaluate.sol",
+    "categoria": "HOMOLOGACAO",
+    "arquivo": "src/lib/nina/avaliador-sol.functions.ts",
+    "funcao": "avaliarComSol",
+    "anteriores": [
+      "message.outbound",
+      "trace.record"
+    ],
+    "seguintes": [
+      "test.report"
+    ]
+  },
+  {
+    "id": "test.report",
+    "categoria": "HOMOLOGACAO",
+    "arquivo": "src/lib/nina/relatorio-teste.functions.ts",
+    "funcao": "detalheRelatorioTeste",
+    "anteriores": [
+      "test.evaluate.sol"
+    ],
+    "seguintes": [
+      "test.review"
+    ]
+  },
+  {
+    "id": "test.review",
+    "categoria": "HOMOLOGACAO",
+    "arquivo": "src/lib/nina/revisao-teste.functions.ts",
+    "funcao": "enviarAchadoParaRevisao",
+    "anteriores": [
+      "test.report"
+    ],
+    "seguintes": [
+      "test.regression"
+    ]
+  },
+  {
+    "id": "test.regression",
+    "categoria": "HOMOLOGACAO",
+    "arquivo": "src/lib/nina/revisao-teste.functions.ts",
+    "funcao": "criarTesteRegressaoDeAchado",
+    "anteriores": [
+      "test.review"
+    ],
+    "seguintes": [
+      "test.scenario.run"
+    ]
   }
 ];
-
-export function assinaturaDe(node: NodeArquitetura): AssinaturaNode {
-  return {
-    id: node.id,
-    categoria: node.categoria,
-    arquivo: node.arquivo ?? null,
-    funcao: node.funcao ?? null,
-    anteriores: [...node.anteriores].sort(),
-    seguintes: [...node.seguintes].sort(),
-  };
-}
-
-/** Assinatura atual do manifesto, base para o canvas e para o diff. */
-export function assinaturaAtual(nodes: NodeArquitetura[] = NODES_ARQUITETURA): AssinaturaNode[] {
-  return nodes.map(assinaturaDe);
-}
-
-const iguais = (a: string[], b: string[]) => a.length === b.length && a.every((v, i) => v === b[i]);
-
-export function calcularDiffArquitetura(
-  anterior: AssinaturaNode[] = SNAPSHOT_ANTERIOR,
-  atual: AssinaturaNode[] = assinaturaAtual(),
-): DiffArquitetura {
-  const antes = new Map(anterior.map((n) => [n.id, n]));
-  const depois = new Map(atual.map((n) => [n.id, n]));
-
-  const adicionados = atual.filter((n) => !antes.has(n.id)).map((n) => n.id);
-  const removidos = anterior.filter((n) => !depois.has(n.id)).map((n) => n.id);
-  const alterados: MudancaNode[] = [];
-  const inalterados: string[] = [];
-
-  for (const node of atual) {
-    const velho = antes.get(node.id);
-    if (!velho) continue;
-    const campos: string[] = [];
-    if (velho.categoria !== node.categoria) campos.push("categoria");
-    // Trocar apenas o caminho do arquivo não conta como mudança arquitetural
-    // quando a função e as conexões continuam as mesmas.
-    if (velho.funcao !== node.funcao) campos.push("funcao");
-    if (!iguais(velho.anteriores, node.anteriores)) campos.push("anteriores");
-    if (!iguais(velho.seguintes, node.seguintes)) campos.push("seguintes");
-    if (campos.length === 0) inalterados.push(node.id);
-    else
-      alterados.push({
-        id: node.id,
-        campos,
-        de: { categoria: velho.categoria, funcao: velho.funcao, anteriores: velho.anteriores, seguintes: velho.seguintes },
-        para: { categoria: node.categoria, funcao: node.funcao, anteriores: node.anteriores, seguintes: node.seguintes },
-      });
-  }
-
-  const semMudanca = adicionados.length === 0 && removidos.length === 0 && alterados.length === 0;
-
-  return {
-    adicionados,
-    alterados,
-    removidos,
-    inalterados,
-    resumo: semMudanca
-      ? "Arquitetura sincronizada — nenhuma alteração estrutural detectada."
-      : `+${adicionados.length} adicionado(s), ~${alterados.length} alterado(s), -${removidos.length} removido(s), ${inalterados.length} inalterado(s).`,
-  };
-}
-
-/** Diff em texto, no formato +/~/- usado no registro da sincronização. */
-export function diffEmTexto(diff: DiffArquitetura = calcularDiffArquitetura()): string {
-  const linhas: string[] = [];
-  for (const id of diff.adicionados) linhas.push(`+ ${id}`);
-  for (const m of diff.alterados) linhas.push(`~ ${m.id} (${m.campos.join(", ")})`);
-  for (const id of diff.removidos) linhas.push(`- ${id}`);
-  return linhas.length > 0 ? linhas.join("\n") : diff.resumo;
-}
-
-/**
- * FASE 5 — Publicar uma nova versão das Instruções da Nina é mudança de
- * CONFIGURAÇÃO, não de estrutura: o Architecture Sync apenas atualiza os
- * metadados do node "Montagem do prompt" e registra a troca de versão.
- * O canvas não é reorganizado e nenhuma versão da arquitetura é criada.
- */
-export type MudancaConfiguracaoPrompt = {
-  nodeId: "prompt.compose";
-  estrutural: false;
-  de: number | null;
-  para: number;
-  resumo: string;
-};
-
-export function mudancaConfiguracaoPrompt(
-  de: number | null,
-  para: number,
-): MudancaConfiguracaoPrompt {
-  return {
-    nodeId: "prompt.compose",
-    estrutural: false,
-    de,
-    para,
-    resumo: `Prompt principal: ${de ? `v${de} → ` : ""}v${para}`,
-  };
-}
-
-// O antigo "diff pendente" comparava só o número da versão com uma constante
-// digitada à mão e deixava o aviso verde mesmo com o mapa desatualizado. A
-// conferência com o código agora fica em `conferencia.ts`.

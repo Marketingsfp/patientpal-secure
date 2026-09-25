@@ -4,13 +4,13 @@
  */
 import { describe, expect, test } from "bun:test";
 import { NODES_ARQUITETURA, type NodeArquitetura } from "../manifesto";
-import { assinaturaAtual, calcularDiffArquitetura, diffPendente } from "../sync";
+import { assinaturaAtual, calcularDiffArquitetura } from "../sync";
+import { LARGURA_NODE, VAO_COLUNA } from "../layout";
 import {
   ESTADO_LAYOUT_VAZIO,
   aplicarDiffIncremental,
   mudancaGrande,
   posicoesEfetivas,
-  statusArquitetura,
   subgrafoAfetado,
   verificarIntegridade,
   type EstadoLayout,
@@ -66,7 +66,9 @@ describe("layout incremental", () => {
 
     const posNovo = resultado.canonical[novo.id]!;
     const posAgenda = resultado.canonical[agenda.id]!;
-    expect(Math.abs(posNovo.x - posAgenda.x)).toBeLessThanOrEqual(600);
+    // "Perto" = no máximo duas colunas ao lado: a coluna vizinha pode já estar
+    // cheia com as outras ferramentas ligadas ao mesmo componente.
+    expect(Math.abs(posNovo.x - posAgenda.x)).toBeLessThanOrEqual(2 * (LARGURA_NODE + VAO_COLUNA));
     expect(Math.abs(posNovo.y - posAgenda.y)).toBeLessThanOrEqual(600);
 
     // Componentes distantes do novo mantêm exatamente a posição anterior.
@@ -232,28 +234,16 @@ describe("layout incremental", () => {
   });
 });
 
-describe("status da arquitetura", () => {
+// O aviso do topo (verde/amarelo/vermelho) é testado em conferencia.test.ts.
+describe("integridade do mapa", () => {
   test("manifesto real não tem problema de integridade", () => {
     expect(verificarIntegridade(NODES_ARQUITETURA)).toEqual([]);
   });
 
-  test("manifesto na versão já sincronizada mostra verde", () => {
-    const status = statusArquitetura(NODES_ARQUITETURA, diffPendente());
-    expect(status.cor).toBe("verde");
-    expect(status.titulo).toBe("Arquitetura sincronizada");
-  });
-
-  test("versão nova sem registro mostra amarelo", () => {
-    const status = statusArquitetura(NODES_ARQUITETURA, diffPendente(99));
-    expect(status.cor).toBe("amarelo");
-  });
-
-  test("referência quebrada mostra vermelho, nunca verde", () => {
+  test("referência quebrada é inconsistência", () => {
     const nodes = clonar(NODES_ARQUITETURA);
     nodes[0]!.seguintes.push("componente.que.nao.existe");
-    const status = statusArquitetura(nodes, diffPendente());
-    expect(status.cor).toBe("vermelho");
-    expect(status.problemas.length).toBeGreaterThan(0);
+    expect(verificarIntegridade(nodes).length).toBeGreaterThan(0);
   });
 
   test("conexão só de um lado é inconsistência", () => {

@@ -10,6 +10,7 @@
  * assinatura estrutural (categoria, função, conexões, nodes) muda.
  */
 import { MANIFESTO_ARQUITETURA, NODES_ARQUITETURA, nodePorId } from "./manifesto";
+import { SNAPSHOT_V5 } from "./snapshot-v5";
 import {
   SNAPSHOT_ANTERIOR,
   assinaturaAtual,
@@ -54,7 +55,7 @@ const SNAPSHOT_ATUAL = assinaturaAtual();
 const IDS_FINALIZACAO = new Set(["response.templates", "response.finalize"]);
 
 /** Foto estrutural da versão 4 (antes da finalização única entrar no mapa). */
-const SNAPSHOT_V4: AssinaturaNode[] = SNAPSHOT_ATUAL.filter(
+const SNAPSHOT_V4: AssinaturaNode[] = SNAPSHOT_V5.filter(
   (n) => !IDS_FINALIZACAO.has(n.id),
 ).map((n) =>
   n.id === "llm.generate"
@@ -182,18 +183,36 @@ export const HISTORICO_ARQUITETURA: VersaoArquitetura[] = [
     snapshot: SNAPSHOT_V4,
   },
   {
-    versao: MANIFESTO_ARQUITETURA.versao,
+    versao: 5,
     data: "2026-09-10",
     deploy: null,
     commit: null,
     versaoPrompt: "Instruções da Nina (versão publicada)",
     modelo: "google/gemini-2.5-flash",
-    quantidadeNodes: SNAPSHOT_ATUAL.length,
-    quantidadeTools: contarTools(SNAPSHOT_ATUAL),
+    quantidadeNodes: SNAPSHOT_V5.length,
+    quantidadeTools: contarTools(SNAPSHOT_V5),
     alteracoes: [
       "Novo componente: Templates das mensagens automáticas, com versão publicada por clínica e texto padrão como reserva.",
       "Novo componente: Finalização da resposta — ponto único por onde passam as respostas do modelo e as mensagens automáticas antes da validação e do envio.",
       "A geração do modelo passou a apontar para a finalização, e não mais direto para a validação da resposta.",
+    ],
+    snapshot: SNAPSHOT_V5,
+  },
+  {
+    versao: MANIFESTO_ARQUITETURA.versao,
+    data: "2026-09-25",
+    deploy: null,
+    commit: null,
+    versaoPrompt: "Instruções da Nina (versão publicada)",
+    modelo: MANIFESTO_ARQUITETURA.modelo,
+    quantidadeNodes: SNAPSHOT_ATUAL.length,
+    quantidadeTools: contarTools(SNAPSHOT_ATUAL),
+    alteracoes: [
+      "Revisão completa do mapa contra o código de 25/09/2026: modelo único Gemini 3.8 Flash, sem escolha por clínica.",
+      "Entraram no mapa etapas que já existiam no código: transcrição de áudio, resposta a lembrete de consulta, código de verificação do site, agrupamento e trava do turno, vigia do turno, descarte de resposta obsoleta, correção de agendamento não confirmado, escolha do horário, Jev na homologação e limpeza automática de registros.",
+      "Descrições corrigidas: assinatura inválida é registrada, mas a mensagem nunca é descartada; falhas passam pelo vigia, que encaminha para a equipe; a avaliação posterior começa pelo Jev.",
+      "Saiu do mapa a Oferta completa de horários, que não era usada pelo atendimento.",
+      "O aviso do topo passou a conferir o mapa com o código (ferramentas e modelo) em vez de comparar números de versão.",
     ],
     snapshot: SNAPSHOT_ATUAL,
   },

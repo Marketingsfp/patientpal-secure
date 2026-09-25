@@ -96,6 +96,24 @@ describe("comparação entre versões", () => {
     expect(c?.de.versao).toBe(versaoAnterior()!.versao);
     expect(c?.para.versao).toBe(versaoAtual().versao);
   });
+
+  it("revisão de 25/09 (v5 → v6): tira a caixa fantasma e inclui as etapas reais", () => {
+    const c = comparacaoRecente()!;
+    expect(c.de.versao).toBe(5);
+    expect(c.para.versao).toBe(6);
+    expect(c.nodes.removidos).toEqual(["offer.complete"]);
+    for (const id of ["audio.transcribe", "reminder.reply", "turn.batch", "turn.watchdog", "test.jev"])
+      expect(c.nodes.adicionados).toContain(id);
+    expect(c.para.modelo).toBe("google/gemini-3.8-flash");
+    expect(c.de.modelo).toBe("google/gemini-2.5-flash");
+  });
+
+  it("versões antigas continuam com a foto da época", () => {
+    const v4 = HISTORICO_ARQUITETURA.find((v) => v.versao === 4)!;
+    const v5 = HISTORICO_ARQUITETURA.find((v) => v.versao === 5)!;
+    expect(v5.snapshot.some((n) => n.id === "offer.complete")).toBe(true);
+    expect(v4.snapshot.some((n) => n.id === "turn.watchdog")).toBe(false);
+  });
 });
 
 describe("mudança visual não gera versão", () => {

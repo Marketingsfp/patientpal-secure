@@ -8,8 +8,10 @@
  * As linhas antigas da flag em `clinica_feature_flags` ficam sem efeito.
  */
 
-/** Model id real da plataforma. Não inventar id nem trocar em silêncio. */
-export const MODELO_NINA_ALVO = "google/gemini-3.8-flash";
+import { MODELO_NINA_ALVO } from "./modelo-nina";
+
+/** Model id real da plataforma (definido em `modelo-nina.ts`). */
+export { MODELO_NINA_ALVO };
 
 export type PerfilModelo = "texto" | "voz" | "whatsapp";
 

@@ -20,7 +20,6 @@ import {
 import {
   assinaturaAtual,
   calcularDiffArquitetura,
-  diffPendente,
   type AssinaturaNode,
   type DiffArquitetura,
 } from "./sync";
@@ -356,58 +355,5 @@ export function verificarIntegridade(nodes: NodeArquitetura[]): ProblemaIntegrid
   return problemas;
 }
 
-export type StatusArquitetura = {
-  nivel: "sincronizada" | "alteracoes" | "inconsistente";
-  cor: "verde" | "amarelo" | "vermelho";
-  titulo: string;
-  detalhe: string;
-  problemas: ProblemaIntegridade[];
-  diff: DiffArquitetura;
-};
-
-/**
- * Status mostrado na página. Nunca fica verde com o manifesto divergente:
- * qualquer inconsistência estrutural vira vermelho e qualquer diferença em
- * relação à última sincronização vira amarelo.
- */
-export function statusArquitetura(
-  nodes: NodeArquitetura[],
-  diff: DiffArquitetura = diffPendente(),
-): StatusArquitetura {
-  const problemas = verificarIntegridade(nodes);
-  if (problemas.length > 0) {
-    return {
-      nivel: "inconsistente",
-      cor: "vermelho",
-      titulo: "Inconsistência na arquitetura",
-      detalhe: `${problemas.length} problema(s) estrutural(is) no mapa: ${problemas
-        .slice(0, 3)
-        .map((p) => `${p.id} — ${p.problema}`)
-        .join("; ")}${problemas.length > 3 ? "…" : ""}`,
-      problemas,
-      diff,
-    };
-  }
-
-  const mudou =
-    diff.adicionados.length > 0 || diff.removidos.length > 0 || diff.alterados.length > 0;
-  if (mudou) {
-    return {
-      nivel: "alteracoes",
-      cor: "amarelo",
-      titulo: "Alterações detectadas — reorganização disponível",
-      detalhe: diff.resumo,
-      problemas,
-      diff,
-    };
-  }
-
-  return {
-    nivel: "sincronizada",
-    cor: "verde",
-    titulo: "Arquitetura sincronizada",
-    detalhe: "Nenhuma alteração estrutural detectada desde a última sincronização.",
-    problemas,
-    diff,
-  };
-}
+// O aviso do topo da página (verde/amarelo/vermelho) fica em `conferencia.ts`:
+// ele compara o mapa com fatos do código, não com um número de versão.

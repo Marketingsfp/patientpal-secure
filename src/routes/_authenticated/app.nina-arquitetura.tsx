@@ -17,13 +17,13 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { ArquiteturaCanvas } from "@/components/nina/ArquiteturaCanvas";
 import { RastrearExecucao } from "@/components/nina/RastrearExecucao";
 import { InstrucoesNina } from "@/components/nina/InstrucoesNina";
-import { FluxoDiretoNina } from "@/components/nina/FluxoDiretoNina";
+import { VisaoSimplesNina } from "@/components/nina/VisaoSimplesNina";
 
 import { useClinica } from "@/hooks/use-clinica";
 import { capacidadesArquitetura } from "@/lib/nina/arquitetura/permissoes.functions";
 import { nivelAcessoDe, podeArquitetura } from "@/lib/nina/arquitetura/permissoes";
 import { NODES_ARQUITETURA } from "@/lib/nina/arquitetura/manifesto";
-import { statusArquitetura } from "@/lib/nina/arquitetura/layout-incremental";
+import { statusArquitetura } from "@/lib/nina/arquitetura/conferencia";
 import {
   HISTORICO_ARQUITETURA,
   comparacaoRecente,
@@ -161,6 +161,13 @@ function Pagina() {
         <div>
           <p className="font-medium">{status.titulo}</p>
           <p className="text-muted-foreground">{status.detalhe}</p>
+          {status.divergencias.length > 0 && (
+            <ul className="mt-1 list-disc space-y-0.5 pl-4 text-muted-foreground">
+              {status.divergencias.map((d) => (
+                <li key={d.detalhe}>{d.detalhe}</li>
+              ))}
+            </ul>
+          )}
         </div>
       </div>
 
@@ -172,7 +179,7 @@ function Pagina() {
         </TabsList>
 
         <TabsContent value="arquitetura" className="mt-4 space-y-4">
-          <FluxoDiretoNina />
+          <VisaoSimplesNina />
           <Card>
             <CardHeader className="flex flex-row items-center justify-between gap-2">
               <CardTitle className="text-base">O que a Nina pode fazer</CardTitle>
