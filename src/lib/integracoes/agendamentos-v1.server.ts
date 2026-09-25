@@ -295,6 +295,73 @@ async function handleCriar(
   const observacoesFinais =
     [body.observacoes ?? null, obsExtra].filter(Boolean).join(" | ") || null;
 
+  // v1.3 — sem procedimento no corpo, deduz: padrão do médico → catálogo da
+  // especialidade (preferindo consulta). O explícito no corpo sempre ganha.
+  let procedimentoDeduzido: string | null = null;
+  if (!body.procedimento && !(body.procedimentos && body.procedimentos.length)) {
+    let espMedico: string | null = null;
+    let nomeMedico: string | null = null;
+    if (body.medico_id) {
+      const { data: med } = await db
+        .from("medicos")
+        .select("nome, procedimento_padrao_id, especialidade_id")
+        .eq("id", body.medico_id)
+        .eq("clinica_id", ctx.clinica_id)
+        .maybeSingle();
+      const m = med as {
+        nome: string | null;
+        procedimento_padrao_id: string | null;
+        especialidade_id: string | null;
+      } | null;
+      nomeMedico = m?.nome ?? null;
+      espMedico = m?.especialidade_id ?? null;
+      if (m?.procedimento_padrao_id) {
+        const { data: proc } = await db
+          .from("procedimentos")
+          .select("nome")
+          .eq("id", m.procedimento_padrao_id)
+          .maybeSingle();
+        procedimentoDeduzido = (proc as { nome: string | null } | null)?.nome ?? null;
+      }
+    }
+    const espAlvo = body.especialidade_id ?? espMedico;
+    if (!procedimentoDeduzido && espAlvo) {
+      const { data: procs } = await db
+        .from("procedimento_especialidades")
+        .select("procedimento:procedimentos!inner(nome, tipo, ativo, clinica_id)")
+        .eq("especialidade_id", espAlvo)
+        .eq("clinica_id", ctx.clinica_id)
+        .eq("procedimento.ativo", true)
+        .eq("procedimento.clinica_id", ctx.clinica_id);
+      const lista = (
+        (procs ?? []) as unknown as Array<{ procedimento: { nome: string; tipo: string | null } | null }>
+      )
+        .map((p) => p.procedimento)
+        .filter((p): p is { nome: string; tipo: string | null } => !!p?.nome)
+        .sort(
+          (a, b) =>
+            Number(b.tipo === "consulta") - Number(a.tipo === "consulta") ||
+            a.nome.localeCompare(b.nome, "pt-BR"),
+        );
+      procedimentoDeduzido = lista[0]?.nome ?? null;
+    }
+    if (!procedimentoDeduzido) {
+      const quem = [
+        body.medico_id ? `médico ${nomeMedico ?? body.medico_id}` : null,
+        espAlvo ? `especialidade ${espAlvo}` : null,
+      ]
+        .filter(Boolean)
+        .join(" / ");
+      throw new ApiError({
+        status: 422,
+        code: "procedure_not_resolved",
+        message: quem
+          ? `Não foi possível deduzir o procedimento: ${quem} sem procedimento configurado. Informe 'procedimento' no corpo.`
+          : "Não foi possível deduzir o procedimento: informe 'procedimento', 'medico_id' ou 'especialidade_id'.",
+      });
+    }
+  }
+
   const ctxAgenda: CtxAgenda = { db, ator };
   const resultado = await criarAgendamentoCore(ctxAgenda, {
     clinica_id: ctx.clinica_id,
@@ -306,7 +373,7 @@ async function handleCriar(
       medico_id: body.medico_id ?? null,
       inicio: new Date(body.inicio).toISOString(),
       fim: new Date(body.fim).toISOString(),
-      procedimento: body.procedimento ?? body.procedimentos?.[0] ?? null,
+      procedimento: body.procedimento ?? body.procedimentos?.[0] ?? procedimentoDeduzido,
       status: "agendado",
       observacoes: observacoesFinais,
       // Agendamento vindo da API entra SEMPRE como não pago.
