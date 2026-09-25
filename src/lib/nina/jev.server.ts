@@ -113,3 +113,43 @@ export async function registrarDecisaoJev(r: {
     console.warn("[nina-jev] falha ao registrar decisão:", e instanceof Error ? e.message : e);
   }
 }
+
+/**
+ * (Fase 4) Cadastros ambíguos: o Jev só SUGERE qual cadastro combina e a
+ * sugestão fica registrada para a recepção. Nunca vincula, cria ou altera.
+ */
+export async function sugerirCadastroJev(
+  ctx: { clinicaId: string; conversaId: string | null; teste?: boolean; origem?: string },
+  dados: { nome: string; data_nascimento: string; telefone: string },
+): Promise<void> {
+  const teste = Boolean(ctx.teste || ctx.origem === "homologacao");
+  if (!(await jevAtivo(ctx.clinicaId, "fase4_cadastro", teste))) return;
+  const { normalizarNome, estadoCadastro, perguntaCadastro, sugestaoCadastro } = await import("./jev-cadastro");
+  const { normalizarTelefone } = await import("@/lib/atendimento/telefone");
+  const { data, error } = await supabaseAdmin
+    .from("pacientes")
+    .select("id,nome,data_nascimento,telefone,telefone2,created_at,ativo")
+    .eq("clinica_id", ctx.clinicaId)
+    .eq("is_mock_data", teste)
+    .eq("teste", teste)
+    .or(`data_nascimento.eq.${dados.data_nascimento},data_nascimento.is.null`)
+    .limit(500);
+  if (error || !data) return;
+  const nome = normalizarNome(dados.nome);
+  const tel = normalizarTelefone(dados.telefone);
+  const candidatos = (data as Array<Record<string, any>>).filter(
+    (p) => normalizarNome(p.nome) === nome &&
+      (normalizarTelefone(p.telefone) === tel || normalizarTelefone(p.telefone2) === tel),
+  ).map((p) => ({ id: p.id, nome: p.nome, data_nascimento: p.data_nascimento, telefone: p.telefone,
+    telefone2: p.telefone2, created_at: p.created_at }));
+  if (candidatos.length < 2) return;
+  const perguntas = perguntaCadastro(candidatos);
+  const resultado = await perguntarJev(estadoCadastro(dados, candidatos), perguntas);
+  const sugerido = resultado.ok ? sugestaoCadastro(resultado.respostas.cadastro, candidatos) : null;
+  const registro = resultado.ok
+    ? { ...resultado, respostas: { ...resultado.respostas,
+        _sugestao_recepcao: { paciente_id: sugerido, candidatos: candidatos.map((c) => c.id).slice(0, 10) } as never } }
+    : resultado;
+  await registrarDecisaoJev({ clinicaId: ctx.clinicaId, conversationId: ctx.conversaId, fase: "fase4_cadastro",
+    teste, perguntas, resultado: registro, aplicada: false });
+}
