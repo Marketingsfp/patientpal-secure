@@ -257,11 +257,50 @@ export async function handleIntake(
     return json(422, { error: { code: "invalid_datetime", message: "Data/hora inválida." } });
   }
 
+  // Especialidade escolhida no site → id do catálogo (sem diferenciar
+  // maiúscula/minúscula nem acento). Não achou, segue null como antes.
+  const normalizar = (s: string) =>
+    s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toLowerCase();
+  const pedidoPaciente = body.procedimento?.trim() || null;
+  let especialidadeId: string | null = null;
+  let procedimentoCatalogo: string | null = null;
+  if (body.especialidade?.trim()) {
+    const alvo = normalizar(body.especialidade);
+    const { data: esps } = await db.from("especialidades").select("id, nome, ativo");
+    const achada = ((esps ?? []) as Array<{ id: string; nome: string; ativo: boolean | null }>)
+      .filter((e) => normalizar(e.nome ?? "") === alvo)
+      .sort((a, b) => Number(b.ativo !== false) - Number(a.ativo !== false))[0];
+    if (achada) {
+      especialidadeId = achada.id;
+      const { data: procs } = await db
+        .from("procedimento_especialidades")
+        .select("procedimento:procedimentos!inner(nome, tipo, ativo)")
+        .eq("especialidade_id", achada.id)
+        .eq("clinica_id", clinicaId)
+        .eq("procedimento.ativo", true);
+      const lista = ((procs ?? []) as Array<{ procedimento: { nome: string; tipo: string | null } | null }>)
+        .map((p) => p.procedimento)
+        .filter((p): p is { nome: string; tipo: string | null } => !!p?.nome)
+        .sort(
+          (a, b) =>
+            Number(b.tipo === "consulta") - Number(a.tipo === "consulta") ||
+            a.nome.localeCompare(b.nome, "pt-BR"),
+        );
+      procedimentoCatalogo = lista[0]?.nome ?? null;
+    }
+  }
+  const procedimentoFinal =
+    procedimentoCatalogo ??
+    (pedidoPaciente
+      ? `A DEFINIR — pedido do paciente: ${pedidoPaciente}`
+      : "Consulta (solicitação do site)");
+
   const linhas = [
     "SOLICITAÇÃO VINDA DO SITE (pendente de confirmação).",
     `Paciente ${r.criado ? "CADASTRADO AGORA pelo site" : "já existente no cadastro"}.`,
     `Contato informado no site: ${body.telefone}${body.email ? ` / ${body.email}` : ""}`,
     body.especialidade ? `Especialidade pedida: ${body.especialidade}` : null,
+    pedidoPaciente ? `Pedido do paciente: ${pedidoPaciente}` : null,
     body.data_preferida || body.hora_preferida || body.periodo_preferido
       ? `Preferência: ${body.data_preferida ?? "sem data"} ${body.hora_preferida ?? body.periodo_preferido ?? ""}`.trim()
       : "Sem preferência de horário informada.",
@@ -275,8 +314,8 @@ export async function handleIntake(
     _paciente_nome: body.nome,
     _inicio: janela.inicio,
     _fim: janela.fim,
-    _procedimento: body.procedimento ?? body.especialidade ?? "Consulta (solicitação do site)",
-    _especialidade_id: null,
+    _procedimento: procedimentoFinal,
+    _especialidade_id: especialidadeId,
     _medico_id: null,
     _observacoes: linhas.join("\n"),
     _id_externo: idExterno,
