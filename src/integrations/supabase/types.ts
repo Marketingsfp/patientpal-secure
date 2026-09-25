@@ -16471,6 +16471,14 @@ export type Database = {
         }
         Returns: undefined
       }
+      lumen_tv_respostas: {
+        Args: { _ids: number[] }
+        Returns: {
+          error_msg: string
+          id: number
+          status_code: number
+        }[]
+      }
       marcar_item_nao_aplicavel: {
         Args: { p_item_id: string; p_motivo: string }
         Returns: Json
