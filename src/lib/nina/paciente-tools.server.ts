@@ -1800,6 +1800,15 @@ async function executarFerramentaInterna(
             ok: false,
             erro: "PATIENT_DATA_MISMATCH",
           });
+          // Jev Fase 4 (só homologação): apenas SUGERE à recepção; nada é vinculado.
+          if (r.erro === "PATIENT_AMBIGUOUS") {
+            try {
+              const { sugerirCadastroJev } = await import("./jev.server");
+              await sugerirCadastroJev(ctx, dados);
+            } catch (e) {
+              console.warn("[nina-jev] fase4:", e instanceof Error ? e.message : e);
+            }
+          }
           return falha(
             r.erro === "PATIENT_AMBIGUOUS" ? "PATIENT_AMBIGUOUS" : "PATIENT_DATA_MISMATCH",
             "Não foi possível vincular o cadastro com segurança. A equipe precisa conferir os dados; não foi criado outro cadastro.",
