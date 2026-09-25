@@ -126,6 +126,15 @@ export function montarCorpoClaude(body: Record<string, any>): Record<string, any
   return corpo;
 }
 
+/** Mesmo pedido, com o schema descrito nas instruções em vez de forçado. */
+export function semFormatoEstruturado(corpo: Record<string, any>): Record<string, any> {
+  const { format, ...restoConfig } = corpo.output_config ?? {};
+  const regra =
+    "\n\nFORMATO OBRIGATÓRIO DA RESPOSTA: devolva SOMENTE um objeto JSON válido (sem markdown, sem texto antes ou depois) que siga exatamente este JSON Schema:\n" +
+    JSON.stringify(format?.schema ?? {});
+  return { ...corpo, output_config: restoConfig, system: `${corpo.system ?? ""}${regra}` };
+}
+
 type Resultado = {
   texto: string;
   conteudo: Bloco[];
@@ -223,6 +232,8 @@ async function consumirStream(res: Response): Promise<Resultado> {
     }
   }
   r.conteudo = blocos.filter(Boolean);
+  const cercado = r.texto.trim().match(/^```(?:json)?\s*([\s\S]*?)\s*```$/);
+  if (cercado && !r.chamadas.length) r.texto = cercado[1]!;
   return r;
 }
 
@@ -271,16 +282,32 @@ export async function chamarClaudeComoResponses(
   const chave = process.env["LOVABLE_API_KEY"];
   if (!chave) return new Response("LOVABLE_API_KEY ausente", { status: 401 });
 
-  const res = await fetch(MESSAGES_URL, {
-    method: "POST",
-    signal: opcoes.signal,
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${chave}`,
-      "X-Lovable-AIG-SDK": "fetch",
-    },
-    body: JSON.stringify(montarCorpoClaude(body)),
-  });
+  const enviar = (corpo: Record<string, any>) =>
+    fetch(MESSAGES_URL, {
+      method: "POST",
+      signal: opcoes.signal,
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${chave}`,
+        "X-Lovable-AIG-SDK": "fetch",
+      },
+      body: JSON.stringify(corpo),
+    });
+
+  const corpoClaude = montarCorpoClaude(body);
+  let res = await enviar(corpoClaude);
+  if (res.status === 400 && corpoClaude.output_config?.format) {
+    const erro = await res.text().catch(() => "");
+    // Alguns schemas herdados da Responses API usam recursos que o formato
+    // estruturado do Claude não compila (muitas uniões, enum com null).
+    // Reparo único: pede o mesmo JSON pelas instruções, sem o formato forçado.
+    if (/schema|union|output_config/i.test(erro)) {
+      console.warn("[claude-messages] schema recusado; usando JSON pelas instruções:", erro.slice(0, 200));
+      res = await enviar(semFormatoEstruturado(corpoClaude));
+    } else {
+      return new Response(erro, { status: 400 });
+    }
+  }
   if (!res.ok || !res.body) {
     const corpo = await res.text().catch(() => "");
     return new Response(corpo, { status: res.ok ? 502 : res.status });
