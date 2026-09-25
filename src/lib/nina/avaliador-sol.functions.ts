@@ -374,11 +374,23 @@ export const avaliarComSol = createServerFn({ method: "POST" })
     };
 
     try {
-      const { texto, inputTokens, outputTokens } = await chamarSol(
-        montarInstrucoesSol(),
-        montarInputSol(dossie),
-      );
-      const avaliacao = parseAvaliacaoSol(texto);
+      // Jev primeiro (notas). Opus 5.5 só escreve resumo/achados se reprovar,
+      // ou quando o Jev está desligado, falha ou o dossiê é grande demais.
+      const input = montarInputSol(dossie);
+      const jev = await avaliarComJev(data.clinicaId, conversaId, input[0].content);
+      let avaliacao: ReturnType<typeof parseAvaliacaoSol>;
+      let inputTokens = 0;
+      let outputTokens = 0;
+      if (jev && !jev.precisaOpus) {
+        avaliacao = jev.avaliacao;
+        base.modelo = "typesafe/jev-latest";
+      } else {
+        const r = await chamarSol(montarInstrucoesSol(), input);
+        avaliacao = parseAvaliacaoSol(r.texto);
+        inputTokens = r.inputTokens;
+        outputTokens = r.outputTokens;
+        if (jev) base.modelo = `typesafe/jev-latest + ${MODELO_SOL}`;
+      }
 
       const { data: linha, error } = await supabaseAdmin
         .from("nina_teste_avaliacoes")
