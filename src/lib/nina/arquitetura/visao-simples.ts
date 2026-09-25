@@ -78,7 +78,7 @@ export const ETAPAS_VISAO_SIMPLES: EtapaVisaoSimples[] = [
     resumo: "Instruções, histórico e paciente",
     tipo: "nina",
     explicacao: [
-      "Reconhece quem é o paciente quando o telefone ou a conversa já estão ligados a um cadastro.",
+      "Reconhece o paciente quando a conversa já está ligada a um cadastro. Não há busca de paciente pelo telefone; o número do WhatsApp fica guardado para o cadastro.",
       "Lê as instruções publicadas pela clínica aqui na Arquitetura, as mensagens automáticas e os aprendizados aprovados pela equipe.",
       "Usa só o trecho recente da conversa e o ponto em que o atendimento parou. Nunca manda a agenda inteira nem o cadastro completo para o modelo.",
     ],
@@ -103,10 +103,12 @@ export const ETAPAS_VISAO_SIMPLES: EtapaVisaoSimples[] = [
     tipo: "nina",
     explicacao: [
       "O modelo de IA (Gemini 3.8, o mesmo para todas as clínicas) lê a mensagem e decide o que precisa consultar.",
+      "Quando ligado na clínica, um segundo modelo (Jev) confere o que o paciente pediu, levando em conta as opções já oferecidas a ele.",
       "Consulta o catálogo publicado (médicos, exames, preços e regras), a agenda (vagas reais) e o horário de funcionamento.",
       "Pode consultar várias vezes antes de responder. Cada consulta aparece em Detalhes técnicos da mensagem.",
     ],
     componentes: [
+      "jev.filtro",
       "llm.model_flag",
       "llm.generate",
       "tool.execute",
@@ -124,7 +126,7 @@ export const ETAPAS_VISAO_SIMPLES: EtapaVisaoSimples[] = [
     resumo: "Identifica, reserva, marca consulta",
     tipo: "nina",
     explicacao: [
-      "Identifica o paciente pelos dados que ele informa e liga o cadastro à conversa.",
+      "Identifica ou cadastra o paciente pelo número do WhatsApp, nome completo e data de nascimento (sem CPF) e liga o cadastro à conversa.",
       "Só marca a consulta depois de identificar o paciente e de ele aceitar o resumo com o horário escolhido.",
       "Se a Nina disser que agendou sem a consulta estar gravada, o sistema corrige a resposta antes de enviar.",
       "O agendamento pela Nina vem ligado e pode ser desligado por clínica.",
@@ -185,9 +187,10 @@ export const SAIDAS_VISAO_SIMPLES: SaidaVisaoSimples[] = [
     resumo: "Pedido, regra ou falha",
     depoisDe: "acao",
     explicacao: [
-      "Quando o paciente pede uma pessoa, quando uma regra da clínica manda encaminhar ou quando não há vaga, a conversa passa para a equipe.",
+      "Quando o paciente pede uma pessoa, quando uma regra da clínica manda encaminhar, quando não há vaga ou quando o pedido continua sem entendimento mesmo depois de duas perguntas de esclarecimento, a conversa passa para a equipe.",
+      "O paciente recebe uma única mensagem de transferência, com o número do protocolo.",
       "Se algo falhar ou travar, o vigia do atendimento tenta retomar. Sem sucesso, avisa o paciente com a frase padrão de encaminhamento e coloca a conversa na fila.",
-      "Quem assume recebe um resumo do que já foi conversado, e o protocolo é gerado quando um atendente assume.",
+      "Quem assume recebe um resumo do que já foi conversado. Na homologação a transferência é simulada: a mensagem leva o aviso de simulação e nenhuma atendente real é acionada.",
     ],
     componentes: [
       "tool.handoff",

@@ -2,7 +2,7 @@ import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { normalizarTelefone } from "@/lib/atendimento/telefone";
 import { dadosPublicosClinicaGrupo } from "@/lib/nina/clinicas-grupo";
 import { agoraNaClinica } from "@/lib/nina-agora";
-import { encaminhamentoSemRegistro, MOTIVO_SEM_REGISTRO, MOTIVO_MEDICO_SEM_REGISTRO, respostaSemRegistro } from "@/lib/nina/catalogo-sem-registro";
+import { encaminhamentoSemRegistro, MOTIVO_SEM_REGISTRO, MOTIVO_MEDICO_SEM_REGISTRO, respostaSemRegistro, AVISO_SIMULACAO_ENCAMINHAMENTO } from "@/lib/nina/catalogo-sem-registro";
 import { dadosPublicosCatalogo, resultadoExigeHumano, MOTIVO_SFP,
   respostaEncaminhamentoSfp, resultadoEncaminhamentoSfp, omitirNomeGenerico } from "@/lib/nina/regras-catalogo";
 
@@ -352,74 +352,9 @@ export function dentroHorarioAtendimento(cfg: WhatsAppConfigRow, now: Date = new
  * Gera resposta automática da Nina usando o mesmo gateway de IA da chatNina,
  * porém sem exigir sessão de usuário (chamado a partir do webhook).
  */
-/**
- * Extrai possíveis identificadores (CPF, telefone, nome) do texto do paciente.
- * Usado para tentar reconhecê-lo antes de pedir dados.
- */
-function extrairIdentificadores(mensagem: string): {
-  cpf: string | null;
-  telefone: string | null;
-  nome: string | null;
-} {
-  const texto = mensagem ?? "";
-  const cpfMatch = texto.match(/\b\d{3}\.?\d{3}\.?\d{3}-?\d{2}\b/);
-  const cpfDigits = cpfMatch ? cpfMatch[0].replace(/\D/g, "") : "";
-  // Telefone: 10 ou 11 dígitos consecutivos (com ou sem máscara/DDI)
-  const telMatch = texto.replace(/\D/g, "").match(/\d{10,13}/);
-  const telDigits =
-    (telMatch && telMatch[0].length !== 11) || !cpfDigits ? (telMatch?.[0] ?? "") : "";
-  // Nome candidato: sequência de 2+ palavras alfabéticas iniciando com maiúsculas
-  // (regex simples — a IA fará o resto)
-  const nomeMatch = texto.match(
-    /\b([A-ZÁÉÍÓÚÂÊÔÃÕÇ][a-záéíóúâêôãõç]+(?:\s+[A-ZÁÉÍÓÚÂÊÔÃÕÇ][a-záéíóúâêôãõç]+){1,4})\b/,
-  );
-  return {
-    cpf: cpfDigits.length === 11 ? cpfDigits : null,
-    telefone: telDigits && telDigits.length >= 10 ? telDigits : null,
-    nome: nomeMatch ? nomeMatch[1] : null,
-  };
-}
-
 /** Normaliza telefone do remetente WhatsApp (regra única do sistema). */
 function normalizarTelefoneRemetente(from: string | null | undefined): string | null {
   return normalizarTelefone(from);
-}
-
-async function identificarPaciente(
-  clinicaId: string,
-  mensagem: string,
-  telefoneRemetente: string | null,
-): Promise<import("@/lib/nina/identidade-paciente").BuscaIdentidade | null> {
-  const ids = extrairIdentificadores(mensagem);
-  const telBusca = telefoneRemetente ?? ids.telefone;
-  if (!ids.cpf && !telBusca && !ids.nome) return null;
-
-  const { data, error } = await supabaseAdmin.rpc("buscar_paciente_contato", {
-    _clinica_id: clinicaId,
-    _cpf: ids.cpf ?? undefined,
-    _telefone: telBusca ?? undefined,
-    _nome: ids.nome ?? undefined,
-  });
-  if (error) {
-    console.error("[Nina] buscar_paciente_contato error", error);
-    return null;
-  }
-  const rows = (data ?? []) as Array<{
-    id: string;
-    nome: string;
-    associado: boolean;
-    convenio_nome: string | null;
-  }>;
-  // FASE 4 — devolve TODOS os candidatos. `rows[0]` não decide identidade.
-  return {
-    candidates: rows.map((r) => ({
-      id: r.id,
-      nome: r.nome ?? null,
-      associado: Boolean(r.associado),
-      convenio_nome: r.convenio_nome ?? null,
-    })),
-    viaCpf: Boolean(ids.cpf),
-  };
 }
 
 
@@ -713,7 +648,10 @@ async function gerarRespostaNinaInterno(
         .select("nome, base_importada, endereco, cidade, estado, cep, telefone, email")
         .eq("id", clinicaId)
         .maybeSingle(),
-      opcoes?.teste ? Promise.resolve(null) : identificarPaciente(clinicaId, mensagemPaciente, telefoneNorm),
+      // Sem busca de paciente por telefone, CPF ou nome em nenhum ambiente
+      // (regra da clínica, 25/09/2026): a identidade vem só do cadastro já
+      // ligado à conversa (número do WhatsApp, nome completo e nascimento).
+      Promise.resolve(null as import("@/lib/nina/identidade-paciente").BuscaIdentidade | null),
       Promise.resolve({ data: [] as any[] }),
       Promise.resolve({ data: [] as any[] }),
       carregarEstadoIdentidade(clinicaId, telefoneRemetente ? String(telefoneRemetente) : null),
@@ -950,62 +888,79 @@ async function gerarRespostaNinaInterno(
   let intencoesTurno = detectarIntencoes(mensagemPaciente);
   let intencaoAmbiguaTurno = intencaoAmbigua(mensagemPaciente, intencoesTurno);
 
-  // JEV — Fases 1 e 2 (somente homologação, flags `nina_jev_fase1/2`), numa
+  // JEV — Fases 1 e 2 (produção e homologação, flags `nina_jev_fase1/2`), numa
   // única chamada. Fase 1: com confiança alta a intenção do Jev prevalece.
-  // Fase 2: sinais acima do limite, ou dúvida em 2 mensagens seguidas,
-  // encaminham para a recepção. Erro/demora = fluxo atual.
+  // Fase 2: sinais acima do limite, ou falha de entendimento em 3 mensagens
+  // seguidas SEM avanço do atendimento, encaminham para a recepção. Escolher
+  // uma opção já oferecida nunca conta como falha. Erro/demora = fluxo atual.
   let jevEncaminhamento: import("@/lib/nina/jev-encaminhamento").Encaminhamento | null = null;
-  if (opcoes?.teste === true) {
-    try {
-      const jev = await import("@/lib/nina/jev.server");
-      const [f1, f2] = await Promise.all([
-        jev.jevAtivo(clinicaId, "fase1_intencao", true),
-        jev.jevAtivo(clinicaId, "fase2_encaminhamento", true),
+  let jevPontuacoes: Record<string, number | null> | null = null;
+  try {
+    const jev = await import("@/lib/nina/jev.server");
+    const [f1, f2] = await Promise.all([
+      jev.jevAtivo(clinicaId, "fase1_intencao", opcoes?.teste === true),
+      jev.jevAtivo(clinicaId, "fase2_encaminhamento", opcoes?.teste === true),
+    ]);
+    if (f1 || f2) {
+      const { perguntaIntencao, estadoIntencao, intencaoAplicavel } = await import("@/lib/nina/jev-intencao");
+      const enc = await import("@/lib/nina/jev-encaminhamento");
+      const ctxJev = await import("@/lib/nina/jev-contexto");
+      const perguntas = {
+        ...perguntaIntencao(),
+        ...(f2 ? enc.perguntasEncaminhamento() : {}),
+      };
+      const inicioCiclo = sessaoNina.estado.session_started_at ?? null;
+      const anteriores = ctxJev.montarHistoricoJev(msgsMemoria, {
+        excluirIds: opcoes?.mensagensEntrada ?? [],
+        conversaId: estadoId.conversaId ?? null,
+        desde: inicioCiclo,
+      });
+      const contextoJev = ctxJev.contextoAtendimentoJev(sessaoNina.estado);
+      const conversaJev = estadoId.conversaId ?? null;
+      const [resultado, anterior] = await Promise.all([
+        jev.perguntarJev(estadoIntencao(mensagemPaciente, anteriores, contextoJev), perguntas),
+        jev.contagemAnteriorFase1(clinicaId, conversaJev, inicioCiclo),
       ]);
-      if (f1 || f2) {
-        const { perguntaIntencao, estadoIntencao, intencaoAplicavel } = await import("@/lib/nina/jev-intencao");
-        const enc = await import("@/lib/nina/jev-encaminhamento");
-        const perguntas = {
-          ...perguntaIntencao(),
-          ...(f2 ? enc.perguntasEncaminhamento() : {}),
-        };
-        const anteriores = msgsMemoria.slice(-7, -1).map((m: any) => ({
-          de: m?.direction === "inbound" ? "paciente" : "atendente",
-          texto: String(m?.body ?? "").slice(0, 500),
-        }));
-        const conversaJev = estadoId.conversaId ?? null;
-        const [resultado, duvidaAnterior] = await Promise.all([
-          jev.perguntarJev(estadoIntencao(mensagemPaciente, anteriores), perguntas),
-          f2 ? jev.duvidaAnteriorFase1(clinicaId, conversaJev) : Promise.resolve(false),
-        ]);
-        const respostas = resultado.ok ? resultado.respostas : null;
-        const escolhida = f1 && respostas ? intencaoAplicavel(respostas["intencao"]) : null;
-        if (escolhida) {
-          intencoesTurno = [escolhida];
-          intencaoAmbiguaTurno = false;
-        }
-        if (f2 && respostas) {
-          jevEncaminhamento = enc.decidirEncaminhamento(
-            respostas,
-            enc.houveDuvida(respostas["intencao"]),
-            duvidaAnterior,
-          );
-        }
-        // A Fase 1 é sempre registrada (a dúvida da mensagem seguinte depende dela).
-        void jev.registrarDecisaoJev({
-          clinicaId, conversationId: conversaJev, fase: "fase1_intencao", teste: true,
-          perguntas, resultado, aplicada: escolhida !== null,
-        });
-        if (f2) {
-          void jev.registrarDecisaoJev({
-            clinicaId, conversationId: conversaJev, fase: "fase2_encaminhamento", teste: true,
-            perguntas, resultado, aplicada: jevEncaminhamento !== null,
-          });
-        }
+      const respostas = resultado.ok ? resultado.respostas : null;
+      const escolhida = f1 && respostas ? intencaoAplicavel(respostas["intencao"]) : null;
+      if (escolhida) {
+        intencoesTurno = [escolhida];
+        intencaoAmbiguaTurno = false;
       }
-    } catch (e) {
-      console.warn("[nina-jev] fases 1/2 ignoradas:", e instanceof Error ? e.message : e);
+      const contagem = respostas
+        ? enc.contarDuvida({
+            intencao: respostas["intencao"],
+            selecaoValida: ctxJev.opcaoEscolhidaJev(mensagemPaciente, contextoJev.opcoes_oferecidas) !== null,
+            marco: ctxJev.marcoAtendimento(sessaoNina.estado),
+            anterior,
+          })
+        : null;
+      if (f2 && respostas) {
+        jevEncaminhamento = enc.decidirEncaminhamento(respostas, contagem);
+        jevPontuacoes = {
+          confianca_intencao: respostas["intencao"]?.confidence ?? null,
+          urgencia: respostas["urgencia"]?.noul ?? null,
+          pedido_atendente: respostas["pedido_atendente"]?.noul ?? null,
+          irritacao: respostas["irritacao"]?.noul ?? null,
+          falhas_seguidas: contagem?.falhas ?? null,
+        };
+      }
+      // A Fase 1 é sempre registrada: a contagem da mensagem seguinte depende dela.
+      await Promise.all([
+        jev.registrarDecisaoJev({
+          clinicaId, conversationId: conversaJev, fase: "fase1_intencao", teste: opcoes?.teste === true,
+          perguntas, resultado, aplicada: escolhida !== null, contagem,
+        }),
+        f2
+          ? jev.registrarDecisaoJev({
+              clinicaId, conversationId: conversaJev, fase: "fase2_encaminhamento", teste: opcoes?.teste === true,
+              perguntas, resultado, aplicada: jevEncaminhamento !== null,
+            })
+          : Promise.resolve(),
+      ]);
     }
+  } catch (e) {
+    console.warn("[nina-jev] fases 1/2 ignoradas:", e instanceof Error ? e.message : e);
   }
 
   // Fatos de identificação do remetente. Nome/convênio/benefício só entram
@@ -1390,7 +1345,9 @@ async function gerarRespostaNinaInterno(
     versaoId: instrucoesNina.versaoId ?? null,
     publicadoEm: instrucoesNina.publicadoEm ?? null,
     mensagemPaciente,
-    ambiente: opcoes?.teste ? "homologacao" : "producao",
+    // Igual nos dois ambientes (25/09/2026): regras publicadas "Em homologação"
+    // não mudam a conduta. A simulação é tratada pelo código, fora do modelo.
+    ambiente: "producao",
     saudacaoObrigatoria,
   });
   const saudacaoObrigatoriaEfetivaTurno = precedenciaTurno.saudacaoObrigatoria;
@@ -1408,7 +1365,9 @@ async function gerarRespostaNinaInterno(
   fluxoEstado.knowledge_context = conhecimentoAnterior;
   const runtimeContext = {
     canal: "whatsapp",
-    ambiente: opcoes?.teste ? "homologacao" : "producao",
+    // O modelo vê sempre "producao": mesma conduta nos dois ambientes. O
+    // ambiente real fica nos registros do turno e nos detalhes técnicos.
+    ambiente: "producao",
     // Dados ADMINISTRATIVOS da clínica correta (cadastro): nome oficial,
     // endereço e contatos. Não é a identidade de apresentação.
     unidade: dadosPublicos,
@@ -1689,11 +1648,17 @@ async function gerarRespostaNinaInterno(
       ? (ctx, nome, args) => executar!(ctx, nome, args as never)
       : null,
   });
+  // Aviso ao paciente que o próprio encaminhamento (protocolo) produziu neste
+  // turno. Quando ele já saiu, a Nina não manda uma segunda mensagem.
+  const avisoDoTurno: { atual: import("@/lib/atendimento/aviso-encaminhamento").ResultadoAvisoEncaminhamento | null } = { atual: null };
   const broker = {
     ...brokerSemGuarda,
     executar: async (...args: Parameters<typeof brokerSemGuarda.executar>) => {
       await conferirReserva();
-      return brokerSemGuarda.executar(...args);
+      const r = await brokerSemGuarda.executar(...args);
+      const aviso = (r.dados as { aviso?: typeof avisoDoTurno.atual } | null)?.aviso ?? null;
+      if (r.capacidade === "requestHumanHandoff" && aviso) avisoDoTurno.atual = aviso;
+      return r;
     },
   };
   // FASE 3 — as regras de handoff vivem no prompt publicado. Aqui não se
@@ -2048,11 +2013,12 @@ async function gerarRespostaNinaInterno(
     };
   }
   // JEV — Fase 2: encaminhamento decidido pelo Jev, pelo fluxo de handoff
-  // existente (em homologação, o broker só simula a transferência).
+  // existente, igual em produção e homologação.
   if (jevEncaminhamento && !finalizacaoHandoff && !turnoObsoleto) {
+    const { motivoLegivel } = await import("@/lib/nina/jev-encaminhamento");
     const argumentos = {
       motivo: jevEncaminhamento.motivo,
-      resumo: `Encaminhado pelo filtro de decisão (Jev). Última mensagem: ${mensagemPaciente.slice(0, 500)}`,
+      resumo: `Encaminhado pelo filtro de decisão (Jev): ${motivoLegivel(jevEncaminhamento.motivo)}. Última mensagem: ${mensagemPaciente.slice(0, 500)}`,
       urgencia: jevEncaminhamento.urgencia,
     };
     const rh = await broker
@@ -2068,7 +2034,10 @@ async function gerarRespostaNinaInterno(
       motivo: argumentos.motivo,
     };
     registrarEtapa({ tipo: "ferramenta", fonte: "atendimento", titulo: "Encaminhamento pelo Jev (Fase 2)",
-      dados: { motivo: argumentos.motivo, urgencia: argumentos.urgencia, handoff_confirmado: confirmado, erro: rh.erro ?? null },
+      dados: {
+        motivo: argumentos.motivo, urgencia: argumentos.urgencia, pontuacoes: jevPontuacoes,
+        handoff_confirmado: confirmado, erro: rh.erro ?? null,
+      },
       codigo: { arquivo: "src/lib/whatsapp.server.ts", funcao: "jevFase2" } });
   }
   for (let rodada = 0; rodada < MAX_RODADAS; rodada++) {
@@ -2553,7 +2522,9 @@ async function gerarRespostaNinaInterno(
           ? "catalogo.limite_esclarecimento"
           : [MOTIVO_SEM_REGISTRO, MOTIVO_MEDICO_SEM_REGISTRO].includes(finalizacaoHandoff.motivo)
             ? "catalogo.sem_registro"
-            : "agenda.sem_vagas",
+            : finalizacaoHandoff.motivo.startsWith("JEV_")
+              ? "jev.encaminhamento"
+              : "agenda.sem_vagas",
       finalizacaoHandoff.motivo,
       antes,
       resposta,
@@ -2597,17 +2568,53 @@ async function gerarRespostaNinaInterno(
     if (resumoEscolha) resumoEscolha.texto = resposta;
   }
 
-  if (!resposta && houveHandoff) {
-    const antes = resposta;
-    resposta =
-      "Certo! Já chamei uma atendente da nossa equipe para continuar com você por aqui 💛";
-    transformar("handoff.texto_padrao", "handoff sem texto do modelo", antes, resposta);
-    marcarOrigem("codigo", "texto fixo de transferência (sem texto do modelo)");
+  // MENSAGEM ÚNICA DE ENCAMINHAMENTO (25/09/2026, sessão 470): o módulo de
+  // encaminhamento já avisou o paciente com o protocolo neste turno. A Nina
+  // não produz uma segunda mensagem — em produção e na homologação.
+  let semNovaMensagem = false;
+  if (houveHandoff && avisoDoTurno.atual) {
+    const { precisaAvisoDoChamador } = await import("@/lib/atendimento/aviso-encaminhamento");
+    if (!precisaAvisoDoChamador(avisoDoTurno.atual)) {
+      const aviso = avisoDoTurno.atual;
+      transformar("handoff.aviso_unico", "aviso do encaminhamento já entregue pelo protocolo", resposta, "");
+      resposta = "";
+      semNovaMensagem = true;
+      marcarOrigem("nenhuma", "aviso de encaminhamento já entregue pelo protocolo neste turno");
+      const { criarResultadoSemNovaMensagem } = await import("@/lib/nina/resposta/contrato");
+      if (opcoes?.auditoria)
+        opcoes.auditoria.resultado = criarResultadoSemNovaMensagem({
+          estado: aviso.entregue ? "confirmado" : "envio_pendente",
+          chaveOperacao: aviso.chave,
+          mensagemId: aviso.mensagemId,
+          protocolo: aviso.protocolo,
+          texto: aviso.texto,
+        });
+    }
   }
 
-  // Aviso explícito ao paciente: ele precisa saber que saiu da IA e foi para
-  // uma pessoa. A frase é fixa para nunca depender do humor do modelo.
-  if (houveHandoff && !(opcoes?.teste && [MOTIVO_SEM_REGISTRO, MOTIVO_MEDICO_SEM_REGISTRO, MOTIVO_MEDICO_NAO_IDENTIFICADO].includes(finalizacaoHandoff?.motivo ?? ""))) {
+  // Sem aviso do protocolo: a própria Nina avisa. Na homologação o aviso é de
+  // simulação — nenhuma atendente real é acionada, então a frase de que uma
+  // atendente assume nunca é acrescentada.
+  if (!semNovaMensagem && houveHandoff && opcoes?.teste) {
+    if (!resposta) {
+      resposta = respostaSemRegistro(true, true);
+      transformar("handoff.texto_padrao", "handoff sem texto do modelo (simulação)", "", resposta);
+      marcarOrigem("codigo", "texto fixo de transferência simulada (sem texto do modelo)");
+    } else if (!/simulação/i.test(resposta)) {
+      const antes = resposta;
+      resposta = `${resposta.trim()}\n\n${AVISO_SIMULACAO_ENCAMINHAMENTO}`;
+      transformar("handoff.aviso", "aviso de encaminhamento simulado", antes, resposta);
+    }
+  } else if (!semNovaMensagem && houveHandoff) {
+    if (!resposta) {
+      const antes = resposta;
+      resposta =
+        "Certo! Já chamei uma atendente da nossa equipe para continuar com você por aqui 💛";
+      transformar("handoff.texto_padrao", "handoff sem texto do modelo", antes, resposta);
+      marcarOrigem("codigo", "texto fixo de transferência (sem texto do modelo)");
+    }
+    // Aviso explícito ao paciente: ele precisa saber que saiu da IA e foi para
+    // uma pessoa. A frase é fixa para nunca depender do humor do modelo.
     const AVISO_TRANSFERENCIA =
       "*Transferido para atendimento humano.* Você não está mais falando com a Nina — uma atendente da equipe assume esta conversa e responde por aqui mesmo.";
     if (!resposta.includes("Transferido para atendimento humano")) {
@@ -2617,8 +2624,7 @@ async function gerarRespostaNinaInterno(
     }
   }
 
-
-  if (!resposta) {
+  if (!resposta && !semNovaMensagem) {
     const antes = resposta;
     resposta =
       "Consegui iniciar aqui, mas preciso de um instante — vou pedir para uma atendente concluir com você.";

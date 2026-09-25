@@ -71,6 +71,14 @@ export function encaminhamentoSemRegistro(r: ResultadoBroker, args: unknown, aut
   };
 }
 
+/**
+ * Aviso de simulação acrescentado a TODO encaminhamento na homologação: lá a
+ * decisão de encaminhar é a mesma da produção, mas nenhuma atendente real é
+ * acionada (regra mantida a pedido da clínica em 25/09/2026).
+ */
+export const AVISO_SIMULACAO_ENCAMINHAMENTO =
+  "Nesta simulação, nenhuma transferência para uma atendente real foi realizada.";
+
 export function respostaSemRegistro(confirmado: boolean, teste = false): string {
   if (teste) return confirmado
     ? "Nesta simulação, registrei que este atendimento deve continuar com a equipe humana. Nenhuma transferência para uma atendente real foi realizada."

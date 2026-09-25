@@ -52,7 +52,11 @@ export function validarRespostas(
   return answers;
 }
 
-/** Jev só vale em homologação e com a flag da fase explicitamente ligada. */
-export function jevPermitido(teste: boolean, flagAtiva: boolean): boolean {
-  return teste === true && flagAtiva === true;
+/**
+ * Jev vale igual em produção e homologação (decisão de 25/09/2026: a Nina se
+ * comporta da mesma forma nos dois ambientes). Só a flag da fase, ligada
+ * explicitamente na clínica, decide. O ambiente fica registrado nas decisões.
+ */
+export function jevPermitido(_teste: boolean, flagAtiva: boolean): boolean {
+  return flagAtiva === true;
 }

@@ -33,7 +33,6 @@ import { diaDaSemanaISO } from "./horario-oficial";
 import { atendimentoExigeHumano } from "./regras-catalogo.server";
 import { MOTIVO_SFP } from "./regras-catalogo";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
-import { isCPFValido, somenteDigitos } from "@/lib/cpf";
 import { normalizar, raizEspecialidade } from "@/lib/nina-especialidade";
 import { cadastroAutorizado, cadastroMinimoSchema } from "./cadastro-paciente";
 import { conhecimentoDaMesmaSessao } from "./confidence/conhecimento-sessao";
@@ -1235,12 +1234,12 @@ async function executarFerramentaInterna(
           dia: p.dia ?? null,
           canal: "whatsapp",
         });
-        // JEV — Fase 3 (só homologação, flag `nina_jev_fase3`): a busca normal
-        // não achou nada → o Jev escolhe na lista publicada. Erro/dúvida = como hoje.
-        if (resultado.knowledge_status === "not_found" && !p.medico && (ctx.teste || ctx.origem === "homologacao")) {
+        // JEV — Fase 3 (produção e homologação, flag `nina_jev_fase3`): a busca
+        // normal não achou nada → o Jev escolhe na lista publicada. Erro/dúvida = como hoje.
+        if (resultado.knowledge_status === "not_found" && !p.medico) {
           try {
             const jev = await import("@/lib/nina/jev.server");
-            if (await jev.jevAtivo(ctx.clinicaId, "fase3_especialidade", true)) {
+            if (await jev.jevAtivo(ctx.clinicaId, "fase3_especialidade", ctx.teste === true)) {
               const { lerPublicados } = await import("@/lib/nina/catalogo-turno.server");
               const esp = await import("@/lib/nina/jev-especialidade");
               const [servicos, profissionais] = await Promise.all([
@@ -1261,7 +1260,7 @@ async function executarFerramentaInterna(
                 }
                 void jev.registrarDecisaoJev({
                   clinicaId: ctx.clinicaId, conversationId: ctx.conversaId, fase: "fase3_especialidade",
-                  teste: true, perguntas: { termo: p.termo, opcoes: opcoes.length } as never, resultado: r, aplicada,
+                  teste: ctx.teste === true || ctx.origem === "homologacao", perguntas: { termo: p.termo, opcoes: opcoes.length } as never, resultado: r, aplicada,
                 });
               }
             }
@@ -1773,16 +1772,16 @@ async function executarFerramentaInterna(
           campos_faltantes: [...new Set(p.error.issues.map(i => String(i.path[0])))],
         });
         const dados = p.data;
-        const cpfInformado = somenteDigitos(entrada.cpf ?? "");
-        const cpf = isCPFValido(cpfInformado) ? cpfInformado : null;
 
         // A mesma RPC resolve ambos os ambientes. A conversa persistida
         // determina o escopo de teste; nome, nascimento e telefone são reais
         // dentro da simulação, sem substituir por um paciente fixo do lead.
+        // CPF não identifica nem cadastra (regra da clínica, 25/09/2026): a
+        // identidade é o número do WhatsApp, o nome completo e o nascimento.
         const { data, error } = await supabaseAdmin.rpc("nina_resolver_cadastro", {
           _clinica_id: ctx.clinicaId,
           _conversa_id: ctx.conversaId,
-          _cpf: ctx.teste || ctx.origem === "homologacao" ? null : cpf,
+          _cpf: null,
           _nome: dados.nome,
           _data_nascimento: dados.data_nascimento,
           _telefone: dados.telefone,

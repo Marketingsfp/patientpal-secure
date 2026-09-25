@@ -7,10 +7,11 @@ const perguntas: Record<string, PerguntaJev> = {
 };
 
 describe("Jev na Nina", () => {
-  test("só vale em homologação com flag ligada", () => {
+  test("vale igual em produção e homologação; só a flag da fase decide", () => {
     expect(jevPermitido(true, true)).toBe(true);
-    expect(jevPermitido(false, true)).toBe(false);
+    expect(jevPermitido(false, true)).toBe(true);
     expect(jevPermitido(true, false)).toBe(false);
+    expect(jevPermitido(false, false)).toBe(false);
   });
   test("aceita respostas completas", () => {
     const r = validarRespostas(perguntas, { answers: { intencao: { choice: "agendar", confidence: 0.9 }, humano: { noul: 0.1 } } });

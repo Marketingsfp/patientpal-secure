@@ -1,22 +1,35 @@
 /**
- * (Fase 2) `duvidaAnteriorFase1`: a mensagem anterior desta conversa também
- * ficou sem entendimento (confiança da intenção abaixo de 0,8)?
+ * (Fase 2) Contagem de falhas de entendimento até a mensagem anterior deste
+ * ciclo, gravada em `respostas._nina` da última decisão da Fase 1. Decisões
+ * antigas (sem contagem) valem como uma falha sem marco, então não somam com
+ * a atual: a regra nova nunca encaminha por causa de um registro antigo.
  */
-export async function duvidaAnteriorFase1(clinicaId: string | null, conversationId: string | null): Promise<boolean> {
-  if (!clinicaId || !conversationId) return false;
+export async function contagemAnteriorFase1(
+  clinicaId: string | null,
+  conversationId: string | null,
+  desde?: string | null,
+): Promise<import("./jev-encaminhamento").ContagemDuvida | null> {
+  if (!clinicaId || !conversationId) return null;
   const { supabaseAdmin: db } = await import("@/integrations/supabase/client.server");
-  const { data, error } = await db
+  let consulta = db
     .from("nina_jev_decisoes" as never)
     .select("respostas")
     .eq("clinica_id", clinicaId)
     .eq("conversation_id", conversationId)
-    .eq("fase", "fase1_intencao")
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  if (error || !data) return false;
-  const conf = (data as { respostas?: { intencao?: { confidence?: unknown } } | null }).respostas?.intencao?.confidence;
-  return typeof conf === "number" && conf < 0.8;
+    .eq("fase", "fase1_intencao");
+  if (desde && Number.isFinite(Date.parse(desde))) consulta = consulta.gte("created_at", desde);
+  const { data, error } = await consulta.order("created_at", { ascending: false }).limit(1).maybeSingle();
+  if (error || !data) return null;
+  const respostas = (data as { respostas?: Record<string, unknown> | null }).respostas ?? null;
+  const salva = respostas?.["_nina"] as Partial<import("./jev-encaminhamento").ContagemDuvida> | undefined;
+  if (salva && typeof salva.falhas === "number" && typeof salva.marco === "string")
+    return {
+      falhas: salva.falhas,
+      marco: salva.marco,
+      confiancas: Array.isArray(salva.confiancas) ? salva.confiancas.filter((c) => typeof c === "number") : [],
+    };
+  const conf = (respostas?.["intencao"] as { confidence?: unknown } | undefined)?.confidence;
+  return typeof conf === "number" && conf < 0.8 ? { falhas: 1, marco: "", confiancas: [conf] } : null;
 }
 
 /**
@@ -39,8 +52,9 @@ export const MODELO_JEV = "typesafe/jev-latest";
 /** Limite para não atrasar a resposta ao paciente; ao estourar, segue o fluxo atual. */
 const LIMITE_MS = 4000;
 
+/** Igual em produção e homologação: só a flag da fase na clínica decide. */
 export async function jevAtivo(clinicaId: string | null, fase: FaseJev, teste: boolean): Promise<boolean> {
-  if (!teste || !clinicaId) return false;
+  if (!clinicaId) return false;
   const { data, error } = await supabaseAdmin
     .from("clinica_feature_flags")
     .select("ativo")
@@ -97,6 +111,8 @@ export async function registrarDecisaoJev(r: {
   perguntas: Record<string, PerguntaJev>;
   resultado: ResultadoJev;
   aplicada: boolean;
+  /** Fase 1: contagem de falhas de entendimento deste turno (lida no próximo). */
+  contagem?: import("./jev-encaminhamento").ContagemDuvida | null;
 }): Promise<void> {
   try {
     await supabaseAdmin.from("nina_jev_decisoes" as never).insert({
@@ -105,7 +121,9 @@ export async function registrarDecisaoJev(r: {
       fase: r.fase,
       teste: r.teste,
       perguntas: Object.keys(r.perguntas),
-      respostas: r.resultado.ok ? r.resultado.respostas : null,
+      respostas: r.resultado.ok
+        ? { ...r.resultado.respostas, ...(r.contagem ? { _nina: r.contagem } : {}) }
+        : null,
       aplicada: r.aplicada,
       latency_ms: r.resultado.latencyMs,
       erro: r.resultado.ok ? null : r.resultado.motivo,

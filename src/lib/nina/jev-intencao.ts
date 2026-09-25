@@ -32,14 +32,22 @@ export function perguntaIntencao(): Record<string, PerguntaJev> {
     intencao: {
       type: "choice",
       instructions:
-        "Qual é o pedido principal do paciente na `mensagem_atual`? Use `mensagens_anteriores` só como contexto para entender respostas curtas.",
+        "Qual é o pedido principal do paciente na `mensagem_atual`? Use `mensagens_anteriores` (em ordem cronológica) e `contexto_atendimento` (etapa atual e opções já oferecidas) só como contexto para entender respostas curtas, como a escolha de uma das opções oferecidas.",
       criteria: OPCOES,
     },
   };
 }
 
-export function estadoIntencao(mensagemAtual: string, anteriores: Array<{ de: string; texto: string }>) {
-  return { mensagem_atual: mensagemAtual, mensagens_anteriores: anteriores.slice(-6) };
+export function estadoIntencao(
+  mensagemAtual: string,
+  anteriores: Array<{ de: string; texto: string }>,
+  contexto?: Record<string, unknown>,
+) {
+  return {
+    mensagem_atual: mensagemAtual,
+    mensagens_anteriores: anteriores.slice(-6),
+    ...(contexto ? { contexto_atendimento: contexto } : {}),
+  };
 }
 
 /** Devolve a intenção a aplicar, ou null (segue a leitura atual). */

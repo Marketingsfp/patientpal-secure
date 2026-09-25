@@ -209,8 +209,9 @@ export const HISTORICO_ARQUITETURA: VersaoArquitetura[] = [
     quantidadeTools: contarTools(SNAPSHOT_ATUAL),
     alteracoes: [
       "Revisão completa do mapa contra o código de 25/09/2026: modelo único Gemini 3.8 Flash, sem escolha por clínica.",
-      "Entraram no mapa etapas que já existiam no código: transcrição de áudio, resposta a lembrete de consulta, código de verificação do site, agrupamento e trava do turno, vigia do turno, descarte de resposta obsoleta, correção de agendamento não confirmado, escolha do horário, Jev na homologação e limpeza automática de registros.",
+      "Entraram no mapa etapas que já existiam no código: transcrição de áudio, resposta a lembrete de consulta, código de verificação do site, agrupamento e trava do turno, vigia do turno, descarte de resposta obsoleta, correção de agendamento não confirmado, escolha do horário, filtro de decisão (Jev) e limpeza automática de registros.",
       "Descrições corrigidas: assinatura inválida é registrada, mas a mensagem nunca é descartada; falhas passam pelo vigia, que encaminha para a equipe; a avaliação posterior começa pelo Jev.",
+      "Mesma conduta nos dois ambientes: Jev em produção e homologação, uma única mensagem de transferência (na homologação, com aviso de simulação e sem atendente real), sem busca de paciente por telefone e sem CPF no cadastro.",
       "Saiu do mapa a Oferta completa de horários, que não era usada pelo atendimento.",
       "O aviso do topo passou a conferir o mapa com o código (ferramentas e modelo) em vez de comparar números de versão.",
     ],

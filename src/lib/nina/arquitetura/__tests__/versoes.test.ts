@@ -102,7 +102,7 @@ describe("comparação entre versões", () => {
     expect(c.de.versao).toBe(5);
     expect(c.para.versao).toBe(6);
     expect(c.nodes.removidos).toEqual(["offer.complete"]);
-    for (const id of ["audio.transcribe", "reminder.reply", "turn.batch", "turn.watchdog", "test.jev"])
+    for (const id of ["audio.transcribe", "reminder.reply", "turn.batch", "turn.watchdog", "jev.filtro"])
       expect(c.nodes.adicionados).toContain(id);
     expect(c.para.modelo).toBe("google/gemini-3.8-flash");
     expect(c.de.modelo).toBe("google/gemini-2.5-flash");
