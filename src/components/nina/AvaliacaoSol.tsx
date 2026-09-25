@@ -204,7 +204,7 @@ export function AvaliacaoSol({ clinicaId, leadId, podeAvaliar }: Props) {
         disabled={!leadId}
         onClick={() => setAberto(true)}
       >
-        <Gavel className="mr-1 h-3.5 w-3.5" /> Avaliar com Sol
+        <Gavel className="mr-1 h-3.5 w-3.5" /> Avaliar com Opus 5.5
       </Button>
 
       <Dialog open={aberto} onOpenChange={setAberto}>

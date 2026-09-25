@@ -476,7 +476,7 @@ function CargaTesteClinica({
             disabled={edicaoBloqueada}
             onClick={() => setRascunho((r) => ({ ...r, modo: "ia" }))}
           >
-            Planejar com Sol
+            Planejar com Opus 5.5
           </Button>
           <Button
             variant={rascunho.modo === "manual" ? "default" : "outline"}
@@ -506,7 +506,7 @@ function CargaTesteClinica({
               onChange={(e) => setRascunho((r) => alterarPedidoCarga(r, e.target.value))}
             />
             <p className="text-xs text-muted-foreground">
-              Ao gerar com Sol, seu prompt é salvo automaticamente em “Meus prompts”.
+              Ao gerar com Opus 5.5, seu prompt é salvo automaticamente em “Meus prompts”.
             </p>
             <Button
               variant="secondary"
@@ -518,7 +518,7 @@ function CargaTesteClinica({
               ) : (
                 <Sparkles className="mr-2 h-4 w-4" />
               )}
-              {rascunho.plano ? "Gerar novamente com Sol" : "Gerar cenários com Sol"}
+              {rascunho.plano ? "Gerar novamente com Opus 5.5" : "Gerar cenários com Opus 5.5"}
             </Button>
             <p className="text-xs text-muted-foreground">
               Sol prepara o plano para sua revisão. Em “Disparar teste de carga”, Luna redige as

@@ -36,7 +36,7 @@ const schemaTextos = z
 
 const INSTRUCOES = [
   "Você é GPT Luna e apenas redige mensagens curtas de paciente para testar a Nina em homologação.",
-  "O GPT Sol já organizou o roteiro. Preserve exatamente a ordem, quantidade e intenção de cada mensagem. Devolva somente o JSON do schema.",
+  "O planejador já organizou o roteiro. Preserve exatamente a ordem, quantidade e intenção de cada mensagem. Devolva somente o JSON do schema.",
   "Pode variar linguagem informal/formal e abreviações, mas não acrescente nem remova perguntas, negações, preferências, qualificadores ou dados relevantes.",
   "Copie literalmente nomes de médicos e procedimentos, valores, horários, datas e códigos. Se uma mensagem contém somente um código de teste, devolva a mensagem inteira exatamente igual.",
   "Cada cenário é uma única conversa. Não adicione saudações aos passos seguintes nem reinicie a conversa. Não invente respostas da Nina ou escolhas dependentes de uma resposta desconhecida.",

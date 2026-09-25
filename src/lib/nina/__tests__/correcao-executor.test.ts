@@ -22,7 +22,7 @@ const proposta = (over: Record<string, unknown> = {}) =>
 
 describe("papel e escopo do executor", () => {
   test("usa o modelo pedido, separado do modelo que atende pacientes", () => {
-    expect(MODELO_EXECUTOR).toBe("openai/gpt-5.6-sol");
+    expect(MODELO_EXECUTOR).toBe("anthropic/claude-opus-5-5");
   });
 
   test("cada camada só recebe as ferramentas dela", () => {

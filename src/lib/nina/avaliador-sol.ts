@@ -16,7 +16,7 @@
  * Este módulo é puro (sem rede e sem banco) para ser testável.
  */
 
-export const MODELO_SOL = "openai/gpt-5.6-sol";
+export const MODELO_SOL = "anthropic/claude-opus-5-5";
 export const VERSAO_RUBRICA = "sol-v1";
 
 export type Dimensao =

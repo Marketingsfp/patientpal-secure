@@ -37,7 +37,7 @@ const base = {
 
 describe("análise assistida — modelo e mascaramento", () => {
   it("usa o modelo pedido para a análise, separado da Nina", () => {
-    expect(MODELO_ANALISE).toBe("openai/gpt-5.6-sol");
+    expect(MODELO_ANALISE).toBe("anthropic/claude-opus-5-5");
   });
 
   it("mascara dados pessoais desnecessários", () => {

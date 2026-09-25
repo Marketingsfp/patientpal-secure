@@ -54,7 +54,7 @@ const base = (over: Partial<EntradaRelatorio> = {}): EntradaRelatorio => ({
   trabalho: {
     execucaoId: "ex-1",
     solicitadoPor: "user-1",
-    modelo: "openai/gpt-5.6-sol",
+    modelo: "anthropic/claude-opus-5-5",
     provedor: "Lovable AI Gateway",
     inicio: "2026-09-12T01:00:00Z",
     fim: "2026-09-12T01:00:42Z",

@@ -13,7 +13,7 @@ import { REGRA_MODALIDADES_CONFIRMADAS } from "./regras-administrativas-confirma
 import { DIAS_SEMANA, RECORRENCIAS, normalizarHora, paraNumero } from "./catalogo";
 
 /** Modelo pedido pela clínica para esta funcionalidade. */
-export const MODELO_CATALOGO_IA = "openai/gpt-5.6-sol";
+export const MODELO_CATALOGO_IA = "anthropic/claude-opus-5-5";
 
 export type TipoCatalogo = "servico" | "profissional";
 

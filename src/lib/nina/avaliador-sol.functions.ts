@@ -26,7 +26,6 @@ import {
 } from "@/lib/nina/avaliador-sol";
 import { TIPOS_CRITERIO } from "@/lib/nina/cenarios";
 
-const GATEWAY = "https://ai.gateway.lovable.dev/v1/responses";
 
 type Ctx = { supabase: any; userId: string };
 
@@ -50,22 +49,14 @@ async function chamarSol(
   const apiKey = process.env["LOVABLE_API_KEY"];
   if (!apiKey) throw new Error("Avaliação indisponível: chave do provedor de IA não configurada.");
 
-  const res = await fetch(GATEWAY, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Lovable-API-Key": apiKey,
-      "X-Lovable-AIG-SDK": "fetch",
-    },
-    body: JSON.stringify({
+  const res = await (await import("@/lib/nina/claude-messages.server")).chamarClaudeComoResponses({
       model: garantirPapel("avaliador", MODELO_SOL),
       instructions: instrucoes,
       input,
       stream: true,
       store: false,
       max_output_tokens: 4000,
-    }),
-  });
+    });
 
   if (!res.ok || !res.body) {
     const corpo = await res.text().catch(() => "");

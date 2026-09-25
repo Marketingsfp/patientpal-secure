@@ -112,7 +112,7 @@ export function montarPipelineHomologacao(
 
   fases.push({
     id: "avaliacao",
-    rotulo: "Avaliação (GPT Sol)",
+    rotulo: "Avaliação (Claude Opus 5.5)",
     descricao: "Executada depois da conversa; não influencia a resposta gerada",
     ocorreu: Boolean(opcoes?.avaliacaoSol),
     status: opcoes?.avaliacaoSol ? "ok" : null,

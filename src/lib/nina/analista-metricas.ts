@@ -11,7 +11,7 @@
  */
 import { partesNoFuso } from "@/lib/nina/metricas-filtros";
 
-export const MODELO_ANALISTA = "openai/gpt-5.6-sol";
+export const MODELO_ANALISTA = "anthropic/claude-opus-5-5";
 export const VERSAO_ANALISTA = "fase8.1";
 /** Rodadas de ferramenta por pergunta (limita consumo). */
 export const MAX_RODADAS_FERRAMENTA = 4;
