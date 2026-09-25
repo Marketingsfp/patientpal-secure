@@ -1,51 +1,38 @@
-# Integração de chamada de senhas com as TVs (LUMEN)
+# Trocar GPT 5.6 Sol por Claude Opus 5.5
 
-**Tipo:** integração externa + banco (senhas é área crítica) + uma tela nova de configuração.
+## O que muda
+Hoje o GPT 5.6 Sol é usado em 6 recursos internos (nenhum conversa com paciente):
 
-## O que muda para a clínica
-Quando alguém **chama** uma senha, o sistema avisa o LUMEN, que mostra a chamada nas TVs. Emitir, chamar e atender senhas continua igual. Se o LUMEN estiver fora do ar, a senha funciona normalmente e só o aviso à TV se perde.
+1. Avaliação Sol (nota das execuções de homologação)
+2. Analista de métricas da Nina (com consultas somente leitura)
+3. Análise de erro da Nina
+4. Criar/editar catálogo com IA
+5. Planejador de teste de carga
+6. Executor de correção assistida
 
-## Escopo
-- **Dentro:** 2 tabelas novas, 1 gatilho novo em `senhas`, 1 tela nova de configuração, a configuração inicial da POLICLINICA SAO FRANCISCO DE PAULA.
-- **Fora:** nenhuma tela, regra, função ou tabela existente muda. Hoje `senhas` não tem nenhum gatilho, então não há nada para conflitar.
+Todos passam a usar `anthropic/claude-opus-5-5`. A conversa da Nina com pacientes (Gemini 3.8), o simulador de paciente (Terra) e a geração de carga (Luna) **não mudam**.
 
-## 1. Banco (uma migração)
-- `lumen_tv_config`: exatamente as colunas pedidas, índice único por `clinica_id`. Acesso (ler e gravar) só para quem administra a clínica (`can_manage_clinica`, mesma regra de `integration_secrets`). Nada para `anon`.
-- `lumen_tv_envios`: `id`, `clinica_id`, `senha_id`, `codigo`, `enviado_em`, `request_id`. Só leitura, e só para quem administra a clínica. Só o gatilho grava.
-- Gatilho `AFTER UPDATE OF status` em `senhas`, com condição `WHEN (OLD.status IS DISTINCT FROM NEW.status AND NEW.status = 'chamada')`. Assim ele nem roda nas outras atualizações.
-- Função `SECURITY DEFINER` com `search_path = public`, com tudo dentro de `EXCEPTION WHEN OTHERS THEN NULL`. Ela busca a configuração ativa (se não houver, sai sem fazer nada), monta `code`, `desk`, `patientName` (só se `enviar_nome`) e `screenPairCodes` (só se houver códigos), chama `net.http_post` com um limite de 5 s (é assíncrono e não segura a chamada) e grava em `lumen_tv_envios`.
-- **Limpeza dos 30 dias:** uma rotina diária com `pg_cron`, que já está ligado. Fica fora do gatilho para não pesar na chamada da senha.
-- O `pg_net` já está habilitado. A migração só usa `create extension if not exists`.
+## Por que não é só trocar o nome
+O Opus 5.5 usa outro formato de chamada no Gateway. Cada um dos 6 recursos precisa ter a chamada reescrita:
+- mudar o endereço e o formato do pedido;
+- mudar como o formato fixo de resposta (JSON) é pedido;
+- no Analista, adaptar as ferramentas de consulta: o Opus 5.5 só aceita que ele mesmo escolha usar a ferramenta, então é preciso tratar o caso em que ele responde sem consultar;
+- ler a resposta em partes no novo formato e tratar recusa/negativa como fim do pedido.
 
-## 2. Botão de teste
-Uma função de servidor, liberada só para quem administra a clínica, que lê a configuração pelo servidor e faz um POST de teste com o código `TESTE`. Ela mostra o status HTTP e a resposta. O token nunca volta para o navegador.
+## Riscos e pontos de atenção
+- **LGPD / retenção de dados:** o Opus 5.5 **guarda dados no fornecedor** (diferente do GPT, que é sem retenção). O espaço de trabalho de vocês permite, mas Análise de erro, Analista e Executor recebem trechos de conversas e podem conter dados de pacientes. Possível regra de negócio — validar com a equipe da clínica.
+- **Custo e velocidade:** o Opus 5.5 costuma ser mais caro e mais lento que o Sol.
+- **Rótulos:** telas e registros que mostram "GPT Sol" passam a mostrar "Claude Opus 5.5". O registro de papéis de modelo (que bloqueia modelo errado) será atualizado junto.
+- Histórico antigo continua mostrando "gpt-5.6-sol" nas execuções passadas (não será alterado).
 
-## 3. Tela
-Nova aba **"TVs (LUMEN)"** dentro de Configurações → Painel/Totem, seguindo as abas que já existem. Ela tem:
-- endereço;
-- token em campo de senha (depois de salvo, só aparecem os últimos 4 caracteres, e o campo vazio mantém o token atual);
-- códigos de pareamento;
-- chave "Ativo";
-- chave "Enviar nome do paciente", desligada por padrão, com um aviso destacado: "A TV fica na sala de espera; ligar isto mostra o nome do paciente para todos os presentes";
-- botão "Enviar chamada de teste";
-- lista dos últimos 20 envios, com o status da resposta vindo do `pg_net`.
+## Fora do escopo
+Modelo da Nina, voz, transcrição, Terra, Luna, banco de dados e dados históricos.
 
-O token só é lido pela função de servidor, que mostra ao navegador apenas os 4 últimos caracteres.
+## Validação
+- Testes automáticos dos 6 recursos e checagem de código.
+- Uma chamada real simples por recurso (sem gravar nada em produção), conferindo resposta, JSON e, no Analista, uma ida e volta de ferramenta.
+- Nada publicado sem sua autorização.
 
-## 4. Configuração inicial
-Insiro o registro da POLICLINICA SAO FRANCISCO DE PAULA com os valores informados (url, token, pair_codes nulo, enviar_nome falso, ativo).
-
-## 5. Verificação (sem tocar em senha real)
-Não vou mudar senhas finalizadas antigas: isso alteraria o histórico e poderia aparecer no painel de senhas de hoje. No lugar disso:
-1. Crio uma senha de teste com o código `TESTE-LUMEN`, numa data antiga (2000-01-01), com o status "emitida", e passo para "chamada". Mostro a linha em `lumen_tv_envios` e a resposta no `pg_net` (esperado: HTTP 200 `{"ok":true,"screens":0}`).
-   - **Atenção:** a TV do LUMEN pode chegar a exibir "TESTE-LUMEN" por um instante, se alguma tela já estiver ligada.
-2. Aponto a url para um endereço inválido, repito com outra senha de teste e mostro que a atualização conclui normalmente. Depois volto a url correta.
-3. Apago as senhas de teste e os registros de envio delas.
-
-Mostro todos os resultados antes de dizer que está pronto. Nada é publicado.
-
-## Riscos e como desfazer
-- **Risco baixo:** o envio é assíncrono e qualquer erro é engolido.
-- **Para desligar na hora:** desmarcar "Ativo" na tela.
-- **Para desfazer tudo:** `drop trigger` em `senhas`.
-- O token fica gravado no banco, como você pediu. Só administradores da clínica conseguem lê-lo.
+## Detalhes técnicos
+- Criar um helper servidor único `claude-messages.server.ts` (POST `/v1/messages`, `stream: true`, `output_config.format` para JSON, `output_config.effort` explícito, leitura SSE até `message_stop`, `stop_reason: "refusal"` e 403 terminais).
+- Arquivos: `avaliador-sol*`, `analista-metricas*`, `analise-erro*`, `catalogo-ia*`, `carga-planejamento*`, `correcao-executor*`, `papeis-modelos.ts` e os testes correspondentes.
