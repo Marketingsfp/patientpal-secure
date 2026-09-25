@@ -280,6 +280,46 @@ async function montarDossie(
   };
 }
 
+/**
+ * Notas pelo Jev (flag `nina_jev_fase5`). Devolve null quando o Jev está
+ * desligado, falha ou o dossiê não cabe — aí o Opus avalia como antes.
+ */
+async function avaliarComJev(
+  clinicaId: string,
+  conversaId: string,
+  dossieTexto: string,
+): Promise<{ avaliacao: ReturnType<typeof parseAvaliacaoSol>; precisaOpus: boolean } | null> {
+  try {
+    const { jevAtivo, perguntarJev, registrarDecisaoJev } = await import("@/lib/nina/jev.server");
+    if (!(await jevAtivo(clinicaId, "fase5_avaliacao", true))) return null;
+    const mod = await import("@/lib/nina/jev-avaliacao");
+    const perguntas = mod.perguntasAvaliacao();
+    if (dossieTexto.length > mod.LIMITE_ESTADO_CARACTERES) {
+      await registrarDecisaoJev({ clinicaId, conversationId: conversaId, fase: "fase5_avaliacao", teste: true,
+        perguntas, resultado: { ok: false, motivo: "dossie_grande_demais", latencyMs: 0 }, aplicada: false });
+      return null;
+    }
+    const resultado = await perguntarJev({ dossie: dossieTexto }, perguntas, 60_000);
+    if (!resultado.ok) {
+      await registrarDecisaoJev({ clinicaId, conversationId: conversaId, fase: "fase5_avaliacao", teste: true,
+        perguntas, resultado, aplicada: false });
+      return null;
+    }
+    const a = mod.interpretarAvaliacao(resultado.respostas);
+    const precisaOpus = mod.precisaOpus(a.resultado);
+    await registrarDecisaoJev({ clinicaId, conversationId: conversaId, fase: "fase5_avaliacao", teste: true,
+      perguntas, resultado, aplicada: !precisaOpus });
+    return {
+      precisaOpus,
+      avaliacao: { resultado: a.resultado, score: a.score, resumo: mod.resumoJev(a), dimensoes: a.dimensoes,
+        achados: [], lacunas: [] },
+    };
+  } catch (e) {
+    console.warn("[nina-jev] avaliação pelo Jev falhou:", e instanceof Error ? e.message : e);
+    return null;
+  }
+}
+
 function descreverCriterio(c: any): string {
   const rotulo = TIPOS_CRITERIO.find((t) => t.valor === c?.tipo)?.rotulo ?? String(c?.tipo ?? "");
   return c?.valor ? `${rotulo}: ${c.valor}` : rotulo;
