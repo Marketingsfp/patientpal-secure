@@ -343,6 +343,24 @@
   --hhp-shadow-hair: 0 1px 2px rgba(0, 0, 0, 0.35);
   --hhp-shadow-card: 0 1px 3px rgba(0, 0, 0, 0.45), 0 1px 2px rgba(0, 0, 0, 0.35);
   --hhp-shadow-lift: 0 8px 24px -12px rgba(0, 0, 0, 0.65);
+
+  /* Realce de marca da tela de portais. No claro é uma pastilha lilás bem
+   * clara com texto índigo escuro; no escuro os dois precisam inverter, senão
+   * o realce do hover vira uma pastilha branca no meio da tela escura. As
+   * demais cores de marca (--brand-1 e companhia) são tons médios, usados em
+   * degradês e brilhos, e funcionam nos dois temas. */
+  --brand-tint: oklch(0.30 0.055 275);
+  --brand-tint-border: oklch(0.42 0.11 272);
+  --brand-tint-text: oklch(0.86 0.06 274);
+}
+
+/* São Francisco de Paula no escuro: mesmo realce, na família verde.
+ * A classe `dark` e o atributo `data-clinica` ficam os dois no <html>, então
+ * é um seletor só, com as duas condições no mesmo elemento. */
+html.dark[data-clinica="sao-francisco"] {
+  --brand-tint: oklch(0.30 0.045 160);
+  --brand-tint-border: oklch(0.44 0.10 158);
+  --brand-tint-text: oklch(0.87 0.09 158);
 }
 
 @layer base {
@@ -1768,6 +1786,20 @@ html.dark.agenda-v2-active .agenda-v2-scope header {
   .dark :where(.border-violet-100) { border-color: color-mix(in oklab, #8b5cf6 22%, transparent); }
   .dark :where(.border-violet-200) { border-color: color-mix(in oklab, #8b5cf6 30%, transparent); }
   .dark :where(.border-violet-300) { border-color: color-mix(in oklab, #8b5cf6 38%, transparent); }
+
+  /* Tons -500 que ficam no limite sobre o card (#1E293B). A varredura de
+   * texto mediu todos os usados no sistema: rose 3,90, indigo 3,20, blue 3,89
+   * e red 3,84 ficam abaixo do mínimo 4,5 da WCAG AA. Sobem um degrau, para
+   * -400, que passa (5,11 / 4,67 / 5,55 / 5,06).
+   *
+   * Os outros -500 em uso (amber 6,85, emerald 5,91, sky 5,41, orange 5,07)
+   * já passam e ficam como estão — clareá-los seria mudar a tela à toa.
+   * Nenhum dos quatro aparece sobre fundo colorido forte, conferido em
+   * src/**, então clarear o texto não inverte nenhum par. */
+  .dark :where(.text-rose-500) { color: #ff637e; }
+  .dark :where(.text-indigo-500, .text-indigo-500\/70) { color: #7c86ff; }
+  .dark :where(.text-blue-500) { color: #51a2ff; }
+  .dark :where(.text-red-500) { color: #ff6467; }
 
   /* Linhas internas das tabelas acompanham a borda da paleta. */
   .dark :where(table) :where(th, td) {

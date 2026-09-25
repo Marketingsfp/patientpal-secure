@@ -253,7 +253,7 @@ export function PatientDrawer({
           </div>
 
           {/* 5. Sugestões IA (estrutura visual) */}
-          <div className="px-6 py-4 border-b border-slate-100 bg-gradient-to-b from-primary/5 to-white">
+          <div className="px-6 py-4 border-b border-slate-100 bg-gradient-to-b from-primary/5 to-white dark:to-card">
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-widest text-primary">
                 <Sparkles className="h-3 w-3" /> Sugestões da IA

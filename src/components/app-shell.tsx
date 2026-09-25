@@ -1992,7 +1992,7 @@ function AppShellInner() {
           <button
             type="button"
             onClick={() => fecharSeletorPortais()}
-            className="absolute top-4 right-4 z-10 h-9 w-9 rounded-full bg-white/80 text-slate-600 shadow-md ring-1 ring-slate-200 flex items-center justify-center hover:bg-card"
+            className="absolute top-4 right-4 z-10 h-9 w-9 rounded-full bg-white/80 text-slate-600 shadow-md ring-1 ring-slate-200 flex items-center justify-center hover:bg-card dark:bg-slate-800/80 dark:text-slate-200 dark:ring-slate-700 dark:hover:bg-slate-700"
             aria-label="Fechar seleção de portais"
             title="Voltar"
           >

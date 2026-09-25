@@ -9452,7 +9452,7 @@ function AgendaPage() {
               </DialogTrigger>
             )}
             <DialogContent className="w-[95vw] max-w-md sm:max-w-3xl max-h-[85vh] flex flex-col overflow-hidden p-0 gap-0 rounded-2xl border-slate-200 shadow-2xl">
-              <DialogHeader className="space-y-0 px-6 pt-1.5 pb-1 border-b border-slate-100 bg-gradient-to-b from-slate-50/60 to-transparent">
+              <DialogHeader className="space-y-0 px-6 pt-1.5 pb-1 border-b border-slate-100 bg-gradient-to-b from-slate-50/60 to-transparent dark:from-slate-800/60">
                 <DialogTitle className="text-sm font-semibold tracking-tight text-slate-900">
                   {editing
                     ? pagosSet.has(editing.id)
