@@ -267,9 +267,20 @@ export async function handleIntake(
   if (body.especialidade?.trim()) {
     const alvo = normalizar(body.especialidade);
     const { data: esps } = await db.from("especialidades").select("id, nome, ativo");
-    const achada = ((esps ?? []) as Array<{ id: string; nome: string; ativo: boolean | null }>)
-      .filter((e) => normalizar(e.nome ?? "") === alvo)
-      .sort((a, b) => Number(b.ativo !== false) - Number(a.ativo !== false))[0];
+    // Seletor dos sites usa o nome popular; o catálogo, o técnico. O mapa só
+    // entra quando a busca direta não acha nada.
+    const SINONIMOS: Record<string, string> = {
+      dentista: "odontologia",
+      alergista: "alergologia",
+      angiologista: "angiologia",
+      pneumologista: "pneumologia",
+    };
+    const catalogo = (esps ?? []) as Array<{ id: string; nome: string; ativo: boolean | null }>;
+    const buscar = (nome: string) =>
+      catalogo
+        .filter((e) => normalizar(e.nome ?? "") === nome)
+        .sort((a, b) => Number(b.ativo !== false) - Number(a.ativo !== false))[0];
+    const achada = buscar(alvo) ?? (SINONIMOS[alvo] ? buscar(SINONIMOS[alvo]) : undefined);
     if (achada) {
       especialidadeId = achada.id;
       const { data: procs } = await db
