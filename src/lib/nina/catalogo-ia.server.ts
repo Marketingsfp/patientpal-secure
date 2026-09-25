@@ -9,6 +9,7 @@
  * Esta rota é independente do modelo de atendimento da Nina: não altera nem
  * lê a configuração de modelo usada nas conversas com pacientes.
  */
+import { chamarClaudeComoResponses } from "@/lib/nina/claude-messages.server";
 import {
   MODELO_CATALOGO_IA,
   instrucoesCatalogoIA,
@@ -85,14 +86,7 @@ async function gerarJsonCatalogo(
       "A IA não está configurada neste projeto. O cadastro manual continua funcionando.",
     );
 
-  const res = await fetch("https://ai.gateway.lovable.dev/v1/responses", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Lovable-API-Key": chave,
-      "X-Lovable-AIG-SDK": "fetch",
-    },
-    body: JSON.stringify({
+  const res = await chamarClaudeComoResponses({
       model: MODELO_CATALOGO_IA,
       stream: true,
       store: false,
@@ -116,8 +110,7 @@ async function gerarJsonCatalogo(
           schema,
         },
       },
-    }),
-  });
+    });
 
   if (!res.ok) {
     const corpo = await res.text().catch(() => "");

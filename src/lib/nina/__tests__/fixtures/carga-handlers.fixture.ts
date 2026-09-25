@@ -267,7 +267,7 @@ describe("handlers reais de carga com fronteiras simuladas", () => {
       versao: 1,
       pedido: "Teste saudação",
       resumo: "Saudação e pergunta",
-      modelo: "openai/gpt-5.6-sol",
+      modelo: "anthropic/claude-opus-5-5",
       config: i.config,
       cenarios: [
         {

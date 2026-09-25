@@ -169,3 +169,9 @@ As regras contidas em `mem/preferences/governanca.md`,
 `mem/constraints/governanca-dados-imutaveis.md` continuam válidas e
 complementam este arquivo. Em caso de conflito, prevalece a interpretação
 **mais restritiva**.
+
+---
+
+## 3. Decisões técnicas
+
+- Recursos internos da Nina que usam Claude chamam `chamarClaudeComoResponses` (`src/lib/nina/claude-messages.server.ts`), que traduz o corpo Responses para `/v1/messages` — por quê: Opus 5.5 só é servido em Messages e assim os chamadores existentes não precisam ser reescritos.

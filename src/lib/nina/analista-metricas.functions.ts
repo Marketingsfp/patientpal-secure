@@ -2,7 +2,7 @@
  * FASE 8 — Analista de métricas da Nina (integração com o modelo).
  *
  * Execução SEPARADA da Nina que atende pacientes: modelo próprio
- * (`openai/gpt-5.6-sol`), ferramentas restritas a consultas agregadas somente
+ * (`anthropic/claude-opus-5-5`), ferramentas restritas a consultas agregadas somente
  * leitura da Fase 7, sem SQL livre, sem escrita, sem navegação e sem acesso às
  * funções operacionais. A credencial fica apenas no servidor.
  */
@@ -26,7 +26,6 @@ import {
   type RespostaAnalista,
 } from "@/lib/nina/analista-metricas";
 
-const GATEWAY = "https://ai.gateway.lovable.dev/v1/responses";
 
 const contextoPainel = z.object({
   de: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
@@ -78,14 +77,7 @@ async function chamarModelo(input: any[], maxTokensSaida: number): Promise<Saida
   const apiKey = process.env["LOVABLE_API_KEY"];
   if (!apiKey) throw new Error("Análise indisponível: chave do provedor de IA não configurada.");
 
-  const res = await fetch(GATEWAY, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Lovable-API-Key": apiKey,
-      "X-Lovable-AIG-SDK": "fetch",
-    },
-    body: JSON.stringify({
+  const res = await (await import("@/lib/nina/claude-messages.server")).chamarClaudeComoResponses({
       model: MODELO_ANALISTA,
       instructions: INSTRUCOES_ANALISTA,
       input,
@@ -102,8 +94,7 @@ async function chamarModelo(input: any[], maxTokensSaida: number): Promise<Saida
           schema: SCHEMA_RESPOSTA_ANALISTA,
         },
       },
-    }),
-  });
+    });
 
   if (!res.ok || !res.body) {
     const corpo = await res.text().catch(() => "");

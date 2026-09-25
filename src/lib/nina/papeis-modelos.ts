@@ -7,7 +7,7 @@
  *
  * - paciente  (GPT Terra) → escreve como paciente simulado;
  * - carga     (GPT Luna)  → gera variações de texto para volume;
- * - avaliador (GPT Sol)   → avalia execuções já concluídas;
+ * - avaliador (Claude Opus 5.5)   → avalia execuções já concluídas;
  * - nina                  → o sistema sob teste; o modelo vem da configuração
  *                           real da clínica e é registrado por execução.
  */
@@ -44,7 +44,7 @@ export const PAPEIS_MODELOS: Record<PapelModelo, DefinicaoPapel> = {
   },
   avaliador: {
     papel: "avaliador",
-    rotulo: "GPT Sol — avaliação",
+    rotulo: "Claude Opus 5.5 — avaliação",
     modelo: MODELO_SOL,
     provedor: PROVEDOR_IA,
     descricao: "Só avalia execuções concluídas. Nunca participa da conversa.",
@@ -58,7 +58,7 @@ export const PAPEIS_MODELOS: Record<PapelModelo, DefinicaoPapel> = {
   },
   planejador_carga: {
     papel: "planejador_carga",
-    rotulo: "GPT Sol — planejamento de carga",
+    rotulo: "Claude Opus 5.5 — planejamento de carga",
     modelo: MODELO_SOL,
     provedor: PROVEDOR_IA,
     descricao:

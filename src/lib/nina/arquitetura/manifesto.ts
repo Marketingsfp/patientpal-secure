@@ -985,13 +985,13 @@ export const NODES_ARQUITETURA: NodeArquitetura[] = [
   },
   {
     id: "test.evaluate.sol",
-    nome: "Avaliação posterior (GPT Sol)",
+    nome: "Avaliação posterior (Claude Opus 5.5)",
     categoria: "HOMOLOGACAO",
     descricao:
       "Avaliador independente executado DEPOIS da conversa: analisa mensagens, traces, ferramentas e resultados reais e devolve score, veredito e achados com evidência. Não participa da geração da resposta.",
     arquivo: "src/lib/nina/avaliador-sol.functions.ts",
     funcao: "avaliarComSol",
-    servico: "Lovable AI Gateway (GPT Sol)",
+    servico: "Lovable AI Gateway (Claude Opus 5.5)",
     entrada: "Conversa de teste já concluída e seus rastros",
     saida: "Avaliação com score, veredito e achados",
     anteriores: ["message.outbound", "trace.record"],

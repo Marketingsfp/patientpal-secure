@@ -44,7 +44,6 @@ import {
 import type { PacoteInvestigacao } from "./evidencias-pacote";
 import { montarRelatorio, type RelatorioCorrecao } from "./correcao-relatorio";
 
-const GATEWAY = "https://ai.gateway.lovable.dev/v1/responses";
 
 async function exigirPermissao(supabase: any, userId: string, clinicaId: string) {
   const { data, error } = await supabase.rpc("nina_fb_pode_revisar", {
@@ -141,22 +140,14 @@ async function chamarExecutor(input: any[], ferramentas: any[]): Promise<SaidaMo
   const apiKey = process.env["LOVABLE_API_KEY"];
   if (!apiKey) throw new Error("Correção indisponível: chave do provedor de IA não configurada.");
 
-  const res = await fetch(GATEWAY, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Lovable-API-Key": apiKey,
-      "X-Lovable-AIG-SDK": "fetch",
-    },
-    body: JSON.stringify({
+  const res = await (await import("@/lib/nina/claude-messages.server")).chamarClaudeComoResponses({
       model: MODELO_EXECUTOR,
       instructions: INSTRUCOES_EXECUTOR,
       input,
       tools: ferramentas,
       stream: true,
       store: false,
-    }),
-  });
+    });
 
   if (!res.ok || !res.body) {
     const corpo = await res.text().catch(() => "");

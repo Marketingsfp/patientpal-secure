@@ -66,7 +66,7 @@ describe("ferramentas autorizadas", () => {
   });
 
   it("usa o modelo pedido, sem troca silenciosa", () => {
-    expect(MODELO_ANALISTA).toBe("openai/gpt-5.6-sol");
+    expect(MODELO_ANALISTA).toBe("anthropic/claude-opus-5-5");
   });
 
   it("as instruções proíbem inventar dados e exigem separar dados de interpretação", () => {

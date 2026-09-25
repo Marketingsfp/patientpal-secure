@@ -17,7 +17,7 @@ import {
 } from "./analise-erro";
 
 /** Mesmo modelo da investigação, papel diferente. */
-export const MODELO_EXECUTOR = "openai/gpt-5.6-sol" as const;
+export const MODELO_EXECUTOR = "anthropic/claude-opus-5-5" as const;
 
 /** Teto de rodadas de ferramenta por correção — evita laço infinito e custo. */
 export const LIMITE_RODADAS_EXECUTOR = 8;

@@ -149,7 +149,7 @@ export function PromptsSalvosCarga({
             <p className="py-3 text-sm text-muted-foreground">
               {busca
                 ? "Nenhum prompt encontrado para essa busca."
-                : "Seus prompts aparecerão aqui quando você usar “Gerar cenários com Sol”."}
+                : "Seus prompts aparecerão aqui quando você usar “Gerar cenários com Opus 5.5”."}
             </p>
           )}
           {temMais && !erro && !carregando && (

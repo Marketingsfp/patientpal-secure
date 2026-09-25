@@ -105,7 +105,7 @@ const relatorio = (over: Partial<EntradaRelatorio> = {}): EntradaRelatorio => ({
   trabalho: {
     execucaoId: "ex-1",
     solicitadoPor: "user-1",
-    modelo: "openai/gpt-5.6-sol",
+    modelo: "anthropic/claude-opus-5-5",
     provedor: "Lovable AI Gateway",
     inicio: "2026-09-12T01:00:00Z",
     fim: "2026-09-12T01:00:30Z",
@@ -284,7 +284,7 @@ describe("FASE 6 — pacote de evidências", () => {
         feedback_id: "fb-1",
         versao: 1,
         criterios_versao: "v1",
-        modelo: "openai/gpt-5.6-sol",
+        modelo: "anthropic/claude-opus-5-5",
         status: "done",
         conclusao: "Regra condicional aplicada fora da condição.",
         resultado: { veredito: "erro", causaProvavel: "regra condicional" },

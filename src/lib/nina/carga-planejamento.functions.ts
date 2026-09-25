@@ -17,16 +17,7 @@ async function solicitar(body: ReturnType<typeof montarRequisicaoPlanejamento>):
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), LIMITES_PLANEJAMENTO.timeoutMs);
   try {
-    const resposta = await fetch("https://ai.gateway.lovable.dev/v1/responses", {
-      method: "POST",
-      signal: controller.signal,
-      headers: {
-        "Content-Type": "application/json",
-        "Lovable-API-Key": chave,
-        "X-Lovable-AIG-SDK": "fetch",
-      },
-      body: JSON.stringify({ ...body, model: garantirPapel("planejador_carga", body.model) }),
-    });
+    const resposta = await (await import("@/lib/nina/claude-messages.server")).chamarClaudeComoResponses({ ...body, model: garantirPapel("planejador_carga", body.model) }, { signal: controller.signal });
     if (!resposta.ok) {
       const erros: Record<number, string> = {
         401: "Integração de IA não configurada corretamente.",

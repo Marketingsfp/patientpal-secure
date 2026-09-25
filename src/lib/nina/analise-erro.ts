@@ -17,7 +17,7 @@
 export const VERSAO_CRITERIOS_ANALISE = "fase4-2026-09" as const;
 
 /** Modelo pedido para a análise (execução separada da Nina que atende pacientes). */
-export const MODELO_ANALISE = "openai/gpt-5.6-sol" as const;
+export const MODELO_ANALISE = "anthropic/claude-opus-5-5" as const;
 
 /** Limite de análises pagas por erro reportado. */
 export const LIMITE_ANALISES_POR_ERRO = 5;

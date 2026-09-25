@@ -2,7 +2,7 @@
  * FASE 4 — "Analisar com IA" de um erro reportado da Nina.
  *
  * Execução SEPARADA da Nina que atende pacientes: modelo próprio
- * (`openai/gpt-5.6-sol`), sem ferramentas, sem escrita, sem navegação.
+ * (`anthropic/claude-opus-5-5`), sem ferramentas, sem escrita, sem navegação.
  * Só roda por clique explícito e grava uma versão por análise.
  */
 import { createServerFn } from "@tanstack/react-start";
@@ -28,7 +28,6 @@ type ResumoEvidencias = ResumoPacote & {
   modelo_da_execucao: string | null;
 };
 
-const GATEWAY = "https://ai.gateway.lovable.dev/v1/responses";
 
 type Analise = {
   id: string;
@@ -72,14 +71,7 @@ async function chamarAvaliador(
   const apiKey = process.env["LOVABLE_API_KEY"];
   if (!apiKey) throw new Error("Análise indisponível: chave do provedor de IA não configurada.");
 
-  const res = await fetch(GATEWAY, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Lovable-API-Key": apiKey,
-      "X-Lovable-AIG-SDK": "fetch",
-    },
-    body: JSON.stringify({
+  const res = await (await import("@/lib/nina/claude-messages.server")).chamarClaudeComoResponses({
       model: MODELO_ANALISE,
       instructions: INSTRUCOES_AVALIADOR,
       input: prompt,
@@ -96,8 +88,7 @@ async function chamarAvaliador(
           schema: SCHEMA_ANALISE,
         },
       },
-    }),
-  });
+    });
 
   if (!res.ok || !res.body) {
     const corpo = await res.text().catch(() => "");

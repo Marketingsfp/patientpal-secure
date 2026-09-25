@@ -10,7 +10,7 @@ import {
 
 describe("Criar com IA — contrato do modelo", () => {
   test("usa o modelo pedido pela clínica", () => {
-    expect(MODELO_CATALOGO_IA).toBe("openai/gpt-5.6-sol");
+    expect(MODELO_CATALOGO_IA).toBe("anthropic/claude-opus-5-5");
   });
 
   test("schema é estrito: todo objeto fecha propriedades extras", () => {

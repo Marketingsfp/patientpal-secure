@@ -68,7 +68,7 @@ describe("disparo paralelo no navegador", () => {
 function plano(): PlanoCarga {
   return {
     versao: 1,
-    modelo: "openai/gpt-5.6-sol",
+    modelo: "anthropic/claude-opus-5-5",
     pedido: "Testar cardiologia e pagamento",
     resumo: "Conversas com continuidade e pagamento.",
     config: normalizarConfig({
