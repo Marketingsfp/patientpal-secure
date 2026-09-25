@@ -1203,6 +1203,7 @@ function Page() {
     }
     return "Nenhum horário cabe nessa configuração. Confira o recorte de horário e a duração de cada atendimento.";
   }, [
+    agendasMistasSemEscolha,
     slotsPreview.length,
     gerar.medico_id,
     gerar.data_inicio,

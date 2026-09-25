@@ -126,13 +126,28 @@ export function ClinicaProvider({ children }: { children: ReactNode }) {
       return;
     }
     if (showLoading) setLoading(true);
-    const { data, error } = await supabase
-      .from("clinica_memberships")
-      .select(
-        "id, clinica_id, role, pode_autorizar, pode_gerir_horarios, clinica:clinicas(id, nome, cidade, estado, branding, base_importada)",
-      )
-      .eq("user_id", user.id)
-      .eq("ativo", true);
+    const consultar = () =>
+      supabase
+        .from("clinica_memberships")
+        .select(
+          "id, clinica_id, role, pode_autorizar, pode_gerir_horarios, clinica:clinicas(id, nome, cidade, estado, branding, base_importada)",
+        )
+        .eq("user_id", user.id)
+        .eq("ativo", true);
+    let { data, error } = await consultar();
+    if (error) {
+      // "Permissão negada" aparece quando a sessão venceu no meio do caminho.
+      // Renova a sessão e tenta uma vez; a lista já carregada fica na tela.
+      await supabase.auth.refreshSession().catch(() => undefined);
+      ({ data, error } = await consultar());
+      if (error) {
+        console.error("[clinica] falha ao carregar vínculos:", error.message);
+        const { toast } = await import("sonner");
+        toast.error("Não foi possível carregar suas unidades. Saia e entre novamente no sistema.", {
+          id: "falha-vinculos",
+        });
+      }
+    }
     if (!error && data) {
       const raw = (data as unknown[]).filter(isClinicaMembership);
       // A6 — Oculta unidades ainda não operacionais (base não importada
