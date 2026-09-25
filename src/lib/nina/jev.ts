@@ -2,13 +2,19 @@
  * Jev (TypeSafe System One) na Nina — tipos e regras puras (sem rede).
  * Plano aprovado em 25/09/2026: 4 fases, válidas SOMENTE em homologação.
  */
-export type FaseJev = "fase1_intencao" | "fase2_encaminhamento" | "fase3_especialidade" | "fase4_cadastro";
+export type FaseJev =
+  | "fase1_intencao"
+  | "fase2_encaminhamento"
+  | "fase3_especialidade"
+  | "fase4_cadastro"
+  | "fase5_avaliacao";
 
 export const FLAG_JEV: Record<FaseJev, string> = {
   fase1_intencao: "nina_jev_fase1",
   fase2_encaminhamento: "nina_jev_fase2",
   fase3_especialidade: "nina_jev_fase3",
   fase4_cadastro: "nina_jev_fase4",
+  fase5_avaliacao: "nina_jev_fase5",
 };
 
 export type PerguntaJev =

@@ -54,12 +54,13 @@ export async function jevAtivo(clinicaId: string | null, fase: FaseJev, teste: b
 export async function perguntarJev(
   state: unknown,
   perguntas: Record<string, PerguntaJev>,
+  limiteMs: number = LIMITE_MS,
 ): Promise<ResultadoJev> {
   const inicio = Date.now();
   const chave = process.env["LOVABLE_API_KEY"];
   if (!chave) return { ok: false, motivo: "sem_chave", latencyMs: 0 };
   const controle = new AbortController();
-  const timer = setTimeout(() => controle.abort(), LIMITE_MS);
+  const timer = setTimeout(() => controle.abort(), limiteMs);
   try {
     const resp = await fetch(URL_JEV, {
       method: "POST",
