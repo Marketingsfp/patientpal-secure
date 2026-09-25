@@ -8,7 +8,13 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { obterLumenConfig, salvarLumenConfig, testarLumen } from "@/lib/lumen-tv.functions";
 
-type Envio = { id: string; codigo: string | null; enviadoEm: string; status: number | null; erro: string | null };
+type Envio = {
+  id: string;
+  codigo: string | null;
+  enviadoEm: string;
+  status: number | null;
+  erro: string | null;
+};
 
 /** Configuração das TVs da recepção (LUMEN) de uma clínica. */
 export function LumenTvConfig({ clinicaId }: { clinicaId: string }) {
@@ -53,7 +59,11 @@ export function LumenTvConfig({ clinicaId }: { clinicaId: string }) {
 
   if (carregando) return <Loader2 className="h-4 w-4 animate-spin" />;
   if (semAcesso)
-    return <p className="text-sm text-muted-foreground">Apenas quem administra a clínica pode ver esta configuração.</p>;
+    return (
+      <p className="text-sm text-muted-foreground">
+        Apenas quem administra a clínica pode ver esta configuração.
+      </p>
+    );
 
   const onSalvar = async () => {
     setSalvando(true);
@@ -63,7 +73,10 @@ export function LumenTvConfig({ clinicaId }: { clinicaId: string }) {
           clinicaId,
           url,
           token: token || undefined,
-          pairCodes: pairCodes.split(/[,\s]+/).map((s) => s.trim()).filter(Boolean),
+          pairCodes: pairCodes
+            .split(/[,\s]+/)
+            .map((s) => s.trim())
+            .filter(Boolean),
           enviarNome,
           ativo,
         },
@@ -94,8 +107,8 @@ export function LumenTvConfig({ clinicaId }: { clinicaId: string }) {
   return (
     <div className="space-y-4 pt-2">
       <p className="text-sm text-muted-foreground">
-        Quando uma senha é chamada, ela é enviada para as TVs da recepção (LUMEN). Se o envio falhar, a
-        senha continua funcionando normalmente.
+        Quando uma senha é chamada, ela é enviada para as TVs da recepção (LUMEN). Se o envio
+        falhar, a senha continua funcionando normalmente.
       </p>
       <div className="grid gap-3 md:grid-cols-2">
         <div className="space-y-1 md:col-span-2">
@@ -108,7 +121,9 @@ export function LumenTvConfig({ clinicaId }: { clinicaId: string }) {
             type="password"
             value={token}
             onChange={(e) => setToken(e.target.value)}
-            placeholder={tokenFim ? `Salvo: ••••${tokenFim} (deixe vazio para manter)` : "Cole o token"}
+            placeholder={
+              tokenFim ? `Salvo: ••••${tokenFim} (deixe vazio para manter)` : "Cole o token"
+            }
             autoComplete="off"
           />
         </div>
@@ -133,8 +148,9 @@ export function LumenTvConfig({ clinicaId }: { clinicaId: string }) {
         <div className="flex gap-2 rounded-md border border-destructive/40 bg-destructive/5 p-3 text-sm">
           <AlertTriangle className="h-4 w-4 shrink-0 text-destructive" />
           <span>
-            A TV fica na sala de espera. Ligar esta opção mostra o <b>nome do paciente para todos os
-            presentes</b>. O padrão é desligado: só a senha e o guichê aparecem.
+            A TV fica na sala de espera. Ligar esta opção mostra o{" "}
+            <b>nome do paciente para todos os presentes</b>. O padrão é desligado: só a senha e o
+            guichê aparecem.
           </span>
         </div>
       </div>
@@ -143,11 +159,17 @@ export function LumenTvConfig({ clinicaId }: { clinicaId: string }) {
           {salvando && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Salvar
         </Button>
         <Button variant="outline" onClick={onTestar} disabled={testando || !tokenFim}>
-          {testando ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
+          {testando ? (
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+          ) : (
+            <Send className="mr-2 h-4 w-4" />
+          )}
           Enviar chamada de teste
         </Button>
       </div>
-      {resultado && <pre className="whitespace-pre-wrap rounded bg-muted p-2 text-xs">{resultado}</pre>}
+      {resultado && (
+        <pre className="whitespace-pre-wrap rounded bg-muted p-2 text-xs">{resultado}</pre>
+      )}
       <div>
         <h4 className="mb-2 text-sm font-semibold">Últimos envios</h4>
         {envios.length === 0 ? (

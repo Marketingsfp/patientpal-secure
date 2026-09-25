@@ -50,11 +50,14 @@ export const obterLumenConfig = createServerFn({ method: "POST" })
       .eq("clinica_id", data.clinicaId)
       .order("enviado_em", { ascending: false })
       .limit(20);
-    const ids = (envios ?? []).map((e: { request_id: number | null }) => e.request_id).filter(Boolean);
+    const ids = (envios ?? [])
+      .map((e: { request_id: number | null }) => e.request_id)
+      .filter(Boolean);
     const respostas: Record<string, { status: number | null; erro: string | null }> = {};
     if (ids.length) {
-      const { data: r } = await db.schema("net").from("_http_response").select("id, status_code, error_msg").in("id", ids);
-      for (const x of r ?? []) respostas[String(x.id)] = { status: x.status_code, erro: x.error_msg };
+      const { data: r } = await db.rpc("lumen_tv_respostas", { _ids: ids });
+      for (const x of r ?? [])
+        respostas[String(x.id)] = { status: x.status_code, erro: x.error_msg };
     }
     return {
       config: cfg
@@ -67,7 +70,12 @@ export const obterLumenConfig = createServerFn({ method: "POST" })
           }
         : null,
       envios: (envios ?? []).map(
-        (e: { id: string; codigo: string | null; enviado_em: string; request_id: number | null }) => ({
+        (e: {
+          id: string;
+          codigo: string | null;
+          enviado_em: string;
+          request_id: number | null;
+        }) => ({
           id: e.id,
           codigo: e.codigo,
           enviadoEm: e.enviado_em,
