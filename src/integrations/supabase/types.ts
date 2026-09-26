@@ -11626,6 +11626,7 @@ export type Database = {
           lead_indice: number | null
           mensagem: string | null
           output_tokens: number
+          resultado: Json | null
           status: string
           tentativa: number
         }
@@ -11646,6 +11647,7 @@ export type Database = {
           lead_indice?: number | null
           mensagem?: string | null
           output_tokens?: number
+          resultado?: Json | null
           status?: string
           tentativa?: number
         }
@@ -11666,6 +11668,7 @@ export type Database = {
           lead_indice?: number | null
           mensagem?: string | null
           output_tokens?: number
+          resultado?: Json | null
           status?: string
           tentativa?: number
         }
