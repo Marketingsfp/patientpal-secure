@@ -2089,3 +2089,49 @@ describe("horários apresentados por período", () => {
     expect(ctx.estado.appointment.slot_options).toBeNull();
   });
 });
+
+// Teste 02 das simulações de 26/09/2026 (Anderson Eloy): o modelo pediu "mais"
+// junto com a_partir_da_hora; a lista recomeçava e o horário da 1ª página
+// deixava de ser escolhível → encaminhamento por falha operacional.
+describe("regressão 26/09: horário de página anterior continua escolhível", () => {
+  const dia = new Date(Date.now() + 3 * 86_400_000);
+  dia.setUTCHours(11, 0, 0, 0);
+  const dataDia = dia.toISOString().slice(0, 10);
+  const depois = (base: Date, min: number) => new Date(base.getTime() + min * 60_000);
+  test("tanto faz → mais com a_partir_da_hora → escolhe 08:20 da 1ª página", async () => {
+    banco.agendamentos = Array.from({ length: 30 }, (_, i) => ({
+      id: `r${i}`, clinica_id: CLINICA, medico_id: MEDICO, inicio: depois(dia, i * 10).toISOString(),
+      fim: depois(dia, i * 10 + 10).toISOString(), paciente_nome: "DISPONIVEL", status: "confirmado",
+    }));
+    const ctx = contexto("tanto faz");
+    ctx.estado.appointment.doctor_id = MEDICO;
+    ctx.estado.appointment.procedure = "Consulta Cardiologia";
+    const primeira = await executarFerramentaPaciente(ctx, "consultar_disponibilidade", { medico_id: MEDICO, data: dataDia, periodo: "qualquer" });
+    expect(((primeira.horarios as Linha[]) ?? []).map((h) => h.hora)).toContain("08:20");
+    expect(String(primeira.instrucao)).toContain("nesse dia");
+    ctx.consultaAgenda.mensagemAtual = "mostra os outros";
+    const segunda = await executarFerramentaPaciente(ctx, "consultar_disponibilidade",
+      { medico_id: MEDICO, data: dataDia, mais: true, a_partir_da_hora: "09:40" });
+    expect(((segunda.horarios as Linha[]) ?? []).map((h) => h.hora)[0]).toBe("09:40");
+    expect(String(segunda.instrucao)).toContain("Esses são os próximos");
+    expect(ctx.estado.appointment.slot_options!.vagas).toHaveLength(20);
+    const vaga = ctx.estado.appointment.slot_options!.vagas.find((v) => v.hora === "08:20")!;
+    ctx.consultaAgenda.mensagemAtual = "Pensando melhor, vou querer aquele das 08:20.";
+    const escolha = await executarFerramentaPaciente(ctx, "selecionar_horario", { medico_id: MEDICO, inicio: vaga.inicio, fim: vaga.fim });
+    expect(escolha.ok).toBe(true);
+    expect(String(escolha.resumo_confirmacao)).toContain("08:20");
+  });
+
+  test("trocar de período mantém escolhíveis os horários já mostrados", async () => {
+    banco.agendamentos = Array.from({ length: 30 }, (_, i) => ({
+      id: `t${i}`, clinica_id: CLINICA, medico_id: MEDICO, inicio: depois(dia, i < 15 ? i * 10 : 300 + i * 10).toISOString(),
+      fim: depois(dia, (i < 15 ? i * 10 : 300 + i * 10) + 10).toISOString(), paciente_nome: "DISPONIVEL", status: "confirmado",
+    }));
+    const ctx = contexto("de manhã");
+    await executarFerramentaPaciente(ctx, "consultar_disponibilidade", { medico_id: MEDICO, data: dataDia, periodo: "manha" });
+    await executarFerramentaPaciente(ctx, "consultar_disponibilidade", { medico_id: MEDICO, data: dataDia, periodo: "tarde" });
+    const horasGuardadas = ctx.estado.appointment.slot_options!.vagas.map((v) => v.hora);
+    expect(horasGuardadas).toContain("08:00");
+    expect(horasGuardadas.some((h) => h >= "13:00")).toBe(true);
+  });
+});

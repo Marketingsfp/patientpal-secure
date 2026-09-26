@@ -567,12 +567,16 @@ async function apresentarDia(
   const pag = paginacaoVigente(ctx.estado, ctx.clinicaId, e.chave);
   const informado: FiltroHorarios | null = e.filtro.periodo || e.filtro.a_partir_da_hora
     ? { periodo: e.filtro.periodo ?? null, a_partir_de: e.filtro.a_partir_da_hora ?? null } : null;
-  const mesmoFiltro = !informado || JSON.stringify(informado) === JSON.stringify(pag?.filtro ?? null);
-  const mais = e.filtro.mais === true && pag !== null && mesmoFiltro;
+  // "Mais" continua a lista desta chave mesmo que o modelo mande outro filtro
+  // junto (ex.: a_partir_da_hora do último horário mostrado): nada se repete.
+  const mais = e.filtro.mais === true && pag !== null;
   const filtro = informado ?? (e.filtro.mais ? pag?.filtro ?? null : null);
-  const plano = planejarHorarios(e.slots, { filtro, mais, jaApresentados: pag?.apresentados ?? [] });
+  const anteriores = pag?.apresentados ?? [];
+  const plano = planejarHorarios(e.slots, { filtro, mais, jaApresentados: anteriores });
   const novos = plano.modo === "todos" || plano.modo === "lista" ? plano.horarios.map(chaveHorario) : [];
-  const apresentados = [...new Set([...(mais ? pag!.apresentados : []), ...novos])];
+  // Tudo o que já foi mostrado para este profissional, atendimento e dia continua
+  // escolhível, inclusive quando o filtro muda entre as páginas (26/09/2026).
+  const apresentados = [...new Set([...anteriores, ...novos])];
   const opcoes = horariosDistintos(e.slots).filter((s) => apresentados.includes(chaveHorario(s)));
   const pendencia = await guardarOpcoes(ctx, opcoes);
   if (pendencia) return { plano, pendencia };

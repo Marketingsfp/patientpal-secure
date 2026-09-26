@@ -117,7 +117,7 @@ export function planejarHorarios<T extends HorarioSlot>(
   if (!candidatos.length) return { modo: "esgotado", filtro, periodos, total_no_filtro: filtrados.length };
   const horarios = candidatos.slice(0, limite);
   return { modo: "lista", horarios, filtro, restantes: candidatos.length - horarios.length,
-    total_no_filtro: filtrados.length, continuacao: candidatos.length < filtrados.length };
+    total_no_filtro: filtrados.length, continuacao: e.mais === true && vistos.size > 0 };
 }
 
 /* ------------------------------------------------ paginação na conversa */
@@ -221,6 +221,12 @@ export const AVISO_HA_MAIS =
 export const AVISO_HA_MAIS_CONTINUACAO =
   "Esses são os próximos horários disponíveis nesse período. Se preferir, posso mostrar mais.";
 
+/** Aviso da página: "próximos" depois da primeira; "nesse dia" para "tanto faz". */
+function avisoDaPagina(plano: Extract<PlanoHorarios<unknown>, { modo: "lista" }>) {
+  const aviso = plano.continuacao ? AVISO_HA_MAIS_CONTINUACAO : AVISO_HA_MAIS;
+  return plano.filtro.periodo === "qualquer" && !plano.filtro.a_partir_de ? aviso.replace("nesse período", "nesse dia") : aviso;
+}
+
 /** Instrução do retorno da ferramenta para cada modo do plano. */
 export function instrucaoDoPlano(plano: PlanoHorarios<unknown>): string {
   const lista = (ps: ResumoPeriodo[]) => ps.map((p) => `${p.rotulo} (${p.quantidade})`).join(", ");
@@ -231,7 +237,7 @@ export function instrucaoDoPlano(plano: PlanoHorarios<unknown>): string {
       return `Há mais de ${LIMITE_EXIBICAO} horários livres neste dia. Ainda NÃO liste horários: pergunte qual período o paciente prefere, citando somente estes períodos com vaga: ${lista(plano.periodos)}. Ex.: "Para esse dia, temos horários pela manhã e à tarde. Qual período você prefere?". Se ele responder um período, "depois das X", "tanto faz" ou pedir para ver, consulte de novo com o filtro correspondente. Muitos horários não são motivo de encaminhamento.`;
     case "lista":
       return plano.restantes > 0
-        ? `Apresente os horários de \`horarios\` em ordem cronológica e termine dizendo exatamente: "${plano.continuacao ? AVISO_HA_MAIS_CONTINUACAO : AVISO_HA_MAIS}". Se o paciente pedir mais opções, consulte de novo com mais=true: ainda restam ${plano.restantes} horário(s) nesse filtro. Não diga que acabaram os horários.`
+        ? `Apresente os horários de \`horarios\` em ordem cronológica e termine dizendo exatamente: "${avisoDaPagina(plano)}" (não repita a frase da página anterior). Se o paciente pedir mais opções, consulte de novo com mais=true: ainda restam ${plano.restantes} horário(s) nesse filtro. Não diga que acabaram os horários.`
         : "Apresente os horários de `horarios` em ordem cronológica. Estes são todos os horários restantes desse filtro.";
     case "esgotado":
       return `Todos os ${plano.total_no_filtro} horários desse filtro já foram apresentados. Diga isso e ofereça outro período com vaga (${lista(plano.periodos)}) ou outra data. O dia ainda tem vagas: não afirme que não há horários.`;

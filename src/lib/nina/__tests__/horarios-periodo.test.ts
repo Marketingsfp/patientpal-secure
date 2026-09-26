@@ -46,7 +46,8 @@ describe("regra de apresentação", () => {
     if (plano.modo !== "lista") return;
     expect(horas(plano.horarios)).toEqual(horas(faixa("13:00", "13:50")));
     expect(plano.restantes).toBe(14);
-    expect(instrucaoDoPlano(plano)).toContain(AVISO_HA_MAIS);
+    // Sem período escolhido, a lista é do dia: mesmo aviso, dito "nesse dia".
+    expect(instrucaoDoPlano(plano)).toContain(AVISO_HA_MAIS.replace("nesse período", "nesse dia"));
   });
 
   test("preferência informada: tarde em ordem cronológica, sem perguntar", () => {
