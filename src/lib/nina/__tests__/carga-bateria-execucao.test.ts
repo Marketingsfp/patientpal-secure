@@ -1,6 +1,6 @@
 /**
  * Bateria por profissional ponta a ponta no executor real da carga, com banco simulado.
- * A Nina e a Luna são simuladas; agendar ocupa uma vaga "DISPONÍVEL" da mesma forma que a
+ * A Nina e a Luna são simuladas; agendar ocupa uma vaga "DISPONIVEL" da mesma forma que a
  * ferramenta real (UPDATE no próprio registro da vaga) e a devolução precisa desfazê-lo.
  */
 import { describe, expect, test } from "bun:test";
@@ -108,7 +108,7 @@ function ambiente(
       medico_id: "m-iarmila",
       inicio: "2026-10-01T11:00:00.000Z",
       paciente_id: null,
-      paciente_nome: "DISPONÍVEL",
+      paciente_nome: "DISPONIVEL",
       status: "agendado",
       procedimento: null,
       observacoes: null,
@@ -283,7 +283,7 @@ describe("bateria por profissional no executor da carga", () => {
     expect(a.db.tabelas.agendamentos![0]).toMatchObject({
       id: SLOT,
       paciente_id: null,
-      paciente_nome: "DISPONÍVEL",
+      paciente_nome: "DISPONIVEL",
       status: "agendado",
       procedimento: null,
       observacoes: null,
@@ -327,7 +327,7 @@ describe("bateria por profissional no executor da carga", () => {
     );
     expect(a.carga().status).toBe("erro");
     expect(a.db.tabelas.agendamentos![0]).toMatchObject({
-      paciente_nome: "DISPONÍVEL",
+      paciente_nome: "DISPONIVEL",
       is_mock_data: false,
       id_externo: null,
     });
@@ -343,7 +343,17 @@ describe("bateria por profissional no executor da carga", () => {
       "Pode ser quinta às 08:00, Simulação Teste 01, 10/05/1990",
     );
     expect(a.carga().status).toBe("parado");
-    expect(a.db.tabelas.agendamentos![0].paciente_nome).toBe("DISPONÍVEL");
+    expect(a.db.tabelas.agendamentos![0].paciente_nome).toBe("DISPONIVEL");
     expect(a.db.tabelas.agendamentos![0].is_mock_data).toBe(false);
+  });
+});
+
+describe("vaga devolvida volta a ser agendável pela Nina", () => {
+  test("o nome da vaga livre é o mesmo que o agendar da Nina procura", async () => {
+    const { readFileSync } = await import("node:fs");
+    const { VAGA_LIVRE } = await import("../carga-bateria.server");
+    const agendar = readFileSync(new URL("../paciente-tools.server.ts", import.meta.url), "utf8");
+    expect(VAGA_LIVRE.paciente_nome).toBe("DISPONIVEL");
+    expect(agendar).toContain(`.eq("paciente_nome", "${VAGA_LIVRE.paciente_nome}")`);
   });
 });

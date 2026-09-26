@@ -30,7 +30,7 @@ const pad = (n: number) => String(n).padStart(2, "0");
 /** Desfaz exatamente o que o agendamento da Nina grava sobre a vaga (paciente-tools.server). */
 export const VAGA_LIVRE = {
   paciente_id: null,
-  paciente_nome: "DISPONÍVEL",
+  paciente_nome: "DISPONIVEL",
   status: "agendado",
   procedimento: null,
   observacoes: null,
@@ -237,7 +237,7 @@ export async function verificarCenarioBateria(e: {
   };
 }
 
-/** Só alcança agendamentos de teste desta conversa; a vaga volta a DISPONÍVEL, nada é apagado. */
+/** Só alcança agendamentos de teste desta conversa; a vaga volta a DISPONIVEL (sem acento, como o agendar da Nina exige), nada é apagado. */
 export async function devolverVagasDaConversa(
   admin: any,
   clinicaId: string,

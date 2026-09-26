@@ -336,7 +336,7 @@ describe("handlers reais de carga com fronteiras simuladas", () => {
         id: "vaga-1",
         clinica_id: CLINICA_CARGA,
         medico_id: "m-1",
-        paciente_nome: "DISPONÍVEL",
+        paciente_nome: "DISPONIVEL",
         inicio: new Date(Date.now() + 86_400_000).toISOString(),
       },
     ];
@@ -418,7 +418,7 @@ describe("handlers reais de carga com fronteiras simuladas", () => {
     const parada = await chamar(f.pararTesteCarga, args);
     expect(parada.vagas).toMatchObject({ devolvidas: 1, pendentes: 0 });
     expect(db.tabelas.agendamentos[0]).toMatchObject({
-      paciente_nome: "DISPONÍVEL",
+      paciente_nome: "DISPONIVEL",
       paciente_id: null,
       is_mock_data: false,
       id_externo: null,
