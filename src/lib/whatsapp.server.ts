@@ -929,6 +929,7 @@ async function gerarRespostaNinaInterno(
       const { perguntaIntencao, estadoIntencao, intencaoAplicavel } = await import("@/lib/nina/jev-intencao");
       const enc = await import("@/lib/nina/jev-encaminhamento");
       const ctxJev = await import("@/lib/nina/jev-contexto");
+      const { respondeEscolhaDeHorarios } = await import("@/lib/nina/horarios-periodo");
       const perguntas = {
         ...perguntaIntencao(),
         ...(f2 ? enc.perguntasEncaminhamento() : {}),
@@ -955,7 +956,9 @@ async function gerarRespostaNinaInterno(
         ? enc.contarDuvida({
             // Pergunta própria de entendimento (Fase 2), não a confiança da intenção.
             entendimento: respostas["entendimento"],
-            selecaoValida: ctxJev.opcaoEscolhidaJev(mensagemPaciente, contextoJev.opcoes_oferecidas) !== null,
+            // Escolha de uma opção, do período ou pedido de mais horários não é falta de entendimento.
+            selecaoValida: ctxJev.opcaoEscolhidaJev(mensagemPaciente, contextoJev.opcoes_oferecidas) !== null ||
+              respondeEscolhaDeHorarios(sessaoNina.estado, mensagemPaciente),
             marco: ctxJev.marcoAtendimento(sessaoNina.estado),
             anterior,
           })

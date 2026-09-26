@@ -28,7 +28,7 @@ const OPCOES: Record<IntencaoNina | "continuacao" | "outro", string> = {
   // meio do atendimento ("neuro", "carlos eduardo") se dividia entre outro,
   // agendamento e médico e parecia incompreensão.
   continuacao:
-    "Responde ou continua a última pergunta ou oferta da atendente, sem trazer um pedido novo (ex.: escolhe uma das opções, informa especialidade, médico, data ou período, confirma ou recusa).",
+    "Responde ou continua a última pergunta ou oferta da atendente, sem trazer um pedido novo (ex.: escolhe uma das opções, informa especialidade, médico, data ou período — “de manhã”, “à tarde”, “depois do almoço”, “depois das 14h”, “tanto faz” —, pede mais horários — “mostra os outros”, “tem mais?” —, confirma ou recusa).",
   outro: "Saudação, agradecimento ou nada acima.",
 };
 

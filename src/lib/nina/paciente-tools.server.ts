@@ -47,6 +47,10 @@ import { confirmacaoDaEscolha, consentimentoDaEscolha, limparEscolhaAgendamento,
 import { chaveResumoModalidade, permiteReserva, orientacaoModalidade, type ModalidadeResolvida } from "./modalidade-atendimento";
 import { enriquecerModalidades, fichaDoAgendamento, modalidadeAtualDaAgenda } from "./modalidade-atendimento.server";
 import {
+  chaveHorario, chavePaginacao, horariosDistintos, instrucaoDoPlano, paginacaoVigente, periodoDaHora, PERIODOS_IDS,
+  planejarHorarios, registrarPaginacao, type FiltroHorarios, type Periodo, type PlanoHorarios,
+} from "./horarios-periodo";
+import {
   resolverMedicoAgenda as resolverMedico,
   vincularProfissionaisCatalogo,
   modalidadePublicadaDoMedico,
@@ -242,17 +246,10 @@ function formatarHora(iso: string) {
   }).format(d);
 }
 
-function horaNumerica(iso: string): number {
-  return Number(formatarHora(iso).slice(0, 2));
-}
-
+/** Períodos da clínica (horarios-periodo.ts): madrugada, manhã, tarde e noite. */
 function dentroDoPeriodo(iso: string, periodo?: string | null) {
-  if (!periodo) return true;
-  const h = horaNumerica(iso);
-  if (periodo === "manha") return h < 12;
-  if (periodo === "tarde") return h >= 12 && h < 18;
-  if (periodo === "noite") return h >= 18;
-  return true;
+  if (!periodo || periodo === "qualquer") return true;
+  return periodoDaHora(formatarHora(iso)) === periodo;
 }
 
 /* ------------------------------------------------------------------ catálogo */
@@ -404,7 +401,7 @@ export async function consultarDisponibilidadeCore(params: {
   medicoId?: string | null;
   dias?: number;
   limite?: number;
-  periodo?: "manha" | "tarde" | "noite" | null;
+  periodo?: Periodo | null;
   data?: string | null;
   /** Comparação entre médicos não pode perder vagas por corte de linhas ocupadas. */
   completa?: boolean;
@@ -529,6 +526,87 @@ async function disponibilidadeDoPedido(ctx: CtxNinaPaciente, params: Parameters<
   if (ctx.estado) ctx.estado.appointment.procedimento_solicitado = { ...pedido, procedimento_id: procedimento.id };
   return consultarDisponibilidadeCore({ ...params, procedimentoId: procedimento.id });
 }
+
+/* ------------------------------------------ horários apresentados por período */
+
+type FiltroPedidoHorarios = { periodo?: Periodo | "qualquer"; a_partir_da_hora?: string; mais?: boolean };
+
+/**
+ * O dia inteiro, sem cortar por período nem por limite de linhas: mostrar 10
+ * horários não pode esconder os demais (horarios-periodo.ts).
+ */
+async function lerDiaCompleto(
+  ctx: CtxNinaPaciente,
+  base: { especialidadeId?: string | null; medicoId?: string | null },
+  data: string,
+): Promise<SlotNina[] | "modalidade_pendente"> {
+  const slots = await enriquecerModalidades(ctx.clinicaId, await disponibilidadeDoPedido(ctx, {
+    clinicaId: ctx.clinicaId, ...base, data, dias: 60, completa: true,
+  }), escopoModalidade(ctx));
+  return slots.some((s) => !permiteReserva(s.modalidade)) ? "modalidade_pendente" : slots;
+}
+
+/** Profissional (ou especialidade), atendimento e data: trocar qualquer um reinicia a lista. */
+function chaveDoDia(ctx: CtxNinaPaciente, base: { especialidadeId?: string | null; medicoId?: string | null }, data: string) {
+  const pedido = procedimentoDaSessao(ctx.estado, ctx.clinicaId);
+  const conhecimento = ctx.estado?.knowledge_context;
+  const atendimento = pedido?.catalogo_id ??
+    (conhecimento && conhecimento.sessionId === ctx.estado?.session_id ? conhecimento.consulta?.termo ?? null : null);
+  return chavePaginacao({ medicoId: base.medicoId, especialidadeId: base.especialidadeId, atendimento, data });
+}
+
+/**
+ * Aplica a regra de apresentação ao dia e guarda como opções da sessão TODOS
+ * os horários já mostrados nessa lista (cada página soma à anterior), relidos
+ * da agenda agora — um horário que deixou de estar livre sai das opções.
+ */
+async function apresentarDia(
+  ctx: CtxNinaPaciente,
+  e: { chave: string; slots: SlotNina[]; filtro: FiltroPedidoHorarios },
+): Promise<{ plano: PlanoHorarios<SlotNina>; pendencia: ResultadoFerramenta | null }> {
+  const pag = paginacaoVigente(ctx.estado, ctx.clinicaId, e.chave);
+  const informado: FiltroHorarios | null = e.filtro.periodo || e.filtro.a_partir_da_hora
+    ? { periodo: e.filtro.periodo ?? null, a_partir_de: e.filtro.a_partir_da_hora ?? null } : null;
+  const mesmoFiltro = !informado || JSON.stringify(informado) === JSON.stringify(pag?.filtro ?? null);
+  const mais = e.filtro.mais === true && pag !== null && mesmoFiltro;
+  const filtro = informado ?? (e.filtro.mais ? pag?.filtro ?? null : null);
+  const plano = planejarHorarios(e.slots, { filtro, mais, jaApresentados: pag?.apresentados ?? [] });
+  const novos = plano.modo === "todos" || plano.modo === "lista" ? plano.horarios.map(chaveHorario) : [];
+  const apresentados = [...new Set([...(mais ? pag!.apresentados : []), ...novos])];
+  const opcoes = horariosDistintos(e.slots).filter((s) => apresentados.includes(chaveHorario(s)));
+  const pendencia = await guardarOpcoes(ctx, opcoes);
+  if (pendencia) return { plano, pendencia };
+  registrarPaginacao(ctx.estado, {
+    clinica_id: ctx.clinicaId,
+    chave: e.chave,
+    filtro: plano.modo === "lista" || plano.modo === "esgotado" ? plano.filtro : filtro,
+    aguardando: plano.modo === "todos" || plano.modo === "lista" ? "horario" : "periodo",
+    periodos_oferecidos: "periodos" in plano ? plano.periodos.map((p) => p.periodo) : [],
+    apresentados,
+  });
+  return { plano, pendencia: null };
+}
+
+/** Campos do retorno comuns às ferramentas de agenda. */
+function camposDoPlano(plano: PlanoHorarios<SlotNina>) {
+  const base = { modo_apresentacao: plano.modo };
+  switch (plano.modo) {
+    case "todos":
+      return { ...base, total_horarios: plano.total };
+    case "lista":
+      return { ...base, periodo: plano.filtro.periodo ?? null, a_partir_da_hora: plano.filtro.a_partir_de ?? null,
+        ha_mais: plano.restantes > 0, restantes: plano.restantes };
+    case "escolher_periodo":
+      return { ...base, periodos_com_vagas: plano.periodos, total_horarios: plano.total };
+    case "esgotado":
+      return { ...base, periodos_com_vagas: plano.periodos, ja_apresentados: plano.total_no_filtro };
+    case "sem_horarios_no_filtro":
+      return { ...base, periodos_com_vagas: plano.periodos, total_horarios: plano.total };
+  }
+}
+
+const horariosDoPlano = (plano: PlanoHorarios<SlotNina>) =>
+  plano.modo === "todos" || plano.modo === "lista" ? plano.horarios : [];
 
 /* ------------------------------------------------- escala × disponibilidade */
 
@@ -686,7 +764,7 @@ export const FERRAMENTAS_NINA_CONSULTA = [
     function: {
       name: "consultar_disponibilidade",
       description:
-        "Consulta vagas REALMENTE livres na agenda do médico escolhido, após solicitação do paciente ou aceite da oferta de verificar vagas. Horários habituais de atendimento vêm do catálogo e dispensam esta consulta. Não usar em uma pergunta geral sobre médicos ou escala.",
+        "Consulta vagas REALMENTE livres na agenda do médico escolhido, após solicitação do paciente ou aceite da oferta de verificar vagas. Horários habituais de atendimento vêm do catálogo e dispensam esta consulta. Não usar em uma pergunta geral sobre médicos ou escala. Apresentação por período: com até 10 horários no dia, mostra todos; com mais de 10, devolve só os períodos com vaga para você perguntar a preferência (não liste horários ainda). Consulte de novo com periodo, a_partir_da_hora ou mais=true (próximos horários, sem repetir). Se o paciente já disse o período ou um horário de preferência, envie-o direto. Muitos horários nunca justificam encaminhamento.",
       parameters: {
         type: "object",
         properties: {
@@ -696,7 +774,9 @@ export const FERRAMENTAS_NINA_CONSULTA = [
             description: "medico_id de vinculos_agenda devolvido por buscar_medicos OU nome do profissional escolhido. catalogo_id/id do registro de conhecimento não é o UUID operacional.",
           },
           data: { type: "string", description: "AAAA-MM-DD, quando o paciente pediu um dia" },
-          periodo: { type: "string", description: "manha, tarde ou noite" },
+          periodo: { type: "string", enum: ["madrugada", "manha", "tarde", "noite", "qualquer"], description: "Preferência do paciente: madrugada (00h-04h59), manha (05h-11h59; também \"mais cedo\"), tarde (12h-17h59; também \"depois do almoço\"), noite (18h-23h59) ou qualquer (\"tanto faz\", \"qualquer período\": primeiros horários do dia)." },
+          a_partir_da_hora: { type: "string", description: "HH:MM para \"depois das 14h\" (14:00)." },
+          mais: { type: "boolean", description: "true quando o paciente pede mais opções (\"mostra os outros\", \"tem mais?\"): continua a lista já apresentada, sem repetir." },
           dias: { type: "number", description: "Janela de busca em dias (padrão 14, máx 60)" },
         },
       },
@@ -732,7 +812,7 @@ export const FERRAMENTAS_NINA_CONSULTA = [
         atendimento: { type: "string", description: "Especialidade ou procedimento exato publicado, ex.: Otorrinolaringologia. Preserve a consulta/procedimento do paciente." },
         data: { type: "string", description: "AAAA-MM-DD para dia exato, inclusive hoje; não substitua por outro dia." },
         a_partir_de: { type: "string", description: "AAAA-MM-DD quando houver data mínima" },
-        periodo: { type: "string", enum: ["manha", "tarde", "noite"] },
+        periodo: { type: "string", enum: ["madrugada", "manha", "tarde", "noite"] },
         dia_semana: { type: "number", description: "0=domingo até 6=sábado" },
         dias: { type: "number", description: "Janela a partir de agora, padrão e máximo 60 dias" },
       }, required: ["tipo", "atendimento"], additionalProperties: false },
@@ -743,7 +823,7 @@ export const FERRAMENTAS_NINA_CONSULTA = [
     function: {
       name: "proxima_vaga",
       description:
-        "Primeira vaga REAL disponível do médico escolhido, após pedido do paciente por vagas. Aceita 'a próxima disponível', 'a primeira vaga', 'a quinta-feira mais próxima' ou 'qualquer horário', sem exigir uma data exata. Exige definir o médico; uma pergunta geral sobre a especialidade não autoriza consultar vagas.",
+        "Primeira vaga REAL disponível do médico escolhido, após pedido do paciente por vagas. Aceita 'a próxima disponível', 'a primeira vaga', 'a quinta-feira mais próxima' ou 'qualquer horário', sem exigir uma data exata. Exige definir o médico; uma pergunta geral sobre a especialidade não autoriza consultar vagas. Apresentação por período: com até 10 horários no dia, mostra todos; com mais de 10, devolve só os períodos com vaga para você perguntar a preferência (não liste horários ainda). Consulte de novo com periodo, a_partir_da_hora ou mais=true (próximos horários, sem repetir). Se o paciente já disse o período ou um horário de preferência, envie-o direto. Muitos horários nunca justificam encaminhamento.",
       parameters: {
         type: "object",
         properties: {
@@ -753,7 +833,9 @@ export const FERRAMENTAS_NINA_CONSULTA = [
           },
           especialidade: { type: "string" },
           a_partir_de: { type: "string", description: "AAAA-MM-DD (padrão: hoje)" },
-          periodo: { type: "string", description: "manha, tarde ou noite" },
+          periodo: { type: "string", enum: ["madrugada", "manha", "tarde", "noite", "qualquer"], description: "Preferência do paciente: madrugada (00h-04h59), manha (05h-11h59; também \"mais cedo\"), tarde (12h-17h59; também \"depois do almoço\"), noite (18h-23h59) ou qualquer (\"tanto faz\", \"qualquer período\": primeiros horários do dia)." },
+          a_partir_da_hora: { type: "string", description: "HH:MM para \"depois das 14h\" (14:00)." },
+          mais: { type: "boolean", description: "true quando o paciente pede mais opções (\"mostra os outros\", \"tem mais?\"): continua a lista já apresentada, sem repetir." },
           dia_semana: {
             type: "number",
             description:
@@ -893,6 +975,13 @@ const zVerificarHorario = z.object({
   data: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   hora: z.string().regex(/^\d{1,2}:\d{2}$/),
 });
+/** "14:00", "14h", "14h30" ou "14" → "HH:MM". */
+const zHoraDoDia = z.string().trim()
+  .regex(/^([01]?\d|2[0-3])(?:[:h]([0-5]\d))?h?$/i)
+  .transform((v) => {
+    const [, h, m] = /^(\d{1,2})(?:[:h](\d{2}))?/i.exec(v)!;
+    return `${h!.padStart(2, "0")}:${m ?? "00"}`;
+  });
 const zProximaVaga = z.object({
   medico_id: z.string().trim().min(2).max(160).optional(),
   especialidade: z.string().max(120).optional(),
@@ -900,7 +989,9 @@ const zProximaVaga = z.object({
     .string()
     .regex(/^\d{4}-\d{2}-\d{2}$/)
     .optional(),
-  periodo: z.enum(["manha", "tarde", "noite"]).optional(),
+  periodo: z.enum([...PERIODOS_IDS, "qualquer"]).optional(),
+  a_partir_da_hora: zHoraDoDia.optional(),
+  mais: z.boolean().optional(),
   /** 0=domingo … 6=sábado. "a próxima quinta" vira dia_semana = 4. */
   dia_semana: z.coerce.number().int().min(0).max(6).optional(),
   dias: z.coerce.number().int().min(1).max(60).optional(),
@@ -914,7 +1005,9 @@ const zDisponibilidade = z.object({
     .string()
     .regex(/^\d{4}-\d{2}-\d{2}$/)
     .optional(),
-  periodo: z.enum(["manha", "tarde", "noite"]).optional(),
+  periodo: z.enum([...PERIODOS_IDS, "qualquer"]).optional(),
+  a_partir_da_hora: zHoraDoDia.optional(),
+  mais: z.boolean().optional(),
   dias: z.coerce.number().int().min(1).max(60).optional(),
 });
 const zIdentificar = z.object({
@@ -1125,7 +1218,7 @@ async function executarFerramentaInterna(
           let vagas: SlotNina[];
           try {
             vagas = await disponibilidadeDoPedido(ctx, { clinicaId: ctx.clinicaId, medicoId,
-              data: p.data, dias: p.dias ?? 60, periodo: p.periodo, completa: true });
+              data: p.data, dias: p.dias ?? 60, periodo: p.periodo === "qualquer" ? null : p.periodo, completa: true });
             vagas = vagas.filter(s => (!p.a_partir_de || dataISODoSlot(s.inicio) >= p.a_partir_de) &&
               (p.dia_semana === undefined || diaSemanaDe(dataISODoSlot(s.inicio)) === p.dia_semana))
               .sort((a, b) => Date.parse(a.inicio) - Date.parse(b.inicio));
@@ -1509,18 +1602,31 @@ async function executarFerramentaInterna(
           medicoId = r.id;
           medicoNome = r.nome;
         }
+        const base = { especialidadeId, medicoId };
+        const periodoBusca = p.periodo && p.periodo !== "qualquer" ? p.periodo : null;
         let slots: SlotNina[];
+        let dataDia: string | null = p.data ?? null;
         try {
-          slots = await disponibilidadeDoPedido(ctx, {
-            clinicaId: ctx.clinicaId,
-            especialidadeId,
-            medicoId,
-            dias: p.dias ?? (p.data ? 30 : 14),
-            periodo: p.periodo ?? null,
-            data: p.data ?? null,
-          });
-          slots = await enriquecerModalidades(ctx.clinicaId, slots, escopoModalidade(ctx));
-          if (slots.some(s => !permiteReserva(s.modalidade))) return modalidadePendente();
+          if (p.data) {
+            // Dia pedido: lido inteiro; período e página são decididos na apresentação.
+            const dia = await lerDiaCompleto(ctx, base, p.data);
+            if (dia === "modalidade_pendente") return modalidadePendente();
+            slots = dia;
+          } else {
+            // Sem dia: o primeiro dia com vaga (no período pedido), depois lido inteiro.
+            const janela = await enriquecerModalidades(ctx.clinicaId, await disponibilidadeDoPedido(ctx, {
+              clinicaId: ctx.clinicaId, ...base, dias: p.dias ?? 14, periodo: periodoBusca,
+            }), escopoModalidade(ctx));
+            if (janela.some(s => !permiteReserva(s.modalidade))) return modalidadePendente();
+            const primeiro = horariosDistintos(janela)[0];
+            slots = [];
+            if (primeiro) {
+              dataDia = dataISODoSlot(primeiro.inicio);
+              const dia = await lerDiaCompleto(ctx, base, dataDia);
+              if (dia === "modalidade_pendente") return modalidadePendente();
+              slots = dia.length ? dia : janela.filter((s) => dataISODoSlot(s.inicio) === dataDia);
+            }
+          }
         } catch (e) {
           return falhaAgenda(e, "consultar_disponibilidade");
         }
@@ -1528,16 +1634,16 @@ async function executarFerramentaInterna(
           medico: medicoNome,
           medico_id: medicoId,
           especialidade_id: especialidadeId,
-          data: p.data ?? null,
+          data: dataDia,
           periodo: p.periodo ?? null,
           slots: slots.length,
         });
         await auditar(ctx, "consultar_disponibilidade", { ...p, slots_encontrados: slots.length }, {
           ok: true,
         });
-        const pendencia = await guardarOpcoes(ctx, slots.slice(0, 12));
-        if (pendencia) return pendencia;
         if (slots.length === 0) {
+          const pendencia = await guardarOpcoes(ctx, []);
+          if (pendencia) return pendencia;
           // Diferencia "não atende nesse dia" de "atende, mas está cheio".
           if (medicoId && p.data) {
             const { atende } = await medicoAtendeNoDia(ctx.clinicaId, medicoId, p.data);
@@ -1563,10 +1669,15 @@ async function executarFerramentaInterna(
           }
           return semVaga("NO_AVAILABILITY", "Nenhum horário livre com esses critérios.");
         }
+        const { plano, pendencia } = await apresentarDia(ctx, {
+          chave: chaveDoDia(ctx, base, dataDia!), slots, filtro: p,
+        });
+        if (pendencia) return pendencia;
         return {
 
           ok: true,
-          horarios: slots.slice(0, 12).map((s) => ({
+          data: dataDia,
+          horarios: horariosDoPlano(plano).map((s) => ({
             medico_id: s.medico_id,
             medico: s.medico_nome,
             especialidade: s.especialidade,
@@ -1577,11 +1688,13 @@ async function executarFerramentaInterna(
             modalidade_atendimento: s.modalidade,
             orientacao: orientacaoModalidade(s.modalidade ?? "nao_definida"),
           })),
-          total: slots.length,
+          ...camposDoPlano(plano),
+          total: horariosDistintos(slots).length,
           // Estes são os ÚNICOS horários realmente livres. A escala da planilha
           // (ex.: 09h-18h) não é vaga.
           instrucao:
-            "Ao apresentar estes horários, inclua também o valor oficial do atendimento solicitado vindo de consultar_base_conhecimento, com a forma de pagamento e a condição correspondentes (se ainda não consultou, consulte antes de responder). Preserve o exame/procedimento: a consulta da especialidade do executante não o substitui. Se não houver valor cadastrado, não estime nem cite preço. Mostre de 3 a 5 opções, agrupadas por médico, com data, horário e unidade.",
+            "Ao apresentar horários, inclua também o valor oficial do atendimento solicitado vindo de consultar_base_conhecimento, com a forma de pagamento e a condição correspondentes (se ainda não consultou, consulte antes de responder). Preserve o exame/procedimento: a consulta da especialidade do executante não o substitui. Se não houver valor cadastrado, não estime nem cite preço. Agrupe por médico, com data, horário e unidade. " +
+            instrucaoDoPlano(plano),
         };
 
       }
@@ -1606,6 +1719,7 @@ async function executarFerramentaInterna(
             medicoId: r.id,
             dias: 60,
             data: p.data,
+            completa: true,
           });
           doDia = await enriquecerModalidades(ctx.clinicaId, doDia, escopoModalidade(ctx));
           if (doDia.some(s => !permiteReserva(s.modalidade))) return modalidadePendente();
@@ -1631,9 +1745,21 @@ async function executarFerramentaInterna(
           { ...p, atende_no_dia: atende, slots_encontrados: doDia.length },
           { ok: true },
         );
-        const alternativas = doDia.filter(s => s.hora !== hora).slice(0, 4);
-        const pendencia = await guardarOpcoes(ctx, [...(alvo ? [alvo] : []), ...alternativas]);
-        if (pendencia) return pendencia;
+        let alternativas = doDia.filter(s => s.hora !== hora).slice(0, 4);
+        let planoAlternativas: PlanoHorarios<SlotNina> | null = null;
+        if (!alvo && doDia.length) {
+          // Horário pedido ocupado: o período dele é a preferência já informada.
+          const { plano, pendencia } = await apresentarDia(ctx, {
+            chave: chaveDoDia(ctx, { medicoId: r.id }, p.data), slots: doDia,
+            filtro: { periodo: periodoDaHora(hora) ?? "qualquer" },
+          });
+          if (pendencia) return pendencia;
+          planoAlternativas = plano;
+          alternativas = horariosDoPlano(plano);
+        } else {
+          const pendencia = await guardarOpcoes(ctx, [...(alvo ? [alvo] : []), ...alternativas]);
+          if (pendencia) return pendencia;
+        }
         if (atende === false)
           return {
             ok: true,
@@ -1659,6 +1785,8 @@ async function executarFerramentaInterna(
             orientacao: orientacaoModalidade(alvo.modalidade ?? "nao_definida") } : {}),
           alternativas: alternativas.map((s) => ({ hora: s.hora, inicio: s.inicio, fim: s.fim, modalidade_atendimento: s.modalidade,
               orientacao: orientacaoModalidade(s.modalidade ?? "nao_definida") })),
+          ...(planoAlternativas ? { ...camposDoPlano(planoAlternativas),
+            instrucao: "O horário pedido não está livre; as alternativas são do mesmo dia. " + instrucaoDoPlano(planoAlternativas) } : {}),
         };
       }
 
@@ -1701,7 +1829,7 @@ async function executarFerramentaInterna(
             // só um dia da semana.
             dias: p.dias ?? 60,
             limite: 800,
-            periodo: p.periodo ?? null,
+            periodo: p.periodo && p.periodo !== "qualquer" ? p.periodo : null,
           });
           todos = await enriquecerModalidades(ctx.clinicaId, todos, escopoModalidade(ctx));
           if (todos.some(s => !permiteReserva(s.modalidade))) return modalidadePendente();
@@ -1728,39 +1856,63 @@ async function executarFerramentaInterna(
           { ...p, slots_encontrados: slots.length },
           { ok: slots.length > 0 },
         );
-        const pendencia = await guardarOpcoes(ctx, slots.slice(0, 4));
-        if (pendencia) return pendencia;
-        if (slots.length === 0)
+        if (slots.length === 0) {
+          const pendencia = await guardarOpcoes(ctx, []);
+          if (pendencia) return pendencia;
           return semVaga(
             "NO_AVAILABILITY",
             `Não há vaga disponível nos próximos ${p.dias ?? 60} dias com esses critérios.`,
             { medico: medicoNome },
           );
-        const primeira = slots[0]!;
+        }
+        // O primeiro dia com vaga, lido inteiro: o período e a página vêm da apresentação.
+        const dataDia = dataISODoSlot(horariosDistintos(slots)[0]!.inicio);
+        const base = { especialidadeId, medicoId };
+        let doDia: SlotNina[];
+        try {
+          const dia = await lerDiaCompleto(ctx, base, dataDia);
+          if (dia === "modalidade_pendente") return modalidadePendente();
+          doDia = dia.length ? dia : slots.filter((s) => dataISODoSlot(s.inicio) === dataDia);
+        } catch (e) {
+          return falhaAgenda(e, "proxima_vaga");
+        }
+        const { plano, pendencia } = await apresentarDia(ctx, {
+          chave: chaveDoDia(ctx, base, dataDia), slots: doDia,
+          filtro: { periodo: p.periodo, a_partir_da_hora: p.a_partir_da_hora, mais: p.mais },
+        });
+        if (pendencia) return pendencia;
+        const horarios = horariosDoPlano(plano);
+        const primeira = horarios[0];
         return {
 
           ok: true,
-          proxima: {
-            modalidade_atendimento: primeira.modalidade,
-            orientacao: orientacaoModalidade(primeira.modalidade!),
-            medico_id: primeira.medico_id,
-            medico: primeira.medico_nome,
-            especialidade: primeira.especialidade,
-            data: primeira.data,
-            hora: primeira.hora,
-            inicio: primeira.inicio,
-            fim: primeira.fim,
-          },
-          seguintes: slots.slice(1, 4).map((s) => ({
-            modalidade_atendimento: s.modalidade,
-            orientacao: orientacaoModalidade(s.modalidade!),
-            medico: s.medico_nome,
-            medico_id: s.medico_id,
-            data: s.data,
-            hora: s.hora,
-            inicio: s.inicio,
-            fim: s.fim,
-          })),
+          data: dataDia,
+          ...(primeira ? {
+            proxima: {
+              modalidade_atendimento: primeira.modalidade,
+              orientacao: orientacaoModalidade(primeira.modalidade!),
+              medico_id: primeira.medico_id,
+              medico: primeira.medico_nome,
+              especialidade: primeira.especialidade,
+              data: primeira.data,
+              hora: primeira.hora,
+              inicio: primeira.inicio,
+              fim: primeira.fim,
+            },
+            seguintes: horarios.slice(1).map((s) => ({
+              modalidade_atendimento: s.modalidade,
+              orientacao: orientacaoModalidade(s.modalidade!),
+              medico: s.medico_nome,
+              medico_id: s.medico_id,
+              data: s.data,
+              hora: s.hora,
+              inicio: s.inicio,
+              fim: s.fim,
+            })),
+          } : { proxima_data: doDia[0]?.data ?? dataDia }),
+          ...camposDoPlano(plano),
+          instrucao: (primeira ? "Em proxima está o primeiro horário apresentado e em seguintes os demais, todos no mesmo dia. " : "") +
+            instrucaoDoPlano(plano),
         };
       }
 

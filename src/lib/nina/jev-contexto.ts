@@ -8,6 +8,7 @@
  * e vai junto a etapa do atendimento com as opções já oferecidas.
  */
 import type { EstadoFluxoNina } from "./fluxo-estado-normalizar";
+import { escolhaDeHorariosPendente } from "./horarios-periodo";
 
 export type MensagemHistoricoJev = {
   id?: string | null;
@@ -102,6 +103,8 @@ export function contextoAtendimentoJev(estado: EstadoFluxoNina | null | undefine
         : null,
     profissional_escolhido: estado?.appointment?.doctor_name ?? null,
     opcoes_oferecidas: opcoesOferecidasJev(estado),
+    // 26/09/2026: a Nina perguntou o período ou mostrou uma lista de horários.
+    escolha_de_horarios: escolhaDeHorariosPendente(estado),
   };
 }
 
