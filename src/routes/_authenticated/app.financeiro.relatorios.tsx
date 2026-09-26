@@ -148,6 +148,7 @@ import {
   type RateioTipo,
   type RateioTotais,
 } from "@/lib/financeiro/rateio-receita";
+import { carregarForaDoCaixa } from "@/lib/financeiro/fora-do-caixa-carregar";
 import {
   colunasRateio,
   ROTULO_AGRUPADOR,
@@ -740,6 +741,26 @@ function Page() {
   const [rServico, setRServico] = useState("todos");
   const [rTipo, setRTipo] = useState<RateioTipo>("sintetico");
   const [rAgrupar, setRAgrupar] = useState<RateioAgruparPor>("data");
+  /**
+   * Somar no Rateio o que o Movimento de Caixa deixa fora do período:
+   * lançamentos retroativos (digitados depois do dia) e parcelas de cartão
+   * importadas do sistema antigo. Desligado por padrão, como no Dashboard e no
+   * Movimento: assim o Rateio abre com o mesmo dinheiro do caixa. Ligado, volta
+   * a mostrar o período por competência.
+   *
+   * Decisão do dono em 26/09/2026: o Rateio divergia do Movimento de Caixa
+   * (01 a 25/09/2026: R$ 3.098,00 de retroativos e R$ 8.817,00 de parcelas
+   * importadas) e a escolha foi a mesma de 23/09 — as duas leituras a um
+   * clique, com a do caixa como padrão.
+   */
+  const [rIncluirRetroativos, setRIncluirRetroativos] = useState(false);
+  /**
+   * Linhas do Rateio que o Movimento de Caixa deixa fora do período atual
+   * (já com os filtros de profissional/serviço aplicados), para o aviso da
+   * tela dizer quantas são e quanto valem — esconder sem avisar faz o
+   * financeiro achar que sumiu lançamento.
+   */
+  const [foraRateio, setForaRateio] = useState<{ qtd: number; valor: number } | null>(null);
   const [servicoAberto, setServicoAberto] = useState(false);
   const [buscaServico, setBuscaServico] = useState("");
   // --- Filtro de Categoria (Rateio e Movimentação Financeira) --------------
@@ -870,6 +891,7 @@ function Page() {
             rModalidade,
             rServico,
             comparar ? `${periodoComp.de}:${periodoComp.ate}` : "sem-comparacao",
+            rIncluirRetroativos ? "com-retroativos" : "sem-retroativos",
           ].join("|")
         : `${tipo}|${from}|${to}`;
   const atualizado = resultado !== null && resultado.chave === chaveAtual;
@@ -1597,7 +1619,7 @@ function Page() {
           rModalidade === "todas" &&
           rServico === "todos" &&
           categorias.length === 0;
-        const [atual, anterior, pago, painel] = await Promise.all([
+        const [atualTodas, anteriorTodas, fora, foraComp, pago, painel] = await Promise.all([
           carregarRateio(ctxRateio, { ...filtrosComuns, de: from, ate: to }),
           comparar
             ? carregarRateio(ctxRateio, {
@@ -1606,17 +1628,43 @@ function Page() {
                 ate: periodoComp.ate,
               })
             : Promise.resolve([] as RateioLinha[]),
+          // Mesmo recorte do Movimento de Caixa e do Dashboard (mesma função):
+          // retroativos e parcelas importadas ficam fora, salvo se o botão
+          // "Incluir lançamentos retroativos" estiver ligado.
+          carregarForaDoCaixa(clinicaAtual.clinica_id, from, to),
+          comparar && !rIncluirRetroativos
+            ? carregarForaDoCaixa(clinicaAtual.clinica_id, periodoComp.de, periodoComp.ate)
+            : Promise.resolve(null),
           // A outra leitura do repasse, a da gaveta: mostrada ao lado do
           // devido para esta tela bater com o Dashboard e o Movimento.
           carregarRepassePagoDetalhado(ctxRateio, clinicaAtual.clinica_id, from, to).catch(
             () => null,
           ),
           semRecorte
-            ? carregarPainelFinanceiro(ctxRateio, clinicaAtual.clinica_id, from, to)
+            ? carregarPainelFinanceiro(
+                ctxRateio,
+                clinicaAtual.clinica_id,
+                from,
+                to,
+                false,
+                rIncluirRetroativos,
+              )
                 .then(resumoPainel)
                 .catch(() => null)
             : Promise.resolve(null),
         ]);
+        const atual = rIncluirRetroativos
+          ? atualTodas
+          : atualTodas.filter((l) => !fora.ids.has(l.id));
+        const anterior =
+          rIncluirRetroativos || !foraComp
+            ? anteriorTodas
+            : anteriorTodas.filter((l) => !foraComp.ids.has(l.id));
+        const linhasFora = atualTodas.filter((l) => fora.ids.has(l.id));
+        setForaRateio({
+          qtd: linhasFora.length,
+          valor: Math.round(linhasFora.reduce((t, l) => t + l.receita, 0) * 100) / 100,
+        });
         setRepassePagoRateio(pago);
         setSaldoCaixaRateio(painel);
         brutasRateio = atual;
@@ -2575,7 +2623,32 @@ function Page() {
               pagamento recebido conta como um atendimento; o que não tem prestador aparece sem
               repasse.
             </p>
-
+          )}
+          {/* Mesmo botão do Dashboard e do Movimento de Caixa, e desligado
+              como lá: o Rateio abre com o mesmo dinheiro do caixa. */}
+          {tipo === "rateio" && (
+            <div className="flex items-center gap-2">
+              <Switch
+                id="rateio-incluir-retroativos"
+                checked={rIncluirRetroativos}
+                onCheckedChange={setRIncluirRetroativos}
+              />
+              <Label
+                htmlFor="rateio-incluir-retroativos"
+                className="text-xs cursor-pointer"
+                title="Desligado (padrão): mesma conta do Movimento de Caixa — fica fora o que foi digitado depois do dia e as parcelas de cartão do sistema antigo. Ligado: entram também esses lançamentos, pela data de competência."
+              >
+                Incluir lançamentos retroativos (ver o período por competência)
+              </Label>
+            </div>
+          )}
+          {tipo === "rateio" && atualizado && foraRateio && foraRateio.qtd > 0 && (
+            <p className="text-xs text-sky-900 bg-sky-50 border border-sky-300 rounded-md px-3 py-2">
+              Nada a fazer — é só informação.{" "}
+              {rIncluirRetroativos
+                ? `Estes números JÁ INCLUEM ${foraRateio.qtd} lançamento(s) (${brl(foraRateio.valor)}) que o Movimento de Caixa deixa de fora: digitados depois do dia ou parcelas de cartão do sistema antigo. Por isso o total aqui fica maior que o do Movimento de Caixa.`
+                : `Ficaram fora destes números, como no Movimento de Caixa, ${foraRateio.qtd} lançamento(s) (${brl(foraRateio.valor)}) digitados depois do dia ou parcelas de cartão do sistema antigo. Para vê-los, ligue o botão acima.`}
+            </p>
           )}
           {tipo === "movimentacao" && (
             <p className="text-xs text-muted-foreground">

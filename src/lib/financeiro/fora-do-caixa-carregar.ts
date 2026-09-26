@@ -13,8 +13,10 @@
  *
  * A regra é a mesma do Movimento de Caixa, pelas mesmas funções:
  * `ehLancamentoRetroativo` (competência anterior à digitação e dinheiro fora
- * do cupom daquele dia) e `ehParcelaImportada`. O Rateio da Receita e o Painel
- * Executivo NÃO usam este recorte: lá a receita continua pela competência.
+ * do cupom daquele dia) e `ehParcelaImportada`. Desde 26/09/2026 o Rateio da
+ * Receita também usa este recorte por padrão, com o mesmo botão para incluir
+ * os retroativos. O Painel Executivo NÃO usa: lá a receita continua pela
+ * competência.
  */
 import { supabase } from "@/integrations/supabase/client";
 import { comCache, TTL_PERIODO } from "@/lib/financeiro/cache-periodo";
