@@ -4,6 +4,23 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* =====================================================================
+ * `tela-alta:` — espaçamento confortável só em monitor grande
+ * ---------------------------------------------------------------------
+ * A Agenda nasce compacta (notebook) e usa `tela-alta:` para voltar ao
+ * espaçamento folgado onde há altura sobrando.
+ *
+ * O corte é pela ALTURA da janela, e não pela largura, de propósito: o que
+ * a recepção reclamou foi quantas linhas cabem na vertical. A tela que o
+ * dono fotografou tinha 1886px de largura e só 841px de altura — larga e
+ * baixa. Um corte por largura (`lg:`, `xl:`) teria classificado aquela tela
+ * como monitor grande e não resolveria nada.
+ *
+ * 900px separa bem: notebook 1366×768 ou 1920×1080 com escala de 125–150%
+ * fica abaixo; monitor Full HD maximizado passa dos 900px de área útil.
+ * ===================================================================== */
+@custom-variant tela-alta (@media (min-height: 900px));
+
 /*
  * Design system definition.
  *

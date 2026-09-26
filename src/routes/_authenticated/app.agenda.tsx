@@ -8812,12 +8812,12 @@ function AgendaPage() {
       className={
         variante === "sheet"
           ? "grid grid-cols-1 gap-3"
-          : "mt-2 flex w-full items-end gap-2.5 rounded-xl border border-slate-200/80 bg-card p-2.5 shadow-xs"
+          : "mt-2 tela-alta:mt-3 flex w-full items-end gap-2.5 rounded-xl border border-slate-200/80 bg-card p-2 tela-alta:p-3.5 shadow-xs"
       }
     >
       {/* Profissional */}
-      <div className="flex min-w-0 flex-[1.6] flex-col gap-0.5">
-        <Label className="flex h-3.5 items-center text-[11px] font-bold uppercase tracking-wider text-slate-500">
+      <div className="flex min-w-0 flex-[1.6] flex-col gap-0.5 tela-alta:gap-1">
+        <Label className="flex h-3.5 tela-alta:h-4 items-center text-[11px] font-bold uppercase tracking-wider text-slate-500">
           Profissional
         </Label>
         <MedicoFiltroInput
@@ -8841,8 +8841,8 @@ function AgendaPage() {
       </div>
 
       {/* Tipo de Agenda */}
-      <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-        <Label className="flex h-3.5 items-center text-[11px] font-bold uppercase tracking-wider text-slate-500">
+      <div className="flex min-w-0 flex-1 flex-col gap-0.5 tela-alta:gap-1">
+        <Label className="flex h-3.5 tela-alta:h-4 items-center text-[11px] font-bold uppercase tracking-wider text-slate-500">
           Tipo de agenda
         </Label>
         {agendaTravada ? (
@@ -8851,13 +8851,13 @@ function AgendaPage() {
           <div
             data-agenda-filtro-tipo-travado
             title="Definido pelo profissional selecionado"
-            className="flex h-9 w-full cursor-not-allowed select-none items-center truncate rounded-lg border border-slate-200 bg-slate-100 px-2.5 text-xs font-semibold text-slate-500"
+            className="flex h-8 tela-alta:h-9 w-full cursor-not-allowed select-none items-center truncate rounded-lg border border-slate-200 bg-slate-100 px-2.5 text-xs font-semibold text-slate-500"
           >
             {agendaTravadaRotulo}
           </div>
         ) : (
           <Select value={filtroAgenda} onValueChange={setFiltroAgenda}>
-            <SelectTrigger className="h-9 w-full truncate rounded-lg border-slate-200 bg-card px-2.5 text-xs font-semibold text-slate-800">
+            <SelectTrigger className="h-8 tela-alta:h-9 w-full truncate rounded-lg border-slate-200 bg-card px-2.5 text-xs font-semibold text-slate-800">
               <SelectValue placeholder="TODAS" />
             </SelectTrigger>
             <SelectContent>
@@ -8892,12 +8892,12 @@ function AgendaPage() {
       </div>
 
       {/* Situação */}
-      <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-        <Label className="flex h-3.5 items-center text-[11px] font-bold uppercase tracking-wider text-slate-500">
+      <div className="flex min-w-0 flex-1 flex-col gap-0.5 tela-alta:gap-1">
+        <Label className="flex h-3.5 tela-alta:h-4 items-center text-[11px] font-bold uppercase tracking-wider text-slate-500">
           Situação
         </Label>
         <Select value={filtroStatus} onValueChange={setFiltroStatus}>
-          <SelectTrigger className="h-9 w-full truncate rounded-lg border-slate-200 bg-card px-2.5 text-xs font-semibold text-slate-800">
+          <SelectTrigger className="h-8 tela-alta:h-9 w-full truncate rounded-lg border-slate-200 bg-card px-2.5 text-xs font-semibold text-slate-800">
             <SelectValue placeholder="TODOS" />
           </SelectTrigger>
           <SelectContent>
@@ -8915,7 +8915,7 @@ function AgendaPage() {
       </div>
 
       {/* Data */}
-      <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+      <div className="flex min-w-0 flex-1 flex-col gap-0.5 tela-alta:gap-1">
         <Label className="flex h-4 items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-slate-500">
           Data
           <span
@@ -8976,12 +8976,12 @@ function AgendaPage() {
       </div>
 
       {/* Especialidade */}
-      <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-        <Label className="flex h-3.5 items-center text-[11px] font-bold uppercase tracking-wider text-slate-500">
+      <div className="flex min-w-0 flex-1 flex-col gap-0.5 tela-alta:gap-1">
+        <Label className="flex h-3.5 tela-alta:h-4 items-center text-[11px] font-bold uppercase tracking-wider text-slate-500">
           Especialidade
         </Label>
         <Select value={filtroEspecialidade} onValueChange={setFiltroEspecialidade}>
-          <SelectTrigger className="h-9 w-full truncate rounded-lg border-slate-200 bg-card px-2.5 text-xs font-semibold text-slate-800">
+          <SelectTrigger className="h-8 tela-alta:h-9 w-full truncate rounded-lg border-slate-200 bg-card px-2.5 text-xs font-semibold text-slate-800">
             <SelectValue placeholder="TODOS" />
           </SelectTrigger>
           <SelectContent>
@@ -8996,8 +8996,8 @@ function AgendaPage() {
       </div>
 
       {/* Cliente + Ações rápidas juntos */}
-      <div className="flex min-w-0 flex-[1.6] flex-col gap-0.5">
-        <Label className="flex h-3.5 items-center text-[11px] font-bold uppercase tracking-wider text-slate-500">
+      <div className="flex min-w-0 flex-[1.6] flex-col gap-0.5 tela-alta:gap-1">
+        <Label className="flex h-3.5 tela-alta:h-4 items-center text-[11px] font-bold uppercase tracking-wider text-slate-500">
           Cliente
         </Label>
         <Input
@@ -9217,14 +9217,14 @@ function AgendaPage() {
           <span className="min-w-0">{SEM_PERMISSAO_MSG}</span>
         </div>
       )}
-      <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-2 sm:flex sm:flex-wrap sm:justify-between">
+      <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-2 tela-alta:gap-y-3 sm:flex sm:flex-wrap sm:justify-between">
         <div className="flex min-w-0 items-center gap-3">
-          <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary">
+          <div className="grid h-9 w-9 tela-alta:h-10 tela-alta:w-10 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary">
             <CalendarDays className="h-5 w-5" />
           </div>
           <div className="min-w-0">
-            <h1 className="truncate text-lg font-bold tracking-tight text-slate-900">Agendas</h1>
-            <div className="mt-1 flex flex-wrap items-center gap-2">
+            <h1 className="truncate text-lg tela-alta:text-xl font-bold tracking-tight text-slate-900">Agendas</h1>
+            <div className="mt-1 tela-alta:mt-1.5 flex flex-wrap items-center gap-2">
               <span className="rounded-md bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
                 {(() => {
                   const label = new Intl.DateTimeFormat("pt-BR", {
@@ -12316,7 +12316,7 @@ function AgendaPage() {
         <div className="hidden lg:block">{renderFiltros("desktop")}</div>
         {/* KPIs REMOVIDOS */}
         {/* ESPAÇAMENTO ENTRE FILTROS E TABELA */}
-        <div className="h-2 xl:h-3"></div>
+        <div className="h-2 xl:h-3 tela-alta:h-4 tela-alta:xl:h-8"></div>
 
         {/* Resumo do dia: volumetria das fichas da DATA e do PROFISSIONAL
             escolhidos nos filtros acima. Fica aqui, entre os filtros e a
@@ -12876,7 +12876,7 @@ function AgendaPage() {
                 <TableHeader className="sticky top-0 z-20">
                   <TableRow className="bg-muted">
                     <TableHead
-                      className="h-9 w-8 rounded-tl-lg px-1.5"
+                      className="h-9 tela-alta:h-11 w-8 rounded-tl-lg px-1.5"
                       title="Marcar todas as linhas desta página, do jeito que estão filtradas"
                     >
                       <Checkbox
@@ -12895,32 +12895,32 @@ function AgendaPage() {
                         onCheckedChange={toggleAll}
                       />
                     </TableHead>
-                    <TableHead className="h-9 w-auto whitespace-nowrap px-1.5 text-center text-[12px] font-semibold uppercase tracking-wider text-muted-foreground">
+                    <TableHead className="h-9 tela-alta:h-11 w-auto whitespace-nowrap px-1.5 text-center text-[12px] font-semibold uppercase tracking-wider text-muted-foreground">
                       Ficha
                     </TableHead>
-                    <TableHead className="h-9 w-auto whitespace-nowrap px-1.5 text-center text-[12px] font-semibold uppercase tracking-wider text-muted-foreground">
+                    <TableHead className="h-9 tela-alta:h-11 w-auto whitespace-nowrap px-1.5 text-center text-[12px] font-semibold uppercase tracking-wider text-muted-foreground">
                       Dia
                     </TableHead>
-                    <TableHead className="h-9 w-auto whitespace-nowrap px-1.5 text-[12px] font-semibold uppercase tracking-wider text-muted-foreground">
+                    <TableHead className="h-9 tela-alta:h-11 w-auto whitespace-nowrap px-1.5 text-[12px] font-semibold uppercase tracking-wider text-muted-foreground">
                       Data
                     </TableHead>
-                    <TableHead className="h-9 w-auto whitespace-nowrap px-1.5 text-[12px] font-semibold uppercase tracking-wider text-muted-foreground">
+                    <TableHead className="h-9 tela-alta:h-11 w-auto whitespace-nowrap px-1.5 text-[12px] font-semibold uppercase tracking-wider text-muted-foreground">
                       Horário
                     </TableHead>
                     {/* As três colunas de texto livre dividem a sobra da linha em
                     proporção fixa. Sem isso um nome comprido de médico ou de
                     procedimento estica a coluna e empurra as ações para fora
                     da tela em notebook. O conteúdo delas trunca com "…". */}
-                    <TableHead className="h-9 w-[15%] px-1.5 text-[12px] font-semibold uppercase tracking-wider text-muted-foreground">
+                    <TableHead className="h-9 tela-alta:h-11 w-[15%] px-1.5 text-[12px] font-semibold uppercase tracking-wider text-muted-foreground">
                       Profissional
                     </TableHead>
-                    <TableHead className="h-9 w-[22%] px-1.5 text-[12px] font-semibold uppercase tracking-wider text-muted-foreground">
+                    <TableHead className="h-9 tela-alta:h-11 w-[22%] px-1.5 text-[12px] font-semibold uppercase tracking-wider text-muted-foreground">
                       Cliente
                     </TableHead>
-                    <TableHead className="h-9 w-[18%] px-1.5 text-[12px] font-semibold uppercase tracking-wider text-muted-foreground">
+                    <TableHead className="h-9 tela-alta:h-11 w-[18%] px-1.5 text-[12px] font-semibold uppercase tracking-wider text-muted-foreground">
                       Serviço
                     </TableHead>
-                    <TableHead className="h-9 w-[110px] px-1.5 whitespace-nowrap text-[12px] font-semibold uppercase tracking-wider text-muted-foreground">
+                    <TableHead className="h-9 tela-alta:h-11 w-[110px] px-1.5 whitespace-nowrap text-[12px] font-semibold uppercase tracking-wider text-muted-foreground">
                       Situação
                     </TableHead>
                     {/* OBS — coluna-ícone de largura fixa. O texto da observação
@@ -12933,7 +12933,7 @@ function AgendaPage() {
                     >
                       Obs
                     </TableHead>
-                    <TableHead className="h-9 w-[170px] px-1 text-right text-[12px] font-semibold uppercase tracking-wider text-muted-foreground rounded-tr-lg">
+                    <TableHead className="h-9 tela-alta:h-11 w-[170px] px-1 text-right text-[12px] font-semibold uppercase tracking-wider text-muted-foreground rounded-tr-lg">
                       Ações
                     </TableHead>
                   </TableRow>
@@ -13113,7 +13113,7 @@ function AgendaPage() {
                           apagada pela tela (o "Excluir" só age no que está
                           marcado). Quem protege o paciente é a trava dentro de
                           excluirSelecionados, não a caixinha desabilitada. */}
-                            <TableCell className="py-1 px-1.5 align-middle text-xs">
+                            <TableCell className="py-1 tela-alta:py-1.5 px-1.5 align-middle text-xs">
                               <Checkbox
                                 checked={selecionados.has(a.id)}
                                 onCheckedChange={() => toggleSel(a.id)}
@@ -13122,7 +13122,7 @@ function AgendaPage() {
                             </TableCell>
 
                             {/* Ficha */}
-                            <TableCell className="py-1 px-1.5 align-middle text-center font-mono text-xs font-medium">
+                            <TableCell className="py-1 tela-alta:py-1.5 px-1.5 align-middle text-center font-mono text-xs font-medium">
                               {ehFila ? (
                                 <span className="text-sm font-bold text-primary">
                                   #{fichaNum || "—"}
@@ -13133,19 +13133,19 @@ function AgendaPage() {
                             </TableCell>
 
                             {/* Dia da semana */}
-                            <TableCell className="py-1 px-1.5 align-middle text-center text-xs font-medium tabular-nums text-muted-foreground">
+                            <TableCell className="py-1 tela-alta:py-1.5 px-1.5 align-middle text-center text-xs font-medium tabular-nums text-muted-foreground">
                               {fmtDiaSemana(a.inicio)}
                             </TableCell>
 
                             {/* Data */}
-                            <TableCell className="py-1 px-1.5 align-middle whitespace-nowrap text-[12px] text-muted-foreground">
+                            <TableCell className="py-1 tela-alta:py-1.5 px-1.5 align-middle whitespace-nowrap text-[12px] text-muted-foreground">
                               {fmtData(a.inicio)}
                             </TableCell>
 
                             {/* Horário — uma linha só, tabular, 24h. Em agenda de
                             ordem de chegada o horário não é hora marcada: a
                             coluna diz isso em vez de mostrar o relógio. */}
-                            <TableCell className="py-1 px-1.5 align-middle text-[12px] font-semibold tabular-nums whitespace-nowrap text-emerald-600">
+                            <TableCell className="py-1 tela-alta:py-1.5 px-1.5 align-middle text-[12px] font-semibold tabular-nums whitespace-nowrap text-emerald-600">
                               {ehFila ? (
                                 <span className="text-[11px] font-normal text-muted-foreground">
                                   Ordem de chegada
@@ -13158,7 +13158,7 @@ function AgendaPage() {
                             </TableCell>
 
                             {/* Profissional */}
-                            <TableCell className="py-1 px-1.5 align-middle text-xs overflow-hidden">
+                            <TableCell className="py-1 tela-alta:py-1.5 px-1.5 align-middle text-xs overflow-hidden">
                               {(() => {
                                 const label = medicoNomeAgendamento(a);
                                 const m = medicos.find((x) => x.id === a.medico_id);
@@ -13180,7 +13180,7 @@ function AgendaPage() {
                             </TableCell>
 
                             {/* Cliente */}
-                            <TableCell className="py-1 px-1.5 align-middle text-xs overflow-hidden">
+                            <TableCell className="py-1 tela-alta:py-1.5 px-1.5 align-middle text-xs overflow-hidden">
                               {ocultarPaciente ? (
                                 <span className="block truncate text-xs italic text-rose-600">
                                   — aguardando estorno —
@@ -13247,7 +13247,7 @@ function AgendaPage() {
                             </TableCell>
 
                             {/* Serviço */}
-                            <TableCell className="py-1 px-1.5 align-middle text-xs overflow-hidden">
+                            <TableCell className="py-1 tela-alta:py-1.5 px-1.5 align-middle text-xs overflow-hidden">
                               <ProcedimentoCell
                                 valor={procedimentoEfetivo(a.medico_id, a.procedimento)}
                                 rotuloExibicao={
@@ -13272,7 +13272,7 @@ function AgendaPage() {
                             </TableCell>
 
                             {/* Situação */}
-                            <TableCell className="py-1 px-1.5 align-middle text-xs w-[110px] whitespace-nowrap">
+                            <TableCell className="py-1 tela-alta:py-1.5 px-1.5 align-middle text-xs w-[110px] whitespace-nowrap">
                               {ehLivre ? (
                                 (() => {
                                   const lockNome = slotTravadoPorOutro(a);
@@ -13297,7 +13297,7 @@ function AgendaPage() {
                                       // ocupam só o tamanho do texto. Agora ele
                                       // acompanha o próprio conteúdo, com o
                                       // mesmo respiro lateral das etiquetas.
-                                      className="h-6 w-fit px-2.5 text-emerald-600 border-emerald-300 hover:bg-emerald-50 hover:text-emerald-700 font-medium text-xs"
+                                      className="h-6 tela-alta:h-7 w-fit px-2.5 text-emerald-600 border-emerald-300 hover:bg-emerald-50 hover:text-emerald-700 font-medium text-xs"
                                     >
                                       <UserPlus className="h-3 w-3 mr-1.5" />
                                       Agendar
@@ -13338,7 +13338,7 @@ function AgendaPage() {
                           vazia (nem o traço, que já custava largura); com
                           observação mostra o balão com a bolinha vermelha,
                           o texto no tooltip e o modal completo no clique. */}
-                            <TableCell className="w-[34px] min-w-[34px] max-w-[34px] py-1 px-1 align-middle text-center">
+                            <TableCell className="w-[34px] min-w-[34px] max-w-[34px] py-1 tela-alta:py-1.5 px-1 align-middle text-center">
                               {(() => {
                                 const obs = (a.observacoes ?? "").trim();
                                 if (ehLivre || ocultarPaciente || !obs) return null;
@@ -13350,7 +13350,7 @@ function AgendaPage() {
                                           type="button"
                                           aria-label="Ver observação do agendamento"
                                           onClick={() => setObsAg(a)}
-                                          className="relative inline-flex h-6 w-6 items-center justify-center rounded-md text-primary hover:bg-primary/10"
+                                          className="relative inline-flex h-6 tela-alta:h-7 w-6 tela-alta:w-7 items-center justify-center rounded-md text-primary hover:bg-primary/10"
                                         >
                                           <MessageSquareText className="h-4 w-4" />
                                           <span
@@ -13372,7 +13372,7 @@ function AgendaPage() {
                             </TableCell>
 
                             {/* Ações - Botões na linha + Menu
-                                Os botões desta linha são 24px (`h-6 w-6`), e não
+                                Os botões desta linha são 24px (`h-6 tela-alta:h-7 w-6 tela-alta:w-7`), e não
                                 28px. Quem define a altura da linha da tabela são
                                 eles, não o texto: com 24px mais o respiro de 4px,
                                 a linha fica em 32px no lugar de 40px, o que cabe
@@ -13381,7 +13381,7 @@ function AgendaPage() {
                                 alvo de clique menor em troca de menos rolagem,
                                 porque a recepção reclamou de rolar demais.
                                 24px é o piso: não diminuir mais. */}
-                            <TableCell className="w-[170px] min-w-[170px] py-1 px-2 text-right whitespace-nowrap">
+                            <TableCell className="w-[170px] min-w-[170px] py-1 tela-alta:py-1.5 px-2 text-right whitespace-nowrap">
                               <TooltipProvider delayDuration={200}>
                                 <div className="flex items-center justify-end gap-1.5">
                                   {/* Confirmar (1 clique). Ocupa o lugar do check-in:
@@ -13402,7 +13402,7 @@ function AgendaPage() {
                                             size="icon"
                                             aria-label="Confirmar — paciente vem"
                                             onClick={() => mudarStatus(a, "confirmado")}
-                                            className="h-6 w-6 shrink-0 rounded-md border-2 border-emerald-400 text-emerald-600 hover:bg-emerald-50"
+                                            className="h-6 tela-alta:h-7 w-6 tela-alta:w-7 shrink-0 rounded-md border-2 border-emerald-400 text-emerald-600 hover:bg-emerald-50"
                                           >
                                             <CheckCircle2 className="h-3.5 w-3.5" />
                                           </Button>
@@ -13432,7 +13432,7 @@ function AgendaPage() {
                                                 size="icon"
                                                 aria-label="Confirmar presença (check-in)"
                                                 onClick={() => confirmarPresenca(a)}
-                                                className="h-6 w-6 shrink-0 rounded-md border border-emerald-300 text-emerald-600 hover:bg-emerald-50"
+                                                className="h-6 tela-alta:h-7 w-6 tela-alta:w-7 shrink-0 rounded-md border border-emerald-300 text-emerald-600 hover:bg-emerald-50"
                                               >
                                                 <BadgeCheck className="h-3.5 w-3.5" />
                                               </Button>
@@ -13453,7 +13453,7 @@ function AgendaPage() {
                                                   size="icon"
                                                   disabled
                                                   aria-label="Check-in já realizado"
-                                                  className="h-6 w-6 shrink-0 rounded-md border border-emerald-400 bg-emerald-50 text-emerald-600 disabled:opacity-100"
+                                                  className="h-6 tela-alta:h-7 w-6 tela-alta:w-7 shrink-0 rounded-md border border-emerald-400 bg-emerald-50 text-emerald-600 disabled:opacity-100"
                                                 >
                                                   <BadgeCheck className="h-3.5 w-3.5" />
                                                 </Button>
@@ -13477,7 +13477,7 @@ function AgendaPage() {
                                             semFaturamento ? "Sem faturamento" : "Pagamento"
                                           }
                                           onClick={() => cobrarAgendamento(a)}
-                                          className={`h-6 w-6 shrink-0 rounded-md border-2 ${
+                                          className={`h-6 tela-alta:h-7 w-6 tela-alta:w-7 shrink-0 rounded-md border-2 ${
                                             semFaturamento
                                               ? // Cinza, e não o vermelho de "falta
                                                 // cobrar": não há cobrança prevista, e
@@ -13551,7 +13551,7 @@ function AgendaPage() {
                                                   : "Nota Fiscal não emitida"
                                               }
                                               onClick={() => verOuEmitirNota(a)}
-                                              className={`h-6 w-6 shrink-0 rounded-md border-2 ${
+                                              className={`h-6 tela-alta:h-7 w-6 tela-alta:w-7 shrink-0 rounded-md border-2 ${
                                                 emitida
                                                   ? // Azul é exclusivo da nota emitida. O verde desta
                                                     // coluna já significa "pago" e "check-in feito" —
@@ -13601,7 +13601,7 @@ function AgendaPage() {
                                         variant="ghost"
                                         size="icon"
                                         aria-label="Mais ações"
-                                        className="h-6 w-6 shrink-0 rounded-md hover:bg-slate-100 text-slate-600 dark:text-slate-400"
+                                        className="h-6 tela-alta:h-7 w-6 tela-alta:w-7 shrink-0 rounded-md hover:bg-slate-100 text-slate-600 dark:text-slate-400"
                                       >
                                         <MoreHorizontal className="h-4 w-4" />
                                       </Button>
