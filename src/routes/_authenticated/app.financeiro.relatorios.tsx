@@ -31,6 +31,7 @@ import {
   Download,
   FileBarChart,
   FileSpreadsheet,
+  Loader2,
   Minus,
   PhoneCall,
   Printer,
@@ -1809,6 +1810,26 @@ function Page() {
     else toast.success(`${data.length.toLocaleString("pt-BR")} registro(s) encontrados`);
   };
 
+  /**
+   * Ligar ou desligar "Incluir lançamentos retroativos" refaz a busca sozinho,
+   * sem esperar o clique em "Buscar" (pedido do financeiro em 26/09/2026).
+   *
+   * Só quando já há um relatório deste tipo na tela: sem busca anterior, o
+   * botão apenas fica guardado para a próxima. Roda depois do render porque
+   * `carregar` lê o valor do botão pelo estado — chamado no próprio clique,
+   * ainda veria a posição antiga.
+   */
+  const retroativosAnterior = useRef(rIncluirRetroativos);
+  useEffect(() => {
+    if (retroativosAnterior.current === rIncluirRetroativos) return;
+    retroativosAnterior.current = rIncluirRetroativos;
+    if (tipo !== "rateio" && tipo !== "movimentacao") return;
+    if (resultado?.tipo !== tipo) return;
+    void carregar();
+    // Só a troca do botão dispara; `carregar` e o resultado são lidos do render atual.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rIncluirRetroativos]);
+
   /** Cabeçalho de contexto que vai no topo da planilha e da folha impressa. */
   const contextoDoRelatorio = () => {
     const linhasCtx = [
@@ -2658,6 +2679,7 @@ function Page() {
                 id="rateio-incluir-retroativos"
                 checked={rIncluirRetroativos}
                 onCheckedChange={setRIncluirRetroativos}
+                disabled={loading}
               />
               <Label
                 htmlFor="rateio-incluir-retroativos"
@@ -2666,6 +2688,11 @@ function Page() {
               >
                 Incluir lançamentos retroativos (ver o período por competência)
               </Label>
+              {loading && (
+                <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                  <Loader2 className="h-3 w-3 animate-spin" /> Atualizando…
+                </span>
+              )}
             </div>
           )}
           {tipo === "rateio" && atualizado && foraRateio && foraRateio.qtd > 0 && (
