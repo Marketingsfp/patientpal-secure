@@ -220,6 +220,11 @@ export interface RateioLinha {
    * estiver em "todas".
    */
   categoria_nome: string;
+  /**
+   * Valor pago pelo paciente — o mesmo de `valor_pago` desde 26/09/2026, para
+   * o Rateio fechar com o Movimento de Caixa. Zero no laudo e na linha sem
+   * pagamento.
+   */
   receita: number;
   repasse: number;
   /** Parte do médico terceiro (dono do equipamento), quando houver. */
@@ -790,8 +795,15 @@ function reparte(
   // o Rateio e o Dashboard mostrarem R$ 120,00 a mais do que entrou no caixa
   // em 11/09/2026. Sem pagamento não há RECEITA — a linha continua no
   // relatório, valendo zero.
+  //
+  // A receita é SEMPRE o que o paciente pagou. Até 26/09/2026 era `calc.total`,
+  // que a grade sobe até o repasse fixo quando ele passa do valor pago — e o
+  // Rateio fechava acima do Movimento de Caixa (uns R$ 1.285 em 01 a
+  // 23/09/2026). O financeiro pediu o mesmo valor do Movimento de Caixa; o
+  // repasse continua pela grade, então nessas linhas o líquido da clínica fica
+  // negativo, que é o que de fato aconteceu com o dinheiro.
   const semPagamento = num(params.valorPago) <= 0;
-  const receita = semPagamento ? 0 : calc.total > 0 ? calc.total : params.valorPago;
+  const receita = semPagamento ? 0 : num(params.valorPago);
 
   // O REPASSE é outra pergunta, e a resposta depende do motivo do R$ 0,00
   // (mesma regra da guia impressa, em `print-gr`):
