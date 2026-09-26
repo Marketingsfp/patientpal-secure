@@ -8812,12 +8812,12 @@ function AgendaPage() {
       className={
         variante === "sheet"
           ? "grid grid-cols-1 gap-3"
-          : "mt-3 flex w-full items-end gap-2.5 rounded-xl border border-slate-200/80 bg-card p-3.5 shadow-xs"
+          : "mt-2 flex w-full items-end gap-2.5 rounded-xl border border-slate-200/80 bg-card p-2.5 shadow-xs"
       }
     >
       {/* Profissional */}
-      <div className="flex min-w-0 flex-[1.6] flex-col gap-1">
-        <Label className="flex h-4 items-center text-[11px] font-bold uppercase tracking-wider text-slate-500">
+      <div className="flex min-w-0 flex-[1.6] flex-col gap-0.5">
+        <Label className="flex h-3.5 items-center text-[11px] font-bold uppercase tracking-wider text-slate-500">
           Profissional
         </Label>
         <MedicoFiltroInput
@@ -8841,8 +8841,8 @@ function AgendaPage() {
       </div>
 
       {/* Tipo de Agenda */}
-      <div className="flex min-w-0 flex-1 flex-col gap-1">
-        <Label className="flex h-4 items-center text-[11px] font-bold uppercase tracking-wider text-slate-500">
+      <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+        <Label className="flex h-3.5 items-center text-[11px] font-bold uppercase tracking-wider text-slate-500">
           Tipo de agenda
         </Label>
         {agendaTravada ? (
@@ -8892,8 +8892,8 @@ function AgendaPage() {
       </div>
 
       {/* Situação */}
-      <div className="flex min-w-0 flex-1 flex-col gap-1">
-        <Label className="flex h-4 items-center text-[11px] font-bold uppercase tracking-wider text-slate-500">
+      <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+        <Label className="flex h-3.5 items-center text-[11px] font-bold uppercase tracking-wider text-slate-500">
           Situação
         </Label>
         <Select value={filtroStatus} onValueChange={setFiltroStatus}>
@@ -8915,7 +8915,7 @@ function AgendaPage() {
       </div>
 
       {/* Data */}
-      <div className="flex min-w-0 flex-1 flex-col gap-1">
+      <div className="flex min-w-0 flex-1 flex-col gap-0.5">
         <Label className="flex h-4 items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-slate-500">
           Data
           <span
@@ -8976,8 +8976,8 @@ function AgendaPage() {
       </div>
 
       {/* Especialidade */}
-      <div className="flex min-w-0 flex-1 flex-col gap-1">
-        <Label className="flex h-4 items-center text-[11px] font-bold uppercase tracking-wider text-slate-500">
+      <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+        <Label className="flex h-3.5 items-center text-[11px] font-bold uppercase tracking-wider text-slate-500">
           Especialidade
         </Label>
         <Select value={filtroEspecialidade} onValueChange={setFiltroEspecialidade}>
@@ -8996,8 +8996,8 @@ function AgendaPage() {
       </div>
 
       {/* Cliente + Ações rápidas juntos */}
-      <div className="flex min-w-0 flex-[1.6] flex-col gap-1">
-        <Label className="flex h-4 items-center text-[11px] font-bold uppercase tracking-wider text-slate-500">
+      <div className="flex min-w-0 flex-[1.6] flex-col gap-0.5">
+        <Label className="flex h-3.5 items-center text-[11px] font-bold uppercase tracking-wider text-slate-500">
           Cliente
         </Label>
         <Input
@@ -9217,14 +9217,14 @@ function AgendaPage() {
           <span className="min-w-0">{SEM_PERMISSAO_MSG}</span>
         </div>
       )}
-      <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-3 sm:flex sm:flex-wrap sm:justify-between">
+      <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-2 sm:flex sm:flex-wrap sm:justify-between">
         <div className="flex min-w-0 items-center gap-3">
-          <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary">
+          <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary">
             <CalendarDays className="h-5 w-5" />
           </div>
           <div className="min-w-0">
-            <h1 className="truncate text-xl font-bold tracking-tight text-slate-900">Agendas</h1>
-            <div className="mt-1.5 flex flex-wrap items-center gap-2">
+            <h1 className="truncate text-lg font-bold tracking-tight text-slate-900">Agendas</h1>
+            <div className="mt-1 flex flex-wrap items-center gap-2">
               <span className="rounded-md bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
                 {(() => {
                   const label = new Intl.DateTimeFormat("pt-BR", {
@@ -12316,7 +12316,7 @@ function AgendaPage() {
         <div className="hidden lg:block">{renderFiltros("desktop")}</div>
         {/* KPIs REMOVIDOS */}
         {/* ESPAÇAMENTO ENTRE FILTROS E TABELA */}
-        <div className="h-4 xl:h-8"></div>
+        <div className="h-2 xl:h-3"></div>
 
         {/* Resumo do dia: volumetria das fichas da DATA e do PROFISSIONAL
             escolhidos nos filtros acima. Fica aqui, entre os filtros e a
