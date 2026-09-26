@@ -44,9 +44,9 @@ function Contador({
   titulo: string;
 }) {
   return (
-    <div title={titulo} className={`min-w-[92px] flex-1 rounded-lg border px-2.5 py-1.5 ${cor}`}>
+    <div title={titulo} className={`min-w-[92px] flex-1 rounded-lg border px-2.5 py-1 ${cor}`}>
       <div className="text-[11px] font-semibold uppercase leading-tight opacity-80">{rotulo}</div>
-      <div className="text-xl font-bold leading-tight tabular-nums">{valor}</div>
+      <div className="text-lg font-bold leading-tight tabular-nums">{valor}</div>
     </div>
   );
 }
@@ -83,8 +83,8 @@ export function ResumoDoDiaBar({ clinicaId, dataRef, filtroMedico, medicoNome, o
   const quem = filtroMedico === "todos" ? "Todos os profissionais" : (medicoNome ?? "Profissional");
 
   return (
-    <div className="mb-3 rounded-xl border border-slate-200 bg-card px-3 py-2.5 shadow-xs">
-      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+    <div className="mb-2 rounded-xl border border-slate-200 bg-card px-3 py-2 shadow-xs">
+      <div className="mb-1.5 flex flex-wrap items-center justify-between gap-2">
         <div className="min-w-0 text-[13px]">
           <span className="font-semibold text-slate-900">Resumo do dia</span>
           <span className="mx-1.5 text-slate-300">·</span>
