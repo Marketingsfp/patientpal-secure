@@ -2135,3 +2135,43 @@ describe("regressão 26/09: horário de página anterior continua escolhível", 
     expect(horasGuardadas.some((h) => h >= "13:00")).toBe(true);
   });
 });
+
+// Reteste 02 (26/09/2026): entre os turnos o estado é salvo e relido, e o termo
+// da pesquisa do catálogo é refeito a cada mensagem. A lista não pode se perder.
+describe("paginação sobrevive entre turnos", () => {
+  const dia = new Date(Date.now() + 3 * 86_400_000);
+  dia.setUTCHours(11, 0, 0, 0);
+  const dataDia = dia.toISOString().slice(0, 10);
+  const depois = (base: Date, min: number) => new Date(base.getTime() + min * 60_000);
+  function novoTurno(ctx: ReturnType<typeof contexto>, mensagem: string, termo: string) {
+    const estado = normalizarEstado(JSON.parse(JSON.stringify(ctx.estado)));
+    // Pesquisa válida só quando o termo é a consulta; frases como "mostra os
+    // outros" refazem a pesquisa sem achar nada, como no atendimento real.
+    const valida = termo === "cardiologia";
+    estado.knowledge_context = { versao: 1, clinicaId: CLINICA, sessionId: estado.session_id!,
+      consulta: { termo, tipo_atendimento: "consulta" },
+      referencias: valida ? [{ registro: CATALOGO, versao: "v1", procedimento: "Consulta — Cardiologia", medicoNome: "Alex Louza" }] : [] } as never;
+    ctx.estado = estado;
+    ctx.consultaAgenda = { mensagemAtual: mensagem, historico: [] };
+  }
+  test("tanto faz → (novo turno) mais → (novo turno) escolhe horário da 1ª página", async () => {
+    banco.agendamentos = Array.from({ length: 30 }, (_, i) => ({
+      id: `u${i}`, clinica_id: CLINICA, medico_id: MEDICO, inicio: depois(dia, i * 10).toISOString(),
+      fim: depois(dia, i * 10 + 10).toISOString(), paciente_nome: "DISPONIVEL", status: "confirmado",
+    }));
+    banco.nina_cat_profissionais![0]!.especialidades = [{ nome: "Cardiologia" }];
+    const ctx = contexto("tanto faz");
+    novoTurno(ctx, "tanto faz", "cardiologia");
+    const primeira = await executarFerramentaPaciente(ctx, "consultar_disponibilidade", { medico_id: MEDICO, data: dataDia, periodo: "qualquer" });
+    expect(((primeira.horarios as Linha[]) ?? [])[0]!.hora).toBe("08:00");
+    novoTurno(ctx, "mostra os outros", "mostra os outros");
+    const segunda = await executarFerramentaPaciente(ctx, "consultar_disponibilidade", { medico_id: MEDICO, data: dataDia, mais: true });
+    expect(((segunda.horarios as Linha[]) ?? [])[0]!.hora).toBe("09:40");
+    expect(String(segunda.instrucao)).toContain("Esses são os próximos");
+    novoTurno(ctx, "Pensando melhor, vou querer aquele das 08:20.", "vou querer aquele das 08:20");
+    const vaga = ctx.estado.appointment.slot_options!.vagas.find((v) => v.hora === "08:20");
+    expect(vaga).toBeDefined();
+    const escolha = await executarFerramentaPaciente(ctx, "selecionar_horario", { medico_id: MEDICO, inicio: vaga!.inicio, fim: vaga!.fim });
+    expect(escolha.ok, JSON.stringify(escolha)).toBe(true);
+  });
+});

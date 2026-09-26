@@ -546,13 +546,17 @@ async function lerDiaCompleto(
   return slots.some((s) => !permiteReserva(s.modalidade)) ? "modalidade_pendente" : slots;
 }
 
-/** Profissional (ou especialidade), atendimento e data: trocar qualquer um reinicia a lista. */
+/**
+ * Profissional (ou especialidade), procedimento pedido e data: trocar qualquer
+ * um reinicia a lista. Não usa o termo da pesquisa do catálogo: ele é refeito a
+ * cada mensagem ("tanto faz", "mostra os outros") e a lista se perdia entre os
+ * turnos (teste 02, 26/09/2026). As vagas vêm da agenda do profissional no dia,
+ * a mesma para qualquer consulta dele; procedimento tem agenda própria.
+ */
 function chaveDoDia(ctx: CtxNinaPaciente, base: { especialidadeId?: string | null; medicoId?: string | null }, data: string) {
   const pedido = procedimentoDaSessao(ctx.estado, ctx.clinicaId);
-  const conhecimento = ctx.estado?.knowledge_context;
-  const atendimento = pedido?.catalogo_id ??
-    (conhecimento && conhecimento.sessionId === ctx.estado?.session_id ? conhecimento.consulta?.termo ?? null : null);
-  return chavePaginacao({ medicoId: base.medicoId, especialidadeId: base.especialidadeId, atendimento, data });
+  return chavePaginacao({ medicoId: base.medicoId, especialidadeId: base.especialidadeId,
+    atendimento: pedido?.catalogo_id ?? null, data });
 }
 
 /**
@@ -578,7 +582,18 @@ async function apresentarDia(
   // escolhível, inclusive quando o filtro muda entre as páginas (26/09/2026).
   const apresentados = [...new Set([...anteriores, ...novos])];
   const opcoes = horariosDistintos(e.slots).filter((s) => apresentados.includes(chaveHorario(s)));
-  const pendencia = await guardarOpcoes(ctx, opcoes);
+  // Na mesma lista (profissional, dia e sessão), o procedimento já vinculado às
+  // opções vale para as páginas seguintes. Sem isso, "mostra os outros" refazia
+  // o vínculo pela pesquisa do turno, que não acha nada, e TODAS as opções
+  // ficavam sem procedimento: a escolha era recusada (teste 02, 26/09/2026).
+  const daLista = pag && ctx.estado
+    ? new Map(vagasDaSessao(ctx.estado, ctx.clinicaId)
+        .filter((v) => v.procedimento).map((v) => [v.medico_id, v.procedimento!] as const))
+    : new Map<string, string>();
+  if (pag && ctx.estado?.appointment.doctor_id && ctx.estado.appointment.procedure && !daLista.has(ctx.estado.appointment.doctor_id))
+    daLista.set(ctx.estado.appointment.doctor_id, ctx.estado.appointment.procedure);
+  const cobreTodos = opcoes.length > 0 && opcoes.every((s) => daLista.has(s.medico_id));
+  const pendencia = await guardarOpcoes(ctx, opcoes, cobreTodos ? daLista : undefined);
   if (pendencia) return { plano, pendencia };
   registrarPaginacao(ctx.estado, {
     clinica_id: ctx.clinicaId,
