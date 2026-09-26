@@ -161,22 +161,29 @@ export async function registrarMarcadorSistema(args: {
   conversaId: string;
   texto: string;
 }) {
-  const { data: conv } = await supabaseAdmin
+  const { data } = await supabaseAdmin
     .from("atend_conversas")
-    .select("contato_telefone")
+    .select("contato_telefone, canal, is_teste")
     .eq("id", args.conversaId)
     .eq("clinica_id", args.clinicaId)
     .maybeSingle();
+  const conv = data as { contato_telefone?: string | null; canal?: string | null; is_teste?: boolean | null } | null;
+  // O trigger `atend_ensure_conversa` escolhe a conversa pelo telefone e pelo
+  // canal da mensagem (sem canal, "whatsapp"). Sem copiar canal e marca de
+  // teste, o aviso de uma conversa da homologação criava uma conversa "real"
+  // de WhatsApp para o número virtual, e a Nina podia passar a usá-la (25/09/2026).
   const { error } = await supabaseAdmin.from("whatsapp_mensagens").insert({
     clinica_id: args.clinicaId,
     conversa_id: args.conversaId,
     direction: "out",
     from_number: null,
-    to_number: (conv as { contato_telefone?: string | null } | null)?.contato_telefone ?? null,
+    to_number: conv?.contato_telefone ?? null,
     body: args.texto,
     tipo: "text",
     status: "system",
     enviada_por: "sistema",
+    ...(conv?.canal ? { canal: conv.canal } : {}),
+    ...(conv?.is_teste ? { is_teste: true } : {}),
   });
   if (error) console.error("[handoff] falha ao registrar marcador", error.message);
 }

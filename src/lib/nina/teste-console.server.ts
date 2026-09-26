@@ -515,6 +515,8 @@ export async function processarMensagemTeste(
           gerarRespostaNina(data.clinicaId, textoDoTurno, lead.telefone_sessao, {
             validarReservaTurno: conferirReservaTurno,
             teste: true,
+            // A conversa do ciclo de teste, nunca "a mais recente do telefone".
+            conversaId,
             ambiente: ambienteQA,
             auditoria: auditoriaNina,
             mensagensEntrada: entradasTurno,

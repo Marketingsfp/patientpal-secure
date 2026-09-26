@@ -378,9 +378,18 @@ export interface EstadoIdentidade {
   memoriaDesde: string | null;
 }
 
-async function carregarEstadoIdentidade(
+const CAMPOS_ESTADO_IDENTIDADE =
+  "id, identidade_confirmada, identidade_perguntada_em, identidade_tentativas, contato_paciente_id, nina_fluxo_estado, resolved_at, closed_at";
+
+export async function carregarEstadoIdentidade(
   clinicaId: string,
   telefone: string | null,
+  /**
+   * Conversa já definida pelo chamador (homologação). Quando existe, é ela que
+   * vale — nunca "a conversa mais recente do telefone": um número de teste
+   * pode ter outra conversa e o turno dividia a memória entre as duas (25/09/2026).
+   */
+  conversaIdInformada?: string | null,
 ): Promise<EstadoIdentidade> {
   const vazio: EstadoIdentidade = {
     conversaId: null,
@@ -392,21 +401,32 @@ async function carregarEstadoIdentidade(
     memoriaDesde: null,
   };
 
-  if (!telefone) return vazio;
+  let data: unknown = null;
+  if (conversaIdInformada) {
+    const { data: informada } = await supabaseAdmin
+      .from("atend_conversas")
+      .select(CAMPOS_ESTADO_IDENTIDADE)
+      .eq("clinica_id", clinicaId)
+      .eq("id", conversaIdInformada)
+      .maybeSingle();
+    data = informada;
+  }
+  if (!data && !telefone) return vazio;
   // Telefone sempre em dígitos: a Meta manda ora "55…", ora "+55…" — sem
   // normalizar, o mesmo contato virava duas conversas.
-  const digits = String(telefone).replace(/\D/g, "");
-  if (!digits) return vazio;
-  const { data } = await supabaseAdmin
-    .from("atend_conversas")
-    .select(
-      "id, identidade_confirmada, identidade_perguntada_em, identidade_tentativas, contato_paciente_id, nina_fluxo_estado, resolved_at, closed_at",
-    )
-    .eq("clinica_id", clinicaId)
-    .in("contato_telefone", [digits, `+${digits}`])
-    .order("ultima_msg_em", { ascending: false, nullsFirst: false })
-    .limit(1)
-    .maybeSingle();
+  const digits = String(telefone ?? "").replace(/\D/g, "");
+  if (!data && !digits) return vazio;
+  if (!data) {
+    const { data: porTelefone } = await supabaseAdmin
+      .from("atend_conversas")
+      .select(CAMPOS_ESTADO_IDENTIDADE)
+      .eq("clinica_id", clinicaId)
+      .in("contato_telefone", [digits, `+${digits}`])
+      .order("ultima_msg_em", { ascending: false, nullsFirst: false })
+      .limit(1)
+      .maybeSingle();
+    data = porTelefone;
+  }
   if (data) {
     const fim = [(data as any).resolved_at, (data as any).closed_at]
       .filter(Boolean)
@@ -489,6 +509,8 @@ export async function gerarRespostaNina(
     lote?: { batchId: string | null; revisao: number | null };
     /** Reserva do lote ainda pertence ao chamador. Falha interrompe sem fallback. */
     validarReservaTurno?: () => Promise<boolean>;
+    /** Conversa já definida pelo chamador (homologação); a Nina usa exatamente esta. */
+    conversaId?: string | null;
   },
 ): Promise<string> {
   const { comColetor } = await import("@/lib/nina/evidencias.server");
@@ -623,6 +645,8 @@ async function gerarRespostaNinaInterno(
     revisao?: { telefone: string; valor: number };
     lote?: { batchId: string | null; revisao: number | null };
     validarReservaTurno?: () => Promise<boolean>;
+    /** Conversa já definida pelo chamador (homologação); a Nina usa exatamente esta. */
+    conversaId?: string | null;
     rastro?: import("@/lib/nina/arquitetura/tracing").Rastro;
   },
 ): Promise<string> {
@@ -654,7 +678,7 @@ async function gerarRespostaNinaInterno(
       Promise.resolve(null as import("@/lib/nina/identidade-paciente").BuscaIdentidade | null),
       Promise.resolve({ data: [] as any[] }),
       Promise.resolve({ data: [] as any[] }),
-      carregarEstadoIdentidade(clinicaId, telefoneRemetente ? String(telefoneRemetente) : null),
+      carregarEstadoIdentidade(clinicaId, telefoneRemetente ? String(telefoneRemetente) : null, opcoes?.conversaId),
       telefoneRemetente
         ? supabaseAdmin
             .from("whatsapp_mensagens")

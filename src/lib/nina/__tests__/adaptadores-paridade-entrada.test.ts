@@ -55,13 +55,16 @@ describe("paridade de entrada e saída dos adaptadores reais", () => {
       expect(Object.keys(entrada.opcoes).sort()).toEqual(
         (r === real
           ? ["lote", "mensagensEntrada", "revisao"]
-          : ["ambiente", "lote", "mensagensEntrada", "revisao", "teste"]
+          : ["ambiente", "conversaId", "lote", "mensagensEntrada", "revisao", "teste"]
         ).sort(),
       );
     }
     expect(teste.entradasGerador[0].opcoes.teste).toBe(true);
     expect(teste.entradasGerador[0].opcoes.ambiente).toBe("homologacao");
     expect(real.entradasGerador[0].opcoes.teste).toBeUndefined();
+    // A homologação informa a conversa do ciclo; o WhatsApp real segue pelo telefone.
+    expect(teste.entradasGerador[0].opcoes.conversaId).toBeTruthy();
+    expect(real.entradasGerador[0].opcoes.conversaId).toBeUndefined();
     expect(real.entradasGerador[0].telefone).not.toBe(teste.entradasGerador[0].telefone);
     expect(real.saidas[0].body).toBe(teste.saidas[0].body);
     expect(real.saidas[0].body).toContain("R$ 120,00");
