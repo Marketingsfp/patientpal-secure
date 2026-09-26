@@ -357,3 +357,19 @@ describe("vaga devolvida volta a ser agendável pela Nina", () => {
     expect(agendar).toContain(`.eq("paciente_nome", "${VAGA_LIVRE.paciente_nome}")`);
   });
 });
+
+describe("status gravados pela bateria cabem na regra do banco", () => {
+  test("a migration mais recente da regra aceita todos os status do executor", async () => {
+    const { readFileSync, readdirSync } = await import("node:fs");
+    const pasta = new URL("../../../../supabase/migrations/", import.meta.url);
+    const regras = readdirSync(pasta).sort()
+      .map((f) => readFileSync(new URL(f, pasta), "utf8"))
+      .filter((sql) => sql.includes("nina_teste_carga_amostras_status_chk") && sql.includes("CHECK"));
+    const vigente = regras.at(-1) ?? "";
+    const executor = readFileSync(new URL("../carga-execucao.server.ts", import.meta.url), "utf8");
+    const itens = readFileSync(new URL("../carga-itens.server.ts", import.meta.url), "utf8");
+    const usados = new Set([...`${executor}\n${itens}`.matchAll(/status: "([a-z]+)"/g)].map((m) => m[1]!));
+    expect(usados.has("dispensado")).toBe(true);
+    for (const s of usados) if (!["concluido", "parado"].includes(s)) expect(vigente).toContain(`'${s}'`);
+  });
+});

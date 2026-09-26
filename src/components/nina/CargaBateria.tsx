@@ -25,6 +25,15 @@ export type SelecaoBateria = {
 const limitar = (v: number, min: number, max: number) =>
   Math.min(max, Math.max(min, Number.isFinite(v) ? Math.trunc(v) : min));
 
+/**
+ * Campo numérico que aceita a digitação livre e só ajusta ao limite ao sair
+ * do campo. Ajustar a cada tecla prendia o valor no mínimo: apagar "10" para
+ * digitar 7 passava por "1" e voltava a 4 (25/09/2026).
+ */
+export function valorDigitado(texto: string, min: number, max: number) {
+  return texto.trim() === "" ? min : limitar(Number(texto), min, max);
+}
+
 export function CargaBateria({
   clinicaId,
   disabled,
@@ -41,8 +50,10 @@ export function CargaBateria({
   const [carregando, setCarregando] = useState(false);
   const [selecionados, setSelecionados] = useState<Set<string>>(() => new Set());
   const [variacoes, setVariacoes] = useState(1);
-  const [turnos, setTurnos] = useState<number>(LIMITES_BATERIA.turnosPadrao);
-  const [simultaneas, setSimultaneas] = useState<number>(LIMITES_BATERIA.simultaneasPadrao);
+  const [turnosTexto, setTurnosTexto] = useState(String(LIMITES_BATERIA.turnosPadrao));
+  const [simultaneasTexto, setSimultaneasTexto] = useState(String(LIMITES_BATERIA.simultaneasPadrao));
+  const turnos = valorDigitado(turnosTexto, LIMITES_BATERIA.turnosMin, LIMITES_BATERIA.turnosMax);
+  const simultaneas = valorDigitado(simultaneasTexto, 1, LIMITES_BATERIA.cenariosMax);
   const [filtro, setFiltro] = useState("");
 
   const carregar = async () => {
@@ -136,16 +147,9 @@ export function CargaBateria({
                 type="number"
                 min={LIMITES_BATERIA.turnosMin}
                 max={LIMITES_BATERIA.turnosMax}
-                value={turnos}
-                onChange={(e) =>
-                  setTurnos(
-                    limitar(
-                      Number(e.target.value),
-                      LIMITES_BATERIA.turnosMin,
-                      LIMITES_BATERIA.turnosMax,
-                    ),
-                  )
-                }
+                value={turnosTexto}
+                onChange={(e) => setTurnosTexto(e.target.value)}
+                onBlur={() => setTurnosTexto(String(turnos))}
               />
             </div>
             <div className="space-y-1.5">
@@ -155,10 +159,9 @@ export function CargaBateria({
                 type="number"
                 min={1}
                 max={LIMITES_BATERIA.cenariosMax}
-                value={simultaneas}
-                onChange={(e) =>
-                  setSimultaneas(limitar(Number(e.target.value), 1, LIMITES_BATERIA.cenariosMax))
-                }
+                value={simultaneasTexto}
+                onChange={(e) => setSimultaneasTexto(e.target.value)}
+                onBlur={() => setSimultaneasTexto(String(simultaneas))}
               />
             </div>
           </div>
