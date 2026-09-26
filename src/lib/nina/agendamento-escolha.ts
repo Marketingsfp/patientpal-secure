@@ -77,17 +77,35 @@ const normalizar = (v: string) =>
     .toLowerCase()
     .trim();
 
-/** Não confunde pergunta de preço, recusa, dois horários ou outro médico com escolha. */
+/** Partes da mensagem que falam só de dados pessoais ou de pagamento. */
+const PARTE_PARALELA =
+  /\b(valor|valores|preco|precos|custa|custo|quanto|pagar|pagando|pagamento|dinheiro|pix|cartao|cpf|nasci|nascida|nascido|nascimento|telefone|celular|meu nome|me chamo)\b/;
+
+/**
+ * Não confunde pergunta de preço, recusa, dois horários ou outro médico com escolha.
+ *
+ * 26/09/2026: a mensagem é lida por partes. Uma parte que só fala de dados
+ * pessoais ou de pagamento ("…e nasci em 22/07/1975", "em dinheiro fica
+ * quanto?") não anula a escolha escrita na outra ("Prefiro o das 12:20").
+ * Antes, qualquer uma dessas palavras descartava a mensagem inteira, a seleção
+ * era recusada e a Nina encaminhava sem motivo.
+ */
 export function lerEscolhaHorario(texto: string): { hora: string; data: string | null } | null {
-  const t = normalizar(texto);
-  if (/\b(nao|nem|talvez|valor|preco|custa|cpf|nasci|nascimento|telefone)\b/.test(t)) return null;
+  const partes = normalizar(texto).split(/[.!?;\n]+|,\s+|\s+e\s+(?=(?:se|meu|minha|nasci|o valor|quanto|em dinheiro|no pix|pelo pix)\b)/);
+  const t = partes.filter((p) => !PARTE_PARALELA.test(p)).join(" , ").trim();
+  if (!t || /\b(nao|nem|talvez)\b/.test(t)) return null;
   const horas = [
     ...t.matchAll(/\b([01]?\d|2[0-3])(?:\s*:\s*([0-5]\d)|\s*h(?:\s*([0-5]\d))?)(?!\d)/g),
   ];
   if (horas.length !== 1) return null;
   const h = horas[0]!;
   const resto = t.replace(h[0], " ");
-  const data = resto.match(/\b(\d{4}-\d{2}-\d{2}|\d{1,2}\/\d{1,2}(?:\/\d{4})?)\b/);
+  // Data com ano passado (ex.: nascimento sem a palavra "nasci") não é a data da consulta.
+  const data = [...resto.matchAll(/\b(\d{4}-\d{2}-\d{2}|\d{1,2}\/\d{1,2}(?:\/(\d{4}))?)\b/g)]
+    .find((m) => {
+      const ano = m[1]!.includes("-") ? Number(m[1]!.slice(0, 4)) : m[2] ? Number(m[2]) : null;
+      return ano === null || ano >= new Date().getFullYear();
+    });
   // Extrai de linguagem livre. Qualificadores que exigem interpretação
   // seguem para a ferramenta de escolha do modelo e seu resumo validado.
   if (

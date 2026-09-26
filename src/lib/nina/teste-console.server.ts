@@ -1118,26 +1118,27 @@ async function executarResetLeadTeste(
     },
   });
 
-  // Limpeza opcional: apaga da agenda o que a Nina marcou nesta sessão de
-  // teste. Só alcança registros de homologação (is_mock_data) desta conversa.
+  // Limpeza opcional: desfaz na agenda o que a Nina marcou nesta sessão de
+  // teste. O agendamento da Nina é gravado POR CIMA da vaga livre; apagar o
+  // registro fazia a vaga sumir da agenda real (26/09/2026: 3 vagas perdidas
+  // nas simulações). Agora a vaga volta a DISPONIVEL; nada é apagado.
+  // Só alcança registros de homologação (is_mock_data) desta conversa.
   let agendamentosRemovidos = 0;
   if (entrada.removerAgendamentos) {
-    const { data: apagados } = await admin
-      .from("agendamentos")
-      .delete()
-      .eq("clinica_id", entrada.clinicaId)
-      .eq("origem_integracao", "nina_homologacao")
-      .eq("is_mock_data", true)
-      .like("id_externo", `${conversaId}|%`)
-      .select("id");
-    agendamentosRemovidos = (apagados ?? []).length;
-    if (agendamentosRemovidos > 0) {
-      await registrarMarcadorSistema({
-        clinicaId: entrada.clinicaId,
-        conversaId,
-        texto: `🧹 ${agendamentosRemovidos} agendamento(s) de teste removido(s) da agenda.`,
-      }).catch(() => {});
+    const { devolverVagasDaConversa } = await import("@/lib/nina/carga-bateria.server");
+    let texto: string | null = null;
+    try {
+      const { devolvidas, pendentes } = await devolverVagasDaConversa(admin, entrada.clinicaId, conversaId);
+      agendamentosRemovidos = devolvidas;
+      if (devolvidas > 0) texto = `🧹 ${devolvidas} vaga(s) de teste devolvida(s) à agenda.`;
+      if (pendentes > 0) texto = `⚠️ ${pendentes} agendamento(s) de teste não voltaram a ficar livres. Confira na agenda.`;
+    } catch (e) {
+      // A vaga fica ocupada pelo teste (não se perde); o reset segue e avisa.
+      console.error("[NINA_TESTE] falha ao devolver vagas de teste", e);
+      texto = "⚠️ Não foi possível devolver as vagas de teste à agenda. Confira na agenda.";
     }
+    if (texto)
+      await registrarMarcadorSistema({ clinicaId: entrada.clinicaId, conversaId, texto }).catch(() => {});
   }
 
   // Nova sessão = novo telefone virtual → a Nina não alcança nada do histórico

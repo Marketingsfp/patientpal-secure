@@ -179,3 +179,23 @@ describe("escolha de horário e consentimento do resumo entregue", () => {
     expect(consentimentoDaEscolha(e)).toBeNull();
   });
 });
+
+// 26/09/2026 — simulações dos 41 profissionais (testes 03 e 04) e lead 07 de
+// 25/09: a parte sobre dados pessoais ou pagamento não anula a escolha.
+describe("escolha de horário junto com dados pessoais ou pergunta de pagamento", () => {
+  test.each([
+    ["De manhã, às 08:00. Meu nome é Simulação Teste Três e nasci em 22/07/1975.", "08:00"],
+    ["Prefiro o das 12:20. E se eu pagar em dinheiro fica quanto mesmo?", "12:20"],
+    ["Prefiro o horário das 08:00. Pode me confirmar o valor da consulta e se pagando em dinheiro fica R$ 120,00?", "08:00"],
+    ["Simulação Teste Quatro 03/11/1962, 08:00", "08:00"],
+  ])("%s", async (texto, hora) => {
+    const { lerEscolhaHorario } = await import("../agendamento-escolha");
+    expect(lerEscolhaHorario(texto)).toEqual({ hora, data: null });
+  });
+
+  test.each(["Quanto custa a consulta das 10h?", "não posso 08:00", "08:00 ou 09:00"])(
+    "%s continua sem escolha", async (texto) => {
+      const { lerEscolhaHorario } = await import("../agendamento-escolha");
+      expect(lerEscolhaHorario(texto)).toBeNull();
+    });
+});

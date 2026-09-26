@@ -1340,7 +1340,7 @@ export function HomologacaoInbox({ laboratorio = false, ativo = true, abrirConve
                     checked={limparAgenda}
                     onChange={(e) => setLimparAgenda(e.target.checked)}
                   />
-                  Remover agendamentos deste teste ao finalizar
+                  Devolver à agenda as vagas usadas neste teste ao finalizar
                 </label>
                 {ciclos.length > 0 && (
                   <div data-testid="diagnostico-ciclos">

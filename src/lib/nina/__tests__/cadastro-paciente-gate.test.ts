@@ -60,6 +60,7 @@ function preparar(faltantes = ["nome", "data_nascimento"]) {
     }
     throw new Error(`Ferramenta inesperada ${nome}`);
   };
+  const encaminhamentos: string[] = [];
   return {
     estado,
     ctx,
@@ -68,9 +69,11 @@ function preparar(faltantes = ["nome", "data_nascimento"]) {
       falhaIdentificacao = r;
     },
     executar,
+    encaminhamentos,
     turno: async (mensagem: string) => {
       ctx.consultaAgenda!.mensagemAtual = mensagem;
-      const r = await aplicarGateIdentificacao({ mensagem, estado, ctx, executar });
+      const r = await aplicarGateIdentificacao({ mensagem, estado, ctx, executar,
+        encaminharVagaIndisponivel: async (motivo) => { encaminhamentos.push(motivo); return true; } });
       ctx.consultaAgenda!.historico.push({ role: "user", content: mensagem });
       if (r) ctx.consultaAgenda!.historico.push({ role: "assistant", content: r.texto });
       return r;
@@ -280,12 +283,19 @@ describe("gate: escolher vaga → coletar dados → confirmar → agendar", () =
     t.ctx.telefone = null;
     expect((await t.turno("sim"))?.camposPendentes).toContain("telefone");
   });
-  test("erro técnico mantém os dados já informados para nova tentativa", async () => {
+  // Regra da clínica (26/09/2026): falha de operação vai para a equipe; a Nina
+  // nunca manda "Não consegui concluir a consulta ao cadastro… tente novamente".
+  test("erro técnico encaminha para a equipe, mantendo os dados informados", async () => {
     const t = preparar();
     await t.turno("sim");
     t.falhar({ ok: false, erro: "INTERNAL_ERROR", mensagem: "Falha" });
     const r = await t.turno("Ana da Silva, 02/01/1990");
-    expect(r?.chaveTemplate).toBe("fluxo.identificacao.instabilidade");
+    expect(r?.origem).toBe("handoff");
+    expect(r?.chaveTemplate).not.toBe("fluxo.identificacao.instabilidade");
+    expect(r?.texto).not.toMatch(/Não consegui/);
+    expect(t.encaminhamentos).toHaveLength(1);
+    expect(t.encaminhamentos[0]).toContain("FALHA_OPERACIONAL_AGENDAMENTO: identificar_paciente (INTERNAL_ERROR)");
+    expect(t.estado.flow.stage).toBe("HANDOFF");
     expect(t.estado.patient.pending.nome).toBe("Ana Da Silva");
     expect(t.chamadas.some((c) => c.nome === "agendar")).toBe(false);
   });
@@ -348,4 +358,18 @@ describe("gate: escolher vaga → coletar dados → confirmar → agendar", () =
     expect(r?.texto).toBe(t.estado.appointment.confirmation!.resumo);
     expect(t.chamadas.some(c => c.nome === "agendar")).toBe(false);
   });
+});
+
+// 26/09/2026 — simulação 01: a frase inteira virou nome no cadastro.
+describe("nome dentro de mensagem livre", () => {
+  test.each([
+    ["A consulta é do meu filho: Simulação Teste Um, nascido em 12/03/2018.", "Simulação Teste Um"],
+    ["É para minha mãe, o nome dela é Joana Pereira Lima, nascida em 03/05/1950", "Joana Pereira Lima"],
+    ["Meu nome é Simulação Teste Três e nasci em 22/07/1975.", "Simulação Teste Três"],
+    ["meu nome completo é Maria de Lourdes Souza", "Maria De Lourdes Souza"],
+    ["Ana da Silva, 02/01/1990", "Ana Da Silva"],
+  ])("%s", (texto, nome) => expect(extrairDadosIdentificacao(texto).nome).toBe(nome));
+
+  test.each(["sim", "Prefiro o das 12:20. E se eu pagar em dinheiro fica quanto mesmo?", "A consulta é do meu filho"])(
+    "%s não vira nome", (texto) => expect(extrairDadosIdentificacao(texto).nome).toBeNull());
 });

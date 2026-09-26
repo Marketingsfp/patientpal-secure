@@ -1588,6 +1588,9 @@ async function gerarRespostaNinaInterno(
   // decidida aqui, em código, antes de qualquer chamada ao modelo.
   // ---------------------------------------------------------------------
   let continuarAgendamento: ((aposSelecao?: boolean) => Promise<import("@/lib/nina/resposta/contrato").ResultadoRespostaNina | null>) | null = null;
+  // Aviso (protocolo) do encaminhamento feito pelo gate: se já saiu, a Nina não
+  // manda uma segunda mensagem (mensagem única, 25/09/2026).
+  const avisoGate: { atual: import("@/lib/atendimento/aviso-encaminhamento").ResultadoAvisoEncaminhamento | null } = { atual: null };
   if (podeAgendar && ctxFerramentas && executar !== null) {
     const { aplicarGateIdentificacao } = await import("@/lib/nina/identificacao-gate.server");
     // FASE 5 — o texto do gate sai do template publicado (ou do padrão).
@@ -1618,6 +1621,7 @@ async function gerarRespostaNinaInterno(
         const { executarHandoffTool } = await import("@/lib/nina/handoff-tool.server");
         const r = await executarHandoffTool({ clinicaId, conversaId: estadoId.conversaId ?? null },
           JSON.stringify({ motivo, resumo: motivo, setor: "Agendamento" }));
+        avisoGate.atual = (r as { aviso?: typeof avisoGate.atual }).aviso ?? null;
         registrarEtapa({ tipo: "ferramenta", fonte: "atendimento", titulo: "Encaminhamento para conferir o agendamento",
           dados: { motivo, handoff_confirmado: r.ok, resultado: r },
           codigo: { arquivo: "src/lib/nina/identificacao-gate.server.ts", funcao: "aplicarGateIdentificacao" } });
@@ -1628,6 +1632,20 @@ async function gerarRespostaNinaInterno(
       return null;
     });
     const respostaGate = await continuarAgendamento();
+    if (respostaGate?.origem === "handoff" && avisoGate.atual) {
+      const { precisaAvisoDoChamador } = await import("@/lib/atendimento/aviso-encaminhamento");
+      if (!precisaAvisoDoChamador(avisoGate.atual)) {
+        const aviso = avisoGate.atual;
+        await salvarFluxoEstado(supabaseAdmin as never, clinicaId, estadoId.conversaId, fluxoEstado);
+        const { criarResultadoSemNovaMensagem } = await import("@/lib/nina/resposta/contrato");
+        if (opcoes?.auditoria)
+          opcoes.auditoria.resultado = criarResultadoSemNovaMensagem({
+            estado: aviso.entregue ? "confirmado" : "envio_pendente",
+            chaveOperacao: aviso.chave, mensagemId: aviso.mensagemId, protocolo: aviso.protocolo, texto: aviso.texto,
+          });
+        return "";
+      }
+    }
     if (respostaGate) {
       await salvarFluxoEstado(supabaseAdmin as never, clinicaId, estadoId.conversaId, fluxoEstado);
       // FASE 1 — caminho SEM modelo: o texto veio da regra determinística de
@@ -2352,12 +2370,18 @@ async function gerarRespostaNinaInterno(
       if (nome === "selecionar_horario" && r.success &&
         (typeof dadosAgendamento?.resumo_confirmacao === "string" ||
           (dadosAgendamento?.selecao_preservada === true && dadosAgendamento.confirmacao_recebida !== true))) {
-        const { criarResultado } = await import("@/lib/nina/resposta/contrato");
-        const { textoDaChave } = await import("@/lib/nina/resposta/templates");
-        resumoEscolha = await continuarAgendamento?.(true) ?? criarResultado({ origem: "erro",
-          texto: textoDaChave("fluxo.identificacao.instabilidade", {}, null).texto,
-          restricoes: ["nao_afirmar_agendamento_sem_gravacao"] });
+        resumoEscolha = await continuarAgendamento?.(true) ?? null;
         // Nenhuma ferramenta do mesmo lote pode gravar antes do novo aceite.
+        if (resumoEscolha) break;
+        // A coleta ficou para a próxima mensagem (ex.: "Prefiro 12:20. Quanto
+        // fica em dinheiro?"). A vaga já está escolhida: o modelo responde e
+        // pede os dados, sem o aviso falso de falha no cadastro (26/09/2026).
+        for (const pendente of chamadas.slice(chamadas.indexOf(c) + 1)) {
+          mensagens.push({ role: "tool", tool_call_id: pendente.id, content: JSON.stringify({
+            ok: false, erro: "CHAMADA_NAO_EXECUTADA", executada: false,
+            mensagem: "A vaga acabou de ser escolhida. Responda o paciente e colete os dados antes de qualquer outra operação.",
+          }) });
+        }
         break;
       }
       const { encaminhamentoFalhaAgendamento, respostaFalhaAgendamento } = await import("@/lib/nina/falha-agendamento");
@@ -2601,6 +2625,12 @@ async function gerarRespostaNinaInterno(
   // encaminhamento já avisou o paciente com o protocolo neste turno. A Nina
   // não produz uma segunda mensagem — em produção e na homologação.
   let semNovaMensagem = false;
+  // Encaminhamento feito pelo gate dentro do laço de ferramentas (ex.: falha ao
+  // identificar após a escolha) segue a mesma regra de mensagem única.
+  if (resumoEscolha?.origem === "handoff" && avisoGate.atual && !avisoDoTurno.atual) {
+    avisoDoTurno.atual = avisoGate.atual;
+    houveHandoff = true;
+  }
   if (houveHandoff && avisoDoTurno.atual) {
     const { precisaAvisoDoChamador } = await import("@/lib/atendimento/aviso-encaminhamento");
     if (!precisaAvisoDoChamador(avisoDoTurno.atual)) {

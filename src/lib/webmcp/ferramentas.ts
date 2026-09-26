@@ -452,7 +452,7 @@ export function montarFerramentasWebmcp(deps: DepsWebmcp): FerramentaWebmcp[] {
             conversaId: uuid("Conversa a encerrar."),
             removerAgendamentos: {
               type: "boolean",
-              description: "Remove da agenda os agendamentos criados nesta sessão de teste.",
+              description: "Devolve à agenda (livres) as vagas ocupadas nesta sessão de teste; nada é apagado.",
             },
           },
           ["leadId", "conversaId"],

@@ -37,6 +37,11 @@ import { aceitarResumoEntregue, confirmacaoDaEscolha, consentimentoDaEscolha,
   limparEscolhaAgendamento, lerEscolhaHorario, vagasDaEscolha, vagasDaSessao,
   resumoDaEscolhaEntregue, LEMBRETE_CONFIRMACAO } from "./agendamento-escolha";
 import { respostaSemVagas } from "./agenda-sem-vagas";
+import { respostaFalhaAgendamento } from "./falha-agendamento";
+
+/** Só é enviado se o anúncio do encaminhamento (com protocolo) não saiu. */
+export const TEXTO_ENCAMINHADO_FALHA =
+  "Vou encaminhar sua conversa para nossa equipe, que continuará o atendimento por aqui.";
 import { reservaDaSessaoAtual } from "./agendamento-sessao";
 
 /* ------------------------------------------------------------ confirmações */
@@ -87,6 +92,36 @@ function normalizarData(bruto: string): string | null {
   return `${a}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
 }
 
+/** Abertura que antecede o nome ("meu nome é", "o nome dele é", "se chama"). */
+const ABERTURA_NOME =
+  /^(?:(?:e\s+)?(?:o\s+|a\s+)?(?:meu|minha|seu|sua)?\s*nome(?:\s+completo)?(?:\s+(?:dele|dela|do\s+paciente|da\s+paciente))?(?:\s+(?:é|eh|e))?|sou|me\s+chamo|(?:ele|ela)\s+se\s+chama|se\s+chama|chama\s+se|chama-se)\s+/i;
+
+/** Palavras que não aparecem num nome de pessoa ("da", "de", "do" continuam válidas). */
+const NAO_E_NOME =
+  /\b(consulta|agendamento|agendar|marcar|quero|queria|preciso|gostaria|pode|filh[oa]s?|m[aã]e|pai|espos[oa]|marido|irm[aã]o?|av[oóô]|net[oa]|sobrinh[oa]|crian[cç]a|beb[eê]|paciente|dele|dela|ele|ela|meu|minha|nascid[oa]|nasceu|nasci|nascimento|data|cpf|telefone|celular|whatsapp|hor[aá]rios?|hora|dia|doutor[a]?|dr[a]?|para|pra|com|em|anos?|prefiro|pode|ser|sim|ok|obrigad[oa]|valor|pre[cç]o|quanto|custa|dinheiro|pix|cart[aã]o|pagar|pagamento|confirmo|tanto|faz|manh[aã]|tarde|noite)\b/i;
+const CONECTIVO = /^(?:da|de|do|das|dos|e|o|a)$/i;
+
+/**
+ * Nome completo dentro de uma mensagem livre. A mensagem é lida por partes e
+ * só vale a parte com cara de nome: "A consulta é do meu filho: Simulação
+ * Teste 01, nascido em 12/03/2018" → "Simulação Teste". Antes, tudo o que
+ * sobrava virava nome e o cadastro foi gravado como "CONSULTA DO MEU FILHO
+ * SIMULACAO TESTE NASCIDO EM" (26/09/2026). Sem parte válida → null (a Nina
+ * pede o nome de novo em vez de gravar texto qualquer).
+ */
+function extrairNome(semData: string): string | null {
+  const partes = semData
+    .replace(/\d[\d.\- ]{9,17}\d/g, " ")
+    .replace(/\d/g, " ")
+    .split(/[,;:|.!?\n]+|\s+e\s+(?=(?:nasci|nascid[oa]|que\s+nasceu|data)\b)|\b(?:nascid[oa]|nasci|que\s+nasceu)\s+(?:em|no\s+dia)?\b/i);
+  const candidatos = partes
+    .map((p) => p.replace(/\s+/g, " ").trim().replace(ABERTURA_NOME, "").trim())
+    .map((p) => p.split(" ").filter((w) => /^[A-Za-zÀ-ÿ'´`^~-]{2,}$/.test(w)))
+    .filter((w) => w.filter((p) => !CONECTIVO.test(p)).length >= 2 && !NAO_E_NOME.test(w.join(" ")));
+  const melhor = candidatos.sort((a, b) => b.length - a.length)[0];
+  return melhor ? melhor.map((p) => p.charAt(0).toUpperCase() + p.slice(1).toLowerCase()).join(" ") : null;
+}
+
 /**
  * Lê nome, CPF e data de nascimento de uma mensagem livre.
  * Aceita "Jean Xavier, 189.471.977-85, 21/10/1999" e também
@@ -110,23 +145,7 @@ export function extrairDadosIdentificacao(texto: string): DadosIdentificacao {
     }
   }
 
-  // Nome: o que sobra depois de tirar números e separadores, exigindo ao
-  // menos duas palavras (nome completo).
-  const restante = semData
-    .replace(/\d[\d.\- ]{9,17}\d/g, " ")
-    .replace(/\d/g, " ")
-    .replace(/[,;:|]/g, " ")
-    .replace(
-      /^(?:(?:meu\s+)?nome(?:\s+completo)?(?:\s+(?:é|eh))?|sou|me chamo)\s*|\b(cpf|telefone|celular|whatsapp|data de nascimento|nascimento|nasci em)\b/gi,
-      " ",
-    )
-    .replace(/\s+/g, " ")
-    .trim();
-  const palavras = restante.split(" ").filter((p) => /^[A-Za-zÀ-ÿ'´`^~-]{2,}$/.test(p));
-  const nome =
-    palavras.length >= 2
-      ? palavras.map((p) => p.charAt(0).toUpperCase() + p.slice(1).toLowerCase()).join(" ")
-      : null;
+  const nome = extrairNome(semData);
 
   const numeros = semData.match(/(?:\+?55\s*)?\(?\d{2}\)?[\s.-]*\d{4,5}[\s.-]*\d{4}/g) ?? [];
   const telefone =
@@ -236,6 +255,16 @@ export async function aplicarGateIdentificacao(params: {
     return criarResultado({ origem: ok ? "handoff" : "erro", texto: respostaSemVagas(ok, true, modalidadePendente),
       fatosConfirmados: ok ? ["handoff_confirmado"] : [], restricoes: ["nao_substituir_vaga_escolhida"] });
   };
+  // Regra da clínica (26/09/2026): a Nina não diz ao paciente que "não
+  // conseguiu" e o deixa sem saída. Falha de operação vai para a equipe.
+  const encaminharFalha = async (etapa: string, codigo?: string | null) => {
+    const motivo = `FALHA_OPERACIONAL_AGENDAMENTO: ${etapa} (${codigo ?? "SEM_CODIGO"}). A equipe deve conferir o cadastro e a agenda antes de continuar; a falha não comprova falta de vagas.`;
+    estado.flow.stage = "HANDOFF";
+    const ok = await params.encaminharVagaIndisponivel?.(motivo).catch(() => false) ?? false;
+    return criarResultado({ origem: ok ? "handoff" : "erro",
+      texto: ok ? TEXTO_ENCAMINHADO_FALHA : respostaFalhaAgendamento(false),
+      fatosConfirmados: ok ? ["handoff_confirmado"] : [], restricoes: ["nao_afirmar_agendamento_sem_gravacao"] });
+  };
   let selecionouAgora = params.aposSelecao === true;
   const cadastroProntoNoInicio = Boolean(p.identified && p.validated && p.id);
   const aceiteDaVaga = !selecionouAgora && ehConfirmacaoDeAgendamento(mensagem, confirmacaoDaEscolha(estado, ctx.clinicaId)?.vaga);
@@ -278,8 +307,8 @@ export async function aplicarGateIdentificacao(params: {
     } else if (r.ok && r.selecao_preservada === true) {
       selecionouAgora = true;
     } else {
-      return resultadoGate(textos, r.ok || r.erro === "ACTION_NOT_AUTHORIZED"
-        ? "fluxo.agendamento.escolher" : "fluxo.identificacao.instabilidade", {});
+      if (r.ok || r.erro === "ACTION_NOT_AUTHORIZED") return resultadoGate(textos, "fluxo.agendamento.escolher", {});
+      return encaminharFalha("selecionar_horario", r.erro);
     }
   }
   if (ehNegacao(mensagem)) {
@@ -313,7 +342,7 @@ export async function aplicarGateIdentificacao(params: {
   // confirma o paciente: nesse caso ainda faltam nome e nascimento.
   const consulta = await executar(ctx, "consultar_cadastro_paciente", {});
   if (!consulta.ok && consulta.erro === "PROFISSIONAL_SFP") return encaminharSfp();
-  if (!consulta.ok) return resultadoGate(textos, "fluxo.identificacao.instabilidade", {});
+  if (!consulta.ok) return encaminharFalha("consultar_cadastro_paciente", consulta.erro);
   const faltantesNoCadastro = (consulta.campos_faltantes ?? []) as CampoCadastro[];
   {
     // Dados já informados são candidatos ao cadastro, nunca prova de identidade.
@@ -386,7 +415,7 @@ export async function aplicarGateIdentificacao(params: {
       p.pending = { nome: null, cpf: null, data_nascimento: null };
       return null;
     }
-    return resultadoGate(textos, "fluxo.identificacao.instabilidade", {});
+    return encaminharFalha("identificar_paciente", r.erro);
   }
   p.pending = { nome: null, cpf: null, data_nascimento: null };
   p.identified = true;
@@ -513,5 +542,5 @@ export async function aplicarGateIdentificacao(params: {
   }
   if (erroAg === "SLOT_UNAVAILABLE" || erroAg === "NO_AVAILABILITY") return encaminhar();
   // Uma falha técnica não autoriza escolher uma nova vaga nem afirmar sucesso.
-  return resultadoGate(textos, "fluxo.identificacao.instabilidade", {});
+  return encaminharFalha("agendar", erroAg);
 }
