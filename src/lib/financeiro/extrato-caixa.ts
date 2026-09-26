@@ -99,6 +99,11 @@ export type MovimentacaoExtrato = {
   status?: string | null;
   /** Ajuste gerencial: competência antiga, sem dinheiro na gaveta daquele dia. */
   retroativo?: boolean;
+  /**
+   * Parcela de cartão importada do sistema antigo: não passou no balcão, e o
+   * Movimento de Caixa a deixa fora do dia (ver `ehParcelaImportada`).
+   */
+  parcelaImportada?: boolean;
 };
 
 /**
@@ -349,7 +354,13 @@ export function linhasAnaliticas(movs: MovimentacaoExtrato[]): LinhaExtrato[] {
       usuario: m.usuarioNome ?? "",
       // A marca de retroativo tem que viajar com a linha: é o que explica um
       // valor com data antiga que não estava no cupom impresso daquele dia.
-      situacao: [m.status ?? "", m.retroativo ? "retroativo" : ""].filter(Boolean).join(" / "),
+      situacao: [
+        m.status ?? "",
+        m.retroativo ? "retroativo" : "",
+        m.parcelaImportada && !m.retroativo ? "parcela do sistema antigo" : "",
+      ]
+        .filter(Boolean)
+        .join(" / "),
     };
   });
 }

@@ -23,7 +23,12 @@ import { carregarCategorias, mapaDeCategorias } from "./categorias-carregar";
 import { classificarForma, LABEL_FORMA, type ParteMisto } from "./formas-pagamento";
 import { buscarPaginado, buscarPorLotes, type ConsultaPaginavel } from "./paginacao";
 import { repartirPorForma } from "./rateio-receita";
-import { ehLancamentoRetroativo, mapaDaGaveta, TIPOS_QUE_PESAM_NA_GAVETA } from "./retroativos";
+import {
+  ehLancamentoRetroativo,
+  ehParcelaImportada,
+  mapaDaGaveta,
+  TIPOS_QUE_PESAM_NA_GAVETA,
+} from "./retroativos";
 import type { MovimentacaoExtrato } from "./extrato-caixa";
 
 /** Linhas por página nas consultas paginadas (limite do PostgREST). */
@@ -295,6 +300,7 @@ export async function carregarMovimentacao(params: {
         { data: l.data, created_at: l.created_at, origem: "fin" },
         gaveta.get(l.id) ?? null,
       ),
+      parcelaImportada: ehParcelaImportada(l),
     };
   });
 

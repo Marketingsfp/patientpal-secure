@@ -761,6 +761,12 @@ function Page() {
    * financeiro achar que sumiu lançamento.
    */
   const [foraRateio, setForaRateio] = useState<{ qtd: number; valor: number } | null>(null);
+  /** O mesmo aviso para a Movimentação Financeira, que também tem despesas. */
+  const [foraMovimentacao, setForaMovimentacao] = useState<{
+    qtd: number;
+    receitas: number;
+    despesas: number;
+  } | null>(null);
   const [servicoAberto, setServicoAberto] = useState(false);
   const [buscaServico, setBuscaServico] = useState("");
   // --- Filtro de Categoria (Rateio e Movimentação Financeira) --------------
@@ -893,7 +899,9 @@ function Page() {
             comparar ? `${periodoComp.de}:${periodoComp.ate}` : "sem-comparacao",
             rIncluirRetroativos ? "com-retroativos" : "sem-retroativos",
           ].join("|")
-        : `${tipo}|${from}|${to}`;
+        : tipo === "movimentacao"
+          ? `${tipo}|${from}|${to}|${rIncluirRetroativos ? "com-retroativos" : "sem-retroativos"}`
+          : `${tipo}|${from}|${to}`;
   const atualizado = resultado !== null && resultado.chave === chaveAtual;
 
   // O `ref` marca que o cadastro já foi pedido. Sem ele, uma falha de rede
@@ -1685,11 +1693,28 @@ function Page() {
             : grupos) as unknown as Linha[];
         }
       } else if (tipo === "movimentacao") {
-        brutasMovs = await carregarMovimentacao({
+        const todasMovs = await carregarMovimentacao({
           clinicaId: clinicaAtual.clinica_id,
           de: from,
           ate: to,
         });
+        // Mesmo recorte do Movimento de Caixa (decisão de 26/09/2026): com o
+        // botão desligado, retroativos e parcelas do sistema antigo ficam fora,
+        // e o aviso da tela diz quantos são e quanto valem.
+        const ficaFora = (m: MovimentacaoExtrato) => !!(m.retroativo || m.parcelaImportada);
+        const movsFora = todasMovs.filter(ficaFora);
+        setForaMovimentacao({
+          qtd: movsFora.length,
+          receitas:
+            Math.round(
+              movsFora.filter((m) => m.tipo === "receita").reduce((t, m) => t + m.valor, 0) * 100,
+            ) / 100,
+          despesas:
+            Math.round(
+              movsFora.filter((m) => m.tipo === "despesa").reduce((t, m) => t + m.valor, 0) * 100,
+            ) / 100,
+        });
+        brutasMovs = rIncluirRetroativos ? todasMovs : todasMovs.filter((m) => !ficaFora(m));
         movs = filtrarPorCategoria(brutasMovs, categorias, categoriaDaLinha);
         data = linhasExtrato(movs, rTipo);
       } else if (tipo === "sessoes") {
@@ -2625,8 +2650,9 @@ function Page() {
             </p>
           )}
           {/* Mesmo botão do Dashboard e do Movimento de Caixa, e desligado
-              como lá: o Rateio abre com o mesmo dinheiro do caixa. */}
-          {tipo === "rateio" && (
+              como lá: o Rateio e a Movimentação Financeira abrem com o mesmo
+              dinheiro do caixa. */}
+          {(tipo === "rateio" || tipo === "movimentacao") && (
             <div className="flex items-center gap-2">
               <Switch
                 id="rateio-incluir-retroativos"
@@ -2654,9 +2680,10 @@ function Page() {
             <p className="text-xs text-muted-foreground">
               Tudo que entrou e saiu do caixa geral no período: recebimentos de pacientes,
               mensalidades e adesões do cartão, despesas, repasse médico, boletos e as sangrias e
-              suprimentos entre caixas. Lançamento cancelado fica de fora. Ajustes com data
-              retroativa entram e vêm marcados na coluna Situação — eles não estavam no cupom
-              impresso daquele dia.{" "}
+              suprimentos entre caixas. Lançamento cancelado fica de fora. Como no Movimento de
+              Caixa, os lançamentos digitados depois do dia e as parcelas de cartão do sistema
+              antigo só entram com o botão abaixo ligado — e aí vêm marcados na coluna Situação,
+              porque não estavam no cupom impresso daquele dia.{" "}
               {/* A diferença entre as duas visões precisa estar escrita na tela: quem imprime
                   o sintético e o analítico lado a lado vê dois TOTAL GERAL diferentes quando
                   houve sangria, e essa frase é a explicação. */}
@@ -2676,6 +2703,23 @@ function Page() {
               )}
             </p>
           )}
+          {tipo === "movimentacao" &&
+            atualizado &&
+            foraMovimentacao &&
+            foraMovimentacao.qtd > 0 && (
+              <p className="text-xs text-sky-900 bg-sky-50 border border-sky-300 rounded-md px-3 py-2">
+                Nada a fazer — é só informação.{" "}
+                {rIncluirRetroativos
+                  ? "Estes números JÁ INCLUEM"
+                  : "Ficaram fora destes números, como no Movimento de Caixa,"}{" "}
+                {foraMovimentacao.qtd} lançamento(s) digitados depois do dia ou parcelas de cartão
+                do sistema antigo ({brl(foraMovimentacao.receitas)} em receitas e{" "}
+                {brl(foraMovimentacao.despesas)} em despesas).{" "}
+                {rIncluirRetroativos
+                  ? "Por isso o total aqui não bate com o Movimento de Caixa."
+                  : "Para vê-los — na conferência do extrato do banco, por exemplo —, ligue o botão acima."}
+              </p>
+            )}
           {tipo === "sessoes" && (
             <p className="text-xs text-muted-foreground">
               Pacote em andamento aparece sempre, mesmo que tenha começado antes do período — é para
