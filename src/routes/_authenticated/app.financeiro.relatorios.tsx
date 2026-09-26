@@ -31,7 +31,6 @@ import {
   Download,
   FileBarChart,
   FileSpreadsheet,
-  Loader2,
   Minus,
   PhoneCall,
   Printer,
@@ -208,6 +207,27 @@ import {
 } from "@/components/ui/command";
 
 import { DateInputBR } from "@/components/ui/date-input-br";
+/**
+ * O recorte do botão "Incluir lançamentos retroativos": desligado, sai o que o
+ * Movimento de Caixa deixa fora do período (retroativos e parcelas de cartão
+ * do sistema antigo). A lista carregada é sempre a completa, para o botão
+ * trocar os números na hora, sem nova busca.
+ */
+function semForaDoCaixa(
+  linhas: RateioLinha[],
+  foraIds: Set<string> | undefined,
+  incluir: boolean,
+): RateioLinha[] {
+  return incluir || !foraIds?.size ? linhas : linhas.filter((l) => !foraIds.has(l.id));
+}
+
+const ficaForaDoCaixa = (m: MovimentacaoExtrato) => !!(m.retroativo || m.parcelaImportada);
+
+/** O mesmo recorte na Movimentação Financeira, pelas marcas de cada linha. */
+function movsNoCaixa(movs: MovimentacaoExtrato[], incluir: boolean): MovimentacaoExtrato[] {
+  return incluir ? movs : movs.filter((m) => !ficaForaDoCaixa(m));
+}
+
 export const Route = createFileRoute("/_authenticated/app/financeiro/relatorios")({
   component: Page,
   head: () => ({ meta: [{ title: "Relatórios — Financeiro" }] }),
@@ -847,6 +867,15 @@ function Page() {
     rateio?: RateioLinha[];
     /** Mesmas linhas para o período de comparação, quando ligada. */
     rateioComp?: RateioLinha[];
+    /**
+     * ids das linhas do Rateio que o Movimento de Caixa deixa fora do período
+     * (retroativos e parcelas do sistema antigo), do período atual e do de
+     * comparação. As listas acima vêm COMPLETAS: o botão "Incluir lançamentos
+     * retroativos" é um recorte em memória, e trocar de posição muda os
+     * números na hora, sem ir ao banco.
+     */
+    foraIds?: Set<string>;
+    foraIdsComp?: Set<string>;
     /** Movimentações cruas do extrato, pelo mesmo motivo: trocar entre
      *  sintético e analítico é um recorte da mesma lista, não outra consulta. */
     movimentacao?: MovimentacaoExtrato[];
@@ -898,11 +927,8 @@ function Page() {
             rModalidade,
             rServico,
             comparar ? `${periodoComp.de}:${periodoComp.ate}` : "sem-comparacao",
-            rIncluirRetroativos ? "com-retroativos" : "sem-retroativos",
           ].join("|")
-        : tipo === "movimentacao"
-          ? `${tipo}|${from}|${to}|${rIncluirRetroativos ? "com-retroativos" : "sem-retroativos"}`
-          : `${tipo}|${from}|${to}`;
+        : `${tipo}|${from}|${to}`;
   const atualizado = resultado !== null && resultado.chave === chaveAtual;
 
   // O `ref` marca que o cadastro já foi pedido. Sem ele, uma falha de rede
@@ -977,25 +1003,32 @@ function Page() {
     setCategorias([]);
   }, [tipo]);
 
-  /** Linhas cruas do rateio, já recortadas pelas categorias escolhidas. */
+  /**
+   * Linhas cruas do rateio, já recortadas pelo botão de retroativos e pelas
+   * categorias escolhidas.
+   */
   const linhasRateio = useMemo(
     () =>
       filtrarPorCategoria(
-        atualizado && resultado?.rateio ? resultado.rateio : [],
+        atualizado && resultado?.rateio
+          ? semForaDoCaixa(resultado.rateio, resultado.foraIds, rIncluirRetroativos)
+          : [],
         categorias,
         (l) => l.categoria_nome,
       ),
-    [atualizado, resultado, categorias],
+    [atualizado, resultado, categorias, rIncluirRetroativos],
   );
   /** Movimentações cruas do extrato; base dos totais e das duas visões. */
   const movsExtrato = useMemo(
     () =>
       filtrarPorCategoria(
-        atualizado && resultado?.movimentacao ? resultado.movimentacao : [],
+        atualizado && resultado?.movimentacao
+          ? movsNoCaixa(resultado.movimentacao, rIncluirRetroativos)
+          : [],
         categorias,
         categoriaDaLinha,
       ),
-    [atualizado, resultado, categorias],
+    [atualizado, resultado, categorias, rIncluirRetroativos],
   );
   const totaisM = useMemo(() => totaisExtrato(movsExtrato), [movsExtrato]);
   /** Linhas cruas de sessões; base dos totais e do filtro em memória. */
@@ -1141,11 +1174,13 @@ function Page() {
   const linhasRateioComp = useMemo(
     () =>
       filtrarPorCategoria(
-        atualizado && resultado?.rateioComp ? resultado.rateioComp : [],
+        atualizado && resultado?.rateioComp
+          ? semForaDoCaixa(resultado.rateioComp, resultado.foraIdsComp, rIncluirRetroativos)
+          : [],
         categorias,
         (l) => l.categoria_nome,
       ),
-    [atualizado, resultado, categorias],
+    [atualizado, resultado, categorias, rIncluirRetroativos],
   );
   /** Só estes dois relatórios têm categoria em cada linha. */
   const usaCategoria = tipo === "rateio" || tipo === "movimentacao";
@@ -1602,6 +1637,8 @@ function Page() {
     let brutasRateio: RateioLinha[] | undefined;
     let brutasComp: RateioLinha[] | undefined;
     let brutasMovs: MovimentacaoExtrato[] | undefined;
+    let foraIds: Set<string> | undefined;
+    let foraIdsComp: Set<string> | undefined;
     let cruas: RateioLinha[] | undefined;
     let cruasComp: RateioLinha[] | undefined;
     let movs: MovimentacaoExtrato[] | undefined;
@@ -1641,7 +1678,7 @@ function Page() {
           // retroativos e parcelas importadas ficam fora, salvo se o botão
           // "Incluir lançamentos retroativos" estiver ligado.
           carregarForaDoCaixa(clinicaAtual.clinica_id, from, to),
-          comparar && !rIncluirRetroativos
+          comparar
             ? carregarForaDoCaixa(clinicaAtual.clinica_id, periodoComp.de, periodoComp.ate)
             : Promise.resolve(null),
           // A outra leitura do repasse, a da gaveta: mostrada ao lado do
@@ -1650,25 +1687,15 @@ function Page() {
             () => null,
           ),
           semRecorte
-            ? carregarPainelFinanceiro(
-                ctxRateio,
-                clinicaAtual.clinica_id,
-                from,
-                to,
-                false,
-                rIncluirRetroativos,
-              )
+            ? carregarPainelFinanceiro(ctxRateio, clinicaAtual.clinica_id, from, to, false, false)
                 .then(resumoPainel)
                 .catch(() => null)
             : Promise.resolve(null),
         ]);
-        const atual = rIncluirRetroativos
-          ? atualTodas
-          : atualTodas.filter((l) => !fora.ids.has(l.id));
-        const anterior =
-          rIncluirRetroativos || !foraComp
-            ? anteriorTodas
-            : anteriorTodas.filter((l) => !foraComp.ids.has(l.id));
+        foraIds = fora.ids;
+        foraIdsComp = foraComp?.ids;
+        const atual = semForaDoCaixa(atualTodas, foraIds, rIncluirRetroativos);
+        const anterior = semForaDoCaixa(anteriorTodas, foraIdsComp, rIncluirRetroativos);
         const linhasFora = atualTodas.filter((l) => fora.ids.has(l.id));
         setForaRateio({
           qtd: linhasFora.length,
@@ -1676,8 +1703,8 @@ function Page() {
         });
         setRepassePagoRateio(pago);
         setSaldoCaixaRateio(painel);
-        brutasRateio = atual;
-        brutasComp = anterior;
+        brutasRateio = atualTodas;
+        brutasComp = anteriorTodas;
         cruas = filtrarPorCategoria(atual, categorias, (l) => l.categoria_nome);
         cruasComp = filtrarPorCategoria(anterior, categorias, (l) => l.categoria_nome);
         if (rTipo === "analitico") {
@@ -1702,8 +1729,7 @@ function Page() {
         // Mesmo recorte do Movimento de Caixa (decisão de 26/09/2026): com o
         // botão desligado, retroativos e parcelas do sistema antigo ficam fora,
         // e o aviso da tela diz quantos são e quanto valem.
-        const ficaFora = (m: MovimentacaoExtrato) => !!(m.retroativo || m.parcelaImportada);
-        const movsFora = todasMovs.filter(ficaFora);
+        const movsFora = todasMovs.filter(ficaForaDoCaixa);
         setForaMovimentacao({
           qtd: movsFora.length,
           receitas:
@@ -1715,8 +1741,12 @@ function Page() {
               movsFora.filter((m) => m.tipo === "despesa").reduce((t, m) => t + m.valor, 0) * 100,
             ) / 100,
         });
-        brutasMovs = rIncluirRetroativos ? todasMovs : todasMovs.filter((m) => !ficaFora(m));
-        movs = filtrarPorCategoria(brutasMovs, categorias, categoriaDaLinha);
+        brutasMovs = todasMovs;
+        movs = filtrarPorCategoria(
+          movsNoCaixa(todasMovs, rIncluirRetroativos),
+          categorias,
+          categoriaDaLinha,
+        );
         data = linhasExtrato(movs, rTipo);
       } else if (tipo === "sessoes") {
         sessoes = await carregarSessoes({
@@ -1787,6 +1817,8 @@ function Page() {
       linhas: data,
       rateio: brutasRateio,
       rateioComp: brutasComp,
+      foraIds,
+      foraIdsComp,
       movimentacao: brutasMovs,
       sessoes,
     });
@@ -1809,26 +1841,6 @@ function Page() {
       toast.success(`${data.length.toLocaleString("pt-BR")} linha(s) no rateio`);
     else toast.success(`${data.length.toLocaleString("pt-BR")} registro(s) encontrados`);
   };
-
-  /**
-   * Ligar ou desligar "Incluir lançamentos retroativos" refaz a busca sozinho,
-   * sem esperar o clique em "Buscar" (pedido do financeiro em 26/09/2026).
-   *
-   * Só quando já há um relatório deste tipo na tela: sem busca anterior, o
-   * botão apenas fica guardado para a próxima. Roda depois do render porque
-   * `carregar` lê o valor do botão pelo estado — chamado no próprio clique,
-   * ainda veria a posição antiga.
-   */
-  const retroativosAnterior = useRef(rIncluirRetroativos);
-  useEffect(() => {
-    if (retroativosAnterior.current === rIncluirRetroativos) return;
-    retroativosAnterior.current = rIncluirRetroativos;
-    if (tipo !== "rateio" && tipo !== "movimentacao") return;
-    if (resultado?.tipo !== tipo) return;
-    void carregar();
-    // Só a troca do botão dispara; `carregar` e o resultado são lidos do render atual.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rIncluirRetroativos]);
 
   /** Cabeçalho de contexto que vai no topo da planilha e da folha impressa. */
   const contextoDoRelatorio = () => {
@@ -2679,7 +2691,6 @@ function Page() {
                 id="rateio-incluir-retroativos"
                 checked={rIncluirRetroativos}
                 onCheckedChange={setRIncluirRetroativos}
-                disabled={loading}
               />
               <Label
                 htmlFor="rateio-incluir-retroativos"
@@ -2688,11 +2699,6 @@ function Page() {
               >
                 Incluir lançamentos retroativos (ver o período por competência)
               </Label>
-              {loading && (
-                <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                  <Loader2 className="h-3 w-3 animate-spin" /> Atualizando…
-                </span>
-              )}
             </div>
           )}
           {tipo === "rateio" && atualizado && foraRateio && foraRateio.qtd > 0 && (
