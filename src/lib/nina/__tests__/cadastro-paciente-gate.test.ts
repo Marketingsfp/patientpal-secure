@@ -134,6 +134,18 @@ describe("gate: escolher vaga → coletar dados → confirmar → agendar", () =
     expect(confirmacaoDaEscolha(t.estado)).toBeNull();
     expect(t.chamadas).toHaveLength(0);
   });
+  test("escolha com dúvida de pagamento preserva vaga e deixa o modelo responder antes da coleta", async () => {
+    const t = preparar();
+    const vaga = t.estado.appointment.confirmation!.vaga;
+    t.estado.appointment.confirmation = null;
+    registrarOpcoesAgendamento(t.estado, "clinica", [vaga]);
+    expect(await t.turno("14:00 fica bom. Se eu pagar no Pix lá na hora pode?")).toBeNull();
+    expect(confirmacaoDaEscolha(t.estado)?.vaga).toEqual(vaga);
+    expect(t.chamadas.map(c => c.nome)).toEqual(["selecionar_horario"]);
+    t.ctx.consultaAgenda!.historico.push({ role: "assistant", content: "Pix somente antecipado pelo WhatsApp. Informe seu nome completo e data de nascimento." });
+    expect((await t.turno("Ana da Silva, 02/01/1990"))?.texto).toBe(confirmacaoDaEscolha(t.estado)?.resumo);
+    expect(t.chamadas.some(c => c.nome === "agendar")).toBe(false);
+  });
   test("aproveita nome e nascimento declarados junto da preferência sem reservar antes do aceite", async () => {
     const t = preparar();
     const vaga = t.estado.appointment.confirmation!.vaga;

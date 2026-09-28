@@ -337,7 +337,7 @@ export async function aplicarGateIdentificacao(params: {
   const novo = declaracaoNaEscolha ? extrairDadosIdentificacao(declaracaoNaEscolha)
     : aceiteDaVaga || selecionouAgora || !coletandoDados ? null : extrairDadosIdentificacao(mensagem);
   if (
-    !selecionouAgora && !aceiteDaVaga &&
+    !aceiteDaVaga &&
     pareceAssuntoParalelo(mensagem) &&
     !novo?.data_nascimento &&
     !novo?.telefone

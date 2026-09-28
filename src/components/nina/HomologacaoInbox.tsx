@@ -844,12 +844,13 @@ export function HomologacaoInbox({ laboratorio = false, ativo = true, abrirConve
         // limpo, nada troca de sessão. Só informamos o estado real.
         if (r.erro) {
           setErro(r.erro);
-          setEncerrado(AVISO_TESTE_ENCERRADO);
+          // Falha/ocupação do processamento não encerra a sessão do lead.
+          setEncerrado(null);
         } else if (r.transferida) {
           setEncerrado(AVISO_TESTE_ENCERRADO);
         } else if (!r.reply && !agrupada && !r.semNovaMensagem) {
           setErro("A Nina não respondeu nesta execução.");
-          setEncerrado(AVISO_TESTE_ENCERRADO);
+          setEncerrado(null);
         }
       }
 
