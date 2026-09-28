@@ -1,4 +1,4 @@
-# API de Agendamentos — Health Hub Pro (v1.4)
+# API de Agendamentos — Health Hub Pro (v1.6)
 
 API REST genérica de agenda, autenticada por **chave de API**. Não é uma
 integração com nenhum sistema específico: é a agenda do Health Hub Pro exposta
@@ -733,3 +733,30 @@ verificação por WhatsApp (`/patients/verify/*`, que continua funcionando).
 - **v1.4 (2026-09):** `POST /patients/lookup` (escopo `patients:lookup`,
   10/min e 100/dia); `nome`/`telefone` opcionais no objeto `paciente`;
   erro `patient_details_required`; seção 9.1 reescrita.
+
+## 13. v1.6 — agenda fora do agendamento online
+
+### 13.1 Campo `medicos.visivel_agendamento_online`
+
+Booleano, padrão `true`. Vale **só** para superfícies públicas (site,
+integrações desta API). Não tem efeito na agenda interna, recepção,
+relatórios ou financeiro. Uso típico: agenda-ponte da recepção para paciente
+atendido em outra unidade/endereço. Editável no cadastro do médico
+("Aparece no agendamento online").
+
+### 13.2 Onde vale
+
+- `GET /availability` (função `horarios_disponiveis_publico`) não devolve
+  fichas de médico com o campo `false`.
+- A lista pública de médicos e especialidades (`GET /doctors`,
+  `GET /specialties`) respeita o campo; especialidade que só existia por
+  causa desse médico some da lista.
+- `POST /appointments` com `medico_id` de médico oculto → **422
+  `doctor_not_bookable_online`** ("profissional/agenda não disponível para
+  agendamento online"). Checado antes de qualquer cadastro de paciente.
+- `intake` do site não escolhe médico, então não muda.
+
+### 13.3 Changelog
+
+- **v1.6 (2026-09):** campo `visivel_agendamento_online`; erro
+  `doctor_not_bookable_online`; listas públicas respeitam o campo.

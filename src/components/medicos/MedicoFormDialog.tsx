@@ -205,6 +205,7 @@ const emptyForm = () => ({
   senhaUsuario: "",
   roleUsuario: "medico" as "admin" | "gestor" | "medico" | "enfermeiro" | "recepcao" | "financeiro",
   ativo: true,
+  visivel_agendamento_online: true,
 });
 
 interface Props {
@@ -605,7 +606,7 @@ export function MedicoFormDialog({
       const { data: m } = await supabase
         .from("medicos")
         .select(
-          "id, clinica_id, user_id, nome, crm, crm_uf, email, telefone, telefone2, nacionalidade, estado_civil, sexo, duracao_consulta_min, usa_sistema, procedimento_padrao_id, paciente_id, cep, logradouro, numero, complemento, bairro, cidade, estado, ativo, medico_especialidades(especialidade_id, tem_rqe, rqe_numero, especialidade:especialidades(id, nome))",
+          "id, clinica_id, user_id, nome, crm, crm_uf, email, telefone, telefone2, nacionalidade, estado_civil, sexo, duracao_consulta_min, usa_sistema, procedimento_padrao_id, paciente_id, cep, logradouro, numero, complemento, bairro, cidade, estado, ativo, visivel_agendamento_online, medico_especialidades(especialidade_id, tem_rqe, rqe_numero, especialidade:especialidades(id, nome))",
         )
         .eq("id", editingMedicoId)
         .maybeSingle();
@@ -778,6 +779,8 @@ export function MedicoFormDialog({
         senhaUsuario: "",
         roleUsuario: "medico",
         ativo: (med as { ativo?: boolean }).ativo !== false,
+        visivel_agendamento_online:
+          (med as { visivel_agendamento_online?: boolean }).visivel_agendamento_online !== false,
       });
       if (med.user_id) {
         if (podeGerenciarEquipe) {
@@ -944,6 +947,7 @@ export function MedicoFormDialog({
       conta: form.conta || null,
       pix_chave: form.pix_chave || null,
       ativo: form.ativo,
+      visivel_agendamento_online: form.visivel_agendamento_online,
       paciente_id: pacienteVinculado?.id ?? null,
       // Só entra no INSERT (nunca no UPDATE, para não sobrescrever o vínculo
       // de um médico já existente): liga este novo registro a um user_id que
@@ -1224,6 +1228,21 @@ export function MedicoFormDialog({
             />
             <Label htmlFor="medico-ativo" className="cursor-pointer">
               Médico ativo {form.ativo ? "" : "(desmarque para inativar)"}
+            </Label>
+          </div>
+          <div className="flex items-center gap-2 rounded-md border bg-muted/30 p-3">
+            <Checkbox
+              id="medico-visivel-online"
+              checked={form.visivel_agendamento_online}
+              onCheckedChange={(v) =>
+                setForm({ ...form, visivel_agendamento_online: v === true })
+              }
+            />
+            <Label htmlFor="medico-visivel-online" className="cursor-pointer">
+              Aparece no agendamento online
+              <span className="block text-xs text-muted-foreground">
+                Desmarque para esconder do site e das integrações. A agenda interna não muda.
+              </span>
             </Label>
           </div>
           <div className="space-y-2">
