@@ -1,5 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import { CONTRATO_MJ_CARTAO_CONSULTA_SEGUROS } from "./contract-templates/menino-jesus-cartao-consulta-seguros";
+import { CONTRATO_SF_CARTAO_CONSULTA_SEGUROS } from "./contract-templates/sao-francisco-cartao-consulta-seguros";
 
 const soDig = (s?: string | null) => (s ?? "").replace(/\D/g, "");
 
@@ -64,7 +65,13 @@ const fmtTelefone = (s?: string | null) => {
 export const CONVENIO_TEMPLATE_OVERRIDES: Record<string, string> = {
   // POLICLINICA MENINO JESUS — CARTÃO CONSULTA + SEGUROS
   "4fdce541-5b2b-4816-ba7d-911b36741b7d": CONTRATO_MJ_CARTAO_CONSULTA_SEGUROS,
+  // POLICLINICA SAO FRANCISCO DE PAULA — CARTÃO CONSULTA + SEGUROS
+  "55cc3be3-6102-4917-ac2f-ff18e0b27917": CONTRATO_SF_CARTAO_CONSULTA_SEGUROS,
 };
+
+// Modelos com layout em fluxo (tabelas normais): os valores longos quebram
+// linha dentro da célula, então não precisam ser encolhidos.
+const OVERRIDES_SEM_REDUCAO = new Set(["55cc3be3-6102-4917-ac2f-ff18e0b27917"]);
 
 const fmtBRL = (v: number) =>
   new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(Number(v || 0));
@@ -109,7 +116,7 @@ export const fmtDataExtenso = (iso?: string | null) => {
 const esc = (s: string | null | undefined) =>
   (s ?? "").replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[c]!);
 
-function applyTemplate(tpl: string, vars: Record<string, string>): string {
+function applyTemplate(tpl: string, vars: Record<string, string>, reduzirLongos = true): string {
   let out = tpl.replace(/\{\{#(\w+)\}\}([\s\S]*?)\{\{\/\1\}\}/g, (_, key, body) =>
     vars[key] && String(vars[key]).trim() ? body : "",
   );
@@ -122,7 +129,7 @@ function applyTemplate(tpl: string, vars: Record<string, string>): string {
     // Reduz o tamanho real da fonte (não só o transform visual) para os
     // valores longos caberem na coluna dos templates absolutos.
     const len = raw.length;
-    if (len <= 20) return safe;
+    if (!reduzirLongos || len <= 20) return safe;
     const pct = len > 42 ? 62 : len > 36 ? 68 : len > 30 ? 75 : len > 26 ? 82 : 90;
     return `<span style="font-size:${pct}%;letter-spacing:-0.02em;white-space:nowrap;">${safe}</span>`;
   });
@@ -346,7 +353,7 @@ export async function printContrato(contratoId: string) {
   const { data: pa } = await supabase
     .from("pacientes")
     .select(
-      "cpf, data_nascimento, telefone, email, logradouro, numero, bairro, cidade, estado, cep",
+      "cpf, data_nascimento, telefone, telefone2, email, logradouro, numero, bairro, cidade, estado, cep",
     )
     .eq("id", (c as any).paciente_id)
     .maybeSingle();
@@ -428,23 +435,36 @@ export async function printContrato(contratoId: string) {
   const temCamposDeEnderecoSeparados = /\{\{PACIENTE_(BAIRRO|CIDADE|ESTADO)\}\}/.test(templateBody);
   const enderecoPaciente = temCamposDeEnderecoSeparados ? enderecoRuaNumero : enderecoCompleto;
 
-  const corpo = applyTemplate(templateBody, {
-    PACIENTE_NOME: c.paciente_nome ?? "",
-    PACIENTE_CPF: fmtCPF(_pa.cpf),
-    PACIENTE_NASCIMENTO: fmtData(_pa.data_nascimento),
-    PACIENTE_ENDERECO: enderecoPaciente,
-    PACIENTE_ENDERECO_COMPLETO: enderecoCompleto,
-    PACIENTE_LOGRADOURO: toTitleCase(_pa.logradouro),
-    PACIENTE_NUMERO: _pa.numero ?? "",
-    PACIENTE_BAIRRO: toTitleCase(_pa.bairro),
-    PACIENTE_CIDADE: toTitleCase(_pa.cidade),
-    PACIENTE_ESTADO: ufPaciente,
-    PACIENTE_CEP: fmtCEP(_pa.cep),
-    PACIENTE_TELEFONE: fmtTelefone(_pa.telefone),
-    PACIENTE_EMAIL: _pa.email ?? "",
-    DATA_HOJE: fmtDataExtenso(new Date().toISOString()),
-    ...depSlotVars,
-  });
+  const corpo = applyTemplate(
+    templateBody,
+    {
+      PACIENTE_NOME: c.paciente_nome ?? "",
+      PACIENTE_CPF: fmtCPF(_pa.cpf),
+      PACIENTE_NASCIMENTO: fmtData(_pa.data_nascimento),
+      PACIENTE_ENDERECO: enderecoPaciente,
+      PACIENTE_ENDERECO_COMPLETO: enderecoCompleto,
+      PACIENTE_LOGRADOURO: toTitleCase(_pa.logradouro),
+      PACIENTE_NUMERO: _pa.numero ?? "",
+      PACIENTE_BAIRRO: toTitleCase(_pa.bairro),
+      PACIENTE_CIDADE: toTitleCase(_pa.cidade),
+      PACIENTE_ESTADO: ufPaciente,
+      PACIENTE_CEP: fmtCEP(_pa.cep),
+      PACIENTE_TELEFONE: fmtTelefone(_pa.telefone),
+      PACIENTE_EMAIL: _pa.email ?? "",
+      PACIENTE_TELEFONE2: fmtTelefone(_pa.telefone2),
+      DATA_HOJE: fmtDataExtenso(new Date().toISOString()),
+      CONTRATO_NUMERO: c.numero != null ? String(c.numero) : "",
+      CONTRATO_DATA: fmtData((c as any).data_inicio ?? (c as any).created_at),
+      // Mesmo critério de renovação usado em info-convenio-paciente.
+      CONTRATO_TIPO:
+        (c as any).contrato_origem_id || Number((c as any).numero_renovacoes ?? 0) > 0
+          ? "RENOVAÇÃO"
+          : "NOVO",
+      DIA_VENCIMENTO: (c as any).dia_vencimento != null ? String((c as any).dia_vencimento) : "",
+      ...depSlotVars,
+    },
+    !((c as any).convenio_id && OVERRIDES_SEM_REDUCAO.has((c as any).convenio_id)),
+  );
 
   const isFullHtml = /<!doctype\s+html|<html[\s>]/i.test(corpo);
 

@@ -4,6 +4,13 @@
  * pronto para injetar no editor.
  */
 
+import {
+  MARCA_FIM,
+  MARCA_INICIO,
+  reorganizarCaixasDoDocx,
+  type TipoCelulaLayout,
+} from "./docx-caixas-flutuantes";
+
 function escapeHtml(s: string) {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
@@ -20,6 +27,9 @@ function textoParaHtml(texto: string) {
 
 const BORDA = "1px solid #111827";
 const AZUL_CABECALHO = "#1b365d";
+const AZUL_CAIXA = "#4472c4";
+// Largura útil de uma folha A4 com as margens padrão do editor (~182 mm).
+const LARGURA_UTIL_PX = 688;
 
 /**
  * Normaliza o HTML gerado pelo mammoth aplicando CSS inline nas tabelas,
@@ -32,8 +42,55 @@ function normalizarHtmlDocx(html: string): string {
   const raiz = doc.getElementById("raiz");
   if (!raiz) return html;
 
+  // Linhas de caixas flutuantes do Word (ver docx-caixas-flutuantes.ts):
+  // tabela sem bordas, com a largura de cada caixa preservada.
+  const tabelasLayout = new Set<Element>();
+  const reMarca = new RegExp(`${MARCA_INICIO}(\\w+)\\|([\\d.]+)${MARCA_FIM}`);
+  raiz.querySelectorAll("td").forEach((td) => {
+    const achado = (td.textContent || "").match(reMarca);
+    if (!achado) return;
+    const tipo = achado[1] as TipoCelulaLayout;
+    const pct = Math.max(1, Math.min(100, Number(achado[2]) || 0));
+    const walker = doc.createTreeWalker(td, NodeFilter.SHOW_TEXT);
+    for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+      if (n.nodeValue && reMarca.test(n.nodeValue)) {
+        n.nodeValue = n.nodeValue.replace(reMarca, "");
+        break;
+      }
+    }
+    td.querySelectorAll("p").forEach((p) => {
+      if (!p.textContent?.trim() && !p.querySelector("img")) p.remove();
+    });
+    const el = td as HTMLElement;
+    let estilo = `border:none;padding:4px 8px;vertical-align:middle;width:${pct.toFixed(1)}%;`;
+    if (tipo === "caixa") estilo += `border:1px solid ${AZUL_CAIXA};`;
+    if (tipo === "faixa")
+      estilo += `background-color:${AZUL_CABECALHO};color:#ffffff;font-weight:700;text-align:center;`;
+    if (tipo === "imagem") estilo += "text-align:center;";
+    el.setAttribute("style", estilo);
+    // Largura em px para o editor (colgroup), proporcional à página A4 útil.
+    el.setAttribute("colwidth", String(Math.round((pct / 100) * LARGURA_UTIL_PX)));
+    if (tipo === "faixa") el.setAttribute("data-bg", AZUL_CABECALHO);
+    else el.removeAttribute("data-bg");
+    el.removeAttribute("class");
+    el.querySelectorAll("p").forEach((p) => {
+      (p as HTMLElement).style.margin = "0";
+      if (tipo === "faixa" || tipo === "imagem") (p as HTMLElement).style.textAlign = "center";
+    });
+    const tabela = td.closest("table");
+    if (tabela) tabelasLayout.add(tabela);
+  });
+  tabelasLayout.forEach((tabela) => {
+    tabela.setAttribute(
+      "style",
+      "width:100%;border-collapse:collapse;table-layout:fixed;border:none;margin:4px 0;",
+    );
+    tabela.setAttribute("class", "docx-layout");
+  });
+
   // Tabelas
   raiz.querySelectorAll("table").forEach((tabela) => {
+    if (tabelasLayout.has(tabela)) return;
     tabela.setAttribute(
       "style",
       `width:100%;border-collapse:collapse;table-layout:fixed;border:${BORDA};margin:8px 0;`,
@@ -128,7 +185,14 @@ export async function extrairHtmlDeArquivo(file: File): Promise<string> {
     const mammothUrl = "https://esm.sh/mammoth@1.12.1/mammoth.browser.js";
     const mammoth: any = await import(/* @vite-ignore */ mammothUrl);
     const lib = mammoth.default ?? mammoth;
-    const arrayBuffer = await file.arrayBuffer();
+    let arrayBuffer = await file.arrayBuffer();
+    try {
+      arrayBuffer = await reorganizarCaixasDoDocx(arrayBuffer);
+    } catch (err) {
+      // Sem o ajuste de layout o documento ainda importa, só com as caixas
+      // empilhadas como antes.
+      console.warn("[importar-documento] caixas flutuantes não reorganizadas", err);
+    }
     const res = await lib.convertToHtml(
       { arrayBuffer },
       {
