@@ -1,5 +1,5 @@
 /**
- * "Caixas das operadoras" no Movimento de Caixa: sangrias recolhidas, sobra em
+ * "Caixas das operadoras" no Movimento de Caixa: sangrias entregues, sobra em
  * espécie entregue no fechamento e o Calculado de cada sessão, somados por
  * atendente no período — sem abrir a modal "Sessão de caixa" uma a uma.
  *
@@ -196,7 +196,7 @@ export function CaixasOperadoras({
               <TableRow>
                 <TableHead>Operador</TableHead>
                 <TableHead className="text-right">Recebido em dinheiro</TableHead>
-                <TableHead className="text-right">Sangrias recolhidas</TableHead>
+                <TableHead className="text-right">Sangrias entregues</TableHead>
                 <TableHead
                   className="text-right"
                   title="Soma do que ficou em cada gaveta ao fechar o caixa e foi entregue no fechamento. Cada dia começa do zero."
