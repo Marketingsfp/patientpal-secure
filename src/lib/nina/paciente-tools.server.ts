@@ -40,6 +40,8 @@ import { procedimentoDaSessao, lembrarProcedimentoSolicitado, vagaPreservaProced
 import { agendasDoProcedimento, resolverProcedimentoOperacional, VinculoProcedimentoError } from "./procedimento-agenda.server";
 import { normalizarSelecaoContextual } from "./confidence/selecao-contextual";
 import type { EscopoAtendimentoConsulta } from "./atendimento-consulta";
+import { pedidoConsultaComPreventivo } from "./atendimento-consulta";
+import { profissionalGenerico, profissionalSfp } from "./regras-catalogo";
 import { consultarCadastroConfirmado } from "./cadastro-paciente.server";
 import { processamentoWatchdogAtual } from "./watchdog-contexto.server";
 import { confirmacaoDaEscolha, consentimentoDaEscolha, limparEscolhaAgendamento, registrarOpcoesAgendamento, selecionarVagaValidada,
@@ -1337,6 +1339,13 @@ async function executarFerramentaInterna(
           })
           .parse(args);
         // FASE 3: mesma camada de retrieval usada pelo painel interno.
+        if (pedidoConsultaComPreventivo(ctx.consultaAgenda?.mensagemAtual ?? "") &&
+            /\b(?:ginecologia|ginecologista|consulta|preventivo)\b/.test(normalizar(p.termo))) {
+          p.termo = "consulta com preventivo";
+          p.tipo_atendimento = "consulta";
+          if (normalizar(procedimentoDaSessao(ctx.estado, ctx.clinicaId)?.nome ?? "") === "preventivo")
+            p.nova_solicitacao = true;
+        }
         const { searchKnowledgeBase } = await import("@/lib/nina/knowledge.server");
         let resultado = await searchKnowledgeBase({
           clinicaId: ctx.clinicaId,
@@ -1433,10 +1442,13 @@ async function executarFerramentaInterna(
           const candidatos = p.nome ? todos.filter(c => escolhido?.ok ? c.medicoId === escolhido.id
             : normalizar(c.medicoNome) === normalizar(p.nome!)) : todos;
           if (!candidatos.length) {
+            const publicos = todos.filter(c => c.medicoNome.trim() &&
+              !profissionalGenerico(c.medicoNome) && !profissionalSfp(c.medicoNome));
+            if (!publicos.length) return falhaVinculoAtendimento();
             const esclarecimento = { tipo: "profissional" as const, motivo: "medico_nao_identificado" as const,
               atendimento: pedido.nome,
-              pergunta: `Não identifiquei esse profissional entre os executantes de ${pedido.nome}. Qual destes profissionais você deseja?`,
-              opcoes: todos.map(c => ({ id: pedido.catalogo_id, nome: c.medicoNome })) };
+              pergunta: `Não identifiquei esse profissional entre os executantes de ${pedido.nome}. Qual destes profissionais você deseja?\n${[...new Set(publicos.map(c => c.medicoNome))].join("\n")}`,
+              opcoes: publicos.map(c => ({ id: pedido.catalogo_id, nome: c.medicoNome })) };
             ctx.esclarecimentoCatalogo = esclarecimento;
             return { ok: true, found: true, knowledge_status: "found", tipo_atendimento: "exame_procedimento",
               procedure: pedido.nome, pedido_interpretado: { atendimento: pedido.nome },
@@ -1493,6 +1505,15 @@ async function executarFerramentaInterna(
 
       case "buscar_procedimentos": {
         const p = zProcedimentos.parse(args);
+        if (normalizar(p.termo) === "preventivo" &&
+            pedidoConsultaComPreventivo(ctx.consultaAgenda?.mensagemAtual ?? "")) {
+          const contexto = conhecimentoDaMesmaSessao(ctx.estado?.knowledge_context, ctx.clinicaId, ctx.estado?.session_id ?? null);
+          return executarFerramentaInterna(ctx, "consultar_base_conhecimento", {
+            termo: "consulta com preventivo", tipo_atendimento: "consulta",
+            ...(contexto?.consulta.medico ? { medico: contexto.consulta.medico } : {}),
+            nova_solicitacao: p.nova_solicitacao,
+          });
+        }
         const { searchKnowledgeBase } = await import("./knowledge.server");
         const { SEM_CATALOGO_INSTRUCAO } = await import("./catalogo-fonte.server");
         const r = await searchKnowledgeBase({

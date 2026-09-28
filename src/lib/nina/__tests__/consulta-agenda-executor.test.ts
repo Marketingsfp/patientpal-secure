@@ -355,6 +355,19 @@ describe("procedimentos do Lead 01 não viram consultas", () => {
     expect(selecionada.ok, JSON.stringify(selecionada)).toBe(true);
     return selecionada;
   }
+  test("nome incorreto reapresenta os executantes nominais publicados", async () => {
+    const { ctx } = await iniciar();
+    await executarFerramentaPaciente(ctx, "buscar_medicos", { nome: "Nome Incorreto" });
+    expect(ctx.esclarecimentoCatalogo?.pergunta).toContain("Mariana Portugal");
+    expect(gravacoes).toHaveLength(0);
+  });
+  test("recurso genérico não gera pergunta de escolha sem nomes", async () => {
+    const { ctx } = await iniciar("PREVENTIVO", "Enfermagem");
+    const r = await executarFerramentaPaciente(ctx, "buscar_medicos", { nome: "Carlos Alberto Varillas" });
+    expect(r.ok).toBe(false);
+    expect(ctx.esclarecimentoCatalogo).toBeUndefined();
+    expect(gravacoes).toHaveLength(0);
+  });
   test.each([true, false])("cadastro %s: identificação e reserva usam o mesmo ID do Clínica OS", async criado => {
     const { ctx } = await iniciar();
     const escolha = await escolher(ctx);
@@ -817,12 +830,36 @@ describe("consulta com preventivo conserva o atendimento publicado", () => {
     expect(r.ok).toBe(true);
     expect(ctx.estado!.appointment.slot_options?.vagas[0]?.procedimento).toBe(comPreventivo);
   });
+  test("busca auxiliar de preventivo não transforma o pacote em exame isolado", async () => {
+    const ctx = preparar("com");
+    ctx.consultaAgenda = { mensagemAtual: "Quero consulta com preventivo junto. Primeira manhã com Alex Louza.", historico: [] };
+    ctx.estado!.knowledge_context!.consulta.medico = "Alex Louza";
+    const inicial = await executarFerramentaPaciente(ctx, "consultar_base_conhecimento", { termo: "ginecologia", tipo_atendimento: "consulta", medico: "Alex Louza" });
+    expect(inicial.pedido_interpretado).toMatchObject({ atendimento: "consulta com preventivo", tipo_atendimento: "consulta" });
+    const auxiliar = await executarFerramentaPaciente(ctx, "buscar_procedimentos", { termo: "preventivo", nova_solicitacao: false });
+    expect(auxiliar.ok).toBe(true);
+    expect(auxiliar.pedido_interpretado).toMatchObject({ atendimento: "consulta com preventivo", tipo_atendimento: "consulta" });
+    expect(ctx.estado!.appointment.procedimento_solicitado).toBeFalsy();
+    expect((await executarFerramentaPaciente(ctx, "proxima_vaga", { medico_id: MEDICO })).ok).toBe(true);
+    expect(ctx.estado!.appointment.slot_options?.vagas[0]?.procedimento).toBe(comPreventivo);
+    expect(gravacoes).toHaveLength(0);
+  });
   test("trocar de médico não autoriza trocar o atendimento", async () => {
     const ctx = preparar("com");
     banco.nina_cat_profissionais![0]!.observacao_publica = "CONSULTA GINECOLOGIA\nEspecialidade: GINECOLOGIA\nObservação: Agendado";
     // O atendimento ausente agora é bloqueado antes da consulta de vagas:
     // não se usa a modalidade da variante sem preventivo.
     expect((await executarFerramentaPaciente(ctx, "proxima_vaga", { medico_id: MEDICO })).erro).toBe("MODALIDADE_NAO_DEFINIDA");
+    expect(gravacoes).toHaveLength(0);
+  });
+  test("esclarecimento do paciente remove seleção antiga do preventivo isolado", async () => {
+    const ctx = preparar("com");
+    ctx.consultaAgenda = { mensagemAtual: "Eu quero a consulta de ginecologia COM preventivo, não só o exame.", historico: [] };
+    ctx.estado!.appointment.procedimento_solicitado = { clinica_id: CLINICA,
+      session_id: ctx.estado!.session_id!, catalogo_id: "exame-isolado", nome: "PREVENTIVO", tipo_atendimento: "exame_procedimento" };
+    const r = await executarFerramentaPaciente(ctx, "buscar_procedimentos", { termo: "preventivo", nova_solicitacao: false });
+    expect(r.pedido_interpretado).toMatchObject({ tipo_atendimento: "consulta", atendimento: "consulta com preventivo" });
+    expect(ctx.estado!.appointment.procedimento_solicitado).toBeNull();
     expect(gravacoes).toHaveLength(0);
   });
   test("o título específico pode ser pesquisado diretamente sem virar duas variantes", async () => {

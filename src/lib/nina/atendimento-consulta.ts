@@ -52,6 +52,16 @@ export function pedidoPreventivo(mensagem: string): "com" | "sem" | null {
   return /\bsem\s+(?:o\s+)?preventivo\b|\bnao\s+(?:quero|desejo|preciso)(?:\s+fazer)?\s+(?:o\s+)?preventivo\b/.test(m) ? "sem" : "com";
 }
 
+/** O pacote de consulta não pode ser substituído por uma pesquisa auxiliar
+ * do exame isolado. Uma mudança explícita para só o exame continua válida. */
+export function pedidoConsultaComPreventivo(mensagem: string): boolean {
+  const m = normalizar(mensagem);
+  if (pedidoPreventivo(m) !== "com" ||
+      /\bnao\s+(?:quero|preciso|desejo)\s+(?:a\s+)?consulta\b/.test(m) ||
+      /\b(?:quero|preciso|desejo|fazer)\s+(?:so|apenas|somente)\s+(?:o\s+)?(?:exame|preventivo)\b/.test(m)) return false;
+  return /\bconsulta(?:\s+(?:de\s+)?(?:ginecologia|ginecologica))?\s*(?:com|e|\+)\s*(?:o\s+)?preventivo\b/.test(m);
+}
+
 export function normalizarPreferenciaAtendimento(v: unknown): PreferenciaAtendimentoConsulta | null {
   if (!v || typeof v !== "object") return null;
   const p = v as Record<string, unknown>;

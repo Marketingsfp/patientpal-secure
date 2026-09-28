@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { atualizarPreferenciaAtendimento, atendePreferenciaConsulta, pedidoPreventivo, selecionarAtendimentosConsulta } from "../atendimento-consulta";
+import { atualizarPreferenciaAtendimento, atendePreferenciaConsulta, pedidoPreventivo, pedidoConsultaComPreventivo, selecionarAtendimentosConsulta } from "../atendimento-consulta";
 import { prepararBuscaCatalogo, REGRA_INTERPRETACAO_CATALOGO } from "../catalogo-busca";
 import { profissionalParaRegistro } from "../catalogo-conhecimento";
 import { atendimentosEstruturados } from "../catalogo-estrutura";
@@ -11,6 +11,8 @@ const registro = profissionalParaRegistro({ id: "medica", nome: "Conceição Mar
   especialidades: [{ nome: "GINECOLOGIA" }], observacao_publica:
     "CONSULTA + PREVENTIVO\nEspecialidade: GINECOLOGIA\nDinheiro: R$ 172,00\nPix/cartão: R$ 205,00\nObservação: Agendado" }, "2026-09-21");
 const com = { especialidade: "GINECOLOGIA", preventivo: "com" as const };
+test.each(["Quero ginecologista Carlos, mas preciso da consulta com preventivo junto", "Consulta + preventivo", "Eu quero a consulta de ginecologia COM preventivo, não só o exame"])("preserva o pacote explícito: %s", m => expect(pedidoConsultaComPreventivo(m)).toBe(true));
+test.each(["Quero só o exame preventivo", "Não quero consulta com preventivo, preciso só o exame", "Quero consulta sem preventivo", "Quanto custa o preventivo?", "Quero só o exame, não a consulta com preventivo"])("não inventa pacote: %s", m => expect(pedidoConsultaComPreventivo(m)).toBe(false));
 
 test("clínica médica não é sinônimo nem correção de escrita de clínico geral", () => {
   const itens = atendimentosEstruturados("CONSULTA CLÍNICO GERAL\nEspecialidade: CLÍNICO GERAL\nProfissional: Dra. Ana", null);
