@@ -443,6 +443,25 @@ async function handleCriar(
     };
   }
 
+  // v1.6 — agenda oculta do agendamento online (ex.: agenda-ponte de outra
+  // unidade) não pode ser marcada por integração. Checado antes do paciente
+  // para não cadastrar ninguém à toa.
+  if (body.medico_id) {
+    const { data: med } = await db
+      .from("medicos")
+      .select("visivel_agendamento_online")
+      .eq("id", body.medico_id)
+      .eq("clinica_id", ctx.clinica_id)
+      .maybeSingle();
+    if (med && med.visivel_agendamento_online === false) {
+      throw new ApiError({
+        status: 422,
+        code: "doctor_not_bookable_online",
+        message: "Este profissional/agenda não está disponível para agendamento online.",
+      });
+    }
+  }
+
   // Resolução do paciente.
   //  • v1 (`paciente_id`): precisa existir; comportamento inalterado.
   //  • v1.1 (`paciente`): encontra pelo CPF na clínica da chave ou cadastra.
@@ -634,7 +653,8 @@ async function handleEspecialidades(
     .from("medicos")
     .select("id, especialidade_id")
     .eq("clinica_id", ctx.clinica_id)
-    .eq("ativo", true);
+    .eq("ativo", true)
+    .eq("visivel_agendamento_online", true);
   let medicosAtivos = (vinculos ?? []) as Array<{ id: string; especialidade_id: string | null }>;
   if (comHorario) {
     const comDisp = await medicosComDisponibilidade(db, ctx.clinica_id);
@@ -693,6 +713,7 @@ async function handleMedicos(
     .select("id,nome")
     .eq("clinica_id", ctx.clinica_id)
     .eq("ativo", true)
+    .eq("visivel_agendamento_online", true)
     .order("nome");
   if (error) {
     throw new ApiError({ status: 500, code: "read_failed", message: "Falha ao ler médicos." });
