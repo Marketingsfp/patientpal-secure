@@ -8013,6 +8013,7 @@ export type Database = {
           usa_sistema: boolean
           user_id: string | null
           valor_repasse_padrao: number | null
+          visivel_agendamento_online: boolean
         }
         Insert: {
           aceita_cartao_beneficios?: boolean
@@ -8065,6 +8066,7 @@ export type Database = {
           usa_sistema?: boolean
           user_id?: string | null
           valor_repasse_padrao?: number | null
+          visivel_agendamento_online?: boolean
         }
         Update: {
           aceita_cartao_beneficios?: boolean
@@ -8117,6 +8119,7 @@ export type Database = {
           usa_sistema?: boolean
           user_id?: string | null
           valor_repasse_padrao?: number | null
+          visivel_agendamento_online?: boolean
         }
         Relationships: [
           {
