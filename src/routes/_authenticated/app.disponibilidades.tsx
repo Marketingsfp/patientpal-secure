@@ -62,10 +62,17 @@ const FERIADOS_FIXOS = new Set<string>([
   "12-25", // Natal
 ]);
 
-function isFeriadoOuDomingo(d: Date): boolean {
-  if (d.getDay() === 0) return true;
+function isFeriado(d: Date): boolean {
   const mmdd = `${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
   return FERIADOS_FIXOS.has(mmdd);
+}
+
+// Feriado só é pulado quando a recepção não marcou "Atender nos feriados" —
+// antes era sempre pulado, sem aviso, e 12/10/2026 ficou impossível de abrir
+// para um médico que ia atender. Domingo continua sempre fechado.
+function isFeriadoOuDomingo(d: Date, liberarFeriados = false): boolean {
+  if (d.getDay() === 0) return true;
+  return !liberarFeriados && isFeriado(d);
 }
 
 // Formatadores em horário local de Brasília — usados para calcular o "piso"
@@ -181,6 +188,8 @@ function Page() {
     fichas_fila: "",
   });
   const [gerarDias, setGerarDias] = useState<number[]>([1, 2, 3, 4, 5, 6]);
+  // Desmarcado por padrão: feriado só recebe horário quando a recepção pede.
+  const [liberarFeriados, setLiberarFeriados] = useState(false);
   const [gerando, setGerando] = useState(false);
   const [salvandoGrade, setSalvandoGrade] = useState(false);
   // Remontar o campo "Até" força o input mascarado a reexibir o valor do
@@ -857,7 +866,7 @@ function Page() {
       for (let i = 0; i < dias; i++) {
         const d = new Date(ini);
         d.setDate(d.getDate() + i);
-        if (isFeriadoOuDomingo(d)) continue;
+        if (isFeriadoOuDomingo(d, liberarFeriados)) continue;
         const dow = d.getDay();
         if (!gerarDias.includes(dow)) continue;
         const diaIso = fmtDateLocal.format(d);
@@ -935,7 +944,7 @@ function Page() {
     for (let i = 0; i < dias; i++) {
       const d = new Date(ini);
       d.setDate(d.getDate() + i);
-      if (isFeriadoOuDomingo(d)) continue;
+      if (isFeriadoOuDomingo(d, liberarFeriados)) continue;
       const dow = d.getDay();
       if (!gerarDias.includes(dow)) continue;
       for (const m of alvo) {
@@ -1096,9 +1105,30 @@ function Page() {
     medicoFilaAlvo,
     agendaFilaAlvo,
     agendasMistasSemEscolha,
+    liberarFeriados,
   ]);
 
   const slotsPreview = geracaoPreview.slots;
+
+  // Feriados do período que caem nos dias da semana marcados. A tela avisa
+  // quais são e oferece "Atender nos feriados" — antes o dia sumia calado.
+  const feriadosNoPeriodo = useMemo(() => {
+    const out: string[] = [];
+    if (!gerar.data_inicio || !gerar.data_fim) return out;
+    const ini = new Date(`${gerar.data_inicio}T00:00:00`);
+    const fimD = new Date(`${gerar.data_fim}T00:00:00`);
+    if (fimD < ini) return out;
+    const total = Math.floor((fimD.getTime() - ini.getTime()) / 86400000) + 1;
+    for (let i = 0; i < total; i++) {
+      const d = new Date(ini);
+      d.setDate(d.getDate() + i);
+      if (d.getDay() === 0 || !isFeriado(d) || !gerarDias.includes(d.getDay())) continue;
+      out.push(
+        `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}`,
+      );
+    }
+    return out;
+  }, [gerar.data_inicio, gerar.data_fim, gerarDias]);
 
   // Menor duração (em minutos) entre os slots pré-visualizados — usada para
   // avisar quando a configuração gera vagas de 1–4 min (sobrepostas).
@@ -1127,7 +1157,7 @@ function Page() {
         for (let i = 0; i < total; i++) {
           const d = new Date(ini);
           d.setDate(d.getDate() + i);
-          if (isFeriadoOuDomingo(d)) continue;
+          if (isFeriadoOuDomingo(d, liberarFeriados)) continue;
           if (gerarDias.includes(d.getDay())) diasNoPeriodo += 1;
         }
       }
@@ -1142,6 +1172,7 @@ function Page() {
     gerarDias,
     medicos.length,
     slotsPreview.length,
+    liberarFeriados,
   ]);
 
   const duracaoInformada = gerar.intervalo_min ? parseInt(gerar.intervalo_min) : null;
@@ -1169,13 +1200,17 @@ function Page() {
           (outros > 0 ? ` O mesmo acontece em mais ${outros} dia(s) do período.` : "")
         );
       }
+      if (resumoGeracao.diasNoPeriodo === 0 && feriadosNoPeriodo.length > 0)
+        return `${feriadosNoPeriodo.join(", ")} é feriado. Se o médico vai atender, marque "Atender nos feriados" logo abaixo.`;
       return "Nenhuma data do período tem grade cadastrada nesta agenda. Cadastre a grade do médico na aba Médicos.";
     }
     if (!gerar.data_inicio || !gerar.data_fim) return "Preencha a data inicial e a data final.";
     if (gerar.data_fim < gerar.data_inicio) return "A data final é anterior à data inicial.";
     if (gerarDias.length === 0) return "Marque pelo menos um dia da semana.";
+    if (resumoGeracao.diasNoPeriodo === 0 && feriadosNoPeriodo.length > 0)
+      return `${feriadosNoPeriodo.join(", ")} é feriado. Se o médico vai atender, marque "Atender nos feriados" logo abaixo.`;
     if (resumoGeracao.diasNoPeriodo === 0)
-      return "Nenhuma data do período cai nos dias da semana marcados. Domingos e feriados nunca recebem horários.";
+      return "Nenhuma data do período cai nos dias da semana marcados. Domingos nunca recebem horários.";
     const hi = hhmm(gerar.hora_inicio);
     const hf = hhmm(gerar.hora_fim);
     if (hi && hf && hi >= hf) return "A hora fim precisa ser maior que a hora início.";
@@ -1218,7 +1253,8 @@ function Page() {
     geracaoPreview.errosFila,
     modoFila,
     gerar.fichas_fila,
-  , agendasMistasSemEscolha]);
+    feriadosNoPeriodo,
+  ]);
 
   // Dias que a geração vai pular por já terem fichas criadas depois da janela
   // pedida — avisados na tela mesmo quando o restante do período gera normal.
@@ -1988,6 +2024,22 @@ function Page() {
                     {diasIgnoradosPorPiso} dia(s) do período não vão receber horários novos porque
                     já têm fichas criadas depois do horário pedido.
                   </p>
+                )}
+                {feriadosNoPeriodo.length > 0 && (
+                  <label className="mt-2 flex items-start gap-2 text-xs">
+                    <input
+                      type="checkbox"
+                      className="mt-0.5"
+                      checked={liberarFeriados}
+                      onChange={(e) => setLiberarFeriados(e.target.checked)}
+                    />
+                    <span>
+                      <strong>Atender nos feriados</strong> —{" "}
+                      {liberarFeriados
+                        ? `${feriadosNoPeriodo.join(", ")} vai receber horários normalmente.`
+                        : `${feriadosNoPeriodo.join(", ")} é feriado e fica sem horários. Marque se o médico vai atender.`}
+                    </span>
+                  </label>
                 )}
                 {medicosFilaForaDaMassa.length > 0 && (
                   <p className="mt-2 text-xs font-medium text-amber-600">
