@@ -169,7 +169,9 @@ function FinDashboard() {
    * competência, e a escolha foi manter as duas leituras a um clique em vez
    * de trocar a régua e quebrar a conferência do caixa.
    */
-  const [incluirRetroativos, setIncluirRetroativos] = useState(false);
+  // Decisão do dono em 28/09/2026: abre LIGADO em todo o Financeiro; para
+  // conferir o cupom impresso, desliga-se o botão naquela hora.
+  const [incluirRetroativos, setIncluirRetroativos] = useState(true);
   const [reload, setReload] = useState(0);
   const [dados, setDados] = useState<DadosPainel | null>(null);
   const [carregando, setCarregando] = useState(true);
@@ -358,9 +360,11 @@ function FinDashboard() {
         />
         <p className="text-xs text-muted-foreground">
           {fmtDate(de)}
-          {de !== ate && ` a ${fmtDate(ate)}`} · tudo que entrou no caixa, pelo dia do pagamento —
-          mesma conta do Movimento de Caixa. Clique em um card para ver o detalhamento em tela
-          cheia.
+          {de !== ate && ` a ${fmtDate(ate)}`} ·{" "}
+          {incluirRetroativos
+            ? "tudo que entrou no caixa, mais os lançamentos digitados depois, pelo dia de competência."
+            : "tudo que entrou no caixa, pelo dia do pagamento — conta do cupom impresso."}{" "}
+          Clique em um card para ver o detalhamento em tela cheia.
         </p>
         {/* Botão das duas leituras do dia, irmão do "Ocultar lançamentos
             retroativos" do Movimento de Caixa. Fica sempre visível, mesmo
@@ -375,7 +379,7 @@ function FinDashboard() {
           <Label
             htmlFor="incluir-retroativos"
             className="text-xs cursor-pointer"
-            title="Desligado (padrão): o período soma só o que passou pela gaveta na data, para bater com o cupom impresso. Ligado: entram também os lançamentos com competência desta data que foram digitados depois — a guia faturada dias depois, a conta paga em atraso — e as parcelas de cartão importadas do sistema antigo."
+            title="Desligado: o período soma só o que passou pela gaveta na data, para bater com o cupom impresso. Ligado (padrão): entram também os lançamentos com competência desta data que foram digitados depois — a guia faturada dias depois, a conta paga em atraso — e as parcelas de cartão importadas do sistema antigo."
           >
             Incluir lançamentos retroativos (ver o dia por competência)
           </Label>

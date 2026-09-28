@@ -774,7 +774,9 @@ function Page() {
    * importadas) e a escolha foi a mesma de 23/09 — as duas leituras a um
    * clique, com a do caixa como padrão.
    */
-  const [rIncluirRetroativos, setRIncluirRetroativos] = useState(false);
+  // Em 28/09/2026 o dono inverteu o padrão: o Financeiro inteiro abre com o
+  // botão LIGADO (competência); a leitura do caixa fica a um clique.
+  const [rIncluirRetroativos, setRIncluirRetroativos] = useState(true);
   /**
    * Linhas do Rateio que o Movimento de Caixa deixa fora do período atual
    * (já com os filtros de profissional/serviço aplicados), para o aviso da
@@ -2698,7 +2700,7 @@ function Page() {
               <Label
                 htmlFor="rateio-incluir-retroativos"
                 className="text-xs cursor-pointer"
-                title="Desligado (padrão): mesma conta do Movimento de Caixa — fica fora o que foi digitado depois do dia e as parcelas de cartão do sistema antigo. Ligado: entram também esses lançamentos, pela data de competência."
+                title="Desligado: mesma conta do Movimento de Caixa — fica fora o que foi digitado depois do dia e as parcelas de cartão do sistema antigo. Ligado (padrão): entram também esses lançamentos, pela data de competência."
               >
                 Incluir lançamentos retroativos (ver o período por competência)
               </Label>

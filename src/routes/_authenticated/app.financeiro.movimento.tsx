@@ -437,22 +437,13 @@ function Page() {
       window.localStorage.setItem("financeiro:decomporMisto", decomporMisto ? "1" : "0");
     }
   }, [decomporMisto]);
-  // Preferência do usuário: manter fora do caixa do dia os lançamentos cuja
-  // competência é de outro dia (guia antiga faturada depois, parcela recebida
-  // em outra data, guia já quitada antes). LIGADO por padrão — o Movimento de
-  // Caixa existe para bater com o cupom impresso da recepção, e esses valores
-  // nunca passaram pela gaveta daquele dia. Desligando, eles voltam à lista e
-  // à soma, marcados como retroativos. Persistido por navegador.
-  const [ocultarRetroativos, setOcultarRetroativos] = useState<boolean>(() => {
-    if (typeof window === "undefined") return true;
-    const v = window.localStorage.getItem("financeiro:ocultarRetroativos");
-    return v === null ? true : v === "1";
-  });
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      window.localStorage.setItem("financeiro:ocultarRetroativos", ocultarRetroativos ? "1" : "0");
-    }
-  }, [ocultarRetroativos]);
+  // Lançamentos cuja competência é de outro dia (guia antiga faturada depois,
+  // parcela recebida em outra data, guia já quitada antes). Decisão do dono
+  // em 28/09/2026: o Financeiro inteiro abre INCLUINDO esses lançamentos (o
+  // dia por competência); quem confere o cupom impresso desliga o botão
+  // "Incluir lançamentos retroativos" naquela hora. Não fica gravado no
+  // navegador: toda abertura da tela volta ao padrão.
+  const [ocultarRetroativos, setOcultarRetroativos] = useState(false);
   /** nome do procedimento (maiúsculo) → tipo cadastrado (consulta/exame/…). */
   const [procTipos, setProcTipos] = useState<Map<string, string>>(() => new Map());
   /**
@@ -2806,16 +2797,16 @@ function Page() {
             </div>
             <div className="flex items-center gap-2 pb-1">
               <Switch
-                id="ocultar-retroativos"
-                checked={ocultarRetroativos}
-                onCheckedChange={setOcultarRetroativos}
+                id="incluir-retroativos"
+                checked={!ocultarRetroativos}
+                onCheckedChange={(v) => setOcultarRetroativos(!v)}
               />
               <Label
-                htmlFor="ocultar-retroativos"
+                htmlFor="incluir-retroativos"
                 className="text-xs cursor-pointer"
-                title="Ligado (padrão): o Movimento mostra só o que passou pela gaveta da recepção na data, para bater com o cupom impresso. Desligado: entram também os lançamentos com competência de outro dia (guia antiga faturada depois, parcela recebida em outra data), marcados como retroativos."
+                title="Ligado (padrão): entram também os lançamentos com competência de outro dia (guia antiga faturada depois, parcela recebida em outra data), marcados como retroativos. Desligado: o Movimento mostra só o que passou pela gaveta da recepção na data, para bater com o cupom impresso."
               >
-                Ocultar lançamentos retroativos
+                Incluir lançamentos retroativos (ver o dia por competência)
               </Label>
             </div>
           </div>
