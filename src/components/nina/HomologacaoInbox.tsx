@@ -920,7 +920,7 @@ export function HomologacaoInbox({ laboratorio = false, ativo = true, abrirConve
           });
           setSimMotivo(env.erro ?? ROTULO_MOTIVO.erro);
           setSim((s) => (s ? { ...s, status: "erro" } : s));
-          setEncerrado(AVISO_TESTE_ENCERRADO);
+          setEncerrado(null);
           break;
         }
 

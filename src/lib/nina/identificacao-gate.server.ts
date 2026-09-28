@@ -101,6 +101,14 @@ const NAO_E_NOME =
   /\b(consulta|agendamento|agendar|marcar|quero|queria|preciso|gostaria|pode|filh[oa]s?|m[aã]e|pai|espos[oa]|marido|irm[aã]o?|av[oóô]|net[oa]|sobrinh[oa]|crian[cç]a|beb[eê]|paciente|dele|dela|ele|ela|meu|minha|nascid[oa]|nasceu|nasci|nascimento|data|cpf|telefone|celular|whatsapp|hor[aá]rios?|hora|dia|doutor[a]?|dr[a]?|para|pra|com|em|anos?|prefiro|pode|ser|sim|ok|obrigad[oa]|valor|pre[cç]o|quanto|custa|dinheiro|pix|cart[aã]o|pagar|pagamento|confirmo|tanto|faz|manh[aã]|tarde|noite)\b/i;
 const CONECTIVO = /^(?:da|de|do|das|dos|e|o|a)$/i;
 
+/** Só recorta uma declaração explícita, sem confundir o médico com o paciente. */
+function declaracaoDePaciente(texto: string): string | null {
+  const propria = texto.match(/\b(?:meu nome(?: completo)? (?:é|eh)|me chamo)\s+.+/i)?.[0];
+  if (propria) return propria;
+  const dependente = texto.match(/(?:^|[.!?]\s*)(?:é|eh|e)\s+(?:para|pra|pro)\s+(?:(?:o|a)\s+)?(?:meu|minha)\s+(?:filh[oa]|mãe|mae|pai|espos[oa])\s+(.+)/i)?.[1];
+  return dependente ?? null;
+}
+
 /**
  * Nome completo dentro de uma mensagem livre. A mensagem é lida por partes e
  * só vale a parte com cara de nome: "A consulta é do meu filho: Simulação
@@ -145,7 +153,7 @@ export function extrairDadosIdentificacao(texto: string): DadosIdentificacao {
     }
   }
 
-  const nome = extrairNome(semData);
+  const nome = extrairNome(declaracaoDePaciente(semData) ?? semData);
 
   const numeros = semData.match(/(?:\+?55\s*)?\(?\d{2}\)?[\s.-]*\d{4,5}[\s.-]*\d{4}/g) ?? [];
   const telefone =
@@ -332,7 +340,7 @@ export async function aplicarGateIdentificacao(params: {
   const coletandoDados = ["AWAITING_PATIENT_DATA", "COLLECTING_PATIENT_DATA", "IDENTIFYING_PATIENT"].includes(estado.flow.stage) ||
     (ultimaMensagem?.role === "assistant" && /nome completo|data de nascimento|telefone com DDD/i.test(ultimaMensagem.content ?? ""));
   const declaracaoNaEscolha = selecionouAgora
-    ? mensagem.match(/\b(?:meu nome(?: completo)? (?:é|eh)|me chamo)\s+.+/i)?.[0]
+    ? declaracaoDePaciente(mensagem)
     : null;
   const novo = declaracaoNaEscolha ? extrairDadosIdentificacao(declaracaoNaEscolha)
     : aceiteDaVaga || selecionouAgora || !coletandoDados ? null : extrairDadosIdentificacao(mensagem);
@@ -357,7 +365,7 @@ export async function aplicarGateIdentificacao(params: {
     for (let i = 0; i < historico.length; i++) {
       const item = historico[i]!;
       if (item.role !== "user" || !item.content) continue;
-      const declaracao = item.content.match(/\b(?:meu nome(?: completo)? (?:é|eh)|me chamo|sou)\s+.+/i)?.[0];
+      const declaracao = declaracaoDePaciente(item.content) ?? item.content.match(/\bsou\s+.+/i)?.[0];
       const respostaCadastro = historico[i - 1]?.role === "assistant" &&
         /(?:nome completo|data de nascimento|telefone com DDD)/i.test(historico[i - 1]?.content ?? "");
       if (!declaracao && !respostaCadastro) continue;

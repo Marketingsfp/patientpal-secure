@@ -171,6 +171,18 @@ describe("gate: escolher vaga → coletar dados → confirmar → agendar", () =
     expect(t.chamadas.map(c => c.nome)).toEqual(["selecionar_horario", "consultar_cadastro_paciente"]);
     expect(confirmacaoDaEscolha(t.estado)?.aceita).toBe(false);
   });
+  test("responsável fornece os dados do filho junto do horário sem perder a escolha", async () => {
+    const t = preparar();
+    const vaga = t.estado.appointment.confirmation!.vaga;
+    t.estado.appointment.confirmation = null;
+    registrarOpcoesAgendamento(t.estado, "clinica", [vaga]);
+    const r = await t.turno("Esse mesmo, 14:00. É pro meu filho Pedro Simulação Teste Três, nascido em 12/03/2018.");
+    expect(r?.texto).toBe(confirmacaoDaEscolha(t.estado)?.resumo);
+    expect(t.chamadas.find(c => c.nome === "identificar_paciente")?.args).toMatchObject({
+      nome: "Pedro Simulação Teste Três", data_nascimento: "2018-03-12",
+    });
+    expect(t.chamadas.some(c => c.nome === "agendar")).toBe(false);
+  });
   for (const frase of ["Sim, confirmo.", "Sim, confirmo todos esses dados para concluir o agendamento.",
     "isso mesmo, pode confirmar", "sim, tudo certo por aqui", "confirmo sim, obrigado!",
     "tá tudo certo, pode confirmar",
@@ -413,6 +425,7 @@ describe("nome dentro de mensagem livre", () => {
     ["Meu nome é Simulação Teste Três e nasci em 22/07/1975.", "Simulação Teste Três"],
     ["meu nome completo é Maria de Lourdes Souza", "Maria De Lourdes Souza"],
     ["Ana da Silva, 02/01/1990", "Ana Da Silva"],
+    ["É pro meu filho Pedro Simulação Teste Três, nascido em 12/03/2018.", "Pedro Simulação Teste Três"],
   ])("%s", (texto, nome) => expect(extrairDadosIdentificacao(texto).nome).toBe(nome));
 
   test.each(["sim", "Prefiro o das 12:20. E se eu pagar em dinheiro fica quanto mesmo?", "A consulta é do meu filho"])(

@@ -298,6 +298,9 @@ export const ferramentasUsadasTeste = createServerFn({ method: "POST" })
       .select("id, created_at, dados_depois")
       .eq("clinica_id", data.clinicaId)
       .eq("action", "NINA_TOOL")
+      // Recorta no banco antes do limite: respostas do catálogo de outras
+      // conversas podem ser grandes e não pertencem a este painel técnico.
+      .eq("dados_depois->>conversa_id", data.conversaId)
       .order("created_at", { ascending: false })
       .limit(200);
 
