@@ -193,6 +193,26 @@ describe("gate: escolher vaga → coletar dados → confirmar → agendar", () =
     });
     expect(t.chamadas.some(c => c.nome === "agendar")).toBe(false);
   });
+  test("declaração Minha filha é aproveita o nome sem confundir o médico", async () => {
+    const t = preparar();
+    const vaga = t.estado.appointment.confirmation!.vaga;
+    t.estado.appointment.confirmation = null;
+    registrarOpcoesAgendamento(t.estado, "clinica", [vaga]);
+    const r = await t.turno("Quero 14:00. Minha filha é Helena Teste Quarenta Dois, 03/07/2024.");
+    expect(r?.texto).toBe(confirmacaoDaEscolha(t.estado)?.resumo);
+    expect(t.chamadas.find(c => c.nome === "identificar_paciente")?.args).toMatchObject({
+      nome: "Helena Teste Quarenta Dois", data_nascimento: "2024-07-03",
+    });
+    expect(t.chamadas.some(c => c.nome === "agendar")).toBe(false);
+    expect(extrairDadosIdentificacao("Quero o doutor Sergio Palermo. Minha filha é Helena Teste Quarenta Dois, 03/07/2024.").nome).toBe("Helena Teste Quarenta Dois");
+    expect(extrairDadosIdentificacao("Minha filha é menor de idade. Ela pode ir com a avó?").nome).toBeNull();
+  });
+  test("recusa com vírgula interrompe a confirmação sem reservar", async () => {
+    const t = preparar();
+    expect(await t.turno("Não, deixa pra lá. Não quero marcar agora.")).toBeNull();
+    expect(t.estado.appointment.confirmation).toBeNull();
+    expect(t.chamadas.some(c => c.nome === "agendar")).toBe(false);
+  });
   for (const frase of ["Sim, confirmo.", "Sim, confirmo todos esses dados para concluir o agendamento.",
     "isso mesmo, pode confirmar", "sim, tudo certo por aqui", "confirmo sim, obrigado!",
     "tá tudo certo, pode confirmar", "Isso, esse mesmo.",

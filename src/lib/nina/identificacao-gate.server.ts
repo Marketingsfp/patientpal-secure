@@ -51,7 +51,7 @@ import { ehRespostaNegativaCurta } from "./resposta-afirmativa";
 export { ehConfirmacaoDeAgendamento } from "./confirmacao-agendamento";
 
 const NEGACAO =
-  /^\s*(n[ãa]o\s+(quero|posso|vou|desejo|dá|da|pode|prefiro|é|eh|serve)|n[ãa]o,|nao,|outro\s+(hor[áa]rio|dia|m[ée]dico)|outra\s+(data|hora|op[cç][ãa]o)|prefiro\b|ainda\s*n[ãa]o\b|cancela\w*)\b/i;
+  /^\s*(n[ãa]o\s+(quero|posso|vou|desejo|dá|da|pode|prefiro|é|eh|serve)|n[ãa]o,|nao,|outro\s+(hor[áa]rio|dia|m[ée]dico)|outra\s+(data|hora|op[cç][ãa]o)|prefiro\b|ainda\s*n[ãa]o\b|cancela\w*)(?=\s|$|[,.!?])/i;
 export function ehNegacao(texto: string): boolean {
   return ehRespostaNegativaCurta(texto) || NEGACAO.test((texto ?? "").trim());
 }
@@ -98,7 +98,7 @@ const ABERTURA_NOME =
 
 /** Palavras que não aparecem num nome de pessoa ("da", "de", "do" continuam válidas). */
 const NAO_E_NOME =
-  /\b(consulta|agendamento|agendar|marcar|quero|queria|preciso|gostaria|pode|filh[oa]s?|m[aã]e|pai|espos[oa]|marido|irm[aã]o?|av[oóô]|net[oa]|sobrinh[oa]|crian[cç]a|beb[eê]|paciente|dele|dela|ele|ela|meu|minha|nascid[oa]|nasceu|nasci|nascimento|data|cpf|telefone|celular|whatsapp|hor[aá]rios?|hora|dia|doutor[a]?|dr[a]?|para|pra|com|em|anos?|prefiro|pode|ser|sim|ok|obrigad[oa]|valor|pre[cç]o|quanto|custa|dinheiro|pix|cart[aã]o|pagar|pagamento|confirmo|tanto|faz|manh[aã]|tarde|noite)\b/i;
+  /\b(consulta|agendamento|agendar|marcar|quero|queria|preciso|gostaria|pode|filh[oa]s?|m[aã]e|pai|espos[oa]|marido|irm[aã]o?|av[oóô]|net[oa]|sobrinh[oa]|crian[cç]a|beb[eê]|paciente|dele|dela|ele|ela|meu|minha|nascid[oa]|nasceu|nasci|nascimento|data|cpf|telefone|celular|whatsapp|hor[aá]rios?|hora|dia|doutor[a]?|dr[a]?|para|pra|com|em|anos?|idade|prefiro|pode|ser|sim|ok|obrigad[oa]|valor|pre[cç]o|quanto|custa|dinheiro|pix|cart[aã]o|pagar|pagamento|confirmo|tanto|faz|manh[aã]|tarde|noite)\b/i;
 const CONECTIVO = /^(?:da|de|do|das|dos|e|o|a)$/i;
 
 /** Só recorta uma declaração explícita, sem confundir o médico com o paciente. */
@@ -107,7 +107,7 @@ function declaracaoDePaciente(texto: string): string | null {
   if (paciente) return paciente;
   const propria = texto.match(/\b(?:meu nome(?: completo)? (?:é|eh)|me chamo)\s+.+/i)?.[0];
   if (propria) return propria;
-  const dependente = texto.match(/(?:^|[.!?]\s*)(?:é|eh|e)\s+(?:para|pra|pro)\s+(?:(?:o|a)\s+)?(?:meu|minha)\s+(?:filh[oa]|mãe|mae|pai|espos[oa])\s+(.+)/i)?.[1];
+  const dependente = texto.match(/(?:^|[.!?]\s*)(?:(?:é|eh|e)\s+(?:para|pra|pro)\s+(?:(?:o|a)\s+)?(?:meu|minha)\s+(?:filh[oa]|mãe|mae|pai|espos[oa])|(?:meu|minha)\s+(?:filh[oa]|mãe|mae|pai|espos[oa])\s+(?:é|eh|e|se\s+chama))\s+(.+)/i)?.[1];
   return dependente ?? null;
 }
 
