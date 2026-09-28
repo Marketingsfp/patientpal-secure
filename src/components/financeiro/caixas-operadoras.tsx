@@ -1,6 +1,6 @@
 /**
- * "Caixas das operadoras" no Movimento de Caixa: sangrias recolhidas, dinheiro
- * que deveria estar na gaveta e o Calculado de cada sessão, somados por
+ * "Caixas das operadoras" no Movimento de Caixa: sangrias recolhidas, sobra em
+ * espécie entregue no fechamento e o Calculado de cada sessão, somados por
  * atendente no período — sem abrir a modal "Sessão de caixa" uma a uma.
  *
  * A conta vive em `@/lib/caixa/resumo-operadoras`; aqui se carrega e desenha.
@@ -129,9 +129,11 @@ export function CaixasOperadoras({
     },
     {
       icon: Wallet,
-      label: "Dinheiro restante nas gavetas",
+      // Soma, sessão a sessão, o que sobrou em espécie ao fechar — não é saldo
+      // acumulado nem dinheiro parado com a operadora: cada dia começa do zero.
+      label: "Sobra entregue no fechamento",
       valor: t ? brl(t.gaveta) : "…",
-      nota: "Troco + dinheiro recebido − estornos em dinheiro − sangrias",
+      nota: "Dinheiro que ficou em cada gaveta ao fechar o caixa e foi entregue — cada dia começa do zero",
       cls: "text-emerald-700 dark:text-emerald-400",
     },
     {
@@ -195,7 +197,12 @@ export function CaixasOperadoras({
                 <TableHead>Operador</TableHead>
                 <TableHead className="text-right">Recebido em dinheiro</TableHead>
                 <TableHead className="text-right">Sangrias recolhidas</TableHead>
-                <TableHead className="text-right">Dinheiro na gaveta</TableHead>
+                <TableHead
+                  className="text-right"
+                  title="Soma do que ficou em cada gaveta ao fechar o caixa e foi entregue no fechamento. Cada dia começa do zero."
+                >
+                  Sobra entregue no fechamento
+                </TableHead>
                 <TableHead className="text-right">Calculado</TableHead>
                 <TableHead className="text-right">Diferença</TableHead>
               </TableRow>
