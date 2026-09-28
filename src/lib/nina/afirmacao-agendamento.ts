@@ -14,7 +14,9 @@ const PROMESSA =
 const RESULTADO_PACIENTE =
   /\b(?:seu|sua)\s+(?:consulta|atendimento|agendamento|hor[aá]rio|exame|procedimento)\b[^.!?;\n]{0,100}\b(?:agendad[oa]|marcad[oa]|reservad[oa]|confirmad[oa])\b/iu;
 const RESULTADO_COM_VERBO =
-  /\b(?:consulta|agendamento|hor[aá]rio|exame|procedimento)\s+(?:foi|est[aá]|ficou|se encontra)\s+(?:agendad[oa]|marcad[oa]|reservad[oa]|confirmad[oa]|conclu[ií]d[oa]|realizad[oa])\b/iu;
+  /\b(?:consulta|agendamento|hor[aá]rio|exame|procedimento)\s+(?:j[aá]\s+)?(?:foi|est[aá]|ficou|se encontra)\s+(?:agendad[oa]|marcad[oa]|reservad[oa]|confirmad[oa]|conclu[ií]d[oa]|realizad[oa])\b/iu;
+const HORARIO_ESPECIFICO_RESERVADO =
+  /\bhor[aá]rio\s+(?:(?:das?|de|[aà]s)\s+)?\d{1,2}(?::\d{2}|h(?:\d{2})?)[^.!?;\n]{0,160}?\b(?:j[aá]\s+)?(?:foi|est[aá]|ficou|se encontra)\s+(?:reservado|agendado|marcado|confirmado)\b/iu;
 const RESULTADO_EXPLICITO =
   /\b(?:agendamento\s+(?:realizado|conclu[ií]do|confirmado)|consulta\s+confirmada|hor[aá]rio\s+(?:reservado|confirmado)|confirmad[oa]\s+(?:seu|sua)\s+(?:consulta|agendamento|hor[aá]rio))\b/iu;
 const RESULTADO_ELIPTICO =
@@ -34,6 +36,10 @@ export function detectarAfirmacaoAgendamento(texto?: string | null): AfirmacaoAg
     const fim = segmento.inicio + segmento.texto.length;
     const original = (texto ?? "").replace(/[*_]/g, "");
     if (original[fim] === "?") continue;
+    // Data e médico podem estar entre vírgulas no mesmo sujeito. Examine
+    // essa frase antes de separar as orações, preservando negativas/perguntas.
+    if (HORARIO_ESPECIFICO_RESERVADO.test(frase) && classificarNatureza(frase) === "afirmacao_positiva")
+      return { tipo: "sucesso_agendamento", trecho: frase };
     for (const oracao of oracoesDaResposta(frase)) {
       const trecho = oracao.texto.trim();
       if (classificarNatureza(trecho) !== "afirmacao_positiva") continue;
