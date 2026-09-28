@@ -6,7 +6,7 @@
  * nada de rascunho/arquivado/nota interna e somente detalhes relevantes
  * enviados ao modelo após pesquisar todas as páginas do índice público.
  */
-import { beforeEach, describe, expect, it, mock } from "bun:test";
+import { beforeEach, describe, expect, it, mock, spyOn } from "bun:test";
 import { agoraNaClinica } from "@/lib/nina-agora";
 import { encaminharAposEsclarecimento, prepararSegundaPergunta } from "../catalogo-esclarecimento";
 import { lembrarConsultaComprovada, conhecimentoDaMesmaSessao } from "../confidence/conhecimento-sessao";
@@ -15,7 +15,7 @@ import { motivoParaAtendimento } from "@/lib/atendimento/texto-interno-apresenta
 import { incorporarResultadoOficial } from "../confidence/evidencias-turno";
 import { validarResultado } from "../tool-broker";
 import { consultaPreventivo, avaliacaoOdontologica } from "./fixtures/consultas-publicadas.fixture";
-import { comCatalogoDoTurno, catalogoDoTurno } from "../catalogo-turno.server";
+import { comCatalogoDoTurno, catalogoDoTurno, lerPublicados } from "../catalogo-turno.server";
 import { contarCatalogoPublicado } from "../catalogo-prompt.server";
 import { especialidadesPublicadas } from "../catalogo-fonte.server";
 import { candidatosPrimeiraVaga } from "../primeiro-disponivel-catalogo.server";
@@ -181,6 +181,28 @@ describe("uma leitura do catálogo por resposta", () => {
     banco.medicos = [{ id: medicoId, nome: "Maria Silva", clinica_id: CLINICA, ativo: true }];
   });
   const leituras = () => chamadas.filter(c => c.tabela.startsWith("nina_cat_"));
+
+  it("conta sem copiar o catálogo e clona só os campos e registros selecionados", async () => {
+    banco.nina_cat_servicos[0]!.estrutura = { aliases: ["mamo"], texto: "x".repeat(100_000) };
+    await comCatalogoDoTurno(CLINICA, async () => {
+      // Carrega o snapshot uma vez antes de medir as cópias dos consumidores.
+      await catalogoDoTurno(CLINICA);
+      const clone = spyOn(globalThis as { structuredClone: (value: unknown) => unknown }, "structuredClone");
+      try {
+        expect(await contarCatalogoPublicado(CLINICA)).toEqual({ servicos: 1, profissionais: 1 });
+        expect(clone).not.toHaveBeenCalled();
+        const a = await lerPublicados<{ id: string; aliases: string[] }>(
+          "nina_cat_servicos", "id, aliases:estrutura->aliases", CLINICA, ["mamografia"]);
+        expect(clone).toHaveBeenCalledTimes(1);
+        expect(JSON.stringify(clone.mock.calls[0]![0]).length).toBeLessThan(100);
+        a[0]!.aliases.push("alterado");
+        const b = await lerPublicados<{ id: string; aliases: string[] }>(
+          "nina_cat_servicos", "id, aliases:estrutura->aliases", CLINICA, ["mamografia"]);
+        expect(b[0]!.aliases).toEqual(["mamo"]);
+      } finally { clone.mockRestore(); }
+      expect(leituras()).toHaveLength(4);
+    });
+  });
 
   it("reutiliza a leitura na contagem, pesquisas, modalidade e vínculo sem guardar a agenda", async () => {
     await comCatalogoDoTurno(CLINICA, async () => {
@@ -596,7 +618,9 @@ describe("recuperação no catálogo publicado", () => {
     expect(r.esclarecimento).toBeUndefined();
     expect(r.records).toHaveLength(4);
     expect(r.records.every((registro) => registro.categoria === "CONSULTA")).toBe(true);
-    expect(JSON.stringify(r)).not.toContain("pedido médico");
+    // Confere os dados recuperados; a instrução geral também menciona pedido
+    // médico para proibir invenções, sem atribuir esse requisito à consulta.
+    expect(JSON.stringify(r.records)).not.toContain("pedido médico");
   });
   it.each([
     "Gostaria de marca a pneumologista",
@@ -712,7 +736,8 @@ describe("recuperação no catálogo publicado", () => {
       profissional({ nome: "Dra. B", especialidades: [{ nome: "Ortopedia" }] }),
     ];
     const r = await buscarNoCatalogo({ clinicaId: CLINICA, query: "consulta ortopedia" });
-    expect(r.instrucao).not.toContain("pedido médico");
+    expect(r.esclarecimento).toBeUndefined();
+    expect(r.knowledge_status).toBe("found");
     expect(r.doctors.length).toBe(2);
   });
 

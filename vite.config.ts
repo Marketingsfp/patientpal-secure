@@ -9,6 +9,7 @@ import { mcpPluginComCaminhosNativos } from "./scripts/mcp-vite-plugin";
 import { relative } from "node:path";
 import type { Plugin } from "vite";
 import { calcularFingerprintNina, fonteDoRuntimeNina } from "./scripts/nina-runtime-fingerprint";
+import { fontesArquiteturaNina } from "./scripts/nina-arquitetura-fontes";
 
 function ninaRuntimeFingerprint(): Plugin {
   let raiz = "";
@@ -49,6 +50,6 @@ export default defineConfig({
     server: { entry: "server" },
   },
   vite: {
-    plugins: [mcpPluginComCaminhosNativos(), ninaRuntimeFingerprint()],
+    plugins: [mcpPluginComCaminhosNativos(), ninaRuntimeFingerprint(), fontesArquiteturaNina()],
   },
 });

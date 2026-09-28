@@ -7,11 +7,7 @@
  * ficam em `codigo.ts`.
  */
 import { arquivoPermitido, extrairTrecho, type TrechoCodigo } from "./codigo";
-
-const FONTES = import.meta.glob("/src/**/*.{ts,tsx}", {
-  query: "?raw",
-  import: "default",
-}) as Record<string, () => Promise<string>>;
+import FONTES from "virtual:nina-arquitetura-fontes";
 
 export async function lerTrechoDoArquivo(
   arquivo: string,

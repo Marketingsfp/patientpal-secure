@@ -28,7 +28,7 @@ export function temCatalogoDoTurno(): boolean {
 }
 
 /** Sem escopo, os leitores independentes mantêm seu comportamento anterior. */
-export function catalogoDoTurno(clinicaId: string): Promise<Catalogo> | null {
+function leituraDoTurno(clinicaId: string): Promise<Catalogo> | null {
   const turno = escopo.getStore();
   if (!turno) return null;
   if (turno.clinicaId !== clinicaId) throw new Error("O catálogo solicitado não pertence à clínica deste turno.");
@@ -44,25 +44,39 @@ export function catalogoDoTurno(clinicaId: string): Promise<Catalogo> | null {
       codigo: { arquivo: "src/lib/nina/catalogo-turno.server.ts", funcao: "catalogoDoTurno" } });
     return { servicos, profissionais };
   });
-  // Cada consumidor recebe sua cópia: filtrar/enriquecer resultados não muda
-  // os dados que as demais ferramentas e a revisão da resposta vão consultar.
-  return turno.leitura.then(catalogo => structuredClone(catalogo));
+  return turno.leitura;
+}
+
+/** Compatibilidade para consumidores que precisam do catálogo completo. */
+export function catalogoDoTurno(clinicaId: string): Promise<Catalogo> | null {
+  return leituraDoTurno(clinicaId)?.then(catalogo => structuredClone(catalogo)) ?? null;
+}
+
+/** A contagem não precisa criar uma cópia de todos os registros publicados. */
+export function contagemCatalogoDoTurno(clinicaId: string) {
+  return leituraDoTurno(clinicaId)?.then(catalogo => ({
+    servicos: catalogo.servicos.length,
+    profissionais: catalogo.profissionais.length,
+  })) ?? null;
 }
 
 export async function lerPublicados<T extends { id: string }>(
   tabela: Tabela, colunas: string, clinicaId: string, ids?: string[],
 ): Promise<T[]> {
-  const catalogo = await catalogoDoTurno(clinicaId);
+  const catalogo = await leituraDoTurno(clinicaId);
   if (!catalogo) return lerPublicadosBanco<T>(tabela, colunas, clinicaId, ids);
   const linhas = tabela === "nina_cat_servicos" ? catalogo.servicos : catalogo.profissionais;
-  return linhas.filter(r => !ids || ids.includes(r.id)).map(r => {
+  // Filtra e projeta ANTES da cópia. Um pedido por nome/id não deve duplicar
+  // serviços, profissionais e estruturas que nem serão usados. A cópia do
+  // resultado preserva o isolamento de campos aninhados entre consumidores.
+  return structuredClone(linhas.filter(r => !ids || ids.includes(r.id)).map(r => {
     const fonte = r as unknown as Record<string, unknown>;
     return Object.fromEntries(colunas.split(",").map(c => c.trim()).map(c => {
       if (c === "aliases:estrutura->aliases") return ["aliases", (fonte.estrutura as { aliases?: unknown } | null)?.aliases];
       const campo = c === "unidades(nome)" ? "unidades" : c;
       return [campo, fonte[campo]];
     })) as T;
-  });
+  }));
 }
 
 async function lerPublicadosBanco<T extends { id: string }>(
