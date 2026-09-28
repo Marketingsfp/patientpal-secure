@@ -607,6 +607,49 @@ describe("busca completa com e sem acentos", () => {
 });
 
 describe("recuperação no catálogo publicado", () => {
+  describe("nome oficial da agenda vinculado ao nome público", () => {
+    const medicoId = "44444444-4444-4444-8444-444444444444";
+    const catalogoId = "55555555-5555-4555-8555-555555555555";
+    beforeEach(() => {
+      banco.nina_cat_profissionais = [profissional({ id: catalogoId, nome: "Rosângela Riolino",
+        medico_id: medicoId, especialidades: [{ nome: "CARDIOLOGIA" }] })];
+      banco.medicos = [{ id: medicoId, nome: "ROSANGELA SCHMITZ RIOLINO", ativo: true, clinica_id: CLINICA }];
+    });
+    it.each(["Rosangela Schmitz Riolino", medicoId])("reconhece %s pelo vínculo explícito", async medico => {
+      const r = await comCatalogoDoTurno(CLINICA, () => buscarNoCatalogo({
+        clinicaId: CLINICA, query: "cardiologia", tipo_atendimento: "consulta", medico,
+      }));
+      expect(r.esclarecimento).toBeUndefined();
+      expect(r.records.map(p => p.id)).toEqual([catalogoId]);
+      expect(chamadas.filter(c => c.tabela === "nina_cat_profissionais" && c.cursor === null)).toHaveLength(1);
+      expect(JSON.stringify(r.records)).not.toContain("medico_id");
+    });
+    it("reusa a resolução legada por nome único, como na leitura da agenda", async () => {
+      banco.nina_cat_profissionais![0]!.medico_id = null;
+      const r = await buscarNoCatalogo({ clinicaId: CLINICA, query: "cardiologia", tipo_atendimento: "consulta", medico: "Rosangela Schmitz Riolino" });
+      expect(r.esclarecimento).toBeUndefined();
+      expect(r.records.map(p => p.id)).toEqual([catalogoId]);
+    });
+    it.each(["inativo", "outra_clinica", "sem_vinculo", "homonimos", "duplicado", "outra_especialidade"])(
+      "não vincula por suposição quando %s", async caso => {
+        if (caso === "inativo") banco.medicos![0]!.ativo = false;
+        if (caso === "outra_clinica") banco.medicos![0]!.clinica_id = "outra";
+        if (caso === "sem_vinculo") {
+          banco.nina_cat_profissionais![0]!.medico_id = null;
+          banco.nina_cat_profissionais![0]!.nome = "Rosângela Souza";
+        }
+        if (caso === "homonimos") banco.medicos!.push({ ...banco.medicos![0]!, id: crypto.randomUUID() });
+        if (caso === "duplicado") banco.nina_cat_profissionais!.push({ ...banco.nina_cat_profissionais![0]!, id: crypto.randomUUID() });
+        if (caso === "outra_especialidade") {
+          banco.nina_cat_profissionais![0]!.especialidades = [{ nome: "PSICOLOGIA" }];
+          banco.nina_cat_profissionais!.push(profissional({ nome: "Maria Silva", especialidades: [{ nome: "CARDIOLOGIA" }] }));
+        }
+        const r = await buscarNoCatalogo({ clinicaId: CLINICA, query: "cardiologia", tipo_atendimento: "consulta", medico: "Rosangela Schmitz Riolino" });
+        expect(r.esclarecimento?.tipo).toBe("profissional");
+        expect(r.esclarecimento?.motivo).toBe("medico_nao_identificado");
+      },
+    );
+  });
   it("cardiologia com quatro médicos e cinco exames retorna somente consultas", async () => {
     banco.nina_cat_profissionais = ["Sandro", "Antonio", "Rosângela", "Alex"].map((nome) =>
       profissional({ nome, especialidades: [{ nome: "CARDIOLOGIA" }] }),

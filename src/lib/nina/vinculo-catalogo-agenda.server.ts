@@ -105,6 +105,24 @@ function origemVinculo(profissional: ProfissionalCatalogo, resolucao: ResolucaoM
     : "vinculo_inativo_reconciliado";
 }
 
+/** Caminho inverso da mesma vinculação usada ao consultar a agenda. Aceita
+ * somente ID operacional ou nome oficial completo, sem busca aproximada.
+ * As publicações recebidas já estão limitadas à clínica e ao atendimento. */
+export async function publicacaoDoMedicoAgenda(
+  clinicaId: string, termo: string, publicados: ProfissionalCatalogo[],
+): Promise<string | null> {
+  if (!publicados.length) return null;
+  const cadastros = await medicosDaClinica(clinicaId);
+  const oficiais = cadastros.filter(m => m.ativo &&
+    (m.id.toLowerCase() === termo.toLowerCase() || normalizar(m.nome) === normalizar(termo)));
+  if (oficiais.length !== 1) return null;
+  const vinculados = publicados.filter(p => {
+    const r = resolverPublicado(p, cadastros);
+    return r.ok && r.id === oficiais[0]!.id;
+  });
+  return vinculados.length === 1 ? vinculados[0]!.id : null;
+}
+
 /** A mesma resolução de identidade do catálogo é usada para ler a modalidade. */
 export async function modalidadePublicadaDoMedico(clinicaId: string, medicoId: string, escopo?: EscopoAtendimentoConsulta) {
   const leitura = await catalogoDoTurno(clinicaId);

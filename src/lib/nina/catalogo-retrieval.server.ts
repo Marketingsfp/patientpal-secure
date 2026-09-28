@@ -21,6 +21,7 @@ import type { TipoAtendimentoCatalogo } from "./catalogo-pesquisa";
 import { profissionalGenerico, profissionalSfp } from "./regras-catalogo";
 import { separarAtendimentos } from "./catalogo-estrutura";
 import { pedidoPreventivo } from "./atendimento-consulta";
+import { publicacaoDoMedicoAgenda } from "./vinculo-catalogo-agenda.server";
 import {
   compararNomeProfissional,
   prepararBuscaCatalogo,
@@ -31,12 +32,12 @@ import {
 /** Projeções para pesquisar e selecionar; no turno, vêm da leitura compartilhada.
  * O modelo continua recebendo somente os detalhes dos registros relevantes. */
 const INDICE_SERVICO = "id, nome, descricao_publica, aliases:estrutura->aliases, status, updated_at";
-const INDICE_PROFISSIONAL = "id, nome, especialidades, tipo_atendimento, horarios, observacao_publica, aliases:estrutura->aliases, status, updated_at";
+const INDICE_PROFISSIONAL = "id, nome, medico_id, especialidades, tipo_atendimento, horarios, observacao_publica, aliases:estrutura->aliases, status, updated_at";
 type IndiceServico = Pick<ServicoPublicado, "id" | "nome" | "descricao_publica"> & { aliases?: unknown };
 type IndiceProfissional = Pick<
   ProfissionalPublicado,
   "id" | "nome" | "especialidades" | "tipo_atendimento" | "horarios" | "observacao_publica"
-> & { aliases?: unknown };
+> & { aliases?: unknown; medico_id?: string | null };
 
 function aliasesDoIndice(i: { aliases?: unknown }): string[] {
   return Array.isArray(i.aliases) ? i.aliases.filter((v): v is string => typeof v === "string") : [];
@@ -175,13 +176,22 @@ export async function buscarNoCatalogo(
     ? correspondenciasCompletas
     : pontuados;
   const idsServicos = servicosRelevantes.slice(0, limite).map((x) => x.s.id);
-  const medico = semAcento(pedido.medico || nomeProfissionalNaPergunta(pedido.query)).trim();
+  let medico = semAcento(pedido.medico || nomeProfissionalNaPergunta(pedido.query)).trim();
   const profissionaisDaConsulta = brutosProfissionais.filter((p) =>
     pontuarProfissional(p) > 0,
   );
   // Um nome não pode trocar a especialidade já localizada por outra.
   const universoProfissionais = tipoAtendimento === "exame_procedimento" ? []
     : medico && (profissionaisDaConsulta.length || preventivo) ? profissionaisDaConsulta : brutosProfissionais;
+  // A agenda pode devolver um nome mais completo que o nome público. Revalida
+  // o cadastro operacional pela mesma vinculação usada na leitura da agenda.
+  // Não aceita semelhança, nome oficial abreviado, outra especialidade ou homônimo.
+  if (medico &&
+      !universoProfissionais.some(p => p.id === medico || compararNomeProfissional(medico, p.nome) === "exato")) {
+    const publicado = await publicacaoDoMedicoAgenda(pedido.clinicaId, medico,
+      universoProfissionais.map(p => ({ id: p.id, nome: p.nome, medico_id: p.medico_id ?? null })));
+    if (publicado) medico = publicado;
+  }
   const candidatosPorNome = universoProfissionais
     .map((p) => ({ p, score: Math.max(...[p.nome, ...aliasesDoIndice(p)].map(n => pontuarProfissional(p, n))) }))
     .filter(({ p, score }) =>
