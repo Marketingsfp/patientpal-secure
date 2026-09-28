@@ -1811,6 +1811,11 @@ async function gerarRespostaNinaInterno(
   // paciente. Uma afirmação real de reserva continua exigindo confirmação.
   const { afirmaOuPrometeAgendamento } = await import("@/lib/nina/afirmacao-agendamento");
   const MAX_RODADAS = podeAgendar ? 6 : 3;
+  let agendaComOpcoes = false;
+  const consultasSemOperacao = new Set([
+    "consultar_base_conhecimento", "buscar_medicos", "buscar_procedimentos", "listar_especialidades",
+    "consultar_disponibilidade", "verificar_horario", "proxima_vaga", "consultar_primeiro_disponivel",
+  ]);
   // Estado do turno para o Reasoning Router (Fase 2).
   const nomesFerramentasTurno: string[] = [];
   let conflitoFerramenta = false;
@@ -2113,17 +2118,24 @@ async function gerarRespostaNinaInterno(
     await conferirReserva();
     if (rastro && rodada > 0) rastro.novoCiclo();
     rastro?.iniciar("llm.generate", { rodada });
+    // Se o modelo consumiu as consultas sem responder, reserva a última
+    // rodada para explicar os fatos já obtidos e perguntar o próximo passo.
+    // Não aplica a operações/cadastro nem converte falhas em disponibilidade.
+    const sintetizarOpcoes = rodada === MAX_RODADAS - 1 && agendaComOpcoes &&
+      nomesFerramentasTurno.every(nome => consultasSemOperacao.has(nome));
+    if (sintetizarOpcoes) mensagens.push({ role: "system", content:
+      "Conclua esta resposta com os resultados já confirmados nas ferramentas. Não faça novas consultas nem anuncie reserva. Preserve médico, atendimento, data e período pedidos; alternativas fora desses critérios devem ser apresentadas como alternativas, nunca como se atendessem ao pedido. Explique a modalidade e os valores publicados quando perguntados. Apresente no máximo dez horários ou pergunte o período que ainda faltar. Se o período já foi informado, não o pergunte novamente. Não invente fatos ausentes." });
     const respostaIA = await ninaAIGateway({
       clinicaId,
       perfil: "whatsapp",
       conversaId: estadoId.conversaId ?? null,
       ferramentasUsadas: nomesFerramentasTurno,
       messages: mensagens as never,
-      ...(ferramentas ? { tools: ferramentas as readonly unknown[] } : {}),
+      ...(ferramentas && !sintetizarOpcoes ? { tools: ferramentas as readonly unknown[] } : {}),
       raciocinio: {
         mensagem: mensagemPaciente,
         rodada,
-        temFerramentas: Boolean(ferramentas),
+        temFerramentas: Boolean(ferramentas) && !sintetizarOpcoes,
         ferramentasExecutadas: nomesFerramentasTurno.length,
         nomesFerramentas: nomesFerramentasTurno,
         houveConflito: conflitoFerramenta,
@@ -2205,6 +2217,10 @@ async function gerarRespostaNinaInterno(
     const msg = { content: respostaIA.conteudo, tool_calls: respostaIA.toolCalls };
     textoModeloAtual = msg.content ?? "";
     const chamadas = msg.tool_calls ?? [];
+    if (sintetizarOpcoes && (chamadas.length > 0 || !(msg.content ?? "").trim())) {
+      limiteRodadasAtingido = true;
+      break;
+    }
 
     if (chamadas.length === 0) {
       const texto = (msg?.content ?? "").trim();
@@ -2298,6 +2314,12 @@ async function gerarRespostaNinaInterno(
 
       rastro?.iniciar("tool.execute", { ferramenta: nome });
       const r = await broker.executar(nome, c.function?.arguments);
+      if (["consultar_disponibilidade", "verificar_horario", "proxima_vaga", "consultar_primeiro_disponivel"].includes(nome)) {
+        const dados = r.dados as Record<string, unknown> | null;
+        agendaComOpcoes = r.success && !r.erro && dados?.ok === true &&
+          ["slots", "horarios", "proximos", "periodos_com_vagas"].some(chave =>
+            Array.isArray(dados[chave]) && dados[chave].length > 0);
+      }
       if (consultaAgendaAguardandoPaciente(r.dados)) {
         // Médico ausente/ambíguo não é agenda vazia nem falha técnica.
         // Registra a tentativa, sem produzir evidência de consulta à agenda.

@@ -242,7 +242,7 @@ mock.module("@/integrations/supabase/client.server", () => ({
     rpc: async () => ({ data: [], error: null }),
   },
 }));
-mock.module("@/lib/nina/agenda-flag.server", () => ({ ferramentasAgendaAtivas: async () => escolhaHorario || clinicoGeral }));
+mock.module("@/lib/nina/agenda-flag.server", () => ({ ferramentasAgendaAtivas: async () => escolhaHorario || clinicoGeral || cenario.startsWith("loop_alternativas") }));
 mock.module("@/lib/nina/atendimento-fase1.server", () => ({ flagFluxoFase1Ativa: async () => false }));
 mock.module("@/lib/nina/atendimento-fase3.server", () => ({ flagFluxoFase3Ativa: async () => false }));
 mock.module("@/lib/nina/atendimento-fase6.server", () => ({ flagFluxoFase6Ativa: async () => false }));
@@ -370,7 +370,7 @@ mock.module("@/lib/nina/tool-broker.server", () => ({ criarToolBroker: (params: 
         success: cenario !== "falha_consulta", reused: false, appointment_confirmed: false,
         dados: cenario === "falha_consulta" ? { ok: false, erro: "INTERNAL_ERROR", codigo: "AGENDA_QUERY_FAILED" }
           : { ok: true, reason: "AGENDA_CHEIA", horarios: [],
-            proximos: cenario === "alternativas" ? [{ data: "2030-01-22", hora: "14:00" }] : [] },
+            proximos: cenario === "alternativas" || cenario.startsWith("loop_alternativas") ? [{ data: "2030-01-22", hora: "14:00" }] : [] },
         ...(cenario === "falha_consulta" ? { erro: "INTERNAL_ERROR" } : {}) };
     }
     if (ausente && nome === ferramentaAusente && !(cenario.endsWith("misto") && argumentosFerramentas.at(-1)?.args.termo === "eletrocardiograma")) {
@@ -433,6 +433,13 @@ mock.module("@/lib/nina/tool-broker.server", () => ({ criarToolBroker: (params: 
 mock.module("@/lib/nina/ai-gateway.server", () => ({ ninaAIGateway: async (req: any) => {
   ordem.push("modelo");
   requests.push(structuredClone(req));
+  if (cenario.startsWith("loop_alternativas")) return {
+    ok: true, modelo: "modelo-simulado", execucaoId: "execucao-direta", nivel: "low",
+    conteudo: !req.tools && cenario === "loop_alternativas" ? "Não há vaga no dia pedido. Como alternativa, temos 22/01 às 14:00. Essa data serve?" : "",
+    toolCalls: req.tools || cenario === "loop_alternativas_ignora" ? [{ id: `loop-${requests.length}`, type: "function", function: {
+      name: !req.tools ? "agendar" : "consultar_disponibilidade", arguments: '{"medico_id":"jorge","data":"2030-01-21"}',
+    } }] : [],
+  };
   if (procedimentoExecutante) return { ok: true, conteudo: requests.length === 1 ? "" : "Mariana Portugal realiza Bioimpedância.",
     modelo: "modelo-simulado", execucaoId: "execucao-direta", nivel: "low",
     toolCalls: requests.length === 1 ? [{ id: "executante", type: "function", function: { name: "buscar_medicos",

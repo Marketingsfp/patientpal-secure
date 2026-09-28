@@ -18,6 +18,24 @@ function simular(ambiente: string, cenario: string) {
 
 describe("geração real interrompe o turno após agenda sem vagas (serviços externos simulados)", () => {
   for (const ambiente of ["producao", "homologacao"]) {
+    test(`${ambiente}: encerra consultas repetidas com as alternativas confirmadas`, () => {
+      const r = simular(ambiente, "loop_alternativas");
+      expect(r.requests).toHaveLength(6);
+      expect(r.requests.at(-1).tools).toBeUndefined();
+      expect(r.requests.at(-1).raciocinio.temFerramentas).toBe(false);
+      expect(r.resposta).toContain("22/01 às 14:00");
+      expect(r.encaminhamentos).toHaveLength(0);
+      expect(r.ferramentas).not.toContain("agendar");
+      expect(r.rede).toBe(0);
+    });
+    for (const cenario of ["loop_alternativas_vazio", "loop_alternativas_ignora"]) {
+      test(`${ambiente}: mantém encaminhamento se síntese falhar (${cenario})`, () => {
+        const r = simular(ambiente, cenario);
+        expect(r.encaminhamentos).toHaveLength(1);
+        expect(r.encaminhamentos[0].motivo).toContain("LIMITE_RODADAS");
+        expect(r.ferramentas).not.toContain("agendar");
+      });
+    }
     test(`${ambiente}: encaminha uma vez, informa o motivo e não espera seis rodadas`, () => {
       const r = simular(ambiente, "sem_vagas");
       expect(r.requests).toHaveLength(1);
