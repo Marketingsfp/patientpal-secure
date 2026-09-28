@@ -39,12 +39,13 @@ import {
   type SessaoOperadora,
 } from "@/lib/caixa/resumo-operadoras";
 
-const FORMAS: Array<{ chave: keyof PorForma; rotulo: string }> = [
-  { chave: "dinheiro", rotulo: "Dinheiro" },
-  { chave: "pix", rotulo: "PIX" },
-  { chave: "credito", rotulo: "Cartão de crédito" },
-  { chave: "debito", rotulo: "Cartão de débito" },
-  { chave: "outros", rotulo: "Outros" },
+/** `curto` é o título da coluna na tabela dia a dia, para caber sem rolar de lado. */
+const FORMAS: Array<{ chave: keyof PorForma; rotulo: string; curto: string }> = [
+  { chave: "dinheiro", rotulo: "Dinheiro", curto: "Dinheiro" },
+  { chave: "pix", rotulo: "PIX", curto: "PIX" },
+  { chave: "credito", rotulo: "Cartão de crédito", curto: "Crédito" },
+  { chave: "debito", rotulo: "Cartão de débito", curto: "Débito" },
+  { chave: "outros", rotulo: "Outros", curto: "Outros" },
 ];
 
 /** Um dia a mais de cada lado: `aberto_em` é UTC e o dia certo sai de `dataClinicaDe`. */
@@ -114,7 +115,7 @@ function DetalheOperadora({
   const totalFormas = linha ? FORMAS.reduce((acc, f) => acc + linha.porForma[f.chave], 0) : 0;
   return (
     <Dialog open={!!linha} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="flex flex-col w-[calc(100vw-2rem)] max-w-400 h-[calc(100dvh-2rem)] max-h-[calc(100dvh-2rem)] overflow-y-auto">
         {linha && (
           <>
             <DialogHeader>
@@ -147,12 +148,14 @@ function DetalheOperadora({
                 <TableRow>
                   <TableHead>Dia</TableHead>
                   {FORMAS.map((f) => (
-                    <TableHead key={f.chave} className="text-right">
-                      {f.rotulo}
+                    <TableHead key={f.chave} className="text-right whitespace-nowrap">
+                      {f.curto}
                     </TableHead>
                   ))}
-                  <TableHead className="text-right">Sangrias entregues</TableHead>
-                  <TableHead className="text-right">Sobra entregue no fechamento</TableHead>
+                  <TableHead className="text-right whitespace-nowrap">Sangrias entregues</TableHead>
+                  <TableHead className="text-right whitespace-nowrap">
+                    Sobra no fechamento
+                  </TableHead>
                   <TableHead className="text-right">Calculado</TableHead>
                   <TableHead className="text-right">Diferença</TableHead>
                 </TableRow>
