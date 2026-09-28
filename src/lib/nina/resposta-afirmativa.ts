@@ -26,7 +26,9 @@ export function ehRespostaAfirmativaCurta(texto: string): boolean {
   if (!texto || texto.length > 160 || /[?¿]/.test(texto)) return false;
   const t = normalizarRespostaInformal(texto)
     .replace(/\s+(?:por favor|por gentileza|obrigad[oa])$/, "")
-    .replace(/^sim\s+(?=(?:e |esse|essa|este|esta|isso|ele|ela)\b)/, "");
+    // Reforços como "Isso, esse mesmo" concordam com a mesma opção.
+    // O restante continua precisando ser uma afirmação completa, sem ressalvas.
+    .replace(/^(?:sim|isso(?: mesmo)?)\s+(?=(?:e |esse|essa|este|esta|isso|ele|ela)\b)/, "");
   return /^(?:sim(?: sim| confirmo| pode ser)?|isso(?: mesmo| ai| ae)?|(?:e )?(?:esse|essa|este|esta|ele|ela)(?: mesmo| mesma| ai)?|e(?: isso(?: mesmo)?| sim)?|confirmo|correto|correta|certo|certinho|exatamente|positivo|aham|uhum|claro|com certeza|ok|okay|okey|beleza|blz|pode ser|pode sim|quero esse|quero essa|esse ai mesmo|essa ai mesma|fechado|fechou|ta bom|ta certo|ta certo sim|ta ok|combinado|demorou|formou|ja e|bora|bora sim)$/.test(
     t,
   );

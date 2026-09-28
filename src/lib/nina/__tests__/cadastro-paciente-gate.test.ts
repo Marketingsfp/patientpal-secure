@@ -195,7 +195,7 @@ describe("gate: escolher vaga → coletar dados → confirmar → agendar", () =
   });
   for (const frase of ["Sim, confirmo.", "Sim, confirmo todos esses dados para concluir o agendamento.",
     "isso mesmo, pode confirmar", "sim, tudo certo por aqui", "confirmo sim, obrigado!",
-    "tá tudo certo, pode confirmar",
+    "tá tudo certo, pode confirmar", "Isso, esse mesmo.",
     "já é", "formou", "demorou", "blz, pode confirmar", "ss, pode agendar pfv",
     "Confirmo a consulta de ortopedia com Jorge Ribeiro em 21/01/2030 às 14:00."]) {
     test(`confirmação natural não retorna à escolha: ${frase}`, async () => {

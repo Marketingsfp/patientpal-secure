@@ -21,6 +21,8 @@ describe("aceite natural vinculado ao resumo", () => {
     "já é, pode confirmar", "formou, pode agendar", "demorou, pode marcar",
     "blz, pode confirmar", "ss, pode agendar pfv", "fechou, confirmo às 08:30",
     "Sim, confirmo.",
+    "Isso, esse mesmo.", "Isso, é esse mesmo", "isso mesmo, essa mesma",
+    "Isso esse msm", "isso, ele mesmo", "isso, essa mesma, obrigada!",
     "isso mesmo, pode confirmar",
     "Esse mesmo, pode marcar.", "essa mesma, pode agendar", "esse, confirmo",
     "sim, tudo certo por aqui",
@@ -36,6 +38,9 @@ describe("aceite natural vinculado ao resumo", () => {
   ])("reconhece: %s", (texto) => expect(ehConfirmacaoDeAgendamento(texto, vaga)).toBe(true));
   test.each([
     "Sim, mas qual o valor?",
+    "Isso, esse mesmo, mas amanhã", "isso, esse mesmo não", "isso, esse mesmo?",
+    "isso, esse mesmo se tiver desconto", "isso, esse mesmo às 10:00",
+    "isso, esse mesmo, quero outro médico",
     "Esse mesmo, pode marcar às 10:00", "essa mesma, pode agendar se tiver desconto",
     "esse, confirmo com outro médico", "esse mesmo, pode marcar não",
     "já é, pode confirmar às 10:00", "formou, pode agendar com outro médico",
