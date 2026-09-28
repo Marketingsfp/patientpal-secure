@@ -264,6 +264,24 @@ async function resolverProcedimentoPadrao(
       .eq("clinica_id", clinicaId)
       .eq("procedimento.ativo", true)
       .eq("procedimento.clinica_id", clinicaId);
+    const { data: espRow } = await db
+      .from("especialidades")
+      .select("nome")
+      .eq("id", espAlvo)
+      .maybeSingle();
+    const norm = (s: string) =>
+      s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\s+/g, " ").trim().toUpperCase();
+    const nomeEsp = norm(((espRow as { nome: string | null } | null)?.nome) ?? "");
+    // Desempate entre consultas: "CONSULTA" exato > começa com "CONSULTA" >
+    // contém o nome da especialidade > alfabética. Exames não têm heurística.
+    const rankConsulta = (p: ProcedimentoResolvido) => {
+      if (p.tipo !== "consulta") return 9;
+      const n = norm(p.nome);
+      if (n === "CONSULTA") return 0;
+      if (n.startsWith("CONSULTA")) return 1;
+      if (nomeEsp && n.includes(nomeEsp)) return 2;
+      return 3;
+    };
     const lista = (
       (procs ?? []) as unknown as Array<{ procedimento: ProcedimentoResolvido | null }>
     )
@@ -272,6 +290,7 @@ async function resolverProcedimentoPadrao(
       .sort(
         (a, b) =>
           Number(b.tipo === "consulta") - Number(a.tipo === "consulta") ||
+          rankConsulta(a) - rankConsulta(b) ||
           a.nome.localeCompare(b.nome, "pt-BR"),
       );
     const p = lista[0];
