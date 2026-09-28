@@ -22,6 +22,7 @@ import {
   autenticarApiKey,
   concluirIdempotencia,
   consumirRateLimit,
+  consumirRateLimitCustom,
   erroResponse,
   exigirEscopo,
   iniciarIdempotencia,
@@ -308,6 +309,33 @@ async function buscarAgendamento(db: SupabaseClient<Database>, ctx: ApiKeyContex
     });
   }
   return r.data;
+}
+
+/** v1.4 — POST /patients/lookup. Ver seção 9.1 da documentação. */
+async function handleLookupPaciente(
+  db: SupabaseClient<Database>,
+  ctx: ApiKeyContexto,
+  bodyTexto: string,
+): Promise<{ status: number; body: unknown }> {
+  exigirEscopo(ctx, "patients:lookup");
+  // Torneira própria e apertada, separada das demais.
+  await consumirRateLimitCustom(db, ctx, "lookup", 10, 100, { limite: "lookup" });
+  let bruto: unknown;
+  try {
+    bruto = JSON.parse(bodyTexto || "{}");
+  } catch {
+    throw new ApiError({ status: 400, code: "invalid_json", message: "Corpo JSON inválido." });
+  }
+  const parsed = lookupSchema.safeParse(bruto);
+  if (!parsed.success) {
+    throw new ApiError({
+      status: 422,
+      code: "invalid_body",
+      message: "Corpo da requisição inválido.",
+      details: parsed.error.flatten().fieldErrors,
+    });
+  }
+  return ok(200, await consultarPaciente(db, ctx, parsed.data));
 }
 
 async function handleCriar(
