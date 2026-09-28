@@ -16324,6 +16324,14 @@ export type Database = {
         }
         Returns: Json
       }
+      integracao_lookup_paciente: {
+        Args: {
+          _clinica_id: string
+          _cpf_digits: string
+          _data_nascimento: string
+        }
+        Returns: Json
+      }
       integracao_rate_limit_consumir: {
         Args: {
           _api_key_id: string
@@ -16341,6 +16349,7 @@ export type Database = {
           _email?: string
           _nome: string
           _sexo?: string
+          _somente_existente?: boolean
           _telefone: string
         }
         Returns: Json
